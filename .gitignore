@@ -5,6 +5,7 @@
 .coverage
 .env
 .idea/
+.run/
 .mypy_cache/
 .pdm-build/
 .pdm-python

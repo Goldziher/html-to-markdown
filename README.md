@@ -1,75 +1,187 @@
-# html_to_markdown
+# html-to-markdown
 
-This library is a refactored and modernized fork of [markdownify](https://pypi.org/project/markdownify/), supporting
-Python 3.9 and above.
+A modern, fully typed Python library for converting HTML to Markdown. This library is a completely rewritten fork
+of [markdownify](https://pypi.org/project/markdownify/) with a modernized codebase, strict type safety and support for
+Python 3.9+.
 
-### Differences with the Markdownify
+## Features
 
-- The refactored codebase uses a strict functional approach - no classes are involved.
-- There is full typing with strict MyPy strict adherence and a py.typed file included.
-- The `convert_to_markdown` function allows passing a pre-configured instance of `BeautifulSoup` instead of html.
-- This library releases follows standard semver. Its version v1.0.0 was branched from markdownify's v0.13.1, at which
-  point versioning is no longer aligned.
+- Full type safety with strict MyPy adherence
+- Functional API design
+- Extensive test coverage
+- Configurable conversion options
+- CLI tool for easy conversions
+- Support for pre-configured BeautifulSoup instances
+- Strict semver versioning
 
 ## Installation
 
 ```shell
-pip install html_to_markdown
+pip install html-to-markdown
 ```
 
-## Usage
+## Quick Start
 
-Convert an string HTML to Markdown:
+Convert HTML to Markdown with a single function call:
 
 ```python
 from html_to_markdown import convert_to_markdown
 
-convert_to_markdown('<b>Yay</b> <a href="http://github.com">GitHub</a>')  # > '**Yay** [GitHub](http://github.com)'
+html = '''
+<article>
+    <h1>Welcome</h1>
+    <p>This is a <strong>sample</strong> with a <a href="https://example.com">link</a>.</p>
+    <ul>
+        <li>Item 1</li>
+        <li>Item 2</li>
+    </ul>
+</article>
+'''
+
+markdown = convert_to_markdown(html)
+print(markdown)
 ```
 
-Or pass a pre-configured instance of `BeautifulSoup`:
+Output:
+
+```markdown
+# Welcome
+
+This is a **sample** with a [link](https://example.com).
+
+* Item 1
+* Item 2
+```
+
+### Working with BeautifulSoup
+
+If you need more control over HTML parsing, you can pass a pre-configured BeautifulSoup instance:
 
 ```python
 from bs4 import BeautifulSoup
 from html_to_markdown import convert_to_markdown
 
-soup = BeautifulSoup('<b>Yay</b> <a href="http://github.com">GitHub</a>', 'lxml')  # lxml requires an extra dependency.
-
-convert_to_markdown(soup)  # > '**Yay** [GitHub](http://github.com)'
+# Configure BeautifulSoup with your preferred parser
+soup = BeautifulSoup(html, 'lxml')  # Note: lxml requires additional installation
+markdown = convert_to_markdown(soup)
 ```
 
-### Options
+## Advanced Usage
 
-The `convert_to_markdown` function accepts the following kwargs:
+### Customizing Conversion Options
 
-- autolinks (bool): Automatically convert valid URLs into Markdown links. Defaults to True.
-- bullets (str): A string of characters to use for bullet points in lists. Defaults to '\*+-'.
-- code_language (str): Default language identifier for fenced code blocks. Defaults to an empty string.
-- code_language_callback (Callable[[Any], str] | None): Function to dynamically determine the language for code blocks.
-- convert (Iterable[str] | None): A list of tag names to convert to Markdown. If None, all supported tags are converted.
-- default_title (bool): Use the default title when converting certain elements (e.g., links). Defaults to False.
-- escape_asterisks (bool): Escape asterisks (\*) to prevent unintended Markdown formatting. Defaults to True.
-- escape_misc (bool): Escape miscellaneous characters to prevent conflicts in Markdown. Defaults to True.
-- escape*underscores (bool): Escape underscores (*) to prevent unintended italic formatting. Defaults to True.
-- heading_style (Literal["underlined", "atx", "atx_closed"]): The style to use for Markdown headings. Defaults to "
-  underlined".
-- keep_inline_images_in (Iterable[str] | None): Tags in which inline images should be preserved. Defaults to None.
-- newline_style (Literal["spaces", "backslash"]): Style for handling newlines in text content. Defaults to "spaces".
-- strip (Iterable[str] | None): Tags to strip from the output. Defaults to None.
-- strong*em_symbol (Literal["\*", "*"]): Symbol to use for strong/emphasized text. Defaults to "\*".
-- sub_symbol (str): Custom symbol for subscript text. Defaults to an empty string.
-- sup_symbol (str): Custom symbol for superscript text. Defaults to an empty string.
-- wrap (bool): Wrap text to the specified width. Defaults to False.
-- wrap_width (int): The number of characters at which to wrap text. Defaults to 80.
-- convert_as_inline (bool): Treat the content as inline elements (no block elements like paragraphs). Defaults to False.
+The library offers extensive customization through various options:
 
-## CLI
+```python
+from html_to_markdown import convert_to_markdown
 
-For compatibility with the original markdownify, a CLI is provided. Use `html_to_markdown example.html > example.md` or
-pipe input from stdin:
+html = '<div>Your content here...</div>'
+markdown = convert_to_markdown(
+    html,
+    heading_style="atx",  # Use # style headers
+    strong_em_symbol="*",  # Use * for bold/italic
+    bullets="*+-",  # Define bullet point characters
+    wrap=True,  # Enable text wrapping
+    wrap_width=100,  # Set wrap width
+    escape_asterisks=True,  # Escape * characters
+    code_language="python"  # Default code block language
+)
+```
+
+### Configuration Options
+
+| Option               | Type | Default        | Description                                            |
+|----------------------|------|----------------|--------------------------------------------------------|
+| `autolinks`          | bool | `True`         | Auto-convert URLs to Markdown links                    |
+| `bullets`            | str  | `'*+-'`        | Characters to use for bullet points                    |
+| `code_language`      | str  | `''`           | Default language for code blocks                       |
+| `heading_style`      | str  | `'underlined'` | Header style (`'underlined'`, `'atx'`, `'atx_closed'`) |
+| `escape_asterisks`   | bool | `True`         | Escape * characters                                    |
+| `escape_underscores` | bool | `True`         | Escape _ characters                                    |
+| `wrap`               | bool | `False`        | Enable text wrapping                                   |
+| `wrap_width`         | int  | `80`           | Text wrap width                                        |
+
+For a complete list of options, see the [Configuration](#configuration) section below.
+
+## CLI Usage
+
+Convert HTML files directly from the command line:
 
 ```shell
-cat example.html | html_to_markdown > example.md
+# Convert a file
+html_to_markdown input.html > output.md
+
+# Process stdin
+cat input.html | html_to_markdown > output.md
+
+# Use custom options
+html_to_markdown --heading-style atx --wrap --wrap-width 100 input.html > output.md
 ```
 
-Use `html_to_markdown -h` to see all available options. They are the same as listed above and take the same arguments.
+View all available options:
+
+```shell
+html_to_markdown --help
+```
+
+## Migration from Markdownify
+
+For existing projects using Markdownify, a compatibility layer is provided:
+
+```python
+# Old code
+from markdownify import markdownify as md
+
+# New code - works the same way
+from html_to_markdown import markdownify as md
+```
+
+The `markdownify` function is an alias for `convert_to_markdown` and provides identical functionality.
+
+## Configuration
+
+Full list of configuration options:
+
+- `autolinks`: Convert valid URLs to Markdown links automatically
+- `bullets`: Characters to use for bullet points in lists
+- `code_language`: Default language for fenced code blocks
+- `code_language_callback`: Function to determine code block language
+- `convert`: List of HTML tags to convert (None = all supported tags)
+- `default_title`: Use default titles for elements like links
+- `escape_asterisks`: Escape * characters
+- `escape_misc`: Escape miscellaneous Markdown characters
+- `escape_underscores`: Escape _ characters
+- `heading_style`: Header style (underlined/atx/atx_closed)
+- `keep_inline_images_in`: Tags where inline images should be kept
+- `newline_style`: Style for handling newlines (spaces/backslash)
+- `strip`: Tags to remove from output
+- `strong_em_symbol`: Symbol for strong/emphasized text (* or _)
+- `sub_symbol`: Symbol for subscript text
+- `sup_symbol`: Symbol for superscript text
+- `wrap`: Enable text wrapping
+- `wrap_width`: Width for text wrapping
+- `convert_as_inline`: Treat content as inline elements
+
+## Contribution
+
+This library is open to contribution. Feel free to open issues or submit PRs. Its better to discuss issues before
+submitting PRs to avoid disappointment.
+
+### Local Development
+
+1. Clone the repo
+2. Install the system dependencies
+3. Install the full dependencies with `uv sync`
+4. Install the pre-commit hooks with:
+   ```shell
+   pre-commit install && pre-commit install --hook-type commit-msg
+   ```
+5. Make your changes and submit a PR
+
+## License
+
+This library uses the MIT license.
+
+## Acknowledgments
+
+Special thanks to the original [markdownify](https://pypi.org/project/markdownify/) project creators and contributors.
