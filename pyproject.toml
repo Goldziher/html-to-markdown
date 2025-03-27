@@ -5,11 +5,10 @@ requires = [ "hatchling" ]
 
 [project]
 name = "html-to-markdown"
-version = "1.2.0"
+version = "1.2.1"
 description = "Convert HTML to markdown"
 readme = "README.md"
 keywords = [ "converter", "html", "markdown", "text-extraction", "text-processing" ]
-
 license = { text = "MIT" }
 authors = [ { name = "Na'aman Hirschfeld", email = "nhirschfeld@gmail.com" } ]
 requires-python = ">=3.9"
@@ -30,9 +29,12 @@ classifiers = [
   "Topic :: Utilities",
   "Typing :: Typed",
 ]
+
 dependencies = [
   "beautifulsoup4>=4.12.3",
 ]
+
+urls.homepage = "https://github.com/Goldziher/html-to-markdown"
 
 [dependency-groups]
 dev = [

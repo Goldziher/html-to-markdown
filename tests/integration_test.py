@@ -40,7 +40,6 @@ def test_named_entities() -> None:
 
 
 def test_hexadecimal_entities() -> None:
-    # This looks to be a bug in BeautifulSoup (fixed in bs4) that we have to work around.
     assert convert_to_markdown("&#x27;") == "\x27"
 
 
@@ -263,7 +262,7 @@ def inline_tests(tag: str, markup: str) -> None:
     assert convert_to_markdown(f"foo <{tag}></{tag}> bar") in [
         "foo  bar",
         "foo bar",
-    ]  # Either is OK
+    ]
 
 
 def test_a() -> None:

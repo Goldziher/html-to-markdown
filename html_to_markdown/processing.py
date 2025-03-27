@@ -87,7 +87,9 @@ def _process_tag(
     strip: set[str] | None,
 ) -> str:
     should_convert_tag = _should_convert_tag(tag_name=tag.name, strip=strip, convert=convert)
-    tag_name: SupportedTag | None = cast(SupportedTag, tag.name.lower()) if tag.name.lower() in converters_map else None
+    tag_name: SupportedTag | None = (
+        cast("SupportedTag", tag.name.lower()) if tag.name.lower() in converters_map else None
+    )
     text = ""
 
     is_heading = html_heading_re.match(tag.name) is not None
@@ -142,11 +144,9 @@ def _process_text(
 ) -> str:
     text = str(el) or ""
 
-    # normalize whitespace if we're not inside a preformatted element
     if not el.find_parent("pre"):
         text = whitespace_re.sub(" ", text)
 
-    # escape special characters if we're not inside a preformatted or code element
     if not el.find_parent(["pre", "code", "kbd", "samp"]):
         text = escape(
             text=text,
@@ -155,9 +155,6 @@ def _process_text(
             escape_underscores=escape_underscores,
         )
 
-    # remove trailing whitespaces if any of the following condition is true:
-    # - current text node is the last node in li
-    # - current text node is followed by an embedded list
     if (
         el.parent
         and el.parent.name == "li"

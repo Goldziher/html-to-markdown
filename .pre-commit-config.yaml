@@ -1,6 +1,6 @@
 repos:
   - repo: https://github.com/alessandrojcm/commitlint-pre-commit-hook
-    rev: "v9.20.0"
+    rev: "v9.22.0"
     hooks:
       - id: commitlint
         stages: [commit-msg]
@@ -14,21 +14,46 @@ repos:
         exclude: factories|test_utils|completion.py|test_data
       - id: trailing-whitespace
       - id: end-of-file-fixer
-      - id: check-yaml
       - id: check-toml
       - id: check-case-conflict
       - id: detect-private-key
+  - repo: https://github.com/abravalheri/validate-pyproject
+    rev: v0.24.1
+    hooks:
+      - id: validate-pyproject
+  - repo: https://github.com/Goldziher/uncomment
+    rev: v1.0.4
+    hooks:
+      - id: uncomment
+        args: ["-i", "# codespell:ignore"]
+  - repo: https://github.com/executablebooks/mdformat
+    rev: 0.7.22
+    hooks:
+      - id: mdformat
+        additional_dependencies:
+          - mdformat-mkdocs==4.0.0
+  - repo: https://github.com/igorshubovych/markdownlint-cli
+    rev: v0.44.0
+    hooks:
+      - id: markdownlint-fix
+  - repo: https://github.com/adamchainz/blacken-docs
+    rev: 1.19.1
+    hooks:
+      - id: blacken-docs
+        args: ["--pyi", "--line-length", "130"]
+        additional_dependencies:
+          - black==25.1.0
   - repo: https://github.com/rbubley/mirrors-prettier
-    rev: "v3.4.2"
+    rev: "v3.5.3"
     hooks:
       - id: prettier
-        exclude: ^tests|^.idea|^migrations|^.git
+        exclude: ^tests|^.idea|^migrations|^.git|README.md|^docs
   - repo: https://github.com/tox-dev/pyproject-fmt
-    rev: "v2.5.0"
+    rev: "v2.5.1"
     hooks:
       - id: pyproject-fmt
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.9.4
+    rev: v0.11.2
     hooks:
       - id: ruff
         args: [--fix]
@@ -37,11 +62,11 @@ repos:
     rev: v2.4.1
     hooks:
       - id: codespell
-        exclude: ^tests|^scripts
+        exclude: ^tests|^scripts|^kreuzberg/_tesseract|^kreuzberg/_mime_types
         additional_dependencies:
           - tomli
   - repo: https://github.com/jsh9/pydoclint
-    rev: 0.6.0
+    rev: 0.6.2
     hooks:
       - id: pydoclint
         args:
