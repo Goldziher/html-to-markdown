@@ -27,7 +27,7 @@ Convert HTML to Markdown with a single function call:
 ```python
 from html_to_markdown import convert_to_markdown
 
-html = '''
+html = """
 <article>
     <h1>Welcome</h1>
     <p>This is a <strong>sample</strong> with a <a href="https://example.com">link</a>.</p>
@@ -36,7 +36,7 @@ html = '''
         <li>Item 2</li>
     </ul>
 </article>
-'''
+"""
 
 markdown = convert_to_markdown(html)
 print(markdown)
@@ -62,7 +62,7 @@ from bs4 import BeautifulSoup
 from html_to_markdown import convert_to_markdown
 
 # Configure BeautifulSoup with your preferred parser
-soup = BeautifulSoup(html, 'lxml')  # Note: lxml requires additional installation
+soup = BeautifulSoup(html, "lxml")  # Note: lxml requires additional installation
 markdown = convert_to_markdown(soup)
 ```
 
@@ -75,7 +75,7 @@ The library offers extensive customization through various options:
 ```python
 from html_to_markdown import convert_to_markdown
 
-html = '<div>Your content here...</div>'
+html = "<div>Your content here...</div>"
 markdown = convert_to_markdown(
     html,
     heading_style="atx",  # Use # style headers
@@ -84,14 +84,14 @@ markdown = convert_to_markdown(
     wrap=True,  # Enable text wrapping
     wrap_width=100,  # Set wrap width
     escape_asterisks=True,  # Escape * characters
-    code_language="python"  # Default code block language
+    code_language="python",  # Default code block language
 )
 ```
 
 ### Configuration Options
 
 | Option               | Type | Default        | Description                                            |
-|----------------------|------|----------------|--------------------------------------------------------|
+| -------------------- | ---- | -------------- | ------------------------------------------------------ |
 | `autolinks`          | bool | `True`         | Auto-convert URLs to Markdown links                    |
 | `bullets`            | str  | `'*+-'`        | Characters to use for bullet points                    |
 | `code_language`      | str  | `''`           | Default language for code blocks                       |
@@ -155,7 +155,7 @@ Full list of configuration options:
 - `keep_inline_images_in`: Tags where inline images should be kept
 - `newline_style`: Style for handling newlines (spaces/backslash)
 - `strip`: Tags to remove from output
-- `strong_em_symbol`: Symbol for strong/emphasized text (* or _)
+- `strong_em_symbol`: Symbol for strong/emphasized text (\* or \_)
 - `sub_symbol`: Symbol for subscript text
 - `sup_symbol`: Symbol for superscript text
 - `wrap`: Enable text wrapping
@@ -170,13 +170,18 @@ submitting PRs to avoid disappointment.
 ### Local Development
 
 1. Clone the repo
-2. Install the system dependencies
-3. Install the full dependencies with `uv sync`
-4. Install the pre-commit hooks with:
-   ```shell
-   pre-commit install && pre-commit install --hook-type commit-msg
-   ```
-5. Make your changes and submit a PR
+
+1. Install the system dependencies
+
+1. Install the full dependencies with `uv sync`
+
+1. Install the pre-commit hooks with:
+
+    ```shell
+    pre-commit install && pre-commit install --hook-type commit-msg
+    ```
+
+1. Make your changes and submit a PR
 
 ## License
 

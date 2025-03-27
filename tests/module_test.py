@@ -109,22 +109,19 @@ def test_complex_file_conversion(complex_html_file: Path) -> None:
 
 def test_error_handling() -> None:
     """Test various error conditions."""
-    # Test nonexistent file
+
     stdout, stderr, returncode = run_cli_command(["nonexistent.html"])
     assert returncode != 0
     assert "No such file" in stderr
 
-    # Test invalid option
     stdout, stderr, returncode = run_cli_command(["--invalid-option"])
     assert returncode != 0
     assert "unrecognized arguments" in stderr
 
-    # Test incompatible options
     stdout, stderr, returncode = run_cli_command(["--strip", "p", "--convert", "p"], input_text="<p>Test</p>")
     assert returncode != 0
     assert "Only one of 'strip' and 'convert' can be specified" in stderr
 
-    # Test invalid HTML
     stdout, stderr, returncode = run_cli_command(["--strip", "p"], input_text="")
     assert returncode != 0
     assert "The input HTML is empty" in stderr
@@ -143,11 +140,10 @@ def test_stdin_input() -> None:
 
 def test_heading_styles(sample_html_file: Path) -> None:
     """Test different heading style options."""
-    # Test ATX style
+
     stdout, _, _ = run_cli_command([str(sample_html_file), "--heading-style", "atx"])
     assert "# Sample Document" in stdout
 
-    # Test ATX closed style
     stdout, _, _ = run_cli_command([str(sample_html_file), "--heading-style", "atx_closed"])
     assert "# Sample Document #" in stdout
 
@@ -156,8 +152,8 @@ def test_formatting_options(sample_html_file: Path) -> None:
     """Test various formatting options."""
     stdout, _, _ = run_cli_command([str(sample_html_file), "--strong-em-symbol", "_", "--wrap", "--wrap-width", "40"])
 
-    assert "__test__" in stdout  # Using underscore
-    # Check that lines are wrapped
+    assert "__test__" in stdout
+
     assert all(len(line) <= 40 for line in stdout.split("\n"))
 
 
@@ -172,12 +168,10 @@ def test_special_characters() -> None:
     """Test handling of special characters and escaping."""
     input_html = "<p>Text with * and _ and ** symbols</p>"
 
-    # Test with escaping
     stdout, _, _ = run_cli_command([], input_text=input_html)
     assert "\\*" in stdout
     assert "\\_" in stdout
 
-    # Test without escaping
     stdout, _, _ = run_cli_command(["--no-escape-asterisks", "--no-escape-underscores"], input_text=input_html)
     assert "\\*" not in stdout
     assert "\\_" not in stdout
@@ -186,7 +180,7 @@ def test_special_characters() -> None:
 def test_large_file_handling(tmp_path: Path) -> None:
     """Test handling of large files."""
     large_file = tmp_path / "large.html"
-    # Create a large HTML file (>1MB)
+
     with large_file.open("w") as f:
         f.write("<p>")
         for i in range(50000):
@@ -195,7 +189,7 @@ def test_large_file_handling(tmp_path: Path) -> None:
 
     stdout, stderr, returncode = run_cli_command(
         [str(large_file)],
-        timeout=30,  # Increased timeout for large file
+        timeout=30,
     )
 
     assert returncode == 0
@@ -221,18 +215,16 @@ def test_multiple_files(sample_html_file: Path, complex_html_file: Path, tmp_pat
         assert returncode == 0
         assert stderr == ""
 
-        # Save output to markdown file
         output_file = tmp_path / f"{file.stem}.md"
         output_file.write_text(stdout)
 
-        # Verify file was created and has content
         assert output_file.exists()
         assert output_file.stat().st_size > 0
 
 
 def test_pipe_chain() -> None:
     """Test the CLI in a pipe chain."""
-    # Create a pipeline: echo "<h1>Test</h1>" | html_to_markdown | grep "Test"
+
     echo_process = subprocess.Popen(["echo", "<h1>Test</h1>"], stdout=subprocess.PIPE, text=True)
 
     html_to_md_process = subprocess.Popen(

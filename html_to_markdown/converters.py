@@ -85,7 +85,7 @@ def _create_inline_converter(markup_prefix: str) -> Callable[[Tag, str], str]:
 
         return f"{prefix}{markup_prefix}{text}{markup_suffix}{suffix}"
 
-    return cast(Callable[[Tag, str], str], implementation)
+    return cast("Callable[[Tag, str], str]", implementation)
 
 
 def _get_colspan(tag: Tag) -> int:
@@ -187,7 +187,7 @@ def _convert_li(*, tag: Tag, text: str, bullets: str) -> str:
     parent = tag.parent
     if parent is not None and parent.name == "ol":
         start = (
-            int(cast(str, parent["start"]))
+            int(cast("str", parent["start"]))
             if isinstance(parent.get("start"), str) and str(parent.get("start")).isnumeric()
             else 1
         )
@@ -263,7 +263,6 @@ def _convert_tr(*, tag: Tag, text: str) -> str:
     overline = ""
     underline = ""
     if is_headrow and not tag.previous_sibling:
-        # first row and is headline: print headline underline
         full_colspan = 0
         for cell in cells:
             if "colspan" in cell.attrs and cell["colspan"].isdigit():
@@ -272,12 +271,8 @@ def _convert_tr(*, tag: Tag, text: str) -> str:
                 full_colspan += 1
         underline += "| " + " | ".join(["---"] * full_colspan) + " |" + "\n"
     elif not tag.previous_sibling and (
-        parent_name == "table" or (parent_name == "tbody" and not cast(Tag, tag.parent).previous_sibling)
+        parent_name == "table" or (parent_name == "tbody" and not cast("Tag", tag.parent).previous_sibling)
     ):
-        # first row, not headline, and:
-        # - the parent is table or
-        # - the parent is tbody at the beginning of a table.
-        # print empty headline above this row
         overline += "| " + " | ".join([""] * len(cells)) + " |" + "\n"
         overline += "| " + " | ".join(["---"] * len(cells)) + " |" + "\n"
     return overline + "|" + text + "\n" + underline
@@ -334,7 +329,7 @@ def create_converters_map(
                 return func(**kwargs)
             return func(text)
 
-        return cast(Callable[[str, Tag], T], _inner)
+        return cast("Callable[[str, Tag], T]", _inner)
 
     return {
         "a": _wrapper(partial(_convert_a, autolinks=autolinks, default_title=default_title)),
