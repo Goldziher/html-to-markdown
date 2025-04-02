@@ -1,5 +1,9 @@
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from collections.abc import Mapping
 from itertools import chain
 from typing import TYPE_CHECKING, Any, Callable, Literal, cast
 
@@ -12,7 +16,7 @@ from html_to_markdown.constants import (
     html_heading_re,
     whitespace_re,
 )
-from html_to_markdown.converters import ConvertersMap, create_converters_map
+from html_to_markdown.converters import Converter, ConvertersMap, SupportedElements, create_converters_map
 from html_to_markdown.utils import escape
 
 if TYPE_CHECKING:
@@ -189,6 +193,8 @@ def convert_to_markdown(
     code_language: str = "",
     code_language_callback: Callable[[Any], str] | None = None,
     convert: str | Iterable[str] | None = None,
+    convert_as_inline: bool = False,
+    custom_converters: Mapping[SupportedElements, Converter] | None = None,
     default_title: bool = False,
     escape_asterisks: bool = True,
     escape_misc: bool = True,
@@ -202,7 +208,6 @@ def convert_to_markdown(
     sup_symbol: str = "",
     wrap: bool = False,
     wrap_width: int = 80,
-    convert_as_inline: bool = False,
 ) -> str:
     """Convert HTML to Markdown.
 
@@ -213,6 +218,8 @@ def convert_to_markdown(
         code_language: Default language identifier for fenced code blocks. Defaults to an empty string.
         code_language_callback: Function to dynamically determine the language for code blocks.
         convert: A list of tag names to convert to Markdown. If None, all supported tags are converted.
+        convert_as_inline: Treat the content as inline elements (no block elements like paragraphs). Defaults to False.
+        custom_converters: A mapping of custom converters for specific HTML tags. Defaults to None.
         default_title: Use the default title when converting certain elements (e.g., links). Defaults to False.
         escape_asterisks: Escape asterisks (*) to prevent unintended Markdown formatting. Defaults to True.
         escape_misc: Escape miscellaneous characters to prevent conflicts in Markdown. Defaults to True.
@@ -226,7 +233,6 @@ def convert_to_markdown(
         sup_symbol: Custom symbol for superscript text. Defaults to an empty string.
         wrap: Wrap text to the specified width. Defaults to False.
         wrap_width: The number of characters at which to wrap text. Defaults to 80.
-        convert_as_inline: Treat the content as inline elements (no block elements like paragraphs). Defaults to False.
 
     Raises:
         ValueError: If both 'strip' and 'convert' are specified, or when the input HTML is empty.
@@ -260,6 +266,8 @@ def convert_to_markdown(
         wrap=wrap,
         wrap_width=wrap_width,
     )
+    if custom_converters:
+        converters_map.update(cast("ConvertersMap", custom_converters))
 
     return _process_tag(
         source,
