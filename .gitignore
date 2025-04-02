@@ -1,11 +1,11 @@
 *$py.class
+*.egg-info/
 *.iml
 *.log
 *.py[cod]
 .coverage
 .env
 .idea/
-.run/
 .mypy_cache/
 .pdm-build/
 .pdm-python
@@ -13,6 +13,7 @@
 .pytest_cache/
 .python-version
 .ruff_cache/
+.run/
 .tox/
 .venv/
 .vscode/

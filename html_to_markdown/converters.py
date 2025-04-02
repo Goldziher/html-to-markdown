@@ -1,6 +1,9 @@
 from __future__ import annotations
 
-from collections.abc import Iterable, Mapping
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from collections.abc import Iterable
 from functools import partial
 from inspect import getfullargspec
 from textwrap import fill
@@ -55,7 +58,8 @@ SupportedElements = Literal[
     "kbd",
 ]
 
-ConvertersMap = Mapping[SupportedElements, Callable[[str, Tag], str]]
+Converter = Callable[[str, Tag], str]
+ConvertersMap = dict[SupportedElements, Converter]
 
 T = TypeVar("T")
 
