@@ -1,7 +1,7 @@
 [build-system]
-build-backend = "hatchling.build"
+build-backend = "setuptools.build_meta"
 
-requires = [ "hatchling" ]
+requires = [ "setuptools>=78.1" ]
 
 [project]
 name = "html-to-markdown"
@@ -42,20 +42,23 @@ dev = [
   "mypy>=1.14.1",
   "pre-commit>=4.1",
   "pytest>=8.3.4",
-  "pytest-cov>=6",
+  "pytest-cov>=6.1",
   "pytest-mock>=3.14",
   "ruff>=0.9.3",
   "types-beautifulsoup4>=4.12.0.20241020",
+  "uv-bump",
 ]
+
+[tool.setuptools.packages.find]
+include = [ "html_to_markdown" ]
+
+[tool.setuptools.package-data]
+html_to_markdown = [ "py.typed" ]
 
 [tool.hatch.build]
 skip-excluded-dirs = true
 
-[tool.hatch.build.targets.sdist]
-only-include = [ "html_to_markdown" ]
-
-[tool.hatch.build.targets.wheel]
-only-include = [ "html_to_markdown" ]
+scripts.html_to_markdown = "html_to_markdown.__main__:cli"
 
 [tool.ruff]
 target-version = "py39"
@@ -113,3 +116,6 @@ disallow_untyped_decorators = false
 
 [tool.uv]
 default-groups = [ "dev" ]
+
+[tool.uv.sources]
+uv-bump = { git = "https://github.com/Goldziher/uv-bump" }

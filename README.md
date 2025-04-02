@@ -88,6 +88,26 @@ markdown = convert_to_markdown(
 )
 ```
 
+### Custom Converters
+
+You can provide your own conversion functions for specific HTML tags:
+
+```python
+from bs4.element import Tag
+from html_to_markdown import convert_to_markdown
+
+# Define a custom converter for the <b> tag
+def custom_bold_converter(*, tag: Tag, text: str, **kwargs) -> str:
+    return f"IMPORTANT: {text}"
+
+html = "<p>This is a <b>bold statement</b>.</p>"
+markdown = convert_to_markdown(html, custom_converters={"b": custom_bold_converter})
+print(markdown)
+# Output: This is a IMPORTANT: bold statement.
+```
+
+Custom converters take precedence over the built-in converters and can be used alongside other configuration options.
+
 ### Configuration Options
 
 | Option               | Type | Default        | Description                                            |
@@ -161,6 +181,7 @@ Full list of configuration options:
 - `wrap`: Enable text wrapping
 - `wrap_width`: Width for text wrapping
 - `convert_as_inline`: Treat content as inline elements
+- `custom_converters`: A mapping of HTML tag names to custom converter functions
 
 ## Contribution
 
