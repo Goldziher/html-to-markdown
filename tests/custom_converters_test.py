@@ -22,8 +22,8 @@ def test_custom_converters() -> None:
     markdown = convert_to_markdown(
         html,
         custom_converters={
-            "b": lambda text, tag: custom_b_converter(tag=tag, text=text),
-            "em": lambda text, tag: custom_em_converter(tag=tag, text=text),
+            "b": lambda tag, text, **kwargs: custom_b_converter(tag=tag, text=text),
+            "em": lambda tag, text, **kwargs: custom_em_converter(tag=tag, text=text),
         },
     )
 
@@ -44,7 +44,7 @@ def test_custom_converters_precedence() -> None:
     markdown = convert_to_markdown(
         html,
         custom_converters={
-            "h1": lambda text, tag: custom_h1_converter(tag=tag, text=text),
+            "h1": lambda tag, text, **kwargs: custom_h1_converter(tag=tag, text=text),
         },
     )
 
@@ -63,7 +63,7 @@ def test_custom_converters_with_other_options() -> None:
     markdown = convert_to_markdown(
         html,
         custom_converters={
-            "code": lambda text, tag: custom_code_converter(tag=tag, text=text),
+            "code": lambda tag, text, **kwargs: custom_code_converter(tag=tag, text=text),
         },
         strong_em_symbol="_",
         wrap=True,
