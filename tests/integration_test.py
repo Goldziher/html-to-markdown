@@ -641,3 +641,9 @@ def test_lang_callback() -> None:
         )
         == "\n```javascript\ntest\n    foo\nbar\n```\n"
     )
+
+
+def test_idempotence() -> None:
+    html_text = "<h2>Header&nbsp;</h2><p>Next paragraph.</p>"
+    converted = convert_to_markdown(html_text)
+    assert converted == convert_to_markdown(converted)
