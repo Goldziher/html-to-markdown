@@ -647,3 +647,12 @@ def test_idempotence() -> None:
     html_text = "<h2>Header&nbsp;</h2><p>Next paragraph.</p>"
     converted = convert_to_markdown(html_text)
     assert converted == convert_to_markdown(converted)
+
+
+def test_character_encoding() -> None:
+    html_with_encoding_issue = (
+        "<cite>api_key=”your-api-key”</cite> or by defining <cite>GOOGLE_API_KEY=”your-api-key”</cite> as an"
+    )
+
+    result = convert_to_markdown(html_with_encoding_issue)
+    assert result == "api\\_key\\=”your\\-api\\-key” or by defining GOOGLE\\_API\\_KEY\\=”your\\-api\\-key” as an"
