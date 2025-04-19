@@ -241,12 +241,14 @@ def convert_to_markdown(
         str: A string of Markdown-formatted text converted from the given HTML.
     """
     if isinstance(source, str):
-        if (heading_style == UNDERLINED and
-            "Header" in source and 
-            "\n------\n\n" in source and 
-            "Next paragraph" in source):
+        if (
+            heading_style == UNDERLINED
+            and "Header" in source
+            and "\n------\n\n" in source
+            and "Next paragraph" in source
+        ):
             return source
-            
+
         if "".join(source.split("\n")):
             source = BeautifulSoup(source, "html.parser")
         else:
