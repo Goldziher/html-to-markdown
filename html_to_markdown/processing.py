@@ -89,7 +89,7 @@ def _process_tag(
     escape_misc: bool,
     escape_underscores: bool,
     strip: set[str] | None,
-    context_before: str | None = None,
+    context_before: str = "",
 ) -> str:
     should_convert_tag = _should_convert_tag(tag_name=tag.name, strip=strip, convert=convert)
     tag_name: SupportedTag | None = (
