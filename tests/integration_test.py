@@ -435,6 +435,9 @@ def test_hn_nested_tag_heading_style() -> None:
 
 def test_hn_eol() -> None:
     assert convert_to_markdown("<p>xxx</p><h3>Hello</h3>", heading_style=ATX) == "xxx\n\n### Hello\n\n"
+    assert convert_to_markdown("\n<h3>Hello</h3>", heading_style=ATX) == "\n### Hello\n\n"
+    assert convert_to_markdown("\nx<h3>Hello</h3>", heading_style=ATX) == "\nx\n\n### Hello\n\n"
+    assert convert_to_markdown("\n<span>x<h3>Hello</h3></span>", heading_style=ATX) == "\nx\n\n### Hello\n\n"
     assert convert_to_markdown("xxx<h3>Hello</h3>", heading_style=ATX) == "xxx\n\n### Hello\n\n"
 
 def test_hn_nested_simple_tag() -> None:
