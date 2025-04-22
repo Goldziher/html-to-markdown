@@ -130,7 +130,7 @@ def _process_tag(
                 escape_misc=escape_misc,
                 escape_underscores=escape_underscores,
                 strip=strip,
-                context_before=text[-2:],
+                context_before=(context_before + text)[-2:],
             )
 
     if tag_name and should_convert_tag:
@@ -138,15 +138,12 @@ def _process_tag(
             tag=tag, text=text, convert_as_inline=convert_as_inline
         )
         # For headings, ensure two newlines before if not already present
-        if is_heading:
-            prefix = ""
-            if context_before != "":
-                if not context_before.endswith("\n\n"):
-                    if context_before.endswith("\n"):
-                        prefix = "\n"
-                    else:
-                        prefix = "\n\n"
-            return f"{prefix}{rendered}"
+        # Edge case where the document starts with a \n and then a heading
+        if is_heading and context_before != "" and context_before != "\n":
+            n_eol_to_add = 2 - (len(context_before) - len(context_before.rstrip("\n")))
+            if n_eol_to_add > 0 :
+                prefix = "\n" * n_eol_to_add
+                return f"{prefix}{rendered}"
         return rendered
 
     return text
@@ -288,17 +285,17 @@ def convert_to_markdown(
     if custom_converters:
         converters_map.update(cast("ConvertersMap", custom_converters))
 
-    result = ""
+    text = ""
     for el in filter(lambda value: not isinstance(value, (Comment, Doctype)), source.children):
         if isinstance(el, NavigableString):
-            result += _process_text(
+            text += _process_text(
                 el=el,
                 escape_misc=escape_misc,
                 escape_asterisks=escape_asterisks,
                 escape_underscores=escape_underscores,
             )
         elif isinstance(el, Tag):
-            result += _process_tag(
+            text += _process_tag(
                 el,
                 converters_map,
                 convert_as_inline=convert_as_inline,
@@ -307,6 +304,6 @@ def convert_to_markdown(
                 escape_misc=escape_misc,
                 escape_underscores=escape_underscores,
                 strip=_as_optional_set(strip),
-                context_before=result[-2:],
+                context_before=text[-2:],
             )
-    return result
+    return text
