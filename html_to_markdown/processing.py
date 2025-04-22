@@ -89,7 +89,7 @@ def _process_tag(
     escape_misc: bool,
     escape_underscores: bool,
     strip: set[str] | None,
-    context_before: str = None
+    context_before: str | None = None,
 ) -> str:
     should_convert_tag = _should_convert_tag(tag_name=tag.name, strip=strip, convert=convert)
     tag_name: SupportedTag | None = (
@@ -139,9 +139,9 @@ def _process_tag(
         )
         # For headings, ensure two newlines before if not already present
         # Edge case where the document starts with a \n and then a heading
-        if is_heading and context_before != "" and context_before != "\n":
+        if is_heading and context_before not in {"", "\n"}:
             n_eol_to_add = 2 - (len(context_before) - len(context_before.rstrip("\n")))
-            if n_eol_to_add > 0 :
+            if n_eol_to_add > 0:
                 prefix = "\n" * n_eol_to_add
                 return f"{prefix}{rendered}"
         return rendered
