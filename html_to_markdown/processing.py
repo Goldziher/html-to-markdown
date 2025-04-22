@@ -89,6 +89,7 @@ def _process_tag(
     escape_misc: bool,
     escape_underscores: bool,
     strip: set[str] | None,
+    context_before: str = None
 ) -> str:
     should_convert_tag = _should_convert_tag(tag_name=tag.name, strip=strip, convert=convert)
     tag_name: SupportedTag | None = (
@@ -129,12 +130,24 @@ def _process_tag(
                 escape_misc=escape_misc,
                 escape_underscores=escape_underscores,
                 strip=strip,
+                context_before=text[-2:],
             )
 
     if tag_name and should_convert_tag:
-        return converters_map[tag_name](  # type: ignore[call-arg]
+        rendered = converters_map[tag_name](  # type: ignore[call-arg]
             tag=tag, text=text, convert_as_inline=convert_as_inline
         )
+        # For headings, ensure two newlines before if not already present
+        if is_heading:
+            prefix = ""
+            if context_before != "":
+                if not context_before.endswith("\n\n"):
+                    if context_before.endswith("\n"):
+                        prefix = "\n"
+                    else:
+                        prefix = "\n\n"
+            return f"{prefix}{rendered}"
+        return rendered
 
     return text
 
@@ -275,13 +288,25 @@ def convert_to_markdown(
     if custom_converters:
         converters_map.update(cast("ConvertersMap", custom_converters))
 
-    return _process_tag(
-        source,
-        converters_map,
-        convert=_as_optional_set(convert),
-        convert_as_inline=convert_as_inline,
-        escape_asterisks=escape_asterisks,
-        escape_misc=escape_misc,
-        escape_underscores=escape_underscores,
-        strip=_as_optional_set(strip),
-    )
+    result = ""
+    for el in filter(lambda value: not isinstance(value, (Comment, Doctype)), source.children):
+        if isinstance(el, NavigableString):
+            result += _process_text(
+                el=el,
+                escape_misc=escape_misc,
+                escape_asterisks=escape_asterisks,
+                escape_underscores=escape_underscores,
+            )
+        elif isinstance(el, Tag):
+            result += _process_tag(
+                el,
+                converters_map,
+                convert_as_inline=convert_as_inline,
+                convert=_as_optional_set(convert),
+                escape_asterisks=escape_asterisks,
+                escape_misc=escape_misc,
+                escape_underscores=escape_underscores,
+                strip=_as_optional_set(strip),
+                context_before=result[-2:],
+            )
+    return result
