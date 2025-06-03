@@ -29,6 +29,7 @@ classifiers = [
   "Topic :: Utilities",
   "Typing :: Typed",
 ]
+scripts.html_to_markdown = "html_to_markdown.__main__:cli"
 
 dependencies = [
   "beautifulsoup4>=4.13.4",
@@ -57,8 +58,6 @@ html_to_markdown = [ "py.typed" ]
 
 [tool.hatch.build]
 skip-excluded-dirs = true
-
-scripts.html_to_markdown = "html_to_markdown.__main__:cli"
 
 [tool.ruff]
 target-version = "py39"
