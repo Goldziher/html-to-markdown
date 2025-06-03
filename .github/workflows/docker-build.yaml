@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
 
 env:
-  DOCKERHUB_NAMESPACE = ${{ vars.DOCKERHUB_ORGNAME || vars.DOCKERHUB_USERNAME }}
+  DOCKERHUB_NAMESPACE: ${{ vars.DOCKERHUB_ORGNAME || vars.DOCKERHUB_USERNAME }}
 
 jobs:
   docker:
@@ -23,7 +23,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@v4
         with:
-          images: ${{ DOCKERHUB_NAMESPACE }}/${{ vars.DOCKERHUB_REPO_NAME }}
+          images: ${{ vars.DOCKERHUB_ORGNAME || vars.DOCKERHUB_USERNAME }}/${{ vars.DOCKERHUB_REPO_NAME }}
           tags: |
             type=raw,value={{date 'YYYYMMDD-HHmmss'}}
             type=sha
