@@ -36,9 +36,8 @@ dependencies = [
 
 urls.homepage = "https://github.com/Goldziher/html-to-markdown"
 
-[project.scripts]
-html_to_markdown = "html_to_markdown.__main__:cli"
-html-to-markdown = "html_to_markdown.__main__:cli"
+scripts.html-to-markdown = "html_to_markdown.__main__:cli"
+scripts.html_to_markdown = "html_to_markdown.__main__:cli"
 
 [dependency-groups]
 dev = [
