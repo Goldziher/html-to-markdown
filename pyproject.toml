@@ -29,13 +29,16 @@ classifiers = [
   "Topic :: Utilities",
   "Typing :: Typed",
 ]
-scripts.html_to_markdown = "html_to_markdown.__main__:cli"
 
 dependencies = [
   "beautifulsoup4>=4.13.4",
 ]
 
 urls.homepage = "https://github.com/Goldziher/html-to-markdown"
+
+[project.scripts]
+html_to_markdown = "html_to_markdown.__main__:cli"
+html-to-markdown = "html_to_markdown.__main__:cli"
 
 [dependency-groups]
 dev = [
