@@ -9,11 +9,12 @@ version = "1.3.3"
 description = "Convert HTML to markdown"
 readme = "README.md"
 keywords = [ "converter", "html", "markdown", "text-extraction", "text-processing" ]
-license = "MIT"
+license = { text = "MIT" }
 authors = [ { name = "Na'aman Hirschfeld", email = "nhirschfeld@gmail.com" } ]
 requires-python = ">=3.9"
 classifiers = [
   "Intended Audience :: Developers",
+  "License :: OSI Approved :: MIT License",
   "Operating System :: OS Independent",
   "Programming Language :: Python :: 3 :: Only",
   "Programming Language :: Python :: 3.9",
