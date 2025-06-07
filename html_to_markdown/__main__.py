@@ -1,6 +1,6 @@
 import sys
 
-if __name__ == "__main__":
+def cli():
     from html_to_markdown.cli import main
 
     try:
@@ -9,3 +9,6 @@ if __name__ == "__main__":
     except ValueError as e:
         print(str(e), file=sys.stderr)  # noqa: T201
         sys.exit(1)
+
+if __name__ == "__main__":
+    cli()
