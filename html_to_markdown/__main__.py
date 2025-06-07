@@ -1,6 +1,8 @@
 import sys
 
-def cli():
+
+def cli() -> None:
+    """Main CLI entrypoint."""
     from html_to_markdown.cli import main
 
     try:
@@ -9,6 +11,7 @@ def cli():
     except ValueError as e:
         print(str(e), file=sys.stderr)  # noqa: T201
         sys.exit(1)
+
 
 if __name__ == "__main__":
     cli()
