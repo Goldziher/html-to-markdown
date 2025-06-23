@@ -512,7 +512,10 @@ def test_img() -> None:
         == '![Alt text](/path/to/img.jpg "Optional title")'
     )
     assert convert_to_markdown('<img src="/path/to/img.jpg" alt="Alt text" />') == "![Alt text](/path/to/img.jpg)"
-    assert convert_to_markdown('<img src="/path/to/img.jpg" width="100" height="100" />') == "<img src='/path/to/img.jpg' alt='' title='' width='100' height='100' />"
+    assert (
+        convert_to_markdown('<img src="/path/to/img.jpg" width="100" height="100" />')
+        == "<img src='/path/to/img.jpg' alt='' title='' width='100' height='100' />"
+    )
 
 def test_kbd() -> None:
     inline_tests("kbd", "`")
