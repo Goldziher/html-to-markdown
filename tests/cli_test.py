@@ -44,6 +44,7 @@ def test_main_with_file_input(mock_convert_to_markdown: Mock) -> None:
         keep_inline_images_in=None,
         wrap=False,
         wrap_width=80,
+        strip_newlines=False,
     )
 
 
@@ -69,6 +70,7 @@ def test_main_with_stdin_input(mock_convert_to_markdown: Mock, mock_stdin: Mock)
         keep_inline_images_in=None,
         wrap=False,
         wrap_width=80,
+        strip_newlines=False,
     )
 
 
@@ -151,3 +153,9 @@ def test_main_with_wrap_options(mock_convert_to_markdown: Mock, mock_stdin: Mock
     mock_convert_to_markdown.assert_called_once()
     assert mock_convert_to_markdown.call_args[1]["wrap"] is True
     assert mock_convert_to_markdown.call_args[1]["wrap_width"] == 100
+
+
+def test_main_with_strip_newlines_option(mock_convert_to_markdown: Mock, mock_stdin: Mock) -> None:
+    main(["--strip-newlines"])
+    mock_convert_to_markdown.assert_called_once()
+    assert mock_convert_to_markdown.call_args[1]["strip_newlines"] is True

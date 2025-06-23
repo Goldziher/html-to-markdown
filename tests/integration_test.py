@@ -517,6 +517,7 @@ def test_img() -> None:
         == "<img src='/path/to/img.jpg' alt='' title='' width='100' height='100' />"
     )
 
+
 def test_kbd() -> None:
     inline_tests("kbd", "`")
 
