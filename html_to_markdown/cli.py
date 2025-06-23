@@ -127,6 +127,12 @@ def main(argv: list[str]) -> str:
         help="The number of characters at which text paragraphs should wrap. Defaults to 80.",
     )
 
+    parser.add_argument(
+        "--strip-newlines",
+        action="store_true",
+        help="Remove newlines from HTML input before processing. This helps flatten janky output from HTML with unnecessary line breaks.",
+    )
+
     args = parser.parse_args(argv)
 
     return convert_to_markdown(
@@ -147,4 +153,5 @@ def main(argv: list[str]) -> str:
         keep_inline_images_in=args.keep_inline_images_in,
         wrap=args.wrap,
         wrap_width=args.wrap_width,
+        strip_newlines=args.strip_newlines,
     )

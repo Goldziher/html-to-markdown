@@ -213,6 +213,7 @@ def convert_to_markdown(
     keep_inline_images_in: Iterable[str] | None = None,
     newline_style: Literal["spaces", "backslash"] = SPACES,
     strip: str | Iterable[str] | None = None,
+    strip_newlines: bool = False,
     strong_em_symbol: Literal["*", "_"] = ASTERISK,
     sub_symbol: str = "",
     sup_symbol: str = "",
@@ -238,6 +239,7 @@ def convert_to_markdown(
         keep_inline_images_in: Tags in which inline images should be preserved. Defaults to None.
         newline_style: Style for handling newlines in text content. Defaults to "spaces".
         strip: Tags to strip from the output. Defaults to None.
+        strip_newlines: Remove newlines from HTML input before processing. Defaults to False.
         strong_em_symbol: Symbol to use for strong/emphasized text. Defaults to "*".
         sub_symbol: Custom symbol for subscript text. Defaults to an empty string.
         sup_symbol: Custom symbol for superscript text. Defaults to an empty string.
@@ -258,6 +260,10 @@ def convert_to_markdown(
             and "Next paragraph" in source
         ):
             return source
+
+        if strip_newlines:
+            # Replace all newlines with spaces before parsing
+            source = source.replace("\n", " ").replace("\r", " ")
 
         if "".join(source.split("\n")):
             source = BeautifulSoup(source, "html.parser")
