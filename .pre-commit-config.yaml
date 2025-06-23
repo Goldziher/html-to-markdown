@@ -28,7 +28,7 @@ repos:
         additional_dependencies:
           - mdformat-mkdocs==4.0.0
   - repo: https://github.com/igorshubovych/markdownlint-cli
-    rev: v0.44.0
+    rev: v0.45.0
     hooks:
       - id: markdownlint-fix
   - repo: https://github.com/adamchainz/blacken-docs
@@ -39,16 +39,16 @@ repos:
         additional_dependencies:
           - black==25.1.0
   - repo: https://github.com/rbubley/mirrors-prettier
-    rev: "v3.5.3"
+    rev: "v3.6.0"
     hooks:
       - id: prettier
         exclude: ^tests|^.idea|^migrations|^.git|README.md|^docs
   - repo: https://github.com/tox-dev/pyproject-fmt
-    rev: "v2.5.1"
+    rev: "v2.6.0"
     hooks:
       - id: pyproject-fmt
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.11.6
+    rev: v0.12.0
     hooks:
       - id: ruff
         args: [--fix]
@@ -61,7 +61,7 @@ repos:
         additional_dependencies:
           - tomli
   - repo: https://github.com/jsh9/pydoclint
-    rev: 0.6.6
+    rev: 0.6.7
     hooks:
       - id: pydoclint
         args:
