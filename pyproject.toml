@@ -5,14 +5,26 @@ requires = [ "setuptools>=78.1" ]
 
 [project]
 name = "html-to-markdown"
-version = "1.3.3"
-description = "Convert HTML to markdown"
+version = "1.4.0"
+description = "A modern, type-safe Python library for converting HTML to Markdown with comprehensive tag support and customizable options"
 readme = "README.md"
-keywords = [ "converter", "html", "markdown", "text-extraction", "text-processing" ]
+keywords = [
+  "beautifulsoup",
+  "cli-tool",
+  "converter",
+  "html",
+  "html2markdown",
+  "markdown",
+  "markup",
+  "text-extraction",
+  "text-processing",
+]
 license = { text = "MIT" }
 authors = [ { name = "Na'aman Hirschfeld", email = "nhirschfeld@gmail.com" } ]
 requires-python = ">=3.9"
 classifiers = [
+  "Development Status :: 5 - Production/Stable",
+  "Environment :: Console",
   "Intended Audience :: Developers",
   "License :: OSI Approved :: MIT License",
   "Operating System :: OS Independent",
@@ -22,6 +34,8 @@ classifiers = [
   "Programming Language :: Python :: 3.11",
   "Programming Language :: Python :: 3.12",
   "Programming Language :: Python :: 3.13",
+  "Topic :: Internet :: WWW/HTTP",
+  "Topic :: Software Development :: Libraries :: Python Modules",
   "Topic :: Text Processing",
   "Topic :: Text Processing :: Markup",
   "Topic :: Text Processing :: Markup :: HTML",
@@ -29,13 +43,14 @@ classifiers = [
   "Topic :: Utilities",
   "Typing :: Typed",
 ]
-
 dependencies = [
   "beautifulsoup4>=4.13.4",
 ]
 
-urls.homepage = "https://github.com/Goldziher/html-to-markdown"
-
+urls.Changelog = "https://github.com/Goldziher/html-to-markdown/releases"
+urls.Homepage = "https://github.com/Goldziher/html-to-markdown"
+urls.Issues = "https://github.com/Goldziher/html-to-markdown/issues"
+urls.Repository = "https://github.com/Goldziher/html-to-markdown.git"
 scripts.html-to-markdown = "html_to_markdown.__main__:cli"
 scripts.html_to_markdown = "html_to_markdown.__main__:cli"
 
@@ -72,16 +87,16 @@ lint.select = [ "ALL" ]
 lint.ignore = [
   "ANN401",  # dynamically typed ANY
   "COM812",  # Conflicts with formatter
-  "D100",    # # pydocstyle - missing docstring in public module
+  "D100",    # pydocstyle - missing docstring in public module
   "D104",    # pydocstyle - missing docstring in public package
   "D107",    # pydocstyle - missing docstring in __init__
   "D205",    # pydocstyle - 1 blank line required between summary line and description
   "E501",    # pycodestyle line too long, handled by ruff format
-  "EM",      # Exception messages,
+  "EM",      # Exception messages
   "FBT",     # Boolean Args
   "FIX",     # we allow todo and fixme comments
   "ISC001",  # Conflicts with formatter
-  "PLR0913", # Pylint - too many arguments.
+  "PLR0913", # Pylint - too many arguments
   "PLR2004", # Magic variables, we allow them
   "TD",      # we allow todo and fixme comments
   "TRY",     # Try except block, rules are too strict
@@ -93,22 +108,32 @@ lint.pydocstyle.convention = "google"
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
+testpaths = [ "tests" ]
+filterwarnings = [
+  "error",
+  "ignore::pytest.PytestConfigWarning",
+  "ignore::pytest.PytestUnraisableExceptionWarning",
+  "ignore::ResourceWarning",
+]
 
 [tool.coverage.run]
+source = [ "html_to_markdown" ]
 omit = [ "tests/*" ]
 plugins = [ "covdefaults" ]
-source = [ "html_to_markdown" ]
 
 [tool.coverage.report]
-exclude_lines = [ 'if TYPE_CHECKING:' ]
+exclude_lines = [ "if TYPE_CHECKING:" ]
 fail_under = 100
+show_missing = true
 
 [tool.mypy]
 packages = [ "html_to_markdown", "tests" ]
 python_version = "3.9"
+strict = true
 implicit_reexport = false
 show_error_codes = true
-strict = true
+warn_return_any = true
+warn_unused_configs = true
 
 [[tool.mypy.overrides]]
 module = "tests.*"
