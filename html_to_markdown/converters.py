@@ -156,11 +156,14 @@ def _convert_img(*, tag: Tag, convert_as_inline: bool, keep_inline_images_in: It
     alt = tag.attrs.get("alt", "")
     src = tag.attrs.get("src", "")
     title = tag.attrs.get("title", "")
+    width = tag.attrs.get("width", "")
+    height = tag.attrs.get("height", "")
     title_part = ' "{}"'.format(title.replace('"', r"\"")) if title else ""
     parent_name = tag.parent.name if tag.parent else ""
     if convert_as_inline and parent_name not in (keep_inline_images_in or []):
         return alt
-
+    if width or height:
+        return f"<img src='{src}' alt='{alt}' title='{title}' width='{width}' height='{height}' />"
     return f"![{alt}]({src}{title_part})"
 
 
