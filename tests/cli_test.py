@@ -9,14 +9,14 @@ from html_to_markdown.cli import main
 
 @pytest.fixture
 def mock_convert_to_markdown() -> Generator[Mock, None, None]:
-    with patch("html_to_markdown.processing.convert_to_markdown") as mock:
+    with patch("html_to_markdown.cli.convert_to_markdown") as mock:
         mock.return_value = "Mocked Markdown Output"
         yield mock
 
 
 @pytest.fixture
 def mock_stdin() -> Generator[None, None, None]:
-    with patch("sys.stdin", new=StringIO("<html><body><p>Test from stdin</p></body></html>")):
+    with patch("html_to_markdown.cli.stdin", new=StringIO("<html><body><p>Test from stdin</p></body></html>")):
         yield
 
 

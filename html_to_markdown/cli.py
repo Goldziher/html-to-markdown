@@ -1,11 +1,12 @@
+from argparse import ArgumentParser, FileType
+from sys import stdin
+
+from html_to_markdown.constants import ASTERISK, ATX, ATX_CLOSED, BACKSLASH, SPACES, UNDERLINED, UNDERSCORE
+from html_to_markdown.processing import convert_to_markdown
+
+
 def main(argv: list[str]) -> str:
     """Command-line entry point."""
-    from argparse import ArgumentParser, FileType
-    from sys import stdin
-
-    from html_to_markdown.constants import ASTERISK, ATX, ATX_CLOSED, BACKSLASH, SPACES, UNDERLINED, UNDERSCORE
-    from html_to_markdown.processing import convert_to_markdown
-
     parser = ArgumentParser(
         prog="html_to_markdown",
         description="Converts HTML to Markdown.",
