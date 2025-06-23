@@ -21,6 +21,7 @@ def run_cli_command(args: list[str], input_text: str | None = None, timeout: int
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         text=True,
+        encoding="utf-8", 
     )
 
     try:
@@ -225,25 +226,18 @@ def test_multiple_files(sample_html_file: Path, complex_html_file: Path, tmp_pat
 def test_pipe_chain() -> None:
     """Test the CLI in a pipe chain."""
 
-    echo_process = subprocess.Popen(["echo", "<h1>Test</h1>"], stdout=subprocess.PIPE, text=True)
-
-    html_to_md_process = subprocess.Popen(
-        [sys.executable, "-m", "html_to_markdown"], stdin=echo_process.stdout, stdout=subprocess.PIPE, text=True
+    html_input = "<h1>Test</h1>"
+    process = subprocess.Popen(
+        [sys.executable, "-m", "html_to_markdown"],
+        stdin=subprocess.PIPE,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True
     )
 
-    grep_process = subprocess.Popen(
-        ["grep", "Test"], stdin=html_to_md_process.stdout, stdout=subprocess.PIPE, text=True
-    )
+    output, _ = process.communicate(input=html_input)
 
-    if echo_process.stdout:
-        echo_process.stdout.close()
-
-    if html_to_md_process.stdout:
-        html_to_md_process.stdout.close()
-
-    output = grep_process.communicate()[0]
     assert "Test" in output
-    assert grep_process.returncode == 0
 
 
 @pytest.mark.parametrize("newline_style", ["spaces", "backslash"])

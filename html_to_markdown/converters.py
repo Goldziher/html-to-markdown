@@ -56,6 +56,7 @@ SupportedElements = Literal[
     "th",
     "tr",
     "kbd",
+    "mark",
 ]
 
 Converter = Callable[[str, Tag], str]
@@ -230,6 +231,21 @@ def _convert_p(*, wrap: bool, text: str, convert_as_inline: bool, wrap_width: in
 
     return f"{text}\n\n" if text else ""
 
+def _convert_mark(*, text: str, convert_as_inline: bool) -> str:
+    if convert_as_inline:
+        return text
+
+    # You can modify this logic later to read from options if needed
+    highlight_style = "double-equal"  # Could be "html" or "bold" optionally
+
+    if highlight_style == "double-equal":
+        return f"=={text}=="
+    elif highlight_style == "bold":
+        return f"**{text}**"
+    elif highlight_style == "html":
+        return f"<mark>{text}</mark>"
+    else:
+        return text
 
 def _convert_pre(
     *,
@@ -363,6 +379,7 @@ def create_converters_map(
         "ol": _wrapper(_convert_list),
         "li": _wrapper(partial(_convert_li, bullets=bullets)),
         "p": _wrapper(partial(_convert_p, wrap=wrap, wrap_width=wrap_width)),
+        "mark": _wrapper(_convert_mark),
         "pre": _wrapper(
             partial(
                 _convert_pre,
