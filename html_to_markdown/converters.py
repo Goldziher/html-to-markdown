@@ -160,7 +160,10 @@ def _convert_img(*, tag: Tag, convert_as_inline: bool, keep_inline_images_in: It
     height = tag.attrs.get("height", "")
     title_part = ' "{}"'.format(title.replace('"', r"\"")) if title else ""
     parent_name = tag.parent.name if tag.parent else ""
-    if convert_as_inline and parent_name not in (keep_inline_images_in or []):
+    # Always preserve images in table cells (td, th) by default
+    default_preserve_in = ["td", "th"]
+    preserve_in = set(keep_inline_images_in or []) | set(default_preserve_in)
+    if convert_as_inline and parent_name not in preserve_in:
         return alt
     if width or height:
         return f"<img src='{src}' alt='{alt}' title='{title}' width='{width}' height='{height}' />"
