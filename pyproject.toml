@@ -87,8 +87,8 @@ format.docstring-code-format = true
 lint.select = [ "ALL" ]
 lint.ignore = [
   "ANN401",  # dynamically typed ANY
-  "COM812",  # Conflicts with formatter
   "C901",    # Complex function complexity - allow for streaming functions
+  "COM812",  # Conflicts with formatter
   "D100",    # pydocstyle - missing docstring in public module
   "D104",    # pydocstyle - missing docstring in public package
   "D107",    # pydocstyle - missing docstring in __init__
@@ -105,8 +105,8 @@ lint.ignore = [
   "TD",      # we allow todo and fixme comments
   "TRY",     # Try except block, rules are too strict
 ]
-lint.per-file-ignores."tests/**/*.*" = [ "ARG", "D", "PD", "PT006", "PT013", "S" ]
 lint.per-file-ignores."performance_test.py" = [ "PLC0415", "S101", "UP006", "UP035" ]
+lint.per-file-ignores."tests/**/*.*" = [ "ARG", "D", "PD", "PT006", "PT013", "S" ]
 lint.isort.known-first-party = [ "html_to_markdown", "tests" ]
 lint.pydocstyle.convention = "google"
 
