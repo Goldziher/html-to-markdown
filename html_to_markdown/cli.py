@@ -155,34 +155,38 @@ def main(argv: list[str]) -> str:
 
     args = parser.parse_args(argv)
 
-    # Progress callback for CLI
-    progress_callback = None
-    if args.show_progress:
-        def progress_callback(processed: int, total: int) -> None:
-            if total > 0:
-                percent = (processed / total) * 100
-                print(f"\rProgress: {percent:.1f}% ({processed}/{total} bytes)", end="", flush=True)
+    # Prepare base arguments
+    base_args = {
+        "strip": args.strip,
+        "convert": args.convert,
+        "autolinks": args.autolinks,
+        "default_title": args.default_title,
+        "heading_style": args.heading_style,
+        "bullets": args.bullets,
+        "strong_em_symbol": args.strong_em_symbol,
+        "sub_symbol": args.sub_symbol,
+        "sup_symbol": args.sup_symbol,
+        "newline_style": args.newline_style,
+        "code_language": args.code_language,
+        "escape_asterisks": args.escape_asterisks,
+        "escape_underscores": args.escape_underscores,
+        "keep_inline_images_in": args.keep_inline_images_in,
+        "wrap": args.wrap,
+        "wrap_width": args.wrap_width,
+        "strip_newlines": args.strip_newlines,
+    }
 
-    return convert_to_markdown(
-        args.html.read(),
-        stream_processing=args.stream_processing,
-        chunk_size=args.chunk_size,
-        progress_callback=progress_callback,
-        strip=args.strip,
-        convert=args.convert,
-        autolinks=args.autolinks,
-        default_title=args.default_title,
-        heading_style=args.heading_style,
-        bullets=args.bullets,
-        strong_em_symbol=args.strong_em_symbol,
-        sub_symbol=args.sub_symbol,
-        sup_symbol=args.sup_symbol,
-        newline_style=args.newline_style,
-        code_language=args.code_language,
-        escape_asterisks=args.escape_asterisks,
-        escape_underscores=args.escape_underscores,
-        keep_inline_images_in=args.keep_inline_images_in,
-        wrap=args.wrap,
-        wrap_width=args.wrap_width,
-        strip_newlines=args.strip_newlines,
-    )
+    # Add streaming parameters only if streaming is enabled
+    if args.stream_processing:
+        base_args["stream_processing"] = True
+        base_args["chunk_size"] = args.chunk_size
+        
+        # Progress callback for CLI
+        if args.show_progress:
+            def progress_callback(processed: int, total: int) -> None:
+                if total > 0:
+                    percent = (processed / total) * 100
+                    print(f"\rProgress: {percent:.1f}% ({processed}/{total} bytes)", end="", flush=True)
+            base_args["progress_callback"] = progress_callback
+
+    return convert_to_markdown(args.html.read(), **base_args)
