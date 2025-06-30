@@ -61,6 +61,9 @@ SupportedTag = Literal[
     "th",
     "tr",
     "kbd",
+    "dl",
+    "dd",
+    "dt",
 ]
 
 
@@ -219,6 +222,7 @@ def convert_to_markdown(
     sup_symbol: str = "",
     wrap: bool = False,
     wrap_width: int = 80,
+    definition_list_style: str = "extended"
 ) -> str:
     """Convert HTML to Markdown.
 
@@ -287,6 +291,7 @@ def convert_to_markdown(
         sup_symbol=sup_symbol,
         wrap=wrap,
         wrap_width=wrap_width,
+        definition_list_style= definition_list_style
     )
     if custom_converters:
         converters_map.update(cast("ConvertersMap", custom_converters))

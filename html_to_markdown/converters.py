@@ -57,6 +57,9 @@ SupportedElements = Literal[
     "tr",
     "kbd",
     "mark",
+    "dl",
+    "dt",
+    "dd",
 ]
 
 Converter = Callable[[str, Tag], str]
@@ -303,6 +306,40 @@ def _convert_tr(*, tag: Tag, text: str) -> str:
         overline += "| " + " | ".join(["---"] * len(cells)) + " |" + "\n"
     return overline + "|" + text + "\n" + underline
 
+def _convert_dl(*, text: str, convert_as_inline: bool) -> str:
+    if convert_as_inline:
+        return text
+    return f"\n{text.strip()}\n\n" if text else ""
+
+
+def _convert_dt(*, text: str, convert_as_inline: bool, definition_list_style: str) -> str:
+    if convert_as_inline:
+        return text
+
+    text = text.strip()
+    if not text:
+        return ""
+
+    if "extended" in definition_list_style:
+        return f"{text}\n"
+    if "fallback" in definition_list_style:
+        return f"**{text}**  \n"
+    return ""
+
+
+def _convert_dd(*, text: str, convert_as_inline: bool, definition_list_style: str) -> str:
+    if convert_as_inline:
+        return text
+
+    text = text.strip()
+    if not text:
+        return ""
+
+    if "extended" in definition_list_style:
+        return f":   {text}\n\n"
+    if "fallback" in definition_list_style:
+        return f"{text}\n\n"
+    return ""
 
 def create_converters_map(
     autolinks: bool,
@@ -318,6 +355,7 @@ def create_converters_map(
     sup_symbol: str,
     wrap: bool,
     wrap_width: int,
+    definition_list_style: str 
 ) -> ConvertersMap:
     """Create a mapping of HTML elements to their corresponding conversion functions.
 
@@ -401,4 +439,7 @@ def create_converters_map(
         "th": _wrapper(_convert_th),
         "tr": _wrapper(_convert_tr),
         "kbd": _wrapper(_create_inline_converter("`")),
+        "dl": _wrapper(_convert_dl),
+        "dt": _wrapper(partial(_convert_dt, definition_list_style=definition_list_style)),
+        "dd": _wrapper(partial(_convert_dd, definition_list_style=definition_list_style)),
     }
