@@ -8,6 +8,7 @@ from html_to_markdown import convert_to_markdown, convert_to_markdown_stream
 # Try to import psutil for memory measurement, but make it optional
 try:
     import psutil
+
     memory_available = True
 except ImportError:
     memory_available = False
@@ -19,22 +20,24 @@ def generate_large_html(size_kb: int = 1000) -> str:
 
     # Add various types of content
     for i in range(size_kb):
-        html_parts.extend([
-            f"<h2>Section {i}</h2>",
-            f"<p>This is paragraph {i} with some <strong>bold text</strong> and <em>italic text</em>.</p>",
-            "<ul>",
-            "  <li>First item with <code>inline code</code></li>",
-            "  <li>Second item</li>",
-            "  <li>Third item with <a href='http://example.com'>link</a></li>",
-            "</ul>",
-            "<blockquote>",
-            f"  <p>This is a quote in section {i}.</p>",
-            "</blockquote>",
-            "<table>",
-            "  <tr><th>Header 1</th><th>Header 2</th></tr>",
-            f"  <tr><td>Data {i}</td><td>More data {i}</td></tr>",
-            "</table>",
-        ])
+        html_parts.extend(
+            [
+                f"<h2>Section {i}</h2>",
+                f"<p>This is paragraph {i} with some <strong>bold text</strong> and <em>italic text</em>.</p>",
+                "<ul>",
+                "  <li>First item with <code>inline code</code></li>",
+                "  <li>Second item</li>",
+                "  <li>Third item with <a href='http://example.com'>link</a></li>",
+                "</ul>",
+                "<blockquote>",
+                f"  <p>This is a quote in section {i}.</p>",
+                "</blockquote>",
+                "<table>",
+                "  <tr><th>Header 1</th><th>Header 2</th></tr>",
+                f"  <tr><td>Data {i}</td><td>More data {i}</td></tr>",
+                "</table>",
+            ]
+        )
 
     return "".join(html_parts)
 

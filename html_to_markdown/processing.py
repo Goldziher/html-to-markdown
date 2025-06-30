@@ -399,9 +399,7 @@ def _process_tag_iteratively(
 
         should_convert_tag = _should_convert_tag(tag_name=current_tag.name, strip=strip, convert=convert)
         tag_name: SupportedTag | None = (
-            cast("SupportedTag", current_tag.name.lower())
-            if current_tag.name.lower() in converters_map
-            else None
+            cast("SupportedTag", current_tag.name.lower()) if current_tag.name.lower() in converters_map else None
         )
 
         is_heading = html_heading_re.match(current_tag.name) is not None
@@ -449,9 +447,7 @@ def _process_tag_iteratively(
         # Convert the tag if needed
         if tag_name and should_convert_tag:
             rendered = converters_map[tag_name](  # type: ignore[call-arg]
-                tag=current_tag,
-                text=children_text,
-                convert_as_inline=current_inline
+                tag=current_tag, text=children_text, convert_as_inline=current_inline
             )
 
             # Handle heading spacing

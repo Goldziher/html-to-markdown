@@ -13,6 +13,7 @@ from html_to_markdown import convert_to_markdown, convert_to_markdown_stream
 # Try to import psutil for memory measurement, but make it optional
 try:
     import psutil
+
     MEMORY_AVAILABLE = True
 except ImportError:
     MEMORY_AVAILABLE = False
@@ -49,6 +50,7 @@ def measure_memory_usage() -> float:
     if not MEMORY_AVAILABLE:
         return 0.0
     import os
+
     memory_bytes = psutil.Process(os.getpid()).memory_info().rss
     return float(memory_bytes / 1024 / 1024)  # MB
 

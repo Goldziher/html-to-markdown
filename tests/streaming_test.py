@@ -68,7 +68,7 @@ class TestStreamingProcessing:
 
         # Check that progress is non-decreasing
         for i in range(1, len(progress_calls)):
-            assert progress_calls[i][0] >= progress_calls[i-1][0]
+            assert progress_calls[i][0] >= progress_calls[i - 1][0]
 
     def test_chunk_callback_in_convert_to_markdown(self) -> None:
         """Test chunk callback in main convert_to_markdown function."""
@@ -78,12 +78,7 @@ class TestStreamingProcessing:
         def chunk_callback(chunk: str) -> None:
             chunks_received.append(chunk)
 
-        result = convert_to_markdown(
-            html,
-            stream_processing=True,
-            chunk_size=50,
-            chunk_callback=chunk_callback
-        )
+        result = convert_to_markdown(html, stream_processing=True, chunk_size=50, chunk_callback=chunk_callback)
 
         # Should have received chunks
         assert len(chunks_received) > 0
@@ -132,21 +127,14 @@ class TestStreamingProcessing:
         """Test streaming with various options."""
         html = "<p>Test with <strong>formatting</strong> and *asterisks*</p>"
 
-        chunks = list(convert_to_markdown_stream(
-            html,
-            chunk_size=20,
-            escape_asterisks=False,
-            strong_em_symbol="_",
-            heading_style="atx"
-        ))
+        chunks = list(
+            convert_to_markdown_stream(
+                html, chunk_size=20, escape_asterisks=False, strong_em_symbol="_", heading_style="atx"
+            )
+        )
         result_streaming = "".join(chunks)
 
-        result_regular = convert_to_markdown(
-            html,
-            escape_asterisks=False,
-            strong_em_symbol="_",
-            heading_style="atx"
-        )
+        result_regular = convert_to_markdown(html, escape_asterisks=False, strong_em_symbol="_", heading_style="atx")
 
         assert result_streaming == result_regular
 

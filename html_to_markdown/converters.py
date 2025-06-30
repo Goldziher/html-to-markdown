@@ -236,6 +236,7 @@ def _convert_p(*, wrap: bool, text: str, convert_as_inline: bool, wrap_width: in
 
     return f"{text}\n\n" if text else ""
 
+
 def _convert_mark(*, text: str, convert_as_inline: bool) -> str:
     if convert_as_inline:
         return text
@@ -250,6 +251,7 @@ def _convert_mark(*, text: str, convert_as_inline: bool) -> str:
     if highlight_style == "html":
         return f"<mark>{text}</mark>"
     return text
+
 
 def _convert_pre(
     *,
@@ -279,10 +281,10 @@ def _convert_th(*, tag: Tag, text: str) -> str:
 
 def _convert_tr(*, tag: Tag, text: str) -> str:
     cells = tag.find_all(["td", "th"])
-    parent_name = tag.parent.name if tag.parent and hasattr(tag.parent, 'name') else ""
+    parent_name = tag.parent.name if tag.parent and hasattr(tag.parent, "name") else ""
     tag_grand_parent = tag.parent.parent if tag.parent else None
     is_headrow = (
-        all(hasattr(cell, 'name') and cell.name == "th" for cell in cells)
+        all(hasattr(cell, "name") and cell.name == "th" for cell in cells)
         or (not tag.previous_sibling and parent_name != "tbody")
         or (
             not tag.previous_sibling
@@ -295,7 +297,7 @@ def _convert_tr(*, tag: Tag, text: str) -> str:
     if is_headrow and not tag.previous_sibling:
         full_colspan = 0
         for cell in cells:
-            if hasattr(cell, 'attrs') and "colspan" in cell.attrs:
+            if hasattr(cell, "attrs") and "colspan" in cell.attrs:
                 colspan_value = cell.attrs["colspan"]
                 if isinstance(colspan_value, str) and colspan_value.isdigit():
                     full_colspan += int(colspan_value)
