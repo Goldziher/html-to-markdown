@@ -1,5 +1,5 @@
+import sys
 from argparse import ArgumentParser, FileType
-from sys import stdin
 
 from html_to_markdown.constants import ASTERISK, ATX, ATX_CLOSED, BACKSLASH, SPACES, UNDERLINED, UNDERSCORE
 from html_to_markdown.processing import convert_to_markdown
@@ -16,7 +16,7 @@ def main(argv: list[str]) -> str:
         "html",
         nargs="?",
         type=FileType("r"),
-        default=stdin,
+        default=sys.stdin,
         help="The HTML file to convert. Defaults to STDIN if not provided.",
     )
 
@@ -134,25 +134,63 @@ def main(argv: list[str]) -> str:
         help="Remove newlines from HTML input before processing. This helps flatten janky output from HTML with unnecessary line breaks.",
     )
 
+    parser.add_argument(
+        "--stream-processing",
+        action="store_true",
+        help="Use streaming processing for large documents to reduce memory usage.",
+    )
+
+    parser.add_argument(
+        "--chunk-size",
+        type=int,
+        default=1024,
+        help="Size of chunks when using streaming processing. Defaults to 1024 characters.",
+    )
+
+    parser.add_argument(
+        "--show-progress",
+        action="store_true",
+        help="Show progress information when processing large documents.",
+    )
+
     args = parser.parse_args(argv)
 
-    return convert_to_markdown(
-        args.html.read(),
-        strip=args.strip,
-        convert=args.convert,
-        autolinks=args.autolinks,
-        default_title=args.default_title,
-        heading_style=args.heading_style,
-        bullets=args.bullets,
-        strong_em_symbol=args.strong_em_symbol,
-        sub_symbol=args.sub_symbol,
-        sup_symbol=args.sup_symbol,
-        newline_style=args.newline_style,
-        code_language=args.code_language,
-        escape_asterisks=args.escape_asterisks,
-        escape_underscores=args.escape_underscores,
-        keep_inline_images_in=args.keep_inline_images_in,
-        wrap=args.wrap,
-        wrap_width=args.wrap_width,
-        strip_newlines=args.strip_newlines,
-    )
+    # Prepare base arguments
+    base_args = {
+        "strip": args.strip,
+        "convert": args.convert,
+        "autolinks": args.autolinks,
+        "default_title": args.default_title,
+        "heading_style": args.heading_style,
+        "bullets": args.bullets,
+        "strong_em_symbol": args.strong_em_symbol,
+        "sub_symbol": args.sub_symbol,
+        "sup_symbol": args.sup_symbol,
+        "newline_style": args.newline_style,
+        "code_language": args.code_language,
+        "escape_asterisks": args.escape_asterisks,
+        "escape_underscores": args.escape_underscores,
+        "keep_inline_images_in": args.keep_inline_images_in,
+        "wrap": args.wrap,
+        "wrap_width": args.wrap_width,
+        "strip_newlines": args.strip_newlines,
+    }
+
+    # Add streaming parameters only if streaming is enabled
+    if args.stream_processing:
+        base_args["stream_processing"] = True
+        base_args["chunk_size"] = args.chunk_size
+
+        # Progress callback for CLI
+        if args.show_progress:
+
+            def progress_callback(processed: int, total: int) -> None:
+                if total > 0:
+                    percent = (processed / total) * 100
+                    # Use sys.stderr to avoid ruff T201 error for progress output
+                    sys.stderr.write(f"\rProgress: {percent:.1f}% ({processed}/{total} bytes)")
+                    sys.stderr.flush()
+
+            base_args["progress_callback"] = progress_callback
+
+    return convert_to_markdown(args.html.read(), **base_args)
