@@ -23,10 +23,11 @@ class TestStreamingProcessing:
 
     def test_streaming_large_document(self) -> None:
         """Test streaming with a larger document."""
-        # Create a large HTML document
-        html_parts = []
-        for i in range(100):
-            html_parts.append(f"<p>This is paragraph {i} with some <strong>bold text</strong> and <em>italic text</em>.</p>")
+        # Create a large HTML document using list comprehension
+        html_parts = [
+            f"<p>This is paragraph {i} with some <strong>bold text</strong> and <em>italic text</em>.</p>"
+            for i in range(100)
+        ]
 
         html = "".join(html_parts)
 
