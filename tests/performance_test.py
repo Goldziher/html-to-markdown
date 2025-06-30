@@ -1,7 +1,8 @@
 """Performance tests for streaming functionality."""
 
 import time
-import sys
+from typing import List
+
 from html_to_markdown import convert_to_markdown, convert_to_markdown_stream
 
 # Try to import psutil for memory measurement, but make it optional
@@ -13,10 +14,10 @@ except ImportError:
     print("psutil not available - memory measurements disabled")
 
 
-def generate_large_html(size_kb=1000):
+def generate_large_html(size_kb: int = 1000) -> str:
     """Create a large HTML document for testing."""
-    html_parts = []
-    
+    html_parts: List[str] = []
+
     # Add various types of content
     for i in range(size_kb):
         html_parts.extend([
@@ -35,18 +36,20 @@ def generate_large_html(size_kb=1000):
             f"  <tr><td>Data {i}</td><td>More data {i}</td></tr>",
             "</table>",
         ])
-    
+
     return "".join(html_parts)
 
 
-def measure_memory_usage():
+def measure_memory_usage() -> float:
+    """Measure current memory usage in MB."""
     if not memory_available:
-        return 0
+        return 0.0
     import os
     return psutil.Process(os.getpid()).memory_info().rss / 1024 / 1024  # MB
 
 
-def test_streaming_performance():
+def test_streaming_performance() -> None:
+    """Test streaming performance compared to regular processing."""
     print("Generating large HTML document...")
     html = generate_large_html(500)  # 500KB document
     print(f"Generated HTML document: {len(html.encode('utf-8')) / 1024:.1f} KB")
@@ -96,7 +99,7 @@ def test_streaming_performance():
     for chunk in convert_to_markdown_stream(html, chunk_size=1024):
         chunks.append(chunk)
         chunk_count += 1
-    result_pure_streaming = ''.join(chunks)
+    result_pure_streaming = "".join(chunks)
     pure_streaming_time = time.time() - start_time
     print(f"Pure streaming time: {pure_streaming_time:.3f} seconds")
     print(f"Number of chunks: {chunk_count}")
@@ -104,5 +107,7 @@ def test_streaming_performance():
     print(f"Results identical to regular: {result_regular == result_pure_streaming}")
 
 
+if __name__ == "__main__":
+    test_streaming_performance()
 if __name__ == "__main__":
     test_streaming_performance()
