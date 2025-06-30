@@ -135,7 +135,7 @@ def main(argv: list[str]) -> str:
     )
 
     parser.add_argument(
-        "--stream-processing", 
+        "--stream-processing",
         action="store_true",
         help="Use streaming processing for large documents to reduce memory usage.",
     )
@@ -149,7 +149,7 @@ def main(argv: list[str]) -> str:
 
     parser.add_argument(
         "--show-progress",
-        action="store_true", 
+        action="store_true",
         help="Show progress information when processing large documents.",
     )
 
@@ -180,7 +180,7 @@ def main(argv: list[str]) -> str:
     if args.stream_processing:
         base_args["stream_processing"] = True
         base_args["chunk_size"] = args.chunk_size
-        
+
         # Progress callback for CLI
         if args.show_progress:
             def progress_callback(processed: int, total: int) -> None:

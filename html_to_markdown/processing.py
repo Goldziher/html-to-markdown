@@ -3,10 +3,10 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from collections.abc import Mapping
-from itertools import chain
-from typing import TYPE_CHECKING, Any, Callable, Literal, cast, Generator
+    from collections.abc import Mapping, Generator
 from io import StringIO
+from itertools import chain
+from typing import TYPE_CHECKING, Any, Callable, Literal, cast
 
 from bs4 import BeautifulSoup, Comment, Doctype, NavigableString, Tag
 
@@ -360,22 +360,22 @@ def convert_to_markdown(
 
 class StreamingProcessor:
     """Handles streaming/chunked processing of HTML to Markdown conversion."""
-    
+
     def __init__(
         self,
         chunk_size: int = 1024,
         progress_callback: Callable[[int, int], None] | None = None,
-    ):
+    ) -> None:
         self.chunk_size = chunk_size
         self.progress_callback = progress_callback
-        self._processed_bytes = 0
-        self._total_bytes = 0
-    
-    def _update_progress(self, processed: int) -> None:
+        self.processed_bytes = 0
+        self.total_bytes = 0
+
+    def update_progress(self, processed: int) -> None:
         """Update progress if callback is provided."""
-        self._processed_bytes = processed
+        self.processed_bytes = processed
         if self.progress_callback:
-            self.progress_callback(self._processed_bytes, self._total_bytes)
+            self.progress_callback(self.processed_bytes, self.total_bytes)
 
 
 def _process_tag_iteratively(
@@ -391,24 +391,23 @@ def _process_tag_iteratively(
     context_before: str = "",
 ) -> Generator[str, None, None]:
     """Process a tag iteratively to avoid deep recursion with large nested structures."""
-    
     # Use a stack to simulate recursion and avoid stack overflow
     stack = [(tag, context_before, convert_as_inline)]
-    
+
     while stack:
         current_tag, current_context, current_inline = stack.pop()
-        
+
         should_convert_tag = _should_convert_tag(tag_name=current_tag.name, strip=strip, convert=convert)
         tag_name: SupportedTag | None = (
-            cast("SupportedTag", current_tag.name.lower()) 
-            if current_tag.name.lower() in converters_map 
+            cast("SupportedTag", current_tag.name.lower())
+            if current_tag.name.lower() in converters_map
             else None
         )
-        
+
         is_heading = html_heading_re.match(current_tag.name) is not None
         is_cell = tag_name in {"td", "th"}
         convert_children_as_inline = current_inline or is_heading or is_cell
-        
+
         # Handle nested tag cleanup
         if _is_nested_tag(current_tag):
             for el in current_tag.children:
@@ -420,7 +419,7 @@ def _process_tag_iteratively(
                 )
                 if can_extract and isinstance(el, NavigableString) and not el.strip():
                     el.extract()
-        
+
         # Process children and collect text
         children_text = ""
         for el in filter(lambda value: not isinstance(value, (Comment, Doctype)), current_tag.children):
@@ -446,22 +445,22 @@ def _process_tag_iteratively(
                     context_before=(current_context + children_text)[-2:],
                 ):
                     children_text += child_chunk
-        
+
         # Convert the tag if needed
         if tag_name and should_convert_tag:
-            rendered = converters_map[tag_name](
-                tag=current_tag, 
-                text=children_text, 
+            rendered = converters_map[tag_name](  # type: ignore[call-arg]
+                tag=current_tag,
+                text=children_text,
                 convert_as_inline=current_inline
             )
-            
+
             # Handle heading spacing
             if is_heading and current_context not in {"", "\n"}:
                 n_eol_to_add = 2 - (len(current_context) - len(current_context.rstrip("\n")))
                 if n_eol_to_add > 0:
                     prefix = "\n" * n_eol_to_add
                     rendered = f"{prefix}{rendered}"
-            
+
             yield rendered
         else:
             yield children_text
@@ -495,19 +494,39 @@ def convert_to_markdown_stream(
     wrap_width: int = 80,
 ) -> Generator[str, None, None]:
     """Convert HTML to Markdown using streaming/chunked processing.
-    
+
     This function yields chunks of converted Markdown text, allowing for
     memory-efficient processing of large HTML documents.
-    
+
     Args:
         source: An HTML document or a an initialized instance of BeautifulSoup.
         chunk_size: Size of chunks to yield (approximate, in characters).
         progress_callback: Optional callback function called with (processed_bytes, total_bytes).
-        ... (all other args same as convert_to_markdown)
-    
+        autolinks: Automatically convert valid URLs into Markdown links. Defaults to True.
+        bullets: A string of characters to use for bullet points in lists. Defaults to '*+-'.
+        code_language: Default language identifier for fenced code blocks. Defaults to an empty string.
+        code_language_callback: Function to dynamically determine the language for code blocks.
+        convert: A list of tag names to convert to Markdown. If None, all supported tags are converted.
+        convert_as_inline: Treat the content as inline elements (no block elements like paragraphs). Defaults to False.
+        custom_converters: A mapping of custom converters for specific HTML tags. Defaults to None.
+        default_title: Use the default title when converting certain elements (e.g., links). Defaults to False.
+        escape_asterisks: Escape asterisks (*) to prevent unintended Markdown formatting. Defaults to True.
+        escape_misc: Escape miscellaneous characters to prevent conflicts in Markdown. Defaults to True.
+        escape_underscores: Escape underscores (_) to prevent unintended italic formatting. Defaults to True.
+        heading_style: The style to use for Markdown headings. Defaults to "underlined".
+        keep_inline_images_in: Tags in which inline images should be preserved. Defaults to None.
+        newline_style: Style for handling newlines in text content. Defaults to "spaces".
+        strip: Tags to strip from the output. Defaults to None.
+        strip_newlines: Remove newlines from HTML input before processing. Defaults to False.
+        strong_em_symbol: Symbol to use for strong/emphasized text. Defaults to "*".
+        sub_symbol: Custom symbol for subscript text. Defaults to an empty string.
+        sup_symbol: Custom symbol for superscript text. Defaults to an empty string.
+        wrap: Wrap text to the specified width. Defaults to False.
+        wrap_width: The number of characters at which to wrap text. Defaults to 80.
+
     Yields:
         str: Chunks of Markdown-formatted text.
-    
+
     Raises:
         ValueError: If both 'strip' and 'convert' are specified, or when the input HTML is empty.
     """
@@ -554,15 +573,15 @@ def convert_to_markdown_stream(
 
     # Initialize streaming processor
     processor = StreamingProcessor(chunk_size, progress_callback)
-    
+
     # Estimate total size for progress reporting
     if isinstance(source, BeautifulSoup):
-        processor._total_bytes = len(str(source))
-    
+        processor.total_bytes = len(str(source))
+
     # Process elements and yield chunks
     buffer = StringIO()
     buffer_size = 0
-    
+
     for el in filter(lambda value: not isinstance(value, (Comment, Doctype)), source.children):
         if isinstance(el, NavigableString):
             text_chunk = _process_text(
@@ -587,19 +606,19 @@ def convert_to_markdown_stream(
             ):
                 buffer.write(text_chunk)
                 buffer_size += len(text_chunk)
-                
+
                 # Yield chunk if buffer is large enough
                 if buffer_size >= chunk_size:
                     content = buffer.getvalue()
                     buffer = StringIO()
                     buffer_size = 0
-                    processor._processed_bytes += len(content)
-                    processor._update_progress(processor._processed_bytes)
+                    processor.processed_bytes += len(content)
+                    processor.update_progress(processor.processed_bytes)
                     yield content
-    
+
     # Yield remaining content
     if buffer_size > 0:
         content = buffer.getvalue()
-        processor._processed_bytes += len(content)
-        processor._update_progress(processor._processed_bytes)
+        processor.processed_bytes += len(content)
+        processor.update_progress(processor.processed_bytes)
         yield content

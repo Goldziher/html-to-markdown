@@ -21,7 +21,7 @@ def run_cli_command(args: list[str], input_text: str | None = None, timeout: int
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         text=True,
-        encoding="utf-8", 
+        encoding="utf-8",
     )
 
     try:

@@ -240,12 +240,11 @@ def _convert_mark(*, text: str, convert_as_inline: bool) -> str:
 
     if highlight_style == "double-equal":
         return f"=={text}=="
-    elif highlight_style == "bold":
+    if highlight_style == "bold":
         return f"**{text}**"
-    elif highlight_style == "html":
+    if highlight_style == "html":
         return f"<mark>{text}</mark>"
-    else:
-        return text
+    return text
 
 def _convert_pre(
     *,
