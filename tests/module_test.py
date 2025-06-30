@@ -232,7 +232,7 @@ def test_pipe_chain() -> None:
         stdin=subprocess.PIPE,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
-        text=True
+        text=True,
     )
 
     output, _ = process.communicate(input=html_input)

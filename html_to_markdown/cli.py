@@ -183,12 +183,14 @@ def main(argv: list[str]) -> str:
 
         # Progress callback for CLI
         if args.show_progress:
+
             def progress_callback(processed: int, total: int) -> None:
                 if total > 0:
                     percent = (processed / total) * 100
                     # Use sys.stderr to avoid ruff T201 error for progress output
                     sys.stderr.write(f"\rProgress: {percent:.1f}% ({processed}/{total} bytes)")
                     sys.stderr.flush()
+
             base_args["progress_callback"] = progress_callback
 
     return convert_to_markdown(args.html.read(), **base_args)
