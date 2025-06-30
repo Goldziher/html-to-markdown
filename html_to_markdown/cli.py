@@ -1,5 +1,5 @@
+import sys
 from argparse import ArgumentParser, FileType
-from sys import stdin
 
 from html_to_markdown.constants import ASTERISK, ATX, ATX_CLOSED, BACKSLASH, SPACES, UNDERLINED, UNDERSCORE
 from html_to_markdown.processing import convert_to_markdown
@@ -16,7 +16,7 @@ def main(argv: list[str]) -> str:
         "html",
         nargs="?",
         type=FileType("r"),
-        default=stdin,
+        default=sys.stdin,
         help="The HTML file to convert. Defaults to STDIN if not provided.",
     )
 
@@ -186,7 +186,9 @@ def main(argv: list[str]) -> str:
             def progress_callback(processed: int, total: int) -> None:
                 if total > 0:
                     percent = (processed / total) * 100
-                    print(f"\rProgress: {percent:.1f}% ({processed}/{total} bytes)", end="", flush=True)
+                    # Use sys.stderr to avoid ruff T201 error for progress output
+                    sys.stderr.write(f"\rProgress: {percent:.1f}% ({processed}/{total} bytes)")
+                    sys.stderr.flush()
             base_args["progress_callback"] = progress_callback
 
     return convert_to_markdown(args.html.read(), **base_args)

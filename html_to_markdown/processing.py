@@ -3,12 +3,14 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from collections.abc import Mapping, Generator
+    from collections.abc import Generator, Mapping
+    # Use the imported PageElement instead of re-importing
 from io import StringIO
 from itertools import chain
 from typing import TYPE_CHECKING, Any, Callable, Literal, cast
 
-from bs4 import BeautifulSoup, Comment, Doctype, NavigableString, Tag
+from bs4 import BeautifulSoup, Comment, Doctype, Tag
+from bs4.element import NavigableString, PageElement
 
 from html_to_markdown.constants import (
     ASTERISK,
@@ -22,8 +24,6 @@ from html_to_markdown.utils import escape
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
-
-    from bs4 import PageElement
 
 SupportedTag = Literal[
     "a",
