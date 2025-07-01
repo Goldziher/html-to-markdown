@@ -45,6 +45,7 @@ def test_main_with_file_input(mock_convert_to_markdown: Mock) -> None:
         wrap=False,
         wrap_width=80,
         strip_newlines=False,
+        definition_list_style="extended",
     )
 
 
@@ -71,6 +72,7 @@ def test_main_with_stdin_input(mock_convert_to_markdown: Mock, mock_stdin: Mock)
         wrap=False,
         wrap_width=80,
         strip_newlines=False,
+        definition_list_style="extended",
     )
 
 
@@ -159,3 +161,8 @@ def test_main_with_strip_newlines_option(mock_convert_to_markdown: Mock, mock_st
     main(["--strip-newlines"])
     mock_convert_to_markdown.assert_called_once()
     assert mock_convert_to_markdown.call_args[1]["strip_newlines"] is True
+
+def test_main_with_definition_list_style_option(mock_convert_to_markdown: Mock, mock_stdin: Mock) -> None:
+    main(["--definition-list-style", "fallback"])
+    mock_convert_to_markdown.assert_called_once()
+    assert mock_convert_to_markdown.call_args[1]["definition_list_style"] == "fallback"
