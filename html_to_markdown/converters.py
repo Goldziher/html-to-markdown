@@ -234,6 +234,7 @@ def _convert_p(*, wrap: bool, text: str, convert_as_inline: bool, wrap_width: in
 
     return f"{text}\n\n" if text else ""
 
+
 def _convert_mark(*, text: str, convert_as_inline: bool) -> str:
     if convert_as_inline:
         return text
@@ -243,12 +244,12 @@ def _convert_mark(*, text: str, convert_as_inline: bool) -> str:
 
     if highlight_style == "double-equal":
         return f"=={text}=="
-    elif highlight_style == "bold":
+    if highlight_style == "bold":
         return f"**{text}**"
-    elif highlight_style == "html":
+    if highlight_style == "html":
         return f"<mark>{text}</mark>"
-    else:
-        return text
+    return text
+
 
 def _convert_pre(
     *,
@@ -306,6 +307,7 @@ def _convert_tr(*, tag: Tag, text: str) -> str:
         overline += "| " + " | ".join(["---"] * len(cells)) + " |" + "\n"
     return overline + "|" + text + "\n" + underline
 
+
 def _convert_dl(*, text: str, convert_as_inline: bool) -> str:
     if convert_as_inline:
         return text
@@ -341,6 +343,7 @@ def _convert_dd(*, text: str, convert_as_inline: bool, definition_list_style: st
         return f"{text}\n\n"
     return ""
 
+
 def create_converters_map(
     autolinks: bool,
     bullets: str,
@@ -355,7 +358,7 @@ def create_converters_map(
     sup_symbol: str,
     wrap: bool,
     wrap_width: int,
-    definition_list_style: str 
+    definition_list_style: str,
 ) -> ConvertersMap:
     """Create a mapping of HTML elements to their corresponding conversion functions.
 
@@ -373,6 +376,7 @@ def create_converters_map(
         sup_symbol: The symbol to use for superscript text.
         wrap: Whether to wrap text.
         wrap_width: The width to wrap text at.
+        definition_list_style: The style of definition lists.
 
     Returns:
         A mapping of HTML elements to their corresponding conversion functions
