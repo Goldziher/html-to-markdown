@@ -134,6 +134,13 @@ def main(argv: list[str]) -> str:
         help="Remove newlines from HTML input before processing. This helps flatten janky output from HTML with unnecessary line breaks.",
     )
 
+    parser.add_argument(
+        "--definition-list-style",
+        default="extended",
+        choices=("extended", "fallback"),
+        help="Set the style for definition lists: 'extended' (default) or 'fallback'.",
+    )
+
     args = parser.parse_args(argv)
 
     return convert_to_markdown(
@@ -155,4 +162,5 @@ def main(argv: list[str]) -> str:
         wrap=args.wrap,
         wrap_width=args.wrap_width,
         strip_newlines=args.strip_newlines,
+        definition_list_style=args.definition_list_style,
     )
