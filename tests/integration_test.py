@@ -547,8 +547,9 @@ def test_p() -> None:
         )
         == "12345678901\\\n12345\n\n"
     )
-    
-def test_mark_tag()  -> None:
+
+
+def test_mark_tag() -> None:
     html = "<mark>highlighted</mark>"
     expected = "==highlighted=="
     assert convert_to_markdown(html).strip() == expected

@@ -162,6 +162,7 @@ def test_main_with_strip_newlines_option(mock_convert_to_markdown: Mock, mock_st
     mock_convert_to_markdown.assert_called_once()
     assert mock_convert_to_markdown.call_args[1]["strip_newlines"] is True
 
+
 def test_main_with_definition_list_style_option(mock_convert_to_markdown: Mock, mock_stdin: Mock) -> None:
     main(["--definition-list-style", "fallback"])
     mock_convert_to_markdown.assert_called_once()
