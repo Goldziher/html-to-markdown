@@ -249,6 +249,7 @@ def convert_to_markdown(
         sup_symbol: Custom symbol for superscript text. Defaults to an empty string.
         wrap: Wrap text to the specified width. Defaults to False.
         wrap_width: The number of characters at which to wrap text. Defaults to 80.
+        definition_list_style (str): The style to use for definition lists.
 
     Raises:
         ValueError: If both 'strip' and 'convert' are specified, or when the input HTML is empty.
