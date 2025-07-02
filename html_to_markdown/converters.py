@@ -57,6 +57,9 @@ SupportedElements = Literal[
     "tr",
     "kbd",
     "mark",
+    "dl",
+    "dt",
+    "dd",
 ]
 
 Converter = Callable[[str, Tag], str]
@@ -231,6 +234,7 @@ def _convert_p(*, wrap: bool, text: str, convert_as_inline: bool, wrap_width: in
 
     return f"{text}\n\n" if text else ""
 
+
 def _convert_mark(*, text: str, convert_as_inline: bool) -> str:
     if convert_as_inline:
         return text
@@ -240,12 +244,12 @@ def _convert_mark(*, text: str, convert_as_inline: bool) -> str:
 
     if highlight_style == "double-equal":
         return f"=={text}=="
-    elif highlight_style == "bold":
+    if highlight_style == "bold":
         return f"**{text}**"
-    elif highlight_style == "html":
+    if highlight_style == "html":
         return f"<mark>{text}</mark>"
-    else:
-        return text
+    return text
+
 
 def _convert_pre(
     *,
@@ -304,6 +308,42 @@ def _convert_tr(*, tag: Tag, text: str) -> str:
     return overline + "|" + text + "\n" + underline
 
 
+def _convert_dl(*, text: str, convert_as_inline: bool) -> str:
+    if convert_as_inline:
+        return text
+    return f"\n{text.strip()}\n\n" if text else ""
+
+
+def _convert_dt(*, text: str, convert_as_inline: bool, definition_list_style: str) -> str:
+    if convert_as_inline:
+        return text
+
+    text = text.strip()
+    if not text:
+        return ""
+
+    if "extended" in definition_list_style:
+        return f"{text}\n"
+    if "fallback" in definition_list_style:
+        return f"**{text}**  \n"
+    return ""
+
+
+def _convert_dd(*, text: str, convert_as_inline: bool, definition_list_style: str) -> str:
+    if convert_as_inline:
+        return text
+
+    text = text.strip()
+    if not text:
+        return ""
+
+    if "extended" in definition_list_style:
+        return f":   {text}\n\n"
+    if "fallback" in definition_list_style:
+        return f"{text}\n\n"
+    return ""
+
+
 def create_converters_map(
     autolinks: bool,
     bullets: str,
@@ -318,6 +358,7 @@ def create_converters_map(
     sup_symbol: str,
     wrap: bool,
     wrap_width: int,
+    definition_list_style: str,
 ) -> ConvertersMap:
     """Create a mapping of HTML elements to their corresponding conversion functions.
 
@@ -335,6 +376,7 @@ def create_converters_map(
         sup_symbol: The symbol to use for superscript text.
         wrap: Whether to wrap text.
         wrap_width: The width to wrap text at.
+        definition_list_style: The style of definition lists.
 
     Returns:
         A mapping of HTML elements to their corresponding conversion functions
@@ -401,4 +443,7 @@ def create_converters_map(
         "th": _wrapper(_convert_th),
         "tr": _wrapper(_convert_tr),
         "kbd": _wrapper(_create_inline_converter("`")),
+        "dl": _wrapper(_convert_dl),
+        "dt": _wrapper(partial(_convert_dt, definition_list_style=definition_list_style)),
+        "dd": _wrapper(partial(_convert_dd, definition_list_style=definition_list_style)),
     }

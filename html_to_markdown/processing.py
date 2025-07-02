@@ -61,6 +61,9 @@ SupportedTag = Literal[
     "th",
     "tr",
     "kbd",
+    "dl",
+    "dd",
+    "dt",
 ]
 
 
@@ -219,6 +222,7 @@ def convert_to_markdown(
     sup_symbol: str = "",
     wrap: bool = False,
     wrap_width: int = 80,
+    definition_list_style: str = "extended",
 ) -> str:
     """Convert HTML to Markdown.
 
@@ -245,6 +249,7 @@ def convert_to_markdown(
         sup_symbol: Custom symbol for superscript text. Defaults to an empty string.
         wrap: Wrap text to the specified width. Defaults to False.
         wrap_width: The number of characters at which to wrap text. Defaults to 80.
+        definition_list_style: The style to use for definition lists. Defaults to "extended".
 
     Raises:
         ValueError: If both 'strip' and 'convert' are specified, or when the input HTML is empty.
@@ -287,6 +292,7 @@ def convert_to_markdown(
         sup_symbol=sup_symbol,
         wrap=wrap,
         wrap_width=wrap_width,
+        definition_list_style=definition_list_style,
     )
     if custom_converters:
         converters_map.update(cast("ConvertersMap", custom_converters))
