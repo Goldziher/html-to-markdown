@@ -231,21 +231,29 @@ def _convert_p(*, wrap: bool, text: str, convert_as_inline: bool, wrap_width: in
 
     return f"{text}\n\n" if text else ""
 
-def _convert_mark(*, text: str, convert_as_inline: bool) -> str:
+
+def _convert_mark(*, text: str, convert_as_inline: bool, highlight_style: str) -> str:
+    """Convert HTML mark element to Markdown highlighting.
+
+    Args:
+        text: The text content of the mark element.
+        convert_as_inline: Whether to convert as inline content.
+        highlight_style: The style to use for highlighting ("double-equal", "html", "bold").
+
+    Returns:
+        The converted markdown text.
+    """
     if convert_as_inline:
         return text
 
-    # You can modify this logic later to read from options if needed
-    highlight_style = "double-equal"  # Could be "html" or "bold" optionally
-
     if highlight_style == "double-equal":
         return f"=={text}=="
-    elif highlight_style == "bold":
+    if highlight_style == "bold":
         return f"**{text}**"
-    elif highlight_style == "html":
+    if highlight_style == "html":
         return f"<mark>{text}</mark>"
-    else:
-        return text
+    return text
+
 
 def _convert_pre(
     *,
@@ -311,6 +319,7 @@ def create_converters_map(
     code_language_callback: Callable[[Tag], str] | None,
     default_title: bool,
     heading_style: Literal["atx", "atx_closed", "underlined"],
+    highlight_style: Literal["double-equal", "html", "bold"],
     keep_inline_images_in: Iterable[str] | None,
     newline_style: str,
     strong_em_symbol: str,
@@ -328,6 +337,7 @@ def create_converters_map(
         code_language_callback: A callback to get the code language.
         default_title: Whether to use the URL as the title for links.
         heading_style: The style of headings.
+        highlight_style: The style to use for highlighted text (mark elements).
         keep_inline_images_in: The tags to keep inline images in.
         newline_style: The style of newlines.
         strong_em_symbol: The symbol to use for strong and emphasis text.
@@ -379,7 +389,7 @@ def create_converters_map(
         "ol": _wrapper(_convert_list),
         "li": _wrapper(partial(_convert_li, bullets=bullets)),
         "p": _wrapper(partial(_convert_p, wrap=wrap, wrap_width=wrap_width)),
-        "mark": _wrapper(_convert_mark),
+        "mark": _wrapper(partial(_convert_mark, highlight_style=highlight_style)),
         "pre": _wrapper(
             partial(
                 _convert_pre,
