@@ -11,6 +11,7 @@ from bs4 import BeautifulSoup, Comment, Doctype, NavigableString, Tag
 
 from html_to_markdown.constants import (
     ASTERISK,
+    DOUBLE_EQUAL,
     SPACES,
     UNDERLINED,
     html_heading_re,
@@ -61,6 +62,7 @@ SupportedTag = Literal[
     "th",
     "tr",
     "kbd",
+    "mark",
 ]
 
 
@@ -210,6 +212,7 @@ def convert_to_markdown(
     escape_misc: bool = True,
     escape_underscores: bool = True,
     heading_style: Literal["underlined", "atx", "atx_closed"] = UNDERLINED,
+    highlight_style: Literal["double-equal", "html", "bold"] = DOUBLE_EQUAL,
     keep_inline_images_in: Iterable[str] | None = None,
     newline_style: Literal["spaces", "backslash"] = SPACES,
     strip: str | Iterable[str] | None = None,
@@ -236,6 +239,7 @@ def convert_to_markdown(
         escape_misc: Escape miscellaneous characters to prevent conflicts in Markdown. Defaults to True.
         escape_underscores: Escape underscores (_) to prevent unintended italic formatting. Defaults to True.
         heading_style: The style to use for Markdown headings. Defaults to "underlined".
+        highlight_style: The style to use for highlighted text (mark elements). Defaults to "double-equal".
         keep_inline_images_in: Tags in which inline images should be preserved. Defaults to None.
         newline_style: Style for handling newlines in text content. Defaults to "spaces".
         strip: Tags to strip from the output. Defaults to None.
@@ -280,6 +284,7 @@ def convert_to_markdown(
         code_language_callback=code_language_callback,
         default_title=default_title,
         heading_style=heading_style,
+        highlight_style=highlight_style,
         keep_inline_images_in=keep_inline_images_in,
         newline_style=newline_style,
         strong_em_symbol=strong_em_symbol,

@@ -549,9 +549,81 @@ def test_p() -> None:
     )
 
 def test_mark_tag():
+    """Test basic mark tag conversion with default double-equal style."""
     html = "<mark>highlighted</mark>"
     expected = "==highlighted=="
     assert convert_to_markdown(html).strip() == expected
+
+
+def test_mark_tag_with_different_styles():
+    """Test mark tag conversion with different highlight styles."""
+    html = "<mark>highlighted</mark>"
+    
+    # Test double-equal style (default)
+    assert convert_to_markdown(html, highlight_style="double-equal").strip() == "==highlighted=="
+    
+    # Test bold style
+    assert convert_to_markdown(html, highlight_style="bold").strip() == "**highlighted**"
+    
+    # Test HTML preservation style
+    assert convert_to_markdown(html, highlight_style="html").strip() == "<mark>highlighted</mark>"
+
+
+def test_mark_tag_in_paragraph():
+    """Test mark tag within paragraphs."""
+    html = "<p>This is <mark>highlighted text</mark> in a paragraph.</p>"
+    expected = "This is ==highlighted text== in a paragraph.\n\n"
+    assert convert_to_markdown(html) == expected
+
+
+def test_mark_tag_with_nested_formatting():
+    """Test mark tag with nested formatting elements."""
+    html = "<mark>This is <strong>bold highlighted</strong> text</mark>"
+    expected = "==This is **bold highlighted** text=="
+    assert convert_to_markdown(html).strip() == expected
+    
+    # Test with emphasis
+    html = "<mark>This is <em>italic highlighted</em> text</mark>"
+    expected = "==This is *italic highlighted* text=="
+    assert convert_to_markdown(html).strip() == expected
+
+
+def test_multiple_mark_tags():
+    """Test multiple mark tags in the same content."""
+    html = "<p>First <mark>highlight</mark> and second <mark>highlight</mark>.</p>"
+    expected = "First ==highlight== and second ==highlight==.\n\n"
+    assert convert_to_markdown(html) == expected
+
+
+def test_nested_mark_tags():
+    """Test nested mark tags."""
+    html = "<mark>Outer <mark>nested</mark> mark</mark>"
+    expected = "==Outer ==nested== mark=="
+    assert convert_to_markdown(html).strip() == expected
+
+
+def test_mark_tag_as_inline():
+    """Test mark tag behavior when convert_as_inline is True."""
+    html = "<mark>highlighted</mark>"
+    expected = "highlighted"
+    assert convert_to_markdown(html, convert_as_inline=True).strip() == expected
+
+
+def test_mark_tag_with_complex_content():
+    """Test mark tag with more complex HTML content."""
+    html = """
+    <div>
+        <h2>Title</h2>
+        <p>Regular text with <mark>highlighted portion</mark> and more text.</p>
+        <ul>
+            <li>Item with <mark>highlighted item text</mark></li>
+            <li>Another item</li>
+        </ul>
+    </div>
+    """
+    result = convert_to_markdown(html)
+    assert "==highlighted portion==" in result
+    assert "==highlighted item text==" in result
 
 
 def test_pre() -> None:
