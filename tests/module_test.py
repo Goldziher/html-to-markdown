@@ -21,7 +21,7 @@ def run_cli_command(args: list[str], input_text: str | None = None, timeout: int
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         text=True,
-        encoding="utf-8", 
+        encoding="utf-8",
     )
 
     try:
@@ -232,7 +232,7 @@ def test_pipe_chain() -> None:
         stdin=subprocess.PIPE,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
-        text=True
+        text=True,
     )
 
     output, _ = process.communicate(input=html_input)

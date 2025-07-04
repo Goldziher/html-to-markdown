@@ -548,6 +548,7 @@ def test_p() -> None:
         == "12345678901\\\n12345\n\n"
     )
 
+
 def test_mark_tag() -> None:
     """Test basic mark tag conversion with default double-equal style."""
     html = "<mark>highlighted</mark>"
@@ -558,13 +559,13 @@ def test_mark_tag() -> None:
 def test_mark_tag_with_different_styles() -> None:
     """Test mark tag conversion with different highlight styles."""
     html = "<mark>highlighted</mark>"
-    
+
     # Test double-equal style (default)
     assert convert_to_markdown(html, highlight_style="double-equal").strip() == "==highlighted=="
-    
+
     # Test bold style
     assert convert_to_markdown(html, highlight_style="bold").strip() == "**highlighted**"
-    
+
     # Test HTML preservation style
     assert convert_to_markdown(html, highlight_style="html").strip() == "<mark>highlighted</mark>"
 
@@ -581,7 +582,7 @@ def test_mark_tag_with_nested_formatting() -> None:
     html = "<mark>This is <strong>bold highlighted</strong> text</mark>"
     expected = "==This is **bold highlighted** text=="
     assert convert_to_markdown(html).strip() == expected
-    
+
     # Test with emphasis
     html = "<mark>This is <em>italic highlighted</em> text</mark>"
     expected = "==This is *italic highlighted* text=="

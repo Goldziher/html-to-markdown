@@ -231,14 +231,15 @@ def _convert_p(*, wrap: bool, text: str, convert_as_inline: bool, wrap_width: in
 
     return f"{text}\n\n" if text else ""
 
+
 def _convert_mark(*, text: str, convert_as_inline: bool, highlight_style: str) -> str:
     """Convert HTML mark element to Markdown highlighting.
-    
+
     Args:
         text: The text content of the mark element.
         convert_as_inline: Whether to convert as inline content.
         highlight_style: The style to use for highlighting ("double-equal", "html", "bold").
-        
+
     Returns:
         The converted markdown text.
     """
@@ -247,12 +248,12 @@ def _convert_mark(*, text: str, convert_as_inline: bool, highlight_style: str) -
 
     if highlight_style == "double-equal":
         return f"=={text}=="
-    elif highlight_style == "bold":
+    if highlight_style == "bold":
         return f"**{text}**"
-    elif highlight_style == "html":
+    if highlight_style == "html":
         return f"<mark>{text}</mark>"
-    else:
-        return text
+    return text
+
 
 def _convert_pre(
     *,
