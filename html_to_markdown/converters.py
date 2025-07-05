@@ -57,6 +57,13 @@ SupportedElements = Literal[
     "tr",
     "kbd",
     "mark",
+    "article",
+    "section",
+    "nav",
+    "aside",
+    "header",
+    "footer",
+    "main",
 ]
 
 Converter = Callable[[str, Tag], str]
@@ -312,6 +319,67 @@ def _convert_tr(*, tag: Tag, text: str) -> str:
     return overline + "|" + text + "\n" + underline
 
 
+def _convert_semantic_element(*, tag: Tag, text: str, element_name: str, convert_as_inline: bool) -> str:
+    """Convert HTML5 semantic elements to Markdown with optional comment markers.
+    
+    Args:
+        tag: The HTML tag being converted.
+        text: The text content of the semantic element.
+        element_name: The name of the semantic element (article, section, etc.).
+        convert_as_inline: Whether to convert as inline content.
+        
+    Returns:
+        The converted markdown text with proper block-level spacing.
+    """
+    if convert_as_inline:
+        return text
+    
+    if not text.strip():
+        return ""
+    
+    # Add comment markers to preserve semantic meaning
+    comment_start = f"<!-- {element_name} -->"
+    comment_end = f"<!-- /{element_name} -->"
+    
+    # Ensure proper block-level spacing
+    return f"\n{comment_start}\n{text.strip()}\n{comment_end}\n"
+
+
+def _convert_article(*, tag: Tag, text: str, convert_as_inline: bool) -> str:
+    """Convert HTML article element to Markdown."""
+    return _convert_semantic_element(tag=tag, text=text, element_name="article", convert_as_inline=convert_as_inline)
+
+
+def _convert_section(*, tag: Tag, text: str, convert_as_inline: bool) -> str:
+    """Convert HTML section element to Markdown."""
+    return _convert_semantic_element(tag=tag, text=text, element_name="section", convert_as_inline=convert_as_inline)
+
+
+def _convert_nav(*, tag: Tag, text: str, convert_as_inline: bool) -> str:
+    """Convert HTML nav element to Markdown."""
+    return _convert_semantic_element(tag=tag, text=text, element_name="nav", convert_as_inline=convert_as_inline)
+
+
+def _convert_aside(*, tag: Tag, text: str, convert_as_inline: bool) -> str:
+    """Convert HTML aside element to Markdown."""
+    return _convert_semantic_element(tag=tag, text=text, element_name="aside", convert_as_inline=convert_as_inline)
+
+
+def _convert_header(*, tag: Tag, text: str, convert_as_inline: bool) -> str:
+    """Convert HTML header element to Markdown."""
+    return _convert_semantic_element(tag=tag, text=text, element_name="header", convert_as_inline=convert_as_inline)
+
+
+def _convert_footer(*, tag: Tag, text: str, convert_as_inline: bool) -> str:
+    """Convert HTML footer element to Markdown."""
+    return _convert_semantic_element(tag=tag, text=text, element_name="footer", convert_as_inline=convert_as_inline)
+
+
+def _convert_main(*, tag: Tag, text: str, convert_as_inline: bool) -> str:
+    """Convert HTML main element to Markdown."""
+    return _convert_semantic_element(tag=tag, text=text, element_name="main", convert_as_inline=convert_as_inline)
+
+
 def create_converters_map(
     autolinks: bool,
     bullets: str,
@@ -411,4 +479,11 @@ def create_converters_map(
         "th": _wrapper(_convert_th),
         "tr": _wrapper(_convert_tr),
         "kbd": _wrapper(_create_inline_converter("`")),
+        "article": _wrapper(_convert_article),
+        "section": _wrapper(_convert_section),
+        "nav": _wrapper(_convert_nav),
+        "aside": _wrapper(_convert_aside),
+        "header": _wrapper(_convert_header),
+        "footer": _wrapper(_convert_footer),
+        "main": _wrapper(_convert_main),
     }

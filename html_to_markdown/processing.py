@@ -63,6 +63,13 @@ SupportedTag = Literal[
     "tr",
     "kbd",
     "mark",
+    "article",
+    "section",
+    "nav",
+    "aside",
+    "header",
+    "footer",
+    "main",
 ]
 
 
