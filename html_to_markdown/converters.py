@@ -21,33 +21,49 @@ from html_to_markdown.utils import chomp, indent, underline
 
 SupportedElements = Literal[
     "a",
+    "article",
+    "aside",
     "b",
     "blockquote",
     "br",
+    "cite",
     "code",
+    "dd",
     "del",
+    "details",
+    "dl",
+    "dt",
     "em",
+    "footer",
     "h1",
     "h2",
     "h3",
     "h4",
     "h5",
     "h6",
+    "header",
     "hr",
     "i",
     "img",
+    "input",
     "list",
+    "main",
+    "mark",
+    "nav",
     "ul",
     "ol",
     "li",
     "p",
     "pre",
+    "q",
     "script",
+    "section",
     "style",
     "s",
     "strong",
     "samp",
     "sub",
+    "summary",
     "sup",
     "table",
     "caption",
@@ -56,7 +72,6 @@ SupportedElements = Literal[
     "th",
     "tr",
     "kbd",
-    "mark",
 ]
 
 Converter = Callable[[str, Tag], str]
@@ -120,10 +135,21 @@ def _convert_a(*, tag: Tag, text: str, autolinks: bool, default_title: bool) -> 
     return f"{prefix}[{text}]({href}{title_part}){suffix}" if href else text
 
 
-def _convert_blockquote(*, text: str, convert_as_inline: bool) -> str:
+def _convert_blockquote(*, text: str, tag: Tag, convert_as_inline: bool) -> str:
     if convert_as_inline:
         return text
-    return f"\n{line_beginning_re.sub('> ', text.strip())}\n\n" if text else ""
+
+    if not text:
+        return ""
+
+    # Handle cite attribute
+    cite_url = tag.get("cite")
+    quote_text = f"\n{line_beginning_re.sub('> ', text.strip())}\n\n"
+
+    if cite_url:
+        quote_text += f"\n— <{cite_url}>\n\n"
+
+    return quote_text
 
 
 def _convert_br(*, convert_as_inline: bool, newline_style: str) -> str:
@@ -195,6 +221,17 @@ def _convert_list(*, tag: Tag, text: str) -> str:
 
 
 def _convert_li(*, tag: Tag, text: str, bullets: str) -> str:
+    # Check for task list (checkbox input)
+    checkbox = tag.find("input", {"type": "checkbox"})
+    if checkbox and isinstance(checkbox, Tag):
+        checked = checkbox.get("checked") is not None
+        checkbox_symbol = "[x]" if checked else "[ ]"
+        # Remove the checkbox from the text content
+        checkbox_text = text
+        if checkbox.string:
+            checkbox_text = text.replace(str(checkbox.string), "").strip()
+        return f"- {checkbox_symbol} {checkbox_text.strip()}\n"
+
     parent = tag.parent
     if parent is not None and parent.name == "ol":
         start = (
@@ -312,6 +349,148 @@ def _convert_tr(*, tag: Tag, text: str) -> str:
     return overline + "|" + text + "\n" + underline
 
 
+def _convert_semantic_block(*, text: str, convert_as_inline: bool) -> str:
+    """Convert HTML5 semantic elements to block-level Markdown.
+
+    Args:
+        text: The text content of the semantic element.
+        convert_as_inline: Whether to convert as inline content.
+
+    Returns:
+        The converted markdown text with proper block spacing.
+    """
+    if convert_as_inline:
+        return text
+
+    return f"{text}\n\n" if text.strip() else ""
+
+
+def _convert_details(*, text: str, convert_as_inline: bool) -> str:
+    """Convert HTML details element preserving HTML structure.
+
+    Args:
+        text: The text content of the details element.
+        convert_as_inline: Whether to convert as inline content.
+
+    Returns:
+        The converted markdown text preserving HTML structure.
+    """
+    if convert_as_inline:
+        return text
+
+    return f"<details>\n{text.strip()}\n</details>\n\n" if text.strip() else ""
+
+
+def _convert_summary(*, text: str, convert_as_inline: bool) -> str:
+    """Convert HTML summary element preserving HTML structure.
+
+    Args:
+        text: The text content of the summary element.
+        convert_as_inline: Whether to convert as inline content.
+
+    Returns:
+        The converted markdown text preserving HTML structure.
+    """
+    if convert_as_inline:
+        return text
+
+    return f"<summary>{text.strip()}</summary>\n\n" if text.strip() else ""
+
+
+def _convert_dl(*, text: str, convert_as_inline: bool) -> str:
+    """Convert HTML definition list element.
+
+    Args:
+        text: The text content of the definition list.
+        convert_as_inline: Whether to convert as inline content.
+
+    Returns:
+        The converted markdown text with proper spacing.
+    """
+    if convert_as_inline:
+        return text
+
+    return f"{text}\n" if text.strip() else ""
+
+
+def _convert_dt(*, text: str, convert_as_inline: bool) -> str:
+    """Convert HTML definition term element.
+
+    Args:
+        text: The text content of the definition term.
+        convert_as_inline: Whether to convert as inline content.
+
+    Returns:
+        The converted markdown text as a definition term.
+    """
+    if convert_as_inline:
+        return text
+
+    if not text.strip():
+        return ""
+
+    return f"{text.strip()}\n"
+
+
+def _convert_dd(*, text: str, convert_as_inline: bool) -> str:
+    """Convert HTML definition description element.
+
+    Args:
+        text: The text content of the definition description.
+        convert_as_inline: Whether to convert as inline content.
+
+    Returns:
+        The converted markdown text as a definition description.
+    """
+    if convert_as_inline:
+        return text
+
+    if not text.strip():
+        return ""
+
+    return f":   {text.strip()}\n\n"
+
+
+def _convert_cite(*, text: str, convert_as_inline: bool) -> str:
+    """Convert HTML cite element to italic text.
+
+    Args:
+        text: The text content of the cite element.
+        convert_as_inline: Whether to convert as inline content.
+
+    Returns:
+        The converted markdown text in italic format.
+    """
+    if convert_as_inline:
+        return text
+
+    if not text.strip():
+        return ""
+
+    return f"*{text.strip()}*"
+
+
+def _convert_q(*, text: str, convert_as_inline: bool) -> str:
+    """Convert HTML q element to quoted text.
+
+    Args:
+        text: The text content of the q element.
+        convert_as_inline: Whether to convert as inline content.
+
+    Returns:
+        The converted markdown text with quotes.
+    """
+    if convert_as_inline:
+        return text
+
+    if not text.strip():
+        return ""
+
+    # Escape any existing quotes in the text
+    escaped_text = text.strip().replace('"', '\\"')
+    return f'"{escaped_text}"'
+
+
 def create_converters_map(
     autolinks: bool,
     bullets: str,
@@ -369,27 +548,40 @@ def create_converters_map(
 
     return {
         "a": _wrapper(partial(_convert_a, autolinks=autolinks, default_title=default_title)),
+        "article": _wrapper(_convert_semantic_block),
+        "aside": _wrapper(_convert_semantic_block),
         "b": _wrapper(partial(_create_inline_converter(2 * strong_em_symbol))),
         "blockquote": _wrapper(partial(_convert_blockquote)),
         "br": _wrapper(partial(_convert_br, newline_style=newline_style)),
+        "cite": _wrapper(_convert_cite),
         "code": _wrapper(_create_inline_converter("`")),
+        "dd": _wrapper(_convert_dd),
         "del": _wrapper(_create_inline_converter("~~")),
+        "details": _wrapper(_convert_details),
+        "dl": _wrapper(_convert_dl),
+        "dt": _wrapper(_convert_dt),
         "em": _wrapper(_create_inline_converter(strong_em_symbol)),
+        "footer": _wrapper(_convert_semantic_block),
         "h1": _wrapper(partial(_convert_hn, n=1, heading_style=heading_style)),
         "h2": _wrapper(partial(_convert_hn, n=2, heading_style=heading_style)),
         "h3": _wrapper(partial(_convert_hn, n=3, heading_style=heading_style)),
         "h4": _wrapper(partial(_convert_hn, n=4, heading_style=heading_style)),
         "h5": _wrapper(partial(_convert_hn, n=5, heading_style=heading_style)),
         "h6": _wrapper(partial(_convert_hn, n=6, heading_style=heading_style)),
+        "header": _wrapper(_convert_semantic_block),
         "hr": _wrapper(lambda _: "\n\n---\n\n"),
         "i": _wrapper(partial(_create_inline_converter(strong_em_symbol))),
         "img": _wrapper(partial(_convert_img, keep_inline_images_in=keep_inline_images_in)),
+        "input": _wrapper(lambda _: ""),
+        "kbd": _wrapper(_create_inline_converter("`")),
         "list": _wrapper(_convert_list),
+        "main": _wrapper(_convert_semantic_block),
+        "mark": _wrapper(partial(_convert_mark, highlight_style=highlight_style)),
+        "nav": _wrapper(_convert_semantic_block),
         "ul": _wrapper(_convert_list),
         "ol": _wrapper(_convert_list),
         "li": _wrapper(partial(_convert_li, bullets=bullets)),
         "p": _wrapper(partial(_convert_p, wrap=wrap, wrap_width=wrap_width)),
-        "mark": _wrapper(partial(_convert_mark, highlight_style=highlight_style)),
         "pre": _wrapper(
             partial(
                 _convert_pre,
@@ -397,12 +589,15 @@ def create_converters_map(
                 code_language_callback=code_language_callback,
             )
         ),
+        "q": _wrapper(_convert_q),
         "script": _wrapper(lambda _: ""),
+        "section": _wrapper(_convert_semantic_block),
         "style": _wrapper(lambda _: ""),
         "s": _wrapper(_create_inline_converter("~~")),
         "strong": _wrapper(_create_inline_converter(strong_em_symbol * 2)),
         "samp": _wrapper(_create_inline_converter("`")),
         "sub": _wrapper(_create_inline_converter(sub_symbol)),
+        "summary": _wrapper(_convert_summary),
         "sup": _wrapper(_create_inline_converter(sup_symbol)),
         "table": _wrapper(lambda text: f"\n\n{text}\n"),
         "caption": _wrapper(lambda text: f"{text}\n"),
@@ -410,5 +605,4 @@ def create_converters_map(
         "td": _wrapper(_convert_td),
         "th": _wrapper(_convert_th),
         "tr": _wrapper(_convert_tr),
-        "kbd": _wrapper(_create_inline_converter("`")),
     }
