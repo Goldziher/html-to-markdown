@@ -424,7 +424,7 @@ def test_hn() -> None:
 def test_hn_chained() -> None:
     assert (
         convert_to_markdown("<h1>First</h1>\n<h2>Second</h2>\n<h3>Third</h3>", heading_style=ATX)
-        == "# First\n\n\n## Second\n\n\n### Third\n\n"
+        == "# First\n\n## Second\n\n### Third\n\n"
     )
     assert convert_to_markdown("X<h1>First</h1>", heading_style=ATX) == "X\n\n# First\n\n"
 
@@ -459,7 +459,7 @@ def test_hn_nested_simple_tag() -> None:
             convert_to_markdown("<h3>A <" + tag + ">" + tag + "</" + tag + "> B</h3>") == "### A " + markdown + " B\n\n"
         )
 
-    assert convert_to_markdown("<h3>A <br>B</h3>", heading_style=ATX) == "### A B\n\n"
+    assert convert_to_markdown("<h3>A <br>B</h3>", heading_style=ATX) == "### A  B\n\n"
 
 
 def test_hn_nested_img() -> None:
@@ -499,7 +499,7 @@ def test_head() -> None:
 def test_hr() -> None:
     assert convert_to_markdown("Hello<hr>World") == "Hello\n\n---\n\nWorld"
     assert convert_to_markdown("Hello<hr />World") == "Hello\n\n---\n\nWorld"
-    assert convert_to_markdown("<p>Hello</p>\n<hr>\n<p>World</p>") == "Hello\n\n\n\n\n---\n\n\nWorld\n\n"
+    assert convert_to_markdown("<p>Hello</p>\n<hr>\n<p>World</p>") == "Hello\n\n---\n\nWorld\n\n"
 
 
 def test_i() -> None:

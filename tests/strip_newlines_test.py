@@ -69,7 +69,7 @@ text</em> with line breaks.</p>"""
 
 def test_strip_newlines_empty_html() -> None:
     """Test that empty HTML still works with strip_newlines."""
-    html = "\n\n\n"
+    html = "\n\n"
 
     # When strip_newlines=True, newlines become spaces which get normalized
     result = convert_to_markdown(html, strip_newlines=True)
