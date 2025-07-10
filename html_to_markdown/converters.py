@@ -42,6 +42,7 @@ SupportedElements = Literal[
     "del",
     "details",
     "dfn",
+    "dialog",
     "dl",
     "dt",
     "em",
@@ -68,6 +69,7 @@ SupportedElements = Literal[
     "list",
     "main",
     "mark",
+    "menu",
     "meter",
     "nav",
     "ol",
@@ -1506,6 +1508,66 @@ def _convert_rtc(*, text: str, convert_as_inline: bool) -> str:  # noqa: ARG001
     return text.strip()
 
 
+def _convert_dialog(*, text: str, convert_as_inline: bool, tag: Tag) -> str:
+    """Convert HTML dialog element preserving structure with attributes.
+
+    Args:
+        text: The text content of the dialog element.
+        convert_as_inline: Whether to convert as inline content.
+        tag: The dialog tag element.
+
+    Returns:
+        The converted markdown text preserving dialog structure.
+    """
+    if convert_as_inline:
+        return text
+
+    if not text.strip():
+        return ""
+
+    # Get dialog attributes for preservation
+    attrs = []
+    if tag.get("open") is not None:
+        attrs.append("open")
+    if tag.get("id"):
+        attrs.append(f'id="{tag.get("id")}"')
+
+    attrs_str = " " + " ".join(attrs) if attrs else ""
+
+    return f"<dialog{attrs_str}>\n{text.strip()}\n</dialog>\n\n"
+
+
+def _convert_menu(*, text: str, convert_as_inline: bool, tag: Tag) -> str:
+    """Convert HTML menu element preserving structure with attributes.
+
+    Args:
+        text: The text content of the menu element.
+        convert_as_inline: Whether to convert as inline content.
+        tag: The menu tag element.
+
+    Returns:
+        The converted markdown text preserving menu structure.
+    """
+    if convert_as_inline:
+        return text
+
+    if not text.strip():
+        return ""
+
+    # Get menu attributes for preservation
+    attrs = []
+    if tag.get("type") and tag.get("type") != "list":
+        attrs.append(f'type="{tag.get("type")}"')
+    if tag.get("label"):
+        attrs.append(f'label="{tag.get("label")}"')
+    if tag.get("id"):
+        attrs.append(f'id="{tag.get("id")}"')
+
+    attrs_str = " " + " ".join(attrs) if attrs else ""
+
+    return f"<menu{attrs_str}>\n{text.strip()}\n</menu>\n\n"
+
+
 def create_converters_map(
     autolinks: bool,
     bullets: str,
@@ -1584,6 +1646,7 @@ def create_converters_map(
         "del": _wrapper(_create_inline_converter("~~")),
         "details": _wrapper(_convert_details),
         "dfn": _wrapper(_create_inline_converter("*")),  # Definition term - italic
+        "dialog": _wrapper(_convert_dialog),
         "dl": _wrapper(_convert_dl),
         "dt": _wrapper(_convert_dt),
         "em": _wrapper(_create_inline_converter(strong_em_symbol)),
@@ -1611,6 +1674,7 @@ def create_converters_map(
         "list": _wrapper(_convert_list),
         "main": _wrapper(_convert_semantic_block),
         "mark": _wrapper(partial(_convert_mark, highlight_style=highlight_style)),
+        "menu": _wrapper(_convert_menu),
         "meter": _wrapper(_convert_meter),
         "nav": _wrapper(_convert_semantic_block),
         "ol": _wrapper(_convert_list),
