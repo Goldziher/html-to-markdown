@@ -550,7 +550,6 @@ def test_p() -> None:
 
 
 def test_mark_tag() -> None:
-
     """Test basic mark tag conversion with default double-equal style."""
     html = "<mark>highlighted</mark>"
     expected = "==highlighted=="
