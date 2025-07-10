@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
+import base64
 import re
 from functools import partial
 from inspect import getfullargspec
@@ -72,6 +73,7 @@ SupportedElements = Literal[
     "list",
     "main",
     "mark",
+    "math",
     "menu",
     "meter",
     "nav",
@@ -101,6 +103,7 @@ SupportedElements = Literal[
     "sub",
     "summary",
     "sup",
+    "svg",
     "table",
     "tbody",
     "td",
@@ -1696,6 +1699,68 @@ def _convert_picture(*, text: str, convert_as_inline: bool, tag: Tag) -> str:
     return img_markdown
 
 
+def _convert_svg(*, text: str, convert_as_inline: bool, tag: Tag) -> str:
+    """Convert SVG element to Markdown image reference.
+
+    Args:
+        text: The text content of the SVG element.
+        convert_as_inline: Whether to convert as inline content.
+        tag: The SVG tag element.
+
+    Returns:
+        The converted markdown text as an image reference.
+    """
+    if convert_as_inline:
+        # In inline mode, just return any text content
+        return text.strip()
+
+    # Get SVG attributes
+    title = tag.find("title")
+    title_text = title.get_text().strip() if title else ""
+
+    # For inline SVG, we'll convert to a data URI
+    # First, we need to get the full SVG markup
+    svg_markup = str(tag)
+
+    # Create a data URI
+    svg_bytes = svg_markup.encode("utf-8")
+    svg_base64 = base64.b64encode(svg_bytes).decode("utf-8")
+    data_uri = f"data:image/svg+xml;base64,{svg_base64}"
+
+    # Use title as alt text, or "SVG Image" if no title
+    alt_text = title_text or "SVG Image"
+
+    return f"![{alt_text}]({data_uri})"
+
+
+def _convert_math(*, text: str, convert_as_inline: bool, tag: Tag) -> str:
+    """Convert MathML math element preserving mathematical notation.
+
+    Args:
+        text: The text content of the math element.
+        convert_as_inline: Whether to convert as inline content.
+        tag: The math tag element.
+
+    Returns:
+        The converted markdown text preserving math structure.
+    """
+    if not text.strip():
+        return ""
+
+    # Check if it's display math vs inline math
+    display = tag.get("display") == "block"
+
+    # For now, preserve the MathML as a comment with the text representation
+    # This allows systems that understand MathML to process it
+    math_comment = f"<!-- MathML: {tag!s} -->"
+
+    if convert_as_inline or not display:
+        # Inline math - just the text with comment
+        return f"{math_comment}{text.strip()}"
+    # Display math - on its own line
+    return f"\n\n{math_comment}\n{text.strip()}\n\n"
+
+
 def create_converters_map(
     autolinks: bool,
     bullets: str,
@@ -1804,6 +1869,7 @@ def create_converters_map(
         "list": _wrapper(_convert_list),
         "main": _wrapper(_convert_semantic_block),
         "mark": _wrapper(partial(_convert_mark, highlight_style=highlight_style)),
+        "math": _wrapper(_convert_math),
         "menu": _wrapper(_convert_menu),
         "meter": _wrapper(_convert_meter),
         "nav": _wrapper(_convert_semantic_block),
@@ -1838,6 +1904,7 @@ def create_converters_map(
         "sub": _wrapper(_create_inline_converter(sub_symbol)),
         "summary": _wrapper(_convert_summary),
         "sup": _wrapper(_create_inline_converter(sup_symbol)),
+        "svg": _wrapper(_convert_svg),
         "table": _wrapper(lambda text: f"\n\n{text}\n"),
         "tbody": _wrapper(_convert_tbody),
         "td": _wrapper(_convert_td),
