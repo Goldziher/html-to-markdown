@@ -16,7 +16,7 @@ def mock_convert_to_markdown() -> Generator[Mock, None, None]:
 
 @pytest.fixture
 def mock_stdin() -> Generator[None, None, None]:
-    with patch("html_to_markdown.cli.stdin", new=StringIO("<html><body><p>Test from stdin</p></body></html>")):
+    with patch("sys.stdin", new=StringIO("<html><body><p>Test from stdin</p></body></html>")):
         yield
 
 

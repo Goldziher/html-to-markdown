@@ -65,6 +65,7 @@ dev = [
   "pytest-mock>=3.14.1",
   "ruff>=0.12.2",
   "types-beautifulsoup4>=4.12.0.20250516",
+  "types-psutil>=7.0.0.20250601",
   "uv-bump",
 ]
 
@@ -87,6 +88,7 @@ format.docstring-code-format = true
 lint.select = [ "ALL" ]
 lint.ignore = [
   "ANN401",  # dynamically typed ANY
+  "C901",    # Complex function complexity - allow for streaming functions
   "COM812",  # Conflicts with formatter
   "D100",    # pydocstyle - missing docstring in public module
   "D104",    # pydocstyle - missing docstring in public package
@@ -97,11 +99,14 @@ lint.ignore = [
   "FBT",     # Boolean Args
   "FIX",     # we allow todo and fixme comments
   "ISC001",  # Conflicts with formatter
+  "PLR0912", # Pylint - too many branches - allow for streaming functions
   "PLR0913", # Pylint - too many arguments
+  "PLR0915", # Pylint - too many statements - allow for performance tests
   "PLR2004", # Magic variables, we allow them
   "TD",      # we allow todo and fixme comments
   "TRY",     # Try except block, rules are too strict
 ]
+lint.per-file-ignores."performance_test.py" = [ "PLC0415", "S101", "UP006", "UP035" ]
 lint.per-file-ignores."tests/**/*.*" = [ "ARG", "D", "PD", "PT006", "PT013", "S" ]
 lint.isort.known-first-party = [ "html_to_markdown", "tests" ]
 lint.pydocstyle.convention = "google"
