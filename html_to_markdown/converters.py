@@ -21,20 +21,27 @@ from html_to_markdown.utils import chomp, indent, underline
 
 SupportedElements = Literal[
     "a",
+    "abbr",
     "article",
     "aside",
     "audio",
     "b",
+    "bdi",
+    "bdo",
     "blockquote",
     "br",
+    "caption",
     "cite",
     "code",
+    "data",
     "dd",
     "del",
     "details",
+    "dfn",
     "dl",
     "dt",
     "em",
+    "figcaption",
     "footer",
     "h1",
     "h2",
@@ -48,33 +55,37 @@ SupportedElements = Literal[
     "iframe",
     "img",
     "input",
+    "ins",
+    "kbd",
     "list",
     "main",
     "mark",
     "nav",
-    "ul",
     "ol",
     "li",
     "p",
     "pre",
     "q",
+    "s",
+    "samp",
     "script",
     "section",
-    "style",
-    "s",
+    "small",
     "strong",
-    "samp",
+    "style",
     "sub",
     "summary",
     "sup",
     "table",
-    "caption",
-    "figcaption",
     "td",
     "th",
+    "time",
     "tr",
-    "kbd",
+    "u",
+    "ul",
+    "var",
     "video",
+    "wbr",
 ]
 
 Converter = Callable[[str, Tag], str]
@@ -684,6 +695,88 @@ def _convert_iframe(*, tag: Tag, text: str, convert_as_inline: bool) -> str:  # 
     return "<iframe></iframe>\n\n"
 
 
+def _convert_abbr(*, tag: Tag, text: str, convert_as_inline: bool) -> str:
+    """Convert HTML abbr element to text with optional title.
+
+    Args:
+        tag: The abbr tag element.
+        text: The text content of the abbr element.
+        convert_as_inline: Whether to convert as inline content.
+
+    Returns:
+        The converted markdown text with optional title annotation.
+    """
+    _ = convert_as_inline  # Unused but kept for API consistency
+    if not text.strip():
+        return ""
+
+    title = tag.get("title")
+    if title and isinstance(title, str) and title.strip():
+        # Show abbreviation with title in parentheses
+        return f"{text.strip()} ({title.strip()})"
+
+    return text.strip()
+
+
+def _convert_time(*, tag: Tag, text: str, convert_as_inline: bool) -> str:
+    """Convert HTML time element preserving datetime attribute.
+
+    Args:
+        tag: The time tag element.
+        text: The text content of the time element.
+        convert_as_inline: Whether to convert as inline content.
+
+    Returns:
+        The converted markdown text preserving time information.
+    """
+    _ = convert_as_inline  # Unused but kept for API consistency
+    if not text.strip():
+        return ""
+
+    datetime_attr = tag.get("datetime")
+    if datetime_attr and isinstance(datetime_attr, str) and datetime_attr.strip():
+        # Preserve machine-readable datetime in HTML
+        return f'<time datetime="{datetime_attr.strip()}">{text.strip()}</time>'
+
+    return text.strip()
+
+
+def _convert_data(*, tag: Tag, text: str, convert_as_inline: bool) -> str:
+    """Convert HTML data element preserving value attribute.
+
+    Args:
+        tag: The data tag element.
+        text: The text content of the data element.
+        convert_as_inline: Whether to convert as inline content.
+
+    Returns:
+        The converted markdown text preserving machine-readable data.
+    """
+    _ = convert_as_inline  # Unused but kept for API consistency
+    if not text.strip():
+        return ""
+
+    value_attr = tag.get("value")
+    if value_attr and isinstance(value_attr, str) and value_attr.strip():
+        # Preserve machine-readable value in HTML
+        return f'<data value="{value_attr.strip()}">{text.strip()}</data>'
+
+    return text.strip()
+
+
+def _convert_wbr(*, convert_as_inline: bool) -> str:
+    """Convert HTML wbr (word break opportunity) element.
+
+    Args:
+        convert_as_inline: Whether to convert as inline content.
+
+    Returns:
+        Empty string as wbr is just a break opportunity.
+    """
+    _ = convert_as_inline  # Unused but kept for API consistency
+    return ""  # Word break opportunity doesn't produce visible output
+
+
 def create_converters_map(
     autolinks: bool,
     bullets: str,
@@ -741,20 +834,27 @@ def create_converters_map(
 
     return {
         "a": _wrapper(partial(_convert_a, autolinks=autolinks, default_title=default_title)),
+        "abbr": _wrapper(_convert_abbr),
         "article": _wrapper(_convert_semantic_block),
         "aside": _wrapper(_convert_semantic_block),
         "audio": _wrapper(_convert_audio),
         "b": _wrapper(partial(_create_inline_converter(2 * strong_em_symbol))),
+        "bdi": _wrapper(_create_inline_converter("")),  # Bidirectional isolation - pass through
+        "bdo": _wrapper(_create_inline_converter("")),  # Bidirectional override - pass through
         "blockquote": _wrapper(partial(_convert_blockquote)),
         "br": _wrapper(partial(_convert_br, newline_style=newline_style)),
+        "caption": _wrapper(lambda text: f"{text}\n"),
         "cite": _wrapper(_convert_cite),
         "code": _wrapper(_create_inline_converter("`")),
+        "data": _wrapper(_convert_data),
         "dd": _wrapper(_convert_dd),
         "del": _wrapper(_create_inline_converter("~~")),
         "details": _wrapper(_convert_details),
+        "dfn": _wrapper(_create_inline_converter("*")),  # Definition term - italic
         "dl": _wrapper(_convert_dl),
         "dt": _wrapper(_convert_dt),
         "em": _wrapper(_create_inline_converter(strong_em_symbol)),
+        "figcaption": _wrapper(lambda text: f"\n\n{text}\n\n"),
         "footer": _wrapper(_convert_semantic_block),
         "h1": _wrapper(partial(_convert_hn, n=1, heading_style=heading_style)),
         "h2": _wrapper(partial(_convert_hn, n=2, heading_style=heading_style)),
@@ -768,14 +868,14 @@ def create_converters_map(
         "iframe": _wrapper(_convert_iframe),
         "img": _wrapper(partial(_convert_img, keep_inline_images_in=keep_inline_images_in)),
         "input": _wrapper(lambda _: ""),
+        "ins": _wrapper(_create_inline_converter("==")),  # Inserted text - highlight style
         "kbd": _wrapper(_create_inline_converter("`")),
+        "li": _wrapper(partial(_convert_li, bullets=bullets)),
         "list": _wrapper(_convert_list),
         "main": _wrapper(_convert_semantic_block),
         "mark": _wrapper(partial(_convert_mark, highlight_style=highlight_style)),
         "nav": _wrapper(_convert_semantic_block),
-        "ul": _wrapper(_convert_list),
         "ol": _wrapper(_convert_list),
-        "li": _wrapper(partial(_convert_li, bullets=bullets)),
         "p": _wrapper(partial(_convert_p, wrap=wrap, wrap_width=wrap_width)),
         "pre": _wrapper(
             partial(
@@ -785,20 +885,24 @@ def create_converters_map(
             )
         ),
         "q": _wrapper(_convert_q),
+        "s": _wrapper(_create_inline_converter("~~")),
+        "samp": _wrapper(_create_inline_converter("`")),
         "script": _wrapper(lambda _: ""),
         "section": _wrapper(_convert_semantic_block),
-        "style": _wrapper(lambda _: ""),
-        "s": _wrapper(_create_inline_converter("~~")),
+        "small": _wrapper(_create_inline_converter("")),  # Small text - pass through
         "strong": _wrapper(_create_inline_converter(strong_em_symbol * 2)),
-        "samp": _wrapper(_create_inline_converter("`")),
+        "style": _wrapper(lambda _: ""),
         "sub": _wrapper(_create_inline_converter(sub_symbol)),
         "summary": _wrapper(_convert_summary),
         "sup": _wrapper(_create_inline_converter(sup_symbol)),
         "table": _wrapper(lambda text: f"\n\n{text}\n"),
-        "caption": _wrapper(lambda text: f"{text}\n"),
-        "figcaption": _wrapper(lambda text: f"\n\n{text}\n\n"),
         "td": _wrapper(_convert_td),
         "th": _wrapper(_convert_th),
+        "time": _wrapper(_convert_time),
         "tr": _wrapper(_convert_tr),
+        "u": _wrapper(_create_inline_converter("")),  # Underlined text - pass through (no Markdown equivalent)
+        "ul": _wrapper(_convert_list),
+        "var": _wrapper(_create_inline_converter("*")),  # Variable - italic
         "video": _wrapper(_convert_video),
+        "wbr": _wrapper(_convert_wbr),
     }
