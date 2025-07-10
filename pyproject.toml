@@ -5,7 +5,7 @@ requires = [ "setuptools>=78.1" ]
 
 [project]
 name = "html-to-markdown"
-version = "1.4.0"
+version = "1.5.0"
 description = "A modern, type-safe Python library for converting HTML to Markdown with comprehensive tag support and customizable options"
 readme = "README.md"
 keywords = [
@@ -43,9 +43,7 @@ classifiers = [
   "Topic :: Utilities",
   "Typing :: Typed",
 ]
-dependencies = [
-  "beautifulsoup4>=4.13.4",
-]
+dependencies = [ "beautifulsoup4>=4.13.4" ]
 
 urls.Changelog = "https://github.com/Goldziher/html-to-markdown/releases"
 urls.Homepage = "https://github.com/Goldziher/html-to-markdown"
@@ -106,7 +104,12 @@ lint.ignore = [
   "TD",      # we allow todo and fixme comments
   "TRY",     # Try except block, rules are too strict
 ]
-lint.per-file-ignores."performance_test.py" = [ "PLC0415", "S101", "UP006", "UP035" ]
+lint.per-file-ignores."performance_test.py" = [
+  "PLC0415",
+  "S101",
+  "UP006",
+  "UP035",
+]
 lint.per-file-ignores."tests/**/*.*" = [ "ARG", "D", "PD", "PT006", "PT013", "S" ]
 lint.isort.known-first-party = [ "html_to_markdown", "tests" ]
 lint.pydocstyle.convention = "google"
