@@ -30,10 +30,12 @@ SupportedElements = Literal[
     "bdo",
     "blockquote",
     "br",
+    "button",
     "caption",
     "cite",
     "code",
     "data",
+    "datalist",
     "dd",
     "del",
     "details",
@@ -41,8 +43,10 @@ SupportedElements = Literal[
     "dl",
     "dt",
     "em",
+    "fieldset",
     "figcaption",
     "footer",
+    "form",
     "h1",
     "h2",
     "h3",
@@ -57,19 +61,27 @@ SupportedElements = Literal[
     "input",
     "ins",
     "kbd",
+    "label",
+    "legend",
     "list",
     "main",
     "mark",
+    "meter",
     "nav",
     "ol",
     "li",
+    "optgroup",
+    "option",
+    "output",
     "p",
     "pre",
+    "progress",
     "q",
     "s",
     "samp",
     "script",
     "section",
+    "select",
     "small",
     "strong",
     "style",
@@ -78,6 +90,7 @@ SupportedElements = Literal[
     "sup",
     "table",
     "td",
+    "textarea",
     "th",
     "time",
     "tr",
@@ -777,6 +790,489 @@ def _convert_wbr(*, convert_as_inline: bool) -> str:
     return ""  # Word break opportunity doesn't produce visible output
 
 
+def _convert_form(*, tag: Tag, text: str, convert_as_inline: bool) -> str:
+    """Convert HTML form element preserving structure for documentation.
+
+    Args:
+        tag: The form tag element.
+        text: The text content of the form element.
+        convert_as_inline: Whether to convert as inline content.
+
+    Returns:
+        The converted markdown text preserving form structure.
+    """
+    if convert_as_inline:
+        return text
+
+    if not text.strip():
+        return ""
+
+    action = tag.get("action", "")
+    method = tag.get("method", "")
+    attrs = []
+
+    if action and isinstance(action, str) and action.strip():
+        attrs.append(f'action="{action.strip()}"')
+    if method and isinstance(method, str) and method.strip():
+        attrs.append(f'method="{method.strip()}"')
+
+    attrs_str = " ".join(attrs)
+    if attrs_str:
+        return f"<form {attrs_str}>\n{text.strip()}\n</form>\n\n"
+    return f"<form>\n{text.strip()}\n</form>\n\n"
+
+
+def _convert_fieldset(*, text: str, convert_as_inline: bool) -> str:
+    """Convert HTML fieldset element preserving structure.
+
+    Args:
+        text: The text content of the fieldset element.
+        convert_as_inline: Whether to convert as inline content.
+
+    Returns:
+        The converted markdown text preserving fieldset structure.
+    """
+    if convert_as_inline:
+        return text
+
+    if not text.strip():
+        return ""
+
+    return f"<fieldset>\n{text.strip()}\n</fieldset>\n\n"
+
+
+def _convert_legend(*, text: str, convert_as_inline: bool) -> str:
+    """Convert HTML legend element to emphasized text.
+
+    Args:
+        text: The text content of the legend element.
+        convert_as_inline: Whether to convert as inline content.
+
+    Returns:
+        The converted markdown text as emphasized legend.
+    """
+    if convert_as_inline:
+        return text
+
+    if not text.strip():
+        return ""
+
+    return f"<legend>{text.strip()}</legend>\n\n"
+
+
+def _convert_label(*, tag: Tag, text: str, convert_as_inline: bool) -> str:
+    """Convert HTML label element preserving for attribute.
+
+    Args:
+        tag: The label tag element.
+        text: The text content of the label element.
+        convert_as_inline: Whether to convert as inline content.
+
+    Returns:
+        The converted markdown text preserving label structure.
+    """
+    if convert_as_inline:
+        return text
+
+    if not text.strip():
+        return ""
+
+    for_attr = tag.get("for")
+    if for_attr and isinstance(for_attr, str) and for_attr.strip():
+        return f'<label for="{for_attr.strip()}">{text.strip()}</label>\n\n'
+
+    return f"<label>{text.strip()}</label>\n\n"
+
+
+def _convert_input_enhanced(*, tag: Tag, convert_as_inline: bool) -> str:  # noqa: C901
+    """Convert HTML input element preserving all relevant attributes.
+
+    Args:
+        tag: The input tag element.
+        convert_as_inline: Whether to convert as inline content.
+
+    Returns:
+        The converted markdown text preserving input structure.
+    """
+    input_type = tag.get("type", "text")
+
+    # Special handling for inputs in list items - let _convert_li handle checkboxes
+    # and ignore other input types in list items (legacy behavior)
+    if tag.find_parent("li"):
+        return ""
+
+    id_attr = tag.get("id", "")
+    name = tag.get("name", "")
+    value = tag.get("value", "")
+    placeholder = tag.get("placeholder", "")
+    required = tag.get("required") is not None
+    disabled = tag.get("disabled") is not None
+    readonly = tag.get("readonly") is not None
+    checked = tag.get("checked") is not None
+    accept = tag.get("accept", "")
+
+    attrs = []
+    if input_type and isinstance(input_type, str):
+        attrs.append(f'type="{input_type}"')
+    if id_attr and isinstance(id_attr, str) and id_attr.strip():
+        attrs.append(f'id="{id_attr}"')
+    if name and isinstance(name, str) and name.strip():
+        attrs.append(f'name="{name}"')
+    if value and isinstance(value, str) and value.strip():
+        attrs.append(f'value="{value}"')
+    if placeholder and isinstance(placeholder, str) and placeholder.strip():
+        attrs.append(f'placeholder="{placeholder}"')
+    if accept and isinstance(accept, str) and accept.strip():
+        attrs.append(f'accept="{accept}"')
+    if required:
+        attrs.append("required")
+    if disabled:
+        attrs.append("disabled")
+    if readonly:
+        attrs.append("readonly")
+    if checked:
+        attrs.append("checked")
+
+    attrs_str = " ".join(attrs)
+    result = f"<input {attrs_str} />" if attrs_str else "<input />"
+
+    return result if convert_as_inline else f"{result}\n\n"
+
+
+def _convert_textarea(*, tag: Tag, text: str, convert_as_inline: bool) -> str:
+    """Convert HTML textarea element preserving attributes.
+
+    Args:
+        tag: The textarea tag element.
+        text: The text content of the textarea element.
+        convert_as_inline: Whether to convert as inline content.
+
+    Returns:
+        The converted markdown text preserving textarea structure.
+    """
+    if convert_as_inline:
+        return text
+
+    if not text.strip():
+        return ""
+
+    name = tag.get("name", "")
+    placeholder = tag.get("placeholder", "")
+    rows = tag.get("rows", "")
+    cols = tag.get("cols", "")
+    required = tag.get("required") is not None
+
+    attrs = []
+    if name and isinstance(name, str) and name.strip():
+        attrs.append(f'name="{name}"')
+    if placeholder and isinstance(placeholder, str) and placeholder.strip():
+        attrs.append(f'placeholder="{placeholder}"')
+    if rows and isinstance(rows, str) and rows.strip():
+        attrs.append(f'rows="{rows}"')
+    if cols and isinstance(cols, str) and cols.strip():
+        attrs.append(f'cols="{cols}"')
+    if required:
+        attrs.append("required")
+
+    attrs_str = " ".join(attrs)
+    content = text.strip()
+
+    if attrs_str:
+        return f"<textarea {attrs_str}>{content}</textarea>\n\n"
+    return f"<textarea>{content}</textarea>\n\n"
+
+
+def _convert_select(*, tag: Tag, text: str, convert_as_inline: bool) -> str:
+    """Convert HTML select element preserving structure.
+
+    Args:
+        tag: The select tag element.
+        text: The text content of the select element.
+        convert_as_inline: Whether to convert as inline content.
+
+    Returns:
+        The converted markdown text preserving select structure.
+    """
+    if convert_as_inline:
+        return text
+
+    if not text.strip():
+        return ""
+
+    id_attr = tag.get("id", "")
+    name = tag.get("name", "")
+    multiple = tag.get("multiple") is not None
+    required = tag.get("required") is not None
+
+    attrs = []
+    if id_attr and isinstance(id_attr, str) and id_attr.strip():
+        attrs.append(f'id="{id_attr}"')
+    if name and isinstance(name, str) and name.strip():
+        attrs.append(f'name="{name}"')
+    if multiple:
+        attrs.append("multiple")
+    if required:
+        attrs.append("required")
+
+    attrs_str = " ".join(attrs)
+    content = text.strip()
+
+    if attrs_str:
+        return f"<select {attrs_str}>\n{content}\n</select>\n\n"
+    return f"<select>\n{content}\n</select>\n\n"
+
+
+def _convert_option(*, tag: Tag, text: str, convert_as_inline: bool) -> str:
+    """Convert HTML option element preserving value and selected state.
+
+    Args:
+        tag: The option tag element.
+        text: The text content of the option element.
+        convert_as_inline: Whether to convert as inline content.
+
+    Returns:
+        The converted markdown text preserving option structure.
+    """
+    if convert_as_inline:
+        return text
+
+    if not text.strip():
+        return ""
+
+    value = tag.get("value", "")
+    selected = tag.get("selected") is not None
+
+    attrs = []
+    if value and isinstance(value, str) and value.strip():
+        attrs.append(f'value="{value}"')
+    if selected:
+        attrs.append("selected")
+
+    attrs_str = " ".join(attrs)
+    content = text.strip()
+
+    if attrs_str:
+        return f"<option {attrs_str}>{content}</option>\n"
+    return f"<option>{content}</option>\n"
+
+
+def _convert_optgroup(*, tag: Tag, text: str, convert_as_inline: bool) -> str:
+    """Convert HTML optgroup element preserving label.
+
+    Args:
+        tag: The optgroup tag element.
+        text: The text content of the optgroup element.
+        convert_as_inline: Whether to convert as inline content.
+
+    Returns:
+        The converted markdown text preserving optgroup structure.
+    """
+    if convert_as_inline:
+        return text
+
+    if not text.strip():
+        return ""
+
+    label = tag.get("label", "")
+
+    attrs = []
+    if label and isinstance(label, str) and label.strip():
+        attrs.append(f'label="{label}"')
+
+    attrs_str = " ".join(attrs)
+    content = text.strip()
+
+    if attrs_str:
+        return f"<optgroup {attrs_str}>\n{content}\n</optgroup>\n"
+    return f"<optgroup>\n{content}\n</optgroup>\n"
+
+
+def _convert_button(*, tag: Tag, text: str, convert_as_inline: bool) -> str:
+    """Convert HTML button element preserving type and attributes.
+
+    Args:
+        tag: The button tag element.
+        text: The text content of the button element.
+        convert_as_inline: Whether to convert as inline content.
+
+    Returns:
+        The converted markdown text preserving button structure.
+    """
+    if convert_as_inline:
+        return text
+
+    if not text.strip():
+        return ""
+
+    button_type = tag.get("type", "")
+    name = tag.get("name", "")
+    value = tag.get("value", "")
+    disabled = tag.get("disabled") is not None
+
+    attrs = []
+    if button_type and isinstance(button_type, str) and button_type.strip():
+        attrs.append(f'type="{button_type}"')
+    if name and isinstance(name, str) and name.strip():
+        attrs.append(f'name="{name}"')
+    if value and isinstance(value, str) and value.strip():
+        attrs.append(f'value="{value}"')
+    if disabled:
+        attrs.append("disabled")
+
+    attrs_str = " ".join(attrs)
+
+    if attrs_str:
+        return f"<button {attrs_str}>{text.strip()}</button>\n\n"
+    return f"<button>{text.strip()}</button>\n\n"
+
+
+def _convert_progress(*, tag: Tag, text: str, convert_as_inline: bool) -> str:
+    """Convert HTML progress element preserving value and max.
+
+    Args:
+        tag: The progress tag element.
+        text: The text content of the progress element.
+        convert_as_inline: Whether to convert as inline content.
+
+    Returns:
+        The converted markdown text preserving progress structure.
+    """
+    if convert_as_inline:
+        return text
+
+    if not text.strip():
+        return ""
+
+    value = tag.get("value", "")
+    max_val = tag.get("max", "")
+
+    attrs = []
+    if value and isinstance(value, str) and value.strip():
+        attrs.append(f'value="{value}"')
+    if max_val and isinstance(max_val, str) and max_val.strip():
+        attrs.append(f'max="{max_val}"')
+
+    attrs_str = " ".join(attrs)
+    content = text.strip()
+
+    if attrs_str:
+        return f"<progress {attrs_str}>{content}</progress>\n\n"
+    return f"<progress>{content}</progress>\n\n"
+
+
+def _convert_meter(*, tag: Tag, text: str, convert_as_inline: bool) -> str:
+    """Convert HTML meter element preserving value and range attributes.
+
+    Args:
+        tag: The meter tag element.
+        text: The text content of the meter element.
+        convert_as_inline: Whether to convert as inline content.
+
+    Returns:
+        The converted markdown text preserving meter structure.
+    """
+    if convert_as_inline:
+        return text
+
+    if not text.strip():
+        return ""
+
+    value = tag.get("value", "")
+    min_val = tag.get("min", "")
+    max_val = tag.get("max", "")
+    low = tag.get("low", "")
+    high = tag.get("high", "")
+    optimum = tag.get("optimum", "")
+
+    attrs = []
+    if value and isinstance(value, str) and value.strip():
+        attrs.append(f'value="{value}"')
+    if min_val and isinstance(min_val, str) and min_val.strip():
+        attrs.append(f'min="{min_val}"')
+    if max_val and isinstance(max_val, str) and max_val.strip():
+        attrs.append(f'max="{max_val}"')
+    if low and isinstance(low, str) and low.strip():
+        attrs.append(f'low="{low}"')
+    if high and isinstance(high, str) and high.strip():
+        attrs.append(f'high="{high}"')
+    if optimum and isinstance(optimum, str) and optimum.strip():
+        attrs.append(f'optimum="{optimum}"')
+
+    attrs_str = " ".join(attrs)
+    content = text.strip()
+
+    if attrs_str:
+        return f"<meter {attrs_str}>{content}</meter>\n\n"
+    return f"<meter>{content}</meter>\n\n"
+
+
+def _convert_output(*, tag: Tag, text: str, convert_as_inline: bool) -> str:
+    """Convert HTML output element preserving for and name attributes.
+
+    Args:
+        tag: The output tag element.
+        text: The text content of the output element.
+        convert_as_inline: Whether to convert as inline content.
+
+    Returns:
+        The converted markdown text preserving output structure.
+    """
+    if convert_as_inline:
+        return text
+
+    if not text.strip():
+        return ""
+
+    for_attr = tag.get("for", "")
+    name = tag.get("name", "")
+
+    attrs = []
+    if for_attr:
+        # BeautifulSoup returns space-separated attributes as lists
+        for_value = " ".join(for_attr) if isinstance(for_attr, list) else str(for_attr)
+        if for_value.strip():
+            attrs.append(f'for="{for_value}"')
+    if name and isinstance(name, str) and name.strip():
+        attrs.append(f'name="{name}"')
+
+    attrs_str = " ".join(attrs)
+
+    if attrs_str:
+        return f"<output {attrs_str}>{text.strip()}</output>\n\n"
+    return f"<output>{text.strip()}</output>\n\n"
+
+
+def _convert_datalist(*, tag: Tag, text: str, convert_as_inline: bool) -> str:
+    """Convert HTML datalist element preserving structure.
+
+    Args:
+        tag: The datalist tag element.
+        text: The text content of the datalist element.
+        convert_as_inline: Whether to convert as inline content.
+
+    Returns:
+        The converted markdown text preserving datalist structure.
+    """
+    if convert_as_inline:
+        return text
+
+    if not text.strip():
+        return ""
+
+    id_attr = tag.get("id", "")
+
+    attrs = []
+    if id_attr and isinstance(id_attr, str) and id_attr.strip():
+        attrs.append(f'id="{id_attr}"')
+
+    attrs_str = " ".join(attrs)
+    content = text.strip()
+
+    if attrs_str:
+        return f"<datalist {attrs_str}>\n{content}\n</datalist>\n\n"
+    return f"<datalist>\n{content}\n</datalist>\n\n"
+
+
 def create_converters_map(
     autolinks: bool,
     bullets: str,
@@ -843,10 +1339,12 @@ def create_converters_map(
         "bdo": _wrapper(_create_inline_converter("")),  # Bidirectional override - pass through
         "blockquote": _wrapper(partial(_convert_blockquote)),
         "br": _wrapper(partial(_convert_br, newline_style=newline_style)),
+        "button": _wrapper(_convert_button),
         "caption": _wrapper(lambda text: f"{text}\n"),
         "cite": _wrapper(_convert_cite),
         "code": _wrapper(_create_inline_converter("`")),
         "data": _wrapper(_convert_data),
+        "datalist": _wrapper(_convert_datalist),
         "dd": _wrapper(_convert_dd),
         "del": _wrapper(_create_inline_converter("~~")),
         "details": _wrapper(_convert_details),
@@ -854,8 +1352,10 @@ def create_converters_map(
         "dl": _wrapper(_convert_dl),
         "dt": _wrapper(_convert_dt),
         "em": _wrapper(_create_inline_converter(strong_em_symbol)),
+        "fieldset": _wrapper(_convert_fieldset),
         "figcaption": _wrapper(lambda text: f"\n\n{text}\n\n"),
         "footer": _wrapper(_convert_semantic_block),
+        "form": _wrapper(_convert_form),
         "h1": _wrapper(partial(_convert_hn, n=1, heading_style=heading_style)),
         "h2": _wrapper(partial(_convert_hn, n=2, heading_style=heading_style)),
         "h3": _wrapper(partial(_convert_hn, n=3, heading_style=heading_style)),
@@ -867,15 +1367,21 @@ def create_converters_map(
         "i": _wrapper(partial(_create_inline_converter(strong_em_symbol))),
         "iframe": _wrapper(_convert_iframe),
         "img": _wrapper(partial(_convert_img, keep_inline_images_in=keep_inline_images_in)),
-        "input": _wrapper(lambda _: ""),
+        "input": _wrapper(_convert_input_enhanced),
         "ins": _wrapper(_create_inline_converter("==")),  # Inserted text - highlight style
         "kbd": _wrapper(_create_inline_converter("`")),
+        "label": _wrapper(_convert_label),
+        "legend": _wrapper(_convert_legend),
         "li": _wrapper(partial(_convert_li, bullets=bullets)),
         "list": _wrapper(_convert_list),
         "main": _wrapper(_convert_semantic_block),
         "mark": _wrapper(partial(_convert_mark, highlight_style=highlight_style)),
+        "meter": _wrapper(_convert_meter),
         "nav": _wrapper(_convert_semantic_block),
         "ol": _wrapper(_convert_list),
+        "optgroup": _wrapper(_convert_optgroup),
+        "option": _wrapper(_convert_option),
+        "output": _wrapper(_convert_output),
         "p": _wrapper(partial(_convert_p, wrap=wrap, wrap_width=wrap_width)),
         "pre": _wrapper(
             partial(
@@ -884,11 +1390,13 @@ def create_converters_map(
                 code_language_callback=code_language_callback,
             )
         ),
+        "progress": _wrapper(_convert_progress),
         "q": _wrapper(_convert_q),
         "s": _wrapper(_create_inline_converter("~~")),
         "samp": _wrapper(_create_inline_converter("`")),
         "script": _wrapper(lambda _: ""),
         "section": _wrapper(_convert_semantic_block),
+        "select": _wrapper(_convert_select),
         "small": _wrapper(_create_inline_converter("")),  # Small text - pass through
         "strong": _wrapper(_create_inline_converter(strong_em_symbol * 2)),
         "style": _wrapper(lambda _: ""),
@@ -897,6 +1405,7 @@ def create_converters_map(
         "sup": _wrapper(_create_inline_converter(sup_symbol)),
         "table": _wrapper(lambda text: f"\n\n{text}\n"),
         "td": _wrapper(_convert_td),
+        "textarea": _wrapper(_convert_textarea),
         "th": _wrapper(_convert_th),
         "time": _wrapper(_convert_time),
         "tr": _wrapper(_convert_tr),
