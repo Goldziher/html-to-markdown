@@ -42,6 +42,8 @@ SupportedTag = Literal[
     "caption",
     "cite",
     "code",
+    "col",
+    "colgroup",
     "data",
     "datalist",
     "dd",
@@ -97,9 +99,12 @@ SupportedTag = Literal[
     "summary",
     "sup",
     "table",
+    "tbody",
     "td",
     "textarea",
+    "tfoot",
     "th",
+    "thead",
     "time",
     "tr",
     "u",
@@ -119,9 +124,11 @@ def _is_nested_tag(el: PageElement) -> bool:
         "thead",
         "tbody",
         "tfoot",
+        "colgroup",
         "tr",
         "td",
         "th",
+        "col",
     }
 
 
