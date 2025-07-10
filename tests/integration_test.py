@@ -745,4 +745,4 @@ def test_character_encoding() -> None:
     )
 
     result = convert_to_markdown(html_with_encoding_issue)
-    assert result == "api\\_key\\=”your\\-api\\-key” or by defining GOOGLE\\_API\\_KEY\\=”your\\-api\\-key” as an"
+    assert result == "*api\\_key\\=”your\\-api\\-key”* or by defining *GOOGLE\\_API\\_KEY\\=”your\\-api\\-key”* as an"
