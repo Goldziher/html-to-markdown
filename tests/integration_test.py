@@ -358,11 +358,11 @@ def test_br() -> None:
 def test_caption() -> None:
     assert (
         convert_to_markdown("TEXT<figure><figcaption>Caption</figcaption><span>SPAN</span></figure>")
-        == "TEXT\n\nCaption\n\nSPAN"
+        == "TEXT<figure>\nCaption\n\nSPAN\n</figure>\n\n"
     )
     assert (
         convert_to_markdown("<figure><span>SPAN</span><figcaption>Caption</figcaption></figure>TEXT")
-        == "SPAN\n\nCaption\n\nTEXT"
+        == "<figure>\nSPAN\n\nCaption\n</figure>\n\nTEXT"
     )
 
 
