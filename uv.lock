@@ -3,6 +3,15 @@ revision = 2
 requires-python = ">=3.9"
 
 [[package]]
+name = "ai-rulez"
+version = "1.1.4"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/79/f9/c23ee69e245cbde2171f01fcd9b496f90b89afea1580998a4b4135ad6edf/ai_rulez-1.1.4.tar.gz", hash = "sha256:e66290b055f401bef1a721185c2503d0c2b4dfd48a610565959858566560c3fb", size = 11435, upload-time = "2025-07-09T06:38:29.733Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/93/89/ac55166bbfd0e73348a587ce3b893a825da7e882728085b23da2d0e0cd81/ai_rulez-1.1.4-py3-none-any.whl", hash = "sha256:4efd5737cee5979d362df1bfd373ef20876a4886921f0a5f4cdedef22d5234f2", size = 8882, upload-time = "2025-07-09T06:38:28.531Z" },
+]
+
+[[package]]
 name = "beautifulsoup4"
 version = "4.13.4"
 source = { registry = "https://pypi.org/simple" }
@@ -164,6 +173,7 @@ dependencies = [
 
 [package.dev-dependencies]
 dev = [
+    { name = "ai-rulez" },
     { name = "covdefaults" },
     { name = "mypy" },
     { name = "pre-commit" },
@@ -180,6 +190,7 @@ requires-dist = [{ name = "beautifulsoup4", specifier = ">=4.13.4" }]
 
 [package.metadata.requires-dev]
 dev = [
+    { name = "ai-rulez", specifier = ">=0.12" },
     { name = "covdefaults", specifier = ">=2.3" },
     { name = "mypy", specifier = ">=1.16.1" },
     { name = "pre-commit", specifier = ">=4.1" },
