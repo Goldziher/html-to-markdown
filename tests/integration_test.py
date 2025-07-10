@@ -243,7 +243,7 @@ def test_table(
     )
     assert (
         convert_to_markdown(table_with_caption)
-        == "TEXT\n\nCaption\n| Firstname | Lastname | Age |\n| --- | --- | --- |\n\n"
+        == "TEXT\n\n*Caption*\n\n| Firstname | Lastname | Age |\n| --- | --- | --- |\n\n"
     )
     assert (
         convert_to_markdown(table_with_colspan)
