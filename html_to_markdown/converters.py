@@ -79,6 +79,11 @@ SupportedElements = Literal[
     "pre",
     "progress",
     "q",
+    "rb",
+    "rp",
+    "rt",
+    "rtc",
+    "ruby",
     "s",
     "samp",
     "script",
@@ -1404,6 +1409,103 @@ def _convert_datalist(*, tag: Tag, text: str, convert_as_inline: bool) -> str:
     return f"<datalist>\n{content}\n</datalist>\n\n"
 
 
+def _convert_ruby(*, text: str, convert_as_inline: bool) -> str:  # noqa: ARG001
+    """Convert HTML ruby element providing pronunciation annotation.
+
+    Args:
+        text: The text content of the ruby element.
+        convert_as_inline: Whether to convert as inline content.
+
+    Returns:
+        The converted markdown text with ruby annotation as fallback text.
+    """
+    if not text.strip():
+        return ""
+
+    # Ruby elements are always inline by nature
+    return text.strip()
+
+
+def _convert_rb(*, text: str, convert_as_inline: bool) -> str:  # noqa: ARG001
+    """Convert HTML rb (ruby base) element.
+
+    Args:
+        text: The text content of the rb element.
+        convert_as_inline: Whether to convert as inline content.
+
+    Returns:
+        The converted markdown text (ruby base text).
+    """
+    if not text.strip():
+        return ""
+
+    # Ruby base is the main text, pass through as-is
+    return text.strip()
+
+
+def _convert_rt(*, text: str, convert_as_inline: bool, tag: Tag) -> str:  # noqa: ARG001
+    """Convert HTML rt (ruby text) element for pronunciation.
+
+    Args:
+        text: The text content of the rt element.
+        convert_as_inline: Whether to convert as inline content.
+        tag: The rt tag element.
+
+    Returns:
+        The converted markdown text with pronunciation in parentheses.
+    """
+    # Handle empty rt elements - still need parentheses
+    content = text.strip()
+
+    # Check if this rt is surrounded by rp elements (fallback parentheses)
+    prev_sibling = tag.previous_sibling
+    next_sibling = tag.next_sibling
+
+    # If surrounded by rp elements, don't add extra parentheses
+    has_rp_before = prev_sibling and getattr(prev_sibling, "name", None) == "rp"
+    has_rp_after = next_sibling and getattr(next_sibling, "name", None) == "rp"
+
+    if has_rp_before and has_rp_after:
+        # Already has rp parentheses, just return the text
+        return content
+    # Ruby text (pronunciation) shown in parentheses as fallback
+    return f"({content})"
+
+
+def _convert_rp(*, text: str, convert_as_inline: bool) -> str:  # noqa: ARG001
+    """Convert HTML rp (ruby parentheses) element for fallback.
+
+    Args:
+        text: The text content of the rp element.
+        convert_as_inline: Whether to convert as inline content.
+
+    Returns:
+        The converted markdown text (parentheses for ruby fallback).
+    """
+    if not text.strip():
+        return ""
+
+    # Ruby parentheses preserved for fallback compatibility
+    return text.strip()
+
+
+def _convert_rtc(*, text: str, convert_as_inline: bool) -> str:  # noqa: ARG001
+    """Convert HTML rtc (ruby text container) element.
+
+    Args:
+        text: The text content of the rtc element.
+        convert_as_inline: Whether to convert as inline content.
+
+    Returns:
+        The converted markdown text (ruby text container).
+    """
+    if not text.strip():
+        return ""
+
+    # Ruby text container, pass through content
+    return text.strip()
+
+
 def create_converters_map(
     autolinks: bool,
     bullets: str,
@@ -1525,6 +1627,11 @@ def create_converters_map(
         ),
         "progress": _wrapper(_convert_progress),
         "q": _wrapper(_convert_q),
+        "rb": _wrapper(_convert_rb),
+        "rp": _wrapper(_convert_rp),
+        "rt": _wrapper(_convert_rt),
+        "rtc": _wrapper(_convert_rtc),
+        "ruby": _wrapper(_convert_ruby),
         "s": _wrapper(_create_inline_converter("~~")),
         "samp": _wrapper(_create_inline_converter("`")),
         "script": _wrapper(lambda _: ""),
