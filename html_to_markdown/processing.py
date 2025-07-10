@@ -6,6 +6,7 @@ if TYPE_CHECKING:
     from collections.abc import Generator, Mapping
     # Use the imported PageElement instead of re-importing
 from io import StringIO
+import re
 from itertools import chain
 from typing import TYPE_CHECKING, Any, Callable, Literal, cast
 
@@ -30,6 +31,7 @@ SupportedTag = Literal[
     "a",
     "article",
     "aside",
+    "audio",
     "b",
     "blockquote",
     "br",
@@ -51,6 +53,7 @@ SupportedTag = Literal[
     "header",
     "hr",
     "i",
+    "iframe",
     "img",
     "input",
     "kbd",
@@ -79,6 +82,7 @@ SupportedTag = Literal[
     "td",
     "th",
     "tr",
+    "video",
 ]
 
 
@@ -470,10 +474,17 @@ def convert_to_markdown(
                 context_before=text[-2:],
             )
 
-    # Prepend metadata comment if extracted
-    if metadata_comment:
-        return metadata_comment + text
-    return text
+    # Combine metadata and text
+    result = metadata_comment + text if metadata_comment else text
+
+    # Normalize excessive newlines - max 2 consecutive newlines (one empty line)
+    result = re.sub(r"\n{3,}", "\n\n", result)
+
+    # Strip all trailing newlines in inline mode
+    if convert_as_inline:
+        result = result.rstrip("\n")
+
+    return result
 
 
 class StreamingProcessor:
