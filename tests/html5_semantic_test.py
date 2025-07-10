@@ -52,14 +52,14 @@ class TestSemanticElements:
         """Test nested semantic elements."""
         html = "<article><header>Article Header</header><section><h2>Section Title</h2><p>Section content</p></section><footer>Article Footer</footer></article>"
         result = convert_to_markdown(html, heading_style="atx")
-        expected = "Article Header\n\n## Section Title\n\nSection content\n\n\n\nArticle Footer\n\n\n\n"
+        expected = "Article Header\n\n## Section Title\n\nSection content\n\nArticle Footer\n\n"
         assert result == expected
 
     def test_semantic_elements_with_other_content(self) -> None:
         """Test semantic elements mixed with other content."""
         html = '<nav><ul><li><a href="#home">Home</a></li><li><a href="#about">About</a></li></ul></nav><main><article><h1>Article Title</h1><p>Article content</p></article></main>'
         result = convert_to_markdown(html, heading_style="atx")
-        expected = "* [Home](#home)\n* [About](#about)\n\n\n# Article Title\n\nArticle content\n\n\n\n\n\n"
+        expected = "* [Home](#home)\n* [About](#about)\n\n# Article Title\n\nArticle content\n\n"
         assert result == expected
 
     def test_empty_semantic_elements(self) -> None:
@@ -114,7 +114,7 @@ class TestCollapsibleContent:
         """Test details with complex content."""
         html = '<details><summary>Code Example</summary><pre><code>def hello():\n    print("Hello, World!")</code></pre><p>This is a Python function.</p></details>'
         result = convert_to_markdown(html)
-        expected = '<details>\n<summary>Code Example</summary>\n\n\n```\ndef hello():\n    print("Hello, World!")\n```\nThis is a Python function.\n</details>\n\n'
+        expected = '<details>\n<summary>Code Example</summary>\n\n```\ndef hello():\n    print("Hello, World!")\n```\nThis is a Python function.\n</details>\n\n'
         assert result == expected
 
     def test_empty_details(self) -> None:

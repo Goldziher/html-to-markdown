@@ -150,13 +150,17 @@ def _convert_blockquote(*, text: str, tag: Tag, convert_as_inline: bool) -> str:
     quote_text = f"\n{line_beginning_re.sub('> ', text.strip())}\n\n"
 
     if cite_url:
-        quote_text += f"\n— <{cite_url}>\n\n"
+        quote_text += f"— <{cite_url}>\n\n"
 
     return quote_text
 
 
-def _convert_br(*, convert_as_inline: bool, newline_style: str) -> str:
-    # Always convert br to line break, even in inline mode
+def _convert_br(*, convert_as_inline: bool, newline_style: str, tag: Tag) -> str:
+    # Convert br to line break, but handle headings specially
+    if tag.find_parent(["h1", "h2", "h3", "h4", "h5", "h6"]):
+        return " "  # Convert to space in headings
+
+    # Always convert br to line break in other contexts
     _ = convert_as_inline  # Unused but kept for API consistency
     return "\\\n" if newline_style.lower() == BACKSLASH else "  \n"
 
