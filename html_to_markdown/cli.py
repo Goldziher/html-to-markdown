@@ -1,7 +1,16 @@
 import sys
 from argparse import ArgumentParser, FileType
 
-from html_to_markdown.constants import ASTERISK, ATX, ATX_CLOSED, BACKSLASH, SPACES, UNDERLINED, UNDERSCORE
+from html_to_markdown.constants import (
+    ASTERISK,
+    ATX,
+    ATX_CLOSED,
+    BACKSLASH,
+    DOUBLE_EQUAL,
+    SPACES,
+    UNDERLINED,
+    UNDERSCORE,
+)
 from html_to_markdown.processing import convert_to_markdown
 
 
@@ -43,8 +52,8 @@ def main(argv: list[str]) -> str:
 
     parser.add_argument(
         "--default-title",
-        action="store_false",
-        help="Use this flag to disable setting the link title to its href when no title is provided.",
+        action="store_true",
+        help="Set the link title to its href when no title is provided.",
     )
 
     parser.add_argument(
@@ -108,6 +117,13 @@ def main(argv: list[str]) -> str:
     )
 
     parser.add_argument(
+        "--no-escape-misc",
+        dest="escape_misc",
+        action="store_false",
+        help="Disable escaping of miscellaneous characters to prevent conflicts in Markdown.",
+    )
+
+    parser.add_argument(
         "-i",
         "--keep-inline-images-in",
         nargs="*",
@@ -132,6 +148,26 @@ def main(argv: list[str]) -> str:
         "--strip-newlines",
         action="store_true",
         help="Remove newlines from HTML input before processing. This helps flatten janky output from HTML with unnecessary line breaks.",
+    )
+
+    parser.add_argument(
+        "--convert-as-inline",
+        action="store_true",
+        help="Treat the content as inline elements (no block elements like paragraphs).",
+    )
+
+    parser.add_argument(
+        "--no-extract-metadata",
+        dest="extract_metadata",
+        action="store_false",
+        help="Disable extraction of document metadata (title, meta tags) as a comment header.",
+    )
+
+    parser.add_argument(
+        "--highlight-style",
+        default=DOUBLE_EQUAL,
+        choices=("double-equal", "html", "bold"),
+        help="Style to use for highlighted text (mark elements). Defaults to 'double-equal'.",
     )
 
     parser.add_argument(
@@ -170,10 +206,14 @@ def main(argv: list[str]) -> str:
         "code_language": args.code_language,
         "escape_asterisks": args.escape_asterisks,
         "escape_underscores": args.escape_underscores,
+        "escape_misc": args.escape_misc,
         "keep_inline_images_in": args.keep_inline_images_in,
         "wrap": args.wrap,
         "wrap_width": args.wrap_width,
         "strip_newlines": args.strip_newlines,
+        "convert_as_inline": args.convert_as_inline,
+        "extract_metadata": args.extract_metadata,
+        "highlight_style": args.highlight_style,
     }
 
     # Add streaming parameters only if streaming is enabled
