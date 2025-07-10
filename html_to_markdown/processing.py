@@ -212,7 +212,88 @@ def _as_optional_set(value: str | Iterable[str] | None) -> set[str] | None:
     return {*chain(*[v.split(",") for v in value])}
 
 
-def convert_to_markdown(
+def _extract_metadata(soup: BeautifulSoup) -> dict[str, str]:  # noqa: C901
+    """Extract metadata from HTML document.
+
+    Args:
+        soup: BeautifulSoup instance of the HTML document.
+
+    Returns:
+        Dictionary of metadata key-value pairs.
+    """
+    metadata = {}
+
+    # Extract title
+    title_tag = soup.find("title")
+    if title_tag and isinstance(title_tag, Tag) and title_tag.string:
+        metadata["title"] = title_tag.string.strip()
+
+    # Extract base href
+    base_tag = soup.find("base", href=True)
+    if base_tag and isinstance(base_tag, Tag) and isinstance(base_tag["href"], str):
+        metadata["base-href"] = base_tag["href"]
+
+    # Extract meta tags
+    for meta in soup.find_all("meta"):
+        # Handle name-based meta tags
+        if meta.get("name") and meta.get("content") is not None:
+            name = meta["name"]
+            content = meta["content"]
+            if isinstance(name, str) and isinstance(content, str):
+                key = f"meta-{name.lower()}"
+                metadata[key] = content
+        # Handle property-based meta tags (Open Graph, etc.)
+        elif meta.get("property") and meta.get("content") is not None:
+            prop = meta["property"]
+            content = meta["content"]
+            if isinstance(prop, str) and isinstance(content, str):
+                key = f"meta-{prop.lower().replace(':', '-')}"
+                metadata[key] = content
+        # Handle http-equiv meta tags
+        elif meta.get("http-equiv") and meta.get("content") is not None:
+            equiv = meta["http-equiv"]
+            content = meta["content"]
+            if isinstance(equiv, str) and isinstance(content, str):
+                key = f"meta-{equiv.lower()}"
+                metadata[key] = content
+
+    # Extract canonical link
+    canonical = soup.find("link", rel="canonical", href=True)
+    if canonical and isinstance(canonical, Tag) and isinstance(canonical["href"], str):
+        metadata["canonical"] = canonical["href"]
+
+    # Extract other important link relations
+    for rel_type in ["author", "license", "alternate"]:
+        link = soup.find("link", rel=rel_type, href=True)
+        if link and isinstance(link, Tag) and isinstance(link["href"], str):
+            metadata[f"link-{rel_type}"] = link["href"]
+
+    return metadata
+
+
+def _format_metadata_comment(metadata: dict[str, str]) -> str:
+    """Format metadata as a Markdown comment block.
+
+    Args:
+        metadata: Dictionary of metadata key-value pairs.
+
+    Returns:
+        Formatted metadata comment block.
+    """
+    if not metadata:
+        return ""
+
+    lines = ["<!--"]
+    for key, value in sorted(metadata.items()):
+        # Escape any potential comment closers in the value
+        safe_value = value.replace("-->", "--&gt;")
+        lines.append(f"{key}: {safe_value}")
+    lines.append("-->")
+
+    return "\n".join(lines) + "\n\n"
+
+
+def convert_to_markdown(  # noqa: C901
     source: str | BeautifulSoup,
     *,
     autolinks: bool = True,
@@ -226,6 +307,7 @@ def convert_to_markdown(
     escape_asterisks: bool = True,
     escape_misc: bool = True,
     escape_underscores: bool = True,
+    extract_metadata: bool = True,
     heading_style: Literal["underlined", "atx", "atx_closed"] = UNDERLINED,
     highlight_style: Literal["double-equal", "html", "bold"] = DOUBLE_EQUAL,
     keep_inline_images_in: Iterable[str] | None = None,
@@ -253,6 +335,7 @@ def convert_to_markdown(
         escape_asterisks: Escape asterisks (*) to prevent unintended Markdown formatting. Defaults to True.
         escape_misc: Escape miscellaneous characters to prevent conflicts in Markdown. Defaults to True.
         escape_underscores: Escape underscores (_) to prevent unintended italic formatting. Defaults to True.
+        extract_metadata: Extract document metadata (title, meta tags) as a comment header. Defaults to True.
         heading_style: The style to use for Markdown headings. Defaults to "underlined".
         highlight_style: The style to use for highlighted text (mark elements). Defaults to "double-equal".
         keep_inline_images_in: Tags in which inline images should be preserved. Defaults to None.
@@ -311,8 +394,18 @@ def convert_to_markdown(
     if custom_converters:
         converters_map.update(cast("ConvertersMap", custom_converters))
 
+    # Extract metadata if requested
+    metadata_comment = ""
+    if extract_metadata and not convert_as_inline:
+        metadata = _extract_metadata(source)
+        metadata_comment = _format_metadata_comment(metadata)
+
+    # Find the body tag to process only its content
+    body = source.find("body")
+    elements_to_process = body.children if body and isinstance(body, Tag) else source.children
+
     text = ""
-    for el in filter(lambda value: not isinstance(value, (Comment, Doctype)), source.children):
+    for el in filter(lambda value: not isinstance(value, (Comment, Doctype)), elements_to_process):
         if isinstance(el, NavigableString):
             text += _process_text(
                 el=el,
@@ -332,4 +425,8 @@ def convert_to_markdown(
                 strip=_as_optional_set(strip),
                 context_before=text[-2:],
             )
+
+    # Prepend metadata comment if extracted
+    if metadata_comment:
+        return metadata_comment + text
     return text
