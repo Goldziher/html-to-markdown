@@ -34,6 +34,8 @@ SupportedElements = Literal[
     "caption",
     "cite",
     "code",
+    "col",
+    "colgroup",
     "data",
     "datalist",
     "dd",
@@ -89,9 +91,12 @@ SupportedElements = Literal[
     "summary",
     "sup",
     "table",
+    "tbody",
     "td",
     "textarea",
+    "tfoot",
     "th",
+    "thead",
     "time",
     "tr",
     "u",
@@ -387,6 +392,132 @@ def _convert_tr(*, tag: Tag, text: str) -> str:
         overline += "| " + " | ".join([""] * len(cells)) + " |" + "\n"
         overline += "| " + " | ".join(["---"] * len(cells)) + " |" + "\n"
     return overline + "|" + text + "\n" + underline
+
+
+def _convert_caption(*, text: str, convert_as_inline: bool) -> str:
+    """Convert HTML caption element to emphasized text.
+
+    Args:
+        text: The text content of the caption element.
+        convert_as_inline: Whether to convert as inline content.
+
+    Returns:
+        The converted markdown text with caption formatting.
+    """
+    if convert_as_inline:
+        return text
+
+    if not text.strip():
+        return ""
+
+    return f"*{text.strip()}*\n\n"
+
+
+def _convert_thead(*, text: str, convert_as_inline: bool) -> str:
+    """Convert HTML thead element preserving table structure.
+
+    Args:
+        text: The text content of the thead element.
+        convert_as_inline: Whether to convert as inline content.
+
+    Returns:
+        The converted markdown text preserving table structure.
+    """
+    if convert_as_inline:
+        return text
+
+    return text
+
+
+def _convert_tbody(*, text: str, convert_as_inline: bool) -> str:
+    """Convert HTML tbody element preserving table structure.
+
+    Args:
+        text: The text content of the tbody element.
+        convert_as_inline: Whether to convert as inline content.
+
+    Returns:
+        The converted markdown text preserving table structure.
+    """
+    if convert_as_inline:
+        return text
+
+    return text
+
+
+def _convert_tfoot(*, text: str, convert_as_inline: bool) -> str:
+    """Convert HTML tfoot element preserving table structure.
+
+    Args:
+        text: The text content of the tfoot element.
+        convert_as_inline: Whether to convert as inline content.
+
+    Returns:
+        The converted markdown text preserving table structure.
+    """
+    if convert_as_inline:
+        return text
+
+    return text
+
+
+def _convert_colgroup(*, tag: Tag, text: str, convert_as_inline: bool) -> str:
+    """Convert HTML colgroup element preserving column structure for documentation.
+
+    Args:
+        tag: The colgroup tag element.
+        text: The text content of the colgroup element.
+        convert_as_inline: Whether to convert as inline content.
+
+    Returns:
+        The converted markdown text preserving colgroup structure.
+    """
+    if convert_as_inline:
+        return text
+
+    if not text.strip():
+        return ""
+
+    span = tag.get("span", "")
+    attrs = []
+    if span and isinstance(span, str) and span.strip():
+        attrs.append(f'span="{span}"')
+
+    attrs_str = " ".join(attrs)
+    if attrs_str:
+        return f"<colgroup {attrs_str}>\n{text.strip()}\n</colgroup>\n\n"
+    return f"<colgroup>\n{text.strip()}\n</colgroup>\n\n"
+
+
+def _convert_col(*, tag: Tag, convert_as_inline: bool) -> str:
+    """Convert HTML col element preserving column attributes for documentation.
+
+    Args:
+        tag: The col tag element.
+        convert_as_inline: Whether to convert as inline content.
+
+    Returns:
+        The converted markdown text preserving col structure.
+    """
+    if convert_as_inline:
+        return ""
+
+    span = tag.get("span", "")
+    width = tag.get("width", "")
+    style = tag.get("style", "")
+
+    attrs = []
+    if width and isinstance(width, str) and width.strip():
+        attrs.append(f'width="{width}"')
+    if style and isinstance(style, str) and style.strip():
+        attrs.append(f'style="{style}"')
+    if span and isinstance(span, str) and span.strip():
+        attrs.append(f'span="{span}"')
+
+    attrs_str = " ".join(attrs)
+    if attrs_str:
+        return f"<col {attrs_str} />\n"
+    return "<col />\n"
 
 
 def _convert_semantic_block(*, text: str, convert_as_inline: bool) -> str:
@@ -1340,9 +1471,11 @@ def create_converters_map(
         "blockquote": _wrapper(partial(_convert_blockquote)),
         "br": _wrapper(partial(_convert_br, newline_style=newline_style)),
         "button": _wrapper(_convert_button),
-        "caption": _wrapper(lambda text: f"{text}\n"),
+        "caption": _wrapper(_convert_caption),
         "cite": _wrapper(_convert_cite),
         "code": _wrapper(_create_inline_converter("`")),
+        "col": _wrapper(_convert_col),
+        "colgroup": _wrapper(_convert_colgroup),
         "data": _wrapper(_convert_data),
         "datalist": _wrapper(_convert_datalist),
         "dd": _wrapper(_convert_dd),
@@ -1404,9 +1537,12 @@ def create_converters_map(
         "summary": _wrapper(_convert_summary),
         "sup": _wrapper(_create_inline_converter(sup_symbol)),
         "table": _wrapper(lambda text: f"\n\n{text}\n"),
+        "tbody": _wrapper(_convert_tbody),
         "td": _wrapper(_convert_td),
         "textarea": _wrapper(_convert_textarea),
+        "tfoot": _wrapper(_convert_tfoot),
         "th": _wrapper(_convert_th),
+        "thead": _wrapper(_convert_thead),
         "time": _wrapper(_convert_time),
         "tr": _wrapper(_convert_tr),
         "u": _wrapper(_create_inline_converter("")),  # Underlined text - pass through (no Markdown equivalent)
