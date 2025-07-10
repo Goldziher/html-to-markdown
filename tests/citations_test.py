@@ -108,21 +108,21 @@ class TestBlockquoteWithCite:
         """Test blockquote with cite attribute."""
         html = '<blockquote cite="https://example.com">Quote with source</blockquote>'
         result = convert_to_markdown(html)
-        expected = "\n> Quote with source\n\n\n— <https://example.com>\n\n"
+        expected = "\n> Quote with source\n\n— <https://example.com>\n\n"
         assert result == expected
 
     def test_blockquote_with_cite_and_content(self) -> None:
         """Test blockquote with cite and complex content."""
         html = '<blockquote cite="https://shakespeare.com"><p>To be or not to be, that is the question.</p><p>Whether \'tis nobler in the mind to suffer...</p></blockquote>'
         result = convert_to_markdown(html)
-        expected = "\n> To be or not to be, that is the question.\n> \n> Whether 'tis nobler in the mind to suffer...\n\n\n— <https://shakespeare.com>\n\n"
+        expected = "\n> To be or not to be, that is the question.\n> \n> Whether 'tis nobler in the mind to suffer...\n\n— <https://shakespeare.com>\n\n"
         assert result == expected
 
     def test_nested_blockquotes(self) -> None:
         """Test nested blockquotes."""
         html = '<blockquote cite="https://outer.com">Outer quote<blockquote cite="https://inner.com">Inner quote</blockquote>Back to outer</blockquote>'
         result = convert_to_markdown(html)
-        expected = "\n> Outer quote\n> > Inner quote\n> \n> \n> — <https://inner.com>\n> \n> Back to outer\n\n\n— <https://outer.com>\n\n"
+        expected = "\n> Outer quote\n> > Inner quote\n> \n> — <https://inner.com>\n> \n> Back to outer\n\n— <https://outer.com>\n\n"
         assert result == expected
 
     def test_blockquote_inline_mode(self) -> None:
@@ -163,7 +163,7 @@ class TestMixedCitationsAndQuotations:
         """Test complex structure with multiple citation elements."""
         html = '<article><p>According to <cite><a href="https://example.com">John Doe</a></cite>, the statement <q>Innovation drives progress</q> is fundamental.</p><blockquote cite="https://johndoe.com/quotes"><p>Innovation is not just about technology, it\'s about <em>thinking differently</em>.</p><cite>John Doe, 2023</cite></blockquote></article>'
         result = convert_to_markdown(html)
-        expected = 'According to *[John Doe](https://example.com)*, the statement "Innovation drives progress" is fundamental.\n\n\n> Innovation is not just about technology, it\'s about *thinking differently*.\n> \n> *John Doe, 2023*\n\n\n— <https://johndoe.com/quotes>\n\n\n\n'
+        expected = 'According to *[John Doe](https://example.com)*, the statement "Innovation drives progress" is fundamental.\n\n> Innovation is not just about technology, it\'s about *thinking differently*.\n> \n> *John Doe, 2023*\n\n— <https://johndoe.com/quotes>\n\n'
         assert result == expected
 
     def test_quote_escaping_edge_cases(self) -> None:
@@ -177,5 +177,5 @@ class TestMixedCitationsAndQuotations:
         """Test that cite attributes are preserved while other attributes are ignored."""
         html = '<blockquote cite="https://example.com" class="important" id="quote1" data-author="John">Important quote</blockquote>'
         result = convert_to_markdown(html)
-        expected = "\n> Important quote\n\n\n— <https://example.com>\n\n"
+        expected = "\n> Important quote\n\n— <https://example.com>\n\n"
         assert result == expected
