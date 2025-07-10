@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
+import re
 from functools import partial
 from inspect import getfullargspec
 from textwrap import fill
@@ -48,6 +49,7 @@ SupportedElements = Literal[
     "em",
     "fieldset",
     "figcaption",
+    "figure",
     "footer",
     "form",
     "h1",
@@ -57,6 +59,7 @@ SupportedElements = Literal[
     "h5",
     "h6",
     "header",
+    "hgroup",
     "hr",
     "i",
     "iframe",
@@ -78,6 +81,7 @@ SupportedElements = Literal[
     "option",
     "output",
     "p",
+    "picture",
     "pre",
     "progress",
     "q",
@@ -1568,6 +1572,130 @@ def _convert_menu(*, text: str, convert_as_inline: bool, tag: Tag) -> str:
     return f"<menu{attrs_str}>\n{text.strip()}\n</menu>\n\n"
 
 
+def _convert_figure(*, text: str, convert_as_inline: bool, tag: Tag) -> str:
+    """Convert HTML figure element preserving semantic structure.
+
+    Args:
+        text: The text content of the figure element.
+        convert_as_inline: Whether to convert as inline content.
+        tag: The figure tag element.
+
+    Returns:
+        The converted markdown text preserving figure structure.
+    """
+    if not text.strip():
+        return ""
+
+    if convert_as_inline:
+        return text
+
+    # Get figure attributes for preservation
+    attrs = []
+    if tag.get("id"):
+        attrs.append(f'id="{tag.get("id")}"')
+    if tag.get("class"):
+        # Handle class attribute which might be a list
+        class_val = tag.get("class")
+        if isinstance(class_val, list):
+            class_val = " ".join(class_val)
+        attrs.append(f'class="{class_val}"')
+
+    attrs_str = " " + " ".join(attrs) if attrs else ""
+
+    # Check if the figure contains only an image (common case)
+    # In that case, we might want to preserve the figure wrapper
+    content = text.strip()
+
+    # If content already has proper spacing, don't add extra newlines
+    if content.endswith("\n\n"):
+        return f"<figure{attrs_str}>\n{content}</figure>\n\n"
+
+    return f"<figure{attrs_str}>\n{content}\n</figure>\n\n"
+
+
+def _convert_hgroup(*, text: str, convert_as_inline: bool) -> str:
+    """Convert HTML hgroup element preserving heading group semantics.
+
+    Args:
+        text: The text content of the hgroup element.
+        convert_as_inline: Whether to convert as inline content.
+
+    Returns:
+        The converted markdown text preserving heading group structure.
+    """
+    if convert_as_inline:
+        return text
+
+    if not text.strip():
+        return ""
+
+    # Preserve the semantic grouping of headings
+    # Add a marker to indicate this is a grouped heading
+    content = text.strip()
+
+    # Remove excessive newlines between headings in the group
+    # Headings in hgroup should be visually closer together
+    content = re.sub(r"\n{3,}", "\n\n", content)
+
+    return f"<!-- heading group -->\n{content}\n<!-- end heading group -->\n\n"
+
+
+def _convert_picture(*, text: str, convert_as_inline: bool, tag: Tag) -> str:
+    """Convert HTML picture element with responsive image sources.
+
+    Args:
+        text: The text content of the picture element.
+        convert_as_inline: Whether to convert as inline content.
+        tag: The picture tag element.
+
+    Returns:
+        The converted markdown text with picture information preserved.
+    """
+    if not text.strip():
+        return ""
+
+    # Find all source elements
+    sources = tag.find_all("source")
+    img = tag.find("img")
+
+    if not img:
+        # No img fallback, just return the text content
+        return text.strip()
+
+    # Get the primary image markdown (already converted)
+    img_markdown = text.strip()
+
+    # If there are no sources, just return the image
+    if not sources:
+        return img_markdown
+
+    # Build a comment with source information for responsive images
+    source_info = []
+    for source in sources:
+        srcset = source.get("srcset")
+        media = source.get("media")
+        mime_type = source.get("type")
+
+        if srcset:
+            info = f'srcset="{srcset}"'
+            if media:
+                info += f' media="{media}"'
+            if mime_type:
+                info += f' type="{mime_type}"'
+            source_info.append(info)
+
+    if source_info and not convert_as_inline:
+        # Add picture source information as a comment
+        sources_comment = "<!-- picture sources:\n"
+        for info in source_info:
+            sources_comment += f"  {info}\n"
+        sources_comment += "-->\n"
+        return f"{sources_comment}{img_markdown}"
+
+    # In inline mode or no sources, just return the image
+    return img_markdown
+
+
 def create_converters_map(
     autolinks: bool,
     bullets: str,
@@ -1652,6 +1780,7 @@ def create_converters_map(
         "em": _wrapper(_create_inline_converter(strong_em_symbol)),
         "fieldset": _wrapper(_convert_fieldset),
         "figcaption": _wrapper(lambda text: f"\n\n{text}\n\n"),
+        "figure": _wrapper(_convert_figure),
         "footer": _wrapper(_convert_semantic_block),
         "form": _wrapper(_convert_form),
         "h1": _wrapper(partial(_convert_hn, n=1, heading_style=heading_style)),
@@ -1661,6 +1790,7 @@ def create_converters_map(
         "h5": _wrapper(partial(_convert_hn, n=5, heading_style=heading_style)),
         "h6": _wrapper(partial(_convert_hn, n=6, heading_style=heading_style)),
         "header": _wrapper(_convert_semantic_block),
+        "hgroup": _wrapper(_convert_hgroup),
         "hr": _wrapper(lambda _: "\n\n---\n\n"),
         "i": _wrapper(partial(_create_inline_converter(strong_em_symbol))),
         "iframe": _wrapper(_convert_iframe),
@@ -1682,6 +1812,7 @@ def create_converters_map(
         "option": _wrapper(_convert_option),
         "output": _wrapper(_convert_output),
         "p": _wrapper(partial(_convert_p, wrap=wrap, wrap_width=wrap_width)),
+        "picture": _wrapper(_convert_picture),
         "pre": _wrapper(
             partial(
                 _convert_pre,
