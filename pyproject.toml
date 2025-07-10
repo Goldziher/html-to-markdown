@@ -56,13 +56,14 @@ scripts.html_to_markdown = "html_to_markdown.__main__:cli"
 
 [dependency-groups]
 dev = [
+  "ai-rulez>=0.12",
   "covdefaults>=2.3",
   "mypy>=1.16.1",
   "pre-commit>=4.1",
   "pytest>=8.4.1",
   "pytest-cov>=6.2.1",
   "pytest-mock>=3.14.1",
-  "ruff>=0.12",
+  "ruff>=0.12.2",
   "types-beautifulsoup4>=4.12.0.20250516",
   "types-psutil>=7.0.0.20250601",
   "uv-bump",
