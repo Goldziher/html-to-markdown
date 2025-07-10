@@ -23,6 +23,7 @@ SupportedElements = Literal[
     "a",
     "article",
     "aside",
+    "audio",
     "b",
     "blockquote",
     "br",
@@ -44,6 +45,7 @@ SupportedElements = Literal[
     "header",
     "hr",
     "i",
+    "iframe",
     "img",
     "input",
     "list",
@@ -72,6 +74,7 @@ SupportedElements = Literal[
     "th",
     "tr",
     "kbd",
+    "video",
 ]
 
 Converter = Callable[[str, Tag], str]
@@ -153,8 +156,8 @@ def _convert_blockquote(*, text: str, tag: Tag, convert_as_inline: bool) -> str:
 
 
 def _convert_br(*, convert_as_inline: bool, newline_style: str) -> str:
-    if convert_as_inline:
-        return ""
+    # Always convert br to line break, even in inline mode
+    _ = convert_as_inline  # Unused but kept for API consistency
     return "\\\n" if newline_style.lower() == BACKSLASH else "  \n"
 
 
@@ -500,6 +503,183 @@ def _convert_q(*, text: str, convert_as_inline: bool) -> str:
     return f'"{escaped_text}"'
 
 
+def _convert_audio(*, tag: Tag, text: str, convert_as_inline: bool) -> str:  # noqa: C901
+    """Convert HTML audio element preserving structure with fallback.
+
+    Args:
+        tag: The audio tag element.
+        text: The text content of the audio element (fallback content).
+        convert_as_inline: Whether to convert as inline content.
+
+    Returns:
+        The converted markdown text preserving audio element.
+    """
+    _ = convert_as_inline  # Unused but kept for API consistency
+    src = tag.get("src", "")
+
+    # Check for source elements if no src attribute
+    if not src:
+        source_tag = tag.find("source")
+        if source_tag and isinstance(source_tag, Tag):
+            src = source_tag.get("src", "")
+
+    # Get other attributes
+    controls = "controls" if tag.get("controls") is not None else ""
+    autoplay = "autoplay" if tag.get("autoplay") is not None else ""
+    loop = "loop" if tag.get("loop") is not None else ""
+    muted = "muted" if tag.get("muted") is not None else ""
+    preload = tag.get("preload", "")
+
+    # Build attributes string
+    attrs = []
+    if src and isinstance(src, str) and src.strip():
+        attrs.append(f'src="{src}"')
+    if controls:
+        attrs.append(controls)
+    if autoplay:
+        attrs.append(autoplay)
+    if loop:
+        attrs.append(loop)
+    if muted:
+        attrs.append(muted)
+    if preload and isinstance(preload, str) and preload.strip():
+        attrs.append(f'preload="{preload}"')
+
+    attrs_str = " ".join(attrs)
+
+    # If there's fallback content, preserve it
+    if text.strip():
+        if attrs_str:
+            return f"<audio {attrs_str}>\n{text.strip()}\n</audio>\n\n"
+        return f"<audio>\n{text.strip()}\n</audio>\n\n"
+
+    # Self-closing for no fallback content
+    if attrs_str:
+        return f"<audio {attrs_str} />\n\n"
+    return "<audio />\n\n"
+
+
+def _convert_video(*, tag: Tag, text: str, convert_as_inline: bool) -> str:  # noqa: C901, PLR0912
+    """Convert HTML video element preserving structure with fallback.
+
+    Args:
+        tag: The video tag element.
+        text: The text content of the video element (fallback content).
+        convert_as_inline: Whether to convert as inline content.
+
+    Returns:
+        The converted markdown text preserving video element.
+    """
+    _ = convert_as_inline  # Unused but kept for API consistency
+    src = tag.get("src", "")
+
+    # Check for source elements if no src attribute
+    if not src:
+        source_tag = tag.find("source")
+        if source_tag and isinstance(source_tag, Tag):
+            src = source_tag.get("src", "")
+
+    # Get other attributes
+    width = tag.get("width", "")
+    height = tag.get("height", "")
+    poster = tag.get("poster", "")
+    controls = "controls" if tag.get("controls") is not None else ""
+    autoplay = "autoplay" if tag.get("autoplay") is not None else ""
+    loop = "loop" if tag.get("loop") is not None else ""
+    muted = "muted" if tag.get("muted") is not None else ""
+    preload = tag.get("preload", "")
+
+    # Build attributes string
+    attrs = []
+    if src and isinstance(src, str) and src.strip():
+        attrs.append(f'src="{src}"')
+    if width and isinstance(width, str) and width.strip():
+        attrs.append(f'width="{width}"')
+    if height and isinstance(height, str) and height.strip():
+        attrs.append(f'height="{height}"')
+    if poster and isinstance(poster, str) and poster.strip():
+        attrs.append(f'poster="{poster}"')
+    if controls:
+        attrs.append(controls)
+    if autoplay:
+        attrs.append(autoplay)
+    if loop:
+        attrs.append(loop)
+    if muted:
+        attrs.append(muted)
+    if preload and isinstance(preload, str) and preload.strip():
+        attrs.append(f'preload="{preload}"')
+
+    attrs_str = " ".join(attrs)
+
+    # If there's fallback content, preserve it
+    if text.strip():
+        if attrs_str:
+            return f"<video {attrs_str}>\n{text.strip()}\n</video>\n\n"
+        return f"<video>\n{text.strip()}\n</video>\n\n"
+
+    # Self-closing for no fallback content
+    if attrs_str:
+        return f"<video {attrs_str} />\n\n"
+    return "<video />\n\n"
+
+
+def _convert_iframe(*, tag: Tag, text: str, convert_as_inline: bool) -> str:  # noqa: C901, PLR0912
+    """Convert HTML iframe element preserving structure.
+
+    Args:
+        tag: The iframe tag element.
+        text: The text content of the iframe element (usually empty).
+        convert_as_inline: Whether to convert as inline content.
+
+    Returns:
+        The converted markdown text preserving iframe element.
+    """
+    _ = text  # Unused but kept for API consistency
+    _ = convert_as_inline  # Unused but kept for API consistency
+    src = tag.get("src", "")
+    width = tag.get("width", "")
+    height = tag.get("height", "")
+    title = tag.get("title", "")
+    allow = tag.get("allow", "")
+    sandbox = tag.get("sandbox")  # Don't provide default
+    loading = tag.get("loading", "")
+
+    # Build attributes string
+    attrs = []
+    if src and isinstance(src, str) and src.strip():
+        attrs.append(f'src="{src}"')
+    if width and isinstance(width, str) and width.strip():
+        attrs.append(f'width="{width}"')
+    if height and isinstance(height, str) and height.strip():
+        attrs.append(f'height="{height}"')
+    if title and isinstance(title, str) and title.strip():
+        attrs.append(f'title="{title}"')
+    if allow and isinstance(allow, str) and allow.strip():
+        attrs.append(f'allow="{allow}"')
+    if sandbox is not None:
+        if isinstance(sandbox, list):
+            # BeautifulSoup returns AttributeValueList for space-separated values
+            if sandbox:
+                attrs.append(f'sandbox="{" ".join(sandbox)}"')
+            else:
+                # Empty list means boolean attribute
+                attrs.append("sandbox")
+        elif isinstance(sandbox, str) and sandbox:
+            attrs.append(f'sandbox="{sandbox}"')
+        else:
+            attrs.append("sandbox")
+    if loading and isinstance(loading, str) and loading.strip():
+        attrs.append(f'loading="{loading}"')
+
+    attrs_str = " ".join(attrs)
+
+    # iframes are typically self-closing in usage
+    if attrs_str:
+        return f"<iframe {attrs_str}></iframe>\n\n"
+    return "<iframe></iframe>\n\n"
+
+
 def create_converters_map(
     autolinks: bool,
     bullets: str,
@@ -559,6 +739,7 @@ def create_converters_map(
         "a": _wrapper(partial(_convert_a, autolinks=autolinks, default_title=default_title)),
         "article": _wrapper(_convert_semantic_block),
         "aside": _wrapper(_convert_semantic_block),
+        "audio": _wrapper(_convert_audio),
         "b": _wrapper(partial(_create_inline_converter(2 * strong_em_symbol))),
         "blockquote": _wrapper(partial(_convert_blockquote)),
         "br": _wrapper(partial(_convert_br, newline_style=newline_style)),
@@ -580,6 +761,7 @@ def create_converters_map(
         "header": _wrapper(_convert_semantic_block),
         "hr": _wrapper(lambda _: "\n\n---\n\n"),
         "i": _wrapper(partial(_create_inline_converter(strong_em_symbol))),
+        "iframe": _wrapper(_convert_iframe),
         "img": _wrapper(partial(_convert_img, keep_inline_images_in=keep_inline_images_in)),
         "input": _wrapper(lambda _: ""),
         "kbd": _wrapper(_create_inline_converter("`")),
@@ -614,4 +796,5 @@ def create_converters_map(
         "td": _wrapper(_convert_td),
         "th": _wrapper(_convert_th),
         "tr": _wrapper(_convert_tr),
+        "video": _wrapper(_convert_video),
     }
