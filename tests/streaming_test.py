@@ -2,7 +2,7 @@
 
 import pytest
 
-from html_to_markdown import convert_to_markdown, convert_to_markdown_stream
+from html_to_markdown import EmptyHtmlError, convert_to_markdown, convert_to_markdown_stream
 
 
 class TestStreamingProcessing:
@@ -120,7 +120,7 @@ class TestStreamingProcessing:
 
     def test_empty_html_streaming(self) -> None:
         """Test streaming with empty HTML."""
-        with pytest.raises(ValueError, match="The input HTML is empty"):
+        with pytest.raises(EmptyHtmlError, match="The input HTML is empty"):
             list(convert_to_markdown_stream(""))
 
     def test_streaming_with_all_options(self) -> None:
