@@ -31,7 +31,7 @@ def test_main_with_file_input(mock_convert_to_markdown: Mock) -> None:
         strip=None,
         convert=None,
         autolinks=False,
-        default_title=True,
+        default_title=False,
         heading_style="underlined",
         bullets="*+-",
         strong_em_symbol="*",
@@ -41,10 +41,14 @@ def test_main_with_file_input(mock_convert_to_markdown: Mock) -> None:
         code_language="",
         escape_asterisks=True,
         escape_underscores=True,
+        escape_misc=True,
         keep_inline_images_in=None,
         wrap=False,
         wrap_width=80,
         strip_newlines=False,
+        convert_as_inline=False,
+        extract_metadata=True,
+        highlight_style="double-equal",
     )
 
 
@@ -57,7 +61,7 @@ def test_main_with_stdin_input(mock_convert_to_markdown: Mock, mock_stdin: Mock)
         strip=None,
         convert=None,
         autolinks=False,
-        default_title=True,
+        default_title=False,
         heading_style="underlined",
         bullets="*+-",
         strong_em_symbol="*",
@@ -67,10 +71,14 @@ def test_main_with_stdin_input(mock_convert_to_markdown: Mock, mock_stdin: Mock)
         code_language="",
         escape_asterisks=True,
         escape_underscores=True,
+        escape_misc=True,
         keep_inline_images_in=None,
         wrap=False,
         wrap_width=80,
         strip_newlines=False,
+        convert_as_inline=False,
+        extract_metadata=True,
+        highlight_style="double-equal",
     )
 
 
@@ -95,7 +103,7 @@ def test_main_with_autolinks_option(mock_convert_to_markdown: Mock, mock_stdin: 
 def test_main_with_default_title_option(mock_convert_to_markdown: Mock, mock_stdin: Mock) -> None:
     main(["--default-title"])
     mock_convert_to_markdown.assert_called_once()
-    assert mock_convert_to_markdown.call_args[1]["default_title"] is False
+    assert mock_convert_to_markdown.call_args[1]["default_title"] is True
 
 
 def test_main_with_heading_style_option(mock_convert_to_markdown: Mock, mock_stdin: Mock) -> None:

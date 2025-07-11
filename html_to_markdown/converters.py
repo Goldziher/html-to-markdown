@@ -137,7 +137,10 @@ def _create_inline_converter(markup_prefix: str) -> Callable[[Tag, str], str]:
     """
 
     def implementation(*, tag: Tag, text: str) -> str:
-        if tag.find_parent(["pre", "code", "kbd", "samp"]):
+        # Check if we're in a code context - if so, don't apply markup
+        from html_to_markdown.processing import _has_ancestor  # noqa: PLC0415
+
+        if _has_ancestor(tag, ["pre", "code", "kbd", "samp"]):
             return text
 
         if not text.strip():
@@ -200,7 +203,9 @@ def _convert_blockquote(*, text: str, tag: Tag, convert_as_inline: bool) -> str:
 
 def _convert_br(*, convert_as_inline: bool, newline_style: str, tag: Tag) -> str:
     # Convert br to line break, but handle headings specially
-    if tag.find_parent(["h1", "h2", "h3", "h4", "h5", "h6"]):
+    from html_to_markdown.processing import _has_ancestor  # noqa: PLC0415
+
+    if _has_ancestor(tag, ["h1", "h2", "h3", "h4", "h5", "h6"]):
         return " "  # Convert to space in headings
 
     # Always convert br to line break in other contexts
@@ -676,7 +681,7 @@ def _convert_q(*, text: str, convert_as_inline: bool) -> str:
     return f'"{escaped_text}"'
 
 
-def _convert_audio(*, tag: Tag, text: str, convert_as_inline: bool) -> str:  # noqa: C901
+def _convert_audio(*, tag: Tag, text: str, convert_as_inline: bool) -> str:
     """Convert HTML audio element preserving structure with fallback.
 
     Args:
@@ -732,7 +737,7 @@ def _convert_audio(*, tag: Tag, text: str, convert_as_inline: bool) -> str:  # n
     return "<audio />\n\n"
 
 
-def _convert_video(*, tag: Tag, text: str, convert_as_inline: bool) -> str:  # noqa: C901, PLR0912
+def _convert_video(*, tag: Tag, text: str, convert_as_inline: bool) -> str:
     """Convert HTML video element preserving structure with fallback.
 
     Args:
@@ -797,7 +802,7 @@ def _convert_video(*, tag: Tag, text: str, convert_as_inline: bool) -> str:  # n
     return "<video />\n\n"
 
 
-def _convert_iframe(*, tag: Tag, text: str, convert_as_inline: bool) -> str:  # noqa: C901, PLR0912
+def _convert_iframe(*, tag: Tag, text: str, convert_as_inline: bool) -> str:
     """Convert HTML iframe element preserving structure.
 
     Args:
@@ -1029,7 +1034,7 @@ def _convert_label(*, tag: Tag, text: str, convert_as_inline: bool) -> str:
     return f"<label>{text.strip()}</label>\n\n"
 
 
-def _convert_input_enhanced(*, tag: Tag, convert_as_inline: bool) -> str:  # noqa: C901
+def _convert_input_enhanced(*, tag: Tag, convert_as_inline: bool) -> str:
     """Convert HTML input element preserving all relevant attributes.
 
     Args:
@@ -1043,7 +1048,9 @@ def _convert_input_enhanced(*, tag: Tag, convert_as_inline: bool) -> str:  # noq
 
     # Special handling for inputs in list items - let _convert_li handle checkboxes
     # and ignore other input types in list items (legacy behavior)
-    if tag.find_parent("li"):
+    from html_to_markdown.processing import _has_ancestor  # noqa: PLC0415
+
+    if _has_ancestor(tag, "li"):
         return ""
 
     id_attr = tag.get("id", "")
