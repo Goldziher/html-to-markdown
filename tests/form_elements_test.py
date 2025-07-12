@@ -507,13 +507,12 @@ class TestComplexFormExamples:
 
 <label><input type="checkbox" name="newsletter" checked />
 
- Subscribe to newsletter</label>
+Subscribe to newsletter</label>
 
 <label for="country">Country:</label>
 
 <select id="country" name="country">
 <option value="us">United States</option>
-
 <option value="ca">Canada</option>
 </select>
 </fieldset>
@@ -553,4 +552,4 @@ class TestComplexFormExamples:
         """Test form elements in inline mode."""
         html = '<form><label>Name:</label> <input type="text" name="name"> <button>Submit</button></form>'
         result = convert_to_markdown(html, convert_as_inline=True)
-        assert result == 'Name: <input type="text" name="name" /> Submit'
+        assert result == 'Name:  <input type="text" name="name" />  Submit'

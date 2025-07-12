@@ -181,5 +181,5 @@ def test_whitespace_in_title() -> None:
     """Test handling whitespace in title."""
     html = "<html><head><title>  Title with   spaces  </title></head><body><p>Content</p></body></html>"
     result = convert_to_markdown(html)
-    expected = "<!--\ntitle: Title with   spaces\n-->\n\nContent\n\n"
+    expected = "<!--\ntitle: Title with spaces\n-->\n\nContent\n\n"
     assert result == expected

@@ -511,6 +511,10 @@ def convert_to_markdown(
         if strip_newlines:
             source = source.replace("\n", " ").replace("\r", " ")
 
+        # Fix lxml parsing of void elements like <wbr>
+        # lxml incorrectly treats them as container tags
+        source = re.sub(r"<wbr\s*>", "<wbr />", source, flags=re.IGNORECASE)
+
         if preprocess_html and create_preprocessor is not None and preprocess_fn is not None:
             config = create_preprocessor(
                 preset=preprocessing_preset,
@@ -661,7 +665,13 @@ def convert_to_markdown(
     def normalize_spaces_outside_code(text: str) -> str:
         parts = text.split("```")
         for i in range(0, len(parts), 2):
-            parts[i] = re.sub(r" {3,}", " ", parts[i])
+            # Preserve definition list formatting (: followed by 3 spaces)
+            # Split by definition list patterns to preserve them
+            def_parts = re.split(r"(:\s{3})", parts[i])
+            for j in range(0, len(def_parts), 2):
+                # Only normalize non-definition-list parts
+                def_parts[j] = re.sub(r" {3,}", " ", def_parts[j])
+            parts[i] = "".join(def_parts)
         return "```".join(parts)
 
     result = normalize_spaces_outside_code(result)
