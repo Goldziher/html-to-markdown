@@ -192,7 +192,7 @@ class TestRubyEdgeCases:
         """Test ruby with line breaks."""
         html = "<ruby>\n漢字\n<rt>\nkanji\n</rt>\n</ruby>"
         result = convert_to_markdown(html)
-        assert result == "漢字\n(kanji)"
+        assert result == "漢字(kanji)"
 
     def test_ruby_with_special_characters(self) -> None:
         """Test ruby with special Markdown characters."""
@@ -242,7 +242,7 @@ class TestRubyEdgeCases:
             <rtc>Chinese characters</rtc>
         </ruby>"""
         result = convert_to_markdown(html)
-        assert result == "漢\n字\n(\n(kan)\n(ji)\n)\nChinese characters"
+        assert result == "漢字((kan)(ji))Chinese characters"
 
     def test_ruby_with_empty_rt(self) -> None:
         """Test ruby with empty rt element."""

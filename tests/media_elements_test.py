@@ -170,8 +170,7 @@ def test_nested_media_elements() -> None:
     </section>
 </article>"""
     result = convert_to_markdown(html)
-    expected = """
-Media Gallery
+    expected = """Media Gallery
 -------------
 
 ### Audio Section

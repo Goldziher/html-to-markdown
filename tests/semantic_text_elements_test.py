@@ -309,14 +309,12 @@ class TestSemanticTextMixedContent:
             <p><small>Last updated: <time datetime="2023-12-25">December 25, 2023</time></small></p>
         </article>"""
         result = convert_to_markdown(html, heading_style="atx")
-        expected = """
-## Programming Concepts
+        expected = """## Programming Concepts
 
 An *API* (API (Application Programming Interface))
  allows different software components to communicate.
 
-When you set the variable *timeout* to <data value="5000">5 seconds</data>,
- ==added in version 2\\.0==, the system will wait.
+When you set the variable *timeout* to <data value="5000">5 seconds</data>, ==added in version 2\\.0==, the system will wait.
 
 Last updated: <time datetime="2023-12-25">December 25, 2023</time>
 

@@ -78,7 +78,7 @@ class TestSemanticElements:
         """Test semantic elements with whitespace."""
         html = "<section>  \n  Content with whitespace  \n  </section>"
         result = convert_to_markdown(html)
-        assert result == " \n Content with whitespace \n \n\n"
+        assert result == " Content with whitespace \n\n"
 
 
 class TestCollapsibleContent:
