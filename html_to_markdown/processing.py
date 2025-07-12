@@ -251,7 +251,22 @@ def _process_text(
 
     # Check for pre ancestor (whitespace handling)
     if "pre" not in ancestor_names:
-        text = whitespace_re.sub(" ", text)
+        # Custom whitespace normalization that preserves leading/trailing single spaces
+        # Split on word boundaries to handle leading/trailing spaces correctly
+        
+        # Check for leading space
+        has_leading_space = text.startswith(' ') or text.startswith('\t')
+        # Check for trailing space  
+        has_trailing_space = text.endswith(' ') or text.endswith('\t')
+        
+        # Normalize all internal whitespace without stripping leading/trailing
+        # Apply the normalization to preserve the leading/trailing space detection above
+        middle_content = text[1:-1] if has_leading_space and has_trailing_space else \
+                        text[1:] if has_leading_space else \
+                        text[:-1] if has_trailing_space else text
+        
+        middle_content = whitespace_re.sub(" ", middle_content.strip())
+        text = (" " if has_leading_space else "") + middle_content + (" " if has_trailing_space else "")
 
     # Check for code-like ancestors (escaping)
     if not ancestor_names.intersection({"pre", "code", "kbd", "samp"}):
@@ -446,6 +461,11 @@ def convert_to_markdown(
     sup_symbol: str = "",
     wrap: bool = False,
     wrap_width: int = 80,
+    # HTML preprocessing options
+    preprocess_html: bool = False,
+    preprocessing_preset: Literal["minimal", "standard", "aggressive"] = "standard",
+    remove_navigation: bool = True,
+    remove_forms: bool = True,
 ) -> str:
     """Convert HTML to Markdown.
 
@@ -480,6 +500,10 @@ def convert_to_markdown(
         sup_symbol: Custom symbol for superscript text. Defaults to an empty string.
         wrap: Wrap text to the specified width. Defaults to False.
         wrap_width: The number of characters at which to wrap text. Defaults to 80.
+        preprocess_html: Apply HTML preprocessing to improve quality. Defaults to False.
+        preprocessing_preset: Preset configuration for preprocessing. Defaults to "standard".
+        remove_navigation: Remove navigation elements during preprocessing. Defaults to True.
+        remove_forms: Remove form elements during preprocessing. Defaults to True.
 
     Raises:
         ConflictingOptionsError: If both 'strip' and 'convert' are specified.
@@ -502,6 +526,18 @@ def convert_to_markdown(
             # Replace all newlines with spaces before parsing
             source = source.replace("\n", " ").replace("\r", " ")
 
+        # HTML preprocessing to improve quality
+        if preprocess_html:
+            from html_to_markdown.preprocessor import create_preprocessor
+            from html_to_markdown.preprocessor import preprocess_html as preprocess_fn
+            
+            config = create_preprocessor(
+                preset=preprocessing_preset,
+                remove_navigation=remove_navigation,
+                remove_forms=remove_forms,
+            )
+            source = preprocess_fn(source, **config)
+
         if "".join(source.split("\n")):
             # Determine parser to use
             if parser is None:
@@ -512,7 +548,33 @@ def convert_to_markdown(
             if parser == "lxml" and not LXML_AVAILABLE:
                 raise MissingDependencyError("lxml", "pip install html-to-markdown[lxml]")
 
+            # Store original source for lxml whitespace preservation
+            original_source = source
             source = BeautifulSoup(source, parser)
+            
+            # Handle lxml's auto-wrapping behavior for raw text
+            if parser == "lxml" and source.find("body"):
+                body = source.find("body")
+                # Check if lxml auto-wrapped raw text and stripped leading whitespace
+                if (body and len(list(body.children)) == 1 and 
+                    isinstance(list(body.children)[0], NavigableString) and
+                    original_source.startswith((" ", "\t")) and
+                    not str(list(body.children)[0]).startswith((" ", "\t"))):
+                    
+                    # Preserve original leading whitespace
+                    first_child = list(body.children)[0]
+                    # Extract leading whitespace from original
+                    leading_ws = ""
+                    for char in original_source:
+                        if char in " \t":
+                            leading_ws += char
+                        else:
+                            break
+                    
+                    # Create new text node with preserved whitespace
+                    from bs4 import NavigableString as NS
+                    new_text = NS(leading_ws + str(first_child))
+                    first_child.replace_with(new_text)
         else:
             raise EmptyHtmlError
 
