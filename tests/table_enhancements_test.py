@@ -194,15 +194,12 @@ class TestComplexTable:
         </table>"""
         result = convert_to_markdown(html)
 
-        # Check caption
         assert "*Employee Database*" in result
 
-        # Check colgroup
         assert "<colgroup>" in result
         assert '<col style="width: 40%" />' in result
         assert '<col style="width: 30%" />' in result
 
-        # Check table data
         assert "| Name | Department | Salary |" in result
         assert "| John Doe | Engineering | $75,000 |" in result
         assert "| Jane Smith | Marketing | $65,000 |" in result
@@ -278,8 +275,8 @@ class TestComplexTable:
             <tfoot></tfoot>
         </table>"""
         result = convert_to_markdown(html)
-        # Empty elements should not appear in output
-        assert "*" not in result.split("Only Data")[0]  # No caption
+
+        assert "*" not in result.split("Only Data")[0]
         assert "<colgroup>" not in result
         assert "| Only Data |" in result
 

@@ -109,7 +109,7 @@ def test_empty_metadata_values() -> None:
     """Test handling of empty metadata values."""
     html = '<html><head><meta name="description" content=""></head><body><p>Content</p></body></html>'
     result = convert_to_markdown(html)
-    # Empty content should still be extracted
+
     expected = "<!--\nmeta-description: \n-->\n\nContent\n\n"
     assert result == expected
 
@@ -118,7 +118,7 @@ def test_no_metadata() -> None:
     """Test document with no metadata."""
     html = "<p>Content</p>"
     result = convert_to_markdown(html)
-    # No metadata comment should be added
+
     assert result == "Content\n\n"
 
 
@@ -126,7 +126,7 @@ def test_extract_metadata_false() -> None:
     """Test disabling metadata extraction."""
     html = "<html><head><title>My Title</title></head><body><p>Content</p></body></html>"
     result = convert_to_markdown(html, extract_metadata=False)
-    # Should not include metadata comment
+
     assert result == "Content\n\n"
     assert "<!--" not in result
 
@@ -135,7 +135,7 @@ def test_metadata_in_inline_mode() -> None:
     """Test that metadata is not extracted in inline mode."""
     html = "<html><head><title>My Title</title></head><body><p>Content</p></body></html>"
     result = convert_to_markdown(html, convert_as_inline=True)
-    # Should not include metadata in inline mode
+
     assert result == "Content"
     assert "<!--" not in result
 
@@ -168,12 +168,11 @@ def test_sorted_metadata_output() -> None:
     <body><p>Content</p></body>
     </html>"""
     result = convert_to_markdown(html)
-    # Extract just the metadata comment
+
     metadata_end = result.index("-->") + 3
     metadata_block = result[:metadata_end]
 
-    # Check that keys are in alphabetical order
-    lines = metadata_block.split("\n")[1:-1]  # Skip <!-- and -->
+    lines = metadata_block.split("\n")[1:-1]
     keys = [line.split(":")[0] for line in lines if line]
     assert keys == sorted(keys)
 

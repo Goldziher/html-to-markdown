@@ -12,18 +12,16 @@ class TestStreamingProcessing:
         """Test basic streaming functionality."""
         html = "<p>Hello <strong>world</strong>!</p>"
 
-        # Collect chunks from streaming
         chunks = list(convert_to_markdown_stream(html, chunk_size=10))
         result_streaming = "".join(chunks)
 
-        # Compare with regular processing
         result_regular = convert_to_markdown(html)
 
         assert result_streaming == result_regular
 
     def test_streaming_large_document(self) -> None:
         """Test streaming with a larger document."""
-        # Create a large HTML document using list comprehension
+
         html_parts = [
             f"<p>This is paragraph {i} with some <strong>bold text</strong> and <em>italic text</em>.</p>"
             for i in range(100)
@@ -31,19 +29,17 @@ class TestStreamingProcessing:
 
         html = "".join(html_parts)
 
-        # Test streaming
         chunks = list(convert_to_markdown_stream(html, chunk_size=500))
         result_streaming = "".join(chunks)
 
-        # Compare with regular processing
         result_regular = convert_to_markdown(html)
 
         assert result_streaming == result_regular
-        assert len(chunks) > 1  # Should be multiple chunks
+        assert len(chunks) > 1
 
     def test_streaming_with_nested_tags(self) -> None:
         """Test streaming with deeply nested tags."""
-        # Create nested structure
+
         html = "<div>" * 50 + "Deeply nested content" + "</div>" * 50
 
         chunks = list(convert_to_markdown_stream(html, chunk_size=20))
@@ -63,10 +59,8 @@ class TestStreamingProcessing:
 
         list(convert_to_markdown_stream(html, progress_callback=progress_callback))
 
-        # Should have received progress updates
         assert len(progress_calls) > 0
 
-        # Check that progress is non-decreasing
         for i in range(1, len(progress_calls)):
             assert progress_calls[i][0] >= progress_calls[i - 1][0]
 
@@ -80,7 +74,6 @@ class TestStreamingProcessing:
 
         result = convert_to_markdown(html, stream_processing=True, chunk_size=50, chunk_callback=chunk_callback)
 
-        # Should have received chunks
         assert len(chunks_received) > 0
         assert "".join(chunks_received) == result
 
@@ -140,14 +133,12 @@ class TestStreamingProcessing:
 
     def test_memory_efficiency(self) -> None:
         """Test that streaming is more memory efficient (conceptual test)."""
-        # Create a very large document
+
         html = "<p>Large content</p>" * 1000
 
-        # This should work without issues using streaming
         chunks = list(convert_to_markdown_stream(html, chunk_size=1000))
         assert len(chunks) > 1
 
-        # Result should be correct
         result_streaming = "".join(chunks)
         result_regular = convert_to_markdown(html)
         assert result_streaming == result_regular
@@ -160,7 +151,6 @@ class TestBackwardCompatibility:
         """Test that the original API works as before."""
         html = "<p>Hello <strong>world</strong>!</p>"
 
-        # Original call should work
         result = convert_to_markdown(html)
         assert "Hello **world**!" in result
 
@@ -168,7 +158,6 @@ class TestBackwardCompatibility:
         """Test that new streaming parameters default to non-streaming behavior."""
         html = "<p>Test</p>"
 
-        # These should be equivalent
         result1 = convert_to_markdown(html)
         result2 = convert_to_markdown(html, stream_processing=False)
 
@@ -192,7 +181,6 @@ class TestEdgeCases:
         html = "<p>Short</p>"
         chunks = list(convert_to_markdown_stream(html, chunk_size=10000))
 
-        # Should still work, just one chunk
         assert len(chunks) == 1
         result = "".join(chunks)
         expected = convert_to_markdown(html)

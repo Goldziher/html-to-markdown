@@ -126,6 +126,6 @@ class TestTaskLists:
         """Test various edge cases for task lists."""
         html = '<ul><li><input type="checkbox" checked=""> Checked with empty value</li><li><input type="checkbox" checked="false"> Checked with false value</li><li><input type="checkbox" checked="true"> Checked with true value</li></ul>'
         result = convert_to_markdown(html)
-        # Any value for checked attribute means checked
+
         expected = "- [x] Checked with empty value\n- [x] Checked with false value\n- [x] Checked with true value\n"
         assert result == expected

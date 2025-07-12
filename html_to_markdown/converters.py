@@ -137,7 +137,6 @@ def _create_inline_converter(markup_prefix: str) -> Callable[[Tag, str], str]:
     """
 
     def implementation(*, tag: Tag, text: str) -> str:
-        # Check if we're in a code context - if so, don't apply markup
         from html_to_markdown.processing import _has_ancestor  # noqa: PLC0415
 
         if _has_ancestor(tag, ["pre", "code", "kbd", "samp"]):
@@ -190,7 +189,6 @@ def _convert_blockquote(*, text: str, tag: Tag, convert_as_inline: bool) -> str:
     if not text:
         return ""
 
-    # Handle cite attribute
     cite_url = tag.get("cite")
     quote_text = f"\n{line_beginning_re.sub('> ', text.strip())}\n\n"
 
@@ -201,14 +199,12 @@ def _convert_blockquote(*, text: str, tag: Tag, convert_as_inline: bool) -> str:
 
 
 def _convert_br(*, convert_as_inline: bool, newline_style: str, tag: Tag) -> str:
-    # Convert br to line break, but handle headings specially
     from html_to_markdown.processing import _has_ancestor  # noqa: PLC0415
 
     if _has_ancestor(tag, ["h1", "h2", "h3", "h4", "h5", "h6"]):
-        return " "  # Convert to space in headings
+        return " "
 
-    # Always convert br to line break in other contexts
-    _ = convert_as_inline  # Unused but kept for API consistency
+    _ = convert_as_inline
     return "\\\n" if newline_style.lower() == BACKSLASH else "  \n"
 
 
@@ -246,7 +242,7 @@ def _convert_img(*, tag: Tag, convert_as_inline: bool, keep_inline_images_in: It
     height = height if isinstance(height, str) else ""
     title_part = ' "{}"'.format(title.replace('"', r"\"")) if title else ""
     parent_name = tag.parent.name if tag.parent else ""
-    # Always preserve images in table cells (td, th) by default
+
     default_preserve_in = ["td", "th"]
     preserve_in = set(keep_inline_images_in or []) | set(default_preserve_in)
     if convert_as_inline and parent_name not in preserve_in:
@@ -280,12 +276,11 @@ def _convert_list(*, tag: Tag, text: str) -> str:
 
 
 def _convert_li(*, tag: Tag, text: str, bullets: str) -> str:
-    # Check for task list (checkbox input)
     checkbox = tag.find("input", {"type": "checkbox"})
     if checkbox and isinstance(checkbox, Tag):
         checked = checkbox.get("checked") is not None
         checkbox_symbol = "[x]" if checked else "[ ]"
-        # Remove the checkbox from the text content
+
         checkbox_text = text
         if checkbox.string:
             checkbox_text = text.replace(str(checkbox.string), "").strip()
@@ -675,7 +670,6 @@ def _convert_q(*, text: str, convert_as_inline: bool) -> str:
     if not text.strip():
         return ""
 
-    # Escape any existing quotes in the text
     escaped_text = text.strip().replace('"', '\\"')
     return f'"{escaped_text}"'
 
@@ -691,23 +685,20 @@ def _convert_audio(*, tag: Tag, text: str, convert_as_inline: bool) -> str:
     Returns:
         The converted markdown text preserving audio element.
     """
-    _ = convert_as_inline  # Unused but kept for API consistency
+    _ = convert_as_inline
     src = tag.get("src", "")
 
-    # Check for source elements if no src attribute
     if not src:
         source_tag = tag.find("source")
         if source_tag and isinstance(source_tag, Tag):
             src = source_tag.get("src", "")
 
-    # Get other attributes
     controls = "controls" if tag.get("controls") is not None else ""
     autoplay = "autoplay" if tag.get("autoplay") is not None else ""
     loop = "loop" if tag.get("loop") is not None else ""
     muted = "muted" if tag.get("muted") is not None else ""
     preload = tag.get("preload", "")
 
-    # Build attributes string
     attrs = []
     if src and isinstance(src, str) and src.strip():
         attrs.append(f'src="{src}"')
@@ -724,13 +715,11 @@ def _convert_audio(*, tag: Tag, text: str, convert_as_inline: bool) -> str:
 
     attrs_str = " ".join(attrs)
 
-    # If there's fallback content, preserve it
     if text.strip():
         if attrs_str:
             return f"<audio {attrs_str}>\n{text.strip()}\n</audio>\n\n"
         return f"<audio>\n{text.strip()}\n</audio>\n\n"
 
-    # Self-closing for no fallback content
     if attrs_str:
         return f"<audio {attrs_str} />\n\n"
     return "<audio />\n\n"
@@ -747,16 +736,14 @@ def _convert_video(*, tag: Tag, text: str, convert_as_inline: bool) -> str:
     Returns:
         The converted markdown text preserving video element.
     """
-    _ = convert_as_inline  # Unused but kept for API consistency
+    _ = convert_as_inline
     src = tag.get("src", "")
 
-    # Check for source elements if no src attribute
     if not src:
         source_tag = tag.find("source")
         if source_tag and isinstance(source_tag, Tag):
             src = source_tag.get("src", "")
 
-    # Get other attributes
     width = tag.get("width", "")
     height = tag.get("height", "")
     poster = tag.get("poster", "")
@@ -766,7 +753,6 @@ def _convert_video(*, tag: Tag, text: str, convert_as_inline: bool) -> str:
     muted = "muted" if tag.get("muted") is not None else ""
     preload = tag.get("preload", "")
 
-    # Build attributes string
     attrs = []
     if src and isinstance(src, str) and src.strip():
         attrs.append(f'src="{src}"')
@@ -789,13 +775,11 @@ def _convert_video(*, tag: Tag, text: str, convert_as_inline: bool) -> str:
 
     attrs_str = " ".join(attrs)
 
-    # If there's fallback content, preserve it
     if text.strip():
         if attrs_str:
             return f"<video {attrs_str}>\n{text.strip()}\n</video>\n\n"
         return f"<video>\n{text.strip()}\n</video>\n\n"
 
-    # Self-closing for no fallback content
     if attrs_str:
         return f"<video {attrs_str} />\n\n"
     return "<video />\n\n"
@@ -812,17 +796,16 @@ def _convert_iframe(*, tag: Tag, text: str, convert_as_inline: bool) -> str:
     Returns:
         The converted markdown text preserving iframe element.
     """
-    _ = text  # Unused but kept for API consistency
-    _ = convert_as_inline  # Unused but kept for API consistency
+    _ = text
+    _ = convert_as_inline
     src = tag.get("src", "")
     width = tag.get("width", "")
     height = tag.get("height", "")
     title = tag.get("title", "")
     allow = tag.get("allow", "")
-    sandbox = tag.get("sandbox")  # Don't provide default
+    sandbox = tag.get("sandbox")
     loading = tag.get("loading", "")
 
-    # Build attributes string
     attrs = []
     if src and isinstance(src, str) and src.strip():
         attrs.append(f'src="{src}"')
@@ -836,11 +819,9 @@ def _convert_iframe(*, tag: Tag, text: str, convert_as_inline: bool) -> str:
         attrs.append(f'allow="{allow}"')
     if sandbox is not None:
         if isinstance(sandbox, list):
-            # BeautifulSoup returns AttributeValueList for space-separated values
             if sandbox:
                 attrs.append(f'sandbox="{" ".join(sandbox)}"')
             else:
-                # Empty list means boolean attribute
                 attrs.append("sandbox")
         elif isinstance(sandbox, str) and sandbox:
             attrs.append(f'sandbox="{sandbox}"')
@@ -851,7 +832,6 @@ def _convert_iframe(*, tag: Tag, text: str, convert_as_inline: bool) -> str:
 
     attrs_str = " ".join(attrs)
 
-    # iframes are typically self-closing in usage
     if attrs_str:
         return f"<iframe {attrs_str}></iframe>\n\n"
     return "<iframe></iframe>\n\n"
@@ -868,13 +848,12 @@ def _convert_abbr(*, tag: Tag, text: str, convert_as_inline: bool) -> str:
     Returns:
         The converted markdown text with optional title annotation.
     """
-    _ = convert_as_inline  # Unused but kept for API consistency
+    _ = convert_as_inline
     if not text.strip():
         return ""
 
     title = tag.get("title")
     if title and isinstance(title, str) and title.strip():
-        # Show abbreviation with title in parentheses
         return f"{text.strip()} ({title.strip()})"
 
     return text.strip()
@@ -891,13 +870,12 @@ def _convert_time(*, tag: Tag, text: str, convert_as_inline: bool) -> str:
     Returns:
         The converted markdown text preserving time information.
     """
-    _ = convert_as_inline  # Unused but kept for API consistency
+    _ = convert_as_inline
     if not text.strip():
         return ""
 
     datetime_attr = tag.get("datetime")
     if datetime_attr and isinstance(datetime_attr, str) and datetime_attr.strip():
-        # Preserve machine-readable datetime in HTML
         return f'<time datetime="{datetime_attr.strip()}">{text.strip()}</time>'
 
     return text.strip()
@@ -914,13 +892,12 @@ def _convert_data(*, tag: Tag, text: str, convert_as_inline: bool) -> str:
     Returns:
         The converted markdown text preserving machine-readable data.
     """
-    _ = convert_as_inline  # Unused but kept for API consistency
+    _ = convert_as_inline
     if not text.strip():
         return ""
 
     value_attr = tag.get("value")
     if value_attr and isinstance(value_attr, str) and value_attr.strip():
-        # Preserve machine-readable value in HTML
         return f'<data value="{value_attr.strip()}">{text.strip()}</data>'
 
     return text.strip()
@@ -935,8 +912,8 @@ def _convert_wbr(*, convert_as_inline: bool) -> str:
     Returns:
         Empty string as wbr is just a break opportunity.
     """
-    _ = convert_as_inline  # Unused but kept for API consistency
-    return ""  # Word break opportunity doesn't produce visible output
+    _ = convert_as_inline
+    return ""
 
 
 def _convert_form(*, tag: Tag, text: str, convert_as_inline: bool) -> str:
@@ -1045,8 +1022,6 @@ def _convert_input_enhanced(*, tag: Tag, convert_as_inline: bool) -> str:
     """
     input_type = tag.get("type", "text")
 
-    # Special handling for inputs in list items - let _convert_li handle checkboxes
-    # and ignore other input types in list items (legacy behavior)
     from html_to_markdown.processing import _has_ancestor  # noqa: PLC0415
 
     if _has_ancestor(tag, "li"):
@@ -1379,7 +1354,6 @@ def _convert_output(*, tag: Tag, text: str, convert_as_inline: bool) -> str:
 
     attrs = []
     if for_attr:
-        # BeautifulSoup returns space-separated attributes as lists
         for_value = " ".join(for_attr) if isinstance(for_attr, list) else str(for_attr)
         if for_value.strip():
             attrs.append(f'for="{for_value}"')
@@ -1437,7 +1411,6 @@ def _convert_ruby(*, text: str, convert_as_inline: bool) -> str:  # noqa: ARG001
     if not text.strip():
         return ""
 
-    # Ruby elements are always inline by nature
     return text.strip()
 
 
@@ -1454,7 +1427,6 @@ def _convert_rb(*, text: str, convert_as_inline: bool) -> str:  # noqa: ARG001
     if not text.strip():
         return ""
 
-    # Ruby base is the main text, pass through as-is
     return text.strip()
 
 
@@ -1469,21 +1441,17 @@ def _convert_rt(*, text: str, convert_as_inline: bool, tag: Tag) -> str:  # noqa
     Returns:
         The converted markdown text with pronunciation in parentheses.
     """
-    # Handle empty rt elements - still need parentheses
     content = text.strip()
 
-    # Check if this rt is surrounded by rp elements (fallback parentheses)
     prev_sibling = tag.previous_sibling
     next_sibling = tag.next_sibling
 
-    # If surrounded by rp elements, don't add extra parentheses
     has_rp_before = prev_sibling and getattr(prev_sibling, "name", None) == "rp"
     has_rp_after = next_sibling and getattr(next_sibling, "name", None) == "rp"
 
     if has_rp_before and has_rp_after:
-        # Already has rp parentheses, just return the text
         return content
-    # Ruby text (pronunciation) shown in parentheses as fallback
+
     return f"({content})"
 
 
@@ -1500,7 +1468,6 @@ def _convert_rp(*, text: str, convert_as_inline: bool) -> str:  # noqa: ARG001
     if not text.strip():
         return ""
 
-    # Ruby parentheses preserved for fallback compatibility
     return text.strip()
 
 
@@ -1517,7 +1484,6 @@ def _convert_rtc(*, text: str, convert_as_inline: bool) -> str:  # noqa: ARG001
     if not text.strip():
         return ""
 
-    # Ruby text container, pass through content
     return text.strip()
 
 
@@ -1538,7 +1504,6 @@ def _convert_dialog(*, text: str, convert_as_inline: bool, tag: Tag) -> str:
     if not text.strip():
         return ""
 
-    # Get dialog attributes for preservation
     attrs = []
     if tag.get("open") is not None:
         attrs.append("open")
@@ -1567,7 +1532,6 @@ def _convert_menu(*, text: str, convert_as_inline: bool, tag: Tag) -> str:
     if not text.strip():
         return ""
 
-    # Get menu attributes for preservation
     attrs = []
     if tag.get("type") and tag.get("type") != "list":
         attrs.append(f'type="{tag.get("type")}"')
@@ -1598,12 +1562,10 @@ def _convert_figure(*, text: str, convert_as_inline: bool, tag: Tag) -> str:
     if convert_as_inline:
         return text
 
-    # Get figure attributes for preservation
     attrs = []
     if tag.get("id"):
         attrs.append(f'id="{tag.get("id")}"')
     if tag.get("class"):
-        # Handle class attribute which might be a list
         class_val = tag.get("class")
         if isinstance(class_val, list):
             class_val = " ".join(class_val)
@@ -1611,11 +1573,8 @@ def _convert_figure(*, text: str, convert_as_inline: bool, tag: Tag) -> str:
 
     attrs_str = " " + " ".join(attrs) if attrs else ""
 
-    # Check if the figure contains only an image (common case)
-    # In that case, we might want to preserve the figure wrapper
     content = text.strip()
 
-    # If content already has proper spacing, don't add extra newlines
     if content.endswith("\n\n"):
         return f"<figure{attrs_str}>\n{content}</figure>\n\n"
 
@@ -1638,12 +1597,8 @@ def _convert_hgroup(*, text: str, convert_as_inline: bool) -> str:
     if not text.strip():
         return ""
 
-    # Preserve the semantic grouping of headings
-    # Add a marker to indicate this is a grouped heading
     content = text.strip()
 
-    # Remove excessive newlines between headings in the group
-    # Headings in hgroup should be visually closer together
     content = re.sub(r"\n{3,}", "\n\n", content)
 
     return f"<!-- heading group -->\n{content}\n<!-- end heading group -->\n\n"
@@ -1663,22 +1618,17 @@ def _convert_picture(*, text: str, convert_as_inline: bool, tag: Tag) -> str:
     if not text.strip():
         return ""
 
-    # Find all source elements
     sources = tag.find_all("source")
     img = tag.find("img")
 
     if not img:
-        # No img fallback, just return the text content
         return text.strip()
 
-    # Get the primary image markdown (already converted)
     img_markdown = text.strip()
 
-    # If there are no sources, just return the image
     if not sources:
         return img_markdown
 
-    # Build a comment with source information for responsive images
     source_info = []
     for source in sources:
         srcset = source.get("srcset")
@@ -1694,14 +1644,12 @@ def _convert_picture(*, text: str, convert_as_inline: bool, tag: Tag) -> str:
             source_info.append(info)
 
     if source_info and not convert_as_inline:
-        # Add picture source information as a comment
         sources_comment = "<!-- picture sources:\n"
         for info in source_info:
             sources_comment += f"  {info}\n"
         sources_comment += "-->\n"
         return f"{sources_comment}{img_markdown}"
 
-    # In inline mode or no sources, just return the image
     return img_markdown
 
 
@@ -1717,23 +1665,17 @@ def _convert_svg(*, text: str, convert_as_inline: bool, tag: Tag) -> str:
         The converted markdown text as an image reference.
     """
     if convert_as_inline:
-        # In inline mode, just return any text content
         return text.strip()
 
-    # Get SVG attributes
     title = tag.find("title")
     title_text = title.get_text().strip() if title else ""
 
-    # For inline SVG, we'll convert to a data URI
-    # First, we need to get the full SVG markup
     svg_markup = str(tag)
 
-    # Create a data URI
     svg_bytes = svg_markup.encode("utf-8")
     svg_base64 = base64.b64encode(svg_bytes).decode("utf-8")
     data_uri = f"data:image/svg+xml;base64,{svg_base64}"
 
-    # Use title as alt text, or "SVG Image" if no title
     alt_text = title_text or "SVG Image"
 
     return f"![{alt_text}]({data_uri})"
@@ -1753,17 +1695,13 @@ def _convert_math(*, text: str, convert_as_inline: bool, tag: Tag) -> str:
     if not text.strip():
         return ""
 
-    # Check if it's display math vs inline math
     display = tag.get("display") == "block"
 
-    # For now, preserve the MathML as a comment with the text representation
-    # This allows systems that understand MathML to process it
     math_comment = f"<!-- MathML: {tag!s} -->"
 
     if convert_as_inline or not display:
-        # Inline math - just the text with comment
         return f"{math_comment}{text.strip()}"
-    # Display math - on its own line
+
     return f"\n\n{math_comment}\n{text.strip()}\n\n"
 
 
@@ -1829,8 +1767,8 @@ def create_converters_map(
         "aside": _wrapper(_convert_semantic_block),
         "audio": _wrapper(_convert_audio),
         "b": _wrapper(partial(_create_inline_converter(2 * strong_em_symbol))),
-        "bdi": _wrapper(_create_inline_converter("")),  # Bidirectional isolation - pass through
-        "bdo": _wrapper(_create_inline_converter("")),  # Bidirectional override - pass through
+        "bdi": _wrapper(_create_inline_converter("")),
+        "bdo": _wrapper(_create_inline_converter("")),
         "blockquote": _wrapper(partial(_convert_blockquote)),
         "br": _wrapper(partial(_convert_br, newline_style=newline_style)),
         "button": _wrapper(_convert_button),
@@ -1844,7 +1782,7 @@ def create_converters_map(
         "dd": _wrapper(_convert_dd),
         "del": _wrapper(_create_inline_converter("~~")),
         "details": _wrapper(_convert_details),
-        "dfn": _wrapper(_create_inline_converter("*")),  # Definition term - italic
+        "dfn": _wrapper(_create_inline_converter("*")),
         "dialog": _wrapper(_convert_dialog),
         "dl": _wrapper(_convert_dl),
         "dt": _wrapper(_convert_dt),
@@ -1867,7 +1805,7 @@ def create_converters_map(
         "iframe": _wrapper(_convert_iframe),
         "img": _wrapper(partial(_convert_img, keep_inline_images_in=keep_inline_images_in)),
         "input": _wrapper(_convert_input_enhanced),
-        "ins": _wrapper(_create_inline_converter("==")),  # Inserted text - highlight style
+        "ins": _wrapper(_create_inline_converter("==")),
         "kbd": _wrapper(_create_inline_converter("`")),
         "label": _wrapper(_convert_label),
         "legend": _wrapper(_convert_legend),
@@ -1904,7 +1842,7 @@ def create_converters_map(
         "script": _wrapper(lambda _: ""),
         "section": _wrapper(_convert_semantic_block),
         "select": _wrapper(_convert_select),
-        "small": _wrapper(_create_inline_converter("")),  # Small text - pass through
+        "small": _wrapper(_create_inline_converter("")),
         "strong": _wrapper(_create_inline_converter(strong_em_symbol * 2)),
         "style": _wrapper(lambda _: ""),
         "sub": _wrapper(_create_inline_converter(sub_symbol)),
@@ -1920,9 +1858,9 @@ def create_converters_map(
         "thead": _wrapper(_convert_thead),
         "time": _wrapper(_convert_time),
         "tr": _wrapper(_convert_tr),
-        "u": _wrapper(_create_inline_converter("")),  # Underlined text - pass through (no Markdown equivalent)
+        "u": _wrapper(_create_inline_converter("")),
         "ul": _wrapper(_convert_list),
-        "var": _wrapper(_create_inline_converter("*")),  # Variable - italic
+        "var": _wrapper(_create_inline_converter("*")),
         "video": _wrapper(_convert_video),
         "wbr": _wrapper(_convert_wbr),
     }

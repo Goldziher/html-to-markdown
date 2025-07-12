@@ -11,7 +11,6 @@ from typing import Any, Callable
 
 from html_to_markdown import convert_to_markdown, convert_to_markdown_stream
 
-# Try to import psutil for memory measurement, but make it optional
 try:
     import psutil
 
@@ -19,7 +18,7 @@ try:
 except ImportError:
     MEMORY_AVAILABLE = False
 
-# Try to import cProfile for profiling
+
 try:
     import cProfile
     import pstats
@@ -65,10 +64,9 @@ def memory_monitor() -> Generator[dict[str, float], None, None]:
 
     process = psutil.Process(os.getpid())
 
-    # Force garbage collection before measurement
     gc.collect()
 
-    memory_before = process.memory_info().rss / 1024 / 1024  # MB
+    memory_before = process.memory_info().rss / 1024 / 1024
     peak_memory = memory_before
 
     def update_peak() -> None:
@@ -76,15 +74,13 @@ def memory_monitor() -> Generator[dict[str, float], None, None]:
         current_memory = process.memory_info().rss / 1024 / 1024
         peak_memory = max(peak_memory, current_memory)
 
-    # Store original memory info method to avoid overhead
-    _ = process.memory_info  # Kept for reference
+    _ = process.memory_info
 
     metrics = {"before": memory_before, "after": 0.0, "peak": 0.0}
 
     try:
         yield metrics
     finally:
-        # Update peak one more time
         update_peak()
         memory_after = process.memory_info().rss / 1024 / 1024
 
@@ -168,47 +164,41 @@ def benchmark_function(
     output_size = 0
     chunks_count = 1
 
-    # Warmup runs to stabilize timing
     for _ in range(warmup):
         func(*args, **kwargs)
 
     for _ in range(iterations):
         with memory_monitor() as memory_metrics:
-            # Use more precise timing for small operations
             start_time = time.perf_counter_ns()
             result = func(*args, **kwargs)
             end_time = time.perf_counter_ns()
 
-            # Handle different result types
             if isinstance(result, str):
                 output_size = len(result)
                 chunks_count = 1
             elif hasattr(result, "__iter__") and not isinstance(result, str):
-                # It's a generator or list of chunks
                 chunks = list(result)
                 chunks_count = len(chunks)
                 output_size = sum(len(chunk) for chunk in chunks)
             else:
                 output_size = len(str(result))
 
-        execution_time = (end_time - start_time) / 1_000_000_000  # Convert to seconds
+        execution_time = (end_time - start_time) / 1_000_000_000
         all_times.append(execution_time)
         memory_deltas.append(memory_metrics["after"] - memory_metrics["before"])
 
-    # Use median for more stable results
     median_time = statistics.median(all_times)
     median_memory_delta = statistics.median(memory_deltas) if memory_deltas else 0.0
 
-    # Calculate throughput
     input_size_mb = len(args[0]) / (1024 * 1024) if args else 0.0
     throughput = input_size_mb / median_time if median_time > 0 else 0.0
 
     return PerformanceMetrics(
         name=func.__name__,
         execution_time=median_time,
-        memory_before=0.0,  # We use delta instead
+        memory_before=0.0,
         memory_after=median_memory_delta,
-        memory_peak=median_memory_delta,  # Simplified for now
+        memory_peak=median_memory_delta,
         output_size=output_size,
         chunks_count=chunks_count,
         throughput_mb_s=throughput,
@@ -228,30 +218,25 @@ def profile_function(func: Callable[..., Any], *args: Any, **kwargs: Any) -> str
     finally:
         profiler.disable()
 
-    # Get statistics
     stats_stream = StringIO()
     stats = pstats.Stats(profiler, stream=stats_stream)
     stats.sort_stats("cumulative")
-    stats.print_stats(10)  # Top 10 functions
+    stats.print_stats(10)
 
     return stats_stream.getvalue()
 
 
 def test_streaming_performance() -> None:
     """Basic test to ensure streaming performance works."""
-    html = generate_complex_html(10)  # Smaller size for testing
+    html = generate_complex_html(10)
 
-    # Test regular processing
     result_regular = convert_to_markdown(html)
 
-    # Test streaming processing via main API
     result_streaming = convert_to_markdown(html, stream_processing=True, chunk_size=1024)
 
-    # Test pure streaming API
     chunks = list(convert_to_markdown_stream(html, chunk_size=1024))
     result_pure_streaming = "".join(chunks)
 
-    # Verify results are identical
     assert result_regular == result_streaming, "Regular and streaming results should match"
     assert result_regular == result_pure_streaming, "All processing methods should produce identical results"
     assert len(chunks) > 0, "Should produce at least one chunk"
@@ -262,7 +247,6 @@ def run_comprehensive_benchmark() -> None:
     print("🚀 HTML to Markdown Performance Benchmark")  # noqa: T201
     print("=" * 50)  # noqa: T201
 
-    # Test different document sizes
     sizes = [10, 50, 100, 200]
     chunk_sizes = [512, 1024, 2048, 4096]
 
@@ -272,20 +256,17 @@ def run_comprehensive_benchmark() -> None:
         input_size_mb = len(html) / (1024 * 1024)
         print(f"   Input size: {input_size_mb:.2f} MB")  # noqa: T201
 
-        # Benchmark regular processing
         regular_metrics = benchmark_function(convert_to_markdown, html)
         print(  # noqa: T201
             f"   Regular processing: {regular_metrics.execution_time:.3f}s, {regular_metrics.throughput_mb_s:.2f} MB/s"
         )
 
-        # Benchmark streaming via main API
         streaming_metrics = benchmark_function(convert_to_markdown, html, stream_processing=True, chunk_size=1024)
         print(  # noqa: T201
             f"   Streaming (main API): {streaming_metrics.execution_time:.3f}s, "
             f"{streaming_metrics.throughput_mb_s:.2f} MB/s"
         )
 
-        # Test different chunk sizes for pure streaming
         best_chunk_time = float("inf")
         best_chunk_size = 1024
 
@@ -303,7 +284,6 @@ def run_comprehensive_benchmark() -> None:
 
         print(f"   🏆 Best chunk size: {best_chunk_size} ({best_chunk_time:.3f}s)")  # noqa: T201
 
-        # Performance comparison
         speedup = regular_metrics.execution_time / best_chunk_time
         if speedup > 1:
             print(f"   ⚡ Streaming is {speedup:.2f}x faster than regular processing")  # noqa: T201
@@ -332,11 +312,8 @@ def profile_bottlenecks() -> None:
 
 
 if __name__ == "__main__":
-    # Run basic test
     test_streaming_performance()
 
-    # Run comprehensive benchmarks
     run_comprehensive_benchmark()
 
-    # Profile for bottlenecks
     profile_bottlenecks()

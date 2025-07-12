@@ -112,16 +112,14 @@ def test_keep_inline_images_in_with_tables() -> None:
     </table>
     <h1><img src="heading.jpg" alt="Heading Image">In heading</h1>"""
 
-    # Without keep_inline_images_in for h1, heading should only show alt text
     result_default = convert_to_markdown(html)
-    assert "![Table Image](table.jpg)" in result_default  # Table images always preserved
-    assert "Heading Image" in result_default  # Heading shows alt text only
+    assert "![Table Image](table.jpg)" in result_default
+    assert "Heading Image" in result_default
     assert "![Heading Image](heading.jpg)" not in result_default
 
-    # With keep_inline_images_in for h1, both should show images
     result_with_h1 = convert_to_markdown(html, keep_inline_images_in=["h1"])
-    assert "![Table Image](table.jpg)" in result_with_h1  # Table images still preserved
-    assert "![Heading Image](heading.jpg)" in result_with_h1  # Heading now shows image
+    assert "![Table Image](table.jpg)" in result_with_h1
+    assert "![Heading Image](heading.jpg)" in result_with_h1
 
 
 def test_complex_table_with_images() -> None:

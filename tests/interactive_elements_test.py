@@ -191,7 +191,7 @@ class TestInteractiveElementsIntegration:
         """Test dialog nested in paragraph (should not happen but test anyway)."""
         html = "<p>Click here: <dialog>Modal content</dialog> to see dialog.</p>"
         result = convert_to_markdown(html)
-        # Dialog should be treated inline when inside paragraph
+
         assert "Click here:" in result
         assert "Modal content" in result
 
@@ -293,7 +293,7 @@ class TestInteractiveElementsEdgeCases:
         """Test dialog with attribute values containing quotes."""
         html = '<dialog id="my-dialog" class="special">Content</dialog>'
         result = convert_to_markdown(html)
-        # Should preserve id but may not preserve class (not in our implementation)
+
         assert '<dialog id="my-dialog">' in result
 
     def test_menu_with_complex_attributes(self) -> None:

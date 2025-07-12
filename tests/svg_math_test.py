@@ -13,11 +13,9 @@ class TestSVGElement:
         svg = '<svg width="100" height="100"><circle cx="50" cy="50" r="40" /></svg>'
         result = convert_to_markdown(svg, extract_metadata=False)
 
-        # Should convert to image with data URI
         assert result.startswith("![SVG Image](data:image/svg+xml;base64,")
         assert result.endswith(")")
 
-        # Verify it's valid base64
         data_uri = result[result.find("base64,") + 7 : -1]
         decoded = base64.b64decode(data_uri).decode("utf-8")
         assert 'width="100"' in decoded
@@ -34,7 +32,6 @@ class TestSVGElement:
         </svg>"""
         result = convert_to_markdown(svg, extract_metadata=False)
 
-        # Should use title as alt text
         assert result.startswith("![My Chart](data:image/svg+xml;base64,")
 
     def test_svg_complex(self) -> None:
@@ -49,7 +46,6 @@ class TestSVGElement:
 
         assert result.startswith("![Complex SVG](data:image/svg+xml;base64,")
 
-        # Decode and verify content
         data_uri = result[result.find("base64,") + 7 : -1]
         decoded = base64.b64decode(data_uri).decode("utf-8")
         assert 'width="200"' in decoded
@@ -61,7 +57,6 @@ class TestSVGElement:
         svg = '<svg><title>Icon</title><path d="M10 10" /></svg>'
         result = convert_to_markdown(svg, convert_as_inline=True, extract_metadata=False)
 
-        # In inline mode, should return text content (title text)
         assert result == "Icon"
 
     def test_svg_with_text_content(self) -> None:
@@ -71,7 +66,6 @@ class TestSVGElement:
 
         assert result.startswith("![SVG Image](data:image/svg+xml;base64,")
 
-        # Verify text is preserved in the encoded SVG
         data_uri = result[result.find("base64,") + 7 : -1]
         decoded = base64.b64decode(data_uri).decode("utf-8")
         assert "Label Text" in decoded
@@ -81,7 +75,6 @@ class TestSVGElement:
         svg = "<svg></svg>"
         result = convert_to_markdown(svg, extract_metadata=False)
 
-        # Should still create data URI even for empty SVG
         assert result.startswith("![SVG Image](data:image/svg+xml;base64,")
 
     def test_svg_with_namespaces(self) -> None:
@@ -91,7 +84,6 @@ class TestSVGElement:
 
         assert result.startswith("![SVG Image](data:image/svg+xml;base64,")
 
-        # Verify namespaces are preserved
         data_uri = result[result.find("base64,") + 7 : -1]
         decoded = base64.b64decode(data_uri).decode("utf-8")
         assert 'xmlns="http://www.w3.org/2000/svg"' in decoded
@@ -106,7 +98,6 @@ class TestMathElement:
         math = "<math><mn>42</mn></math>"
         result = convert_to_markdown(math, extract_metadata=False)
 
-        # Should preserve MathML as comment with text representation
         assert "<!-- MathML:" in result
         assert "<math><mn>42</mn></math>" in result
         assert "42" in result
@@ -124,7 +115,6 @@ class TestMathElement:
         math = '<math display="block"><mfrac><mn>1</mn><mn>2</mn></mfrac></math>'
         result = convert_to_markdown(math, extract_metadata=False)
 
-        # Display math should be on its own line
         assert result.startswith("\n\n<!-- MathML:")
         assert result.endswith("12\n\n")
 
@@ -175,7 +165,6 @@ class TestMathElement:
         math = '<math display="block"><mi>E</mi><mo>=</mo><mi>mc</mi><msup><mi></mi><mn>2</mn></msup></math>'
         result = convert_to_markdown(math, convert_as_inline=True)
 
-        # Should still include MathML comment but inline
         assert "<!-- MathML:" in result
         assert "E\\=mc2" in result
         assert not result.startswith("\n\n")
@@ -196,7 +185,6 @@ class TestSVGMathIntegration:
         html = '<p>Here is an icon: <svg width="16" height="16"><circle r="8" /></svg> inline.</p>'
         result = convert_to_markdown(html, extract_metadata=False)
 
-        # SVG should be converted even within paragraph
         assert "Here is an icon: ![SVG Image](data:image/svg+xml;base64," in result
 
     def test_math_in_paragraph(self) -> None:
@@ -260,7 +248,6 @@ class TestSVGMathIntegration:
         </picture>"""
         result = convert_to_markdown(html, extract_metadata=False)
 
-        # Picture element should handle this, not SVG converter
         assert "<!-- picture sources:" in result
         assert "![Chart](chart.png)" in result
 
@@ -273,7 +260,6 @@ class TestSVGMathEdgeCases:
         svg = '<svg><script>alert("test")</script><circle r="10" /></svg>'
         result = convert_to_markdown(svg, extract_metadata=False)
 
-        # Script should be preserved in the data URI
         assert result.startswith("![SVG Image](data:image/svg+xml;base64,")
         data_uri = result[result.find("base64,") + 7 : -1]
         decoded = base64.b64decode(data_uri).decode("utf-8")
@@ -290,7 +276,7 @@ class TestSVGMathEdgeCases:
         result = convert_to_markdown(math, extract_metadata=False)
 
         assert "x\\+1" in result
-        assert "x \\+ 1" in result  # Annotation text also appears
+        assert "x \\+ 1" in result
 
     def test_svg_with_style(self) -> None:
         """Test SVG with style element."""
@@ -312,7 +298,6 @@ class TestSVGMathEdgeCases:
         </math>"""
         result = convert_to_markdown(math, extract_metadata=False)
 
-        # Should handle whitespace appropriately
         assert "x" in result
         assert "\\+" in result
         assert "y" in result
