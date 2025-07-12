@@ -151,7 +151,6 @@ def _create_inline_converter(markup_prefix: str) -> Callable[[Tag, str], str]:
             markup_suffix = "</" + markup_prefix[1:]
 
         prefix, suffix, text = chomp(text)
-
         return f"{prefix}{markup_prefix}{text}{markup_suffix}{suffix}"
 
     return cast("Callable[[Tag, str], str]", implementation)

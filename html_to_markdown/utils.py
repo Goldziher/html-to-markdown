@@ -6,18 +6,27 @@ from html_to_markdown.constants import line_beginning_re
 
 
 def chomp(text: str) -> tuple[str, str, str]:
-    """If the text in an inline tag like b, a, or em contains a leading or trailing
-    space, strip the string and return a space as suffix of prefix, if needed.
+    """Simplified whitespace handling for inline elements.
+    
+    For semantic markdown output, preserves leading/trailing spaces as single spaces
+    and normalizes internal whitespace.
 
     Args:
         text: The text to chomp.
 
     Returns:
-        A tuple containing the prefix, suffix, and the stripped text.
+        A tuple containing the prefix, suffix, and the normalized text.
     """
-    prefix = " " if text and text[0] == " " else ""
-    suffix = " " if text and text[-1] == " " else ""
+    if not text:
+        return "", "", ""
+    
+    # For semantic output, normalize leading/trailing to single spaces
+    prefix = " " if text.startswith((" ", "\t")) else ""
+    suffix = " " if text.endswith((" ", "\t")) else ""
+    
+    # Normalize the content
     text = text.strip()
+    
     return prefix, suffix, text
 
 
