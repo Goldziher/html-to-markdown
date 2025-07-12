@@ -549,20 +549,26 @@ def convert_to_markdown(
                 raise MissingDependencyError("lxml", "pip install html-to-markdown[lxml]")
 
             # Store original source for lxml whitespace preservation
-            original_source = source
+            original_source = source if isinstance(source, str) else str(source)
+            needs_leading_whitespace_fix = (parser == "lxml" and 
+                                          isinstance(source, str) and 
+                                          original_source.startswith((" ", "\t", "\n", "\r")))
+            
             source = BeautifulSoup(source, parser)
             
-            # Handle lxml's auto-wrapping behavior for raw text
+            # Handle lxml's auto-wrapping behavior for raw text (single text node case only)
             if parser == "lxml" and source.find("body"):
                 body = source.find("body")
-                # Check if lxml auto-wrapped raw text and stripped leading whitespace
-                if (body and len(list(body.children)) == 1 and 
-                    isinstance(list(body.children)[0], NavigableString) and
-                    original_source.startswith((" ", "\t")) and
-                    not str(list(body.children)[0]).startswith((" ", "\t"))):
+                children = list(body.children)
+                
+                # Only handle single text node case - mixed content is handled at output level
+                if (len(children) == 1 and 
+                    isinstance(children[0], NavigableString) and
+                    original_source.startswith((" ", "\t", "\n", "\r")) and
+                    not str(children[0]).startswith((" ", "\t", "\n", "\r"))):
                     
-                    # Preserve original leading whitespace
-                    first_child = list(body.children)[0]
+                    # Preserve original leading whitespace for single text nodes
+                    first_child = children[0]
                     # Extract leading whitespace from original
                     leading_ws = ""
                     for char in original_source:
@@ -575,6 +581,7 @@ def convert_to_markdown(
                     from bs4 import NavigableString as NS
                     new_text = NS(leading_ws + str(first_child))
                     first_child.replace_with(new_text)
+                    needs_leading_space_fix = False  # Fixed at DOM level
         else:
             raise EmptyHtmlError
 
@@ -663,8 +670,37 @@ def convert_to_markdown(
 
     result = sink.get_result()
 
+    # Handle lxml leading whitespace issue for mixed content at output level
+    if 'needs_leading_whitespace_fix' in locals() and needs_leading_whitespace_fix and not result.startswith((" ", "\t", "\n", "\r")):
+        # Extract the original leading whitespace
+        original_input = sink.original_source if hasattr(sink, 'original_source') else original_source
+        leading_whitespace_match = re.match(r"^[\s]*", original_input)
+        if leading_whitespace_match:
+            leading_whitespace = leading_whitespace_match.group(0)
+            
+            # For block-level elements (lists, headings), preserve only newlines, not indentation spaces
+            if any(tag in original_input for tag in ['<ol', '<ul', '<li', '<h1', '<h2', '<h3', '<h4', '<h5', '<h6']):
+                # Extract only newlines from the leading whitespace
+                leading_newlines = re.match(r"^[\n\r]*", leading_whitespace)
+                if leading_newlines:
+                    leading_whitespace = leading_newlines.group(0)
+                else:
+                    leading_whitespace = ""
+            
+            if leading_whitespace:
+                result = leading_whitespace + result
+
     # Normalize excessive newlines - max 2 consecutive newlines (one empty line)
     result = re.sub(r"\n{3,}", "\n\n", result)
+    
+    # Normalize excessive spaces while preserving meaningful single and double spaces
+    # This handles cases where multiple whitespace processing layers create extra spaces
+    result = re.sub(r" {3,}", " ", result)  # 3+ spaces -> 1 space (preserve doubles for empty elements)
+    
+    # Additional normalization for specific edge cases with inline elements
+    # Handle case where inline markup creates double spaces at boundaries
+    result = re.sub(r"\*\* {2,}", "** ", result)  # "**  " -> "** "
+    result = re.sub(r" {2,}\*\*", " **", result)  # "  **" -> " **"
 
     # Strip all trailing newlines in inline mode
     if convert_as_inline:
