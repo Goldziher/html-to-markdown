@@ -7,7 +7,7 @@ from html_to_markdown.constants import line_beginning_re
 
 def chomp(text: str) -> tuple[str, str, str]:
     """Simplified whitespace handling for inline elements.
-    
+
     For semantic markdown output, preserves leading/trailing spaces as single spaces
     and normalizes internal whitespace.
 
@@ -19,14 +19,12 @@ def chomp(text: str) -> tuple[str, str, str]:
     """
     if not text:
         return "", "", ""
-    
-    # For semantic output, normalize leading/trailing to single spaces
+
     prefix = " " if text.startswith((" ", "\t")) else ""
     suffix = " " if text.endswith((" ", "\t")) else ""
-    
-    # Normalize the content
+
     text = text.strip()
-    
+
     return prefix, suffix, text
 
 

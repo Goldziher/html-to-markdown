@@ -11,16 +11,13 @@ the list will have at most <code class="docutils literal notranslate"><span clas
 specified or <code class="docutils literal notranslate"><span class="pre">-1</span></code>, then there is no limit on the number of splits
 (all possible splits are made).</p>"""
 
-    # Without strip_newlines (default behavior)
     result_default = convert_to_markdown(html, wrap=False)
-    assert "\n" in result_default  # Should contain newlines
+    assert "\n" in result_default
 
-    # With strip_newlines
     result_stripped = convert_to_markdown(html, strip_newlines=True, wrap=False)
-    assert "\n\n" in result_stripped  # Only paragraph break should remain
-    assert result_stripped.count("\n") == 2  # Only the two newlines at the end of paragraph
+    assert "\n\n" in result_stripped
+    assert result_stripped.count("\n") == 2
 
-    # Verify content is preserved
     assert "Return a list of the words in the string" in result_stripped
     assert "*sep*" in result_stripped
     assert "*maxsplit*" in result_stripped
@@ -36,10 +33,10 @@ with a line break.</p>
 also with a line break.</p>"""
 
     result = convert_to_markdown(html, strip_newlines=True)
-    # Should have exactly one blank line between paragraphs
+
     assert "First paragraph with a line break." in result
     assert "Second paragraph also with a line break." in result
-    # Verify paragraph separation
+
     assert "\n\n" in result
 
 
@@ -53,7 +50,7 @@ newlines</pre>"""
 
     result = convert_to_markdown(html, strip_newlines=True)
     assert "Regular text with newline." in result
-    # Pre blocks content is still affected by strip_newlines since it's applied before parsing
+
     assert "Code block with preserved newlines" in result
 
 
@@ -71,9 +68,8 @@ def test_strip_newlines_empty_html() -> None:
     """Test that empty HTML still works with strip_newlines."""
     html = "\n\n"
 
-    # When strip_newlines=True, newlines become spaces which get normalized
     result = convert_to_markdown(html, strip_newlines=True)
-    assert result.strip() == ""  # The spaces get normalized
+    assert result.strip() == ""
 
 
 def test_strip_newlines_with_carriage_returns() -> None:

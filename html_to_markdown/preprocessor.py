@@ -43,10 +43,8 @@ def preprocess_html(
     if not html or not html.strip():  # pragma: no cover
         return html
 
-    # Pre-clean class-based navigation elements before nh3 processing
     html = _remove_class_based_navigation(html, remove_navigation)
 
-    # Configure nh3 settings
     nh3_config = _configure_cleaning_rules(
         remove_navigation=remove_navigation,
         remove_forms=remove_forms,
@@ -60,7 +58,6 @@ def preprocess_html(
         custom_attributes_to_remove=custom_attributes_to_remove or set(),
     )
 
-    # Use nh3 to clean the HTML with proper configuration
     cleaned_html = nh3.clean(
         html,
         tags=nh3_config["tags"],
@@ -69,7 +66,6 @@ def preprocess_html(
         strip_comments=nh3_config["strip_comments"],
     )
 
-    # Additional custom cleaning for specific patterns
     cleaned_html = _remove_navigation_patterns(cleaned_html, remove_navigation)
     return _fix_whitespace_issues(cleaned_html)
 
@@ -88,29 +84,24 @@ def _configure_cleaning_rules(
     custom_attributes_to_remove: set[str],
 ) -> dict[str, Any]:
     """Configure the cleaning rules for nh3."""
-    # Start with basic allowed tags for text extraction
     allowed_tags = {
-        # Text formatting
         "p",
         "div",
         "span",
         "br",
         "hr",
-        # Headings
         "h1",
         "h2",
         "h3",
         "h4",
         "h5",
         "h6",
-        # Lists
         "ul",
         "ol",
         "li",
         "dl",
         "dt",
         "dd",
-        # Text semantics
         "strong",
         "b",
         "em",
@@ -133,14 +124,11 @@ def _configure_cleaning_rules(
         "dfn",
         "time",
         "data",
-        # Links
         "a",
-        # Quotes and citations
         "blockquote",
         "q",
     }
 
-    # Add semantic HTML5 elements if preserving structure
     if preserve_semantic_structure:
         allowed_tags.update(
             {
@@ -158,7 +146,6 @@ def _configure_cleaning_rules(
             }
         )
 
-    # Add table elements if preserving tables
     if preserve_tables:
         allowed_tags.update(
             {
@@ -175,7 +162,6 @@ def _configure_cleaning_rules(
             }
         )
 
-    # Add media elements if preserving media
     if preserve_media:
         allowed_tags.update(
             {
@@ -191,10 +177,8 @@ def _configure_cleaning_rules(
             }
         )
 
-    # Remove custom tags
     allowed_tags -= custom_tags_to_remove
 
-    # Define tags to completely remove (including content)
     clean_content_tags = set()
 
     if remove_navigation:
@@ -205,7 +189,6 @@ def _configure_cleaning_rules(
                 "menuitem",
                 "header",
                 "footer",
-                # Wikipedia-specific navigation elements
                 "mw-jump-link",
                 "vector-header",
                 "vector-header-container",
@@ -245,14 +228,10 @@ def _configure_cleaning_rules(
     if remove_styles:
         clean_content_tags.update({"style"})
 
-    # Add custom tags to remove
     clean_content_tags.update(custom_tags_to_remove)
 
-    # Remove clean_content_tags from allowed_tags to avoid conflicts
     allowed_tags -= clean_content_tags
 
-    # Configure allowed attributes (basic set for text extraction)
-    # Use a simple approach to avoid conflicts with nh3 defaults
     allowed_attributes = {
         "*": {"id", "class", "lang", "dir", "title"},
         "a": {"href"},
@@ -261,13 +240,11 @@ def _configure_cleaning_rules(
         "td": {"colspan", "rowspan"},
     }
 
-    # Remove custom attributes
     if custom_attributes_to_remove:
         for attrs in allowed_attributes.values():
             if isinstance(attrs, set):
-                attrs -= custom_attributes_to_remove
+                attrs.difference_update(custom_attributes_to_remove)
 
-    # Store the configuration
     return {
         "tags": allowed_tags,
         "attributes": allowed_attributes,
@@ -281,9 +258,7 @@ def _remove_class_based_navigation(html: str, remove_navigation: bool) -> str:
     if not remove_navigation:
         return html
 
-    # Define navigation-related class patterns
     navigation_classes = [
-        # Wikipedia-specific classes
         r'vector-header[^"]*',
         r'vector-main-menu[^"]*',
         r'vector-page-tools[^"]*',
@@ -293,7 +268,6 @@ def _remove_class_based_navigation(html: str, remove_navigation: bool) -> str:
         r'navbox[^"]*',
         r'navigation-box[^"]*',
         r'sidebar[^"]*',
-        # Generic navigation classes
         r'nav[^"]*',
         r'header[^"]*',
         r'footer[^"]*',
@@ -303,13 +277,10 @@ def _remove_class_based_navigation(html: str, remove_navigation: bool) -> str:
         r'toolbar[^"]*',
     ]
 
-    # Remove elements with these classes
     for class_pattern in navigation_classes:
-        # Match elements with the specified class
         pattern = rf'<[^>]*class="[^"]*{class_pattern}[^"]*"[^>]*>.*?</[^>]*>'
         html = re.sub(pattern, "", html, flags=re.DOTALL | re.IGNORECASE)
 
-        # Also match self-closing elements
         pattern = rf'<[^>]*class="[^"]*{class_pattern}[^"]*"[^>]*/>'
         html = re.sub(pattern, "", html, flags=re.IGNORECASE)
 
@@ -321,44 +292,30 @@ def _remove_navigation_patterns(html: str, remove_navigation: bool) -> str:
     if not remove_navigation:
         return html
 
-    # Remove entire navigation list sections
     html = _remove_wikipedia_navigation_lists(html)
 
-    # Common navigation patterns found in benchmarks
     patterns_to_remove = [
-        # Wikipedia-style navigation
         r"\[Jump to content\]\(#[^)]*\)",
-        r"\[Jump to content\]",  # Sometimes without link
-        r"Jump to content",  # Plain text version
+        r"\[Jump to content\]",
+        r"Jump to content",
         r"Main menu.*?hide.*?Navigation",
         r"move to sidebar.*?hide",
-        # Breadcrumb navigation
         r"Home\s*[>»]\s*[^<]*[>»]",
-        # Skip links
         r"\[Skip to [^]]*\]",
         r"\[Skip [^]]*\]",
-        # Menu toggles
         r"<label[^>]*>.*?menu.*?</label>",
-        # Common UI text
         r"<button[^>]*>.*?(menu|toggle|expand|collapse|show|hide).*?</button>",
-        # Wikipedia-specific patterns
         r"The Free Encyclopedia[^a-zA-Z]*",
-        # Wikipedia logos and branding
         r"<img[^>]*wikipedia[^>]*>",
         r"\[Wikipedia\]\([^)]*\)",
-        # Wikipedia search and navigation
         r'\[Search\]\([^)]*"Search[^)]*"\)',
         r"\[Add links\]\([^)]*\)",
-        # Wikipedia article info
         r"This is a good article\. Click here for more information\.",
         r"From Wikipedia, the free encyclopedia",
-        # Remove image tags with empty or placeholder content
         r'<img[^>]*alt=[\'"][\'"][^>]*>',
         r'<img[^>]*src=[\'"][\'"][^>]*>',
-        # Clean up malformed tags
         r"div\\>",
         r"</?\w+\\>",
-        # Remove standalone "Main menu" headers
         r"^Main menu\s*$",
         r"^Search\s*$",
         r"^History\s*$",
@@ -373,12 +330,8 @@ def _remove_navigation_patterns(html: str, remove_navigation: bool) -> str:
 
 def _remove_wikipedia_navigation_lists(html: str) -> str:
     """Remove Wikipedia-style navigation lists that appear at the start."""
-    # Pattern to match navigation lists (multiple consecutive list items with Wikipedia links)
-    # This targets the main menu that appears before the article content
     patterns = [
-        # Remove navigation list that starts with "Contents" and has multiple Wikipedia links
         r"Main menu\s*\n\n(-\s*\[.*?\]\(.*?\).*?\n){3,}",
-        # Remove any list with multiple consecutive Wikipedia navigation links
         r"(-\s*\[[^\]]*\]\(/wiki/[^)]*\).*?\n){5,}",
     ]
 
@@ -390,19 +343,13 @@ def _remove_wikipedia_navigation_lists(html: str) -> str:
 
 def _fix_whitespace_issues(html: str) -> str:
     """Fix common whitespace issues in HTML."""
-    # Only normalize excessive internal whitespace, preserve leading/trailing
-    # Replace multiple whitespace characters (except single spaces) with single space
-    html = re.sub(r"[ \t]{2,}", " ", html)  # Multiple spaces/tabs -> single space
-    html = re.sub(r"\n\s*\n", "\n\n", html)  # Multiple newlines -> double newline
-    
-    # Clean up whitespace around tags but preserve leading/trailing text whitespace
-    html = re.sub(r">\s*<", "><", html)
-    
-    return html
+    html = re.sub(r"[ \t]{2,}", " ", html)
+    html = re.sub(r"\n\s*\n", "\n\n", html)
+
+    return re.sub(r">\s*<", "><", html)
 
 
-# Preset configurations for common use cases
-PRESETS = {
+PRESETS: dict[str, dict[str, Any]] = {
     "minimal": {
         "remove_navigation": True,
         "remove_forms": True,
@@ -454,7 +401,7 @@ def create_preprocessor(preset: str = "standard", **overrides: Any) -> dict[str,
         msg = f"Unknown preset '{preset}'. Available presets: {list(PRESETS.keys())}"
         raise ValueError(msg)
 
-    config: dict[str, Any] = PRESETS[preset].copy()
+    config: dict[str, Any] = dict(PRESETS[preset])
     config.update(overrides)
 
     return config

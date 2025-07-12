@@ -191,7 +191,6 @@ def main(argv: list[str]) -> str:
 
     args = parser.parse_args(argv)
 
-    # Prepare base arguments
     base_args = {
         "strip": args.strip,
         "convert": args.convert,
@@ -216,18 +215,16 @@ def main(argv: list[str]) -> str:
         "highlight_style": args.highlight_style,
     }
 
-    # Add streaming parameters only if streaming is enabled
     if args.stream_processing:
         base_args["stream_processing"] = True
         base_args["chunk_size"] = args.chunk_size
 
-        # Progress callback for CLI
         if args.show_progress:
 
             def progress_callback(processed: int, total: int) -> None:
                 if total > 0:
                     percent = (processed / total) * 100
-                    # Use sys.stderr to avoid ruff T201 error for progress output
+
                     sys.stderr.write(f"\rProgress: {percent:.1f}% ({processed}/{total} bytes)")
                     sys.stderr.flush()
 

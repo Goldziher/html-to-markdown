@@ -194,7 +194,7 @@ def test_media_inline_mode() -> None:
     """Test media elements in inline mode."""
     html = '<audio src="audio.mp3" controls></audio>'
     result = convert_to_markdown(html, convert_as_inline=True)
-    # In inline mode, trailing newlines are stripped
+
     assert result == '<audio src="audio.mp3" controls />'
 
 
@@ -238,7 +238,7 @@ def test_audio_no_boolean_attributes() -> None:
     """Test audio element without boolean attributes."""
     html = '<audio src="audio.mp3" controls="false"></audio>'
     result = convert_to_markdown(html)
-    # BeautifulSoup treats controls="false" as having controls attribute
+
     assert result == '<audio src="audio.mp3" controls />\n\n'
 
 

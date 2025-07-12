@@ -29,12 +29,10 @@ class TestHTMLPreprocessor:
         config = create_preprocessor("standard", remove_navigation=True)
         cleaned = preprocess_html(html, **config)
 
-        # Navigation should be removed
         assert "<nav>" not in cleaned
         assert "Home" not in cleaned
         assert "About" not in cleaned
 
-        # Main content should remain
         assert "Main Content" in cleaned
         assert "actual content" in cleaned
 
@@ -57,13 +55,11 @@ class TestHTMLPreprocessor:
         config = create_preprocessor("standard", remove_forms=True)
         cleaned = preprocess_html(html, **config)
 
-        # Form elements should be removed
         assert "<form>" not in cleaned
         assert "<input>" not in cleaned
         assert "<button>" not in cleaned
         assert "<label>" not in cleaned
 
-        # Other content should remain
         assert "Contact Us" in cleaned
         assert "Thank you for visiting!" in cleaned
 
@@ -88,7 +84,6 @@ class TestHTMLPreprocessor:
         config = create_preprocessor("standard", preserve_tables=True)
         cleaned = preprocess_html(html, **config)
 
-        # Table structure should be preserved
         assert "<table>" in cleaned
         assert "<thead>" in cleaned
         assert "<tbody>" in cleaned
@@ -121,23 +116,18 @@ class TestIntegratedPreprocessing:
         </html>
         """
 
-        # Without preprocessing
         result_no_preprocess = convert_to_markdown(html, preprocess_html=False)
 
-        # With preprocessing
         result_with_preprocess = convert_to_markdown(html, preprocess_html=True, preprocessing_preset="standard")
 
-        # Preprocessing should remove navigation artifacts
         assert "Jump to content" not in result_with_preprocess
         assert "Main menu" not in result_with_preprocess
         assert "move to sidebar" not in result_with_preprocess
         assert "hide" not in result_with_preprocess
 
-        # But preserve the actual content
         assert "Article Title" in result_with_preprocess
         assert "actual article content" in result_with_preprocess
 
-        # Should be cleaner than without preprocessing
         assert len(result_with_preprocess) < len(result_no_preprocess)
 
     def test_form_removal_integration(self) -> None:
@@ -161,12 +151,10 @@ class TestIntegratedPreprocessing:
 
         result = convert_to_markdown(html, preprocess_html=True, remove_forms=True)
 
-        # Form elements should not appear in markdown
         assert "email" not in result.lower()
         assert "subscribe" not in result.lower()
         assert "fieldset" not in result.lower()
 
-        # Page content should be preserved
         assert "Page Title" in result
         assert "Important information" in result
 
@@ -191,11 +179,9 @@ class TestIntegratedPreprocessing:
 
         result = convert_to_markdown(html, preprocess_html=True, preprocessing_preset="minimal")
 
-        # Should preserve basic content structure
         assert "Article" in result
         assert "Content" in result
 
-        # Navigation should be removed
         assert "Navigation" not in result
 
     def test_aggressive_preset(self) -> None:
@@ -217,11 +203,9 @@ class TestIntegratedPreprocessing:
 
         result = convert_to_markdown(html, preprocess_html=True, preprocessing_preset="aggressive")
 
-        # Should preserve essential content
         assert "Main Title" in result
         assert "Main content" in result
 
-        # Should remove more elements than standard preset
         assert "Site Header" not in result
         assert "Navigation" not in result
         assert "Sidebar" not in result
@@ -251,17 +235,13 @@ class TestIntegratedPreprocessing:
 
         result = convert_to_markdown(html, preprocess_html=True, remove_navigation=True)
 
-        # Wikipedia navigation should be significantly reduced
-        # The class-based removal should catch most navigation elements
         assert "vector-header" not in result
         assert "mw-jump-link" not in result
         assert "vector-main-menu" not in result
 
-        # Article content should remain
         assert "Article Title" in result
         assert "Actual article content" in result
 
-        # Test without preprocessing to ensure we're making an improvement
         result_no_preprocess = convert_to_markdown(html, preprocess_html=False)
         assert len(result) < len(result_no_preprocess)
 
@@ -286,12 +266,10 @@ class TestIntegratedPreprocessing:
         )
         cleaned = preprocess_html(html, **config)
 
-        # Custom tags should be removed
         assert "advertisement" not in cleaned.lower()
         assert "cookie" not in cleaned.lower()
         assert "social" not in cleaned.lower()
 
-        # Main content should remain
         assert "Title" in cleaned
         assert "Important content" in cleaned
 
@@ -315,12 +293,10 @@ class TestIntegratedPreprocessing:
         config = create_preprocessor("standard", remove_navigation=True)
         cleaned = preprocess_html(html, **config)
 
-        # Navigation classes should be removed
         assert "Site navigation" not in cleaned
         assert "Sidebar menu" not in cleaned
         assert "Home >" not in cleaned
 
-        # Main content should remain
         assert "Main Content" in cleaned
         assert "This should be preserved" in cleaned
 
@@ -341,13 +317,11 @@ class TestIntegratedPreprocessing:
 
         cleaned = preprocess_html(html, remove_navigation=True, remove_forms=True, preserve_tables=True)
 
-        # Navigation and forms should be removed
         assert "<nav>" not in cleaned
         assert "<form>" not in cleaned
         assert "<input>" not in cleaned
         assert "<button>" not in cleaned
 
-        # Content and tables should remain
         assert "Content" in cleaned
         assert "<table>" in cleaned
         assert "Data" in cleaned

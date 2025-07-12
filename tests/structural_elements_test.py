@@ -125,7 +125,7 @@ class TestHgroupElement:
         """Test hgroup in inline mode."""
         html = "<hgroup><h1>Inline Title</h1></hgroup>"
         result = convert_to_markdown(html, convert_as_inline=True)
-        # In inline mode, just return the content
+
         assert "Inline Title" in result
         assert "<!-- heading group -->" not in result
 
@@ -141,7 +141,7 @@ class TestHgroupElement:
         """Test that hgroup removes excessive spacing between headings."""
         html = "<hgroup><h1>Title</h1><p></p><p></p><h2>Subtitle</h2></hgroup>"
         result = convert_to_markdown(html)
-        # Should not have more than one empty line between headings
+
         assert "\n\n\n" not in result
 
     def test_hgroup_with_formatted_headings(self) -> None:
@@ -215,7 +215,7 @@ class TestPictureElement:
             <img src="small.jpg" alt="Test">
         </picture>"""
         result = convert_to_markdown(html, convert_as_inline=True)
-        # In inline mode, just the alt text
+
         assert result == "Test"
         assert "<!-- picture sources:" not in result
 
@@ -345,7 +345,7 @@ class TestStructuralElementsEdgeCases:
             <img src="valid.jpg">
         </picture>"""
         result = convert_to_markdown(html)
-        # Should only process valid sources
+
         assert result == "![](valid.jpg)"
 
     def test_figure_whitespace_handling(self) -> None:
