@@ -7,6 +7,7 @@ Python 3.9+.
 ## Features
 
 - **Full HTML5 Support**: Comprehensive support for all modern HTML5 elements including semantic, form, table, ruby, interactive, structural, SVG, and math elements
+- **Enhanced Table Support**: Advanced handling of merged cells with rowspan/colspan support for better table representation
 - **Type Safety**: Strict MyPy adherence with comprehensive type hints
 - **Metadata Extraction**: Automatic extraction of document metadata (title, meta tags) as comment headers
 - **Streaming Support**: Memory-efficient processing for large documents with progress callbacks
@@ -16,7 +17,7 @@ Python 3.9+.
 - **CLI Tool**: Full-featured command-line interface with all API options exposed
 - **Custom Converters**: Extensible converter system for custom HTML tag handling
 - **BeautifulSoup Integration**: Support for pre-configured BeautifulSoup instances
-- **Extensive Test Coverage**: 100% test coverage requirement with comprehensive test suite
+- **Comprehensive Test Coverage**: 91%+ test coverage with 623+ comprehensive tests
 
 ## Installation
 
@@ -163,6 +164,51 @@ print(markdown)
 ```
 
 Custom converters take precedence over the built-in converters and can be used alongside other configuration options.
+
+### Enhanced Table Support
+
+The library now provides better handling of complex tables with merged cells:
+
+```python
+from html_to_markdown import convert_to_markdown
+
+# HTML table with merged cells
+html = """
+<table>
+    <tr>
+        <th rowspan="2">Category</th>
+        <th colspan="2">Sales Data</th>
+    </tr>
+    <tr>
+        <th>Q1</th>
+        <th>Q2</th>
+    </tr>
+    <tr>
+        <td>Product A</td>
+        <td>$100K</td>
+        <td>$150K</td>
+    </tr>
+</table>
+"""
+
+markdown = convert_to_markdown(html)
+print(markdown)
+```
+
+Output:
+
+```markdown
+| Category | Sales Data |  |
+| --- | --- | --- |
+| | Q1 | Q2 |
+| Product A | $100K | $150K |
+```
+
+The library handles:
+
+- **Rowspan**: Inserts empty cells in subsequent rows
+- **Colspan**: Properly manages column spanning
+- **Clean output**: Removes `<colgroup>` and `<col>` elements that have no Markdown equivalent
 
 ### Key Configuration Options
 
@@ -399,7 +445,9 @@ This library provides comprehensive support for all modern HTML5 elements:
 
 ### Table Elements
 
-- `<table>`, `<thead>`, `<tbody>`, `<tfoot>`, `<tr>`, `<th>`, `<td>`, `<caption>`, `<col>`, `<colgroup>`
+- `<table>`, `<thead>`, `<tbody>`, `<tfoot>`, `<tr>`, `<th>`, `<td>`, `<caption>`
+- **Merged cell support**: Handles `rowspan` and `colspan` attributes for complex table layouts
+- **Smart cleanup**: Automatically handles table styling elements for clean Markdown output
 
 ### Interactive Elements
 
@@ -418,16 +466,41 @@ This library provides comprehensive support for all modern HTML5 elements:
 
 - `<math>` (MathML support)
 
-## Breaking Changes (Major Version)
+## Advanced Table Support
 
-This version introduces several breaking changes for improved consistency and functionality:
+The library provides sophisticated handling of complex HTML tables, including merged cells and proper structure conversion:
 
-1. **Enhanced Metadata Extraction**: Now enabled by default with comprehensive extraction of title, meta tags, and link relations
-1. **Improved Newline Handling**: Better normalization of excessive newlines (max 2 consecutive)
-1. **Extended HTML5 Support**: Added support for 40+ new HTML5 elements
-1. **Streaming API**: New streaming parameters for large document processing
-1. **Task List Support**: Automatic conversion of HTML checkboxes to GitHub-compatible task lists
-1. **Highlight Styles**: New `highlight_style` parameter with multiple options for `<mark>` elements
+```python
+from html_to_markdown import convert_to_markdown
+
+# Complex table with merged cells
+html = """
+<table>
+    <caption>Sales Report</caption>
+    <tr>
+        <th rowspan="2">Product</th>
+        <th colspan="2">Quarterly Sales</th>
+    </tr>
+    <tr>
+        <th>Q1</th>
+        <th>Q2</th>
+    </tr>
+    <tr>
+        <td>Widget A</td>
+        <td>$50K</td>
+        <td>$75K</td>
+    </tr>
+</table>
+"""
+
+result = convert_to_markdown(html)
+```
+
+**Features:**
+
+- **Merged cell support**: Handles `rowspan` and `colspan` attributes intelligently
+- **Clean output**: Automatically removes table styling elements that don't translate to Markdown
+- **Structure preservation**: Maintains table hierarchy and relationships
 
 ## Acknowledgments
 

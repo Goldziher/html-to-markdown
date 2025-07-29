@@ -167,3 +167,44 @@ def test_main_with_strip_newlines_option(mock_convert_to_markdown: Mock, mock_st
     main(["--strip-newlines"])
     mock_convert_to_markdown.assert_called_once()
     assert mock_convert_to_markdown.call_args[1]["strip_newlines"] is True
+
+
+def test_main_with_stream_processing_option(mock_convert_to_markdown: Mock, mock_stdin: Mock) -> None:
+    main(["--stream-processing", "--chunk-size", "2048"])
+    mock_convert_to_markdown.assert_called_once()
+    args = mock_convert_to_markdown.call_args[1]
+    assert args["stream_processing"] is True
+    assert args["chunk_size"] == 2048
+
+
+def test_main_with_stream_processing_and_progress(mock_convert_to_markdown: Mock, mock_stdin: Mock) -> None:
+    with patch("sys.stderr") as mock_stderr:
+        main(["--stream-processing", "--show-progress"])
+        mock_convert_to_markdown.assert_called_once()
+        args = mock_convert_to_markdown.call_args[1]
+        assert args["stream_processing"] is True
+        assert "progress_callback" in args
+
+        # Test the progress callback function
+        callback = args["progress_callback"]
+        callback(50, 100)
+        mock_stderr.write.assert_called_with("\rProgress: 50.0% (50/100 bytes)")
+        mock_stderr.flush.assert_called_once()
+
+
+def test_main_with_convert_as_inline_option(mock_convert_to_markdown: Mock, mock_stdin: Mock) -> None:
+    main(["--convert-as-inline"])
+    mock_convert_to_markdown.assert_called_once()
+    assert mock_convert_to_markdown.call_args[1]["convert_as_inline"] is True
+
+
+def test_main_with_no_extract_metadata_option(mock_convert_to_markdown: Mock, mock_stdin: Mock) -> None:
+    main(["--no-extract-metadata"])
+    mock_convert_to_markdown.assert_called_once()
+    assert mock_convert_to_markdown.call_args[1]["extract_metadata"] is False
+
+
+def test_main_with_highlight_style_option(mock_convert_to_markdown: Mock, mock_stdin: Mock) -> None:
+    main(["--highlight-style", "html"])
+    mock_convert_to_markdown.assert_called_once()
+    assert mock_convert_to_markdown.call_args[1]["highlight_style"] == "html"
