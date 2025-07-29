@@ -665,13 +665,23 @@ def convert_to_markdown(
     def normalize_spaces_outside_code(text: str) -> str:
         parts = text.split("```")
         for i in range(0, len(parts), 2):
-            # Preserve definition list formatting (: followed by 3 spaces)
-            # Split by definition list patterns to preserve them
-            def_parts = re.split(r"(:\s{3})", parts[i])
-            for j in range(0, len(def_parts), 2):
-                # Only normalize non-definition-list parts
-                def_parts[j] = re.sub(r" {3,}", " ", def_parts[j])
-            parts[i] = "".join(def_parts)
+            # Process each line separately to preserve leading spaces
+            lines = parts[i].split("\n")
+            processed_lines = []
+            for line in lines:
+                # Preserve definition list formatting (: followed by 3 spaces)
+                def_parts = re.split(r"(:\s{3})", line)
+                for j in range(0, len(def_parts), 2):
+                    # Only normalize non-definition-list parts
+                    # Also preserve leading spaces (for list indentation)
+                    match = re.match(r"^(\s*)(.*)", def_parts[j])
+                    if match:
+                        leading_spaces, rest = match.groups()
+                        # Only normalize multiple spaces that are not at the beginning
+                        rest = re.sub(r" {3,}", " ", rest)
+                        def_parts[j] = leading_spaces + rest
+                processed_lines.append("".join(def_parts))
+            parts[i] = "\n".join(processed_lines)
         return "```".join(parts)
 
     result = normalize_spaces_outside_code(result)

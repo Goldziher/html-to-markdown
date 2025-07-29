@@ -340,7 +340,7 @@ Last updated: <time datetime="2023-12-25">December 25, 2023</time>
         """Test empty semantic text elements."""
         html = "<p>Empty elements: <abbr></abbr> <var></var> <ins></ins> <dfn></dfn></p>"
         result = convert_to_markdown(html)
-        assert result == "Empty elements:    \n\n"
+        assert result == "Empty elements:       \n\n"
 
     def test_whitespace_handling(self) -> None:
         """Test whitespace handling in semantic elements."""
