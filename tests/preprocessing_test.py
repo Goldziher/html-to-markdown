@@ -325,3 +325,67 @@ class TestIntegratedPreprocessing:
         assert "Content" in cleaned
         assert "<table>" in cleaned
         assert "Data" in cleaned
+
+
+def test_preprocessor_edge_cases() -> None:
+    """Test edge cases in preprocessing."""
+    # Test with minimal HTML
+    result = preprocess_html("<p>test</p>", remove_navigation=True)
+    assert "test" in result
+    
+    # Test with empty HTML
+    result = preprocess_html("", remove_navigation=True)
+    assert result == ""
+    
+    # Test create_preprocessor with different presets
+    config = create_preprocessor(preset="minimal")
+    assert isinstance(config, dict)
+    
+    config = create_preprocessor(preset="aggressive", remove_navigation=False)
+    assert isinstance(config, dict)
+    
+    # Test with malformed HTML
+    malformed = "<div><p>unclosed paragraph<div>nested</div>"
+    result = preprocess_html(malformed, minimal_whitespace=True)
+    assert "unclosed paragraph" in result
+    
+    # Test navigation removal with different tags
+    nav_html = """
+    <header>Header nav</header>
+    <nav>Main nav</nav> 
+    <aside>Sidebar</aside>
+    <div class="navigation">Class-based nav</div>
+    <div id="menu">ID-based nav</div>
+    <p>Content</p>
+    """
+    result = preprocess_html(nav_html, remove_navigation=True)
+    assert "Header nav" not in result
+    assert "Main nav" not in result
+    assert "Sidebar" not in result
+    assert "Class-based nav" not in result
+    assert "ID-based nav" not in result
+    assert "Content" in result
+
+
+def test_form_removal_edge_cases() -> None:
+    """Test form removal edge cases."""
+    # Test various form elements
+    form_html = """
+    <form>Form content</form>
+    <input type="text" value="input">
+    <textarea>textarea content</textarea>
+    <select><option>option</option></select>
+    <button>button</button>
+    <fieldset><legend>legend</legend></fieldset>
+    <p>Keep this content</p>
+    """
+    
+    result = preprocess_html(form_html, remove_forms=True)
+    
+    assert "Form content" not in result
+    assert "input" not in result
+    assert "textarea content" not in result
+    assert "option" not in result
+    assert "button" not in result
+    assert "legend" not in result
+    assert "Keep this content" in result

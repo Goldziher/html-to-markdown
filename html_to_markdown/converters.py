@@ -256,8 +256,8 @@ def _convert_img(*, tag: Tag, convert_as_inline: bool, keep_inline_images_in: It
     title_part = ' "{}"'.format(title.replace('"', r"\"")) if title else ""
     parent_name = tag.parent.name if tag.parent else ""
 
-    default_preserve_in = ["td", "th"]
-    preserve_in = set(keep_inline_images_in or []) | set(default_preserve_in)
+    default_preserve_in = {"td", "th"}
+    preserve_in = set(keep_inline_images_in or []) | default_preserve_in
     if convert_as_inline and parent_name not in preserve_in:
         return alt
     if width or height:
@@ -351,19 +351,17 @@ def _convert_li(*, tag: Tag, text: str, bullets: str) -> str:
 
         if paragraphs:
             # First paragraph goes directly after the bullet
-            result = f"{bullet} {paragraphs[0].strip()}\n"
+            result_parts = [f"{bullet} {paragraphs[0].strip()}\n"]
 
             # Subsequent paragraphs need to be indented and separated by blank lines
             for para in paragraphs[1:]:
                 if para.strip():
                     # Add blank line before the paragraph
-                    result += "\n"
+                    result_parts.append("\n")
                     # Indent each line of the paragraph by 4 spaces
-                    for line in para.strip().split("\n"):
-                        if line.strip():
-                            result += f"    {line}\n"
+                    result_parts.extend(f"    {line}\n" for line in para.strip().split("\n") if line.strip())
 
-            return result
+            return "".join(result_parts)
 
     # Simple case: no block elements, just inline content
     return "{} {}\n".format(bullet, (text or "").strip())
