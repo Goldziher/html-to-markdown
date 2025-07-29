@@ -9,14 +9,14 @@ from html_to_markdown.exceptions import (
 )
 
 
-def test_html_to_markdown_error():
+def test_html_to_markdown_error() -> None:
     """Test base exception class."""
     error = HtmlToMarkdownError("test message")
     assert str(error) == "test message"
     assert isinstance(error, Exception)
 
 
-def test_missing_dependency_error_with_install_command():
+def test_missing_dependency_error_with_install_command() -> None:
     """Test MissingDependencyError with install command."""
     error = MissingDependencyError("lxml", "pip install lxml")
 
@@ -25,7 +25,7 @@ def test_missing_dependency_error_with_install_command():
     assert str(error) == "lxml is not installed. Install with: pip install lxml"
 
 
-def test_missing_dependency_error_without_install_command():
+def test_missing_dependency_error_without_install_command() -> None:
     """Test MissingDependencyError without install command."""
     error = MissingDependencyError("unknown-lib", None)
 
@@ -34,7 +34,7 @@ def test_missing_dependency_error_without_install_command():
     assert str(error) == "unknown-lib is not installed."
 
 
-def test_missing_dependency_error_without_install_param():
+def test_missing_dependency_error_without_install_param() -> None:
     """Test MissingDependencyError without install parameter."""
     error = MissingDependencyError("another-lib")
 
@@ -43,7 +43,7 @@ def test_missing_dependency_error_without_install_param():
     assert str(error) == "another-lib is not installed."
 
 
-def test_invalid_parser_error():
+def test_invalid_parser_error() -> None:
     """Test InvalidParserError."""
     available = ["html.parser", "lxml", "html5lib"]
     error = InvalidParserError("invalid", available)
@@ -53,13 +53,13 @@ def test_invalid_parser_error():
     assert str(error) == "Invalid parser 'invalid'. Available parsers: html.parser, lxml, html5lib"
 
 
-def test_empty_html_error():
+def test_empty_html_error() -> None:
     """Test EmptyHtmlError."""
     error = EmptyHtmlError()
     assert str(error) == "The input HTML is empty."
 
 
-def test_conflicting_options_error():
+def test_conflicting_options_error() -> None:
     """Test ConflictingOptionsError."""
     error = ConflictingOptionsError("strip", "convert")
 
@@ -68,7 +68,7 @@ def test_conflicting_options_error():
     assert str(error) == "Only one of 'strip' and 'convert' can be specified."
 
 
-def test_exceptions_inheritance():
+def test_exceptions_inheritance() -> None:
     """Test that all custom exceptions inherit from base exception."""
     exceptions = [
         MissingDependencyError("test"),
