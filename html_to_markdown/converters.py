@@ -189,11 +189,24 @@ def _convert_blockquote(*, text: str, tag: Tag, convert_as_inline: bool) -> str:
     if not text:
         return ""
 
+    from html_to_markdown.processing import _has_ancestor  # noqa: PLC0415
+
     cite_url = tag.get("cite")
-    quote_text = f"\n{line_beginning_re.sub('> ', text.strip())}\n\n"
+
+    # Check if this blockquote is inside a list item
+    if _has_ancestor(tag, "li"):
+        # Indent the blockquote by 4 spaces
+        lines = text.strip().split("\n")
+        indented_lines = [f"    > {line}" if line.strip() else "" for line in lines]
+        quote_text = "\n".join(indented_lines) + "\n\n"
+    else:
+        quote_text = f"\n{line_beginning_re.sub('> ', text.strip())}\n\n"
 
     if cite_url:
-        quote_text += f"— <{cite_url}>\n\n"
+        if _has_ancestor(tag, "li"):
+            quote_text += f"    — <{cite_url}>\n\n"
+        else:
+            quote_text += f"— <{cite_url}>\n\n"
 
     return quote_text
 
@@ -253,24 +266,42 @@ def _convert_img(*, tag: Tag, convert_as_inline: bool, keep_inline_images_in: It
 
 
 def _convert_list(*, tag: Tag, text: str) -> str:
-    nested = False
+    from html_to_markdown.processing import _has_ancestor  # noqa: PLC0415
 
     before_paragraph = False
     if tag.next_sibling and getattr(tag.next_sibling, "name", None) not in {"ul", "ol"}:
         before_paragraph = True
 
-    while tag:
-        if tag.name == "li":
-            nested = True
-            break
+    # Check if this list is inside a list item
+    if _has_ancestor(tag, "li"):
+        # This is a nested list - needs indentation
+        # But we need to check if it's the first element after a paragraph
+        parent = tag.parent
+        while parent and parent.name != "li":
+            parent = parent.parent
 
-        if not tag.parent:
-            break
+        if parent:
+            # Check if there's a paragraph before this list
+            prev_p = None
+            for child in parent.children:
+                if hasattr(child, "name"):
+                    if child == tag:
+                        break
+                    if child.name == "p":
+                        prev_p = child
 
-        tag = tag.parent
-
-    if nested:
-        return "\n" + indent(text=text, level=1).rstrip()
+            if prev_p:
+                # If there's a paragraph before, we need proper indentation
+                lines = text.strip().split("\n")
+                indented_lines = []
+                for line in lines:
+                    if line.strip():
+                        indented_lines.append(f"    {line}")
+                    else:
+                        indented_lines.append("")
+                return "\n" + "\n".join(indented_lines) + "\n"
+            # Otherwise use the original tab indentation
+            return "\n" + indent(text=text, level=1).rstrip()
 
     return text + ("\n" if before_paragraph else "")
 
@@ -305,10 +336,40 @@ def _convert_li(*, tag: Tag, text: str, bullets: str) -> str:
             tag = tag.parent
 
         bullet = bullets[depth % len(bullets)]
+
+    # Check if the list item contains block-level elements (like <p>, <blockquote>, etc.)
+    has_block_children = any(
+        child.name in {"p", "blockquote", "pre", "ul", "ol", "div", "h1", "h2", "h3", "h4", "h5", "h6"}
+        for child in tag.children
+        if hasattr(child, "name")
+    )
+
+    if has_block_children:
+        # Handle multi-paragraph list items
+        # Split by double newlines (paragraph separators)
+        paragraphs = text.strip().split("\n\n")
+
+        if paragraphs:
+            # First paragraph goes directly after the bullet
+            result = f"{bullet} {paragraphs[0].strip()}\n"
+
+            # Subsequent paragraphs need to be indented and separated by blank lines
+            for para in paragraphs[1:]:
+                if para.strip():
+                    # Add blank line before the paragraph
+                    result += "\n"
+                    # Indent each line of the paragraph by 4 spaces
+                    for line in para.strip().split("\n"):
+                        if line.strip():
+                            result += f"    {line}\n"
+
+            return result
+
+    # Simple case: no block elements, just inline content
     return "{} {}\n".format(bullet, (text or "").strip())
 
 
-def _convert_p(*, wrap: bool, text: str, convert_as_inline: bool, wrap_width: int) -> str:
+def _convert_p(*, wrap: bool, text: str, convert_as_inline: bool, wrap_width: int, tag: Tag) -> str:
     if convert_as_inline:
         return text
 
@@ -319,6 +380,30 @@ def _convert_p(*, wrap: bool, text: str, convert_as_inline: bool, wrap_width: in
             break_long_words=False,
             break_on_hyphens=False,
         )
+
+    from html_to_markdown.processing import _has_ancestor  # noqa: PLC0415
+
+    # Check if this paragraph is inside a list item
+    if _has_ancestor(tag, "li"):
+        # Check if this is the first paragraph in the list item
+        parent = tag.parent
+        while parent and parent.name != "li":
+            parent = parent.parent
+
+        if parent:
+            # Get all direct children that are paragraphs
+            p_children = [child for child in parent.children if hasattr(child, "name") and child.name == "p"]
+
+            # If this is not the first paragraph, indent it
+            if p_children and tag != p_children[0]:
+                # Indent all lines by 4 spaces
+                indented_lines = []
+                for line in text.split("\n"):
+                    if line.strip():
+                        indented_lines.append(f"    {line}")
+                    else:
+                        indented_lines.append("")
+                text = "\n".join(indented_lines)
 
     return f"{text}\n\n" if text else ""
 
