@@ -475,7 +475,10 @@ def _convert_tfoot(*, text: str, convert_as_inline: bool) -> str:
 
 
 def _convert_colgroup(*, tag: Tag, text: str, convert_as_inline: bool) -> str:
-    """Convert HTML colgroup element preserving column structure for documentation.
+    """Convert HTML colgroup element - removes it entirely from Markdown output.
+
+    Colgroup is a table column grouping element that defines styling for columns.
+    It has no representation in Markdown and should be removed.
 
     Args:
         tag: The colgroup tag element.
@@ -483,54 +486,30 @@ def _convert_colgroup(*, tag: Tag, text: str, convert_as_inline: bool) -> str:
         convert_as_inline: Whether to convert as inline content.
 
     Returns:
-        The converted markdown text preserving colgroup structure.
+        Empty string as colgroup has no Markdown representation.
     """
-    if convert_as_inline:
-        return text
-
-    if not text.strip():
-        return ""
-
-    span = tag.get("span", "")
-    attrs = []
-    if span and isinstance(span, str) and span.strip():
-        attrs.append(f'span="{span}"')
-
-    attrs_str = " ".join(attrs)
-    if attrs_str:
-        return f"<colgroup {attrs_str}>\n{text.strip()}\n</colgroup>\n\n"
-    return f"<colgroup>\n{text.strip()}\n</colgroup>\n\n"
+    _ = tag, text, convert_as_inline
+    # Colgroup and its contents (col elements) are purely presentational
+    # and have no equivalent in Markdown tables
+    return ""
 
 
 def _convert_col(*, tag: Tag, convert_as_inline: bool) -> str:
-    """Convert HTML col element preserving column attributes for documentation.
+    """Convert HTML col element - removes it entirely from Markdown output.
+
+    Col elements define column properties (width, style) in HTML tables.
+    They have no representation in Markdown and should be removed.
 
     Args:
         tag: The col tag element.
         convert_as_inline: Whether to convert as inline content.
 
     Returns:
-        The converted markdown text preserving col structure.
+        Empty string as col has no Markdown representation.
     """
-    if convert_as_inline:
-        return ""
-
-    span = tag.get("span", "")
-    width = tag.get("width", "")
-    style = tag.get("style", "")
-
-    attrs = []
-    if width and isinstance(width, str) and width.strip():
-        attrs.append(f'width="{width}"')
-    if style and isinstance(style, str) and style.strip():
-        attrs.append(f'style="{style}"')
-    if span and isinstance(span, str) and span.strip():
-        attrs.append(f'span="{span}"')
-
-    attrs_str = " ".join(attrs)
-    if attrs_str:
-        return f"<col {attrs_str} />\n"
-    return "<col />\n"
+    _ = tag, convert_as_inline
+    # Col elements are self-closing and purely presentational
+    return ""
 
 
 def _convert_semantic_block(*, text: str, convert_as_inline: bool) -> str:

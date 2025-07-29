@@ -37,18 +37,20 @@ class TestColgroup:
     """Test colgroup element conversion."""
 
     def test_colgroup_basic(self) -> None:
-        """Test basic colgroup conversion."""
+        """Test basic colgroup conversion - colgroup should be removed."""
         html = "<table><colgroup><col><col></colgroup><tr><td>A</td><td>B</td></tr></table>"
         result = convert_to_markdown(html)
-        assert "<colgroup>" in result
-        assert "<col />" in result
-        assert "</colgroup>" in result
+        assert "<colgroup>" not in result
+        assert "<col />" not in result
+        assert "</colgroup>" not in result
+        assert "| A | B |" in result
 
     def test_colgroup_with_span(self) -> None:
-        """Test colgroup with span attribute."""
+        """Test colgroup with span attribute - should be removed."""
         html = '<table><colgroup span="3"><col><col></colgroup><tr><td>A</td><td>B</td></tr></table>'
         result = convert_to_markdown(html)
-        assert '<colgroup span="3">' in result
+        assert '<colgroup span="3">' not in result
+        assert "| A | B |" in result
 
     def test_colgroup_empty(self) -> None:
         """Test empty colgroup."""
@@ -67,34 +69,39 @@ class TestCol:
     """Test col element conversion."""
 
     def test_col_basic(self) -> None:
-        """Test basic col conversion."""
+        """Test basic col conversion - col should be removed."""
         html = "<table><colgroup><col></colgroup><tr><td>Data</td></tr></table>"
         result = convert_to_markdown(html)
-        assert "<col />" in result
+        assert "<col />" not in result
+        assert "| Data |" in result
 
     def test_col_with_width(self) -> None:
-        """Test col with width attribute."""
+        """Test col with width attribute - should be removed."""
         html = '<table><colgroup><col width="50%"></colgroup><tr><td>Data</td></tr></table>'
         result = convert_to_markdown(html)
-        assert '<col width="50%" />' in result
+        assert '<col width="50%" />' not in result
+        assert "| Data |" in result
 
     def test_col_with_style(self) -> None:
-        """Test col with style attribute."""
+        """Test col with style attribute - should be removed."""
         html = '<table><colgroup><col style="background-color: yellow;"></colgroup><tr><td>Data</td></tr></table>'
         result = convert_to_markdown(html)
-        assert '<col style="background-color: yellow;" />' in result
+        assert '<col style="background-color: yellow;" />' not in result
+        assert "| Data |" in result
 
     def test_col_with_span(self) -> None:
-        """Test col with span attribute."""
+        """Test col with span attribute - should be removed."""
         html = '<table><colgroup><col span="2"></colgroup><tr><td>A</td><td>B</td></tr></table>'
         result = convert_to_markdown(html)
-        assert '<col span="2" />' in result
+        assert '<col span="2" />' not in result
+        assert "| A | B |" in result
 
     def test_col_with_multiple_attributes(self) -> None:
-        """Test col with multiple attributes."""
+        """Test col with multiple attributes - should be removed."""
         html = '<table><colgroup><col span="2" width="30%" style="color: red;"></colgroup><tr><td>A</td><td>B</td></tr></table>'
         result = convert_to_markdown(html)
-        assert '<col width="30%" style="color: red;" span="2" />' in result
+        assert '<col width="30%" style="color: red;" span="2" />' not in result
+        assert "| A | B |" in result
 
     def test_col_inline_mode(self) -> None:
         """Test col in inline mode."""
@@ -196,9 +203,9 @@ class TestComplexTable:
 
         assert "*Employee Database*" in result
 
-        assert "<colgroup>" in result
-        assert '<col style="width: 40%" />' in result
-        assert '<col style="width: 30%" />' in result
+        assert "<colgroup>" not in result
+        assert '<col style="width: 40%" />' not in result
+        assert '<col style="width: 30%" />' not in result
 
         assert "| Name | Department | Salary |" in result
         assert "| John Doe | Engineering | $75,000 |" in result
@@ -221,9 +228,9 @@ class TestComplexTable:
             </tr>
         </table>"""
         result = convert_to_markdown(html)
-        assert "<col />" in result
-        assert '<col width="50%" />' in result
-        assert '<col style="background: yellow;" span="2" />' in result
+        assert "<col />" not in result
+        assert '<col width="50%" />' not in result
+        assert '<col style="background: yellow;" span="2" />' not in result
         assert "| A | B | C | D |" in result
 
     def test_nested_colgroups(self) -> None:
@@ -243,10 +250,11 @@ class TestComplexTable:
             </tr>
         </table>"""
         result = convert_to_markdown(html)
-        assert '<colgroup span="2">' in result
-        assert '<col style="background: red;" />' in result
-        assert '<col style="background: blue;" />' in result
-        assert '<col style="background: green;" />' in result
+        assert '<colgroup span="2">' not in result
+        assert '<col style="background: red;" />' not in result
+        assert '<col style="background: blue;" />' not in result
+        assert '<col style="background: green;" />' not in result
+        assert "| Red | Blue | Green |" in result
 
     def test_table_with_caption_and_formatting(self) -> None:
         """Test table with caption containing complex formatting."""
