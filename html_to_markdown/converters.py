@@ -21,6 +21,24 @@ from html_to_markdown.constants import (
 )
 from html_to_markdown.utils import chomp, indent, underline
 
+
+def _format_block_element(text: str) -> str:
+    """Format text as a block element with trailing newlines."""
+    return f"{text.strip()}\n\n" if text.strip() else ""
+
+
+def _format_inline_or_block(text: str, convert_as_inline: bool) -> str:
+    """Format text as inline or block element based on context."""
+    return text.strip() if convert_as_inline else _format_block_element(text)
+
+
+def _format_wrapped_block(text: str, start_marker: str, end_marker: str = "") -> str:
+    """Format text wrapped in markers as a block element."""
+    if not end_marker:
+        end_marker = start_marker
+    return f"{start_marker}{text.strip()}{end_marker}\n\n" if text.strip() else ""
+
+
 SupportedElements = Literal[
     "a",
     "abbr",
@@ -560,7 +578,7 @@ def _convert_caption(*, text: str, convert_as_inline: bool) -> str:
     if not text.strip():
         return ""
 
-    return f"*{text.strip()}*\n\n"
+    return _format_wrapped_block(text, "*")
 
 
 def _convert_thead(*, text: str, convert_as_inline: bool) -> str:
@@ -679,7 +697,7 @@ def _convert_details(*, text: str, convert_as_inline: bool) -> str:
         return text
 
     # Details is a semantic container, return its content
-    return f"{text.strip()}\n\n" if text.strip() else ""
+    return _format_block_element(text)
 
 
 def _convert_summary(*, text: str, convert_as_inline: bool) -> str:
@@ -696,7 +714,7 @@ def _convert_summary(*, text: str, convert_as_inline: bool) -> str:
         return text
 
     # Summary is like a heading/title
-    return f"**{text.strip()}**\n\n" if text.strip() else ""
+    return _format_wrapped_block(text, "**")
 
 
 def _convert_dl(*, text: str, convert_as_inline: bool) -> str:
@@ -821,7 +839,7 @@ def _convert_media_element(*, tag: Tag, text: str, convert_as_inline: bool) -> s
 
     # No src, just return fallback content
     if text.strip():
-        return text.strip() if convert_as_inline else f"{text.strip()}\n\n"
+        return _format_inline_or_block(text, convert_as_inline)
 
     return ""
 
@@ -984,7 +1002,7 @@ def _convert_legend(*, text: str, convert_as_inline: bool) -> str:
         return ""
 
     # Legend is like a heading/title for fieldsets
-    return f"**{text.strip()}**\n\n"
+    return _format_wrapped_block(text, "**")
 
 
 def _convert_label(*, tag: Tag, text: str, convert_as_inline: bool) -> str:
@@ -1003,7 +1021,7 @@ def _convert_label(*, tag: Tag, text: str, convert_as_inline: bool) -> str:
     if not text.strip():
         return ""
 
-    return text.strip() if convert_as_inline else f"{text.strip()}\n\n"
+    return _format_inline_or_block(text, convert_as_inline)
 
 
 def _convert_input_enhanced(*, tag: Tag, convert_as_inline: bool) -> str:
@@ -1037,7 +1055,7 @@ def _convert_textarea(*, tag: Tag, text: str, convert_as_inline: bool) -> str:
     if not text.strip():
         return ""
 
-    return text.strip() if convert_as_inline else f"{text.strip()}\n\n"
+    return _format_inline_or_block(text, convert_as_inline)
 
 
 def _convert_select(*, tag: Tag, text: str, convert_as_inline: bool) -> str:
@@ -1063,7 +1081,7 @@ def _convert_select(*, tag: Tag, text: str, convert_as_inline: bool) -> str:
         return ", ".join(options)
 
     # In block mode, show as a list
-    return f"{text.strip()}\n\n"
+    return _format_block_element(text)
 
 
 def _convert_option(*, tag: Tag, text: str, convert_as_inline: bool) -> str:
@@ -1136,7 +1154,7 @@ def _convert_button(*, tag: Tag, text: str, convert_as_inline: bool) -> str:
     if not text.strip():
         return ""
 
-    return text.strip() if convert_as_inline else f"{text.strip()}\n\n"
+    return _format_inline_or_block(text, convert_as_inline)
 
 
 def _convert_progress(*, tag: Tag, text: str, convert_as_inline: bool) -> str:
@@ -1158,7 +1176,7 @@ def _convert_progress(*, tag: Tag, text: str, convert_as_inline: bool) -> str:
         return ""
 
     # Progress elements convert to their text content
-    return f"{text.strip()}\n\n"
+    return _format_block_element(text)
 
 
 def _convert_meter(*, tag: Tag, text: str, convert_as_inline: bool) -> str:
@@ -1180,7 +1198,7 @@ def _convert_meter(*, tag: Tag, text: str, convert_as_inline: bool) -> str:
         return ""
 
     # Meter elements convert to their text content
-    return f"{text.strip()}\n\n"
+    return _format_block_element(text)
 
 
 def _convert_output(*, tag: Tag, text: str, convert_as_inline: bool) -> str:
@@ -1202,7 +1220,7 @@ def _convert_output(*, tag: Tag, text: str, convert_as_inline: bool) -> str:
         return ""
 
     # Output elements convert to their text content
-    return f"{text.strip()}\n\n"
+    return _format_block_element(text)
 
 
 def _convert_datalist(*, tag: Tag, text: str, convert_as_inline: bool) -> str:
@@ -1224,7 +1242,7 @@ def _convert_datalist(*, tag: Tag, text: str, convert_as_inline: bool) -> str:
         return ""
 
     # Datalist shows options as a list
-    return f"{text.strip()}\n\n"
+    return _format_block_element(text)
 
 
 def _convert_ruby(*, text: str, convert_as_inline: bool) -> str:  # noqa: ARG001
@@ -1335,7 +1353,7 @@ def _convert_dialog(*, text: str, convert_as_inline: bool, tag: Tag) -> str:
         return ""
 
     # Dialog is a semantic container, return its content
-    return f"{text.strip()}\n\n"
+    return _format_block_element(text)
 
 
 def _convert_menu(*, text: str, convert_as_inline: bool, tag: Tag) -> str:
@@ -1357,7 +1375,7 @@ def _convert_menu(*, text: str, convert_as_inline: bool, tag: Tag) -> str:
         return ""
 
     # Menu is converted as a list
-    return f"{text.strip()}\n\n"
+    return _format_block_element(text)
 
 
 def _convert_figure(*, text: str, convert_as_inline: bool, tag: Tag) -> str:
