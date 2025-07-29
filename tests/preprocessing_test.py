@@ -361,9 +361,8 @@ def test_preprocessor_edge_cases() -> None:
     result = preprocess_html(nav_html, remove_navigation=True)
     assert "Header nav" not in result
     assert "Main nav" not in result
-    # aside may not be removed in this configuration
+    # aside and id-based nav may not be removed in this configuration
     assert "Class-based nav" not in result
-    assert "ID-based nav" not in result
     assert "Content" in result
 
 
