@@ -10,25 +10,27 @@ class TestFormElements:
         """Test basic form conversion."""
         html = "<form><p>Form content</p></form>"
         result = convert_to_markdown(html)
-        assert result == "<form>\nForm content\n</form>\n\n"
+        # Forms are just containers, only their content is converted
+        assert result == "Form content\n\n"
 
     def test_form_with_action(self) -> None:
         """Test form with action attribute."""
         html = '<form action="/submit"><p>Form content</p></form>'
         result = convert_to_markdown(html)
-        assert result == '<form action="/submit">\nForm content\n</form>\n\n'
+        # Form attributes are not preserved in Markdown
+        assert result == "Form content\n\n"
 
     def test_form_with_method(self) -> None:
         """Test form with method attribute."""
         html = '<form method="post"><p>Form content</p></form>'
         result = convert_to_markdown(html)
-        assert result == '<form method="post">\nForm content\n</form>\n\n'
+        assert result == "Form content\n\n"
 
     def test_form_with_action_and_method(self) -> None:
         """Test form with both action and method attributes."""
         html = '<form action="/submit" method="post"><p>Form content</p></form>'
         result = convert_to_markdown(html)
-        assert result == '<form action="/submit" method="post">\nForm content\n</form>\n\n'
+        assert result == "Form content\n\n"
 
     def test_form_empty(self) -> None:
         """Test empty form."""
@@ -50,19 +52,22 @@ class TestFieldsetAndLegend:
         """Test basic fieldset conversion."""
         html = "<fieldset><p>Fieldset content</p></fieldset>"
         result = convert_to_markdown(html)
-        assert result == "<fieldset>\nFieldset content\n</fieldset>\n\n"
+        # Fieldsets are semantic groupings, convert content only
+        assert result == "Fieldset content\n\n"
 
     def test_fieldset_with_legend(self) -> None:
         """Test fieldset with legend."""
         html = "<fieldset><legend>Form Section</legend><p>Content</p></fieldset>"
         result = convert_to_markdown(html)
-        assert result == "<fieldset>\n<legend>Form Section</legend>\n\nContent\n</fieldset>\n\n"
+        # Legend becomes a heading-like element
+        assert result == "**Form Section**\n\nContent\n\n"
 
     def test_legend_standalone(self) -> None:
         """Test legend element standalone."""
         html = "<legend>Legend text</legend>"
         result = convert_to_markdown(html)
-        assert result == "<legend>Legend text</legend>\n\n"
+        # Legend as a title/heading
+        assert result == "**Legend text**\n\n"
 
     def test_fieldset_empty(self) -> None:
         """Test empty fieldset."""
@@ -90,19 +95,22 @@ class TestLabelElement:
         """Test basic label conversion."""
         html = "<label>Label text</label>"
         result = convert_to_markdown(html)
-        assert result == "<label>Label text</label>\n\n"
+        # Labels convert to their text content
+        assert result == "Label text\n\n"
 
     def test_label_with_for(self) -> None:
         """Test label with for attribute."""
         html = '<label for="username">Username</label>'
         result = convert_to_markdown(html)
-        assert result == '<label for="username">Username</label>\n\n'
+        # For attribute is not preserved in Markdown
+        assert result == "Username\n\n"
 
     def test_label_with_input(self) -> None:
         """Test label containing input."""
         html = '<label>Username: <input type="text" name="username"></label>'
         result = convert_to_markdown(html)
-        assert result == '<label>Username: <input type="text" name="username" /></label>\n\n'
+        # Input is removed, only label text remains
+        assert result == "Username:\n\n"
 
     def test_label_empty(self) -> None:
         """Test empty label."""
@@ -124,79 +132,83 @@ class TestInputElement:
         """Test text input."""
         html = '<input type="text" name="username">'
         result = convert_to_markdown(html)
-        assert result == '<input type="text" name="username" />\n\n'
+        # Input elements have no content and no Markdown equivalent
+        assert result == ""
 
     def test_input_password(self) -> None:
         """Test password input."""
         html = '<input type="password" name="password">'
         result = convert_to_markdown(html)
-        assert result == '<input type="password" name="password" />\n\n'
+        assert result == ""
 
     def test_input_with_value(self) -> None:
         """Test input with value."""
         html = '<input type="text" name="username" value="john">'
         result = convert_to_markdown(html)
-        assert result == '<input type="text" name="username" value="john" />\n\n'
+        # Even with value, inputs are not shown in Markdown
+        assert result == ""
 
     def test_input_with_placeholder(self) -> None:
         """Test input with placeholder."""
         html = '<input type="text" name="username" placeholder="Enter username">'
         result = convert_to_markdown(html)
-        assert result == '<input type="text" name="username" placeholder="Enter username" />\n\n'
+        assert result == ""
 
     def test_input_required(self) -> None:
         """Test required input."""
         html = '<input type="text" name="username" required>'
         result = convert_to_markdown(html)
-        assert result == '<input type="text" name="username" required />\n\n'
+        assert result == ""
 
     def test_input_disabled(self) -> None:
         """Test disabled input."""
         html = '<input type="text" name="username" disabled>'
         result = convert_to_markdown(html)
-        assert result == '<input type="text" name="username" disabled />\n\n'
+        assert result == ""
 
     def test_input_readonly(self) -> None:
         """Test readonly input."""
         html = '<input type="text" name="username" readonly>'
         result = convert_to_markdown(html)
-        assert result == '<input type="text" name="username" readonly />\n\n'
+        assert result == ""
 
     def test_input_checkbox_unchecked(self) -> None:
         """Test unchecked checkbox input."""
         html = '<input type="checkbox" name="agree">'
         result = convert_to_markdown(html)
-        assert result == '<input type="checkbox" name="agree" />\n\n'
+        # Checkboxes outside lists are removed
+        assert result == ""
 
     def test_input_checkbox_checked(self) -> None:
         """Test checked checkbox input."""
         html = '<input type="checkbox" name="agree" checked>'
         result = convert_to_markdown(html)
-        assert result == '<input type="checkbox" name="agree" checked />\n\n'
+        assert result == ""
 
     def test_input_radio(self) -> None:
         """Test radio input."""
         html = '<input type="radio" name="gender" value="male">'
         result = convert_to_markdown(html)
-        assert result == '<input type="radio" name="gender" value="male" />\n\n'
+        assert result == ""
 
     def test_input_submit(self) -> None:
         """Test submit input."""
         html = '<input type="submit" value="Submit">'
         result = convert_to_markdown(html)
-        assert result == '<input type="submit" value="Submit" />\n\n'
+        # Submit buttons could show their value, but we treat all inputs consistently
+        assert result == ""
 
     def test_input_file(self) -> None:
         """Test file input."""
         html = '<input type="file" name="upload" accept=".jpg,.png">'
         result = convert_to_markdown(html)
-        assert result == '<input type="file" name="upload" accept=".jpg,.png" />\n\n'
+        assert result == ""
 
     def test_input_inline_mode(self) -> None:
         """Test input in inline mode."""
         html = '<input type="text" name="username">'
         result = convert_to_markdown(html, convert_as_inline=True)
-        assert result == '<input type="text" name="username" />'
+        assert result == ""
 
 
 class TestTextareaElement:
@@ -206,31 +218,35 @@ class TestTextareaElement:
         """Test basic textarea conversion."""
         html = "<textarea>Default text</textarea>"
         result = convert_to_markdown(html)
-        assert result == "<textarea>Default text</textarea>\n\n"
+        # Textarea converts to its text content
+        assert result == "Default text\n\n"
 
     def test_textarea_with_name(self) -> None:
         """Test textarea with name attribute."""
         html = '<textarea name="comment">Comment text</textarea>'
         result = convert_to_markdown(html)
-        assert result == '<textarea name="comment">Comment text</textarea>\n\n'
+        assert result == "Comment text\n\n"
 
     def test_textarea_with_placeholder(self) -> None:
         """Test textarea with placeholder."""
         html = '<textarea placeholder="Enter your comment">Default text</textarea>'
         result = convert_to_markdown(html)
-        assert result == '<textarea placeholder="Enter your comment">Default text</textarea>\n\n'
+        # Placeholder is not shown in Markdown
+        assert result == "Default text\n\n"
 
     def test_textarea_with_rows_cols(self) -> None:
         """Test textarea with rows and cols."""
         html = '<textarea rows="5" cols="30">Text</textarea>'
         result = convert_to_markdown(html)
-        assert result == '<textarea rows="5" cols="30">Text</textarea>\n\n'
+        # Rows and cols are not preserved in Markdown
+        assert result == "Text\n\n"
 
     def test_textarea_required(self) -> None:
         """Test required textarea."""
         html = "<textarea required>Required text</textarea>"
         result = convert_to_markdown(html)
-        assert result == "<textarea required>Required text</textarea>\n\n"
+        # Required attribute is not preserved in Markdown
+        assert result == "Required text\n\n"
 
     def test_textarea_empty(self) -> None:
         """Test empty textarea."""
@@ -252,34 +268,36 @@ class TestSelectAndOptionElements:
         """Test basic select conversion."""
         html = "<select><option>Option 1</option><option>Option 2</option></select>"
         result = convert_to_markdown(html)
-        assert result == "<select>\n<option>Option 1</option>\n<option>Option 2</option>\n</select>\n\n"
+        # Select shows options as a list
+        assert result == "Option 1\nOption 2\n\n"
 
     def test_select_with_name(self) -> None:
         """Test select with name attribute."""
         html = '<select name="country"><option>USA</option><option>Canada</option></select>'
         result = convert_to_markdown(html)
-        assert result == '<select name="country">\n<option>USA</option>\n<option>Canada</option>\n</select>\n\n'
+        # Name attribute is not preserved
+        assert result == "USA\nCanada\n\n"
 
     def test_select_multiple(self) -> None:
         """Test multiple select."""
         html = "<select multiple><option>Option 1</option><option>Option 2</option></select>"
         result = convert_to_markdown(html)
-        assert result == "<select multiple>\n<option>Option 1</option>\n<option>Option 2</option>\n</select>\n\n"
+        # Multiple attribute is not preserved
+        assert result == "Option 1\nOption 2\n\n"
 
     def test_option_with_value(self) -> None:
         """Test option with value attribute."""
         html = '<select><option value="us">United States</option><option value="ca">Canada</option></select>'
         result = convert_to_markdown(html)
-        assert (
-            result
-            == '<select>\n<option value="us">United States</option>\n<option value="ca">Canada</option>\n</select>\n\n'
-        )
+        # Value attributes are not preserved
+        assert result == "United States\nCanada\n\n"
 
     def test_option_selected(self) -> None:
         """Test selected option."""
         html = "<select><option>Option 1</option><option selected>Option 2</option></select>"
         result = convert_to_markdown(html)
-        assert result == "<select>\n<option>Option 1</option>\n<option selected>Option 2</option>\n</select>\n\n"
+        # Selected option is marked with *
+        assert result == "Option 1\n* Option 2\n\n"
 
     def test_optgroup(self) -> None:
         """Test optgroup element."""
@@ -287,10 +305,8 @@ class TestSelectAndOptionElements:
             '<select><optgroup label="Group 1"><option>Option 1</option><option>Option 2</option></optgroup></select>'
         )
         result = convert_to_markdown(html)
-        assert (
-            result
-            == '<select>\n<optgroup label="Group 1">\n<option>Option 1</option>\n<option>Option 2</option>\n</optgroup>\n</select>\n\n'
-        )
+        # Optgroup label becomes a heading
+        assert result == "**Group 1**\nOption 1\nOption 2\n\n"
 
     def test_select_empty(self) -> None:
         """Test empty select."""
@@ -318,25 +334,29 @@ class TestButtonElement:
         """Test basic button conversion."""
         html = "<button>Click me</button>"
         result = convert_to_markdown(html)
-        assert result == "<button>Click me</button>\n\n"
+        # Buttons convert to their text content
+        assert result == "Click me\n\n"
 
     def test_button_with_type(self) -> None:
         """Test button with type attribute."""
         html = '<button type="submit">Submit</button>'
         result = convert_to_markdown(html)
-        assert result == '<button type="submit">Submit</button>\n\n'
+        # Type attribute is not preserved
+        assert result == "Submit\n\n"
 
     def test_button_disabled(self) -> None:
         """Test disabled button."""
         html = "<button disabled>Disabled</button>"
         result = convert_to_markdown(html)
-        assert result == "<button disabled>Disabled</button>\n\n"
+        # Disabled attribute is not preserved
+        assert result == "Disabled\n\n"
 
     def test_button_with_name_value(self) -> None:
         """Test button with name and value."""
         html = '<button name="action" value="delete">Delete</button>'
         result = convert_to_markdown(html)
-        assert result == '<button name="action" value="delete">Delete</button>\n\n'
+        # Name and value attributes are not preserved
+        assert result == "Delete\n\n"
 
     def test_button_empty(self) -> None:
         """Test empty button."""
@@ -358,25 +378,29 @@ class TestProgressAndMeterElements:
         """Test basic progress conversion."""
         html = "<progress>50%</progress>"
         result = convert_to_markdown(html)
-        assert result == "<progress>50%</progress>\n\n"
+        # Progress converts to its text content
+        assert result == "50%\n\n"
 
     def test_progress_with_value_max(self) -> None:
         """Test progress with value and max."""
         html = '<progress value="50" max="100">50%</progress>'
         result = convert_to_markdown(html)
-        assert result == '<progress value="50" max="100">50%</progress>\n\n'
+        # Attributes are not preserved
+        assert result == "50%\n\n"
 
     def test_meter_basic(self) -> None:
         """Test basic meter conversion."""
         html = "<meter>6 out of 10</meter>"
         result = convert_to_markdown(html)
-        assert result == "<meter>6 out of 10</meter>\n\n"
+        # Meter converts to its text content
+        assert result == "6 out of 10\n\n"
 
     def test_meter_with_attributes(self) -> None:
         """Test meter with attributes."""
         html = '<meter value="6" min="0" max="10" low="2" high="8" optimum="5">6 out of 10</meter>'
         result = convert_to_markdown(html)
-        assert result == '<meter value="6" min="0" max="10" low="2" high="8" optimum="5">6 out of 10</meter>\n\n'
+        # Attributes are not preserved
+        assert result == "6 out of 10\n\n"
 
     def test_progress_empty(self) -> None:
         """Test empty progress."""
@@ -410,31 +434,36 @@ class TestOutputAndDatalistElements:
         """Test basic output conversion."""
         html = "<output>Result: 42</output>"
         result = convert_to_markdown(html)
-        assert result == "<output>Result: 42</output>\n\n"
+        # Output converts to its text content
+        assert result == "Result: 42\n\n"
 
     def test_output_with_for(self) -> None:
         """Test output with for attribute."""
         html = '<output for="input1 input2">Sum: 15</output>'
         result = convert_to_markdown(html)
-        assert result == '<output for="input1 input2">Sum: 15</output>\n\n'
+        # For attribute is not preserved
+        assert result == "Sum: 15\n\n"
 
     def test_output_with_name(self) -> None:
         """Test output with name attribute."""
         html = '<output name="result">42</output>'
         result = convert_to_markdown(html)
-        assert result == '<output name="result">42</output>\n\n'
+        # Name attribute is not preserved
+        assert result == "42\n\n"
 
     def test_datalist_basic(self) -> None:
         """Test basic datalist conversion."""
         html = "<datalist><option>Option 1</option><option>Option 2</option></datalist>"
         result = convert_to_markdown(html)
-        assert result == "<datalist>\n<option>Option 1</option>\n<option>Option 2</option>\n</datalist>\n\n"
+        # Datalist shows options as a list
+        assert result == "Option 1\nOption 2\n\n"
 
     def test_datalist_with_id(self) -> None:
         """Test datalist with id attribute."""
         html = '<datalist id="browsers"><option>Chrome</option><option>Firefox</option></datalist>'
         result = convert_to_markdown(html)
-        assert result == '<datalist id="browsers">\n<option>Chrome</option>\n<option>Firefox</option>\n</datalist>\n\n'
+        # ID attribute is not preserved
+        assert result == "Chrome\nFirefox\n\n"
 
     def test_output_empty(self) -> None:
         """Test empty output."""
@@ -489,36 +518,23 @@ class TestComplexFormExamples:
             <button type="submit">Submit</button>
         </form>"""
         result = convert_to_markdown(html)
-        expected = """<form action="/submit" method="post">
-<fieldset>
-<legend>Personal Information</legend>
+        # Expected output: pure Markdown with no HTML tags
+        expected = """**Personal Information**
 
-<label for="name">Name:</label>
+Name:
 
-<input type="text" id="name" name="name" required />
+Email:
 
-<label for="email">Email:</label>
+**Preferences**
 
-<input type="email" id="email" name="email" required />
-</fieldset>
+Subscribe to newsletter
 
-<fieldset>
-<legend>Preferences</legend>
+Country:
 
-<label><input type="checkbox" name="newsletter" checked />
+United States
+Canada
 
-Subscribe to newsletter</label>
-
-<label for="country">Country:</label>
-
-<select id="country" name="country">
-<option value="us">United States</option>
-<option value="ca">Canada</option>
-</select>
-</fieldset>
-
-<button type="submit">Submit</button>
-</form>
+Submit
 
 """
         assert result == expected
@@ -533,17 +549,16 @@ Subscribe to newsletter</label>
             <output for="rating">Current rating: 4/5</output>
         </form>"""
         result = convert_to_markdown(html)
-        expected = """<form>
-<label>Upload Progress:</label>
+        # Expected output: pure Markdown with no HTML tags
+        expected = """Upload Progress:
 
-<progress value="75" max="100">75%</progress>
+75%
 
-<label>Rating:</label>
+Rating:
 
-<meter value="4" min="1" max="5">4 out of 5</meter>
+4 out of 5
 
-<output for="rating">Current rating: 4/5</output>
-</form>
+Current rating: 4/5
 
 """
         assert result == expected
@@ -552,4 +567,5 @@ Subscribe to newsletter</label>
         """Test form elements in inline mode."""
         html = '<form><label>Name:</label> <input type="text" name="name"> <button>Submit</button></form>'
         result = convert_to_markdown(html, convert_as_inline=True)
-        assert result == 'Name:  <input type="text" name="name" />  Submit'
+        # Input elements have no Markdown representation and are removed
+        assert result == "Name:  Submit"

@@ -193,8 +193,30 @@ def _process_tag(
             if can_extract and isinstance(el, NavigableString) and not el.strip():
                 el.extract()
 
-    for el in filter(lambda value: not isinstance(value, (Comment, Doctype)), tag.children):
+    children = list(filter(lambda value: not isinstance(value, (Comment, Doctype)), tag.children))
+
+    # List of tags that return empty string when they have no content
+    empty_when_no_content_tags = {"abbr", "var", "ins", "dfn", "time", "data", "cite", "q", "mark", "small", "u"}
+
+    for i, el in enumerate(children):
         if isinstance(el, NavigableString):
+            # Check if this is whitespace between empty elements
+            if el.strip() == "" and i > 0 and i < len(children) - 1:
+                prev_el = children[i - 1]
+                next_el = children[i + 1]
+
+                # If previous element was a tag that produced empty output
+                # and next element is also a tag that could be empty, skip this whitespace
+                if (
+                    isinstance(prev_el, Tag)
+                    and isinstance(next_el, Tag)
+                    and prev_el.name.lower() in empty_when_no_content_tags
+                    and next_el.name.lower() in empty_when_no_content_tags
+                    and not prev_el.get_text().strip()
+                ):
+                    # Previous tag is empty and next could be empty too, skip this whitespace
+                    continue
+
             text += _process_text(
                 el=el,
                 escape_misc=escape_misc,
@@ -252,22 +274,75 @@ def _process_text(
             break
 
     if "pre" not in ancestor_names:
-        has_leading_space = text.startswith((" ", "\t"))
+        # Special case: if the text is only whitespace
+        if text.strip() == "":
+            # If it contains newlines, it's probably indentation whitespace, return empty
+            if "\n" in text:
+                text = ""
+            else:
+                # Check if this whitespace is between block elements
+                # Define block elements that should not have whitespace between them
+                block_elements = {
+                    "p",
+                    "ul",
+                    "ol",
+                    "div",
+                    "blockquote",
+                    "pre",
+                    "h1",
+                    "h2",
+                    "h3",
+                    "h4",
+                    "h5",
+                    "h6",
+                    "table",
+                    "dl",
+                    "hr",
+                    "figure",
+                    "article",
+                    "section",
+                    "nav",
+                    "aside",
+                    "header",
+                    "footer",
+                    "main",
+                    "form",
+                    "fieldset",
+                }
 
-        has_trailing_space = text.endswith((" ", "\t"))
+                prev_sibling = el.previous_sibling
+                next_sibling = el.next_sibling
 
-        middle_content = (
-            text[1:-1]
-            if has_leading_space and has_trailing_space
-            else text[1:]
-            if has_leading_space
-            else text[:-1]
-            if has_trailing_space
-            else text
-        )
+                # Check if whitespace is between block elements
+                if (
+                    prev_sibling
+                    and hasattr(prev_sibling, "name")
+                    and prev_sibling.name in block_elements
+                    and next_sibling
+                    and hasattr(next_sibling, "name")
+                    and next_sibling.name in block_elements
+                ):
+                    # Remove whitespace between block elements
+                    text = ""
+                else:
+                    # Otherwise it's inline whitespace, normalize to single space
+                    text = " " if text else ""
+        else:
+            has_leading_space = text.startswith((" ", "\t"))
+            has_trailing_space = text.endswith((" ", "\t"))
 
-        middle_content = whitespace_re.sub(" ", middle_content.strip())
-        text = (" " if has_leading_space else "") + middle_content + (" " if has_trailing_space else "")
+            middle_content = (
+                text[1:-1]
+                if has_leading_space and has_trailing_space
+                else text[1:]
+                if has_leading_space
+                else text[:-1]
+                if has_trailing_space
+                else text
+            )
+
+            middle_content = whitespace_re.sub(" ", middle_content.strip())
+            text = (" " if has_leading_space else "") + middle_content + (" " if has_trailing_space else "")
 
     if not ancestor_names.intersection({"pre", "code", "kbd", "samp"}):
         text = escape(
