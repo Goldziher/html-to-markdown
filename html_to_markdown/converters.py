@@ -5,10 +5,11 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from collections.abc import Iterable
 import base64
+from collections.abc import Callable
 from functools import partial
 from inspect import getfullargspec
 from textwrap import fill
-from typing import Any, Callable, Literal, TypeVar, cast
+from typing import Any, Literal, TypeVar, cast
 
 from bs4.element import Tag
 
@@ -421,13 +422,15 @@ def _convert_mark(*, text: str, convert_as_inline: bool, highlight_style: str) -
     if convert_as_inline:
         return text
 
-    if highlight_style == "double-equal":
-        return f"=={text}=="
-    if highlight_style == "bold":
-        return f"**{text}**"
-    if highlight_style == "html":
-        return f"<mark>{text}</mark>"
-    return text
+    match highlight_style:
+        case "double-equal":
+            return f"=={text}=="
+        case "bold":
+            return f"**{text}**"
+        case "html":
+            return f"<mark>{text}</mark>"
+        case _:
+            return text
 
 
 def _convert_pre(
@@ -460,6 +463,58 @@ def _convert_tr(*, tag: Tag, text: str) -> str:
     cells = tag.find_all(["td", "th"])
     parent_name = tag.parent.name if tag.parent and hasattr(tag.parent, "name") else ""
     tag_grand_parent = tag.parent.parent if tag.parent else None
+
+    # Simple rowspan handling: if previous row had cells with rowspan, add empty cells
+    if tag.previous_sibling and hasattr(tag.previous_sibling, "name") and tag.previous_sibling.name == "tr":
+        prev_cells = cast("Tag", tag.previous_sibling).find_all(["td", "th"])
+        rowspan_positions = []
+        col_pos = 0
+
+        # Check which cells in previous row have rowspan > 1
+        for prev_cell in prev_cells:
+            rowspan = 1
+            if (
+                "rowspan" in prev_cell.attrs
+                and isinstance(prev_cell["rowspan"], str)
+                and prev_cell["rowspan"].isdigit()
+            ):
+                rowspan = int(prev_cell["rowspan"])
+
+            if rowspan > 1:
+                # This cell spans into current row
+                rowspan_positions.append(col_pos)
+
+            # Account for colspan
+            colspan = 1
+            if (
+                "colspan" in prev_cell.attrs
+                and isinstance(prev_cell["colspan"], str)
+                and prev_cell["colspan"].isdigit()
+            ):
+                colspan = int(prev_cell["colspan"])
+            col_pos += colspan
+
+        # If there are rowspan cells from previous row, add empty cells
+        if rowspan_positions:
+            # Build new text with empty cells inserted
+            new_cells = []
+            cell_index = 0
+
+            for pos in range(col_pos):  # Total columns
+                if pos in rowspan_positions:
+                    # Add empty cell for rowspan
+                    new_cells.append(" |")
+                elif cell_index < len(cells):
+                    # Add actual cell content
+                    cell = cells[cell_index]
+                    cell_text = cell.get_text().strip().replace("\n", " ")
+                    colspan = _get_colspan(cell)
+                    new_cells.append(f" {cell_text} |" * colspan)
+                    cell_index += 1
+
+            # Override text with new cell arrangement
+            text = "".join(new_cells)
+
     is_headrow = (
         all(hasattr(cell, "name") and cell.name == "th" for cell in cells)
         or (not tag.previous_sibling and parent_name != "tbody")
@@ -739,12 +794,12 @@ def _convert_q(*, text: str, convert_as_inline: bool) -> str:
     return f'"{escaped_text}"'
 
 
-def _convert_audio(*, tag: Tag, text: str, convert_as_inline: bool) -> str:
-    """Convert HTML audio element to semantic Markdown.
+def _convert_media_element(*, tag: Tag, text: str, convert_as_inline: bool) -> str:
+    """Convert HTML media elements (audio/video) to semantic Markdown.
 
     Args:
-        tag: The audio tag element.
-        text: The text content of the audio element (fallback content).
+        tag: The media tag element.
+        text: The text content of the media element (fallback content).
         convert_as_inline: Whether to convert as inline content.
 
     Returns:
@@ -752,46 +807,8 @@ def _convert_audio(*, tag: Tag, text: str, convert_as_inline: bool) -> str:
     """
     src = tag.get("src", "")
 
-    if not src:
-        source_tag = tag.find("source")
-        if source_tag and isinstance(source_tag, Tag):
-            src = source_tag.get("src", "")
-
-    # If we have a src, convert to a link
-    if src and isinstance(src, str) and src.strip():
-        link = f"[{src}]({src})"
-        if convert_as_inline:
-            return link
-        result = f"{link}\n\n"
-        # Add fallback content if present
-        if text.strip():
-            result += f"{text.strip()}\n\n"
-        return result
-
-    # No src, just return fallback content
-    if text.strip():
-        return text.strip() if convert_as_inline else f"{text.strip()}\n\n"
-
-    return ""
-
-
-def _convert_video(*, tag: Tag, text: str, convert_as_inline: bool) -> str:
-    """Convert HTML video element to semantic Markdown.
-
-    Args:
-        tag: The video tag element.
-        text: The text content of the video element (fallback content).
-        convert_as_inline: Whether to convert as inline content.
-
-    Returns:
-        The converted markdown text (link if src exists, otherwise fallback content).
-    """
-    src = tag.get("src", "")
-
-    if not src:
-        source_tag = tag.find("source")
-        if source_tag and isinstance(source_tag, Tag):
-            src = source_tag.get("src", "")
+    if not src and (source_tag := tag.find("source")) and isinstance(source_tag, Tag):
+        src = source_tag.get("src", "")
 
     # If we have a src, convert to a link
     if src and isinstance(src, str) and src.strip():
@@ -1525,7 +1542,7 @@ def create_converters_map(
         "abbr": _wrapper(_convert_abbr),
         "article": _wrapper(_convert_semantic_block),
         "aside": _wrapper(_convert_semantic_block),
-        "audio": _wrapper(_convert_audio),
+        "audio": _wrapper(_convert_media_element),
         "b": _wrapper(partial(_create_inline_converter(2 * strong_em_symbol))),
         "bdi": _wrapper(_create_inline_converter("")),
         "bdo": _wrapper(_create_inline_converter("")),
@@ -1621,6 +1638,6 @@ def create_converters_map(
         "u": _wrapper(_create_inline_converter("")),
         "ul": _wrapper(_convert_list),
         "var": _wrapper(_create_inline_converter("*")),
-        "video": _wrapper(_convert_video),
+        "video": _wrapper(_convert_media_element),
         "wbr": _wrapper(_convert_wbr),
     }
