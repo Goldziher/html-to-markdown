@@ -3,13 +3,13 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from collections.abc import Generator, Mapping
+    from collections.abc import Callable, Generator, Mapping
 
 import re
 from contextvars import ContextVar
 from io import StringIO
 from itertools import chain
-from typing import TYPE_CHECKING, Any, Callable, Literal, cast
+from typing import TYPE_CHECKING, Any, Literal, cast
 
 from bs4 import BeautifulSoup, Comment, Doctype, Tag
 from bs4.element import NavigableString, PageElement

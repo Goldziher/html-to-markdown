@@ -21,7 +21,7 @@ keywords = [
 ]
 license = { text = "MIT" }
 authors = [ { name = "Na'aman Hirschfeld", email = "nhirschfeld@gmail.com" } ]
-requires-python = ">=3.9"
+requires-python = ">=3.10"
 classifiers = [
   "Development Status :: 5 - Production/Stable",
   "Environment :: Console",
@@ -29,7 +29,6 @@ classifiers = [
   "License :: OSI Approved :: MIT License",
   "Operating System :: OS Independent",
   "Programming Language :: Python :: 3 :: Only",
-  "Programming Language :: Python :: 3.9",
   "Programming Language :: Python :: 3.10",
   "Programming Language :: Python :: 3.11",
   "Programming Language :: Python :: 3.12",
@@ -78,7 +77,7 @@ html_to_markdown = [ "py.typed" ]
 skip-excluded-dirs = true
 
 [tool.ruff]
-target-version = "py39"
+target-version = "py310"
 line-length = 120
 src = [ "html_to_markdown", "tests" ]
 
@@ -138,7 +137,7 @@ show_missing = true
 
 [tool.mypy]
 packages = [ "html_to_markdown", "tests" ]
-python_version = "3.9"
+python_version = "3.10"
 strict = true
 implicit_reexport = false
 show_error_codes = true
