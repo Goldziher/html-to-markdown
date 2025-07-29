@@ -5,7 +5,6 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from collections.abc import Iterable
 import base64
-import re
 from functools import partial
 from inspect import getfullargspec
 from textwrap import fill
@@ -614,35 +613,37 @@ def _convert_semantic_block(*, text: str, convert_as_inline: bool) -> str:
 
 
 def _convert_details(*, text: str, convert_as_inline: bool) -> str:
-    """Convert HTML details element preserving HTML structure.
+    """Convert HTML details element to semantic Markdown.
 
     Args:
         text: The text content of the details element.
         convert_as_inline: Whether to convert as inline content.
 
     Returns:
-        The converted markdown text preserving HTML structure.
+        The converted markdown text (only content, no HTML tags).
     """
     if convert_as_inline:
         return text
 
-    return f"<details>\n{text.strip()}\n</details>\n\n" if text.strip() else ""
+    # Details is a semantic container, return its content
+    return f"{text.strip()}\n\n" if text.strip() else ""
 
 
 def _convert_summary(*, text: str, convert_as_inline: bool) -> str:
-    """Convert HTML summary element preserving HTML structure.
+    """Convert HTML summary element to emphasized text.
 
     Args:
         text: The text content of the summary element.
         convert_as_inline: Whether to convert as inline content.
 
     Returns:
-        The converted markdown text preserving HTML structure.
+        The converted markdown text as bold heading.
     """
     if convert_as_inline:
         return text
 
-    return f"<summary>{text.strip()}</summary>\n\n" if text.strip() else ""
+    # Summary is like a heading/title
+    return f"**{text.strip()}**\n\n" if text.strip() else ""
 
 
 def _convert_dl(*, text: str, convert_as_inline: bool) -> str:
@@ -739,7 +740,7 @@ def _convert_q(*, text: str, convert_as_inline: bool) -> str:
 
 
 def _convert_audio(*, tag: Tag, text: str, convert_as_inline: bool) -> str:
-    """Convert HTML audio element preserving structure with fallback.
+    """Convert HTML audio element to semantic Markdown.
 
     Args:
         tag: The audio tag element.
@@ -747,9 +748,8 @@ def _convert_audio(*, tag: Tag, text: str, convert_as_inline: bool) -> str:
         convert_as_inline: Whether to convert as inline content.
 
     Returns:
-        The converted markdown text preserving audio element.
+        The converted markdown text (link if src exists, otherwise fallback content).
     """
-    _ = convert_as_inline
     src = tag.get("src", "")
 
     if not src:
@@ -757,40 +757,26 @@ def _convert_audio(*, tag: Tag, text: str, convert_as_inline: bool) -> str:
         if source_tag and isinstance(source_tag, Tag):
             src = source_tag.get("src", "")
 
-    controls = "controls" if tag.get("controls") is not None else ""
-    autoplay = "autoplay" if tag.get("autoplay") is not None else ""
-    loop = "loop" if tag.get("loop") is not None else ""
-    muted = "muted" if tag.get("muted") is not None else ""
-    preload = tag.get("preload", "")
-
-    attrs = []
+    # If we have a src, convert to a link
     if src and isinstance(src, str) and src.strip():
-        attrs.append(f'src="{src}"')
-    if controls:
-        attrs.append(controls)
-    if autoplay:
-        attrs.append(autoplay)
-    if loop:
-        attrs.append(loop)
-    if muted:
-        attrs.append(muted)
-    if preload and isinstance(preload, str) and preload.strip():
-        attrs.append(f'preload="{preload}"')
+        link = f"[{src}]({src})"
+        if convert_as_inline:
+            return link
+        result = f"{link}\n\n"
+        # Add fallback content if present
+        if text.strip():
+            result += f"{text.strip()}\n\n"
+        return result
 
-    attrs_str = " ".join(attrs)
-
+    # No src, just return fallback content
     if text.strip():
-        if attrs_str:
-            return f"<audio {attrs_str}>\n{text.strip()}\n</audio>\n\n"
-        return f"<audio>\n{text.strip()}\n</audio>\n\n"
+        return text.strip() if convert_as_inline else f"{text.strip()}\n\n"
 
-    if attrs_str:
-        return f"<audio {attrs_str} />\n\n"
-    return "<audio />\n\n"
+    return ""
 
 
 def _convert_video(*, tag: Tag, text: str, convert_as_inline: bool) -> str:
-    """Convert HTML video element preserving structure with fallback.
+    """Convert HTML video element to semantic Markdown.
 
     Args:
         tag: The video tag element.
@@ -798,9 +784,8 @@ def _convert_video(*, tag: Tag, text: str, convert_as_inline: bool) -> str:
         convert_as_inline: Whether to convert as inline content.
 
     Returns:
-        The converted markdown text preserving video element.
+        The converted markdown text (link if src exists, otherwise fallback content).
     """
-    _ = convert_as_inline
     src = tag.get("src", "")
 
     if not src:
@@ -808,49 +793,26 @@ def _convert_video(*, tag: Tag, text: str, convert_as_inline: bool) -> str:
         if source_tag and isinstance(source_tag, Tag):
             src = source_tag.get("src", "")
 
-    width = tag.get("width", "")
-    height = tag.get("height", "")
-    poster = tag.get("poster", "")
-    controls = "controls" if tag.get("controls") is not None else ""
-    autoplay = "autoplay" if tag.get("autoplay") is not None else ""
-    loop = "loop" if tag.get("loop") is not None else ""
-    muted = "muted" if tag.get("muted") is not None else ""
-    preload = tag.get("preload", "")
-
-    attrs = []
+    # If we have a src, convert to a link
     if src and isinstance(src, str) and src.strip():
-        attrs.append(f'src="{src}"')
-    if width and isinstance(width, str) and width.strip():
-        attrs.append(f'width="{width}"')
-    if height and isinstance(height, str) and height.strip():
-        attrs.append(f'height="{height}"')
-    if poster and isinstance(poster, str) and poster.strip():
-        attrs.append(f'poster="{poster}"')
-    if controls:
-        attrs.append(controls)
-    if autoplay:
-        attrs.append(autoplay)
-    if loop:
-        attrs.append(loop)
-    if muted:
-        attrs.append(muted)
-    if preload and isinstance(preload, str) and preload.strip():
-        attrs.append(f'preload="{preload}"')
+        link = f"[{src}]({src})"
+        if convert_as_inline:
+            return link
+        result = f"{link}\n\n"
+        # Add fallback content if present
+        if text.strip():
+            result += f"{text.strip()}\n\n"
+        return result
 
-    attrs_str = " ".join(attrs)
-
+    # No src, just return fallback content
     if text.strip():
-        if attrs_str:
-            return f"<video {attrs_str}>\n{text.strip()}\n</video>\n\n"
-        return f"<video>\n{text.strip()}\n</video>\n\n"
+        return text.strip() if convert_as_inline else f"{text.strip()}\n\n"
 
-    if attrs_str:
-        return f"<video {attrs_str} />\n\n"
-    return "<video />\n\n"
+    return ""
 
 
 def _convert_iframe(*, tag: Tag, text: str, convert_as_inline: bool) -> str:
-    """Convert HTML iframe element preserving structure.
+    """Convert HTML iframe element to semantic Markdown.
 
     Args:
         tag: The iframe tag element.
@@ -858,47 +820,19 @@ def _convert_iframe(*, tag: Tag, text: str, convert_as_inline: bool) -> str:
         convert_as_inline: Whether to convert as inline content.
 
     Returns:
-        The converted markdown text preserving iframe element.
+        The converted markdown text (link if src exists).
     """
     _ = text
-    _ = convert_as_inline
     src = tag.get("src", "")
-    width = tag.get("width", "")
-    height = tag.get("height", "")
-    title = tag.get("title", "")
-    allow = tag.get("allow", "")
-    sandbox = tag.get("sandbox")
-    loading = tag.get("loading", "")
 
-    attrs = []
+    # If we have a src, convert to a link
     if src and isinstance(src, str) and src.strip():
-        attrs.append(f'src="{src}"')
-    if width and isinstance(width, str) and width.strip():
-        attrs.append(f'width="{width}"')
-    if height and isinstance(height, str) and height.strip():
-        attrs.append(f'height="{height}"')
-    if title and isinstance(title, str) and title.strip():
-        attrs.append(f'title="{title}"')
-    if allow and isinstance(allow, str) and allow.strip():
-        attrs.append(f'allow="{allow}"')
-    if sandbox is not None:
-        if isinstance(sandbox, list):
-            if sandbox:
-                attrs.append(f'sandbox="{" ".join(sandbox)}"')
-            else:
-                attrs.append("sandbox")
-        elif isinstance(sandbox, str) and sandbox:
-            attrs.append(f'sandbox="{sandbox}"')
-        else:
-            attrs.append("sandbox")
-    if loading and isinstance(loading, str) and loading.strip():
-        attrs.append(f'loading="{loading}"')
+        link = f"[{src}]({src})"
+        if convert_as_inline:
+            return link
+        return f"{link}\n\n"
 
-    attrs_str = " ".join(attrs)
-
-    if attrs_str:
-        return f"<iframe {attrs_str}></iframe>\n\n"
-    return "<iframe></iframe>\n\n"
+    return ""
 
 
 def _convert_abbr(*, tag: Tag, text: str, convert_as_inline: bool) -> str:
@@ -924,7 +858,7 @@ def _convert_abbr(*, tag: Tag, text: str, convert_as_inline: bool) -> str:
 
 
 def _convert_time(*, tag: Tag, text: str, convert_as_inline: bool) -> str:
-    """Convert HTML time element preserving datetime attribute.
+    """Convert HTML time element to semantic Markdown.
 
     Args:
         tag: The time tag element.
@@ -932,21 +866,19 @@ def _convert_time(*, tag: Tag, text: str, convert_as_inline: bool) -> str:
         convert_as_inline: Whether to convert as inline content.
 
     Returns:
-        The converted markdown text preserving time information.
+        The converted markdown text (content only, no HTML tags).
     """
+    _ = tag
     _ = convert_as_inline
     if not text.strip():
         return ""
 
-    datetime_attr = tag.get("datetime")
-    if datetime_attr and isinstance(datetime_attr, str) and datetime_attr.strip():
-        return f'<time datetime="{datetime_attr.strip()}">{text.strip()}</time>'
-
+    # Time elements are semantic - just return the content
     return text.strip()
 
 
 def _convert_data(*, tag: Tag, text: str, convert_as_inline: bool) -> str:
-    """Convert HTML data element preserving value attribute.
+    """Convert HTML data element to semantic Markdown.
 
     Args:
         tag: The data tag element.
@@ -954,16 +886,14 @@ def _convert_data(*, tag: Tag, text: str, convert_as_inline: bool) -> str:
         convert_as_inline: Whether to convert as inline content.
 
     Returns:
-        The converted markdown text preserving machine-readable data.
+        The converted markdown text (content only, no HTML tags).
     """
+    _ = tag
     _ = convert_as_inline
     if not text.strip():
         return ""
 
-    value_attr = tag.get("value")
-    if value_attr and isinstance(value_attr, str) and value_attr.strip():
-        return f'<data value="{value_attr.strip()}">{text.strip()}</data>'
-
+    # Data elements are semantic - just return the content
     return text.strip()
 
 
@@ -981,7 +911,7 @@ def _convert_wbr(*, convert_as_inline: bool) -> str:
 
 
 def _convert_form(*, tag: Tag, text: str, convert_as_inline: bool) -> str:
-    """Convert HTML form element preserving structure for documentation.
+    """Convert HTML form element to semantic Markdown.
 
     Args:
         tag: The form tag element.
@@ -989,38 +919,28 @@ def _convert_form(*, tag: Tag, text: str, convert_as_inline: bool) -> str:
         convert_as_inline: Whether to convert as inline content.
 
     Returns:
-        The converted markdown text preserving form structure.
+        The converted markdown text (only content, no HTML tags).
     """
+    _ = tag
     if convert_as_inline:
         return text
 
     if not text.strip():
         return ""
 
-    action = tag.get("action", "")
-    method = tag.get("method", "")
-    attrs = []
-
-    if action and isinstance(action, str) and action.strip():
-        attrs.append(f'action="{action.strip()}"')
-    if method and isinstance(method, str) and method.strip():
-        attrs.append(f'method="{method.strip()}"')
-
-    attrs_str = " ".join(attrs)
-    if attrs_str:
-        return f"<form {attrs_str}>\n{text.strip()}\n</form>\n\n"
-    return f"<form>\n{text.strip()}\n</form>\n\n"
+    # Forms are just containers, return their content
+    return text
 
 
 def _convert_fieldset(*, text: str, convert_as_inline: bool) -> str:
-    """Convert HTML fieldset element preserving structure.
+    """Convert HTML fieldset element to semantic Markdown.
 
     Args:
         text: The text content of the fieldset element.
         convert_as_inline: Whether to convert as inline content.
 
     Returns:
-        The converted markdown text preserving fieldset structure.
+        The converted markdown text (only content, no HTML tags).
     """
     if convert_as_inline:
         return text
@@ -1028,7 +948,8 @@ def _convert_fieldset(*, text: str, convert_as_inline: bool) -> str:
     if not text.strip():
         return ""
 
-    return f"<fieldset>\n{text.strip()}\n</fieldset>\n\n"
+    # Fieldsets are semantic groupings, return their content
+    return text
 
 
 def _convert_legend(*, text: str, convert_as_inline: bool) -> str:
@@ -1047,11 +968,12 @@ def _convert_legend(*, text: str, convert_as_inline: bool) -> str:
     if not text.strip():
         return ""
 
-    return f"<legend>{text.strip()}</legend>\n\n"
+    # Legend is like a heading/title for fieldsets
+    return f"**{text.strip()}**\n\n"
 
 
 def _convert_label(*, tag: Tag, text: str, convert_as_inline: bool) -> str:
-    """Convert HTML label element preserving for attribute.
+    """Convert HTML label element to Markdown.
 
     Args:
         tag: The label tag element.
@@ -1059,78 +981,33 @@ def _convert_label(*, tag: Tag, text: str, convert_as_inline: bool) -> str:
         convert_as_inline: Whether to convert as inline content.
 
     Returns:
-        The converted markdown text preserving label structure.
+        The label text content.
     """
-    if convert_as_inline:
-        return text
-
+    _ = tag
+    # Labels are just text, return the content
     if not text.strip():
         return ""
 
-    for_attr = tag.get("for")
-    if for_attr and isinstance(for_attr, str) and for_attr.strip():
-        return f'<label for="{for_attr.strip()}">{text.strip()}</label>\n\n'
-
-    return f"<label>{text.strip()}</label>\n\n"
+    return text.strip() if convert_as_inline else f"{text.strip()}\n\n"
 
 
 def _convert_input_enhanced(*, tag: Tag, convert_as_inline: bool) -> str:
-    """Convert HTML input element preserving all relevant attributes.
+    """Convert HTML input element to Markdown.
 
     Args:
         tag: The input tag element.
         convert_as_inline: Whether to convert as inline content.
 
     Returns:
-        The converted markdown text preserving input structure.
+        Empty string since input elements have no Markdown representation.
     """
-    input_type = tag.get("type", "text")
-
-    from html_to_markdown.processing import _has_ancestor  # noqa: PLC0415
-
-    if _has_ancestor(tag, "li"):
-        return ""
-
-    id_attr = tag.get("id", "")
-    name = tag.get("name", "")
-    value = tag.get("value", "")
-    placeholder = tag.get("placeholder", "")
-    required = tag.get("required") is not None
-    disabled = tag.get("disabled") is not None
-    readonly = tag.get("readonly") is not None
-    checked = tag.get("checked") is not None
-    accept = tag.get("accept", "")
-
-    attrs = []
-    if input_type and isinstance(input_type, str):
-        attrs.append(f'type="{input_type}"')
-    if id_attr and isinstance(id_attr, str) and id_attr.strip():
-        attrs.append(f'id="{id_attr}"')
-    if name and isinstance(name, str) and name.strip():
-        attrs.append(f'name="{name}"')
-    if value and isinstance(value, str) and value.strip():
-        attrs.append(f'value="{value}"')
-    if placeholder and isinstance(placeholder, str) and placeholder.strip():
-        attrs.append(f'placeholder="{placeholder}"')
-    if accept and isinstance(accept, str) and accept.strip():
-        attrs.append(f'accept="{accept}"')
-    if required:
-        attrs.append("required")
-    if disabled:
-        attrs.append("disabled")
-    if readonly:
-        attrs.append("readonly")
-    if checked:
-        attrs.append("checked")
-
-    attrs_str = " ".join(attrs)
-    result = f"<input {attrs_str} />" if attrs_str else "<input />"
-
-    return result if convert_as_inline else f"{result}\n\n"
+    _ = tag, convert_as_inline
+    # Input elements have no content and no Markdown equivalent
+    return ""
 
 
 def _convert_textarea(*, tag: Tag, text: str, convert_as_inline: bool) -> str:
-    """Convert HTML textarea element preserving attributes.
+    """Convert HTML textarea element to Markdown.
 
     Args:
         tag: The textarea tag element.
@@ -1138,42 +1015,18 @@ def _convert_textarea(*, tag: Tag, text: str, convert_as_inline: bool) -> str:
         convert_as_inline: Whether to convert as inline content.
 
     Returns:
-        The converted markdown text preserving textarea structure.
+        The text content of the textarea.
     """
-    if convert_as_inline:
-        return text
-
+    _ = tag
+    # Return the text content, which is what the user entered
     if not text.strip():
         return ""
 
-    name = tag.get("name", "")
-    placeholder = tag.get("placeholder", "")
-    rows = tag.get("rows", "")
-    cols = tag.get("cols", "")
-    required = tag.get("required") is not None
-
-    attrs = []
-    if name and isinstance(name, str) and name.strip():
-        attrs.append(f'name="{name}"')
-    if placeholder and isinstance(placeholder, str) and placeholder.strip():
-        attrs.append(f'placeholder="{placeholder}"')
-    if rows and isinstance(rows, str) and rows.strip():
-        attrs.append(f'rows="{rows}"')
-    if cols and isinstance(cols, str) and cols.strip():
-        attrs.append(f'cols="{cols}"')
-    if required:
-        attrs.append("required")
-
-    attrs_str = " ".join(attrs)
-    content = text.strip()
-
-    if attrs_str:
-        return f"<textarea {attrs_str}>{content}</textarea>\n\n"
-    return f"<textarea>{content}</textarea>\n\n"
+    return text.strip() if convert_as_inline else f"{text.strip()}\n\n"
 
 
 def _convert_select(*, tag: Tag, text: str, convert_as_inline: bool) -> str:
-    """Convert HTML select element preserving structure.
+    """Convert HTML select element to Markdown.
 
     Args:
         tag: The select tag element.
@@ -1181,39 +1034,25 @@ def _convert_select(*, tag: Tag, text: str, convert_as_inline: bool) -> str:
         convert_as_inline: Whether to convert as inline content.
 
     Returns:
-        The converted markdown text preserving select structure.
+        The text content (options) as a comma-separated list.
     """
-    if convert_as_inline:
-        return text
-
+    _ = tag
+    # Return the options as text
     if not text.strip():
         return ""
 
-    id_attr = tag.get("id", "")
-    name = tag.get("name", "")
-    multiple = tag.get("multiple") is not None
-    required = tag.get("required") is not None
+    # In inline mode, show options separated by commas
+    if convert_as_inline:
+        # Remove extra whitespace and join options
+        options = [opt.strip() for opt in text.strip().split("\n") if opt.strip()]
+        return ", ".join(options)
 
-    attrs = []
-    if id_attr and isinstance(id_attr, str) and id_attr.strip():
-        attrs.append(f'id="{id_attr}"')
-    if name and isinstance(name, str) and name.strip():
-        attrs.append(f'name="{name}"')
-    if multiple:
-        attrs.append("multiple")
-    if required:
-        attrs.append("required")
-
-    attrs_str = " ".join(attrs)
-    content = text.strip()
-
-    if attrs_str:
-        return f"<select {attrs_str}>\n{content}\n</select>\n\n"
-    return f"<select>\n{content}\n</select>\n\n"
+    # In block mode, show as a list
+    return f"{text.strip()}\n\n"
 
 
 def _convert_option(*, tag: Tag, text: str, convert_as_inline: bool) -> str:
-    """Convert HTML option element preserving value and selected state.
+    """Convert HTML option element to Markdown.
 
     Args:
         tag: The option tag element.
@@ -1221,33 +1060,26 @@ def _convert_option(*, tag: Tag, text: str, convert_as_inline: bool) -> str:
         convert_as_inline: Whether to convert as inline content.
 
     Returns:
-        The converted markdown text preserving option structure.
+        The option text, potentially with a marker if selected.
     """
-    if convert_as_inline:
-        return text
-
     if not text.strip():
         return ""
 
-    value = tag.get("value", "")
+    # Check if this option is selected
     selected = tag.get("selected") is not None
-
-    attrs = []
-    if value and isinstance(value, str) and value.strip():
-        attrs.append(f'value="{value}"')
-    if selected:
-        attrs.append("selected")
-
-    attrs_str = " ".join(attrs)
     content = text.strip()
 
-    if attrs_str:
-        return f"<option {attrs_str}>{content}</option>\n"
-    return f"<option>{content}</option>\n"
+    if convert_as_inline:
+        return content
+
+    # In block mode, mark selected options
+    if selected:
+        return f"* {content}\n"
+    return f"{content}\n"
 
 
 def _convert_optgroup(*, tag: Tag, text: str, convert_as_inline: bool) -> str:
-    """Convert HTML optgroup element preserving label.
+    """Convert HTML optgroup element to semantic Markdown.
 
     Args:
         tag: The optgroup tag element.
@@ -1255,7 +1087,7 @@ def _convert_optgroup(*, tag: Tag, text: str, convert_as_inline: bool) -> str:
         convert_as_inline: Whether to convert as inline content.
 
     Returns:
-        The converted markdown text preserving optgroup structure.
+        The converted markdown text with label as heading.
     """
     if convert_as_inline:
         return text
@@ -1264,21 +1096,17 @@ def _convert_optgroup(*, tag: Tag, text: str, convert_as_inline: bool) -> str:
         return ""
 
     label = tag.get("label", "")
-
-    attrs = []
-    if label and isinstance(label, str) and label.strip():
-        attrs.append(f'label="{label}"')
-
-    attrs_str = " ".join(attrs)
     content = text.strip()
 
-    if attrs_str:
-        return f"<optgroup {attrs_str}>\n{content}\n</optgroup>\n"
-    return f"<optgroup>\n{content}\n</optgroup>\n"
+    # If there's a label, show it as a heading
+    if label and isinstance(label, str) and label.strip():
+        return f"**{label.strip()}**\n{content}\n"
+
+    return f"{content}\n"
 
 
 def _convert_button(*, tag: Tag, text: str, convert_as_inline: bool) -> str:
-    """Convert HTML button element preserving type and attributes.
+    """Convert HTML button element to Markdown.
 
     Args:
         tag: The button tag element.
@@ -1286,38 +1114,18 @@ def _convert_button(*, tag: Tag, text: str, convert_as_inline: bool) -> str:
         convert_as_inline: Whether to convert as inline content.
 
     Returns:
-        The converted markdown text preserving button structure.
+        The button text content.
     """
-    if convert_as_inline:
-        return text
-
+    _ = tag
+    # Buttons are just interactive text, return the text content
     if not text.strip():
         return ""
 
-    button_type = tag.get("type", "")
-    name = tag.get("name", "")
-    value = tag.get("value", "")
-    disabled = tag.get("disabled") is not None
-
-    attrs = []
-    if button_type and isinstance(button_type, str) and button_type.strip():
-        attrs.append(f'type="{button_type}"')
-    if name and isinstance(name, str) and name.strip():
-        attrs.append(f'name="{name}"')
-    if value and isinstance(value, str) and value.strip():
-        attrs.append(f'value="{value}"')
-    if disabled:
-        attrs.append("disabled")
-
-    attrs_str = " ".join(attrs)
-
-    if attrs_str:
-        return f"<button {attrs_str}>{text.strip()}</button>\n\n"
-    return f"<button>{text.strip()}</button>\n\n"
+    return text.strip() if convert_as_inline else f"{text.strip()}\n\n"
 
 
 def _convert_progress(*, tag: Tag, text: str, convert_as_inline: bool) -> str:
-    """Convert HTML progress element preserving value and max.
+    """Convert HTML progress element to semantic text.
 
     Args:
         tag: The progress tag element.
@@ -1325,33 +1133,21 @@ def _convert_progress(*, tag: Tag, text: str, convert_as_inline: bool) -> str:
         convert_as_inline: Whether to convert as inline content.
 
     Returns:
-        The converted markdown text preserving progress structure.
+        The converted markdown text (only content, no HTML tags).
     """
+    _ = tag
     if convert_as_inline:
         return text
 
     if not text.strip():
         return ""
 
-    value = tag.get("value", "")
-    max_val = tag.get("max", "")
-
-    attrs = []
-    if value and isinstance(value, str) and value.strip():
-        attrs.append(f'value="{value}"')
-    if max_val and isinstance(max_val, str) and max_val.strip():
-        attrs.append(f'max="{max_val}"')
-
-    attrs_str = " ".join(attrs)
-    content = text.strip()
-
-    if attrs_str:
-        return f"<progress {attrs_str}>{content}</progress>\n\n"
-    return f"<progress>{content}</progress>\n\n"
+    # Progress elements convert to their text content
+    return f"{text.strip()}\n\n"
 
 
 def _convert_meter(*, tag: Tag, text: str, convert_as_inline: bool) -> str:
-    """Convert HTML meter element preserving value and range attributes.
+    """Convert HTML meter element to semantic text.
 
     Args:
         tag: The meter tag element.
@@ -1359,45 +1155,21 @@ def _convert_meter(*, tag: Tag, text: str, convert_as_inline: bool) -> str:
         convert_as_inline: Whether to convert as inline content.
 
     Returns:
-        The converted markdown text preserving meter structure.
+        The converted markdown text (only content, no HTML tags).
     """
+    _ = tag
     if convert_as_inline:
         return text
 
     if not text.strip():
         return ""
 
-    value = tag.get("value", "")
-    min_val = tag.get("min", "")
-    max_val = tag.get("max", "")
-    low = tag.get("low", "")
-    high = tag.get("high", "")
-    optimum = tag.get("optimum", "")
-
-    attrs = []
-    if value and isinstance(value, str) and value.strip():
-        attrs.append(f'value="{value}"')
-    if min_val and isinstance(min_val, str) and min_val.strip():
-        attrs.append(f'min="{min_val}"')
-    if max_val and isinstance(max_val, str) and max_val.strip():
-        attrs.append(f'max="{max_val}"')
-    if low and isinstance(low, str) and low.strip():
-        attrs.append(f'low="{low}"')
-    if high and isinstance(high, str) and high.strip():
-        attrs.append(f'high="{high}"')
-    if optimum and isinstance(optimum, str) and optimum.strip():
-        attrs.append(f'optimum="{optimum}"')
-
-    attrs_str = " ".join(attrs)
-    content = text.strip()
-
-    if attrs_str:
-        return f"<meter {attrs_str}>{content}</meter>\n\n"
-    return f"<meter>{content}</meter>\n\n"
+    # Meter elements convert to their text content
+    return f"{text.strip()}\n\n"
 
 
 def _convert_output(*, tag: Tag, text: str, convert_as_inline: bool) -> str:
-    """Convert HTML output element preserving for and name attributes.
+    """Convert HTML output element to semantic text.
 
     Args:
         tag: The output tag element.
@@ -1405,34 +1177,21 @@ def _convert_output(*, tag: Tag, text: str, convert_as_inline: bool) -> str:
         convert_as_inline: Whether to convert as inline content.
 
     Returns:
-        The converted markdown text preserving output structure.
+        The converted markdown text (only content, no HTML tags).
     """
+    _ = tag
     if convert_as_inline:
         return text
 
     if not text.strip():
         return ""
 
-    for_attr = tag.get("for", "")
-    name = tag.get("name", "")
-
-    attrs = []
-    if for_attr:
-        for_value = " ".join(for_attr) if isinstance(for_attr, list) else str(for_attr)
-        if for_value.strip():
-            attrs.append(f'for="{for_value}"')
-    if name and isinstance(name, str) and name.strip():
-        attrs.append(f'name="{name}"')
-
-    attrs_str = " ".join(attrs)
-
-    if attrs_str:
-        return f"<output {attrs_str}>{text.strip()}</output>\n\n"
-    return f"<output>{text.strip()}</output>\n\n"
+    # Output elements convert to their text content
+    return f"{text.strip()}\n\n"
 
 
 def _convert_datalist(*, tag: Tag, text: str, convert_as_inline: bool) -> str:
-    """Convert HTML datalist element preserving structure.
+    """Convert HTML datalist element to semantic Markdown.
 
     Args:
         tag: The datalist tag element.
@@ -1440,26 +1199,17 @@ def _convert_datalist(*, tag: Tag, text: str, convert_as_inline: bool) -> str:
         convert_as_inline: Whether to convert as inline content.
 
     Returns:
-        The converted markdown text preserving datalist structure.
+        The converted markdown text (only content, no HTML tags).
     """
+    _ = tag
     if convert_as_inline:
         return text
 
     if not text.strip():
         return ""
 
-    id_attr = tag.get("id", "")
-
-    attrs = []
-    if id_attr and isinstance(id_attr, str) and id_attr.strip():
-        attrs.append(f'id="{id_attr}"')
-
-    attrs_str = " ".join(attrs)
-    content = text.strip()
-
-    if attrs_str:
-        return f"<datalist {attrs_str}>\n{content}\n</datalist>\n\n"
-    return f"<datalist>\n{content}\n</datalist>\n\n"
+    # Datalist shows options as a list
+    return f"{text.strip()}\n\n"
 
 
 def _convert_ruby(*, text: str, convert_as_inline: bool) -> str:  # noqa: ARG001
@@ -1552,7 +1302,7 @@ def _convert_rtc(*, text: str, convert_as_inline: bool) -> str:  # noqa: ARG001
 
 
 def _convert_dialog(*, text: str, convert_as_inline: bool, tag: Tag) -> str:
-    """Convert HTML dialog element preserving structure with attributes.
+    """Convert HTML dialog element to semantic Markdown.
 
     Args:
         text: The text content of the dialog element.
@@ -1560,27 +1310,21 @@ def _convert_dialog(*, text: str, convert_as_inline: bool, tag: Tag) -> str:
         tag: The dialog tag element.
 
     Returns:
-        The converted markdown text preserving dialog structure.
+        The converted markdown text (only content, no HTML tags).
     """
+    _ = tag
     if convert_as_inline:
         return text
 
     if not text.strip():
         return ""
 
-    attrs = []
-    if tag.get("open") is not None:
-        attrs.append("open")
-    if tag.get("id"):
-        attrs.append(f'id="{tag.get("id")}"')
-
-    attrs_str = " " + " ".join(attrs) if attrs else ""
-
-    return f"<dialog{attrs_str}>\n{text.strip()}\n</dialog>\n\n"
+    # Dialog is a semantic container, return its content
+    return f"{text.strip()}\n\n"
 
 
 def _convert_menu(*, text: str, convert_as_inline: bool, tag: Tag) -> str:
-    """Convert HTML menu element preserving structure with attributes.
+    """Convert HTML menu element to semantic Markdown.
 
     Args:
         text: The text content of the menu element.
@@ -1588,29 +1332,21 @@ def _convert_menu(*, text: str, convert_as_inline: bool, tag: Tag) -> str:
         tag: The menu tag element.
 
     Returns:
-        The converted markdown text preserving menu structure.
+        The converted markdown text (only content, no HTML tags).
     """
+    _ = tag
     if convert_as_inline:
         return text
 
     if not text.strip():
         return ""
 
-    attrs = []
-    if tag.get("type") and tag.get("type") != "list":
-        attrs.append(f'type="{tag.get("type")}"')
-    if tag.get("label"):
-        attrs.append(f'label="{tag.get("label")}"')
-    if tag.get("id"):
-        attrs.append(f'id="{tag.get("id")}"')
-
-    attrs_str = " " + " ".join(attrs) if attrs else ""
-
-    return f"<menu{attrs_str}>\n{text.strip()}\n</menu>\n\n"
+    # Menu is converted as a list
+    return f"{text.strip()}\n\n"
 
 
 def _convert_figure(*, text: str, convert_as_inline: bool, tag: Tag) -> str:
-    """Convert HTML figure element preserving semantic structure.
+    """Convert HTML figure element to semantic Markdown.
 
     Args:
         text: The text content of the figure element.
@@ -1618,42 +1354,35 @@ def _convert_figure(*, text: str, convert_as_inline: bool, tag: Tag) -> str:
         tag: The figure tag element.
 
     Returns:
-        The converted markdown text preserving figure structure.
+        The converted markdown text (only content, no HTML tags).
     """
+    _ = tag
     if not text.strip():
         return ""
 
     if convert_as_inline:
         return text
 
-    attrs = []
-    if tag.get("id"):
-        attrs.append(f'id="{tag.get("id")}"')
-    if tag.get("class"):
-        class_val = tag.get("class")
-        if isinstance(class_val, list):
-            class_val = " ".join(class_val)
-        attrs.append(f'class="{class_val}"')
-
-    attrs_str = " " + " ".join(attrs) if attrs else ""
-
+    # Figure is a semantic container, return its content
+    # Make sure there's proper spacing after the figure content
     content = text.strip()
-
-    if content.endswith("\n\n"):
-        return f"<figure{attrs_str}>\n{content}</figure>\n\n"
-
-    return f"<figure{attrs_str}>\n{content}\n</figure>\n\n"
+    if content and not content.endswith("\n\n"):
+        if content.endswith("\n"):
+            content += "\n"
+        else:
+            content += "\n\n"
+    return content
 
 
 def _convert_hgroup(*, text: str, convert_as_inline: bool) -> str:
-    """Convert HTML hgroup element preserving heading group semantics.
+    """Convert HTML hgroup element to semantic Markdown.
 
     Args:
         text: The text content of the hgroup element.
         convert_as_inline: Whether to convert as inline content.
 
     Returns:
-        The converted markdown text preserving heading group structure.
+        The converted markdown text (only content, no HTML tags).
     """
     if convert_as_inline:
         return text
@@ -1661,15 +1390,12 @@ def _convert_hgroup(*, text: str, convert_as_inline: bool) -> str:
     if not text.strip():
         return ""
 
-    content = text.strip()
-
-    content = re.sub(r"\n{3,}", "\n\n", content)
-
-    return f"<!-- heading group -->\n{content}\n<!-- end heading group -->\n\n"
+    # Hgroup is a semantic container for headings, return its content
+    return text
 
 
 def _convert_picture(*, text: str, convert_as_inline: bool, tag: Tag) -> str:
-    """Convert HTML picture element with responsive image sources.
+    """Convert HTML picture element to semantic Markdown.
 
     Args:
         text: The text content of the picture element.
@@ -1677,44 +1403,14 @@ def _convert_picture(*, text: str, convert_as_inline: bool, tag: Tag) -> str:
         tag: The picture tag element.
 
     Returns:
-        The converted markdown text with picture information preserved.
+        The converted markdown text (only the img element).
     """
+    _ = tag, convert_as_inline
     if not text.strip():
         return ""
 
-    sources = tag.find_all("source")
-    img = tag.find("img")
-
-    if not img:
-        return text.strip()
-
-    img_markdown = text.strip()
-
-    if not sources:
-        return img_markdown
-
-    source_info = []
-    for source in sources:
-        srcset = source.get("srcset")
-        media = source.get("media")
-        mime_type = source.get("type")
-
-        if srcset:
-            info = f'srcset="{srcset}"'
-            if media:
-                info += f' media="{media}"'
-            if mime_type:
-                info += f' type="{mime_type}"'
-            source_info.append(info)
-
-    if source_info and not convert_as_inline:
-        sources_comment = "<!-- picture sources:\n"
-        for info in source_info:
-            sources_comment += f"  {info}\n"
-        sources_comment += "-->\n"
-        return f"{sources_comment}{img_markdown}"
-
-    return img_markdown
+    # Picture is a container for responsive images, only the img matters for Markdown
+    return text.strip()
 
 
 def _convert_svg(*, text: str, convert_as_inline: bool, tag: Tag) -> str:
@@ -1852,7 +1548,7 @@ def create_converters_map(
         "dt": _wrapper(_convert_dt),
         "em": _wrapper(_create_inline_converter(strong_em_symbol)),
         "fieldset": _wrapper(_convert_fieldset),
-        "figcaption": _wrapper(lambda text: f"\n\n{text}\n\n"),
+        "figcaption": _wrapper(lambda text: f"\n\n*{text.strip()}*\n\n" if text.strip() else ""),
         "figure": _wrapper(_convert_figure),
         "footer": _wrapper(_convert_semantic_block),
         "form": _wrapper(_convert_form),

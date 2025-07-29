@@ -88,33 +88,39 @@ class TestCollapsibleContent:
         """Test details element conversion."""
         html = "<details>This is details content</details>"
         result = convert_to_markdown(html)
-        assert result == "<details>\nThis is details content\n</details>\n\n"
+        # Details is a semantic container, only content is converted
+        assert result == "This is details content\n\n"
 
     def test_summary_element(self) -> None:
         """Test summary element conversion."""
         html = "<summary>Summary text</summary>"
         result = convert_to_markdown(html)
-        assert result == "<summary>Summary text</summary>\n\n"
+        # Summary is like a heading/title
+        assert result == "**Summary text**\n\n"
 
     def test_details_with_summary(self) -> None:
         """Test details with summary element."""
         html = "<details><summary>Click to expand</summary><p>Hidden content here</p></details>"
         result = convert_to_markdown(html)
-        expected = "<details>\n<summary>Click to expand</summary>\n\nHidden content here\n</details>\n\n"
+        # Summary becomes bold heading, rest is content
+        expected = "**Click to expand**\n\nHidden content here\n\n"
         assert result == expected
 
     def test_nested_details(self) -> None:
         """Test nested details elements."""
         html = "<details><summary>Level 1</summary><details><summary>Level 2</summary><p>Nested content</p></details></details>"
         result = convert_to_markdown(html)
-        expected = "<details>\n<summary>Level 1</summary>\n\n<details>\n<summary>Level 2</summary>\n\nNested content\n</details>\n</details>\n\n"
+        # Nested details become semantic nested content
+        expected = "**Level 1**\n\n**Level 2**\n\nNested content\n\n"
         assert result == expected
 
     def test_details_with_complex_content(self) -> None:
         """Test details with complex content."""
         html = '<details><summary>Code Example</summary><pre><code>def hello():\n    print("Hello, World!")</code></pre><p>This is a Python function.</p></details>'
         result = convert_to_markdown(html)
-        expected = '<details>\n<summary>Code Example</summary>\n\n```\ndef hello():\n    print("Hello, World!")\n```\nThis is a Python function.\n</details>\n\n'
+        expected = (
+            '**Code Example**\n\n```\ndef hello():\n    print("Hello, World!")\n```\nThis is a Python function.\n\n'
+        )
         assert result == expected
 
     def test_empty_details(self) -> None:
@@ -145,5 +151,6 @@ class TestCollapsibleContent:
         """Test details with attributes."""
         html = "<details open><summary>Always open</summary><p>Content</p></details>"
         result = convert_to_markdown(html)
-        expected = "<details>\n<summary>Always open</summary>\n\nContent\n</details>\n\n"
+        # Open attribute is not preserved in Markdown
+        expected = "**Always open**\n\nContent\n\n"
         assert result == expected

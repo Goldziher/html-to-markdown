@@ -50,7 +50,8 @@ class TestTimeElements:
         """Test time with datetime attribute."""
         html = '<time datetime="2023-12-25T10:30:00">Christmas Day</time>'
         result = convert_to_markdown(html)
-        assert result == '<time datetime="2023-12-25T10:30:00">Christmas Day</time>'
+        # Time elements with datetime should show content only
+        assert result == "Christmas Day"
 
     def test_time_with_empty_datetime(self) -> None:
         """Test time with empty datetime."""
@@ -62,13 +63,13 @@ class TestTimeElements:
         """Test time in inline mode."""
         html = '<time datetime="2023-12-25">Christmas</time>'
         result = convert_to_markdown(html, convert_as_inline=True)
-        assert result == '<time datetime="2023-12-25">Christmas</time>'
+        assert result == "Christmas"
 
     def test_time_in_paragraph(self) -> None:
         """Test time element within paragraph."""
         html = '<p>The event is on <time datetime="2023-12-25">Christmas Day</time>.</p>'
         result = convert_to_markdown(html)
-        assert result == 'The event is on <time datetime="2023-12-25">Christmas Day</time>.\n\n'
+        assert result == "The event is on Christmas Day.\n\n"
 
 
 class TestDataElements:
@@ -84,7 +85,8 @@ class TestDataElements:
         """Test data with value attribute."""
         html = '<data value="12345">Product Name</data>'
         result = convert_to_markdown(html)
-        assert result == '<data value="12345">Product Name</data>'
+        # Data elements should show content only
+        assert result == "Product Name"
 
     def test_data_with_empty_value(self) -> None:
         """Test data with empty value."""
@@ -96,13 +98,13 @@ class TestDataElements:
         """Test data in inline mode."""
         html = '<data value="12345">Product</data>'
         result = convert_to_markdown(html, convert_as_inline=True)
-        assert result == '<data value="12345">Product</data>'
+        assert result == "Product"
 
     def test_data_in_list(self) -> None:
         """Test data element within list."""
         html = '<ul><li><data value="A001">Product A</data></li><li><data value="B002">Product B</data></li></ul>'
         result = convert_to_markdown(html)
-        assert result == '* <data value="A001">Product A</data>\n* <data value="B002">Product B</data>\n'
+        assert result == "* Product A\n* Product B\n"
 
 
 class TestInsertedText:
@@ -314,9 +316,9 @@ class TestSemanticTextMixedContent:
 An *API* (API (Application Programming Interface))
  allows different software components to communicate.
 
-When you set the variable *timeout* to <data value="5000">5 seconds</data>, ==added in version 2\\.0==, the system will wait.
+When you set the variable *timeout* to 5 seconds, ==added in version 2\\.0==, the system will wait.
 
-Last updated: <time datetime="2023-12-25">December 25, 2023</time>
+Last updated: December 25, 2023
 
 """
         assert result == expected
@@ -340,7 +342,7 @@ Last updated: <time datetime="2023-12-25">December 25, 2023</time>
         """Test empty semantic text elements."""
         html = "<p>Empty elements: <abbr></abbr> <var></var> <ins></ins> <dfn></dfn></p>"
         result = convert_to_markdown(html)
-        assert result == "Empty elements:       \n\n"
+        assert result == "Empty elements: \n\n"
 
     def test_whitespace_handling(self) -> None:
         """Test whitespace handling in semantic elements."""
