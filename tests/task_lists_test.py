@@ -92,7 +92,7 @@ class TestTaskLists:
         """Test checkbox with complex nested content."""
         html = '<ul><li><input type="checkbox"> Complex task with:<p>Paragraph content</p><blockquote>Quote content</blockquote></li></ul>'
         result = convert_to_markdown(html)
-        expected = "- [ ] Complex task with:Paragraph content\n\n> Quote content\n"
+        expected = "- [ ] Complex task with:Paragraph content\n\n    > Quote content\n"
         assert result == expected
 
     def test_non_checkbox_input_ignored(self) -> None:

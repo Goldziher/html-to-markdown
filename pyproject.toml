@@ -5,7 +5,7 @@ requires = [ "setuptools>=78.1" ]
 
 [project]
 name = "html-to-markdown"
-version = "1.8.0"
+version = "1.9.0"
 description = "A modern, type-safe Python library for converting HTML to Markdown with comprehensive tag support and customizable options"
 readme = "README.md"
 keywords = [
@@ -21,7 +21,7 @@ keywords = [
 ]
 license = { text = "MIT" }
 authors = [ { name = "Na'aman Hirschfeld", email = "nhirschfeld@gmail.com" } ]
-requires-python = ">=3.9"
+requires-python = ">=3.10"
 classifiers = [
   "Development Status :: 5 - Production/Stable",
   "Environment :: Console",
@@ -29,7 +29,6 @@ classifiers = [
   "License :: OSI Approved :: MIT License",
   "Operating System :: OS Independent",
   "Programming Language :: Python :: 3 :: Only",
-  "Programming Language :: Python :: 3.9",
   "Programming Language :: Python :: 3.10",
   "Programming Language :: Python :: 3.11",
   "Programming Language :: Python :: 3.12",
@@ -43,9 +42,9 @@ classifiers = [
   "Topic :: Utilities",
   "Typing :: Typed",
 ]
-dependencies = [ "beautifulsoup4>=4.13.4", "nh3>=0.2.21" ]
+dependencies = [ "beautifulsoup4>=4.13.4", "nh3>=0.3" ]
 
-optional-dependencies.lxml = [ "lxml>=5" ]
+optional-dependencies.lxml = [ "lxml>=6" ]
 urls.Changelog = "https://github.com/Goldziher/html-to-markdown/releases"
 urls.Homepage = "https://github.com/Goldziher/html-to-markdown"
 urls.Issues = "https://github.com/Goldziher/html-to-markdown/issues"
@@ -57,12 +56,12 @@ scripts.html_to_markdown = "html_to_markdown.__main__:cli"
 dev = [
   "ai-rulez>=0.12",
   "covdefaults>=2.3",
-  "mypy>=1.16.1",
+  "mypy>=1.17",
   "pre-commit>=4.1",
   "pytest>=8.4.1",
   "pytest-cov>=6.2.1",
   "pytest-mock>=3.14.1",
-  "ruff>=0.12.2",
+  "ruff>=0.12.5",
   "types-beautifulsoup4>=4.12.0.20250516",
   "types-psutil>=7.0.0.20250601",
   "uv-bump",
@@ -78,7 +77,7 @@ html_to_markdown = [ "py.typed" ]
 skip-excluded-dirs = true
 
 [tool.ruff]
-target-version = "py39"
+target-version = "py310"
 line-length = 120
 src = [ "html_to_markdown", "tests" ]
 
@@ -138,7 +137,7 @@ show_missing = true
 
 [tool.mypy]
 packages = [ "html_to_markdown", "tests" ]
-python_version = "3.9"
+python_version = "3.10"
 strict = true
 implicit_reexport = false
 show_error_codes = true

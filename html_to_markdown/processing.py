@@ -3,13 +3,13 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from collections.abc import Generator, Mapping
+    from collections.abc import Callable, Generator, Mapping
 
 import re
 from contextvars import ContextVar
 from io import StringIO
 from itertools import chain
-from typing import TYPE_CHECKING, Any, Callable, Literal, cast
+from typing import TYPE_CHECKING, Any, Literal, cast
 
 from bs4 import BeautifulSoup, Comment, Doctype, Tag
 from bs4.element import NavigableString, PageElement
@@ -176,7 +176,7 @@ def _process_tag(
     tag_name: SupportedTag | None = (
         cast("SupportedTag", tag.name.lower()) if tag.name.lower() in converters_map else None
     )
-    text = ""
+    text_parts: list[str] = []
 
     is_heading = html_heading_re.match(tag.name) is not None
     is_cell = tag_name in {"td", "th"}
@@ -193,26 +193,55 @@ def _process_tag(
             if can_extract and isinstance(el, NavigableString) and not el.strip():
                 el.extract()
 
-    for el in filter(lambda value: not isinstance(value, (Comment, Doctype)), tag.children):
+    children = list(filter(lambda value: not isinstance(value, (Comment, Doctype)), tag.children))
+
+    # List of tags that return empty string when they have no content
+    empty_when_no_content_tags = {"abbr", "var", "ins", "dfn", "time", "data", "cite", "q", "mark", "small", "u"}
+
+    for i, el in enumerate(children):
         if isinstance(el, NavigableString):
-            text += _process_text(
-                el=el,
-                escape_misc=escape_misc,
-                escape_asterisks=escape_asterisks,
-                escape_underscores=escape_underscores,
+            # Check if this is whitespace between empty elements
+            if el.strip() == "" and i > 0 and i < len(children) - 1:
+                prev_el = children[i - 1]
+                next_el = children[i + 1]
+
+                # If previous element was a tag that produced empty output
+                # and next element is also a tag that could be empty, skip this whitespace
+                if (
+                    isinstance(prev_el, Tag)
+                    and isinstance(next_el, Tag)
+                    and prev_el.name.lower() in empty_when_no_content_tags
+                    and next_el.name.lower() in empty_when_no_content_tags
+                    and not prev_el.get_text().strip()
+                ):
+                    # Previous tag is empty and next could be empty too, skip this whitespace
+                    continue
+
+            text_parts.append(
+                _process_text(
+                    el=el,
+                    escape_misc=escape_misc,
+                    escape_asterisks=escape_asterisks,
+                    escape_underscores=escape_underscores,
+                )
             )
         elif isinstance(el, Tag):
-            text += _process_tag(
-                el,
-                converters_map,
-                convert_as_inline=convert_children_as_inline,
-                convert=convert,
-                escape_asterisks=escape_asterisks,
-                escape_misc=escape_misc,
-                escape_underscores=escape_underscores,
-                strip=strip,
-                context_before=(context_before + text)[-2:],
+            current_text = "".join(text_parts)
+            text_parts.append(
+                _process_tag(
+                    el,
+                    converters_map,
+                    convert_as_inline=convert_children_as_inline,
+                    convert=convert,
+                    escape_asterisks=escape_asterisks,
+                    escape_misc=escape_misc,
+                    escape_underscores=escape_underscores,
+                    strip=strip,
+                    context_before=(context_before + current_text)[-2:],
+                )
             )
+
+    text = "".join(text_parts)
 
     if tag_name and should_convert_tag:
         rendered = converters_map[tag_name](  # type: ignore[call-arg]
@@ -252,22 +281,75 @@ def _process_text(
             break
 
     if "pre" not in ancestor_names:
-        has_leading_space = text.startswith((" ", "\t"))
+        # Special case: if the text is only whitespace
+        if text.strip() == "":
+            # If it contains newlines, it's probably indentation whitespace, return empty
+            if "\n" in text:
+                text = ""
+            else:
+                # Check if this whitespace is between block elements
+                # Define block elements that should not have whitespace between them
+                block_elements = {
+                    "p",
+                    "ul",
+                    "ol",
+                    "div",
+                    "blockquote",
+                    "pre",
+                    "h1",
+                    "h2",
+                    "h3",
+                    "h4",
+                    "h5",
+                    "h6",
+                    "table",
+                    "dl",
+                    "hr",
+                    "figure",
+                    "article",
+                    "section",
+                    "nav",
+                    "aside",
+                    "header",
+                    "footer",
+                    "main",
+                    "form",
+                    "fieldset",
+                }
 
-        has_trailing_space = text.endswith((" ", "\t"))
+                prev_sibling = el.previous_sibling
+                next_sibling = el.next_sibling
 
-        middle_content = (
-            text[1:-1]
-            if has_leading_space and has_trailing_space
-            else text[1:]
-            if has_leading_space
-            else text[:-1]
-            if has_trailing_space
-            else text
-        )
+                # Check if whitespace is between block elements
+                if (
+                    prev_sibling
+                    and hasattr(prev_sibling, "name")
+                    and prev_sibling.name in block_elements
+                    and next_sibling
+                    and hasattr(next_sibling, "name")
+                    and next_sibling.name in block_elements
+                ):
+                    # Remove whitespace between block elements
+                    text = ""
+                else:
+                    # Otherwise it's inline whitespace, normalize to single space
+                    text = " " if text else ""
+        else:
+            has_leading_space = text.startswith((" ", "\t"))
+            has_trailing_space = text.endswith((" ", "\t"))
 
-        middle_content = whitespace_re.sub(" ", middle_content.strip())
-        text = (" " if has_leading_space else "") + middle_content + (" " if has_trailing_space else "")
+            middle_content = (
+                text[1:-1]
+                if has_leading_space and has_trailing_space
+                else text[1:]
+                if has_leading_space
+                else text[:-1]
+                if has_trailing_space
+                else text
+            )
+
+            middle_content = whitespace_re.sub(" ", middle_content.strip())
+            text = (" " if has_leading_space else "") + middle_content + (" " if has_trailing_space else "")
 
     if not ancestor_names.intersection({"pre", "code", "kbd", "samp"}):
         text = escape(
@@ -388,7 +470,9 @@ def _extract_metadata(soup: BeautifulSoup) -> dict[str, str]:
     if canonical and isinstance(canonical, Tag) and isinstance(canonical["href"], str):
         metadata["canonical"] = canonical["href"]
 
-    for rel_type in ["author", "license", "alternate"]:
+    # Extract link relations
+    link_relations = {"author", "license", "alternate"}
+    for rel_type in link_relations:
         link = soup.find("link", rel=rel_type, href=True)
         if link and isinstance(link, Tag) and isinstance(link["href"], str):
             metadata[f"link-{rel_type}"] = link["href"]
@@ -653,7 +737,9 @@ def convert_to_markdown(
         if leading_whitespace_match:
             leading_whitespace = leading_whitespace_match.group(0)
 
-            if any(tag in original_input for tag in ["<ol", "<ul", "<li", "<h1", "<h2", "<h3", "<h4", "<h5", "<h6"]):
+            # Check if input contains list or heading tags
+            list_heading_tags = {"<ol", "<ul", "<li", "<h1", "<h2", "<h3", "<h4", "<h5", "<h6"}
+            if any(tag in original_input for tag in list_heading_tags):
                 leading_newlines = re.match(r"^[\n\r]*", leading_whitespace)
                 leading_whitespace = leading_newlines.group(0) if leading_newlines else ""
 
@@ -665,13 +751,23 @@ def convert_to_markdown(
     def normalize_spaces_outside_code(text: str) -> str:
         parts = text.split("```")
         for i in range(0, len(parts), 2):
-            # Preserve definition list formatting (: followed by 3 spaces)
-            # Split by definition list patterns to preserve them
-            def_parts = re.split(r"(:\s{3})", parts[i])
-            for j in range(0, len(def_parts), 2):
-                # Only normalize non-definition-list parts
-                def_parts[j] = re.sub(r" {3,}", " ", def_parts[j])
-            parts[i] = "".join(def_parts)
+            # Process each line separately to preserve leading spaces
+            lines = parts[i].split("\n")
+            processed_lines = []
+            for line in lines:
+                # Preserve definition list formatting (: followed by 3 spaces)
+                def_parts = re.split(r"(:\s{3})", line)
+                for j in range(0, len(def_parts), 2):
+                    # Only normalize non-definition-list parts
+                    # Also preserve leading spaces (for list indentation)
+                    match = re.match(r"^(\s*)(.*)", def_parts[j])
+                    if match:
+                        leading_spaces, rest = match.groups()
+                        # Only normalize multiple spaces that are not at the beginning
+                        rest = re.sub(r" {3,}", " ", rest)
+                        def_parts[j] = leading_spaces + rest
+                processed_lines.append("".join(def_parts))
+            parts[i] = "\n".join(processed_lines)
         return "```".join(parts)
 
     result = normalize_spaces_outside_code(result)

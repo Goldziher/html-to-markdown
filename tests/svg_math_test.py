@@ -206,9 +206,9 @@ class TestSVGMathIntegration:
         </figure>"""
         result = convert_to_markdown(html, extract_metadata=False)
 
-        assert "<figure>" in result
+        # Figure is converted to semantic Markdown
         assert "![Chart](data:image/svg+xml;base64," in result
-        assert "Sales chart" in result
+        assert "*Sales chart*" in result
 
     def test_multiple_svg_elements(self) -> None:
         """Test multiple SVG elements."""
@@ -248,8 +248,8 @@ class TestSVGMathIntegration:
         </picture>"""
         result = convert_to_markdown(html, extract_metadata=False)
 
-        assert "<!-- picture sources:" in result
-        assert "![Chart](chart.png)" in result
+        # Picture element now converts to pure Markdown (just the img)
+        assert result == "![Chart](chart.png)"
 
 
 class TestSVGMathEdgeCases:

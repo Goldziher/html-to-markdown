@@ -10,34 +10,37 @@ class TestFigureElement:
         """Test basic figure conversion."""
         html = '<figure><img src="image.jpg" alt="Test image"></figure>'
         result = convert_to_markdown(html)
-        assert result == "<figure>\n![Test image](image.jpg)\n</figure>\n\n"
+        # Figure is a semantic container, only content is converted
+        assert result == "![Test image](image.jpg)\n\n"
 
     def test_figure_with_caption(self) -> None:
         """Test figure with figcaption."""
         html = '<figure><img src="test.jpg"><figcaption>Image caption</figcaption></figure>'
         result = convert_to_markdown(html)
-        assert "<figure>" in result
-        assert "![](test.jpg)" in result
-        assert "Image caption" in result
-        assert "</figure>" in result
+        # Figure and figcaption convert to semantic Markdown
+        expected = "![](test.jpg)\n\n*Image caption*\n\n"
+        assert result == expected
 
     def test_figure_with_id(self) -> None:
         """Test figure with id attribute."""
         html = '<figure id="fig1"><img src="chart.png"></figure>'
         result = convert_to_markdown(html)
-        assert result == '<figure id="fig1">\n![](chart.png)\n</figure>\n\n'
+        # ID attribute is not preserved in Markdown
+        assert result == "![](chart.png)\n\n"
 
     def test_figure_with_class(self) -> None:
         """Test figure with class attribute."""
         html = '<figure class="photo"><img src="photo.jpg"></figure>'
         result = convert_to_markdown(html)
-        assert result == '<figure class="photo">\n![](photo.jpg)\n</figure>\n\n'
+        # Class attribute is not preserved in Markdown
+        assert result == "![](photo.jpg)\n\n"
 
     def test_figure_with_multiple_attributes(self) -> None:
         """Test figure with multiple attributes."""
         html = '<figure id="fig2" class="diagram"><img src="diagram.svg"></figure>'
         result = convert_to_markdown(html)
-        assert result == '<figure id="fig2" class="diagram">\n![](diagram.svg)\n</figure>\n\n'
+        # Attributes are not preserved in Markdown
+        assert result == "![](diagram.svg)\n\n"
 
     def test_figure_empty(self) -> None:
         """Test empty figure."""
@@ -60,10 +63,8 @@ class TestFigureElement:
             </figcaption>
         </figure>"""
         result = convert_to_markdown(html)
-        assert "<figure>" in result
-        assert "![Main image](main.jpg)" in result
-        assert "**Figure 1:**" in result
-        assert "*emphasis*" in result
+        expected = """![Main image](main.jpg)\n\n***Figure 1:** This is a complex caption with *emphasis*.*\n\n"""
+        assert result == expected
 
     def test_figure_with_multiple_images(self) -> None:
         """Test figure containing multiple images."""
@@ -73,10 +74,8 @@ class TestFigureElement:
             <figcaption>Before and after comparison</figcaption>
         </figure>"""
         result = convert_to_markdown(html)
-        assert "<figure>" in result
-        assert "![Before](before.jpg)" in result
-        assert "![After](after.jpg)" in result
-        assert "Before and after comparison" in result
+        expected = """![Before](before.jpg)![After](after.jpg)\n\n*Before and after comparison*\n\n"""
+        assert result == expected
 
     def test_figure_with_nested_elements(self) -> None:
         """Test figure with various nested elements."""
@@ -88,10 +87,8 @@ class TestFigureElement:
             <figcaption>Annual sales data</figcaption>
         </figure>"""
         result = convert_to_markdown(html)
-        assert '<figure id="stats">' in result
-        assert "| Year | Sales |" in result
-        assert "| 2023 | 100 |" in result
-        assert "Annual sales data" in result
+        expected = """| Year | Sales |\n| --- | --- |\n| 2023 | 100 |\n\n*Annual sales data*\n\n"""
+        assert result == expected
 
 
 class TestHgroupElement:
@@ -101,19 +98,17 @@ class TestHgroupElement:
         """Test basic hgroup conversion."""
         html = "<hgroup><h1>Main Title</h1><h2>Subtitle</h2></hgroup>"
         result = convert_to_markdown(html)
-        assert "<!-- heading group -->" in result
-        assert "Main Title" in result
-        assert "Subtitle" in result
-        assert "<!-- end heading group -->" in result
+        # Hgroup is a semantic container, headings are converted normally
+        expected = "Main Title\n==========\n\nSubtitle\n--------\n\n"
+        assert result == expected
 
     def test_hgroup_multiple_headings(self) -> None:
         """Test hgroup with multiple heading levels."""
         html = "<hgroup><h1>Title</h1><h2>Subtitle</h2><h3>Section</h3></hgroup>"
         result = convert_to_markdown(html)
-        assert "<!-- heading group -->" in result
-        assert "Title" in result
-        assert "Subtitle" in result
-        assert "Section" in result
+        # All headings are converted to their Markdown equivalents
+        expected = "Title\n=====\n\nSubtitle\n--------\n\n### Section\n\n"
+        assert result == expected
 
     def test_hgroup_empty(self) -> None:
         """Test empty hgroup."""
@@ -125,31 +120,30 @@ class TestHgroupElement:
         """Test hgroup in inline mode."""
         html = "<hgroup><h1>Inline Title</h1></hgroup>"
         result = convert_to_markdown(html, convert_as_inline=True)
-
-        assert "Inline Title" in result
-        assert "<!-- heading group -->" not in result
+        # In inline mode, just the text content
+        assert result == "Inline Title"
 
     def test_hgroup_with_atx_headings(self) -> None:
         """Test hgroup with ATX-style headings."""
         html = "<hgroup><h1>Main</h1><h2>Sub</h2></hgroup>"
         result = convert_to_markdown(html, heading_style="atx")
-        assert "<!-- heading group -->" in result
-        assert "# Main" in result
-        assert "## Sub" in result
+        expected = "# Main\n\n## Sub\n\n"
+        assert result == expected
 
     def test_hgroup_excessive_spacing(self) -> None:
         """Test that hgroup removes excessive spacing between headings."""
         html = "<hgroup><h1>Title</h1><p></p><p></p><h2>Subtitle</h2></hgroup>"
         result = convert_to_markdown(html)
-
-        assert "\n\n\n" not in result
+        # Empty paragraphs are removed, headings have normal spacing
+        expected = "Title\n=====\n\nSubtitle\n--------\n\n"
+        assert result == expected
 
     def test_hgroup_with_formatted_headings(self) -> None:
         """Test hgroup with formatted heading content."""
         html = "<hgroup><h1>The <em>Amazing</em> Title</h1><h2>A <strong>Bold</strong> Subtitle</h2></hgroup>"
         result = convert_to_markdown(html)
-        assert "*Amazing*" in result
-        assert "**Bold**" in result
+        expected = "The *Amazing* Title\n===================\n\nA **Bold** Subtitle\n-------------------\n\n"
+        assert result == expected
 
 
 class TestPictureElement:
@@ -168,9 +162,8 @@ class TestPictureElement:
             <img src="small.jpg" alt="Responsive image">
         </picture>"""
         result = convert_to_markdown(html)
-        assert "<!-- picture sources:" in result
-        assert 'srcset="large.jpg" media="(min-width: 800px)"' in result
-        assert "![Responsive image](small.jpg)" in result
+        # Picture is a container, only the img is converted
+        assert result == "![Responsive image](small.jpg)"
 
     def test_picture_multiple_sources(self) -> None:
         """Test picture with multiple source elements."""
@@ -180,10 +173,8 @@ class TestPictureElement:
             <img src="fallback.jpg" alt="Multi-format">
         </picture>"""
         result = convert_to_markdown(html)
-        assert "<!-- picture sources:" in result
-        assert 'srcset="image.webp" type="image/webp"' in result
-        assert 'srcset="image.jpg" type="image/jpeg"' in result
-        assert "![Multi-format](fallback.jpg)" in result
+        # Only the img element is converted to Markdown
+        assert result == "![Multi-format](fallback.jpg)"
 
     def test_picture_complex_srcset(self) -> None:
         """Test picture with complex srcset values."""
@@ -193,8 +184,8 @@ class TestPictureElement:
             <img src="default.jpg">
         </picture>"""
         result = convert_to_markdown(html)
-        assert 'srcset="small.jpg 480w, medium.jpg 800w, large.jpg 1200w"' in result
-        assert 'media="(min-width: 600px)"' in result
+        # Source elements are ignored, only img is converted
+        assert result == "![](default.jpg)"
 
     def test_picture_no_img(self) -> None:
         """Test picture without img element."""
@@ -215,9 +206,8 @@ class TestPictureElement:
             <img src="small.jpg" alt="Test">
         </picture>"""
         result = convert_to_markdown(html, convert_as_inline=True)
-
+        # In inline mode, just the alt text
         assert result == "Test"
-        assert "<!-- picture sources:" not in result
 
     def test_picture_with_sizes(self) -> None:
         """Test picture with sizes attribute."""
@@ -227,7 +217,8 @@ class TestPictureElement:
             <img src="default.jpg">
         </picture>"""
         result = convert_to_markdown(html)
-        assert 'srcset="img-480.jpg 480w, img-800.jpg 800w"' in result
+        # Only img element matters
+        assert result == "![](default.jpg)"
 
 
 class TestStructuralElementsIntegration:
@@ -244,9 +235,8 @@ class TestStructuralElementsIntegration:
             <p>Article content...</p>
         </article>"""
         result = convert_to_markdown(html)
-        assert '<figure id="main-image">' in result
-        assert "![Hero image](hero.jpg)" in result
-        assert "The main article image" in result
+        expected = """Article Title\n=============\n\n![Hero image](hero.jpg)\n\n*The main article image*\n\nArticle content...\n\n"""
+        assert result == expected
 
     def test_hgroup_in_header(self) -> None:
         """Test hgroup within header element."""
@@ -258,9 +248,8 @@ class TestStructuralElementsIntegration:
             <nav>Navigation here</nav>
         </header>"""
         result = convert_to_markdown(html)
-        assert "<!-- heading group -->" in result
-        assert "Site Title" in result
-        assert "Site Tagline" in result
+        expected = """Site Title\n==========\n\nSite Tagline\n------------\n\nNavigation here\n\n"""
+        assert result == expected
 
     def test_picture_in_figure(self) -> None:
         """Test picture element within figure."""
@@ -272,10 +261,8 @@ class TestStructuralElementsIntegration:
             <figcaption>A responsive image in a figure</figcaption>
         </figure>"""
         result = convert_to_markdown(html)
-        assert "<figure>" in result
-        assert "<!-- picture sources:" in result
-        assert "![Test image](fallback.jpg)" in result
-        assert "A responsive image in a figure" in result
+        expected = """![Test image](fallback.jpg)\n\n*A responsive image in a figure*\n\n"""
+        assert result == expected
 
     def test_multiple_figures(self) -> None:
         """Test multiple figure elements."""
@@ -290,10 +277,8 @@ class TestStructuralElementsIntegration:
         </figure>
         """
         result = convert_to_markdown(html)
-        assert '<figure id="fig1">' in result
-        assert '<figure id="fig2">' in result
-        assert "First figure" in result
-        assert "Second figure" in result
+        expected = """\n        ![](image1.jpg)\n\n*First figure*\n\n![](image2.jpg)\n\n*Second figure*\n\n"""
+        assert result == expected
 
     def test_nested_structural_elements(self) -> None:
         """Test complex nesting of structural elements."""
@@ -311,10 +296,8 @@ class TestStructuralElementsIntegration:
             </figure>
         </section>"""
         result = convert_to_markdown(html)
-        assert "<!-- heading group -->" in result
-        assert "<figure>" in result
-        assert "<!-- picture sources:" in result
-        assert "Quarterly results" in result
+        expected = """Section Title\n=============\n\nSection Subtitle\n----------------\n\n![Data chart](chart.png)\n\n*Quarterly results*\n\n"""
+        assert result == expected
 
 
 class TestStructuralElementsEdgeCases:
@@ -326,16 +309,15 @@ class TestStructuralElementsEdgeCases:
             '<figure><img src="test.jpg"><figcaption>Caption with *asterisks* and _underscores_</figcaption></figure>'
         )
         result = convert_to_markdown(html)
-        assert "<figure>" in result
-        assert "\\*asterisks\\*" in result
-        assert "\\_underscores\\_" in result
+        expected = "![](test.jpg)\n\n*Caption with \\*asterisks\\* and \\_underscores\\_*\n\n"
+        assert result == expected
 
     def test_hgroup_single_heading(self) -> None:
         """Test hgroup with only one heading."""
         html = "<hgroup><h1>Only Title</h1></hgroup>"
         result = convert_to_markdown(html)
-        assert "<!-- heading group -->" in result
-        assert "Only Title" in result
+        expected = "Only Title\n==========\n\n"
+        assert result == expected
 
     def test_picture_malformed_source(self) -> None:
         """Test picture with malformed source elements."""
@@ -345,7 +327,7 @@ class TestStructuralElementsEdgeCases:
             <img src="valid.jpg">
         </picture>"""
         result = convert_to_markdown(html)
-
+        # Malformed sources are ignored
         assert result == "![](valid.jpg)"
 
     def test_figure_whitespace_handling(self) -> None:
@@ -360,9 +342,8 @@ class TestStructuralElementsEdgeCases:
 
         </figure>"""
         result = convert_to_markdown(html)
-        assert "<figure>" in result
-        assert "![](test.jpg)" in result
-        assert "Caption text" in result
+        expected = "![](test.jpg)\n\n*Caption text*\n\n"
+        assert result == expected
 
     def test_empty_elements_with_attributes(self) -> None:
         """Test empty structural elements with attributes."""
@@ -384,7 +365,5 @@ class TestStructuralElementsEdgeCases:
             <figcaption>Code example</figcaption>
         </figure>"""
         result = convert_to_markdown(html)
-        assert "<figure>" in result
-        assert "```" in result
-        assert "function example()" in result
-        assert "Code example" in result
+        expected = """```\nfunction example() {\n  return 42;\n}\n```\n\n*Code example*\n\n"""
+        assert result == expected

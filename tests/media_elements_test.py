@@ -7,21 +7,23 @@ def test_audio_basic() -> None:
     """Test basic audio element conversion."""
     html = '<audio src="audio.mp3"></audio>'
     result = convert_to_markdown(html)
-    assert result == '<audio src="audio.mp3" />\n\n'
+    # Audio elements with src could be converted to links
+    assert result == "[audio.mp3](audio.mp3)\n\n"
 
 
 def test_audio_with_controls() -> None:
     """Test audio element with controls attribute."""
     html = '<audio src="audio.mp3" controls></audio>'
     result = convert_to_markdown(html)
-    assert result == '<audio src="audio.mp3" controls />\n\n'
+    assert result == "[audio.mp3](audio.mp3)\n\n"
 
 
 def test_audio_with_all_attributes() -> None:
     """Test audio element with all common attributes."""
     html = '<audio src="audio.mp3" controls autoplay loop muted preload="auto"></audio>'
     result = convert_to_markdown(html)
-    assert result == '<audio src="audio.mp3" controls autoplay loop muted preload="auto" />\n\n'
+    # Attributes are not preserved in Markdown
+    assert result == "[audio.mp3](audio.mp3)\n\n"
 
 
 def test_audio_with_source_element() -> None:
@@ -31,14 +33,16 @@ def test_audio_with_source_element() -> None:
     <source src="audio.ogg" type="audio/ogg">
 </audio>"""
     result = convert_to_markdown(html)
-    assert result == '<audio src="audio.mp3" controls />\n\n'
+    # Takes first source
+    assert result == "[audio.mp3](audio.mp3)\n\n"
 
 
 def test_audio_with_fallback_content() -> None:
     """Test audio element with fallback content."""
     html = '<audio src="audio.mp3" controls>Your browser does not support the audio element.</audio>'
     result = convert_to_markdown(html)
-    expected = '<audio src="audio.mp3" controls>\nYour browser does not support the audio element.\n</audio>\n\n'
+    # Shows fallback content with link
+    expected = "[audio.mp3](audio.mp3)\n\nYour browser does not support the audio element.\n\n"
     assert result == expected
 
 
@@ -46,29 +50,32 @@ def test_audio_without_src() -> None:
     """Test audio element without src attribute."""
     html = "<audio controls></audio>"
     result = convert_to_markdown(html)
-    assert result == "<audio controls />\n\n"
+    # No src, no content
+    assert result == ""
 
 
 def test_video_basic() -> None:
     """Test basic video element conversion."""
     html = '<video src="video.mp4"></video>'
     result = convert_to_markdown(html)
-    assert result == '<video src="video.mp4" />\n\n'
+    # Video elements with src converted to links
+    assert result == "[video.mp4](video.mp4)\n\n"
 
 
 def test_video_with_dimensions() -> None:
     """Test video element with width and height."""
     html = '<video src="video.mp4" width="640" height="480"></video>'
     result = convert_to_markdown(html)
-    assert result == '<video src="video.mp4" width="640" height="480" />\n\n'
+    # Dimensions are not preserved in Markdown
+    assert result == "[video.mp4](video.mp4)\n\n"
 
 
 def test_video_with_all_attributes() -> None:
     """Test video element with all common attributes."""
     html = '<video src="video.mp4" width="640" height="480" poster="poster.jpg" controls autoplay loop muted preload="metadata"></video>'
     result = convert_to_markdown(html)
-    expected = '<video src="video.mp4" width="640" height="480" poster="poster.jpg" controls autoplay loop muted preload="metadata" />\n\n'
-    assert result == expected
+    # All attributes are lost in Markdown
+    assert result == "[video.mp4](video.mp4)\n\n"
 
 
 def test_video_with_source_element() -> None:
@@ -78,14 +85,16 @@ def test_video_with_source_element() -> None:
     <source src="video.webm" type="video/webm">
 </video>"""
     result = convert_to_markdown(html)
-    assert result == '<video src="video.mp4" width="640" controls />\n\n'
+    # Takes first source
+    assert result == "[video.mp4](video.mp4)\n\n"
 
 
 def test_video_with_fallback_content() -> None:
     """Test video element with fallback content."""
     html = '<video src="video.mp4" controls>Your browser does not support the video element.</video>'
     result = convert_to_markdown(html)
-    expected = '<video src="video.mp4" controls>\nYour browser does not support the video element.\n</video>\n\n'
+    # Shows fallback content with link
+    expected = "[video.mp4](video.mp4)\n\nYour browser does not support the video element.\n\n"
     assert result == expected
 
 
@@ -96,44 +105,48 @@ def test_video_with_track_elements() -> None:
     <track src="subtitles_es.vtt" kind="subtitles" srclang="es" label="Spanish">
 </video>"""
     result = convert_to_markdown(html)
-    assert result == '<video src="video.mp4" controls />\n\n'
+    # Track elements are not preserved
+    assert result == "[video.mp4](video.mp4)\n\n"
 
 
 def test_iframe_basic() -> None:
     """Test basic iframe element conversion."""
     html = '<iframe src="https://example.com"></iframe>'
     result = convert_to_markdown(html)
-    assert result == '<iframe src="https://example.com"></iframe>\n\n'
+    # Iframe converted to link
+    assert result == "[https://example.com](https://example.com)\n\n"
 
 
 def test_iframe_with_dimensions() -> None:
     """Test iframe element with width and height."""
     html = '<iframe src="https://example.com" width="800" height="600"></iframe>'
     result = convert_to_markdown(html)
-    assert result == '<iframe src="https://example.com" width="800" height="600"></iframe>\n\n'
+    # Dimensions not preserved
+    assert result == "[https://example.com](https://example.com)\n\n"
 
 
 def test_iframe_with_all_attributes() -> None:
     """Test iframe element with all common attributes."""
     html = '<iframe src="https://example.com" width="800" height="600" title="Example Frame" allow="fullscreen" sandbox="allow-scripts" loading="lazy"></iframe>'
     result = convert_to_markdown(html)
-    expected = '<iframe src="https://example.com" width="800" height="600" title="Example Frame" allow="fullscreen" sandbox="allow-scripts" loading="lazy"></iframe>\n\n'
-    assert result == expected
+    # All attributes lost, only link remains
+    assert result == "[https://example.com](https://example.com)\n\n"
 
 
 def test_iframe_youtube_embed() -> None:
     """Test iframe for YouTube embed."""
     html = '<iframe width="560" height="315" src="https://www.youtube.com/embed/dQw4w9WgXcQ" title="YouTube video player" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>'
     result = convert_to_markdown(html)
-    expected = '<iframe src="https://www.youtube.com/embed/dQw4w9WgXcQ" width="560" height="315" title="YouTube video player" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"></iframe>\n\n'
-    assert result == expected
+    # YouTube embed becomes a link
+    assert result == "[https://www.youtube.com/embed/dQw4w9WgXcQ](https://www.youtube.com/embed/dQw4w9WgXcQ)\n\n"
 
 
 def test_iframe_with_sandbox_boolean() -> None:
     """Test iframe with sandbox as boolean attribute."""
     html = '<iframe src="https://example.com" sandbox></iframe>'
     result = convert_to_markdown(html)
-    assert result == '<iframe src="https://example.com" sandbox></iframe>\n\n'
+    # Sandbox attribute not preserved
+    assert result == "[https://example.com](https://example.com)\n\n"
 
 
 def test_media_in_paragraphs() -> None:
@@ -142,11 +155,11 @@ def test_media_in_paragraphs() -> None:
 <p>Here is a video: <video src="video.mp4" controls></video></p>
 <p>Here is an iframe: <iframe src="https://example.com"></iframe></p>"""
     result = convert_to_markdown(html)
-    expected = """Here is an audio file: <audio src="audio.mp3" controls />
+    expected = """Here is an audio file: [audio.mp3](audio.mp3)
 
-Here is a video: <video src="video.mp4" controls />
+Here is a video: [video.mp4](video.mp4)
 
-Here is an iframe: <iframe src="https://example.com"></iframe>
+Here is an iframe: [https://example.com](https://example.com)
 
 """
     assert result == expected
@@ -175,15 +188,15 @@ def test_nested_media_elements() -> None:
 
 ### Audio Section
 
-<audio src="audio1.mp3" controls>
+[audio1.mp3](audio1.mp3)
+
 Your browser doesn't support HTML5 audio.
-</audio>
 
 ### Video Section
 
-<video src="video1.mp4" width="640" height="480" controls>
+[video1.mp4](video1.mp4)
+
 Your browser doesn't support HTML5 video.
-</video>
 
 """
     assert result == expected
@@ -193,15 +206,16 @@ def test_media_inline_mode() -> None:
     """Test media elements in inline mode."""
     html = '<audio src="audio.mp3" controls></audio>'
     result = convert_to_markdown(html, convert_as_inline=True)
-
-    assert result == '<audio src="audio.mp3" controls />'
+    # In inline mode, media elements become links without newlines
+    assert result == "[audio.mp3](audio.mp3)"
 
 
 def test_empty_media_attributes() -> None:
     """Test media elements with empty attributes."""
     html = '<video src="" width="" height=""></video>'
     result = convert_to_markdown(html)
-    assert result == "<video />\n\n"
+    # No src means no link to create
+    assert result == ""
 
 
 def test_media_with_metadata() -> None:
@@ -223,11 +237,11 @@ meta-description: Page with media elements
 title: Media Page
 -->
 
-<audio src="audio.mp3" controls />
+[audio.mp3](audio.mp3)
 
-<video src="video.mp4" controls />
+[video.mp4](video.mp4)
 
-<iframe src="https://example.com"></iframe>
+[https://example.com](https://example.com)
 
 """
     assert result == expected
@@ -237,12 +251,13 @@ def test_audio_no_boolean_attributes() -> None:
     """Test audio element without boolean attributes."""
     html = '<audio src="audio.mp3" controls="false"></audio>'
     result = convert_to_markdown(html)
-
-    assert result == '<audio src="audio.mp3" controls />\n\n'
+    # Converts to link regardless of controls attribute
+    assert result == "[audio.mp3](audio.mp3)\n\n"
 
 
 def test_video_poster_only() -> None:
     """Test video element with only poster attribute."""
     html = '<video poster="poster.jpg"></video>'
     result = convert_to_markdown(html)
-    assert result == '<video poster="poster.jpg" />\n\n'
+    # No src, no content to show
+    assert result == ""
