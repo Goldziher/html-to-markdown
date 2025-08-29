@@ -4,6 +4,14 @@ A modern, fully typed Python library for converting HTML to Markdown. This libra
 of [markdownify](https://pypi.org/project/markdownify/) with a modernized codebase, strict type safety and support for
 Python 3.9+.
 
+## Support This Project
+
+If you find html-to-markdown useful, please consider sponsoring the development:
+
+<a href="https://github.com/sponsors/Goldziher"><img src="https://img.shields.io/badge/Sponsor-%E2%9D%A4-pink?logo=github-sponsors" alt="Sponsor on GitHub" height="32"></a>
+
+Your support helps maintain and improve this library for the community! 🚀
+
 ## Features
 
 - **Full HTML5 Support**: Comprehensive support for all modern HTML5 elements including semantic, form, table, ruby, interactive, structural, SVG, and math elements
