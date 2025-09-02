@@ -8,7 +8,6 @@ def test_nested_list_not_inside_li() -> None:
 
     result = convert_to_markdown(html)
 
-    # The nested list should be indented with 4 spaces
     expected = "* a\n* b\n    + c\n    + d\n"
     assert result == expected
 
@@ -31,7 +30,6 @@ def test_nested_list_not_inside_li_with_multiple_levels() -> None:
 
     assert "* Item 1" in result
     assert "* Item 2" in result
-    # Periods and dashes in text will be escaped
     assert "    + Subitem 2\\.1" in result
     assert "    + Subitem 2\\.2" in result
     assert "        - Sub\\-subitem" in result
