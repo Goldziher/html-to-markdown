@@ -1,14 +1,9 @@
-"""Test HTML preprocessing functionality."""
-
 from html_to_markdown import convert_to_markdown
 from html_to_markdown.preprocessor import create_preprocessor, preprocess_html
 
 
 class TestHTMLPreprocessor:
-    """Test the HTML preprocessor functionality."""
-
     def test_remove_navigation(self) -> None:
-        """Test removal of navigation elements."""
         html = """
         <html>
         <body>
@@ -37,7 +32,6 @@ class TestHTMLPreprocessor:
         assert "actual content" in cleaned
 
     def test_remove_forms(self) -> None:
-        """Test removal of form elements."""
         html = """
         <html>
         <body>
@@ -64,7 +58,6 @@ class TestHTMLPreprocessor:
         assert "Thank you for visiting!" in cleaned
 
     def test_preserve_tables(self) -> None:
-        """Test that table structure is preserved."""
         html = """
         <html>
         <body>
@@ -93,10 +86,7 @@ class TestHTMLPreprocessor:
 
 
 class TestIntegratedPreprocessing:
-    """Test preprocessing integration with convert_to_markdown."""
-
     def test_wikipedia_style_cleaning(self) -> None:
-        """Test cleaning of Wikipedia-style navigation."""
         html = """
         <html>
         <body>
@@ -131,7 +121,6 @@ class TestIntegratedPreprocessing:
         assert len(result_with_preprocess) < len(result_no_preprocess)
 
     def test_form_removal_integration(self) -> None:
-        """Test form removal through integrated preprocessing."""
         html = """
         <html>
         <body>
@@ -159,7 +148,6 @@ class TestIntegratedPreprocessing:
         assert "Important information" in result
 
     def test_minimal_preset(self) -> None:
-        """Test the minimal preprocessing preset."""
         html = """
         <html>
         <body>
@@ -185,7 +173,6 @@ class TestIntegratedPreprocessing:
         assert "Navigation" not in result
 
     def test_aggressive_preset(self) -> None:
-        """Test the aggressive preprocessing preset."""
         html = """
         <html>
         <body>
@@ -212,7 +199,6 @@ class TestIntegratedPreprocessing:
         assert "Site Footer" not in result
 
     def test_wikipedia_navigation_removal(self) -> None:
-        """Test specific Wikipedia navigation patterns are removed."""
         html = """
         <html>
         <body>
@@ -246,7 +232,6 @@ class TestIntegratedPreprocessing:
         assert len(result) < len(result_no_preprocess)
 
     def test_custom_tag_removal(self) -> None:
-        """Test custom tag removal configuration."""
         html = """
         <html>
         <body>
@@ -274,7 +259,6 @@ class TestIntegratedPreprocessing:
         assert "Important content" in cleaned
 
     def test_class_based_navigation_removal(self) -> None:
-        """Test removal of elements based on navigation classes."""
         html = """
         <html>
         <body>
@@ -301,7 +285,6 @@ class TestIntegratedPreprocessing:
         assert "This should be preserved" in cleaned
 
     def test_direct_function_usage(self) -> None:
-        """Test using preprocess_html function directly."""
         html = """
         <html>
         <body>
@@ -328,28 +311,22 @@ class TestIntegratedPreprocessing:
 
 
 def test_preprocessor_edge_cases() -> None:
-    """Test edge cases in preprocessing."""
-    # Test with minimal HTML
     result = preprocess_html("<p>test</p>", remove_navigation=True)
     assert "test" in result
 
-    # Test with empty HTML
     result = preprocess_html("", remove_navigation=True)
     assert result == ""
 
-    # Test create_preprocessor with different presets
     config = create_preprocessor(preset="minimal")
     assert isinstance(config, dict)
 
     config = create_preprocessor(preset="aggressive", remove_navigation=False)
     assert isinstance(config, dict)
 
-    # Test with malformed HTML
     malformed = "<div><p>unclosed paragraph<div>nested</div>"
     result = preprocess_html(malformed, remove_navigation=False)
     assert "unclosed paragraph" in result
 
-    # Test navigation removal with different tags
     nav_html = """
     <header>Header nav</header>
     <nav>Main nav</nav>
@@ -361,14 +338,11 @@ def test_preprocessor_edge_cases() -> None:
     result = preprocess_html(nav_html, remove_navigation=True)
     assert "Header nav" not in result
     assert "Main nav" not in result
-    # aside and id-based nav may not be removed in this configuration
     assert "Class-based nav" not in result
     assert "Content" in result
 
 
 def test_form_removal_edge_cases() -> None:
-    """Test form removal edge cases."""
-    # Test various form elements
     form_html = """
     <form>Form content</form>
     <input type="text" value="input">

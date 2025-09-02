@@ -1,10 +1,7 @@
-"""Tests for metadata extraction functionality."""
-
 from html_to_markdown import convert_to_markdown
 
 
 def test_title_extraction() -> None:
-    """Test extracting title tag."""
     html = "<html><head><title>My Page Title</title></head><body><p>Content</p></body></html>"
     result = convert_to_markdown(html)
     expected = "<!--\ntitle: My Page Title\n-->\n\nContent\n\n"
@@ -12,7 +9,6 @@ def test_title_extraction() -> None:
 
 
 def test_meta_description() -> None:
-    """Test extracting meta description."""
     html = '<html><head><meta name="description" content="Page description"></head><body><p>Content</p></body></html>'
     result = convert_to_markdown(html)
     expected = "<!--\nmeta-description: Page description\n-->\n\nContent\n\n"
@@ -20,7 +16,6 @@ def test_meta_description() -> None:
 
 
 def test_meta_keywords() -> None:
-    """Test extracting meta keywords."""
     html = '<html><head><meta name="keywords" content="keyword1, keyword2, keyword3"></head><body><p>Content</p></body></html>'
     result = convert_to_markdown(html)
     expected = "<!--\nmeta-keywords: keyword1, keyword2, keyword3\n-->\n\nContent\n\n"
@@ -28,7 +23,6 @@ def test_meta_keywords() -> None:
 
 
 def test_meta_author() -> None:
-    """Test extracting meta author."""
     html = '<html><head><meta name="author" content="John Doe"></head><body><p>Content</p></body></html>'
     result = convert_to_markdown(html)
     expected = "<!--\nmeta-author: John Doe\n-->\n\nContent\n\n"
@@ -36,7 +30,6 @@ def test_meta_author() -> None:
 
 
 def test_base_href() -> None:
-    """Test extracting base href."""
     html = '<html><head><base href="https://example.com/"></head><body><p>Content</p></body></html>'
     result = convert_to_markdown(html)
     expected = "<!--\nbase-href: https://example.com/\n-->\n\nContent\n\n"
@@ -44,7 +37,6 @@ def test_base_href() -> None:
 
 
 def test_canonical_link() -> None:
-    """Test extracting canonical link."""
     html = '<html><head><link rel="canonical" href="https://example.com/page"></head><body><p>Content</p></body></html>'
     result = convert_to_markdown(html)
     expected = "<!--\ncanonical: https://example.com/page\n-->\n\nContent\n\n"
@@ -52,7 +44,6 @@ def test_canonical_link() -> None:
 
 
 def test_open_graph_metadata() -> None:
-    """Test extracting Open Graph metadata."""
     html = """<html>
     <head>
         <meta property="og:title" content="OG Title">
@@ -70,7 +61,6 @@ def test_open_graph_metadata() -> None:
 
 
 def test_http_equiv_metadata() -> None:
-    """Test extracting http-equiv metadata."""
     html = '<html><head><meta http-equiv="content-type" content="text/html; charset=UTF-8"></head><body><p>Content</p></body></html>'
     result = convert_to_markdown(html)
     expected = "<!--\nmeta-content-type: text/html; charset=UTF-8\n-->\n\nContent\n\n"
@@ -78,7 +68,6 @@ def test_http_equiv_metadata() -> None:
 
 
 def test_multiple_metadata() -> None:
-    """Test extracting multiple metadata elements."""
     html = """<html>
     <head>
         <title>Page Title</title>
@@ -98,7 +87,6 @@ def test_multiple_metadata() -> None:
 
 
 def test_metadata_with_special_characters() -> None:
-    """Test metadata with special characters that need escaping."""
     html = "<html><head><title>Title with --> comment closer</title></head><body><p>Content</p></body></html>"
     result = convert_to_markdown(html)
     expected = "<!--\ntitle: Title with --&gt; comment closer\n-->\n\nContent\n\n"
@@ -106,7 +94,6 @@ def test_metadata_with_special_characters() -> None:
 
 
 def test_empty_metadata_values() -> None:
-    """Test handling of empty metadata values."""
     html = '<html><head><meta name="description" content=""></head><body><p>Content</p></body></html>'
     result = convert_to_markdown(html)
 
@@ -115,7 +102,6 @@ def test_empty_metadata_values() -> None:
 
 
 def test_no_metadata() -> None:
-    """Test document with no metadata."""
     html = "<p>Content</p>"
     result = convert_to_markdown(html)
 
@@ -123,7 +109,6 @@ def test_no_metadata() -> None:
 
 
 def test_extract_metadata_false() -> None:
-    """Test disabling metadata extraction."""
     html = "<html><head><title>My Title</title></head><body><p>Content</p></body></html>"
     result = convert_to_markdown(html, extract_metadata=False)
 
@@ -132,7 +117,6 @@ def test_extract_metadata_false() -> None:
 
 
 def test_metadata_in_inline_mode() -> None:
-    """Test that metadata is not extracted in inline mode."""
     html = "<html><head><title>My Title</title></head><body><p>Content</p></body></html>"
     result = convert_to_markdown(html, convert_as_inline=True)
 
@@ -141,7 +125,6 @@ def test_metadata_in_inline_mode() -> None:
 
 
 def test_link_relations() -> None:
-    """Test extracting various link relations."""
     html = """<html>
     <head>
         <link rel="author" href="https://example.com/author">
@@ -157,7 +140,6 @@ def test_link_relations() -> None:
 
 
 def test_sorted_metadata_output() -> None:
-    """Test that metadata is output in sorted order."""
     html = """<html>
     <head>
         <title>Title</title>
@@ -178,7 +160,6 @@ def test_sorted_metadata_output() -> None:
 
 
 def test_whitespace_in_title() -> None:
-    """Test handling whitespace in title."""
     html = "<html><head><title>  Title with   spaces  </title></head><body><p>Content</p></body></html>"
     result = convert_to_markdown(html)
     expected = "<!--\ntitle: Title with spaces\n-->\n\nContent\n\n"

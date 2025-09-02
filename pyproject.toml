@@ -42,9 +42,9 @@ classifiers = [
   "Topic :: Utilities",
   "Typing :: Typed",
 ]
-dependencies = [ "beautifulsoup4>=4.13.4", "nh3>=0.3" ]
+dependencies = [ "beautifulsoup4>=4.13.5", "nh3>=0.3" ]
 
-optional-dependencies.lxml = [ "lxml>=6" ]
+optional-dependencies.lxml = [ "lxml>=6.0.1" ]
 urls.Changelog = "https://github.com/Goldziher/html-to-markdown/releases"
 urls.Homepage = "https://github.com/Goldziher/html-to-markdown"
 urls.Issues = "https://github.com/Goldziher/html-to-markdown/issues"
@@ -54,16 +54,16 @@ scripts.html_to_markdown = "html_to_markdown.__main__:cli"
 
 [dependency-groups]
 dev = [
-  "ai-rulez>=0.12",
+  "ai-rulez>=1.6.1",
   "covdefaults>=2.3",
-  "mypy>=1.17",
-  "pre-commit>=4.1",
+  "mypy>=1.17.1",
+  "pre-commit>=4.3",
   "pytest>=8.4.1",
   "pytest-cov>=6.2.1",
   "pytest-mock>=3.14.1",
-  "ruff>=0.12.5",
+  "ruff>=0.12.11",
   "types-beautifulsoup4>=4.12.0.20250516",
-  "types-psutil>=7.0.0.20250601",
+  "types-psutil>=7.0.0.20250822",
   "uv-bump",
 ]
 

@@ -11,9 +11,6 @@ if TYPE_CHECKING:
 
 
 def run_cli_command(args: list[str], input_text: str | None = None, timeout: int = 60) -> tuple[str, str, int]:
-    """
-    Run the CLI command with given arguments and input.
-    """
     cli_command = [sys.executable, "-m", "html_to_markdown", *args]
     process = subprocess.Popen(
         cli_command,
@@ -34,7 +31,6 @@ def run_cli_command(args: list[str], input_text: str | None = None, timeout: int
 
 @pytest.fixture
 def sample_html_file(tmp_path: Path) -> Path:
-    """Create a sample HTML file for testing."""
     file_path = tmp_path / "test.html"
     content = """
     <html>
@@ -55,7 +51,6 @@ def sample_html_file(tmp_path: Path) -> Path:
 
 @pytest.fixture
 def complex_html_file(tmp_path: Path) -> Path:
-    """Create a more complex HTML file for testing."""
     file_path = tmp_path / "complex.html"
     content = """
     <html>
@@ -82,7 +77,6 @@ def hello():
 
 
 def test_basic_file_conversion(sample_html_file: Path) -> None:
-    """Test basic file conversion with default settings."""
     stdout, stderr, returncode = run_cli_command([str(sample_html_file)])
 
     assert returncode == 0
@@ -95,7 +89,6 @@ def test_basic_file_conversion(sample_html_file: Path) -> None:
 
 
 def test_complex_file_conversion(complex_html_file: Path) -> None:
-    """Test conversion of complex HTML with various elements."""
     stdout, stderr, returncode = run_cli_command([str(complex_html_file)])
 
     assert returncode == 0
@@ -109,8 +102,6 @@ def test_complex_file_conversion(complex_html_file: Path) -> None:
 
 
 def test_error_handling() -> None:
-    """Test various error conditions."""
-
     stdout, stderr, returncode = run_cli_command(["nonexistent.html"])
     assert returncode != 0
     assert "No such file" in stderr
@@ -129,7 +120,6 @@ def test_error_handling() -> None:
 
 
 def test_stdin_input() -> None:
-    """Test conversion from stdin."""
     input_html = "<h1>Test</h1><p>Content</p>"
     stdout, stderr, returncode = run_cli_command([], input_text=input_html)
 
@@ -140,8 +130,6 @@ def test_stdin_input() -> None:
 
 
 def test_heading_styles(sample_html_file: Path) -> None:
-    """Test different heading style options."""
-
     stdout, _, _ = run_cli_command([str(sample_html_file), "--heading-style", "atx"])
     assert "# Sample Document" in stdout
 
@@ -150,7 +138,6 @@ def test_heading_styles(sample_html_file: Path) -> None:
 
 
 def test_formatting_options(sample_html_file: Path) -> None:
-    """Test various formatting options."""
     stdout, _, _ = run_cli_command([str(sample_html_file), "--strong-em-symbol", "_", "--wrap", "--wrap-width", "40"])
 
     assert "__test__" in stdout
@@ -159,14 +146,12 @@ def test_formatting_options(sample_html_file: Path) -> None:
 
 
 def test_code_block_options(complex_html_file: Path) -> None:
-    """Test code block handling options."""
     stdout, _, _ = run_cli_command([str(complex_html_file), "--code-language", "python"])
 
     assert "```python" in stdout
 
 
 def test_special_characters() -> None:
-    """Test handling of special characters and escaping."""
     input_html = "<p>Text with * and _ and ** symbols</p>"
 
     stdout, _, _ = run_cli_command([], input_text=input_html)
@@ -179,7 +164,6 @@ def test_special_characters() -> None:
 
 
 def test_large_file_handling(tmp_path: Path) -> None:
-    """Test handling of large files."""
     large_file = tmp_path / "large.html"
 
     with large_file.open("w") as f:
@@ -200,7 +184,6 @@ def test_large_file_handling(tmp_path: Path) -> None:
 
 
 def test_unicode_handling() -> None:
-    """Test handling of Unicode characters."""
     input_html = "<p>Unicode: 你好 • é è à ñ</p>"
     stdout, stderr, returncode = run_cli_command([], input_text=input_html)
 
@@ -210,7 +193,6 @@ def test_unicode_handling() -> None:
 
 
 def test_multiple_files(sample_html_file: Path, complex_html_file: Path, tmp_path: Path) -> None:
-    """Test processing multiple files in sequence."""
     for file in [sample_html_file, complex_html_file]:
         stdout, stderr, returncode = run_cli_command([str(file)])
         assert returncode == 0
@@ -224,8 +206,6 @@ def test_multiple_files(sample_html_file: Path, complex_html_file: Path, tmp_pat
 
 
 def test_pipe_chain() -> None:
-    """Test the CLI in a pipe chain."""
-
     html_input = "<h1>Test</h1>"
     process = subprocess.Popen(
         [sys.executable, "-m", "html_to_markdown"],
@@ -242,7 +222,6 @@ def test_pipe_chain() -> None:
 
 @pytest.mark.parametrize("newline_style", ["spaces", "backslash"])
 def test_newline_styles(newline_style: str) -> None:
-    """Test different newline styles."""
     input_html = "<p>Line 1<br>Line 2</p>"
     stdout, _, _ = run_cli_command(["--newline-style", newline_style], input_text=input_html)
 

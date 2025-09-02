@@ -4,7 +4,6 @@ from html_to_markdown import convert_to_markdown
 
 
 def test_strip_newlines_basic() -> None:
-    """Test basic newline stripping functionality."""
     html = """<p>Return a list of the words in the string, using <em>sep</em> as the delimiter
 string.  If <em>maxsplit</em> is given, at most <em>maxsplit</em> splits are done (thus,
 the list will have at most <code class="docutils literal notranslate"><span class="pre">maxsplit+1</span></code> elements).  If <em>maxsplit</em> is not
@@ -26,7 +25,6 @@ specified or <code class="docutils literal notranslate"><span class="pre">-1</sp
 
 
 def test_strip_newlines_with_multiple_paragraphs() -> None:
-    """Test that paragraph breaks are preserved when stripping newlines."""
     html = """<p>First paragraph
 with a line break.</p>
 <p>Second paragraph
@@ -41,7 +39,6 @@ also with a line break.</p>"""
 
 
 def test_strip_newlines_preserves_pre_blocks() -> None:
-    """Test that newlines in pre blocks are preserved."""
     html = """<p>Regular text
 with newline.</p>
 <pre>Code block
@@ -55,7 +52,6 @@ newlines</pre>"""
 
 
 def test_strip_newlines_with_inline_elements() -> None:
-    """Test newline stripping with inline elements."""
     html = """<p>This is <strong>bold
 text</strong> and <em>italic
 text</em> with line breaks.</p>"""
@@ -65,7 +61,6 @@ text</em> with line breaks.</p>"""
 
 
 def test_strip_newlines_empty_html() -> None:
-    """Test that empty HTML still works with strip_newlines."""
     html = "\n\n"
 
     result = convert_to_markdown(html, strip_newlines=True)
@@ -73,7 +68,6 @@ def test_strip_newlines_empty_html() -> None:
 
 
 def test_strip_newlines_with_carriage_returns() -> None:
-    """Test that carriage returns are also stripped."""
     html = "<p>Text with\r\nWindows-style\rline breaks.</p>"
 
     result = convert_to_markdown(html, strip_newlines=True)
@@ -82,7 +76,6 @@ def test_strip_newlines_with_carriage_returns() -> None:
 
 
 def test_strip_newlines_preserves_br_tags() -> None:
-    """Test that <br> tags still create line breaks even with strip_newlines."""
     html = "<p>Line one<br>Line two</p>"
 
     result = convert_to_markdown(html, strip_newlines=True)
@@ -90,7 +83,6 @@ def test_strip_newlines_preserves_br_tags() -> None:
 
 
 def test_strip_newlines_with_lists() -> None:
-    """Test newline stripping in lists."""
     html = """<ul>
 <li>Item one
 with newline</li>
@@ -104,7 +96,6 @@ also with newline</li>
 
 
 def test_strip_newlines_complex_html() -> None:
-    """Test with complex HTML structure."""
     html = """<div>
     <h1>Title with
     newline</h1>
