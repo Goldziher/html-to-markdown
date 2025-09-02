@@ -1,4 +1,3 @@
-
 import importlib.util
 from typing import Any
 
@@ -24,7 +23,6 @@ def test_conflicting_options_error() -> None:
 
 
 def test_missing_dependency_error(monkeypatch: Any) -> None:
-
     monkeypatch.setattr(html_to_markdown.processing, "LXML_AVAILABLE", False)
 
     with pytest.raises(MissingDependencyError):
@@ -35,9 +33,6 @@ def test_beautifulsoup_input() -> None:
     soup = BeautifulSoup("<p>test</p>", "html.parser")
     result = convert_to_markdown(soup)
     assert "test" in result
-
-
-def test_custom_converters() -> None:
 
 
 def test_metadata_extraction() -> None:

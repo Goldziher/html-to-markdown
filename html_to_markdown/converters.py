@@ -288,6 +288,7 @@ def _convert_list(*, tag: Tag, text: str) -> str:
     if tag.next_sibling and getattr(tag.next_sibling, "name", None) not in {"ul", "ol"}:
         before_paragraph = True
 
+    # Check if this list is inside a list item (proper nesting)
     if _has_ancestor(tag, "li"):
         parent = tag.parent
         while parent and parent.name != "li":
@@ -312,6 +313,22 @@ def _convert_list(*, tag: Tag, text: str) -> str:
                         indented_lines.append("")
                 return "\n" + "\n".join(indented_lines) + "\n"
             return "\n" + indent(text=text, level=1).rstrip()
+
+    # Check if this list is a direct child of another list (incorrect nesting)
+    if tag.parent and tag.parent.name in {"ul", "ol"}:
+        # Indent all lines by 4 spaces for incorrectly nested lists
+        lines = text.strip().split("\n")
+        indented_lines = []
+        for line in lines:
+            if line.strip():
+                indented_lines.append(f"    {line}")
+            else:
+                indented_lines.append("")
+        result = "\n".join(indented_lines)
+        # Add trailing newline for improperly nested lists
+        if not result.endswith("\n"):
+            result += "\n"
+        return result
 
     return text + ("\n" if before_paragraph else "")
 
