@@ -288,7 +288,6 @@ def _convert_list(*, tag: Tag, text: str) -> str:
     if tag.next_sibling and getattr(tag.next_sibling, "name", None) not in {"ul", "ol"}:
         before_paragraph = True
 
-    # Check if this list is inside a list item (proper nesting)
     if _has_ancestor(tag, "li"):
         parent = tag.parent
         while parent and parent.name != "li":
@@ -314,9 +313,7 @@ def _convert_list(*, tag: Tag, text: str) -> str:
                 return "\n" + "\n".join(indented_lines) + "\n"
             return "\n" + indent(text=text, level=1).rstrip()
 
-    # Check if this list is a direct child of another list (incorrect nesting)
     if tag.parent and tag.parent.name in {"ul", "ol"}:
-        # Indent all lines by 4 spaces for incorrectly nested lists
         lines = text.strip().split("\n")
         indented_lines = []
         for line in lines:
@@ -325,7 +322,6 @@ def _convert_list(*, tag: Tag, text: str) -> str:
             else:
                 indented_lines.append("")
         result = "\n".join(indented_lines)
-        # Add trailing newline for improperly nested lists
         if not result.endswith("\n"):
             result += "\n"
         return result
@@ -503,17 +499,19 @@ def _convert_tr(*, tag: Tag, text: str) -> str:
             col_pos += colspan
 
         if rowspan_positions:
-            new_cells = []
+            converted_cells: list[str] = []
+            if text.strip():
+                parts = text.split("|")
+                converted_cells.extend(part.rstrip() + " |" for part in parts[:-1] if part)
+
+            new_cells: list[str] = []
             cell_index = 0
 
             for pos in range(col_pos):
                 if pos in rowspan_positions:
                     new_cells.append(" |")
-                elif cell_index < len(cells):
-                    cell = cells[cell_index]
-                    cell_text = cell.get_text().strip().replace("\n", " ")
-                    colspan = _get_colspan(cell)
-                    new_cells.append(f" {cell_text} |" * colspan)
+                elif cell_index < len(converted_cells):
+                    new_cells.append(converted_cells[cell_index])
                     cell_index += 1
 
             text = "".join(new_cells)
