@@ -4,7 +4,6 @@ from html_to_markdown import convert_to_markdown
 
 
 def test_image_in_table_cell() -> None:
-    """Test that images are preserved in table cells."""
     html = """<table>
         <tr>
             <td><img src="test.jpg" alt="Test Image">Cell with image</td>
@@ -19,7 +18,6 @@ def test_image_in_table_cell() -> None:
 
 
 def test_image_with_title_in_table() -> None:
-    """Test that images with title attributes work in tables."""
     html = """<table>
         <tr>
             <td><img src="icon.png" alt="Icon" title="An icon">Text</td>
@@ -32,7 +30,6 @@ def test_image_with_title_in_table() -> None:
 
 
 def test_image_without_alt_in_table() -> None:
-    """Test that images without alt text work in tables."""
     html = """<table>
         <tr>
             <td><img src="image.gif">Content</td>
@@ -45,7 +42,6 @@ def test_image_without_alt_in_table() -> None:
 
 
 def test_multiple_images_in_table_cell() -> None:
-    """Test multiple images in the same table cell."""
     html = """<table>
         <tr>
             <td><img src="img1.jpg" alt="First"> and <img src="img2.jpg" alt="Second"></td>
@@ -59,7 +55,6 @@ def test_multiple_images_in_table_cell() -> None:
 
 
 def test_image_in_table_header() -> None:
-    """Test that images work in table headers (th elements)."""
     html = """<table>
         <tr>
             <th><img src="header.png" alt="Header Icon">Column</th>
@@ -76,7 +71,6 @@ def test_image_in_table_header() -> None:
 
 
 def test_image_with_dimensions_in_table() -> None:
-    """Test that images with width/height attributes are preserved in tables."""
     html = """<table>
         <tr>
             <td><img src="sized.jpg" alt="Sized" width="100" height="50">Text</td>
@@ -89,7 +83,6 @@ def test_image_with_dimensions_in_table() -> None:
 
 
 def test_original_issue_example() -> None:
-    """Test the exact example from issue #13."""
     html = """<table class="normal">
         <tr>
             <td><img class="icon" src="../../icons/back16.gif">&nbsp;Go one page back</td>
@@ -104,7 +97,6 @@ def test_original_issue_example() -> None:
 
 
 def test_keep_inline_images_in_with_tables() -> None:
-    """Test that keep_inline_images_in still works and doesn't override table behavior."""
     html = """<table>
         <tr>
             <td><img src="table.jpg" alt="Table Image">In table</td>
@@ -123,7 +115,6 @@ def test_keep_inline_images_in_with_tables() -> None:
 
 
 def test_complex_table_with_images() -> None:
-    """Test a more complex table with multiple rows and images."""
     html = """<table>
         <thead>
             <tr>
@@ -153,7 +144,6 @@ def test_complex_table_with_images() -> None:
 
 
 def test_table_with_mixed_content() -> None:
-    """Test table with images mixed with other inline elements."""
     html = """<table>
         <tr>
             <td><img src="test.jpg" alt="Test"> <strong>Bold text</strong> and <em>italic</em></td>

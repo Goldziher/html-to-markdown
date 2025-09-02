@@ -9,8 +9,6 @@ from html_to_markdown import convert_to_markdown
 
 
 def test_custom_converters() -> None:
-    """Test custom converters functionality."""
-
     def custom_b_converter(*, tag: Tag, text: str, **kwargs: Any) -> str:
         return text.upper()
 
@@ -34,8 +32,6 @@ def test_custom_converters() -> None:
 
 
 def test_custom_converters_precedence() -> None:
-    """Test that custom converters take precedence over default converters."""
-
     def custom_h1_converter(*, tag: Tag, text: str, **kwargs: Any) -> str:
         return f"CUSTOM_HEADING: {text}\n\n"
 
@@ -53,8 +49,6 @@ def test_custom_converters_precedence() -> None:
 
 
 def test_custom_converters_with_other_options() -> None:
-    """Test that custom converters work alongside other conversion options."""
-
     def custom_code_converter(*, tag: Tag, text: str, **kwargs: Any) -> str:
         return f"`python:{text}`"
 
