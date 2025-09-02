@@ -31,8 +31,6 @@ except ImportError:
 
 @dataclass
 class PerformanceMetrics:
-    """Container for performance measurement results."""
-
     name: str
     execution_time: float
     memory_before: float
@@ -44,12 +42,10 @@ class PerformanceMetrics:
 
     @property
     def memory_delta(self) -> float:
-        """Memory usage difference in MB."""
         return self.memory_after - self.memory_before
 
     @property
     def memory_efficiency(self) -> float:
-        """Output size per MB of memory used."""
         if self.memory_delta <= 0:
             return float("inf")
         return self.output_size / (self.memory_delta * 1024 * 1024)
@@ -57,7 +53,6 @@ class PerformanceMetrics:
 
 @contextmanager
 def memory_monitor() -> Generator[dict[str, float], None, None]:
-    """Context manager to monitor memory usage."""
     if not MEMORY_AVAILABLE:
         yield {"before": 0.0, "after": 0.0, "peak": 0.0}
         return
@@ -88,7 +83,6 @@ def memory_monitor() -> Generator[dict[str, float], None, None]:
 
 
 def generate_complex_html(size_factor: int = 100) -> str:
-    """Generate complex HTML with various elements for testing."""
     html_parts = [
         "<!DOCTYPE html>",
         "<html>",
@@ -158,7 +152,6 @@ def generate_complex_html(size_factor: int = 100) -> str:
 def benchmark_function(
     func: Callable[..., Any], *args: Any, iterations: int = 5, warmup: int = 2, **kwargs: Any
 ) -> PerformanceMetrics:
-    """Benchmark a function with detailed metrics."""
     all_times = []
     memory_deltas = []
     output_size = 0
@@ -206,7 +199,6 @@ def benchmark_function(
 
 
 def profile_function(func: Callable[..., Any], *args: Any, **kwargs: Any) -> str:
-    """Profile a function and return formatted statistics."""
     if not PROFILING_AVAILABLE:
         return "Profiling not available (cProfile not installed)"
 
@@ -227,7 +219,6 @@ def profile_function(func: Callable[..., Any], *args: Any, **kwargs: Any) -> str
 
 
 def test_streaming_performance() -> None:
-    """Basic test to ensure streaming performance works."""
     html = generate_complex_html(10)
 
     result_regular = convert_to_markdown(html)
@@ -243,7 +234,6 @@ def test_streaming_performance() -> None:
 
 
 def run_comprehensive_benchmark() -> None:
-    """Run comprehensive performance benchmarks."""
     print("🚀 HTML to Markdown Performance Benchmark")  # noqa: T201
     print("=" * 50)  # noqa: T201
 
@@ -292,7 +282,6 @@ def run_comprehensive_benchmark() -> None:
 
 
 def profile_bottlenecks() -> None:
-    """Profile both processing methods to identify bottlenecks."""
     if not PROFILING_AVAILABLE:
         print("⚠️  Profiling not available - install cProfile for detailed analysis")  # noqa: T201
         return

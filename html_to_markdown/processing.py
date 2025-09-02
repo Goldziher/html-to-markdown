@@ -195,18 +195,14 @@ def _process_tag(
 
     children = list(filter(lambda value: not isinstance(value, (Comment, Doctype)), tag.children))
 
-    # List of tags that return empty string when they have no content
     empty_when_no_content_tags = {"abbr", "var", "ins", "dfn", "time", "data", "cite", "q", "mark", "small", "u"}
 
     for i, el in enumerate(children):
         if isinstance(el, NavigableString):
-            # Check if this is whitespace between empty elements
             if el.strip() == "" and i > 0 and i < len(children) - 1:
                 prev_el = children[i - 1]
                 next_el = children[i + 1]
 
-                # If previous element was a tag that produced empty output
-                # and next element is also a tag that could be empty, skip this whitespace
                 if (
                     isinstance(prev_el, Tag)
                     and isinstance(next_el, Tag)
@@ -214,7 +210,6 @@ def _process_tag(
                     and next_el.name.lower() in empty_when_no_content_tags
                     and not prev_el.get_text().strip()
                 ):
-                    # Previous tag is empty and next could be empty too, skip this whitespace
                     continue
 
             text_parts.append(
@@ -281,14 +276,10 @@ def _process_text(
             break
 
     if "pre" not in ancestor_names:
-        # Special case: if the text is only whitespace
         if text.strip() == "":
-            # If it contains newlines, it's probably indentation whitespace, return empty
             if "\n" in text:
                 text = ""
             else:
-                # Check if this whitespace is between block elements
-                # Define block elements that should not have whitespace between them
                 block_elements = {
                     "p",
                     "ul",
@@ -320,7 +311,6 @@ def _process_text(
                 prev_sibling = el.previous_sibling
                 next_sibling = el.next_sibling
 
-                # Check if whitespace is between block elements
                 if (
                     prev_sibling
                     and hasattr(prev_sibling, "name")
@@ -329,10 +319,8 @@ def _process_text(
                     and hasattr(next_sibling, "name")
                     and next_sibling.name in block_elements
                 ):
-                    # Remove whitespace between block elements
                     text = ""
                 else:
-                    # Otherwise it's inline whitespace, normalize to single space
                     text = " " if text else ""
         else:
             has_leading_space = text.startswith((" ", "\t"))
@@ -470,7 +458,6 @@ def _extract_metadata(soup: BeautifulSoup) -> dict[str, str]:
     if canonical and isinstance(canonical, Tag) and isinstance(canonical["href"], str):
         metadata["canonical"] = canonical["href"]
 
-    # Extract link relations
     link_relations = {"author", "license", "alternate"}
     for rel_type in link_relations:
         link = soup.find("link", rel=rel_type, href=True)
@@ -595,8 +582,6 @@ def convert_to_markdown(
         if strip_newlines:
             source = source.replace("\n", " ").replace("\r", " ")
 
-        # Fix lxml parsing of void elements like <wbr>
-        # lxml incorrectly treats them as container tags
         source = re.sub(r"<wbr\s*>", "<wbr />", source, flags=re.IGNORECASE)
 
         if preprocess_html and create_preprocessor is not None and preprocess_fn is not None:
@@ -737,7 +722,6 @@ def convert_to_markdown(
         if leading_whitespace_match:
             leading_whitespace = leading_whitespace_match.group(0)
 
-            # Check if input contains list or heading tags
             list_heading_tags = {"<ol", "<ul", "<li", "<h1", "<h2", "<h3", "<h4", "<h5", "<h6"}
             if any(tag in original_input for tag in list_heading_tags):
                 leading_newlines = re.match(r"^[\n\r]*", leading_whitespace)
@@ -751,19 +735,14 @@ def convert_to_markdown(
     def normalize_spaces_outside_code(text: str) -> str:
         parts = text.split("```")
         for i in range(0, len(parts), 2):
-            # Process each line separately to preserve leading spaces
             lines = parts[i].split("\n")
             processed_lines = []
             for line in lines:
-                # Preserve definition list formatting (: followed by 3 spaces)
                 def_parts = re.split(r"(:\s{3})", line)
                 for j in range(0, len(def_parts), 2):
-                    # Only normalize non-definition-list parts
-                    # Also preserve leading spaces (for list indentation)
                     match = re.match(r"^(\s*)(.*)", def_parts[j])
                     if match:
                         leading_spaces, rest = match.groups()
-                        # Only normalize multiple spaces that are not at the beginning
                         rest = re.sub(r" {3,}", " ", rest)
                         def_parts[j] = leading_spaces + rest
                 processed_lines.append("".join(def_parts))
