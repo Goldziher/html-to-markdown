@@ -185,7 +185,6 @@ def test_main_with_stream_processing_and_progress(mock_convert_to_markdown: Mock
         assert args["stream_processing"] is True
         assert "progress_callback" in args
 
-        # Test the progress callback function
         callback = args["progress_callback"]
         callback(50, 100)
         mock_stderr.write.assert_called_with("\rProgress: 50.0% (50/100 bytes)")

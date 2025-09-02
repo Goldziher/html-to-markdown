@@ -211,9 +211,7 @@ def _convert_blockquote(*, text: str, tag: Tag, convert_as_inline: bool) -> str:
 
     cite_url = tag.get("cite")
 
-    # Check if this blockquote is inside a list item
     if _has_ancestor(tag, "li"):
-        # Indent the blockquote by 4 spaces
         lines = text.strip().split("\n")
         indented_lines = [f"    > {line}" if line.strip() else "" for line in lines]
         quote_text = "\n".join(indented_lines) + "\n\n"
@@ -290,16 +288,12 @@ def _convert_list(*, tag: Tag, text: str) -> str:
     if tag.next_sibling and getattr(tag.next_sibling, "name", None) not in {"ul", "ol"}:
         before_paragraph = True
 
-    # Check if this list is inside a list item
     if _has_ancestor(tag, "li"):
-        # This is a nested list - needs indentation
-        # But we need to check if it's the first element after a paragraph
         parent = tag.parent
         while parent and parent.name != "li":
             parent = parent.parent
 
         if parent:
-            # Check if there's a paragraph before this list
             prev_p = None
             for child in parent.children:
                 if hasattr(child, "name"):
@@ -309,7 +303,6 @@ def _convert_list(*, tag: Tag, text: str) -> str:
                         prev_p = child
 
             if prev_p:
-                # If there's a paragraph before, we need proper indentation
                 lines = text.strip().split("\n")
                 indented_lines = []
                 for line in lines:
@@ -318,7 +311,6 @@ def _convert_list(*, tag: Tag, text: str) -> str:
                     else:
                         indented_lines.append("")
                 return "\n" + "\n".join(indented_lines) + "\n"
-            # Otherwise use the original tab indentation
             return "\n" + indent(text=text, level=1).rstrip()
 
     return text + ("\n" if before_paragraph else "")
@@ -355,7 +347,6 @@ def _convert_li(*, tag: Tag, text: str, bullets: str) -> str:
 
         bullet = bullets[depth % len(bullets)]
 
-    # Check if the list item contains block-level elements (like <p>, <blockquote>, etc.)
     has_block_children = any(
         child.name in {"p", "blockquote", "pre", "ul", "ol", "div", "h1", "h2", "h3", "h4", "h5", "h6"}
         for child in tag.children
@@ -363,25 +354,18 @@ def _convert_li(*, tag: Tag, text: str, bullets: str) -> str:
     )
 
     if has_block_children:
-        # Handle multi-paragraph list items
-        # Split by double newlines (paragraph separators)
         paragraphs = text.strip().split("\n\n")
 
         if paragraphs:
-            # First paragraph goes directly after the bullet
             result_parts = [f"{bullet} {paragraphs[0].strip()}\n"]
 
-            # Subsequent paragraphs need to be indented and separated by blank lines
             for para in paragraphs[1:]:
                 if para.strip():
-                    # Add blank line before the paragraph
                     result_parts.append("\n")
-                    # Indent each line of the paragraph by 4 spaces
                     result_parts.extend(f"    {line}\n" for line in para.strip().split("\n") if line.strip())
 
             return "".join(result_parts)
 
-    # Simple case: no block elements, just inline content
     return "{} {}\n".format(bullet, (text or "").strip())
 
 
@@ -399,20 +383,15 @@ def _convert_p(*, wrap: bool, text: str, convert_as_inline: bool, wrap_width: in
 
     from html_to_markdown.processing import _has_ancestor  # noqa: PLC0415
 
-    # Check if this paragraph is inside a list item
     if _has_ancestor(tag, "li"):
-        # Check if this is the first paragraph in the list item
         parent = tag.parent
         while parent and parent.name != "li":
             parent = parent.parent
 
         if parent:
-            # Get all direct children that are paragraphs
             p_children = [child for child in parent.children if hasattr(child, "name") and child.name == "p"]
 
-            # If this is not the first paragraph, indent it
             if p_children and tag != p_children[0]:
-                # Indent all lines by 4 spaces
                 indented_lines = []
                 for line in text.split("\n"):
                     if line.strip():
@@ -480,13 +459,11 @@ def _convert_tr(*, tag: Tag, text: str) -> str:
     parent_name = tag.parent.name if tag.parent and hasattr(tag.parent, "name") else ""
     tag_grand_parent = tag.parent.parent if tag.parent else None
 
-    # Simple rowspan handling: if previous row had cells with rowspan, add empty cells
     if tag.previous_sibling and hasattr(tag.previous_sibling, "name") and tag.previous_sibling.name == "tr":
         prev_cells = cast("Tag", tag.previous_sibling).find_all(["td", "th"])
         rowspan_positions = []
         col_pos = 0
 
-        # Check which cells in previous row have rowspan > 1
         for prev_cell in prev_cells:
             rowspan = 1
             if (
@@ -497,10 +474,8 @@ def _convert_tr(*, tag: Tag, text: str) -> str:
                 rowspan = int(prev_cell["rowspan"])
 
             if rowspan > 1:
-                # This cell spans into current row
                 rowspan_positions.append(col_pos)
 
-            # Account for colspan
             colspan = 1
             if (
                 "colspan" in prev_cell.attrs
@@ -510,25 +485,20 @@ def _convert_tr(*, tag: Tag, text: str) -> str:
                 colspan = int(prev_cell["colspan"])
             col_pos += colspan
 
-        # If there are rowspan cells from previous row, add empty cells
         if rowspan_positions:
-            # Build new text with empty cells inserted
             new_cells = []
             cell_index = 0
 
-            for pos in range(col_pos):  # Total columns
+            for pos in range(col_pos):
                 if pos in rowspan_positions:
-                    # Add empty cell for rowspan
                     new_cells.append(" |")
                 elif cell_index < len(cells):
-                    # Add actual cell content
                     cell = cells[cell_index]
                     cell_text = cell.get_text().strip().replace("\n", " ")
                     colspan = _get_colspan(cell)
                     new_cells.append(f" {cell_text} |" * colspan)
                     cell_index += 1
 
-            # Override text with new cell arrangement
             text = "".join(new_cells)
 
     is_headrow = (
@@ -644,8 +614,6 @@ def _convert_colgroup(*, tag: Tag, text: str, convert_as_inline: bool) -> str:
         Empty string as colgroup has no Markdown representation.
     """
     _ = tag, text, convert_as_inline
-    # Colgroup and its contents (col elements) are purely presentational
-    # and have no equivalent in Markdown tables
     return ""
 
 
@@ -663,7 +631,6 @@ def _convert_col(*, tag: Tag, convert_as_inline: bool) -> str:
         Empty string as col has no Markdown representation.
     """
     _ = tag, convert_as_inline
-    # Col elements are self-closing and purely presentational
     return ""
 
 
@@ -696,7 +663,6 @@ def _convert_details(*, text: str, convert_as_inline: bool) -> str:
     if convert_as_inline:
         return text
 
-    # Details is a semantic container, return its content
     return _format_block_element(text)
 
 
@@ -713,7 +679,6 @@ def _convert_summary(*, text: str, convert_as_inline: bool) -> str:
     if convert_as_inline:
         return text
 
-    # Summary is like a heading/title
     return _format_wrapped_block(text, "**")
 
 
@@ -826,18 +791,15 @@ def _convert_media_element(*, tag: Tag, text: str, convert_as_inline: bool) -> s
     if not src and (source_tag := tag.find("source")) and isinstance(source_tag, Tag):
         src = source_tag.get("src", "")
 
-    # If we have a src, convert to a link
     if src and isinstance(src, str) and src.strip():
         link = f"[{src}]({src})"
         if convert_as_inline:
             return link
         result = f"{link}\n\n"
-        # Add fallback content if present
         if text.strip():
             result += f"{text.strip()}\n\n"
         return result
 
-    # No src, just return fallback content
     if text.strip():
         return _format_inline_or_block(text, convert_as_inline)
 
@@ -858,7 +820,6 @@ def _convert_iframe(*, tag: Tag, text: str, convert_as_inline: bool) -> str:
     _ = text
     src = tag.get("src", "")
 
-    # If we have a src, convert to a link
     if src and isinstance(src, str) and src.strip():
         link = f"[{src}]({src})"
         if convert_as_inline:
@@ -906,7 +867,6 @@ def _convert_time(*, tag: Tag, text: str, convert_as_inline: bool) -> str:
     if not text.strip():
         return ""
 
-    # Time elements are semantic - just return the content
     return text.strip()
 
 
@@ -926,7 +886,6 @@ def _convert_data(*, tag: Tag, text: str, convert_as_inline: bool) -> str:
     if not text.strip():
         return ""
 
-    # Data elements are semantic - just return the content
     return text.strip()
 
 
@@ -961,7 +920,6 @@ def _convert_form(*, tag: Tag, text: str, convert_as_inline: bool) -> str:
     if not text.strip():
         return ""
 
-    # Forms are just containers, return their content
     return text
 
 
@@ -981,7 +939,6 @@ def _convert_fieldset(*, text: str, convert_as_inline: bool) -> str:
     if not text.strip():
         return ""
 
-    # Fieldsets are semantic groupings, return their content
     return text
 
 
@@ -1001,7 +958,6 @@ def _convert_legend(*, text: str, convert_as_inline: bool) -> str:
     if not text.strip():
         return ""
 
-    # Legend is like a heading/title for fieldsets
     return _format_wrapped_block(text, "**")
 
 
@@ -1017,7 +973,6 @@ def _convert_label(*, tag: Tag, text: str, convert_as_inline: bool) -> str:
         The label text content.
     """
     _ = tag
-    # Labels are just text, return the content
     if not text.strip():
         return ""
 
@@ -1035,7 +990,6 @@ def _convert_input_enhanced(*, tag: Tag, convert_as_inline: bool) -> str:
         Empty string since input elements have no Markdown representation.
     """
     _ = tag, convert_as_inline
-    # Input elements have no content and no Markdown equivalent
     return ""
 
 
@@ -1051,7 +1005,6 @@ def _convert_textarea(*, tag: Tag, text: str, convert_as_inline: bool) -> str:
         The text content of the textarea.
     """
     _ = tag
-    # Return the text content, which is what the user entered
     if not text.strip():
         return ""
 
@@ -1070,17 +1023,13 @@ def _convert_select(*, tag: Tag, text: str, convert_as_inline: bool) -> str:
         The text content (options) as a comma-separated list.
     """
     _ = tag
-    # Return the options as text
     if not text.strip():
         return ""
 
-    # In inline mode, show options separated by commas
     if convert_as_inline:
-        # Remove extra whitespace and join options
         options = [opt.strip() for opt in text.strip().split("\n") if opt.strip()]
         return ", ".join(options)
 
-    # In block mode, show as a list
     return _format_block_element(text)
 
 
@@ -1098,14 +1047,12 @@ def _convert_option(*, tag: Tag, text: str, convert_as_inline: bool) -> str:
     if not text.strip():
         return ""
 
-    # Check if this option is selected
     selected = tag.get("selected") is not None
     content = text.strip()
 
     if convert_as_inline:
         return content
 
-    # In block mode, mark selected options
     if selected:
         return f"* {content}\n"
     return f"{content}\n"
@@ -1131,7 +1078,6 @@ def _convert_optgroup(*, tag: Tag, text: str, convert_as_inline: bool) -> str:
     label = tag.get("label", "")
     content = text.strip()
 
-    # If there's a label, show it as a heading
     if label and isinstance(label, str) and label.strip():
         return f"**{label.strip()}**\n{content}\n"
 
@@ -1150,7 +1096,6 @@ def _convert_button(*, tag: Tag, text: str, convert_as_inline: bool) -> str:
         The button text content.
     """
     _ = tag
-    # Buttons are just interactive text, return the text content
     if not text.strip():
         return ""
 
@@ -1175,7 +1120,6 @@ def _convert_progress(*, tag: Tag, text: str, convert_as_inline: bool) -> str:
     if not text.strip():
         return ""
 
-    # Progress elements convert to their text content
     return _format_block_element(text)
 
 
@@ -1197,7 +1141,6 @@ def _convert_meter(*, tag: Tag, text: str, convert_as_inline: bool) -> str:
     if not text.strip():
         return ""
 
-    # Meter elements convert to their text content
     return _format_block_element(text)
 
 
@@ -1219,7 +1162,6 @@ def _convert_output(*, tag: Tag, text: str, convert_as_inline: bool) -> str:
     if not text.strip():
         return ""
 
-    # Output elements convert to their text content
     return _format_block_element(text)
 
 
@@ -1241,7 +1183,6 @@ def _convert_datalist(*, tag: Tag, text: str, convert_as_inline: bool) -> str:
     if not text.strip():
         return ""
 
-    # Datalist shows options as a list
     return _format_block_element(text)
 
 
@@ -1352,7 +1293,6 @@ def _convert_dialog(*, text: str, convert_as_inline: bool, tag: Tag) -> str:
     if not text.strip():
         return ""
 
-    # Dialog is a semantic container, return its content
     return _format_block_element(text)
 
 
@@ -1374,7 +1314,6 @@ def _convert_menu(*, text: str, convert_as_inline: bool, tag: Tag) -> str:
     if not text.strip():
         return ""
 
-    # Menu is converted as a list
     return _format_block_element(text)
 
 
@@ -1396,8 +1335,6 @@ def _convert_figure(*, text: str, convert_as_inline: bool, tag: Tag) -> str:
     if convert_as_inline:
         return text
 
-    # Figure is a semantic container, return its content
-    # Make sure there's proper spacing after the figure content
     content = text.strip()
     if content and not content.endswith("\n\n"):
         if content.endswith("\n"):
@@ -1423,7 +1360,6 @@ def _convert_hgroup(*, text: str, convert_as_inline: bool) -> str:
     if not text.strip():
         return ""
 
-    # Hgroup is a semantic container for headings, return its content
     return text
 
 
@@ -1442,7 +1378,6 @@ def _convert_picture(*, text: str, convert_as_inline: bool, tag: Tag) -> str:
     if not text.strip():
         return ""
 
-    # Picture is a container for responsive images, only the img matters for Markdown
     return text.strip()
 
 
