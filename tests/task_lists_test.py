@@ -99,7 +99,7 @@ class TestTaskLists:
     def test_deep_nested_task_lists(self) -> None:
         html = '<ul><li><input type="checkbox"> Level 1<ul><li><input type="checkbox" checked> Level 2<ul><li><input type="checkbox"> Level 3</li></ul></li></ul></li></ul>'
         result = convert_to_markdown(html)
-        expected = "- [ ] Level 1\n\t- [x] Level 2\n\t\t- [ ] Level 3\n"
+        expected = "- [ ] Level 1\n    - [x] Level 2\n        - [ ] Level 3\n"
         assert result == expected
 
     def test_task_list_edge_cases(self) -> None:

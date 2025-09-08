@@ -19,9 +19,10 @@
 .vscode/
 __pycache__/
 __pypackages__/
+.claude/
 coverage.xml
 dist/
-
+htmlcov/
 # AI-rulez generated files
 .cursorrules
 CLAUDE.md

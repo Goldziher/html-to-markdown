@@ -1,5 +1,3 @@
-"""HTML preprocessing using nh3 (ammonia bindings) for improved quality and performance."""
-
 from __future__ import annotations
 
 import re
@@ -22,24 +20,6 @@ def preprocess_html(
     custom_tags_to_remove: set[str] | None = None,
     custom_attributes_to_remove: set[str] | None = None,
 ) -> str:
-    """Preprocess HTML to remove unwanted elements and improve quality.
-
-    Args:
-        html: Raw HTML content to preprocess.
-        remove_navigation: Remove navigation elements and menus.
-        remove_forms: Remove form elements (input, button, select, etc.).
-        remove_scripts: Remove script tags and content.
-        remove_styles: Remove style tags and content.
-        remove_comments: Remove HTML comments.
-        preserve_semantic_structure: Preserve semantic HTML5 elements.
-        preserve_tables: Preserve table structure.
-        preserve_media: Preserve media elements (img, video, audio).
-        custom_tags_to_remove: Additional tags to remove.
-        custom_attributes_to_remove: Additional attributes to remove.
-
-    Returns:
-        Cleaned HTML ready for conversion to markdown.
-    """
     if not html or not html.strip():  # pragma: no cover
         return html
 
@@ -83,7 +63,6 @@ def _configure_cleaning_rules(
     custom_tags_to_remove: set[str],
     custom_attributes_to_remove: set[str],
 ) -> dict[str, Any]:
-    """Configure the cleaning rules for nh3."""
     allowed_tags = {
         "p",
         "div",
@@ -254,7 +233,6 @@ def _configure_cleaning_rules(
 
 
 def _remove_class_based_navigation(html: str, remove_navigation: bool) -> str:
-    """Remove elements with navigation-related classes."""
     if not remove_navigation:
         return html
 
@@ -288,7 +266,6 @@ def _remove_class_based_navigation(html: str, remove_navigation: bool) -> str:
 
 
 def _remove_navigation_patterns(html: str, remove_navigation: bool) -> str:
-    """Remove common navigation patterns that nh3 might miss."""
     if not remove_navigation:
         return html
 
@@ -329,7 +306,6 @@ def _remove_navigation_patterns(html: str, remove_navigation: bool) -> str:
 
 
 def _remove_wikipedia_navigation_lists(html: str) -> str:
-    """Remove Wikipedia-style navigation lists that appear at the start."""
     patterns = [
         r"Main menu\s*\n\n(-\s*\[.*?\]\(.*?\).*?\n){3,}",
         r"(-\s*\[[^\]]*\]\(/wiki/[^)]*\).*?\n){5,}",
@@ -342,7 +318,6 @@ def _remove_wikipedia_navigation_lists(html: str) -> str:
 
 
 def _fix_whitespace_issues(html: str) -> str:
-    """Fix common whitespace issues in HTML."""
     html = re.sub(r"[ \t]{2,}", " ", html)
     html = re.sub(r"\n\s*\n", "\n\n", html)
 
@@ -385,18 +360,6 @@ PRESETS: dict[str, dict[str, Any]] = {
 
 
 def create_preprocessor(preset: str = "standard", **overrides: Any) -> dict[str, Any]:
-    """Create preprocessor configuration with a preset.
-
-    Args:
-        preset: The preset configuration to use (minimal, standard, aggressive).
-        **overrides: Any configuration options to override.
-
-    Returns:
-        Configuration dict for preprocessor.
-
-    Raises:
-        ValueError: If preset is unknown.
-    """
     if preset not in PRESETS:
         msg = f"Unknown preset '{preset}'. Available presets: {list(PRESETS.keys())}"
         raise ValueError(msg)

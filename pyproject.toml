@@ -5,7 +5,7 @@ requires = [ "setuptools>=78.1" ]
 
 [project]
 name = "html-to-markdown"
-version = "1.9.1"
+version = "1.10.0"
 description = "A modern, type-safe Python library for converting HTML to Markdown with comprehensive tag support and customizable options"
 readme = "README.md"
 keywords = [
@@ -89,9 +89,13 @@ lint.ignore = [
   "C901",    # Complex function complexity - allow for streaming functions
   "COM812",  # Conflicts with formatter
   "D100",    # pydocstyle - missing docstring in public module
+  "D101",    # pydocstyle - missing docstring in public class
+  "D102",    # pydocstyle - missing docstring in public method
+  "D103",    # pydocstyle - missing docstring in public function
   "D104",    # pydocstyle - missing docstring in public package
   "D107",    # pydocstyle - missing docstring in __init__
   "D205",    # pydocstyle - 1 blank line required between summary line and description
+  "D301",    # pydocstyle - use r""" if any backslashes in docstring
   "E501",    # pycodestyle line too long, handled by ruff format
   "EM",      # Exception messages
   "FBT",     # Boolean Args

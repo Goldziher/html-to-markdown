@@ -28,27 +28,34 @@ def test_main_with_file_input(mock_convert_to_markdown: Mock) -> None:
     assert result == "Mocked Markdown Output"
     mock_convert_to_markdown.assert_called_once_with(
         test_html,
-        strip=None,
-        convert=None,
         autolinks=False,
-        default_title=False,
-        heading_style="underlined",
         bullets="*+-",
+        code_language="",
+        convert=None,
+        convert_as_inline=False,
+        default_title=False,
+        escape_asterisks=True,
+        escape_misc=True,
+        escape_underscores=True,
+        extract_metadata=True,
+        heading_style="underlined",
+        highlight_style="double-equal",
+        keep_inline_images_in=None,
+        list_indent_type="spaces",
+        list_indent_width=4,
+        newline_style="spaces",
+        preprocess_html=False,
+        preprocessing_preset="standard",
+        remove_forms=True,
+        remove_navigation=True,
+        strip=None,
+        strip_newlines=False,
         strong_em_symbol="*",
         sub_symbol="",
         sup_symbol="",
-        newline_style="spaces",
-        code_language="",
-        escape_asterisks=True,
-        escape_underscores=True,
-        escape_misc=True,
-        keep_inline_images_in=None,
+        whitespace_mode="normalized",
         wrap=False,
         wrap_width=80,
-        strip_newlines=False,
-        convert_as_inline=False,
-        extract_metadata=True,
-        highlight_style="double-equal",
     )
 
 
@@ -58,27 +65,34 @@ def test_main_with_stdin_input(mock_convert_to_markdown: Mock, mock_stdin: Mock)
     assert result == "Mocked Markdown Output"
     mock_convert_to_markdown.assert_called_once_with(
         "<html><body><p>Test from stdin</p></body></html>",
-        strip=None,
-        convert=None,
         autolinks=False,
-        default_title=False,
-        heading_style="underlined",
         bullets="*+-",
+        code_language="",
+        convert=None,
+        convert_as_inline=False,
+        default_title=False,
+        escape_asterisks=True,
+        escape_misc=True,
+        escape_underscores=True,
+        extract_metadata=True,
+        heading_style="underlined",
+        highlight_style="double-equal",
+        keep_inline_images_in=None,
+        list_indent_type="spaces",
+        list_indent_width=4,
+        newline_style="spaces",
+        preprocess_html=False,
+        preprocessing_preset="standard",
+        remove_forms=True,
+        remove_navigation=True,
+        strip=None,
+        strip_newlines=False,
         strong_em_symbol="*",
         sub_symbol="",
         sup_symbol="",
-        newline_style="spaces",
-        code_language="",
-        escape_asterisks=True,
-        escape_underscores=True,
-        escape_misc=True,
-        keep_inline_images_in=None,
+        whitespace_mode="normalized",
         wrap=False,
         wrap_width=80,
-        strip_newlines=False,
-        convert_as_inline=False,
-        extract_metadata=True,
-        highlight_style="double-equal",
     )
 
 
@@ -207,3 +221,116 @@ def test_main_with_highlight_style_option(mock_convert_to_markdown: Mock, mock_s
     main(["--highlight-style", "html"])
     mock_convert_to_markdown.assert_called_once()
     assert mock_convert_to_markdown.call_args[1]["highlight_style"] == "html"
+
+
+def test_main_with_parser_option(mock_convert_to_markdown: Mock, mock_stdin: Mock) -> None:
+    main(["--parser", "lxml"])
+    mock_convert_to_markdown.assert_called_once()
+    assert mock_convert_to_markdown.call_args[1]["parser"] == "lxml"
+
+
+def test_main_with_list_indent_type_spaces(mock_convert_to_markdown: Mock, mock_stdin: Mock) -> None:
+    main(["--list-indent-type", "spaces"])
+    mock_convert_to_markdown.assert_called_once()
+    assert mock_convert_to_markdown.call_args[1]["list_indent_type"] == "spaces"
+
+
+def test_main_with_list_indent_type_tabs(mock_convert_to_markdown: Mock, mock_stdin: Mock) -> None:
+    main(["--list-indent-type", "tabs"])
+    mock_convert_to_markdown.assert_called_once()
+    assert mock_convert_to_markdown.call_args[1]["list_indent_type"] == "tabs"
+
+
+def test_main_with_list_indent_width_option(mock_convert_to_markdown: Mock, mock_stdin: Mock) -> None:
+    main(["--list-indent-width", "2"])
+    mock_convert_to_markdown.assert_called_once()
+    assert mock_convert_to_markdown.call_args[1]["list_indent_width"] == 2
+
+
+def test_main_with_list_indent_discord_compatible(mock_convert_to_markdown: Mock, mock_stdin: Mock) -> None:
+    main(["--list-indent-width", "2", "--list-indent-type", "spaces"])
+    mock_convert_to_markdown.assert_called_once()
+    assert mock_convert_to_markdown.call_args[1]["list_indent_width"] == 2
+    assert mock_convert_to_markdown.call_args[1]["list_indent_type"] == "spaces"
+
+
+def test_main_with_whitespace_mode_normalized(mock_convert_to_markdown: Mock, mock_stdin: Mock) -> None:
+    main(["--whitespace-mode", "normalized"])
+    mock_convert_to_markdown.assert_called_once()
+    assert mock_convert_to_markdown.call_args[1]["whitespace_mode"] == "normalized"
+
+
+def test_main_with_whitespace_mode_strict(mock_convert_to_markdown: Mock, mock_stdin: Mock) -> None:
+    main(["--whitespace-mode", "strict"])
+    mock_convert_to_markdown.assert_called_once()
+    assert mock_convert_to_markdown.call_args[1]["whitespace_mode"] == "strict"
+
+
+def test_main_with_preprocess_html_option(mock_convert_to_markdown: Mock, mock_stdin: Mock) -> None:
+    main(["--preprocess-html"])
+    mock_convert_to_markdown.assert_called_once()
+    assert mock_convert_to_markdown.call_args[1]["preprocess_html"] is True
+
+
+def test_main_with_preprocessing_preset_minimal(mock_convert_to_markdown: Mock, mock_stdin: Mock) -> None:
+    main(["--preprocessing-preset", "minimal"])
+    mock_convert_to_markdown.assert_called_once()
+    assert mock_convert_to_markdown.call_args[1]["preprocessing_preset"] == "minimal"
+
+
+def test_main_with_preprocessing_preset_aggressive(mock_convert_to_markdown: Mock, mock_stdin: Mock) -> None:
+    main(["--preprocessing-preset", "aggressive"])
+    mock_convert_to_markdown.assert_called_once()
+    assert mock_convert_to_markdown.call_args[1]["preprocessing_preset"] == "aggressive"
+
+
+def test_main_with_no_remove_forms_option(mock_convert_to_markdown: Mock, mock_stdin: Mock) -> None:
+    main(["--no-remove-forms"])
+    mock_convert_to_markdown.assert_called_once()
+    assert mock_convert_to_markdown.call_args[1]["remove_forms"] is False
+
+
+def test_main_with_no_remove_navigation_option(mock_convert_to_markdown: Mock, mock_stdin: Mock) -> None:
+    main(["--no-remove-navigation"])
+    mock_convert_to_markdown.assert_called_once()
+    assert mock_convert_to_markdown.call_args[1]["remove_navigation"] is False
+
+
+def test_main_with_preprocessing_combined_options(mock_convert_to_markdown: Mock, mock_stdin: Mock) -> None:
+    main(["--preprocess-html", "--preprocessing-preset", "aggressive", "--no-remove-forms", "--no-remove-navigation"])
+    mock_convert_to_markdown.assert_called_once()
+    args = mock_convert_to_markdown.call_args[1]
+    assert args["preprocess_html"] is True
+    assert args["preprocessing_preset"] == "aggressive"
+    assert args["remove_forms"] is False
+    assert args["remove_navigation"] is False
+
+
+def test_main_with_all_new_options_combined(mock_convert_to_markdown: Mock, mock_stdin: Mock) -> None:
+    main(
+        [
+            "--parser",
+            "lxml",
+            "--list-indent-type",
+            "tabs",
+            "--list-indent-width",
+            "3",
+            "--whitespace-mode",
+            "strict",
+            "--preprocess-html",
+            "--preprocessing-preset",
+            "minimal",
+            "--no-remove-forms",
+            "--no-remove-navigation",
+        ]
+    )
+    mock_convert_to_markdown.assert_called_once()
+    args = mock_convert_to_markdown.call_args[1]
+    assert args["parser"] == "lxml"
+    assert args["list_indent_type"] == "tabs"
+    assert args["list_indent_width"] == 3
+    assert args["whitespace_mode"] == "strict"
+    assert args["preprocess_html"] is True
+    assert args["preprocessing_preset"] == "minimal"
+    assert args["remove_forms"] is False
+    assert args["remove_navigation"] is False

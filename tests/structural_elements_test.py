@@ -227,7 +227,7 @@ class TestStructuralElementsIntegration:
         </figure>
         """
         result = convert_to_markdown(html)
-        expected = """\n        ![](image1.jpg)\n\n*First figure*\n\n![](image2.jpg)\n\n*Second figure*\n\n"""
+        expected = """![](image1.jpg)\n\n*First figure*\n\n![](image2.jpg)\n\n*Second figure*\n\n"""
         assert result == expected
 
     def test_nested_structural_elements(self) -> None:
