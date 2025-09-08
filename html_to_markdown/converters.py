@@ -63,6 +63,7 @@ SupportedElements = Literal[
     "details",
     "dfn",
     "dialog",
+    "div",
     "dl",
     "dt",
     "em",
@@ -200,7 +201,7 @@ def _convert_a(*, tag: Tag, text: str, autolinks: bool, default_title: bool) -> 
     return f"{prefix}[{text}]({href}{title_part}){suffix}" if href else text
 
 
-def _convert_blockquote(*, text: str, tag: Tag, convert_as_inline: bool) -> str:
+def _convert_blockquote(*, text: str, tag: Tag, convert_as_inline: bool, list_indent_str: str) -> str:
     if convert_as_inline:
         return text
 
@@ -213,14 +214,14 @@ def _convert_blockquote(*, text: str, tag: Tag, convert_as_inline: bool) -> str:
 
     if _has_ancestor(tag, "li"):
         lines = text.strip().split("\n")
-        indented_lines = [f"    > {line}" if line.strip() else "" for line in lines]
+        indented_lines = [f"{list_indent_str}> {line}" if line.strip() else "" for line in lines]
         quote_text = "\n".join(indented_lines) + "\n\n"
     else:
         quote_text = f"\n{line_beginning_re.sub('> ', text.strip())}\n\n"
 
     if cite_url:
         if _has_ancestor(tag, "li"):
-            quote_text += f"    — <{cite_url}>\n\n"
+            quote_text += f"{list_indent_str}— <{cite_url}>\n\n"
         else:
             quote_text += f"— <{cite_url}>\n\n"
 
@@ -281,7 +282,7 @@ def _convert_img(*, tag: Tag, convert_as_inline: bool, keep_inline_images_in: It
     return f"![{alt}]({src}{title_part})"
 
 
-def _convert_list(*, tag: Tag, text: str) -> str:
+def _convert_list(*, tag: Tag, text: str, list_indent_str: str) -> str:
     from html_to_markdown.processing import _has_ancestor  # noqa: PLC0415
 
     before_paragraph = False
@@ -307,18 +308,18 @@ def _convert_list(*, tag: Tag, text: str) -> str:
                 indented_lines = []
                 for line in lines:
                     if line.strip():
-                        indented_lines.append(f"    {line}")
+                        indented_lines.append(f"{list_indent_str}{line}")
                     else:
                         indented_lines.append("")
                 return "\n" + "\n".join(indented_lines) + "\n"
-            return "\n" + indent(text=text, level=1).rstrip()
+            return "\n" + indent(text=text, level=1, indent_str=list_indent_str).rstrip()
 
     if tag.parent and tag.parent.name in {"ul", "ol"}:
         lines = text.strip().split("\n")
         indented_lines = []
         for line in lines:
             if line.strip():
-                indented_lines.append(f"    {line}")
+                indented_lines.append(f"{list_indent_str}{line}")
             else:
                 indented_lines.append("")
         result = "\n".join(indented_lines)
@@ -329,7 +330,7 @@ def _convert_list(*, tag: Tag, text: str) -> str:
     return text + ("\n" if before_paragraph else "")
 
 
-def _convert_li(*, tag: Tag, text: str, bullets: str) -> str:
+def _convert_li(*, tag: Tag, text: str, bullets: str, list_indent_str: str) -> str:
     checkbox = tag.find("input", {"type": "checkbox"})
     if checkbox and isinstance(checkbox, Tag):
         checked = checkbox.get("checked") is not None
@@ -375,14 +376,18 @@ def _convert_li(*, tag: Tag, text: str, bullets: str) -> str:
             for para in paragraphs[1:]:
                 if para.strip():
                     result_parts.append("\n")
-                    result_parts.extend(f"    {line}\n" for line in para.strip().split("\n") if line.strip())
+                    result_parts.extend(
+                        f"{list_indent_str}{line}\n" for line in para.strip().split("\n") if line.strip()
+                    )
 
             return "".join(result_parts)
 
     return "{} {}\n".format(bullet, (text or "").strip())
 
 
-def _convert_p(*, wrap: bool, text: str, convert_as_inline: bool, wrap_width: int, tag: Tag) -> str:
+def _convert_p(
+    *, wrap: bool, text: str, convert_as_inline: bool, wrap_width: int, tag: Tag, list_indent_str: str
+) -> str:
     if convert_as_inline:
         return text
 
@@ -408,7 +413,7 @@ def _convert_p(*, wrap: bool, text: str, convert_as_inline: bool, wrap_width: in
                 indented_lines = []
                 for line in text.split("\n"):
                     if line.strip():
-                        indented_lines.append(f"    {line}")
+                        indented_lines.append(f"{list_indent_str}{line}")
                     else:
                         indented_lines.append("")
                 text = "\n".join(indented_lines)
@@ -663,6 +668,21 @@ def _convert_semantic_block(*, text: str, convert_as_inline: bool) -> str:
         return text
 
     return f"{text}\n\n" if text.strip() else ""
+
+
+def _convert_div(*, text: str, convert_as_inline: bool) -> str:  # noqa: ARG001
+    """Convert HTML div element to Markdown.
+
+    Args:
+        text: The text content of the div element.
+        convert_as_inline: Whether to convert as inline content.
+
+    Returns:
+        The text content without additional formatting.
+    """
+    # Divs are transparent containers - just return the text as-is
+    # Block spacing should be handled by the content within the div
+    return text
 
 
 def _convert_details(*, text: str, convert_as_inline: bool) -> str:
@@ -1457,6 +1477,8 @@ def create_converters_map(
     heading_style: Literal["atx", "atx_closed", "underlined"],
     highlight_style: Literal["double-equal", "html", "bold"],
     keep_inline_images_in: Iterable[str] | None,
+    list_indent_type: str,
+    list_indent_width: int,
     newline_style: str,
     strong_em_symbol: str,
     sub_symbol: str,
@@ -1475,6 +1497,8 @@ def create_converters_map(
         heading_style: The style of headings.
         highlight_style: The style to use for highlighted text (mark elements).
         keep_inline_images_in: The tags to keep inline images in.
+        list_indent_type: Type of indentation for lists ("spaces" or "tabs").
+        list_indent_width: Number of spaces for list indentation (ignored for tabs).
         newline_style: The style of newlines.
         strong_em_symbol: The symbol to use for strong and emphasis text.
         sub_symbol: The symbol to use for subscript text.
@@ -1485,6 +1509,8 @@ def create_converters_map(
     Returns:
         A mapping of HTML elements to their corresponding conversion functions
     """
+    # Create the list indent string based on type and width
+    list_indent_str = "\t" if list_indent_type == "tabs" else " " * list_indent_width
 
     def _wrapper(func: Callable[..., T]) -> Callable[[str, Tag], T]:
         spec = getfullargspec(func)
@@ -1498,6 +1524,8 @@ def create_converters_map(
                     kwargs["text"] = text
                 if "convert_as_inline" in spec.kwonlyargs:
                     kwargs["convert_as_inline"] = convert_as_inline
+                if "list_indent_str" in spec.kwonlyargs:
+                    kwargs["list_indent_str"] = list_indent_str
                 return func(**kwargs)
             return func(text)
 
@@ -1512,7 +1540,7 @@ def create_converters_map(
         "b": _wrapper(partial(_create_inline_converter(2 * strong_em_symbol))),
         "bdi": _wrapper(_create_inline_converter("")),
         "bdo": _wrapper(_create_inline_converter("")),
-        "blockquote": _wrapper(partial(_convert_blockquote)),
+        "blockquote": _wrapper(partial(_convert_blockquote, list_indent_str=list_indent_str)),
         "br": _wrapper(partial(_convert_br, newline_style=newline_style)),
         "button": _wrapper(_convert_button),
         "caption": _wrapper(_convert_caption),
@@ -1527,6 +1555,7 @@ def create_converters_map(
         "details": _wrapper(_convert_details),
         "dfn": _wrapper(_create_inline_converter("*")),
         "dialog": _wrapper(_convert_dialog),
+        "div": _wrapper(_convert_div),
         "dl": _wrapper(_convert_dl),
         "dt": _wrapper(_convert_dt),
         "em": _wrapper(_create_inline_converter(strong_em_symbol)),
@@ -1552,19 +1581,19 @@ def create_converters_map(
         "kbd": _wrapper(_create_inline_converter("`")),
         "label": _wrapper(_convert_label),
         "legend": _wrapper(_convert_legend),
-        "li": _wrapper(partial(_convert_li, bullets=bullets)),
-        "list": _wrapper(_convert_list),
+        "li": _wrapper(partial(_convert_li, bullets=bullets, list_indent_str=list_indent_str)),
+        "list": _wrapper(partial(_convert_list, list_indent_str=list_indent_str)),
         "main": _wrapper(_convert_semantic_block),
         "mark": _wrapper(partial(_convert_mark, highlight_style=highlight_style)),
         "math": _wrapper(_convert_math),
         "menu": _wrapper(_convert_menu),
         "meter": _wrapper(_convert_meter),
         "nav": _wrapper(_convert_semantic_block),
-        "ol": _wrapper(_convert_list),
+        "ol": _wrapper(partial(_convert_list, list_indent_str=list_indent_str)),
         "optgroup": _wrapper(_convert_optgroup),
         "option": _wrapper(_convert_option),
         "output": _wrapper(_convert_output),
-        "p": _wrapper(partial(_convert_p, wrap=wrap, wrap_width=wrap_width)),
+        "p": _wrapper(partial(_convert_p, wrap=wrap, wrap_width=wrap_width, list_indent_str=list_indent_str)),
         "picture": _wrapper(_convert_picture),
         "pre": _wrapper(
             partial(
@@ -1602,7 +1631,7 @@ def create_converters_map(
         "time": _wrapper(_convert_time),
         "tr": _wrapper(_convert_tr),
         "u": _wrapper(_create_inline_converter("")),
-        "ul": _wrapper(_convert_list),
+        "ul": _wrapper(partial(_convert_list, list_indent_str=list_indent_str)),
         "var": _wrapper(_create_inline_converter("*")),
         "video": _wrapper(_convert_media_element),
         "wbr": _wrapper(_convert_wbr),

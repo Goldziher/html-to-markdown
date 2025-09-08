@@ -138,7 +138,7 @@ def test_ol() -> None:
 def test_nested_ols(nested_ols: str) -> None:
     assert (
         convert_to_markdown(nested_ols)
-        == "\n1. 1\n\t1. a\n\t\t1. I\n\t\t2. II\n\t\t3. III\n\t2. b\n\t3. c\n2. 2\n3. 3\n"
+        == "\n1. 1\n    1. a\n        1. I\n        2. II\n        3. III\n    2. b\n    3. c\n2. 2\n3. 3\n"
     )
 
 
@@ -164,13 +164,16 @@ def test_inline_ul() -> None:
 
 
 def test_nested_uls(nested_uls: str) -> None:
-    assert convert_to_markdown(nested_uls) == "\n* 1\n\t+ a\n\t\t- I\n\t\t- II\n\t\t- III\n\t+ b\n\t+ c\n* 2\n* 3\n"
+    assert (
+        convert_to_markdown(nested_uls)
+        == "\n* 1\n    + a\n        - I\n        - II\n        - III\n    + b\n    + c\n* 2\n* 3\n"
+    )
 
 
 def test_bullets(nested_uls: str) -> None:
     assert (
         convert_to_markdown(nested_uls, bullets="-")
-        == "\n- 1\n\t- a\n\t\t- I\n\t\t- II\n\t\t- III\n\t- b\n\t- c\n- 2\n- 3\n"
+        == "\n- 1\n    - a\n        - I\n        - II\n        - III\n    - b\n    - c\n- 2\n- 3\n"
     )
 
 

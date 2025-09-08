@@ -48,7 +48,7 @@ repos:
     hooks:
       - id: pyproject-fmt
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.12.11
+    rev: v0.12.12
     hooks:
       - id: ruff
         args: [--fix]
@@ -61,7 +61,7 @@ repos:
         additional_dependencies:
           - tomli
   - repo: https://github.com/jsh9/pydoclint
-    rev: 0.7.1
+    rev: 0.7.3
     hooks:
       - id: pydoclint
         args:

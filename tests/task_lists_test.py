@@ -34,7 +34,7 @@ class TestTaskLists:
     def test_nested_task_lists(self) -> None:
         html = '<ul><li><input type="checkbox"> Parent task<ul><li><input type="checkbox" checked> Child task 1</li><li><input type="checkbox"> Child task 2</li></ul></li></ul>'
         result = convert_to_markdown(html)
-        expected = "- [ ] Parent task\n\t- [x] Child task 1\n\t- [ ] Child task 2\n"
+        expected = "- [ ] Parent task\n    - [x] Child task 1\n    - [ ] Child task 2\n"
         assert result == expected
 
     def test_task_with_inline_formatting(self) -> None:

@@ -52,17 +52,18 @@ def escape(*, text: str, escape_misc: bool, escape_asterisks: bool, escape_under
     return text
 
 
-def indent(*, text: str, level: int) -> str:
+def indent(*, text: str, level: int, indent_str: str = "\t") -> str:
     """Indent text by a given level.
 
     Args:
         text: The text to indent.
         level: The level of indentation.
+        indent_str: The string to use for each indentation level. Defaults to tab.
 
     Returns:
         The indented text.
     """
-    return line_beginning_re.sub("\t" * level, text) if text else ""
+    return line_beginning_re.sub(indent_str * level, text) if text else ""
 
 
 def underline(*, text: str, pad_char: str) -> str:
