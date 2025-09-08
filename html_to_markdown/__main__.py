@@ -4,7 +4,6 @@ from html_to_markdown.cli import main
 
 
 def cli() -> None:
-    """Main CLI entrypoint."""
     try:
         result = main(sys.argv[1:])
         print(result)  # noqa: T201

@@ -23,17 +23,14 @@ from html_to_markdown.utils import chomp, indent, underline
 
 
 def _format_block_element(text: str) -> str:
-    """Format text as a block element with trailing newlines."""
     return f"{text.strip()}\n\n" if text.strip() else ""
 
 
 def _format_inline_or_block(text: str, convert_as_inline: bool) -> str:
-    """Format text as inline or block element based on context."""
     return text.strip() if convert_as_inline else _format_block_element(text)
 
 
 def _format_wrapped_block(text: str, start_marker: str, end_marker: str = "") -> str:
-    """Format text wrapped in markers as a block element."""
     if not end_marker:
         end_marker = start_marker
     return f"{start_marker}{text.strip()}{end_marker}\n\n" if text.strip() else ""
@@ -146,15 +143,6 @@ T = TypeVar("T")
 
 
 def _create_inline_converter(markup_prefix: str) -> Callable[[Tag, str], str]:
-    """Create an inline converter for a markup pattern or tag.
-
-    Args:
-        markup_prefix: The markup prefix to insert.
-
-    Returns:
-        A function that can be used to convert HTML to Markdown.
-    """
-
     def implementation(*, tag: Tag, text: str) -> str:
         from html_to_markdown.processing import _has_ancestor  # noqa: PLC0415
 
@@ -422,16 +410,6 @@ def _convert_p(
 
 
 def _convert_mark(*, text: str, convert_as_inline: bool, highlight_style: str) -> str:
-    """Convert HTML mark element to Markdown highlighting.
-
-    Args:
-        text: The text content of the mark element.
-        convert_as_inline: Whether to convert as inline content.
-        highlight_style: The style to use for highlighting ("double-equal", "html", "bold").
-
-    Returns:
-        The converted markdown text.
-    """
     if convert_as_inline:
         return text
 
@@ -553,15 +531,6 @@ def _convert_tr(*, tag: Tag, text: str) -> str:
 
 
 def _convert_caption(*, text: str, convert_as_inline: bool) -> str:
-    """Convert HTML caption element to emphasized text.
-
-    Args:
-        text: The text content of the caption element.
-        convert_as_inline: Whether to convert as inline content.
-
-    Returns:
-        The converted markdown text with caption formatting.
-    """
     if convert_as_inline:
         return text
 
@@ -572,15 +541,6 @@ def _convert_caption(*, text: str, convert_as_inline: bool) -> str:
 
 
 def _convert_thead(*, text: str, convert_as_inline: bool) -> str:
-    """Convert HTML thead element preserving table structure.
-
-    Args:
-        text: The text content of the thead element.
-        convert_as_inline: Whether to convert as inline content.
-
-    Returns:
-        The converted markdown text preserving table structure.
-    """
     if convert_as_inline:
         return text
 
@@ -588,15 +548,6 @@ def _convert_thead(*, text: str, convert_as_inline: bool) -> str:
 
 
 def _convert_tbody(*, text: str, convert_as_inline: bool) -> str:
-    """Convert HTML tbody element preserving table structure.
-
-    Args:
-        text: The text content of the tbody element.
-        convert_as_inline: Whether to convert as inline content.
-
-    Returns:
-        The converted markdown text preserving table structure.
-    """
     if convert_as_inline:
         return text
 
@@ -604,15 +555,6 @@ def _convert_tbody(*, text: str, convert_as_inline: bool) -> str:
 
 
 def _convert_tfoot(*, text: str, convert_as_inline: bool) -> str:
-    """Convert HTML tfoot element preserving table structure.
-
-    Args:
-        text: The text content of the tfoot element.
-        convert_as_inline: Whether to convert as inline content.
-
-    Returns:
-        The converted markdown text preserving table structure.
-    """
     if convert_as_inline:
         return text
 
@@ -620,50 +562,16 @@ def _convert_tfoot(*, text: str, convert_as_inline: bool) -> str:
 
 
 def _convert_colgroup(*, tag: Tag, text: str, convert_as_inline: bool) -> str:
-    """Convert HTML colgroup element - removes it entirely from Markdown output.
-
-    Colgroup is a table column grouping element that defines styling for columns.
-    It has no representation in Markdown and should be removed.
-
-    Args:
-        tag: The colgroup tag element.
-        text: The text content of the colgroup element.
-        convert_as_inline: Whether to convert as inline content.
-
-    Returns:
-        Empty string as colgroup has no Markdown representation.
-    """
     _ = tag, text, convert_as_inline
     return ""
 
 
 def _convert_col(*, tag: Tag, convert_as_inline: bool) -> str:
-    """Convert HTML col element - removes it entirely from Markdown output.
-
-    Col elements define column properties (width, style) in HTML tables.
-    They have no representation in Markdown and should be removed.
-
-    Args:
-        tag: The col tag element.
-        convert_as_inline: Whether to convert as inline content.
-
-    Returns:
-        Empty string as col has no Markdown representation.
-    """
     _ = tag, convert_as_inline
     return ""
 
 
 def _convert_semantic_block(*, text: str, convert_as_inline: bool) -> str:
-    """Convert HTML5 semantic elements to block-level Markdown.
-
-    Args:
-        text: The text content of the semantic element.
-        convert_as_inline: Whether to convert as inline content.
-
-    Returns:
-        The converted markdown text with proper block spacing.
-    """
     if convert_as_inline:
         return text
 
@@ -671,30 +579,10 @@ def _convert_semantic_block(*, text: str, convert_as_inline: bool) -> str:
 
 
 def _convert_div(*, text: str, convert_as_inline: bool) -> str:  # noqa: ARG001
-    """Convert HTML div element to Markdown.
-
-    Args:
-        text: The text content of the div element.
-        convert_as_inline: Whether to convert as inline content.
-
-    Returns:
-        The text content without additional formatting.
-    """
-    # Divs are transparent containers - just return the text as-is
-    # Block spacing should be handled by the content within the div
     return text
 
 
 def _convert_details(*, text: str, convert_as_inline: bool) -> str:
-    """Convert HTML details element to semantic Markdown.
-
-    Args:
-        text: The text content of the details element.
-        convert_as_inline: Whether to convert as inline content.
-
-    Returns:
-        The converted markdown text (only content, no HTML tags).
-    """
     if convert_as_inline:
         return text
 
@@ -702,15 +590,6 @@ def _convert_details(*, text: str, convert_as_inline: bool) -> str:
 
 
 def _convert_summary(*, text: str, convert_as_inline: bool) -> str:
-    """Convert HTML summary element to emphasized text.
-
-    Args:
-        text: The text content of the summary element.
-        convert_as_inline: Whether to convert as inline content.
-
-    Returns:
-        The converted markdown text as bold heading.
-    """
     if convert_as_inline:
         return text
 
@@ -718,15 +597,6 @@ def _convert_summary(*, text: str, convert_as_inline: bool) -> str:
 
 
 def _convert_dl(*, text: str, convert_as_inline: bool) -> str:
-    """Convert HTML definition list element.
-
-    Args:
-        text: The text content of the definition list.
-        convert_as_inline: Whether to convert as inline content.
-
-    Returns:
-        The converted markdown text with proper spacing.
-    """
     if convert_as_inline:
         return text
 
@@ -734,15 +604,6 @@ def _convert_dl(*, text: str, convert_as_inline: bool) -> str:
 
 
 def _convert_dt(*, text: str, convert_as_inline: bool) -> str:
-    """Convert HTML definition term element.
-
-    Args:
-        text: The text content of the definition term.
-        convert_as_inline: Whether to convert as inline content.
-
-    Returns:
-        The converted markdown text as a definition term.
-    """
     if convert_as_inline:
         return text
 
@@ -753,15 +614,6 @@ def _convert_dt(*, text: str, convert_as_inline: bool) -> str:
 
 
 def _convert_dd(*, text: str, convert_as_inline: bool) -> str:
-    """Convert HTML definition description element.
-
-    Args:
-        text: The text content of the definition description.
-        convert_as_inline: Whether to convert as inline content.
-
-    Returns:
-        The converted markdown text as a definition description.
-    """
     if convert_as_inline:
         return text
 
@@ -772,15 +624,6 @@ def _convert_dd(*, text: str, convert_as_inline: bool) -> str:
 
 
 def _convert_cite(*, text: str, convert_as_inline: bool) -> str:
-    """Convert HTML cite element to italic text.
-
-    Args:
-        text: The text content of the cite element.
-        convert_as_inline: Whether to convert as inline content.
-
-    Returns:
-        The converted markdown text in italic format.
-    """
     if convert_as_inline:
         return text
 
@@ -791,15 +634,6 @@ def _convert_cite(*, text: str, convert_as_inline: bool) -> str:
 
 
 def _convert_q(*, text: str, convert_as_inline: bool) -> str:
-    """Convert HTML q element to quoted text.
-
-    Args:
-        text: The text content of the q element.
-        convert_as_inline: Whether to convert as inline content.
-
-    Returns:
-        The converted markdown text with quotes.
-    """
     if convert_as_inline:
         return text
 
@@ -811,16 +645,6 @@ def _convert_q(*, text: str, convert_as_inline: bool) -> str:
 
 
 def _convert_media_element(*, tag: Tag, text: str, convert_as_inline: bool) -> str:
-    """Convert HTML media elements (audio/video) to semantic Markdown.
-
-    Args:
-        tag: The media tag element.
-        text: The text content of the media element (fallback content).
-        convert_as_inline: Whether to convert as inline content.
-
-    Returns:
-        The converted markdown text (link if src exists, otherwise fallback content).
-    """
     src = tag.get("src", "")
 
     if not src and (source_tag := tag.find("source")) and isinstance(source_tag, Tag):
@@ -842,16 +666,6 @@ def _convert_media_element(*, tag: Tag, text: str, convert_as_inline: bool) -> s
 
 
 def _convert_iframe(*, tag: Tag, text: str, convert_as_inline: bool) -> str:
-    """Convert HTML iframe element to semantic Markdown.
-
-    Args:
-        tag: The iframe tag element.
-        text: The text content of the iframe element (usually empty).
-        convert_as_inline: Whether to convert as inline content.
-
-    Returns:
-        The converted markdown text (link if src exists).
-    """
     _ = text
     src = tag.get("src", "")
 
@@ -865,16 +679,6 @@ def _convert_iframe(*, tag: Tag, text: str, convert_as_inline: bool) -> str:
 
 
 def _convert_abbr(*, tag: Tag, text: str, convert_as_inline: bool) -> str:
-    """Convert HTML abbr element to text with optional title.
-
-    Args:
-        tag: The abbr tag element.
-        text: The text content of the abbr element.
-        convert_as_inline: Whether to convert as inline content.
-
-    Returns:
-        The converted markdown text with optional title annotation.
-    """
     _ = convert_as_inline
     if not text.strip():
         return ""
@@ -887,16 +691,6 @@ def _convert_abbr(*, tag: Tag, text: str, convert_as_inline: bool) -> str:
 
 
 def _convert_time(*, tag: Tag, text: str, convert_as_inline: bool) -> str:
-    """Convert HTML time element to semantic Markdown.
-
-    Args:
-        tag: The time tag element.
-        text: The text content of the time element.
-        convert_as_inline: Whether to convert as inline content.
-
-    Returns:
-        The converted markdown text (content only, no HTML tags).
-    """
     _ = tag
     _ = convert_as_inline
     if not text.strip():
@@ -906,16 +700,6 @@ def _convert_time(*, tag: Tag, text: str, convert_as_inline: bool) -> str:
 
 
 def _convert_data(*, tag: Tag, text: str, convert_as_inline: bool) -> str:
-    """Convert HTML data element to semantic Markdown.
-
-    Args:
-        tag: The data tag element.
-        text: The text content of the data element.
-        convert_as_inline: Whether to convert as inline content.
-
-    Returns:
-        The converted markdown text (content only, no HTML tags).
-    """
     _ = tag
     _ = convert_as_inline
     if not text.strip():
@@ -925,29 +709,11 @@ def _convert_data(*, tag: Tag, text: str, convert_as_inline: bool) -> str:
 
 
 def _convert_wbr(*, convert_as_inline: bool) -> str:
-    """Convert HTML wbr (word break opportunity) element.
-
-    Args:
-        convert_as_inline: Whether to convert as inline content.
-
-    Returns:
-        Empty string as wbr is just a break opportunity.
-    """
     _ = convert_as_inline
     return ""
 
 
 def _convert_form(*, tag: Tag, text: str, convert_as_inline: bool) -> str:
-    """Convert HTML form element to semantic Markdown.
-
-    Args:
-        tag: The form tag element.
-        text: The text content of the form element.
-        convert_as_inline: Whether to convert as inline content.
-
-    Returns:
-        The converted markdown text (only content, no HTML tags).
-    """
     _ = tag
     if convert_as_inline:
         return text
@@ -959,15 +725,6 @@ def _convert_form(*, tag: Tag, text: str, convert_as_inline: bool) -> str:
 
 
 def _convert_fieldset(*, text: str, convert_as_inline: bool) -> str:
-    """Convert HTML fieldset element to semantic Markdown.
-
-    Args:
-        text: The text content of the fieldset element.
-        convert_as_inline: Whether to convert as inline content.
-
-    Returns:
-        The converted markdown text (only content, no HTML tags).
-    """
     if convert_as_inline:
         return text
 
@@ -978,15 +735,6 @@ def _convert_fieldset(*, text: str, convert_as_inline: bool) -> str:
 
 
 def _convert_legend(*, text: str, convert_as_inline: bool) -> str:
-    """Convert HTML legend element to emphasized text.
-
-    Args:
-        text: The text content of the legend element.
-        convert_as_inline: Whether to convert as inline content.
-
-    Returns:
-        The converted markdown text as emphasized legend.
-    """
     if convert_as_inline:
         return text
 
@@ -997,16 +745,6 @@ def _convert_legend(*, text: str, convert_as_inline: bool) -> str:
 
 
 def _convert_label(*, tag: Tag, text: str, convert_as_inline: bool) -> str:
-    """Convert HTML label element to Markdown.
-
-    Args:
-        tag: The label tag element.
-        text: The text content of the label element.
-        convert_as_inline: Whether to convert as inline content.
-
-    Returns:
-        The label text content.
-    """
     _ = tag
     if not text.strip():
         return ""
@@ -1015,30 +753,11 @@ def _convert_label(*, tag: Tag, text: str, convert_as_inline: bool) -> str:
 
 
 def _convert_input_enhanced(*, tag: Tag, convert_as_inline: bool) -> str:
-    """Convert HTML input element to Markdown.
-
-    Args:
-        tag: The input tag element.
-        convert_as_inline: Whether to convert as inline content.
-
-    Returns:
-        Empty string since input elements have no Markdown representation.
-    """
     _ = tag, convert_as_inline
     return ""
 
 
 def _convert_textarea(*, tag: Tag, text: str, convert_as_inline: bool) -> str:
-    """Convert HTML textarea element to Markdown.
-
-    Args:
-        tag: The textarea tag element.
-        text: The text content of the textarea element.
-        convert_as_inline: Whether to convert as inline content.
-
-    Returns:
-        The text content of the textarea.
-    """
     _ = tag
     if not text.strip():
         return ""
@@ -1047,16 +766,6 @@ def _convert_textarea(*, tag: Tag, text: str, convert_as_inline: bool) -> str:
 
 
 def _convert_select(*, tag: Tag, text: str, convert_as_inline: bool) -> str:
-    """Convert HTML select element to Markdown.
-
-    Args:
-        tag: The select tag element.
-        text: The text content of the select element.
-        convert_as_inline: Whether to convert as inline content.
-
-    Returns:
-        The text content (options) as a comma-separated list.
-    """
     _ = tag
     if not text.strip():
         return ""
@@ -1069,16 +778,6 @@ def _convert_select(*, tag: Tag, text: str, convert_as_inline: bool) -> str:
 
 
 def _convert_option(*, tag: Tag, text: str, convert_as_inline: bool) -> str:
-    """Convert HTML option element to Markdown.
-
-    Args:
-        tag: The option tag element.
-        text: The text content of the option element.
-        convert_as_inline: Whether to convert as inline content.
-
-    Returns:
-        The option text, potentially with a marker if selected.
-    """
     if not text.strip():
         return ""
 
@@ -1094,16 +793,6 @@ def _convert_option(*, tag: Tag, text: str, convert_as_inline: bool) -> str:
 
 
 def _convert_optgroup(*, tag: Tag, text: str, convert_as_inline: bool) -> str:
-    """Convert HTML optgroup element to semantic Markdown.
-
-    Args:
-        tag: The optgroup tag element.
-        text: The text content of the optgroup element.
-        convert_as_inline: Whether to convert as inline content.
-
-    Returns:
-        The converted markdown text with label as heading.
-    """
     if convert_as_inline:
         return text
 
@@ -1120,16 +809,6 @@ def _convert_optgroup(*, tag: Tag, text: str, convert_as_inline: bool) -> str:
 
 
 def _convert_button(*, tag: Tag, text: str, convert_as_inline: bool) -> str:
-    """Convert HTML button element to Markdown.
-
-    Args:
-        tag: The button tag element.
-        text: The text content of the button element.
-        convert_as_inline: Whether to convert as inline content.
-
-    Returns:
-        The button text content.
-    """
     _ = tag
     if not text.strip():
         return ""
@@ -1138,16 +817,6 @@ def _convert_button(*, tag: Tag, text: str, convert_as_inline: bool) -> str:
 
 
 def _convert_progress(*, tag: Tag, text: str, convert_as_inline: bool) -> str:
-    """Convert HTML progress element to semantic text.
-
-    Args:
-        tag: The progress tag element.
-        text: The text content of the progress element.
-        convert_as_inline: Whether to convert as inline content.
-
-    Returns:
-        The converted markdown text (only content, no HTML tags).
-    """
     _ = tag
     if convert_as_inline:
         return text
@@ -1159,16 +828,6 @@ def _convert_progress(*, tag: Tag, text: str, convert_as_inline: bool) -> str:
 
 
 def _convert_meter(*, tag: Tag, text: str, convert_as_inline: bool) -> str:
-    """Convert HTML meter element to semantic text.
-
-    Args:
-        tag: The meter tag element.
-        text: The text content of the meter element.
-        convert_as_inline: Whether to convert as inline content.
-
-    Returns:
-        The converted markdown text (only content, no HTML tags).
-    """
     _ = tag
     if convert_as_inline:
         return text
@@ -1180,16 +839,6 @@ def _convert_meter(*, tag: Tag, text: str, convert_as_inline: bool) -> str:
 
 
 def _convert_output(*, tag: Tag, text: str, convert_as_inline: bool) -> str:
-    """Convert HTML output element to semantic text.
-
-    Args:
-        tag: The output tag element.
-        text: The text content of the output element.
-        convert_as_inline: Whether to convert as inline content.
-
-    Returns:
-        The converted markdown text (only content, no HTML tags).
-    """
     _ = tag
     if convert_as_inline:
         return text
@@ -1201,16 +850,6 @@ def _convert_output(*, tag: Tag, text: str, convert_as_inline: bool) -> str:
 
 
 def _convert_datalist(*, tag: Tag, text: str, convert_as_inline: bool) -> str:
-    """Convert HTML datalist element to semantic Markdown.
-
-    Args:
-        tag: The datalist tag element.
-        text: The text content of the datalist element.
-        convert_as_inline: Whether to convert as inline content.
-
-    Returns:
-        The converted markdown text (only content, no HTML tags).
-    """
     _ = tag
     if convert_as_inline:
         return text
@@ -1222,15 +861,6 @@ def _convert_datalist(*, tag: Tag, text: str, convert_as_inline: bool) -> str:
 
 
 def _convert_ruby(*, text: str, convert_as_inline: bool) -> str:  # noqa: ARG001
-    """Convert HTML ruby element providing pronunciation annotation.
-
-    Args:
-        text: The text content of the ruby element.
-        convert_as_inline: Whether to convert as inline content.
-
-    Returns:
-        The converted markdown text with ruby annotation as fallback text.
-    """
     if not text.strip():
         return ""
 
@@ -1238,15 +868,6 @@ def _convert_ruby(*, text: str, convert_as_inline: bool) -> str:  # noqa: ARG001
 
 
 def _convert_rb(*, text: str, convert_as_inline: bool) -> str:  # noqa: ARG001
-    """Convert HTML rb (ruby base) element.
-
-    Args:
-        text: The text content of the rb element.
-        convert_as_inline: Whether to convert as inline content.
-
-    Returns:
-        The converted markdown text (ruby base text).
-    """
     if not text.strip():
         return ""
 
@@ -1254,16 +875,6 @@ def _convert_rb(*, text: str, convert_as_inline: bool) -> str:  # noqa: ARG001
 
 
 def _convert_rt(*, text: str, convert_as_inline: bool, tag: Tag) -> str:  # noqa: ARG001
-    """Convert HTML rt (ruby text) element for pronunciation.
-
-    Args:
-        text: The text content of the rt element.
-        convert_as_inline: Whether to convert as inline content.
-        tag: The rt tag element.
-
-    Returns:
-        The converted markdown text with pronunciation in parentheses.
-    """
     content = text.strip()
 
     prev_sibling = tag.previous_sibling
@@ -1279,15 +890,6 @@ def _convert_rt(*, text: str, convert_as_inline: bool, tag: Tag) -> str:  # noqa
 
 
 def _convert_rp(*, text: str, convert_as_inline: bool) -> str:  # noqa: ARG001
-    """Convert HTML rp (ruby parentheses) element for fallback.
-
-    Args:
-        text: The text content of the rp element.
-        convert_as_inline: Whether to convert as inline content.
-
-    Returns:
-        The converted markdown text (parentheses for ruby fallback).
-    """
     if not text.strip():
         return ""
 
@@ -1295,15 +897,6 @@ def _convert_rp(*, text: str, convert_as_inline: bool) -> str:  # noqa: ARG001
 
 
 def _convert_rtc(*, text: str, convert_as_inline: bool) -> str:  # noqa: ARG001
-    """Convert HTML rtc (ruby text container) element.
-
-    Args:
-        text: The text content of the rtc element.
-        convert_as_inline: Whether to convert as inline content.
-
-    Returns:
-        The converted markdown text (ruby text container).
-    """
     if not text.strip():
         return ""
 
@@ -1311,16 +904,6 @@ def _convert_rtc(*, text: str, convert_as_inline: bool) -> str:  # noqa: ARG001
 
 
 def _convert_dialog(*, text: str, convert_as_inline: bool, tag: Tag) -> str:
-    """Convert HTML dialog element to semantic Markdown.
-
-    Args:
-        text: The text content of the dialog element.
-        convert_as_inline: Whether to convert as inline content.
-        tag: The dialog tag element.
-
-    Returns:
-        The converted markdown text (only content, no HTML tags).
-    """
     _ = tag
     if convert_as_inline:
         return text
@@ -1332,16 +915,6 @@ def _convert_dialog(*, text: str, convert_as_inline: bool, tag: Tag) -> str:
 
 
 def _convert_menu(*, text: str, convert_as_inline: bool, tag: Tag) -> str:
-    """Convert HTML menu element to semantic Markdown.
-
-    Args:
-        text: The text content of the menu element.
-        convert_as_inline: Whether to convert as inline content.
-        tag: The menu tag element.
-
-    Returns:
-        The converted markdown text (only content, no HTML tags).
-    """
     _ = tag
     if convert_as_inline:
         return text
@@ -1353,16 +926,6 @@ def _convert_menu(*, text: str, convert_as_inline: bool, tag: Tag) -> str:
 
 
 def _convert_figure(*, text: str, convert_as_inline: bool, tag: Tag) -> str:
-    """Convert HTML figure element to semantic Markdown.
-
-    Args:
-        text: The text content of the figure element.
-        convert_as_inline: Whether to convert as inline content.
-        tag: The figure tag element.
-
-    Returns:
-        The converted markdown text (only content, no HTML tags).
-    """
     _ = tag
     if not text.strip():
         return ""
@@ -1380,15 +943,6 @@ def _convert_figure(*, text: str, convert_as_inline: bool, tag: Tag) -> str:
 
 
 def _convert_hgroup(*, text: str, convert_as_inline: bool) -> str:
-    """Convert HTML hgroup element to semantic Markdown.
-
-    Args:
-        text: The text content of the hgroup element.
-        convert_as_inline: Whether to convert as inline content.
-
-    Returns:
-        The converted markdown text (only content, no HTML tags).
-    """
     if convert_as_inline:
         return text
 
@@ -1399,16 +953,6 @@ def _convert_hgroup(*, text: str, convert_as_inline: bool) -> str:
 
 
 def _convert_picture(*, text: str, convert_as_inline: bool, tag: Tag) -> str:
-    """Convert HTML picture element to semantic Markdown.
-
-    Args:
-        text: The text content of the picture element.
-        convert_as_inline: Whether to convert as inline content.
-        tag: The picture tag element.
-
-    Returns:
-        The converted markdown text (only the img element).
-    """
     _ = tag, convert_as_inline
     if not text.strip():
         return ""
@@ -1417,16 +961,6 @@ def _convert_picture(*, text: str, convert_as_inline: bool, tag: Tag) -> str:
 
 
 def _convert_svg(*, text: str, convert_as_inline: bool, tag: Tag) -> str:
-    """Convert SVG element to Markdown image reference.
-
-    Args:
-        text: The text content of the SVG element.
-        convert_as_inline: Whether to convert as inline content.
-        tag: The SVG tag element.
-
-    Returns:
-        The converted markdown text as an image reference.
-    """
     if convert_as_inline:
         return text.strip()
 
@@ -1445,16 +979,6 @@ def _convert_svg(*, text: str, convert_as_inline: bool, tag: Tag) -> str:
 
 
 def _convert_math(*, text: str, convert_as_inline: bool, tag: Tag) -> str:
-    """Convert MathML math element preserving mathematical notation.
-
-    Args:
-        text: The text content of the math element.
-        convert_as_inline: Whether to convert as inline content.
-        tag: The math tag element.
-
-    Returns:
-        The converted markdown text preserving math structure.
-    """
     if not text.strip():
         return ""
 
@@ -1486,30 +1010,6 @@ def create_converters_map(
     wrap: bool,
     wrap_width: int,
 ) -> ConvertersMap:
-    """Create a mapping of HTML elements to their corresponding conversion functions.
-
-    Args:
-        autolinks: Whether to convert URLs into links.
-        bullets: The bullet characters to use for unordered lists.
-        code_language: The default code language to use.
-        code_language_callback: A callback to get the code language.
-        default_title: Whether to use the URL as the title for links.
-        heading_style: The style of headings.
-        highlight_style: The style to use for highlighted text (mark elements).
-        keep_inline_images_in: The tags to keep inline images in.
-        list_indent_type: Type of indentation for lists ("spaces" or "tabs").
-        list_indent_width: Number of spaces for list indentation (ignored for tabs).
-        newline_style: The style of newlines.
-        strong_em_symbol: The symbol to use for strong and emphasis text.
-        sub_symbol: The symbol to use for subscript text.
-        sup_symbol: The symbol to use for superscript text.
-        wrap: Whether to wrap text.
-        wrap_width: The width to wrap text at.
-
-    Returns:
-        A mapping of HTML elements to their corresponding conversion functions
-    """
-    # Create the list indent string based on type and width
     list_indent_str = "\t" if list_indent_type == "tabs" else " " * list_indent_width
 
     def _wrapper(func: Callable[..., T]) -> Callable[[str, Tag], T]:

@@ -9,7 +9,6 @@ class TestTableConversion:
     """Test cases for HTML table to Markdown conversion."""
 
     def test_basic_table(self) -> None:
-        """Test basic table conversion."""
         html = """<table>
         <tr><th>Header 1</th><th>Header 2</th></tr>
         <tr><td>Cell 1</td><td>Cell 2</td></tr>
@@ -20,7 +19,6 @@ class TestTableConversion:
         assert "| Cell 1 | Cell 2 |" in result
 
     def test_colgroup_removed_from_output(self) -> None:
-        """Test that colgroup elements are properly removed from output (issue #52)."""
         html = """<table>
         <colgroup>
             <col style="width: 50%">
@@ -49,7 +47,6 @@ class TestTableConversion:
         assert "| Cell 1 | Cell 2 |" in result
 
     def test_col_elements_removed(self) -> None:
-        """Test that individual col elements are removed."""
         html = """<table>
         <col width="100">
         <tr><td>Cell</td></tr>
@@ -62,7 +59,6 @@ class TestTableConversion:
         assert "| Cell |" in result
 
     def test_links_in_rowspan_cells(self) -> None:
-        """Test that links in rowspan-affected cells are preserved (issue #55)."""
         html = """<table>
         <tr>
             <td rowspan="2">Cell A</td>
@@ -80,7 +76,6 @@ class TestTableConversion:
         assert "Link C |" not in result or "[Link C]" in result
 
     def test_complex_table_with_rowspan_and_links(self) -> None:
-        """Test complex table with multiple rowspans and links."""
         html = """<table>
         <tr>
             <th>Header 1</th>
@@ -110,7 +105,6 @@ class TestTableConversion:
         assert "[Fourth Link](https://test.com)" in result
 
     def test_issue_55_exact_case(self) -> None:
-        """Test exact case from issue #55."""
         html = """<table>
         <tbody>
         <tr>
@@ -129,11 +123,9 @@ class TestTableConversion:
         assert "[EDC](https://www.temp.com)" in result
         assert "[EDD](https://www.temp.com)" in result
 
-        # Ensure links are not concatenated without proper formatting
         assert "EDCEDD" not in result or ("[EDC]" in result and "[EDD]" in result)
 
     def test_multiple_rowspan_levels(self) -> None:
-        """Test table with multiple rowspan levels."""
         html = """<table>
         <tr>
             <td rowspan="3">A</td>

@@ -145,15 +145,6 @@ SupportedTag = Literal[
 
 
 def _get_list_indent(list_indent_type: str, list_indent_width: int) -> str:
-    """Generate the indent string for lists based on type and width.
-
-    Args:
-        list_indent_type: Either "spaces" or "tabs"
-        list_indent_width: Number of spaces (ignored for tabs)
-
-    Returns:
-        The indent string to use
-    """
     if list_indent_type == "tabs":
         return "\t"
     return " " * list_indent_width
@@ -295,10 +286,8 @@ def _process_text(
         if len(ancestor_names) > 10:
             break
 
-    # Check if we're in a pre element (preserve whitespace only in pre, not inline code)
     in_pre = bool(ancestor_names.intersection({"pre"}))
 
-    # Process whitespace using the handler
     text = whitespace_handler.process_text_whitespace(text, el, in_pre=in_pre)
 
     if not ancestor_names.intersection({"pre", "code", "kbd", "samp"}):
@@ -319,7 +308,6 @@ _ancestor_cache: ContextVar[dict[int, set[str]] | None] = ContextVar("ancestor_c
 
 
 def _get_ancestor_names(element: PageElement, max_depth: int = 10) -> set[str]:
-    """Get set of ancestor tag names for efficient parent checking."""
     elem_id = id(element)
     cache = _ancestor_cache.get()
     if cache is None:
@@ -350,7 +338,6 @@ def _get_ancestor_names(element: PageElement, max_depth: int = 10) -> set[str]:
 
 
 def _has_ancestor(element: PageElement, tag_names: str | list[str]) -> bool:
-    """Check if element has any of the specified ancestors efficiently."""
     if isinstance(tag_names, str):
         tag_names = [tag_names]
 
@@ -376,14 +363,6 @@ def _as_optional_set(value: str | Iterable[str] | None) -> set[str] | None:
 
 
 def _extract_metadata(soup: BeautifulSoup) -> dict[str, str]:
-    """Extract metadata from HTML document.
-
-    Args:
-        soup: BeautifulSoup instance of the HTML document.
-
-    Returns:
-        Dictionary of metadata key-value pairs.
-    """
     metadata = {}
 
     title_tag = soup.find("title")
@@ -430,14 +409,6 @@ def _extract_metadata(soup: BeautifulSoup) -> dict[str, str]:
 
 
 def _format_metadata_comment(metadata: dict[str, str]) -> str:
-    """Format metadata as a Markdown comment block.
-
-    Args:
-        metadata: Dictionary of metadata key-value pairs.
-
-    Returns:
-        Formatted metadata comment block.
-    """
     if not metadata:
         return ""
 
@@ -489,54 +460,71 @@ def convert_to_markdown(
     wrap: bool = False,
     wrap_width: int = 80,
 ) -> str:
-    """Convert HTML to Markdown.
+    """Convert HTML content to Markdown format.
+
+    This is the main entry point for converting HTML to Markdown. It supports
+    various customization options for controlling the conversion behavior.
 
     Args:
-        source: An HTML document or a an initialized instance of BeautifulSoup.
-        stream_processing: Use streaming processing for large documents. Defaults to False.
-        chunk_size: Size of chunks when using streaming processing. Defaults to 1024.
-        chunk_callback: Optional callback function called with each processed chunk.
-        progress_callback: Optional callback function called with (processed_bytes, total_bytes).
-        parser: BeautifulSoup parser to use. Options: "html.parser", "lxml", "html5lib".
-                Defaults to "lxml" if installed, otherwise "html.parser". Install lxml with: pip install html-to-markdown[lxml]
-        autolinks: Automatically convert valid URLs into Markdown links. Defaults to True.
-        bullets: A string of characters to use for bullet points in lists. Defaults to '*+-'.
-        code_language: Default language identifier for fenced code blocks. Defaults to an empty string.
-        code_language_callback: Function to dynamically determine the language for code blocks.
-        convert: A list of tag names to convert to Markdown. If None, all supported tags are converted.
-        convert_as_inline: Treat the content as inline elements (no block elements like paragraphs). Defaults to False.
-        custom_converters: A mapping of custom converters for specific HTML tags. Defaults to None.
-        default_title: Use the default title when converting certain elements (e.g., links). Defaults to False.
-        escape_asterisks: Escape asterisks (*) to prevent unintended Markdown formatting. Defaults to True.
-        escape_misc: Escape miscellaneous characters to prevent conflicts in Markdown. Defaults to True.
-        escape_underscores: Escape underscores (_) to prevent unintended italic formatting. Defaults to True.
-        extract_metadata: Extract document metadata (title, meta tags) as a comment header. Defaults to True.
-        heading_style: The style to use for Markdown headings. Defaults to "underlined".
-        highlight_style: The style to use for highlighted text (mark elements). Defaults to "double-equal".
-        keep_inline_images_in: Tags in which inline images should be preserved. Defaults to None.
-        list_indent_type: Type of indentation for lists: "spaces" or "tabs". Defaults to "spaces".
-        list_indent_width: Number of spaces for list indentation (ignored when using tabs). Defaults to 4.
-        newline_style: Style for handling newlines in text content. Defaults to "spaces".
-        preprocess_html: Apply HTML preprocessing to improve quality. Defaults to False.
-        preprocessing_preset: Preset configuration for preprocessing. Defaults to "standard".
-        remove_forms: Remove form elements during preprocessing. Defaults to True.
-        remove_navigation: Remove navigation elements during preprocessing. Defaults to True.
-        strip: Tags to strip from the output. Defaults to None.
-        strip_newlines: Remove newlines from HTML input before processing. Defaults to False.
-        strong_em_symbol: Symbol to use for strong/emphasized text. Defaults to "*".
-        sub_symbol: Custom symbol for subscript text. Defaults to an empty string.
-        sup_symbol: Custom symbol for superscript text. Defaults to an empty string.
-        whitespace_mode: How to handle whitespace: "normalized" applies smart normalization (default), "strict" preserves all.
-        wrap: Wrap text to the specified width. Defaults to False.
-        wrap_width: The number of characters at which to wrap text. Defaults to 80.
-
-    Raises:
-        ConflictingOptionsError: If both 'strip' and 'convert' are specified.
-        EmptyHtmlError: When the input HTML is empty.
-        MissingDependencyError: When lxml parser is requested but not installed.
+        source: HTML string or BeautifulSoup object to convert.
+        stream_processing: Enable streaming mode for large documents.
+        chunk_size: Size of chunks for streaming processing.
+        chunk_callback: Callback for processing chunks in streaming mode.
+        progress_callback: Callback for progress updates (current, total).
+        parser: HTML parser to use ('html.parser', 'lxml', 'html5lib').
+        autolinks: Convert URLs to automatic links.
+        bullets: Characters to use for unordered list bullets.
+        code_language: Default language for code blocks.
+        code_language_callback: Callback to determine code language from element.
+        convert: HTML tags to convert to Markdown.
+        convert_as_inline: Treat block elements as inline during conversion.
+        custom_converters: Custom converters for specific HTML elements.
+        default_title: Add a default title if none exists.
+        escape_asterisks: Escape asterisk characters in text.
+        escape_misc: Escape miscellaneous Markdown characters.
+        escape_underscores: Escape underscore characters in text.
+        extract_metadata: Extract metadata from HTML head.
+        heading_style: Style for headings ('underlined', 'atx', 'atx_closed').
+        highlight_style: Style for highlighting ('double-equal', 'html', 'bold').
+        keep_inline_images_in: Parent tags where images should remain inline.
+        list_indent_type: Type of indentation for lists ('spaces', 'tabs').
+        list_indent_width: Number of spaces for list indentation.
+        newline_style: Style for newlines ('spaces', 'backslash').
+        preprocess_html: Enable HTML preprocessing to clean up content.
+        preprocessing_preset: Preprocessing aggressiveness level.
+        remove_forms: Remove form elements during preprocessing.
+        remove_navigation: Remove navigation elements during preprocessing.
+        strip: HTML tags to strip from output.
+        strip_newlines: Remove newlines from HTML before processing.
+        strong_em_symbol: Symbol for strong/emphasis ('*' or '_').
+        sub_symbol: Symbol for subscript text.
+        sup_symbol: Symbol for superscript text.
+        whitespace_mode: How to handle whitespace ('normalized', 'strict').
+        wrap: Enable text wrapping.
+        wrap_width: Column width for text wrapping.
 
     Returns:
-        str: A string of Markdown-formatted text converted from the given HTML.
+        The converted Markdown string.
+
+    Raises:
+        EmptyHtmlError: If the HTML input is empty.
+        MissingDependencyError: If required dependencies are not installed.
+        ConflictingOptionsError: If conflicting options are provided.
+
+    Examples:
+        Basic conversion:
+        >>> html = "<h1>Title</h1><p>Content</p>"
+        >>> convert_to_markdown(html)
+        'Title\\n=====\\n\\nContent\\n\\n'
+
+        With custom options:
+        >>> convert_to_markdown(html, heading_style="atx", list_indent_width=2)
+        '# Title\\n\\nContent\\n\\n'
+
+        Discord-compatible lists (2-space indent):
+        >>> html = "<ul><li>Item 1</li><li>Item 2</li></ul>"
+        >>> convert_to_markdown(html, list_indent_width=2)
+        '* Item 1\\n* Item 2\\n\\n'
     """
     if isinstance(source, str):
         if (
@@ -650,7 +638,6 @@ def convert_to_markdown(
 
     sink = StringSink()
 
-    # Create whitespace handler
     whitespace_handler = WhitespaceHandler(whitespace_mode)
 
     _process_html_core(
@@ -736,34 +723,25 @@ def convert_to_markdown(
 
 
 class OutputSink:
-    """Abstract output sink for processed markdown text."""
-
     def write(self, text: str) -> None:
-        """Write text to the sink."""
         raise NotImplementedError
 
     def finalize(self) -> None:
-        """Finalize the output."""
+        pass
 
 
 class StringSink(OutputSink):
-    """Collects all output into a single string."""
-
     def __init__(self) -> None:
         self.buffer = StringIO()
 
     def write(self, text: str) -> None:
-        """Write text to the buffer."""
         self.buffer.write(text)
 
     def get_result(self) -> str:
-        """Get the complete result string."""
         return self.buffer.getvalue()
 
 
 class StreamingSink(OutputSink):
-    """Yields chunks of output for streaming processing."""
-
     def __init__(self, chunk_size: int = 1024, progress_callback: Callable[[int, int], None] | None = None) -> None:
         self.chunk_size = chunk_size
         self.progress_callback = progress_callback
@@ -774,7 +752,6 @@ class StreamingSink(OutputSink):
         self.chunks: list[str] = []
 
     def write(self, text: str) -> None:
-        """Write text and yield chunks when threshold is reached."""
         if not text:
             return
 
@@ -797,7 +774,6 @@ class StreamingSink(OutputSink):
         self.buffer_size = len(current_content)
 
     def finalize(self) -> None:
-        """Finalize and yield any remaining content."""
         if self.buffer_size > 0:
             content = self.buffer.getvalue()
             self.chunks.append(content)
@@ -805,11 +781,9 @@ class StreamingSink(OutputSink):
             self._update_progress()
 
     def get_chunks(self) -> Generator[str, None, None]:
-        """Get all chunks yielded during processing."""
         yield from self.chunks
 
     def _find_split_position(self, content: str) -> int:
-        """Find optimal position to split content for chunks."""
         target = self.chunk_size
         lookahead = min(100, len(content) - target)
 
@@ -822,7 +796,6 @@ class StreamingSink(OutputSink):
         return min(target, len(content))
 
     def _update_progress(self) -> None:
-        """Update progress if callback is provided."""
         if self.progress_callback:
             self.progress_callback(self.processed_bytes, self.total_bytes)
 
@@ -859,7 +832,6 @@ def _process_html_core(
     wrap: bool,
     wrap_width: int,
 ) -> None:
-    """Core HTML to Markdown processing logic shared by both regular and streaming."""
     token = _ancestor_cache.set({})
 
     try:
@@ -986,48 +958,6 @@ def convert_to_markdown_stream(
     wrap: bool = False,
     wrap_width: int = 80,
 ) -> Generator[str, None, None]:
-    """Convert HTML to Markdown using streaming/chunked processing.
-
-    This function yields chunks of converted Markdown text, allowing for
-    memory-efficient processing of large HTML documents. The output is guaranteed
-    to be identical to convert_to_markdown().
-
-    Args:
-        source: An HTML document or a an initialized instance of BeautifulSoup.
-        chunk_size: Size of chunks to yield (approximate, in characters).
-        progress_callback: Optional callback function called with (processed_bytes, total_bytes).
-        parser: BeautifulSoup parser to use. Options: "html.parser", "lxml", "html5lib".
-                Defaults to "lxml" if installed, otherwise "html.parser". Install lxml with: pip install html-to-markdown[lxml]
-        autolinks: Automatically convert valid URLs into Markdown links. Defaults to True.
-        bullets: A string of characters to use for bullet points in lists. Defaults to '*+-'.
-        code_language: Default language identifier for fenced code blocks. Defaults to an empty string.
-        code_language_callback: Function to dynamically determine the language for code blocks.
-        convert: A list of tag names to convert to Markdown. If None, all supported tags are converted.
-        convert_as_inline: Treat the content as inline elements (no block elements like paragraphs). Defaults to False.
-        custom_converters: A mapping of custom converters for specific HTML tags. Defaults to None.
-        default_title: Use the default title when converting certain elements (e.g., links). Defaults to False.
-        escape_asterisks: Escape asterisks (*) to prevent unintended Markdown formatting. Defaults to True.
-        escape_misc: Escape miscellaneous characters to prevent conflicts in Markdown. Defaults to True.
-        escape_underscores: Escape underscores (_) to prevent unintended italic formatting. Defaults to True.
-        extract_metadata: Extract document metadata (title, meta tags) as a comment header. Defaults to True.
-        heading_style: The style to use for Markdown headings. Defaults to "underlined".
-        highlight_style: The style to use for highlighted text (mark elements). Defaults to "double-equal".
-        keep_inline_images_in: Tags in which inline images should be preserved. Defaults to None.
-        list_indent_type: Type of indentation for lists: "spaces" or "tabs". Defaults to "spaces".
-        list_indent_width: Number of spaces for list indentation (ignored when using tabs). Defaults to 4.
-        newline_style: Style for handling newlines in text content. Defaults to "spaces".
-        strip: Tags to strip from the output. Defaults to None.
-        strip_newlines: Remove newlines from HTML input before processing. Defaults to False.
-        strong_em_symbol: Symbol to use for strong/emphasized text. Defaults to "*".
-        sub_symbol: Custom symbol for subscript text. Defaults to an empty string.
-        sup_symbol: Custom symbol for superscript text. Defaults to an empty string.
-        whitespace_mode: How to handle whitespace: "normalized" applies smart normalization (default), "strict" preserves all.
-        wrap: Wrap text to the specified width. Defaults to False.
-        wrap_width: The number of characters at which to wrap text. Defaults to 80.
-
-    Yields:
-        str: Chunks of Markdown-formatted text.
-    """
     sink = StreamingSink(chunk_size, progress_callback)
 
     if isinstance(source, str):
@@ -1035,7 +965,6 @@ def convert_to_markdown_stream(
     elif isinstance(source, BeautifulSoup):
         sink.total_bytes = len(str(source))
 
-    # Create whitespace handler
     whitespace_handler = WhitespaceHandler(whitespace_mode)
 
     _process_html_core(

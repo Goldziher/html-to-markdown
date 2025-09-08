@@ -10,22 +10,25 @@ If you find html-to-markdown useful, please consider sponsoring the development:
 
 <a href="https://github.com/sponsors/Goldziher"><img src="https://img.shields.io/badge/Sponsor-%E2%9D%A4-pink?logo=github-sponsors" alt="Sponsor on GitHub" height="32"></a>
 
-Your support helps maintain and improve this library for the community! 🚀
+Your support helps maintain and improve this library for the community.
 
 ## Features
 
 - **Full HTML5 Support**: Comprehensive support for all modern HTML5 elements including semantic, form, table, ruby, interactive, structural, SVG, and math elements
-- **Enhanced Table Support**: Advanced handling of merged cells with rowspan/colspan support for better table representation
+- **Table Support**: Advanced handling of complex tables with rowspan/colspan support
 - **Type Safety**: Strict MyPy adherence with comprehensive type hints
 - **Metadata Extraction**: Automatic extraction of document metadata (title, meta tags) as comment headers
 - **Streaming Support**: Memory-efficient processing for large documents with progress callbacks
 - **Highlight Support**: Multiple styles for highlighted text (`<mark>` elements)
 - **Task List Support**: Converts HTML checkboxes to GitHub-compatible task list syntax
-- **Flexible Configuration**: 20+ configuration options for customizing conversion behavior
-- **CLI Tool**: Full-featured command-line interface with all API options exposed
+- **Flexible Configuration**: Comprehensive configuration options for customizing conversion behavior
+- **CLI Tool**: Full-featured command-line interface with complete API parity
 - **Custom Converters**: Extensible converter system for custom HTML tag handling
+- **List Formatting**: Configurable list indentation with Discord/Slack compatibility
+- **HTML Preprocessing**: Clean messy HTML with configurable aggressiveness levels
+- **Whitespace Control**: Normalized or strict whitespace preservation modes
 - **BeautifulSoup Integration**: Support for pre-configured BeautifulSoup instances
-- **Comprehensive Test Coverage**: 91%+ test coverage with 623+ comprehensive tests
+- **Robustly Tested**: Comprehensive unit tests and integration tests covering all conversion scenarios
 
 ## Installation
 
@@ -41,19 +44,9 @@ For improved performance, you can install with the optional lxml parser:
 pip install html-to-markdown[lxml]
 ```
 
-The lxml parser offers:
+The lxml parser offers faster HTML parsing and better handling of malformed HTML compared to the default html.parser.
 
-- **~30% faster HTML parsing** compared to the default html.parser
-- Better handling of malformed HTML
-- More robust parsing for complex documents
-
-Once installed, lxml is automatically used by default for better performance. You can explicitly specify a parser if needed:
-
-```python
-result = convert_to_markdown(html)  # Auto-detects: uses lxml if available, otherwise html.parser
-result = convert_to_markdown(html, parser="lxml")  # Force lxml (requires installation)
-result = convert_to_markdown(html, parser="html.parser")  # Force built-in parser
-```
+The library automatically uses lxml when available. You can explicitly specify a parser using the `parser` parameter.
 
 ## Quick Start
 
@@ -118,123 +111,176 @@ soup = BeautifulSoup(html, "lxml")  # Note: lxml requires additional installatio
 markdown = convert_to_markdown(soup)
 ```
 
-## Advanced Usage
+## Common Use Cases
 
-### Customizing Conversion Options
+### Discord/Slack Compatible Lists
 
-The library offers extensive customization through various options:
+Discord and Slack require 2-space indentation for nested lists:
+
+**Python:**
 
 ```python
 from html_to_markdown import convert_to_markdown
 
-html = "<div>Your content here...</div>"
+html = "<ul><li>Item 1<ul><li>Nested item</li></ul></li></ul>"
+markdown = convert_to_markdown(html, list_indent_width=2)
+# Output: * Item 1\n  + Nested item
+```
+
+**CLI:**
+
+```shell
+html_to_markdown --list-indent-width 2 input.html
+```
+
+### Cleaning Web-Scraped HTML
+
+Remove navigation, advertisements, and forms from scraped content:
+
+**Python:**
+
+```python
+markdown = convert_to_markdown(html, preprocess_html=True, preprocessing_preset="aggressive")
+```
+
+**CLI:**
+
+```shell
+html_to_markdown --preprocess-html --preprocessing-preset aggressive input.html
+```
+
+### Preserving Whitespace for Documentation
+
+Maintain exact whitespace for code documentation or technical content:
+
+**Python:**
+
+```python
+markdown = convert_to_markdown(html, whitespace_mode="strict")
+```
+
+**CLI:**
+
+```shell
+html_to_markdown --whitespace-mode strict input.html
+```
+
+### Using Tabs for List Indentation
+
+Some editors and platforms prefer tab-based indentation:
+
+**Python:**
+
+```python
+markdown = convert_to_markdown(html, list_indent_type="tabs")
+```
+
+**CLI:**
+
+```shell
+html_to_markdown --list-indent-type tabs input.html
+```
+
+## Advanced Usage
+
+### Configuration Example
+
+```python
+from html_to_markdown import convert_to_markdown
+
 markdown = convert_to_markdown(
     html,
-    # Document processing
-    extract_metadata=True,  # Extract metadata as comment header
-    convert_as_inline=False,  # Treat as block-level content
-    strip_newlines=False,  # Preserve original newlines
-    # Formatting options
-    heading_style="atx",  # Use # style headers
-    strong_em_symbol="*",  # Use * for bold/italic
-    bullets="*+-",  # Define bullet point characters
-    highlight_style="double-equal",  # Use == for highlighted text
-    # Text processing
-    wrap=True,  # Enable text wrapping
-    wrap_width=100,  # Set wrap width
-    escape_asterisks=True,  # Escape * characters
-    escape_underscores=True,  # Escape _ characters
-    escape_misc=True,  # Escape other special characters
-    # Code blocks
-    code_language="python",  # Default code block language
-    # Streaming for large documents
-    stream_processing=False,  # Enable for memory efficiency
-    chunk_size=1024,  # Chunk size for streaming
+    # Headers and formatting
+    heading_style="atx",
+    strong_em_symbol="*",
+    bullets="*+-",
+    highlight_style="double-equal",
+    # List indentation
+    list_indent_type="spaces",
+    list_indent_width=4,
+    # Whitespace handling
+    whitespace_mode="normalized",
+    # HTML preprocessing
+    preprocess_html=True,
+    preprocessing_preset="standard",
 )
 ```
 
 ### Custom Converters
 
-You can provide your own conversion functions for specific HTML tags:
+Custom converters allow you to override the default conversion behavior for any HTML tag. This is particularly useful for customizing header formatting or implementing domain-specific conversion rules.
+
+#### Basic Example: Custom Header Formatting
 
 ```python
 from bs4.element import Tag
 from html_to_markdown import convert_to_markdown
 
-# Define a custom converter for the <b> tag
-def custom_bold_converter(*, tag: Tag, text: str, **kwargs) -> str:
-    return f"IMPORTANT: {text}"
+def custom_h1_converter(*, tag: Tag, text: str, **kwargs) -> str:
+    """Convert h1 tags with custom formatting."""
+    return f"### {text.upper()} ###\n\n"
 
-html = "<p>This is a <b>bold statement</b>.</p>"
-markdown = convert_to_markdown(html, custom_converters={"b": custom_bold_converter})
+def custom_h2_converter(*, tag: Tag, text: str, **kwargs) -> str:
+    """Convert h2 tags with underline."""
+    return f"{text}\n{'=' * len(text)}\n\n"
+
+html = "<h1>Title</h1><h2>Subtitle</h2><p>Content</p>"
+markdown = convert_to_markdown(html, custom_converters={"h1": custom_h1_converter, "h2": custom_h2_converter})
 print(markdown)
-# Output: This is a IMPORTANT: bold statement.
+# Output:
+# ### TITLE ###
+#
+# Subtitle
+# ========
+#
+# Content
 ```
 
-Custom converters take precedence over the built-in converters and can be used alongside other configuration options.
-
-### Enhanced Table Support
-
-The library now provides better handling of complex tables with merged cells:
+#### Advanced Example: Context-Aware Link Conversion
 
 ```python
-from html_to_markdown import convert_to_markdown
+def smart_link_converter(*, tag: Tag, text: str, **kwargs) -> str:
+    """Convert links based on their attributes."""
+    href = tag.get("href", "")
+    title = tag.get("title", "")
 
-# HTML table with merged cells
-html = """
-<table>
-    <tr>
-        <th rowspan="2">Category</th>
-        <th colspan="2">Sales Data</th>
-    </tr>
-    <tr>
-        <th>Q1</th>
-        <th>Q2</th>
-    </tr>
-    <tr>
-        <td>Product A</td>
-        <td>$100K</td>
-        <td>$150K</td>
-    </tr>
-</table>
-"""
+    # Handle different link types
+    if href.startswith("http"):
+        # External link
+        return f"[{text}]({href} \"{title or 'External link'}\")"
+    elif href.startswith("#"):
+        # Anchor link
+        return f"[{text}]({href})"
+    elif href.startswith("mailto:"):
+        # Email link
+        return f"[{text}]({href})"
+    else:
+        # Relative link
+        return f"[{text}]({href})"
 
-markdown = convert_to_markdown(html)
-print(markdown)
+html = '<a href="https://example.com">External</a> <a href="#section">Anchor</a>'
+markdown = convert_to_markdown(html, custom_converters={"a": smart_link_converter})
 ```
 
-Output:
+#### Converter Function Signature
 
-```markdown
-| Category | Sales Data |  |
-| --- | --- | --- |
-| | Q1 | Q2 |
-| Product A | $100K | $150K |
+All converter functions must follow this signature:
+
+```python
+def converter(*, tag: Tag, text: str, **kwargs) -> str:
+    """
+    Args:
+        tag: BeautifulSoup Tag object with access to all HTML attributes
+        text: Pre-processed text content of the tag
+        **kwargs: Additional context passed through from conversion
+
+    Returns:
+        Markdown formatted string
+    """
+    pass
 ```
 
-The library handles:
-
-- **Rowspan**: Inserts empty cells in subsequent rows
-- **Colspan**: Properly manages column spanning
-- **Clean output**: Removes `<colgroup>` and `<col>` elements that have no Markdown equivalent
-
-### Key Configuration Options
-
-| Option              | Type | Default          | Description                                                     |
-| ------------------- | ---- | ---------------- | --------------------------------------------------------------- |
-| `extract_metadata`  | bool | `True`           | Extract document metadata as comment header                     |
-| `convert_as_inline` | bool | `False`          | Treat content as inline elements only                           |
-| `heading_style`     | str  | `'underlined'`   | Header style (`'underlined'`, `'atx'`, `'atx_closed'`)          |
-| `highlight_style`   | str  | `'double-equal'` | Highlight style (`'double-equal'`, `'html'`, `'bold'`)          |
-| `stream_processing` | bool | `False`          | Enable streaming for large documents                            |
-| `parser`            | str  | auto-detect      | BeautifulSoup parser (auto-detects `'lxml'` or `'html.parser'`) |
-| `autolinks`         | bool | `True`           | Auto-convert URLs to Markdown links                             |
-| `bullets`           | str  | `'*+-'`          | Characters to use for bullet points                             |
-| `escape_asterisks`  | bool | `True`           | Escape * characters                                             |
-| `wrap`              | bool | `False`          | Enable text wrapping                                            |
-| `wrap_width`        | int  | `80`             | Text wrap width                                                 |
-
-For a complete list of all 20+ options, see the [Configuration Reference](#configuration-reference) section below.
+Custom converters take precedence over built-in converters and can be used alongside other configuration options.
 
 ## CLI Usage
 
@@ -250,50 +296,29 @@ cat input.html | html_to_markdown > output.md
 # Use custom options
 html_to_markdown --heading-style atx --wrap --wrap-width 100 input.html > output.md
 
-# Advanced options
+# Discord-compatible lists with HTML preprocessing
 html_to_markdown \
-  --no-extract-metadata \
-  --convert-as-inline \
-  --highlight-style html \
-  --stream-processing \
-  --show-progress \
+  --list-indent-width 2 \
+  --preprocess-html \
+  --preprocessing-preset aggressive \
   input.html > output.md
 ```
 
 ### Key CLI Options
 
-```shell
-# Content processing
---convert-as-inline          # Treat content as inline elements
---no-extract-metadata        # Disable metadata extraction
---strip-newlines             # Remove newlines from input
-
-# Formatting
---heading-style {atx,atx_closed,underlined}
---highlight-style {double-equal,html,bold}
---strong-em-symbol {*,_}
---bullets CHARS              # e.g., "*+-"
-
-# Text escaping
---no-escape-asterisks        # Disable * escaping
---no-escape-underscores      # Disable _ escaping
---no-escape-misc             # Disable misc character escaping
-
-# Large document processing
---stream-processing          # Enable streaming mode
---chunk-size SIZE            # Set chunk size (default: 1024)
---show-progress              # Show progress for large files
-
-# Text wrapping
---wrap                       # Enable text wrapping
---wrap-width WIDTH           # Set wrap width (default: 80)
-```
-
-View all available options:
+**Most Common Options:**
 
 ```shell
-html_to_markdown --help
+--list-indent-width WIDTH           # Spaces per indent (default: 4, use 2 for Discord)
+--list-indent-type {spaces,tabs}    # Indentation type (default: spaces)
+--preprocess-html                   # Enable HTML cleaning for web scraping
+--whitespace-mode {normalized,strict} # Whitespace handling (default: normalized)
+--heading-style {atx,atx_closed,underlined} # Header style
+--no-extract-metadata               # Disable metadata extraction
 ```
+
+**All Available Options:**
+The CLI supports all Python API parameters. Use `html_to_markdown --help` to see the complete list.
 
 ## Migration from Markdownify
 
@@ -313,33 +338,38 @@ The `markdownify` function is an alias for `convert_to_markdown` and provides id
 
 ## Configuration Reference
 
-Complete list of all configuration options:
+### Most Common Parameters
 
-### Document Processing
-
-- `extract_metadata` (bool, default: `True`): Extract document metadata (title, meta tags) as comment header
-- `convert_as_inline` (bool, default: `False`): Treat content as inline elements only (no block elements)
-- `strip_newlines` (bool, default: `False`): Remove newlines from HTML input before processing
-- `convert` (list, default: `None`): List of HTML tags to convert (None = all supported tags)
-- `strip` (list, default: `None`): List of HTML tags to remove from output
-- `custom_converters` (dict, default: `None`): Mapping of HTML tag names to custom converter functions
-
-### Streaming Support
-
-- `stream_processing` (bool, default: `False`): Enable streaming processing for large documents
-- `chunk_size` (int, default: `1024`): Size of chunks when using streaming processing
-- `chunk_callback` (callable, default: `None`): Callback function called with each processed chunk
-- `progress_callback` (callable, default: `None`): Callback function called with (processed_bytes, total_bytes)
+- `list_indent_width` (int, default: `4`): Number of spaces per indentation level (use 2 for Discord/Slack)
+- `list_indent_type` (str, default: `'spaces'`): Use `'spaces'` or `'tabs'` for list indentation
+- `heading_style` (str, default: `'underlined'`): Header style (`'underlined'`, `'atx'`, `'atx_closed'`)
+- `whitespace_mode` (str, default: `'normalized'`): Whitespace handling (`'normalized'` or `'strict'`)
+- `preprocess_html` (bool, default: `False`): Enable HTML preprocessing to clean messy HTML
+- `extract_metadata` (bool, default: `True`): Extract document metadata as comment header
 
 ### Text Formatting
 
-- `heading_style` (str, default: `'underlined'`): Header style (`'underlined'`, `'atx'`, `'atx_closed'`)
 - `highlight_style` (str, default: `'double-equal'`): Style for highlighted text (`'double-equal'`, `'html'`, `'bold'`)
 - `strong_em_symbol` (str, default: `'*'`): Symbol for strong/emphasized text (`'*'` or `'_'`)
 - `bullets` (str, default: `'*+-'`): Characters to use for bullet points in lists
 - `newline_style` (str, default: `'spaces'`): Style for handling newlines (`'spaces'` or `'backslash'`)
 - `sub_symbol` (str, default: `''`): Custom symbol for subscript text
 - `sup_symbol` (str, default: `''`): Custom symbol for superscript text
+
+### Parser Options
+
+- `parser` (str, default: auto-detect): BeautifulSoup parser to use (`'lxml'`, `'html.parser'`, `'html5lib'`)
+- `preprocessing_preset` (str, default: `'standard'`): Preprocessing level (`'minimal'`, `'standard'`, `'aggressive'`)
+- `remove_forms` (bool, default: `True`): Remove form elements during preprocessing
+- `remove_navigation` (bool, default: `True`): Remove navigation elements during preprocessing
+
+### Document Processing
+
+- `convert_as_inline` (bool, default: `False`): Treat content as inline elements only
+- `strip_newlines` (bool, default: `False`): Remove newlines from HTML input before processing
+- `convert` (list, default: `None`): List of HTML tags to convert (None = all supported tags)
+- `strip` (list, default: `None`): List of HTML tags to remove from output
+- `custom_converters` (dict, default: `None`): Mapping of HTML tag names to custom converter functions
 
 ### Text Escaping
 
@@ -362,6 +392,15 @@ Complete list of all configuration options:
 
 - `wrap` (bool, default: `False`): Enable text wrapping
 - `wrap_width` (int, default: `80`): Width for text wrapping
+
+### HTML Processing
+
+- `parser` (str, default: auto-detect): BeautifulSoup parser to use (`'lxml'`, `'html.parser'`, `'html5lib'`)
+- `whitespace_mode` (str, default: `'normalized'`): How to handle whitespace (`'normalized'` intelligently cleans whitespace, `'strict'` preserves original)
+- `preprocess_html` (bool, default: `False`): Enable HTML preprocessing to clean messy HTML
+- `preprocessing_preset` (str, default: `'standard'`): Preprocessing aggressiveness (`'minimal'` for basic cleaning, `'standard'` for balanced, `'aggressive'` for heavy cleaning)
+- `remove_forms` (bool, default: `True`): Remove form elements during preprocessing
+- `remove_navigation` (bool, default: `True`): Remove navigation elements during preprocessing
 
 ## Contribution
 
@@ -420,17 +459,6 @@ uv run python -m html_to_markdown input.html
 uv build
 ```
 
-## Performance
-
-The library is optimized for performance with several key features:
-
-- **Efficient ancestor caching**: Reduces repeated DOM traversals using context-aware caching
-- **Streaming support**: Process large documents in chunks to minimize memory usage
-- **Optional lxml parser**: ~30% faster parsing for complex HTML documents
-- **Optimized string operations**: Minimizes string concatenations in hot paths
-
-Typical throughput: ~2 MB/s for regular processing on modern hardware.
-
 ## License
 
 This library uses the MIT license.
@@ -473,42 +501,6 @@ This library provides comprehensive support for all modern HTML5 elements:
 ### Math Elements
 
 - `<math>` (MathML support)
-
-## Advanced Table Support
-
-The library provides sophisticated handling of complex HTML tables, including merged cells and proper structure conversion:
-
-```python
-from html_to_markdown import convert_to_markdown
-
-# Complex table with merged cells
-html = """
-<table>
-    <caption>Sales Report</caption>
-    <tr>
-        <th rowspan="2">Product</th>
-        <th colspan="2">Quarterly Sales</th>
-    </tr>
-    <tr>
-        <th>Q1</th>
-        <th>Q2</th>
-    </tr>
-    <tr>
-        <td>Widget A</td>
-        <td>$50K</td>
-        <td>$75K</td>
-    </tr>
-</table>
-"""
-
-result = convert_to_markdown(html)
-```
-
-**Features:**
-
-- **Merged cell support**: Handles `rowspan` and `colspan` attributes intelligently
-- **Clean output**: Automatically removes table styling elements that don't translate to Markdown
-- **Structure preservation**: Maintains table hierarchy and relationships
 
 ## Acknowledgments
 

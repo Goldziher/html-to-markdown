@@ -9,7 +9,6 @@ class TestListConversion:
     """Test cases for HTML list to Markdown conversion."""
 
     def test_basic_unordered_list(self) -> None:
-        """Test basic unordered list conversion."""
         html = """<ul>
         <li>Item 1</li>
         <li>Item 2</li>
@@ -22,7 +21,6 @@ class TestListConversion:
         assert "* Item 3" in result
 
     def test_basic_ordered_list(self) -> None:
-        """Test basic ordered list conversion."""
         html = """<ol>
         <li>First</li>
         <li>Second</li>
@@ -35,7 +33,6 @@ class TestListConversion:
         assert "3. Third" in result
 
     def test_list_first_item_indent_with_strip_newlines(self) -> None:
-        """Test that first list item doesn't have extra indent with strip_newlines (issue #48)."""
         html = """
         <p>Above</p>
         <ul>
@@ -55,7 +52,6 @@ class TestListConversion:
             assert first_item.startswith("*"), "First item should start with bullet"
 
     def test_list_indentation_consistency(self) -> None:
-        """Test that all list items have consistent indentation."""
         html = """
         <ul>
             <li>Item 1</li>
@@ -67,20 +63,17 @@ class TestListConversion:
         result_normal = convert_to_markdown(html)
         result_stripped = convert_to_markdown(html, strip_newlines=True)
 
-        # Check that indentation is consistent in both modes
         for result in [result_normal, result_stripped]:
             lines = result.split("\n")
             list_lines = [line for line in lines if line.strip().startswith("*")]
 
             if len(list_lines) > 1:
-                # All items should have the same indentation
                 first_indent = len(list_lines[0]) - len(list_lines[0].lstrip())
                 for line in list_lines[1:]:
                     indent = len(line) - len(line.lstrip())
                     assert indent == first_indent, f"Inconsistent indentation: {indent} != {first_indent}"
 
     def test_list_with_multiple_paragraphs(self) -> None:
-        """Test list items with multiple paragraphs are properly indented (issue #50)."""
         html = """<ul>
         <li>
             <p>First paragraph</p>
@@ -99,11 +92,9 @@ class TestListConversion:
         lines = result.split("\n")
         for line in lines:
             if "Second paragraph" in line:
-                # Should be indented to align with list content
                 assert line.startswith(("    ", "\t")), "Second paragraph should be indented"
 
     def test_list_with_nested_paragraphs_complex(self) -> None:
-        """Test complex list with multiple paragraphs in items."""
         html = """<ol>
         <li>
             <p>Item 1 first paragraph</p>
@@ -123,7 +114,6 @@ class TestListConversion:
         assert "3. Item 3 with paragraph" in result
 
     def test_nested_list_not_inside_li(self) -> None:
-        """Test incorrectly nested lists still get indented (issue #59)."""
         html = "<ul><li>a</li><li>b</li><ul><li>c</li><li>d</li></ul></ul>"
 
         result = convert_to_markdown(html)
@@ -132,7 +122,6 @@ class TestListConversion:
         assert result == expected
 
     def test_nested_list_not_inside_li_with_multiple_levels(self) -> None:
-        """Test multiple levels of incorrect nesting."""
         html = """<ul>
             <li>Item 1</li>
             <li>Item 2</li>
@@ -156,7 +145,6 @@ class TestListConversion:
         assert "* Item 3" in result
 
     def test_mixed_correct_and_incorrect_nesting(self) -> None:
-        """Test mix of correctly and incorrectly nested lists."""
         html = """<ul>
             <li>Item 1
                 <ul>
@@ -183,7 +171,6 @@ class TestListConversion:
         assert "* Item 3" in result
 
     def test_ordered_list_incorrectly_nested(self) -> None:
-        """Test incorrectly nested ordered lists."""
         html = "<ol><li>First</li><li>Second</li><ol><li>Nested first</li><li>Nested second</li></ol></ol>"
 
         result = convert_to_markdown(html)
@@ -194,7 +181,6 @@ class TestListConversion:
             assert line in result
 
     def test_deeply_incorrect_nesting(self) -> None:
-        """Test deeply incorrectly nested lists."""
         html = """<ul>
             <li>Level 1</li>
             <ul>

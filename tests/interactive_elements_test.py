@@ -198,7 +198,7 @@ class TestInteractiveElementsIntegration:
         <dialog id="dialog2" open>Second dialog</dialog>
         """
         result = convert_to_markdown(html)
-        expected = """\n        First dialog\n\nSecond dialog\n\n"""
+        expected = """First dialog\n\nSecond dialog\n\n"""
         assert result == expected
 
     def test_menu_with_submenus(self) -> None:
