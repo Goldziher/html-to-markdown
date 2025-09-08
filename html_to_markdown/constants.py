@@ -17,3 +17,7 @@ UNDERLINED: Final = "underlined"
 SPACES: Final = "spaces"
 UNDERSCORE: Final = "_"
 DOUBLE_EQUAL: Final = "double-equal"
+
+# Whitespace preservation modes
+WHITESPACE_NORMALIZED: Final = "normalized"
+WHITESPACE_STRICT: Final = "strict"

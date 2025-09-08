@@ -33,12 +33,13 @@ from html_to_markdown.constants import (
     DOUBLE_EQUAL,
     SPACES,
     UNDERLINED,
+    WHITESPACE_NORMALIZED,
     html_heading_re,
-    whitespace_re,
 )
 from html_to_markdown.converters import Converter, ConvertersMap, SupportedElements, create_converters_map
 from html_to_markdown.exceptions import ConflictingOptionsError, EmptyHtmlError, MissingDependencyError
 from html_to_markdown.utils import escape
+from html_to_markdown.whitespace import WhitespaceHandler
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
@@ -143,6 +144,21 @@ SupportedTag = Literal[
 ]
 
 
+def _get_list_indent(list_indent_type: str, list_indent_width: int) -> str:
+    """Generate the indent string for lists based on type and width.
+
+    Args:
+        list_indent_type: Either "spaces" or "tabs"
+        list_indent_width: Number of spaces (ignored for tabs)
+
+    Returns:
+        The indent string to use
+    """
+    if list_indent_type == "tabs":
+        return "\t"
+    return " " * list_indent_width
+
+
 def _is_nested_tag(el: PageElement) -> bool:
     return isinstance(el, Tag) and el.name in {
         "ol",
@@ -170,6 +186,7 @@ def _process_tag(
     escape_misc: bool,
     escape_underscores: bool,
     strip: set[str] | None,
+    whitespace_handler: WhitespaceHandler,
     context_before: str = "",
 ) -> str:
     should_convert_tag = _should_convert_tag(tag_name=tag.name, strip=strip, convert=convert)
@@ -218,6 +235,7 @@ def _process_tag(
                     escape_misc=escape_misc,
                     escape_asterisks=escape_asterisks,
                     escape_underscores=escape_underscores,
+                    whitespace_handler=whitespace_handler,
                 )
             )
         elif isinstance(el, Tag):
@@ -232,6 +250,7 @@ def _process_tag(
                     escape_misc=escape_misc,
                     escape_underscores=escape_underscores,
                     strip=strip,
+                    whitespace_handler=whitespace_handler,
                     context_before=(context_before + current_text)[-2:],
                 )
             )
@@ -259,6 +278,7 @@ def _process_text(
     escape_misc: bool,
     escape_asterisks: bool,
     escape_underscores: bool,
+    whitespace_handler: WhitespaceHandler,
 ) -> str:
     text = str(el) or ""
 
@@ -275,69 +295,11 @@ def _process_text(
         if len(ancestor_names) > 10:
             break
 
-    if "pre" not in ancestor_names:
-        if text.strip() == "":
-            if "\n" in text:
-                text = ""
-            else:
-                block_elements = {
-                    "p",
-                    "ul",
-                    "ol",
-                    "div",
-                    "blockquote",
-                    "pre",
-                    "h1",
-                    "h2",
-                    "h3",
-                    "h4",
-                    "h5",
-                    "h6",
-                    "table",
-                    "dl",
-                    "hr",
-                    "figure",
-                    "article",
-                    "section",
-                    "nav",
-                    "aside",
-                    "header",
-                    "footer",
-                    "main",
-                    "form",
-                    "fieldset",
-                }
+    # Check if we're in a pre element (preserve whitespace only in pre, not inline code)
+    in_pre = bool(ancestor_names.intersection({"pre"}))
 
-                prev_sibling = el.previous_sibling
-                next_sibling = el.next_sibling
-
-                if (
-                    prev_sibling
-                    and hasattr(prev_sibling, "name")
-                    and prev_sibling.name in block_elements
-                    and next_sibling
-                    and hasattr(next_sibling, "name")
-                    and next_sibling.name in block_elements
-                ):
-                    text = ""
-                else:
-                    text = " " if text else ""
-        else:
-            has_leading_space = text.startswith((" ", "\t"))
-            has_trailing_space = text.endswith((" ", "\t"))
-
-            middle_content = (
-                text[1:-1]
-                if has_leading_space and has_trailing_space
-                else text[1:]
-                if has_leading_space
-                else text[:-1]
-                if has_trailing_space
-                else text
-            )
-
-            middle_content = whitespace_re.sub(" ", middle_content.strip())
-            text = (" " if has_leading_space else "") + middle_content + (" " if has_trailing_space else "")
+    # Process whitespace using the handler
+    text = whitespace_handler.process_text_whitespace(text, el, in_pre=in_pre)
 
     if not ancestor_names.intersection({"pre", "code", "kbd", "samp"}):
         text = escape(
@@ -511,18 +473,21 @@ def convert_to_markdown(
     heading_style: Literal["underlined", "atx", "atx_closed"] = UNDERLINED,
     highlight_style: Literal["double-equal", "html", "bold"] = DOUBLE_EQUAL,
     keep_inline_images_in: Iterable[str] | None = None,
+    list_indent_type: Literal["spaces", "tabs"] = "spaces",
+    list_indent_width: int = 4,
     newline_style: Literal["spaces", "backslash"] = SPACES,
+    preprocess_html: bool = False,
+    preprocessing_preset: Literal["minimal", "standard", "aggressive"] = "standard",
+    remove_forms: bool = True,
+    remove_navigation: bool = True,
     strip: str | Iterable[str] | None = None,
     strip_newlines: bool = False,
     strong_em_symbol: Literal["*", "_"] = ASTERISK,
     sub_symbol: str = "",
     sup_symbol: str = "",
+    whitespace_mode: Literal["normalized", "strict"] = WHITESPACE_NORMALIZED,
     wrap: bool = False,
     wrap_width: int = 80,
-    preprocess_html: bool = False,
-    preprocessing_preset: Literal["minimal", "standard", "aggressive"] = "standard",
-    remove_navigation: bool = True,
-    remove_forms: bool = True,
 ) -> str:
     """Convert HTML to Markdown.
 
@@ -549,18 +514,21 @@ def convert_to_markdown(
         heading_style: The style to use for Markdown headings. Defaults to "underlined".
         highlight_style: The style to use for highlighted text (mark elements). Defaults to "double-equal".
         keep_inline_images_in: Tags in which inline images should be preserved. Defaults to None.
+        list_indent_type: Type of indentation for lists: "spaces" or "tabs". Defaults to "spaces".
+        list_indent_width: Number of spaces for list indentation (ignored when using tabs). Defaults to 4.
         newline_style: Style for handling newlines in text content. Defaults to "spaces".
+        preprocess_html: Apply HTML preprocessing to improve quality. Defaults to False.
+        preprocessing_preset: Preset configuration for preprocessing. Defaults to "standard".
+        remove_forms: Remove form elements during preprocessing. Defaults to True.
+        remove_navigation: Remove navigation elements during preprocessing. Defaults to True.
         strip: Tags to strip from the output. Defaults to None.
         strip_newlines: Remove newlines from HTML input before processing. Defaults to False.
         strong_em_symbol: Symbol to use for strong/emphasized text. Defaults to "*".
         sub_symbol: Custom symbol for subscript text. Defaults to an empty string.
         sup_symbol: Custom symbol for superscript text. Defaults to an empty string.
+        whitespace_mode: How to handle whitespace: "normalized" applies smart normalization (default), "strict" preserves all.
         wrap: Wrap text to the specified width. Defaults to False.
         wrap_width: The number of characters at which to wrap text. Defaults to 80.
-        preprocess_html: Apply HTML preprocessing to improve quality. Defaults to False.
-        preprocessing_preset: Preset configuration for preprocessing. Defaults to "standard".
-        remove_navigation: Remove navigation elements during preprocessing. Defaults to True.
-        remove_forms: Remove form elements during preprocessing. Defaults to True.
 
     Raises:
         ConflictingOptionsError: If both 'strip' and 'convert' are specified.
@@ -665,6 +633,7 @@ def convert_to_markdown(
             sup_symbol=sup_symbol,
             wrap=wrap,
             wrap_width=wrap_width,
+            whitespace_mode=whitespace_mode,
         ):
             if chunk_callback:
                 chunk_callback(chunk)
@@ -681,9 +650,13 @@ def convert_to_markdown(
 
     sink = StringSink()
 
+    # Create whitespace handler
+    whitespace_handler = WhitespaceHandler(whitespace_mode)
+
     _process_html_core(
         source,
         sink,
+        whitespace_handler=whitespace_handler,
         parser=parser,
         autolinks=autolinks,
         bullets=bullets,
@@ -700,6 +673,8 @@ def convert_to_markdown(
         heading_style=heading_style,
         highlight_style=highlight_style,
         keep_inline_images_in=keep_inline_images_in,
+        list_indent_type=list_indent_type,
+        list_indent_width=list_indent_width,
         newline_style=newline_style,
         strip=strip,
         strip_newlines=strip_newlines,
@@ -856,6 +831,7 @@ def _process_html_core(
     source: str | BeautifulSoup,
     sink: OutputSink,
     *,
+    whitespace_handler: WhitespaceHandler,
     parser: str | None = None,
     autolinks: bool,
     bullets: str,
@@ -872,6 +848,8 @@ def _process_html_core(
     heading_style: Literal["underlined", "atx", "atx_closed"],
     highlight_style: Literal["double-equal", "html", "bold"],
     keep_inline_images_in: Iterable[str] | None,
+    list_indent_type: str,
+    list_indent_width: int,
     newline_style: Literal["spaces", "backslash"],
     strip: str | Iterable[str] | None,
     strip_newlines: bool,
@@ -921,6 +899,8 @@ def _process_html_core(
             heading_style=heading_style,
             highlight_style=highlight_style,
             keep_inline_images_in=keep_inline_images_in,
+            list_indent_type=list_indent_type,
+            list_indent_width=list_indent_width,
             newline_style=newline_style,
             strong_em_symbol=strong_em_symbol,
             sub_symbol=sub_symbol,
@@ -948,6 +928,7 @@ def _process_html_core(
                     escape_misc=escape_misc,
                     escape_asterisks=escape_asterisks,
                     escape_underscores=escape_underscores,
+                    whitespace_handler=whitespace_handler,
                 )
                 sink.write(text)
                 context += text
@@ -961,6 +942,7 @@ def _process_html_core(
                     escape_misc=escape_misc,
                     escape_underscores=escape_underscores,
                     strip=_as_optional_set(strip),
+                    whitespace_handler=whitespace_handler,
                     context_before=context[-2:],
                 )
                 sink.write(text)
@@ -992,12 +974,15 @@ def convert_to_markdown_stream(
     heading_style: Literal["underlined", "atx", "atx_closed"] = UNDERLINED,
     highlight_style: Literal["double-equal", "html", "bold"] = DOUBLE_EQUAL,
     keep_inline_images_in: Iterable[str] | None = None,
+    list_indent_type: Literal["spaces", "tabs"] = "spaces",
+    list_indent_width: int = 4,
     newline_style: Literal["spaces", "backslash"] = SPACES,
     strip: str | Iterable[str] | None = None,
     strip_newlines: bool = False,
     strong_em_symbol: Literal["*", "_"] = ASTERISK,
     sub_symbol: str = "",
     sup_symbol: str = "",
+    whitespace_mode: Literal["normalized", "strict"] = WHITESPACE_NORMALIZED,
     wrap: bool = False,
     wrap_width: int = 80,
 ) -> Generator[str, None, None]:
@@ -1028,12 +1013,15 @@ def convert_to_markdown_stream(
         heading_style: The style to use for Markdown headings. Defaults to "underlined".
         highlight_style: The style to use for highlighted text (mark elements). Defaults to "double-equal".
         keep_inline_images_in: Tags in which inline images should be preserved. Defaults to None.
+        list_indent_type: Type of indentation for lists: "spaces" or "tabs". Defaults to "spaces".
+        list_indent_width: Number of spaces for list indentation (ignored when using tabs). Defaults to 4.
         newline_style: Style for handling newlines in text content. Defaults to "spaces".
         strip: Tags to strip from the output. Defaults to None.
         strip_newlines: Remove newlines from HTML input before processing. Defaults to False.
         strong_em_symbol: Symbol to use for strong/emphasized text. Defaults to "*".
         sub_symbol: Custom symbol for subscript text. Defaults to an empty string.
         sup_symbol: Custom symbol for superscript text. Defaults to an empty string.
+        whitespace_mode: How to handle whitespace: "normalized" applies smart normalization (default), "strict" preserves all.
         wrap: Wrap text to the specified width. Defaults to False.
         wrap_width: The number of characters at which to wrap text. Defaults to 80.
 
@@ -1047,9 +1035,13 @@ def convert_to_markdown_stream(
     elif isinstance(source, BeautifulSoup):
         sink.total_bytes = len(str(source))
 
+    # Create whitespace handler
+    whitespace_handler = WhitespaceHandler(whitespace_mode)
+
     _process_html_core(
         source,
         sink,
+        whitespace_handler=whitespace_handler,
         parser=parser,
         autolinks=autolinks,
         bullets=bullets,
@@ -1066,6 +1058,8 @@ def convert_to_markdown_stream(
         heading_style=heading_style,
         highlight_style=highlight_style,
         keep_inline_images_in=keep_inline_images_in,
+        list_indent_type=list_indent_type,
+        list_indent_width=list_indent_width,
         newline_style=newline_style,
         strip=strip,
         strip_newlines=strip_newlines,
