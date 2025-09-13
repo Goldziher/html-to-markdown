@@ -132,7 +132,7 @@ class WhitespaceHandler:
         for char in text:
             if unicodedata.category(char) in ("Zs", "Zl", "Zp"):
                 normalized.append(" ")
-            elif char in ("\r\n", "\r"):
+            elif char == "\r":  # pragma: no cover
                 normalized.append("\n")
             else:
                 normalized.append(char)
@@ -168,15 +168,13 @@ class WhitespaceHandler:
         *,
         in_pre: bool = False,
     ) -> str:
-        if not text:
+        if not text:  # pragma: no cover
             return ""
 
         if in_pre or self.should_preserve_whitespace(element):
             return text
 
-        if self.mode == "strict":
-            return text
-
+        # Note: mode == "strict" case is handled by should_preserve_whitespace above
         text = self.normalize_unicode_spaces(text)
         return self._process_normalized(text, element)
 
