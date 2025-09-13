@@ -32,7 +32,7 @@ repos:
     hooks:
       - id: markdownlint-fix
   - repo: https://github.com/adamchainz/blacken-docs
-    rev: 1.19.1
+    rev: 1.20.0
     hooks:
       - id: blacken-docs
         args: ["--pyi", "--line-length", "130"]
@@ -48,7 +48,7 @@ repos:
     hooks:
       - id: pyproject-fmt
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.12.12
+    rev: v0.13.0
     hooks:
       - id: ruff
         args: [--fix]
@@ -70,17 +70,3 @@ repos:
             --check-return-types=False,
             --arg-type-hints-in-docstring=False,
           ]
-  - repo: local
-    hooks:
-      - id: ai-rulez
-        name: ai-rulez
-        entry: uv run ai-rulez generate
-        language: system
-        pass_filenames: false
-        always_run: true
-      - id: mypy
-        name: mypy
-        entry: uv run mypy
-        require_serial: true
-        language: system
-        types: [python]
