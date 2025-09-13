@@ -271,33 +271,26 @@ def test_carriage_return_normalization() -> None:
     result = convert_to_markdown(html)
     assert "Line 1\nLine 2\nLine 3" in result
 
-    # Test carriage return alone
     html = "<p>Text\rCarriage</p>"
     result = convert_to_markdown(html, whitespace_mode="normalized")
     assert "Text\nCarriage" in result or "Text Carriage" in result
 
 
 def test_empty_text_processing() -> None:
-    """Test processing of empty text strings."""
-    # Empty text should return empty string
     html = "<p></p>"
     result = convert_to_markdown(html)
     assert result.strip() == ""
 
-    # Empty text in strict mode
     html = "<p></p>"
     result = convert_to_markdown(html, whitespace_mode="strict")
     assert result.strip() == ""
 
-    # Test with only whitespace that becomes empty after stripping
     html = "<p>   </p>"
     result = convert_to_markdown(html)
     assert result.strip() == ""
 
 
 def test_strict_mode_text_preservation() -> None:
-    """Test that strict mode preserves text as-is in process_text_whitespace."""
-    # Test that strict mode returns text unchanged - note BeautifulSoup normalizes some spaces
     html = "<pre>  Text  with   spaces  </pre>"
     result = convert_to_markdown(html, whitespace_mode="strict")
     assert "  Text  with   spaces  " in result
@@ -334,13 +327,10 @@ def test_mixed_block_and_inline_elements() -> None:
 
 
 def test_whitespace_trailing_with_inline_sibling() -> None:
-    """Test whitespace handling when text ends with newline/tab and next sibling is inline."""
-    # Test text ending with newline followed by inline element
     html = "Text\n<span>inline</span>"
     result = convert_to_markdown(html, whitespace_mode="normalized")
     assert "Text inline" in result
 
-    # Test text ending with tab followed by inline element
     html = "Text\t<em>emphasized</em>"
     result = convert_to_markdown(html, whitespace_mode="normalized")
     assert "Text *emphasized*" in result
@@ -360,27 +350,21 @@ def test_unicode_whitespace_strict_mode() -> None:
 
 
 def test_strict_mode_block_spacing() -> None:
-    """Test that strict mode returns empty string for block spacing."""
     html = "<p>First paragraph</p><p>Second paragraph</p>"
     result = convert_to_markdown(html, whitespace_mode="strict")
-    # In strict mode, get_block_spacing should return empty string
     assert "First paragraph" in result
     assert "Second paragraph" in result
 
 
 def test_block_spacing_with_double_newline_elements() -> None:
-    """Test block spacing for elements that should have double newlines."""
-    # Test div followed by block element
     html = "<div>Content</div><p>Paragraph</p>"
     result = convert_to_markdown(html, whitespace_mode="normalized")
     assert "Content\n\nParagraph" in result
 
-    # Test blockquote followed by block element
     html = "<blockquote>Quote</blockquote><div>Content</div>"
     result = convert_to_markdown(html, whitespace_mode="normalized")
     assert "> Quote\n\nContent" in result
 
-    # Test table followed by block element
     html = "<table><tr><td>Cell</td></tr></table><p>After table</p>"
     result = convert_to_markdown(html, whitespace_mode="normalized")
     assert "Cell" in result
@@ -388,19 +372,15 @@ def test_block_spacing_with_double_newline_elements() -> None:
 
 
 def test_block_spacing_with_single_newline_elements() -> None:
-    """Test block spacing for elements that should have single newlines."""
-    # Test list items
     html = "<ul><li>Item 1</li><li>Item 2</li></ul>"
     result = convert_to_markdown(html, whitespace_mode="normalized")
     assert "* Item 1\n* Item 2" in result
 
-    # Test definition list
     html = "<dl><dt>Term</dt><dd>Definition</dd></dl>"
     result = convert_to_markdown(html, whitespace_mode="normalized")
     assert "Term" in result
     assert "Definition" in result
 
-    # Test table rows
     html = "<table><tr><td>Cell 1</td></tr><tr><td>Cell 2</td></tr></table>"
     result = convert_to_markdown(html, whitespace_mode="normalized")
     assert "Cell 1" in result
@@ -408,18 +388,14 @@ def test_block_spacing_with_single_newline_elements() -> None:
 
 
 def test_block_spacing_heading_elements() -> None:
-    """Test block spacing for heading elements."""
-    # Test h1 followed by paragraph
     html = "<h1>Heading 1</h1><p>Content</p>"
     result = convert_to_markdown(html, whitespace_mode="normalized", heading_style="atx")
     assert "# Heading 1\n\nContent" in result
 
-    # Test h2 followed by div
     html = "<h2>Heading 2</h2><div>Content</div>"
     result = convert_to_markdown(html, whitespace_mode="normalized", heading_style="atx")
     assert "## Heading 2\n\nContent" in result
 
-    # Test h3 through h6
     for i in range(3, 7):
         html = f"<h{i}>Heading {i}</h{i}><p>Content</p>"
         result = convert_to_markdown(html, whitespace_mode="normalized", heading_style="atx")
@@ -427,7 +403,6 @@ def test_block_spacing_heading_elements() -> None:
 
 
 def test_block_spacing_non_block_next_sibling() -> None:
-    """Test block spacing when next sibling is not a block element."""
     html = "<div>Content</div>plain text"
     result = convert_to_markdown(html, whitespace_mode="normalized")
     assert "Content\n\nplain text" in result

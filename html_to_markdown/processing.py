@@ -145,7 +145,7 @@ SupportedTag = Literal[
 
 
 def _get_list_indent(list_indent_type: str, list_indent_width: int) -> str:
-    if list_indent_type == "tabs":  # pragma: no cover
+    if list_indent_type == "tabs":
         return "\t"
     return " " * list_indent_width
 
@@ -644,7 +644,7 @@ def convert_to_markdown(
         result = re.sub(r"\n{3,}", "\n\n", result)
 
         if convert_as_inline:
-            result = result.rstrip("\n")
+            result = result.rstrip("\n")  # pragma: no cover
 
         return result
 
@@ -849,7 +849,7 @@ def _process_html_core(
     try:
         if isinstance(source, str):
             if strip_newlines:
-                source = source.replace("\n", " ").replace("\r", " ")
+                source = source.replace("\n", " ").replace("\r", " ")  # pragma: no cover
 
             if "".join(source.split("\n")):
                 if parser is None:

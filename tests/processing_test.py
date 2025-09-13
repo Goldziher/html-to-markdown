@@ -7,7 +7,24 @@ from bs4 import BeautifulSoup
 import html_to_markdown.processing
 from html_to_markdown import convert_to_markdown
 from html_to_markdown.exceptions import ConflictingOptionsError, EmptyHtmlError, MissingDependencyError
-from html_to_markdown.processing import _as_optional_set, convert_to_markdown_stream
+from html_to_markdown.processing import _as_optional_set, _get_list_indent, convert_to_markdown_stream
+
+
+def test_get_list_indent_tabs() -> None:
+    result = _get_list_indent("tabs", 4)
+    assert result == "\t"
+
+
+def test_get_list_indent_spaces() -> None:
+    result = _get_list_indent("spaces", 2)
+    assert result == "  "
+
+
+def test_convert_as_inline_strips_trailing_newlines() -> None:
+    html = "<p>Test content\n</p>"
+    result = convert_to_markdown(html, convert_as_inline=True)
+    assert not result.endswith("\n")
+    assert result == "Test content"
 
 
 def test_empty_html_error() -> None:
