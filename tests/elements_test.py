@@ -2118,6 +2118,19 @@ def test_paragraph_directly_in_list() -> None:
     assert "Line 2" in result
 
 
+def test_paragraph_in_list_with_blank_lines() -> None:
+    """Test paragraph in list item with blank lines to trigger empty line handling."""
+    html = """<ul>
+        <li>
+            <p>First line\n\nSecond line\n\n\nThird line</p>
+        </li>
+    </ul>"""
+    result = convert_to_markdown(html)
+    assert "First line" in result
+    assert "Second line" in result
+    assert "Third line" in result
+
+
 def test_checkbox_with_string_content() -> None:
     """Test checkbox input with string content (rare edge case)."""
     html = '<ul><li><input type="checkbox">checkbox text content</input> List item text</li></ul>'
@@ -2141,6 +2154,23 @@ def test_paragraph_in_deeply_nested_li() -> None:
     result = convert_to_markdown(html)
     assert "First paragraph" in result
     assert "Second paragraph" in result
+
+
+def test_paragraph_deeply_nested_needs_traversal() -> None:
+    """Test paragraph that needs multiple parent traversals to find li."""
+    html = """<ul>
+        <li>
+            <div>
+                <section>
+                    <article>
+                        <p>Deeply nested paragraph</p>
+                    </article>
+                </section>
+            </div>
+        </li>
+    </ul>"""
+    result = convert_to_markdown(html)
+    assert "Deeply nested paragraph" in result
 
 
 def test_iframe_inline_mode() -> None:

@@ -289,6 +289,11 @@ def test_empty_text_processing() -> None:
     result = convert_to_markdown(html, whitespace_mode="strict")
     assert result.strip() == ""
 
+    # Test with only whitespace that becomes empty after stripping
+    html = "<p>   </p>"
+    result = convert_to_markdown(html)
+    assert result.strip() == ""
+
 
 def test_strict_mode_text_preservation() -> None:
     """Test that strict mode preserves text as-is in process_text_whitespace."""

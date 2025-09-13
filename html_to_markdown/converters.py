@@ -324,10 +324,8 @@ def _convert_li(*, tag: Tag, text: str, bullets: str, list_indent_str: str) -> s
         checked = checkbox.get("checked") is not None
         checkbox_symbol = "[x]" if checked else "[ ]"
 
-        checkbox_text = text
-        if checkbox.string:
-            checkbox_text = text.replace(str(checkbox.string), "").strip()
-        return f"- {checkbox_symbol} {checkbox_text.strip()}\n"
+        checkbox_text = text.strip()
+        return f"- {checkbox_symbol} {checkbox_text}\n"
 
     parent = tag.parent
     if parent is not None and parent.name == "ol":

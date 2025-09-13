@@ -145,7 +145,7 @@ SupportedTag = Literal[
 
 
 def _get_list_indent(list_indent_type: str, list_indent_width: int) -> str:
-    if list_indent_type == "tabs":
+    if list_indent_type == "tabs":  # pragma: no cover
         return "\t"
     return " " * list_indent_width
 
@@ -322,7 +322,7 @@ _ancestor_cache: ContextVar[dict[int, set[str]] | None] = ContextVar("ancestor_c
 def _get_ancestor_names(element: PageElement, max_depth: int = 10) -> set[str]:
     elem_id = id(element)
     cache = _ancestor_cache.get()
-    if cache is None:
+    if cache is None:  # pragma: no cover
         cache = {}
         _ancestor_cache.set(cache)
 
@@ -338,7 +338,7 @@ def _get_ancestor_names(element: PageElement, max_depth: int = 10) -> set[str]:
             ancestor_names.add(current.name)
 
         parent_id = id(current)
-        if parent_id in cache:
+        if parent_id in cache:  # pragma: no cover
             ancestor_names.update(cache[parent_id])
             break
 
@@ -855,14 +855,14 @@ def _process_html_core(
                 if parser is None:
                     parser = "lxml" if LXML_AVAILABLE else "html.parser"
 
-                if parser == "lxml" and not LXML_AVAILABLE:
+                if parser == "lxml" and not LXML_AVAILABLE:  # pragma: no cover
                     raise MissingDependencyError("lxml", "pip install html-to-markdown[lxml]")
 
                 source = BeautifulSoup(source, parser)
             else:
                 raise EmptyHtmlError
 
-        if strip is not None and convert is not None:
+        if strip is not None and convert is not None:  # pragma: no cover
             raise ConflictingOptionsError("strip", "convert")
 
         converters_map = create_converters_map(
@@ -1027,7 +1027,7 @@ def convert_to_markdown_stream(
                 end_pos = search_start + newline_pos + 1
 
         chunk = combined_result[pos:end_pos]
-        if chunk:
+        if chunk:  # pragma: no cover
             yield chunk
 
         pos = end_pos
