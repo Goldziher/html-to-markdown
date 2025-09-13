@@ -171,13 +171,13 @@ class WhitespaceHandler:
         if not text:
             return ""
 
-        text = self.normalize_unicode_spaces(text)
-
         if in_pre or self.should_preserve_whitespace(element):
             return text
 
         if self.mode == "strict":
             return text
+
+        text = self.normalize_unicode_spaces(text)
         return self._process_normalized(text, element)
 
     def _process_normalized(self, text: str, element: NavigableString) -> str:
@@ -242,6 +242,14 @@ class WhitespaceHandler:
         prev_sibling = element.previous_sibling
         next_sibling = element.next_sibling
 
+        multiple_newlines_before_block = (
+            original
+            and original.count("\n") >= 2
+            and self.is_block_element(next_sibling)
+            and text.strip()
+            and (self.is_inline_element(prev_sibling) or prev_sibling is None)
+        )
+
         has_leading = (
             has_lead_space
             and original[0] == " "
@@ -268,6 +276,9 @@ class WhitespaceHandler:
         if has_trailing and not (original and original[-1] in "\n\t"):
             text = text + " "
 
+        if multiple_newlines_before_block:
+            text = text + "\n\n"
+
         return text
 
     def get_block_spacing(self, tag: Tag, next_sibling: PageElement | None = None) -> str:
@@ -286,7 +297,7 @@ class WhitespaceHandler:
             return "\n"
         if tag_name in single_newline_elements:
             return "\n"
-        if tag_name.startswith("h") and len(tag_name) == 2:
+        if tag_name.startswith("h") and len(tag_name) == 2 and tag_name[1].isdigit():
             return "\n\n"
 
         return ""

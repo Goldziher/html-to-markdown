@@ -1,0 +1,148 @@
+$schema: https://github.com/Goldziher/ai-rulez/schema/ai-rules-v2.schema.json
+agents: []
+commands: []
+mcp_servers:
+  - args:
+      - mcp
+    command: ai-rulez
+    description: AI-Rulez MCP server for configuration management
+    name: ai-rulez
+metadata:
+  description: A modern, type-safe Python library for converting HTML to Markdown with comprehensive HTML5 support, advanced table handling, and customizable conversion options. Built with BeautifulSoup4, it features streaming support, metadata extraction, custom converters, and a full CLI interface. Emphasizes strict type safety with MyPy and maintains 100% test coverage.
+  name: html-to-markdown
+  version: 1.0.0
+presets:
+  - claude
+rules:
+  - content: Use Python 3.10+ type hints for all function signatures and class attributes. Enforce strict MyPy checking with disallow_untyped_defs=true. Use TYPE_CHECKING imports to avoid circular dependencies. Prefer concrete types over Any, and use TypeVar for generic functions. Always specify return types including Generator/Iterator types for streaming functions.
+    name: Type Safety and Annotations
+    priority: critical
+  - content: Raise appropriate custom exceptions from html_to_markdown.exceptions (HtmlToMarkdownError, ConflictingOptionsError, EmptyHtmlError, InvalidParserError, MissingDependencyError). Never catch generic Exception without re-raising. Use nh3 for HTML sanitization when processing untrusted input. Validate BeautifulSoup parser availability before use.
+    name: Error Handling with Custom Exceptions
+    priority: high
+  - content: Write comprehensive pytest tests using fixtures from conftest.py for common HTML structures. Maintain 100% coverage using pytest-cov with fail_under=100. Test all converter functions with edge cases including nested elements, malformed HTML, and empty inputs. Use pytest-mock for external dependencies. Test both convert_to_markdown and convert_to_markdown_stream APIs.
+    name: Testing with Pytest and Fixtures
+    priority: critical
+  - content: "Implement converters as pure functions in html_to_markdown.converters following the pattern: converter_name(tag: Tag, ...) -> str. Use partial functions for configuration. Format block elements with _format_block_element() and inline elements with _format_inline_or_block(). Register converters in the CONVERTER_MAPPING dictionary. Support custom converters via converters parameter."
+    name: Converter Architecture Pattern
+    priority: high
+  - content: Use BeautifulSoup4 Tag objects for HTML parsing. Access attributes via tag.attrs dictionary. Use tag.get_text(strip=True) for text extraction. Handle NavigableString vs Tag types explicitly. Support both lxml and html.parser backends. Process children recursively using tag.children or tag.descendants.
+    name: BeautifulSoup4 Tag Processing
+    priority: medium
+  - content: "Format code with ruff using 120 character line length. Follow Google docstring convention. Ignore specific ruff rules: D100-D107 (docstrings), EM/TRY (exception handling), FBT (boolean args). Run pre-commit hooks including ruff format and ruff check. Use uv for dependency management and virtual environments."
+    name: Code Quality with Ruff
+    priority: high
+  - content: Implement streaming conversion for large documents via convert_to_markdown_stream with progress callbacks. Use generators for memory-efficient processing. Cache compiled regex patterns in constants.py. Avoid repeated string concatenation in loops. Process tables with rowspan/colspan efficiently using cell tracking. Benchmark performance with tests/performance_test.py.
+    name: Performance and Memory Optimization
+    priority: medium
+sections:
+  - content: |-
+      ## Prerequisites
+      - Python 3.10+ (project uses 3.10-3.13)
+      - uv package manager
+
+      ## Setup Development Environment
+      ```bash
+      # Clone the repository
+      git clone https://github.com/Goldziher/html-to-markdown.git
+      cd html-to-markdown
+
+      # Install dependencies using uv
+      uv sync --all-extras --dev
+
+      # Install pre-commit hooks
+      uv run pre-commit install
+      ```
+
+      ## Running Tests
+      ```bash
+      # Run all tests with coverage
+      uv run pytest --cov=html_to_markdown --cov-report=term-missing
+
+      # Run specific test files
+      uv run pytest tests/tables_test.py
+      uv run pytest tests/cli_test.py
+      ```
+
+      ## Code Quality Checks
+      ```bash
+      # Run linting and formatting
+      uv run ruff check --fix .
+      uv run ruff format .
+
+      # Type checking with mypy
+      uv run mypy
+
+      # Run all pre-commit hooks
+      uv run pre-commit run --all-files
+      ```
+    name: Developer Quick Start
+    priority: high
+  - content: |-
+      ## Core Components
+
+      ### Main Module Structure
+      - `html_to_markdown/converters.py` - HTML tag converter strategies
+      - `html_to_markdown/processing.py` - Main conversion logic
+      - `html_to_markdown/preprocessor.py` - HTML cleaning and preprocessing
+      - `html_to_markdown/whitespace.py` - Whitespace normalization modes
+
+      ### Converter Pattern
+      Each HTML tag has a dedicated converter function in `converters.py`:
+      ```python
+      def convert_h1(*, tag: Tag, text: str, **kwargs) -> str:
+          """Convert h1 tags to markdown headers."""
+          return f"# {text}\n\n"
+      ```
+
+      ### Custom Converters
+      Override any tag's conversion behavior:
+      ```python
+      from html_to_markdown import convert_to_markdown
+
+      def my_link_converter(*, tag: Tag, text: str, **kwargs) -> str:
+          href = tag.get('href', '')
+          return f"[{text}]({href} 'Custom Link')"
+
+      markdown = convert_to_markdown(
+          html,
+          custom_converters={'a': my_link_converter}
+      )
+      ```
+
+      ### Preprocessing Presets
+      - `minimal` - Basic cleanup only
+      - `standard` - Balanced cleaning (default)
+      - `aggressive` - Heavy cleaning for web scraping
+    name: Converter Architecture
+    priority: medium
+  - content: |-
+      ## Test Organization
+      Tests are organized by feature in `tests/`:
+      - `tests/tables_test.py` - Table conversion tests
+      - `tests/lists_test.py` - List handling tests
+      - `tests/cli_test.py` - CLI functionality tests
+      - `tests/custom_converters_test.py` - Custom converter tests
+
+      ## Writing Tests
+      ```python
+      # Use pytest fixtures from conftest.py
+      def test_table_with_rowspan(convert):
+          html = '<table><tr><td rowspan="2">A</td><td>B</td></tr></table>'
+          result = convert(html)
+          assert '| A | B |' in result
+      ```
+
+      ## Coverage Requirements
+      - Project maintains 100% test coverage
+      - Coverage report fails under 100%
+      - Run `uv run pytest --cov` to check coverage
+
+      ## Performance Testing
+      See `tests/performance_test.py` for benchmarking:
+      ```bash
+      # Run performance benchmarks
+      uv run pytest tests/performance_test.py -v
+      ```
+    name: Testing Guidelines
+    priority: low

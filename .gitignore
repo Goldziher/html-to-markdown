@@ -23,8 +23,11 @@ __pypackages__/
 coverage.xml
 dist/
 htmlcov/
+
 # AI-rulez generated files
 .cursorrules
 CLAUDE.md
 GEMINI.md
 .windsurfrules
+.mcp.json
+.gemini/
