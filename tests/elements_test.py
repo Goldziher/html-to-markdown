@@ -1036,6 +1036,35 @@ def test_iframe_with_sandbox_boolean() -> None:
     assert result == "[https://example.com](https://example.com)\n\n"
 
 
+def test_blockquote_with_single_newline_end() -> None:
+    html = "<blockquote>Test content\n</blockquote>"
+    result = convert_to_markdown(html)
+    assert result == "\n> Test content\n\n"
+
+
+def test_list_with_empty_lines_multiline_content() -> None:
+    html = """<ul>
+    <li><p>First paragraph</p>
+
+    <p>Second paragraph</p></li>
+</ul>"""
+    result = convert_to_markdown(html)
+    assert "First paragraph\n\n    Second paragraph" in result
+
+
+def test_list_with_empty_lines() -> None:
+    html = """<ul>
+    <li>
+        First item
+
+        Second paragraph
+    </li>
+</ul>"""
+    result = convert_to_markdown(html)
+    expected = "* First item\n\n Second paragraph\n"
+    assert result == expected
+
+
 def test_media_in_paragraphs() -> None:
     html = """<p>Here is an audio file: <audio src="audio.mp3" controls></audio></p>
 <p>Here is a video: <video src="video.mp4" controls></video></p>
@@ -2109,7 +2138,6 @@ def test_media_element_without_src_but_with_text() -> None:
 
 
 def test_paragraph_directly_in_list() -> None:
-    """Test paragraph directly as child of ul/ol element."""
     html = """<ul>
         <p>Line 1\n\nLine 2</p>
     </ul>"""
@@ -2119,7 +2147,6 @@ def test_paragraph_directly_in_list() -> None:
 
 
 def test_paragraph_in_list_with_blank_lines() -> None:
-    """Test paragraph in list item with blank lines to trigger empty line handling."""
     html = """<ul>
         <li>
             <p>First line\n\nSecond line\n\n\nThird line</p>
@@ -2131,8 +2158,29 @@ def test_paragraph_in_list_with_blank_lines() -> None:
     assert "Third line" in result
 
 
+def test_blockquote_directly_under_list() -> None:
+    html = """<ul>
+        <blockquote>Quote\n\nWith blank lines</blockquote>
+    </ul>"""
+    result = convert_to_markdown(html)
+    assert "Quote" in result
+
+
+def test_blockquote_deeply_nested_in_li_needs_traversal() -> None:
+    html = """<ul>
+        <li>
+            <div>
+                <span>
+                    <blockquote>Nested quote</blockquote>
+                </span>
+            </div>
+        </li>
+    </ul>"""
+    result = convert_to_markdown(html)
+    assert "> Nested quote" in result
+
+
 def test_checkbox_with_string_content() -> None:
-    """Test checkbox input with string content (rare edge case)."""
     html = '<ul><li><input type="checkbox">checkbox text content</input> List item text</li></ul>'
     result = convert_to_markdown(html)
     assert "[ ]" in result
@@ -2140,7 +2188,6 @@ def test_checkbox_with_string_content() -> None:
 
 
 def test_paragraph_in_deeply_nested_li() -> None:
-    """Test paragraph in list item with intermediate non-li parents."""
     html = """<ul>
         <li>
             <div>
@@ -2157,7 +2204,6 @@ def test_paragraph_in_deeply_nested_li() -> None:
 
 
 def test_paragraph_deeply_nested_needs_traversal() -> None:
-    """Test paragraph that needs multiple parent traversals to find li."""
     html = """<ul>
         <li>
             <div>
@@ -2173,36 +2219,43 @@ def test_paragraph_deeply_nested_needs_traversal() -> None:
     assert "Deeply nested paragraph" in result
 
 
+def test_blockquote_in_list_with_empty_lines() -> None:
+    html = """<ul>
+        <li>
+            <blockquote>Line 1\n\nLine 2\n\n\nLine 3</blockquote>
+        </li>
+    </ul>"""
+    result = convert_to_markdown(html)
+    assert "Line 1" in result
+    assert "Line 2" in result
+    assert "Line 3" in result
+
+
 def test_iframe_inline_mode() -> None:
-    """Test iframe conversion in inline mode."""
     html = '<iframe src="https://example.com/embed"></iframe>'
     result = convert_to_markdown(html, convert_as_inline=True)
     assert result == "[https://example.com/embed](https://example.com/embed)"
 
 
 def test_time_element_empty() -> None:
-    """Test empty time element."""
     html = "<time></time>"
     result = convert_to_markdown(html)
     assert result == ""
 
 
 def test_data_element_empty() -> None:
-    """Test empty data element."""
     html = "<data></data>"
     result = convert_to_markdown(html)
     assert result == ""
 
 
 def test_optgroup_inline_mode() -> None:
-    """Test optgroup conversion in inline mode."""
     html = '<optgroup label="Group"><option>Option 1</option></optgroup>'
     result = convert_to_markdown(html, convert_as_inline=True)
     assert "Option 1" in result
 
 
 def test_optgroup_without_label() -> None:
-    """Test optgroup without label attribute."""
     html = "<optgroup><option>Option 1</option><option>Option 2</option></optgroup>"
     result = convert_to_markdown(html)
     assert "Option 1" in result
@@ -2210,42 +2263,36 @@ def test_optgroup_without_label() -> None:
 
 
 def test_optgroup_empty() -> None:
-    """Test empty optgroup element."""
     html = "<optgroup>  </optgroup>"
     result = convert_to_markdown(html)
     assert result == ""
 
 
 def test_ruby_element_empty() -> None:
-    """Test empty ruby element."""
     html = "<ruby>  </ruby>"
     result = convert_to_markdown(html)
     assert result == ""
 
 
 def test_rp_element_empty() -> None:
-    """Test empty rp element."""
     html = "<rp>  </rp>"
     result = convert_to_markdown(html)
     assert result == ""
 
 
 def test_rtc_element_empty() -> None:
-    """Test empty rtc element."""
     html = "<rtc>  </rtc>"
     result = convert_to_markdown(html)
     assert result == ""
 
 
 def test_legend_inline_mode() -> None:
-    """Test legend conversion in inline mode."""
     html = "<legend>Form Legend</legend>"
     result = convert_to_markdown(html, convert_as_inline=True)
     assert result == "Form Legend"
 
 
 def test_iframe_without_src() -> None:
-    """Test iframe without src attribute."""
     html = "<iframe></iframe>"
     result = convert_to_markdown(html)
     assert result == ""

@@ -175,12 +175,10 @@ def test_list_indent_type_spaces() -> None:
 
 
 def test_list_indent_type_tabs() -> None:
-    """Test list indentation using tabs."""
     html = "<ul><li>Item 1<ul><li>Nested Item</li></ul></li></ul>"
     result = convert_to_markdown(html, list_indent_type="tabs")
     assert "\t+ Nested Item" in result
 
-    # Test multiple levels with tabs
     html = "<ul><li>Level 1<ul><li>Level 2<ul><li>Level 3</li></ul></li></ul></li></ul>"
     result = convert_to_markdown(html, list_indent_type="tabs")
     assert "\t+ Level 2" in result

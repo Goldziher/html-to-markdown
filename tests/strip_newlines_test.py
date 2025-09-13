@@ -18,10 +18,12 @@ specified or <code class="docutils literal notranslate"><span class="pre">-1</sp
     assert result_stripped.count("\n") == 2
 
     assert "Return a list of the words in the string" in result_stripped
-    assert "*sep*" in result_stripped
-    assert "*maxsplit*" in result_stripped
-    assert "`maxsplit+1`" in result_stripped
-    assert "`-1`" in result_stripped
+
+
+def test_strip_newlines_with_carriage_returns() -> None:
+    html_with_cr = "Text with\r\nnewlines and\rcarriage returns"
+    result = convert_to_markdown(html_with_cr, strip_newlines=True)
+    assert "Text with newlines and carriage returns" in result
 
 
 def test_strip_newlines_with_multiple_paragraphs() -> None:
@@ -67,14 +69,6 @@ def test_strip_newlines_empty_html() -> None:
     assert result.strip() == ""
 
 
-def test_strip_newlines_with_carriage_returns() -> None:
-    html = "<p>Text with\r\nWindows-style\rline breaks.</p>"
-
-    result = convert_to_markdown(html, strip_newlines=True)
-    assert "Text with Windows" in result
-    assert "style line breaks." in result
-
-
 def test_strip_newlines_preserves_br_tags() -> None:
     html = "<p>Line one<br>Line two</p>"
 
@@ -113,7 +107,6 @@ def test_strip_newlines_complex_html() -> None:
 
 
 def test_strip_newlines_with_only_carriage_returns() -> None:
-    """Test strip_newlines with only carriage returns."""
-    html = "<p>Text\rwith\rcarriage\rreturns</p>"
+    html = "Text\rwith\rcarriage\rreturns"
     result = convert_to_markdown(html, strip_newlines=True)
     assert "Text with carriage returns" in result

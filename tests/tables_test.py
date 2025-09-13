@@ -11,6 +11,17 @@ import pytest
 from html_to_markdown import convert_to_markdown
 
 
+def test_table_first_row_in_tbody_without_previous_sibling() -> None:
+    html = """<table>
+    <tbody>
+        <tr><td>Cell 1</td><td>Cell 2</td></tr>
+    </tbody>
+    </table>"""
+    result = convert_to_markdown(html)
+    expected = "\n\n| Cell 1 | Cell 2 |\n| --- | --- |\n\n"
+    assert result == expected
+
+
 def test_basic_table() -> None:
     html = """<table>
     <tr><th>Header 1</th><th>Header 2</th></tr>
@@ -576,7 +587,6 @@ def test_table_element_removal(html: str, should_not_contain: list[str]) -> None
 
 
 def test_table_with_tbody_but_no_thead() -> None:
-    """Test table with tbody but no thead."""
     html = """
     <table>
         <tbody>
@@ -590,32 +600,24 @@ def test_table_with_tbody_but_no_thead() -> None:
     assert "| Cell 3 | Cell 4 |" in result
 
 
-def test_table_first_row_in_tbody_without_previous_sibling() -> None:
-    """Test first row in tbody when tbody has no previous sibling (no thead)."""
-    html = """
-    <table>
-        <tbody>
-            <tr><td>First</td><td>Row</td></tr>
-            <tr><td>Second</td><td>Row</td></tr>
-        </tbody>
-    </table>
-    """
+def test_table_first_row_directly_in_table() -> None:
+    html = """<table>
+        <tr><td>Cell1</td><td>Cell2</td></tr>
+        <tr><td>Cell3</td><td>Cell4</td></tr>
+    </table>"""
     result = convert_to_markdown(html)
-    # First row is treated as data row with header separator
+    assert "| Cell1 | Cell2 |" in result
     assert "| --- | --- |" in result
-    assert "| First | Row |" in result
-    assert "| Second | Row |" in result
+    assert "| Cell3 | Cell4 |" in result
 
 
 def test_tbody_inline_mode() -> None:
-    """Test tbody conversion in inline mode."""
     html = "<tbody><tr><td>Cell</td></tr></tbody>"
     result = convert_to_markdown(html, convert_as_inline=True)
     assert "Cell" in result
 
 
 def test_tfoot_inline_mode() -> None:
-    """Test tfoot conversion in inline mode."""
     html = "<tfoot><tr><td>Footer</td></tr></tfoot>"
     result = convert_to_markdown(html, convert_as_inline=True)
     assert "Footer" in result
