@@ -210,7 +210,6 @@ def test_deeply_incorrect_nesting() -> None:
 
 
 def test_list_after_paragraph_with_empty_lines() -> None:
-    """Test list with empty lines after paragraph in list item."""
     html = """<ul>
         <li>
             <p>First paragraph</p>
@@ -230,7 +229,6 @@ def test_list_after_paragraph_with_empty_lines() -> None:
 
 
 def test_nested_list_without_preceding_paragraph() -> None:
-    """Test nested list without preceding paragraph."""
     html = """<ul>
         <li>
             <ul>
@@ -244,7 +242,6 @@ def test_nested_list_without_preceding_paragraph() -> None:
 
 
 def test_empty_line_handling_in_nested_list() -> None:
-    """Test empty line handling in nested lists."""
     html = """<ul>
         <li>
             <p>Paragraph before</p>

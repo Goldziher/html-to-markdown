@@ -253,14 +253,12 @@ def _process_tag(
             tag=tag, text=text, convert_as_inline=convert_as_inline
         )
 
-        # Ensure headings start on a new line
         if is_heading and context_before not in {"", "\n"}:
             n_eol_to_add = 2 - (len(context_before) - len(context_before.rstrip("\n")))
             if n_eol_to_add > 0:
                 prefix = "\n" * n_eol_to_add
                 return f"{prefix}{rendered}"
 
-        # Ensure block elements start on a new line when preceded by inline content
         from html_to_markdown.whitespace import BLOCK_ELEMENTS  # noqa: PLC0415
 
         is_block_element = tag.name.lower() in BLOCK_ELEMENTS
@@ -269,7 +267,7 @@ def _process_tag(
             and not convert_as_inline
             and context_before
             and not context_before.endswith("\n")
-            and rendered.strip()  # Only if the element has content
+            and rendered.strip()
         ):
             return f"\n\n{rendered}"
         return rendered

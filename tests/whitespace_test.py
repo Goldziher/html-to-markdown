@@ -267,36 +267,28 @@ def test_block_element_separation_comprehensive(html: str, expected_lines: list[
 
 
 def test_carriage_return_normalization() -> None:
-    """Test normalization of carriage return characters."""
     html = "<p>Line 1\rLine 2\r\nLine 3</p>"
     result = convert_to_markdown(html)
-    # Should normalize \r and \r\n to \n
     assert "Line 1\nLine 2\nLine 3" in result
 
 
 def test_strict_whitespace_mode() -> None:
-    """Test strict whitespace mode with no spacing."""
     html = "<p>First paragraph</p><p>Second paragraph</p>"
     result = convert_to_markdown(html, whitespace_mode="strict")
-    # Strict mode should return empty string for block spacing
     assert result
 
 
 def test_block_spacing_combinations() -> None:
-    """Test various block element spacing combinations."""
-    # Test double newline elements
     html = "<div>Div content</div><blockquote>Quote content</blockquote>"
     result = convert_to_markdown(html)
     assert "Div content" in result
     assert "Quote content" in result
 
-    # Test single newline elements
     html = "<ul><li>Item 1</li><li>Item 2</li></ul>"
     result = convert_to_markdown(html)
     assert "Item 1" in result
     assert "Item 2" in result
 
-    # Test heading spacing
     html = "<h1>Title</h1><p>Content</p>"
     result = convert_to_markdown(html)
     assert "Title" in result
@@ -304,7 +296,6 @@ def test_block_spacing_combinations() -> None:
 
 
 def test_mixed_block_and_inline_elements() -> None:
-    """Test spacing with mixed block and inline elements."""
     html = "<p>Text with <strong>inline</strong> element</p><div>Block element</div>"
     result = convert_to_markdown(html)
     assert "Text with **inline** element" in result
@@ -312,17 +303,13 @@ def test_mixed_block_and_inline_elements() -> None:
 
 
 def test_unicode_whitespace_strict_mode() -> None:
-    """Test Unicode whitespace preservation in strict mode - critical bug fix test."""
-    # Unicode non-breaking space (U+00A0) and em space (U+2003)
-    html = "<p>Text\u00A0with\u2003unicode\u00A0spaces</p>"
+    html = "<p>Text\u00a0with\u2003unicode\u00a0spaces</p>"
 
-    # In strict mode, Unicode spaces should be preserved
     result_strict = convert_to_markdown(html, whitespace_mode="strict")
-    assert "\u00A0" in result_strict
+    assert "\u00a0" in result_strict
     assert "\u2003" in result_strict
 
-    # In normalized mode, Unicode spaces should be converted to regular spaces
     result_normalized = convert_to_markdown(html, whitespace_mode="normalized")
-    assert "\u00A0" not in result_normalized
+    assert "\u00a0" not in result_normalized
     assert "\u2003" not in result_normalized
     assert "Text with unicode spaces" in result_normalized
