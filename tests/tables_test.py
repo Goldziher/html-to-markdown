@@ -573,3 +573,35 @@ def test_table_element_removal(html: str, should_not_contain: list[str]) -> None
     result = convert_to_markdown(html)
     for unwanted in should_not_contain:
         assert unwanted not in result
+
+
+def test_table_with_tbody_but_no_thead() -> None:
+    """Test table with tbody but no thead."""
+    html = """
+    <table>
+        <tbody>
+            <tr><td>Cell 1</td><td>Cell 2</td></tr>
+            <tr><td>Cell 3</td><td>Cell 4</td></tr>
+        </tbody>
+    </table>
+    """
+    result = convert_to_markdown(html)
+    assert "| Cell 1 | Cell 2 |" in result
+    assert "| Cell 3 | Cell 4 |" in result
+
+
+def test_table_first_row_in_tbody_without_previous_sibling() -> None:
+    """Test first row in tbody when tbody has no previous sibling (no thead)."""
+    html = """
+    <table>
+        <tbody>
+            <tr><td>First</td><td>Row</td></tr>
+            <tr><td>Second</td><td>Row</td></tr>
+        </tbody>
+    </table>
+    """
+    result = convert_to_markdown(html)
+    # First row is treated as data row with header separator
+    assert "| --- | --- |" in result
+    assert "| First | Row |" in result
+    assert "| Second | Row |" in result

@@ -2106,3 +2106,38 @@ def test_media_element_without_src_but_with_text() -> None:
     html = "<audio>Audio not supported</audio>"
     result = convert_to_markdown(html)
     assert "Audio not supported" in result
+
+
+def test_paragraph_directly_in_list() -> None:
+    """Test paragraph directly as child of ul/ol element."""
+    html = """<ul>
+        <p>Line 1\n\nLine 2</p>
+    </ul>"""
+    result = convert_to_markdown(html)
+    assert "Line 1" in result
+    assert "Line 2" in result
+
+
+def test_checkbox_with_string_content() -> None:
+    """Test checkbox input with string content (rare edge case)."""
+    html = '<ul><li><input type="checkbox">checkbox text content</input> List item text</li></ul>'
+    result = convert_to_markdown(html)
+    assert "[ ]" in result
+    assert "List item text" in result
+
+
+def test_paragraph_in_deeply_nested_li() -> None:
+    """Test paragraph in list item with intermediate non-li parents."""
+    html = """<ul>
+        <li>
+            <div>
+                <span>
+                    <p>First paragraph</p>
+                    <p>Second paragraph with\n\nempty lines</p>
+                </span>
+            </div>
+        </li>
+    </ul>"""
+    result = convert_to_markdown(html)
+    assert "First paragraph" in result
+    assert "Second paragraph" in result
