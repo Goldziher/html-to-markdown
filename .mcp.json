@@ -1,7 +1,0 @@
-{
-  "ai-rulez": {
-    "type": "stdio",
-    "command": "ai-rulez",
-    "args": ["mcp"]
-  }
-}

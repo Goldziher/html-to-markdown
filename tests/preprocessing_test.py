@@ -1,3 +1,5 @@
+import pytest
+
 from html_to_markdown import convert_to_markdown
 from html_to_markdown.preprocessor import create_preprocessor, preprocess_html
 
@@ -348,32 +350,22 @@ def test_preprocessor_edge_cases() -> None:
 
 
 def test_custom_attributes_removal() -> None:
-    """Test custom attributes to remove functionality."""
-    html = '''<p id="test" class="special" data-custom="value">Content</p>'''
+    html = """<p id="test" class="special" data-custom="value">Content</p>"""
 
-    # Test with custom attributes removal
     result = preprocess_html(html, custom_attributes_to_remove={"id", "class"})
-    # The result should not have id and class attributes, but should preserve content
     assert "Content" in result
 
-    # Test with empty custom attributes set
     result = preprocess_html(html, custom_attributes_to_remove=set())
     assert "Content" in result
 
-    # Test with None (should not cause issues)
     result = preprocess_html(html, custom_attributes_to_remove=None)
     assert "Content" in result
 
 
 def test_invalid_preset_error() -> None:
-    """Test error handling for invalid preset names."""
-    import pytest
-
-    # Test invalid preset raises ValueError
     with pytest.raises(ValueError, match="Unknown preset 'invalid'"):
         create_preprocessor(preset="invalid")
 
-    # Test that the error message includes available presets
     with pytest.raises(ValueError, match="Available presets:"):
         create_preprocessor(preset="nonexistent")
 

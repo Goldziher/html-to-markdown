@@ -242,15 +242,12 @@ class WhitespaceHandler:
         prev_sibling = element.previous_sibling
         next_sibling = element.next_sibling
 
-        # Check for multiple newlines at the end when followed by a block element
-        # This indicates a paragraph break that should be preserved
-        # Only apply this when there's actual content and the previous sibling was inline/text
         multiple_newlines_before_block = (
             original
-            and original.count("\n") >= 2  # Multiple newlines
-            and self.is_block_element(next_sibling)  # Followed by block element
-            and text.strip()  # Has actual content
-            and (self.is_inline_element(prev_sibling) or prev_sibling is None)  # Previous was inline or none
+            and original.count("\n") >= 2
+            and self.is_block_element(next_sibling)
+            and text.strip()
+            and (self.is_inline_element(prev_sibling) or prev_sibling is None)
         )
 
         has_leading = (
@@ -279,7 +276,6 @@ class WhitespaceHandler:
         if has_trailing and not (original and original[-1] in "\n\t"):
             text = text + " "
 
-        # If there were multiple newlines before a block element, add block separation
         if multiple_newlines_before_block:
             text = text + "\n\n"
 

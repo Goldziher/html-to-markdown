@@ -223,9 +223,7 @@ def test_definition_with_code() -> None:
 
 
 def test_nested_definition_lists() -> None:
-    html = (
-        "<dl><dt>Outer Term</dt><dd>Outer definition<dl><dt>Inner Term</dt><dd>Inner definition</dd></dl></dd></dl>"
-    )
+    html = "<dl><dt>Outer Term</dt><dd>Outer definition<dl><dt>Inner Term</dt><dd>Inner definition</dd></dl></dd></dl>"
     result = convert_to_markdown(html)
     expected = "Outer Term\n:   Outer definition\n\nInner Term\n:   Inner definition\n\n"
     assert result == expected
@@ -552,9 +550,7 @@ def test_option_selected() -> None:
 
 
 def test_optgroup() -> None:
-    html = (
-        '<select><optgroup label="Group 1"><option>Option 1</option><option>Option 2</option></optgroup></select>'
-    )
+    html = '<select><optgroup label="Group 1"><option>Option 1</option><option>Option 2</option></optgroup></select>'
     result = convert_to_markdown(html)
     assert result == "**Group 1**\nOption 1\nOption 2\n\n"
 
@@ -783,7 +779,7 @@ Current rating: 4/5
     assert result == expected
 
 
-def test_form_inline_mode() -> None:
+def test_form_with_inputs_inline_mode() -> None:
     html = '<form><label>Name:</label> <input type="text" name="name"> <button>Submit</button></form>'
     result = convert_to_markdown(html, convert_as_inline=True)
     assert result == "Name:  Submit"
@@ -831,7 +827,7 @@ def test_main_element() -> None:
     assert result == "This is main content\n\n"
 
 
-def test_nested_semantic_elements() -> None:
+def test_article_with_sections() -> None:
     html = "<article><header>Article Header</header><section><h2>Section Title</h2><p>Section content</p></section><footer>Article Footer</footer></article>"
     result = convert_to_markdown(html, heading_style="atx")
     expected = "Article Header\n\n## Section Title\n\nSection content\n\nArticle Footer\n\n"
@@ -845,13 +841,13 @@ def test_semantic_elements_with_other_content() -> None:
     assert result == expected
 
 
-def test_empty_semantic_elements() -> None:
+def test_empty_article_element() -> None:
     html = "<article></article>"
     result = convert_to_markdown(html)
     assert result == ""
 
 
-def test_semantic_elements_inline_mode() -> None:
+def test_article_inline_mode() -> None:
     html = "<article>This is inline content</article>"
     result = convert_to_markdown(html, convert_as_inline=True)
     assert result == "This is inline content"
@@ -892,9 +888,7 @@ def test_nested_details() -> None:
 def test_details_with_complex_content() -> None:
     html = '<details><summary>Code Example</summary><pre><code>def hello():\n    print("Hello, World!")</code></pre><p>This is a Python function.</p></details>'
     result = convert_to_markdown(html)
-    expected = (
-        '**Code Example**\n\n```\ndef hello():\n    print("Hello, World!")\n```\nThis is a Python function.\n\n'
-    )
+    expected = '**Code Example**\n\n```\ndef hello():\n    print("Hello, World!")\n```\nThis is a Python function.\n\n'
     assert result == expected
 
 
@@ -1662,7 +1656,7 @@ Last updated: December 25, 2023
     assert result == expected
 
 
-def test_nested_semantic_elements() -> None:
+def test_complex_nested_semantic_elements() -> None:
     html = '<p>The <dfn><abbr title="Application Programming Interface">API</abbr></dfn> documentation has been <ins>updated with <var>new_parameter</var></ins>.</p>'
     result = convert_to_markdown(html)
     assert (
@@ -1671,13 +1665,13 @@ def test_nested_semantic_elements() -> None:
     )
 
 
-def test_semantic_elements_inline_mode() -> None:
+def test_mixed_semantic_elements_inline_mode() -> None:
     html = '<abbr title="HyperText Markup Language">HTML</abbr> and <var>css</var> with <ins>updates</ins>'
     result = convert_to_markdown(html, convert_as_inline=True)
     assert result == "HTML (HyperText Markup Language) and *css* with ==updates=="
 
 
-def test_empty_semantic_elements() -> None:
+def test_multiple_empty_semantic_elements() -> None:
     html = "<p>Empty elements: <abbr></abbr> <var></var> <ins></ins> <dfn></dfn></p>"
     result = convert_to_markdown(html)
     assert result == "Empty elements: \n\n"
@@ -1957,9 +1951,7 @@ def test_nested_structural_elements() -> None:
 
 
 def test_figure_with_special_characters() -> None:
-    html = (
-        '<figure><img src="test.jpg"><figcaption>Caption with *asterisks* and _underscores_</figcaption></figure>'
-    )
+    html = '<figure><img src="test.jpg"><figcaption>Caption with *asterisks* and _underscores_</figcaption></figure>'
     result = convert_to_markdown(html)
     expected = "![](test.jpg)\n\n*Caption with \\*asterisks\\* and \\_underscores\\_*\n\n"
     assert result == expected
@@ -2081,7 +2073,6 @@ def test_empty_elements(html: str, expected_empty: bool) -> None:
 
 
 def test_blockquote_with_cite_in_list() -> None:
-    """Test blockquote with cite attribute inside a list item."""
     html = """<ul>
         <li>
             Item with blockquote:
@@ -2096,26 +2087,22 @@ def test_blockquote_with_cite_in_list() -> None:
 
 
 def test_mark_with_unsupported_highlight_style() -> None:
-    """Test mark element with unsupported highlight style (default case)."""
     html = "<mark>highlighted text</mark>"
     result = convert_to_markdown(html, highlight_style="unsupported")
     assert result == "highlighted text"
 
 
 def test_empty_pre_element() -> None:
-    """Test empty pre element."""
     html = "<pre></pre>"
     result = convert_to_markdown(html)
     assert result == ""
 
 
 def test_media_element_without_src_but_with_text() -> None:
-    """Test media element without src but with text content."""
     html = "<video>Your browser doesn't support video</video>"
     result = convert_to_markdown(html)
     assert "Your browser doesn't support video" in result
 
-    # Test audio element as well
     html = "<audio>Audio not supported</audio>"
     result = convert_to_markdown(html)
     assert "Audio not supported" in result
