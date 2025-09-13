@@ -110,3 +110,10 @@ def test_strip_newlines_complex_html() -> None:
     assert "Title with newline" in result
     assert "Paragraph with multiple newlines." in result
     assert "> Quote with newline." in result
+
+
+def test_strip_newlines_with_only_carriage_returns() -> None:
+    """Test strip_newlines with only carriage returns."""
+    html = "<p>Text\rwith\rcarriage\rreturns</p>"
+    result = convert_to_markdown(html, strip_newlines=True)
+    assert "Text with carriage returns" in result

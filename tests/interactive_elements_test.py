@@ -258,6 +258,13 @@ def test_dialog_attribute_values_with_quotes() -> None:
     assert result == "Content\n\n"
 
 
+def test_dialog_content_ending_with_single_newline() -> None:
+    """Test dialog content that ends with single newline."""
+    html = "<dialog>Content\n</dialog>"
+    result = convert_to_markdown(html)
+    assert result == "Content\n\n"
+
+
 def test_menu_with_complex_attributes() -> None:
     html = '<menu type="toolbar" label="Tools &amp; Options" id="toolbar-1"><li>Cut</li></menu>'
     result = convert_to_markdown(html)

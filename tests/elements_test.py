@@ -2141,3 +2141,81 @@ def test_paragraph_in_deeply_nested_li() -> None:
     result = convert_to_markdown(html)
     assert "First paragraph" in result
     assert "Second paragraph" in result
+
+
+def test_iframe_inline_mode() -> None:
+    """Test iframe conversion in inline mode."""
+    html = '<iframe src="https://example.com/embed"></iframe>'
+    result = convert_to_markdown(html, convert_as_inline=True)
+    assert result == "[https://example.com/embed](https://example.com/embed)"
+
+
+def test_time_element_empty() -> None:
+    """Test empty time element."""
+    html = "<time></time>"
+    result = convert_to_markdown(html)
+    assert result == ""
+
+
+def test_data_element_empty() -> None:
+    """Test empty data element."""
+    html = "<data></data>"
+    result = convert_to_markdown(html)
+    assert result == ""
+
+
+def test_optgroup_inline_mode() -> None:
+    """Test optgroup conversion in inline mode."""
+    html = '<optgroup label="Group"><option>Option 1</option></optgroup>'
+    result = convert_to_markdown(html, convert_as_inline=True)
+    assert "Option 1" in result
+
+
+def test_optgroup_without_label() -> None:
+    """Test optgroup without label attribute."""
+    html = "<optgroup><option>Option 1</option><option>Option 2</option></optgroup>"
+    result = convert_to_markdown(html)
+    assert "Option 1" in result
+    assert "Option 2" in result
+
+
+def test_optgroup_empty() -> None:
+    """Test empty optgroup element."""
+    html = "<optgroup>  </optgroup>"
+    result = convert_to_markdown(html)
+    assert result == ""
+
+
+def test_ruby_element_empty() -> None:
+    """Test empty ruby element."""
+    html = "<ruby>  </ruby>"
+    result = convert_to_markdown(html)
+    assert result == ""
+
+
+def test_rp_element_empty() -> None:
+    """Test empty rp element."""
+    html = "<rp>  </rp>"
+    result = convert_to_markdown(html)
+    assert result == ""
+
+
+def test_rtc_element_empty() -> None:
+    """Test empty rtc element."""
+    html = "<rtc>  </rtc>"
+    result = convert_to_markdown(html)
+    assert result == ""
+
+
+def test_legend_inline_mode() -> None:
+    """Test legend conversion in inline mode."""
+    html = "<legend>Form Legend</legend>"
+    result = convert_to_markdown(html, convert_as_inline=True)
+    assert result == "Form Legend"
+
+
+def test_iframe_without_src() -> None:
+    """Test iframe without src attribute."""
+    html = "<iframe></iframe>"
+    result = convert_to_markdown(html)
+    assert result == ""
