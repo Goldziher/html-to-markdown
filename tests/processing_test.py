@@ -7,7 +7,7 @@ from bs4 import BeautifulSoup
 import html_to_markdown.processing
 from html_to_markdown import convert_to_markdown
 from html_to_markdown.exceptions import ConflictingOptionsError, EmptyHtmlError, MissingDependencyError
-from html_to_markdown.processing import convert_to_markdown_stream
+from html_to_markdown.processing import _as_optional_set, convert_to_markdown_stream
 
 
 def test_empty_html_error() -> None:
@@ -157,3 +157,33 @@ def test_definition_list_formatting() -> None:
     """
     result = convert_to_markdown(html)
     assert ":   " in result
+
+
+def test_as_optional_set_function() -> None:
+    assert _as_optional_set(None) is None
+
+    result = _as_optional_set("a,b,c")
+    expected = {"a", "b", "c"}
+    assert result == expected, f"String splitting failed: expected {expected}, got {result}"
+
+    result = _as_optional_set("single")
+    assert result == {"single"}
+
+    result = _as_optional_set("")
+    assert result == {""}
+
+    result = _as_optional_set(["a,b", "c,d"])
+    expected = {"a", "b", "c", "d"}
+    assert result == expected
+
+
+def test_underlined_heading_conversion() -> None:
+    html = "<h2>Header</h2><p>Next paragraph</p>"
+    result = convert_to_markdown(html, heading_style="underlined")
+
+    assert "Header" in result
+    assert "------" in result
+    assert "Next paragraph" in result
+
+    expected = "Header\n------\n\nNext paragraph\n\n"
+    assert result == expected

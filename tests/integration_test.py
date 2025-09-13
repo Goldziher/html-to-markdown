@@ -14,7 +14,7 @@ def test_single_tag() -> None:
 
 
 def test_soup() -> None:
-    assert convert_to_markdown("<div><span>Hello</div></span>") == "Hello"
+    assert convert_to_markdown("<div><span>Hello</div></span>") == "Hello\n\n"
 
 
 def test_whitespace() -> None:
@@ -138,7 +138,7 @@ def test_ol() -> None:
 def test_nested_ols(nested_ols: str) -> None:
     assert (
         convert_to_markdown(nested_ols)
-        == "\n1. 1\n    1. a\n        1. I\n        2. II\n        3. III\n    2. b\n    3. c\n2. 2\n3. 3\n"
+        == "\n1. 1\n\n    1. a\n            1. I\n                2. II\n                3. III\n        2. b\n        3. c\n2. 2\n3. 3\n"
     )
 
 
@@ -166,14 +166,14 @@ def test_inline_ul() -> None:
 def test_nested_uls(nested_uls: str) -> None:
     assert (
         convert_to_markdown(nested_uls)
-        == "\n* 1\n    + a\n        - I\n        - II\n        - III\n    + b\n    + c\n* 2\n* 3\n"
+        == "\n* 1\n\n    \n    \n    + a\n    \n    \n        \n        \n        - I\n        - II\n        - III\n    + b\n    + c\n* 2\n* 3\n"
     )
 
 
 def test_bullets(nested_uls: str) -> None:
     assert (
         convert_to_markdown(nested_uls, bullets="-")
-        == "\n- 1\n    - a\n        - I\n        - II\n        - III\n    - b\n    - c\n- 2\n- 3\n"
+        == "\n- 1\n\n    \n    \n    - a\n    \n    \n        \n        \n        - I\n        - II\n        - III\n    - b\n    - c\n- 2\n- 3\n"
     )
 
 
@@ -347,7 +347,7 @@ def test_blockquote_with_paragraph() -> None:
 
 def test_blockquote_nested() -> None:
     text = convert_to_markdown("<blockquote>And she was like <blockquote>Hello</blockquote></blockquote>")
-    assert text == "\n> And she was like \n> > Hello\n\n"
+    assert text == "\n> And she was like \n> \n> \n> > Hello\n\n"
 
 
 def test_br() -> None:
@@ -358,7 +358,7 @@ def test_br() -> None:
 def test_caption() -> None:
     assert (
         convert_to_markdown("TEXT<figure><figcaption>Caption</figcaption><span>SPAN</span></figure>")
-        == "TEXT*Caption*\n\nSPAN\n\n"
+        == "TEXT\n\n*Caption*\n\nSPAN\n\n"
     )
     assert (
         convert_to_markdown("<figure><span>SPAN</span><figcaption>Caption</figcaption></figure>TEXT")

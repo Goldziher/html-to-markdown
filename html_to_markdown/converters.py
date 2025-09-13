@@ -578,8 +578,11 @@ def _convert_semantic_block(*, text: str, convert_as_inline: bool) -> str:
     return f"{text}\n\n" if text.strip() else ""
 
 
-def _convert_div(*, text: str, convert_as_inline: bool) -> str:  # noqa: ARG001
-    return text
+def _convert_div(*, text: str, convert_as_inline: bool) -> str:
+    if convert_as_inline:
+        return text
+
+    return _format_block_element(text)
 
 
 def _convert_details(*, text: str, convert_as_inline: bool) -> str:
