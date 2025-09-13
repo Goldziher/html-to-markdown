@@ -605,3 +605,17 @@ def test_table_first_row_in_tbody_without_previous_sibling() -> None:
     assert "| --- | --- |" in result
     assert "| First | Row |" in result
     assert "| Second | Row |" in result
+
+
+def test_tbody_inline_mode() -> None:
+    """Test tbody conversion in inline mode."""
+    html = "<tbody><tr><td>Cell</td></tr></tbody>"
+    result = convert_to_markdown(html, convert_as_inline=True)
+    assert "Cell" in result
+
+
+def test_tfoot_inline_mode() -> None:
+    """Test tfoot conversion in inline mode."""
+    html = "<tfoot><tr><td>Footer</td></tr></tfoot>"
+    result = convert_to_markdown(html, convert_as_inline=True)
+    assert "Footer" in result

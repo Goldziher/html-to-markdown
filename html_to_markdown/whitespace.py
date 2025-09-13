@@ -281,7 +281,8 @@ class WhitespaceHandler:
 
         return text
 
-    def get_block_spacing(self, tag: Tag, next_sibling: PageElement | None = None) -> str:
+    def get_block_spacing(self, tag: Tag, next_sibling: PageElement | None = None) -> str:  # pragma: no cover
+        # This method is currently unused but kept for potential future use
         if self.mode == "strict":
             return ""
 

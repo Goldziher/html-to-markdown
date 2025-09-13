@@ -17,7 +17,7 @@ from bs4.element import NavigableString, PageElement
 try:
     from html_to_markdown.preprocessor import create_preprocessor
     from html_to_markdown.preprocessor import preprocess_html as preprocess_fn
-except ImportError:
+except ImportError:  # pragma: no cover
     create_preprocessor = None  # type: ignore[assignment]
     preprocess_fn = None  # type: ignore[assignment]
 
@@ -25,7 +25,7 @@ try:
     import importlib.util
 
     LXML_AVAILABLE = importlib.util.find_spec("lxml") is not None
-except ImportError:
+except ImportError:  # pragma: no cover
     LXML_AVAILABLE = False
 
 from html_to_markdown.constants import (

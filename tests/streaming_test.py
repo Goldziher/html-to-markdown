@@ -178,3 +178,20 @@ def test_complex_nesting_streaming() -> None:
 
     result_regular = convert_to_markdown(html)
     assert result_streaming == result_regular
+
+
+def test_streaming_inline_mode() -> None:
+    """Test streaming with convert_as_inline=True."""
+    html = "<p>Test paragraph</p>"
+    chunks = list(convert_to_markdown_stream(html, chunk_size=10, convert_as_inline=True))
+    result = "".join(chunks)
+    assert "Test paragraph" in result
+    assert not result.endswith("\n\n")
+
+
+def test_streaming_empty_result() -> None:
+    """Test streaming when result is effectively empty after processing."""
+    html = "<!-- comment only -->"
+    chunks = list(convert_to_markdown_stream(html, chunk_size=10))
+    result = "".join(chunks)
+    assert result == ""
