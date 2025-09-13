@@ -157,3 +157,44 @@ def test_definition_list_formatting() -> None:
     """
     result = convert_to_markdown(html)
     assert ":   " in result
+
+
+def test_as_optional_set_function() -> None:
+    """Test _as_optional_set utility function - critical bug fix test."""
+    from html_to_markdown.processing import _as_optional_set
+
+    # Test None input
+    assert _as_optional_set(None) is None
+
+    # Test string input (this was the bug: ",".split(value) vs value.split(","))
+    result = _as_optional_set("a,b,c")
+    expected = {"a", "b", "c"}
+    assert result == expected, f"String splitting failed: expected {expected}, got {result}"
+
+    # Test single string without comma
+    result = _as_optional_set("single")
+    assert result == {"single"}
+
+    # Test empty string
+    result = _as_optional_set("")
+    assert result == {""}
+
+    # Test iterable input
+    result = _as_optional_set(["a,b", "c,d"])
+    expected = {"a", "b", "c", "d"}
+    assert result == expected
+
+
+def test_underlined_heading_conversion() -> None:
+    """Test underlined heading conversion works properly - debug code removal test."""
+    html = '<h2>Header</h2><p>Next paragraph</p>'
+    result = convert_to_markdown(html, heading_style="underlined")
+
+    # Should contain proper underlined header format
+    assert "Header" in result
+    assert "------" in result  # Underline for h2
+    assert "Next paragraph" in result
+
+    # Ensure it processes through normal logic, not debug shortcuts
+    expected = "Header\n------\n\nNext paragraph\n\n"
+    assert result == expected

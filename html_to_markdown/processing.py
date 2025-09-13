@@ -253,11 +253,25 @@ def _process_tag(
             tag=tag, text=text, convert_as_inline=convert_as_inline
         )
 
+        # Ensure headings start on a new line
         if is_heading and context_before not in {"", "\n"}:
             n_eol_to_add = 2 - (len(context_before) - len(context_before.rstrip("\n")))
             if n_eol_to_add > 0:
                 prefix = "\n" * n_eol_to_add
                 return f"{prefix}{rendered}"
+
+        # Ensure block elements start on a new line when preceded by inline content
+        from html_to_markdown.whitespace import BLOCK_ELEMENTS  # noqa: PLC0415
+
+        is_block_element = tag.name.lower() in BLOCK_ELEMENTS
+        if (
+            is_block_element
+            and not convert_as_inline
+            and context_before
+            and not context_before.endswith("\n")
+            and rendered.strip()  # Only if the element has content
+        ):
+            return f"\n\n{rendered}"
         return rendered
 
     return text
@@ -358,7 +372,7 @@ def _as_optional_set(value: str | Iterable[str] | None) -> set[str] | None:
     if value is None:
         return None
     if isinstance(value, str):
-        return set(",".split(value))
+        return set(value.split(","))
     return {*chain(*[v.split(",") for v in value])}
 
 
@@ -836,15 +850,6 @@ def _process_html_core(
 
     try:
         if isinstance(source, str):
-            if (
-                heading_style == UNDERLINED
-                and "Header" in source
-                and "\n------\n\n" in source
-                and "Next paragraph" in source
-            ):
-                sink.write(source)
-                return
-
             if strip_newlines:
                 source = source.replace("\n", " ").replace("\r", " ")
 
