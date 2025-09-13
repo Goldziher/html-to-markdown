@@ -5,6 +5,7 @@ from unittest.mock import Mock, mock_open, patch
 import pytest
 
 from html_to_markdown.cli import main
+from html_to_markdown.exceptions import InvalidEncodingSpecifiedError
 
 
 @pytest.fixture
@@ -334,3 +335,159 @@ def test_main_with_all_new_options_combined(mock_convert_to_markdown: Mock, mock
     assert args["preprocessing_preset"] == "minimal"
     assert args["remove_forms"] is False
     assert args["remove_navigation"] is False
+
+
+def test_main_with_source_encoding_option(mock_convert_to_markdown: Mock) -> None:
+    test_html = "<html><body><h1>Test ñ</h1></body></html>"
+    mock_file = mock_open(read_data=test_html)
+
+    # Mock the Path.open context manager to return the file content with specific encoding
+    with patch("builtins.open", mock_file), patch("pathlib.Path.open") as mock_path_open:
+        mock_path_open.return_value.__enter__ = lambda self: mock_file.return_value
+        mock_path_open.return_value.__exit__ = lambda self, *args: None
+        mock_path_open.return_value.read.return_value = test_html
+
+        result = main(["input.html", "--source_encoding", "utf-8"])
+
+    assert result == "Mocked Markdown Output"
+    mock_path_open.assert_called_once_with(encoding="utf-8")
+    mock_convert_to_markdown.assert_called_once_with(
+        test_html,
+        autolinks=False,
+        bullets="*+-",
+        code_language="",
+        convert=None,
+        convert_as_inline=False,
+        default_title=False,
+        escape_asterisks=True,
+        escape_misc=True,
+        escape_underscores=True,
+        extract_metadata=True,
+        heading_style="underlined",
+        highlight_style="double-equal",
+        keep_inline_images_in=None,
+        list_indent_type="spaces",
+        list_indent_width=4,
+        newline_style="spaces",
+        preprocess_html=False,
+        preprocessing_preset="standard",
+        remove_forms=True,
+        remove_navigation=True,
+        strip=None,
+        strip_newlines=False,
+        strong_em_symbol="*",
+        sub_symbol="",
+        sup_symbol="",
+        whitespace_mode="normalized",
+        wrap=False,
+        wrap_width=80,
+    )
+
+
+def test_main_with_invalid_source_encoding_raises_error(mock_convert_to_markdown: Mock) -> None:
+    """Test that an invalid source_encoding raises InvalidEncodingSpecifiedError."""
+    test_html = "<html><body><h1>Test</h1></body></html>"
+    mock_file = mock_open(read_data=test_html)
+
+    with patch("builtins.open", mock_file), patch("pathlib.Path.open") as mock_path_open:
+        # Create a mock file object that raises LookupError on read()
+        mock_file_obj = Mock()
+        mock_file_obj.read.side_effect = LookupError("unknown encoding: invalid-encoding")
+
+        # Set up the context manager to return our mock file object
+        mock_path_open.return_value.__enter__.return_value = mock_file_obj
+        mock_path_open.return_value.__exit__.return_value = None
+
+        with pytest.raises(InvalidEncodingSpecifiedError) as exc_info:
+            main(["input.html", "--source_encoding", "invalid-encoding"])
+
+        assert str(exc_info.value) == "The specified encoding (invalid-encoding) is not valid."
+        mock_path_open.assert_called_once_with(encoding="invalid-encoding")
+
+
+def test_main_with_source_encoding_ignored_for_stdin(mock_convert_to_markdown: Mock) -> None:
+    """Test that source_encoding argument is ignored when input comes from stdin."""
+    # Create a custom stdin mock with the name attribute
+    mock_stdin_io = StringIO("<html><body><p>Test from stdin</p></body></html>")
+    mock_stdin_io.name = "<stdin>"
+
+    with patch("sys.stdin", new=mock_stdin_io):
+        # When using stdin, source_encoding should be ignored
+        result = main(["--source_encoding", "utf-8"])
+
+    assert result == "Mocked Markdown Output"
+
+    # Verify that the stdin content was used directly without encoding handling
+    mock_convert_to_markdown.assert_called_once_with(
+        "<html><body><p>Test from stdin</p></body></html>",
+        autolinks=False,
+        bullets="*+-",
+        code_language="",
+        convert=None,
+        convert_as_inline=False,
+        default_title=False,
+        escape_asterisks=True,
+        escape_misc=True,
+        escape_underscores=True,
+        extract_metadata=True,
+        heading_style="underlined",
+        highlight_style="double-equal",
+        keep_inline_images_in=None,
+        list_indent_type="spaces",
+        list_indent_width=4,
+        newline_style="spaces",
+        preprocess_html=False,
+        preprocessing_preset="standard",
+        remove_forms=True,
+        remove_navigation=True,
+        strip=None,
+        strip_newlines=False,
+        strong_em_symbol="*",
+        sub_symbol="",
+        sup_symbol="",
+        whitespace_mode="normalized",
+        wrap=False,
+        wrap_width=80,
+    )
+
+
+def test_main_with_source_encoding_default_none(mock_convert_to_markdown: Mock) -> None:
+    """Test that when no source_encoding is specified, default file reading is used."""
+    test_html = "<html><body><h1>Test default encoding</h1></body></html>"
+
+    with patch("builtins.open", mock_open(read_data=test_html)):
+        result = main(["input.html"])
+
+    assert result == "Mocked Markdown Output"
+    # Verify that when no source_encoding is specified, the normal file reading is used
+    mock_convert_to_markdown.assert_called_once_with(
+        test_html,
+        autolinks=False,
+        bullets="*+-",
+        code_language="",
+        convert=None,
+        convert_as_inline=False,
+        default_title=False,
+        escape_asterisks=True,
+        escape_misc=True,
+        escape_underscores=True,
+        extract_metadata=True,
+        heading_style="underlined",
+        highlight_style="double-equal",
+        keep_inline_images_in=None,
+        list_indent_type="spaces",
+        list_indent_width=4,
+        newline_style="spaces",
+        preprocess_html=False,
+        preprocessing_preset="standard",
+        remove_forms=True,
+        remove_navigation=True,
+        strip=None,
+        strip_newlines=False,
+        strong_em_symbol="*",
+        sub_symbol="",
+        sup_symbol="",
+        whitespace_mode="normalized",
+        wrap=False,
+        wrap_width=80,
+    )

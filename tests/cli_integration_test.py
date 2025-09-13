@@ -2,6 +2,7 @@
 
 import subprocess
 import sys
+import tempfile
 
 
 def run_cli(args: list[str], input_html: str) -> str:
@@ -193,6 +194,68 @@ def test_cli_help_includes_new_options() -> None:
     assert "--preprocessing-preset" in help_text
     assert "--no-remove-forms" in help_text
     assert "--no-remove-navigation" in help_text
+    assert "--source_encoding" in help_text
 
     # Check for Discord mention
     assert "Discord" in help_text or "2" in help_text
+
+
+def test_cli_source_encoding_with_stdin() -> None:
+    """Test that source_encoding is ignored when using stdin."""
+    html = "<html><body><h1>Test with stdin</h1></body></html>"
+    output = run_cli(["--source_encoding", "utf-8", "--no-extract-metadata"], html)
+    assert "Test with stdin" in output
+
+
+def test_cli_source_encoding_with_file() -> None:
+    """Test source_encoding with an actual file.
+
+    Create a temporary HTML file with a specific encoding and read it using the CLI.
+    """
+    html_content = "<html><body><h1>Tëst with special çharacters: ñáéíóú</h1></body></html>"
+
+    with tempfile.NamedTemporaryFile(mode="w", encoding="utf-8", delete=False, suffix=".html") as f:
+        f.write(html_content)
+        temp_file = f.name
+
+        result = subprocess.run(
+            [
+                sys.executable,
+                "-m",
+                "html_to_markdown",
+                temp_file,
+                "--source_encoding",
+                "utf-8",
+                "--no-extract-metadata",
+            ],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+
+        output = result.stdout
+        assert "Tëst with special çharacters" in output
+        assert "ñáéíóú" in output
+
+
+def test_cli_source_encoding_invalid_encoding() -> None:
+    """Test that invalid encoding produces an error.
+
+    Create a temporary HTML file with a specific encoding and read it using the CLI.
+    Pass a different, invalid encoding to trigger the error (resultcode != 0).
+    """
+    html_content = "<html><body><h1>Test content</h1></body></html>"
+
+    with tempfile.NamedTemporaryFile(mode="w", encoding="utf-8", delete=False, suffix=".html") as f:
+        f.write(html_content)
+        temp_file = f.name
+
+        result = subprocess.run(
+            [sys.executable, "-m", "html_to_markdown", temp_file, "--source_encoding", "invalid-encoding"],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+
+        assert result.returncode != 0
+        assert "encoding" in result.stderr.lower() or "invalid" in result.stderr.lower()
