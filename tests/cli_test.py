@@ -730,7 +730,7 @@ def test_main_with_source_encoding_option(mock_convert_to_markdown: Mock) -> Non
         mock_path_open.return_value.__exit__ = lambda self, *args: None
         mock_path_open.return_value.read.return_value = test_html
 
-        result = main(["input.html", "--source_encoding", "utf-8"])
+        result = main(["input.html", "--source-encoding", "utf-8"])
 
     assert result == "Mocked Markdown Output"
     mock_path_open.assert_called_once_with(encoding="utf-8")
@@ -782,7 +782,7 @@ def test_main_with_invalid_source_encoding_raises_error(mock_convert_to_markdown
         mock_path_open.return_value.__exit__.return_value = None
 
         with pytest.raises(InvalidEncodingSpecifiedError) as exc_info:
-            main(["input.html", "--source_encoding", "invalid-encoding"])
+            main(["input.html", "--source-encoding", "invalid-encoding"])
 
         assert str(exc_info.value) == "The specified encoding (invalid-encoding) is not valid."
         mock_path_open.assert_called_once_with(encoding="invalid-encoding")
@@ -796,7 +796,7 @@ def test_main_with_source_encoding_ignored_for_stdin(mock_convert_to_markdown: M
 
     with patch("sys.stdin", new=mock_stdin_io):
         # When using stdin, source_encoding should be ignored
-        result = main(["--source_encoding", "utf-8"])
+        result = main(["--source-encoding", "utf-8"])
 
     assert result == "Mocked Markdown Output"
 
