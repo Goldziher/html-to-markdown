@@ -102,19 +102,19 @@ def test_complex_file_conversion(complex_html_file: Path) -> None:
 
 
 def test_error_handling() -> None:
-    stdout, stderr, returncode = run_cli_command(["nonexistent.html"])
+    _stdout, stderr, returncode = run_cli_command(["nonexistent.html"])
     assert returncode != 0
     assert "No such file" in stderr
 
-    stdout, stderr, returncode = run_cli_command(["--invalid-option"])
+    _stdout, stderr, returncode = run_cli_command(["--invalid-option"])
     assert returncode != 0
     assert "unrecognized arguments" in stderr
 
-    stdout, stderr, returncode = run_cli_command(["--strip", "p", "--convert", "p"], input_text="<p>Test</p>")
+    _stdout, stderr, returncode = run_cli_command(["--strip", "p", "--convert", "p"], input_text="<p>Test</p>")
     assert returncode != 0
     assert "Only one of 'strip' and 'convert' can be specified" in stderr
 
-    stdout, stderr, returncode = run_cli_command(["--strip", "p"], input_text="")
+    _stdout, stderr, returncode = run_cli_command(["--strip", "p"], input_text="")
     assert returncode != 0
     assert "The input HTML is empty" in stderr
 
@@ -185,7 +185,7 @@ def test_large_file_handling(tmp_path: Path) -> None:
 
 def test_unicode_handling() -> None:
     input_html = "<p>Unicode: 你好 • é è à ñ</p>"
-    stdout, stderr, returncode = run_cli_command([], input_text=input_html)
+    stdout, _stderr, returncode = run_cli_command([], input_text=input_html)
 
     assert returncode == 0
     assert "你好" in stdout

@@ -287,7 +287,7 @@ def main(argv: list[str]) -> str:
         if args.show_progress:
 
             def progress_callback(processed: int, total: int) -> None:
-                if total > 0:
+                if total > 0:  # pragma: no cover
                     percent = (processed / total) * 100
 
                     sys.stderr.write(f"\rProgress: {percent:.1f}% ({processed}/{total} bytes)")
