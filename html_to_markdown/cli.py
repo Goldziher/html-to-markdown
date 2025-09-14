@@ -238,7 +238,7 @@ def main(argv: list[str]) -> str:
     )
 
     parser.add_argument(
-        "--source_encoding",
+        "--source-encoding",
         type=str,
         default=None,
         help="Source file encoding (e.g. 'utf-8', 'latin-1'). Defaults to system default.",
@@ -299,11 +299,11 @@ def main(argv: list[str]) -> str:
     # encoding, except if the source is stdin
     if args.source_encoding and args.html.name != "<stdin>":
         args.html.close()
-        with Path(args.html.name).open(encoding=args.source_encoding) as f:
-            try:
+        try:
+            with Path(args.html.name).open(encoding=args.source_encoding) as f:
                 html_content = f.read()
-            except LookupError:
-                raise InvalidEncodingSpecifiedError(args.source_encoding) from None
+        except LookupError:
+            raise InvalidEncodingSpecifiedError(args.source_encoding) from None
     else:
         html_content = args.html.read()
 
