@@ -548,7 +548,13 @@ def convert_to_markdown(
         >>> convert_to_markdown(html, list_indent_width=2)
         '* Item 1\\n* Item 2\\n\\n'
     """
+    # Initialize original input string for Windows lxml fix
+    original_input_str = None
+
     if isinstance(source, str):
+        # Store original string for plain text detection (Windows lxml fix)
+        original_input_str = source
+
         if (
             heading_style == UNDERLINED
             and "Header" in source
@@ -750,6 +756,19 @@ def convert_to_markdown(
     result = re.sub(r" {2,}\*\*", " **", result)
 
     if convert_as_inline:
+        result = result.rstrip("\n")
+
+    # Windows-specific fix: For plain text input (no HTML tags), lxml may add extra trailing newlines
+    # This ensures consistent behavior across platforms when processing plain text
+    # Only apply to cases where lxml adds extra newlines (\n\n) at the end
+    if (
+        "original_input_str" in locals()
+        and original_input_str
+        and not original_input_str.strip().startswith("<")
+        and not original_input_str.strip().endswith(">")
+        and result.endswith("\n\n")
+    ):
+        # Input appears to be plain text, not HTML - normalize trailing newlines only
         result = result.rstrip("\n")
 
     return result

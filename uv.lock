@@ -172,7 +172,7 @@ wheels = [
 
 [[package]]
 name = "html-to-markdown"
-version = "1.12.1"
+version = "1.12.2"
 source = { editable = "." }
 dependencies = [
     { name = "beautifulsoup4" },

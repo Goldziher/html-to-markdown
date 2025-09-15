@@ -6,6 +6,7 @@ and integration with actual conversions.
 
 from __future__ import annotations
 
+import os
 import subprocess
 import sys
 from io import StringIO
@@ -56,6 +57,13 @@ DEFAULT_CLI_ARGS = {
 
 def run_cli_command(args: list[str], input_text: str | None = None, timeout: int = 60) -> tuple[str, str, int]:
     cli_command = [sys.executable, "-m", "html_to_markdown", *args]
+
+    # Set up environment with proper UTF-8 encoding on Windows
+    env = os.environ.copy()
+    env["PYTHONIOENCODING"] = "utf-8:replace"
+    if os.name == "nt":  # Windows
+        env["PYTHONUTF8"] = "1"
+
     process = subprocess.Popen(
         cli_command,
         stdin=subprocess.PIPE if input_text else None,
@@ -63,10 +71,16 @@ def run_cli_command(args: list[str], input_text: str | None = None, timeout: int
         stderr=subprocess.PIPE,
         text=True,
         encoding="utf-8",
+        # Windows-specific: Ensure proper Unicode handling
+        errors="replace",
+        env=env,
     )
 
     try:
         stdout, stderr = process.communicate(input=input_text, timeout=timeout)
+        # Ensure stdout/stderr are never None for Windows compatibility
+        stdout = stdout or ""
+        stderr = stderr or ""
         return stdout, stderr, process.returncode
     except subprocess.TimeoutExpired:
         process.kill()
@@ -74,14 +88,24 @@ def run_cli_command(args: list[str], input_text: str | None = None, timeout: int
 
 
 def run_cli(args: list[str], input_html: str) -> str:
+    # Set up environment with proper UTF-8 encoding on Windows
+    env = os.environ.copy()
+    env["PYTHONIOENCODING"] = "utf-8:replace"
+    if os.name == "nt":  # Windows
+        env["PYTHONUTF8"] = "1"
+
     result = subprocess.run(
         [sys.executable, "-m", "html_to_markdown", *args],
         check=False,
         input=input_html,
         capture_output=True,
         text=True,
+        encoding="utf-8",
+        # Windows-specific: Ensure proper Unicode handling
+        errors="replace",
+        env=env,
     )
-    return result.stdout
+    return result.stdout or ""
 
 
 @pytest.fixture
