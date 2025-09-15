@@ -95,6 +95,36 @@ def test_nested_q_elements() -> None:
     assert result == '"Outer quote \\"inner quote\\" continues"'
 
 
+@pytest.mark.parametrize(
+    "html,expected",
+    [
+        ("<dl><dd>What is this?</dd></dl>", "What is this?\n\n"),
+        ("<dl><dt>Term</dt><dd>Definition</dd></dl>", "**Term**\n\n:   Definition\n\n"),
+        (
+            "<dl><dt>Term</dt><dd>Definition 1</dd><dd>Definition 2</dd></dl>",
+            "**Term**\n\n:   Definition 1\n\n:   Definition 2\n\n",
+        ),
+        (
+            "<dl><dt>Term 1</dt><dd>Def 1</dd><dt>Term 2</dt><dd>Def 2</dd></dl>",
+            "**Term 1**\n\n:   Def 1\n\n**Term 2**\n\n:   Def 2\n\n",
+        ),
+        ("<dl><dd>First definition</dd><dd>Second definition</dd></dl>", "First definition\n\nSecond definition\n\n"),
+        ("<dl><dt>Term only</dt></dl>", "**Term only**\n\n"),
+        ("<dl><dd><p>Complex definition with paragraph</p></dd></dl>", "Complex definition with paragraph\n\n"),
+        (
+            "Some text before<dl><dd>Definition</dd></dl>Some text after",
+            "Some text before\n\nDefinition\n\nSome text after",
+        ),
+        ("<dl></dl>", ""),
+        ("<dl><dt></dt><dd></dd></dl>", "****\n\n:\n\n"),
+    ],
+)
+def test_definition_list_issues(html: str, expected: str) -> None:
+    """Test definition list conversion - Issue #68."""
+    result = convert_to_markdown(html)
+    assert result == expected
+
+
 def test_simple_blockquote() -> None:
     html = "<blockquote>Simple quote</blockquote>"
     result = convert_to_markdown(html)

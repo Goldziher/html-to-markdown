@@ -5,6 +5,7 @@ from html_to_markdown.converters import create_converters_map
 def test_create_converters_map() -> None:
     converters = create_converters_map(
         autolinks=True,
+        br_in_tables=False,
         bullets="*+-",
         code_language="",
         code_language_callback=None,
@@ -27,6 +28,7 @@ def test_create_converters_map() -> None:
 
     converters = create_converters_map(
         autolinks=False,
+        br_in_tables=True,
         bullets="-*+",
         code_language="python",
         code_language_callback=None,
