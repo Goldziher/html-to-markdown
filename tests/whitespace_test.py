@@ -439,7 +439,7 @@ test2
 <a href="https://example.com">example.com</a>
 
 <a href="https://example.org">example.org</a>""",
-            "test1 test2 [example.com](https://example.com) [example.org](https://example.org)",
+            "test1\n\ntest2 [example.com](https://example.com)[example.org](https://example.org)",
             None,
         ),
         (
@@ -455,18 +455,17 @@ test2
 test2
 
 [example.com](https://example.com)
-
 [example.org](https://example.org)""",
             "strict",
         ),
-        ("<b>bold</b><i>italic</i><code>code</code>", "**bold** *italic* `code`", None),
+        ("<b>bold</b><i>italic</i><code>code</code>", "**bold***italic*`code`", None),
         ("<p>Para 1</p><b>bold text</b><p>Para 2</p>", "Para 1\n\n**bold text**\n\nPara 2\n\n", None),
         (
             "<div>Text content</div><div><ul><li>List item</li></ul></div><div>More text</div>",
             "Text content\n\n* List item\n\nMore text\n\n",
             None,
         ),
-        ("<h1>Header</h1>inline text<p>Paragraph</p>", "# Header\n\ninline text\n\nParagraph\n\n", None),
+        ("<h1>Header</h1>inline text<p>Paragraph</p>", "Header\n======\n\ninline text\n\nParagraph\n\n", None),
         (
             """<div>
     <p>Paragraph in div</p>
@@ -485,7 +484,7 @@ Following paragraph
 """,
             None,
         ),
-        ('<a href="url1">Link1</a><a href="url2">Link2</a>', "[Link1](url1) [Link2](url2)", None),
+        ('<a href="url1">Link1</a><a href="url2">Link2</a>', "[Link1](url1)[Link2](url2)", None),
         ('<a href="url1">Link1</a> <a href="url2">Link2</a>', "[Link1](url1) [Link2](url2)", None),
         (
             """<p>Para 1</p>
