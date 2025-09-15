@@ -386,36 +386,35 @@ def _extract_metadata(soup: BeautifulSoup) -> dict[str, str]:
         metadata["base-href"] = base_tag["href"]
 
     for meta in soup.find_all("meta"):
-        if meta.get("name") and meta.get("content") is not None:
-            name = meta["name"]
-            content = meta["content"]
+        if (name := meta.get("name")) and (content := meta.get("content")) is not None:
             if isinstance(name, str) and isinstance(content, str):
-                key = f"meta-{name.lower()}"
-                metadata[key] = content
+                metadata[f"meta-{name.lower()}"] = content
 
-        elif meta.get("property") and meta.get("content") is not None:
-            prop = meta["property"]
-            content = meta["content"]
+        elif (prop := meta.get("property")) and (content := meta.get("content")) is not None:
             if isinstance(prop, str) and isinstance(content, str):
-                key = f"meta-{prop.lower().replace(':', '-')}"
-                metadata[key] = content
+                metadata[f"meta-{prop.lower().replace(':', '-')}"] = content
 
-        elif meta.get("http-equiv") and meta.get("content") is not None:
-            equiv = meta["http-equiv"]
-            content = meta["content"]
-            if isinstance(equiv, str) and isinstance(content, str):
-                key = f"meta-{equiv.lower()}"
-                metadata[key] = content
+        elif (
+            (equiv := meta.get("http-equiv"))
+            and (content := meta.get("content")) is not None
+            and isinstance(equiv, str)
+            and isinstance(content, str)
+        ):
+            metadata[f"meta-{equiv.lower()}"] = content
 
     canonical = soup.find("link", rel="canonical", href=True)
     if canonical and isinstance(canonical, Tag) and isinstance(canonical["href"], str):
         metadata["canonical"] = canonical["href"]
 
     link_relations = {"author", "license", "alternate"}
-    for rel_type in link_relations:
-        link = soup.find("link", rel=rel_type, href=True)
-        if link and isinstance(link, Tag) and isinstance(link["href"], str):
-            metadata[f"link-{rel_type}"] = link["href"]
+    link_metadata = {
+        f"link-{rel_type}": link["href"]
+        for rel_type in link_relations
+        if (link := soup.find("link", rel=rel_type, href=True))
+        and isinstance(link, Tag)
+        and isinstance(link["href"], str)
+    }
+    metadata.update(link_metadata)
 
     return metadata
 
@@ -424,11 +423,7 @@ def _format_metadata_comment(metadata: dict[str, str]) -> str:
     if not metadata:
         return ""
 
-    lines = ["<!--"]
-    for key, value in sorted(metadata.items()):
-        safe_value = value.replace("-->", "--&gt;")
-        lines.append(f"{key}: {safe_value}")
-    lines.append("-->")
+    lines = ["<!--", *[f"{key}: {value.replace('-->', '--&gt;')}" for key, value in sorted(metadata.items())], "-->"]
 
     return "\n".join(lines) + "\n\n"
 
@@ -442,6 +437,7 @@ def convert_to_markdown(
     progress_callback: Callable[[int, int], None] | None = None,
     parser: str | None = None,
     autolinks: bool = True,
+    br_in_tables: bool = False,
     bullets: str = "*+-",
     code_language: str = "",
     code_language_callback: Callable[[Any], str] | None = None,
@@ -485,6 +481,7 @@ def convert_to_markdown(
         progress_callback: Callback for progress updates (current, total).
         parser: HTML parser to use ('html.parser', 'lxml', 'html5lib').
         autolinks: Convert URLs to automatic links.
+        br_in_tables: Use <br> tags for line breaks in table cells instead of spaces.
         bullets: Characters to use for unordered list bullets.
         code_language: Default language for code blocks.
         code_language_callback: Callback to determine code language from element.
@@ -658,6 +655,7 @@ def convert_to_markdown(
         whitespace_handler=whitespace_handler,
         parser=parser,
         autolinks=autolinks,
+        br_in_tables=br_in_tables,
         bullets=bullets,
         code_language=code_language,
         code_language_callback=code_language_callback,
@@ -819,6 +817,7 @@ def _process_html_core(
     whitespace_handler: WhitespaceHandler,
     parser: str | None = None,
     autolinks: bool,
+    br_in_tables: bool,
     bullets: str,
     code_language: str,
     code_language_callback: Callable[[Any], str] | None,
@@ -867,6 +866,7 @@ def _process_html_core(
 
         converters_map = create_converters_map(
             autolinks=autolinks,
+            br_in_tables=br_in_tables,
             bullets=bullets,
             code_language=code_language,
             code_language_callback=code_language_callback,
@@ -935,6 +935,7 @@ def convert_to_markdown_stream(
     progress_callback: Callable[[int, int], None] | None = None,
     parser: str | None = None,
     autolinks: bool = True,
+    br_in_tables: bool = False,
     bullets: str = "*+-",
     code_language: str = "",
     code_language_callback: Callable[[Any], str] | None = None,
@@ -976,6 +977,7 @@ def convert_to_markdown_stream(
         whitespace_handler=whitespace_handler,
         parser=parser,
         autolinks=autolinks,
+        br_in_tables=br_in_tables,
         bullets=bullets,
         code_language=code_language,
         code_language_callback=code_language_callback,

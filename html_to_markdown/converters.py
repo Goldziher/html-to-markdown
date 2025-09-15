@@ -5,9 +5,11 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from collections.abc import Iterable
 import base64
+import re
 from collections.abc import Callable
 from functools import partial
 from inspect import getfullargspec
+from itertools import chain
 from textwrap import fill
 from typing import Any, Literal, TypeVar, cast
 
@@ -34,6 +36,19 @@ def _format_wrapped_block(text: str, start_marker: str, end_marker: str = "") ->
     if not end_marker:
         end_marker = start_marker
     return f"{start_marker}{text.strip()}{end_marker}\n\n" if text.strip() else ""
+
+
+def _find_list_item_ancestor(tag: Tag) -> Tag | None:
+    """Find the nearest list item ancestor of a tag."""
+    parent = tag.parent
+    while parent and parent.name != "li":
+        parent = parent.parent
+    return parent
+
+
+BLOCK_ELEMENTS = frozenset({"p", "blockquote", "pre", "ul", "ol", "div", "h1", "h2", "h3", "h4", "h5", "h6"})
+
+_LIST_ITEM_PATTERN = re.compile(r"^\s*(\*|\+|-|\d+\.)\s")
 
 
 SupportedElements = Literal[
@@ -270,52 +285,91 @@ def _convert_img(*, tag: Tag, convert_as_inline: bool, keep_inline_images_in: It
     return f"![{alt}]({src}{title_part})"
 
 
+def _has_block_list_items(tag: Tag) -> bool:
+    """Check if any list items contain block elements."""
+    return any(
+        any(child.name in BLOCK_ELEMENTS for child in li.children if hasattr(child, "name"))
+        for li in tag.find_all("li", recursive=False)
+    )
+
+
+def _handle_nested_list_indentation(text: str, list_indent_str: str, parent: Tag) -> str:
+    """Handle indentation for lists nested within list items."""
+    prev_p = None
+    for child in parent.children:
+        if hasattr(child, "name"):
+            if child.name == "p":
+                prev_p = child
+            break
+
+    if prev_p:
+        lines = text.strip().split("\n")
+        indented_lines = [f"{list_indent_str}{line}" if line.strip() else "" for line in lines]
+        return "\n" + "\n".join(indented_lines) + "\n"
+    return "\n" + indent(text=text, level=1, indent_str=list_indent_str).rstrip()
+
+
+def _handle_direct_nested_list_indentation(text: str, list_indent_str: str) -> str:
+    """Handle indentation for lists that are direct children of other lists."""
+    lines = text.strip().split("\n")
+    indented_lines = [f"{list_indent_str}{line}" if line.strip() else "" for line in lines]
+    result = "\n".join(indented_lines)
+    return result + "\n" if not result.endswith("\n") else result
+
+
+def _add_list_item_spacing(text: str) -> str:
+    """Add extra spacing between list items that contain block content."""
+    lines = text.split("\n")
+    items_with_blocks = set()
+
+    i = 0
+    while i < len(lines):
+        line = lines[i]
+        if line.strip() and _LIST_ITEM_PATTERN.match(line.lstrip()):
+            j = i + 1
+            has_continuation = False
+            while j < len(lines):
+                next_line = lines[j]
+                if next_line.strip() and _LIST_ITEM_PATTERN.match(next_line.lstrip()):
+                    break
+                if next_line.strip() and next_line.startswith(("  ", "   ", "\t")):
+                    has_continuation = True
+                j += 1
+
+            if has_continuation and j < len(lines):
+                items_with_blocks.add(j - 1)
+
+        i += 1
+
+    if items_with_blocks:
+        processed_lines = list(
+            chain.from_iterable([line, ""] if i in items_with_blocks else [line] for i, line in enumerate(lines))
+        )
+        return "\n".join(processed_lines)
+
+    return text
+
+
 def _convert_list(*, tag: Tag, text: str, list_indent_str: str) -> str:
     from html_to_markdown.processing import _has_ancestor  # noqa: PLC0415
 
-    before_paragraph = False
-    if tag.next_sibling and getattr(tag.next_sibling, "name", None) not in {"ul", "ol"}:
-        before_paragraph = True
+    before_paragraph = tag.next_sibling and getattr(tag.next_sibling, "name", None) not in {"ul", "ol"}
+
+    has_block_items = _has_block_list_items(tag)
 
     if _has_ancestor(tag, "li"):
-        parent = tag.parent
-        while parent and parent.name != "li":
-            parent = parent.parent  # pragma: no cover
-
+        parent = _find_list_item_ancestor(tag)
         if parent:
-            prev_p = None
-            for child in parent.children:
-                if hasattr(child, "name"):
-                    if child == tag:
-                        break
-                    if child.name == "p":
-                        prev_p = child
-
-            if prev_p:
-                lines = text.strip().split("\n")
-                indented_lines = []
-                for line in lines:
-                    if line.strip():
-                        indented_lines.append(f"{list_indent_str}{line}")
-                    else:
-                        indented_lines.append("")
-                return "\n" + "\n".join(indented_lines) + "\n"
-            return "\n" + indent(text=text, level=1, indent_str=list_indent_str).rstrip()
+            return _handle_nested_list_indentation(text, list_indent_str, parent)
 
     if tag.parent and tag.parent.name in {"ul", "ol"}:
-        lines = text.strip().split("\n")
-        indented_lines = []
-        for line in lines:
-            if line.strip():
-                indented_lines.append(f"{list_indent_str}{line}")
-            else:
-                indented_lines.append("")  # pragma: no cover
-        result = "\n".join(indented_lines)
-        if not result.endswith("\n"):
-            result += "\n"
-        return result
+        return _handle_direct_nested_list_indentation(text, list_indent_str)
 
-    return text + ("\n" if before_paragraph else "")
+    if has_block_items:
+        text = _add_list_item_spacing(text)
+
+    trailing_newlines = "\n\n" if has_block_items else ("\n" if before_paragraph else "")
+    return text + trailing_newlines
 
 
 def _convert_li(*, tag: Tag, text: str, bullets: str, list_indent_str: str) -> str:
@@ -347,11 +401,7 @@ def _convert_li(*, tag: Tag, text: str, bullets: str, list_indent_str: str) -> s
 
         bullet = bullets[depth % len(bullets)]
 
-    has_block_children = any(
-        child.name in {"p", "blockquote", "pre", "ul", "ol", "div", "h1", "h2", "h3", "h4", "h5", "h6"}
-        for child in tag.children
-        if hasattr(child, "name")
-    )
+    has_block_children = "\n\n" in text
 
     if has_block_children:
         paragraphs = text.strip().split("\n\n")
@@ -388,20 +438,13 @@ def _convert_p(
     from html_to_markdown.processing import _has_ancestor  # noqa: PLC0415
 
     if _has_ancestor(tag, "li"):
-        parent = tag.parent
-        while parent and parent.name != "li":
-            parent = parent.parent  # pragma: no cover
+        parent = _find_list_item_ancestor(tag)
 
         if parent:
             p_children = [child for child in parent.children if hasattr(child, "name") and child.name == "p"]
 
             if p_children and tag != p_children[0]:
-                indented_lines = []
-                for line in text.split("\n"):
-                    if line.strip():
-                        indented_lines.append(f"{list_indent_str}{line}")
-                    else:
-                        indented_lines.append("")  # pragma: no cover
+                indented_lines = [f"{list_indent_str}{line}" if line.strip() else "" for line in text.split("\n")]
                 text = "\n".join(indented_lines)
 
     return f"{text}\n\n" if text else ""
@@ -438,14 +481,92 @@ def _convert_pre(
     return f"\n```{code_language}\n{text}\n```\n"
 
 
-def _convert_td(*, tag: Tag, text: str) -> str:
-    colspan = _get_colspan(tag)
-    return " " + text.strip().replace("\n", " ") + " |" * colspan
+def _process_table_cell_content(*, tag: Tag, text: str, br_in_tables: bool) -> str:
+    """Process table cell content, optionally using <br> tags for multi-line content."""
+    if br_in_tables:
+        block_children = [child for child in tag.children if hasattr(child, "name") and child.name in BLOCK_ELEMENTS]
+
+        if len(block_children) > 1:
+            child_contents = []
+            for child in block_children:
+                child_text = child.get_text().strip()
+                if child_text:
+                    child_contents.append(child_text)
+            return "<br>".join(child_contents)
+        return text.strip().replace("\n", "<br>")
+    return text.strip().replace("\n", " ")
 
 
-def _convert_th(*, tag: Tag, text: str) -> str:
+def _convert_td(*, tag: Tag, text: str, br_in_tables: bool = False) -> str:
     colspan = _get_colspan(tag)
-    return " " + text.strip().replace("\n", " ") + " |" * colspan
+    processed_text = _process_table_cell_content(tag=tag, text=text, br_in_tables=br_in_tables)
+    return " " + processed_text + " |" * colspan
+
+
+def _convert_th(*, tag: Tag, text: str, br_in_tables: bool = False) -> str:
+    colspan = _get_colspan(tag)
+    processed_text = _process_table_cell_content(tag=tag, text=text, br_in_tables=br_in_tables)
+    return " " + processed_text + " |" * colspan
+
+
+def _get_rowspan_positions(prev_cells: list[Tag]) -> tuple[list[int], int]:
+    """Get positions of cells with rowspan > 1 from previous row."""
+    rowspan_positions = []
+    col_pos = 0
+
+    for prev_cell in prev_cells:
+        rowspan = 1
+        if "rowspan" in prev_cell.attrs and isinstance(prev_cell["rowspan"], str) and prev_cell["rowspan"].isdigit():
+            rowspan = int(prev_cell["rowspan"])
+
+        if rowspan > 1:
+            rowspan_positions.append(col_pos)
+
+        colspan = 1
+        if "colspan" in prev_cell.attrs and isinstance(prev_cell["colspan"], str) and prev_cell["colspan"].isdigit():
+            colspan = int(prev_cell["colspan"])
+        col_pos += colspan
+
+    return rowspan_positions, col_pos
+
+
+def _handle_rowspan_text(text: str, rowspan_positions: list[int], col_pos: int) -> str:
+    """Handle text adjustment for rows with rowspan cells."""
+    converted_cells = [part.rstrip() + " |" for part in text.split("|")[:-1] if part] if text.strip() else []
+    rowspan_set = set(rowspan_positions)
+
+    cell_iter = iter(converted_cells)
+    new_cells = [" |" if pos in rowspan_set else next(cell_iter, "") for pos in range(col_pos)]
+
+    return "".join(new_cells)
+
+
+def _is_header_row(tag: Tag, cells: list[Tag], parent_name: str, tag_grand_parent: Tag | None) -> bool:
+    """Determine if this table row should be treated as a header row."""
+    return (
+        all(hasattr(cell, "name") and cell.name == "th" for cell in cells)
+        or (not tag.previous_sibling and parent_name != "tbody")
+        or (
+            not tag.previous_sibling
+            and parent_name == "tbody"
+            and (not tag_grand_parent or len(tag_grand_parent.find_all(["thead"])) < 1)
+        )
+    )
+
+
+def _calculate_total_colspan(cells: list[Tag]) -> int:
+    """Calculate total colspan for all cells in a row."""
+    full_colspan = 0
+    for cell in cells:
+        if hasattr(cell, "attrs") and "colspan" in cell.attrs:
+            colspan_value = cell.attrs["colspan"]
+            if isinstance(colspan_value, str) and colspan_value.isdigit():
+                full_colspan += int(colspan_value)
+            else:
+                full_colspan += 1
+        else:
+            full_colspan += 1
+    return full_colspan
 
 
 def _convert_tr(*, tag: Tag, text: str) -> str:
@@ -455,76 +576,24 @@ def _convert_tr(*, tag: Tag, text: str) -> str:
 
     if tag.previous_sibling and hasattr(tag.previous_sibling, "name") and tag.previous_sibling.name == "tr":
         prev_cells = cast("Tag", tag.previous_sibling).find_all(["td", "th"])
-        rowspan_positions = []
-        col_pos = 0
-
-        for prev_cell in prev_cells:
-            rowspan = 1
-            if (
-                "rowspan" in prev_cell.attrs
-                and isinstance(prev_cell["rowspan"], str)
-                and prev_cell["rowspan"].isdigit()
-            ):
-                rowspan = int(prev_cell["rowspan"])
-
-            if rowspan > 1:
-                rowspan_positions.append(col_pos)
-
-            colspan = 1
-            if (
-                "colspan" in prev_cell.attrs
-                and isinstance(prev_cell["colspan"], str)
-                and prev_cell["colspan"].isdigit()
-            ):
-                colspan = int(prev_cell["colspan"])
-            col_pos += colspan
+        rowspan_positions, col_pos = _get_rowspan_positions(prev_cells)
 
         if rowspan_positions:
-            converted_cells: list[str] = []
-            if text.strip():
-                parts = text.split("|")
-                converted_cells.extend(part.rstrip() + " |" for part in parts[:-1] if part)
+            text = _handle_rowspan_text(text, rowspan_positions, col_pos)
 
-            new_cells: list[str] = []
-            cell_index = 0
-
-            for pos in range(col_pos):
-                if pos in rowspan_positions:
-                    new_cells.append(" |")
-                elif cell_index < len(converted_cells):
-                    new_cells.append(converted_cells[cell_index])
-                    cell_index += 1
-
-            text = "".join(new_cells)
-
-    is_headrow = (
-        all(hasattr(cell, "name") and cell.name == "th" for cell in cells)
-        or (not tag.previous_sibling and parent_name != "tbody")
-        or (
-            not tag.previous_sibling
-            and parent_name == "tbody"
-            and (not tag_grand_parent or len(tag_grand_parent.find_all(["thead"])) < 1)
-        )
-    )
+    is_headrow = _is_header_row(tag, cells, parent_name, tag_grand_parent)
     overline = ""
     underline = ""
+
     if is_headrow and not tag.previous_sibling:
-        full_colspan = 0
-        for cell in cells:
-            if hasattr(cell, "attrs") and "colspan" in cell.attrs:
-                colspan_value = cell.attrs["colspan"]
-                if isinstance(colspan_value, str) and colspan_value.isdigit():
-                    full_colspan += int(colspan_value)
-                else:
-                    full_colspan += 1
-            else:
-                full_colspan += 1
+        full_colspan = _calculate_total_colspan(cells)
         underline += "| " + " | ".join(["---"] * full_colspan) + " |" + "\n"
     elif not tag.previous_sibling and (
         parent_name == "table" or (parent_name == "tbody" and not cast("Tag", tag.parent).previous_sibling)
     ):
         overline += "| " + " | ".join([""] * len(cells)) + " |" + "\n"  # pragma: no cover
         overline += "| " + " | ".join(["---"] * len(cells)) + " |" + "\n"  # pragma: no cover
+
     return overline + "|" + text + "\n" + underline
 
 
@@ -576,9 +645,22 @@ def _convert_semantic_block(*, text: str, convert_as_inline: bool) -> str:
     return f"{text}\n\n" if text.strip() else ""
 
 
-def _convert_div(*, text: str, convert_as_inline: bool) -> str:
+def _convert_div(*, text: str, convert_as_inline: bool, tag: Tag, list_indent_str: str) -> str:
     if convert_as_inline:
         return text
+
+    from html_to_markdown.processing import _has_ancestor  # noqa: PLC0415
+
+    if _has_ancestor(tag, "li"):
+        parent = _find_list_item_ancestor(tag)
+        if parent:
+            div_children = [child for child in parent.children if hasattr(child, "name") and child.name == "div"]
+
+            if div_children and tag != div_children[0]:
+                indented_lines = [f"{list_indent_str}{line}" if line.strip() else "" for line in text.split("\n")]
+                indented_text = "\n".join(indented_lines)
+
+                return f"{indented_text}\n\n" if indented_text.strip() else ""
 
     return _format_block_element(text)
 
@@ -601,7 +683,7 @@ def _convert_dl(*, text: str, convert_as_inline: bool) -> str:
     if convert_as_inline:
         return text
 
-    return f"{text}\n" if text.strip() else ""
+    return _format_block_element(text)
 
 
 def _convert_dt(*, text: str, convert_as_inline: bool) -> str:
@@ -614,14 +696,21 @@ def _convert_dt(*, text: str, convert_as_inline: bool) -> str:
     return f"{text.strip()}\n"
 
 
-def _convert_dd(*, text: str, convert_as_inline: bool) -> str:
+def _convert_dd(*, text: str, convert_as_inline: bool, tag: Tag) -> str:
     if convert_as_inline:
         return text
 
-    if not text.strip():
-        return ""
+    has_dt_sibling = False
+    current = tag.previous_sibling
+    while current:
+        if hasattr(current, "name") and current.name and current.name == "dt":
+            has_dt_sibling = True
+            break
+        current = current.previous_sibling
 
-    return f":   {text.strip()}\n\n"
+    if has_dt_sibling:
+        return f":   {text.strip()}\n\n" if text.strip() else ":   \n\n"
+    return f"{text.strip()}\n\n" if text.strip() else ""
 
 
 def _convert_cite(*, text: str, convert_as_inline: bool) -> str:
@@ -646,9 +735,7 @@ def _convert_q(*, text: str, convert_as_inline: bool) -> str:
 
 
 def _convert_media_element(*, tag: Tag, text: str, convert_as_inline: bool) -> str:
-    src = tag.get("src", "")
-
-    if not src and (source_tag := tag.find("source")) and isinstance(source_tag, Tag):
+    if not (src := tag.get("src", "")) and (source_tag := tag.find("source")) and isinstance(source_tag, Tag):
         src = source_tag.get("src", "")
 
     if src and isinstance(src, str) and src.strip():
@@ -668,9 +755,8 @@ def _convert_media_element(*, tag: Tag, text: str, convert_as_inline: bool) -> s
 
 def _convert_iframe(*, tag: Tag, text: str, convert_as_inline: bool) -> str:
     _ = text
-    src = tag.get("src", "")
 
-    if src and isinstance(src, str) and src.strip():
+    if (src := tag.get("src", "")) and isinstance(src, str) and src.strip():
         link = f"[{src}]({src})"
         if convert_as_inline:
             return link
@@ -995,6 +1081,7 @@ def _convert_math(*, text: str, convert_as_inline: bool, tag: Tag) -> str:
 
 def create_converters_map(
     autolinks: bool,
+    br_in_tables: bool,
     bullets: str,
     code_language: str,
     code_language_callback: Callable[[Tag], str] | None,
@@ -1027,6 +1114,8 @@ def create_converters_map(
                     kwargs["convert_as_inline"] = convert_as_inline
                 if "list_indent_str" in spec.kwonlyargs:
                     kwargs["list_indent_str"] = list_indent_str
+                if "br_in_tables" in spec.kwonlyargs:
+                    kwargs["br_in_tables"] = br_in_tables
                 return func(**kwargs)
             return func(text)
 

@@ -21,6 +21,38 @@ if TYPE_CHECKING:
     from collections.abc import Generator
     from pathlib import Path
 
+DEFAULT_CLI_ARGS = {
+    "autolinks": False,
+    "br_in_tables": False,
+    "bullets": "*+-",
+    "code_language": "",
+    "convert": None,
+    "convert_as_inline": False,
+    "default_title": False,
+    "escape_asterisks": True,
+    "escape_misc": True,
+    "escape_underscores": True,
+    "extract_metadata": True,
+    "heading_style": "underlined",
+    "highlight_style": "double-equal",
+    "keep_inline_images_in": None,
+    "list_indent_type": "spaces",
+    "list_indent_width": 4,
+    "newline_style": "spaces",
+    "preprocess_html": False,
+    "preprocessing_preset": "standard",
+    "remove_forms": True,
+    "remove_navigation": True,
+    "strip": None,
+    "strip_newlines": False,
+    "strong_em_symbol": "*",
+    "sub_symbol": "",
+    "sup_symbol": "",
+    "whitespace_mode": "normalized",
+    "wrap": False,
+    "wrap_width": 80,
+}
+
 
 def run_cli_command(args: list[str], input_text: str | None = None, timeout: int = 60) -> tuple[str, str, int]:
     cli_command = [sys.executable, "-m", "html_to_markdown", *args]
@@ -118,37 +150,7 @@ def test_file_input_mocked(mock_convert_to_markdown: Mock) -> None:
         result = main(["input.html"])
 
     assert result == "Mocked Markdown Output"
-    mock_convert_to_markdown.assert_called_once_with(
-        test_html,
-        autolinks=False,
-        bullets="*+-",
-        code_language="",
-        convert=None,
-        convert_as_inline=False,
-        default_title=False,
-        escape_asterisks=True,
-        escape_misc=True,
-        escape_underscores=True,
-        extract_metadata=True,
-        heading_style="underlined",
-        highlight_style="double-equal",
-        keep_inline_images_in=None,
-        list_indent_type="spaces",
-        list_indent_width=4,
-        newline_style="spaces",
-        preprocess_html=False,
-        preprocessing_preset="standard",
-        remove_forms=True,
-        remove_navigation=True,
-        strip=None,
-        strip_newlines=False,
-        strong_em_symbol="*",
-        sub_symbol="",
-        sup_symbol="",
-        whitespace_mode="normalized",
-        wrap=False,
-        wrap_width=80,
-    )
+    mock_convert_to_markdown.assert_called_once_with(test_html, **DEFAULT_CLI_ARGS)
 
 
 def test_stdin_input_mocked(mock_convert_to_markdown: Mock, mock_stdin: Mock) -> None:
@@ -156,35 +158,7 @@ def test_stdin_input_mocked(mock_convert_to_markdown: Mock, mock_stdin: Mock) ->
 
     assert result == "Mocked Markdown Output"
     mock_convert_to_markdown.assert_called_once_with(
-        "<html><body><p>Test from stdin</p></body></html>",
-        autolinks=False,
-        bullets="*+-",
-        code_language="",
-        convert=None,
-        convert_as_inline=False,
-        default_title=False,
-        escape_asterisks=True,
-        escape_misc=True,
-        escape_underscores=True,
-        extract_metadata=True,
-        heading_style="underlined",
-        highlight_style="double-equal",
-        keep_inline_images_in=None,
-        list_indent_type="spaces",
-        list_indent_width=4,
-        newline_style="spaces",
-        preprocess_html=False,
-        preprocessing_preset="standard",
-        remove_forms=True,
-        remove_navigation=True,
-        strip=None,
-        strip_newlines=False,
-        strong_em_symbol="*",
-        sub_symbol="",
-        sup_symbol="",
-        whitespace_mode="normalized",
-        wrap=False,
-        wrap_width=80,
+        "<html><body><p>Test from stdin</p></body></html>", **DEFAULT_CLI_ARGS
     )
 
 
@@ -273,6 +247,12 @@ def test_strip_newlines_option(mock_convert_to_markdown: Mock, mock_stdin: Mock)
     main(["--strip-newlines"])
     mock_convert_to_markdown.assert_called_once()
     assert mock_convert_to_markdown.call_args[1]["strip_newlines"] is True
+
+
+def test_br_in_tables_option(mock_convert_to_markdown: Mock, mock_stdin: Mock) -> None:
+    main(["--br-in-tables"])
+    mock_convert_to_markdown.assert_called_once()
+    assert mock_convert_to_markdown.call_args[1]["br_in_tables"] is True
 
 
 def test_stream_processing_option(mock_convert_to_markdown: Mock, mock_stdin: Mock) -> None:
@@ -515,13 +495,13 @@ def test_error_handling() -> None:
 def test_discord_list_indentation() -> None:
     html = "<ul><li>Item 1<ul><li>Nested</li></ul></li><li>Item 2</li></ul>"
     output = run_cli(["--list-indent-width", "2", "--no-extract-metadata"], html)
-    assert "* Item 1\n\n  \n  \n  + Nested\n* Item 2" in output
+    assert "* Item 1\n\n  + Nested\n* Item 2" in output
 
 
 def test_tab_list_indentation() -> None:
     html = "<ul><li>Item 1<ul><li>Nested</li></ul></li></ul>"
     output = run_cli(["--list-indent-type", "tabs", "--no-extract-metadata"], html)
-    assert "* Item 1\n\n\t\n\t\n\t+ Nested" in output
+    assert "* Item 1\n\n\t+ Nested" in output
 
 
 def test_whitespace_mode_strict() -> None:
@@ -619,7 +599,7 @@ def test_preprocessing_preset_aggressive() -> None:
 def test_combined_list_and_whitespace() -> None:
     html = "<ul><li>Item  with   spaces<ul><li>Nested  item</li></ul></li></ul>"
     output = run_cli(["--list-indent-width", "2", "--whitespace-mode", "normalized", "--no-extract-metadata"], html)
-    assert "* Item with spaces\n\n  \n  \n  + Nested item" in output
+    assert "* Item with spaces\n\n  + Nested item" in output
 
 
 def test_all_new_options_combined() -> None:
@@ -651,7 +631,7 @@ def test_all_new_options_combined() -> None:
         html,
     )
     assert "Navigation" not in output
-    assert "* Item 1\n\n   \n   \n   + Nested" in output
+    assert "* Item 1\n\n   + Nested" in output
 
 
 def test_help_includes_new_options() -> None:
@@ -733,37 +713,7 @@ def test_main_with_source_encoding_option(mock_convert_to_markdown: Mock) -> Non
 
     assert result == "Mocked Markdown Output"
     mock_path_open.assert_called_once_with(encoding="utf-8")
-    mock_convert_to_markdown.assert_called_once_with(
-        test_html,
-        autolinks=False,
-        bullets="*+-",
-        code_language="",
-        convert=None,
-        convert_as_inline=False,
-        default_title=False,
-        escape_asterisks=True,
-        escape_misc=True,
-        escape_underscores=True,
-        extract_metadata=True,
-        heading_style="underlined",
-        highlight_style="double-equal",
-        keep_inline_images_in=None,
-        list_indent_type="spaces",
-        list_indent_width=4,
-        newline_style="spaces",
-        preprocess_html=False,
-        preprocessing_preset="standard",
-        remove_forms=True,
-        remove_navigation=True,
-        strip=None,
-        strip_newlines=False,
-        strong_em_symbol="*",
-        sub_symbol="",
-        sup_symbol="",
-        whitespace_mode="normalized",
-        wrap=False,
-        wrap_width=80,
-    )
+    mock_convert_to_markdown.assert_called_once_with(test_html, **DEFAULT_CLI_ARGS)
 
 
 def test_main_with_invalid_source_encoding_raises_error(mock_convert_to_markdown: Mock) -> None:
@@ -796,35 +746,7 @@ def test_main_with_source_encoding_ignored_for_stdin(mock_convert_to_markdown: M
     assert result == "Mocked Markdown Output"
 
     mock_convert_to_markdown.assert_called_once_with(
-        "<html><body><p>Test from stdin</p></body></html>",
-        autolinks=False,
-        bullets="*+-",
-        code_language="",
-        convert=None,
-        convert_as_inline=False,
-        default_title=False,
-        escape_asterisks=True,
-        escape_misc=True,
-        escape_underscores=True,
-        extract_metadata=True,
-        heading_style="underlined",
-        highlight_style="double-equal",
-        keep_inline_images_in=None,
-        list_indent_type="spaces",
-        list_indent_width=4,
-        newline_style="spaces",
-        preprocess_html=False,
-        preprocessing_preset="standard",
-        remove_forms=True,
-        remove_navigation=True,
-        strip=None,
-        strip_newlines=False,
-        strong_em_symbol="*",
-        sub_symbol="",
-        sup_symbol="",
-        whitespace_mode="normalized",
-        wrap=False,
-        wrap_width=80,
+        "<html><body><p>Test from stdin</p></body></html>", **DEFAULT_CLI_ARGS
     )
 
 
@@ -836,35 +758,4 @@ def test_main_with_source_encoding_default_none(mock_convert_to_markdown: Mock) 
         result = main(["input.html"])
 
     assert result == "Mocked Markdown Output"
-    # Verify that when no source_encoding is specified, the normal file reading is used
-    mock_convert_to_markdown.assert_called_once_with(
-        test_html,
-        autolinks=False,
-        bullets="*+-",
-        code_language="",
-        convert=None,
-        convert_as_inline=False,
-        default_title=False,
-        escape_asterisks=True,
-        escape_misc=True,
-        escape_underscores=True,
-        extract_metadata=True,
-        heading_style="underlined",
-        highlight_style="double-equal",
-        keep_inline_images_in=None,
-        list_indent_type="spaces",
-        list_indent_width=4,
-        newline_style="spaces",
-        preprocess_html=False,
-        preprocessing_preset="standard",
-        remove_forms=True,
-        remove_navigation=True,
-        strip=None,
-        strip_newlines=False,
-        strong_em_symbol="*",
-        sub_symbol="",
-        sup_symbol="",
-        whitespace_mode="normalized",
-        wrap=False,
-        wrap_width=80,
-    )
+    mock_convert_to_markdown.assert_called_once_with(test_html, **DEFAULT_CLI_ARGS)

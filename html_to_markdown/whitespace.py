@@ -7,7 +7,7 @@ import unicodedata
 from typing import TYPE_CHECKING, Literal
 
 if TYPE_CHECKING:
-    from bs4 import NavigableString, PageElement, Tag
+    from bs4 import NavigableString, PageElement
 
 
 WhitespaceMode = Literal["normalized", "strict"]
@@ -174,7 +174,6 @@ class WhitespaceHandler:
         if in_pre or self.should_preserve_whitespace(element):
             return text
 
-        # Note: mode == "strict" case is handled by should_preserve_whitespace above
         text = self.normalize_unicode_spaces(text)
         return self._process_normalized(text, element)
 
@@ -202,8 +201,8 @@ class WhitespaceHandler:
     def _process_text_with_content(self, text: str, element: NavigableString) -> str:
         original = str(element)
 
-        has_lead_space = original and original[0] in " \t\n"
-        has_trail_space = original and original[-1] in " \t\n"
+        has_lead_space = bool(original and original[0] in " \t\n")
+        has_trail_space = bool(original and original[-1] in " \t\n")
 
         text = self._multiple_spaces.sub(" ", text.strip())
 
@@ -213,9 +212,9 @@ class WhitespaceHandler:
             return self._process_special_inline_containers(text, original)
 
         if parent and self.is_inline_element(parent):
-            return self._process_inline_element_text(text, original, bool(has_lead_space), bool(has_trail_space))
+            return self._process_inline_element_text(text, original, has_lead_space, has_trail_space)
 
-        return self._process_standalone_text(text, original, element, bool(has_lead_space), bool(has_trail_space))
+        return self._process_standalone_text(text, original, element, has_lead_space, has_trail_space)
 
     def _process_special_inline_containers(self, text: str, original: str) -> str:
         if original and "\n" not in original and "\t" not in original:
@@ -278,25 +277,3 @@ class WhitespaceHandler:
             text = text + "\n\n"
 
         return text
-
-    def get_block_spacing(self, tag: Tag, next_sibling: PageElement | None = None) -> str:  # pragma: no cover
-        # This method is currently unused but kept for potential future use
-        if self.mode == "strict":
-            return ""
-
-        tag_name = tag.name.lower() if hasattr(tag, "name") else ""
-
-        double_newline_elements = {"p", "div", "blockquote", "pre", "table", "ul", "ol", "dl"}
-
-        single_newline_elements = {"li", "dt", "dd", "tr", "td", "th"}
-
-        if tag_name in double_newline_elements:
-            if self.is_block_element(next_sibling):
-                return "\n\n"
-            return "\n"
-        if tag_name in single_newline_elements:
-            return "\n"
-        if tag_name.startswith("h") and len(tag_name) == 2 and tag_name[1].isdigit():
-            return "\n\n"
-
-        return ""
