@@ -712,6 +712,5 @@ def test_tfoot_inline_mode() -> None:
     ],
 )
 def test_table_cell_multiline_content_issues(html: str, expected: str) -> None:
-    """Test table cell multi-line content with <br> tags - Issue #66."""
     result = convert_to_markdown(html, br_in_tables=True)
     assert result == expected

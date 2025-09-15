@@ -506,7 +506,6 @@ Div content
     ],
 )
 def test_whitespace_and_spacing_issues(html: str, expected: str, whitespace_mode: str | None) -> None:
-    """Test whitespace and spacing handling - Issue #63."""
     if whitespace_mode:
         result = convert_to_markdown(html, whitespace_mode=whitespace_mode)
     else:

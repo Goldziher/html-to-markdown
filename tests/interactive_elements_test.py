@@ -219,7 +219,7 @@ def test_multiple_dialogs() -> None:
     <dialog id="dialog2" open>Second dialog</dialog>
     """
     result = convert_to_markdown(html)
-    expected = """\n    First dialog\n\nSecond dialog\n\n"""
+    expected = """First dialog\n\nSecond dialog\n\n"""
     assert result == expected
 
 
