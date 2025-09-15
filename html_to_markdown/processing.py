@@ -783,11 +783,13 @@ def convert_to_markdown(
         # These may be inline in HTML spec but produce block output in our Markdown conversion.
         blockish = set(BLOCK_ELEMENTS) | {
             "textarea",
+            "dialog",
             "label",
             "button",
             "progress",
             "meter",
             "output",
+            "math",
             "audio",
             "video",
             "iframe",
