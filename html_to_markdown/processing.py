@@ -484,6 +484,70 @@ def convert_to_markdown(
     wrap: bool = False,
     wrap_width: int = 80,
 ) -> str:
+    """Convert HTML content to Markdown format.
+    This is the main entry point for converting HTML to Markdown. It supports
+    various customization options for controlling the conversion behavior.
+
+    Args:
+        source: HTML string or BeautifulSoup object to convert.
+        stream_processing: Enable streaming mode for large documents.
+        chunk_size: Size of chunks for streaming processing.
+        chunk_callback: Callback for processing chunks in streaming mode.
+        progress_callback: Callback for progress updates (current, total).
+        parser: HTML parser to use ('html.parser', 'lxml', 'html5lib').
+        autolinks: Convert URLs to automatic links.
+        br_in_tables: Use <br> tags for line breaks in table cells instead of spaces.
+        bullets: Characters to use for unordered list bullets.
+        code_language: Default language for code blocks.
+        code_language_callback: Callback to determine code language from element.
+        convert: HTML tags to convert to Markdown.
+        convert_as_inline: Treat block elements as inline during conversion.
+        custom_converters: Custom converters for specific HTML elements.
+        default_title: Add a default title if none exists.
+        escape_asterisks: Escape asterisk characters in text.
+        escape_misc: Escape miscellaneous Markdown characters.
+        escape_underscores: Escape underscore characters in text.
+        extract_metadata: Extract metadata from HTML head.
+        heading_style: Style for headings ('underlined', 'atx', 'atx_closed').
+        highlight_style: Style for highlighting ('double-equal', 'html', 'bold').
+        keep_inline_images_in: Parent tags where images should remain inline.
+        list_indent_type: Type of indentation for lists ('spaces', 'tabs').
+        list_indent_width: Number of spaces for list indentation.
+        newline_style: Style for newlines ('spaces', 'backslash').
+        preprocess_html: Enable HTML preprocessing to clean up content.
+        preprocessing_preset: Preprocessing aggressiveness level.
+        remove_forms: Remove form elements during preprocessing.
+        remove_navigation: Remove navigation elements during preprocessing.
+        strip: HTML tags to strip from output.
+        strip_newlines: Remove newlines from HTML before processing.
+        strong_em_symbol: Symbol for strong/emphasis ('*' or '_').
+        sub_symbol: Symbol for subscript text.
+        sup_symbol: Symbol for superscript text.
+        whitespace_mode: How to handle whitespace ('normalized', 'strict').
+        wrap: Enable text wrapping.
+        wrap_width: Column width for text wrapping.
+
+    Returns:
+        The converted Markdown string.
+
+    Raises:
+        EmptyHtmlError: If the HTML input is empty.
+        MissingDependencyError: If required dependencies are not installed.
+        ConflictingOptionsError: If conflicting options are provided.
+
+    Examples:
+        Basic conversion:
+        >>> html = "<h1>Title</h1><p>Content</p>"
+        >>> convert_to_markdown(html)
+        'Title\\n=====\\n\\nContent\\n\\n'
+        With custom options:
+        >>> convert_to_markdown(html, heading_style="atx", list_indent_width=2)
+        '# Title\\n\\nContent\\n\\n'
+        Discord-compatible lists (2-space indent):
+        >>> html = "<ul><li>Item 1</li><li>Item 2</li></ul>"
+        >>> convert_to_markdown(html, list_indent_width=2)
+        '* Item 1\\n* Item 2\\n\\n'
+    """
     if isinstance(source, str):
         if (
             heading_style == UNDERLINED
