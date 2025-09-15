@@ -39,8 +39,13 @@ jobs:
       - name: Execute Pre-Commit
         run: uv run pre-commit run --show-diff-on-failure --color=always --all-files
   test:
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        python: ["3.10", "3.11", "3.12", "3.13"]
     steps:
       - name: Checkout
         uses: actions/checkout@v5
@@ -53,10 +58,21 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v6
         with:
-          python-version-file: "pyproject.toml"
+          python-version: ${{ matrix.python }}
 
       - name: Install Dependencies
-        run: uv sync --all-extras --dev
+        uses: nick-fields/retry@v3
+        with:
+          timeout_minutes: 5
+          max_attempts: 3
+          retry_wait_seconds: 30
+          command: |
+            if [[ "${{ runner.os }}" == "Windows" ]] && [[ -d ".venv" ]]; then
+              echo "Removing existing .venv directory on Windows"
+              rm -rf .venv
+            fi
+            uv sync --all-extras --dev
+          shell: bash
 
       - name: Test
-        run: uv run pytest
+        run: uv run pytest --cov=html_to_markdown --cov-report=term-missing

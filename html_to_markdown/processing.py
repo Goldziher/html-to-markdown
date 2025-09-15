@@ -697,23 +697,27 @@ def convert_to_markdown(
 
     result = sink.get_result()
 
-    if (
-        "needs_leading_whitespace_fix" in locals()
-        and needs_leading_whitespace_fix
-        and not result.startswith((" ", "\t", "\n", "\r"))
-    ):
+    # Parser-agnostic behavior: handle leading whitespace differences between parsers
+    # lxml may either add unwanted whitespace or strip meaningful whitespace compared to html.parser
+    if "needs_leading_whitespace_fix" in locals() and needs_leading_whitespace_fix:
         original_input = sink.original_source if hasattr(sink, "original_source") else original_source
-        leading_whitespace_match = re.match(r"^[\s]*", original_input)
-        if leading_whitespace_match:
-            leading_whitespace = leading_whitespace_match.group(0)
+        if isinstance(original_input, str):
+            original_leading_whitespace_match = re.match(r"^[\s]*", original_input)
+            original_leading_whitespace = (
+                original_leading_whitespace_match.group(0) if original_leading_whitespace_match else ""
+            )
 
-            list_heading_tags = {"<ol", "<ul", "<li", "<h1", "<h2", "<h3", "<h4", "<h5", "<h6"}
-            if any(tag in original_input for tag in list_heading_tags):
-                leading_newlines = re.match(r"^[\n\r]*", leading_whitespace)
-                leading_whitespace = leading_newlines.group(0) if leading_newlines else ""
+            # Case 1: lxml added leading newlines (like "\n<figure>") - strip them
+            if result.startswith("\n") and not original_input.lstrip().startswith(result.strip()):
+                result = result.lstrip("\n\r")
 
-            if leading_whitespace:
-                result = leading_whitespace + result
+            # Case 2: lxml stripped meaningful leading whitespace (like " <b>") - restore it
+            elif not result.startswith((" ", "\t")) and original_leading_whitespace.startswith((" ", "\t")):
+                # Only restore spaces/tabs, not newlines (which are usually formatting)
+                leading_spaces_tabs_match = re.match(r"^[ \t]*", original_leading_whitespace)
+                leading_spaces_tabs = leading_spaces_tabs_match.group(0) if leading_spaces_tabs_match else ""
+                if leading_spaces_tabs:
+                    result = leading_spaces_tabs + result
 
     result = re.sub(r"\n{3,}", "\n\n", result)
 
