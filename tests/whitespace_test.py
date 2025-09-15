@@ -410,3 +410,106 @@ def test_block_spacing_non_block_next_sibling() -> None:
     html = "<p>Paragraph</p><span>inline span</span>"
     result = convert_to_markdown(html, whitespace_mode="normalized")
     assert "Paragraph\n\ninline span" in result
+
+
+@pytest.mark.parametrize(
+    "html,expected,whitespace_mode",
+    [
+        (
+            """<b>test1</b>
+ test2
+
+<div>
+<ul>
+<li>
+test3
+</li>
+</ul></div><div>
+test4
+</div>
+<p>test5</p>""",
+            "**test1** test2\n\n* test3\n\ntest4\n\ntest5\n\n",
+            None,
+        ),
+        (
+            """test1
+
+test2
+
+<a href="https://example.com">example.com</a>
+
+<a href="https://example.org">example.org</a>""",
+            "test1 test2 [example.com](https://example.com) [example.org](https://example.org)",
+            None,
+        ),
+        (
+            """test1
+
+test2
+
+<a href="https://example.com">example.com</a>
+
+<a href="https://example.org">example.org</a>""",
+            """test1
+
+test2
+
+[example.com](https://example.com)
+
+[example.org](https://example.org)""",
+            "strict",
+        ),
+        ("<b>bold</b><i>italic</i><code>code</code>", "**bold** *italic* `code`", None),
+        ("<p>Para 1</p><b>bold text</b><p>Para 2</p>", "Para 1\n\n**bold text**\n\nPara 2\n\n", None),
+        (
+            "<div>Text content</div><div><ul><li>List item</li></ul></div><div>More text</div>",
+            "Text content\n\n* List item\n\nMore text\n\n",
+            None,
+        ),
+        ("<h1>Header</h1>inline text<p>Paragraph</p>", "# Header\n\ninline text\n\nParagraph\n\n", None),
+        (
+            """<div>
+    <p>Paragraph in div</p>
+    <span>Inline span</span>
+    <div>Nested div</div>
+</div>
+<p>Following paragraph</p>""",
+            """Paragraph in div
+
+Inline span
+
+Nested div
+
+Following paragraph
+
+""",
+            None,
+        ),
+        ('<a href="url1">Link1</a><a href="url2">Link2</a>', "[Link1](url1) [Link2](url2)", None),
+        ('<a href="url1">Link1</a> <a href="url2">Link2</a>', "[Link1](url1) [Link2](url2)", None),
+        (
+            """<p>Para 1</p>
+
+<p>Para 2</p>
+
+<div>Div content</div>""",
+            """Para 1
+
+Para 2
+
+Div content
+
+""",
+            "strict",
+        ),
+        ("""text    with    multiple    spaces""", "text with multiple spaces", "normalized"),
+        ("<p>Content 1</p><div></div><p>Content 2</p>", "Content 1\n\nContent 2\n\n", None),
+    ],
+)
+def test_whitespace_and_spacing_issues(html: str, expected: str, whitespace_mode: str | None) -> None:
+    """Test whitespace and spacing handling - Issue #63."""
+    if whitespace_mode:
+        result = convert_to_markdown(html, whitespace_mode=whitespace_mode)
+    else:
+        result = convert_to_markdown(html)
+    assert result == expected
