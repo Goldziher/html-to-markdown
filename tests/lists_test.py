@@ -352,6 +352,5 @@ def test_empty_line_handling_in_nested_list() -> None:
     ],
 )
 def test_multiline_list_item_indentation_issues(html: str, expected: str) -> None:
-    """Test multi-line list item indentation - Issue #67."""
     result = convert_to_markdown(html)
     assert result == expected
