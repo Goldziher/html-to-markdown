@@ -84,10 +84,11 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          COVERAGE_FILE=".coverage.${{ matrix.os }}-${{ matrix.python }}"
           if [[ -f .coverage ]]; then
             echo "Copying .coverage to $COVERAGE_FILE"
             cp .coverage "$COVERAGE_FILE"
-          elif [[ -f $COVERAGE_FILE ]]; then
+          elif [[ -f "$COVERAGE_FILE" ]]; then
             echo "Found $COVERAGE_FILE already"
           else
             echo "Warning: no coverage file found to upload" >&2
