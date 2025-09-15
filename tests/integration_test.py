@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from html_to_markdown import convert_to_markdown
 from html_to_markdown.constants import ATX, ATX_CLOSED, BACKSLASH, UNDERSCORE
 
 if TYPE_CHECKING:
@@ -69,8 +70,6 @@ def test_misc(convert: Callable[[str, ...], str]) -> None:
 
 
 def test_chomp() -> None:
-    from html_to_markdown import convert_to_markdown  # noqa: PLC0415
-
     assert convert_to_markdown(" <b></b> ", parser="html.parser") == "  "
     assert convert_to_markdown(" <b> </b> ", parser="html.parser") == "  "
     assert convert_to_markdown(" <b>  </b> ", parser="html.parser") == "  "
