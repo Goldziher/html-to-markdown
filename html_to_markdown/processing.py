@@ -712,7 +712,13 @@ def convert_to_markdown(
                 result = result.lstrip("\n\r")
 
             # Case 2: lxml stripped meaningful leading whitespace (like " <b>") - restore it
-            elif not result.startswith((" ", "\t")) and original_leading_whitespace.startswith((" ", "\t")):
+            # However, don't restore whitespace if strip_newlines=True was used, as the user
+            # explicitly requested to remove formatting whitespace
+            elif (
+                not strip_newlines
+                and not result.startswith((" ", "\t"))
+                and original_leading_whitespace.startswith((" ", "\t"))
+            ):
                 # Only restore spaces/tabs, not newlines (which are usually formatting)
                 leading_spaces_tabs_match = re.match(r"^[ \t]*", original_leading_whitespace)
                 leading_spaces_tabs = leading_spaces_tabs_match.group(0) if leading_spaces_tabs_match else ""
