@@ -69,18 +69,16 @@ def run_cli_command(args: list[str], input_text: str | None = None, timeout: int
         stdin=subprocess.PIPE if input_text else None,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
-        text=True,
-        encoding="utf-8",
-        # Windows-specific: Ensure proper Unicode handling
-        errors="replace",
+        text=False,
         env=env,
     )
 
     try:
-        stdout, stderr = process.communicate(input=input_text, timeout=timeout)
-        # Ensure stdout/stderr are never None for Windows compatibility
-        stdout = stdout or ""
-        stderr = stderr or ""
+        stdin_bytes = input_text.encode("utf-8") if input_text is not None else None
+        stdout_b, stderr_b = process.communicate(input=stdin_bytes, timeout=timeout)
+        # Decode with replacement to avoid platform threading decode errors
+        stdout = (stdout_b or b"").decode("utf-8", "replace")
+        stderr = (stderr_b or b"").decode("utf-8", "replace")
         return stdout, stderr, process.returncode
     except subprocess.TimeoutExpired:
         process.kill()
@@ -97,15 +95,12 @@ def run_cli(args: list[str], input_html: str) -> str:
     result = subprocess.run(
         [sys.executable, "-m", "html_to_markdown", *args],
         check=False,
-        input=input_html,
+        input=input_html.encode("utf-8"),
         capture_output=True,
-        text=True,
-        encoding="utf-8",
-        # Windows-specific: Ensure proper Unicode handling
-        errors="replace",
+        text=False,
         env=env,
     )
-    return result.stdout or ""
+    return (result.stdout or b"").decode("utf-8", "replace")
 
 
 @pytest.fixture
