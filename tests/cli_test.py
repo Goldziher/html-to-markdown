@@ -21,7 +21,6 @@ if TYPE_CHECKING:
     from collections.abc import Generator
     from pathlib import Path
 
-# Default arguments for CLI tests - must match CLI defaults
 DEFAULT_CLI_ARGS = {
     "autolinks": False,
     "br_in_tables": False,
@@ -759,5 +758,4 @@ def test_main_with_source_encoding_default_none(mock_convert_to_markdown: Mock) 
         result = main(["input.html"])
 
     assert result == "Mocked Markdown Output"
-    # Verify that when no source_encoding is specified, the normal file reading is used
     mock_convert_to_markdown.assert_called_once_with(test_html, **DEFAULT_CLI_ARGS)
