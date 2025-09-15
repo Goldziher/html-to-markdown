@@ -15,7 +15,7 @@ from unittest.mock import Mock, mock_open, patch
 import pytest
 
 from html_to_markdown.cli import main
-from html_to_markdown.exceptions import InvalidEncodingSpecifiedError
+from html_to_markdown.exceptions import InvalidEncodingError
 
 if TYPE_CHECKING:
     from collections.abc import Generator
@@ -781,7 +781,7 @@ def test_main_with_invalid_source_encoding_raises_error(mock_convert_to_markdown
         mock_path_open.return_value.__enter__.return_value = mock_file_obj
         mock_path_open.return_value.__exit__.return_value = None
 
-        with pytest.raises(InvalidEncodingSpecifiedError) as exc_info:
+        with pytest.raises(InvalidEncodingError) as exc_info:
             main(["input.html", "--source-encoding", "invalid-encoding"])
 
         assert str(exc_info.value) == "The specified encoding (invalid-encoding) is not valid."
