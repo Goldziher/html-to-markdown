@@ -6,8 +6,10 @@ import re
 import unicodedata
 from typing import TYPE_CHECKING, Literal
 
+from bs4.element import NavigableString
+
 if TYPE_CHECKING:
-    from bs4 import NavigableString, PageElement
+    from bs4 import PageElement
 
 
 WhitespaceMode = Literal["normalized", "strict"]
@@ -127,6 +129,8 @@ class WhitespaceHandler:
 
     def normalize_unicode_spaces(self, text: str) -> str:
         text = self._unicode_spaces.sub(" ", text)
+
+        text = text.replace("\r\n", "\n")
 
         normalized = []
         for char in text:
@@ -250,12 +254,22 @@ class WhitespaceHandler:
         has_leading = (
             has_lead_space
             and original[0] == " "
-            and (self.is_inline_element(prev_sibling) or self.is_block_element(prev_sibling) or prev_sibling is None)
+            and (
+                self.is_inline_element(prev_sibling)
+                or self.is_block_element(prev_sibling)
+                or prev_sibling is None
+                or isinstance(prev_sibling, NavigableString)
+            )
         )
         has_trailing = (
             has_trail_space
             and original[-1] == " "
-            and (self.is_inline_element(next_sibling) or self.is_block_element(next_sibling) or next_sibling is None)
+            and (
+                self.is_inline_element(next_sibling)
+                or self.is_block_element(next_sibling)
+                or next_sibling is None
+                or isinstance(next_sibling, NavigableString)
+            )
         )
 
         if original and original[0] in "\n\t" and self.is_inline_element(prev_sibling):

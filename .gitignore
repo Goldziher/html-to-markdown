@@ -32,3 +32,7 @@ GEMINI.md
 .mcp.json
 .gemini/
 AGENTS.md
+
+# Benchmark results
+.benchmarks/
+BENCHMARK_BASELINE.md

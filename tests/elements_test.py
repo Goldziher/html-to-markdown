@@ -120,7 +120,6 @@ def test_nested_q_elements() -> None:
     ],
 )
 def test_definition_list_issues(html: str, expected: str) -> None:
-    """Test definition list conversion - Issue #68."""
     result = convert_to_markdown(html)
     assert result == expected
 
@@ -1986,7 +1985,7 @@ def test_multiple_figures() -> None:
     </figure>
     """
     result = convert_to_markdown(html)
-    expected = """\n    ![](image1.jpg)\n\n*First figure*\n\n![](image2.jpg)\n\n*Second figure*\n\n"""
+    expected = """![](image1.jpg)\n\n*First figure*\n\n![](image2.jpg)\n\n*Second figure*\n\n"""
     assert result == expected
 
 
