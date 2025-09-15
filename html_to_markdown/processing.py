@@ -779,7 +779,20 @@ def convert_to_markdown(
     if "original_input_str" in locals() and original_input_str:
         from html_to_markdown.whitespace import BLOCK_ELEMENTS  # noqa: PLC0415
 
-        block_pattern = r"<(?:" + "|".join(sorted(BLOCK_ELEMENTS)) + r")\b"
+        # Treat additional tags as block-producing for trailing newline purposes.
+        # These may be inline in HTML spec but produce block output in our Markdown conversion.
+        blockish = set(BLOCK_ELEMENTS) | {
+            "textarea",
+            "label",
+            "button",
+            "progress",
+            "meter",
+            "output",
+            "audio",
+            "video",
+            "iframe",
+        }
+        block_pattern = r"<(?:" + "|".join(sorted(blockish)) + r")\b"
         if not re.search(block_pattern, original_input_str, flags=re.IGNORECASE):
             result = result.rstrip("\n")
 
