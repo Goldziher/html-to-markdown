@@ -771,6 +771,18 @@ def convert_to_markdown(
         # Input appears to be plain text, not HTML - normalize trailing newlines only
         result = result.rstrip("\n")
 
+    # If the original input contained no block-level elements, normalize any
+    # accidental trailing newlines for cross-platform consistency.
+    # This guards cases like inline-only inputs (e.g., "text <strong>bold</strong>")
+    # and head-only documents (e.g., "<head>head</head>") where output should
+    # not end with extra blank lines.
+    if "original_input_str" in locals() and original_input_str:
+        from html_to_markdown.whitespace import BLOCK_ELEMENTS  # noqa: PLC0415
+
+        block_pattern = r"<(?:" + "|".join(sorted(BLOCK_ELEMENTS)) + r")\b"
+        if not re.search(block_pattern, original_input_str, flags=re.IGNORECASE):
+            result = result.rstrip("\n")
+
     return result
 
 
