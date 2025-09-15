@@ -138,7 +138,7 @@ def test_ol() -> None:
 def test_nested_ols(nested_ols: str) -> None:
     assert (
         convert_to_markdown(nested_ols)
-        == "\n1. 1\n\n    1. a\n            1. I\n                2. II\n                3. III\n        2. b\n        3. c\n2. 2\n3. 3\n\n"
+        == "1. 1\n\n    1. a\n            1. I\n                2. II\n                3. III\n        2. b\n        3. c\n2. 2\n3. 3\n\n"
     )
 
 
@@ -166,14 +166,14 @@ def test_inline_ul() -> None:
 def test_nested_uls(nested_uls: str) -> None:
     assert (
         convert_to_markdown(nested_uls)
-        == "\n* 1\n\n    + a\n            - I\n                - II\n                - III\n        + b\n        + c\n* 2\n* 3\n\n"
+        == "* 1\n\n    + a\n            - I\n                - II\n                - III\n        + b\n        + c\n* 2\n* 3\n\n"
     )
 
 
 def test_bullets(nested_uls: str) -> None:
     assert (
         convert_to_markdown(nested_uls, bullets="-")
-        == "\n- 1\n\n    - a\n            - I\n                - II\n                - III\n        - b\n        - c\n- 2\n- 3\n\n"
+        == "- 1\n\n    - a\n            - I\n                - II\n                - III\n        - b\n        - c\n- 2\n- 3\n\n"
     )
 
 
@@ -430,17 +430,17 @@ def test_hn_chained() -> None:
 
 
 def test_hn_nested_tag_heading_style() -> None:
-    assert convert_to_markdown("<h1>A <p>P</p> C </h1>", heading_style=ATX_CLOSED) == "# A #\n\nP\n\n C "
+    assert convert_to_markdown("<h1>A <p>P</p> C </h1>", heading_style=ATX_CLOSED) == "# A P C #\n\n"
 
-    assert convert_to_markdown("<h1>A <p>P</p> C </h1>", heading_style=ATX) == "# A\n\nP\n\n C "
+    assert convert_to_markdown("<h1>A <p>P</p> C </h1>", heading_style=ATX) == "# A P C\n\n"
 
 
 def test_hn_eol() -> None:
     assert convert_to_markdown("<p>xxx</p><h3>Hello</h3>", heading_style=ATX) == "xxx\n\n### Hello\n\n"
 
-    assert convert_to_markdown("\n<h3>Hello</h3>", heading_style=ATX) == "\n### Hello\n\n"
-    assert convert_to_markdown("\nx<h3>Hello</h3>", heading_style=ATX) == "\nx\n\n### Hello\n\n"
-    assert convert_to_markdown("\n<span>x<h3>Hello</h3></span>", heading_style=ATX) == "\nx\n\n### Hello\n\n"
+    assert convert_to_markdown("\n<h3>Hello</h3>", heading_style=ATX) == "### Hello\n\n"
+    assert convert_to_markdown("\nx<h3>Hello</h3>", heading_style=ATX) == "x\n\n### Hello\n\n"
+    assert convert_to_markdown("\n<span>x<h3>Hello</h3></span>", heading_style=ATX) == "x\n\n### Hello\n\n"
     assert convert_to_markdown("xxx<h3>Hello</h3>", heading_style=ATX) == "xxx\n\n### Hello\n\n"
 
 
@@ -460,7 +460,7 @@ def test_hn_nested_simple_tag() -> None:
             convert_to_markdown("<h3>A <" + tag + ">" + tag + "</" + tag + "> B</h3>") == "### A " + markdown + " B\n\n"
         )
 
-    assert convert_to_markdown("<h3>A <p>p</p> B</h3>") == "### A\n\np\n\n B"
+    assert convert_to_markdown("<h3>A <p>p</p> B</h3>") == "### A p B\n\n"
 
     assert convert_to_markdown("<h3>A <br>B</h3>", heading_style=ATX) == "### A  B\n\n"
 

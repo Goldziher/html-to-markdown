@@ -5,7 +5,7 @@ requires = [ "setuptools>=78.1" ]
 
 [project]
 name = "html-to-markdown"
-version = "1.12.0"
+version = "1.12.1"
 description = "A modern, type-safe Python library for converting HTML to Markdown with comprehensive tag support and customizable options"
 readme = "README.md"
 keywords = [
@@ -58,6 +58,7 @@ dev = [
   "mypy>=1.18.1",
   "pre-commit>=4.3",
   "pytest>=8.4.2",
+  "pytest-benchmark>=5.1",
   "pytest-cov>=7",
   "pytest-mock>=3.15",
   "ruff>=0.13",
@@ -114,6 +115,7 @@ lint.per-file-ignores."performance_test.py" = [
   "UP035",
 ]
 lint.per-file-ignores."tests/**/*.*" = [ "ARG", "D", "PD", "PT006", "PT013", "S" ]
+lint.per-file-ignores."tests/benchmark_*_test.py" = [ "T201" ]
 lint.isort.known-first-party = [ "html_to_markdown", "tests" ]
 lint.pydocstyle.convention = "google"
 
@@ -151,6 +153,14 @@ warn_unused_configs = true
 module = "tests.*"
 disallow_any_generics = false
 disallow_untyped_decorators = false
+
+[[tool.mypy.overrides]]
+module = "tests.benchmark_performance_test"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "tests.benchmark_memory_test"
+ignore_missing_imports = true
 
 [tool.uv]
 default-groups = [ "dev" ]

@@ -39,7 +39,6 @@ def _format_wrapped_block(text: str, start_marker: str, end_marker: str = "") ->
 
 
 def _find_list_item_ancestor(tag: Tag) -> Tag | None:
-    """Find the nearest list item ancestor of a tag."""
     parent = tag.parent
     while parent and parent.name != "li":
         parent = parent.parent
@@ -231,14 +230,15 @@ def _convert_blockquote(*, text: str, tag: Tag, convert_as_inline: bool, list_in
     return quote_text
 
 
-def _convert_br(*, convert_as_inline: bool, newline_style: str, tag: Tag) -> str:
+def _convert_br(*, convert_as_inline: bool, newline_style: str, tag: Tag, text: str) -> str:
     from html_to_markdown.processing import _has_ancestor  # noqa: PLC0415
 
     if _has_ancestor(tag, ["h1", "h2", "h3", "h4", "h5", "h6"]):
-        return " "
+        return " " + text.strip()
 
     _ = convert_as_inline
-    return "\\\n" if newline_style.lower() == BACKSLASH else "  \n"
+    newline = "\\\n" if newline_style.lower() == BACKSLASH else "  \n"
+    return newline + text.strip() if text.strip() else newline
 
 
 def _convert_hn(
@@ -286,7 +286,6 @@ def _convert_img(*, tag: Tag, convert_as_inline: bool, keep_inline_images_in: It
 
 
 def _has_block_list_items(tag: Tag) -> bool:
-    """Check if any list items contain block elements."""
     return any(
         any(child.name in BLOCK_ELEMENTS for child in li.children if hasattr(child, "name"))
         for li in tag.find_all("li", recursive=False)
@@ -294,7 +293,6 @@ def _has_block_list_items(tag: Tag) -> bool:
 
 
 def _handle_nested_list_indentation(text: str, list_indent_str: str, parent: Tag) -> str:
-    """Handle indentation for lists nested within list items."""
     prev_p = None
     for child in parent.children:
         if hasattr(child, "name"):
@@ -310,7 +308,6 @@ def _handle_nested_list_indentation(text: str, list_indent_str: str, parent: Tag
 
 
 def _handle_direct_nested_list_indentation(text: str, list_indent_str: str) -> str:
-    """Handle indentation for lists that are direct children of other lists."""
     lines = text.strip().split("\n")
     indented_lines = [f"{list_indent_str}{line}" if line.strip() else "" for line in lines]
     result = "\n".join(indented_lines)
@@ -318,7 +315,6 @@ def _handle_direct_nested_list_indentation(text: str, list_indent_str: str) -> s
 
 
 def _add_list_item_spacing(text: str) -> str:
-    """Add extra spacing between list items that contain block content."""
     lines = text.split("\n")
     items_with_blocks = set()
 
@@ -482,7 +478,6 @@ def _convert_pre(
 
 
 def _process_table_cell_content(*, tag: Tag, text: str, br_in_tables: bool) -> str:
-    """Process table cell content, optionally using <br> tags for multi-line content."""
     if br_in_tables:
         block_children = [child for child in tag.children if hasattr(child, "name") and child.name in BLOCK_ELEMENTS]
 
@@ -510,7 +505,6 @@ def _convert_th(*, tag: Tag, text: str, br_in_tables: bool = False) -> str:
 
 
 def _get_rowspan_positions(prev_cells: list[Tag]) -> tuple[list[int], int]:
-    """Get positions of cells with rowspan > 1 from previous row."""
     rowspan_positions = []
     col_pos = 0
 
@@ -531,7 +525,6 @@ def _get_rowspan_positions(prev_cells: list[Tag]) -> tuple[list[int], int]:
 
 
 def _handle_rowspan_text(text: str, rowspan_positions: list[int], col_pos: int) -> str:
-    """Handle text adjustment for rows with rowspan cells."""
     converted_cells = [part.rstrip() + " |" for part in text.split("|")[:-1] if part] if text.strip() else []
     rowspan_set = set(rowspan_positions)
 
@@ -542,7 +535,6 @@ def _handle_rowspan_text(text: str, rowspan_positions: list[int], col_pos: int) 
 
 
 def _is_header_row(tag: Tag, cells: list[Tag], parent_name: str, tag_grand_parent: Tag | None) -> bool:
-    """Determine if this table row should be treated as a header row."""
     return (
         all(hasattr(cell, "name") and cell.name == "th" for cell in cells)
         or (not tag.previous_sibling and parent_name != "tbody")
@@ -555,7 +547,6 @@ def _is_header_row(tag: Tag, cells: list[Tag], parent_name: str, tag_grand_paren
 
 
 def _calculate_total_colspan(cells: list[Tag]) -> int:
-    """Calculate total colspan for all cells in a row."""
     full_colspan = 0
     for cell in cells:
         if hasattr(cell, "attrs") and "colspan" in cell.attrs:

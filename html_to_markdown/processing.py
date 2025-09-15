@@ -11,7 +11,7 @@ from io import StringIO
 from itertools import chain
 from typing import TYPE_CHECKING, Any, Literal, cast
 
-from bs4 import BeautifulSoup, Comment, Doctype, Tag
+from bs4 import BeautifulSoup, CData, Comment, Doctype, Tag
 from bs4.element import NavigableString, PageElement
 
 try:
@@ -179,12 +179,24 @@ def _process_tag(
     strip: set[str] | None,
     whitespace_handler: WhitespaceHandler,
     context_before: str = "",
+    ancestor_names: set[str] | None = None,
 ) -> str:
     should_convert_tag = _should_convert_tag(tag_name=tag.name, strip=strip, convert=convert)
     tag_name: SupportedTag | None = (
         cast("SupportedTag", tag.name.lower()) if tag.name.lower() in converters_map else None
     )
     text_parts: list[str] = []
+
+    if ancestor_names is None:
+        ancestor_names = set()
+        current: Tag | None = tag
+        while current and hasattr(current, "name"):
+            if current.name:
+                ancestor_names.add(current.name)
+            current = getattr(current, "parent", None)
+
+            if len(ancestor_names) > 10:
+                break
 
     is_heading = html_heading_re.match(tag.name) is not None
     is_cell = tag_name in {"td", "th"}
@@ -201,7 +213,7 @@ def _process_tag(
             if can_extract and isinstance(el, NavigableString) and not el.strip():
                 el.extract()
 
-    children = list(filter(lambda value: not isinstance(value, (Comment, Doctype)), tag.children))
+    children = list(filter(lambda value: not isinstance(value, (Comment, Doctype, CData)), tag.children))
 
     empty_when_no_content_tags = {"abbr", "var", "ins", "dfn", "time", "data", "cite", "q", "mark", "small", "u"}
 
@@ -227,6 +239,7 @@ def _process_tag(
                     escape_asterisks=escape_asterisks,
                     escape_underscores=escape_underscores,
                     whitespace_handler=whitespace_handler,
+                    ancestor_names=ancestor_names,
                 )
             )
         elif isinstance(el, Tag):
@@ -243,6 +256,7 @@ def _process_tag(
                     strip=strip,
                     whitespace_handler=whitespace_handler,
                     context_before=(context_before + current_text)[-2:],
+                    ancestor_names=ancestor_names,
                 )
             )
 
@@ -282,21 +296,23 @@ def _process_text(
     escape_asterisks: bool,
     escape_underscores: bool,
     whitespace_handler: WhitespaceHandler,
+    ancestor_names: set[str] | None = None,
 ) -> str:
     text = str(el) or ""
 
     parent = el.parent
     parent_name = parent.name if parent else None
 
-    ancestor_names = set()
-    current = parent
-    while current and hasattr(current, "name"):
-        if current.name:
-            ancestor_names.add(current.name)
-        current = getattr(current, "parent", None)
+    if ancestor_names is None:
+        ancestor_names = set()
+        current = parent
+        while current and hasattr(current, "name"):
+            if current.name:
+                ancestor_names.add(current.name)
+            current = getattr(current, "parent", None)
 
-        if len(ancestor_names) > 10:
-            break
+            if len(ancestor_names) > 10:
+                break
 
     in_pre = bool(ancestor_names.intersection({"pre"}))
 
@@ -469,7 +485,6 @@ def convert_to_markdown(
     wrap_width: int = 80,
 ) -> str:
     """Convert HTML content to Markdown format.
-
     This is the main entry point for converting HTML to Markdown. It supports
     various customization options for controlling the conversion behavior.
 
@@ -525,11 +540,9 @@ def convert_to_markdown(
         >>> html = "<h1>Title</h1><p>Content</p>"
         >>> convert_to_markdown(html)
         'Title\\n=====\\n\\nContent\\n\\n'
-
         With custom options:
         >>> convert_to_markdown(html, heading_style="atx", list_indent_width=2)
         '# Title\\n\\nContent\\n\\n'
-
         Discord-compatible lists (2-space indent):
         >>> html = "<ul><li>Item 1</li><li>Item 2</li></ul>"
         >>> convert_to_markdown(html, list_indent_width=2)
@@ -896,7 +909,7 @@ def _process_html_core(
         elements_to_process = body.children if body and isinstance(body, Tag) else source.children
 
         context = ""
-        for el in filter(lambda value: not isinstance(value, (Comment, Doctype)), elements_to_process):
+        for el in filter(lambda value: not isinstance(value, (Comment, Doctype, CData)), elements_to_process):
             if isinstance(el, NavigableString):
                 text = _process_text(
                     el=el,

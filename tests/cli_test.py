@@ -717,7 +717,6 @@ def test_main_with_source_encoding_option(mock_convert_to_markdown: Mock) -> Non
 
 
 def test_main_with_invalid_source_encoding_raises_error(mock_convert_to_markdown: Mock) -> None:
-    """Test that an invalid source_encoding raises InvalidEncodingSpecifiedError."""
     test_html = "<html><body><h1>Test</h1></body></html>"
     mock_file = mock_open(read_data=test_html)
 
@@ -736,7 +735,6 @@ def test_main_with_invalid_source_encoding_raises_error(mock_convert_to_markdown
 
 
 def test_main_with_source_encoding_ignored_for_stdin(mock_convert_to_markdown: Mock) -> None:
-    """Test that source_encoding argument is ignored when input comes from stdin."""
     mock_stdin_io = StringIO("<html><body><p>Test from stdin</p></body></html>")
     mock_stdin_io.name = "<stdin>"
 
@@ -751,7 +749,6 @@ def test_main_with_source_encoding_ignored_for_stdin(mock_convert_to_markdown: M
 
 
 def test_main_with_source_encoding_default_none(mock_convert_to_markdown: Mock) -> None:
-    """Test that when no source_encoding is specified, default file reading is used."""
     test_html = "<html><body><h1>Test default encoding</h1></body></html>"
 
     with patch("builtins.open", mock_open(read_data=test_html)):
