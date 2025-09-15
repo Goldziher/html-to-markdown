@@ -79,6 +79,9 @@ def run_cli_command(args: list[str], input_text: str | None = None, timeout: int
         # Decode with replacement to avoid platform threading decode errors
         stdout = (stdout_b or b"").decode("utf-8", "replace")
         stderr = (stderr_b or b"").decode("utf-8", "replace")
+        # Normalize Windows CRLF to LF for stable assertions
+        stdout = stdout.replace("\r\n", "\n")
+        stderr = stderr.replace("\r\n", "\n")
         return stdout, stderr, process.returncode
     except subprocess.TimeoutExpired:
         process.kill()
@@ -100,7 +103,8 @@ def run_cli(args: list[str], input_html: str) -> str:
         text=False,
         env=env,
     )
-    return (result.stdout or b"").decode("utf-8", "replace")
+    out = (result.stdout or b"").decode("utf-8", "replace")
+    return out.replace("\r\n", "\n")
 
 
 @pytest.fixture
