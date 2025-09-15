@@ -2,38 +2,41 @@
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
+
 import pytest
 
-from html_to_markdown import convert_to_markdown
 
-
-def test_basic_unordered_list() -> None:
+def test_basic_unordered_list(convert: Callable[[str, ...], str]) -> None:
     html = """<ul>
     <li>Item 1</li>
     <li>Item 2</li>
     <li>Item 3</li>
     </ul>"""
 
-    result = convert_to_markdown(html)
+    result = convert(html)
     assert "* Item 1" in result
     assert "* Item 2" in result
     assert "* Item 3" in result
 
 
-def test_basic_ordered_list() -> None:
+def test_basic_ordered_list(convert: Callable[[str, ...], str]) -> None:
     html = """<ol>
     <li>First</li>
     <li>Second</li>
     <li>Third</li>
     </ol>"""
 
-    result = convert_to_markdown(html)
+    result = convert(html)
     assert "1. First" in result
     assert "2. Second" in result
     assert "3. Third" in result
 
 
-def test_list_first_item_indent_with_strip_newlines() -> None:
+def test_list_first_item_indent_with_strip_newlines(convert: Callable[[str, ...], str]) -> None:
     html = """
     <p>Above</p>
     <ul>
@@ -42,7 +45,7 @@ def test_list_first_item_indent_with_strip_newlines() -> None:
     </ul>
     """
 
-    result = convert_to_markdown(html, strip_newlines=True)
+    result = convert(html, strip_newlines=True)
 
     lines = result.split("\n")
     list_lines = [line for line in lines if line.strip().startswith("*")]
@@ -53,7 +56,7 @@ def test_list_first_item_indent_with_strip_newlines() -> None:
         assert first_item.startswith("*"), "First item should start with bullet"
 
 
-def test_list_indentation_consistency() -> None:
+def test_list_indentation_consistency(convert: Callable[[str, ...], str]) -> None:
     html = """
     <ul>
         <li>Item 1</li>
@@ -62,8 +65,8 @@ def test_list_indentation_consistency() -> None:
     </ul>
     """
 
-    result_normal = convert_to_markdown(html)
-    result_stripped = convert_to_markdown(html, strip_newlines=True)
+    result_normal = convert(html)
+    result_stripped = convert(html, strip_newlines=True)
 
     for result in [result_normal, result_stripped]:
         lines = result.split("\n")
@@ -76,7 +79,7 @@ def test_list_indentation_consistency() -> None:
                 assert indent == first_indent, f"Inconsistent indentation: {indent} != {first_indent}"
 
 
-def test_list_with_multiple_paragraphs() -> None:
+def test_list_with_multiple_paragraphs(convert: Callable[[str, ...], str]) -> None:
     html = """<ul>
     <li>
         <p>First paragraph</p>
@@ -87,7 +90,7 @@ def test_list_with_multiple_paragraphs() -> None:
     </li>
     </ul>"""
 
-    result = convert_to_markdown(html)
+    result = convert(html)
 
     assert "* First paragraph" in result
     assert "Second paragraph" in result
@@ -98,7 +101,7 @@ def test_list_with_multiple_paragraphs() -> None:
             assert line.startswith(("    ", "\t")), "Second paragraph should be indented"
 
 
-def test_list_with_nested_paragraphs_complex() -> None:
+def test_list_with_nested_paragraphs_complex(convert: Callable[[str, ...], str]) -> None:
     html = """<ol>
     <li>
         <p>Item 1 first paragraph</p>
@@ -110,7 +113,7 @@ def test_list_with_nested_paragraphs_complex() -> None:
     </li>
     </ol>"""
 
-    result = convert_to_markdown(html)
+    result = convert(html)
 
     assert "1. Item 1 first paragraph" in result
     assert "Item 1 second paragraph" in result
@@ -118,16 +121,16 @@ def test_list_with_nested_paragraphs_complex() -> None:
     assert "3. Item 3 with paragraph" in result
 
 
-def test_nested_list_not_inside_li() -> None:
+def test_nested_list_not_inside_li(convert: Callable[[str, ...], str]) -> None:
     html = "<ul><li>a</li><li>b</li><ul><li>c</li><li>d</li></ul></ul>"
 
-    result = convert_to_markdown(html)
+    result = convert(html)
 
     expected = "* a\n* b\n    + c\n    + d\n"
     assert result == expected
 
 
-def test_nested_list_not_inside_li_with_multiple_levels() -> None:
+def test_nested_list_not_inside_li_with_multiple_levels(convert: Callable[[str, ...], str]) -> None:
     html = """<ul>
         <li>Item 1</li>
         <li>Item 2</li>
@@ -141,7 +144,7 @@ def test_nested_list_not_inside_li_with_multiple_levels() -> None:
         <li>Item 3</li>
     </ul>"""
 
-    result = convert_to_markdown(html)
+    result = convert(html)
 
     assert "* Item 1" in result
     assert "* Item 2" in result
@@ -151,7 +154,7 @@ def test_nested_list_not_inside_li_with_multiple_levels() -> None:
     assert "* Item 3" in result
 
 
-def test_mixed_correct_and_incorrect_nesting() -> None:
+def test_mixed_correct_and_incorrect_nesting(convert: Callable[[str, ...], str]) -> None:
     html = """<ul>
         <li>Item 1
             <ul>
@@ -167,7 +170,7 @@ def test_mixed_correct_and_incorrect_nesting() -> None:
         <li>Item 3</li>
     </ul>"""
 
-    result = convert_to_markdown(html)
+    result = convert(html)
 
     assert "* Item 1" in result
     assert "    + Correctly nested 1\\.1" in result
@@ -178,10 +181,10 @@ def test_mixed_correct_and_incorrect_nesting() -> None:
     assert "* Item 3" in result
 
 
-def test_ordered_list_incorrectly_nested() -> None:
+def test_ordered_list_incorrectly_nested(convert: Callable[[str, ...], str]) -> None:
     html = "<ol><li>First</li><li>Second</li><ol><li>Nested first</li><li>Nested second</li></ol></ol>"
 
-    result = convert_to_markdown(html)
+    result = convert(html)
 
     expected_lines = ["1. First", "2. Second", "    1. Nested first", "    2. Nested second"]
 
@@ -189,7 +192,7 @@ def test_ordered_list_incorrectly_nested() -> None:
         assert line in result
 
 
-def test_deeply_incorrect_nesting() -> None:
+def test_deeply_incorrect_nesting(convert: Callable[[str, ...], str]) -> None:
     html = """<ul>
         <li>Level 1</li>
         <ul>
@@ -203,7 +206,7 @@ def test_deeply_incorrect_nesting() -> None:
         </ul>
     </ul>"""
 
-    result = convert_to_markdown(html)
+    result = convert(html)
 
     assert "* Level 1" in result
     assert "    + Level 2" in result
@@ -211,7 +214,7 @@ def test_deeply_incorrect_nesting() -> None:
     assert "            * Level 4" in result
 
 
-def test_list_after_paragraph_with_empty_lines() -> None:
+def test_list_after_paragraph_with_empty_lines(convert: Callable[[str, ...], str]) -> None:
     html = """<ul>
         <li>
             <p>First paragraph</p>
@@ -224,13 +227,13 @@ def test_list_after_paragraph_with_empty_lines() -> None:
         </li>
     </ul>"""
 
-    result = convert_to_markdown(html)
+    result = convert(html)
     assert "First paragraph" in result
     assert "Item with content" in result
     assert "Second item" in result
 
 
-def test_nested_list_without_preceding_paragraph() -> None:
+def test_nested_list_without_preceding_paragraph(convert: Callable[[str, ...], str]) -> None:
     html = """<ul>
         <li>
             <ul>
@@ -239,11 +242,11 @@ def test_nested_list_without_preceding_paragraph() -> None:
         </li>
     </ul>"""
 
-    result = convert_to_markdown(html)
+    result = convert(html)
     assert "Direct nested item" in result
 
 
-def test_empty_line_handling_in_nested_list() -> None:
+def test_empty_line_handling_in_nested_list(convert: Callable[[str, ...], str]) -> None:
     html = """<ul>
         <li>
             <p>Paragraph before</p>
@@ -255,7 +258,7 @@ def test_empty_line_handling_in_nested_list() -> None:
         </li>
     </ul>"""
 
-    result = convert_to_markdown(html)
+    result = convert(html)
     assert "Paragraph before" in result
     assert "First item" in result
     assert "Third item" in result
@@ -351,6 +354,6 @@ def test_empty_line_handling_in_nested_list() -> None:
         ),
     ],
 )
-def test_multiline_list_item_indentation_issues(html: str, expected: str) -> None:
-    result = convert_to_markdown(html)
+def test_multiline_list_item_indentation_issues(html: str, expected: str, convert: Callable[[str, ...], str]) -> None:
+    result = convert(html)
     assert result == expected

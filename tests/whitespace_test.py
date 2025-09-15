@@ -6,31 +6,34 @@ and various whitespace modes and configurations.
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
+
 import pytest
 
-from html_to_markdown import convert_to_markdown
+
+def test_normalized_mode_basic(convert: Callable[[str, ...], str]) -> None:
+    assert convert("<b>bold</b> text", whitespace_mode="normalized") == "**bold** text"
+    assert convert("<b>bold</b>\ntext", whitespace_mode="normalized") == "**bold** text"
+    assert convert("text    with    spaces", whitespace_mode="normalized") == "text with spaces"
 
 
-def test_normalized_mode_basic() -> None:
-    assert convert_to_markdown("<b>bold</b> text", whitespace_mode="normalized") == "**bold** text"
-    assert convert_to_markdown("<b>bold</b>\ntext", whitespace_mode="normalized") == "**bold** text"
-    assert convert_to_markdown("text    with    spaces", whitespace_mode="normalized") == "text with spaces"
-
-
-def test_normalized_mode() -> None:
+def test_normalized_mode(convert: Callable[[str, ...], str]) -> None:
     html = "<b>bold</b>\n text"
-    result = convert_to_markdown(html, whitespace_mode="normalized")
+    result = convert(html, whitespace_mode="normalized")
     assert "**bold**" in result
 
 
-def test_strict_mode_preservation() -> None:
+def test_strict_mode_preservation(convert: Callable[[str, ...], str]) -> None:
     html = "<b>bold</b>  \n  text"
-    result = convert_to_markdown(html, whitespace_mode="strict")
+    result = convert(html, whitespace_mode="strict")
     assert "**bold**" in result
     assert "text" in result
 
 
-def test_unicode_space_normalization() -> None:
+def test_unicode_space_normalization(convert: Callable[[str, ...], str]) -> None:
     test_cases = [
         ("\u00a0", " "),
         ("\u1680", " "),
@@ -52,46 +55,46 @@ def test_unicode_space_normalization() -> None:
 
     for unicode_space, _expected in test_cases:
         html = f"text{unicode_space}with{unicode_space}space"
-        result = convert_to_markdown(html, whitespace_mode="normalized")
+        result = convert(html, whitespace_mode="normalized")
         assert result == "text with space", f"Failed for Unicode {ord(unicode_space):04X}"
 
 
-def test_block_element_spacing() -> None:
-    assert convert_to_markdown("<div>div1</div><div>div2</div>", whitespace_mode="normalized") == "div1\n\ndiv2\n\n"
-    assert convert_to_markdown("<p>para1</p><p>para2</p>", whitespace_mode="normalized") == "para1\n\npara2\n\n"
-    assert convert_to_markdown("<div>div</div><p>para</p>", whitespace_mode="normalized") == "div\n\npara\n\n"
+def test_block_element_spacing(convert: Callable[[str, ...], str]) -> None:
+    assert convert("<div>div1</div><div>div2</div>", whitespace_mode="normalized") == "div1\n\ndiv2\n\n"
+    assert convert("<p>para1</p><p>para2</p>", whitespace_mode="normalized") == "para1\n\npara2\n\n"
+    assert convert("<div>div</div><p>para</p>", whitespace_mode="normalized") == "div\n\npara\n\n"
 
 
-def test_inline_element_spacing() -> None:
-    assert convert_to_markdown("<em>italic</em> text") == "*italic* text"
-    assert convert_to_markdown("text <strong>bold</strong>") == "text **bold**"
-    assert convert_to_markdown('<a href="#">link</a> text') == "[link](#) text"
-    assert convert_to_markdown('text <a href="#">link</a>') == "text [link](#)"
+def test_inline_element_spacing(convert: Callable[[str, ...], str]) -> None:
+    assert convert("<em>italic</em> text") == "*italic* text"
+    assert convert("text <strong>bold</strong>") == "text **bold**"
+    assert convert('<a href="#">link</a> text') == "[link](#) text"
+    assert convert('text <a href="#">link</a>') == "text [link](#)"
 
 
-def test_adjacent_inline_elements() -> None:
+def test_adjacent_inline_elements(convert: Callable[[str, ...], str]) -> None:
     html = "<b>bold</b><i>italic</i>"
-    result = convert_to_markdown(html, whitespace_mode="normalized")
+    result = convert(html, whitespace_mode="normalized")
     assert result == "**bold***italic*"
 
     html = "<b>bold</b> <i>italic</i>"
-    result = convert_to_markdown(html, whitespace_mode="normalized")
+    result = convert(html, whitespace_mode="normalized")
     assert result == "**bold** *italic*"
 
 
-def test_whitespace_in_lists() -> None:
+def test_whitespace_in_lists(convert: Callable[[str, ...], str]) -> None:
     html = """
     <ul>
         <li>item 1</li>
         <li>item 2</li>
     </ul>
     """
-    result = convert_to_markdown(html, whitespace_mode="normalized")
+    result = convert(html, whitespace_mode="normalized")
     assert "* item 1" in result
     assert "* item 2" in result
 
 
-def test_whitespace_in_nested_structures() -> None:
+def test_whitespace_in_nested_structures(convert: Callable[[str, ...], str]) -> None:
     html = """
     <div>
         <p>Paragraph in div</p>
@@ -100,56 +103,56 @@ def test_whitespace_in_nested_structures() -> None:
         </ul>
     </div>
     """
-    result = convert_to_markdown(html, whitespace_mode="normalized")
+    result = convert(html, whitespace_mode="normalized")
     assert "Paragraph in div" in result
     assert "* List item" in result
 
 
-def test_pre_and_code_whitespace() -> None:
+def test_pre_and_code_whitespace(convert: Callable[[str, ...], str]) -> None:
     pre_html = "<pre>  line 1\n    line 2  </pre>"
-    pre_result = convert_to_markdown(pre_html, whitespace_mode="normalized")
+    pre_result = convert(pre_html, whitespace_mode="normalized")
     assert "  line 1\n    line 2  " in pre_result
 
     code_html = "<code>  spaced  </code>"
-    code_result = convert_to_markdown(code_html, whitespace_mode="normalized")
+    code_result = convert(code_html, whitespace_mode="normalized")
     assert "`" in code_result
     assert "spaced" in code_result
 
 
-def test_tab_character_handling() -> None:
+def test_tab_character_handling(convert: Callable[[str, ...], str]) -> None:
     html = "text\twith\ttabs"
-    result = convert_to_markdown(html, whitespace_mode="normalized")
+    result = convert(html, whitespace_mode="normalized")
     assert result == "text with tabs"
 
 
-def test_mixed_whitespace() -> None:
+def test_mixed_whitespace(convert: Callable[[str, ...], str]) -> None:
     html = "  \t \n  text  \n\t  "
-    result = convert_to_markdown(html, whitespace_mode="normalized")
+    result = convert(html, whitespace_mode="normalized")
     assert result.strip() == "text"
 
 
-def test_br_tag_handling() -> None:
+def test_br_tag_handling(convert: Callable[[str, ...], str]) -> None:
     html = "line1<br>line2<br/>line3"
 
-    result = convert_to_markdown(html, newline_style="spaces")
+    result = convert(html, newline_style="spaces")
     assert result == "line1  \nline2  \nline3"
 
-    result = convert_to_markdown(html, newline_style="backslash")
+    result = convert(html, newline_style="backslash")
     assert result == "line1\\\nline2\\\nline3"
 
 
-def test_empty_elements() -> None:
-    assert convert_to_markdown("<div></div>") == ""
-    assert convert_to_markdown("<p></p>") == ""
-    assert convert_to_markdown("<span></span>") == ""
+def test_empty_elements(convert: Callable[[str, ...], str]) -> None:
+    assert convert("<div></div>") == ""
+    assert convert("<p></p>") == ""
+    assert convert("<span></span>") == ""
 
 
-def test_whitespace_only_elements() -> None:
-    assert convert_to_markdown("<div>   </div>", whitespace_mode="normalized").strip() == ""
-    assert "\n\t" in convert_to_markdown("<pre>\n\t</pre>", whitespace_mode="normalized")
+def test_whitespace_only_elements(convert: Callable[[str, ...], str]) -> None:
+    assert convert("<div>   </div>", whitespace_mode="normalized").strip() == ""
+    assert "\n\t" in convert("<pre>\n\t</pre>", whitespace_mode="normalized")
 
 
-def test_complex_real_world_example() -> None:
+def test_complex_real_world_example(convert: Callable[[str, ...], str]) -> None:
     html = """
     <article>
         <h1>Title</h1>
@@ -164,7 +167,7 @@ def test_complex_real_world_example() -> None:
         <p>Final paragraph.</p>
     </article>
     """
-    result = convert_to_markdown(html, whitespace_mode="normalized")
+    result = convert(html, whitespace_mode="normalized")
 
     assert "Title" in result
     assert "First paragraph with **bold** and *italic* text." in result
@@ -174,7 +177,7 @@ def test_complex_real_world_example() -> None:
     assert "Final paragraph." in result
 
 
-def test_block_element_newline_separation() -> None:
+def test_block_element_newline_separation(convert: Callable[[str, ...], str]) -> None:
     html = """<b>test1</b>
  test2
 
@@ -188,7 +191,7 @@ test4
 </div>
 <p>test5</p>"""
 
-    result = convert_to_markdown(html, whitespace_mode="normalized")
+    result = convert(html, whitespace_mode="normalized")
 
     assert "**test1** test2" in result
 
@@ -203,10 +206,10 @@ test4
     assert "test5" in result
 
     div_test = "<div>div1</div><div>div2</div>"
-    _ = convert_to_markdown(div_test, whitespace_mode="normalized")
+    _ = convert(div_test, whitespace_mode="normalized")
 
     p_test = "<p>para1</p><p>para2</p>"
-    p_result = convert_to_markdown(p_test, whitespace_mode="normalized")
+    p_result = convert(p_test, whitespace_mode="normalized")
     assert "para1\n\npara2" in p_result
 
 
@@ -219,8 +222,8 @@ test4
         ("<div>block</div>text", "block\n\ntext"),
     ],
 )
-def test_whitespace_patterns(html: str, expected: str) -> None:
-    result = convert_to_markdown(html, whitespace_mode="normalized")
+def test_whitespace_patterns(html: str, expected: str, convert: Callable[[str, ...], str]) -> None:
+    result = convert(html, whitespace_mode="normalized")
     assert expected in result
 
 
@@ -251,8 +254,10 @@ def test_whitespace_patterns(html: str, expected: str) -> None:
         ("<ul><li>item1</li></ul><div>content</div>", ["* item1", "content"], "List followed by div"),
     ],
 )
-def test_block_element_separation_comprehensive(html: str, expected_lines: list[str], description: str) -> None:
-    result = convert_to_markdown(html, whitespace_mode="normalized")
+def test_block_element_separation_comprehensive(
+    html: str, expected_lines: list[str], description: str, convert: Callable[[str, ...], str]
+) -> None:
+    result = convert(html, whitespace_mode="normalized")
 
     blocks = [block.strip() for block in result.split("\n\n") if block.strip()]
 
@@ -266,149 +271,149 @@ def test_block_element_separation_comprehensive(html: str, expected_lines: list[
         )
 
 
-def test_carriage_return_normalization() -> None:
+def test_carriage_return_normalization(convert: Callable[[str, ...], str]) -> None:
     html = "<p>Line 1\rLine 2\r\nLine 3</p>"
-    result = convert_to_markdown(html)
+    result = convert(html)
     assert "Line 1\nLine 2\nLine 3" in result
 
     html = "<p>Text\rCarriage</p>"
-    result = convert_to_markdown(html, whitespace_mode="normalized")
+    result = convert(html, whitespace_mode="normalized")
     assert "Text\nCarriage" in result or "Text Carriage" in result
 
 
-def test_empty_text_processing() -> None:
+def test_empty_text_processing(convert: Callable[[str, ...], str]) -> None:
     html = "<p></p>"
-    result = convert_to_markdown(html)
+    result = convert(html)
     assert result.strip() == ""
 
     html = "<p></p>"
-    result = convert_to_markdown(html, whitespace_mode="strict")
+    result = convert(html, whitespace_mode="strict")
     assert result.strip() == ""
 
     html = "<p>   </p>"
-    result = convert_to_markdown(html)
+    result = convert(html)
     assert result.strip() == ""
 
 
-def test_strict_mode_text_preservation() -> None:
+def test_strict_mode_text_preservation(convert: Callable[[str, ...], str]) -> None:
     html = "<pre>  Text  with   spaces  </pre>"
-    result = convert_to_markdown(html, whitespace_mode="strict")
+    result = convert(html, whitespace_mode="strict")
     assert "  Text  with   spaces  " in result
 
 
-def test_strict_whitespace_mode() -> None:
+def test_strict_whitespace_mode(convert: Callable[[str, ...], str]) -> None:
     html = "<p>First paragraph</p><p>Second paragraph</p>"
-    result = convert_to_markdown(html, whitespace_mode="strict")
+    result = convert(html, whitespace_mode="strict")
     assert result
 
 
-def test_block_spacing_combinations() -> None:
+def test_block_spacing_combinations(convert: Callable[[str, ...], str]) -> None:
     html = "<div>Div content</div><blockquote>Quote content</blockquote>"
-    result = convert_to_markdown(html)
+    result = convert(html)
     assert "Div content" in result
     assert "Quote content" in result
 
     html = "<ul><li>Item 1</li><li>Item 2</li></ul>"
-    result = convert_to_markdown(html)
+    result = convert(html)
     assert "Item 1" in result
     assert "Item 2" in result
 
     html = "<h1>Title</h1><p>Content</p>"
-    result = convert_to_markdown(html)
+    result = convert(html)
     assert "Title" in result
     assert "Content" in result
 
 
-def test_mixed_block_and_inline_elements() -> None:
+def test_mixed_block_and_inline_elements(convert: Callable[[str, ...], str]) -> None:
     html = "<p>Text with <strong>inline</strong> element</p><div>Block element</div>"
-    result = convert_to_markdown(html)
+    result = convert(html)
     assert "Text with **inline** element" in result
     assert "Block element" in result
 
 
-def test_whitespace_trailing_with_inline_sibling() -> None:
+def test_whitespace_trailing_with_inline_sibling(convert: Callable[[str, ...], str]) -> None:
     html = "Text\n<span>inline</span>"
-    result = convert_to_markdown(html, whitespace_mode="normalized")
+    result = convert(html, whitespace_mode="normalized")
     assert "Text inline" in result
 
     html = "Text\t<em>emphasized</em>"
-    result = convert_to_markdown(html, whitespace_mode="normalized")
+    result = convert(html, whitespace_mode="normalized")
     assert "Text *emphasized*" in result
 
 
-def test_unicode_whitespace_strict_mode() -> None:
+def test_unicode_whitespace_strict_mode(convert: Callable[[str, ...], str]) -> None:
     html = "<p>Text\u00a0with\u2003unicode\u00a0spaces</p>"
 
-    result_strict = convert_to_markdown(html, whitespace_mode="strict")
+    result_strict = convert(html, whitespace_mode="strict")
     assert "\u00a0" in result_strict
     assert "\u2003" in result_strict
 
-    result_normalized = convert_to_markdown(html, whitespace_mode="normalized")
+    result_normalized = convert(html, whitespace_mode="normalized")
     assert "\u00a0" not in result_normalized
     assert "\u2003" not in result_normalized
     assert "Text with unicode spaces" in result_normalized
 
 
-def test_strict_mode_block_spacing() -> None:
+def test_strict_mode_block_spacing(convert: Callable[[str, ...], str]) -> None:
     html = "<p>First paragraph</p><p>Second paragraph</p>"
-    result = convert_to_markdown(html, whitespace_mode="strict")
+    result = convert(html, whitespace_mode="strict")
     assert "First paragraph" in result
     assert "Second paragraph" in result
 
 
-def test_block_spacing_with_double_newline_elements() -> None:
+def test_block_spacing_with_double_newline_elements(convert: Callable[[str, ...], str]) -> None:
     html = "<div>Content</div><p>Paragraph</p>"
-    result = convert_to_markdown(html, whitespace_mode="normalized")
+    result = convert(html, whitespace_mode="normalized")
     assert "Content\n\nParagraph" in result
 
     html = "<blockquote>Quote</blockquote><div>Content</div>"
-    result = convert_to_markdown(html, whitespace_mode="normalized")
+    result = convert(html, whitespace_mode="normalized")
     assert "> Quote\n\nContent" in result
 
     html = "<table><tr><td>Cell</td></tr></table><p>After table</p>"
-    result = convert_to_markdown(html, whitespace_mode="normalized")
+    result = convert(html, whitespace_mode="normalized")
     assert "Cell" in result
     assert "After table" in result
 
 
-def test_block_spacing_with_single_newline_elements() -> None:
+def test_block_spacing_with_single_newline_elements(convert: Callable[[str, ...], str]) -> None:
     html = "<ul><li>Item 1</li><li>Item 2</li></ul>"
-    result = convert_to_markdown(html, whitespace_mode="normalized")
+    result = convert(html, whitespace_mode="normalized")
     assert "* Item 1\n* Item 2" in result
 
     html = "<dl><dt>Term</dt><dd>Definition</dd></dl>"
-    result = convert_to_markdown(html, whitespace_mode="normalized")
+    result = convert(html, whitespace_mode="normalized")
     assert "Term" in result
     assert "Definition" in result
 
     html = "<table><tr><td>Cell 1</td></tr><tr><td>Cell 2</td></tr></table>"
-    result = convert_to_markdown(html, whitespace_mode="normalized")
+    result = convert(html, whitespace_mode="normalized")
     assert "Cell 1" in result
     assert "Cell 2" in result
 
 
-def test_block_spacing_heading_elements() -> None:
+def test_block_spacing_heading_elements(convert: Callable[[str, ...], str]) -> None:
     html = "<h1>Heading 1</h1><p>Content</p>"
-    result = convert_to_markdown(html, whitespace_mode="normalized", heading_style="atx")
+    result = convert(html, whitespace_mode="normalized", heading_style="atx")
     assert "# Heading 1\n\nContent" in result
 
     html = "<h2>Heading 2</h2><div>Content</div>"
-    result = convert_to_markdown(html, whitespace_mode="normalized", heading_style="atx")
+    result = convert(html, whitespace_mode="normalized", heading_style="atx")
     assert "## Heading 2\n\nContent" in result
 
     for i in range(3, 7):
         html = f"<h{i}>Heading {i}</h{i}><p>Content</p>"
-        result = convert_to_markdown(html, whitespace_mode="normalized", heading_style="atx")
+        result = convert(html, whitespace_mode="normalized", heading_style="atx")
         assert f"{'#' * i} Heading {i}\n\nContent" in result
 
 
-def test_block_spacing_non_block_next_sibling() -> None:
+def test_block_spacing_non_block_next_sibling(convert: Callable[[str, ...], str]) -> None:
     html = "<div>Content</div>plain text"
-    result = convert_to_markdown(html, whitespace_mode="normalized")
+    result = convert(html, whitespace_mode="normalized")
     assert "Content\n\nplain text" in result
 
     html = "<p>Paragraph</p><span>inline span</span>"
-    result = convert_to_markdown(html, whitespace_mode="normalized")
+    result = convert(html, whitespace_mode="normalized")
     assert "Paragraph\n\ninline span" in result
 
 
@@ -505,9 +510,8 @@ Div content
         ("<p>Content 1</p><div></div><p>Content 2</p>", "Content 1\n\nContent 2\n\n", None),
     ],
 )
-def test_whitespace_and_spacing_issues(html: str, expected: str, whitespace_mode: str | None) -> None:
-    if whitespace_mode:
-        result = convert_to_markdown(html, whitespace_mode=whitespace_mode)
-    else:
-        result = convert_to_markdown(html)
+def test_whitespace_and_spacing_issues(
+    html: str, expected: str, whitespace_mode: str | None, convert: Callable[[str, ...], str]
+) -> None:
+    result = convert(html, whitespace_mode=whitespace_mode) if whitespace_mode else convert(html)
     assert result == expected
