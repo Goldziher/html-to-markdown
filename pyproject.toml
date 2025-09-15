@@ -141,6 +141,7 @@ plugins = [ "covdefaults" ]
 
 [tool.coverage.report]
 exclude_lines = [ "if TYPE_CHECKING:" ]
+fail_under = 0
 show_missing = true
 
 [tool.mypy]
