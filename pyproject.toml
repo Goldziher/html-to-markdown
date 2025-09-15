@@ -137,7 +137,6 @@ filterwarnings = [
 [tool.coverage.run]
 source = [ "html_to_markdown" ]
 omit = [ "tests/*" ]
-plugins = [ "covdefaults" ]
 
 [tool.coverage.report]
 exclude_lines = [ "if TYPE_CHECKING:" ]
