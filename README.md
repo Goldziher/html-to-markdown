@@ -282,6 +282,88 @@ def converter(*, tag: Tag, text: str, **kwargs) -> str:
 
 Custom converters take precedence over built-in converters and can be used alongside other configuration options.
 
+### Streaming API
+
+For processing large documents with memory constraints, use the streaming API:
+
+```python
+from html_to_markdown import convert_to_markdown_stream
+
+# Process large HTML in chunks
+with open("large_document.html", "r") as f:
+    html_content = f.read()
+
+# Returns a generator that yields markdown chunks
+for chunk in convert_to_markdown_stream(html_content, chunk_size=2048):
+    print(chunk, end="")
+```
+
+With progress tracking:
+
+```python
+def show_progress(processed: int, total: int):
+    if total > 0:
+        percent = (processed / total) * 100
+        print(f"\rProgress: {percent:.1f}%", end="")
+
+# Stream with progress callback
+markdown = convert_to_markdown(html_content, stream_processing=True, chunk_size=4096, progress_callback=show_progress)
+```
+
+### Preprocessing API
+
+The library provides functions for preprocessing HTML before conversion, useful for cleaning messy or complex HTML:
+
+```python
+from html_to_markdown import preprocess_html, create_preprocessor
+
+# Direct preprocessing with custom options
+cleaned_html = preprocess_html(
+    raw_html,
+    remove_navigation=True,
+    remove_forms=True,
+    remove_scripts=True,
+    remove_styles=True,
+    remove_comments=True,
+    preserve_semantic_structure=True,
+    preserve_tables=True,
+    preserve_media=True,
+)
+markdown = convert_to_markdown(cleaned_html)
+
+# Create a preprocessor configuration from presets
+config = create_preprocessor(preset="aggressive", preserve_tables=False)  # or "minimal", "standard"  # Override preset settings
+markdown = convert_to_markdown(html, **config)
+```
+
+### Exception Handling
+
+The library provides specific exception classes for better error handling:
+
+````python
+from html_to_markdown import (
+    convert_to_markdown,
+    HtmlToMarkdownError,
+    EmptyHtmlError,
+    InvalidParserError,
+    ConflictingOptionsError,
+    MissingDependencyError
+)
+
+try:
+    markdown = convert_to_markdown(html, parser='lxml')
+except MissingDependencyError:
+    # lxml not installed
+    markdown = convert_to_markdown(html, parser='html.parser')
+except EmptyHtmlError:
+    print("No HTML content to convert")
+except InvalidParserError as e:
+    print(f"Parser error: {e}")
+except ConflictingOptionsError as e:
+    print(f"Conflicting options: {e}")
+except HtmlToMarkdownError as e:
+    print(f"Conversion error: {e}")
+
 ## CLI Usage
 
 Convert HTML files directly from the command line with full access to all API options:
@@ -302,7 +384,7 @@ html_to_markdown \
   --preprocess-html \
   --preprocessing-preset aggressive \
   input.html > output.md
-```
+````
 
 ### Key CLI Options
 
@@ -315,6 +397,20 @@ html_to_markdown \
 --whitespace-mode {normalized,strict} # Whitespace handling (default: normalized)
 --heading-style {atx,atx_closed,underlined} # Header style
 --no-extract-metadata               # Disable metadata extraction
+--br-in-tables                      # Use <br> tags for line breaks in table cells
+--source-encoding ENCODING          # Override auto-detected encoding (rarely needed)
+```
+
+**File Encoding:**
+
+The CLI automatically detects file encoding in most cases. Use `--source-encoding` only when automatic detection fails (typically on some Windows systems or with unusual encodings):
+
+```shell
+# Override auto-detection for Latin-1 encoded file
+html_to_markdown --source-encoding latin-1 input.html > output.md
+
+# Force UTF-16 encoding when auto-detection fails
+html_to_markdown --source-encoding utf-16 input.html > output.md
 ```
 
 **All Available Options:**
@@ -355,6 +451,7 @@ The `markdownify` function is an alias for `convert_to_markdown` and provides id
 - `newline_style` (str, default: `'spaces'`): Style for handling newlines (`'spaces'` or `'backslash'`)
 - `sub_symbol` (str, default: `''`): Custom symbol for subscript text
 - `sup_symbol` (str, default: `''`): Custom symbol for superscript text
+- `br_in_tables` (bool, default: `False`): Use `<br>` tags for line breaks in table cells instead of spaces
 
 ### Parser Options
 
