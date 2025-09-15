@@ -133,6 +133,12 @@ def main(argv: list[str]) -> str:
         help="Parent tags where images remain inline (not converted to alt-text).",
     )
 
+    parser.add_argument(
+        "--br-in-tables",
+        action="store_true",
+        help="Use <br> tags for line breaks in table cells instead of spaces.",
+    )
+
     parser.add_argument("-w", "--wrap", action="store_true", help="Enable text wrapping at --wrap-width characters.")
 
     parser.add_argument(
@@ -248,6 +254,7 @@ def main(argv: list[str]) -> str:
 
     base_args = {
         "autolinks": args.autolinks,
+        "br_in_tables": args.br_in_tables,
         "bullets": args.bullets,
         "code_language": args.code_language,
         "convert": args.convert,
