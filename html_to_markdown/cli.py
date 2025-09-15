@@ -295,8 +295,6 @@ def main(argv: list[str]) -> str:
 
             base_args["progress_callback"] = progress_callback
 
-    # If encoding is specified, reopen the file with the given
-    # encoding, except if the source is stdin
     if args.source_encoding and args.html.name != "<stdin>":
         args.html.close()
         try:

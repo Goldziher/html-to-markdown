@@ -724,7 +724,6 @@ def test_main_with_source_encoding_option(mock_convert_to_markdown: Mock) -> Non
     test_html = "<html><body><h1>Test ñ</h1></body></html>"
     mock_file = mock_open(read_data=test_html)
 
-    # Mock the Path.open context manager to return the file content with specific encoding
     with patch("builtins.open", mock_file), patch("pathlib.Path.open") as mock_path_open:
         mock_path_open.return_value.__enter__ = lambda self: mock_file.return_value
         mock_path_open.return_value.__exit__ = lambda self, *args: None
@@ -773,11 +772,9 @@ def test_main_with_invalid_source_encoding_raises_error(mock_convert_to_markdown
     mock_file = mock_open(read_data=test_html)
 
     with patch("builtins.open", mock_file), patch("pathlib.Path.open") as mock_path_open:
-        # Create a mock file object that raises LookupError on read()
         mock_file_obj = Mock()
         mock_file_obj.read.side_effect = LookupError("unknown encoding: invalid-encoding")
 
-        # Set up the context manager to return our mock file object
         mock_path_open.return_value.__enter__.return_value = mock_file_obj
         mock_path_open.return_value.__exit__.return_value = None
 
@@ -790,17 +787,14 @@ def test_main_with_invalid_source_encoding_raises_error(mock_convert_to_markdown
 
 def test_main_with_source_encoding_ignored_for_stdin(mock_convert_to_markdown: Mock) -> None:
     """Test that source_encoding argument is ignored when input comes from stdin."""
-    # Create a custom stdin mock with the name attribute
     mock_stdin_io = StringIO("<html><body><p>Test from stdin</p></body></html>")
     mock_stdin_io.name = "<stdin>"
 
     with patch("sys.stdin", new=mock_stdin_io):
-        # When using stdin, source_encoding should be ignored
         result = main(["--source-encoding", "utf-8"])
 
     assert result == "Mocked Markdown Output"
 
-    # Verify that the stdin content was used directly without encoding handling
     mock_convert_to_markdown.assert_called_once_with(
         "<html><body><p>Test from stdin</p></body></html>",
         autolinks=False,
