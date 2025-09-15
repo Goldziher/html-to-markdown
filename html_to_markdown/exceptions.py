@@ -39,6 +39,6 @@ class ConflictingOptionsError(HtmlToMarkdownError):
         super().__init__(f"Only one of '{option1}' and '{option2}' can be specified.")
 
 
-class InvalidEncodingSpecifiedError(HtmlToMarkdownError):
+class InvalidEncodingError(HtmlToMarkdownError):
     def __init__(self, encoding: str) -> None:
         super().__init__(f"The specified encoding ({encoding}) is not valid.")

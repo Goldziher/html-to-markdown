@@ -14,7 +14,7 @@ from html_to_markdown.constants import (
     WHITESPACE_NORMALIZED,
     WHITESPACE_STRICT,
 )
-from html_to_markdown.exceptions import InvalidEncodingSpecifiedError
+from html_to_markdown.exceptions import InvalidEncodingError
 from html_to_markdown.processing import convert_to_markdown
 
 
@@ -302,8 +302,8 @@ def main(argv: list[str]) -> str:
         try:
             with Path(args.html.name).open(encoding=args.source_encoding) as f:
                 html_content = f.read()
-        except LookupError:
-            raise InvalidEncodingSpecifiedError(args.source_encoding) from None
+        except LookupError as e:
+            raise InvalidEncodingError(args.source_encoding) from e
     else:
         html_content = args.html.read()
 

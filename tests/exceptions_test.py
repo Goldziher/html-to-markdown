@@ -2,7 +2,7 @@ from html_to_markdown.exceptions import (
     ConflictingOptionsError,
     EmptyHtmlError,
     HtmlToMarkdownError,
-    InvalidEncodingSpecifiedError,
+    InvalidEncodingError,
     InvalidParserError,
     MissingDependencyError,
 )
@@ -53,7 +53,7 @@ def test_empty_html_error() -> None:
 
 
 def test_invalid_encoding_error() -> None:
-    error = InvalidEncodingSpecifiedError("invalid-encoding")
+    error = InvalidEncodingError("invalid-encoding")
     assert str(error) == "The specified encoding (invalid-encoding) is not valid."
 
 
