@@ -1,5 +1,6 @@
 import sys
 from argparse import ArgumentParser, FileType
+from pathlib import Path
 
 from html_to_markdown.constants import (
     ASTERISK,
@@ -13,6 +14,7 @@ from html_to_markdown.constants import (
     WHITESPACE_NORMALIZED,
     WHITESPACE_STRICT,
 )
+from html_to_markdown.exceptions import InvalidEncodingError
 from html_to_markdown.processing import convert_to_markdown
 
 
@@ -235,6 +237,13 @@ def main(argv: list[str]) -> str:
         help="Keep navigation elements when preprocessing (normally removed).",
     )
 
+    parser.add_argument(
+        "--source-encoding",
+        type=str,
+        default=None,
+        help="Source file encoding (e.g. 'utf-8', 'latin-1'). Defaults to system default.",
+    )
+
     args = parser.parse_args(argv)
 
     base_args = {
@@ -286,4 +295,14 @@ def main(argv: list[str]) -> str:
 
             base_args["progress_callback"] = progress_callback
 
-    return convert_to_markdown(args.html.read(), **base_args)
+    if args.source_encoding and args.html.name != "<stdin>":
+        args.html.close()
+        try:
+            with Path(args.html.name).open(encoding=args.source_encoding) as f:
+                html_content = f.read()
+        except LookupError as e:
+            raise InvalidEncodingError(args.source_encoding) from e
+    else:
+        html_content = args.html.read()
+
+    return convert_to_markdown(html_content, **base_args)
