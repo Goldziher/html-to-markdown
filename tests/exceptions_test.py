@@ -2,6 +2,7 @@ from html_to_markdown.exceptions import (
     ConflictingOptionsError,
     EmptyHtmlError,
     HtmlToMarkdownError,
+    InvalidEncodingError,
     InvalidParserError,
     MissingDependencyError,
 )
@@ -49,6 +50,11 @@ def test_invalid_parser_error() -> None:
 def test_empty_html_error() -> None:
     error = EmptyHtmlError()
     assert str(error) == "The input HTML is empty."
+
+
+def test_invalid_encoding_error() -> None:
+    error = InvalidEncodingError("invalid-encoding")
+    assert str(error) == "The specified encoding (invalid-encoding) is not valid."
 
 
 def test_conflicting_options_error() -> None:
