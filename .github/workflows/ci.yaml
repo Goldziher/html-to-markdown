@@ -79,6 +79,20 @@ jobs:
           COVERAGE_FILE: .coverage.${{ matrix.os }}-${{ matrix.python }}
         run: uv run pytest --cov=html_to_markdown --cov-report=term-missing
 
+      - name: Prepare coverage artifact
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -f .coverage ]]; then
+            echo "Copying .coverage to $COVERAGE_FILE"
+            cp .coverage "$COVERAGE_FILE"
+          elif [[ -f $COVERAGE_FILE ]]; then
+            echo "Found $COVERAGE_FILE already"
+          else
+            echo "Warning: no coverage file found to upload" >&2
+          fi
+
       - name: Upload coverage data
         uses: actions/upload-artifact@v4
         with:
