@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import pytest
+
 from html_to_markdown import convert_to_markdown
 
 
@@ -257,3 +259,99 @@ def test_empty_line_handling_in_nested_list() -> None:
     assert "Paragraph before" in result
     assert "First item" in result
     assert "Third item" in result
+
+
+@pytest.mark.parametrize(
+    "html,expected",
+    [
+        (
+            """<ul>
+<li>Item 1</li>
+<li>
+    <div>Item 2-1</div>
+    <div>Item 2-2</div>
+</li>
+</ul>""",
+            "* Item 1\n* Item 2\\-1\n\n    Item 2\\-2\n\n",
+        ),
+        (
+            """<ul>
+<li><p>First paragraph</p><p>Second paragraph</p></li>
+<li>Simple item</li>
+</ul>""",
+            "* First paragraph\n\n    Second paragraph\n\n* Simple item\n\n",
+        ),
+        (
+            """<ol>
+<li>First item</li>
+<li>
+    <div>Second item line 1</div>
+    <div>Second item line 2</div>
+</li>
+<li>Third item</li>
+</ol>""",
+            "1. First item\n2. Second item line 1\n\n    Second item line 2\n\n3. Third item\n\n",
+        ),
+        (
+            """<ul>
+<li>
+    <div>Main content</div>
+    <ul><li>Nested item</li></ul>
+    <div>More content</div>
+</li>
+</ul>""",
+            "* Main content\n\n    + Nested item\n\n    More content\n\n",
+        ),
+        (
+            """<ul>
+<li>
+    <div>
+        <p>Deep paragraph 1</p>
+        <p>Deep paragraph 2</p>
+    </div>
+</li>
+</ul>""",
+            "* Deep paragraph 1\n\n    Deep paragraph 2\n\n",
+        ),
+        (
+            """<ul>
+<li>
+    <div>Item 1 line 1</div>
+    <div>Item 1 line 2</div>
+</li>
+<li>
+    <div>Item 2 line 1</div>
+    <div>Item 2 line 2</div>
+</li>
+</ul>""",
+            "* Item 1 line 1\n\n    Item 1 line 2\n\n* Item 2 line 1\n\n    Item 2 line 2\n\n",
+        ),
+        (
+            """<ol>
+<li>
+    <p>First paragraph</p>
+    <div>Middle div</div>
+    <p>Last paragraph</p>
+</li>
+</ol>""",
+            "1. First paragraph\n\n    Middle div\n\n    Last paragraph\n\n",
+        ),
+        (
+            """<ul>
+<li>Level 1
+    <ul>
+    <li>Level 2
+        <div>Content line 1</div>
+        <div>Content line 2</div>
+    </li>
+    </ul>
+</li>
+</ul>""",
+            "* Level 1\n\n    + Level 2\n            Content line 1\n            Content line 2\n\n",
+        ),
+    ],
+)
+def test_multiline_list_item_indentation_issues(html: str, expected: str) -> None:
+    """Test multi-line list item indentation - Issue #67."""
+    result = convert_to_markdown(html)
+    assert result == expected

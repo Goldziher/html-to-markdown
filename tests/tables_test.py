@@ -621,3 +621,97 @@ def test_tfoot_inline_mode() -> None:
     html = "<tfoot><tr><td>Footer</td></tr></tfoot>"
     result = convert_to_markdown(html, convert_as_inline=True)
     assert "Footer" in result
+
+
+@pytest.mark.parametrize(
+    "html,expected",
+    [
+        (
+            """<table>
+<tr><th>Header 1</th><th>Header 2</th></tr>
+<tr><td>Cell 3</td><td>
+    <div>Cell 4-1</div>
+    <div>Cell 4-2</div>
+</td></tr>
+</table>""",
+            "\n\n| Header 1 | Header 2 |\n| --- | --- |\n| Cell 3 | Cell 4-1<br>Cell 4-2 |\n\n",
+        ),
+        (
+            """<table>
+<tr><td><p>Paragraph 1</p><p>Paragraph 2</p></td></tr>
+</table>""",
+            "\n\n| Paragraph 1<br>Paragraph 2 |\n| --- |\n\n",
+        ),
+        (
+            """<table>
+<tr><th>
+    <div>Header 1</div>
+    <div>Sub-header</div>
+</th><th>Header 2</th></tr>
+<tr><td>Cell 1</td><td>Cell 2</td></tr>
+</table>""",
+            "\n\n| Header 1<br>Sub-header | Header 2 |\n| --- | --- |\n| Cell 1 | Cell 2 |\n\n",
+        ),
+        (
+            """<table>
+<tr><td>
+    <div>Text content</div>
+    <ul><li>List item</li></ul>
+    <div>More text</div>
+</td></tr>
+</table>""",
+            "\n\n| Text content<br>List item<br>More text |\n| --- |\n\n",
+        ),
+        (
+            """<table>
+<tr>
+<td>
+    <div>Cell 1-1</div>
+    <div>Cell 1-2</div>
+</td>
+<td>
+    <div>Cell 2-1</div>
+    <div>Cell 2-2</div>
+</td>
+</tr>
+</table>""",
+            "\n\n| Cell 1-1<br>Cell 1-2 | Cell 2-1<br>Cell 2-2 |\n| --- | --- |\n\n",
+        ),
+        (
+            """<table>
+<tr><th>Header 1</th><th>Header 2</th></tr>
+<tr><td rowspan="2">Spanning cell</td><td>
+    <div>First row content</div>
+    <div>Second line</div>
+</td></tr>
+<tr><td>
+    <div>Next row</div>
+    <div>More content</div>
+</td></tr>
+</table>""",
+            "\n\n| Header 1 | Header 2 |\n| --- | --- |\n| Spanning cell | First row content<br>Second line |\n| | Next row<br>More content |\n\n",
+        ),
+        (
+            """<table>
+<tr><td>
+    <div><p>Nested paragraph 1</p></div>
+    <div><p>Nested paragraph 2</p></div>
+</td></tr>
+</table>""",
+            "\n\n| Nested paragraph 1<br>Nested paragraph 2 |\n| --- |\n\n",
+        ),
+        (
+            """<table>
+<tr><td>
+    <h3>Title</h3>
+    <p>Content paragraph</p>
+</td></tr>
+</table>""",
+            "\n\n| Title<br>Content paragraph |\n| --- |\n\n",
+        ),
+    ],
+)
+def test_table_cell_multiline_content_issues(html: str, expected: str) -> None:
+    """Test table cell multi-line content with <br> tags - Issue #66."""
+    result = convert_to_markdown(html, br_in_tables=True)
+    assert result == expected

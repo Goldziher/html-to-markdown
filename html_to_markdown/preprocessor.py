@@ -5,6 +5,98 @@ from typing import Any
 
 import nh3
 
+BASE_ALLOWED_TAGS = frozenset(
+    {
+        "p",
+        "div",
+        "span",
+        "br",
+        "hr",
+        "h1",
+        "h2",
+        "h3",
+        "h4",
+        "h5",
+        "h6",
+        "ul",
+        "ol",
+        "li",
+        "dl",
+        "dt",
+        "dd",
+        "strong",
+        "b",
+        "em",
+        "i",
+        "u",
+        "s",
+        "del",
+        "ins",
+        "mark",
+        "small",
+        "sub",
+        "sup",
+        "code",
+        "pre",
+        "kbd",
+        "samp",
+        "var",
+        "abbr",
+        "cite",
+        "dfn",
+        "time",
+        "data",
+        "a",
+        "blockquote",
+        "q",
+    }
+)
+
+SEMANTIC_STRUCTURE_TAGS = frozenset(
+    {
+        "article",
+        "section",
+        "aside",
+        "header",
+        "footer",
+        "main",
+        "nav",
+        "figure",
+        "figcaption",
+        "details",
+        "summary",
+    }
+)
+
+TABLE_TAGS = frozenset(
+    {
+        "table",
+        "thead",
+        "tbody",
+        "tfoot",
+        "tr",
+        "td",
+        "th",
+        "caption",
+        "colgroup",
+        "col",
+    }
+)
+
+MEDIA_TAGS = frozenset(
+    {
+        "img",
+        "picture",
+        "source",
+        "audio",
+        "video",
+        "track",
+        "canvas",
+        "svg",
+        "iframe",
+    }
+)
+
 
 def preprocess_html(
     html: str,
@@ -63,98 +155,16 @@ def _configure_cleaning_rules(
     custom_tags_to_remove: set[str],
     custom_attributes_to_remove: set[str],
 ) -> dict[str, Any]:
-    allowed_tags = {
-        "p",
-        "div",
-        "span",
-        "br",
-        "hr",
-        "h1",
-        "h2",
-        "h3",
-        "h4",
-        "h5",
-        "h6",
-        "ul",
-        "ol",
-        "li",
-        "dl",
-        "dt",
-        "dd",
-        "strong",
-        "b",
-        "em",
-        "i",
-        "u",
-        "s",
-        "del",
-        "ins",
-        "mark",
-        "small",
-        "sub",
-        "sup",
-        "code",
-        "pre",
-        "kbd",
-        "samp",
-        "var",
-        "abbr",
-        "cite",
-        "dfn",
-        "time",
-        "data",
-        "a",
-        "blockquote",
-        "q",
-    }
+    allowed_tags = set(BASE_ALLOWED_TAGS)
 
     if preserve_semantic_structure:
-        allowed_tags.update(
-            {
-                "article",
-                "section",
-                "aside",
-                "header",
-                "footer",
-                "main",
-                "nav",
-                "figure",
-                "figcaption",
-                "details",
-                "summary",
-            }
-        )
+        allowed_tags.update(SEMANTIC_STRUCTURE_TAGS)
 
     if preserve_tables:
-        allowed_tags.update(
-            {
-                "table",
-                "thead",
-                "tbody",
-                "tfoot",
-                "tr",
-                "th",
-                "td",
-                "caption",
-                "col",
-                "colgroup",
-            }
-        )
+        allowed_tags.update(TABLE_TAGS)
 
     if preserve_media:
-        allowed_tags.update(
-            {
-                "img",
-                "picture",
-                "source",
-                "audio",
-                "video",
-                "track",
-                "canvas",
-                "svg",
-                "iframe",
-            }
-        )
+        allowed_tags.update(MEDIA_TAGS)
 
     allowed_tags -= custom_tags_to_remove
 

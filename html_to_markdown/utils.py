@@ -12,9 +12,7 @@ def chomp(text: str) -> tuple[str, str, str]:
     prefix = " " if text.startswith((" ", "\t")) else ""
     suffix = " " if text.endswith((" ", "\t")) else ""
 
-    text = text.strip()
-
-    return prefix, suffix, text
+    return prefix, suffix, text.strip()
 
 
 def escape(*, text: str, escape_misc: bool, escape_asterisks: bool, escape_underscores: bool) -> str:

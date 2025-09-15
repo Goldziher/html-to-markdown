@@ -36,7 +36,7 @@ def test_mixed_regular_and_task_items() -> None:
 def test_nested_task_lists() -> None:
     html = '<ul><li><input type="checkbox"> Parent task<ul><li><input type="checkbox" checked> Child task 1</li><li><input type="checkbox"> Child task 2</li></ul></li></ul>'
     result = convert_to_markdown(html)
-    expected = "- [ ] Parent task\n\n    \n    \n    - [x] Child task 1\n    - [ ] Child task 2\n"
+    expected = "- [ ] Parent task\n\n    \n    \n    - [x] Child task 1\n    - [ ] Child task 2\n\n"
     assert result == expected
 
 
@@ -86,7 +86,7 @@ def test_multiple_checkboxes_in_one_item() -> None:
 def test_checkbox_with_complex_content() -> None:
     html = '<ul><li><input type="checkbox"> Complex task with:<p>Paragraph content</p><blockquote>Quote content</blockquote></li></ul>'
     result = convert_to_markdown(html)
-    expected = "- [ ] Complex task with:\n\nParagraph content\n\n    > Quote content\n"
+    expected = "- [ ] Complex task with:\n\nParagraph content\n\n    > Quote content\n\n"
     assert result == expected
 
 
@@ -107,13 +107,15 @@ def test_checkbox_input_attributes() -> None:
 def test_checkbox_in_div_within_li() -> None:
     html = '<ul><li><div><input type="checkbox"> Task in div</div></li></ul>'
     result = convert_to_markdown(html)
-    assert result == "- [ ] Task in div\n"
+    assert result == "- [ ] Task in div\n\n"
 
 
 def test_deep_nested_task_lists() -> None:
     html = '<ul><li><input type="checkbox"> Level 1<ul><li><input type="checkbox" checked> Level 2<ul><li><input type="checkbox"> Level 3</li></ul></li></ul></li></ul>'
     result = convert_to_markdown(html)
-    expected = "- [ ] Level 1\n\n    \n    \n    - [x] Level 2\n    \n    \n        \n        \n        - [ ] Level 3\n"
+    expected = (
+        "- [ ] Level 1\n\n    \n    \n    - [x] Level 2\n    \n    \n        \n        \n        - [ ] Level 3\n\n"
+    )
     assert result == expected
 
 
