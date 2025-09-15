@@ -7,7 +7,7 @@ import unicodedata
 from typing import TYPE_CHECKING, Literal
 
 if TYPE_CHECKING:
-    from bs4 import NavigableString, PageElement, Tag
+    from bs4 import NavigableString, PageElement
 
 
 WhitespaceMode = Literal["normalized", "strict"]
@@ -277,24 +277,3 @@ class WhitespaceHandler:
             text = text + "\n\n"
 
         return text
-
-    def get_block_spacing(self, tag: Tag, next_sibling: PageElement | None = None) -> str:  # pragma: no cover
-        if self.mode == "strict":
-            return ""
-
-        tag_name = tag.name.lower() if hasattr(tag, "name") else ""
-
-        double_newline_elements = {"p", "div", "blockquote", "pre", "table", "ul", "ol", "dl"}
-
-        single_newline_elements = {"li", "dt", "dd", "tr", "td", "th"}
-
-        if tag_name in double_newline_elements:
-            if self.is_block_element(next_sibling):
-                return "\n\n"
-            return "\n"
-        if tag_name in single_newline_elements:
-            return "\n"
-        if tag_name.startswith("h") and len(tag_name) == 2 and tag_name[1].isdigit():
-            return "\n\n"
-
-        return ""

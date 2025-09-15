@@ -691,9 +691,9 @@ def _convert_dt(*, text: str, convert_as_inline: bool) -> str:
         return text
 
     if not text.strip():
-        return "****\n\n"
+        return ""
 
-    return f"**{text.strip()}**\n\n"
+    return f"{text.strip()}\n"
 
 
 def _convert_dd(*, text: str, convert_as_inline: bool, tag: Tag) -> str:
