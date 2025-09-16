@@ -172,11 +172,10 @@ wheels = [
 
 [[package]]
 name = "html-to-markdown"
-version = "1.12.2"
+version = "1.13.0"
 source = { editable = "." }
 dependencies = [
     { name = "beautifulsoup4" },
-    { name = "lxml" },
     { name = "nh3" },
 ]
 
@@ -204,7 +203,6 @@ dev = [
 requires-dist = [
     { name = "beautifulsoup4", specifier = ">=4.13.5" },
     { name = "beautifulsoup4", extras = ["lxml"], marker = "extra == 'lxml'", specifier = ">=4.13.5" },
-    { name = "lxml", specifier = ">=6.0.1" },
     { name = "nh3", specifier = ">=0.3" },
 ]
 provides-extras = ["lxml"]
