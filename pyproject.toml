@@ -44,7 +44,6 @@ classifiers = [
 ]
 dependencies = [
   "beautifulsoup4>=4.13.5",
-  "lxml>=6.0.1",
   "nh3>=0.3",
 ]
 optional-dependencies.lxml = [ "beautifulsoup4[lxml]>=4.13.5" ]
