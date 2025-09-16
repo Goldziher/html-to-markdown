@@ -185,7 +185,7 @@ def test_large_file_handling(tmp_path: Path) -> None:
 
     stdout, stderr, returncode = run_cli_command(
         [str(large_file)],
-        timeout=30,
+        timeout=120,  # 2 minutes timeout for Windows performance
     )
 
     assert returncode == 0
