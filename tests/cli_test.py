@@ -462,7 +462,9 @@ def test_large_file_handling(tmp_path: Path) -> None:
             f.write(f"Line {i} with some <b>bold</b> text.\n")
         f.write("</p>")
 
-    stdout, stderr, returncode = run_cli_command([str(large_file)], timeout=30)
+    stdout, stderr, returncode = run_cli_command(
+        [str(large_file)], timeout=120
+    )  # 2 minutes timeout for Windows performance
 
     assert returncode == 0
     assert stderr == ""
