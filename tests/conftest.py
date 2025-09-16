@@ -1,4 +1,41 @@
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, Any
+
 import pytest
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
+
+from html_to_markdown import convert_to_markdown
+
+try:
+    import importlib.util
+
+    LXML_AVAILABLE = importlib.util.find_spec("lxml") is not None
+except ImportError:  # pragma: no cover
+    LXML_AVAILABLE = False
+
+# Define available parsers for testing
+AVAILABLE_PARSERS = ["html.parser"]
+if LXML_AVAILABLE:
+    AVAILABLE_PARSERS.append("lxml")
+
+
+@pytest.fixture(params=AVAILABLE_PARSERS)
+def parser(request: pytest.FixtureRequest) -> str:
+    """Fixture that runs tests with all available HTML parsers to ensure parser-agnostic behavior."""
+    return request.param
+
+
+@pytest.fixture
+def convert(parser: str) -> Callable[[str, ...], str]:
+    """Fixture that provides a convert function using the current parser."""
+
+    def _convert(html: str, **kwargs: Any) -> str:
+        return convert_to_markdown(html, parser=parser, **kwargs)
+
+    return _convert
 
 
 @pytest.fixture

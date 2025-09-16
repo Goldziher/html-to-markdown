@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import subprocess
 import sys
 from typing import TYPE_CHECKING
@@ -12,17 +13,27 @@ if TYPE_CHECKING:
 
 def run_cli_command(args: list[str], input_text: str | None = None, timeout: int = 60) -> tuple[str, str, int]:
     cli_command = [sys.executable, "-m", "html_to_markdown", *args]
+
+    # Set up environment with proper UTF-8 encoding on Windows
+    env = os.environ.copy()
+    env["PYTHONIOENCODING"] = "utf-8:replace"
+    if os.name == "nt":  # Windows
+        env["PYTHONUTF8"] = "1"
+
     process = subprocess.Popen(
         cli_command,
         stdin=subprocess.PIPE if input_text else None,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
-        text=True,
-        encoding="utf-8",
+        text=False,
+        env=env,
     )
 
     try:
-        stdout, stderr = process.communicate(input=input_text, timeout=timeout)
+        stdin_bytes = input_text.encode("utf-8") if input_text is not None else None
+        stdout_b, stderr_b = process.communicate(input=stdin_bytes, timeout=timeout)
+        stdout = (stdout_b or b"").decode("utf-8", "replace").replace("\r\n", "\n")
+        stderr = (stderr_b or b"").decode("utf-8", "replace").replace("\r\n", "\n")
         return stdout, stderr, process.returncode
     except subprocess.TimeoutExpired:
         process.kill()
@@ -174,7 +185,7 @@ def test_large_file_handling(tmp_path: Path) -> None:
 
     stdout, stderr, returncode = run_cli_command(
         [str(large_file)],
-        timeout=30,
+        timeout=120,  # 2 minutes timeout for Windows performance
     )
 
     assert returncode == 0
