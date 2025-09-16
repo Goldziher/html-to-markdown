@@ -414,7 +414,10 @@ def _convert_li(*, tag: Tag, text: str, bullets: str, list_indent_str: str) -> s
 
             return "".join(result_parts)
 
-    return "{} {}\n".format(bullet, (text or "").strip())
+    # Ensure consistent whitespace handling for list items, especially with strip_newlines=True
+    # Strip any leading whitespace that may have been inherited from parent containers
+    clean_text = (text or "").strip()
+    return f"{bullet} {clean_text}\n"
 
 
 def _convert_p(

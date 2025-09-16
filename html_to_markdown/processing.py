@@ -548,7 +548,13 @@ def convert_to_markdown(
         >>> convert_to_markdown(html, list_indent_width=2)
         '* Item 1\\n* Item 2\\n\\n'
     """
+    # Initialize original input string for Windows lxml fix
+    original_input_str = None
+
     if isinstance(source, str):
+        # Store original string for plain text detection (Windows lxml fix)
+        original_input_str = source
+
         if (
             heading_style == UNDERLINED
             and "Header" in source
@@ -697,23 +703,33 @@ def convert_to_markdown(
 
     result = sink.get_result()
 
-    if (
-        "needs_leading_whitespace_fix" in locals()
-        and needs_leading_whitespace_fix
-        and not result.startswith((" ", "\t", "\n", "\r"))
-    ):
+    # Parser-agnostic behavior: handle leading whitespace differences between parsers
+    # lxml may either add unwanted whitespace or strip meaningful whitespace compared to html.parser
+    if "needs_leading_whitespace_fix" in locals() and needs_leading_whitespace_fix:
         original_input = sink.original_source if hasattr(sink, "original_source") else original_source
-        leading_whitespace_match = re.match(r"^[\s]*", original_input)
-        if leading_whitespace_match:
-            leading_whitespace = leading_whitespace_match.group(0)
+        if isinstance(original_input, str):
+            original_leading_whitespace_match = re.match(r"^[\s]*", original_input)
+            original_leading_whitespace = (
+                original_leading_whitespace_match.group(0) if original_leading_whitespace_match else ""
+            )
 
-            list_heading_tags = {"<ol", "<ul", "<li", "<h1", "<h2", "<h3", "<h4", "<h5", "<h6"}
-            if any(tag in original_input for tag in list_heading_tags):
-                leading_newlines = re.match(r"^[\n\r]*", leading_whitespace)
-                leading_whitespace = leading_newlines.group(0) if leading_newlines else ""
+            # Case 1: lxml added leading newlines (like "\n<figure>") - strip them
+            if result.startswith("\n") and not original_input.lstrip().startswith(result.strip()):
+                result = result.lstrip("\n\r")
 
-            if leading_whitespace:
-                result = leading_whitespace + result
+            # Case 2: lxml stripped meaningful leading whitespace (like " <b>") - restore it
+            # However, don't restore whitespace if strip_newlines=True was used, as the user
+            # explicitly requested to remove formatting whitespace
+            elif (
+                not strip_newlines
+                and not result.startswith((" ", "\t"))
+                and original_leading_whitespace.startswith((" ", "\t"))
+            ):
+                # Only restore spaces/tabs, not newlines (which are usually formatting)
+                leading_spaces_tabs_match = re.match(r"^[ \t]*", original_leading_whitespace)
+                leading_spaces_tabs = leading_spaces_tabs_match.group(0) if leading_spaces_tabs_match else ""
+                if leading_spaces_tabs:
+                    result = leading_spaces_tabs + result
 
     result = re.sub(r"\n{3,}", "\n\n", result)
 
@@ -741,6 +757,46 @@ def convert_to_markdown(
 
     if convert_as_inline:
         result = result.rstrip("\n")
+
+    # Windows-specific fix: For plain text input (no HTML tags), lxml may add extra trailing newlines
+    # This ensures consistent behavior across platforms when processing plain text
+    # Only apply to cases where lxml adds extra newlines (\n\n) at the end
+    if (
+        "original_input_str" in locals()
+        and original_input_str
+        and not original_input_str.strip().startswith("<")
+        and not original_input_str.strip().endswith(">")
+        and result.endswith("\n\n")
+    ):
+        # Input appears to be plain text, not HTML - normalize trailing newlines only
+        result = result.rstrip("\n")
+
+    # If the original input contained no block-level elements, normalize any
+    # accidental trailing newlines for cross-platform consistency.
+    # This guards cases like inline-only inputs (e.g., "text <strong>bold</strong>")
+    # and head-only documents (e.g., "<head>head</head>") where output should
+    # not end with extra blank lines.
+    if "original_input_str" in locals() and original_input_str:
+        from html_to_markdown.whitespace import BLOCK_ELEMENTS  # noqa: PLC0415
+
+        # Treat additional tags as block-producing for trailing newline purposes.
+        # These may be inline in HTML spec but produce block output in our Markdown conversion.
+        blockish = set(BLOCK_ELEMENTS) | {
+            "textarea",
+            "dialog",
+            "label",
+            "button",
+            "progress",
+            "meter",
+            "output",
+            "math",
+            "audio",
+            "video",
+            "iframe",
+        }
+        block_pattern = r"<(?:" + "|".join(sorted(blockish)) + r")\b"
+        if not re.search(block_pattern, original_input_str, flags=re.IGNORECASE):
+            result = result.rstrip("\n")
 
     return result
 
