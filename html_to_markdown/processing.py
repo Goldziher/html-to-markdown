@@ -616,6 +616,37 @@ def convert_to_markdown(
                         new_text = NavigableString(leading_ws + str(first_child))
                         first_child.replace_with(new_text)
                         needs_leading_space_fix = False
+
+            # Fix html5lib whitespace handling to match other parsers
+            if parser == "html5lib":
+                body = source.find("body")
+                if body and isinstance(body, Tag):
+                    children = list(body.children)
+
+                    if (
+                        len(children) == 1
+                        and isinstance(children[0], NavigableString)
+                        and original_source.startswith((" ", "\t", "\n", "\r"))
+                        and not str(children[0]).startswith((" ", "\t", "\n", "\r"))
+                    ):
+                        first_child = children[0]
+                        original_text = str(first_child)
+
+                        # Preserve leading whitespace from original if html5lib stripped it
+                        leading_ws = ""
+                        for char in original_source:
+                            if char in " \t\n\r":
+                                leading_ws += char
+                            else:
+                                break
+
+                        # Create normalized text: restore leading whitespace only
+                        normalized_text = original_text
+                        if leading_ws and not normalized_text.startswith(leading_ws):
+                            normalized_text = leading_ws + normalized_text
+
+                        new_text = NavigableString(normalized_text)
+                        first_child.replace_with(new_text)
         else:
             raise EmptyHtmlError
 
@@ -1060,11 +1091,9 @@ def convert_to_markdown_stream(
 ) -> Generator[str, None, None]:
     sink = StreamingSink(chunk_size, progress_callback)
 
-    # Handle bytes input by converting to string first
     if isinstance(source, bytes):
         source = source.decode(source_encoding or "utf-8", errors="replace")
 
-    # Apply HTML preprocessing before parsing for string/bytes input
     if isinstance(source, str) and preprocess_html and create_preprocessor is not None and preprocess_fn is not None:
         config = create_preprocessor(
             preset=preprocessing_preset,

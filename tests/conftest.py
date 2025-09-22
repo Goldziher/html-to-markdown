@@ -13,12 +13,16 @@ try:
     import importlib.util
 
     LXML_AVAILABLE = importlib.util.find_spec("lxml") is not None
+    HTML5LIB_AVAILABLE = importlib.util.find_spec("html5lib") is not None
 except ImportError:  # pragma: no cover
     LXML_AVAILABLE = False
+    HTML5LIB_AVAILABLE = False
 
 AVAILABLE_PARSERS = ["html.parser"]
 if LXML_AVAILABLE:
     AVAILABLE_PARSERS.append("lxml")
+if HTML5LIB_AVAILABLE:
+    AVAILABLE_PARSERS.append("html5lib")
 
 
 @pytest.fixture(params=AVAILABLE_PARSERS)
