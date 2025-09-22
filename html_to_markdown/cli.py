@@ -1,5 +1,5 @@
 import sys
-from argparse import ArgumentParser, FileType
+from argparse import ArgumentParser
 from pathlib import Path
 
 from html_to_markdown.constants import (
@@ -27,8 +27,7 @@ def main(argv: list[str]) -> str:
     parser.add_argument(
         "html",
         nargs="?",
-        type=FileType("r"),
-        default=sys.stdin,
+        default="-",
         help="The HTML file to convert. Defaults to STDIN if not provided.",
     )
 
@@ -246,8 +245,8 @@ def main(argv: list[str]) -> str:
     parser.add_argument(
         "--source-encoding",
         type=str,
-        default=None,
-        help="Source file encoding (e.g. 'utf-8', 'latin-1'). Defaults to system default.",
+        default="utf-8",
+        help="Encoding for reading input files and decoding bytes (e.g. 'utf-8', 'latin-1'). Default: utf-8.",
     )
 
     args = parser.parse_args(argv)
@@ -260,6 +259,7 @@ def main(argv: list[str]) -> str:
         "convert": args.convert,
         "convert_as_inline": args.convert_as_inline,
         "default_title": args.default_title,
+        "source_encoding": args.source_encoding,
         "escape_asterisks": args.escape_asterisks,
         "escape_misc": args.escape_misc,
         "escape_underscores": args.escape_underscores,
@@ -302,14 +302,20 @@ def main(argv: list[str]) -> str:
 
             base_args["progress_callback"] = progress_callback
 
-    if args.source_encoding and args.html.name != "<stdin>":
-        args.html.close()
-        try:
-            with Path(args.html.name).open(encoding=args.source_encoding) as f:
-                html_content = f.read()
-        except LookupError as e:
-            raise InvalidEncodingError(args.source_encoding) from e
+    if args.html == "-":
+        html_content = sys.stdin.buffer.read()
     else:
-        html_content = args.html.read()
+        try:
+            file_path = Path(args.html)
+            if args.source_encoding:
+                with file_path.open(encoding=args.source_encoding) as f:
+                    html_content = f.read()
+            else:
+                with file_path.open("rb") as f:
+                    html_content = f.read()
+        except (OSError, LookupError) as e:
+            if isinstance(e, LookupError):
+                raise InvalidEncodingError(args.source_encoding) from e
+            raise
 
     return convert_to_markdown(html_content, **base_args)
