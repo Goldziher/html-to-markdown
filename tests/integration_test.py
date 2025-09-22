@@ -51,7 +51,6 @@ def test_single_escaping_entities(convert: Callable[[str, ...], str]) -> None:
 
 def test_misc(convert: Callable[[str, ...], str]) -> None:
     assert convert("\\*") == r"\\\*"
-    # Note: <foo> is treated as malformed HTML and gets stripped by the parser
     assert convert("<foo>") == ""
     assert convert("# foo") == r"\# foo"
     assert convert("> foo") == r"\> foo"
@@ -415,10 +414,7 @@ def test_hn_chained(convert: Callable[[str, ...], str]) -> None:
 
 
 def test_hn_nested_tag_heading_style(convert: Callable[[str, ...], str]) -> None:
-    # Note: Different parsers handle invalid HTML (p inside h1) differently
-    # html.parser preserves the structure, lxml restructures it according to HTML5 rules
     result = convert("<h1>A <p>P</p> C </h1>", heading_style=ATX_CLOSED)
-    # Accept both behaviors as valid since they reflect different parser approaches
     assert result in ["# A P C #\n\n", "# A #\n\nP\n\n C "]
 
     result2 = convert("<h1>A <p>P</p> C </h1>", heading_style=ATX)
@@ -448,7 +444,6 @@ def test_hn_nested_simple_tag(convert: Callable[[str, ...], str]) -> None:
     for tag, markdown in inline_tag_to_markdown:
         assert convert("<h3>A <" + tag + ">" + tag + "</" + tag + "> B</h3>") == "### A " + markdown + " B\n\n"
 
-    # Different parsers handle invalid HTML (p inside h3) differently
     result = convert("<h3>A <p>p</p> B</h3>")
     assert result in ["### A p B\n\n", "### A\n\np\n\n B"]
 

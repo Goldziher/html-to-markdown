@@ -209,3 +209,61 @@ def test_underlined_heading_conversion(convert: Callable[[str, ...], str]) -> No
 
     expected = "Header\n------\n\nNext paragraph\n\n"
     assert result == expected
+
+
+def test_bytes_input_handling() -> None:
+    """Test that bytes input is properly handled - reproduces issue #73"""
+    html = b"<html><head><title>Test Title</title></head><body><p>Test content</p></body></html>"
+
+    result = convert_to_markdown(html)
+    assert "Test content" in result
+
+    result = convert_to_markdown(html, extract_metadata=True)
+    assert "Test content" in result
+
+    complex_html = b"""<!DOCTYPE html>
+<html>
+<head>
+    <meta name="viewport" content="width=device-width" />
+    <title>COD FISCAL (A) 08/09/2015</title>
+</head>
+<body>
+    <span class="S_DEN">CODUL FISCAL din 8 septembrie 2015</span>
+    <p>Test content for issue #73</p>
+</body>
+</html>"""
+
+    result = convert_to_markdown(complex_html, extract_metadata=True)
+    assert "CODUL FISCAL" in result
+    assert "Test content for issue" in result
+    assert "73" in result
+
+
+def test_bytes_input_with_encodings() -> None:
+    """Test that bytes input handles different encodings correctly"""
+    html_utf8 = "<p>Café naïve résumé 日本語</p>".encode()
+    result = convert_to_markdown(html_utf8)
+    assert "Café naïve résumé 日本語" in result
+
+    html_latin1 = "<p>Café naïve résumé</p>".encode("latin-1")
+    result = convert_to_markdown(html_latin1, encoding="latin-1")
+    assert "Café naïve résumé" in result
+
+    html_win1252 = '<p>Smart quotes: "Hello"</p>'.encode("windows-1252")
+    result = convert_to_markdown(html_win1252, encoding="windows-1252")
+    assert "Smart quotes" in result
+
+    html_iso = "<p>Español: ñ, Português: ção</p>".encode("iso-8859-1")
+    result = convert_to_markdown(html_iso, encoding="iso-8859-1")
+    assert "Español" in result
+    assert "Português" in result
+
+    html_invalid = b"<p>Invalid \xff\xfe bytes</p>"
+    result = convert_to_markdown(html_invalid)
+    assert "Invalid" in result
+    assert "bytes" in result
+
+    html_stream = "<p>Streaming with encoding: café</p>".encode("latin-1")
+    chunks = list(convert_to_markdown_stream(html_stream, encoding="latin-1", chunk_size=10))
+    combined = "".join(chunks)
+    assert "café" in combined
