@@ -245,7 +245,7 @@ def main(argv: list[str]) -> str:
     parser.add_argument(
         "--source-encoding",
         type=str,
-        default="utf-8",
+        default=None,
         help="Encoding for reading input files and decoding bytes (e.g. 'utf-8', 'latin-1'). Default: utf-8.",
     )
 
@@ -308,7 +308,7 @@ def main(argv: list[str]) -> str:
         try:
             file_path = Path(args.html)
             if args.source_encoding:
-                with file_path.open(encoding=args.source_encoding) as f:
+                with file_path.open(encoding=args.source_encoding, errors="replace") as f:
                     html_content = f.read()
             else:
                 with file_path.open("rb") as f:

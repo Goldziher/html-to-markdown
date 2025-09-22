@@ -552,6 +552,9 @@ def convert_to_markdown(
     """
     original_input_str = None
 
+    if isinstance(source, bytes):
+        source = source.decode(source_encoding or "utf-8", errors="replace")
+
     if isinstance(source, str):
         original_input_str = source
 
@@ -903,7 +906,7 @@ def _process_html_core(
         if isinstance(source, (str, bytes)):
             original_source = source
             if isinstance(source, bytes):
-                source = source.decode(source_encoding, errors="replace")
+                source = source.decode(source_encoding or "utf-8", errors="replace")
                 original_source = source
 
             if strip_newlines:
@@ -1042,6 +1045,10 @@ def convert_to_markdown_stream(
     list_indent_type: Literal["spaces", "tabs"] = "spaces",
     list_indent_width: int = 4,
     newline_style: Literal["spaces", "backslash"] = SPACES,
+    preprocess_html: bool = False,
+    preprocessing_preset: Literal["minimal", "standard", "aggressive"] = "standard",
+    remove_forms: bool = True,
+    remove_navigation: bool = True,
     strip: str | Iterable[str] | None = None,
     strip_newlines: bool = False,
     strong_em_symbol: Literal["*", "_"] = ASTERISK,
@@ -1052,6 +1059,19 @@ def convert_to_markdown_stream(
     wrap_width: int = 80,
 ) -> Generator[str, None, None]:
     sink = StreamingSink(chunk_size, progress_callback)
+
+    # Handle bytes input by converting to string first
+    if isinstance(source, bytes):
+        source = source.decode(source_encoding or "utf-8", errors="replace")
+
+    # Apply HTML preprocessing before parsing for string/bytes input
+    if isinstance(source, str) and preprocess_html and create_preprocessor is not None and preprocess_fn is not None:
+        config = create_preprocessor(
+            preset=preprocessing_preset,
+            remove_navigation=remove_navigation,
+            remove_forms=remove_forms,
+        )
+        source = preprocess_fn(source, **config)
 
     if isinstance(source, (str, bytes)):
         if isinstance(source, bytes):
