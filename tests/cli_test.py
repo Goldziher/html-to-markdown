@@ -9,7 +9,6 @@ from __future__ import annotations
 import os
 import subprocess
 import sys
-from io import StringIO
 from typing import TYPE_CHECKING
 from unittest.mock import Mock, mock_open, patch
 
@@ -30,6 +29,7 @@ DEFAULT_CLI_ARGS = {
     "convert": None,
     "convert_as_inline": False,
     "default_title": False,
+    "source_encoding": "utf-8",
     "escape_asterisks": True,
     "escape_misc": True,
     "escape_underscores": True,
@@ -55,18 +55,19 @@ DEFAULT_CLI_ARGS = {
 }
 
 
-def run_cli_command(args: list[str], input_text: str | None = None, timeout: int = 60) -> tuple[str, str, int]:
+def run_cli_command(
+    args: list[str], input_text: str | None = None, input_bytes: bytes | None = None, timeout: int = 60
+) -> tuple[str, str, int]:
     cli_command = [sys.executable, "-m", "html_to_markdown", *args]
 
-    # Set up environment with proper UTF-8 encoding on Windows
     env = os.environ.copy()
     env["PYTHONIOENCODING"] = "utf-8:replace"
-    if os.name == "nt":  # Windows
+    if os.name == "nt":
         env["PYTHONUTF8"] = "1"
 
     process = subprocess.Popen(
         cli_command,
-        stdin=subprocess.PIPE if input_text else None,
+        stdin=subprocess.PIPE if (input_text or input_bytes) else None,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         text=False,
@@ -74,12 +75,15 @@ def run_cli_command(args: list[str], input_text: str | None = None, timeout: int
     )
 
     try:
-        stdin_bytes = input_text.encode("utf-8") if input_text is not None else None
+        if input_bytes is not None:
+            stdin_bytes = input_bytes
+        elif input_text is not None:
+            stdin_bytes = input_text.encode("utf-8")
+        else:
+            stdin_bytes = None
         stdout_b, stderr_b = process.communicate(input=stdin_bytes, timeout=timeout)
-        # Decode with replacement to avoid platform threading decode errors
         stdout = (stdout_b or b"").decode("utf-8", "replace")
         stderr = (stderr_b or b"").decode("utf-8", "replace")
-        # Normalize Windows CRLF to LF for stable assertions
         stdout = stdout.replace("\r\n", "\n")
         stderr = stderr.replace("\r\n", "\n")
         return stdout, stderr, process.returncode
@@ -89,10 +93,9 @@ def run_cli_command(args: list[str], input_text: str | None = None, timeout: int
 
 
 def run_cli(args: list[str], input_html: str) -> str:
-    # Set up environment with proper UTF-8 encoding on Windows
     env = os.environ.copy()
     env["PYTHONIOENCODING"] = "utf-8:replace"
-    if os.name == "nt":  # Windows
+    if os.name == "nt":
         env["PYTHONUTF8"] = "1"
 
     result = subprocess.run(
@@ -116,7 +119,13 @@ def mock_convert_to_markdown() -> Generator[Mock, None, None]:
 
 @pytest.fixture
 def mock_stdin() -> Generator[None, None, None]:
-    with patch("sys.stdin", new=StringIO("<html><body><p>Test from stdin</p></body></html>")):
+    mock_buffer = Mock()
+    mock_buffer.read.return_value = b"<html><body><p>Test from stdin</p></body></html>"
+
+    mock_stdin_obj = Mock()
+    mock_stdin_obj.buffer = mock_buffer
+
+    with patch("sys.stdin", mock_stdin_obj):
         yield
 
 
@@ -168,12 +177,19 @@ def hello():
 
 
 def test_file_input_mocked(mock_convert_to_markdown: Mock) -> None:
-    test_html = "<html><body><h1>Test</h1></body></html>"
-    with patch("builtins.open", mock_open(read_data=test_html)):
+    test_html_bytes = b"<html><body><h1>Test</h1></body></html>"
+
+    with patch("pathlib.Path.open") as mock_path_open:
+        mock_file = Mock()
+        mock_file.read.return_value = test_html_bytes
+        mock_path_open.return_value.__enter__.return_value = mock_file
+        mock_path_open.return_value.__exit__ = lambda self, *args: None
+
         result = main(["input.html"])
 
     assert result == "Mocked Markdown Output"
-    mock_convert_to_markdown.assert_called_once_with(test_html, **DEFAULT_CLI_ARGS)
+    mock_path_open.assert_called_once_with("rb")
+    mock_convert_to_markdown.assert_called_once_with(test_html_bytes, **DEFAULT_CLI_ARGS)
 
 
 def test_stdin_input_mocked(mock_convert_to_markdown: Mock, mock_stdin: Mock) -> None:
@@ -181,7 +197,7 @@ def test_stdin_input_mocked(mock_convert_to_markdown: Mock, mock_stdin: Mock) ->
 
     assert result == "Mocked Markdown Output"
     mock_convert_to_markdown.assert_called_once_with(
-        "<html><body><p>Test from stdin</p></body></html>", **DEFAULT_CLI_ARGS
+        b"<html><body><p>Test from stdin</p></body></html>", **DEFAULT_CLI_ARGS
     )
 
 
@@ -462,9 +478,7 @@ def test_large_file_handling(tmp_path: Path) -> None:
             f.write(f"Line {i} with some <b>bold</b> text.\n")
         f.write("</p>")
 
-    stdout, stderr, returncode = run_cli_command(
-        [str(large_file)], timeout=120
-    )  # 2 minutes timeout for Windows performance
+    stdout, stderr, returncode = run_cli_command([str(large_file)], timeout=120)
 
     assert returncode == 0
     assert stderr == ""
@@ -760,16 +774,19 @@ def test_main_with_invalid_source_encoding_raises_error(mock_convert_to_markdown
 
 
 def test_main_with_source_encoding_ignored_for_stdin(mock_convert_to_markdown: Mock) -> None:
-    mock_stdin_io = StringIO("<html><body><p>Test from stdin</p></body></html>")
-    mock_stdin_io.name = "<stdin>"
+    mock_buffer = Mock()
+    mock_buffer.read.return_value = b"<html><body><p>Test from stdin</p></body></html>"
 
-    with patch("sys.stdin", new=mock_stdin_io):
+    mock_stdin_obj = Mock()
+    mock_stdin_obj.buffer = mock_buffer
+
+    with patch("sys.stdin", mock_stdin_obj):
         result = main(["--source-encoding", "utf-8"])
 
     assert result == "Mocked Markdown Output"
 
     mock_convert_to_markdown.assert_called_once_with(
-        "<html><body><p>Test from stdin</p></body></html>", **DEFAULT_CLI_ARGS
+        b"<html><body><p>Test from stdin</p></body></html>", **DEFAULT_CLI_ARGS
     )
 
 
@@ -781,3 +798,116 @@ def test_main_with_source_encoding_default_none(mock_convert_to_markdown: Mock) 
 
     assert result == "Mocked Markdown Output"
     mock_convert_to_markdown.assert_called_once_with(test_html, **DEFAULT_CLI_ARGS)
+
+
+def test_source_encoding_parameter_with_piped_bytes() -> None:
+    """Test that the --source-encoding parameter works with piped binary input"""
+    html_utf8 = "<p>UTF-8: café 日本語</p>".encode()
+    stdout, stderr, returncode = run_cli_command([], input_bytes=html_utf8)
+    assert returncode == 0
+    assert "café 日本語" in stdout
+    assert stderr == ""
+
+    html_latin1 = "<p>Latin-1: café naïve résumé</p>".encode("latin-1")
+    stdout, stderr, returncode = run_cli_command(["--source-encoding", "latin-1"], input_bytes=html_latin1)
+    assert returncode == 0
+    assert "café naïve résumé" in stdout
+    assert stderr == ""
+
+    html_windows = '<p>Windows: "smart quotes"</p>'.encode("windows-1252")
+    stdout, stderr, returncode = run_cli_command(["--source-encoding", "windows-1252"], input_bytes=html_windows)
+    assert returncode == 0
+    assert "Windows:" in stdout
+    assert "smart quotes" in stdout
+    assert stderr == ""
+
+    html_iso = "<p>ISO: español português</p>".encode("iso-8859-1")
+    stdout, stderr, returncode = run_cli_command(["--source-encoding", "iso-8859-1"], input_bytes=html_iso)
+    assert returncode == 0
+    assert "español português" in stdout
+    assert stderr == ""
+
+
+def test_encoding_with_file_input(tmp_path: Path) -> None:
+    """Test that encoding works with file input"""
+    html_content = "<p>File test: café résumé</p>"
+    file_path = tmp_path / "test_latin1.html"
+    file_path.write_bytes(html_content.encode("latin-1"))
+
+    stdout, stderr, returncode = run_cli_command([str(file_path), "--source-encoding", "latin-1"])
+    assert returncode == 0
+    assert "File test: café résumé" in stdout
+    assert stderr == ""
+
+    stdout, stderr, returncode = run_cli_command([str(file_path), "--source-encoding", "utf-8"])
+    assert returncode == 0
+    assert "File test:" in stdout
+
+
+def test_source_encoding_parameter(tmp_path: Path) -> None:
+    """Test that --source-encoding works for reading files"""
+    html_content = "<p>Source encoding: café</p>"
+    file_path = tmp_path / "test_source.html"
+    file_path.write_text(html_content, encoding="latin-1")
+
+    stdout, stderr, returncode = run_cli_command([str(file_path), "--source-encoding", "latin-1"])
+    assert returncode == 0
+    assert "Source encoding: café" in stdout
+    assert stderr == ""
+
+
+def test_encoding_cross_platform_compatibility() -> None:
+    """Test encoding works consistently across platforms"""
+    test_cases = [
+        ("<p>Emoji: 😀 🎉 ✨</p>", "Emoji: 😀 🎉 ✨"),
+        ("<p>CJK: 日本語 中文 한국어</p>", "CJK: 日本語 中文 한국어"),
+        ("<p>Diacritics: àáäâ èéëê ìíïî</p>", "Diacritics: àáäâ èéëê ìíïî"),
+        ("<p>Symbols: © ® ™ € £ ¥</p>", "Symbols: © ® ™ € £ ¥"),
+        ("<p>Math: ∑ ∫ √ ∞ ≈ ≠</p>", "Math: ∑ ∫ √ ∞ ≈ ≠"),
+    ]
+
+    for html, expected_text in test_cases:
+        stdout, stderr, returncode = run_cli_command([], input_text=html)
+        assert returncode == 0
+        assert expected_text in stdout
+        assert stderr == ""
+
+
+def test_encoding_with_invalid_bytes() -> None:
+    """Test handling of invalid byte sequences"""
+    invalid_bytes = b"<p>Invalid: \xff\xfe</p>"
+
+    stdout, stderr, returncode = run_cli_command([], input_bytes=invalid_bytes)
+    assert returncode == 0
+    assert "Invalid:" in stdout
+    assert stderr == ""
+
+
+def test_encoding_with_mixed_content(tmp_path: Path) -> None:
+    """Test complex HTML with various encodings"""
+    complex_html = """<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="ISO-8859-1">
+    <title>Mixed Content Test</title>
+</head>
+<body>
+    <h1>Título en Español</h1>
+    <p>Text with special chars: café, naïve, résumé</p>
+    <blockquote>Quote: "Hello World"</blockquote>
+    <ul>
+        <li>Item with - dash</li>
+        <li>Item with … ellipsis</li>
+    </ul>
+</body>
+</html>"""
+
+    stdout, stderr, returncode = run_cli_command([], input_text=complex_html)
+    assert returncode == 0
+    assert "Título en Español" in stdout
+    assert stderr == ""
+
+    latin1_bytes = complex_html.encode("latin-1", errors="ignore")
+    stdout, stderr, returncode = run_cli_command(["--source-encoding", "latin-1"], input_bytes=latin1_bytes)
+    assert returncode == 0
+    assert "Mixed Content Test" in stdout

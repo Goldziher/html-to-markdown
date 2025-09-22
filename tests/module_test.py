@@ -14,10 +14,9 @@ if TYPE_CHECKING:
 def run_cli_command(args: list[str], input_text: str | None = None, timeout: int = 60) -> tuple[str, str, int]:
     cli_command = [sys.executable, "-m", "html_to_markdown", *args]
 
-    # Set up environment with proper UTF-8 encoding on Windows
     env = os.environ.copy()
     env["PYTHONIOENCODING"] = "utf-8:replace"
-    if os.name == "nt":  # Windows
+    if os.name == "nt":
         env["PYTHONUTF8"] = "1"
 
     process = subprocess.Popen(
@@ -185,7 +184,7 @@ def test_large_file_handling(tmp_path: Path) -> None:
 
     stdout, stderr, returncode = run_cli_command(
         [str(large_file)],
-        timeout=120,  # 2 minutes timeout for Windows performance
+        timeout=120,
     )
 
     assert returncode == 0
