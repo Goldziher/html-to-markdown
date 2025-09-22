@@ -246,15 +246,15 @@ def test_bytes_input_with_encodings() -> None:
     assert "Café naïve résumé 日本語" in result
 
     html_latin1 = "<p>Café naïve résumé</p>".encode("latin-1")
-    result = convert_to_markdown(html_latin1, encoding="latin-1")
+    result = convert_to_markdown(html_latin1, source_encoding="latin-1")
     assert "Café naïve résumé" in result
 
     html_win1252 = '<p>Smart quotes: "Hello"</p>'.encode("windows-1252")
-    result = convert_to_markdown(html_win1252, encoding="windows-1252")
+    result = convert_to_markdown(html_win1252, source_encoding="windows-1252")
     assert "Smart quotes" in result
 
     html_iso = "<p>Español: ñ, Português: ção</p>".encode("iso-8859-1")
-    result = convert_to_markdown(html_iso, encoding="iso-8859-1")
+    result = convert_to_markdown(html_iso, source_encoding="iso-8859-1")
     assert "Español" in result
     assert "Português" in result
 
@@ -264,6 +264,6 @@ def test_bytes_input_with_encodings() -> None:
     assert "bytes" in result
 
     html_stream = "<p>Streaming with encoding: café</p>".encode("latin-1")
-    chunks = list(convert_to_markdown_stream(html_stream, encoding="latin-1", chunk_size=10))
+    chunks = list(convert_to_markdown_stream(html_stream, source_encoding="latin-1", chunk_size=10))
     combined = "".join(chunks)
     assert "café" in combined

@@ -125,7 +125,7 @@ markdown = convert_to_markdown(response.content)  # response.content returns byt
 
 # Specify encoding for non-UTF-8 content
 response = requests.get("https://example.fr")
-markdown = convert_to_markdown(response.content, encoding="latin-1")
+markdown = convert_to_markdown(response.content, source_encoding="latin-1")
 
 # Common encoding examples
 html_bytes = b"<p>Hello World</p>"
@@ -133,11 +133,15 @@ markdown = convert_to_markdown(html_bytes)  # UTF-8 by default
 
 # Latin-1 encoded content
 html_latin1 = "<p>Café résumé</p>".encode("latin-1")
-markdown = convert_to_markdown(html_latin1, encoding="latin-1")
+markdown = convert_to_markdown(html_latin1, source_encoding="latin-1")
 
 # Windows-1252 encoded content
 html_windows = '<p>Smart quotes: "Hello"</p>'.encode("windows-1252")
-markdown = convert_to_markdown(html_windows, encoding="windows-1252")
+markdown = convert_to_markdown(html_windows, source_encoding="windows-1252")
+
+# Piping bytes from command line
+# echo '<p>Hello</p>' | python -m html_to_markdown
+# cat file.html | python -m html_to_markdown --source-encoding latin-1
 ```
 
 ## Common Use Cases
@@ -672,6 +676,130 @@ This library provides comprehensive support for all modern HTML5 elements:
 
 - `<math>` (MathML support)
 
+## Command Line Interface
+
+The library includes a full-featured CLI tool with complete API parity:
+
+### Basic Usage
+
+```bash
+# Convert HTML file to Markdown
+html-to-markdown document.html
+
+# Convert from stdin
+echo '<h1>Title</h1><p>Content</p>' | html-to-markdown
+
+# Read HTML file with specific encoding
+html-to-markdown document.html --source-encoding latin-1
+
+# Pipe bytes with encoding specification
+cat document.html | html-to-markdown --source-encoding utf-8
+```
+
+### Advanced CLI Options
+
+```bash
+# Discord/Slack compatible lists (2-space indent)
+html-to-markdown file.html --list-indent-width 2
+
+# Clean messy HTML before conversion
+html-to-markdown file.html --preprocess-html --preprocessing-preset aggressive
+
+# Custom heading style
+html-to-markdown file.html --heading-style atx
+
+# Strip specific tags
+html-to-markdown file.html --strip nav aside footer
+
+# Convert only specific tags
+html-to-markdown file.html --convert h1 h2 p a strong em
+
+# Enable streaming for large files with progress
+html-to-markdown large.html --stream-processing --show-progress
+
+# Use specific parser
+html-to-markdown file.html --parser lxml
+```
+
+### Real-World CLI Examples
+
+```bash
+# Download and convert a webpage
+curl -s https://example.com | html-to-markdown --preprocess-html > output.md
+
+# Process multiple files with different encodings
+for file in *.html; do
+    html-to-markdown "$file" --source-encoding latin-1 > "${file%.html}.md"
+done
+
+# Convert with custom formatting for documentation
+html-to-markdown docs.html \
+    --heading-style atx \
+    --list-indent-width 2 \
+    --highlight-style bold \
+    --no-extract-metadata > docs.md
+```
+
+## Differences from markdownify
+
+html-to-markdown is a modern, completely rewritten library inspired by markdownify but with significant improvements:
+
+### Key Advantages
+
+| Feature                 | markdownify      | html-to-markdown                                                       |
+| ----------------------- | ---------------- | ---------------------------------------------------------------------- |
+| **Type Safety**         | No type hints    | Full MyPy compliance with strict typing                                |
+| **Python Support**      | Python 3.6+      | Python 3.10+ with modern features                                      |
+| **HTML5 Elements**      | Basic support    | Comprehensive HTML5 support (semantic, form, table, interactive, etc.) |
+| **Table Handling**      | Simple tables    | Advanced rowspan/colspan support                                       |
+| **Streaming**           | Memory-intensive | Memory-efficient streaming for large documents                         |
+| **CLI Tool**            | Basic            | Full-featured CLI with all API options                                 |
+| **Preprocessing**       | None             | Built-in HTML cleaning with configurable presets                       |
+| **Metadata Extraction** | None             | Automatic title/meta extraction as comments                            |
+| **Task Lists**          | None             | GitHub-compatible checkbox conversion                                  |
+| **Custom Converters**   | Class-based      | Function-based with simpler API                                        |
+| **Testing**             | Basic            | Comprehensive test suite with 100% coverage                            |
+| **Performance**         | Standard         | Optimized with optional lxml parser                                    |
+
+### API Compatibility
+
+While inspired by markdownify, html-to-markdown uses a more modern, explicit API:
+
+```python
+# markdownify style
+from markdownify import markdownify
+
+result = markdownify(html, heading_style="atx", strip=["nav"])
+
+# html-to-markdown style (more explicit)
+from html_to_markdown import convert_to_markdown
+
+result = convert_to_markdown(html, heading_style="atx", strip=["nav"])
+```
+
+### Migration from markdownify
+
+Most markdownify code can be easily migrated:
+
+```python
+# Before (markdownify)
+from markdownify import markdownify as md
+
+result = md(html, heading_style="atx")
+
+# After (html-to-markdown)
+from html_to_markdown import convert_to_markdown
+
+result = convert_to_markdown(html, heading_style="atx")
+```
+
+Key changes when migrating:
+
+- Import path: `markdownify` → `html_to_markdown`
+- Function name: `markdownify()` → `convert_to_markdown()`
+- All parameter names remain the same for common options
+- New parameters available for advanced features (preprocessing, streaming, etc.)
+
 ## Acknowledgments
 
-Special thanks to the original [markdownify](https://pypi.org/project/markdownify/) project creators and contributors.
+Special thanks to the original [markdownify](https://pypi.org/project/markdownify/) project creators and contributors for the inspiration and foundation that made this modern implementation possible.

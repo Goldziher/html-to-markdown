@@ -29,7 +29,7 @@ DEFAULT_CLI_ARGS = {
     "convert": None,
     "convert_as_inline": False,
     "default_title": False,
-    "source_encoding": "utf-8",
+    "source_encoding": None,
     "escape_asterisks": True,
     "escape_misc": True,
     "escape_underscores": True,
@@ -751,8 +751,10 @@ def test_main_with_source_encoding_option(mock_convert_to_markdown: Mock) -> Non
         result = main(["input.html", "--source-encoding", "utf-8"])
 
     assert result == "Mocked Markdown Output"
-    mock_path_open.assert_called_once_with(encoding="utf-8")
-    mock_convert_to_markdown.assert_called_once_with(test_html, **DEFAULT_CLI_ARGS)
+    mock_path_open.assert_called_once_with(encoding="utf-8", errors="replace")
+    expected_args = DEFAULT_CLI_ARGS.copy()
+    expected_args["source_encoding"] = "utf-8"
+    mock_convert_to_markdown.assert_called_once_with(test_html, **expected_args)
 
 
 def test_main_with_invalid_source_encoding_raises_error(mock_convert_to_markdown: Mock) -> None:
@@ -770,7 +772,7 @@ def test_main_with_invalid_source_encoding_raises_error(mock_convert_to_markdown
             main(["input.html", "--source-encoding", "invalid-encoding"])
 
         assert str(exc_info.value) == "The specified encoding (invalid-encoding) is not valid."
-        mock_path_open.assert_called_once_with(encoding="invalid-encoding")
+        mock_path_open.assert_called_once_with(encoding="invalid-encoding", errors="replace")
 
 
 def test_main_with_source_encoding_ignored_for_stdin(mock_convert_to_markdown: Mock) -> None:
@@ -785,19 +787,27 @@ def test_main_with_source_encoding_ignored_for_stdin(mock_convert_to_markdown: M
 
     assert result == "Mocked Markdown Output"
 
+    expected_args = DEFAULT_CLI_ARGS.copy()
+    expected_args["source_encoding"] = "utf-8"
     mock_convert_to_markdown.assert_called_once_with(
-        b"<html><body><p>Test from stdin</p></body></html>", **DEFAULT_CLI_ARGS
+        b"<html><body><p>Test from stdin</p></body></html>", **expected_args
     )
 
 
 def test_main_with_source_encoding_default_none(mock_convert_to_markdown: Mock) -> None:
-    test_html = "<html><body><h1>Test default encoding</h1></body></html>"
+    test_html_bytes = b"<html><body><h1>Test default encoding</h1></body></html>"
 
-    with patch("builtins.open", mock_open(read_data=test_html)):
+    with patch("pathlib.Path.open") as mock_path_open:
+        mock_file = Mock()
+        mock_file.read.return_value = test_html_bytes
+        mock_path_open.return_value.__enter__.return_value = mock_file
+        mock_path_open.return_value.__exit__ = lambda self, *args: None
+
         result = main(["input.html"])
 
     assert result == "Mocked Markdown Output"
-    mock_convert_to_markdown.assert_called_once_with(test_html, **DEFAULT_CLI_ARGS)
+    mock_path_open.assert_called_once_with("rb")
+    mock_convert_to_markdown.assert_called_once_with(test_html_bytes, **DEFAULT_CLI_ARGS)
 
 
 def test_source_encoding_parameter_with_piped_bytes() -> None:
