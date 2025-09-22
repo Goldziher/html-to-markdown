@@ -46,8 +46,9 @@ dependencies = [
   "beautifulsoup4>=4.13.5",
   "nh3>=0.3",
 ]
-optional-dependencies.lxml = [ "beautifulsoup4[lxml]>=4.13.5" ]
+optional-dependencies.html5lib = [ "beautifulsoup4[html5lib]>=4.13.5" ]
 
+optional-dependencies.lxml = [ "beautifulsoup4[lxml]>=4.13.5" ]
 urls.Changelog = "https://github.com/Goldziher/html-to-markdown/releases"
 urls.Homepage = "https://github.com/Goldziher/html-to-markdown"
 urls.Issues = "https://github.com/Goldziher/html-to-markdown/issues"
@@ -57,6 +58,8 @@ scripts.html_to_markdown = "html_to_markdown.__main__:cli"
 
 [dependency-groups]
 dev = [
+  "beautifulsoup4[html5lib]>=4.13.5",
+  "beautifulsoup4[lxml]>=4.13.5",
   "covdefaults>=2.3",
   "mypy>=1.18.2",
   "pre-commit>=4.3",

@@ -2,7 +2,7 @@
 
 A modern, fully typed Python library for converting HTML to Markdown. This library is a completely rewritten fork
 of [markdownify](https://pypi.org/project/markdownify/) with a modernized codebase, strict type safety and support for
-Python 3.9+.
+Python 3.10+.
 
 ## Support This Project
 
@@ -26,8 +26,10 @@ Your support helps maintain and improve this library for the community.
 - **Custom Converters**: Extensible converter system for custom HTML tag handling
 - **List Formatting**: Configurable list indentation with Discord/Slack compatibility
 - **HTML Preprocessing**: Clean messy HTML with configurable aggressiveness levels
+- **Bytes Input Support**: Direct handling of bytes input with automatic encoding detection and configurable source encoding
 - **Whitespace Control**: Normalized or strict whitespace preservation modes
 - **BeautifulSoup Integration**: Support for pre-configured BeautifulSoup instances
+- **Parser Normalization**: Consistent output across all supported parsers (html.parser, lxml, html5lib)
 - **Robustly Tested**: Comprehensive unit tests and integration tests covering all conversion scenarios
 
 ## Installation
@@ -36,17 +38,27 @@ Your support helps maintain and improve this library for the community.
 pip install html-to-markdown
 ```
 
-### Optional lxml Parser
+### Optional Parsers
 
-For improved performance, you can install with the optional lxml parser:
+For improved performance and compatibility, you can install with optional parsers:
 
 ```shell
+# Fast lxml parser (recommended)
 pip install html-to-markdown[lxml]
+
+# Standards-compliant html5lib parser
+pip install html-to-markdown[html5lib]
 ```
 
-The lxml parser offers faster HTML parsing and better handling of malformed HTML compared to the default html.parser.
+**Parser Options:**
 
-The library automatically uses lxml when available. You can explicitly specify a parser using the `parser` parameter.
+- **html.parser** (default): Built-in Python parser, no dependencies
+- **lxml**: **Recommended** - Fastest parser with good malformed HTML handling
+- **html5lib**: Most standards-compliant, handles edge cases best
+
+The library automatically uses lxml when available and **normalizes output to ensure consistent results regardless of parser choice**. We recommend using the **lxml parser for optimal performance** - it's significantly faster than the other options while maintaining excellent compatibility.
+
+You can explicitly specify a parser using the `parser` parameter.
 
 ## Quick Start
 
@@ -717,7 +729,7 @@ html-to-markdown file.html --convert h1 h2 p a strong em
 # Enable streaming for large files with progress
 html-to-markdown large.html --stream-processing --show-progress
 
-# Use specific parser
+# Use specific parser (lxml recommended for best performance)
 html-to-markdown file.html --parser lxml
 ```
 
@@ -757,9 +769,10 @@ html-to-markdown is a modern, completely rewritten library inspired by markdowni
 | **Preprocessing**       | None             | Built-in HTML cleaning with configurable presets                       |
 | **Metadata Extraction** | None             | Automatic title/meta extraction as comments                            |
 | **Task Lists**          | None             | GitHub-compatible checkbox conversion                                  |
+| **Bytes Input**         | None             | Direct bytes support with configurable encoding                        |
 | **Custom Converters**   | Class-based      | Function-based with simpler API                                        |
 | **Testing**             | Basic            | Comprehensive test suite with 100% coverage                            |
-| **Performance**         | Standard         | Optimized with optional lxml parser                                    |
+| **Performance**         | Standard         | Significantly faster with recommended lxml parser                      |
 
 ### API Compatibility
 
