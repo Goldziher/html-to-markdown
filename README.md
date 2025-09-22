@@ -111,6 +111,35 @@ soup = BeautifulSoup(html, "lxml")  # Note: lxml requires additional installatio
 markdown = convert_to_markdown(soup)
 ```
 
+### Working with Bytes and Encodings
+
+The library can directly handle bytes input, which is useful when working with HTTP responses or files:
+
+```python
+import requests
+from html_to_markdown import convert_to_markdown
+
+# Working with HTTP responses (bytes)
+response = requests.get("https://example.com")
+markdown = convert_to_markdown(response.content)  # response.content returns bytes
+
+# Specify encoding for non-UTF-8 content
+response = requests.get("https://example.fr")
+markdown = convert_to_markdown(response.content, encoding="latin-1")
+
+# Common encoding examples
+html_bytes = b"<p>Hello World</p>"
+markdown = convert_to_markdown(html_bytes)  # UTF-8 by default
+
+# Latin-1 encoded content
+html_latin1 = "<p>Café résumé</p>".encode("latin-1")
+markdown = convert_to_markdown(html_latin1, encoding="latin-1")
+
+# Windows-1252 encoded content
+html_windows = '<p>Smart quotes: "Hello"</p>'.encode("windows-1252")
+markdown = convert_to_markdown(html_windows, encoding="windows-1252")
+```
+
 ## Common Use Cases
 
 ### Discord/Slack Compatible Lists

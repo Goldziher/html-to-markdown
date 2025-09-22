@@ -16,7 +16,6 @@ try:
 except ImportError:  # pragma: no cover
     LXML_AVAILABLE = False
 
-# Define available parsers for testing
 AVAILABLE_PARSERS = ["html.parser"]
 if LXML_AVAILABLE:
     AVAILABLE_PARSERS.append("lxml")
