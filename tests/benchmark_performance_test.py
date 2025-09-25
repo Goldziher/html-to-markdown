@@ -13,7 +13,7 @@ import pytest
 from html_to_markdown import convert_to_markdown, convert_to_markdown_stream
 
 if TYPE_CHECKING:
-    from pytest_benchmark.fixture import BenchmarkFixture
+    from pytest_benchmark.fixture import BenchmarkFixture  # type: ignore[import-untyped]
 
 try:
     from .performance_test import generate_complex_html

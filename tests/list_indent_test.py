@@ -8,32 +8,32 @@ if TYPE_CHECKING:
 import pytest
 
 
-def test_default_list_indent_4_spaces(convert: Callable[[str, ...], str]) -> None:
+def test_default_list_indent_4_spaces(convert: Callable[..., str]) -> None:
     html = "<ul><li>Item 1<ul><li>Nested item</li></ul></li></ul>"
     result = convert(html)
     assert "    + Nested item" in result
 
 
-def test_custom_spaces_indent_2_spaces(convert: Callable[[str, ...], str]) -> None:
+def test_custom_spaces_indent_2_spaces(convert: Callable[..., str]) -> None:
     html = "<ul><li>Item 1<ul><li>Nested item</li></ul></li></ul>"
     result = convert(html, list_indent_width=2, list_indent_type="spaces")
     assert "  + Nested item" in result
     assert "    + Nested item" not in result
 
 
-def test_custom_spaces_indent_6_spaces(convert: Callable[[str, ...], str]) -> None:
+def test_custom_spaces_indent_6_spaces(convert: Callable[..., str]) -> None:
     html = "<ul><li>Item 1<ul><li>Nested item</li></ul></li></ul>"
     result = convert(html, list_indent_width=6, list_indent_type="spaces")
     assert "      + Nested item" in result
 
 
-def test_tabs_indent(convert: Callable[[str, ...], str]) -> None:
+def test_tabs_indent(convert: Callable[..., str]) -> None:
     html = "<ul><li>Item 1<ul><li>Nested item</li></ul></li></ul>"
     result = convert(html, list_indent_type="tabs")
     assert "\t+ Nested item" in result
 
 
-def test_tabs_ignore_width(convert: Callable[[str, ...], str]) -> None:
+def test_tabs_ignore_width(convert: Callable[..., str]) -> None:
     html = "<ul><li>Item 1<ul><li>Nested item</li></ul></li></ul>"
     result1 = convert(html, list_indent_type="tabs", list_indent_width=2)
     result2 = convert(html, list_indent_type="tabs", list_indent_width=8)
@@ -41,7 +41,7 @@ def test_tabs_ignore_width(convert: Callable[[str, ...], str]) -> None:
     assert "\t+ Nested item" in result1
 
 
-def test_deeply_nested_lists(convert: Callable[[str, ...], str]) -> None:
+def test_deeply_nested_lists(convert: Callable[..., str]) -> None:
     html = """
     <ul>
         <li>Level 1
@@ -67,7 +67,7 @@ def test_deeply_nested_lists(convert: Callable[[str, ...], str]) -> None:
     assert "    - Level 3" in level3_line
 
 
-def test_mixed_list_types_with_custom_indent(convert: Callable[[str, ...], str]) -> None:
+def test_mixed_list_types_with_custom_indent(convert: Callable[..., str]) -> None:
     html = """
     <ol>
         <li>First ordered
@@ -82,7 +82,7 @@ def test_mixed_list_types_with_custom_indent(convert: Callable[[str, ...], str])
     assert "   * First unordered" in result
 
 
-def test_blockquote_in_list_with_custom_indent(convert: Callable[[str, ...], str]) -> None:
+def test_blockquote_in_list_with_custom_indent(convert: Callable[..., str]) -> None:
     html = """
     <ul>
         <li>
@@ -95,7 +95,7 @@ def test_blockquote_in_list_with_custom_indent(convert: Callable[[str, ...], str
     assert "  > This is a quote" in result
 
 
-def test_paragraph_in_list_with_custom_indent(convert: Callable[[str, ...], str]) -> None:
+def test_paragraph_in_list_with_custom_indent(convert: Callable[..., str]) -> None:
     html = """
     <ul>
         <li>
@@ -114,7 +114,7 @@ def test_paragraph_in_list_with_custom_indent(convert: Callable[[str, ...], str]
     assert "  Second paragraph" in second_para_line
 
 
-def test_code_block_in_list_preserves_formatting(convert: Callable[[str, ...], str]) -> None:
+def test_code_block_in_list_preserves_formatting(convert: Callable[..., str]) -> None:
     html = """
     <ul>
         <li>Item with code
@@ -128,7 +128,7 @@ def test_code_block_in_list_preserves_formatting(convert: Callable[[str, ...], s
     assert '    print("world")' in result
 
 
-def test_task_list_with_custom_indent(convert: Callable[[str, ...], str]) -> None:
+def test_task_list_with_custom_indent(convert: Callable[..., str]) -> None:
     html = """
     <ul>
         <li><input type="checkbox" checked> Completed task
@@ -143,7 +143,7 @@ def test_task_list_with_custom_indent(convert: Callable[[str, ...], str]) -> Non
     assert "  - [ ] Subtask" in result
 
 
-def test_backward_compatibility_default_behavior(convert: Callable[[str, ...], str]) -> None:
+def test_backward_compatibility_default_behavior(convert: Callable[..., str]) -> None:
     html = "<ul><li>Item<ul><li>Nested</li></ul></li></ul>"
     result1 = convert(html)
     result2 = convert(html, list_indent_width=4, list_indent_type="spaces")
@@ -152,34 +152,34 @@ def test_backward_compatibility_default_behavior(convert: Callable[[str, ...], s
 
 
 @pytest.mark.parametrize("indent_width", [1, 2, 3, 4, 5, 6, 8])
-def test_various_indent_widths(indent_width: int, convert: Callable[[str, ...], str]) -> None:
+def test_various_indent_widths(indent_width: int, convert: Callable[..., str]) -> None:
     html = "<ul><li>Item<ul><li>Nested</li></ul></li></ul>"
     result = convert(html, list_indent_width=indent_width, list_indent_type="spaces")
     expected_spaces = " " * indent_width
     assert f"{expected_spaces}+ Nested" in result
 
 
-def test_edge_case_zero_width_spaces(convert: Callable[[str, ...], str]) -> None:
+def test_edge_case_zero_width_spaces(convert: Callable[..., str]) -> None:
     html = "<ul><li>Item<ul><li>Nested</li></ul></li></ul>"
     result = convert(html, list_indent_width=0, list_indent_type="spaces")
     assert "+ Nested" in result
     assert " + Nested" not in result
 
 
-def test_very_large_indent_width(convert: Callable[[str, ...], str]) -> None:
+def test_very_large_indent_width(convert: Callable[..., str]) -> None:
     html = "<ul><li>Item<ul><li>Nested</li></ul></li></ul>"
     result = convert(html, list_indent_width=20, list_indent_type="spaces")
     expected_spaces = " " * 20
     assert f"{expected_spaces}+ Nested" in result
 
 
-def test_list_indent_type_spaces(convert: Callable[[str, ...], str]) -> None:
+def test_list_indent_type_spaces(convert: Callable[..., str]) -> None:
     html = "<ul><li>Item 1<ul><li>Nested Item</li></ul></li></ul>"
     result = convert(html, list_indent_type="spaces", list_indent_width=2)
     assert "  + Nested Item" in result
 
 
-def test_list_indent_type_tabs(convert: Callable[[str, ...], str]) -> None:
+def test_list_indent_type_tabs(convert: Callable[..., str]) -> None:
     html = "<ul><li>Item 1<ul><li>Nested Item</li></ul></li></ul>"
     result = convert(html, list_indent_type="tabs")
     assert "\t+ Nested Item" in result

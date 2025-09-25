@@ -28,11 +28,11 @@ if HTML5LIB_AVAILABLE:
 @pytest.fixture(params=AVAILABLE_PARSERS)
 def parser(request: pytest.FixtureRequest) -> str:
     """Fixture that runs tests with all available HTML parsers to ensure parser-agnostic behavior."""
-    return request.param
+    return str(request.param)
 
 
 @pytest.fixture
-def convert(parser: str) -> Callable[[str, ...], str]:
+def convert(parser: str) -> Callable[..., str]:
     """Fixture that provides a convert function using the current parser."""
 
     def _convert(html: str, **kwargs: Any) -> str:
