@@ -97,6 +97,27 @@ MEDIA_TAGS = frozenset(
     }
 )
 
+DEFAULT_NAVIGATION_CLASSES: frozenset[str] = frozenset(
+    {
+        "vector-header",
+        "vector-main-menu",
+        "vector-page-tools",
+        "vector-toc",
+        "mw-jump-link",
+        "mw-navigation",
+        "navbox",
+        "navigation-box",
+        "sidebar",
+        "nav",
+        "header",
+        "footer",
+        "menu",
+        "breadcrumb",
+        "topbar",
+        "toolbar",
+    }
+)
+
 
 def preprocess_html(
     html: str,
@@ -111,11 +132,12 @@ def preprocess_html(
     preserve_media: bool = True,
     custom_tags_to_remove: set[str] | None = None,
     custom_attributes_to_remove: set[str] | None = None,
+    navigation_classes: set[str] | None = None,
 ) -> str:
     if not html or not html.strip():  # pragma: no cover
         return html
 
-    html = _remove_class_based_navigation(html, remove_navigation)
+    html = _remove_class_based_navigation(html, remove_navigation, navigation_classes)
 
     nh3_config = _configure_cleaning_rules(
         remove_navigation=remove_navigation,
@@ -242,35 +264,28 @@ def _configure_cleaning_rules(
     }
 
 
-def _remove_class_based_navigation(html: str, remove_navigation: bool) -> str:
+def _remove_class_based_navigation(
+    html: str,
+    remove_navigation: bool,
+    navigation_classes: set[str] | None,
+) -> str:
     if not remove_navigation:
         return html
 
-    navigation_classes = [
-        r'vector-header[^"]*',
-        r'vector-main-menu[^"]*',
-        r'vector-page-tools[^"]*',
-        r'vector-toc[^"]*',
-        r'mw-jump-link[^"]*',
-        r'mw-navigation[^"]*',
-        r'navbox[^"]*',
-        r'navigation-box[^"]*',
-        r'sidebar[^"]*',
-        r'nav[^"]*',
-        r'header[^"]*',
-        r'footer[^"]*',
-        r'menu[^"]*',
-        r'breadcrumb[^"]*',
-        r'topbar[^"]*',
-        r'toolbar[^"]*',
-    ]
+    class_names = set()
+    if navigation_classes:
+        class_names.update(navigation_classes)
+    else:
+        class_names.update(DEFAULT_NAVIGATION_CLASSES)
 
-    for class_pattern in navigation_classes:
-        pattern = rf'<[^>]*class="[^"]*{class_pattern}[^"]*"[^>]*>.*?</[^>]*>'
-        html = re.sub(pattern, "", html, flags=re.DOTALL | re.IGNORECASE)
+    for class_name in class_names:
+        class_pattern = rf'{re.escape(class_name)}[^"]*'
 
-        pattern = rf'<[^>]*class="[^"]*{class_pattern}[^"]*"[^>]*/>'
-        html = re.sub(pattern, "", html, flags=re.IGNORECASE)
+        block_pattern = rf'<(?P<tag>[^>\s]+)[^>]*class="[^"]*{class_pattern}[^"]*"[^>]*>.*?</(?P=tag)>'
+        html = re.sub(block_pattern, "", html, flags=re.DOTALL | re.IGNORECASE)
+
+        self_closing_pattern = rf'<[^>]*class="[^"]*{class_pattern}[^"]*"[^>]*/>'
+        html = re.sub(self_closing_pattern, "", html, flags=re.IGNORECASE)
 
     return html
 
