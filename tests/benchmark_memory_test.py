@@ -9,16 +9,29 @@ if TYPE_CHECKING:
     from collections.abc import Generator
     from pathlib import Path
 
+import pytest
 
 from html_to_markdown import convert_to_markdown, convert_to_markdown_stream
+
+# Skip entire module if dependencies not available
+pytest_plugins = []
+
+try:
+    import psutil
+except ImportError:
+    pytest.skip("psutil not available", allow_module_level=True)
+
+try:
+    import memray  # type: ignore[import-untyped]
+
+    MEMRAY_AVAILABLE = True
+except ImportError:
+    MEMRAY_AVAILABLE = False
 
 try:
     from .performance_test import generate_complex_html
 except ImportError:
     from tests.performance_test import generate_complex_html
-
-import memray
-import psutil
 
 
 @contextmanager
@@ -145,6 +158,7 @@ class TestMemoryProfiling:
             )
 
 
+@pytest.mark.skipif(not MEMRAY_AVAILABLE, reason="memray not available on this platform")
 class TestMemrayProfiling:
     def test_memray_profile_conversion(self, tmp_path: Path) -> None:
         html = generate_complex_html(size_factor=50)
