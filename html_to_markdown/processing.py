@@ -314,11 +314,12 @@ def _process_text(
             if len(ancestor_names) > 10:
                 break
 
-    in_pre = bool(ancestor_names.intersection({"pre"}))
+    in_pre = bool(ancestor_names.intersection({"pre"})) or parent_name == "pre"
 
     text = whitespace_handler.process_text_whitespace(text, el, in_pre=in_pre)
 
-    if not ancestor_names.intersection({"pre", "code", "kbd", "samp"}):
+    code_like_tags = {"pre", "code", "kbd", "samp"}
+    if not (ancestor_names.intersection(code_like_tags) or parent_name in code_like_tags):
         text = escape(
             text=text,
             escape_misc=escape_misc,
@@ -617,7 +618,6 @@ def convert_to_markdown(
                         first_child.replace_with(new_text)
                         needs_leading_space_fix = False
 
-            # Fix html5lib whitespace handling to match other parsers
             if parser == "html5lib":
                 body = source.find("body")
                 if body and isinstance(body, Tag):
@@ -632,7 +632,6 @@ def convert_to_markdown(
                         first_child = children[0]
                         original_text = str(first_child)
 
-                        # Preserve leading whitespace from original if html5lib stripped it
                         leading_ws = ""
                         for char in original_source:
                             if char in " \t\n\r":
@@ -640,7 +639,6 @@ def convert_to_markdown(
                             else:
                                 break
 
-                        # Create normalized text: restore leading whitespace only
                         normalized_text = original_text
                         if leading_ws and not normalized_text.startswith(leading_ws):
                             normalized_text = leading_ws + normalized_text

@@ -11,45 +11,45 @@ if TYPE_CHECKING:
     from bs4.element import Tag
 
 
-def test_single_tag(convert: Callable[[str, ...], str]) -> None:
+def test_single_tag(convert: Callable[..., str]) -> None:
     assert convert("<span>Hello</span>") == "Hello"
 
 
-def test_soup(convert: Callable[[str, ...], str]) -> None:
+def test_soup(convert: Callable[..., str]) -> None:
     assert convert("<div><span>Hello</div></span>") == "Hello\n\n"
 
 
-def test_whitespace(convert: Callable[[str, ...], str]) -> None:
+def test_whitespace(convert: Callable[..., str]) -> None:
     assert convert(" a  b \t\t c ") == " a b c "
 
 
-def test_asterisks(convert: Callable[[str, ...], str]) -> None:
+def test_asterisks(convert: Callable[..., str]) -> None:
     assert convert("*hey*dude*") == r"\*hey\*dude\*"
     assert convert("*hey*dude*", escape_asterisks=False) == r"*hey*dude*"
 
 
-def test_underscore(convert: Callable[[str, ...], str]) -> None:
+def test_underscore(convert: Callable[..., str]) -> None:
     assert convert("_hey_dude_") == r"\_hey\_dude\_"
     assert convert("_hey_dude_", escape_underscores=False) == r"_hey_dude_"
 
 
-def test_xml_entities(convert: Callable[[str, ...], str]) -> None:
+def test_xml_entities(convert: Callable[..., str]) -> None:
     assert convert("&amp;") == r"\&"
 
 
-def test_named_entities(convert: Callable[[str, ...], str]) -> None:
+def test_named_entities(convert: Callable[..., str]) -> None:
     assert convert("&raquo;") == "\xbb"
 
 
-def test_hexadecimal_entities(convert: Callable[[str, ...], str]) -> None:
+def test_hexadecimal_entities(convert: Callable[..., str]) -> None:
     assert convert("&#x27;") == "\x27"
 
 
-def test_single_escaping_entities(convert: Callable[[str, ...], str]) -> None:
+def test_single_escaping_entities(convert: Callable[..., str]) -> None:
     assert convert("&amp;amp;") == r"\&amp;"
 
 
-def test_misc(convert: Callable[[str, ...], str]) -> None:
+def test_misc(convert: Callable[..., str]) -> None:
     assert convert("\\*") == r"\\\*"
     assert convert("<foo>") == ""
     assert convert("# foo") == r"\# foo"
@@ -79,22 +79,22 @@ def test_chomp() -> None:
     assert convert_to_markdown(" <b>  s  </b> ") == " **s** "
 
 
-def test_nested(convert: Callable[[str, ...], str]) -> None:
+def test_nested(convert: Callable[..., str]) -> None:
     text = convert('<p>This is an <a href="http://example.com/">example link</a>.</p>')
     assert text == "This is an [example link](http://example.com/).\n\n"
 
 
-def test_ignore_comments(convert: Callable[[str, ...], str]) -> None:
+def test_ignore_comments(convert: Callable[..., str]) -> None:
     text = convert("<!-- This is a comment -->")
     assert text == ""
 
 
-def test_ignore_comments_with_other_tags(convert: Callable[[str, ...], str]) -> None:
+def test_ignore_comments_with_other_tags(convert: Callable[..., str]) -> None:
     text = convert("<!-- This is a comment --><a href='http://example.com/'>example link</a>")
     assert text == "[example link](http://example.com/)"
 
 
-def test_code_with_tricky_content(convert: Callable[[str, ...], str]) -> None:
+def test_code_with_tricky_content(convert: Callable[..., str]) -> None:
     assert convert("<code>></code>") == "`>`"
     assert convert("<code>/home/</code><b>username</b>") == "`/home/`**username**"
     assert (
@@ -103,33 +103,33 @@ def test_code_with_tricky_content(convert: Callable[[str, ...], str]) -> None:
     )
 
 
-def test_special_tags(convert: Callable[[str, ...], str]) -> None:
+def test_special_tags(convert: Callable[..., str]) -> None:
     assert convert("<!DOCTYPE html>") == ""
 
     assert convert("<![CDATA[foobar]]>") == ""
 
 
-def test_strip(convert: Callable[[str, ...], str]) -> None:
+def test_strip(convert: Callable[..., str]) -> None:
     text = convert('<a href="https://github.com/matthewwithanm">Some Text</a>', strip=["a"])
     assert text == "Some Text"
 
 
-def test_do_not_strip(convert: Callable[[str, ...], str]) -> None:
+def test_do_not_strip(convert: Callable[..., str]) -> None:
     text = convert('<a href="https://github.com/matthewwithanm">Some Text</a>', strip=[])
     assert text == "[Some Text](https://github.com/matthewwithanm)"
 
 
-def test_convert(convert: Callable[[str, ...], str]) -> None:
+def test_convert(convert: Callable[..., str]) -> None:
     text = convert('<a href="https://github.com/matthewwithanm">Some Text</a>', convert=["a"])
     assert text == "[Some Text](https://github.com/matthewwithanm)"
 
 
-def test_do_not_convert(convert: Callable[[str, ...], str]) -> None:
+def test_do_not_convert(convert: Callable[..., str]) -> None:
     text = convert('<a href="https://github.com/matthewwithanm">Some Text</a>', convert=[])
     assert text == "Some Text"
 
 
-def test_ol(convert: Callable[[str, ...], str]) -> None:
+def test_ol(convert: Callable[..., str]) -> None:
     assert convert("<ol><li>a</li><li>b</li></ol>") == "1. a\n2. b\n"
     assert convert('<ol start="3"><li>a</li><li>b</li></ol>') == "3. a\n4. b\n"
     assert convert('<ol start="-1"><li>a</li><li>b</li></ol>') == "1. a\n2. b\n"
@@ -137,14 +137,14 @@ def test_ol(convert: Callable[[str, ...], str]) -> None:
     assert convert('<ol start="1.5"><li>a</li><li>b</li></ol>') == "1. a\n2. b\n"
 
 
-def test_nested_ols(nested_ols: str, convert: Callable[[str, ...], str]) -> None:
+def test_nested_ols(nested_ols: str, convert: Callable[..., str]) -> None:
     assert (
         convert(nested_ols)
         == "1. 1\n\n    1. a\n            1. I\n                2. II\n                3. III\n        2. b\n        3. c\n2. 2\n3. 3\n\n"
     )
 
 
-def test_ul(convert: Callable[[str, ...], str]) -> None:
+def test_ul(convert: Callable[..., str]) -> None:
     assert convert("<ul><li>a</li><li>b</li></ul>") == "* a\n* b\n"
     assert (
         convert(
@@ -161,25 +161,25 @@ def test_ul(convert: Callable[[str, ...], str]) -> None:
     )
 
 
-def test_inline_ul(convert: Callable[[str, ...], str]) -> None:
+def test_inline_ul(convert: Callable[..., str]) -> None:
     assert convert("<p>foo</p><ul><li>a</li><li>b</li></ul><p>bar</p>") == "foo\n\n* a\n* b\n\nbar\n\n"
 
 
-def test_nested_uls(nested_uls: str, convert: Callable[[str, ...], str]) -> None:
+def test_nested_uls(nested_uls: str, convert: Callable[..., str]) -> None:
     assert (
         convert(nested_uls)
         == "* 1\n\n    + a\n            - I\n                - II\n                - III\n        + b\n        + c\n* 2\n* 3\n\n"
     )
 
 
-def test_bullets(nested_uls: str, convert: Callable[[str, ...], str]) -> None:
+def test_bullets(nested_uls: str, convert: Callable[..., str]) -> None:
     assert (
         convert(nested_uls, bullets="-")
         == "- 1\n\n    - a\n            - I\n                - II\n                - III\n        - b\n        - c\n- 2\n- 3\n\n"
     )
 
 
-def test_li_text(convert: Callable[[str, ...], str]) -> None:
+def test_li_text(convert: Callable[..., str]) -> None:
     assert (
         convert('<ul><li>foo <a href="#">bar</a></li><li>foo bar  </li><li>foo <b>bar</b>   <i>space</i>.</ul>')
         == "* foo [bar](#)\n* foo bar\n* foo **bar** *space*.\n"
@@ -200,7 +200,7 @@ def test_table(
     table_with_caption: str,
     table_with_colspan: str,
     table_with_undefined_colspan: str,
-    convert: Callable[[str, ...], str],
+    convert: Callable[..., str],
 ) -> None:
     assert (
         convert(table)
@@ -250,7 +250,7 @@ def test_table(
     assert convert(table_with_undefined_colspan) == "\n\n| Name | Age |\n| --- | --- |\n| Jill | Smith |\n\n"
 
 
-def inline_tests(tag: str, markup: str, convert: Callable[[str, ...], str]) -> None:
+def inline_tests(tag: str, markup: str, convert: Callable[..., str]) -> None:
     assert convert(f"<{tag}>Hello</{tag}>") == f"{markup}Hello{markup}"
     assert convert(f"foo <{tag}>Hello</{tag}> bar") == f"foo {markup}Hello{markup} bar"
     assert convert(f"foo<{tag}> Hello</{tag}> bar") == f"foo {markup}Hello{markup} bar"
@@ -261,7 +261,7 @@ def inline_tests(tag: str, markup: str, convert: Callable[[str, ...], str]) -> N
     ]
 
 
-def test_a(convert: Callable[[str, ...], str]) -> None:
+def test_a(convert: Callable[..., str]) -> None:
     assert convert('<a href="https://google.com">Google</a>') == "[Google](https://google.com)"
     assert convert('<a href="https://google.com">https://google.com</a>') == "<https://google.com>"
     assert (
@@ -277,14 +277,14 @@ def test_a(convert: Callable[[str, ...], str]) -> None:
     )
 
 
-def test_a_spaces(convert: Callable[[str, ...], str]) -> None:
+def test_a_spaces(convert: Callable[..., str]) -> None:
     assert convert('foo <a href="http://google.com">Google</a> bar') == "foo [Google](http://google.com) bar"
     assert convert('foo<a href="http://google.com"> Google</a> bar') == "foo [Google](http://google.com) bar"
     assert convert('foo <a href="http://google.com">Google </a>bar') == "foo [Google](http://google.com) bar"
     assert convert('foo <a href="http://google.com"></a> bar') == "foo  bar"
 
 
-def test_a_with_title(convert: Callable[[str, ...], str]) -> None:
+def test_a_with_title(convert: Callable[..., str]) -> None:
     text = convert('<a href="http://google.com" title="The &quot;Goog&quot;">Google</a>')
     assert text == r'[Google](http://google.com "The \"Goog\"")'
     assert (
@@ -293,54 +293,54 @@ def test_a_with_title(convert: Callable[[str, ...], str]) -> None:
     )
 
 
-def test_a_shortcut(convert: Callable[[str, ...], str]) -> None:
+def test_a_shortcut(convert: Callable[..., str]) -> None:
     text = convert('<a href="http://google.com">http://google.com</a>')
     assert text == "<http://google.com>"
 
 
-def test_a_no_autolinks(convert: Callable[[str, ...], str]) -> None:
+def test_a_no_autolinks(convert: Callable[..., str]) -> None:
     assert (
         convert('<a href="https://google.com">https://google.com</a>', autolinks=False)
         == "[https://google.com](https://google.com)"
     )
 
 
-def test_b(convert: Callable[[str, ...], str]) -> None:
+def test_b(convert: Callable[..., str]) -> None:
     assert convert("<b>Hello</b>") == "**Hello**"
 
 
-def test_b_spaces(convert: Callable[[str, ...], str]) -> None:
+def test_b_spaces(convert: Callable[..., str]) -> None:
     assert convert("foo <b>Hello</b> bar") == "foo **Hello** bar"
     assert convert("foo<b> Hello</b> bar") == "foo **Hello** bar"
     assert convert("foo <b>Hello </b>bar") == "foo **Hello** bar"
     assert convert("foo <b></b> bar") == "foo  bar"
 
 
-def test_blockquote(convert: Callable[[str, ...], str]) -> None:
+def test_blockquote(convert: Callable[..., str]) -> None:
     assert convert("<blockquote>Hello</blockquote>") == "\n> Hello\n\n"
     assert convert("<blockquote>\nHello\n</blockquote>") == "\n> Hello\n\n"
 
 
-def test_blockquote_with_nested_paragraph(convert: Callable[[str, ...], str]) -> None:
+def test_blockquote_with_nested_paragraph(convert: Callable[..., str]) -> None:
     assert convert("<blockquote><p>Hello</p></blockquote>") == "\n> Hello\n\n"
     assert convert("<blockquote><p>Hello</p><p>Hello again</p></blockquote>") == "\n> Hello\n> \n> Hello again\n\n"
 
 
-def test_blockquote_with_paragraph(convert: Callable[[str, ...], str]) -> None:
+def test_blockquote_with_paragraph(convert: Callable[..., str]) -> None:
     assert convert("<blockquote>Hello</blockquote><p>handsome</p>") == "\n> Hello\n\nhandsome\n\n"
 
 
-def test_blockquote_nested(convert: Callable[[str, ...], str]) -> None:
+def test_blockquote_nested(convert: Callable[..., str]) -> None:
     text = convert("<blockquote>And she was like <blockquote>Hello</blockquote></blockquote>")
     assert text == "\n> And she was like \n> \n> \n> > Hello\n\n"
 
 
-def test_br(convert: Callable[[str, ...], str]) -> None:
+def test_br(convert: Callable[..., str]) -> None:
     assert convert("a<br />b<br />c") == "a  \nb  \nc"
     assert convert("a<br />b<br />c", newline_style=BACKSLASH) == "a\\\nb\\\nc"
 
 
-def test_caption(convert: Callable[[str, ...], str]) -> None:
+def test_caption(convert: Callable[..., str]) -> None:
     assert (
         convert("TEXT<figure><figcaption>Caption</figcaption><span>SPAN</span></figure>")
         == "TEXT\n\n*Caption*\n\nSPAN\n\n"
@@ -350,12 +350,15 @@ def test_caption(convert: Callable[[str, ...], str]) -> None:
     )
 
 
-def test_code(convert: Callable[[str, ...], str]) -> None:
+def test_code(convert: Callable[..., str]) -> None:
     inline_tests("code", "`", convert)
     assert convert("<code>*this_should_not_escape*</code>") == "`*this_should_not_escape*`"
     assert convert("<kbd>*this_should_not_escape*</kbd>") == "`*this_should_not_escape*`"
     assert convert("<samp>*this_should_not_escape*</samp>") == "`*this_should_not_escape*`"
     assert convert("<code><span>*this_should_not_escape*</span></code>") == "`*this_should_not_escape*`"
+    assert convert("<div><code>code_with_underscores</code></div>") == "`code_with_underscores`\n\n"
+    assert convert("<span><code>*asterisks* and _underscores_</code></span>") == "`*asterisks* and _underscores_`"
+    assert convert("<p><code>foo_bar_baz</code></p>") == "`foo_bar_baz`\n\n"
     assert convert("<code>this  should\t\tnormalize</code>") == "`this should normalize`"
     assert convert("<code><span>this  should\t\tnormalize</span></code>") == "`this should normalize`"
     assert convert("<code>foo<b>bar</b>baz</code>") == "`foobarbaz`"
@@ -370,19 +373,19 @@ def test_code(convert: Callable[[str, ...], str]) -> None:
     assert convert("<code>foo<sub>bar</sub>baz</code>") == "`foobarbaz`"
 
 
-def test_del(convert: Callable[[str, ...], str]) -> None:
+def test_del(convert: Callable[..., str]) -> None:
     inline_tests("del", "~~", convert)
 
 
-def test_div(convert: Callable[[str, ...], str]) -> None:
+def test_div(convert: Callable[..., str]) -> None:
     assert convert("Hello</div> World") == "Hello World"
 
 
-def test_em(convert: Callable[[str, ...], str]) -> None:
+def test_em(convert: Callable[..., str]) -> None:
     inline_tests("em", "*", convert)
 
 
-def test_header_with_space(convert: Callable[[str, ...], str]) -> None:
+def test_header_with_space(convert: Callable[..., str]) -> None:
     assert convert("<h3>\n\nHello</h3>") == "### Hello\n\n"
     assert convert("<h4>\n\nHello</h4>") == "#### Hello\n\n"
     assert convert("<h5>\n\nHello</h5>") == "##### Hello\n\n"
@@ -390,22 +393,22 @@ def test_header_with_space(convert: Callable[[str, ...], str]) -> None:
     assert convert("<h5>\n\nHello   \n\n</h5>") == "##### Hello\n\n"
 
 
-def test_h1(convert: Callable[[str, ...], str]) -> None:
+def test_h1(convert: Callable[..., str]) -> None:
     assert convert("<h1>Hello</h1>") == "Hello\n=====\n\n"
 
 
-def test_h2(convert: Callable[[str, ...], str]) -> None:
+def test_h2(convert: Callable[..., str]) -> None:
     assert convert("<h2>Hello</h2>") == "Hello\n-----\n\n"
 
 
-def test_hn(convert: Callable[[str, ...], str]) -> None:
+def test_hn(convert: Callable[..., str]) -> None:
     assert convert("<h3>Hello</h3>") == "### Hello\n\n"
     assert convert("<h4>Hello</h4>") == "#### Hello\n\n"
     assert convert("<h5>Hello</h5>") == "##### Hello\n\n"
     assert convert("<h6>Hello</h6>") == "###### Hello\n\n"
 
 
-def test_hn_chained(convert: Callable[[str, ...], str]) -> None:
+def test_hn_chained(convert: Callable[..., str]) -> None:
     assert (
         convert("<h1>First</h1>\n<h2>Second</h2>\n<h3>Third</h3>", heading_style=ATX)
         == "# First\n\n## Second\n\n### Third\n\n"
@@ -413,7 +416,7 @@ def test_hn_chained(convert: Callable[[str, ...], str]) -> None:
     assert convert("X<h1>First</h1>", heading_style=ATX) == "X\n\n# First\n\n"
 
 
-def test_hn_nested_tag_heading_style(convert: Callable[[str, ...], str]) -> None:
+def test_hn_nested_tag_heading_style(convert: Callable[..., str]) -> None:
     result = convert("<h1>A <p>P</p> C </h1>", heading_style=ATX_CLOSED)
     assert result in ["# A P C #\n\n", "# A #\n\nP\n\n C "]
 
@@ -421,7 +424,7 @@ def test_hn_nested_tag_heading_style(convert: Callable[[str, ...], str]) -> None
     assert result2 in ["# A P C\n\n", "# A\n\nP\n\n C "]
 
 
-def test_hn_eol(convert: Callable[[str, ...], str]) -> None:
+def test_hn_eol(convert: Callable[..., str]) -> None:
     assert convert("<p>xxx</p><h3>Hello</h3>", heading_style=ATX) == "xxx\n\n### Hello\n\n"
 
     assert convert("\n<h3>Hello</h3>", heading_style=ATX) == "### Hello\n\n"
@@ -430,7 +433,7 @@ def test_hn_eol(convert: Callable[[str, ...], str]) -> None:
     assert convert("xxx<h3>Hello</h3>", heading_style=ATX) == "xxx\n\n### Hello\n\n"
 
 
-def test_hn_nested_simple_tag(convert: Callable[[str, ...], str]) -> None:
+def test_hn_nested_simple_tag(convert: Callable[..., str]) -> None:
     inline_tag_to_markdown = [
         ("strong", "**strong**"),
         ("b", "**b**"),
@@ -450,7 +453,7 @@ def test_hn_nested_simple_tag(convert: Callable[[str, ...], str]) -> None:
     assert convert("<h3>A <br>B</h3>", heading_style=ATX) == "### A  B\n\n"
 
 
-def test_hn_nested_img(convert: Callable[[str, ...], str]) -> None:
+def test_hn_nested_img(convert: Callable[..., str]) -> None:
     image_attributes_to_markdown = [
         ("", "", ""),
         ("alt='Alt Text'", "Alt Text", ""),
@@ -470,31 +473,31 @@ def test_hn_nested_img(convert: Callable[[str, ...], str]) -> None:
         )
 
 
-def test_hn_atx_headings(convert: Callable[[str, ...], str]) -> None:
+def test_hn_atx_headings(convert: Callable[..., str]) -> None:
     assert convert("<h1>Hello</h1>", heading_style=ATX) == "# Hello\n\n"
     assert convert("<h2>Hello</h2>", heading_style=ATX) == "## Hello\n\n"
 
 
-def test_hn_atx_closed_headings(convert: Callable[[str, ...], str]) -> None:
+def test_hn_atx_closed_headings(convert: Callable[..., str]) -> None:
     assert convert("<h1>Hello</h1>", heading_style=ATX_CLOSED) == "# Hello #\n\n"
     assert convert("<h2>Hello</h2>", heading_style=ATX_CLOSED) == "## Hello ##\n\n"
 
 
-def test_head(convert: Callable[[str, ...], str]) -> None:
+def test_head(convert: Callable[..., str]) -> None:
     assert convert("<head>head</head>") == "head"
 
 
-def test_hr(convert: Callable[[str, ...], str]) -> None:
+def test_hr(convert: Callable[..., str]) -> None:
     assert convert("Hello<hr>World") == "Hello\n\n---\n\nWorld"
     assert convert("Hello<hr />World") == "Hello\n\n---\n\nWorld"
     assert convert("<p>Hello</p>\n<hr>\n<p>World</p>") == "Hello\n\n---\n\nWorld\n\n"
 
 
-def test_i(convert: Callable[[str, ...], str]) -> None:
+def test_i(convert: Callable[..., str]) -> None:
     assert convert("<i>Hello</i>") == "*Hello*"
 
 
-def test_img(convert: Callable[[str, ...], str]) -> None:
+def test_img(convert: Callable[..., str]) -> None:
     assert (
         convert('<img src="/path/to/img.jpg" alt="Alt text" title="Optional title" />')
         == '![Alt text](/path/to/img.jpg "Optional title")'
@@ -506,11 +509,11 @@ def test_img(convert: Callable[[str, ...], str]) -> None:
     )
 
 
-def test_kbd(convert: Callable[[str, ...], str]) -> None:
+def test_kbd(convert: Callable[..., str]) -> None:
     inline_tests("kbd", "`", convert)
 
 
-def test_p(convert: Callable[[str, ...], str]) -> None:
+def test_p(convert: Callable[..., str]) -> None:
     assert convert("<p>hello</p>") == "hello\n\n"
     assert convert("<p>123456789 123456789</p>") == "123456789 123456789\n\n"
     assert convert("<p>123456789 123456789</p>", wrap=True, wrap_width=10) == "123456789\n123456789\n\n"
@@ -534,13 +537,13 @@ def test_p(convert: Callable[[str, ...], str]) -> None:
     )
 
 
-def test_mark_tag(convert: Callable[[str, ...], str]) -> None:
+def test_mark_tag(convert: Callable[..., str]) -> None:
     html = "<mark>highlighted</mark>"
     expected = "==highlighted=="
     assert convert(html).strip() == expected
 
 
-def test_mark_tag_with_different_styles(convert: Callable[[str, ...], str]) -> None:
+def test_mark_tag_with_different_styles(convert: Callable[..., str]) -> None:
     html = "<mark>highlighted</mark>"
 
     assert convert(html, highlight_style="double-equal").strip() == "==highlighted=="
@@ -550,13 +553,13 @@ def test_mark_tag_with_different_styles(convert: Callable[[str, ...], str]) -> N
     assert convert(html, highlight_style="html").strip() == "<mark>highlighted</mark>"
 
 
-def test_mark_tag_in_paragraph(convert: Callable[[str, ...], str]) -> None:
+def test_mark_tag_in_paragraph(convert: Callable[..., str]) -> None:
     html = "<p>This is <mark>highlighted text</mark> in a paragraph.</p>"
     expected = "This is ==highlighted text== in a paragraph.\n\n"
     assert convert(html) == expected
 
 
-def test_mark_tag_with_nested_formatting(convert: Callable[[str, ...], str]) -> None:
+def test_mark_tag_with_nested_formatting(convert: Callable[..., str]) -> None:
     html = "<mark>This is <strong>bold highlighted</strong> text</mark>"
     expected = "==This is **bold highlighted** text=="
     assert convert(html).strip() == expected
@@ -566,25 +569,25 @@ def test_mark_tag_with_nested_formatting(convert: Callable[[str, ...], str]) -> 
     assert convert(html).strip() == expected
 
 
-def test_multiple_mark_tags(convert: Callable[[str, ...], str]) -> None:
+def test_multiple_mark_tags(convert: Callable[..., str]) -> None:
     html = "<p>First <mark>highlight</mark> and second <mark>highlight</mark>.</p>"
     expected = "First ==highlight== and second ==highlight==.\n\n"
     assert convert(html) == expected
 
 
-def test_nested_mark_tags(convert: Callable[[str, ...], str]) -> None:
+def test_nested_mark_tags(convert: Callable[..., str]) -> None:
     html = "<mark>Outer <mark>nested</mark> mark</mark>"
     expected = "==Outer ==nested== mark=="
     assert convert(html).strip() == expected
 
 
-def test_mark_tag_as_inline(convert: Callable[[str, ...], str]) -> None:
+def test_mark_tag_as_inline(convert: Callable[..., str]) -> None:
     html = "<mark>highlighted</mark>"
     expected = "highlighted"
     assert convert(html, convert_as_inline=True).strip() == expected
 
 
-def test_mark_tag_with_complex_content(convert: Callable[[str, ...], str]) -> None:
+def test_mark_tag_with_complex_content(convert: Callable[..., str]) -> None:
     html = """
     <div>
         <h2>Title</h2>
@@ -600,11 +603,16 @@ def test_mark_tag_with_complex_content(convert: Callable[[str, ...], str]) -> No
     assert "==highlighted item text==" in result
 
 
-def test_pre(convert: Callable[[str, ...], str]) -> None:
+def test_pre(convert: Callable[..., str]) -> None:
     assert convert("<pre>test\n    foo\nbar</pre>") == "\n```\ntest\n    foo\nbar\n```\n"
     assert convert("<pre><code>test\n    foo\nbar</code></pre>") == "\n```\ntest\n    foo\nbar\n```\n"
     assert convert("<pre>*this_should_not_escape*</pre>") == "\n```\n*this_should_not_escape*\n```\n"
     assert convert("<pre><span>*this_should_not_escape*</span></pre>") == "\n```\n*this_should_not_escape*\n```\n"
+    assert convert("<div><pre>code_with_underscores</pre></div>") == "```\ncode_with_underscores\n```\n\n"
+    assert (
+        convert("<div><pre>*asterisks* and _underscores_</pre></div>") == "```\n*asterisks* and _underscores_\n```\n\n"
+    )
+    assert convert("<section><pre>foo_bar_baz</pre></section>") == "\n```\nfoo_bar_baz\n```\n\n"
     assert (
         convert("<pre>\t\tthis  should\t\tnot  normalize</pre>") == "\n```\n\t\tthis  should\t\tnot  normalize\n```\n"
     )
@@ -625,46 +633,46 @@ def test_pre(convert: Callable[[str, ...], str]) -> None:
     assert convert("<pre>foo<sub>\nbar\n</sub>baz</pre>", sub_symbol="^") == "\n```\nfoo\nbar\nbaz\n```\n"
 
 
-def test_script(convert: Callable[[str, ...], str]) -> None:
+def test_script(convert: Callable[..., str]) -> None:
     assert convert("foo <script>var foo=42;</script> bar") == "foo  bar"
 
 
-def test_style(convert: Callable[[str, ...], str]) -> None:
+def test_style(convert: Callable[..., str]) -> None:
     assert convert("foo <style>h1 { font-size: larger }</style> bar") == "foo  bar"
 
 
-def test_s(convert: Callable[[str, ...], str]) -> None:
+def test_s(convert: Callable[..., str]) -> None:
     inline_tests("s", "~~", convert)
 
 
-def test_samp(convert: Callable[[str, ...], str]) -> None:
+def test_samp(convert: Callable[..., str]) -> None:
     inline_tests("samp", "`", convert)
 
 
-def test_strong(convert: Callable[[str, ...], str]) -> None:
+def test_strong(convert: Callable[..., str]) -> None:
     assert convert("<strong>Hello</strong>") == "**Hello**"
 
 
-def test_strong_em_symbol(convert: Callable[[str, ...], str]) -> None:
+def test_strong_em_symbol(convert: Callable[..., str]) -> None:
     assert convert("<strong>Hello</strong>", strong_em_symbol=UNDERSCORE) == "__Hello__"
     assert convert("<b>Hello</b>", strong_em_symbol=UNDERSCORE) == "__Hello__"
     assert convert("<em>Hello</em>", strong_em_symbol=UNDERSCORE) == "_Hello_"
     assert convert("<i>Hello</i>", strong_em_symbol=UNDERSCORE) == "_Hello_"
 
 
-def test_sub(convert: Callable[[str, ...], str]) -> None:
+def test_sub(convert: Callable[..., str]) -> None:
     assert convert("<sub>foo</sub>") == "foo"
     assert convert("<sub>foo</sub>", sub_symbol="~") == "~foo~"
     assert convert("<sub>foo</sub>", sub_symbol="<sub>") == "<sub>foo</sub>"
 
 
-def test_sup(convert: Callable[[str, ...], str]) -> None:
+def test_sup(convert: Callable[..., str]) -> None:
     assert convert("<sup>foo</sup>") == "foo"
     assert convert("<sup>foo</sup>", sup_symbol="^") == "^foo^"
     assert convert("<sup>foo</sup>", sup_symbol="<sup>") == "<sup>foo</sup>"
 
 
-def test_lang(convert: Callable[[str, ...], str]) -> None:
+def test_lang(convert: Callable[..., str]) -> None:
     assert convert("<pre>test\n    foo\nbar</pre>", code_language="python") == "\n```python\ntest\n    foo\nbar\n```\n"
     assert (
         convert("<pre><code>test\n    foo\nbar</code></pre>", code_language="javascript")
@@ -672,7 +680,7 @@ def test_lang(convert: Callable[[str, ...], str]) -> None:
     )
 
 
-def test_lang_callback(convert: Callable[[str, ...], str]) -> None:
+def test_lang_callback(convert: Callable[..., str]) -> None:
     def callback(el: Tag) -> str | None:
         return el["class"][0] if el.has_attr("class") else None
 
@@ -699,13 +707,13 @@ def test_lang_callback(convert: Callable[[str, ...], str]) -> None:
     )
 
 
-def test_idempotence(convert: Callable[[str, ...], str]) -> None:
+def test_idempotence(convert: Callable[..., str]) -> None:
     html_text = "<h2>Header&nbsp;</h2><p>Next paragraph.</p>"
     converted = convert(html_text)
     assert converted == convert(converted)
 
 
-def test_character_encoding(convert: Callable[[str, ...], str]) -> None:
+def test_character_encoding(convert: Callable[..., str]) -> None:
     html_with_encoding_issue = (
         "<cite>api_key=”your-api-key”</cite> or by defining <cite>GOOGLE_API_KEY=”your-api-key”</cite> as an"
     )

@@ -9,7 +9,6 @@ if TYPE_CHECKING:
     from collections.abc import Generator
     from pathlib import Path
 
-import pytest
 
 from html_to_markdown import convert_to_markdown, convert_to_markdown_stream
 
@@ -18,19 +17,8 @@ try:
 except ImportError:
     from tests.performance_test import generate_complex_html
 
-try:
-    import memray
-
-    MEMRAY_AVAILABLE = True
-except ImportError:
-    MEMRAY_AVAILABLE = False
-
-try:
-    import psutil
-
-    PSUTIL_AVAILABLE = True
-except ImportError:
-    PSUTIL_AVAILABLE = False
+import memray
+import psutil
 
 
 @contextmanager
@@ -41,10 +29,8 @@ def memory_snapshot() -> Generator[dict[str, Any], None, None]:
     snapshot_before = tracemalloc.take_snapshot()
     initial_stats = snapshot_before.statistics("lineno")
 
-    process_info = {}
-    if PSUTIL_AVAILABLE:
-        process = psutil.Process()
-        process_info["rss_before"] = process.memory_info().rss
+    process = psutil.Process()
+    process_info = {"rss_before": process.memory_info().rss}
 
     memory_data = {
         "tracemalloc_before": initial_stats,
@@ -61,10 +47,9 @@ def memory_snapshot() -> Generator[dict[str, Any], None, None]:
         snapshot_after = tracemalloc.take_snapshot()
         final_stats = snapshot_after.statistics("lineno")
 
-        if PSUTIL_AVAILABLE:
-            process = psutil.Process()
-            memory_data["process_after"] = {"rss_after": process.memory_info().rss}
-            memory_data["peak_memory"] = process.memory_info().rss
+        process = psutil.Process()
+        memory_data["process_after"] = {"rss_after": process.memory_info().rss}
+        memory_data["peak_memory"] = process.memory_info().rss
 
         memory_data["tracemalloc_after"] = final_stats
 
@@ -86,12 +71,11 @@ class TestMemoryProfiling:
 
         assert len(result) > 0
 
-        if PSUTIL_AVAILABLE and memory_data["process_after"]:
-            memory_used_mb = (
-                (memory_data["process_after"]["rss_after"] - memory_data["process_before"]["rss_before"]) / 1024 / 1024
-            )
+        memory_used_mb = (
+            (memory_data["process_after"]["rss_after"] - memory_data["process_before"]["rss_before"]) / 1024 / 1024
+        )
 
-            assert memory_used_mb < 50, f"Small document used {memory_used_mb:.2f}MB"
+        assert memory_used_mb < 50, f"Small document used {memory_used_mb:.2f}MB"
 
     def test_memory_baseline_large(self) -> None:
         html = generate_complex_html(size_factor=100)
@@ -101,12 +85,11 @@ class TestMemoryProfiling:
 
         assert len(result) > 0
 
-        if PSUTIL_AVAILABLE and memory_data["process_after"]:
-            memory_used_mb = (
-                (memory_data["process_after"]["rss_after"] - memory_data["process_before"]["rss_before"]) / 1024 / 1024
-            )
+        memory_used_mb = (
+            (memory_data["process_after"]["rss_after"] - memory_data["process_before"]["rss_before"]) / 1024 / 1024
+        )
 
-            assert memory_used_mb < 200, f"Large document used {memory_used_mb:.2f}MB"
+        assert memory_used_mb < 200, f"Large document used {memory_used_mb:.2f}MB"
 
     def test_memory_streaming_efficiency(self) -> None:
         html = generate_complex_html(size_factor=100)
@@ -119,22 +102,21 @@ class TestMemoryProfiling:
 
         assert result_regular == result_streaming
 
-        if PSUTIL_AVAILABLE:
-            regular_mb = (
-                (regular_memory["process_after"]["rss_after"] - regular_memory["process_before"]["rss_before"])
-                / 1024
-                / 1024
-            )
+        regular_mb = (
+            (regular_memory["process_after"]["rss_after"] - regular_memory["process_before"]["rss_before"])
+            / 1024
+            / 1024
+        )
 
-            streaming_mb = (
-                (streaming_memory["process_after"]["rss_after"] - streaming_memory["process_before"]["rss_before"])
-                / 1024
-                / 1024
-            )
+        streaming_mb = (
+            (streaming_memory["process_after"]["rss_after"] - streaming_memory["process_before"]["rss_before"])
+            / 1024
+            / 1024
+        )
 
-            assert streaming_mb <= regular_mb * 1.1, (
-                f"Streaming used more memory: {streaming_mb:.2f}MB vs {regular_mb:.2f}MB"
-            )
+        assert streaming_mb <= regular_mb * 1.1, (
+            f"Streaming used more memory: {streaming_mb:.2f}MB vs {regular_mb:.2f}MB"
+        )
 
     def test_memory_leak_detection(self) -> None:
         html = generate_complex_html(size_factor=20)
@@ -142,9 +124,8 @@ class TestMemoryProfiling:
         memory_usage = []
 
         for _i in range(5):
-            if PSUTIL_AVAILABLE:
-                process = psutil.Process()
-                _memory_before = process.memory_info().rss
+            process = psutil.Process()
+            _memory_before = process.memory_info().rss
 
             for _ in range(10):
                 result = convert_to_markdown(html)
@@ -152,11 +133,10 @@ class TestMemoryProfiling:
 
             gc.collect()
 
-            if PSUTIL_AVAILABLE:
-                memory_after = process.memory_info().rss
-                memory_usage.append(memory_after)
+            memory_after = process.memory_info().rss
+            memory_usage.append(memory_after)
 
-        if PSUTIL_AVAILABLE and len(memory_usage) >= 3:
+        if len(memory_usage) >= 3:
             growth_rate = (memory_usage[-1] - memory_usage[0]) / len(memory_usage)
             max_acceptable_growth = 1024 * 1024
 
@@ -165,7 +145,6 @@ class TestMemoryProfiling:
             )
 
 
-@pytest.mark.skipif(not MEMRAY_AVAILABLE, reason="memray not installed")
 class TestMemrayProfiling:
     def test_memray_profile_conversion(self, tmp_path: Path) -> None:
         html = generate_complex_html(size_factor=50)
@@ -203,16 +182,15 @@ def run_memory_analysis() -> None:
         with memory_snapshot() as memory_data:
             result = convert_to_markdown(html)
 
-        if PSUTIL_AVAILABLE and memory_data["process_after"]:
-            memory_used_mb = (
-                (memory_data["process_after"]["rss_after"] - memory_data["process_before"]["rss_before"]) / 1024 / 1024
-            )
+        memory_used_mb = (
+            (memory_data["process_after"]["rss_after"] - memory_data["process_before"]["rss_before"]) / 1024 / 1024
+        )
 
-            efficiency = len(result) / (memory_used_mb * 1024 * 1024) if memory_used_mb > 0 else float("inf")
+        efficiency = len(result) / (memory_used_mb * 1024 * 1024) if memory_used_mb > 0 else float("inf")
 
-            print(f"   Memory used: {memory_used_mb:.2f}MB")
-            print(f"   Output size: {len(result) / 1024:.2f}KB")
-            print(f"   Efficiency: {efficiency:.2f} chars/byte")
+        print(f"   Memory used: {memory_used_mb:.2f}MB")
+        print(f"   Output size: {len(result) / 1024:.2f}KB")
+        print(f"   Efficiency: {efficiency:.2f} chars/byte")
 
         if memory_data["allocations_diff"]:
             print("   Top allocations:")
