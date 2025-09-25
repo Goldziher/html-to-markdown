@@ -587,6 +587,7 @@ The `markdownify` function is an alias for `convert_to_markdown` and provides id
 - `preprocessing_preset` (str, default: `'standard'`): Preprocessing aggressiveness (`'minimal'` for basic cleaning, `'standard'` for balanced, `'aggressive'` for heavy cleaning)
 - `remove_forms` (bool, default: `True`): Remove form elements during preprocessing
 - `remove_navigation` (bool, default: `True`): Remove navigation elements during preprocessing
+- `navigation_classes` (set[str], default: `None`): Custom CSS class names fragments to remove during navigation cleanup. If not provided, uses default navigation classes
 
 ## Contribution
 

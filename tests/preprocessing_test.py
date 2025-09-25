@@ -33,6 +33,70 @@ def test_remove_navigation() -> None:
     assert "actual content" in cleaned
 
 
+def test_custom_navigation_classes() -> None:
+    html = """
+    <html>
+    <body>
+        <div class="main-links">
+            <ul>
+                <li><a href="#dashboard">Dashboard</a></li>
+                <li><a href="#reports">Reports</a></li>
+            </ul>
+        </div>
+        <main>
+            <h1>Insights</h1>
+            <p>Only the main content should remain.</p>
+        </main>
+    </body>
+    </html>
+    """
+
+    default_cleaned = preprocess_html(html, remove_navigation=True)
+    assert "Dashboard" in default_cleaned
+    assert "Reports" in default_cleaned
+
+    config = create_preprocessor("standard", navigation_classes=["main-links"])
+    custom_cleaned = preprocess_html(html, **config)
+
+    assert "Dashboard" not in custom_cleaned
+    assert "Reports" not in custom_cleaned
+
+    result = convert_to_markdown(
+        html,
+        preprocess_html=True,
+        remove_navigation=True,
+        navigation_classes=["main-links"],
+    )
+
+    assert "Dashboard" not in result
+    assert "Reports" not in result
+    assert "Insights" in result
+    assert "Only the main content" in result
+
+
+def test_default_navigation_classes() -> None:
+    html = """
+    <html>
+    <body>
+        <div class="header">
+            <ul>
+                <li><a href="#dashboard">Dashboard</a></li>
+                <li><a href="#reports">Reports</a></li>
+            </ul>
+        </div>
+        <main>
+            <h1>Insights</h1>
+            <p>Only the main content should remain.</p>
+        </main>
+    </body>
+    </html>
+    """
+
+    default_cleaned = preprocess_html(html, remove_navigation=True)
+    assert "Dashboard" not in default_cleaned
+    assert "Reports" not in default_cleaned
+
+
 def test_remove_forms() -> None:
     html = """
     <html>
