@@ -132,12 +132,18 @@ def preprocess_html(
     preserve_media: bool = True,
     custom_tags_to_remove: set[str] | None = None,
     custom_attributes_to_remove: set[str] | None = None,
-    navigation_classes: set[str] | None = None,
+    excluded_navigation_classes: set[str] | None = None,
+    extra_navigation_classes: set[str] | None = None,
 ) -> str:
     if not html or not html.strip():  # pragma: no cover
         return html
 
-    html = _remove_class_based_navigation(html, remove_navigation, navigation_classes)
+    html = _remove_class_based_navigation(
+        html,
+        remove_navigation,
+        excluded_navigation_classes,
+        extra_navigation_classes,
+    )
 
     nh3_config = _configure_cleaning_rules(
         remove_navigation=remove_navigation,
@@ -267,16 +273,19 @@ def _configure_cleaning_rules(
 def _remove_class_based_navigation(
     html: str,
     remove_navigation: bool,
-    navigation_classes: set[str] | None,
+    excluded_navigation_classes: set[str] | None,
+    extra_navigation_classes: set[str] | None,
 ) -> str:
     if not remove_navigation:
         return html
 
-    class_names = set()
-    if navigation_classes:
-        class_names.update(navigation_classes)
-    else:
-        class_names.update(DEFAULT_NAVIGATION_CLASSES)
+    class_names = set(DEFAULT_NAVIGATION_CLASSES)
+
+    if excluded_navigation_classes:
+        class_names.difference_update(excluded_navigation_classes)
+
+    if extra_navigation_classes:
+        class_names.update(extra_navigation_classes)
 
     for class_name in class_names:
         class_pattern = rf'{re.escape(class_name)}[^"]*'
