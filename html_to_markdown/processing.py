@@ -477,6 +477,8 @@ def convert_to_markdown(
     preprocessing_preset: Literal["minimal", "standard", "aggressive"] = "standard",
     remove_forms: bool = True,
     remove_navigation: bool = True,
+    excluded_navigation_classes: set[str] | None = None,
+    extra_navigation_classes: set[str] | None = None,
     strip: str | Iterable[str] | None = None,
     strip_newlines: bool = False,
     strong_em_symbol: Literal["*", "_"] = ASTERISK,
@@ -521,6 +523,8 @@ def convert_to_markdown(
         preprocessing_preset: Preprocessing aggressiveness level.
         remove_forms: Remove form elements during preprocessing.
         remove_navigation: Remove navigation elements during preprocessing.
+        excluded_navigation_classes: Navigation class fragments to keep even when removing navigation.
+        extra_navigation_classes: Additional navigation class fragments to strip beyond the defaults.
         strip: HTML tags to strip from output.
         strip_newlines: Remove newlines from HTML before processing.
         strong_em_symbol: Symbol for strong/emphasis ('*' or '_').
@@ -576,6 +580,8 @@ def convert_to_markdown(
             config = create_preprocessor(
                 preset=preprocessing_preset,
                 remove_navigation=remove_navigation,
+                excluded_navigation_classes=excluded_navigation_classes,
+                extra_navigation_classes=extra_navigation_classes,
                 remove_forms=remove_forms,
             )
             source = preprocess_fn(source, **config)
@@ -1078,6 +1084,8 @@ def convert_to_markdown_stream(
     preprocessing_preset: Literal["minimal", "standard", "aggressive"] = "standard",
     remove_forms: bool = True,
     remove_navigation: bool = True,
+    excluded_navigation_classes: set[str] | None = None,
+    extra_navigation_classes: set[str] | None = None,
     strip: str | Iterable[str] | None = None,
     strip_newlines: bool = False,
     strong_em_symbol: Literal["*", "_"] = ASTERISK,
@@ -1096,6 +1104,8 @@ def convert_to_markdown_stream(
         config = create_preprocessor(
             preset=preprocessing_preset,
             remove_navigation=remove_navigation,
+            excluded_navigation_classes=excluded_navigation_classes,
+            extra_navigation_classes=extra_navigation_classes,
             remove_forms=remove_forms,
         )
         source = preprocess_fn(source, **config)
