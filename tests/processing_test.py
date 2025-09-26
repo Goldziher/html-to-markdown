@@ -15,31 +15,31 @@ from html_to_markdown.exceptions import ConflictingOptionsError, EmptyHtmlError,
 from html_to_markdown.processing import _as_optional_set, _get_list_indent, convert_to_markdown_stream
 
 
-def test_get_list_indent_tabs(convert: Callable[[str, ...], str]) -> None:
+def test_get_list_indent_tabs(convert: Callable[..., str]) -> None:
     result = _get_list_indent("tabs", 4)
     assert result == "\t"
 
 
-def test_get_list_indent_spaces(convert: Callable[[str, ...], str]) -> None:
+def test_get_list_indent_spaces(convert: Callable[..., str]) -> None:
     result = _get_list_indent("spaces", 2)
     assert result == "  "
 
 
-def test_convert_as_inline_strips_trailing_newlines(convert: Callable[[str, ...], str]) -> None:
+def test_convert_as_inline_strips_trailing_newlines(convert: Callable[..., str]) -> None:
     html = "<p>Test content\n</p>"
     result = convert(html, convert_as_inline=True)
     assert not result.endswith("\n")
     assert result == "Test content"
 
 
-def test_empty_html_error(convert: Callable[[str, ...], str]) -> None:
+def test_empty_html_error(convert: Callable[..., str]) -> None:
     with pytest.raises(EmptyHtmlError):
         convert("")
 
     convert("   \n\n  ")
 
 
-def test_conflicting_options_error(convert: Callable[[str, ...], str]) -> None:
+def test_conflicting_options_error(convert: Callable[..., str]) -> None:
     with pytest.raises(ConflictingOptionsError):
         convert("<p>test</p>", strip=["p"], convert=["p"])
 
@@ -51,13 +51,13 @@ def test_missing_dependency_error(monkeypatch: Any) -> None:
         convert_to_markdown("<p>test</p>", parser="lxml")
 
 
-def test_beautifulsoup_input(convert: Callable[[str, ...], str]) -> None:
+def test_beautifulsoup_input(convert: Callable[..., str]) -> None:
     soup = BeautifulSoup("<p>test</p>", "html.parser")
     result = convert(soup)
     assert "test" in result
 
 
-def test_metadata_extraction(convert: Callable[[str, ...], str]) -> None:
+def test_metadata_extraction(convert: Callable[..., str]) -> None:
     html = """
     <html>
     <head>
@@ -85,7 +85,7 @@ def test_metadata_extraction(convert: Callable[[str, ...], str]) -> None:
     assert "Content" in result_no_meta
 
 
-def test_stream_processing(convert: Callable[[str, ...], str]) -> None:
+def test_stream_processing(convert: Callable[..., str]) -> None:
     html = "<p>" + "test " * 1000 + "</p>"
 
     chunks = list(convert_to_markdown_stream(html, chunk_size=100))
@@ -96,7 +96,7 @@ def test_stream_processing(convert: Callable[[str, ...], str]) -> None:
     assert len(chunks) > 1
 
 
-def test_progress_callback(convert: Callable[[str, ...], str]) -> None:
+def test_progress_callback(convert: Callable[..., str]) -> None:
     html = "<p>" + "test " * 1000 + "</p>"
     progress_calls = []
 
@@ -107,13 +107,13 @@ def test_progress_callback(convert: Callable[[str, ...], str]) -> None:
     assert len(progress_calls) > 0
 
 
-def test_strip_newlines(convert: Callable[[str, ...], str]) -> None:
+def test_strip_newlines(convert: Callable[..., str]) -> None:
     html = "<p>Line 1\nLine 2\rLine 3</p>"
     result = convert(html, strip_newlines=True)
     assert "Line 1 Line 2 Line 3" in result
 
 
-def test_convert_as_inline(convert: Callable[[str, ...], str]) -> None:
+def test_convert_as_inline(convert: Callable[..., str]) -> None:
     html = "<p>Paragraph text</p>"
     result = convert(html, convert_as_inline=True)
     assert not result.endswith("\n")
@@ -129,7 +129,7 @@ def test_parser_selection() -> None:
     assert "test" in result
 
 
-def test_whitespace_handling(convert: Callable[[str, ...], str]) -> None:
+def test_whitespace_handling(convert: Callable[..., str]) -> None:
     html = "  <p>text</p>"
     result = convert(html)
 
@@ -139,13 +139,13 @@ def test_whitespace_handling(convert: Callable[[str, ...], str]) -> None:
     assert "Para 2" in result
 
 
-def test_wbr_element_handling(convert: Callable[[str, ...], str]) -> None:
+def test_wbr_element_handling(convert: Callable[..., str]) -> None:
     html = "<p>long<wbr>word</p>"
     result = convert(html)
     assert "longword" in result
 
 
-def test_normalize_spaces_outside_code(convert: Callable[[str, ...], str]) -> None:
+def test_normalize_spaces_outside_code(convert: Callable[..., str]) -> None:
     html = """
     <p>Text   with    multiple     spaces</p>
     <pre><code>Code   with    preserved     spaces</code></pre>
@@ -170,7 +170,7 @@ def test_leading_whitespace_with_lxml() -> None:
         pytest.skip("lxml not available")
 
 
-def test_definition_list_formatting(convert: Callable[[str, ...], str]) -> None:
+def test_definition_list_formatting(convert: Callable[..., str]) -> None:
     html = """
     <dl>
         <dt>Term</dt>
@@ -181,7 +181,7 @@ def test_definition_list_formatting(convert: Callable[[str, ...], str]) -> None:
     assert ":   " in result
 
 
-def test_as_optional_set_function(convert: Callable[[str, ...], str]) -> None:
+def test_as_optional_set_function(convert: Callable[..., str]) -> None:
     assert _as_optional_set(None) is None
 
     result = _as_optional_set("a,b,c")
@@ -199,7 +199,7 @@ def test_as_optional_set_function(convert: Callable[[str, ...], str]) -> None:
     assert result == expected
 
 
-def test_underlined_heading_conversion(convert: Callable[[str, ...], str]) -> None:
+def test_underlined_heading_conversion(convert: Callable[..., str]) -> None:
     html = "<h2>Header</h2><p>Next paragraph</p>"
     result = convert(html, heading_style="underlined")
 

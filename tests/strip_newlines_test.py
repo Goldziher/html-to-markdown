@@ -6,7 +6,7 @@ if TYPE_CHECKING:
     from collections.abc import Callable
 
 
-def test_strip_newlines_basic(convert: Callable[[str, ...], str]) -> None:
+def test_strip_newlines_basic(convert: Callable[..., str]) -> None:
     html = """<p>Return a list of the words in the string, using <em>sep</em> as the delimiter
 string.  If <em>maxsplit</em> is given, at most <em>maxsplit</em> splits are done (thus,
 the list will have at most <code class="docutils literal notranslate"><span class="pre">maxsplit+1</span></code> elements).  If <em>maxsplit</em> is not
@@ -23,13 +23,13 @@ specified or <code class="docutils literal notranslate"><span class="pre">-1</sp
     assert "Return a list of the words in the string" in result_stripped
 
 
-def test_strip_newlines_with_carriage_returns(convert: Callable[[str, ...], str]) -> None:
+def test_strip_newlines_with_carriage_returns(convert: Callable[..., str]) -> None:
     html_with_cr = "Text with\r\nnewlines and\rcarriage returns"
     result = convert(html_with_cr, strip_newlines=True)
     assert "Text with newlines and carriage returns" in result
 
 
-def test_strip_newlines_with_multiple_paragraphs(convert: Callable[[str, ...], str]) -> None:
+def test_strip_newlines_with_multiple_paragraphs(convert: Callable[..., str]) -> None:
     html = """<p>First paragraph
 with a line break.</p>
 <p>Second paragraph
@@ -43,7 +43,7 @@ also with a line break.</p>"""
     assert "\n\n" in result
 
 
-def test_strip_newlines_preserves_pre_blocks(convert: Callable[[str, ...], str]) -> None:
+def test_strip_newlines_preserves_pre_blocks(convert: Callable[..., str]) -> None:
     html = """<p>Regular text
 with newline.</p>
 <pre>Code block
@@ -56,7 +56,7 @@ newlines</pre>"""
     assert "Code block with preserved newlines" in result
 
 
-def test_strip_newlines_with_inline_elements(convert: Callable[[str, ...], str]) -> None:
+def test_strip_newlines_with_inline_elements(convert: Callable[..., str]) -> None:
     html = """<p>This is <strong>bold
 text</strong> and <em>italic
 text</em> with line breaks.</p>"""
@@ -65,21 +65,21 @@ text</em> with line breaks.</p>"""
     assert result == "This is **bold text** and *italic text* with line breaks.\n\n"
 
 
-def test_strip_newlines_empty_html(convert: Callable[[str, ...], str]) -> None:
+def test_strip_newlines_empty_html(convert: Callable[..., str]) -> None:
     html = "\n\n"
 
     result = convert(html, strip_newlines=True)
     assert result.strip() == ""
 
 
-def test_strip_newlines_preserves_br_tags(convert: Callable[[str, ...], str]) -> None:
+def test_strip_newlines_preserves_br_tags(convert: Callable[..., str]) -> None:
     html = "<p>Line one<br>Line two</p>"
 
     result = convert(html, strip_newlines=True)
     assert result == "Line one  \nLine two\n\n"
 
 
-def test_strip_newlines_with_lists(convert: Callable[[str, ...], str]) -> None:
+def test_strip_newlines_with_lists(convert: Callable[..., str]) -> None:
     html = """<ul>
 <li>Item one
 with newline</li>
@@ -92,7 +92,7 @@ also with newline</li>
     assert "* Item two also with newline\n" in result
 
 
-def test_strip_newlines_complex_html(convert: Callable[[str, ...], str]) -> None:
+def test_strip_newlines_complex_html(convert: Callable[..., str]) -> None:
     html = """<div>
     <h1>Title with
     newline</h1>
@@ -109,7 +109,7 @@ def test_strip_newlines_complex_html(convert: Callable[[str, ...], str]) -> None
     assert "> Quote with newline." in result
 
 
-def test_strip_newlines_with_only_carriage_returns(convert: Callable[[str, ...], str]) -> None:
+def test_strip_newlines_with_only_carriage_returns(convert: Callable[..., str]) -> None:
     html = "Text\rwith\rcarriage\rreturns"
     result = convert(html, strip_newlines=True)
     assert "Text with carriage returns" in result
