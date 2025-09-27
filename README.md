@@ -15,6 +15,7 @@ Your support helps maintain and improve this library for the community.
 ## Features
 
 - **Full HTML5 Support**: Comprehensive support for all modern HTML5 elements including semantic, form, table, ruby, interactive, structural, SVG, and math elements
+- **HOCR Support**: Automatic detection and processing of HOCR (HTML-based OCR) documents with clean text extraction and proper spacing
 - **Table Support**: Advanced handling of complex tables with rowspan/colspan support
 - **Type Safety**: Strict MyPy adherence with comprehensive type hints
 - **Metadata Extraction**: Automatic extraction of document metadata (title, meta tags) as comment headers
@@ -225,6 +226,63 @@ markdown = convert_to_markdown(html, list_indent_type="tabs")
 ```shell
 html_to_markdown --list-indent-type tabs input.html
 ```
+
+### Working with HOCR Documents
+
+HOCR (HTML-based OCR) is a standard format used by OCR software like Tesseract to output structured text with positioning and confidence information. The library automatically detects and processes HOCR documents, extracting clean text while preserving proper spacing and structure.
+
+**Python:**
+
+```python
+from html_to_markdown import convert_to_markdown
+
+# HOCR from Tesseract OCR
+hocr_content = """<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+    "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+    <meta name='ocr-system' content='tesseract 5.5.1' />
+    <meta name='ocr-capabilities' content='ocr_page ocr_carea ocr_par ocr_line ocrx_word'/>
+</head>
+<body>
+    <div class='ocr_page' id='page_1'>
+        <div class='ocr_carea' id='block_1_1'>
+            <p class='ocr_par' id='par_1_1'>
+                <span class='ocr_line' id='line_1_1'>
+                    <span class='ocrx_word' id='word_1_1'>Hello</span>
+                    <span class='ocrx_word' id='word_1_2'>world</span>
+                </span>
+            </p>
+        </div>
+    </div>
+</body>
+</html>"""
+
+# Automatically detected as HOCR and converted to clean text
+markdown = convert_to_markdown(hocr_content)
+print(markdown)  # Output: "Hello world"
+```
+
+**CLI:**
+
+```shell
+# Process HOCR files directly
+tesseract image.png output hocr
+html_to_markdown output.hocr
+
+# Or pipe directly from Tesseract
+tesseract image.png - hocr | html_to_markdown
+```
+
+**Features:**
+
+- **Automatic Detection**: No configuration needed - HOCR documents are detected automatically
+- **Clean Output**: Removes OCR metadata, bounding boxes, and confidence scores
+- **Proper Spacing**: Maintains correct word spacing and text structure
+- **Multi-language Support**: Works with HOCR output in any language
+- **Performance Optimized**: Efficient processing of large OCR documents
+- **Error Resilient**: Handles malformed or incomplete HOCR gracefully
 
 ## Advanced Usage
 
