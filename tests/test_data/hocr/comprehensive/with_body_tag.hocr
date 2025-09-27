@@ -1,0 +1,8 @@
+<html>
+<head>
+    <title>Test hocr_formatter.parser.HOCRParser.root with body tag</title>
+</head>
+<body>
+    <p>Foo</p>
+</body>
+</html>
