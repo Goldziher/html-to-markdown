@@ -38,6 +38,7 @@ from html_to_markdown.constants import (
 )
 from html_to_markdown.converters import Converter, ConvertersMap, SupportedElements, create_converters_map
 from html_to_markdown.exceptions import ConflictingOptionsError, EmptyHtmlError, MissingDependencyError
+from html_to_markdown.hocr_processor import HOCRProcessor
 from html_to_markdown.utils import escape
 from html_to_markdown.whitespace import WhitespaceHandler
 
@@ -150,6 +151,11 @@ def _get_list_indent(list_indent_type: str, list_indent_width: int) -> str:
     return " " * list_indent_width
 
 
+_is_hocr_document = HOCRProcessor.is_hocr_document
+_is_hocr_word_element = HOCRProcessor.is_hocr_word_element
+_should_add_space_before_hocr_word = HOCRProcessor.should_add_space_before_word
+
+
 def _is_nested_tag(el: PageElement) -> bool:
     return isinstance(el, Tag) and el.name in {
         "ol",
@@ -244,6 +250,10 @@ def _process_tag(
             )
         elif isinstance(el, Tag):
             current_text = "".join(text_parts)
+
+            if _is_hocr_word_element(el) and _should_add_space_before_hocr_word(children, i):
+                text_parts.append(" ")
+
             text_parts.append(
                 _process_tag(
                     el,
@@ -588,7 +598,7 @@ def convert_to_markdown(
 
         if "".join(source.split("\n")):
             if parser is None:
-                parser = "lxml" if LXML_AVAILABLE else "html.parser"
+                parser = HOCRProcessor.get_optimal_parser(source, LXML_AVAILABLE)
 
             if parser == "lxml" and not LXML_AVAILABLE:
                 raise MissingDependencyError("lxml", "pip install html-to-markdown[lxml]")
@@ -949,7 +959,7 @@ def _process_html_core(
 
             if "".join(source.split("\n")):
                 if parser is None:
-                    parser = "lxml" if LXML_AVAILABLE else "html.parser"
+                    parser = HOCRProcessor.get_optimal_parser(source, LXML_AVAILABLE)
 
                 if parser == "lxml" and not LXML_AVAILABLE:  # pragma: no cover
                     raise MissingDependencyError("lxml", "pip install html-to-markdown[lxml]")
@@ -1012,7 +1022,7 @@ def _process_html_core(
         if custom_converters:
             converters_map.update(cast("ConvertersMap", custom_converters))
 
-        if extract_metadata and not convert_as_inline:
+        if extract_metadata and not convert_as_inline and not HOCRProcessor.is_hocr_element_in_soup(source):
             metadata = _extract_metadata(source)
             metadata_comment = _format_metadata_comment(metadata)
             if metadata_comment:

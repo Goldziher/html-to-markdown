@@ -13,7 +13,6 @@ import pytest
 
 from html_to_markdown import convert_to_markdown, convert_to_markdown_stream
 
-# Skip entire module if dependencies not available
 pytest_plugins = []
 
 try:
