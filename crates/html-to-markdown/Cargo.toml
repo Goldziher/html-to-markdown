@@ -1,0 +1,22 @@
+[package]
+name = "html-to-markdown"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+description = "A modern, type-safe library for converting HTML to Markdown with comprehensive HTML5 support"
+keywords = ["html", "markdown", "converter", "html5", "parser"]
+categories = ["parsing", "text-processing"]
+
+[lib]
+crate-type = ["rlib"]
+
+[dependencies]
+scraper.workspace = true
+html5ever.workspace = true
+markup5ever_rcdom.workspace = true
+regex.workspace = true
+once_cell.workspace = true
+thiserror.workspace = true

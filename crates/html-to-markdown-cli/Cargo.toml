@@ -1,0 +1,17 @@
+[package]
+name = "html-to-markdown-cli"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+description = "CLI for html-to-markdown"
+
+[[bin]]
+name = "html-to-markdown"
+path = "src/main.rs"
+
+[dependencies]
+html-to-markdown.workspace = true
+clap.workspace = true

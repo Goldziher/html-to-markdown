@@ -70,3 +70,17 @@ repos:
             --check-return-types=False,
             --arg-type-hints-in-docstring=False,
           ]
+  - repo: https://github.com/FeryET/pre-commit-rust
+    rev: v1.2.1
+    hooks:
+      - id: fmt
+      - id: cargo-check
+      - id: clippy
+  - repo: local
+    hooks:
+      - id: mypy
+        name: mypy
+        entry: uv run mypy
+        require_serial: true
+        language: system
+        types: [python]

@@ -36,3 +36,9 @@ AGENTS.md
 # Benchmark results
 .benchmarks/
 BENCHMARK_BASELINE.md
+
+# Rust
+target/
+Cargo.lock
+**/*.rs.bk
+*.pdb
