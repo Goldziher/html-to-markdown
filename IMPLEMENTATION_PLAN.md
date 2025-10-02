@@ -1,396 +1,134 @@
-# html-to-markdown v2 Implementation Plan
+# Rust Implementation Plan - Executive Summary
 
-## Overview
+## Status Overview
 
-This document outlines the staged implementation approach for v2, which replaces BeautifulSoup with lol-html (Rust streaming parser) and nh3 (Python ammonia bindings) with direct Rust ammonia.
+**Current Completion**: ~25% (14/80+ tags, basic features only)
+**Estimated Time to Production**: 3-4 weeks (20-25 days)
+**Critical Blockers**: 4 (text escaping, whitespace, ordered lists, table bugs)
 
-## Migration Notes
+## What Works Now ✅
 
-### nh3 → ammonia (Direct Rust)
+- Basic HTML tags: h1-h6, p, strong, b, em, i, a, img
+- Lists: ul, li (bullets only, ol broken)
+- Tables: Basic tables with colspan (rowspan broken)
+- Code: inline code, pre blocks
+- Misc: blockquote, br, hr
+- Infrastructure: html5ever parser, PyO3 bindings, ammonia sanitization
 
-- **Current (v1)**: Uses nh3 (Python bindings to ammonia crate) for HTML sanitization
-- **New (v2)**: Direct use of ammonia in Rust layer
-- **Why**: Eliminates Python→Rust boundary overhead, better integration with lol-html
-- **Performance Impact**: Expected additional 2-3x improvement from eliminating bindings layer
+## What's Broken ❌
 
-### BeautifulSoup → lol-html
+### Critical (Blockers)
 
-- **Current (v1)**: BeautifulSoup (DOM-based, Python)
-- **New (v2)**: lol-html (streaming, Rust)
-- **Why**: True streaming support, 2x faster than html5ever, memory efficient
-- **Performance Impact**: 10-20x improvement expected
+1. **No text escaping** → `Use *wildcards*` renders as italics instead of `Use \*wildcards\*`
+1. **No whitespace normalization** → Spacing between inline elements is wrong
+1. **Ordered lists broken** → All output as bullets instead of `1. 2. 3.`
+1. **Table rowspan broken** → First-row detection always fails
 
-## Stage 1: Python API Refactor + Baseline Benchmarks
+### Missing Features
 
-**Goal**: Update to new functional API, establish performance baseline with current BeautifulSoup backend.
+- 60+ HTML tags (mark, del, ins, cite, q, dl/dt/dd, forms, media, etc.)
+- Custom converters (Python callbacks)
+- Text wrapping
+- Metadata extraction
+- Autolinks
+- convert/strip options
+- convert_as_inline support
 
-### 1.1: Update Python API
+## Implementation Strategy
 
-- [ ] Create option dataclasses (`ConversionOptions`, `PreprocessingOptions`, etc.)
-- [ ] Implement new functional API (`convert()`, `convert_stream()`)
-- [ ] Keep backward compatibility layer (`convert_to_markdown()` with deprecation warning)
-- [ ] Update type hints and docstrings
-- [ ] Maintain all existing features (hOCR, metadata extraction, streaming, etc.)
+### 11-Phase Plan (See TODO.md)
 
-**Files to modify**:
+**Phase 1: Critical Blockers (3 days)**
 
-- `html_to_markdown/__init__.py` - New exports
-- `html_to_markdown/options.py` - New file for dataclasses
-- `html_to_markdown/processing.py` - Refactor to use new API
-- `html_to_markdown/converters.py` - Update function signatures if needed
+- Text escaping system
+- Whitespace normalization (chomp, modes)
+- Fix ordered lists
+- Fix table bugs
 
-### 1.2: Update Tests
+**Phase 2: Core HTML Tags (4 days)**
 
-- [ ] Update all tests to use new API
-- [ ] Ensure 100% of existing tests pass
-- [ ] Verify coverage remains at 100%
-- [ ] Test backward compatibility layer
+- Inline formatting (mark, del, ins, sub, sup, etc.)
+- Semantic blocks (article, section, nav, etc.)
+- Citations (cite, q)
+- Definition lists (dl, dt, dd)
 
-**Files to modify**:
+**Phase 3-4: Interactive & Forms (4 days)**
 
-- `tests/*.py` - Update test fixtures and assertions
+- Interactive elements (details, summary, dialog)
+- Media tags (audio, video, iframe, svg)
+- Form elements (input, select, button, etc.)
 
-### 1.3: Add Comprehensive Benchmarks
+**Phase 5: Advanced Features (4 days)**
 
-Create benchmark suite using `pytest-benchmark` to measure:
+- Ruby annotations
+- Task lists (GitHub checkboxes)
+- Custom converters (Python callbacks)
+- Text wrapping
+- Metadata extraction
+- Autolinks
 
-#### Throughput Benchmarks
+**Phase 6-8: Integration (3 days)**
 
-- **Small documents** (< 10KB): Simple HTML, single page
-- **Medium documents** (10-100KB): Wikipedia articles, blog posts
-- **Large documents** (> 100KB): Long-form content, documentation
-- **hOCR documents**: OCR output (special handling)
+- Enhanced preprocessing options
+- hOCR support
+- PyO3 bindings completion
+- Replace Python implementation
 
-Metrics:
+**Phase 9: Testing (5 days)**
 
-- Operations per second
-- Time per document size
-- Scaling characteristics
+- Run all 700+ tests
+- Fix failures iteratively
+- Track progress per test file
 
-#### Memory Benchmarks
+**Phase 10-11: Release (2 days)**
 
-- **Peak memory usage**: Maximum RSS during conversion
-- **Memory scaling**: Memory usage vs document size
-- **Streaming efficiency**: Memory usage difference between `convert()` and `convert_stream()`
+- Documentation
+- Performance benchmarks
+- CI/CD setup
+- Release preparation
 
-Metrics (using `memory_profiler` or `tracemalloc`):
+## Development Workflow
 
-- Peak memory (MB)
-- Memory growth rate
-- Allocations count
+### Per Session
 
-#### Feature Benchmarks
+1. Check `TODO.md` for current phase/task
+1. Reference Python implementation in `html_to_markdown/converters.py`
+1. Implement in `crates/html-to-markdown/src/converter.rs`
+1. Update PyO3 bindings if needed
+1. Run tests: `pytest tests/elements_test.py -v`
+1. Update `TODO.md` with ✅
+1. Commit progress
 
-- **Table conversion**: Complex tables with rowspan/colspan
-- **List conversion**: Deeply nested lists
-- **Metadata extraction**: Documents with extensive metadata
-- **Custom converters**: Impact of custom element handlers
-- **Preprocessing**: Different preset levels (minimal/standard/aggressive)
-
-#### Test Documents
-
-**Current test documents** (verify we have these):
-
-- Simple HTML samples
-- Complex tables
-- hOCR documents
-- Nested structures
-
-**New Wikipedia documents to download**:
-
-- [ ] Short article (~5KB): <https://en.wikipedia.org/wiki/HTML>
-- [ ] Medium article (~50KB): <https://en.wikipedia.org/wiki/Python_(programming_language)>
-- [ ] Long article (~200KB): <https://en.wikipedia.org/wiki/Rust_(programming_language)>
-- [ ] Table-heavy article: <https://en.wikipedia.org/wiki/List_of_countries_by_population_(United_Nations)>
-- [ ] List-heavy article: <https://en.wikipedia.org/wiki/Timeline_of_computing>
-
-**Storage**:
-
-```
-tests/benchmark_documents/
-├── wikipedia/
-│   ├── small_html.html
-│   ├── medium_python.html
-│   ├── large_rust.html
-│   ├── tables_countries.html
-│   └── lists_timeline.html
-├── hocr/
-│   └── sample_ocr.html
-└── synthetic/
-    ├── deep_nesting.html
-    ├── complex_table.html
-    └── large_metadata.html
-```
-
-#### Benchmark Implementation
-
-**File structure**:
-
-```
-tests/benchmarks/
-├── __init__.py
-├── conftest.py              # Shared fixtures
-├── test_throughput.py       # Ops/sec benchmarks
-├── test_memory.py           # Memory profiling
-├── test_features.py         # Feature-specific benchmarks
-└── test_scaling.py          # Scaling characteristics
-```
-
-**Example benchmark**:
-
-```python
-# tests/benchmarks/test_throughput.py
-import pytest
-from html_to_markdown import convert, ConversionOptions
-
-@pytest.fixture
-def small_doc():
-    with open("tests/benchmark_documents/wikipedia/small_html.html") as f:
-        return f.read()
-
-@pytest.fixture
-def options():
-    return ConversionOptions(
-        heading_style="atx",
-        list_indent_width=2,
-    )
-
-def test_convert_small_document(benchmark, small_doc, options):
-    """Benchmark conversion of small Wikipedia article."""
-    result = benchmark(convert, small_doc, options)
-    assert len(result) > 0
-
-@pytest.mark.parametrize("doc_size", ["small", "medium", "large"])
-def test_convert_scaling(benchmark, doc_size, options):
-    """Benchmark conversion scaling across document sizes."""
-    with open(f"tests/benchmark_documents/wikipedia/{doc_size}.html") as f:
-        html = f.read()
-
-    result = benchmark(convert, html, options)
-    assert len(result) > 0
-```
-
-### 1.4: Run Baseline Benchmarks
-
-- [ ] Run full benchmark suite with pytest-benchmark
-- [ ] Save results with `--benchmark-save=baseline_v1`
-- [ ] Generate comparison report
-- [ ] Document results in `BENCHMARKS.md`
-
-**Commands**:
+### Quick Commands
 
 ```bash
-# Run benchmarks
-uv run pytest tests/benchmarks/ --benchmark-only --benchmark-save=baseline_v1
+# Build Rust
+cargo build --release
 
-# Generate report
-uv run pytest-benchmark compare baseline_v1 --csv=baseline_v1.csv
+# Install with Rust backend
+pip install -e .
 
-# With memory profiling
-uv run pytest tests/benchmarks/test_memory.py --memray
+# Run specific test
+pytest tests/elements_test.py::test_cite_element -v
+
+# Run all non-benchmark tests
+pytest tests/ -k "not benchmark" -v
+
+# Use Python fallback for comparison
+env HTML_TO_MD_USE_PYTHON=1 pytest tests/...
 ```
 
-### 1.5: Commit Stage 1
+## Next Steps
 
-- [ ] Verify all tests pass (100% coverage)
-- [ ] Verify benchmarks run successfully
-- [ ] Commit changes with benchmark results
-- [ ] Tag as `v2.0.0-alpha.1`
+**Immediate (Start of Next Session)**:
 
-**Commit message**:
+1. Open `TODO.md`
+1. Start Phase 1.1: Text Escaping Integration
+1. Reference: `html_to_markdown/utils.py:escape()`
+1. Implement: Apply escaping in `converter.rs`
+1. Test: Create simple test for `*` escaping
+1. Mark complete in `TODO.md`
 
-```
-feat: refactor to functional API with baseline benchmarks
+---
 
-- Replace class-based API with functional design
-- Introduce ConversionOptions dataclasses
-- Add comprehensive pytest-benchmark suite
-- Add Wikipedia test documents for benchmarking
-- Establish baseline: [X] ops/sec, [Y] MB peak memory
-- Maintain 100% test coverage and backward compatibility
-
-BREAKING CHANGE: New API uses convert() with options instead of
-convert_to_markdown() with kwargs. Old API deprecated but still works.
-
-Benchmark results:
-- Small docs (5KB): X ops/sec
-- Medium docs (50KB): Y ops/sec
-- Large docs (200KB): Z ops/sec
-- Peak memory: A MB
-```
-
-## Stage 2: Rust Backend Implementation
-
-**Goal**: Replace BeautifulSoup + nh3 with lol-html + ammonia (direct Rust).
-
-### 2.1: Core Rust Implementation
-
-- [ ] Add lol-html and ammonia to `Cargo.toml`
-- [ ] Implement HTML sanitization with ammonia
-- [ ] Implement streaming parser with lol-html
-- [ ] Port element converters from Python to Rust
-- [ ] Implement ElementContext abstraction
-- [ ] Support custom element handlers (via callbacks from Rust→Python)
-
-**Files to create/modify**:
-
-```
-crates/html-to-markdown/src/
-├── lib.rs                    # Public API
-├── parser.rs                 # lol-html integration
-├── sanitizer.rs              # ammonia integration
-├── converters/
-│   ├── mod.rs
-│   ├── headings.rs
-│   ├── links.rs
-│   ├── lists.rs
-│   ├── tables.rs
-│   └── inline.rs
-├── options.rs                # Option structs (mirror Python dataclasses)
-└── context.rs                # ElementContext type
-```
-
-### 2.2: Python Bindings
-
-- [ ] Create PyO3 bindings in `crates/html-to-markdown-py`
-- [ ] Expose `convert()` and `convert_stream()` to Python
-- [ ] Convert Python dataclasses → Rust structs
-- [ ] Handle custom converters (Python callbacks)
-- [ ] Implement streaming with Python generators
-
-**Files**:
-
-```
-crates/html-to-markdown-py/src/
-├── lib.rs                    # PyO3 module
-├── options.rs                # Python→Rust option conversion
-└── handlers.rs               # Custom handler bridge
-```
-
-### 2.3: Port Special Features
-
-- [ ] Port hOCR detection and processing
-- [ ] Port metadata extraction
-- [ ] Port table handling (rowspan/colspan)
-- [ ] Port whitespace normalization
-- [ ] Ensure feature parity with v1
-
-### 2.4: Testing
-
-- [ ] All v1 tests pass with Rust backend
-- [ ] Add Rust unit tests
-- [ ] Test custom converters work
-- [ ] Test streaming functionality
-- [ ] Verify 100% feature parity
-
-### 2.5: Benchmarking
-
-- [ ] Run same benchmark suite from Stage 1
-- [ ] Save results with `--benchmark-save=v2_rust`
-- [ ] Compare against baseline: `pytest-benchmark compare baseline_v1 v2_rust`
-- [ ] Document improvements in `BENCHMARKS.md`
-
-**Expected improvements**:
-
-- **Throughput**: 10-20x faster
-- **Memory**: 50-70% reduction in peak memory
-- **Streaming**: 80-90% memory reduction for large documents
-
-### 2.6: Commit Stage 2
-
-- [ ] All tests pass
-- [ ] Benchmarks show significant improvement
-- [ ] Update CHANGELOG.md with migration notes
-- [ ] Tag as `v2.0.0-beta.1`
-
-## Stage 3: Documentation & Release
-
-### 3.1: Update Documentation
-
-- [ ] Update README.md with new API examples
-- [ ] Document migration guide (v1 → v2)
-- [ ] Update API reference
-- [ ] Add performance comparison section
-- [ ] Document nh3 → ammonia migration
-
-### 3.2: CHANGELOG.md
-
-Add section:
-
-```markdown
-## [2.0.0] - YYYY-MM-DD
-
-### Changed
-
-- **BREAKING**: New functional API with dataclass options
-- **BREAKING**: Minimum Python version 3.10
-- Replaced BeautifulSoup with lol-html (Rust streaming parser)
-- Replaced nh3 (Python ammonia bindings) with direct Rust ammonia integration
-
-### Performance
-
-- 10-20x faster conversion throughput
-- 50-70% reduction in memory usage
-- True streaming support with minimal memory overhead
-
-### Added
-
-- Comprehensive benchmark suite with pytest-benchmark
-- ConversionOptions, PreprocessingOptions, StreamingOptions dataclasses
-- ElementContext abstraction for custom handlers
-
-### Deprecated
-
-- convert_to_markdown() with kwargs (use convert() with options instead)
-- BeautifulSoup instance as input (will be removed in v3.0)
-
-### Migration Notes
-
-- **nh3 users**: HTML sanitization now happens in Rust layer via ammonia
-  - No API changes needed
-  - 2-3x additional performance improvement from eliminating Python bindings
-- **Custom converters**: Update to use ElementContext instead of BeautifulSoup Tag
-- See MIGRATION.md for detailed guide
-```
-
-### 3.3: Release
-
-- [ ] Final testing on all platforms (Linux, macOS, Windows)
-- [ ] Build wheels with maturin
-- [ ] Test installation from wheels
-- [ ] Tag `v2.0.0`
-- [ ] Publish to PyPI
-- [ ] Publish crates to crates.io
-- [ ] Create GitHub release with benchmark comparison
-
-## Success Criteria
-
-### Stage 1 Complete When
-
-- ✅ All tests pass with new API
-- ✅ 100% code coverage maintained
-- ✅ Baseline benchmarks saved
-- ✅ Wikipedia test documents downloaded
-
-### Stage 2 Complete When
-
-- ✅ All tests pass with Rust backend
-- ✅ 10x+ throughput improvement shown in benchmarks
-- ✅ 50%+ memory reduction shown in benchmarks
-- ✅ Feature parity with v1 verified
-
-### Release Ready When
-
-- ✅ Documentation updated
-- ✅ Migration guide written
-- ✅ CHANGELOG.md complete
-- ✅ Wheels build on all platforms
-- ✅ Performance improvements validated
-
-## Timeline Estimate
-
-- **Stage 1** (API + Benchmarks): 1-2 days
-- **Stage 2** (Rust Implementation): 3-5 days
-- **Stage 3** (Docs + Release): 1-2 days
-
-**Total**: 5-9 days for complete v2.0.0 release
+**Remember**: The foundation is solid. This is about adding features systematically. Use Python code as reference, tests will tell you when you're done.

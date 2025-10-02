@@ -14,9 +14,9 @@ categories = ["parsing", "text-processing"]
 crate-type = ["rlib"]
 
 [dependencies]
-scraper.workspace = true
 html5ever.workspace = true
 markup5ever_rcdom.workspace = true
+ammonia.workspace = true
 regex.workspace = true
 once_cell.workspace = true
 thiserror.workspace = true

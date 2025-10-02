@@ -18,10 +18,10 @@ homepage = "https://github.com/Goldziher/html-to-markdown"
 # Core library
 html-to-markdown = { path = "crates/html-to-markdown" }
 
-# HTML parsing
-scraper = "0.21"
-html5ever = "0.29"
-markup5ever_rcdom = "0.3"
+# HTML parsing and sanitization
+html5ever = "0.35"
+markup5ever_rcdom = "0.35"
+ammonia = "4.1"
 
 # Utilities
 regex = "1.11"

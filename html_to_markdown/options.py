@@ -206,21 +206,3 @@ class ParsingOptions:
 
     parser: str | None = None
     """HTML parser to use: 'html.parser', 'lxml', or 'html5lib' (None = auto)."""
-
-
-@dataclass
-class StreamingOptions:
-    """Streaming conversion configuration.
-
-    Example:
-        >>> options = StreamingOptions(
-        ...     chunk_size=8192,
-        ...     progress_callback=lambda current, total: print(f"{current}/{total}"),
-        ... )
-    """
-
-    chunk_size: int = 8192
-    """Size of chunks for streaming processing."""
-
-    progress_callback: Callable[[int, int], None] | None = None
-    """Callback for progress updates (current_bytes, total_bytes)."""

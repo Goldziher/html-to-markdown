@@ -11,7 +11,7 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from html_to_markdown import ConversionOptions, StreamingOptions, convert, convert_stream, convert_to_markdown
+from html_to_markdown import ConversionOptions, convert, convert_stream, convert_to_markdown
 
 if TYPE_CHECKING:
     from pytest_benchmark.fixture import BenchmarkFixture  # type: ignore[import-untyped]
@@ -134,8 +134,7 @@ class TestWikipediaStreaming:
         html = _load_wikipedia_doc("small_html.html")
 
         def stream_convert() -> str:
-            options = StreamingOptions(chunk_size=chunk_size)
-            return "".join(convert_stream(html, streaming=options))
+            return "".join(convert_stream(html, chunk_size=chunk_size))
 
         result = benchmark(stream_convert)
         assert len(result) > 0

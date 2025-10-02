@@ -9,34 +9,22 @@ if TYPE_CHECKING:
 
 from html_to_markdown import convert_to_markdown
 
-try:
-    import importlib.util
 
-    LXML_AVAILABLE = importlib.util.find_spec("lxml") is not None
-    HTML5LIB_AVAILABLE = importlib.util.find_spec("html5lib") is not None
-except ImportError:  # pragma: no cover
-    LXML_AVAILABLE = False
-    HTML5LIB_AVAILABLE = False
+@pytest.fixture
+def parser() -> str:
+    """Fixture that provides the HTML parser to use for tests.
 
-AVAILABLE_PARSERS = ["html.parser"]
-if LXML_AVAILABLE:
-    AVAILABLE_PARSERS.append("lxml")
-if HTML5LIB_AVAILABLE:
-    AVAILABLE_PARSERS.append("html5lib")
-
-
-@pytest.fixture(params=AVAILABLE_PARSERS)
-def parser(request: pytest.FixtureRequest) -> str:
-    """Fixture that runs tests with all available HTML parsers to ensure parser-agnostic behavior."""
-    return str(request.param)
+    Currently only supports html.parser since we're using the Rust backend.
+    """
+    return "html.parser"
 
 
 @pytest.fixture
-def convert(parser: str) -> Callable[..., str]:
-    """Fixture that provides a convert function using the current parser."""
+def convert() -> Callable[..., str]:
+    """Fixture that provides a convert function using the Rust backend."""
 
     def _convert(html: str, **kwargs: Any) -> str:
-        return convert_to_markdown(html, parser=parser, **kwargs)
+        return convert_to_markdown(html, **kwargs)
 
     return _convert
 
