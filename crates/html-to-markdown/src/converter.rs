@@ -1372,11 +1372,11 @@ fn walk_node(handle: &Handle, output: &mut String, options: &ConversionOptions, 
 
                 // Tables - process at table level to track row indices
                 "table" => {
-                    // Add leading block separation (tables always start with \n\n)
+                    // Add leading block separation (but not at document start)
                     if !output.ends_with("\n\n") {
-                        if output.is_empty() || !output.ends_with('\n') {
+                        if !output.is_empty() && !output.ends_with('\n') {
                             output.push_str("\n\n");
-                        } else {
+                        } else if !output.is_empty() {
                             output.push('\n');
                         }
                     }
