@@ -80,6 +80,8 @@ struct Context {
     in_list: bool,
     /// Is this a "loose" list where all items should have blank lines?
     loose_list: bool,
+    /// Are we inside a heading element (h1-h6)?
+    in_heading: bool,
 }
 
 /// Check if a document is an hOCR (HTML-based OCR) document.
@@ -321,6 +323,7 @@ pub fn convert_html(html: &str, options: &ConversionOptions) -> Result<String> {
         in_ruby: false,
         in_list: false,
         loose_list: false,
+        in_heading: false,
     };
     walk_node(&dom.document, &mut output, options, &ctx, 0);
 
@@ -483,8 +486,12 @@ fn walk_node(handle: &Handle, output: &mut String, options: &ConversionOptions, 
                     let level = tag_name.chars().last().and_then(|c| c.to_digit(10)).unwrap_or(1) as usize;
 
                     let mut text = String::new();
+                    let heading_ctx = Context {
+                        in_heading: true,
+                        ..ctx.clone()
+                    };
                     for child in handle.children.borrow().iter() {
-                        walk_node(child, &mut text, options, ctx, depth + 1);
+                        walk_node(child, &mut text, options, &heading_ctx, depth + 1);
                     }
                     let text = text.trim();
 
@@ -667,15 +674,61 @@ fn walk_node(handle: &Handle, output: &mut String, options: &ConversionOptions, 
                         .map(|attr| attr.value.to_string())
                         .unwrap_or_default();
 
-                    if ctx.convert_as_inline {
-                        // In inline mode, just output alt text
+                    let title = attrs
+                        .borrow()
+                        .iter()
+                        .find(|attr| attr.name.local.as_ref() == "title")
+                        .map(|attr| attr.value.to_string());
+
+                    // Check for width/height attributes
+                    let width = attrs
+                        .borrow()
+                        .iter()
+                        .find(|attr| attr.name.local.as_ref() == "width")
+                        .map(|attr| attr.value.to_string());
+
+                    let height = attrs
+                        .borrow()
+                        .iter()
+                        .find(|attr| attr.name.local.as_ref() == "height")
+                        .map(|attr| attr.value.to_string());
+
+                    if ctx.convert_as_inline || ctx.in_heading {
+                        // In inline mode or headings, just output alt text
                         output.push_str(&alt);
+                    } else if width.is_some() || height.is_some() {
+                        // If width or height specified, output as HTML tag
+                        output.push_str("<img src='");
+                        output.push_str(&src);
+                        output.push_str("' alt='");
+                        output.push_str(&alt);
+                        output.push_str("' title='");
+                        if let Some(title_text) = &title {
+                            output.push_str(title_text);
+                        }
+                        output.push('\'');
+                        if let Some(w) = &width {
+                            output.push_str(" width='");
+                            output.push_str(w);
+                            output.push('\'');
+                        }
+                        if let Some(h) = &height {
+                            output.push_str(" height='");
+                            output.push_str(h);
+                            output.push('\'');
+                        }
+                        output.push_str(" />");
                     } else {
-                        // In normal mode, output ![alt](src)
+                        // In normal mode, output ![alt](src) or ![alt](src "title")
                         output.push_str("![");
                         output.push_str(&alt);
                         output.push_str("](");
                         output.push_str(&src);
+                        if let Some(title_text) = title {
+                            output.push_str(" \"");
+                            output.push_str(&title_text);
+                            output.push('"');
+                        }
                         output.push(')');
                     }
                 }
@@ -1307,9 +1360,13 @@ fn walk_node(handle: &Handle, output: &mut String, options: &ConversionOptions, 
 
                 // Tables - process at table level to track row indices
                 "table" => {
-                    // Add leading block separation if there's prior content
-                    if !output.is_empty() && !output.ends_with("\n\n") {
-                        output.push_str("\n\n");
+                    // Add leading block separation (tables always start with \n\n)
+                    if !output.ends_with("\n\n") {
+                        if output.is_empty() || !output.ends_with('\n') {
+                            output.push_str("\n\n");
+                        } else {
+                            output.push('\n');
+                        }
                     }
                     convert_table(handle, output, options, ctx);
                     output.push('\n');
@@ -2054,47 +2111,117 @@ fn walk_node(handle: &Handle, output: &mut String, options: &ConversionOptions, 
 
                 // Ruby annotations
                 "ruby" => {
-                    // Process ruby content: collect base text and annotations separately
+                    // Process ruby content: handle rb, rt, and rtc elements
                     let ruby_ctx = Context {
                         in_ruby: true,
                         ..ctx.clone()
                     };
 
-                    let mut base_text = String::new();
-                    let mut annotations = String::new();
-
-                    for child in handle.children.borrow().iter() {
-                        match &child.data {
-                            NodeData::Element { name, .. } => {
-                                let tag_name = name.local.as_ref();
-                                if tag_name == "rt" || tag_name == "rtc" {
-                                    // Annotations go to annotations buffer
-                                    walk_node(child, &mut annotations, options, &ruby_ctx, depth);
+                    // Analyze structure: collect tag names to check pattern
+                    let tag_sequence: Vec<String> = handle
+                        .children
+                        .borrow()
+                        .iter()
+                        .filter_map(|child| {
+                            if let NodeData::Element { name, .. } = &child.data {
+                                let tag = name.local.as_ref();
+                                if tag == "rb" || tag == "rt" || tag == "rtc" {
+                                    Some(tag.to_string())
                                 } else {
-                                    // Everything else (rb, rp, etc) goes to base text
+                                    None
+                                }
+                            } else {
+                                None
+                            }
+                        })
+                        .collect();
+
+                    // Check if there's an rtc element
+                    let has_rtc = tag_sequence.iter().any(|tag| tag == "rtc");
+
+                    // Check if rb/rt are interleaved (rb rt rb rt) vs grouped (rb rb rt rt)
+                    let is_interleaved = tag_sequence.windows(2).any(|w| w[0] == "rb" && w[1] == "rt");
+
+                    if is_interleaved && !has_rtc {
+                        // Interleaved pattern: output rb(rt) pairs as we go
+                        let mut current_base = String::new();
+                        for child in handle.children.borrow().iter() {
+                            match &child.data {
+                                NodeData::Element { name, .. } => {
+                                    let tag_name = name.local.as_ref();
+                                    if tag_name == "rt" {
+                                        let mut annotation = String::new();
+                                        walk_node(child, &mut annotation, options, &ruby_ctx, depth);
+                                        if !current_base.is_empty() {
+                                            output.push_str(current_base.trim());
+                                            current_base.clear();
+                                        }
+                                        output.push_str(annotation.trim());
+                                    } else if tag_name == "rb" {
+                                        if !current_base.is_empty() {
+                                            output.push_str(current_base.trim());
+                                            current_base.clear();
+                                        }
+                                        walk_node(child, &mut current_base, options, &ruby_ctx, depth);
+                                    } else if tag_name != "rp" {
+                                        walk_node(child, &mut current_base, options, &ruby_ctx, depth);
+                                    }
+                                }
+                                NodeData::Text { .. } => {
+                                    walk_node(child, &mut current_base, options, &ruby_ctx, depth);
+                                }
+                                _ => {}
+                            }
+                        }
+                        if !current_base.is_empty() {
+                            output.push_str(current_base.trim());
+                        }
+                    } else {
+                        // Grouped pattern: collect all, then output base + (annotations) + rtc
+                        let mut base_text = String::new();
+                        let mut rt_annotations = Vec::new();
+                        let mut rtc_content = String::new();
+
+                        for child in handle.children.borrow().iter() {
+                            match &child.data {
+                                NodeData::Element { name, .. } => {
+                                    let tag_name = name.local.as_ref();
+                                    if tag_name == "rt" {
+                                        let mut annotation = String::new();
+                                        walk_node(child, &mut annotation, options, &ruby_ctx, depth);
+                                        rt_annotations.push(annotation);
+                                    } else if tag_name == "rtc" {
+                                        walk_node(child, &mut rtc_content, options, &ruby_ctx, depth);
+                                    } else if tag_name != "rp" {
+                                        walk_node(child, &mut base_text, options, &ruby_ctx, depth);
+                                    }
+                                }
+                                NodeData::Text { .. } => {
                                     walk_node(child, &mut base_text, options, &ruby_ctx, depth);
                                 }
+                                _ => {}
                             }
-                            NodeData::Text { .. } => {
-                                // Text nodes (outside of rb/rt) are base text
-                                walk_node(child, &mut base_text, options, &ruby_ctx, depth);
+                        }
+
+                        // Output base text - trim it completely in grouped pattern
+                        output.push_str(base_text.trim());
+
+                        if !rt_annotations.is_empty() {
+                            let rt_text = rt_annotations.iter().map(|s| s.trim()).collect::<Vec<_>>().join("");
+                            // Wrap rt annotations in extra parentheses only if multiple rt + rtc
+                            if has_rtc && !rtc_content.trim().is_empty() && rt_annotations.len() > 1 {
+                                output.push('(');
+                                output.push_str(&rt_text);
+                                output.push(')');
+                            } else {
+                                output.push_str(&rt_text);
                             }
-                            _ => {}
+                        }
+
+                        if !rtc_content.trim().is_empty() {
+                            output.push_str(rtc_content.trim());
                         }
                     }
-
-                    // Output base text + annotations
-                    // Trim leading whitespace from base, but preserve trailing space if present
-                    let base_trimmed_start = base_text.trim_start();
-                    let has_trailing_space = base_trimmed_start.ends_with(' ') || base_trimmed_start.ends_with('\t');
-                    let base_final = base_trimmed_start.trim_end();
-
-                    output.push_str(base_final);
-                    // Add space before annotation if base text had trailing whitespace
-                    if !base_final.is_empty() && has_trailing_space {
-                        output.push(' ');
-                    }
-                    output.push_str(annotations.trim());
                 }
 
                 "rb" => {
@@ -2282,6 +2409,19 @@ fn get_colspan(handle: &Handle) -> usize {
     1
 }
 
+fn get_rowspan(handle: &Handle) -> usize {
+    if let NodeData::Element { attrs, .. } = &handle.data {
+        for attr in attrs.borrow().iter() {
+            if attr.name.local.as_ref() == "rowspan" {
+                if let Ok(rowspan) = attr.value.to_string().parse::<usize>() {
+                    return rowspan;
+                }
+            }
+        }
+    }
+    1
+}
+
 /// Convert table cell (td or th)
 fn convert_table_cell(
     handle: &Handle,
@@ -2330,6 +2470,7 @@ fn convert_table_row(
     options: &ConversionOptions,
     ctx: &Context,
     row_index: usize,
+    rowspan_tracker: &mut std::collections::HashMap<usize, usize>,
 ) {
     let mut row_text = String::new();
     let mut cells = Vec::new();
@@ -2346,13 +2487,40 @@ fn convert_table_row(
         }
     }
 
-    // Process cells
-    for child in handle.children.borrow().iter() {
-        if let NodeData::Element { name, .. } = &child.data {
-            let cell_name = name.local.as_ref();
-            if cell_name == "th" || cell_name == "td" {
-                convert_table_cell(child, &mut row_text, options, ctx, cell_name);
+    // Process cells and track column positions with rowspan handling
+    let mut col_index = 0;
+    let mut cell_iter = cells.iter();
+
+    loop {
+        // Check if there's an active rowspan cell for this column
+        if let Some(remaining_rows) = rowspan_tracker.get_mut(&col_index) {
+            if *remaining_rows > 0 {
+                // Insert empty placeholder for this column
+                row_text.push_str(" |");
+                *remaining_rows -= 1;
+                if *remaining_rows == 0 {
+                    rowspan_tracker.remove(&col_index);
+                }
+                col_index += 1;
+                continue;
             }
+        }
+
+        // Process next actual cell
+        if let Some(cell_handle) = cell_iter.next() {
+            convert_table_cell(cell_handle, &mut row_text, options, ctx, "");
+
+            let colspan = get_colspan(cell_handle);
+            let rowspan = get_rowspan(cell_handle);
+
+            // If this cell has rowspan > 1, track it for future rows
+            if rowspan > 1 {
+                rowspan_tracker.insert(col_index, rowspan - 1);
+            }
+
+            col_index += colspan;
+        } else {
+            break;
         }
     }
 
@@ -2379,6 +2547,7 @@ fn convert_table_row(
 fn convert_table(handle: &Handle, output: &mut String, options: &ConversionOptions, ctx: &Context) {
     if let NodeData::Element { .. } = &handle.data {
         let mut row_index = 0;
+        let mut rowspan_tracker = std::collections::HashMap::new();
 
         // Process all table children in order
         for child in handle.children.borrow().iter() {
@@ -2405,7 +2574,7 @@ fn convert_table(handle: &Handle, output: &mut String, options: &ConversionOptio
                         for row_child in child.children.borrow().iter() {
                             if let NodeData::Element { name: row_name, .. } = &row_child.data {
                                 if row_name.local.as_ref() == "tr" {
-                                    convert_table_row(row_child, output, options, ctx, row_index);
+                                    convert_table_row(row_child, output, options, ctx, row_index, &mut rowspan_tracker);
                                     row_index += 1;
                                 }
                             }
@@ -2414,7 +2583,7 @@ fn convert_table(handle: &Handle, output: &mut String, options: &ConversionOptio
 
                     "tr" => {
                         // Direct tr children (no thead/tbody)
-                        convert_table_row(child, output, options, ctx, row_index);
+                        convert_table_row(child, output, options, ctx, row_index, &mut rowspan_tracker);
                         row_index += 1;
                     }
 
