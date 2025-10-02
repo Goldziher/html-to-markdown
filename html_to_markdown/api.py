@@ -86,6 +86,7 @@ def convert(
         sub_symbol=options.sub_symbol,
         sup_symbol=options.sup_symbol,
         newline_style=options.newline_style,
+        keep_inline_images_in=list(options.keep_inline_images_in) if options.keep_inline_images_in else [],
         preprocessing=rust_preprocessing,
         parsing=rust_parsing,
     )

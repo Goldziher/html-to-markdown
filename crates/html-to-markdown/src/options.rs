@@ -160,6 +160,9 @@ pub struct ConversionOptions {
     /// Newline style
     pub newline_style: NewlineStyle,
 
+    /// Elements where images should remain as markdown (not converted to alt text)
+    pub keep_inline_images_in: Vec<String>,
+
     /// Preprocessing options
     pub preprocessing: PreprocessingOptions,
 
@@ -192,6 +195,7 @@ impl Default for ConversionOptions {
             sub_symbol: String::new(),
             sup_symbol: String::new(),
             newline_style: NewlineStyle::default(),
+            keep_inline_images_in: Vec::new(),
             preprocessing: PreprocessingOptions::default(),
             parsing: ParsingOptions::default(),
         }

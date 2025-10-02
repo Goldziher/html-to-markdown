@@ -127,6 +127,8 @@ struct ConversionOptions {
     #[pyo3(get, set)]
     newline_style: String,
     #[pyo3(get, set)]
+    keep_inline_images_in: Vec<String>,
+    #[pyo3(get, set)]
     preprocessing: PreprocessingOptions,
     #[pyo3(get, set)]
     parsing: ParsingOptions,
@@ -159,6 +161,7 @@ impl ConversionOptions {
         sub_symbol="".to_string(),
         sup_symbol="".to_string(),
         newline_style="spaces".to_string(),
+        keep_inline_images_in=Vec::new(),
         preprocessing=None,
         parsing=None
     ))]
@@ -185,6 +188,7 @@ impl ConversionOptions {
         sub_symbol: String,
         sup_symbol: String,
         newline_style: String,
+        keep_inline_images_in: Vec<String>,
         preprocessing: Option<PreprocessingOptions>,
         parsing: Option<ParsingOptions>,
     ) -> Self {
@@ -211,6 +215,7 @@ impl ConversionOptions {
             sub_symbol,
             sup_symbol,
             newline_style,
+            keep_inline_images_in,
             preprocessing: preprocessing
                 .unwrap_or_else(|| PreprocessingOptions::new(false, "standard".to_string(), true, true)),
             parsing: parsing.unwrap_or_else(|| ParsingOptions::new("utf-8".to_string(), None)),
@@ -262,6 +267,7 @@ impl ConversionOptions {
                 "backslash" => NewlineStyle::Backslash,
                 _ => NewlineStyle::Spaces,
             },
+            keep_inline_images_in: self.keep_inline_images_in.clone(),
             preprocessing: self.preprocessing.to_rust(),
             parsing: self.parsing.to_rust(),
         }

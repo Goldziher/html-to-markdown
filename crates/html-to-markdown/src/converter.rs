@@ -82,6 +82,8 @@ struct Context {
     loose_list: bool,
     /// Are we inside a heading element (h1-h6)?
     in_heading: bool,
+    /// Current heading tag (h1, h2, etc.) if in_heading is true
+    heading_tag: Option<String>,
 }
 
 /// Check if a document is an hOCR (HTML-based OCR) document.
@@ -324,6 +326,7 @@ pub fn convert_html(html: &str, options: &ConversionOptions) -> Result<String> {
         in_list: false,
         loose_list: false,
         in_heading: false,
+        heading_tag: None,
     };
     walk_node(&dom.document, &mut output, options, &ctx, 0);
 
@@ -488,6 +491,7 @@ fn walk_node(handle: &Handle, output: &mut String, options: &ConversionOptions, 
                     let mut text = String::new();
                     let heading_ctx = Context {
                         in_heading: true,
+                        heading_tag: Some(tag_name.to_string()),
                         ..ctx.clone()
                     };
                     for child in handle.children.borrow().iter() {
@@ -693,8 +697,16 @@ fn walk_node(handle: &Handle, output: &mut String, options: &ConversionOptions, 
                         .find(|attr| attr.name.local.as_ref() == "height")
                         .map(|attr| attr.value.to_string());
 
-                    if ctx.convert_as_inline || ctx.in_heading {
-                        // In inline mode or headings, just output alt text
+                    // Determine if image should be rendered as alt text
+                    let should_use_alt_text = ctx.convert_as_inline
+                        || (ctx.in_heading
+                            && ctx
+                                .heading_tag
+                                .as_ref()
+                                .is_none_or(|tag| !options.keep_inline_images_in.contains(tag)));
+
+                    if should_use_alt_text {
+                        // In inline mode or headings (unless in keep_inline_images_in), just output alt text
                         output.push_str(&alt);
                     } else if width.is_some() || height.is_some() {
                         // If width or height specified, output as HTML tag

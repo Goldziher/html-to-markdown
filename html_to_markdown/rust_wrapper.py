@@ -35,7 +35,7 @@ def convert_to_markdown_rust(
     extract_metadata: bool = True,
     heading_style: Literal["underlined", "atx", "atx_closed"] = UNDERLINED,
     highlight_style: Literal["double-equal", "html", "bold"] = DOUBLE_EQUAL,
-    _keep_inline_images_in: Iterable[str] | None = None,
+    keep_inline_images_in: Iterable[str] | None = None,
     list_indent_type: Literal["spaces", "tabs"] = "spaces",
     list_indent_width: int = 4,
     newline_style: Literal["spaces", "backslash"] = SPACES,
@@ -102,6 +102,7 @@ def convert_to_markdown_rust(
         sub_symbol=sub_symbol,
         sup_symbol=sup_symbol,
         newline_style=newline_style,
+        keep_inline_images_in=list(keep_inline_images_in) if keep_inline_images_in else [],
         preprocessing=rust_preprocessing,
         parsing=rust_parsing,
     )
