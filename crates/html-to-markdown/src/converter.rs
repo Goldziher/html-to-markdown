@@ -1372,11 +1372,11 @@ fn walk_node(handle: &Handle, output: &mut String, options: &ConversionOptions, 
 
                 // Tables - process at table level to track row indices
                 "table" => {
-                    // Add leading block separation (but not at document start)
+                    // Add leading block separation (tables always start with \n\n)
                     if !output.ends_with("\n\n") {
-                        if !output.is_empty() && !output.ends_with('\n') {
+                        if output.is_empty() || !output.ends_with('\n') {
                             output.push_str("\n\n");
-                        } else if !output.is_empty() {
+                        } else {
                             output.push('\n');
                         }
                     }
@@ -1446,17 +1446,20 @@ fn walk_node(handle: &Handle, output: &mut String, options: &ConversionOptions, 
                         return;
                     }
 
-                    // Track content start position to check if figure had any content
-                    let content_start = output.len();
-
-                    // Process children directly into output (don't trim - preserve structure)
+                    // Process children into a temporary buffer
+                    let mut figure_content = String::new();
                     for child in handle.children.borrow().iter() {
-                        walk_node(child, output, options, ctx, depth);
+                        walk_node(child, &mut figure_content, options, ctx, depth);
                     }
 
-                    // Add trailing block separation if figure had content
-                    if output.len() > content_start && !output.ends_with("\n\n") {
-                        output.push_str("\n\n");
+                    // Strip leading newlines and output
+                    let trimmed = figure_content.trim_start_matches('\n');
+                    if !trimmed.is_empty() {
+                        output.push_str(trimmed);
+                        // Add trailing block separation if needed
+                        if !output.ends_with("\n\n") {
+                            output.push_str("\n\n");
+                        }
                     }
                 }
 
