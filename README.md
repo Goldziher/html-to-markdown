@@ -9,7 +9,7 @@ High-performance HTML to Markdown converter. Rust crate with Python bindings and
 
 ## ⚡ Performance
 
-Built with Rust using `html5ever` and `ammonia` for exceptional performance:
+Built with Rust using `html5ever` for exceptional performance and correctness:
 
 | Document Type      | Size  | Conversion Time | Throughput   |
 | ------------------ | ----- | --------------- | ------------ |
@@ -23,9 +23,11 @@ Built with Rust using `html5ever` and `ammonia` for exceptional performance:
 - Convert large documentation (656KB) in **~11ms**
 - Batch process 1000 documents in **5-11 seconds** depending on size
 
+**10-30x faster** than v1 Python implementation.
+
 ## Features
 
-- **🚀 Blazing Fast**: Rust core with `html5ever` parser and `ammonia` sanitizer
+- **🚀 Blazing Fast**: Pure Rust core with Mozilla's `html5ever` parser
 - **🐍 Python Bindings**: Clean Python API via PyO3 with full type hints
 - **🦀 Native CLI**: Rust CLI binary with comprehensive options
 - **📊 hOCR Support**: Advanced table extraction from OCR documents
@@ -119,11 +121,11 @@ fn main() {
     "#;
 
     let options = ConversionOptions {
-        heading_style: "atx".to_string(),
+        heading_style: HeadingStyle::Atx,
         ..Default::default()
     };
 
-    let markdown = convert(html, &options).unwrap();
+    let markdown = convert(html, Some(options)).unwrap();
     println!("{}", markdown);
 }
 ```
@@ -157,7 +159,6 @@ from html_to_markdown import (
     convert,
     ConversionOptions,
     PreprocessingOptions,
-    ParsingOptions,
 )
 
 # Conversion settings
@@ -180,13 +181,7 @@ preprocessing = PreprocessingOptions(
     remove_forms=True,
 )
 
-# Parser settings
-parsing = ParsingOptions(
-    encoding="utf-8",
-    parser="html.parser",  # "lxml" recommended for speed
-)
-
-markdown = convert(html, options, preprocessing, parsing)
+markdown = convert(html, options, preprocessing)
 ```
 
 ### Python: Legacy API (v1 compatibility)
@@ -282,13 +277,6 @@ markdown = convert(hocr_html, options)
 | `remove_navigation` | bool | `True`       | Remove nav elements                 |
 | `remove_forms`      | bool | `True`       | Remove form elements                |
 
-### ParsingOptions
-
-| Parameter  | Type | Default         | Description                               |
-| ---------- | ---- | --------------- | ----------------------------------------- |
-| `encoding` | str  | `"utf-8"`       | Source encoding                           |
-| `parser`   | str  | `"html.parser"` | Parser: "html.parser", "lxml", "html5lib" |
-
 ## Upgrading from v1.x
 
 ### Backward Compatibility
@@ -312,23 +300,23 @@ options = ConversionOptions(heading_style="atx", list_indent_width=2)
 markdown = convert(html, options)
 ```
 
-### Unsupported v1 Features
+### What Changed in v2
 
-Some v1 features are not available due to the Rust backend:
+**Core Rewrite:**
 
-- `code_language_callback` - Callbacks not supported
+- Complete Rust rewrite using `html5ever` (Mozilla's HTML parser)
+- 10-30x performance improvement over v1
+- No BeautifulSoup or lxml dependencies
+- Smaller package size, faster installation
+
+**Unsupported v1 Features:**
+
+Some v1 features are not available in v2 (raise `NotImplementedError`):
+
+- `code_language_callback` - Callbacks not supported in Rust backend
 - `strip` / `convert` options - Use preprocessing instead
 - `custom_converters` - Not yet implemented
 - `convert_to_markdown_stream()` - Not yet implemented
-
-These raise `NotImplementedError` with clear messages.
-
-## Performance Tips
-
-1. **Use lxml parser** when available: `pip install lxml`
-1. **Enable preprocessing** for web-scraped content
-1. **Adjust hOCR thresholds** for your OCR quality
-1. **Use V2 API** for better type checking and IDE support
 
 ## Contributing
 
@@ -340,7 +328,7 @@ MIT License - see [LICENSE](LICENSE) for details.
 
 ## Acknowledgments
 
-This library started out as a fork of [markdownify](https://pypi.org/project/markdownify/), with the goal of improving performance and adding modern Python typing.
+Version 1 started as a fork of [markdownify](https://pypi.org/project/markdownify/), rewritten, extended, and enhanced with better typing and features. Version 2 is a complete Rust rewrite for high performance.
 
 ## Support
 
