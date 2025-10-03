@@ -79,8 +79,7 @@ jobs:
           retry_wait_seconds: 30
           command: |
             uv sync --all-extras
-            uv pip install maturin
-            uv run maturin develop --release --manifest-path crates/html-to-markdown-py/Cargo.toml
+            uv pip install --no-build-isolation -e .
           shell: bash
 
       - name: Run Rust Checks
@@ -133,8 +132,7 @@ jobs:
           retry_wait_seconds: 30
           command: |
             uv sync --all-extras
-            uv pip install maturin
-            uv run maturin develop --release --manifest-path crates/html-to-markdown-py/Cargo.toml
+            uv pip install --no-build-isolation -e .
           shell: bash
 
       - name: Run Tests with Coverage
@@ -200,8 +198,7 @@ jobs:
               rm -rf .venv
             fi
             uv sync --all-extras
-            uv pip install maturin
-            uv run maturin develop --release --manifest-path crates/html-to-markdown-py/Cargo.toml
+            uv pip install --no-build-isolation -e .
           shell: bash
 
       - name: Test

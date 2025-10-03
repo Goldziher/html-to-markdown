@@ -1,11 +1,10 @@
 [build-system]
-build-backend = "setuptools.build_meta"
-
-requires = [ "setuptools>=78.1" ]
+build-backend = "maturin"
+requires = [ "maturin>=1.9,<2" ]
 
 [project]
 name = "html-to-markdown"
-version = "1.16.0"
+version = "2.0.0"
 description = "A modern, type-safe Python library for converting HTML to Markdown with comprehensive tag support and customizable options"
 readme = "README.md"
 keywords = [
@@ -42,13 +41,7 @@ classifiers = [
   "Topic :: Utilities",
   "Typing :: Typed",
 ]
-dependencies = [
-  "beautifulsoup4>=4.13.5",
-  "nh3>=0.3",
-]
-optional-dependencies.html5lib = [ "beautifulsoup4[html5lib]>=4.13.5" ]
-
-optional-dependencies.lxml = [ "beautifulsoup4[lxml]>=4.13.5" ]
+dependencies = [  ]
 urls.Changelog = "https://github.com/Goldziher/html-to-markdown/releases"
 urls.Homepage = "https://github.com/Goldziher/html-to-markdown"
 urls.Issues = "https://github.com/Goldziher/html-to-markdown/issues"
@@ -83,6 +76,10 @@ html_to_markdown = [ "py.typed" ]
 
 [tool.hatch.build]
 skip-excluded-dirs = true
+
+[tool.maturin]
+manifest-path = "crates/html-to-markdown-py/Cargo.toml"
+module-name = "html_to_markdown._html_to_markdown"
 
 [tool.ruff]
 target-version = "py310"
