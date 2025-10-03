@@ -1,4 +1,4 @@
-use html_to_markdown::{convert, ConversionOptions};
+use html_to_markdown::convert;
 
 fn main() {
     let html = "<h1>Hello World</h1><p>This is a <strong>test</strong>.</p>";

@@ -1,4 +1,4 @@
-use html_to_markdown::{convert, ConversionOptions};
+use html_to_markdown::convert;
 
 fn main() {
     // Test 1: Asterisks should be escaped
