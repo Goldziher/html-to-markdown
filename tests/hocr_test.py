@@ -8,7 +8,7 @@ from pathlib import Path
 
 import pytest
 
-from html_to_markdown import ConversionOptions, convert_to_markdown
+from html_to_markdown import ConversionOptions, convert, convert_to_markdown
 
 
 def get_hocr_file(filename: str) -> Path:
@@ -243,9 +243,10 @@ def test_hocr_table_extraction() -> None:
     </html>
     """
 
+    # Use convert API with ConversionOptions
     options = ConversionOptions()
     options.hocr_extract_tables = True
-    result = convert_to_markdown(hocr_content, options)
+    result = convert(hocr_content, options)
 
     # Verify table structure is present in markdown
     assert "|" in result, "Should contain table markdown"
@@ -278,7 +279,7 @@ def test_hocr_table_extraction_disabled() -> None:
 
     options = ConversionOptions()
     options.hocr_extract_tables = False
-    result = convert_to_markdown(hocr_content, options)
+    result = convert(hocr_content, options)
 
     # With table extraction disabled, should just be plain text
     assert "Col1" in result
@@ -303,7 +304,7 @@ def test_hocr_table_confidence_filtering() -> None:
 
     options = ConversionOptions()
     options.hocr_extract_tables = True
-    result = convert_to_markdown(hocr_content, options)
+    result = convert(hocr_content, options)
 
     assert "Good" in result, "High confidence word should be included"
     assert "Quality" in result, "High confidence word should be included"

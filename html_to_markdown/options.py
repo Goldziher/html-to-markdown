@@ -106,6 +106,16 @@ class ConversionOptions:
     br_in_tables: bool = False
     """Use <br> tags for line breaks in table cells instead of spaces."""
 
+    # hOCR table extraction
+    hocr_extract_tables: bool = True
+    """Enable table extraction from hOCR (HTML-based OCR) documents."""
+
+    hocr_table_column_threshold: int = 50
+    """Pixel threshold for detecting column boundaries in hOCR tables."""
+
+    hocr_table_row_threshold_ratio: float = 0.5
+    """Row height ratio threshold for detecting row boundaries in hOCR tables."""
+
     # Highlighting
     highlight_style: Literal["double-equal", "html", "bold"] = "double-equal"
     """Style for highlighting <mark> elements."""
