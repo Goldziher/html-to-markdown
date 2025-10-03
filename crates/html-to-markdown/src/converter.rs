@@ -368,6 +368,33 @@ pub fn convert_html(html: &str, options: &ConversionOptions) -> Result<String> {
         in_paragraph: false,
         in_ruby: false,
     };
+
+    // Extract tables from hOCR if enabled
+    if options.hocr_extract_tables && is_hocr_document(&dom.document) {
+        use crate::hocr::{extract_hocr_words, reconstruct_table, table_to_markdown};
+
+        // Extract words from hOCR with minimum confidence of 0.0 (include all words)
+        let words = extract_hocr_words(&dom.document, 0.0);
+
+        if !words.is_empty() {
+            // Reconstruct table from positioned words
+            let table = reconstruct_table(
+                &words,
+                options.hocr_table_column_threshold,
+                options.hocr_table_row_threshold_ratio,
+            );
+
+            // Convert table to markdown and prepend to output
+            if !table.is_empty() {
+                let table_markdown = table_to_markdown(&table);
+                if !table_markdown.is_empty() {
+                    output.push_str(&table_markdown);
+                    output.push_str("\n\n");
+                }
+            }
+        }
+    }
+
     walk_node(&dom.document, &mut output, options, &ctx, 0);
 
     Ok(output)
