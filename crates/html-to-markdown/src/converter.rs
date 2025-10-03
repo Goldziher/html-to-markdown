@@ -74,8 +74,6 @@ struct Context {
     in_list_item: bool,
     /// List nesting depth (for indentation)
     list_depth: usize,
-    /// Are we inside a ruby element?
-    in_ruby: bool,
     /// Are we inside any list (ul or ol)?
     in_list: bool,
     /// Is this a "loose" list where all items should have blank lines?
@@ -84,6 +82,8 @@ struct Context {
     in_heading: bool,
     /// Current heading tag (h1, h2, etc.) if in_heading is true
     heading_tag: Option<String>,
+    /// Are we inside a paragraph element?
+    in_paragraph: bool,
 }
 
 /// Check if a document is an hOCR (HTML-based OCR) document.
@@ -322,11 +322,11 @@ pub fn convert_html(html: &str, options: &ConversionOptions) -> Result<String> {
         convert_as_inline: options.convert_as_inline,
         in_list_item: false,
         list_depth: 0,
-        in_ruby: false,
         in_list: false,
         loose_list: false,
         in_heading: false,
         heading_tag: None,
+        in_paragraph: false,
     };
     walk_node(&dom.document, &mut output, options, &ctx, 0);
 
@@ -574,11 +574,14 @@ fn walk_node(handle: &Handle, output: &mut String, options: &ConversionOptions, 
                         && !output.ends_with(". ");
 
                     // Check if we need leading block separation
+                    // Don't add spacing after code blocks (ending with ```\n)
+                    let after_code_block = output.ends_with("```\n");
                     let needs_leading_sep = !ctx.in_table_cell
                         && !ctx.in_list_item
                         && !ctx.convert_as_inline
                         && !output.is_empty()
-                        && !output.ends_with("\n\n");
+                        && !output.ends_with("\n\n")
+                        && !after_code_block;
 
                     if is_table_continuation {
                         // In table cells, separate multiple block elements with <br>
@@ -602,8 +605,14 @@ fn walk_node(handle: &Handle, output: &mut String, options: &ConversionOptions, 
                         output.push_str("\n\n");
                     }
 
+                    // Create paragraph context for children
+                    let p_ctx = Context {
+                        in_paragraph: true,
+                        ..ctx.clone()
+                    };
+
                     for child in handle.children.borrow().iter() {
-                        walk_node(child, output, options, ctx, depth + 1);
+                        walk_node(child, output, options, &p_ctx, depth + 1);
                     }
 
                     // Only add trailing separator if paragraph had content
@@ -878,16 +887,17 @@ fn walk_node(handle: &Handle, output: &mut String, options: &ConversionOptions, 
                 }
 
                 "abbr" => {
-                    // Collect and trim content
+                    // Collect content
                     let mut content = String::new();
                     for child in handle.children.borrow().iter() {
                         walk_node(child, &mut content, options, ctx, depth + 1);
                     }
-                    let trimmed_content = content.trim();
+                    let (prefix, suffix, trimmed) = chomp(&content);
 
                     // Only output if there's content
-                    if !trimmed_content.is_empty() {
-                        output.push_str(trimmed_content);
+                    if !trimmed.is_empty() {
+                        output.push_str(prefix);
+                        output.push_str(trimmed);
 
                         // Optionally add title as footnote (trimmed)
                         if let Some(title) = attrs
@@ -903,6 +913,7 @@ fn walk_node(handle: &Handle, output: &mut String, options: &ConversionOptions, 
                                 output.push(')');
                             }
                         }
+                        output.push_str(suffix);
                     }
                 }
 
@@ -956,7 +967,7 @@ fn walk_node(handle: &Handle, output: &mut String, options: &ConversionOptions, 
                         }
                         output.push('\n');
                         output.push_str(&content);
-                        output.push_str("\n```\n\n");
+                        output.push_str("\n```\n");
                     }
                 }
 
@@ -1351,7 +1362,7 @@ fn walk_node(handle: &Handle, output: &mut String, options: &ConversionOptions, 
 
                     // Ensure list items end with proper separator (but not in table cells)
                     if !ctx.in_table_cell {
-                        // Use \n\n if: item has block children OR list is "loose" (contains paragraphs)
+                        // Use \n\n if item has block children OR list is loose
                         if has_block_children || ctx.loose_list {
                             // List items with block children or in loose lists should end with \n\n
                             if !output.ends_with("\n\n") {
@@ -1471,8 +1482,14 @@ fn walk_node(handle: &Handle, output: &mut String, options: &ConversionOptions, 
                     let text = text.trim();
                     if !text.is_empty() {
                         // Add block separation before caption if there's prior content
-                        if !output.is_empty() && !output.ends_with("\n\n") {
-                            output.push_str("\n\n");
+                        if !output.is_empty() {
+                            if output.ends_with("```\n") {
+                                // After code block, add single newline
+                                output.push('\n');
+                            } else if !output.ends_with("\n\n") {
+                                // Otherwise add double newline
+                                output.push_str("\n\n");
+                            }
                         }
                         output.push('*');
                         output.push_str(text);
@@ -1769,7 +1786,8 @@ fn walk_node(handle: &Handle, output: &mut String, options: &ConversionOptions, 
                         output.push_str("](");
                         output.push_str(&src);
                         output.push(')');
-                        if !ctx.convert_as_inline {
+                        // Add block spacing only when not inside paragraph/inline contexts
+                        if !ctx.in_paragraph && !ctx.convert_as_inline {
                             output.push_str("\n\n");
                         }
                     }
@@ -1787,8 +1805,8 @@ fn walk_node(handle: &Handle, output: &mut String, options: &ConversionOptions, 
                         }
                     }
                     if !fallback.is_empty() {
-                        output.push_str(&fallback);
-                        if !ctx.convert_as_inline {
+                        output.push_str(fallback.trim());
+                        if !ctx.in_paragraph && !ctx.convert_as_inline {
                             output.push_str("\n\n");
                         }
                     }
@@ -1829,7 +1847,8 @@ fn walk_node(handle: &Handle, output: &mut String, options: &ConversionOptions, 
                         output.push_str("](");
                         output.push_str(&src);
                         output.push(')');
-                        if !ctx.convert_as_inline {
+                        // Add block spacing only when not inside paragraph/inline contexts
+                        if !ctx.in_paragraph && !ctx.convert_as_inline {
                             output.push_str("\n\n");
                         }
                     }
@@ -1847,8 +1866,8 @@ fn walk_node(handle: &Handle, output: &mut String, options: &ConversionOptions, 
                         }
                     }
                     if !fallback.is_empty() {
-                        output.push_str(&fallback);
-                        if !ctx.convert_as_inline {
+                        output.push_str(fallback.trim());
+                        if !ctx.in_paragraph && !ctx.convert_as_inline {
                             output.push_str("\n\n");
                         }
                     }
@@ -1885,7 +1904,8 @@ fn walk_node(handle: &Handle, output: &mut String, options: &ConversionOptions, 
                         output.push_str("](");
                         output.push_str(&src);
                         output.push(')');
-                        if !ctx.convert_as_inline {
+                        // Add block spacing only when not inside paragraph/inline contexts
+                        if !ctx.in_paragraph && !ctx.convert_as_inline {
                             output.push_str("\n\n");
                         }
                     }
@@ -2127,10 +2147,7 @@ fn walk_node(handle: &Handle, output: &mut String, options: &ConversionOptions, 
                 // Ruby annotations
                 "ruby" => {
                     // Process ruby content: handle rb, rt, and rtc elements
-                    let ruby_ctx = Context {
-                        in_ruby: true,
-                        ..ctx.clone()
-                    };
+                    let ruby_ctx = ctx.clone();
 
                     // Analyze structure: collect tag names to check pattern
                     let tag_sequence: Vec<String> = handle
@@ -2218,11 +2235,18 @@ fn walk_node(handle: &Handle, output: &mut String, options: &ConversionOptions, 
                             }
                         }
 
-                        // Output base text - trim it completely in grouped pattern
-                        output.push_str(base_text.trim());
+                        // Check if base text has trailing whitespace before trimming
+                        let (_prefix, base_suffix, base_trimmed) = chomp(&base_text);
+
+                        // Output base text - trimmed
+                        output.push_str(base_trimmed);
 
                         if !rt_annotations.is_empty() {
                             let rt_text = rt_annotations.iter().map(|s| s.trim()).collect::<Vec<_>>().join("");
+                            // Add space before annotation only if base text had trailing whitespace
+                            if !rt_text.is_empty() && !base_suffix.is_empty() {
+                                output.push(' ');
+                            }
                             // Wrap rt annotations in extra parentheses only if multiple rt + rtc
                             if has_rtc && !rtc_content.trim().is_empty() && rt_annotations.len() > 1 {
                                 output.push('(');
@@ -2249,25 +2273,20 @@ fn walk_node(handle: &Handle, output: &mut String, options: &ConversionOptions, 
                 }
 
                 "rt" => {
-                    // Ruby annotation text - render in parentheses with trimmed content
+                    // Ruby annotation text - always render in parentheses
                     let mut text = String::new();
                     for child in handle.children.borrow().iter() {
                         walk_node(child, &mut text, options, ctx, depth + 1);
                     }
                     let trimmed = text.trim();
-                    // Always output parentheses, even if empty
                     output.push('(');
                     output.push_str(trimmed);
                     output.push(')');
                 }
 
                 "rp" => {
-                    // Ruby parentheses - ignore if inside ruby element, otherwise output content
-                    if !ctx.in_ruby {
-                        for child in handle.children.borrow().iter() {
-                            walk_node(child, output, options, ctx, depth + 1);
-                        }
-                    }
+                    // Ruby parentheses - always ignore (rt elements provide formatting)
+                    // These are fallback parentheses for browsers that don't support ruby
                 }
 
                 "rtc" => {
