@@ -160,25 +160,25 @@ class TestV1CompatUnsupportedOptions:
         def callback(el: object) -> str:
             return "python"
 
-        with pytest.raises(NotImplementedError, match="code_language_callback is not supported"):
+        with pytest.raises(NotImplementedError, match="code_language_callback was removed"):
             convert_to_markdown(html, code_language_callback=callback)
 
     def test_strip_option_raises(self) -> None:
         """Test that strip option raises NotImplementedError."""
         html = "<a href='#'>link</a>"
-        with pytest.raises(NotImplementedError, match="strip option is not supported"):
+        with pytest.raises(NotImplementedError, match="strip option was removed"):
             convert_to_markdown(html, strip=["a"])
 
     def test_convert_option_raises(self) -> None:
         """Test that convert option raises NotImplementedError."""
         html = "<a href='#'>link</a>"
-        with pytest.raises(NotImplementedError, match="convert option is not supported"):
+        with pytest.raises(NotImplementedError, match="convert option was removed"):
             convert_to_markdown(html, convert=["a"])
 
     def test_custom_converters_raises(self) -> None:
         """Test that custom_converters raises NotImplementedError."""
         html = "<custom>content</custom>"
-        with pytest.raises(NotImplementedError, match="custom_converters is not supported"):
+        with pytest.raises(NotImplementedError, match="custom_converters is not yet implemented"):
             convert_to_markdown(html, custom_converters={"custom": lambda **kw: "converted"})
 
 
@@ -188,7 +188,7 @@ class TestV1CompatStreaming:
     def test_streaming_not_implemented(self) -> None:
         """Test that streaming raises NotImplementedError."""
         html = "<p>Content</p>"
-        with pytest.raises(NotImplementedError, match=r"Streaming API.*not yet implemented"):
+        with pytest.raises(NotImplementedError, match=r"Streaming API.*was removed"):
             list(convert_to_markdown_stream(html))
 
 

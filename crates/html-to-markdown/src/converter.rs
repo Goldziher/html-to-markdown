@@ -34,6 +34,7 @@ use html5ever::parse_document;
 use html5ever::tendril::TendrilSink;
 use markup5ever_rcdom::{Handle, NodeData, RcDom};
 use std::collections::BTreeMap;
+use std::rc::Rc;
 
 use crate::error::Result;
 use crate::options::{ConversionOptions, HeadingStyle};
@@ -1300,12 +1301,9 @@ fn walk_node(handle: &Handle, output: &mut String, options: &ConversionOptions, 
                         }
                     }
 
-                    let mut is_task_list = false;
-                    let mut task_checked = false;
-                    let mut skip_first_input = false;
-
-                    for child in handle.children.borrow().iter() {
-                        if let NodeData::Element { name, attrs, .. } = &child.data {
+                    // Helper function to recursively find checkbox in descendants
+                    fn find_checkbox(node: &Handle) -> Option<(bool, Handle)> {
+                        if let NodeData::Element { name, attrs, .. } = &node.data {
                             if name.local.as_ref() == "input" {
                                 let input_type = attrs
                                     .borrow()
@@ -1314,22 +1312,28 @@ fn walk_node(handle: &Handle, output: &mut String, options: &ConversionOptions, 
                                     .map(|attr| attr.value.to_string());
 
                                 if input_type.as_deref() == Some("checkbox") {
-                                    is_task_list = true;
-                                    task_checked =
+                                    let checked =
                                         attrs.borrow().iter().any(|attr| attr.name.local.as_ref() == "checked");
-                                    skip_first_input = true;
-                                    break;
+                                    return Some((checked, Rc::clone(node)));
                                 }
                             }
                         }
-                        if let NodeData::Text { contents } = &child.data {
-                            if !contents.borrow().trim().is_empty() {
-                                break;
+
+                        // Search children
+                        for child in node.children.borrow().iter() {
+                            if let Some(result) = find_checkbox(child) {
+                                return Some(result);
                             }
-                        } else {
-                            break;
                         }
+                        None
                     }
+
+                    let (is_task_list, task_checked, checkbox_node) =
+                        if let Some((checked, node)) = find_checkbox(handle) {
+                            (true, checked, Some(node))
+                        } else {
+                            (false, false, None)
+                        };
 
                     let li_ctx = Context {
                         in_list_item: true,
@@ -1342,26 +1346,56 @@ fn walk_node(handle: &Handle, output: &mut String, options: &ConversionOptions, 
                         output.push(' ');
                         output.push_str(if task_checked { "[x]" } else { "[ ]" });
 
-                        let mut first_input_seen = false;
-                        let mut task_text = String::new();
-                        for child in handle.children.borrow().iter() {
-                            if !first_input_seen && skip_first_input {
-                                if let NodeData::Element { name, attrs, .. } = &child.data {
-                                    if name.local.as_ref() == "input" {
-                                        let input_type = attrs
-                                            .borrow()
-                                            .iter()
-                                            .find(|attr| attr.name.local.as_ref() == "type")
-                                            .map(|attr| attr.value.to_string());
+                        // Helper to check if a node is the checkbox we want to skip
+                        fn is_checkbox_node(node: &Handle, checkbox: &Option<Handle>) -> bool {
+                            if let Some(cb) = checkbox {
+                                Rc::ptr_eq(node, cb)
+                            } else {
+                                false
+                            }
+                        }
 
-                                        if input_type.as_deref() == Some("checkbox") {
-                                            first_input_seen = true;
-                                            continue;
-                                        }
-                                    }
+                        // Helper to check if a node contains the checkbox in its descendants
+                        fn contains_checkbox(node: &Handle, checkbox: &Option<Handle>) -> bool {
+                            if is_checkbox_node(node, checkbox) {
+                                return true;
+                            }
+                            for child in node.children.borrow().iter() {
+                                if contains_checkbox(child, checkbox) {
+                                    return true;
                                 }
                             }
-                            walk_node(child, &mut task_text, options, &li_ctx, depth + 1);
+                            false
+                        }
+
+                        // Helper to render li content, skipping the checkbox
+                        fn render_li_content(
+                            node: &Handle,
+                            output: &mut String,
+                            options: &ConversionOptions,
+                            ctx: &Context,
+                            depth: usize,
+                            checkbox: &Option<Handle>,
+                        ) {
+                            if is_checkbox_node(node, checkbox) {
+                                // Skip the checkbox itself
+                                return;
+                            }
+
+                            if contains_checkbox(node, checkbox) {
+                                // This node contains the checkbox somewhere, recurse to find and skip it
+                                for child in node.children.borrow().iter() {
+                                    render_li_content(child, output, options, ctx, depth, checkbox);
+                                }
+                            } else {
+                                // No checkbox in this subtree, render normally
+                                walk_node(node, output, options, ctx, depth);
+                            }
+                        }
+
+                        let mut task_text = String::new();
+                        for child in handle.children.borrow().iter() {
+                            render_li_content(child, &mut task_text, options, &li_ctx, depth + 1, &checkbox_node);
                         }
                         output.push(' ');
                         let trimmed_task = task_text.trim();
