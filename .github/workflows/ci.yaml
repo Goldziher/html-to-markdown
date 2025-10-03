@@ -80,7 +80,7 @@ jobs:
           command: |
             uv sync --all-extras
             uv pip install maturin
-            maturin develop --release --manifest-path crates/html-to-markdown-py/Cargo.toml
+            uv run maturin develop --release --manifest-path crates/html-to-markdown-py/Cargo.toml
           shell: bash
 
       - name: Run Rust Checks
@@ -134,7 +134,7 @@ jobs:
           command: |
             uv sync --all-extras
             uv pip install maturin
-            maturin develop --release --manifest-path crates/html-to-markdown-py/Cargo.toml
+            uv run maturin develop --release --manifest-path crates/html-to-markdown-py/Cargo.toml
           shell: bash
 
       - name: Run Tests with Coverage
@@ -201,7 +201,7 @@ jobs:
             fi
             uv sync --all-extras
             uv pip install maturin
-            maturin develop --release --manifest-path crates/html-to-markdown-py/Cargo.toml
+            uv run maturin develop --release --manifest-path crates/html-to-markdown-py/Cargo.toml
           shell: bash
 
       - name: Test
