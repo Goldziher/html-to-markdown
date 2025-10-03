@@ -1,6 +1,6 @@
 # html-to-markdown
 
-High-performance HTML to Markdown converter powered by Rust with a clean Python API.
+High-performance HTML to Markdown converter. Rust crate with Python bindings and native CLI.
 
 [![PyPI version](https://badge.fury.io/py/html-to-markdown.svg)](https://pypi.org/project/html-to-markdown/)
 [![Python Versions](https://img.shields.io/pypi/pyversions/html-to-markdown.svg)](https://pypi.org/project/html-to-markdown/)
@@ -8,24 +8,32 @@ High-performance HTML to Markdown converter powered by Rust with a clean Python 
 
 ## ⚡ Performance
 
-Version 2.0 features a complete Rust rewrite, delivering **10-30x performance improvements**:
+Built with Rust using `html5ever` and `ammonia` for exceptional performance:
 
-| Document Type | Size  | V1 (Python) | V2 (Rust) | Speedup |
-| ------------- | ----- | ----------- | --------- | ------- |
-| Small HTML    | 5KB   | 12ms        | 0.8ms     | **15x** |
-| Medium Docs   | 150KB | 180ms       | 8ms       | **22x** |
-| Large Docs    | 800KB | 950ms       | 35ms      | **27x** |
+| Document Type      | Size  | Conversion Time | Throughput   |
+| ------------------ | ----- | --------------- | ------------ |
+| Lists (Timeline)   | 129KB | 1.6ms           | 630 docs/sec |
+| Tables (Countries) | 360KB | 5.4ms           | 185 docs/sec |
+| Python Article     | 656KB | 10.8ms          | 93 docs/sec  |
+
+**Real-world impact:**
+
+- Process 360KB web pages at **185 pages/second**
+- Convert large documentation (656KB) in **~11ms**
+- Batch process 1000 documents in **5-11 seconds** depending on size
+
+See [V2_BENCHMARKS.md](V2_BENCHMARKS.md) for detailed performance analysis.
 
 ## Features
 
-- **🚀 Blazing Fast**: Rust-powered conversion engine with 10-30x speedup
-- **🔄 100% Backward Compatible**: V1 API works seamlessly with V2 backend
+- **🚀 Blazing Fast**: Rust core with `html5ever` parser and `ammonia` sanitizer
+- **🐍 Python Bindings**: Clean Python API via PyO3 with full type hints
+- **🦀 Native CLI**: Rust CLI binary with comprehensive options
 - **📊 hOCR Support**: Advanced table extraction from OCR documents
 - **🎯 Type Safe**: Full type hints and `.pyi` stubs for excellent IDE support
-- **🔧 Flexible**: Clean V2 dataclass API + legacy V1 kwargs API
+- **🔄 Backward Compatible**: Legacy v1 kwargs API supported
 - **🌍 Cross-Platform**: Wheels for Linux, macOS, Windows (x86_64)
 - **✅ Well-Tested**: 700+ tests with dual Python + Rust coverage
-- **🛠️ Modern CLI**: Native Rust CLI with comprehensive options
 
 ## Installation
 
@@ -37,20 +45,20 @@ pip install html-to-markdown
 
 ## Quick Start
 
-### V2 API (Recommended)
+### Python API
 
-Clean, explicit configuration with dataclasses:
+Clean, type-safe configuration with dataclasses:
 
 ```python
 from html_to_markdown import convert, ConversionOptions
 
 html = """
-<h1>Welcome to V2</h1>
+<h1>Welcome</h1>
 <p>This is <strong>fast</strong> Rust-powered conversion!</p>
 <ul>
-    <li>10-30x faster</li>
-    <li>100% compatible</li>
-    <li>Better types</li>
+    <li>Blazing fast</li>
+    <li>Type safe</li>
+    <li>Easy to use</li>
 </ul>
 """
 
@@ -67,18 +75,18 @@ print(markdown)
 Output:
 
 ```markdown
-# Welcome to V2
+# Welcome
 
 This is **fast** Rust-powered conversion!
 
-* 10-30x faster
-+ 100% compatible
-- Better types
+* Blazing fast
++ Type safe
+- Easy to use
 ```
 
-### V1 API (Fully Compatible)
+### Legacy API (v1 compatibility)
 
-Your existing code works without changes:
+For backward compatibility with existing code:
 
 ```python
 from html_to_markdown import convert_to_markdown
@@ -88,7 +96,7 @@ markdown = convert_to_markdown(html, heading_style="atx")
 
 ## Configuration
 
-### V2 API - Dataclass Configuration
+### Dataclass Configuration
 
 ```python
 from html_to_markdown import (
@@ -127,7 +135,9 @@ parsing = ParsingOptions(
 markdown = convert(html, options, preprocessing, parsing)
 ```
 
-### V1 API - Kwargs Configuration
+### Legacy Configuration (kwargs)
+
+For backward compatibility with v1:
 
 ```python
 from html_to_markdown import convert_to_markdown
@@ -227,45 +237,39 @@ html-to-markdown \
 html-to-markdown --help
 ```
 
-## Migration from V1
+## Upgrading from v1.x
 
-### No Changes Needed
+### Backward Compatibility
 
-If you're using the v1 API, your code works as-is:
+Existing v1 code works without changes:
 
 ```python
-# This still works!
 from html_to_markdown import convert_to_markdown
 
-markdown = convert_to_markdown(html, heading_style="atx")
+markdown = convert_to_markdown(html, heading_style="atx")  # Still works!
 ```
 
-### Recommended: Migrate to V2
+### Modern API (Recommended)
 
-For new code, use the V2 API for better type safety:
+For new projects, use the dataclass-based API:
 
 ```python
-# Before (v1)
-markdown = convert_to_markdown(html, heading_style="atx", list_indent_width=2)
-
-# After (v2)
 from html_to_markdown import convert, ConversionOptions
 
 options = ConversionOptions(heading_style="atx", list_indent_width=2)
 markdown = convert(html, options)
 ```
 
-### Unsupported V1 Features
+### Unsupported Features
 
-The following v1 features are not available in v2:
+Some v1 features are not available due to the Rust backend:
 
-- `code_language_callback` - Callbacks not supported in Rust backend
-- `strip` - Use preprocessing instead
-- `convert` - Use preprocessing instead
+- `code_language_callback` - Callbacks not supported
+- `strip` / `convert` options - Use preprocessing instead
 - `custom_converters` - Not yet implemented
 - `convert_to_markdown_stream()` - Not yet implemented
 
-These will raise `NotImplementedError` with clear error messages.
+These raise `NotImplementedError` with clear messages.
 
 ## Configuration Reference
 
