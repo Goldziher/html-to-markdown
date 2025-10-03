@@ -103,13 +103,30 @@ html-to-markdown/
 - **Rust tests**: Add to `crates/html-to-markdown/src/` (inline) or `crates/html-to-markdown/tests/`
 - **Python tests**: Add to `tests/` following existing patterns
 
-## Building Wheels
+## Testing
+
+### Test Without Releasing
+
+To test wheels and binaries without creating a release:
 
 ```bash
-# Build wheels locally
+# Test wheel building (workflow_dispatch or push to main/v2-dev)
+gh workflow run test-wheels.yaml
+
+# Or manually build locally
 pip install cibuildwheel
 cibuildwheel --output-dir wheelhouse
+
+# Test CLI binary locally
+cargo build --release --package html-to-markdown-cli
+./target/release/html-to-markdown --version
 ```
+
+### CI Workflows
+
+- **ci.yaml**: Runs on every PR and push to main (tests, validation, coverage)
+- **test-wheels.yaml**: Builds and tests wheels (manual or on Rust/config changes)
+- All workflows must pass before merging
 
 ## Commit Guidelines
 
@@ -150,10 +167,59 @@ All checks run automatically via prek on commit.
 1. Commit with conventional commit format
 1. Push and create a pull request
 
+## Release Process (Maintainers Only)
+
+### Pre-release Checklist
+
+1. Update version in `Cargo.toml`:
+
+    ```toml
+    [workspace.package]
+    version = "2.1.0"
+    ```
+
+1. Update `CHANGELOG.md` with changes
+
+1. Run full test suite: `task test`
+
+1. Build CLI locally: `task build:cli && ./target/release/html-to-markdown --version`
+
+1. Commit changes: `git commit -m "chore: bump version to 2.1.0"`
+
+### Creating a Release
+
+1. **Create and push tag**:
+
+    ```bash
+    git tag -a v2.1.0 -m "Release v2.1.0"
+    git push origin v2.1.0
+    ```
+
+1. **Automated workflows trigger**:
+
+    - `release.yml` - Creates GitHub release with CLI binaries
+    - `release-homebrew.yml` - Updates Homebrew tap formula
+    - `publish-cargo.yml` - Publishes to crates.io
+    - `release.yaml` - Publishes Python package to PyPI
+
+1. **Required secrets** (already configured):
+
+    - `CARGO_TOKEN` - From <https://crates.io/settings/tokens>
+    - `HOMEBREW_TOKEN` - GitHub token with `repo` scope
+    - `PYPI_TOKEN` - Configured via PyPI trusted publishing
+
+### Post-release Verification
+
+- Cargo: <https://crates.io/crates/html-to-markdown>
+- PyPI: <https://pypi.org/project/html-to-markdown/>
+- Homebrew: <https://github.com/Goldziher/homebrew-tap>
+- GitHub: <https://github.com/Goldziher/html-to-markdown/releases>
+
 ## Getting Help
 
 - **Issues**: [GitHub Issues](https://github.com/Goldziher/html-to-markdown/issues)
 - **Discussions**: [GitHub Discussions](https://github.com/Goldziher/html-to-markdown/discussions)
+- **Discord**: [Kreuzberg Community](https://discord.gg/pXxagNK2zN)
 
 ## License
 
