@@ -5,7 +5,6 @@ tasks:
     desc: "Install dependencies with uv and build Rust components"
     cmds:
       - uv sync --all-extras
-      - uv pip install --no-build-isolation -e .
       - prek install && prek install --hook-type commit-msg
 
   update:
@@ -14,7 +13,6 @@ tasks:
       - uv run uv-bump
       - cargo upgrade --incompatible
       - uv sync --all-extras --upgrade
-      - uv pip install --no-build-isolation -e .
       - prek autoupdate
 
   test:python:
@@ -71,7 +69,7 @@ tasks:
   build:
     desc: "Build Rust components for development"
     cmds:
-      - uv pip install --no-build-isolation -e .
+      - uv sync --all-extras
 
   build:debug:
     desc: "Build Rust components in debug mode (without optimization)"
