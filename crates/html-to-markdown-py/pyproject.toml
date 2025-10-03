@@ -1,0 +1,33 @@
+[build-system]
+build-backend = "maturin"
+requires = [ "maturin>=1.9,<2" ]
+
+[project]
+name = "html-to-markdown"
+version = "2.0.0"
+description = "A modern, type-safe library for converting HTML to Markdown with comprehensive HTML5 support"
+readme = "../../README.md"
+keywords = [ "converter", "html", "html5", "markdown", "parser" ]
+license = { text = "MIT" }
+authors = [ { name = "Na'aman Hirschfeld", email = "nhirschfeld@gmail.com" } ]
+requires-python = ">=3.10"
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Intended Audience :: Developers",
+  "License :: OSI Approved :: MIT License",
+  "Operating System :: OS Independent",
+  "Programming Language :: Python :: 3 :: Only",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Programming Language :: Rust",
+  "Topic :: Text Processing :: Markup :: HTML",
+  "Typing :: Typed",
+]
+
+[tool.maturin]
+python-source = "python"
+module-name = "html_to_markdown._html_to_markdown"
+features = [ "pyo3/extension-module" ]
+compatibility = "manylinux2014"

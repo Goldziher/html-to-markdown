@@ -1,0 +1,25 @@
+[package]
+name = "html-to-markdown"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+documentation.workspace = true
+readme.workspace = true
+rust-version.workspace = true
+description = "High-performance HTML to Markdown converter using html5ever. Part of the Kreuzberg ecosystem."
+keywords = ["html", "markdown", "converter", "html5ever", "document-intelligence"]
+categories = ["parsing", "text-processing", "web-programming"]
+
+[lib]
+crate-type = ["rlib"]
+
+[dependencies]
+html5ever.workspace = true
+markup5ever_rcdom.workspace = true
+ammonia.workspace = true
+regex.workspace = true
+once_cell.workspace = true
+thiserror.workspace = true

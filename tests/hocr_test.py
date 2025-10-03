@@ -8,7 +8,7 @@ from pathlib import Path
 
 import pytest
 
-from html_to_markdown import convert_to_markdown
+from html_to_markdown import ConversionOptions, convert
 
 
 def get_hocr_file(filename: str) -> Path:
@@ -20,7 +20,7 @@ def test_german_pdf_hocr_conversion() -> None:
     """Test conversion of German PDF HOCR to clean text."""
     hocr_content = get_hocr_file("german_pdf_german.hocr").read_text(encoding="utf-8")
 
-    result = convert_to_markdown(hocr_content)
+    result = convert(hocr_content)
 
     assert "<!--" not in result, "Result should not contain HTML comments"
     assert "meta-content-type" not in result, "Result should not contain meta tags"
@@ -45,7 +45,7 @@ def test_english_pdf_hocr_conversion() -> None:
     """Test conversion of English PDF HOCR to clean text."""
     hocr_content = get_hocr_file("english_pdf_default.hocr").read_text(encoding="utf-8")
 
-    result = convert_to_markdown(hocr_content)
+    result = convert(hocr_content)
 
     assert "<!--" not in result, "Result should not contain HTML comments"
     assert "meta-ocr-system" not in result, "Result should not contain OCR system info"
@@ -57,7 +57,7 @@ def test_invoice_hocr_conversion() -> None:
     """Test conversion of invoice image HOCR to clean text."""
     hocr_content = get_hocr_file("invoice_image_default.hocr").read_text(encoding="utf-8")
 
-    result = convert_to_markdown(hocr_content)
+    result = convert(hocr_content)
 
     assert "<!--" not in result, "Result should not contain HTML comments"
     assert "ocr_page" not in result, "Result should not contain HOCR class names"
@@ -70,7 +70,7 @@ def test_hocr_with_confidence_and_coordinates() -> None:
     """Test that HOCR coordinate and confidence info is stripped."""
     hocr_content = get_hocr_file("german_pdf_german.hocr").read_text(encoding="utf-8")
 
-    result = convert_to_markdown(hocr_content)
+    result = convert(hocr_content)
 
     assert "x_wconf" not in result, "Should not contain confidence scores"
     assert "bbox" not in result, "Should not contain bounding boxes"
@@ -83,7 +83,7 @@ def test_hocr_preserves_text_structure() -> None:
     """Test that HOCR conversion preserves logical text structure."""
     hocr_content = get_hocr_file("german_pdf_german.hocr").read_text(encoding="utf-8")
 
-    result = convert_to_markdown(hocr_content)
+    result = convert(hocr_content)
 
     lines = [line.strip() for line in result.split("\n") if line.strip()]
     assert len(lines) > 5, "Should preserve multiple text blocks"
@@ -107,7 +107,7 @@ def test_empty_hocr_handling() -> None:
  </body>
 </html>"""
 
-    result = convert_to_markdown(minimal_hocr)
+    result = convert(minimal_hocr)
 
     assert isinstance(result, str), "Should return string even for empty HOCR"
     assert "meta" not in result, "Should not contain meta information"
@@ -125,7 +125,7 @@ def test_all_hocr_files_convert_cleanly(hocr_file: str) -> None:
     """Test that all HOCR test files convert without errors and produce clean output."""
     hocr_content = get_hocr_file(hocr_file).read_text(encoding="utf-8")
 
-    result = convert_to_markdown(hocr_content)
+    result = convert(hocr_content)
 
     assert isinstance(result, str), "Should return string"
     assert "<?xml" not in result, "Should not contain XML declaration"
@@ -140,7 +140,7 @@ def test_multilingual_hocr_conversion() -> None:
         encoding="utf-8"
     )
 
-    result = convert_to_markdown(hocr_content)
+    result = convert(hocr_content)
 
     assert "<!--" not in result, "Should not contain HTML comments"
     assert "<?xml" not in result, "Should not contain XML declaration"
@@ -163,7 +163,7 @@ def test_utf8_encoding_hocr() -> None:
         encoding="utf-8"
     )
 
-    result = convert_to_markdown(hocr_content)
+    result = convert(hocr_content)
 
     assert "fööbär" in result, "Should preserve UTF-8 special characters"
 
@@ -174,7 +174,7 @@ def test_confidence_scores_hocr() -> None:
         encoding="utf-8"
     )
 
-    result = convert_to_markdown(hocr_content)
+    result = convert(hocr_content)
 
     assert "Foo" in result, "Should contain text content"
     assert "x_wconf" not in result, "Should not contain confidence scores"
@@ -188,7 +188,7 @@ def test_overlapping_bbox_hocr() -> None:
         encoding="utf-8"
     )
 
-    result = convert_to_markdown(hocr_content)
+    result = convert(hocr_content)
 
     assert isinstance(result, str), "Should return string"
     assert "bbox" not in result, "Should not contain bounding box information"
@@ -210,7 +210,7 @@ def test_comprehensive_hocr_files(comprehensive_file: str) -> None:
     hocr_path = Path(__file__).parent / "test_data" / "hocr" / "comprehensive" / comprehensive_file
     hocr_content = hocr_path.read_text(encoding="utf-8")
 
-    result = convert_to_markdown(hocr_content)
+    result = convert(hocr_content)
 
     assert isinstance(result, str), "Should return string"
     assert "<?xml" not in result, "Should not contain XML declaration"
@@ -221,3 +221,86 @@ def test_comprehensive_hocr_files(comprehensive_file: str) -> None:
     assert "x_wconf" not in result, "Should not contain confidence scores"
     assert "baseline" not in result, "Should not contain baseline information"
     assert "ppageno" not in result, "Should not contain page number information"
+
+
+def test_hocr_table_extraction() -> None:
+    """Test hOCR table extraction from positioned words."""
+    hocr_content = """
+    <html>
+    <body>
+        <div class="ocr_page">
+            <span class="ocrx_word" title="bbox 100 50 140 70; x_wconf 95">Product</span>
+            <span class="ocrx_word" title="bbox 200 50 240 70; x_wconf 95">Price</span>
+            <span class="ocrx_word" title="bbox 300 50 340 70; x_wconf 95">Stock</span>
+            <span class="ocrx_word" title="bbox 100 100 140 120; x_wconf 95">Apple</span>
+            <span class="ocrx_word" title="bbox 200 100 240 120; x_wconf 95">$1.50</span>
+            <span class="ocrx_word" title="bbox 300 100 340 120; x_wconf 95">Yes</span>
+            <span class="ocrx_word" title="bbox 100 150 140 170; x_wconf 95">Orange</span>
+            <span class="ocrx_word" title="bbox 200 150 240 170; x_wconf 95">$2.00</span>
+            <span class="ocrx_word" title="bbox 300 150 340 170; x_wconf 95">No</span>
+        </div>
+    </body>
+    </html>
+    """
+
+    options = ConversionOptions()
+    options.hocr_extract_tables = True
+    result = convert(hocr_content, options)
+
+    assert "|" in result, "Should contain table markdown"
+    assert "Product" in result, "Should contain header"
+    assert "Price" in result, "Should contain header"
+    assert "Stock" in result, "Should contain header"
+    assert "Apple" in result, "Should contain data"
+    assert "$1.50" in result, "Should contain data"
+    assert "Orange" in result, "Should contain data"
+    assert "$2.00" in result, "Should contain data"
+
+    assert "| ---" in result, "Should contain header separator"
+
+
+def test_hocr_table_extraction_disabled() -> None:
+    """Test that table extraction can be disabled."""
+    hocr_content = """
+    <html>
+    <body>
+        <div class="ocr_page">
+            <span class="ocrx_word" title="bbox 100 50 140 70; x_wconf 95">Col1</span>
+            <span class="ocrx_word" title="bbox 200 50 240 70; x_wconf 95">Col2</span>
+            <span class="ocrx_word" title="bbox 100 100 140 120; x_wconf 95">Data1</span>
+            <span class="ocrx_word" title="bbox 200 100 240 120; x_wconf 95">Data2</span>
+        </div>
+    </body>
+    </html>
+    """
+
+    options = ConversionOptions()
+    options.hocr_extract_tables = False
+    result = convert(hocr_content, options)
+
+    assert "Col1" in result
+    assert "Col2" in result
+    assert "Data1" in result
+    assert "Data2" in result
+
+
+def test_hocr_table_confidence_filtering() -> None:
+    """Test that low confidence words are filtered out."""
+    hocr_content = """
+    <html>
+    <body>
+        <div class="ocr_page">
+            <span class="ocrx_word" title="bbox 100 50 140 70; x_wconf 95">Good</span>
+            <span class="ocrx_word" title="bbox 200 50 240 70; x_wconf 30">Bad</span>
+            <span class="ocrx_word" title="bbox 100 100 140 120; x_wconf 92">Quality</span>
+        </div>
+    </body>
+    </html>
+    """
+
+    options = ConversionOptions()
+    options.hocr_extract_tables = True
+    result = convert(hocr_content, options)
+
+    assert "Good" in result, "High confidence word should be included"
+    assert "Quality" in result, "High confidence word should be included"

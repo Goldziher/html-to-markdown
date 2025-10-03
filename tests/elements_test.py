@@ -1251,7 +1251,7 @@ def test_ruby_nested_in_paragraph(convert: Callable[..., str]) -> None:
 def test_ruby_with_whitespace(convert: Callable[..., str]) -> None:
     html = "<ruby> 漢字 <rt> kanji </rt> </ruby>"
     result = convert(html)
-    assert result == "漢字 (kanji)"
+    assert result == "漢字(kanji)"
 
 
 def test_ruby_empty_elements(convert: Callable[..., str]) -> None:
@@ -1741,7 +1741,7 @@ def test_multiple_empty_semantic_elements(convert: Callable[..., str]) -> None:
 def test_whitespace_handling_semantic(convert: Callable[..., str]) -> None:
     html = "<p>Spaces around <var>  variable  </var> and <abbr title='  title  '>  abbr  </abbr></p>"
     result = convert(html)
-    assert result == "Spaces around  *variable*  and abbr (title)\n\n"
+    assert result == "Spaces around  *variable* and abbr (title)\n\n"
 
 
 def test_figure_basic(convert: Callable[..., str]) -> None:
