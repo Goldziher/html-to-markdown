@@ -129,6 +129,12 @@ struct ConversionOptions {
     #[pyo3(get, set)]
     keep_inline_images_in: Vec<String>,
     #[pyo3(get, set)]
+    hocr_extract_tables: bool,
+    #[pyo3(get, set)]
+    hocr_table_column_threshold: u32,
+    #[pyo3(get, set)]
+    hocr_table_row_threshold_ratio: f64,
+    #[pyo3(get, set)]
     preprocessing: PreprocessingOptions,
     #[pyo3(get, set)]
     parsing: ParsingOptions,
@@ -162,6 +168,9 @@ impl ConversionOptions {
         sup_symbol="".to_string(),
         newline_style="spaces".to_string(),
         keep_inline_images_in=Vec::new(),
+        hocr_extract_tables=true,
+        hocr_table_column_threshold=50,
+        hocr_table_row_threshold_ratio=0.5,
         preprocessing=None,
         parsing=None
     ))]
@@ -189,6 +198,9 @@ impl ConversionOptions {
         sup_symbol: String,
         newline_style: String,
         keep_inline_images_in: Vec<String>,
+        hocr_extract_tables: bool,
+        hocr_table_column_threshold: u32,
+        hocr_table_row_threshold_ratio: f64,
         preprocessing: Option<PreprocessingOptions>,
         parsing: Option<ParsingOptions>,
     ) -> Self {
@@ -216,6 +228,9 @@ impl ConversionOptions {
             sup_symbol,
             newline_style,
             keep_inline_images_in,
+            hocr_extract_tables,
+            hocr_table_column_threshold,
+            hocr_table_row_threshold_ratio,
             preprocessing: preprocessing
                 .unwrap_or_else(|| PreprocessingOptions::new(false, "standard".to_string(), true, true)),
             parsing: parsing.unwrap_or_else(|| ParsingOptions::new("utf-8".to_string(), None)),
@@ -268,6 +283,9 @@ impl ConversionOptions {
                 _ => NewlineStyle::Spaces,
             },
             keep_inline_images_in: self.keep_inline_images_in.clone(),
+            hocr_extract_tables: self.hocr_extract_tables,
+            hocr_table_column_threshold: self.hocr_table_column_threshold,
+            hocr_table_row_threshold_ratio: self.hocr_table_row_threshold_ratio,
             preprocessing: self.preprocessing.to_rust(),
             parsing: self.parsing.to_rust(),
         }
