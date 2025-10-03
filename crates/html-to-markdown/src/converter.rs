@@ -134,6 +134,114 @@ fn is_loose_list(handle: &Handle) -> bool {
     false
 }
 
+/// Add list continuation indentation to output.
+///
+/// Used when block elements (like <p> or <div>) appear inside list items.
+/// Adds appropriate line separation and indentation to continue the list item.
+///
+/// # Arguments
+///
+/// * `output` - The output string to append to
+/// * `list_depth` - Current list nesting depth
+/// * `blank_line` - If true, adds blank line separation (\n\n); if false, single newline (\n)
+///
+/// # Examples
+///
+/// ```text
+/// Paragraph continuation (blank_line = true):
+///   * First para
+///
+///       Second para  (blank line + indentation)
+///
+/// Div continuation (blank_line = false):
+///   * First div
+///       Second div   (single newline + indentation)
+/// ```
+fn add_list_continuation_indent(output: &mut String, list_depth: usize, blank_line: bool) {
+    trim_trailing_whitespace(output);
+
+    if blank_line {
+        // Paragraph-style: blank line separation
+        if !output.ends_with("\n\n") {
+            if output.ends_with('\n') {
+                output.push('\n');
+            } else {
+                output.push_str("\n\n");
+            }
+        }
+    } else {
+        // Div-style: single newline separation
+        if !output.ends_with('\n') {
+            output.push('\n');
+        }
+    }
+
+    // Add continuation indentation
+    let indent_level = calculate_list_continuation_indent(list_depth);
+    output.push_str(&"    ".repeat(indent_level));
+}
+
+/// Add appropriate leading separator before a list.
+///
+/// Lists need different separators depending on context:
+/// - In table cells: <br> tag if there's already content
+/// - Outside lists: blank line (\n\n) if needed
+/// - Inside list items: blank line before nested list
+fn add_list_leading_separator(output: &mut String, ctx: &Context) {
+    // In table cells, use <br> separator
+    if ctx.in_table_cell {
+        let is_table_continuation = !output.is_empty()
+            && !output.ends_with('|')
+            && !output.ends_with(' ')
+            && !output.ends_with("<br>");
+        if is_table_continuation {
+            output.push_str("<br>");
+        }
+        return;
+    }
+
+    // For lists outside of other lists, add block separation if needed
+    if !output.is_empty() && !ctx.in_list {
+        let needs_newline = !output.ends_with("\n\n")
+            && !output.ends_with("* ")
+            && !output.ends_with("- ")
+            && !output.ends_with(". ");
+        if needs_newline {
+            output.push_str("\n\n");
+        }
+        return;
+    }
+
+    // If in a list item with content before the nested list, add newline
+    if ctx.in_list_item && !output.is_empty() {
+        let needs_newline = !output.ends_with('\n')
+            && !output.ends_with("* ")
+            && !output.ends_with("- ")
+            && !output.ends_with(". ");
+        if needs_newline {
+            trim_trailing_whitespace(output);
+            output.push_str("\n\n");
+        }
+    }
+}
+
+/// Add appropriate trailing separator after a nested list.
+///
+/// Nested lists inside list items need a trailing blank line to separate
+/// from following content (if any).
+fn add_nested_list_trailing_separator(output: &mut String, ctx: &Context) {
+    if ctx.in_list_item {
+        // Only add extra newline if not already ending with double newline
+        if !output.ends_with("\n\n") {
+            if !output.ends_with('\n') {
+                output.push('\n');
+            }
+            // Add another newline to create blank line
+            output.push('\n');
+        }
+    }
+}
+
 /// Conversion context to track state during traversal
 #[derive(Debug, Clone)]
 struct Context {
@@ -709,22 +817,26 @@ fn walk_node(handle: &Handle, output: &mut String, options: &ConversionOptions, 
                         trim_trailing_whitespace(output);
                         output.push_str("<br>");
                     } else if is_list_continuation {
-                        // Trim trailing spaces/tabs before adding newline
-                        trim_trailing_whitespace(output);
-                        // Paragraphs in list items should always have blank line separation (double newline)
-                        // This ensures proper spacing between different block elements
-                        if !output.ends_with("\n\n") {
-                            if output.ends_with('\n') {
-                                output.push('\n');
-                            } else {
-                                output.push_str("\n\n");
-                            }
-                        }
-                        // Continuation indentation: base indentation + content indentation
-                        // Formula: (list_depth - 1) * 4 spaces for nesting + list_depth * 4 for continuation
-                        // Simplified: (2 * list_depth - 1) * 4 spaces
-                        let indent_level = calculate_list_continuation_indent(ctx.list_depth);
-                        output.push_str(&"    ".repeat(indent_level));
+                        // List continuation: paragraph inside a list item
+                        //
+                        // When paragraphs appear inside list items, they need:
+                        // 1. Blank line separation (\n\n) before the paragraph
+                        // 2. Proper indentation to align with list item content
+                        //
+                        // Example:
+                        //   <ul>
+                        //     <li>
+                        //       <p>First para</p>
+                        //       <p>Second para</p>
+                        //     </li>
+                        //   </ul>
+                        //
+                        // Renders as:
+                        //   * First para
+                        //
+                        //       Second para
+                        //
+                        add_list_continuation_indent(output, ctx.list_depth, true);
                     } else if needs_leading_sep {
                         // Trim trailing whitespace before adding block separation
                         trim_trailing_whitespace(output);
@@ -1194,39 +1306,8 @@ fn walk_node(handle: &Handle, output: &mut String, options: &ConversionOptions, 
 
                 // Lists
                 "ul" => {
-                    // In table cells, check if we need <br> separator
-                    if ctx.in_table_cell {
-                        let is_table_continuation = !output.is_empty()
-                            && !output.ends_with('|')
-                            && !output.ends_with(' ')
-                            && !output.ends_with("<br>");
-                        if is_table_continuation {
-                            output.push_str("<br>");
-                        }
-                    } else if !output.is_empty() && !ctx.in_list {
-                        // For lists outside of other lists, add block separation if needed
-                        // (e.g., list after text in a dd element)
-                        let needs_newline = !output.ends_with("\n\n")
-                            && !output.ends_with("* ")
-                            && !output.ends_with("- ")
-                            && !output.ends_with(". ");
-                        if needs_newline {
-                            output.push_str("\n\n");
-                        }
-                    }
-
-                    // If in a list item with content before the nested list, add newline
-                    if ctx.in_list_item && !output.is_empty() {
-                        let needs_newline = !output.ends_with('\n')
-                            && !output.ends_with("* ")
-                            && !output.ends_with("- ")
-                            && !output.ends_with(". ");
-                        if needs_newline {
-                            // Trim trailing spaces/tabs before adding newlines
-                            trim_trailing_whitespace(output);
-                            output.push_str("\n\n");
-                        }
-                    }
+                    // Add appropriate leading separator based on context
+                    add_list_leading_separator(output, ctx);
 
                     // If in a list but NOT in a list item, this is incorrectly nested - increment depth
                     // If in a list item, the depth was already incremented by the <li>
@@ -1267,45 +1348,13 @@ fn walk_node(handle: &Handle, output: &mut String, options: &ConversionOptions, 
                         let had_blocks = li_output.contains("\n\n    ") || li_output.contains("\n    ");
                         prev_had_blocks = had_blocks;
                     }
-                    // Nested lists (in list items) should add trailing newline to separate from following content
-                    // This creates blank line before next continuation element (if there is one)
-                    if ctx.in_list_item {
-                        // Only add extra newline if not already ending with double newline
-                        // (which would be the case if it's the last child of the list item)
-                        if !output.ends_with("\n\n") {
-                            if !output.ends_with('\n') {
-                                output.push('\n');
-                            }
-                            // Add another newline to create blank line
-                            output.push('\n');
-                        }
-                    }
+                    // Add trailing separator for nested lists
+                    add_nested_list_trailing_separator(output, ctx);
                 }
 
                 "ol" => {
-                    // For lists outside of other lists, add block separation if needed
-                    if !output.is_empty() && !ctx.in_list && !ctx.in_table_cell {
-                        let needs_newline = !output.ends_with("\n\n")
-                            && !output.ends_with("* ")
-                            && !output.ends_with("- ")
-                            && !output.ends_with(". ");
-                        if needs_newline {
-                            output.push_str("\n\n");
-                        }
-                    }
-
-                    // If in a list item with content before the nested list, add newline
-                    if ctx.in_list_item && !output.is_empty() {
-                        let needs_newline = !output.ends_with('\n')
-                            && !output.ends_with("* ")
-                            && !output.ends_with("- ")
-                            && !output.ends_with(". ");
-                        if needs_newline {
-                            // Trim trailing spaces/tabs before adding newlines
-                            trim_trailing_whitespace(output);
-                            output.push_str("\n\n");
-                        }
-                    }
+                    // Add appropriate leading separator based on context
+                    add_list_leading_separator(output, ctx);
 
                     // If in a list but NOT in a list item, this is incorrectly nested - increment depth
                     // If in a list item, the depth was already incremented by the <li>
@@ -1361,19 +1410,8 @@ fn walk_node(handle: &Handle, output: &mut String, options: &ConversionOptions, 
                         // For non-li children, use base context with in_list set
                         walk_node(child, output, options, &base_list_ctx, depth);
                     }
-                    // Nested lists (in list items) should add trailing newline to separate from following content
-                    // This creates blank line before next continuation element (if there is one)
-                    if ctx.in_list_item {
-                        // Only add extra newline if not already ending with double newline
-                        // (which would be the case if it's the last child of the list item)
-                        if !output.ends_with("\n\n") {
-                            if !output.ends_with('\n') {
-                                output.push('\n');
-                            }
-                            // Add another newline to create blank line
-                            output.push('\n');
-                        }
-                    }
+                    // Add trailing separator for nested lists
+                    add_nested_list_trailing_separator(output, ctx);
                 }
 
                 "li" => {
@@ -1509,14 +1547,24 @@ fn walk_node(handle: &Handle, output: &mut String, options: &ConversionOptions, 
                         trim_trailing_whitespace(output);
                     }
 
-                    // Ensure list items end with proper separator (but not in table cells)
+                    // List item ending logic follows CommonMark specification:
+                    //
+                    // 1. Items with block children (div, p, etc.) → \n\n
+                    //    Example: <li><p>Text</p></li> → "* Text\n\n"
+                    //
+                    // 2. Items in loose lists (any item has <p>) → \n\n
+                    //    Example: <ul><li><p>A</p></li><li>B</li></ul> → "* A\n\n* B\n\n"
+                    //
+                    // 3. Items following block-containing items → \n\n (for visual consistency)
+                    //    Example: If previous item had <div>, this item also gets \n\n
+                    //
+                    // 4. Simple items in tight lists → \n
+                    //    Example: <li>Simple</li> → "* Simple\n"
+                    //
+                    // (Note: In table cells, no ending separators are added)
                     if !ctx.in_table_cell {
-                        // Use \n\n if:
-                        // - Item has block children, OR
-                        // - List is loose (contains paragraphs), OR
-                        // - Previous item had block children
                         if has_block_children || ctx.loose_list || ctx.prev_item_had_blocks {
-                            // List items with block children or in loose lists should end with \n\n
+                            // Add blank line separation (\n\n)
                             if !output.ends_with("\n\n") {
                                 if output.ends_with('\n') {
                                     output.push('\n');
@@ -1525,7 +1573,7 @@ fn walk_node(handle: &Handle, output: &mut String, options: &ConversionOptions, 
                                 }
                             }
                         } else {
-                            // Simple list items in tight lists should end with single \n
+                            // Tight list: single newline only
                             if !output.ends_with('\n') {
                                 output.push('\n');
                             }
@@ -2494,18 +2542,25 @@ fn walk_node(handle: &Handle, output: &mut String, options: &ConversionOptions, 
                         trim_trailing_whitespace(output);
                         output.push_str("<br>");
                     } else if is_list_continuation {
-                        // Trim trailing spaces/tabs before adding newline
-                        trim_trailing_whitespace(output);
-                        // Add newline before indentation if not already present
-                        // For consecutive divs, we want single newline between them
-                        if !output.ends_with('\n') {
-                            output.push('\n');
-                        }
-                        // Continuation indentation: base indentation + content indentation
-                        // Formula: (list_depth - 1) * 4 spaces for nesting + list_depth * 4 for continuation
-                        // Simplified: (2 * list_depth - 1) * 4 spaces
-                        let indent_level = calculate_list_continuation_indent(ctx.list_depth);
-                        output.push_str(&"    ".repeat(indent_level));
+                        // List continuation: div inside a list item
+                        //
+                        // Divs in list items need:
+                        // 1. Single newline (\n) separation (not blank line like <p>)
+                        // 2. Proper indentation to align with list item content
+                        //
+                        // Example:
+                        //   <ul>
+                        //     <li>
+                        //       <div>First div</div>
+                        //       <div>Second div</div>
+                        //     </li>
+                        //   </ul>
+                        //
+                        // Renders as:
+                        //   * First div
+                        //       Second div
+                        //
+                        add_list_continuation_indent(output, ctx.list_depth, false);
                     } else if needs_leading_sep {
                         // Trim trailing whitespace before adding block separation
                         trim_trailing_whitespace(output);
