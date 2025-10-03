@@ -70,7 +70,7 @@ repos:
             --check-return-types=False,
             --arg-type-hints-in-docstring=False,
           ]
-        exclude: ^html_to_markdown/v1_compat\.py$
+        exclude: ^html_to_markdown/(v1_compat|options)\.py$
   - repo: https://github.com/FeryET/pre-commit-rust
     rev: v1.2.1
     hooks:
