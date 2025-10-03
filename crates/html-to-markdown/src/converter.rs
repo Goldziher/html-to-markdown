@@ -942,7 +942,7 @@ fn walk_node(handle: &Handle, output: &mut String, options: &ConversionOptions, 
                             && ctx
                                 .heading_tag
                                 .as_ref()
-                                .is_none_or(|tag| !options.keep_inline_images_in.contains(tag)));
+                                .map_or(true, |tag| !options.keep_inline_images_in.contains(tag)));
 
                     if should_use_alt_text {
                         output.push_str(&alt);

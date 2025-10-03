@@ -6,7 +6,12 @@ authors.workspace = true
 license.workspace = true
 repository.workspace = true
 homepage.workspace = true
-description = "CLI for html-to-markdown"
+documentation.workspace = true
+readme.workspace = true
+rust-version.workspace = true
+description = "Command-line interface for html-to-markdown - high-performance HTML to Markdown converter"
+keywords = ["html", "markdown", "cli", "converter", "html5ever"]
+categories = ["command-line-utilities", "text-processing"]
 
 [[bin]]
 name = "html-to-markdown"

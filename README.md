@@ -5,7 +5,11 @@ High-performance HTML to Markdown converter. Rust crate with Python bindings and
 [![PyPI version](https://badge.fury.io/py/html-to-markdown.svg)](https://pypi.org/project/html-to-markdown/)
 [![Crates.io](https://img.shields.io/crates/v/html-to-markdown.svg)](https://crates.io/crates/html-to-markdown)
 [![Python Versions](https://img.shields.io/pypi/pyversions/html-to-markdown.svg)](https://pypi.org/project/html-to-markdown/)
+[![Documentation](https://img.shields.io/badge/docs-github-blue)](https://github.com/Goldziher/html-to-markdown)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Discord](https://img.shields.io/badge/Discord-Join%20our%20community-7289da)](https://discord.gg/pXxagNK2zN)
+
+Part of the [Kreuzberg](https://kreuzberg.dev) ecosystem for document intelligence.
 
 ## ⚡ Performance
 
@@ -320,6 +324,18 @@ The following v1 features were removed in v2:
 **Planned for v2:**
 
 - `custom_converters` - Not yet implemented, but planned with Rust and Python callback support
+
+## Kreuzberg Ecosystem
+
+html-to-markdown is part of the [Kreuzberg](https://kreuzberg.dev) ecosystem, a comprehensive framework for document intelligence and processing. While html-to-markdown focuses on converting HTML to Markdown with maximum performance, Kreuzberg provides a complete solution for:
+
+- **Document Extraction**: Extract text, images, and metadata from 50+ document formats
+- **OCR Processing**: Multiple OCR backends (Tesseract, EasyOCR, PaddleOCR)
+- **Table Extraction**: Vision-based and OCR-based table detection
+- **Document Classification**: Automatic detection of contracts, forms, invoices, etc.
+- **RAG Pipelines**: Integration with retrieval-augmented generation workflows
+
+Learn more at [kreuzberg.dev](https://kreuzberg.dev) or join our [Discord community](https://discord.gg/pXxagNK2zN).
 
 ## Contributing
 

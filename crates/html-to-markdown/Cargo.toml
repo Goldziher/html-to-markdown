@@ -6,9 +6,12 @@ authors.workspace = true
 license.workspace = true
 repository.workspace = true
 homepage.workspace = true
-description = "A modern, type-safe library for converting HTML to Markdown with comprehensive HTML5 support"
-keywords = ["html", "markdown", "converter", "html5", "parser"]
-categories = ["parsing", "text-processing"]
+documentation.workspace = true
+readme.workspace = true
+rust-version.workspace = true
+description = "High-performance HTML to Markdown converter using html5ever. Part of the Kreuzberg ecosystem."
+keywords = ["html", "markdown", "converter", "html5ever", "document-intelligence"]
+categories = ["parsing", "text-processing", "web-programming"]
 
 [lib]
 crate-type = ["rlib"]

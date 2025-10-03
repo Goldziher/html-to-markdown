@@ -6,7 +6,12 @@ authors.workspace = true
 license.workspace = true
 repository.workspace = true
 homepage.workspace = true
-description = "Python bindings for html-to-markdown"
+documentation.workspace = true
+readme.workspace = true
+rust-version.workspace = true
+description = "Python bindings (PyO3) for html-to-markdown - high-performance HTML to Markdown converter"
+keywords = ["html", "markdown", "python", "pyo3", "bindings"]
+categories = ["api-bindings"]
 
 [lib]
 name = "_html_to_markdown"
