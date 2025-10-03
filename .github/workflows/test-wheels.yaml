@@ -11,7 +11,9 @@ on:
       - 'Cargo.toml'
       - 'Cargo.lock'
       - 'pyproject.toml'
+      - 'prepare_wheel.py'
       - '.github/workflows/test-wheels.yaml'
+      - '.github/actions/build-wheels/**'
 
 env:
   CARGO_TERM_COLOR: always
