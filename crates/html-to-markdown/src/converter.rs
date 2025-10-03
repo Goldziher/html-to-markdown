@@ -296,6 +296,40 @@ fn format_metadata_comment(metadata: &BTreeMap<String, String>) -> String {
     lines.join("\n") + "\n\n"
 }
 
+/// Check if a handle is an empty inline element (abbr, var, ins, dfn, etc. with no text content).
+fn is_empty_inline_element(handle: &Handle) -> bool {
+    // List of inline elements that should be considered when empty
+    const EMPTY_WHEN_NO_CONTENT_TAGS: &[&str] = &[
+        "abbr", "var", "ins", "dfn", "time", "data", "cite", "q", "mark", "small", "u",
+    ];
+
+    if let NodeData::Element { name, .. } = &handle.data {
+        let tag_name = name.local.as_ref();
+        if EMPTY_WHEN_NO_CONTENT_TAGS.contains(&tag_name) {
+            // Check if the element has no text content
+            return get_text_content(handle).trim().is_empty();
+        }
+    }
+    false
+}
+
+/// Get the text content of a node and its children.
+fn get_text_content(handle: &Handle) -> String {
+    let mut text = String::new();
+    for child in handle.children.borrow().iter() {
+        match &child.data {
+            NodeData::Text { contents } => {
+                text.push_str(&contents.borrow());
+            }
+            NodeData::Element { .. } => {
+                text.push_str(&get_text_content(child));
+            }
+            _ => {}
+        }
+    }
+    text
+}
+
 /// Convert HTML to Markdown using html5ever DOM parser.
 pub fn convert_html(html: &str, options: &ConversionOptions) -> Result<String> {
     // Parse HTML into DOM
@@ -434,8 +468,7 @@ fn walk_node(handle: &Handle, output: &mut String, options: &ConversionOptions, 
                 let (prefix, suffix, core) = text::chomp(&normalized_text);
 
                 // Don't add leading space if output ends with a separator
-                let skip_prefix = output.is_empty()
-                    || output.ends_with("\n\n")
+                let skip_prefix = output.ends_with("\n\n")
                     || output.ends_with("* ")
                     || output.ends_with("- ")
                     || output.ends_with(". ")
@@ -611,7 +644,21 @@ fn walk_node(handle: &Handle, output: &mut String, options: &ConversionOptions, 
                         ..ctx.clone()
                     };
 
-                    for child in handle.children.borrow().iter() {
+                    // Process children, skipping whitespace-only text nodes between empty inline elements
+                    let children: Vec<_> = handle.children.borrow().iter().cloned().collect();
+                    for (i, child) in children.iter().enumerate() {
+                        // Check if this is a whitespace-only text node between empty inline elements
+                        if let NodeData::Text { contents } = &child.data {
+                            let text = contents.borrow();
+                            if text.trim().is_empty() && i > 0 && i < children.len() - 1 {
+                                let prev = &children[i - 1];
+                                let next = &children[i + 1];
+                                if is_empty_inline_element(prev) && is_empty_inline_element(next) {
+                                    // Skip this whitespace text node
+                                    continue;
+                                }
+                            }
+                        }
                         walk_node(child, output, options, &p_ctx, depth + 1);
                     }
 
