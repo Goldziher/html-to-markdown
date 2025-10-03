@@ -9,7 +9,10 @@ V2 API (current):
     options = ConversionOptions(heading_style="atx")
     markdown = convert(html, options)
 
-V1 compatibility will be added in a future release.
+V1 API (backward compatibility):
+    from html_to_markdown import convert_to_markdown
+
+    markdown = convert_to_markdown(html, heading_style="atx")
 """
 
 # V2 API - Rust bindings
@@ -31,6 +34,9 @@ from html_to_markdown.options import (
     PreprocessingOptions,
 )
 
+# V1 Compatibility
+from html_to_markdown.v1_compat import convert_to_markdown, convert_to_markdown_stream
+
 __all__ = [
     "ConflictingOptionsError",
     "ConversionOptions",
@@ -41,6 +47,8 @@ __all__ = [
     "ParsingOptions",
     "PreprocessingOptions",
     "convert",
+    "convert_to_markdown",
+    "convert_to_markdown_stream",
 ]
 
 __version__ = "2.0.0"
