@@ -1,10 +1,6 @@
-"""Type stubs for Rust-based html-to-markdown module."""
-
 from typing import Literal
 
 class PreprocessingOptions:
-    """HTML preprocessing configuration."""
-
     enabled: bool
     preset: Literal["minimal", "standard", "aggressive"]
     remove_navigation: bool
@@ -19,8 +15,6 @@ class PreprocessingOptions:
     ) -> None: ...
 
 class ParsingOptions:
-    """HTML parsing configuration."""
-
     encoding: str
     parser: str | None
 
@@ -31,8 +25,6 @@ class ParsingOptions:
     ) -> None: ...
 
 class ConversionOptions:
-    """Main conversion configuration."""
-
     heading_style: Literal["underlined", "atx", "atx_closed"]
     list_indent_type: Literal["spaces", "tabs"]
     list_indent_width: int
@@ -94,14 +86,4 @@ class ConversionOptions:
         parsing: ParsingOptions | None = None,
     ) -> None: ...
 
-def convert(html: str, options: ConversionOptions | None = None) -> str:
-    """Convert HTML to Markdown.
-
-    Args:
-        html: HTML string to convert
-        options: Conversion options (uses defaults if None)
-
-    Returns:
-        Markdown string
-    """
-    ...
+def convert(html: str, options: ConversionOptions | None = None) -> str: ...
