@@ -44,3 +44,4 @@ Cargo.lock
 *.pdb
 *.so
 *.dylib
+html_to_markdown-*.data/

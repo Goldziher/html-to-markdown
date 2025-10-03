@@ -81,6 +81,11 @@ tasks:
     cmds:
       - cargo build --release --package html-to-markdown-cli
 
+  build:wheel-prep:
+    desc: "Prepare CLI binary for wheel packaging"
+    cmds:
+      - python build.py
+
   bench:
     desc: "Run Wikipedia document benchmarks"
     cmds:
