@@ -139,7 +139,7 @@ implicit_reexport = false
 show_error_codes = true
 warn_return_any = true
 warn_unused_configs = true
-exclude = [ "crates/", "build.py" ]
+exclude = [ "crates/", "prepare_wheel.py" ]
 
 [[tool.mypy.overrides]]
 module = "tests.*"

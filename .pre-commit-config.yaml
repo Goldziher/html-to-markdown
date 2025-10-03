@@ -85,4 +85,4 @@ repos:
         require_serial: true
         language: system
         types: [python]
-        exclude: ^crates/|^build\.py$
+        exclude: ^crates/|^prepare_wheel\.py$

@@ -84,7 +84,7 @@ tasks:
   build:wheel-prep:
     desc: "Prepare CLI binary for wheel packaging"
     cmds:
-      - python build.py
+      - python prepare_wheel.py
 
   bench:
     desc: "Run Wikipedia document benchmarks"
