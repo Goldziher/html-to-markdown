@@ -101,7 +101,7 @@ fn get_text_content(handle: &Handle) -> String {
 ///
 /// Walks the DOM and extracts all elements with `ocrx_word` class,
 /// parsing their bbox and confidence information.
-pub fn extract_hocr_words(handle: &Handle, min_confidence: f64) -> Vec<HocrWord> {
+pub fn extract_hocr_words(handle: &Handle, min_confidence: f64, debug: bool) -> Vec<HocrWord> {
     let mut words = Vec::new();
 
     if let NodeData::Element { name, attrs, .. } = &handle.data {
@@ -139,15 +139,35 @@ pub fn extract_hocr_words(handle: &Handle, min_confidence: f64) -> Vec<HocrWord>
                                 height,
                                 confidence,
                             });
+                        } else if debug {
+                            eprintln!(
+                                "[hOCR] Warning: ocrx_word element has no text content (bbox: {})",
+                                title
+                            );
                         }
+                    } else if debug {
+                        eprintln!(
+                            "[hOCR] Warning: Word confidence ({:.1}) below threshold ({:.1}): {}",
+                            confidence,
+                            min_confidence,
+                            get_text_content(handle).trim()
+                        );
                     }
+                } else if debug {
+                    let text = get_text_content(handle);
+                    let trimmed = text.trim();
+                    eprintln!(
+                        "[hOCR] Warning: Failed to parse bbox for ocrx_word element: {} (title: {})",
+                        if trimmed.is_empty() { "<empty>" } else { trimmed },
+                        title
+                    );
                 }
             }
         }
     }
 
     for child in handle.children.borrow().iter() {
-        words.extend(extract_hocr_words(child, min_confidence));
+        words.extend(extract_hocr_words(child, min_confidence, debug));
     }
 
     words
@@ -254,8 +274,16 @@ pub fn detect_rows(words: &[HocrWord], row_threshold_ratio: f64) -> Vec<u32> {
 /// 1. Detecting column and row positions
 /// 2. Assigning words to cells based on position
 /// 3. Combining words within the same cell
-pub fn reconstruct_table(words: &[HocrWord], column_threshold: u32, row_threshold_ratio: f64) -> Vec<Vec<String>> {
+pub fn reconstruct_table(
+    words: &[HocrWord],
+    column_threshold: u32,
+    row_threshold_ratio: f64,
+    debug: bool,
+) -> Vec<Vec<String>> {
     if words.is_empty() {
+        if debug {
+            eprintln!("[hOCR] Warning: No words to reconstruct table from");
+        }
         return Vec::new();
     }
 
@@ -263,12 +291,28 @@ pub fn reconstruct_table(words: &[HocrWord], column_threshold: u32, row_threshol
     let row_positions = detect_rows(words, row_threshold_ratio);
 
     if col_positions.is_empty() || row_positions.is_empty() {
+        if debug {
+            eprintln!(
+                "[hOCR] Warning: Could not detect table structure (columns: {}, rows: {})",
+                col_positions.len(),
+                row_positions.len()
+            );
+        }
         return Vec::new();
+    }
+
+    if debug {
+        eprintln!(
+            "[hOCR] Detected table structure: {} rows × {} columns",
+            row_positions.len(),
+            col_positions.len()
+        );
     }
 
     let num_rows = row_positions.len();
     let num_cols = col_positions.len();
     let mut table: Vec<Vec<Vec<String>>> = vec![vec![vec![]; num_cols]; num_rows];
+    let mut unassigned_words = 0;
 
     for word in words {
         if let (Some(r), Some(c)) = (
@@ -277,8 +321,32 @@ pub fn reconstruct_table(words: &[HocrWord], column_threshold: u32, row_threshol
         ) {
             if r < num_rows && c < num_cols {
                 table[r][c].push(word.text.clone());
+            } else {
+                unassigned_words += 1;
+                if debug {
+                    eprintln!(
+                        "[hOCR] Warning: Word '{}' assigned to out-of-bounds cell ({}, {})",
+                        word.text, r, c
+                    );
+                }
+            }
+        } else {
+            unassigned_words += 1;
+            if debug {
+                eprintln!(
+                    "[hOCR] Warning: Could not assign word '{}' to any cell (position: {}, {})",
+                    word.text, word.left, word.top
+                );
             }
         }
+    }
+
+    if debug && unassigned_words > 0 {
+        eprintln!(
+            "[hOCR] Warning: {} out of {} words could not be assigned to table cells",
+            unassigned_words,
+            words.len()
+        );
     }
 
     let result: Vec<Vec<String>> = table
@@ -496,7 +564,7 @@ mod tests {
             .read_from(&mut Cursor::new(hocr.as_bytes()))
             .unwrap();
 
-        let words = extract_hocr_words(&dom.document, 0.0);
+        let words = extract_hocr_words(&dom.document, 0.0, false);
 
         assert_eq!(words.len(), 2);
         assert_eq!(words[0].text, "Hello");
@@ -523,7 +591,7 @@ mod tests {
             .read_from(&mut Cursor::new(hocr.as_bytes()))
             .unwrap();
 
-        let words = extract_hocr_words(&dom.document, 90.0);
+        let words = extract_hocr_words(&dom.document, 90.0, false);
 
         assert_eq!(words.len(), 2);
         assert_eq!(words[0].text, "HighConf");
@@ -567,7 +635,7 @@ mod tests {
             },
         ];
 
-        let table = reconstruct_table(&words, 50, 0.5);
+        let table = reconstruct_table(&words, 50, 0.5, false);
 
         assert_eq!(table.len(), 2);
         assert_eq!(table[0].len(), 2);
@@ -614,7 +682,7 @@ mod tests {
             },
         ];
 
-        let table = reconstruct_table(&words, 50, 0.5);
+        let table = reconstruct_table(&words, 50, 0.5, false);
 
         assert_eq!(table.len(), 1);
         assert_eq!(table[0].len(), 2);
@@ -640,8 +708,8 @@ mod tests {
             .read_from(&mut Cursor::new(hocr.as_bytes()))
             .unwrap();
 
-        let words = extract_hocr_words(&dom.document, 0.0);
-        let table = reconstruct_table(&words, 50, 0.5);
+        let words = extract_hocr_words(&dom.document, 0.0, false);
+        let table = reconstruct_table(&words, 50, 0.5, false);
         let markdown = table_to_markdown(&table);
 
         assert_eq!(table.len(), 3);

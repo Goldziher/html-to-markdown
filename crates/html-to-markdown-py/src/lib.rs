@@ -138,6 +138,8 @@ struct ConversionOptions {
     preprocessing: PreprocessingOptions,
     #[pyo3(get, set)]
     parsing: ParsingOptions,
+    #[pyo3(get, set)]
+    debug: bool,
 }
 
 #[pymethods]
@@ -172,7 +174,8 @@ impl ConversionOptions {
         hocr_table_column_threshold=50,
         hocr_table_row_threshold_ratio=0.5,
         preprocessing=None,
-        parsing=None
+        parsing=None,
+        debug=false
     ))]
     fn new(
         heading_style: String,
@@ -203,6 +206,7 @@ impl ConversionOptions {
         hocr_table_row_threshold_ratio: f64,
         preprocessing: Option<PreprocessingOptions>,
         parsing: Option<ParsingOptions>,
+        debug: bool,
     ) -> Self {
         Self {
             heading_style,
@@ -234,6 +238,7 @@ impl ConversionOptions {
             preprocessing: preprocessing
                 .unwrap_or_else(|| PreprocessingOptions::new(false, "standard".to_string(), true, true)),
             parsing: parsing.unwrap_or_else(|| ParsingOptions::new("utf-8".to_string(), None)),
+            debug,
         }
     }
 }
@@ -288,6 +293,7 @@ impl ConversionOptions {
             hocr_table_row_threshold_ratio: self.hocr_table_row_threshold_ratio,
             preprocessing: self.preprocessing.to_rust(),
             parsing: self.parsing.to_rust(),
+            debug: self.debug,
         }
     }
 }

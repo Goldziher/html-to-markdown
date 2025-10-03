@@ -147,6 +147,9 @@ class ConversionOptions:
     custom_converters: dict[str, Callable[..., str]] | None = None
     """Custom converter functions for specific HTML elements."""
 
+    debug: bool = False
+    """Enable debug mode with diagnostic warnings about unhandled elements and hOCR processing."""
+
 
 @dataclass
 class PreprocessingOptions:

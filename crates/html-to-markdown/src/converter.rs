@@ -589,22 +589,38 @@ pub fn convert_html(html: &str, options: &ConversionOptions) -> Result<String> {
     if options.hocr_extract_tables && is_hocr_document(&dom.document) {
         use crate::hocr::{extract_hocr_words, reconstruct_table, table_to_markdown};
 
-        let words = extract_hocr_words(&dom.document, 0.0);
+        if options.debug {
+            eprintln!("[hOCR] Detected hOCR document, extracting table...");
+        }
+
+        let words = extract_hocr_words(&dom.document, 0.0, options.debug);
 
         if !words.is_empty() {
+            if options.debug {
+                eprintln!("[hOCR] Extracted {} words from document", words.len());
+            }
+
             let table = reconstruct_table(
                 &words,
                 options.hocr_table_column_threshold,
                 options.hocr_table_row_threshold_ratio,
+                options.debug,
             );
 
             if !table.is_empty() {
+                if options.debug {
+                    eprintln!("[hOCR] Successfully reconstructed table with {} rows", table.len());
+                }
                 let table_markdown = table_to_markdown(&table);
                 if !table_markdown.is_empty() {
                     output.push_str(&table_markdown);
                     output.push_str("\n\n");
                 }
+            } else if options.debug {
+                eprintln!("[hOCR] Warning: Table reconstruction resulted in empty table");
             }
+        } else if options.debug {
+            eprintln!("[hOCR] Warning: No words extracted from hOCR document");
         }
     }
 

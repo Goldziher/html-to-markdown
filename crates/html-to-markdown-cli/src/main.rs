@@ -374,6 +374,7 @@ fn main() {
         hocr_table_row_threshold_ratio: 0.5,
         preprocessing,
         parsing,
+        debug: false,
     };
 
     let markdown = match convert(&html, Some(options)) {

@@ -177,6 +177,9 @@ pub struct ConversionOptions {
 
     /// Parsing options
     pub parsing: ParsingOptions,
+
+    /// Enable debug mode with diagnostic warnings
+    pub debug: bool,
 }
 
 impl Default for ConversionOptions {
@@ -210,6 +213,7 @@ impl Default for ConversionOptions {
             hocr_table_row_threshold_ratio: 0.5,
             preprocessing: PreprocessingOptions::default(),
             parsing: ParsingOptions::default(),
+            debug: false,
         }
     }
 }
