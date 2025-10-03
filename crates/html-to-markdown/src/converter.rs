@@ -190,10 +190,8 @@ fn add_list_continuation_indent(output: &mut String, list_depth: usize, blank_li
 fn add_list_leading_separator(output: &mut String, ctx: &Context) {
     // In table cells, use <br> separator
     if ctx.in_table_cell {
-        let is_table_continuation = !output.is_empty()
-            && !output.ends_with('|')
-            && !output.ends_with(' ')
-            && !output.ends_with("<br>");
+        let is_table_continuation =
+            !output.is_empty() && !output.ends_with('|') && !output.ends_with(' ') && !output.ends_with("<br>");
         if is_table_continuation {
             output.push_str("<br>");
         }
@@ -202,10 +200,8 @@ fn add_list_leading_separator(output: &mut String, ctx: &Context) {
 
     // For lists outside of other lists, add block separation if needed
     if !output.is_empty() && !ctx.in_list {
-        let needs_newline = !output.ends_with("\n\n")
-            && !output.ends_with("* ")
-            && !output.ends_with("- ")
-            && !output.ends_with(". ");
+        let needs_newline =
+            !output.ends_with("\n\n") && !output.ends_with("* ") && !output.ends_with("- ") && !output.ends_with(". ");
         if needs_newline {
             output.push_str("\n\n");
         }
@@ -214,10 +210,8 @@ fn add_list_leading_separator(output: &mut String, ctx: &Context) {
 
     // If in a list item with content before the nested list, add newline
     if ctx.in_list_item && !output.is_empty() {
-        let needs_newline = !output.ends_with('\n')
-            && !output.ends_with("* ")
-            && !output.ends_with("- ")
-            && !output.ends_with(". ");
+        let needs_newline =
+            !output.ends_with('\n') && !output.ends_with("* ") && !output.ends_with("- ") && !output.ends_with(". ");
         if needs_newline {
             trim_trailing_whitespace(output);
             output.push_str("\n\n");
@@ -259,6 +253,7 @@ fn calculate_list_nesting_depth(ctx: &Context) -> usize {
 ///
 /// This is used to determine proper spacing between list items.
 /// Returns true if the last processed item had block children.
+#[allow(clippy::too_many_arguments)]
 fn process_list_children(
     handle: &Handle,
     output: &mut String,

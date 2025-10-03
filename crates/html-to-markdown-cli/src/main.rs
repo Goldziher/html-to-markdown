@@ -1,127 +1,302 @@
 use clap::Parser;
 use html_to_markdown::{
-    convert, ConversionOptions, HeadingStyle, HighlightStyle, ListIndentType, NewlineStyle,
-    ParsingOptions, PreprocessingOptions, PreprocessingPreset, WhitespaceMode,
+    convert, ConversionOptions, HeadingStyle, HighlightStyle, ListIndentType, NewlineStyle, ParsingOptions,
+    PreprocessingOptions, PreprocessingPreset, WhitespaceMode,
 };
 use std::fs;
-use std::io::{self, Read};
+use std::io::{self, Read, Write as IoWrite};
 use std::path::PathBuf;
 
+/// Convert HTML to Markdown
+///
+/// A fast, powerful HTML to Markdown converter with comprehensive
+/// customization options. Uses the html5ever parser for standards-compliant
+/// HTML processing.
 #[derive(Parser)]
 #[command(name = "html-to-markdown")]
-#[command(version, about = "Convert HTML to Markdown with comprehensive customization options", long_about = None)]
+#[command(version)]
+#[command(about, long_about = None)]
+#[command(after_help = "EXAMPLES:
+    # Basic conversion from stdin
+    echo '<h1>Title</h1><p>Content</p>' | html-to-markdown
+
+    # Convert file to stdout
+    html-to-markdown input.html
+
+    # Convert and save to file
+    html-to-markdown input.html -o output.md
+    html-to-markdown input.html --output output.md
+
+    # Web scraping with preprocessing
+    html-to-markdown page.html --preprocess --preset aggressive
+
+    # Discord/Slack-friendly (2-space indents)
+    html-to-markdown input.html --list-indent-width 2
+
+    # Custom heading and list styles
+    html-to-markdown input.html \\
+        --heading-style atx \\
+        --bullets '*' \\
+        --list-indent-width 2
+
+For more information and documentation: https://github.com/Goldziher/html-to-markdown
+")]
 struct Cli {
-    /// Input HTML file (use "-" or omit for stdin)
+    /// Input HTML file (use \"-\" or omit for stdin)
     #[arg(value_name = "FILE")]
     input: Option<String>,
 
-    /// Header style: 'atx' (#), 'atx_closed' (# #), or 'underlined' (===)
+    /// Output file (default: stdout)
+    #[arg(short = 'o', long = "output", value_name = "FILE")]
+    output: Option<PathBuf>,
+
+    // ============================================================
+    // HEADING OPTIONS
+    // ============================================================
+    /// Heading style
+    ///
+    /// Controls how headings are formatted in the output:
+    /// - 'underlined': h1 uses ===, h2 uses --- (default)
+    /// - 'atx': # for h1, ## for h2, etc.
+    /// - 'atx_closed': # Title # with closing hashes
     #[arg(long, value_name = "STYLE", default_value = "underlined")]
+    #[arg(help_heading = "Heading Options")]
+    #[arg(value_parser = ["underlined", "atx", "atx_closed"])]
     heading_style: String,
 
-    /// Characters for bullet points, alternates by nesting level
-    #[arg(short, long, value_name = "CHARS", default_value = "*+-")]
+    // ============================================================
+    // LIST OPTIONS
+    // ============================================================
+    /// List indentation type
+    #[arg(long, value_name = "TYPE", default_value = "spaces")]
+    #[arg(help_heading = "List Options")]
+    #[arg(value_parser = ["spaces", "tabs"])]
+    list_indent_type: String,
+
+    /// Spaces per list indent level
+    ///
+    /// Use 2 for Discord/Slack compatibility, 4 for standard Markdown
+    #[arg(long, value_name = "N", default_value = "4")]
+    #[arg(help_heading = "List Options")]
+    list_indent_width: usize,
+
+    /// Bullet characters for unordered lists
+    ///
+    /// Characters cycle through nesting levels. Default "*+-" uses * for
+    /// level 1, + for level 2, - for level 3, then repeats.
+    #[arg(short = 'b', long, value_name = "CHARS", default_value = "*+-")]
+    #[arg(help_heading = "List Options")]
     bullets: String,
 
-    /// Symbol for bold/italic text: '*' or '_'
-    #[arg(long, value_name = "SYMBOL", default_value = "*")]
+    // ============================================================
+    // TEXT FORMATTING
+    // ============================================================
+    /// Symbol for bold and italic
+    ///
+    /// Choose '*' (default) or '_' for **bold** and *italic* text
+    #[arg(long, value_name = "CHAR", default_value = "*")]
+    #[arg(help_heading = "Text Formatting")]
     strong_em_symbol: char,
-
-    /// Characters to surround subscript text
-    #[arg(long, value_name = "SYMBOL", default_value = "")]
-    sub_symbol: String,
-
-    /// Characters to surround superscript text
-    #[arg(long, value_name = "SYMBOL", default_value = "")]
-    sup_symbol: String,
-
-    /// Line break style: 'spaces' (two spaces) or 'backslash' (\)
-    #[arg(long, value_name = "STYLE", default_value = "spaces")]
-    newline_style: String,
-
-    /// Default language for code blocks
-    #[arg(long, value_name = "LANG", default_value = "")]
-    code_language: String,
 
     /// Don't escape asterisk (*) characters
     #[arg(long)]
+    #[arg(help_heading = "Text Formatting")]
     no_escape_asterisks: bool,
 
     /// Don't escape underscore (_) characters
     #[arg(long)]
+    #[arg(help_heading = "Text Formatting")]
     no_escape_underscores: bool,
 
-    /// Don't escape other special Markdown characters
+    /// Don't escape misc Markdown characters
+    ///
+    /// When disabled, characters like [, ], <, >, #, etc. won't be escaped
     #[arg(long)]
+    #[arg(help_heading = "Text Formatting")]
     no_escape_misc: bool,
 
-    /// Convert URLs to automatic links when text matches href
-    #[arg(short, long)]
+    /// Symbol to wrap subscript text
+    ///
+    /// Example: "~" wraps <sub>text</sub> as ~text~
+    #[arg(long, value_name = "SYMBOL", default_value = "")]
+    #[arg(help_heading = "Text Formatting")]
+    sub_symbol: String,
+
+    /// Symbol to wrap superscript text
+    ///
+    /// Example: "^" wraps <sup>text</sup> as ^text^
+    #[arg(long, value_name = "SYMBOL", default_value = "")]
+    #[arg(help_heading = "Text Formatting")]
+    sup_symbol: String,
+
+    /// Line break style
+    ///
+    /// How to represent <br> tags:
+    /// - 'spaces': Two spaces at end of line (default)
+    /// - 'backslash': Backslash at end of line
+    #[arg(long, value_name = "STYLE", default_value = "spaces")]
+    #[arg(help_heading = "Text Formatting")]
+    #[arg(value_parser = ["spaces", "backslash"])]
+    newline_style: String,
+
+    // ============================================================
+    // CODE BLOCKS
+    // ============================================================
+    /// Default language for code blocks
+    ///
+    /// Sets the language for fenced code blocks when not specified in HTML
+    #[arg(short = 'l', long, value_name = "LANG", default_value = "")]
+    #[arg(help_heading = "Code Blocks")]
+    code_language: String,
+
+    // ============================================================
+    // LINKS
+    // ============================================================
+    /// Convert URLs to autolinks
+    ///
+    /// When link text equals href, use <url> instead of [url](url)
+    #[arg(short = 'a', long)]
+    #[arg(help_heading = "Links")]
     autolinks: bool,
 
-    /// Use href as link title when no title is provided
+    /// Add default title to links
+    ///
+    /// Use href as link title when no title attribute exists
     #[arg(long)]
+    #[arg(help_heading = "Links")]
     default_title: bool,
 
-    /// Use <br> tags for line breaks in table cells instead of spaces
+    // ============================================================
+    // TABLES
+    // ============================================================
+    /// Use <br> in table cells
+    ///
+    /// Preserve line breaks in table cells using <br> tags instead of
+    /// converting to spaces
     #[arg(long)]
+    #[arg(help_heading = "Tables")]
     br_in_tables: bool,
 
-    /// Enable text wrapping at --wrap-width characters
-    #[arg(short, long)]
-    wrap: bool,
-
-    /// Column width for text wrapping
-    #[arg(long, value_name = "WIDTH", default_value = "80")]
-    wrap_width: usize,
-
-    /// Remove newlines from HTML input (helps with messy HTML formatting)
-    #[arg(long)]
-    strip_newlines: bool,
-
-    /// Treat all content as inline elements (no paragraph breaks)
-    #[arg(long)]
-    convert_as_inline: bool,
-
-    /// Don't extract metadata (title, meta tags) as comment header
-    #[arg(long)]
-    no_extract_metadata: bool,
-
-    /// Highlighting style: 'double-equal' (==), 'html' (<mark>), or 'bold' (**)
+    // ============================================================
+    // HIGHLIGHTING
+    // ============================================================
+    /// Style for <mark> elements
+    ///
+    /// How to represent highlighted text:
+    /// - 'double-equal': ==text== (default)
+    /// - 'html': <mark>text</mark>
+    /// - 'bold': **text**
+    /// - 'none': plain text
     #[arg(long, value_name = "STYLE", default_value = "double-equal")]
+    #[arg(help_heading = "Highlighting")]
+    #[arg(value_parser = ["double-equal", "html", "bold", "none"])]
     highlight_style: String,
 
-    /// List indentation: 'spaces' or 'tabs'
-    #[arg(long, value_name = "TYPE", default_value = "spaces")]
-    list_indent_type: String,
+    // ============================================================
+    // METADATA
+    // ============================================================
+    /// Don't extract metadata
+    ///
+    /// Skip extracting title and meta tags as HTML comment header
+    #[arg(long)]
+    #[arg(help_heading = "Metadata")]
+    no_extract_metadata: bool,
 
-    /// Spaces per list indent level (use 2 for Discord/Slack)
-    #[arg(long, value_name = "WIDTH", default_value = "4")]
-    list_indent_width: usize,
-
-    /// Whitespace handling: 'normalized' (clean) or 'strict' (preserve)
+    // ============================================================
+    // WHITESPACE
+    // ============================================================
+    /// Whitespace handling mode
+    ///
+    /// How to handle whitespace in HTML:
+    /// - 'normalized': Clean up excess whitespace (default)
+    /// - 'strict': Preserve whitespace as-is
     #[arg(long, value_name = "MODE", default_value = "normalized")]
+    #[arg(help_heading = "Whitespace")]
+    #[arg(value_parser = ["normalized", "strict"])]
     whitespace_mode: String,
 
-    /// Clean messy HTML (removes navigation, ads, forms, etc)
+    /// Strip newlines from input
+    ///
+    /// Remove all newlines from HTML before processing (useful for
+    /// minified HTML)
     #[arg(long)]
-    preprocess_html: bool,
+    #[arg(help_heading = "Whitespace")]
+    strip_newlines: bool,
 
-    /// Cleaning level: 'minimal', 'standard', or 'aggressive'
-    #[arg(long, value_name = "PRESET", default_value = "standard")]
-    preprocessing_preset: String,
+    // ============================================================
+    // WRAPPING
+    // ============================================================
+    /// Enable text wrapping
+    ///
+    /// Wrap output lines at --wrap-width columns
+    #[arg(short = 'w', long)]
+    #[arg(help_heading = "Wrapping")]
+    wrap: bool,
 
-    /// Keep form elements when preprocessing (normally removed)
+    /// Wrap width in columns
+    ///
+    /// Column width for text wrapping when --wrap is enabled
+    #[arg(long, value_name = "N", default_value = "80")]
+    #[arg(help_heading = "Wrapping")]
+    wrap_width: usize,
+
+    // ============================================================
+    // ELEMENT HANDLING
+    // ============================================================
+    /// Treat block elements as inline
+    ///
+    /// Convert block-level elements without adding paragraph breaks
     #[arg(long)]
-    no_remove_forms: bool,
+    #[arg(help_heading = "Element Handling")]
+    convert_as_inline: bool,
 
-    /// Keep navigation elements when preprocessing (normally removed)
+    // ============================================================
+    // PREPROCESSING
+    // ============================================================
+    /// Enable HTML preprocessing
+    ///
+    /// Clean up HTML before conversion (removes navigation, ads, forms, etc.)
+    #[arg(short = 'p', long)]
+    #[arg(help_heading = "Preprocessing")]
+    preprocess: bool,
+
+    /// Preprocessing aggressiveness preset
+    ///
+    /// How aggressively to clean HTML:
+    /// - 'minimal': Basic cleanup only
+    /// - 'standard': Balanced cleaning (default)
+    /// - 'aggressive': Maximum cleaning for web scraping
+    #[arg(long, value_name = "LEVEL", default_value = "standard")]
+    #[arg(help_heading = "Preprocessing")]
+    #[arg(requires = "preprocess")]
+    #[arg(value_parser = ["minimal", "standard", "aggressive"])]
+    preset: String,
+
+    /// Keep navigation elements
+    ///
+    /// Don't remove <nav>, menus, etc. during preprocessing
     #[arg(long)]
-    no_remove_navigation: bool,
+    #[arg(help_heading = "Preprocessing")]
+    #[arg(requires = "preprocess")]
+    keep_navigation: bool,
 
-    /// Encoding for reading input files (e.g. 'utf-8', 'latin-1')
-    #[arg(long, value_name = "ENCODING")]
-    source_encoding: Option<String>,
+    /// Keep form elements
+    ///
+    /// Don't remove <form>, <input>, etc. during preprocessing
+    #[arg(long)]
+    #[arg(help_heading = "Preprocessing")]
+    #[arg(requires = "preprocess")]
+    keep_forms: bool,
+
+    // ============================================================
+    // PARSING
+    // ============================================================
+    /// Input character encoding
+    ///
+    /// Encoding to use when reading input files (e.g., 'utf-8', 'latin-1')
+    #[arg(short = 'e', long, value_name = "ENCODING", default_value = "utf-8")]
+    #[arg(help_heading = "Parsing")]
+    encoding: String,
 }
 
 fn parse_heading_style(s: &str) -> HeadingStyle {
@@ -129,10 +304,7 @@ fn parse_heading_style(s: &str) -> HeadingStyle {
         "atx" => HeadingStyle::Atx,
         "atx_closed" => HeadingStyle::AtxClosed,
         "underlined" => HeadingStyle::Underlined,
-        _ => {
-            eprintln!("Invalid heading style '{}', using default 'underlined'", s);
-            HeadingStyle::Underlined
-        }
+        _ => HeadingStyle::Underlined,
     }
 }
 
@@ -140,10 +312,7 @@ fn parse_newline_style(s: &str) -> NewlineStyle {
     match s {
         "spaces" => NewlineStyle::Spaces,
         "backslash" => NewlineStyle::Backslash,
-        _ => {
-            eprintln!("Invalid newline style '{}', using default 'spaces'", s);
-            NewlineStyle::Spaces
-        }
+        _ => NewlineStyle::Spaces,
     }
 }
 
@@ -153,13 +322,7 @@ fn parse_highlight_style(s: &str) -> HighlightStyle {
         "html" => HighlightStyle::Html,
         "bold" => HighlightStyle::Bold,
         "none" => HighlightStyle::None,
-        _ => {
-            eprintln!(
-                "Invalid highlight style '{}', using default 'double-equal'",
-                s
-            );
-            HighlightStyle::DoubleEqual
-        }
+        _ => HighlightStyle::DoubleEqual,
     }
 }
 
@@ -167,10 +330,7 @@ fn parse_list_indent_type(s: &str) -> ListIndentType {
     match s {
         "spaces" => ListIndentType::Spaces,
         "tabs" => ListIndentType::Tabs,
-        _ => {
-            eprintln!("Invalid list indent type '{}', using default 'spaces'", s);
-            ListIndentType::Spaces
-        }
+        _ => ListIndentType::Spaces,
     }
 }
 
@@ -178,13 +338,7 @@ fn parse_whitespace_mode(s: &str) -> WhitespaceMode {
     match s {
         "normalized" => WhitespaceMode::Normalized,
         "strict" => WhitespaceMode::Strict,
-        _ => {
-            eprintln!(
-                "Invalid whitespace mode '{}', using default 'normalized'",
-                s
-            );
-            WhitespaceMode::Normalized
-        }
+        _ => WhitespaceMode::Normalized,
     }
 }
 
@@ -193,13 +347,7 @@ fn parse_preprocessing_preset(s: &str) -> PreprocessingPreset {
         "minimal" => PreprocessingPreset::Minimal,
         "standard" => PreprocessingPreset::Standard,
         "aggressive" => PreprocessingPreset::Aggressive,
-        _ => {
-            eprintln!(
-                "Invalid preprocessing preset '{}', using default 'standard'",
-                s
-            );
-            PreprocessingPreset::Standard
-        }
+        _ => PreprocessingPreset::Standard,
     }
 }
 
@@ -211,9 +359,10 @@ fn main() {
         None | Some("-") => {
             // Read from stdin
             let mut buffer = String::new();
-            io::stdin()
-                .read_to_string(&mut buffer)
-                .expect("Failed to read from stdin");
+            io::stdin().read_to_string(&mut buffer).unwrap_or_else(|e| {
+                eprintln!("Error reading from stdin: {}", e);
+                std::process::exit(1);
+            });
             buffer
         }
         Some(path) => {
@@ -226,19 +375,21 @@ fn main() {
         }
     };
 
-    // Build conversion options
+    // Build preprocessing options
     let preprocessing = PreprocessingOptions {
-        enabled: cli.preprocess_html,
-        preset: parse_preprocessing_preset(&cli.preprocessing_preset),
-        remove_navigation: !cli.no_remove_navigation,
-        remove_forms: !cli.no_remove_forms,
+        enabled: cli.preprocess,
+        preset: parse_preprocessing_preset(&cli.preset),
+        remove_navigation: !cli.keep_navigation,
+        remove_forms: !cli.keep_forms,
     };
 
+    // Build parsing options
     let parsing = ParsingOptions {
-        encoding: cli.source_encoding.unwrap_or_else(|| "utf-8".to_string()),
+        encoding: cli.encoding,
         parser: None, // Rust always uses html5ever
     };
 
+    // Build main conversion options
     let options = ConversionOptions {
         heading_style: parse_heading_style(&cli.heading_style),
         list_indent_type: parse_list_indent_type(&cli.list_indent_type),
@@ -262,19 +413,36 @@ fn main() {
         sub_symbol: cli.sub_symbol,
         sup_symbol: cli.sup_symbol,
         newline_style: parse_newline_style(&cli.newline_style),
-        keep_inline_images_in: vec![], // Not supported in CLI yet
+        keep_inline_images_in: vec![],
         preprocessing,
         parsing,
     };
 
     // Convert HTML to Markdown
-    match convert(&html, Some(options)) {
-        Ok(markdown) => {
-            print!("{}", markdown);
-        }
+    let markdown = match convert(&html, Some(options)) {
+        Ok(md) => md,
         Err(e) => {
             eprintln!("Error converting HTML: {}", e);
             std::process::exit(1);
+        }
+    };
+
+    // Write output
+    match cli.output {
+        Some(path) => {
+            // Write to file
+            let mut file = fs::File::create(&path).unwrap_or_else(|e| {
+                eprintln!("Error creating output file '{}': {}", path.display(), e);
+                std::process::exit(1);
+            });
+            file.write_all(markdown.as_bytes()).unwrap_or_else(|e| {
+                eprintln!("Error writing to file '{}': {}", path.display(), e);
+                std::process::exit(1);
+            });
+        }
+        None => {
+            // Write to stdout
+            print!("{}", markdown);
         }
     }
 }
