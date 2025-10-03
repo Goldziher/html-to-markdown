@@ -41,9 +41,33 @@ impl HocrWord {
 /// Parse bbox attribute from hOCR title attribute
 ///
 /// Example: "bbox 100 50 180 80; x_wconf 95" -> (100, 50, 80, 30)
-fn parse_bbox(title: &str) -> Option<(u32, u32, u32, u32)> {
+fn parse_bbox(title: &str, debug: bool) -> Option<(u32, u32, u32, u32)> {
+    let known_attributes = [
+        "bbox",
+        "x_wconf",
+        "baseline",
+        "x_size",
+        "x_descenders",
+        "x_ascenders",
+        "textangle",
+        "poly",
+        "order",
+        "x_font",
+        "x_fsize",
+        "x_confs",
+    ];
+
     for part in title.split(';') {
         let part = part.trim();
+
+        // Report unknown attributes in debug mode
+        if debug && !part.is_empty() {
+            let attr_name = part.split_whitespace().next().unwrap_or("");
+            if !known_attributes.iter().any(|&k| part.starts_with(k)) {
+                eprintln!("[hOCR] Info: Found unknown title attribute: '{}'", attr_name);
+            }
+        }
+
         if let Some(bbox_str) = part.strip_prefix("bbox ") {
             let coords: Vec<&str> = bbox_str.split_whitespace().collect();
             if coords.len() == 4 {
@@ -105,9 +129,46 @@ pub fn extract_hocr_words(handle: &Handle, min_confidence: f64, debug: bool) -> 
     let mut words = Vec::new();
 
     if let NodeData::Element { name, attrs, .. } = &handle.data {
-        if name.local.as_ref() == "span" {
-            let attrs = attrs.borrow();
+        let tag_name = name.local.as_ref();
+        let attrs = attrs.borrow();
 
+        // Collect class names if present
+        let class_attr = attrs
+            .iter()
+            .find(|a| a.name.local.as_ref() == "class")
+            .map(|a| a.value.to_string());
+
+        // Check for hOCR classes we recognize
+        if let Some(ref classes) = class_attr {
+            let known_classes = [
+                "ocr_page",
+                "ocr_carea",
+                "ocr_par",
+                "ocr_line",
+                "ocrx_word",
+                "ocr_header",
+                "ocr_footer",
+                "ocr_table",
+                "ocr_caption",
+                "ocr_textfloat",
+                "ocr_separator",
+                "ocr_noise",
+            ];
+
+            let class_list: Vec<&str> = classes.split_whitespace().collect();
+            let has_ocr_class = class_list.iter().any(|c| c.starts_with("ocr"));
+
+            if has_ocr_class && debug {
+                // Report unknown hOCR classes
+                for class in &class_list {
+                    if class.starts_with("ocr") && !known_classes.contains(class) {
+                        eprintln!("[hOCR] Info: Found unhandled hOCR class '{}' on <{}>", class, tag_name);
+                    }
+                }
+            }
+        }
+
+        if tag_name == "span" {
             let mut is_word = false;
             let mut title = String::new();
 
@@ -124,7 +185,7 @@ pub fn extract_hocr_words(handle: &Handle, min_confidence: f64, debug: bool) -> 
             }
 
             if is_word {
-                if let Some((left, top, width, height)) = parse_bbox(&title) {
+                if let Some((left, top, width, height)) = parse_bbox(&title, debug) {
                     let confidence = parse_confidence(&title);
 
                     if confidence >= min_confidence {
@@ -463,11 +524,14 @@ mod tests {
 
     #[test]
     fn test_parse_bbox() {
-        assert_eq!(parse_bbox("bbox 100 50 180 80"), Some((100, 50, 80, 30)));
-        assert_eq!(parse_bbox("bbox 0 0 100 200"), Some((0, 0, 100, 200)));
-        assert_eq!(parse_bbox("bbox 100 50 180 80; x_wconf 95"), Some((100, 50, 80, 30)));
-        assert_eq!(parse_bbox("invalid"), None);
-        assert_eq!(parse_bbox("bbox 100 50"), None);
+        assert_eq!(parse_bbox("bbox 100 50 180 80", false), Some((100, 50, 80, 30)));
+        assert_eq!(parse_bbox("bbox 0 0 100 200", false), Some((0, 0, 100, 200)));
+        assert_eq!(
+            parse_bbox("bbox 100 50 180 80; x_wconf 95", false),
+            Some((100, 50, 80, 30))
+        );
+        assert_eq!(parse_bbox("invalid", false), None);
+        assert_eq!(parse_bbox("bbox 100 50", false), None);
     }
 
     #[test]

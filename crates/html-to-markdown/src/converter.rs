@@ -591,6 +591,7 @@ pub fn convert_html(html: &str, options: &ConversionOptions) -> Result<String> {
 
         if options.debug {
             eprintln!("[hOCR] Detected hOCR document, extracting table...");
+            eprintln!("[hOCR] Debug mode enabled - will report unhandled elements and attributes");
         }
 
         let words = extract_hocr_words(&dom.document, 0.0, options.debug);
