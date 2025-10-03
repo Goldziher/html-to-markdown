@@ -106,6 +106,7 @@ lint.ignore = [
   "TD",      # Allow todo and fixme comments
   "TRY",     # Try except block rules too strict
 ]
+lint.per-file-ignores."prepare_wheel.py" = [ "S607" ]
 lint.per-file-ignores."tests/**/*.*" = [ "ARG", "D", "PD", "PT006", "PT013", "S" ]
 lint.per-file-ignores."tests/benchmark_*_test.py" = [ "T201" ]
 lint.isort.known-first-party = [ "html_to_markdown", "tests" ]

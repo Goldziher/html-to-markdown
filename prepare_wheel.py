@@ -1,3 +1,9 @@
+# /// script
+# requires-python = ">=3.10"
+# dependencies = [
+#   "tomli>=2; python_version<'3.11'",
+# ]
+# ///
 """Build script to include CLI binary in wheel.
 
 This script is called by maturin during the build process to:
@@ -20,7 +26,7 @@ def main() -> None:
     """Build CLI binary and prepare for wheel packaging."""
     # Build the CLI binary
     subprocess.run(
-        ["/usr/bin/env", "cargo", "build", "--release", "--package", "html-to-markdown-cli"],
+        ["cargo", "build", "--release", "--package", "html-to-markdown-cli"],
         check=True,
     )
 

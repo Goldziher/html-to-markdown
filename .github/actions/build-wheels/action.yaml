@@ -42,17 +42,17 @@ runs:
           refreshenv
 
         CIBW_BEFORE_BUILD_LINUX: >
-          pip install maturin &&
+          pip install maturin uv &&
           source ~/.cargo/env &&
-          python prepare_wheel.py
+          uv run prepare_wheel.py
         CIBW_BEFORE_BUILD_MACOS: >
-          pip install maturin &&
+          pip install maturin uv &&
           source ~/.cargo/env &&
-          python prepare_wheel.py
+          uv run prepare_wheel.py
         CIBW_BEFORE_BUILD_WINDOWS: >
-          pip install maturin &&
-          refreshenv &&
-          python prepare_wheel.py
+          pip install maturin uv &&
+          set PATH=%USERPROFILE%\.cargo\bin;%PATH% &&
+          uv run prepare_wheel.py
 
         CIBW_BUILD_FRONTEND: build
 
