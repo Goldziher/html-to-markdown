@@ -15,7 +15,7 @@ repository = "https://github.com/Goldziher/html-to-markdown"
 homepage = "https://github.com/Goldziher/html-to-markdown"
 documentation = "https://docs.rs/html-to-markdown"
 readme = "README.md"
-rust-version = "1.75"
+rust-version = "1.80"
 
 [workspace.dependencies]
 # Core library
