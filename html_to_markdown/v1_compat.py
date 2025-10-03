@@ -61,10 +61,10 @@ def convert_to_markdown(  # noqa: D417
     the same kwargs and translating them to v2 ConversionOptions.
 
     Note: Some v1 options are not supported in v2:
-    - code_language_callback: Callbacks not supported in Rust backend
-    - strip: Tag stripping not supported in v2
-    - convert: Selective tag conversion not supported in v2
-    - custom_converters: Custom converters not supported in v2
+    - code_language_callback: Removed in v2
+    - strip: Removed in v2
+    - convert: Removed in v2
+    - custom_converters: Not yet implemented in v2
 
     Args:
         html: HTML string to convert
@@ -77,14 +77,14 @@ def convert_to_markdown(  # noqa: D417
     """
     if code_language_callback is not None:
         raise NotImplementedError(
-            "code_language_callback is not supported in v2 (Rust backend doesn't support callbacks)"
+            "code_language_callback was removed in v2. Use the code_language option to set a default language."
         )
     if strip is not None:
-        raise NotImplementedError("strip option is not supported in v2")
+        raise NotImplementedError("strip option was removed in v2. Use preprocessing options to clean HTML instead.")
     if convert is not None:
-        raise NotImplementedError("convert option is not supported in v2")
+        raise NotImplementedError("convert option was removed in v2. All supported tags are converted by default.")
     if custom_converters is not None:
-        raise NotImplementedError("custom_converters is not supported in v2")
+        raise NotImplementedError("custom_converters is not yet implemented in v2")
 
     options = ConversionOptions(
         heading_style=heading_style,  # type: ignore[arg-type]
@@ -138,17 +138,17 @@ def convert_to_markdown_stream(  # noqa: D417
 ) -> Iterator[str]:
     """Stream HTML to Markdown conversion (v1 API).
 
-    Note: Streaming is not yet implemented in v2.
+    Note: Streaming was removed in v2.
 
     Args:
         html: HTML string to convert
         chunk_size: Size of chunks to yield (not used in v2)
 
     Raises:
-        NotImplementedError: Streaming not yet implemented in v2
+        NotImplementedError: Streaming was removed in v2
     """
     raise NotImplementedError(
-        "Streaming API (convert_to_markdown_stream) is not yet implemented in v2. Use convert_to_markdown() for now."
+        "Streaming API (convert_to_markdown_stream) was removed in v2. Use convert_to_markdown() instead."
     )
 
 

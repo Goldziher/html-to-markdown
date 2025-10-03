@@ -309,14 +309,17 @@ markdown = convert(html, options)
 - No BeautifulSoup or lxml dependencies
 - Smaller package size, faster installation
 
-**Unsupported v1 Features:**
+**Removed v1 Features:**
 
-Some v1 features are not available in v2 (raise `NotImplementedError`):
+The following v1 features were removed in v2:
 
-- `code_language_callback` - Callbacks not supported in Rust backend
-- `strip` / `convert` options - Use preprocessing instead
-- `custom_converters` - Not yet implemented
-- `convert_to_markdown_stream()` - Not yet implemented
+- `code_language_callback` - Removed (use `code_language` option for default language)
+- `strip` / `convert` options - Removed (use preprocessing options instead)
+- `convert_to_markdown_stream()` - Removed (streaming API not needed with Rust performance)
+
+**Planned for v2:**
+
+- `custom_converters` - Not yet implemented, but planned with Rust and Python callback support
 
 ## Contributing
 

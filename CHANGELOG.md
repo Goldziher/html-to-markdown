@@ -76,15 +76,18 @@ Version 2.0.0 represents a complete rewrite of html-to-markdown with a high-perf
 - Clearer parameter naming and organization
 - Improved error messages and exception handling
 
-### Deprecated
+### Removed v1 Features
 
-The following v1 features are **not supported** in v2 and will raise `NotImplementedError`:
+The following v1 features were **removed** in v2:
 
-- `code_language_callback` - Callbacks not supported in Rust backend
-- `strip` option - Tag stripping not in v2 design
-- `convert` option - Selective tag conversion not supported
-- `custom_converters` - Custom converters not supported
-- `convert_to_markdown_stream()` - Streaming API not yet implemented
+- `code_language_callback` - Removed (use `code_language` option for default language)
+- `strip` option - Removed (use preprocessing options instead)
+- `convert` option - Removed (all supported tags are converted by default)
+- `convert_to_markdown_stream()` - Removed (streaming not needed with Rust performance)
+
+### Not Yet Implemented
+
+- `custom_converters` - Planned for future release with Rust and Python callback support
 
 ### Migration Guide
 
@@ -161,9 +164,9 @@ None if using v1 API. If migrating to v2 API:
 
 1. **Import changes**: `convert_to_markdown` → `convert`
 1. **Configuration**: Kwargs → Dataclasses (`ConversionOptions`)
-1. **Unsupported features**: See [Deprecated](#deprecated) section above
+1. **Removed features**: See [Removed v1 Features](#removed-v1-features) section above
 
-### Removed
+### Removed Python Implementation
 
 - Python implementation of HTML conversion
 - `html_to_markdown/converters.py` (1220 lines)
@@ -182,7 +185,7 @@ Total: **~3,850 lines** of Python code removed, replaced by **~4,800 lines** of 
 - **ABI Compatibility**: Uses `abi3` for Python 3.10+ wheel reuse
 - **Rust Version**: Built with stable Rust (tested on 1.75+)
 
----
+______________________________________________________________________
 
 ## [1.x] - Previous Versions
 
