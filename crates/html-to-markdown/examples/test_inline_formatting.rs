@@ -1,4 +1,4 @@
-use html_to_markdown::convert;
+use html_to_markdown::{convert, ConversionOptions};
 
 fn main() {
     // Test mark with default (DoubleEqual)
