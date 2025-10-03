@@ -1,14 +1,9 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
-
-from html_to_markdown import convert_to_markdown
-from html_to_markdown.constants import ATX, ATX_CLOSED, BACKSLASH, UNDERSCORE
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from collections.abc import Callable
-
-    from bs4.element import Tag
 
 
 def test_single_tag(convert: Callable[..., str]) -> None:
@@ -68,15 +63,15 @@ def test_misc(convert: Callable[..., str]) -> None:
     assert convert(r"\ <foo> &amp;amp; | ` `", escape_misc=False) == r"\ &amp; | ` `"
 
 
-def test_chomp() -> None:
-    assert convert_to_markdown(" <b></b> ", parser="html.parser") == "  "
-    assert convert_to_markdown(" <b> </b> ", parser="html.parser") == "  "
-    assert convert_to_markdown(" <b>  </b> ", parser="html.parser") == "  "
-    assert convert_to_markdown(" <b>   </b> ", parser="html.parser") == "  "
-    assert convert_to_markdown(" <b>s </b> ") == " **s** "
-    assert convert_to_markdown(" <b> s</b> ") == " **s** "
-    assert convert_to_markdown(" <b> s </b> ") == " **s** "
-    assert convert_to_markdown(" <b>  s  </b> ") == " **s** "
+def test_chomp(convert: Callable[..., str]) -> None:
+    assert convert(" <b></b> ", parser="html.parser") == "  "
+    assert convert(" <b> </b> ", parser="html.parser") == "  "
+    assert convert(" <b>  </b> ", parser="html.parser") == "  "
+    assert convert(" <b>   </b> ", parser="html.parser") == "  "
+    assert convert(" <b>s </b> ") == " **s** "
+    assert convert(" <b> s</b> ") == " **s** "
+    assert convert(" <b> s </b> ") == " **s** "
+    assert convert(" <b>  s  </b> ") == " **s** "
 
 
 def test_nested(convert: Callable[..., str]) -> None:
@@ -337,7 +332,7 @@ def test_blockquote_nested(convert: Callable[..., str]) -> None:
 
 def test_br(convert: Callable[..., str]) -> None:
     assert convert("a<br />b<br />c") == "a  \nb  \nc"
-    assert convert("a<br />b<br />c", newline_style=BACKSLASH) == "a\\\nb\\\nc"
+    assert convert("a<br />b<br />c", newline_style="backslash") == "a\\\nb\\\nc"
 
 
 def test_caption(convert: Callable[..., str]) -> None:
@@ -410,27 +405,27 @@ def test_hn(convert: Callable[..., str]) -> None:
 
 def test_hn_chained(convert: Callable[..., str]) -> None:
     assert (
-        convert("<h1>First</h1>\n<h2>Second</h2>\n<h3>Third</h3>", heading_style=ATX)
+        convert("<h1>First</h1>\n<h2>Second</h2>\n<h3>Third</h3>", heading_style="atx")
         == "# First\n\n## Second\n\n### Third\n\n"
     )
-    assert convert("X<h1>First</h1>", heading_style=ATX) == "X\n\n# First\n\n"
+    assert convert("X<h1>First</h1>", heading_style="atx") == "X\n\n# First\n\n"
 
 
 def test_hn_nested_tag_heading_style(convert: Callable[..., str]) -> None:
-    result = convert("<h1>A <p>P</p> C </h1>", heading_style=ATX_CLOSED)
+    result = convert("<h1>A <p>P</p> C </h1>", heading_style="atx_closed")
     assert result in ["# A P C #\n\n", "# A #\n\nP\n\n C "]
 
-    result2 = convert("<h1>A <p>P</p> C </h1>", heading_style=ATX)
+    result2 = convert("<h1>A <p>P</p> C </h1>", heading_style="atx")
     assert result2 in ["# A P C\n\n", "# A\n\nP\n\n C "]
 
 
 def test_hn_eol(convert: Callable[..., str]) -> None:
-    assert convert("<p>xxx</p><h3>Hello</h3>", heading_style=ATX) == "xxx\n\n### Hello\n\n"
+    assert convert("<p>xxx</p><h3>Hello</h3>", heading_style="atx") == "xxx\n\n### Hello\n\n"
 
-    assert convert("\n<h3>Hello</h3>", heading_style=ATX) == "### Hello\n\n"
-    assert convert("\nx<h3>Hello</h3>", heading_style=ATX) == "x\n\n### Hello\n\n"
-    assert convert("\n<span>x<h3>Hello</h3></span>", heading_style=ATX) == "x\n\n### Hello\n\n"
-    assert convert("xxx<h3>Hello</h3>", heading_style=ATX) == "xxx\n\n### Hello\n\n"
+    assert convert("\n<h3>Hello</h3>", heading_style="atx") == "### Hello\n\n"
+    assert convert("\nx<h3>Hello</h3>", heading_style="atx") == "x\n\n### Hello\n\n"
+    assert convert("\n<span>x<h3>Hello</h3></span>", heading_style="atx") == "x\n\n### Hello\n\n"
+    assert convert("xxx<h3>Hello</h3>", heading_style="atx") == "xxx\n\n### Hello\n\n"
 
 
 def test_hn_nested_simple_tag(convert: Callable[..., str]) -> None:
@@ -450,7 +445,7 @@ def test_hn_nested_simple_tag(convert: Callable[..., str]) -> None:
     result = convert("<h3>A <p>p</p> B</h3>")
     assert result in ["### A p B\n\n", "### A\n\np\n\n B"]
 
-    assert convert("<h3>A <br>B</h3>", heading_style=ATX) == "### A  B\n\n"
+    assert convert("<h3>A <br>B</h3>", heading_style="atx") == "### A  B\n\n"
 
 
 def test_hn_nested_img(convert: Callable[..., str]) -> None:
@@ -474,13 +469,13 @@ def test_hn_nested_img(convert: Callable[..., str]) -> None:
 
 
 def test_hn_atx_headings(convert: Callable[..., str]) -> None:
-    assert convert("<h1>Hello</h1>", heading_style=ATX) == "# Hello\n\n"
-    assert convert("<h2>Hello</h2>", heading_style=ATX) == "## Hello\n\n"
+    assert convert("<h1>Hello</h1>", heading_style="atx") == "# Hello\n\n"
+    assert convert("<h2>Hello</h2>", heading_style="atx") == "## Hello\n\n"
 
 
 def test_hn_atx_closed_headings(convert: Callable[..., str]) -> None:
-    assert convert("<h1>Hello</h1>", heading_style=ATX_CLOSED) == "# Hello #\n\n"
-    assert convert("<h2>Hello</h2>", heading_style=ATX_CLOSED) == "## Hello ##\n\n"
+    assert convert("<h1>Hello</h1>", heading_style="atx_closed") == "# Hello #\n\n"
+    assert convert("<h2>Hello</h2>", heading_style="atx_closed") == "## Hello ##\n\n"
 
 
 def test_head(convert: Callable[..., str]) -> None:
@@ -525,13 +520,15 @@ def test_p(convert: Callable[..., str]) -> None:
         )
         == "[Some long\nlink](https://example.com)\n\n"
     )
-    assert convert("<p>12345<br />67890</p>", wrap=True, wrap_width=10, newline_style=BACKSLASH) == "12345\\\n67890\n\n"
+    assert (
+        convert("<p>12345<br />67890</p>", wrap=True, wrap_width=10, newline_style="backslash") == "12345\\\n67890\n\n"
+    )
     assert (
         convert(
             "<p>12345678901<br />12345</p>",
             wrap=True,
             wrap_width=10,
-            newline_style=BACKSLASH,
+            newline_style="backslash",
         )
         == "12345678901\\\n12345\n\n"
     )
@@ -654,10 +651,10 @@ def test_strong(convert: Callable[..., str]) -> None:
 
 
 def test_strong_em_symbol(convert: Callable[..., str]) -> None:
-    assert convert("<strong>Hello</strong>", strong_em_symbol=UNDERSCORE) == "__Hello__"
-    assert convert("<b>Hello</b>", strong_em_symbol=UNDERSCORE) == "__Hello__"
-    assert convert("<em>Hello</em>", strong_em_symbol=UNDERSCORE) == "_Hello_"
-    assert convert("<i>Hello</i>", strong_em_symbol=UNDERSCORE) == "_Hello_"
+    assert convert("<strong>Hello</strong>", strong_em_symbol="_") == "__Hello__"
+    assert convert("<b>Hello</b>", strong_em_symbol="_") == "__Hello__"
+    assert convert("<em>Hello</em>", strong_em_symbol="_") == "_Hello_"
+    assert convert("<i>Hello</i>", strong_em_symbol="_") == "_Hello_"
 
 
 def test_sub(convert: Callable[..., str]) -> None:
@@ -681,27 +678,27 @@ def test_lang(convert: Callable[..., str]) -> None:
 
 
 def test_lang_callback(convert: Callable[..., str]) -> None:
-    def callback(el: Tag) -> str | None:
+    def callback(el: Any) -> str | None:
         return el["class"][0] if el.has_attr("class") else None
 
     assert (
         convert(
             '<pre class="python">test\n    foo\nbar</pre>',
-            code_language_callback=callback,  # type: ignore[arg-type]
+            code_language_callback=callback,
         )
         == "\n```python\ntest\n    foo\nbar\n```\n"
     )
     assert (
         convert(
             '<pre class="javascript"><code>test\n    foo\nbar</code></pre>',
-            code_language_callback=callback,  # type: ignore[arg-type]
+            code_language_callback=callback,
         )
         == "\n```javascript\ntest\n    foo\nbar\n```\n"
     )
     assert (
         convert(
             '<pre class="javascript"><code class="javascript">test\n    foo\nbar</code></pre>',
-            code_language_callback=callback,  # type: ignore[arg-type]
+            code_language_callback=callback,
         )
         == "\n```javascript\ntest\n    foo\nbar\n```\n"
     )
