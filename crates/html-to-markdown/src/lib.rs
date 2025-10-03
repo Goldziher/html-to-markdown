@@ -5,6 +5,7 @@
 
 pub mod converter;
 pub mod error;
+pub mod hocr;
 pub mod options;
 pub mod sanitizer;
 pub mod text;

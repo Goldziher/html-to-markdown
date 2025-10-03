@@ -163,6 +163,15 @@ pub struct ConversionOptions {
     /// Elements where images should remain as markdown (not converted to alt text)
     pub keep_inline_images_in: Vec<String>,
 
+    /// Enable hOCR table extraction
+    pub hocr_extract_tables: bool,
+
+    /// Column threshold for hOCR table detection (pixels)
+    pub hocr_table_column_threshold: u32,
+
+    /// Row threshold ratio for hOCR table detection
+    pub hocr_table_row_threshold_ratio: f64,
+
     /// Preprocessing options
     pub preprocessing: PreprocessingOptions,
 
@@ -196,6 +205,9 @@ impl Default for ConversionOptions {
             sup_symbol: String::new(),
             newline_style: NewlineStyle::default(),
             keep_inline_images_in: Vec::new(),
+            hocr_extract_tables: true,
+            hocr_table_column_threshold: 50,
+            hocr_table_row_threshold_ratio: 0.5,
             preprocessing: PreprocessingOptions::default(),
             parsing: ParsingOptions::default(),
         }
