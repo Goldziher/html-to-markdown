@@ -53,6 +53,87 @@ fn chomp(text: &str) -> (&str, &str, &str) {
     (prefix, suffix, text.trim())
 }
 
+/// Indentation width for list items (4 spaces per level).
+#[allow(dead_code)]
+const LIST_INDENT_WIDTH: usize = 4;
+
+/// Remove trailing spaces and tabs from output string.
+///
+/// This is used before adding block separators or newlines to ensure
+/// clean Markdown output without spurious whitespace.
+fn trim_trailing_whitespace(output: &mut String) {
+    while output.ends_with(' ') || output.ends_with('\t') {
+        output.pop();
+    }
+}
+
+/// Calculate indentation level for list item continuations.
+///
+/// Returns the number of 4-space indent groups needed for list continuations.
+///
+/// List continuations (block elements inside list items) need special indentation:
+/// - Base indentation: (depth - 1) groups (for the nesting level)
+/// - Content indentation: depth groups (for the list item content)
+/// - Combined formula: (2 * depth - 1) groups of 4 spaces each
+///
+/// # Examples
+///
+/// ```text
+/// * Item 1           (depth=0, no continuation)
+/// * Item 2           (depth=0)
+///     Continuation   (depth=0: 0 groups = 0 spaces)
+///
+/// * Level 1          (depth=0)
+///     + Level 2      (depth=1)
+///             Cont   (depth=1: (2*1-1) = 1 group = 4 spaces, total 12 with bullet indent)
+/// ```
+fn calculate_list_continuation_indent(depth: usize) -> usize {
+    if depth > 0 {
+        2 * depth - 1
+    } else {
+        0
+    }
+}
+
+/// Check if a list (ul or ol) is "loose".
+///
+/// A loose list is one where any list item contains block-level elements
+/// like paragraphs (<p>). In loose lists, all items should have blank line
+/// separation (ending with \n\n) regardless of their own content.
+///
+/// # Examples
+///
+/// ```html
+/// <!-- Loose list (has <p> in an item) -->
+/// <ul>
+///   <li><p>Item 1</p></li>
+///   <li>Item 2</li>  <!-- Also gets \n\n ending -->
+/// </ul>
+///
+/// <!-- Tight list (no block elements) -->
+/// <ul>
+///   <li>Item 1</li>
+///   <li>Item 2</li>
+/// </ul>
+/// ```
+fn is_loose_list(handle: &Handle) -> bool {
+    for child in handle.children.borrow().iter() {
+        if let NodeData::Element { name, .. } = &child.data {
+            if name.local.as_ref() == "li" {
+                // Check if this li contains paragraph elements
+                for li_child in child.children.borrow().iter() {
+                    if let NodeData::Element { name, .. } = &li_child.data {
+                        if name.local.as_ref() == "p" {
+                            return true;
+                        }
+                    }
+                }
+            }
+        }
+    }
+    false
+}
+
 /// Conversion context to track state during traversal
 #[derive(Debug, Clone)]
 struct Context {
@@ -625,15 +706,11 @@ fn walk_node(handle: &Handle, output: &mut String, options: &ConversionOptions, 
                     if is_table_continuation {
                         // In table cells, separate multiple block elements with <br>
                         // Trim trailing whitespace first
-                        while output.ends_with(' ') || output.ends_with('\t') {
-                            output.pop();
-                        }
+                        trim_trailing_whitespace(output);
                         output.push_str("<br>");
                     } else if is_list_continuation {
                         // Trim trailing spaces/tabs before adding newline
-                        while output.ends_with(' ') || output.ends_with('\t') {
-                            output.pop();
-                        }
+                        trim_trailing_whitespace(output);
                         // Paragraphs in list items should always have blank line separation (double newline)
                         // This ensures proper spacing between different block elements
                         if !output.ends_with("\n\n") {
@@ -646,13 +723,11 @@ fn walk_node(handle: &Handle, output: &mut String, options: &ConversionOptions, 
                         // Continuation indentation: base indentation + content indentation
                         // Formula: (list_depth - 1) * 4 spaces for nesting + list_depth * 4 for continuation
                         // Simplified: (2 * list_depth - 1) * 4 spaces
-                        let indent_level = if ctx.list_depth > 0 { 2 * ctx.list_depth - 1 } else { 0 };
+                        let indent_level = calculate_list_continuation_indent(ctx.list_depth);
                         output.push_str(&"    ".repeat(indent_level));
                     } else if needs_leading_sep {
                         // Trim trailing whitespace before adding block separation
-                        while output.ends_with(' ') || output.ends_with('\t') {
-                            output.pop();
-                        }
+                        trim_trailing_whitespace(output);
                         // Add leading block separation for paragraphs in normal context
                         output.push_str("\n\n");
                     }
@@ -1148,9 +1223,7 @@ fn walk_node(handle: &Handle, output: &mut String, options: &ConversionOptions, 
                             && !output.ends_with(". ");
                         if needs_newline {
                             // Trim trailing spaces/tabs before adding newlines
-                            while output.ends_with(' ') || output.ends_with('\t') {
-                                output.pop();
-                            }
+                            trim_trailing_whitespace(output);
                             output.push_str("\n\n");
                         }
                     }
@@ -1166,25 +1239,7 @@ fn walk_node(handle: &Handle, output: &mut String, options: &ConversionOptions, 
                     // Check if this is a "loose" list (any li contains paragraphs)
                     // Lists with paragraphs should have blank lines between ALL items
                     // Note: divs are handled via has_block_children per-item, not loose list status
-                    let mut is_loose = false;
-                    for child in handle.children.borrow().iter() {
-                        if let NodeData::Element { name, .. } = &child.data {
-                            if name.local.as_ref() == "li" {
-                                // Check if this li contains paragraph elements
-                                for li_child in child.children.borrow().iter() {
-                                    if let NodeData::Element { name, .. } = &li_child.data {
-                                        if name.local.as_ref() == "p" {
-                                            is_loose = true;
-                                            break;
-                                        }
-                                    }
-                                }
-                                if is_loose {
-                                    break;
-                                }
-                            }
-                        }
-                    }
+                    let is_loose = is_loose_list(handle);
 
                     let mut prev_had_blocks = false;
                     for child in handle.children.borrow().iter() {
@@ -1247,9 +1302,7 @@ fn walk_node(handle: &Handle, output: &mut String, options: &ConversionOptions, 
                             && !output.ends_with(". ");
                         if needs_newline {
                             // Trim trailing spaces/tabs before adding newlines
-                            while output.ends_with(' ') || output.ends_with('\t') {
-                                output.pop();
-                            }
+                            trim_trailing_whitespace(output);
                             output.push_str("\n\n");
                         }
                     }
@@ -1265,25 +1318,7 @@ fn walk_node(handle: &Handle, output: &mut String, options: &ConversionOptions, 
                     // Check if this is a "loose" list (any li contains paragraphs)
                     // Lists with paragraphs should have blank lines between ALL items
                     // Note: divs are handled via has_block_children per-item, not loose list status
-                    let mut is_loose = false;
-                    for child in handle.children.borrow().iter() {
-                        if let NodeData::Element { name, .. } = &child.data {
-                            if name.local.as_ref() == "li" {
-                                // Check if this li contains paragraph elements
-                                for li_child in child.children.borrow().iter() {
-                                    if let NodeData::Element { name, .. } = &li_child.data {
-                                        if name.local.as_ref() == "p" {
-                                            is_loose = true;
-                                            break;
-                                        }
-                                    }
-                                }
-                                if is_loose {
-                                    break;
-                                }
-                            }
-                        }
-                    }
+                    let is_loose = is_loose_list(handle);
 
                     // Create base context for this list
                     let base_list_ctx = Context {
@@ -1471,9 +1506,7 @@ fn walk_node(handle: &Handle, output: &mut String, options: &ConversionOptions, 
                         }
 
                         // Trim trailing spaces/tabs but preserve newlines
-                        while output.ends_with(' ') || output.ends_with('\t') {
-                            output.pop();
-                        }
+                        trim_trailing_whitespace(output);
                     }
 
                     // Ensure list items end with proper separator (but not in table cells)
@@ -2458,15 +2491,11 @@ fn walk_node(handle: &Handle, output: &mut String, options: &ConversionOptions, 
                     if is_table_continuation {
                         // In table cells, separate multiple block elements with <br>
                         // Trim trailing whitespace first
-                        while output.ends_with(' ') || output.ends_with('\t') {
-                            output.pop();
-                        }
+                        trim_trailing_whitespace(output);
                         output.push_str("<br>");
                     } else if is_list_continuation {
                         // Trim trailing spaces/tabs before adding newline
-                        while output.ends_with(' ') || output.ends_with('\t') {
-                            output.pop();
-                        }
+                        trim_trailing_whitespace(output);
                         // Add newline before indentation if not already present
                         // For consecutive divs, we want single newline between them
                         if !output.ends_with('\n') {
@@ -2475,13 +2504,11 @@ fn walk_node(handle: &Handle, output: &mut String, options: &ConversionOptions, 
                         // Continuation indentation: base indentation + content indentation
                         // Formula: (list_depth - 1) * 4 spaces for nesting + list_depth * 4 for continuation
                         // Simplified: (2 * list_depth - 1) * 4 spaces
-                        let indent_level = if ctx.list_depth > 0 { 2 * ctx.list_depth - 1 } else { 0 };
+                        let indent_level = calculate_list_continuation_indent(ctx.list_depth);
                         output.push_str(&"    ".repeat(indent_level));
                     } else if needs_leading_sep {
                         // Trim trailing whitespace before adding block separation
-                        while output.ends_with(' ') || output.ends_with('\t') {
-                            output.pop();
-                        }
+                        trim_trailing_whitespace(output);
                         // Add leading block separation for divs in normal context
                         output.push_str("\n\n");
                     }
@@ -2495,9 +2522,7 @@ fn walk_node(handle: &Handle, output: &mut String, options: &ConversionOptions, 
 
                     if has_content {
                         // Trim trailing whitespace from div content (but not newlines)
-                        while output.ends_with(' ') || output.ends_with('\t') {
-                            output.pop();
-                        }
+                        trim_trailing_whitespace(output);
 
                         // Add trailing newlines based on context
                         if ctx.in_table_cell {
