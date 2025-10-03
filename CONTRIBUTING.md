@@ -110,8 +110,8 @@ html-to-markdown/
 To test wheels and binaries without creating a release:
 
 ```bash
-# Test wheel building (workflow_dispatch or push to main/v2-dev)
-gh workflow run test-wheels.yaml
+# Test wheel building manually
+gh workflow run "Test Wheel Building"
 
 # Or manually build locally
 pip install cibuildwheel
