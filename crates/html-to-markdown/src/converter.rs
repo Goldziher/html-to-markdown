@@ -242,6 +242,75 @@ fn add_nested_list_trailing_separator(output: &mut String, ctx: &Context) {
     }
 }
 
+/// Calculate the nesting depth for a list.
+///
+/// If we're in a list but NOT in a list item, this is incorrectly nested HTML
+/// and we need to increment the depth. If in a list item, the depth was already
+/// incremented by the <li> element.
+fn calculate_list_nesting_depth(ctx: &Context) -> usize {
+    if ctx.in_list && !ctx.in_list_item {
+        ctx.list_depth + 1
+    } else {
+        ctx.list_depth
+    }
+}
+
+/// Process a list's children, tracking which items had block elements.
+///
+/// This is used to determine proper spacing between list items.
+/// Returns true if the last processed item had block children.
+fn process_list_children(
+    handle: &Handle,
+    output: &mut String,
+    options: &ConversionOptions,
+    ctx: &Context,
+    depth: usize,
+    is_ordered: bool,
+    is_loose: bool,
+    nested_depth: usize,
+) {
+    let mut counter = 1;
+    let mut prev_had_blocks = false;
+
+    for child in handle.children.borrow().iter() {
+        // Skip whitespace-only text nodes between list items
+        if let NodeData::Text { contents } = &child.data {
+            if contents.borrow().trim().is_empty() {
+                continue;
+            }
+        }
+
+        // Build context for this list item
+        let list_ctx = Context {
+            in_ordered_list: is_ordered,
+            list_counter: if is_ordered { counter } else { 0 },
+            in_list: true,
+            list_depth: nested_depth,
+            loose_list: is_loose,
+            prev_item_had_blocks: prev_had_blocks,
+            ..ctx.clone()
+        };
+
+        let before_len = output.len();
+        walk_node(child, output, options, &list_ctx, depth);
+
+        // Check if this li had block children by detecting continuation patterns
+        let li_output = &output[before_len..];
+        let had_blocks = li_output.contains("\n\n    ") || li_output.contains("\n    ");
+        prev_had_blocks = had_blocks;
+
+        // Increment counter for ordered lists
+        if is_ordered {
+            // Only count li elements
+            if let NodeData::Element { name, .. } = &child.data {
+                if name.local.as_ref() == "li" {
+                    counter += 1;
+                }
+            }
+        }
+    }
+}
+
 /// Conversion context to track state during traversal
 #[derive(Debug, Clone)]
 struct Context {
@@ -1309,45 +1378,13 @@ fn walk_node(handle: &Handle, output: &mut String, options: &ConversionOptions, 
                     // Add appropriate leading separator based on context
                     add_list_leading_separator(output, ctx);
 
-                    // If in a list but NOT in a list item, this is incorrectly nested - increment depth
-                    // If in a list item, the depth was already incremented by the <li>
-                    let nested_depth = if ctx.in_list && !ctx.in_list_item {
-                        ctx.list_depth + 1
-                    } else {
-                        ctx.list_depth
-                    };
-
-                    // Check if this is a "loose" list (any li contains paragraphs)
-                    // Lists with paragraphs should have blank lines between ALL items
-                    // Note: divs are handled via has_block_children per-item, not loose list status
+                    // Calculate nesting depth and check if loose list
+                    let nested_depth = calculate_list_nesting_depth(ctx);
                     let is_loose = is_loose_list(handle);
 
-                    let mut prev_had_blocks = false;
-                    for child in handle.children.borrow().iter() {
-                        // Skip whitespace-only text nodes between list items
-                        if let NodeData::Text { contents } = &child.data {
-                            if contents.borrow().trim().is_empty() {
-                                continue;
-                            }
-                        }
+                    // Process all list children (unordered list)
+                    process_list_children(handle, output, options, ctx, depth, false, is_loose, nested_depth);
 
-                        let list_ctx = Context {
-                            in_ordered_list: false,
-                            list_counter: 0,
-                            in_list: true,
-                            list_depth: nested_depth,
-                            loose_list: is_loose,
-                            prev_item_had_blocks: prev_had_blocks,
-                            ..ctx.clone()
-                        };
-                        let before_len = output.len();
-                        walk_node(child, output, options, &list_ctx, depth);
-
-                        // Check if this li had block children by detecting if output has continuation patterns
-                        let li_output = &output[before_len..];
-                        let had_blocks = li_output.contains("\n\n    ") || li_output.contains("\n    ");
-                        prev_had_blocks = had_blocks;
-                    }
                     // Add trailing separator for nested lists
                     add_nested_list_trailing_separator(output, ctx);
                 }
@@ -1356,60 +1393,13 @@ fn walk_node(handle: &Handle, output: &mut String, options: &ConversionOptions, 
                     // Add appropriate leading separator based on context
                     add_list_leading_separator(output, ctx);
 
-                    // If in a list but NOT in a list item, this is incorrectly nested - increment depth
-                    // If in a list item, the depth was already incremented by the <li>
-                    let nested_depth = if ctx.in_list && !ctx.in_list_item {
-                        ctx.list_depth + 1
-                    } else {
-                        ctx.list_depth
-                    };
-
-                    // Check if this is a "loose" list (any li contains paragraphs)
-                    // Lists with paragraphs should have blank lines between ALL items
-                    // Note: divs are handled via has_block_children per-item, not loose list status
+                    // Calculate nesting depth and check if loose list
+                    let nested_depth = calculate_list_nesting_depth(ctx);
                     let is_loose = is_loose_list(handle);
 
-                    // Create base context for this list
-                    let base_list_ctx = Context {
-                        in_list: true,
-                        list_depth: nested_depth,
-                        loose_list: is_loose,
-                        ..ctx.clone()
-                    };
+                    // Process all list children (ordered list)
+                    process_list_children(handle, output, options, ctx, depth, true, is_loose, nested_depth);
 
-                    let mut counter = 1;
-                    let mut prev_had_blocks = false;
-                    for child in handle.children.borrow().iter() {
-                        // Check if this is an li element
-                        if let NodeData::Element { name, .. } = &child.data {
-                            if name.local.as_ref() == "li" {
-                                let list_ctx = Context {
-                                    in_ordered_list: true,
-                                    list_counter: counter,
-                                    prev_item_had_blocks: prev_had_blocks,
-                                    ..base_list_ctx.clone()
-                                };
-                                let before_len = output.len();
-                                walk_node(child, output, options, &list_ctx, depth);
-                                counter += 1;
-
-                                // Check if this li had block children by detecting if output has continuation patterns
-                                let li_output = &output[before_len..];
-                                let had_blocks = li_output.contains("\n\n    ") || li_output.contains("\n    ");
-                                prev_had_blocks = had_blocks;
-
-                                continue;
-                            }
-                        }
-                        // Skip whitespace-only text nodes between list items
-                        if let NodeData::Text { contents } = &child.data {
-                            if contents.borrow().trim().is_empty() {
-                                continue;
-                            }
-                        }
-                        // For non-li children, use base context with in_list set
-                        walk_node(child, output, options, &base_list_ctx, depth);
-                    }
                     // Add trailing separator for nested lists
                     add_nested_list_trailing_separator(output, ctx);
                 }
