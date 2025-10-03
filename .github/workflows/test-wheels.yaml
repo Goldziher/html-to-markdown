@@ -77,6 +77,9 @@ jobs:
           # Install test dependencies
           pip install pytest pytest-cov pytest-mock pytest-benchmark
 
+          # Remove source directory to ensure tests use installed wheel
+          rm -rf html_to_markdown
+
           # Test basic import and functionality
           python -c "
           import html_to_markdown
