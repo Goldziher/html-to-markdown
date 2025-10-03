@@ -78,12 +78,16 @@ struct Context {
     in_list: bool,
     /// Is this a "loose" list where all items should have blank lines?
     loose_list: bool,
+    /// Did a previous list item have block children?
+    prev_item_had_blocks: bool,
     /// Are we inside a heading element (h1-h6)?
     in_heading: bool,
     /// Current heading tag (h1, h2, etc.) if in_heading is true
     heading_tag: Option<String>,
     /// Are we inside a paragraph element?
     in_paragraph: bool,
+    /// Are we inside a ruby element?
+    in_ruby: bool,
 }
 
 /// Check if a document is an hOCR (HTML-based OCR) document.
@@ -358,9 +362,11 @@ pub fn convert_html(html: &str, options: &ConversionOptions) -> Result<String> {
         list_depth: 0,
         in_list: false,
         loose_list: false,
+        prev_item_had_blocks: false,
         in_heading: false,
         heading_tag: None,
         in_paragraph: false,
+        in_ruby: false,
     };
     walk_node(&dom.document, &mut output, options, &ctx, 0);
 
@@ -442,10 +448,10 @@ fn walk_node(handle: &Handle, output: &mut String, options: &ConversionOptions, 
             }
 
             // Apply text escaping (unless we're in code or table cells)
-            let processed_text = if ctx.in_code || ctx.in_table_cell {
-                // In code blocks or table cells, preserve text as-is
-                // Normalize whitespace if in normalized mode (but only if not in code)
-                if ctx.in_code {
+            let processed_text = if ctx.in_code || ctx.in_table_cell || ctx.in_ruby {
+                // In code blocks, table cells, or ruby elements, preserve text as-is
+                // Normalize whitespace if in normalized mode (but only if not in code/ruby)
+                if ctx.in_code || ctx.in_ruby {
                     text
                 } else if options.whitespace_mode == crate::options::WhitespaceMode::Normalized {
                     text::normalize_whitespace(&text)
@@ -624,11 +630,24 @@ fn walk_node(handle: &Handle, output: &mut String, options: &ConversionOptions, 
                         }
                         output.push_str("<br>");
                     } else if is_list_continuation {
-                        // Add indentation for continuation, but only add newline if not already double-spaced
-                        if !output.ends_with("\n\n") {
-                            output.push('\n');
+                        // Trim trailing spaces/tabs before adding newline
+                        while output.ends_with(' ') || output.ends_with('\t') {
+                            output.pop();
                         }
-                        output.push_str(&"    ".repeat(ctx.list_depth));
+                        // Paragraphs in list items should always have blank line separation (double newline)
+                        // This ensures proper spacing between different block elements
+                        if !output.ends_with("\n\n") {
+                            if output.ends_with('\n') {
+                                output.push('\n');
+                            } else {
+                                output.push_str("\n\n");
+                            }
+                        }
+                        // Continuation indentation: base indentation + content indentation
+                        // Formula: (list_depth - 1) * 4 spaces for nesting + list_depth * 4 for continuation
+                        // Simplified: (2 * list_depth - 1) * 4 spaces
+                        let indent_level = if ctx.list_depth > 0 { 2 * ctx.list_depth - 1 } else { 0 };
+                        output.push_str(&"    ".repeat(indent_level));
                     } else if needs_leading_sep {
                         // Trim trailing whitespace before adding block separation
                         while output.ends_with(' ') || output.ends_with('\t') {
@@ -939,11 +958,10 @@ fn walk_node(handle: &Handle, output: &mut String, options: &ConversionOptions, 
                     for child in handle.children.borrow().iter() {
                         walk_node(child, &mut content, options, ctx, depth + 1);
                     }
-                    let (prefix, suffix, trimmed) = chomp(&content);
+                    let trimmed = content.trim();
 
-                    // Only output if there's content
+                    // Only output if there's content (no prefix/suffix preservation for abbr)
                     if !trimmed.is_empty() {
-                        output.push_str(prefix);
                         output.push_str(trimmed);
 
                         // Optionally add title as footnote (trimmed)
@@ -960,7 +978,6 @@ fn walk_node(handle: &Handle, output: &mut String, options: &ConversionOptions, 
                                 output.push(')');
                             }
                         }
-                        output.push_str(suffix);
                     }
                 }
 
@@ -1130,6 +1147,10 @@ fn walk_node(handle: &Handle, output: &mut String, options: &ConversionOptions, 
                             && !output.ends_with("- ")
                             && !output.ends_with(". ");
                         if needs_newline {
+                            // Trim trailing spaces/tabs before adding newlines
+                            while output.ends_with(' ') || output.ends_with('\t') {
+                                output.pop();
+                            }
                             output.push_str("\n\n");
                         }
                     }
@@ -1144,6 +1165,7 @@ fn walk_node(handle: &Handle, output: &mut String, options: &ConversionOptions, 
 
                     // Check if this is a "loose" list (any li contains paragraphs)
                     // Lists with paragraphs should have blank lines between ALL items
+                    // Note: divs are handled via has_block_children per-item, not loose list status
                     let mut is_loose = false;
                     for child in handle.children.borrow().iter() {
                         if let NodeData::Element { name, .. } = &child.data {
@@ -1164,14 +1186,7 @@ fn walk_node(handle: &Handle, output: &mut String, options: &ConversionOptions, 
                         }
                     }
 
-                    let list_ctx = Context {
-                        in_ordered_list: false,
-                        list_counter: 0,
-                        in_list: true,
-                        list_depth: nested_depth,
-                        loose_list: is_loose,
-                        ..ctx.clone()
-                    };
+                    let mut prev_had_blocks = false;
                     for child in handle.children.borrow().iter() {
                         // Skip whitespace-only text nodes between list items
                         if let NodeData::Text { contents } = &child.data {
@@ -1179,9 +1194,37 @@ fn walk_node(handle: &Handle, output: &mut String, options: &ConversionOptions, 
                                 continue;
                             }
                         }
+
+                        let list_ctx = Context {
+                            in_ordered_list: false,
+                            list_counter: 0,
+                            in_list: true,
+                            list_depth: nested_depth,
+                            loose_list: is_loose,
+                            prev_item_had_blocks: prev_had_blocks,
+                            ..ctx.clone()
+                        };
+                        let before_len = output.len();
                         walk_node(child, output, options, &list_ctx, depth);
+
+                        // Check if this li had block children by detecting if output has continuation patterns
+                        let li_output = &output[before_len..];
+                        let had_blocks = li_output.contains("\n\n    ") || li_output.contains("\n    ");
+                        prev_had_blocks = had_blocks;
                     }
-                    // Top-level lists don't add extra trailing newlines - list items handle their own
+                    // Nested lists (in list items) should add trailing newline to separate from following content
+                    // This creates blank line before next continuation element (if there is one)
+                    if ctx.in_list_item {
+                        // Only add extra newline if not already ending with double newline
+                        // (which would be the case if it's the last child of the list item)
+                        if !output.ends_with("\n\n") {
+                            if !output.ends_with('\n') {
+                                output.push('\n');
+                            }
+                            // Add another newline to create blank line
+                            output.push('\n');
+                        }
+                    }
                 }
 
                 "ol" => {
@@ -1203,6 +1246,10 @@ fn walk_node(handle: &Handle, output: &mut String, options: &ConversionOptions, 
                             && !output.ends_with("- ")
                             && !output.ends_with(". ");
                         if needs_newline {
+                            // Trim trailing spaces/tabs before adding newlines
+                            while output.ends_with(' ') || output.ends_with('\t') {
+                                output.pop();
+                            }
                             output.push_str("\n\n");
                         }
                     }
@@ -1217,6 +1264,7 @@ fn walk_node(handle: &Handle, output: &mut String, options: &ConversionOptions, 
 
                     // Check if this is a "loose" list (any li contains paragraphs)
                     // Lists with paragraphs should have blank lines between ALL items
+                    // Note: divs are handled via has_block_children per-item, not loose list status
                     let mut is_loose = false;
                     for child in handle.children.borrow().iter() {
                         if let NodeData::Element { name, .. } = &child.data {
@@ -1246,6 +1294,7 @@ fn walk_node(handle: &Handle, output: &mut String, options: &ConversionOptions, 
                     };
 
                     let mut counter = 1;
+                    let mut prev_had_blocks = false;
                     for child in handle.children.borrow().iter() {
                         // Check if this is an li element
                         if let NodeData::Element { name, .. } = &child.data {
@@ -1253,10 +1302,18 @@ fn walk_node(handle: &Handle, output: &mut String, options: &ConversionOptions, 
                                 let list_ctx = Context {
                                     in_ordered_list: true,
                                     list_counter: counter,
+                                    prev_item_had_blocks: prev_had_blocks,
                                     ..base_list_ctx.clone()
                                 };
+                                let before_len = output.len();
                                 walk_node(child, output, options, &list_ctx, depth);
                                 counter += 1;
+
+                                // Check if this li had block children by detecting if output has continuation patterns
+                                let li_output = &output[before_len..];
+                                let had_blocks = li_output.contains("\n\n    ") || li_output.contains("\n    ");
+                                prev_had_blocks = had_blocks;
+
                                 continue;
                             }
                         }
@@ -1269,7 +1326,19 @@ fn walk_node(handle: &Handle, output: &mut String, options: &ConversionOptions, 
                         // For non-li children, use base context with in_list set
                         walk_node(child, output, options, &base_list_ctx, depth);
                     }
-                    // Top-level lists don't add extra trailing newlines - list items handle their own
+                    // Nested lists (in list items) should add trailing newline to separate from following content
+                    // This creates blank line before next continuation element (if there is one)
+                    if ctx.in_list_item {
+                        // Only add extra newline if not already ending with double newline
+                        // (which would be the case if it's the last child of the list item)
+                        if !output.ends_with("\n\n") {
+                            if !output.ends_with('\n') {
+                                output.push('\n');
+                            }
+                            // Add another newline to create blank line
+                            output.push('\n');
+                        }
+                    }
                 }
 
                 "li" => {
@@ -1409,8 +1478,11 @@ fn walk_node(handle: &Handle, output: &mut String, options: &ConversionOptions, 
 
                     // Ensure list items end with proper separator (but not in table cells)
                     if !ctx.in_table_cell {
-                        // Use \n\n if item has block children OR list is loose
-                        if has_block_children || ctx.loose_list {
+                        // Use \n\n if:
+                        // - Item has block children, OR
+                        // - List is loose (contains paragraphs), OR
+                        // - Previous item had block children
+                        if has_block_children || ctx.loose_list || ctx.prev_item_had_blocks {
                             // List items with block children or in loose lists should end with \n\n
                             if !output.ends_with("\n\n") {
                                 if output.ends_with('\n') {
@@ -2283,24 +2355,24 @@ fn walk_node(handle: &Handle, output: &mut String, options: &ConversionOptions, 
                         }
 
                         // Check if base text has trailing whitespace before trimming
-                        let (_prefix, base_suffix, base_trimmed) = chomp(&base_text);
+                        let trimmed_base = base_text.trim();
 
                         // Output base text - trimmed
-                        output.push_str(base_trimmed);
+                        output.push_str(trimmed_base);
 
                         if !rt_annotations.is_empty() {
                             let rt_text = rt_annotations.iter().map(|s| s.trim()).collect::<Vec<_>>().join("");
-                            // Add space before annotation only if base text had trailing whitespace
-                            if !rt_text.is_empty() && !base_suffix.is_empty() {
-                                output.push(' ');
-                            }
-                            // Wrap rt annotations in extra parentheses only if multiple rt + rtc
-                            if has_rtc && !rtc_content.trim().is_empty() && rt_annotations.len() > 1 {
-                                output.push('(');
-                                output.push_str(&rt_text);
-                                output.push(')');
-                            } else {
-                                output.push_str(&rt_text);
+                            // No space before annotation - annotations already include parentheses
+                            // Ruby base text and annotations should be adjacent: 漢字(kanji)
+                            if !rt_text.is_empty() {
+                                // Wrap rt annotations in extra parentheses only if multiple rt + rtc
+                                if has_rtc && !rtc_content.trim().is_empty() && rt_annotations.len() > 1 {
+                                    output.push('(');
+                                    output.push_str(&rt_text);
+                                    output.push(')');
+                                } else {
+                                    output.push_str(&rt_text);
+                                }
                             }
                         }
 
@@ -2320,20 +2392,36 @@ fn walk_node(handle: &Handle, output: &mut String, options: &ConversionOptions, 
                 }
 
                 "rt" => {
-                    // Ruby annotation text - always render in parentheses
+                    // Ruby annotation text - check for rp siblings to decide on parentheses
                     let mut text = String::new();
                     for child in handle.children.borrow().iter() {
                         walk_node(child, &mut text, options, ctx, depth + 1);
                     }
                     let trimmed = text.trim();
-                    output.push('(');
-                    output.push_str(trimmed);
-                    output.push(')');
+
+                    // Heuristic: if output ends with '(' from a preceding <rp>, don't add parentheses
+                    // This handles: <rp>(</rp><rt>text</rt><rp>)</rp> -> (text)
+                    if output.ends_with('(') {
+                        // Previous rp added opening paren, just output content
+                        output.push_str(trimmed);
+                    } else {
+                        // No rp before, wrap in parentheses
+                        output.push('(');
+                        output.push_str(trimmed);
+                        output.push(')');
+                    }
                 }
 
                 "rp" => {
-                    // Ruby parentheses - always ignore (rt elements provide formatting)
-                    // These are fallback parentheses for browsers that don't support ruby
+                    // Ruby parentheses - output the text content (stripped)
+                    let mut content = String::new();
+                    for child in handle.children.borrow().iter() {
+                        walk_node(child, &mut content, options, ctx, depth + 1);
+                    }
+                    let trimmed = content.trim();
+                    if !trimmed.is_empty() {
+                        output.push_str(trimmed);
+                    }
                 }
 
                 "rtc" => {
@@ -2375,11 +2463,20 @@ fn walk_node(handle: &Handle, output: &mut String, options: &ConversionOptions, 
                         }
                         output.push_str("<br>");
                     } else if is_list_continuation {
-                        // Add indentation for continuation, but only add newline if not already double-spaced
-                        if !output.ends_with("\n\n") {
+                        // Trim trailing spaces/tabs before adding newline
+                        while output.ends_with(' ') || output.ends_with('\t') {
+                            output.pop();
+                        }
+                        // Add newline before indentation if not already present
+                        // For consecutive divs, we want single newline between them
+                        if !output.ends_with('\n') {
                             output.push('\n');
                         }
-                        output.push_str(&"    ".repeat(ctx.list_depth));
+                        // Continuation indentation: base indentation + content indentation
+                        // Formula: (list_depth - 1) * 4 spaces for nesting + list_depth * 4 for continuation
+                        // Simplified: (2 * list_depth - 1) * 4 spaces
+                        let indent_level = if ctx.list_depth > 0 { 2 * ctx.list_depth - 1 } else { 0 };
+                        output.push_str(&"    ".repeat(indent_level));
                     } else if needs_leading_sep {
                         // Trim trailing whitespace before adding block separation
                         while output.ends_with(' ') || output.ends_with('\t') {
@@ -2405,9 +2502,25 @@ fn walk_node(handle: &Handle, output: &mut String, options: &ConversionOptions, 
                         // Add trailing newlines based on context
                         if ctx.in_table_cell {
                             // No trailing separator in table cells
-                        } else if ctx.in_list_item && !output.ends_with("\n\n") {
-                            // In list items, add double newline if not already present
-                            output.push_str("\n\n");
+                        } else if ctx.in_list_item {
+                            // In list items:
+                            // - First div (non-continuation) adds \n\n for blank line before next continuation
+                            // - Continuation div adds \n to separate from next element
+                            if is_list_continuation {
+                                // Continuation div: add single newline
+                                if !output.ends_with('\n') {
+                                    output.push('\n');
+                                }
+                            } else {
+                                // First div (inline with bullet): add double newline
+                                if !output.ends_with("\n\n") {
+                                    if output.ends_with('\n') {
+                                        output.push('\n');
+                                    } else {
+                                        output.push_str("\n\n");
+                                    }
+                                }
+                            }
                         } else if !ctx.in_list_item && !ctx.convert_as_inline {
                             // In normal context, ensure double newline block separation
                             if output.ends_with("\n\n") {
