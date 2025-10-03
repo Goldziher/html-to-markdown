@@ -4,7 +4,7 @@ use once_cell::sync::Lazy;
 use regex::Regex;
 
 /// Regex for escaping miscellaneous characters
-static ESCAPE_MISC_RE: Lazy<Regex> = Lazy::new(|| Regex::new(r"([\\&<`\[>~#=+|\-])").unwrap());
+static ESCAPE_MISC_RE: Lazy<Regex> = Lazy::new(|| Regex::new(r"([\\&<`\[\]>~#=+|\-])").unwrap());
 
 /// Regex for escaping numbered lists
 static ESCAPE_NUMBERED_LIST_RE: Lazy<Regex> = Lazy::new(|| Regex::new(r"([0-9])([.)])").unwrap());

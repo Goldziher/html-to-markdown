@@ -2873,3 +2873,111 @@ fn convert_table(handle: &Handle, output: &mut String, options: &ConversionOptio
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_trim_trailing_whitespace() {
+        let mut s = String::from("hello   ");
+        trim_trailing_whitespace(&mut s);
+        assert_eq!(s, "hello");
+
+        let mut s = String::from("hello\t\t");
+        trim_trailing_whitespace(&mut s);
+        assert_eq!(s, "hello");
+
+        let mut s = String::from("hello \t \t");
+        trim_trailing_whitespace(&mut s);
+        assert_eq!(s, "hello");
+
+        let mut s = String::from("hello");
+        trim_trailing_whitespace(&mut s);
+        assert_eq!(s, "hello");
+
+        let mut s = String::from("");
+        trim_trailing_whitespace(&mut s);
+        assert_eq!(s, "");
+
+        // Should preserve newlines
+        let mut s = String::from("hello\n");
+        trim_trailing_whitespace(&mut s);
+        assert_eq!(s, "hello\n");
+    }
+
+    #[test]
+    fn test_chomp_preserves_boundary_spaces() {
+        assert_eq!(chomp("  text  "), (" ", " ", "text"));
+        assert_eq!(chomp("text"), ("", "", "text"));
+        assert_eq!(chomp("  text"), (" ", "", "text"));
+        assert_eq!(chomp("text  "), ("", " ", "text"));
+        assert_eq!(chomp("   "), (" ", " ", ""));
+        assert_eq!(chomp(""), ("", "", ""));
+    }
+
+    #[test]
+    fn test_calculate_list_continuation_indent() {
+        // Depth 0 (not in a list) = 0 indent groups
+        assert_eq!(calculate_list_continuation_indent(0), 0);
+
+        // Depth 1 (first level list) = 1 indent group (2*1-1 = 1)
+        assert_eq!(calculate_list_continuation_indent(1), 1);
+
+        // Depth 2 (nested list) = 3 indent groups (2*2-1 = 3)
+        assert_eq!(calculate_list_continuation_indent(2), 3);
+
+        // Depth 3 = 5 indent groups (2*3-1 = 5)
+        assert_eq!(calculate_list_continuation_indent(3), 5);
+
+        // Depth 4 = 7 indent groups (2*4-1 = 7)
+        assert_eq!(calculate_list_continuation_indent(4), 7);
+    }
+
+    #[test]
+    fn test_add_list_continuation_indent_blank_line() {
+        let mut output = String::from("* First para");
+        add_list_continuation_indent(&mut output, 1, true);
+        assert_eq!(output, "* First para\n\n    ");
+
+        let mut output = String::from("* First para\n");
+        add_list_continuation_indent(&mut output, 1, true);
+        assert_eq!(output, "* First para\n\n    ");
+
+        let mut output = String::from("* First para\n\n");
+        add_list_continuation_indent(&mut output, 1, true);
+        assert_eq!(output, "* First para\n\n    ");
+
+        // Depth 2 nested list
+        let mut output = String::from("* First para");
+        add_list_continuation_indent(&mut output, 2, true);
+        assert_eq!(output, "* First para\n\n            "); // 3 * 4 = 12 spaces
+    }
+
+    #[test]
+    fn test_add_list_continuation_indent_single_line() {
+        let mut output = String::from("* First div");
+        add_list_continuation_indent(&mut output, 1, false);
+        assert_eq!(output, "* First div\n    ");
+
+        let mut output = String::from("* First div\n");
+        add_list_continuation_indent(&mut output, 1, false);
+        assert_eq!(output, "* First div\n    ");
+
+        // Should not add extra newline if already has one
+        let mut output = String::from("* First div\n");
+        add_list_continuation_indent(&mut output, 1, false);
+        assert_eq!(output, "* First div\n    ");
+    }
+
+    #[test]
+    fn test_trim_trailing_whitespace_in_continuation() {
+        let mut output = String::from("* First   ");
+        add_list_continuation_indent(&mut output, 1, true);
+        assert_eq!(output, "* First\n\n    ");
+
+        let mut output = String::from("* First\t\t");
+        add_list_continuation_indent(&mut output, 1, false);
+        assert_eq!(output, "* First\n    ");
+    }
+}
