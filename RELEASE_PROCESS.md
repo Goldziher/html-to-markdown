@@ -73,7 +73,7 @@ gh workflow run publish-cargo.yml -f tag=v2.0.1
 
 **Homebrew Tap**: <https://github.com/Goldziher/homebrew-tap>
 
-- Formula will be at `Formula/html-to-markdown.rb`
+- Formula is at `homebrew-tap/Formula/html-to-markdown.rb` (git submodule)
 - Automatically updated by the workflow
 
 ## Pre-release Checklist
