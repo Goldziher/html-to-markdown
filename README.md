@@ -3,6 +3,7 @@
 High-performance HTML to Markdown converter. Rust crate with Python bindings and native CLI.
 
 [![PyPI version](https://badge.fury.io/py/html-to-markdown.svg)](https://pypi.org/project/html-to-markdown/)
+[![Crates.io](https://img.shields.io/crates/v/html-to-markdown.svg)](https://crates.io/crates/html-to-markdown)
 [![Python Versions](https://img.shields.io/pypi/pyversions/html-to-markdown.svg)](https://pypi.org/project/html-to-markdown/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
@@ -22,8 +23,6 @@ Built with Rust using `html5ever` and `ammonia` for exceptional performance:
 - Convert large documentation (656KB) in **~11ms**
 - Batch process 1000 documents in **5-11 seconds** depending on size
 
-See [V2_BENCHMARKS.md](V2_BENCHMARKS.md) for detailed performance analysis.
-
 ## Features
 
 - **🚀 Blazing Fast**: Rust core with `html5ever` parser and `ammonia` sanitizer
@@ -31,17 +30,41 @@ See [V2_BENCHMARKS.md](V2_BENCHMARKS.md) for detailed performance analysis.
 - **🦀 Native CLI**: Rust CLI binary with comprehensive options
 - **📊 hOCR Support**: Advanced table extraction from OCR documents
 - **🎯 Type Safe**: Full type hints and `.pyi` stubs for excellent IDE support
-- **🔄 Backward Compatible**: Legacy v1 kwargs API supported
-- **🌍 Cross-Platform**: Wheels for Linux, macOS, Windows (x86_64)
+- **🌍 Cross-Platform**: Wheels for Linux, macOS, Windows (x86_64 + ARM64)
 - **✅ Well-Tested**: 700+ tests with dual Python + Rust coverage
 
 ## Installation
+
+### Python Package
 
 ```bash
 pip install html-to-markdown
 ```
 
-**Supported Python versions**: 3.10, 3.11, 3.12, 3.13
+### Rust Library
+
+```bash
+cargo add html-to-markdown
+```
+
+### CLI Binary
+
+#### via Homebrew (macOS/Linux)
+
+```bash
+brew tap goldziher/tap
+brew install html-to-markdown
+```
+
+#### via Cargo
+
+```bash
+cargo install html-to-markdown-cli
+```
+
+#### Direct Download
+
+Download pre-built binaries from [GitHub Releases](https://github.com/Goldziher/html-to-markdown/releases).
 
 ## Quick Start
 
@@ -84,19 +107,50 @@ This is **fast** Rust-powered conversion!
 - Easy to use
 ```
 
-### Legacy API (v1 compatibility)
+### Rust API
 
-For backward compatibility with existing code:
+```rust
+use html_to_markdown::{convert, ConversionOptions};
 
-```python
-from html_to_markdown import convert_to_markdown
+fn main() {
+    let html = r#"
+        <h1>Welcome</h1>
+        <p>This is <strong>fast</strong> conversion!</p>
+    "#;
 
-markdown = convert_to_markdown(html, heading_style="atx")
+    let options = ConversionOptions {
+        heading_style: "atx".to_string(),
+        ..Default::default()
+    };
+
+    let markdown = convert(html, &options).unwrap();
+    println!("{}", markdown);
+}
+```
+
+### CLI Usage
+
+```bash
+# Convert file
+html-to-markdown input.html > output.md
+
+# From stdin
+cat input.html | html-to-markdown > output.md
+
+# With options
+html-to-markdown --heading-style atx --list-indent-width 2 input.html
+
+# Clean web-scraped content
+html-to-markdown \
+    --preprocess \
+    --preset aggressive \
+    --no-extract-metadata \
+    scraped.html > clean.md
 ```
 
 ## Configuration
 
-### Dataclass Configuration
+### Python: Dataclass Configuration
 
 ```python
 from html_to_markdown import (
@@ -135,9 +189,9 @@ parsing = ParsingOptions(
 markdown = convert(html, options, preprocessing, parsing)
 ```
 
-### Legacy Configuration (kwargs)
+### Python: Legacy API (v1 compatibility)
 
-For backward compatibility with v1:
+For backward compatibility with existing v1 code:
 
 ```python
 from html_to_markdown import convert_to_markdown
@@ -193,84 +247,6 @@ options = ConversionOptions(
 markdown = convert(hocr_html, options)
 ```
 
-## CLI Usage
-
-### Basic Conversion
-
-```bash
-# Convert file
-html-to-markdown input.html > output.md
-
-# From stdin
-cat input.html | html-to-markdown > output.md
-
-# With options
-html-to-markdown --heading-style atx --list-indent-width 2 input.html
-```
-
-### Advanced Examples
-
-```bash
-# Clean web-scraped content
-html-to-markdown \
-    --preprocess \
-    --preset aggressive \
-    --no-extract-metadata \
-    scraped.html > clean.md
-
-# Discord-compatible lists
-html-to-markdown \
-    --list-indent-width 2 \
-    --bullets "*" \
-    input.html > discord.md
-
-# Process hOCR with table extraction
-html-to-markdown \
-    --hocr-extract-tables \
-    --hocr-table-column-threshold 50 \
-    ocr_output.hocr > document.md
-```
-
-### CLI Help
-
-```bash
-html-to-markdown --help
-```
-
-## Upgrading from v1.x
-
-### Backward Compatibility
-
-Existing v1 code works without changes:
-
-```python
-from html_to_markdown import convert_to_markdown
-
-markdown = convert_to_markdown(html, heading_style="atx")  # Still works!
-```
-
-### Modern API (Recommended)
-
-For new projects, use the dataclass-based API:
-
-```python
-from html_to_markdown import convert, ConversionOptions
-
-options = ConversionOptions(heading_style="atx", list_indent_width=2)
-markdown = convert(html, options)
-```
-
-### Unsupported Features
-
-Some v1 features are not available due to the Rust backend:
-
-- `code_language_callback` - Callbacks not supported
-- `strip` / `convert` options - Use preprocessing instead
-- `custom_converters` - Not yet implemented
-- `convert_to_markdown_stream()` - Not yet implemented
-
-These raise `NotImplementedError` with clear messages.
-
 ## Configuration Reference
 
 ### ConversionOptions
@@ -313,6 +289,40 @@ These raise `NotImplementedError` with clear messages.
 | `encoding` | str  | `"utf-8"`       | Source encoding                           |
 | `parser`   | str  | `"html.parser"` | Parser: "html.parser", "lxml", "html5lib" |
 
+## Upgrading from v1.x
+
+### Backward Compatibility
+
+Existing v1 code works without changes:
+
+```python
+from html_to_markdown import convert_to_markdown
+
+markdown = convert_to_markdown(html, heading_style="atx")  # Still works!
+```
+
+### Modern API (Recommended)
+
+For new projects, use the dataclass-based API:
+
+```python
+from html_to_markdown import convert, ConversionOptions
+
+options = ConversionOptions(heading_style="atx", list_indent_width=2)
+markdown = convert(html, options)
+```
+
+### Unsupported v1 Features
+
+Some v1 features are not available due to the Rust backend:
+
+- `code_language_callback` - Callbacks not supported
+- `strip` / `convert` options - Use preprocessing instead
+- `custom_converters` - Not yet implemented
+- `convert_to_markdown_stream()` - Not yet implemented
+
+These raise `NotImplementedError` with clear messages.
+
 ## Performance Tips
 
 1. **Use lxml parser** when available: `pip install lxml`
@@ -320,61 +330,9 @@ These raise `NotImplementedError` with clear messages.
 1. **Adjust hOCR thresholds** for your OCR quality
 1. **Use V2 API** for better type checking and IDE support
 
-## Development
+## Contributing
 
-### Setup
-
-```bash
-# Clone and install
-git clone https://github.com/Goldziher/html-to-markdown.git
-cd html-to-markdown
-uv sync --all-extras
-
-# Install pre-commit
-uv run pre-commit install
-
-# Build Rust extension
-./build_rust.sh
-```
-
-### Testing
-
-```bash
-# Python tests
-uv run pytest
-
-# Rust tests
-cargo test --all-features
-
-# Full test suite with coverage
-uv run pytest --cov=html_to_markdown --cov-report=term-missing
-cargo llvm-cov --all-features --lcov --output-path rust-coverage.lcov
-```
-
-### Building Wheels
-
-```bash
-# Build wheels locally
-pip install cibuildwheel
-cibuildwheel --output-dir wheelhouse
-```
-
-## Architecture
-
-```text
-html-to-markdown/
-├── crates/
-│   ├── html-to-markdown/       # Core Rust library
-│   ├── html-to-markdown-py/    # Python bindings (PyO3)
-│   └── html-to-markdown-cli/   # Native CLI binary
-├── html_to_markdown/
-│   ├── api.py                  # V2 Python API
-│   ├── options.py              # Configuration dataclasses
-│   ├── v1_compat.py           # V1 compatibility layer
-│   ├── cli_proxy.py           # CLI argument translation
-│   └── _rust.pyi              # Type stubs
-└── tests/                      # 700+ tests
-```
+See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup, testing, and contribution guidelines.
 
 ## License
 
@@ -382,9 +340,7 @@ MIT License - see [LICENSE](LICENSE) for details.
 
 ## Acknowledgments
 
-- Original [markdownify](https://pypi.org/project/markdownify/) for inspiration
-- Rust ecosystem for excellent HTML parsing libraries
-- PyO3 for seamless Rust-Python integration
+This library started out as a fork of [markdownify](https://pypi.org/project/markdownify/), with the goal of improving performance and adding modern Python typing.
 
 ## Support
 

@@ -69,18 +69,18 @@ task bench:all
 ## Project Structure
 
 ```text
-crates/
-├── html-to-markdown/       # Core Rust library (html5ever + ammonia)
-├── html-to-markdown-py/    # Python bindings (PyO3)
-└── html-to-markdown-cli/   # Native CLI binary
-
-html_to_markdown/
-├── api.py                  # Python API wrapper
-├── options.py              # Configuration dataclasses
-├── v1_compat.py           # v1 compatibility layer
-└── _rust.pyi              # Type stubs for Rust bindings
-
-tests/                      # Python integration tests
+html-to-markdown/
+├── crates/
+│   ├── html-to-markdown/       # Core Rust library (html5ever + ammonia)
+│   ├── html-to-markdown-py/    # Python bindings (PyO3)
+│   └── html-to-markdown-cli/   # Native CLI binary
+├── html_to_markdown/
+│   ├── api.py                  # V2 Python API
+│   ├── options.py              # Configuration dataclasses
+│   ├── v1_compat.py           # V1 compatibility layer
+│   ├── cli_proxy.py           # CLI argument translation
+│   └── _rust.pyi              # Type stubs
+└── tests/                      # 700+ tests
 ```
 
 ## Making Changes
@@ -102,6 +102,14 @@ tests/                      # Python integration tests
 
 - **Rust tests**: Add to `crates/html-to-markdown/src/` (inline) or `crates/html-to-markdown/tests/`
 - **Python tests**: Add to `tests/` following existing patterns
+
+## Building Wheels
+
+```bash
+# Build wheels locally
+pip install cibuildwheel
+cibuildwheel --output-dir wheelhouse
+```
 
 ## Commit Guidelines
 
