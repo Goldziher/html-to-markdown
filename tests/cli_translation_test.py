@@ -145,7 +145,7 @@ class TestCLITranslationComplex:
             "input.html",
             "--preprocess-html",
             "--no-escape-asterisks",
-            "--escape-underscores",  # Should be removed
+            "--escape-underscores",
             "--autolinks",
             "-o",
             "output.md",
@@ -233,11 +233,9 @@ class TestCLITranslationEdgeCases:
 
     def test_output_flag_variations(self) -> None:
         """Test output flag variations."""
-        # Short form
         args1 = ["-o", "output.md"]
         assert translate_v1_args_to_v2(args1) == args1
 
-        # Long form
         args2 = ["--output", "output.md"]
         assert translate_v1_args_to_v2(args2) == args2
 

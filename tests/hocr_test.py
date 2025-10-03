@@ -243,12 +243,10 @@ def test_hocr_table_extraction() -> None:
     </html>
     """
 
-    # Use convert API with ConversionOptions
     options = ConversionOptions()
     options.hocr_extract_tables = True
     result = convert(hocr_content, options)
 
-    # Verify table structure is present in markdown
     assert "|" in result, "Should contain table markdown"
     assert "Product" in result, "Should contain header"
     assert "Price" in result, "Should contain header"
@@ -258,7 +256,6 @@ def test_hocr_table_extraction() -> None:
     assert "Orange" in result, "Should contain data"
     assert "$2.00" in result, "Should contain data"
 
-    # Verify table markdown format
     assert "| ---" in result, "Should contain header separator"
 
 
@@ -281,7 +278,6 @@ def test_hocr_table_extraction_disabled() -> None:
     options.hocr_extract_tables = False
     result = convert(hocr_content, options)
 
-    # With table extraction disabled, should just be plain text
     assert "Col1" in result
     assert "Col2" in result
     assert "Data1" in result
@@ -308,5 +304,3 @@ def test_hocr_table_confidence_filtering() -> None:
 
     assert "Good" in result, "High confidence word should be included"
     assert "Quality" in result, "High confidence word should be included"
-    # Note: Default min confidence is 0.0, so all words are included in the Rust implementation
-    # This test verifies the confidence parsing works

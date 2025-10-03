@@ -57,11 +57,9 @@ class ConversionOptions:
         >>> markdown = convert("<h1>Title</h1>", options)
     """
 
-    # Heading options
     heading_style: Literal["underlined", "atx", "atx_closed"] = "underlined"
     """Style for headings: 'underlined' (===), 'atx' (#), or 'atx_closed' (# #)."""
 
-    # List options
     list_indent_type: Literal["spaces", "tabs"] = "spaces"
     """Type of indentation for lists."""
 
@@ -71,7 +69,6 @@ class ConversionOptions:
     bullets: str = "*+-"
     """Characters to use for unordered list bullets, cycling through levels."""
 
-    # Text formatting
     strong_em_symbol: Literal["*", "_"] = "*"
     """Symbol for strong/emphasis formatting."""
 
@@ -84,29 +81,24 @@ class ConversionOptions:
     escape_misc: bool = True
     """Escape miscellaneous Markdown characters."""
 
-    # Code blocks
     code_language: str = ""
     """Default language for code blocks."""
 
     code_language_callback: Callable[[Tag], str] | None = None
     """Callback to determine code language from element."""
 
-    # Links
     autolinks: bool = True
     """Convert bare URLs to automatic links."""
 
     default_title: bool = False
     """Add a default title if none exists."""
 
-    # Images
     keep_inline_images_in: set[str] | None = None
     """Parent tag names where images should remain inline."""
 
-    # Tables
     br_in_tables: bool = False
     """Use <br> tags for line breaks in table cells instead of spaces."""
 
-    # hOCR table extraction
     hocr_extract_tables: bool = True
     """Enable table extraction from hOCR (HTML-based OCR) documents."""
 
@@ -116,29 +108,24 @@ class ConversionOptions:
     hocr_table_row_threshold_ratio: float = 0.5
     """Row height ratio threshold for detecting row boundaries in hOCR tables."""
 
-    # Highlighting
     highlight_style: Literal["double-equal", "html", "bold"] = "double-equal"
     """Style for highlighting <mark> elements."""
 
-    # Metadata
     extract_metadata: bool = True
     """Extract metadata from HTML head and include as comment."""
 
-    # Whitespace
     whitespace_mode: Literal["normalized", "strict"] = "normalized"
     """How to handle whitespace: 'normalized' or 'strict'."""
 
     strip_newlines: bool = False
     """Remove newlines from HTML before processing."""
 
-    # Wrapping
     wrap: bool = False
     """Enable text wrapping."""
 
     wrap_width: int = 80
     """Column width for text wrapping."""
 
-    # Element filtering
     convert: set[str] | None = None
     """HTML tags to convert to Markdown (None = all supported tags)."""
 
@@ -148,18 +135,15 @@ class ConversionOptions:
     convert_as_inline: bool = False
     """Treat block elements as inline during conversion."""
 
-    # Subscript/superscript
     sub_symbol: str = ""
     """Symbol for subscript text."""
 
     sup_symbol: str = ""
     """Symbol for superscript text."""
 
-    # Newlines
     newline_style: Literal["spaces", "backslash"] = "spaces"
     """Style for newlines: 'spaces' (two spaces) or 'backslash' (\\)."""
 
-    # Custom converters
     custom_converters: dict[str, Callable[..., str]] | None = None
     """Custom converter functions for specific HTML elements."""
 

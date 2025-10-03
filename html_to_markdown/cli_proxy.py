@@ -19,13 +19,9 @@ def find_cli_binary() -> Path:
     Raises:
         FileNotFoundError: If the binary cannot be found
     """
-    # Try to find the binary in common locations
     possible_locations = [
-        # Development: built with cargo
         Path(__file__).parent.parent / "target" / "release" / "html-to-markdown",
-        # Installed: bundled with Python package
         Path(__file__).parent / "bin" / "html-to-markdown",
-        # macOS bundled binary
         Path(__file__).parent / "html-to-markdown",
     ]
 
@@ -59,58 +55,36 @@ def translate_v1_args_to_v2(argv: list[str]) -> list[str]:
     while i < len(argv):
         arg = argv[i]
 
-        # Handle v1-specific flags that don't exist in v2
         if arg in ("--strip", "--convert"):
             raise ValueError(f"{arg} option is not supported in v2. Please remove it from your command.")
 
-        # Translate flag names
         if arg == "--preprocess-html":
             translated.append("--preprocess")
 
-        # Handle boolean flags that changed
-        # v1: --escape-asterisks (default true), v2: --no-escape-asterisks (to disable)
         elif arg == "--no-escape-asterisks":
             translated.append("--no-escape-asterisks")
         elif arg == "--escape-asterisks":
-            # In v2, escaping is default, so skip this flag
             pass
 
-        # v1: --escape-underscores (default true), v2: --no-escape-underscores (to disable)
         elif arg == "--no-escape-underscores":
             translated.append("--no-escape-underscores")
         elif arg == "--escape-underscores":
-            # In v2, escaping is default, so skip this flag
             pass
 
-        # v1: --escape-misc (default true), v2: --no-escape-misc (to disable)
         elif arg == "--no-escape-misc":
             translated.append("--no-escape-misc")
-        elif arg == "--escape-misc":
-            # In v2, escaping is default, so skip this flag
-            pass
-
-        # v1: --autolinks (default false), v2: --autolinks (to enable)
-        elif arg == "--no-autolinks":
-            # In v2, autolinks are disabled by default, so skip this flag
+        elif arg in {"--escape-misc", "--no-autolinks"}:
             pass
         elif arg == "--autolinks":
             translated.append("--autolinks")
 
-        # v1: --extract-metadata (default true), v2: --no-extract-metadata (to disable)
         elif arg == "--no-extract-metadata":
             translated.append("--no-extract-metadata")
-        elif arg == "--extract-metadata":
-            # In v2, metadata extraction is default, so skip this flag
-            pass
-
-        # v1: --wrap (default false), v2: --wrap (to enable)
-        elif arg == "--no-wrap":
-            # In v2, wrapping is disabled by default, so skip this flag
+        elif arg in {"--extract-metadata", "--no-wrap"}:
             pass
         elif arg == "--wrap":
             translated.append("--wrap")
 
-        # All other flags pass through unchanged
         else:
             translated.append(arg)
 
@@ -133,14 +107,12 @@ def main(argv: list[str]) -> str:
     """
     cli_binary = find_cli_binary()
 
-    # Translate v1 args to v2
     try:
         translated_args = translate_v1_args_to_v2(argv)
     except ValueError as e:
         sys.stderr.write(f"Error: {e}\n")
         sys.exit(1)
 
-    # Run the Rust CLI binary
     result = subprocess.run(  # noqa: S603
         [str(cli_binary), *translated_args],
         capture_output=True,
@@ -149,7 +121,6 @@ def main(argv: list[str]) -> str:
     )
 
     if result.returncode != 0:
-        # Print stderr and exit with same code
         sys.stderr.write(result.stderr)
         sys.exit(result.returncode)
 

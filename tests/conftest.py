@@ -38,7 +38,6 @@ def convert_v2() -> Callable[..., str]:
     def _convert(
         html: str,
         *,
-        # Conversion options as kwargs for convenience
         heading_style: str = "underlined",
         list_indent_type: str = "spaces",
         list_indent_width: int = 4,
@@ -65,12 +64,10 @@ def convert_v2() -> Callable[..., str]:
         sup_symbol: str = "",
         newline_style: str = "spaces",
         keep_inline_images_in: set[str] | None = None,
-        # Preprocessing options
         preprocess: bool = False,
         preprocessing_preset: str = "standard",
         remove_navigation: bool = True,
         remove_forms: bool = True,
-        # Parsing options
         source_encoding: str = "utf-8",
     ) -> str:
         """Convert HTML to Markdown using v2 API."""
@@ -112,7 +109,7 @@ def convert_v2() -> Callable[..., str]:
 
         parsing = ParsingOptions(
             encoding=source_encoding,
-            parser="html.parser",  # Always use html.parser with Rust backend
+            parser="html.parser",
         )
 
         return convert_api(html, options, preprocessing, parsing)
@@ -120,14 +117,12 @@ def convert_v2() -> Callable[..., str]:
     return _convert
 
 
-# Alias for backwards compatibility with existing tests
 @pytest.fixture
 def convert(convert_v2: Callable[..., str]) -> Callable[..., str]:
     """Backwards compatible convert fixture."""
     return convert_v2
 
 
-# HTML fixtures for common test cases
 @pytest.fixture
 def nested_uls() -> str:
     return """

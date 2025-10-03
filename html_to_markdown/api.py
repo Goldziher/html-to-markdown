@@ -42,7 +42,6 @@ def convert(
         # Title
         <BLANKLINE>
     """
-    # Use defaults if not provided
     if options is None:
         options = ConversionOptions()
     if preprocessing is None:
@@ -50,7 +49,6 @@ def convert(
     if parsing is None:
         parsing = ParsingOptions()
 
-    # Convert Python options to Rust options
     rust_preprocessing = _rust.PreprocessingOptions(
         enabled=preprocessing.enabled,
         preset=preprocessing.preset,

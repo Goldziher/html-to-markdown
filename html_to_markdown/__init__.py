@@ -15,10 +15,7 @@ V1 API (backward compatibility):
     markdown = convert_to_markdown(html, heading_style="atx")
 """
 
-# V2 API - Rust bindings
 from html_to_markdown.api import convert
-
-# Exceptions
 from html_to_markdown.exceptions import (
     ConflictingOptionsError,
     EmptyHtmlError,
@@ -26,15 +23,11 @@ from html_to_markdown.exceptions import (
     InvalidParserError,
     MissingDependencyError,
 )
-
-# V2 Options
 from html_to_markdown.options import (
     ConversionOptions,
     ParsingOptions,
     PreprocessingOptions,
 )
-
-# V1 Compatibility
 from html_to_markdown.v1_compat import convert_to_markdown, convert_to_markdown_stream
 
 __all__ = [

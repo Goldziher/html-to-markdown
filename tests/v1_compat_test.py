@@ -32,7 +32,7 @@ class TestV1CompatBasic:
         """Test list indent width option."""
         html = "<ul><li>a<ul><li>b</li></ul></li></ul>"
         result = convert_to_markdown(html, list_indent_width=2)
-        assert "  +" in result  # 2-space indent
+        assert "  +" in result
 
     def test_bullets_custom(self) -> None:
         """Test custom bullet characters."""
@@ -69,8 +69,6 @@ class TestV1CompatBasic:
         """Test autolinks enabled (default)."""
         html = '<a href="https://example.com">https://example.com</a>'
         result = convert_to_markdown(html, autolinks=True)
-        # v2 doesn't auto-detect autolinks the same way as v1
-        # It produces regular link syntax
         assert result == "[https://example.com](https://example.com)"
 
     def test_autolinks_false(self) -> None:
@@ -101,8 +99,6 @@ class TestV1CompatOptions:
         """Test text wrapping enabled."""
         html = "<p>123456789 123456789</p>"
         result = convert_to_markdown(html, wrap=True, wrap_width=10)
-        # v2 wrapping behavior may differ from v1
-        # Just check that the text is present
         assert "123456789" in result
         assert "123456789" in result
 
@@ -151,8 +147,6 @@ class TestV1CompatPreprocessing:
         """Test preprocessing enabled."""
         html = "<nav>Navigation</nav><p>Content</p>"
         result = convert_to_markdown(html, preprocess=True, remove_navigation=True)
-        # Preprocessing may not fully remove navigation in v2
-        # Just check that conversion works
         assert "Content" in result
 
 

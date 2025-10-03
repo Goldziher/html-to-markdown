@@ -1,7 +1,6 @@
 use html_to_markdown::convert;
 
 fn main() {
-    // Test unchecked task list
     let html = r#"<ul>
         <li><input type="checkbox"> Unchecked task</li>
         <li><input type="checkbox" checked> Checked task</li>
@@ -22,7 +21,6 @@ fn main() {
         Err(e) => eprintln!("Error: {}", e),
     }
 
-    // Test nested task list
     let html2 = r#"<ul>
         <li><input type="checkbox"> Parent task
             <ul>
@@ -41,7 +39,6 @@ fn main() {
         Err(e) => eprintln!("Error: {}", e),
     }
 
-    // Test ruby annotations
     let html3 = r#"<ruby>東京<rt>とうきょう</rt></ruby>"#;
 
     match convert(html3, None) {

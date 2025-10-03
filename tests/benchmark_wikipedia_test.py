@@ -13,9 +13,6 @@ import pytest
 
 from html_to_markdown import ConversionOptions, convert
 
-# V1 API compatibility not yet implemented
-# convert_stream and convert_to_markdown will be added in compatibility layer
-
 if TYPE_CHECKING:
     from pytest_benchmark.fixture import BenchmarkFixture  # type: ignore[import-untyped]
 
@@ -64,7 +61,6 @@ class TestWikipediaFeatures:
         html = _load_wikipedia_doc("tables_countries.html")
         result = benchmark(convert, html)
         assert len(result) > 0
-        # Verify tables were converted (should contain table markers)
         assert "|" in result or "```" in result
 
     @pytest.mark.benchmark(group="wikipedia-features")
@@ -73,7 +69,6 @@ class TestWikipediaFeatures:
         html = _load_wikipedia_doc("lists_timeline.html")
         result = benchmark(convert, html)
         assert len(result) > 0
-        # Verify lists were converted
         assert "*" in result or "-" in result or "1." in result
 
 
@@ -139,11 +134,11 @@ class TestWikipediaV1vsV2:
 @pytest.mark.parametrize(
     "doc_file,expected_min_ops",
     [
-        ("lists_timeline.html", 5.0),  # 130KB - expect ~5+ ops/sec
-        ("tables_countries.html", 3.0),  # 361KB - expect ~3+ ops/sec
-        ("small_html.html", 2.0),  # 464KB - expect ~2+ ops/sec
-        ("large_rust.html", 1.5),  # 567KB - expect ~1.5+ ops/sec
-        ("medium_python.html", 1.0),  # 656KB - expect ~1+ ops/sec
+        ("lists_timeline.html", 5.0),
+        ("tables_countries.html", 3.0),
+        ("small_html.html", 2.0),
+        ("large_rust.html", 1.5),
+        ("medium_python.html", 1.0),
     ],
 )
 def test_wikipedia_scalability(benchmark: BenchmarkFixture, doc_file: str, expected_min_ops: float) -> None:
@@ -155,6 +150,4 @@ def test_wikipedia_scalability(benchmark: BenchmarkFixture, doc_file: str, expec
     html = _load_wikipedia_doc(doc_file)
     stats = benchmark(convert, html)
 
-    # stats object from pytest-benchmark contains performance metrics
-    # This is informational - we're establishing baseline, not enforcing limits
     assert len(stats) > 0 if isinstance(stats, str) else True

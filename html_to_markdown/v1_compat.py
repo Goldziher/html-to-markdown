@@ -18,7 +18,6 @@ from html_to_markdown import convert as convert_v2
 def convert_to_markdown(  # noqa: D417
     html: str,
     *,
-    # Conversion options
     heading_style: str = "underlined",
     list_indent_type: str = "spaces",
     list_indent_width: int = 4,
@@ -45,15 +44,12 @@ def convert_to_markdown(  # noqa: D417
     sup_symbol: str = "",
     newline_style: str = "spaces",
     keep_inline_images_in: set[str] | None = None,
-    # Preprocessing options
     preprocess: bool = False,
     preprocessing_preset: str = "standard",
     remove_navigation: bool = True,
     remove_forms: bool = True,
-    # Parsing options
     parser: str = "html.parser",
     source_encoding: str = "utf-8",
-    # V1 options not supported in v2
     code_language_callback: object | None = None,
     strip: list[str] | None = None,
     convert: list[str] | None = None,
@@ -79,7 +75,6 @@ def convert_to_markdown(  # noqa: D417
     Raises:
         NotImplementedError: If unsupported v1 options are provided
     """
-    # Check for unsupported v1 options
     if code_language_callback is not None:
         raise NotImplementedError(
             "code_language_callback is not supported in v2 (Rust backend doesn't support callbacks)"
@@ -91,7 +86,6 @@ def convert_to_markdown(  # noqa: D417
     if custom_converters is not None:
         raise NotImplementedError("custom_converters is not supported in v2")
 
-    # Build v2 options
     options = ConversionOptions(
         heading_style=heading_style,  # type: ignore[arg-type]
         list_indent_type=list_indent_type,  # type: ignore[arg-type]

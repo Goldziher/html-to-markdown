@@ -1741,7 +1741,6 @@ def test_multiple_empty_semantic_elements(convert: Callable[..., str]) -> None:
 def test_whitespace_handling_semantic(convert: Callable[..., str]) -> None:
     html = "<p>Spaces around <var>  variable  </var> and <abbr title='  title  '>  abbr  </abbr></p>"
     result = convert(html)
-    # Whitespace normalization collapses the double space after *variable* to single space
     assert result == "Spaces around  *variable* and abbr (title)\n\n"
 
 

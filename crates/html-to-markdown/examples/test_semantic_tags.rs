@@ -1,7 +1,6 @@
 use html_to_markdown::convert;
 
 fn main() {
-    // Test semantic block elements
     let html = r#"<article>
         <header><h1>Title</h1></header>
         <section><p>Content here</p></section>
@@ -17,7 +16,6 @@ fn main() {
         Err(e) => eprintln!("Error: {}", e),
     }
 
-    // Test figure and figcaption
     let html2 = r#"<figure>
         <img src="image.jpg" alt="Diagram">
         <figcaption>Figure 1: Example diagram</figcaption>
@@ -34,7 +32,6 @@ fn main() {
         Err(e) => eprintln!("Error: {}", e),
     }
 
-    // Test cite and q
     let html3 = r#"<p>As <cite>Shakespeare</cite> said, <q>To be or not to be</q></p>"#;
     match convert(html3, None) {
         Ok(markdown) => {
@@ -47,7 +44,6 @@ fn main() {
         Err(e) => eprintln!("Error: {}", e),
     }
 
-    // Test definition lists
     let html4 = r#"<dl>
         <dt>Term 1</dt>
         <dd>Definition 1</dd>
@@ -70,7 +66,6 @@ fn main() {
         Err(e) => eprintln!("Error: {}", e),
     }
 
-    // Test hgroup
     let html5 = r#"<hgroup>
         <h1>Main Title</h1>
         <h2>Subtitle</h2>

@@ -38,17 +38,13 @@ pub use options::{
 pub fn convert(html: &str, options: Option<ConversionOptions>) -> Result<String> {
     let options = options.unwrap_or_default();
 
-    // Normalize line endings per HTML5 spec: Convert \r\n and \r to \n
-    // The HTML5 spec requires CR and CRLF to be normalized to LF during preprocessing
     let normalized_html = html.replace("\r\n", "\n").replace('\r', "\n");
 
-    // Sanitize HTML if preprocessing is enabled
     let clean_html = if options.preprocessing.enabled {
         sanitizer::sanitize(&normalized_html, &options.preprocessing)?
     } else {
         normalized_html
     };
 
-    // Convert to Markdown using html5ever
     converter::convert_html(&clean_html, &options)
 }

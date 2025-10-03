@@ -29,10 +29,8 @@ pub fn escape(text: &str, escape_misc: bool, escape_asterisks: bool, escape_unde
     let mut result = text.to_string();
 
     if escape_misc {
-        // Escape special characters: \ & < ` [ > ~ # = + | -
         result = ESCAPE_MISC_RE.replace_all(&result, r"\$1").to_string();
 
-        // Escape numbered lists: "1." -> "1\." and "1)" -> "1\)"
         result = ESCAPE_NUMBERED_LIST_RE.replace_all(&result, r"$1\$2").to_string();
     }
 
@@ -57,14 +55,12 @@ pub fn chomp(text: &str) -> (&str, &str, &str) {
         return ("", "", "");
     }
 
-    // Check if starts with any whitespace (space, tab, newline)
     let prefix = if text.starts_with(|c: char| c.is_whitespace()) {
         " "
     } else {
         ""
     };
 
-    // Check if ends with any whitespace (space, tab, newline)
     let suffix = if text.ends_with(|c: char| c.is_whitespace()) {
         " "
     } else {
@@ -94,17 +90,14 @@ pub fn normalize_whitespace(text: &str) -> String {
     let mut prev_was_space = false;
 
     for ch in text.chars() {
-        // Check if it's a space-like character (including unicode spaces)
         let is_space = ch == ' ' || ch == '\t' || is_unicode_space(ch);
 
         if is_space {
-            // Collapse consecutive spaces and tabs to single space
             if !prev_was_space {
                 result.push(' ');
                 prev_was_space = true;
             }
         } else {
-            // Preserve newlines and other characters
             result.push(ch);
             prev_was_space = false;
         }
@@ -119,22 +112,22 @@ pub fn normalize_whitespace(text: &str) -> String {
 fn is_unicode_space(ch: char) -> bool {
     matches!(
         ch,
-        '\u{00A0}' |  // Non-breaking space
-        '\u{1680}' |  // Ogham space mark
-        '\u{2000}' |  // En quad
-        '\u{2001}' |  // Em quad
-        '\u{2002}' |  // En space
-        '\u{2003}' |  // Em space
-        '\u{2004}' |  // Three-per-em space
-        '\u{2005}' |  // Four-per-em space
-        '\u{2006}' |  // Six-per-em space
-        '\u{2007}' |  // Figure space
-        '\u{2008}' |  // Punctuation space
-        '\u{2009}' |  // Thin space
-        '\u{200A}' |  // Hair space
-        '\u{202F}' |  // Narrow no-break space
-        '\u{205F}' |  // Medium mathematical space
-        '\u{3000}' // Ideographic space
+        '\u{00A0}'
+            | '\u{1680}'
+            | '\u{2000}'
+            | '\u{2001}'
+            | '\u{2002}'
+            | '\u{2003}'
+            | '\u{2004}'
+            | '\u{2005}'
+            | '\u{2006}'
+            | '\u{2007}'
+            | '\u{2008}'
+            | '\u{2009}'
+            | '\u{200A}'
+            | '\u{202F}'
+            | '\u{205F}'
+            | '\u{3000}'
     )
 }
 

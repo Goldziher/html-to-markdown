@@ -1,7 +1,6 @@
 use html_to_markdown::convert;
 
 fn main() {
-    // Test ordered list
     let html = "<ol><li>First item</li><li>Second item</li><li>Third item</li></ol>";
     match convert(html, None) {
         Ok(markdown) => {
@@ -17,7 +16,6 @@ fn main() {
         Err(e) => eprintln!("Error: {}", e),
     }
 
-    // Test unordered list
     let html2 = "<ul><li>First item</li><li>Second item</li></ul>";
     match convert(html2, None) {
         Ok(markdown) => {

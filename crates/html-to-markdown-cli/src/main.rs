@@ -50,9 +50,6 @@ struct Cli {
     #[arg(short = 'o', long = "output", value_name = "FILE")]
     output: Option<PathBuf>,
 
-    // ============================================================
-    // HEADING OPTIONS
-    // ============================================================
     /// Heading style
     ///
     /// Controls how headings are formatted in the output:
@@ -64,9 +61,6 @@ struct Cli {
     #[arg(value_parser = ["underlined", "atx", "atx_closed"])]
     heading_style: String,
 
-    // ============================================================
-    // LIST OPTIONS
-    // ============================================================
     /// List indentation type
     #[arg(long, value_name = "TYPE", default_value = "spaces")]
     #[arg(help_heading = "List Options")]
@@ -88,9 +82,6 @@ struct Cli {
     #[arg(help_heading = "List Options")]
     bullets: String,
 
-    // ============================================================
-    // TEXT FORMATTING
-    // ============================================================
     /// Symbol for bold and italic
     ///
     /// Choose '*' (default) or '_' for **bold** and *italic* text
@@ -139,9 +130,6 @@ struct Cli {
     #[arg(value_parser = ["spaces", "backslash"])]
     newline_style: String,
 
-    // ============================================================
-    // CODE BLOCKS
-    // ============================================================
     /// Default language for code blocks
     ///
     /// Sets the language for fenced code blocks when not specified in HTML
@@ -149,9 +137,6 @@ struct Cli {
     #[arg(help_heading = "Code Blocks")]
     code_language: String,
 
-    // ============================================================
-    // LINKS
-    // ============================================================
     /// Convert URLs to autolinks
     ///
     /// When link text equals href, use <url> instead of [url](url)
@@ -166,9 +151,6 @@ struct Cli {
     #[arg(help_heading = "Links")]
     default_title: bool,
 
-    // ============================================================
-    // TABLES
-    // ============================================================
     /// Use <br> in table cells
     ///
     /// Preserve line breaks in table cells using <br> tags instead of
@@ -177,9 +159,6 @@ struct Cli {
     #[arg(help_heading = "Tables")]
     br_in_tables: bool,
 
-    // ============================================================
-    // HIGHLIGHTING
-    // ============================================================
     /// Style for <mark> elements
     ///
     /// How to represent highlighted text:
@@ -192,9 +171,6 @@ struct Cli {
     #[arg(value_parser = ["double-equal", "html", "bold", "none"])]
     highlight_style: String,
 
-    // ============================================================
-    // METADATA
-    // ============================================================
     /// Don't extract metadata
     ///
     /// Skip extracting title and meta tags as HTML comment header
@@ -202,9 +178,6 @@ struct Cli {
     #[arg(help_heading = "Metadata")]
     no_extract_metadata: bool,
 
-    // ============================================================
-    // WHITESPACE
-    // ============================================================
     /// Whitespace handling mode
     ///
     /// How to handle whitespace in HTML:
@@ -223,9 +196,6 @@ struct Cli {
     #[arg(help_heading = "Whitespace")]
     strip_newlines: bool,
 
-    // ============================================================
-    // WRAPPING
-    // ============================================================
     /// Enable text wrapping
     ///
     /// Wrap output lines at --wrap-width columns
@@ -240,9 +210,6 @@ struct Cli {
     #[arg(help_heading = "Wrapping")]
     wrap_width: usize,
 
-    // ============================================================
-    // ELEMENT HANDLING
-    // ============================================================
     /// Treat block elements as inline
     ///
     /// Convert block-level elements without adding paragraph breaks
@@ -250,9 +217,6 @@ struct Cli {
     #[arg(help_heading = "Element Handling")]
     convert_as_inline: bool,
 
-    // ============================================================
-    // PREPROCESSING
-    // ============================================================
     /// Enable HTML preprocessing
     ///
     /// Clean up HTML before conversion (removes navigation, ads, forms, etc.)
@@ -288,9 +252,6 @@ struct Cli {
     #[arg(requires = "preprocess")]
     keep_forms: bool,
 
-    // ============================================================
-    // PARSING
-    // ============================================================
     /// Input character encoding
     ///
     /// Encoding to use when reading input files (e.g., 'utf-8', 'latin-1')
@@ -354,10 +315,8 @@ fn parse_preprocessing_preset(s: &str) -> PreprocessingPreset {
 fn main() {
     let cli = Cli::parse();
 
-    // Read input HTML
     let html = match cli.input.as_deref() {
         None | Some("-") => {
-            // Read from stdin
             let mut buffer = String::new();
             io::stdin().read_to_string(&mut buffer).unwrap_or_else(|e| {
                 eprintln!("Error reading from stdin: {}", e);
@@ -366,7 +325,6 @@ fn main() {
             buffer
         }
         Some(path) => {
-            // Read from file
             let path = PathBuf::from(path);
             fs::read_to_string(&path).unwrap_or_else(|e| {
                 eprintln!("Error reading file '{}': {}", path.display(), e);
@@ -375,7 +333,6 @@ fn main() {
         }
     };
 
-    // Build preprocessing options
     let preprocessing = PreprocessingOptions {
         enabled: cli.preprocess,
         preset: parse_preprocessing_preset(&cli.preset),
@@ -383,13 +340,11 @@ fn main() {
         remove_forms: !cli.keep_forms,
     };
 
-    // Build parsing options
     let parsing = ParsingOptions {
         encoding: cli.encoding,
-        parser: None, // Rust always uses html5ever
+        parser: None,
     };
 
-    // Build main conversion options
     let options = ConversionOptions {
         heading_style: parse_heading_style(&cli.heading_style),
         list_indent_type: parse_list_indent_type(&cli.list_indent_type),
@@ -421,7 +376,6 @@ fn main() {
         parsing,
     };
 
-    // Convert HTML to Markdown
     let markdown = match convert(&html, Some(options)) {
         Ok(md) => md,
         Err(e) => {
@@ -430,10 +384,8 @@ fn main() {
         }
     };
 
-    // Write output
     match cli.output {
         Some(path) => {
-            // Write to file
             let mut file = fs::File::create(&path).unwrap_or_else(|e| {
                 eprintln!("Error creating output file '{}': {}", path.display(), e);
                 std::process::exit(1);
@@ -444,7 +396,6 @@ fn main() {
             });
         }
         None => {
-            // Write to stdout
             print!("{}", markdown);
         }
     }

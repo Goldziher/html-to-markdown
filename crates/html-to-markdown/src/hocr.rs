@@ -104,12 +104,10 @@ fn get_text_content(handle: &Handle) -> String {
 pub fn extract_hocr_words(handle: &Handle, min_confidence: f64) -> Vec<HocrWord> {
     let mut words = Vec::new();
 
-    // Check if this is an ocrx_word element
     if let NodeData::Element { name, attrs, .. } = &handle.data {
         if name.local.as_ref() == "span" {
             let attrs = attrs.borrow();
 
-            // Check for ocrx_word class
             let mut is_word = false;
             let mut title = String::new();
 
@@ -126,11 +124,9 @@ pub fn extract_hocr_words(handle: &Handle, min_confidence: f64) -> Vec<HocrWord>
             }
 
             if is_word {
-                // Parse bbox and confidence
                 if let Some((left, top, width, height)) = parse_bbox(&title) {
                     let confidence = parse_confidence(&title);
 
-                    // Check confidence threshold
                     if confidence >= min_confidence {
                         let text = get_text_content(handle).trim().to_string();
 
@@ -150,7 +146,6 @@ pub fn extract_hocr_words(handle: &Handle, min_confidence: f64) -> Vec<HocrWord>
         }
     }
 
-    // Recursively process children
     for child in handle.children.borrow().iter() {
         words.extend(extract_hocr_words(child, min_confidence));
     }
@@ -167,13 +162,11 @@ pub fn detect_columns(words: &[HocrWord], column_threshold: u32) -> Vec<u32> {
         return Vec::new();
     }
 
-    // Group words by approximate x-position
     let mut position_groups: Vec<Vec<u32>> = Vec::new();
 
     for word in words {
         let x_pos = word.left;
 
-        // Find existing group within threshold
         let mut found_group = false;
         for group in &mut position_groups {
             if let Some(&first_pos) = group.first() {
@@ -185,13 +178,11 @@ pub fn detect_columns(words: &[HocrWord], column_threshold: u32) -> Vec<u32> {
             }
         }
 
-        // Create new group if not found
         if !found_group {
             position_groups.push(vec![x_pos]);
         }
     }
 
-    // Calculate median for each group
     let mut columns: Vec<u32> = position_groups
         .iter()
         .filter(|group| !group.is_empty())
@@ -203,7 +194,6 @@ pub fn detect_columns(words: &[HocrWord], column_threshold: u32) -> Vec<u32> {
         })
         .collect();
 
-    // Sort columns left to right
     columns.sort_unstable();
     columns
 }
@@ -217,19 +207,16 @@ pub fn detect_rows(words: &[HocrWord], row_threshold_ratio: f64) -> Vec<u32> {
         return Vec::new();
     }
 
-    // Calculate median height for threshold
     let mut heights: Vec<u32> = words.iter().map(|w| w.height).collect();
     heights.sort_unstable();
     let median_height = heights[heights.len() / 2];
     let row_threshold = (median_height as f64 * row_threshold_ratio) as u32;
 
-    // Group words by approximate y-center
     let mut position_groups: Vec<Vec<f64>> = Vec::new();
 
     for word in words {
         let y_center = word.y_center();
 
-        // Find existing group within threshold
         let mut found_group = false;
         for group in &mut position_groups {
             if let Some(&first_pos) = group.first() {
@@ -241,13 +228,11 @@ pub fn detect_rows(words: &[HocrWord], row_threshold_ratio: f64) -> Vec<u32> {
             }
         }
 
-        // Create new group if not found
         if !found_group {
             position_groups.push(vec![y_center]);
         }
     }
 
-    // Calculate median for each group
     let mut rows: Vec<u32> = position_groups
         .iter()
         .filter(|group| !group.is_empty())
@@ -259,7 +244,6 @@ pub fn detect_rows(words: &[HocrWord], row_threshold_ratio: f64) -> Vec<u32> {
         })
         .collect();
 
-    // Sort rows top to bottom
     rows.sort_unstable();
     rows
 }
@@ -275,7 +259,6 @@ pub fn reconstruct_table(words: &[HocrWord], column_threshold: u32, row_threshol
         return Vec::new();
     }
 
-    // Detect table structure
     let col_positions = detect_columns(words, column_threshold);
     let row_positions = detect_rows(words, row_threshold_ratio);
 
@@ -283,12 +266,10 @@ pub fn reconstruct_table(words: &[HocrWord], column_threshold: u32, row_threshol
         return Vec::new();
     }
 
-    // Initialize table grid
     let num_rows = row_positions.len();
     let num_cols = col_positions.len();
     let mut table: Vec<Vec<Vec<String>>> = vec![vec![vec![]; num_cols]; num_rows];
 
-    // Assign words to cells
     for word in words {
         if let (Some(r), Some(c)) = (
             find_row_index(&row_positions, word),
@@ -300,7 +281,6 @@ pub fn reconstruct_table(words: &[HocrWord], column_threshold: u32, row_threshol
         }
     }
 
-    // Combine words within cells
     let result: Vec<Vec<String>> = table
         .into_iter()
         .map(|row| {
@@ -316,7 +296,6 @@ pub fn reconstruct_table(words: &[HocrWord], column_threshold: u32, row_threshol
         })
         .collect();
 
-    // Remove empty rows and columns
     remove_empty_rows_and_columns(result)
 }
 
@@ -324,7 +303,6 @@ pub fn reconstruct_table(words: &[HocrWord], column_threshold: u32, row_threshol
 fn find_row_index(row_positions: &[u32], word: &HocrWord) -> Option<usize> {
     let y_center = word.y_center() as u32;
 
-    // Find closest row
     row_positions
         .iter()
         .enumerate()
@@ -336,7 +314,6 @@ fn find_row_index(row_positions: &[u32], word: &HocrWord) -> Option<usize> {
 fn find_column_index(col_positions: &[u32], word: &HocrWord) -> Option<usize> {
     let x_pos = word.left;
 
-    // Find closest column
     col_positions
         .iter()
         .enumerate()
@@ -350,7 +327,6 @@ fn remove_empty_rows_and_columns(table: Vec<Vec<String>>) -> Vec<Vec<String>> {
         return table;
     }
 
-    // Find non-empty columns
     let num_cols = table[0].len();
     let mut non_empty_cols: Vec<bool> = vec![false; num_cols];
 
@@ -362,7 +338,6 @@ fn remove_empty_rows_and_columns(table: Vec<Vec<String>>) -> Vec<Vec<String>> {
         }
     }
 
-    // Filter rows and columns
     table
         .into_iter()
         .filter(|row| row.iter().any(|cell| !cell.trim().is_empty()))
@@ -389,18 +364,15 @@ pub fn table_to_markdown(table: &[Vec<String>]) -> String {
 
     let mut markdown = String::new();
 
-    // Add rows
     for (row_idx, row) in table.iter().enumerate() {
         markdown.push('|');
         for cell in row {
             markdown.push(' ');
-            // Escape pipes in cell content
             markdown.push_str(&cell.replace('|', "\\|"));
             markdown.push_str(" |");
         }
         markdown.push('\n');
 
-        // Add header separator after first row
         if row_idx == 0 {
             markdown.push('|');
             for _ in 0..num_cols {
@@ -560,9 +532,7 @@ mod tests {
 
     #[test]
     fn test_reconstruct_simple_table() {
-        // Create a simple 2x2 table
         let words = vec![
-            // Row 1
             HocrWord {
                 text: "Name".to_string(),
                 left: 100,
@@ -579,7 +549,6 @@ mod tests {
                 height: 20,
                 confidence: 95.0,
             },
-            // Row 2
             HocrWord {
                 text: "Alice".to_string(),
                 left: 100,
@@ -600,8 +569,8 @@ mod tests {
 
         let table = reconstruct_table(&words, 50, 0.5);
 
-        assert_eq!(table.len(), 2); // 2 rows
-        assert_eq!(table[0].len(), 2); // 2 columns
+        assert_eq!(table.len(), 2);
+        assert_eq!(table[0].len(), 2);
         assert_eq!(table[0][0], "Name");
         assert_eq!(table[0][1], "Age");
         assert_eq!(table[1][0], "Alice");
@@ -610,7 +579,6 @@ mod tests {
 
     #[test]
     fn test_reconstruct_table_with_multi_word_cells() {
-        // Create a table where cells have multiple words
         let words = vec![
             HocrWord {
                 text: "First".to_string(),
@@ -648,8 +616,8 @@ mod tests {
 
         let table = reconstruct_table(&words, 50, 0.5);
 
-        assert_eq!(table.len(), 1); // 1 row
-        assert_eq!(table[0].len(), 2); // 2 columns
+        assert_eq!(table.len(), 1);
+        assert_eq!(table[0].len(), 2);
         assert_eq!(table[0][0], "First Name");
         assert_eq!(table[0][1], "Last Name");
     }
@@ -676,7 +644,7 @@ mod tests {
         let table = reconstruct_table(&words, 50, 0.5);
         let markdown = table_to_markdown(&table);
 
-        assert_eq!(table.len(), 3); // 3 rows
+        assert_eq!(table.len(), 3);
         assert_eq!(table[0][0], "Product");
         assert_eq!(table[0][1], "Price");
         assert_eq!(table[1][0], "Apple");

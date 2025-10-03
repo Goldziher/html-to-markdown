@@ -24,7 +24,6 @@ class TestCLIV1Integration:
         Returns:
             Tuple of (stdout, stderr, returncode)
         """
-        # Run via Python module to get v1 translation
         result = subprocess.run(
             ["python", "-m", "html_to_markdown", *args],
             input=input_html,
@@ -50,7 +49,6 @@ class TestCLIV1Integration:
             input_file = Path(f.name)
 
         try:
-            # Use v1 flags that should be translated
             stdout, stderr, returncode = self.run_cli([str(input_file), "--heading-style", "atx", "--escape-asterisks"])
             assert returncode == 0, f"CLI failed: {stderr}"
             assert "# Title" in stdout
@@ -63,22 +61,19 @@ class TestCLIV1Integration:
         html = "<nav>Navigation</nav><p>Content</p>"
         stdout, stderr, returncode = self.run_cli(["-", "--preprocess-html"], html)
         assert returncode == 0, f"CLI failed: {stderr}"
-        # Just check that preprocessing works, navigation handling may differ in v2
         assert "Content" in stdout
 
     def test_boolean_flags_translation(self) -> None:
         """Test boolean flags are correctly translated."""
         html = "Text with *asterisks* and _underscores_"
 
-        # Test --no-escape-asterisks (should be preserved)
         stdout, stderr, returncode = self.run_cli(["-", "--no-escape-asterisks"], html)
         assert returncode == 0, f"CLI failed: {stderr}"
-        assert "*asterisks*" in stdout  # Not escaped
+        assert "*asterisks*" in stdout
 
-        # Test --escape-asterisks (should be removed as it's default)
         stdout2, stderr2, returncode2 = self.run_cli(["-", "--escape-asterisks"], html)
         assert returncode2 == 0, f"CLI failed: {stderr2}"
-        assert r"\*asterisks\*" in stdout2  # Escaped
+        assert r"\*asterisks\*" in stdout2
 
     def test_output_to_file(self) -> None:
         """Test output to file with v1 flags."""
@@ -92,13 +87,11 @@ class TestCLIV1Integration:
             output_file = Path(f_out.name)
 
         try:
-            # Use v1 -o flag
             _stdout, stderr, returncode = self.run_cli(
                 [str(input_file), "-o", str(output_file), "--heading-style", "atx", "--bullets", "-"]
             )
             assert returncode == 0, f"CLI failed: {stderr}"
 
-            # Read output file
             content = output_file.read_text()
             assert "## Heading" in content
             assert "- Item" in content
@@ -156,8 +149,8 @@ class TestCLIV1Integration:
                     "python",
                     "--strong-em-symbol",
                     "_",
-                    "--extract-metadata",  # v1 default flag (should be removed)
-                    "--escape-asterisks",  # v1 default flag (should be removed)
+                    "--extract-metadata",
+                    "--escape-asterisks",
                 ]
             )
             assert returncode == 0, f"CLI failed: {stderr}"
@@ -174,13 +167,10 @@ class TestCLIV1Integration:
         """Test --autolinks flag translation."""
         html = '<a href="https://example.com">https://example.com</a>'
 
-        # With --autolinks (should be preserved)
         stdout, stderr, returncode = self.run_cli(["-", "--autolinks"], html)
         assert returncode == 0, f"CLI failed: {stderr}"
-        # Note: v2 doesn't auto-detect the same way as v1, but flag should work
         assert "example.com" in stdout
 
-        # With --no-autolinks (should be removed as it's default)
         stdout2, stderr2, returncode2 = self.run_cli(["-", "--no-autolinks"], html)
         assert returncode2 == 0, f"CLI failed: {stderr2}"
         assert "example.com" in stdout2
@@ -189,12 +179,10 @@ class TestCLIV1Integration:
         """Test metadata extraction flag translation."""
         html = "<html><head><title>My Page</title></head><body><p>Content</p></body></html>"
 
-        # With --extract-metadata (default, should be removed)
         stdout, stderr, returncode = self.run_cli(["-", "--extract-metadata"], html)
         assert returncode == 0, f"CLI failed: {stderr}"
         assert "title: My Page" in stdout
 
-        # With --no-extract-metadata (should be preserved)
         stdout2, stderr2, returncode2 = self.run_cli(["-", "--no-extract-metadata"], html)
         assert returncode2 == 0, f"CLI failed: {stderr2}"
         assert "title:" not in stdout2
@@ -203,14 +191,10 @@ class TestCLIV1Integration:
         """Test wrap flag translation."""
         html = "<p>This is a long line of text that should be wrapped when wrap is enabled with a specific width.</p>"
 
-        # With --wrap (should be preserved)
         stdout, stderr, returncode = self.run_cli(["-", "--wrap", "--wrap-width", "20"], html)
         assert returncode == 0, f"CLI failed: {stderr}"
-        # Check that wrapping happened (multiple lines)
         [line for line in stdout.split("\n") if line.strip()]
-        # Note: v2 wrapping may differ from v1, just check it ran without error
 
-        # With --no-wrap (default, should be removed)
         stdout2, stderr2, returncode2 = self.run_cli(["-", "--no-wrap"], html)
         assert returncode2 == 0, f"CLI failed: {stderr2}"
         assert "long line of text" in stdout2
@@ -219,12 +203,10 @@ class TestCLIV1Integration:
         """Test highlight style option."""
         html = "<mark>highlighted text</mark>"
 
-        # Test double-equal (default)
         stdout, stderr, returncode = self.run_cli(["-", "--highlight-style", "double-equal"], html)
         assert returncode == 0, f"CLI failed: {stderr}"
         assert "==highlighted text==" in stdout
 
-        # Test bold style
         stdout2, stderr2, returncode2 = self.run_cli(["-", "--highlight-style", "bold"], html)
         assert returncode2 == 0, f"CLI failed: {stderr2}"
         assert "**highlighted text**" in stdout2
@@ -233,12 +215,10 @@ class TestCLIV1Integration:
         """Test newline style option."""
         html = "Line 1<br />Line 2"
 
-        # Test spaces style (default)
         stdout, stderr, returncode = self.run_cli(["-", "--newline-style", "spaces"], html)
         assert returncode == 0, f"CLI failed: {stderr}"
         assert "Line 1  \nLine 2" in stdout
 
-        # Test backslash style
         stdout2, stderr2, returncode2 = self.run_cli(["-", "--newline-style", "backslash"], html)
         assert returncode2 == 0, f"CLI failed: {stderr2}"
         assert "Line 1\\\nLine 2" in stdout2
@@ -258,7 +238,7 @@ class TestCLIV1Integration:
 
         stdout, stderr, returncode = self.run_cli(["-", "--convert-as-inline"], html)
         assert returncode == 0, f"CLI failed: {stderr}"
-        assert stdout.strip() == "Just text"  # No trailing newlines
+        assert stdout.strip() == "Just text"
 
     def test_br_in_tables(self) -> None:
         """Test br-in-tables option."""
@@ -268,11 +248,9 @@ class TestCLIV1Integration:
         </table>
         """
 
-        # Without --br-in-tables (br is ignored in tables)
         _stdout, stderr, returncode = self.run_cli(["-"], html)
         assert returncode == 0, f"CLI failed: {stderr}"
 
-        # With --br-in-tables (br is converted)
         _stdout2, stderr2, returncode2 = self.run_cli(["-", "--br-in-tables"], html)
         assert returncode2 == 0, f"CLI failed: {stderr2}"
 
@@ -296,13 +274,11 @@ class TestCLIV1ErrorHandling:
         html = "<h1>Title</h1>"
         _stdout, _stderr, returncode = self.run_cli(["-", "--heading-style", "invalid"], html)
         assert returncode != 0
-        # Should fail with error about invalid heading style
 
     def test_file_not_found(self) -> None:
         """Test file not found error."""
         _stdout, _stderr, returncode = self.run_cli(["nonexistent.html"])
         assert returncode != 0
-        # Should fail with file not found error
 
     def test_empty_input_from_stdin(self) -> None:
         """Test empty input from stdin."""

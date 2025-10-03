@@ -1,7 +1,6 @@
 use html_to_markdown::{convert, ConversionOptions};
 
 fn main() {
-    // Test mark with default (DoubleEqual)
     let html = "<p>This is <mark>highlighted</mark> text</p>";
     match convert(html, None) {
         Ok(markdown) => {
@@ -14,7 +13,6 @@ fn main() {
         Err(e) => eprintln!("Error: {}", e),
     }
 
-    // Test del and s tags
     let html2 = "<p>This is <del>deleted</del> and <s>strikethrough</s> text</p>";
     match convert(html2, None) {
         Ok(markdown) => {
@@ -27,7 +25,6 @@ fn main() {
         Err(e) => eprintln!("Error: {}", e),
     }
 
-    // Test ins tag
     let html3 = "<p>This is <ins>inserted</ins> text</p>";
     match convert(html3, None) {
         Ok(markdown) => {
@@ -40,7 +37,6 @@ fn main() {
         Err(e) => eprintln!("Error: {}", e),
     }
 
-    // Test kbd and samp
     let html4 = "<p>Press <kbd>Ctrl+C</kbd> and see <samp>output</samp></p>";
     match convert(html4, None) {
         Ok(markdown) => {
@@ -53,7 +49,6 @@ fn main() {
         Err(e) => eprintln!("Error: {}", e),
     }
 
-    // Test var
     let html5 = "<p>The variable <var>x</var> is defined</p>";
     match convert(html5, None) {
         Ok(markdown) => {
@@ -66,7 +61,6 @@ fn main() {
         Err(e) => eprintln!("Error: {}", e),
     }
 
-    // Test sub and sup with custom symbols
     let mut opts = ConversionOptions::default();
     opts.sub_symbol = "~".to_string();
     opts.sup_symbol = "^".to_string();
@@ -83,7 +77,6 @@ fn main() {
         Err(e) => eprintln!("Error: {}", e),
     }
 
-    // Test abbr with title
     let html7 = r#"<p>The <abbr title="World Health Organization">WHO</abbr> announced</p>"#;
     match convert(html7, None) {
         Ok(markdown) => {
@@ -96,7 +89,6 @@ fn main() {
         Err(e) => eprintln!("Error: {}", e),
     }
 
-    // Test u and small (no formatting)
     let html8 = "<p>This is <u>underlined</u> and <small>small</small> text</p>";
     match convert(html8, None) {
         Ok(markdown) => {

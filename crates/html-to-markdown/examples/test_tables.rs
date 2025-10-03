@@ -1,7 +1,6 @@
 use html_to_markdown::convert;
 
 fn main() {
-    // Test simple table with header
     let html = r#"<table>
         <tr>
             <th>Name</th>
@@ -32,7 +31,6 @@ fn main() {
         Err(e) => eprintln!("Error: {}", e),
     }
 
-    // Test table with colspan
     let html2 = r#"<table>
         <tr>
             <th colspan="2">Full Name</th>
@@ -59,7 +57,6 @@ fn main() {
         Err(e) => eprintln!("Error: {}", e),
     }
 
-    // Test table with thead/tbody
     let html3 = r#"<table>
         <thead>
             <tr>

@@ -1,7 +1,6 @@
 use html_to_markdown::convert;
 
 fn main() {
-    // Test whitespace normalization
     let html = "<p>text    with    multiple    spaces</p>";
     match convert(html, None) {
         Ok(markdown) => {
@@ -14,7 +13,6 @@ fn main() {
         Err(e) => eprintln!("Error: {}", e),
     }
 
-    // Test with newlines
     let html2 = "<p>text\nwith\nnewlines</p>";
     match convert(html2, None) {
         Ok(markdown) => {
