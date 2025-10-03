@@ -83,7 +83,7 @@ The following v1 features were **removed** in v2:
 - `code_language_callback` - Removed (use `code_language` option for default language)
 - `strip` option - Removed (use preprocessing options instead)
 - `convert` option - Removed (all supported tags are converted by default)
-- `convert_to_markdown_stream()` - Removed (streaming not needed with Rust performance)
+- `convert_to_markdown_stream()` - Removed (html5ever does not support streaming parsing)
 
 ### Not Yet Implemented
 

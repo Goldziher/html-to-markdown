@@ -315,7 +315,7 @@ The following v1 features were removed in v2:
 
 - `code_language_callback` - Removed (use `code_language` option for default language)
 - `strip` / `convert` options - Removed (use preprocessing options instead)
-- `convert_to_markdown_stream()` - Removed (streaming API not needed with Rust performance)
+- `convert_to_markdown_stream()` - Removed (html5ever does not support streaming parsing)
 
 **Planned for v2:**
 

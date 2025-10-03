@@ -148,7 +148,8 @@ def convert_to_markdown_stream(  # noqa: D417
         NotImplementedError: Streaming was removed in v2
     """
     raise NotImplementedError(
-        "Streaming API (convert_to_markdown_stream) was removed in v2. Use convert_to_markdown() instead."
+        "Streaming API (convert_to_markdown_stream) was removed in v2 (html5ever does not support streaming). "
+        "Use convert_to_markdown() instead."
     )
 
 
