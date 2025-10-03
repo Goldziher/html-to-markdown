@@ -414,6 +414,9 @@ fn main() {
         sup_symbol: cli.sup_symbol,
         newline_style: parse_newline_style(&cli.newline_style),
         keep_inline_images_in: vec![],
+        hocr_extract_tables: true,
+        hocr_table_column_threshold: 50,
+        hocr_table_row_threshold_ratio: 0.5,
         preprocessing,
         parsing,
     };

@@ -44,8 +44,8 @@ impl HocrWord {
 fn parse_bbox(title: &str) -> Option<(u32, u32, u32, u32)> {
     for part in title.split(';') {
         let part = part.trim();
-        if part.starts_with("bbox ") {
-            let coords: Vec<&str> = part[5..].split_whitespace().collect();
+        if let Some(bbox_str) = part.strip_prefix("bbox ") {
+            let coords: Vec<&str> = bbox_str.split_whitespace().collect();
             if coords.len() == 4 {
                 if let (Ok(x1), Ok(y1), Ok(x2), Ok(y2)) = (
                     coords[0].parse::<u32>(),
@@ -69,8 +69,8 @@ fn parse_bbox(title: &str) -> Option<(u32, u32, u32, u32)> {
 fn parse_confidence(title: &str) -> f64 {
     for part in title.split(';') {
         let part = part.trim();
-        if part.starts_with("x_wconf ") {
-            if let Ok(conf) = part[8..].trim().parse::<f64>() {
+        if let Some(conf_str) = part.strip_prefix("x_wconf ") {
+            if let Ok(conf) = conf_str.trim().parse::<f64>() {
                 return conf;
             }
         }
@@ -270,11 +270,7 @@ pub fn detect_rows(words: &[HocrWord], row_threshold_ratio: f64) -> Vec<u32> {
 /// 1. Detecting column and row positions
 /// 2. Assigning words to cells based on position
 /// 3. Combining words within the same cell
-pub fn reconstruct_table(
-    words: &[HocrWord],
-    column_threshold: u32,
-    row_threshold_ratio: f64,
-) -> Vec<Vec<String>> {
+pub fn reconstruct_table(words: &[HocrWord], column_threshold: u32, row_threshold_ratio: f64) -> Vec<Vec<String>> {
     if words.is_empty() {
         return Vec::new();
     }
