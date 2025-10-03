@@ -41,7 +41,18 @@ runs:
           curl --proto "=https" --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y &&
           refreshenv
 
-        CIBW_BEFORE_BUILD: pip install maturin && python prepare_wheel.py
+        CIBW_BEFORE_BUILD_LINUX: >
+          pip install maturin &&
+          source ~/.cargo/env &&
+          python prepare_wheel.py
+        CIBW_BEFORE_BUILD_MACOS: >
+          pip install maturin &&
+          source ~/.cargo/env &&
+          python prepare_wheel.py
+        CIBW_BEFORE_BUILD_WINDOWS: >
+          pip install maturin &&
+          refreshenv &&
+          python prepare_wheel.py
 
         CIBW_BUILD_FRONTEND: build
 
