@@ -1,6 +1,6 @@
 # html-to-markdown
 
-High-performance HTML to Markdown converter. Rust crate with Python bindings and native CLI.
+High-performance HTML to Markdown converter Rust crate and CLI with Python bindings and CLI. Available via PyPI, Homebrew, and Cargo. Cross-platform support for Linux, macOS, and Windows.
 
 [![PyPI version](https://badge.fury.io/py/html-to-markdown.svg)](https://pypi.org/project/html-to-markdown/)
 [![Crates.io](https://img.shields.io/crates/v/html-to-markdown.svg)](https://crates.io/crates/html-to-markdown)
