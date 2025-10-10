@@ -58,11 +58,11 @@ jobs:
           fi
           echo "✅ Version match: $cargo_version"
 
-      - name: Publish html-to-markdown (core library)
+      - name: Publish html-to-markdown-rs (core library)
         if: ${{ !inputs.dry_run }}
         run: |
-          echo "Publishing html-to-markdown crate..."
-          cargo publish -p html-to-markdown --token ${{ secrets.CARGO_TOKEN }}
+          echo "Publishing html-to-markdown-rs crate..."
+          cargo publish -p html-to-markdown-rs --token ${{ secrets.CARGO_TOKEN }}
 
       - name: Wait for crates.io to index
         if: ${{ !inputs.dry_run }}
@@ -80,7 +80,7 @@ jobs:
         if: ${{ inputs.dry_run }}
         run: |
           echo "🔍 DRY RUN: Would publish:"
-          echo "  - html-to-markdown"
+          echo "  - html-to-markdown-rs"
           echo "  - html-to-markdown-cli"
 
   build-wheels:
@@ -209,11 +209,11 @@ jobs:
         run: |
           version="${{ steps.version.outputs.version }}"
 
-          echo "🔍 Checking html-to-markdown on crates.io..."
-          if cargo search html-to-markdown | grep -q "html-to-markdown = \"$version\""; then
-            echo "✅ html-to-markdown $version found on crates.io"
+          echo "🔍 Checking html-to-markdown-rs on crates.io..."
+          if cargo search html-to-markdown-rs | grep -q "html-to-markdown-rs = \"$version\""; then
+            echo "✅ html-to-markdown-rs $version found on crates.io"
           else
-            echo "⚠️  html-to-markdown $version not yet indexed (may take a few minutes)"
+            echo "⚠️  html-to-markdown-rs $version not yet indexed (may take a few minutes)"
           fi
 
           echo "🔍 Checking html-to-markdown-cli on crates.io..."
@@ -236,6 +236,6 @@ jobs:
           echo "  Homebrew:    brew tap goldziher/tap && brew install html-to-markdown"
           echo ""
           echo "🔗 Links:"
-          echo "  Crates.io (lib):  https://crates.io/crates/html-to-markdown/$version"
+          echo "  Crates.io (lib):  https://crates.io/crates/html-to-markdown-rs/$version"
           echo "  Crates.io (CLI):  https://crates.io/crates/html-to-markdown-cli/$version"
           echo "  PyPI:             https://pypi.org/project/html-to-markdown/$version/"
