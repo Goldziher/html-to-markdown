@@ -1,23 +1,32 @@
 # html-to-markdown
 
-High-performance HTML to Markdown converter Rust crate and CLI with Python bindings and CLI. Available via PyPI, Homebrew, and Cargo. Cross-platform support for Linux, macOS, and Windows.
+High-performance HTML to Markdown converter built with Rust. Available as:
+- **Rust crate** (`html-to-markdown-rs` on crates.io)
+- **Python package** (`html-to-markdown` on PyPI)
+- **CLI binary** (via Homebrew, Cargo, or direct download)
+
+Cross-platform support for Linux, macOS, and Windows.
 
 [![PyPI version](https://badge.fury.io/py/html-to-markdown.svg)](https://pypi.org/project/html-to-markdown/)
 [![Crates.io](https://img.shields.io/crates/v/html-to-markdown-rs.svg)](https://crates.io/crates/html-to-markdown-rs)
 [![Python Versions](https://img.shields.io/pypi/pyversions/html-to-markdown.svg)](https://pypi.org/project/html-to-markdown/)
-[![Documentation](https://img.shields.io/badge/docs-github-blue)](https://github.com/Goldziher/html-to-markdown)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Discord](https://img.shields.io/badge/Discord-Join%20our%20community-7289da)](https://discord.gg/pXxagNK2zN)
 
 Part of the [Kreuzberg](https://kreuzberg.dev) ecosystem for document intelligence.
 
-**📚 [Full V2 Documentation](crates/html-to-markdown/README.md)** - Comprehensive guide for Rust, Python, and CLI usage.
+## 📚 Documentation
+
+- **[Python Users](README_PYPI.md)** - Python package documentation and examples
+- **[Rust Users](crates/html-to-markdown/README.md)** - Rust crate documentation and API reference
+- **[Contributing](CONTRIBUTING.md)** - Development setup and contribution guidelines
+- **[Changelog](CHANGELOG.md)** - Version history and migration guides
 
 ## ⚡ Benchmarks
 
 ### Throughput (Python API)
 
-Real Wikipedia documents on Apple M1 Pro:
+Real Wikipedia documents on Apple M4:
 
 | Document            | Size  | Latency | Throughput | Docs/sec |
 | ------------------- | ----- | ------- | ---------- | -------- |
@@ -39,11 +48,6 @@ Memory usage is linear and stable across 50+ repeated conversions.
 
 **V2 is 19-30x faster** than v1 Python/BeautifulSoup implementation.
 
-📊 **[Benchmark Results](BENCHMARK_RESULTS.md)** - Detailed Python API comparison
-📈 **[Performance Analysis](PERFORMANCE.md)** - Rust core benchmarks and profiling
-🔧 **[Benchmarking Guide](BENCHMARKS.md)** - How to run benchmarks
-✅ **[CommonMark Compliance](COMMONMARK_COMPLIANCE.md)** - CommonMark specification compliance
-
 ## Features
 
 - **🚀 Blazing Fast**: Pure Rust core with ultra-fast `tl` HTML parser
@@ -52,7 +56,7 @@ Memory usage is linear and stable across 50+ repeated conversions.
 - **📊 hOCR 1.2 Compliant**: Full support for all 40+ elements and 20+ properties
 - **📝 CommonMark Compliant**: Follows CommonMark specification for list formatting
 - **🎯 Type Safe**: Full type hints and `.pyi` stubs for excellent IDE support
-- **🌍 Cross-Platform**: Wheels for Linux, macOS, Windows (x86_64 + ARM64)
+- **🌍 Cross-Platform**: Wheels for Linux (x86_64, aarch64), macOS (x86_64, arm64), Windows (x86_64)
 - **✅ Well-Tested**: 900+ tests with dual Python + Rust coverage
 
 ## Installation
@@ -94,10 +98,10 @@ Download pre-built binaries from [GitHub Releases](https://github.com/Goldziher/
 
 ### Python API
 
-Clean, type-safe configuration with dataclasses:
+Simple function-based API:
 
 ```python
-from html_to_markdown import convert, ConversionOptions
+from html_to_markdown import convert_to_markdown
 
 html = """
 <h1>Welcome</h1>
@@ -109,13 +113,17 @@ html = """
 </ul>
 """
 
-options = ConversionOptions(
+# Basic conversion
+markdown = convert_to_markdown(html)
+
+# With custom options
+markdown = convert_to_markdown(
+    html,
     heading_style="atx",
     strong_em_symbol="*",
     bullets="*+-",
 )
 
-markdown = convert(html, options)
 print(markdown)
 ```
 
@@ -131,26 +139,41 @@ This is **fast** Rust-powered conversion!
 - Easy to use
 ```
 
+**For detailed Python documentation**, see [README_PYPI.md](README_PYPI.md).
+
 ### Rust API
 
 ```rust
 use html_to_markdown_rs::{convert, ConversionOptions, HeadingStyle};
 
-fn main() {
+fn main() -> Result<(), Box<dyn std::error::Error>> {
     let html = r#"
         <h1>Welcome</h1>
         <p>This is <strong>fast</strong> conversion!</p>
+        <ul>
+            <li>Blazing fast</li>
+            <li>Type safe</li>
+            <li>Easy to use</li>
+        </ul>
     "#;
 
+    // Basic conversion
+    let markdown = convert(html, None)?;
+
+    // With custom options
     let options = ConversionOptions {
         heading_style: HeadingStyle::Atx,
+        bullets: "*+-".to_string(),
         ..Default::default()
     };
+    let markdown = convert(html, Some(options))?;
 
-    let markdown = convert(html, Some(options)).unwrap();
     println!("{}", markdown);
+    Ok(())
 }
 ```
+
+**For detailed Rust documentation**, see [crates/html-to-markdown/README.md](crates/html-to-markdown/README.md).
 
 ### CLI Usage
 
@@ -174,52 +197,76 @@ html-to-markdown \
 
 ## Configuration
 
-### Python: Dataclass Configuration
+### Python Configuration
 
-```python
-from html_to_markdown import (
-    convert,
-    ConversionOptions,
-    PreprocessingOptions,
-)
-
-# Conversion settings
-options = ConversionOptions(
-    heading_style="atx",  # "atx", "atx_closed", "underlined"
-    list_indent_width=2,  # Discord/Slack: use 2
-    bullets="*+-",  # Bullet characters
-    strong_em_symbol="*",  # "*" or "_"
-    escape_asterisks=True,  # Escape * in text
-    code_language="python",  # Default code block language
-    extract_metadata=True,  # Extract HTML metadata
-    highlight_style="double-equal",  # "double-equal", "html", "bold"
-)
-
-# HTML preprocessing
-preprocessing = PreprocessingOptions(
-    enabled=True,
-    preset="standard",  # "minimal", "standard", "aggressive"
-    remove_navigation=True,
-    remove_forms=True,
-)
-
-markdown = convert(html, options, preprocessing)
-```
-
-### Python: Legacy API (v1 compatibility)
-
-For backward compatibility with existing v1 code:
+All options available as keyword arguments:
 
 ```python
 from html_to_markdown import convert_to_markdown
 
 markdown = convert_to_markdown(
     html,
-    heading_style="atx",
-    list_indent_width=2,
-    preprocess=True,
-    preprocessing_preset="standard",
+    # Heading options
+    heading_style="atx",  # "atx", "atx_closed", "underlined"
+
+    # List options
+    list_indent_width=2,  # Discord/Slack: use 2
+    bullets="*+-",  # Bullet characters (cycles through levels)
+
+    # Text formatting
+    strong_em_symbol="*",  # "*" or "_"
+    escape_asterisks=True,  # Escape * in text
+    escape_underscores=True,  # Escape _ in text
+
+    # Code blocks
+    code_language="python",  # Default code block language
+    code_block_style="backticks",  # "indented", "backticks", "tildes"
+
+    # HTML preprocessing
+    preprocess=True,  # Enable HTML cleaning
+    preprocessing_preset="standard",  # "minimal", "standard", "aggressive"
+
+    # Metadata
+    extract_metadata=True,  # Extract HTML metadata
 )
+```
+
+### Rust Configuration
+
+```rust
+use html_to_markdown_rs::{
+    convert, ConversionOptions, HeadingStyle,
+    CodeBlockStyle, PreprocessingPreset
+};
+
+let options = ConversionOptions {
+    // Heading options
+    heading_style: HeadingStyle::Atx,
+
+    // List options
+    list_indent_width: 2,
+    bullets: "*+-".to_string(),
+
+    // Text formatting
+    strong_em_symbol: '*',
+    escape_asterisks: false,
+    escape_underscores: false,
+
+    // Code blocks
+    code_block_style: CodeBlockStyle::Backticks,
+    code_language: "python".to_string(),
+
+    // HTML preprocessing
+    preprocessing: html_to_markdown_rs::PreprocessingOptions {
+        enabled: true,
+        preset: PreprocessingPreset::Standard,
+        ..Default::default()
+    },
+
+    ..Default::default()
+};
+
+let markdown = convert(html, Some(options))?;
 ```
 
 ## Common Use Cases
@@ -227,87 +274,92 @@ markdown = convert_to_markdown(
 ### Discord/Slack Compatible Lists
 
 ```python
-from html_to_markdown import convert, ConversionOptions
+from html_to_markdown import convert_to_markdown
 
-options = ConversionOptions(list_indent_width=2)
-markdown = convert(html, options)
+markdown = convert_to_markdown(html, list_indent_width=2)
 ```
 
 ### Clean Web-Scraped HTML
 
 ```python
-from html_to_markdown import convert, PreprocessingOptions
+from html_to_markdown import convert_to_markdown
 
-preprocessing = PreprocessingOptions(
-    enabled=True,
-    preset="aggressive",  # Heavy cleaning
-    remove_navigation=True,
-    remove_forms=True,
+markdown = convert_to_markdown(
+    scraped_html,
+    preprocess=True,
+    preprocessing_preset="aggressive",
 )
-
-markdown = convert(html, preprocessing=preprocessing)
 ```
 
 ### hOCR 1.2 Support
 
-**Complete hOCR 1.2 specification compliance** with support for all elements, properties, and metadata:
+Complete hOCR 1.2 specification compliance:
 
 ```python
-from html_to_markdown import convert, ConversionOptions
+from html_to_markdown import convert_to_markdown
 
-# Option 1: Document structure extraction (NEW in v2)
-# Extracts all hOCR elements and converts to structured markdown
-# Supports: paragraphs, sections, chapters, headers/footers, images, math, etc.
-markdown = convert(hocr_html)
+# Basic hOCR conversion (document structure)
+markdown = convert_to_markdown(hocr_html)
 
-# Option 2: Legacy table extraction (spatial reconstruction)
-# Reconstructs tables from word bounding boxes
-options = ConversionOptions(
+# With table extraction from bounding boxes
+markdown = convert_to_markdown(
+    hocr_html,
     hocr_extract_tables=True,
     hocr_table_column_threshold=50,
-    hocr_table_row_threshold_ratio=0.5,
 )
-markdown = convert(hocr_html, options)
 ```
 
-**Full hOCR 1.2 Spec Coverage:**
+**hOCR Features:**
+- ✅ All 40 element types (logical structure, typesetting, floats, inline, engine-specific)
+- ✅ All 20+ properties (bbox, baseline, textangle, poly, confidence scores, fonts, etc.)
+- ✅ All 5 metadata fields (system, capabilities, languages, scripts, page count)
+- ✅ Semantic markdown conversion (headings, sections, quotes, images, math, etc.)
 
-- ✅ **All 40 Element Types** - Logical structure (12), typesetting (6), float (13), inline (6), engine-specific (3)
-- ✅ **All 20+ Properties** - bbox, baseline, textangle, poly, x_wconf, x_confs, x_font, x_fsize, order, cflow, cuts, x_bboxes, image, ppageno, lpageno, scan_res, and more
-- ✅ **All 5 Metadata Fields** - ocr-system, ocr-capabilities, ocr-number-of-pages, ocr-langs, ocr-scripts
-- ✅ **37 Tests** - Complete coverage of all elements and properties
-
-**Semantic Markdown Conversion:**
-
-| Element Category | Examples                        | Markdown Output                           |
-| ---------------- | ------------------------------- | ----------------------------------------- |
-| Headings         | `ocr_title`, `ocr_chapter`      | `# Heading`                               |
-| Sections         | `ocr_section`, `ocr_subsection` | `##`, `###`                               |
-| Structure        | `ocr_par`, `ocr_blockquote`     | Paragraphs, `> quotes`                    |
-| Metadata         | `ocr_abstract`, `ocr_author`    | `**Abstract**`, `*Author*`                |
-| Floats           | `ocr_header`, `ocr_footer`      | `*Header*`, `*Footer*`                    |
-| Images           | `ocr_image`, `ocr_photo`        | `![alt](path)` with image property        |
-| Math             | `ocr_math`, `ocr_display`       | `` `formula` ``, ```` ```equation``` ```` |
-| Layout           | `ocr_separator`                 | `---` horizontal rule                     |
-| Inline           | `ocrx_word`, `ocr_dropcap`      | Text, `**Letter**`                        |
-
-**HTML Entity Handling:** Automatically decodes `&quot;`, `&apos;`, `&lt;`, `&gt;`, `&amp;` in title attributes for proper property parsing.
+**For complete hOCR documentation**, see [README_PYPI.md](README_PYPI.md).
 
 ## Configuration Reference
 
-**V2 Defaults (CommonMark-compliant):**
+### ConversionOptions
 
-- `list_indent_width`: 2 (CommonMark standard)
-- `bullets`: "\*+-" (cycles through `*`, `+`, `-` for nested levels)
-- `escape_asterisks`: false (minimal escaping)
-- `escape_underscores`: false (minimal escaping)
-- `escape_misc`: false (minimal escaping)
-- `newline_style`: "spaces" (CommonMark: two trailing spaces)
-- `code_block_style`: "backticks" (fenced code blocks with \`\`\`, better whitespace preservation)
-- `heading_style`: "atx" (CommonMark: `#`)
-- `preprocessing.enabled`: false (no preprocessing by default)
+| Option                           | Type   | Default       | Description                                                      |
+| -------------------------------- | ------ | ------------- | ---------------------------------------------------------------- |
+| `heading_style`                  | str    | `"atx"`       | Heading format: `"atx"` (#), `"atx_closed"` (# #), `"underlined"` (===) |
+| `list_indent_width`              | int    | `2`           | Spaces per list indent level (CommonMark: 2)                     |
+| `list_indent_type`               | str    | `"spaces"`    | `"spaces"` or `"tabs"`                                           |
+| `bullets`                        | str    | `"*+-"`       | Bullet chars for unordered lists (cycles through levels)         |
+| `strong_em_symbol`               | str    | `"*"`         | Symbol for bold/italic: `"*"` or `"_"`                           |
+| `escape_asterisks`               | bool   | `True`        | Escape `*` in text                                               |
+| `escape_underscores`             | bool   | `True`        | Escape `_` in text                                               |
+| `escape_misc`                    | bool   | `False`       | Escape other Markdown special chars                              |
+| `code_language`                  | str    | `""`          | Default language for code blocks                                 |
+| `code_block_style`               | str    | `"backticks"` | `"indented"` (4 spaces), `"backticks"` (\`\`\`), `"tildes"` (\~~~) |
+| `highlight_style`                | str    | `"double-equal"` | `"double-equal"` (==), `"html"` (<mark>), `"bold"` (\*\*), `"none"` |
+| `extract_metadata`               | bool   | `True`        | Extract HTML metadata as comment                                 |
+| `hocr_extract_tables`            | bool   | `True`        | Enable hOCR table extraction                                     |
+| `hocr_table_column_threshold`    | int    | `50`          | Column detection threshold (pixels)                              |
+| `hocr_table_row_threshold_ratio` | float  | `0.5`         | Row grouping threshold ratio                                     |
 
-For complete configuration reference, see **[Full Documentation](crates/html-to-markdown/README.md#configuration-reference)**.
+### PreprocessingOptions
+
+| Option              | Type | Default      | Description                            |
+| ------------------- | ---- | ------------ | -------------------------------------- |
+| `enabled`           | bool | `False`      | Enable HTML preprocessing              |
+| `preset`            | str  | `"standard"` | `"minimal"`, `"standard"`, `"aggressive"` |
+| `remove_navigation` | bool | `True`       | Remove `<nav>` and navigation elements |
+| `remove_forms`      | bool | `True`       | Remove `<form>` and form inputs        |
+
+### CLI Options
+
+All Python options are available as CLI flags. Use `html-to-markdown --help` for full reference.
+
+**Common CLI flags:**
+- `--heading-style <STYLE>`: atx, atx-closed, underlined
+- `--list-indent-width <N>`: Number of spaces for list indentation
+- `--bullets <CHARS>`: Bullet characters (e.g., `*+-`)
+- `--code-language <LANG>`: Default language for code blocks
+- `--preprocess`: Enable HTML preprocessing
+- `--preset <PRESET>`: Preprocessing preset (minimal, standard, aggressive)
+- `-o, --output <FILE>`: Write output to file
 
 ## Upgrading from v1.x
 

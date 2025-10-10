@@ -7,9 +7,9 @@ requires = [
 
 [project]
 name = "html-to-markdown"
-version = "2.0.0"
+version = "2.0.1"
 description = "High-performance HTML to Markdown converter powered by Rust with a clean Python API"
-readme = "README.md"
+readme = "README_PYPI.md"
 keywords = [
   "cli-tool",
   "converter",
