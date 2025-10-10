@@ -18,7 +18,7 @@ name = "html-to-markdown"
 path = "src/main.rs"
 
 [dependencies]
-html-to-markdown.workspace = true
+html-to-markdown-rs.workspace = true
 clap.workspace = true
 clap_complete.workspace = true
 clap_mangen.workspace = true
