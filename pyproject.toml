@@ -22,7 +22,7 @@ keywords = [
   "rust",
   "text-processing",
 ]
-license = { text = "MIT" }
+license = { file = "LICENSE" }
 authors = [ { name = "Na'aman Hirschfeld", email = "nhirschfeld@gmail.com" } ]
 requires-python = ">=3.10"
 classifiers = [
