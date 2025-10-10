@@ -1,0 +1,30 @@
+[package]
+name = "html-to-markdown-cli"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+documentation.workspace = true
+readme.workspace = true
+rust-version.workspace = true
+description = "Command-line interface for html-to-markdown - high-performance HTML to Markdown converter"
+keywords = ["html", "markdown", "cli", "converter", "html5ever"]
+categories = ["command-line-utilities", "text-processing"]
+
+[[bin]]
+name = "html-to-markdown"
+path = "src/main.rs"
+
+[dependencies]
+html-to-markdown.workspace = true
+clap.workspace = true
+clap_complete.workspace = true
+clap_mangen.workspace = true
+encoding_rs.workspace = true
+
+[dev-dependencies]
+assert_cmd = "2.0"
+predicates = "3.1"
+tempfile = "3.12"
