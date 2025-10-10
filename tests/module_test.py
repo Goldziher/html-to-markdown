@@ -114,7 +114,7 @@ def test_complex_file_conversion(complex_html_file: Path) -> None:
 def test_error_handling() -> None:
     _stdout, stderr, returncode = run_cli_command(["nonexistent.html"])
     assert returncode != 0
-    assert "No such file" in stderr
+    assert "No such file" in stderr or "cannot find the file" in stderr
 
     _stdout, stderr, returncode = run_cli_command(["--invalid-option"])
     assert returncode != 0
