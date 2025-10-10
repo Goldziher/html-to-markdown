@@ -17,6 +17,7 @@ pip install html-to-markdown
 ```
 
 Pre-built wheels available for:
+
 - **Linux**: x86_64, aarch64
 - **macOS**: x86_64 (Intel), arm64 (Apple Silicon)
 - **Windows**: x86_64
@@ -59,9 +60,9 @@ Output:
 
 This is **fast** Rust-powered conversion!
 
-* Blazing fast
-* Type safe
-* Easy to use
+- Blazing fast
+- Type safe
+- Easy to use
 ```
 
 ## Configuration
@@ -127,6 +128,7 @@ markdown = convert_to_markdown(
 ```
 
 **Full hOCR 1.2 Spec Coverage:**
+
 - ✅ **All 40 Element Types** - Logical structure, typesetting, floats, inline, engine-specific
 - ✅ **All 20+ Properties** - bbox, baseline, textangle, poly, x_wconf, x_font, x_fsize, and more
 - ✅ **All 5 Metadata Fields** - ocr-system, ocr-capabilities, ocr-number-of-pages, ocr-langs, ocr-scripts
@@ -135,28 +137,28 @@ markdown = convert_to_markdown(
 
 ### ConversionOptions
 
-| Option                           | Type  | Default       | Description                                                      |
-| -------------------------------- | ----- | ------------- | ---------------------------------------------------------------- |
+| Option                           | Type  | Default       | Description                                                             |
+| -------------------------------- | ----- | ------------- | ----------------------------------------------------------------------- |
 | `heading_style`                  | str   | `"atx"`       | Heading format: `"atx"` (#), `"atx_closed"` (# #), `"underlined"` (===) |
-| `list_indent_width`              | int   | `2`           | Spaces per list indent level (CommonMark: 2)                     |
-| `list_indent_type`               | str   | `"spaces"`    | `"spaces"` or `"tabs"`                                           |
-| `bullets`                        | str   | `"*+-"`       | Bullet chars for unordered lists (cycles through levels)         |
-| `strong_em_symbol`               | str   | `"*"`         | Symbol for bold/italic: `"*"` or `"_"`                           |
-| `escape_asterisks`               | bool  | `True`        | Escape `*` in text                                               |
-| `escape_underscores`             | bool  | `True`        | Escape `_` in text                                               |
-| `code_language`                  | str   | `""`          | Default language for code blocks                                 |
-| `code_block_style`               | str   | `"backticks"` | `"indented"` (4 spaces), `"backticks"` (\`\`\`), `"tildes"` (\~~~) |
-| `extract_metadata`               | bool  | `True`        | Extract HTML metadata as comment                                 |
-| `hocr_extract_tables`            | bool  | `True`        | Enable hOCR table extraction                                     |
-| `hocr_table_column_threshold`    | int   | `50`          | Column detection threshold (pixels)                              |
-| `hocr_table_row_threshold_ratio` | float | `0.5`         | Row grouping threshold ratio                                     |
+| `list_indent_width`              | int   | `2`           | Spaces per list indent level (CommonMark: 2)                            |
+| `list_indent_type`               | str   | `"spaces"`    | `"spaces"` or `"tabs"`                                                  |
+| `bullets`                        | str   | `"*+-"`       | Bullet chars for unordered lists (cycles through levels)                |
+| `strong_em_symbol`               | str   | `"*"`         | Symbol for bold/italic: `"*"` or `"_"`                                  |
+| `escape_asterisks`               | bool  | `True`        | Escape `*` in text                                                      |
+| `escape_underscores`             | bool  | `True`        | Escape `_` in text                                                      |
+| `code_language`                  | str   | `""`          | Default language for code blocks                                        |
+| `code_block_style`               | str   | `"backticks"` | `"indented"` (4 spaces), `"backticks"` (\`\`\`), `"tildes"` (\~~~)      |
+| `extract_metadata`               | bool  | `True`        | Extract HTML metadata as comment                                        |
+| `hocr_extract_tables`            | bool  | `True`        | Enable hOCR table extraction                                            |
+| `hocr_table_column_threshold`    | int   | `50`          | Column detection threshold (pixels)                                     |
+| `hocr_table_row_threshold_ratio` | float | `0.5`         | Row grouping threshold ratio                                            |
 
 ### Preprocessing Options
 
-| Option           | Type | Default      | Description                            |
-| ---------------- | ---- | ------------ | -------------------------------------- |
-| `preprocess`     | bool | `False`      | Enable HTML preprocessing              |
-| `preprocessing_preset` | str | `"standard"` | `"minimal"`, `"standard"`, `"aggressive"` |
+| Option                 | Type | Default      | Description                               |
+| ---------------------- | ---- | ------------ | ----------------------------------------- |
+| `preprocess`           | bool | `False`      | Enable HTML preprocessing                 |
+| `preprocessing_preset` | str  | `"standard"` | `"minimal"`, `"standard"`, `"aggressive"` |
 
 ## CLI Tool
 
@@ -181,11 +183,13 @@ echo "<h1>Test</h1>" | html-to-markdown
 All v1 code works without changes. v2 is a complete Rust rewrite with **19-30x performance improvements**:
 
 **What Changed:**
+
 - Complete Rust rewrite using `tl` HTML parser
 - CommonMark-compliant defaults (2-space indents, minimal escaping, ATX headings)
 - No BeautifulSoup or lxml dependencies
 
 **Removed Features:**
+
 - `code_language_callback` - use `code_language` for default language
 - `strip` / `convert` options - use preprocessing instead
 - `convert_to_markdown_stream()` - not supported in v2
