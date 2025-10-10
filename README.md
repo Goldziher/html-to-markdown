@@ -3,7 +3,7 @@
 High-performance HTML to Markdown converter Rust crate and CLI with Python bindings and CLI. Available via PyPI, Homebrew, and Cargo. Cross-platform support for Linux, macOS, and Windows.
 
 [![PyPI version](https://badge.fury.io/py/html-to-markdown.svg)](https://pypi.org/project/html-to-markdown/)
-[![Crates.io](https://img.shields.io/crates/v/html-to-markdown.svg)](https://crates.io/crates/html-to-markdown)
+[![Crates.io](https://img.shields.io/crates/v/html-to-markdown-rs.svg)](https://crates.io/crates/html-to-markdown-rs)
 [![Python Versions](https://img.shields.io/pypi/pyversions/html-to-markdown.svg)](https://pypi.org/project/html-to-markdown/)
 [![Documentation](https://img.shields.io/badge/docs-github-blue)](https://github.com/Goldziher/html-to-markdown)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
@@ -57,6 +57,8 @@ Memory usage is linear and stable across 50+ repeated conversions.
 
 ## Installation
 
+> **📦 Package Names**: Due to a naming conflict on crates.io, the Rust crate is published as `html-to-markdown-rs`, while the Python package remains `html-to-markdown` on PyPI. The CLI binary name is `html-to-markdown` for both.
+
 ### Python Package
 
 ```bash
@@ -66,7 +68,7 @@ pip install html-to-markdown
 ### Rust Library
 
 ```bash
-cargo add html-to-markdown
+cargo add html-to-markdown-rs
 ```
 
 ### CLI Binary
@@ -132,7 +134,7 @@ This is **fast** Rust-powered conversion!
 ### Rust API
 
 ```rust
-use html_to_markdown::{convert, ConversionOptions};
+use html_to_markdown_rs::{convert, ConversionOptions, HeadingStyle};
 
 fn main() {
     let html = r#"

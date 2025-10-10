@@ -1,6 +1,6 @@
 use clap::{Parser, ValueEnum};
 use encoding_rs::Encoding;
-use html_to_markdown::{
+use html_to_markdown_rs::{
     convert, CodeBlockStyle, ConversionOptions, HeadingStyle, HighlightStyle, ListIndentType, NewlineStyle,
     ParsingOptions, PreprocessingOptions, PreprocessingPreset, WhitespaceMode,
 };

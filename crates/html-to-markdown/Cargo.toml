@@ -1,5 +1,5 @@
 [package]
-name = "html-to-markdown"
+name = "html-to-markdown-rs"
 version.workspace = true
 edition.workspace = true
 authors.workspace = true

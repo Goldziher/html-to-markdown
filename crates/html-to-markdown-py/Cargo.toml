@@ -18,7 +18,7 @@ name = "_html_to_markdown"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-html-to-markdown.workspace = true
+html-to-markdown-rs.workspace = true
 pyo3.workspace = true
 
 [features]

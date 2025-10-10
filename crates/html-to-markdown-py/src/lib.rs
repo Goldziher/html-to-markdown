@@ -1,4 +1,4 @@
-use html_to_markdown::{
+use html_to_markdown_rs::{
     CodeBlockStyle, ConversionOptions as RustConversionOptions, HeadingStyle, HighlightStyle, ListIndentType,
     NewlineStyle, ParsingOptions as RustParsingOptions, PreprocessingOptions as RustPreprocessingOptions,
     PreprocessingPreset, WhitespaceMode,
@@ -325,7 +325,7 @@ impl ConversionOptions {
 #[pyo3(signature = (html, options=None))]
 fn convert(html: &str, options: Option<ConversionOptions>) -> PyResult<String> {
     let rust_options = options.map(|opts| opts.to_rust());
-    html_to_markdown::convert(html, rust_options).map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))
+    html_to_markdown_rs::convert(html, rust_options).map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))
 }
 
 /// Python bindings for html-to-markdown
