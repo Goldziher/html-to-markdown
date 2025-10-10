@@ -1,0 +1,75 @@
+name: Update Homebrew Formula
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release tag (e.g., v2.0.0)'
+        required: true
+        type: string
+      dry_run:
+        description: 'Dry run (skip actual formula update)'
+        required: false
+        type: boolean
+        default: false
+
+jobs:
+  update-formula:
+    name: Update Homebrew formula
+    runs-on: ubuntu-latest
+    steps:
+      - name: Extract version and download URL
+        id: release
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            tag="${{ github.event.inputs.tag }}"
+          else
+            tag=${GITHUB_REF#refs/tags/}
+          fi
+          version=${tag#v}
+
+          echo "tag=$tag" >> $GITHUB_OUTPUT
+          echo "version=$version" >> $GITHUB_OUTPUT
+          echo "url=https://github.com/Goldziher/html-to-markdown/archive/$tag.tar.gz" >> $GITHUB_OUTPUT
+
+          echo "Release info:"
+          echo "  Tag: $tag"
+          echo "  Version: $version"
+
+      - name: Calculate tarball SHA256
+        id: sha
+        run: |
+          url="${{ steps.release.outputs.url }}"
+          echo "Downloading tarball from: $url"
+
+          sha256=$(curl -sL "$url" | shasum -a 256 | cut -d' ' -f1)
+
+          echo "sha256=$sha256" >> $GITHUB_OUTPUT
+          echo "Calculated SHA256: $sha256"
+
+      - name: Update Homebrew formula
+        if: ${{ !inputs.dry_run }}
+        uses: mislav/bump-homebrew-formula-action@v3
+        with:
+          formula-name: html-to-markdown
+          homebrew-tap: Goldziher/homebrew-tap
+          download-url: ${{ steps.release.outputs.url }}
+          commit-message: |
+            chore(homebrew): update html-to-markdown to ${{ steps.release.outputs.version }}
+
+            Auto-update from release ${{ steps.release.outputs.tag }}
+        env:
+          COMMITTER_TOKEN: ${{ secrets.HOMEBREW_TOKEN }}
+
+      - name: Dry run - Skip Homebrew update
+        if: ${{ inputs.dry_run }}
+        run: |
+          echo "🔍 DRY RUN: Would update Homebrew formula with:"
+          echo "  Tag: ${{ steps.release.outputs.tag }}"
+          echo "  Version: ${{ steps.release.outputs.version }}"
+          echo "  URL: ${{ steps.release.outputs.url }}"
+          echo "  SHA256: ${{ steps.sha.outputs.sha256 }}"
+          echo ""
+          echo "Formula would be updated in: Goldziher/homebrew-tap"
