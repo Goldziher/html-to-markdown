@@ -2,9 +2,8 @@
 
 High-performance HTML to Markdown converter built with Rust.
 
-[![Crates.io](https://img.shields.io/crates/v/html-to-markdown.svg)](https://crates.io/crates/html-to-markdown)
+[![Crates.io](https://img.shields.io/crates/v/html-to-markdown-rs.svg)](https://crates.io/crates/html-to-markdown-rs)
 [![PyPI version](https://badge.fury.io/py/html-to-markdown.svg)](https://pypi.org/project/html-to-markdown/)
-[![Documentation](https://docs.rs/html-to-markdown/badge.svg)](https://docs.rs/html-to-markdown)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 Fast, reliable HTML to Markdown conversion with full CommonMark compliance. Built with `html5ever` for correctness and `ammonia` for safe HTML preprocessing.
@@ -15,13 +14,13 @@ Fast, reliable HTML to Markdown conversion with full CommonMark compliance. Buil
 
 ```toml
 [dependencies]
-html-to-markdown = "2.0"
+html-to-markdown-rs = "2.0"
 ```
 
 ### Basic Usage
 
 ```rust
-use html_to_markdown::{convert, ConversionOptions};
+use html_to_markdown_rs::{convert, ConversionOptions};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let html = r#"
@@ -42,7 +41,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 ### Configuration
 
 ```rust
-use html_to_markdown::{
+use html_to_markdown_rs::{
     convert, ConversionOptions, HeadingStyle, ListIndentType,
     PreprocessingOptions, PreprocessingPreset,
 };
@@ -55,8 +54,8 @@ let options = ConversionOptions {
     strong_em_symbol: '*',
     escape_asterisks: false,
     escape_underscores: false,
-    newline_style: html_to_markdown::NewlineStyle::Backslash,
-    code_block_style: html_to_markdown::CodeBlockStyle::Indented,
+    newline_style: html_to_markdown_rs::NewlineStyle::Backslash,
+    code_block_style: html_to_markdown_rs::CodeBlockStyle::Indented,
     ..Default::default()
 };
 
@@ -66,11 +65,11 @@ let markdown = convert(html, Some(options))?;
 ### With Preprocessing
 
 ```rust
-use html_to_markdown::{convert, ConversionOptions, PreprocessingOptions};
+use html_to_markdown_rs::{convert, ConversionOptions, PreprocessingOptions};
 
 let mut options = ConversionOptions::default();
 options.preprocessing.enabled = true;
-options.preprocessing.preset = html_to_markdown::PreprocessingPreset::Aggressive;
+options.preprocessing.preset = html_to_markdown_rs::PreprocessingPreset::Aggressive;
 options.preprocessing.remove_navigation = true;
 options.preprocessing.remove_forms = true;
 
@@ -80,7 +79,7 @@ let markdown = convert(scraped_html, Some(options))?;
 ### hOCR Table Extraction
 
 ```rust
-use html_to_markdown::{convert, ConversionOptions};
+use html_to_markdown_rs::{convert, ConversionOptions};
 
 let options = ConversionOptions {
     hocr_extract_tables: true,
@@ -356,8 +355,6 @@ man ./html-to-markdown.1
 
 ## V2 Changes from V1
 
-See [CHANGELOG.md](../../CHANGELOG.md) for detailed migration guide.
-
 ### Key Differences
 
 **V2 Defaults (CommonMark-compliant):**
@@ -396,11 +393,10 @@ See [CHANGELOG.md](../../CHANGELOG.md) for detailed migration guide.
 ## Links
 
 - [GitHub Repository](https://github.com/Goldziher/html-to-markdown)
-- [Changelog](../../CHANGELOG.md)
-- [Rust Documentation](https://docs.rs/html-to-markdown)
+- [Rust Crate (crates.io)](https://crates.io/crates/html-to-markdown-rs)
 - [Python Package (PyPI)](https://pypi.org/project/html-to-markdown/)
 - [Discord Community](https://discord.gg/pXxagNK2zN)
 
 ## License
 
-MIT License - see [LICENSE](../../LICENSE) for details.
+MIT License
