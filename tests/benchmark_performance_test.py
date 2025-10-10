@@ -1,16 +1,10 @@
-"""Modern pytest-benchmark integration for html-to-markdown performance testing.
-
-This module provides pytest-benchmark integration for continuous performance monitoring
-in CI/CD pipelines, complementing the existing comprehensive performance_test.py.
-"""
-
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
 import pytest
 
-from html_to_markdown import convert_to_markdown, convert_to_markdown_stream
+from html_to_markdown import convert_to_markdown
 
 if TYPE_CHECKING:
     from pytest_benchmark.fixture import BenchmarkFixture  # type: ignore[import-untyped]
@@ -38,26 +32,6 @@ class TestBenchmarkCore:
     def test_benchmark_large_document(self, benchmark: BenchmarkFixture) -> None:
         html = generate_complex_html(size_factor=100)
         result = benchmark(convert_to_markdown, html)
-        assert len(result) > 0
-
-    @pytest.mark.benchmark(group="streaming")
-    def test_benchmark_streaming_small(self, benchmark: BenchmarkFixture) -> None:
-        html = generate_complex_html(size_factor=5)
-
-        def stream_convert() -> str:
-            return "".join(convert_to_markdown_stream(html, chunk_size=1024))
-
-        result = benchmark(stream_convert)
-        assert len(result) > 0
-
-    @pytest.mark.benchmark(group="streaming")
-    def test_benchmark_streaming_large(self, benchmark: BenchmarkFixture) -> None:
-        html = generate_complex_html(size_factor=100)
-
-        def stream_convert() -> str:
-            return "".join(convert_to_markdown_stream(html, chunk_size=4096))
-
-        result = benchmark(stream_convert)
         assert len(result) > 0
 
 
@@ -154,18 +128,3 @@ def test_benchmark_scalability(benchmark: BenchmarkFixture, size_factor: int) ->
     input_size_mb = len(html) / (1024 * 1024)
     benchmark.extra_info["input_size_mb"] = round(input_size_mb, 3)
     benchmark.extra_info["size_factor"] = size_factor
-
-
-@pytest.mark.benchmark(group="chunk_optimization")
-@pytest.mark.parametrize("chunk_size", [256, 512, 1024, 2048, 4096, 8192])
-def test_benchmark_chunk_sizes(benchmark: BenchmarkFixture, chunk_size: int) -> None:
-    html = generate_complex_html(size_factor=50)
-
-    def stream_with_chunk() -> str:
-        return "".join(convert_to_markdown_stream(html, chunk_size=chunk_size))
-
-    result = benchmark(stream_with_chunk)
-    assert len(result) > 0
-
-    benchmark.extra_info["chunk_size"] = chunk_size
-    benchmark.extra_info["chunks_produced"] = len(list(convert_to_markdown_stream(html, chunk_size=chunk_size)))
