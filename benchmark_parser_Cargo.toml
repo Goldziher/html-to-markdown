@@ -1,0 +1,13 @@
+[package]
+name = "parser-benchmark"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+html5ever = "0.35"
+markup5ever_rcdom = "0.35"
+tl = "0.7"
+
+[[bin]]
+name = "parser_benchmark"
+path = "parser_benchmark.rs"
