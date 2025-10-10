@@ -10,7 +10,7 @@ documentation.workspace = true
 readme.workspace = true
 rust-version.workspace = true
 description = "High-performance HTML to Markdown converter using tl parser. Part of the Kreuzberg ecosystem."
-keywords = ["html", "markdown", "converter", "tl", "document-intelligence"]
+keywords = ["html", "markdown", "converter", "tl", "doc-processing"]
 categories = ["parsing", "text-processing", "web-programming"]
 
 [lib]
