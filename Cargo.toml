@@ -1,0 +1,47 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/html-to-markdown",
+    "crates/html-to-markdown-cli",
+    "crates/html-to-markdown-py",
+]
+
+[workspace.package]
+version = "2.0.0"
+edition = "2021"
+authors = ["Na'aman Hirschfeld <nhirschfeld@gmail.com>"]
+license = "MIT"
+repository = "https://github.com/Goldziher/html-to-markdown"
+homepage = "https://github.com/Goldziher/html-to-markdown"
+documentation = "https://docs.rs/html-to-markdown"
+readme = "README.md"
+rust-version = "1.80"
+
+[workspace.dependencies]
+# Core library
+html-to-markdown = { path = "crates/html-to-markdown" }
+
+# HTML parsing and sanitization
+tl = "0.7"
+ammonia = "4.1"
+
+# Utilities
+regex = "1.11"
+once_cell = "1.21"
+thiserror = "2.0"
+base64 = "0.22"
+encoding_rs = "0.8"
+
+# CLI dependencies
+clap = { version = "4.5", features = ["derive"] }
+clap_complete = "4.5"
+clap_mangen = "0.2"
+
+# Python bindings
+pyo3 = { version = "0.26.0", features = ["abi3-py310"] }
+
+[profile.release]
+lto = "thin"
+codegen-units = 1
+opt-level = 3
+strip = true
