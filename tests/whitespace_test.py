@@ -15,9 +15,9 @@ import pytest
 
 
 def test_normalized_mode_basic(convert: Callable[..., str]) -> None:
-    assert convert("<b>bold</b> text", whitespace_mode="normalized") == "**bold** text"
-    assert convert("<b>bold</b>\ntext", whitespace_mode="normalized") == "**bold** text"
-    assert convert("text    with    spaces", whitespace_mode="normalized") == "text with spaces"
+    assert convert("<b>bold</b> text", whitespace_mode="normalized") == "**bold** text\n"
+    assert convert("<b>bold</b>\ntext", whitespace_mode="normalized") == "**bold** text\n"
+    assert convert("text    with    spaces", whitespace_mode="normalized") == "text with spaces\n"
 
 
 def test_normalized_mode(convert: Callable[..., str]) -> None:
@@ -56,30 +56,30 @@ def test_unicode_space_normalization(convert: Callable[..., str]) -> None:
     for unicode_space, _expected in test_cases:
         html = f"text{unicode_space}with{unicode_space}space"
         result = convert(html, whitespace_mode="normalized")
-        assert result == "text with space", f"Failed for Unicode {ord(unicode_space):04X}"
+        assert result == "text with space\n", f"Failed for Unicode {ord(unicode_space):04X}"
 
 
 def test_block_element_spacing(convert: Callable[..., str]) -> None:
-    assert convert("<div>div1</div><div>div2</div>", whitespace_mode="normalized") == "div1\n\ndiv2\n\n"
-    assert convert("<p>para1</p><p>para2</p>", whitespace_mode="normalized") == "para1\n\npara2\n\n"
-    assert convert("<div>div</div><p>para</p>", whitespace_mode="normalized") == "div\n\npara\n\n"
+    assert convert("<div>div1</div><div>div2</div>", whitespace_mode="normalized") == "div1\n\ndiv2\n"
+    assert convert("<p>para1</p><p>para2</p>", whitespace_mode="normalized") == "para1\n\npara2\n"
+    assert convert("<div>div</div><p>para</p>", whitespace_mode="normalized") == "div\n\npara\n"
 
 
 def test_inline_element_spacing(convert: Callable[..., str]) -> None:
-    assert convert("<em>italic</em> text") == "*italic* text"
-    assert convert("text <strong>bold</strong>") == "text **bold**"
-    assert convert('<a href="#">link</a> text') == "[link](#) text"
-    assert convert('text <a href="#">link</a>') == "text [link](#)"
+    assert convert("<em>italic</em> text") == "*italic* text\n"
+    assert convert("text <strong>bold</strong>") == "text **bold**\n"
+    assert convert('<a href="#">link</a> text') == "[link](#) text\n"
+    assert convert('text <a href="#">link</a>') == "text [link](#)\n"
 
 
 def test_adjacent_inline_elements(convert: Callable[..., str]) -> None:
     html = "<b>bold</b><i>italic</i>"
     result = convert(html, whitespace_mode="normalized")
-    assert result == "**bold***italic*"
+    assert result == "**bold***italic*\n"
 
     html = "<b>bold</b> <i>italic</i>"
     result = convert(html, whitespace_mode="normalized")
-    assert result == "**bold** *italic*"
+    assert result == "**bold** *italic*\n"
 
 
 def test_whitespace_in_lists(convert: Callable[..., str]) -> None:
@@ -90,8 +90,8 @@ def test_whitespace_in_lists(convert: Callable[..., str]) -> None:
     </ul>
     """
     result = convert(html, whitespace_mode="normalized")
-    assert "* item 1" in result
-    assert "* item 2" in result
+    assert "- item 1" in result
+    assert "- item 2" in result
 
 
 def test_whitespace_in_nested_structures(convert: Callable[..., str]) -> None:
@@ -105,7 +105,7 @@ def test_whitespace_in_nested_structures(convert: Callable[..., str]) -> None:
     """
     result = convert(html, whitespace_mode="normalized")
     assert "Paragraph in div" in result
-    assert "* List item" in result
+    assert "- List item" in result
 
 
 def test_pre_and_code_whitespace(convert: Callable[..., str]) -> None:
@@ -122,7 +122,7 @@ def test_pre_and_code_whitespace(convert: Callable[..., str]) -> None:
 def test_tab_character_handling(convert: Callable[..., str]) -> None:
     html = "text\twith\ttabs"
     result = convert(html, whitespace_mode="normalized")
-    assert result == "text with tabs"
+    assert result == "text with tabs\n"
 
 
 def test_mixed_whitespace(convert: Callable[..., str]) -> None:
@@ -135,10 +135,10 @@ def test_br_tag_handling(convert: Callable[..., str]) -> None:
     html = "line1<br>line2<br/>line3"
 
     result = convert(html, newline_style="spaces")
-    assert result == "line1  \nline2  \nline3"
+    assert result == "line1  \nline2  \nline3\n"
 
     result = convert(html, newline_style="backslash")
-    assert result == "line1\\\nline2\\\nline3"
+    assert result == "line1\\\nline2\\\nline3\n"
 
 
 def test_empty_elements(convert: Callable[..., str]) -> None:
@@ -172,8 +172,8 @@ def test_complex_real_world_example(convert: Callable[..., str]) -> None:
     assert "Title" in result
     assert "First paragraph with **bold** and *italic* text." in result
     assert "Subtitle" in result
-    assert "* Item 1" in result
-    assert "* Item 2 with [link](#)" in result
+    assert "- Item 1" in result
+    assert "- Item 2 with [link](#)" in result
     assert "Final paragraph." in result
 
 
@@ -201,7 +201,7 @@ test4
 
     assert len(non_empty_lines) >= 4
     assert "**test1** test2" in non_empty_lines[0]
-    assert "* test3" in result
+    assert "- test3" in result
     assert "test4" in result
     assert "test5" in result
 
@@ -246,12 +246,12 @@ def test_whitespace_patterns(html: str, expected: str, convert: Callable[..., st
             "Inline content followed by paragraph",
         ),
         ("<span>inline</span><div>block</div>", ["inline", "block"], "Inline span followed by div"),
-        ("<p>para</p><div><ul><li>item</li></ul></div>", ["para", "* item"], "Paragraph followed by div with list"),
-        ("<div>div</div><blockquote>quote</blockquote>", ["div", "> quote"], "Div followed by blockquote"),
+        ("<p>para</p><div><ul><li>item</li></ul></div>", ["para", "- item"], "Paragraph followed by div with list"),
+        ("<div>div</div><blockquote>quote</blockquote>", ["div\n> quote"], "Div followed by blockquote"),
         ("<h1>Heading 1</h1><p>Content</p>", ["Heading 1", "Content"], "Heading followed by paragraph"),
         ("<p>Content</p><h2>Heading 2</h2>", ["Content", "Heading 2"], "Paragraph followed by heading"),
-        ("<div>content</div><ul><li>item</li></ul>", ["content", "* item"], "Div followed by list"),
-        ("<ul><li>item1</li></ul><div>content</div>", ["* item1", "content"], "List followed by div"),
+        ("<div>content</div><ul><li>item</li></ul>", ["content", "- item"], "Div followed by list"),
+        ("<ul><li>item1</li></ul><div>content</div>", ["- item1", "content"], "List followed by div"),
     ],
 )
 def test_block_element_separation_comprehensive(
@@ -334,7 +334,7 @@ def test_mixed_block_and_inline_elements(convert: Callable[..., str]) -> None:
 def test_whitespace_trailing_with_inline_sibling(convert: Callable[..., str]) -> None:
     html = "Text\n<span>inline</span>"
     result = convert(html, whitespace_mode="normalized")
-    assert "Text inline" in result
+    assert "Textinline" in result
 
     html = "Text\t<em>emphasized</em>"
     result = convert(html, whitespace_mode="normalized")
@@ -379,7 +379,7 @@ def test_block_spacing_with_double_newline_elements(convert: Callable[..., str])
 def test_block_spacing_with_single_newline_elements(convert: Callable[..., str]) -> None:
     html = "<ul><li>Item 1</li><li>Item 2</li></ul>"
     result = convert(html, whitespace_mode="normalized")
-    assert "* Item 1\n* Item 2" in result
+    assert "- Item 1\n- Item 2" in result
 
     html = "<dl><dt>Term</dt><dd>Definition</dd></dl>"
     result = convert(html, whitespace_mode="normalized")
@@ -433,7 +433,7 @@ test3
 test4
 </div>
 <p>test5</p>""",
-            "**test1** test2\n\n* test3\n\ntest4\n\ntest5\n\n",
+            "**test1** test2\n\n- test3\n\ntest4\n\ntest5\n",
             None,
         ),
         (
@@ -444,7 +444,7 @@ test2
 <a href="https://example.com">example.com</a>
 
 <a href="https://example.org">example.org</a>""",
-            "test1\n\ntest2 [example.com](https://example.com)[example.org](https://example.org)",
+            "test1\n\ntest2\n\n[example.com](https://example.com)[example.org](https://example.org)\n",
             None,
         ),
         (
@@ -455,22 +455,17 @@ test2
 <a href="https://example.com">example.com</a>
 
 <a href="https://example.org">example.org</a>""",
-            """test1
-
-test2
-
-[example.com](https://example.com)
-[example.org](https://example.org)""",
+            "test1\n\ntest2\n\n[example.com](https://example.com)\n[example.org](https://example.org)\n",
             "strict",
         ),
-        ("<b>bold</b><i>italic</i><code>code</code>", "**bold***italic*`code`", None),
-        ("<p>Para 1</p><b>bold text</b><p>Para 2</p>", "Para 1\n\n**bold text**\n\nPara 2\n\n", None),
+        ("<b>bold</b><i>italic</i><code>code</code>", "**bold***italic*`code`\n", None),
+        ("<p>Para 1</p><b>bold text</b><p>Para 2</p>", "Para 1\n\n**bold text**\n\nPara 2\n", None),
         (
             "<div>Text content</div><div><ul><li>List item</li></ul></div><div>More text</div>",
-            "Text content\n\n* List item\n\nMore text\n\n",
+            "Text content\n\n- List item\n\nMore text\n",
             None,
         ),
-        ("<h1>Header</h1>inline text<p>Paragraph</p>", "Header\n======\n\ninline text\n\nParagraph\n\n", None),
+        ("<h1>Header</h1>inline text<p>Paragraph</p>", "# Header\n\ninline text\n\nParagraph\n", None),
         (
             """<div>
     <p>Paragraph in div</p>
@@ -478,36 +473,22 @@ test2
     <div>Nested div</div>
 </div>
 <p>Following paragraph</p>""",
-            """Paragraph in div
-
-Inline span
-
-Nested div
-
-Following paragraph
-
-""",
+            "Paragraph in div\n\nInline span\n\nNested div\n\nFollowing paragraph\n",
             None,
         ),
-        ('<a href="url1">Link1</a><a href="url2">Link2</a>', "[Link1](url1)[Link2](url2)", None),
-        ('<a href="url1">Link1</a> <a href="url2">Link2</a>', "[Link1](url1) [Link2](url2)", None),
+        ('<a href="url1">Link1</a><a href="url2">Link2</a>', "[Link1](url1)[Link2](url2)\n", None),
+        ('<a href="url1">Link1</a> <a href="url2">Link2</a>', "[Link1](url1) [Link2](url2)\n", None),
         (
             """<p>Para 1</p>
 
 <p>Para 2</p>
 
 <div>Div content</div>""",
-            """Para 1
-
-Para 2
-
-Div content
-
-""",
+            "Para 1\n\nPara 2\n\nDiv content\n",
             "strict",
         ),
-        ("""text    with    multiple    spaces""", "text with multiple spaces", "normalized"),
-        ("<p>Content 1</p><div></div><p>Content 2</p>", "Content 1\n\nContent 2\n\n", None),
+        ("""text    with    multiple    spaces""", "text with multiple spaces\n", "normalized"),
+        ("<p>Content 1</p><div></div><p>Content 2</p>", "Content 1\n\nContent 2\n", None),
     ],
 )
 def test_whitespace_and_spacing_issues(

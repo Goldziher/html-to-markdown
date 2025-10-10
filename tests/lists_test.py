@@ -18,9 +18,9 @@ def test_basic_unordered_list(convert: Callable[..., str]) -> None:
     </ul>"""
 
     result = convert(html)
-    assert "* Item 1" in result
-    assert "* Item 2" in result
-    assert "* Item 3" in result
+    assert "- Item 1" in result
+    assert "- Item 2" in result
+    assert "- Item 3" in result
 
 
 def test_basic_ordered_list(convert: Callable[..., str]) -> None:
@@ -92,13 +92,13 @@ def test_list_with_multiple_paragraphs(convert: Callable[..., str]) -> None:
 
     result = convert(html)
 
-    assert "* First paragraph" in result
+    assert "- First paragraph" in result
     assert "Second paragraph" in result
 
     lines = result.split("\n")
     for line in lines:
         if "Second paragraph" in line:
-            assert line.startswith(("    ", "\t")), "Second paragraph should be indented"
+            assert line.startswith(("  ", "    ", "\t")), "Second paragraph should be indented"
 
 
 def test_list_with_nested_paragraphs_complex(convert: Callable[..., str]) -> None:
@@ -126,7 +126,7 @@ def test_nested_list_not_inside_li(convert: Callable[..., str]) -> None:
 
     result = convert(html)
 
-    expected = "* a\n* b\n    + c\n    + d\n"
+    expected = "- a\n- b\n  * c\n  * d\n"
     assert result == expected
 
 
@@ -146,12 +146,12 @@ def test_nested_list_not_inside_li_with_multiple_levels(convert: Callable[..., s
 
     result = convert(html)
 
-    assert "* Item 1" in result
-    assert "* Item 2" in result
-    assert "    + Subitem 2\\.1" in result
-    assert "    + Subitem 2\\.2" in result
-    assert "        - Sub\\-subitem" in result
-    assert "* Item 3" in result
+    assert "- Item 1" in result
+    assert "- Item 2" in result
+    assert "  * Subitem 2.1" in result
+    assert "  * Subitem 2.2" in result
+    assert "    + Sub-subitem" in result
+    assert "- Item 3" in result
 
 
 def test_mixed_correct_and_incorrect_nesting(convert: Callable[..., str]) -> None:
@@ -172,13 +172,13 @@ def test_mixed_correct_and_incorrect_nesting(convert: Callable[..., str]) -> Non
 
     result = convert(html)
 
-    assert "* Item 1" in result
-    assert "    + Correctly nested 1\\.1" in result
-    assert "    + Correctly nested 1\\.2" in result
-    assert "* Item 2" in result
-    assert "    + Incorrectly nested 2\\.1" in result
-    assert "    + Incorrectly nested 2\\.2" in result
-    assert "* Item 3" in result
+    assert "- Item 1" in result
+    assert "  * Correctly nested 1.1" in result
+    assert "  * Correctly nested 1.2" in result
+    assert "- Item 2" in result
+    assert "  * Incorrectly nested 2.1" in result
+    assert "  * Incorrectly nested 2.2" in result
+    assert "- Item 3" in result
 
 
 def test_ordered_list_incorrectly_nested(convert: Callable[..., str]) -> None:
@@ -186,7 +186,7 @@ def test_ordered_list_incorrectly_nested(convert: Callable[..., str]) -> None:
 
     result = convert(html)
 
-    expected_lines = ["1. First", "2. Second", "    1. Nested first", "    2. Nested second"]
+    expected_lines = ["1. First", "2. Second", "  1. Nested first", "  2. Nested second"]
 
     for line in expected_lines:
         assert line in result
@@ -208,10 +208,10 @@ def test_deeply_incorrect_nesting(convert: Callable[..., str]) -> None:
 
     result = convert(html)
 
-    assert "* Level 1" in result
-    assert "    + Level 2" in result
-    assert "        - Level 3" in result
-    assert "            * Level 4" in result
+    assert "- Level 1" in result
+    assert "  * Level 2" in result
+    assert "    + Level 3" in result
+    assert "      - Level 4" in result
 
 
 def test_list_after_paragraph_with_empty_lines(convert: Callable[..., str]) -> None:
@@ -275,14 +275,14 @@ def test_empty_line_handling_in_nested_list(convert: Callable[..., str]) -> None
     <div>Item 2-2</div>
 </li>
 </ul>""",
-            "* Item 1\n* Item 2\\-1\n\n    Item 2\\-2\n\n",
+            "- Item 1\n- Item 2-1\n\n  Item 2-2\n",
         ),
         (
             """<ul>
 <li><p>First paragraph</p><p>Second paragraph</p></li>
 <li>Simple item</li>
 </ul>""",
-            "* First paragraph\n\n    Second paragraph\n\n* Simple item\n\n",
+            "- First paragraph\n\n  Second paragraph\n\n- Simple item\n",
         ),
         (
             """<ol>
@@ -293,7 +293,7 @@ def test_empty_line_handling_in_nested_list(convert: Callable[..., str]) -> None
 </li>
 <li>Third item</li>
 </ol>""",
-            "1. First item\n2. Second item line 1\n\n    Second item line 2\n\n3. Third item\n\n",
+            "1. First item\n2. Second item line 1\n\n  Second item line 2\n\n3. Third item\n",
         ),
         (
             """<ul>
@@ -303,7 +303,7 @@ def test_empty_line_handling_in_nested_list(convert: Callable[..., str]) -> None
     <div>More content</div>
 </li>
 </ul>""",
-            "* Main content\n\n    + Nested item\n\n    More content\n\n",
+            "- Main content\n\n  * Nested item\n  More content\n",
         ),
         (
             """<ul>
@@ -314,7 +314,7 @@ def test_empty_line_handling_in_nested_list(convert: Callable[..., str]) -> None
     </div>
 </li>
 </ul>""",
-            "* Deep paragraph 1\n\n    Deep paragraph 2\n\n",
+            "- Deep paragraph 1\n\n  Deep paragraph 2\n",
         ),
         (
             """<ul>
@@ -327,7 +327,7 @@ def test_empty_line_handling_in_nested_list(convert: Callable[..., str]) -> None
     <div>Item 2 line 2</div>
 </li>
 </ul>""",
-            "* Item 1 line 1\n\n    Item 1 line 2\n\n* Item 2 line 1\n\n    Item 2 line 2\n\n",
+            "- Item 1 line 1\n\n  Item 1 line 2\n\n- Item 2 line 1\n\n  Item 2 line 2\n",
         ),
         (
             """<ol>
@@ -337,7 +337,7 @@ def test_empty_line_handling_in_nested_list(convert: Callable[..., str]) -> None
     <p>Last paragraph</p>
 </li>
 </ol>""",
-            "1. First paragraph\n\n    Middle div\n\n    Last paragraph\n\n",
+            "1. First paragraph\n\n  Middle div\n\n  Last paragraph\n",
         ),
         (
             """<ul>
@@ -350,7 +350,7 @@ def test_empty_line_handling_in_nested_list(convert: Callable[..., str]) -> None
     </ul>
 </li>
 </ul>""",
-            "* Level 1\n\n    + Level 2\n            Content line 1\n            Content line 2\n\n",
+            "- Level 1\n  * Level 2\n      Content line 1\n      Content line 2\n",
         ),
     ],
 )

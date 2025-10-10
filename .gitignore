@@ -36,3 +36,15 @@ AGENTS.md
 # Benchmark results
 .benchmarks/
 BENCHMARK_BASELINE.md
+
+# Rust
+target/
+Cargo.lock
+**/*.rs.bk
+*.pdb
+*.so
+*.dylib
+html_to_markdown-*.data/
+
+# Generated CLI binary (created by scripts/prepare_wheel.py)
+html_to_markdown/bin/

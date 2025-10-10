@@ -1,3 +1,21 @@
+"""html-to-markdown: Convert HTML to Markdown using Rust backend.
+
+This package provides high-performance HTML to Markdown conversion
+powered by Rust with a clean Python API.
+
+V2 API (current):
+    from html_to_markdown import convert, ConversionOptions
+
+    options = ConversionOptions(heading_style="atx")
+    markdown = convert(html, options)
+
+V1 API (backward compatibility):
+    from html_to_markdown import convert_to_markdown
+
+    markdown = convert_to_markdown(html, heading_style="atx")
+"""
+
+from html_to_markdown.api import convert
 from html_to_markdown.exceptions import (
     ConflictingOptionsError,
     EmptyHtmlError,
@@ -5,20 +23,26 @@ from html_to_markdown.exceptions import (
     InvalidParserError,
     MissingDependencyError,
 )
-from html_to_markdown.preprocessor import create_preprocessor, preprocess_html
-from html_to_markdown.processing import convert_to_markdown, convert_to_markdown_stream
-
-markdownify = convert_to_markdown
+from html_to_markdown.options import (
+    ConversionOptions,
+    ParsingOptions,
+    PreprocessingOptions,
+)
+from html_to_markdown.v1_compat import convert_to_markdown, convert_to_markdown_stream, markdownify
 
 __all__ = [
     "ConflictingOptionsError",
+    "ConversionOptions",
     "EmptyHtmlError",
     "HtmlToMarkdownError",
     "InvalidParserError",
     "MissingDependencyError",
+    "ParsingOptions",
+    "PreprocessingOptions",
+    "convert",
     "convert_to_markdown",
     "convert_to_markdown_stream",
-    "create_preprocessor",
     "markdownify",
-    "preprocess_html",
 ]
+
+__version__ = "2.0.0"
