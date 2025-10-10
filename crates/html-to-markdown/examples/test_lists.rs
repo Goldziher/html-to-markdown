@@ -1,4 +1,4 @@
-use html_to_markdown::convert;
+use html_to_markdown_rs::convert;
 
 fn main() {
     let html = "<ol><li>First item</li><li>Second item</li><li>Third item</li></ol>";

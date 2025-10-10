@@ -3,7 +3,7 @@
 //! These tests verify end-to-end conversion of various HTML elements
 //! to ensure correct Markdown output.
 
-use html_to_markdown::{convert, ConversionOptions};
+use html_to_markdown_rs::{convert, ConversionOptions};
 
 #[test]
 fn test_basic_paragraph() {

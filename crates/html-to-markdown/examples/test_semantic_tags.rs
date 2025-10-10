@@ -1,4 +1,4 @@
-use html_to_markdown::convert;
+use html_to_markdown_rs::convert;
 
 fn main() {
     let html = r#"<article>
