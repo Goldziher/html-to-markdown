@@ -1,6 +1,7 @@
 # html-to-markdown
 
 High-performance HTML to Markdown converter built with Rust. Available as:
+
 - **Rust crate** (`html-to-markdown-rs` on crates.io)
 - **Python package** (`html-to-markdown` on PyPI)
 - **CLI binary** (via Homebrew, Cargo, or direct download)
@@ -208,24 +209,19 @@ markdown = convert_to_markdown(
     html,
     # Heading options
     heading_style="atx",  # "atx", "atx_closed", "underlined"
-
     # List options
     list_indent_width=2,  # Discord/Slack: use 2
     bullets="*+-",  # Bullet characters (cycles through levels)
-
     # Text formatting
     strong_em_symbol="*",  # "*" or "_"
     escape_asterisks=True,  # Escape * in text
     escape_underscores=True,  # Escape _ in text
-
     # Code blocks
     code_language="python",  # Default code block language
     code_block_style="backticks",  # "indented", "backticks", "tildes"
-
     # HTML preprocessing
     preprocess=True,  # Enable HTML cleaning
     preprocessing_preset="standard",  # "minimal", "standard", "aggressive"
-
     # Metadata
     extract_metadata=True,  # Extract HTML metadata
 )
@@ -310,6 +306,7 @@ markdown = convert_to_markdown(
 ```
 
 **hOCR Features:**
+
 - ✅ All 40 element types (logical structure, typesetting, floats, inline, engine-specific)
 - ✅ All 20+ properties (bbox, baseline, textangle, poly, confidence scores, fonts, etc.)
 - ✅ All 5 metadata fields (system, capabilities, languages, scripts, page count)
@@ -321,38 +318,39 @@ markdown = convert_to_markdown(
 
 ### ConversionOptions
 
-| Option                           | Type   | Default       | Description                                                      |
-| -------------------------------- | ------ | ------------- | ---------------------------------------------------------------- |
-| `heading_style`                  | str    | `"atx"`       | Heading format: `"atx"` (#), `"atx_closed"` (# #), `"underlined"` (===) |
-| `list_indent_width`              | int    | `2`           | Spaces per list indent level (CommonMark: 2)                     |
-| `list_indent_type`               | str    | `"spaces"`    | `"spaces"` or `"tabs"`                                           |
-| `bullets`                        | str    | `"*+-"`       | Bullet chars for unordered lists (cycles through levels)         |
-| `strong_em_symbol`               | str    | `"*"`         | Symbol for bold/italic: `"*"` or `"_"`                           |
-| `escape_asterisks`               | bool   | `True`        | Escape `*` in text                                               |
-| `escape_underscores`             | bool   | `True`        | Escape `_` in text                                               |
-| `escape_misc`                    | bool   | `False`       | Escape other Markdown special chars                              |
-| `code_language`                  | str    | `""`          | Default language for code blocks                                 |
-| `code_block_style`               | str    | `"backticks"` | `"indented"` (4 spaces), `"backticks"` (\`\`\`), `"tildes"` (\~~~) |
-| `highlight_style`                | str    | `"double-equal"` | `"double-equal"` (==), `"html"` (<mark>), `"bold"` (\*\*), `"none"` |
-| `extract_metadata`               | bool   | `True`        | Extract HTML metadata as comment                                 |
-| `hocr_extract_tables`            | bool   | `True`        | Enable hOCR table extraction                                     |
-| `hocr_table_column_threshold`    | int    | `50`          | Column detection threshold (pixels)                              |
-| `hocr_table_row_threshold_ratio` | float  | `0.5`         | Row grouping threshold ratio                                     |
+| Option                           | Type  | Default          | Description                                                             |
+| -------------------------------- | ----- | ---------------- | ----------------------------------------------------------------------- |
+| `heading_style`                  | str   | `"atx"`          | Heading format: `"atx"` (#), `"atx_closed"` (# #), `"underlined"` (===) |
+| `list_indent_width`              | int   | `2`              | Spaces per list indent level (CommonMark: 2)                            |
+| `list_indent_type`               | str   | `"spaces"`       | `"spaces"` or `"tabs"`                                                  |
+| `bullets`                        | str   | `"*+-"`          | Bullet chars for unordered lists (cycles through levels)                |
+| `strong_em_symbol`               | str   | `"*"`            | Symbol for bold/italic: `"*"` or `"_"`                                  |
+| `escape_asterisks`               | bool  | `True`           | Escape `*` in text                                                      |
+| `escape_underscores`             | bool  | `True`           | Escape `_` in text                                                      |
+| `escape_misc`                    | bool  | `False`          | Escape other Markdown special chars                                     |
+| `code_language`                  | str   | `""`             | Default language for code blocks                                        |
+| `code_block_style`               | str   | `"backticks"`    | `"indented"` (4 spaces), `"backticks"` (\`\`\`), `"tildes"` (\~~~)      |
+| `highlight_style`                | str   | `"double-equal"` | `"double-equal"` (==), `"html"` (<mark>), `"bold"` (\*\*), `"none"`     |
+| `extract_metadata`               | bool  | `True`           | Extract HTML metadata as comment                                        |
+| `hocr_extract_tables`            | bool  | `True`           | Enable hOCR table extraction                                            |
+| `hocr_table_column_threshold`    | int   | `50`             | Column detection threshold (pixels)                                     |
+| `hocr_table_row_threshold_ratio` | float | `0.5`            | Row grouping threshold ratio                                            |
 
 ### PreprocessingOptions
 
-| Option              | Type | Default      | Description                            |
-| ------------------- | ---- | ------------ | -------------------------------------- |
-| `enabled`           | bool | `False`      | Enable HTML preprocessing              |
+| Option              | Type | Default      | Description                               |
+| ------------------- | ---- | ------------ | ----------------------------------------- |
+| `enabled`           | bool | `False`      | Enable HTML preprocessing                 |
 | `preset`            | str  | `"standard"` | `"minimal"`, `"standard"`, `"aggressive"` |
-| `remove_navigation` | bool | `True`       | Remove `<nav>` and navigation elements |
-| `remove_forms`      | bool | `True`       | Remove `<form>` and form inputs        |
+| `remove_navigation` | bool | `True`       | Remove `<nav>` and navigation elements    |
+| `remove_forms`      | bool | `True`       | Remove `<form>` and form inputs           |
 
 ### CLI Options
 
 All Python options are available as CLI flags. Use `html-to-markdown --help` for full reference.
 
 **Common CLI flags:**
+
 - `--heading-style <STYLE>`: atx, atx-closed, underlined
 - `--list-indent-width <N>`: Number of spaces for list indentation
 - `--bullets <CHARS>`: Bullet characters (e.g., `*+-`)
