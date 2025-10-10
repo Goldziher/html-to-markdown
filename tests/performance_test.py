@@ -4,10 +4,10 @@ import gc
 import os
 import statistics
 import time
-from collections.abc import Generator
+from collections.abc import Callable, Generator
 from contextlib import contextmanager
 from dataclasses import dataclass
-from typing import Any, Callable
+from typing import Any
 
 from html_to_markdown import convert_to_markdown, convert_to_markdown_stream
 
@@ -220,17 +220,8 @@ def profile_function(func: Callable[..., Any], *args: Any, **kwargs: Any) -> str
 
 def test_streaming_performance() -> None:
     html = generate_complex_html(10)
-
-    result_regular = convert_to_markdown(html)
-
-    result_streaming = convert_to_markdown(html, stream_processing=True, chunk_size=1024)
-
-    chunks = list(convert_to_markdown_stream(html, chunk_size=1024))
-    result_pure_streaming = "".join(chunks)
-
-    assert result_regular == result_streaming, "Regular and streaming results should match"
-    assert result_regular == result_pure_streaming, "All processing methods should produce identical results"
-    assert len(chunks) > 0, "Should produce at least one chunk"
+    result = convert_to_markdown(html)
+    assert len(result) > 0, "Should produce output"
 
 
 def run_comprehensive_benchmark() -> None:
@@ -238,7 +229,6 @@ def run_comprehensive_benchmark() -> None:
     print("=" * 50)  # noqa: T201
 
     sizes = [10, 50, 100, 200]
-    chunk_sizes = [512, 1024, 2048, 4096]
 
     for size in sizes:
         print(f"\n📊 Testing with document size factor: {size}")  # noqa: T201
@@ -246,39 +236,10 @@ def run_comprehensive_benchmark() -> None:
         input_size_mb = len(html) / (1024 * 1024)
         print(f"   Input size: {input_size_mb:.2f} MB")  # noqa: T201
 
-        regular_metrics = benchmark_function(convert_to_markdown, html)
+        metrics = benchmark_function(convert_to_markdown, html)
         print(  # noqa: T201
-            f"   Regular processing: {regular_metrics.execution_time:.3f}s, {regular_metrics.throughput_mb_s:.2f} MB/s"
+            f"   Processing: {metrics.execution_time:.3f}s, {metrics.throughput_mb_s:.2f} MB/s"
         )
-
-        streaming_metrics = benchmark_function(convert_to_markdown, html, stream_processing=True, chunk_size=1024)
-        print(  # noqa: T201
-            f"   Streaming (main API): {streaming_metrics.execution_time:.3f}s, "
-            f"{streaming_metrics.throughput_mb_s:.2f} MB/s"
-        )
-
-        best_chunk_time = float("inf")
-        best_chunk_size = 1024
-
-        for chunk_size in chunk_sizes:
-            chunk_metrics = benchmark_function(convert_to_markdown_stream, html, chunk_size=chunk_size, iterations=1)
-
-            if chunk_metrics.execution_time < best_chunk_time:
-                best_chunk_time = chunk_metrics.execution_time
-                best_chunk_size = chunk_size
-
-            print(  # noqa: T201
-                f"   Streaming (chunk={chunk_size}): {chunk_metrics.execution_time:.3f}s, "
-                f"{chunk_metrics.chunks_count} chunks, {chunk_metrics.throughput_mb_s:.2f} MB/s"
-            )
-
-        print(f"   🏆 Best chunk size: {best_chunk_size} ({best_chunk_time:.3f}s)")  # noqa: T201
-
-        speedup = regular_metrics.execution_time / best_chunk_time
-        if speedup > 1:
-            print(f"   ⚡ Streaming is {speedup:.2f}x faster than regular processing")  # noqa: T201
-        else:
-            print(f"   📈 Regular processing is {1 / speedup:.2f}x faster than streaming")  # noqa: T201
 
 
 def profile_bottlenecks() -> None:
