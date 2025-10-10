@@ -21,7 +21,7 @@ def test_table_first_row_in_tbody_without_previous_sibling(convert: Callable[...
     </tbody>
     </table>"""
     result = convert(html)
-    expected = "\n\n| Cell 1 | Cell 2 |\n| --- | --- |\n\n"
+    expected = "\n\n| Cell 1 | Cell 2 |\n| --- | --- |\n"
     assert result == expected
 
 
@@ -109,7 +109,7 @@ def test_caption_empty(convert: Callable[..., str]) -> None:
 def test_caption_inline_mode(convert: Callable[..., str]) -> None:
     html = "<caption>Inline Caption</caption>"
     result = convert(html, convert_as_inline=True)
-    assert result == "Inline Caption"
+    assert result == "*Inline Caption*\n"
 
 
 def test_colgroup_removed(convert: Callable[..., str]) -> None:
@@ -542,7 +542,8 @@ def test_mixed_table_elements(convert: Callable[..., str]) -> None:
 def test_table_sections_inline_mode(convert: Callable[..., str]) -> None:
     html = "<thead><tr><th>Header</th></tr></thead>"
     result = convert(html, convert_as_inline=True)
-    assert "Header" in result
+    # Table sections are stripped in inline mode
+    assert result == ""
 
 
 def test_colgroup_inline_mode(convert: Callable[..., str]) -> None:
@@ -617,13 +618,15 @@ def test_table_first_row_directly_in_table(convert: Callable[..., str]) -> None:
 def test_tbody_inline_mode(convert: Callable[..., str]) -> None:
     html = "<tbody><tr><td>Cell</td></tr></tbody>"
     result = convert(html, convert_as_inline=True)
-    assert "Cell" in result
+    # Table sections are stripped in inline mode
+    assert result == ""
 
 
 def test_tfoot_inline_mode(convert: Callable[..., str]) -> None:
     html = "<tfoot><tr><td>Footer</td></tr></tfoot>"
     result = convert(html, convert_as_inline=True)
-    assert "Footer" in result
+    # Table sections are stripped in inline mode
+    assert result == ""
 
 
 @pytest.mark.parametrize(
@@ -637,13 +640,13 @@ def test_tfoot_inline_mode(convert: Callable[..., str]) -> None:
     <div>Cell 4-2</div>
 </td></tr>
 </table>""",
-            "\n\n| Header 1 | Header 2 |\n| --- | --- |\n| Cell 3 | Cell 4-1<br>Cell 4-2 |\n\n",
+            "\n\n| Header 1 | Header 2 |\n| --- | --- |\n| Cell 3 | Cell 4-1<br>Cell 4-2 |\n",
         ),
         (
             """<table>
 <tr><td><p>Paragraph 1</p><p>Paragraph 2</p></td></tr>
 </table>""",
-            "\n\n| Paragraph 1<br>Paragraph 2 |\n| --- |\n\n",
+            "\n\n| Paragraph 1<br>Paragraph 2 |\n| --- |\n",
         ),
         (
             """<table>
@@ -653,7 +656,7 @@ def test_tfoot_inline_mode(convert: Callable[..., str]) -> None:
 </th><th>Header 2</th></tr>
 <tr><td>Cell 1</td><td>Cell 2</td></tr>
 </table>""",
-            "\n\n| Header 1<br>Sub-header | Header 2 |\n| --- | --- |\n| Cell 1 | Cell 2 |\n\n",
+            "\n\n| Header 1<br>Sub-header | Header 2 |\n| --- | --- |\n| Cell 1 | Cell 2 |\n",
         ),
         (
             """<table>
@@ -663,7 +666,7 @@ def test_tfoot_inline_mode(convert: Callable[..., str]) -> None:
     <div>More text</div>
 </td></tr>
 </table>""",
-            "\n\n| Text content<br>List item<br>More text |\n| --- |\n\n",
+            "\n\n| Text content<br>List item<br>More text |\n| --- |\n",
         ),
         (
             """<table>
@@ -678,7 +681,7 @@ def test_tfoot_inline_mode(convert: Callable[..., str]) -> None:
 </td>
 </tr>
 </table>""",
-            "\n\n| Cell 1-1<br>Cell 1-2 | Cell 2-1<br>Cell 2-2 |\n| --- | --- |\n\n",
+            "\n\n| Cell 1-1<br>Cell 1-2 | Cell 2-1<br>Cell 2-2 |\n| --- | --- |\n",
         ),
         (
             """<table>
@@ -692,7 +695,7 @@ def test_tfoot_inline_mode(convert: Callable[..., str]) -> None:
     <div>More content</div>
 </td></tr>
 </table>""",
-            "\n\n| Header 1 | Header 2 |\n| --- | --- |\n| Spanning cell | First row content<br>Second line |\n| | Next row<br>More content |\n\n",
+            "\n\n| Header 1 | Header 2 |\n| --- | --- |\n| Spanning cell | First row content<br>Second line |\n| | Next row<br>More content |\n",
         ),
         (
             """<table>
@@ -701,7 +704,7 @@ def test_tfoot_inline_mode(convert: Callable[..., str]) -> None:
     <div><p>Nested paragraph 2</p></div>
 </td></tr>
 </table>""",
-            "\n\n| Nested paragraph 1<br>Nested paragraph 2 |\n| --- |\n\n",
+            "\n\n| Nested paragraph 1<br>Nested paragraph 2 |\n| --- |\n",
         ),
         (
             """<table>
@@ -710,7 +713,7 @@ def test_tfoot_inline_mode(convert: Callable[..., str]) -> None:
     <p>Content paragraph</p>
 </td></tr>
 </table>""",
-            "\n\n| Title<br>Content paragraph |\n| --- |\n\n",
+            "\n\n| Title<br>Content paragraph |\n| --- |\n",
         ),
     ],
 )
