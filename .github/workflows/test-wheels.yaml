@@ -1,0 +1,130 @@
+name: Test Wheel Building
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+      - v2-dev
+    paths:
+      - 'crates/**'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+      - 'pyproject.toml'
+      - 'prepare_wheel.py'
+      - '.github/workflows/test-wheels.yaml'
+      - '.github/actions/build-wheels/**'
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build_wheels:
+    name: Build wheels on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Build wheels
+        uses: ./.github/actions/build-wheels
+
+  test_wheels:
+    name: Test wheels on Python ${{ matrix.python-version }}
+    needs: build_wheels
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        python-version: ['3.10', '3.12', '3.14']
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v6
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Download wheels
+        uses: actions/download-artifact@v4
+        with:
+          name: wheels-${{ runner.os }}
+          path: ./wheels
+
+      - name: Install wheel and run full test suite
+        shell: bash
+        run: |
+          # Find the wheel file (cp310-abi3 is compatible with all Python 3.10+)
+          wheel_file=$(find ./wheels -name "*.whl" | head -1)
+
+          if [ -z "$wheel_file" ]; then
+            echo "No wheel found for Python ${{ matrix.python-version }}"
+            ls ./wheels/
+            exit 1
+          fi
+
+          echo "Installing wheel: $wheel_file"
+          pip install "$wheel_file"
+
+          # Install test dependencies
+          pip install pytest pytest-cov pytest-mock pytest-benchmark
+
+          # Remove source directory to ensure tests use installed wheel
+          rm -rf html_to_markdown
+
+          # Test basic import and functionality
+          python -c "
+          import html_to_markdown
+          print('Import successful')
+
+          # Test v2 API
+          from html_to_markdown import convert, ConversionOptions
+          print('V2 API available')
+
+          # Test v1 compatibility
+          from html_to_markdown import convert_to_markdown
+          print('V1 API available')
+
+          # Test basic conversion
+          html = '<p>Hello <strong>world</strong>!</p>'
+          result = convert_to_markdown(html)
+          assert 'Hello **world**!' in result
+          print('Basic conversion works')
+
+          print('All wheel smoke tests passed!')
+          "
+
+          # Run full test suite
+          echo "Running full test suite..."
+          pytest tests/ -v --tb=short
+
+  summarize:
+    name: Wheel building summary
+    needs: [build_wheels, test_wheels]
+    runs-on: ubuntu-latest
+    if: always()
+
+    steps:
+      - name: Display results
+        run: |
+          echo "## Wheel Building Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Build Status: ${{ needs.build_wheels.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "Test Status: ${{ needs.test_wheels.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          if [ "${{ needs.build_wheels.result }}" = "success" ] && [ "${{ needs.test_wheels.result }}" = "success" ]; then
+            echo "✅ All wheels built and tested successfully!" >> $GITHUB_STEP_SUMMARY
+            echo "Ready to integrate with release pipeline." >> $GITHUB_STEP_SUMMARY
+          else
+            echo "❌ Some wheel builds or tests failed." >> $GITHUB_STEP_SUMMARY
+            echo "Check job details for more information." >> $GITHUB_STEP_SUMMARY
+          fi

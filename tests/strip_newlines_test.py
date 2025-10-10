@@ -17,8 +17,8 @@ specified or <code class="docutils literal notranslate"><span class="pre">-1</sp
     assert "\n" in result_default
 
     result_stripped = convert(html, strip_newlines=True, wrap=False)
-    assert "\n\n" in result_stripped
-    assert result_stripped.count("\n") == 2
+    assert "\n" in result_stripped
+    assert result_stripped.count("\n") == 1
 
     assert "Return a list of the words in the string" in result_stripped
 
@@ -62,7 +62,7 @@ text</strong> and <em>italic
 text</em> with line breaks.</p>"""
 
     result = convert(html, strip_newlines=True)
-    assert result == "This is **bold text** and *italic text* with line breaks.\n\n"
+    assert result == "This is **bold text** and *italic text* with line breaks.\n"
 
 
 def test_strip_newlines_empty_html(convert: Callable[..., str]) -> None:
@@ -76,7 +76,7 @@ def test_strip_newlines_preserves_br_tags(convert: Callable[..., str]) -> None:
     html = "<p>Line one<br>Line two</p>"
 
     result = convert(html, strip_newlines=True)
-    assert result == "Line one  \nLine two\n\n"
+    assert result == "Line one  \nLine two\n"
 
 
 def test_strip_newlines_with_lists(convert: Callable[..., str]) -> None:
@@ -88,8 +88,8 @@ also with newline</li>
 </ul>"""
 
     result = convert(html, strip_newlines=True)
-    assert "* Item one with newline\n" in result
-    assert "* Item two also with newline\n" in result
+    assert "- Item one with newline\n" in result
+    assert "- Item two also with newline\n" in result
 
 
 def test_strip_newlines_complex_html(convert: Callable[..., str]) -> None:

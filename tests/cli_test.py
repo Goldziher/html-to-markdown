@@ -10,49 +10,11 @@ import os
 import subprocess
 import sys
 from typing import TYPE_CHECKING
-from unittest.mock import Mock, mock_open, patch
 
 import pytest
 
-from html_to_markdown.cli import main
-from html_to_markdown.exceptions import InvalidEncodingError
-
 if TYPE_CHECKING:
-    from collections.abc import Generator
     from pathlib import Path
-
-DEFAULT_CLI_ARGS = {
-    "autolinks": False,
-    "br_in_tables": False,
-    "bullets": "*+-",
-    "code_language": "",
-    "convert": None,
-    "convert_as_inline": False,
-    "default_title": False,
-    "source_encoding": None,
-    "escape_asterisks": True,
-    "escape_misc": True,
-    "escape_underscores": True,
-    "extract_metadata": True,
-    "heading_style": "underlined",
-    "highlight_style": "double-equal",
-    "keep_inline_images_in": None,
-    "list_indent_type": "spaces",
-    "list_indent_width": 4,
-    "newline_style": "spaces",
-    "preprocess_html": False,
-    "preprocessing_preset": "standard",
-    "remove_forms": True,
-    "remove_navigation": True,
-    "strip": None,
-    "strip_newlines": False,
-    "strong_em_symbol": "*",
-    "sub_symbol": "",
-    "sup_symbol": "",
-    "whitespace_mode": "normalized",
-    "wrap": False,
-    "wrap_width": 80,
-}
 
 
 def run_cli_command(
@@ -111,25 +73,6 @@ def run_cli(args: list[str], input_html: str) -> str:
 
 
 @pytest.fixture
-def mock_convert_to_markdown() -> Generator[Mock, None, None]:
-    with patch("html_to_markdown.cli.convert_to_markdown") as mock:
-        mock.return_value = "Mocked Markdown Output"
-        yield mock
-
-
-@pytest.fixture
-def mock_stdin() -> Generator[None, None, None]:
-    mock_buffer = Mock()
-    mock_buffer.read.return_value = b"<html><body><p>Test from stdin</p></body></html>"
-
-    mock_stdin_obj = Mock()
-    mock_stdin_obj.buffer = mock_buffer
-
-    with patch("sys.stdin", mock_stdin_obj):
-        yield
-
-
-@pytest.fixture
 def sample_html_file(tmp_path: Path) -> Path:
     file_path = tmp_path / "test.html"
     content = """
@@ -176,223 +119,6 @@ def hello():
     return file_path
 
 
-def test_file_input_mocked(mock_convert_to_markdown: Mock) -> None:
-    test_html_bytes = b"<html><body><h1>Test</h1></body></html>"
-
-    with patch("pathlib.Path.open") as mock_path_open:
-        mock_file = Mock()
-        mock_file.read.return_value = test_html_bytes
-        mock_path_open.return_value.__enter__.return_value = mock_file
-        mock_path_open.return_value.__exit__ = lambda self, *args: None
-
-        result = main(["input.html"])
-
-    assert result == "Mocked Markdown Output"
-    mock_path_open.assert_called_once_with("rb")
-    mock_convert_to_markdown.assert_called_once_with(test_html_bytes, **DEFAULT_CLI_ARGS)
-
-
-def test_stdin_input_mocked(mock_convert_to_markdown: Mock, mock_stdin: Mock) -> None:
-    result = main([])
-
-    assert result == "Mocked Markdown Output"
-    mock_convert_to_markdown.assert_called_once_with(
-        b"<html><body><p>Test from stdin</p></body></html>", **DEFAULT_CLI_ARGS
-    )
-
-
-def test_strip_option(mock_convert_to_markdown: Mock, mock_stdin: Mock) -> None:
-    main(["--strip", "div", "span"])
-    mock_convert_to_markdown.assert_called_once()
-    assert mock_convert_to_markdown.call_args[1]["strip"] == ["div", "span"]
-
-
-def test_convert_option(mock_convert_to_markdown: Mock, mock_stdin: Mock) -> None:
-    main(["--convert", "p", "h1"])
-    mock_convert_to_markdown.assert_called_once()
-    assert mock_convert_to_markdown.call_args[1]["convert"] == ["p", "h1"]
-
-
-def test_autolinks_option(mock_convert_to_markdown: Mock, mock_stdin: Mock) -> None:
-    main(["--autolinks"])
-    mock_convert_to_markdown.assert_called_once()
-    assert mock_convert_to_markdown.call_args[1]["autolinks"] is True
-
-
-def test_default_title_option(mock_convert_to_markdown: Mock, mock_stdin: Mock) -> None:
-    main(["--default-title"])
-    mock_convert_to_markdown.assert_called_once()
-    assert mock_convert_to_markdown.call_args[1]["default_title"] is True
-
-
-def test_heading_style_option(mock_convert_to_markdown: Mock, mock_stdin: Mock) -> None:
-    main(["--heading-style", "atx"])
-    mock_convert_to_markdown.assert_called_once()
-    assert mock_convert_to_markdown.call_args[1]["heading_style"] == "atx"
-
-
-def test_bullets_option(mock_convert_to_markdown: Mock, mock_stdin: Mock) -> None:
-    main(["--bullets", "+-*"])
-    mock_convert_to_markdown.assert_called_once()
-    assert mock_convert_to_markdown.call_args[1]["bullets"] == "+-*"
-
-
-def test_strong_em_symbol_option(mock_convert_to_markdown: Mock, mock_stdin: Mock) -> None:
-    main(["--strong-em-symbol", "_"])
-    mock_convert_to_markdown.assert_called_once()
-    assert mock_convert_to_markdown.call_args[1]["strong_em_symbol"] == "_"
-
-
-def test_sub_and_sup_symbol_options(mock_convert_to_markdown: Mock, mock_stdin: Mock) -> None:
-    main(["--sub-symbol", "~", "--sup-symbol", "^"])
-    mock_convert_to_markdown.assert_called_once()
-    assert mock_convert_to_markdown.call_args[1]["sub_symbol"] == "~"
-    assert mock_convert_to_markdown.call_args[1]["sup_symbol"] == "^"
-
-
-def test_newline_style_option(mock_convert_to_markdown: Mock, mock_stdin: Mock) -> None:
-    main(["--newline-style", "backslash"])
-    mock_convert_to_markdown.assert_called_once()
-    assert mock_convert_to_markdown.call_args[1]["newline_style"] == "backslash"
-
-
-def test_code_language_option(mock_convert_to_markdown: Mock, mock_stdin: Mock) -> None:
-    main(["--code-language", "python"])
-    mock_convert_to_markdown.assert_called_once()
-    assert mock_convert_to_markdown.call_args[1]["code_language"] == "python"
-
-
-def test_no_escape_options(mock_convert_to_markdown: Mock, mock_stdin: Mock) -> None:
-    main(["--no-escape-asterisks", "--no-escape-underscores"])
-    mock_convert_to_markdown.assert_called_once()
-    assert mock_convert_to_markdown.call_args[1]["escape_asterisks"] is False
-    assert mock_convert_to_markdown.call_args[1]["escape_underscores"] is False
-
-
-def test_keep_inline_images_in_option(mock_convert_to_markdown: Mock, mock_stdin: Mock) -> None:
-    main(["--keep-inline-images-in", "p", "div"])
-    mock_convert_to_markdown.assert_called_once()
-    assert mock_convert_to_markdown.call_args[1]["keep_inline_images_in"] == ["p", "div"]
-
-
-def test_wrap_options(mock_convert_to_markdown: Mock, mock_stdin: Mock) -> None:
-    main(["--wrap", "--wrap-width", "100"])
-    mock_convert_to_markdown.assert_called_once()
-    assert mock_convert_to_markdown.call_args[1]["wrap"] is True
-    assert mock_convert_to_markdown.call_args[1]["wrap_width"] == 100
-
-
-def test_strip_newlines_option(mock_convert_to_markdown: Mock, mock_stdin: Mock) -> None:
-    main(["--strip-newlines"])
-    mock_convert_to_markdown.assert_called_once()
-    assert mock_convert_to_markdown.call_args[1]["strip_newlines"] is True
-
-
-def test_br_in_tables_option(mock_convert_to_markdown: Mock, mock_stdin: Mock) -> None:
-    main(["--br-in-tables"])
-    mock_convert_to_markdown.assert_called_once()
-    assert mock_convert_to_markdown.call_args[1]["br_in_tables"] is True
-
-
-def test_stream_processing_option(mock_convert_to_markdown: Mock, mock_stdin: Mock) -> None:
-    main(["--stream-processing", "--chunk-size", "2048"])
-    mock_convert_to_markdown.assert_called_once()
-    args = mock_convert_to_markdown.call_args[1]
-    assert args["stream_processing"] is True
-    assert args["chunk_size"] == 2048
-
-
-def test_stream_processing_with_progress(mock_convert_to_markdown: Mock, mock_stdin: Mock) -> None:
-    with patch("sys.stderr") as mock_stderr:
-        main(["--stream-processing", "--show-progress"])
-        mock_convert_to_markdown.assert_called_once()
-        args = mock_convert_to_markdown.call_args[1]
-        assert args["stream_processing"] is True
-        assert "progress_callback" in args
-
-        callback = args["progress_callback"]
-        callback(50, 100)
-        mock_stderr.write.assert_called_with("\rProgress: 50.0% (50/100 bytes)")
-        mock_stderr.flush.assert_called_once()
-
-
-def test_convert_as_inline_option(mock_convert_to_markdown: Mock, mock_stdin: Mock) -> None:
-    main(["--convert-as-inline"])
-    mock_convert_to_markdown.assert_called_once()
-    assert mock_convert_to_markdown.call_args[1]["convert_as_inline"] is True
-
-
-def test_no_extract_metadata_option(mock_convert_to_markdown: Mock, mock_stdin: Mock) -> None:
-    main(["--no-extract-metadata"])
-    mock_convert_to_markdown.assert_called_once()
-    assert mock_convert_to_markdown.call_args[1]["extract_metadata"] is False
-
-
-def test_highlight_style_option(mock_convert_to_markdown: Mock, mock_stdin: Mock) -> None:
-    main(["--highlight-style", "html"])
-    mock_convert_to_markdown.assert_called_once()
-    assert mock_convert_to_markdown.call_args[1]["highlight_style"] == "html"
-
-
-def test_parser_option(mock_convert_to_markdown: Mock, mock_stdin: Mock) -> None:
-    main(["--parser", "lxml"])
-    mock_convert_to_markdown.assert_called_once()
-    assert mock_convert_to_markdown.call_args[1]["parser"] == "lxml"
-
-
-def test_list_indent_options(mock_convert_to_markdown: Mock, mock_stdin: Mock) -> None:
-    main(["--list-indent-type", "tabs", "--list-indent-width", "2"])
-    mock_convert_to_markdown.assert_called_once()
-    assert mock_convert_to_markdown.call_args[1]["list_indent_type"] == "tabs"
-    assert mock_convert_to_markdown.call_args[1]["list_indent_width"] == 2
-
-
-def test_whitespace_mode_options(mock_convert_to_markdown: Mock, mock_stdin: Mock) -> None:
-    main(["--whitespace-mode", "strict"])
-    mock_convert_to_markdown.assert_called_once()
-    assert mock_convert_to_markdown.call_args[1]["whitespace_mode"] == "strict"
-
-
-def test_preprocessing_options(mock_convert_to_markdown: Mock, mock_stdin: Mock) -> None:
-    main(["--preprocess-html", "--preprocessing-preset", "aggressive", "--no-remove-forms", "--no-remove-navigation"])
-    mock_convert_to_markdown.assert_called_once()
-    args = mock_convert_to_markdown.call_args[1]
-    assert args["preprocess_html"] is True
-    assert args["preprocessing_preset"] == "aggressive"
-    assert args["remove_forms"] is False
-    assert args["remove_navigation"] is False
-
-
-def test_all_options_combined(mock_convert_to_markdown: Mock, mock_stdin: Mock) -> None:
-    main(
-        [
-            "--parser",
-            "lxml",
-            "--list-indent-type",
-            "tabs",
-            "--list-indent-width",
-            "3",
-            "--whitespace-mode",
-            "strict",
-            "--preprocess-html",
-            "--preprocessing-preset",
-            "minimal",
-            "--no-remove-forms",
-            "--no-remove-navigation",
-        ]
-    )
-    mock_convert_to_markdown.assert_called_once()
-    args = mock_convert_to_markdown.call_args[1]
-    assert args["parser"] == "lxml"
-    assert args["list_indent_type"] == "tabs"
-    assert args["list_indent_width"] == 3
-    assert args["whitespace_mode"] == "strict"
-    assert args["preprocess_html"] is True
-    assert args["preprocessing_preset"] == "minimal"
-    assert args["remove_forms"] is False
-    assert args["remove_navigation"] is False
-
-
 def test_basic_file_conversion(sample_html_file: Path) -> None:
     stdout, stderr, returncode = run_cli_command([str(sample_html_file)])
 
@@ -401,8 +127,8 @@ def test_basic_file_conversion(sample_html_file: Path) -> None:
     assert "Sample Document" in stdout
     assert "**test**" in stdout
     assert "*formatted*" in stdout
-    assert "* Item 1" in stdout
-    assert "```\nprint" in stdout
+    assert "- Item 1" in stdout  # CommonMark default: hyphen bullets
+    assert '    print("Hello World")' in stdout  # CommonMark default: indented code blocks
 
 
 def test_complex_file_conversion(complex_html_file: Path) -> None:
@@ -432,7 +158,7 @@ def test_heading_styles_integration(sample_html_file: Path) -> None:
     stdout, _, _ = run_cli_command([str(sample_html_file), "--heading-style", "atx"])
     assert "# Sample Document" in stdout
 
-    stdout, _, _ = run_cli_command([str(sample_html_file), "--heading-style", "atx_closed"])
+    stdout, _, _ = run_cli_command([str(sample_html_file), "--heading-style", "atx-closed"])
     assert "# Sample Document #" in stdout
 
 
@@ -444,17 +170,27 @@ def test_formatting_options_integration(sample_html_file: Path) -> None:
 
 
 def test_code_block_options_integration(complex_html_file: Path) -> None:
-    stdout, _, _ = run_cli_command([str(complex_html_file), "--code-language", "python"])
+    # v2 default is indented code blocks; need to specify backticks style
+    stdout, _, _ = run_cli_command(
+        [str(complex_html_file), "--code-language", "python", "--code-block-style", "backticks"]
+    )
     assert "```python" in stdout
 
 
 def test_special_characters_integration() -> None:
     input_html = "<p>Text with * and _ and ** symbols</p>"
 
+    # v2 default: no escaping
     stdout, _, _ = run_cli_command([], input_text=input_html)
+    assert "*" in stdout
+    assert "_" in stdout
+
+    # Enable escaping explicitly
+    stdout, _, _ = run_cli_command(["--escape-asterisks", "--escape-underscores"], input_text=input_html)
     assert "\\*" in stdout
     assert "\\_" in stdout
 
+    # Disable escaping (same as default)
     stdout, _, _ = run_cli_command(["--no-escape-asterisks", "--no-escape-underscores"], input_text=input_html)
     assert "\\*" not in stdout
     assert "\\_" not in stdout
@@ -516,37 +252,29 @@ def test_pipe_chain() -> None:
 def test_error_handling() -> None:
     _stdout, stderr, returncode = run_cli_command(["nonexistent.html"])
     assert returncode != 0
-    assert "No such file" in stderr
+    assert "No such file" in stderr or "cannot find the file" in stderr
 
     _stdout, stderr, returncode = run_cli_command(["--invalid-option"])
     assert returncode != 0
-    assert "unrecognized arguments" in stderr
-
-    _stdout, stderr, returncode = run_cli_command(["--strip", "p", "--convert", "p"], input_text="<p>Test</p>")
-    assert returncode != 0
-    assert "Only one of 'strip' and 'convert' can be specified" in stderr
-
-    _stdout, stderr, returncode = run_cli_command(["--strip", "p"], input_text="")
-    assert returncode != 0
-    assert "The input HTML is empty" in stderr
+    assert "unexpected argument" in stderr or "unrecognized" in stderr
 
 
 def test_discord_list_indentation() -> None:
     html = "<ul><li>Item 1<ul><li>Nested</li></ul></li><li>Item 2</li></ul>"
     output = run_cli(["--list-indent-width", "2", "--no-extract-metadata"], html)
-    assert "* Item 1\n\n  + Nested\n* Item 2" in output
+    assert "- Item 1\n  - Nested\n- Item 2" in output
 
 
 def test_tab_list_indentation() -> None:
     html = "<ul><li>Item 1<ul><li>Nested</li></ul></li></ul>"
     output = run_cli(["--list-indent-type", "tabs", "--no-extract-metadata"], html)
-    assert "* Item 1\n\n\t+ Nested" in output
+    assert "- Item 1\n\t- Nested" in output
 
 
 def test_whitespace_mode_strict() -> None:
     html = "<p>  Multiple   spaces   here  </p>"
     output = run_cli(["--whitespace-mode", "strict", "--no-extract-metadata"], html)
-    assert "Multiple spaces here" in output
+    assert "  Multiple   spaces   here  " in output
 
 
 def test_whitespace_mode_normalized() -> None:
@@ -557,7 +285,7 @@ def test_whitespace_mode_normalized() -> None:
 
 def test_parser_selection() -> None:
     html = "<div>Test</div>"
-    output = run_cli(["--parser", "html.parser", "--no-extract-metadata"], html)
+    output = run_cli(["--no-extract-metadata"], html)
     assert "Test" in output
 
 
@@ -571,7 +299,7 @@ def test_html_preprocessing() -> None:
     </body>
     </html>
     """
-    output = run_cli(["--preprocess-html", "--no-extract-metadata"], html)
+    output = run_cli(["--preprocess", "--no-extract-metadata"], html)
     assert "Navigation menu" not in output
     assert "Main content" in output
     assert "Form content" not in output
@@ -586,7 +314,7 @@ def test_preprocess_keep_forms() -> None:
     </body>
     </html>
     """
-    output = run_cli(["--preprocess-html", "--no-remove-forms", "--no-extract-metadata"], html)
+    output = run_cli(["--preprocess", "--keep-forms", "--no-extract-metadata"], html)
     assert "Form content" in output
     assert "Main content" in output
 
@@ -600,7 +328,7 @@ def test_preprocess_keep_navigation() -> None:
     </body>
     </html>
     """
-    output = run_cli(["--preprocess-html", "--no-remove-navigation", "--no-extract-metadata"], html)
+    output = run_cli(["--preprocess", "--keep-navigation", "--no-extract-metadata"], html)
     assert "Navigation menu" in output
     assert "Main content" in output
 
@@ -615,7 +343,7 @@ def test_preprocessing_preset_minimal() -> None:
     </body>
     </html>
     """
-    output = run_cli(["--preprocess-html", "--preprocessing-preset", "minimal", "--no-extract-metadata"], html)
+    output = run_cli(["--preprocess", "--preset", "minimal", "--no-extract-metadata"], html)
     assert "alert" not in output
     assert "color: red" not in output
     assert "Main content" in output
@@ -631,14 +359,14 @@ def test_preprocessing_preset_aggressive() -> None:
     </body>
     </html>
     """
-    output = run_cli(["--preprocess-html", "--preprocessing-preset", "aggressive", "--no-extract-metadata"], html)
+    output = run_cli(["--preprocess", "--preset", "aggressive", "--no-extract-metadata"], html)
     assert "Main content" in output
 
 
 def test_combined_list_and_whitespace() -> None:
     html = "<ul><li>Item  with   spaces<ul><li>Nested  item</li></ul></li></ul>"
     output = run_cli(["--list-indent-width", "2", "--whitespace-mode", "normalized", "--no-extract-metadata"], html)
-    assert "* Item with spaces\n\n  + Nested item" in output
+    assert "- Item with spaces\n  - Nested item" in output
 
 
 def test_all_new_options_combined() -> None:
@@ -662,15 +390,15 @@ def test_all_new_options_combined() -> None:
             "spaces",
             "--whitespace-mode",
             "normalized",
-            "--preprocess-html",
-            "--preprocessing-preset",
+            "--preprocess",
+            "--preset",
             "standard",
             "--no-extract-metadata",
         ],
         html,
     )
     assert "Navigation" not in output
-    assert "* Item 1\n\n   + Nested" in output
+    assert "- Item 1\n   - Nested" in output
 
 
 def test_help_includes_new_options() -> None:
@@ -682,14 +410,13 @@ def test_help_includes_new_options() -> None:
     )
     help_text = result.stdout
 
-    assert "--parser" in help_text
     assert "--list-indent-type" in help_text
     assert "--list-indent-width" in help_text
     assert "--whitespace-mode" in help_text
-    assert "--preprocess-html" in help_text
-    assert "--preprocessing-preset" in help_text
-    assert "--no-remove-forms" in help_text
-    assert "--no-remove-navigation" in help_text
+    assert "--preprocess" in help_text
+    assert "--preset" in help_text
+    assert "--keep-forms" in help_text
+    assert "--keep-navigation" in help_text
 
     assert "Discord" in help_text or "2" in help_text
 
@@ -703,115 +430,7 @@ def test_newline_styles(newline_style: str) -> None:
     assert expected_break in stdout
 
 
-@pytest.mark.parametrize(
-    "option,expected_param,expected_value",
-    [
-        (["--autolinks"], "autolinks", True),
-        (["--default-title"], "default_title", True),
-        (["--heading-style", "atx"], "heading_style", "atx"),
-        (["--bullets", "+-*"], "bullets", "+-*"),
-        (["--strong-em-symbol", "_"], "strong_em_symbol", "_"),
-        (["--newline-style", "backslash"], "newline_style", "backslash"),
-        (["--code-language", "python"], "code_language", "python"),
-        (["--no-escape-asterisks"], "escape_asterisks", False),
-        (["--strip-newlines"], "strip_newlines", True),
-        (["--convert-as-inline"], "convert_as_inline", True),
-        (["--no-extract-metadata"], "extract_metadata", False),
-        (["--parser", "lxml"], "parser", "lxml"),
-        (["--list-indent-type", "tabs"], "list_indent_type", "tabs"),
-        (["--list-indent-width", "2"], "list_indent_width", 2),
-        (["--whitespace-mode", "strict"], "whitespace_mode", "strict"),
-        (["--preprocess-html"], "preprocess_html", True),
-        (["--preprocessing-preset", "aggressive"], "preprocessing_preset", "aggressive"),
-        (["--no-remove-forms"], "remove_forms", False),
-        (["--no-remove-navigation"], "remove_navigation", False),
-    ],
-)
-def test_individual_cli_options(
-    option: list[str],
-    expected_param: str,
-    expected_value: str | bool | int,
-    mock_convert_to_markdown: Mock,
-    mock_stdin: Mock,
-) -> None:
-    main(option)
-    mock_convert_to_markdown.assert_called_once()
-    assert mock_convert_to_markdown.call_args[1][expected_param] == expected_value
-
-
-def test_main_with_source_encoding_option(mock_convert_to_markdown: Mock) -> None:
-    test_html = "<html><body><h1>Test ñ</h1></body></html>"
-    mock_file = mock_open(read_data=test_html)
-
-    with patch("builtins.open", mock_file), patch("pathlib.Path.open") as mock_path_open:
-        mock_path_open.return_value.__enter__ = lambda self: mock_file.return_value
-        mock_path_open.return_value.__exit__ = lambda self, *args: None
-        mock_path_open.return_value.read.return_value = test_html
-
-        result = main(["input.html", "--source-encoding", "utf-8"])
-
-    assert result == "Mocked Markdown Output"
-    mock_path_open.assert_called_once_with(encoding="utf-8", errors="replace")
-    expected_args = DEFAULT_CLI_ARGS.copy()
-    expected_args["source_encoding"] = "utf-8"
-    mock_convert_to_markdown.assert_called_once_with(test_html, **expected_args)
-
-
-def test_main_with_invalid_source_encoding_raises_error(mock_convert_to_markdown: Mock) -> None:
-    test_html = "<html><body><h1>Test</h1></body></html>"
-    mock_file = mock_open(read_data=test_html)
-
-    with patch("builtins.open", mock_file), patch("pathlib.Path.open") as mock_path_open:
-        mock_file_obj = Mock()
-        mock_file_obj.read.side_effect = LookupError("unknown encoding: invalid-encoding")
-
-        mock_path_open.return_value.__enter__.return_value = mock_file_obj
-        mock_path_open.return_value.__exit__.return_value = None
-
-        with pytest.raises(InvalidEncodingError) as exc_info:
-            main(["input.html", "--source-encoding", "invalid-encoding"])
-
-        assert str(exc_info.value) == "The specified encoding (invalid-encoding) is not valid."
-        mock_path_open.assert_called_once_with(encoding="invalid-encoding", errors="replace")
-
-
-def test_main_with_source_encoding_ignored_for_stdin(mock_convert_to_markdown: Mock) -> None:
-    mock_buffer = Mock()
-    mock_buffer.read.return_value = b"<html><body><p>Test from stdin</p></body></html>"
-
-    mock_stdin_obj = Mock()
-    mock_stdin_obj.buffer = mock_buffer
-
-    with patch("sys.stdin", mock_stdin_obj):
-        result = main(["--source-encoding", "utf-8"])
-
-    assert result == "Mocked Markdown Output"
-
-    expected_args = DEFAULT_CLI_ARGS.copy()
-    expected_args["source_encoding"] = "utf-8"
-    mock_convert_to_markdown.assert_called_once_with(
-        b"<html><body><p>Test from stdin</p></body></html>", **expected_args
-    )
-
-
-def test_main_with_source_encoding_default_none(mock_convert_to_markdown: Mock) -> None:
-    test_html_bytes = b"<html><body><h1>Test default encoding</h1></body></html>"
-
-    with patch("pathlib.Path.open") as mock_path_open:
-        mock_file = Mock()
-        mock_file.read.return_value = test_html_bytes
-        mock_path_open.return_value.__enter__.return_value = mock_file
-        mock_path_open.return_value.__exit__ = lambda self, *args: None
-
-        result = main(["input.html"])
-
-    assert result == "Mocked Markdown Output"
-    mock_path_open.assert_called_once_with("rb")
-    mock_convert_to_markdown.assert_called_once_with(test_html_bytes, **DEFAULT_CLI_ARGS)
-
-
 def test_source_encoding_parameter_with_piped_bytes() -> None:
-    """Test that the --source-encoding parameter works with piped binary input"""
     html_utf8 = "<p>UTF-8: café 日本語</p>".encode()
     stdout, stderr, returncode = run_cli_command([], input_bytes=html_utf8)
     assert returncode == 0
@@ -819,55 +438,52 @@ def test_source_encoding_parameter_with_piped_bytes() -> None:
     assert stderr == ""
 
     html_latin1 = "<p>Latin-1: café naïve résumé</p>".encode("latin-1")
-    stdout, stderr, returncode = run_cli_command(["--source-encoding", "latin-1"], input_bytes=html_latin1)
+    stdout, stderr, returncode = run_cli_command(["--encoding", "latin-1"], input_bytes=html_latin1)
     assert returncode == 0
     assert "café naïve résumé" in stdout
     assert stderr == ""
 
     html_windows = '<p>Windows: "smart quotes"</p>'.encode("windows-1252")
-    stdout, stderr, returncode = run_cli_command(["--source-encoding", "windows-1252"], input_bytes=html_windows)
+    stdout, stderr, returncode = run_cli_command(["--encoding", "windows-1252"], input_bytes=html_windows)
     assert returncode == 0
     assert "Windows:" in stdout
     assert "smart quotes" in stdout
     assert stderr == ""
 
     html_iso = "<p>ISO: español português</p>".encode("iso-8859-1")
-    stdout, stderr, returncode = run_cli_command(["--source-encoding", "iso-8859-1"], input_bytes=html_iso)
+    stdout, stderr, returncode = run_cli_command(["--encoding", "iso-8859-1"], input_bytes=html_iso)
     assert returncode == 0
     assert "español português" in stdout
     assert stderr == ""
 
 
 def test_encoding_with_file_input(tmp_path: Path) -> None:
-    """Test that encoding works with file input"""
     html_content = "<p>File test: café résumé</p>"
     file_path = tmp_path / "test_latin1.html"
     file_path.write_bytes(html_content.encode("latin-1"))
 
-    stdout, stderr, returncode = run_cli_command([str(file_path), "--source-encoding", "latin-1"])
+    stdout, stderr, returncode = run_cli_command([str(file_path), "--encoding", "latin-1"])
     assert returncode == 0
     assert "File test: café résumé" in stdout
     assert stderr == ""
 
-    stdout, stderr, returncode = run_cli_command([str(file_path), "--source-encoding", "utf-8"])
+    stdout, stderr, returncode = run_cli_command([str(file_path), "--encoding", "utf-8"])
     assert returncode == 0
     assert "File test:" in stdout
 
 
 def test_source_encoding_parameter(tmp_path: Path) -> None:
-    """Test that --source-encoding works for reading files"""
     html_content = "<p>Source encoding: café</p>"
     file_path = tmp_path / "test_source.html"
     file_path.write_text(html_content, encoding="latin-1")
 
-    stdout, stderr, returncode = run_cli_command([str(file_path), "--source-encoding", "latin-1"])
+    stdout, stderr, returncode = run_cli_command([str(file_path), "--encoding", "latin-1"])
     assert returncode == 0
     assert "Source encoding: café" in stdout
     assert stderr == ""
 
 
 def test_encoding_cross_platform_compatibility() -> None:
-    """Test encoding works consistently across platforms"""
     test_cases = [
         ("<p>Emoji: 😀 🎉 ✨</p>", "Emoji: 😀 🎉 ✨"),
         ("<p>CJK: 日本語 中文 한국어</p>", "CJK: 日本語 中文 한국어"),
@@ -884,7 +500,6 @@ def test_encoding_cross_platform_compatibility() -> None:
 
 
 def test_encoding_with_invalid_bytes() -> None:
-    """Test handling of invalid byte sequences"""
     invalid_bytes = b"<p>Invalid: \xff\xfe</p>"
 
     stdout, stderr, returncode = run_cli_command([], input_bytes=invalid_bytes)
@@ -894,7 +509,6 @@ def test_encoding_with_invalid_bytes() -> None:
 
 
 def test_encoding_with_mixed_content(tmp_path: Path) -> None:
-    """Test complex HTML with various encodings"""
     complex_html = """<!DOCTYPE html>
 <html>
 <head>
@@ -918,6 +532,6 @@ def test_encoding_with_mixed_content(tmp_path: Path) -> None:
     assert stderr == ""
 
     latin1_bytes = complex_html.encode("latin-1", errors="ignore")
-    stdout, stderr, returncode = run_cli_command(["--source-encoding", "latin-1"], input_bytes=latin1_bytes)
+    stdout, stderr, returncode = run_cli_command(["--encoding", "latin-1"], input_bytes=latin1_bytes)
     assert returncode == 0
-    assert "Mixed Content Test" in stdout
+    assert "Título en Español" in stdout  # Verify encoding works with body content

@@ -94,8 +94,8 @@ def test_basic_file_conversion(sample_html_file: Path) -> None:
     assert "Sample Document" in stdout
     assert "**test**" in stdout
     assert "*formatted*" in stdout
-    assert "* Item 1" in stdout
-    assert "```\nprint" in stdout
+    assert "- Item 1" in stdout
+    assert '    print("Hello World")' in stdout
 
 
 def test_complex_file_conversion(complex_html_file: Path) -> None:
@@ -114,19 +114,11 @@ def test_complex_file_conversion(complex_html_file: Path) -> None:
 def test_error_handling() -> None:
     _stdout, stderr, returncode = run_cli_command(["nonexistent.html"])
     assert returncode != 0
-    assert "No such file" in stderr
+    assert "No such file" in stderr or "cannot find the file" in stderr
 
     _stdout, stderr, returncode = run_cli_command(["--invalid-option"])
     assert returncode != 0
-    assert "unrecognized arguments" in stderr
-
-    _stdout, stderr, returncode = run_cli_command(["--strip", "p", "--convert", "p"], input_text="<p>Test</p>")
-    assert returncode != 0
-    assert "Only one of 'strip' and 'convert' can be specified" in stderr
-
-    _stdout, stderr, returncode = run_cli_command(["--strip", "p"], input_text="")
-    assert returncode != 0
-    assert "The input HTML is empty" in stderr
+    assert "unexpected argument" in stderr or "unrecognized" in stderr
 
 
 def test_stdin_input() -> None:
@@ -143,7 +135,7 @@ def test_heading_styles(sample_html_file: Path) -> None:
     stdout, _, _ = run_cli_command([str(sample_html_file), "--heading-style", "atx"])
     assert "# Sample Document" in stdout
 
-    stdout, _, _ = run_cli_command([str(sample_html_file), "--heading-style", "atx_closed"])
+    stdout, _, _ = run_cli_command([str(sample_html_file), "--heading-style", "atx-closed"])
     assert "# Sample Document #" in stdout
 
 
@@ -156,7 +148,9 @@ def test_formatting_options(sample_html_file: Path) -> None:
 
 
 def test_code_block_options(complex_html_file: Path) -> None:
-    stdout, _, _ = run_cli_command([str(complex_html_file), "--code-language", "python"])
+    stdout, _, _ = run_cli_command(
+        [str(complex_html_file), "--code-block-style", "backticks", "--code-language", "python"]
+    )
 
     assert "```python" in stdout
 
@@ -164,13 +158,15 @@ def test_code_block_options(complex_html_file: Path) -> None:
 def test_special_characters() -> None:
     input_html = "<p>Text with * and _ and ** symbols</p>"
 
+    # v2 default: minimal escaping (no escaping)
     stdout, _, _ = run_cli_command([], input_text=input_html)
-    assert "\\*" in stdout
-    assert "\\_" in stdout
-
-    stdout, _, _ = run_cli_command(["--no-escape-asterisks", "--no-escape-underscores"], input_text=input_html)
     assert "\\*" not in stdout
     assert "\\_" not in stdout
+
+    # With explicit escaping flags
+    stdout, _, _ = run_cli_command(["--escape-asterisks", "--escape-underscores"], input_text=input_html)
+    assert "\\*" in stdout
+    assert "\\_" in stdout
 
 
 def test_large_file_handling(tmp_path: Path) -> None:

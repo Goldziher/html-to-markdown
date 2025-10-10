@@ -1,0 +1,128 @@
+version: "3"
+
+tasks:
+  setup:
+    desc: "Install dependencies with uv and build Rust components"
+    cmds:
+      - uv sync --all-extras
+      - prek install && prek install --hook-type commit-msg
+
+  update:
+    desc: "Update Python and Rust dependencies"
+    cmds:
+      - uv run uv-bump
+      - cargo upgrade --incompatible
+      - uv sync --all-extras --upgrade
+      - prek autoupdate
+
+  test:python:
+    desc: "Run Python tests with pytest"
+    cmds:
+      - uv run pytest
+
+  test:cov:
+    desc: "Run Python tests with coverage"
+    cmds:
+      - uv run pytest --cov=html_to_markdown --cov-report=term-missing
+
+  test:rust:
+    desc: "Run Rust tests"
+    cmds:
+      - cargo test --release --no-default-features
+
+  cov:rust:
+    desc: "Generate Rust code coverage report (requires cargo-llvm-cov)"
+    cmds:
+      - cargo llvm-cov --all-features --lcov --output-path rust-coverage.lcov
+      - echo "Rust coverage report generated at rust-coverage.lcov"
+      - cargo llvm-cov --all-features --summary-only
+
+  cov:python:
+    desc: "Generate Python code coverage report"
+    cmds:
+      - uv run pytest --cov=html_to_markdown --cov-report=lcov:coverage.lcov --cov-report=term
+      - echo "Python coverage report generated at coverage.lcov"
+
+  cov:all:
+    desc: "Generate both Rust and Python coverage reports"
+    cmds:
+      - task: cov:rust
+      - task: cov:python
+
+  test:
+    desc: "Run both Rust and Python tests"
+    cmds:
+      - task: test:rust
+      - task: test:python
+
+  lint:
+    desc: "Lint Python code with ruff/prek and Rust code with clippy/fmt"
+    cmds:
+      - prek run --all-files
+
+  fmt:
+    desc: "Format Python and Rust code"
+    cmds:
+      - cargo fmt
+      - prek run ruff-format --all-files
+
+  build:
+    desc: "Build Rust components for development"
+    cmds:
+      - uv sync --all-extras
+
+  build:debug:
+    desc: "Build Rust components in debug mode (without optimization)"
+    cmds:
+      - uv pip install --no-build-isolation --config-settings=build-args="--profile dev" -e .
+
+  build:cli:
+    desc: "Build CLI binary"
+    cmds:
+      - cargo build --release --package html-to-markdown-cli
+
+  build:wheel-prep:
+    desc: "Prepare CLI binary for wheel packaging"
+    cmds:
+      - uv run scripts/prepare_wheel.py
+
+  bench:
+    desc: "Run Wikipedia document benchmarks"
+    cmds:
+      - uv run pytest tests/benchmark_wikipedia_test.py::TestWikipediaConversion --benchmark-only -v
+
+  bench:all:
+    desc: "Run all benchmarks including scalability tests"
+    cmds:
+      - uv run pytest tests/benchmark_wikipedia_test.py --benchmark-only -v
+
+  bench:rust:
+    desc: "Run Rust benchmarks with criterion"
+    cmds:
+      - cargo bench --package html-to-markdown
+
+  bench:python:
+    desc: "Run Python benchmarks only"
+    cmds:
+      - uv run pytest tests/benchmark_*.py --benchmark-only -v
+
+  bench:full:
+    desc: "Run all Rust and Python benchmarks"
+    cmds:
+      - task: bench:rust
+      - task: bench:python
+
+  clean:
+    desc: "Clean build artifacts"
+    cmds:
+      - cargo clean
+      - rm -rf target/
+      - rm -rf .pytest_cache/
+      - rm -rf htmlcov/
+      - find . -type d -name "__pycache__" -exec rm -rf {} +
+      - find . -type f -name "*.pyc" -delete
+
+  default:
+    desc: "Show available tasks"
+    cmds:
+      - task --list

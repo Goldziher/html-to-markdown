@@ -3,7 +3,7 @@ from __future__ import annotations
 import gc
 import tracemalloc
 from contextlib import contextmanager
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 if TYPE_CHECKING:
     from collections.abc import Generator
@@ -11,9 +11,9 @@ if TYPE_CHECKING:
 
 import pytest
 
-from html_to_markdown import convert_to_markdown, convert_to_markdown_stream
+from html_to_markdown import convert_to_markdown
 
-pytest_plugins = []
+pytest_plugins: list[str] = []
 
 try:
     import psutil
@@ -21,7 +21,7 @@ except ImportError:
     pytest.skip("psutil not available", allow_module_level=True)
 
 try:
-    import memray  # type: ignore[import-untyped]
+    import memray
 
     MEMRAY_AVAILABLE = True
 except ImportError:
@@ -66,10 +66,13 @@ def memory_snapshot() -> Generator[dict[str, Any], None, None]:
         memory_data["tracemalloc_after"] = final_stats
 
         top_stats = snapshot_after.compare_to(snapshot_before, "lineno")
-        memory_data["allocations_diff"] = [
-            {"filename": stat.traceback.format()[0], "size_diff": stat.size_diff, "count_diff": stat.count_diff}
-            for stat in top_stats[:10]
-        ]
+        memory_data["allocations_diff"] = cast(
+            "Any",
+            [
+                {"filename": stat.traceback.format()[0], "size_diff": stat.size_diff, "count_diff": stat.count_diff}
+                for stat in top_stats[:10]
+            ],
+        )
 
         tracemalloc.stop()
 
@@ -102,33 +105,6 @@ class TestMemoryProfiling:
         )
 
         assert memory_used_mb < 200, f"Large document used {memory_used_mb:.2f}MB"
-
-    def test_memory_streaming_efficiency(self) -> None:
-        html = generate_complex_html(size_factor=100)
-
-        with memory_snapshot() as regular_memory:
-            result_regular = convert_to_markdown(html)
-
-        with memory_snapshot() as streaming_memory:
-            result_streaming = "".join(convert_to_markdown_stream(html, chunk_size=1024))
-
-        assert result_regular == result_streaming
-
-        regular_mb = (
-            (regular_memory["process_after"]["rss_after"] - regular_memory["process_before"]["rss_before"])
-            / 1024
-            / 1024
-        )
-
-        streaming_mb = (
-            (streaming_memory["process_after"]["rss_after"] - streaming_memory["process_before"]["rss_before"])
-            / 1024
-            / 1024
-        )
-
-        assert streaming_mb <= regular_mb * 1.1, (
-            f"Streaming used more memory: {streaming_mb:.2f}MB vs {regular_mb:.2f}MB"
-        )
 
     def test_memory_leak_detection(self) -> None:
         html = generate_complex_html(size_factor=20)
@@ -165,16 +141,6 @@ class TestMemrayProfiling:
 
         with memray.Tracker(output_file):
             result = convert_to_markdown(html)
-
-        assert len(result) > 0
-        assert output_file.exists()
-
-    def test_memray_streaming_profile(self, tmp_path: Path) -> None:
-        html = generate_complex_html(size_factor=50)
-        output_file = tmp_path / "memray_streaming.bin"
-
-        with memray.Tracker(output_file):
-            result = "".join(convert_to_markdown_stream(html, chunk_size=2048))
 
         assert len(result) > 0
         assert output_file.exists()

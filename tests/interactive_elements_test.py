@@ -10,25 +10,25 @@ def test_dialog_basic(convert: Callable[..., str]) -> None:
     """Test basic dialog conversion."""
     html = "<dialog>Simple dialog content</dialog>"
     result = convert(html)
-    assert result == "Simple dialog content\n\n"
+    assert result == "Simple dialog content\n"
 
 
 def test_dialog_open(convert: Callable[..., str]) -> None:
     html = "<dialog open>This dialog is open</dialog>"
     result = convert(html)
-    assert result == "This dialog is open\n\n"
+    assert result == "This dialog is open\n"
 
 
 def test_dialog_with_id(convert: Callable[..., str]) -> None:
     html = '<dialog id="myDialog">Dialog with ID</dialog>'
     result = convert(html)
-    assert result == "Dialog with ID\n\n"
+    assert result == "Dialog with ID\n"
 
 
 def test_dialog_open_with_id(convert: Callable[..., str]) -> None:
     html = '<dialog open id="openDialog">Open dialog with ID</dialog>'
     result = convert(html)
-    assert result == "Open dialog with ID\n\n"
+    assert result == "Open dialog with ID\n"
 
 
 def test_dialog_empty(convert: Callable[..., str]) -> None:
@@ -46,13 +46,13 @@ def test_dialog_whitespace_only(convert: Callable[..., str]) -> None:
 def test_dialog_inline_mode(convert: Callable[..., str]) -> None:
     html = "<dialog>Inline dialog content</dialog>"
     result = convert(html, convert_as_inline=True)
-    assert result == "Inline dialog content"
+    assert result == "Inline dialog content\n"
 
 
 def test_dialog_with_nested_elements(convert: Callable[..., str]) -> None:
     html = "<dialog><h2>Dialog Title</h2><p>Dialog content with <strong>bold</strong> text.</p></dialog>"
     result = convert(html)
-    expected = """Dialog Title\n------------\n\nDialog content with **bold** text.\n\n"""
+    expected = """## Dialog Title\n\nDialog content with **bold** text.\n"""
     assert result == expected
 
 
@@ -62,7 +62,7 @@ def test_dialog_multiline_content(convert: Callable[..., str]) -> None:
         <p>Second paragraph</p>
     </dialog>"""
     result = convert(html)
-    expected = """First paragraph\n\nSecond paragraph\n\n"""
+    expected = """First paragraph\n\nSecond paragraph\n"""
     assert result == expected
 
 
@@ -73,56 +73,56 @@ def test_dialog_with_buttons(convert: Callable[..., str]) -> None:
         <button>No</button>
     </dialog>"""
     result = convert(html)
-    expected = """Are you sure?\n\nYes\n\nNo\n\n"""
+    expected = """Are you sure?\n\nYes\n\nNo\n"""
     assert result == expected
 
 
 def test_menu_basic(convert: Callable[..., str]) -> None:
     html = "<menu><li>Item 1</li><li>Item 2</li></menu>"
     result = convert(html)
-    assert result == "- Item 1\n- Item 2\n\n"
+    assert result == "- Item 1\n- Item 2\n"
 
 
 def test_menu_toolbar(convert: Callable[..., str]) -> None:
     html = '<menu type="toolbar"><li>Cut</li><li>Copy</li><li>Paste</li></menu>'
     result = convert(html)
-    assert result == "- Cut\n- Copy\n- Paste\n\n"
+    assert result == "- Cut\n- Copy\n- Paste\n"
 
 
 def test_menu_context(convert: Callable[..., str]) -> None:
     html = '<menu type="context"><li>Delete</li><li>Rename</li></menu>'
     result = convert(html)
-    assert result == "- Delete\n- Rename\n\n"
+    assert result == "- Delete\n- Rename\n"
 
 
 def test_menu_with_label(convert: Callable[..., str]) -> None:
     html = '<menu label="File Operations"><li>Open</li><li>Save</li></menu>'
     result = convert(html)
-    assert result == "- Open\n- Save\n\n"
+    assert result == "- Open\n- Save\n"
 
 
 def test_menu_toolbar_with_label(convert: Callable[..., str]) -> None:
     html = '<menu type="toolbar" label="Edit Tools"><li>Bold</li><li>Italic</li></menu>'
     result = convert(html)
-    assert result == "- Bold\n- Italic\n\n"
+    assert result == "- Bold\n- Italic\n"
 
 
 def test_menu_with_id(convert: Callable[..., str]) -> None:
     html = '<menu id="mainMenu"><li>Home</li><li>About</li></menu>'
     result = convert(html)
-    assert result == "- Home\n- About\n\n"
+    assert result == "- Home\n- About\n"
 
 
 def test_menu_all_attributes(convert: Callable[..., str]) -> None:
     html = '<menu type="context" label="Context Actions" id="contextMenu"><li>Edit</li><li>Delete</li></menu>'
     result = convert(html)
-    assert result == "- Edit\n- Delete\n\n"
+    assert result == "- Edit\n- Delete\n"
 
 
 def test_menu_type_list_omitted(convert: Callable[..., str]) -> None:
     html = '<menu type="list"><li>Item 1</li><li>Item 2</li></menu>'
     result = convert(html)
-    assert result == "- Item 1\n- Item 2\n\n"
+    assert result == "- Item 1\n- Item 2\n"
 
 
 def test_menu_empty(convert: Callable[..., str]) -> None:
@@ -140,13 +140,13 @@ def test_menu_whitespace_only(convert: Callable[..., str]) -> None:
 def test_menu_inline_mode(convert: Callable[..., str]) -> None:
     html = "<menu><li>Inline item</li></menu>"
     result = convert(html, convert_as_inline=True)
-    assert result == "- Inline item"
+    assert result == "- Inline item\n"
 
 
 def test_menu_with_nested_elements(convert: Callable[..., str]) -> None:
     html = "<menu><li><strong>Bold Item</strong></li><li><em>Italic Item</em></li></menu>"
     result = convert(html)
-    expected = "- **Bold Item**\n- *Italic Item*\n\n"
+    expected = "- **Bold Item**\n- *Italic Item*\n"
     assert result == expected
 
 
@@ -157,7 +157,7 @@ def test_menu_with_buttons(convert: Callable[..., str]) -> None:
         <button>Save</button>
     </menu>"""
     result = convert(html)
-    expected = """New\n\nOpen\n\nSave\n\n"""
+    expected = """New\n\nOpen\n\nSave\n"""
     assert result == expected
 
 
@@ -168,14 +168,14 @@ def test_menu_mixed_content(convert: Callable[..., str]) -> None:
         <li>Another list item</li>
     </menu>"""
     result = convert(html)
-    expected = """- List item\nButton item\n\n- Another list item\n\n"""
+    expected = """- List item\nButton item\n\n- Another list item\n"""
     assert result == expected
 
 
 def test_dialog_in_paragraph(convert: Callable[..., str]) -> None:
     html = "<p>Click here: <dialog>Modal content</dialog> to see dialog.</p>"
     result = convert(html)
-    expected = "Click here: Modal content\n\n to see dialog.\n\n"
+    expected = "Click here: Modal content\n\nto see dialog.\n"
     assert result == expected
 
 
@@ -187,7 +187,7 @@ def test_menu_in_navigation(convert: Callable[..., str]) -> None:
         </menu>
     </nav>"""
     result = convert(html)
-    expected = "- [Home](/home)\n- [About](/about)\n\n"
+    expected = "- [Home](/home)\n- [About](/about)\n"
     assert result == expected
 
 
@@ -202,7 +202,7 @@ def test_nested_interactive_elements(convert: Callable[..., str]) -> None:
         </details>
     </div>"""
     result = convert(html)
-    expected = """**Show Menu**\n\n- Option 1\n- Option 2\n\n"""
+    expected = """**Show Menu**\n\n- Option 1\n- Option 2\n"""
     assert result == expected
 
 
@@ -214,7 +214,7 @@ def test_dialog_with_form(convert: Callable[..., str]) -> None:
         </form>
     </dialog>"""
     result = convert(html)
-    expected = """Name:\n\nSubmit\n\n"""
+    expected = """Name:\n\nSubmit\n"""
     assert result == expected
 
 
@@ -224,7 +224,7 @@ def test_multiple_dialogs(convert: Callable[..., str]) -> None:
     <dialog id="dialog2" open>Second dialog</dialog>
     """
     result = convert(html)
-    expected = """First dialog\n\nSecond dialog\n\n"""
+    expected = """First dialog\n\nSecond dialog\n"""
     assert result == expected
 
 
@@ -239,40 +239,40 @@ def test_menu_with_submenus(convert: Callable[..., str]) -> None:
         <li>Edit</li>
     </menu>"""
     result = convert(html)
-    expected = """- File - New\n- Open\n- Edit\n\n"""
+    expected = """- File   - New\n  - Open\n\n- Edit\n"""
     assert result == expected
 
 
 def test_dialog_with_special_characters(convert: Callable[..., str]) -> None:
     html = "<dialog>This has *asterisks* and _underscores_ and [brackets]</dialog>"
     result = convert(html)
-    expected = "This has \\*asterisks\\* and \\_underscores\\_ and \\[brackets]\n\n"
+    expected = "This has *asterisks* and _underscores_ and [brackets]\n"
     assert result == expected
 
 
 def test_menu_with_special_characters(convert: Callable[..., str]) -> None:
     html = "<menu><li>Item with *bold* text</li><li>Item with _italic_ text</li></menu>"
     result = convert(html)
-    expected = "- Item with \\*bold\\* text\n- Item with \\_italic\\_ text\n\n"
+    expected = "- Item with *bold* text\n- Item with _italic_ text\n"
     assert result == expected
 
 
 def test_dialog_attribute_values_with_quotes(convert: Callable[..., str]) -> None:
     html = '<dialog id="my-dialog" class="special">Content</dialog>'
     result = convert(html)
-    assert result == "Content\n\n"
+    assert result == "Content\n"
 
 
 def test_dialog_content_ending_with_single_newline(convert: Callable[..., str]) -> None:
     html = "<dialog>Content\n</dialog>"
     result = convert(html)
-    assert result == "Content\n\n"
+    assert result == "Content\n"
 
 
 def test_menu_with_complex_attributes(convert: Callable[..., str]) -> None:
     html = '<menu type="toolbar" label="Tools &amp; Options" id="toolbar-1"><li>Cut</li></menu>'
     result = convert(html)
-    assert result == "- Cut\n\n"
+    assert result == "- Cut\n"
 
 
 def test_empty_dialog_with_attributes(convert: Callable[..., str]) -> None:
