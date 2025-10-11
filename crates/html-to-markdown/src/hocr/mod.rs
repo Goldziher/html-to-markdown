@@ -1,4 +1,4 @@
-//! hOCR 1.2 document processing
+//! hOCR 1.2 document processing.
 //!
 //! Complete hOCR 1.2 specification support for extracting structured content from OCR documents.
 //!
@@ -24,7 +24,6 @@ pub mod parser;
 pub mod spatial;
 pub mod types;
 
-// Re-export main types
 pub use converter::convert_to_markdown;
 pub use extractor::extract_hocr_document;
 pub use spatial::{extract_hocr_words, reconstruct_table, table_to_markdown, HocrWord};

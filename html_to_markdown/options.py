@@ -6,38 +6,7 @@ This module provides dataclass-based configuration for the v2 API.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, Literal, Protocol
-
-if TYPE_CHECKING:
-    from collections.abc import Callable
-
-    from bs4 import Tag
-
-
-class ConverterFunction(Protocol):
-    """Protocol for custom converter functions.
-
-    Converter functions receive keyword-only arguments including the HTML tag,
-    processed text content, and any conversion options needed.
-
-    Example:
-        >>> def custom_link_converter(*, tag: Tag, text: str, autolinks: bool, **kwargs: Any) -> str:
-        ...     href = tag.get("href", "")
-        ...     return f"[{text}]({href})"
-    """
-
-    def __call__(self, *, tag: Tag, text: str, **kwargs: Any) -> str:
-        """Convert an HTML element to Markdown.
-
-        Args:
-            tag: BeautifulSoup Tag object representing the HTML element
-            text: Processed text content of the element's children
-            **kwargs: Additional conversion options (varies by converter)
-
-        Returns:
-            Markdown string representation of the element
-        """
-        ...
+from typing import Literal
 
 
 @dataclass
@@ -87,9 +56,6 @@ class ConversionOptions:
     code_language: str = ""
     """Default language for code blocks."""
 
-    code_language_callback: Callable[[Tag], str] | None = None
-    """Callback to determine code language from element."""
-
     encoding: str = "utf-8"
     """Character encoding expected for the HTML input."""
 
@@ -123,9 +89,6 @@ class ConversionOptions:
     wrap_width: int = 80
     """Column width for text wrapping."""
 
-    convert: set[str] | None = None
-    """HTML tags to convert to Markdown (None = all supported tags). v1 compatibility only."""
-
     strip_tags: set[str] | None = None
     """HTML tags to strip from output (output only text content, no markdown conversion)."""
 
@@ -143,9 +106,6 @@ class ConversionOptions:
 
     code_block_style: Literal["indented", "backticks", "tildes"] = "backticks"
     """Style for code blocks: 'backticks' (```, better whitespace preservation), 'indented' (4 spaces), or 'tildes' (~~~). All are CommonMark compliant."""
-
-    custom_converters: dict[str, Callable[..., str]] | None = None
-    """Custom converter functions for specific HTML elements."""
 
     debug: bool = False
     """Enable debug mode with diagnostic warnings about unhandled elements and hOCR processing."""
@@ -176,9 +136,3 @@ class PreprocessingOptions:
 
     remove_forms: bool = True
     """Remove form elements during preprocessing."""
-
-    excluded_navigation_classes: set[str] | None = None
-    """Navigation class fragments to keep even when removing navigation."""
-
-    extra_navigation_classes: set[str] | None = None
-    """Additional navigation class fragments to strip beyond defaults."""

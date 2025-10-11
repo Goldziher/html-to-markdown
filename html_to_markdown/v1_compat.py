@@ -6,16 +6,13 @@ by translating v1 kwargs to v2 ConversionOptions and PreprocessingOptions.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
-
-if TYPE_CHECKING:
-    from collections.abc import Iterator
+import warnings
 
 from html_to_markdown import ConversionOptions, PreprocessingOptions
 from html_to_markdown import convert as convert_v2
 
 
-def convert_to_markdown(  # noqa: D417
+def convert_to_markdown(
     html: str,
     *,
     heading_style: str = "underlined",
@@ -54,25 +51,66 @@ def convert_to_markdown(  # noqa: D417
     convert: list[str] | None = None,
     custom_converters: dict[str, object] | None = None,
 ) -> str:
-    """Convert HTML to Markdown (v1 API compatibility).
+    """Convert HTML to Markdown (v1 compatibility API).
 
-    This function provides backward compatibility with the v1 API by accepting
-    the same kwargs and translating them to v2 ConversionOptions.
-
-    Note: Some v1 options are not supported in v2:
-    - code_language_callback: Removed in v2
-    - convert: Removed in v2
-    - custom_converters: Not yet implemented in v2
+    This function provides backward compatibility with the v1 API by translating
+    v1-style keyword arguments to v2 ConversionOptions and PreprocessingOptions.
 
     Args:
-        html: HTML string to convert
+        html: HTML string to convert.
+        heading_style: Style for headings (default: "underlined" for v1 compatibility).
+        list_indent_type: Type of indentation for lists.
+        list_indent_width: Number of spaces for list indentation (v1 default: 4).
+        bullets: Characters to use for unordered list bullets.
+        strong_em_symbol: Symbol for strong/emphasis formatting.
+        escape_asterisks: Escape asterisk characters (v1 default: True).
+        escape_underscores: Escape underscore characters (v1 default: True).
+        escape_misc: Escape miscellaneous Markdown characters (v1 default: True).
+        code_language: Default language for code blocks.
+        autolinks: Convert bare URLs to automatic links.
+        default_title: Add a default title if none exists.
+        br_in_tables: Use <br> tags for line breaks in table cells.
+        hocr_extract_tables: Deprecated - always True in v2.
+        hocr_table_column_threshold: Deprecated - uses built-in heuristics in v2.
+        hocr_table_row_threshold_ratio: Deprecated - uses built-in heuristics in v2.
+        highlight_style: Style for highlighting <mark> elements.
+        extract_metadata: Extract metadata from HTML head.
+        whitespace_mode: How to handle whitespace.
+        strip_newlines: Remove newlines from HTML before processing.
+        wrap: Enable text wrapping.
+        wrap_width: Column width for text wrapping.
+        convert_as_inline: Treat block elements as inline.
+        sub_symbol: Symbol for subscript text.
+        sup_symbol: Symbol for superscript text.
+        newline_style: Style for newlines.
+        keep_inline_images_in: Parent tag names where images should remain inline.
+        preprocess: Enable HTML preprocessing.
+        preprocessing_preset: Preprocessing aggressiveness level.
+        remove_navigation: Remove navigation elements during preprocessing.
+        remove_forms: Remove form elements during preprocessing.
+        source_encoding: Character encoding expected for the HTML input.
+        code_language_callback: Deprecated - not supported in v2.
+        strip: HTML tags to strip from output.
+        convert: Deprecated - not supported in v2.
+        custom_converters: Deprecated - not yet implemented in v2.
 
     Returns:
-        Markdown string
+        Converted Markdown string.
 
     Raises:
-        NotImplementedError: If unsupported v1 options are provided
+        NotImplementedError: If deprecated v1 features are used.
+
+    .. deprecated:: 2.0
+        Use :func:`html_to_markdown.convert` with :class:`ConversionOptions` instead.
+        The v1 API is provided for backward compatibility only.
     """
+    warnings.warn(
+        "convert_to_markdown() is deprecated and will be removed in v3.0. "
+        "Use html_to_markdown.convert() with ConversionOptions instead.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
+
     if code_language_callback is not None:
         raise NotImplementedError(
             "code_language_callback was removed in v2. Use the code_language option to set a default language."
@@ -90,8 +128,8 @@ def convert_to_markdown(  # noqa: D417
             "hOCR table threshold overrides were removed in v2. Table reconstruction now uses built-in heuristics."
         )
 
-    # V1 behavior: if code_language is set, use fenced code blocks (backticks)
-    # V2 default is indented code blocks, so we need to override
+    # ~keep: v1 used indented code blocks by default, but switched to backticks when a language was set
+    # This maintains v1 behavior for backward compatibility
     code_block_style = "backticks" if code_language else "indented"
 
     options = ConversionOptions(
@@ -133,29 +171,19 @@ def convert_to_markdown(  # noqa: D417
     return convert_v2(html, options, preprocessing)
 
 
-def convert_to_markdown_stream(  # noqa: D417
-    html: str,
-    *,
-    chunk_size: int = 4096,
-    **kwargs: object,
-) -> Iterator[str]:
-    """Stream HTML to Markdown conversion (v1 API).
+def markdownify(*args: object, **kwargs: object) -> str:
+    """Alias for convert_to_markdown (deprecated).
 
-    Note: Streaming was removed in v2.
-
-    Args:
-        html: HTML string to convert
-        chunk_size: Size of chunks to yield (not used in v2)
-
-    Raises:
-        NotImplementedError: Streaming was removed in v2
+    .. deprecated:: 2.0
+        Use html_to_markdown.convert() instead.
     """
-    raise NotImplementedError(
-        "Streaming API (convert_to_markdown_stream) was removed in v2 (html5ever does not support streaming). "
-        "Use convert_to_markdown() instead."
+    warnings.warn(
+        "markdownify() is deprecated and will be removed in v3.0. "
+        "Use html_to_markdown.convert() with ConversionOptions instead.",
+        DeprecationWarning,
+        stacklevel=2,
     )
+    return convert_to_markdown(*args, **kwargs)  # type: ignore[arg-type]
 
 
-markdownify = convert_to_markdown
-
-__all__ = ["convert_to_markdown", "convert_to_markdown_stream", "markdownify"]
+__all__ = ["convert_to_markdown", "markdownify"]

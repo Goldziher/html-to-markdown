@@ -1,5 +1,3 @@
-"""Python bindings for the html-to-markdown Rust library."""
-
 from html_to_markdown._html_to_markdown import (
     ConversionOptions,
     InlineImageConfig,

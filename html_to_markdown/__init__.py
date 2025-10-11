@@ -24,7 +24,7 @@ from html_to_markdown.exceptions import (
     MissingDependencyError,
 )
 from html_to_markdown.options import ConversionOptions, PreprocessingOptions
-from html_to_markdown.v1_compat import convert_to_markdown, convert_to_markdown_stream, markdownify
+from html_to_markdown.v1_compat import convert_to_markdown, markdownify
 
 __all__ = [
     "ConflictingOptionsError",
@@ -36,7 +36,6 @@ __all__ = [
     "PreprocessingOptions",
     "convert",
     "convert_to_markdown",
-    "convert_to_markdown_stream",
     "markdownify",
 ]
 

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from html_to_markdown import convert_to_markdown, convert_to_markdown_stream
+from html_to_markdown import convert_to_markdown
 
 
 class TestV1CompatBasic:
@@ -145,13 +145,6 @@ class TestV1CompatUnsupportedOptions:
         html = "<custom>content</custom>"
         with pytest.raises(NotImplementedError, match="custom_converters is not yet implemented"):
             convert_to_markdown(html, custom_converters={"custom": lambda **kw: "converted"})
-
-
-class TestV1CompatStreaming:
-    def test_streaming_not_implemented(self) -> None:
-        html = "<p>Content</p>"
-        with pytest.raises(NotImplementedError, match=r"Streaming API.*was removed"):
-            list(convert_to_markdown_stream(html))
 
 
 class TestV1CompatEdgeCases:
