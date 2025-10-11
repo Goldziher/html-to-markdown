@@ -130,6 +130,13 @@ fn convert_element(element: &HocrElement, output: &mut String, depth: usize, pre
             if !output.is_empty() && !output.ends_with("\n\n") {
                 output.push_str("\n\n");
             }
+
+            if let Some(table_markdown) = try_spatial_table_reconstruction(element) {
+                output.push_str(&table_markdown);
+                output.push_str("\n\n");
+                return;
+            }
+
             append_text_and_children(element, output, depth, preserve_structure);
             // Trim trailing space
             if output.ends_with(' ') {

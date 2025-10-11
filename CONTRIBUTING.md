@@ -175,7 +175,7 @@ All checks run automatically via prek on commit.
 
     ```toml
     [workspace.package]
-    version = "2.1.0"
+    version = "2.1.1"
     ```
 
 1. Update `CHANGELOG.md` with changes
@@ -184,15 +184,15 @@ All checks run automatically via prek on commit.
 
 1. Build CLI locally: `task build:cli && ./target/release/html-to-markdown --version`
 
-1. Commit changes: `git commit -m "chore: bump version to 2.1.0"`
+1. Commit changes: `git commit -m "chore: bump version to 2.1.1"`
 
 ### Creating a Release
 
 1. **Create and push tag**:
 
     ```bash
-    git tag -a v2.1.0 -m "Release v2.1.0"
-    git push origin v2.1.0
+    git tag -a v2.1.1 -m "Release v2.1.1"
+    git push origin v2.1.1
     ```
 
 1. **Automated workflows trigger**:
