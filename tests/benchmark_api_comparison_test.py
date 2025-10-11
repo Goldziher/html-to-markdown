@@ -19,6 +19,9 @@ from html_to_markdown.v1_compat import convert_to_markdown
 if TYPE_CHECKING:
     from pytest_benchmark.fixture import BenchmarkFixture  # type: ignore[import-untyped]
 
+# Suppress deprecation warnings for v1 compatibility benchmarks
+pytestmark = pytest.mark.filterwarnings("ignore::DeprecationWarning")
+
 try:
     from .performance_test import generate_complex_html
 except ImportError:

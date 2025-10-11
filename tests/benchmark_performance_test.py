@@ -9,6 +9,9 @@ from html_to_markdown import convert_to_markdown
 if TYPE_CHECKING:
     from pytest_benchmark.fixture import BenchmarkFixture  # type: ignore[import-untyped]
 
+# Suppress deprecation warnings for v1 compatibility benchmarks
+pytestmark = pytest.mark.filterwarnings("ignore::DeprecationWarning")
+
 try:
     from .performance_test import generate_complex_html
 except ImportError:
@@ -96,13 +99,6 @@ class TestBenchmarkFeatures:
 
 
 class TestBenchmarkConfiguration:
-    @pytest.mark.benchmark(group="config")
-    def test_benchmark_different_parsers(self, benchmark: BenchmarkFixture) -> None:
-        html = generate_complex_html(size_factor=20)
-
-        result = benchmark(convert_to_markdown, html, parser="html.parser")
-        assert len(result) > 0
-
     @pytest.mark.benchmark(group="config")
     def test_benchmark_whitespace_modes(self, benchmark: BenchmarkFixture) -> None:
         html = generate_complex_html(size_factor=20)

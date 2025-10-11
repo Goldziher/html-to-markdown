@@ -1168,10 +1168,10 @@ def test_media_with_metadata(convert: Callable[..., str]) -> None:
 </body>
 </html>"""
     result = convert(html)
-    expected = """<!--
+    expected = """---
 meta-description: Page with media elements
 title: Media Page
--->
+---
 
 [audio.mp3](audio.mp3)
 

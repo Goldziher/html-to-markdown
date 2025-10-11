@@ -15,6 +15,9 @@ from html_to_markdown import convert_to_markdown
 
 pytest_plugins: list[str] = []
 
+# Suppress deprecation warnings for v1 compatibility benchmarks
+pytestmark = pytest.mark.filterwarnings("ignore::DeprecationWarning")
+
 try:
     import psutil
 except ImportError:
