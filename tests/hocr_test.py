@@ -16,7 +16,6 @@ def get_hocr_file(filename: str) -> Path:
 
 
 def get_content_without_frontmatter(markdown: str) -> str:
-    """Extract markdown content, excluding YAML frontmatter."""
     if markdown.startswith("---\n"):
         parts = markdown.split("---\n", 2)
         return parts[2] if len(parts) > 2 else markdown
@@ -212,7 +211,6 @@ def test_comprehensive_hocr_files(comprehensive_file: str) -> None:
 
 
 def test_hocr_table_extraction() -> None:
-    """Test automatic table reconstruction for explicit ocr_table elements."""
     hocr_content = """
     <html>
     <body>
@@ -248,7 +246,6 @@ def test_hocr_table_extraction() -> None:
 
 
 def test_hocr_without_table_element() -> None:
-    """Test that words without ocr_table wrapper are processed as normal text."""
     hocr_content = """
     <html>
     <body>
@@ -264,7 +261,6 @@ def test_hocr_without_table_element() -> None:
 
     result = convert(hocr_content)
 
-    # Without ocr_table wrapper, words are processed as plain text
     assert "Col1" in result
     assert "Col2" in result
     assert "Data1" in result
@@ -273,7 +269,6 @@ def test_hocr_without_table_element() -> None:
 
 
 def test_hocr_word_extraction() -> None:
-    """Test that words are extracted regardless of confidence scores."""
     hocr_content = """
     <html>
     <body>

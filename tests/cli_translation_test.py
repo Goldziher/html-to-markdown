@@ -41,10 +41,8 @@ class TestCLITranslationBooleanFlags:
         assert result == ["--escape-asterisks"]
 
     def test_no_escape_asterisks_silently_accepted(self) -> None:
-        # --no-escape-asterisks is silently accepted for v1 compatibility
         args = ["--no-escape-asterisks", "input.html"]
         result = translate_v1_args_to_v2(args)
-        # Flag should be removed, only input.html remains
         assert result == ["input.html"]
 
     def test_escape_underscores_preserved(self) -> None:
@@ -53,7 +51,6 @@ class TestCLITranslationBooleanFlags:
         assert result == ["--escape-underscores"]
 
     def test_no_escape_underscores_silently_accepted(self) -> None:
-        # --no-escape-underscores is silently accepted for v1 compatibility
         args = ["--no-escape-underscores", "input.html"]
         result = translate_v1_args_to_v2(args)
         assert result == ["input.html"]
@@ -64,7 +61,6 @@ class TestCLITranslationBooleanFlags:
         assert result == ["--escape-misc"]
 
     def test_no_escape_misc_silently_accepted(self) -> None:
-        # --no-escape-misc is silently accepted for v1 compatibility
         args = ["--no-escape-misc", "input.html"]
         result = translate_v1_args_to_v2(args)
         assert result == ["input.html"]
@@ -75,10 +71,8 @@ class TestCLITranslationBooleanFlags:
         assert result == ["--autolinks"]
 
     def test_no_autolinks_silently_accepted(self) -> None:
-        # --no-autolinks is silently accepted (matches Rust CLI default)
         args = ["--no-autolinks", "input.html"]
         result = translate_v1_args_to_v2(args)
-        # Flag should be removed, only input.html remains
         assert result == ["input.html"]
 
     def test_extract_metadata_preserved(self) -> None:
@@ -87,10 +81,8 @@ class TestCLITranslationBooleanFlags:
         assert result == ["--extract-metadata"]
 
     def test_no_extract_metadata_silently_accepted(self) -> None:
-        # --no-extract-metadata is silently accepted (matches Rust CLI default)
         args = ["--no-extract-metadata", "input.html"]
         result = translate_v1_args_to_v2(args)
-        # Flag should be removed, only input.html remains
         assert result == ["input.html"]
 
     def test_wrap_preserved(self) -> None:
@@ -99,7 +91,6 @@ class TestCLITranslationBooleanFlags:
         assert result == ["--wrap"]
 
     def test_no_wrap_silently_accepted(self) -> None:
-        # --no-wrap is silently accepted for v1 compatibility
         args = ["--no-wrap", "input.html"]
         result = translate_v1_args_to_v2(args)
         assert result == ["input.html"]
@@ -143,7 +134,6 @@ class TestCLITranslationComplex:
         assert result == expected
 
     def test_all_boolean_flags_default(self) -> None:
-        # v2 silently accepts --no-* flags for v1 compatibility
         args = [
             "--no-escape-asterisks",
             "input.html",

@@ -127,8 +127,8 @@ def test_basic_file_conversion(sample_html_file: Path) -> None:
     assert "Sample Document" in stdout
     assert "**test**" in stdout
     assert "*formatted*" in stdout
-    assert "- Item 1" in stdout  # CommonMark default: hyphen bullets
-    assert '    print("Hello World")' in stdout  # CommonMark default: indented code blocks
+    assert "- Item 1" in stdout
+    assert '    print("Hello World")' in stdout
 
 
 def test_complex_file_conversion(complex_html_file: Path) -> None:
@@ -170,7 +170,6 @@ def test_formatting_options_integration(sample_html_file: Path) -> None:
 
 
 def test_code_block_options_integration(complex_html_file: Path) -> None:
-    # v2 default is indented code blocks; need to specify backticks style
     stdout, _, _ = run_cli_command(
         [str(complex_html_file), "--code-language", "python", "--code-block-style", "backticks"]
     )
@@ -180,17 +179,14 @@ def test_code_block_options_integration(complex_html_file: Path) -> None:
 def test_special_characters_integration() -> None:
     input_html = "<p>Text with * and _ and ** symbols</p>"
 
-    # v2 default: no escaping
     stdout, _, _ = run_cli_command([], input_text=input_html)
     assert "*" in stdout
     assert "_" in stdout
 
-    # Enable escaping explicitly
     stdout, _, _ = run_cli_command(["--escape-asterisks", "--escape-underscores"], input_text=input_html)
     assert "\\*" in stdout
     assert "\\_" in stdout
 
-    # Disable escaping (same as default)
     stdout, _, _ = run_cli_command(["--no-escape-asterisks", "--no-escape-underscores"], input_text=input_html)
     assert "\\*" not in stdout
     assert "\\_" not in stdout
@@ -534,4 +530,4 @@ def test_encoding_with_mixed_content(tmp_path: Path) -> None:
     latin1_bytes = complex_html.encode("latin-1", errors="ignore")
     stdout, stderr, returncode = run_cli_command(["--encoding", "latin-1"], input_bytes=latin1_bytes)
     assert returncode == 0
-    assert "Título en Español" in stdout  # Verify encoding works with body content
+    assert "Título en Español" in stdout
