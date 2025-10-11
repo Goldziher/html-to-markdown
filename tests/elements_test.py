@@ -181,14 +181,12 @@ def test_q_in_blockquote(convert: Callable[..., str]) -> None:
 def test_blockquote_in_cite(convert: Callable[..., str]) -> None:
     html = "<cite>Author: <blockquote>Their famous quote</blockquote></cite>"
     result = convert(html)
-    # Fixed: blockquote adds \n\n for block separation even inside cite (CommonMark compliant)
     assert result == "*Author: \n> Their famous quote*\n"
 
 
 def test_complex_citation_structure(convert: Callable[..., str]) -> None:
     html = '<article><p>According to <cite><a href="https://example.com">John Doe</a></cite>, the statement <q>Innovation drives progress</q> is fundamental.</p><blockquote cite="https://johndoe.com/quotes"><p>Innovation is not just about technology, it\'s about <em>thinking differently</em>.</p><cite>John Doe, 2023</cite></blockquote></article>'
     result = convert(html)
-    # Fixed: paragraph adds \n\n for block separation (CommonMark compliant)
     expected = 'According to *[John Doe](https://example.com)*, the statement "Innovation drives progress" is fundamental.\n> Innovation is not just about technology, it\'s about *thinking differently*.\n> \n> *John Doe, 2023*\n\n— <https://johndoe.com/quotes>\n'
     assert result == expected
 
@@ -196,8 +194,6 @@ def test_complex_citation_structure(convert: Callable[..., str]) -> None:
 def test_quote_escaping_edge_cases(convert: Callable[..., str]) -> None:
     html = '<div><q>Quote with "nested quotes" and \'single quotes\'</q><q>Quote with backslash: \\</q><q>Quote with both \\" and regular quotes</q></div>'
     result = convert(html)
-    # Fixed: backslashes must be escaped to prevent them from escaping the closing quote
-    # Between quotes: "" (close prev, open next), not """ (which would be malformed)
     expected = '"Quote with \\"nested quotes\\" and \'single quotes\'""Quote with backslash: \\\\""Quote with both \\\\\\" and regular quotes"\n'
     assert result == expected
 
