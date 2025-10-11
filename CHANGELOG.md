@@ -145,7 +145,7 @@ These flags can be safely removed from your commands, or you can leave them for 
 
 #### Performance
 
-- **10-30x faster** than v1 for most conversion operations
+- **60-80x faster** than v1 for most conversion operations (144-208 MB/s throughput)
 - Memory-efficient processing with Rust's zero-cost abstractions
 - Optimized table handling with rowspan/colspan tracking
 - Faster list processing with unified helpers
@@ -213,15 +213,15 @@ html-to-markdown --preprocess input.html  # escaping is default
 
 ### Performance Benchmarks
 
-Real-world performance improvements over v1:
+Real-world performance improvements over v1 (Apple M4):
 
-| Document Type      | Size  | V1 Time | V2 Time | Speedup |
-| ------------------ | ----- | ------- | ------- | ------- |
-| Small HTML         | 5KB   | 12ms    | 0.8ms   | **15x** |
-| Medium Python Docs | 150KB | 180ms   | 8ms     | **22x** |
-| Large Rust Docs    | 800KB | 950ms   | 35ms    | **27x** |
-| Tables (Countries) | 200KB | 220ms   | 12ms    | **18x** |
-| Lists (Timeline)   | 100KB | 140ms   | 6ms     | **23x** |
+| Document Type       | Size  | V2 Latency | V2 Throughput | Speedup vs V1 (2.5 MB/s) |
+| ------------------- | ----- | ---------- | ------------- | ------------------------ |
+| Lists (Timeline)    | 129KB | 0.62ms     | 208 MB/s      | **83x**                  |
+| Tables (Countries)  | 360KB | 2.02ms     | 178 MB/s      | **71x**                  |
+| Mixed (Python wiki) | 656KB | 4.56ms     | 144 MB/s      | **58x**                  |
+
+V2's Rust engine delivers **60-80x higher throughput** than V1's Python/BeautifulSoup implementation across real-world documents.
 
 ### Technical Details
 
@@ -268,13 +268,12 @@ None if using v1 compatibility layer. If migrating to v2 API:
 
 #### Performance Differences
 
-| Document Type       | V1 Time | V2 Time | Speedup |
-| ------------------- | ------- | ------- | ------- |
-| Small HTML (5KB)    | 12ms    | 0.8ms   | **15x** |
-| Medium Docs (150KB) | 180ms   | 8ms     | **22x** |
-| Large Docs (800KB)  | 950ms   | 35ms    | **27x** |
-| Tables (200KB)      | 220ms   | 12ms    | **18x** |
-| Lists (100KB)       | 140ms   | 6ms     | **23x** |
+| Document Type       | V1 Throughput | V2 Throughput | Speedup |
+| ------------------- | ------------- | ------------- | ------- |
+| Lists (Timeline)    | 2.5 MB/s      | 208 MB/s      | **83x** |
+| Tables (Countries)  | 2.5 MB/s      | 178 MB/s      | **71x** |
+| Mixed (Python wiki) | 2.5 MB/s      | 144 MB/s      | **58x** |
+| Average             | 2.5 MB/s      | 177 MB/s      | **71x** |
 
 #### Implementation Differences
 

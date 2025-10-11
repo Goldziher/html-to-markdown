@@ -9,7 +9,12 @@ from contextlib import contextmanager
 from dataclasses import dataclass
 from typing import Any
 
+import pytest
+
 from html_to_markdown import convert_to_markdown
+
+# Suppress deprecation warnings for v1 compatibility tests
+pytestmark = pytest.mark.filterwarnings("ignore::DeprecationWarning")
 
 try:
     import psutil

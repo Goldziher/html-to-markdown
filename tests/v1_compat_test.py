@@ -4,6 +4,9 @@ import pytest
 
 from html_to_markdown import convert_to_markdown
 
+# Suppress deprecation warnings for v1 compatibility tests
+pytestmark = pytest.mark.filterwarnings("ignore::DeprecationWarning")
+
 
 class TestV1CompatBasic:
     def test_basic_conversion(self) -> None:
@@ -66,13 +69,14 @@ class TestV1CompatOptions:
     def test_extract_metadata_true(self) -> None:
         html = "<html><head><title>Test</title></head><body><p>Content</p></body></html>"
         result = convert_to_markdown(html, extract_metadata=True)
-        assert "<!--" in result
+        # v2 uses YAML frontmatter instead of HTML comments
+        assert "---" in result
         assert "title: Test" in result
 
     def test_extract_metadata_false(self) -> None:
         html = "<html><head><title>Test</title></head><body><p>Content</p></body></html>"
         result = convert_to_markdown(html, extract_metadata=False)
-        assert "<!--" not in result
+        assert "---" not in result
         assert "title:" not in result
 
     def test_wrap_enabled(self) -> None:

@@ -25,12 +25,14 @@ class TestCLITranslationBasic:
 class TestCLITranslationFlagNames:
     def test_preprocess_html_to_preprocess(self) -> None:
         args = ["--preprocess-html"]
-        result = translate_v1_args_to_v2(args)
+        with pytest.warns(DeprecationWarning, match="--preprocess-html"):
+            result = translate_v1_args_to_v2(args)
         assert result == ["--preprocess"]
 
     def test_preprocess_html_with_other_args(self) -> None:
         args = ["input.html", "--preprocess-html", "--preset", "aggressive"]
-        result = translate_v1_args_to_v2(args)
+        with pytest.warns(DeprecationWarning, match="--preprocess-html"):
+            result = translate_v1_args_to_v2(args)
         assert result == ["input.html", "--preprocess", "--preset", "aggressive"]
 
 
@@ -42,7 +44,8 @@ class TestCLITranslationBooleanFlags:
 
     def test_no_escape_asterisks_silently_accepted(self) -> None:
         args = ["--no-escape-asterisks", "input.html"]
-        result = translate_v1_args_to_v2(args)
+        with pytest.warns(DeprecationWarning, match="deprecated and redundant"):
+            result = translate_v1_args_to_v2(args)
         assert result == ["input.html"]
 
     def test_escape_underscores_preserved(self) -> None:
@@ -52,7 +55,8 @@ class TestCLITranslationBooleanFlags:
 
     def test_no_escape_underscores_silently_accepted(self) -> None:
         args = ["--no-escape-underscores", "input.html"]
-        result = translate_v1_args_to_v2(args)
+        with pytest.warns(DeprecationWarning, match="deprecated and redundant"):
+            result = translate_v1_args_to_v2(args)
         assert result == ["input.html"]
 
     def test_escape_misc_preserved(self) -> None:
@@ -62,7 +66,8 @@ class TestCLITranslationBooleanFlags:
 
     def test_no_escape_misc_silently_accepted(self) -> None:
         args = ["--no-escape-misc", "input.html"]
-        result = translate_v1_args_to_v2(args)
+        with pytest.warns(DeprecationWarning, match="deprecated and redundant"):
+            result = translate_v1_args_to_v2(args)
         assert result == ["input.html"]
 
     def test_autolinks_preserved(self) -> None:
@@ -72,7 +77,8 @@ class TestCLITranslationBooleanFlags:
 
     def test_no_autolinks_silently_accepted(self) -> None:
         args = ["--no-autolinks", "input.html"]
-        result = translate_v1_args_to_v2(args)
+        with pytest.warns(DeprecationWarning, match="deprecated and redundant"):
+            result = translate_v1_args_to_v2(args)
         assert result == ["input.html"]
 
     def test_extract_metadata_preserved(self) -> None:
@@ -82,7 +88,8 @@ class TestCLITranslationBooleanFlags:
 
     def test_no_extract_metadata_silently_accepted(self) -> None:
         args = ["--no-extract-metadata", "input.html"]
-        result = translate_v1_args_to_v2(args)
+        with pytest.warns(DeprecationWarning, match="deprecated and redundant"):
+            result = translate_v1_args_to_v2(args)
         assert result == ["input.html"]
 
     def test_wrap_preserved(self) -> None:
@@ -92,7 +99,8 @@ class TestCLITranslationBooleanFlags:
 
     def test_no_wrap_silently_accepted(self) -> None:
         args = ["--no-wrap", "input.html"]
-        result = translate_v1_args_to_v2(args)
+        with pytest.warns(DeprecationWarning, match="deprecated and redundant"):
+            result = translate_v1_args_to_v2(args)
         assert result == ["input.html"]
 
 
@@ -122,7 +130,8 @@ class TestCLITranslationComplex:
             "-o",
             "output.md",
         ]
-        result = translate_v1_args_to_v2(args)
+        with pytest.warns(DeprecationWarning, match="--preprocess-html"):
+            result = translate_v1_args_to_v2(args)
         expected = [
             "input.html",
             "--preprocess",
@@ -138,7 +147,8 @@ class TestCLITranslationComplex:
             "--no-escape-asterisks",
             "input.html",
         ]
-        result = translate_v1_args_to_v2(args)
+        with pytest.warns(DeprecationWarning, match="deprecated and redundant"):
+            result = translate_v1_args_to_v2(args)
         assert result == ["input.html"]
 
     def test_all_boolean_flags_non_default(self) -> None:
@@ -164,7 +174,8 @@ class TestCLITranslationComplex:
             "atx",
             "--autolinks",
         ]
-        result = translate_v1_args_to_v2(args)
+        with pytest.warns(DeprecationWarning, match="--preprocess-html"):
+            result = translate_v1_args_to_v2(args)
         expected = [
             "input.html",
             "--preprocess",
@@ -219,7 +230,8 @@ class TestCLITranslationEdgeCases:
             "--code-language",
             "python",
         ]
-        result = translate_v1_args_to_v2(args)
+        with pytest.warns(DeprecationWarning, match="--preprocess-html"):
+            result = translate_v1_args_to_v2(args)
         expected = [
             "page.html",
             "-o",
