@@ -1,10 +1,3 @@
-"""Build script to include CLI binary in wheel.
-
-This script is called by maturin during the build process to:
-1. Build the html-to-markdown CLI binary
-2. Copy it to the .data/scripts directory for wheel inclusion
-"""
-
 import shutil
 import subprocess
 import sys
@@ -17,7 +10,6 @@ except ImportError:
 
 
 def main() -> None:
-    """Build CLI binary and prepare for wheel packaging."""
     print("Building html-to-markdown CLI binary...")
     subprocess.run(
         ["cargo", "build", "--release", "--package", "html-to-markdown-cli"],
@@ -33,7 +25,6 @@ def main() -> None:
 
     print(f"Found CLI binary at {source}")
 
-    # Copy to package directory so Python code can find it
     package_bin_dir = Path("html_to_markdown") / "bin"
     package_bin_dir.mkdir(parents=True, exist_ok=True)
 
@@ -45,7 +36,6 @@ def main() -> None:
         dest.chmod(0o755)
         print(f"Made binary executable: {dest}")
 
-    # Also copy to .data/scripts for system PATH installation (optional but nice to have)
     with Path("Cargo.toml").open("rb") as f:
         cargo_toml = tomllib.load(f)
     version = cargo_toml["workspace"]["package"]["version"]

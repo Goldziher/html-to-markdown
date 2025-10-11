@@ -15,26 +15,15 @@ def convert(
     options: ConversionOptions | None = None,
     preprocessing: PreprocessingOptions | None = None,
 ) -> str:
-    """Convert HTML to Markdown using Rust backend.
-
-    This is the main entry point for the v2 API, using dataclass-based configuration
-    and Rust implementation for high-performance conversion.
+    """Convert HTML to Markdown using the Rust backend.
 
     Args:
-        html: HTML string to convert
-        options: Conversion options (uses defaults if None)
-        preprocessing: HTML preprocessing options (uses defaults if None)
+        html: HTML string to convert.
+        options: Conversion configuration options (defaults to ConversionOptions()).
+        preprocessing: HTML preprocessing options (defaults to PreprocessingOptions()).
 
     Returns:
-        Markdown string
-
-    Example:
-        >>> from html_to_markdown import convert, ConversionOptions
-        >>> options = ConversionOptions(heading_style="atx", list_indent_width=2)
-        >>> markdown = convert("<h1>Title</h1>", options)
-        >>> print(markdown)
-        # Title
-        <BLANKLINE>
+        Converted Markdown string.
     """
     if options is None:
         options = ConversionOptions()

@@ -1,10 +1,8 @@
-"""Exception classes for html-to-markdown."""
-
 from __future__ import annotations
 
 
 class HtmlToMarkdownError(Exception):
-    """Base exception for html-to-markdown errors."""
+    """Base exception for all html-to-markdown errors."""
 
 
 class MissingDependencyError(HtmlToMarkdownError):
@@ -22,7 +20,7 @@ class MissingDependencyError(HtmlToMarkdownError):
 
 
 class InvalidParserError(HtmlToMarkdownError):
-    """Raised when an invalid HTML parser is specified."""
+    """Raised when an invalid parser is specified."""
 
     def __init__(self, parser: str, available_parsers: list[str]) -> None:
         self.parser = parser
@@ -33,14 +31,14 @@ class InvalidParserError(HtmlToMarkdownError):
 
 
 class EmptyHtmlError(HtmlToMarkdownError):
-    """Raised when the input HTML is empty."""
+    """Raised when input HTML is empty."""
 
     def __init__(self) -> None:
         super().__init__("The input HTML is empty.")
 
 
 class ConflictingOptionsError(HtmlToMarkdownError):
-    """Raised when conflicting options are specified."""
+    """Raised when conflicting configuration options are specified."""
 
     def __init__(self, option1: str, option2: str) -> None:
         self.option1 = option1
@@ -50,20 +48,14 @@ class ConflictingOptionsError(HtmlToMarkdownError):
 
 
 class InvalidEncodingError(HtmlToMarkdownError):
-    """Raised when an invalid encoding is specified."""
+    """Raised when an invalid character encoding is specified."""
 
     def __init__(self, encoding: str) -> None:
         super().__init__(f"The specified encoding ({encoding}) is not valid.")
 
 
 class UnsupportedV1FeatureError(HtmlToMarkdownError):
-    """Raised when a v1 feature is not supported in v2.
-
-    Args:
-        flag: The CLI flag or feature that is not supported
-        reason: Why the feature is not supported
-        migration: How to migrate away from this feature
-    """
+    """Raised when a v1 feature is not supported in v2."""
 
     def __init__(self, flag: str, reason: str, migration: str) -> None:
         self.flag = flag
@@ -74,8 +66,8 @@ class UnsupportedV1FeatureError(HtmlToMarkdownError):
 
 
 class RemovedV1FlagError(UnsupportedV1FeatureError):
-    """Raised when a CLI flag has been completely removed in v2."""
+    """Raised when a v1 flag has been removed in v2."""
 
 
 class RedundantV1FlagError(UnsupportedV1FeatureError):
-    """Raised when a v1 flag is redundant in v2 because it's the default behavior."""
+    """Raised when a v1 flag is redundant in v2."""

@@ -9,7 +9,7 @@ from contextlib import contextmanager
 from dataclasses import dataclass
 from typing import Any
 
-from html_to_markdown import convert_to_markdown, convert_to_markdown_stream
+from html_to_markdown import convert_to_markdown
 
 try:
     import psutil
@@ -252,13 +252,9 @@ def profile_bottlenecks() -> None:
 
     html = generate_complex_html(50)
 
-    print("\n📈 Regular Processing Profile:")  # noqa: T201
-    regular_profile = profile_function(convert_to_markdown, html)
-    print(regular_profile)  # noqa: T201
-
-    print("\n📊 Streaming Processing Profile:")  # noqa: T201
-    streaming_profile = profile_function(convert_to_markdown_stream, html, chunk_size=1024)
-    print(streaming_profile)  # noqa: T201
+    print("\n📈 Processing Profile:")  # noqa: T201
+    profile_result = profile_function(convert_to_markdown, html)
+    print(profile_result)  # noqa: T201
 
 
 if __name__ == "__main__":

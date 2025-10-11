@@ -1,6 +1,5 @@
-//! # html-to-markdown
+//! High-performance HTML to Markdown converter.
 //!
-//! A modern, high-performance library for converting HTML to Markdown.
 //! Built with html5ever for fast, memory-efficient HTML parsing.
 //!
 //! ## Optional inline image extraction
@@ -30,13 +29,10 @@ pub use options::{
 
 /// Convert HTML to Markdown.
 ///
-/// This function takes HTML input and converts it to Markdown using the provided options.
-/// If no options are provided, default options will be used.
-///
 /// # Arguments
 ///
 /// * `html` - The HTML string to convert
-/// * `options` - Optional conversion options
+/// * `options` - Optional conversion options (defaults to ConversionOptions::default())
 ///
 /// # Example
 ///
@@ -70,13 +66,13 @@ pub fn convert(html: &str, options: Option<ConversionOptions>) -> Result<String>
 #[cfg(feature = "inline-images")]
 /// Convert HTML to Markdown while collecting inline image assets (requires the `inline-images` feature).
 ///
-/// This function is identical to [`convert`] but also extracts inline image data URIs and inline `<svg>` elements.
+/// Extracts inline image data URIs and inline `<svg>` elements alongside Markdown conversion.
 ///
 /// # Arguments
 ///
-/// * `html` - The HTML string to convert.
-/// * `options` - Optional conversion options.
-/// * `image_cfg` - Configuration controlling inline image extraction.
+/// * `html` - The HTML string to convert
+/// * `options` - Optional conversion options (defaults to ConversionOptions::default())
+/// * `image_cfg` - Configuration controlling inline image extraction
 pub fn convert_with_inline_images(
     html: &str,
     options: Option<ConversionOptions>,
