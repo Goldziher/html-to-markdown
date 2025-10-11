@@ -9,7 +9,6 @@ import pytest
 
 
 def test_default_list_indent_4_spaces(convert: Callable[..., str]) -> None:
-    """Test v1 default behavior (4-space indent)."""
     html = "<ul><li>Item 1<ul><li>Nested item</li></ul></li></ul>"
     result = convert(html, list_indent_width=4)
     assert "    * Nested item" in result
@@ -145,7 +144,6 @@ def test_task_list_with_custom_indent(convert: Callable[..., str]) -> None:
 
 
 def test_backward_compatibility_default_behavior(convert: Callable[..., str]) -> None:
-    """Test v2 default behavior (2-space indent, CommonMark standard)."""
     html = "<ul><li>Item<ul><li>Nested</li></ul></li></ul>"
     result1 = convert(html)
     result2 = convert(html, list_indent_width=2, list_indent_type="spaces")

@@ -36,7 +36,7 @@ use super::types::{HocrElement, HocrElementType, HocrMetadata};
 /// # Example
 ///
 /// ```rust
-/// use html_to_markdown::hocr::extract_hocr_document;
+/// use html_to_markdown_rs::hocr::extract_hocr_document;
 ///
 /// let html = r#"<div class="ocr_page" title="bbox 0 0 1000 1500">
 ///     <p class="ocr_par" title="bbox 100 100 900 200">

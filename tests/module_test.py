@@ -158,12 +158,10 @@ def test_code_block_options(complex_html_file: Path) -> None:
 def test_special_characters() -> None:
     input_html = "<p>Text with * and _ and ** symbols</p>"
 
-    # v2 default: minimal escaping (no escaping)
     stdout, _, _ = run_cli_command([], input_text=input_html)
     assert "\\*" not in stdout
     assert "\\_" not in stdout
 
-    # With explicit escaping flags
     stdout, _, _ = run_cli_command(["--escape-asterisks", "--escape-underscores"], input_text=input_html)
     assert "\\*" in stdout
     assert "\\_" in stdout

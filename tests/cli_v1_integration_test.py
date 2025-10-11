@@ -133,7 +133,7 @@ class TestCLIV1Integration:
             assert "__bold__" in stdout
             assert "_italic_" in stdout
             assert "- First item" in stdout
-            assert "    def hello():" in stdout  # v2 default: indented code blocks
+            assert "    def hello():" in stdout
             assert "title: Test Page" in stdout
         finally:
             input_file.unlink()

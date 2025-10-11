@@ -2,9 +2,9 @@
 
 High-performance HTML to Markdown converter built with Rust.
 
-[![Crates.io](https://img.shields.io/crates/v/html-to-markdown-rs.svg)](https://crates.io/crates/html-to-markdown-rs)
-[![PyPI version](https://badge.fury.io/py/html-to-markdown.svg)](https://pypi.org/project/html-to-markdown/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Crates.io](https://img.shields.io/crates/v/html-to-markdown-rs.svg)](https://github.com/Goldziher/html-to-markdown)
+[![PyPI version](https://badge.fury.io/py/html-to-markdown.svg)](https://github.com/Goldziher/html-to-markdown)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://github.com/Goldziher/html-to-markdown/blob/main/LICENSE)
 
 Fast, reliable HTML to Markdown conversion with full CommonMark compliance. Built with `html5ever` for correctness and `ammonia` for safe HTML preprocessing.
 
@@ -79,16 +79,11 @@ let markdown = convert(scraped_html, Some(options))?;
 ### hOCR Table Extraction
 
 ```rust
-use html_to_markdown_rs::{convert, ConversionOptions};
+use html_to_markdown_rs::convert;
 
-let options = ConversionOptions {
-    hocr_extract_tables: true,
-    hocr_table_column_threshold: 50,
-    hocr_table_row_threshold_ratio: 0.5,
-    ..Default::default()
-};
-
-let markdown = convert(hocr_html, Some(options))?;
+// hOCR documents (from Tesseract, etc.) are detected automatically.
+// Tables and spatial layout are reconstructed without additional options.
+let markdown = convert(hocr_html, None)?;
 ```
 
 ## Python Library
@@ -149,15 +144,10 @@ markdown = convert(scraped_html, preprocessing=preprocessing)
 ### Python hOCR Support
 
 ```python
-from html_to_markdown import convert, ConversionOptions
+from html_to_markdown import convert
 
-options = ConversionOptions(
-    hocr_extract_tables=True,
-    hocr_table_column_threshold=50,
-    hocr_table_row_threshold_ratio=0.5,
-)
-
-markdown = convert(hocr_html, options)
+# hOCR documents are detected automatically; no extra configuration required.
+markdown = convert(hocr_html)
 ```
 
 ### V1 Compatibility API
@@ -311,38 +301,35 @@ man ./html-to-markdown.1
 
 ### ConversionOptions
 
-| Field                            | Type   | Default       | Description                                                      |
-| -------------------------------- | ------ | ------------- | ---------------------------------------------------------------- |
-| `heading_style`                  | enum   | `Atx`         | Heading format: `Atx` (#), `AtxClosed` (# #), `Underlined` (===) |
-| `list_indent_width`              | u8     | `2`           | Spaces per list indent level (CommonMark: 2)                     |
-| `list_indent_type`               | enum   | `Spaces`      | `Spaces` or `Tabs`                                               |
-| `bullets`                        | String | `"-"`         | Bullet chars for unordered lists (cycles through levels)         |
-| `strong_em_symbol`               | char   | `'*'`         | Symbol for bold/italic: `'*'` or `'_'`                           |
-| `escape_asterisks`               | bool   | `false`       | Escape `*` in text (minimal escaping by default)                 |
-| `escape_underscores`             | bool   | `false`       | Escape `_` in text (minimal escaping by default)                 |
-| `escape_misc`                    | bool   | `false`       | Escape other Markdown special chars                              |
-| `escape_ascii`                   | bool   | `false`       | Escape all ASCII punctuation                                     |
-| `code_language`                  | String | `""`          | Default language for code blocks                                 |
-| `code_block_style`               | enum   | `Indented`    | `Indented` (4 spaces), `Backticks` (\`\`\`), `Tildes` (\~~~)     |
-| `autolinks`                      | bool   | `true`        | Convert bare URLs to `<url>`                                     |
-| `default_title`                  | bool   | `false`       | Use href as link title if missing                                |
-| `br_in_tables`                   | bool   | `false`       | Preserve `<br>` in table cells                                   |
-| `highlight_style`                | enum   | `DoubleEqual` | `DoubleEqual` (==), `Html` (<mark>), `Bold` (\*\*), `None`       |
-| `extract_metadata`               | bool   | `true`        | Extract HTML metadata as comment                                 |
-| `whitespace_mode`                | enum   | `Normalized`  | `Normalized` or `Strict`                                         |
-| `strip_newlines`                 | bool   | `false`       | Strip newlines from input                                        |
-| `wrap`                           | bool   | `false`       | Enable text wrapping                                             |
-| `wrap_width`                     | usize  | `80`          | Wrap column width                                                |
-| `convert_as_inline`              | bool   | `false`       | Treat block elements as inline                                   |
-| `sub_symbol`                     | String | `""`          | Custom subscript symbol                                          |
-| `sup_symbol`                     | String | `""`          | Custom superscript symbol                                        |
-| `newline_style`                  | enum   | `Backslash`   | `Backslash` (\\) or `Spaces` (two spaces)                        |
-| `keep_inline_images_in`          | Vec    | `[]`          | Elements to keep inline images                                   |
-| `strip_tags`                     | Vec    | `[]`          | Tags to strip (output text only)                                 |
-| `hocr_extract_tables`            | bool   | `true`        | Enable hOCR table extraction                                     |
-| `hocr_table_column_threshold`    | i32    | `50`          | Column detection threshold (pixels)                              |
-| `hocr_table_row_threshold_ratio` | f64    | `0.5`         | Row grouping threshold ratio                                     |
-| `debug`                          | bool   | `false`       | Enable debug output                                              |
+| Field                   | Type   | Default       | Description                                                      |
+| ----------------------- | ------ | ------------- | ---------------------------------------------------------------- |
+| `heading_style`         | enum   | `Atx`         | Heading format: `Atx` (#), `AtxClosed` (# #), `Underlined` (===) |
+| `list_indent_width`     | u8     | `2`           | Spaces per list indent level (CommonMark: 2)                     |
+| `list_indent_type`      | enum   | `Spaces`      | `Spaces` or `Tabs`                                               |
+| `bullets`               | String | `"-"`         | Bullet chars for unordered lists (cycles through levels)         |
+| `strong_em_symbol`      | char   | `'*'`         | Symbol for bold/italic: `'*'` or `'_'`                           |
+| `escape_asterisks`      | bool   | `false`       | Escape `*` in text (minimal escaping by default)                 |
+| `escape_underscores`    | bool   | `false`       | Escape `_` in text (minimal escaping by default)                 |
+| `escape_misc`           | bool   | `false`       | Escape other Markdown special chars                              |
+| `escape_ascii`          | bool   | `false`       | Escape all ASCII punctuation                                     |
+| `code_language`         | String | `""`          | Default language for code blocks                                 |
+| `code_block_style`      | enum   | `Indented`    | `Indented` (4 spaces), `Backticks` (\`\`\`), `Tildes` (\~~~)     |
+| `autolinks`             | bool   | `true`        | Convert bare URLs to `<url>`                                     |
+| `default_title`         | bool   | `false`       | Use href as link title if missing                                |
+| `br_in_tables`          | bool   | `false`       | Preserve `<br>` in table cells                                   |
+| `highlight_style`       | enum   | `DoubleEqual` | `DoubleEqual` (==), `Html` (<mark>), `Bold` (\*\*), `None`       |
+| `extract_metadata`      | bool   | `true`        | Extract HTML metadata as comment                                 |
+| `whitespace_mode`       | enum   | `Normalized`  | `Normalized` or `Strict`                                         |
+| `strip_newlines`        | bool   | `false`       | Strip newlines from input                                        |
+| `wrap`                  | bool   | `false`       | Enable text wrapping                                             |
+| `wrap_width`            | usize  | `80`          | Wrap column width                                                |
+| `convert_as_inline`     | bool   | `false`       | Treat block elements as inline                                   |
+| `sub_symbol`            | String | `""`          | Custom subscript symbol                                          |
+| `sup_symbol`            | String | `""`          | Custom superscript symbol                                        |
+| `newline_style`         | enum   | `Backslash`   | `Backslash` (\\) or `Spaces` (two spaces)                        |
+| `keep_inline_images_in` | Vec    | `[]`          | Elements to keep inline images                                   |
+| `strip_tags`            | Vec    | `[]`          | Tags to strip (output text only)                                 |
+| `debug`                 | bool   | `false`       | Enable debug output                                              |
 
 ### PreprocessingOptions
 
@@ -393,8 +380,6 @@ man ./html-to-markdown.1
 ## Links
 
 - [GitHub Repository](https://github.com/Goldziher/html-to-markdown)
-- [Rust Crate (crates.io)](https://crates.io/crates/html-to-markdown-rs)
-- [Python Package (PyPI)](https://pypi.org/project/html-to-markdown/)
 - [Discord Community](https://discord.gg/pXxagNK2zN)
 
 ## License

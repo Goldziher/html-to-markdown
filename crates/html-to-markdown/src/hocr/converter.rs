@@ -2,6 +2,7 @@
 //!
 //! Converts structured hOCR elements to Markdown while preserving document hierarchy.
 
+use super::spatial::{self, HocrWord};
 use super::types::{HocrElement, HocrElementType};
 
 /// Convert hOCR elements to Markdown with semantic formatting
@@ -41,7 +42,7 @@ use super::types::{HocrElement, HocrElementType};
 /// # Example
 ///
 /// ```rust
-/// use html_to_markdown::hocr::{extract_hocr_document, convert_to_markdown};
+/// use html_to_markdown_rs::hocr::{extract_hocr_document, convert_to_markdown};
 ///
 /// let html = r#"<div class="ocr_page">
 ///     <h1 class="ocr_title">Document Title</h1>
@@ -245,15 +246,22 @@ fn convert_element(element: &HocrElement, output: &mut String, depth: usize, pre
             if !output.is_empty() && !output.ends_with("\n\n") {
                 output.push_str("\n\n");
             }
-            // Sort children by order property if preserve_structure is enabled
-            let mut sorted_children: Vec<_> = element.children.iter().collect();
-            if preserve_structure {
-                sorted_children.sort_by_key(|e| e.properties.order.unwrap_or(u32::MAX));
+
+            // Try spatial table reconstruction first
+            if let Some(table_markdown) = try_spatial_table_reconstruction(element) {
+                output.push_str(&table_markdown);
+                output.push_str("\n\n");
+            } else {
+                // Fallback: process children normally
+                let mut sorted_children: Vec<_> = element.children.iter().collect();
+                if preserve_structure {
+                    sorted_children.sort_by_key(|e| e.properties.order.unwrap_or(u32::MAX));
+                }
+                for child in sorted_children {
+                    convert_element(child, output, depth + 1, preserve_structure);
+                }
+                output.push_str("\n\n");
             }
-            for child in sorted_children {
-                convert_element(child, output, depth + 1, preserve_structure);
-            }
-            output.push_str("\n\n");
         }
 
         HocrElementType::OcrFloat | HocrElementType::OcrTextfloat | HocrElementType::OcrTextimage => {
@@ -371,6 +379,56 @@ fn append_text_and_children(element: &HocrElement, output: &mut String, depth: u
     for child in sorted_children {
         convert_element(child, output, depth + 1, preserve_structure);
     }
+}
+
+/// Collect all word elements recursively from an element tree
+fn collect_words(element: &HocrElement, words: &mut Vec<HocrWord>) {
+    if element.element_type == HocrElementType::OcrxWord {
+        // Convert HocrElement to HocrWord if it has bbox data
+        if let Some(bbox) = element.properties.bbox {
+            let confidence = element.properties.x_wconf.unwrap_or(0.0);
+            words.push(HocrWord {
+                text: element.text.clone(),
+                left: bbox.x1,
+                top: bbox.y1,
+                width: bbox.width(),
+                height: bbox.height(),
+                confidence,
+            });
+        }
+    }
+
+    // Recursively collect from children
+    for child in &element.children {
+        collect_words(child, words);
+    }
+}
+
+/// Try to detect and reconstruct a table from an element's word children
+///
+/// Returns Some(markdown) if table structure detected, None otherwise
+fn try_spatial_table_reconstruction(element: &HocrElement) -> Option<String> {
+    let mut words = Vec::new();
+    collect_words(element, &mut words);
+
+    // Need at least 6 words for a minimal 2x3 table
+    if words.len() < 6 {
+        return None;
+    }
+
+    // Try to reconstruct table with default thresholds
+    let table = spatial::reconstruct_table(&words, 50, 0.5, false);
+
+    // Be conservative: only use table if we have at least 3 rows and 2 columns
+    // This avoids false positives on headers or short text spans
+    if !table.is_empty() && table.len() >= 3 && table[0].len() >= 2 {
+        let markdown = spatial::table_to_markdown(&table);
+        if !markdown.is_empty() {
+            return Some(markdown);
+        }
+    }
+
+    None
 }
 
 #[cfg(test)]

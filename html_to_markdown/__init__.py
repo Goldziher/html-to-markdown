@@ -23,12 +23,8 @@ from html_to_markdown.exceptions import (
     InvalidParserError,
     MissingDependencyError,
 )
-from html_to_markdown.options import (
-    ConversionOptions,
-    ParsingOptions,
-    PreprocessingOptions,
-)
-from html_to_markdown.v1_compat import convert_to_markdown, convert_to_markdown_stream, markdownify
+from html_to_markdown.options import ConversionOptions, PreprocessingOptions
+from html_to_markdown.v1_compat import convert_to_markdown, markdownify
 
 __all__ = [
     "ConflictingOptionsError",
@@ -37,12 +33,10 @@ __all__ = [
     "HtmlToMarkdownError",
     "InvalidParserError",
     "MissingDependencyError",
-    "ParsingOptions",
     "PreprocessingOptions",
     "convert",
     "convert_to_markdown",
-    "convert_to_markdown_stream",
     "markdownify",
 ]
 
-__version__ = "2.0.0"
+__version__ = "2.1.0"

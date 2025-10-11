@@ -490,56 +490,6 @@ fn test_keep_forms() {
 }
 
 #[test]
-fn test_hocr_extract_tables() {
-    cli()
-        .arg("--hocr-extract-tables")
-        .write_stdin("<p>Test</p>")
-        .assert()
-        .success();
-}
-
-#[test]
-fn test_hocr_table_column_threshold() {
-    cli()
-        .arg("--hocr-table-column-threshold")
-        .arg("100")
-        .write_stdin("<p>Test</p>")
-        .assert()
-        .success();
-}
-
-#[test]
-fn test_hocr_table_column_threshold_validation() {
-    cli()
-        .arg("--hocr-table-column-threshold")
-        .arg("2000")
-        .write_stdin("<p>Test</p>")
-        .assert()
-        .failure();
-}
-
-#[test]
-fn test_hocr_table_row_threshold_ratio() {
-    cli()
-        .arg("--hocr-table-row-threshold-ratio")
-        .arg("0.5")
-        .write_stdin("<p>Test</p>")
-        .assert()
-        .success();
-}
-
-#[test]
-fn test_hocr_table_row_threshold_ratio_validation() {
-    cli()
-        .arg("--hocr-table-row-threshold-ratio")
-        .arg("1.5")
-        .write_stdin("<p>Test</p>")
-        .assert()
-        .failure()
-        .stderr(predicate::str::contains("between 0.0 and 1.0"));
-}
-
-#[test]
 fn test_debug_flag() {
     cli().arg("--debug").write_stdin("<p>Test</p>").assert().success();
 }
@@ -672,7 +622,7 @@ fn test_version_flag() {
         .arg("--version")
         .assert()
         .success()
-        .stdout(predicate::str::contains("2.0.0"));
+        .stdout(predicate::str::contains("2.1.0"));
 }
 
 #[test]

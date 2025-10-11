@@ -7,58 +7,34 @@ using the Rust backend for conversion.
 from __future__ import annotations
 
 import html_to_markdown._html_to_markdown as _rust  # type: ignore[import-not-found]
-from html_to_markdown.options import (
-    ConversionOptions,
-    ParsingOptions,
-    PreprocessingOptions,
-)
+from html_to_markdown.options import ConversionOptions, PreprocessingOptions
 
 
 def convert(
     html: str,
     options: ConversionOptions | None = None,
     preprocessing: PreprocessingOptions | None = None,
-    parsing: ParsingOptions | None = None,
 ) -> str:
-    """Convert HTML to Markdown using Rust backend.
-
-    This is the main entry point for the v2 API, using dataclass-based configuration
-    and Rust implementation for high-performance conversion.
+    """Convert HTML to Markdown using the Rust backend.
 
     Args:
-        html: HTML string to convert
-        options: Conversion options (uses defaults if None)
-        preprocessing: HTML preprocessing options (uses defaults if None)
-        parsing: HTML parsing options (uses defaults if None)
+        html: HTML string to convert.
+        options: Conversion configuration options (defaults to ConversionOptions()).
+        preprocessing: HTML preprocessing options (defaults to PreprocessingOptions()).
 
     Returns:
-        Markdown string
-
-    Example:
-        >>> from html_to_markdown import convert, ConversionOptions
-        >>> options = ConversionOptions(heading_style="atx", list_indent_width=2)
-        >>> markdown = convert("<h1>Title</h1>", options)
-        >>> print(markdown)
-        # Title
-        <BLANKLINE>
+        Converted Markdown string.
     """
     if options is None:
         options = ConversionOptions()
     if preprocessing is None:
         preprocessing = PreprocessingOptions()
-    if parsing is None:
-        parsing = ParsingOptions()
 
     rust_preprocessing = _rust.PreprocessingOptions(
         enabled=preprocessing.enabled,
         preset=preprocessing.preset,
         remove_navigation=preprocessing.remove_navigation,
         remove_forms=preprocessing.remove_forms,
-    )
-
-    rust_parsing = _rust.ParsingOptions(
-        encoding=parsing.encoding,
-        parser=parsing.parser,
     )
 
     rust_options = _rust.ConversionOptions(
@@ -75,9 +51,6 @@ def convert(
         autolinks=options.autolinks,
         default_title=options.default_title,
         br_in_tables=options.br_in_tables,
-        hocr_extract_tables=options.hocr_extract_tables,
-        hocr_table_column_threshold=options.hocr_table_column_threshold,
-        hocr_table_row_threshold_ratio=options.hocr_table_row_threshold_ratio,
         highlight_style=options.highlight_style,
         extract_metadata=options.extract_metadata,
         whitespace_mode=options.whitespace_mode,
@@ -91,7 +64,7 @@ def convert(
         code_block_style=options.code_block_style,
         keep_inline_images_in=list(options.keep_inline_images_in) if options.keep_inline_images_in else [],
         preprocessing=rust_preprocessing,
-        parsing=rust_parsing,
+        encoding=options.encoding,
         debug=options.debug,
         strip_tags=list(options.strip_tags) if options.strip_tags else [],
     )

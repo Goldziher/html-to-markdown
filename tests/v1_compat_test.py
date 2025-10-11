@@ -2,7 +2,10 @@ from __future__ import annotations
 
 import pytest
 
-from html_to_markdown import convert_to_markdown, convert_to_markdown_stream
+from html_to_markdown import convert_to_markdown
+
+# Suppress deprecation warnings for v1 compatibility tests
+pytestmark = pytest.mark.filterwarnings("ignore::DeprecationWarning")
 
 
 class TestV1CompatBasic:
@@ -66,13 +69,14 @@ class TestV1CompatOptions:
     def test_extract_metadata_true(self) -> None:
         html = "<html><head><title>Test</title></head><body><p>Content</p></body></html>"
         result = convert_to_markdown(html, extract_metadata=True)
-        assert "<!--" in result
+        # v2 uses YAML frontmatter instead of HTML comments
+        assert "---" in result
         assert "title: Test" in result
 
     def test_extract_metadata_false(self) -> None:
         html = "<html><head><title>Test</title></head><body><p>Content</p></body></html>"
         result = convert_to_markdown(html, extract_metadata=False)
-        assert "<!--" not in result
+        assert "---" not in result
         assert "title:" not in result
 
     def test_wrap_enabled(self) -> None:
@@ -145,13 +149,6 @@ class TestV1CompatUnsupportedOptions:
         html = "<custom>content</custom>"
         with pytest.raises(NotImplementedError, match="custom_converters is not yet implemented"):
             convert_to_markdown(html, custom_converters={"custom": lambda **kw: "converted"})
-
-
-class TestV1CompatStreaming:
-    def test_streaming_not_implemented(self) -> None:
-        html = "<p>Content</p>"
-        with pytest.raises(NotImplementedError, match=r"Streaming API.*was removed"):
-            list(convert_to_markdown_stream(html))
 
 
 class TestV1CompatEdgeCases:
