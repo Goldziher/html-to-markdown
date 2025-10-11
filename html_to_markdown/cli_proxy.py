@@ -1,25 +1,19 @@
-"""CLI proxy that calls the Rust CLI binary.
-
-This module provides a Python wrapper around the Rust CLI binary,
-allowing the Python package to use the high-performance Rust implementation
-for command-line operations. It also provides v1 -> v2 CLI argument translation.
-"""
-
 import subprocess
 import sys
+import warnings
 from pathlib import Path
 
 from html_to_markdown.exceptions import RedundantV1FlagError, RemovedV1FlagError
 
 
 def find_cli_binary() -> Path:
-    """Find the html-to-markdown CLI binary.
+    """Find the html-to-markdown CLI binary in expected locations.
 
     Returns:
-        Path to the CLI binary
+        Path to the CLI binary.
 
     Raises:
-        FileNotFoundError: If the binary cannot be found
+        FileNotFoundError: If the binary cannot be found.
     """
     binary_name = "html-to-markdown.exe" if sys.platform == "win32" else "html-to-markdown"
 
@@ -38,28 +32,22 @@ def find_cli_binary() -> Path:
 
 
 def translate_v1_args_to_v2(argv: list[str]) -> list[str]:
-    """Translate v1 CLI arguments to v2 Rust CLI arguments.
-
-    This handles differences between the v1 Python CLI and v2 Rust CLI:
-    - Boolean flags: v1 used --flag/--no-flag, v2 uses presence/absence
-    - Flag name changes: --preprocess-html -> --preprocess
-    - Unsupported flags: --strip, --convert (raise errors)
+    """Translate v1 CLI arguments to v2 format.
 
     Args:
-        argv: v1 CLI arguments
+        argv: List of command-line arguments.
 
     Returns:
-        Translated v2 CLI arguments
+        Translated list of arguments compatible with v2.
 
     Raises:
-        RemovedV1FlagError: If a v1 flag has been removed in v2
+        RemovedV1FlagError: If a v1 flag has been removed in v2.
     """
     translated = []
     i = 0
     while i < len(argv):
         arg = argv[i]
 
-        # Error on removed/unsupported v1 features
         if arg in ("--strip", "--convert"):
             raise RemovedV1FlagError(
                 flag=arg,
@@ -67,8 +55,6 @@ def translate_v1_args_to_v2(argv: list[str]) -> list[str]:
                 migration="Remove this flag from your command. The feature is no longer available.",
             )
 
-        # These flags are redundant (match v2 defaults) but we accept them for v1 compatibility
-        # Silently skip - Rust CLI defaults match these flags
         if arg in (
             "--no-escape-asterisks",
             "--no-escape-underscores",
@@ -77,14 +63,21 @@ def translate_v1_args_to_v2(argv: list[str]) -> list[str]:
             "--no-autolinks",
             "--no-extract-metadata",
         ):
-            # Skip this flag - matches Rust CLI defaults
-            pass
+            warnings.warn(
+                f"'{arg}' is deprecated and redundant in v2. "
+                f"These options are now disabled by default. Remove this flag.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
 
-        # Flag name translations
         elif arg == "--preprocess-html":
+            warnings.warn(
+                "'--preprocess-html' is deprecated. Use '--preprocess' instead.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
             translated.append("--preprocess")
 
-        # Positive flags that should be passed through
         elif arg in (
             "--escape-asterisks",
             "--escape-underscores",
@@ -95,7 +88,6 @@ def translate_v1_args_to_v2(argv: list[str]) -> list[str]:
         ):
             translated.append(arg)
 
-        # All other args pass through unchanged
         else:
             translated.append(arg)
 
@@ -105,23 +97,21 @@ def translate_v1_args_to_v2(argv: list[str]) -> list[str]:
 
 
 def main(argv: list[str]) -> str:
-    """Run the Rust CLI with the given arguments.
+    """Main entry point for the CLI proxy.
 
-    Translates v1 CLI arguments to v2 format if needed.
-    Exits with non-zero status on errors (FileNotFoundError, UnsupportedV1FeatureError, CLI errors).
+    Translates v1 arguments to v2 and invokes the native Rust CLI binary.
 
     Args:
-        argv: Command line arguments (without program name)
+        argv: Command-line arguments.
 
     Returns:
-        Output from the CLI
+        Stdout from the CLI binary.
     """
     cli_binary = find_cli_binary()
 
     try:
         translated_args = translate_v1_args_to_v2(argv)
     except (RemovedV1FlagError, RedundantV1FlagError) as e:
-        # Format the error nicely for CLI users
         sys.stderr.write(f"\n❌ Error: {e.flag}\n\n")
         sys.stderr.write(f"   {e.reason}\n\n")
         sys.stderr.write(f"   💡 {e.migration}\n\n")

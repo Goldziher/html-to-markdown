@@ -7,7 +7,7 @@ requires = [
 
 [project]
 name = "html-to-markdown"
-version = "2.0.1"
+version = "2.1.0"
 description = "High-performance HTML to Markdown converter powered by Rust with a clean Python API"
 readme = "README_PYPI.md"
 keywords = [
@@ -36,6 +36,7 @@ classifiers = [
   "Programming Language :: Python :: 3.11",
   "Programming Language :: Python :: 3.12",
   "Programming Language :: Python :: 3.13",
+  "Programming Language :: Python :: 3.14",
   "Programming Language :: Rust",
   "Topic :: Software Development :: Libraries :: Python Modules",
   "Topic :: Text Processing",
@@ -62,7 +63,6 @@ dev = [
   "pytest-cov>=7",
   "pytest-mock>=3.15.1",
   "ruff>=0.13.3",
-  "types-beautifulsoup4>=4.12.0.20250516",
   "types-psutil>=7.0.0.20251001",
   "uv-bump",
 ]
@@ -74,6 +74,12 @@ include = [
   { path = "html_to_markdown-*.data/**/*", format = "wheel" },
   { path = "html_to_markdown/bin/*", format = "wheel" },
 ]
+
+[tool.uv]
+default-groups = [ "dev" ]
+
+[tool.uv.sources]
+uv-bump = { git = "https://github.com/Goldziher/uv-bump" }
 
 [tool.ruff]
 target-version = "py310"
@@ -147,9 +153,3 @@ exclude = [ "crates/", "scripts/" ]
 module = "tests.*"
 disallow_any_generics = false
 disallow_untyped_decorators = false
-
-[tool.uv]
-default-groups = [ "dev" ]
-
-[tool.uv.sources]
-uv-bump = { git = "https://github.com/Goldziher/uv-bump" }

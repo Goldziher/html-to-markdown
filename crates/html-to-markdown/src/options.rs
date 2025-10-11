@@ -186,20 +186,11 @@ pub struct ConversionOptions {
     /// Elements where images should remain as markdown (not converted to alt text)
     pub keep_inline_images_in: Vec<String>,
 
-    /// Enable hOCR table extraction
-    pub hocr_extract_tables: bool,
-
-    /// Column threshold for hOCR table detection (pixels)
-    pub hocr_table_column_threshold: u32,
-
-    /// Row threshold ratio for hOCR table detection
-    pub hocr_table_row_threshold_ratio: f64,
-
     /// Preprocessing options
     pub preprocessing: PreprocessingOptions,
 
-    /// Parsing options
-    pub parsing: ParsingOptions,
+    /// Source encoding (informational)
+    pub encoding: String,
 
     /// Enable debug mode with diagnostic warnings
     pub debug: bool,
@@ -236,11 +227,8 @@ impl Default for ConversionOptions {
             newline_style: NewlineStyle::Spaces,
             code_block_style: CodeBlockStyle::default(),
             keep_inline_images_in: Vec::new(),
-            hocr_extract_tables: true,
-            hocr_table_column_threshold: 50,
-            hocr_table_row_threshold_ratio: 0.5,
             preprocessing: PreprocessingOptions::default(),
-            parsing: ParsingOptions::default(),
+            encoding: "utf-8".to_string(),
             debug: false,
             strip_tags: Vec::new(),
         }
@@ -270,25 +258,6 @@ impl Default for PreprocessingOptions {
             preset: PreprocessingPreset::default(),
             remove_navigation: true,
             remove_forms: true,
-        }
-    }
-}
-
-/// HTML parsing options.
-#[derive(Debug, Clone)]
-pub struct ParsingOptions {
-    /// Source encoding
-    pub encoding: String,
-
-    /// HTML parser to use
-    pub parser: Option<String>,
-}
-
-impl Default for ParsingOptions {
-    fn default() -> Self {
-        Self {
-            encoding: "utf-8".to_string(),
-            parser: None,
         }
     }
 }

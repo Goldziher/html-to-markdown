@@ -149,7 +149,6 @@ def test_nested_ols(nested_ols: str, convert: Callable[..., str]) -> None:
 
 
 def test_ul(convert: Callable[..., str]) -> None:
-    # v2 default: bullets="-" (hyphen), CommonMark compliant
     assert convert("<ul><li>a</li><li>b</li></ul>") == "- a\n- b\n"
     assert (
         convert(
@@ -253,8 +252,6 @@ def test_table(
 
 
 def inline_tests(tag: str, markup: str, convert: Callable[..., str]) -> None:
-    # Only code preserves whitespace inside
-    # All other elements (kbd, samp, em, del, s) normalize whitespace outside
     preserves_whitespace = tag == "code"
 
     assert convert(f"<{tag}>Hello</{tag}>") == f"{markup}Hello{markup}\n"
@@ -366,7 +363,6 @@ def test_blockquote_nested(convert: Callable[..., str]) -> None:
 
 
 def test_br(convert: Callable[..., str]) -> None:
-    # v2 default: spaces (not backslash)
     assert convert("a<br />b<br />c") == "a  \nb  \nc\n"
     assert convert("a<br />b<br />c", newline_style="backslash") == "a\\\nb\\\nc\n"
 
@@ -522,7 +518,6 @@ def test_head(convert: Callable[..., str]) -> None:
 
 
 def test_hr(convert: Callable[..., str]) -> None:
-    # CommonMark: hr needs to be on its own line, no blank lines required
     assert convert("Hello<hr>World") == "Hello\n---\nWorld\n"
     assert convert("Hello<hr />World") == "Hello\n---\nWorld\n"
     assert convert("<p>Hello</p>\n<hr>\n<p>World</p>") == "Hello\n---\n\n\nWorld\n"
@@ -641,7 +636,6 @@ def test_mark_tag_with_complex_content(convert: Callable[..., str]) -> None:
 
 
 def test_pre(convert: Callable[..., str]) -> None:
-    # v2 default: backtick code blocks (better whitespace preservation)
     assert convert("<pre>test\n    foo\nbar</pre>") == "```\ntest\n    foo\nbar\n```\n"
     assert convert("<pre><code>test\n    foo\nbar</code></pre>") == "```\ntest\n    foo\nbar\n```\n"
     assert convert("<pre>*this_should_not_escape*</pre>") == "```\n*this_should_not_escape*\n```\n"
@@ -666,7 +660,6 @@ def test_pre(convert: Callable[..., str]) -> None:
     assert convert("<pre>foo<sup>\nbar\n</sup>baz</pre>", sup_symbol="^") == "```\nfoo\nbar\nbaz\n```\n"
     assert convert("<pre>foo<sub>\nbar\n</sub>baz</pre>", sub_symbol="^") == "```\nfoo\nbar\nbaz\n```\n"
 
-    # Can still use indented style explicitly
     assert convert("<pre>test\n    foo\nbar</pre>", code_block_style="indented") == "    test\n        foo\n    bar\n"
     assert (
         convert("<pre><code>test\n    foo\nbar</code></pre>", code_block_style="indented")

@@ -2,7 +2,7 @@ use clap::{Parser, ValueEnum};
 use encoding_rs::Encoding;
 use html_to_markdown_rs::{
     convert, CodeBlockStyle, ConversionOptions, HeadingStyle, HighlightStyle, ListIndentType, NewlineStyle,
-    ParsingOptions, PreprocessingOptions, PreprocessingPreset, WhitespaceMode,
+    PreprocessingOptions, PreprocessingPreset, WhitespaceMode,
 };
 use std::fs;
 use std::io::{self, Read, Write as IoWrite};
@@ -296,27 +296,6 @@ struct Cli {
     #[arg(requires = "preprocess")]
     keep_forms: bool,
 
-    /// Enable hOCR table extraction
-    ///
-    /// Extract tables from hOCR (OCR output) documents
-    #[arg(long)]
-    #[arg(help_heading = "hOCR Options")]
-    hocr_extract_tables: bool,
-
-    /// hOCR column detection threshold
-    ///
-    /// Pixel threshold for detecting table columns in hOCR
-    #[arg(long, value_name = "PIXELS", value_parser = clap::value_parser!(u32).range(1..=1000))]
-    #[arg(help_heading = "hOCR Options")]
-    hocr_table_column_threshold: Option<u32>,
-
-    /// hOCR row detection threshold ratio
-    ///
-    /// Ratio threshold for detecting table rows in hOCR
-    #[arg(long, value_name = "RATIO", value_parser = validate_ratio)]
-    #[arg(help_heading = "hOCR Options")]
-    hocr_table_row_threshold_ratio: Option<f64>,
-
     /// Input character encoding
     ///
     /// Encoding to use when reading input files (e.g., 'utf-8', 'latin-1')
@@ -497,14 +476,6 @@ fn validate_strong_em_symbol(s: &str) -> Result<char, String> {
     Ok(c)
 }
 
-fn validate_ratio(s: &str) -> Result<f64, String> {
-    let ratio: f64 = s.parse().map_err(|_| "ratio must be a number".to_string())?;
-    if !(0.0..=1.0).contains(&ratio) {
-        return Err("ratio must be between 0.0 and 1.0".to_string());
-    }
-    Ok(ratio)
-}
-
 fn decode_bytes(bytes: &[u8], encoding_name: &str) -> Result<String, String> {
     let lowercase = encoding_name.to_lowercase();
     let normalized = match lowercase.as_str() {
@@ -600,11 +571,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         remove_forms: !cli.keep_forms,
     };
 
-    let parsing = ParsingOptions {
-        encoding: cli.encoding,
-        parser: None,
-    };
-
     let options = ConversionOptions {
         heading_style: cli.heading_style.map(Into::into).unwrap_or(defaults.heading_style),
         list_indent_type: cli
@@ -640,15 +606,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             .map(Into::into)
             .unwrap_or(defaults.code_block_style),
         keep_inline_images_in: cli.keep_inline_images_in.unwrap_or(defaults.keep_inline_images_in),
-        hocr_extract_tables: cli.hocr_extract_tables,
-        hocr_table_column_threshold: cli
-            .hocr_table_column_threshold
-            .unwrap_or(defaults.hocr_table_column_threshold),
-        hocr_table_row_threshold_ratio: cli
-            .hocr_table_row_threshold_ratio
-            .unwrap_or(defaults.hocr_table_row_threshold_ratio),
         preprocessing,
-        parsing,
+        encoding: cli.encoding.clone(),
         debug: cli.debug,
         strip_tags: cli.strip_tags.unwrap_or(defaults.strip_tags),
     };

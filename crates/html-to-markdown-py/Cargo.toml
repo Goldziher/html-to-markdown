@@ -18,8 +18,12 @@ name = "_html_to_markdown"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-html-to-markdown-rs.workspace = true
+html-to-markdown-rs = { workspace = true, features = ["inline-images"] }
 pyo3.workspace = true
+
+[dev-dependencies]
+base64 = "0.22"
+image = { version = "0.25", default-features = false, features = ["png"] }
 
 [features]
 default = []

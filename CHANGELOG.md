@@ -7,15 +7,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.1.0] - 2025-10-11
+
+### Added
+
+- **Inline image extraction** - New `convert_with_inline_images()` function to extract embedded images during conversion
+    - Supports data URI images (`data:image/*`)
+    - Supports inline SVG elements
+    - Configurable via `InlineImageConfig` with options for:
+        - Maximum decoded size limits
+        - Custom filename prefixes
+        - SVG capture control
+        - Optional dimension inference for raster images
+    - Returns `HtmlExtraction` with markdown, extracted images, and warnings
+    - Available through both Rust and Python APIs
+
+### Changed
+
+- **Simplified API** - Removed `ParsingOptions` class in favor of direct `encoding` parameter on `ConversionOptions`
+- **Automatic hOCR table extraction** - hOCR tables are now extracted automatically without requiring configuration
+    - Removed `hocr_extract_tables` option (always enabled for hOCR content)
+    - Removed `hocr_table_column_threshold` option (uses built-in heuristics)
+    - Removed `hocr_table_row_threshold_ratio` option (uses built-in heuristics)
+- Updated pre-commit hook versions (commitlint v9.23.0, pyproject-fmt v2.10.0, ruff v0.14.0)
+
 ### Fixed
 
+- **hOCR metadata now uses YAML frontmatter** instead of HTML comments for cleaner markdown output
+- **hOCR code organization** - Restructured spatial table reconstruction into dedicated `hocr/spatial.rs` module
+- **Conservative table detection** - hOCR spatial table reconstruction now only applies to explicit `ocr_table` elements, preventing false positives
 - Windows CLI binary detection - now correctly searches for `.exe` extension on Windows
 - CLI binary bundling in Python wheels - binary now included in package for all platforms
 - hOCR extractor Rust doctest - added missing import statement
 - 928 Python test expectations updated for CommonMark-compliant v2 defaults
-
-### Changed
-
 - Python 3.14-dev → Python 3.14 stable in CI workflows
 - Reorganized wheel preparation script to `scripts/` directory
 - Removed duplicate markdown documentation files (BENCHMARKS.md, PERFORMANCE.md, BENCHMARK_RESULTS.md, COMMONMARK_COMPLIANCE.md, REFACTORING_SUMMARY.md)
@@ -82,15 +106,15 @@ These flags can be safely removed from your commands, or you can leave them for 
 - **Complete Rust rewrite** of HTML-to-Markdown conversion engine using `scraper` and `html5ever`
 - **Native Rust CLI** with improved argument parsing and validation
 - **PyO3 Python bindings** for seamless Rust/Python integration
-- **hOCR table extraction** support with configurable thresholds for OCR document processing
+- **Automatic hOCR table extraction** with built-in heuristics for OCR documents
 
 #### New V2 API
 
 - Clean, modern API with dataclass-based configuration
-- `convert(html, options, preprocessing, parsing)` - new primary API
-- `ConversionOptions` - comprehensive conversion settings
+- `convert(html, options, preprocessing)` - primary API entry point
+- `ConversionOptions` - comprehensive conversion settings (now includes `encoding`)
 - `PreprocessingOptions` - HTML cleaning configuration
-- `ParsingOptions` - parser and encoding settings
+- Legacy parsing options removed in favour of explicit encoding on `ConversionOptions`
 - Improved type safety with full type stubs (`.pyi` files)
 
 #### V1 Compatibility Layer
@@ -121,7 +145,7 @@ These flags can be safely removed from your commands, or you can leave them for 
 
 #### Performance
 
-- **10-30x faster** than v1 for most conversion operations
+- **60-80x faster** than v1 for most conversion operations (144-208 MB/s throughput)
 - Memory-efficient processing with Rust's zero-cost abstractions
 - Optimized table handling with rowspan/colspan tracking
 - Faster list processing with unified helpers
@@ -189,15 +213,15 @@ html-to-markdown --preprocess input.html  # escaping is default
 
 ### Performance Benchmarks
 
-Real-world performance improvements over v1:
+Real-world performance improvements over v1 (Apple M4):
 
-| Document Type      | Size  | V1 Time | V2 Time | Speedup |
-| ------------------ | ----- | ------- | ------- | ------- |
-| Small HTML         | 5KB   | 12ms    | 0.8ms   | **15x** |
-| Medium Python Docs | 150KB | 180ms   | 8ms     | **22x** |
-| Large Rust Docs    | 800KB | 950ms   | 35ms    | **27x** |
-| Tables (Countries) | 200KB | 220ms   | 12ms    | **18x** |
-| Lists (Timeline)   | 100KB | 140ms   | 6ms     | **23x** |
+| Document Type       | Size  | V2 Latency | V2 Throughput | Speedup vs V1 (2.5 MB/s) |
+| ------------------- | ----- | ---------- | ------------- | ------------------------ |
+| Lists (Timeline)    | 129KB | 0.62ms     | 208 MB/s      | **83x**                  |
+| Tables (Countries)  | 360KB | 2.02ms     | 178 MB/s      | **71x**                  |
+| Mixed (Python wiki) | 656KB | 4.56ms     | 144 MB/s      | **58x**                  |
+
+V2's Rust engine delivers **60-80x higher throughput** than V1's Python/BeautifulSoup implementation across real-world documents.
 
 ### Technical Details
 
@@ -244,13 +268,12 @@ None if using v1 compatibility layer. If migrating to v2 API:
 
 #### Performance Differences
 
-| Document Type       | V1 Time | V2 Time | Speedup |
-| ------------------- | ------- | ------- | ------- |
-| Small HTML (5KB)    | 12ms    | 0.8ms   | **15x** |
-| Medium Docs (150KB) | 180ms   | 8ms     | **22x** |
-| Large Docs (800KB)  | 950ms   | 35ms    | **27x** |
-| Tables (200KB)      | 220ms   | 12ms    | **18x** |
-| Lists (100KB)       | 140ms   | 6ms     | **23x** |
+| Document Type       | V1 Throughput | V2 Throughput | Speedup |
+| ------------------- | ------------- | ------------- | ------- |
+| Lists (Timeline)    | 2.5 MB/s      | 208 MB/s      | **83x** |
+| Tables (Countries)  | 2.5 MB/s      | 178 MB/s      | **71x** |
+| Mixed (Python wiki) | 2.5 MB/s      | 144 MB/s      | **58x** |
+| Average             | 2.5 MB/s      | 177 MB/s      | **71x** |
 
 #### Implementation Differences
 

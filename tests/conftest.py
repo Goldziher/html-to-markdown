@@ -7,7 +7,7 @@ import pytest
 if TYPE_CHECKING:
     from collections.abc import Callable
 
-from html_to_markdown import ConversionOptions, ParsingOptions, PreprocessingOptions
+from html_to_markdown import ConversionOptions, PreprocessingOptions
 from html_to_markdown import convert as convert_api
 
 
@@ -35,9 +35,6 @@ def convert_v2() -> Callable[..., str]:
         autolinks: bool = True,
         default_title: bool = False,
         br_in_tables: bool = False,
-        hocr_extract_tables: bool = True,
-        hocr_table_column_threshold: int = 50,
-        hocr_table_row_threshold_ratio: float = 0.5,
         highlight_style: str = "double-equal",
         extract_metadata: bool = True,
         whitespace_mode: str = "normalized",
@@ -74,9 +71,6 @@ def convert_v2() -> Callable[..., str]:
             autolinks=autolinks,
             default_title=default_title,
             br_in_tables=br_in_tables,
-            hocr_extract_tables=hocr_extract_tables,
-            hocr_table_column_threshold=hocr_table_column_threshold,
-            hocr_table_row_threshold_ratio=hocr_table_row_threshold_ratio,
             highlight_style=highlight_style,  # type: ignore[arg-type]
             extract_metadata=extract_metadata,
             whitespace_mode=whitespace_mode,  # type: ignore[arg-type]
@@ -98,12 +92,9 @@ def convert_v2() -> Callable[..., str]:
             remove_forms=remove_forms,
         )
 
-        parsing = ParsingOptions(
-            encoding=source_encoding,
-            parser="html.parser",
-        )
+        options.encoding = source_encoding
 
-        return convert_api(html, options, preprocessing, parsing)
+        return convert_api(html, options, preprocessing)
 
     return _convert
 

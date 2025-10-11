@@ -94,27 +94,9 @@ fn main() {
     }
 
     if let Some(html) = load_hocr_document("german_pdf_german.hocr") {
-        println!("Profiling: hOCR German PDF (44KB) - with table extraction");
-        let options = ConversionOptions {
-            hocr_extract_tables: true,
-            hocr_table_column_threshold: 50,
-            hocr_table_row_threshold_ratio: 0.5,
-            ..Default::default()
-        };
+        println!("Profiling: hOCR German PDF (44KB) - automatic table extraction");
         for _ in 0..500 {
-            let _ = black_box(convert(black_box(&html), Some(options.clone())));
-        }
-        println!("  ✓ Completed 500 iterations\n");
-    }
-
-    if let Some(html) = load_hocr_document("german_pdf_german.hocr") {
-        println!("Profiling: hOCR German PDF (44KB) - no table extraction");
-        let options = ConversionOptions {
-            hocr_extract_tables: false,
-            ..Default::default()
-        };
-        for _ in 0..500 {
-            let _ = black_box(convert(black_box(&html), Some(options.clone())));
+            let _ = black_box(convert(black_box(&html), None));
         }
         println!("  ✓ Completed 500 iterations\n");
     }

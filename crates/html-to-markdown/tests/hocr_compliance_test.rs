@@ -2,7 +2,7 @@
 //!
 //! Tests full hOCR specification support across all element types and properties.
 
-use html_to_markdown_rs::hocr::{convert_to_markdown, extract_hocr_document, HocrElementType};
+use html_to_markdown_rs::hocr::{convert_to_markdown, extract_hocr_document, HocrElement, HocrElementType};
 
 #[test]
 fn test_full_hocr_document_structure() {
@@ -62,7 +62,7 @@ fn test_advanced_properties() {
     let (elements, _) = extract_hocr_document(&dom, false);
 
     // Find the line element
-    fn find_line(elements: &[html_to_markdown::hocr::HocrElement]) -> Option<&html_to_markdown::hocr::HocrElement> {
+    fn find_line(elements: &[HocrElement]) -> Option<&HocrElement> {
         for elem in elements {
             if matches!(elem.element_type, HocrElementType::OcrLine) {
                 return Some(elem);
@@ -144,7 +144,7 @@ fn test_character_level_properties() {
     let (elements, _) = extract_hocr_document(&dom, false);
 
     // Find ocr_cinfo
-    fn find_cinfo(elements: &[html_to_markdown::hocr::HocrElement]) -> Option<&html_to_markdown::hocr::HocrElement> {
+    fn find_cinfo(elements: &[HocrElement]) -> Option<&HocrElement> {
         for elem in elements {
             if matches!(elem.element_type, HocrElementType::OcrCinfo) {
                 return Some(elem);
@@ -178,7 +178,7 @@ fn test_page_properties() {
     let (elements, _) = extract_hocr_document(&dom, false);
 
     // Find page element
-    fn find_page(elements: &[html_to_markdown::hocr::HocrElement]) -> Option<&html_to_markdown::hocr::HocrElement> {
+    fn find_page(elements: &[HocrElement]) -> Option<&HocrElement> {
         for elem in elements {
             if matches!(elem.element_type, HocrElementType::OcrPage) {
                 return Some(elem);
@@ -210,7 +210,7 @@ fn test_content_flow_and_order() {
     let (elements, _) = extract_hocr_document(&dom, false);
 
     // Find linear element
-    fn find_linear(elements: &[html_to_markdown::hocr::HocrElement]) -> Option<&html_to_markdown::hocr::HocrElement> {
+    fn find_linear(elements: &[HocrElement]) -> Option<&HocrElement> {
         for elem in elements {
             if matches!(elem.element_type, HocrElementType::OcrLinear) {
                 return Some(elem);

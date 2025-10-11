@@ -542,7 +542,6 @@ def test_mixed_table_elements(convert: Callable[..., str]) -> None:
 def test_table_sections_inline_mode(convert: Callable[..., str]) -> None:
     html = "<thead><tr><th>Header</th></tr></thead>"
     result = convert(html, convert_as_inline=True)
-    # Table sections are stripped in inline mode
     assert result == ""
 
 
@@ -618,14 +617,12 @@ def test_table_first_row_directly_in_table(convert: Callable[..., str]) -> None:
 def test_tbody_inline_mode(convert: Callable[..., str]) -> None:
     html = "<tbody><tr><td>Cell</td></tr></tbody>"
     result = convert(html, convert_as_inline=True)
-    # Table sections are stripped in inline mode
     assert result == ""
 
 
 def test_tfoot_inline_mode(convert: Callable[..., str]) -> None:
     html = "<tfoot><tr><td>Footer</td></tr></tfoot>"
     result = convert(html, convert_as_inline=True)
-    # Table sections are stripped in inline mode
     assert result == ""
 
 
