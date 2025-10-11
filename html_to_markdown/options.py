@@ -90,6 +90,9 @@ class ConversionOptions:
     code_language_callback: Callable[[Tag], str] | None = None
     """Callback to determine code language from element."""
 
+    encoding: str = "utf-8"
+    """Character encoding expected for the HTML input."""
+
     autolinks: bool = True
     """Convert bare URLs to automatic links."""
 
@@ -101,15 +104,6 @@ class ConversionOptions:
 
     br_in_tables: bool = False
     """Use <br> tags for line breaks in table cells instead of spaces."""
-
-    hocr_extract_tables: bool = True
-    """Enable table extraction from hOCR (HTML-based OCR) documents."""
-
-    hocr_table_column_threshold: int = 50
-    """Pixel threshold for detecting column boundaries in hOCR tables."""
-
-    hocr_table_row_threshold_ratio: float = 0.5
-    """Row height ratio threshold for detecting row boundaries in hOCR tables."""
 
     highlight_style: Literal["double-equal", "html", "bold"] = "double-equal"
     """Style for highlighting <mark> elements."""
@@ -188,24 +182,3 @@ class PreprocessingOptions:
 
     extra_navigation_classes: set[str] | None = None
     """Additional navigation class fragments to strip beyond defaults."""
-
-
-@dataclass
-class ParsingOptions:
-    """HTML parsing configuration.
-
-    Example:
-        >>> options = ParsingOptions(
-        ...     encoding="utf-8",
-        ...     detect_encoding=True,
-        ... )
-    """
-
-    encoding: str = "utf-8"
-    """Character encoding for decoding bytes input."""
-
-    detect_encoding: bool = False
-    """Attempt to detect encoding from HTML (not yet implemented)."""
-
-    parser: str | None = None
-    """HTML parser to use: 'html.parser', 'lxml', or 'html5lib' (None = auto)."""

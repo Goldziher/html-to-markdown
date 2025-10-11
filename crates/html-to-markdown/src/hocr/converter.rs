@@ -41,7 +41,7 @@ use super::types::{HocrElement, HocrElementType};
 /// # Example
 ///
 /// ```rust
-/// use html_to_markdown::hocr::{extract_hocr_document, convert_to_markdown};
+/// use html_to_markdown_rs::hocr::{extract_hocr_document, convert_to_markdown};
 ///
 /// let html = r#"<div class="ocr_page">
 ///     <h1 class="ocr_title">Document Title</h1>

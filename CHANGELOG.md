@@ -7,15 +7,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.1.0] - 2025-10-11
+
+### Added
+
+- **Inline image extraction** - New `convert_with_inline_images()` function to extract embedded images during conversion
+    - Supports data URI images (`data:image/*`)
+    - Supports inline SVG elements
+    - Configurable via `InlineImageConfig` with options for:
+        - Maximum decoded size limits
+        - Custom filename prefixes
+        - SVG capture control
+        - Optional dimension inference for raster images
+    - Returns `HtmlExtraction` with markdown, extracted images, and warnings
+    - Available through both Rust and Python APIs
+
+### Changed
+
+- **Simplified API** - Removed `ParsingOptions` class in favor of direct `encoding` parameter on `ConversionOptions`
+- **Automatic hOCR table extraction** - hOCR tables are now extracted automatically without requiring configuration
+    - Removed `hocr_extract_tables` option (always enabled for hOCR content)
+    - Removed `hocr_table_column_threshold` option (uses built-in heuristics)
+    - Removed `hocr_table_row_threshold_ratio` option (uses built-in heuristics)
+- Updated pre-commit hook versions (commitlint v9.23.0, pyproject-fmt v2.10.0, ruff v0.14.0)
+
 ### Fixed
 
 - Windows CLI binary detection - now correctly searches for `.exe` extension on Windows
 - CLI binary bundling in Python wheels - binary now included in package for all platforms
 - hOCR extractor Rust doctest - added missing import statement
 - 928 Python test expectations updated for CommonMark-compliant v2 defaults
-
-### Changed
-
 - Python 3.14-dev → Python 3.14 stable in CI workflows
 - Reorganized wheel preparation script to `scripts/` directory
 - Removed duplicate markdown documentation files (BENCHMARKS.md, PERFORMANCE.md, BENCHMARK_RESULTS.md, COMMONMARK_COMPLIANCE.md, REFACTORING_SUMMARY.md)
@@ -82,15 +103,15 @@ These flags can be safely removed from your commands, or you can leave them for 
 - **Complete Rust rewrite** of HTML-to-Markdown conversion engine using `scraper` and `html5ever`
 - **Native Rust CLI** with improved argument parsing and validation
 - **PyO3 Python bindings** for seamless Rust/Python integration
-- **hOCR table extraction** support with configurable thresholds for OCR document processing
+- **Automatic hOCR table extraction** with built-in heuristics for OCR documents
 
 #### New V2 API
 
 - Clean, modern API with dataclass-based configuration
-- `convert(html, options, preprocessing, parsing)` - new primary API
-- `ConversionOptions` - comprehensive conversion settings
+- `convert(html, options, preprocessing)` - primary API entry point
+- `ConversionOptions` - comprehensive conversion settings (now includes `encoding`)
 - `PreprocessingOptions` - HTML cleaning configuration
-- `ParsingOptions` - parser and encoding settings
+- Legacy parsing options removed in favour of explicit encoding on `ConversionOptions`
 - Improved type safety with full type stubs (`.pyi` files)
 
 #### V1 Compatibility Layer

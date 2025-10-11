@@ -8,7 +8,7 @@ from pathlib import Path
 
 import pytest
 
-from html_to_markdown import ConversionOptions, convert
+from html_to_markdown import convert
 
 
 def get_hocr_file(filename: str) -> Path:
@@ -229,9 +229,7 @@ def test_hocr_table_extraction() -> None:
     </html>
     """
 
-    options = ConversionOptions()
-    options.hocr_extract_tables = True
-    result = convert(hocr_content, options)
+    result = convert(hocr_content)
 
     assert "|" in result, "Should contain table markdown"
     assert "Product" in result, "Should contain header"
@@ -243,30 +241,6 @@ def test_hocr_table_extraction() -> None:
     assert "$2.00" in result, "Should contain data"
 
     assert "| ---" in result, "Should contain header separator"
-
-
-def test_hocr_table_extraction_disabled() -> None:
-    hocr_content = """
-    <html>
-    <body>
-        <div class="ocr_page">
-            <span class="ocrx_word" title="bbox 100 50 140 70; x_wconf 95">Col1</span>
-            <span class="ocrx_word" title="bbox 200 50 240 70; x_wconf 95">Col2</span>
-            <span class="ocrx_word" title="bbox 100 100 140 120; x_wconf 95">Data1</span>
-            <span class="ocrx_word" title="bbox 200 100 240 120; x_wconf 95">Data2</span>
-        </div>
-    </body>
-    </html>
-    """
-
-    options = ConversionOptions()
-    options.hocr_extract_tables = False
-    result = convert(hocr_content, options)
-
-    assert "Col1" in result
-    assert "Col2" in result
-    assert "Data1" in result
-    assert "Data2" in result
 
 
 def test_hocr_table_confidence_filtering() -> None:
@@ -282,9 +256,7 @@ def test_hocr_table_confidence_filtering() -> None:
     </html>
     """
 
-    options = ConversionOptions()
-    options.hocr_extract_tables = True
-    result = convert(hocr_content, options)
+    result = convert(hocr_content)
 
     assert "Good" in result, "High confidence word should be included"
     assert "Quality" in result, "High confidence word should be included"

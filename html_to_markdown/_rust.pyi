@@ -21,8 +21,9 @@ class ConversionOptions:
     sub_symbol: str
     sup_symbol: str
     newline_style: str
+    keep_inline_images_in: list[str]
     preprocessing: PreprocessingOptions
-    parsing: ParsingOptions
+    encoding: str
 
     def __init__(
         self,
@@ -48,8 +49,9 @@ class ConversionOptions:
         sub_symbol: str = "",
         sup_symbol: str = "",
         newline_style: str = "spaces",
+        keep_inline_images_in: list[str] | None = None,
         preprocessing: PreprocessingOptions | None = None,
-        parsing: ParsingOptions | None = None,
+        encoding: str = "utf-8",
     ) -> None: ...
 
 class PreprocessingOptions:
@@ -64,16 +66,6 @@ class PreprocessingOptions:
         preset: str = "standard",
         remove_navigation: bool = True,
         remove_forms: bool = True,
-    ) -> None: ...
-
-class ParsingOptions:
-    encoding: str
-    parser: str | None
-
-    def __init__(
-        self,
-        encoding: str = "utf-8",
-        parser: str | None = None,
     ) -> None: ...
 
 def convert(html: str, options: ConversionOptions | None = None) -> str: ...

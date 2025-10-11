@@ -1,4 +1,4 @@
-from typing import Literal
+from typing import Literal, TypedDict
 
 class PreprocessingOptions:
     enabled: bool
@@ -12,16 +12,6 @@ class PreprocessingOptions:
         preset: Literal["minimal", "standard", "aggressive"] = "standard",
         remove_navigation: bool = True,
         remove_forms: bool = True,
-    ) -> None: ...
-
-class ParsingOptions:
-    encoding: str
-    parser: str | None
-
-    def __init__(
-        self,
-        encoding: str = "utf-8",
-        parser: str | None = None,
     ) -> None: ...
 
 class ConversionOptions:
@@ -48,11 +38,8 @@ class ConversionOptions:
     sup_symbol: str
     newline_style: Literal["spaces", "backslash"]
     keep_inline_images_in: list[str]
-    hocr_extract_tables: bool
-    hocr_table_column_threshold: int
-    hocr_table_row_threshold_ratio: float
     preprocessing: PreprocessingOptions
-    parsing: ParsingOptions
+    encoding: str
 
     def __init__(
         self,
@@ -79,11 +66,40 @@ class ConversionOptions:
         sup_symbol: str = "",
         newline_style: Literal["spaces", "backslash"] = "spaces",
         keep_inline_images_in: list[str] = [],
-        hocr_extract_tables: bool = True,
-        hocr_table_column_threshold: int = 50,
-        hocr_table_row_threshold_ratio: float = 0.5,
         preprocessing: PreprocessingOptions | None = None,
-        parsing: ParsingOptions | None = None,
+        encoding: str = "utf-8",
     ) -> None: ...
 
+class InlineImageConfig:
+    max_decoded_size_bytes: int
+    filename_prefix: str | None
+    capture_svg: bool
+    infer_dimensions: bool
+
+    def __init__(
+        self,
+        max_decoded_size_bytes: int = ...,
+        filename_prefix: str | None = None,
+        capture_svg: bool = True,
+        infer_dimensions: bool = False,
+    ) -> None: ...
+
+class InlineImage(TypedDict):
+    data: bytes
+    format: str
+    filename: str | None
+    description: str | None
+    dimensions: tuple[int, int] | None
+    source: Literal["img_data_uri", "svg_element"]
+    attributes: dict[str, str]
+
+class InlineImageWarning(TypedDict):
+    index: int
+    message: str
+
 def convert(html: str, options: ConversionOptions | None = None) -> str: ...
+def convert_with_inline_images(
+    html: str,
+    options: ConversionOptions | None = None,
+    image_config: InlineImageConfig | None = None,
+) -> tuple[str, list[InlineImage], list[InlineImageWarning]]: ...

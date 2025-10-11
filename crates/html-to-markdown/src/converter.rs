@@ -34,18 +34,29 @@
 //! # Examples
 //!
 //! ```rust
-//! use html_to_markdown::{convert, ConversionOptions};
+//! use html_to_markdown_rs::{convert, ConversionOptions};
 //!
 //! let html = "<h1>Title</h1><p>Paragraph with <strong>bold</strong> text.</p>";
 //! let markdown = convert(html, None).unwrap();
 //! assert_eq!(markdown, "# Title\n\nParagraph with **bold** text.\n");
 //! ```
 
+#[cfg(feature = "inline-images")]
+use std::cell::RefCell;
 use std::collections::BTreeMap;
+#[cfg(feature = "inline-images")]
+use std::rc::Rc;
 
 use crate::error::Result;
+#[cfg(feature = "inline-images")]
+use crate::inline_images::{InlineImageCollector, InlineImageFormat, InlineImageSource};
 use crate::options::{ConversionOptions, HeadingStyle, ListIndentType};
 use crate::text;
+
+#[cfg(feature = "inline-images")]
+type InlineCollectorHandle = Rc<RefCell<InlineImageCollector>>;
+#[cfg(not(feature = "inline-images"))]
+type InlineCollectorHandle = ();
 
 /// Chomp whitespace from inline element content, preserving line breaks.
 ///
@@ -390,6 +401,9 @@ struct Context {
     in_paragraph: bool,
     /// Are we inside a ruby element?
     in_ruby: bool,
+    #[cfg(feature = "inline-images")]
+    /// Shared collector for inline images when enabled.
+    inline_collector: Option<InlineCollectorHandle>,
 }
 
 /// Check if a document is an hOCR (HTML-based OCR) document.
@@ -702,6 +716,215 @@ fn serialize_element(node_handle: &tl::NodeHandle, parser: &tl::Parser) -> Strin
     String::new()
 }
 
+#[cfg(feature = "inline-images")]
+fn non_empty_trimmed(value: &str) -> Option<String> {
+    let trimmed = value.trim();
+    if trimmed.is_empty() {
+        None
+    } else {
+        Some(trimmed.to_string())
+    }
+}
+
+#[cfg(feature = "inline-images")]
+fn handle_inline_data_image(
+    collector_ref: &InlineCollectorHandle,
+    src: &str,
+    alt: &str,
+    title: Option<&str>,
+    attributes: BTreeMap<String, String>,
+) {
+    let trimmed_src = src.trim();
+    if !trimmed_src.starts_with("data:") {
+        return;
+    }
+
+    let mut collector = collector_ref.borrow_mut();
+    let index = collector.next_index();
+
+    let Some((meta, payload)) = trimmed_src.split_once(',') else {
+        collector.warn_skip(index, "missing data URI separator");
+        return;
+    };
+
+    if payload.trim().is_empty() {
+        collector.warn_skip(index, "empty data URI payload");
+        return;
+    }
+
+    if !meta.starts_with("data:") {
+        collector.warn_skip(index, "invalid data URI scheme");
+        return;
+    }
+
+    let header = &meta["data:".len()..];
+    if header.is_empty() {
+        collector.warn_skip(index, "missing MIME type");
+        return;
+    }
+
+    let mut segments = header.split(';');
+    let mime = segments.next().unwrap_or("");
+    let Some((top_level, subtype_raw)) = mime.split_once('/') else {
+        collector.warn_skip(index, "missing MIME subtype");
+        return;
+    };
+
+    if !top_level.eq_ignore_ascii_case("image") {
+        collector.warn_skip(index, format!("unsupported MIME type {mime}"));
+        return;
+    }
+
+    let subtype_raw = subtype_raw.trim();
+    if subtype_raw.is_empty() {
+        collector.warn_skip(index, "missing MIME subtype");
+        return;
+    }
+
+    let subtype_lower = subtype_raw.to_ascii_lowercase();
+
+    let mut is_base64 = false;
+    let mut inline_name: Option<String> = None;
+    for segment in segments {
+        if segment.eq_ignore_ascii_case("base64") {
+            is_base64 = true;
+        } else if let Some(value) = segment.strip_prefix("name=") {
+            inline_name = non_empty_trimmed(value.trim_matches('"'));
+        } else if let Some(value) = segment.strip_prefix("filename=") {
+            inline_name = non_empty_trimmed(value.trim_matches('"'));
+        }
+    }
+
+    if !is_base64 {
+        collector.warn_skip(index, "missing base64 encoding marker");
+        return;
+    }
+
+    use base64::{engine::general_purpose::STANDARD, Engine as _};
+
+    let payload_clean = payload.trim();
+    let decoded = match STANDARD.decode(payload_clean) {
+        Ok(bytes) => bytes,
+        Err(_) => {
+            collector.warn_skip(index, "invalid base64 payload");
+            return;
+        }
+    };
+
+    if decoded.is_empty() {
+        collector.warn_skip(index, "empty base64 payload");
+        return;
+    }
+
+    let max_size = collector.max_decoded_size();
+    if decoded.len() as u64 > max_size {
+        collector.warn_skip(
+            index,
+            format!(
+                "decoded payload ({} bytes) exceeds configured max ({})",
+                decoded.len(),
+                max_size
+            ),
+        );
+        return;
+    }
+
+    let format = match subtype_lower.as_str() {
+        "png" => InlineImageFormat::Png,
+        "jpeg" | "jpg" => InlineImageFormat::Jpeg,
+        "gif" => InlineImageFormat::Gif,
+        "bmp" => InlineImageFormat::Bmp,
+        "webp" => InlineImageFormat::Webp,
+        "svg+xml" => InlineImageFormat::Svg,
+        other => InlineImageFormat::Other(other.to_string()),
+    };
+
+    let description = non_empty_trimmed(alt).or_else(|| title.and_then(non_empty_trimmed));
+
+    let filename_candidate = attributes
+        .get("data-filename")
+        .cloned()
+        .or_else(|| attributes.get("filename").cloned())
+        .or_else(|| attributes.get("data-name").cloned())
+        .or(inline_name);
+
+    let dimensions = collector.infer_dimensions(index, &decoded, &format);
+
+    let image = collector.build_image(
+        decoded,
+        format,
+        filename_candidate,
+        description,
+        dimensions,
+        InlineImageSource::ImgDataUri,
+        attributes,
+    );
+
+    collector.push_image(index, image);
+}
+
+#[cfg(feature = "inline-images")]
+fn handle_inline_svg(
+    collector_ref: &InlineCollectorHandle,
+    node_handle: &tl::NodeHandle,
+    parser: &tl::Parser,
+    title_opt: Option<String>,
+    attributes: BTreeMap<String, String>,
+) {
+    {
+        let borrow = collector_ref.borrow();
+        if !borrow.capture_svg() {
+            return;
+        }
+    }
+
+    let mut collector = collector_ref.borrow_mut();
+    let index = collector.next_index();
+
+    let serialized = serialize_element(node_handle, parser);
+    if serialized.is_empty() {
+        collector.warn_skip(index, "unable to serialize SVG element");
+        return;
+    }
+
+    let data = serialized.into_bytes();
+    let max_size = collector.max_decoded_size();
+    if data.len() as u64 > max_size {
+        collector.warn_skip(
+            index,
+            format!(
+                "serialized SVG payload ({} bytes) exceeds configured max ({})",
+                data.len(),
+                max_size
+            ),
+        );
+        return;
+    }
+
+    let description = attributes
+        .get("aria-label")
+        .and_then(|value| non_empty_trimmed(value))
+        .or_else(|| title_opt.clone().and_then(|t| non_empty_trimmed(&t)));
+
+    let filename_candidate = attributes
+        .get("data-filename")
+        .cloned()
+        .or_else(|| attributes.get("filename").cloned())
+        .or_else(|| attributes.get("data-name").cloned());
+
+    let image = collector.build_image(
+        data,
+        InlineImageFormat::Svg,
+        filename_candidate,
+        description,
+        None,
+        InlineImageSource::SvgElement,
+        attributes,
+    );
+
+    collector.push_image(index, image);
+}
+
 /// Serialize a node to HTML string.
 fn serialize_node(node_handle: &tl::NodeHandle, parser: &tl::Parser) -> String {
     if let Some(node) = node_handle.get(parser) {
@@ -717,6 +940,24 @@ fn serialize_node(node_handle: &tl::NodeHandle, parser: &tl::Parser) -> String {
 
 /// Convert HTML to Markdown using tl DOM parser.
 pub fn convert_html(html: &str, options: &ConversionOptions) -> Result<String> {
+    convert_html_impl(html, options, None)
+}
+
+#[cfg(feature = "inline-images")]
+pub(crate) fn convert_html_with_inline_collector(
+    html: &str,
+    options: &ConversionOptions,
+    collector: InlineCollectorHandle,
+) -> Result<String> {
+    convert_html_impl(html, options, Some(collector))
+}
+
+#[cfg_attr(not(feature = "inline-images"), allow(unused_variables))]
+fn convert_html_impl(
+    html: &str,
+    options: &ConversionOptions,
+    inline_collector: Option<InlineCollectorHandle>,
+) -> Result<String> {
     // Fix: tl parser has issues with self-closing tags like <br/>
     // Temporarily convert them to non-self-closing format
     let html = html
@@ -732,12 +973,10 @@ pub fn convert_html(html: &str, options: &ConversionOptions) -> Result<String> {
 
     // Check for hOCR document and extract metadata by checking all top-level children
     let mut is_hocr = false;
-    if options.hocr_extract_tables || (options.extract_metadata && !options.convert_as_inline) {
-        for child_handle in dom.children().iter() {
-            if is_hocr_document(child_handle, parser) {
-                is_hocr = true;
-                break;
-            }
+    for child_handle in dom.children().iter() {
+        if is_hocr_document(child_handle, parser) {
+            is_hocr = true;
+            break;
         }
     }
 
@@ -750,6 +989,47 @@ pub fn convert_html(html: &str, options: &ConversionOptions) -> Result<String> {
                 break;
             }
         }
+    }
+
+    if is_hocr {
+        use crate::hocr::{convert_to_markdown as convert_hocr_to_markdown, extract_hocr_document};
+
+        let (elements, metadata) = extract_hocr_document(&dom, options.debug);
+
+        if options.extract_metadata && !options.convert_as_inline {
+            let mut metadata_map = BTreeMap::new();
+            if let Some(system) = metadata.ocr_system {
+                metadata_map.insert("ocr-system".to_string(), system);
+            }
+            if !metadata.ocr_capabilities.is_empty() {
+                metadata_map.insert("ocr-capabilities".to_string(), metadata.ocr_capabilities.join(", "));
+            }
+            if let Some(pages) = metadata.ocr_number_of_pages {
+                metadata_map.insert("ocr-number-of-pages".to_string(), pages.to_string());
+            }
+            if !metadata.ocr_langs.is_empty() {
+                metadata_map.insert("ocr-langs".to_string(), metadata.ocr_langs.join(", "));
+            }
+            if !metadata.ocr_scripts.is_empty() {
+                metadata_map.insert("ocr-scripts".to_string(), metadata.ocr_scripts.join(", "));
+            }
+
+            if !metadata_map.is_empty() {
+                output.push_str(&format_metadata_comment(&metadata_map));
+            }
+        }
+
+        let mut markdown = convert_hocr_to_markdown(&elements, true);
+
+        if markdown.trim().is_empty() {
+            return Ok(output);
+        }
+
+        markdown.truncate(markdown.trim_end().len());
+        output.push_str(&markdown);
+        output.push('\n');
+
+        return Ok(output);
     }
 
     let ctx = Context {
@@ -770,50 +1050,9 @@ pub fn convert_html(html: &str, options: &ConversionOptions) -> Result<String> {
         heading_tag: None,
         in_paragraph: false,
         in_ruby: false,
+        #[cfg(feature = "inline-images")]
+        inline_collector: inline_collector.clone(),
     };
-
-    if options.hocr_extract_tables && is_hocr {
-        use crate::hocr::{extract_hocr_words, reconstruct_table, table_to_markdown};
-
-        if options.debug {
-            eprintln!("[hOCR] Detected hOCR document, extracting table...");
-            eprintln!("[hOCR] Debug mode enabled - will report unhandled elements and attributes");
-        }
-
-        // Extract words from all children
-        let mut words = Vec::new();
-        for child_handle in dom.children().iter() {
-            words.extend(extract_hocr_words(child_handle, parser, 0.0, options.debug));
-        }
-
-        if !words.is_empty() {
-            if options.debug {
-                eprintln!("[hOCR] Extracted {} words from document", words.len());
-            }
-
-            let table = reconstruct_table(
-                &words,
-                options.hocr_table_column_threshold,
-                options.hocr_table_row_threshold_ratio,
-                options.debug,
-            );
-
-            if !table.is_empty() {
-                if options.debug {
-                    eprintln!("[hOCR] Successfully reconstructed table with {} rows", table.len());
-                }
-                let table_markdown = table_to_markdown(&table);
-                if !table_markdown.is_empty() {
-                    output.push_str(&table_markdown);
-                    output.push_str("\n\n");
-                }
-            } else if options.debug {
-                eprintln!("[hOCR] Warning: Table reconstruction resulted in empty table");
-            }
-        } else if options.debug {
-            eprintln!("[hOCR] Warning: No words extracted from hOCR document");
-        }
-    }
 
     // Walk all top-level children
     for child_handle in dom.children().iter() {
@@ -1394,6 +1633,30 @@ fn walk_node(
                     let width = tag.attributes().get("width").flatten().map(|v| v.as_utf8_str());
 
                     let height = tag.attributes().get("height").flatten().map(|v| v.as_utf8_str());
+
+                    #[cfg(feature = "inline-images")]
+                    if let Some(ref collector_ref) = ctx.inline_collector {
+                        let mut attributes_map = BTreeMap::new();
+                        for (key, value_opt) in tag.attributes().iter() {
+                            let key_str = key.to_string();
+                            let keep = key_str == "width"
+                                || key_str == "height"
+                                || key_str == "filename"
+                                || key_str == "aria-label"
+                                || key_str.starts_with("data-");
+                            if keep {
+                                let value = value_opt.map(|value| value.to_string()).unwrap_or_default();
+                                attributes_map.insert(key_str, value);
+                            }
+                        }
+                        handle_inline_data_image(
+                            collector_ref,
+                            src.as_ref(),
+                            alt.as_ref(),
+                            title.as_deref(),
+                            attributes_map,
+                        );
+                    }
 
                     let keep_as_markdown = ctx.in_heading
                         && ctx
@@ -2743,6 +3006,29 @@ fn walk_node(
                                 }
                             }
                         }
+                    }
+
+                    #[cfg(feature = "inline-images")]
+                    if let Some(ref collector_ref) = ctx.inline_collector {
+                        let title_opt = if title == "SVG Image" {
+                            None
+                        } else {
+                            Some(title.clone())
+                        };
+                        let mut attributes_map = BTreeMap::new();
+                        for (key, value_opt) in tag.attributes().iter() {
+                            let key_str = key.to_string();
+                            let keep = key_str == "width"
+                                || key_str == "height"
+                                || key_str == "filename"
+                                || key_str == "aria-label"
+                                || key_str.starts_with("data-");
+                            if keep {
+                                let value = value_opt.map(|value| value.to_string()).unwrap_or_default();
+                                attributes_map.insert(key_str, value);
+                            }
+                        }
+                        handle_inline_svg(collector_ref, node_handle, parser, title_opt, attributes_map);
                     }
 
                     if ctx.convert_as_inline {

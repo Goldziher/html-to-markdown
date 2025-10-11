@@ -1,7 +1,7 @@
 """V1 API compatibility layer.
 
 Provides backward compatibility for the v1 convert_to_markdown API
-by translating v1 kwargs to v2 ConversionOptions/PreprocessingOptions/ParsingOptions.
+by translating v1 kwargs to v2 ConversionOptions and PreprocessingOptions.
 """
 
 from __future__ import annotations
@@ -11,7 +11,7 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from collections.abc import Iterator
 
-from html_to_markdown import ConversionOptions, ParsingOptions, PreprocessingOptions
+from html_to_markdown import ConversionOptions, PreprocessingOptions
 from html_to_markdown import convert as convert_v2
 
 
@@ -48,7 +48,6 @@ def convert_to_markdown(  # noqa: D417
     preprocessing_preset: str = "standard",
     remove_navigation: bool = True,
     remove_forms: bool = True,
-    parser: str = "html.parser",
     source_encoding: str = "utf-8",
     code_language_callback: object | None = None,
     strip: list[str] | None = None,
@@ -82,6 +81,14 @@ def convert_to_markdown(  # noqa: D417
         raise NotImplementedError("convert option was removed in v2. All supported tags are converted by default.")
     if custom_converters is not None:
         raise NotImplementedError("custom_converters is not yet implemented in v2")
+    if not hocr_extract_tables:
+        raise NotImplementedError(
+            "hocr_extract_tables toggle was removed in v2. hOCR tables are always reconstructed when detected."
+        )
+    if hocr_table_column_threshold != 50 or hocr_table_row_threshold_ratio != 0.5:
+        raise NotImplementedError(
+            "hOCR table threshold overrides were removed in v2. Table reconstruction now uses built-in heuristics."
+        )
 
     # V1 behavior: if code_language is set, use fenced code blocks (backticks)
     # V2 default is indented code blocks, so we need to override
@@ -101,9 +108,6 @@ def convert_to_markdown(  # noqa: D417
         autolinks=autolinks,
         default_title=default_title,
         br_in_tables=br_in_tables,
-        hocr_extract_tables=hocr_extract_tables,
-        hocr_table_column_threshold=hocr_table_column_threshold,
-        hocr_table_row_threshold_ratio=hocr_table_row_threshold_ratio,
         highlight_style=highlight_style,  # type: ignore[arg-type]
         extract_metadata=extract_metadata,
         whitespace_mode=whitespace_mode,  # type: ignore[arg-type]
@@ -125,12 +129,8 @@ def convert_to_markdown(  # noqa: D417
         remove_forms=remove_forms,
     )
 
-    parsing = ParsingOptions(
-        encoding=source_encoding,
-        parser=parser,
-    )
-
-    return convert_v2(html, options, preprocessing, parsing)
+    options.encoding = source_encoding
+    return convert_v2(html, options, preprocessing)
 
 
 def convert_to_markdown_stream(  # noqa: D417
