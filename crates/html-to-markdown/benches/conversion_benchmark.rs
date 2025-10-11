@@ -276,28 +276,11 @@ fn bench_hocr(c: &mut Criterion) {
         if let Ok(html) = std::fs::read_to_string(path) {
             let size = html.len();
 
-            let options = ConversionOptions {
-                hocr_extract_tables: true,
-                hocr_table_column_threshold: 50,
-                hocr_table_row_threshold_ratio: 0.5,
-                ..Default::default()
-            };
             group.throughput(Throughput::Bytes(size as u64));
             group.bench_with_input(
-                BenchmarkId::new(format!("{}_with_tables", name), size),
+                BenchmarkId::new(format!("{}_auto_tables", name), size),
                 &html,
-                |b, html| b.iter(|| convert(black_box(html), Some(options.clone()))),
-            );
-
-            let options_no_tables = ConversionOptions {
-                hocr_extract_tables: false,
-                ..Default::default()
-            };
-            group.throughput(Throughput::Bytes(size as u64));
-            group.bench_with_input(
-                BenchmarkId::new(format!("{}_no_tables", name), size),
-                &html,
-                |b, html| b.iter(|| convert(black_box(html), Some(options_no_tables.clone()))),
+                |b, html| b.iter(|| convert(black_box(html), None)),
             );
         }
     }

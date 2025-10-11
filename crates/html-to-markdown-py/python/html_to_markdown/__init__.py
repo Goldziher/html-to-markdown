@@ -1,5 +1,20 @@
-"""Python bindings for html-to-markdown Rust library."""
+"""Python bindings for the html-to-markdown Rust library."""
 
-from html_to_markdown._html_to_markdown import convert
+from html_to_markdown._html_to_markdown import (
+    ConversionOptions,
+    InlineImageConfig,
+    PreprocessingOptions,
+    convert,
+    convert_with_inline_images,
+)
 
-__all__ = ["convert"]
+convert_to_markdown = convert
+
+__all__ = [
+    "ConversionOptions",
+    "InlineImageConfig",
+    "PreprocessingOptions",
+    "convert",
+    "convert_to_markdown",
+    "convert_with_inline_images",
+]

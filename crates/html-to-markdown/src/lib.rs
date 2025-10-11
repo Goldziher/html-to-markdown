@@ -2,18 +2,29 @@
 //!
 //! A modern, high-performance library for converting HTML to Markdown.
 //! Built with html5ever for fast, memory-efficient HTML parsing.
+//!
+//! ## Optional inline image extraction
+//!
+//! Enable the `inline-images` Cargo feature to collect embedded data URI images and inline SVG
+//! assets alongside the produced Markdown.
 
 pub mod converter;
 pub mod error;
 pub mod hocr;
+#[cfg(feature = "inline-images")]
+mod inline_images;
 pub mod options;
 pub mod sanitizer;
 pub mod text;
 pub mod wrapper;
 
 pub use error::{ConversionError, Result};
+#[cfg(feature = "inline-images")]
+pub use inline_images::{
+    HtmlExtraction, InlineImage, InlineImageConfig, InlineImageFormat, InlineImageSource, InlineImageWarning,
+};
 pub use options::{
-    CodeBlockStyle, ConversionOptions, HeadingStyle, HighlightStyle, ListIndentType, NewlineStyle, ParsingOptions,
+    CodeBlockStyle, ConversionOptions, HeadingStyle, HighlightStyle, ListIndentType, NewlineStyle,
     PreprocessingOptions, PreprocessingPreset, WhitespaceMode,
 };
 
@@ -30,7 +41,7 @@ pub use options::{
 /// # Example
 ///
 /// ```
-/// use html_to_markdown::{convert, ConversionOptions};
+/// use html_to_markdown_rs::{convert, ConversionOptions};
 ///
 /// let html = "<h1>Hello World</h1>";
 /// let markdown = convert(html, None).unwrap();
@@ -54,4 +65,54 @@ pub fn convert(html: &str, options: Option<ConversionOptions>) -> Result<String>
     } else {
         Ok(markdown)
     }
+}
+
+#[cfg(feature = "inline-images")]
+/// Convert HTML to Markdown while collecting inline image assets (requires the `inline-images` feature).
+///
+/// This function is identical to [`convert`] but also extracts inline image data URIs and inline `<svg>` elements.
+///
+/// # Arguments
+///
+/// * `html` - The HTML string to convert.
+/// * `options` - Optional conversion options.
+/// * `image_cfg` - Configuration controlling inline image extraction.
+pub fn convert_with_inline_images(
+    html: &str,
+    options: Option<ConversionOptions>,
+    image_cfg: InlineImageConfig,
+) -> Result<HtmlExtraction> {
+    use std::cell::RefCell;
+    use std::rc::Rc;
+
+    let options = options.unwrap_or_default();
+
+    let normalized_html = html.replace("\r\n", "\n").replace('\r', "\n");
+
+    let clean_html = if options.preprocessing.enabled {
+        sanitizer::sanitize(&normalized_html, &options.preprocessing)?
+    } else {
+        normalized_html
+    };
+
+    let collector = Rc::new(RefCell::new(inline_images::InlineImageCollector::new(image_cfg)?));
+
+    let markdown = converter::convert_html_with_inline_collector(&clean_html, &options, Rc::clone(&collector))?;
+
+    let markdown = if options.wrap {
+        wrapper::wrap_markdown(&markdown, &options)
+    } else {
+        markdown
+    };
+
+    let collector = Rc::try_unwrap(collector)
+        .map_err(|_| ConversionError::Other("failed to recover inline image state".to_string()))?
+        .into_inner();
+    let (inline_images, warnings) = collector.finish();
+
+    Ok(HtmlExtraction {
+        markdown,
+        inline_images,
+        warnings,
+    })
 }

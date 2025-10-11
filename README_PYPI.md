@@ -1,14 +1,11 @@
 # html-to-markdown
 
-High-performance HTML to Markdown converter powered by Rust with a clean Python API. Available via PyPI with pre-built wheels for all major platforms.
+High-performance HTML to Markdown converter with a clean Python API (powered by a Rust core). Wheels are published for Linux, macOS, and Windows.
 
-[![PyPI version](https://badge.fury.io/py/html-to-markdown.svg)](https://pypi.org/project/html-to-markdown/)
-[![Crates.io](https://img.shields.io/crates/v/html-to-markdown-rs.svg)](https://crates.io/crates/html-to-markdown-rs)
-[![Python Versions](https://img.shields.io/pypi/pyversions/html-to-markdown.svg)](https://pypi.org/project/html-to-markdown/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Discord](https://img.shields.io/badge/Discord-Join%20our%20community-7289da)](https://discord.gg/pXxagNK2zN)
-
-Part of the [Kreuzberg](https://kreuzberg.dev) ecosystem for document intelligence.
+[![PyPI version](https://badge.fury.io/py/html-to-markdown.svg)](https://github.com/Goldziher/html-to-markdown)
+[![Rust crate](https://img.shields.io/crates/v/html-to-markdown-rs.svg)](https://github.com/Goldziher/html-to-markdown)
+[![Python Versions](https://img.shields.io/pypi/pyversions/html-to-markdown.svg)](https://github.com/Goldziher/html-to-markdown)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://github.com/Goldziher/html-to-markdown/blob/main/LICENSE)
 
 ## Installation
 
@@ -16,28 +13,22 @@ Part of the [Kreuzberg](https://kreuzberg.dev) ecosystem for document intelligen
 pip install html-to-markdown
 ```
 
-Pre-built wheels available for:
+## Performance Snapshot
 
-- **Linux**: x86_64, aarch64
-- **macOS**: x86_64 (Intel), arm64 (Apple Silicon)
-- **Windows**: x86_64
-
-## ⚡ Performance
-
-Real Wikipedia documents on Apple M4:
+Apple M4 • Real Wikipedia documents • `convert()` (Python)
 
 | Document            | Size  | Latency | Throughput | Docs/sec |
 | ------------------- | ----- | ------- | ---------- | -------- |
-| Lists (Timeline)    | 129KB | 0.62ms  | 208 MB/s   | 1,613    |
-| Tables (Countries)  | 360KB | 2.02ms  | 178 MB/s   | 495      |
-| Mixed (Python wiki) | 656KB | 4.56ms  | 144 MB/s   | 219      |
+| Lists (Timeline)    | 129KB | 0.62ms  | 208 MB/s   | 1,613    |
+| Tables (Countries)  | 360KB | 2.02ms  | 178 MB/s   | 495      |
+| Mixed (Python wiki) | 656KB | 4.56ms  | 144 MB/s   | 219      |
 
-**19-30x faster** than pure Python implementations.
+> V1 averaged ~2.5 MB/s (Python/BeautifulSoup). V2’s Rust engine delivers 60–80× higher throughput.
 
 ## Quick Start
 
 ```python
-from html_to_markdown import convert_to_markdown
+from html_to_markdown import convert
 
 html = """
 <h1>Welcome</h1>
@@ -49,161 +40,122 @@ html = """
 </ul>
 """
 
-markdown = convert_to_markdown(html)
+markdown = convert(html)
 print(markdown)
 ```
 
-Output:
-
-```markdown
-# Welcome
-
-This is **fast** Rust-powered conversion!
-
-- Blazing fast
-- Type safe
-- Easy to use
-```
-
-## Configuration
+## Configuration (v2 API)
 
 ```python
-from html_to_markdown import convert_to_markdown
+from html_to_markdown import ConversionOptions, convert
 
-markdown = convert_to_markdown(
-    html,
-    heading_style="atx",  # "atx", "atx_closed", "underlined"
-    list_indent_width=2,  # Discord/Slack: use 2
-    bullets="*+-",  # Bullet characters
-    strong_em_symbol="*",  # "*" or "_"
-    escape_asterisks=True,  # Escape * in text
-    code_language="python",  # Default code block language
-    extract_metadata=True,  # Extract HTML metadata
+options = ConversionOptions(
+    heading_style="atx",
+    list_indent_width=2,
+    bullets="*+-",
 )
+options.escape_asterisks = True
+options.code_language = "python"
+options.extract_metadata = True
+
+markdown = convert(html, options)
 ```
 
 ### HTML Preprocessing
 
-Clean web-scraped HTML before conversion:
-
 ```python
-from html_to_markdown import convert_to_markdown
+from html_to_markdown import ConversionOptions, PreprocessingOptions, convert
 
-markdown = convert_to_markdown(
-    scraped_html,
-    preprocess=True,
-    preprocessing_preset="aggressive",  # "minimal", "standard", "aggressive"
+options = ConversionOptions(
+    preprocessing=PreprocessingOptions(enabled=True, preset="aggressive"),
 )
+
+markdown = convert(scraped_html, options)
 ```
 
-## Features
-
-- **🚀 Blazing Fast**: Pure Rust core with ultra-fast `tl` HTML parser
-- **🐍 Type Safe**: Full type hints and `.pyi` stubs for excellent IDE support
-- **📊 hOCR 1.2 Compliant**: Full support for all 40+ elements and 20+ properties
-- **📝 CommonMark Compliant**: Follows CommonMark specification for list formatting
-- **🌍 Cross-Platform**: Pre-built wheels for Linux, macOS, and Windows
-- **✅ Well-Tested**: 900+ tests with dual Python + Rust coverage
-- **🔧 Zero Dependencies**: No BeautifulSoup or lxml required
-
-## hOCR 1.2 Support
-
-Complete hOCR 1.2 specification compliance with support for all elements, properties, and metadata:
+### Inline Image Extraction
 
 ```python
-from html_to_markdown import convert_to_markdown
+from html_to_markdown import InlineImageConfig, convert_with_inline_images
 
-# Option 1: Document structure extraction (NEW in v2)
-# Extracts all hOCR elements and converts to structured markdown
-markdown = convert_to_markdown(hocr_html)
-
-# Option 2: Legacy table extraction (spatial reconstruction)
-# Reconstructs tables from word bounding boxes
-markdown = convert_to_markdown(
-    hocr_html,
-    hocr_extract_tables=True,
-    hocr_table_column_threshold=50,
-    hocr_table_row_threshold_ratio=0.5,
+markdown, inline_images, warnings = convert_with_inline_images(
+    '<p><img src="data:image/png;base64,...==" alt="Pixel" width="1" height="1"></p>',
+    image_config=InlineImageConfig(max_decoded_size_bytes=1024, infer_dimensions=True),
 )
+
+if inline_images:
+    first = inline_images[0]
+    print(first["format"], first["dimensions"], first["attributes"])  # e.g. "png", (1, 1), {"width": "1"}
 ```
 
-**Full hOCR 1.2 Spec Coverage:**
+Each inline image is returned as a typed dictionary (`bytes` payload, metadata, and relevant HTML attributes). Warnings are human-readable skip reasons.
 
-- ✅ **All 40 Element Types** - Logical structure, typesetting, floats, inline, engine-specific
-- ✅ **All 20+ Properties** - bbox, baseline, textangle, poly, x_wconf, x_font, x_fsize, and more
-- ✅ **All 5 Metadata Fields** - ocr-system, ocr-capabilities, ocr-number-of-pages, ocr-langs, ocr-scripts
+### hOCR (HTML OCR) Support
 
-## Configuration Reference
+```python
+from html_to_markdown import ConversionOptions, convert
 
-### ConversionOptions
+# Default: emit structured Markdown directly
+markdown = convert(hocr_html)
 
-| Option                           | Type  | Default       | Description                                                             |
-| -------------------------------- | ----- | ------------- | ----------------------------------------------------------------------- |
-| `heading_style`                  | str   | `"atx"`       | Heading format: `"atx"` (#), `"atx_closed"` (# #), `"underlined"` (===) |
-| `list_indent_width`              | int   | `2`           | Spaces per list indent level (CommonMark: 2)                            |
-| `list_indent_type`               | str   | `"spaces"`    | `"spaces"` or `"tabs"`                                                  |
-| `bullets`                        | str   | `"*+-"`       | Bullet chars for unordered lists (cycles through levels)                |
-| `strong_em_symbol`               | str   | `"*"`         | Symbol for bold/italic: `"*"` or `"_"`                                  |
-| `escape_asterisks`               | bool  | `True`        | Escape `*` in text                                                      |
-| `escape_underscores`             | bool  | `True`        | Escape `_` in text                                                      |
-| `code_language`                  | str   | `""`          | Default language for code blocks                                        |
-| `code_block_style`               | str   | `"backticks"` | `"indented"` (4 spaces), `"backticks"` (\`\`\`), `"tildes"` (\~~~)      |
-| `extract_metadata`               | bool  | `True`        | Extract HTML metadata as comment                                        |
-| `hocr_extract_tables`            | bool  | `True`        | Enable hOCR table extraction                                            |
-| `hocr_table_column_threshold`    | int   | `50`          | Column detection threshold (pixels)                                     |
-| `hocr_table_row_threshold_ratio` | float | `0.5`         | Row grouping threshold ratio                                            |
+# hOCR documents are detected automatically; tables are reconstructed without extra configuration.
+markdown = convert(hocr_html)
+```
 
-### Preprocessing Options
-
-| Option                 | Type | Default      | Description                               |
-| ---------------------- | ---- | ------------ | ----------------------------------------- |
-| `preprocess`           | bool | `False`      | Enable HTML preprocessing                 |
-| `preprocessing_preset` | str  | `"standard"` | `"minimal"`, `"standard"`, `"aggressive"` |
-
-## CLI Tool
-
-A native Rust CLI binary is also available:
+## CLI (same engine)
 
 ```bash
-# Install via pipx (recommended for CLI tools)
-pipx install html-to-markdown
+pipx install html-to-markdown  # or: pip install html-to-markdown
 
-# Or install with pip
-pip install html-to-markdown
-
-# Use the CLI
-html-to-markdown input.html > output.md
-echo "<h1>Test</h1>" | html-to-markdown
+html-to-markdown page.html > page.md
+cat page.html | html-to-markdown --heading-style atx > page.md
 ```
 
-**For Rust library usage and comprehensive documentation**, see the [GitHub repository](https://github.com/Goldziher/html-to-markdown).
+## API Surface
 
-## Upgrading from v1.x
+### `ConversionOptions`
 
-All v1 code works without changes. v2 is a complete Rust rewrite with **19-30x performance improvements**:
+Key fields (see docstring for full matrix):
 
-**What Changed:**
+- `heading_style`: `"underlined" | "atx" | "atx_closed"`
+- `list_indent_width`: spaces per indent level (default 2)
+- `bullets`: cycle of bullet characters (`"*+-"`)
+- `strong_em_symbol`: `"*"` or `"_"`
+- `code_language`: default fenced code block language
+- `wrap`, `wrap_width`: wrap Markdown output
+- `strip_tags`: remove specific HTML tags
+- `preprocessing`: `PreprocessingOptions`
+- `encoding`: input character encoding (informational)
 
-- Complete Rust rewrite using `tl` HTML parser
-- CommonMark-compliant defaults (2-space indents, minimal escaping, ATX headings)
-- No BeautifulSoup or lxml dependencies
+### `PreprocessingOptions`
 
-**Removed Features:**
+- `enabled`: enable HTML sanitisation
+- `preset`: `"minimal" | "standard" | "aggressive"`
+- `remove_navigation`, `remove_forms`
 
-- `code_language_callback` - use `code_language` for default language
-- `strip` / `convert` options - use preprocessing instead
-- `convert_to_markdown_stream()` - not supported in v2
+### `InlineImageConfig`
+
+- `max_decoded_size_bytes`: reject larger payloads
+- `filename_prefix`: generated name prefix (`embedded_image` default)
+- `capture_svg`: collect inline `<svg>` (default `True`)
+- `infer_dimensions`: decode raster images to obtain dimensions (default `False`)
+
+## v1 Compatibility
+
+- **Performance**: V1 averaged ~2.5 MB/s; V2 sustains 150–210 MB/s with identical Markdown output.
+- **Compat shim**: `html_to_markdown.v1_compat` exposes `convert_to_markdown`, `convert_to_markdown_stream`, and `markdownify` to ease migration. Keyword mappings are listed in the [changelog](CHANGELOG.md#v200).
+- **CLI**: The Rust CLI replaces the Python script. New flags are documented via `html-to-markdown --help`.
+- **Removed options**: `code_language_callback`, `strip`, and streaming APIs were removed; use `ConversionOptions`, `PreprocessingOptions`, and the inline-image helpers instead.
 
 ## Links
 
-- **GitHub Repository**: [https://github.com/Goldziher/html-to-markdown](https://github.com/Goldziher/html-to-markdown)
-- **Rust Crate**: [https://crates.io/crates/html-to-markdown-rs](https://crates.io/crates/html-to-markdown-rs)
-- **Discord Community**: [https://discord.gg/pXxagNK2zN](https://discord.gg/pXxagNK2zN)
-- **Kreuzberg Ecosystem**: [https://kreuzberg.dev](https://kreuzberg.dev)
+- GitHub: [https://github.com/Goldziher/html-to-markdown](https://github.com/Goldziher/html-to-markdown)
+- Discord: [https://discord.gg/pXxagNK2zN](https://discord.gg/pXxagNK2zN)
+- Kreuzberg ecosystem: [https://kreuzberg.dev](https://kreuzberg.dev)
 
 ## License
 
-MIT License - see [LICENSE](https://github.com/Goldziher/html-to-markdown/blob/main/LICENSE) for details.
+MIT License – see [LICENSE](https://github.com/Goldziher/html-to-markdown/blob/main/LICENSE).
 
 ## Support
 
