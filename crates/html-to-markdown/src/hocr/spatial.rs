@@ -1,35 +1,7 @@
-//! hOCR 1.2 document processing
+//! Spatial table reconstruction from hOCR bounding box coordinates
 //!
-//! Complete hOCR 1.2 specification support for extracting structured content from OCR documents.
-//!
-//! ## Features
-//!
-//! - **Full Element Support**: All 40+ hOCR 1.2 element types
-//! - **Complete Property Parsing**: All 20+ hOCR properties (bbox, baseline, fonts, etc.)
-//! - **Document Structure**: Logical hierarchy (paragraphs, sections, chapters)
-//! - **Table Extraction**: Spatial layout analysis for tabular data
-//! - **Metadata Extraction**: OCR system info, capabilities, languages
-//!
-//! ## Modules
-//!
-//! - [`types`]: Core hOCR element and property types
-//! - [`parser`]: Property parsing from title attributes
-//! - [`extractor`]: DOM to hOCR element tree extraction
-//! - [`converter`]: hOCR to Markdown conversion
-//!
-//! ## Legacy Table Extraction
-//!
-//! The original table extraction API is maintained for backward compatibility.
-
-pub mod converter;
-pub mod extractor;
-pub mod parser;
-pub mod types;
-
-// Re-export main types
-pub use converter::convert_to_markdown;
-pub use extractor::extract_hocr_document;
-pub use types::{BBox, Baseline, HocrElement, HocrElementType, HocrMetadata, HocrProperties};
+//! This module provides functions to detect and reconstruct tabular data from OCR'd text
+//! by analyzing the spatial positions of words using their bounding box (bbox) coordinates.
 
 /// Represents a word extracted from hOCR with position and confidence information
 #[derive(Debug, Clone)]

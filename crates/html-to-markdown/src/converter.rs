@@ -620,18 +620,24 @@ fn extract_metadata(node_handle: &tl::NodeHandle, parser: &tl::Parser) -> BTreeM
     metadata
 }
 
-/// Format metadata as HTML comment.
-fn format_metadata_comment(metadata: &BTreeMap<String, String>) -> String {
+/// Format metadata as YAML frontmatter.
+fn format_metadata_frontmatter(metadata: &BTreeMap<String, String>) -> String {
     if metadata.is_empty() {
         return String::new();
     }
 
-    let mut lines = vec!["<!--".to_string()];
+    let mut lines = vec!["---".to_string()];
     for (key, value) in metadata {
-        let escaped_value = value.replace("-->", "--&gt;");
-        lines.push(format!("{}: {}", key, escaped_value));
+        // Escape YAML special characters and quote if needed
+        let needs_quotes = value.contains(':') || value.contains('#') || value.contains('[') || value.contains(']');
+        if needs_quotes {
+            let escaped = value.replace('\\', "\\\\").replace('"', "\\\"");
+            lines.push(format!("{}: \"{}\"", key, escaped));
+        } else {
+            lines.push(format!("{}: {}", key, value));
+        }
     }
-    lines.push("-->".to_string());
+    lines.push("---".to_string());
 
     lines.join("\n") + "\n\n"
 }
@@ -984,8 +990,8 @@ fn convert_html_impl(
         for child_handle in dom.children().iter() {
             let metadata = extract_metadata(child_handle, parser);
             if !metadata.is_empty() {
-                let metadata_comment = format_metadata_comment(&metadata);
-                output.push_str(&metadata_comment);
+                let metadata_frontmatter = format_metadata_frontmatter(&metadata);
+                output.push_str(&metadata_frontmatter);
                 break;
             }
         }
@@ -996,6 +1002,7 @@ fn convert_html_impl(
 
         let (elements, metadata) = extract_hocr_document(&dom, options.debug);
 
+        // Extract hOCR metadata as YAML frontmatter
         if options.extract_metadata && !options.convert_as_inline {
             let mut metadata_map = BTreeMap::new();
             if let Some(system) = metadata.ocr_system {
@@ -1015,7 +1022,7 @@ fn convert_html_impl(
             }
 
             if !metadata_map.is_empty() {
-                output.push_str(&format_metadata_comment(&metadata_map));
+                output.push_str(&format_metadata_frontmatter(&metadata_map));
             }
         }
 

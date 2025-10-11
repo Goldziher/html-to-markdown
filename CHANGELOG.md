@@ -33,6 +33,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **hOCR metadata now uses YAML frontmatter** instead of HTML comments for cleaner markdown output
+- **hOCR code organization** - Restructured spatial table reconstruction into dedicated `hocr/spatial.rs` module
+- **Conservative table detection** - hOCR spatial table reconstruction now only applies to explicit `ocr_table` elements, preventing false positives
 - Windows CLI binary detection - now correctly searches for `.exe` extension on Windows
 - CLI binary bundling in Python wheels - binary now included in package for all platforms
 - hOCR extractor Rust doctest - added missing import statement
