@@ -998,7 +998,7 @@ fn convert_html_impl(
     }
 
     if is_hocr {
-        use crate::hocr::{convert_to_markdown as convert_hocr_to_markdown, extract_hocr_document};
+        use crate::hocr::{convert_to_markdown_with_options as convert_hocr_to_markdown, extract_hocr_document};
 
         let (elements, metadata) = extract_hocr_document(&dom, options.debug);
 
@@ -1026,7 +1026,7 @@ fn convert_html_impl(
             }
         }
 
-        let mut markdown = convert_hocr_to_markdown(&elements, true);
+        let mut markdown = convert_hocr_to_markdown(&elements, true, options.hocr_spatial_tables);
 
         if markdown.trim().is_empty() {
             return Ok(output);

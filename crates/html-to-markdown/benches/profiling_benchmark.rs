@@ -3,7 +3,7 @@
 //! Run with: cargo bench --bench profiling_benchmark --profile-time=10
 //! Or with flamegraph: cargo flamegraph --bench profiling_benchmark
 
-use html_to_markdown::{convert, ConversionOptions};
+use html_to_markdown_rs::convert;
 use std::hint::black_box;
 
 fn load_wikipedia_document(filename: &str) -> Option<String> {

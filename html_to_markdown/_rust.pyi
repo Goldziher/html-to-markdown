@@ -11,6 +11,7 @@ class ConversionOptions:
     autolinks: bool
     default_title: bool
     br_in_tables: bool
+    hocr_spatial_tables: bool
     highlight_style: str
     extract_metadata: bool
     whitespace_mode: str
@@ -39,6 +40,7 @@ class ConversionOptions:
         autolinks: bool = True,
         default_title: bool = False,
         br_in_tables: bool = False,
+        hocr_spatial_tables: bool = True,
         highlight_style: str = "double-equal",
         extract_metadata: bool = True,
         whitespace_mode: str = "normalized",

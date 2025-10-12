@@ -131,6 +131,8 @@ struct ConversionOptions {
     #[pyo3(get, set)]
     br_in_tables: bool,
     #[pyo3(get, set)]
+    hocr_spatial_tables: bool,
+    #[pyo3(get, set)]
     highlight_style: String,
     #[pyo3(get, set)]
     extract_metadata: bool,
@@ -182,6 +184,7 @@ impl ConversionOptions {
         autolinks=true,
         default_title=false,
         br_in_tables=false,
+        hocr_spatial_tables=true,
         highlight_style="double-equal".to_string(),
         extract_metadata=true,
         whitespace_mode="normalized".to_string(),
@@ -213,6 +216,7 @@ impl ConversionOptions {
         autolinks: bool,
         default_title: bool,
         br_in_tables: bool,
+        hocr_spatial_tables: bool,
         highlight_style: String,
         extract_metadata: bool,
         whitespace_mode: String,
@@ -244,6 +248,7 @@ impl ConversionOptions {
             autolinks,
             default_title,
             br_in_tables,
+            hocr_spatial_tables,
             highlight_style,
             extract_metadata,
             whitespace_mode,
@@ -289,6 +294,7 @@ impl ConversionOptions {
             autolinks: self.autolinks,
             default_title: self.default_title,
             br_in_tables: self.br_in_tables,
+            hocr_spatial_tables: self.hocr_spatial_tables,
             highlight_style: match self.highlight_style.as_str() {
                 "double-equal" => HighlightStyle::DoubleEqual,
                 "html" => HighlightStyle::Html,
