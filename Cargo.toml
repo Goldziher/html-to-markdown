@@ -3,7 +3,9 @@ resolver = "2"
 members = [
     "crates/html-to-markdown",
     "crates/html-to-markdown-cli",
-    "crates/html-to-markdown-py",
+    "crates/html-to-markdown-node",
+    "crates/html-to-markdown-wasm",
+    "packages/html-to-markdown-py",
 ]
 
 [workspace.package]

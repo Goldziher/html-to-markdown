@@ -1,0 +1,8 @@
+packages:
+  - crates/html-to-markdown-node
+  - crates/html-to-markdown-wasm
+  - packages/html-to-markdown-ts
+
+ignoredBuiltDependencies:
+  - esbuild
+  - wasm-pack

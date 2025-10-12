@@ -2,11 +2,19 @@
 
 ## Prerequisites
 
+### Core Development
+
 - **Python** 3.10+
-- **Rust** 1.75+ (stable)
+- **Rust** 1.80+ (stable)
 - **uv** - Python package manager ([install](https://docs.astral.sh/uv/))
 - **Task** - Task runner ([install](https://taskfile.dev/))
 - **prek** - Pre-commit hooks (`uv tool install prek`)
+
+### JavaScript/TypeScript Development (Optional)
+
+- **Node.js** 18+
+- **pnpm** 8+ - Fast package manager ([install](https://pnpm.io/installation))
+- **wasm-pack** - For WASM builds (`cargo install wasm-pack`)
 
 ## Quick Setup
 
@@ -29,6 +37,8 @@ This will:
 
 ### Running Tests
 
+#### Python & Rust
+
 ```bash
 # Python tests
 task test:python
@@ -36,14 +46,39 @@ task test:python
 # Rust tests
 task test:rust
 
-# All tests
+# All Python + Rust tests
 task test
 
 # With coverage
 task cov:all
 ```
 
+#### JavaScript/TypeScript
+
+```bash
+# Install dependencies first
+pnpm install
+
+# All JavaScript tests
+pnpm test
+
+# Specific packages
+pnpm run test:node      # NAPI-RS bindings
+pnpm run test:wasm      # WebAssembly bindings
+pnpm run test:ts        # TypeScript package
+
+# Watch mode
+cd packages/html-to-markdown-ts
+pnpm test:watch
+
+# With coverage
+cd packages/html-to-markdown-ts
+pnpm test --coverage
+```
+
 ### Code Quality
+
+#### Python & Rust
 
 ```bash
 # Format code (Rust + Python)
@@ -54,6 +89,24 @@ task lint
 
 # Build Rust components
 task build
+```
+
+#### JavaScript/TypeScript
+
+```bash
+# Type checking
+pnpm run typecheck
+
+# Build all packages
+pnpm run build
+
+# Build specific targets
+pnpm run build:node     # NAPI-RS native bindings
+pnpm run build:wasm     # WebAssembly (all 3 targets)
+pnpm run build:ts       # TypeScript wrapper
+
+# Clean build artifacts
+pnpm run clean
 ```
 
 ### Benchmarking
@@ -68,29 +121,53 @@ task bench:all
 
 ## Project Structure
 
+This is a **monorepo** containing multiple language bindings and distributions:
+
 ```text
 html-to-markdown/
-├── crates/
-│   ├── html-to-markdown/       # Core Rust library (html5ever + ammonia)
-│   ├── html-to-markdown-py/    # Python bindings (PyO3)
-│   └── html-to-markdown-cli/   # Native CLI binary
-├── html_to_markdown/
+├── pnpm-workspace.yaml         # pnpm workspace configuration
+├── package.json                # Root workspace scripts
+│
+├── crates/                     # Rust crates
+│   ├── html-to-markdown/       # Core library (tl parser + ammonia)
+│   ├── html-to-markdown-cli/   # Rust CLI binary
+│   ├── html-to-markdown-node/  # NAPI-RS bindings for Node.js (~691k ops/sec)
+│   └── html-to-markdown-wasm/  # wasm-bindgen for browsers (~229k ops/sec)
+│
+├── packages/                   # Releasable packages
+│   ├── html-to-markdown-py/    # PyO3 Python bindings (PyPI)
+│   └── html-to-markdown-ts/    # TypeScript package with CLI (npm)
+│
+├── html_to_markdown/           # Python API
 │   ├── api.py                  # V2 Python API
 │   ├── options.py              # Configuration dataclasses
 │   ├── v1_compat.py           # V1 compatibility layer
-│   ├── cli_proxy.py           # CLI argument translation
 │   └── _rust.pyi              # Type stubs
-└── tests/                      # 700+ tests
+│
+└── tests/                      # Python integration tests (700+)
 ```
+
+### Package Distribution
+
+| Package                  | Registry  | Description                 |
+| ------------------------ | --------- | --------------------------- |
+| `html-to-markdown-rs`    | crates.io | Core Rust library           |
+| `html-to-markdown`       | PyPI      | Python package              |
+| `html-to-markdown`       | npm       | TypeScript package with CLI |
+| `@html-to-markdown/node` | npm       | Native Node.js bindings     |
+| `@html-to-markdown/wasm` | npm       | WebAssembly bindings        |
 
 ## Making Changes
 
 ### Rust Core Changes
 
 1. Edit code in `crates/html-to-markdown/src/`
-1. Run Rust tests: `task test:rust`
-1. Rebuild Python bindings: `task build`
-1. Run Python integration tests: `task test:python`
+1. Run Rust tests: `task test:rust` or `cargo test`
+1. Rebuild bindings:
+    - Python: `task build`
+    - Node.js: `cd crates/html-to-markdown-node && pnpm run build`
+    - WASM: `cd crates/html-to-markdown-wasm && pnpm run build:all`
+1. Run integration tests: `task test:python` or `pnpm test`
 
 ### Python API Changes
 
@@ -98,10 +175,34 @@ html-to-markdown/
 1. Update type stubs in `_rust.pyi` if needed
 1. Run tests: `task test:python`
 
+### JavaScript/TypeScript Changes
+
+#### Node.js Bindings (`crates/html-to-markdown-node`)
+
+1. Edit Rust code in `src/lib.rs`
+1. Rebuild: `pnpm run build` (generates TypeScript types automatically)
+1. Test: `pnpm test` or `cargo test`
+
+#### WASM Bindings (`crates/html-to-markdown-wasm`)
+
+1. Edit Rust code in `src/lib.rs`
+1. Rebuild: `pnpm run build:all` (builds for bundler, nodejs, and web)
+1. Test: `pnpm test` or `cargo test`
+
+#### TypeScript Package with CLI (`packages/html-to-markdown-ts`)
+
+1. Edit code in `src/` (library in `index.ts`, CLI in `cli.ts`)
+1. Build: `pnpm run build` (builds both library and CLI)
+1. Test: `pnpm test` or `pnpm test:watch`
+1. Type check: `pnpm run typecheck`
+1. Test CLI locally: `node dist/cli.js input.html`
+
 ### Adding Tests
 
-- **Rust tests**: Add to `crates/html-to-markdown/src/` (inline) or `crates/html-to-markdown/tests/`
-- **Python tests**: Add to `tests/` following existing patterns
+- **Rust tests**: Add to `crates/*/src/lib.rs` or `crates/*/tests/`
+- **Python tests**: Add to `tests/` following pytest patterns
+- **TypeScript tests**: Add to `packages/*/src/*.test.ts` using vitest
+- **Integration tests**: Add to appropriate test directory
 
 ## Testing
 
@@ -155,8 +256,17 @@ Prek enforces this automatically via commitlint hook.
 - **Formatting**: `cargo fmt`
 - **Linting**: `cargo clippy` with `-D warnings`
 - **Style**: Follow standard Rust conventions
+- **Tests**: Required for all public APIs
 
-All checks run automatically via prek on commit.
+### TypeScript
+
+- **Formatting**: Prettier via tsup
+- **Type checking**: TypeScript 5.6+ in strict mode
+- **Linting**: ESLint (when configured)
+- **Tests**: vitest with coverage reporting
+- **Style**: 2-space indentation, trailing commas
+
+All Python/Rust checks run automatically via prek on commit.
 
 ## Pull Requests
 
@@ -171,20 +281,41 @@ All checks run automatically via prek on commit.
 
 ### Pre-release Checklist
 
-1. Update version in `Cargo.toml`:
+1. **Update versions** in:
+
+    - `Cargo.toml` (workspace.package.version)
+    - `packages/*/package.json`
+    - `crates/html-to-markdown-node/package.json`
+    - `crates/html-to-markdown-wasm/package.json`
 
     ```toml
+    # Cargo.toml
     [workspace.package]
-    version = "2.1.1"
+    version = "2.2.0"
+    ```
+
+    ```json
+    // package.json files
+    "version": "2.2.0"
     ```
 
 1. Update `CHANGELOG.md` with changes
 
-1. Run full test suite: `task test`
+1. Run full test suite:
 
-1. Build CLI locally: `task build:cli && ./target/release/html-to-markdown --version`
+    ```bash
+    task test           # Python + Rust
+    pnpm test          # JavaScript/TypeScript
+    ```
 
-1. Commit changes: `git commit -m "chore: bump version to 2.1.1"`
+1. Build and verify all targets:
+
+    ```bash
+    task build:cli && ./target/release/html-to-markdown --version
+    pnpm run build     # All JS/TS packages
+    ```
+
+1. Commit changes: `git commit -m "chore: bump version to 2.2.0"`
 
 ### Creating a Release
 
@@ -197,23 +328,51 @@ All checks run automatically via prek on commit.
 
 1. **Automated workflows trigger**:
 
-    - `release.yml` - Creates GitHub release with CLI binaries
-    - `release-homebrew.yml` - Updates Homebrew tap formula
+    - `release.yml` - GitHub release with CLI binaries
+    - `release-homebrew.yml` - Updates Homebrew formula
     - `publish-cargo.yml` - Publishes to crates.io
-    - `release.yaml` - Publishes Python package to PyPI
+    - `release.yaml` - Publishes Python to PyPI
+    - Manual npm publish required (see below)
+
+1. **Publish npm packages** (manual):
+
+    ```bash
+    # Login to npm (once)
+    npm login
+
+    # Publish main TypeScript package (includes CLI)
+    cd packages/html-to-markdown-ts
+    pnpm publish
+
+    # Publish native bindings (with pre-built binaries)
+    cd ../../crates/html-to-markdown-node
+    pnpm run build
+    pnpm publish
+
+    # Publish WASM
+    cd ../html-to-markdown-wasm
+    pnpm run build:all
+    pnpm publish
+    ```
 
 1. **Required secrets** (already configured):
 
     - `CARGO_TOKEN` - From <https://crates.io/settings/tokens>
     - `HOMEBREW_TOKEN` - GitHub token with `repo` scope
-    - `PYPI_TOKEN` - Configured via PyPI trusted publishing
+    - `PYPI_TOKEN` - PyPI trusted publishing
+    - `NPM_TOKEN` - From <https://www.npmjs.com/settings/tokens> (automation token)
 
 ### Post-release Verification
 
-- Cargo: <https://crates.io/crates/html-to-markdown>
-- PyPI: <https://pypi.org/project/html-to-markdown/>
-- Homebrew: <https://github.com/Goldziher/homebrew-tap>
-- GitHub: <https://github.com/Goldziher/html-to-markdown/releases>
+Verify all distributions are published:
+
+- **Rust**: <https://crates.io/crates/html-to-markdown-rs>
+- **Python**: <https://pypi.org/project/html-to-markdown/>
+- **npm (main)**: <https://www.npmjs.com/package/html-to-markdown>
+- **npm (node)**: <https://www.npmjs.com/package/@html-to-markdown/node>
+- **npm (wasm)**: <https://www.npmjs.com/package/@html-to-markdown/wasm>
+- **Homebrew**: <https://github.com/Goldziher/homebrew-tap>
+- **GitHub**: <https://github.com/Goldziher/html-to-markdown/releases>
 
 ## Getting Help
 
