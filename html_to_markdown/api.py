@@ -51,6 +51,7 @@ def convert(
         autolinks=options.autolinks,
         default_title=options.default_title,
         br_in_tables=options.br_in_tables,
+        hocr_spatial_tables=options.hocr_spatial_tables,
         highlight_style=options.highlight_style,
         extract_metadata=options.extract_metadata,
         whitespace_mode=options.whitespace_mode,

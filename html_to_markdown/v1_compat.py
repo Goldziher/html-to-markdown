@@ -120,8 +120,11 @@ def convert_to_markdown(
     if custom_converters is not None:
         raise NotImplementedError("custom_converters is not yet implemented in v2")
     if not hocr_extract_tables:
-        raise NotImplementedError(
-            "hocr_extract_tables toggle was removed in v2. hOCR tables are always reconstructed when detected."
+        warnings.warn(
+            "hocr_extract_tables is deprecated and will be removed in a future release. "
+            "Use ConversionOptions(hocr_spatial_tables=False) to disable spatial table reconstruction.",
+            DeprecationWarning,
+            stacklevel=2,
         )
     if hocr_table_column_threshold != 50 or hocr_table_row_threshold_ratio != 0.5:
         raise NotImplementedError(
@@ -146,6 +149,7 @@ def convert_to_markdown(
         autolinks=autolinks,
         default_title=default_title,
         br_in_tables=br_in_tables,
+        hocr_spatial_tables=hocr_extract_tables,
         highlight_style=highlight_style,  # type: ignore[arg-type]
         extract_metadata=extract_metadata,
         whitespace_mode=whitespace_mode,  # type: ignore[arg-type]

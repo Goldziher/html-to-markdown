@@ -4,7 +4,7 @@
 //! for the core Rust conversion engine.
 
 use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
-use html_to_markdown::{convert, ConversionOptions};
+use html_to_markdown_rs::{convert, CodeBlockStyle, ConversionOptions, HeadingStyle};
 use std::time::Duration;
 
 /// Generate HTML with varying complexity
@@ -230,7 +230,7 @@ fn bench_configurations(c: &mut Criterion) {
     });
 
     let options = ConversionOptions {
-        heading_style: html_to_markdown::HeadingStyle::Atx,
+        heading_style: HeadingStyle::Atx,
         ..Default::default()
     };
     group.throughput(Throughput::Bytes(size as u64));
@@ -239,7 +239,7 @@ fn bench_configurations(c: &mut Criterion) {
     });
 
     let options = ConversionOptions {
-        code_block_style: html_to_markdown::CodeBlockStyle::Backticks,
+        code_block_style: CodeBlockStyle::Backticks,
         ..Default::default()
     };
     group.throughput(Throughput::Bytes(size as u64));
