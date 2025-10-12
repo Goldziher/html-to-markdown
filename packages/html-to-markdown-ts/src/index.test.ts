@@ -106,9 +106,7 @@ describe("html-to-markdown", () => {
       });
 
       const lines = wrapped.split("\n");
-      const hasShortLines = lines.some(
-        (line) => line.length > 0 && line.length <= 85,
-      );
+      const hasShortLines = lines.some((line) => line.length > 0 && line.length <= 85);
       expect(hasShortLines).toBe(true);
     });
   });
@@ -116,8 +114,7 @@ describe("html-to-markdown", () => {
   describe("Inline Images", () => {
     it("should extract inline images", async () => {
       // Simple 1x1 red PNG in base64
-      const png =
-        "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8DwHwAFBQIAX8jx0gAAAABJRU5ErkJggg==";
+      const png = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8DwHwAFBQIAX8jx0gAAAABJRU5ErkJggg==";
       const html = `<img src="data:image/png;base64,${png}" alt="Red Pixel">`;
 
       const result = await convertWithInlineImages(html, undefined, {

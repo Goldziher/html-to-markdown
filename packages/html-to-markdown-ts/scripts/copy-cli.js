@@ -15,8 +15,7 @@ const binDir = join(__dirname, "../bin");
 mkdirSync(binDir, { recursive: true });
 
 // Determine binary name based on platform
-const binaryName =
-  process.platform === "win32" ? "html-to-markdown.exe" : "html-to-markdown";
+const binaryName = process.platform === "win32" ? "html-to-markdown.exe" : "html-to-markdown";
 
 // Copy the binary
 const sourcePath = join(targetDir, binaryName);

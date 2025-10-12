@@ -62,6 +62,4 @@ for (let i = 0; i < iterations; i++) {
 const elapsed = Date.now() - start;
 console.log(`Converted ${iterations} documents in ${elapsed}ms`);
 console.log(`Average: ${(elapsed / iterations).toFixed(3)}ms per document`);
-console.log(
-  `Throughput: ${Math.round((iterations / elapsed) * 1000)} docs/sec`,
-);
+console.log(`Throughput: ${Math.round((iterations / elapsed) * 1000)} docs/sec`);

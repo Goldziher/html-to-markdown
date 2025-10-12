@@ -1,8 +1,4 @@
-import type {
-  ConversionOptions,
-  InlineImageConfig,
-  HtmlExtraction,
-} from "./types.js";
+import type { ConversionOptions, InlineImageConfig, HtmlExtraction } from "./types.js";
 
 export * from "./types.js";
 
@@ -52,10 +48,7 @@ class Converter {
     } catch (error) {
       // Native bindings not available, try WASM
       if (process.env.NODE_ENV === "development") {
-        console.debug(
-          "Native bindings not available, falling back to WASM:",
-          error,
-        );
+        console.debug("Native bindings not available, falling back to WASM:", error);
       }
     }
 
@@ -67,10 +60,9 @@ class Converter {
       this.backend = "wasm";
       return;
     } catch (error) {
-      throw new Error(
-        "Failed to initialize html-to-markdown: Neither native nor WASM backend available",
-        { cause: error },
-      );
+      throw new Error("Failed to initialize html-to-markdown: Neither native nor WASM backend available", {
+        cause: error,
+      });
     }
   }
 
@@ -127,9 +119,7 @@ class Converter {
    */
   convertSync(html: string, options?: ConversionOptions): string {
     if (!this.convertFn) {
-      throw new Error(
-        "Converter not initialized. Call convert() first or use initializeSync()",
-      );
+      throw new Error("Converter not initialized. Call convert() first or use initializeSync()");
     }
 
     return this.convertFn(html, options);
@@ -187,9 +177,7 @@ class Converter {
     imageConfig?: InlineImageConfig,
   ): HtmlExtraction {
     if (!this.convertWithInlineImagesFn) {
-      throw new Error(
-        "Converter not initialized. Call convert() first or use initializeSync()",
-      );
+      throw new Error("Converter not initialized. Call convert() first or use initializeSync()");
     }
 
     return this.convertWithInlineImagesFn(html, options, imageConfig);
@@ -215,10 +203,7 @@ class Converter {
     } catch (error) {
       // Native bindings not available, try WASM
       if (process.env.NODE_ENV === "development") {
-        console.debug(
-          "Native bindings not available, falling back to WASM:",
-          error,
-        );
+        console.debug("Native bindings not available, falling back to WASM:", error);
       }
     }
 
@@ -230,10 +215,9 @@ class Converter {
       this.convertWithInlineImagesFn = wasmModule.convertWithInlineImages;
       this.backend = "wasm";
     } catch (error) {
-      throw new Error(
-        "Failed to initialize html-to-markdown: Neither native nor WASM backend available",
-        { cause: error },
-      );
+      throw new Error("Failed to initialize html-to-markdown: Neither native nor WASM backend available", {
+        cause: error,
+      });
     }
   }
 }
@@ -256,10 +240,7 @@ const defaultConverter = new Converter();
  * console.log(markdown); // # Hello World
  * ```
  */
-export async function convert(
-  html: string,
-  options?: ConversionOptions,
-): Promise<string> {
+export async function convert(html: string, options?: ConversionOptions): Promise<string> {
   return defaultConverter.convert(html, options);
 }
 
@@ -371,11 +352,7 @@ export function convertWithInlineImagesSync(
   options?: ConversionOptions,
   imageConfig?: InlineImageConfig,
 ): HtmlExtraction {
-  return defaultConverter.convertWithInlineImagesSync(
-    html,
-    options,
-    imageConfig,
-  );
+  return defaultConverter.convertWithInlineImagesSync(html, options, imageConfig);
 }
 
 /**

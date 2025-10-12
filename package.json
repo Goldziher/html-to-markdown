@@ -3,6 +3,7 @@
   "version": "2.2.0",
   "private": true,
   "description": "HTML to Markdown converter - monorepo root",
+  "packageManager": "pnpm@10.18.2+sha512.9fb969fa749b3ade6035e0f109f0b8a60b5d08a1a87fdf72e337da90dcc93336e2280ca4e44f2358a649b83c17959e9993e777c2080879f3801e6f0d999ad3dd",
   "scripts": {
     "build": "pnpm run build:node && pnpm run build:wasm && pnpm run build:ts",
     "build:node": "pnpm --filter '@html-to-markdown/node' run build",
@@ -13,16 +14,18 @@
     "test:wasm": "pnpm --filter '@html-to-markdown/wasm' test",
     "test:ts": "pnpm --filter 'html-to-markdown' test",
     "clean": "pnpm -r run clean && rm -rf node_modules",
-    "lint": "pnpm -r run lint",
+    "lint": "biome check --write .",
+    "format": "biome format --write .",
     "typecheck": "pnpm -r run typecheck"
   },
   "devDependencies": {
+    "@biomejs/biome": "^2.2.5",
     "@types/node": "^24.7.2",
     "typescript": "^5.9.3",
     "vitest": "^3.2.4"
   },
   "engines": {
     "node": ">=18",
-    "pnpm": ">=8"
+    "pnpm": ">=10"
   }
 }

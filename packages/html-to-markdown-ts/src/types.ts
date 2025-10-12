@@ -156,14 +156,7 @@ export interface ConversionOptions {
 /**
  * Inline image format
  */
-export type InlineImageFormat =
-  | "png"
-  | "jpeg"
-  | "gif"
-  | "bmp"
-  | "webp"
-  | "svg"
-  | string;
+export type InlineImageFormat = "png" | "jpeg" | "gif" | "bmp" | "webp" | "svg" | string;
 
 /**
  * Inline image source type
