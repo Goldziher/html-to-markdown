@@ -144,7 +144,7 @@ jobs:
         run: cargo install cargo-llvm-cov
 
       - name: Generate Rust Coverage
-        run: cargo llvm-cov --all-features --lcov --output-path rust-coverage.lcov
+        run: cargo llvm-cov --workspace --exclude html-to-markdown-py --all-features --lcov --output-path rust-coverage.lcov
 
       - name: Upload Coverage Artifacts
         if: always()

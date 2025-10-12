@@ -150,6 +150,9 @@ pub struct ConversionOptions {
     /// Use <br> in tables instead of spaces
     pub br_in_tables: bool,
 
+    /// Enable spatial table reconstruction in hOCR documents
+    pub hocr_spatial_tables: bool,
+
     /// Highlight style for <mark> elements
     pub highlight_style: HighlightStyle,
 
@@ -215,6 +218,7 @@ impl Default for ConversionOptions {
             autolinks: true,
             default_title: false,
             br_in_tables: false,
+            hocr_spatial_tables: true,
             highlight_style: HighlightStyle::default(),
             extract_metadata: true,
             whitespace_mode: WhitespaceMode::default(),

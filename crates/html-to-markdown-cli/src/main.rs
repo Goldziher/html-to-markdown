@@ -198,6 +198,11 @@ struct Cli {
     #[arg(help_heading = "Tables")]
     br_in_tables: bool,
 
+    /// Disable spatial table reconstruction for hOCR documents
+    #[arg(long = "no-hocr-spatial-tables")]
+    #[arg(help_heading = "Tables")]
+    no_hocr_spatial_tables: bool,
+
     /// Style for <mark> elements
     ///
     /// How to represent highlighted text:
@@ -591,6 +596,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         autolinks: cli.autolinks,
         default_title: cli.default_title,
         br_in_tables: cli.br_in_tables,
+        hocr_spatial_tables: if cli.no_hocr_spatial_tables {
+            false
+        } else {
+            defaults.hocr_spatial_tables
+        },
         highlight_style: cli.highlight_style.map(Into::into).unwrap_or(defaults.highlight_style),
         extract_metadata: cli.extract_metadata,
         whitespace_mode: cli.whitespace_mode.map(Into::into).unwrap_or(defaults.whitespace_mode),

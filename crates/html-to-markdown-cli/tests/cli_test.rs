@@ -622,7 +622,7 @@ fn test_version_flag() {
         .arg("--version")
         .assert()
         .success()
-        .stdout(predicate::str::contains("2.1.1"));
+        .stdout(predicate::str::contains("2.2.0"));
 }
 
 #[test]
