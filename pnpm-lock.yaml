@@ -29,9 +29,6 @@ importers:
       '@octokit/core':
         specifier: 7.0.5
         version: 7.0.5
-      '@types/node':
-        specifier: 24.7.2
-        version: 24.7.2
       typanion:
         specifier: 3.14.0
         version: 3.14.0
@@ -42,6 +39,12 @@ importers:
       '@napi-rs/cli':
         specifier: ^3.3.1
         version: 3.3.1(@emnapi/runtime@1.5.0)(@types/node@24.7.2)
+      '@types/node':
+        specifier: ^24.7.2
+        version: 24.7.2
+      vitest:
+        specifier: ^3.0.0
+        version: 3.2.4(@types/node@24.7.2)(@vitest/ui@3.2.4)(tsx@4.20.6)
 
   crates/html-to-markdown-wasm:
     dependencies:

@@ -14,11 +14,13 @@ from html_to_markdown import ConversionOptions, convert
 
 
 def get_hocr_file(filename: str) -> Path:
-    return Path(__file__).parent / "test_data" / "hocr" / filename
+    return Path(__file__).parent.parent / "test_documents" / "test_data" / "hocr" / filename
 
 
 def get_expected_markdown(filename: str) -> str:
-    return (Path(__file__).parent / "test_data" / "hocr_expected" / filename).read_text(encoding="utf-8")
+    return (Path(__file__).parent.parent / "test_documents" / "test_data" / "hocr_expected" / filename).read_text(
+        encoding="utf-8"
+    )
 
 
 def convert_hocr_file(filename: str, **kwargs: Any) -> str:
@@ -189,9 +191,9 @@ def test_v4_code_formula_hocr_preserves_code_block() -> None:
 
 
 def test_multilingual_hocr_conversion() -> None:
-    hocr_content = (Path(__file__).parent / "test_data" / "hocr" / "comprehensive" / "valid_file.hocr").read_text(
-        encoding="utf-8"
-    )
+    hocr_content = (
+        Path(__file__).parent.parent / "test_documents" / "test_data" / "hocr" / "comprehensive" / "valid_file.hocr"
+    ).read_text(encoding="utf-8")
 
     options = ConversionOptions(hocr_spatial_tables=False)
     result = convert(hocr_content, options)
@@ -213,9 +215,9 @@ def test_multilingual_hocr_conversion() -> None:
 
 
 def test_utf8_encoding_hocr() -> None:
-    hocr_content = (Path(__file__).parent / "test_data" / "hocr" / "comprehensive" / "utf8_encoding.hocr").read_text(
-        encoding="utf-8"
-    )
+    hocr_content = (
+        Path(__file__).parent.parent / "test_documents" / "test_data" / "hocr" / "comprehensive" / "utf8_encoding.hocr"
+    ).read_text(encoding="utf-8")
 
     result = convert(hocr_content)
 
@@ -223,9 +225,14 @@ def test_utf8_encoding_hocr() -> None:
 
 
 def test_overlapping_bbox_hocr() -> None:
-    hocr_content = (Path(__file__).parent / "test_data" / "hocr" / "comprehensive" / "bbox_overlapping.hocr").read_text(
-        encoding="utf-8"
-    )
+    hocr_content = (
+        Path(__file__).parent.parent
+        / "test_documents"
+        / "test_data"
+        / "hocr"
+        / "comprehensive"
+        / "bbox_overlapping.hocr"
+    ).read_text(encoding="utf-8")
 
     result = convert(hocr_content)
     content = get_content_without_frontmatter(result)
@@ -246,7 +253,9 @@ def test_overlapping_bbox_hocr() -> None:
     ],
 )
 def test_comprehensive_hocr_files(comprehensive_file: str) -> None:
-    hocr_path = Path(__file__).parent / "test_data" / "hocr" / "comprehensive" / comprehensive_file
+    hocr_path = (
+        Path(__file__).parent.parent / "test_documents" / "test_data" / "hocr" / "comprehensive" / comprehensive_file
+    )
     hocr_content = hocr_path.read_text(encoding="utf-8")
 
     result = convert(hocr_content)
