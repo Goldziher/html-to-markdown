@@ -1,50 +1,62 @@
-*$py.class
-*.egg-info/
-*.iml
-*.log
-*.py[cod]
-.coverage
-.env
-.idea/
-.mypy_cache/
-.pdm-build/
-.pdm-python
-.pdm.toml
-.pytest_cache/
-.python-version
-.ruff_cache/
-.run/
-.tox/
-.venv/
-.vscode/
+# Python
 __pycache__/
-__pypackages__/
-.claude/
-coverage.xml
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
 dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
 htmlcov/
-
-# AI-rulez generated files
-.cursorrules
-CLAUDE.md
-GEMINI.md
-.windsurfrules
-.mcp.json
-.gemini/
-AGENTS.md
-
-# Benchmark results
-.benchmarks/
-BENCHMARK_BASELINE.md
+.coverage
+.coverage.*
+coverage.lcov
 
 # Rust
 target/
 Cargo.lock
-**/*.rs.bk
-*.pdb
-*.so
-*.dylib
-html_to_markdown-*.data/
+rust-coverage.lcov
+*.node
 
-# Generated CLI binary (created by scripts/prepare_wheel.py)
-html_to_markdown/bin/
+# Node.js / TypeScript
+node_modules/
+dist/
+dist-node/
+dist-web/
+*.tsbuildinfo
+.pnpm-debug.log
+pnpm-lock.yaml
+packages/html-to-markdown-ts/bin/
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Benchmarks
+.benchmarks/
+
+# Environment
+.env
+.env.local
