@@ -40,7 +40,6 @@ dist-node/
 dist-web/
 *.tsbuildinfo
 .pnpm-debug.log
-pnpm-lock.yaml
 packages/html-to-markdown-ts/bin/
 
 # IDEs
