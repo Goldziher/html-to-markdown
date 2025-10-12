@@ -80,9 +80,15 @@ repos:
   - repo: local
     hooks:
       - id: mypy
-        name: mypy
-        entry: uv run mypy
+        name: mypy (root package)
+        entry: uv run mypy html_to_markdown tests
         require_serial: true
         language: system
-        types: [python]
-        exclude: ^crates/|^packages/|^scripts/
+        pass_filenames: false
+      - id: mypy-py-bindings
+        name: mypy (python bindings)
+        entry: uv run mypy packages/html-to-markdown-py/python/html_to_markdown
+        require_serial: true
+        language: system
+        pass_filenames: false
+        files: ^packages/html-to-markdown-py/python/
