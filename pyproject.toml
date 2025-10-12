@@ -68,7 +68,7 @@ dev = [
 ]
 
 [tool.maturin]
-manifest-path = "packages/html-to-markdown-py/Cargo.toml"
+manifest-path = "crates/html-to-markdown-py/Cargo.toml"
 module-name = "html_to_markdown._html_to_markdown"
 include = [
   { path = "html_to_markdown-*.data/**/*", format = "wheel" },
@@ -148,7 +148,6 @@ warn_return_any = true
 warn_unused_configs = true
 exclude = [
   "^crates/",
-  "^packages/html-to-markdown-ts/",
   "^scripts/",
   "^node_modules/",
   "^dist/",

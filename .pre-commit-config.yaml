@@ -87,8 +87,8 @@ repos:
         pass_filenames: false
       - id: mypy-py-bindings
         name: mypy (python bindings)
-        entry: uv run mypy packages/html-to-markdown-py/python/html_to_markdown
+        entry: uv run mypy crates/html-to-markdown-py/python/html_to_markdown
         require_serial: true
         language: system
         pass_filenames: false
-        files: ^packages/html-to-markdown-py/python/
+        files: ^crates/html-to-markdown-py/python/
