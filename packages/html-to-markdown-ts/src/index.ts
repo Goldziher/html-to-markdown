@@ -1,4 +1,4 @@
-import type { ConversionOptions, InlineImageConfig, HtmlExtraction } from "./types.js";
+import type { ConversionOptions, HtmlExtraction, InlineImageConfig } from "./types.js";
 
 export * from "./types.js";
 

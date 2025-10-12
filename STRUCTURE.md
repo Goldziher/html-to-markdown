@@ -66,18 +66,18 @@ Rust components are managed via Cargo workspace in root `Cargo.toml`:
 - **Technology**: NAPI-RS v3
 - **Performance**: ~2x faster than WASM
 - **Platform support**:
-  - macOS (x64, ARM64)
-  - Linux (x64 gnu/musl, ARM64 gnu/musl, ARMv7)
-  - Windows (x64, ARM64)
+    - macOS (x64, ARM64)
+    - Linux (x64 gnu/musl, ARM64 gnu/musl, ARMv7)
+    - Windows (x64, ARM64)
 - **Package**: `@html-to-markdown/node`
 
 ### WebAssembly (`crates/html-to-markdown-wasm`)
 
 - **Technology**: wasm-bindgen
 - **Targets**:
-  - `bundler` (Webpack, Vite, etc.)
-  - `nodejs` (Node.js/Deno)
-  - `web` (Browser ESM)
+    - `bundler` (Webpack, Vite, etc.)
+    - `nodejs` (Node.js/Deno)
+    - `web` (Browser ESM)
 - **Package**: `@html-to-markdown/wasm`
 
 ### Python Bindings (`packages/html-to-markdown-py`)

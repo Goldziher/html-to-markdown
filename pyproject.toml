@@ -147,7 +147,14 @@ implicit_reexport = false
 show_error_codes = true
 warn_return_any = true
 warn_unused_configs = true
-exclude = [ "crates/", "packages/", "scripts/" ]
+exclude = [
+  "^crates/",
+  "^packages/",
+  "^scripts/",
+  "^node_modules/",
+  "^dist/",
+  "^target/",
+]
 
 [[tool.mypy.overrides]]
 module = "tests.*"
