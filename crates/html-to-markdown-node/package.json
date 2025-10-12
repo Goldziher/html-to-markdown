@@ -44,20 +44,21 @@
     "build": "napi build --platform --release",
     "build:debug": "napi build --platform",
     "prepublishOnly": "napi prepublish -t npm",
-    "test": "node test.js",
-    "test:vitest": "vitest run",
-    "test:vitest:watch": "vitest",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:simple": "node test.js",
     "universal": "napi universal",
     "version": "napi version",
     "clean": "rm -rf dist node_modules *.node"
   },
   "devDependencies": {
-    "@napi-rs/cli": "^3.3.1"
+    "@napi-rs/cli": "^3.3.1",
+    "@types/node": "^24.7.2",
+    "vitest": "^3.0.0"
   },
   "dependencies": {
     "@emnapi/runtime": "1.5.0",
     "@octokit/core": "7.0.5",
-    "@types/node": "24.7.2",
     "typanion": "3.14.0",
     "up": "^1.0.2"
   }

@@ -10,7 +10,7 @@ from html_to_markdown import ConversionOptions, convert
 if TYPE_CHECKING:
     from pytest_benchmark.fixture import BenchmarkFixture  # type: ignore[import-untyped]
 
-BENCHMARK_DIR = Path(__file__).parent / "benchmark_documents" / "wikipedia"
+BENCHMARK_DIR = Path(__file__).parent.parent / "test_documents" / "html" / "wikipedia"
 
 
 def _load_wikipedia_doc(filename: str) -> str:
