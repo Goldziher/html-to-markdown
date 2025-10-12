@@ -1,15 +1,15 @@
-import { describe, it, expect, beforeAll } from "vitest";
+import { beforeAll, describe, expect, it } from "vitest";
 import {
+  CodeBlockStyle,
+  type ConversionOptions,
   convert,
   convertSync,
   convertWithInlineImages,
-  initializeSync,
-  getBackend,
   createConverter,
+  getBackend,
   HeadingStyle,
-  CodeBlockStyle,
+  initializeSync,
   ListIndentType,
-  type ConversionOptions,
 } from "./index.js";
 
 describe("html-to-markdown", () => {

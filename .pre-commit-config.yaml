@@ -85,4 +85,4 @@ repos:
         require_serial: true
         language: system
         types: [python]
-        exclude: ^crates/|^scripts/
+        exclude: ^crates/|^packages/|^scripts/

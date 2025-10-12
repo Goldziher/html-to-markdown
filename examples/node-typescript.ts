@@ -3,7 +3,7 @@
  * This automatically uses native bindings when available, falls back to WASM
  */
 
-import { convert, getBackend, type ConversionOptions, HeadingStyle, CodeBlockStyle } from "html-to-markdown";
+import { CodeBlockStyle, type ConversionOptions, convert, getBackend, HeadingStyle } from "html-to-markdown";
 
 const html = `
 <!DOCTYPE html>
