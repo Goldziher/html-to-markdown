@@ -52,6 +52,12 @@ importers:
         specifier: ^1.0.2
         version: 1.0.2
     devDependencies:
+      '@types/node':
+        specifier: ^24.7.2
+        version: 24.7.2
+      vitest:
+        specifier: ^3.0.0
+        version: 3.2.4(@types/node@24.7.2)(@vitest/ui@3.2.4)(tsx@4.20.6)
       wasm-pack:
         specifier: ^0.13.1
         version: 0.13.1

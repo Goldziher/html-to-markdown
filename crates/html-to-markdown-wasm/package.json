@@ -23,12 +23,14 @@
     "build:nodejs": "wasm-pack build --target nodejs --out-dir dist-node --scope html-to-markdown",
     "build:web": "wasm-pack build --target web --out-dir dist-web --scope html-to-markdown",
     "build:all": "pnpm run build && pnpm run build:nodejs && pnpm run build:web",
-    "test": "wasm-pack test --headless --chrome",
-    "test:vitest": "vitest run",
-    "test:vitest:watch": "vitest",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:wasm-pack": "wasm-pack test --headless --chrome",
     "clean": "rm -rf dist dist-node dist-web node_modules pkg"
   },
   "devDependencies": {
+    "@types/node": "^24.7.2",
+    "vitest": "^3.0.0",
     "wasm-pack": "^0.13.1"
   },
   "publishConfig": {
