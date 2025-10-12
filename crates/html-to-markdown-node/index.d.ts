@@ -142,7 +142,4 @@ export interface ConversionOptions {
  * console.log(markdown); // # Hello World
  * ```
  */
-export function convert(
-  html: string,
-  options?: ConversionOptions | undefined | null,
-): string;
+export function convert(html: string, options?: ConversionOptions | undefined | null): string;

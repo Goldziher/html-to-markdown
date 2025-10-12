@@ -38,11 +38,11 @@ repos:
         args: ["--pyi", "--line-length", "130"]
         additional_dependencies:
           - black==25.1.0
-  - repo: https://github.com/rbubley/mirrors-prettier
-    rev: "v3.6.2"
+  - repo: https://github.com/biomejs/pre-commit
+    rev: "v0.4.0"
     hooks:
-      - id: prettier
-        exclude: ^tests|^.idea|^migrations|^.git|README.md|^docs|CHANGELOG.md|CONTRIBUTING.md
+      - id: biome-check
+        additional_dependencies: ["@biomejs/biome@2.2.5"]
   - repo: https://github.com/tox-dev/pyproject-fmt
     rev: "v2.10.0"
     hooks:

@@ -15,8 +15,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 // Find the Rust CLI binary
-const binaryName =
-  process.platform === "win32" ? "html-to-markdown.exe" : "html-to-markdown";
+const binaryName = process.platform === "win32" ? "html-to-markdown.exe" : "html-to-markdown";
 const binaryPath = join(__dirname, "..", "bin", binaryName);
 
 // Proxy all arguments to the Rust CLI

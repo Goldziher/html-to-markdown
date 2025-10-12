@@ -38,14 +38,8 @@ const html3 = `
 `;
 const md3 = convert(html3);
 assert(md3.includes("Title"), "Should have title");
-assert(
-  md3.includes("**bold**") || md3.includes("__bold__"),
-  "Should have bold",
-);
-assert(
-  md3.includes("*italic*") || md3.includes("_italic_"),
-  "Should have italic",
-);
+assert(md3.includes("**bold**") || md3.includes("__bold__"), "Should have bold");
+assert(md3.includes("*italic*") || md3.includes("_italic_"), "Should have italic");
 console.log("✓ Complex HTML works\n");
 
 // Test 4: Performance
