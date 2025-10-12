@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.2.0] - 2025-10-11
+
+### Added
+
+- `hocr_spatial_tables` option on `ConversionOptions` (Rust, Python, CLI) with `--no-hocr-spatial-tables` flag to disable spatial table reconstruction when desired.
+- New hOCR regression fixtures for complex tables and code blocks to guard against formatting regressions.
+
+### Changed
+
+- Improved hOCR conversion heuristics to distinguish between dense paragraph layouts and true tables, yielding cleaner Markdown for scientific data.
+- hOCR code-block detection now preserves fenced formatting, restoring context headings when present.
+
+### Fixed
+
+- CLI `--version` output and package metadata now report version 2.2.0 consistently.
+
 ## [2.1.1] - 2025-10-11
 
 ### Fixed

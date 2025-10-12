@@ -158,6 +158,17 @@ def test_v4_embedded_tables_hocr_produces_expected_table() -> None:
     assert expected_table in result
 
 
+def test_v4_embedded_tables_hocr_toggle_controls_table_reconstruction() -> None:
+    expected_table = get_expected_markdown("embedded_tables.md").strip()
+
+    default_result = convert_hocr_file("v4_embedded_tables.hocr")
+    assert expected_table in default_result
+
+    options = ConversionOptions(hocr_spatial_tables=False)
+    result_without_tables = convert_hocr_file("v4_embedded_tables.hocr", options=options)
+    assert expected_table not in result_without_tables
+
+
 def test_v4_code_formula_hocr_preserves_code_block() -> None:
     result = convert_hocr_file("v4_code_formula.hocr")
     expected_code = get_expected_markdown("code_formula.md").strip()
