@@ -67,7 +67,8 @@
   },
   "dependencies": {
     "@html-to-markdown/node": "workspace:*",
-    "@html-to-markdown/wasm": "workspace:*"
+    "@html-to-markdown/wasm": "workspace:*",
+    "up": "^1.0.2"
   },
   "devDependencies": {
     "@types/node": "^24.7.2",

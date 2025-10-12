@@ -34,5 +34,8 @@
   "publishConfig": {
     "registry": "https://registry.npmjs.org/",
     "access": "public"
+  },
+  "dependencies": {
+    "up": "^1.0.2"
   }
 }

@@ -218,19 +218,8 @@ jobs:
       - name: Setup Rust
         uses: actions-rust-lang/setup-rust-toolchain@v1
 
-      - name: Install pnpm
-        uses: pnpm/action-setup@v4
-        with:
-          package_json_file: package.json
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-          cache: 'pnpm'
-
-      - name: Install Dependencies
-        run: pnpm install --frozen-lockfile
+      - name: Setup workspace
+        uses: ./.github/actions/setup-node-workspace
 
       - name: Build NAPI-RS Bindings
         working-directory: crates/html-to-markdown-node
@@ -259,19 +248,8 @@ jobs:
       - name: Install wasm-pack
         run: curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
 
-      - name: Install pnpm
-        uses: pnpm/action-setup@v4
-        with:
-          package_json_file: package.json
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-          cache: 'pnpm'
-
-      - name: Install Dependencies
-        run: pnpm install --frozen-lockfile
+      - name: Setup workspace
+        uses: ./.github/actions/setup-node-workspace
 
       - name: Build WASM (all targets)
         working-directory: crates/html-to-markdown-wasm
@@ -301,19 +279,8 @@ jobs:
       - name: Install wasm-pack
         run: curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
 
-      - name: Install pnpm
-        uses: pnpm/action-setup@v4
-        with:
-          package_json_file: package.json
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-          cache: 'pnpm'
-
-      - name: Install Dependencies
-        run: pnpm install --frozen-lockfile
+      - name: Setup workspace
+        uses: ./.github/actions/setup-node-workspace
 
       - name: Build Rust CLI
         run: cargo build --release --package html-to-markdown-cli
@@ -366,30 +333,23 @@ jobs:
       - name: Install wasm-pack
         run: curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
 
-      - name: Install pnpm
-        uses: pnpm/action-setup@v4
-        with:
-          package_json_file: package.json
-
-      - name: Setup Node.js
+      - name: Setup workspace
         if: matrix.runtime == 'node' || matrix.runtime == 'bun'
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-          cache: 'pnpm'
+        uses: ./.github/actions/setup-node-workspace
 
       - name: Setup Bun
         if: matrix.runtime == 'bun'
         uses: oven-sh/setup-bun@v2
+
+      - name: Setup workspace (Deno)
+        if: matrix.runtime == 'deno'
+        uses: ./.github/actions/setup-node-workspace
 
       - name: Setup Deno
         if: matrix.runtime == 'deno'
         uses: denoland/setup-deno@v2
         with:
           deno-version: v2.x
-
-      - name: Install Dependencies
-        run: pnpm install --frozen-lockfile
 
       - name: Build Rust CLI
         run: cargo build --release --package html-to-markdown-cli

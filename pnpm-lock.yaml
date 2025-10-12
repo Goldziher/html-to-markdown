@@ -35,12 +35,19 @@ importers:
       typanion:
         specifier: 3.14.0
         version: 3.14.0
+      up:
+        specifier: ^1.0.2
+        version: 1.0.2
     devDependencies:
       '@napi-rs/cli':
         specifier: ^3.3.1
         version: 3.3.1(@emnapi/runtime@1.5.0)(@types/node@24.7.2)
 
   crates/html-to-markdown-wasm:
+    dependencies:
+      up:
+        specifier: ^1.0.2
+        version: 1.0.2
     devDependencies:
       wasm-pack:
         specifier: ^0.13.1
@@ -54,6 +61,9 @@ importers:
       '@html-to-markdown/wasm':
         specifier: workspace:*
         version: link:../../crates/html-to-markdown-wasm
+      up:
+        specifier: ^1.0.2
+        version: 1.0.2
     devDependencies:
       '@types/node':
         specifier: ^24.7.2
@@ -1567,6 +1577,9 @@ packages:
   universal-user-agent@7.0.3:
     resolution: {integrity: sha512-TmnEAEAsBJVZM/AADELsK76llnwcf9vMKuPz8JflO1frO8Lchitr0fNaN9d+Ap0BjKtqWqd/J17qeDnXh8CL2A==}
 
+  up@1.0.2:
+    resolution: {integrity: sha512-PKVGUj7i1qMWSR83H3PZpw1h+21wAr1qxqF/8zgTVHS+sHTsu1zvepQDoDJN0Kv49quNJwWgAKDAK2xPy7jocg==}
+
   vite-node@3.2.4:
     resolution: {integrity: sha512-EbKSKh+bh1E1IFxeO0pg1n4dvoOTt0UDiXMd/qn++r98+jPO1xtJilvXldeuQ8giIB5IkpjCgMleHMNEsGH6pg==}
     engines: {node: ^18.0.0 || ^20.0.0 || >=22.0.0}
@@ -2943,6 +2956,8 @@ snapshots:
   undici-types@7.14.0: {}
 
   universal-user-agent@7.0.3: {}
+
+  up@1.0.2: {}
 
   vite-node@3.2.4(@types/node@24.7.2)(tsx@4.20.6):
     dependencies:

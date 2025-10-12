@@ -69,6 +69,7 @@
     "@emnapi/runtime": "1.5.0",
     "@octokit/core": "7.0.5",
     "@types/node": "24.7.2",
-    "typanion": "3.14.0"
+    "typanion": "3.14.0",
+    "up": "^1.0.2"
   }
 }
