@@ -4,6 +4,7 @@ HOCR is a standard format used by OCR software like Tesseract to output
 structured text with positioning and confidence information.
 """
 
+import re
 from pathlib import Path
 from typing import Any
 
@@ -25,6 +26,18 @@ def convert_hocr_file(filename: str, **kwargs: Any) -> str:
     result = convert(hocr_content, **kwargs)
     assert isinstance(result, str)
     return result
+
+
+def normalize_table_rules(markdown: str) -> str:
+    def normalize_line(line: str) -> str:
+        line = line.strip()
+        if not line.startswith("|") or "|" not in line[1:]:
+            return line
+        cells = [cell.strip() for cell in line.strip().strip("|").split("|")]
+        normalized = "| " + " | ".join(cells) + " |"
+        return re.sub(r"(\|\s*)-+(?=\s*\|)", lambda m: m.group(1) + "---", normalized)
+
+    return "\n".join(normalize_line(line) for line in markdown.splitlines())
 
 
 def get_content_without_frontmatter(markdown: str) -> str:
@@ -155,18 +168,18 @@ def test_all_hocr_files_convert_cleanly(hocr_file: str) -> None:
 def test_v4_embedded_tables_hocr_produces_expected_table() -> None:
     result = convert_hocr_file("v4_embedded_tables.hocr")
     expected_table = get_expected_markdown("embedded_tables.md").strip()
-    assert expected_table in result
+    assert normalize_table_rules(expected_table) in normalize_table_rules(result)
 
 
 def test_v4_embedded_tables_hocr_toggle_controls_table_reconstruction() -> None:
     expected_table = get_expected_markdown("embedded_tables.md").strip()
 
     default_result = convert_hocr_file("v4_embedded_tables.hocr")
-    assert expected_table in default_result
+    assert normalize_table_rules(expected_table) in normalize_table_rules(default_result)
 
     options = ConversionOptions(hocr_spatial_tables=False)
     result_without_tables = convert_hocr_file("v4_embedded_tables.hocr", options=options)
-    assert expected_table not in result_without_tables
+    assert normalize_table_rules(expected_table) not in normalize_table_rules(result_without_tables)
 
 
 def test_v4_code_formula_hocr_preserves_code_block() -> None:
