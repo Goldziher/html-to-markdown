@@ -4,15 +4,40 @@ HOCR is a standard format used by OCR software like Tesseract to output
 structured text with positioning and confidence information.
 """
 
+import re
 from pathlib import Path
+from typing import Any
 
 import pytest
 
-from html_to_markdown import convert
+from html_to_markdown import ConversionOptions, convert
 
 
 def get_hocr_file(filename: str) -> Path:
     return Path(__file__).parent / "test_data" / "hocr" / filename
+
+
+def get_expected_markdown(filename: str) -> str:
+    return (Path(__file__).parent / "test_data" / "hocr_expected" / filename).read_text(encoding="utf-8")
+
+
+def convert_hocr_file(filename: str, **kwargs: Any) -> str:
+    hocr_content = get_hocr_file(filename).read_text(encoding="utf-8")
+    result = convert(hocr_content, **kwargs)
+    assert isinstance(result, str)
+    return result
+
+
+def normalize_table_rules(markdown: str) -> str:
+    def normalize_line(line: str) -> str:
+        line = line.strip()
+        if not line.startswith("|") or "|" not in line[1:]:
+            return line
+        cells = [cell.strip() for cell in line.strip().strip("|").split("|")]
+        normalized = "| " + " | ".join(cells) + " |"
+        return re.sub(r"(\|\s*)-+(?=\s*\|)", lambda m: m.group(1) + "---", normalized)
+
+    return "\n".join(normalize_line(line) for line in markdown.splitlines())
 
 
 def get_content_without_frontmatter(markdown: str) -> str:
@@ -25,7 +50,8 @@ def get_content_without_frontmatter(markdown: str) -> str:
 def test_german_pdf_hocr_conversion() -> None:
     hocr_content = get_hocr_file("german_pdf_german.hocr").read_text(encoding="utf-8")
 
-    result = convert(hocr_content)
+    options = ConversionOptions(hocr_spatial_tables=False)
+    result = convert(hocr_content, options)
 
     assert "<!--" not in result, "Result should not contain HTML comments"
     assert "meta-content-type" not in result, "Result should not contain meta tags"
@@ -49,7 +75,8 @@ def test_german_pdf_hocr_conversion() -> None:
 def test_english_pdf_hocr_conversion() -> None:
     hocr_content = get_hocr_file("english_pdf_default.hocr").read_text(encoding="utf-8")
 
-    result = convert(hocr_content)
+    options = ConversionOptions(hocr_spatial_tables=False)
+    result = convert(hocr_content, options)
 
     assert "<!--" not in result, "Result should not contain HTML comments"
     assert "meta-ocr-system" not in result, "Result should not contain OCR system info"
@@ -60,7 +87,8 @@ def test_english_pdf_hocr_conversion() -> None:
 def test_invoice_hocr_conversion() -> None:
     hocr_content = get_hocr_file("invoice_image_default.hocr").read_text(encoding="utf-8")
 
-    result = convert(hocr_content)
+    options = ConversionOptions(hocr_spatial_tables=False)
+    result = convert(hocr_content, options)
     content = get_content_without_frontmatter(result)
 
     assert "<!--" not in result, "Result should not contain HTML comments"
@@ -73,7 +101,8 @@ def test_invoice_hocr_conversion() -> None:
 def test_hocr_with_confidence_and_coordinates() -> None:
     hocr_content = get_hocr_file("german_pdf_german.hocr").read_text(encoding="utf-8")
 
-    result = convert(hocr_content)
+    options = ConversionOptions(hocr_spatial_tables=False)
+    result = convert(hocr_content, options)
     content = get_content_without_frontmatter(result)
 
     assert "x_wconf" not in content, "Content should not contain confidence scores"
@@ -136,12 +165,36 @@ def test_all_hocr_files_convert_cleanly(hocr_file: str) -> None:
     assert "ocr_" not in content, "Content should not contain HOCR class names"
 
 
+def test_v4_embedded_tables_hocr_produces_expected_table() -> None:
+    result = convert_hocr_file("v4_embedded_tables.hocr")
+    expected_table = get_expected_markdown("embedded_tables.md").strip()
+    assert normalize_table_rules(expected_table) in normalize_table_rules(result)
+
+
+def test_v4_embedded_tables_hocr_toggle_controls_table_reconstruction() -> None:
+    expected_table = get_expected_markdown("embedded_tables.md").strip()
+
+    default_result = convert_hocr_file("v4_embedded_tables.hocr")
+    assert normalize_table_rules(expected_table) in normalize_table_rules(default_result)
+
+    options = ConversionOptions(hocr_spatial_tables=False)
+    result_without_tables = convert_hocr_file("v4_embedded_tables.hocr", options=options)
+    assert normalize_table_rules(expected_table) not in normalize_table_rules(result_without_tables)
+
+
+def test_v4_code_formula_hocr_preserves_code_block() -> None:
+    result = convert_hocr_file("v4_code_formula.hocr")
+    expected_code = get_expected_markdown("code_formula.md").strip()
+    assert expected_code in result
+
+
 def test_multilingual_hocr_conversion() -> None:
     hocr_content = (Path(__file__).parent / "test_data" / "hocr" / "comprehensive" / "valid_file.hocr").read_text(
         encoding="utf-8"
     )
 
-    result = convert(hocr_content)
+    options = ConversionOptions(hocr_spatial_tables=False)
+    result = convert(hocr_content, options)
     content = get_content_without_frontmatter(result)
 
     assert "<!--" not in result, "Should not contain HTML comments"
