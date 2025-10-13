@@ -715,7 +715,14 @@ fn collect_code_block(children: &[&HocrElement]) -> Option<(Vec<String>, usize, 
         lines.pop();
     }
 
-    if lines.is_empty() {
+    let meaningful_lines: Vec<&String> = lines.iter().filter(|line| !line.trim().is_empty()).collect();
+    let meaningful_count = meaningful_lines.len();
+    if meaningful_count < 3 {
+        return None;
+    }
+
+    let bullet_like = meaningful_lines.iter().filter(|line| is_bullet_like(line)).count();
+    if bullet_like * 2 >= meaningful_count {
         return None;
     }
 
@@ -804,12 +811,46 @@ fn collect_line_words(element: &HocrElement, words: &mut Vec<String>) {
     }
 }
 
+fn is_bullet_like(line: &str) -> bool {
+    let trimmed = line.trim_start();
+    if trimmed.is_empty() {
+        return false;
+    }
+
+    if trimmed.starts_with("- ") || trimmed.starts_with("* ") || trimmed.starts_with("+ ") || trimmed.starts_with("•")
+    {
+        return true;
+    }
+
+    let mut chars = trimmed.chars().peekable();
+    let mut digit_count = 0;
+    while let Some(&ch) = chars.peek() {
+        if ch.is_ascii_digit() {
+            digit_count += 1;
+            chars.next();
+            continue;
+        }
+        break;
+    }
+
+    if digit_count > 0 {
+        if let Some(&ch) = chars.peek() {
+            if (ch == '.' || ch == ')') && chars.clone().nth(1).map(|c| c.is_whitespace()).unwrap_or(false) {
+                return true;
+            }
+        }
+    }
+
+    false
+}
+
 fn is_code_paragraph(lines: &[CodeLineInfo]) -> bool {
     if lines.is_empty() {
         return false;
     }
 
     let mut strong_markers = 0;
+    let mut moderate_markers = 0;
     let mut total = 0;
 
     for info in lines {
@@ -817,29 +858,74 @@ fn is_code_paragraph(lines: &[CodeLineInfo]) -> bool {
         if text.is_empty() {
             continue;
         }
+
+        if is_bullet_like(&info.text) {
+            return false;
+        }
+
         total += 1;
         let lower = text.to_lowercase();
-        if lower.contains("function")
+
+        let has_keyword = lower.contains("function")
             || lower.contains("console.")
-            || lower.contains("return")
-            || lower.contains("var ")
-            || lower.contains("let ")
-            || lower.contains("const ")
-            || lower.contains("async ")
+            || lower.starts_with("return")
+            || lower.starts_with("var ")
+            || lower.starts_with("let ")
+            || lower.starts_with("const ")
+            || lower.starts_with("async ")
+            || lower.starts_with("await ")
             || lower.starts_with("if ")
+            || lower.starts_with("elif ")
+            || lower.starts_with("else if ")
             || lower.starts_with("for ")
             || lower.starts_with("while ")
-            || text.contains('{')
+            || lower.starts_with("switch ")
+            || lower.starts_with("case ")
+            || lower.starts_with("class ")
+            || lower.starts_with("struct ")
+            || lower.starts_with("enum ")
+            || lower.starts_with("def ")
+            || lower.starts_with("fn ")
+            || lower.starts_with("pub ")
+            || lower.starts_with("import ")
+            || lower.starts_with("from ")
+            || lower.starts_with("using ")
+            || lower.starts_with("namespace ");
+
+        let has_symbol = text.contains('{')
             || text.contains('}')
             || text.contains(';')
-            || text.contains("=>")
-            || text.contains('=')
-        {
+            || text.contains("::")
+            || text.contains("->")
+            || text.contains("=>");
+
+        if has_keyword || has_symbol {
             strong_markers += 1;
+            continue;
+        }
+
+        let trimmed = text.trim_start();
+        let starts_with_indent = trimmed.len() + 2 <= text.len();
+        let has_assignment = text.contains(" = ")
+            || text.contains("+=")
+            || text.contains("-=")
+            || text.contains("*=")
+            || text.contains("/=")
+            || text.contains(" := ")
+            || text.contains(" == ");
+
+        if has_assignment || starts_with_indent {
+            moderate_markers += 1;
         }
     }
 
-    strong_markers > 0 && strong_markers * 2 >= total
+    if total == 0 {
+        return false;
+    }
+    if strong_markers * 2 >= total {
+        return true;
+    }
+    strong_markers > 0 && (strong_markers + moderate_markers) * 2 >= total
 }
 
 fn normalize_code_line(text: &str) -> String {

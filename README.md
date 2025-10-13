@@ -12,13 +12,12 @@ High-performance HTML → Markdown conversion powered by Rust. Shipping as a Rus
 ## Documentation
 
 - **JavaScript/TypeScript guides**:
-    - Node.js/Bun (native) – [crates/html-to-markdown-node/README.md](crates/html-to-markdown-node/README.md)
-    - WebAssembly (universal) – [crates/html-to-markdown-wasm/README.md](crates/html-to-markdown-wasm/README.md)
-- **Python guide** – [README_PYPI.md](README_PYPI.md)
-- **Rust guide** – [crates/html-to-markdown/README.md](crates/html-to-markdown/README.md)
-- **Repository structure** – [STRUCTURE.md](STRUCTURE.md)
-- **Contributing** – [CONTRIBUTING.md](CONTRIBUTING.md) ⭐ Start here!
-- **Changelog** – [CHANGELOG.md](CHANGELOG.md)
+    - Node.js/Bun (native) – [Node.js README](https://github.com/Goldziher/html-to-markdown/tree/main/crates/html-to-markdown-node)
+    - WebAssembly (universal) – [WASM README](https://github.com/Goldziher/html-to-markdown/tree/main/crates/html-to-markdown-wasm)
+- **Python guide** – [Python README](https://github.com/Goldziher/html-to-markdown/blob/main/README_PYPI.md)
+- **Rust guide** – [Rust README](https://github.com/Goldziher/html-to-markdown/tree/main/crates/html-to-markdown)
+- **Contributing** – [CONTRIBUTING.md](https://github.com/Goldziher/html-to-markdown/blob/main/CONTRIBUTING.md) ⭐ Start here!
+- **Changelog** – [CHANGELOG.md](https://github.com/Goldziher/html-to-markdown/blob/main/CHANGELOG.md)
 
 ## Installation
 
@@ -66,8 +65,8 @@ const markdown = convert(html, {
 
 See the JavaScript guides for full API documentation:
 
-- [Node.js/Bun guide](crates/html-to-markdown-node/README.md)
-- [WebAssembly guide](crates/html-to-markdown-wasm/README.md)
+- [Node.js/Bun guide](https://github.com/Goldziher/html-to-markdown/tree/main/crates/html-to-markdown-node)
+- [WebAssembly guide](https://github.com/Goldziher/html-to-markdown/tree/main/crates/html-to-markdown-wasm)
 
 ### CLI
 
@@ -150,8 +149,8 @@ Benchmarked on Apple M4 with complex real-world documents (Wikipedia articles, t
 ## Compatibility (v1 → v2)
 
 - V2’s Rust core sustains **150–210 MB/s** throughput; V1 averaged **≈ 2.5 MB/s** in its Python/BeautifulSoup implementation (60–80× faster).
-- The Python package offers a compatibility shim in `html_to_markdown.v1_compat` (`convert_to_markdown`, `convert_to_markdown_stream`, `markdownify`). Details and keyword mappings live in [README_PYPI.md](README_PYPI.md#v1-compatibility).
-- CLI flag changes, option renames, and other breaking updates are summarised in [CHANGELOG.md](CHANGELOG.md#breaking-changes).
+- The Python package offers a compatibility shim in `html_to_markdown.v1_compat` (`convert_to_markdown`, `convert_to_markdown_stream`, `markdownify`). Details and keyword mappings live in [Python README](https://github.com/Goldziher/html-to-markdown/blob/main/README_PYPI.md#v1-compatibility).
+- CLI flag changes, option renames, and other breaking updates are summarised in [CHANGELOG](https://github.com/Goldziher/html-to-markdown/blob/main/CHANGELOG.md#breaking-changes).
 
 ## Community
 
