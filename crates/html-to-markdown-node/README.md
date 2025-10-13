@@ -4,7 +4,7 @@ Native Node.js and Bun bindings for html-to-markdown using NAPI-RS v3.
 
 High-performance HTML to Markdown conversion using native Rust code compiled to platform-specific binaries.
 
-[![npm version](https://badge.fury.io/js/%40html-to-markdown%2Fnode.svg)](https://www.npmjs.com/package/html-to-markdown-node)
+[![npm version](https://badge.fury.io/js/html-to-markdown-node.svg)](https://www.npmjs.com/package/html-to-markdown-node)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://github.com/Goldziher/html-to-markdown/blob/main/LICENSE)
 
 ## Performance
