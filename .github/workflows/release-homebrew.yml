@@ -157,6 +157,28 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y musl-tools
 
+      - name: Configure cross-compilation linkers
+        if: matrix.settings.os == 'ubuntu-latest'
+        run: |
+          mkdir -p .cargo
+          cat > .cargo/config.toml << 'EOF'
+          [target.aarch64-unknown-linux-gnu]
+          linker = "aarch64-linux-gnu-gcc"
+
+          [target.armv7-unknown-linux-gnueabihf]
+          linker = "arm-linux-gnueabihf-gcc"
+
+          [target.aarch64-unknown-linux-musl]
+          linker = "aarch64-linux-musl-gcc"
+          EOF
+
+      - name: Install musl cross-compiler (aarch64)
+        if: matrix.settings.target == 'aarch64-unknown-linux-musl'
+        run: |
+          wget https://musl.cc/aarch64-linux-musl-cross.tgz
+          tar -xzf aarch64-linux-musl-cross.tgz
+          echo "$PWD/aarch64-linux-musl-cross/bin" >> $GITHUB_PATH
+
       - name: Cache cargo
         uses: actions/cache@v4
         with:
