@@ -1,10 +1,10 @@
-# @html-to-markdown/node
+# html-to-markdown-node
 
 Native Node.js and Bun bindings for html-to-markdown using NAPI-RS v3.
 
 High-performance HTML to Markdown conversion using native Rust code compiled to platform-specific binaries.
 
-[![npm version](https://badge.fury.io/js/%40html-to-markdown%2Fnode.svg)](https://www.npmjs.com/package/@html-to-markdown/node)
+[![npm version](https://badge.fury.io/js/%40html-to-markdown%2Fnode.svg)](https://www.npmjs.com/package/html-to-markdown-node)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://github.com/Goldziher/html-to-markdown/blob/main/LICENSE)
 
 ## Performance
@@ -36,17 +36,17 @@ Native NAPI-RS bindings deliver **the fastest HTML to Markdown conversion** avai
 ### Node.js
 
 ```bash
-npm install @html-to-markdown/node
+npm install html-to-markdown-node
 # or
-yarn add @html-to-markdown/node
+yarn add html-to-markdown-node
 # or
-pnpm add @html-to-markdown/node
+pnpm add html-to-markdown-node
 ```
 
 ### Bun
 
 ```bash
-bun add @html-to-markdown/node
+bun add html-to-markdown-node
 ```
 
 ## Usage
@@ -54,7 +54,7 @@ bun add @html-to-markdown/node
 ### Node.js (CommonJS)
 
 ```javascript
-const { convert } = require('@html-to-markdown/node');
+const { convert } = require('html-to-markdown-node');
 
 const html = '<h1>Hello World</h1><p>This is <strong>fast</strong>!</p>';
 const markdown = convert(html);
@@ -67,7 +67,7 @@ console.log(markdown);
 ### Node.js (ESM)
 
 ```javascript
-import { convert } from '@html-to-markdown/node';
+import { convert } from 'html-to-markdown-node';
 
 const markdown = convert('<h1>Hello</h1>', {
   headingStyle: 'Atx',
@@ -80,7 +80,7 @@ const markdown = convert('<h1>Hello</h1>', {
 ### Bun
 
 ```typescript
-import { convert } from '@html-to-markdown/node';
+import { convert } from 'html-to-markdown-node';
 
 const html = await Bun.file('input.html').text();
 const markdown = convert(html, {
@@ -97,7 +97,7 @@ await Bun.write('output.md', markdown);
 Full TypeScript definitions included:
 
 ```typescript
-import { convert, convertWithInlineImages, type JsConversionOptions } from '@html-to-markdown/node';
+import { convert, convertWithInlineImages, type JsConversionOptions } from 'html-to-markdown-node';
 
 const options: JsConversionOptions = {
   headingStyle: 'Atx',
@@ -116,7 +116,7 @@ const markdown = convert('<h1>Hello</h1>', options);
 Extract and decode inline images (data URIs, SVG):
 
 ```typescript
-import { convertWithInlineImages } from '@html-to-markdown/node';
+import { convertWithInlineImages } from 'html-to-markdown-node';
 
 const html = '<img src="data:image/png;base64,iVBORw0..." alt="Logo">';
 
@@ -151,17 +151,17 @@ Pre-built native binaries are provided for:
 
 ✅ **Node.js** 18+ (LTS)
 ✅ **Bun** 1.0+ (full NAPI-RS support)
-❌ **Deno** (use [@html-to-markdown/wasm](https://www.npmjs.com/package/@html-to-markdown/wasm) instead)
+❌ **Deno** (use [html-to-markdown-wasm](https://www.npmjs.com/package/html-to-markdown-wasm) instead)
 
 ## When to Use
 
-Choose `@html-to-markdown/node` when:
+Choose `html-to-markdown-node` when:
 
 - ✅ Running in Node.js or Bun
 - ✅ Maximum performance is required
 - ✅ Server-side conversion at scale
 
-Use [`@html-to-markdown/wasm`](https://www.npmjs.com/package/@html-to-markdown/wasm) for:
+Use [`html-to-markdown-wasm`](https://www.npmjs.com/package/html-to-markdown-wasm) for:
 
 - 🌐 Browser/client-side conversion
 - 🦕 Deno runtime
@@ -185,7 +185,7 @@ See [ConversionOptions](https://github.com/Goldziher/html-to-markdown/tree/main/
 ### Web Scraping
 
 ```javascript
-const { convert } = require('@html-to-markdown/node');
+const { convert } = require('html-to-markdown-node');
 
 const scrapedHtml = await fetch('https://example.com').then(r => r.text());
 
@@ -204,7 +204,7 @@ const markdown = convert(scrapedHtml, {
 ### hOCR Document Processing
 
 ```javascript
-const { convert } = require('@html-to-markdown/node');
+const { convert } = require('html-to-markdown-node');
 const fs = require('fs');
 
 // OCR output from Tesseract in hOCR format
@@ -220,7 +220,7 @@ const markdown = convert(hocrHtml, {
 
 - [GitHub Repository](https://github.com/Goldziher/html-to-markdown)
 - [Full Documentation](https://github.com/Goldziher/html-to-markdown/blob/main/README.md)
-- [WASM Package](https://www.npmjs.com/package/@html-to-markdown/wasm)
+- [WASM Package](https://www.npmjs.com/package/html-to-markdown-wasm)
 - [Python Package](https://pypi.org/project/html-to-markdown/)
 - [Rust Crate](https://crates.io/crates/html-to-markdown-rs)
 

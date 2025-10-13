@@ -844,6 +844,22 @@ fn is_bullet_like(line: &str) -> bool {
     false
 }
 
+fn contains_keyword_token(text: &str, keyword: &str) -> bool {
+    text.split(|ch: char| !(ch.is_ascii_alphanumeric() || ch == '_'))
+        .any(|token| token == keyword)
+}
+
+fn starts_with_keyword(line: &str, keyword: &str) -> bool {
+    if !line.starts_with(keyword) {
+        return false;
+    }
+    let next = line.chars().nth(keyword.len());
+    match next {
+        None => true,
+        Some(ch) => ch.is_whitespace() || matches!(ch, '(' | ':' | '{' | '['),
+    }
+}
+
 fn is_code_paragraph(lines: &[CodeLineInfo]) -> bool {
     if lines.is_empty() {
         return false;
@@ -865,39 +881,58 @@ fn is_code_paragraph(lines: &[CodeLineInfo]) -> bool {
 
         total += 1;
         let lower = text.to_lowercase();
+        let trimmed_lower = lower.trim_start();
 
-        let has_keyword = lower.contains("function")
+        let documentation_tokens = [
+            "definition",
+            "theorem",
+            "lemma",
+            "proof",
+            "corollary",
+            "algorithm",
+            "figure",
+            "table",
+            "appendix",
+        ];
+        if documentation_tokens
+            .iter()
+            .any(|token| contains_keyword_token(&lower, token))
+        {
+            return false;
+        }
+
+        let has_keyword = (contains_keyword_token(&lower, "function") && text.contains('('))
             || lower.contains("console.")
-            || lower.starts_with("return")
-            || lower.starts_with("var ")
-            || lower.starts_with("let ")
-            || lower.starts_with("const ")
-            || lower.starts_with("async ")
-            || lower.starts_with("await ")
-            || lower.starts_with("if ")
-            || lower.starts_with("elif ")
-            || lower.starts_with("else if ")
-            || lower.starts_with("for ")
-            || lower.starts_with("while ")
-            || lower.starts_with("switch ")
-            || lower.starts_with("case ")
-            || lower.starts_with("class ")
-            || lower.starts_with("struct ")
-            || lower.starts_with("enum ")
-            || lower.starts_with("def ")
-            || lower.starts_with("fn ")
-            || lower.starts_with("pub ")
-            || lower.starts_with("import ")
-            || lower.starts_with("from ")
-            || lower.starts_with("using ")
-            || lower.starts_with("namespace ");
+            || contains_keyword_token(&lower, "return")
+            || (starts_with_keyword(trimmed_lower, "var") && text.contains('='))
+            || (starts_with_keyword(trimmed_lower, "let") && text.contains('='))
+            || (starts_with_keyword(trimmed_lower, "const") && text.contains('='))
+            || starts_with_keyword(trimmed_lower, "async")
+            || starts_with_keyword(trimmed_lower, "await")
+            || starts_with_keyword(trimmed_lower, "class")
+            || starts_with_keyword(trimmed_lower, "struct")
+            || starts_with_keyword(trimmed_lower, "enum")
+            || starts_with_keyword(trimmed_lower, "def")
+            || starts_with_keyword(trimmed_lower, "fn")
+            || starts_with_keyword(trimmed_lower, "pub")
+            || starts_with_keyword(trimmed_lower, "import")
+            || starts_with_keyword(trimmed_lower, "using")
+            || starts_with_keyword(trimmed_lower, "namespace")
+            || starts_with_keyword(trimmed_lower, "public")
+            || starts_with_keyword(trimmed_lower, "private")
+            || starts_with_keyword(trimmed_lower, "protected")
+            || starts_with_keyword(trimmed_lower, "static")
+            || starts_with_keyword(trimmed_lower, "void")
+            || starts_with_keyword(trimmed_lower, "try")
+            || starts_with_keyword(trimmed_lower, "catch")
+            || starts_with_keyword(trimmed_lower, "finally")
+            || starts_with_keyword(trimmed_lower, "throw")
+            || starts_with_keyword(trimmed_lower, "typedef")
+            || starts_with_keyword(trimmed_lower, "package")
+            || starts_with_keyword(trimmed_lower, "module")
+            || contains_keyword_token(&lower, "lambda");
 
-        let has_symbol = text.contains('{')
-            || text.contains('}')
-            || text.contains(';')
-            || text.contains("::")
-            || text.contains("->")
-            || text.contains("=>");
+        let has_symbol = text.contains(';') || text.contains("::");
 
         if has_keyword || has_symbol {
             strong_markers += 1;
@@ -905,7 +940,16 @@ fn is_code_paragraph(lines: &[CodeLineInfo]) -> bool {
         }
 
         let trimmed = text.trim_start();
-        let starts_with_indent = trimmed.len() + 2 <= text.len();
+        let has_shell_prompt = trimmed.starts_with('$')
+            || trimmed.starts_with('#')
+            || trimmed.contains("]#")
+            || trimmed.starts_with("sudo ")
+            || trimmed.starts_with("./");
+
+        if has_shell_prompt {
+            strong_markers += 1;
+            continue;
+        }
         let has_assignment = text.contains(" = ")
             || text.contains("+=")
             || text.contains("-=")
@@ -914,7 +958,12 @@ fn is_code_paragraph(lines: &[CodeLineInfo]) -> bool {
             || text.contains(" := ")
             || text.contains(" == ");
 
-        if has_assignment || starts_with_indent {
+        let has_arrow = text.contains("=>");
+        let has_brace = text.contains('{') || text.contains('}');
+        let has_pointer_arrow = text.contains("->");
+
+        let is_moderate = has_assignment || has_arrow || has_brace || has_pointer_arrow;
+        if is_moderate {
             moderate_markers += 1;
         }
     }
@@ -922,10 +971,13 @@ fn is_code_paragraph(lines: &[CodeLineInfo]) -> bool {
     if total == 0 {
         return false;
     }
+    if strong_markers == 0 {
+        return false;
+    }
     if strong_markers * 2 >= total {
         return true;
     }
-    strong_markers > 0 && (strong_markers + moderate_markers) * 2 >= total
+    (strong_markers + moderate_markers) * 2 >= total
 }
 
 fn normalize_code_line(text: &str) -> String {
