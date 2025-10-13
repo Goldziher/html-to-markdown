@@ -39,10 +39,13 @@ repos:
         additional_dependencies:
           - black==25.1.0
   - repo: https://github.com/biomejs/pre-commit
-    rev: "v0.4.0"
+    rev: v2.2.5
     hooks:
       - id: biome-check
-        additional_dependencies: ["@biomejs/biome@2.2.5"]
+  - repo: https://github.com/oxc-project/mirrors-oxlint
+    rev: "v1.22.0"
+    hooks:
+      - id: oxlint
   - repo: https://github.com/tox-dev/pyproject-fmt
     rev: "v2.10.0"
     hooks:
@@ -87,7 +90,7 @@ repos:
         pass_filenames: false
       - id: mypy-py-bindings
         name: mypy (python bindings)
-        entry: uv run mypy crates/html-to-markdown-py/python/html_to_markdown
+        entry: uv run mypy crates/html-to-markdown-py/python/html_to_markdown/__init__.py crates/html-to-markdown-py/python/html_to_markdown/_html_to_markdown.pyi
         require_serial: true
         language: system
         pass_filenames: false

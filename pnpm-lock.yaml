@@ -42,6 +42,12 @@ importers:
       '@types/node':
         specifier: ^24.7.2
         version: 24.7.2
+      tinybench:
+        specifier: ^5.0.1
+        version: 5.0.1
+      tsx:
+        specifier: ^4.20.6
+        version: 4.20.6
       vitest:
         specifier: ^3.0.0
         version: 3.2.4(@types/node@24.7.2)(@vitest/ui@3.2.4)(tsx@4.20.6)
@@ -55,6 +61,12 @@ importers:
       '@types/node':
         specifier: ^24.7.2
         version: 24.7.2
+      tinybench:
+        specifier: ^5.0.1
+        version: 5.0.1
+      tsx:
+        specifier: ^4.20.6
+        version: 4.20.6
       vitest:
         specifier: ^3.0.0
         version: 3.2.4(@types/node@24.7.2)(@vitest/ui@3.2.4)(tsx@4.20.6)
@@ -1276,6 +1288,10 @@ packages:
   tinybench@2.9.0:
     resolution: {integrity: sha512-0+DUvqWMValLmha6lr4kD8iAMK1HzV0/aKnCtWb9v9641TnP/MFb7Pc2bxoxQjTXAErryXVgUOfv2YqNllqGeg==}
 
+  tinybench@5.0.1:
+    resolution: {integrity: sha512-aNVgWQZY4veCZLQJRftDA1X9OoLUIjDWNfC90nledkX7Lx205IpSEFYnsu4slyofoPGpJ+NIQj+BNSt4U5edMg==}
+    engines: {node: '>=20.0.0'}
+
   tinyexec@0.3.2:
     resolution: {integrity: sha512-KQQR9yN7R5+OSwaK0XQoj22pwHoTlgYqmUscPYoknOoWCWfj/5/ABTMRi69FrKU5ffPVh5QcFikpWJI/P1ocHA==}
 
@@ -2264,7 +2280,6 @@ snapshots:
   get-tsconfig@4.12.0:
     dependencies:
       resolve-pkg-maps: 1.0.0
-    optional: true
 
   glob@7.2.3:
     dependencies:
@@ -2346,8 +2361,7 @@ snapshots:
       picocolors: 1.1.1
       source-map-js: 1.2.1
 
-  resolve-pkg-maps@1.0.0:
-    optional: true
+  resolve-pkg-maps@1.0.0: {}
 
   rimraf@3.0.2:
     dependencies:
@@ -2427,6 +2441,8 @@ snapshots:
 
   tinybench@2.9.0: {}
 
+  tinybench@5.0.1: {}
+
   tinyexec@0.3.2: {}
 
   tinyglobby@0.2.15:
@@ -2451,7 +2467,6 @@ snapshots:
       get-tsconfig: 4.12.0
     optionalDependencies:
       fsevents: 2.3.3
-    optional: true
 
   typanion@3.14.0: {}
 

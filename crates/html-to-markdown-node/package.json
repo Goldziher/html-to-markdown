@@ -1,6 +1,6 @@
 {
   "name": "@html-to-markdown/node",
-  "version": "2.2.0",
+  "version": "2.3.0",
   "description": "High-performance HTML to Markdown converter - Node.js native bindings",
   "main": "index.js",
   "types": "index.d.ts",
@@ -47,6 +47,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:simple": "node test.js",
+    "bench": "tsx benchmark.ts",
     "universal": "napi universal",
     "version": "napi version",
     "clean": "rm -rf dist node_modules *.node"
@@ -54,6 +55,8 @@
   "devDependencies": {
     "@napi-rs/cli": "^3.3.1",
     "@types/node": "^24.7.2",
+    "tinybench": "^5.0.1",
+    "tsx": "^4.20.6",
     "vitest": "^3.0.0"
   },
   "dependencies": {

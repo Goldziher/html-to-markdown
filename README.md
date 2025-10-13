@@ -11,7 +11,9 @@ High-performance HTML → Markdown conversion powered by Rust. Shipping as a Rus
 
 ## Documentation
 
-- **JavaScript/TypeScript guide** – [packages/html-to-markdown/README.md](packages/html-to-markdown/README.md)
+- **JavaScript/TypeScript guides**:
+    - Node.js/Bun (native) – [crates/html-to-markdown-node/README.md](crates/html-to-markdown-node/README.md)
+    - WebAssembly (universal) – [crates/html-to-markdown-wasm/README.md](crates/html-to-markdown-wasm/README.md)
 - **Python guide** – [README_PYPI.md](README_PYPI.md)
 - **Rust guide** – [crates/html-to-markdown/README.md](crates/html-to-markdown/README.md)
 - **Repository structure** – [STRUCTURE.md](STRUCTURE.md)
@@ -22,9 +24,9 @@ High-performance HTML → Markdown conversion powered by Rust. Shipping as a Rus
 
 | Target                      | Command                                                                   |
 | --------------------------- | ------------------------------------------------------------------------- |
-| **JavaScript/TypeScript**   | `npm install html-to-markdown`                                            |
-| Node.js native (NAPI-RS)    | `npm install @html-to-markdown/node`                                      |
-| WebAssembly (browsers)      | `npm install @html-to-markdown/wasm`                                      |
+| **Node.js/Bun** (native)    | `npm install @html-to-markdown/node`                                      |
+| **WebAssembly** (universal) | `npm install @html-to-markdown/wasm`                                      |
+| **Deno**                    | `import { convert } from "npm:@html-to-markdown/wasm"`                    |
 | **Python** (bindings + CLI) | `pip install html-to-markdown`                                            |
 | **Rust** crate              | `cargo add html-to-markdown-rs`                                           |
 | Rust CLI                    | `cargo install html-to-markdown-cli`                                      |
@@ -35,23 +37,37 @@ High-performance HTML → Markdown conversion powered by Rust. Shipping as a Rus
 
 ### JavaScript/TypeScript
 
+**Node.js / Bun (Native - Fastest):**
+
 ```typescript
-import { convert } from 'html-to-markdown';
+import { convert } from '@html-to-markdown/node';
 
 const html = '<h1>Hello</h1><p>Rust ❤️ Markdown</p>';
-const markdown = await convert(html);
-
-// With options
-const markdown = await convert(html, {
+const markdown = convert(html, {
   headingStyle: 'Atx',
   codeBlockStyle: 'Backticks',
   wrap: true,
 });
 ```
 
-**Smart backend selection:** The package automatically uses native Node.js bindings (~691k ops/sec) when available, falling back to WebAssembly (~229k ops/sec) for universal compatibility.
+**Deno / Browsers / Edge (Universal):**
 
-See [packages/html-to-markdown/README.md](packages/html-to-markdown/README.md) for full TypeScript API.
+```typescript
+import { convert } from "npm:@html-to-markdown/wasm"; // Deno
+// or: import { convert } from '@html-to-markdown/wasm'; // Bundlers
+
+const markdown = convert(html, {
+  headingStyle: 'atx',
+  listIndentWidth: 2,
+});
+```
+
+**Performance:** Native bindings average ~19k ops/sec, WASM averages ~16k ops/sec (benchmarked on complex real-world documents).
+
+See the JavaScript guides for full API documentation:
+
+- [Node.js/Bun guide](crates/html-to-markdown-node/README.md)
+- [WebAssembly guide](crates/html-to-markdown-wasm/README.md)
 
 ### CLI
 
@@ -99,16 +115,37 @@ See the language-specific READMEs for complete configuration, hOCR workflows, an
 
 ## Performance
 
-Comparative throughput for typical workloads:
+Benchmarked on Apple M4 with complex real-world documents (Wikipedia articles, tables, lists):
 
-| Implementation         | Operations/sec | Relative Speed |
-| ---------------------- | -------------- | -------------- |
-| **Native Node (NAPI)** | ~691,000       | **1.0×**       |
-| Rust Binary/Python     | ~500-600,000   | 0.8×           |
-| **WebAssembly**        | ~229,000       | 0.33×          |
-| Pure JavaScript        | ~276,000       | 0.40×          |
+### Operations per Second (higher is better)
 
-The Rust core delivers **16-19× performance** improvements over pure Python/JS implementations, with native bindings offering maximum throughput.
+| Document Type              | Node.js (NAPI) | WASM   | Python (PyO3) | Speedup (Node vs Python) |
+| -------------------------- | -------------- | ------ | ------------- | ------------------------ |
+| **Small (5 paragraphs)**   | 86,233         | 70,300 | 8,443         | **10.2×**                |
+| **Medium (25 paragraphs)** | 18,979         | 15,282 | 1,846         | **10.3×**                |
+| **Large (100 paragraphs)** | 4,907          | 3,836  | 438           | **11.2×**                |
+| **Tables (complex)**       | 5,003          | 3,748  | 4,829         | 1.0×                     |
+| **Lists (nested)**         | 1,819          | 1,391  | 1,165         | **1.6×**                 |
+| **Wikipedia (129KB)**      | 1,125          | 1,022  | -             | -                        |
+| **Wikipedia (653KB)**      | 156            | 147    | -             | -                        |
+
+### Average Performance Summary
+
+| Implementation        | Avg ops/sec      | vs WASM      | vs Python       | Best For                          |
+| --------------------- | ---------------- | ------------ | --------------- | --------------------------------- |
+| **Node.js (NAPI-RS)** | **18,162**       | 1.17× faster | **7.4× faster** | Maximum throughput in Node.js/Bun |
+| **WebAssembly**       | **15,536**       | baseline     | **6.3× faster** | Universal (Deno, browsers, edge)  |
+| **Python (PyO3)**     | **2,465**        | 6.3× slower  | baseline        | Python ecosystem integration      |
+| **Rust CLI/Binary**   | **150-210 MB/s** | -            | -               | Standalone processing             |
+
+### Key Insights
+
+- **JavaScript bindings are fastest**: Native Node.js bindings achieve ~18k ops/sec average, with WASM close behind at ~16k ops/sec
+- **Python is 6-10× slower**: Despite using the same Rust core, PyO3 FFI overhead significantly impacts Python performance
+- **Small documents**: Both JS implementations reach 70-90k ops/sec on simple HTML
+- **Large documents**: Performance gap widens with complexity
+
+**Note on Python performance**: The current Python bindings have optimization opportunities. The v2 API with direct `convert()` calls performs best; avoid the v1 compatibility layer for performance-critical applications.
 
 ## Compatibility (v1 → v2)
 
