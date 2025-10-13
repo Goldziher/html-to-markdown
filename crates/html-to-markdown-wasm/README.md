@@ -4,7 +4,7 @@ Universal HTML to Markdown converter using WebAssembly.
 
 Runs anywhere: Node.js, Deno, Bun, browsers, and edge runtimes.
 
-[![npm version](https://badge.fury.io/js/%40html-to-markdown%2Fwasm.svg)](https://www.npmjs.com/package/html-to-markdown-wasm)
+[![npm version](https://badge.fury.io/js/html-to-markdown-wasm.svg)](https://www.npmjs.com/package/html-to-markdown-wasm)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://github.com/Goldziher/html-to-markdown/blob/main/LICENSE)
 
 ## Performance

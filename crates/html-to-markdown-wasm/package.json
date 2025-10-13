@@ -1,6 +1,6 @@
 {
   "name": "html-to-markdown-wasm",
-  "version": "2.3.1",
+  "version": "2.3.2",
   "description": "High-performance HTML to Markdown converter - WebAssembly bindings",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",

@@ -662,6 +662,10 @@ fn collect_code_block(children: &[&HocrElement]) -> Option<(Vec<String>, usize, 
         return None;
     }
 
+    if !is_confident_code_block(&collected) {
+        return None;
+    }
+
     // Determine base indentation metrics
     let mut x_values: Vec<u32> = collected
         .iter()
@@ -849,6 +853,22 @@ fn contains_keyword_token(text: &str, keyword: &str) -> bool {
         .any(|token| token == keyword)
 }
 
+fn is_shell_prompt(text: &str) -> bool {
+    let trimmed = text.trim_start();
+    if trimmed.is_empty() {
+        return false;
+    }
+
+    trimmed.starts_with('$')
+        || trimmed.starts_with('#')
+        || trimmed.contains("]#")
+        || trimmed.starts_with("sudo ")
+        || trimmed.starts_with("./")
+        || trimmed.starts_with("python ")
+        || trimmed.starts_with("pip ")
+        || trimmed.starts_with("uv ")
+}
+
 fn starts_with_keyword(line: &str, keyword: &str) -> bool {
     if !line.starts_with(keyword) {
         return false;
@@ -939,14 +959,7 @@ fn is_code_paragraph(lines: &[CodeLineInfo]) -> bool {
             continue;
         }
 
-        let trimmed = text.trim_start();
-        let has_shell_prompt = trimmed.starts_with('$')
-            || trimmed.starts_with('#')
-            || trimmed.contains("]#")
-            || trimmed.starts_with("sudo ")
-            || trimmed.starts_with("./");
-
-        if has_shell_prompt {
+        if is_shell_prompt(text) {
             strong_markers += 1;
             continue;
         }
@@ -962,8 +975,7 @@ fn is_code_paragraph(lines: &[CodeLineInfo]) -> bool {
         let has_brace = text.contains('{') || text.contains('}');
         let has_pointer_arrow = text.contains("->");
 
-        let is_moderate = has_assignment || has_arrow || has_brace || has_pointer_arrow;
-        if is_moderate {
+        if has_assignment || has_arrow || has_brace || has_pointer_arrow {
             moderate_markers += 1;
         }
     }
@@ -1030,6 +1042,116 @@ fn normalize_code_line(text: &str) -> String {
         final_line = final_line.replace("  ", " ");
     }
     final_line.trim().to_string()
+}
+
+fn is_confident_code_block(lines: &[CodeLineInfo]) -> bool {
+    let mut total = 0;
+    let mut keyword_lines = 0;
+    let mut punctuation_lines = 0;
+    let mut assignment_lines = 0;
+    let mut shell_lines = 0;
+    let mut indent_lines = 0;
+
+    let min_x = lines.iter().map(|info| info.x1).min().unwrap_or_default();
+
+    for info in lines {
+        let text = info.text.trim();
+        if text.is_empty() {
+            continue;
+        }
+        total += 1;
+
+        if is_shell_prompt(text) {
+            shell_lines += 1;
+        }
+
+        let lower = text.to_lowercase();
+        let trimmed_lower = lower.trim_start();
+
+        if (contains_keyword_token(&lower, "function") && text.contains('('))
+            || lower.contains("console.")
+            || contains_keyword_token(&lower, "return")
+            || (starts_with_keyword(trimmed_lower, "var") && text.contains('='))
+            || (starts_with_keyword(trimmed_lower, "let") && text.contains('='))
+            || (starts_with_keyword(trimmed_lower, "const") && text.contains('='))
+            || starts_with_keyword(trimmed_lower, "async")
+            || starts_with_keyword(trimmed_lower, "await")
+            || starts_with_keyword(trimmed_lower, "class")
+            || starts_with_keyword(trimmed_lower, "struct")
+            || starts_with_keyword(trimmed_lower, "enum")
+            || starts_with_keyword(trimmed_lower, "def")
+            || starts_with_keyword(trimmed_lower, "fn")
+            || starts_with_keyword(trimmed_lower, "pub")
+            || starts_with_keyword(trimmed_lower, "import")
+            || starts_with_keyword(trimmed_lower, "using")
+            || starts_with_keyword(trimmed_lower, "namespace")
+            || starts_with_keyword(trimmed_lower, "public")
+            || starts_with_keyword(trimmed_lower, "private")
+            || starts_with_keyword(trimmed_lower, "protected")
+            || starts_with_keyword(trimmed_lower, "static")
+            || starts_with_keyword(trimmed_lower, "void")
+            || starts_with_keyword(trimmed_lower, "try")
+            || starts_with_keyword(trimmed_lower, "catch")
+            || starts_with_keyword(trimmed_lower, "finally")
+            || starts_with_keyword(trimmed_lower, "throw")
+            || starts_with_keyword(trimmed_lower, "typedef")
+            || starts_with_keyword(trimmed_lower, "package")
+            || starts_with_keyword(trimmed_lower, "module")
+            || contains_keyword_token(&lower, "lambda")
+        {
+            keyword_lines += 1;
+        }
+
+        if text.contains(';')
+            || text.contains('{')
+            || text.contains('}')
+            || text.contains("::")
+            || text.contains("->")
+            || text.contains("=>")
+        {
+            punctuation_lines += 1;
+        }
+
+        if text.contains(" = ")
+            || text.contains("+=")
+            || text.contains("-=")
+            || text.contains("*=")
+            || text.contains("/=")
+            || text.contains(" := ")
+            || text.contains(" == ")
+        {
+            assignment_lines += 1;
+        }
+
+        if info.x1 > min_x + 8 {
+            indent_lines += 1;
+        }
+    }
+
+    if total < 3 {
+        return false;
+    }
+
+    if shell_lines >= 2 && shell_lines * 2 >= total {
+        return true;
+    }
+
+    let strong = keyword_lines + punctuation_lines + assignment_lines;
+    let strong_ratio = strong as f32 / total as f32;
+
+    if strong >= 3 && strong_ratio >= 0.85 {
+        return true;
+    }
+
+    if keyword_lines >= 2 && assignment_lines >= 1 && strong_ratio >= 0.7 {
+        return true;
+    }
+
+    if indent_lines == total && strong_ratio >= 0.6 && strong >= 2 {
+        return true;
+    }
+
+    false
 }
 
 fn detect_code_language(lines: &[String]) -> Option<&'static str> {
