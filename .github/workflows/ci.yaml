@@ -20,6 +20,8 @@ jobs:
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
     timeout-minutes: 20
+    env:
+      RUSTFLAGS: -D warnings -A unsafe_op_in_unsafe_fn -A unexpected_cfgs
     steps:
       - name: Checkout
         uses: actions/checkout@v5
@@ -103,6 +105,8 @@ jobs:
   coverage:
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    env:
+      RUSTFLAGS: -D warnings -A unsafe_op_in_unsafe_fn -A unexpected_cfgs
     steps:
       - name: Checkout
         uses: actions/checkout@v5
