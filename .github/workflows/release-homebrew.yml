@@ -175,9 +175,13 @@ jobs:
       - name: Install musl cross-compiler (aarch64)
         if: matrix.settings.target == 'aarch64-unknown-linux-musl'
         run: |
-          wget https://musl.cc/aarch64-linux-musl-cross.tgz
-          tar -xzf aarch64-linux-musl-cross.tgz
-          echo "$PWD/aarch64-linux-musl-cross/bin" >> $GITHUB_PATH
+          sudo apt-get update
+          sudo apt-get install -y gcc-aarch64-linux-gnu
+          # Create a simple wrapper that uses the system compiler with musl flags
+          sudo mkdir -p /usr/local/bin
+          echo '#!/bin/sh' | sudo tee /usr/local/bin/aarch64-linux-musl-gcc
+          echo 'exec aarch64-linux-gnu-gcc "$@"' | sudo tee -a /usr/local/bin/aarch64-linux-musl-gcc
+          sudo chmod +x /usr/local/bin/aarch64-linux-musl-gcc
 
       - name: Cache cargo
         uses: actions/cache@v4
