@@ -19,7 +19,7 @@ const loadTestDoc = (path: string): string => {
   return readFileSync(fullPath, "utf-8");
 };
 
-describe("@html-to-markdown/node - NAPI-RS Bindings", () => {
+describe("html-to-markdown-node - NAPI-RS Bindings", () => {
   describe("Basic Conversion", () => {
     it("should convert simple HTML to markdown", () => {
       const html = "<h1>Hello World</h1>";

@@ -1,5 +1,5 @@
 {
-  "name": "@html-to-markdown/wasm",
+  "name": "html-to-markdown-wasm",
   "version": "2.3.0",
   "description": "High-performance HTML to Markdown converter - WebAssembly bindings",
   "main": "dist/index.js",
@@ -19,9 +19,9 @@
     "README.md"
   ],
   "scripts": {
-    "build": "wasm-pack build --target bundler --out-dir dist --scope html-to-markdown",
-    "build:nodejs": "wasm-pack build --target nodejs --out-dir dist-node --scope html-to-markdown",
-    "build:web": "wasm-pack build --target web --out-dir dist-web --scope html-to-markdown",
+    "build": "wasm-pack build --target bundler --out-dir dist",
+    "build:nodejs": "wasm-pack build --target nodejs --out-dir dist-node",
+    "build:web": "wasm-pack build --target web --out-dir dist-web",
     "build:all": "pnpm run build && pnpm run build:nodejs && pnpm run build:web",
     "test": "vitest run",
     "test:watch": "vitest",

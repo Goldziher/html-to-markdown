@@ -10,7 +10,7 @@ function assert(condition, message) {
   }
 }
 
-console.log("Testing @html-to-markdown/node...\n");
+console.log("Testing html-to-markdown-node...\n");
 
 // Test 1: Basic conversion
 console.log("Test 1: Basic conversion");

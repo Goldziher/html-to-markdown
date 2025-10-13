@@ -1,10 +1,10 @@
-# @html-to-markdown/wasm
+# html-to-markdown-wasm
 
 Universal HTML to Markdown converter using WebAssembly.
 
 Runs anywhere: Node.js, Deno, Bun, browsers, and edge runtimes.
 
-[![npm version](https://badge.fury.io/js/%40html-to-markdown%2Fwasm.svg)](https://www.npmjs.com/package/@html-to-markdown/wasm)
+[![npm version](https://badge.fury.io/js/%40html-to-markdown%2Fwasm.svg)](https://www.npmjs.com/package/html-to-markdown-wasm)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://github.com/Goldziher/html-to-markdown/blob/main/LICENSE)
 
 ## Performance
@@ -36,18 +36,18 @@ Universal WebAssembly bindings with **excellent performance** across all JavaScr
 ### npm / Yarn / pnpm
 
 ```bash
-npm install @html-to-markdown/wasm
+npm install html-to-markdown-wasm
 # or
-yarn add @html-to-markdown/wasm
+yarn add html-to-markdown-wasm
 # or
-pnpm add @html-to-markdown/wasm
+pnpm add html-to-markdown-wasm
 ```
 
 ### Deno
 
 ```typescript
 // Via npm specifier
-import { convert } from "npm:@html-to-markdown/wasm";
+import { convert } from "npm:html-to-markdown-wasm";
 ```
 
 ## Usage
@@ -56,7 +56,7 @@ import { convert } from "npm:@html-to-markdown/wasm";
 
 ```javascript
 // CommonJS
-const { convert } = require('@html-to-markdown/wasm/dist-node');
+const { convert } = require('html-to-markdown-wasm/dist-node');
 
 const markdown = convert('<h1>Hello World</h1>');
 console.log(markdown);
@@ -64,7 +64,7 @@ console.log(markdown);
 
 ```javascript
 // ESM
-import { convert } from '@html-to-markdown/wasm/dist-node';
+import { convert } from 'html-to-markdown-wasm/dist-node';
 
 const html = '<h1>Hello</h1><p>World</p>';
 const markdown = convert(html, {
@@ -76,7 +76,7 @@ const markdown = convert(html, {
 ### Deno
 
 ```typescript
-import { convert } from "npm:@html-to-markdown/wasm";
+import { convert } from "npm:html-to-markdown-wasm";
 
 const html = await Deno.readTextFile("input.html");
 
@@ -92,7 +92,7 @@ await Deno.writeTextFile("output.md", markdown);
 ### Bun
 
 ```typescript
-import { convert } from '@html-to-markdown/wasm';
+import { convert } from 'html-to-markdown-wasm';
 
 const markdown = convert('<h1>Fast conversion</h1>', {
   headingStyle: 'atx',
@@ -101,7 +101,7 @@ const markdown = convert('<h1>Fast conversion</h1>', {
 });
 ```
 
-> **Note:** For Bun, consider using [@html-to-markdown/node](https://www.npmjs.com/package/@html-to-markdown/node) for ~3× better performance with native bindings.
+> **Note:** For Bun, consider using [html-to-markdown-node](https://www.npmjs.com/package/html-to-markdown-node) for ~3× better performance with native bindings.
 
 ### Browser (ESM)
 
@@ -113,7 +113,7 @@ const markdown = convert('<h1>Fast conversion</h1>', {
 </head>
 <body>
   <script type="module">
-    import init, { convert } from 'https://unpkg.com/@html-to-markdown/wasm/dist-web/html_to_markdown_wasm.js';
+    import init, { convert } from 'https://unpkg.com/html-to-markdown-wasm/dist-web/html_to_markdown_wasm.js';
 
     // Initialize WASM module
     await init();
@@ -131,7 +131,7 @@ const markdown = convert('<h1>Fast conversion</h1>', {
 ### Vite / Webpack / Bundlers
 
 ```typescript
-import { convert } from '@html-to-markdown/wasm';
+import { convert } from 'html-to-markdown-wasm';
 
 const markdown = convert('<h1>Hello</h1>', {
   headingStyle: 'atx',
@@ -142,7 +142,7 @@ const markdown = convert('<h1>Hello</h1>', {
 ### Cloudflare Workers
 
 ```typescript
-import { convert } from '@html-to-markdown/wasm';
+import { convert } from 'html-to-markdown-wasm';
 
 export default {
   async fetch(request: Request): Promise<Response> {
@@ -166,7 +166,7 @@ import {
   convertWithInlineImages,
   WasmInlineImageConfig,
   type WasmConversionOptions
-} from '@html-to-markdown/wasm';
+} from 'html-to-markdown-wasm';
 
 const options: WasmConversionOptions = {
   headingStyle: 'atx',
@@ -184,7 +184,7 @@ const markdown = convert('<h1>Hello</h1>', options);
 Extract and decode inline images (data URIs, SVG):
 
 ```typescript
-import { convertWithInlineImages, WasmInlineImageConfig } from '@html-to-markdown/wasm';
+import { convertWithInlineImages, WasmInlineImageConfig } from 'html-to-markdown-wasm';
 
 const html = '<img src="data:image/png;base64,iVBORw0..." alt="Logo">';
 
@@ -208,11 +208,11 @@ for (const img of result.inlineImages) {
 
 Three build targets are provided for different environments:
 
-| Target      | Path                               | Use Case                       |
-| ----------- | ---------------------------------- | ------------------------------ |
-| **Bundler** | `@html-to-markdown/wasm`           | Webpack, Vite, Rollup, esbuild |
-| **Node.js** | `@html-to-markdown/wasm/dist-node` | Node.js, Bun (CommonJS/ESM)    |
-| **Web**     | `@html-to-markdown/wasm/dist-web`  | Direct browser ESM imports     |
+| Target      | Path                              | Use Case                       |
+| ----------- | --------------------------------- | ------------------------------ |
+| **Bundler** | `html-to-markdown-wasm`           | Webpack, Vite, Rollup, esbuild |
+| **Node.js** | `html-to-markdown-wasm/dist-node` | Node.js, Bun (CommonJS/ESM)    |
+| **Web**     | `html-to-markdown-wasm/dist-web`  | Direct browser ESM imports     |
 
 ## Runtime Compatibility
 
@@ -227,7 +227,7 @@ Three build targets are provided for different environments:
 
 ## When to Use
 
-Choose `@html-to-markdown/wasm` when:
+Choose `html-to-markdown-wasm` when:
 
 - 🌐 Running in browsers or edge runtimes
 - 🦕 Using Deno
@@ -235,7 +235,7 @@ Choose `@html-to-markdown/wasm` when:
 - 📦 Building universal libraries
 - 🔄 Need consistent behavior across all platforms
 
-Use [@html-to-markdown/node](https://www.npmjs.com/package/@html-to-markdown/node) for:
+Use [html-to-markdown-node](https://www.npmjs.com/package/html-to-markdown-node) for:
 
 - ⚡ Maximum performance in Node.js/Bun (~3× faster)
 - 🖥️ Server-side only applications
@@ -257,7 +257,7 @@ See the [TypeScript definitions](./dist-node/html_to_markdown_wasm.d.ts) for all
 ### Deno Web Server
 
 ```typescript
-import { convert } from "npm:@html-to-markdown/wasm";
+import { convert } from "npm:html-to-markdown-wasm";
 
 Deno.serve((req) => {
   const url = new URL(req.url);
@@ -283,7 +283,7 @@ Deno.serve((req) => {
 <pre id="output"></pre>
 
 <script type="module">
-  import init, { convert } from 'https://unpkg.com/@html-to-markdown/wasm/dist-web/html_to_markdown_wasm.js';
+  import init, { convert } from 'https://unpkg.com/html-to-markdown-wasm/dist-web/html_to_markdown_wasm.js';
 
   await init();
 
@@ -299,7 +299,7 @@ Deno.serve((req) => {
 ### Web Scraping (Deno)
 
 ```typescript
-import { convert } from "npm:@html-to-markdown/wasm";
+import { convert } from "npm:html-to-markdown-wasm";
 
 const response = await fetch("https://example.com");
 const html = await response.text();
@@ -322,7 +322,7 @@ console.log(markdown);
 
 - [GitHub Repository](https://github.com/Goldziher/html-to-markdown)
 - [Full Documentation](https://github.com/Goldziher/html-to-markdown/blob/main/README.md)
-- [Native Node Package](https://www.npmjs.com/package/@html-to-markdown/node)
+- [Native Node Package](https://www.npmjs.com/package/html-to-markdown-node)
 - [Python Package](https://pypi.org/project/html-to-markdown/)
 - [Rust Crate](https://crates.io/crates/html-to-markdown-rs)
 

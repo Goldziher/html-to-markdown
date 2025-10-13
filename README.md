@@ -23,9 +23,9 @@ High-performance HTML → Markdown conversion powered by Rust. Shipping as a Rus
 
 | Target                      | Command                                                                   |
 | --------------------------- | ------------------------------------------------------------------------- |
-| **Node.js/Bun** (native)    | `npm install @html-to-markdown/node`                                      |
-| **WebAssembly** (universal) | `npm install @html-to-markdown/wasm`                                      |
-| **Deno**                    | `import { convert } from "npm:@html-to-markdown/wasm"`                    |
+| **Node.js/Bun** (native)    | `npm install html-to-markdown-node`                                       |
+| **WebAssembly** (universal) | `npm install html-to-markdown-wasm`                                       |
+| **Deno**                    | `import { convert } from "npm:html-to-markdown-wasm"`                     |
 | **Python** (bindings + CLI) | `pip install html-to-markdown`                                            |
 | **Rust** crate              | `cargo add html-to-markdown-rs`                                           |
 | Rust CLI                    | `cargo install html-to-markdown-cli`                                      |
@@ -39,7 +39,7 @@ High-performance HTML → Markdown conversion powered by Rust. Shipping as a Rus
 **Node.js / Bun (Native - Fastest):**
 
 ```typescript
-import { convert } from '@html-to-markdown/node';
+import { convert } from 'html-to-markdown-node';
 
 const html = '<h1>Hello</h1><p>Rust ❤️ Markdown</p>';
 const markdown = convert(html, {
@@ -52,8 +52,8 @@ const markdown = convert(html, {
 **Deno / Browsers / Edge (Universal):**
 
 ```typescript
-import { convert } from "npm:@html-to-markdown/wasm"; // Deno
-// or: import { convert } from '@html-to-markdown/wasm'; // Bundlers
+import { convert } from "npm:html-to-markdown-wasm"; // Deno
+// or: import { convert } from 'html-to-markdown-wasm'; // Bundlers
 
 const markdown = convert(html, {
   headingStyle: 'atx',

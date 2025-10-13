@@ -299,12 +299,12 @@ jobs:
 
           ### Node.js / Bun
           ```bash
-          npm install @html-to-markdown/node
+          npm install html-to-markdown-node
           ```
 
           ### Deno / Browsers
           ```bash
-          npm install @html-to-markdown/wasm
+          npm install html-to-markdown-wasm
           ```
 
           ### Python (PyPI)
