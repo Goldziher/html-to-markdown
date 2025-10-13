@@ -81,6 +81,32 @@ tasks:
     cmds:
       - cargo build --release --package html-to-markdown-cli
 
+  build:node:
+    desc: "Build Node.js native bindings with NAPI-RS"
+    dir: crates/html-to-markdown-node
+    cmds:
+      - pnpm run build
+
+  build:wasm:
+    desc: "Build WebAssembly bindings with wasm-bindgen"
+    dir: crates/html-to-markdown-wasm
+    cmds:
+      - pnpm run build:all
+
+  build:ts:
+    desc: "Build TypeScript package (library + CLI)"
+    dir: packages/html-to-markdown-ts
+    cmds:
+      - pnpm run build
+      - pnpm run build:cli
+
+  build:js:
+    desc: "Build all JavaScript/TypeScript packages (node, wasm, ts)"
+    cmds:
+      - task: build:node
+      - task: build:wasm
+      - task: build:ts
+
   build:wheel-prep:
     desc: "Prepare CLI binary for wheel packaging"
     cmds:
@@ -112,6 +138,31 @@ tasks:
       - task: bench:rust
       - task: bench:python
 
+  test:node:
+    desc: "Test Node.js bindings"
+    dir: crates/html-to-markdown-node
+    cmds:
+      - pnpm test
+
+  test:wasm:
+    desc: "Test WebAssembly bindings"
+    dir: crates/html-to-markdown-wasm
+    cmds:
+      - pnpm test
+
+  test:ts:
+    desc: "Test TypeScript package"
+    dir: packages/html-to-markdown-ts
+    cmds:
+      - pnpm test
+
+  test:js:
+    desc: "Test all JavaScript/TypeScript packages"
+    cmds:
+      - task: test:node
+      - task: test:wasm
+      - task: test:ts
+
   clean:
     desc: "Clean build artifacts"
     cmds:
@@ -121,6 +172,8 @@ tasks:
       - rm -rf htmlcov/
       - find . -type d -name "__pycache__" -exec rm -rf {} +
       - find . -type f -name "*.pyc" -delete
+      - find crates packages -type d -name "dist" -exec rm -rf {} + 2>/dev/null || true
+      - find crates packages -type d -name "node_modules" -exec rm -rf {} + 2>/dev/null || true
 
   default:
     desc: "Show available tasks"

@@ -3,11 +3,13 @@ resolver = "2"
 members = [
     "crates/html-to-markdown",
     "crates/html-to-markdown-cli",
+    "crates/html-to-markdown-node",
+    "crates/html-to-markdown-wasm",
     "crates/html-to-markdown-py",
 ]
 
 [workspace.package]
-version = "2.2.0"
+version = "2.3.0"
 edition = "2021"
 authors = ["Na'aman Hirschfeld <nhirschfeld@gmail.com>"]
 license = "MIT"
@@ -19,7 +21,7 @@ rust-version = "1.80"
 
 [workspace.dependencies]
 # Core library
-html-to-markdown-rs = { version = "2.2.0", path = "crates/html-to-markdown" }
+html-to-markdown-rs = { version = "2.3.0", path = "crates/html-to-markdown" }
 
 # HTML parsing and sanitization
 tl = "0.7"

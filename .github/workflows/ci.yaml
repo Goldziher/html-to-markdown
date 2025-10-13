@@ -33,6 +33,7 @@ jobs:
         uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
           components: rustfmt, clippy, llvm-tools-preview
+          rustflags: ""
 
       - name: Run Rust Tests
         env:
@@ -121,6 +122,7 @@ jobs:
         uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
           components: rustfmt, clippy, llvm-tools-preview
+          rustflags: ""
 
       - name: Install Dependencies
         uses: nick-fields/retry@v3
@@ -203,3 +205,62 @@ jobs:
 
       - name: Test
         run: uv run pytest
+
+  node-bindings:
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup Rust
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+
+      - name: Setup workspace
+        uses: ./.github/actions/setup-node-workspace
+
+      - name: Build NAPI-RS Bindings
+        working-directory: crates/html-to-markdown-node
+        run: pnpm run build
+
+      - name: Test NAPI-RS Bindings
+        working-directory: crates/html-to-markdown-node
+        run: pnpm test
+
+      - name: Run Rust Tests
+        working-directory: crates/html-to-markdown-node
+        run: cargo test
+
+  wasm-bindings:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup Rust
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          target: wasm32-unknown-unknown
+
+      - name: Install wasm-pack
+        run: curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
+
+      - name: Setup workspace
+        uses: ./.github/actions/setup-node-workspace
+
+      - name: Build WASM (all targets)
+        working-directory: crates/html-to-markdown-wasm
+        run: pnpm run build:all
+
+      - name: Test WASM
+        working-directory: crates/html-to-markdown-wasm
+        run: pnpm test
+
+      - name: Run Rust Tests
+        working-directory: crates/html-to-markdown-wasm
+        run: cargo test

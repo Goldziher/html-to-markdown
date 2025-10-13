@@ -1,0 +1,25 @@
+[package]
+name = "html-to-markdown-node"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+documentation.workspace = true
+readme.workspace = true
+rust-version.workspace = true
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+html-to-markdown-rs = { workspace = true, features = ["inline-images"] }
+napi = { version = "3.3", default-features = false, features = ["napi8"] }
+napi-derive = "3.2"
+
+[target.'cfg(all(any(windows, unix), target_arch = "x86_64", not(target_env = "musl")))'.dependencies]
+mimalloc-rust = "0.2"
+
+[build-dependencies]
+napi-build = "2.2"

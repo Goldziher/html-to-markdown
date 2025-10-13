@@ -7,7 +7,7 @@ requires = [
 
 [project]
 name = "html-to-markdown"
-version = "2.2.0"
+version = "2.3.0"
 description = "High-performance HTML to Markdown converter powered by Rust with a clean Python API"
 readme = "README_PYPI.md"
 keywords = [
@@ -117,7 +117,7 @@ lint.per-file-ignores."scripts/*.py" = [ "INP001", "S607", "T201" ]
 lint.per-file-ignores."tests/**/*.*" = [ "ARG", "D", "PD", "PT006", "PT013", "S" ]
 lint.per-file-ignores."tests/benchmark_*_test.py" = [ "T201" ]
 lint.isort.known-first-party = [ "html_to_markdown", "tests" ]
-lint.pydocstyle.convention = "google"
+lint.pydocstyle.convention = "pep257"
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
@@ -140,14 +140,19 @@ fail_under = 0
 show_missing = true
 
 [tool.mypy]
-packages = [ "html_to_markdown", "tests" ]
 python_version = "3.10"
 strict = true
 implicit_reexport = false
 show_error_codes = true
 warn_return_any = true
 warn_unused_configs = true
-exclude = [ "crates/", "scripts/" ]
+exclude = [
+  "^crates/",
+  "^scripts/",
+  "^node_modules/",
+  "^dist/",
+  "^target/",
+]
 
 [[tool.mypy.overrides]]
 module = "tests.*"

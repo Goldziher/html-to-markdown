@@ -1,0 +1,68 @@
+{
+  "name": "@html-to-markdown/node",
+  "version": "2.3.0",
+  "description": "High-performance HTML to Markdown converter - Node.js native bindings",
+  "main": "index.js",
+  "types": "index.d.ts",
+  "repository": "https://github.com/Goldziher/html-to-markdown",
+  "license": "MIT",
+  "keywords": [
+    "html",
+    "markdown",
+    "converter",
+    "rust",
+    "napi",
+    "native"
+  ],
+  "files": [
+    "index.js",
+    "index.d.ts"
+  ],
+  "napi": {
+    "binaryName": "html-to-markdown-node",
+    "targets": [
+      "x86_64-apple-darwin",
+      "aarch64-apple-darwin",
+      "x86_64-pc-windows-msvc",
+      "aarch64-pc-windows-msvc",
+      "x86_64-unknown-linux-gnu",
+      "x86_64-unknown-linux-musl",
+      "aarch64-unknown-linux-gnu",
+      "aarch64-unknown-linux-musl",
+      "armv7-unknown-linux-gnueabihf"
+    ]
+  },
+  "engines": {
+    "node": ">= 10"
+  },
+  "publishConfig": {
+    "registry": "https://registry.npmjs.org/",
+    "access": "public"
+  },
+  "scripts": {
+    "artifacts": "napi artifacts",
+    "build": "napi build --platform --release",
+    "build:debug": "napi build --platform",
+    "prepublishOnly": "napi prepublish -t npm",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:simple": "node test.js",
+    "bench": "tsx benchmark.ts",
+    "universal": "napi universal",
+    "version": "napi version",
+    "clean": "rm -rf dist node_modules *.node"
+  },
+  "devDependencies": {
+    "@napi-rs/cli": "^3.3.1",
+    "@types/node": "^24.7.2",
+    "tinybench": "^5.0.1",
+    "tsx": "^4.20.6",
+    "vitest": "^3.0.0"
+  },
+  "dependencies": {
+    "@emnapi/runtime": "1.5.0",
+    "@octokit/core": "7.0.5",
+    "typanion": "3.14.0",
+    "up": "^1.0.2"
+  }
+}

@@ -38,11 +38,14 @@ repos:
         args: ["--pyi", "--line-length", "130"]
         additional_dependencies:
           - black==25.1.0
-  - repo: https://github.com/rbubley/mirrors-prettier
-    rev: "v3.6.2"
+  - repo: https://github.com/biomejs/pre-commit
+    rev: v2.2.5
     hooks:
-      - id: prettier
-        exclude: ^tests|^.idea|^migrations|^.git|README.md|^docs|CHANGELOG.md|CONTRIBUTING.md
+      - id: biome-check
+  - repo: https://github.com/oxc-project/mirrors-oxlint
+    rev: "v1.22.0"
+    hooks:
+      - id: oxlint
   - repo: https://github.com/tox-dev/pyproject-fmt
     rev: "v2.10.0"
     hooks:
@@ -57,7 +60,7 @@ repos:
     rev: v2.4.1
     hooks:
       - id: codespell
-        exclude: ^tests|^scripts|^kreuzberg/_tesseract|^kreuzberg/_mime_types
+        exclude: ^tests|^scripts|^test_documents|^kreuzberg/_tesseract|^kreuzberg/_mime_types|pnpm-lock\.yaml
         additional_dependencies:
           - tomli
   - repo: https://github.com/jsh9/pydoclint
@@ -80,9 +83,15 @@ repos:
   - repo: local
     hooks:
       - id: mypy
-        name: mypy
-        entry: uv run mypy
+        name: mypy (root package)
+        entry: uv run mypy html_to_markdown tests
         require_serial: true
         language: system
-        types: [python]
-        exclude: ^crates/|^scripts/
+        pass_filenames: false
+      - id: mypy-py-bindings
+        name: mypy (python bindings)
+        entry: uv run mypy crates/html-to-markdown-py/python/html_to_markdown/__init__.py crates/html-to-markdown-py/python/html_to_markdown/_html_to_markdown.pyi
+        require_serial: true
+        language: system
+        pass_filenames: false
+        files: ^crates/html-to-markdown-py/python/
