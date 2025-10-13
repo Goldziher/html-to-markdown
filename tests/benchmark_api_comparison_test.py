@@ -27,7 +27,7 @@ try:
 except ImportError:
     from tests.performance_test import generate_complex_html
 
-BENCHMARK_DIR = Path(__file__).parent / "benchmark_documents" / "wikipedia"
+BENCHMARK_DIR = Path(__file__).parent.parent / "test_documents" / "html" / "wikipedia"
 
 
 def _load_wikipedia_doc(filename: str) -> str:

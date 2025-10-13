@@ -97,7 +97,7 @@ def translate_v1_args_to_v2(argv: list[str]) -> list[str]:
 
 
 def main(argv: list[str]) -> str:
-    """Main entry point for the CLI proxy.
+    """Execute the CLI proxy.
 
     Translates v1 arguments to v2 and invokes the native Rust CLI binary.
 

@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "ai-rulez": {
+      "command": "ai-rulez",
+      "args": ["mcp"]
+    }
+  }
+}
