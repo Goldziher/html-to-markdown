@@ -27,17 +27,17 @@ impl WasmInlineImageConfig {
         }
     }
 
-    #[wasm_bindgen(setter)]
+    #[wasm_bindgen(setter, js_name = "filenamePrefix")]
     pub fn set_filename_prefix(&mut self, prefix: Option<String>) {
         self.filename_prefix = prefix;
     }
 
-    #[wasm_bindgen(setter)]
+    #[wasm_bindgen(setter, js_name = "captureSvg")]
     pub fn set_capture_svg(&mut self, capture: bool) {
         self.capture_svg = capture;
     }
 
-    #[wasm_bindgen(setter)]
+    #[wasm_bindgen(setter, js_name = "inferDimensions")]
     pub fn set_infer_dimensions(&mut self, infer: bool) {
         self.infer_dimensions = infer;
     }
@@ -163,7 +163,7 @@ impl WasmHtmlExtraction {
         self.markdown.clone()
     }
 
-    #[wasm_bindgen(getter)]
+    #[wasm_bindgen(getter, js_name = "inlineImages")]
     pub fn inline_images(&self) -> Vec<WasmInlineImage> {
         self.inline_images.clone()
     }

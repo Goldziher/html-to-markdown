@@ -5,7 +5,6 @@ import {
   convert,
   convertWithInlineImages,
   JsCodeBlockStyle,
-  type JsConversionOptions,
   JsHeadingStyle,
   JsHighlightStyle,
   JsListIndentType,

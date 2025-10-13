@@ -183,9 +183,112 @@ jobs:
           echo "Source distribution:"
           ls -1 dist/*.tar.gz
 
+  publish-npm-node:
+    name: Publish @html-to-markdown/node to npm
+    runs-on: ubuntu-latest
+    needs: publish-crates
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+        with:
+          ref: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.tag || '' }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Download NAPI artifacts from release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          tag="${{ github.event_name == 'workflow_dispatch' && github.event.inputs.tag || github.ref_name }}"
+
+          # Download all NAPI binaries from the release
+          cd crates/html-to-markdown-node
+          gh release download "$tag" --pattern "*.node" --dir . || echo "No .node files found in release"
+
+      - name: Install dependencies
+        working-directory: crates/html-to-markdown-node
+        run: pnpm install
+
+      - name: Publish to npm
+        if: ${{ !inputs.dry_run }}
+        working-directory: crates/html-to-markdown-node
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          echo "Publishing @html-to-markdown/node..."
+          pnpm publish --access public --no-git-checks
+
+      - name: Dry run - Skip npm publish
+        if: ${{ inputs.dry_run }}
+        run: |
+          echo "🔍 DRY RUN: Would publish @html-to-markdown/node to npm"
+          ls -la crates/html-to-markdown-node/*.node || echo "No .node files"
+
+  publish-npm-wasm:
+    name: Publish @html-to-markdown/wasm to npm
+    runs-on: ubuntu-latest
+    needs: publish-crates
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+        with:
+          ref: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.tag || '' }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+
+      - name: Install wasm-pack
+        run: curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
+
+      - name: Build WASM (all targets)
+        working-directory: crates/html-to-markdown-wasm
+        run: |
+          pnpm install
+          pnpm run build:all
+
+      - name: Publish to npm
+        if: ${{ !inputs.dry_run }}
+        working-directory: crates/html-to-markdown-wasm
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          echo "Publishing @html-to-markdown/wasm..."
+          pnpm publish --access public --no-git-checks
+
+      - name: Dry run - Skip npm publish
+        if: ${{ inputs.dry_run }}
+        run: |
+          echo "🔍 DRY RUN: Would publish @html-to-markdown/wasm to npm"
+          ls -la crates/html-to-markdown-wasm/dist/
+
   verify:
     name: Verify publications
-    needs: [publish-crates, publish-pypi]
+    needs: [publish-crates, publish-pypi, publish-npm-node, publish-npm-wasm]
     runs-on: ubuntu-latest
     if: ${{ !inputs.dry_run }}
     steps:
@@ -223,6 +326,25 @@ jobs:
             echo "⚠️  html-to-markdown-cli $version not yet indexed (may take a few minutes)"
           fi
 
+      - name: Verify npm publication
+        run: |
+          version="${{ steps.version.outputs.version }}"
+
+          echo "🔍 Checking @html-to-markdown/node on npm..."
+          sleep 30  # Give npm time to index
+          if npm view @html-to-markdown/node@$version version 2>/dev/null; then
+            echo "✅ @html-to-markdown/node $version found on npm"
+          else
+            echo "⚠️  @html-to-markdown/node $version not yet indexed (may take a few minutes)"
+          fi
+
+          echo "🔍 Checking @html-to-markdown/wasm on npm..."
+          if npm view @html-to-markdown/wasm@$version version 2>/dev/null; then
+            echo "✅ @html-to-markdown/wasm $version found on npm"
+          else
+            echo "⚠️  @html-to-markdown/wasm $version not yet indexed (may take a few minutes)"
+          fi
+
       - name: Display installation commands
         run: |
           version="${{ steps.version.outputs.version }}"
@@ -231,11 +353,15 @@ jobs:
           echo "✅ Published successfully!"
           echo ""
           echo "📦 Installation commands:"
-          echo "  Rust CLI:    cargo install html-to-markdown-cli --version $version"
+          echo "  Node.js/Bun: npm install @html-to-markdown/node@$version"
+          echo "  WASM:        npm install @html-to-markdown/wasm@$version"
           echo "  Python:      pip install html-to-markdown==$version"
+          echo "  Rust CLI:    cargo install html-to-markdown-cli --version $version"
           echo "  Homebrew:    brew tap goldziher/tap && brew install html-to-markdown"
           echo ""
           echo "🔗 Links:"
+          echo "  npm (node):       https://www.npmjs.com/package/@html-to-markdown/node/v/$version"
+          echo "  npm (wasm):       https://www.npmjs.com/package/@html-to-markdown/wasm/v/$version"
           echo "  Crates.io (lib):  https://crates.io/crates/html-to-markdown-rs/$version"
           echo "  Crates.io (CLI):  https://crates.io/crates/html-to-markdown-cli/$version"
           echo "  PyPI:             https://pypi.org/project/html-to-markdown/$version/"

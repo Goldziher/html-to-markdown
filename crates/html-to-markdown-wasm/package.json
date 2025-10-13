@@ -1,6 +1,6 @@
 {
   "name": "@html-to-markdown/wasm",
-  "version": "2.2.0",
+  "version": "2.3.0",
   "description": "High-performance HTML to Markdown converter - WebAssembly bindings",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -26,10 +26,13 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:wasm-pack": "wasm-pack test --headless --chrome",
+    "bench": "tsx benchmark.ts",
     "clean": "rm -rf dist dist-node dist-web node_modules pkg"
   },
   "devDependencies": {
     "@types/node": "^24.7.2",
+    "tinybench": "^5.0.1",
+    "tsx": "^4.20.6",
     "vitest": "^3.0.0",
     "wasm-pack": "^0.13.1"
   },

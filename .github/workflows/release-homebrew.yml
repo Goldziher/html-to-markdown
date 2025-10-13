@@ -85,9 +85,135 @@ jobs:
             html-to-markdown-${{ matrix.target }}.tar.gz
             html-to-markdown-${{ matrix.target }}.zip
 
+  build-napi:
+    name: Build NAPI-RS ${{ matrix.settings.target }}
+    runs-on: ${{ matrix.settings.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        settings:
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-musl
+          - os: ubuntu-latest
+            target: aarch64-unknown-linux-gnu
+          - os: ubuntu-latest
+            target: aarch64-unknown-linux-musl
+          - os: ubuntu-latest
+            target: armv7-unknown-linux-gnueabihf
+          - os: macos-latest
+            target: x86_64-apple-darwin
+          - os: macos-latest
+            target: aarch64-apple-darwin
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+          - os: windows-latest
+            target: aarch64-pc-windows-msvc
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.settings.target }}
+
+      - name: Install cross-compilation tools (Linux ARM)
+        if: matrix.settings.target == 'aarch64-unknown-linux-gnu'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc-aarch64-linux-gnu
+
+      - name: Install cross-compilation tools (Linux ARMv7)
+        if: matrix.settings.target == 'armv7-unknown-linux-gnueabihf'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc-arm-linux-gnueabihf
+
+      - name: Install cross-compilation tools (Linux musl)
+        if: contains(matrix.settings.target, 'musl')
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y musl-tools
+
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ matrix.settings.os }}-cargo-${{ matrix.settings.target }}-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Build NAPI-RS bindings
+        working-directory: crates/html-to-markdown-node
+        run: |
+          pnpm install
+          pnpm run build --target ${{ matrix.settings.target }}
+
+      - name: Upload NAPI artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: napi-${{ matrix.settings.target }}
+          path: crates/html-to-markdown-node/*.node
+          retention-days: 1
+
+  build-wasm:
+    name: Build WASM
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+
+      - name: Install wasm-pack
+        run: curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Build WASM (all targets)
+        working-directory: crates/html-to-markdown-wasm
+        run: |
+          pnpm install
+          pnpm run build:all
+
+      - name: Upload WASM artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: wasm-bindings
+          path: |
+            crates/html-to-markdown-wasm/dist/
+            crates/html-to-markdown-wasm/dist-node/
+            crates/html-to-markdown-wasm/dist-web/
+          retention-days: 1
+
   release:
     name: Create Release
-    needs: build
+    needs: [build, build-napi, build-wasm]
     runs-on: ubuntu-latest
     outputs:
       version: ${{ steps.version.outputs.version }}
@@ -129,6 +255,21 @@ jobs:
 
           ## Installation
 
+          ### Node.js / Bun
+          ```bash
+          npm install @html-to-markdown/node
+          ```
+
+          ### Deno / Browsers
+          ```bash
+          npm install @html-to-markdown/wasm
+          ```
+
+          ### Python (PyPI)
+          ```bash
+          pip install html-to-markdown
+          ```
+
           ### Homebrew
           ```bash
           brew tap goldziher/tap
@@ -140,19 +281,22 @@ jobs:
           cargo install html-to-markdown-cli
           ```
 
-          ### Python (PyPI)
-          ```bash
-          pip install html-to-markdown
-          ```
-
           ### Direct Download
           Download the appropriate binary for your platform below.
           EOF
           )"
 
-          # Upload binaries
+          # Upload CLI binaries
           for artifact in html-to-markdown-*/; do
             files=$(find "$artifact" -name "*.tar.gz" -o -name "*.zip")
+            for file in $files; do
+              gh release upload "$tag" "$file"
+            done
+          done
+
+          # Upload NAPI binaries
+          for artifact in napi-*/; do
+            files=$(find "$artifact" -name "*.node")
             for file in $files; do
               gh release upload "$tag" "$file"
             done
