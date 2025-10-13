@@ -117,7 +117,7 @@ lint.per-file-ignores."scripts/*.py" = [ "INP001", "S607", "T201" ]
 lint.per-file-ignores."tests/**/*.*" = [ "ARG", "D", "PD", "PT006", "PT013", "S" ]
 lint.per-file-ignores."tests/benchmark_*_test.py" = [ "T201" ]
 lint.isort.known-first-party = [ "html_to_markdown", "tests" ]
-lint.pydocstyle.convention = "google"
+lint.pydocstyle.convention = "pep257"
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"

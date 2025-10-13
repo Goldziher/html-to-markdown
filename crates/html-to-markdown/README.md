@@ -12,7 +12,7 @@ Fast, reliable HTML to Markdown conversion with full CommonMark compliance. Buil
 
 ```toml
 [dependencies]
-html-to-markdown-rs = "2.2"
+html-to-markdown-rs = "2.3"
 ```
 
 ## Basic Usage
