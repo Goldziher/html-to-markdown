@@ -291,12 +291,12 @@ All Python/Rust checks run automatically via prek on commit.
     ```toml
     # Cargo.toml
     [workspace.package]
-    version = "2.3.3"
+    version = "2.3.4"
     ```
 
     ```json
     // package.json files
-    "version": "2.3.3"
+    "version": "2.3.4"
     ```
 
 1. Update `CHANGELOG.md` with changes
@@ -315,15 +315,15 @@ All Python/Rust checks run automatically via prek on commit.
     pnpm run build     # All JS/TS packages
     ```
 
-1. Commit changes: `git commit -m "chore: bump version to 2.3.3"`
+1. Commit changes: `git commit -m "chore: bump version to 2.3.4"`
 
 ### Creating a Release
 
 1. **Create and push tag**:
 
     ```bash
-    git tag -a v2.3.3 -m "Release v2.3.3"
-    git push origin v2.1.1
+    git tag -a v2.3.4 -m "Release v2.3.4"
+    git push origin v2.3.4
     ```
 
 1. **Automated workflows trigger**:

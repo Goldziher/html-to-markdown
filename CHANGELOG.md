@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.3.4] - 2025-10-12
+
+### Changed
+
+- Incremented all distribution metadata and CLI version checks to 2.3.4 following the previous release tag conflict.
+- Regenerated package metadata artifacts for the new patch release.
+
 ## [2.3.3] - 2025-10-12
 
 ### Added

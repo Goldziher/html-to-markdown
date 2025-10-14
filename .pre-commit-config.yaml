@@ -25,6 +25,7 @@ repos:
     rev: 0.7.22
     hooks:
       - id: mdformat
+        exclude: ^test_documents/test_data/hocr_expected/
         additional_dependencies:
           - mdformat-mkdocs==4.0.0
   - repo: https://github.com/igorshubovych/markdownlint-cli
