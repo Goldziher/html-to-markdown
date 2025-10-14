@@ -15,7 +15,13 @@ V1 API (backward compatibility):
     markdown = convert_to_markdown(html, heading_style="atx")
 """
 
-from html_to_markdown.api import convert
+from html_to_markdown.api import (
+    InlineImage,
+    InlineImageConfig,
+    InlineImageWarning,
+    convert,
+    convert_with_inline_images,
+)
 from html_to_markdown.exceptions import (
     ConflictingOptionsError,
     EmptyHtmlError,
@@ -31,12 +37,16 @@ __all__ = [
     "ConversionOptions",
     "EmptyHtmlError",
     "HtmlToMarkdownError",
+    "InlineImage",
+    "InlineImageConfig",
+    "InlineImageWarning",
     "InvalidParserError",
     "MissingDependencyError",
     "PreprocessingOptions",
     "convert",
     "convert_to_markdown",
+    "convert_with_inline_images",
     "markdownify",
 ]
 
-__version__ = "2.3.0"
+__version__ = "2.3.3"

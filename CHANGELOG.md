@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.3.3] - 2025-10-12
+
+### Added
+
+- Python API now exports inline image helpers (`InlineImage`, `InlineImageWarning`, and `InlineImageConfig`) alongside `convert_with_inline_images`, with dedicated regression tests.
+- Node and WASM bindings include inline image extraction examples and TypeScript definitions, validated by Vitest coverage.
+
+### Changed
+
+- Bumped all package metadata (Python, Rust, Node, WASM, CLI) to version 2.3.3 for a synchronized release.
+
+### Fixed
+
+- CLI `--version` test updated to assert the new release number.
+
 ## [2.2.0] - 2025-10-11
 
 ### Added

@@ -30,6 +30,49 @@ def convert_hocr_file(filename: str, **kwargs: Any) -> str:
     return result
 
 
+MATH_PARAGRAPH_HOCR = """<?xml version="1.0" encoding="UTF-8"?>
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+  <body>
+    <div class='ocr_page' id='page_1'>
+      <div class='ocr_carea' id='block_1'>
+        <p class='ocr_par' id='par_1'>
+          <span class='ocrx_word' id='word_1'>Let</span>
+          <span class='ocrx_word' id='word_2'>f</span>
+          <span class='ocrx_word' id='word_3'>=</span>
+          <span class='ocrx_word' id='word_4'>∑</span>
+          <span class='ocrx_word' id='word_5'>_{i=1}^n</span>
+          <span class='ocrx_word' id='word_6'>a_i</span>
+          <span class='ocrx_word' id='word_7'>x_i</span>
+          <span class='ocrx_word' id='word_8'>and</span>
+          <span class='ocrx_word' id='word_9'>suppose</span>
+          <span class='ocrx_word' id='word_10'>that</span>
+          <span class='ocrx_word' id='word_11'>f</span>
+          <span class='ocrx_word' id='word_12'>(x)</span>
+          <span class='ocrx_word' id='word_13'>=</span>
+          <span class='ocrx_word' id='word_14'>0</span>
+          <span class='ocrx_word' id='word_15'>defines</span>
+          <span class='ocrx_word' id='word_16'>a</span>
+          <span class='ocrx_word' id='word_17'>hyperplane.</span>
+          <span class='ocrx_word' id='word_18'>We</span>
+          <span class='ocrx_word' id='word_19'>write</span>
+          <span class='ocrx_word' id='word_20'>h(x)</span>
+          <span class='ocrx_word' id='word_21'>=</span>
+          <span class='ocrx_word' id='word_22'>∑</span>
+          <span class='ocrx_word' id='word_23'>_{i=1}^n</span>
+          <span class='ocrx_word' id='word_24'>b_i</span>
+          <span class='ocrx_word' id='word_25'>x_i</span>
+          <span class='ocrx_word' id='word_26'>for</span>
+          <span class='ocrx_word' id='word_27'>another</span>
+          <span class='ocrx_word' id='word_28'>linear</span>
+          <span class='ocrx_word' id='word_29'>form.</span>
+        </p>
+      </div>
+    </div>
+  </body>
+</html>
+"""
+
+
 def normalize_table_rules(markdown: str) -> str:
     def normalize_line(line: str) -> str:
         line = line.strip()
@@ -188,6 +231,14 @@ def test_v4_code_formula_hocr_preserves_code_block() -> None:
     result = convert_hocr_file("v4_code_formula.hocr")
     expected_code = get_expected_markdown("code_formula.md").strip()
     assert expected_code in result
+
+
+def test_math_paragraph_hocr_does_not_emit_code_block() -> None:
+    options = ConversionOptions(hocr_spatial_tables=False)
+    result = convert(MATH_PARAGRAPH_HOCR, options)
+
+    assert "```" not in result
+    assert "Let f" in result
 
 
 def test_multilingual_hocr_conversion() -> None:
