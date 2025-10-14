@@ -39,11 +39,11 @@ repos:
         additional_dependencies:
           - black==25.1.0
   - repo: https://github.com/biomejs/pre-commit
-    rev: v2.2.5
+    rev: v2.2.6
     hooks:
       - id: biome-check
   - repo: https://github.com/oxc-project/mirrors-oxlint
-    rev: "v1.22.0"
+    rev: "v1.23.0"
     hooks:
       - id: oxlint
   - repo: https://github.com/tox-dev/pyproject-fmt
