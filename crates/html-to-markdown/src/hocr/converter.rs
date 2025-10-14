@@ -156,8 +156,15 @@ fn convert_element(
 
         // Paragraphs
         HocrElementType::OcrPar => {
-            if !output.is_empty() && !output.ends_with("\n\n") {
-                output.push_str("\n\n");
+            let bullet_paragraph = is_bullet_paragraph(element);
+            if !output.is_empty() {
+                if bullet_paragraph {
+                    if !output.ends_with('\n') {
+                        output.push('\n');
+                    }
+                } else if !output.ends_with("\n\n") {
+                    output.push_str("\n\n");
+                }
             }
 
             if let Some(heading) = detect_heading_paragraph(element) {
@@ -188,7 +195,13 @@ fn convert_element(
             if output.ends_with(' ') {
                 output.pop();
             }
-            output.push_str("\n\n");
+            if bullet_paragraph {
+                if !output.ends_with('\n') {
+                    output.push('\n');
+                }
+            } else {
+                output.push_str("\n\n");
+            }
         }
 
         // Blockquotes
@@ -588,6 +601,43 @@ fn try_spatial_table_reconstruction(element: &HocrElement) -> Option<String> {
     None
 }
 
+fn is_bullet_paragraph(element: &HocrElement) -> bool {
+    if element.element_type != HocrElementType::OcrPar {
+        return false;
+    }
+
+    let text = element_text_content(element);
+    let trimmed = text.trim_start();
+    if trimmed.is_empty() {
+        return false;
+    }
+
+    if matches!(trimmed.chars().next(), Some('•' | '●' | '-' | '+' | '*')) {
+        return true;
+    }
+
+    let mut chars = trimmed.chars().peekable();
+    let mut digit_count = 0;
+    while let Some(&ch) = chars.peek() {
+        if ch.is_ascii_digit() {
+            digit_count += 1;
+            chars.next();
+        } else {
+            break;
+        }
+    }
+
+    if digit_count > 0 {
+        if let Some(&ch) = chars.peek() {
+            if (ch == '.' || ch == ')') && chars.clone().nth(1).map(|c| c.is_whitespace()).unwrap_or(false) {
+                return true;
+            }
+        }
+    }
+
+    false
+}
+
 #[derive(Clone)]
 struct CodeLineInfo {
     text: String,
@@ -869,14 +919,18 @@ fn is_shell_prompt(text: &str) -> bool {
         || trimmed.starts_with("uv ")
 }
 
-fn starts_with_keyword(line: &str, keyword: &str) -> bool {
-    if !line.starts_with(keyword) {
+fn starts_with_keyword(trimmed: &str, keyword: &str) -> bool {
+    if !trimmed.starts_with(keyword) {
         return false;
     }
-    let next = line.chars().nth(keyword.len());
-    match next {
+    if let Some(first) = trimmed.chars().next() {
+        if !first.is_ascii_lowercase() {
+            return false;
+        }
+    }
+    match trimmed.chars().nth(keyword.len()) {
         None => true,
-        Some(ch) => ch.is_whitespace() || matches!(ch, '(' | ':' | '{' | '['),
+        Some(ch) => ch.is_whitespace() || matches!(ch, '(' | ':' | '{' | '[' | '.'),
     }
 }
 
@@ -901,7 +955,7 @@ fn is_code_paragraph(lines: &[CodeLineInfo]) -> bool {
 
         total += 1;
         let lower = text.to_lowercase();
-        let trimmed_lower = lower.trim_start();
+        let trimmed = text.trim_start();
 
         let documentation_tokens = [
             "definition",
@@ -921,36 +975,38 @@ fn is_code_paragraph(lines: &[CodeLineInfo]) -> bool {
             return false;
         }
 
-        let has_keyword = (contains_keyword_token(&lower, "function") && text.contains('('))
-            || lower.contains("console.")
-            || contains_keyword_token(&lower, "return")
-            || (starts_with_keyword(trimmed_lower, "var") && text.contains('='))
-            || (starts_with_keyword(trimmed_lower, "let") && text.contains('='))
-            || (starts_with_keyword(trimmed_lower, "const") && text.contains('='))
-            || starts_with_keyword(trimmed_lower, "async")
-            || starts_with_keyword(trimmed_lower, "await")
-            || starts_with_keyword(trimmed_lower, "class")
-            || starts_with_keyword(trimmed_lower, "struct")
-            || starts_with_keyword(trimmed_lower, "enum")
-            || starts_with_keyword(trimmed_lower, "def")
-            || starts_with_keyword(trimmed_lower, "fn")
-            || starts_with_keyword(trimmed_lower, "pub")
-            || starts_with_keyword(trimmed_lower, "import")
-            || starts_with_keyword(trimmed_lower, "using")
-            || starts_with_keyword(trimmed_lower, "namespace")
-            || starts_with_keyword(trimmed_lower, "public")
-            || starts_with_keyword(trimmed_lower, "private")
-            || starts_with_keyword(trimmed_lower, "protected")
-            || starts_with_keyword(trimmed_lower, "static")
-            || starts_with_keyword(trimmed_lower, "void")
-            || starts_with_keyword(trimmed_lower, "try")
-            || starts_with_keyword(trimmed_lower, "catch")
-            || starts_with_keyword(trimmed_lower, "finally")
-            || starts_with_keyword(trimmed_lower, "throw")
-            || starts_with_keyword(trimmed_lower, "typedef")
-            || starts_with_keyword(trimmed_lower, "package")
-            || starts_with_keyword(trimmed_lower, "module")
-            || contains_keyword_token(&lower, "lambda");
+        let has_keyword = (starts_with_keyword(trimmed, "function") && text.contains('('))
+            || (starts_with_keyword(trimmed, "return")
+                && trimmed
+                    .chars()
+                    .nth("return".len())
+                    .map(|c| c.is_whitespace())
+                    .unwrap_or(true))
+            || trimmed.starts_with("console.")
+            || starts_with_keyword(trimmed, "async")
+            || starts_with_keyword(trimmed, "await")
+            || (starts_with_keyword(trimmed, "class") && (text.contains('{') || text.contains(':')))
+            || (starts_with_keyword(trimmed, "struct") && text.contains('{'))
+            || (starts_with_keyword(trimmed, "enum") && text.contains('{'))
+            || (starts_with_keyword(trimmed, "def") && (text.contains('(') || text.contains(':')))
+            || (starts_with_keyword(trimmed, "fn") && text.contains('('))
+            || (starts_with_keyword(trimmed, "pub")
+                && (text.contains("fn") || text.contains("struct") || text.contains("enum")))
+            || starts_with_keyword(trimmed, "import")
+            || starts_with_keyword(trimmed, "using")
+            || starts_with_keyword(trimmed, "namespace")
+            || starts_with_keyword(trimmed, "public")
+            || starts_with_keyword(trimmed, "private")
+            || starts_with_keyword(trimmed, "protected")
+            || starts_with_keyword(trimmed, "static")
+            || starts_with_keyword(trimmed, "void")
+            || starts_with_keyword(trimmed, "try")
+            || starts_with_keyword(trimmed, "catch")
+            || starts_with_keyword(trimmed, "finally")
+            || starts_with_keyword(trimmed, "throw")
+            || starts_with_keyword(trimmed, "typedef")
+            || starts_with_keyword(trimmed, "package")
+            || starts_with_keyword(trimmed, "module");
 
         let has_symbol = text.contains(';') || text.contains("::");
 
@@ -1065,39 +1121,40 @@ fn is_confident_code_block(lines: &[CodeLineInfo]) -> bool {
             shell_lines += 1;
         }
 
-        let lower = text.to_lowercase();
-        let trimmed_lower = lower.trim_start();
+        let trimmed = text.trim_start();
 
-        if (contains_keyword_token(&lower, "function") && text.contains('('))
-            || lower.contains("console.")
-            || contains_keyword_token(&lower, "return")
-            || (starts_with_keyword(trimmed_lower, "var") && text.contains('='))
-            || (starts_with_keyword(trimmed_lower, "let") && text.contains('='))
-            || (starts_with_keyword(trimmed_lower, "const") && text.contains('='))
-            || starts_with_keyword(trimmed_lower, "async")
-            || starts_with_keyword(trimmed_lower, "await")
-            || starts_with_keyword(trimmed_lower, "class")
-            || starts_with_keyword(trimmed_lower, "struct")
-            || starts_with_keyword(trimmed_lower, "enum")
-            || starts_with_keyword(trimmed_lower, "def")
-            || starts_with_keyword(trimmed_lower, "fn")
-            || starts_with_keyword(trimmed_lower, "pub")
-            || starts_with_keyword(trimmed_lower, "import")
-            || starts_with_keyword(trimmed_lower, "using")
-            || starts_with_keyword(trimmed_lower, "namespace")
-            || starts_with_keyword(trimmed_lower, "public")
-            || starts_with_keyword(trimmed_lower, "private")
-            || starts_with_keyword(trimmed_lower, "protected")
-            || starts_with_keyword(trimmed_lower, "static")
-            || starts_with_keyword(trimmed_lower, "void")
-            || starts_with_keyword(trimmed_lower, "try")
-            || starts_with_keyword(trimmed_lower, "catch")
-            || starts_with_keyword(trimmed_lower, "finally")
-            || starts_with_keyword(trimmed_lower, "throw")
-            || starts_with_keyword(trimmed_lower, "typedef")
-            || starts_with_keyword(trimmed_lower, "package")
-            || starts_with_keyword(trimmed_lower, "module")
-            || contains_keyword_token(&lower, "lambda")
+        if (starts_with_keyword(trimmed, "function") && text.contains('('))
+            || trimmed.starts_with("console.")
+            || (starts_with_keyword(trimmed, "return")
+                && trimmed
+                    .chars()
+                    .nth("return".len())
+                    .map(|c| c.is_whitespace())
+                    .unwrap_or(true))
+            || starts_with_keyword(trimmed, "async")
+            || starts_with_keyword(trimmed, "await")
+            || (starts_with_keyword(trimmed, "class") && (text.contains('{') || text.contains(':')))
+            || (starts_with_keyword(trimmed, "struct") && text.contains('{'))
+            || (starts_with_keyword(trimmed, "enum") && text.contains('{'))
+            || (starts_with_keyword(trimmed, "def") && (text.contains('(') || text.contains(':')))
+            || (starts_with_keyword(trimmed, "fn") && text.contains('('))
+            || (starts_with_keyword(trimmed, "pub")
+                && (text.contains("fn") || text.contains("struct") || text.contains("enum")))
+            || starts_with_keyword(trimmed, "import")
+            || starts_with_keyword(trimmed, "using")
+            || starts_with_keyword(trimmed, "namespace")
+            || starts_with_keyword(trimmed, "public")
+            || starts_with_keyword(trimmed, "private")
+            || starts_with_keyword(trimmed, "protected")
+            || starts_with_keyword(trimmed, "static")
+            || starts_with_keyword(trimmed, "void")
+            || starts_with_keyword(trimmed, "try")
+            || starts_with_keyword(trimmed, "catch")
+            || starts_with_keyword(trimmed, "finally")
+            || starts_with_keyword(trimmed, "throw")
+            || starts_with_keyword(trimmed, "typedef")
+            || starts_with_keyword(trimmed, "package")
+            || starts_with_keyword(trimmed, "module")
         {
             keyword_lines += 1;
         }
@@ -1136,18 +1193,15 @@ fn is_confident_code_block(lines: &[CodeLineInfo]) -> bool {
         return true;
     }
 
-    let strong = keyword_lines + punctuation_lines + assignment_lines;
-    let strong_ratio = strong as f32 / total as f32;
-
-    if strong >= 3 && strong_ratio >= 0.85 {
+    if keyword_lines >= 2 && assignment_lines >= 1 {
         return true;
     }
 
-    if keyword_lines >= 2 && assignment_lines >= 1 && strong_ratio >= 0.7 {
+    if keyword_lines >= 1 && punctuation_lines >= 1 && assignment_lines >= 1 {
         return true;
     }
 
-    if indent_lines == total && strong_ratio >= 0.6 && strong >= 2 {
+    if indent_lines == total && keyword_lines >= 1 && assignment_lines >= 1 {
         return true;
     }
 
