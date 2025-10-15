@@ -9,6 +9,12 @@ High-performance HTML → Markdown conversion powered by Rust. Shipping as a Rus
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://github.com/Goldziher/html-to-markdown/blob/main/LICENSE)
 [![Discord](https://img.shields.io/badge/Discord-Join%20our%20community-7289da)](https://discord.gg/pXxagNK2zN)
 
+## 🎮 Live Demo
+
+**Try it now:** [https://goldziher.github.io/html-to-markdown/](https://goldziher.github.io/html-to-markdown/)
+
+Experience the power of WebAssembly-based HTML to Markdown conversion directly in your browser!
+
 ## Documentation
 
 - **JavaScript/TypeScript guides**:
