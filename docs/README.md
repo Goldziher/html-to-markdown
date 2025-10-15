@@ -4,7 +4,7 @@ This directory contains the live demo of the HTML to Markdown converter, powered
 
 ## 🌐 Live Demo
 
-Visit the live demo at: **https://goldziher.github.io/html-to-markdown/**
+Visit the live demo at: **<https://goldziher.github.io/html-to-markdown/>**
 
 ## 🚀 Running Locally
 
@@ -22,7 +22,7 @@ python3 -m http.server 8000
 npx http-server docs -p 8000
 ```
 
-Then open http://localhost:8000 in your browser.
+Then open <http://localhost:8000> in your browser.
 
 ## 🔧 Building the WASM Files
 
