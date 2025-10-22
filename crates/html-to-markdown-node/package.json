@@ -1,6 +1,6 @@
 {
   "name": "html-to-markdown-node",
-  "version": "2.3.4",
+  "version": "2.4.0",
   "description": "High-performance HTML to Markdown converter - Node.js native bindings",
   "main": "index.js",
   "types": "index.d.ts",
@@ -16,7 +16,10 @@
   ],
   "files": [
     "index.js",
-    "index.d.ts"
+    "*.cjs",
+    "*.d.ts",
+    "*.node",
+    "README.md"
   ],
   "napi": {
     "binaryName": "html-to-markdown-node",
@@ -53,13 +56,13 @@
   },
   "devDependencies": {
     "@napi-rs/cli": "^3.3.1",
-    "@types/node": "^24.7.2",
+    "@types/node": "^24.9.1",
     "tinybench": "^5.0.1",
     "tsx": "^4.20.6",
-    "vitest": "^3.0.0"
+    "vitest": "^3.2.4"
   },
   "dependencies": {
-    "@emnapi/runtime": "1.5.0",
+    "@emnapi/runtime": "1.6.0",
     "@octokit/core": "7.0.5",
     "typanion": "3.14.0",
     "up": "^1.0.2"

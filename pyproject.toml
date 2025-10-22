@@ -7,7 +7,7 @@ requires = [
 
 [project]
 name = "html-to-markdown"
-version = "2.3.4"
+version = "2.4.0"
 description = "High-performance HTML to Markdown converter powered by Rust with a clean Python API"
 readme = "README_PYPI.md"
 keywords = [
@@ -54,15 +54,15 @@ urls.Repository = "https://github.com/Goldziher/html-to-markdown.git"
 [dependency-groups]
 dev = [
   "covdefaults>=2.3",
-  "memray>=1.18; sys_platform!='win32'",
+  "memray>=1.19.1; sys_platform!='win32'",
   "mypy>=1.18.2",
   "pre-commit>=4.3",
-  "psutil>=7.1; sys_platform!='win32'",
+  "psutil>=7.1.1; sys_platform!='win32'",
   "pytest>=8.4.2",
   "pytest-benchmark>=5.1",
   "pytest-cov>=7",
   "pytest-mock>=3.15.1",
-  "ruff>=0.13.3",
+  "ruff>=0.14.1",
   "types-psutil>=7.0.0.20251001",
   "uv-bump",
 ]

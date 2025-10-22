@@ -33,7 +33,7 @@ image = { version = "0.25", default-features = false, features = ["gif", "jpeg",
 [dev-dependencies]
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
-criterion = { version = "0.5", features = ["html_reports"] }
+criterion = { version = "0.7", features = ["html_reports"] }
 
 [[bench]]
 name = "conversion_benchmark"
