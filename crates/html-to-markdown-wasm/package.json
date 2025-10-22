@@ -1,6 +1,6 @@
 {
   "name": "html-to-markdown-wasm",
-  "version": "2.4.0",
+  "version": "2.4.1",
   "description": "High-performance HTML to Markdown converter - WebAssembly bindings",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -22,7 +22,8 @@
     "build": "wasm-pack build --target bundler --out-dir dist",
     "build:nodejs": "wasm-pack build --target nodejs --out-dir dist-node",
     "build:web": "wasm-pack build --target web --out-dir dist-web",
-    "build:all": "pnpm run build && pnpm run build:nodejs && pnpm run build:web",
+    "build:all": "pnpm run build && pnpm run build:nodejs && pnpm run build:web && pnpm run cleanup:gitignore",
+    "cleanup:gitignore": "node ./scripts/cleanup-gitignore.js",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:wasm-pack": "wasm-pack test --headless --chrome",
