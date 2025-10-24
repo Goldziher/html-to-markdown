@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.5.0] - 2025-10-24
+
+### Added
+
+- **New `preserve_tags` option** - Preserve specific HTML tags in their original HTML form instead of converting them to Markdown. This is useful for complex elements like tables that may not convert well to Markdown. Fixes issue #95.
+    - Accepts a list of tag names (e.g., `["table", "form"]`)
+    - Preserves all attributes and nested content as HTML
+    - Works independently of `strip_tags` - can use both options together
+    - Available in all bindings: Rust, Python, Node.js, and WASM
+    - Comprehensive test coverage in Rust, Python (pytest), and TypeScript (vitest)
+
 ### Changed
 
 - **HTML preprocessing is now enabled by default** - The `PreprocessingOptions.enabled` default changed from `False` to `True` to ensure robust handling of malformed HTML. Users who want minimal preprocessing can explicitly set `enabled=False`.
@@ -19,6 +30,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - Handles edge cases like `1<2`, `1 < 2 < 3`, and angle brackets at tag boundaries
     - Fixes issue #94 where content following malformed angle brackets was lost
 - Added comprehensive test coverage for malformed angle bracket handling in both Rust and Python test suites
+- Fixed WASM build configuration to use correct `getrandom` backend for wasm32-unknown-unknown targets
 
 ## [2.4.1] - 2025-10-22
 

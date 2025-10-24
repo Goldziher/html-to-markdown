@@ -248,11 +248,44 @@ See the [TypeScript definitions](./dist-node/html_to_markdown_wasm.d.ts) for all
 - Code block styles (indented, backticks, tildes)
 - List formatting (indent width, bullet characters)
 - Text escaping and formatting
+- Tag preservation (`preserveTags`) and stripping (`stripTags`)
 - Preprocessing for web scraping
 - hOCR table extraction
 - And more...
 
 ## Examples
+
+### Preserving HTML Tags
+
+Keep specific HTML tags in their original form:
+
+```typescript
+import { convert } from '@html-to-markdown/wasm';
+
+const html = `
+<p>Before table</p>
+<table class="data">
+    <tr><th>Name</th><th>Value</th></tr>
+    <tr><td>Item 1</td><td>100</td></tr>
+</table>
+<p>After table</p>
+`;
+
+const markdown = convert(html, {
+  preserveTags: ['table']
+});
+
+// Result includes the table as HTML
+```
+
+Combine with `stripTags`:
+
+```typescript
+const markdown = convert(html, {
+  preserveTags: ['table', 'form'],  // Keep as HTML
+  stripTags: ['script', 'style']    // Remove entirely
+});
+```
 
 ### Deno Web Server
 
