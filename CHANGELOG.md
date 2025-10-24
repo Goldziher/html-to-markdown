@@ -24,6 +24,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Task list checkbox support** - Fixed sanitizer removing `<input type="checkbox">` elements when `remove_forms` is enabled (default). Checkboxes are now preserved during preprocessing to enable proper task list conversion (`- [x]` / `- [ ]`).
+    - Added `input` tag to allowed tags in all sanitization presets (minimal, standard, aggressive)
+    - Preserved `type` and `checked` attributes on input elements
+    - Fixed pre-existing bug where task list checkboxes were silently removed
 - **Robust handling of malformed angle brackets in HTML** - Fixed parser failures when bare `<` or `>` characters appear in HTML text content (e.g., `1<2`, mathematical comparisons). The converter now:
     - Automatically escapes malformed angle brackets that aren't part of valid HTML tags
     - Works correctly with preprocessing both enabled and disabled
