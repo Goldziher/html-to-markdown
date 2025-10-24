@@ -2315,3 +2315,72 @@ def test_iframe_without_src(convert: Callable[..., str]) -> None:
     html = "<iframe></iframe>"
     result = convert(html)
     assert result == ""
+
+
+# preserve_tags tests
+
+
+def test_preserve_tags_simple_table(convert: Callable[..., str]) -> None:
+    html = """<p>Before table</p>
+<table><tr><td>Cell 1</td><td>Cell 2</td></tr></table>
+<p>After table</p>"""
+    result = convert(html, preserve_tags=["table"])
+    assert "<table>" in result
+    assert "<tr>" in result
+    assert "<td>Cell 1</td>" in result
+    assert "Before table" in result
+    assert "After table" in result
+
+
+def test_preserve_tags_with_attributes(convert: Callable[..., str]) -> None:
+    html = '<div class="content"><table id="data" class="styled"><tr><td>Value</td></tr></table></div>'
+    result = convert(html, preserve_tags=["table"])
+    assert '<table id="data" class="styled">' in result
+    assert "<tr>" in result
+    assert "<td>Value</td>" in result
+    assert "</table>" in result
+
+
+def test_preserve_tags_multiple_tags(convert: Callable[..., str]) -> None:
+    html = """<p>Text</p>
+<table><tr><td>Table</td></tr></table>
+<form><input type="text"/></form>
+<div>More text</div>"""
+    result = convert(html, preserve_tags=["table", "form"])
+    assert "<table>" in result
+    assert "<form>" in result
+    assert '<input type="text"/>' in result or '<input type="text">' in result
+    assert "Text" in result
+    assert "More text" in result
+
+
+def test_preserve_tags_nested_content(convert: Callable[..., str]) -> None:
+    html = "<table><tr><td><strong>Bold</strong> and <em>italic</em></td></tr></table>"
+    result = convert(html, preserve_tags=["table"])
+    assert "<table>" in result
+    assert "<strong>Bold</strong>" in result
+    assert "<em>italic</em>" in result
+    assert "</table>" in result
+
+
+def test_preserve_tags_empty_list(convert: Callable[..., str]) -> None:
+    html = "<table><tr><td>Cell</td></tr></table>"
+    result = convert(html, preserve_tags=[])
+    # Without preserve_tags, table should be converted to markdown
+    assert "<table>" not in result
+    assert "Cell" in result
+
+
+def test_preserve_tags_vs_strip_tags(convert: Callable[..., str]) -> None:
+    html = """<p>Text</p>
+<table><tr><td>Table content</td></tr></table>
+<div>Div content</div>"""
+    result = convert(html, preserve_tags=["table"], strip_tags=["div"])
+    # table should be preserved as HTML
+    assert "<table>" in result
+    assert "Table content" in result
+    # div should be stripped (only text content)
+    assert "<div>" not in result
+    assert "Div content" in result
+    # p should be converted normally
+    assert "Text" in result

@@ -95,6 +95,9 @@ class ConversionOptions:
     strip_tags: set[str] | None = None
     """HTML tags to strip from output (output only text content, no markdown conversion)."""
 
+    preserve_tags: set[str] | None = None
+    """HTML tags to preserve as-is in the output (keep original HTML). Useful for complex elements like tables."""
+
     convert_as_inline: bool = False
     """Treat block elements as inline during conversion."""
 

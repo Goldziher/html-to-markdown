@@ -51,10 +51,10 @@ bun add html-to-markdown-node
 
 ## Usage
 
-### Node.js (CommonJS)
+### Basic Conversion
 
 ```javascript
-const { convert } = require('html-to-markdown-node');
+import { convert } from 'html-to-markdown-node';
 
 const html = '<h1>Hello World</h1><p>This is <strong>fast</strong>!</p>';
 const markdown = convert(html);
@@ -64,32 +64,43 @@ console.log(markdown);
 // This is **fast**!
 ```
 
-### Node.js (ESM)
+### With Options
 
-```javascript
+```typescript
 import { convert } from 'html-to-markdown-node';
 
-const markdown = convert('<h1>Hello</h1>', {
+const markdown = convert(html, {
   headingStyle: 'Atx',
   codeBlockStyle: 'Backticks',
+  listIndentWidth: 2,
+  bullets: '-',
   wrap: true,
   wrapWidth: 80
 });
 ```
 
-### Bun
+### Preserve Complex HTML (NEW in v2.5)
 
 ```typescript
 import { convert } from 'html-to-markdown-node';
 
-const html = await Bun.file('input.html').text();
-const markdown = convert(html, {
-  headingStyle: 'Atx',
-  listIndentWidth: 2,
-  bullets: '-'
-});
+const html = `
+<h1>Report</h1>
+<table>
+  <tr><th>Name</th><th>Value</th></tr>
+  <tr><td>Foo</td><td>Bar</td></tr>
+</table>
+`;
 
-await Bun.write('output.md', markdown);
+const markdown = convert(html, {
+  preserveTags: ['table'] // Keep tables as HTML
+});
+// # Report
+//
+// <table>
+//   <tr><th>Name</th><th>Value</th></tr>
+//   <tr><td>Foo</td><td>Bar</td></tr>
+// </table>
 ```
 
 ## TypeScript
@@ -176,11 +187,45 @@ See [ConversionOptions](https://github.com/Goldziher/html-to-markdown/tree/main/
 - Code block styles (indented, backticks, tildes)
 - List formatting (indent width, bullet characters)
 - Text escaping and formatting
+- Tag preservation (`preserveTags`) and stripping (`stripTags`)
 - Preprocessing for web scraping
 - hOCR table extraction
 - And more...
 
 ## Examples
+
+### Preserving HTML Tags
+
+Keep specific HTML tags in their original form instead of converting to Markdown:
+
+```typescript
+import { convert } from '@html-to-markdown/node';
+
+const html = `
+<p>Before table</p>
+<table class="data">
+    <tr><th>Name</th><th>Value</th></tr>
+    <tr><td>Item 1</td><td>100</td></tr>
+</table>
+<p>After table</p>
+`;
+
+const markdown = convert(html, {
+  preserveTags: ['table']
+});
+
+// Result includes the table as HTML:
+// "Before table\n\n<table class=\"data\">...</table>\n\nAfter table\n"
+```
+
+Combine with `stripTags` for fine-grained control:
+
+```typescript
+const markdown = convert(html, {
+  preserveTags: ['table', 'form'],  // Keep these as HTML
+  stripTags: ['script', 'style']    // Remove these entirely
+});
+```
 
 ### Web Scraping
 

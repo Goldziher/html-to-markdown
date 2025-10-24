@@ -237,9 +237,22 @@ fn convert_element(
 
         // Words - join with space
         HocrElementType::OcrxWord => {
+            // Ensure space before this word if output doesn't end with whitespace or markdown formatting
+            if !output.is_empty()
+                && !output.ends_with(' ')
+                && !output.ends_with('\t')
+                && !output.ends_with('\n')
+                && !output.ends_with('*')  // Don't add space after italic/bold markers
+                && !output.ends_with('`')  // Don't add space after code markers
+                && !output.ends_with('_')  // Don't add space after underline markers
+                && !output.ends_with('[')
+            // Don't add space after opening bracket (link/image alt)
+            {
+                output.push(' ');
+            }
+
             if !element.text.is_empty() {
                 output.push_str(&element.text);
-                output.push(' ');
             }
         }
 

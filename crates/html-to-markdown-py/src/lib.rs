@@ -163,6 +163,8 @@ struct ConversionOptions {
     #[pyo3(get, set)]
     strip_tags: Vec<String>,
     #[pyo3(get, set)]
+    preserve_tags: Vec<String>,
+    #[pyo3(get, set)]
     encoding: String,
 }
 
@@ -200,6 +202,7 @@ impl ConversionOptions {
         preprocessing=None,
         debug=false,
         strip_tags=Vec::new(),
+        preserve_tags=Vec::new(),
         encoding="utf-8".to_string()
     ))]
     fn new(
@@ -232,6 +235,7 @@ impl ConversionOptions {
         preprocessing: Option<PreprocessingOptions>,
         debug: bool,
         strip_tags: Vec<String>,
+        preserve_tags: Vec<String>,
         encoding: String,
     ) -> Self {
         Self {
@@ -265,6 +269,7 @@ impl ConversionOptions {
                 .unwrap_or_else(|| PreprocessingOptions::new(false, "standard".to_string(), true, true)),
             debug,
             strip_tags,
+            preserve_tags,
             encoding,
         }
     }
@@ -326,6 +331,7 @@ impl ConversionOptions {
             encoding: self.encoding.clone(),
             debug: self.debug,
             strip_tags: self.strip_tags.clone(),
+            preserve_tags: self.preserve_tags.clone(),
         }
     }
 }
@@ -526,6 +532,7 @@ mod tests {
             Vec::new(),
             None,
             false,
+            Vec::new(),
             Vec::new(),
             "utf-8".to_string(),
         );

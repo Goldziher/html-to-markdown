@@ -52,24 +52,49 @@ import { convert } from "npm:html-to-markdown-wasm";
 
 ## Usage
 
-### Node.js
+### Basic Conversion
 
 ```javascript
-// CommonJS
-const { convert } = require('html-to-markdown-wasm/dist-node');
+import { convert } from 'html-to-markdown-wasm';
 
-const markdown = convert('<h1>Hello World</h1>');
+const html = '<h1>Hello World</h1><p>This is <strong>fast</strong>!</p>';
+const markdown = convert(html);
 console.log(markdown);
+// # Hello World
+//
+// This is **fast**!
 ```
 
-```javascript
-// ESM
-import { convert } from 'html-to-markdown-wasm/dist-node';
+### With Options
 
-const html = '<h1>Hello</h1><p>World</p>';
+```typescript
+import { convert } from 'html-to-markdown-wasm';
+
 const markdown = convert(html, {
   headingStyle: 'atx',
   codeBlockStyle: 'backticks',
+  listIndentWidth: 2,
+  bullets: '-',
+  wrap: true,
+  wrapWidth: 80
+});
+```
+
+### Preserve Complex HTML (NEW in v2.5)
+
+```typescript
+import { convert } from 'html-to-markdown-wasm';
+
+const html = `
+<h1>Report</h1>
+<table>
+  <tr><th>Name</th><th>Value</th></tr>
+  <tr><td>Foo</td><td>Bar</td></tr>
+</table>
+`;
+
+const markdown = convert(html, {
+  preserveTags: ['table'] // Keep tables as HTML
 });
 ```
 
@@ -79,29 +104,11 @@ const markdown = convert(html, {
 import { convert } from "npm:html-to-markdown-wasm";
 
 const html = await Deno.readTextFile("input.html");
-
-const markdown = convert(html, {
-  headingStyle: "atx",
-  listIndentWidth: 2,
-  bullets: "-"
-});
-
+const markdown = convert(html, { headingStyle: "atx" });
 await Deno.writeTextFile("output.md", markdown);
 ```
 
-### Bun
-
-```typescript
-import { convert } from 'html-to-markdown-wasm';
-
-const markdown = convert('<h1>Fast conversion</h1>', {
-  headingStyle: 'atx',
-  wrap: true,
-  wrapWidth: 80
-});
-```
-
-> **Note:** For Bun, consider using [html-to-markdown-node](https://www.npmjs.com/package/html-to-markdown-node) for ~3× better performance with native bindings.
+> **Performance Tip:** For Node.js/Bun, use [html-to-markdown-node](https://www.npmjs.com/package/html-to-markdown-node) for 1.17× better performance with native bindings.
 
 ### Browser (ESM)
 
@@ -248,11 +255,44 @@ See the [TypeScript definitions](./dist-node/html_to_markdown_wasm.d.ts) for all
 - Code block styles (indented, backticks, tildes)
 - List formatting (indent width, bullet characters)
 - Text escaping and formatting
+- Tag preservation (`preserveTags`) and stripping (`stripTags`)
 - Preprocessing for web scraping
 - hOCR table extraction
 - And more...
 
 ## Examples
+
+### Preserving HTML Tags
+
+Keep specific HTML tags in their original form:
+
+```typescript
+import { convert } from '@html-to-markdown/wasm';
+
+const html = `
+<p>Before table</p>
+<table class="data">
+    <tr><th>Name</th><th>Value</th></tr>
+    <tr><td>Item 1</td><td>100</td></tr>
+</table>
+<p>After table</p>
+`;
+
+const markdown = convert(html, {
+  preserveTags: ['table']
+});
+
+// Result includes the table as HTML
+```
+
+Combine with `stripTags`:
+
+```typescript
+const markdown = convert(html, {
+  preserveTags: ['table', 'form'],  // Keep as HTML
+  stripTags: ['script', 'style']    // Remove entirely
+});
+```
 
 ### Deno Web Server
 

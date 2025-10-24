@@ -21,11 +21,6 @@ serde-wasm-bindgen = "0.6"
 console_error_panic_hook = "0.1"
 js-sys = "0.3"
 
-# Optional: for better error messages
-[dependencies.getrandom]
-version = "0.3"
-features = ["wasm_js"]
-
 [dev-dependencies]
 wasm-bindgen-test = "0.3"
 

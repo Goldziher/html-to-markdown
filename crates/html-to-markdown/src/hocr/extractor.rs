@@ -78,69 +78,58 @@ fn collect_hocr_elements(
     }
 }
 
-/// Extract hOCR metadata from HTML head
+/// Extract hOCR metadata from HTML head (or from orphaned meta tags after sanitization)
 fn extract_metadata(dom: &tl::VDom) -> HocrMetadata {
     let mut metadata = HocrMetadata::default();
     let parser = dom.parser();
 
-    // Recursively search for head element
-    fn find_head_and_extract<'a>(
-        node_handle: &tl::NodeHandle,
-        parser: &'a tl::Parser<'a>,
-        metadata: &mut HocrMetadata,
-    ) {
+    // Helper function to extract metadata from a single meta tag
+    fn extract_from_meta_tag(meta_tag: &tl::HTMLTag, metadata: &mut HocrMetadata) {
+        let attrs = meta_tag.attributes();
+        if let (Some(name), Some(content)) = (attrs.get("name").flatten(), attrs.get("content").flatten()) {
+            let name_str = name.as_utf8_str();
+            let content_str = content.as_utf8_str().to_string();
+
+            match name_str.as_ref() {
+                "ocr-system" => metadata.ocr_system = Some(content_str),
+                "ocr-capabilities" => {
+                    metadata.ocr_capabilities = content_str.split_whitespace().map(|s| s.to_string()).collect();
+                }
+                "ocr-number-of-pages" => {
+                    metadata.ocr_number_of_pages = content_str.parse().ok();
+                }
+                "ocr-langs" => {
+                    metadata.ocr_langs = content_str.split_whitespace().map(|s| s.to_string()).collect();
+                }
+                "ocr-scripts" => {
+                    metadata.ocr_scripts = content_str.split_whitespace().map(|s| s.to_string()).collect();
+                }
+                _ => {}
+            }
+        }
+    }
+
+    // Recursively search for meta tags (either inside head or as orphans after sanitization)
+    fn find_meta_tags<'a>(node_handle: &tl::NodeHandle, parser: &'a tl::Parser<'a>, metadata: &mut HocrMetadata) {
         if let Some(tl::Node::Tag(tag)) = node_handle.get(parser) {
             let tag_name = tag.name().as_utf8_str();
 
-            if tag_name == "head" {
-                // Found head, extract meta tags
-                let children = tag.children();
-                for meta_handle in children.top().iter() {
-                    if let Some(tl::Node::Tag(meta_tag)) = meta_handle.get(parser) {
-                        if meta_tag.name().as_utf8_str() == "meta" {
-                            let attrs = meta_tag.attributes();
-                            if let (Some(name), Some(content)) =
-                                (attrs.get("name").flatten(), attrs.get("content").flatten())
-                            {
-                                let name_str = name.as_utf8_str();
-                                let content_str = content.as_utf8_str().to_string();
+            // Extract from meta tags directly (handles both meta inside head and orphaned meta)
+            if tag_name == "meta" {
+                extract_from_meta_tag(tag, metadata);
+            }
 
-                                match name_str.as_ref() {
-                                    "ocr-system" => metadata.ocr_system = Some(content_str),
-                                    "ocr-capabilities" => {
-                                        metadata.ocr_capabilities =
-                                            content_str.split_whitespace().map(|s| s.to_string()).collect();
-                                    }
-                                    "ocr-number-of-pages" => {
-                                        metadata.ocr_number_of_pages = content_str.parse().ok();
-                                    }
-                                    "ocr-langs" => {
-                                        metadata.ocr_langs =
-                                            content_str.split_whitespace().map(|s| s.to_string()).collect();
-                                    }
-                                    "ocr-scripts" => {
-                                        metadata.ocr_scripts =
-                                            content_str.split_whitespace().map(|s| s.to_string()).collect();
-                                    }
-                                    _ => {}
-                                }
-                            }
-                        }
-                    }
-                }
-            } else {
-                // Keep searching in children
-                let children = tag.children();
-                for child_handle in children.top().iter() {
-                    find_head_and_extract(child_handle, parser, metadata);
-                }
+            // Recursively search children
+            let children = tag.children();
+            for child_handle in children.top().iter() {
+                find_meta_tags(child_handle, parser, metadata);
             }
         }
     }
 
     // Search from root
     for child_handle in dom.children().iter() {
-        find_head_and_extract(child_handle, parser, &mut metadata);
+        find_meta_tags(child_handle, parser, &mut metadata);
     }
 
     metadata

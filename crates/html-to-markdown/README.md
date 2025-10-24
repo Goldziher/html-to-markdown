@@ -60,6 +60,41 @@ let options = ConversionOptions {
 let markdown = convert(html, Some(options))?;
 ```
 
+### Preserving HTML Tags
+
+The `preserve_tags` option allows you to keep specific HTML tags in their original form instead of converting them to Markdown. This is useful for complex elements like tables that may not convert well:
+
+```rust
+use html_to_markdown_rs::{convert, ConversionOptions};
+
+let html = r#"
+<p>Before table</p>
+<table class="data">
+    <tr><th>Name</th><th>Value</th></tr>
+    <tr><td>Item 1</td><td>100</td></tr>
+</table>
+<p>After table</p>
+"#;
+
+let options = ConversionOptions {
+    preserve_tags: vec!["table".to_string()],
+    ..Default::default()
+};
+
+let markdown = convert(html, Some(options))?;
+// Result: "Before table\n\n<table class=\"data\">...</table>\n\nAfter table\n"
+```
+
+You can preserve multiple tag types and combine with `strip_tags`:
+
+```rust
+let options = ConversionOptions {
+    preserve_tags: vec!["table".to_string(), "form".to_string()],
+    strip_tags: vec!["script".to_string(), "style".to_string()],
+    ..Default::default()
+};
+```
+
 ## Web Scraping with Preprocessing
 
 ```rust
