@@ -200,6 +200,10 @@ pub struct ConversionOptions {
 
     /// List of HTML tags to strip (output only text content, no markdown conversion)
     pub strip_tags: Vec<String>,
+
+    /// List of HTML tags to preserve as-is in the output (keep original HTML)
+    /// Useful for complex elements like tables that don't convert well to Markdown
+    pub preserve_tags: Vec<String>,
 }
 
 impl Default for ConversionOptions {
@@ -235,6 +239,7 @@ impl Default for ConversionOptions {
             encoding: "utf-8".to_string(),
             debug: false,
             strip_tags: Vec::new(),
+            preserve_tags: Vec::new(),
         }
     }
 }

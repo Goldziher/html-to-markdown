@@ -466,6 +466,66 @@ describe("@html-to-markdown/wasm - WebAssembly Bindings", () => {
     });
   });
 
+  describe("Preserve Tags", () => {
+    it("should preserve simple table as HTML", () => {
+      const html = "<p>Before table</p><table><tr><td>Cell 1</td><td>Cell 2</td></tr></table><p>After table</p>";
+      const markdown = convert(html, { preserveTags: ["table"] });
+      expect(markdown).toContain("<table>");
+      expect(markdown).toContain("<tr>");
+      expect(markdown).toContain("<td>Cell 1</td>");
+      expect(markdown).toContain("Before table");
+      expect(markdown).toContain("After table");
+    });
+
+    it("should preserve table with attributes", () => {
+      const html = '<div class="content"><table id="data" class="styled"><tr><td>Value</td></tr></table></div>';
+      const markdown = convert(html, { preserveTags: ["table"] });
+      expect(markdown).toContain('<table id="data" class="styled">');
+      expect(markdown).toContain("<tr>");
+      expect(markdown).toContain("<td>Value</td>");
+      expect(markdown).toContain("</table>");
+    });
+
+    it("should preserve multiple tag types", () => {
+      const html =
+        '<p>Text</p><table><tr><td>Table</td></tr></table><form><input type="text"/></form><div>More text</div>';
+      const markdown = convert(html, { preserveTags: ["table", "form"] });
+      expect(markdown).toContain("<table>");
+      expect(markdown).toContain("<form>");
+      expect(markdown).toContain("Text");
+      expect(markdown).toContain("More text");
+    });
+
+    it("should preserve nested content in tags", () => {
+      const html = "<table><tr><td><strong>Bold</strong> and <em>italic</em></td></tr></table>";
+      const markdown = convert(html, { preserveTags: ["table"] });
+      expect(markdown).toContain("<table>");
+      expect(markdown).toContain("<strong>Bold</strong>");
+      expect(markdown).toContain("<em>italic</em>");
+      expect(markdown).toContain("</table>");
+    });
+
+    it("should convert tables normally without preserve_tags", () => {
+      const html = "<table><tr><td>Cell</td></tr></table>";
+      const markdown = convert(html, { preserveTags: [] });
+      expect(markdown).not.toContain("<table>");
+      expect(markdown).toContain("Cell");
+    });
+
+    it("should work with both preserve and strip tags", () => {
+      const html = "<p>Text</p><table><tr><td>Table content</td></tr></table><div>Div content</div>";
+      const markdown = convert(html, { preserveTags: ["table"], stripTags: ["div"] });
+      // table should be preserved as HTML
+      expect(markdown).toContain("<table>");
+      expect(markdown).toContain("Table content");
+      // div should be stripped (only text content)
+      expect(markdown).not.toContain("<div>");
+      expect(markdown).toContain("Div content");
+      // p should be converted normally
+      expect(markdown).toContain("Text");
+    });
+  });
+
   describe("Real-World Documents", () => {
     it("should convert Wikipedia timeline", () => {
       const html = loadTestDoc("html/wikipedia/lists_timeline.html");

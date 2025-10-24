@@ -1159,6 +1159,75 @@ fn escape_malformed_angle_brackets(input: &str) -> Cow<'_, str> {
     }
 }
 
+/// Serialize a tag and its children back to HTML.
+///
+/// This is used for the preserve_tags feature to output original HTML for specific elements.
+fn serialize_tag_to_html(handle: &tl::NodeHandle, parser: &tl::Parser) -> String {
+    let mut html = String::new();
+    serialize_node_to_html(handle, parser, &mut html);
+    html
+}
+
+/// Recursively serialize a node to HTML.
+fn serialize_node_to_html(handle: &tl::NodeHandle, parser: &tl::Parser, output: &mut String) {
+    match handle.get(parser) {
+        Some(tl::Node::Tag(tag)) => {
+            let tag_name = tag.name().as_utf8_str();
+
+            // Opening tag
+            output.push('<');
+            output.push_str(&tag_name);
+
+            // Attributes
+            for (key, value) in tag.attributes().iter() {
+                output.push(' ');
+                output.push_str(&key);
+                if let Some(val) = value {
+                    output.push_str("=\"");
+                    output.push_str(&val);
+                    output.push('"');
+                }
+            }
+
+            output.push('>');
+
+            // Children
+            let children = tag.children();
+            for child_handle in children.top().iter() {
+                serialize_node_to_html(child_handle, parser, output);
+            }
+
+            // Closing tag (skip for self-closing tags)
+            if !matches!(
+                tag_name.as_ref(),
+                "br" | "hr"
+                    | "img"
+                    | "input"
+                    | "meta"
+                    | "link"
+                    | "area"
+                    | "base"
+                    | "col"
+                    | "embed"
+                    | "param"
+                    | "source"
+                    | "track"
+                    | "wbr"
+            ) {
+                output.push_str("</");
+                output.push_str(&tag_name);
+                output.push('>');
+            }
+        }
+        Some(tl::Node::Raw(bytes)) => {
+            if let Ok(text) = std::str::from_utf8(bytes.as_bytes()) {
+                output.push_str(text);
+            }
+        }
+        _ => {}
+    }
+}
+
 fn strip_script_and_style_sections(input: &str) -> Cow<'_, str> {
     const TAGS: [&[u8]; 2] = [b"script", b"style"];
     const SVG: &[u8] = b"svg";
@@ -1554,6 +1623,13 @@ fn walk_node(
                         walk_node(child_handle, parser, output, options, ctx, depth + 1);
                     }
                 }
+                return;
+            }
+
+            // Preserve tags: output original HTML
+            if options.preserve_tags.iter().any(|t| t.as_str() == tag_name) {
+                let html = serialize_tag_to_html(node_handle, parser);
+                output.push_str(&html);
                 return;
             }
 
@@ -4397,5 +4473,83 @@ mod tests {
             "Result should contain 'Content': {:?}",
             result
         );
+    }
+
+    #[test]
+    fn test_preserve_tags_simple_table() {
+        let html = r#"<div><table><tr><td>Cell 1</td><td>Cell 2</td></tr></table><p>Text</p></div>"#;
+        let mut options = ConversionOptions::default();
+        options.preserve_tags = vec!["table".to_string()];
+        let result = convert_html(html, &options).unwrap();
+
+        assert!(result.contains("<table>"), "Should preserve table tag");
+        assert!(result.contains("</table>"), "Should have closing table tag");
+        assert!(result.contains("<tr>"), "Should preserve tr tag");
+        assert!(result.contains("<td>"), "Should preserve td tag");
+        assert!(result.contains("Text"), "Should convert other elements");
+    }
+
+    #[test]
+    fn test_preserve_tags_with_attributes() {
+        let html = r#"<table class="data" id="mytable"><tr><td>Data</td></tr></table>"#;
+        let mut options = ConversionOptions::default();
+        options.preserve_tags = vec!["table".to_string()];
+        let result = convert_html(html, &options).unwrap();
+
+        assert!(result.contains("<table"), "Should preserve table tag");
+        assert!(result.contains("class="), "Should preserve class attribute");
+        assert!(result.contains("id="), "Should preserve id attribute");
+        assert!(result.contains("</table>"), "Should have closing tag");
+    }
+
+    #[test]
+    fn test_preserve_tags_multiple_tags() {
+        let html = r#"<div><table><tr><td>Table</td></tr></table><form><input type="text"/></form><p>Text</p></div>"#;
+        let mut options = ConversionOptions::default();
+        options.preserve_tags = vec!["table".to_string(), "form".to_string()];
+        let result = convert_html(html, &options).unwrap();
+
+        assert!(result.contains("<table>"), "Should preserve table");
+        assert!(result.contains("<form>"), "Should preserve form");
+        assert!(result.contains("Text"), "Should convert paragraph");
+    }
+
+    #[test]
+    fn test_preserve_tags_nested_content() {
+        let html = r#"<table><thead><tr><th>Header</th></tr></thead><tbody><tr><td>Data</td></tr></tbody></table>"#;
+        let mut options = ConversionOptions::default();
+        options.preserve_tags = vec!["table".to_string()];
+        let result = convert_html(html, &options).unwrap();
+
+        assert!(result.contains("<thead>"), "Should preserve nested thead");
+        assert!(result.contains("<tbody>"), "Should preserve nested tbody");
+        assert!(result.contains("<th>"), "Should preserve th tag");
+        assert!(result.contains("Header"), "Should preserve text content");
+    }
+
+    #[test]
+    fn test_preserve_tags_empty_list() {
+        let html = r#"<table><tr><td>Cell</td></tr></table>"#;
+        let options = ConversionOptions::default(); // No preserve_tags
+        let result = convert_html(html, &options).unwrap();
+
+        // Should convert to markdown table (or at least not preserve HTML)
+        assert!(
+            !result.contains("<table>"),
+            "Should not preserve table without preserve_tags"
+        );
+    }
+
+    #[test]
+    fn test_preserve_tags_vs_strip_tags() {
+        let html = r#"<table><tr><td>Table</td></tr></table><div><span>Text</span></div>"#;
+        let mut options = ConversionOptions::default();
+        options.preserve_tags = vec!["table".to_string()];
+        options.strip_tags = vec!["span".to_string()];
+        let result = convert_html(html, &options).unwrap();
+
+        assert!(result.contains("<table>"), "Should preserve table");
+        assert!(!result.contains("<span>"), "Should strip span tag");
+        assert!(result.contains("Text"), "Should keep span text content");
     }
 }

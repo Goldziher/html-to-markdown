@@ -82,6 +82,7 @@ def _to_rust_options(
         encoding=options.encoding,
         debug=options.debug,
         strip_tags=list(options.strip_tags) if options.strip_tags else [],
+        preserve_tags=list(options.preserve_tags) if options.preserve_tags else [],
     )
 
 

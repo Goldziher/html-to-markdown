@@ -53,6 +53,7 @@ def convert_v2() -> Callable[..., str]:
         source_encoding: str = "utf-8",
         strip: list[str] | None = None,
         strip_tags: list[str] | None = None,
+        preserve_tags: list[str] | None = None,
     ) -> str:
         final_strip_tags = strip_tags or strip
 
@@ -83,6 +84,7 @@ def convert_v2() -> Callable[..., str]:
             newline_style=newline_style,  # type: ignore[arg-type]
             keep_inline_images_in=keep_inline_images_in,
             strip_tags=set(final_strip_tags) if final_strip_tags else None,
+            preserve_tags=set(preserve_tags) if preserve_tags else None,
         )
 
         preprocessing = PreprocessingOptions(
