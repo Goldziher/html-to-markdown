@@ -92,6 +92,7 @@ pub fn convert_to_markdown_with_options(
         );
     }
 
+    collapse_extra_newlines(&mut output);
     output.trim().to_string()
 }
 
@@ -185,7 +186,7 @@ fn convert_element(
             if enable_spatial_tables {
                 if let Some(table_markdown) = try_spatial_table_reconstruction(element) {
                     output.push_str(&table_markdown);
-                    output.push_str("\n\n");
+                    ensure_trailing_blank_line(output);
                     return;
                 }
             }
@@ -324,7 +325,7 @@ fn convert_element(
             if enable_spatial_tables {
                 if let Some(table_markdown) = try_spatial_table_reconstruction(element) {
                     output.push_str(&table_markdown);
-                    output.push_str("\n\n");
+                    ensure_trailing_blank_line(output);
                 } else {
                     // Fallback: process children normally
                     let mut sorted_children: Vec<_> = element.children.iter().collect();
@@ -334,7 +335,7 @@ fn convert_element(
                     for child in sorted_children {
                         convert_element(child, output, depth + 1, preserve_structure, enable_spatial_tables, ctx);
                     }
-                    output.push_str("\n\n");
+                    ensure_trailing_blank_line(output);
                 }
             } else {
                 // Fallback: process children normally
@@ -345,7 +346,7 @@ fn convert_element(
                 for child in sorted_children {
                     convert_element(child, output, depth + 1, preserve_structure, enable_spatial_tables, ctx);
                 }
-                output.push_str("\n\n");
+                ensure_trailing_blank_line(output);
             }
         }
 
@@ -361,7 +362,7 @@ fn convert_element(
             for child in sorted_children {
                 convert_element(child, output, depth + 1, preserve_structure, enable_spatial_tables, ctx);
             }
-            output.push_str("\n\n");
+            ensure_trailing_blank_line(output);
         }
 
         // Images - markdown image placeholder or alt text
@@ -460,6 +461,41 @@ fn convert_element(
 
         // Skip noise
         HocrElementType::OcrNoise => {}
+    }
+}
+
+fn ensure_trailing_blank_line(output: &mut String) {
+    while output.ends_with("\n\n\n") {
+        output.pop();
+    }
+    if output.ends_with("\n\n") {
+        return;
+    }
+    if output.ends_with('\n') {
+        output.push('\n');
+    } else {
+        output.push_str("\n\n");
+    }
+}
+
+fn collapse_extra_newlines(output: &mut String) {
+    let mut collapsed = String::with_capacity(output.len());
+    let mut newline_count = 0;
+
+    for ch in output.chars() {
+        if ch == '\n' {
+            newline_count += 1;
+            if newline_count <= 2 {
+                collapsed.push('\n');
+            }
+        } else {
+            newline_count = 0;
+            collapsed.push(ch);
+        }
+    }
+
+    if collapsed.len() != output.len() {
+        *output = collapsed;
     }
 }
 

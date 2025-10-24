@@ -219,6 +219,10 @@ jobs:
         working-directory: crates/html-to-markdown-node
         run: pnpm install
 
+      - name: Build Node bindings
+        working-directory: crates/html-to-markdown-node
+        run: pnpm run build
+
       - name: Publish to npm
         if: ${{ !inputs.dry_run }}
         working-directory: crates/html-to-markdown-node
@@ -263,9 +267,16 @@ jobs:
 
       - name: Build WASM (all targets)
         working-directory: crates/html-to-markdown-wasm
+        env:
+          RUSTFLAGS: '--cfg getrandom_backend="wasm_js"'
         run: |
           pnpm install
           pnpm run build:all
+
+      - name: Remove wasm-pack gitignores
+        working-directory: crates/html-to-markdown-wasm
+        run: |
+          find dist dist-node dist-web -maxdepth 1 -name ".gitignore" -delete
 
       - name: Publish to npm
         if: ${{ !inputs.dry_run }}
