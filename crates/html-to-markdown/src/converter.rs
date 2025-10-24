@@ -47,6 +47,9 @@ use std::collections::BTreeMap;
 #[cfg(feature = "inline-images")]
 use std::rc::Rc;
 
+use std::borrow::Cow;
+use std::str;
+
 use crate::error::Result;
 #[cfg(feature = "inline-images")]
 use crate::inline_images::{InlineImageCollector, InlineImageFormat, InlineImageSource};
@@ -971,7 +974,9 @@ fn convert_html_impl(
         .replace("<hr/>", "<hr>")
         .replace("<img/>", "<img>");
 
-    let dom = tl::parse(&html, tl::ParserOptions::default())
+    let html = strip_script_and_style_sections(&html);
+
+    let dom = tl::parse(html.as_ref(), tl::ParserOptions::default())
         .map_err(|_| crate::error::ConversionError::ParseError("Failed to parse HTML".to_string()))?;
 
     let parser = dom.parser();
@@ -1073,6 +1078,161 @@ fn convert_html_impl(
     } else {
         Ok(format!("{}\n", trimmed))
     }
+}
+
+fn strip_script_and_style_sections(input: &str) -> Cow<'_, str> {
+    const TAGS: [&[u8]; 2] = [b"script", b"style"];
+    const SVG: &[u8] = b"svg";
+
+    let bytes = input.as_bytes();
+    let len = bytes.len();
+    let mut idx = 0;
+    let mut last = 0;
+    let mut output: Option<String> = None;
+    let mut svg_depth = 0usize;
+
+    while idx < len {
+        if bytes[idx] == b'<' {
+            if matches_tag_start(bytes, idx + 1, SVG) {
+                if let Some(open_end) = find_tag_end(bytes, idx + 1 + SVG.len()) {
+                    svg_depth += 1;
+                    idx = open_end;
+                    continue;
+                }
+            } else if matches_end_tag_start(bytes, idx + 1, SVG) {
+                if let Some(close_end) = find_tag_end(bytes, idx + 2 + SVG.len()) {
+                    if svg_depth > 0 {
+                        svg_depth = svg_depth.saturating_sub(1);
+                    }
+                    idx = close_end;
+                    continue;
+                }
+            }
+
+            if svg_depth == 0 {
+                let mut handled = false;
+                for tag in TAGS {
+                    if matches_tag_start(bytes, idx + 1, tag) {
+                        if let Some(open_end) = find_tag_end(bytes, idx + 1 + tag.len()) {
+                            let remove_end = find_closing_tag(bytes, open_end, tag).unwrap_or(len);
+                            let out = output.get_or_insert_with(|| String::with_capacity(input.len()));
+                            out.push_str(&input[last..idx]);
+                            out.push_str(&input[idx..open_end]);
+                            out.push_str("</");
+                            out.push_str(str::from_utf8(tag).unwrap());
+                            out.push('>');
+
+                            last = remove_end;
+                            idx = remove_end;
+                            handled = true;
+                        }
+                    }
+
+                    if handled {
+                        break;
+                    }
+                }
+
+                if handled {
+                    continue;
+                }
+            }
+        }
+
+        idx += 1;
+    }
+
+    if let Some(mut out) = output {
+        if last < input.len() {
+            out.push_str(&input[last..]);
+        }
+        Cow::Owned(out)
+    } else {
+        Cow::Borrowed(input)
+    }
+}
+
+fn matches_tag_start(bytes: &[u8], mut start: usize, tag: &[u8]) -> bool {
+    if start >= bytes.len() {
+        return false;
+    }
+
+    if start + tag.len() > bytes.len() {
+        return false;
+    }
+
+    if !bytes[start..start + tag.len()].eq_ignore_ascii_case(tag) {
+        return false;
+    }
+
+    start += tag.len();
+
+    match bytes.get(start) {
+        Some(b'>' | b'/' | b' ' | b'\t' | b'\n' | b'\r') => true,
+        Some(_) => false,
+        None => true,
+    }
+}
+
+fn find_tag_end(bytes: &[u8], mut idx: usize) -> Option<usize> {
+    let len = bytes.len();
+    let mut in_quote: Option<u8> = None;
+
+    while idx < len {
+        match bytes[idx] {
+            b'"' | b'\'' => {
+                if let Some(current) = in_quote {
+                    if current == bytes[idx] {
+                        in_quote = None;
+                    }
+                } else {
+                    in_quote = Some(bytes[idx]);
+                }
+            }
+            b'>' if in_quote.is_none() => return Some(idx + 1),
+            _ => {}
+        }
+        idx += 1;
+    }
+
+    None
+}
+
+fn find_closing_tag(bytes: &[u8], mut idx: usize, tag: &[u8]) -> Option<usize> {
+    let len = bytes.len();
+    let mut depth = 1usize;
+
+    while idx < len {
+        if bytes[idx] == b'<' {
+            if matches_tag_start(bytes, idx + 1, tag) {
+                if let Some(next) = find_tag_end(bytes, idx + 1 + tag.len()) {
+                    depth += 1;
+                    idx = next;
+                    continue;
+                }
+            } else if matches_end_tag_start(bytes, idx + 1, tag) {
+                if let Some(close) = find_tag_end(bytes, idx + 2 + tag.len()) {
+                    depth -= 1;
+                    if depth == 0 {
+                        return Some(close);
+                    }
+                    idx = close;
+                    continue;
+                }
+            }
+        }
+
+        idx += 1;
+    }
+
+    None
+}
+
+fn matches_end_tag_start(bytes: &[u8], start: usize, tag: &[u8]) -> bool {
+    if start >= bytes.len() || bytes[start] != b'/' {
+        return false;
+    }
+    matches_tag_start(bytes, start + 1, tag)
 }
 
 /// Check if an element is inline (not block-level).
@@ -4000,6 +4160,22 @@ mod tests {
         assert_eq!(calculate_list_continuation_indent(3), 5);
 
         assert_eq!(calculate_list_continuation_indent(4), 7);
+    }
+
+    #[test]
+    fn strips_script_sections_without_removing_following_content() {
+        let input = "<div>before</div><script>1 < 2</script><p>after</p>";
+        let stripped = strip_script_and_style_sections(input);
+        assert_eq!(stripped, "<div>before</div><script></script><p>after</p>");
+    }
+
+    #[test]
+    fn strips_multiline_script_sections() {
+        let input = "<html>\n<script>1 < 2</script>\nContent\n</html>";
+        let stripped = strip_script_and_style_sections(input);
+        assert!(stripped.contains("Content"));
+        assert!(stripped.contains("<script"));
+        assert!(!stripped.contains("1 < 2"));
     }
 
     #[test]

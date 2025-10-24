@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.4.1] - 2025-10-22
+
+### Fixed
+
+- Ensure npm publishes include the generated Node bindings and platform binaries by running the N-API build during CI.
+- Configure WebAssembly builds with the `wasm_js` backend and strip wasm-pack `.gitignore` files so published packages ship the compiled `.wasm` artifacts.
+
+## [2.4.0] - 2025-10-22
+
+### Changed
+
+- Updated Rust workspace dependencies (including `pyo3`) to their latest compatible releases and refreshed lockfiles.
+- Normalized hOCR conversion spacing by collapsing stray triple newlines, ensuring generated Markdown matches regression fixtures.
+
+### Fixed
+
+- Corrected the WASM crate to depend on `getrandom`'s `wasm_js` feature, restoring WebAssembly builds.
+- Expanded the Node package `files` list so published tarballs now include compiled `.node` artifacts, CommonJS shims, and typings.
+
 ## [2.3.4] - 2025-10-12
 
 ### Changed
