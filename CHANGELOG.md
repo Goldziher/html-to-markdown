@@ -40,6 +40,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - `<meta>` tags with `name` and `content` attributes (required for hOCR metadata detection)
     - `<head>` tags (container for meta tags)
 - **hOCR metadata extraction after sanitization** - Fixed metadata extraction failing when preprocessing strips the `<head>` container element. The extractor now finds orphaned meta tags anywhere in the document, not just inside `<head>` elements.
+- **`preserve_tags` functionality with preprocessing** - Fixed `preserve_tags` not working when HTML preprocessing is enabled (the new default). The sanitizer now:
+    - Accepts the `preserve_tags` list and allows those tags through sanitization
+    - Preserves common HTML attributes (`id`, `class`, `style`, `title`, etc.) on preserved tags
+    - Prevents `remove_forms` from stripping form tags when they're in the preserve list
+    - Ensures tags and attributes survive preprocessing so they can be output as HTML
+- **SVG support for inline image extraction** - Fixed SVG elements being stripped by the sanitizer, breaking inline image capture. All sanitization presets now allow:
+    - SVG elements: `svg`, `circle`, `rect`, `path`, `line`, `polyline`, `polygon`, `ellipse`, `g`
+    - SVG attributes: `width`, `height`, `viewBox`, `cx`, `cy`, `r`, `x`, `y`, `d`, `fill`, `stroke`
+    - Enables `convert_with_inline_images` to capture inline SVG elements
 - **Robust handling of malformed angle brackets in HTML** - Fixed parser failures when bare `<` or `>` characters appear in HTML text content (e.g., `1<2`, mathematical comparisons). The converter now:
     - Automatically escapes malformed angle brackets that aren't part of valid HTML tags
     - Works correctly with preprocessing both enabled and disabled
