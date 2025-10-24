@@ -75,16 +75,27 @@ fn create_minimal_builder() -> Builder<'static> {
     url_schemes.insert("data");
     builder.url_schemes(url_schemes);
 
-    // Add input to allowed tags for checkbox support in task lists
+    // Add input and meta tags for checkbox support and hOCR detection
     let mut tags = builder.clone_tags();
     tags.insert("input");
+    tags.insert("meta");
+    tags.insert("head");
     builder.tags(tags);
 
     // Allow type and checked attributes on input elements
+    // Allow name and content on meta tags for hOCR detection
+    // Allow class attribute on all tags for hOCR detection
     let mut tag_attrs = builder.clone_tag_attributes();
     let input_attrs: HashSet<&str> = ["type", "checked"].iter().copied().collect();
     tag_attrs.insert("input", input_attrs);
+    let meta_attrs: HashSet<&str> = ["name", "content"].iter().copied().collect();
+    tag_attrs.insert("meta", meta_attrs);
     builder.tag_attributes(tag_attrs);
+
+    // Add class attribute globally for hOCR support
+    let mut generic_attrs = builder.clone_generic_attributes();
+    generic_attrs.insert("class");
+    builder.generic_attributes(generic_attrs);
 
     builder
 }
@@ -101,16 +112,26 @@ fn create_standard_builder() -> Builder<'static> {
     url_schemes.insert("data");
     builder.url_schemes(url_schemes);
 
-    // Add input to allowed tags for checkbox support in task lists
+    // Add input and meta tags for checkbox support and hOCR detection
     let mut tags = builder.clone_tags();
     tags.insert("input");
+    tags.insert("meta");
+    tags.insert("head");
     builder.tags(tags);
 
     // Allow type and checked attributes on input elements
+    // Allow name and content on meta tags for hOCR detection
     let mut tag_attrs = builder.clone_tag_attributes();
     let input_attrs: HashSet<&str> = ["type", "checked"].iter().copied().collect();
     tag_attrs.insert("input", input_attrs);
+    let meta_attrs: HashSet<&str> = ["name", "content"].iter().copied().collect();
+    tag_attrs.insert("meta", meta_attrs);
     builder.tag_attributes(tag_attrs);
+
+    // Add class attribute globally for hOCR support
+    let mut generic_attrs = builder.clone_generic_attributes();
+    generic_attrs.insert("class");
+    builder.generic_attributes(generic_attrs);
 
     builder
 }
@@ -128,16 +149,26 @@ fn create_aggressive_builder() -> Builder<'static> {
     url_schemes.insert("data");
     builder.url_schemes(url_schemes);
 
-    // Add input to allowed tags for checkbox support in task lists
+    // Add input and meta tags for checkbox support and hOCR detection
     let mut tags = builder.clone_tags();
     tags.insert("input");
+    tags.insert("meta");
+    tags.insert("head");
     builder.tags(tags);
 
     // Allow type and checked attributes on input elements
+    // Allow name and content on meta tags for hOCR detection
     let mut tag_attrs = builder.clone_tag_attributes();
     let input_attrs: HashSet<&str> = ["type", "checked"].iter().copied().collect();
     tag_attrs.insert("input", input_attrs);
+    let meta_attrs: HashSet<&str> = ["name", "content"].iter().copied().collect();
+    tag_attrs.insert("meta", meta_attrs);
     builder.tag_attributes(tag_attrs);
+
+    // Add class attribute globally for hOCR support
+    let mut generic_attrs = builder.clone_generic_attributes();
+    generic_attrs.insert("class");
+    builder.generic_attributes(generic_attrs);
 
     builder
 }

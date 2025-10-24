@@ -32,7 +32,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - Added `data` to allowed URL schemes in all sanitization presets
     - Fixes `convert_with_inline_images` functionality for base64-encoded images
 - **CDATA section handling** - Fixed test expectation for CDATA sections. CDATA sections are now correctly preserved as-is during HTML parsing instead of being partially stripped.
-- **hOCR word spacing (Rust only)** - Fixed missing whitespace between `<span class="ocrx_word">` elements in hOCR documents. Words now have proper spaces between them in Rust library (Python bindings pending rebuild investigation).
+- **hOCR word spacing** - Fixed missing whitespace between `<span class="ocrx_word">` elements in hOCR documents. Words now have proper spaces between them.
+    - Modified `OcrxWord` converter to insert space before each word if output doesn't end with whitespace
+    - Ensures proper word separation in OCR-generated documents
+- **hOCR detection with preprocessing** - Fixed hOCR documents not being detected when HTML preprocessing is enabled (new default). The sanitizer now preserves:
+    - `class` attributes on all elements (required for detecting hOCR element types)
+    - `<meta>` tags with `name` and `content` attributes (required for hOCR metadata detection)
+    - `<head>` tags (container for meta tags)
+- **hOCR metadata extraction after sanitization** - Fixed metadata extraction failing when preprocessing strips the `<head>` container element. The extractor now finds orphaned meta tags anywhere in the document, not just inside `<head>` elements.
 - **Robust handling of malformed angle brackets in HTML** - Fixed parser failures when bare `<` or `>` characters appear in HTML text content (e.g., `1<2`, mathematical comparisons). The converter now:
     - Automatically escapes malformed angle brackets that aren't part of valid HTML tags
     - Works correctly with preprocessing both enabled and disabled
