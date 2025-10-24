@@ -1,5 +1,5 @@
 {
-  "$schema": "https://biomejs.dev/schemas/2.2.5/schema.json",
+  "$schema": "https://biomejs.dev/schemas/2.2.6/schema.json",
   "vcs": {
     "enabled": true,
     "clientKind": "git",
@@ -15,7 +15,9 @@
         "**/html-to-markdown-node/index.js",
         "**/html-to-markdown-node/index.d.ts",
         "**/html-to-markdown-wasm/**/*.js",
-        "**/html-to-markdown-wasm/**/*.d.ts"
+        "**/html-to-markdown-wasm/**/*.d.ts",
+        "docs/html_to_markdown_wasm.js",
+        "docs/html_to_markdown_wasm_bg.wasm"
       ],
       "linter": {
         "enabled": false
