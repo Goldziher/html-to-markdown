@@ -9,11 +9,23 @@ High-performance HTML → Markdown conversion powered by Rust. Shipping as a Rus
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://github.com/Goldziher/html-to-markdown/blob/main/LICENSE)
 [![Discord](https://img.shields.io/badge/Discord-Join%20our%20community-7289da)](https://discord.gg/pXxagNK2zN)
 
-## 🎮 Live Demo
+---
 
-**Try it now:** [https://goldziher.github.io/html-to-markdown/](https://goldziher.github.io/html-to-markdown/)
+## 🎮 **[Try the Live Demo →](https://goldziher.github.io/html-to-markdown/)**
 
-Experience the power of WebAssembly-based HTML to Markdown conversion directly in your browser!
+Experience WebAssembly-powered HTML to Markdown conversion instantly in your browser. No installation needed!
+
+---
+
+## Why html-to-markdown?
+
+- **Blazing Fast**: Rust-powered core delivers 10-80× faster conversion than pure Python alternatives
+- **Universal**: Works everywhere - Node.js, Bun, Deno, browsers, Python, Rust, and standalone CLI
+- **Smart Conversion**: Handles complex documents including nested tables, code blocks, task lists, and hOCR OCR output
+- **Highly Configurable**: Control heading styles, code block fences, list formatting, whitespace handling, and HTML sanitization
+- **Tag Preservation**: Keep specific HTML tags unconverted when markdown isn't expressive enough
+- **Secure by Default**: Built-in HTML sanitization prevents malicious content
+- **Consistent Output**: Identical markdown rendering across all language bindings
 
 ## Documentation
 
@@ -52,6 +64,7 @@ const markdown = convert(html, {
   headingStyle: 'Atx',
   codeBlockStyle: 'Backticks',
   wrap: true,
+  preserveTags: ['table'], // NEW in v2.5: Keep complex HTML as-is
 });
 ```
 
