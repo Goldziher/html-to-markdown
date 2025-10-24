@@ -237,9 +237,13 @@ fn convert_element(
 
         // Words - join with space
         HocrElementType::OcrxWord => {
+            // Ensure space before this word if output doesn't end with whitespace
+            if !output.is_empty() && !output.ends_with(' ') && !output.ends_with('\t') && !output.ends_with('\n') {
+                output.push(' ');
+            }
+
             if !element.text.is_empty() {
                 output.push_str(&element.text);
-                output.push(' ');
             }
         }
 
