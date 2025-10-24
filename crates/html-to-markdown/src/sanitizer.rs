@@ -70,6 +70,11 @@ fn create_minimal_builder() -> Builder<'static> {
     let mut builder = Builder::default();
     builder.strip_comments(false);
 
+    // Allow data: URLs for inline images (base64 encoded images)
+    let mut url_schemes = builder.clone_url_schemes();
+    url_schemes.insert("data");
+    builder.url_schemes(url_schemes);
+
     // Add input to allowed tags for checkbox support in task lists
     let mut tags = builder.clone_tags();
     tags.insert("input");
@@ -90,6 +95,11 @@ fn create_standard_builder() -> Builder<'static> {
 
     let mut builder = Builder::default();
     builder.strip_comments(true);
+
+    // Allow data: URLs for inline images (base64 encoded images)
+    let mut url_schemes = builder.clone_url_schemes();
+    url_schemes.insert("data");
+    builder.url_schemes(url_schemes);
 
     // Add input to allowed tags for checkbox support in task lists
     let mut tags = builder.clone_tags();
@@ -112,6 +122,11 @@ fn create_aggressive_builder() -> Builder<'static> {
     let mut builder = Builder::default();
     builder.strip_comments(true);
     builder.link_rel(Some("nofollow noopener noreferrer"));
+
+    // Allow data: URLs for inline images (base64 encoded images)
+    let mut url_schemes = builder.clone_url_schemes();
+    url_schemes.insert("data");
+    builder.url_schemes(url_schemes);
 
     // Add input to allowed tags for checkbox support in task lists
     let mut tags = builder.clone_tags();
