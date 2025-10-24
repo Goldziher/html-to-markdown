@@ -107,6 +107,17 @@ tasks:
       - task: build:wasm
       - task: build:ts
 
+  build:demo:
+    desc: "Build and update the GitHub Pages demo"
+    cmds:
+      - ./scripts/build-demo.sh
+
+  serve:demo:
+    desc: "Serve the GitHub Pages demo locally"
+    dir: docs
+    cmds:
+      - python3 -m http.server 8000
+
   build:wheel-prep:
     desc: "Prepare CLI binary for wheel packaging"
     cmds:
