@@ -128,8 +128,8 @@ class PreprocessingOptions:
         ... )
     """
 
-    enabled: bool = False
-    """Whether to enable HTML preprocessing (disabled by default for minimal transformation)."""
+    enabled: bool = True
+    """Whether to enable HTML preprocessing (enabled by default for robust handling of malformed HTML)."""
 
     preset: Literal["minimal", "standard", "aggressive"] = "standard"
     """Preprocessing aggressiveness level."""

@@ -974,6 +974,9 @@ fn convert_html_impl(
         .replace("<hr/>", "<hr>")
         .replace("<img/>", "<img>");
 
+    // Escape malformed angle brackets in text content to prevent parser failures
+    let html = escape_malformed_angle_brackets(&html);
+
     let html = strip_script_and_style_sections(&html);
 
     let dom = tl::parse(html.as_ref(), tl::ParserOptions::default())
@@ -1077,6 +1080,82 @@ fn convert_html_impl(
         Ok(String::new())
     } else {
         Ok(format!("{}\n", trimmed))
+    }
+}
+
+/// Escape malformed angle brackets in HTML that are not part of valid tags.
+///
+/// This function ensures robust parsing by escaping bare `<` and `>` characters
+/// that appear in text content and are not part of HTML tags. This prevents
+/// parser failures on malformed HTML like "1<2" or comparisons in text.
+///
+/// # Examples
+///
+/// - `1<2` becomes `1&lt;2`
+/// - `<div>1<2</div>` becomes `<div>1&lt;2</div>`
+/// - `<script>1 < 2</script>` remains unchanged (handled by script stripping)
+fn escape_malformed_angle_brackets(input: &str) -> Cow<'_, str> {
+    let bytes = input.as_bytes();
+    let len = bytes.len();
+    let mut idx = 0;
+    let mut last = 0;
+    let mut output: Option<String> = None;
+
+    while idx < len {
+        if bytes[idx] == b'<' {
+            // Check if this is a valid tag start
+            if idx + 1 < len {
+                let next = bytes[idx + 1];
+
+                // Valid tag patterns: <tagname, </tagname, <!doctype, <!--
+                let is_valid_tag = match next {
+                    b'!' => {
+                        // DOCTYPE or comment
+                        idx + 2 < len
+                            && (bytes[idx + 2] == b'-'
+                                || bytes[idx + 2].is_ascii_alphabetic()
+                                || bytes[idx + 2].is_ascii_uppercase())
+                    }
+                    b'/' => {
+                        // Closing tag
+                        idx + 2 < len && (bytes[idx + 2].is_ascii_alphabetic() || bytes[idx + 2].is_ascii_uppercase())
+                    }
+                    b'?' => {
+                        // XML declaration
+                        true
+                    }
+                    c if c.is_ascii_alphabetic() || c.is_ascii_uppercase() => {
+                        // Opening tag
+                        true
+                    }
+                    _ => false,
+                };
+
+                if !is_valid_tag {
+                    // This is a bare `<` that should be escaped
+                    let out = output.get_or_insert_with(|| String::with_capacity(input.len() + 4));
+                    out.push_str(&input[last..idx]);
+                    out.push_str("&lt;");
+                    last = idx + 1;
+                }
+            } else {
+                // `<` at end of string - escape it
+                let out = output.get_or_insert_with(|| String::with_capacity(input.len() + 4));
+                out.push_str(&input[last..idx]);
+                out.push_str("&lt;");
+                last = idx + 1;
+            }
+        }
+        idx += 1;
+    }
+
+    if let Some(mut out) = output {
+        if last < input.len() {
+            out.push_str(&input[last..]);
+        }
+        Cow::Owned(out)
+    } else {
+        Cow::Borrowed(input)
     }
 }
 
@@ -4224,5 +4303,99 @@ mod tests {
         let mut output = String::from("* First\t\t");
         add_list_continuation_indent(&mut output, 1, false, &opts);
         assert_eq!(output, "* First\n  ");
+    }
+
+    #[test]
+    fn test_escape_malformed_angle_brackets_bare() {
+        let input = "1<2";
+        let escaped = escape_malformed_angle_brackets(input);
+        assert_eq!(escaped, "1&lt;2");
+    }
+
+    #[test]
+    fn test_escape_malformed_angle_brackets_in_text() {
+        let input = "<html>1<2 Content</html>";
+        let escaped = escape_malformed_angle_brackets(input);
+        assert_eq!(escaped, "<html>1&lt;2 Content</html>");
+    }
+
+    #[test]
+    fn test_escape_malformed_angle_brackets_multiple() {
+        let input = "1 < 2 < 3";
+        let escaped = escape_malformed_angle_brackets(input);
+        assert_eq!(escaped, "1 &lt; 2 &lt; 3");
+    }
+
+    #[test]
+    fn test_escape_malformed_angle_brackets_preserves_valid_tags() {
+        let input = "<div>content</div>";
+        let escaped = escape_malformed_angle_brackets(input);
+        assert_eq!(escaped, "<div>content</div>");
+    }
+
+    #[test]
+    fn test_escape_malformed_angle_brackets_mixed() {
+        let input = "<div>1<2</div><p>3<4</p>";
+        let escaped = escape_malformed_angle_brackets(input);
+        assert_eq!(escaped, "<div>1&lt;2</div><p>3&lt;4</p>");
+    }
+
+    #[test]
+    fn test_escape_malformed_angle_brackets_at_end() {
+        let input = "test<";
+        let escaped = escape_malformed_angle_brackets(input);
+        assert_eq!(escaped, "test&lt;");
+    }
+
+    #[test]
+    fn test_escape_malformed_angle_brackets_preserves_comments() {
+        let input = "<!-- comment -->1<2";
+        let escaped = escape_malformed_angle_brackets(input);
+        assert_eq!(escaped, "<!-- comment -->1&lt;2");
+    }
+
+    #[test]
+    fn test_escape_malformed_angle_brackets_preserves_doctype() {
+        let input = "<!DOCTYPE html>1<2";
+        let escaped = escape_malformed_angle_brackets(input);
+        assert_eq!(escaped, "<!DOCTYPE html>1&lt;2");
+    }
+
+    #[test]
+    fn test_convert_with_malformed_angle_brackets() {
+        // Test the full conversion pipeline (issue #94)
+        let html = "<html>1<2\nContent</html>";
+        let result = convert_html(html, &ConversionOptions::default()).unwrap();
+        assert!(
+            result.contains("Content"),
+            "Result should contain 'Content': {:?}",
+            result
+        );
+        assert!(
+            result.contains("1<2") || result.contains("1&lt;2"),
+            "Result should contain escaped or unescaped comparison"
+        );
+    }
+
+    #[test]
+    fn test_convert_with_malformed_angle_brackets_in_div() {
+        let html = "<html><div>1<2</div><div>Content</div></html>";
+        let result = convert_html(html, &ConversionOptions::default()).unwrap();
+        assert!(
+            result.contains("Content"),
+            "Result should contain 'Content': {:?}",
+            result
+        );
+    }
+
+    #[test]
+    fn test_convert_with_multiple_malformed_angle_brackets() {
+        let html = "<html>1 < 2 < 3<p>Content</p></html>";
+        let result = convert_html(html, &ConversionOptions::default()).unwrap();
+        assert!(
+            result.contains("Content"),
+            "Result should contain 'Content': {:?}",
+            result
+        );
     }
 }

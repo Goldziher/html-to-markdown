@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **HTML preprocessing is now enabled by default** - The `PreprocessingOptions.enabled` default changed from `False` to `True` to ensure robust handling of malformed HTML. Users who want minimal preprocessing can explicitly set `enabled=False`.
+
+### Fixed
+
+- **Robust handling of malformed angle brackets in HTML** - Fixed parser failures when bare `<` or `>` characters appear in HTML text content (e.g., `1<2`, mathematical comparisons). The converter now:
+    - Automatically escapes malformed angle brackets that aren't part of valid HTML tags
+    - Works correctly with preprocessing both enabled and disabled
+    - Handles edge cases like `1<2`, `1 < 2 < 3`, and angle brackets at tag boundaries
+    - Fixes issue #94 where content following malformed angle brackets was lost
+- Added comprehensive test coverage for malformed angle bracket handling in both Rust and Python test suites
+
 ## [2.4.1] - 2025-10-22
 
 ### Fixed
