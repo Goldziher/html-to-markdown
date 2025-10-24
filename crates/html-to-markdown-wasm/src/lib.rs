@@ -252,6 +252,8 @@ pub struct WasmConversionOptions {
     pub debug: Option<bool>,
     /// List of HTML tags to strip
     pub strip_tags: Option<Vec<String>>,
+    /// List of HTML tags to preserve as-is in the output
+    pub preserve_tags: Option<Vec<String>>,
 }
 
 impl From<WasmConversionOptions> for RustConversionOptions {
@@ -294,6 +296,7 @@ impl From<WasmConversionOptions> for RustConversionOptions {
             encoding: val.encoding.unwrap_or(defaults.encoding),
             debug: val.debug.unwrap_or(defaults.debug),
             strip_tags: val.strip_tags.unwrap_or(defaults.strip_tags),
+            preserve_tags: val.preserve_tags.unwrap_or(defaults.preserve_tags),
         }
     }
 }
@@ -422,6 +425,7 @@ mod tests {
             encoding: None,
             debug: None,
             strip_tags: None,
+            preserve_tags: None,
         };
 
         let js_options = serde_wasm_bindgen::to_value(&options).unwrap();

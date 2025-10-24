@@ -7,18 +7,46 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.5.0] - 2025-10-24
+
+### Added
+
+- **New `preserve_tags` option** - Preserve specific HTML tags in their original HTML form instead of converting them to Markdown. This is useful for complex elements like tables that may not convert well to Markdown. Fixes issue #95.
+    - Accepts a list of tag names (e.g., `["table", "form"]`)
+    - Preserves all attributes and nested content as HTML
+    - Works independently of `strip_tags` - can use both options together
+    - Available in all bindings: Rust, Python, Node.js, and WASM
+    - Comprehensive test coverage in Rust, Python (pytest), and TypeScript (vitest)
+
 ### Changed
 
 - **HTML preprocessing is now enabled by default** - The `PreprocessingOptions.enabled` default changed from `False` to `True` to ensure robust handling of malformed HTML. Users who want minimal preprocessing can explicitly set `enabled=False`.
 
 ### Fixed
 
+- **Task list checkbox support** - Fixed sanitizer removing `<input type="checkbox">` elements when `remove_forms` is enabled (default). Checkboxes are now preserved during preprocessing to enable proper task list conversion (`- [x]` / `- [ ]`).
+    - Added `input` tag to allowed tags in all sanitization presets (minimal, standard, aggressive)
+    - Preserved `type` and `checked` attributes on input elements
+    - Fixed pre-existing bug where task list checkboxes were silently removed
+- **Data URI support for inline images** - Fixed sanitizer stripping `data:` URLs from image src attributes. Base64-encoded inline images (data URIs) are now preserved during preprocessing.
+    - Added `data` to allowed URL schemes in all sanitization presets
+    - Fixes `convert_with_inline_images` functionality for base64-encoded images
+- **CDATA section handling** - Fixed test expectation for CDATA sections. CDATA sections are now correctly preserved as-is during HTML parsing instead of being partially stripped.
+- **hOCR word spacing** - Fixed missing whitespace between `<span class="ocrx_word">` elements in hOCR documents. Words now have proper spaces between them.
+    - Modified `OcrxWord` converter to insert space before each word if output doesn't end with whitespace or markdown formatting characters
+    - Ensures proper word separation in OCR-generated documents without breaking markdown formatting (e.g., `*text*`, `[alt](url)`, `` `code` ``)
+- **hOCR detection with preprocessing** - Fixed hOCR documents not being detected when HTML preprocessing is enabled (new default). The sanitizer now preserves:
+    - `class` attributes on all elements (required for detecting hOCR element types)
+    - `<meta>` tags with `name` and `content` attributes (required for hOCR metadata detection)
+    - `<head>` tags (container for meta tags)
+- **hOCR metadata extraction after sanitization** - Fixed metadata extraction failing when preprocessing strips the `<head>` container element. The extractor now finds orphaned meta tags anywhere in the document, not just inside `<head>` elements.
 - **Robust handling of malformed angle brackets in HTML** - Fixed parser failures when bare `<` or `>` characters appear in HTML text content (e.g., `1<2`, mathematical comparisons). The converter now:
     - Automatically escapes malformed angle brackets that aren't part of valid HTML tags
     - Works correctly with preprocessing both enabled and disabled
     - Handles edge cases like `1<2`, `1 < 2 < 3`, and angle brackets at tag boundaries
     - Fixes issue #94 where content following malformed angle brackets was lost
 - Added comprehensive test coverage for malformed angle bracket handling in both Rust and Python test suites
+- Fixed WASM build configuration to use correct `getrandom` backend for wasm32-unknown-unknown targets
 
 ## [2.4.1] - 2025-10-22
 

@@ -620,6 +620,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         encoding: cli.encoding.clone(),
         debug: cli.debug,
         strip_tags: cli.strip_tags.unwrap_or(defaults.strip_tags),
+        preserve_tags: Vec::new(), // CLI doesn't have preserve_tags flag yet
     };
 
     let markdown = convert(&html, Some(options)).map_err(|e| format!("Error converting HTML: {}", e))?;
