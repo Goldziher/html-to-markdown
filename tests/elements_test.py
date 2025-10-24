@@ -1653,9 +1653,9 @@ def test_u_basic(convert: Callable[..., str]) -> None:
 
 
 def test_u_misspelling(convert: Callable[..., str]) -> None:
-    html = "<p>This word is <u>mispelled</u>.</p>"
+    html = "<p>This word is <u>mispelled</u>.</p>"  # codespell:ignore mispelled
     result = convert(html)
-    assert result == "This word is mispelled.\n"
+    assert result == "This word is mispelled.\n"  # codespell:ignore mispelled
 
 
 def test_u_inline_mode(convert: Callable[..., str]) -> None:
