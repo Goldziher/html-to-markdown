@@ -129,9 +129,12 @@ Key fields (see docstring for full matrix):
 
 ### `PreprocessingOptions`
 
-- `enabled`: enable HTML sanitisation
-- `preset`: `"minimal" | "standard" | "aggressive"`
-- `remove_navigation`, `remove_forms`
+- `enabled`: enable HTML sanitisation (default: `True` since v2.4.2 for robust malformed HTML handling)
+- `preset`: `"minimal" | "standard" | "aggressive"` (default: `"standard"`)
+- `remove_navigation`: remove navigation elements (default: `True`)
+- `remove_forms`: remove form elements (default: `True`)
+
+**Note:** As of v2.4.2, preprocessing is enabled by default to ensure robust handling of malformed HTML (e.g., bare angle brackets like `1<2` in content). Set `enabled=False` if you need minimal preprocessing.
 
 ### `InlineImageConfig`
 
