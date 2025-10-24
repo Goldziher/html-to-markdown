@@ -49,7 +49,7 @@ pub fn convert(html: &str, options: Option<ConversionOptions>) -> Result<String>
     let normalized_html = html.replace("\r\n", "\n").replace('\r', "\n");
 
     let clean_html = if options.preprocessing.enabled {
-        sanitizer::sanitize(&normalized_html, &options.preprocessing)?
+        sanitizer::sanitize(&normalized_html, &options.preprocessing, &options.preserve_tags)?
     } else {
         normalized_html
     };
@@ -86,7 +86,7 @@ pub fn convert_with_inline_images(
     let normalized_html = html.replace("\r\n", "\n").replace('\r', "\n");
 
     let clean_html = if options.preprocessing.enabled {
-        sanitizer::sanitize(&normalized_html, &options.preprocessing)?
+        sanitizer::sanitize(&normalized_html, &options.preprocessing, &options.preserve_tags)?
     } else {
         normalized_html
     };
