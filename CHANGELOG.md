@@ -33,8 +33,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - Fixes `convert_with_inline_images` functionality for base64-encoded images
 - **CDATA section handling** - Fixed test expectation for CDATA sections. CDATA sections are now correctly preserved as-is during HTML parsing instead of being partially stripped.
 - **hOCR word spacing** - Fixed missing whitespace between `<span class="ocrx_word">` elements in hOCR documents. Words now have proper spaces between them.
-    - Modified `OcrxWord` converter to insert space before each word if output doesn't end with whitespace
-    - Ensures proper word separation in OCR-generated documents
+    - Modified `OcrxWord` converter to insert space before each word if output doesn't end with whitespace or markdown formatting characters
+    - Ensures proper word separation in OCR-generated documents without breaking markdown formatting (e.g., `*text*`, `[alt](url)`, `` `code` ``)
 - **hOCR detection with preprocessing** - Fixed hOCR documents not being detected when HTML preprocessing is enabled (new default). The sanitizer now preserves:
     - `class` attributes on all elements (required for detecting hOCR element types)
     - `<meta>` tags with `name` and `content` attributes (required for hOCR metadata detection)
