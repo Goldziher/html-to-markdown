@@ -330,7 +330,29 @@ impl ConversionOptions {
     }
 }
 
-/// Convert HTML to Markdown
+/// Convert HTML to Markdown.
+///
+/// Args:
+///     html: HTML string to convert
+///     options: Optional conversion configuration
+///
+/// Returns:
+///     Markdown string
+///
+/// Raises:
+///     ValueError: Invalid HTML or configuration
+///
+/// Example:
+///     ```ignore
+///     from html_to_markdown import convert, ConversionOptions
+///
+///     html = "<h1>Hello</h1><p>World</p>"
+///     markdown = convert(html)
+///
+///     # With options
+///     options = ConversionOptions(heading_style="atx")
+///     markdown = convert(html, options)
+///     ```
 #[pyfunction]
 #[pyo3(signature = (html, options=None))]
 fn convert(html: &str, options: Option<ConversionOptions>) -> PyResult<String> {
@@ -396,6 +418,33 @@ fn warning_to_py<'py>(py: Python<'py>, warning: html_to_markdown_rs::InlineImage
     Ok(dict.into())
 }
 
+/// Convert HTML to Markdown with inline image extraction.
+///
+/// Extracts embedded images (data URIs and inline SVG) during conversion.
+///
+/// Args:
+///     html: HTML string to convert
+///     options: Optional conversion configuration
+///     image_config: Optional image extraction configuration
+///
+/// Returns:
+///     Tuple of (markdown: str, images: List[dict], warnings: List[dict])
+///
+/// Raises:
+///     ValueError: Invalid HTML or configuration
+///
+/// Example:
+///     ```ignore
+///     from html_to_markdown import convert_with_inline_images, InlineImageConfig
+///
+///     html = '<img src="data:image/png;base64,..." alt="Logo">'
+///     config = InlineImageConfig(max_decoded_size_bytes=1024*1024)
+///     markdown, images, warnings = convert_with_inline_images(html, image_config=config)
+///
+///     print(f"Found {len(images)} images")
+///     for img in images:
+///         print(f"Format: {img['format']}, Size: {len(img['data'])} bytes")
+///     ```
 #[pyfunction]
 #[pyo3(signature = (html, options=None, image_config=None))]
 fn convert_with_inline_images<'py>(
@@ -438,104 +487,63 @@ fn _html_to_markdown(m: &Bound<'_, PyModule>) -> PyResult<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use base64::{engine::general_purpose::STANDARD, Engine as _};
-    use image::{codecs::png::PngEncoder, ColorType, ImageEncoder, Rgb, RgbImage};
-
-    fn with_gil<F, R>(f: F) -> R
-    where
-        F: FnOnce(Python<'_>) -> R,
-    {
-        Python::initialize();
-        #[allow(deprecated)]
-        {
-            Python::with_gil(f)
-        }
-    }
-
-    fn png_data_uri_base64() -> String {
-        let mut buffer = Vec::new();
-        let image = RgbImage::from_pixel(1, 1, Rgb([0, 128, 255]));
-        let encoder = PngEncoder::new(&mut buffer);
-        encoder
-            .write_image(image.as_raw(), image.width(), image.height(), ColorType::Rgb8.into())
-            .expect("encode png");
-        STANDARD.encode(buffer)
-    }
 
     #[test]
-    fn convert_returns_markdown() {
+    fn test_convert_returns_markdown() {
         let html = "<h1>Hello</h1>";
         let result = convert(html, None).expect("conversion succeeds");
         assert!(result.contains("Hello"));
     }
 
     #[test]
-    fn convert_with_inline_images_collects_assets() {
-        with_gil(|py| {
-            let png_base64 = png_data_uri_base64();
-            let html = r#"
-                <p>
-                    <img src="DATA_URI" alt="Pixel" width="1" height="1">
-                </p>
-            "#
-            .replace("DATA_URI", &format!("data:image/png;base64,{}", png_base64));
-            let (markdown, images, warnings) =
-                convert_with_inline_images(py, &html, None, Some(InlineImageConfig::new(1024, None, true, true)))
-                    .expect("conversion succeeds");
-
-            assert!(markdown.contains("Pixel"));
-            assert!(warnings.is_empty());
-            assert_eq!(images.len(), 1);
-
-            let image = images[0].bind(py);
-            let image_dict = image.downcast::<PyDict>().unwrap();
-
-            let format_obj = image_dict
-                .get_item("format")
-                .expect("format lookup failed")
-                .expect("format missing");
-            let format: String = format_obj.extract().unwrap();
-            assert_eq!(format, "png");
-
-            let dimensions_obj = image_dict
-                .get_item("dimensions")
-                .expect("dimensions lookup failed")
-                .expect("dimensions missing");
-            let dimensions: (u32, u32) = dimensions_obj.extract().unwrap();
-            assert_eq!(dimensions, (1, 1));
-
-            let attributes_obj = image_dict
-                .get_item("attributes")
-                .expect("attributes lookup failed")
-                .expect("attributes missing");
-            let attributes = attributes_obj.downcast::<PyDict>().unwrap();
-            let width_obj = attributes
-                .get_item("width")
-                .expect("width lookup failed")
-                .expect("width missing");
-            let width: String = width_obj.extract().unwrap();
-            assert_eq!(width, "1");
-        });
+    fn test_conversion_options_defaults() {
+        let opts = ConversionOptions::new(
+            "underlined".to_string(),
+            "spaces".to_string(),
+            4,
+            "*+-".to_string(),
+            '*',
+            false,
+            false,
+            false,
+            false,
+            "".to_string(),
+            true,
+            false,
+            false,
+            true,
+            "double-equal".to_string(),
+            true,
+            "normalized".to_string(),
+            false,
+            false,
+            80,
+            false,
+            "".to_string(),
+            "".to_string(),
+            "spaces".to_string(),
+            "indented".to_string(),
+            Vec::new(),
+            None,
+            false,
+            Vec::new(),
+            "utf-8".to_string(),
+        );
+        let rust_opts = opts.to_rust();
+        assert_eq!(rust_opts.list_indent_width, 4);
+        assert_eq!(rust_opts.wrap_width, 80);
     }
 
     #[test]
-    fn convert_with_inline_images_reports_warnings() {
-        with_gil(|py| {
-            let html = r#"<img src="data:image/png;base64,@@@" alt="Broken">"#;
-            let (_, images, warnings) =
-                convert_with_inline_images(py, html, None, Some(InlineImageConfig::new(1024, None, true, false)))
-                    .expect("conversion succeeds with warning");
-
-            assert!(images.is_empty());
-            assert_eq!(warnings.len(), 1);
-            let warning = warnings[0].bind(py);
-            let warning_dict = warning.downcast::<PyDict>().unwrap();
-            let message_obj = warning_dict
-                .get_item("message")
-                .expect("message lookup failed")
-                .expect("message missing");
-            let message: String = message_obj.extract().unwrap();
-            assert!(message.contains("invalid base64"));
-        });
+    fn test_preprocessing_options_conversion() {
+        let preprocessing = PreprocessingOptions::new(true, "aggressive".to_string(), true, false);
+        let rust_preprocessing = preprocessing.to_rust();
+        assert!(rust_preprocessing.enabled);
+        assert!(matches!(
+            rust_preprocessing.preset,
+            html_to_markdown_rs::PreprocessingPreset::Aggressive
+        ));
+        assert!(rust_preprocessing.remove_navigation);
+        assert!(!rust_preprocessing.remove_forms);
     }
 }

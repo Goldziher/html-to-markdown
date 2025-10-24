@@ -16,6 +16,7 @@ categories = ["api-bindings"]
 [lib]
 name = "_html_to_markdown"
 crate-type = ["cdylib", "rlib"]
+doctest = false
 
 [dependencies]
 html-to-markdown-rs = { workspace = true, features = ["inline-images"] }
