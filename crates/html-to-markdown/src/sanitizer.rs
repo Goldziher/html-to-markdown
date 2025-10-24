@@ -39,7 +39,7 @@ pub fn sanitize(html: &str, options: &PreprocessingOptions) -> Result<String> {
 
     if options.remove_forms {
         clean_content.insert("form");
-        clean_content.insert("input");
+        // Note: Don't remove "input" here - we'll keep checkboxes for task lists
         clean_content.insert("button");
         clean_content.insert("select");
         clean_content.insert("textarea");
@@ -47,7 +47,8 @@ pub fn sanitize(html: &str, options: &PreprocessingOptions) -> Result<String> {
         clean_content.insert("fieldset");
         clean_content.insert("legend");
         allowed_tags.remove("form");
-        allowed_tags.remove("input");
+        // Keep input tags - checkboxes are needed for task lists
+        // allowed_tags.remove("input");
         allowed_tags.remove("button");
         allowed_tags.remove("select");
         allowed_tags.remove("textarea");
@@ -64,22 +65,64 @@ pub fn sanitize(html: &str, options: &PreprocessingOptions) -> Result<String> {
 
 /// Create a minimal sanitization builder (keeps most elements).
 fn create_minimal_builder() -> Builder<'static> {
+    use std::collections::HashSet;
+
     let mut builder = Builder::default();
     builder.strip_comments(false);
+
+    // Add input to allowed tags for checkbox support in task lists
+    let mut tags = builder.clone_tags();
+    tags.insert("input");
+    builder.tags(tags);
+
+    // Allow type and checked attributes on input elements
+    let mut tag_attrs = builder.clone_tag_attributes();
+    let input_attrs: HashSet<&str> = ["type", "checked"].iter().copied().collect();
+    tag_attrs.insert("input", input_attrs);
+    builder.tag_attributes(tag_attrs);
+
     builder
 }
 
 /// Create a standard sanitization builder (balanced cleaning).
 fn create_standard_builder() -> Builder<'static> {
+    use std::collections::HashSet;
+
     let mut builder = Builder::default();
     builder.strip_comments(true);
+
+    // Add input to allowed tags for checkbox support in task lists
+    let mut tags = builder.clone_tags();
+    tags.insert("input");
+    builder.tags(tags);
+
+    // Allow type and checked attributes on input elements
+    let mut tag_attrs = builder.clone_tag_attributes();
+    let input_attrs: HashSet<&str> = ["type", "checked"].iter().copied().collect();
+    tag_attrs.insert("input", input_attrs);
+    builder.tag_attributes(tag_attrs);
+
     builder
 }
 
 /// Create an aggressive sanitization builder (heavy cleaning for web scraping).
 fn create_aggressive_builder() -> Builder<'static> {
+    use std::collections::HashSet;
+
     let mut builder = Builder::default();
     builder.strip_comments(true);
     builder.link_rel(Some("nofollow noopener noreferrer"));
+
+    // Add input to allowed tags for checkbox support in task lists
+    let mut tags = builder.clone_tags();
+    tags.insert("input");
+    builder.tags(tags);
+
+    // Allow type and checked attributes on input elements
+    let mut tag_attrs = builder.clone_tag_attributes();
+    let input_attrs: HashSet<&str> = ["type", "checked"].iter().copied().collect();
+    tag_attrs.insert("input", input_attrs);
+    builder.tag_attributes(tag_attrs);
+
     builder
 }

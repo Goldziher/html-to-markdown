@@ -292,7 +292,6 @@ fn test_metadata_disabled() {
 }
 
 #[test]
-#[ignore] // TODO: Pre-existing bug - checkboxes not being converted to task lists
 fn test_task_list() {
     let html = "<ul><li><input type=\"checkbox\" checked> Done</li><li><input type=\"checkbox\"> Todo</li></ul>";
     let result = convert(html, None).unwrap();
