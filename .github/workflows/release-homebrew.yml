@@ -86,7 +86,7 @@ jobs:
           mv html-to-markdown-${{ matrix.target }}.zip ../../../
 
       - name: Upload artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: html-to-markdown-${{ matrix.target }}
           path: |
@@ -199,7 +199,7 @@ jobs:
           pnpm run build --target ${{ matrix.settings.target }}
 
       - name: Upload NAPI artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: napi-${{ matrix.settings.target }}
           path: crates/html-to-markdown-node/*.node
@@ -238,7 +238,7 @@ jobs:
           pnpm run build:all
 
       - name: Upload WASM artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: wasm-bindings
           path: |
