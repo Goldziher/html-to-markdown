@@ -264,7 +264,9 @@ jobs:
         if: runner.os == 'Windows'
         working-directory: crates/html-to-markdown-rb
         shell: pwsh
-        run: ridk exec bash -lc "bundle _2.5.12_ install"
+        run: |
+          $unixPath = ridk exec bash -lc "cygpath -au '$env:GITHUB_WORKSPACE/crates/html-to-markdown-rb'"
+          ridk exec bash -lc "cd $unixPath && bundle _2.5.12_ install"
 
       - name: Compile Ruby extension (Unix)
         if: runner.os != 'Windows'
@@ -279,7 +281,9 @@ jobs:
         env:
           RB_SYS_CARGO_PROFILE: release
         shell: pwsh
-        run: ridk exec bash -lc "bundle _2.5.12_ exec rake compile"
+        run: |
+          $unixPath = ridk exec bash -lc "cygpath -au '$env:GITHUB_WORKSPACE/crates/html-to-markdown-rb'"
+          ridk exec bash -lc "cd $unixPath && bundle _2.5.12_ exec rake compile"
 
       - name: Run Ruby specs (Unix)
         if: runner.os != 'Windows'
@@ -290,7 +294,9 @@ jobs:
         if: runner.os == 'Windows'
         working-directory: crates/html-to-markdown-rb
         shell: pwsh
-        run: ridk exec bash -lc "bundle _2.5.12_ exec rspec --format progress"
+        run: |
+          $unixPath = ridk exec bash -lc "cygpath -au '$env:GITHUB_WORKSPACE/crates/html-to-markdown-rb'"
+          ridk exec bash -lc "cd $unixPath && bundle _2.5.12_ exec rspec --format progress"
 
   node-bindings:
     runs-on: ${{ matrix.os }}
