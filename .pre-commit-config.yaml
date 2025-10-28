@@ -16,7 +16,7 @@ repos:
     hooks:
       - id: pyproject-fmt
   - repo: https://github.com/biomejs/pre-commit
-    rev: v2.2.6
+    rev: v2.3.1
     hooks:
       - id: biome-format
       - id: biome-lint
@@ -26,7 +26,7 @@ repos:
       - id: oxlint
         args: ["--fix"]
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.14.1
+    rev: v0.14.2
     hooks:
       - id: ruff
         args: ["--fix", "--unsafe-fixes"]
