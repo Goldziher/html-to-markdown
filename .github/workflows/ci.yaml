@@ -206,6 +206,41 @@ jobs:
       - name: Test
         run: uv run pytest
 
+  ruby-bindings:
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        ruby: ["3.0", "3.2", "3.3"]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup Rust
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+
+      - name: Setup Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: ${{ matrix.ruby }}
+          bundler-cache: true
+          working-directory: crates/html-to-markdown-rb
+
+      - name: Build CLI binary
+        run: cargo build --release --package html-to-markdown-cli
+
+      - name: Compile Ruby extension
+        working-directory: crates/html-to-markdown-rb
+        env:
+          RB_SYS_CARGO_PROFILE: release
+        run: bundle exec rake compile
+
+      - name: Run Ruby specs
+        working-directory: crates/html-to-markdown-rb
+        run: bundle exec rspec --format progress
+
   node-bindings:
     runs-on: ${{ matrix.os }}
     timeout-minutes: 15
