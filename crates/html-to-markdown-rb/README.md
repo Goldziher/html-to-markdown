@@ -8,5 +8,7 @@ This crate pairs with the Ruby gem exposed from the `lib/` directory and provide
 
 - Ruby 3.2 or newer (Magnus requires fiber APIs not available on Ruby 3.0/3.1)
 - A working Rust toolchain (1.85+) and the Ruby development headers
-- Windows builds require an MSYS2 environment with the Ruby headers (including `strings.h`). The CI
-  currently targets macOS and Linux; add MSYS2 setup before enabling Windows automation.
+- On Windows, install [RubyInstaller with MSYS2](https://rubyinstaller.org/) and ensure the
+  `UCRT64` toolchain is available. Run `ridk exec pacman -S --needed --noconfirm base-devel
+  mingw-w64-ucrt-x86_64-toolchain` once to install the headers (including `strings.h`) required to
+  compile the extension.
