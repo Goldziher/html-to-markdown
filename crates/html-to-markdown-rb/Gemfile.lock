@@ -74,7 +74,7 @@ DEPENDENCIES
   rubocop-rspec
 
 RUBY VERSION
-   ruby 3.0.7p220
+   ruby 3.2.9p248
 
 BUNDLED WITH
    2.5.12
