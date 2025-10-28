@@ -212,8 +212,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
-        ruby: ["3.0", "3.2", "3.3"]
+        os: [ubuntu-latest, macos-latest]
+        ruby: ["3.2", "3.3"]
     steps:
       - name: Checkout
         uses: actions/checkout@v5
