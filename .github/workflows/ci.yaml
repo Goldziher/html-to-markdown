@@ -208,11 +208,11 @@ jobs:
 
   ruby-bindings:
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 20
+    timeout-minutes: 25
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest]
+        os: [ubuntu-latest, macos-latest, windows-latest]
         ruby: ["3.2", "3.3"]
     steps:
       - name: Checkout
@@ -221,25 +221,76 @@ jobs:
       - name: Setup Rust
         uses: actions-rust-lang/setup-rust-toolchain@v1
 
-      - name: Setup Ruby
+      - name: Setup Ruby (Unix)
+        if: runner.os != 'Windows'
         uses: ruby/setup-ruby@v1
         with:
           ruby-version: ${{ matrix.ruby }}
-          bundler-cache: true
+          bundler-cache: false
           working-directory: crates/html-to-markdown-rb
+
+      - name: Setup Ruby (Windows)
+        if: runner.os == 'Windows'
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: ${{ matrix.ruby }}
+          bundler-cache: false
+          working-directory: crates/html-to-markdown-rb
+          msys2: UCRT64
+
+      - name: Install MSYS2 toolchain
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: ridk exec pacman -S --needed --noconfirm base-devel mingw-w64-ucrt-x86_64-toolchain
 
       - name: Build CLI binary
         run: cargo build --release --package html-to-markdown-cli
 
-      - name: Compile Ruby extension
+      - name: Install Bundler 2.5.12 (Unix)
+        if: runner.os != 'Windows'
+        run: gem install bundler -v 2.5.12
+
+      - name: Install Bundler 2.5.12 (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: ridk exec gem install bundler -v 2.5.12
+
+      - name: Install Ruby gems (Unix)
+        if: runner.os != 'Windows'
+        working-directory: crates/html-to-markdown-rb
+        run: bundle _2.5.12_ install
+
+      - name: Install Ruby gems (Windows)
+        if: runner.os == 'Windows'
+        working-directory: crates/html-to-markdown-rb
+        shell: pwsh
+        run: ridk exec bash -lc "bundle _2.5.12_ install"
+
+      - name: Compile Ruby extension (Unix)
+        if: runner.os != 'Windows'
         working-directory: crates/html-to-markdown-rb
         env:
           RB_SYS_CARGO_PROFILE: release
-        run: bundle exec rake compile
+        run: bundle _2.5.12_ exec rake compile
 
-      - name: Run Ruby specs
+      - name: Compile Ruby extension (Windows)
+        if: runner.os == 'Windows'
         working-directory: crates/html-to-markdown-rb
-        run: bundle exec rspec --format progress
+        env:
+          RB_SYS_CARGO_PROFILE: release
+        shell: pwsh
+        run: ridk exec bash -lc "bundle _2.5.12_ exec rake compile"
+
+      - name: Run Ruby specs (Unix)
+        if: runner.os != 'Windows'
+        working-directory: crates/html-to-markdown-rb
+        run: bundle _2.5.12_ exec rspec --format progress
+
+      - name: Run Ruby specs (Windows)
+        if: runner.os == 'Windows'
+        working-directory: crates/html-to-markdown-rb
+        shell: pwsh
+        run: ridk exec bash -lc "bundle _2.5.12_ exec rspec --format progress"
 
   node-bindings:
     runs-on: ${{ matrix.os }}
