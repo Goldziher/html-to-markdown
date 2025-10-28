@@ -28,12 +28,12 @@ tasks:
   test:rust:
     desc: "Run Rust tests"
     cmds:
-      - cargo test --release --no-default-features
+      - cargo test --release --no-default-features --workspace --exclude html-to-markdown-rb
 
   cov:rust:
     desc: "Generate Rust code coverage report (requires cargo-llvm-cov)"
     cmds:
-      - cargo llvm-cov --all-features --lcov --output-path rust-coverage.lcov
+      - cargo llvm-cov --all-features --workspace --exclude html-to-markdown-py --exclude html-to-markdown-rb --lcov --output-path rust-coverage.lcov
       - echo "Rust coverage report generated at rust-coverage.lcov"
       - cargo llvm-cov --all-features --summary-only
 

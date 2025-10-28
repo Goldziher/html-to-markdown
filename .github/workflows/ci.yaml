@@ -40,7 +40,7 @@ jobs:
           RUST_BACKTRACE: full
         run: |
           echo "Running Rust tests with full debugging..."
-          cargo test --release --no-default-features -vv -- --nocapture --test-threads=1
+          cargo test --release --no-default-features --workspace --exclude html-to-markdown-rb -vv -- --nocapture --test-threads=1
 
       - name: Check Rust Formatting
         if: matrix.os == 'ubuntu-latest'
@@ -84,7 +84,7 @@ jobs:
       - name: Run Rust Checks
         run: |
           cargo fmt --check
-          cargo clippy -- -D warnings
+          cargo clippy --workspace --exclude html-to-markdown-rb -- -D warnings
 
       - name: Install prek
         run: |
@@ -146,7 +146,7 @@ jobs:
         run: cargo install cargo-llvm-cov
 
       - name: Generate Rust Coverage
-        run: cargo llvm-cov --workspace --exclude html-to-markdown-py --all-features --lcov --output-path rust-coverage.lcov
+        run: cargo llvm-cov --workspace --exclude html-to-markdown-py --exclude html-to-markdown-rb --all-features --lcov --output-path rust-coverage.lcov
 
       - name: Upload Coverage Artifacts
         if: always()
