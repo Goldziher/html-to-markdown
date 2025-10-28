@@ -50,10 +50,11 @@ tasks:
       - task: cov:python
 
   test:
-    desc: "Run both Rust and Python tests"
+    desc: "Run Rust, Python, and Ruby tests"
     cmds:
       - task: test:rust
       - task: test:python
+      - task: test:ruby
 
   lint:
     desc: "Lint Python code with ruff/prek and Rust code with clippy/fmt"
@@ -173,6 +174,15 @@ tasks:
       - task: test:node
       - task: test:wasm
       - task: test:ts
+
+  test:ruby:
+    desc: "Run Ruby specs for the Magnus bindings"
+    cmds:
+      - cargo build --release --package html-to-markdown-cli
+      - cmd: PATH=/opt/homebrew/opt/ruby/bin:$PATH bundle install
+        dir: crates/html-to-markdown-rb
+      - cmd: PATH=/opt/homebrew/opt/ruby/bin:$PATH bundle exec rake spec
+        dir: crates/html-to-markdown-rb
 
   clean:
     desc: "Clean build artifacts"

@@ -1,0 +1,28 @@
+[package]
+name = "html-to-markdown-rb"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+documentation.workspace = true
+readme = "README.md"
+rust-version.workspace = true
+description = "Ruby bindings (Magnus) for html-to-markdown - high-performance HTML to Markdown converter"
+keywords = ["html", "markdown", "ruby", "magnus", "bindings"]
+categories = ["api-bindings"]
+
+[lib]
+name = "html_to_markdown_rb"
+crate-type = ["cdylib", "rlib"]
+
+[features]
+default = []
+
+[dependencies]
+html-to-markdown-rs = { workspace = true, features = ["inline-images"] }
+magnus = { git = "https://github.com/matsadler/magnus", rev = "f6db11769efb517427bf7f121f9c32e18b059b38", features = ["rb-sys"] }
+
+[dev-dependencies]
+pretty_assertions = "1.4"
