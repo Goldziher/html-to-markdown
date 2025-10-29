@@ -1,6 +1,6 @@
 # html-to-markdown
 
-High-performance HTML to Markdown converter with a clean Python API (powered by a Rust core). Wheels are published for Linux, macOS, and Windows.
+High-performance HTML to Markdown converter with a clean Python API (powered by a Rust core). The same engine also drives the Node.js, Ruby, and WebAssembly bindings, so rendered Markdown stays identical across runtimes. Wheels are published for Linux, macOS, and Windows.
 
 [![PyPI version](https://badge.fury.io/py/html-to-markdown.svg)](https://github.com/Goldziher/html-to-markdown)
 [![Rust crate](https://img.shields.io/crates/v/html-to-markdown-rs.svg)](https://github.com/Goldziher/html-to-markdown)
