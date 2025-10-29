@@ -156,7 +156,7 @@ You can also call the CLI binary directly for scripting:
 
 ```ruby
 HtmlToMarkdown::CLIProxy.call(['--version'])
-# => "html-to-markdown 2.5.3"
+# => "html-to-markdown 2.5.4"
 ```
 
 Rebuild the CLI locally if you see `CLI binary not built` during tests:

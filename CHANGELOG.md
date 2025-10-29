@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.5.4] - 2025-10-30
+
+### Changed
+- Polished the Ruby gem messaging and README with performance highlights, configuration examples, and CLI guidance to match other language docs.
+- Bumped every package (Rust crates, npm, PyPI, Ruby gem) to version 2.5.4.
+
 ## [2.5.3] - 2025-10-30
 
 ### Changed
