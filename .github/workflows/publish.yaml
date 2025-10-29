@@ -183,6 +183,38 @@ jobs:
           echo "Source distribution:"
           ls -1 dist/*.tar.gz
 
+  publish-gem:
+    name: Push gem to RubyGems.org
+    needs: publish-crates
+    if: ${{ github.event_name != 'workflow_dispatch' || !inputs.dry_run }}
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: write
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.tag || '' }}
+          persist-credentials: false
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '3.3'
+          bundler-cache: true
+          working-directory: crates/html-to-markdown-rb
+
+      - name: Prepare gem assets
+        run: ruby scripts/prepare_ruby_gem.rb
+
+      - name: Release gem via Trusted Publishing
+        uses: rubygems/release-gem@v1
+        env:
+          BUNDLE_GEMFILE: crates/html-to-markdown-rb/Gemfile
+
   publish-npm-node:
     name: Publish html-to-markdown-node to npm
     runs-on: ubuntu-latest
@@ -295,7 +327,7 @@ jobs:
 
   verify:
     name: Verify publications
-    needs: [publish-crates, publish-pypi, publish-npm-node, publish-npm-wasm]
+    needs: [publish-crates, publish-pypi, publish-gem, publish-npm-node, publish-npm-wasm]
     runs-on: ubuntu-latest
     if: ${{ !inputs.dry_run }}
     steps:
@@ -351,6 +383,32 @@ jobs:
           else
             echo "⚠️  html-to-markdown-wasm $version not yet indexed (may take a few minutes)"
           fi
+
+      - name: Verify RubyGems publication
+        run: |
+          version="${{ steps.version.outputs.version }}"
+          echo "🔍 Checking html-to-markdown on RubyGems..."
+          VERSION="$version" python - <<'PY'
+import json
+import os
+import sys
+import urllib.request
+
+version = os.environ["VERSION"]
+url = "https://rubygems.org/api/v1/gems/html-to-markdown.json"
+
+try:
+    with urllib.request.urlopen(url, timeout=10) as response:
+        payload = json.load(response)
+except Exception as exc:  # noqa: BLE001
+    print(f"⚠️  Unable to query RubyGems: {exc}")
+    sys.exit(0)
+
+if payload.get("version") == version:
+    print(f"✅ html-to-markdown {version} found on RubyGems")
+else:
+    print(f"⚠️  html-to-markdown {version} not yet indexed (may take a few minutes)")
+PY
 
       - name: Display installation commands
         run: |

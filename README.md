@@ -1,8 +1,9 @@
 # html-to-markdown
 
-High-performance HTML → Markdown conversion powered by Rust. Shipping as a Rust crate, Python package, Node.js bindings, WebAssembly, and standalone CLI with identical rendering behaviour.
+High-performance HTML → Markdown conversion powered by Rust. Shipping as a Rust crate, Python package, Ruby gem, Node.js bindings, WebAssembly, and standalone CLI with identical rendering behaviour.
 
 [![PyPI version](https://badge.fury.io/py/html-to-markdown.svg)](https://pypi.org/project/html-to-markdown/)
+[![RubyGems](https://badge.fury.io/rb/html-to-markdown.svg)](https://rubygems.org/gems/html-to-markdown)
 [![npm version](https://badge.fury.io/js/html-to-markdown.svg)](https://www.npmjs.com/package/html-to-markdown-node)
 [![Crates.io](https://img.shields.io/crates/v/html-to-markdown-rs.svg)](https://crates.io/crates/html-to-markdown-rs)
 [![Python Versions](https://img.shields.io/pypi/pyversions/html-to-markdown.svg)](https://pypi.org/project/html-to-markdown/)
@@ -33,6 +34,7 @@ Experience WebAssembly-powered HTML to Markdown conversion instantly in your bro
     - Node.js/Bun (native) – [Node.js README](https://github.com/Goldziher/html-to-markdown/tree/main/crates/html-to-markdown-node)
     - WebAssembly (universal) – [WASM README](https://github.com/Goldziher/html-to-markdown/tree/main/crates/html-to-markdown-wasm)
 - **Python guide** – [Python README](https://github.com/Goldziher/html-to-markdown/blob/main/README_PYPI.md)
+- **Ruby guide** – [Ruby README](https://github.com/Goldziher/html-to-markdown/tree/main/crates/html-to-markdown-rb)
 - **Rust guide** – [Rust README](https://github.com/Goldziher/html-to-markdown/tree/main/crates/html-to-markdown)
 - **Contributing** – [CONTRIBUTING.md](https://github.com/Goldziher/html-to-markdown/blob/main/CONTRIBUTING.md) ⭐ Start here!
 - **Changelog** – [CHANGELOG.md](https://github.com/Goldziher/html-to-markdown/blob/main/CHANGELOG.md)
@@ -45,6 +47,7 @@ Experience WebAssembly-powered HTML to Markdown conversion instantly in your bro
 | **WebAssembly** (universal) | `npm install html-to-markdown-wasm`                                       |
 | **Deno**                    | `import { convert } from "npm:html-to-markdown-wasm"`                     |
 | **Python** (bindings + CLI) | `pip install html-to-markdown`                                            |
+| **Ruby** gem                | `bundle add html-to-markdown` or `gem install html-to-markdown`           |
 | **Rust** crate              | `cargo add html-to-markdown-rs`                                           |
 | Rust CLI                    | `cargo install html-to-markdown-cli`                                      |
 | Homebrew CLI                | `brew tap goldziher/tap`<br>`brew install html-to-markdown`               |
@@ -176,3 +179,18 @@ Benchmarked on Apple M4 with complex real-world documents (Wikipedia articles, t
 - Chat with us on [Discord](https://discord.gg/pXxagNK2zN)
 - Explore the broader [Kreuzberg](https://kreuzberg.dev) document-processing ecosystem
 - Sponsor development via [GitHub Sponsors](https://github.com/sponsors/Goldziher)
+### Ruby
+
+```ruby
+require 'html_to_markdown'
+
+html = '<h1>Hello</h1><p>Rust ❤️ Markdown</p>'
+markdown = HtmlToMarkdown.convert(html, heading_style: :atx, wrap: true)
+
+puts markdown
+# # Hello
+#
+# Rust ❤️ Markdown
+```
+
+See the language-specific READMEs for complete configuration, hOCR workflows, and inline image extraction.
