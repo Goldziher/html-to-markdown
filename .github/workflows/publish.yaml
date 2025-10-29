@@ -252,7 +252,7 @@ jobs:
   publish-gem:
     name: Push gem to RubyGems.org
     needs: publish-crates
-    if: ${{ !(github.event_name == 'workflow_dispatch' && github.event.inputs.dry_run == 'true') }}
+    if: ${{ vars.PUBLISH_RUBYGEMS == 'true' && !(github.event_name == 'workflow_dispatch' && github.event.inputs.dry_run == 'true') }}
     runs-on: ubuntu-latest
     permissions:
       id-token: write
