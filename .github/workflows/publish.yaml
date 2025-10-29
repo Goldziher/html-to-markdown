@@ -85,9 +85,9 @@ jobs:
                   versions = [item.get("num") for item in data.get("versions", [])]
                   exists = version in versions
                   if exists:
-                      print(f"::notice::{crate} {version} already published on crates.io")
+                      print(f"::notice::{crate} {version} already published on crates.io", file=sys.stderr)
                   else:
-                      print(f"::notice::{crate} {version} not found on crates.io")
+                      print(f"::notice::{crate} {version} not found on crates.io", file=sys.stderr)
               print(f"{key}={'true' if exists else 'false'}")
           PY
 
