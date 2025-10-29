@@ -112,7 +112,7 @@ You can also call the CLI binary directly for scripting:
 
 ```ruby
 HtmlToMarkdown::CLIProxy.call(['--version'])
-# => "html-to-markdown 2.5.2"
+# => "html-to-markdown 2.5.3"
 ```
 
 ### Error Handling
