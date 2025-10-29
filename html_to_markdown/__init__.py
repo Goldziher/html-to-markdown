@@ -49,4 +49,4 @@ __all__ = [
     "markdownify",
 ]
 
-__version__ = "2.5.4"
+__version__ = "2.5.5"
