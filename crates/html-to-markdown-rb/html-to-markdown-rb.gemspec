@@ -39,4 +39,9 @@ Gem::Specification.new do |spec|
 
   spec.add_dependency 'rb_sys', '>= 0.9', '< 1.0'
   spec.metadata['rubygems_mfa_required'] = 'true'
+  spec.metadata['homepage_uri'] = 'https://github.com/Goldziher/html-to-markdown'
+  spec.metadata['source_code_uri'] = 'https://github.com/Goldziher/html-to-markdown'
+  spec.metadata['bug_tracker_uri'] = 'https://github.com/Goldziher/html-to-markdown/issues'
+  spec.metadata['changelog_uri'] = 'https://github.com/Goldziher/html-to-markdown/releases'
+  spec.metadata['documentation_uri'] = 'https://github.com/Goldziher/html-to-markdown/blob/main/README.md'
 end
