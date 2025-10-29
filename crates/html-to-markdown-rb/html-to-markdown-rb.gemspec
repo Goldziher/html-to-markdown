@@ -8,8 +8,11 @@ Gem::Specification.new do |spec|
   spec.authors       = ["Na'aman Hirschfeld"]
   spec.email         = ['nhirschfeld@gmail.com']
 
-  spec.summary       = 'Ruby bindings for the html-to-markdown Rust library'
-  spec.description   = 'High-performance HTML to Markdown conversion from Ruby using Magnus and rb-sys.'
+  spec.summary       = 'Blazing-fast HTML to Markdown conversion for Ruby, powered by Rust.'
+  spec.description   = <<~DESC.strip
+    html-to-markdown wraps our ultra-fast Rust converter with a Ruby-native API via Magnus and rb-sys.
+    Enjoy identical output to the Python, Node, and WASM bindings, a bundled CLI proxy, and seamless cross-platform installs.
+  DESC
   spec.homepage      = 'https://github.com/Goldziher/html-to-markdown'
   spec.license       = 'MIT'
 
