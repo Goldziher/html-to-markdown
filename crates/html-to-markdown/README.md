@@ -2,6 +2,8 @@
 
 High-performance HTML to Markdown converter built with Rust.
 
+This crate is the core engine compiled into the Python wheels, Ruby gem, Node.js NAPI bindings, WebAssembly package, and CLI, ensuring identical Markdown output across every language.
+
 [![Crates.io](https://img.shields.io/crates/v/html-to-markdown-rs.svg)](https://crates.io/crates/html-to-markdown-rs)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://github.com/Goldziher/html-to-markdown/blob/main/LICENSE)
 [![docs.rs](https://docs.rs/html-to-markdown-rs/badge.svg)](https://docs.rs/html-to-markdown-rs)
@@ -142,6 +144,7 @@ This is the core Rust library. For other languages:
 
 - **JavaScript/TypeScript**: [@html-to-markdown/node](https://github.com/Goldziher/html-to-markdown/tree/main/crates/html-to-markdown-node) (NAPI-RS) or [@html-to-markdown/wasm](https://github.com/Goldziher/html-to-markdown/tree/main/crates/html-to-markdown-wasm) (WebAssembly)
 - **Python**: [html-to-markdown](https://github.com/Goldziher/html-to-markdown/tree/main/crates/html-to-markdown-py) (PyO3)
+- **Ruby**: [html-to-markdown](https://github.com/Goldziher/html-to-markdown/tree/main/crates/html-to-markdown-rb) (Magnus + rb-sys)
 - **CLI**: [html-to-markdown-cli](https://github.com/Goldziher/html-to-markdown/tree/main/crates/html-to-markdown-cli)
 
 ## Documentation

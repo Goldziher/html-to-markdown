@@ -2,6 +2,8 @@
 
 Native Node.js and Bun bindings for html-to-markdown using NAPI-RS v3.
 
+Built on the shared Rust engine that powers the Python wheels, Ruby gem, WebAssembly package, and CLI – ensuring identical Markdown output across every language target.
+
 High-performance HTML to Markdown conversion using native Rust code compiled to platform-specific binaries.
 
 [![npm version](https://badge.fury.io/js/html-to-markdown-node.svg)](https://www.npmjs.com/package/html-to-markdown-node)
@@ -178,6 +180,12 @@ Use [`html-to-markdown-wasm`](https://www.npmjs.com/package/html-to-markdown-was
 - 🦕 Deno runtime
 - ☁️ Edge runtimes (Cloudflare Workers, Deno Deploy)
 - 📦 Universal packages
+
+Other runtimes:
+
+- 🐍 Python: [`html-to-markdown`](https://pypi.org/project/html-to-markdown/)
+- 💎 Ruby: [`html-to-markdown`](https://rubygems.org/gems/html-to-markdown)
+- 🌐 WebAssembly: [`html-to-markdown-wasm`](https://www.npmjs.com/package/html-to-markdown-wasm)
 
 ## Configuration Options
 
