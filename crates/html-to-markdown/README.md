@@ -5,8 +5,11 @@ High-performance HTML to Markdown converter built with Rust.
 This crate is the core engine compiled into the Python wheels, Ruby gem, Node.js NAPI bindings, WebAssembly package, and CLI, ensuring identical Markdown output across every language.
 
 [![Crates.io](https://img.shields.io/crates/v/html-to-markdown-rs.svg)](https://crates.io/crates/html-to-markdown-rs)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://github.com/Goldziher/html-to-markdown/blob/main/LICENSE)
+[![npm version](https://badge.fury.io/js/html-to-markdown-node.svg)](https://www.npmjs.com/package/html-to-markdown-node)
+[![PyPI version](https://badge.fury.io/py/html-to-markdown.svg)](https://pypi.org/project/html-to-markdown/)
+[![Gem Version](https://badge.fury.io/rb/html-to-markdown.svg)](https://rubygems.org/gems/html-to-markdown)
 [![docs.rs](https://docs.rs/html-to-markdown-rs/badge.svg)](https://docs.rs/html-to-markdown-rs)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://github.com/Goldziher/html-to-markdown/blob/main/LICENSE)
 
 Fast, reliable HTML to Markdown conversion with full CommonMark compliance. Built with `html5ever` for correctness and `ammonia` for safe HTML preprocessing.
 

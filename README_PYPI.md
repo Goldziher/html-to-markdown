@@ -2,9 +2,11 @@
 
 High-performance HTML to Markdown converter with a clean Python API (powered by a Rust core). The same engine also drives the Node.js, Ruby, and WebAssembly bindings, so rendered Markdown stays identical across runtimes. Wheels are published for Linux, macOS, and Windows.
 
-[![PyPI version](https://badge.fury.io/py/html-to-markdown.svg)](https://github.com/Goldziher/html-to-markdown)
-[![Rust crate](https://img.shields.io/crates/v/html-to-markdown-rs.svg)](https://github.com/Goldziher/html-to-markdown)
-[![Python Versions](https://img.shields.io/pypi/pyversions/html-to-markdown.svg)](https://github.com/Goldziher/html-to-markdown)
+[![Crates.io](https://img.shields.io/crates/v/html-to-markdown-rs.svg)](https://crates.io/crates/html-to-markdown-rs)
+[![npm version](https://badge.fury.io/js/html-to-markdown-node.svg)](https://www.npmjs.com/package/html-to-markdown-node)
+[![PyPI version](https://badge.fury.io/py/html-to-markdown.svg)](https://pypi.org/project/html-to-markdown/)
+[![Gem Version](https://badge.fury.io/rb/html-to-markdown.svg)](https://rubygems.org/gems/html-to-markdown)
+[![Python Versions](https://img.shields.io/pypi/pyversions/html-to-markdown.svg)](https://pypi.org/project/html-to-markdown/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://github.com/Goldziher/html-to-markdown/blob/main/LICENSE)
 
 ## Installation
