@@ -327,7 +327,7 @@ jobs:
         working-directory: crates/html-to-markdown-rb
         env:
           BUNDLE_GEMFILE: Gemfile
-          GEM_HOST_API_KEY: ${{ secrets.RUBY_GEMS_TOKEN }}
+          #GEM_HOST_API_KEY: ${{ secrets.RUBY_GEMS_TOKEN }}
         run: bundle exec rake release
 
   publish-npm-node:
