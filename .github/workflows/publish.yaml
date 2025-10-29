@@ -176,7 +176,50 @@ jobs:
     permissions:
       id-token: write
     steps:
+      - name: Determine release version
+        id: pypi_version
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            tag="${{ github.event.inputs.tag }}"
+          else
+            tag=${GITHUB_REF#refs/tags/}
+          fi
+          version=${tag#v}
+          echo "version=$version" >> $GITHUB_OUTPUT
+
+      - name: Check PyPI for existing release
+        id: pypi_check
+        env:
+          VERSION: ${{ steps.pypi_version.outputs.version }}
+        run: |
+          python - <<'PY' >> "$GITHUB_OUTPUT"
+          import json
+          import os
+          import sys
+          import urllib.request
+
+          version = os.environ["VERSION"]
+          url = "https://pypi.org/pypi/html-to-markdown/json"
+
+          try:
+              with urllib.request.urlopen(url) as resp:
+                  data = json.load(resp)
+          except Exception as exc:
+              print(f"::warning::failed to query PyPI ({exc})", file=sys.stderr)
+              exists = False
+          else:
+              releases = data.get("releases") or {}
+              exists = version in releases and releases[version]
+              if exists:
+                  print(f"::notice::html-to-markdown {version} already published on PyPI", file=sys.stderr)
+              else:
+                  print(f"::notice::html-to-markdown {version} not found on PyPI", file=sys.stderr)
+
+          print(f"exists={'true' if exists else 'false'}")
+          PY
+
       - name: Download wheels
+        if: ${{ steps.pypi_check.outputs.exists != 'true' }}
         uses: actions/download-artifact@v6
         with:
           pattern: "wheels-*"
@@ -184,18 +227,20 @@ jobs:
           path: dist/
 
       - name: Download sdist
+        if: ${{ steps.pypi_check.outputs.exists != 'true' }}
         uses: actions/download-artifact@v6
         with:
           name: sdist
           path: dist/
 
       - name: List artifacts
+        if: ${{ steps.pypi_check.outputs.exists != 'true' }}
         run: |
           echo "Artifacts ready for PyPI:"
           ls -lh dist/
 
       - name: Publish to PyPI
-        if: ${{ !(github.event_name == 'workflow_dispatch' && github.event.inputs.dry_run == 'true') }}
+        if: ${{ steps.pypi_check.outputs.exists != 'true' && !(github.event_name == 'workflow_dispatch' && github.event.inputs.dry_run == 'true') }}
         uses: pypa/gh-action-pypi-publish@release/v1
 
       - name: Dry run - Skip PyPI publish
@@ -226,13 +271,57 @@ jobs:
           bundler-cache: true
           working-directory: crates/html-to-markdown-rb
 
+      - name: Determine release version
+        id: gem_version
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            tag="${{ github.event.inputs.tag }}"
+          else
+            tag=${GITHUB_REF#refs/tags/}
+          fi
+          version=${tag#v}
+          echo "version=$version" >> $GITHUB_OUTPUT
+
+      - name: Check RubyGems for existing release
+        id: gem_check
+        env:
+          VERSION: ${{ steps.gem_version.outputs.version }}
+        run: |
+          python - <<'PY' >> "$GITHUB_OUTPUT"
+          import json
+          import os
+          import sys
+          import urllib.request
+
+          version = os.environ["VERSION"]
+          url = "https://rubygems.org/api/v1/versions/html-to-markdown.json"
+
+          try:
+              with urllib.request.urlopen(url) as resp:
+                  data = json.load(resp)
+          except Exception as exc:
+              print(f"::warning::failed to query RubyGems ({exc})", file=sys.stderr)
+              exists = False
+          else:
+              exists = any(entry.get("number") == version for entry in data)
+              if exists:
+                  print(f"::notice::html-to-markdown {version} already published on RubyGems", file=sys.stderr)
+              else:
+                  print(f"::notice::html-to-markdown {version} not found on RubyGems", file=sys.stderr)
+
+          print(f"exists={'true' if exists else 'false'}")
+          PY
+
       - name: Prepare gem assets
+        if: ${{ steps.gem_check.outputs.exists != 'true' }}
         run: ruby scripts/prepare_ruby_gem.rb
 
       - name: Configure trusted publishing credentials
+        if: ${{ steps.gem_check.outputs.exists != 'true' }}
         uses: rubygems/configure-rubygems-credentials@v1.0.0
 
       - name: Release gem
+        if: ${{ steps.gem_check.outputs.exists != 'true' }}
         working-directory: crates/html-to-markdown-rb
         env:
           BUNDLE_GEMFILE: Gemfile
