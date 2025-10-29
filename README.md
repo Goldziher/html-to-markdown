@@ -31,11 +31,11 @@ Experience WebAssembly-powered HTML to Markdown conversion instantly in your bro
 ## Documentation
 
 - **JavaScript/TypeScript guides**:
-    - Node.js/Bun (native) – [Node.js README](https://github.com/Goldziher/html-to-markdown/tree/main/crates/html-to-markdown-node)
-    - WebAssembly (universal) – [WASM README](https://github.com/Goldziher/html-to-markdown/tree/main/crates/html-to-markdown-wasm)
+    - Node.js/Bun (native) – [Node.js README](https://github.com/Goldziher/html-to-markdown/blob/main/crates/html-to-markdown-node/README.md)
+    - WebAssembly (universal) – [WASM README](https://github.com/Goldziher/html-to-markdown/blob/main/crates/html-to-markdown-wasm/README.md)
 - **Python guide** – [Python README](https://github.com/Goldziher/html-to-markdown/blob/main/README_PYPI.md)
-- **Ruby guide** – [Ruby README](https://github.com/Goldziher/html-to-markdown/tree/main/crates/html-to-markdown-rb)
-- **Rust guide** – [Rust README](https://github.com/Goldziher/html-to-markdown/tree/main/crates/html-to-markdown)
+- **Ruby guide** – [Ruby README](https://github.com/Goldziher/html-to-markdown/blob/main/crates/html-to-markdown-rb/README.md)
+- **Rust guide** – [Rust README](https://github.com/Goldziher/html-to-markdown/blob/main/crates/html-to-markdown/README.md)
 - **Contributing** – [CONTRIBUTING.md](https://github.com/Goldziher/html-to-markdown/blob/main/CONTRIBUTING.md) ⭐ Start here!
 - **Changelog** – [CHANGELOG.md](https://github.com/Goldziher/html-to-markdown/blob/main/CHANGELOG.md)
 

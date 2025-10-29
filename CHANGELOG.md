@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.5.5] - 2025-10-30
+
+### Changed
+- Synced documentation: the root README now links to every language guide, and the Ruby README highlights GitHub resources alongside feature docs.
+- Gem packaging now reads the README directly for the RubyGems long description while keeping Rubocop happy on all Ruby sources.
+- Bumped every package (Rust crates, npm, PyPI, Ruby gem) to version 2.5.5.
+
 ## [2.5.4] - 2025-10-30
 
 ### Changed
