@@ -2,6 +2,8 @@
 
 Universal HTML to Markdown converter using WebAssembly.
 
+Powered by the same Rust engine as the Node.js, Python, and Ruby bindings, so Markdown output stays identical regardless of runtime.
+
 Runs anywhere: Node.js, Deno, Bun, browsers, and edge runtimes.
 
 [![npm version](https://badge.fury.io/js/html-to-markdown-wasm.svg)](https://www.npmjs.com/package/html-to-markdown-wasm)
@@ -357,6 +359,15 @@ const markdown = convert(html, {
 
 console.log(markdown);
 ```
+
+## Other Runtimes
+
+The same Rust engine ships as native bindings for other ecosystems:
+
+- 🖥️ Node.js / Bun: [`html-to-markdown-node`](https://www.npmjs.com/package/html-to-markdown-node)
+- 🐍 Python: [`html-to-markdown`](https://pypi.org/project/html-to-markdown/)
+- 💎 Ruby: [`html-to-markdown`](https://rubygems.org/gems/html-to-markdown)
+- 🦀 Rust crate & CLI: [`html-to-markdown-rs`](https://crates.io/crates/html-to-markdown-rs)
 
 ## Links
 
