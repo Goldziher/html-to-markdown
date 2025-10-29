@@ -76,7 +76,7 @@ jobs:
             build_source_gem: true
           - os: macos-14
             label: macos-arm64
-          - os: macos-12
+          - os: macos-13
             label: macos-x86_64
           - os: windows-latest
             label: windows-x64
