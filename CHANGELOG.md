@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.5.6] - 2025-10-30
+
+### Changed
+- The Ruby gem now packages its own README at the gem root, so RubyGems renders the fully formatted documentation (benchmarks, configuration, CLI notes) without broken links.
+- Documentation links: the Ruby README now surfaces GitHub resources (issues, changelog, live demo) alongside feature highlights.
+- Bumped every package (Rust crates, npm, PyPI, Ruby gem) to version 2.5.6.
+
 ## [2.5.5] - 2025-10-30
 
 ### Changed

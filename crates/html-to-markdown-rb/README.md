@@ -17,6 +17,13 @@ Blazing-fast HTML → Markdown conversion for Ruby, powered by the same Rust eng
 - 🧰 **Bundled CLI proxy**: Call the Rust CLI straight from Ruby or shell scripts.
 - 🛠️ **First-class Rails support**: Works with `Gem.win_platform?` builds, supports Trusted Publishing, and compiles on install if no native gem matches.
 
+## Documentation & Support
+
+- [GitHub repository](https://github.com/Goldziher/html-to-markdown)
+- [Issue tracker](https://github.com/Goldziher/html-to-markdown/issues)
+- [Changelog](https://github.com/Goldziher/html-to-markdown/blob/main/CHANGELOG.md)
+- [Live demo (WASM)](https://goldziher.github.io/html-to-markdown/)
+
 ## Installation
 
 ```bash
@@ -156,7 +163,7 @@ You can also call the CLI binary directly for scripting:
 
 ```ruby
 HtmlToMarkdown::CLIProxy.call(['--version'])
-# => "html-to-markdown 2.5.5"
+# => "html-to-markdown 2.5.6"
 ```
 
 Rebuild the CLI locally if you see `CLI binary not built` during tests:
