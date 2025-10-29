@@ -10,7 +10,7 @@ members = [
 ]
 
 [workspace.package]
-version = "2.5.1"
+version = "2.5.2"
 edition = "2021"
 authors = ["Na'aman Hirschfeld <nhirschfeld@gmail.com>"]
 license = "MIT"
@@ -22,7 +22,7 @@ rust-version = "1.80"
 
 [workspace.dependencies]
 # Core library
-html-to-markdown-rs = { version = "2.5.1", path = "crates/html-to-markdown" }
+html-to-markdown-rs = { version = "2.5.2", path = "crates/html-to-markdown" }
 
 # HTML parsing and sanitization
 tl = "0.7"
@@ -48,3 +48,6 @@ lto = "thin"
 codegen-units = 1
 opt-level = 3
 strip = true
+
+[patch.crates-io]
+html-to-markdown-rs = { path = "crates/html-to-markdown" }
