@@ -5,7 +5,7 @@ require 'rb_sys/mkmf'
 require 'rbconfig'
 
 if RbConfig::CONFIG['host_os'] =~ /mswin|mingw/
-  devkit = ENV['RI_DEVKIT']
+  devkit = ENV.fetch('RI_DEVKIT', nil)
   prefix = ENV['MSYSTEM_PREFIX'] || '/ucrt64'
 
   if devkit
