@@ -2,6 +2,9 @@
 
 require_relative 'lib/html_to_markdown/version'
 
+readme_path = File.expand_path('README.md', __dir__)
+readme_body = File.read(readme_path, encoding: 'UTF-8')
+
 Gem::Specification.new do |spec|
   spec.name          = 'html-to-markdown'
   spec.version       = HtmlToMarkdown::VERSION
@@ -9,10 +12,7 @@ Gem::Specification.new do |spec|
   spec.email         = ['nhirschfeld@gmail.com']
 
   spec.summary       = 'Blazing-fast HTML to Markdown conversion for Ruby, powered by Rust.'
-  spec.description   = <<~DESC.strip
-    html-to-markdown wraps our ultra-fast Rust converter with a Ruby-native API via Magnus and rb-sys.
-    Enjoy identical output to the Python, Node, and WASM bindings, a bundled CLI proxy, and seamless cross-platform installs.
-  DESC
+  spec.description   = readme_body
   spec.homepage      = 'https://github.com/Goldziher/html-to-markdown'
   spec.license       = 'MIT'
 
@@ -22,21 +22,8 @@ Gem::Specification.new do |spec|
   spec.executables = ['html-to-markdown']
   spec.require_paths = ['lib']
 
-  spec.files = Dir.chdir(__dir__) do
-    Dir.glob(
-      %w[
-        Cargo.toml
-        Cargo.lock
-        README.md
-        extconf.rb
-        exe/*
-        lib/**/*.rb
-        lib/bin/*
-        src/**/*.rs
-        spec/**/*.rb
-      ]
-    )
-  end
+  spec.files = `git ls-files -z`.split("\x0")
+  spec.extra_rdoc_files = ['README.md']
 
   spec.extensions = ['extconf.rb']
 
