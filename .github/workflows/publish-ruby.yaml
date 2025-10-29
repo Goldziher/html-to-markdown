@@ -1,0 +1,89 @@
+---
+name: Publish Ruby Gem
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag to publish (e.g., v2.5.2)"
+        required: true
+        type: string
+      dry_run:
+        description: "Dry run (skip actual publishing)"
+        required: false
+        type: boolean
+        default: false
+
+jobs:
+  publish-gem:
+    if: ${{ !(github.event_name == 'workflow_dispatch' && github.event.inputs.dry_run == 'true') }}
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+        with:
+          ref: ${{ format('refs/tags/{0}', github.event.inputs.tag) }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "3.3"
+          bundler-cache: true
+          working-directory: crates/html-to-markdown-rb
+
+      - name: Determine release version
+        id: gem_version
+        run: |
+          tag=${{ github.event.inputs.tag }}
+          version=${tag#v}
+          echo "version=$version" >> $GITHUB_OUTPUT
+
+      - name: Check RubyGems for existing release
+        id: gem_check
+        env:
+          VERSION: ${{ steps.gem_version.outputs.version }}
+        run: |
+          python - <<'PY' >> "$GITHUB_OUTPUT"
+          import json
+          import os
+          import sys
+          import urllib.request
+
+          version = os.environ["VERSION"]
+          url = "https://rubygems.org/api/v1/versions/html-to-markdown.json"
+
+          try:
+              with urllib.request.urlopen(url) as resp:
+                  data = json.load(resp)
+          except Exception as exc:
+              print(f"::warning::failed to query RubyGems ({exc})", file=sys.stderr)
+              exists = False
+          else:
+              exists = any(entry.get("number") == version for entry in data)
+              if exists:
+                  print(f"::notice::html-to-markdown {version} already published on RubyGems", file=sys.stderr)
+              else:
+                  print(f"::notice::html-to-markdown {version} not found on RubyGems", file=sys.stderr)
+
+          print(f"exists={'true' if exists else 'false'}")
+          PY
+
+      - name: Prepare gem assets
+        if: ${{ steps.gem_check.outputs.exists != 'true' }}
+        run: ruby scripts/prepare_ruby_gem.rb
+
+      - name: Configure trusted publishing credentials
+        if: ${{ steps.gem_check.outputs.exists != 'true' }}
+        uses: rubygems/configure-rubygems-credentials@v1.0.0
+
+      - name: Release gem
+        if: ${{ steps.gem_check.outputs.exists != 'true' }}
+        working-directory: crates/html-to-markdown-rb
+        env:
+          BUNDLE_GEMFILE: Gemfile
+        run: bundle exec rake release
