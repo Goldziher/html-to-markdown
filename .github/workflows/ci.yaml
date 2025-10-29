@@ -243,6 +243,16 @@ jobs:
         shell: pwsh
         run: ridk exec pacman -S --needed --noconfirm base-devel mingw-w64-ucrt-x86_64-toolchain
 
+      - name: Install Rust GNU toolchain
+        if: runner.os == 'Windows'
+        shell: bash
+        run: rustup toolchain install stable-gnu --profile minimal --no-self-update
+
+      - name: Configure bindgen sysroot (Windows)
+        if: runner.os == 'Windows'
+        shell: bash
+        run: echo "BINDGEN_EXTRA_CLANG_ARGS=--target=x86_64-pc-windows-gnu --sysroot=${RI_DEVKIT//\\/\/}$MSYSTEM_PREFIX" >> $GITHUB_ENV
+
       - name: Build CLI binary
         run: cargo build --release --package html-to-markdown-cli
 
@@ -266,7 +276,7 @@ jobs:
         shell: pwsh
         run: |
           $unixPath = ridk exec bash -lc "cygpath -au '$env:GITHUB_WORKSPACE/crates/html-to-markdown-rb'"
-          ridk exec bash -lc "cd $unixPath && export CC=x86_64-w64-mingw32-gcc CXX=x86_64-w64-mingw32-g++ && bundle _2.5.12_ install"
+          ridk exec bash -lc "cd $unixPath && export RUSTUP_TOOLCHAIN=stable-gnu CC=x86_64-w64-mingw32-gcc CXX=x86_64-w64-mingw32-g++ && bundle _2.5.12_ install"
 
       - name: Compile Ruby extension (Unix)
         if: runner.os != 'Windows'
@@ -283,7 +293,7 @@ jobs:
         shell: pwsh
         run: |
           $unixPath = ridk exec bash -lc "cygpath -au '$env:GITHUB_WORKSPACE/crates/html-to-markdown-rb'"
-          ridk exec bash -lc "cd $unixPath && export CC=x86_64-w64-mingw32-gcc CXX=x86_64-w64-mingw32-g++ && bundle _2.5.12_ exec rake compile"
+          ridk exec bash -lc "cd $unixPath && export RUSTUP_TOOLCHAIN=stable-gnu CC=x86_64-w64-mingw32-gcc CXX=x86_64-w64-mingw32-g++ && bundle _2.5.12_ exec rake compile"
 
       - name: Run Ruby specs (Unix)
         if: runner.os != 'Windows'
@@ -296,7 +306,7 @@ jobs:
         shell: pwsh
         run: |
           $unixPath = ridk exec bash -lc "cygpath -au '$env:GITHUB_WORKSPACE/crates/html-to-markdown-rb'"
-          ridk exec bash -lc "cd $unixPath && export CC=x86_64-w64-mingw32-gcc CXX=x86_64-w64-mingw32-g++ && bundle _2.5.12_ exec rspec --format progress"
+          ridk exec bash -lc "cd $unixPath && export RUSTUP_TOOLCHAIN=stable-gnu CC=x86_64-w64-mingw32-gcc CXX=x86_64-w64-mingw32-g++ && bundle _2.5.12_ exec rspec --format progress"
 
   node-bindings:
     runs-on: ${{ matrix.os }}
