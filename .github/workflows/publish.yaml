@@ -20,7 +20,6 @@ concurrency:
 
 jobs:
   publish-crates:
-    if: false
     name: Publish Rust crates to crates.io
     runs-on: ubuntu-latest
     steps:
@@ -110,7 +109,6 @@ jobs:
           echo "DRY RUN: would publish html-to-markdown-rs and html-to-markdown-cli"
 
   build-wheels:
-    if: false
     name: Build wheels on ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     strategy:
@@ -129,7 +127,6 @@ jobs:
           python-version: "3.13"
 
   build-sdist:
-    if: false
     name: Build source distribution
     runs-on: ubuntu-latest
     steps:
@@ -168,7 +165,6 @@ jobs:
           retention-days: 7
 
   publish-pypi:
-    if: false
     name: Publish to PyPI
     needs:
       - build-wheels
@@ -251,87 +247,7 @@ jobs:
           echo "DRY RUN: would publish the following packages to PyPI"
           ls -1 dist/*.whl dist/*.tar.gz
 
-  publish-gem:
-    name: Push gem to RubyGems.org
-    if: ${{ !(github.event_name == 'workflow_dispatch' && github.event.inputs.dry_run == 'true') }}
-    runs-on: ubuntu-latest
-    permissions:
-      id-token: write
-      contents: write
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v5
-        with:
-          ref: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.tag != '' && format('refs/tags/{0}', github.event.inputs.tag) || '' }}
-          fetch-depth: 0
-          persist-credentials: false
-
-      - name: Set up Ruby
-        uses: ruby/setup-ruby@v1
-        with:
-          ruby-version: "3.3"
-          bundler-cache: true
-          working-directory: crates/html-to-markdown-rb
-
-      - name: Determine release version
-        id: gem_version
-        run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            tag="${{ github.event.inputs.tag }}"
-          else
-            tag=${GITHUB_REF#refs/tags/}
-          fi
-          version=${tag#v}
-          echo "version=$version" >> $GITHUB_OUTPUT
-
-      - name: Check RubyGems for existing release
-        id: gem_check
-        env:
-          VERSION: ${{ steps.gem_version.outputs.version }}
-        run: |
-          python - <<'PY' >> "$GITHUB_OUTPUT"
-          import json
-          import os
-          import sys
-          import urllib.request
-
-          version = os.environ["VERSION"]
-          url = "https://rubygems.org/api/v1/versions/html-to-markdown.json"
-
-          try:
-              with urllib.request.urlopen(url) as resp:
-                  data = json.load(resp)
-          except Exception as exc:
-              print(f"::warning::failed to query RubyGems ({exc})", file=sys.stderr)
-              exists = False
-          else:
-              exists = any(entry.get("number") == version for entry in data)
-              if exists:
-                  print(f"::notice::html-to-markdown {version} already published on RubyGems", file=sys.stderr)
-              else:
-                  print(f"::notice::html-to-markdown {version} not found on RubyGems", file=sys.stderr)
-
-          print(f"exists={'true' if exists else 'false'}")
-          PY
-
-      - name: Prepare gem assets
-        if: ${{ steps.gem_check.outputs.exists != 'true' }}
-        run: ruby scripts/prepare_ruby_gem.rb
-
-      - name: Configure trusted publishing credentials
-        if: ${{ steps.gem_check.outputs.exists != 'true' }}
-        uses: rubygems/configure-rubygems-credentials@v1.0.0
-
-      - name: Release gem
-        if: ${{ steps.gem_check.outputs.exists != 'true' }}
-        working-directory: crates/html-to-markdown-rb
-        env:
-          BUNDLE_GEMFILE: Gemfile
-          #GEM_HOST_API_KEY: ${{ secrets.RUBY_GEMS_TOKEN }}
-        run: bundle exec rake release
-
   publish-npm-node:
-    if: false
     name: Publish html-to-markdown-node to npm
     runs-on: ubuntu-latest
     steps:
@@ -406,7 +322,6 @@ jobs:
           echo "DRY RUN: would publish html-to-markdown-node to npm"
 
   publish-npm-wasm:
-    if: false
     name: Publish html-to-markdown-wasm to npm
     runs-on: ubuntu-latest
     steps:
@@ -482,12 +397,10 @@ jobs:
           echo "DRY RUN: would publish html-to-markdown-wasm to npm"
 
   verify:
-    if: false
     name: Verify publications
     needs:
       - publish-crates
       - publish-pypi
-      - publish-gem
       - publish-npm-node
       - publish-npm-wasm
     runs-on: ubuntu-latest
