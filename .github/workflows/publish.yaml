@@ -48,7 +48,7 @@ jobs:
 
       - name: Verify Cargo.toml version matches tag
         run: |
-          cargo_version=$(grep '^version = ' Cargo.toml | head -1 | sed 's/version = "\(.*\)"//')
+          cargo_version=$(grep '^version = ' Cargo.toml | head -1 | sed -E 's/version = "(.*)"/\1/')
           tag_version="${{ steps.version.outputs.version }}"
           if [ "$cargo_version" != "$tag_version" ]; then
             echo "Version mismatch! Cargo: $cargo_version, tag: $tag_version"
@@ -57,21 +57,21 @@ jobs:
           echo "Cargo.toml version matches tag: $cargo_version"
 
       - name: Publish html-to-markdown-rs (core library)
-        if: ${{ !inputs.dry_run }}
+        if: ${{ !(github.event_name == 'workflow_dispatch' && github.event.inputs.dry_run == 'true') }}
         run: |
           cargo publish -p html-to-markdown-rs --token ${{ secrets.CARGO_TOKEN }}
 
       - name: Wait for crates.io to index
-        if: ${{ !inputs.dry_run }}
+        if: ${{ !(github.event_name == 'workflow_dispatch' && github.event.inputs.dry_run == 'true') }}
         run: sleep 30
 
       - name: Publish html-to-markdown-cli
-        if: ${{ !inputs.dry_run }}
+        if: ${{ !(github.event_name == 'workflow_dispatch' && github.event.inputs.dry_run == 'true') }}
         run: |
           cargo publish -p html-to-markdown-cli --token ${{ secrets.CARGO_TOKEN }}
 
       - name: Dry run - Skip crates.io publish
-        if: ${{ inputs.dry_run }}
+        if: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.dry_run == 'true' }}
         run: |
           echo "DRY RUN: would publish html-to-markdown-rs and html-to-markdown-cli"
 
@@ -160,11 +160,11 @@ jobs:
           ls -lh dist/
 
       - name: Publish to PyPI
-        if: ${{ !inputs.dry_run }}
+        if: ${{ !(github.event_name == 'workflow_dispatch' && github.event.inputs.dry_run == 'true') }}
         uses: pypa/gh-action-pypi-publish@release/v1
 
       - name: Dry run - Skip PyPI publish
-        if: ${{ inputs.dry_run }}
+        if: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.dry_run == 'true' }}
         run: |
           echo "DRY RUN: would publish the following packages to PyPI"
           ls -1 dist/*.whl dist/*.tar.gz
@@ -172,7 +172,7 @@ jobs:
   publish-gem:
     name: Push gem to RubyGems.org
     needs: publish-crates
-    if: ${{ github.event_name != 'workflow_dispatch' || !inputs.dry_run }}
+    if: ${{ !(github.event_name == 'workflow_dispatch' && github.event.inputs.dry_run == 'true') }}
     runs-on: ubuntu-latest
     permissions:
       id-token: write
@@ -242,15 +242,16 @@ jobs:
         run: pnpm run build
 
       - name: Publish to npm
-        if: ${{ !inputs.dry_run }}
+        if: ${{ !(github.event_name == 'workflow_dispatch' && github.event.inputs.dry_run == 'true') }}
         working-directory: crates/html-to-markdown-node
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: pnpm publish --access public --no-git-checks
 
       - name: Dry run - Skip npm publish
-        if: ${{ inputs.dry_run }}
-        run: echo "DRY RUN: would publish html-to-markdown-node to npm"
+        if: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.dry_run == 'true' }}
+        run: |
+          echo "DRY RUN: would publish html-to-markdown-node to npm"
 
   publish-npm-wasm:
     name: Publish html-to-markdown-wasm to npm
@@ -292,15 +293,16 @@ jobs:
         run: find dist dist-node dist-web -maxdepth 1 -name ".gitignore" -delete
 
       - name: Publish to npm
-        if: ${{ !inputs.dry_run }}
+        if: ${{ !(github.event_name == 'workflow_dispatch' && github.event.inputs.dry_run == 'true') }}
         working-directory: crates/html-to-markdown-wasm
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: pnpm publish --access public --no-git-checks
 
       - name: Dry run - Skip npm publish
-        if: ${{ inputs.dry_run }}
-        run: echo "DRY RUN: would publish html-to-markdown-wasm to npm"
+        if: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.dry_run == 'true' }}
+        run: |
+          echo "DRY RUN: would publish html-to-markdown-wasm to npm"
 
   verify:
     name: Verify publications
@@ -311,7 +313,7 @@ jobs:
       - publish-npm-node
       - publish-npm-wasm
     runs-on: ubuntu-latest
-    if: ${{ !inputs.dry_run }}
+    if: ${{ !(github.event_name == 'workflow_dispatch' && github.event.inputs.dry_run == 'true') }}
     steps:
       - name: Extract version
         id: version
@@ -327,12 +329,12 @@ jobs:
       - name: Verify crates.io publication
         run: |
           version="${{ steps.version.outputs.version }}"
-          if cargo search html-to-markdown-rs | grep -q "html-to-markdown-rs = "$version""; then
+          if cargo search html-to-markdown-rs | grep -q "html-to-markdown-rs = \"$version\""; then
             echo "html-to-markdown-rs indexed"
           else
             echo "html-to-markdown-rs not yet indexed"
           fi
-          if cargo search html-to-markdown-cli | grep -q "html-to-markdown-cli = "$version""; then
+          if cargo search html-to-markdown-cli | grep -q "html-to-markdown-cli = \"$version\""; then
             echo "html-to-markdown-cli indexed"
           else
             echo "html-to-markdown-cli not yet indexed"
