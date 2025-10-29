@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.5.1] - 2025-10-28
+
+### Added
+- Magnus-based Ruby gem (`html-to-markdown-rb`) with CLI proxy and comprehensive specs.
+
+### Changed
+- CI now includes Ruby coverage across macOS, Linux, and Windows, installing the appropriate toolchains (MSYS2 on Windows) for Magnus builds.
+- Release workflow prepares the Ruby gem via trusted publishing alongside existing crates/npm packages.
+
+### Fixed
+- Bundler version pinned to 2.5.12 to support Ruby 3.2 CI environments.
+
 ## [2.5.0] - 2025-10-24
 
 ### Added
