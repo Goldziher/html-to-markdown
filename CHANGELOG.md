@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.5.2] - 2025-10-29
+
+- Fix Ruby gem packaging to embed standalone Cargo manifest (no workspace inheritance) so installs compile out of tree successfully.
+- Bump versions across Rust, Node, Python, and Ruby bindings.
+
 ## [2.5.1] - 2025-10-28
 
 ### Added
