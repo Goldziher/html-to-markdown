@@ -1,12 +1,13 @@
+---
 name: Publish Packages
 
 on:
   release:
-    types: [ published ]
+    types: [published]
   workflow_dispatch:
     inputs:
       tag:
-        description: "Release tag to publish (e.g., v2.1.0)"
+        description: "Release tag to publish (e.g., v2.5.1)"
         required: true
         type: string
       dry_run:
@@ -24,11 +25,13 @@ jobs:
     name: Publish Rust crates to crates.io
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - name: Checkout
+        uses: actions/checkout@v5
         with:
           ref: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.tag || '' }}
 
-      - uses: dtolnay/rust-toolchain@stable
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
 
       - name: Extract version from tag
         id: version
@@ -41,19 +44,22 @@ jobs:
           version=${tag#v}
           echo "version=$version" >> $GITHUB_OUTPUT
           echo "tag=$tag" >> $GITHUB_OUTPUT
+          echo "Publishing version: $version"
 
       - name: Verify Cargo.toml version matches tag
         run: |
-          cargo_version=$(grep '^version = ' Cargo.toml | head -1 | sed 's/version = "\(.*\)"/\1/')
+          cargo_version=$(grep '^version = ' Cargo.toml | head -1 | sed 's/version = "\(.*\)"//')
           tag_version="${{ steps.version.outputs.version }}"
           if [ "$cargo_version" != "$tag_version" ]; then
-            echo "Version mismatch: $cargo_version (Cargo.toml) vs $tag_version (tag)"
+            echo "Version mismatch! Cargo: $cargo_version, tag: $tag_version"
             exit 1
           fi
+          echo "Cargo.toml version matches tag: $cargo_version"
 
-      - name: Publish html-to-markdown-rs
+      - name: Publish html-to-markdown-rs (core library)
         if: ${{ !inputs.dry_run }}
-        run: cargo publish -p html-to-markdown-rs --token ${{ secrets.CARGO_TOKEN }}
+        run: |
+          cargo publish -p html-to-markdown-rs --token ${{ secrets.CARGO_TOKEN }}
 
       - name: Wait for crates.io to index
         if: ${{ !inputs.dry_run }}
@@ -61,13 +67,13 @@ jobs:
 
       - name: Publish html-to-markdown-cli
         if: ${{ !inputs.dry_run }}
-        run: cargo publish -p html-to-markdown-cli --token ${{ secrets.CARGO_TOKEN }}
+        run: |
+          cargo publish -p html-to-markdown-cli --token ${{ secrets.CARGO_TOKEN }}
 
       - name: Dry run - Skip crates.io publish
         if: ${{ inputs.dry_run }}
         run: |
-          echo "DRY RUN: html-to-markdown-rs"
-          echo "DRY RUN: html-to-markdown-cli"
+          echo "DRY RUN: would publish html-to-markdown-rs and html-to-markdown-cli"
 
   build-wheels:
     name: Build wheels on ${{ matrix.os }}
@@ -75,13 +81,15 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ ubuntu-latest, windows-latest, macos-latest ]
+        os: [ubuntu-latest, windows-latest, macos-latest]
     steps:
-      - uses: actions/checkout@v5
+      - name: Checkout
+        uses: actions/checkout@v5
         with:
           ref: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.tag || '' }}
 
-      - uses: ./.github/actions/build-wheels
+      - name: Build wheels
+        uses: ./.github/actions/build-wheels
         with:
           python-version: "3.13"
 
@@ -89,13 +97,16 @@ jobs:
     name: Build source distribution
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - name: Checkout
+        uses: actions/checkout@v5
         with:
           ref: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.tag || '' }}
 
-      - uses: actions-rust-lang/setup-rust-toolchain@v1
+      - name: Setup Rust
+        uses: actions-rust-lang/setup-rust-toolchain@v1
 
-      - uses: actions/setup-python@v6
+      - name: Set up Python
+        uses: actions/setup-python@v6
         with:
           python-version: "3.13"
 
@@ -122,26 +133,30 @@ jobs:
 
   publish-pypi:
     name: Publish to PyPI
-    needs: [ build-wheels, build-sdist ]
+    needs:
+      - build-wheels
+      - build-sdist
     runs-on: ubuntu-latest
     environment: pypi
     permissions:
       id-token: write
     steps:
-      - uses: actions/download-artifact@v6
+      - name: Download wheels
+        uses: actions/download-artifact@v6
         with:
           pattern: "wheels-*"
           merge-multiple: true
           path: dist/
 
-      - uses: actions/download-artifact@v6
+      - name: Download sdist
+        uses: actions/download-artifact@v6
         with:
           name: sdist
           path: dist/
 
       - name: List artifacts
         run: |
-          echo "Artifacts in dist:"
+          echo "Artifacts ready for PyPI:"
           ls -lh dist/
 
       - name: Publish to PyPI
@@ -151,7 +166,7 @@ jobs:
       - name: Dry run - Skip PyPI publish
         if: ${{ inputs.dry_run }}
         run: |
-          echo "DRY RUN: PyPI"
+          echo "DRY RUN: would publish the following packages to PyPI"
           ls -1 dist/*.whl dist/*.tar.gz
 
   publish-gem:
@@ -163,12 +178,14 @@ jobs:
       id-token: write
       contents: write
     steps:
-      - uses: actions/checkout@v5
+      - name: Checkout
+        uses: actions/checkout@v5
         with:
           ref: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.tag || '' }}
           persist-credentials: false
 
-      - uses: ruby/setup-ruby@v1
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
         with:
           ruby-version: "3.3"
           bundler-cache: true
@@ -177,28 +194,36 @@ jobs:
       - name: Prepare gem assets
         run: ruby scripts/prepare_ruby_gem.rb
 
-      - name: Release gem via Trusted Publishing
-        uses: rubygems/release-gem@v1
+      - name: Configure trusted publishing credentials
+        uses: rubygems/configure-rubygems-credentials@v1.0.0
+
+      - name: Release gem
+        working-directory: crates/html-to-markdown-rb
         env:
-          BUNDLE_GEMFILE: crates/html-to-markdown-rb/Gemfile
+          BUNDLE_GEMFILE: Gemfile
+        run: bundle exec rake release
 
   publish-npm-node:
     name: Publish html-to-markdown-node to npm
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - name: Checkout
+        uses: actions/checkout@v5
         with:
           ref: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.tag || '' }}
 
-      - uses: pnpm/action-setup@v4
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
 
-      - uses: actions/setup-node@v6
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
         with:
           node-version: 24
-          registry-url: "https://registry.npmjs.org"
+          registry-url: https://registry.npmjs.org
           cache: pnpm
 
-      - uses: dtolnay/rust-toolchain@stable
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
 
       - name: Download NAPI artifacts from release
         env:
@@ -206,7 +231,7 @@ jobs:
         run: |
           tag="${{ github.event_name == 'workflow_dispatch' && github.event.inputs.tag || github.ref_name }}"
           cd crates/html-to-markdown-node
-          gh release download "$tag" --pattern "*.node" --dir . || echo "No .node files"
+          gh release download "$tag" --pattern "*.node" --dir . || echo "No prebuilt .node files"
 
       - name: Install dependencies
         working-directory: crates/html-to-markdown-node
@@ -223,23 +248,31 @@ jobs:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: pnpm publish --access public --no-git-checks
 
+      - name: Dry run - Skip npm publish
+        if: ${{ inputs.dry_run }}
+        run: echo "DRY RUN: would publish html-to-markdown-node to npm"
+
   publish-npm-wasm:
     name: Publish html-to-markdown-wasm to npm
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - name: Checkout
+        uses: actions/checkout@v5
         with:
           ref: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.tag || '' }}
 
-      - uses: pnpm/action-setup@v4
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
 
-      - uses: actions/setup-node@v6
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
         with:
           node-version: 24
-          registry-url: "https://registry.npmjs.org"
+          registry-url: https://registry.npmjs.org
           cache: pnpm
 
-      - uses: dtolnay/rust-toolchain@stable
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
         with:
           targets: wasm32-unknown-unknown
 
@@ -265,10 +298,18 @@ jobs:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: pnpm publish --access public --no-git-checks
 
+      - name: Dry run - Skip npm publish
+        if: ${{ inputs.dry_run }}
+        run: echo "DRY RUN: would publish html-to-markdown-wasm to npm"
 
   verify:
     name: Verify publications
-    needs: [ publish-crates, publish-pypi, publish-gem, publish-npm-node, publish-npm-wasm ]
+    needs:
+      - publish-crates
+      - publish-pypi
+      - publish-gem
+      - publish-npm-node
+      - publish-npm-wasm
     runs-on: ubuntu-latest
     if: ${{ !inputs.dry_run }}
     steps:
@@ -286,11 +327,15 @@ jobs:
       - name: Verify crates.io publication
         run: |
           version="${{ steps.version.outputs.version }}"
-          if cargo search html-to-markdown-rs | grep -q "html-to-markdown-rs = \"$version\""; then
+          if cargo search html-to-markdown-rs | grep -q "html-to-markdown-rs = "$version""; then
             echo "html-to-markdown-rs indexed"
+          else
+            echo "html-to-markdown-rs not yet indexed"
           fi
-          if cargo search html-to-markdown-cli | grep -q "html-to-markdown-cli = \"$version\""; then
+          if cargo search html-to-markdown-cli | grep -q "html-to-markdown-cli = "$version""; then
             echo "html-to-markdown-cli indexed"
+          else
+            echo "html-to-markdown-cli not yet indexed"
           fi
 
       - name: Verify npm publication
