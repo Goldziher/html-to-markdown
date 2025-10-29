@@ -22,6 +22,7 @@ concurrency:
 
 jobs:
   publish-crates:
+    if: false
     name: Publish Rust crates to crates.io
     runs-on: ubuntu-latest
     steps:
@@ -111,6 +112,7 @@ jobs:
           echo "DRY RUN: would publish html-to-markdown-rs and html-to-markdown-cli"
 
   build-wheels:
+    if: false
     name: Build wheels on ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     strategy:
@@ -129,6 +131,7 @@ jobs:
           python-version: "3.13"
 
   build-sdist:
+    if: false
     name: Build source distribution
     runs-on: ubuntu-latest
     steps:
@@ -167,6 +170,7 @@ jobs:
           retention-days: 7
 
   publish-pypi:
+    if: false
     name: Publish to PyPI
     needs:
       - build-wheels
@@ -251,8 +255,7 @@ jobs:
 
   publish-gem:
     name: Push gem to RubyGems.org
-    needs: publish-crates
-    if: ${{ vars.PUBLISH_RUBYGEMS == 'true' && !(github.event_name == 'workflow_dispatch' && github.event.inputs.dry_run == 'true') }}
+    if: ${{ !(github.event_name == 'workflow_dispatch' && github.event.inputs.dry_run == 'true') }}
     runs-on: ubuntu-latest
     permissions:
       id-token: write
@@ -328,6 +331,7 @@ jobs:
         run: bundle exec rake release
 
   publish-npm-node:
+    if: false
     name: Publish html-to-markdown-node to npm
     runs-on: ubuntu-latest
     steps:
@@ -402,6 +406,7 @@ jobs:
           echo "DRY RUN: would publish html-to-markdown-node to npm"
 
   publish-npm-wasm:
+    if: false
     name: Publish html-to-markdown-wasm to npm
     runs-on: ubuntu-latest
     steps:
@@ -477,6 +482,7 @@ jobs:
           echo "DRY RUN: would publish html-to-markdown-wasm to npm"
 
   verify:
+    if: false
     name: Verify publications
     needs:
       - publish-crates
