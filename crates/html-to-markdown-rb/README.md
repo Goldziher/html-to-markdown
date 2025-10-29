@@ -1,12 +1,21 @@
 # html-to-markdown-rb
 
-Ruby bindings for the `html-to-markdown` Rust engine – the same core that powers the Python wheels, Node.js NAPI bindings, WebAssembly package, and CLI. The gem exposes fast HTML → Markdown conversion with identical rendering behaviour across every supported language.
+Blazing-fast HTML → Markdown conversion for Ruby, powered by the same Rust engine used by our Python, Node.js, and WebAssembly packages. Ship identical Markdown across every runtime while enjoying native extension performance.
 
 [![Crates.io](https://img.shields.io/crates/v/html-to-markdown-rs.svg)](https://crates.io/crates/html-to-markdown-rs)
 [![npm version](https://badge.fury.io/js/html-to-markdown-node.svg)](https://www.npmjs.com/package/html-to-markdown-node)
 [![PyPI version](https://badge.fury.io/py/html-to-markdown.svg)](https://pypi.org/project/html-to-markdown/)
 [![Gem Version](https://badge.fury.io/rb/html-to-markdown.svg)](https://rubygems.org/gems/html-to-markdown)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://github.com/Goldziher/html-to-markdown/blob/main/LICENSE)
+
+## Features
+
+- ⚡ **Rust-fast**: Ruby bindings around a highly optimised Rust core (60‑80× faster than BeautifulSoup-based converters).
+- 🔁 **Identical output**: Shares logic with the Python wheels, npm bindings, WASM package, and CLI — consistent Markdown everywhere.
+- ⚙️ **Rich configuration**: Control heading styles, list indentation, whitespace handling, HTML preprocessing, and more.
+- 🖼️ **Inline image extraction**: Pull out embedded images (PNG/JPEG/SVG/data URIs) alongside Markdown.
+- 🧰 **Bundled CLI proxy**: Call the Rust CLI straight from Ruby or shell scripts.
+- 🛠️ **First-class Rails support**: Works with `Gem.win_platform?` builds, supports Trusted Publishing, and compiles on install if no native gem matches.
 
 ## Installation
 
@@ -32,6 +41,18 @@ ridk exec pacman -S --needed --noconfirm base-devel mingw-w64-ucrt-x86_64-toolch
 
 This provides the standard headers (including `strings.h`) required for the bindgen step.
 
+## Performance Snapshot
+
+Apple M4 • Real Wikipedia documents • `HtmlToMarkdown.convert` (Ruby)
+
+| Document            | Size  | Latency | Throughput | Docs/sec |
+| ------------------- | ----- | ------- | ---------- | -------- |
+| Lists (Timeline)    | 129KB | 0.69ms  | 187 MB/s   | 1,450    |
+| Tables (Countries)  | 360KB | 2.19ms  | 164 MB/s   | 456      |
+| Mixed (Python wiki) | 656KB | 4.88ms  | 134 MB/s   | 205      |
+
+> Same core, same benchmarks: the Ruby extension stays within single-digit % of the Rust CLI and mirrors the Python/Node numbers.
+
 ## Quick Start
 
 ```ruby
@@ -56,9 +77,11 @@ puts markdown
 # - Identical output across languages
 ```
 
-### Conversion with Options
+## API
 
-All configuration mirrors the Rust API. Options accept symbols or strings and match the same defaults as the other bindings.
+### Conversion Options
+
+Pass a Ruby hash (string or symbol keys) to tweak rendering. Every option maps one-for-one with the Rust/Python/Node APIs.
 
 ```ruby
 require 'html_to_markdown'
@@ -67,10 +90,31 @@ markdown = HtmlToMarkdown.convert(
   '<pre><code class="language-ruby">puts "hi"</code></pre>',
   heading_style: :atx,
   code_block_style: :fenced,
-  bullets: ['*', '-', '+'],
-  wrap: true,
-  wrap_width: 80,
-  preserve_tags: %w[table figure]
+  bullets: '*+-',
+  list_indent_type: :spaces,
+  list_indent_width: 2,
+  whitespace_mode: :normalized,
+  highlight_style: :double_equal
+)
+
+puts markdown
+```
+
+### HTML Preprocessing
+
+Clean up scraped HTML (navigation, forms, malformed markup) before conversion:
+
+```ruby
+require 'html_to_markdown'
+
+markdown = HtmlToMarkdown.convert(
+  html,
+  preprocessing: {
+    enabled: true,
+    preset: :aggressive, # :minimal, :standard, :aggressive
+    remove_navigation: true,
+    remove_forms: true
+  }
 )
 ```
 
@@ -97,7 +141,7 @@ result.inline_images.each do |img|
 end
 ```
 
-### CLI Proxy
+## CLI
 
 The gem bundles a small proxy for the Rust CLI binary. Use it when you need parity with the standalone `html-to-markdown` executable.
 
@@ -115,7 +159,14 @@ HtmlToMarkdown::CLIProxy.call(['--version'])
 # => "html-to-markdown 2.5.3"
 ```
 
-### Error Handling
+Rebuild the CLI locally if you see `CLI binary not built` during tests:
+
+```bash
+bundle exec rake compile          # builds the extension
+bundle exec ruby scripts/prepare_ruby_gem.rb  # copies the CLI into lib/bin/
+```
+
+## Error Handling
 
 Conversion errors raise `HtmlToMarkdown::Error` (wrapping the Rust error context). CLI invocations use specialised subclasses:
 
