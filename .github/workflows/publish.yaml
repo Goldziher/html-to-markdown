@@ -56,17 +56,52 @@ jobs:
           fi
           echo "Cargo.toml version matches tag: $cargo_version"
 
+      - name: Check crates.io for existing release
+        id: crate_check
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          python - <<'PY' >> "$GITHUB_OUTPUT"
+          import json
+          import os
+          import sys
+          import urllib.request
+
+          version = os.environ["VERSION"]
+          crates = [
+              ("html-to-markdown-rs", "rs_exists"),
+              ("html-to-markdown-cli", "cli_exists"),
+          ]
+
+          for crate, key in crates:
+              url = f"https://crates.io/api/v1/crates/{crate}"
+              try:
+                  with urllib.request.urlopen(url) as resp:
+                      data = json.load(resp)
+              except Exception as exc:
+                  print(f"::warning::{crate}: failed to query crates.io ({exc})", file=sys.stderr)
+                  exists = False
+              else:
+                  versions = [item.get("num") for item in data.get("versions", [])]
+                  exists = version in versions
+                  if exists:
+                      print(f"::notice::{crate} {version} already published on crates.io")
+                  else:
+                      print(f"::notice::{crate} {version} not found on crates.io")
+              print(f"{key}={'true' if exists else 'false'}")
+          PY
+
       - name: Publish html-to-markdown-rs (core library)
-        if: ${{ !(github.event_name == 'workflow_dispatch' && github.event.inputs.dry_run == 'true') }}
+        if: ${{ steps.crate_check.outputs.rs_exists != 'true' && !(github.event_name == 'workflow_dispatch' && github.event.inputs.dry_run == 'true') }}
         run: |
           cargo publish -p html-to-markdown-rs --token ${{ secrets.CARGO_TOKEN }}
 
       - name: Wait for crates.io to index
-        if: ${{ !(github.event_name == 'workflow_dispatch' && github.event.inputs.dry_run == 'true') }}
+        if: ${{ steps.crate_check.outputs.rs_exists != 'true' && !(github.event_name == 'workflow_dispatch' && github.event.inputs.dry_run == 'true') }}
         run: sleep 30
 
       - name: Publish html-to-markdown-cli
-        if: ${{ !(github.event_name == 'workflow_dispatch' && github.event.inputs.dry_run == 'true') }}
+        if: ${{ steps.crate_check.outputs.cli_exists != 'true' && !(github.event_name == 'workflow_dispatch' && github.event.inputs.dry_run == 'true') }}
         run: |
           cargo publish -p html-to-markdown-cli --token ${{ secrets.CARGO_TOKEN }}
 
@@ -225,6 +260,30 @@ jobs:
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
 
+      - name: Determine release version
+        id: node_version
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            tag="${{ github.event.inputs.tag }}"
+          else
+            tag=${GITHUB_REF#refs/tags/}
+          fi
+          version=${tag#v}
+          echo "version=$version" >> $GITHUB_OUTPUT
+
+      - name: Check npm for existing html-to-markdown-node release
+        id: node_npm_check
+        env:
+          VERSION: ${{ steps.node_version.outputs.version }}
+        run: |
+          if npm view html-to-markdown-node@"$VERSION" version >/dev/null 2>&1; then
+            echo "::notice::html-to-markdown-node@$VERSION already published on npm"
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::notice::html-to-markdown-node@$VERSION not found on npm"
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Download NAPI artifacts from release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -242,7 +301,7 @@ jobs:
         run: pnpm run build
 
       - name: Publish to npm
-        if: ${{ !(github.event_name == 'workflow_dispatch' && github.event.inputs.dry_run == 'true') }}
+        if: ${{ steps.node_npm_check.outputs.exists != 'true' && !(github.event_name == 'workflow_dispatch' && github.event.inputs.dry_run == 'true') }}
         working-directory: crates/html-to-markdown-node
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
@@ -277,6 +336,30 @@ jobs:
         with:
           targets: wasm32-unknown-unknown
 
+      - name: Determine release version
+        id: wasm_version
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            tag="${{ github.event.inputs.tag }}"
+          else
+            tag=${GITHUB_REF#refs/tags/}
+          fi
+          version=${tag#v}
+          echo "version=$version" >> $GITHUB_OUTPUT
+
+      - name: Check npm for existing html-to-markdown-wasm release
+        id: wasm_npm_check
+        env:
+          VERSION: ${{ steps.wasm_version.outputs.version }}
+        run: |
+          if npm view html-to-markdown-wasm@"$VERSION" version >/dev/null 2>&1; then
+            echo "::notice::html-to-markdown-wasm@$VERSION already published on npm"
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::notice::html-to-markdown-wasm@$VERSION not found on npm"
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Install wasm-pack
         run: curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
 
@@ -293,7 +376,7 @@ jobs:
         run: find dist dist-node dist-web -maxdepth 1 -name ".gitignore" -delete
 
       - name: Publish to npm
-        if: ${{ !(github.event_name == 'workflow_dispatch' && github.event.inputs.dry_run == 'true') }}
+        if: ${{ steps.wasm_npm_check.outputs.exists != 'true' && !(github.event_name == 'workflow_dispatch' && github.event.inputs.dry_run == 'true') }}
         working-directory: crates/html-to-markdown-wasm
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
