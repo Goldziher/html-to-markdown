@@ -40,6 +40,12 @@ def main() -> None:
         dest.chmod(0o755)
         print(f"Made binary executable: {dest}")
 
+    license_src = repo_root / "LICENSE"
+    license_dest = repo_root / "packages" / "python" / "LICENSE"
+    if license_src.exists():
+        shutil.copy(license_src, license_dest)
+        print(f"Copied LICENSE to {license_dest}")
+
     with (repo_root / "Cargo.toml").open("rb") as f:
         cargo_toml = tomllib.load(f)
     version = cargo_toml["workspace"]["package"]["version"]
