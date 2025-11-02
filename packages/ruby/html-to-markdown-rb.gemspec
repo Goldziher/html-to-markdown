@@ -4,8 +4,8 @@ require_relative 'lib/html_to_markdown/version'
 
 readme_path = File.expand_path('README.md', __dir__)
 readme_body = File.read(readme_path, encoding: 'UTF-8')
-repo_root = File.expand_path('..', __dir__)
-crate_prefix = 'crates/html-to-markdown-rb/'
+repo_root = File.expand_path('../..', __dir__)
+crate_prefix = 'packages/ruby/'
 git_cmd = %(git -C "#{repo_root}" ls-files -z #{crate_prefix})
 git_files =
   `#{git_cmd}`.split("\x0")
@@ -14,10 +14,8 @@ git_files =
 fallback_files = Dir.chdir(__dir__) do
   Dir.glob(
     %w[
-      Cargo.toml
-      Cargo.lock
       README.md
-      extconf.rb
+      ext/html-to-markdown-rb/extconf.rb
       exe/*
       lib/**/*.rb
       lib/bin/*
@@ -48,7 +46,7 @@ Gem::Specification.new do |spec|
   spec.files = files
   spec.extra_rdoc_files = ['README.md']
 
-  spec.extensions = ['extconf.rb']
+  spec.extensions = ['ext/html-to-markdown-rb/extconf.rb']
 
   spec.add_dependency 'rb_sys', '>= 0.9', '< 1.0'
   spec.metadata['rubygems_mfa_required'] = 'true'
@@ -56,5 +54,5 @@ Gem::Specification.new do |spec|
   spec.metadata['source_code_uri'] = 'https://github.com/Goldziher/html-to-markdown'
   spec.metadata['bug_tracker_uri'] = 'https://github.com/Goldziher/html-to-markdown/issues'
   spec.metadata['changelog_uri'] = 'https://github.com/Goldziher/html-to-markdown/releases'
-  spec.metadata['documentation_uri'] = 'https://github.com/Goldziher/html-to-markdown/blob/main/crates/html-to-markdown-rb/README.md'
+  spec.metadata['documentation_uri'] = 'https://github.com/Goldziher/html-to-markdown/blob/main/packages/ruby/README.md'
 end

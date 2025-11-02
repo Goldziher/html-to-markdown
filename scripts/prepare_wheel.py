@@ -25,7 +25,8 @@ def main() -> None:
 
     print(f"Found CLI binary at {source}")
 
-    package_bin_dir = Path("html_to_markdown") / "bin"
+    package_root = Path("packages") / "python" / "html_to_markdown"
+    package_bin_dir = package_root / "bin"
     package_bin_dir.mkdir(parents=True, exist_ok=True)
 
     dest = package_bin_dir / binary_name
@@ -40,8 +41,8 @@ def main() -> None:
         cargo_toml = tomllib.load(f)
     version = cargo_toml["workspace"]["package"]["version"]
 
-    data_dir_name = f"html_to_markdown-{version}.data"
-    scripts_dir = Path(data_dir_name) / "scripts"
+    data_dir_name = Path("packages") / "python" / f"html_to_markdown-{version}.data"
+    scripts_dir = data_dir_name / "scripts"
     scripts_dir.mkdir(parents=True, exist_ok=True)
 
     scripts_dest = scripts_dir / binary_name

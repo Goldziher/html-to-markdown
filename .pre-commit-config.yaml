@@ -1,4 +1,13 @@
+default_install_hook_types:
+  - pre-commit
+  - commit-msg
+
 repos:
+  - repo: https://github.com/compilerla/conventional-pre-commit
+    rev: v4.3.0
+    hooks:
+      - id: conventional-pre-commit
+        stages: [commit-msg]
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v6.0.0
     hooks:
@@ -6,7 +15,6 @@ repos:
       - id: end-of-file-fixer
       - id: check-toml
       - id: check-case-conflict
-      - id: detect-private-key
   - repo: https://github.com/abravalheri/validate-pyproject
     rev: v0.24.1
     hooks:
@@ -15,26 +23,23 @@ repos:
     rev: v2.11.0
     hooks:
       - id: pyproject-fmt
-  - repo: https://github.com/biomejs/pre-commit
-    rev: v2.3.1
-    hooks:
-      - id: biome-format
-      - id: biome-lint
   - repo: https://github.com/oxc-project/mirrors-oxlint
     rev: v1.24.0
     hooks:
       - id: oxlint
         args: ["--fix"]
-  - repo: https://github.com/rubocop/rubocop
-    rev: v1.81.6
-    hooks:
-      - id: rubocop
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.14.2
+    rev: v0.14.3
     hooks:
       - id: ruff
         args: ["--fix", "--unsafe-fixes"]
       - id: ruff-format
+  - repo: https://github.com/rubocop/rubocop
+    rev: v1.81.7
+    hooks:
+      - id: rubocop
+        args: ["--autocorrect", "--config", "packages/ruby/.rubocop.yml"]
+        files: ^packages/ruby/
   - repo: https://github.com/codespell-project/codespell
     rev: v2.4.1
     hooks:
@@ -42,8 +47,8 @@ repos:
         exclude: ^test_documents/|^scripts/|pnpm-lock\.yaml|^uv\.lock
         additional_dependencies:
           - tomli
-  - repo: https://github.com/FeryET/pre-commit-rust
-    rev: v1.2.1
+  - repo: https://github.com/doublify/pre-commit-rust
+    rev: v1.0
     hooks:
       - id: fmt
       - id: cargo-check
@@ -56,4 +61,4 @@ repos:
         require_serial: true
         language: system
         types: [python]
-        exclude: ^scripts/|^examples/|^crates/
+        exclude: ^scripts/|^examples/

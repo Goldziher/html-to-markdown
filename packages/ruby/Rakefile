@@ -8,6 +8,7 @@ GEMSPEC = Gem::Specification.load(File.expand_path('html-to-markdown-rb.gemspec'
 
 RbSys::ExtensionTask.new('html-to-markdown-rb', GEMSPEC) do |ext|
   ext.lib_dir = 'lib'
+  ext.ext_dir = 'ext/html-to-markdown-rb'
   ext.cross_compile = true
   ext.cross_platform = %w[
     x86_64-linux

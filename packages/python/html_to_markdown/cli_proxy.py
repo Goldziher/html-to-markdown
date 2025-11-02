@@ -17,10 +17,18 @@ def find_cli_binary() -> Path:
     """
     binary_name = "html-to-markdown.exe" if sys.platform == "win32" else "html-to-markdown"
 
+    module_dir = Path(__file__).resolve().parent
+    parent_dirs = list(module_dir.parents)
+
+    search_roots = []
+    for parent in parent_dirs:
+        candidate = parent / "target" / "release" / binary_name
+        search_roots.append(candidate)
+
     possible_locations = [
-        Path(__file__).parent.parent / "target" / "release" / binary_name,
-        Path(__file__).parent / "bin" / binary_name,
-        Path(__file__).parent / binary_name,
+        *search_roots,
+        module_dir / "bin" / binary_name,
+        module_dir / binary_name,
     ]
 
     for location in possible_locations:

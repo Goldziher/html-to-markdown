@@ -20,7 +20,7 @@ struct CommonMarkTest {
 }
 
 fn load_spec_tests() -> Vec<CommonMarkTest> {
-    let spec_json = include_str!("../../../tests/commonmark_spec.json");
+    let spec_json = include_str!("../../../packages/python/tests/commonmark_spec.json");
     serde_json::from_str(spec_json).expect("Failed to parse commonmark_spec.json")
 }
 
