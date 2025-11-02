@@ -4,6 +4,9 @@ on:
   workflow_run:
     workflows: ["Build Artifacts"]
     types: [completed]
+  push:
+    paths:
+      - ".github/workflows/publish.yaml"
   workflow_dispatch:
     inputs:
       tag:
