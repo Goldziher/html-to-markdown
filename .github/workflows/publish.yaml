@@ -19,22 +19,12 @@ on:
   workflow_run:
     workflows: ["Build Artifacts"]
     types: [completed]
-  push:
-    paths:
-      - ".github/workflows/publish.yaml"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event_name == 'workflow_dispatch' && github.event.inputs.build_run_id || github.event_name == 'workflow_run' && github.event.workflow_run.id || github.run_id }}
   cancel-in-progress: false
 
 jobs:
-  ignore-push:
-    name: Ignore push event
-    if: ${{ github.event_name == 'push' }}
-    runs-on: ubuntu-latest
-    steps:
-      - run: echo "Publish workflow only runs for workflow_run or manual dispatch."
-
   gather:
     name: Load release metadata
     if: ${{ github.event_name == 'workflow_dispatch' || (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success') }}
