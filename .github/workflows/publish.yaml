@@ -21,13 +21,20 @@ on:
         default: true
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event_name == 'workflow_dispatch' && inputs.build_run_id || github.event.workflow_run.id }}
+  group: ${{ github.workflow }}-${{ github.event_name == 'workflow_dispatch' && inputs.build_run_id || github.event_name == 'workflow_run' && github.event.workflow_run.id || github.run_id }}
   cancel-in-progress: false
 
 jobs:
+  ignore-push:
+    name: Ignore push event
+    if: ${{ github.event_name == 'push' }}
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "Publish workflow only runs for workflow_run or manual dispatch."
+
   gather:
     name: Load release metadata
-    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
+    if: ${{ github.event_name == 'workflow_dispatch' || (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success') }}
     runs-on: ubuntu-latest
     outputs:
       tag: ${{ steps.read.outputs.tag }}
