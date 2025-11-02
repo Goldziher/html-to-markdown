@@ -8,7 +8,6 @@
     "sourceMap": false,
     "emitDeclarationOnly": false,
     "target": "ES2020",
-    "module": "CommonJS",
     "types": ["node"]
   },
   "include": ["src/**/*.ts"],
