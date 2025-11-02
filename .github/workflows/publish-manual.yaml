@@ -1,18 +1,25 @@
-name: Publish Release
+name: Publish Release (Manual)
 
 on:
-  workflow_run:
-    workflows: ["Build Artifacts"]
-    types: [completed]
-
-concurrency:
-  group: ${{ github.workflow }}-${{ github.event.workflow_run.id }}
-  cancel-in-progress: false
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag to publish (e.g., v2.6.0)"
+        required: true
+        type: string
+      build_run_id:
+        description: "Workflow run ID from the Build Artifacts workflow"
+        required: true
+        type: string
+      dry_run:
+        description: "Dry run (validate artifacts without publishing)"
+        required: false
+        type: boolean
+        default: true
 
 jobs:
   gather:
     name: Load release metadata
-    if: ${{ github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
     outputs:
       tag: ${{ steps.read.outputs.tag }}
@@ -24,7 +31,12 @@ jobs:
       - name: Determine build run
         id: build_run
         run: |
-          echo "id=${{ github.event.workflow_run.id }}" >> "$GITHUB_OUTPUT"
+          id="${{ inputs.build_run_id }}"
+          if [ -z "$id" ]; then
+            echo "build_run_id input is required when manually dispatching this workflow." >&2
+            exit 1
+          fi
+          echo "id=$id" >> "$GITHUB_OUTPUT"
 
       - name: Download metadata artifact
         uses: actions/download-artifact@v4
@@ -55,7 +67,11 @@ PY >> "$GITHUB_OUTPUT"
       - name: Determine dry-run flag
         id: dryrun
         run: |
-          echo "value=${{ steps.read.outputs.dry_run }}" >> "$GITHUB_OUTPUT"
+          if [ "${{ inputs.tag }}" != "${{ steps.read.outputs.tag }}" ]; then
+            echo "Specified tag '${{ inputs.tag }}' does not match metadata tag '${{ steps.read.outputs.tag }}'." >&2
+            exit 1
+          fi
+          echo "value=${{ inputs.dry_run }}" >> "$GITHUB_OUTPUT"
 
       - name: Summarize release
         run: |
@@ -68,7 +84,7 @@ PY >> "$GITHUB_OUTPUT"
   publish-crates:
     name: Publish crates.io packages
     needs: gather
-    if: ${{ needs.gather.result == 'success' && needs.gather.outputs.tag && needs.gather.outputs.dry_run != 'true' }}
+    if: ${{ needs.gather.outputs.tag && needs.gather.outputs.dry_run != 'true' }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -135,7 +151,7 @@ PY
   publish-pypi:
     name: Publish Python packages to PyPI
     needs: gather
-    if: ${{ needs.gather.result == 'success' && needs.gather.outputs.tag }}
+    if: ${{ needs.gather.outputs.tag }}
     runs-on: ubuntu-latest
     environment: pypi
     permissions:
@@ -174,7 +190,7 @@ PY
   publish-rubygems:
     name: Publish Ruby gems
     needs: gather
-    if: ${{ needs.gather.result == 'success' && needs.gather.outputs.tag }}
+    if: ${{ needs.gather.outputs.tag }}
     runs-on: ubuntu-latest
     permissions:
       id-token: write
@@ -213,10 +229,3 @@ PY
         run: |
           echo "Dry run requested; gem artifacts ready:" >> $GITHUB_STEP_SUMMARY
           ls -1 html-to-markdown-*.gem >> $GITHUB_STEP_SUMMARY
-
-  concluded:
-    if: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.conclusion != 'success' }}
-    runs-on: ubuntu-latest
-    steps:
-      - run: |
-          echo "Build workflow did not succeed (status: ${{ github.event.workflow_run.conclusion }}). Skipping publish." >> $GITHUB_STEP_SUMMARY
