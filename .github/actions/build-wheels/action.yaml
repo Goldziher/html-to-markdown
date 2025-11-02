@@ -44,15 +44,15 @@ runs:
         CIBW_BEFORE_BUILD_LINUX: >
           pip install maturin uv &&
           source ~/.cargo/env &&
-          python ../../scripts/prepare_wheel.py
+          python scripts/prepare_wheel.py
         CIBW_BEFORE_BUILD_MACOS: >
           pip install maturin uv &&
           source ~/.cargo/env &&
-          python ../../scripts/prepare_wheel.py
+          python scripts/prepare_wheel.py
         CIBW_BEFORE_BUILD_WINDOWS: >
           pip install maturin uv &&
           set PATH=%USERPROFILE%\.cargo\bin;%PATH% &&
-          python ..\..\scripts\prepare_wheel.py
+          python scripts\prepare_wheel.py
 
         CIBW_BUILD_FRONTEND: build
 
