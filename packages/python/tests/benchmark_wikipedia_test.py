@@ -1,16 +1,18 @@
 from __future__ import annotations
 
-from pathlib import Path
 from typing import TYPE_CHECKING
 
 import pytest
 
 from html_to_markdown import ConversionOptions, convert
+from html_to_markdown.v1_compat import convert_to_markdown
+
+from .conftest import TEST_DOCUMENTS_DIR
 
 if TYPE_CHECKING:
-    from pytest_benchmark.fixture import BenchmarkFixture  # type: ignore[import-untyped]
+    from pytest_benchmark.fixture import BenchmarkFixture
 
-BENCHMARK_DIR = Path(__file__).parent.parent / "test_documents" / "html" / "wikipedia"
+BENCHMARK_DIR = TEST_DOCUMENTS_DIR / "html" / "wikipedia"
 
 
 def _load_wikipedia_doc(filename: str) -> str:
@@ -85,7 +87,7 @@ class TestWikipediaV1vsV2:
     def test_benchmark_v1_api(self, benchmark: BenchmarkFixture) -> None:
         html = _load_wikipedia_doc("small_html.html")
         result = benchmark(
-            convert_to_markdown,  # type: ignore[name-defined]  # noqa: F821
+            convert_to_markdown,
             html,
             heading_style="atx",
             list_indent_width=2,

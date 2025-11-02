@@ -227,7 +227,7 @@ jobs:
         with:
           ruby-version: ${{ matrix.ruby }}
           bundler-cache: false
-          working-directory: crates/html-to-markdown-rb
+          working-directory: packages/ruby
 
       - name: Setup Ruby (Windows)
         if: runner.os == 'Windows'
@@ -235,7 +235,7 @@ jobs:
         with:
           ruby-version: ${{ matrix.ruby }}
           bundler-cache: false
-          working-directory: crates/html-to-markdown-rb
+          working-directory: packages/ruby
           msys2: UCRT64
 
       - name: Install MSYS2 toolchain
@@ -267,45 +267,45 @@ jobs:
 
       - name: Install Ruby gems (Unix)
         if: runner.os != 'Windows'
-        working-directory: crates/html-to-markdown-rb
+        working-directory: packages/ruby
         run: bundle _2.5.12_ install
 
       - name: Install Ruby gems (Windows)
         if: runner.os == 'Windows'
-        working-directory: crates/html-to-markdown-rb
+        working-directory: packages/ruby
         shell: pwsh
         run: |
-          $unixPath = ridk exec bash -lc "cygpath -au '$env:GITHUB_WORKSPACE/crates/html-to-markdown-rb'"
+          $unixPath = ridk exec bash -lc "cygpath -au '$env:GITHUB_WORKSPACE/packages/ruby'"
           ridk exec bash -lc "cd $unixPath && export RUSTUP_TOOLCHAIN=stable-gnu CC=x86_64-w64-mingw32-gcc CXX=x86_64-w64-mingw32-g++ && bundle _2.5.12_ install"
 
       - name: Compile Ruby extension (Unix)
         if: runner.os != 'Windows'
-        working-directory: crates/html-to-markdown-rb
+        working-directory: packages/ruby
         env:
           RB_SYS_CARGO_PROFILE: release
         run: bundle _2.5.12_ exec rake compile
 
       - name: Compile Ruby extension (Windows)
         if: runner.os == 'Windows'
-        working-directory: crates/html-to-markdown-rb
+        working-directory: packages/ruby
         env:
           RB_SYS_CARGO_PROFILE: release
         shell: pwsh
         run: |
-          $unixPath = ridk exec bash -lc "cygpath -au '$env:GITHUB_WORKSPACE/crates/html-to-markdown-rb'"
+          $unixPath = ridk exec bash -lc "cygpath -au '$env:GITHUB_WORKSPACE/packages/ruby'"
           ridk exec bash -lc "cd $unixPath && export RUSTUP_TOOLCHAIN=stable-gnu CC=x86_64-w64-mingw32-gcc CXX=x86_64-w64-mingw32-g++ && bundle _2.5.12_ exec rake compile"
 
       - name: Run Ruby specs (Unix)
         if: runner.os != 'Windows'
-        working-directory: crates/html-to-markdown-rb
+        working-directory: packages/ruby
         run: bundle _2.5.12_ exec rspec --format progress
 
       - name: Run Ruby specs (Windows)
         if: runner.os == 'Windows'
-        working-directory: crates/html-to-markdown-rb
+        working-directory: packages/ruby
         shell: pwsh
         run: |
-          $unixPath = ridk exec bash -lc "cygpath -au '$env:GITHUB_WORKSPACE/crates/html-to-markdown-rb'"
+          $unixPath = ridk exec bash -lc "cygpath -au '$env:GITHUB_WORKSPACE/packages/ruby'"
           ridk exec bash -lc "cd $unixPath && export RUSTUP_TOOLCHAIN=stable-gnu CC=x86_64-w64-mingw32-gcc CXX=x86_64-w64-mingw32-g++ && bundle _2.5.12_ exec rspec --format progress"
 
   node-bindings:
@@ -336,6 +336,14 @@ jobs:
       - name: Run Rust Tests
         working-directory: crates/html-to-markdown-node
         run: cargo test
+
+      - name: Build TypeScript package
+        working-directory: packages/typescript
+        run: pnpm run build
+
+      - name: Test TypeScript package
+        working-directory: packages/typescript
+        run: pnpm test
 
   wasm-bindings:
     runs-on: ubuntu-latest

@@ -68,12 +68,12 @@ pnpm run test:wasm      # WebAssembly bindings
 pnpm run test:ts        # TypeScript package
 
 # Watch mode
-cd packages/html-to-markdown-ts
+cd packages/typescript
 pnpm test:watch
 
 # With coverage
-cd packages/html-to-markdown-ts
-pnpm test --coverage
+cd packages/typescript
+pnpm test -- --coverage
 ```
 
 ### Code Quality
@@ -132,19 +132,17 @@ html-to-markdown/
 │   ├── html-to-markdown/       # Core library (tl parser + ammonia)
 │   ├── html-to-markdown-cli/   # Rust CLI binary
 │   ├── html-to-markdown-node/  # NAPI-RS bindings for Node.js (~691k ops/sec)
-│   └── html-to-markdown-wasm/  # wasm-bindgen for browsers (~229k ops/sec)
+│   ├── html-to-markdown-wasm/  # wasm-bindgen for browsers (~229k ops/sec)
+│   └── html-to-markdown-py/    # PyO3 bindings powering the Python package
 │
 ├── packages/                   # Releasable packages
-│   ├── html-to-markdown-py/    # PyO3 Python bindings (PyPI)
-│   └── html-to-markdown-ts/    # TypeScript package with CLI (npm)
+│   ├── python/                 # PyPI package (html_to_markdown)
+│   │   ├── html_to_markdown/   # Python sources
+│   │   └── tests/             # Python integration + unit tests
+│   ├── typescript/             # TypeScript package with CLI (npm)
+│   └── ruby/                   # Ruby gem sources/specs (RubyGems)
 │
-├── html_to_markdown/           # Python API
-│   ├── api.py                  # V2 Python API
-│   ├── options.py              # Configuration dataclasses
-│   ├── v1_compat.py           # V1 compatibility layer
-│   └── _rust.pyi              # Type stubs
-│
-└── tests/                      # Python integration tests (700+)
+└── scripts/                    # Helper scripts (wheel prep, gem prep, demo)
 ```
 
 ### Package Distribution
@@ -154,6 +152,7 @@ html-to-markdown/
 | `html-to-markdown-rs`    | crates.io | Core Rust library           |
 | `html-to-markdown`       | PyPI      | Python package              |
 | `html-to-markdown`       | npm       | TypeScript package with CLI |
+| `html-to-markdown`       | RubyGems  | Ruby gem (Magnus bindings)  |
 | `@html-to-markdown/node` | npm       | Native Node.js bindings     |
 | `@html-to-markdown/wasm` | npm       | WebAssembly bindings        |
 
@@ -171,7 +170,7 @@ html-to-markdown/
 
 ### Python API Changes
 
-1. Edit code in `html_to_markdown/`
+1. Edit code in `packages/python/html_to_markdown/`
 1. Update type stubs in `_rust.pyi` if needed
 1. Run tests: `task test:python`
 
@@ -189,19 +188,26 @@ html-to-markdown/
 1. Rebuild: `pnpm run build:all` (builds for bundler, nodejs, and web)
 1. Test: `pnpm test` or `cargo test`
 
-#### TypeScript Package with CLI (`packages/html-to-markdown-ts`)
+#### TypeScript Package with CLI (`packages/typescript`)
 
-1. Edit code in `src/` (library in `index.ts`, CLI in `cli.ts`)
-1. Build: `pnpm run build` (builds both library and CLI)
+1. Edit code in `src/` (library entrypoints + CLI)
+1. Build: `pnpm run build` (runs Node binding build + TypeScript emit)
+1. Lint: `pnpm run lint`
 1. Test: `pnpm test` or `pnpm test:watch`
-1. Type check: `pnpm run typecheck`
 1. Test CLI locally: `node dist/cli.js input.html`
+
+#### Ruby Gem (`packages/ruby`)
+
+1. Edit Ruby sources in `lib/` and specs in `spec/`
+1. Build native extension: `bundle exec rake compile`
+1. Run specs: `bundle exec rake spec`
 
 ### Adding Tests
 
 - **Rust tests**: Add to `crates/*/src/lib.rs` or `crates/*/tests/`
-- **Python tests**: Add to `tests/` following pytest patterns
-- **TypeScript tests**: Add to `packages/*/src/*.test.ts` using vitest
+- **Python tests**: Add to `packages/python/tests/` following pytest patterns
+- **TypeScript tests**: Add to `packages/typescript/tests/` using vitest
+- **Ruby specs**: Add to `packages/ruby/spec/`
 - **Integration tests**: Add to appropriate test directory
 
 ## Testing
@@ -341,7 +347,7 @@ All Python/Rust checks run automatically via prek on commit.
     npm login
 
     # Publish main TypeScript package (includes CLI)
-    cd packages/html-to-markdown-ts
+    cd packages/typescript
     pnpm publish
 
     # Publish native bindings (with pre-built binaries)

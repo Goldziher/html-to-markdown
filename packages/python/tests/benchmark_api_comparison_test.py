@@ -8,7 +8,6 @@ Both APIs use the same Rust backend, so this measures API overhead only.
 
 from __future__ import annotations
 
-from pathlib import Path
 from typing import TYPE_CHECKING
 
 import pytest
@@ -16,8 +15,10 @@ import pytest
 from html_to_markdown import ConversionOptions, PreprocessingOptions, convert
 from html_to_markdown.v1_compat import convert_to_markdown
 
+from .conftest import TEST_DOCUMENTS_DIR
+
 if TYPE_CHECKING:
-    from pytest_benchmark.fixture import BenchmarkFixture  # type: ignore[import-untyped]
+    from pytest_benchmark.fixture import BenchmarkFixture
 
 # Suppress deprecation warnings for v1 compatibility benchmarks
 pytestmark = pytest.mark.filterwarnings("ignore::DeprecationWarning")
@@ -27,7 +28,7 @@ try:
 except ImportError:
     from tests.performance_test import generate_complex_html
 
-BENCHMARK_DIR = Path(__file__).parent.parent / "test_documents" / "html" / "wikipedia"
+BENCHMARK_DIR = TEST_DOCUMENTS_DIR / "html" / "wikipedia"
 
 
 def _load_wikipedia_doc(filename: str) -> str:

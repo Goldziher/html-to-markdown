@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from pathlib import Path
+from typing import TYPE_CHECKING, Literal
 
 import pytest
 
@@ -9,6 +10,8 @@ if TYPE_CHECKING:
 
 from html_to_markdown import ConversionOptions, PreprocessingOptions
 from html_to_markdown import convert as convert_api
+
+TEST_DOCUMENTS_DIR = Path(__file__).resolve().parents[3] / "test_documents"
 
 
 @pytest.fixture
@@ -21,33 +24,33 @@ def convert_v2() -> Callable[..., str]:
     def _convert(
         html: str,
         *,
-        heading_style: str = "atx",
-        list_indent_type: str = "spaces",
+        heading_style: Literal["underlined", "atx", "atx_closed"] = "atx",
+        list_indent_type: Literal["spaces", "tabs"] = "spaces",
         list_indent_width: int = 2,
         bullets: str = "-*+",
-        strong_em_symbol: str = "*",
+        strong_em_symbol: Literal["*", "_"] = "*",
         escape_asterisks: bool = False,
         escape_underscores: bool = False,
         escape_misc: bool = False,
         escape_ascii: bool = False,
         code_language: str = "",
-        code_block_style: str = "backticks",
+        code_block_style: Literal["indented", "backticks", "tildes"] = "backticks",
         autolinks: bool = True,
         default_title: bool = False,
         br_in_tables: bool = False,
-        highlight_style: str = "double-equal",
+        highlight_style: Literal["double-equal", "html", "bold"] = "double-equal",
         extract_metadata: bool = True,
-        whitespace_mode: str = "normalized",
+        whitespace_mode: Literal["normalized", "strict"] = "normalized",
         strip_newlines: bool = False,
         wrap: bool = False,
         wrap_width: int = 80,
         convert_as_inline: bool = False,
         sub_symbol: str = "",
         sup_symbol: str = "",
-        newline_style: str = "spaces",
+        newline_style: Literal["spaces", "backslash"] = "spaces",
         keep_inline_images_in: set[str] | None = None,
         preprocess: bool = False,
-        preprocessing_preset: str = "standard",
+        preprocessing_preset: Literal["minimal", "standard", "aggressive"] = "standard",
         remove_navigation: bool = True,
         remove_forms: bool = True,
         source_encoding: str = "utf-8",
@@ -58,30 +61,30 @@ def convert_v2() -> Callable[..., str]:
         final_strip_tags = strip_tags or strip
 
         options = ConversionOptions(
-            heading_style=heading_style,  # type: ignore[arg-type]
-            list_indent_type=list_indent_type,  # type: ignore[arg-type]
+            heading_style=heading_style,
+            list_indent_type=list_indent_type,
             list_indent_width=list_indent_width,
             bullets=bullets,
-            strong_em_symbol=strong_em_symbol,  # type: ignore[arg-type]
+            strong_em_symbol=strong_em_symbol,
             escape_asterisks=escape_asterisks,
             escape_underscores=escape_underscores,
             escape_misc=escape_misc,
             escape_ascii=escape_ascii,
             code_language=code_language,
-            code_block_style=code_block_style,  # type: ignore[arg-type]
+            code_block_style=code_block_style,
             autolinks=autolinks,
             default_title=default_title,
             br_in_tables=br_in_tables,
-            highlight_style=highlight_style,  # type: ignore[arg-type]
+            highlight_style=highlight_style,
             extract_metadata=extract_metadata,
-            whitespace_mode=whitespace_mode,  # type: ignore[arg-type]
+            whitespace_mode=whitespace_mode,
             strip_newlines=strip_newlines,
             wrap=wrap,
             wrap_width=wrap_width,
             convert_as_inline=convert_as_inline,
             sub_symbol=sub_symbol,
             sup_symbol=sup_symbol,
-            newline_style=newline_style,  # type: ignore[arg-type]
+            newline_style=newline_style,
             keep_inline_images_in=keep_inline_images_in,
             strip_tags=set(final_strip_tags) if final_strip_tags else None,
             preserve_tags=set(preserve_tags) if preserve_tags else None,
@@ -89,7 +92,7 @@ def convert_v2() -> Callable[..., str]:
 
         preprocessing = PreprocessingOptions(
             enabled=preprocess,
-            preset=preprocessing_preset,  # type: ignore[arg-type]
+            preset=preprocessing_preset,
             remove_navigation=remove_navigation,
             remove_forms=remove_forms,
         )

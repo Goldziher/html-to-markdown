@@ -1,56 +1,3 @@
-[build-system]
-build-backend = "maturin"
-requires = [
-  "maturin>=1.9,<2",
-  "tomli>=2; python_version<'3.11'",
-]
-
-[project]
-name = "html-to-markdown"
-version = "2.5.6"
-description = "High-performance HTML to Markdown converter powered by Rust with a clean Python API"
-readme = "README_PYPI.md"
-keywords = [
-  "cli-tool",
-  "converter",
-  "html",
-  "html2markdown",
-  "html5",
-  "markdown",
-  "markup",
-  "parser",
-  "rust",
-  "text-processing",
-]
-license = { file = "LICENSE" }
-authors = [ { name = "Na'aman Hirschfeld", email = "nhirschfeld@gmail.com" } ]
-requires-python = ">=3.10"
-classifiers = [
-  "Development Status :: 5 - Production/Stable",
-  "Environment :: Console",
-  "Intended Audience :: Developers",
-  "License :: OSI Approved :: MIT License",
-  "Operating System :: OS Independent",
-  "Programming Language :: Python :: 3 :: Only",
-  "Programming Language :: Python :: 3.10",
-  "Programming Language :: Python :: 3.11",
-  "Programming Language :: Python :: 3.12",
-  "Programming Language :: Python :: 3.13",
-  "Programming Language :: Python :: 3.14",
-  "Programming Language :: Rust",
-  "Topic :: Software Development :: Libraries :: Python Modules",
-  "Topic :: Text Processing",
-  "Topic :: Text Processing :: Markup",
-  "Topic :: Text Processing :: Markup :: HTML",
-  "Topic :: Text Processing :: Markup :: Markdown",
-  "Typing :: Typed",
-]
-dependencies = [  ]
-urls.Changelog = "https://github.com/Goldziher/html-to-markdown/releases"
-urls.Homepage = "https://github.com/Goldziher/html-to-markdown"
-urls.Issues = "https://github.com/Goldziher/html-to-markdown/issues"
-urls.Repository = "https://github.com/Goldziher/html-to-markdown.git"
-
 [dependency-groups]
 dev = [
   "covdefaults>=2.3",
@@ -59,24 +6,27 @@ dev = [
   "pre-commit>=4.3",
   "psutil>=7.1.2; sys_platform!='win32'",
   "pytest>=8.4.2",
-  "pytest-benchmark>=5.1",
+  "pytest-benchmark>=5.2",
   "pytest-cov>=7",
   "pytest-mock>=3.15.1",
-  "ruff>=0.14.2",
+  "ruff>=0.14.3",
   "types-psutil>=7.0.0.20251001",
   "uv-bump",
 ]
 
-[tool.maturin]
-manifest-path = "crates/html-to-markdown-py/Cargo.toml"
-module-name = "html_to_markdown._html_to_markdown"
-include = [
-  { path = "html_to_markdown-*.data/**/*", format = "wheel" },
-  { path = "html_to_markdown/bin/*", format = "wheel" },
-]
-
 [tool.uv]
 default-groups = [ "dev" ]
+cache-keys = [
+  { file = "pyproject.toml" },
+  { file = "Cargo.toml" },
+  { file = "Cargo.lock" },
+  { file = "packages/python/pyproject.toml" },
+  { file = "crates/**/Cargo.toml" },
+  { file = "crates/**/*.rs" },
+]
+
+[tool.uv.workspace]
+members = [ "packages/python" ]
 
 [tool.uv.sources]
 uv-bump = { git = "https://github.com/Goldziher/uv-bump" }
@@ -84,8 +34,7 @@ uv-bump = { git = "https://github.com/Goldziher/uv-bump" }
 [tool.ruff]
 target-version = "py310"
 line-length = 120
-src = [ "html_to_markdown", "tests" ]
-
+src = [ "packages/python/html_to_markdown", "packages/python/tests", "scripts" ]
 format.docstring-code-line-length = 120
 format.docstring-code-format = true
 lint.select = [ "ALL" ]
@@ -99,7 +48,7 @@ lint.ignore = [
   "D103",    # pydocstyle - missing docstring in public function
   "D104",    # pydocstyle - missing docstring in public package
   "D107",    # pydocstyle - missing docstring in __init__
-  "D205",    # pydocstyle - 1 blank line required between summary line and description
+  "D205",    # pydocstyle - 1 blank line between summary line and description
   "D301",    # pydocstyle - use r""" if any backslashes in docstring
   "E501",    # pycodestyle line too long, handled by ruff format
   "EM",      # Exception messages
@@ -113,16 +62,16 @@ lint.ignore = [
   "TD",      # Allow todo and fixme comments
   "TRY",     # Try except block rules too strict
 ]
+lint.per-file-ignores."packages/python/tests/**/*.*" = [ "ARG", "D", "PD", "PT006", "PT013", "S" ]
+lint.per-file-ignores."packages/python/tests/benchmark_*_test.py" = [ "T201" ]
 lint.per-file-ignores."scripts/*.py" = [ "INP001", "S607", "T201" ]
-lint.per-file-ignores."tests/**/*.*" = [ "ARG", "D", "PD", "PT006", "PT013", "S" ]
-lint.per-file-ignores."tests/benchmark_*_test.py" = [ "T201" ]
 lint.isort.known-first-party = [ "html_to_markdown", "tests" ]
 lint.pydocstyle.convention = "pep257"
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
-testpaths = [ "tests" ]
+testpaths = [ "packages/python/tests" ]
 filterwarnings = [
   "error",
   "ignore::pytest.PytestConfigWarning",
@@ -131,8 +80,8 @@ filterwarnings = [
 ]
 
 [tool.coverage.run]
-source = [ "html_to_markdown" ]
-omit = [ "tests/*" ]
+source = [ "packages/python/html_to_markdown" ]
+omit = [ "packages/python/tests/*" ]
 
 [tool.coverage.report]
 exclude_lines = [ "if TYPE_CHECKING:" ]
@@ -146,8 +95,11 @@ implicit_reexport = false
 show_error_codes = true
 warn_return_any = true
 warn_unused_configs = true
+files = [ "packages/python" ]
 exclude = [
   "^crates/",
+  "^packages/typescript/",
+  "^packages/ruby/",
   "^scripts/",
   "^node_modules/",
   "^dist/",

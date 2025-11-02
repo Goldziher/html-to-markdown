@@ -7,7 +7,17 @@
   },
   "files": {
     "ignoreUnknown": true,
-    "includes": ["**/*.js", "**/*.jsx", "**/*.ts", "**/*.tsx", "**/*.json", "**/*.jsonc"]
+    "includes": [
+      "packages/**/*.js",
+      "packages/**/*.jsx",
+      "packages/**/*.ts",
+      "packages/**/*.tsx",
+      "packages/**/*.json",
+      "packages/**/*.jsonc",
+      "crates/**/*.js",
+      "crates/**/*.ts",
+      "crates/**/*.json"
+    ]
   },
   "overrides": [
     {
