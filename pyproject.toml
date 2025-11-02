@@ -96,6 +96,8 @@ show_error_codes = true
 warn_return_any = true
 warn_unused_configs = true
 files = [ "packages/python" ]
+explicit_package_bases = true
+mypy_path = [ "packages/python" ]
 exclude = [
   "^crates/",
   "^packages/typescript/",

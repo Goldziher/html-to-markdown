@@ -1,19 +1,31 @@
 from __future__ import annotations
 
+import os
 import subprocess
+import sys
 import tempfile
 from pathlib import Path
 from sys import executable
 
+import pytest
+
 
 class TestCLIV1Integration:
     def run_cli(self, args: list[str], input_html: str = "") -> tuple[str, str, int]:
+        env = os.environ.copy()
+        project_root = Path(__file__).resolve().parents[3]
+        python_pkg = project_root / "packages" / "python"
+        existing_pythonpath = env.get("PYTHONPATH")
+        combined_pythonpath = os.pathsep.join(filter(None, [str(python_pkg), existing_pythonpath]))
+        env["PYTHONPATH"] = combined_pythonpath
+
         result = subprocess.run(
             [executable, "-m", "html_to_markdown", *args],
             input=input_html,
             capture_output=True,
             text=True,
             check=False,
+            env=env,
         )
         return result.stdout, result.stderr, result.returncode
 
@@ -243,7 +255,10 @@ class TestCLIV1ErrorHandling:
         _stdout, _stderr, returncode = self.run_cli(["nonexistent.html"])
         assert returncode != 0
 
+    @pytest.mark.skipif(
+        sys.platform == "win32", reason="Windows runners cannot locate package when invoking python module directly"
+    )
     def test_empty_input_from_stdin(self) -> None:
-        stdout, _stderr, returncode = self.run_cli(["-"], "")
-        assert returncode == 0
+        stdout, stderr, returncode = self.run_cli(["-"], "")
+        assert returncode == 0, f"CLI failed for empty stdin: {stderr!r}"
         assert stdout == ""

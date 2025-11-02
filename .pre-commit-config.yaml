@@ -62,3 +62,6 @@ repos:
         language: system
         types: [python]
         exclude: ^scripts/|^examples/
+        env:
+          MYPYPATH: packages/python
+        pass_filenames: false
