@@ -24,7 +24,7 @@ on:
       - ".github/workflows/publish.yaml"
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event_name == 'workflow_dispatch' ? inputs.build_run_id : github.event_name == 'workflow_run' ? github.event.workflow_run.id : github.run_id }}
+  group: ${{ github.workflow }}-${{ github.event_name == 'workflow_dispatch' && github.event.inputs.build_run_id || github.event_name == 'workflow_run' && github.event.workflow_run.id || github.run_id }}
   cancel-in-progress: false
 
 jobs:
