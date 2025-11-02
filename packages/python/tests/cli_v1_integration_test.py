@@ -3,12 +3,13 @@ from __future__ import annotations
 import subprocess
 import tempfile
 from pathlib import Path
+from sys import executable
 
 
 class TestCLIV1Integration:
     def run_cli(self, args: list[str], input_html: str = "") -> tuple[str, str, int]:
         result = subprocess.run(
-            ["python", "-m", "html_to_markdown", *args],
+            [executable, "-m", "html_to_markdown", *args],
             input=input_html,
             capture_output=True,
             text=True,

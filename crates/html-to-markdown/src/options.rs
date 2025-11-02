@@ -1,67 +1,48 @@
 //! Configuration options for HTML to Markdown conversion.
 
 /// Heading style options.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum HeadingStyle {
     /// Underlined style (=== for h1, --- for h2)
     Underlined,
     /// ATX style (# for h1, ## for h2, etc.)
+    #[default]
     Atx,
     /// ATX closed style (# title #)
     AtxClosed,
 }
 
-impl Default for HeadingStyle {
-    fn default() -> Self {
-        Self::Atx
-    }
-}
-
 /// List indentation type.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum ListIndentType {
+    #[default]
     Spaces,
     Tabs,
 }
 
-impl Default for ListIndentType {
-    fn default() -> Self {
-        Self::Spaces
-    }
-}
-
 /// Whitespace handling mode.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum WhitespaceMode {
+    #[default]
     Normalized,
     Strict,
 }
 
-impl Default for WhitespaceMode {
-    fn default() -> Self {
-        Self::Normalized
-    }
-}
-
 /// Newline style.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum NewlineStyle {
     /// Two spaces at end of line
+    #[default]
     Spaces,
     /// Backslash at end of line
     Backslash,
 }
 
-impl Default for NewlineStyle {
-    fn default() -> Self {
-        Self::Spaces
-    }
-}
-
 /// Code block style.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum CodeBlockStyle {
     /// Indented code blocks (4 spaces) - CommonMark default
+    #[default]
     Indented,
     /// Fenced code blocks with backticks (```)
     Backticks,
@@ -69,16 +50,11 @@ pub enum CodeBlockStyle {
     Tildes,
 }
 
-impl Default for CodeBlockStyle {
-    fn default() -> Self {
-        Self::Indented
-    }
-}
-
 /// Highlight style for `<mark>` elements.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum HighlightStyle {
     /// ==text==
+    #[default]
     DoubleEqual,
     /// <mark>text</mark>
     Html,
@@ -88,24 +64,13 @@ pub enum HighlightStyle {
     None,
 }
 
-impl Default for HighlightStyle {
-    fn default() -> Self {
-        Self::DoubleEqual
-    }
-}
-
 /// Preprocessing preset levels.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum PreprocessingPreset {
     Minimal,
+    #[default]
     Standard,
     Aggressive,
-}
-
-impl Default for PreprocessingPreset {
-    fn default() -> Self {
-        Self::Standard
-    }
 }
 
 /// Main conversion options.
