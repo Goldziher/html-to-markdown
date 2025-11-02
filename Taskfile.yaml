@@ -1,115 +1,134 @@
 version: "3"
 
+vars:
+  RUST_LOG: info
+
+silent: false
+
 tasks:
   setup:
-    desc: "Install dependencies with uv and build Rust components"
+    desc: "Install all language dependencies and build the Rust core"
     cmds:
-      - uv sync --all-extras
-      - prek install && prek install --hook-type commit-msg
+      - task: python:install
+      - task: js:install
+      - task: ruby:install
+      - task: rust:build
 
   update:
-    desc: "Update Python and Rust dependencies"
+    desc: "Update dependencies across Rust, JavaScript, Python, and Ruby"
     cmds:
-      - uv run uv-bump
+      - echo "Updating Rust crates..."
       - cargo upgrade --incompatible
+      - cargo update
+      - echo "Updating JavaScript packages..."
+      - pnpm up --latest -r
+      - echo "Updating Ruby gems..."
+      - cmd: PATH=/opt/homebrew/opt/ruby/bin:$PATH bundle _2.5.12_ update
+        dir: packages/ruby
+      - echo "Updating Python dependencies..."
+      - uv run uv-bump --pyproject-toml pyproject.toml
+      - uv run uv-bump --pyproject-toml packages/python/pyproject.toml
       - uv sync --all-extras --upgrade
-      - prek autoupdate
-
-  test:python:
-    desc: "Run Python tests with pytest"
-    cmds:
-      - uv run pytest
-
-  test:cov:
-    desc: "Run Python tests with coverage"
-    cmds:
-      - uv run pytest --cov=html_to_markdown --cov-report=term-missing
-
-  test:rust:
-    desc: "Run Rust tests"
-    cmds:
-      - cargo test --release --no-default-features --workspace --exclude html-to-markdown-rb
-
-  cov:rust:
-    desc: "Generate Rust code coverage report (requires cargo-llvm-cov)"
-    cmds:
-      - cargo llvm-cov --all-features --workspace --exclude html-to-markdown-py --exclude html-to-markdown-rb --lcov --output-path rust-coverage.lcov
-      - echo "Rust coverage report generated at rust-coverage.lcov"
-      - cargo llvm-cov --all-features --summary-only
-
-  cov:python:
-    desc: "Generate Python code coverage report"
-    cmds:
-      - uv run pytest --cov=html_to_markdown --cov-report=lcov:coverage.lcov --cov-report=term
-      - echo "Python coverage report generated at coverage.lcov"
-
-  cov:all:
-    desc: "Generate both Rust and Python coverage reports"
-    cmds:
-      - task: cov:rust
-      - task: cov:python
-
-  test:
-    desc: "Run Rust, Python, and Ruby tests"
-    cmds:
-      - task: test:rust
-      - task: test:python
-      - task: test:ruby
-
-  lint:
-    desc: "Lint Python code with ruff/prek and Rust code with clippy/fmt"
-    cmds:
-      - prek run --all-files
-
-  fmt:
-    desc: "Format Python and Rust code"
-    cmds:
-      - cargo fmt
-      - prek run ruff-format --all-files
 
   build:
-    desc: "Build Rust components for development"
+    desc: "Build Rust core and JavaScript bindings"
     cmds:
-      - uv sync --all-extras
+      - task: rust:build
+      - task: js:build
 
-  build:debug:
-    desc: "Build Rust components in debug mode (without optimization)"
+  test:
+    desc: "Run test suites for all languages"
     cmds:
-      - uv pip install --no-build-isolation --config-settings=build-args="--profile dev" -e .
+      - task: rust:test
+      - task: python:test
+      - task: ruby:test
+      - task: js:test
+
+  lint:
+    desc: "Run linters across the repo"
+    cmds:
+      - task: rust:lint
+      - task: python:lint
+      - task: ruby:lint
+      - task: typescript:lint
+
+  fmt:
+    desc: "Format code for all languages"
+    cmds:
+      - task: rust:fmt
+      - task: python:format
+      - task: ruby:format
+      - task: typescript:format
+
+  bench:
+    desc: "Run benchmark suites (Rust + Python)"
+    cmds:
+      - task: rust:bench
+      - task: python:bench
+
+  # Aliases (backward compatibility with legacy task names) -------------------
+  test:rust:
+    desc: "Alias for rust:test"
+    cmds:
+      - task: rust:test
+
+  test:python:
+    desc: "Alias for python:test"
+    cmds:
+      - task: python:test
+
+  test:ruby:
+    desc: "Alias for ruby:test"
+    cmds:
+      - task: ruby:test
+
+  test:node:
+    desc: "Alias for node:test"
+    cmds:
+      - task: node:test
+
+  test:wasm:
+    desc: "Alias for wasm:test"
+    cmds:
+      - task: wasm:test
+
+  test:ts:
+    desc: "Alias for typescript:test"
+    cmds:
+      - task: typescript:test
+
+  test:js:
+    desc: "Alias for js:test"
+    cmds:
+      - task: js:test
 
   build:cli:
-    desc: "Build CLI binary"
+    desc: "Build the html-to-markdown CLI binary"
     cmds:
-      - cargo build --release --package html-to-markdown-cli
+      - RB_SYS_RUBY=/opt/homebrew/opt/ruby/bin/ruby RUBY=/opt/homebrew/opt/ruby/bin/ruby cargo build --release --package html-to-markdown-cli
 
   build:node:
-    desc: "Build Node.js native bindings with NAPI-RS"
-    dir: crates/html-to-markdown-node
+    desc: "Alias for node:build"
     cmds:
-      - pnpm run build
+      - task: node:build
 
   build:wasm:
-    desc: "Build WebAssembly bindings with wasm-bindgen"
-    dir: crates/html-to-markdown-wasm
+    desc: "Alias for wasm:build"
     cmds:
-      - pnpm run build:all
+      - task: wasm:build
 
   build:ts:
-    desc: "Build TypeScript package (library + CLI)"
-    dir: packages/html-to-markdown-ts
+    desc: "Alias for typescript:build"
     cmds:
-      - pnpm run build
-      - pnpm run build:cli
+      - task: typescript:build
 
   build:js:
-    desc: "Build all JavaScript/TypeScript packages (node, wasm, ts)"
+    desc: "Alias for js:build"
     cmds:
-      - task: build:node
-      - task: build:wasm
-      - task: build:ts
+      - task: js:build
 
   build:demo:
-    desc: "Build and update the GitHub Pages demo"
+    desc: "Build the GitHub Pages demo"
     cmds:
       - ./scripts/build-demo.sh
 
@@ -120,83 +139,265 @@ tasks:
       - python3 -m http.server 8000
 
   build:wheel-prep:
+    desc: "Alias for python:wheel:prep"
+    cmds:
+      - task: python:wheel:prep
+
+  cov:rust:
+    desc: "Alias for rust:coverage"
+    cmds:
+      - task: rust:coverage
+
+  cov:python:
+    desc: "Alias for python:coverage"
+    cmds:
+      - task: python:coverage
+
+  cov:all:
+    desc: "Generate Rust + Python coverage reports"
+    cmds:
+      - task: cov:rust
+      - task: cov:python
+
+  bench:rust:
+    desc: "Alias for rust:bench"
+    cmds:
+      - task: rust:bench
+
+  bench:python:
+    desc: "Alias for python:bench"
+    cmds:
+      - task: python:bench
+
+  bench:all:
+    desc: "Alias for bench"
+    cmds:
+      - task: bench
+
+  clean:
+    desc: "Remove build artifacts across languages"
+    cmds:
+      - task: rust:clean
+      - task: python:clean
+      - task: ruby:clean
+      - task: js:clean
+
+  pre-commit:install:
+    desc: "Install prek hooks (pre-commit + commit-msg)"
+    cmds:
+      - prek install
+      - prek install --hook-type commit-msg
+
+  pre-commit:run:
+    desc: "Run all pre-commit hooks"
+    cmds:
+      - prek run --all-files
+
+  # Rust tasks ----------------------------------------------------------------
+  rust:build:
+    desc: "Build all Rust crates"
+    cmds:
+      - RB_SYS_RUBY=/opt/homebrew/opt/ruby/bin/ruby RUBY=/opt/homebrew/opt/ruby/bin/ruby cargo build --workspace --exclude html-to-markdown-rb --release
+
+  rust:test:
+    desc: "Run Rust tests"
+    cmds:
+      - RB_SYS_RUBY=/opt/homebrew/opt/ruby/bin/ruby RUBY=/opt/homebrew/opt/ruby/bin/ruby cargo test --release --no-default-features --workspace --exclude html-to-markdown-rb
+
+  rust:lint:
+    desc: "Run Rust fmt + clippy"
+    cmds:
+      - cargo fmt --all
+      - RB_SYS_RUBY=/opt/homebrew/opt/ruby/bin/ruby RUBY=/opt/homebrew/opt/ruby/bin/ruby cargo clippy --workspace --exclude html-to-markdown-rb -- -D warnings
+
+  rust:fmt:
+    desc: "Format Rust code"
+    cmds:
+      - cargo fmt --all
+
+  rust:bench:
+    desc: "Run Rust benchmarks"
+    cmds:
+      - RB_SYS_RUBY=/opt/homebrew/opt/ruby/bin/ruby RUBY=/opt/homebrew/opt/ruby/bin/ruby cargo bench --package html-to-markdown
+
+  rust:coverage:
+    desc: "Generate Rust coverage report (requires cargo-llvm-cov)"
+    cmds:
+      - RB_SYS_RUBY=/opt/homebrew/opt/ruby/bin/ruby RUBY=/opt/homebrew/opt/ruby/bin/ruby cargo llvm-cov --all-features --workspace --exclude html-to-markdown-py --exclude html-to-markdown-rb --lcov --output-path rust-coverage.lcov
+      - RB_SYS_RUBY=/opt/homebrew/opt/ruby/bin/ruby RUBY=/opt/homebrew/opt/ruby/bin/ruby cargo llvm-cov --all-features --summary-only
+
+  rust:clean:
+    desc: "Clean Rust artifacts"
+    cmds:
+      - cargo clean
+
+  # Python tasks --------------------------------------------------------------
+  python:install:
+    desc: "Install Python dependencies via uv"
+    dir: packages/python
+    cmds:
+      - uv sync --all-extras
+
+  python:test:
+    desc: "Run Python tests (build CLI first for proxy tests)"
+    cmds:
+      - RB_SYS_RUBY=/opt/homebrew/opt/ruby/bin/ruby RUBY=/opt/homebrew/opt/ruby/bin/ruby cargo build --release --package html-to-markdown-cli
+      - cmd: uv run pytest
+        dir: packages/python
+
+  python:test:cov:
+    desc: "Run Python tests with coverage"
+    cmds:
+      - RB_SYS_RUBY=/opt/homebrew/opt/ruby/bin/ruby RUBY=/opt/homebrew/opt/ruby/bin/ruby cargo build --release --package html-to-markdown-cli
+      - cmd: uv run pytest --cov=html_to_markdown --cov-report=term-missing
+        dir: packages/python
+
+  python:bench:
+    desc: "Run Python benchmark suite"
+    cmds:
+      - RB_SYS_RUBY=/opt/homebrew/opt/ruby/bin/ruby RUBY=/opt/homebrew/opt/ruby/bin/ruby cargo build --release --package html-to-markdown-cli
+      - cmd: uv run pytest tests/benchmark_wikipedia_test.py --benchmark-only -v
+        dir: packages/python
+
+  python:lint:
+    desc: "Lint Python code with ruff + mypy"
+    dir: packages/python
+    cmds:
+      - uv run ruff check
+      - uv run mypy
+
+  python:format:
+    desc: "Format Python code"
+    dir: packages/python
+    cmds:
+      - uv run ruff check --fix
+      - uv run ruff format
+
+  python:coverage:
+    desc: "Generate Python coverage lcov file"
+    cmds:
+      - RB_SYS_RUBY=/opt/homebrew/opt/ruby/bin/ruby RUBY=/opt/homebrew/opt/ruby/bin/ruby cargo build --release --package html-to-markdown-cli
+      - cmd: uv run pytest --cov=html_to_markdown --cov-report=lcov:coverage.lcov --cov-report=term
+        dir: packages/python
+
+  python:wheel:prep:
     desc: "Prepare CLI binary for wheel packaging"
     cmds:
       - uv run scripts/prepare_wheel.py
 
-  bench:
-    desc: "Run Wikipedia document benchmarks"
+  python:clean:
+    desc: "Clean Python build artifacts"
+    dir: packages/python
     cmds:
-      - uv run pytest tests/benchmark_wikipedia_test.py::TestWikipediaConversion --benchmark-only -v
+      - rm -rf build/ dist/ *.egg-info .pytest_cache .ruff_cache .mypy_cache html_to_markdown/bin
 
-  bench:all:
-    desc: "Run all benchmarks including scalability tests"
+  # Ruby tasks ----------------------------------------------------------------
+  ruby:install:
+    desc: "Install Ruby dependencies"
     cmds:
-      - uv run pytest tests/benchmark_wikipedia_test.py --benchmark-only -v
+      - cmd: cd packages/ruby && PATH=/opt/homebrew/opt/ruby/bin:$PATH bundle _2.5.12_ install
 
-  bench:rust:
-    desc: "Run Rust benchmarks with criterion"
+  ruby:build:
+    desc: "Build Ruby native extension"
     cmds:
-      - cargo bench --package html-to-markdown
+      - cmd: cd packages/ruby && PATH=/opt/homebrew/opt/ruby/bin:$PATH bundle _2.5.12_ exec rake compile
 
-  bench:python:
-    desc: "Run Python benchmarks only"
+  ruby:test:
+    desc: "Run Ruby specs"
     cmds:
-      - uv run pytest tests/benchmark_*.py --benchmark-only -v
+      - task: ruby:build
+      - cmd: cd packages/ruby && PATH=/opt/homebrew/opt/ruby/bin:$PATH bundle _2.5.12_ exec rake spec
 
-  bench:full:
-    desc: "Run all Rust and Python benchmarks"
+  ruby:lint:
+    desc: "Lint Ruby code"
     cmds:
-      - task: bench:rust
-      - task: bench:python
+      - cmd: cd packages/ruby && PATH=/opt/homebrew/opt/ruby/bin:$PATH bundle _2.5.12_ exec rubocop --config ./.rubocop.yml
 
-  test:node:
-    desc: "Test Node.js bindings"
-    dir: crates/html-to-markdown-node
+  ruby:format:
+    desc: "Auto-correct Ruby lint issues"
     cmds:
-      - pnpm test
+      - cmd: cd packages/ruby && PATH=/opt/homebrew/opt/ruby/bin:$PATH bundle _2.5.12_ exec rubocop --config ./.rubocop.yml --autocorrect
 
-  test:wasm:
-    desc: "Test WebAssembly bindings"
-    dir: crates/html-to-markdown-wasm
+  ruby:clean:
+    desc: "Clean Ruby build artifacts"
+    dir: packages/ruby
     cmds:
-      - pnpm test
+      - rm -rf lib/*.bundle lib/*.so pkg/ tmp/
 
-  test:ts:
-    desc: "Test TypeScript package"
-    dir: packages/html-to-markdown-ts
+  # JavaScript / TypeScript tasks --------------------------------------------
+  js:install:
+    desc: "Install pnpm workspace dependencies"
     cmds:
-      - pnpm test
+      - pnpm install --frozen-lockfile
 
-  test:js:
-    desc: "Test all JavaScript/TypeScript packages"
+  js:build:
+    desc: "Build Node, WASM, and TypeScript packages"
     cmds:
-      - task: test:node
-      - task: test:wasm
-      - task: test:ts
+      - task: node:build
+      - task: wasm:build
+      - task: typescript:build
 
-  test:ruby:
-    desc: "Run Ruby specs for the Magnus bindings"
+  js:test:
+    desc: "Run Node, WASM, and TypeScript tests"
     cmds:
-      - cargo build --release --package html-to-markdown-cli
-      - cmd: PATH=/opt/homebrew/opt/ruby/bin:$PATH bundle install
-        dir: crates/html-to-markdown-rb
-      - cmd: PATH=/opt/homebrew/opt/ruby/bin:$PATH bundle exec rake spec
-        dir: crates/html-to-markdown-rb
+      - task: node:test
+      - task: wasm:test
+      - task: typescript:test
 
-  clean:
-    desc: "Clean build artifacts"
+  js:clean:
+    desc: "Clean JS/TS build artifacts"
     cmds:
-      - cargo clean
-      - rm -rf target/
-      - rm -rf .pytest_cache/
-      - rm -rf htmlcov/
-      - find . -type d -name "__pycache__" -exec rm -rf {} +
-      - find . -type f -name "*.pyc" -delete
       - find crates packages -type d -name "dist" -exec rm -rf {} + 2>/dev/null || true
       - find crates packages -type d -name "node_modules" -exec rm -rf {} + 2>/dev/null || true
 
+  node:build:
+    desc: "Build Node.js native bindings"
+    cmds:
+      - pnpm --filter html-to-markdown-node run build
+
+  node:test:
+    desc: "Run Node.js binding tests"
+    cmds:
+      - pnpm --filter html-to-markdown-node test
+
+  wasm:build:
+    desc: "Build WebAssembly bindings"
+    cmds:
+      - pnpm --filter html-to-markdown-wasm run build:all
+
+  wasm:test:
+    desc: "Run WebAssembly tests"
+    cmds:
+      - pnpm --filter html-to-markdown-wasm test
+
+  typescript:build:
+    desc: "Build the TypeScript distribution"
+    cmds:
+      - pnpm --filter html-to-markdown run build
+
+  typescript:test:
+    desc: "Test the TypeScript distribution"
+    cmds:
+      - pnpm --filter html-to-markdown test
+
+  typescript:lint:
+    desc: "Lint the TypeScript distribution"
+    cmds:
+      - pnpm --filter html-to-markdown run lint
+
+  typescript:format:
+    desc: "Format TypeScript sources"
+    cmds:
+      - pnpm --filter html-to-markdown run lint:fix
+
+  # Misc tasks ----------------------------------------------------------------
+  docs:build:
+    desc: "Build documentation site"
+    cmds:
+      - task: python:install
+      - uv run mkdocs build --clean --strict
+
   default:
-    desc: "Show available tasks"
+    desc: "List available tasks"
     cmds:
       - task --list

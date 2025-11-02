@@ -1,0 +1,60 @@
+[build-system]
+build-backend = "maturin"
+requires = [
+  "maturin>=1.9,<2",
+  "tomli>=2; python_version<'3.11'",
+]
+
+[project]
+name = "html-to-markdown"
+version = "2.5.6"
+description = "High-performance HTML to Markdown converter powered by Rust with a clean Python API"
+readme = "README.md"
+keywords = [
+  "cli-tool",
+  "converter",
+  "html",
+  "html2markdown",
+  "html5",
+  "markdown",
+  "markup",
+  "parser",
+  "rust",
+  "text-processing",
+]
+license = { file = "../../LICENSE" }
+authors = [ { name = "Na'aman Hirschfeld", email = "nhirschfeld@gmail.com" } ]
+requires-python = ">=3.10"
+classifiers = [
+  "Development Status :: 5 - Production/Stable",
+  "Environment :: Console",
+  "Intended Audience :: Developers",
+  "License :: OSI Approved :: MIT License",
+  "Operating System :: OS Independent",
+  "Programming Language :: Python :: 3 :: Only",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Programming Language :: Python :: 3.14",
+  "Programming Language :: Rust",
+  "Topic :: Software Development :: Libraries :: Python Modules",
+  "Topic :: Text Processing",
+  "Topic :: Text Processing :: Markup",
+  "Topic :: Text Processing :: Markup :: HTML",
+  "Topic :: Text Processing :: Markup :: Markdown",
+  "Typing :: Typed",
+]
+dependencies = [  ]
+urls.Changelog = "https://github.com/Goldziher/html-to-markdown/releases"
+urls.Homepage = "https://github.com/Goldziher/html-to-markdown"
+urls.Issues = "https://github.com/Goldziher/html-to-markdown/issues"
+urls.Repository = "https://github.com/Goldziher/html-to-markdown.git"
+
+[tool.maturin]
+manifest-path = "../../crates/html-to-markdown-py/Cargo.toml"
+module-name = "html_to_markdown._html_to_markdown"
+include = [
+  { path = "html_to_markdown-*.data/**/*", format = "wheel" },
+  { path = "html_to_markdown/bin/*", format = "wheel" },
+]

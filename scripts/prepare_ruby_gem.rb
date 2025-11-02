@@ -16,7 +16,7 @@ binary_name = Gem.win_platform? ? "html-to-markdown.exe" : "html-to-markdown"
 source = root.join("target", "release", binary_name)
 abort "CLI binary not found at #{source}" unless source.file?
 
-bin_dir = root.join("crates", "html-to-markdown-rb", "lib", "bin")
+bin_dir = root.join("packages", "ruby", "lib", "bin")
 FileUtils.mkdir_p(bin_dir)
 
 plain_binary = bin_dir.join("html-to-markdown")

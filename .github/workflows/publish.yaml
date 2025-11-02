@@ -1,55 +1,122 @@
----
-name: Publish Packages
+name: Publish Release
 
 on:
+  workflow_run:
+    workflows: ["Build Artifacts"]
+    types: [completed]
   workflow_dispatch:
     inputs:
       tag:
-        description: "Release tag to publish (e.g., v2.5.1)"
+        description: "Release tag to publish (e.g., v2.6.0)"
+        required: true
+        type: string
+      build_run_id:
+        description: "Workflow run ID from the Build Artifacts workflow"
         required: true
         type: string
       dry_run:
-        description: "Dry run (skip actual publishing)"
+        description: "Dry run (validate artifacts without publishing)"
         required: false
         type: boolean
-        default: false
+        default: true
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.run_id }}
-  cancel-in-progress: true
+  group: ${{ github.workflow }}-${{ github.event_name == 'workflow_dispatch' && inputs.build_run_id || github.event.workflow_run.id }}
+  cancel-in-progress: false
 
 jobs:
+  gather:
+    name: Load release metadata
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.read.outputs.tag }}
+      version: ${{ steps.read.outputs.version }}
+      ref: ${{ steps.read.outputs.ref }}
+      dry_run: ${{ steps.dryrun.outputs.value }}
+      build_run_id: ${{ steps.build_run.outputs.id }}
+    steps:
+      - name: Determine build run
+        id: build_run
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            id="${{ inputs.build_run_id }}"
+            if [ -z "$id" ]; then
+              echo "build_run_id input is required when manually dispatching this workflow." >&2
+              exit 1
+            fi
+          else
+            id="${{ github.event.workflow_run.id }}"
+          fi
+          echo "id=$id" >> "$GITHUB_OUTPUT"
+
+      - name: Download metadata artifact
+        uses: actions/download-artifact@v4
+        with:
+          run-id: ${{ steps.build_run.outputs.id }}
+          name: release-metadata
+          path: metadata
+
+      - name: Read metadata
+        id: read
+        run: |
+          set -euo pipefail
+          metadata="metadata/release-metadata.json"
+          if [ ! -f "$metadata" ]; then
+            echo "Metadata artifact not found" >&2
+            exit 1
+          fi
+          python - <<'PY'
+import json, os
+with open('metadata/release-metadata.json', 'r', encoding='utf-8') as fh:
+    data = json.load(fh)
+print(f"tag={data['tag']}")
+print(f"version={data['version']}")
+print(f"ref={data['ref']}")
+print(f"dry_run={str(data.get('dry_run', False)).lower()}")
+PY >> "$GITHUB_OUTPUT"
+
+      - name: Determine dry-run flag
+        id: dryrun
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            if [ "${{ inputs.tag }}" != "${{ steps.read.outputs.tag }}" ]; then
+              echo "Specified tag '${{ inputs.tag }}' does not match metadata tag '${{ steps.read.outputs.tag }}'." >&2
+              exit 1
+            fi
+            echo "value=${{ inputs.dry_run }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "value=${{ steps.read.outputs.dry_run }}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Summarize release
+        run: |
+          echo "### Release metadata" >> $GITHUB_STEP_SUMMARY
+          echo "- Build run ID: ${{ steps.build_run.outputs.id }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Tag: ${{ steps.read.outputs.tag }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Version: ${{ steps.read.outputs.version }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Dry run: ${{ steps.dryrun.outputs.value }}" >> $GITHUB_STEP_SUMMARY
+
   publish-crates:
-    name: Publish Rust crates to crates.io
+    name: Publish crates.io packages
+    needs: gather
+    if: ${{ needs.gather.result == 'success' && needs.gather.outputs.tag && needs.gather.outputs.dry_run != 'true' }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v5
         with:
-          ref: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.tag || '' }}
+          ref: ${{ needs.gather.outputs.ref }}
 
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
 
-      - name: Extract version from tag
-        id: version
-        run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            tag="${{ github.event.inputs.tag }}"
-          else
-            tag=${GITHUB_REF#refs/tags/}
-          fi
-          version=${tag#v}
-          echo "version=$version" >> $GITHUB_OUTPUT
-          echo "tag=$tag" >> $GITHUB_OUTPUT
-          echo "Publishing version: $version"
-
       - name: Verify Cargo.toml version matches tag
         run: |
           cargo_version=$(grep '^version = ' Cargo.toml | head -1 | sed -E 's/version = "(.*)"/\1/')
-          tag_version="${{ steps.version.outputs.version }}"
+          tag_version="${{ needs.gather.outputs.version }}"
           if [ "$cargo_version" != "$tag_version" ]; then
-            echo "Version mismatch! Cargo: $cargo_version, tag: $tag_version"
+            echo "Version mismatch! Cargo: $cargo_version, tag: $tag_version" >&2
             exit 1
           fi
           echo "Cargo.toml version matches tag: $cargo_version"
@@ -57,391 +124,131 @@ jobs:
       - name: Check crates.io for existing release
         id: crate_check
         env:
-          VERSION: ${{ steps.version.outputs.version }}
+          VERSION: ${{ needs.gather.outputs.version }}
         run: |
           python - <<'PY' >> "$GITHUB_OUTPUT"
-          import json
-          import os
-          import sys
-          import urllib.request
+import json
+import os
+import sys
+import urllib.request
+version = os.environ["VERSION"]
+crates = [
+    ("html-to-markdown-rs", "rs_exists"),
+    ("html-to-markdown-cli", "cli_exists"),
+]
+for crate, key in crates:
+    url = f"https://crates.io/api/v1/crates/{crate}"
+    try:
+        with urllib.request.urlopen(url) as resp:
+            data = json.load(resp)
+    except Exception as exc:  # pragma: no cover
+        print(f"::warning::{crate}: failed to query crates.io ({exc})", file=sys.stderr)
+        exists = False
+    else:
+        versions = [item.get("num") for item in data.get("versions", [])]
+        exists = version in versions
+        message = "already" if exists else "not yet"
+        print(f"::notice::{crate} {version} {message} published", file=sys.stderr)
+    print(f"{key}={'true' if exists else 'false'}")
+PY
 
-          version = os.environ["VERSION"]
-          crates = [
-              ("html-to-markdown-rs", "rs_exists"),
-              ("html-to-markdown-cli", "cli_exists"),
-          ]
+      - name: Publish html-to-markdown-rs
+        if: ${{ steps.crate_check.outputs.rs_exists != 'true' }}
+        run: cargo publish -p html-to-markdown-rs --token ${{ secrets.CARGO_TOKEN }}
 
-          for crate, key in crates:
-              url = f"https://crates.io/api/v1/crates/{crate}"
-              try:
-                  with urllib.request.urlopen(url) as resp:
-                      data = json.load(resp)
-              except Exception as exc:
-                  print(f"::warning::{crate}: failed to query crates.io ({exc})", file=sys.stderr)
-                  exists = False
-              else:
-                  versions = [item.get("num") for item in data.get("versions", [])]
-                  exists = version in versions
-                  if exists:
-                      print(f"::notice::{crate} {version} already published on crates.io", file=sys.stderr)
-                  else:
-                      print(f"::notice::{crate} {version} not found on crates.io", file=sys.stderr)
-              print(f"{key}={'true' if exists else 'false'}")
-          PY
-
-      - name: Publish html-to-markdown-rs (core library)
-        if: ${{ steps.crate_check.outputs.rs_exists != 'true' && !(github.event_name == 'workflow_dispatch' && github.event.inputs.dry_run == 'true') }}
-        run: |
-          cargo publish -p html-to-markdown-rs --token ${{ secrets.CARGO_TOKEN }}
-
-      - name: Wait for crates.io to index
-        if: ${{ steps.crate_check.outputs.rs_exists != 'true' && !(github.event_name == 'workflow_dispatch' && github.event.inputs.dry_run == 'true') }}
+      - name: Wait for indexing
+        if: ${{ steps.crate_check.outputs.rs_exists != 'true' }}
         run: sleep 30
 
       - name: Publish html-to-markdown-cli
-        if: ${{ steps.crate_check.outputs.cli_exists != 'true' && !(github.event_name == 'workflow_dispatch' && github.event.inputs.dry_run == 'true') }}
-        run: |
-          cargo publish -p html-to-markdown-cli --token ${{ secrets.CARGO_TOKEN }}
-
-      - name: Dry run - Skip crates.io publish
-        if: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.dry_run == 'true' }}
-        run: |
-          echo "DRY RUN: would publish html-to-markdown-rs and html-to-markdown-cli"
-
-  build-wheels:
-    name: Build wheels on ${{ matrix.os }}
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v5
-        with:
-          ref: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.tag || '' }}
-
-      - name: Build wheels
-        uses: ./.github/actions/build-wheels
-        with:
-          python-version: "3.13"
-
-  build-sdist:
-    name: Build source distribution
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v5
-        with:
-          ref: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.tag || '' }}
-
-      - name: Setup Rust
-        uses: actions-rust-lang/setup-rust-toolchain@v1
-
-      - name: Set up Python
-        uses: actions/setup-python@v6
-        with:
-          python-version: "3.13"
-
-      - name: Install build dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install maturin
-
-      - name: Build CLI binary for sdist
-        run: cargo build --release --package html-to-markdown-cli
-
-      - name: Prepare sdist with CLI
-        run: python scripts/prepare_wheel.py
-
-      - name: Build sdist
-        run: maturin sdist --out dist/
-
-      - name: Upload sdist
-        uses: actions/upload-artifact@v5
-        with:
-          name: sdist
-          path: dist/*.tar.gz
-          retention-days: 7
+        if: ${{ steps.crate_check.outputs.cli_exists != 'true' }}
+        run: cargo publish -p html-to-markdown-cli --token ${{ secrets.CARGO_TOKEN }}
 
   publish-pypi:
-    name: Publish to PyPI
-    needs:
-      - build-wheels
-      - build-sdist
+    name: Publish Python packages to PyPI
+    needs: gather
+    if: ${{ needs.gather.result == 'success' && needs.gather.outputs.tag }}
     runs-on: ubuntu-latest
     environment: pypi
     permissions:
       id-token: write
     steps:
-      - name: Determine release version
-        id: pypi_version
-        run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            tag="${{ github.event.inputs.tag }}"
-          else
-            tag=${GITHUB_REF#refs/tags/}
-          fi
-          version=${tag#v}
-          echo "version=$version" >> $GITHUB_OUTPUT
-
-      - name: Check PyPI for existing release
-        id: pypi_check
-        env:
-          VERSION: ${{ steps.pypi_version.outputs.version }}
-        run: |
-          python - <<'PY' >> "$GITHUB_OUTPUT"
-          import json
-          import os
-          import sys
-          import urllib.request
-
-          version = os.environ["VERSION"]
-          url = "https://pypi.org/pypi/html-to-markdown/json"
-
-          try:
-              with urllib.request.urlopen(url) as resp:
-                  data = json.load(resp)
-          except Exception as exc:
-              print(f"::warning::failed to query PyPI ({exc})", file=sys.stderr)
-              exists = False
-          else:
-              releases = data.get("releases") or {}
-              exists = version in releases and releases[version]
-              if exists:
-                  print(f"::notice::html-to-markdown {version} already published on PyPI", file=sys.stderr)
-              else:
-                  print(f"::notice::html-to-markdown {version} not found on PyPI", file=sys.stderr)
-
-          print(f"exists={'true' if exists else 'false'}")
-          PY
-
-      - name: Download wheels
-        if: ${{ steps.pypi_check.outputs.exists != 'true' }}
-        uses: actions/download-artifact@v6
+      - name: Download wheel artifacts
+        uses: actions/download-artifact@v4
         with:
-          pattern: "wheels-*"
+          run-id: ${{ needs.gather.outputs.build_run_id }}
+          pattern: python-wheels-*
+          path: dist
           merge-multiple: true
-          path: dist/
 
-      - name: Download sdist
-        if: ${{ steps.pypi_check.outputs.exists != 'true' }}
-        uses: actions/download-artifact@v6
+      - name: Download sdist artifact
+        uses: actions/download-artifact@v4
         with:
-          name: sdist
-          path: dist/
+          run-id: ${{ needs.gather.outputs.build_run_id }}
+          name: python-sdist
+          path: dist
 
       - name: List artifacts
-        if: ${{ steps.pypi_check.outputs.exists != 'true' }}
-        run: |
-          echo "Artifacts ready for PyPI:"
-          ls -lh dist/
+        run: ls -R dist
 
       - name: Publish to PyPI
-        if: ${{ steps.pypi_check.outputs.exists != 'true' && !(github.event_name == 'workflow_dispatch' && github.event.inputs.dry_run == 'true') }}
+        if: ${{ needs.gather.outputs.dry_run != 'true' }}
         uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: dist
 
-      - name: Dry run - Skip PyPI publish
-        if: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.dry_run == 'true' }}
+      - name: Dry run summary
+        if: ${{ needs.gather.outputs.dry_run == 'true' }}
         run: |
-          echo "DRY RUN: would publish the following packages to PyPI"
-          ls -1 dist/*.whl dist/*.tar.gz
+          echo "Dry run requested; artifacts staged for PyPI:" >> $GITHUB_STEP_SUMMARY
+          ls -1 dist >> $GITHUB_STEP_SUMMARY
 
-  publish-npm-node:
-    name: Publish html-to-markdown-node to npm
+  publish-rubygems:
+    name: Publish Ruby gems
+    needs: gather
+    if: ${{ needs.gather.result == 'success' && needs.gather.outputs.tag }}
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+    steps:
+      - name: Download Ruby gem artifacts
+        uses: actions/download-artifact@v4
+        with:
+          run-id: ${{ needs.gather.outputs.build_run_id }}
+          pattern: rubygems-*
+          path: dist
+          merge-multiple: true
+
+      - name: Configure trusted publishing credentials
+        if: ${{ needs.gather.outputs.dry_run != 'true' }}
+        uses: rubygems/configure-rubygems-credentials@v1.0.0
+
+      - name: Publish gems
+        if: ${{ needs.gather.outputs.dry_run != 'true' }}
+        working-directory: dist
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          gems=($(ls html-to-markdown-*.gem | sort))
+          if [ ${#gems[@]} -eq 0 ]; then
+            echo "No gem artifacts found" >&2
+            exit 1
+          fi
+          for gem in "${gems[@]}"; do
+            echo "Pushing ${gem}"
+            gem push "$gem"
+          done
+
+      - name: Dry run summary
+        if: ${{ needs.gather.outputs.dry_run == 'true' }}
+        working-directory: dist
+        run: |
+          echo "Dry run requested; gem artifacts ready:" >> $GITHUB_STEP_SUMMARY
+          ls -1 html-to-markdown-*.gem >> $GITHUB_STEP_SUMMARY
+
+  concluded:
+    if: ${{ github.event.workflow_run.conclusion != 'success' }}
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v5
-        with:
-          ref: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.tag || '' }}
-
-      - name: Install pnpm
-        uses: pnpm/action-setup@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v6
-        with:
-          node-version: 24
-          registry-url: https://registry.npmjs.org
-          cache: pnpm
-
-      - name: Setup Rust
-        uses: dtolnay/rust-toolchain@stable
-
-      - name: Determine release version
-        id: node_version
-        run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            tag="${{ github.event.inputs.tag }}"
-          else
-            tag=${GITHUB_REF#refs/tags/}
-          fi
-          version=${tag#v}
-          echo "version=$version" >> $GITHUB_OUTPUT
-
-      - name: Check npm for existing html-to-markdown-node release
-        id: node_npm_check
-        env:
-          VERSION: ${{ steps.node_version.outputs.version }}
-        run: |
-          if npm view html-to-markdown-node@"$VERSION" version >/dev/null 2>&1; then
-            echo "::notice::html-to-markdown-node@$VERSION already published on npm"
-            echo "exists=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "::notice::html-to-markdown-node@$VERSION not found on npm"
-            echo "exists=false" >> "$GITHUB_OUTPUT"
-          fi
-
-      - name: Download NAPI artifacts from release
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          tag="${{ github.event_name == 'workflow_dispatch' && github.event.inputs.tag || github.ref_name }}"
-          cd crates/html-to-markdown-node
-          gh release download "$tag" --pattern "*.node" --dir . || echo "No prebuilt .node files"
-
-      - name: Install dependencies
-        working-directory: crates/html-to-markdown-node
-        run: pnpm install
-
-      - name: Build Node bindings
-        working-directory: crates/html-to-markdown-node
-        run: pnpm run build
-
-      - name: Publish to npm
-        if: ${{ steps.node_npm_check.outputs.exists != 'true' && !(github.event_name == 'workflow_dispatch' && github.event.inputs.dry_run == 'true') }}
-        working-directory: crates/html-to-markdown-node
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-        run: pnpm publish --access public --no-git-checks
-
-      - name: Dry run - Skip npm publish
-        if: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.dry_run == 'true' }}
-        run: |
-          echo "DRY RUN: would publish html-to-markdown-node to npm"
-
-  publish-npm-wasm:
-    name: Publish html-to-markdown-wasm to npm
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v5
-        with:
-          ref: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.tag || '' }}
-
-      - name: Install pnpm
-        uses: pnpm/action-setup@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v6
-        with:
-          node-version: 24
-          registry-url: https://registry.npmjs.org
-          cache: pnpm
-
-      - name: Setup Rust
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: wasm32-unknown-unknown
-
-      - name: Determine release version
-        id: wasm_version
-        run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            tag="${{ github.event.inputs.tag }}"
-          else
-            tag=${GITHUB_REF#refs/tags/}
-          fi
-          version=${tag#v}
-          echo "version=$version" >> $GITHUB_OUTPUT
-
-      - name: Check npm for existing html-to-markdown-wasm release
-        id: wasm_npm_check
-        env:
-          VERSION: ${{ steps.wasm_version.outputs.version }}
-        run: |
-          if npm view html-to-markdown-wasm@"$VERSION" version >/dev/null 2>&1; then
-            echo "::notice::html-to-markdown-wasm@$VERSION already published on npm"
-            echo "exists=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "::notice::html-to-markdown-wasm@$VERSION not found on npm"
-            echo "exists=false" >> "$GITHUB_OUTPUT"
-          fi
-
-      - name: Install wasm-pack
-        run: curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
-
-      - name: Build WASM (all targets)
-        working-directory: crates/html-to-markdown-wasm
-        env:
-          RUSTFLAGS: '--cfg getrandom_backend="wasm_js"'
-        run: |
-          pnpm install
-          pnpm run build:all
-
-      - name: Remove wasm-pack gitignores
-        working-directory: crates/html-to-markdown-wasm
-        run: find dist dist-node dist-web -maxdepth 1 -name ".gitignore" -delete
-
-      - name: Publish to npm
-        if: ${{ steps.wasm_npm_check.outputs.exists != 'true' && !(github.event_name == 'workflow_dispatch' && github.event.inputs.dry_run == 'true') }}
-        working-directory: crates/html-to-markdown-wasm
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-        run: pnpm publish --access public --no-git-checks
-
-      - name: Dry run - Skip npm publish
-        if: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.dry_run == 'true' }}
-        run: |
-          echo "DRY RUN: would publish html-to-markdown-wasm to npm"
-
-  verify:
-    name: Verify publications
-    needs:
-      - publish-crates
-      - publish-pypi
-      - publish-npm-node
-      - publish-npm-wasm
-    runs-on: ubuntu-latest
-    if: ${{ !(github.event_name == 'workflow_dispatch' && github.event.inputs.dry_run == 'true') }}
-    steps:
-      - name: Extract version
-        id: version
-        run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            tag="${{ github.event.inputs.tag }}"
-          else
-            tag=${GITHUB_REF#refs/tags/}
-          fi
-          version=${tag#v}
-          echo "version=$version" >> $GITHUB_OUTPUT
-
-      - name: Verify crates.io publication
-        run: |
-          version="${{ steps.version.outputs.version }}"
-          if cargo search html-to-markdown-rs | grep -q "html-to-markdown-rs = \"$version\""; then
-            echo "html-to-markdown-rs indexed"
-          else
-            echo "html-to-markdown-rs not yet indexed"
-          fi
-          if cargo search html-to-markdown-cli | grep -q "html-to-markdown-cli = \"$version\""; then
-            echo "html-to-markdown-cli indexed"
-          else
-            echo "html-to-markdown-cli not yet indexed"
-          fi
-
-      - name: Verify npm publication
-        run: |
-          version="${{ steps.version.outputs.version }}"
-          npm view html-to-markdown-node@$version version || true
-          npm view html-to-markdown-wasm@$version version || true
-
-      - name: Display installation commands
-        run: |
-          version="${{ steps.version.outputs.version }}"
-          echo "npm install html-to-markdown-node@$version"
-          echo "npm install html-to-markdown-wasm@$version"
-          echo "pip install html-to-markdown==$version"
-          echo "cargo install html-to-markdown-cli --version $version"
-          echo "brew tap goldziher/tap && brew install html-to-markdown"
+      - run: |
+          echo "Build workflow did not succeed (status: ${{ github.event.workflow_run.conclusion }}). Skipping publish." >> $GITHUB_STEP_SUMMARY

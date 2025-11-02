@@ -47,11 +47,11 @@ dist-web/
 packages/html-to-markdown-ts/bin/
 
 # Ruby gem build outputs
-!crates/html-to-markdown-rb/lib/
-!crates/html-to-markdown-rb/lib/**/*.rb
-crates/html-to-markdown-rb/lib/bin/
-crates/html-to-markdown-rb/lib/*.bundle
-crates/html-to-markdown-rb/tmp/
+!packages/ruby/lib/
+!packages/ruby/lib/**/*.rb
+packages/ruby/lib/bin/
+packages/ruby/lib/*.bundle
+packages/ruby/tmp/
 
 # IDEs
 .vscode/
