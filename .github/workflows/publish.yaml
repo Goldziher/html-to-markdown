@@ -1,12 +1,6 @@
 name: Publish Release
 
 on:
-  workflow_run:
-    workflows: ["Build Artifacts"]
-    types: [completed]
-  push:
-    paths:
-      - ".github/workflows/publish.yaml"
   workflow_dispatch:
     inputs:
       tag:
@@ -22,6 +16,12 @@ on:
         required: false
         type: boolean
         default: true
+  workflow_run:
+    workflows: ["Build Artifacts"]
+    types: [completed]
+  push:
+    paths:
+      - ".github/workflows/publish.yaml"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event_name == 'workflow_dispatch' ? inputs.build_run_id : github.event_name == 'workflow_run' ? github.event.workflow_run.id : github.run_id }}
