@@ -117,13 +117,14 @@ jobs:
         run: python scripts/prepare_wheel.py
 
       - name: Build sdist
+        working-directory: packages/python
         run: maturin sdist --out dist/
 
       - name: Upload sdist
         uses: actions/upload-artifact@v4
         with:
           name: python-sdist
-          path: dist/*.tar.gz
+          path: packages/python/dist/*.tar.gz
           retention-days: 14
 
   ruby-gem:

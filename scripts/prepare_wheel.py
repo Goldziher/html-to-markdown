@@ -10,14 +10,17 @@ except ImportError:
 
 
 def main() -> None:
+    repo_root = Path(__file__).resolve().parent.parent
+
     print("Building html-to-markdown CLI binary...")
     subprocess.run(
         ["cargo", "build", "--release", "--package", "html-to-markdown-cli"],
         check=True,
+        cwd=repo_root,
     )
 
     binary_name = "html-to-markdown.exe" if sys.platform == "win32" else "html-to-markdown"
-    source = Path("target") / "release" / binary_name
+    source = repo_root / "target" / "release" / binary_name
 
     if not source.exists():
         msg = f"CLI binary not found at {source}"
@@ -25,7 +28,7 @@ def main() -> None:
 
     print(f"Found CLI binary at {source}")
 
-    package_root = Path("packages") / "python" / "html_to_markdown"
+    package_root = repo_root / "packages" / "python" / "html_to_markdown"
     package_bin_dir = package_root / "bin"
     package_bin_dir.mkdir(parents=True, exist_ok=True)
 
@@ -37,11 +40,11 @@ def main() -> None:
         dest.chmod(0o755)
         print(f"Made binary executable: {dest}")
 
-    with Path("Cargo.toml").open("rb") as f:
+    with (repo_root / "Cargo.toml").open("rb") as f:
         cargo_toml = tomllib.load(f)
     version = cargo_toml["workspace"]["package"]["version"]
 
-    data_dir_name = Path("packages") / "python" / f"html_to_markdown-{version}.data"
+    data_dir_name = repo_root / "packages" / "python" / f"html_to_markdown-{version}.data"
     scripts_dir = data_dir_name / "scripts"
     scripts_dir.mkdir(parents=True, exist_ok=True)
 

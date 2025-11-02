@@ -31,7 +31,7 @@ runs:
 
     - name: Build wheels
       shell: bash
-      run: python -m cibuildwheel --output-dir wheelhouse
+      run: python -m cibuildwheel --output-dir wheelhouse packages/python
       env:
         CIBW_BUILD: cp310-* cp311-* cp312-* cp313-*
 
@@ -44,15 +44,15 @@ runs:
         CIBW_BEFORE_BUILD_LINUX: >
           pip install maturin uv &&
           source ~/.cargo/env &&
-          uv run scripts/prepare_wheel.py
+          python ../../scripts/prepare_wheel.py
         CIBW_BEFORE_BUILD_MACOS: >
           pip install maturin uv &&
           source ~/.cargo/env &&
-          uv run scripts/prepare_wheel.py
+          python ../../scripts/prepare_wheel.py
         CIBW_BEFORE_BUILD_WINDOWS: >
           pip install maturin uv &&
           set PATH=%USERPROFILE%\.cargo\bin;%PATH% &&
-          uv run scripts/prepare_wheel.py
+          python ..\..\scripts\prepare_wheel.py
 
         CIBW_BUILD_FRONTEND: build
 
