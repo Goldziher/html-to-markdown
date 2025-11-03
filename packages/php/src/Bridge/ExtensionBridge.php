@@ -4,20 +4,20 @@ declare(strict_types=1);
 
 namespace HtmlToMarkdown\Bridge;
 
-use HtmlToMarkdown\Config\ConversionOptions;
-use HtmlToMarkdown\Config\InlineImageConfig;
 use HtmlToMarkdown\Contract\ExtensionBridge as ExtensionBridgeContract;
 use HtmlToMarkdown\Exception\ConversionFailed;
 use HtmlToMarkdown\Exception\ExtensionNotLoaded;
 use HtmlToMarkdown\Exception\InvalidOption;
-use HtmlToMarkdown\Value\InlineImageExtraction;
 
 final class ExtensionBridge implements ExtensionBridgeContract
 {
     private const CONVERT_FUNCTION = 'html_to_markdown_convert';
     private const CONVERT_INLINE_FUNCTION = 'html_to_markdown_convert_with_inline_images';
 
-    public function convert(string $html, ?ConversionOptions $options = null): string
+    /**
+     * @param array<string, mixed>|null $options
+     */
+    public function convert(string $html, ?array $options = null): string
     {
         /** @var callable-string $callable */
         $callable = self::CONVERT_FUNCTION;
@@ -25,11 +25,9 @@ final class ExtensionBridge implements ExtensionBridgeContract
             throw ExtensionNotLoaded::create();
         }
 
-        $optionsArray = $options?->toArray();
-
         try {
             /** @var string $result */
-            $result = $callable($html, $optionsArray);
+            $result = $callable($html, $options);
         } catch (\Throwable $exception) {
             throw ConversionFailed::withMessage($exception->getMessage());
         }
@@ -37,23 +35,26 @@ final class ExtensionBridge implements ExtensionBridgeContract
         return $result;
     }
 
+    /**
+     * @param array<string, mixed>|null $options
+     * @param array<string, mixed>|null $config
+     *
+     * @return array<string, mixed>
+     */
     public function convertWithInlineImages(
         string $html,
-        ?ConversionOptions $options = null,
-        ?InlineImageConfig $config = null,
-    ): InlineImageExtraction {
+        ?array $options = null,
+        ?array $config = null,
+    ): array {
         /** @var callable-string $callable */
         $callable = self::CONVERT_INLINE_FUNCTION;
         if (!function_exists($callable)) {
             throw ExtensionNotLoaded::create();
         }
 
-        $optionsArray = $options?->toArray();
-        $configArray = $config?->toArray();
-
         try {
             /** @var array<string, mixed> $payload */
-            $payload = $callable($html, $optionsArray, $configArray);
+            $payload = $callable($html, $options, $config);
         } catch (\Throwable $exception) {
             throw ConversionFailed::withMessage($exception->getMessage());
         }
@@ -65,6 +66,6 @@ final class ExtensionBridge implements ExtensionBridgeContract
             );
         }
 
-        return InlineImageExtraction::fromExtensionPayload($payload);
+        return $payload;
     }
 }
