@@ -17,7 +17,13 @@ if test "$PHP_HTML_TO_MARKDOWN" != "no"; then
     HTM2MD_CARGO_BIN=$PHP_CARGO_BIN
   fi
 
-  HTM2MD_WORKSPACE_ROOT=`cd "$abs_srcdir/../.." && pwd`
+  if test -f "$abs_srcdir/../../Cargo.toml"; then
+    HTM2MD_WORKSPACE_ROOT=`cd "$abs_srcdir/../.." && pwd`
+  elif test -f "$abs_srcdir/../Cargo.toml"; then
+    HTM2MD_WORKSPACE_ROOT=`cd "$abs_srcdir/.." && pwd`
+  else
+    HTM2MD_WORKSPACE_ROOT="$abs_srcdir"
+  fi
 
   AC_SUBST([HTM2MD_CARGO_BIN])
   AC_SUBST([HTM2MD_PACKAGE], [html-to-markdown-php])
