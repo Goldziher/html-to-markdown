@@ -6,10 +6,10 @@ use PhpCsFixer\Config;
 use PhpCsFixer\Finder;
 
 $finder = Finder::create()
-    ->in([
-        __DIR__ . '/src',
-        __DIR__ . '/tests',
-    ])
+    ->files()
+    ->in(__DIR__)
+    ->path('^src')
+    ->path('^tests')
     ->notName('*.blade.php');
 
 return (new Config())
