@@ -220,7 +220,7 @@ jobs:
       - name: Expand workspace snapshot
         shell: pwsh
         run: |
-          $archive = Get-ChildItem -Path "tmp/pie-src" -Filter "php_html_to_markdown-*-src.tgz" | Select-Object -First 1
+          $archive = Get-ChildItem -Path "tmp/pie-src" -Recurse -Filter "php_html_to_markdown-*-src.tgz" | Select-Object -First 1
           if ($null -eq $archive) {
             Write-Error "PIE source archive not found"
             exit 1
@@ -307,7 +307,7 @@ jobs:
         env:
           TARGET: ${{ matrix.target }}
         run: |
-          pnpm --filter html-to-markdown-node exec napi artifacts --release
+          pnpm --filter html-to-markdown-node exec napi artifacts
           test -d crates/html-to-markdown-node/npm || { echo "npm artifact directory missing"; exit 1; }
           tar -czf node-bindings-$TARGET.tar.gz -C crates/html-to-markdown-node npm
 
@@ -317,7 +317,7 @@ jobs:
         env:
           TARGET: ${{ matrix.target }}
         run: |
-          pnpm --filter html-to-markdown-node exec napi artifacts --release
+          pnpm --filter html-to-markdown-node exec napi artifacts
           if (-Not (Test-Path crates/html-to-markdown-node\npm)) { throw "npm artifact directory missing" }
           tar -czf node-bindings-$env:TARGET.tar.gz -C crates/html-to-markdown-node npm
 
