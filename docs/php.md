@@ -15,6 +15,38 @@ composer require html-to-markdown/extension
 > Publish the extension via PECL or ship prebuilt binaries. Composer only wraps
 the extension and provides the modern PHP surface area.
 
+## Distribution via PIE
+
+The PHP extension is now packaged for [PIE](https://github.com/php/pie).
+Each release tag uploads a `php_html_to_markdown-<version>-src.tgz` archive to
+the GitHub release, which pie can consume directly:
+
+```bash
+pie install html-to-markdown/html-to-markdown-ext
+```
+
+The install process requires a Rust toolchain (`cargo`) and the PHP development
+headers for the target PHP version (available via `phpize`).
+
+### Windows DLLs
+
+The build pipeline also pushes pre-built Windows binaries following the PIE
+naming convention:
+
+```
+php_html_to_markdown-<tag>-<php-version>-<ts|nts>-<compiler>-<arch>.zip
+```
+
+Each archive contains:
+
+- `php_html_to_markdown.dll` — the extension library
+- `php_html_to_markdown.pdb` — debug symbols (when available)
+- any dependent DLLs required by the build and associated licenses
+
+These ZIP files are attached to the same GitHub release and can be consumed by
+PIE on Windows or installed manually by copying the DLL into the appropriate
+`php/ext` directory and enabling `extension=php_html_to_markdown` in `php.ini`.
+
 ## Usage
 
 ```php

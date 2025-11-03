@@ -52,6 +52,7 @@ packages/html-to-markdown-ts/bin/
 packages/ruby/lib/bin/
 packages/ruby/lib/*.bundle
 packages/ruby/tmp/
+packages/php-ext/workspace/
 
 # IDEs
 .vscode/

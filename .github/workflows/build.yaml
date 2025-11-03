@@ -127,6 +127,122 @@ jobs:
           path: packages/python/dist/*.tar.gz
           retention-days: 14
 
+  php-pie:
+    name: Build PHP PIE source bundle
+    needs: prepare
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+        with:
+          ref: ${{ needs.prepare.outputs.ref }}
+
+      - name: Setup Rust
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: stable
+
+      - name: Set up PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: "8.3"
+          coverage: none
+          tools: none
+
+      - name: Ensure packaging script is executable
+        run: chmod +x scripts/package_php_pie_source.sh
+
+      - name: Assemble PIE source archive
+        run: ./scripts/package_php_pie_source.sh ${{ needs.prepare.outputs.version }} build/artifacts
+
+      - name: Download PIE CLI
+        run: |
+          curl -fsSL https://github.com/php/pie/releases/latest/download/pie.phar -o build/pie.phar
+
+      - name: Verify PIE build from archive
+        run: |
+          set -euo pipefail
+          TMP_DIR=$(mktemp -d)
+          tar -xzf build/artifacts/php_html_to_markdown-${{ needs.prepare.outputs.version }}-src.tgz -C "$TMP_DIR"
+          php build/pie.phar repository:add path "$TMP_DIR"
+          php build/pie.phar build html-to-markdown/html-to-markdown-ext:*@dev --with-cargo-bin=$(command -v cargo)
+
+      - name: Upload PIE source archive
+        uses: actions/upload-artifact@v4
+        with:
+          name: php-pie-src
+          path: build/artifacts/php_html_to_markdown-${{ needs.prepare.outputs.version }}-src.tgz
+          retention-days: 14
+
+  php-windows-matrix:
+    name: Resolve Windows build matrix
+    needs: prepare
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.matrix.outputs.matrix }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+        with:
+          ref: ${{ needs.prepare.outputs.ref }}
+
+      - name: Compute Windows matrix
+        id: matrix
+        uses: php/php-windows-builder/extension-matrix@v1
+        with:
+          extension-url: https://github.com/${{ github.repository }}
+          extension-ref: ${{ needs.prepare.outputs.ref }}
+
+  php-windows:
+    name: Build PHP extension (Windows)
+    needs: [prepare, php-pie, php-windows-matrix]
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.php-windows-matrix.outputs.matrix) }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+        with:
+          ref: ${{ needs.prepare.outputs.ref }}
+
+      - name: Download PIE source snapshot
+        uses: actions/download-artifact@v4
+        with:
+          name: php-pie-src
+          path: tmp/pie-src
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: stable
+
+      - name: Expand workspace snapshot
+        shell: pwsh
+        run: |
+          $archive = Get-ChildItem -Path "tmp/pie-src" -Filter "php_html_to_markdown-*-src.tgz" | Select-Object -First 1
+          if ($null -eq $archive) {
+            Write-Error "PIE source archive not found"
+            exit 1
+          }
+          $workspace = Join-Path $PWD "packages\php-ext\workspace"
+          if (Test-Path $workspace) {
+            Remove-Item $workspace -Recurse -Force
+          }
+          New-Item -ItemType Directory -Path $workspace | Out-Null
+          tar -xf $archive.FullName -C $workspace
+
+      - name: Build Windows artifacts
+        uses: php/php-windows-builder/extension@v1
+        env:
+          GITHUB_ACTIONS: 'false'
+        with:
+          php-version: ${{ matrix.php-version }}
+          arch: ${{ matrix.arch }}
+          ts: ${{ matrix.ts }}
+          args: --enable-html_to_markdown
+          run-tests: 'false'
+
   ruby-gem:
     name: Build Ruby gem (${{ matrix.label }})
     needs: prepare

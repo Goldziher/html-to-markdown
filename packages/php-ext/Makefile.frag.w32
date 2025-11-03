@@ -1,0 +1,30 @@
+HTM2MD_WORKSPACE_DIR = $(top_srcdir)\workspace
+HTM2MD_TARGET_DIR    = $(HTM2MD_WORKSPACE_DIR)\target\release
+HTM2MD_SOURCE_DLL    = $(HTM2MD_TARGET_DIR)\html_to_markdown_php.dll
+HTM2MD_SOURCE_PDB    = $(HTM2MD_TARGET_DIR)\html_to_markdown_php.pdb
+HTM2MD_OUTPUT_DLL    = $(BUILD_DIR)\php_html_to_markdown.dll
+HTM2MD_OUTPUT_PDB    = $(BUILD_DIR)\php_html_to_markdown.pdb
+
+PHP_MODULES += $(HTM2MD_OUTPUT_DLL)
+all_targets += $(HTM2MD_OUTPUT_DLL)
+
+$(HTM2MD_OUTPUT_DLL): FORCE
+	@if not exist "$(HTM2MD_WORKSPACE_DIR)" (
+		echo Workspace snapshot missing at $(HTM2MD_WORKSPACE_DIR) 1>&2
+		exit /b 1
+	)
+	@if not exist "$(BUILD_DIR)" mkdir "$(BUILD_DIR)"
+	@cargo build --manifest-path="$(HTM2MD_WORKSPACE_DIR)\Cargo.toml" --package html-to-markdown-php --release --target-dir "$(HTM2MD_WORKSPACE_DIR)\target"
+	@if not exist "$(HTM2MD_SOURCE_DLL)" (
+		echo cargo did not produce expected artifact: $(HTM2MD_SOURCE_DLL) 1>&2
+		exit /b 1
+	)
+	@copy /Y "$(HTM2MD_SOURCE_DLL)" "$(HTM2MD_OUTPUT_DLL)" >nul
+	@if exist "$(HTM2MD_SOURCE_PDB)" copy /Y "$(HTM2MD_SOURCE_PDB)" "$(HTM2MD_OUTPUT_PDB)" >nul
+
+clean::
+	@if exist "$(HTM2MD_TARGET_DIR)" rd /s /q "$(HTM2MD_TARGET_DIR)"
+	@if exist "$(HTM2MD_OUTPUT_DLL)" del "$(HTM2MD_OUTPUT_DLL)"
+	@if exist "$(HTM2MD_OUTPUT_PDB)" del "$(HTM2MD_OUTPUT_PDB)"
+
+FORCE:
