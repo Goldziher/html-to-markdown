@@ -8,8 +8,8 @@ use PhpCsFixer\Finder;
 $finder = Finder::create()
     ->files()
     ->in(__DIR__)
-    ->path('^src')
-    ->path('^tests')
+    ->path('#^src/#')
+    ->path('#^tests/#')
     ->notName('*.blade.php');
 
 return (new Config())
