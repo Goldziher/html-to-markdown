@@ -1,5 +1,5 @@
 {
-  "name": "html-to-markdown/html-to-markdown-ext",
+  "name": "goldziher/html-to-markdown",
   "description": "Native html_to_markdown PHP extension built on the Rust html-to-markdown engine.",
   "type": "php-ext",
   "license": "MIT",
