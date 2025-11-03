@@ -1,5 +1,12 @@
 # PHP Extension
 
+[![Crates.io](https://img.shields.io/crates/v/html-to-markdown-rs.svg)](https://crates.io/crates/html-to-markdown-rs)
+[![npm version](https://badge.fury.io/js/html-to-markdown-node.svg)](https://www.npmjs.com/package/html-to-markdown-node)
+[![PyPI version](https://badge.fury.io/py/html-to-markdown.svg)](https://pypi.org/project/html-to-markdown/)
+[![Gem Version](https://badge.fury.io/rb/html-to-markdown.svg)](https://rubygems.org/gems/html-to-markdown)
+[![Packagist](https://img.shields.io/packagist/v/goldziher/html-to-markdown.svg)](https://packagist.org/packages/goldziher/html-to-markdown)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://github.com/Goldziher/html-to-markdown/blob/main/LICENSE)
+
 The PHP bindings expose the native Rust converter through the `html_to_markdown`
 extension and a typed composer package located in `packages/php`.
 
@@ -8,11 +15,12 @@ extension and a typed composer package located in `packages/php`.
 Install the PHP package and ensure the native extension is available:
 
 ```bash
+pie install goldziher/html-to-markdown
 composer require html-to-markdown/extension
 ```
 
 > **Note**
-> Publish the extension via PECL or ship prebuilt binaries. Composer only wraps
+> Distribute the extension via PIE and publish prebuilt binaries as needed. Composer only wraps
 the extension and provides the modern PHP surface area.
 
 ## Distribution via PIE

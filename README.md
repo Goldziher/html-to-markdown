@@ -6,6 +6,7 @@ High-performance HTML → Markdown conversion powered by Rust. Shipping as a Rus
 [![npm version](https://badge.fury.io/js/html-to-markdown-node.svg)](https://www.npmjs.com/package/html-to-markdown-node)
 [![PyPI version](https://badge.fury.io/py/html-to-markdown.svg)](https://pypi.org/project/html-to-markdown/)
 [![Gem Version](https://badge.fury.io/rb/html-to-markdown.svg)](https://rubygems.org/gems/html-to-markdown)
+[![Packagist](https://img.shields.io/packagist/v/goldziher/html-to-markdown.svg)](https://packagist.org/packages/goldziher/html-to-markdown)
 [![Python Versions](https://img.shields.io/pypi/pyversions/html-to-markdown.svg)](https://pypi.org/project/html-to-markdown/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://github.com/Goldziher/html-to-markdown/blob/main/LICENSE)
 [![Discord](https://img.shields.io/badge/Discord-Join%20our%20community-7289da)](https://discord.gg/pXxagNK2zN)
@@ -48,7 +49,7 @@ Experience WebAssembly-powered HTML to Markdown conversion instantly in your bro
 | **WebAssembly** (universal) | `npm install html-to-markdown-wasm`                                       |
 | **Deno**                    | `import { convert } from "npm:html-to-markdown-wasm"`                     |
 | **Python** (bindings + CLI) | `pip install html-to-markdown`                                            |
-| **PHP** (extension + helpers) | `pecl install html_to_markdown` or `composer require html-to-markdown/extension` |
+| **PHP** (extension + helpers) | `pie install goldziher/html-to-markdown`<br>`composer require html-to-markdown/extension` |
 | **Ruby** gem                | `bundle add html-to-markdown` or `gem install html-to-markdown`           |
 | **Rust** crate              | `cargo add html-to-markdown-rs`                                           |
 | Rust CLI                    | `cargo install html-to-markdown-cli`                                      |
