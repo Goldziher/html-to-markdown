@@ -2,8 +2,6 @@
 
 require_relative 'lib/html_to_markdown/version'
 
-readme_path = File.expand_path('README.md', __dir__)
-readme_body = File.read(readme_path, encoding: 'UTF-8')
 repo_root = File.expand_path('../..', __dir__)
 crate_prefix = 'packages/ruby/'
 git_cmd = %(git -C "#{repo_root}" ls-files -z #{crate_prefix})
@@ -33,7 +31,10 @@ Gem::Specification.new do |spec|
   spec.email         = ['nhirschfeld@gmail.com']
 
   spec.summary       = 'Blazing-fast HTML to Markdown conversion for Ruby, powered by Rust.'
-  spec.description   = readme_body
+  spec.description   = <<~DESC.strip
+    html-to-markdown is a native Ruby extension built on the shared Rust engine that powers the html-to-markdown project.
+    It delivers identical HTML-to-Markdown output across languages, exposes inline image extraction, and ships with a CLI for automation workflows.
+  DESC
   spec.homepage      = 'https://github.com/Goldziher/html-to-markdown'
   spec.license       = 'MIT'
 
