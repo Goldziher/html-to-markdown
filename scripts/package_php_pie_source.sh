@@ -20,7 +20,9 @@ mkdir -p "$DEST_DIR"
 
 # Base files required to build the Rust workspace
 cp "$ROOT/Cargo.toml" "$STAGING/"
-cp "$ROOT/Cargo.lock" "$STAGING/"
+if [[ -f "$ROOT/Cargo.lock" ]]; then
+  cp "$ROOT/Cargo.lock" "$STAGING/"
+fi
 cp "$ROOT/LICENSE" "$STAGING/"
 cp "$ROOT/README.md" "$STAGING/PROJECT-README.md"
 
