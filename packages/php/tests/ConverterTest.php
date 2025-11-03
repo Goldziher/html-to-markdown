@@ -37,6 +37,16 @@ final class ConverterTest extends TestCase
         self::assertSame("Lorem\nipsum\ndolor sit\namet\n\n", $markdown);
     }
 
+    public function testConvertAcceptsArrayOptions(): void
+    {
+        $markdown = $this->converter->convert('<p>Lorem ipsum dolor sit amet</p>', [
+            'wrap' => true,
+            'wrap_width' => 10,
+        ]);
+
+        self::assertSame("Lorem\nipsum\ndolor sit\namet\n\n", $markdown);
+    }
+
     public function testConvertWithInlineImagesReturnsExtraction(): void
     {
         $html = '<p><img src="data:image/png;base64,Zm9v" alt="test"></p>';

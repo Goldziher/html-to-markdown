@@ -4,17 +4,22 @@ declare(strict_types=1);
 
 namespace HtmlToMarkdown\Contract;
 
-use HtmlToMarkdown\Config\ConversionOptions;
-use HtmlToMarkdown\Config\InlineImageConfig;
-use HtmlToMarkdown\Value\InlineImageExtraction;
-
 interface ExtensionBridge
 {
-    public function convert(string $html, ?ConversionOptions $options = null): string;
+    /**
+     * @param array<string, mixed>|null $options
+     */
+    public function convert(string $html, ?array $options = null): string;
 
+    /**
+     * @param array<string, mixed>|null $options
+     * @param array<string, mixed>|null $config
+     *
+     * @return array<string, mixed>
+     */
     public function convertWithInlineImages(
         string $html,
-        ?ConversionOptions $options = null,
-        ?InlineImageConfig $config = null,
-    ): InlineImageExtraction;
+        ?array $options = null,
+        ?array $config = null,
+    ): array;
 }
