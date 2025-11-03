@@ -18,15 +18,18 @@ trap cleanup EXIT
 
 mkdir -p "$DEST_DIR"
 
+WORKSPACE_DIR="$STAGING/workspace"
+mkdir -p "$WORKSPACE_DIR"
+
 # Base files required to build the Rust workspace
-cp "$ROOT/Cargo.toml" "$STAGING/"
+cp "$ROOT/Cargo.toml" "$WORKSPACE_DIR/"
 if [[ -f "$ROOT/Cargo.lock" ]]; then
-  cp "$ROOT/Cargo.lock" "$STAGING/"
+  cp "$ROOT/Cargo.lock" "$WORKSPACE_DIR/"
 fi
 cp "$ROOT/LICENSE" "$STAGING/"
 cp "$ROOT/README.md" "$STAGING/PROJECT-README.md"
 
-rsync -a --exclude 'target' --exclude 'debug' "$ROOT/crates" "$STAGING/"
+rsync -a --exclude 'target' --exclude 'debug' "$ROOT/crates" "$WORKSPACE_DIR/"
 
 # PIE metadata lives under packages/php-ext; copy into staging root.
 cp "$ROOT/composer.json" "$STAGING/"

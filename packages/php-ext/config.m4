@@ -17,7 +17,9 @@ if test "$PHP_HTML_TO_MARKDOWN" != "no"; then
     HTM2MD_CARGO_BIN=$PHP_CARGO_BIN
   fi
 
-  if test -f "$abs_srcdir/../../Cargo.toml"; then
+  if test -d "$abs_srcdir/workspace"; then
+    HTM2MD_WORKSPACE_ROOT="$abs_srcdir/workspace"
+  elif test -f "$abs_srcdir/../../Cargo.toml"; then
     HTM2MD_WORKSPACE_ROOT=`cd "$abs_srcdir/../.." && pwd`
   elif test -f "$abs_srcdir/../Cargo.toml"; then
     HTM2MD_WORKSPACE_ROOT=`cd "$abs_srcdir/.." && pwd`

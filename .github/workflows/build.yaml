@@ -273,7 +273,6 @@ jobs:
         with:
           node-version: 20
           check-latest: true
-          cache: pnpm
 
       - name: Enable corepack
         run: corepack enable
