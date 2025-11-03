@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.5.7] - 2025-11-03
+
+### Added
+- Publish Windows PHP extension binaries alongside the PIE source bundle during the release pipeline, enabling one-click installs on every platform.
+
+### Changed
+- Renamed the PHP extension package to `goldziher/html-to-markdown`, moved the Composer metadata to the repository root, and refreshed the documentation/badges for every language target.
+- Bumped every package (Rust crates, npm packages, PyPI wheels, Ruby gem, PHP extension) to version 2.5.7.
+
 ## [2.5.6] - 2025-10-30
 
 ### Changed

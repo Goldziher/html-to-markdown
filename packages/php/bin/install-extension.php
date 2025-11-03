@@ -13,8 +13,8 @@ fwrite(
     <<<EOT
 The "{$extension}" extension is not currently enabled.
 
-Install via PECL:
-  pecl install {$extension}
+Install via PIE:
+  pie install goldziher/html-to-markdown
 
 Or download a prebuilt binary from the html-to-markdown release page and add it
 to your PHP extension directory:

@@ -1,5 +1,12 @@
 # html-to-markdown PHP package
 
+[![Crates.io](https://img.shields.io/crates/v/html-to-markdown-rs.svg)](https://crates.io/crates/html-to-markdown-rs)
+[![npm version](https://badge.fury.io/js/html-to-markdown-node.svg)](https://www.npmjs.com/package/html-to-markdown-node)
+[![PyPI version](https://badge.fury.io/py/html-to-markdown.svg)](https://pypi.org/project/html-to-markdown/)
+[![Gem Version](https://badge.fury.io/rb/html-to-markdown.svg)](https://rubygems.org/gems/html-to-markdown)
+[![Packagist](https://img.shields.io/packagist/v/goldziher/html-to-markdown.svg)](https://packagist.org/packages/goldziher/html-to-markdown)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://github.com/Goldziher/html-to-markdown/blob/main/LICENSE)
+
 Typed PHP bindings for the `html_to_markdown` native extension generated from
 the Rust html-to-markdown engine. The API mirrors the behaviour exposed by the
 Rust, Python, Ruby, Node.js, and WASM distributions while embracing modern PHP
@@ -8,14 +15,14 @@ features (readonly value objects, enums, typed exceptions).
 ## Requirements
 
 - PHP 8.2 or newer
-- `html_to_markdown` native extension (install via PECL or download the release
-  shared library)
+- `html_to_markdown` native extension (install via PIE `goldziher/html-to-markdown` or download the GitHub release artifacts)
 - Composer for dependency management
 
 ## Installation
 
 ```bash
-composer require html-to-markdown/extension
+pie install goldziher/html-to-markdown        # Native extension via PIE
+composer require html-to-markdown/extension   # Typed PHP API wrappers
 ```
 
 If the extension is not enabled the post-install script prints the steps

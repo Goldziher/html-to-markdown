@@ -13,7 +13,7 @@
     "phpunit/phpunit": "^11.3"
   },
   "suggest": {
-    "ext-html_to_markdown": "Provides native conversion. Install via PECL or download the release binary."
+    "ext-html_to_markdown": "Provides native conversion. Install via PIE (goldziher/html-to-markdown) or download the release binary."
   },
   "autoload": {
     "psr-4": {

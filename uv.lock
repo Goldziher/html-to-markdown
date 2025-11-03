@@ -189,7 +189,7 @@ wheels = [
 
 [[package]]
 name = "html-to-markdown"
-version = "2.5.6"
+version = "2.5.7"
 source = { editable = "packages/python" }
 
 [[package]]
