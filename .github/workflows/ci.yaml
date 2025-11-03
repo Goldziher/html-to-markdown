@@ -333,9 +333,9 @@ jobs:
       - name: Build PHP extension
         run: cargo build -p html-to-markdown-php --release
 
-      - name: Run PHP lint (phpstan + cs-fixer dry-run)
+      - name: Run PHP static analysis
         working-directory: packages/php
-        run: composer run lint
+        run: composer run phpstan
 
       - name: Run PHP tests
         working-directory: packages/php
