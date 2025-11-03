@@ -217,6 +217,72 @@ PY
           echo "Dry run requested; gem artifacts ready:" >> $GITHUB_STEP_SUMMARY
           ls -1 html-to-markdown-*.gem >> $GITHUB_STEP_SUMMARY
 
+  publish-node:
+    name: Publish Node packages
+    needs: gather
+    if: ${{ needs.gather.result == 'success' && needs.gather.outputs.tag }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+        with:
+          ref: ${{ needs.gather.outputs.ref }}
+
+      - name: Download Node artifacts
+        uses: actions/download-artifact@v4
+        with:
+          run-id: ${{ needs.gather.outputs.build_run_id }}
+          pattern: node-bindings-*
+          path: node-artifacts
+          merge-multiple: true
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          registry-url: https://registry.npmjs.org/
+
+      - name: Enable corepack
+        run: corepack enable
+
+      - name: Prepare artifact directory
+        run: |
+          rm -rf crates/html-to-markdown-node/npm
+          mkdir -p crates/html-to-markdown-node
+          for pkg in node-artifacts/*.tar.gz; do
+            tar -xzf "$pkg" -C crates/html-to-markdown-node
+          done
+
+      - name: Node artifacts summary
+        if: ${{ needs.gather.outputs.dry_run == 'true' }}
+        run: |
+          echo "Dry run requested; Node binding tarballs staged:" >> $GITHUB_STEP_SUMMARY
+          find node-artifacts -name '*.tar.gz' -printf '%f\n' >> $GITHUB_STEP_SUMMARY
+
+      - name: Install workspace dependencies
+        if: ${{ needs.gather.outputs.dry_run != 'true' }}
+        run: pnpm install --filter html-to-markdown-node...
+
+      - name: Publish native binary packages
+        if: ${{ needs.gather.outputs.dry_run != 'true' }}
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          for pkg in crates/html-to-markdown-node/npm/**/*.tgz crates/html-to-markdown-node/npm/*.tgz; do
+            echo "Publishing $pkg"
+            npm publish "$pkg" --access public --ignore-scripts
+          done
+
+      - name: Publish main Node package
+        if: ${{ needs.gather.outputs.dry_run != 'true' }}
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          cd crates/html-to-markdown-node
+          pnpm publish --access public
+
   publish-php-windows:
     name: Upload Windows extension artifacts
     needs: gather

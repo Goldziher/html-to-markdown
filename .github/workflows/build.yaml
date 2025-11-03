@@ -243,6 +243,92 @@ jobs:
           args: --enable-html_to_markdown
           run-tests: 'false'
 
+  node-bindings:
+    name: Build Node bindings (${{ matrix.target }})
+    needs: prepare
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-14
+            target: aarch64-apple-darwin
+          - os: macos-13
+            target: x86_64-apple-darwin
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+        with:
+          ref: ${{ needs.prepare.outputs.ref }}
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          check-latest: true
+          cache: pnpm
+
+      - name: Enable corepack
+        run: corepack enable
+
+      - name: Install Node dependencies
+        run: pnpm install --filter html-to-markdown-node...
+
+      - name: Clean npm directory
+        if: runner.os != 'Windows'
+        run: rm -rf crates/html-to-markdown-node/npm
+
+      - name: Clean npm directory (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: Remove-Item -Recurse -Force crates/html-to-markdown-node\npm -ErrorAction SilentlyContinue
+
+      - name: Build native module
+        if: runner.os != 'Windows'
+        env:
+          TARGET: ${{ matrix.target }}
+        run: pnpm --filter html-to-markdown-node exec napi build --release --target $TARGET
+
+      - name: Build native module (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        env:
+          TARGET: ${{ matrix.target }}
+        run: pnpm --filter html-to-markdown-node exec napi build --release --target $env:TARGET
+
+      - name: Package artifacts
+        if: runner.os != 'Windows'
+        env:
+          TARGET: ${{ matrix.target }}
+        run: |
+          pnpm --filter html-to-markdown-node exec napi artifacts --release
+          test -d crates/html-to-markdown-node/npm || { echo "npm artifact directory missing"; exit 1; }
+          tar -czf node-bindings-$TARGET.tar.gz -C crates/html-to-markdown-node npm
+
+      - name: Package artifacts (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        env:
+          TARGET: ${{ matrix.target }}
+        run: |
+          pnpm --filter html-to-markdown-node exec napi artifacts --release
+          if (-Not (Test-Path crates/html-to-markdown-node\npm)) { throw "npm artifact directory missing" }
+          tar -czf node-bindings-$env:TARGET.tar.gz -C crates/html-to-markdown-node npm
+
+      - name: Upload Node artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: node-bindings-${{ matrix.target }}
+          path: node-bindings-${{ matrix.target }}.tar.gz
+          retention-days: 14
+
   ruby-gem:
     name: Build Ruby gem (${{ matrix.label }})
     needs: prepare
