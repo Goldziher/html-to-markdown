@@ -13,7 +13,7 @@ You can exercise the PIE build locally once `pie.phar` is on your `PATH`:
 
 ```bash
 pie repository:add path $(pwd)
-pie build html-to-markdown/html-to-markdown-ext:*@dev
+pie build goldziher/html-to-markdown:*@dev
 ```
 
 The build requires a Rust toolchain (`cargo`) and the PHP development headers

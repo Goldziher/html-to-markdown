@@ -22,7 +22,7 @@ Each release tag uploads a `php_html_to_markdown-<version>-src.tgz` archive to
 the GitHub release, which pie can consume directly:
 
 ```bash
-pie install html-to-markdown/html-to-markdown-ext
+pie install goldziher/html-to-markdown
 ```
 
 The install process requires a Rust toolchain (`cargo`) and the PHP development
