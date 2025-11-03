@@ -5,6 +5,9 @@ on:
     workflows: ["Build Artifacts"]
     types: [completed]
 
+permissions:
+  contents: write
+
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.workflow_run.id }}
   cancel-in-progress: false
@@ -213,6 +216,73 @@ PY
         run: |
           echo "Dry run requested; gem artifacts ready:" >> $GITHUB_STEP_SUMMARY
           ls -1 html-to-markdown-*.gem >> $GITHUB_STEP_SUMMARY
+
+  publish-php-windows:
+    name: Upload Windows extension artifacts
+    needs: gather
+    if: ${{ needs.gather.result == 'success' && needs.gather.outputs.tag }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download Windows artifacts
+        uses: actions/download-artifact@v4
+        with:
+          run-id: ${{ needs.gather.outputs.build_run_id }}
+          pattern: php_html_to_markdown-*.zip
+          path: dist/php-windows
+          merge-multiple: true
+
+      - name: List Windows artifacts
+        run: find dist/php-windows -maxdepth 1 -type f -name 'php_html_to_markdown-*.zip' -print
+
+      - name: Upload Windows assets
+        if: ${{ needs.gather.outputs.dry_run != 'true' }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          shopt -s nullglob
+          files=(dist/php-windows/php_html_to_markdown-*.zip)
+          if [ ${#files[@]} -eq 0 ]; then
+            echo "No Windows artifacts to upload" >&2
+            exit 1
+          fi
+          for file in "${files[@]}"; do
+            gh release upload ${{ needs.gather.outputs.tag }} "$file" --clobber
+          done
+
+      - name: Record Windows dry run artifacts
+        if: ${{ needs.gather.outputs.dry_run == 'true' }}
+        run: |
+          echo "Dry run requested; Windows packages staged:" >> $GITHUB_STEP_SUMMARY
+          find dist/php-windows -maxdepth 1 -type f -name 'php_html_to_markdown-*.zip' -printf '%f\n' >> $GITHUB_STEP_SUMMARY
+
+  publish-php-pie:
+    name: Upload PIE source archive
+    needs: gather
+    if: ${{ needs.gather.result == 'success' && needs.gather.outputs.tag }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download PIE source artifact
+        uses: actions/download-artifact@v4
+        with:
+          run-id: ${{ needs.gather.outputs.build_run_id }}
+          name: php-pie-src
+          path: dist/php-pie
+
+      - name: List PIE artifact contents
+        run: ls -R dist/php-pie
+
+      - name: Upload PIE source to release
+        if: ${{ needs.gather.outputs.dry_run != 'true' }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release upload ${{ needs.gather.outputs.tag }} dist/php-pie/php_html_to_markdown-${{ needs.gather.outputs.version }}-src.tgz --clobber
+
+      - name: Record dry-run bundle location
+        if: ${{ needs.gather.outputs.dry_run == 'true' }}
+        run: |
+          echo "Dry run requested; PIE source archive staged locally:" >> $GITHUB_STEP_SUMMARY
+          ls -1 dist/php-pie >> $GITHUB_STEP_SUMMARY
 
   concluded:
     if: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.conclusion != 'success' }}

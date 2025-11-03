@@ -1,0 +1,37 @@
+{
+  "name": "html-to-markdown/html-to-markdown-ext",
+  "description": "Native html_to_markdown PHP extension built on the Rust html-to-markdown engine.",
+  "type": "php-ext",
+  "license": "MIT",
+  "homepage": "https://github.com/Goldziher/html-to-markdown",
+  "support": {
+    "issues": "https://github.com/Goldziher/html-to-markdown/issues",
+    "source": "https://github.com/Goldziher/html-to-markdown"
+  },
+  "authors": [
+    {
+      "name": "Na'aman Hirschfeld",
+      "email": "nhirschfeld@gmail.com",
+      "role": "Lead Developer"
+    }
+  ],
+  "require": {
+    "php": "^8.2"
+  },
+  "require-dev": {
+    "php/pie": "^1.0"
+  },
+  "php-ext": {
+    "extension-name": "html_to_markdown",
+    "support-zts": true,
+    "support-nts": true,
+    "build-path": "packages/php-ext",
+    "configure-options": [
+      {
+        "name": "with-cargo-bin",
+        "description": "Path to the cargo executable used to build the extension.",
+        "needs-value": true
+      }
+    ]
+  }
+}

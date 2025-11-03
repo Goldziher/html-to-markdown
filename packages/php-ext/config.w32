@@ -1,0 +1,6 @@
+ARG_ENABLE("html_to_markdown", "Enable html_to_markdown support", "yes");
+
+if (PHP_HTML_TO_MARKDOWN != "no") {
+    EXTENSION("html_to_markdown", null, PHP_HTML_TO_MARKDOWN_SHARED, "/DZEND_ENABLE_STATIC_TSRMLS_CACHE=1");
+    ADD_MAKEFILE_FRAGMENT();
+}
