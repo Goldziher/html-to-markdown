@@ -1,0 +1,60 @@
+{
+  "name": "html-to-markdown/extension",
+  "description": "Modern PHP API for the html_to_markdown native extension powered by the Rust html-to-markdown engine.",
+  "type": "library",
+  "license": "MIT",
+  "homepage": "https://github.com/Goldziher/html-to-markdown",
+  "require": {
+    "php": "^8.2"
+  },
+  "require-dev": {
+    "friendsofphp/php-cs-fixer": "^3.69",
+    "phpstan/phpstan": "^1.11",
+    "phpunit/phpunit": "^11.3"
+  },
+  "suggest": {
+    "ext-html_to_markdown": "Provides native conversion. Install via PECL or download the release binary."
+  },
+  "autoload": {
+    "psr-4": {
+      "HtmlToMarkdown\\": "src/"
+    },
+    "files": [
+      "src/functions.php"
+    ]
+  },
+  "autoload-dev": {
+    "psr-4": {
+      "HtmlToMarkdown\\Tests\\": "tests/"
+    }
+  },
+  "scripts": {
+    "post-install-cmd": [
+      "@php bin/install-extension.php"
+    ],
+    "post-update-cmd": [
+      "@php bin/install-extension.php"
+    ],
+    "phpstan": "php -d detect_unicode=0 vendor/bin/phpstan --configuration=phpstan.neon",
+    "csfixer": "php vendor/bin/php-cs-fixer fix --diff --dry-run",
+    "format": "php vendor/bin/php-cs-fixer fix",
+    "test": "php bin/run-tests.php",
+    "lint": [
+      "@phpstan",
+      "@csfixer"
+    ]
+  },
+  "config": {
+    "sort-packages": true,
+    "allow-plugins": {
+      "phpstan/extension-installer": true
+    }
+  },
+  "extra": {
+    "html-to-markdown": {
+      "binary-base-url": "https://github.com/Goldziher/html-to-markdown/releases/download"
+    }
+  },
+  "minimum-stability": "stable",
+  "prefer-stable": true
+}

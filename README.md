@@ -1,6 +1,6 @@
 # html-to-markdown
 
-High-performance HTML → Markdown conversion powered by Rust. Shipping as a Rust crate, Python package, Ruby gem, Node.js bindings, WebAssembly, and standalone CLI with identical rendering behaviour.
+High-performance HTML → Markdown conversion powered by Rust. Shipping as a Rust crate, Python package, PHP extension, Ruby gem, Node.js bindings, WebAssembly, and standalone CLI with identical rendering behaviour.
 
 [![Crates.io](https://img.shields.io/crates/v/html-to-markdown-rs.svg)](https://crates.io/crates/html-to-markdown-rs)
 [![npm version](https://badge.fury.io/js/html-to-markdown-node.svg)](https://www.npmjs.com/package/html-to-markdown-node)
@@ -34,6 +34,7 @@ Experience WebAssembly-powered HTML to Markdown conversion instantly in your bro
     - Node.js/Bun (native) – [Node.js README](https://github.com/Goldziher/html-to-markdown/blob/main/crates/html-to-markdown-node/README.md)
     - WebAssembly (universal) – [WASM README](https://github.com/Goldziher/html-to-markdown/blob/main/crates/html-to-markdown-wasm/README.md)
 - **Python guide** – [Python README](https://github.com/Goldziher/html-to-markdown/blob/main/README_PYPI.md)
+- **PHP guide** – [PHP README](https://github.com/Goldziher/html-to-markdown/blob/main/docs/php.md)
 - **Ruby guide** – [Ruby README](https://github.com/Goldziher/html-to-markdown/blob/main/crates/html-to-markdown-rb/README.md)
 - **Rust guide** – [Rust README](https://github.com/Goldziher/html-to-markdown/blob/main/crates/html-to-markdown/README.md)
 - **Contributing** – [CONTRIBUTING.md](https://github.com/Goldziher/html-to-markdown/blob/main/CONTRIBUTING.md) ⭐ Start here!
@@ -47,6 +48,7 @@ Experience WebAssembly-powered HTML to Markdown conversion instantly in your bro
 | **WebAssembly** (universal) | `npm install html-to-markdown-wasm`                                       |
 | **Deno**                    | `import { convert } from "npm:html-to-markdown-wasm"`                     |
 | **Python** (bindings + CLI) | `pip install html-to-markdown`                                            |
+| **PHP** (extension + helpers) | `pecl install html_to_markdown` or `composer require html-to-markdown/extension` |
 | **Ruby** gem                | `bundle add html-to-markdown` or `gem install html-to-markdown`           |
 | **Rust** crate              | `cargo add html-to-markdown-rs`                                           |
 | Rust CLI                    | `cargo install html-to-markdown-cli`                                      |

@@ -12,6 +12,7 @@ tasks:
       - task: python:install
       - task: js:install
       - task: ruby:install
+      - task: php:install
       - task: rust:build
 
   update:
@@ -29,6 +30,8 @@ tasks:
       - uv run uv-bump --pyproject-toml pyproject.toml
       - uv run uv-bump --pyproject-toml packages/python/pyproject.toml
       - uv sync --all-extras --upgrade
+      - echo "Updating PHP dependencies..."
+      - task: php:update
 
   build:
     desc: "Build Rust core and JavaScript bindings"
@@ -43,6 +46,7 @@ tasks:
       - task: python:test
       - task: ruby:test
       - task: js:test
+      - task: php:test
 
   lint:
     desc: "Run linters across the repo"
@@ -51,6 +55,7 @@ tasks:
       - task: python:lint
       - task: ruby:lint
       - task: typescript:lint
+      - task: php:lint
 
   fmt:
     desc: "Format code for all languages"
@@ -59,6 +64,7 @@ tasks:
       - task: python:format
       - task: ruby:format
       - task: typescript:format
+      - task: php:format
 
   bench:
     desc: "Run benchmark suites (Rust + Python)"
@@ -323,6 +329,32 @@ tasks:
     dir: packages/ruby
     cmds:
       - rm -rf lib/*.bundle lib/*.so pkg/ tmp/
+
+  # PHP tasks ----------------------------------------------------------------
+  php:install:
+    desc: "Install PHP dependencies"
+    cmds:
+      - cmd: cd packages/php && composer install --no-interaction --no-progress
+
+  php:update:
+    desc: "Update PHP dependencies"
+    cmds:
+      - cmd: cd packages/php && composer update --no-interaction --no-progress
+
+  php:test:
+    desc: "Run PHP test suite"
+    cmds:
+      - cmd: cd packages/php && composer run test
+
+  php:lint:
+    desc: "Run PHP static analysis and coding standards"
+    cmds:
+      - cmd: cd packages/php && composer run lint
+
+  php:format:
+    desc: "Format PHP sources"
+    cmds:
+      - cmd: cd packages/php && composer run format
 
   # JavaScript / TypeScript tasks --------------------------------------------
   js:install:

@@ -1,0 +1,21 @@
+[package]
+name = "html-to-markdown-php"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+documentation.workspace = true
+readme.workspace = true
+rust-version.workspace = true
+description = "PHP extension bindings for html-to-markdown powered by ext-php-rs"
+keywords = ["html", "markdown", "php", "bindings"]
+categories = ["api-bindings"]
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+html-to-markdown-rs = { workspace = true, features = ["inline-images"] }
+ext-php-rs = { workspace = true }
