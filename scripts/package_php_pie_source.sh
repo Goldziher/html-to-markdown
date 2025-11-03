@@ -27,7 +27,7 @@ cp "$ROOT/README.md" "$STAGING/PROJECT-README.md"
 rsync -a --exclude 'target' --exclude 'debug' "$ROOT/crates" "$STAGING/"
 
 # PIE metadata lives under packages/php-ext; copy into staging root.
-cp "$ROOT/packages/php-ext/composer.json" "$STAGING/"
+cp "$ROOT/composer.json" "$STAGING/"
 cp "$ROOT/packages/php-ext/config.m4" "$STAGING/"
 cp "$ROOT/packages/php-ext/Makefile.frag" "$STAGING/"
 cp "$ROOT/packages/php-ext/Makefile.frag.w32" "$STAGING/"
