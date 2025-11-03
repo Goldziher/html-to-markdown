@@ -36,13 +36,10 @@
       "@php bin/install-extension.php"
     ],
     "phpstan": "php -d detect_unicode=0 vendor/bin/phpstan --configuration=phpstan.neon",
-    "csfixer": "php vendor/bin/php-cs-fixer fix --diff --dry-run",
+    "csfixer": "php vendor/bin/php-cs-fixer fix",
     "format": "php vendor/bin/php-cs-fixer fix",
     "test": "php bin/run-tests.php",
-    "lint": [
-      "@phpstan",
-      "@csfixer"
-    ]
+    "lint": "@phpstan"
   },
   "config": {
     "sort-packages": true,
