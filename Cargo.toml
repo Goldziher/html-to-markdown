@@ -7,6 +7,7 @@ members = [
     "crates/html-to-markdown-wasm",
     "crates/html-to-markdown-py",
     "crates/html-to-markdown-rb",
+    "crates/html-to-markdown-php",
 ]
 
 [workspace.package]
@@ -42,6 +43,9 @@ clap_mangen = "0.2"
 
 # Python bindings
 pyo3 = { version = "0.27.1", features = ["abi3-py310"] }
+
+# PHP bindings
+ext-php-rs = "0.15.1"
 
 [profile.release]
 lto = "thin"

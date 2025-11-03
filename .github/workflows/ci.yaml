@@ -308,6 +308,39 @@ jobs:
           $unixPath = ridk exec bash -lc "cygpath -au '$env:GITHUB_WORKSPACE/packages/ruby'"
           ridk exec bash -lc "cd $unixPath && export RUSTUP_TOOLCHAIN=stable-gnu CC=x86_64-w64-mingw32-gcc CXX=x86_64-w64-mingw32-g++ && bundle _2.5.12_ exec rspec --format progress"
 
+  php-bindings:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          coverage: none
+
+      - name: Setup Rust
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+
+      - name: Install Composer dependencies
+        uses: ramsey/composer-install@v3
+        with:
+          working-directory: packages/php
+          dependency-versions: locked
+
+      - name: Build PHP extension
+        run: cargo build -p html-to-markdown-php --release
+
+      - name: Run PHP lint (phpstan + cs-fixer dry-run)
+        working-directory: packages/php
+        run: composer run lint
+
+      - name: Run PHP tests
+        working-directory: packages/php
+        run: composer run test
+
   node-bindings:
     runs-on: ${{ matrix.os }}
     timeout-minutes: 15
