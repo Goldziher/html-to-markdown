@@ -546,4 +546,3 @@ jobs:
           name: rubygems-${{ matrix.label }}
           path: packages/ruby/pkg/*.gem
           retention-days: 14
-  repository_dispatch:
