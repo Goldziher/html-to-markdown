@@ -24,8 +24,7 @@ tasks:
       - echo "Updating JavaScript packages..."
       - pnpm up --latest -r
       - echo "Updating Ruby gems..."
-      - cmd: PATH=/opt/homebrew/opt/ruby/bin:$PATH bundle _2.5.12_ update
-        dir: packages/ruby
+      - task: ruby:update
       - echo "Updating Python dependencies..."
       - uv run uv-bump --pyproject-toml pyproject.toml
       - uv run uv-bump --pyproject-toml packages/python/pyproject.toml
@@ -302,6 +301,12 @@ tasks:
     desc: "Install Ruby dependencies"
     cmds:
       - cmd: cd packages/ruby && PATH=/opt/homebrew/opt/ruby/bin:$PATH bundle _2.5.12_ install
+
+  ruby:update:
+    desc: "Update Ruby dependencies"
+    dir: packages/ruby
+    cmds:
+      - PATH=/opt/homebrew/opt/ruby/bin:$PATH bundle _2.5.12_ update
 
   ruby:build:
     desc: "Build Ruby native extension"

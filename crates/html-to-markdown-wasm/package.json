@@ -54,10 +54,10 @@
     "clean": "rm -rf dist dist-node dist-web node_modules pkg"
   },
   "devDependencies": {
-    "@types/node": "^24.9.1",
-    "tinybench": "^5.0.1",
+    "@types/node": "^24.10.0",
+    "tinybench": "^5.1.0",
     "tsx": "^4.20.6",
-    "vitest": "^3.2.4",
+    "vitest": "^4.0.6",
     "wasm-pack": "^0.13.1"
   },
   "publishConfig": {

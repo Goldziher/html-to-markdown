@@ -58,15 +58,15 @@
     "clean": "rm -rf dist node_modules *.node"
   },
   "devDependencies": {
-    "@napi-rs/cli": "^3.3.1",
-    "@types/node": "^24.9.1",
-    "tinybench": "^5.0.1",
+    "@napi-rs/cli": "^3.4.1",
+    "@types/node": "^24.10.0",
+    "tinybench": "^5.1.0",
     "tsx": "^4.20.6",
-    "vitest": "^3.2.4"
+    "vitest": "^4.0.6"
   },
   "dependencies": {
-    "@emnapi/runtime": "1.6.0",
-    "@octokit/core": "7.0.5",
+    "@emnapi/runtime": "1.7.0",
+    "@octokit/core": "7.0.6",
     "typanion": "3.14.0",
     "up": "^1.0.2"
   }
