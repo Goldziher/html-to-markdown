@@ -16,19 +16,16 @@ tasks:
       - task: rust:build
 
   update:
-    desc: "Update dependencies across Rust, JavaScript, Python, and Ruby"
+    desc: "Update dependencies across Rust, JavaScript, Python, Ruby, and PHP"
     cmds:
       - echo "Updating Rust crates..."
-      - cargo upgrade --incompatible
-      - cargo update
+      - task: rust:update
       - echo "Updating JavaScript packages..."
-      - pnpm up --latest -r
+      - task: js:update
       - echo "Updating Ruby gems..."
       - task: ruby:update
       - echo "Updating Python dependencies..."
-      - uv run uv-bump --pyproject-toml pyproject.toml
-      - uv run uv-bump --pyproject-toml packages/python/pyproject.toml
-      - uv sync --all-extras --upgrade
+      - task: python:update
       - echo "Updating PHP dependencies..."
       - task: php:update
 
@@ -220,6 +217,12 @@ tasks:
     cmds:
       - cargo fmt --all
 
+  rust:update:
+    desc: "Update Rust dependencies"
+    cmds:
+      - cargo upgrade --incompatible
+      - cargo update
+
   rust:bench:
     desc: "Run Rust benchmarks"
     cmds:
@@ -242,6 +245,13 @@ tasks:
     dir: packages/python
     cmds:
       - uv sync --all-extras
+
+  python:update:
+    desc: "Update Python dependencies"
+    cmds:
+      - uv run uv-bump --pyproject-toml pyproject.toml
+      - uv run uv-bump --pyproject-toml packages/python/pyproject.toml
+      - uv sync --all-extras --upgrade
 
   python:test:
     desc: "Run Python tests (build CLI first for proxy tests)"
@@ -269,7 +279,7 @@ tasks:
     dir: packages/python
     cmds:
       - uv run ruff check
-      - uv run mypy
+      - uv run mypy .
 
   python:format:
     desc: "Format Python code"
@@ -366,6 +376,11 @@ tasks:
     desc: "Install pnpm workspace dependencies"
     cmds:
       - pnpm install --frozen-lockfile
+
+  js:update:
+    desc: "Update pnpm workspace dependencies"
+    cmds:
+      - pnpm up --latest -r
 
   js:build:
     desc: "Build Node, WASM, and TypeScript packages"
