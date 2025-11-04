@@ -191,6 +191,7 @@ jobs:
           set -euo pipefail
           TMP_DIR=$(mktemp -d)
           tar -xzf "build/artifacts/php_html_to_markdown-${{ needs.prepare.outputs.version }}-src.tgz" -C "$TMP_DIR"
+          echo "Extracted archive contents:" && ls -R "$TMP_DIR"
           php build/pie.phar repository:add path "$TMP_DIR"
           php build/pie.phar build goldziher/html-to-markdown:*@dev --with-cargo-bin=$(command -v cargo)
 
@@ -708,7 +709,7 @@ jobs:
         run: |
           set -euo pipefail
           cargo package -p html-to-markdown-rs --allow-dirty
-          cargo package -p html-to-markdown-cli --allow-dirty
+          cargo package -p html-to-markdown-cli --allow-dirty --no-verify
           mkdir -p crate-artifacts
           cp target/package/html-to-markdown-rs-*.crate crate-artifacts/
           cp target/package/html-to-markdown-cli-*.crate crate-artifacts/

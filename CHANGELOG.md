@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - Publish Windows PHP extension binaries alongside the PIE source bundle during the release pipeline, enabling one-click installs on every platform.
+- Build and archive the CLI binary for Linux (gnu & musl), macOS arm64, and Windows x86_64, plus ship prebuilt WASM bundles (dist/dist-node/dist-web) so every runtime gets first-class artifacts.
 
 ### Changed
 - Renamed the PHP extension package to `goldziher/html-to-markdown`, moved the Composer metadata to the repository root, and refreshed the documentation/badges for every language target.

@@ -62,7 +62,7 @@
     "@types/node": "^24.10.0",
     "tinybench": "^5.1.0",
     "tsx": "^4.20.6",
-    "vitest": "^4.0.6"
+    "vitest": "^4.0.7"
   },
   "dependencies": {
     "@emnapi/runtime": "1.7.0",
