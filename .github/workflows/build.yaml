@@ -37,6 +37,9 @@ jobs:
           if [[ "$event" == "workflow_dispatch" ]]; then
             tag="${{ inputs.tag }}"
             dry_run_input="${{ inputs.dry_run }}"
+          elif [[ "$event" == "repository_dispatch" ]]; then
+            tag="${{ github.event.client_payload.tag }}"
+            dry_run_input="${{ github.event.client_payload.dry_run }}"
           else
             tag="${GITHUB_REF_NAME}"
             dry_run_input="false"
@@ -537,3 +540,4 @@ linker = "rust-lld"
           name: rubygems-${{ matrix.label }}
           path: packages/ruby/pkg/*.gem
           retention-days: 14
+  repository_dispatch:
