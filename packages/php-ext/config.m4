@@ -17,14 +17,20 @@ if test "$PHP_HTML_TO_MARKDOWN" != "no"; then
     HTM2MD_CARGO_BIN=$PHP_CARGO_BIN
   fi
 
-  if test -d "$abs_srcdir/workspace"; then
-    HTM2MD_WORKSPACE_ROOT="$abs_srcdir/workspace"
-  elif test -f "$abs_srcdir/../../Cargo.toml"; then
-    HTM2MD_WORKSPACE_ROOT=`cd "$abs_srcdir/../.." && pwd`
-  elif test -f "$abs_srcdir/../Cargo.toml"; then
-    HTM2MD_WORKSPACE_ROOT=`cd "$abs_srcdir/.." && pwd`
+  if test "x$abs_srcdir" = "x"; then
+    HTM2MD_ABS_SRCDIR=`pwd`
   else
-    HTM2MD_WORKSPACE_ROOT="$abs_srcdir"
+    HTM2MD_ABS_SRCDIR=$abs_srcdir
+  fi
+
+  if test -d "$HTM2MD_ABS_SRCDIR/workspace"; then
+    HTM2MD_WORKSPACE_ROOT=`cd "$HTM2MD_ABS_SRCDIR/workspace" && pwd`
+  elif test -f "$HTM2MD_ABS_SRCDIR/../../Cargo.toml"; then
+    HTM2MD_WORKSPACE_ROOT=`cd "$HTM2MD_ABS_SRCDIR/../.." && pwd`
+  elif test -f "$HTM2MD_ABS_SRCDIR/../Cargo.toml"; then
+    HTM2MD_WORKSPACE_ROOT=`cd "$HTM2MD_ABS_SRCDIR/.." && pwd`
+  else
+    HTM2MD_WORKSPACE_ROOT=`cd "$HTM2MD_ABS_SRCDIR" && pwd`
   fi
 
   AC_SUBST([HTM2MD_CARGO_BIN])
