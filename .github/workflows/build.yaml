@@ -308,7 +308,7 @@ jobs:
             rust_target: ""
             use_cross: false
             use_napi_cross: false
-          - os: macos-13
+          - os: macos-15
             target: x86_64-apple-darwin
             rust_target: ""
             use_cross: false
@@ -457,7 +457,7 @@ jobs:
             label: linux
           - os: macos-14
             label: macos-arm64
-          - os: macos-13
+          - os: macos-15
             label: macos-x86_64
           - os: windows-latest
             label: windows-x64
