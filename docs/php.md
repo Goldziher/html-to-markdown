@@ -90,6 +90,35 @@ Configuration is handled through `ConversionOptions`, `InlineImageConfig`, and
 `InlineImageExtraction`, containing `InlineImage` descriptors and
 `InlineImageWarning` instances that map 1:1 with the Rust API.
 
+### Building locally on Windows
+
+If you want to compile the extension on Windows rather than relying on the
+published DLLs, make sure the following prerequisites are in place:
+
+- **Official PHP SDK** — cargo-php only supports PHP installations sourced from
+  <https://windows.php.net>. Custom SDKs are not yet supported.
+- **Rust nightly toolchain** — vectorcall support is an unstable nightly feature.
+  You can install it with `rustup toolchain install nightly` and set
+  `RUSTUP_TOOLCHAIN=nightly` before invoking `cargo-php`.
+- **LLD linker** — the recommended configuration uses the bundled `rust-lld`.
+  Create a `.cargo/config.toml` alongside the extension sources with:
+
+  ```toml
+  [target.x86_64-pc-windows-msvc]
+  linker = "rust-lld"
+
+  [target.i686-pc-windows-msvc]
+  linker = "rust-lld"
+  ```
+
+  Microsoft’s `link.exe` is technically supported but tends to be brittle
+  across SDK revisions.
+- **MSVC build tools** — the `cc` crate expects `cl.exe` to be available
+  (installed with Visual Studio or the Build Tools workload).
+
+When targeting debug builds, you must point `PHP_LIB` at a debug PHP SDK (for
+example `set PHP_LIB=C:\php-sdk\php-dev\vc16\x64\php-8.3.13-src\x64\Debug_TS`).
+
 ## Local testing
 
 ```bash
