@@ -7,6 +7,11 @@ This directory contains the live demo of the HTML to Markdown converter, powered
 [![PyPI version](https://badge.fury.io/py/html-to-markdown.svg)](https://pypi.org/project/html-to-markdown/)
 [![Gem Version](https://badge.fury.io/rb/html-to-markdown.svg)](https://rubygems.org/gems/html-to-markdown)
 
+## 📚 Documentation
+
+- [Language bindings overview](./bindings.md) — install & usage notes for Rust, Node.js, WebAssembly, Python, Ruby, PHP, and the CLI.
+- [PHP extension details](./php.md) — packaging, PIE distribution, and usage examples.
+
 ## 🌐 Live Demo
 
 Visit the live demo at: **<https://goldziher.github.io/html-to-markdown/>**
