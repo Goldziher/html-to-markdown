@@ -225,18 +225,12 @@ jobs:
             Write-Error "PIE source archive not found"
             exit 1
           }
-          $workspace = Join-Path $PWD "packages\php-ext\workspace"
-          if (Test-Path $workspace) {
-            Remove-Item $workspace -Recurse -Force
-          }
-          New-Item -ItemType Directory -Path $workspace | Out-Null
-          tar -xf $archive.FullName -C $workspace
+          tar -xf $archive.FullName -C $PWD
 
       - name: Build Windows artifacts
         uses: php/php-windows-builder/extension@v1
         env:
           GITHUB_ACTIONS: 'false'
-          GITHUB_WORKSPACE: ${{ github.workspace }}/packages/php-ext
         with:
           php-version: ${{ matrix.php-version }}
           arch: ${{ matrix.arch }}
