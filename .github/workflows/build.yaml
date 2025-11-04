@@ -13,7 +13,6 @@ on:
         type: boolean
         default: false
   push:
-    branches: []
     tags:
       - "v*"
 
@@ -264,10 +263,13 @@ linker = "rust-lld"
           Set-Location $root
 
           $repoPath = (Get-Item $repoBare).FullName.Replace('\','/')
-          if (-not $repoPath.StartsWith('/')) {
-            $repoPath = '/' + $repoPath
+          if ($repoPath -notmatch '^file://') {
+            if ($repoPath -notmatch '^/') {
+              $repoPath = '/' + $repoPath
+            }
+            $repoPath = "file:///$($repoPath.TrimStart('/'))"
           }
-          $repoUri = ([System.UriBuilder]::new("file", "", -1, $repoPath)).Uri.AbsoluteUri
+          $repoUri = $repoPath
           "repo_uri=$repoUri" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
 
       - name: Build Windows artifacts
