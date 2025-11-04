@@ -1,16 +1,16 @@
 # PHP Extension
 
-[![Crates.io](https://img.shields.io/crates/v/html-to-markdown-rs.svg)](https://crates.io/crates/html-to-markdown-rs)
-[![npm version](https://badge.fury.io/js/html-to-markdown-node.svg)](https://www.npmjs.com/package/html-to-markdown-node)
-[![PyPI version](https://badge.fury.io/py/html-to-markdown.svg)](https://pypi.org/project/html-to-markdown/)
-[![Gem Version](https://badge.fury.io/rb/html-to-markdown.svg)](https://rubygems.org/gems/html-to-markdown)
 [![Packagist](https://img.shields.io/packagist/v/goldziher/html-to-markdown.svg)](https://packagist.org/packages/goldziher/html-to-markdown)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://github.com/Goldziher/html-to-markdown/blob/main/LICENSE)
 
-The PHP bindings expose the native Rust converter through the `html_to_markdown`
-extension and a typed composer package located in `packages/php`.
+The PHP binding exposes the native Rust converter through the
+`html_to_markdown` extension and a typed Composer package hosted in
+`packages/php`. Install via PIE to get prebuilt binaries, or build locally with
+`cargo`.
 
 ## Installation
+
+Install the extension and high-level Composer wrapper:
 
 Install the PHP package and ensure the native extension is available:
 
@@ -22,6 +22,14 @@ composer require html-to-markdown/extension
 > **Note**
 > Distribute the extension via PIE and publish prebuilt binaries as needed. Composer only wraps
 the extension and provides the modern PHP surface area.
+
+### Using PIE without a local build
+
+```bash
+pie install goldziher/html-to-markdown --install-project
+```
+
+The `--install-project` flag tells PIE to copy the extension built during the project installation (our bundled artifact) straight into your PHP install, so you don't need a system Rust toolchain.
 
 ## Distribution via PIE
 
@@ -80,7 +88,7 @@ $markdown = convert('<p>Lorem ipsum</p>');
 Configuration is handled through `ConversionOptions`, `InlineImageConfig`, and
 `PreprocessingOptions` value objects. Inline image extraction returns
 `InlineImageExtraction`, containing `InlineImage` descriptors and
-`InlineImageWarning` instances that match the Rust API one-to-one.
+`InlineImageWarning` instances that map 1:1 with the Rust API.
 
 ## Local testing
 
@@ -95,3 +103,8 @@ composer run test
 
 `composer run test` invokes `cargo build -p html-to-markdown-php --release` to
 ensure the latest extension is available before running PHPUnit.
+
+## See also
+
+- [Language binding overview](./bindings.md) for the full matrix of supported runtimes.
+- [Rust crate documentation](../crates/html-to-markdown/README.md) for the core engine.
