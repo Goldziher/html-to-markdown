@@ -23,6 +23,7 @@ jobs:
       ref: ${{ steps.read.outputs.ref }}
       dry_run: ${{ steps.dryrun.outputs.value }}
       build_run_id: ${{ steps.build_run.outputs.id }}
+      is_tag: ${{ steps.ref_type.outputs.is_tag }}
     steps:
       - name: Determine build run
         id: build_run
@@ -46,19 +47,29 @@ jobs:
             exit 1
           fi
           python - <<'PY'
-import json, os
-with open('metadata/release-metadata.json', 'r', encoding='utf-8') as fh:
-    data = json.load(fh)
-print(f"tag={data['tag']}")
-print(f"version={data['version']}")
-print(f"ref={data['ref']}")
-print(f"dry_run={str(data.get('dry_run', False)).lower()}")
-PY >> "$GITHUB_OUTPUT"
+          import json, os
+          with open('metadata/release-metadata.json', 'r', encoding='utf-8') as fh:
+              data = json.load(fh)
+          print(f"tag={data['tag']}")
+          print(f"version={data['version']}")
+          print(f"ref={data['ref']}")
+          print(f"dry_run={str(data.get('dry_run', False)).lower()}")
+          PY >> "$GITHUB_OUTPUT"
 
       - name: Determine dry-run flag
         id: dryrun
         run: |
           echo "value=${{ steps.read.outputs.dry_run }}" >> "$GITHUB_OUTPUT"
+
+      - name: Determine reference type
+        id: ref_type
+        run: |
+          ref="${{ steps.read.outputs.ref }}"
+          if [[ "$ref" =~ ^refs/tags/v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "is_tag=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "is_tag=false" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Summarize release
         run: |
@@ -67,11 +78,13 @@ PY >> "$GITHUB_OUTPUT"
           echo "- Tag: ${{ steps.read.outputs.tag }}" >> $GITHUB_STEP_SUMMARY
           echo "- Version: ${{ steps.read.outputs.version }}" >> $GITHUB_STEP_SUMMARY
           echo "- Dry run: ${{ steps.dryrun.outputs.value }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Reference: ${{ steps.read.outputs.ref }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Reference is tag: ${{ steps.ref_type.outputs.is_tag }}" >> $GITHUB_STEP_SUMMARY
 
   publish-crates:
     name: Publish crates.io packages
     needs: gather
-    if: ${{ needs.gather.result == 'success' && needs.gather.outputs.tag && needs.gather.outputs.dry_run != 'true' }}
+    if: ${{ needs.gather.result == 'success' && needs.gather.outputs.tag && needs.gather.outputs.dry_run != 'true' && needs.gather.outputs.is_tag == 'true' }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -138,7 +151,7 @@ PY
   publish-pypi:
     name: Publish Python packages to PyPI
     needs: gather
-    if: ${{ needs.gather.result == 'success' && needs.gather.outputs.tag }}
+    if: ${{ needs.gather.result == 'success' && needs.gather.outputs.tag && needs.gather.outputs.dry_run != 'true' && needs.gather.outputs.is_tag == 'true' }}
     runs-on: ubuntu-latest
     environment: pypi
     permissions:
@@ -177,7 +190,7 @@ PY
   publish-rubygems:
     name: Publish Ruby gems
     needs: gather
-    if: ${{ needs.gather.result == 'success' && needs.gather.outputs.tag }}
+    if: ${{ needs.gather.result == 'success' && needs.gather.outputs.tag && needs.gather.outputs.is_tag == 'true' }}
     runs-on: ubuntu-latest
     permissions:
       id-token: write
@@ -220,7 +233,7 @@ PY
   publish-node:
     name: Publish Node packages
     needs: gather
-    if: ${{ needs.gather.result == 'success' && needs.gather.outputs.tag }}
+    if: ${{ needs.gather.result == 'success' && needs.gather.outputs.tag && needs.gather.outputs.dry_run != 'true' && needs.gather.outputs.is_tag == 'true' }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -286,7 +299,7 @@ PY
   publish-php-windows:
     name: Upload Windows extension artifacts
     needs: gather
-    if: ${{ needs.gather.result == 'success' && needs.gather.outputs.tag }}
+    if: ${{ needs.gather.result == 'success' && needs.gather.outputs.tag && needs.gather.outputs.dry_run != 'true' && needs.gather.outputs.is_tag == 'true' }}
     runs-on: ubuntu-latest
     steps:
       - name: Download Windows artifacts
@@ -324,7 +337,7 @@ PY
   publish-php-pie:
     name: Upload PIE source archive
     needs: gather
-    if: ${{ needs.gather.result == 'success' && needs.gather.outputs.tag }}
+    if: ${{ needs.gather.result == 'success' && needs.gather.outputs.tag && needs.gather.outputs.dry_run != 'true' && needs.gather.outputs.is_tag == 'true' }}
     runs-on: ubuntu-latest
     steps:
       - name: Download PIE source artifact

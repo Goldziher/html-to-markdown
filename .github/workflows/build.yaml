@@ -12,12 +12,18 @@ on:
         required: false
         type: boolean
         default: false
+      ref:
+        description: "Git ref (branch, tag, or commit) to build; defaults to the tag"
+        required: false
+        type: string
   push:
     tags:
       - "v*"
+  repository_dispatch:
+    types: [release-build]
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.inputs.tag || github.ref || github.run_id }}
+  group: ${{ github.workflow }}-${{ github.event.inputs.ref || github.event.client_payload.ref || github.event.inputs.tag || github.event.client_payload.tag || github.ref || github.run_id }}
   cancel-in-progress: false
 
 jobs:
@@ -37,12 +43,15 @@ jobs:
           if [[ "$event" == "workflow_dispatch" ]]; then
             tag="${{ inputs.tag }}"
             dry_run_input="${{ inputs.dry_run }}"
+            ref_input="${{ inputs.ref }}"
           elif [[ "$event" == "repository_dispatch" ]]; then
             tag="${{ github.event.client_payload.tag }}"
             dry_run_input="${{ github.event.client_payload.dry_run }}"
+            ref_input="${{ github.event.client_payload.ref }}"
           else
             tag="${GITHUB_REF_NAME}"
             dry_run_input="false"
+            ref_input=""
             if [[ "$tag" == *-pre* ]]; then
               dry_run_input="true"
             fi
@@ -56,7 +65,11 @@ jobs:
             exit 1
           fi
           version="${tag#v}"
-          ref="refs/tags/${tag}"
+          if [[ -n "$ref_input" ]]; then
+            ref="$ref_input"
+          else
+            ref="refs/tags/${tag}"
+          fi
           dry_run="$dry_run_input"
           cat <<JSON > release-metadata.json
           {
