@@ -206,32 +206,18 @@ jobs:
         with:
           ref: ${{ needs.prepare.outputs.ref }}
 
-      - name: Download PIE source snapshot
-        uses: actions/download-artifact@v4
-        with:
-          name: php-pie-src
-          path: tmp/pie-src
-
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: stable
-
-      - name: Expand workspace snapshot
-        shell: pwsh
-        run: |
-          $archive = Get-ChildItem -Path "tmp/pie-src" -Recurse -Filter "php_html_to_markdown-*-src.tgz" | Select-Object -First 1
-          if ($null -eq $archive) {
-            Write-Error "PIE source archive not found"
-            exit 1
-          }
-          tar -xf $archive.FullName -C $PWD
 
       - name: Build Windows artifacts
         uses: php/php-windows-builder/extension@v1
         env:
           GITHUB_ACTIONS: 'false'
         with:
+          extension-url: https://github.com/${{ github.repository }}
+          extension-ref: ${{ needs.prepare.outputs.ref }}
           php-version: ${{ matrix.php-version }}
           arch: ${{ matrix.arch }}
           ts: ${{ matrix.ts }}
