@@ -236,13 +236,13 @@ jobs:
         uses: php/php-windows-builder/extension@v1
         env:
           GITHUB_ACTIONS: 'false'
+          GITHUB_WORKSPACE: ${{ github.workspace }}/packages/php-ext
         with:
           php-version: ${{ matrix.php-version }}
           arch: ${{ matrix.arch }}
           ts: ${{ matrix.ts }}
           args: --enable-html_to_markdown
           run-tests: 'false'
-        working-directory: packages/php-ext
 
   node-bindings:
     name: Build Node bindings (${{ matrix.target }})
