@@ -10,8 +10,6 @@ VERSION="$1"
 DEST_DIR="$2"
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 STAGING="$(mktemp -d "${ROOT}/.pie-src.XXXXXX")"
-EXT_SRC_DIR="$ROOT/packages/php-ext"
-EXT_DEST_DIR="$STAGING/packages/php-ext"
 
 cleanup() {
   rm -rf "$STAGING"
@@ -20,12 +18,12 @@ trap cleanup EXIT
 
 mkdir -p "$DEST_DIR"
 
-mkdir -p "$EXT_DEST_DIR"
+EXT_SRC_DIR="$ROOT/packages/php-ext"
 
-# Copy extension scaffold (build scripts, metadata, helpers)
-rsync -a "$EXT_SRC_DIR"/ "$EXT_DEST_DIR"/
+# Copy extension scaffold (config.m4, sources, etc.) to the archive root so PIE builds in place.
+rsync -a "$EXT_SRC_DIR"/ "$STAGING"/
 
-WORKSPACE_DIR="$EXT_DEST_DIR/workspace"
+WORKSPACE_DIR="$STAGING/workspace"
 mkdir -p "$WORKSPACE_DIR"
 
 # Base files required to build the Rust workspace
