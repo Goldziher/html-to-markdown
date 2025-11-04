@@ -12,12 +12,18 @@ on:
         required: false
         type: boolean
         default: false
+      ref:
+        description: "Git ref (branch, tag, or commit) to build; defaults to the tag"
+        required: false
+        type: string
   push:
     tags:
       - "v*"
+  repository_dispatch:
+    types: [release-build]
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.inputs.tag || github.ref || github.run_id }}
+  group: ${{ github.workflow }}-${{ github.event.inputs.ref || github.event.client_payload.ref || github.event.inputs.tag || github.event.client_payload.tag || github.ref || github.run_id }}
   cancel-in-progress: false
 
 jobs:
@@ -37,12 +43,15 @@ jobs:
           if [[ "$event" == "workflow_dispatch" ]]; then
             tag="${{ inputs.tag }}"
             dry_run_input="${{ inputs.dry_run }}"
+            ref_input="${{ inputs.ref }}"
           elif [[ "$event" == "repository_dispatch" ]]; then
             tag="${{ github.event.client_payload.tag }}"
             dry_run_input="${{ github.event.client_payload.dry_run }}"
+            ref_input="${{ github.event.client_payload.ref }}"
           else
             tag="${GITHUB_REF_NAME}"
             dry_run_input="false"
+            ref_input=""
             if [[ "$tag" == *-pre* ]]; then
               dry_run_input="true"
             fi
@@ -56,7 +65,11 @@ jobs:
             exit 1
           fi
           version="${tag#v}"
-          ref="refs/tags/${tag}"
+          if [[ -n "$ref_input" ]]; then
+            ref="$ref_input"
+          else
+            ref="refs/tags/${tag}"
+          fi
           dry_run="$dry_run_input"
           cat <<JSON > release-metadata.json
           {
@@ -248,13 +261,8 @@ jobs:
 
           $cargoDir = Join-Path $repoDir ".cargo"
           New-Item -ItemType Directory -Path $cargoDir -Force | Out-Null
-          @"
-[target.x86_64-pc-windows-msvc]
-linker = "rust-lld"
-
-[target.i686-pc-windows-msvc]
-linker = "rust-lld"
-"@ | Set-Content -Path (Join-Path $cargoDir "config.toml") -Encoding utf8
+          $cargoConfig = "[target.x86_64-pc-windows-msvc]`nlinker = `"rust-lld`"`n`n[target.i686-pc-windows-msvc]`nlinker = `"rust-lld`"`n"
+          Set-Content -Path (Join-Path $cargoDir "config.toml") -Value $cargoConfig -Encoding utf8
 
           Set-Location $repoDir
           git init | Out-Null
@@ -278,7 +286,7 @@ linker = "rust-lld"
       - name: Build Windows artifacts
         uses: php/php-windows-builder/extension@v1
         env:
-          GITHUB_ACTIONS: 'false'
+          GITHUB_ACTIONS: "false"
           RUSTUP_TOOLCHAIN: nightly
         with:
           extension-url: ${{ steps.php_repo.outputs.repo_uri }}
@@ -287,7 +295,7 @@ linker = "rust-lld"
           arch: ${{ matrix.arch }}
           ts: ${{ matrix.ts }}
           args: --enable-html_to_markdown
-          run-tests: 'false'
+          run-tests: "false"
 
   node-bindings:
     name: Build Node bindings (${{ matrix.target }})
