@@ -32,6 +32,10 @@ if test "$PHP_HTML_TO_MARKDOWN" != "no"; then
   else
     HTM2MD_WORKSPACE_ROOT=`cd "$HTM2MD_ABS_SRCDIR" && pwd`
   fi
+  AC_MSG_NOTICE([html_to_markdown workspace root: $HTM2MD_WORKSPACE_ROOT])
+  if test ! -f "$HTM2MD_WORKSPACE_ROOT/Cargo.toml"; then
+    AC_MSG_ERROR([Rust workspace snapshot missing (expected $HTM2MD_WORKSPACE_ROOT/Cargo.toml)])
+  fi
 
   AC_SUBST([HTM2MD_CARGO_BIN])
   AC_SUBST([HTM2MD_PACKAGE], [html-to-markdown-php])
