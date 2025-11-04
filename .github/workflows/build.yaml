@@ -441,6 +441,157 @@ jobs:
           path: node-bindings-${{ matrix.target }}.tar.gz
           retention-days: 14
 
+  wasm-bindings:
+    name: Build WASM bindings
+    needs: prepare
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+        with:
+          ref: ${{ needs.prepare.outputs.ref }}
+
+      - name: Setup Rust
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+
+      - name: Add wasm32 target
+        run: rustup target add wasm32-unknown-unknown
+
+      - name: Install wasm-pack
+        run: |
+          if ! command -v wasm-pack >/dev/null 2>&1; then
+            cargo install wasm-pack --locked
+          fi
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          check-latest: true
+
+      - name: Enable corepack
+        run: corepack enable
+
+      - name: Install dependencies
+        run: pnpm install --filter html-to-markdown-wasm...
+
+      - name: Build WASM bundles
+        run: pnpm --filter html-to-markdown-wasm run build:all
+
+      - name: Package WASM artifacts
+        run: |
+          set -euo pipefail
+          out_dir="wasm-artifacts"
+          rm -rf "$out_dir"
+          mkdir -p "$out_dir"
+          for folder in dist dist-node dist-web; do
+            if [ -d "crates/html-to-markdown-wasm/$folder" ]; then
+              tar -czf "$out_dir/html-to-markdown-${folder}.tar.gz" -C crates/html-to-markdown-wasm "$folder"
+            fi
+          done
+
+      - name: Upload WASM artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: wasm-bundles
+          path: wasm-artifacts/*
+          retention-days: 14
+
+  cli-binaries:
+    name: Build CLI binaries (${{ matrix.target }})
+    needs: prepare
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            use_cross: false
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-musl
+            use_cross: true
+          - os: ubuntu-latest
+            target: aarch64-unknown-linux-gnu
+            use_cross: true
+          - os: macos-14
+            target: aarch64-apple-darwin
+            use_cross: false
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            use_cross: false
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+        with:
+          ref: ${{ needs.prepare.outputs.ref }}
+
+      - name: Setup Rust
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+
+      - name: Add compilation target
+        run: rustup target add ${{ matrix.target }}
+
+      - name: Install cross
+        if: ${{ matrix.use_cross }}
+        run: cargo install cross --git https://github.com/cross-rs/cross --locked
+
+      - name: Build CLI
+        shell: bash
+        run: |
+          set -euo pipefail
+          target="${{ matrix.target }}"
+          if [ "${{ matrix.use_cross }}" = "true" ]; then
+            cross build --release --target "$target" --package html-to-markdown-cli
+          else
+            cargo build --release --target "$target" --package html-to-markdown-cli
+          fi
+
+      - name: Package CLI artifact
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          set -euo pipefail
+          target="${{ matrix.target }}"
+          stage="cli-${target}"
+          rm -rf "$stage"
+          mkdir -p "$stage"
+          cp "target/${target}/release/html-to-markdown" "$stage/"
+          cp LICENSE "$stage/"
+          cp README.md "$stage/"
+          tar -czf "${stage}.tar.gz" "$stage"
+          rm -rf "$stage"
+
+      - name: Package CLI artifact (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $target = '${{ matrix.target }}'
+          $stage = "cli-$target"
+          Remove-Item -Recurse -Force $stage -ErrorAction SilentlyContinue
+          New-Item -ItemType Directory -Path $stage | Out-Null
+          Copy-Item "target/$target/release/html-to-markdown.exe" $stage
+          Copy-Item LICENSE $stage
+          Copy-Item README.md $stage
+          Compress-Archive -Path "$stage/*" -DestinationPath "$stage.zip" -Force
+          Remove-Item -Recurse -Force $stage
+
+      - name: Upload CLI artifact
+        if: runner.os != 'Windows'
+        uses: actions/upload-artifact@v4
+        with:
+          name: cli-${{ matrix.target }}
+          path: cli-${{ matrix.target }}.tar.gz
+          retention-days: 14
+
+      - name: Upload CLI artifact (Windows)
+        if: runner.os == 'Windows'
+        uses: actions/upload-artifact@v4
+        with:
+          name: cli-${{ matrix.target }}
+          path: cli-${{ matrix.target }}.zip
+          retention-days: 14
+
   ruby-gem:
     name: Build Ruby gem (${{ matrix.label }})
     needs: prepare
@@ -538,4 +689,33 @@ jobs:
         with:
           name: rubygems-${{ matrix.label }}
           path: packages/ruby/pkg/*.gem
+          retention-days: 14
+
+  cargo-packages:
+    name: Package Rust crates
+    needs: prepare
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+        with:
+          ref: ${{ needs.prepare.outputs.ref }}
+
+      - name: Setup Rust
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+
+      - name: Package crates
+        run: |
+          set -euo pipefail
+          cargo package -p html-to-markdown-rs --allow-dirty
+          cargo package -p html-to-markdown-cli --allow-dirty
+          mkdir -p crate-artifacts
+          cp target/package/html-to-markdown-rs-*.crate crate-artifacts/
+          cp target/package/html-to-markdown-cli-*.crate crate-artifacts/
+
+      - name: Upload crate packages
+        uses: actions/upload-artifact@v4
+        with:
+          name: cargo-crates
+          path: crate-artifacts/*.crate
           retention-days: 14
