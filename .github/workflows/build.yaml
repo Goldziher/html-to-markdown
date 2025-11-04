@@ -12,9 +12,13 @@ on:
         required: false
         type: boolean
         default: false
+  push:
+    branches: []
+    tags:
+      - "v*"
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.inputs.tag || github.run_id }}
+  group: ${{ github.workflow }}-${{ github.event.inputs.tag || github.ref || github.run_id }}
   cancel-in-progress: false
 
 jobs:
@@ -30,9 +34,19 @@ jobs:
       - name: Validate tag and compute version
         id: meta
         run: |
-          tag="${{ inputs.tag }}"
+          event="${{ github.event_name }}"
+          if [[ "$event" == "workflow_dispatch" ]]; then
+            tag="${{ inputs.tag }}"
+            dry_run_input="${{ inputs.dry_run }}"
+          else
+            tag="${GITHUB_REF_NAME}"
+            dry_run_input="false"
+            if [[ "$tag" == *-pre* ]]; then
+              dry_run_input="true"
+            fi
+          fi
           if [[ -z "$tag" ]]; then
-            echo "Tag input is required" >&2
+            echo "Release tag could not be determined" >&2
             exit 1
           fi
           if [[ "$tag" != v* ]]; then
@@ -41,7 +55,7 @@ jobs:
           fi
           version="${tag#v}"
           ref="refs/tags/${tag}"
-          dry_run="${{ inputs.dry_run }}"
+          dry_run="$dry_run_input"
           cat <<JSON > release-metadata.json
           {
             "tag": "$tag",
@@ -209,15 +223,61 @@ jobs:
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
         with:
-          toolchain: stable
+          toolchain: nightly
+
+      - name: Prepare extension repository
+        id: php_repo
+        shell: pwsh
+        run: |
+          $root = Get-Location
+          $extSrc = Join-Path $root "packages\php-ext"
+          $repoDir = Join-Path $root "php-ext-src"
+          $repoBare = Join-Path $root "php-ext.git"
+
+          if (Test-Path $repoDir) {
+            Remove-Item $repoDir -Recurse -Force
+          }
+          if (Test-Path $repoBare) {
+            Remove-Item $repoBare -Recurse -Force
+          }
+
+          New-Item -ItemType Directory -Path $repoDir -Force | Out-Null
+          Copy-Item -Path "$extSrc\*" -Destination $repoDir -Recurse -Force
+
+          $cargoDir = Join-Path $repoDir ".cargo"
+          New-Item -ItemType Directory -Path $cargoDir -Force | Out-Null
+          @"
+[target.x86_64-pc-windows-msvc]
+linker = "rust-lld"
+
+[target.i686-pc-windows-msvc]
+linker = "rust-lld"
+"@ | Set-Content -Path (Join-Path $cargoDir "config.toml") -Encoding utf8
+
+          Set-Location $repoDir
+          git init | Out-Null
+          git config user.email "ci@html-to-markdown.dev"
+          git config user.name "html-to-markdown CI"
+          git add . | Out-Null
+          git commit -m "extension snapshot" | Out-Null
+          git clone --bare . $repoBare | Out-Null
+          Set-Location $root
+
+          $repoPath = (Get-Item $repoBare).FullName.Replace('\','/')
+          if (-not $repoPath.StartsWith('/')) {
+            $repoPath = '/' + $repoPath
+          }
+          $repoUri = ([System.UriBuilder]::new("file", "", -1, $repoPath)).Uri.AbsoluteUri
+          "repo_uri=$repoUri" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
 
       - name: Build Windows artifacts
         uses: php/php-windows-builder/extension@v1
         env:
           GITHUB_ACTIONS: 'false'
+          RUSTUP_TOOLCHAIN: nightly
         with:
-          extension-url: https://github.com/${{ github.repository }}
-          extension-ref: ${{ needs.prepare.outputs.ref }}
+          extension-url: ${{ steps.php_repo.outputs.repo_uri }}
+          extension-ref: main
           php-version: ${{ matrix.php-version }}
           arch: ${{ matrix.arch }}
           ts: ${{ matrix.ts }}
