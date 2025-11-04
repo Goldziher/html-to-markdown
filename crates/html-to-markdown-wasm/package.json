@@ -2,8 +2,26 @@
   "name": "html-to-markdown-wasm",
   "version": "2.5.7",
   "description": "High-performance HTML to Markdown converter - WebAssembly bindings",
-  "main": "dist/index.js",
-  "types": "dist/index.d.ts",
+  "main": "dist/html_to_markdown_wasm.js",
+  "types": "dist/html_to_markdown_wasm.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/html_to_markdown_wasm.js",
+      "types": "./dist/html_to_markdown_wasm.d.ts",
+      "default": "./dist/html_to_markdown_wasm.js"
+    },
+    "./dist-node": {
+      "import": "./dist-node/html_to_markdown_wasm.js",
+      "require": "./dist-node/html_to_markdown_wasm.js",
+      "types": "./dist-node/html_to_markdown_wasm.d.ts"
+    },
+    "./dist-node/*": "./dist-node/*",
+    "./dist-web": {
+      "import": "./dist-web/html_to_markdown_wasm.js",
+      "types": "./dist-web/html_to_markdown_wasm.d.ts"
+    },
+    "./dist-web/*": "./dist-web/*"
+  },
   "repository": "https://github.com/Goldziher/html-to-markdown",
   "homepage": "https://github.com/Goldziher/html-to-markdown",
   "license": "MIT",
@@ -19,6 +37,8 @@
   ],
   "files": [
     "dist",
+    "dist-node",
+    "dist-web",
     "README.md"
   ],
   "scripts": {
