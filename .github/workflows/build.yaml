@@ -23,7 +23,7 @@ on:
     types: [release-build]
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.inputs.ref || github.event.client_payload.ref || github.event.inputs.tag || github.event.client_payload.tag || github.ref || github.run_id }}
+  group: ${{ github.workflow }}-${{ (github.event_name == 'workflow_dispatch' && (github.event.inputs.ref || github.event.inputs.tag)) || (github.event_name == 'repository_dispatch' && (github.event.client_payload.ref || github.event.client_payload.tag)) || github.ref || github.run_id }}
   cancel-in-progress: false
 
 jobs:
