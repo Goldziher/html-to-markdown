@@ -340,3 +340,26 @@ fn test_mixed_content() {
     assert!(result.contains("- List item 1"));
     assert!(result.contains("[Example](https://example.com)"));
 }
+
+#[test]
+fn test_ordered_list_with_heading_and_table() {
+    let html = r#"
+<ol>
+  <li>
+    <h3>h3</h3>
+  </li>
+  <li>
+    <table>
+      <caption>table</caption>
+      <tr>
+        <td>blah</td>
+      </tr>
+    </table>
+  </li>
+</ol>
+"#;
+
+    let result = convert(html, None).unwrap();
+    let expected = "1. ### h3\n2. *table*\n\n    | blah |\n    | --- |\n";
+    assert_eq!(result, expected);
+}

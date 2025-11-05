@@ -238,6 +238,20 @@ fn add_list_continuation_indent(output: &mut String, list_depth: usize, blank_li
     output.push_str(&indent_char.repeat(indent_level));
 }
 
+/// Calculate the indentation string for list continuations based on depth and options.
+fn continuation_indent_string(list_depth: usize, options: &ConversionOptions) -> Option<String> {
+    let indent_level = calculate_list_continuation_indent(list_depth);
+    if indent_level == 0 {
+        return None;
+    }
+
+    let indent = match options.list_indent_type {
+        ListIndentType::Tabs => "\t".repeat(indent_level),
+        ListIndentType::Spaces => " ".repeat(options.list_indent_width * indent_level),
+    };
+    Some(indent)
+}
+
 /// Add appropriate leading separator before a list.
 ///
 /// Lists need different separators depending on context:
@@ -1670,7 +1684,15 @@ fn walk_node(
                             return;
                         }
 
-                        if !output.is_empty() && !output.ends_with("\n\n") {
+                        if ctx.in_list_item {
+                            if output.ends_with('\n') {
+                                if let Some(indent) = continuation_indent_string(ctx.list_depth, options) {
+                                    output.push_str(&indent);
+                                }
+                            } else if !output.ends_with(' ') && !output.is_empty() {
+                                output.push(' ');
+                            }
+                        } else if !output.is_empty() && !output.ends_with("\n\n") {
                             if output.ends_with('\n') {
                                 output.push('\n');
                             } else {
@@ -1679,7 +1701,11 @@ fn walk_node(
                             }
                         }
 
-                        let heading_suffix = if ctx.blockquote_depth > 0 { "\n" } else { "\n\n" };
+                        let heading_suffix = if ctx.in_list_item || ctx.blockquote_depth > 0 {
+                            "\n"
+                        } else {
+                            "\n\n"
+                        };
 
                         match options.heading_style {
                             HeadingStyle::Underlined => {
@@ -2585,18 +2611,7 @@ fn walk_node(
                                 let tag_name = child_tag.name().as_utf8_str();
                                 if matches!(
                                     tag_name.as_ref(),
-                                    "p" | "div"
-                                        | "blockquote"
-                                        | "pre"
-                                        | "table"
-                                        | "h1"
-                                        | "h2"
-                                        | "h3"
-                                        | "h4"
-                                        | "h5"
-                                        | "h6"
-                                        | "hr"
-                                        | "dl"
+                                    "p" | "div" | "blockquote" | "pre" | "table" | "hr" | "dl"
                                 ) {
                                     has_block_children = true;
                                     break;
@@ -2772,15 +2787,35 @@ fn walk_node(
                 }
 
                 "table" => {
-                    if !output.ends_with("\n\n") {
-                        if output.is_empty() || !output.ends_with('\n') {
-                            output.push_str("\n\n");
-                        } else {
-                            output.push('\n');
+                    let mut table_output = String::new();
+                    convert_table(node_handle, parser, &mut table_output, options, ctx);
+
+                    if ctx.in_list_item {
+                        let has_caption = table_output.starts_with('*');
+
+                        if !has_caption {
+                            trim_trailing_whitespace(output);
+                            if !output.is_empty() && !output.ends_with('\n') {
+                                output.push('\n');
+                            }
                         }
+
+                        let indented = indent_table_for_list(&table_output, ctx.list_depth, options);
+                        output.push_str(&indented);
+                    } else {
+                        if !output.ends_with("\n\n") {
+                            if output.is_empty() || !output.ends_with('\n') {
+                                output.push_str("\n\n");
+                            } else {
+                                output.push('\n');
+                            }
+                        }
+                        output.push_str(&table_output);
                     }
-                    convert_table(node_handle, parser, output, options, ctx);
-                    output.push('\n');
+
+                    if !output.ends_with('\n') {
+                        output.push('\n');
+                    }
                 }
 
                 "thead" | "tbody" | "tfoot" | "tr" | "th" | "td" => {}
@@ -4179,6 +4214,35 @@ fn convert_table_row(
         }
         output.push_str(" |\n");
     }
+}
+
+/// Indent table lines so they stay within their parent list item.
+fn indent_table_for_list(table_content: &str, list_depth: usize, options: &ConversionOptions) -> String {
+    if list_depth == 0 {
+        return table_content.to_string();
+    }
+
+    let Some(mut indent) = continuation_indent_string(list_depth, options) else {
+        return table_content.to_string();
+    };
+
+    if matches!(options.list_indent_type, ListIndentType::Spaces) {
+        let space_count = indent.chars().filter(|c| *c == ' ').count();
+        if space_count < 4 {
+            indent.push_str(&" ".repeat(4 - space_count));
+        }
+    }
+
+    let mut result = String::with_capacity(table_content.len() + indent.len() * 4);
+    for segment in table_content.split_inclusive('\n') {
+        if segment.starts_with('|') {
+            result.push_str(&indent);
+            result.push_str(segment);
+        } else {
+            result.push_str(segment);
+        }
+    }
+    result
 }
 
 /// Convert an entire table element
