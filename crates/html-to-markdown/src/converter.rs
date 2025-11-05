@@ -1821,10 +1821,12 @@ fn walk_node(
                 }
 
                 if text.trim().is_empty() && text.contains('\n') {
+                    if output.is_empty() {
+                        return;
+                    }
                     if !output.ends_with("\n\n") {
                         if let Some(next_tag) = get_next_sibling_tag(node_handle, parser, dom_ctx) {
                             if is_inline_element(&next_tag) {
-                                output.push(' ');
                                 return;
                             }
                         }
@@ -1841,7 +1843,13 @@ fn walk_node(
                 let should_preserve = ctx.convert_as_inline || ctx.in_table_cell || !skip_whitespace;
 
                 if should_preserve {
-                    if output.is_empty() && text.contains('\n') {
+                    if output.is_empty() {
+                        if !text.contains('\n') {
+                            output.push(' ');
+                        }
+                        return;
+                    }
+                    if output.chars().last().is_some_and(|c| c == '\n') {
                         return;
                     }
                     output.push(' ');
