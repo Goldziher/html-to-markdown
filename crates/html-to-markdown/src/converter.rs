@@ -418,9 +418,221 @@ struct Context {
     in_paragraph: bool,
     /// Are we inside a ruby element?
     in_ruby: bool,
+    /// Are we inside a strong/bold element?
+    in_strong: bool,
     #[cfg(feature = "inline-images")]
     /// Shared collector for inline images when enabled.
     inline_collector: Option<InlineCollectorHandle>,
+}
+
+fn escape_link_label(text: &str) -> String {
+    if text.is_empty() {
+        return String::new();
+    }
+
+    let mut result = String::with_capacity(text.len());
+    let mut backslash_count = 0usize;
+
+    for ch in text.chars() {
+        if ch == '\\' {
+            result.push('\\');
+            backslash_count += 1;
+            continue;
+        }
+
+        let is_escaped = backslash_count % 2 == 1;
+        backslash_count = 0;
+
+        if (ch == '[' || ch == ']') && !is_escaped {
+            result.push('\\');
+        }
+        result.push(ch);
+    }
+
+    result
+}
+
+fn append_markdown_link(
+    output: &mut String,
+    label: &str,
+    href: &str,
+    title: Option<&str>,
+    raw_text: &str,
+    options: &ConversionOptions,
+) {
+    output.push('[');
+    output.push_str(label);
+    output.push_str("](");
+
+    if href.is_empty() {
+        output.push_str("<>");
+    } else if href.contains(' ') || href.contains('\n') {
+        output.push('<');
+        output.push_str(href);
+        output.push('>');
+    } else {
+        let open_count = href.chars().filter(|&c| c == '(').count();
+        let close_count = href.chars().filter(|&c| c == ')').count();
+
+        if open_count == close_count {
+            output.push_str(href);
+        } else {
+            let escaped_href = href.replace("(", "\\(").replace(")", "\\)");
+            output.push_str(&escaped_href);
+        }
+    }
+
+    if let Some(title_text) = title {
+        output.push_str(" \"");
+        if title_text.contains('"') {
+            let escaped_title = title_text.replace('"', "\\\"");
+            output.push_str(&escaped_title);
+        } else {
+            output.push_str(title_text);
+        }
+        output.push('"');
+    } else if options.default_title && raw_text == href {
+        output.push_str(" \"");
+        if href.contains('"') {
+            let escaped_href = href.replace('"', "\\\"");
+            output.push_str(&escaped_href);
+        } else {
+            output.push_str(href);
+        }
+        output.push('"');
+    }
+
+    output.push(')');
+}
+
+fn heading_level_from_name(name: &str) -> Option<usize> {
+    match name {
+        "h1" => Some(1),
+        "h2" => Some(2),
+        "h3" => Some(3),
+        "h4" => Some(4),
+        "h5" => Some(5),
+        "h6" => Some(6),
+        _ => None,
+    }
+}
+
+fn find_single_heading_child(node_handle: &tl::NodeHandle, parser: &tl::Parser) -> Option<(usize, tl::NodeHandle)> {
+    let node = node_handle.get(parser)?;
+
+    let tl::Node::Tag(tag) = node else {
+        return None;
+    };
+
+    let children = tag.children();
+    let mut heading_data: Option<(usize, tl::NodeHandle)> = None;
+
+    for child_handle in children.top().iter() {
+        let Some(child_node) = child_handle.get(parser) else {
+            continue;
+        };
+
+        match child_node {
+            tl::Node::Raw(bytes) => {
+                if !bytes.as_utf8_str().trim().is_empty() {
+                    return None;
+                }
+            }
+            tl::Node::Tag(child_tag) => {
+                let name = child_tag.name().as_utf8_str();
+                if let Some(level) = heading_level_from_name(name.as_ref()) {
+                    if heading_data.is_some() {
+                        return None;
+                    }
+                    heading_data = Some((level, *child_handle));
+                } else {
+                    return None;
+                }
+            }
+            _ => return None,
+        }
+    }
+
+    heading_data
+}
+
+fn push_heading(output: &mut String, ctx: &Context, options: &ConversionOptions, level: usize, text: &str) {
+    if text.is_empty() {
+        return;
+    }
+
+    if ctx.convert_as_inline {
+        output.push_str(text);
+        return;
+    }
+
+    if ctx.in_table_cell {
+        let is_table_continuation =
+            !output.is_empty() && !output.ends_with('|') && !output.ends_with(' ') && !output.ends_with("<br>");
+        if is_table_continuation {
+            output.push_str("<br>");
+        }
+        output.push_str(text);
+        return;
+    }
+
+    if ctx.in_list_item {
+        if output.ends_with('\n') {
+            if let Some(indent) = continuation_indent_string(ctx.list_depth, options) {
+                output.push_str(&indent);
+            }
+        } else if !output.ends_with(' ') && !output.is_empty() {
+            output.push(' ');
+        }
+    } else if !output.is_empty() && !output.ends_with("\n\n") {
+        if output.ends_with('\n') {
+            output.push('\n');
+        } else {
+            trim_trailing_whitespace(output);
+            output.push_str("\n\n");
+        }
+    }
+
+    let heading_suffix = if ctx.in_list_item || ctx.blockquote_depth > 0 {
+        "\n"
+    } else {
+        "\n\n"
+    };
+
+    match options.heading_style {
+        HeadingStyle::Underlined => {
+            if level == 1 {
+                output.push_str(text);
+                output.push('\n');
+                output.push_str(&"=".repeat(text.len()));
+                output.push_str(heading_suffix);
+            } else if level == 2 {
+                output.push_str(text);
+                output.push('\n');
+                output.push_str(&"-".repeat(text.len()));
+                output.push_str(heading_suffix);
+            } else {
+                output.push_str(&"#".repeat(level));
+                output.push(' ');
+                output.push_str(text);
+                output.push_str(heading_suffix);
+            }
+        }
+        HeadingStyle::Atx => {
+            output.push_str(&"#".repeat(level));
+            output.push(' ');
+            output.push_str(text);
+            output.push_str(heading_suffix);
+        }
+        HeadingStyle::AtxClosed => {
+            output.push_str(&"#".repeat(level));
+            output.push(' ');
+            output.push_str(text);
+            output.push(' ');
+            output.push_str(&"#".repeat(level));
+            output.push_str(heading_suffix);
+        }
+    }
 }
 
 /// Check if a document is an hOCR (HTML-based OCR) document.
@@ -1079,6 +1291,7 @@ fn convert_html_impl(
         heading_tag: None,
         in_paragraph: false,
         in_ruby: false,
+        in_strong: false,
         #[cfg(feature = "inline-images")]
         inline_collector: inline_collector.clone(),
     };
@@ -1568,7 +1781,8 @@ fn walk_node(
                     || output.ends_with("* ")
                     || output.ends_with("- ")
                     || output.ends_with(". ")
-                    || output.ends_with("] ");
+                    || output.ends_with("] ")
+                    || (output.ends_with('\n') && prefix == " ");
 
                 let mut final_text = String::new();
                 if !skip_prefix && !prefix.is_empty() {
@@ -1595,18 +1809,7 @@ fn walk_node(
                         );
                     }
                     if !at_paragraph_break {
-                        if let Some(next_tag) = get_next_sibling_tag(node_handle, parser) {
-                            if options.debug {
-                                eprintln!(
-                                    "[DEBUG] Next sibling tag: {}, is_inline: {}",
-                                    next_tag,
-                                    is_inline_element(&next_tag)
-                                );
-                            }
-                            if is_inline_element(&next_tag) {
-                                final_text.push(' ');
-                            }
-                        }
+                        final_text.push('\n');
                     }
                 }
 
@@ -1664,83 +1867,10 @@ fn walk_node(
                             walk_node(child_handle, parser, &mut text, options, &heading_ctx, depth + 1);
                         }
                     }
-                    let text = text.trim();
+                    let trimmed = text.trim();
 
-                    if !text.is_empty() {
-                        if ctx.convert_as_inline {
-                            output.push_str(text);
-                            return;
-                        }
-
-                        if ctx.in_table_cell {
-                            let is_table_continuation = !output.is_empty()
-                                && !output.ends_with('|')
-                                && !output.ends_with(' ')
-                                && !output.ends_with("<br>");
-                            if is_table_continuation {
-                                output.push_str("<br>");
-                            }
-                            output.push_str(text);
-                            return;
-                        }
-
-                        if ctx.in_list_item {
-                            if output.ends_with('\n') {
-                                if let Some(indent) = continuation_indent_string(ctx.list_depth, options) {
-                                    output.push_str(&indent);
-                                }
-                            } else if !output.ends_with(' ') && !output.is_empty() {
-                                output.push(' ');
-                            }
-                        } else if !output.is_empty() && !output.ends_with("\n\n") {
-                            if output.ends_with('\n') {
-                                output.push('\n');
-                            } else {
-                                trim_trailing_whitespace(output);
-                                output.push_str("\n\n");
-                            }
-                        }
-
-                        let heading_suffix = if ctx.in_list_item || ctx.blockquote_depth > 0 {
-                            "\n"
-                        } else {
-                            "\n\n"
-                        };
-
-                        match options.heading_style {
-                            HeadingStyle::Underlined => {
-                                if level == 1 {
-                                    output.push_str(text);
-                                    output.push('\n');
-                                    output.push_str(&"=".repeat(text.len()));
-                                    output.push_str(heading_suffix);
-                                } else if level == 2 {
-                                    output.push_str(text);
-                                    output.push('\n');
-                                    output.push_str(&"-".repeat(text.len()));
-                                    output.push_str(heading_suffix);
-                                } else {
-                                    output.push_str(&"#".repeat(level));
-                                    output.push(' ');
-                                    output.push_str(text);
-                                    output.push_str(heading_suffix);
-                                }
-                            }
-                            HeadingStyle::Atx => {
-                                output.push_str(&"#".repeat(level));
-                                output.push(' ');
-                                output.push_str(text);
-                                output.push_str(heading_suffix);
-                            }
-                            HeadingStyle::AtxClosed => {
-                                output.push_str(&"#".repeat(level));
-                                output.push(' ');
-                                output.push_str(text);
-                                output.push(' ');
-                                output.push_str(&"#".repeat(level));
-                                output.push_str(heading_suffix);
-                            }
-                        }
+                    if !trimmed.is_empty() {
+                        push_heading(output, ctx, options, level, trimmed);
                     }
                 }
 
@@ -1822,18 +1952,26 @@ fn walk_node(
                         let mut content = String::with_capacity(64);
                         let children = tag.children();
                         {
+                            let strong_ctx = Context {
+                                in_strong: true,
+                                ..ctx.clone()
+                            };
                             for child_handle in children.top().iter() {
-                                walk_node(child_handle, parser, &mut content, options, ctx, depth + 1);
+                                walk_node(child_handle, parser, &mut content, options, &strong_ctx, depth + 1);
                             }
                         }
                         let (prefix, suffix, trimmed) = chomp_inline(&content);
                         if !content.trim().is_empty() {
                             output.push_str(prefix);
-                            output.push(options.strong_em_symbol);
-                            output.push(options.strong_em_symbol);
-                            output.push_str(trimmed);
-                            output.push(options.strong_em_symbol);
-                            output.push(options.strong_em_symbol);
+                            if ctx.in_strong {
+                                output.push_str(trimmed);
+                            } else {
+                                output.push(options.strong_em_symbol);
+                                output.push(options.strong_em_symbol);
+                                output.push_str(trimmed);
+                                output.push(options.strong_em_symbol);
+                                output.push(options.strong_em_symbol);
+                            }
                             output.push_str(suffix);
                         } else if !content.is_empty() {
                             output.push_str(prefix);
@@ -1878,7 +2016,11 @@ fn walk_node(
                         .get("href")
                         .flatten()
                         .map(|v| text::decode_html_entities(&v.as_utf8_str()));
-                    let title = tag.attributes().get("title").flatten().map(|v| v.as_utf8_str());
+                    let title = tag
+                        .attributes()
+                        .get("title")
+                        .flatten()
+                        .map(|v| v.as_utf8_str().to_string());
 
                     if let Some(href) = href_attr {
                         let raw_text = get_text_content(node_handle, parser).trim().to_string();
@@ -1886,7 +2028,7 @@ fn walk_node(
                         let is_autolink = options.autolinks
                             && !options.default_title
                             && !href.is_empty()
-                            && (raw_text == href.as_ref() || (href.starts_with("mailto:") && raw_text == href[7..]));
+                            && (raw_text == href || (href.starts_with("mailto:") && raw_text == href[7..]));
 
                         if is_autolink {
                             output.push('<');
@@ -1896,59 +2038,64 @@ fn walk_node(
                                 output.push_str(&href);
                             }
                             output.push('>');
-                        } else {
-                            output.push('[');
-                            let children = tag.children();
-                            {
-                                for child_handle in children.top().iter() {
-                                    walk_node(child_handle, parser, output, options, ctx, depth + 1);
-                                }
-                            }
-                            output.push_str("](");
-
-                            if href.is_empty() {
-                                output.push_str("<>");
-                            } else if href.contains(' ') || href.contains('\n') {
-                                output.push('<');
-                                output.push_str(&href);
-                                output.push('>');
-                            } else {
-                                let open_count = href.chars().filter(|&c| c == '(').count();
-                                let close_count = href.chars().filter(|&c| c == ')').count();
-
-                                if open_count == close_count {
-                                    output.push_str(&href);
-                                } else {
-                                    // Only allocate when escaping is needed
-                                    let escaped_href = href.replace("(", "\\(").replace(")", "\\)");
-                                    output.push_str(&escaped_href);
-                                }
-                            }
-
-                            if let Some(title_text) = title {
-                                output.push_str(" \"");
-                                // Only allocate if quotes are present
-                                if title_text.contains('"') {
-                                    let escaped_title = title_text.replace('"', "\\\"");
-                                    output.push_str(&escaped_title);
-                                } else {
-                                    output.push_str(&title_text);
-                                }
-                                output.push('"');
-                            } else if options.default_title && raw_text == href.as_ref() {
-                                output.push_str(" \"");
-                                // Only allocate if quotes are present
-                                if href.contains('"') {
-                                    let escaped_href = href.replace('"', "\\\"");
-                                    output.push_str(&escaped_href);
-                                } else {
-                                    output.push_str(&href);
-                                }
-                                output.push('"');
-                            }
-
-                            output.push(')');
+                            return;
                         }
+
+                        if let Some((heading_level, heading_handle)) = find_single_heading_child(node_handle, parser) {
+                            if let Some(heading_node) = heading_handle.get(parser) {
+                                if let tl::Node::Tag(heading_tag) = heading_node {
+                                    let heading_name = heading_tag.name().as_utf8_str().to_string();
+                                    let mut heading_text = String::new();
+                                    let heading_ctx = Context {
+                                        in_heading: true,
+                                        convert_as_inline: true,
+                                        heading_tag: Some(heading_name),
+                                        ..ctx.clone()
+                                    };
+                                    walk_node(
+                                        &heading_handle,
+                                        parser,
+                                        &mut heading_text,
+                                        options,
+                                        &heading_ctx,
+                                        depth + 1,
+                                    );
+                                    let trimmed_heading = heading_text.trim();
+                                    if !trimmed_heading.is_empty() {
+                                        let escaped_label = escape_link_label(trimmed_heading);
+                                        let mut link_buffer = String::new();
+                                        append_markdown_link(
+                                            &mut link_buffer,
+                                            &escaped_label,
+                                            href.as_str(),
+                                            title.as_deref(),
+                                            raw_text.as_str(),
+                                            options,
+                                        );
+                                        push_heading(output, ctx, options, heading_level, link_buffer.as_str());
+                                        return;
+                                    }
+                                }
+                            }
+                        }
+
+                        let mut content = String::new();
+                        let link_ctx = Context { ..ctx.clone() };
+                        let children = tag.children();
+                        {
+                            for child_handle in children.top().iter() {
+                                walk_node(child_handle, parser, &mut content, options, &link_ctx, depth + 1);
+                            }
+                        }
+                        let escaped_label = escape_link_label(&content);
+                        append_markdown_link(
+                            output,
+                            &escaped_label,
+                            href.as_str(),
+                            title.as_deref(),
+                            raw_text.as_str(),
+                            options,
+                        );
                     } else {
                         let children = tag.children();
                         {
@@ -2523,9 +2670,22 @@ fn walk_node(
                         output.push_str("  ");
                     } else {
                         use crate::options::NewlineStyle;
-                        match options.newline_style {
-                            NewlineStyle::Spaces => output.push_str("  \n"),
-                            NewlineStyle::Backslash => output.push_str("\\\n"),
+                        let is_top_level = !ctx.in_paragraph
+                            && !ctx.in_list_item
+                            && !ctx.in_list
+                            && ctx.blockquote_depth == 0
+                            && !ctx.in_table_cell
+                            && !ctx.in_strong
+                            && !ctx.in_ruby
+                            && !ctx.convert_as_inline;
+
+                        if output.is_empty() || output.ends_with('\n') || is_top_level {
+                            output.push('\n');
+                        } else {
+                            match options.newline_style {
+                                NewlineStyle::Spaces => output.push_str("  \n"),
+                                NewlineStyle::Backslash => output.push_str("\\\n"),
+                            }
                         }
                     }
                 }

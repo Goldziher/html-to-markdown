@@ -363,3 +363,38 @@ fn test_ordered_list_with_heading_and_table() {
     let expected = "1. ### h3\n2. *table*\n\n    | blah |\n    | --- |\n";
     assert_eq!(result, expected);
 }
+
+#[test]
+fn test_heading_wrapped_in_link_issue_115() {
+    let html = r#"<a href="https://domain.local"><h2>Heading A</h2></a>"#;
+    let result = convert(html, None).unwrap();
+    assert_eq!(result, "## [Heading A](https://domain.local)\n");
+}
+
+#[test]
+fn test_link_text_escaping_issue_114() {
+    let html = r#"<a href="https://domain.local">Hi :]</a><br><a href="https://domain.local">1<2</a>"#;
+    let result = convert(html, None).unwrap();
+    assert_eq!(result, "[Hi :\\]](https://domain.local)\n[1<2](https://domain.local)\n");
+}
+
+#[test]
+fn test_uppercase_tags_issue_113() {
+    let html = r#"<B>Foo<Br />Bar</B>"#;
+    let result = convert(html, None).unwrap();
+    assert_eq!(result, "**Foo  \nBar**\n");
+}
+
+#[test]
+fn test_breaks_and_newlines_issue_112() {
+    let html = "<br>\n1\n2\n<b>3</b>";
+    let result = convert(html, None).unwrap();
+    assert_eq!(result, "\n1\n2\n**3**\n");
+}
+
+#[test]
+fn test_nested_bold_issue_111() {
+    let html = "<b>bold<b>er</b></b>";
+    let result = convert(html, None).unwrap();
+    assert_eq!(result, "**bolder**\n");
+}
