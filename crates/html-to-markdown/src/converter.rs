@@ -688,7 +688,7 @@ fn build_dom_context(dom: &tl::VDom, parser: &tl::Parser) -> DomContext {
     let mut ctx = DomContext {
         parent_map: HashMap::new(),
         children_map: HashMap::new(),
-        root_children: dom.children().iter().copied().collect(),
+        root_children: dom.children().to_vec(),
     };
 
     for child_handle in dom.children().iter() {
@@ -3028,6 +3028,7 @@ fn walk_node(
                             false
                         }
 
+                        #[allow(clippy::too_many_arguments)]
                         fn render_li_content<'a>(
                             node_handle: &tl::NodeHandle,
                             parser: &'a tl::Parser<'a>,
@@ -4513,6 +4514,7 @@ fn convert_table_cell(
 }
 
 /// Convert table row (tr)
+#[allow(clippy::too_many_arguments)]
 fn convert_table_row(
     node_handle: &tl::NodeHandle,
     parser: &tl::Parser,
