@@ -727,7 +727,12 @@ jobs:
           cargo package -p html-to-markdown-rs --allow-dirty
 
           cli_packaged=0
-          if cargo package -p html-to-markdown-cli --allow-dirty --no-verify; then
+          set +e
+          cargo package -p html-to-markdown-cli --allow-dirty --no-verify
+          cli_status=$?
+          set -e
+
+          if [ "$cli_status" -eq 0 ]; then
             cli_packaged=1
           else
             echo "::warning::Skipping html-to-markdown-cli crate packaging; html-to-markdown-rs ${RELEASE_VERSION:-unknown} is not yet available on crates.io."
