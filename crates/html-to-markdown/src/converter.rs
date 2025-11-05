@@ -43,7 +43,7 @@
 
 #[cfg(feature = "inline-images")]
 use std::cell::RefCell;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashMap};
 #[cfg(feature = "inline-images")]
 use std::rc::Rc;
 
@@ -337,6 +337,7 @@ fn process_list_children(
     is_loose: bool,
     nested_depth: usize,
     start_counter: usize,
+    dom_ctx: &DomContext,
 ) {
     let mut counter = start_counter;
 
@@ -364,7 +365,7 @@ fn process_list_children(
                         ..ctx.clone()
                     };
 
-                    walk_node(child_handle, parser, output, options, &list_ctx, depth);
+                    walk_node(child_handle, parser, output, options, &list_ctx, depth, dom_ctx);
 
                     if is_ordered {
                         if let Some(child_node) = child_handle.get(parser) {
@@ -398,6 +399,8 @@ struct Context {
     in_table_cell: bool,
     /// Should we convert block elements as inline?
     convert_as_inline: bool,
+    /// Depth of inline formatting elements (strong/emphasis/span/etc).
+    inline_depth: usize,
     /// Are we inside a list item?
     in_list_item: bool,
     /// List nesting depth (for indentation)
@@ -418,11 +421,15 @@ struct Context {
     in_paragraph: bool,
     /// Are we inside a ruby element?
     in_ruby: bool,
-    /// Are we inside a strong/bold element?
-    in_strong: bool,
     #[cfg(feature = "inline-images")]
     /// Shared collector for inline images when enabled.
     inline_collector: Option<InlineCollectorHandle>,
+}
+
+struct DomContext {
+    parent_map: HashMap<u32, Option<u32>>,
+    children_map: HashMap<u32, Vec<tl::NodeHandle>>,
+    root_children: Vec<tl::NodeHandle>,
 }
 
 fn escape_link_label(text: &str) -> String {
@@ -432,6 +439,7 @@ fn escape_link_label(text: &str) -> String {
 
     let mut result = String::with_capacity(text.len());
     let mut backslash_count = 0usize;
+    let mut bracket_depth = 0usize;
 
     for ch in text.chars() {
         if ch == '\\' {
@@ -443,13 +451,54 @@ fn escape_link_label(text: &str) -> String {
         let is_escaped = backslash_count % 2 == 1;
         backslash_count = 0;
 
-        if (ch == '[' || ch == ']') && !is_escaped {
-            result.push('\\');
+        match ch {
+            '[' if !is_escaped => {
+                bracket_depth = bracket_depth.saturating_add(1);
+                result.push('[');
+            }
+            ']' if !is_escaped => {
+                if bracket_depth == 0 {
+                    result.push('\\');
+                } else {
+                    bracket_depth -= 1;
+                }
+                result.push(']');
+            }
+            _ => result.push(ch),
         }
-        result.push(ch);
     }
 
     result
+}
+
+fn flatten_nested_strong<'a>(content: &'a str) -> Cow<'a, str> {
+    let Some(closing_idx) = content.rfind("**") else {
+        return Cow::Borrowed(content);
+    };
+
+    if closing_idx + 2 != content.len() {
+        return Cow::Borrowed(content);
+    }
+
+    let before_closing = &content[..closing_idx];
+    let Some(opening_idx) = before_closing.rfind("**") else {
+        return Cow::Borrowed(content);
+    };
+
+    let prefix = &before_closing[..opening_idx];
+    if prefix.is_empty() || prefix.chars().last().map(char::is_whitespace).unwrap_or(true) {
+        return Cow::Borrowed(content);
+    }
+
+    let inner = &before_closing[opening_idx + 2..];
+    if inner.is_empty() || inner.contains("**") {
+        return Cow::Borrowed(content);
+    }
+
+    let mut merged = String::with_capacity(prefix.len() + inner.len());
+    merged.push_str(prefix);
+    merged.push_str(inner);
+    Cow::Owned(merged)
 }
 
 fn append_markdown_link(
@@ -631,6 +680,35 @@ fn push_heading(output: &mut String, ctx: &Context, options: &ConversionOptions,
             output.push(' ');
             output.push_str(&"#".repeat(level));
             output.push_str(heading_suffix);
+        }
+    }
+}
+
+fn build_dom_context(dom: &tl::VDom, parser: &tl::Parser) -> DomContext {
+    let mut ctx = DomContext {
+        parent_map: HashMap::new(),
+        children_map: HashMap::new(),
+        root_children: dom.children().iter().copied().collect(),
+    };
+
+    for child_handle in dom.children().iter() {
+        record_node_hierarchy(child_handle, None, parser, &mut ctx);
+    }
+
+    ctx
+}
+
+fn record_node_hierarchy(node_handle: &tl::NodeHandle, parent: Option<u32>, parser: &tl::Parser, ctx: &mut DomContext) {
+    let id = node_handle.get_inner();
+    ctx.parent_map.insert(id, parent);
+
+    if let Some(node) = node_handle.get(parser) {
+        if let tl::Node::Tag(tag) = node {
+            let children: Vec<_> = tag.children().top().iter().copied().collect();
+            ctx.children_map.insert(id, children.clone());
+            for child in children {
+                record_node_hierarchy(&child, Some(id), parser, ctx);
+            }
         }
     }
 }
@@ -1209,6 +1287,7 @@ fn convert_html_impl(
         .map_err(|_| crate::error::ConversionError::ParseError("Failed to parse HTML".to_string()))?;
 
     let parser = dom.parser();
+    let dom_ctx = build_dom_context(&dom, parser);
     let mut output = String::with_capacity(html.len());
 
     // Check for hOCR document and extract metadata by checking all top-level children
@@ -1281,6 +1360,7 @@ fn convert_html_impl(
         blockquote_depth: 0,
         in_table_cell: false,
         convert_as_inline: options.convert_as_inline,
+        inline_depth: 0,
         in_list_item: false,
         list_depth: 0,
         ul_depth: 0,
@@ -1291,14 +1371,13 @@ fn convert_html_impl(
         heading_tag: None,
         in_paragraph: false,
         in_ruby: false,
-        in_strong: false,
         #[cfg(feature = "inline-images")]
         inline_collector: inline_collector.clone(),
     };
 
     // Walk all top-level children
     for child_handle in dom.children().iter() {
-        walk_node(child_handle, parser, &mut output, options, &ctx, 0);
+        walk_node(child_handle, parser, &mut output, options, &ctx, 0, &dom_ctx);
     }
 
     // Trim trailing blank lines but preserve final newline
@@ -1666,19 +1745,32 @@ fn is_inline_element(tag_name: &str) -> bool {
     )
 }
 
-/// Get the next sibling element tag name if it exists and is an element.
-///
-/// TODO: This function needs architectural changes for tl API.
-/// tl doesn't provide parent references like html5ever did.
-/// Options:
-/// 1. Pass sibling context from parent when iterating
-/// 2. Build a sibling lookup map during parsing
-/// 3. Accept loss of this optimization
-///
-/// For now, returning None to allow compilation.
-fn get_next_sibling_tag(_node_handle: &tl::NodeHandle, _parser: &tl::Parser) -> Option<String> {
-    // TODO: Implement sibling lookup with tl API
-    // This affects whitespace handling between inline elements
+fn get_next_sibling_tag(node_handle: &tl::NodeHandle, parser: &tl::Parser, dom_ctx: &DomContext) -> Option<String> {
+    let id = node_handle.get_inner();
+    let parent = dom_ctx.parent_map.get(&id).copied().flatten();
+
+    let siblings = if let Some(parent_id) = parent {
+        dom_ctx.children_map.get(&parent_id)?
+    } else {
+        &dom_ctx.root_children
+    };
+
+    let position = siblings.iter().position(|handle| handle.get_inner() == id)?;
+
+    for sibling in siblings.iter().skip(position + 1) {
+        if let Some(node) = sibling.get(parser) {
+            match node {
+                tl::Node::Tag(tag) => return Some(tag.name().as_utf8_str().to_string()),
+                tl::Node::Raw(raw) => {
+                    if !raw.as_utf8_str().trim().is_empty() {
+                        return None;
+                    }
+                }
+                _ => {}
+            }
+        }
+    }
+
     None
 }
 
@@ -1691,6 +1783,7 @@ fn walk_node(
     options: &ConversionOptions,
     ctx: &Context,
     depth: usize,
+    dom_ctx: &DomContext,
 ) {
     let Some(node) = node_handle.get(parser) else { return };
 
@@ -1729,7 +1822,7 @@ fn walk_node(
 
                 if text.trim().is_empty() && text.contains('\n') {
                     if !output.ends_with("\n\n") {
-                        if let Some(next_tag) = get_next_sibling_tag(node_handle, parser) {
+                        if let Some(next_tag) = get_next_sibling_tag(node_handle, parser, dom_ctx) {
                             if is_inline_element(&next_tag) {
                                 output.push(' ');
                                 return;
@@ -1748,6 +1841,9 @@ fn walk_node(
                 let should_preserve = ctx.convert_as_inline || ctx.in_table_cell || !skip_whitespace;
 
                 if should_preserve {
+                    if output.is_empty() && text.contains('\n') {
+                        return;
+                    }
                     output.push(' ');
                 }
                 return;
@@ -1809,7 +1905,24 @@ fn walk_node(
                         );
                     }
                     if !at_paragraph_break {
-                        final_text.push('\n');
+                        if text.contains("\n\n") || text.contains("\r\n\r\n") {
+                            final_text.push('\n');
+                        } else if let Some(next_tag) = get_next_sibling_tag(node_handle, parser, dom_ctx) {
+                            if options.debug {
+                                eprintln!("[DEBUG] Next sibling tag after newline: {}", next_tag);
+                            }
+                            if matches!(next_tag.as_str(), "span") {
+                                // Collapse formatting newlines between inline siblings like span
+                            } else if ctx.inline_depth > 0 || ctx.convert_as_inline || ctx.in_paragraph {
+                                final_text.push(' ');
+                            } else {
+                                final_text.push('\n');
+                            }
+                        } else if ctx.inline_depth > 0 || ctx.convert_as_inline || ctx.in_paragraph {
+                            final_text.push(' ');
+                        } else {
+                            final_text.push('\n');
+                        }
                     }
                 }
 
@@ -1837,7 +1950,7 @@ fn walk_node(
                 let children = tag.children();
                 {
                     for child_handle in children.top().iter() {
-                        walk_node(child_handle, parser, output, options, ctx, depth + 1);
+                        walk_node(child_handle, parser, output, options, ctx, depth + 1, dom_ctx);
                     }
                 }
                 return;
@@ -1864,7 +1977,15 @@ fn walk_node(
                     let children = tag.children();
                     {
                         for child_handle in children.top().iter() {
-                            walk_node(child_handle, parser, &mut text, options, &heading_ctx, depth + 1);
+                            walk_node(
+                                child_handle,
+                                parser,
+                                &mut text,
+                                options,
+                                &heading_ctx,
+                                depth + 1,
+                                dom_ctx,
+                            );
                         }
                     }
                     let trimmed = text.trim();
@@ -1929,7 +2050,7 @@ fn walk_node(
                                     }
                                 }
                             }
-                            walk_node(child_handle, parser, output, options, &p_ctx, depth + 1);
+                            walk_node(child_handle, parser, output, options, &p_ctx, depth + 1, dom_ctx);
                         }
                     }
 
@@ -1945,7 +2066,7 @@ fn walk_node(
                         let children = tag.children();
                         {
                             for child_handle in children.top().iter() {
-                                walk_node(child_handle, parser, output, options, ctx, depth + 1);
+                                walk_node(child_handle, parser, output, options, ctx, depth + 1, dom_ctx);
                             }
                         }
                     } else {
@@ -1953,25 +2074,30 @@ fn walk_node(
                         let children = tag.children();
                         {
                             let strong_ctx = Context {
-                                in_strong: true,
+                                inline_depth: ctx.inline_depth + 1,
                                 ..ctx.clone()
                             };
                             for child_handle in children.top().iter() {
-                                walk_node(child_handle, parser, &mut content, options, &strong_ctx, depth + 1);
+                                walk_node(
+                                    child_handle,
+                                    parser,
+                                    &mut content,
+                                    options,
+                                    &strong_ctx,
+                                    depth + 1,
+                                    dom_ctx,
+                                );
                             }
                         }
                         let (prefix, suffix, trimmed) = chomp_inline(&content);
                         if !content.trim().is_empty() {
                             output.push_str(prefix);
-                            if ctx.in_strong {
-                                output.push_str(trimmed);
-                            } else {
-                                output.push(options.strong_em_symbol);
-                                output.push(options.strong_em_symbol);
-                                output.push_str(trimmed);
-                                output.push(options.strong_em_symbol);
-                                output.push(options.strong_em_symbol);
-                            }
+                            let merged = flatten_nested_strong(trimmed);
+                            output.push(options.strong_em_symbol);
+                            output.push(options.strong_em_symbol);
+                            output.push_str(&merged);
+                            output.push(options.strong_em_symbol);
+                            output.push(options.strong_em_symbol);
                             output.push_str(suffix);
                         } else if !content.is_empty() {
                             output.push_str(prefix);
@@ -1985,15 +2111,19 @@ fn walk_node(
                         let children = tag.children();
                         {
                             for child_handle in children.top().iter() {
-                                walk_node(child_handle, parser, output, options, ctx, depth + 1);
+                                walk_node(child_handle, parser, output, options, ctx, depth + 1, dom_ctx);
                             }
                         }
                     } else {
                         let mut content = String::with_capacity(64);
                         let children = tag.children();
                         {
+                            let em_ctx = Context {
+                                inline_depth: ctx.inline_depth + 1,
+                                ..ctx.clone()
+                            };
                             for child_handle in children.top().iter() {
-                                walk_node(child_handle, parser, &mut content, options, ctx, depth + 1);
+                                walk_node(child_handle, parser, &mut content, options, &em_ctx, depth + 1, dom_ctx);
                             }
                         }
                         let (prefix, suffix, trimmed) = chomp_inline(&content);
@@ -2059,6 +2189,7 @@ fn walk_node(
                                         options,
                                         &heading_ctx,
                                         depth + 1,
+                                        dom_ctx,
                                     );
                                     let trimmed_heading = heading_text.trim();
                                     if !trimmed_heading.is_empty() {
@@ -2080,11 +2211,22 @@ fn walk_node(
                         }
 
                         let mut content = String::new();
-                        let link_ctx = Context { ..ctx.clone() };
+                        let link_ctx = Context {
+                            inline_depth: ctx.inline_depth + 1,
+                            ..ctx.clone()
+                        };
                         let children = tag.children();
                         {
                             for child_handle in children.top().iter() {
-                                walk_node(child_handle, parser, &mut content, options, &link_ctx, depth + 1);
+                                walk_node(
+                                    child_handle,
+                                    parser,
+                                    &mut content,
+                                    options,
+                                    &link_ctx,
+                                    depth + 1,
+                                    dom_ctx,
+                                );
                             }
                         }
                         let escaped_label = escape_link_label(&content);
@@ -2100,7 +2242,7 @@ fn walk_node(
                         let children = tag.children();
                         {
                             for child_handle in children.top().iter() {
-                                walk_node(child_handle, parser, output, options, ctx, depth + 1);
+                                walk_node(child_handle, parser, output, options, ctx, depth + 1, dom_ctx);
                             }
                         }
                     }
@@ -2209,7 +2351,7 @@ fn walk_node(
                         let children = tag.children();
                         {
                             for child_handle in children.top().iter() {
-                                walk_node(child_handle, parser, output, options, ctx, depth + 1);
+                                walk_node(child_handle, parser, output, options, ctx, depth + 1, dom_ctx);
                             }
                         }
                     } else {
@@ -2220,7 +2362,7 @@ fn walk_node(
                                 let children = tag.children();
                                 {
                                     for child_handle in children.top().iter() {
-                                        walk_node(child_handle, parser, output, options, ctx, depth + 1);
+                                        walk_node(child_handle, parser, output, options, ctx, depth + 1, dom_ctx);
                                     }
                                 }
                                 output.push_str("==");
@@ -2230,7 +2372,7 @@ fn walk_node(
                                 let children = tag.children();
                                 {
                                     for child_handle in children.top().iter() {
-                                        walk_node(child_handle, parser, output, options, ctx, depth + 1);
+                                        walk_node(child_handle, parser, output, options, ctx, depth + 1, dom_ctx);
                                     }
                                 }
                                 output.push_str("</mark>");
@@ -2241,7 +2383,7 @@ fn walk_node(
                                 let children = tag.children();
                                 {
                                     for child_handle in children.top().iter() {
-                                        walk_node(child_handle, parser, output, options, ctx, depth + 1);
+                                        walk_node(child_handle, parser, output, options, ctx, depth + 1, dom_ctx);
                                     }
                                 }
                                 output.push_str(&symbol);
@@ -2250,7 +2392,7 @@ fn walk_node(
                                 let children = tag.children();
                                 {
                                     for child_handle in children.top().iter() {
-                                        walk_node(child_handle, parser, output, options, ctx, depth + 1);
+                                        walk_node(child_handle, parser, output, options, ctx, depth + 1, dom_ctx);
                                     }
                                 }
                             }
@@ -2263,7 +2405,7 @@ fn walk_node(
                         let children = tag.children();
                         {
                             for child_handle in children.top().iter() {
-                                walk_node(child_handle, parser, output, options, ctx, depth + 1);
+                                walk_node(child_handle, parser, output, options, ctx, depth + 1, dom_ctx);
                             }
                         }
                     } else {
@@ -2271,7 +2413,7 @@ fn walk_node(
                         let children = tag.children();
                         {
                             for child_handle in children.top().iter() {
-                                walk_node(child_handle, parser, &mut content, options, ctx, depth + 1);
+                                walk_node(child_handle, parser, &mut content, options, ctx, depth + 1, dom_ctx);
                             }
                         }
                         let (prefix, suffix, trimmed) = chomp_inline(&content);
@@ -2293,7 +2435,7 @@ fn walk_node(
                     let children = tag.children();
                     {
                         for child_handle in children.top().iter() {
-                            walk_node(child_handle, parser, &mut content, options, ctx, depth + 1);
+                            walk_node(child_handle, parser, &mut content, options, ctx, depth + 1, dom_ctx);
                         }
                     }
                     let (prefix, suffix, trimmed) = chomp_inline(&content);
@@ -2310,7 +2452,7 @@ fn walk_node(
                     let children = tag.children();
                     {
                         for child_handle in children.top().iter() {
-                            walk_node(child_handle, parser, output, options, ctx, depth + 1);
+                            walk_node(child_handle, parser, output, options, ctx, depth + 1, dom_ctx);
                         }
                     }
                 }
@@ -2322,7 +2464,7 @@ fn walk_node(
                     let children = tag.children();
                     {
                         for child_handle in children.top().iter() {
-                            walk_node(child_handle, parser, output, options, ctx, depth + 1);
+                            walk_node(child_handle, parser, output, options, ctx, depth + 1, dom_ctx);
                         }
                     }
                     if !ctx.in_code && !options.sub_symbol.is_empty() {
@@ -2341,7 +2483,7 @@ fn walk_node(
                     let children = tag.children();
                     {
                         for child_handle in children.top().iter() {
-                            walk_node(child_handle, parser, output, options, ctx, depth + 1);
+                            walk_node(child_handle, parser, output, options, ctx, depth + 1, dom_ctx);
                         }
                     }
                     if !ctx.in_code && !options.sup_symbol.is_empty() {
@@ -2362,7 +2504,15 @@ fn walk_node(
                     let children = tag.children();
                     {
                         for child_handle in children.top().iter() {
-                            walk_node(child_handle, parser, &mut content, options, &code_ctx, depth + 1);
+                            walk_node(
+                                child_handle,
+                                parser,
+                                &mut content,
+                                options,
+                                &code_ctx,
+                                depth + 1,
+                                dom_ctx,
+                            );
                         }
                     }
                     let normalized = text::normalize_whitespace(&content);
@@ -2384,7 +2534,7 @@ fn walk_node(
                     let children = tag.children();
                     {
                         for child_handle in children.top().iter() {
-                            walk_node(child_handle, parser, &mut content, options, ctx, depth + 1);
+                            walk_node(child_handle, parser, &mut content, options, ctx, depth + 1, dom_ctx);
                         }
                     }
                     let (prefix, suffix, trimmed) = chomp_inline(&content);
@@ -2402,7 +2552,7 @@ fn walk_node(
                     let children = tag.children();
                     {
                         for child_handle in children.top().iter() {
-                            walk_node(child_handle, parser, &mut content, options, ctx, depth + 1);
+                            walk_node(child_handle, parser, &mut content, options, ctx, depth + 1, dom_ctx);
                         }
                     }
                     let (prefix, suffix, trimmed) = chomp_inline(&content);
@@ -2420,7 +2570,7 @@ fn walk_node(
                     let children = tag.children();
                     {
                         for child_handle in children.top().iter() {
-                            walk_node(child_handle, parser, &mut content, options, ctx, depth + 1);
+                            walk_node(child_handle, parser, &mut content, options, ctx, depth + 1, dom_ctx);
                         }
                     }
                     let trimmed = content.trim();
@@ -2443,7 +2593,7 @@ fn walk_node(
                     let children = tag.children();
                     {
                         for child_handle in children.top().iter() {
-                            walk_node(child_handle, parser, output, options, ctx, depth + 1);
+                            walk_node(child_handle, parser, output, options, ctx, depth + 1, dom_ctx);
                         }
                     }
                 }
@@ -2461,7 +2611,15 @@ fn walk_node(
                         let children = tag.children();
                         {
                             for child_handle in children.top().iter() {
-                                walk_node(child_handle, parser, &mut content, options, &code_ctx, depth + 1);
+                                walk_node(
+                                    child_handle,
+                                    parser,
+                                    &mut content,
+                                    options,
+                                    &code_ctx,
+                                    depth + 1,
+                                    dom_ctx,
+                                );
                             }
                         }
 
@@ -2521,7 +2679,7 @@ fn walk_node(
                         let children = tag.children();
                         {
                             for child_handle in children.top().iter() {
-                                walk_node(child_handle, parser, output, options, &code_ctx, depth + 1);
+                                walk_node(child_handle, parser, output, options, &code_ctx, depth + 1, dom_ctx);
                             }
                         }
                     }
@@ -2537,7 +2695,15 @@ fn walk_node(
                     let children = tag.children();
                     {
                         for child_handle in children.top().iter() {
-                            walk_node(child_handle, parser, &mut content, options, &code_ctx, depth + 1);
+                            walk_node(
+                                child_handle,
+                                parser,
+                                &mut content,
+                                options,
+                                &code_ctx,
+                                depth + 1,
+                                dom_ctx,
+                            );
                         }
                     }
 
@@ -2601,7 +2767,7 @@ fn walk_node(
                         let children = tag.children();
                         {
                             for child_handle in children.top().iter() {
-                                walk_node(child_handle, parser, output, options, ctx, depth + 1);
+                                walk_node(child_handle, parser, output, options, ctx, depth + 1, dom_ctx);
                             }
                         }
                         return;
@@ -2621,7 +2787,15 @@ fn walk_node(
                     let children = tag.children();
                     {
                         for child_handle in children.top().iter() {
-                            walk_node(child_handle, parser, &mut content, options, &blockquote_ctx, depth + 1);
+                            walk_node(
+                                child_handle,
+                                parser,
+                                &mut content,
+                                options,
+                                &blockquote_ctx,
+                                depth + 1,
+                                dom_ctx,
+                            );
                         }
                     }
 
@@ -2670,16 +2844,7 @@ fn walk_node(
                         output.push_str("  ");
                     } else {
                         use crate::options::NewlineStyle;
-                        let is_top_level = !ctx.in_paragraph
-                            && !ctx.in_list_item
-                            && !ctx.in_list
-                            && ctx.blockquote_depth == 0
-                            && !ctx.in_table_cell
-                            && !ctx.in_strong
-                            && !ctx.in_ruby
-                            && !ctx.convert_as_inline;
-
-                        if output.is_empty() || output.ends_with('\n') || is_top_level {
+                        if output.is_empty() || output.ends_with('\n') {
                             output.push('\n');
                         } else {
                             match options.newline_style {
@@ -2720,6 +2885,7 @@ fn walk_node(
                         is_loose,
                         nested_depth,
                         1,
+                        dom_ctx,
                     );
 
                     add_nested_list_trailing_separator(output, ctx);
@@ -2749,6 +2915,7 @@ fn walk_node(
                         is_loose,
                         nested_depth,
                         start,
+                        dom_ctx,
                     );
 
                     add_nested_list_trailing_separator(output, ctx);
@@ -2861,6 +3028,7 @@ fn walk_node(
                             ctx: &Context,
                             depth: usize,
                             checkbox: &Option<tl::NodeHandle>,
+                            dom_ctx: &DomContext,
                         ) {
                             if is_checkbox_node(node_handle, checkbox) {
                                 return;
@@ -2879,12 +3047,13 @@ fn walk_node(
                                                 ctx,
                                                 depth,
                                                 checkbox,
+                                                dom_ctx,
                                             );
                                         }
                                     }
                                 }
                             } else {
-                                walk_node(node_handle, parser, output, options, ctx, depth);
+                                walk_node(node_handle, parser, output, options, ctx, depth, dom_ctx);
                             }
                         }
 
@@ -2900,6 +3069,7 @@ fn walk_node(
                                     &li_ctx,
                                     depth + 1,
                                     &checkbox_node,
+                                    dom_ctx,
                                 );
                             }
                         }
@@ -2924,7 +3094,7 @@ fn walk_node(
                         let children = tag.children();
                         {
                             for child_handle in children.top().iter() {
-                                walk_node(child_handle, parser, output, options, &li_ctx, depth + 1);
+                                walk_node(child_handle, parser, output, options, &li_ctx, depth + 1, dom_ctx);
                             }
                         }
 
@@ -2948,7 +3118,7 @@ fn walk_node(
 
                 "table" => {
                     let mut table_output = String::new();
-                    convert_table(node_handle, parser, &mut table_output, options, ctx);
+                    convert_table(node_handle, parser, &mut table_output, options, ctx, dom_ctx);
 
                     if ctx.in_list_item {
                         let has_caption = table_output.starts_with('*');
@@ -2985,7 +3155,7 @@ fn walk_node(
                     let children = tag.children();
                     {
                         for child_handle in children.top().iter() {
-                            walk_node(child_handle, parser, &mut text, options, ctx, depth + 1);
+                            walk_node(child_handle, parser, &mut text, options, ctx, depth + 1, dom_ctx);
                         }
                     }
                     let text = text.trim();
@@ -3005,7 +3175,7 @@ fn walk_node(
                         let children = tag.children();
                         {
                             for child_handle in children.top().iter() {
-                                walk_node(child_handle, parser, output, options, ctx, depth);
+                                walk_node(child_handle, parser, output, options, ctx, depth, dom_ctx);
                             }
                         }
                         return;
@@ -3015,7 +3185,7 @@ fn walk_node(
                     let children = tag.children();
                     {
                         for child_handle in children.top().iter() {
-                            walk_node(child_handle, parser, &mut content, options, ctx, depth);
+                            walk_node(child_handle, parser, &mut content, options, ctx, depth, dom_ctx);
                         }
                     }
                     if content.trim().is_empty() {
@@ -3038,7 +3208,7 @@ fn walk_node(
                         let children = tag.children();
                         {
                             for child_handle in children.top().iter() {
-                                walk_node(child_handle, parser, output, options, ctx, depth);
+                                walk_node(child_handle, parser, output, options, ctx, depth, dom_ctx);
                             }
                         }
                         return;
@@ -3052,15 +3222,21 @@ fn walk_node(
                     let children = tag.children();
                     {
                         for child_handle in children.top().iter() {
-                            walk_node(child_handle, parser, &mut figure_content, options, ctx, depth);
+                            walk_node(child_handle, parser, &mut figure_content, options, ctx, depth, dom_ctx);
                         }
                     }
 
-                    let trimmed = figure_content.trim_start_matches('\n');
+                    figure_content = figure_content.replace("\n![", "![");
+                    figure_content = figure_content.replace(" ![", "![");
+
+                    let trimmed = figure_content.trim_matches(|c| c == '\n' || c == ' ' || c == '\t');
                     if !trimmed.is_empty() {
                         output.push_str(trimmed);
+                        if !output.ends_with('\n') {
+                            output.push('\n');
+                        }
                         if !output.ends_with("\n\n") {
-                            output.push_str("\n\n");
+                            output.push('\n');
                         }
                     }
                 }
@@ -3070,7 +3246,7 @@ fn walk_node(
                     let children = tag.children();
                     {
                         for child_handle in children.top().iter() {
-                            walk_node(child_handle, parser, &mut text, options, ctx, depth + 1);
+                            walk_node(child_handle, parser, &mut text, options, ctx, depth + 1, dom_ctx);
                         }
                     }
                     let text = text.trim();
@@ -3097,7 +3273,7 @@ fn walk_node(
                     let children = tag.children();
                     {
                         for child_handle in children.top().iter() {
-                            walk_node(child_handle, parser, output, options, ctx, depth);
+                            walk_node(child_handle, parser, output, options, ctx, depth, dom_ctx);
                         }
                     }
                 }
@@ -3107,7 +3283,7 @@ fn walk_node(
                     let children = tag.children();
                     {
                         for child_handle in children.top().iter() {
-                            walk_node(child_handle, parser, &mut content, options, ctx, depth + 1);
+                            walk_node(child_handle, parser, &mut content, options, ctx, depth + 1, dom_ctx);
                         }
                     }
                     let trimmed = content.trim();
@@ -3127,7 +3303,7 @@ fn walk_node(
                     let children = tag.children();
                     {
                         for child_handle in children.top().iter() {
-                            walk_node(child_handle, parser, &mut content, options, ctx, depth + 1);
+                            walk_node(child_handle, parser, &mut content, options, ctx, depth + 1, dom_ctx);
                         }
                     }
                     let trimmed = content.trim();
@@ -3149,7 +3325,7 @@ fn walk_node(
                         let children = tag.children();
                         {
                             for child_handle in children.top().iter() {
-                                walk_node(child_handle, parser, output, options, ctx, depth);
+                                walk_node(child_handle, parser, output, options, ctx, depth, dom_ctx);
                             }
                         }
                         return;
@@ -3171,7 +3347,7 @@ fn walk_node(
                                 last_was_dt: in_dt_group && is_dd,
                                 ..ctx.clone()
                             };
-                            walk_node(child_handle, parser, &mut content, options, &child_ctx, depth);
+                            walk_node(child_handle, parser, &mut content, options, &child_ctx, depth, dom_ctx);
 
                             if is_dt {
                                 in_dt_group = true;
@@ -3196,7 +3372,7 @@ fn walk_node(
                     let children = tag.children();
                     {
                         for child_handle in children.top().iter() {
-                            walk_node(child_handle, parser, &mut content, options, ctx, depth + 1);
+                            walk_node(child_handle, parser, &mut content, options, ctx, depth + 1, dom_ctx);
                         }
                     }
                     let trimmed = content.trim();
@@ -3215,7 +3391,7 @@ fn walk_node(
                     let children = tag.children();
                     {
                         for child_handle in children.top().iter() {
-                            walk_node(child_handle, parser, &mut content, options, ctx, depth + 1);
+                            walk_node(child_handle, parser, &mut content, options, ctx, depth + 1, dom_ctx);
                         }
                     }
 
@@ -3244,7 +3420,7 @@ fn walk_node(
                         let children = tag.children();
                         {
                             for child_handle in children.top().iter() {
-                                walk_node(child_handle, parser, output, options, ctx, depth);
+                                walk_node(child_handle, parser, output, options, ctx, depth, dom_ctx);
                             }
                         }
                         return;
@@ -3254,7 +3430,7 @@ fn walk_node(
                     let children = tag.children();
                     {
                         for child_handle in children.top().iter() {
-                            walk_node(child_handle, parser, &mut content, options, ctx, depth);
+                            walk_node(child_handle, parser, &mut content, options, ctx, depth, dom_ctx);
                         }
                     }
                     let trimmed = content.trim();
@@ -3272,7 +3448,7 @@ fn walk_node(
                     let children = tag.children();
                     {
                         for child_handle in children.top().iter() {
-                            walk_node(child_handle, parser, &mut content, options, ctx, depth + 1);
+                            walk_node(child_handle, parser, &mut content, options, ctx, depth + 1, dom_ctx);
                         }
                     }
                     let trimmed = content.trim();
@@ -3294,7 +3470,7 @@ fn walk_node(
                         let children = tag.children();
                         {
                             for child_handle in children.top().iter() {
-                                walk_node(child_handle, parser, output, options, ctx, depth);
+                                walk_node(child_handle, parser, output, options, ctx, depth, dom_ctx);
                             }
                         }
                         return;
@@ -3305,7 +3481,7 @@ fn walk_node(
                     let children = tag.children();
                     {
                         for child_handle in children.top().iter() {
-                            walk_node(child_handle, parser, output, options, ctx, depth);
+                            walk_node(child_handle, parser, output, options, ctx, depth, dom_ctx);
                         }
                     }
 
@@ -3337,7 +3513,7 @@ fn walk_node(
                     let children = tag.children();
                     {
                         for child_handle in children.top().iter() {
-                            walk_node(child_handle, parser, output, &menu_options, &list_ctx, depth);
+                            walk_node(child_handle, parser, output, &menu_options, &list_ctx, depth, dom_ctx);
                         }
                     }
 
@@ -3405,7 +3581,7 @@ fn walk_node(
                             };
 
                             if !is_source {
-                                walk_node(child_handle, parser, &mut fallback, options, ctx, depth + 1);
+                                walk_node(child_handle, parser, &mut fallback, options, ctx, depth + 1, dom_ctx);
                             }
                         }
                     }
@@ -3466,7 +3642,7 @@ fn walk_node(
                             };
 
                             if !is_source {
-                                walk_node(child_handle, parser, &mut fallback, options, ctx, depth + 1);
+                                walk_node(child_handle, parser, &mut fallback, options, ctx, depth + 1, dom_ctx);
                             }
                         }
                     }
@@ -3486,7 +3662,7 @@ fn walk_node(
                         for child_handle in children.top().iter() {
                             if let Some(tl::Node::Tag(child_tag)) = child_handle.get(parser) {
                                 if child_tag.name().as_utf8_str() == "img" {
-                                    walk_node(child_handle, parser, output, options, ctx, depth);
+                                    walk_node(child_handle, parser, output, options, ctx, depth, dom_ctx);
                                     break;
                                 }
                             }
@@ -3613,7 +3789,7 @@ fn walk_node(
                         let children = tag.children();
                         {
                             for child_handle in children.top().iter() {
-                                walk_node(child_handle, parser, output, options, ctx, depth);
+                                walk_node(child_handle, parser, output, options, ctx, depth, dom_ctx);
                             }
                         }
                         return;
@@ -3623,7 +3799,7 @@ fn walk_node(
                     let children = tag.children();
                     {
                         for child_handle in children.top().iter() {
-                            walk_node(child_handle, parser, &mut content, options, ctx, depth);
+                            walk_node(child_handle, parser, &mut content, options, ctx, depth, dom_ctx);
                         }
                     }
                     let trimmed = content.trim();
@@ -3641,7 +3817,7 @@ fn walk_node(
                         let children = tag.children();
                         {
                             for child_handle in children.top().iter() {
-                                walk_node(child_handle, parser, output, options, ctx, depth);
+                                walk_node(child_handle, parser, output, options, ctx, depth, dom_ctx);
                             }
                         }
                         return;
@@ -3650,7 +3826,7 @@ fn walk_node(
                     let children = tag.children();
                     {
                         for child_handle in children.top().iter() {
-                            walk_node(child_handle, parser, &mut content, options, ctx, depth);
+                            walk_node(child_handle, parser, &mut content, options, ctx, depth, dom_ctx);
                         }
                     }
                     let trimmed = content.trim();
@@ -3668,7 +3844,7 @@ fn walk_node(
                     let children = tag.children();
                     {
                         for child_handle in children.top().iter() {
-                            walk_node(child_handle, parser, &mut content, options, ctx, depth + 1);
+                            walk_node(child_handle, parser, &mut content, options, ctx, depth + 1, dom_ctx);
                         }
                     }
                     let trimmed = content.trim();
@@ -3690,7 +3866,7 @@ fn walk_node(
                     let children = tag.children();
                     {
                         for child_handle in children.top().iter() {
-                            walk_node(child_handle, parser, &mut content, options, ctx, depth + 1);
+                            walk_node(child_handle, parser, &mut content, options, ctx, depth + 1, dom_ctx);
                         }
                     }
                     let trimmed = content.trim();
@@ -3709,7 +3885,7 @@ fn walk_node(
                     let children = tag.children();
                     {
                         for child_handle in children.top().iter() {
-                            walk_node(child_handle, parser, output, options, ctx, depth + 1);
+                            walk_node(child_handle, parser, output, options, ctx, depth + 1, dom_ctx);
                         }
                     }
 
@@ -3723,7 +3899,7 @@ fn walk_node(
                     let children = tag.children();
                     {
                         for child_handle in children.top().iter() {
-                            walk_node(child_handle, parser, output, options, ctx, depth + 1);
+                            walk_node(child_handle, parser, output, options, ctx, depth + 1, dom_ctx);
                         }
                     }
 
@@ -3739,7 +3915,7 @@ fn walk_node(
                     let children = tag.children();
                     {
                         for child_handle in children.top().iter() {
-                            walk_node(child_handle, parser, &mut text, options, ctx, depth + 1);
+                            walk_node(child_handle, parser, &mut text, options, ctx, depth + 1, dom_ctx);
                         }
                     }
                     let trimmed = text.trim();
@@ -3775,7 +3951,7 @@ fn walk_node(
                     let children = tag.children();
                     {
                         for child_handle in children.top().iter() {
-                            walk_node(child_handle, parser, output, options, ctx, depth + 1);
+                            walk_node(child_handle, parser, output, options, ctx, depth + 1, dom_ctx);
                         }
                     }
                 }
@@ -3785,7 +3961,7 @@ fn walk_node(
                     let children = tag.children();
                     {
                         for child_handle in children.top().iter() {
-                            walk_node(child_handle, parser, output, options, ctx, depth + 1);
+                            walk_node(child_handle, parser, output, options, ctx, depth + 1, dom_ctx);
                         }
                     }
 
@@ -3799,7 +3975,7 @@ fn walk_node(
                     let children = tag.children();
                     {
                         for child_handle in children.top().iter() {
-                            walk_node(child_handle, parser, output, options, ctx, depth + 1);
+                            walk_node(child_handle, parser, output, options, ctx, depth + 1, dom_ctx);
                         }
                     }
 
@@ -3813,7 +3989,7 @@ fn walk_node(
                     let children = tag.children();
                     {
                         for child_handle in children.top().iter() {
-                            walk_node(child_handle, parser, output, options, ctx, depth + 1);
+                            walk_node(child_handle, parser, output, options, ctx, depth + 1, dom_ctx);
                         }
                     }
 
@@ -3827,7 +4003,7 @@ fn walk_node(
                     let children = tag.children();
                     {
                         for child_handle in children.top().iter() {
-                            walk_node(child_handle, parser, output, options, ctx, depth + 1);
+                            walk_node(child_handle, parser, output, options, ctx, depth + 1, dom_ctx);
                         }
                     }
 
@@ -3841,7 +4017,7 @@ fn walk_node(
                     let children = tag.children();
                     {
                         for child_handle in children.top().iter() {
-                            walk_node(child_handle, parser, output, options, ctx, depth + 1);
+                            walk_node(child_handle, parser, output, options, ctx, depth + 1, dom_ctx);
                         }
                     }
 
@@ -3893,6 +4069,7 @@ fn walk_node(
                                                     options,
                                                     &ruby_ctx,
                                                     depth,
+                                                    dom_ctx,
                                                 );
                                                 if !current_base.is_empty() {
                                                     output.push_str(current_base.trim());
@@ -3911,6 +4088,7 @@ fn walk_node(
                                                     options,
                                                     &ruby_ctx,
                                                     depth,
+                                                    dom_ctx,
                                                 );
                                             } else if tag_name != "rp" {
                                                 walk_node(
@@ -3920,6 +4098,7 @@ fn walk_node(
                                                     options,
                                                     &ruby_ctx,
                                                     depth,
+                                                    dom_ctx,
                                                 );
                                             }
                                         }
@@ -3931,6 +4110,7 @@ fn walk_node(
                                                 options,
                                                 &ruby_ctx,
                                                 depth,
+                                                dom_ctx,
                                             );
                                         }
                                         _ => {}
@@ -3962,6 +4142,7 @@ fn walk_node(
                                                     options,
                                                     &ruby_ctx,
                                                     depth,
+                                                    dom_ctx,
                                                 );
                                                 rt_annotations.push(annotation);
                                             } else if tag_name == "rtc" {
@@ -3972,6 +4153,7 @@ fn walk_node(
                                                     options,
                                                     &ruby_ctx,
                                                     depth,
+                                                    dom_ctx,
                                                 );
                                             } else if tag_name != "rp" {
                                                 walk_node(
@@ -3981,11 +4163,20 @@ fn walk_node(
                                                     options,
                                                     &ruby_ctx,
                                                     depth,
+                                                    dom_ctx,
                                                 );
                                             }
                                         }
                                         tl::Node::Raw(_) => {
-                                            walk_node(child_handle, parser, &mut base_text, options, &ruby_ctx, depth);
+                                            walk_node(
+                                                child_handle,
+                                                parser,
+                                                &mut base_text,
+                                                options,
+                                                &ruby_ctx,
+                                                depth,
+                                                dom_ctx,
+                                            );
                                         }
                                         _ => {}
                                     }
@@ -4021,7 +4212,7 @@ fn walk_node(
                     let children = tag.children();
                     {
                         for child_handle in children.top().iter() {
-                            walk_node(child_handle, parser, &mut text, options, ctx, depth + 1);
+                            walk_node(child_handle, parser, &mut text, options, ctx, depth + 1, dom_ctx);
                         }
                     }
                     output.push_str(text.trim());
@@ -4032,7 +4223,7 @@ fn walk_node(
                     let children = tag.children();
                     {
                         for child_handle in children.top().iter() {
-                            walk_node(child_handle, parser, &mut text, options, ctx, depth + 1);
+                            walk_node(child_handle, parser, &mut text, options, ctx, depth + 1, dom_ctx);
                         }
                     }
                     let trimmed = text.trim();
@@ -4051,7 +4242,7 @@ fn walk_node(
                     let children = tag.children();
                     {
                         for child_handle in children.top().iter() {
-                            walk_node(child_handle, parser, &mut content, options, ctx, depth + 1);
+                            walk_node(child_handle, parser, &mut content, options, ctx, depth + 1, dom_ctx);
                         }
                     }
                     let trimmed = content.trim();
@@ -4064,7 +4255,7 @@ fn walk_node(
                     let children = tag.children();
                     {
                         for child_handle in children.top().iter() {
-                            walk_node(child_handle, parser, output, options, ctx, depth);
+                            walk_node(child_handle, parser, output, options, ctx, depth, dom_ctx);
                         }
                     }
                 }
@@ -4074,7 +4265,7 @@ fn walk_node(
                         let children = tag.children();
                         {
                             for child_handle in children.top().iter() {
-                                walk_node(child_handle, parser, output, options, ctx, depth + 1);
+                                walk_node(child_handle, parser, output, options, ctx, depth + 1, dom_ctx);
                             }
                         }
                         return;
@@ -4110,7 +4301,7 @@ fn walk_node(
                     let children = tag.children();
                     {
                         for child_handle in children.top().iter() {
-                            walk_node(child_handle, parser, output, options, ctx, depth);
+                            walk_node(child_handle, parser, output, options, ctx, depth, dom_ctx);
                         }
                     }
 
@@ -4164,10 +4355,17 @@ fn walk_node(
                         output.push(' ');
                     }
 
+                    if options.whitespace_mode == crate::options::WhitespaceMode::Normalized
+                        && output.ends_with('\n')
+                        && !output.ends_with("\n\n")
+                    {
+                        output.pop();
+                    }
+
                     let children = tag.children();
                     {
                         for child_handle in children.top().iter() {
-                            walk_node(child_handle, parser, output, options, ctx, depth);
+                            walk_node(child_handle, parser, output, options, ctx, depth, dom_ctx);
                         }
                     }
                 }
@@ -4179,7 +4377,7 @@ fn walk_node(
                     let children = tag.children();
                     {
                         for child_handle in children.top().iter() {
-                            walk_node(child_handle, parser, output, options, ctx, depth);
+                            walk_node(child_handle, parser, output, options, ctx, depth, dom_ctx);
                         }
                     }
 
@@ -4271,6 +4469,7 @@ fn convert_table_cell(
     options: &ConversionOptions,
     ctx: &Context,
     _tag_name: &str,
+    dom_ctx: &DomContext,
 ) {
     let mut text = String::with_capacity(128);
 
@@ -4283,7 +4482,7 @@ fn convert_table_cell(
         let children = tag.children();
         {
             for child_handle in children.top().iter() {
-                walk_node(child_handle, parser, &mut text, options, &cell_ctx, 0);
+                walk_node(child_handle, parser, &mut text, options, &cell_ctx, 0, dom_ctx);
             }
         }
     }
@@ -4314,6 +4513,7 @@ fn convert_table_row(
     ctx: &Context,
     row_index: usize,
     rowspan_tracker: &mut std::collections::HashMap<usize, usize>,
+    dom_ctx: &DomContext,
 ) {
     let mut row_text = String::with_capacity(256);
     let mut cells = Vec::new();
@@ -4349,7 +4549,7 @@ fn convert_table_row(
         }
 
         if let Some(cell_handle) = cell_iter.next() {
-            convert_table_cell(cell_handle, parser, &mut row_text, options, ctx, "");
+            convert_table_cell(cell_handle, parser, &mut row_text, options, ctx, "", dom_ctx);
 
             let (colspan, rowspan) = get_colspan_rowspan(cell_handle, parser);
 
@@ -4417,6 +4617,7 @@ fn convert_table(
     output: &mut String,
     options: &ConversionOptions,
     ctx: &Context,
+    dom_ctx: &DomContext,
 ) {
     if let Some(tl::Node::Tag(tag)) = node_handle.get(parser) {
         let mut row_index = 0;
@@ -4434,7 +4635,7 @@ fn convert_table(
                             let grandchildren = child_tag.children();
                             {
                                 for grandchild_handle in grandchildren.top().iter() {
-                                    walk_node(grandchild_handle, parser, &mut text, options, ctx, 0);
+                                    walk_node(grandchild_handle, parser, &mut text, options, ctx, 0, dom_ctx);
                                 }
                             }
                             let text = text.trim();
@@ -4461,6 +4662,7 @@ fn convert_table(
                                                 ctx,
                                                 row_index,
                                                 &mut rowspan_tracker,
+                                                dom_ctx,
                                             );
                                             row_index += 1;
                                         }
@@ -4478,6 +4680,7 @@ fn convert_table(
                                 ctx,
                                 row_index,
                                 &mut rowspan_tracker,
+                                dom_ctx,
                             );
                             row_index += 1;
                         }

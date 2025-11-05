@@ -375,7 +375,10 @@ fn test_heading_wrapped_in_link_issue_115() {
 fn test_link_text_escaping_issue_114() {
     let html = r#"<a href="https://domain.local">Hi :]</a><br><a href="https://domain.local">1<2</a>"#;
     let result = convert(html, None).unwrap();
-    assert_eq!(result, "[Hi :\\]](https://domain.local)\n[1<2](https://domain.local)\n");
+    assert_eq!(
+        result,
+        "[Hi :\\]](https://domain.local)  \n[1<2](https://domain.local)\n"
+    );
 }
 
 #[test]
