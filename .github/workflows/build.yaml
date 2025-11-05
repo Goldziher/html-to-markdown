@@ -82,7 +82,7 @@ jobs:
           echo "ref=$ref" >> "$GITHUB_OUTPUT"
           echo "dry_run=${dry_run:-false}" >> "$GITHUB_OUTPUT"
       - name: Upload release metadata
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: release-metadata
           path: release-metadata.json
@@ -108,7 +108,7 @@ jobs:
           python-version: "3.13"
 
       - name: Upload wheels
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: python-wheels-${{ matrix.os }}
           path: wheelhouse/*.whl
@@ -148,7 +148,7 @@ jobs:
         run: maturin sdist --out dist/
 
       - name: Upload sdist
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: python-sdist
           path: packages/python/dist/*.tar.gz
@@ -196,7 +196,7 @@ jobs:
           php build/pie.phar build goldziher/html-to-markdown:*@dev --with-cargo-bin=$(command -v cargo)
 
       - name: Upload PIE source archive
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: php-pie-src
           path: build/artifacts/php_html_to_markdown-${{ needs.prepare.outputs.version }}-src.tgz
@@ -436,7 +436,7 @@ jobs:
           tar -czf node-bindings-$env:TARGET.tar.gz -C crates/html-to-markdown-node npm
 
       - name: Upload Node artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: node-bindings-${{ matrix.target }}
           path: node-bindings-${{ matrix.target }}.tar.gz
@@ -492,7 +492,7 @@ jobs:
           done
 
       - name: Upload WASM artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: wasm-bundles
           path: wasm-artifacts/*
@@ -579,7 +579,7 @@ jobs:
 
       - name: Upload CLI artifact
         if: runner.os != 'Windows'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: cli-${{ matrix.target }}
           path: cli-${{ matrix.target }}.tar.gz
@@ -587,7 +587,7 @@ jobs:
 
       - name: Upload CLI artifact (Windows)
         if: runner.os == 'Windows'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: cli-${{ matrix.target }}
           path: cli-${{ matrix.target }}.zip
@@ -686,7 +686,7 @@ jobs:
           fi
 
       - name: Upload gem artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: rubygems-${{ matrix.label }}
           path: packages/ruby/pkg/*.gem
@@ -715,7 +715,7 @@ jobs:
           cp target/package/html-to-markdown-cli-*.crate crate-artifacts/
 
       - name: Upload crate packages
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: cargo-crates
           path: crate-artifacts/*.crate
