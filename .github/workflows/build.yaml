@@ -720,13 +720,31 @@ jobs:
         uses: actions-rust-lang/setup-rust-toolchain@v1
 
       - name: Package crates
+        env:
+          RELEASE_VERSION: ${{ needs.prepare.outputs.version }}
         run: |
           set -euo pipefail
           cargo package -p html-to-markdown-rs --allow-dirty
-          cargo package -p html-to-markdown-cli --allow-dirty --no-verify
+
+          cli_packaged=0
+          if cargo package -p html-to-markdown-cli --allow-dirty --no-verify; then
+            cli_packaged=1
+          else
+            echo "::warning::Skipping html-to-markdown-cli crate packaging; html-to-markdown-rs ${RELEASE_VERSION:-unknown} is not yet available on crates.io."
+            if [ -n "${GITHUB_STEP_SUMMARY:-}" ]; then
+              {
+                echo "### html-to-markdown-cli crate"
+                echo ""
+                echo "- Packaging skipped because html-to-markdown-rs ${RELEASE_VERSION:-unknown} is not yet published to crates.io."
+              } >> "$GITHUB_STEP_SUMMARY"
+            fi
+          fi
+
           mkdir -p crate-artifacts
           cp target/package/html-to-markdown-rs-*.crate crate-artifacts/
-          cp target/package/html-to-markdown-cli-*.crate crate-artifacts/
+          if [ "$cli_packaged" -eq 1 ]; then
+            cp target/package/html-to-markdown-cli-*.crate crate-artifacts/
+          fi
 
       - name: Upload crate packages
         uses: actions/upload-artifact@v5
