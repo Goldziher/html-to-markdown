@@ -18,6 +18,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Bumped every package (Rust crates, npm packages, PyPI wheels, Ruby gem, PHP extension) to version 2.5.7.
 - Restored the Node.js N-API build matrix so macOS, Windows, and Linux binaries ship automatically with each npm release.
 
+### Fixed
+- Preserve ordered list numbering and indentation when list items render headings or HTML tables, so mixed block content stays under the correct bullet (fixes #107).
+
 ## [2.5.6] - 2025-10-30
 
 ### Changed
