@@ -2,6 +2,8 @@ version: "3"
 
 vars:
   RUST_LOG: info
+  RUBY_BIN: /opt/homebrew/opt/ruby/bin
+  BUNDLER_VERSION: "2.5.12"
 
 silent: false
 
@@ -306,38 +308,48 @@ tasks:
     cmds:
       - rm -rf build/ dist/ *.egg-info .pytest_cache .ruff_cache .mypy_cache html_to_markdown/bin
 
-  # Ruby tasks ----------------------------------------------------------------
+# Ruby tasks ----------------------------------------------------------------
+  ruby:ensure-bundler:
+    desc: "Ensure required Bundler version is installed"
+    cmds:
+      - PATH={{.RUBY_BIN}}:$PATH gem list -i bundler -v {{.BUNDLER_VERSION}} || PATH={{.RUBY_BIN}}:$PATH gem install bundler -v {{.BUNDLER_VERSION}} --no-document
+
   ruby:install:
     desc: "Install Ruby dependencies"
     cmds:
-      - cmd: cd packages/ruby && PATH=/opt/homebrew/opt/ruby/bin:$PATH bundle _2.5.12_ install
+      - task: ruby:ensure-bundler
+      - cmd: cd packages/ruby && PATH={{.RUBY_BIN}}:$PATH bundle _{{.BUNDLER_VERSION}}_ install
 
   ruby:update:
     desc: "Update Ruby dependencies"
     dir: packages/ruby
     cmds:
-      - PATH=/opt/homebrew/opt/ruby/bin:$PATH bundle _2.5.12_ update
+      - task: ruby:ensure-bundler
+      - PATH={{.RUBY_BIN}}:$PATH bundle _{{.BUNDLER_VERSION}}_ update
 
   ruby:build:
     desc: "Build Ruby native extension"
     cmds:
-      - cmd: cd packages/ruby && PATH=/opt/homebrew/opt/ruby/bin:$PATH bundle _2.5.12_ exec rake compile
+      - task: ruby:ensure-bundler
+      - cmd: cd packages/ruby && PATH={{.RUBY_BIN}}:$PATH bundle _{{.BUNDLER_VERSION}}_ exec rake compile
 
   ruby:test:
     desc: "Run Ruby specs"
     cmds:
       - task: ruby:build
-      - cmd: cd packages/ruby && PATH=/opt/homebrew/opt/ruby/bin:$PATH bundle _2.5.12_ exec rake spec
+      - cmd: cd packages/ruby && PATH={{.RUBY_BIN}}:$PATH bundle _{{.BUNDLER_VERSION}}_ exec rake spec
 
   ruby:lint:
     desc: "Lint Ruby code"
     cmds:
-      - cmd: cd packages/ruby && PATH=/opt/homebrew/opt/ruby/bin:$PATH bundle _2.5.12_ exec rubocop --config ./.rubocop.yml
+      - task: ruby:ensure-bundler
+      - cmd: cd packages/ruby && PATH={{.RUBY_BIN}}:$PATH bundle _{{.BUNDLER_VERSION}}_ exec rubocop --config ./.rubocop.yml
 
   ruby:format:
     desc: "Auto-correct Ruby lint issues"
     cmds:
-      - cmd: cd packages/ruby && PATH=/opt/homebrew/opt/ruby/bin:$PATH bundle _2.5.12_ exec rubocop --config ./.rubocop.yml --autocorrect
+      - task: ruby:ensure-bundler
+      - cmd: cd packages/ruby && PATH={{.RUBY_BIN}}:$PATH bundle _{{.BUNDLER_VERSION}}_ exec rubocop --config ./.rubocop.yml --autocorrect
 
   ruby:clean:
     desc: "Clean Ruby build artifacts"
