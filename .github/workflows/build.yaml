@@ -193,7 +193,8 @@ jobs:
           tar -xzf "build/artifacts/php_html_to_markdown-${{ needs.prepare.outputs.version }}-src.tgz" -C "$TMP_DIR"
           echo "Extracted archive contents:" && ls -R "$TMP_DIR"
           php build/pie.phar repository:add path "$TMP_DIR"
-          php build/pie.phar build goldziher/html-to-markdown:*@dev --with-cargo-bin=$(command -v cargo)
+          CARGO_BIN="$(command -v cargo)"
+          php build/pie.phar build goldziher/html-to-markdown:*@dev --working-dir "$TMP_DIR" --with-cargo-bin="$CARGO_BIN"
 
       - name: Upload PIE source archive
         uses: actions/upload-artifact@v5
@@ -547,6 +548,16 @@ jobs:
               ;;
           esac
 
+      - name: Configure cross linker
+        if: ${{ matrix.target == 'aarch64-unknown-linux-gnu' }}
+        run: |
+          {
+            echo "CC_aarch64_unknown_linux_gnu=aarch64-linux-gnu-gcc"
+            echo "CXX_aarch64_unknown_linux_gnu=aarch64-linux-gnu-g++"
+            echo "AR_aarch64_unknown_linux_gnu=aarch64-linux-gnu-ar"
+            echo "CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER=aarch64-linux-gnu-gcc"
+          } >> "$GITHUB_ENV"
+
       - name: Install cross
         if: ${{ matrix.use_cross }}
         run: cargo install cross --git https://github.com/cross-rs/cross --locked
@@ -727,10 +738,8 @@ jobs:
           cargo package -p html-to-markdown-rs --allow-dirty
 
           cli_packaged=0
-          set +e
-          cargo package -p html-to-markdown-cli --allow-dirty --no-verify
-          cli_status=$?
-          set -e
+          cli_status=0
+          cargo package -p html-to-markdown-cli --allow-dirty --no-verify || cli_status=$?
 
           if [ "$cli_status" -eq 0 ]; then
             cli_packaged=1
