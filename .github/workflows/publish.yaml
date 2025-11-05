@@ -31,7 +31,7 @@ jobs:
           echo "id=${{ github.event.workflow_run.id }}" >> "$GITHUB_OUTPUT"
 
       - name: Download metadata artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v6
         with:
           run-id: ${{ steps.build_run.outputs.id }}
           name: release-metadata
@@ -158,7 +158,7 @@ jobs:
       id-token: write
     steps:
       - name: Download wheel artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v6
         with:
           run-id: ${{ needs.gather.outputs.build_run_id }}
           pattern: python-wheels-*
@@ -166,7 +166,7 @@ jobs:
           merge-multiple: true
 
       - name: Download sdist artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v6
         with:
           run-id: ${{ needs.gather.outputs.build_run_id }}
           name: python-sdist
@@ -196,7 +196,7 @@ jobs:
       id-token: write
     steps:
       - name: Download Ruby gem artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v6
         with:
           run-id: ${{ needs.gather.outputs.build_run_id }}
           pattern: rubygems-*
@@ -242,7 +242,7 @@ jobs:
           ref: ${{ needs.gather.outputs.ref }}
 
       - name: Download Node artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v6
         with:
           run-id: ${{ needs.gather.outputs.build_run_id }}
           pattern: node-bindings-*
@@ -303,7 +303,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Download Windows artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v6
         with:
           run-id: ${{ needs.gather.outputs.build_run_id }}
           pattern: php_html_to_markdown-*.zip
@@ -341,7 +341,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Download PIE source artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v6
         with:
           run-id: ${{ needs.gather.outputs.build_run_id }}
           name: php-pie-src
