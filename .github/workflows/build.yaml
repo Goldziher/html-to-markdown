@@ -270,7 +270,9 @@ jobs:
           git config user.name "html-to-markdown CI"
           git add . | Out-Null
           git commit -m "extension snapshot" | Out-Null
+          git branch -M main | Out-Null
           git clone --bare . $repoBare | Out-Null
+          $commit = git rev-parse HEAD
           Set-Location $root
 
           $repoPath = (Get-Item $repoBare).FullName.Replace('\','/')
@@ -282,6 +284,7 @@ jobs:
           }
           $repoUri = $repoPath
           "repo_uri=$repoUri" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+          "repo_ref=$commit" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
 
       - name: Build Windows artifacts
         uses: php/php-windows-builder/extension@v1
@@ -290,7 +293,7 @@ jobs:
           RUSTUP_TOOLCHAIN: nightly
         with:
           extension-url: ${{ steps.php_repo.outputs.repo_uri }}
-          extension-ref: main
+          extension-ref: ${{ steps.php_repo.outputs.repo_ref }}
           php-version: ${{ matrix.php-version }}
           arch: ${{ matrix.arch }}
           ts: ${{ matrix.ts }}
