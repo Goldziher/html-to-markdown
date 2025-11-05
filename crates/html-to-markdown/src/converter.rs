@@ -2918,8 +2918,13 @@ fn walk_node(
                         if !output.is_empty() {
                             if output.ends_with("```\n") {
                                 output.push('\n');
-                            } else if !output.ends_with("\n\n") {
-                                output.push_str("\n\n");
+                            } else {
+                                trim_trailing_whitespace(output);
+                                if output.ends_with('\n') && !output.ends_with("\n\n") {
+                                    output.push('\n');
+                                } else if !output.ends_with('\n') {
+                                    output.push_str("\n\n");
+                                }
                             }
                         }
                         output.push('*');
