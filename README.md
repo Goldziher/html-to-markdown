@@ -3,11 +3,12 @@
 High-performance HTML → Markdown conversion powered by Rust. Shipping as a Rust crate, Python package, PHP extension, Ruby gem, Node.js bindings, WebAssembly, and standalone CLI with identical rendering behaviour.
 
 [![Crates.io](https://img.shields.io/crates/v/html-to-markdown-rs.svg)](https://crates.io/crates/html-to-markdown-rs)
-[![npm version](https://badge.fury.io/js/html-to-markdown-node.svg)](https://www.npmjs.com/package/html-to-markdown-node)
-[![PyPI version](https://badge.fury.io/py/html-to-markdown.svg)](https://pypi.org/project/html-to-markdown/)
-[![Gem Version](https://badge.fury.io/rb/html-to-markdown.svg)](https://rubygems.org/gems/html-to-markdown)
+[![npm (node)](https://badge.fury.io/js/html-to-markdown-node.svg)](https://www.npmjs.com/package/html-to-markdown-node)
+[![npm (wasm)](https://badge.fury.io/js/html-to-markdown-wasm.svg)](https://www.npmjs.com/package/html-to-markdown-wasm)
+[![npm (typescript)](https://badge.fury.io/js/html-to-markdown.svg)](https://www.npmjs.com/package/html-to-markdown)
+[![PyPI](https://badge.fury.io/py/html-to-markdown.svg)](https://pypi.org/project/html-to-markdown/)
 [![Packagist](https://img.shields.io/packagist/v/goldziher/html-to-markdown.svg)](https://packagist.org/packages/goldziher/html-to-markdown)
-[![Python Versions](https://img.shields.io/pypi/pyversions/html-to-markdown.svg)](https://pypi.org/project/html-to-markdown/)
+[![RubyGems](https://badge.fury.io/rb/html-to-markdown.svg)](https://rubygems.org/gems/html-to-markdown)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://github.com/Goldziher/html-to-markdown/blob/main/LICENSE)
 [![Discord](https://img.shields.io/badge/Discord-Join%20our%20community-7289da)](https://discord.gg/pXxagNK2zN)
 
@@ -34,8 +35,11 @@ Experience WebAssembly-powered HTML to Markdown conversion instantly in your bro
 - **JavaScript/TypeScript guides**:
     - Node.js/Bun (native) – [Node.js README](https://github.com/Goldziher/html-to-markdown/blob/main/crates/html-to-markdown-node/README.md)
     - WebAssembly (universal) – [WASM README](https://github.com/Goldziher/html-to-markdown/blob/main/crates/html-to-markdown-wasm/README.md)
-- **Python guide** – [Python README](https://github.com/Goldziher/html-to-markdown/blob/main/README_PYPI.md)
-- **PHP guide** – [PHP README](https://github.com/Goldziher/html-to-markdown/blob/main/docs/php.md)
+    - TypeScript wrapper – [TypeScript README](https://github.com/Goldziher/html-to-markdown/blob/main/packages/typescript/README.md)
+- **Python guide** – [Python README](https://github.com/Goldziher/html-to-markdown/blob/main/packages/python/README.md)
+- **PHP guides**:
+    - PHP wrapper package – [PHP README](https://github.com/Goldziher/html-to-markdown/blob/main/packages/php/README.md)
+    - PHP extension (PIE) – [Extension README](https://github.com/Goldziher/html-to-markdown/blob/main/packages/php-ext/README.md)
 - **Ruby guide** – [Ruby README](https://github.com/Goldziher/html-to-markdown/blob/main/crates/html-to-markdown-rb/README.md)
 - **Rust guide** – [Rust README](https://github.com/Goldziher/html-to-markdown/blob/main/crates/html-to-markdown/README.md)
 - **Contributing** – [CONTRIBUTING.md](https://github.com/Goldziher/html-to-markdown/blob/main/CONTRIBUTING.md) ⭐ Start here!
@@ -174,7 +178,7 @@ Benchmarked on Apple M4 with complex real-world documents (Wikipedia articles, t
 ## Compatibility (v1 → v2)
 
 - V2’s Rust core sustains **150–210 MB/s** throughput; V1 averaged **≈ 2.5 MB/s** in its Python/BeautifulSoup implementation (60–80× faster).
-- The Python package offers a compatibility shim in `html_to_markdown.v1_compat` (`convert_to_markdown`, `convert_to_markdown_stream`, `markdownify`). Details and keyword mappings live in [Python README](https://github.com/Goldziher/html-to-markdown/blob/main/README_PYPI.md#v1-compatibility).
+- The Python package offers a compatibility shim in `html_to_markdown.v1_compat` (`convert_to_markdown`, `convert_to_markdown_stream`, `markdownify`). Details and keyword mappings live in [Python README](https://github.com/Goldziher/html-to-markdown/blob/main/packages/python/README.md#v1-compatibility).
 - CLI flag changes, option renames, and other breaking updates are summarised in [CHANGELOG](https://github.com/Goldziher/html-to-markdown/blob/main/CHANGELOG.md#breaking-changes).
 
 ## Community
