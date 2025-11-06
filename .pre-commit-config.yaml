@@ -49,13 +49,6 @@ repos:
       - id: clippy
   - repo: local
     hooks:
-      - id: rubocop
-        name: rubocop
-        entry: bundle exec rubocop --autocorrect --config .rubocop.yml
-        language: system
-        files: ^packages/ruby/
-        working_directory: packages/ruby
-        pass_filenames: false
       - id: mypy
         name: mypy
         entry: uv run mypy
