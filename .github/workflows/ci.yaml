@@ -280,6 +280,11 @@ jobs:
         working-directory: packages/ruby
         run: bundle _2.5.12_ install
 
+      - name: Run Rubocop (Unix)
+        if: runner.os != 'Windows' && matrix.os == 'ubuntu-latest' && matrix.ruby == '3.3'
+        working-directory: packages/ruby
+        run: bundle _2.5.12_ exec rubocop --config .rubocop.yml
+
       - name: Install Ruby gems (Windows)
         if: runner.os == 'Windows'
         working-directory: packages/ruby
