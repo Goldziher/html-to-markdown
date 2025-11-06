@@ -258,6 +258,7 @@ jobs:
 
           New-Item -ItemType Directory -Path $repoDir -Force | Out-Null
           Copy-Item -Path "$extSrc\*" -Destination $repoDir -Recurse -Force
+          Get-ChildItem -Path $repoDir -Recurse | ForEach-Object { Write-Host "snapshot:: $($_.FullName)" }
 
           $cargoDir = Join-Path $repoDir ".cargo"
           New-Item -ItemType Directory -Path $cargoDir -Force | Out-Null
