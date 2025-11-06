@@ -1,6 +1,26 @@
 ARG_ENABLE("html_to_markdown", "Enable html_to_markdown support", "yes");
 
 if (PHP_HTML_TO_MARKDOWN != "no") {
-    EXTENSION("html_to_markdown", null, PHP_HTML_TO_MARKDOWN_SHARED, "/DZEND_ENABLE_STATIC_TSRMLS_CACHE=1");
+    var extname = "html_to_markdown";
+    var EXT = extname.toUpperCase();
+    var dllname = "php_" + extname + ".dll";
+
+    if (force_all_shared()) {
+        PHP_HTML_TO_MARKDOWN_SHARED = true;
+    }
+
+    if (!PHP_HTML_TO_MARKDOWN_SHARED) {
+        PHP_HTML_TO_MARKDOWN_SHARED = true;
+    }
+
+    STDOUT.WriteLine("Enabling extension " + configure_module_dirname + " [shared]");
+
+    ADD_FLAG("CFLAGS_PHP", "/D COMPILE_DL_" + EXT);
+    ADD_FLAG("CFLAGS_" + EXT, "/D ZEND_COMPILE_DL_EXT=1 /D COMPILE_DL_" + EXT + " /D " + EXT + "_EXPORTS=1 /DZEND_ENABLE_STATIC_TSRMLS_CACHE=1");
+    DEFINE("CFLAGS_" + EXT + "_OBJ", "$(CFLAGS_" + EXT + ")");
+    ADD_FLAG("EXT_TARGETS", dllname);
+    AC_DEFINE("HAVE_" + EXT, 1, "Have " + extname + " support");
+    extensions_enabled[extensions_enabled.length] = [extname, 'shared', false];
+
     ADD_MAKEFILE_FRAGMENT();
 }
