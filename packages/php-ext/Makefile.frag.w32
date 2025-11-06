@@ -1,7 +1,7 @@
-HTM2MD_WORKSPACE_DIR = $(top_srcdir)\workspace
+HTM2MD_ARTIFACT_NAME = html_to_markdown_php
 HTM2MD_TARGET_DIR    = $(HTM2MD_WORKSPACE_DIR)\target\release
-HTM2MD_SOURCE_DLL    = $(HTM2MD_TARGET_DIR)\html_to_markdown_php.dll
-HTM2MD_SOURCE_PDB    = $(HTM2MD_TARGET_DIR)\html_to_markdown_php.pdb
+HTM2MD_SOURCE_DLL    = $(HTM2MD_TARGET_DIR)\$(HTM2MD_ARTIFACT_NAME).dll
+HTM2MD_SOURCE_PDB    = $(HTM2MD_TARGET_DIR)\$(HTM2MD_ARTIFACT_NAME).pdb
 HTM2MD_OUTPUT_DLL    = $(BUILD_DIR)\php_html_to_markdown.dll
 HTM2MD_OUTPUT_PDB    = $(BUILD_DIR)\php_html_to_markdown.pdb
 
