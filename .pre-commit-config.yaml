@@ -34,15 +34,6 @@ repos:
       - id: ruff
         args: ["--fix", "--unsafe-fixes"]
       - id: ruff-format
-  - repo: https://github.com/rubocop/rubocop
-    rev: v1.81.7
-    hooks:
-      - id: rubocop
-        args: ["--autocorrect", "--config", "packages/ruby/.rubocop.yml"]
-        files: ^packages/ruby/
-        additional_dependencies:
-          - rubocop-rspec
-        language_version: 3.3.0
   - repo: https://github.com/codespell-project/codespell
     rev: v2.4.1
     hooks:
@@ -58,6 +49,13 @@ repos:
       - id: clippy
   - repo: local
     hooks:
+      - id: rubocop
+        name: rubocop
+        entry: bundle exec rubocop --autocorrect --config .rubocop.yml
+        language: system
+        files: ^packages/ruby/
+        working_directory: packages/ruby
+        pass_filenames: false
       - id: mypy
         name: mypy
         entry: uv run mypy
