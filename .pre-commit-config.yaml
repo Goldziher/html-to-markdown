@@ -40,6 +40,9 @@ repos:
       - id: rubocop
         args: ["--autocorrect", "--config", "packages/ruby/.rubocop.yml"]
         files: ^packages/ruby/
+        additional_dependencies:
+          - rubocop-rspec
+        language_version: 2.7.8
   - repo: https://github.com/codespell-project/codespell
     rev: v2.4.1
     hooks:
