@@ -1,33 +1,40 @@
-HTM2MD_ARTIFACT_NAME = html_to_markdown_php
-HTM2MD_TARGET_DIR    = $(HTM2MD_WORKSPACE_DIR)\target\release
-HTM2MD_SOURCE_DLL    = $(HTM2MD_TARGET_DIR)\$(HTM2MD_ARTIFACT_NAME).dll
-HTM2MD_SOURCE_PDB    = $(HTM2MD_TARGET_DIR)\$(HTM2MD_ARTIFACT_NAME).pdb
-HTM2MD_OUTPUT_DLL    = $(BUILD_DIR)\php_html_to_markdown.dll
-HTM2MD_OUTPUT_PDB    = $(BUILD_DIR)\php_html_to_markdown.pdb
+HTMLTOMARKDOWN_ARTIFACT_NAME = html_to_markdown_php
+HTMLTOMARKDOWN_TARGET_DIR    = $(HTMLTOMARKDOWN_WORKSPACE_DIR)\target\release
+HTMLTOMARKDOWN_SOURCE_DLL    = $(HTMLTOMARKDOWN_TARGET_DIR)\$(HTMLTOMARKDOWN_ARTIFACT_NAME).dll
+HTMLTOMARKDOWN_SOURCE_PDB    = $(HTMLTOMARKDOWN_TARGET_DIR)\$(HTMLTOMARKDOWN_ARTIFACT_NAME).pdb
+HTMLTOMARKDOWN_OUTPUT_DLL    = $(BUILD_DIR)\php_html_to_markdown.dll
+HTMLTOMARKDOWN_OUTPUT_PDB    = $(BUILD_DIR)\php_html_to_markdown.pdb
 
-PHP_MODULES = $(PHP_MODULES) $(HTM2MD_OUTPUT_DLL)
-all_targets = $(all_targets) $(HTM2MD_OUTPUT_DLL)
+PHP_MODULES = $(PHP_MODULES) $(HTMLTOMARKDOWN_OUTPUT_DLL)
+all_targets = $(all_targets) $(HTMLTOMARKDOWN_OUTPUT_DLL)
 
-$(HTM2MD_OUTPUT_DLL): FORCE
-	@echo [htm2md] workspace: $(HTM2MD_WORKSPACE_DIR)
-	if not exist "$(HTM2MD_WORKSPACE_DIR)" (
-		echo [htm2md] error: workspace snapshot missing at $(HTM2MD_WORKSPACE_DIR) 1>&2
+$(HTMLTOMARKDOWN_OUTPUT_DLL): FORCE
+	@echo ================================================
+	@echo [htmltomarkdown] Building Rust extension via cargo
+	@echo [htmltomarkdown] workspace: $(HTMLTOMARKDOWN_WORKSPACE_DIR)
+	@echo [htmltomarkdown] BUILD_DIR: $(BUILD_DIR)
+	@echo [htmltomarkdown] target DLL: $(HTMLTOMARKDOWN_OUTPUT_DLL)
+	@echo ================================================
+	if not exist "$(HTMLTOMARKDOWN_WORKSPACE_DIR)" (
+		echo [htmltomarkdown] error: workspace missing at $(HTMLTOMARKDOWN_WORKSPACE_DIR) 1>&2
+		exit /b 1
+	)
+	@echo [htmltomarkdown] running cargo build...
+	cargo build --manifest-path="$(HTMLTOMARKDOWN_WORKSPACE_DIR)\Cargo.toml" --package html-to-markdown-php --release --target-dir "$(HTMLTOMARKDOWN_WORKSPACE_DIR)\target"
+	@if errorlevel 1 (
+		echo [htmltomarkdown] error: cargo build failed 1>&2
+		exit /b 1
+	)
+	@echo [htmltomarkdown] cargo build succeeded
+	if not exist "$(HTMLTOMARKDOWN_SOURCE_DLL)" (
+		echo [htmltomarkdown] error: cargo did not produce $(HTMLTOMARKDOWN_SOURCE_DLL) 1>&2
+		dir "$(HTMLTOMARKDOWN_TARGET_DIR)" 1>&2
 		exit /b 1
 	)
 	if not exist "$(BUILD_DIR)" mkdir "$(BUILD_DIR)"
-	@echo [htm2md] running cargo build for html-to-markdown-php
-	@cargo build --manifest-path="$(HTM2MD_WORKSPACE_DIR)\Cargo.toml" --package html-to-markdown-php --release --target-dir "$(HTM2MD_WORKSPACE_DIR)\target"
-	@if errorlevel 1 (
-		echo [htm2md] error: cargo build failed 1>&2
-		exit /b 1
-	)
-	if not exist "$(HTM2MD_SOURCE_DLL)" (
-		echo [htm2md] error: cargo did not produce expected artifact: $(HTM2MD_SOURCE_DLL) 1>&2
-		dir "$(HTM2MD_TARGET_DIR)"
-		exit /b 1
-	)
-	@copy /Y "$(HTM2MD_SOURCE_DLL)" "$(HTM2MD_OUTPUT_DLL)" >nul
-	@if exist "$(HTM2MD_SOURCE_PDB)" copy /Y "$(HTM2MD_SOURCE_PDB)" "$(HTM2MD_OUTPUT_PDB)" >nul
-	@echo [htm2md] copied DLL to $(HTM2MD_OUTPUT_DLL)
+	@echo [htmltomarkdown] copying DLL to build directory...
+	copy /Y "$(HTMLTOMARKDOWN_SOURCE_DLL)" "$(HTMLTOMARKDOWN_OUTPUT_DLL)"
+	@if exist "$(HTMLTOMARKDOWN_SOURCE_PDB)" copy /Y "$(HTMLTOMARKDOWN_SOURCE_PDB)" "$(HTMLTOMARKDOWN_OUTPUT_PDB)"
+	@echo [htmltomarkdown] SUCCESS: DLL ready at $(HTMLTOMARKDOWN_OUTPUT_DLL)
 
 FORCE:
