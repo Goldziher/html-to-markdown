@@ -286,12 +286,15 @@ jobs:
           "repo_uri=$repoUri" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
           "repo_ref=$commit" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
 
+      - name: Allow git file protocol
+        shell: pwsh
+        run: git config --global protocol.file.allow always
+
       - name: Build Windows artifacts
         uses: php/php-windows-builder/extension@v1
         env:
           GITHUB_ACTIONS: "false"
           RUSTUP_TOOLCHAIN: nightly
-          GIT_ALLOW_PROTOCOL: file
         with:
           extension-url: ${{ steps.php_repo.outputs.repo_uri }}
           extension-ref: ${{ steps.php_repo.outputs.repo_ref }}
