@@ -33,6 +33,9 @@ jobs:
       version: ${{ steps.meta.outputs.version }}
       ref: ${{ steps.meta.outputs.ref }}
       dry_run: ${{ steps.meta.outputs.dry_run }}
+      checkout_ref: ${{ steps.meta.outputs.checkout_ref }}
+      target_sha: ${{ steps.meta.outputs.target_sha }}
+      matrix_ref: ${{ steps.meta.outputs.matrix_ref }}
     steps:
       - name: Validate tag and compute version
         id: meta
@@ -68,12 +71,34 @@ jobs:
           else
             ref="refs/tags/${tag}"
           fi
+          if [[ "$ref" =~ ^[0-9a-f]{40}$ ]]; then
+            checkout_ref="refs/heads/main"
+            target_sha="$ref"
+          elif [[ "$ref" =~ ^refs/ ]]; then
+            checkout_ref="$ref"
+            target_sha=""
+          else
+            checkout_ref="refs/heads/${ref}"
+            target_sha=""
+          fi
+          if [[ "$ref" =~ ^[0-9a-f]{40}$ ]]; then
+            matrix_ref="main"
+          elif [[ "$ref" =~ ^refs/heads/(.+)$ ]]; then
+            matrix_ref="${BASH_REMATCH[1]}"
+          elif [[ "$ref" =~ ^refs/tags/(.+)$ ]]; then
+            matrix_ref="${BASH_REMATCH[1]}"
+          else
+            matrix_ref="$ref"
+          fi
           dry_run="$dry_run_input"
           cat <<JSON > release-metadata.json
           {
             "tag": "$tag",
             "version": "$version",
             "ref": "$ref",
+            "checkout_ref": "$checkout_ref",
+            "target_sha": "$target_sha",
+            "matrix_ref": "$matrix_ref",
             "dry_run": ${dry_run:-false}
           }
           JSON
@@ -81,6 +106,9 @@ jobs:
           echo "version=$version" >> "$GITHUB_OUTPUT"
           echo "ref=$ref" >> "$GITHUB_OUTPUT"
           echo "dry_run=${dry_run:-false}" >> "$GITHUB_OUTPUT"
+          echo "checkout_ref=$checkout_ref" >> "$GITHUB_OUTPUT"
+          echo "target_sha=$target_sha" >> "$GITHUB_OUTPUT"
+          echo "matrix_ref=$matrix_ref" >> "$GITHUB_OUTPUT"
       - name: Upload release metadata
         uses: actions/upload-artifact@v5
         with:
@@ -100,7 +128,12 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v5
         with:
-          ref: ${{ needs.prepare.outputs.ref }}
+          ref: ${{ needs.prepare.outputs.checkout_ref }}
+          fetch-depth: 0
+
+      - name: Ensure target commit
+        if: ${{ needs.prepare.outputs.target_sha != '' }}
+        run: git checkout --progress --force ${{ needs.prepare.outputs.target_sha }}
 
       - name: Build wheels
         uses: ./.github/actions/build-wheels
@@ -122,7 +155,12 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v5
         with:
-          ref: ${{ needs.prepare.outputs.ref }}
+          ref: ${{ needs.prepare.outputs.checkout_ref }}
+          fetch-depth: 0
+
+      - name: Ensure target commit
+        if: ${{ needs.prepare.outputs.target_sha != '' }}
+        run: git checkout --progress --force ${{ needs.prepare.outputs.target_sha }}
 
       - name: Setup Rust
         uses: actions-rust-lang/setup-rust-toolchain@v1
@@ -162,7 +200,12 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v5
         with:
-          ref: ${{ needs.prepare.outputs.ref }}
+          ref: ${{ needs.prepare.outputs.checkout_ref }}
+          fetch-depth: 0
+
+      - name: Ensure target commit
+        if: ${{ needs.prepare.outputs.target_sha != '' }}
+        run: git checkout --progress --force ${{ needs.prepare.outputs.target_sha }}
 
       - name: Setup Rust
         uses: actions-rust-lang/setup-rust-toolchain@v1
@@ -213,14 +256,19 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v5
         with:
-          ref: ${{ needs.prepare.outputs.ref }}
+          ref: ${{ needs.prepare.outputs.checkout_ref }}
+          fetch-depth: 0
+
+      - name: Ensure target commit
+        if: ${{ needs.prepare.outputs.target_sha != '' }}
+        run: git checkout --progress --force ${{ needs.prepare.outputs.target_sha }}
 
       - name: Compute Windows matrix
         id: matrix
         uses: php/php-windows-builder/extension-matrix@v1
         with:
           extension-url: https://github.com/${{ github.repository }}
-          extension-ref: ${{ needs.prepare.outputs.ref }}
+          extension-ref: ${{ needs.prepare.outputs.matrix_ref }}
 
   php-windows:
     name: Build PHP extension (Windows)
@@ -233,7 +281,12 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v5
         with:
-          ref: ${{ needs.prepare.outputs.ref }}
+          ref: ${{ needs.prepare.outputs.checkout_ref }}
+          fetch-depth: 0
+
+      - name: Ensure target commit
+        if: ${{ needs.prepare.outputs.target_sha != '' }}
+        run: git checkout --progress --force ${{ needs.prepare.outputs.target_sha }}
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
@@ -358,7 +411,12 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v5
         with:
-          ref: ${{ needs.prepare.outputs.ref }}
+          ref: ${{ needs.prepare.outputs.checkout_ref }}
+          fetch-depth: 0
+
+      - name: Ensure target commit
+        if: ${{ needs.prepare.outputs.target_sha != '' }}
+        run: git checkout --progress --force ${{ needs.prepare.outputs.target_sha }}
 
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
@@ -460,7 +518,12 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v5
         with:
-          ref: ${{ needs.prepare.outputs.ref }}
+          ref: ${{ needs.prepare.outputs.checkout_ref }}
+          fetch-depth: 0
+
+      - name: Ensure target commit
+        if: ${{ needs.prepare.outputs.target_sha != '' }}
+        run: git checkout --progress --force ${{ needs.prepare.outputs.target_sha }}
 
       - name: Setup Rust
         uses: actions-rust-lang/setup-rust-toolchain@v1
@@ -535,7 +598,12 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v5
         with:
-          ref: ${{ needs.prepare.outputs.ref }}
+          ref: ${{ needs.prepare.outputs.checkout_ref }}
+          fetch-depth: 0
+
+      - name: Ensure target commit
+        if: ${{ needs.prepare.outputs.target_sha != '' }}
+        run: git checkout --progress --force ${{ needs.prepare.outputs.target_sha }}
 
       - name: Setup Rust
         uses: actions-rust-lang/setup-rust-toolchain@v1
@@ -647,8 +715,12 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v5
         with:
-          ref: ${{ needs.prepare.outputs.ref }}
+          ref: ${{ needs.prepare.outputs.checkout_ref }}
           fetch-depth: 0
+
+      - name: Ensure target commit
+        if: ${{ needs.prepare.outputs.target_sha != '' }}
+        run: git checkout --progress --force ${{ needs.prepare.outputs.target_sha }}
 
       - name: Remove cached CLI binaries
         shell: bash
@@ -734,7 +806,12 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v5
         with:
-          ref: ${{ needs.prepare.outputs.ref }}
+          ref: ${{ needs.prepare.outputs.checkout_ref }}
+          fetch-depth: 0
+
+      - name: Ensure target commit
+        if: ${{ needs.prepare.outputs.target_sha != '' }}
+        run: git checkout --progress --force ${{ needs.prepare.outputs.target_sha }}
 
       - name: Setup Rust
         uses: actions-rust-lang/setup-rust-toolchain@v1
