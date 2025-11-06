@@ -246,8 +246,9 @@ jobs:
         run: |
           $root = Get-Location
           $extSrc = Join-Path $root "packages\php-ext"
-          $repoDir = Join-Path $root "php-ext-src"
-          $repoBare = Join-Path $root "php-ext.git"
+          $tempBase = Join-Path $env:RUNNER_TEMP "html-to-markdown-php-ext"
+          $repoDir = Join-Path $tempBase "src"
+          $repoBare = Join-Path $tempBase "repo.git"
 
           if (Test-Path $repoDir) {
             Remove-Item $repoDir -Recurse -Force
