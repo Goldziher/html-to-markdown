@@ -32,7 +32,7 @@ if (PHP_HTML_TO_MARKDOWN != "no") {
     }
     workspaceRoot = FSO.GetAbsolutePathName(workspaceRoot);
     STDOUT.WriteLine("html_to_markdown workspace root: " + workspaceRoot);
-    DEFINE("HTM2MD_WORKSPACE_DIR", workspaceRoot);
+    DEFINE("HTMLTOMARKDOWN_WORKSPACE_DIR", workspaceRoot);
 
     EXTENSION(extname, placeholder, PHP_HTML_TO_MARKDOWN_SHARED, "/DZEND_ENABLE_STATIC_TSRMLS_CACHE=1");
     REMOVE_TARGET(dllname, "EXT_TARGETS");
