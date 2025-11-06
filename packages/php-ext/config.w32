@@ -22,5 +22,9 @@ if (PHP_HTML_TO_MARKDOWN != "no") {
     AC_DEFINE("HAVE_" + EXT, 1, "Have " + extname + " support");
     extensions_enabled[extensions_enabled.length] = [extname, 'shared', false];
 
+    // Provide a synthetic EXTENSION() declaration so the php-windows-builder
+    // helper can detect the extension name before running configure.js.
+    // EXTENSION("html_to_markdown", "placeholder.c", PHP_HTML_TO_MARKDOWN_SHARED, "/DZEND_ENABLE_STATIC_TSRMLS_CACHE=1");
+
     ADD_MAKEFILE_FRAGMENT();
 }
