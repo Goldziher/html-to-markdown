@@ -22,9 +22,4 @@ $(HTM2MD_OUTPUT_DLL): FORCE
 	@copy /Y "$(HTM2MD_SOURCE_DLL)" "$(HTM2MD_OUTPUT_DLL)" >nul
 	@if exist "$(HTM2MD_SOURCE_PDB)" copy /Y "$(HTM2MD_SOURCE_PDB)" "$(HTM2MD_OUTPUT_PDB)" >nul
 
-clean::
-	@if exist "$(HTM2MD_TARGET_DIR)" rd /s /q "$(HTM2MD_TARGET_DIR)"
-	@if exist "$(HTM2MD_OUTPUT_DLL)" del "$(HTM2MD_OUTPUT_DLL)"
-	@if exist "$(HTM2MD_OUTPUT_PDB)" del "$(HTM2MD_OUTPUT_PDB)"
-
 FORCE:
