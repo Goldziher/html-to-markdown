@@ -283,8 +283,12 @@ jobs:
 
       - name: Pack platform packages
         run: |
-          cd crates/html-to-markdown-node
-          pnpm exec napi artifacts
+          cd crates/html-to-markdown-node/npm
+          for dir in */; do
+            if [ -f "$dir/package.json" ]; then
+              (cd "$dir" && npm pack)
+            fi
+          done
 
       - name: Publish native binary packages
         if: ${{ needs.gather.outputs.dry_run != 'true' }}
