@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.6.1] - 2025-11-07
+
+### Fixed
+- **Node.js Platform Packages** - Fixed publishing of platform-specific npm packages. The workflow now correctly packs npm directories into .tgz files before publishing, ensuring all platform bindings (linux-x64-gnu, darwin-arm64, win32-x64-msvc, etc.) are published to npm.
+- **WASM Package Publishing** - Added proper WASM package publishing workflow to ensure html-to-markdown-wasm is published to npm registry.
+
 ## [2.6.0] - 2025-11-07
 
 ### Added
