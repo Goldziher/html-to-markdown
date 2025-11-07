@@ -455,6 +455,11 @@ tasks:
       - pnpm --filter html-to-markdown run lint:fix
 
   # Misc tasks ----------------------------------------------------------------
+  sync-versions:
+    desc: "Sync version from Cargo.toml to all package manifests"
+    cmds:
+      - uv run scripts/sync_versions.py
+
   docs:build:
     desc: "Build documentation site"
     cmds:
