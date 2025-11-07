@@ -49,6 +49,7 @@
     "artifacts": "napi artifacts",
     "build": "napi build --platform --release",
     "build:debug": "napi build --platform",
+    "prepublishOnly": "napi prepublish -t npm",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:simple": "node test.js",
@@ -69,16 +70,5 @@
     "@octokit/core": "7.0.6",
     "typanion": "3.14.0",
     "up": "^1.0.2"
-  },
-  "optionalDependencies": {
-    "html-to-markdown-node-darwin-x64": "2.6.3",
-    "html-to-markdown-node-darwin-arm64": "2.6.3",
-    "html-to-markdown-node-win32-x64-msvc": "2.6.3",
-    "html-to-markdown-node-win32-arm64-msvc": "2.6.3",
-    "html-to-markdown-node-linux-x64-gnu": "2.6.3",
-    "html-to-markdown-node-linux-x64-musl": "2.6.3",
-    "html-to-markdown-node-linux-arm64-gnu": "2.6.3",
-    "html-to-markdown-node-linux-arm64-musl": "2.6.3",
-    "html-to-markdown-node-linux-arm-gnueabihf": "2.6.3"
   }
 }
