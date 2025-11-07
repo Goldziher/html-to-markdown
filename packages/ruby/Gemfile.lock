@@ -1,7 +1,7 @@
 PATH
   remote: .
   specs:
-    html-to-markdown (2.5.7)
+    html-to-markdown (2.6.1)
       rb_sys (>= 0.9, < 1.0)
 
 GEM
@@ -9,7 +9,7 @@ GEM
   specs:
     ast (2.4.3)
     diff-lcs (1.6.2)
-    json (2.15.2)
+    json (2.16.0)
     language_server-protocol (3.17.0.5)
     lint_roller (1.1.0)
     parallel (1.27.0)
