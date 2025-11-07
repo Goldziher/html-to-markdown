@@ -281,6 +281,11 @@ jobs:
         if: ${{ needs.gather.outputs.dry_run != 'true' }}
         run: pnpm install --filter html-to-markdown-node...
 
+      - name: Pack platform packages
+        run: |
+          cd crates/html-to-markdown-node
+          pnpm exec napi artifacts --output-dir ../../artifacts
+
       - name: Publish native binary packages
         if: ${{ needs.gather.outputs.dry_run != 'true' }}
         env:
