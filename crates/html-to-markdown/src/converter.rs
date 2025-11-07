@@ -4931,8 +4931,10 @@ mod tests {
     #[test]
     fn test_preserve_tags_simple_table() {
         let html = r#"<div><table><tr><td>Cell 1</td><td>Cell 2</td></tr></table><p>Text</p></div>"#;
-        let mut options = ConversionOptions::default();
-        options.preserve_tags = vec!["table".to_string()];
+        let options = ConversionOptions {
+            preserve_tags: vec!["table".to_string()],
+            ..Default::default()
+        };
         let result = convert_html(html, &options).unwrap();
 
         assert!(result.contains("<table>"), "Should preserve table tag");
@@ -4945,8 +4947,10 @@ mod tests {
     #[test]
     fn test_preserve_tags_with_attributes() {
         let html = r#"<table class="data" id="mytable"><tr><td>Data</td></tr></table>"#;
-        let mut options = ConversionOptions::default();
-        options.preserve_tags = vec!["table".to_string()];
+        let options = ConversionOptions {
+            preserve_tags: vec!["table".to_string()],
+            ..Default::default()
+        };
         let result = convert_html(html, &options).unwrap();
 
         assert!(result.contains("<table"), "Should preserve table tag");
@@ -4958,8 +4962,10 @@ mod tests {
     #[test]
     fn test_preserve_tags_multiple_tags() {
         let html = r#"<div><table><tr><td>Table</td></tr></table><form><input type="text"/></form><p>Text</p></div>"#;
-        let mut options = ConversionOptions::default();
-        options.preserve_tags = vec!["table".to_string(), "form".to_string()];
+        let options = ConversionOptions {
+            preserve_tags: vec!["table".to_string(), "form".to_string()],
+            ..Default::default()
+        };
         let result = convert_html(html, &options).unwrap();
 
         assert!(result.contains("<table>"), "Should preserve table");
@@ -4970,8 +4976,10 @@ mod tests {
     #[test]
     fn test_preserve_tags_nested_content() {
         let html = r#"<table><thead><tr><th>Header</th></tr></thead><tbody><tr><td>Data</td></tr></tbody></table>"#;
-        let mut options = ConversionOptions::default();
-        options.preserve_tags = vec!["table".to_string()];
+        let options = ConversionOptions {
+            preserve_tags: vec!["table".to_string()],
+            ..Default::default()
+        };
         let result = convert_html(html, &options).unwrap();
 
         assert!(result.contains("<thead>"), "Should preserve nested thead");
@@ -4996,9 +5004,11 @@ mod tests {
     #[test]
     fn test_preserve_tags_vs_strip_tags() {
         let html = r#"<table><tr><td>Table</td></tr></table><div><span>Text</span></div>"#;
-        let mut options = ConversionOptions::default();
-        options.preserve_tags = vec!["table".to_string()];
-        options.strip_tags = vec!["span".to_string()];
+        let options = ConversionOptions {
+            preserve_tags: vec!["table".to_string()],
+            strip_tags: vec!["span".to_string()],
+            ..Default::default()
+        };
         let result = convert_html(html, &options).unwrap();
 
         assert!(result.contains("<table>"), "Should preserve table");

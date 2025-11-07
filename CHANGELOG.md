@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.6.2] - 2025-11-07
+
+### Fixed
+- **Table Rowspan Support** - Fixed tables with rowspan cells to correctly duplicate cell content across spanned rows instead of showing empty cells (fixes #116)
+- **Node.js Platform Package Publishing** - Fixed workflow to correctly move packed .tgz files to npm directory for publishing
+- **Deprecation Warnings** - Updated CLI tests to use `CARGO_BIN_EXE` env var instead of deprecated `cargo_bin` method
+- **Deprecation Warnings** - Replaced deprecated `criterion::black_box` with `std::hint::black_box` in benchmarks
+- **Clippy Warnings** - Fixed field assignment warnings by using struct initialization with defaults
+
 ## [2.6.1] - 2025-11-07
 
 ### Fixed

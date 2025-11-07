@@ -286,7 +286,7 @@ jobs:
           cd crates/html-to-markdown-node/npm
           for dir in */; do
             if [ -f "$dir/package.json" ]; then
-              (cd "$dir" && npm pack)
+              (cd "$dir" && npm pack && mv *.tgz ..)
             fi
           done
 
@@ -297,7 +297,7 @@ jobs:
         run: |
           set -euo pipefail
           shopt -s nullglob
-          for pkg in crates/html-to-markdown-node/npm/**/*.tgz crates/html-to-markdown-node/npm/*.tgz; do
+          for pkg in crates/html-to-markdown-node/npm/*.tgz; do
             echo "Publishing $pkg"
             npm publish "$pkg" --access public --ignore-scripts
           done

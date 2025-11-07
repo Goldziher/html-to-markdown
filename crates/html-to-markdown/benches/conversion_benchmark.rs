@@ -3,8 +3,9 @@
 //! Measures throughput (ops/sec, MB/sec) and provides performance baselines
 //! for the core Rust conversion engine.
 
-use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
+use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
 use html_to_markdown_rs::{convert, CodeBlockStyle, ConversionOptions, HeadingStyle};
+use std::hint::black_box;
 use std::time::Duration;
 
 /// Generate HTML with varying complexity

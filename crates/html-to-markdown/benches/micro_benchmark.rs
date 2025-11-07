@@ -1,7 +1,8 @@
 //! Micro-benchmarks for specific operations
 
-use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
+use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion};
 use html_to_markdown_rs::{convert, ConversionOptions};
+use std::hint::black_box;
 
 /// Benchmark text-heavy documents
 fn bench_text_operations(c: &mut Criterion) {
