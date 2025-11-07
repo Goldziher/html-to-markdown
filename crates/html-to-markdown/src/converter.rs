@@ -4522,7 +4522,7 @@ fn convert_table_row(
     options: &ConversionOptions,
     ctx: &Context,
     row_index: usize,
-    rowspan_tracker: &mut std::collections::HashMap<usize, usize>,
+    rowspan_tracker: &mut std::collections::HashMap<usize, (String, usize)>,
     dom_ctx: &DomContext,
 ) {
     let mut row_text = String::with_capacity(256);
@@ -4546,8 +4546,10 @@ fn convert_table_row(
     let mut cell_iter = cells.iter();
 
     loop {
-        if let Some(remaining_rows) = rowspan_tracker.get_mut(&col_index) {
+        if let Some((content, remaining_rows)) = rowspan_tracker.get_mut(&col_index) {
             if *remaining_rows > 0 {
+                row_text.push(' ');
+                row_text.push_str(content);
                 row_text.push_str(" |");
                 *remaining_rows -= 1;
                 if *remaining_rows == 0 {
@@ -4559,12 +4561,21 @@ fn convert_table_row(
         }
 
         if let Some(cell_handle) = cell_iter.next() {
+            let cell_start = row_text.len();
             convert_table_cell(cell_handle, parser, &mut row_text, options, ctx, "", dom_ctx);
 
             let (colspan, rowspan) = get_colspan_rowspan(cell_handle, parser);
 
             if rowspan > 1 {
-                rowspan_tracker.insert(col_index, rowspan - 1);
+                // Extract the cell content that was just added (without separators)
+                let cell_text = &row_text[cell_start..];
+                // Strip leading space and trailing " |"
+                let cell_content = cell_text
+                    .trim_start_matches(' ')
+                    .trim_end_matches(" |")
+                    .trim()
+                    .to_string();
+                rowspan_tracker.insert(col_index, (cell_content, rowspan - 1));
             }
 
             col_index += colspan;

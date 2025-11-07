@@ -55,10 +55,10 @@
     "html-to-markdown-node": "workspace:*"
   },
   "devDependencies": {
-    "@biomejs/biome": "^2.3.3",
+    "@biomejs/biome": "^2.3.4",
     "@types/node": "^24.10.0",
     "typescript": "^5.9.3",
-    "vitest": "^4.0.7"
+    "vitest": "^4.0.8"
   },
   "engines": {
     "node": ">=18"
