@@ -36,6 +36,7 @@ jobs:
           run-id: ${{ steps.build_run.outputs.id }}
           name: release-metadata
           path: metadata
+          github-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Read metadata
         id: read
@@ -164,6 +165,7 @@ jobs:
           pattern: python-wheels-*
           path: dist
           merge-multiple: true
+          github-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Download sdist artifact
         uses: actions/download-artifact@v6
@@ -171,6 +173,7 @@ jobs:
           run-id: ${{ needs.gather.outputs.build_run_id }}
           name: python-sdist
           path: dist
+          github-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: List artifacts
         run: ls -R dist
@@ -202,6 +205,7 @@ jobs:
           pattern: rubygems-*
           path: dist
           merge-multiple: true
+          github-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Configure trusted publishing credentials
         if: ${{ needs.gather.outputs.dry_run != 'true' }}
@@ -248,6 +252,7 @@ jobs:
           pattern: node-bindings-*
           path: node-artifacts
           merge-multiple: true
+          github-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Setup Node
         uses: actions/setup-node@v6
@@ -309,6 +314,7 @@ jobs:
           pattern: php_html_to_markdown-*.zip
           path: dist/php-windows
           merge-multiple: true
+          github-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: List Windows artifacts
         run: find dist/php-windows -maxdepth 1 -type f -name 'php_html_to_markdown-*.zip' -print
@@ -346,6 +352,7 @@ jobs:
           run-id: ${{ needs.gather.outputs.build_run_id }}
           name: php-pie-src
           path: dist/php-pie
+          github-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: List PIE artifact contents
         run: ls -R dist/php-pie
