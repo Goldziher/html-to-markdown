@@ -51,12 +51,8 @@ def update_package_json(file_path: Path, version: str) -> tuple[bool, str, str]:
         data["version"] = version
         changed = True
 
-    # Update optionalDependencies for html-to-markdown-node platform packages
-    if "optionalDependencies" in data:
-        for dep in data["optionalDependencies"]:
-            if dep.startswith("html-to-markdown-node-") and data["optionalDependencies"][dep] != version:
-                data["optionalDependencies"][dep] = version
-                changed = True
+    # Note: We don't update optionalDependencies for html-to-markdown-node
+    # because napi prepublish adds them automatically during publish
 
     if changed:
         file_path.write_text(json.dumps(data, indent=2) + "\n")
