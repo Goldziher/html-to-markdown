@@ -301,6 +301,44 @@ jobs:
           cd crates/html-to-markdown-node
           pnpm publish --access public --no-git-checks
 
+  publish-wasm:
+    name: Publish WASM package
+    needs: gather
+    if: ${{ needs.gather.result == 'success' && needs.gather.outputs.tag && needs.gather.outputs.dry_run != 'true' && needs.gather.outputs.is_tag == 'true' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+        with:
+          ref: ${{ needs.gather.outputs.ref }}
+
+      - name: Download WASM artifacts
+        uses: actions/download-artifact@v6
+        with:
+          run-id: ${{ needs.gather.outputs.build_run_id }}
+          name: wasm-bundles
+          path: wasm-artifacts
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: 20
+          registry-url: https://registry.npmjs.org/
+
+      - name: Extract WASM artifacts
+        run: |
+          cd wasm-artifacts
+          tar -xzf wasm-bundles.tar.gz -C ../crates/html-to-markdown-wasm
+
+      - name: Publish WASM package
+        if: ${{ needs.gather.outputs.dry_run != 'true' }}
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          cd crates/html-to-markdown-wasm
+          npm publish --access public
+
   publish-php-windows:
     name: Upload Windows extension artifacts
     needs: gather
