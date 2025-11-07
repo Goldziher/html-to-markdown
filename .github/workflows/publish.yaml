@@ -299,7 +299,7 @@ jobs:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
           cd crates/html-to-markdown-node
-          pnpm publish --access public
+          pnpm publish --access public --no-git-checks
 
   publish-php-windows:
     name: Upload Windows extension artifacts
@@ -307,6 +307,11 @@ jobs:
     if: ${{ needs.gather.result == 'success' && needs.gather.outputs.tag && needs.gather.outputs.dry_run != 'true' && needs.gather.outputs.is_tag == 'true' }}
     runs-on: ubuntu-latest
     steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+        with:
+          ref: ${{ needs.gather.outputs.ref }}
+
       - name: Download Windows artifacts
         uses: actions/download-artifact@v6
         with:
@@ -346,6 +351,11 @@ jobs:
     if: ${{ needs.gather.result == 'success' && needs.gather.outputs.tag && needs.gather.outputs.dry_run != 'true' && needs.gather.outputs.is_tag == 'true' }}
     runs-on: ubuntu-latest
     steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+        with:
+          ref: ${{ needs.gather.outputs.ref }}
+
       - name: Download PIE source artifact
         uses: actions/download-artifact@v6
         with:
