@@ -47,7 +47,7 @@ jobs:
             echo "Metadata artifact not found" >&2
             exit 1
           fi
-          python - <<'PY'
+          python - >> "$GITHUB_OUTPUT" <<'PY'
           import json, os
           with open('metadata/release-metadata.json', 'r', encoding='utf-8') as fh:
               data = json.load(fh)
@@ -55,7 +55,7 @@ jobs:
           print(f"version={data['version']}")
           print(f"ref={data['ref']}")
           print(f"dry_run={str(data.get('dry_run', False)).lower()}")
-          PY >> "$GITHUB_OUTPUT"
+          PY
 
       - name: Determine dry-run flag
         id: dryrun
