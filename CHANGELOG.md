@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.6.0] - 2025-11-07
+
+### Added
+- **PHP Extension Support** - Official PHP extension (`goldziher/html-to-markdown`) providing native HTML to Markdown conversion for PHP 8.2+
+  - Built with ext-php-rs for high-performance Rust-backed conversion
+  - Supports both Thread-Safe (TS) and Non-Thread-Safe (NTS) builds
+  - Available for Windows (x86, x64), Linux, and macOS
+  - Distributed via PIE (PHP Installer for Extensions) source bundles
+  - Prebuilt Windows binaries for PHP 8.2, 8.3, and 8.4
+  - Comprehensive test suite with PHPUnit
+
+### Changed
+- Refactored PHP build variable names from `HTM2MD_*` to `HTMLTOMARKDOWN_*` for improved clarity in Makefile.frag and config.m4
+- Bumped all package versions to 2.6.0 across Rust crates, npm packages, PyPI wheels, Ruby gem, and PHP extension
+
 ## [2.5.7] - 2025-11-03
 
 ### Added
