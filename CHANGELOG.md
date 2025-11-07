@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.6.3] - 2025-11-07
+
+### Fixed
+- **Release Pipeline** - Fixed missing `is_tag` output in publish workflow that caused all publishing jobs to be skipped
+- **Node.js Package Dependencies** - Added missing `optionalDependencies` to html-to-markdown-node package.json to properly link platform-specific binaries
+- **Version Management** - Created centralized version sync script (`scripts/sync_versions.py`) to maintain consistency across all package manifests (Rust, Node.js, Python, Ruby, WASM)
+- **Cargo Workspace** - Aligned html-to-markdown-rb crate version (was 2.5.7) with workspace version
+
+### Changed
+- Added `task sync-versions` command to Taskfile for easy version synchronization across the monorepo
+
 ## [2.6.2] - 2025-11-07
 
 ### Fixed

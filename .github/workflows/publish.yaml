@@ -36,6 +36,7 @@ jobs:
       checkout_ref: ${{ steps.meta.outputs.checkout_ref }}
       target_sha: ${{ steps.meta.outputs.target_sha }}
       matrix_ref: ${{ steps.meta.outputs.matrix_ref }}
+      is_tag: ${{ steps.meta.outputs.is_tag }}
     steps:
       - name: Validate tag and compute version
         id: meta
@@ -91,6 +92,14 @@ jobs:
             matrix_ref="$ref"
           fi
           dry_run="$dry_run_input"
+
+          # Determine if this is a tag push
+          if [[ "$ref" =~ ^refs/tags/ ]]; then
+            is_tag="true"
+          else
+            is_tag="false"
+          fi
+
           cat <<JSON > release-metadata.json
           {
             "tag": "$tag",
@@ -99,7 +108,8 @@ jobs:
             "checkout_ref": "$checkout_ref",
             "target_sha": "$target_sha",
             "matrix_ref": "$matrix_ref",
-            "dry_run": ${dry_run:-false}
+            "dry_run": ${dry_run:-false},
+            "is_tag": $is_tag
           }
           JSON
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
@@ -109,6 +119,7 @@ jobs:
           echo "checkout_ref=$checkout_ref" >> "$GITHUB_OUTPUT"
           echo "target_sha=$target_sha" >> "$GITHUB_OUTPUT"
           echo "matrix_ref=$matrix_ref" >> "$GITHUB_OUTPUT"
+          echo "is_tag=$is_tag" >> "$GITHUB_OUTPUT"
       - name: Upload release metadata
         uses: actions/upload-artifact@v5
         with:
