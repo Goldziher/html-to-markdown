@@ -1177,3 +1177,39 @@ jobs:
         run: |
           cd crates/html-to-markdown-wasm
           npm publish --access public
+
+  publish-homebrew:
+    name: Update Homebrew formula
+    needs: [prepare, create-release]
+    if: ${{ needs.prepare.result == 'success' && needs.prepare.outputs.tag && needs.prepare.outputs.dry_run != 'true' && needs.prepare.outputs.is_tag == 'true' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Extract release info
+        id: release
+        run: |
+          tag="${{ needs.prepare.outputs.tag }}"
+          version="${{ needs.prepare.outputs.version }}"
+          url="https://github.com/Goldziher/html-to-markdown/archive/$tag.tar.gz"
+
+          echo "tag=$tag" >> $GITHUB_OUTPUT
+          echo "version=$version" >> $GITHUB_OUTPUT
+          echo "url=$url" >> $GITHUB_OUTPUT
+
+          echo "Release info:"
+          echo "  Tag: $tag"
+          echo "  Version: $version"
+          echo "  URL: $url"
+
+      - name: Update Homebrew formula
+        uses: mislav/bump-homebrew-formula-action@v3
+        with:
+          formula-name: html-to-markdown
+          formula-path: Formula/html-to-markdown.rb
+          homebrew-tap: Goldziher/homebrew-tap
+          download-url: ${{ steps.release.outputs.url }}
+          commit-message: |
+            chore(homebrew): update html-to-markdown to ${{ steps.release.outputs.version }}
+
+            Auto-update from release ${{ steps.release.outputs.tag }}
+        env:
+          COMMITTER_TOKEN: ${{ secrets.HOMEBREW_TOKEN }}
