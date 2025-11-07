@@ -284,7 +284,7 @@ jobs:
       - name: Pack platform packages
         run: |
           cd crates/html-to-markdown-node
-          pnpm exec napi artifacts --output-dir ../../artifacts
+          pnpm exec napi artifacts
 
       - name: Publish native binary packages
         if: ${{ needs.gather.outputs.dry_run != 'true' }}
@@ -334,7 +334,9 @@ jobs:
       - name: Extract WASM artifacts
         run: |
           cd wasm-artifacts
-          tar -xzf wasm-bundles.tar.gz -C ../crates/html-to-markdown-wasm
+          for tarball in *.tar.gz; do
+            tar -xzf "$tarball" -C ../crates/html-to-markdown-wasm
+          done
 
       - name: Publish WASM package
         if: ${{ needs.gather.outputs.dry_run != 'true' }}
