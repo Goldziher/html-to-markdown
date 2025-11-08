@@ -864,8 +864,8 @@ jobs:
           path: crate-artifacts/*.crate
           retention-days: 14
 
-  create-release:
-    name: Create GitHub Release
+  upload-release-artifacts:
+    name: Upload Release Artifacts
     needs: [prepare, python-wheels, python-sdist, php-pie, php-windows, node-bindings, wasm-bindings, cli-binaries, ruby-gem, cargo-packages]
     if: ${{ needs.prepare.outputs.dry_run != 'true' && needs.prepare.outputs.is_tag == 'true' }}
     runs-on: ubuntu-latest
@@ -889,14 +889,6 @@ jobs:
           pattern: php-windows-*
           path: dist/php-windows
           merge-multiple: true
-
-      - name: Create GitHub Release
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          gh release create ${{ needs.prepare.outputs.tag }} \
-            --title "${{ needs.prepare.outputs.tag }}" \
-            --generate-notes
 
       - name: Upload PHP PIE source bundle
         env:
@@ -922,7 +914,7 @@ jobs:
 
   publish-crates:
     name: Publish crates.io packages
-    needs: [prepare, create-release]
+    needs: [prepare, upload-release-artifacts]
     if: ${{ needs.prepare.result == 'success' && needs.prepare.outputs.tag && needs.prepare.outputs.dry_run != 'true' && needs.prepare.outputs.is_tag == 'true' }}
     runs-on: ubuntu-latest
     steps:
@@ -989,7 +981,7 @@ jobs:
 
   publish-pypi:
     name: Publish Python packages to PyPI
-    needs: [prepare, create-release]
+    needs: [prepare, upload-release-artifacts]
     if: ${{ needs.prepare.result == 'success' && needs.prepare.outputs.tag && needs.prepare.outputs.dry_run != 'true' && needs.prepare.outputs.is_tag == 'true' }}
     runs-on: ubuntu-latest
     environment: pypi
@@ -1026,7 +1018,7 @@ jobs:
 
   publish-rubygems:
     name: Publish Ruby gems
-    needs: [prepare, create-release]
+    needs: [prepare, upload-release-artifacts]
     if: ${{ needs.prepare.result == 'success' && needs.prepare.outputs.tag && needs.prepare.outputs.is_tag == 'true' }}
     runs-on: ubuntu-latest
     permissions:
@@ -1068,7 +1060,7 @@ jobs:
 
   publish-node:
     name: Publish Node packages
-    needs: [prepare, create-release]
+    needs: [prepare, upload-release-artifacts]
     if: ${{ needs.prepare.result == 'success' && needs.prepare.outputs.tag && needs.prepare.outputs.dry_run != 'true' && needs.prepare.outputs.is_tag == 'true' }}
     runs-on: ubuntu-latest
     steps:
@@ -1142,7 +1134,7 @@ jobs:
 
   publish-wasm:
     name: Publish WASM package
-    needs: [prepare, create-release]
+    needs: [prepare, upload-release-artifacts]
     if: ${{ needs.prepare.result == 'success' && needs.prepare.outputs.tag && needs.prepare.outputs.dry_run != 'true' && needs.prepare.outputs.is_tag == 'true' }}
     runs-on: ubuntu-latest
     steps:
@@ -1180,7 +1172,7 @@ jobs:
 
   publish-homebrew:
     name: Update Homebrew formula
-    needs: [prepare, create-release]
+    needs: [prepare, upload-release-artifacts]
     if: ${{ needs.prepare.result == 'success' && needs.prepare.outputs.tag && needs.prepare.outputs.dry_run != 'true' && needs.prepare.outputs.is_tag == 'true' }}
     runs-on: ubuntu-latest
     steps:
