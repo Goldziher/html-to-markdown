@@ -34,7 +34,6 @@ rust-coverage.lcov
 *.node
 
 # NAPI-RS generated files
-crates/html-to-markdown-node/index.js
 crates/html-to-markdown-node/index.d.ts
 
 # Node.js / TypeScript
