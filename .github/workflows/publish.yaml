@@ -509,7 +509,10 @@ jobs:
         run: |
           pnpm --filter html-to-markdown-node exec napi artifacts --output-dir ./artifacts
           test -d crates/html-to-markdown-node/npm || { echo "npm artifact directory missing"; exit 1; }
-          tar -czf node-bindings-$TARGET.tar.gz -C crates/html-to-markdown-node npm
+          # Copy index.js and index.d.ts from artifacts to the package root
+          cp -f ./artifacts/index.js ./artifacts/index.d.ts crates/html-to-markdown-node/ || true
+          # Create tarball with both npm directory and TypeScript files
+          tar -czf node-bindings-$TARGET.tar.gz -C crates/html-to-markdown-node npm index.js index.d.ts 2>/dev/null || tar -czf node-bindings-$TARGET.tar.gz -C crates/html-to-markdown-node npm
 
       - name: Package artifacts (Windows)
         if: runner.os == 'Windows'
@@ -519,7 +522,12 @@ jobs:
         run: |
           pnpm --filter html-to-markdown-node exec napi artifacts --output-dir ./artifacts
           if (-Not (Test-Path crates/html-to-markdown-node\npm)) { throw "npm artifact directory missing" }
-          tar -czf node-bindings-$env:TARGET.tar.gz -C crates/html-to-markdown-node npm
+          # Copy index.js and index.d.ts from artifacts to the package root
+          Copy-Item -Path .\artifacts\index.js -Destination crates\html-to-markdown-node\ -ErrorAction SilentlyContinue
+          Copy-Item -Path .\artifacts\index.d.ts -Destination crates\html-to-markdown-node\ -ErrorAction SilentlyContinue
+          # Create tarball with both npm directory and TypeScript files
+          tar -czf node-bindings-$env:TARGET.tar.gz -C crates/html-to-markdown-node npm index.js index.d.ts 2>$null
+          if (-Not $?) { tar -czf node-bindings-$env:TARGET.tar.gz -C crates/html-to-markdown-node npm }
 
       - name: Upload Node artifact
         uses: actions/upload-artifact@v5
