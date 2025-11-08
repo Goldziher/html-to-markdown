@@ -377,6 +377,51 @@ jobs:
           path: artifacts/*.zip
           retention-days: 14
 
+  node-typescript-defs:
+    name: Generate Node TypeScript definitions
+    needs: prepare
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+        with:
+          ref: ${{ needs.prepare.outputs.checkout_ref }}
+          fetch-depth: 0
+
+      - name: Ensure target commit
+        if: ${{ needs.prepare.outputs.target_sha != '' }}
+        run: git checkout --progress --force ${{ needs.prepare.outputs.target_sha }}
+
+      - name: Setup Rust
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: 20
+          check-latest: true
+
+      - name: Enable corepack
+        run: corepack enable
+
+      - name: Install Node dependencies
+        run: pnpm install --filter html-to-markdown-node...
+
+      - name: Generate TypeScript definitions
+        run: |
+          # Build without --platform to generate index.js and index.d.ts
+          pnpm --filter html-to-markdown-node exec napi build --release
+          # Copy generated files
+          mkdir -p typescript-defs
+          cp crates/html-to-markdown-node/index.js crates/html-to-markdown-node/index.d.ts typescript-defs/
+
+      - name: Upload TypeScript definitions
+        uses: actions/upload-artifact@v5
+        with:
+          name: node-typescript-defs
+          path: typescript-defs/
+          retention-days: 14
+
   node-bindings:
     name: Build Node bindings (${{ matrix.target }})
     needs: prepare
@@ -509,10 +554,7 @@ jobs:
         run: |
           pnpm --filter html-to-markdown-node exec napi artifacts --output-dir ./artifacts
           test -d crates/html-to-markdown-node/npm || { echo "npm artifact directory missing"; exit 1; }
-          # Copy index.js and index.d.ts from artifacts to the package root
-          cp -f ./artifacts/index.js ./artifacts/index.d.ts crates/html-to-markdown-node/ || true
-          # Create tarball with both npm directory and TypeScript files
-          tar -czf node-bindings-$TARGET.tar.gz -C crates/html-to-markdown-node npm index.js index.d.ts 2>/dev/null || tar -czf node-bindings-$TARGET.tar.gz -C crates/html-to-markdown-node npm
+          tar -czf node-bindings-$TARGET.tar.gz -C crates/html-to-markdown-node npm
 
       - name: Package artifacts (Windows)
         if: runner.os == 'Windows'
@@ -522,12 +564,7 @@ jobs:
         run: |
           pnpm --filter html-to-markdown-node exec napi artifacts --output-dir ./artifacts
           if (-Not (Test-Path crates/html-to-markdown-node\npm)) { throw "npm artifact directory missing" }
-          # Copy index.js and index.d.ts from artifacts to the package root
-          Copy-Item -Path .\artifacts\index.js -Destination crates\html-to-markdown-node\ -ErrorAction SilentlyContinue
-          Copy-Item -Path .\artifacts\index.d.ts -Destination crates\html-to-markdown-node\ -ErrorAction SilentlyContinue
-          # Create tarball with both npm directory and TypeScript files
-          tar -czf node-bindings-$env:TARGET.tar.gz -C crates/html-to-markdown-node npm index.js index.d.ts 2>$null
-          if (-Not $?) { tar -czf node-bindings-$env:TARGET.tar.gz -C crates/html-to-markdown-node npm }
+          tar -czf node-bindings-$env:TARGET.tar.gz -C crates/html-to-markdown-node npm
 
       - name: Upload Node artifact
         uses: actions/upload-artifact@v5
@@ -881,7 +918,7 @@ jobs:
 
   upload-release-artifacts:
     name: Upload Release Artifacts
-    needs: [prepare, python-wheels, python-sdist, php-pie, php-windows, node-bindings, wasm-bindings, cli-binaries, ruby-gem, cargo-packages]
+    needs: [prepare, python-wheels, python-sdist, php-pie, php-windows, node-typescript-defs, node-bindings, wasm-bindings, cli-binaries, ruby-gem, cargo-packages]
     if: ${{ needs.prepare.outputs.dry_run != 'true' && needs.prepare.outputs.is_tag == 'true' }}
     runs-on: ubuntu-latest
     permissions:
@@ -1109,6 +1146,12 @@ jobs:
           path: node-artifacts
           merge-multiple: true
 
+      - name: Download TypeScript definitions
+        uses: actions/download-artifact@v6
+        with:
+          name: node-typescript-defs
+          path: typescript-defs
+
       - name: Setup Node
         uses: actions/setup-node@v6
         with:
@@ -1125,6 +1168,8 @@ jobs:
           for pkg in node-artifacts/*.tar.gz; do
             tar -xzf "$pkg" -C crates/html-to-markdown-node
           done
+          # Copy TypeScript definitions to package root
+          cp typescript-defs/index.js typescript-defs/index.d.ts crates/html-to-markdown-node/
 
       - name: Node artifacts summary
         if: ${{ needs.prepare.outputs.dry_run == 'true' }}
