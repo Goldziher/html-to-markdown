@@ -370,6 +370,13 @@ jobs:
           args: --enable-html_to_markdown
           run-tests: "false"
 
+      - name: Upload PHP Windows artifacts
+        uses: actions/upload-artifact@v5
+        with:
+          name: php-windows-${{ matrix.php-version }}-${{ matrix.arch }}-${{ matrix.ts }}
+          path: artifacts/*.zip
+          retention-days: 14
+
   node-bindings:
     name: Build Node bindings (${{ matrix.target }})
     needs: prepare
@@ -890,6 +897,13 @@ jobs:
           path: dist/php-windows
           merge-multiple: true
 
+      - name: Download CLI artifacts
+        uses: actions/download-artifact@v5
+        with:
+          pattern: cli-*
+          path: dist/cli
+          merge-multiple: false
+
       - name: Upload PHP PIE source bundle
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -905,11 +919,22 @@ jobs:
           shopt -s nullglob
           files=(dist/php-windows/php_html_to_markdown-*.zip)
           if [ ${#files[@]} -eq 0 ]; then
-            echo "No Windows artifacts to upload" >&2
-            exit 1
+            echo "::warning::No PHP Windows artifacts to upload"
+          else
+            for file in "${files[@]}"; do
+              gh release upload ${{ needs.prepare.outputs.tag }} "$file" --clobber
+            done
           fi
-          for file in "${files[@]}"; do
-            gh release upload ${{ needs.prepare.outputs.tag }} "$file" --clobber
+
+      - name: Upload CLI binaries
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          shopt -s nullglob
+          for archive in dist/cli/*/*.{tar.gz,zip}; do
+            if [ -f "$archive" ]; then
+              gh release upload ${{ needs.prepare.outputs.tag }} "$archive" --clobber
+            fi
           done
 
   publish-crates:
