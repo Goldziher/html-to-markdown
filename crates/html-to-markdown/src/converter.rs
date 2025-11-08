@@ -4546,10 +4546,9 @@ fn convert_table_row(
     let mut cell_iter = cells.iter();
 
     loop {
-        if let Some((content, remaining_rows)) = rowspan_tracker.get_mut(&col_index) {
+        if let Some((_content, remaining_rows)) = rowspan_tracker.get_mut(&col_index) {
             if *remaining_rows > 0 {
                 row_text.push(' ');
-                row_text.push_str(content);
                 row_text.push_str(" |");
                 *remaining_rows -= 1;
                 if *remaining_rows == 0 {
