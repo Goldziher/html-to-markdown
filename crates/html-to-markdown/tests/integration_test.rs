@@ -152,6 +152,26 @@ fn test_simple_table() {
 }
 
 #[test]
+fn test_table_rowspan() {
+    let html = r#"<table>
+<tr><th>Header 1</th><th>Header 2</th></tr>
+<tr><td rowspan="2">Spanning cell</td><td>
+    <div>First row content</div>
+    <div>Second line</div>
+</td></tr>
+<tr><td>
+    <div>Next row</div>
+    <div>More content</div>
+</td></tr>
+</table>"#;
+    let mut options = ConversionOptions::default();
+    options.br_in_tables = true;
+    let result = convert(html, Some(options)).unwrap();
+    let expected = "\n\n| Header 1 | Header 2 |\n| --- | --- |\n| Spanning cell | First row content<br>Second line |\n|  | Next row<br>More content |\n";
+    assert_eq!(result, expected);
+}
+
+#[test]
 fn test_empty_element() {
     let html = "<p></p>";
     let result = convert(html, None).unwrap();

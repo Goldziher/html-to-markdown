@@ -118,55 +118,24 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v5
 
-      - name: Install uv
-        uses: astral-sh/setup-uv@v7
-        with:
-          enable-cache: true
-
-      - name: Set up Python
-        uses: actions/setup-python@v6
-        with:
-          python-version: "3.13"
-
       - name: Setup Rust
         uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
           components: rustfmt, clippy, llvm-tools-preview
           rustflags: ""
 
-      - name: Install Dependencies
-        uses: nick-fields/retry@v3
-        with:
-          timeout_minutes: 5
-          max_attempts: 3
-          retry_wait_seconds: 30
-          command: uv sync --all-extras
-          shell: bash
-
-      - name: Build CLI Binary
-        run: cargo build --release --package html-to-markdown-cli
-
-      - name: Run Tests with Coverage
-        run: |
-          uv run coverage erase
-          uv run pytest --cov=html_to_markdown --cov-report=lcov:coverage.lcov --cov-report=term-missing
-          uv run coverage report --precision=2
-
-      - name: Install cargo-llvm-cov for Rust Coverage
+      - name: Install cargo-llvm-cov
         run: cargo install cargo-llvm-cov
 
       - name: Generate Rust Coverage
-        run: cargo llvm-cov --workspace --exclude html-to-markdown-py --exclude html-to-markdown-rb --exclude html-to-markdown-php --all-features --lcov --output-path rust-coverage.lcov
+        run: cargo llvm-cov --workspace --exclude html-to-markdown-py --exclude html-to-markdown-rb --exclude html-to-markdown-php --exclude html-to-markdown-node --exclude html-to-markdown-wasm --all-features --lcov --output-path coverage.lcov
 
       - name: Upload Coverage Artifacts
         if: always()
         uses: actions/upload-artifact@v5
         with:
           name: coverage-report-${{ github.sha }}
-          path: |
-            coverage.lcov
-            rust-coverage.lcov
-            .coverage
+          path: coverage.lcov
           retention-days: 7
 
   test:
