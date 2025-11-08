@@ -692,7 +692,7 @@ def test_tfoot_inline_mode(convert: Callable[..., str]) -> None:
     <div>More content</div>
 </td></tr>
 </table>""",
-            "\n\n| Header 1 | Header 2 |\n| --- | --- |\n| Spanning cell | First row content<br>Second line |\n| | Next row<br>More content |\n",
+            "\n\n| Header 1 | Header 2 |\n| --- | --- |\n| Spanning cell | First row content<br>Second line |\n|  | Next row<br>More content |\n",
         ),
         (
             """<table>
