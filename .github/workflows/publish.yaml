@@ -411,9 +411,22 @@ jobs:
         run: |
           # Build without --platform to generate index.js and index.d.ts
           pnpm --filter html-to-markdown-node exec napi build --release
-          # Copy generated files
+          # List what was generated to debug
+          ls -la crates/html-to-markdown-node/
+          # Copy generated files (they should be in the package root after build)
           mkdir -p typescript-defs
-          cp crates/html-to-markdown-node/index.js crates/html-to-markdown-node/index.d.ts typescript-defs/
+          if [ -f crates/html-to-markdown-node/index.js ]; then
+            cp crates/html-to-markdown-node/index.js typescript-defs/
+          else
+            echo "ERROR: index.js not found!"
+            exit 1
+          fi
+          if [ -f crates/html-to-markdown-node/index.d.ts ]; then
+            cp crates/html-to-markdown-node/index.d.ts typescript-defs/
+          else
+            echo "ERROR: index.d.ts not found!"
+            exit 1
+          fi
 
       - name: Upload TypeScript definitions
         uses: actions/upload-artifact@v5
