@@ -930,20 +930,20 @@ jobs:
           ref: ${{ needs.prepare.outputs.ref }}
 
       - name: Download PHP PIE artifact
-        uses: actions/download-artifact@v5
+        uses: actions/download-artifact@v6
         with:
           name: php-pie-src
           path: dist/php-pie
 
       - name: Download PHP Windows artifacts
-        uses: actions/download-artifact@v5
+        uses: actions/download-artifact@v6
         with:
           pattern: php-windows-*
           path: dist/php-windows
           merge-multiple: true
 
       - name: Download CLI artifacts
-        uses: actions/download-artifact@v5
+        uses: actions/download-artifact@v6
         with:
           pattern: cli-*
           path: dist/cli
