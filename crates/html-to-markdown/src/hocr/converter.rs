@@ -1329,11 +1329,7 @@ fn post_process_table(mut table: Vec<Vec<String>>) -> Option<Vec<Vec<String>>> {
                 .iter()
                 .filter(|cell| cell.chars().any(|c| c.is_ascii_digit()))
                 .count();
-            if digit_cells >= 3 {
-                Some(idx)
-            } else {
-                None
-            }
+            if digit_cells >= 3 { Some(idx) } else { None }
         })
         .unwrap_or(0);
 
@@ -1393,7 +1389,7 @@ fn post_process_table(mut table: Vec<Vec<String>>) -> Option<Vec<Vec<String>>> {
         let header_text = processed[0][col].trim().to_string();
         let data_empty = processed[1..]
             .iter()
-            .all(|row| row.get(col).map_or(true, |cell| cell.trim().is_empty()));
+            .all(|row| row.get(col).is_none_or(|cell| cell.trim().is_empty()));
 
         if data_empty {
             merge_header_only_column(&mut processed, col, header_text);

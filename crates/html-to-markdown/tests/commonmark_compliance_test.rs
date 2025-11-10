@@ -5,7 +5,7 @@
 //!
 //! The test cases are derived from https://spec.commonmark.org/
 
-use html_to_markdown_rs::{convert, ConversionOptions};
+use html_to_markdown_rs::{ConversionOptions, convert};
 use serde::Deserialize;
 
 #[derive(Debug, Deserialize)]

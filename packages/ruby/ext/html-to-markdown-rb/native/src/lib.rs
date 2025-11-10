@@ -1,11 +1,11 @@
 use html_to_markdown_rs::{
-    convert as convert_inner, convert_with_inline_images as convert_with_inline_images_inner, error::ConversionError,
     CodeBlockStyle, ConversionOptions, HeadingStyle, HighlightStyle, HtmlExtraction, InlineImage, InlineImageConfig,
     InlineImageFormat, InlineImageSource, InlineImageWarning, ListIndentType, NewlineStyle, PreprocessingOptions,
-    PreprocessingPreset, WhitespaceMode,
+    PreprocessingPreset, WhitespaceMode, convert as convert_inner,
+    convert_with_inline_images as convert_with_inline_images_inner, error::ConversionError,
 };
 use magnus::prelude::*;
-use magnus::{function, scan_args::scan_args, Error, RArray, RHash, Ruby, Symbol, TryConvert, Value};
+use magnus::{Error, RArray, RHash, Ruby, Symbol, TryConvert, Value, function, scan_args::scan_args};
 
 const DEFAULT_INLINE_IMAGE_LIMIT: u64 = 5 * 1024 * 1024;
 

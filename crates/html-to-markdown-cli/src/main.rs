@@ -1,8 +1,8 @@
 use clap::{Parser, ValueEnum};
 use encoding_rs::Encoding;
 use html_to_markdown_rs::{
-    convert, CodeBlockStyle, ConversionOptions, HeadingStyle, HighlightStyle, ListIndentType, NewlineStyle,
-    PreprocessingOptions, PreprocessingPreset, WhitespaceMode,
+    CodeBlockStyle, ConversionOptions, HeadingStyle, HighlightStyle, ListIndentType, NewlineStyle,
+    PreprocessingOptions, PreprocessingPreset, WhitespaceMode, convert,
 };
 use std::fs;
 use std::io::{self, Read, Write as IoWrite};
@@ -509,7 +509,7 @@ fn decode_bytes(bytes: &[u8], encoding_name: &str) -> Result<String, String> {
 
 fn generate_completions(shell: Shell) {
     use clap::CommandFactory;
-    use clap_complete::{generate, Shell as ClapShell};
+    use clap_complete::{Shell as ClapShell, generate};
 
     let mut cmd = Cli::command();
     let shell = match shell {

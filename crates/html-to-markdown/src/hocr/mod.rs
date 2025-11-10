@@ -26,5 +26,5 @@ pub mod types;
 
 pub use converter::{convert_to_markdown, convert_to_markdown_with_options};
 pub use extractor::extract_hocr_document;
-pub use spatial::{extract_hocr_words, reconstruct_table, table_to_markdown, HocrWord};
+pub use spatial::{HocrWord, extract_hocr_words, reconstruct_table, table_to_markdown};
 pub use types::{BBox, Baseline, HocrElement, HocrElementType, HocrMetadata, HocrProperties};

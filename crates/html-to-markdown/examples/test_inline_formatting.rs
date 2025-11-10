@@ -1,4 +1,4 @@
-use html_to_markdown_rs::{convert, ConversionOptions};
+use html_to_markdown_rs::{ConversionOptions, convert};
 
 fn main() {
     let html = "<p>This is <mark>highlighted</mark> text</p>";

@@ -2,14 +2,13 @@
 
 Native Node.js and Bun bindings for html-to-markdown using NAPI-RS v3.
 
-Built on the shared Rust engine that powers the Python wheels, Ruby gem, WebAssembly package, and CLI – ensuring identical Markdown output across every language target.
+Built on the shared Rust engine that powers the Python wheels, Ruby gem, PHP extension, WebAssembly package, and CLI – ensuring identical Markdown output across every language target.
 
 High-performance HTML to Markdown conversion using native Rust code compiled to platform-specific binaries.
 
 [![Crates.io](https://img.shields.io/crates/v/html-to-markdown-rs.svg)](https://crates.io/crates/html-to-markdown-rs)
 [![npm (node)](https://badge.fury.io/js/html-to-markdown-node.svg)](https://www.npmjs.com/package/html-to-markdown-node)
 [![npm (wasm)](https://badge.fury.io/js/html-to-markdown-wasm.svg)](https://www.npmjs.com/package/html-to-markdown-wasm)
-[![npm (typescript)](https://badge.fury.io/js/html-to-markdown.svg)](https://www.npmjs.com/package/html-to-markdown)
 [![PyPI](https://badge.fury.io/py/html-to-markdown.svg)](https://pypi.org/project/html-to-markdown/)
 [![Packagist](https://img.shields.io/packagist/v/goldziher/html-to-markdown.svg)](https://packagist.org/packages/goldziher/html-to-markdown)
 [![RubyGems](https://badge.fury.io/rb/html-to-markdown.svg)](https://rubygems.org/gems/html-to-markdown)
@@ -191,6 +190,7 @@ Other runtimes:
 
 - 🐍 Python: [`html-to-markdown`](https://pypi.org/project/html-to-markdown/)
 - 💎 Ruby: [`html-to-markdown`](https://rubygems.org/gems/html-to-markdown)
+- 🐘 PHP: [`goldziher/html-to-markdown`](https://packagist.org/packages/goldziher/html-to-markdown)
 - 🌐 WebAssembly: [`html-to-markdown-wasm`](https://www.npmjs.com/package/html-to-markdown-wasm)
 
 ## Configuration Options

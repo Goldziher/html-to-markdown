@@ -6,20 +6,20 @@ members = [
     "crates/html-to-markdown-node",
     "crates/html-to-markdown-wasm",
     "crates/html-to-markdown-py",
-    "crates/html-to-markdown-rb",
+    "packages/ruby/ext/html-to-markdown-rb/native",
     "crates/html-to-markdown-php",
 ]
 
 [workspace.package]
-version = "2.6.5"
-edition = "2021"
+version = "2.6.6"
+edition = "2024"
 authors = ["Na'aman Hirschfeld <nhirschfeld@gmail.com>"]
 license = "MIT"
 repository = "https://github.com/Goldziher/html-to-markdown"
 homepage = "https://github.com/Goldziher/html-to-markdown"
 documentation = "https://docs.rs/html-to-markdown-rs"
 readme = "README.md"
-rust-version = "1.80"
+rust-version = "1.85"
 
 [workspace.dependencies]
 # Core library

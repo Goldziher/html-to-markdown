@@ -148,7 +148,8 @@ This is the core Rust library. For other languages:
 
 - **JavaScript/TypeScript**: [@html-to-markdown/node](https://github.com/Goldziher/html-to-markdown/tree/main/crates/html-to-markdown-node) (NAPI-RS) or [@html-to-markdown/wasm](https://github.com/Goldziher/html-to-markdown/tree/main/crates/html-to-markdown-wasm) (WebAssembly)
 - **Python**: [html-to-markdown](https://github.com/Goldziher/html-to-markdown/tree/main/crates/html-to-markdown-py) (PyO3)
-- **Ruby**: [html-to-markdown](https://github.com/Goldziher/html-to-markdown/tree/main/crates/html-to-markdown-rb) (Magnus + rb-sys)
+- **PHP**: [html-to-markdown](https://github.com/Goldziher/html-to-markdown/tree/main/packages/php) (PIE + Composer helpers)
+- **Ruby**: [html-to-markdown](https://github.com/Goldziher/html-to-markdown/tree/main/packages/ruby) (Magnus + rb-sys)
 - **CLI**: [html-to-markdown-cli](https://github.com/Goldziher/html-to-markdown/tree/main/crates/html-to-markdown-cli)
 
 ## Documentation

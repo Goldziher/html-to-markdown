@@ -9,9 +9,9 @@ use ext_php_rs::boxed::ZBox;
 use ext_php_rs::prelude::*;
 use ext_php_rs::types::{ArrayKey, ZendHashTable, Zval};
 use html_to_markdown_rs::{
-    convert, convert_with_inline_images, CodeBlockStyle, ConversionOptions, HeadingStyle, HighlightStyle,
-    HtmlExtraction, InlineImage, InlineImageConfig, InlineImageFormat, InlineImageSource, InlineImageWarning,
-    ListIndentType, NewlineStyle, PreprocessingOptions, PreprocessingPreset, WhitespaceMode,
+    CodeBlockStyle, ConversionOptions, HeadingStyle, HighlightStyle, HtmlExtraction, InlineImage, InlineImageConfig,
+    InlineImageFormat, InlineImageSource, InlineImageWarning, ListIndentType, NewlineStyle, PreprocessingOptions,
+    PreprocessingPreset, WhitespaceMode, convert, convert_with_inline_images,
 };
 
 const DEFAULT_INLINE_IMAGE_LIMIT: u64 = 5 * 1024 * 1024;

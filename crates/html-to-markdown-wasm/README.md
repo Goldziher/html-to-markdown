@@ -2,14 +2,13 @@
 
 Universal HTML to Markdown converter using WebAssembly.
 
-Powered by the same Rust engine as the Node.js, Python, and Ruby bindings, so Markdown output stays identical regardless of runtime.
+Powered by the same Rust engine as the Node.js, Python, Ruby, and PHP bindings, so Markdown output stays identical regardless of runtime.
 
 Runs anywhere: Node.js, Deno, Bun, browsers, and edge runtimes.
 
 [![Crates.io](https://img.shields.io/crates/v/html-to-markdown-rs.svg)](https://crates.io/crates/html-to-markdown-rs)
 [![npm (node)](https://badge.fury.io/js/html-to-markdown-node.svg)](https://www.npmjs.com/package/html-to-markdown-node)
 [![npm (wasm)](https://badge.fury.io/js/html-to-markdown-wasm.svg)](https://www.npmjs.com/package/html-to-markdown-wasm)
-[![npm (typescript)](https://badge.fury.io/js/html-to-markdown.svg)](https://www.npmjs.com/package/html-to-markdown)
 [![PyPI](https://badge.fury.io/py/html-to-markdown.svg)](https://pypi.org/project/html-to-markdown/)
 [![Packagist](https://img.shields.io/packagist/v/goldziher/html-to-markdown.svg)](https://packagist.org/packages/goldziher/html-to-markdown)
 [![RubyGems](https://badge.fury.io/rb/html-to-markdown.svg)](https://rubygems.org/gems/html-to-markdown)
@@ -373,6 +372,7 @@ The same Rust engine ships as native bindings for other ecosystems:
 - 🖥️ Node.js / Bun: [`html-to-markdown-node`](https://www.npmjs.com/package/html-to-markdown-node)
 - 🐍 Python: [`html-to-markdown`](https://pypi.org/project/html-to-markdown/)
 - 💎 Ruby: [`html-to-markdown`](https://rubygems.org/gems/html-to-markdown)
+- 🐘 PHP: [`goldziher/html-to-markdown`](https://packagist.org/packages/goldziher/html-to-markdown)
 - 🦀 Rust crate & CLI: [`html-to-markdown-rs`](https://crates.io/crates/html-to-markdown-rs)
 
 ## Links
@@ -381,6 +381,7 @@ The same Rust engine ships as native bindings for other ecosystems:
 - [Full Documentation](https://github.com/Goldziher/html-to-markdown/blob/main/README.md)
 - [Native Node Package](https://www.npmjs.com/package/html-to-markdown-node)
 - [Python Package](https://pypi.org/project/html-to-markdown/)
+- [PHP Extension & Helpers](https://packagist.org/packages/goldziher/html-to-markdown)
 - [Rust Crate](https://crates.io/crates/html-to-markdown-rs)
 
 ## License

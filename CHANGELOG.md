@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.6.6] - 2025-11-10
+
+### Changed
+- **Ruby Gem Packaging** – Moved the `html-to-markdown-rb` crate under `packages/ruby/ext/html-to-markdown-rb/native` and pointed `extconf.rb` at that path so every published gem now contains the Cargo sources it needs to compile on install.
+- **Documentation Consistency** – Updated the root, crate, and package READMEs to drop references to the unrelated `html-to-markdown` npm package and to consistently list our supported targets (Node, WASM, Python, Ruby, PHP, CLI).
+- **Dependency Refresh** – Ran `task update` to upgrade Rust crates, npm packages, Bundler gems, Python requirements, and Composer dependencies across the monorepo.
+
+### Fixed
+- **Rust Clippy Lints** – Addressed `clippy::unnecessary-map-or` in the converter and hOCR table builder by using `.is_none_or`, keeping inline-image filtering and column pruning logic clear while allowing `cargo clippy -D warnings` to pass.
+
 ## [2.6.3] - 2025-11-07
 
 ### Fixed

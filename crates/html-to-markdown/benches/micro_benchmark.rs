@@ -1,7 +1,7 @@
 //! Micro-benchmarks for specific operations
 
-use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion};
-use html_to_markdown_rs::{convert, ConversionOptions};
+use criterion::{BenchmarkId, Criterion, criterion_group, criterion_main};
+use html_to_markdown_rs::{ConversionOptions, convert};
 use std::hint::black_box;
 
 /// Benchmark text-heavy documents
