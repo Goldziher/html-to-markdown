@@ -2,7 +2,7 @@
 //!
 //! Tests full hOCR specification support across all element types and properties.
 
-use html_to_markdown_rs::hocr::{convert_to_markdown, extract_hocr_document, HocrElement, HocrElementType};
+use html_to_markdown_rs::hocr::{HocrElement, HocrElementType, convert_to_markdown, extract_hocr_document};
 
 #[test]
 fn test_full_hocr_document_structure() {

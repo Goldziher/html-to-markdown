@@ -39,7 +39,7 @@ Experience WebAssembly-powered HTML to Markdown conversion instantly in your bro
 - **PHP guides**:
     - PHP wrapper package – [PHP README](https://github.com/Goldziher/html-to-markdown/blob/main/packages/php/README.md)
     - PHP extension (PIE) – [Extension README](https://github.com/Goldziher/html-to-markdown/blob/main/packages/php-ext/README.md)
-- **Ruby guide** – [Ruby README](https://github.com/Goldziher/html-to-markdown/blob/main/crates/html-to-markdown-rb/README.md)
+- **Ruby guide** – [Ruby README](https://github.com/Goldziher/html-to-markdown/blob/main/packages/ruby/README.md)
 - **Rust guide** – [Rust README](https://github.com/Goldziher/html-to-markdown/blob/main/crates/html-to-markdown/README.md)
 - **Contributing** – [CONTRIBUTING.md](https://github.com/Goldziher/html-to-markdown/blob/main/CONTRIBUTING.md) ⭐ Start here!
 - **Changelog** – [CHANGELOG.md](https://github.com/Goldziher/html-to-markdown/blob/main/CHANGELOG.md)

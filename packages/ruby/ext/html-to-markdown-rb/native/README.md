@@ -1,11 +1,10 @@
 # html-to-markdown-rb
 
-Blazing-fast HTML → Markdown conversion for Ruby, powered by the same Rust engine used by our Python, Node.js, and WebAssembly packages. Ship identical Markdown across every runtime while enjoying native extension performance.
+Blazing-fast HTML → Markdown conversion for Ruby, powered by the same Rust engine used by our Python, Node.js, WebAssembly, and PHP packages. Ship identical Markdown across every runtime while enjoying native extension performance.
 
 [![Crates.io](https://img.shields.io/crates/v/html-to-markdown-rs.svg)](https://crates.io/crates/html-to-markdown-rs)
 [![npm (node)](https://badge.fury.io/js/html-to-markdown-node.svg)](https://www.npmjs.com/package/html-to-markdown-node)
 [![npm (wasm)](https://badge.fury.io/js/html-to-markdown-wasm.svg)](https://www.npmjs.com/package/html-to-markdown-wasm)
-[![npm (typescript)](https://badge.fury.io/js/html-to-markdown.svg)](https://www.npmjs.com/package/html-to-markdown)
 [![PyPI](https://badge.fury.io/py/html-to-markdown.svg)](https://pypi.org/project/html-to-markdown/)
 [![Packagist](https://img.shields.io/packagist/v/goldziher/html-to-markdown.svg)](https://packagist.org/packages/goldziher/html-to-markdown)
 [![RubyGems](https://badge.fury.io/rb/html-to-markdown.svg)](https://rubygems.org/gems/html-to-markdown)
@@ -14,7 +13,7 @@ Blazing-fast HTML → Markdown conversion for Ruby, powered by the same Rust eng
 ## Features
 
 - ⚡ **Rust-fast**: Ruby bindings around a highly optimised Rust core (60‑80× faster than BeautifulSoup-based converters).
-- 🔁 **Identical output**: Shares logic with the Python wheels, npm bindings, WASM package, and CLI — consistent Markdown everywhere.
+- 🔁 **Identical output**: Shares logic with the Python wheels, npm bindings, PHP extension, WASM package, and CLI — consistent Markdown everywhere.
 - ⚙️ **Rich configuration**: Control heading styles, list indentation, whitespace handling, HTML preprocessing, and more.
 - 🖼️ **Inline image extraction**: Pull out embedded images (PNG/JPEG/SVG/data URIs) alongside Markdown.
 - 🧰 **Bundled CLI proxy**: Call the Rust CLI straight from Ruby or shell scripts.

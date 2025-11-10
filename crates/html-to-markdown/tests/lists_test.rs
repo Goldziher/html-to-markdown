@@ -1,4 +1,4 @@
-use html_to_markdown_rs::{convert, ConversionOptions};
+use html_to_markdown_rs::{ConversionOptions, convert};
 
 #[test]
 fn test_basic_unordered_list() {

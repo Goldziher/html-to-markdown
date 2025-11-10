@@ -76,11 +76,7 @@ fn chomp_inline(text: &str) -> (&str, &str, &str) {
     let has_trailing_linebreak = text.ends_with("  \n") || text.ends_with("\\\n");
 
     let suffix = if has_trailing_linebreak {
-        if text.ends_with("  \n") {
-            "  \n"
-        } else {
-            "\\\n"
-        }
+        if text.ends_with("  \n") { "  \n" } else { "\\\n" }
     } else if text.ends_with(&[' ', '\t'][..]) {
         " "
     } else {
@@ -133,11 +129,7 @@ fn trim_trailing_whitespace(output: &mut String) {
 ///             Cont   (depth=1: (2*1-1) = 1 group = 4 spaces, total 12 with bullet indent)
 /// ```
 fn calculate_list_continuation_indent(depth: usize) -> usize {
-    if depth > 0 {
-        2 * depth - 1
-    } else {
-        0
-    }
+    if depth > 0 { 2 * depth - 1 } else { 0 }
 }
 
 /// Check if a list (ul or ol) is "loose".
@@ -1113,7 +1105,7 @@ fn handle_inline_data_image(
         return;
     }
 
-    use base64::{engine::general_purpose::STANDARD, Engine as _};
+    use base64::{Engine as _, engine::general_purpose::STANDARD};
 
     let payload_clean = payload.trim();
     let decoded = match STANDARD.decode(payload_clean) {
@@ -2315,7 +2307,7 @@ fn walk_node(
                                 && ctx
                                     .heading_tag
                                     .as_ref()
-                                    .map_or(true, |tag| !options.keep_inline_images_in.iter().any(|t| t == tag))));
+                                    .is_none_or(|tag| !options.keep_inline_images_in.iter().any(|t| t == tag))));
 
                     if should_use_alt_text {
                         output.push_str(&alt);
@@ -3741,7 +3733,7 @@ fn walk_node(
                     if ctx.convert_as_inline {
                         output.push_str(&title);
                     } else {
-                        use base64::{engine::general_purpose::STANDARD, Engine as _};
+                        use base64::{Engine as _, engine::general_purpose::STANDARD};
 
                         let svg_html = serialize_element(node_handle, parser);
 
