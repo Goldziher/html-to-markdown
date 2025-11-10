@@ -39,6 +39,10 @@ cp "$ROOT/README.md" "$STAGING/PROJECT-README.md"
 
 rsync -a --exclude 'target' --exclude 'debug' "$ROOT/crates" "$WORKSPACE_DIR/"
 
+# Include Ruby binding sources since the workspace now depends on packages/ruby/.
+mkdir -p "$WORKSPACE_DIR/packages/ruby"
+rsync -a --exclude 'target' --exclude 'native/target' "$ROOT/packages/ruby/" "$WORKSPACE_DIR/packages/ruby/"
+
 # Mirror workspace for packages/php-ext to satisfy configure scripts that resolve relative paths.
 WORKSPACE_ALT_DIR="$STAGING/packages/php-ext/workspace"
 mkdir -p "$WORKSPACE_ALT_DIR"
