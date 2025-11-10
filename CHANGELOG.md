@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - **Rust Clippy Lints** – Addressed `clippy::unnecessary-map-or` in the converter and hOCR table builder by using `.is_none_or`, keeping inline-image filtering and column pruning logic clear while allowing `cargo clippy -D warnings` to pass.
+- **PIE Source Packaging** – `scripts/package_php_pie_source.sh` now copies `packages/ruby/.../native` into the temporary workspace so the Ruby crate exists when PIE builds the PHP extension.
 
 ## [2.6.3] - 2025-11-07
 
