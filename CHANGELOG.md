@@ -23,6 +23,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Ruby Benchmark Output** – The Ruby benchmark driver now emits JSON without relying on `json` native extensions, preventing `libruby` incompatibility errors during `task bench:bindings`.
 - **Nested `<strong>` Normalization (Fix #111)** – The Rust converter now tracks when bold markup is already active, so nested `<b>`/`<strong>` combinations (including `<mark>`, `<summary>`, `<legend>`) no longer generate `****` artifacts (`<b>bo<b>ld</b>er</b>` correctly becomes `**bolder**`). The CommonMark harness documents the four spec examples that expect stacked markers and skips them accordingly.
 - **Heading Whitespace (Fix #118)** – ATX/Setext headings swallow layout-only newlines and indentation inside `<h1>…<h6>` so pretty-printed HTML like `<h2>Heading\n  Text</h2>` renders as a single Markdown heading line.
+- **Inline Whitespace Preservation** – Reworked the inline text pipeline so removing zero-width inline elements (e.g., `<input>`, `<script>`, empty `<b>`) no longer collapses surrounding spaces; fixtures like `test_chomp`, `test_form_with_inputs_inline_mode`, and checkbox/task-list rendering now match their expected double-space gaps.
+- **DOCTYPE Handling (Fix #119)** – `<!DOCTYPE …>` declarations are stripped during preprocessing so they never leak as stray `PUBLIC…` text in the output, even when metadata extraction is enabled.
 
 ## [2.6.6] - 2025-11-10
 
