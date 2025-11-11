@@ -1408,6 +1408,7 @@ fn preprocess_html(input: &str) -> Cow<'_, str> {
     const SELF_CLOSING: [(&[u8], &str); 3] = [(b"<br/>", "<br>"), (b"<hr/>", "<hr>"), (b"<img/>", "<img>")];
     const TAGS: [&[u8]; 2] = [b"script", b"style"];
     const SVG: &[u8] = b"svg";
+    const DOCTYPE: &[u8] = b"doctype";
 
     let bytes = input.as_bytes();
     let len = bytes.len();
@@ -1480,6 +1481,25 @@ fn preprocess_html(input: &str) -> Cow<'_, str> {
 
                 if handled {
                     continue;
+                }
+
+                if idx + 2 < len && bytes[idx + 1] == b'!' {
+                    let mut cursor = idx + 2;
+                    while cursor < len && bytes[cursor].is_ascii_whitespace() {
+                        cursor += 1;
+                    }
+
+                    if cursor + DOCTYPE.len() <= len
+                        && bytes[cursor..cursor + DOCTYPE.len()].eq_ignore_ascii_case(DOCTYPE)
+                    {
+                        if let Some(end) = find_tag_end(bytes, cursor + DOCTYPE.len()) {
+                            let out = output.get_or_insert_with(|| String::with_capacity(input.len()));
+                            out.push_str(&input[last..idx]);
+                            last = end;
+                            idx = end;
+                            continue;
+                        }
+                    }
                 }
             }
 
@@ -5200,6 +5220,19 @@ mod tests {
 </h2>"#;
         let result = convert_html(html, &ConversionOptions::default()).unwrap();
         assert_eq!(result.trim(), "## Heading Text with Line Breaks");
+    }
+
+    #[test]
+    fn doctype_is_removed() {
+        let html = r#"<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.0 Transitional//EN" "http://www.w3.org/TR/REC-html40/loose.dtd">
+            <html>
+                <head><title>Example</title></head>
+                <body><p>Hello World</p></body>
+            </html>"#;
+        let mut options = ConversionOptions::default();
+        options.extract_metadata = false;
+        let result = convert_html(html, &options).unwrap();
+        assert_eq!(result.trim(), "Hello World");
     }
 
     #[test]
