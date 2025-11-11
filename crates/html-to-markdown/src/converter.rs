@@ -1993,6 +1993,134 @@ fn get_next_sibling_tag(node_handle: &tl::NodeHandle, parser: &tl::Parser, dom_c
     None
 }
 
+fn previous_sibling_is_inline_tag(node_handle: &tl::NodeHandle, parser: &tl::Parser, dom_ctx: &DomContext) -> bool {
+    let id = node_handle.get_inner();
+    let parent = dom_ctx.parent_map.get(&id).copied().flatten();
+
+    let siblings = if let Some(parent_id) = parent {
+        if let Some(children) = dom_ctx.children_map.get(&parent_id) {
+            children
+        } else {
+            return false;
+        }
+    } else {
+        &dom_ctx.root_children
+    };
+
+    let Some(position) = siblings.iter().position(|handle| handle.get_inner() == id) else {
+        return false;
+    };
+
+    for sibling in siblings.iter().take(position).rev() {
+        if let Some(node) = sibling.get(parser) {
+            match node {
+                tl::Node::Tag(tag) => {
+                    let name = normalized_tag_name(tag.name().as_utf8_str());
+                    return is_inline_element(name.as_ref()) || matches!(name.as_ref(), "script" | "style");
+                }
+                tl::Node::Raw(raw) => {
+                    if raw.as_utf8_str().trim().is_empty() {
+                        continue;
+                    }
+                    return false;
+                }
+                _ => continue,
+            }
+        }
+    }
+
+    false
+}
+
+fn next_sibling_is_whitespace_text(node_handle: &tl::NodeHandle, parser: &tl::Parser, dom_ctx: &DomContext) -> bool {
+    let id = node_handle.get_inner();
+    let parent = dom_ctx.parent_map.get(&id).copied().flatten();
+
+    let siblings = if let Some(parent_id) = parent {
+        if let Some(children) = dom_ctx.children_map.get(&parent_id) {
+            children
+        } else {
+            return false;
+        }
+    } else {
+        &dom_ctx.root_children
+    };
+
+    let Some(position) = siblings.iter().position(|handle| handle.get_inner() == id) else {
+        return false;
+    };
+
+    for sibling in siblings.iter().skip(position + 1) {
+        if let Some(node) = sibling.get(parser) {
+            match node {
+                tl::Node::Raw(raw) => return raw.as_utf8_str().trim().is_empty(),
+                tl::Node::Tag(_) => return false,
+                _ => continue,
+            }
+        }
+    }
+
+    false
+}
+
+fn next_sibling_is_inline_tag(node_handle: &tl::NodeHandle, parser: &tl::Parser, dom_ctx: &DomContext) -> bool {
+    let id = node_handle.get_inner();
+    let parent = dom_ctx.parent_map.get(&id).copied().flatten();
+
+    let siblings = if let Some(parent_id) = parent {
+        if let Some(children) = dom_ctx.children_map.get(&parent_id) {
+            children
+        } else {
+            return false;
+        }
+    } else {
+        &dom_ctx.root_children
+    };
+
+    let Some(position) = siblings.iter().position(|handle| handle.get_inner() == id) else {
+        return false;
+    };
+
+    for sibling in siblings.iter().skip(position + 1) {
+        if let Some(node) = sibling.get(parser) {
+            match node {
+                tl::Node::Tag(tag) => {
+                    let name = normalized_tag_name(tag.name().as_utf8_str());
+                    return is_inline_element(name.as_ref()) || matches!(name.as_ref(), "script" | "style");
+                }
+                tl::Node::Raw(raw) => {
+                    if raw.as_utf8_str().trim().is_empty() {
+                        continue;
+                    }
+                    return false;
+                }
+                _ => continue,
+            }
+        }
+    }
+
+    false
+}
+
+fn append_inline_suffix(
+    output: &mut String,
+    suffix: &str,
+    has_core_content: bool,
+    node_handle: &tl::NodeHandle,
+    parser: &tl::Parser,
+    dom_ctx: &DomContext,
+) {
+    if suffix.is_empty() {
+        return;
+    }
+
+    if suffix == " " && has_core_content && next_sibling_is_whitespace_text(node_handle, parser, dom_ctx) {
+        return;
+    }
+
+    output.push_str(suffix);
+}
+
 /// Recursively walk DOM nodes and convert to Markdown.
 #[allow(clippy::only_used_in_recursion)]
 fn walk_node(
@@ -2018,10 +2146,6 @@ fn walk_node(
                 text = text.replace(['\r', '\n'], " ");
             }
 
-            while output.ends_with(' ') && text.starts_with(' ') {
-                text.remove(0);
-            }
-
             if text.trim().is_empty() {
                 if ctx.in_code {
                     output.push_str(&text);
@@ -2043,7 +2167,7 @@ fn walk_node(
                     return;
                 }
 
-                if text.trim().is_empty() && text.contains('\n') {
+                if text.contains('\n') {
                     if output.is_empty() {
                         return;
                     }
@@ -2057,27 +2181,18 @@ fn walk_node(
                     return;
                 }
 
-                let skip_whitespace = output.ends_with("\n\n")
-                    || output.ends_with("* ")
-                    || output.ends_with("- ")
-                    || output.ends_with(". ")
-                    || output.ends_with("] ");
-
-                let should_preserve = ctx.convert_as_inline || ctx.in_table_cell || !skip_whitespace;
-
-                if should_preserve {
-                    if output.is_empty() {
-                        if !text.contains('\n') {
+                if previous_sibling_is_inline_tag(node_handle, parser, dom_ctx)
+                    && next_sibling_is_inline_tag(node_handle, parser, dom_ctx)
+                {
+                    if text.chars().count() > 1 {
+                        if !output.ends_with(' ') {
                             output.push(' ');
                         }
-                        return;
+                    } else {
+                        output.push_str(&text);
                     }
-                    if output.chars().last().is_some_and(|c| c == '\n') {
-                        return;
-                    }
-                    if !output.ends_with(' ') {
-                        output.push(' ');
-                    }
+                } else {
+                    output.push_str(&text);
                 }
                 return;
             }
@@ -2112,7 +2227,9 @@ fn walk_node(
                     || output.ends_with(". ")
                     || output.ends_with("] ")
                     || (output.ends_with('\n') && prefix == " ")
-                    || (output.ends_with(' ') && prefix == " ");
+                    || (output.ends_with(' ')
+                        && prefix == " "
+                        && !previous_sibling_is_inline_tag(node_handle, parser, dom_ctx));
 
                 let mut final_text = String::new();
                 if !skip_prefix && !prefix.is_empty() {
@@ -2158,10 +2275,6 @@ fn walk_node(
                             final_text.push('\n');
                         }
                     }
-                }
-
-                if output.ends_with(' ') && final_text.starts_with(' ') {
-                    final_text.remove(0);
                 }
 
                 final_text
@@ -2348,10 +2461,10 @@ fn walk_node(
                                 output.push(options.strong_em_symbol);
                                 output.push(options.strong_em_symbol);
                             }
-                            output.push_str(suffix);
+                            append_inline_suffix(output, suffix, !trimmed.is_empty(), node_handle, parser, dom_ctx);
                         } else if !content.is_empty() {
                             output.push_str(prefix);
-                            output.push_str(suffix);
+                            append_inline_suffix(output, suffix, false, node_handle, parser, dom_ctx);
                         }
                     }
                 }
@@ -2382,10 +2495,10 @@ fn walk_node(
                             output.push(options.strong_em_symbol);
                             output.push_str(trimmed);
                             output.push(options.strong_em_symbol);
-                            output.push_str(suffix);
+                            append_inline_suffix(output, suffix, !trimmed.is_empty(), node_handle, parser, dom_ctx);
                         } else if !content.is_empty() {
                             output.push_str(prefix);
-                            output.push_str(suffix);
+                            append_inline_suffix(output, suffix, false, node_handle, parser, dom_ctx);
                         }
                     }
                 }
@@ -2677,10 +2790,10 @@ fn walk_node(
                             output.push_str("~~");
                             output.push_str(trimmed);
                             output.push_str("~~");
-                            output.push_str(suffix);
+                            append_inline_suffix(output, suffix, !trimmed.is_empty(), node_handle, parser, dom_ctx);
                         } else if !content.is_empty() {
                             output.push_str(prefix);
-                            output.push_str(suffix);
+                            append_inline_suffix(output, suffix, false, node_handle, parser, dom_ctx);
                         }
                     }
                 }
@@ -2699,7 +2812,7 @@ fn walk_node(
                         output.push_str("==");
                         output.push_str(trimmed);
                         output.push_str("==");
-                        output.push_str(suffix);
+                        append_inline_suffix(output, suffix, !trimmed.is_empty(), node_handle, parser, dom_ctx);
                     }
                 }
 
@@ -2777,10 +2890,10 @@ fn walk_node(
                         output.push('`');
                         output.push_str(trimmed);
                         output.push('`');
-                        output.push_str(suffix);
+                        append_inline_suffix(output, suffix, !trimmed.is_empty(), node_handle, parser, dom_ctx);
                     } else if !content.is_empty() {
                         output.push_str(prefix);
-                        output.push_str(suffix);
+                        append_inline_suffix(output, suffix, false, node_handle, parser, dom_ctx);
                     }
                 }
 
@@ -2798,7 +2911,7 @@ fn walk_node(
                         output.push(options.strong_em_symbol);
                         output.push_str(trimmed);
                         output.push(options.strong_em_symbol);
-                        output.push_str(suffix);
+                        append_inline_suffix(output, suffix, !trimmed.is_empty(), node_handle, parser, dom_ctx);
                     }
                 }
 
@@ -2816,7 +2929,7 @@ fn walk_node(
                         output.push(options.strong_em_symbol);
                         output.push_str(trimmed);
                         output.push(options.strong_em_symbol);
-                        output.push_str(suffix);
+                        append_inline_suffix(output, suffix, !trimmed.is_empty(), node_handle, parser, dom_ctx);
                     }
                 }
 
