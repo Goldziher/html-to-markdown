@@ -37,7 +37,14 @@ fi
 cp "$ROOT/LICENSE" "$STAGING/"
 cp "$ROOT/README.md" "$STAGING/PROJECT-README.md"
 
+# Add all Rust workspace crates plus tooling needed by the workspace members.
 rsync -a --exclude 'target' --exclude 'debug' "$ROOT/crates" "$WORKSPACE_DIR/"
+
+# Copy workspace tools (e.g., runtime benchmarks) so cargo metadata stays intact.
+if [[ -d "$ROOT/tools" ]]; then
+  mkdir -p "$WORKSPACE_DIR/tools"
+  rsync -a --exclude 'target' --exclude 'debug' "$ROOT/tools/" "$WORKSPACE_DIR/tools/"
+fi
 
 # Include Ruby binding sources since the workspace now depends on packages/ruby/.
 mkdir -p "$WORKSPACE_DIR/packages/ruby"
