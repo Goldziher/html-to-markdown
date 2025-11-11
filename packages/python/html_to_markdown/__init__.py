@@ -19,8 +19,11 @@ from html_to_markdown.api import (
     InlineImage,
     InlineImageConfig,
     InlineImageWarning,
+    OptionsHandle,
     convert,
+    convert_with_handle,
     convert_with_inline_images,
+    create_options_handle,
 )
 from html_to_markdown.exceptions import (
     ConflictingOptionsError,
@@ -42,11 +45,14 @@ __all__ = [
     "InlineImageWarning",
     "InvalidParserError",
     "MissingDependencyError",
+    "OptionsHandle",
     "PreprocessingOptions",
     "convert",
     "convert_to_markdown",
+    "convert_with_handle",
     "convert_with_inline_images",
+    "create_options_handle",
     "markdownify",
 ]
 
-__version__ = "2.5.7"
+__version__ = "2.7.0"

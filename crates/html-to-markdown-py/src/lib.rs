@@ -336,6 +336,28 @@ impl ConversionOptions {
     }
 }
 
+#[pyclass(name = "ConversionOptionsHandle")]
+#[derive(Clone)]
+struct ConversionOptionsHandle {
+    inner: RustConversionOptions,
+}
+
+impl ConversionOptionsHandle {
+    fn new_with_options(options: Option<ConversionOptions>) -> Self {
+        let inner = options.map(|opts| opts.to_rust()).unwrap_or_default();
+        Self { inner }
+    }
+}
+
+#[pymethods]
+impl ConversionOptionsHandle {
+    #[new]
+    #[pyo3(signature = (options=None))]
+    fn py_new(options: Option<ConversionOptions>) -> Self {
+        ConversionOptionsHandle::new_with_options(options)
+    }
+}
+
 /// Convert HTML to Markdown.
 ///
 /// Args:
@@ -364,6 +386,19 @@ impl ConversionOptions {
 fn convert(html: &str, options: Option<ConversionOptions>) -> PyResult<String> {
     let rust_options = options.map(|opts| opts.to_rust());
     html_to_markdown_rs::convert(html, rust_options).map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))
+}
+
+#[pyfunction]
+#[pyo3(signature = (html, handle))]
+fn convert_with_options_handle(html: &str, handle: &ConversionOptionsHandle) -> PyResult<String> {
+    html_to_markdown_rs::convert(html, Some(handle.inner.clone()))
+        .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))
+}
+
+#[pyfunction]
+#[pyo3(signature = (options=None))]
+fn create_options_handle(options: Option<ConversionOptions>) -> ConversionOptionsHandle {
+    ConversionOptionsHandle::new_with_options(options)
 }
 
 fn inline_image_format_to_str(format: &InlineImageFormat) -> String {
@@ -483,8 +518,11 @@ fn convert_with_inline_images<'py>(
 #[pymodule]
 fn _html_to_markdown(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(convert, m)?)?;
+    m.add_function(wrap_pyfunction!(convert_with_options_handle, m)?)?;
+    m.add_function(wrap_pyfunction!(create_options_handle, m)?)?;
     m.add_class::<ConversionOptions>()?;
     m.add_class::<PreprocessingOptions>()?;
+    m.add_class::<ConversionOptionsHandle>()?;
     m.add_function(wrap_pyfunction!(convert_with_inline_images, m)?)?;
     m.add_class::<InlineImageConfig>()?;
     Ok(())

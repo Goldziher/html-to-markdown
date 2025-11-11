@@ -1,7 +1,15 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { convert, convertWithInlineImages, WasmInlineImageConfig } from "./dist-node/html_to_markdown_wasm.js";
+import {
+  convert,
+  convertBytes,
+  convertBytesWithOptionsHandle,
+  convertBytesWithInlineImages,
+  convertWithInlineImages,
+  createConversionOptionsHandle,
+  WasmInlineImageConfig,
+} from "./dist-node/html_to_markdown_wasm.js";
 
 // Helper to load test documents
 const loadTestDoc = (path: string): string => {
@@ -31,6 +39,37 @@ describe("@html-to-markdown/wasm - WebAssembly Bindings", () => {
       const html = "<h1>Test</h1>";
       const markdown = convert(html, undefined);
       expect(markdown).toContain("Test");
+    });
+  });
+
+  describe("Byte-based Conversion", () => {
+    it("should convert Uint8Array input", () => {
+      const encoder = new TextEncoder();
+      const html = encoder.encode("<h1>Bytes</h1>");
+      const markdown = convertBytes(html);
+      expect(markdown).toContain("Bytes");
+    });
+
+    it("should convert bytes with option handles", () => {
+      const encoder = new TextEncoder();
+      const html = encoder.encode("<h1>Handles</h1>");
+      const handle = createConversionOptionsHandle({ headingStyle: "atx" });
+      const markdown = convertBytesWithOptionsHandle(html, handle);
+      expect(markdown).toMatch(/^#\s+Handles/m);
+    });
+
+    it("should convert bytes with inline images", () => {
+      const encoder = new TextEncoder();
+      const png = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8DwHwAFBQIAX8jx0gAAAABJRU5ErkJggg==";
+      const html = encoder.encode(`<img src="data:image/png;base64,${png}" alt="buffered">`);
+      const config = new WasmInlineImageConfig(4096);
+      const result = convertBytesWithInlineImages(html, undefined, config);
+      expect(result.markdown).toContain("buffered");
+    });
+
+    it("should reject invalid UTF-8 byte streams", () => {
+      const bytes = new Uint8Array([0xff, 0xfe, 0xfd]);
+      expect(() => convertBytes(bytes)).toThrow(/UTF-8/);
     });
   });
 

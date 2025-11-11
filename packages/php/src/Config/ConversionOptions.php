@@ -15,6 +15,7 @@ use HtmlToMarkdown\Internal\TypeAssertions;
 
 final readonly class ConversionOptions
 {
+
     public PreprocessingOptions $preprocessing;
 
     /**
@@ -172,39 +173,104 @@ final readonly class ConversionOptions
      */
     public function toArray(): array
     {
-        return [
-            'heading_style' => $this->headingStyle->value,
-            'list_indent_type' => $this->listIndentType->value,
-            'list_indent_width' => $this->listIndentWidth,
-            'bullets' => $this->bullets,
-            'strong_em_symbol' => $this->strongEmSymbol,
-            'escape_asterisks' => $this->escapeAsterisks,
-            'escape_underscores' => $this->escapeUnderscores,
-            'escape_misc' => $this->escapeMisc,
-            'escape_ascii' => $this->escapeAscii,
-            'code_language' => $this->codeLanguage,
-            'autolinks' => $this->autolinks,
-            'default_title' => $this->defaultTitle,
-            'br_in_tables' => $this->brInTables,
-            'hocr_spatial_tables' => $this->hocrSpatialTables,
-            'highlight_style' => $this->highlightStyle->value,
-            'extract_metadata' => $this->extractMetadata,
-            'whitespace_mode' => $this->whitespaceMode->value,
-            'strip_newlines' => $this->stripNewlines,
-            'wrap' => $this->wrap,
-            'wrap_width' => $this->wrapWidth,
-            'convert_as_inline' => $this->convertAsInline,
-            'sub_symbol' => $this->subSymbol,
-            'sup_symbol' => $this->supSymbol,
-            'newline_style' => $this->newlineStyle->value,
-            'code_block_style' => $this->codeBlockStyle->value,
-            'keep_inline_images_in' => array_values($this->keepInlineImagesIn),
-            'preprocessing' => $this->preprocessing->toArray(),
-            'encoding' => $this->encoding,
-            'debug' => $this->debug,
-            'strip_tags' => array_values($this->stripTags),
-            'preserve_tags' => array_values($this->preserveTags),
-        ];
+        $defaults = self::defaults();
+        $payload = [];
+
+        if ($this->headingStyle !== $defaults->headingStyle) {
+            $payload['heading_style'] = $this->headingStyle->value;
+        }
+        if ($this->listIndentType !== $defaults->listIndentType) {
+            $payload['list_indent_type'] = $this->listIndentType->value;
+        }
+        if ($this->listIndentWidth !== $defaults->listIndentWidth) {
+            $payload['list_indent_width'] = $this->listIndentWidth;
+        }
+        if ($this->bullets !== $defaults->bullets) {
+            $payload['bullets'] = $this->bullets;
+        }
+        if ($this->strongEmSymbol !== $defaults->strongEmSymbol) {
+            $payload['strong_em_symbol'] = $this->strongEmSymbol;
+        }
+        if ($this->escapeAsterisks !== $defaults->escapeAsterisks) {
+            $payload['escape_asterisks'] = $this->escapeAsterisks;
+        }
+        if ($this->escapeUnderscores !== $defaults->escapeUnderscores) {
+            $payload['escape_underscores'] = $this->escapeUnderscores;
+        }
+        if ($this->escapeMisc !== $defaults->escapeMisc) {
+            $payload['escape_misc'] = $this->escapeMisc;
+        }
+        if ($this->escapeAscii !== $defaults->escapeAscii) {
+            $payload['escape_ascii'] = $this->escapeAscii;
+        }
+        if ($this->codeLanguage !== $defaults->codeLanguage) {
+            $payload['code_language'] = $this->codeLanguage;
+        }
+        if ($this->autolinks !== $defaults->autolinks) {
+            $payload['autolinks'] = $this->autolinks;
+        }
+        if ($this->defaultTitle !== $defaults->defaultTitle) {
+            $payload['default_title'] = $this->defaultTitle;
+        }
+        if ($this->brInTables !== $defaults->brInTables) {
+            $payload['br_in_tables'] = $this->brInTables;
+        }
+        if ($this->hocrSpatialTables !== $defaults->hocrSpatialTables) {
+            $payload['hocr_spatial_tables'] = $this->hocrSpatialTables;
+        }
+        if ($this->highlightStyle !== $defaults->highlightStyle) {
+            $payload['highlight_style'] = $this->highlightStyle->value;
+        }
+        if ($this->extractMetadata !== $defaults->extractMetadata) {
+            $payload['extract_metadata'] = $this->extractMetadata;
+        }
+        if ($this->whitespaceMode !== $defaults->whitespaceMode) {
+            $payload['whitespace_mode'] = $this->whitespaceMode->value;
+        }
+        if ($this->stripNewlines !== $defaults->stripNewlines) {
+            $payload['strip_newlines'] = $this->stripNewlines;
+        }
+        if ($this->wrap !== $defaults->wrap) {
+            $payload['wrap'] = $this->wrap;
+        }
+        if ($this->wrapWidth !== $defaults->wrapWidth) {
+            $payload['wrap_width'] = $this->wrapWidth;
+        }
+        if ($this->convertAsInline !== $defaults->convertAsInline) {
+            $payload['convert_as_inline'] = $this->convertAsInline;
+        }
+        if ($this->subSymbol !== $defaults->subSymbol) {
+            $payload['sub_symbol'] = $this->subSymbol;
+        }
+        if ($this->supSymbol !== $defaults->supSymbol) {
+            $payload['sup_symbol'] = $this->supSymbol;
+        }
+        if ($this->newlineStyle !== $defaults->newlineStyle) {
+            $payload['newline_style'] = $this->newlineStyle->value;
+        }
+        if ($this->codeBlockStyle !== $defaults->codeBlockStyle) {
+            $payload['code_block_style'] = $this->codeBlockStyle->value;
+        }
+        if ($this->keepInlineImagesIn !== $defaults->keepInlineImagesIn && $this->keepInlineImagesIn !== []) {
+            $payload['keep_inline_images_in'] = array_values($this->keepInlineImagesIn);
+        }
+        if (!$this->preprocessing->isDefault()) {
+            $payload['preprocessing'] = $this->preprocessing->toArray();
+        }
+        if ($this->encoding !== $defaults->encoding) {
+            $payload['encoding'] = $this->encoding;
+        }
+        if ($this->debug !== $defaults->debug) {
+            $payload['debug'] = $this->debug;
+        }
+        if ($this->stripTags !== $defaults->stripTags && $this->stripTags !== []) {
+            $payload['strip_tags'] = array_values($this->stripTags);
+        }
+        if ($this->preserveTags !== $defaults->preserveTags && $this->preserveTags !== []) {
+            $payload['preserve_tags'] = array_values($this->preserveTags);
+        }
+
+        return $payload;
     }
 
     /**
@@ -227,6 +293,14 @@ final readonly class ConversionOptions
         }
 
         return $value;
+    }
+
+    private static function defaults(): self
+    {
+        static $defaults = null;
+        $defaults ??= new self();
+
+        return $defaults;
     }
 
     private function assertSingleCharacter(string $value, string $option): void

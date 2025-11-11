@@ -12,7 +12,7 @@ This crate is the core engine compiled into the Python wheels, Ruby gem, Node.js
 [![docs.rs](https://docs.rs/html-to-markdown-rs/badge.svg)](https://docs.rs/html-to-markdown-rs)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://github.com/Goldziher/html-to-markdown/blob/main/LICENSE)
 
-Fast, reliable HTML to Markdown conversion with full CommonMark compliance. Built with `html5ever` for correctness and `ammonia` for safe HTML preprocessing.
+Fast, reliable HTML to Markdown conversion with full CommonMark compliance. Built with `html5ever` for correctness and a DOM-based filter for safe preprocessing.
 
 ## Installation
 

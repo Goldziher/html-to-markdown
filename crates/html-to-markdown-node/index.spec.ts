@@ -1,9 +1,15 @@
+import { Buffer } from "node:buffer";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
   convert,
+  convertBuffer,
+  convertInlineImagesBuffer,
   convertWithInlineImages,
+  convertWithOptionsHandle,
+  convertBufferWithOptionsHandle,
+  createConversionOptionsHandle,
   JsCodeBlockStyle,
   JsHeadingStyle,
   JsHighlightStyle,
@@ -79,6 +85,44 @@ describe("html-to-markdown-node - NAPI-RS Bindings", () => {
         headingStyle: JsHeadingStyle.AtxClosed,
       });
       expect(markdown).toMatch(/#\s+Test\s+#/);
+    });
+  });
+
+  describe("Option Handles", () => {
+    it("should reuse parsed options across conversions", () => {
+      const handle = createConversionOptionsHandle({
+        headingStyle: JsHeadingStyle.AtxClosed,
+      });
+      const markdown = convertWithOptionsHandle("<h1>Reusable</h1>", handle);
+      expect(markdown).toContain("# Reusable #");
+    });
+
+    it("should support default options via handles", () => {
+      const handle = createConversionOptionsHandle();
+      const markdown = convertWithOptionsHandle("<p>Default</p>", handle);
+      expect(markdown).toContain("Default");
+    });
+  });
+
+  describe("Buffer conversions", () => {
+    it("should convert buffers without UTF-16 copies", () => {
+      const html = Buffer.from("<h1>Buffer</h1>");
+      const markdown = convertBuffer(html);
+      expect(markdown).toContain("Buffer");
+    });
+
+    it("should convert buffers with handles", () => {
+      const handle = createConversionOptionsHandle({
+        headingStyle: JsHeadingStyle.Atx,
+      });
+      const html = Buffer.from("<h1>Buffered</h1>");
+      const markdown = convertBufferWithOptionsHandle(html, handle);
+      expect(markdown).toMatch(/^#\s+Buffered/m);
+    });
+
+    it("should reject non UTF-8 buffers", () => {
+      const invalid = Buffer.from([0xff, 0xfe, 0xfd]);
+      expect(() => convertBuffer(invalid)).toThrow(/UTF-8/);
     });
   });
 
@@ -520,6 +564,16 @@ describe("html-to-markdown-node - NAPI-RS Bindings", () => {
         captureSvg: false,
       });
       expect(result.inlineImages.some((img) => img.format === "svg")).toBe(false);
+    });
+
+    it("should support buffer inputs for inline images", () => {
+      const png = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8DwHwAFBQIAX8jx0gAAAABJRU5ErkJggg==";
+      const html = Buffer.from(`<img src="data:image/png;base64,${png}" alt="buf">`);
+      const result = convertInlineImagesBuffer(html, undefined, {
+        maxDecodedSizeBytes: 2048n,
+      });
+      expect(result.markdown).toContain("buf");
+      expect(result.inlineImages).toHaveLength(1);
     });
   });
 

@@ -51,6 +51,7 @@ packages/html-to-markdown-ts/bin/
 packages/ruby/lib/bin/
 packages/ruby/lib/*.bundle
 packages/ruby/tmp/
+packages/ruby/vendor/
 packages/php-ext/workspace/
 
 # IDEs
@@ -66,6 +67,7 @@ Thumbs.db
 
 # Benchmarks
 .benchmarks/
+tools/runtime-bench/results/
 
 # Environment
 .env

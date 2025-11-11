@@ -129,7 +129,7 @@ html-to-markdown/
 ├── package.json                # Root workspace scripts
 │
 ├── crates/                     # Rust crates
-│   ├── html-to-markdown/       # Core library (tl parser + ammonia)
+│   ├── html-to-markdown/       # Core library (tl parser)
 │   ├── html-to-markdown-cli/   # Rust CLI binary
 │   ├── html-to-markdown-node/  # NAPI-RS bindings for Node.js (~691k ops/sec)
 │   ├── html-to-markdown-wasm/  # wasm-bindgen for browsers (~229k ops/sec)

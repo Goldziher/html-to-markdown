@@ -118,6 +118,64 @@ def update_cargo_toml(file_path: Path, version: str) -> tuple[bool, str, str]:
     return True, old_version, version
 
 
+def update_gemfile_lock(file_path: Path, version: str) -> tuple[bool, str, str]:
+    content = file_path.read_text()
+    match = re.search(r"(html-to-markdown\s*\()\s*([^)]+)(\))", content)
+    if not match:
+        return False, "NOT FOUND", version
+
+    old_version = match.group(2)
+    if old_version == version:
+        return False, old_version, version
+
+    new_content = re.sub(r"(html-to-markdown\s*\()\s*([^)]+)(\))", rf"\1{version}\3", content, count=1)
+    file_path.write_text(new_content)
+    return True, old_version, version
+
+
+def update_python_version_file(file_path: Path, version: str) -> tuple[bool, str, str]:
+    content = file_path.read_text()
+    match = re.search(r'(__version__\s*=\s*)"([^"]+)"', content)
+    old_version = match.group(2) if match else "NOT FOUND"
+
+    if old_version == version:
+        return False, old_version, version
+
+    new_content = re.sub(r'(__version__\s*=\s*)"([^"]+)"', rf'\1"{version}"', content, count=1)
+    file_path.write_text(new_content)
+    return True, old_version, version
+
+
+def update_node_binding_version(file_path: Path, version: str) -> tuple[bool, str, str]:
+    content = file_path.read_text()
+    pattern = r"(bindingPackageVersion\s*!==\s*')([0-9]+\.[0-9]+\.[0-9]+)(')"
+    new_content, count = re.subn(pattern, rf"\g<1>{version}\g<3>", content)
+    new_content, count_expected = re.subn(
+        r"(expected\s+)([0-9]+\.[0-9]+\.[0-9]+)(\s+but)", rf"\g<1>{version}\g<3>", new_content
+    )
+    if count == 0 and count_expected == 0:
+        return False, "N/A", version
+
+    file_path.write_text(new_content)
+    return True, "Updated node binding checks", version
+
+
+def update_uv_lock(file_path: Path, version: str) -> tuple[bool, str, str]:
+    content = file_path.read_text()
+    pattern = re.compile(r'(name\s*=\s*"html-to-markdown"\s+version\s*=\s*)"([^"]+)"')
+    match = pattern.search(content)
+    if not match:
+        return False, "NOT FOUND", version
+
+    old_version = match.group(2)
+    if old_version == version:
+        return False, old_version, version
+
+    new_content = pattern.sub(lambda m: f'{m.group(1)}"{version}"', content, count=1)
+    file_path.write_text(new_content)
+    return True, old_version, version
+
+
 def main() -> None:
     repo_root = get_repo_root()
 
@@ -171,6 +229,52 @@ def main() -> None:
         changed, old_ver, new_ver = update_ruby_version(ruby_version, version)
         rel_path = ruby_version.relative_to(repo_root)
 
+        if changed:
+            print(f"✓ {rel_path}: {old_ver} → {new_ver}")
+            updated_files.append(str(rel_path))
+        else:
+            unchanged_files.append(str(rel_path))
+
+    # Update Gemfile.lock for the Ruby gem
+    gemfile_lock = repo_root / "packages/ruby/Gemfile.lock"
+    if gemfile_lock.exists():
+        changed, old_ver, new_ver = update_gemfile_lock(gemfile_lock, version)
+        rel_path = gemfile_lock.relative_to(repo_root)
+
+        if changed:
+            print(f"✓ {rel_path}: {old_ver} → {new_ver}")
+            updated_files.append(str(rel_path))
+        else:
+            unchanged_files.append(str(rel_path))
+
+    # Update Python package __version__
+    python_version_file = repo_root / "packages/python/html_to_markdown/__init__.py"
+    if python_version_file.exists():
+        changed, old_ver, new_ver = update_python_version_file(python_version_file, version)
+        rel_path = python_version_file.relative_to(repo_root)
+
+        if changed:
+            print(f"✓ {rel_path}: {old_ver} → {new_ver}")
+            updated_files.append(str(rel_path))
+        else:
+            unchanged_files.append(str(rel_path))
+
+    # Update Node binding runtime version checks
+    node_binding_index = repo_root / "crates/html-to-markdown-node/index.js"
+    if node_binding_index.exists():
+        changed, _, _ = update_node_binding_version(node_binding_index, version)
+        rel_path = node_binding_index.relative_to(repo_root)
+        if changed:
+            print(f"✓ {rel_path}: updated binding version guards to {version}")
+            updated_files.append(str(rel_path))
+        else:
+            unchanged_files.append(str(rel_path))
+
+    # Update uv.lock version pin
+    uv_lock = repo_root / "uv.lock"
+    if uv_lock.exists():
+        changed, old_ver, new_ver = update_uv_lock(uv_lock, version)
+        rel_path = uv_lock.relative_to(repo_root)
         if changed:
             print(f"✓ {rel_path}: {old_ver} → {new_ver}")
             updated_files.append(str(rel_path))

@@ -65,10 +65,35 @@ tasks:
       - task: php:format
 
   bench:
-    desc: "Run benchmark suites (Rust + Python)"
+    desc: "Run Rust benchmarks plus runtime harness"
     cmds:
       - task: rust:bench
-      - task: python:bench
+      - task: bench:bindings
+
+  bench:bindings:
+    desc: "Benchmark PHP and Ruby bindings via runtime harness"
+    cmds:
+      - cargo run --release --manifest-path tools/runtime-bench/Cargo.toml -- --output tools/runtime-bench/results/latest.json
+
+  bench:bindings:php:
+    desc: "Benchmark PHP binding only"
+    cmds:
+      - cargo run --release --manifest-path tools/runtime-bench/Cargo.toml -- --language php --output tools/runtime-bench/results/php.json
+
+  bench:bindings:ruby:
+    desc: "Benchmark Ruby binding only"
+    cmds:
+      - cargo run --release --manifest-path tools/runtime-bench/Cargo.toml -- --language ruby --output tools/runtime-bench/results/ruby.json
+
+  bench:bindings:profile:
+    desc: "Benchmark PHP and Ruby bindings with resource profiling"
+    cmds:
+      - cargo run --release --manifest-path tools/runtime-bench/Cargo.toml -- --profile --output tools/runtime-bench/results/profile.json
+
+  flamegraph:rust:
+    desc: "Generate a flamegraph for the Rust core (lists_timeline fixture)"
+    cmds:
+      - cargo run --release --manifest-path tools/runtime-bench/Cargo.toml -- --language rust --fixture lists_timeline --flamegraph tools/runtime-bench/results/flamegraph.svg
 
   # Aliases (backward compatibility with legacy task names) -------------------
   test:rust:
@@ -168,11 +193,6 @@ tasks:
     cmds:
       - task: rust:bench
 
-  bench:python:
-    desc: "Alias for python:bench"
-    cmds:
-      - task: python:bench
-
   bench:all:
     desc: "Alias for bench"
     cmds:
@@ -228,7 +248,7 @@ tasks:
   rust:bench:
     desc: "Run Rust benchmarks"
     cmds:
-      - RB_SYS_RUBY=/opt/homebrew/opt/ruby/bin/ruby RUBY=/opt/homebrew/opt/ruby/bin/ruby cargo bench --package html-to-markdown
+      - RB_SYS_RUBY=/opt/homebrew/opt/ruby/bin/ruby RUBY=/opt/homebrew/opt/ruby/bin/ruby cargo bench --package html-to-markdown-rs
 
   rust:coverage:
     desc: "Generate Rust coverage report (requires cargo-llvm-cov)"
@@ -259,6 +279,7 @@ tasks:
     desc: "Run Python tests (build CLI first for proxy tests)"
     cmds:
       - RB_SYS_RUBY=/opt/homebrew/opt/ruby/bin/ruby RUBY=/opt/homebrew/opt/ruby/bin/ruby cargo build --release --package html-to-markdown-cli
+      - uv pip install --editable packages/python
       - cmd: uv run pytest
         dir: packages/python
 
@@ -269,17 +290,11 @@ tasks:
       - cmd: uv run pytest --cov=html_to_markdown --cov-report=term-missing
         dir: packages/python
 
-  python:bench:
-    desc: "Run Python benchmark suite"
-    cmds:
-      - RB_SYS_RUBY=/opt/homebrew/opt/ruby/bin/ruby RUBY=/opt/homebrew/opt/ruby/bin/ruby cargo build --release --package html-to-markdown-cli
-      - cmd: uv run pytest tests/benchmark_wikipedia_test.py --benchmark-only -v
-        dir: packages/python
-
   python:lint:
     desc: "Lint Python code with ruff + mypy"
     dir: packages/python
     cmds:
+      - uv pip install --editable .
       - uv run ruff check
       - uv run mypy .
 
@@ -343,7 +358,8 @@ tasks:
     desc: "Lint Ruby code"
     cmds:
       - task: ruby:ensure-bundler
-      - cmd: cd packages/ruby && PATH={{.RUBY_BIN}}:$PATH bundle _{{.BUNDLER_VERSION}}_ exec rubocop --config ./.rubocop.yml
+      - cmd: cd packages/ruby && BUNDLE_PATH=vendor/bundle PATH={{.RUBY_BIN}}:$PATH bundle _{{.BUNDLER_VERSION}}_ install
+      - cmd: cd packages/ruby && BUNDLE_PATH=vendor/bundle PATH={{.RUBY_BIN}}:$PATH bundle _{{.BUNDLER_VERSION}}_ exec rubocop --config ./.rubocop.yml
 
   ruby:format:
     desc: "Auto-correct Ruby lint issues"

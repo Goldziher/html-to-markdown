@@ -1,20 +1,17 @@
-"""New v2 functional API for HTML to Markdown conversion.
-
-This module provides the new functional API with dataclass-based options,
-using the Rust backend for conversion.
-"""
+"""High-level Python API backed by the Rust core."""
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Literal, TypedDict, cast
+from typing import Literal, TypedDict, cast
 
-import html_to_markdown._html_to_markdown as _rust  # type: ignore[import-not-found]
+import html_to_markdown._html_to_markdown as _rust
+from html_to_markdown._html_to_markdown import (
+    ConversionOptionsHandle as OptionsHandle,
+)
+from html_to_markdown._html_to_markdown import (
+    InlineImageConfig,
+)
 from html_to_markdown.options import ConversionOptions, PreprocessingOptions
-
-if TYPE_CHECKING:
-    from html_to_markdown._html_to_markdown import InlineImageConfig
-else:
-    InlineImageConfig = _rust.InlineImageConfig  # type: ignore[misc, assignment]
 
 
 class InlineImage(TypedDict):
@@ -37,7 +34,6 @@ class InlineImageWarning(TypedDict):
 
 
 def _to_rust_preprocessing(options: PreprocessingOptions) -> _rust.PreprocessingOptions:
-    """Convert high-level preprocessing options to the Rust bindings."""
     return _rust.PreprocessingOptions(
         enabled=options.enabled,
         preset=options.preset,
@@ -50,7 +46,6 @@ def _to_rust_options(
     options: ConversionOptions,
     preprocessing: PreprocessingOptions,
 ) -> _rust.ConversionOptions:
-    """Convert high-level conversion options to the Rust bindings."""
     return _rust.ConversionOptions(
         heading_style=options.heading_style,
         list_indent_type=options.list_indent_type,
@@ -91,23 +86,17 @@ def convert(
     options: ConversionOptions | None = None,
     preprocessing: PreprocessingOptions | None = None,
 ) -> str:
-    """Convert HTML to Markdown using the Rust backend.
+    """Convert HTML to Markdown using the Rust backend."""
+    if options is None and preprocessing is None:
+        return _rust.convert(html, None)
 
-    Args:
-        html: HTML string to convert.
-        options: Conversion configuration options (defaults to ConversionOptions()).
-        preprocessing: HTML preprocessing options (defaults to PreprocessingOptions()).
-
-    Returns:
-        Converted Markdown string.
-    """
     if options is None:
         options = ConversionOptions()
     if preprocessing is None:
         preprocessing = PreprocessingOptions()
 
     rust_options = _to_rust_options(options, preprocessing)
-    return cast("str", _rust.convert(html, rust_options))
+    return _rust.convert(html, rust_options)
 
 
 def convert_with_inline_images(
@@ -116,10 +105,7 @@ def convert_with_inline_images(
     preprocessing: PreprocessingOptions | None = None,
     image_config: InlineImageConfig | None = None,
 ) -> tuple[str, list[InlineImage], list[InlineImageWarning]]:
-    """Convert HTML and extract inline images.
-
-    Returns Markdown along with extracted inline images and any warnings.
-    """
+    """Convert HTML and extract inline images."""
     if options is None:
         options = ConversionOptions()
     if preprocessing is None:
@@ -135,10 +121,31 @@ def convert_with_inline_images(
     return markdown, list(images), list(warnings)
 
 
+def create_options_handle(
+    options: ConversionOptions | None = None,
+    preprocessing: PreprocessingOptions | None = None,
+) -> OptionsHandle:
+    """Create a reusable ConversionOptions handle backed by Rust."""
+    if options is None:
+        options = ConversionOptions()
+    if preprocessing is None:
+        preprocessing = PreprocessingOptions()
+    rust_options = _to_rust_options(options, preprocessing)
+    return _rust.create_options_handle(rust_options)
+
+
+def convert_with_handle(html: str, handle: OptionsHandle) -> str:
+    """Convert HTML using a pre-parsed ConversionOptions handle."""
+    return _rust.convert_with_options_handle(html, handle)
+
+
 __all__ = [
     "InlineImage",
     "InlineImageConfig",
     "InlineImageWarning",
+    "OptionsHandle",
     "convert",
+    "convert_with_handle",
     "convert_with_inline_images",
+    "create_options_handle",
 ]

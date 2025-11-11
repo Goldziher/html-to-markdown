@@ -8,10 +8,11 @@ members = [
     "crates/html-to-markdown-py",
     "packages/ruby/ext/html-to-markdown-rb/native",
     "crates/html-to-markdown-php",
+    "tools/runtime-bench",
 ]
 
 [workspace.package]
-version = "2.6.6"
+version = "2.7.0"
 edition = "2024"
 authors = ["Na'aman Hirschfeld <nhirschfeld@gmail.com>"]
 license = "MIT"
@@ -25,9 +26,8 @@ rust-version = "1.85"
 # Core library
 html-to-markdown-rs = { version = "2.6.1", path = "crates/html-to-markdown" }
 
-# HTML parsing and sanitization
+# HTML parsing
 tl = "0.7"
-ammonia = "4.1"
 
 # Utilities
 regex = "1.12"

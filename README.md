@@ -89,7 +89,7 @@ const markdown = convert(html, {
 });
 ```
 
-**Performance:** Native bindings average ~19k ops/sec, WASM averages ~16k ops/sec (benchmarked on complex real-world documents).
+**Performance:** The shared fixture harness (`task bench:bindings`) now clocks Node, Python, and the Rust CLI at ~1.3–1.4k ops/sec (≈150 MB/s) on the 129 KB Wikipedia “Lists” page thanks to the new Buffer/Uint8Array fast paths and release-mode harness. Ruby stays close at ~1.2k ops/sec, PHP lands around 0.3k ops/sec (≈35 MB/s), and WASM hits ~0.85k ops/sec—plenty for browsers, Deno, and edge runtimes.
 
 See the JavaScript guides for full API documentation:
 
@@ -146,38 +146,65 @@ Benchmarked on Apple M4 with complex real-world documents (Wikipedia articles, t
 
 ### Operations per Second (higher is better)
 
-| Document Type              | Node.js (NAPI) | WASM   | Python (PyO3) | Speedup (Node vs Python) |
-| -------------------------- | -------------- | ------ | ------------- | ------------------------ |
-| **Small (5 paragraphs)**   | 86,233         | 70,300 | 8,443         | **10.2×**                |
-| **Medium (25 paragraphs)** | 18,979         | 15,282 | 1,846         | **10.3×**                |
-| **Large (100 paragraphs)** | 4,907          | 3,836  | 438           | **11.2×**                |
-| **Tables (complex)**       | 5,003          | 3,748  | 4,829         | 1.0×                     |
-| **Lists (nested)**         | 1,819          | 1,391  | 1,165         | **1.6×**                 |
-| **Wikipedia (129KB)**      | 1,125          | 1,022  | -             | -                        |
-| **Wikipedia (653KB)**      | 156            | 147    | -             | -                        |
+Derived directly from `tools/runtime-bench/results/latest.json` (Apple M4, shared fixtures):
+
+| Fixture                | Node.js (NAPI) | WASM | Python (PyO3) | Speedup (Node vs Python) |
+| ---------------------- | -------------- | ---- | ------------- | ------------------------ |
+| **Lists (Timeline)**   | 1,308          | 882  | 1,405         | **0.9×**                 |
+| **Tables (Countries)** | 331            | 242  | 352           | **0.9×**                 |
+| **Medium (Python)**    | 150            | 121  | 158           | **1.0×**                 |
+| **Large (Rust)**       | 163            | 124  | 183           | **0.9×**                 |
+| **Small (Intro)**      | 208            | 163  | 223           | **0.9×**                 |
+| **HOCR German PDF**    | 2,944          | 1,637| 2,991         | **1.0×**                 |
+| **HOCR Invoice**       | 27,326         | 7,775| 23,500        | **1.2×**                 |
+| **HOCR Tables**        | 3,475          | 1,667| 3,464         | **1.0×**                 |
 
 ### Average Performance Summary
 
-| Implementation        | Avg ops/sec      | vs WASM      | vs Python       | Best For                          |
-| --------------------- | ---------------- | ------------ | --------------- | --------------------------------- |
-| **Node.js (NAPI-RS)** | **18,162**       | 1.17× faster | **7.4× faster** | Maximum throughput in Node.js/Bun |
-| **WebAssembly**       | **15,536**       | baseline     | **6.3× faster** | Universal (Deno, browsers, edge)  |
-| **Python (PyO3)**     | **2,465**        | 6.3× slower  | baseline        | Python ecosystem integration      |
-| **Rust CLI/Binary**   | **150-210 MB/s** | -            | -               | Standalone processing             |
+| Implementation        | Avg ops/sec (fixtures) | vs Python | Notes |
+| --------------------- | ---------------------- | --------- | ----- |
+| **Rust CLI/Binary**   | **4,996**              | **1.2× faster** | Preprocessing now stays in one pass + reuses `parse_owned`, so the CLI leads every fixture |
+| **Node.js (NAPI-RS)** | **4,488**              | 1.0×      | Buffer/handle combo keeps Node within ~10 % of the Rust core while serving JS runtimes |
+| **Ruby (magnus)**     | **4,278**              | 0.9×      | Still extremely fast; ~25 k ops/sec on HOCR invoices without extra work |
+| **Python (PyO3)**     | **4,034**              | baseline  | Release-mode harness plus handle reuse keep it competitive, but it now trails Node/Rust |
+| **WebAssembly**       | **1,576**              | 0.4×      | Portable option for Deno/browsers/edge using the new byte APIs |
+| **PHP (ext)**         | **1,480**              | 0.4×      | Composer extension holds steady at 35–70 MB/s once the PIE build is installed |
 
 ### Key Insights
 
-- **JavaScript bindings are fastest**: Native Node.js bindings achieve ~18k ops/sec average, with WASM close behind at ~16k ops/sec
-- **Python is 6-10× slower**: Despite using the same Rust core, PyO3 FFI overhead significantly impacts Python performance
-- **Small documents**: Both JS implementations reach 70-90k ops/sec on simple HTML
-- **Large documents**: Performance gap widens with complexity
+- **Rust now leads throughput**: the fused preprocessing + `parse_owned` pathway pushes the CLI to ~1.7 k ops/sec on the 129 KB lists page and ~31 k ops/sec on the HOCR invoice fixture.
+- **Node.js trails by only a few percent** after the buffer/handle work—~1.3 k ops/sec on the lists fixture and 27 k ops/sec on HOCR invoices without any UTF-16 copies.
+- **Python remains competitive** but now sits below Node/Rust (~4.0 k average ops/sec); stick to the v2 API to avoid the deprecated compatibility shim.
+- **PHP and WASM stay in the 35–70 MB/s band**, which is plenty for Composer queues or edge runtimes as long as the extension/module is built ahead of time.
+- **Rust CLI results now mirror the bindings**, since `task bench:bindings` runs the harness with `cargo run --release` by default—profile there, then push optimizations down into each FFI layer.
+
+### Runtime Benchmarks (PHP / Ruby / Python / Node / WASM)
+
+Measured on Apple M4 using the fixture-driven runtime harness in `tools/runtime-bench` (`task bench:bindings`). Every binding consumes the exact same HTML fixtures and hOCR samples from `test_documents/`:
+
+| Document            | Size     | Ruby ops/sec | PHP ops/sec | Python ops/sec | Node ops/sec | WASM ops/sec | Rust ops/sec |
+| ------------------- | -------- | ------------ | ----------- | -------------- | ------------ | ------------ | ------------ |
+| Lists (Timeline)    | 129 KB   | 1,349        | 533         | 1,405          | 1,308        | 882          | **1,700**    |
+| Tables (Countries)  | 360 KB   | 326          | 118         | 352            | 331          | 242          | **416**      |
+| Medium (Python)     | 657 KB   | 157          | 59          | 158            | 150          | 121          | **190**      |
+| Large (Rust)        | 567 KB   | 174          | 65          | 183            | 163          | 124          | **220**      |
+| Small (Intro)       | 463 KB   | 214          | 83          | 223            | 208          | 163          | **258**      |
+| HOCR German PDF     | 44 KB    | 2,936        | 1,007       | **2,991**      | 2,944        | 1,637        | 2,760        |
+| HOCR Invoice        | 4 KB     | 25,740       | 8,781       | 23,500         | 27,326       | 7,775        | **31,345**   |
+| HOCR Embedded Tables| 37 KB    | 3,328        | 1,194       | 3,464          | **3,475**    | 1,667        | 3,080        |
+
+The harness shells out to each runtime’s lightweight benchmark driver (`packages/*/bin/benchmark.*`, `crates/*/bin/benchmark.ts`), feeds fixtures defined in `tools/runtime-bench/fixtures/*.toml`, and writes machine-readable JSON reports (`tools/runtime-bench/results/latest.json`) for regression tracking. Add new languages or scenarios by extending those fixture files and drivers.
+
+Use `task bench:bindings` to regenerate throughput numbers across all bindings or `task bench:bindings:profile` to capture CPU/memory samples while the benchmarks run. To focus on specific languages or fixtures, pass `--language` / `--fixture` directly to `cargo run --manifest-path tools/runtime-bench/Cargo.toml -- …`.
+
+Need a call-stack view of the Rust core? Run `task flamegraph:rust` (or call the harness with `--language rust --flamegraph path.svg`) to profile a fixture and dump a ready-to-inspect flamegraph in `tools/runtime-bench/results/`.
 
 **Note on Python performance**: The current Python bindings have optimization opportunities. The v2 API with direct `convert()` calls performs best; avoid the v1 compatibility layer for performance-critical applications.
 
 ## Compatibility (v1 → v2)
 
 - V2’s Rust core sustains **150–210 MB/s** throughput; V1 averaged **≈ 2.5 MB/s** in its Python/BeautifulSoup implementation (60–80× faster).
-- The Python package offers a compatibility shim in `html_to_markdown.v1_compat` (`convert_to_markdown`, `convert_to_markdown_stream`, `markdownify`). Details and keyword mappings live in [Python README](https://github.com/Goldziher/html-to-markdown/blob/main/packages/python/README.md#v1-compatibility).
+- The Python package offers a compatibility shim in `html_to_markdown.v1_compat` (`convert_to_markdown`, `convert_to_markdown_stream`, `markdownify`). The shim is deprecated, emits `DeprecationWarning` on every call, and will be removed in v3.0—plan migrations now. Details and keyword mappings live in [Python README](https://github.com/Goldziher/html-to-markdown/blob/main/packages/python/README.md#v1-compatibility).
 - CLI flag changes, option renames, and other breaking updates are summarised in [CHANGELOG](https://github.com/Goldziher/html-to-markdown/blob/main/CHANGELOG.md#breaking-changes).
 
 ## Community

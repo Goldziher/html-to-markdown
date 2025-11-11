@@ -129,6 +129,45 @@ const options: JsConversionOptions = {
 const markdown = convert('<h1>Hello</h1>', options);
 ```
 
+### Reusing Parsed Options
+
+Avoid re-parsing the same options object on every call (benchmarks, tight render loops) by creating a reusable handle:
+
+```ts
+import {
+  createConversionOptionsHandle,
+  convertWithOptionsHandle,
+} from 'html-to-markdown-node';
+
+const handle = createConversionOptionsHandle({ hocrSpatialTables: false });
+const markdown = convertWithOptionsHandle('<h1>Handles</h1>', handle);
+```
+
+### Zero-Copy Buffer Input
+
+Skip the intermediate UTF-16 string allocation by feeding `Buffer`/`Uint8Array` inputs directly—handy for benchmark harnesses or when you already have raw bytes:
+
+```ts
+import {
+  convertBuffer,
+  convertInlineImagesBuffer,
+  convertBufferWithOptionsHandle,
+  createConversionOptionsHandle,
+} from 'html-to-markdown-node';
+import { readFileSync } from 'node:fs';
+
+const html = readFileSync('fixtures/lists.html'); // Buffer
+const markdown = convertBuffer(html);
+
+const handle = createConversionOptionsHandle({ headingStyle: 'Atx' });
+const markdownFromHandle = convertBufferWithOptionsHandle(html, handle);
+
+// Inline images work too:
+const extraction = convertInlineImagesBuffer(html, null, {
+  maxDecodedSizeBytes: 5 * 1024 * 1024,
+});
+```
+
 ## Inline Images
 
 Extract and decode inline images (data URIs, SVG):

@@ -1,0 +1,61 @@
+title = "Wikipedia Fixtures"
+description = "Real-world Wikipedia documents shared across benchmarks"
+
+[[fixtures]]
+id = "lists_timeline"
+name = "Lists (Timeline)"
+path = "test_documents/html/wikipedia/lists_timeline.html"
+category = "wikipedia"
+iterations = 150
+
+[[fixtures]]
+id = "tables_countries"
+name = "Tables (Countries)"
+path = "test_documents/html/wikipedia/tables_countries.html"
+category = "wikipedia"
+iterations = 120
+
+[[fixtures]]
+id = "medium_python"
+name = "Medium (Python)"
+path = "test_documents/html/wikipedia/medium_python.html"
+category = "wikipedia"
+iterations = 60
+
+[[fixtures]]
+id = "large_rust"
+name = "Large (Rust)"
+path = "test_documents/html/wikipedia/large_rust.html"
+category = "wikipedia"
+iterations = 40
+
+[[fixtures]]
+id = "small_html"
+name = "Small (Intro)"
+path = "test_documents/html/wikipedia/small_html.html"
+category = "wikipedia"
+iterations = 200
+
+[[fixtures]]
+id = "hocr_german_pdf"
+name = "HOCR German PDF"
+path = "test_documents/test_data/hocr/german_pdf_german.hocr"
+category = "hocr"
+iterations = 60
+format = "hocr"
+
+[[fixtures]]
+id = "hocr_invoice"
+name = "HOCR Invoice"
+path = "test_documents/test_data/hocr/invoice_image_default.hocr"
+category = "hocr"
+iterations = 80
+format = "hocr"
+
+[[fixtures]]
+id = "hocr_tables"
+name = "HOCR Embedded Tables"
+path = "test_documents/test_data/hocr/v4_embedded_tables.hocr"
+category = "hocr"
+iterations = 50
+format = "hocr"

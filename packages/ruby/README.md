@@ -109,6 +109,18 @@ markdown = HtmlToMarkdown.convert(
 puts markdown
 ```
 
+### Reusing Options
+
+If you’re running tight loops or benchmarks, build the options once and pass the handle back into `convert_with_options`:
+
+```ruby
+handle = HtmlToMarkdown.options(hocr_spatial_tables: false)
+
+100.times do
+  HtmlToMarkdown.convert_with_options('<h1>Handles</h1>', handle)
+end
+```
+
 ### HTML Preprocessing
 
 Clean up scraped HTML (navigation, forms, malformed markup) before conversion:
