@@ -648,6 +648,37 @@ fn push_heading(output: &mut String, ctx: &Context, options: &ConversionOptions,
     }
 }
 
+fn normalize_heading_text<'a>(text: &'a str) -> Cow<'a, str> {
+    if !text.contains('\n') && !text.contains('\r') {
+        return Cow::Borrowed(text);
+    }
+
+    let mut normalized = String::with_capacity(text.len());
+    let mut pending_space = false;
+
+    for ch in text.chars() {
+        match ch {
+            '\n' | '\r' => {
+                if !normalized.is_empty() {
+                    pending_space = true;
+                }
+            }
+            ' ' | '\t' if pending_space => continue,
+            _ => {
+                if pending_space {
+                    if !normalized.ends_with(' ') {
+                        normalized.push(' ');
+                    }
+                    pending_space = false;
+                }
+                normalized.push(ch);
+            }
+        }
+    }
+
+    Cow::Owned(normalized)
+}
+
 fn build_dom_context(dom: &tl::VDom, parser: &tl::Parser) -> DomContext {
     let mut ctx = DomContext {
         parent_map: HashMap::new(),
@@ -2204,9 +2235,9 @@ fn walk_node(
                         }
                     }
                     let trimmed = text.trim();
-
                     if !trimmed.is_empty() {
-                        push_heading(output, ctx, options, level, trimmed);
+                        let normalized = normalize_heading_text(trimmed);
+                        push_heading(output, ctx, options, level, normalized.as_ref());
                     }
                 }
 
@@ -5043,6 +5074,19 @@ mod tests {
         let html = "<p><mark><strong>Hot</strong></mark></p>";
         let result = convert_html(html, &options).unwrap();
         assert_eq!(result.trim(), "**Hot**");
+    }
+
+    #[test]
+    fn atx_heading_swallows_layout_line_breaks() {
+        let html = r#"<h2>
+  Heading
+  Text
+  with
+  Line
+  Breaks
+</h2>"#;
+        let result = convert_html(html, &ConversionOptions::default()).unwrap();
+        assert_eq!(result.trim(), "## Heading Text with Line Breaks");
     }
 
     #[test]
