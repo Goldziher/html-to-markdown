@@ -1,7 +1,9 @@
 {
-  "ai-rulez": {
-    "type": "stdio",
-    "command": "ai-rulez",
-    "args": ["mcp"]
+  "mcpServers": {
+    "ai-rulez": {
+      "type": "stdio",
+      "command": "ai-rulez",
+      "args": ["mcp"]
+    }
   }
 }

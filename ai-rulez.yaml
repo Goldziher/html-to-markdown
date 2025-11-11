@@ -8,12 +8,12 @@ mcp_servers:
     description: AI-Rulez MCP server for configuration management
     name: ai-rulez
 metadata:
-  description: High-performance HTML to Markdown converter with a Rust core plus Python, TypeScript, and Ruby distribution packages.
+  description: High-performance HTML to Markdown converter with a Rust core plus Python, TypeScript, Ruby, and PHP distribution packages.
   name: html-to-markdown
   version: 2.0.0
 presets:
   - claude
-  - gemini
+  - codex
 rules:
   - content: Core conversion logic is in Rust. Python bindings expose the API via PyO3. Python code should be minimal wrappers around Rust functions. Rust code in crates/html-to-markdown/ implements the conversion engine using html5ever parser and ammonia sanitizer.
     name: Rust Core Architecture
@@ -21,7 +21,7 @@ rules:
   - content: Use Python 3.10+ type hints for Python wrapper code. Rust code uses standard Rust types. Python type stubs in _rust.pyi provide type information for Rust bindings. Test both Python API and Rust implementation separately.
     name: Type Safety
     priority: critical
-  - content: Python tests in packages/python/tests validate API and integration. Rust tests in crates/ validate core logic. TypeScript tests live in packages/typescript/tests and Ruby specs in packages/ruby/spec. Use pytest, vitest, rspec, and cargo test respectively. Maintain dual coverage with pytest-cov and cargo-llvm-cov.
+  - content: Python tests in packages/python/tests validate API and integration. Rust tests in crates/ validate core logic. TypeScript tests live in packages/typescript/tests, Ruby specs in packages/ruby/spec, and PHP PHPUnit suites in packages/php/tests (composer run test builds html-to-markdown-php before running). Use pytest, vitest, rspec, phpunit, and cargo test respectively. Maintain dual coverage with pytest-cov and cargo-llvm-cov.
     name: Dual Testing Strategy
     priority: critical
   - content: Use prek (not pre-commit) for pre-commit hooks. Format Python with ruff, Rust with cargo fmt. Lint Python with ruff, Rust with clippy. Run prek run --all-files to check everything. Install hooks with prek install && prek install --hook-type commit-msg.
@@ -30,8 +30,11 @@ rules:
   - content: Use Taskfile for development tasks. Run task setup for initial setup, task update for dependency updates, task build for development builds, and task test:* for language-specific suites. See Taskfile.yaml for all available commands.
     name: Task Runner Commands
     priority: high
-  - content: Build Python package with maturin via uv pip install -e packages/python. TypeScript package builds with pnpm run build in packages/typescript (after the Node bindings build), Ruby gem uses bundle exec rake spec/package in packages/ruby, and the CLI binary builds with cargo build --release --package html-to-markdown-cli.
+  - content: Build Python package with maturin via uv pip install -e packages/python. TypeScript package builds with pnpm run build in packages/typescript (after the Node bindings build), Ruby gem uses bundle exec rake spec/package in packages/ruby, the PHP extension builds with cargo build -p html-to-markdown-php --release (PIE packaging lives in scripts/package_php_pie_source.sh + packages/php-ext), and the CLI binary builds with cargo build --release --package html-to-markdown-cli.
     name: Build System
+    priority: high
+  - content: PHP support ships as the Rust html-to-markdown-php extension crate plus the Composer package in packages/php and PIE metadata in packages/php-ext. Build or install the extension (cargo build -p html-to-markdown-php --release or pie install goldziher/html-to-markdown) before running composer run test, and keep phpstan/php-cs-fixer in sync via composer run lint or composer run format.
+    name: PHP Distribution
     priority: high
 sections:
   - content: |-
@@ -88,18 +91,22 @@ sections:
       ├── html-to-markdown/        # Core Rust library
       ├── html-to-markdown-cli/    # Native CLI binary
       ├── html-to-markdown-node/   # NAPI bindings for Node.js/Bun
+      ├── html-to-markdown-php/    # PHP extension crate exported via PIE + Composer wrappers
       ├── html-to-markdown-wasm/   # wasm-bindgen bindings
       └── html-to-markdown-py/     # PyO3 bindings used by Python package
       packages/
+      ├── php/                     # Composer package with typed PHP bindings + PHPUnit tests
+      ├── php-ext/                 # PIE packaging metadata for the PHP extension
       ├── python/                  # PyPI distribution (html_to_markdown package + tests)
-      ├── typescript/              # npm distribution + CLI wrapper
-      └── ruby/                    # Ruby gem sources and specs
+      ├── ruby/                    # Ruby gem sources and specs
+      └── typescript/              # npm distribution + CLI wrapper
       scripts/                     # Helper scripts (wheel prep, gem prep, demo build)
       ```
 
       ## Rust Crates
       - **html-to-markdown**: Core conversion logic with html5ever + ammonia
       - **html-to-markdown-node**: Native Node.js bindings (NAPI-RS)
+      - **html-to-markdown-php**: PHP extension crate packaged for PIE and Composer consumers
       - **html-to-markdown-wasm**: WebAssembly bindings
       - **html-to-markdown-py**: PyO3 bindings consumed by Python package
       - **html-to-markdown-cli**: Standalone CLI binary
@@ -108,6 +115,8 @@ sections:
       - **packages/python**: PyPI package with Python API and tests
       - **packages/typescript**: npm package + CLI built on Node bindings
       - **packages/ruby**: Ruby gem using Magnus bindings
+      - **packages/php**: Composer package exposing typed PHP bindings/tests atop the native extension
+      - **packages/php-ext**: PIE metadata + build scripts for publishing the PHP extension
     name: Architecture Overview
     priority: medium
   - content: |-
@@ -122,8 +131,9 @@ sections:
 
       ## Testing Matrix
       - Python: 3.10, 3.12, 3.14-dev
+      - PHP: 8.2+ with the html_to_markdown extension built from crates/html-to-markdown-php
       - OS: Linux, macOS, Windows
-      - Rust tests run on all platforms; TypeScript and Ruby test on Unix + Windows where supported
+      - Rust tests run on all platforms; TypeScript, Ruby, and PHP test on Unix + Windows where supported
 
       ## Prek Configuration
       - .prek-config.yaml contains hook configuration
