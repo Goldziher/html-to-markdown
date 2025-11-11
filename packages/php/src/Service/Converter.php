@@ -62,10 +62,12 @@ final class Converter
         }
 
         if ($options instanceof ConversionOptions) {
-            return $options->toArray();
+            $payload = $options->toArray();
+        } else {
+            $payload = ConversionOptions::fromArray($options)->toArray();
         }
 
-        return ConversionOptions::fromArray($options)->toArray();
+        return $payload === [] ? null : $payload;
     }
 
     /**

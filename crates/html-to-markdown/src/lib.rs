@@ -7,13 +7,14 @@
 //! Enable the `inline-images` Cargo feature to collect embedded data URI images and inline SVG
 //! assets alongside the produced Markdown.
 
+use std::borrow::Cow;
+
 pub mod converter;
 pub mod error;
 pub mod hocr;
 #[cfg(feature = "inline-images")]
 mod inline_images;
 pub mod options;
-pub mod sanitizer;
 pub mod text;
 pub mod wrapper;
 
@@ -46,15 +47,13 @@ pub use options::{
 pub fn convert(html: &str, options: Option<ConversionOptions>) -> Result<String> {
     let options = options.unwrap_or_default();
 
-    let normalized_html = html.replace("\r\n", "\n").replace('\r', "\n");
-
-    let clean_html = if options.preprocessing.enabled {
-        sanitizer::sanitize(&normalized_html, &options.preprocessing, &options.preserve_tags)?
+    let normalized_html = if html.contains('\r') {
+        Cow::Owned(html.replace("\r\n", "\n").replace('\r', "\n"))
     } else {
-        normalized_html
+        Cow::Borrowed(html)
     };
 
-    let markdown = converter::convert_html(&clean_html, &options)?;
+    let markdown = converter::convert_html(normalized_html.as_ref(), &options)?;
 
     if options.wrap {
         Ok(wrapper::wrap_markdown(&markdown, &options))
@@ -83,17 +82,16 @@ pub fn convert_with_inline_images(
 
     let options = options.unwrap_or_default();
 
-    let normalized_html = html.replace("\r\n", "\n").replace('\r', "\n");
-
-    let clean_html = if options.preprocessing.enabled {
-        sanitizer::sanitize(&normalized_html, &options.preprocessing, &options.preserve_tags)?
+    let normalized_html = if html.contains('\r') {
+        Cow::Owned(html.replace("\r\n", "\n").replace('\r', "\n"))
     } else {
-        normalized_html
+        Cow::Borrowed(html)
     };
 
     let collector = Rc::new(RefCell::new(inline_images::InlineImageCollector::new(image_cfg)?));
 
-    let markdown = converter::convert_html_with_inline_collector(&clean_html, &options, Rc::clone(&collector))?;
+    let markdown =
+        converter::convert_html_with_inline_collector(normalized_html.as_ref(), &options, Rc::clone(&collector))?;
 
     let markdown = if options.wrap {
         wrapper::wrap_markdown(&markdown, &options)

@@ -11,6 +11,15 @@ import warnings
 from html_to_markdown import ConversionOptions, PreprocessingOptions
 from html_to_markdown import convert as convert_v2
 
+DEPRECATION_MESSAGE = (
+    "The v1 compatibility layer is deprecated and will be removed in v3.0. "
+    "Use html_to_markdown.convert() with ConversionOptions instead."
+)
+
+
+def _warn_deprecated(api_name: str, *, stacklevel: int = 2) -> None:
+    warnings.warn(f"{api_name} is deprecated. {DEPRECATION_MESSAGE}", DeprecationWarning, stacklevel=stacklevel)
+
 
 def convert_to_markdown(
     html: str,
@@ -104,12 +113,7 @@ def convert_to_markdown(
         Use :func:`html_to_markdown.convert` with :class:`ConversionOptions` instead.
         The v1 API is provided for backward compatibility only.
     """
-    warnings.warn(
-        "convert_to_markdown() is deprecated and will be removed in v3.0. "
-        "Use html_to_markdown.convert() with ConversionOptions instead.",
-        DeprecationWarning,
-        stacklevel=2,
-    )
+    _warn_deprecated("convert_to_markdown()", stacklevel=2)
 
     if code_language_callback is not None:
         raise NotImplementedError(
@@ -181,12 +185,7 @@ def markdownify(*args: object, **kwargs: object) -> str:
     .. deprecated:: 2.0
         Use html_to_markdown.convert() instead.
     """
-    warnings.warn(
-        "markdownify() is deprecated and will be removed in v3.0. "
-        "Use html_to_markdown.convert() with ConversionOptions instead.",
-        DeprecationWarning,
-        stacklevel=2,
-    )
+    _warn_deprecated("markdownify()", stacklevel=2)
     return convert_to_markdown(*args, **kwargs)  # type: ignore[arg-type]
 
 

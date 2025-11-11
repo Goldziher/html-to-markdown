@@ -70,4 +70,15 @@ final readonly class PreprocessingOptions
         ];
     }
 
+    public function isDefault(): bool
+    {
+        static $defaults = null;
+        $defaults ??= new self();
+
+        return $this->enabled === $defaults->enabled
+            && $this->preset === $defaults->preset
+            && $this->removeNavigation === $defaults->removeNavigation
+            && $this->removeForms === $defaults->removeForms;
+    }
+
 }

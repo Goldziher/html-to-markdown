@@ -64,6 +64,19 @@ options.extract_metadata = True
 markdown = convert(html, options)
 ```
 
+### Reusing Parsed Options
+
+Avoid re-parsing the same option dictionaries inside hot loops by building a reusable handle:
+
+```python
+from html_to_markdown import ConversionOptions, convert_with_handle, create_options_handle
+
+handle = create_options_handle(ConversionOptions(hocr_spatial_tables=False))
+
+for html in documents:
+    markdown = convert_with_handle(html, handle)
+```
+
 ### HTML Preprocessing
 
 ```python

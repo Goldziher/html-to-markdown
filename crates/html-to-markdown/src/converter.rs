@@ -161,13 +161,13 @@ fn is_loose_list(node_handle: &tl::NodeHandle, parser: &tl::Parser) -> bool {
                 for child_handle in children.top().iter() {
                     if let Some(child_node) = child_handle.get(parser) {
                         if let tl::Node::Tag(child_tag) = child_node {
-                            if child_tag.name().as_utf8_str() == "li" {
+                            if tag_name_eq(child_tag.name().as_utf8_str(), "li") {
                                 let li_children = child_tag.children();
                                 {
                                     for li_child_handle in li_children.top().iter() {
                                         if let Some(li_child_node) = li_child_handle.get(parser) {
                                             if let tl::Node::Tag(li_child_tag) = li_child_node {
-                                                if li_child_tag.name().as_utf8_str() == "p" {
+                                                if tag_name_eq(li_child_tag.name().as_utf8_str(), "p") {
                                                     return true;
                                                 }
                                             }
@@ -362,7 +362,7 @@ fn process_list_children(
                     if is_ordered {
                         if let Some(child_node) = child_handle.get(parser) {
                             if let tl::Node::Tag(child_tag) = child_node {
-                                if child_tag.name().as_utf8_str() == "li" {
+                                if tag_name_eq(child_tag.name().as_utf8_str(), "li") {
                                     counter += 1;
                                 }
                             }
@@ -580,7 +580,7 @@ fn find_single_heading_child(node_handle: &tl::NodeHandle, parser: &tl::Parser) 
                 }
             }
             tl::Node::Tag(child_tag) => {
-                let name = child_tag.name().as_utf8_str();
+                let name = normalized_tag_name(child_tag.name().as_utf8_str());
                 if let Some(level) = heading_level_from_name(name.as_ref()) {
                     if heading_data.is_some() {
                         return None;
@@ -718,7 +718,7 @@ fn is_hocr_document(node_handle: &tl::NodeHandle, parser: &tl::Parser) -> bool {
         if let Some(node) = node_handle.get(parser) {
             match node {
                 tl::Node::Tag(tag) => {
-                    let tag_name = tag.name().as_utf8_str();
+                    let tag_name = normalized_tag_name(tag.name().as_utf8_str());
 
                     if tag_name == "meta" {
                         if let Some(name_attr) = tag.attributes().get("name") {
@@ -781,7 +781,7 @@ fn extract_metadata(node_handle: &tl::NodeHandle, parser: &tl::Parser) -> BTreeM
     fn find_head(node_handle: &tl::NodeHandle, parser: &tl::Parser) -> Option<tl::NodeHandle> {
         if let Some(node) = node_handle.get(parser) {
             if let tl::Node::Tag(tag) = node {
-                if tag.name().as_utf8_str() == "head" {
+                if tag_name_eq(tag.name().as_utf8_str(), "head") {
                     return Some(*node_handle);
                 }
                 let children = tag.children();
@@ -809,7 +809,7 @@ fn extract_metadata(node_handle: &tl::NodeHandle, parser: &tl::Parser) -> BTreeM
                 for child_handle in children.top().iter() {
                     if let Some(child_node) = child_handle.get(parser) {
                         if let tl::Node::Tag(child_tag) = child_node {
-                            let tag_name = child_tag.name().as_utf8_str();
+                            let tag_name = normalized_tag_name(child_tag.name().as_utf8_str());
 
                             match tag_name.as_ref() {
                                 "title" => {
@@ -949,7 +949,7 @@ fn is_empty_inline_element(node_handle: &tl::NodeHandle, parser: &tl::Parser) ->
 
     if let Some(node) = node_handle.get(parser) {
         if let tl::Node::Tag(tag) = node {
-            let tag_name = tag.name().as_utf8_str();
+            let tag_name = normalized_tag_name(tag.name().as_utf8_str());
             if EMPTY_WHEN_NO_CONTENT_TAGS.contains(&tag_name.as_ref()) {
                 return get_text_content(node_handle, parser).trim().is_empty();
             }
@@ -984,7 +984,7 @@ fn get_text_content(node_handle: &tl::NodeHandle, parser: &tl::Parser) -> String
 fn serialize_element(node_handle: &tl::NodeHandle, parser: &tl::Parser) -> String {
     if let Some(node) = node_handle.get(parser) {
         if let tl::Node::Tag(tag) = node {
-            let tag_name = tag.name().as_utf8_str();
+            let tag_name = normalized_tag_name(tag.name().as_utf8_str());
             let mut html = String::with_capacity(256);
             html.push('<');
             html.push_str(&tag_name);
@@ -1263,28 +1263,47 @@ fn convert_html_impl(
     options: &ConversionOptions,
     inline_collector: Option<InlineCollectorHandle>,
 ) -> Result<String> {
-    // Fix: tl parser has issues with self-closing tags like <br/>
-    // Temporarily convert them to non-self-closing format
-    let html = html
-        .replace("<br/>", "<br>")
-        .replace("<hr/>", "<hr>")
-        .replace("<img/>", "<img>");
+    // Normalize problematic HTML constructs before parsing
+    let preprocessed = preprocess_html(html);
+    let preprocessed_len = preprocessed.len();
 
-    // Escape malformed angle brackets in text content to prevent parser failures
-    let html = escape_malformed_angle_brackets(&html);
+    enum ParsedDom<'a> {
+        Borrowed(tl::VDom<'a>),
+        Owned(tl::VDomGuard),
+    }
 
-    let html = strip_script_and_style_sections(&html);
+    let parser_options = tl::ParserOptions::default();
+    let mut _dom_storage: Option<ParsedDom> = None;
+    let dom_ref = match preprocessed {
+        Cow::Borrowed(s) => {
+            let dom = tl::parse(s, parser_options)
+                .map_err(|_| crate::error::ConversionError::ParseError("Failed to parse HTML".to_string()))?;
+            _dom_storage = Some(ParsedDom::Borrowed(dom));
+            match _dom_storage.as_ref().unwrap() {
+                ParsedDom::Borrowed(dom) => dom,
+                ParsedDom::Owned(_) => unreachable!(),
+            }
+        }
+        Cow::Owned(s) => {
+            let guard = unsafe {
+                tl::parse_owned(s, parser_options)
+                    .map_err(|_| crate::error::ConversionError::ParseError("Failed to parse HTML".to_string()))?
+            };
+            _dom_storage = Some(ParsedDom::Owned(guard));
+            match _dom_storage.as_ref().unwrap() {
+                ParsedDom::Owned(guard) => guard.get_ref(),
+                ParsedDom::Borrowed(_) => unreachable!(),
+            }
+        }
+    };
 
-    let dom = tl::parse(html.as_ref(), tl::ParserOptions::default())
-        .map_err(|_| crate::error::ConversionError::ParseError("Failed to parse HTML".to_string()))?;
-
-    let parser = dom.parser();
-    let dom_ctx = build_dom_context(&dom, parser);
-    let mut output = String::with_capacity(html.len());
+    let parser = dom_ref.parser();
+    let dom_ctx = build_dom_context(dom_ref, parser);
+    let mut output = String::with_capacity(preprocessed_len);
 
     // Check for hOCR document and extract metadata by checking all top-level children
     let mut is_hocr = false;
-    for child_handle in dom.children().iter() {
+    for child_handle in dom_ref.children().iter() {
         if is_hocr_document(child_handle, parser) {
             is_hocr = true;
             break;
@@ -1292,7 +1311,7 @@ fn convert_html_impl(
     }
 
     if options.extract_metadata && !options.convert_as_inline && !is_hocr {
-        for child_handle in dom.children().iter() {
+        for child_handle in dom_ref.children().iter() {
             let metadata = extract_metadata(child_handle, parser);
             if !metadata.is_empty() {
                 let metadata_frontmatter = format_metadata_frontmatter(&metadata);
@@ -1305,7 +1324,7 @@ fn convert_html_impl(
     if is_hocr {
         use crate::hocr::{convert_to_markdown_with_options as convert_hocr_to_markdown, extract_hocr_document};
 
-        let (elements, metadata) = extract_hocr_document(&dom, options.debug);
+        let (elements, metadata) = extract_hocr_document(dom_ref, options.debug);
 
         // Extract hOCR metadata as YAML frontmatter
         if options.extract_metadata && !options.convert_as_inline {
@@ -1368,7 +1387,7 @@ fn convert_html_impl(
     };
 
     // Walk all top-level children
-    for child_handle in dom.children().iter() {
+    for child_handle in dom_ref.children().iter() {
         walk_node(child_handle, parser, &mut output, options, &ctx, 0, &dom_ctx);
     }
 
@@ -1379,6 +1398,168 @@ fn convert_html_impl(
     } else {
         Ok(format!("{}\n", trimmed))
     }
+}
+
+fn preprocess_html(input: &str) -> Cow<'_, str> {
+    const SELF_CLOSING: [(&[u8], &str); 3] = [(b"<br/>", "<br>"), (b"<hr/>", "<hr>"), (b"<img/>", "<img>")];
+    const TAGS: [&[u8]; 2] = [b"script", b"style"];
+    const SVG: &[u8] = b"svg";
+
+    let bytes = input.as_bytes();
+    let len = bytes.len();
+    if len == 0 {
+        return Cow::Borrowed(input);
+    }
+
+    let mut idx = 0;
+    let mut last = 0;
+    let mut output: Option<String> = None;
+    let mut svg_depth = 0usize;
+
+    while idx < len {
+        if bytes[idx] == b'<' {
+            let mut replaced = false;
+            for (pattern, replacement) in &SELF_CLOSING {
+                if bytes[idx..].starts_with(pattern) {
+                    let out = output.get_or_insert_with(|| String::with_capacity(input.len()));
+                    out.push_str(&input[last..idx]);
+                    out.push_str(replacement);
+                    idx += pattern.len();
+                    last = idx;
+                    replaced = true;
+                    break;
+                }
+            }
+            if replaced {
+                continue;
+            }
+
+            if matches_tag_start(bytes, idx + 1, SVG) {
+                if let Some(open_end) = find_tag_end(bytes, idx + 1 + SVG.len()) {
+                    svg_depth += 1;
+                    idx = open_end;
+                    continue;
+                }
+            } else if matches_end_tag_start(bytes, idx + 1, SVG) {
+                if let Some(close_end) = find_tag_end(bytes, idx + 2 + SVG.len()) {
+                    if svg_depth > 0 {
+                        svg_depth = svg_depth.saturating_sub(1);
+                    }
+                    idx = close_end;
+                    continue;
+                }
+            }
+
+            if svg_depth == 0 {
+                let mut handled = false;
+                for tag in TAGS {
+                    if matches_tag_start(bytes, idx + 1, tag) {
+                        if let Some(open_end) = find_tag_end(bytes, idx + 1 + tag.len()) {
+                            let remove_end = find_closing_tag(bytes, open_end, tag).unwrap_or(len);
+                            let out = output.get_or_insert_with(|| String::with_capacity(input.len()));
+                            out.push_str(&input[last..idx]);
+                            out.push_str(&input[idx..open_end]);
+                            out.push_str("</");
+                            out.push_str(str::from_utf8(tag).unwrap());
+                            out.push('>');
+
+                            last = remove_end;
+                            idx = remove_end;
+                            handled = true;
+                        }
+                    }
+
+                    if handled {
+                        break;
+                    }
+                }
+
+                if handled {
+                    continue;
+                }
+            }
+
+            let is_valid_tag = if idx + 1 < len {
+                match bytes[idx + 1] {
+                    b'!' => {
+                        idx + 2 < len
+                            && (bytes[idx + 2] == b'-'
+                                || bytes[idx + 2].is_ascii_alphabetic()
+                                || bytes[idx + 2].is_ascii_uppercase())
+                    }
+                    b'/' => {
+                        idx + 2 < len && (bytes[idx + 2].is_ascii_alphabetic() || bytes[idx + 2].is_ascii_uppercase())
+                    }
+                    b'?' => true,
+                    c if c.is_ascii_alphabetic() || c.is_ascii_uppercase() => true,
+                    _ => false,
+                }
+            } else {
+                false
+            };
+
+            if !is_valid_tag {
+                let out = output.get_or_insert_with(|| String::with_capacity(input.len() + 4));
+                out.push_str(&input[last..idx]);
+                out.push_str("&lt;");
+                idx += 1;
+                last = idx;
+                continue;
+            }
+        }
+
+        idx += 1;
+    }
+
+    if let Some(mut out) = output {
+        if last < len {
+            out.push_str(&input[last..]);
+        }
+        Cow::Owned(out)
+    } else {
+        Cow::Borrowed(input)
+    }
+}
+
+#[cfg(test)]
+fn normalize_self_closing_tags(input: &str) -> Cow<'_, str> {
+    const REPLACEMENTS: [(&[u8], &str); 3] = [(b"<br/>", "<br>"), (b"<hr/>", "<hr>"), (b"<img/>", "<img>")];
+
+    if !REPLACEMENTS
+        .iter()
+        .any(|(pattern, _)| input.as_bytes().windows(pattern.len()).any(|w| w == *pattern))
+    {
+        return Cow::Borrowed(input);
+    }
+
+    let bytes = input.as_bytes();
+    let mut output = String::with_capacity(input.len());
+    let mut idx = 0;
+    let mut last = 0;
+
+    while idx < bytes.len() {
+        let mut matched = false;
+        for (pattern, replacement) in &REPLACEMENTS {
+            if bytes[idx..].starts_with(*pattern) {
+                output.push_str(&input[last..idx]);
+                output.push_str(replacement);
+                idx += pattern.len();
+                last = idx;
+                matched = true;
+                break;
+            }
+        }
+
+        if !matched {
+            idx += 1;
+        }
+    }
+
+    if last < input.len() {
+        output.push_str(&input[last..]);
+    }
+
+    Cow::Owned(output)
 }
 
 /// Escape malformed angle brackets in HTML that are not part of valid tags.
@@ -1392,6 +1573,7 @@ fn convert_html_impl(
 /// - `1<2` becomes `1&lt;2`
 /// - `<div>1<2</div>` becomes `<div>1&lt;2</div>`
 /// - `<script>1 < 2</script>` remains unchanged (handled by script stripping)
+#[cfg(test)]
 fn escape_malformed_angle_brackets(input: &str) -> Cow<'_, str> {
     let bytes = input.as_bytes();
     let len = bytes.len();
@@ -1457,6 +1639,46 @@ fn escape_malformed_angle_brackets(input: &str) -> Cow<'_, str> {
     }
 }
 
+fn normalized_tag_name<'a>(raw: Cow<'a, str>) -> Cow<'a, str> {
+    if raw.as_bytes().iter().any(|b| b.is_ascii_uppercase()) {
+        let mut owned = raw.into_owned();
+        owned.make_ascii_lowercase();
+        Cow::Owned(owned)
+    } else {
+        raw
+    }
+}
+
+fn tag_name_eq(name: Cow<'_, str>, needle: &str) -> bool {
+    name.eq_ignore_ascii_case(needle)
+}
+
+fn should_drop_for_preprocessing(tag_name: &str, options: &ConversionOptions) -> bool {
+    if !options.preprocessing.enabled {
+        return false;
+    }
+
+    if options.preprocessing.remove_navigation && matches!(tag_name, "nav" | "aside" | "header" | "footer") {
+        return true;
+    }
+
+    if options.preprocessing.remove_forms {
+        if tag_name == "form" {
+            let preserves_form = options.preserve_tags.iter().any(|t| t == "form");
+            if !preserves_form {
+                return true;
+            }
+        } else if matches!(
+            tag_name,
+            "button" | "select" | "textarea" | "label" | "fieldset" | "legend"
+        ) {
+            return true;
+        }
+    }
+
+    false
+}
+
 /// Serialize a tag and its children back to HTML.
 ///
 /// This is used for the preserve_tags feature to output original HTML for specific elements.
@@ -1470,7 +1692,7 @@ fn serialize_tag_to_html(handle: &tl::NodeHandle, parser: &tl::Parser) -> String
 fn serialize_node_to_html(handle: &tl::NodeHandle, parser: &tl::Parser, output: &mut String) {
     match handle.get(parser) {
         Some(tl::Node::Tag(tag)) => {
-            let tag_name = tag.name().as_utf8_str();
+            let tag_name = normalized_tag_name(tag.name().as_utf8_str());
 
             // Opening tag
             output.push('<');
@@ -1526,6 +1748,7 @@ fn serialize_node_to_html(handle: &tl::NodeHandle, parser: &tl::Parser, output: 
     }
 }
 
+#[cfg(test)]
 fn strip_script_and_style_sections(input: &str) -> Cow<'_, str> {
     const TAGS: [&[u8]; 2] = [b"script", b"style"];
     const SVG: &[u8] = b"svg";
@@ -1752,7 +1975,7 @@ fn get_next_sibling_tag(node_handle: &tl::NodeHandle, parser: &tl::Parser, dom_c
     for sibling in siblings.iter().skip(position + 1) {
         if let Some(node) = sibling.get(parser) {
             match node {
-                tl::Node::Tag(tag) => return Some(tag.name().as_utf8_str().to_string()),
+                tl::Node::Tag(tag) => return Some(normalized_tag_name(tag.name().as_utf8_str()).into_owned()),
                 tl::Node::Raw(raw) => {
                     if !raw.as_utf8_str().trim().is_empty() {
                         return None;
@@ -1789,6 +2012,10 @@ fn walk_node(
 
             if options.strip_newlines {
                 text = text.replace(['\r', '\n'], " ");
+            }
+
+            while output.ends_with(' ') && text.starts_with(' ') {
+                text.remove(0);
             }
 
             if text.trim().is_empty() {
@@ -1844,7 +2071,9 @@ fn walk_node(
                     if output.chars().last().is_some_and(|c| c == '\n') {
                         return;
                     }
-                    output.push(' ');
+                    if !output.ends_with(' ') {
+                        output.push(' ');
+                    }
                 }
                 return;
             }
@@ -1878,7 +2107,8 @@ fn walk_node(
                     || output.ends_with("- ")
                     || output.ends_with(". ")
                     || output.ends_with("] ")
-                    || (output.ends_with('\n') && prefix == " ");
+                    || (output.ends_with('\n') && prefix == " ")
+                    || (output.ends_with(' ') && prefix == " ");
 
                 let mut final_text = String::new();
                 if !skip_prefix && !prefix.is_empty() {
@@ -1926,6 +2156,10 @@ fn walk_node(
                     }
                 }
 
+                if output.ends_with(' ') && final_text.starts_with(' ') {
+                    final_text.remove(0);
+                }
+
                 final_text
             };
 
@@ -1944,7 +2178,15 @@ fn walk_node(
         }
 
         tl::Node::Tag(tag) => {
-            let tag_name = tag.name().as_utf8_str();
+            let tag_name = normalized_tag_name(tag.name().as_utf8_str());
+
+            if should_drop_for_preprocessing(tag_name.as_ref(), options) {
+                trim_trailing_whitespace(output);
+                if options.debug {
+                    eprintln!("[DEBUG] Dropping <{}> subtree due to preprocessing settings", tag_name);
+                }
+                return;
+            }
 
             if options.strip_tags.iter().any(|t| t.as_str() == tag_name) {
                 let children = tag.children();
@@ -2174,7 +2416,8 @@ fn walk_node(
                         if let Some((heading_level, heading_handle)) = find_single_heading_child(node_handle, parser) {
                             if let Some(heading_node) = heading_handle.get(parser) {
                                 if let tl::Node::Tag(heading_tag) = heading_node {
-                                    let heading_name = heading_tag.name().as_utf8_str().to_string();
+                                    let heading_name =
+                                        normalized_tag_name(heading_tag.name().as_utf8_str()).into_owned();
                                     let mut heading_text = String::new();
                                     let heading_ctx = Context {
                                         in_heading: true,
@@ -2935,7 +3178,7 @@ fn walk_node(
                     {
                         for child_handle in children.top().iter() {
                             if let Some(tl::Node::Tag(child_tag)) = child_handle.get(parser) {
-                                let tag_name = child_tag.name().as_utf8_str();
+                                let tag_name = normalized_tag_name(child_tag.name().as_utf8_str());
                                 if matches!(
                                     tag_name.as_ref(),
                                     "p" | "div" | "blockquote" | "pre" | "table" | "hr" | "dl"
@@ -2952,7 +3195,7 @@ fn walk_node(
                         parser: &'a tl::Parser<'a>,
                     ) -> Option<(bool, tl::NodeHandle)> {
                         if let Some(tl::Node::Tag(node_tag)) = node_handle.get(parser) {
-                            if node_tag.name().as_utf8_str() == "input" {
+                            if tag_name_eq(node_tag.name().as_utf8_str(), "input") {
                                 let input_type = node_tag.attributes().get("type").flatten().map(|v| v.as_utf8_str());
 
                                 if input_type.as_deref() == Some("checkbox") {
@@ -3338,7 +3581,7 @@ fn walk_node(
                     {
                         for child_handle in children.top().iter() {
                             let (is_dt, is_dd) = if let Some(tl::Node::Tag(child_tag)) = child_handle.get(parser) {
-                                let tag_name = child_tag.name().as_utf8_str();
+                                let tag_name = normalized_tag_name(child_tag.name().as_utf8_str());
                                 (tag_name == "dt", tag_name == "dd")
                             } else {
                                 (false, false)
@@ -3546,7 +3789,7 @@ fn walk_node(
                             {
                                 for child_handle in children.top().iter() {
                                     if let Some(tl::Node::Tag(child_tag)) = child_handle.get(parser) {
-                                        if child_tag.name().as_utf8_str() == "source" {
+                                        if tag_name_eq(child_tag.name().as_utf8_str(), "source") {
                                             return child_tag
                                                 .attributes()
                                                 .get("src")
@@ -3576,7 +3819,7 @@ fn walk_node(
                     {
                         for child_handle in children.top().iter() {
                             let is_source = if let Some(tl::Node::Tag(child_tag)) = child_handle.get(parser) {
-                                child_tag.name().as_utf8_str() == "source"
+                                tag_name_eq(child_tag.name().as_utf8_str(), "source")
                             } else {
                                 false
                             };
@@ -3607,7 +3850,7 @@ fn walk_node(
                             {
                                 for child_handle in children.top().iter() {
                                     if let Some(tl::Node::Tag(child_tag)) = child_handle.get(parser) {
-                                        if child_tag.name().as_utf8_str() == "source" {
+                                        if tag_name_eq(child_tag.name().as_utf8_str(), "source") {
                                             return child_tag
                                                 .attributes()
                                                 .get("src")
@@ -3637,7 +3880,7 @@ fn walk_node(
                     {
                         for child_handle in children.top().iter() {
                             let is_source = if let Some(tl::Node::Tag(child_tag)) = child_handle.get(parser) {
-                                child_tag.name().as_utf8_str() == "source"
+                                tag_name_eq(child_tag.name().as_utf8_str(), "source")
                             } else {
                                 false
                             };
@@ -3662,7 +3905,7 @@ fn walk_node(
                     {
                         for child_handle in children.top().iter() {
                             if let Some(tl::Node::Tag(child_tag)) = child_handle.get(parser) {
-                                if child_tag.name().as_utf8_str() == "img" {
+                                if tag_name_eq(child_tag.name().as_utf8_str(), "img") {
                                     walk_node(child_handle, parser, output, options, ctx, depth, dom_ctx);
                                     break;
                                 }
@@ -3699,7 +3942,7 @@ fn walk_node(
                     {
                         for child_handle in children.top().iter() {
                             if let Some(tl::Node::Tag(child_tag)) = child_handle.get(parser) {
-                                if child_tag.name().as_utf8_str() == "title" {
+                                if tag_name_eq(child_tag.name().as_utf8_str(), "title") {
                                     title = get_text_content(child_handle, parser).trim().to_string();
                                     break;
                                 }
@@ -4036,9 +4279,9 @@ fn walk_node(
                         .iter()
                         .filter_map(|child_handle| {
                             if let Some(tl::Node::Tag(child_tag)) = child_handle.get(parser) {
-                                let tag_name = child_tag.name().as_utf8_str();
-                                if tag_name == "rb" || tag_name == "rt" || tag_name == "rtc" {
-                                    Some(tag_name.to_string())
+                                let tag_name = normalized_tag_name(child_tag.name().as_utf8_str());
+                                if matches!(tag_name.as_ref(), "rb" | "rt" | "rtc") {
+                                    Some(tag_name.into_owned())
                                 } else {
                                     None
                                 }
@@ -4060,7 +4303,7 @@ fn walk_node(
                                 if let Some(node) = child_handle.get(parser) {
                                     match node {
                                         tl::Node::Tag(child_tag) => {
-                                            let tag_name = child_tag.name().as_utf8_str();
+                                            let tag_name = normalized_tag_name(child_tag.name().as_utf8_str());
                                             if tag_name == "rt" {
                                                 let mut annotation = String::new();
                                                 walk_node(
@@ -4133,7 +4376,7 @@ fn walk_node(
                                 if let Some(node) = child_handle.get(parser) {
                                     match node {
                                         tl::Node::Tag(child_tag) => {
-                                            let tag_name = child_tag.name().as_utf8_str();
+                                            let tag_name = normalized_tag_name(child_tag.name().as_utf8_str());
                                             if tag_name == "rt" {
                                                 let mut annotation = String::new();
                                                 walk_node(
@@ -4525,7 +4768,7 @@ fn convert_table_row(
         {
             for child_handle in children.top().iter() {
                 if let Some(tl::Node::Tag(child_tag)) = child_handle.get(parser) {
-                    let cell_name = child_tag.name().as_utf8_str();
+                    let cell_name = normalized_tag_name(child_tag.name().as_utf8_str());
                     if cell_name == "th" || cell_name == "td" {
                         cells.push(*child_handle);
                     }
@@ -4639,7 +4882,7 @@ fn convert_table(
         {
             for child_handle in children.top().iter() {
                 if let Some(tl::Node::Tag(child_tag)) = child_handle.get(parser) {
-                    let tag_name = child_tag.name().as_utf8_str();
+                    let tag_name = normalized_tag_name(child_tag.name().as_utf8_str());
 
                     match tag_name.as_ref() {
                         "caption" => {
@@ -4665,7 +4908,7 @@ fn convert_table(
                             {
                                 for row_handle in section_children.top().iter() {
                                     if let Some(tl::Node::Tag(row_tag)) = row_handle.get(parser) {
-                                        if row_tag.name().as_utf8_str() == "tr" {
+                                        if tag_name_eq(row_tag.name().as_utf8_str(), "tr") {
                                             convert_table_row(
                                                 row_handle,
                                                 parser,
@@ -5006,4 +5249,18 @@ mod tests {
         assert!(!result.contains("<span>"), "Should strip span tag");
         assert!(result.contains("Text"), "Should keep span text content");
     }
+}
+#[test]
+fn normalize_self_closing_tags_noop_when_absent() {
+    let html = "<div><p>text</p></div>";
+    let normalized = normalize_self_closing_tags(html);
+    assert!(matches!(normalized, Cow::Borrowed(_)));
+    assert_eq!(normalized.as_ref(), html);
+}
+
+#[test]
+fn normalize_self_closing_tags_replaces_targets() {
+    let html = "<br/><hr/><img/>";
+    let normalized = normalize_self_closing_tags(html);
+    assert_eq!(normalized.as_ref(), "<br><hr><img>");
 }

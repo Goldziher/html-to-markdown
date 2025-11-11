@@ -26,4 +26,13 @@ RSpec.describe HtmlToMarkdown do
       expect(extraction[:inline_images].first[:description]).to eq('fake')
     end
   end
+
+  describe '.options' do
+    it 'returns a reusable options handle' do
+      handle = described_class.options(heading_style: :atx_closed)
+      expect(handle).to be_a(HtmlToMarkdown::Options)
+      result = described_class.convert_with_options('<h1>Hello</h1>', handle)
+      expect(result).to include('# Hello #')
+    end
+  end
 end

@@ -72,6 +72,42 @@ console.log(markdown);
 // This is **fast**!
 ```
 
+### Reusing Options Handles
+
+```ts
+import {
+  convertWithOptionsHandle,
+  createConversionOptionsHandle,
+} from '@html-to-markdown/wasm';
+
+const handle = createConversionOptionsHandle({ hocrSpatialTables: false });
+const markdown = convertWithOptionsHandle('<h1>Reusable</h1>', handle);
+```
+
+### Byte-Based Input (Buffers / Uint8Array)
+
+When you already have raw bytes (e.g., `fs.readFileSync`, Fetch API responses), skip re-encoding with `TextDecoder` by calling the byte-friendly helpers:
+
+```ts
+import {
+  convertBytes,
+  convertBytesWithOptionsHandle,
+  createConversionOptionsHandle,
+  convertBytesWithInlineImages,
+} from '@html-to-markdown/wasm';
+import { readFileSync } from 'node:fs';
+
+const htmlBytes = readFileSync('input.html'); // Buffer -> Uint8Array
+const markdown = convertBytes(htmlBytes);
+
+const handle = createConversionOptionsHandle({ headingStyle: 'atx' });
+const markdownFromHandle = convertBytesWithOptionsHandle(htmlBytes, handle);
+
+const inlineExtraction = convertBytesWithInlineImages(htmlBytes, null, {
+  maxDecodedSizeBytes: 5 * 1024 * 1024,
+});
+```
+
 ### With Options
 
 ```typescript

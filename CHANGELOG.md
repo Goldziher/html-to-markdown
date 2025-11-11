@@ -9,6 +9,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - **Rust Toolchain Settings** – All crates (including the Ruby binding) now inherit `edition = "2024"` and `rust-version = "1.85"` from the workspace to keep toolchain configuration centralized.
 
+## [2.7.0] - 2025-11-12
+
+### Added
+- **Zero-Copy Inline Images** – Node/N-API and WASM bindings now expose `convertInlineImagesBuffer` / `convertBytesWithInlineImages`, letting benchmark harnesses feed `Buffer`/`Uint8Array` data directly without creating intermediate JS strings.
+
+### Changed
+- **Rust Core Preprocessing** – HTML normalization (self-closing fixes, malformed `<` escaping, script/style stripping) now happens in a single streaming pass that hands owned buffers straight to `tl::parse_owned`, cutting multiple allocations from every conversion.
+- **Benchmark Harness + Docs** – Re-ran the cross-language runtime suite after the Rust core optimizations and refreshed the README tables, keeping the published throughput numbers (Node/Python/Rust/WASM/PHP) in sync with `tools/runtime-bench/results/latest.json`.
+- **Version Alignment** – Bumped every package (Rust crates, npm packages, PyPI distribution, Ruby gem, PHP extension, WASM bundle) to `2.7.0` via `task sync-versions`.
+
+### Fixed
+- **Ruby Benchmark Output** – The Ruby benchmark driver now emits JSON without relying on `json` native extensions, preventing `libruby` incompatibility errors during `task bench:bindings`.
+
 ## [2.6.6] - 2025-11-10
 
 ### Changed
@@ -506,7 +519,7 @@ None if using v1 compatibility layer. If migrating to v2 API:
 | Component        | V1                         | V2                       |
 | ---------------- | -------------------------- | ------------------------ |
 | **HTML Parser**  | BeautifulSoup4 / lxml      | html5ever (Rust)         |
-| **Sanitizer**    | Custom Python              | ammonia (Rust)           |
+| **Sanitizer**    | Custom Python              | html5ever DOM filtering  |
 | **Conversion**   | Pure Python (~3,850 lines) | Pure Rust (~4,800 lines) |
 | **Bindings**     | N/A                        | PyO3                     |
 | **CLI**          | Python wrapper             | Native Rust binary       |

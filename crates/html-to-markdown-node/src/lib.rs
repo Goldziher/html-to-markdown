@@ -7,7 +7,7 @@ use html_to_markdown_rs::{
 };
 use napi::bindgen_prelude::*;
 use napi_derive::napi;
-use std::collections::HashMap;
+use std::{collections::HashMap, str};
 
 /// Heading style options
 #[napi(string_enum)]
@@ -236,49 +236,103 @@ pub struct JsConversionOptions {
 
 impl From<JsConversionOptions> for RustConversionOptions {
     fn from(val: JsConversionOptions) -> Self {
-        let defaults = RustConversionOptions::default();
-        RustConversionOptions {
-            heading_style: val.heading_style.map(Into::into).unwrap_or(defaults.heading_style),
-            list_indent_type: val
-                .list_indent_type
-                .map(Into::into)
-                .unwrap_or(defaults.list_indent_type),
-            list_indent_width: val.list_indent_width.unwrap_or(defaults.list_indent_width as u32) as usize,
-            bullets: val.bullets.unwrap_or(defaults.bullets),
-            strong_em_symbol: val
-                .strong_em_symbol
-                .and_then(|s| s.chars().next())
-                .unwrap_or(defaults.strong_em_symbol),
-            escape_asterisks: val.escape_asterisks.unwrap_or(defaults.escape_asterisks),
-            escape_underscores: val.escape_underscores.unwrap_or(defaults.escape_underscores),
-            escape_misc: val.escape_misc.unwrap_or(defaults.escape_misc),
-            escape_ascii: val.escape_ascii.unwrap_or(defaults.escape_ascii),
-            code_language: val.code_language.unwrap_or(defaults.code_language),
-            autolinks: val.autolinks.unwrap_or(defaults.autolinks),
-            default_title: val.default_title.unwrap_or(defaults.default_title),
-            br_in_tables: val.br_in_tables.unwrap_or(defaults.br_in_tables),
-            hocr_spatial_tables: val.hocr_spatial_tables.unwrap_or(defaults.hocr_spatial_tables),
-            highlight_style: val.highlight_style.map(Into::into).unwrap_or(defaults.highlight_style),
-            extract_metadata: val.extract_metadata.unwrap_or(defaults.extract_metadata),
-            whitespace_mode: val.whitespace_mode.map(Into::into).unwrap_or(defaults.whitespace_mode),
-            strip_newlines: val.strip_newlines.unwrap_or(defaults.strip_newlines),
-            wrap: val.wrap.unwrap_or(defaults.wrap),
-            wrap_width: val.wrap_width.unwrap_or(defaults.wrap_width as u32) as usize,
-            convert_as_inline: val.convert_as_inline.unwrap_or(defaults.convert_as_inline),
-            sub_symbol: val.sub_symbol.unwrap_or(defaults.sub_symbol),
-            sup_symbol: val.sup_symbol.unwrap_or(defaults.sup_symbol),
-            newline_style: val.newline_style.map(Into::into).unwrap_or(defaults.newline_style),
-            code_block_style: val
-                .code_block_style
-                .map(Into::into)
-                .unwrap_or(defaults.code_block_style),
-            keep_inline_images_in: val.keep_inline_images_in.unwrap_or(defaults.keep_inline_images_in),
-            preprocessing: val.preprocessing.map(Into::into).unwrap_or(defaults.preprocessing),
-            encoding: val.encoding.unwrap_or(defaults.encoding),
-            debug: val.debug.unwrap_or(defaults.debug),
-            strip_tags: val.strip_tags.unwrap_or(defaults.strip_tags),
-            preserve_tags: val.preserve_tags.unwrap_or(defaults.preserve_tags),
+        let mut opts = RustConversionOptions::default();
+
+        if let Some(heading_style) = val.heading_style {
+            opts.heading_style = heading_style.into();
         }
+        if let Some(list_indent_type) = val.list_indent_type {
+            opts.list_indent_type = list_indent_type.into();
+        }
+        if let Some(list_indent_width) = val.list_indent_width {
+            opts.list_indent_width = list_indent_width as usize;
+        }
+        if let Some(bullets) = val.bullets {
+            opts.bullets = bullets;
+        }
+        if let Some(strong_em_symbol) = val.strong_em_symbol.and_then(|s| s.chars().next()) {
+            opts.strong_em_symbol = strong_em_symbol;
+        }
+        if let Some(escape_asterisks) = val.escape_asterisks {
+            opts.escape_asterisks = escape_asterisks;
+        }
+        if let Some(escape_underscores) = val.escape_underscores {
+            opts.escape_underscores = escape_underscores;
+        }
+        if let Some(escape_misc) = val.escape_misc {
+            opts.escape_misc = escape_misc;
+        }
+        if let Some(escape_ascii) = val.escape_ascii {
+            opts.escape_ascii = escape_ascii;
+        }
+        if let Some(code_language) = val.code_language {
+            opts.code_language = code_language;
+        }
+        if let Some(autolinks) = val.autolinks {
+            opts.autolinks = autolinks;
+        }
+        if let Some(default_title) = val.default_title {
+            opts.default_title = default_title;
+        }
+        if let Some(br_in_tables) = val.br_in_tables {
+            opts.br_in_tables = br_in_tables;
+        }
+        if let Some(hocr_spatial_tables) = val.hocr_spatial_tables {
+            opts.hocr_spatial_tables = hocr_spatial_tables;
+        }
+        if let Some(highlight_style) = val.highlight_style {
+            opts.highlight_style = highlight_style.into();
+        }
+        if let Some(extract_metadata) = val.extract_metadata {
+            opts.extract_metadata = extract_metadata;
+        }
+        if let Some(whitespace_mode) = val.whitespace_mode {
+            opts.whitespace_mode = whitespace_mode.into();
+        }
+        if let Some(strip_newlines) = val.strip_newlines {
+            opts.strip_newlines = strip_newlines;
+        }
+        if let Some(wrap) = val.wrap {
+            opts.wrap = wrap;
+        }
+        if let Some(wrap_width) = val.wrap_width {
+            opts.wrap_width = wrap_width as usize;
+        }
+        if let Some(convert_as_inline) = val.convert_as_inline {
+            opts.convert_as_inline = convert_as_inline;
+        }
+        if let Some(sub_symbol) = val.sub_symbol {
+            opts.sub_symbol = sub_symbol;
+        }
+        if let Some(sup_symbol) = val.sup_symbol {
+            opts.sup_symbol = sup_symbol;
+        }
+        if let Some(newline_style) = val.newline_style {
+            opts.newline_style = newline_style.into();
+        }
+        if let Some(code_block_style) = val.code_block_style {
+            opts.code_block_style = code_block_style.into();
+        }
+        if let Some(keep_inline_images_in) = val.keep_inline_images_in {
+            opts.keep_inline_images_in = keep_inline_images_in;
+        }
+        if let Some(preprocessing) = val.preprocessing {
+            opts.preprocessing = preprocessing.into();
+        }
+        if let Some(encoding) = val.encoding {
+            opts.encoding = encoding;
+        }
+        if let Some(debug) = val.debug {
+            opts.debug = debug;
+        }
+        if let Some(strip_tags) = val.strip_tags {
+            opts.strip_tags = strip_tags;
+        }
+        if let Some(preserve_tags) = val.preserve_tags {
+            opts.preserve_tags = preserve_tags;
+        }
+
+        opts
     }
 }
 
@@ -390,30 +444,42 @@ pub fn convert(html: String, options: Option<JsConversionOptions>) -> Result<Str
     html_to_markdown_rs::convert(&html, rust_options).map_err(|e| Error::new(Status::GenericFailure, e.to_string()))
 }
 
-/// Convert HTML to Markdown while collecting inline images
-///
-/// # Arguments
-///
-/// * `html` - The HTML string to convert
-/// * `options` - Optional conversion options
-/// * `image_config` - Configuration for inline image extraction
-///
-/// # Example
-///
-/// ```javascript
-/// const { convertWithInlineImages } = require('html-to-markdown');
-///
-/// const html = '<img src="data:image/png;base64,..." alt="test">';
-/// const result = convertWithInlineImages(html, null, {
-///   maxDecodedSizeBytes: 1024 * 1024,
-///   inferDimensions: true
-/// });
-/// console.log(result.markdown);
-/// console.log(result.inlineImages.length);
-/// ```
+fn buffer_to_str(html: &Buffer) -> Result<&str> {
+    str::from_utf8(html.as_ref())
+        .map_err(|e| Error::new(Status::InvalidArg, format!("HTML must be valid UTF-8: {}", e)))
+}
+
+/// Convert HTML to Markdown from a Buffer/Uint8Array without creating intermediate JS strings.
+#[napi(js_name = "convertBuffer")]
+pub fn convert_buffer(html: Buffer, options: Option<JsConversionOptions>) -> Result<String> {
+    let html = buffer_to_str(&html)?;
+    let rust_options = options.map(Into::into);
+    html_to_markdown_rs::convert(html, rust_options).map_err(|e| Error::new(Status::GenericFailure, e.to_string()))
+}
+
+/// Create a reusable ConversionOptions handle.
 #[napi]
-pub fn convert_with_inline_images(
-    html: String,
+pub fn create_conversion_options_handle(options: Option<JsConversionOptions>) -> External<RustConversionOptions> {
+    External::new(options.map(Into::into).unwrap_or_default())
+}
+
+/// Convert HTML using a previously-created ConversionOptions handle.
+#[napi]
+pub fn convert_with_options_handle(html: String, options: &External<RustConversionOptions>) -> Result<String> {
+    html_to_markdown_rs::convert(&html, Some((**options).clone()))
+        .map_err(|e| Error::new(Status::GenericFailure, e.to_string()))
+}
+
+/// Convert HTML Buffer data using a previously-created ConversionOptions handle.
+#[napi(js_name = "convertBufferWithOptionsHandle")]
+pub fn convert_buffer_with_options_handle(html: Buffer, options: &External<RustConversionOptions>) -> Result<String> {
+    let html = buffer_to_str(&html)?;
+    html_to_markdown_rs::convert(html, Some((**options).clone()))
+        .map_err(|e| Error::new(Status::GenericFailure, e.to_string()))
+}
+
+fn convert_inline_images_impl(
+    html: &str,
     options: Option<JsConversionOptions>,
     image_config: Option<JsInlineImageConfig>,
 ) -> Result<JsHtmlExtraction> {
@@ -422,7 +488,7 @@ pub fn convert_with_inline_images(
         .map(Into::into)
         .unwrap_or_else(|| RustInlineImageConfig::new(5 * 1024 * 1024));
 
-    let extraction = html_to_markdown_rs::convert_with_inline_images(&html, rust_options, rust_config)
+    let extraction = html_to_markdown_rs::convert_with_inline_images(html, rust_options, rust_config)
         .map_err(|e| Error::new(Status::GenericFailure, e.to_string()))?;
 
     let inline_images = extraction
@@ -453,6 +519,33 @@ pub fn convert_with_inline_images(
         inline_images,
         warnings,
     })
+}
+
+/// Convert HTML to Markdown while collecting inline images
+///
+/// # Arguments
+///
+/// * `html` - The HTML string to convert
+/// * `options` - Optional conversion options
+/// * `image_config` - Configuration for inline image extraction
+#[napi]
+pub fn convert_with_inline_images(
+    html: String,
+    options: Option<JsConversionOptions>,
+    image_config: Option<JsInlineImageConfig>,
+) -> Result<JsHtmlExtraction> {
+    convert_inline_images_impl(&html, options, image_config)
+}
+
+/// Convert inline images from Buffer/Uint8Array input without an intermediate string allocation.
+#[napi(js_name = "convertInlineImagesBuffer")]
+pub fn convert_inline_images_buffer(
+    html: Buffer,
+    options: Option<JsConversionOptions>,
+    image_config: Option<JsInlineImageConfig>,
+) -> Result<JsHtmlExtraction> {
+    let html = buffer_to_str(&html)?;
+    convert_inline_images_impl(html, options, image_config)
 }
 
 #[cfg(all(

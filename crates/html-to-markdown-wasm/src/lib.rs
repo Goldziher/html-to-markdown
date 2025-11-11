@@ -3,7 +3,7 @@ use html_to_markdown_rs::{
     NewlineStyle, PreprocessingOptions as RustPreprocessingOptions, PreprocessingPreset, WhitespaceMode,
 };
 use serde::{Deserialize, Serialize};
-use wasm_bindgen::prelude::*;
+use wasm_bindgen::{JsCast, prelude::*};
 
 mod inline_images;
 pub use inline_images::{WasmHtmlExtraction, WasmInlineImage, WasmInlineImageConfig, WasmInlineImageWarning};
@@ -258,46 +258,139 @@ pub struct WasmConversionOptions {
 
 impl From<WasmConversionOptions> for RustConversionOptions {
     fn from(val: WasmConversionOptions) -> Self {
-        let defaults = RustConversionOptions::default();
-        RustConversionOptions {
-            heading_style: val.heading_style.map(Into::into).unwrap_or(defaults.heading_style),
-            list_indent_type: val
-                .list_indent_type
-                .map(Into::into)
-                .unwrap_or(defaults.list_indent_type),
-            list_indent_width: val.list_indent_width.unwrap_or(defaults.list_indent_width),
-            bullets: val.bullets.unwrap_or(defaults.bullets),
-            strong_em_symbol: val.strong_em_symbol.unwrap_or(defaults.strong_em_symbol),
-            escape_asterisks: val.escape_asterisks.unwrap_or(defaults.escape_asterisks),
-            escape_underscores: val.escape_underscores.unwrap_or(defaults.escape_underscores),
-            escape_misc: val.escape_misc.unwrap_or(defaults.escape_misc),
-            escape_ascii: val.escape_ascii.unwrap_or(defaults.escape_ascii),
-            code_language: val.code_language.unwrap_or(defaults.code_language),
-            autolinks: val.autolinks.unwrap_or(defaults.autolinks),
-            default_title: val.default_title.unwrap_or(defaults.default_title),
-            br_in_tables: val.br_in_tables.unwrap_or(defaults.br_in_tables),
-            hocr_spatial_tables: val.hocr_spatial_tables.unwrap_or(defaults.hocr_spatial_tables),
-            highlight_style: val.highlight_style.map(Into::into).unwrap_or(defaults.highlight_style),
-            extract_metadata: val.extract_metadata.unwrap_or(defaults.extract_metadata),
-            whitespace_mode: val.whitespace_mode.map(Into::into).unwrap_or(defaults.whitespace_mode),
-            strip_newlines: val.strip_newlines.unwrap_or(defaults.strip_newlines),
-            wrap: val.wrap.unwrap_or(defaults.wrap),
-            wrap_width: val.wrap_width.unwrap_or(defaults.wrap_width),
-            convert_as_inline: val.convert_as_inline.unwrap_or(defaults.convert_as_inline),
-            sub_symbol: val.sub_symbol.unwrap_or(defaults.sub_symbol),
-            sup_symbol: val.sup_symbol.unwrap_or(defaults.sup_symbol),
-            newline_style: val.newline_style.map(Into::into).unwrap_or(defaults.newline_style),
-            code_block_style: val
-                .code_block_style
-                .map(Into::into)
-                .unwrap_or(defaults.code_block_style),
-            keep_inline_images_in: val.keep_inline_images_in.unwrap_or(defaults.keep_inline_images_in),
-            preprocessing: val.preprocessing.map(Into::into).unwrap_or(defaults.preprocessing),
-            encoding: val.encoding.unwrap_or(defaults.encoding),
-            debug: val.debug.unwrap_or(defaults.debug),
-            strip_tags: val.strip_tags.unwrap_or(defaults.strip_tags),
-            preserve_tags: val.preserve_tags.unwrap_or(defaults.preserve_tags),
+        let mut opts = RustConversionOptions::default();
+
+        if let Some(heading_style) = val.heading_style {
+            opts.heading_style = heading_style.into();
         }
+        if let Some(list_indent_type) = val.list_indent_type {
+            opts.list_indent_type = list_indent_type.into();
+        }
+        if let Some(list_indent_width) = val.list_indent_width {
+            opts.list_indent_width = list_indent_width;
+        }
+        if let Some(bullets) = val.bullets {
+            opts.bullets = bullets;
+        }
+        if let Some(strong_em_symbol) = val.strong_em_symbol {
+            opts.strong_em_symbol = strong_em_symbol;
+        }
+        if let Some(escape_asterisks) = val.escape_asterisks {
+            opts.escape_asterisks = escape_asterisks;
+        }
+        if let Some(escape_underscores) = val.escape_underscores {
+            opts.escape_underscores = escape_underscores;
+        }
+        if let Some(escape_misc) = val.escape_misc {
+            opts.escape_misc = escape_misc;
+        }
+        if let Some(escape_ascii) = val.escape_ascii {
+            opts.escape_ascii = escape_ascii;
+        }
+        if let Some(code_language) = val.code_language {
+            opts.code_language = code_language;
+        }
+        if let Some(autolinks) = val.autolinks {
+            opts.autolinks = autolinks;
+        }
+        if let Some(default_title) = val.default_title {
+            opts.default_title = default_title;
+        }
+        if let Some(br_in_tables) = val.br_in_tables {
+            opts.br_in_tables = br_in_tables;
+        }
+        if let Some(hocr_spatial_tables) = val.hocr_spatial_tables {
+            opts.hocr_spatial_tables = hocr_spatial_tables;
+        }
+        if let Some(highlight_style) = val.highlight_style {
+            opts.highlight_style = highlight_style.into();
+        }
+        if let Some(extract_metadata) = val.extract_metadata {
+            opts.extract_metadata = extract_metadata;
+        }
+        if let Some(whitespace_mode) = val.whitespace_mode {
+            opts.whitespace_mode = whitespace_mode.into();
+        }
+        if let Some(strip_newlines) = val.strip_newlines {
+            opts.strip_newlines = strip_newlines;
+        }
+        if let Some(wrap) = val.wrap {
+            opts.wrap = wrap;
+        }
+        if let Some(wrap_width) = val.wrap_width {
+            opts.wrap_width = wrap_width;
+        }
+        if let Some(convert_as_inline) = val.convert_as_inline {
+            opts.convert_as_inline = convert_as_inline;
+        }
+        if let Some(sub_symbol) = val.sub_symbol {
+            opts.sub_symbol = sub_symbol;
+        }
+        if let Some(sup_symbol) = val.sup_symbol {
+            opts.sup_symbol = sup_symbol;
+        }
+        if let Some(newline_style) = val.newline_style {
+            opts.newline_style = newline_style.into();
+        }
+        if let Some(code_block_style) = val.code_block_style {
+            opts.code_block_style = code_block_style.into();
+        }
+        if let Some(keep_inline_images_in) = val.keep_inline_images_in {
+            opts.keep_inline_images_in = keep_inline_images_in;
+        }
+        if let Some(preprocessing) = val.preprocessing {
+            opts.preprocessing = preprocessing.into();
+        }
+        if let Some(encoding) = val.encoding {
+            opts.encoding = encoding;
+        }
+        if let Some(debug) = val.debug {
+            opts.debug = debug;
+        }
+        if let Some(strip_tags) = val.strip_tags {
+            opts.strip_tags = strip_tags;
+        }
+        if let Some(preserve_tags) = val.preserve_tags {
+            opts.preserve_tags = preserve_tags;
+        }
+
+        opts
+    }
+}
+
+fn parse_wasm_options(options: JsValue) -> Result<Option<RustConversionOptions>, JsValue> {
+    if options.is_undefined() || options.is_null() {
+        return Ok(None);
+    }
+
+    if let Some(obj) = options.dyn_ref::<js_sys::Object>() {
+        if js_sys::Object::keys(obj).length() == 0 {
+            return Ok(None);
+        }
+    }
+
+    let wasm_options: WasmConversionOptions = serde_wasm_bindgen::from_value(options)
+        .map_err(|e| JsValue::from_str(&format!("Failed to parse options: {}", e)))?;
+    Ok(Some(wasm_options.into()))
+}
+
+fn bytes_to_string(bytes: js_sys::Uint8Array) -> Result<String, JsValue> {
+    let mut buffer = vec![0u8; bytes.length() as usize];
+    bytes.copy_to(&mut buffer);
+    String::from_utf8(buffer).map_err(|e| JsValue::from_str(&format!("HTML must be valid UTF-8: {}", e)))
+}
+
+#[wasm_bindgen]
+pub struct WasmConversionOptionsHandle {
+    inner: RustConversionOptions,
+}
+
+#[wasm_bindgen]
+impl WasmConversionOptionsHandle {
+    #[wasm_bindgen(constructor)]
+    pub fn new(options: JsValue) -> Result<WasmConversionOptionsHandle, JsValue> {
+        let inner = parse_wasm_options(options)?.unwrap_or_else(RustConversionOptions::default);
+        Ok(Self { inner })
     }
 }
 
@@ -319,15 +412,35 @@ impl From<WasmConversionOptions> for RustConversionOptions {
 /// ```
 #[wasm_bindgen]
 pub fn convert(html: String, options: JsValue) -> Result<String, JsValue> {
-    let rust_options = if options.is_undefined() || options.is_null() {
-        None
-    } else {
-        let wasm_options: WasmConversionOptions = serde_wasm_bindgen::from_value(options)
-            .map_err(|e| JsValue::from_str(&format!("Failed to parse options: {}", e)))?;
-        Some(wasm_options.into())
-    };
+    let rust_options = parse_wasm_options(options)?;
 
     html_to_markdown_rs::convert(&html, rust_options).map_err(|e| JsValue::from_str(&e.to_string()))
+}
+
+#[wasm_bindgen(js_name = convertBytes)]
+pub fn convert_bytes(html: js_sys::Uint8Array, options: JsValue) -> Result<String, JsValue> {
+    let html = bytes_to_string(html)?;
+    let rust_options = parse_wasm_options(options)?;
+    html_to_markdown_rs::convert(&html, rust_options).map_err(|e| JsValue::from_str(&e.to_string()))
+}
+
+#[wasm_bindgen(js_name = createConversionOptionsHandle)]
+pub fn create_conversion_options_handle(options: JsValue) -> Result<WasmConversionOptionsHandle, JsValue> {
+    WasmConversionOptionsHandle::new(options)
+}
+
+#[wasm_bindgen(js_name = convertWithOptionsHandle)]
+pub fn convert_with_options_handle(html: String, handle: &WasmConversionOptionsHandle) -> Result<String, JsValue> {
+    html_to_markdown_rs::convert(&html, Some(handle.inner.clone())).map_err(|e| JsValue::from_str(&e.to_string()))
+}
+
+#[wasm_bindgen(js_name = convertBytesWithOptionsHandle)]
+pub fn convert_bytes_with_options_handle(
+    html: js_sys::Uint8Array,
+    handle: &WasmConversionOptionsHandle,
+) -> Result<String, JsValue> {
+    let html = bytes_to_string(html)?;
+    html_to_markdown_rs::convert(&html, Some(handle.inner.clone())).map_err(|e| JsValue::from_str(&e.to_string()))
 }
 
 /// Convert HTML to Markdown while collecting inline images
@@ -351,28 +464,40 @@ pub fn convert(html: String, options: JsValue) -> Result<String, JsValue> {
 /// console.log(result.markdown);
 /// console.log(result.inlineImages.length);
 /// ```
+fn convert_with_inline_images_internal(
+    html: &str,
+    options: JsValue,
+    image_config: Option<WasmInlineImageConfig>,
+) -> Result<WasmHtmlExtraction, JsValue> {
+    let rust_options = parse_wasm_options(options)?;
+
+    let rust_config = image_config
+        .map(Into::into)
+        .unwrap_or_else(|| html_to_markdown_rs::InlineImageConfig::new(5 * 1024 * 1024));
+
+    let extraction = html_to_markdown_rs::convert_with_inline_images(html, rust_options, rust_config)
+        .map_err(|e| JsValue::from_str(&e.to_string()))?;
+
+    Ok(extraction.into())
+}
+
 #[wasm_bindgen(js_name = convertWithInlineImages)]
 pub fn convert_with_inline_images(
     html: String,
     options: JsValue,
     image_config: Option<WasmInlineImageConfig>,
 ) -> Result<WasmHtmlExtraction, JsValue> {
-    let rust_options = if options.is_undefined() || options.is_null() {
-        None
-    } else {
-        let wasm_options: WasmConversionOptions = serde_wasm_bindgen::from_value(options)
-            .map_err(|e| JsValue::from_str(&format!("Failed to parse options: {}", e)))?;
-        Some(wasm_options.into())
-    };
+    convert_with_inline_images_internal(&html, options, image_config)
+}
 
-    let rust_config = image_config
-        .map(Into::into)
-        .unwrap_or_else(|| html_to_markdown_rs::InlineImageConfig::new(5 * 1024 * 1024));
-
-    let extraction = html_to_markdown_rs::convert_with_inline_images(&html, rust_options, rust_config)
-        .map_err(|e| JsValue::from_str(&e.to_string()))?;
-
-    Ok(extraction.into())
+#[wasm_bindgen(js_name = convertBytesWithInlineImages)]
+pub fn convert_bytes_with_inline_images(
+    html: js_sys::Uint8Array,
+    options: JsValue,
+    image_config: Option<WasmInlineImageConfig>,
+) -> Result<WasmHtmlExtraction, JsValue> {
+    let html = bytes_to_string(html)?;
+    convert_with_inline_images_internal(&html, options, image_config)
 }
 
 #[cfg(test)]
