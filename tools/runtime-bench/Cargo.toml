@@ -12,5 +12,7 @@ toml = "0.9"
 humansize = "2.1"
 thiserror = "2.0"
 sysinfo = "0.37"
-pprof = { version = "0.15", features = ["flamegraph"] }
 html-to-markdown-rs = { workspace = true }
+
+[target.'cfg(not(target_os = "windows"))'.dependencies]
+pprof = { version = "0.15", features = ["flamegraph"] }

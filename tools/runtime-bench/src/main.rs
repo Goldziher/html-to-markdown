@@ -9,6 +9,7 @@ use std::{
 use anyhow::{Context, Result, bail};
 use clap::{ArgAction, Parser, ValueEnum};
 use humansize::{BINARY, format_size_i};
+#[cfg(not(target_os = "windows"))]
 use pprof::ProfilerGuardBuilder;
 use serde::{Deserialize, Serialize};
 
@@ -389,6 +390,12 @@ fn run_rust_benchmark(
 
     convert(html, Some(options.clone())).context("Rust warmup conversion failed")?;
 
+    #[cfg(target_os = "windows")]
+    if flamegraph_path.is_some() {
+        bail!("--flamegraph isn't supported on Windows hosts (pprof depends on Unix tooling)");
+    }
+
+    #[cfg(not(target_os = "windows"))]
     let mut guard = if let Some(path) = flamegraph_path {
         Some((
             ProfilerGuardBuilder::default().frequency(100).build()?,
@@ -404,17 +411,20 @@ fn run_rust_benchmark(
     }
     let elapsed = start.elapsed().as_secs_f64();
 
-    if let Some((profile_guard, path)) = guard.take()
-        && let Ok(report) = profile_guard.report().build()
+    #[cfg(not(target_os = "windows"))]
     {
-        if let Some(parent) = path.parent() {
-            fs::create_dir_all(parent)
-                .with_context(|| format!("Failed to create flamegraph directory {}", parent.display()))?;
-        }
-        if let Err(err) = report.flamegraph(fs::File::create(&path)?) {
-            eprintln!("Failed to write flamegraph: {err}");
-        } else {
-            println!("Flamegraph saved to {}", path.display());
+        if let Some((profile_guard, path)) = guard.take()
+            && let Ok(report) = profile_guard.report().build()
+        {
+            if let Some(parent) = path.parent() {
+                fs::create_dir_all(parent)
+                    .with_context(|| format!("Failed to create flamegraph directory {}", parent.display()))?;
+            }
+            if let Err(err) = report.flamegraph(fs::File::create(&path)?) {
+                eprintln!("Failed to write flamegraph: {err}");
+            } else {
+                println!("Flamegraph saved to {}", path.display());
+            }
         }
     }
 
