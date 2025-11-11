@@ -413,6 +413,8 @@ struct Context {
     in_paragraph: bool,
     /// Are we inside a ruby element?
     in_ruby: bool,
+    /// Are we inside a `<strong>` / `<b>` element?
+    in_strong: bool,
     #[cfg(feature = "inline-images")]
     /// Shared collector for inline images when enabled.
     inline_collector: Option<InlineCollectorHandle>,
@@ -461,36 +463,6 @@ fn escape_link_label(text: &str) -> String {
     }
 
     result
-}
-
-fn flatten_nested_strong<'a>(content: &'a str) -> Cow<'a, str> {
-    let Some(closing_idx) = content.rfind("**") else {
-        return Cow::Borrowed(content);
-    };
-
-    if closing_idx + 2 != content.len() {
-        return Cow::Borrowed(content);
-    }
-
-    let before_closing = &content[..closing_idx];
-    let Some(opening_idx) = before_closing.rfind("**") else {
-        return Cow::Borrowed(content);
-    };
-
-    let prefix = &before_closing[..opening_idx];
-    if prefix.is_empty() || prefix.chars().last().map(char::is_whitespace).unwrap_or(true) {
-        return Cow::Borrowed(content);
-    }
-
-    let inner = &before_closing[opening_idx + 2..];
-    if inner.is_empty() || inner.contains("**") {
-        return Cow::Borrowed(content);
-    }
-
-    let mut merged = String::with_capacity(prefix.len() + inner.len());
-    merged.push_str(prefix);
-    merged.push_str(inner);
-    Cow::Owned(merged)
 }
 
 fn append_markdown_link(
@@ -1382,6 +1354,7 @@ fn convert_html_impl(
         heading_tag: None,
         in_paragraph: false,
         in_ruby: false,
+        in_strong: false,
         #[cfg(feature = "inline-images")]
         inline_collector: inline_collector.clone(),
     };
@@ -2317,6 +2290,7 @@ fn walk_node(
                         {
                             let strong_ctx = Context {
                                 inline_depth: ctx.inline_depth + 1,
+                                in_strong: true,
                                 ..ctx.clone()
                             };
                             for child_handle in children.top().iter() {
@@ -2334,12 +2308,15 @@ fn walk_node(
                         let (prefix, suffix, trimmed) = chomp_inline(&content);
                         if !content.trim().is_empty() {
                             output.push_str(prefix);
-                            let merged = flatten_nested_strong(trimmed);
-                            output.push(options.strong_em_symbol);
-                            output.push(options.strong_em_symbol);
-                            output.push_str(&merged);
-                            output.push(options.strong_em_symbol);
-                            output.push(options.strong_em_symbol);
+                            if ctx.in_strong {
+                                output.push_str(trimmed);
+                            } else {
+                                output.push(options.strong_em_symbol);
+                                output.push(options.strong_em_symbol);
+                                output.push_str(trimmed);
+                                output.push(options.strong_em_symbol);
+                                output.push(options.strong_em_symbol);
+                            }
                             output.push_str(suffix);
                         } else if !content.is_empty() {
                             output.push_str(prefix);
@@ -2623,10 +2600,14 @@ fn walk_node(
                             HighlightStyle::Bold => {
                                 let symbol = options.strong_em_symbol.to_string().repeat(2);
                                 output.push_str(&symbol);
+                                let bold_ctx = Context {
+                                    in_strong: true,
+                                    ..ctx.clone()
+                                };
                                 let children = tag.children();
                                 {
                                     for child_handle in children.top().iter() {
-                                        walk_node(child_handle, parser, output, options, ctx, depth + 1, dom_ctx);
+                                        walk_node(child_handle, parser, output, options, &bold_ctx, depth + 1, dom_ctx);
                                     }
                                 }
                                 output.push_str(&symbol);
@@ -3689,10 +3670,22 @@ fn walk_node(
 
                 "summary" => {
                     let mut content = String::with_capacity(64);
+                    let mut summary_ctx = ctx.clone();
+                    if !ctx.convert_as_inline {
+                        summary_ctx.in_strong = true;
+                    }
                     let children = tag.children();
                     {
                         for child_handle in children.top().iter() {
-                            walk_node(child_handle, parser, &mut content, options, ctx, depth + 1, dom_ctx);
+                            walk_node(
+                                child_handle,
+                                parser,
+                                &mut content,
+                                options,
+                                &summary_ctx,
+                                depth + 1,
+                                dom_ctx,
+                            );
                         }
                     }
                     let trimmed = content.trim();
@@ -4085,10 +4078,22 @@ fn walk_node(
 
                 "legend" => {
                     let mut content = String::new();
+                    let mut legend_ctx = ctx.clone();
+                    if !ctx.convert_as_inline {
+                        legend_ctx.in_strong = true;
+                    }
                     let children = tag.children();
                     {
                         for child_handle in children.top().iter() {
-                            walk_node(child_handle, parser, &mut content, options, ctx, depth + 1, dom_ctx);
+                            walk_node(
+                                child_handle,
+                                parser,
+                                &mut content,
+                                options,
+                                &legend_ctx,
+                                depth + 1,
+                                dom_ctx,
+                            );
                         }
                     }
                     let trimmed = content.trim();
@@ -4953,6 +4958,7 @@ fn convert_table(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::options::HighlightStyle;
 
     #[test]
     fn test_trim_trailing_whitespace() {
@@ -4989,6 +4995,54 @@ mod tests {
         assert_eq!(chomp_inline("text  "), ("", " ", "text"));
         assert_eq!(chomp_inline("   "), (" ", " ", ""));
         assert_eq!(chomp_inline(""), ("", "", ""));
+    }
+
+    #[test]
+    fn nested_strong_markup_is_normalized() {
+        let html = "<strong><strong>Bold</strong></strong>";
+        let result = convert_html(html, &ConversionOptions::default()).unwrap();
+        assert_eq!(result.trim(), "**Bold**");
+    }
+
+    #[test]
+    fn nested_strong_with_additional_text_is_normalized() {
+        let html = "<strong>Hello <strong>World</strong></strong>";
+        let result = convert_html(html, &ConversionOptions::default()).unwrap();
+        assert_eq!(result.trim(), "**Hello World**");
+    }
+
+    #[test]
+    fn nested_strong_partial_segments_are_normalized() {
+        let html = "<b>bo<b>ld</b>er</b>";
+        let result = convert_html(html, &ConversionOptions::default()).unwrap();
+        assert_eq!(result.trim(), "**bolder**");
+    }
+
+    #[test]
+    fn summary_with_inner_strong_is_not_double_wrapped() {
+        let html = "<details><summary><strong>Title</strong></summary></details>";
+        let mut options = ConversionOptions::default();
+        options.preprocessing.remove_forms = false;
+        let result = convert_html(html, &options).unwrap();
+        assert_eq!(result.trim(), "**Title**");
+    }
+
+    #[test]
+    fn legend_with_inner_strong_is_not_double_wrapped() {
+        let html = "<fieldset><legend><strong>Section</strong></legend></fieldset>";
+        let mut options = ConversionOptions::default();
+        options.preprocessing.remove_forms = false; // keep form controls for this regression check
+        let result = convert_html(html, &options).unwrap();
+        assert_eq!(result.trim(), "**Section**");
+    }
+
+    #[test]
+    fn bold_highlight_suppresses_nested_strong() {
+        let mut options = ConversionOptions::default();
+        options.highlight_style = HighlightStyle::Bold;
+        let html = "<p><mark><strong>Hot</strong></mark></p>";
+        let result = convert_html(html, &options).unwrap();
+        assert_eq!(result.trim(), "**Hot**");
     }
 
     #[test]

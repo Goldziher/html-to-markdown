@@ -21,6 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - **Ruby Benchmark Output** – The Ruby benchmark driver now emits JSON without relying on `json` native extensions, preventing `libruby` incompatibility errors during `task bench:bindings`.
+- **Nested `<strong>` Normalization (Fix #111)** – The Rust converter now tracks when bold markup is already active, so nested `<b>`/`<strong>` combinations (including `<mark>`, `<summary>`, `<legend>`) no longer generate `****` artifacts (`<b>bo<b>ld</b>er</b>` correctly becomes `**bolder**`). The CommonMark harness documents the four spec examples that expect stacked markers and skips them accordingly.
 
 ## [2.6.6] - 2025-11-10
 
