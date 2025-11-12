@@ -395,7 +395,7 @@ jobs:
   smoke:
     name: Smoke README installs
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 30
     steps:
       - name: Checkout
         uses: actions/checkout@v5
@@ -409,6 +409,17 @@ jobs:
           node-version: 20
           check-latest: true
 
+      - name: Setup Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Setup Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "3.3"
+          bundler-cache: false
+
       - name: Setup Rust
         uses: actions-rust-lang/setup-rust-toolchain@v1
 
@@ -421,20 +432,22 @@ jobs:
       - name: Capture php-config path
         run: echo "PHP_CONFIG=$(command -v php-config)" >> "$GITHUB_ENV"
 
-      - name: Install workspace deps for Node binding
-        run: pnpm install --filter html-to-markdown-node...
+      - name: Install pnpm workspace deps
+        run: pnpm install
 
-      - name: Build Node bindings and pack tarball
+      - name: Build Node bindings
+        run: pnpm --filter html-to-markdown-node run build
+
+      - name: Pack Node tarball
         run: |
           set -euo pipefail
-          pnpm --filter html-to-markdown-node run build
           pushd crates/html-to-markdown-node >/dev/null
           NODE_TGZ=$(npm pack | tail -1)
           mv "$NODE_TGZ" "$GITHUB_WORKSPACE/$NODE_TGZ"
           popd >/dev/null
           echo "NODE_TGZ=$GITHUB_WORKSPACE/$NODE_TGZ" >> "$GITHUB_ENV"
 
-      - name: Smoke Node install (README flow)
+      - name: Smoke Node install
         run: |
           set -euo pipefail
           tmp=$(mktemp -d)
@@ -445,12 +458,60 @@ jobs:
           pnpm run check
           popd >/dev/null
 
+      - name: Build WASM bundle
+        run: pnpm --filter html-to-markdown-wasm run build:all
+
+      - name: Pack WASM tarball
+        run: |
+          set -euo pipefail
+          pushd crates/html-to-markdown-wasm >/dev/null
+          WASM_TGZ=$(npm pack | tail -1)
+          mv "$WASM_TGZ" "$GITHUB_WORKSPACE/$WASM_TGZ"
+          popd >/dev/null
+          echo "WASM_TGZ=$GITHUB_WORKSPACE/$WASM_TGZ" >> "$GITHUB_ENV"
+
+      - name: Smoke WASM install
+        run: |
+          set -euo pipefail
+          tmp=$(mktemp -d)
+          rsync -a examples/wasm-smoke/ "$tmp"/
+          pushd "$tmp" >/dev/null
+          pnpm install
+          pnpm add "$WASM_TGZ"
+          pnpm run check
+          popd >/dev/null
+
+      - name: Smoke Python install
+        run: |
+          set -euo pipefail
+          tmp=$(mktemp -d)
+          rsync -a examples/python-smoke/ "$tmp"/
+          pushd "$tmp" >/dev/null
+          python -m venv .venv
+          . .venv/bin/activate
+          pip install --upgrade pip
+          pip install "${GITHUB_WORKSPACE}/packages/python"
+          python main.py
+          popd >/dev/null
+
+      - name: Smoke Ruby install
+        run: |
+          set -euo pipefail
+          tmp=$(mktemp -d)
+          rsync -a examples/ruby-smoke/ "$tmp"/
+          pushd "$tmp" >/dev/null
+          bundle config set --local path vendor/bundle
+          bundle config set --local local.html-to-markdown "${GITHUB_WORKSPACE}/packages/ruby"
+          bundle install
+          bundle exec ruby app.rb
+          popd >/dev/null
+
       - name: Build PHP extension
         env:
           PHP_CONFIG: ${{ env.PHP_CONFIG }}
         run: cargo build --release -p html-to-markdown-php
 
-      - name: Smoke PHP install (README flow)
+      - name: Smoke PHP install
         env:
           EXT_PATH: ${{ github.workspace }}/target/release/libhtml_to_markdown_php.so
           COMPOSER_ALLOW_SUPERUSER: 1
@@ -464,4 +525,15 @@ jobs:
           php -d "extension=$EXT_PATH" "$composer_bin" config repositories.local.options.symlink false --no-plugins
           php -d "extension=$EXT_PATH" "$composer_bin" install --no-interaction --no-progress --no-scripts
           php -d "extension=$EXT_PATH" convert.php
+          popd >/dev/null
+
+      - name: Smoke Rust example
+        run: |
+          set -euo pipefail
+          tmp=$(mktemp -d)
+          rsync -a examples/rust-smoke/ "$tmp"/
+          pushd "$tmp" >/dev/null
+          mkdir -p .cargo
+          cp .cargo/config.local-template.toml .cargo/config.toml
+          cargo run --quiet
           popd >/dev/null
