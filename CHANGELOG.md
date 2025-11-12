@@ -21,7 +21,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Repository Hygiene** – `.gitignore` now drops `.venv/`, vendor directories, and nested `node_modules/` so smoke tests and language-specific toolchains don’t dirty the tree.
 - **Ruby Build Metadata** – `extconf.rb` uses a relative path for the embedded Cargo crate and the crate’s `Cargo.toml` now declares explicit `edition`, `rust-version`, and dependency pins, allowing `gem install` outside the workspace.
 - **Version Sync Script** – `scripts/sync_versions.py` updates every `html-to-markdown-rs` dependency pin (workspace root plus downstream crates) to keep cross-language releases in lockstep.
-- **Packagist Automation** – The publish workflow now pings Packagist for both `html-to-markdown/extension` and `goldziher/html-to-markdown` after each tag so Composer consumers pick up the release immediately.
 
 ### Fixed
 - **Smoke Test Coverage** – Verified Node, WASM, Python, Ruby (local gem), PHP (Composer path repo), and Rust installs; documented gaps where external registries still need to publish `html-to-markdown/extension` or `html-to-markdown` 2.7.1 before release.
