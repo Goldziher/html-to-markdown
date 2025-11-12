@@ -1,0 +1,191 @@
+name: smoke-test
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  node-smoke:
+    name: node-smoke (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: Install dependencies
+        working-directory: examples/node-smoke
+        run: pnpm install --no-frozen-lockfile
+
+      - name: Run smoke test
+        working-directory: examples/node-smoke
+        run: pnpm run check
+
+  wasm-smoke:
+    name: wasm-smoke (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: Install dependencies
+        working-directory: examples/wasm-smoke
+        run: pnpm install --no-frozen-lockfile
+
+      - name: Run smoke test
+        working-directory: examples/wasm-smoke
+        run: pnpm run check
+
+  python-smoke:
+    name: python-smoke (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Run smoke test
+        working-directory: examples/python-smoke
+        run: |
+          python -m venv .venv
+          if [[ "$RUNNER_OS" == "Windows" ]]; then
+            VENV_PY=".venv/Scripts/python.exe"
+          else
+            VENV_PY=".venv/bin/python"
+          fi
+          "$VENV_PY" -m pip install --upgrade pip
+          "$VENV_PY" -m pip install -r requirements.txt
+          "$VENV_PY" main.py
+
+  ruby-smoke:
+    name: ruby-smoke (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "3.2"
+
+      - name: Install gems
+        working-directory: examples/ruby-smoke
+        run: bundle install
+
+      - name: Run smoke test
+        working-directory: examples/ruby-smoke
+        run: bundle exec ruby app.rb
+
+  php-smoke:
+    name: php-smoke (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: stable
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: "8.2"
+          tools: composer
+
+      - name: Build PHP extension
+        run: cargo build -p html-to-markdown-php --release
+
+      - name: Install Composer dependencies
+        working-directory: examples/php-smoke
+        run: composer install --no-interaction --no-progress
+
+      - name: Run smoke test
+        working-directory: examples/php-smoke
+        env:
+          GITHUB_WORKSPACE: ${{ github.workspace }}
+        run: |
+          case "$RUNNER_OS" in
+            Linux) EXT="libhtml_to_markdown_php.so" ;;
+            macOS) EXT="libhtml_to_markdown_php.dylib" ;;
+            *) EXT="html_to_markdown_php.dll" ;;
+          esac
+          EXT_PATH="${GITHUB_WORKSPACE}/target/release/${EXT}"
+          php -d "extension=${EXT_PATH}" convert.php
+
+  rust-smoke:
+    name: rust-smoke (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: stable
+
+      - name: Run smoke test
+        run: cargo run --manifest-path examples/rust-smoke/Cargo.toml
