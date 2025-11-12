@@ -68,6 +68,18 @@ importers:
         specifier: ^0.13.1
         version: 0.13.1
 
+  examples/node-smoke:
+    dependencies:
+      html-to-markdown-node:
+        specifier: ^2.7.1
+        version: 2.7.1
+
+  examples/wasm-smoke:
+    dependencies:
+      html-to-markdown-wasm:
+        specifier: ^2.7.1
+        version: 2.7.1
+
   packages/typescript:
     dependencies:
       html-to-markdown-node:
@@ -1128,6 +1140,67 @@ packages:
   glob@7.2.3:
     resolution: {integrity: sha512-nFR0zLpU2YCaRxwoCJvL6UvCH2JFyFVIvwTLsIf21AuHlMskA1hhTdk+LlYJtOlYt9v6dvszD2BGRqBL+iQK9Q==}
     deprecated: Glob versions prior to v9 are no longer supported
+
+  html-to-markdown-node-darwin-arm64@2.7.1:
+    resolution: {integrity: sha512-0yMt7tSUQTBeZe23xteKbAahvfV9LFhXLelFcqN1OhUD+YXoFMEv1OjYivjJfYWzQUOixTQ3xHwLbat7wY0Ulg==}
+    engines: {node: '>= 10'}
+    cpu: [arm64]
+    os: [darwin]
+
+  html-to-markdown-node-darwin-x64@2.7.1:
+    resolution: {integrity: sha512-0mWENzlRR+vxXM2NIYpVO23DFC03hekU4+YW8tS7VET64aQaz37UWQuka37mMHIvdygjNWP0oQ1c15kHhXGMNg==}
+    engines: {node: '>= 10'}
+    cpu: [x64]
+    os: [darwin]
+
+  html-to-markdown-node-linux-arm-gnueabihf@2.7.1:
+    resolution: {integrity: sha512-b/eNS3Z/dXADoL1neF9uSZAF5UhmivSzMgRUoShVnUtAIyFRMG6k3/1ZUDWB1ER1sN0j5YAmQ3AI2lZkksWnrw==}
+    engines: {node: '>= 10'}
+    cpu: [arm]
+    os: [linux]
+
+  html-to-markdown-node-linux-arm64-gnu@2.7.1:
+    resolution: {integrity: sha512-23UcVc2zyMAbvHl1Dovk10EmrCteQd6qnX+8b8/ep4tJJq6I3ZxY2HtCXuFiAVI/k0SDRyCvCxuzURnHSbZahg==}
+    engines: {node: '>= 10'}
+    cpu: [arm64]
+    os: [linux]
+
+  html-to-markdown-node-linux-arm64-musl@2.7.1:
+    resolution: {integrity: sha512-i9QIO1rcwHvKUBZS506DmRKMV/qfe48sk6OA2tYZ0OpoWHvSYKEBDv833DOKEBXmq3+lsQnwuovoU1JYlmZyzg==}
+    engines: {node: '>= 10'}
+    cpu: [arm64]
+    os: [linux]
+
+  html-to-markdown-node-linux-x64-gnu@2.7.1:
+    resolution: {integrity: sha512-JdPvwQ4Qu/0gfIyfdiFbtVLKujFmkcVtLgfxGmDsP21hrIMcDR4olkRlk1JmEUUB3nZjS5DEPUZxPL4IKRamaQ==}
+    engines: {node: '>= 10'}
+    cpu: [x64]
+    os: [linux]
+
+  html-to-markdown-node-linux-x64-musl@2.7.1:
+    resolution: {integrity: sha512-EWlGV5MhG2hmGCcalxhiZCwN9E4U9k80MloKoBh2/Y6tmDuQSg8eVCLTVYdY6HqAmIJyoDbq586GbqyJy25Ajw==}
+    engines: {node: '>= 10'}
+    cpu: [x64]
+    os: [linux]
+
+  html-to-markdown-node-win32-arm64-msvc@2.7.1:
+    resolution: {integrity: sha512-aidkib2Ao90FbVmpq+P0Us5l87+MOU7zr3OIu2mP2w2nNhQ6X9yO+yWXhz+G0d2mPV6f+GuQl0Gt894mYFJUyQ==}
+    engines: {node: '>= 10'}
+    cpu: [arm64]
+    os: [win32]
+
+  html-to-markdown-node-win32-x64-msvc@2.7.1:
+    resolution: {integrity: sha512-4MMYdsv0LzGzPSfAaJnIf9ZBmLltmLlkIylZhQ9P6BqBjuBsqEltBJRibIQPm0CFcUvuiDhb1B6ifO7BUmVATw==}
+    engines: {node: '>= 10'}
+    cpu: [x64]
+    os: [win32]
+
+  html-to-markdown-node@2.7.1:
+    resolution: {integrity: sha512-5BhA9pkpgBq+8Op09c2ziQp8wAvgOjvvuVuCsKUpcB2lkhZfVr5/xkQAvQMie5hRULCHbGY3Vl/LmNQFix522Q==}
+    engines: {node: '>= 10'}
+
+  html-to-markdown-wasm@2.7.1:
+    resolution: {integrity: sha512-D479hLQUhF5w3UN2O26Dn0E1mTvm+NyLUInOYM+j47wdnELoX+CqpFxQrZWFrD1YKJ4p0Jwr1Lez9P6kXPmWTg==}
 
   iconv-lite@0.7.0:
     resolution: {integrity: sha512-cf6L2Ds3h57VVmkZe+Pn+5APsT7FpqJtEhhieDCvrE2MK5Qk9MyffgQyuxQTm6BChfeZNtcOLHp9IcWRVcIcBQ==}
@@ -2210,6 +2283,54 @@ snapshots:
       minimatch: 3.1.2
       once: 1.4.0
       path-is-absolute: 1.0.1
+
+  html-to-markdown-node-darwin-arm64@2.7.1:
+    optional: true
+
+  html-to-markdown-node-darwin-x64@2.7.1:
+    optional: true
+
+  html-to-markdown-node-linux-arm-gnueabihf@2.7.1:
+    optional: true
+
+  html-to-markdown-node-linux-arm64-gnu@2.7.1:
+    optional: true
+
+  html-to-markdown-node-linux-arm64-musl@2.7.1:
+    optional: true
+
+  html-to-markdown-node-linux-x64-gnu@2.7.1:
+    optional: true
+
+  html-to-markdown-node-linux-x64-musl@2.7.1:
+    optional: true
+
+  html-to-markdown-node-win32-arm64-msvc@2.7.1:
+    optional: true
+
+  html-to-markdown-node-win32-x64-msvc@2.7.1:
+    optional: true
+
+  html-to-markdown-node@2.7.1:
+    dependencies:
+      '@emnapi/runtime': 1.7.0
+      '@octokit/core': 7.0.6
+      typanion: 3.14.0
+      up: 1.0.2
+    optionalDependencies:
+      html-to-markdown-node-darwin-arm64: 2.7.1
+      html-to-markdown-node-darwin-x64: 2.7.1
+      html-to-markdown-node-linux-arm-gnueabihf: 2.7.1
+      html-to-markdown-node-linux-arm64-gnu: 2.7.1
+      html-to-markdown-node-linux-arm64-musl: 2.7.1
+      html-to-markdown-node-linux-x64-gnu: 2.7.1
+      html-to-markdown-node-linux-x64-musl: 2.7.1
+      html-to-markdown-node-win32-arm64-msvc: 2.7.1
+      html-to-markdown-node-win32-x64-msvc: 2.7.1
+
+  html-to-markdown-wasm@2.7.1:
+    dependencies:
+      up: 1.0.2
 
   iconv-lite@0.7.0:
     dependencies:
