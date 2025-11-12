@@ -989,21 +989,60 @@ jobs:
           echo "WASM_TGZ=$GITHUB_WORKSPACE/artifacts/wasm/output/$WASM_TGZ" >> "$GITHUB_ENV"
 
       - name: Smoke test Node example against artifacts
-        working-directory: examples/node-smoke
         run: |
           set -euo pipefail
+          tmp=$(mktemp -d)
+          rsync -a examples/node-smoke/ "$tmp"/
+          pushd "$tmp" >/dev/null
           pnpm install
-          pnpm add --no-save file:../../crates/html-to-markdown-node
-          pnpm add --no-save "$NODE_TGZ"
+          pnpm add "file:${GITHUB_WORKSPACE}/crates/html-to-markdown-node"
+          pnpm add "$NODE_TGZ"
           pnpm run check
+          popd >/dev/null
 
       - name: Smoke test WASM example against artifacts
-        working-directory: examples/wasm-smoke
         run: |
           set -euo pipefail
+          tmp=$(mktemp -d)
+          rsync -a examples/wasm-smoke/ "$tmp"/
+          pushd "$tmp" >/dev/null
           pnpm install
-          pnpm add --no-save "$WASM_TGZ"
+          pnpm add "$WASM_TGZ"
           pnpm run check
+          popd >/dev/null
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: "8.2"
+          tools: composer
+
+      - name: Setup Rust for PHP extension
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+
+      - name: Export php-config path
+        run: echo "PHP_CONFIG=$(command -v php-config)" >> "$GITHUB_ENV"
+
+      - name: Build PHP extension
+        env:
+          PHP_CONFIG: ${{ env.PHP_CONFIG }}
+        run: cargo build --release -p html-to-markdown-php
+
+      - name: Smoke test PHP example against artifacts
+        env:
+          EXT_PATH: ${{ github.workspace }}/target/release/libhtml_to_markdown_php.so
+          COMPOSER_ALLOW_SUPERUSER: 1
+        run: |
+          set -euo pipefail
+          tmp=$(mktemp -d)
+          rsync -a examples/php-smoke/ "$tmp"/
+          pushd "$tmp" >/dev/null
+          composer_bin=$(command -v composer)
+          php -d "extension=$EXT_PATH" "$composer_bin" config repositories.local path "${GITHUB_WORKSPACE}/packages/php" --no-plugins
+          php -d "extension=$EXT_PATH" "$composer_bin" config repositories.local.options.symlink false --no-plugins
+          php -d "extension=$EXT_PATH" "$composer_bin" install --no-interaction --no-progress --no-scripts
+          php -d "extension=$EXT_PATH" convert.php
+          popd >/dev/null
 
   upload-release-artifacts:
     name: Upload Release Artifacts
