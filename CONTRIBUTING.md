@@ -153,8 +153,8 @@ html-to-markdown/
 | `html-to-markdown`       | PyPI      | Python package              |
 | `html-to-markdown`       | npm       | TypeScript package with CLI |
 | `html-to-markdown`       | RubyGems  | Ruby gem (Magnus bindings)  |
-| `@html-to-markdown/node` | npm       | Native Node.js bindings     |
-| `@html-to-markdown/wasm` | npm       | WebAssembly bindings        |
+| `html-to-markdown-node` | npm       | Native Node.js bindings     |
+| `html-to-markdown-wasm` | npm       | WebAssembly bindings        |
 
 ## Making Changes
 
@@ -375,8 +375,8 @@ Verify all distributions are published:
 - **Rust**: <https://crates.io/crates/html-to-markdown-rs>
 - **Python**: <https://pypi.org/project/html-to-markdown/>
 - **npm (main)**: <https://www.npmjs.com/package/html-to-markdown>
-- **npm (node)**: <https://www.npmjs.com/package/@html-to-markdown/node>
-- **npm (wasm)**: <https://www.npmjs.com/package/@html-to-markdown/wasm>
+- **npm (node)**: <https://www.npmjs.com/package/html-to-markdown-node>
+- **npm (wasm)**: <https://www.npmjs.com/package/html-to-markdown-wasm>
 - **Homebrew**: <https://github.com/Goldziher/homebrew-tap>
 - **GitHub**: <https://github.com/Goldziher/html-to-markdown/releases>
 

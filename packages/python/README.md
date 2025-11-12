@@ -28,6 +28,23 @@ Apple M4 • Real Wikipedia documents • `convert()` (Python)
 
 > V1 averaged ~2.5 MB/s (Python/BeautifulSoup). V2's Rust engine delivers 60–80× higher throughput.
 
+### Benchmark Fixtures (Apple M4)
+
+Pulled directly from `tools/runtime-bench` (`task bench:bindings -- --language python`) so they stay in lockstep with the Rust core:
+
+| Document               | Size   | ops/sec (Python) |
+| ---------------------- | ------ | ---------------- |
+| Lists (Timeline)       | 129 KB | 1,405            |
+| Tables (Countries)     | 360 KB | 352              |
+| Medium (Python)        | 657 KB | 158              |
+| Large (Rust)           | 567 KB | 183              |
+| Small (Intro)          | 463 KB | 223              |
+| hOCR German PDF        | 44 KB  | 2,991            |
+| hOCR Invoice           | 4 KB   | 23,500           |
+| hOCR Embedded Tables   | 37 KB  | 3,464            |
+
+> Re-run locally with `task bench:bindings -- --language python --output tmp.json` to compare against CI history.
+
 ## Quick Start
 
 ```python

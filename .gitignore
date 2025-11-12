@@ -32,12 +32,14 @@ target/
 Cargo.lock
 rust-coverage.lcov
 *.node
+examples/**/.cargo/config.toml
 
 # NAPI-RS generated files
 crates/html-to-markdown-node/index.d.ts
 
 # Node.js / TypeScript
 node_modules/
+**/node_modules/
 dist/
 dist-node/
 dist-web/
@@ -54,6 +56,11 @@ packages/ruby/tmp/
 packages/ruby/vendor/
 packages/php-ext/workspace/
 
+# Example dependency directories
+vendor/
+**/vendor/
+**/vendor/bundle/
+
 # IDEs
 .vscode/
 .idea/
@@ -69,9 +76,11 @@ Thumbs.db
 .benchmarks/
 tools/runtime-bench/results/
 
-# Environment
+# Environment & virtualenvs
 .env
 .env.local
+.venv/
+**/.venv/
 
 # AI Rules generated files
 .claude/agents/

@@ -146,7 +146,7 @@ for (i, img) in extraction.inline_images.iter().enumerate() {
 
 This is the core Rust library. For other languages:
 
-- **JavaScript/TypeScript**: [@html-to-markdown/node](https://github.com/Goldziher/html-to-markdown/tree/main/crates/html-to-markdown-node) (NAPI-RS) or [@html-to-markdown/wasm](https://github.com/Goldziher/html-to-markdown/tree/main/crates/html-to-markdown-wasm) (WebAssembly)
+- **JavaScript/TypeScript**: [html-to-markdown-node](https://github.com/Goldziher/html-to-markdown/tree/main/crates/html-to-markdown-node) (NAPI-RS) or [html-to-markdown-wasm](https://github.com/Goldziher/html-to-markdown/tree/main/crates/html-to-markdown-wasm) (WebAssembly)
 - **Python**: [html-to-markdown](https://github.com/Goldziher/html-to-markdown/tree/main/crates/html-to-markdown-py) (PyO3)
 - **PHP**: [html-to-markdown](https://github.com/Goldziher/html-to-markdown/tree/main/packages/php) (PIE + Composer helpers)
 - **Ruby**: [html-to-markdown](https://github.com/Goldziher/html-to-markdown/tree/main/packages/ruby) (Magnus + rb-sys)

@@ -424,6 +424,7 @@ struct DomContext {
     parent_map: HashMap<u32, Option<u32>>,
     children_map: HashMap<u32, Vec<tl::NodeHandle>>,
     root_children: Vec<tl::NodeHandle>,
+    node_map: HashMap<u32, tl::NodeHandle>,
 }
 
 fn escape_link_label(text: &str) -> String {
@@ -684,6 +685,7 @@ fn build_dom_context(dom: &tl::VDom, parser: &tl::Parser) -> DomContext {
         parent_map: HashMap::new(),
         children_map: HashMap::new(),
         root_children: dom.children().to_vec(),
+        node_map: HashMap::new(),
     };
 
     for child_handle in dom.children().iter() {
@@ -696,6 +698,7 @@ fn build_dom_context(dom: &tl::VDom, parser: &tl::Parser) -> DomContext {
 fn record_node_hierarchy(node_handle: &tl::NodeHandle, parent: Option<u32>, parser: &tl::Parser, ctx: &mut DomContext) {
     let id = node_handle.get_inner();
     ctx.parent_map.insert(id, parent);
+    ctx.node_map.insert(id, *node_handle);
 
     if let Some(node) = node_handle.get(parser) {
         if let tl::Node::Tag(tag) = node {
@@ -1677,13 +1680,44 @@ fn tag_name_eq(name: Cow<'_, str>, needle: &str) -> bool {
     name.eq_ignore_ascii_case(needle)
 }
 
-fn should_drop_for_preprocessing(tag_name: &str, options: &ConversionOptions) -> bool {
+fn should_drop_for_preprocessing(
+    node_handle: &tl::NodeHandle,
+    tag_name: &str,
+    tag: &tl::HTMLTag,
+    parser: &tl::Parser,
+    dom_ctx: &DomContext,
+    options: &ConversionOptions,
+) -> bool {
     if !options.preprocessing.enabled {
         return false;
     }
 
-    if options.preprocessing.remove_navigation && matches!(tag_name, "nav" | "aside" | "header" | "footer") {
-        return true;
+    if options.preprocessing.remove_navigation {
+        let inside_semantic_content = has_semantic_content_ancestor(node_handle, parser, dom_ctx);
+        let has_nav_hint = element_has_navigation_hint(tag);
+
+        if tag_name == "nav" {
+            return true;
+        }
+
+        if tag_name == "header" {
+            if !inside_semantic_content {
+                return true;
+            }
+            if has_nav_hint {
+                return true;
+            }
+        } else if tag_name == "footer" {
+            if !inside_semantic_content || has_nav_hint {
+                return true;
+            }
+        } else if tag_name == "aside" {
+            if has_nav_hint {
+                return true;
+            }
+        } else if has_nav_hint && tag_name != "main" && tag_name != "article" {
+            return true;
+        }
     }
 
     if options.preprocessing.remove_forms {
@@ -1701,6 +1735,140 @@ fn should_drop_for_preprocessing(tag_name: &str, options: &ConversionOptions) ->
     }
 
     false
+}
+
+fn has_semantic_content_ancestor(node_handle: &tl::NodeHandle, parser: &tl::Parser, dom_ctx: &DomContext) -> bool {
+    let mut current_id = node_handle.get_inner();
+    while let Some(parent_id) = dom_ctx.parent_map.get(&current_id).copied().flatten() {
+        if let Some(parent_handle) = dom_ctx.node_map.get(&parent_id) {
+            if let Some(tl::Node::Tag(parent_tag)) = parent_handle.get(parser) {
+                let parent_name = normalized_tag_name(parent_tag.name().as_utf8_str());
+                if matches!(parent_name.as_ref(), "main" | "article" | "section") {
+                    return true;
+                }
+                if tag_has_main_semantics(parent_tag) {
+                    return true;
+                }
+            }
+        }
+        current_id = parent_id;
+    }
+    false
+}
+
+fn tag_has_main_semantics(tag: &tl::HTMLTag) -> bool {
+    if let Some(role_attr) = tag.attributes().get("role") {
+        if let Some(role) = role_attr {
+            let lowered = role.as_utf8_str().to_ascii_lowercase();
+            if matches!(lowered.as_str(), "main" | "article" | "document" | "region") {
+                return true;
+            }
+        }
+    }
+
+    if let Some(class_attr) = tag.attributes().get("class") {
+        if let Some(class_bytes) = class_attr {
+            let class_value = class_bytes.as_utf8_str().to_ascii_lowercase();
+            const MAIN_CLASS_HINTS: &[&str] = &[
+                "mw-body",
+                "mw-parser-output",
+                "content-body",
+                "content-container",
+                "article-body",
+                "article-content",
+                "main-content",
+                "page-content",
+                "entry-content",
+                "post-content",
+                "document-body",
+            ];
+            if MAIN_CLASS_HINTS.iter().any(|hint| class_value.contains(hint)) {
+                return true;
+            }
+        }
+    }
+
+    false
+}
+
+fn element_has_navigation_hint(tag: &tl::HTMLTag) -> bool {
+    if attribute_matches_any(tag, "role", &["navigation", "menubar", "tablist", "toolbar"]) {
+        return true;
+    }
+
+    if attribute_contains_any(
+        tag,
+        "aria-label",
+        &["navigation", "menu", "contents", "table of contents", "toc"],
+    ) {
+        return true;
+    }
+
+    const NAV_KEYWORDS: &[&str] = &[
+        "nav",
+        "navigation",
+        "navbar",
+        "breadcrumbs",
+        "breadcrumb",
+        "toc",
+        "sidebar",
+        "sidenav",
+        "menu",
+        "menubar",
+        "mainmenu",
+        "subnav",
+        "tabs",
+        "tablist",
+        "toolbar",
+        "pager",
+        "pagination",
+        "skipnav",
+        "skip-link",
+        "skiplinks",
+        "site-nav",
+        "site-menu",
+        "site-header",
+        "site-footer",
+        "topbar",
+        "bottombar",
+        "masthead",
+        "vector-nav",
+        "vector-header",
+        "vector-footer",
+    ];
+
+    attribute_matches_any(tag, "class", NAV_KEYWORDS) || attribute_matches_any(tag, "id", NAV_KEYWORDS)
+}
+
+fn attribute_matches_any(tag: &tl::HTMLTag, attr: &str, keywords: &[&str]) -> bool {
+    let Some(attr_value) = tag.attributes().get(attr) else {
+        return false;
+    };
+    let Some(value) = attr_value else {
+        return false;
+    };
+    let raw = value.as_utf8_str();
+    let tokens = raw
+        .split(|c: char| c.is_ascii_whitespace() || matches!(c, '-' | '_' | ':' | '.' | '/'))
+        .filter(|token| !token.is_empty())
+        .map(|token| token.to_ascii_lowercase());
+    for token in tokens {
+        if keywords.iter().any(|kw| token == *kw) {
+            return true;
+        }
+    }
+    false
+}
+
+fn attribute_contains_any(tag: &tl::HTMLTag, attr: &str, keywords: &[&str]) -> bool {
+    let Some(attr_value) = tag.attributes().get(attr) else {
+        return false;
+    };
+    let Some(value) = attr_value else {
+        return false;
+    };
+    let lower = value.as_utf8_str().to_ascii_lowercase();
+    keywords.iter().any(|kw| lower.contains(*kw))
 }
 
 /// Serialize a tag and its children back to HTML.
@@ -2317,7 +2485,7 @@ fn walk_node(
         tl::Node::Tag(tag) => {
             let tag_name = normalized_tag_name(tag.name().as_utf8_str());
 
-            if should_drop_for_preprocessing(tag_name.as_ref(), options) {
+            if should_drop_for_preprocessing(node_handle, tag_name.as_ref(), tag, parser, dom_ctx, options) {
                 trim_trailing_whitespace(output);
                 if options.debug {
                     eprintln!("[DEBUG] Dropping <{}> subtree due to preprocessing settings", tag_name);
@@ -5198,6 +5366,85 @@ mod tests {
         options.preprocessing.remove_forms = false; // keep form controls for this regression check
         let result = convert_html(html, &options).unwrap();
         assert_eq!(result.trim(), "**Section**");
+    }
+
+    #[test]
+    fn preprocessing_keeps_article_header_inside_main() {
+        let html = r#"
+        <body>
+            <header class="global-header">
+                <div>Global Navigation</div>
+            </header>
+            <main>
+                <header class="article-header">
+                    <h1>Primary Title</h1>
+                </header>
+                <p>Body content stays.</p>
+            </main>
+        </body>
+        "#;
+        let result = convert_html(html, &ConversionOptions::default()).unwrap();
+        assert!(
+            result.contains("Primary Title"),
+            "article header was removed: {}",
+            result
+        );
+        assert!(
+            result.contains("Body content stays"),
+            "main body content missing: {}",
+            result
+        );
+        assert!(
+            !result.contains("Global Navigation"),
+            "site chrome unexpectedly rendered: {}",
+            result
+        );
+    }
+
+    #[test]
+    fn preprocessing_drops_nav_but_keeps_body() {
+        let html = r##"
+        <main>
+            <nav aria-label="Primary navigation">
+                <a href="#a">NavOnly</a>
+            </nav>
+            <article>
+                <p>Important narrative</p>
+            </article>
+        </main>
+        "##;
+        let result = convert_html(html, &ConversionOptions::default()).unwrap();
+        assert!(
+            !result.contains("NavOnly"),
+            "navigation text should not appear: {}",
+            result
+        );
+        assert!(
+            result.contains("Important narrative"),
+            "article text should remain: {}",
+            result
+        );
+    }
+
+    #[test]
+    fn preprocessing_retains_section_headers_inside_articles() {
+        let html = r#"
+        <article>
+            <header>
+                <h2>Section Heading</h2>
+            </header>
+            <section>
+                <p>Section body</p>
+            </section>
+        </article>
+        "#;
+        let result = convert_html(html, &ConversionOptions::default()).unwrap();
+        assert!(
+            result.contains("Section Heading"),
+            "section heading was stripped: {}",
+            result
+        );
+        assert!(result.contains("Section body"), "section body missing: {}", result);
     }
 
     #[test]
