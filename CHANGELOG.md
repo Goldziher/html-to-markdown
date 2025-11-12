@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - **Rust Toolchain Settings** – All crates (including the Ruby binding) now inherit `edition = "2024"` and `rust-version = "1.85"` from the workspace to keep toolchain configuration centralized.
 
+## [2.7.2] - 2025-11-12
+
+### Fixed
+- **Node/WASM Binding Regression** – HTML preprocessing no longer drops `<html>`, `<head>`, or `<body>` wrappers when their classes resemble navigation chrome, so large Wikipedia fixtures once again emit full markdown (restoring the Vitest length/table expectations for Node bindings and keeping WASM conversions consistent).
+
 ## [2.7.1] - 2025-11-12
 
 ### Added
