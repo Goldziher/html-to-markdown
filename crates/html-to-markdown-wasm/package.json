@@ -53,7 +53,7 @@
     "clean": "rm -rf dist dist-node dist-web node_modules pkg"
   },
   "devDependencies": {
-    "@types/node": "^24.10.0",
+    "@types/node": "^24.10.1",
     "tsx": "^4.20.6",
     "vitest": "^4.0.8",
     "wasm-pack": "^0.13.1"
