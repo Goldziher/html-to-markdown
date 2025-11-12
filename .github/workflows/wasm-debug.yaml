@@ -1,0 +1,57 @@
+name: wasm-node-debug
+
+on:
+  push:
+    branches:
+      - main
+      - "release/*"
+  workflow_dispatch:
+
+jobs:
+  wasm-dev-smoke:
+    name: Debug WASM install on Node
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup Rust
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          target: wasm32-unknown-unknown
+
+      - name: Install wasm-pack
+        run: |
+          if ! command -v wasm-pack >/dev/null 2>&1; then
+            cargo install wasm-pack --locked
+          fi
+
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: 20
+          check-latest: true
+
+      - name: Enable corepack
+        run: corepack enable
+
+      - name: Install workspace deps
+        run: pnpm install --filter html-to-markdown-wasm...
+
+      - name: Build wasm bundle
+        run: pnpm --filter html-to-markdown-wasm run build:all
+
+      - name: Pack WASM package
+        run: |
+          set -euo pipefail
+          cd crates/html-to-markdown-wasm
+          npm pack >/dev/null
+          mv html-to-markdown-wasm-*.tgz "$GITHUB_WORKSPACE/html-to-markdown-wasm.tgz"
+
+      - name: Run WASM smoke test
+        working-directory: examples/wasm-smoke
+        run: |
+          set -euo pipefail
+          pnpm install
+          pnpm add --no-save "$GITHUB_WORKSPACE/html-to-markdown-wasm.tgz"
+          pnpm run check

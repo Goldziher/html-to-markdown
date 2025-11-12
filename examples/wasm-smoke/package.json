@@ -8,6 +8,6 @@
     "check": "node index.mjs"
   },
   "dependencies": {
-    "html-to-markdown-wasm": "*"
+    "html-to-markdown-wasm": "^2.7.1"
   }
 }

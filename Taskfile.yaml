@@ -30,6 +30,8 @@ tasks:
       - task: python:update
       - echo "Updating PHP dependencies..."
       - task: php:update
+      - echo "Updating smoke test fixtures..."
+      - task: examples:update
 
   build:
     desc: "Build Rust core and JavaScript bindings"
@@ -398,6 +400,32 @@ tasks:
     desc: "Format PHP sources"
     cmds:
       - cmd: cd packages/php && composer run format
+
+  # Example smoke tests ------------------------------------------------------
+  examples:update:
+    desc: "Update all smoke test dependencies"
+    cmds:
+      - task: examples:node-smoke:update
+      - task: examples:wasm-smoke:update
+      - task: examples:ruby-smoke:update
+
+  examples:node-smoke:update:
+    desc: "Update Node smoke test dependencies"
+    dir: examples/node-smoke
+    cmds:
+      - pnpm up --latest
+
+  examples:wasm-smoke:update:
+    desc: "Update WASM smoke test dependencies"
+    dir: examples/wasm-smoke
+    cmds:
+      - pnpm up --latest
+
+  examples:ruby-smoke:update:
+    desc: "Update Ruby smoke test dependencies"
+    cmds:
+      - task: ruby:ensure-bundler
+      - cmd: cd examples/ruby-smoke && PATH={{.RUBY_BIN}}:$PATH bundle _{{.BUNDLER_VERSION}}_ update
 
   # JavaScript / TypeScript tasks --------------------------------------------
   js:install:
