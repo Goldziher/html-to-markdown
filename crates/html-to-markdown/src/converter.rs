@@ -1715,7 +1715,7 @@ fn should_drop_for_preprocessing(
             if has_nav_hint {
                 return true;
             }
-        } else if has_nav_hint && tag_name != "main" && tag_name != "article" {
+        } else if has_nav_hint && !matches!(tag_name, "main" | "article" | "html" | "body" | "head") {
             return true;
         }
     }
