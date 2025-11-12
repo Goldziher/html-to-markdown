@@ -577,14 +577,9 @@ PY2
       - name: Smoke Rust example
         run: |
           set -euo pipefail
-          tmp=$(python - <<'PY2'
-import tempfile
-print(tempfile.mkdtemp(prefix="smoke-rust-"))
-PY2
-)
-          cp -R examples/rust-smoke/. "$tmp"/
-          pushd "$tmp" >/dev/null
+          pushd examples/rust-smoke >/dev/null
           mkdir -p .cargo
-          cp .cargo/config.local-template.toml .cargo/config.toml 2>/dev/null || true
+          cp .cargo/config.local-template.toml .cargo/config.toml
           cargo run --quiet
+          rm .cargo/config.toml
           popd >/dev/null
