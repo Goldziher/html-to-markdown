@@ -394,8 +394,15 @@ jobs:
 
   smoke:
     name: Smoke README installs
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
     timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    defaults:
+      run:
+        shell: bash
     steps:
       - name: Checkout
         uses: actions/checkout@v5
@@ -415,6 +422,7 @@ jobs:
           python-version: "3.12"
 
       - name: Setup Ruby
+        if: runner.os != 'Windows'
         uses: ruby/setup-ruby@v1
         with:
           ruby-version: "3.3"
@@ -423,13 +431,22 @@ jobs:
       - name: Setup Rust
         uses: actions-rust-lang/setup-rust-toolchain@v1
 
+      - name: Install wasm-pack
+        run: |
+          set -euo pipefail
+          if ! command -v wasm-pack >/dev/null 2>&1; then
+            cargo install wasm-pack --locked
+          fi
+
       - name: Setup PHP
+        if: runner.os != 'Windows'
         uses: shivammathur/setup-php@v2
         with:
           php-version: "8.2"
           tools: composer
 
       - name: Capture php-config path
+        if: runner.os != 'Windows'
         run: echo "PHP_CONFIG=$(command -v php-config)" >> "$GITHUB_ENV"
 
       - name: Install pnpm workspace deps
@@ -450,11 +467,16 @@ jobs:
       - name: Smoke Node install
         run: |
           set -euo pipefail
-          tmp=$(mktemp -d)
-          rsync -a examples/node-smoke/ "$tmp"/
+          tmp=$(python - <<'PY2'
+import tempfile
+print(tempfile.mkdtemp(prefix="smoke-node-"))
+PY2
+)
+          cp -R examples/node-smoke/. "$tmp"/
           pushd "$tmp" >/dev/null
           pnpm install
-          pnpm add "$NODE_TGZ"
+          cp "$NODE_TGZ" ./node.tgz
+          pnpm add ./node.tgz
           pnpm run check
           popd >/dev/null
 
@@ -473,33 +495,52 @@ jobs:
       - name: Smoke WASM install
         run: |
           set -euo pipefail
-          tmp=$(mktemp -d)
-          rsync -a examples/wasm-smoke/ "$tmp"/
+          tmp=$(python - <<'PY2'
+import tempfile
+print(tempfile.mkdtemp(prefix="smoke-wasm-"))
+PY2
+)
+          cp -R examples/wasm-smoke/. "$tmp"/
           pushd "$tmp" >/dev/null
           pnpm install
-          pnpm add "$WASM_TGZ"
+          cp "$WASM_TGZ" ./wasm.tgz
+          pnpm add ./wasm.tgz
           pnpm run check
           popd >/dev/null
 
       - name: Smoke Python install
         run: |
           set -euo pipefail
-          tmp=$(mktemp -d)
-          rsync -a examples/python-smoke/ "$tmp"/
+          tmp=$(python - <<'PY2'
+import tempfile
+print(tempfile.mkdtemp(prefix="smoke-python-"))
+PY2
+)
+          cp -R examples/python-smoke/. "$tmp"/
           pushd "$tmp" >/dev/null
           python -m venv .venv
-          . .venv/bin/activate
-          pip install --upgrade pip
-          pip install "${GITHUB_WORKSPACE}/packages/python"
-          python main.py
+          if [[ "$RUNNER_OS" == "Windows" ]]; then
+            VENV_PY=".venv/Scripts/python.exe"
+          else
+            VENV_PY=".venv/bin/python"
+          fi
+          "$VENV_PY" -m pip install --upgrade pip
+          "$VENV_PY" -m pip install "${GITHUB_WORKSPACE}/packages/python"
+          "$VENV_PY" main.py
           popd >/dev/null
 
       - name: Smoke Ruby install
+        if: runner.os != 'Windows'
         run: |
           set -euo pipefail
-          tmp=$(mktemp -d)
-          rsync -a examples/ruby-smoke/ "$tmp"/
+          tmp=$(python - <<'PY2'
+import tempfile
+print(tempfile.mkdtemp(prefix="smoke-ruby-"))
+PY2
+)
+          cp -R examples/ruby-smoke/. "$tmp"/
           pushd "$tmp" >/dev/null
+          gem list -i bundler -v 2.5.12 || gem install bundler -v 2.5.12 --no-document
           bundle config set --local path vendor/bundle
           bundle config set --local local.html-to-markdown "${GITHUB_WORKSPACE}/packages/ruby"
           bundle install
@@ -507,18 +548,24 @@ jobs:
           popd >/dev/null
 
       - name: Build PHP extension
+        if: runner.os != 'Windows'
         env:
           PHP_CONFIG: ${{ env.PHP_CONFIG }}
         run: cargo build --release -p html-to-markdown-php
 
       - name: Smoke PHP install
+        if: runner.os != 'Windows'
         env:
           EXT_PATH: ${{ github.workspace }}/target/release/libhtml_to_markdown_php.so
           COMPOSER_ALLOW_SUPERUSER: 1
         run: |
           set -euo pipefail
-          tmp=$(mktemp -d)
-          rsync -a examples/php-smoke/ "$tmp"/
+          tmp=$(python - <<'PY2'
+import tempfile
+print(tempfile.mkdtemp(prefix="smoke-php-"))
+PY2
+)
+          cp -R examples/php-smoke/. "$tmp"/
           pushd "$tmp" >/dev/null
           composer_bin=$(command -v composer)
           php -d "extension=$EXT_PATH" "$composer_bin" config repositories.local path "${GITHUB_WORKSPACE}/packages/php" --no-plugins
@@ -530,10 +577,14 @@ jobs:
       - name: Smoke Rust example
         run: |
           set -euo pipefail
-          tmp=$(mktemp -d)
-          rsync -a examples/rust-smoke/ "$tmp"/
+          tmp=$(python - <<'PY2'
+import tempfile
+print(tempfile.mkdtemp(prefix="smoke-rust-"))
+PY2
+)
+          cp -R examples/rust-smoke/. "$tmp"/
           pushd "$tmp" >/dev/null
           mkdir -p .cargo
-          cp .cargo/config.local-template.toml .cargo/config.toml
+          cp .cargo/config.local-template.toml .cargo/config.toml 2>/dev/null || true
           cargo run --quiet
           popd >/dev/null
