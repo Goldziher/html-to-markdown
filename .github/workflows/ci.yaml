@@ -467,11 +467,7 @@ jobs:
       - name: Smoke Node install
         run: |
           set -euo pipefail
-          tmp=$(python - <<'PY2'
-import tempfile
-print(tempfile.mkdtemp(prefix="smoke-node-"))
-PY2
-)
+          tmp=$(mktemp -d)
           cp -R examples/node-smoke/. "$tmp"/
           pushd "$tmp" >/dev/null
           pnpm install
@@ -495,11 +491,7 @@ PY2
       - name: Smoke WASM install
         run: |
           set -euo pipefail
-          tmp=$(python - <<'PY2'
-import tempfile
-print(tempfile.mkdtemp(prefix="smoke-wasm-"))
-PY2
-)
+          tmp=$(mktemp -d)
           cp -R examples/wasm-smoke/. "$tmp"/
           pushd "$tmp" >/dev/null
           pnpm install
@@ -511,11 +503,7 @@ PY2
       - name: Smoke Python install
         run: |
           set -euo pipefail
-          tmp=$(python - <<'PY2'
-import tempfile
-print(tempfile.mkdtemp(prefix="smoke-python-"))
-PY2
-)
+          tmp=$(mktemp -d)
           cp -R examples/python-smoke/. "$tmp"/
           pushd "$tmp" >/dev/null
           python -m venv .venv
@@ -533,11 +521,7 @@ PY2
         if: runner.os != 'Windows'
         run: |
           set -euo pipefail
-          tmp=$(python - <<'PY2'
-import tempfile
-print(tempfile.mkdtemp(prefix="smoke-ruby-"))
-PY2
-)
+          tmp=$(mktemp -d)
           cp -R examples/ruby-smoke/. "$tmp"/
           pushd "$tmp" >/dev/null
           gem list -i bundler -v 2.5.12 || gem install bundler -v 2.5.12 --no-document
@@ -560,11 +544,7 @@ PY2
           COMPOSER_ALLOW_SUPERUSER: 1
         run: |
           set -euo pipefail
-          tmp=$(python - <<'PY2'
-import tempfile
-print(tempfile.mkdtemp(prefix="smoke-php-"))
-PY2
-)
+          tmp=$(mktemp -d)
           cp -R examples/php-smoke/. "$tmp"/
           pushd "$tmp" >/dev/null
           composer_bin=$(command -v composer)
