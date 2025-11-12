@@ -49,9 +49,12 @@ jobs:
           mv html-to-markdown-wasm-*.tgz "$GITHUB_WORKSPACE/html-to-markdown-wasm.tgz"
 
       - name: Run WASM smoke test
-        working-directory: examples/wasm-smoke
         run: |
           set -euo pipefail
+          tmp=$(mktemp -d)
+          rsync -a examples/wasm-smoke/ "$tmp"/
+          pushd "$tmp" >/dev/null
           pnpm install
-          pnpm add --no-save "$GITHUB_WORKSPACE/html-to-markdown-wasm.tgz"
+          pnpm add "$GITHUB_WORKSPACE/html-to-markdown-wasm.tgz"
           pnpm run check
+          popd >/dev/null
