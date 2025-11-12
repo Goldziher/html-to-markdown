@@ -3,7 +3,7 @@
  * This uses the fastest backend (~691k ops/sec)
  */
 
-const { convert } = require("@html-to-markdown/node");
+const { convert } = require("html-to-markdown-node");
 
 const html = `
 <!DOCTYPE html>

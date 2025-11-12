@@ -9,6 +9,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - **Rust Toolchain Settings** – All crates (including the Ruby binding) now inherit `edition = "2024"` and `rust-version = "1.85"` from the workspace to keep toolchain configuration centralized.
 
+## [2.7.1] - 2025-11-12
+
+### Added
+- **Language-Specific Benchmarks** – Every binding README (Node, WASM, Python, Ruby, PHP, TypeScript) now publishes the latest `task bench:bindings` throughput numbers so runtime documentation stays aligned with the shared fixtures.
+- **Examples/Smoke Suite** – Added `examples/{node,wasm,python,ruby,php,rust}-smoke` plus an overview README to exercise both the published artifacts and local builds before a release.
+
+### Changed
+- **Docs Accuracy** – Node/WASM READMEs now clearly reference the real npm packages (`html-to-markdown-node`, `html-to-markdown-wasm`) and provide correct import samples.
+- **TypeScript README** – Highlights that the CLI wrapper inherits the native Node benchmarks.
+- **Repository Hygiene** – `.gitignore` now drops `.venv/`, vendor directories, and nested `node_modules/` so smoke tests and language-specific toolchains don’t dirty the tree.
+- **Ruby Build Metadata** – `extconf.rb` uses a relative path for the embedded Cargo crate and the crate’s `Cargo.toml` now declares explicit `edition`, `rust-version`, and dependency pins, allowing `gem install` outside the workspace.
+- **Version Sync Script** – `scripts/sync_versions.py` updates every `html-to-markdown-rs` dependency pin (workspace root plus downstream crates) to keep cross-language releases in lockstep.
+- **Packagist Automation** – The publish workflow now pings Packagist for both `html-to-markdown/extension` and `goldziher/html-to-markdown` after each tag so Composer consumers pick up the release immediately.
+
+### Fixed
+- **Smoke Test Coverage** – Verified Node, WASM, Python, Ruby (local gem), PHP (Composer path repo), and Rust installs; documented gaps where external registries still need to publish `html-to-markdown/extension` or `html-to-markdown` 2.7.1 before release.
+
 ## [2.7.0] - 2025-11-12
 
 ### Added

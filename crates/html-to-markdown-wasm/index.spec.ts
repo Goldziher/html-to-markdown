@@ -17,7 +17,7 @@ const loadTestDoc = (path: string): string => {
   return readFileSync(fullPath, "utf-8");
 };
 
-describe("@html-to-markdown/wasm - WebAssembly Bindings", () => {
+describe("html-to-markdown-wasm - WebAssembly Bindings", () => {
   describe("Basic Conversion", () => {
     it("should convert simple HTML to markdown", () => {
       const html = "<h1>Hello World</h1>";

@@ -1,0 +1,13 @@
+{
+  "name": "html-to-markdown-wasm-smoke",
+  "version": "2.7.1",
+  "private": true,
+  "type": "module",
+  "description": "Smoke test for installing html-to-markdown-wasm",
+  "scripts": {
+    "check": "node index.mjs"
+  },
+  "dependencies": {
+    "html-to-markdown-wasm": "*"
+  }
+}

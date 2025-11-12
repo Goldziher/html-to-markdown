@@ -1,5 +1,8 @@
 # html-to-markdown-wasm
 
+> **npm package:** `html-to-markdown-wasm` (this README).
+> Use [`html-to-markdown-node`](https://www.npmjs.com/package/html-to-markdown-node) when you only target Node.js or Bun and want native performance.
+
 Universal HTML to Markdown converter using WebAssembly.
 
 Powered by the same Rust engine as the Node.js, Python, Ruby, and PHP bindings, so Markdown output stays identical regardless of runtime.
@@ -37,6 +40,23 @@ Universal WebAssembly bindings with **excellent performance** across all JavaScr
 - **vs Native NAPI**: ~1.17× slower (WASM has minimal overhead)
 - **vs Python**: ~6.3× faster (no FFI overhead)
 - **Best for**: Universal deployment (browsers, Deno, edge runtimes, cross-platform apps)
+
+### Benchmark Fixtures (Apple M4)
+
+Numbers captured via `task bench:bindings -- --language wasm` using the shared Wikipedia + hOCR suite:
+
+| Document               | Size   | ops/sec (WASM) |
+| ---------------------- | ------ | -------------- |
+| Lists (Timeline)       | 129 KB | 882            |
+| Tables (Countries)     | 360 KB | 242            |
+| Medium (Python)        | 657 KB | 121            |
+| Large (Rust)           | 567 KB | 124            |
+| Small (Intro)          | 463 KB | 163            |
+| hOCR German PDF        | 44 KB  | 1,637          |
+| hOCR Invoice           | 4 KB   | 7,775          |
+| hOCR Embedded Tables   | 37 KB  | 1,667          |
+
+> Expect slightly higher numbers in long-lived browser/Deno workers once the WASM module is warm.
 
 ## Installation
 
@@ -78,7 +98,7 @@ console.log(markdown);
 import {
   convertWithOptionsHandle,
   createConversionOptionsHandle,
-} from '@html-to-markdown/wasm';
+} from 'html-to-markdown-wasm';
 
 const handle = createConversionOptionsHandle({ hocrSpatialTables: false });
 const markdown = convertWithOptionsHandle('<h1>Reusable</h1>', handle);
@@ -94,7 +114,7 @@ import {
   convertBytesWithOptionsHandle,
   createConversionOptionsHandle,
   convertBytesWithInlineImages,
-} from '@html-to-markdown/wasm';
+} from 'html-to-markdown-wasm';
 import { readFileSync } from 'node:fs';
 
 const htmlBytes = readFileSync('input.html'); // Buffer -> Uint8Array
@@ -310,7 +330,7 @@ See the [TypeScript definitions](./dist-node/html_to_markdown_wasm.d.ts) for all
 Keep specific HTML tags in their original form:
 
 ```typescript
-import { convert } from '@html-to-markdown/wasm';
+import { convert } from 'html-to-markdown-wasm';
 
 const html = `
 <p>Before table</p>

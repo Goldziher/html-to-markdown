@@ -118,6 +118,23 @@ def update_cargo_toml(file_path: Path, version: str) -> tuple[bool, str, str]:
     return True, old_version, version
 
 
+def update_rust_dependency_versions(file_path: Path, version: str) -> bool:
+    """Update html-to-markdown-rs dependency version pins inside Cargo manifests."""
+    content = file_path.read_text()
+
+    pattern = re.compile(r'(html-to-markdown-rs\s*=\s*\{\s*version\s*=\s*")([^"]+)(")')
+
+    def repl(match: re.Match[str]) -> str:
+        return f"{match.group(1)}{version}{match.group(3)}"
+
+    new_content, count = pattern.subn(repl, content)
+    if count == 0:
+        return False
+
+    file_path.write_text(new_content)
+    return True
+
+
 def update_gemfile_lock(file_path: Path, version: str) -> tuple[bool, str, str]:
     content = file_path.read_text()
     match = re.search(r"(html-to-markdown\s*\()\s*([^)]+)(\))", content)
@@ -128,7 +145,12 @@ def update_gemfile_lock(file_path: Path, version: str) -> tuple[bool, str, str]:
     if old_version == version:
         return False, old_version, version
 
-    new_content = re.sub(r"(html-to-markdown\s*\()\s*([^)]+)(\))", rf"\1{version}\3", content, count=1)
+    new_content = re.sub(
+        r"(html-to-markdown\s*\()\s*([^)]+)(\))",
+        lambda m: f"{m.group(1)}{version}{m.group(3)}",
+        content,
+        count=1,
+    )
     file_path.write_text(new_content)
     return True, old_version, version
 
@@ -302,6 +324,16 @@ def main() -> None:
                 updated_files.append(str(rel_path))
             else:
                 unchanged_files.append(str(rel_path))
+
+    # Update html-to-markdown-rs dependency pins across Cargo manifests (including the workspace root)
+    for cargo_toml in repo_root.rglob("Cargo.toml"):
+        if "target" in cargo_toml.parts:
+            continue
+
+        if update_rust_dependency_versions(cargo_toml, version):
+            rel_path = cargo_toml.relative_to(repo_root)
+            print(f"✓ {rel_path}: updated html-to-markdown-rs dependency → {version}")
+            updated_files.append(str(rel_path))
 
     # Summary
     print("\n📊 Summary:")

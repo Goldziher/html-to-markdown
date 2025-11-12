@@ -43,3 +43,20 @@ npx html-to-markdown --input input.html --output output.md
 ```
 
 Use `npx html-to-markdown --help` for full usage information.
+
+## Performance (Apple M4)
+
+This package wraps the native `html-to-markdown-node` bindings, so throughput matches the Node README. Benchmarks come from `task bench:bindings -- --language node` and use shared Wikipedia + hOCR fixtures:
+
+| Document               | Size   | ops/sec |
+| ---------------------- | ------ | ------- |
+| Lists (Timeline)       | 129 KB | 1,308   |
+| Tables (Countries)     | 360 KB | 331     |
+| Medium (Python)        | 657 KB | 150     |
+| Large (Rust)           | 567 KB | 163     |
+| Small (Intro)          | 463 KB | 208     |
+| hOCR German PDF        | 44 KB  | 2,944   |
+| hOCR Invoice           | 4 KB   | 27,326  |
+| hOCR Embedded Tables   | 37 KB  | 3,475   |
+
+> Run `task bench:bindings -- --language node` to regenerate the data locally.

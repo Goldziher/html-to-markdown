@@ -54,6 +54,23 @@ $markdown = convert('<p>Lorem ipsum</p>');
 $extraction = convert_with_inline_images('<img src="data:image/png;base64,Zm9v" alt="demo">');
 ```
 
+## Performance (Apple M4)
+
+Captured via `task bench:bindings -- --language php` so they match the data in the root README:
+
+| Document               | Size   | ops/sec (PHP) |
+| ---------------------- | ------ | ------------- |
+| Lists (Timeline)       | 129 KB | 533           |
+| Tables (Countries)     | 360 KB | 118           |
+| Medium (Python)        | 657 KB | 59            |
+| Large (Rust)           | 567 KB | 65            |
+| Small (Intro)          | 463 KB | 83            |
+| hOCR German PDF        | 44 KB  | 1,007         |
+| hOCR Invoice           | 4 KB   | 8,781         |
+| hOCR Embedded Tables   | 37 KB  | 1,194         |
+
+> Throughput sits in the tens of MB/s range once the extension is loaded; startup time is dominated by compiling the Rust library.
+
 ## Configuration
 
 - `ConversionOptions` is an immutable value object covering all options exposed

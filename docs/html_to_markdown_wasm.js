@@ -252,7 +252,7 @@ export function init() {
  * # Example
  *
  * ```javascript
- * import { convert } from '@html-to-markdown/wasm';
+ * import { convert } from 'html-to-markdown-wasm';
  *
  * const html = '<h1>Hello World</h1>';
  * const markdown = convert(html);
@@ -307,7 +307,7 @@ function _assertClass(instance, klass) {
  * # Example
  *
  * ```javascript
- * import { convertWithInlineImages, WasmInlineImageConfig } from '@html-to-markdown/wasm';
+ * import { convertWithInlineImages, WasmInlineImageConfig } from 'html-to-markdown-wasm';
  *
  * const html = '<img src="data:image/png;base64,..." alt="test">';
  * const config = new WasmInlineImageConfig(1024 * 1024);

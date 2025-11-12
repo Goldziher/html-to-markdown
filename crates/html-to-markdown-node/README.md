@@ -1,5 +1,8 @@
 # html-to-markdown-node
 
+> **npm package:** `html-to-markdown-node` (this README).
+> Use [`html-to-markdown-wasm`](https://www.npmjs.com/package/html-to-markdown-wasm) for the portable WASM build.
+
 Native Node.js and Bun bindings for html-to-markdown using NAPI-RS v3.
 
 Built on the shared Rust engine that powers the Python wheels, Ruby gem, PHP extension, WebAssembly package, and CLI – ensuring identical Markdown output across every language target.
@@ -37,6 +40,23 @@ Native NAPI-RS bindings deliver **the fastest HTML to Markdown conversion** avai
 - **vs WASM**: ~1.17× faster (native has zero startup time, direct memory access)
 - **vs Python**: ~7.4× faster (avoids FFI overhead)
 - **Best for**: Node.js and Bun server-side applications requiring maximum throughput
+
+### Benchmark Fixtures (Apple M4)
+
+`task bench:bindings` feeds identical Wikipedia + hOCR fixtures into every binding. Node keeps pace with the Rust CLI across the board:
+
+| Document               | Size   | ops/sec (Node) |
+| ---------------------- | ------ | -------------- |
+| Lists (Timeline)       | 129 KB | 1,308          |
+| Tables (Countries)     | 360 KB | 331            |
+| Medium (Python)        | 657 KB | 150            |
+| Large (Rust)           | 567 KB | 163            |
+| Small (Intro)          | 463 KB | 208            |
+| hOCR German PDF        | 44 KB  | 2,944          |
+| hOCR Invoice           | 4 KB   | 27,326         |
+| hOCR Embedded Tables   | 37 KB  | 3,475          |
+
+> Run `task bench:bindings -- --language node` locally to regenerate these numbers.
 
 ## Installation
 
@@ -252,7 +272,7 @@ See [ConversionOptions](https://github.com/Goldziher/html-to-markdown/tree/main/
 Keep specific HTML tags in their original form instead of converting to Markdown:
 
 ```typescript
-import { convert } from '@html-to-markdown/node';
+import { convert } from 'html-to-markdown-node';
 
 const html = `
 <p>Before table</p>

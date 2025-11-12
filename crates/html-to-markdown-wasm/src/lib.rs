@@ -404,7 +404,7 @@ impl WasmConversionOptionsHandle {
 /// # Example
 ///
 /// ```javascript
-/// import { convert } from '@html-to-markdown/wasm';
+/// import { convert } from 'html-to-markdown-wasm';
 ///
 /// const html = '<h1>Hello World</h1>';
 /// const markdown = convert(html);
@@ -454,7 +454,7 @@ pub fn convert_bytes_with_options_handle(
 /// # Example
 ///
 /// ```javascript
-/// import { convertWithInlineImages, WasmInlineImageConfig } from '@html-to-markdown/wasm';
+/// import { convertWithInlineImages, WasmInlineImageConfig } from 'html-to-markdown-wasm';
 ///
 /// const html = '<img src="data:image/png;base64,..." alt="test">';
 /// const config = new WasmInlineImageConfig(1024 * 1024);
