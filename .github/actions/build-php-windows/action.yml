@@ -55,18 +55,40 @@ runs:
       shell: pwsh
       run: git config --global protocol.file.allow always
 
+    - name: Install llvm-tools for libclang
+      shell: bash
+      run: rustup component add llvm-tools --toolchain nightly
+
     - name: Set LIBCLANG_PATH for bindgen
       shell: pwsh
       run: |
-        # Find rustup nightly libclang.dll
+        # Find rustup nightly toolchain and locate libclang.dll
         $nightlyPath = (rustup toolchain list --verbose | Select-String "nightly.*x86_64-pc-windows-msvc" | ForEach-Object { $_ -replace '.*\s+', '' }).Trim()
         if (-not $nightlyPath) {
           throw "Could not find nightly toolchain path"
         }
-        $libclangPath = Join-Path $nightlyPath "bin"
-        if (-not (Test-Path (Join-Path $libclangPath "libclang.dll"))) {
-          throw "libclang.dll not found in $libclangPath"
+
+        # Check multiple possible locations for libclang.dll
+        $possiblePaths = @(
+          (Join-Path $nightlyPath "bin"),
+          (Join-Path $nightlyPath "lib"),
+          (Join-Path $nightlyPath "lib\rustlib\x86_64-pc-windows-msvc\bin")
+        )
+
+        $libclangPath = $null
+        foreach ($path in $possiblePaths) {
+          if (Test-Path (Join-Path $path "libclang.dll")) {
+            $libclangPath = $path
+            break
+          }
         }
+
+        if (-not $libclangPath) {
+          Write-Host "Searching for libclang.dll in toolchain..."
+          Get-ChildItem -Path $nightlyPath -Recurse -Filter "libclang.dll" -ErrorAction SilentlyContinue | ForEach-Object { Write-Host "Found: $($_.FullName)" }
+          throw "libclang.dll not found in nightly toolchain"
+        }
+
         Write-Host "Setting LIBCLANG_PATH=$libclangPath"
         "LIBCLANG_PATH=$libclangPath" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
 
