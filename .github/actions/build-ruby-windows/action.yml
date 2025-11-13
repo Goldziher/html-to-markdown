@@ -1,0 +1,33 @@
+name: Build Ruby gem (Windows)
+description: Builds Ruby gem on Windows using MSYS2
+
+runs:
+  using: composite
+  steps:
+    - name: Install MSYS2 toolchain
+      shell: pwsh
+      run: ridk exec pacman -S --needed --noconfirm base-devel mingw-w64-ucrt-x86_64-toolchain
+
+    - name: Install Rust GNU toolchain
+      shell: bash
+      run: rustup toolchain install stable-gnu --profile minimal --no-self-update
+
+    - name: Configure bindgen sysroot
+      shell: bash
+      run: echo "BINDGEN_EXTRA_CLANG_ARGS=--target=x86_64-pc-windows-gnu --sysroot=${RI_DEVKIT//\\/\/}$MSYSTEM_PREFIX" >> $GITHUB_ENV
+
+    - name: Install Ruby gems
+      shell: pwsh
+      working-directory: packages/ruby
+      run: |
+        $unixPath = ridk exec bash -lc "cygpath -au '$env:GITHUB_WORKSPACE/packages/ruby'"
+        ridk exec bash -lc "cd $unixPath && export RUSTUP_TOOLCHAIN=stable-gnu CC=x86_64-w64-mingw32-gcc CXX=x86_64-w64-mingw32-g++ && bundle install"
+
+    - name: Compile Ruby extension
+      shell: pwsh
+      working-directory: packages/ruby
+      env:
+        RB_SYS_CARGO_PROFILE: release
+      run: |
+        $unixPath = ridk exec bash -lc "cygpath -au '$env:GITHUB_WORKSPACE/packages/ruby'"
+        ridk exec bash -lc "cd $unixPath && export RUSTUP_TOOLCHAIN=stable-gnu CC=x86_64-w64-mingw32-gcc CXX=x86_64-w64-mingw32-g++ && bundle exec rake compile"

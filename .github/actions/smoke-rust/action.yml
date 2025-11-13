@@ -1,0 +1,17 @@
+name: Smoke test Rust crate
+description: Tests Rust crate with local path dependency
+
+runs:
+  using: composite
+  steps:
+    - name: Smoke Rust example
+      shell: bash
+      run: |
+        set -euo pipefail
+        pushd examples/rust-smoke >/dev/null
+        mkdir -p .cargo
+        cp .cargo/config.local-template.toml .cargo/config.toml
+        cargo run --quiet
+        rm .cargo/config.toml
+        popd >/dev/null
+        echo "✓ Rust crate smoke test passed"

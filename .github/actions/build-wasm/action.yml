@@ -1,0 +1,33 @@
+name: Build WASM package
+description: Builds WebAssembly package and optionally creates tarball
+
+outputs:
+  tarball:
+    description: Path to the packed tarball (if pack-tarball is true)
+    value: ${{ steps.pack.outputs.tarball }}
+
+inputs:
+  pack-tarball:
+    description: Whether to pack the result as a tarball
+    required: false
+    default: 'false'
+
+runs:
+  using: composite
+  steps:
+    - name: Build WASM bundle
+      shell: bash
+      working-directory: crates/html-to-markdown-wasm
+      run: pnpm run build:all
+
+    - name: Pack WASM tarball
+      if: inputs.pack-tarball == 'true'
+      id: pack
+      shell: bash
+      run: |
+        set -euo pipefail
+        pushd crates/html-to-markdown-wasm >/dev/null
+        WASM_TGZ=$(npm pack | tail -1)
+        mv "$WASM_TGZ" "$GITHUB_WORKSPACE/$WASM_TGZ"
+        popd >/dev/null
+        echo "tarball=$GITHUB_WORKSPACE/$WASM_TGZ" >> $GITHUB_OUTPUT

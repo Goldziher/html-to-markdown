@@ -1,0 +1,21 @@
+name: Build CLI binary
+description: Builds standalone CLI binary
+
+outputs:
+  binary-path:
+    description: Path to the built CLI binary
+    value: ${{ steps.build.outputs.binary-path }}
+
+runs:
+  using: composite
+  steps:
+    - name: Build CLI binary
+      id: build
+      shell: bash
+      run: |
+        cargo build --release --package html-to-markdown-cli
+        if [[ "$RUNNER_OS" == "Windows" ]]; then
+          echo "binary-path=$GITHUB_WORKSPACE/target/release/html-to-markdown.exe" >> $GITHUB_OUTPUT
+        else
+          echo "binary-path=$GITHUB_WORKSPACE/target/release/html-to-markdown" >> $GITHUB_OUTPUT
+        fi

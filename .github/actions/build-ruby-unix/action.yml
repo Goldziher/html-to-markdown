@@ -1,0 +1,17 @@
+name: Build Ruby gem (Unix)
+description: Builds Ruby gem on Unix platforms (Linux/macOS)
+
+runs:
+  using: composite
+  steps:
+    - name: Install Ruby gems
+      shell: bash
+      working-directory: packages/ruby
+      run: bundle install
+
+    - name: Compile Ruby extension
+      shell: bash
+      working-directory: packages/ruby
+      env:
+        RB_SYS_CARGO_PROFILE: release
+      run: bundle exec rake compile

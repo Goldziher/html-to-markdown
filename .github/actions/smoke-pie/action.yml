@@ -1,0 +1,53 @@
+name: Smoke test PIE install
+description: Tests PHP extension installation via PIE
+
+inputs:
+  pie-artifacts-dir:
+    description: Directory containing PIE source artifacts
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Smoke PIE install
+      shell: bash
+      env:
+        COMPOSER_ALLOW_SUPERUSER: 1
+      run: |
+        set -euo pipefail
+        # Download PIE
+        curl -fsSL https://github.com/php/pie/releases/latest/download/pie.phar -o /tmp/pie.phar
+
+        # Find the PIE source archive
+        pie_archive=$(find "${{ inputs.pie-artifacts-dir }}" -name "php_html_to_markdown-*.tgz" | head -n 1)
+        if [ -z "$pie_archive" ]; then
+          echo "PIE source archive not found" >&2
+          exit 1
+        fi
+
+        # Extract to temp dir and install via PIE
+        tmp=$(mktemp -d)
+        tar -xzf "$pie_archive" -C "$tmp"
+
+        # Add as local repository and build
+        php /tmp/pie.phar repository:add path "$tmp"
+        CARGO_BIN=$(command -v cargo)
+        php /tmp/pie.phar build goldziher/html-to-markdown:*@dev --working-dir "$tmp" --with-cargo-bin="$CARGO_BIN"
+
+        # Find the built extension
+        ext_so=$(find "$tmp" -name "*.so" -path "*/html_to_markdown.so" | head -n 1)
+        if [ -z "$ext_so" ]; then
+          echo "Extension .so file not found after PIE build" >&2
+          exit 1
+        fi
+
+        # Test the extension
+        smoke_tmp=$(mktemp -d)
+        cp -R examples/php-smoke/. "$smoke_tmp"/
+        cd "$smoke_tmp"
+        composer config repositories.local path "${GITHUB_WORKSPACE}/packages/php" --no-plugins
+        composer config repositories.local.options.symlink false --no-plugins
+        composer install --no-interaction --no-progress --no-scripts
+        php -d "extension=$ext_so" convert.php
+
+        echo "✓ PIE install smoke test passed"

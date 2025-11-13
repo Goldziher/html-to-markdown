@@ -1,0 +1,25 @@
+name: Smoke test WASM package
+description: Tests WebAssembly package installation and functionality
+
+inputs:
+  wasm-tarball:
+    description: Path to the WASM package tarball
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Smoke WASM install
+      shell: bash
+      run: |
+        set -euo pipefail
+        tmp=$(mktemp -d)
+        cp -R examples/wasm-smoke/. "$tmp"/
+        pushd "$tmp" >/dev/null
+        cp "${{ inputs.wasm-tarball }}" ./wasm.tgz
+        node -e "const fs=require('fs');const pkg=JSON.parse(fs.readFileSync('package.json','utf8'));pkg.dependencies=pkg.dependencies||{};pkg.dependencies['html-to-markdown-wasm']='file:./wasm.tgz';fs.writeFileSync('package.json',JSON.stringify(pkg,null,2)+ '\n');"
+        rm -f pnpm-lock.yaml
+        pnpm install --no-frozen-lockfile
+        pnpm run check
+        popd >/dev/null
+        echo "✓ WASM package smoke test passed"

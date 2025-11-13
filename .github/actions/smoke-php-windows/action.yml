@@ -1,0 +1,25 @@
+name: Smoke test PHP extension (Windows)
+description: Tests PHP extension installation and functionality on Windows
+
+inputs:
+  dll-path:
+    description: Path to the PHP extension DLL file
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Smoke PHP install (Windows)
+      shell: pwsh
+      run: |
+        $tmp = Join-Path $env:RUNNER_TEMP "php-smoke-windows"
+        if (Test-Path $tmp) { Remove-Item $tmp -Recurse -Force }
+        New-Item -ItemType Directory -Path $tmp -Force | Out-Null
+        Copy-Item -Path "$env:GITHUB_WORKSPACE/examples/php-smoke/*" -Destination $tmp -Recurse -Force
+        Set-Location $tmp
+        $workspace = $env:GITHUB_WORKSPACE -replace '\\','/'
+        composer config repositories.local path "$workspace/packages/php" --no-plugins
+        composer config repositories.local.options.symlink false --no-plugins
+        composer install --no-interaction --no-progress --no-scripts
+        php -n -d "extension=${{ inputs.dll-path }}" convert.php
+        Write-Host "✓ PHP extension (Windows) smoke test passed"
