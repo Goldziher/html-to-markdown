@@ -636,21 +636,45 @@ jobs:
         id: php_dll
         shell: pwsh
         run: |
-          $zip = Get-ChildItem -Path artifacts -Filter *.zip | Select-Object -First 1
-          if (-not $zip) { throw "No built PHP artifact found" }
-          $dest = Join-Path $env:RUNNER_TEMP "php-ext-built"
-          if (Test-Path $dest) { Remove-Item $dest -Recurse -Force }
-          Expand-Archive -Path $zip.FullName -DestinationPath $dest -Force
-          $innerZip = Get-ChildItem $dest -Recurse -Filter "*.zip" | Select-Object -First 1
-          if ($innerZip) {
-            $final = Join-Path $dest "unzipped"
-            if (Test-Path $final) { Remove-Item $final -Recurse -Force }
-            Expand-Archive -Path $innerZip.FullName -DestinationPath $final -Force
-          } else {
-            $final = $dest
+          $searchPatterns = @(
+            Join-Path $env:GITHUB_WORKSPACE "build"
+            Join-Path $env:GITHUB_WORKSPACE "artifacts"
+            Join-Path $env:RUNNER_TEMP "php-ext-built"
+            Join-Path $env:RUNNER_TEMP "php-ext-built" "unzipped"
+          )
+
+          $dll = $null
+
+          if (Test-Path $searchPatterns[0]) {
+            $dll = Get-ChildItem $searchPatterns[0] -Recurse -Filter "*.dll" | Where-Object { $_.Name -like "*html_to_markdown*.dll" } | Select-Object -First 1
           }
-          $dll = Get-ChildItem $final -Recurse -Filter "*.dll" | Where-Object { $_.Name -like "html_to_markdown*.dll" } | Select-Object -First 1
-          if (-not $dll) { throw "Unable to locate DLL inside $($zip.FullName)" }
+
+          if (-not $dll) {
+            $artifactDir = Join-Path $env:GITHUB_WORKSPACE "artifacts"
+            if (-not (Test-Path $artifactDir)) {
+              throw "Artifact directory not found at $artifactDir"
+            }
+
+            $zip = Get-ChildItem -Path $artifactDir -Filter "*.zip" | Sort-Object LastWriteTime -Descending | Select-Object -First 1
+            if (-not $zip) { throw "No built PHP artifact found in $artifactDir" }
+
+            $dest = Join-Path $env:RUNNER_TEMP "php-ext-built"
+            if (Test-Path $dest) { Remove-Item $dest -Recurse -Force }
+            Expand-Archive -Path $zip.FullName -DestinationPath $dest -Force
+
+            $innerZip = Get-ChildItem $dest -Recurse -Filter "*.zip" | Select-Object -First 1
+            if ($innerZip) {
+              $final = Join-Path $dest "unzipped"
+              if (Test-Path $final) { Remove-Item $final -Recurse -Force }
+              Expand-Archive -Path $innerZip.FullName -DestinationPath $final -Force
+            } else {
+              $final = $dest
+            }
+
+            $dll = Get-ChildItem $final -Recurse -Filter "*.dll" | Where-Object { $_.Name -like "*html_to_markdown*.dll" } | Select-Object -First 1
+            if (-not $dll) { throw "Unable to locate DLL inside $($zip.FullName)" }
+          }
+
           "dll=$($dll.FullName)" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
 
       - name: Smoke PHP install
