@@ -618,6 +618,15 @@ jobs:
           New-Item -ItemType Directory -Path $repoDir -Force | Out-Null
           Copy-Item -Path "$source\*" -Destination $repoDir -Recurse -Force
 
+          # Set up .cargo/config.toml with LIBCLANG_PATH for Windows builds
+          $cargoDir = Join-Path $repoDir ".cargo"
+          New-Item -ItemType Directory -Path $cargoDir -Force | Out-Null
+          $cargoWindows = Join-Path $source ".cargo-windows.toml"
+          if (Test-Path $cargoWindows) {
+            Copy-Item -Path $cargoWindows -Destination (Join-Path $cargoDir "config.toml") -Force
+            Write-Host "Copied .cargo-windows.toml to .cargo/config.toml"
+          }
+
           Set-Location $repoDir
           git init | Out-Null
           git config user.email "ci@html-to-markdown.dev"
@@ -644,7 +653,6 @@ jobs:
         env:
           GITHUB_ACTIONS: "false"
           RUSTUP_TOOLCHAIN: nightly
-          LIBCLANG_PATH: C:\Users\runneradmin\.rustup\toolchains\nightly-x86_64-pc-windows-msvc\lib
         with:
           extension-url: ${{ steps.php_repo.outputs.repo_uri }}
           extension-ref: ${{ steps.php_repo.outputs.repo_ref }}
