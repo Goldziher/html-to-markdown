@@ -4,6 +4,11 @@ description: Builds Ruby gem on Unix platforms (Linux/macOS)
 runs:
   using: composite
   steps:
+    - name: Set LD_LIBRARY_PATH (Linux)
+      if: runner.os == 'Linux'
+      shell: bash
+      run: echo "LD_LIBRARY_PATH=$(ruby -rrbconfig -e'puts RbConfig::CONFIG["libdir"]')${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}" >> $GITHUB_ENV
+
     - name: Install Ruby gems
       shell: bash
       working-directory: packages/ruby
