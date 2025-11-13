@@ -42,7 +42,7 @@
     "README.md"
   ],
   "scripts": {
-    "build": "wasm-pack build --target bundler --out-dir dist",
+    "build": "wasm-pack build --target bundler --out-dir dist && node ./scripts/patch-bundler-entry.js",
     "build:nodejs": "wasm-pack build --target nodejs --out-dir dist-node",
     "build:web": "wasm-pack build --target web --out-dir dist-web",
     "build:all": "pnpm run build && pnpm run build:nodejs && pnpm run build:web && pnpm run cleanup:gitignore",

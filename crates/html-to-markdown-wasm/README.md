@@ -92,6 +92,8 @@ console.log(markdown);
 // This is **fast**!
 ```
 
+> **Heads up for edge runtimes:** Cloudflare Workers, Vite dev servers, and other environments that instantiate `.wasm` files asynchronously must call `await initWasm()` (or `await wasmReady`) once during startup before invoking `convert`. Traditional bundlers (Webpack, Rollup) and Deno/Node imports continue to work without manual initialization.
+
 ### Reusing Options Handles
 
 ```ts
@@ -212,10 +214,15 @@ const markdown = convert('<h1>Hello</h1>', {
 ### Cloudflare Workers
 
 ```typescript
-import { convert } from 'html-to-markdown-wasm';
+import { convert, initWasm, wasmReady } from 'html-to-markdown-wasm';
+
+// Cloudflare Workers / other edge runtimes instantiate WASM asynchronously.
+// Kick off initialization once at module scope.
+const ready = wasmReady ?? initWasm();
 
 export default {
   async fetch(request: Request): Promise<Response> {
+    await ready;
     const html = await request.text();
     const markdown = convert(html, { headingStyle: 'atx' });
 
