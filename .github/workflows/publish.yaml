@@ -257,130 +257,6 @@ jobs:
           path: build/artifacts/php_html_to_markdown-${{ needs.prepare.outputs.version }}-src.tgz
           retention-days: 14
 
-  php-windows-matrix:
-    name: Resolve Windows build matrix
-    needs: prepare
-    runs-on: ubuntu-latest
-    outputs:
-      matrix: ${{ steps.matrix.outputs.matrix }}
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v5
-        with:
-          ref: ${{ needs.prepare.outputs.checkout_ref }}
-          fetch-depth: 0
-
-      - name: Ensure target commit
-        if: ${{ needs.prepare.outputs.target_sha != '' }}
-        run: git checkout --progress --force ${{ needs.prepare.outputs.target_sha }}
-
-      - name: Compute Windows matrix
-        id: matrix
-        uses: php/php-windows-builder/extension-matrix@v1
-        with:
-          extension-url: https://github.com/${{ github.repository }}
-          extension-ref: ${{ needs.prepare.outputs.matrix_ref }}
-
-  php-windows:
-    name: Build PHP extension (Windows)
-    needs: [prepare, php-pie, php-windows-matrix]
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix: ${{ fromJson(needs.php-windows-matrix.outputs.matrix) }}
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v5
-        with:
-          ref: ${{ needs.prepare.outputs.checkout_ref }}
-          fetch-depth: 0
-
-      - name: Ensure target commit
-        if: ${{ needs.prepare.outputs.target_sha != '' }}
-        run: git checkout --progress --force ${{ needs.prepare.outputs.target_sha }}
-
-      - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          toolchain: nightly
-
-      - name: Prepare extension repository
-        id: php_repo
-        shell: pwsh
-        run: |
-          $root = Get-Location
-          $extSrc = Join-Path $root "packages\php-ext"
-          $tempBase = Join-Path $env:RUNNER_TEMP "html-to-markdown-php-ext"
-          $repoDir = Join-Path $tempBase "src"
-          $repoBare = Join-Path $tempBase "repo.git"
-
-          if (Test-Path $repoDir) {
-            Remove-Item $repoDir -Recurse -Force
-          }
-          if (Test-Path $repoBare) {
-            Remove-Item $repoBare -Recurse -Force
-          }
-
-          New-Item -ItemType Directory -Path $repoDir -Force | Out-Null
-          Copy-Item -Path "$extSrc\*" -Destination $repoDir -Recurse -Force
-          Get-ChildItem -Path $repoDir -Recurse | ForEach-Object { Write-Host "snapshot:: $($_.FullName)" }
-
-          # Set up .cargo/config.toml with LIBCLANG_PATH for Windows builds
-          $cargoDir = Join-Path $repoDir ".cargo"
-          New-Item -ItemType Directory -Path $cargoDir -Force | Out-Null
-          $cargoWindows = Join-Path $extSrc ".cargo-windows.toml"
-          if (Test-Path $cargoWindows) {
-            Copy-Item -Path $cargoWindows -Destination (Join-Path $cargoDir "config.toml") -Force
-            Write-Host "Copied .cargo-windows.toml to .cargo/config.toml"
-          }
-
-          Set-Location $repoDir
-          git init | Out-Null
-          git config user.email "ci@html-to-markdown.dev"
-          git config user.name "html-to-markdown CI"
-          git add . | Out-Null
-          git commit -m "extension snapshot" | Out-Null
-          git branch -M main | Out-Null
-          git clone --bare . $repoBare | Out-Null
-          $commit = git rev-parse HEAD
-          Set-Location $root
-
-          $repoPath = (Get-Item $repoBare).FullName.Replace('\','/')
-          if ($repoPath -notmatch '^file://') {
-            if ($repoPath -notmatch '^/') {
-              $repoPath = '/' + $repoPath
-            }
-            $repoPath = "file:///$($repoPath.TrimStart('/'))"
-          }
-          $repoUri = $repoPath
-          "repo_uri=$repoUri" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
-          "repo_ref=$commit" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
-
-      - name: Allow git file protocol
-        shell: pwsh
-        run: git config --global protocol.file.allow always
-
-      - name: Build Windows artifacts
-        uses: php/php-windows-builder/extension@v1
-        env:
-          GITHUB_ACTIONS: "false"
-          RUSTUP_TOOLCHAIN: nightly
-        with:
-          extension-url: ${{ steps.php_repo.outputs.repo_uri }}
-          extension-ref: ${{ steps.php_repo.outputs.repo_ref }}
-          php-version: ${{ matrix.php-version }}
-          arch: ${{ matrix.arch }}
-          ts: ${{ matrix.ts }}
-          args: --enable-html_to_markdown
-          run-tests: "false"
-
-      - name: Upload PHP Windows artifacts
-        uses: actions/upload-artifact@v5
-        with:
-          name: php-windows-${{ matrix.php-version }}-${{ matrix.arch }}-${{ matrix.ts }}
-          path: artifacts/*.zip
-          retention-days: 14
-
   node-typescript-defs:
     name: Generate Node TypeScript definitions
     needs: prepare
@@ -769,7 +645,6 @@ jobs:
       - python-wheels
       - python-sdist
       - php-pie
-      - php-windows
       - node-typescript-defs
       - node-bindings
       - wasm-bindings
@@ -846,14 +721,6 @@ jobs:
           name: rubygems-${{ steps.ruby_label.outputs.label }}
           path: ruby-gems
 
-      - name: Download PHP Windows artifacts
-        if: runner.os == 'Windows'
-        uses: actions/download-artifact@v6
-        with:
-          pattern: php-windows-*
-          path: php-windows-artifacts
-          merge-multiple: true
-
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
 
@@ -891,23 +758,6 @@ jobs:
         with:
           php-version: "8.2"
           tools: composer:2.9.1
-
-      - name: Setup PHP (Windows)
-        if: runner.os == 'Windows'
-        uses: shivammathur/setup-php@v2
-        with:
-          php-version: "8.2"
-          tools: composer:2.9.1
-
-      - name: Detect PHP build (Windows)
-        if: runner.os == 'Windows'
-        shell: pwsh
-        run: |
-          $tsLine = php -i | Select-String -Pattern 'Thread Safety'
-          $mode = if ($tsLine -and $tsLine -match 'enabled') { 'ts' } else { 'nts' }
-          $version = php -r "echo PHP_MAJOR_VERSION . '.' . PHP_MINOR_VERSION;"
-          "WINDOWS_PHP_TS=$mode" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
-          "WINDOWS_PHP_VERSION=$version" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
 
       - name: Capture php-config path
         if: runner.os == 'Linux'
@@ -1062,52 +912,6 @@ PY
           php -d "extension=$EXT_PATH" "$composer_bin" install --no-interaction --no-progress --no-scripts
           php -d "extension=$EXT_PATH" convert.php
           popd >/dev/null
-
-      - name: Locate PHP Windows DLL
-        if: runner.os == 'Windows'
-        id: smoke_php_dll
-        shell: pwsh
-        run: |
-          $phpVersion = $env:WINDOWS_PHP_VERSION
-          $ts = $env:WINDOWS_PHP_TS
-          $zip = Get-ChildItem -Path "$env:GITHUB_WORKSPACE/php-windows-artifacts" -Filter "*.zip" |
-            Where-Object { $_.Name -like "*-$phpVersion-*" -and $_.Name -like "*-$ts-*" } |
-            Sort-Object LastWriteTime -Descending |
-            Select-Object -First 1
-          if (-not $zip) { throw "No PHP Windows artifact zip found" }
-          $dest = Join-Path $env:RUNNER_TEMP "php-smoke-artifacts"
-          if (Test-Path $dest) { Remove-Item $dest -Recurse -Force }
-          Expand-Archive -Path $zip.FullName -DestinationPath $dest -Force
-
-          while ($true) {
-            $innerZip = Get-ChildItem $dest -Recurse -File -Filter "*.zip" | Select-Object -First 1
-            if (-not $innerZip) { break }
-            $target = Join-Path $innerZip.Directory.FullName ("unzipped_" + [guid]::NewGuid().ToString())
-            Expand-Archive -Path $innerZip.FullName -DestinationPath $target -Force
-            Remove-Item $innerZip.FullName -Force
-          }
-
-          $dll = Get-ChildItem $dest -Recurse -Filter "php_html_to_markdown*.dll" | Select-Object -First 1
-          if (-not $dll) { throw "Unable to locate html_to_markdown DLL in artifact" }
-          "dll=$($dll.FullName)" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
-
-      - name: Smoke PHP install (Windows)
-        if: runner.os == 'Windows'
-        shell: pwsh
-        env:
-          DLL_PATH: ${{ steps.smoke_php_dll.outputs.dll }}
-        run: |
-          if (-not $env:DLL_PATH) { throw "DLL path missing" }
-          $tmp = Join-Path $env:RUNNER_TEMP "php-smoke-windows"
-          if (Test-Path $tmp) { Remove-Item $tmp -Recurse -Force }
-          New-Item -ItemType Directory -Path $tmp -Force | Out-Null
-          Copy-Item -Path "$env:GITHUB_WORKSPACE/examples/php-smoke/*" -Destination $tmp -Recurse -Force
-          Set-Location $tmp
-          $workspace = $env:GITHUB_WORKSPACE -replace '\\','/'
-          composer config repositories.local path "$workspace/packages/php" --no-plugins
-          composer config repositories.local.options.symlink false --no-plugins
-          composer install --no-interaction --no-progress --no-scripts
-          php -n -d "extension=$env:DLL_PATH" convert.php
 
       - name: Smoke Rust example
         run: |
@@ -1386,7 +1190,7 @@ PY
 
   upload-release-artifacts:
     name: Upload Release Artifacts
-    needs: [prepare, python-wheels, python-sdist, php-pie, php-windows, node-typescript-defs, node-bindings, wasm-bindings, cli-binaries, ruby-gem, cargo-packages, release-smoke]
+    needs: [prepare, python-wheels, python-sdist, php-pie, node-typescript-defs, node-bindings, wasm-bindings, cli-binaries, ruby-gem, cargo-packages, release-smoke]
     if: ${{ needs.prepare.outputs.dry_run != 'true' && needs.prepare.outputs.is_tag == 'true' }}
     runs-on: ubuntu-latest
     permissions:
@@ -1403,13 +1207,6 @@ PY
           name: php-pie-src
           path: dist/php-pie
 
-      - name: Download PHP Windows artifacts
-        uses: actions/download-artifact@v6
-        with:
-          pattern: php-windows-*
-          path: dist/php-windows
-          merge-multiple: true
-
       - name: Download CLI artifacts
         uses: actions/download-artifact@v6
         with:
@@ -1424,20 +1221,6 @@ PY
           gh release upload ${{ needs.prepare.outputs.tag }} \
             dist/php-pie/php_html_to_markdown-${{ needs.prepare.outputs.version }}-src.tgz \
             --clobber
-
-      - name: Upload PHP Windows binaries
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          shopt -s nullglob
-          files=(dist/php-windows/php_html_to_markdown-*.zip)
-          if [ ${#files[@]} -eq 0 ]; then
-            echo "::warning::No PHP Windows artifacts to upload"
-          else
-            for file in "${files[@]}"; do
-              gh release upload ${{ needs.prepare.outputs.tag }} "$file" --clobber
-            done
-          fi
 
       - name: Upload CLI binaries
         env:
