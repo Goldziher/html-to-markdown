@@ -471,7 +471,9 @@ jobs:
           cp -R examples/node-smoke/. "$tmp"/
           pushd "$tmp" >/dev/null
           cp "$NODE_TGZ" ./node.tgz
-          pnpm add ./node.tgz
+          node -e "const fs=require('fs');const pkg=JSON.parse(fs.readFileSync('package.json','utf8'));pkg.dependencies=pkg.dependencies||{};pkg.dependencies['html-to-markdown-node']='file:./node.tgz';fs.writeFileSync('package.json',JSON.stringify(pkg,null,2)+ '\n');"
+          rm -f pnpm-lock.yaml
+          pnpm install --no-frozen-lockfile
           pnpm run check
           popd >/dev/null
 
@@ -494,7 +496,9 @@ jobs:
           cp -R examples/wasm-smoke/. "$tmp"/
           pushd "$tmp" >/dev/null
           cp "$WASM_TGZ" ./wasm.tgz
-          pnpm add ./wasm.tgz
+          node -e "const fs=require('fs');const pkg=JSON.parse(fs.readFileSync('package.json','utf8'));pkg.dependencies=pkg.dependencies||{};pkg.dependencies['html-to-markdown-wasm']='file:./wasm.tgz';fs.writeFileSync('package.json',JSON.stringify(pkg,null,2)+ '\n');"
+          rm -f pnpm-lock.yaml
+          pnpm install --no-frozen-lockfile
           pnpm run check
           popd >/dev/null
 
