@@ -32,10 +32,14 @@ if (PHP_HTML_TO_MARKDOWN != "no") {
     }
     workspaceRoot = FSO.GetAbsolutePathName(workspaceRoot);
     STDOUT.WriteLine("html_to_markdown workspace root: " + workspaceRoot);
-    DEFINE("HTMLTOMARKDOWN_WORKSPACE_DIR", workspaceRoot);
+
+    // Export workspace path as Makefile variable for fragment
+    MFO.WriteLine("");
+    MFO.WriteLine("# html_to_markdown Rust workspace");
+    MFO.WriteLine("HTMLTOMARKDOWN_WORKSPACE_DIR = " + workspaceRoot);
+    MFO.WriteLine("");
 
     EXTENSION(extname, placeholder, PHP_HTML_TO_MARKDOWN_SHARED, "/DZEND_ENABLE_STATIC_TSRMLS_CACHE=1");
-    REMOVE_TARGET(dllname, "EXT_TARGETS");
     AC_DEFINE("HAVE_" + EXT, 1, "Have " + extname + " support");
     ADD_FLAG("CFLAGS_PHP", "/D COMPILE_DL_" + EXT);
     extensions_enabled[extensions_enabled.length] = [extname, 'shared', false];
