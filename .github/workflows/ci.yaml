@@ -470,7 +470,6 @@ jobs:
           tmp=$(mktemp -d)
           cp -R examples/node-smoke/. "$tmp"/
           pushd "$tmp" >/dev/null
-          pnpm install
           cp "$NODE_TGZ" ./node.tgz
           pnpm add ./node.tgz
           pnpm run check
@@ -494,7 +493,6 @@ jobs:
           tmp=$(mktemp -d)
           cp -R examples/wasm-smoke/. "$tmp"/
           pushd "$tmp" >/dev/null
-          pnpm install
           cp "$WASM_TGZ" ./wasm.tgz
           pnpm add ./wasm.tgz
           pnpm run check
@@ -684,8 +682,9 @@ jobs:
         run: |
           $tmp = Join-Path $env:RUNNER_TEMP "php-smoke-windows"
           if (Test-Path $tmp) { Remove-Item $tmp -Recurse -Force }
-          Copy-Item -Path "$env:GITHUB_WORKSPACE/examples/php-smoke" -Destination $tmp -Recurse
-          Set-Location $tmp/php-smoke
+          New-Item -ItemType Directory -Path $tmp -Force | Out-Null
+          Copy-Item -Path "$env:GITHUB_WORKSPACE/examples/php-smoke/*" -Destination $tmp -Recurse -Force
+          Set-Location $tmp
           $workspace = $env:GITHUB_WORKSPACE -replace '\\','/'
           composer config repositories.local path "$workspace/packages/php" --no-plugins
           composer config repositories.local.options.symlink false --no-plugins
