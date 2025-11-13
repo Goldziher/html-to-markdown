@@ -227,8 +227,8 @@ jobs:
         uses: shivammathur/setup-php@v2
         with:
           php-version: "8.3"
+          tools: composer:2.9.1
           coverage: none
-          tools: none
 
       - name: Ensure packaging script is executable
         run: chmod +x scripts/package_php_pie_source.sh
@@ -890,14 +890,14 @@ jobs:
         uses: shivammathur/setup-php@v2
         with:
           php-version: "8.2"
-          tools: composer
+          tools: composer:2.9.1
 
       - name: Setup PHP (Windows)
         if: runner.os == 'Windows'
         uses: shivammathur/setup-php@v2
         with:
           php-version: "8.2"
-          tools: composer
+          tools: composer:2.9.1
 
       - name: Detect PHP build (Windows)
         if: runner.os == 'Windows'
@@ -1026,7 +1026,6 @@ PY
           tmp=$(mktemp -d)
           cp -R examples/ruby-smoke/. "$tmp"/
           pushd "$tmp" >/dev/null
-          gem list -i bundler -v 2.5.12 || gem install bundler -v 2.5.12 --no-document
           bundle config set --local path vendor/bundle
           gem_file=$(ls "$GITHUB_WORKSPACE"/ruby-gems/html-to-markdown-*.gem | head -n 1)
           if [ -z "$gem_file" ]; then
@@ -1277,12 +1276,12 @@ PY
         uses: ruby/setup-ruby@v1
         with:
           ruby-version: "3.3"
-          bundler: "2.5.12"
+          bundler: "2.7.2"
           bundler-cache: false
 
       - name: Install Ruby dependencies (Unix)
         if: runner.os != 'Windows'
-        run: bundle _2.5.12_ install --jobs 4 --retry 3
+        run: bundle install --jobs 4 --retry 3
         working-directory: packages/ruby
 
       - name: Install Ruby dependencies (Windows)
@@ -1291,7 +1290,7 @@ PY
         run: |
           $workspace = ridk exec bash -lc "cygpath -au '$env:GITHUB_WORKSPACE'"
           $gemdir = "$workspace/packages/ruby"
-          ridk exec bash -lc "cd $gemdir && export RUSTUP_TOOLCHAIN=stable-gnu CC=x86_64-w64-mingw32-gcc CXX=x86_64-w64-mingw32-g++ && bundle _2.5.12_ install --jobs 4 --retry 3"
+          ridk exec bash -lc "cd $gemdir && export RUSTUP_TOOLCHAIN=stable-gnu CC=x86_64-w64-mingw32-gcc CXX=x86_64-w64-mingw32-g++ && bundle install --jobs 4 --retry 3"
 
       - name: Build gem artifacts (Unix)
         if: runner.os != 'Windows'
@@ -1299,9 +1298,9 @@ PY
         working-directory: packages/ruby
         run: |
           set -euo pipefail
-          bundle _2.5.12_ exec rake clean
+          bundle exec rake clean
           ruby ../../scripts/prepare_ruby_gem.rb
-          bundle _2.5.12_ exec rake build
+          bundle exec rake build
 
       - name: Build gem artifacts (Windows)
         if: runner.os == 'Windows'
@@ -1310,7 +1309,7 @@ PY
           $workspace = ridk exec bash -lc "cygpath -au '$env:GITHUB_WORKSPACE'"
           $gemdir = "$workspace/packages/ruby"
           ridk exec bash -lc "cd $workspace && export RUSTUP_TOOLCHAIN=stable-gnu && ruby scripts/prepare_ruby_gem.rb"
-          ridk exec bash -lc "cd $gemdir && export RUSTUP_TOOLCHAIN=stable-gnu CC=x86_64-w64-mingw32-gcc CXX=x86_64-w64-mingw32-g++ && bundle _2.5.12_ exec rake clean && bundle _2.5.12_ exec rake build"
+          ridk exec bash -lc "cd $gemdir && export RUSTUP_TOOLCHAIN=stable-gnu CC=x86_64-w64-mingw32-gcc CXX=x86_64-w64-mingw32-g++ && bundle exec rake clean && bundle exec rake build"
 
       - name: Verify gem artifacts
         shell: bash

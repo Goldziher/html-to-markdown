@@ -1,0 +1,60 @@
+name: Smoke test CLI binary
+description: Tests standalone CLI binary
+
+inputs:
+  cli-artifacts-dir:
+    description: Directory containing CLI binary artifacts
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Smoke CLI binary
+      shell: bash
+      run: |
+        set -euo pipefail
+        # Find the CLI binary for this platform
+        if [[ "$RUNNER_OS" == "Windows" ]]; then
+          cli_archive=$(find "${{ inputs.cli-artifacts-dir }}" -name "cli-x86_64-pc-windows-msvc.zip" | head -n 1)
+          if [ -z "$cli_archive" ]; then
+            echo "CLI binary not found for Windows" >&2
+            exit 1
+          fi
+          tmp=$(mktemp -d)
+          unzip -q "$cli_archive" -d "$tmp"
+          cli_bin=$(find "$tmp" -name "html-to-markdown.exe" | head -n 1)
+        elif [[ "$RUNNER_OS" == "macOS" ]]; then
+          cli_archive=$(find "${{ inputs.cli-artifacts-dir }}" -name "cli-aarch64-apple-darwin.tar.gz" | head -n 1)
+          if [ -z "$cli_archive" ]; then
+            echo "CLI binary not found for macOS" >&2
+            exit 1
+          fi
+          tmp=$(mktemp -d)
+          tar -xzf "$cli_archive" -C "$tmp"
+          cli_bin=$(find "$tmp" -name "html-to-markdown" -type f | head -n 1)
+        else
+          cli_archive=$(find "${{ inputs.cli-artifacts-dir }}" -name "cli-x86_64-unknown-linux-gnu.tar.gz" | head -n 1)
+          if [ -z "$cli_archive" ]; then
+            echo "CLI binary not found for Linux" >&2
+            exit 1
+          fi
+          tmp=$(mktemp -d)
+          tar -xzf "$cli_archive" -C "$tmp"
+          cli_bin=$(find "$tmp" -name "html-to-markdown" -type f | head -n 1)
+        fi
+
+        if [ ! -f "$cli_bin" ]; then
+          echo "ERROR: CLI binary extraction failed" >&2
+          exit 1
+        fi
+
+        chmod +x "$cli_bin" || true
+        output=$("$cli_bin" "<h1>CLI Test</h1><p>Testing CLI binary</p>")
+
+        if ! echo "$output" | grep -q "# CLI Test"; then
+          echo "ERROR: CLI did not produce expected output" >&2
+          echo "Output: $output" >&2
+          exit 1
+        fi
+
+        echo "✓ CLI binary smoke test passed"

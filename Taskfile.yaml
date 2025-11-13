@@ -3,7 +3,7 @@ version: "3"
 vars:
   RUST_LOG: info
   RUBY_BIN: /opt/homebrew/opt/ruby/bin
-  BUNDLER_VERSION: "2.5.12"
+  BUNDLER_VERSION: "2.7.2"
 
 silent: false
 

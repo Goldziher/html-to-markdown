@@ -1,0 +1,25 @@
+name: Build PHP extension (Linux)
+description: Builds PHP extension on Linux
+
+outputs:
+  extension-path:
+    description: Path to the built .so file
+    value: ${{ steps.build.outputs.extension-path }}
+
+inputs:
+  php-config:
+    description: Path to php-config binary
+    required: false
+    default: ''
+
+runs:
+  using: composite
+  steps:
+    - name: Build PHP extension
+      id: build
+      shell: bash
+      env:
+        PHP_CONFIG: ${{ inputs.php-config }}
+      run: |
+        cargo build --release -p html-to-markdown-php
+        echo "extension-path=$GITHUB_WORKSPACE/target/release/libhtml_to_markdown_php.so" >> $GITHUB_OUTPUT

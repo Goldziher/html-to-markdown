@@ -205,6 +205,7 @@ jobs:
         uses: ruby/setup-ruby@v1
         with:
           ruby-version: ${{ matrix.ruby }}
+          bundler: "2.7.2"
           bundler-cache: false
           working-directory: packages/ruby
 
@@ -213,76 +214,31 @@ jobs:
         uses: ruby/setup-ruby@v1
         with:
           ruby-version: ${{ matrix.ruby }}
+          bundler: "2.7.2"
           bundler-cache: false
           working-directory: packages/ruby
           msys2: UCRT64
 
-      - name: Install MSYS2 toolchain
-        if: runner.os == 'Windows'
-        shell: pwsh
-        run: ridk exec pacman -S --needed --noconfirm base-devel mingw-w64-ucrt-x86_64-toolchain
-
-      - name: Install Rust GNU toolchain
-        if: runner.os == 'Windows'
-        shell: bash
-        run: rustup toolchain install stable-gnu --profile minimal --no-self-update
-
-      - name: Configure bindgen sysroot (Windows)
-        if: runner.os == 'Windows'
-        shell: bash
-        run: echo "BINDGEN_EXTRA_CLANG_ARGS=--target=x86_64-pc-windows-gnu --sysroot=${RI_DEVKIT//\\/\/}$MSYSTEM_PREFIX" >> $GITHUB_ENV
-
       - name: Build CLI binary
-        run: cargo build --release --package html-to-markdown-cli
+        uses: ./.github/actions/build-cli
 
-      - name: Install Bundler 2.5.12 (Unix)
+      - name: Build Ruby extension (Unix)
         if: runner.os != 'Windows'
-        run: gem install bundler -v 2.5.12
-
-      - name: Install Bundler 2.5.12 (Windows)
-        if: runner.os == 'Windows'
-        shell: pwsh
-        run: ridk exec gem install bundler -v 2.5.12
-
-      - name: Install Ruby gems (Unix)
-        if: runner.os != 'Windows'
-        working-directory: packages/ruby
-        run: bundle _2.5.12_ install
+        uses: ./.github/actions/build-ruby-unix
 
       - name: Run Rubocop (Unix)
         if: runner.os != 'Windows' && matrix.os == 'ubuntu-latest' && matrix.ruby == '3.3'
         working-directory: packages/ruby
-        run: bundle _2.5.12_ exec rubocop --config .rubocop.yml
+        run: bundle exec rubocop --config .rubocop.yml
 
-      - name: Install Ruby gems (Windows)
+      - name: Build Ruby extension (Windows)
         if: runner.os == 'Windows'
-        working-directory: packages/ruby
-        shell: pwsh
-        run: |
-          $unixPath = ridk exec bash -lc "cygpath -au '$env:GITHUB_WORKSPACE/packages/ruby'"
-          ridk exec bash -lc "cd $unixPath && export RUSTUP_TOOLCHAIN=stable-gnu CC=x86_64-w64-mingw32-gcc CXX=x86_64-w64-mingw32-g++ && bundle _2.5.12_ install"
-
-      - name: Compile Ruby extension (Unix)
-        if: runner.os != 'Windows'
-        working-directory: packages/ruby
-        env:
-          RB_SYS_CARGO_PROFILE: release
-        run: bundle _2.5.12_ exec rake compile
-
-      - name: Compile Ruby extension (Windows)
-        if: runner.os == 'Windows'
-        working-directory: packages/ruby
-        env:
-          RB_SYS_CARGO_PROFILE: release
-        shell: pwsh
-        run: |
-          $unixPath = ridk exec bash -lc "cygpath -au '$env:GITHUB_WORKSPACE/packages/ruby'"
-          ridk exec bash -lc "cd $unixPath && export RUSTUP_TOOLCHAIN=stable-gnu CC=x86_64-w64-mingw32-gcc CXX=x86_64-w64-mingw32-g++ && bundle _2.5.12_ exec rake compile"
+        uses: ./.github/actions/build-ruby-windows
 
       - name: Run Ruby specs (Unix)
         if: runner.os != 'Windows'
         working-directory: packages/ruby
-        run: bundle _2.5.12_ exec rspec --format progress
+        run: bundle exec rspec --format progress
 
       - name: Run Ruby specs (Windows)
         if: runner.os == 'Windows'
@@ -290,7 +246,7 @@ jobs:
         shell: pwsh
         run: |
           $unixPath = ridk exec bash -lc "cygpath -au '$env:GITHUB_WORKSPACE/packages/ruby'"
-          ridk exec bash -lc "cd $unixPath && export RUSTUP_TOOLCHAIN=stable-gnu CC=x86_64-w64-mingw32-gcc CXX=x86_64-w64-mingw32-g++ && bundle _2.5.12_ exec rspec --format progress"
+          ridk exec bash -lc "cd $unixPath && export RUSTUP_TOOLCHAIN=stable-gnu CC=x86_64-w64-mingw32-gcc CXX=x86_64-w64-mingw32-g++ && bundle exec rspec --format progress"
 
   php-bindings:
     runs-on: ubuntu-latest
@@ -303,6 +259,7 @@ jobs:
         uses: shivammathur/setup-php@v2
         with:
           php-version: "8.2"
+          tools: composer:2.9.1
           coverage: none
 
       - name: Setup Rust
@@ -315,7 +272,7 @@ jobs:
           dependency-versions: locked
 
       - name: Build PHP extension
-        run: cargo build -p html-to-markdown-php --release
+        uses: ./.github/actions/build-php-linux
 
       - name: Run PHP static analysis
         working-directory: packages/php
@@ -343,8 +300,7 @@ jobs:
         uses: ./.github/actions/setup-node-workspace
 
       - name: Build NAPI-RS Bindings
-        working-directory: crates/html-to-markdown-node
-        run: pnpm run build
+        uses: ./.github/actions/build-node
 
       - name: Test NAPI-RS Bindings
         working-directory: crates/html-to-markdown-node
@@ -355,8 +311,7 @@ jobs:
         run: cargo test
 
       - name: Build TypeScript package
-        working-directory: packages/typescript
-        run: pnpm run build
+        uses: ./.github/actions/build-typescript
 
       - name: Test TypeScript package
         working-directory: packages/typescript
@@ -381,8 +336,7 @@ jobs:
         uses: ./.github/actions/setup-node-workspace
 
       - name: Build WASM (all targets)
-        working-directory: crates/html-to-markdown-wasm
-        run: pnpm run build:all
+        uses: ./.github/actions/build-wasm
 
       - name: Test WASM
         working-directory: crates/html-to-markdown-wasm
@@ -426,6 +380,7 @@ jobs:
         uses: ruby/setup-ruby@v1
         with:
           ruby-version: "3.3"
+          bundler: "2.7.2"
           bundler-cache: false
 
       - name: Setup Rust
@@ -443,7 +398,7 @@ jobs:
         uses: shivammathur/setup-php@v2
         with:
           php-version: "8.2"
-          tools: composer
+          tools: composer:2.9.1
 
       - name: Detect PHP build (Windows)
         if: runner.os == 'Windows'
@@ -463,118 +418,49 @@ jobs:
         run: pnpm install
 
       - name: Build Node bindings
-        run: pnpm --filter html-to-markdown-node run build
-
-      - name: Pack Node tarball
-        run: |
-          set -euo pipefail
-          pushd crates/html-to-markdown-node >/dev/null
-          NODE_TGZ=$(npm pack | tail -1)
-          mv "$NODE_TGZ" "$GITHUB_WORKSPACE/$NODE_TGZ"
-          popd >/dev/null
-          echo "NODE_TGZ=$GITHUB_WORKSPACE/$NODE_TGZ" >> "$GITHUB_ENV"
+        id: build_node
+        uses: ./.github/actions/build-node
+        with:
+          pack-tarball: 'true'
 
       - name: Smoke Node install
-        run: |
-          set -euo pipefail
-          tmp=$(mktemp -d)
-          cp -R examples/node-smoke/. "$tmp"/
-          pushd "$tmp" >/dev/null
-          cp "$NODE_TGZ" ./node.tgz
-          node -e "const fs=require('fs');const pkg=JSON.parse(fs.readFileSync('package.json','utf8'));pkg.dependencies=pkg.dependencies||{};pkg.dependencies['html-to-markdown-node']='file:./node.tgz';fs.writeFileSync('package.json',JSON.stringify(pkg,null,2)+ '\n');"
-          rm -f pnpm-lock.yaml
-          pnpm install --no-frozen-lockfile
-          pnpm run check
-          popd >/dev/null
+        uses: ./.github/actions/smoke-node
+        with:
+          node-tarball: ${{ steps.build_node.outputs.tarball }}
 
       - name: Build WASM bundle
-        run: pnpm --filter html-to-markdown-wasm run build:all
-
-      - name: Pack WASM tarball
-        run: |
-          set -euo pipefail
-          pushd crates/html-to-markdown-wasm >/dev/null
-          WASM_TGZ=$(npm pack | tail -1)
-          mv "$WASM_TGZ" "$GITHUB_WORKSPACE/$WASM_TGZ"
-          popd >/dev/null
-          echo "WASM_TGZ=$GITHUB_WORKSPACE/$WASM_TGZ" >> "$GITHUB_ENV"
+        id: build_wasm
+        uses: ./.github/actions/build-wasm
+        with:
+          pack-tarball: 'true'
 
       - name: Smoke WASM install
-        run: |
-          set -euo pipefail
-          tmp=$(mktemp -d)
-          cp -R examples/wasm-smoke/. "$tmp"/
-          pushd "$tmp" >/dev/null
-          cp "$WASM_TGZ" ./wasm.tgz
-          node -e "const fs=require('fs');const pkg=JSON.parse(fs.readFileSync('package.json','utf8'));pkg.dependencies=pkg.dependencies||{};pkg.dependencies['html-to-markdown-wasm']='file:./wasm.tgz';fs.writeFileSync('package.json',JSON.stringify(pkg,null,2)+ '\n');"
-          rm -f pnpm-lock.yaml
-          pnpm install --no-frozen-lockfile
-          pnpm run check
-          popd >/dev/null
+        uses: ./.github/actions/smoke-wasm
+        with:
+          wasm-tarball: ${{ steps.build_wasm.outputs.tarball }}
 
       - name: Smoke Python install
-        run: |
-          set -euo pipefail
-          tmp=$(mktemp -d)
-          cp -R examples/python-smoke/. "$tmp"/
-          pushd "$tmp" >/dev/null
-          python -m venv .venv
-          if [[ "$RUNNER_OS" == "Windows" ]]; then
-            VENV_PY=".venv/Scripts/python.exe"
-          else
-            VENV_PY=".venv/bin/python"
-          fi
-          "$VENV_PY" -m pip install --upgrade pip
-          "$VENV_PY" -m pip install "${GITHUB_WORKSPACE}/packages/python"
-          "$VENV_PY" main.py
-          popd >/dev/null
+        uses: ./.github/actions/smoke-python
 
       - name: Smoke Ruby install
         if: runner.os != 'Windows'
-        run: |
-          set -euo pipefail
-          tmp=$(mktemp -d)
-          cp -R examples/ruby-smoke/. "$tmp"/
-          pushd "$tmp" >/dev/null
-          gem list -i bundler -v 2.5.12 || gem install bundler -v 2.5.12 --no-document
-          bundle config set --local path vendor/bundle
-          bundle config set --local local.html-to-markdown "${GITHUB_WORKSPACE}/packages/ruby"
-          bundle install
-          bundle exec ruby app.rb
-          popd >/dev/null
+        uses: ./.github/actions/smoke-ruby
 
       - name: Build PHP extension
         if: runner.os == 'Linux'
-        env:
-          PHP_CONFIG: ${{ env.PHP_CONFIG }}
-        run: cargo build --release -p html-to-markdown-php
+        id: build_php
+        uses: ./.github/actions/build-php-linux
+        with:
+          php-config: ${{ env.PHP_CONFIG }}
 
       - name: Smoke PHP install
         if: runner.os == 'Linux'
-        env:
-          EXT_PATH: ${{ github.workspace }}/target/release/libhtml_to_markdown_php.so
-          COMPOSER_ALLOW_SUPERUSER: 1
-        run: |
-          set -euo pipefail
-          tmp=$(mktemp -d)
-          cp -R examples/php-smoke/. "$tmp"/
-          pushd "$tmp" >/dev/null
-          composer_bin=$(command -v composer)
-          php -d "extension=$EXT_PATH" "$composer_bin" config repositories.local path "${GITHUB_WORKSPACE}/packages/php" --no-plugins
-          php -d "extension=$EXT_PATH" "$composer_bin" config repositories.local.options.symlink false --no-plugins
-          php -d "extension=$EXT_PATH" "$composer_bin" install --no-interaction --no-progress --no-scripts
-          php -d "extension=$EXT_PATH" convert.php
-          popd >/dev/null
+        uses: ./.github/actions/smoke-php-linux
+        with:
+          extension-path: ${{ steps.build_php.outputs.extension-path }}
 
       - name: Smoke Rust example
-        run: |
-          set -euo pipefail
-          pushd examples/rust-smoke >/dev/null
-          mkdir -p .cargo
-          cp .cargo/config.local-template.toml .cargo/config.toml
-          cargo run --quiet
-          rm .cargo/config.toml
-          popd >/dev/null
+        uses: ./.github/actions/smoke-rust
 
   smoke-php-windows:
     name: Smoke PHP install (Windows)
@@ -593,7 +479,7 @@ jobs:
         uses: shivammathur/setup-php@v2
         with:
           php-version: "8.2"
-          tools: composer
+          tools: composer:2.9.1
 
       - name: Detect PHP build
         shell: pwsh
@@ -604,120 +490,14 @@ jobs:
           "WINDOWS_PHP_TS=$mode" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
           "WINDOWS_PHP_VERSION=$version" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
 
-      - name: Prepare extension repository snapshot
-        id: php_repo
-        shell: pwsh
-        run: |
-          $root = Get-Location
-          $source = Join-Path $env:GITHUB_WORKSPACE "packages\php-ext"
-          $work = Join-Path $env:RUNNER_TEMP "php-ext-smoke"
-          $repoDir = Join-Path $work "src"
-          $bareDir = Join-Path $work "repo.git"
-
-          if (Test-Path $work) { Remove-Item $work -Recurse -Force }
-          New-Item -ItemType Directory -Path $repoDir -Force | Out-Null
-          Copy-Item -Path "$source\*" -Destination $repoDir -Recurse -Force
-
-          # Set up .cargo/config.toml with LIBCLANG_PATH for Windows builds
-          $cargoDir = Join-Path $repoDir ".cargo"
-          New-Item -ItemType Directory -Path $cargoDir -Force | Out-Null
-          $cargoWindows = Join-Path $source ".cargo-windows.toml"
-          if (Test-Path $cargoWindows) {
-            Copy-Item -Path $cargoWindows -Destination (Join-Path $cargoDir "config.toml") -Force
-            Write-Host "Copied .cargo-windows.toml to .cargo/config.toml"
-          }
-
-          Set-Location $repoDir
-          git init | Out-Null
-          git config user.email "ci@html-to-markdown.dev"
-          git config user.name "html-to-markdown CI"
-          git add . | Out-Null
-          git commit -m "snapshot" | Out-Null
-          $commit = git rev-parse HEAD
-          git clone --bare . $bareDir | Out-Null
-          Set-Location $root
-
-          $repoPath = (Resolve-Path $bareDir).Path.Replace('\','/')
-          if ($repoPath -notmatch '^file:///') {
-            $repoPath = "file:///$repoPath"
-          }
-          "repo_uri=$repoPath" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
-          "repo_ref=$commit" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
-
-      - name: Allow git file protocol
-        shell: pwsh
-        run: git config --global protocol.file.allow always
-
       - name: Build PHP extension (Windows)
-        uses: php/php-windows-builder/extension@v1
-        env:
-          GITHUB_ACTIONS: "false"
-          RUSTUP_TOOLCHAIN: nightly
+        id: build_php_win
+        uses: ./.github/actions/build-php-windows
         with:
-          extension-url: ${{ steps.php_repo.outputs.repo_uri }}
-          extension-ref: ${{ steps.php_repo.outputs.repo_ref }}
           php-version: ${{ env.WINDOWS_PHP_VERSION }}
-          arch: x64
-          ts: ${{ env.WINDOWS_PHP_TS || 'nts' }}
-          args: --enable-html_to_markdown
-          run-tests: "false"
-
-      - name: Extract built DLL
-        id: php_dll
-        shell: pwsh
-        run: |
-          $dll = $null
-          $buildRoot = Join-Path $env:GITHUB_WORKSPACE "build"
-          if (Test-Path $buildRoot) {
-            $dll = Get-ChildItem $buildRoot -Recurse -Filter "php_html_to_markdown*.dll" |
-              Sort-Object LastWriteTime -Descending |
-              Select-Object -First 1
-          }
-
-          if (-not $dll) {
-            $artifactDir = Join-Path $env:GITHUB_WORKSPACE "artifacts"
-            if (-not (Test-Path $artifactDir)) {
-              throw "Artifact directory not found at $artifactDir"
-            }
-
-            $phpVersion = $env:WINDOWS_PHP_VERSION
-            $ts = $env:WINDOWS_PHP_TS
-            $zip = Get-ChildItem -Path $artifactDir -Filter "*.zip" |
-              Where-Object { $_.Name -like "*-$phpVersion-*" -and $_.Name -like "*-$ts-*" } |
-              Sort-Object LastWriteTime -Descending |
-              Select-Object -First 1
-            if (-not $zip) { throw "No built PHP artifact found in $artifactDir" }
-
-            $dest = Join-Path $env:RUNNER_TEMP "php-ext-built"
-            if (Test-Path $dest) { Remove-Item $dest -Recurse -Force }
-            Expand-Archive -Path $zip.FullName -DestinationPath $dest -Force
-
-            while ($true) {
-              $innerZip = Get-ChildItem $dest -Recurse -File -Filter "*.zip" | Select-Object -First 1
-              if (-not $innerZip) { break }
-              $target = Join-Path $innerZip.Directory.FullName ("unzipped_" + [guid]::NewGuid().ToString())
-              Expand-Archive -Path $innerZip.FullName -DestinationPath $target -Force
-              Remove-Item $innerZip.FullName -Force
-            }
-
-            $dll = Get-ChildItem $dest -Recurse -Filter "php_html_to_markdown*.dll" | Select-Object -First 1
-            if (-not $dll) { throw "Unable to locate DLL inside $($zip.FullName)" }
-          }
-
-          "dll=$($dll.FullName)" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+          php-ts: ${{ env.WINDOWS_PHP_TS || 'nts' }}
 
       - name: Smoke PHP install
-        shell: pwsh
-        env:
-          DLL_PATH: ${{ steps.php_dll.outputs.dll }}
-        run: |
-          $tmp = Join-Path $env:RUNNER_TEMP "php-smoke-windows"
-          if (Test-Path $tmp) { Remove-Item $tmp -Recurse -Force }
-          New-Item -ItemType Directory -Path $tmp -Force | Out-Null
-          Copy-Item -Path "$env:GITHUB_WORKSPACE/examples/php-smoke/*" -Destination $tmp -Recurse -Force
-          Set-Location $tmp
-          $workspace = $env:GITHUB_WORKSPACE -replace '\\','/'
-          composer config repositories.local path "$workspace/packages/php" --no-plugins
-          composer config repositories.local.options.symlink false --no-plugins
-          composer install --no-interaction --no-progress --no-scripts
-          php -n -d "extension=$env:DLL_PATH" convert.php
+        uses: ./.github/actions/smoke-php-windows
+        with:
+          dll-path: ${{ steps.build_php_win.outputs.dll-path }}

@@ -1,0 +1,10 @@
+name: Build TypeScript package
+description: Builds TypeScript package (requires Node bindings to be built first)
+
+runs:
+  using: composite
+  steps:
+    - name: Build TypeScript package
+      shell: bash
+      working-directory: packages/typescript
+      run: pnpm run build

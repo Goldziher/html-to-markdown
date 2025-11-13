@@ -1,0 +1,27 @@
+name: Smoke test PHP extension (Linux)
+description: Tests PHP extension installation and functionality on Linux
+
+inputs:
+  extension-path:
+    description: Path to the PHP extension .so file
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Smoke PHP install (Linux)
+      shell: bash
+      env:
+        COMPOSER_ALLOW_SUPERUSER: 1
+      run: |
+        set -euo pipefail
+        tmp=$(mktemp -d)
+        cp -R examples/php-smoke/. "$tmp"/
+        pushd "$tmp" >/dev/null
+        composer_bin=$(command -v composer)
+        php -d "extension=${{ inputs.extension-path }}" "$composer_bin" config repositories.local path "${GITHUB_WORKSPACE}/packages/php" --no-plugins
+        php -d "extension=${{ inputs.extension-path }}" "$composer_bin" config repositories.local.options.symlink false --no-plugins
+        php -d "extension=${{ inputs.extension-path }}" "$composer_bin" install --no-interaction --no-progress --no-scripts
+        php -d "extension=${{ inputs.extension-path }}" convert.php
+        popd >/dev/null
+        echo "✓ PHP extension (Linux) smoke test passed"
