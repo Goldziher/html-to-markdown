@@ -854,17 +854,17 @@ jobs:
           fi
           "$VENV_PY" -m pip install --upgrade pip
           wheel_path=$("$VENV_PY" - <<'PY'
-import os
-import sys
-from pathlib import Path
-root = Path(os.environ["GITHUB_WORKSPACE"]) / "python-wheels"
-for path in root.rglob("*.whl"):
-    print(path)
-    break
-else:
-    sys.exit("No wheel found")
-PY
-)
+          import os
+          import sys
+          from pathlib import Path
+          root = Path(os.environ["GITHUB_WORKSPACE"]) / "python-wheels"
+          for path in root.rglob("*.whl"):
+              print(path)
+              break
+          else:
+              sys.exit("No wheel found")
+          PY
+          )
           "$VENV_PY" -m pip install "$wheel_path"
           "$VENV_PY" main.py
           popd >/dev/null
