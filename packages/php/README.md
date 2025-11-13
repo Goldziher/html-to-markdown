@@ -19,6 +19,17 @@ features (readonly value objects, enums, typed exceptions).
 - `html_to_markdown` native extension (install via PIE `goldziher/html-to-markdown` or download the GitHub release artifacts)
 - Composer for dependency management
 
+## Platform Support
+
+The native extension builds and runs on **Linux and macOS** (x86_64 and ARM64).
+
+**Windows is not currently supported** due to limitations in the ext-php-rs library that prevent proper symbol resolution during the build process. Specifically, the Windows PHP SDK does not export certain Zend engine symbols (e.g., `zend_ce_exception`, `zend_ce_traversable`) in a way that the Rust linker can resolve them. This is a known limitation of ext-php-rs 0.15.x on Windows.
+
+If you require Windows support, consider using one of the alternative distributions:
+- **Node.js** (`html-to-markdown-node`)
+- **Python** (`html-to-markdown`)
+- **WebAssembly** (`html-to-markdown-wasm`)
+
 ## Installation
 
 ```bash
