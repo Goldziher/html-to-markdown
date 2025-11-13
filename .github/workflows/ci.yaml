@@ -644,6 +644,7 @@ jobs:
         env:
           GITHUB_ACTIONS: "false"
           RUSTUP_TOOLCHAIN: nightly
+          LIBCLANG_PATH: C:\Users\runneradmin\.rustup\toolchains\nightly-x86_64-pc-windows-msvc\bin
         with:
           extension-url: ${{ steps.php_repo.outputs.repo_uri }}
           extension-ref: ${{ steps.php_repo.outputs.repo_ref }}
