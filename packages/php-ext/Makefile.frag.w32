@@ -1,5 +1,7 @@
 # html_to_markdown Rust build fragment for Windows
 # This runs AFTER the stub DLL is built and overwrites it with the real Rust extension
+#
+# Note: LIBCLANG_PATH is configured in .cargo/config.toml (from .cargo-windows.toml)
 
 HTMLTOMARKDOWN_ARTIFACT_NAME = html_to_markdown_php
 HTMLTOMARKDOWN_TARGET_DIR    = $(HTMLTOMARKDOWN_WORKSPACE_DIR)\target\release
@@ -13,10 +15,7 @@ build-rust-ext:
 	@echo [htmltomarkdown] workspace: $(HTMLTOMARKDOWN_WORKSPACE_DIR)
 	@echo [htmltomarkdown] BUILD_DIR: $(BUILD_DIR)
 	@echo ================================================
-	@echo [htmltomarkdown] Setting LIBCLANG_PATH for bindgen...
-	@set LIBCLANG_PATH=C:\Users\runneradmin\.rustup\toolchains\nightly-x86_64-pc-windows-msvc\lib
-	@echo [htmltomarkdown] Running cargo build...
-	@cd /d "$(HTMLTOMARKDOWN_WORKSPACE_DIR)" && set LIBCLANG_PATH=C:\Users\runneradmin\.rustup\toolchains\nightly-x86_64-pc-windows-msvc\lib && cargo build --package html-to-markdown-php --release || exit /b 1
+	@cd /d "$(HTMLTOMARKDOWN_WORKSPACE_DIR)" && cargo build --package html-to-markdown-php --release || exit /b 1
 	@if not exist "$(HTMLTOMARKDOWN_SOURCE_DLL)" (
 		echo [htmltomarkdown] ERROR: Rust DLL not found at $(HTMLTOMARKDOWN_SOURCE_DLL) 1>&2
 		exit /b 1
