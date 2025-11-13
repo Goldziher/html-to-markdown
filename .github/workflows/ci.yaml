@@ -641,27 +641,22 @@ jobs:
           $dest = Join-Path $env:RUNNER_TEMP "php-ext-built"
           if (Test-Path $dest) { Remove-Item $dest -Recurse -Force }
           Expand-Archive -Path $zip.FullName -DestinationPath $dest -Force
-          $dll = Get-ChildItem $dest -Recurse -Filter "*.dll" | Where-Object { $_.Name -like "html_to_markdown*.dll" } | Select-Object -First 1
+          $innerZip = Get-ChildItem $dest -Recurse -Filter "*.zip" | Select-Object -First 1
+          if ($innerZip) {
+            $final = Join-Path $dest "unzipped"
+            if (Test-Path $final) { Remove-Item $final -Recurse -Force }
+            Expand-Archive -Path $innerZip.FullName -DestinationPath $final -Force
+          } else {
+            $final = $dest
+          }
+          $dll = Get-ChildItem $final -Recurse -Filter "*.dll" | Where-Object { $_.Name -like "html_to_markdown*.dll" } | Select-Object -First 1
           if (-not $dll) { throw "Unable to locate DLL inside $($zip.FullName)" }
           "dll=$($dll.FullName)" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
 
-      - name: Install PHP extension
+      - name: Smoke PHP install
         shell: pwsh
         env:
           DLL_PATH: ${{ steps.php_dll.outputs.dll }}
-        run: |
-          $extDir = php -r "echo ini_get('extension_dir');"
-          if (-not $extDir) { throw "Unable to determine PHP extension dir" }
-          Copy-Item $env:DLL_PATH (Join-Path $extDir "html_to_markdown_php.dll") -Force
-          $ini = php -r "echo php_ini_loaded_file();"
-          if (-not $ini) {
-            $ini = Join-Path (Split-Path $extDir -Parent) "php.ini"
-            if (-not (Test-Path $ini)) { New-Item -ItemType File -Path $ini | Out-Null }
-          }
-          Add-Content -Path $ini -Value "`nextension=html_to_markdown_php"
-
-      - name: Smoke PHP install
-        shell: pwsh
         run: |
           $tmp = Join-Path $env:RUNNER_TEMP "php-smoke-windows"
           if (Test-Path $tmp) { Remove-Item $tmp -Recurse -Force }
@@ -671,4 +666,4 @@ jobs:
           composer config repositories.local path "$workspace/packages/php" --no-plugins
           composer config repositories.local.options.symlink false --no-plugins
           composer install --no-interaction --no-progress --no-scripts
-          php convert.php
+          php -n -d "extension=$env:DLL_PATH" convert.php
