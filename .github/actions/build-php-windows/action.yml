@@ -1,13 +1,10 @@
 name: Build PHP extension (Windows)
-description: Builds PHP extension on Windows using php-windows-builder
+description: Builds PHP extension on Windows using cargo (ext-php-rs)
 
 outputs:
   dll-path:
     description: Path to the built DLL file
-    value: ${{ steps.extract.outputs.dll }}
-  artifact-dir:
-    description: Directory containing build artifacts
-    value: ${{ steps.build.outputs.artifact-dir }}
+    value: ${{ steps.build.outputs.dll }}
 
 inputs:
   php-version:
@@ -20,41 +17,6 @@ inputs:
 runs:
   using: composite
   steps:
-    - name: Prepare extension repository snapshot
-      id: repo
-      shell: pwsh
-      run: |
-        $root = Get-Location
-        $source = Join-Path $env:GITHUB_WORKSPACE "packages\php-ext"
-        $work = Join-Path $env:RUNNER_TEMP "php-ext-build"
-        $repoDir = Join-Path $work "src"
-        $bareDir = Join-Path $work "repo.git"
-
-        if (Test-Path $work) { Remove-Item $work -Recurse -Force }
-        New-Item -ItemType Directory -Path $repoDir -Force | Out-Null
-        Copy-Item -Path "$source\*" -Destination $repoDir -Recurse -Force
-
-        Set-Location $repoDir
-        git init | Out-Null
-        git config user.email "ci@html-to-markdown.dev"
-        git config user.name "html-to-markdown CI"
-        git add . | Out-Null
-        git commit -m "snapshot" | Out-Null
-        $commit = git rev-parse HEAD
-        git clone --bare . $bareDir | Out-Null
-        Set-Location $root
-
-        $repoPath = (Resolve-Path $bareDir).Path.Replace('\','/')
-        if ($repoPath -notmatch '^file:///') {
-          $repoPath = "file:///$repoPath"
-        }
-        "repo_uri=$repoPath" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
-        "repo_ref=$commit" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
-
-    - name: Allow git file protocol
-      shell: pwsh
-      run: git config --global protocol.file.allow always
-
     - name: Install LLVM for libclang
       shell: pwsh
       run: |
@@ -68,50 +30,22 @@ runs:
         "LIBCLANG_PATH=$llvmPath" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
         "PATH=$llvmPath;$env:PATH" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
 
-    - name: Build PHP extension
+    - name: Build PHP extension with cargo
       id: build
-      uses: php/php-windows-builder/extension@v1
-      env:
-        GITHUB_ACTIONS: "false"
-        RUSTUP_TOOLCHAIN: nightly
-        LIBCLANG_PATH: ${{ env.LIBCLANG_PATH }}
-      with:
-        extension-url: ${{ steps.repo.outputs.repo_uri }}
-        extension-ref: ${{ steps.repo.outputs.repo_ref }}
-        php-version: ${{ inputs.php-version }}
-        arch: x64
-        ts: ${{ inputs.php-ts }}
-        args: --enable-html_to_markdown
-        run-tests: "false"
-
-    - name: Extract built DLL
-      id: extract
       shell: pwsh
+      env:
+        LIBCLANG_PATH: ${{ env.LIBCLANG_PATH }}
       run: |
-        $artifactDir = "${{ steps.build.outputs.artifact-dir }}"
-        if (Test-Path $artifactDir) {
-          $phpVersion = "${{ inputs.php-version }}"
-          $ts = "${{ inputs.php-ts }}"
-          $zip = Get-ChildItem -Path $artifactDir -Filter "*.zip" |
-            Where-Object { $_.Name -like "*-$phpVersion-*" -and $_.Name -like "*-$ts-*" } |
-            Sort-Object LastWriteTime -Descending |
-            Select-Object -First 1
-          if (-not $zip) { throw "No built PHP artifact found in $artifactDir" }
+        $ErrorActionPreference = "Stop"
 
-          $dest = Join-Path $env:RUNNER_TEMP "php-ext-built"
-          if (Test-Path $dest) { Remove-Item $dest -Recurse -Force }
-          Expand-Archive -Path $zip.FullName -DestinationPath $dest -Force
+        # Build the extension with cargo
+        cargo build --package html-to-markdown-php --release
 
-          while ($true) {
-            $innerZip = Get-ChildItem $dest -Recurse -File -Filter "*.zip" | Select-Object -First 1
-            if (-not $innerZip) { break }
-            $target = Join-Path $innerZip.Directory.FullName ("unzipped_" + [guid]::NewGuid().ToString())
-            Expand-Archive -Path $innerZip.FullName -DestinationPath $target -Force
-            Remove-Item $innerZip.FullName -Force
-          }
-
-          $dll = Get-ChildItem $dest -Recurse -Filter "php_html_to_markdown*.dll" | Select-Object -First 1
-          if (-not $dll) { throw "Unable to locate DLL inside $($zip.FullName)" }
+        # Find the built DLL
+        $dllPath = Join-Path $env:GITHUB_WORKSPACE "target\release\html_to_markdown_php.dll"
+        if (-not (Test-Path $dllPath)) {
+          throw "Built DLL not found at $dllPath"
         }
 
-        "dll=$($dll.FullName)" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+        Write-Host "Built DLL at: $dllPath"
+        "dll=$dllPath" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
