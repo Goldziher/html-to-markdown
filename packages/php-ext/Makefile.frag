@@ -1,37 +1,39 @@
-HTMLTOMARKDOWN_BUILD_DIR        ?= $(top_builddir)/modules
-HTMLTOMARKDOWN_TARGET_DIR       ?= $(HTMLTOMARKDOWN_WORKSPACE_ROOT)/target
-HTMLTOMARKDOWN_RELEASE_DIR      ?= $(HTMLTOMARKDOWN_TARGET_DIR)/release
-HTMLTOMARKDOWN_ARTIFACT_EXT     ?= $(SHLIB_SUFFIX_NAME)
-HTMLTOMARKDOWN_ARTIFACT         ?= $(HTMLTOMARKDOWN_RELEASE_DIR)/$(HTMLTOMARKDOWN_ARTIFACT_NAME).$(HTMLTOMARKDOWN_ARTIFACT_EXT)
-HTMLTOMARKDOWN_OUTPUT_SO        ?= $(HTMLTOMARKDOWN_BUILD_DIR)/html_to_markdown.so
-MKDIR_P                 ?= $(mkinstalldirs)
+HTMLTOMARKDOWN_ARTIFACT_NAME = html_to_markdown_php
+HTMLTOMARKDOWN_TARGET_DIR    = $(HTMLTOMARKDOWN_WORKSPACE_DIR)\target\release
+HTMLTOMARKDOWN_SOURCE_DLL    = $(HTMLTOMARKDOWN_TARGET_DIR)\$(HTMLTOMARKDOWN_ARTIFACT_NAME).dll
+HTMLTOMARKDOWN_SOURCE_PDB    = $(HTMLTOMARKDOWN_TARGET_DIR)\$(HTMLTOMARKDOWN_ARTIFACT_NAME).pdb
+HTMLTOMARKDOWN_OUTPUT_DLL    = $(BUILD_DIR)\php_html_to_markdown.dll
+HTMLTOMARKDOWN_OUTPUT_PDB    = $(BUILD_DIR)\php_html_to_markdown.pdb
 
-PHP_MODULES += $(HTMLTOMARKDOWN_OUTPUT_SO)
-all_targets += $(HTMLTOMARKDOWN_OUTPUT_SO)
+all: $(HTMLTOMARKDOWN_OUTPUT_DLL)
 
-.PHONY: html_to_markdown-build
+$(HTMLTOMARKDOWN_OUTPUT_DLL): FORCE
+	@echo ================================================
+	@echo [htmltomarkdown] Building Rust extension via cargo
+	@echo [htmltomarkdown] workspace: $(HTMLTOMARKDOWN_WORKSPACE_DIR)
+	@echo [htmltomarkdown] BUILD_DIR: $(BUILD_DIR)
+	@echo [htmltomarkdown] target DLL: $(HTMLTOMARKDOWN_OUTPUT_DLL)
+	@echo ================================================
+	if not exist "$(HTMLTOMARKDOWN_WORKSPACE_DIR)" (
+		echo [htmltomarkdown] error: workspace missing at $(HTMLTOMARKDOWN_WORKSPACE_DIR) 1>&2
+		exit /b 1
+	)
+	@echo [htmltomarkdown] running cargo build...
+	cargo build --manifest-path="$(HTMLTOMARKDOWN_WORKSPACE_DIR)\Cargo.toml" --package html-to-markdown-php --release --target-dir "$(HTMLTOMARKDOWN_WORKSPACE_DIR)\target"
+	@if errorlevel 1 (
+		echo [htmltomarkdown] error: cargo build failed 1>&2
+		exit /b 1
+	)
+	@echo [htmltomarkdown] cargo build succeeded
+	if not exist "$(HTMLTOMARKDOWN_SOURCE_DLL)" (
+		echo [htmltomarkdown] error: cargo did not produce $(HTMLTOMARKDOWN_SOURCE_DLL) 1>&2
+		dir "$(HTMLTOMARKDOWN_TARGET_DIR)" 1>&2
+		exit /b 1
+	)
+	if not exist "$(BUILD_DIR)" mkdir "$(BUILD_DIR)"
+	@echo [htmltomarkdown] copying DLL to build directory...
+	copy /Y "$(HTMLTOMARKDOWN_SOURCE_DLL)" "$(HTMLTOMARKDOWN_OUTPUT_DLL)"
+	@if exist "$(HTMLTOMARKDOWN_SOURCE_PDB)" copy /Y "$(HTMLTOMARKDOWN_SOURCE_PDB)" "$(HTMLTOMARKDOWN_OUTPUT_PDB)"
+	@echo [htmltomarkdown] SUCCESS: DLL ready at $(HTMLTOMARKDOWN_OUTPUT_DLL)
 
-all: $(HTMLTOMARKDOWN_OUTPUT_SO)
-
-$(HTMLTOMARKDOWN_OUTPUT_SO): html_to_markdown-build
-	@$(MKDIR_P) "$(dir $@)"
-	@if test "$(HTMLTOMARKDOWN_ARTIFACT_EXT)" = "dylib"; then \
-		cp "$(HTMLTOMARKDOWN_ARTIFACT)" "$@.tmp"; \
-		mv "$@.tmp" "$@"; \
-	else \
-		cp "$(HTMLTOMARKDOWN_ARTIFACT)" "$@"; \
-	fi
-
-html_to_markdown-build:
-	@"$(HTMLTOMARKDOWN_CARGO_BIN)" build --manifest-path="$(HTMLTOMARKDOWN_WORKSPACE_ROOT)/Cargo.toml" --package "$(HTMLTOMARKDOWN_PACKAGE)" --release
-	@if test ! -f "$(HTMLTOMARKDOWN_ARTIFACT)"; then \
-		echo "cargo did not produce expected artifact: $(HTMLTOMARKDOWN_ARTIFACT)"; \
-		exit 1; \
-	fi
-
-install-modules: $(HTMLTOMARKDOWN_OUTPUT_SO)
-	$(INSTALL) -m 0755 $(HTMLTOMARKDOWN_OUTPUT_SO) $(INSTALL_ROOT)$(PHP_EXTENSION_DIR)/html_to_markdown.so
-
-clean:
-	-@"$(HTMLTOMARKDOWN_CARGO_BIN)" clean --manifest-path="$(HTMLTOMARKDOWN_WORKSPACE_ROOT)/Cargo.toml"
-	-rm -f $(HTMLTOMARKDOWN_OUTPUT_SO)
+FORCE:
