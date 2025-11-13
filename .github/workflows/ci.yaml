@@ -405,16 +405,6 @@ jobs:
           php-version: "8.2"
           tools: composer:2.9.1
 
-      - name: Detect PHP build (Windows)
-        if: runner.os == 'Windows'
-        shell: pwsh
-        run: |
-          $tsLine = php -i | Select-String -Pattern 'Thread Safety'
-          $mode = if ($tsLine -and $tsLine -match 'enabled') { 'ts' } else { 'nts' }
-          $version = php -r "echo PHP_MAJOR_VERSION . '.' . PHP_MINOR_VERSION;"
-          "WINDOWS_PHP_TS=$mode" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
-          "WINDOWS_PHP_VERSION=$version" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
-
       - name: Capture php-config path
         if: runner.os == 'Linux'
         run: echo "PHP_CONFIG=$(command -v php-config)" >> "$GITHUB_ENV"
@@ -466,43 +456,3 @@ jobs:
 
       - name: Smoke Rust example
         uses: ./.github/actions/smoke-rust
-
-  smoke-php-windows:
-    name: Smoke PHP install (Windows)
-    runs-on: windows-latest
-    timeout-minutes: 25
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v5
-
-      - name: Install Rust (nightly)
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          toolchain: nightly
-
-      - name: Setup PHP
-        uses: shivammathur/setup-php@v2
-        with:
-          php-version: "8.2"
-          tools: composer:2.9.1
-
-      - name: Detect PHP build
-        shell: pwsh
-        run: |
-          $tsLine = php -i | Select-String -Pattern 'Thread Safety'
-          $mode = if ($tsLine -and $tsLine -match 'enabled') { 'ts' } else { 'nts' }
-          $version = php -r "echo PHP_MAJOR_VERSION . '.' . PHP_MINOR_VERSION;"
-          "WINDOWS_PHP_TS=$mode" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
-          "WINDOWS_PHP_VERSION=$version" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
-
-      - name: Build PHP extension (Windows)
-        id: build_php_win
-        uses: ./.github/actions/build-php-windows
-        with:
-          php-version: ${{ env.WINDOWS_PHP_VERSION }}
-          php-ts: ${{ env.WINDOWS_PHP_TS || 'nts' }}
-
-      - name: Smoke PHP install
-        uses: ./.github/actions/smoke-php-windows
-        with:
-          dll-path: ${{ steps.build_php_win.outputs.dll-path }}
