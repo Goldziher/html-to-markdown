@@ -439,14 +439,14 @@ jobs:
           fi
 
       - name: Setup PHP
-        if: runner.os != 'Windows'
+        if: runner.os == 'Linux'
         uses: shivammathur/setup-php@v2
         with:
           php-version: "8.2"
           tools: composer
 
       - name: Capture php-config path
-        if: runner.os != 'Windows'
+        if: runner.os == 'Linux'
         run: echo "PHP_CONFIG=$(command -v php-config)" >> "$GITHUB_ENV"
 
       - name: Install pnpm workspace deps
@@ -532,13 +532,13 @@ jobs:
           popd >/dev/null
 
       - name: Build PHP extension
-        if: runner.os != 'Windows'
+        if: runner.os == 'Linux'
         env:
           PHP_CONFIG: ${{ env.PHP_CONFIG }}
         run: cargo build --release -p html-to-markdown-php
 
       - name: Smoke PHP install
-        if: runner.os != 'Windows'
+        if: runner.os == 'Linux'
         env:
           EXT_PATH: ${{ github.workspace }}/target/release/libhtml_to_markdown_php.so
           COMPOSER_ALLOW_SUPERUSER: 1
