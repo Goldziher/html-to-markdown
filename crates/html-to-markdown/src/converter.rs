@@ -1693,7 +1693,6 @@ fn should_drop_for_preprocessing(
     }
 
     if options.preprocessing.remove_navigation {
-        let inside_semantic_content = has_semantic_content_ancestor(node_handle, parser, dom_ctx);
         let has_nav_hint = element_has_navigation_hint(tag);
 
         if tag_name == "nav" {
@@ -1701,17 +1700,14 @@ fn should_drop_for_preprocessing(
         }
 
         if tag_name == "header" {
+            let inside_semantic_content = has_semantic_content_ancestor(node_handle, parser, dom_ctx);
             if !inside_semantic_content {
                 return true;
             }
             if has_nav_hint {
                 return true;
             }
-        } else if tag_name == "footer" {
-            if !inside_semantic_content || has_nav_hint {
-                return true;
-            }
-        } else if tag_name == "aside" {
+        } else if tag_name == "footer" || tag_name == "aside" {
             if has_nav_hint {
                 return true;
             }
@@ -1848,16 +1844,19 @@ fn attribute_matches_any(tag: &tl::HTMLTag, attr: &str, keywords: &[&str]) -> bo
         return false;
     };
     let raw = value.as_utf8_str();
-    let tokens = raw
-        .split(|c: char| c.is_ascii_whitespace() || matches!(c, '-' | '_' | ':' | '.' | '/'))
+    raw.split_whitespace()
+        .map(|token| {
+            token
+                .chars()
+                .map(|c| match c {
+                    '_' | ':' | '.' | '/' => '-',
+                    _ => c,
+                })
+                .collect::<String>()
+                .to_ascii_lowercase()
+        })
         .filter(|token| !token.is_empty())
-        .map(|token| token.to_ascii_lowercase());
-    for token in tokens {
-        if keywords.iter().any(|kw| token == *kw) {
-            return true;
-        }
-    }
-    false
+        .any(|token| keywords.iter().any(|kw| token == *kw))
 }
 
 fn attribute_contains_any(tag: &tl::HTMLTag, attr: &str, keywords: &[&str]) -> bool {

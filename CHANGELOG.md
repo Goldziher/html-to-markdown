@@ -13,6 +13,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - **Node/WASM Binding Regression** – HTML preprocessing no longer drops `<html>`, `<head>`, or `<body>` wrappers when their classes resemble navigation chrome, so large Wikipedia fixtures once again emit full markdown (restoring the Vitest length/table expectations for Node bindings and keeping WASM conversions consistent).
+- **Cloudflare WASM Initialization** – Bundler builds of `html-to-markdown-wasm` now expose `initWasm()`/`wasmReady` so edge runtimes that instantiate WebAssembly modules asynchronously (Cloudflare Workers, Vite dev servers, etc.) can await initialization before calling `convert()`, eliminating the `__wbindgen_start` runtime error.
+- **Footer Retention (Fix #120)** – The Rust preprocessor keeps plain `<footer>` content unless the element carries explicit navigation hints (role/class/id). Python and Rust conversions once again preserve footer copy while still stripping true navigation footers such as `.site-footer` menus.
+- **Release Smoke Coverage** – The publish workflow now downloads the built artifacts (Node, WASM, Python wheels, Ruby gems, PHP zips) and reruns the README smoke installs across Linux/macOS/Windows before any packages are uploaded, ensuring we're testing the exact bits we ship.
 
 ## [2.7.1] - 2025-11-12
 
