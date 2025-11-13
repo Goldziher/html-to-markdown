@@ -54,6 +54,9 @@ jobs:
           tmp=$(mktemp -d)
           rsync -a examples/wasm-smoke/ "$tmp"/
           pushd "$tmp" >/dev/null
-          pnpm add "$GITHUB_WORKSPACE/html-to-markdown-wasm.tgz"
+          cp "$GITHUB_WORKSPACE/html-to-markdown-wasm.tgz" ./wasm.tgz
+          node -e "const fs=require('fs');const pkg=JSON.parse(fs.readFileSync('package.json','utf8'));pkg.dependencies=pkg.dependencies||{};pkg.dependencies['html-to-markdown-wasm']='file:./wasm.tgz';fs.writeFileSync('package.json',JSON.stringify(pkg,null,2)+ '\n');"
+          rm -f pnpm-lock.yaml
+          pnpm install --no-frozen-lockfile
           pnpm run check
           popd >/dev/null
