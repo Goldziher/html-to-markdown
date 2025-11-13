@@ -54,7 +54,6 @@ jobs:
           tmp=$(mktemp -d)
           rsync -a examples/wasm-smoke/ "$tmp"/
           pushd "$tmp" >/dev/null
-          pnpm install
           pnpm add "$GITHUB_WORKSPACE/html-to-markdown-wasm.tgz"
           pnpm run check
           popd >/dev/null
