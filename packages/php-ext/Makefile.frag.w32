@@ -13,16 +13,8 @@ build-rust-ext:
 	@echo [htmltomarkdown] workspace: $(HTMLTOMARKDOWN_WORKSPACE_DIR)
 	@echo [htmltomarkdown] BUILD_DIR: $(BUILD_DIR)
 	@echo ================================================
-	@if not exist "$(HTMLTOMARKDOWN_WORKSPACE_DIR)\Cargo.toml" (
-		echo [htmltomarkdown] ERROR: Cargo.toml not found at $(HTMLTOMARKDOWN_WORKSPACE_DIR) 1>&2
-		exit /b 1
-	)
 	@echo [htmltomarkdown] Running cargo build...
-	@cd "$(HTMLTOMARKDOWN_WORKSPACE_DIR)" && cargo build --package html-to-markdown-php --release
-	@if errorlevel 1 (
-		echo [htmltomarkdown] ERROR: cargo build failed 1>&2
-		exit /b 1
-	)
+	@cd /d "$(HTMLTOMARKDOWN_WORKSPACE_DIR)" && cargo build --package html-to-markdown-php --release || exit /b 1
 	@if not exist "$(HTMLTOMARKDOWN_SOURCE_DLL)" (
 		echo [htmltomarkdown] ERROR: Rust DLL not found at $(HTMLTOMARKDOWN_SOURCE_DLL) 1>&2
 		exit /b 1
