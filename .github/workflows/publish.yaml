@@ -1060,7 +1060,16 @@ PY
           $dest = Join-Path $env:RUNNER_TEMP "php-smoke-artifacts"
           if (Test-Path $dest) { Remove-Item $dest -Recurse -Force }
           Expand-Archive -Path $zip.FullName -DestinationPath $dest -Force
-          $dll = Get-ChildItem $dest -Recurse -Filter "html_to_markdown*.dll" | Select-Object -First 1
+
+          while ($true) {
+            $innerZip = Get-ChildItem $dest -Recurse -File -Filter "*.zip" | Select-Object -First 1
+            if (-not $innerZip) { break }
+            $target = Join-Path $innerZip.Directory.FullName ("unzipped_" + [guid]::NewGuid().ToString())
+            Expand-Archive -Path $innerZip.FullName -DestinationPath $target -Force
+            Remove-Item $innerZip.FullName -Force
+          }
+
+          $dll = Get-ChildItem $dest -Recurse -Filter "php_html_to_markdown*.dll" | Select-Object -First 1
           if (-not $dll) { throw "Unable to locate html_to_markdown DLL in artifact" }
           "dll=$($dll.FullName)" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
 
