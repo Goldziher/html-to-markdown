@@ -563,3 +563,112 @@ jobs:
           cargo run --quiet
           rm .cargo/config.toml
           popd >/dev/null
+
+  smoke-php-windows:
+    name: Smoke PHP install (Windows)
+    runs-on: windows-latest
+    timeout-minutes: 25
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Install Rust (nightly)
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: nightly
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: "8.2"
+          tools: composer
+
+      - name: Prepare extension repository snapshot
+        id: php_repo
+        shell: pwsh
+        run: |
+          $root = Get-Location
+          $source = Join-Path $env:GITHUB_WORKSPACE "packages\php-ext"
+          $work = Join-Path $env:RUNNER_TEMP "php-ext-smoke"
+          $repoDir = Join-Path $work "src"
+          $bareDir = Join-Path $work "repo.git"
+
+          if (Test-Path $work) { Remove-Item $work -Recurse -Force }
+          New-Item -ItemType Directory -Path $repoDir -Force | Out-Null
+          Copy-Item -Path "$source\*" -Destination $repoDir -Recurse -Force
+
+          Set-Location $repoDir
+          git init | Out-Null
+          git config user.email "ci@html-to-markdown.dev"
+          git config user.name "html-to-markdown CI"
+          git add . | Out-Null
+          git commit -m "snapshot" | Out-Null
+          $commit = git rev-parse HEAD
+          git clone --bare . $bareDir | Out-Null
+          Set-Location $root
+
+          $repoPath = (Resolve-Path $bareDir).Path.Replace('\','/')
+          if ($repoPath -notmatch '^file:///') {
+            $repoPath = "file:///$repoPath"
+          }
+          "repo_uri=$repoPath" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+          "repo_ref=$commit" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+
+      - name: Allow git file protocol
+        shell: pwsh
+        run: git config --global protocol.file.allow always
+
+      - name: Build PHP extension (Windows)
+        uses: php/php-windows-builder/extension@v1
+        env:
+          GITHUB_ACTIONS: "false"
+          RUSTUP_TOOLCHAIN: nightly
+        with:
+          extension-url: ${{ steps.php_repo.outputs.repo_uri }}
+          extension-ref: ${{ steps.php_repo.outputs.repo_ref }}
+          php-version: "8.2"
+          arch: x64
+          ts: nts
+          args: --enable-html_to_markdown
+          run-tests: "false"
+
+      - name: Extract built DLL
+        id: php_dll
+        shell: pwsh
+        run: |
+          $zip = Get-ChildItem -Path artifacts -Filter *.zip | Select-Object -First 1
+          if (-not $zip) { throw "No built PHP artifact found" }
+          $dest = Join-Path $env:RUNNER_TEMP "php-ext-built"
+          if (Test-Path $dest) { Remove-Item $dest -Recurse -Force }
+          Expand-Archive -Path $zip.FullName -DestinationPath $dest -Force
+          $dll = Get-ChildItem $dest -Recurse -Filter "*.dll" | Where-Object { $_.Name -like "html_to_markdown*.dll" } | Select-Object -First 1
+          if (-not $dll) { throw "Unable to locate DLL inside $($zip.FullName)" }
+          "dll=$($dll.FullName)" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+
+      - name: Install PHP extension
+        shell: pwsh
+        env:
+          DLL_PATH: ${{ steps.php_dll.outputs.dll }}
+        run: |
+          $extDir = php -r "echo ini_get('extension_dir');"
+          if (-not $extDir) { throw "Unable to determine PHP extension dir" }
+          Copy-Item $env:DLL_PATH (Join-Path $extDir "html_to_markdown_php.dll") -Force
+          $ini = php -r "echo php_ini_loaded_file();"
+          if (-not $ini) {
+            $ini = Join-Path (Split-Path $extDir -Parent) "php.ini"
+            if (-not (Test-Path $ini)) { New-Item -ItemType File -Path $ini | Out-Null }
+          }
+          Add-Content -Path $ini -Value "`nextension=html_to_markdown_php"
+
+      - name: Smoke PHP install
+        shell: pwsh
+        run: |
+          $tmp = Join-Path $env:RUNNER_TEMP "php-smoke-windows"
+          if (Test-Path $tmp) { Remove-Item $tmp -Recurse -Force }
+          Copy-Item -Path "$env:GITHUB_WORKSPACE/examples/php-smoke" -Destination $tmp -Recurse
+          Set-Location $tmp/php-smoke
+          $workspace = $env:GITHUB_WORKSPACE -replace '\\','/'
+          composer config repositories.local path "$workspace/packages/php" --no-plugins
+          composer config repositories.local.options.symlink false --no-plugins
+          composer install --no-interaction --no-progress --no-scripts
+          php convert.php
