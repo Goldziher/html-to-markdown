@@ -657,33 +657,43 @@ jobs:
         id: php_dll
         shell: pwsh
         run: |
-          $artifactDir = Join-Path $env:GITHUB_WORKSPACE "artifacts"
-          if (-not (Test-Path $artifactDir)) {
-            throw "Artifact directory not found at $artifactDir"
+          $dll = $null
+          $buildRoot = Join-Path $env:GITHUB_WORKSPACE "build"
+          if (Test-Path $buildRoot) {
+            $dll = Get-ChildItem $buildRoot -Recurse -Filter "php_html_to_markdown*.dll" |
+              Sort-Object LastWriteTime -Descending |
+              Select-Object -First 1
           }
 
-          $phpVersion = $env:WINDOWS_PHP_VERSION
-          $ts = $env:WINDOWS_PHP_TS
-          $zip = Get-ChildItem -Path $artifactDir -Filter "*.zip" |
-            Where-Object { $_.Name -like "*-$phpVersion-*" -and $_.Name -like "*-$ts-*" } |
-            Sort-Object LastWriteTime -Descending |
-            Select-Object -First 1
-          if (-not $zip) { throw "No built PHP artifact found in $artifactDir" }
+          if (-not $dll) {
+            $artifactDir = Join-Path $env:GITHUB_WORKSPACE "artifacts"
+            if (-not (Test-Path $artifactDir)) {
+              throw "Artifact directory not found at $artifactDir"
+            }
 
-          $dest = Join-Path $env:RUNNER_TEMP "php-ext-built"
-          if (Test-Path $dest) { Remove-Item $dest -Recurse -Force }
-          Expand-Archive -Path $zip.FullName -DestinationPath $dest -Force
+            $phpVersion = $env:WINDOWS_PHP_VERSION
+            $ts = $env:WINDOWS_PHP_TS
+            $zip = Get-ChildItem -Path $artifactDir -Filter "*.zip" |
+              Where-Object { $_.Name -like "*-$phpVersion-*" -and $_.Name -like "*-$ts-*" } |
+              Sort-Object LastWriteTime -Descending |
+              Select-Object -First 1
+            if (-not $zip) { throw "No built PHP artifact found in $artifactDir" }
 
-          while ($true) {
-            $innerZip = Get-ChildItem $dest -Recurse -File -Filter "*.zip" | Select-Object -First 1
-            if (-not $innerZip) { break }
-            $target = Join-Path $innerZip.Directory.FullName ("unzipped_" + [guid]::NewGuid().ToString())
-            Expand-Archive -Path $innerZip.FullName -DestinationPath $target -Force
-            Remove-Item $innerZip.FullName -Force
+            $dest = Join-Path $env:RUNNER_TEMP "php-ext-built"
+            if (Test-Path $dest) { Remove-Item $dest -Recurse -Force }
+            Expand-Archive -Path $zip.FullName -DestinationPath $dest -Force
+
+            while ($true) {
+              $innerZip = Get-ChildItem $dest -Recurse -File -Filter "*.zip" | Select-Object -First 1
+              if (-not $innerZip) { break }
+              $target = Join-Path $innerZip.Directory.FullName ("unzipped_" + [guid]::NewGuid().ToString())
+              Expand-Archive -Path $innerZip.FullName -DestinationPath $target -Force
+              Remove-Item $innerZip.FullName -Force
+            }
+
+            $dll = Get-ChildItem $dest -Recurse -Filter "php_html_to_markdown*.dll" | Select-Object -First 1
+            if (-not $dll) { throw "Unable to locate DLL inside $($zip.FullName)" }
           }
-
-          $dll = Get-ChildItem $dest -Recurse -Filter "php_html_to_markdown*.dll" | Select-Object -First 1
-          if (-not $dll) { throw "Unable to locate DLL inside $($zip.FullName)" }
 
           "dll=$($dll.FullName)" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
 
