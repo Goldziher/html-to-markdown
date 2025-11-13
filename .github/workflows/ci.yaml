@@ -445,6 +445,16 @@ jobs:
           php-version: "8.2"
           tools: composer
 
+      - name: Detect PHP build (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $tsLine = php -i | Select-String -Pattern 'Thread Safety'
+          $mode = if ($tsLine -and $tsLine -match 'enabled') { 'ts' } else { 'nts' }
+          $version = php -r "echo PHP_MAJOR_VERSION . '.' . PHP_MINOR_VERSION;"
+          "WINDOWS_PHP_TS=$mode" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          "WINDOWS_PHP_VERSION=$version" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
       - name: Capture php-config path
         if: runner.os == 'Linux'
         run: echo "PHP_CONFIG=$(command -v php-config)" >> "$GITHUB_ENV"
@@ -628,9 +638,9 @@ jobs:
         with:
           extension-url: ${{ steps.php_repo.outputs.repo_uri }}
           extension-ref: ${{ steps.php_repo.outputs.repo_ref }}
-          php-version: "8.2"
+          php-version: ${{ env.WINDOWS_PHP_VERSION }}
           arch: x64
-          ts: nts
+          ts: ${{ env.WINDOWS_PHP_TS || 'nts' }}
           args: --enable-html_to_markdown
           run-tests: "false"
 
@@ -643,7 +653,12 @@ jobs:
             throw "Artifact directory not found at $artifactDir"
           }
 
-          $zip = Get-ChildItem -Path $artifactDir -Filter "*.zip" | Sort-Object LastWriteTime -Descending | Select-Object -First 1
+          $phpVersion = $env:WINDOWS_PHP_VERSION
+          $ts = $env:WINDOWS_PHP_TS
+          $zip = Get-ChildItem -Path $artifactDir -Filter "*.zip" |
+            Where-Object { $_.Name -like "*-$phpVersion-*" -and $_.Name -like "*-$ts-*" } |
+            Sort-Object LastWriteTime -Descending |
+            Select-Object -First 1
           if (-not $zip) { throw "No built PHP artifact found in $artifactDir" }
 
           $dest = Join-Path $env:RUNNER_TEMP "php-ext-built"
