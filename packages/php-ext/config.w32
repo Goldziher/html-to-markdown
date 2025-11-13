@@ -40,5 +40,5 @@ if (PHP_HTML_TO_MARKDOWN != "no") {
     ADD_FLAG("CFLAGS_PHP", "/D COMPILE_DL_" + EXT);
     extensions_enabled[extensions_enabled.length] = [extname, 'shared', false];
 
-    ADD_MAKEFILE_FRAGMENT();
+    ADD_MAKEFILE_FRAGMENT("Makefile.frag.w32");
 }
