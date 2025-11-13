@@ -1,39 +1,35 @@
+# html_to_markdown Rust build fragment for Windows
+# This runs AFTER the stub DLL is built and overwrites it with the real Rust extension
+
 HTMLTOMARKDOWN_ARTIFACT_NAME = html_to_markdown_php
 HTMLTOMARKDOWN_TARGET_DIR    = $(HTMLTOMARKDOWN_WORKSPACE_DIR)\target\release
 HTMLTOMARKDOWN_SOURCE_DLL    = $(HTMLTOMARKDOWN_TARGET_DIR)\$(HTMLTOMARKDOWN_ARTIFACT_NAME).dll
 HTMLTOMARKDOWN_SOURCE_PDB    = $(HTMLTOMARKDOWN_TARGET_DIR)\$(HTMLTOMARKDOWN_ARTIFACT_NAME).pdb
-HTMLTOMARKDOWN_OUTPUT_DLL    = $(BUILD_DIR)\php_html_to_markdown.dll
-HTMLTOMARKDOWN_OUTPUT_PDB    = $(BUILD_DIR)\php_html_to_markdown.pdb
+HTMLTOMARKDOWN_STUB_DLL      = $(BUILD_DIR)\php_html_to_markdown.dll
 
-all: $(HTMLTOMARKDOWN_OUTPUT_DLL)
-
-$(HTMLTOMARKDOWN_OUTPUT_DLL): FORCE
+build-rust-ext:
 	@echo ================================================
 	@echo [htmltomarkdown] Building Rust extension via cargo
 	@echo [htmltomarkdown] workspace: $(HTMLTOMARKDOWN_WORKSPACE_DIR)
 	@echo [htmltomarkdown] BUILD_DIR: $(BUILD_DIR)
-	@echo [htmltomarkdown] target DLL: $(HTMLTOMARKDOWN_OUTPUT_DLL)
 	@echo ================================================
-	if not exist "$(HTMLTOMARKDOWN_WORKSPACE_DIR)" (
-		echo [htmltomarkdown] error: workspace missing at $(HTMLTOMARKDOWN_WORKSPACE_DIR) 1>&2
+	@if not exist "$(HTMLTOMARKDOWN_WORKSPACE_DIR)\Cargo.toml" (
+		echo [htmltomarkdown] ERROR: Cargo.toml not found at $(HTMLTOMARKDOWN_WORKSPACE_DIR) 1>&2
 		exit /b 1
 	)
-	@echo [htmltomarkdown] running cargo build...
-	cargo build --manifest-path="$(HTMLTOMARKDOWN_WORKSPACE_DIR)\Cargo.toml" --package html-to-markdown-php --release --target-dir "$(HTMLTOMARKDOWN_WORKSPACE_DIR)\target"
+	@echo [htmltomarkdown] Running cargo build...
+	@cd "$(HTMLTOMARKDOWN_WORKSPACE_DIR)" && cargo build --package html-to-markdown-php --release
 	@if errorlevel 1 (
-		echo [htmltomarkdown] error: cargo build failed 1>&2
+		echo [htmltomarkdown] ERROR: cargo build failed 1>&2
 		exit /b 1
 	)
-	@echo [htmltomarkdown] cargo build succeeded
-	if not exist "$(HTMLTOMARKDOWN_SOURCE_DLL)" (
-		echo [htmltomarkdown] error: cargo did not produce $(HTMLTOMARKDOWN_SOURCE_DLL) 1>&2
-		dir "$(HTMLTOMARKDOWN_TARGET_DIR)" 1>&2
+	@if not exist "$(HTMLTOMARKDOWN_SOURCE_DLL)" (
+		echo [htmltomarkdown] ERROR: Rust DLL not found at $(HTMLTOMARKDOWN_SOURCE_DLL) 1>&2
 		exit /b 1
 	)
-	if not exist "$(BUILD_DIR)" mkdir "$(BUILD_DIR)"
-	@echo [htmltomarkdown] copying DLL to build directory...
-	copy /Y "$(HTMLTOMARKDOWN_SOURCE_DLL)" "$(HTMLTOMARKDOWN_OUTPUT_DLL)"
-	@if exist "$(HTMLTOMARKDOWN_SOURCE_PDB)" copy /Y "$(HTMLTOMARKDOWN_SOURCE_PDB)" "$(HTMLTOMARKDOWN_OUTPUT_PDB)"
-	@echo [htmltomarkdown] SUCCESS: DLL ready at $(HTMLTOMARKDOWN_OUTPUT_DLL)
+	@echo [htmltomarkdown] Replacing stub DLL with Rust extension...
+	@copy /Y "$(HTMLTOMARKDOWN_SOURCE_DLL)" "$(HTMLTOMARKDOWN_STUB_DLL)" >nul
+	@if exist "$(HTMLTOMARKDOWN_SOURCE_PDB)" copy /Y "$(HTMLTOMARKDOWN_SOURCE_PDB)" "$(BUILD_DIR)\php_html_to_markdown.pdb" >nul
+	@echo [htmltomarkdown] SUCCESS: Rust DLL installed at $(HTMLTOMARKDOWN_STUB_DLL)
 
-FORCE:
+all: build-rust-ext
