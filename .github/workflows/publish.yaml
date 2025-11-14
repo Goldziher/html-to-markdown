@@ -864,97 +864,15 @@ jobs:
           path: php-pie-artifacts
 
       - name: Smoke CLI binary
-        shell: bash
-        run: |
-          set -euo pipefail
-          # Find the CLI binary for this platform
-          if [[ "$RUNNER_OS" == "Windows" ]]; then
-            cli_archive=$(find "$GITHUB_WORKSPACE/cli-artifacts" -name "cli-x86_64-pc-windows-msvc.zip" | head -n 1)
-            if [ -z "$cli_archive" ]; then
-              echo "CLI binary not found for Windows" >&2
-              exit 1
-            fi
-            tmp=$(mktemp -d)
-            unzip -q "$cli_archive" -d "$tmp"
-            cli_bin=$(find "$tmp" -name "html-to-markdown.exe" | head -n 1)
-          elif [[ "$RUNNER_OS" == "macOS" ]]; then
-            cli_archive=$(find "$GITHUB_WORKSPACE/cli-artifacts" -name "cli-aarch64-apple-darwin.tar.gz" | head -n 1)
-            if [ -z "$cli_archive" ]; then
-              echo "CLI binary not found for macOS" >&2
-              exit 1
-            fi
-            tmp=$(mktemp -d)
-            tar -xzf "$cli_archive" -C "$tmp"
-            cli_bin=$(find "$tmp" -name "html-to-markdown" -type f | head -n 1)
-          else
-            cli_archive=$(find "$GITHUB_WORKSPACE/cli-artifacts" -name "cli-x86_64-unknown-linux-gnu.tar.gz" | head -n 1)
-            if [ -z "$cli_archive" ]; then
-              echo "CLI binary not found for Linux" >&2
-              exit 1
-            fi
-            tmp=$(mktemp -d)
-            tar -xzf "$cli_archive" -C "$tmp"
-            cli_bin=$(find "$tmp" -name "html-to-markdown" -type f | head -n 1)
-          fi
-
-          if [ ! -f "$cli_bin" ]; then
-            echo "ERROR: CLI binary extraction failed" >&2
-            exit 1
-          fi
-
-          chmod +x "$cli_bin" || true
-          output=$("$cli_bin" "<h1>CLI Test</h1><p>Testing CLI binary</p>")
-
-          if ! echo "$output" | grep -q "# CLI Test"; then
-            echo "ERROR: CLI did not produce expected output" >&2
-            echo "Output: $output" >&2
-            exit 1
-          fi
-
-          echo "✓ CLI binary smoke test passed"
+        uses: ./.github/actions/smoke-cli
+        with:
+          cli-artifacts-dir: ${{ github.workspace }}/cli-artifacts
 
       - name: Smoke PIE install (Linux)
         if: runner.os == 'Linux'
-        env:
-          PHP_CONFIG: ${{ env.PHP_CONFIG }}
-        run: |
-          set -euo pipefail
-          # Download PIE
-          curl -fsSL https://github.com/php/pie/releases/latest/download/pie.phar -o /tmp/pie.phar
-
-          # Find the PIE source archive
-          pie_archive=$(find "$GITHUB_WORKSPACE/php-pie-artifacts" -name "php_html_to_markdown-*.tgz" | head -n 1)
-          if [ -z "$pie_archive" ]; then
-            echo "PIE source archive not found" >&2
-            exit 1
-          fi
-
-          # Extract to temp dir and install via PIE
-          tmp=$(mktemp -d)
-          tar -xzf "$pie_archive" -C "$tmp"
-
-          # Add as local repository and build
-          php /tmp/pie.phar repository:add path "$tmp"
-          CARGO_BIN=$(command -v cargo)
-          php /tmp/pie.phar build goldziher/html-to-markdown:*@dev --working-dir "$tmp" --with-cargo-bin="$CARGO_BIN"
-
-          # Find the built extension
-          ext_so=$(find "$tmp" -name "*.so" -path "*/html_to_markdown.so" | head -n 1)
-          if [ -z "$ext_so" ]; then
-            echo "Extension .so file not found after PIE build" >&2
-            exit 1
-          fi
-
-          # Test the extension
-          smoke_tmp=$(mktemp -d)
-          cp -R examples/php-smoke/. "$smoke_tmp"/
-          cd "$smoke_tmp"
-          composer config repositories.local path "${GITHUB_WORKSPACE}/packages/php" --no-plugins
-          composer config repositories.local.options.symlink false --no-plugins
-          composer install --no-interaction --no-progress --no-scripts
-          php -d "extension=$ext_so" convert.php
-
-          echo "✓ PIE install smoke test passed"
+        uses: ./.github/actions/smoke-pie
+        with:
+          pie-artifacts-dir: ${{ github.workspace }}/php-pie-artifacts
 
   ruby-gem:
     name: Build Ruby gem (${{ matrix.label }})
