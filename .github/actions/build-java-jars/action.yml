@@ -1,0 +1,114 @@
+name: Build Java JARs with native libraries
+description: Build platform-specific Java JARs containing native FFI libraries for Maven Central
+
+inputs:
+  java-version:
+    description: Java version to use
+    required: false
+    default: "22"
+  platform:
+    description: Platform identifier (linux, macos, windows)
+    required: true
+  version:
+    description: Version number for the JARs
+    required: true
+
+outputs:
+  jar_path:
+    description: Path to the main JAR file
+    value: ${{ steps.set-outputs.outputs.jar_path }}
+  sources_jar_path:
+    description: Path to the sources JAR file
+    value: ${{ steps.set-outputs.outputs.sources_jar_path }}
+  javadoc_jar_path:
+    description: Path to the javadoc JAR file
+    value: ${{ steps.set-outputs.outputs.javadoc_jar_path }}
+
+runs:
+  using: composite
+  steps:
+    - name: Setup Java
+      uses: actions/setup-java@v4
+      with:
+        distribution: temurin
+        java-version: ${{ inputs.java-version }}
+        cache: maven
+
+    - name: Setup Rust
+      uses: actions-rust-lang/setup-rust-toolchain@v1
+
+    - name: Build native FFI library
+      shell: bash
+      run: |
+        echo "Building native FFI library for ${{ inputs.platform }}..."
+        cargo build --release --package html-to-markdown-ffi
+
+        # List the built library
+        if [[ "$RUNNER_OS" == "Windows" ]]; then
+          ls -lh target/release/html_to_markdown_ffi.dll
+        elif [[ "$RUNNER_OS" == "macOS" ]]; then
+          ls -lh target/release/libhtml_to_markdown_ffi.dylib
+        else
+          ls -lh target/release/libhtml_to_markdown_ffi.so
+        fi
+
+    - name: Copy native library to resources
+      shell: bash
+      run: |
+        mkdir -p packages/java/src/main/resources
+
+        if [[ "$RUNNER_OS" == "Windows" ]]; then
+          cp target/release/html_to_markdown_ffi.dll packages/java/src/main/resources/
+        elif [[ "$RUNNER_OS" == "macOS" ]]; then
+          cp target/release/libhtml_to_markdown_ffi.dylib packages/java/src/main/resources/
+        else
+          cp target/release/libhtml_to_markdown_ffi.so packages/java/src/main/resources/
+        fi
+
+        echo "✓ Native library copied to resources"
+        ls -lh packages/java/src/main/resources/
+
+    - name: Set version in POM
+      shell: bash
+      working-directory: packages/java
+      run: |
+        mvn versions:set -DnewVersion=${{ inputs.version }} -DgenerateBackupPoms=false
+        echo "✓ Version set to ${{ inputs.version }}"
+
+    - name: Build and package JARs
+      shell: bash
+      working-directory: packages/java
+      run: |
+        # Build all JARs (main, sources, javadoc) but skip GPG signing for now
+        mvn clean package source:jar-no-fork javadoc:jar -DskipTests -Dgpg.skip=true
+
+        echo "✓ JARs built successfully"
+        ls -lh target/*.jar
+
+    - name: Rename JARs with platform classifier
+      shell: bash
+      working-directory: packages/java/target
+      run: |
+        VERSION="${{ inputs.version }}"
+        PLATFORM="${{ inputs.platform }}"
+
+        # Rename main JAR
+        mv html-to-markdown-${VERSION}.jar html-to-markdown-${VERSION}-${PLATFORM}.jar
+
+        # Sources and javadoc don't need platform classifier (they're platform-independent)
+        echo "✓ JARs renamed with platform classifier"
+        ls -lh *.jar
+
+    - name: Set output paths
+      id: set-outputs
+      shell: bash
+      run: |
+        VERSION="${{ inputs.version }}"
+        PLATFORM="${{ inputs.platform }}"
+        BASE_PATH="packages/java/target"
+
+        echo "jar_path=${BASE_PATH}/html-to-markdown-${VERSION}-${PLATFORM}.jar" >> "$GITHUB_OUTPUT"
+        echo "sources_jar_path=${BASE_PATH}/html-to-markdown-${VERSION}-sources.jar" >> "$GITHUB_OUTPUT"
+        echo "javadoc_jar_path=${BASE_PATH}/html-to-markdown-${VERSION}-javadoc.jar" >> "$GITHUB_OUTPUT"
+
+        echo "✓ Output paths set"

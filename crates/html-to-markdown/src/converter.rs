@@ -5382,7 +5382,9 @@ mod tests {
             </main>
         </body>
         "#;
-        let result = convert_html(html, &ConversionOptions::default()).unwrap();
+        let mut options = ConversionOptions::default();
+        options.preprocessing.enabled = true;
+        let result = convert_html(html, &options).unwrap();
         assert!(
             result.contains("Primary Title"),
             "article header was removed: {}",
@@ -5412,7 +5414,9 @@ mod tests {
             </article>
         </main>
         "##;
-        let result = convert_html(html, &ConversionOptions::default()).unwrap();
+        let mut options = ConversionOptions::default();
+        options.preprocessing.enabled = true;
+        let result = convert_html(html, &options).unwrap();
         assert!(
             !result.contains("NavOnly"),
             "navigation text should not appear: {}",
