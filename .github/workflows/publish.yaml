@@ -751,6 +751,12 @@ jobs:
       - name: Smoke Rust example
         uses: ./.github/actions/smoke-rust
 
+      - name: Smoke Go install
+        uses: ./.github/actions/smoke-go
+
+      - name: Smoke C# install
+        uses: ./.github/actions/smoke-csharp
+
       - name: Download CLI artifacts
         uses: actions/download-artifact@v6
         with:

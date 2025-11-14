@@ -1,0 +1,48 @@
+name: Smoke test Go bindings
+description: Tests Go cgo bindings with FFI library
+
+runs:
+  using: composite
+  steps:
+    - name: Build FFI library
+      shell: bash
+      run: |
+        set -euo pipefail
+        cargo build --release -p html-to-markdown-ffi
+
+    - name: Setup Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: '1.21'
+        check-latest: true
+
+    - name: Smoke Go install (Unix)
+      if: runner.os != 'Windows'
+      shell: bash
+      run: |
+        set -euo pipefail
+        lib_path="${GITHUB_WORKSPACE}/target/release"
+
+        if [[ "${{ runner.os }}" == "Linux" ]]; then
+          export LD_LIBRARY_PATH="$lib_path:${LD_LIBRARY_PATH:-}"
+        elif [[ "${{ runner.os }}" == "macOS" ]]; then
+          export DYLD_LIBRARY_PATH="$lib_path:${DYLD_LIBRARY_PATH:-}"
+        fi
+
+        pushd examples/go-smoke >/dev/null
+        go run main.go
+        popd >/dev/null
+        echo "✓ Go cgo bindings smoke test passed"
+
+    - name: Smoke Go install (Windows)
+      if: runner.os == 'Windows'
+      shell: bash
+      run: |
+        set -euo pipefail
+        lib_path="${GITHUB_WORKSPACE}/target/release"
+        export PATH="$lib_path:$PATH"
+
+        pushd examples/go-smoke >/dev/null
+        go run main.go
+        popd >/dev/null
+        echo "✓ Go cgo bindings smoke test passed"

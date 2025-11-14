@@ -1,0 +1,51 @@
+name: Smoke test C# bindings
+description: Tests C# P/Invoke bindings with FFI library
+
+runs:
+  using: composite
+  steps:
+    - name: Build FFI library
+      shell: bash
+      run: |
+        set -euo pipefail
+        cargo build --release -p html-to-markdown-ffi
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: '6.0.x'
+
+    - name: Smoke C# install (Unix)
+      if: runner.os != 'Windows'
+      shell: bash
+      run: |
+        set -euo pipefail
+        lib_path="${GITHUB_WORKSPACE}/target/release"
+
+        # Copy library to system location or set environment variable
+        if [[ "${{ runner.os }}" == "Linux" ]]; then
+          export LD_LIBRARY_PATH="$lib_path:${LD_LIBRARY_PATH:-}"
+          # Alternatively, we can copy to /usr/local/lib but that requires sudo
+        elif [[ "${{ runner.os }}" == "macOS" ]]; then
+          export DYLD_LIBRARY_PATH="$lib_path:${DYLD_LIBRARY_PATH:-}"
+        fi
+
+        pushd examples/csharp-smoke >/dev/null
+        dotnet run
+        popd >/dev/null
+        echo "✓ C# P/Invoke bindings smoke test passed"
+
+    - name: Smoke C# install (Windows)
+      if: runner.os == 'Windows'
+      shell: bash
+      run: |
+        set -euo pipefail
+        lib_path="${GITHUB_WORKSPACE}/target/release"
+
+        # On Windows, DLL needs to be in same directory or in PATH
+        export PATH="$lib_path:$PATH"
+
+        pushd examples/csharp-smoke >/dev/null
+        dotnet run
+        popd >/dev/null
+        echo "✓ C# P/Invoke bindings smoke test passed"
