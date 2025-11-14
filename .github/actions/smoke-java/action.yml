@@ -1,0 +1,40 @@
+name: Smoke test Java bindings
+description: Tests Java JAR installation and functionality
+
+inputs:
+  jar-path:
+    description: Path to the JAR file (optional, uses local if not provided)
+    required: false
+    default: ""
+
+runs:
+  using: composite
+  steps:
+    - name: Smoke Java install
+      shell: bash
+      run: |
+        set -euo pipefail
+        tmp=$(mktemp -d)
+        cp -R examples/java-smoke/. "$tmp"/
+        pushd "$tmp" >/dev/null
+
+        if [[ -n "${{ inputs.jar-path }}" ]]; then
+          # Install the JAR to local Maven repository
+          mvn install:install-file \
+            -Dfile="${{ inputs.jar-path }}" \
+            -DgroupId=io.github.goldziher \
+            -DartifactId=html-to-markdown \
+            -Dversion=2.7.3 \
+            -Dpackaging=jar \
+            -DgeneratePom=true
+        else
+          # Install from local packages/java/target
+          pushd "${GITHUB_WORKSPACE}/packages/java" >/dev/null
+          mvn install -DskipTests
+          popd >/dev/null
+        fi
+
+        # Compile and run the smoke test
+        mvn compile exec:java -Dexec.mainClass="io.github.goldziher.htmltomarkdown.SmokeTest"
+        popd >/dev/null
+        echo "✓ Java JAR smoke test passed"
