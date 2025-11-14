@@ -1,0 +1,12 @@
+# Type signature for Open3 standard library
+module Open3
+  # Execute command and capture stdout, stderr, and status
+  #
+  # @param cmd Command to execute
+  # @param args Command arguments
+  # @return Array containing stdout (String), stderr (String), and status (Process::Status)
+  def self.capture3: (
+    String cmd,
+    *String args
+  ) -> [String, String, Process::Status]
+end

@@ -41,12 +41,22 @@ async function loadJson<T>(value: string, label: string): Promise<T> {
   }
 }
 
+function getNextArg(args: string[], index: number, flagName: string): string {
+  const value = args[index + 1];
+  if (value === undefined) {
+    throw new Error(`Missing value for ${flagName}`);
+  }
+  return value;
+}
+
 async function parseArgs(): Promise<CliOptions | "help" | "version"> {
   const args = process.argv.slice(2);
   const opts: CliOptions = {};
 
   for (let index = 0; index < args.length; index += 1) {
     const arg = args[index];
+    if (arg === undefined) continue;
+
     switch (arg) {
       case "-h":
       case "--help":
@@ -55,19 +65,26 @@ async function parseArgs(): Promise<CliOptions | "help" | "version"> {
       case "--version":
         return "version";
       case "--input":
-        opts.input = args[++index];
+        opts.input = getNextArg(args, index, "--input");
+        index += 1;
         break;
       case "--output":
-        opts.output = args[++index];
+        opts.output = getNextArg(args, index, "--output");
+        index += 1;
         break;
       case "--options":
-        opts.options = await loadJson<JsConversionOptions>(args[++index], "--options");
+        opts.options = await loadJson<JsConversionOptions>(getNextArg(args, index, "--options"), "--options");
+        index += 1;
         break;
       case "--inline-images":
         opts.inlineImages = true;
         break;
       case "--inline-image-config":
-        opts.inlineImageConfig = await loadJson<JsInlineImageConfig>(args[++index], "--inline-image-config");
+        opts.inlineImageConfig = await loadJson<JsInlineImageConfig>(
+          getNextArg(args, index, "--inline-image-config"),
+          "--inline-image-config",
+        );
+        index += 1;
         break;
       default:
         throw new Error(`Unknown argument: ${arg}`);

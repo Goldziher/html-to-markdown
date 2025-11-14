@@ -42,11 +42,11 @@ module HtmlToMarkdown
     end
 
     def root_path
-      @root_path ||= Pathname(__dir__).join('../..').expand_path
+      @root_path ||= Pathname(__dir__.to_s).join('../..').expand_path
     end
 
     def lib_path
-      @lib_path ||= Pathname(__dir__).join('..').expand_path
+      @lib_path ||= Pathname(__dir__.to_s).join('..').expand_path
     end
 
     def search_paths(binary_name)

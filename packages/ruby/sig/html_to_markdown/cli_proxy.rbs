@@ -16,6 +16,8 @@ module HtmlToMarkdown
       def initialize: (String message, stderr: String, status: Integer?) -> void
     end
 
+    # Module methods (module_function creates both module and instance methods)
+
     # Execute CLI with given arguments
     def self.call: (Array[String] argv) -> String
 
@@ -33,5 +35,14 @@ module HtmlToMarkdown
 
     # Get error message for missing binary
     def self.missing_binary_message: () -> String
+
+    # Instance method versions (created by module_function)
+
+    def call: (Array[String] argv) -> String
+    def find_cli_binary: () -> Pathname
+    def root_path: () -> Pathname
+    def lib_path: () -> Pathname
+    def search_paths: (String binary_name) -> Array[Pathname]
+    def missing_binary_message: () -> String
   end
 end
