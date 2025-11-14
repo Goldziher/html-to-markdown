@@ -19,4 +19,8 @@ target :lib do
 
   # Ignore bin directory
   ignore "bin"
+
+  # Ignore internal implementation modules (not public API)
+  ignore "lib/html_to_markdown/cli.rb"
+  ignore "lib/html_to_markdown/cli_proxy.rb"
 end
