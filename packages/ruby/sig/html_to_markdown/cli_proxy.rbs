@@ -33,13 +33,5 @@ module HtmlToMarkdown
 
     # Get error message for missing binary
     def self.missing_binary_message: () -> String
-
-    # Module function versions
-    def self?.call: (Array[String] argv) -> String
-    def self?.find_cli_binary: () -> Pathname
-    def self?.root_path: () -> Pathname
-    def self?.lib_path: () -> Pathname
-    def self?.search_paths: (String binary_name) -> Array[Pathname]
-    def self?.missing_binary_message: () -> String
   end
 end

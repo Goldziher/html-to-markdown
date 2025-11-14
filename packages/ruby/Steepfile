@@ -14,21 +14,9 @@ target :lib do
   # Ignore vendor directory
   ignore "vendor"
 
-  # Ignore specs during type checking (they're checked separately)
+  # Ignore spec directory
   ignore "spec"
 
   # Ignore bin directory
   ignore "bin"
-end
-
-target :spec do
-  signature "sig"
-
-  check "spec"
-
-  library "pathname"
-  library "open3"
-
-  # Include RSpec types if available
-  # library "rspec"
 end

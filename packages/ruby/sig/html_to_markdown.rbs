@@ -102,20 +102,4 @@ module HtmlToMarkdown
     ?conversion_options? options,
     ?inline_image_config? image_config
   ) -> html_extraction
-
-  # Convert HTML to Markdown (module function alias)
-  def self?.convert: (String html, ?conversion_options? options) -> String
-
-  # Create options handle (module function alias)
-  def self?.options: (?conversion_options? options_hash) -> Options
-
-  # Convert with options handle (module function alias)
-  def self?.convert_with_options: (String html, Options options_handle) -> String
-
-  # Convert with inline images (module function alias)
-  def self?.convert_with_inline_images: (
-    String html,
-    ?conversion_options? options,
-    ?inline_image_config? image_config
-  ) -> html_extraction
 end

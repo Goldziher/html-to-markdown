@@ -11,11 +11,5 @@ module HtmlToMarkdown
       ?stdout: IO,
       ?stderr: IO
     ) -> Integer
-
-    def self?.run: (
-      ?Array[String] argv,
-      ?stdout: IO,
-      ?stderr: IO
-    ) -> Integer
   end
 end
