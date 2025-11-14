@@ -780,26 +780,19 @@ jobs:
           cp node-typescript-defs/index.js node-typescript-defs/index.d.ts crates/html-to-markdown-node/
 
       - name: Pack Node tarball from artifacts
+        id: pack_node
         run: |
           set -euo pipefail
           pushd crates/html-to-markdown-node >/dev/null
           NODE_TGZ=$(npm pack | tail -n 1 | tr -d '\r')
           mv "$NODE_TGZ" "$GITHUB_WORKSPACE/$NODE_TGZ"
           popd >/dev/null
-          echo "NODE_TGZ=$GITHUB_WORKSPACE/$NODE_TGZ" >> "$GITHUB_ENV"
+          echo "tarball=$GITHUB_WORKSPACE/$NODE_TGZ" >> "$GITHUB_OUTPUT"
 
       - name: Smoke Node install
-        run: |
-          set -euo pipefail
-          tmp=$(mktemp -d)
-          cp -R examples/node-smoke/. "$tmp"/
-          pushd "$tmp" >/dev/null
-          cp "$NODE_TGZ" ./node.tgz
-          node -e "const fs=require('fs');const pkg=JSON.parse(fs.readFileSync('package.json','utf8'));pkg.dependencies=pkg.dependencies||{};pkg.dependencies['html-to-markdown-node']='file:./node.tgz';fs.writeFileSync('package.json',JSON.stringify(pkg,null,2)+ '\n');"
-          rm -f pnpm-lock.yaml
-          pnpm install --no-frozen-lockfile
-          pnpm run check
-          popd >/dev/null
+        uses: ./.github/actions/smoke-node
+        with:
+          node-tarball: ${{ steps.pack_node.outputs.tarball }}
 
       - name: Prepare WASM package from artifacts
         run: |
@@ -819,109 +812,42 @@ jobs:
           popd >/dev/null
 
       - name: Pack WASM tarball from artifacts
+        id: pack_wasm
         run: |
           set -euo pipefail
           pushd crates/html-to-markdown-wasm >/dev/null
           WASM_TGZ=$(npm pack | tail -n 1 | tr -d '\r')
           mv "$WASM_TGZ" "$GITHUB_WORKSPACE/$WASM_TGZ"
           popd >/dev/null
-          echo "WASM_TGZ=$GITHUB_WORKSPACE/$WASM_TGZ" >> "$GITHUB_ENV"
+          echo "tarball=$GITHUB_WORKSPACE/$WASM_TGZ" >> "$GITHUB_OUTPUT"
 
       - name: Smoke WASM install
-        run: |
-          set -euo pipefail
-          tmp=$(mktemp -d)
-          cp -R examples/wasm-smoke/. "$tmp"/
-          pushd "$tmp" >/dev/null
-          cp "$WASM_TGZ" ./wasm.tgz
-          node -e "const fs=require('fs');const pkg=JSON.parse(fs.readFileSync('package.json','utf8'));pkg.dependencies=pkg.dependencies||{};pkg.dependencies['html-to-markdown-wasm']='file:./wasm.tgz';fs.writeFileSync('package.json',JSON.stringify(pkg,null,2)+ '\n');"
-          rm -f pnpm-lock.yaml
-          pnpm install --no-frozen-lockfile
-          pnpm run check
-          popd >/dev/null
+        uses: ./.github/actions/smoke-wasm
+        with:
+          wasm-tarball: ${{ steps.pack_wasm.outputs.tarball }}
 
       - name: Smoke Python install
-        run: |
-          set -euo pipefail
-          tmp=$(mktemp -d)
-          cp -R examples/python-smoke/. "$tmp"/
-          pushd "$tmp" >/dev/null
-          python -m venv .venv
-          if [[ "$RUNNER_OS" == "Windows" ]]; then
-            VENV_PY=".venv/Scripts/python.exe"
-          else
-            VENV_PY=".venv/bin/python"
-          fi
-          "$VENV_PY" -m pip install --upgrade pip
-          wheel_path=$("$VENV_PY" - <<'PY'
-          import os
-          import sys
-          from pathlib import Path
-          root = Path(os.environ["GITHUB_WORKSPACE"]) / "python-wheels"
-          for path in root.rglob("*.whl"):
-              print(path)
-              break
-          else:
-              sys.exit("No wheel found")
-          PY
-          )
-          "$VENV_PY" -m pip install "$wheel_path"
-          "$VENV_PY" main.py
-          popd >/dev/null
+        uses: ./.github/actions/smoke-python
 
       - name: Smoke Ruby install
         if: runner.os != 'Windows'
-        run: |
-          set -euo pipefail
-          tmp=$(mktemp -d)
-          cp -R examples/ruby-smoke/. "$tmp"/
-          pushd "$tmp" >/dev/null
-          bundle config set --local path vendor/bundle
-          gem_file=$(ls "$GITHUB_WORKSPACE"/ruby-gems/html-to-markdown-*.gem | head -n 1)
-          if [ -z "$gem_file" ]; then
-            echo "No Ruby gem artifact found" >&2
-            exit 1
-          fi
-          mkdir -p vendor/local-gems
-          gem unpack "$gem_file" --target vendor/local-gems >/dev/null
-          gem_dir=$(find vendor/local-gems -maxdepth 1 -type d -name 'html-to-markdown-*' | head -n 1)
-          bundle config set --local local.html-to-markdown "$gem_dir"
-          bundle install
-          bundle exec ruby app.rb
-          popd >/dev/null
+        uses: ./.github/actions/smoke-ruby
 
       - name: Build PHP extension
         if: runner.os == 'Linux'
-        env:
-          PHP_CONFIG: ${{ env.PHP_CONFIG }}
-        run: cargo build --release -p html-to-markdown-php
+        id: build_php_smoke
+        uses: ./.github/actions/build-php-linux
+        with:
+          php-config: ${{ env.PHP_CONFIG }}
 
       - name: Smoke PHP install
         if: runner.os == 'Linux'
-        env:
-          EXT_PATH: ${{ github.workspace }}/target/release/libhtml_to_markdown_php.so
-          COMPOSER_ALLOW_SUPERUSER: 1
-        run: |
-          set -euo pipefail
-          tmp=$(mktemp -d)
-          cp -R examples/php-smoke/. "$tmp"/
-          pushd "$tmp" >/dev/null
-          composer_bin=$(command -v composer)
-          php -d "extension=$EXT_PATH" "$composer_bin" config repositories.local path "${GITHUB_WORKSPACE}/packages/php" --no-plugins
-          php -d "extension=$EXT_PATH" "$composer_bin" config repositories.local.options.symlink false --no-plugins
-          php -d "extension=$EXT_PATH" "$composer_bin" install --no-interaction --no-progress --no-scripts
-          php -d "extension=$EXT_PATH" convert.php
-          popd >/dev/null
+        uses: ./.github/actions/smoke-php-linux
+        with:
+          extension-path: ${{ steps.build_php_smoke.outputs.extension-path }}
 
       - name: Smoke Rust example
-        run: |
-          set -euo pipefail
-          pushd examples/rust-smoke >/dev/null
-          mkdir -p .cargo
-          cp .cargo/config.local-template.toml .cargo/config.toml
-          cargo run --quiet
-          rm .cargo/config.toml
-          popd >/dev/null
+        uses: ./.github/actions/smoke-rust
 
       - name: Download CLI artifacts
         uses: actions/download-artifact@v6
