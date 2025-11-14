@@ -9,7 +9,9 @@ gemspec
 group :development, :test do
   gem 'rake-compiler'
   gem 'rb_sys' # provides build tooling when developing locally
+  gem 'rbs', require: false
   gem 'rspec'
   gem 'rubocop', require: false
   gem 'rubocop-rspec', require: false
+  gem 'steep', require: false
 end

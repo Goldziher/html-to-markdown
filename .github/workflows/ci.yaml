@@ -231,6 +231,16 @@ jobs:
         working-directory: packages/ruby
         run: bundle exec rubocop --config .rubocop.yml
 
+      - name: Validate RBS signatures (Unix)
+        if: runner.os != 'Windows' && matrix.os == 'ubuntu-latest' && matrix.ruby == '3.3'
+        working-directory: packages/ruby
+        run: bundle exec rbs validate
+
+      - name: Run Steep type checking (Unix)
+        if: runner.os != 'Windows' && matrix.os == 'ubuntu-latest' && matrix.ruby == '3.3'
+        working-directory: packages/ruby
+        run: bundle exec steep check
+
       - name: Build Ruby extension (Windows)
         if: runner.os == 'Windows'
         uses: ./.github/actions/build-ruby-windows

@@ -1,0 +1,45 @@
+module HtmlToMarkdown
+  module CLIProxy
+    # Base error class
+    class Error < StandardError
+    end
+
+    # Error when CLI binary is not found
+    class MissingBinaryError < Error
+    end
+
+    # Error when CLI execution fails
+    class CLIExecutionError < Error
+      attr_reader stderr: String
+      attr_reader status: Integer?
+
+      def initialize: (String message, stderr: String, status: Integer?) -> void
+    end
+
+    # Execute CLI with given arguments
+    def self.call: (Array[String] argv) -> String
+
+    # Find the CLI binary in search paths
+    def self.find_cli_binary: () -> Pathname
+
+    # Get root path of the gem
+    def self.root_path: () -> Pathname
+
+    # Get lib path of the gem
+    def self.lib_path: () -> Pathname
+
+    # Get search paths for CLI binary
+    def self.search_paths: (String binary_name) -> Array[Pathname]
+
+    # Get error message for missing binary
+    def self.missing_binary_message: () -> String
+
+    # Module function versions
+    def self?.call: (Array[String] argv) -> String
+    def self?.find_cli_binary: () -> Pathname
+    def self?.root_path: () -> Pathname
+    def self?.lib_path: () -> Pathname
+    def self?.search_paths: (String binary_name) -> Array[Pathname]
+    def self?.missing_binary_message: () -> String
+  end
+end

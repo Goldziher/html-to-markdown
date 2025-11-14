@@ -1,0 +1,121 @@
+# Type definitions for HtmlToMarkdown Ruby gem
+module HtmlToMarkdown
+  VERSION: String
+
+  # Opaque handle for reusable conversion options
+  class Options
+  end
+
+  type heading_style = :underlined | :atx | :atx_closed
+  type list_indent_type = :spaces | :tabs
+  type highlight_style = :double_equal | :html | :bold | :none
+  type whitespace_mode = :normalized | :strict
+  type newline_style = :spaces | :backslash
+  type code_block_style = :indented | :backticks | :tildes
+  type preprocessing_preset = :minimal | :standard | :aggressive
+
+  type preprocessing_options = {
+    enabled: bool,
+    preset: preprocessing_preset,
+    remove_navigation: bool,
+    remove_forms: bool
+  }
+
+  type conversion_options = {
+    heading_style: heading_style,
+    list_indent_type: list_indent_type,
+    list_indent_width: Integer,
+    bullets: String,
+    strong_em_symbol: String,
+    escape_asterisks: bool,
+    escape_underscores: bool,
+    escape_misc: bool,
+    escape_ascii: bool,
+    code_language: String,
+    autolinks: bool,
+    default_title: bool,
+    br_in_tables: bool,
+    hocr_spatial_tables: bool,
+    highlight_style: highlight_style,
+    extract_metadata: bool,
+    whitespace_mode: whitespace_mode,
+    strip_newlines: bool,
+    wrap: bool,
+    wrap_width: Integer,
+    convert_as_inline: bool,
+    sub_symbol: String,
+    sup_symbol: String,
+    newline_style: newline_style,
+    code_block_style: code_block_style,
+    keep_inline_images_in: Array[String],
+    preprocessing: preprocessing_options,
+    encoding: String,
+    debug: bool,
+    strip_tags: Array[String],
+    preserve_tags: Array[String]
+  }
+
+  type inline_image_config = {
+    max_decoded_size_bytes: Integer,
+    filename_prefix: String?,
+    capture_svg: bool,
+    infer_dimensions: bool
+  }
+
+  type inline_image_format = "png" | "jpeg" | "gif" | "bmp" | "webp" | "svg" | String
+
+  type inline_image_source = "img_data_uri" | "svg_element"
+
+  type inline_image = {
+    data: String,
+    format: inline_image_format,
+    filename: String?,
+    description: String?,
+    dimensions: [Integer, Integer]?,
+    source: inline_image_source,
+    attributes: Hash[String, String]
+  }
+
+  type inline_image_warning = {
+    index: Integer,
+    message: String
+  }
+
+  type html_extraction = {
+    markdown: String,
+    inline_images: Array[inline_image],
+    warnings: Array[inline_image_warning]
+  }
+
+  # Convert HTML to Markdown with optional configuration
+  def self.convert: (String html, ?conversion_options? options) -> String
+
+  # Create a reusable options handle for performance
+  def self.options: (?conversion_options? options_hash) -> Options
+
+  # Convert HTML using a pre-built options handle
+  def self.convert_with_options: (String html, Options options_handle) -> String
+
+  # Convert HTML with inline image extraction
+  def self.convert_with_inline_images: (
+    String html,
+    ?conversion_options? options,
+    ?inline_image_config? image_config
+  ) -> html_extraction
+
+  # Convert HTML to Markdown (module function alias)
+  def self?.convert: (String html, ?conversion_options? options) -> String
+
+  # Create options handle (module function alias)
+  def self?.options: (?conversion_options? options_hash) -> Options
+
+  # Convert with options handle (module function alias)
+  def self?.convert_with_options: (String html, Options options_handle) -> String
+
+  # Convert with inline images (module function alias)
+  def self?.convert_with_inline_images: (
+    String html,
+    ?conversion_options? options,
+    ?inline_image_config? image_config
+  ) -> html_extraction
+end
