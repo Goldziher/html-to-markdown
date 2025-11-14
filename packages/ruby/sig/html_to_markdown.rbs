@@ -87,6 +87,30 @@ module HtmlToMarkdown
     warnings: Array[inline_image_warning]
   }
 
+  # Native methods (implemented in Rust via Magnus/rb-sys)
+  # These are aliased from the Rust extension and available as both module and instance methods
+  private
+
+  def self.native_convert: (String html, conversion_options? options) -> String
+  def self.native_options: (conversion_options? options_hash) -> Options
+  def self.native_convert_with_options: (String html, Options options_handle) -> String
+  def self.native_convert_with_inline_images: (
+    String html,
+    conversion_options? options,
+    inline_image_config? image_config
+  ) -> html_extraction
+
+  def native_convert: (String html, conversion_options? options) -> String
+  def native_options: (conversion_options? options_hash) -> Options
+  def native_convert_with_options: (String html, Options options_handle) -> String
+  def native_convert_with_inline_images: (
+    String html,
+    conversion_options? options,
+    inline_image_config? image_config
+  ) -> html_extraction
+
+  public
+
   # Convert HTML to Markdown with optional configuration
   def self.convert: (String html, ?conversion_options? options) -> String
 
@@ -98,6 +122,16 @@ module HtmlToMarkdown
 
   # Convert HTML with inline image extraction
   def self.convert_with_inline_images: (
+    String html,
+    ?conversion_options? options,
+    ?inline_image_config? image_config
+  ) -> html_extraction
+
+  # Instance method versions (created by module_function)
+  def convert: (String html, ?conversion_options? options) -> String
+  def options: (?conversion_options? options_hash) -> Options
+  def convert_with_options: (String html, Options options_handle) -> String
+  def convert_with_inline_images: (
     String html,
     ?conversion_options? options,
     ?inline_image_config? image_config
