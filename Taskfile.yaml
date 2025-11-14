@@ -357,11 +357,13 @@ tasks:
       - cmd: cd packages/ruby && PATH={{.RUBY_BIN}}:$PATH bundle _{{.BUNDLER_VERSION}}_ exec rake spec
 
   ruby:lint:
-    desc: "Lint Ruby code"
+    desc: "Lint Ruby code with Rubocop, RBS, and Steep"
     cmds:
       - task: ruby:ensure-bundler
       - cmd: cd packages/ruby && BUNDLE_PATH=vendor/bundle PATH={{.RUBY_BIN}}:$PATH bundle _{{.BUNDLER_VERSION}}_ install
       - cmd: cd packages/ruby && BUNDLE_PATH=vendor/bundle PATH={{.RUBY_BIN}}:$PATH bundle _{{.BUNDLER_VERSION}}_ exec rubocop --config ./.rubocop.yml
+      - cmd: cd packages/ruby && BUNDLE_PATH=vendor/bundle PATH={{.RUBY_BIN}}:$PATH bundle _{{.BUNDLER_VERSION}}_ exec rbs validate
+      - cmd: cd packages/ruby && BUNDLE_PATH=vendor/bundle PATH={{.RUBY_BIN}}:$PATH bundle _{{.BUNDLER_VERSION}}_ exec steep check
 
   ruby:format:
     desc: "Auto-correct Ruby lint issues"
