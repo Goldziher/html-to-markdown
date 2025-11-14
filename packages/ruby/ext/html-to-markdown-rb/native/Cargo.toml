@@ -1,6 +1,6 @@
 [package]
 name = "html-to-markdown-rb"
-version = "2.7.2"
+version = "2.7.3"
 edition = "2024"
 authors = ["Na'aman Hirschfeld <nhirschfeld@gmail.com>"]
 license = "MIT"
@@ -21,7 +21,7 @@ crate-type = ["cdylib", "rlib"]
 default = []
 
 [dependencies]
-html-to-markdown-rs = { version = "2.7.1", features = ["inline-images"] }
+html-to-markdown-rs = { version = "2.7.3", features = ["inline-images"] }
 magnus = { git = "https://github.com/matsadler/magnus", rev = "f6db11769efb517427bf7f121f9c32e18b059b38", features = ["rb-sys"] }
 
 [dev-dependencies]
