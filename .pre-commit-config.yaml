@@ -58,6 +58,7 @@ repos:
     hooks:
       - id: golangci-lint
         args: ["--config", ".golangci.yml"]
+        files: ^packages/go/|^examples/go-smoke/
   - repo: local
     hooks:
       - id: mypy
