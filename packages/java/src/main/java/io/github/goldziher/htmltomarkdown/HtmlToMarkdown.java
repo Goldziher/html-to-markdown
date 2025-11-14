@@ -28,7 +28,7 @@ import java.lang.foreign.MemorySegment;
  * <b>Performance:</b> The underlying Rust implementation provides 60-80x higher
  * throughput compared to pure Java HTML-to-Markdown converters.
  *
- * @since 2.7.2
+ * @since 2.7.3
  */
 public final class HtmlToMarkdown {
 
