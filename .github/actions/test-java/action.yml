@@ -1,0 +1,43 @@
+name: Test Java Panama FFI bindings
+description: Setup Java, build native library, and run Java tests
+
+inputs:
+  java-version:
+    description: Java version to use
+    required: false
+    default: "22"
+
+runs:
+  using: composite
+  steps:
+    - name: Setup Java
+      uses: actions/setup-java@v4
+      with:
+        distribution: temurin
+        java-version: ${{ inputs.java-version }}
+        cache: maven
+
+    - name: Setup Rust
+      uses: actions-rust-lang/setup-rust-toolchain@v1
+
+    - name: Build native library
+      shell: bash
+      run: |
+        cargo build --release --package html-to-markdown-ffi
+        if [[ "$RUNNER_OS" == "Windows" ]]; then
+          cp target/release/html_to_markdown_ffi.dll packages/java/src/main/resources/
+        elif [[ "$RUNNER_OS" == "macOS" ]]; then
+          cp target/release/libhtml_to_markdown_ffi.dylib packages/java/src/main/resources/
+        else
+          cp target/release/libhtml_to_markdown_ffi.so packages/java/src/main/resources/
+        fi
+
+    - name: Run Java tests
+      shell: bash
+      working-directory: packages/java
+      run: |
+        if [[ "$RUNNER_OS" == "Windows" ]]; then
+          export PATH="${GITHUB_WORKSPACE}/packages/java/src/main/resources:${PATH}"
+        fi
+        mvn clean test
+        echo "✓ Java Panama FFI bindings test completed"
