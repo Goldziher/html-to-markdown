@@ -53,6 +53,12 @@ repos:
       - id: cpd
       - id: checkstyle
         args: ["-c", "packages/java/checkstyle.xml"]
+  - repo: https://github.com/golangci/golangci-lint
+    rev: v1.63.4
+    hooks:
+      - id: golangci-lint
+        args: ["--config", ".golangci.yml"]
+      - id: golangci-lint-config-verify
   - repo: local
     hooks:
       - id: mypy
