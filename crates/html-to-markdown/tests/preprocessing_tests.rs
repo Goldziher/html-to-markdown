@@ -1,4 +1,4 @@
-use html_to_markdown_rs::convert;
+use html_to_markdown_rs::{ConversionOptions, convert};
 
 #[test]
 fn footer_without_navigation_hint_is_preserved() {
@@ -38,7 +38,9 @@ fn footer_with_navigation_hint_is_removed() {
   </body>
 </html>"#;
 
-    let markdown = convert(html, None).unwrap();
+    let mut options = ConversionOptions::default();
+    options.preprocessing.enabled = true;
+    let markdown = convert(html, Some(options)).unwrap();
     assert!(
         !markdown.contains("processors validation"),
         "navigational footers should still be stripped entirely:\n{}",

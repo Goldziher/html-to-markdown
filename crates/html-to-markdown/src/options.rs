@@ -228,7 +228,7 @@ pub struct PreprocessingOptions {
 impl Default for PreprocessingOptions {
     fn default() -> Self {
         Self {
-            enabled: true,
+            enabled: false,
             preset: PreprocessingPreset::default(),
             remove_navigation: true,
             remove_forms: true,
