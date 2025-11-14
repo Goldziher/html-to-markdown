@@ -50,10 +50,9 @@ repos:
   - repo: https://github.com/gherynos/pre-commit-java
     rev: v0.6.27
     hooks:
-      - id: pmd
-        args: ["-R", "packages/java/pmd-ruleset.xml"]
       - id: cpd
       - id: checkstyle
+        args: ["-c", "packages/java/checkstyle.xml"]
   - repo: local
     hooks:
       - id: mypy

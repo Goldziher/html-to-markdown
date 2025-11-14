@@ -9,6 +9,12 @@ import static org.junit.jupiter.api.Assertions.*;
  */
 class HtmlToMarkdownTest {
 
+    /** Number of sections for large document test. */
+    private static final int LARGE_DOC_SECTIONS = 100;
+
+    /** Minimum length for large document output. */
+    private static final int LARGE_DOC_MIN_LENGTH = 1000;
+
     @Test
     @DisplayName("Basic heading conversion")
     void testBasicHeading() {
@@ -35,9 +41,9 @@ class HtmlToMarkdownTest {
         String html = "<ul><li>Item 1</li><li>Item 2</li><li>Item 3</li></ul>";
         String markdown = HtmlToMarkdown.convert(html);
 
-        assertTrue(markdown.contains("Item 1") &&
-                   markdown.contains("Item 2") &&
-                   markdown.contains("Item 3"),
+        assertTrue(markdown.contains("Item 1")
+                   && markdown.contains("Item 2")
+                   && markdown.contains("Item 3"),
             "Expected list items to be present, got: " + markdown);
     }
 
@@ -47,10 +53,10 @@ class HtmlToMarkdownTest {
         String html = "<ol><li>First</li><li>Second</li><li>Third</li></ol>";
         String markdown = HtmlToMarkdown.convert(html);
 
-        assertTrue(markdown.contains("First") &&
-                   markdown.contains("Second") &&
-                   markdown.contains("Third"),
-            "Expected ordered list items to be present, got: " + markdown);
+        assertTrue(markdown.contains("First")
+                   && markdown.contains("Second")
+                   && markdown.contains("Third"),
+            "Expected ordered list items, got: " + markdown);
     }
 
     @Test
@@ -59,19 +65,21 @@ class HtmlToMarkdownTest {
         String html = "<a href=\"https://example.com\">Example</a>";
         String markdown = HtmlToMarkdown.convert(html);
 
-        assertTrue(markdown.contains("[Example]") &&
-                   markdown.contains("(https://example.com)"),
+        assertTrue(markdown.contains("[Example]")
+                   && markdown.contains("(https://example.com)"),
             "Expected markdown link format, got: " + markdown);
     }
 
     @Test
     @DisplayName("Code block conversion")
     void testCodeBlock() {
-        String html = "<pre><code>function test() { return true; }</code></pre>";
+        String html = "<pre><code>"
+            + "function test() { return true; }"
+            + "</code></pre>";
         String markdown = HtmlToMarkdown.convert(html);
 
         assertTrue(markdown.contains("function test()"),
-            "Expected code block content to be present, got: " + markdown);
+            "Expected code block content, got: " + markdown);
     }
 
     @Test
@@ -81,7 +89,7 @@ class HtmlToMarkdownTest {
         String markdown = HtmlToMarkdown.convert(html);
 
         assertTrue(markdown.contains("`convert()`"),
-            "Expected inline code to be wrapped in backticks, got: " + markdown);
+            "Expected inline code in backticks, got: " + markdown);
     }
 
     @Test
@@ -90,7 +98,8 @@ class HtmlToMarkdownTest {
         String html = "<p>This is <em>important</em>.</p>";
         String markdown = HtmlToMarkdown.convert(html);
 
-        assertTrue(markdown.contains("*important*") || markdown.contains("_important_"),
+        assertTrue(markdown.contains("*important*")
+                   || markdown.contains("_important_"),
             "Expected emphasis to be converted, got: " + markdown);
     }
 
@@ -100,21 +109,26 @@ class HtmlToMarkdownTest {
         String html = "<blockquote>This is a quote</blockquote>";
         String markdown = HtmlToMarkdown.convert(html);
 
-        assertTrue(markdown.contains("> ") && markdown.contains("This is a quote"),
+        assertTrue(markdown.contains("> ")
+                   && markdown.contains("This is a quote"),
             "Expected blockquote format, got: " + markdown);
     }
 
     @Test
     @DisplayName("Complex nested HTML")
     void testComplexNested() {
-        String html = "<div><h2>Section</h2><p>Text with <strong>bold</strong> and <em>italic</em>.</p><ul><li>Item 1</li><li>Item 2</li></ul></div>";
+        String html = "<div><h2>Section</h2>"
+            + "<p>Text with <strong>bold</strong> "
+            + "and <em>italic</em>.</p>"
+            + "<ul><li>Item 1</li><li>Item 2</li></ul></div>";
         String markdown = HtmlToMarkdown.convert(html);
 
-        assertTrue(markdown.contains("## Section") &&
-                   markdown.contains("**bold**") &&
-                   (markdown.contains("*italic*") || markdown.contains("_italic_")) &&
-                   markdown.contains("Item 1"),
-            "Expected all elements to be converted, got: " + markdown);
+        assertTrue(markdown.contains("## Section")
+                   && markdown.contains("**bold**")
+                   && (markdown.contains("*italic*")
+                       || markdown.contains("_italic_"))
+                   && markdown.contains("Item 1"),
+            "Expected all elements, got: " + markdown);
     }
 
     @Test
@@ -147,14 +161,16 @@ class HtmlToMarkdownTest {
     @Test
     @DisplayName("Table conversion")
     void testTable() {
-        String html = "<table><tr><th>Name</th><th>Age</th></tr><tr><td>Alice</td><td>30</td></tr><tr><td>Bob</td><td>25</td></tr></table>";
+        String html = "<table><tr><th>Name</th><th>Age</th></tr>"
+            + "<tr><td>Alice</td><td>30</td></tr>"
+            + "<tr><td>Bob</td><td>25</td></tr></table>";
         String markdown = HtmlToMarkdown.convert(html);
 
-        assertTrue(markdown.contains("Name") &&
-                   markdown.contains("Age") &&
-                   markdown.contains("Alice") &&
-                   markdown.contains("Bob"),
-            "Expected table content to be present, got: " + markdown);
+        assertTrue(markdown.contains("Name")
+                   && markdown.contains("Age")
+                   && markdown.contains("Alice")
+                   && markdown.contains("Bob"),
+            "Expected table content, got: " + markdown);
     }
 
     @Test
@@ -163,8 +179,8 @@ class HtmlToMarkdownTest {
         String html = "<img src=\"image.png\" alt=\"Test Image\">";
         String markdown = HtmlToMarkdown.convert(html);
 
-        assertTrue(markdown.contains("![Test Image]") &&
-                   markdown.contains("(image.png)"),
+        assertTrue(markdown.contains("![Test Image]")
+                   && markdown.contains("(image.png)"),
             "Expected markdown image format, got: " + markdown);
     }
 
@@ -174,10 +190,12 @@ class HtmlToMarkdownTest {
         String html = "<p>Before</p><hr><p>After</p>";
         String markdown = HtmlToMarkdown.convert(html);
 
-        assertTrue(markdown.contains("Before") &&
-                   markdown.contains("After") &&
-                   (markdown.contains("---") || markdown.contains("* * *") || markdown.contains("___")),
-            "Expected horizontal rule to be present, got: " + markdown);
+        assertTrue(markdown.contains("Before")
+                   && markdown.contains("After")
+                   && (markdown.contains("---")
+                       || markdown.contains("* * *")
+                       || markdown.contains("___")),
+            "Expected horizontal rule, got: " + markdown);
     }
 
     @Test
@@ -186,9 +204,10 @@ class HtmlToMarkdownTest {
         String version = HtmlToMarkdown.getVersion();
 
         assertNotNull(version, "Version should not be null");
-        assertFalse(version.isEmpty(), "Version should not be empty");
+        assertFalse(version.isEmpty(),
+            "Version should not be empty");
         assertTrue(version.matches("\\d+\\.\\d+\\.\\d+"),
-            "Version should match semver format (x.y.z), got: " + version);
+            "Version should match semver (x.y.z), got: " + version);
     }
 
     @Test
@@ -212,9 +231,10 @@ class HtmlToMarkdownTest {
     void testLargeDocument() {
         StringBuilder html = new StringBuilder();
         html.append("<article>");
-        for (int i = 1; i <= 100; i++) {
+        for (int i = 1; i <= LARGE_DOC_SECTIONS; i++) {
             html.append("<h2>Section ").append(i).append("</h2>");
-            html.append("<p>This is paragraph ").append(i).append(" with <strong>bold</strong> text.</p>");
+            html.append("<p>This is paragraph ").append(i)
+                .append(" with <strong>bold</strong> text.</p>");
             html.append("<ul><li>Item A</li><li>Item B</li></ul>");
         }
         html.append("</article>");
@@ -222,30 +242,36 @@ class HtmlToMarkdownTest {
         String markdown = HtmlToMarkdown.convert(html.toString());
 
         assertNotNull(markdown, "Markdown should not be null");
-        assertTrue(markdown.contains("## Section 1"), "Should contain first section");
-        assertTrue(markdown.contains("## Section 100"), "Should contain last section");
-        assertTrue(markdown.length() > 1000, "Markdown should be substantial in length");
+        assertTrue(markdown.contains("## Section 1"),
+            "Should contain first section");
+        assertTrue(markdown.contains("## Section 100"),
+            "Should contain last section");
+        assertTrue(markdown.length() > LARGE_DOC_MIN_LENGTH,
+            "Markdown should be substantial in length");
     }
 
     @Test
     @DisplayName("Special characters in text")
     void testSpecialCharacters() {
-        String html = "<p>Characters: &lt; &gt; &amp; &quot; &#39;</p>";
+        String html =
+            "<p>Characters: &lt; &gt; &amp; &quot; &#39;</p>";
         String markdown = HtmlToMarkdown.convert(html);
 
-        assertTrue(markdown.contains("<") || markdown.contains("&lt;"),
-            "Expected special characters to be handled, got: " + markdown);
+        assertTrue(markdown.contains("<")
+                   || markdown.contains("&lt;"),
+            "Expected special chars, got: " + markdown);
     }
 
     @Test
     @DisplayName("Nested lists")
     void testNestedLists() {
-        String html = "<ul><li>Level 1<ul><li>Level 2<ul><li>Level 3</li></ul></li></ul></li></ul>";
+        String html = "<ul><li>Level 1<ul><li>Level 2"
+            + "<ul><li>Level 3</li></ul></li></ul></li></ul>";
         String markdown = HtmlToMarkdown.convert(html);
 
-        assertTrue(markdown.contains("Level 1") &&
-                   markdown.contains("Level 2") &&
-                   markdown.contains("Level 3"),
-            "Expected nested list items to be present, got: " + markdown);
+        assertTrue(markdown.contains("Level 1")
+                   && markdown.contains("Level 2")
+                   && markdown.contains("Level 3"),
+            "Expected nested list items, got: " + markdown);
     }
 }
