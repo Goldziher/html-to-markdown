@@ -15,10 +15,12 @@ tasks:
       - task: js:install
       - task: ruby:install
       - task: php:install
+      - task: go:install
+      - task: csharp:install
       - task: rust:build
 
   update:
-    desc: "Update dependencies across Rust, JavaScript, Python, Ruby, and PHP"
+    desc: "Update dependencies across Rust, JavaScript, Python, Ruby, PHP, Go, and C#"
     cmds:
       - echo "Updating Rust crates..."
       - task: rust:update
@@ -30,6 +32,10 @@ tasks:
       - task: python:update
       - echo "Updating PHP dependencies..."
       - task: php:update
+      - echo "Updating Go dependencies..."
+      - task: go:update
+      - echo "Updating C# dependencies..."
+      - task: csharp:update
       - echo "Updating smoke test fixtures..."
       - task: examples:update
 
@@ -47,6 +53,8 @@ tasks:
       - task: ruby:test
       - task: js:test
       - task: php:test
+      - task: go:test
+      - task: csharp:test
 
   lint:
     desc: "Run linters across the repo"
@@ -56,6 +64,8 @@ tasks:
       - task: ruby:lint
       - task: typescript:lint
       - task: php:lint
+      - task: go:lint
+      - task: csharp:lint
 
   fmt:
     desc: "Format code for all languages"
@@ -65,6 +75,8 @@ tasks:
       - task: ruby:format
       - task: typescript:format
       - task: php:format
+      - task: go:format
+      - task: csharp:format
 
   bench:
     desc: "Run Rust benchmarks plus runtime harness"
@@ -402,6 +414,80 @@ tasks:
     desc: "Format PHP sources"
     cmds:
       - cmd: cd packages/php && composer run format
+
+  # Go tasks -----------------------------------------------------------------
+  go:install:
+    desc: "Install golangci-lint"
+    cmds:
+      - |
+        if ! command -v golangci-lint >/dev/null 2>&1; then
+          echo "Installing golangci-lint..."
+          go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
+        else
+          echo "golangci-lint already installed"
+        fi
+
+  go:update:
+    desc: "Update Go dependencies and golangci-lint"
+    cmds:
+      - echo "Updating golangci-lint..."
+      - go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
+      - echo "Updating Go module dependencies..."
+      - cmd: cd packages/go && go get -u ./... && go mod tidy
+      - cmd: cd examples/go-smoke && go get -u ./... && go mod tidy
+
+  go:test:
+    desc: "Run Go tests"
+    cmds:
+      - cargo build --release -p html-to-markdown-ffi
+      - cmd: cd packages/go/htmltomarkdown && LD_LIBRARY_PATH=${GITHUB_WORKSPACE:-$PWD}/target/release:${LD_LIBRARY_PATH:-} DYLD_LIBRARY_PATH=${GITHUB_WORKSPACE:-$PWD}/target/release:${DYLD_LIBRARY_PATH:-} go test -v
+
+  go:lint:
+    desc: "Lint Go code with golangci-lint"
+    cmds:
+      - golangci-lint run --config .golangci.yml ./packages/go/... ./examples/go-smoke/...
+
+  go:format:
+    desc: "Format Go code"
+    cmds:
+      - gofmt -w packages/go examples/go-smoke
+
+  # C# tasks -----------------------------------------------------------------
+  csharp:install:
+    desc: "Verify .NET SDK is installed"
+    cmds:
+      - |
+        if ! command -v dotnet >/dev/null 2>&1; then
+          echo "ERROR: .NET SDK is not installed. Please install .NET 6.0+ SDK"
+          exit 1
+        fi
+        echo ".NET SDK $(dotnet --version) is installed"
+
+  csharp:update:
+    desc: "Update C# NuGet dependencies"
+    cmds:
+      - cmd: cd packages/csharp/HtmlToMarkdown && dotnet restore --force-evaluate
+      - cmd: cd packages/csharp/HtmlToMarkdown.Tests && dotnet restore --force-evaluate
+      - cmd: cd examples/csharp-smoke && dotnet restore --force-evaluate
+
+  csharp:test:
+    desc: "Run C# tests"
+    cmds:
+      - cargo build --release -p html-to-markdown-ffi
+      - cmd: cd packages/csharp/HtmlToMarkdown.Tests && LD_LIBRARY_PATH=${GITHUB_WORKSPACE:-$PWD}/../../target/release:${LD_LIBRARY_PATH:-} DYLD_LIBRARY_PATH=${GITHUB_WORKSPACE:-$PWD}/../../target/release:${DYLD_LIBRARY_PATH:-} dotnet test
+
+  csharp:lint:
+    desc: "Lint C# code (build with warnings as errors)"
+    cmds:
+      - cmd: cd packages/csharp/HtmlToMarkdown && dotnet build /p:TreatWarningsAsErrors=true
+      - cmd: cd packages/csharp/HtmlToMarkdown.Tests && dotnet build /p:TreatWarningsAsErrors=true
+
+  csharp:format:
+    desc: "Format C# code with dotnet format"
+    cmds:
+      - dotnet format packages/csharp/HtmlToMarkdown/HtmlToMarkdown.csproj
+      - dotnet format packages/csharp/HtmlToMarkdown.Tests/HtmlToMarkdown.Tests.csproj
+      - dotnet format examples/csharp-smoke/csharp-smoke.csproj
 
   # Example smoke tests ------------------------------------------------------
   examples:update:
