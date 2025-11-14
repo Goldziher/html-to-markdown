@@ -1,0 +1,20 @@
+[package]
+name = "html-to-markdown-ffi"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+documentation.workspace = true
+readme.workspace = true
+rust-version.workspace = true
+
+[lib]
+crate-type = ["cdylib", "staticlib"]
+
+[dependencies]
+html-to-markdown-rs = { workspace = true, features = ["inline-images"] }
+
+[build-dependencies]
+cbindgen = "0.29"
