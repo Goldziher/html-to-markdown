@@ -3,24 +3,24 @@
 # Steepfile for type checking html-to-markdown Ruby gem
 
 target :lib do
-  signature "sig"
+  signature 'sig'
 
-  check "lib"
+  check 'lib'
 
   # Configure libraries
-  library "pathname"
-  library "open3"
+  library 'pathname'
+  library 'open3'
 
   # Ignore vendor directory
-  ignore "vendor"
+  ignore 'vendor'
 
   # Ignore spec directory
-  ignore "spec"
+  ignore 'spec'
 
   # Ignore bin directory
-  ignore "bin"
+  ignore 'bin'
 
   # Ignore internal implementation modules (not public API)
-  ignore "lib/html_to_markdown/cli.rb"
-  ignore "lib/html_to_markdown/cli_proxy.rb"
+  ignore 'lib/html_to_markdown/cli.rb'
+  ignore 'lib/html_to_markdown/cli_proxy.rb'
 end
