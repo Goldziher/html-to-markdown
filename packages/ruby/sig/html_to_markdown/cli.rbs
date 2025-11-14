@@ -1,5 +1,7 @@
 module HtmlToMarkdown
   module CLI
+    # Module method (module_function creates both module and instance methods)
+    #
     # Run the CLI with the given arguments
     #
     # @param argv Command-line arguments (defaults to ARGV)
@@ -7,6 +9,13 @@ module HtmlToMarkdown
     # @param stderr Output stream for standard error
     # @return Exit code (0 for success, non-zero for failure)
     def self.run: (
+      ?Array[String] argv,
+      ?stdout: IO,
+      ?stderr: IO
+    ) -> Integer
+
+    # Instance method version (created by module_function)
+    def run: (
       ?Array[String] argv,
       ?stdout: IO,
       ?stderr: IO
