@@ -82,6 +82,13 @@ tools/runtime-bench/results/
 .venv/
 **/.venv/
 
+# C# / .NET
+bin/
+obj/
+*.dll
+*.exe
+*.pdb
+
 # AI Rules generated files
 .claude/agents/
 .mcp.json
