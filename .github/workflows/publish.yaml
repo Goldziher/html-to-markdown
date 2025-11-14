@@ -778,7 +778,6 @@ jobs:
 
   smoke-java:
     name: Smoke Java install
-    needs: java-jars
     strategy:
       fail-fast: false
       matrix:
