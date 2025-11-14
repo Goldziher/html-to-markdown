@@ -1,0 +1,24 @@
+<?xml version="1.0"?>
+<!DOCTYPE suppressions PUBLIC
+    "-//Checkstyle//DTD SuppressionFilter Configuration 1.2//EN"
+    "https://checkstyle.org/dtds/suppressions_1_2.dtd">
+
+<suppressions>
+    <!-- Suppress Javadoc for FFI method handles (they're internal implementation) -->
+    <suppress checks="JavadocVariable" files="HtmlToMarkdownFFI\.java" lines="40-43"/>
+
+    <!-- Suppress FinalParameters for FFI utility methods -->
+    <suppress checks="FinalParameters" files="HtmlToMarkdownFFI\.java"/>
+
+    <!-- Suppress FinalParameters for exception constructors -->
+    <suppress checks="FinalParameters" files="HtmlToMarkdown\.java" lines="125-131"/>
+
+    <!-- Suppress MissingJavadocMethod for exception constructors -->
+    <suppress checks="MissingJavadocMethod" files="HtmlToMarkdown\.java" lines="125-131"/>
+
+    <!-- Allow star imports for test assertions -->
+    <suppress checks="AvoidStarImport" files=".*Test\.java"/>
+
+    <!-- Suppress package-info requirement for test packages -->
+    <suppress checks="JavadocPackage" files=".*[\\/]test[\\/].*"/>
+</suppressions>
