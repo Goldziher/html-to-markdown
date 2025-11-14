@@ -1,15 +1,6 @@
 {
   "name": "html-to-markdown/php-smoke",
   "description": "Smoke test for the html-to-markdown PHP extension + Composer helpers",
-  "repositories": [
-    {
-      "type": "path",
-      "url": "../../packages/php",
-      "options": {
-        "symlink": false
-      }
-    }
-  ],
   "require": {
     "php": "^8.2",
     "html-to-markdown/extension": "dev-main@dev"
