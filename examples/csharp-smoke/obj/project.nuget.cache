@@ -1,0 +1,12 @@
+{
+  "version": 2,
+  "dgSpecHash": "to8Jf0QHAhA=",
+  "success": true,
+  "projectFilePath": "/Users/naamanhirschfeld/workspace/html-to-markdown/examples/csharp-smoke/csharp-smoke.csproj",
+  "expectedPackageFiles": [
+    "/Users/naamanhirschfeld/.nuget/packages/microsoft.netcore.app.ref/6.0.36/microsoft.netcore.app.ref.6.0.36.nupkg.sha512",
+    "/Users/naamanhirschfeld/.nuget/packages/microsoft.aspnetcore.app.ref/6.0.36/microsoft.aspnetcore.app.ref.6.0.36.nupkg.sha512",
+    "/Users/naamanhirschfeld/.nuget/packages/microsoft.netcore.app.host.osx-arm64/6.0.36/microsoft.netcore.app.host.osx-arm64.6.0.36.nupkg.sha512"
+  ],
+  "logs": []
+}

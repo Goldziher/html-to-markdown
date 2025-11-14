@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net6.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+
+    <!-- Package metadata -->
+    <PackageId>HtmlToMarkdown</PackageId>
+    <Version>2.8.0</Version>
+    <Authors>Na'aman Hirschfeld</Authors>
+    <Company>Goldziher</Company>
+    <Description>High-performance HTML to Markdown converter with C# bindings to Rust core</Description>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageProjectUrl>https://github.com/Goldziher/html-to-markdown</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/Goldziher/html-to-markdown</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PackageTags>html;markdown;converter;rust;ffi</PackageTags>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="../../../README.md" Pack="true" PackagePath="/" />
+  </ItemGroup>
+
+</Project>
