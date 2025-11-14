@@ -671,25 +671,6 @@ jobs:
         if: ${{ needs.prepare.outputs.target_sha != '' }}
         run: git checkout --progress --force ${{ needs.prepare.outputs.target_sha }}
 
-      - name: Download Node binding artifacts
-        uses: actions/download-artifact@v6
-        with:
-          pattern: node-bindings-*
-          path: node-artifacts
-          merge-multiple: true
-
-      - name: Download Node TypeScript definitions
-        uses: actions/download-artifact@v6
-        with:
-          name: node-typescript-defs
-          path: node-typescript-defs
-
-      - name: Download WASM bundles
-        uses: actions/download-artifact@v6
-        with:
-          name: wasm-bundles
-          path: wasm-artifacts
-
       - name: Download Python wheels
         uses: actions/download-artifact@v6
         with:
@@ -721,15 +702,6 @@ jobs:
           name: rubygems-${{ steps.ruby_label.outputs.label }}
           path: ruby-gems
 
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v6
-        with:
-          node-version: 20
-          check-latest: true
-
       - name: Setup Python
         uses: actions/setup-python@v6
         with:
@@ -745,13 +717,6 @@ jobs:
       - name: Setup Rust
         uses: actions-rust-lang/setup-rust-toolchain@v1
 
-      - name: Install wasm-pack
-        run: |
-          set -euo pipefail
-          if ! command -v wasm-pack >/dev/null 2>&1; then
-            cargo install wasm-pack --locked
-          fi
-
       - name: Setup PHP
         if: runner.os == 'Linux'
         uses: shivammathur/setup-php@v2
@@ -762,69 +727,6 @@ jobs:
       - name: Capture php-config path
         if: runner.os == 'Linux'
         run: echo "PHP_CONFIG=$(command -v php-config)" >> "$GITHUB_ENV"
-
-      - name: Prepare Node package from artifacts
-        run: |
-          set -euo pipefail
-          rm -rf crates/html-to-markdown-node/npm
-          mkdir -p node-artifacts
-          mkdir -p crates/html-to-markdown-node
-          shopt -s nullglob
-          for pkg in "$GITHUB_WORKSPACE"/node-artifacts/*.tar.gz; do
-            tar -xzf "$pkg" -C crates/html-to-markdown-node
-          done
-          if [ ! -d crates/html-to-markdown-node/npm ]; then
-            echo "Node npm artifacts missing" >&2
-            exit 1
-          fi
-          cp node-typescript-defs/index.js node-typescript-defs/index.d.ts crates/html-to-markdown-node/
-
-      - name: Pack Node tarball from artifacts
-        id: pack_node
-        run: |
-          set -euo pipefail
-          pushd crates/html-to-markdown-node >/dev/null
-          NODE_TGZ=$(npm pack | tail -n 1 | tr -d '\r')
-          mv "$NODE_TGZ" "$GITHUB_WORKSPACE/$NODE_TGZ"
-          popd >/dev/null
-          echo "tarball=$GITHUB_WORKSPACE/$NODE_TGZ" >> "$GITHUB_OUTPUT"
-
-      - name: Smoke Node install
-        uses: ./.github/actions/smoke-node
-        with:
-          node-tarball: ${{ steps.pack_node.outputs.tarball }}
-
-      - name: Prepare WASM package from artifacts
-        run: |
-          set -euo pipefail
-          pushd crates/html-to-markdown-wasm >/dev/null
-          rm -rf dist dist-node dist-web
-          shopt -s nullglob
-          for tarball in "$GITHUB_WORKSPACE"/wasm-artifacts/*.tar.gz; do
-            tar -xzf "$tarball" -C .
-          done
-          for dir in dist dist-node dist-web; do
-            if [ ! -d "$dir" ]; then
-              echo "Missing $dir from wasm artifacts" >&2
-              exit 1
-            fi
-          done
-          popd >/dev/null
-
-      - name: Pack WASM tarball from artifacts
-        id: pack_wasm
-        run: |
-          set -euo pipefail
-          pushd crates/html-to-markdown-wasm >/dev/null
-          WASM_TGZ=$(npm pack | tail -n 1 | tr -d '\r')
-          mv "$WASM_TGZ" "$GITHUB_WORKSPACE/$WASM_TGZ"
-          popd >/dev/null
-          echo "tarball=$GITHUB_WORKSPACE/$WASM_TGZ" >> "$GITHUB_OUTPUT"
-
-      - name: Smoke WASM install
-        uses: ./.github/actions/smoke-wasm
-        with:
-          wasm-tarball: ${{ steps.pack_wasm.outputs.tarball }}
 
       - name: Smoke Python install
         uses: ./.github/actions/smoke-python
