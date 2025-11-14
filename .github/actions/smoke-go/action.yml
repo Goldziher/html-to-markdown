@@ -23,6 +23,9 @@ runs:
         set -euo pipefail
         lib_path="${GITHUB_WORKSPACE}/target/release"
 
+        # Set CGO_LDFLAGS so the linker can find the library during build
+        export CGO_LDFLAGS="-L$lib_path"
+
         if [[ "${{ runner.os }}" == "Linux" ]]; then
           export LD_LIBRARY_PATH="$lib_path:${LD_LIBRARY_PATH:-}"
         elif [[ "${{ runner.os }}" == "macOS" ]]; then
@@ -40,6 +43,9 @@ runs:
       run: |
         set -euo pipefail
         lib_path="${GITHUB_WORKSPACE}/target/release"
+
+        # Set CGO_LDFLAGS so the linker can find the library during build
+        export CGO_LDFLAGS="-L$lib_path"
         export PATH="$lib_path:$PATH"
 
         pushd examples/go-smoke >/dev/null
