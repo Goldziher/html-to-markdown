@@ -58,7 +58,6 @@ repos:
     hooks:
       - id: golangci-lint
         args: ["--config", ".golangci.yml"]
-      - id: golangci-lint-config-verify
   - repo: local
     hooks:
       - id: mypy
