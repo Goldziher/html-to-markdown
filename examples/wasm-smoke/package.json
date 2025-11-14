@@ -1,6 +1,6 @@
 {
   "name": "html-to-markdown-wasm-smoke",
-  "version": "2.7.3",
+  "version": "2.7.2",
   "private": true,
   "type": "module",
   "description": "Smoke test for installing html-to-markdown-wasm",

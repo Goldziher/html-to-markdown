@@ -15,11 +15,10 @@ tasks:
       - task: js:install
       - task: ruby:install
       - task: php:install
-      - task: java:install
       - task: rust:build
 
   update:
-    desc: "Update dependencies across Rust, JavaScript, Python, Ruby, PHP, and Java"
+    desc: "Update dependencies across Rust, JavaScript, Python, Ruby, and PHP"
     cmds:
       - echo "Updating Rust crates..."
       - task: rust:update
@@ -31,8 +30,6 @@ tasks:
       - task: python:update
       - echo "Updating PHP dependencies..."
       - task: php:update
-      - echo "Updating Java dependencies..."
-      - task: java:update
       - echo "Updating smoke test fixtures..."
       - task: examples:update
 
@@ -50,7 +47,6 @@ tasks:
       - task: ruby:test
       - task: js:test
       - task: php:test
-      - task: java:test
 
   lint:
     desc: "Run linters across the repo"
@@ -60,7 +56,6 @@ tasks:
       - task: ruby:lint
       - task: typescript:lint
       - task: php:lint
-      - task: java:lint
 
   fmt:
     desc: "Format code for all languages"
@@ -407,47 +402,6 @@ tasks:
     desc: "Format PHP sources"
     cmds:
       - cmd: cd packages/php && composer run format
-
-  # Java tasks ----------------------------------------------------------------
-  java:install:
-    desc: "Install Java dependencies"
-    cmds:
-      - cmd: cd packages/java && mvn clean install -DskipTests
-
-  java:update:
-    desc: "Update Java dependencies and plugins"
-    dir: packages/java
-    cmds:
-      - mvn versions:display-dependency-updates
-      - mvn versions:display-plugin-updates
-
-  java:build:
-    desc: "Build Java package with native library"
-    cmds:
-      - cargo build --release --package html-to-markdown-ffi
-      - cmd: cd packages/java && mvn clean package -DskipTests
-
-  java:test:
-    desc: "Run Java tests"
-    cmds:
-      - cargo build --release --package html-to-markdown-ffi
-      - cmd: cd packages/java && mvn test
-
-  java:lint:
-    desc: "Run Checkstyle on Java sources"
-    cmds:
-      - cmd: cd packages/java && mvn checkstyle:check
-
-  java:format:
-    desc: "Format Java code"
-    cmds:
-      - cmd: cd packages/java && mvn spotless:apply 2>/dev/null || echo "Note: spotless not configured; use IDE formatting"
-
-  java:clean:
-    desc: "Clean Java build artifacts"
-    dir: packages/java
-    cmds:
-      - mvn clean
 
   # Example smoke tests ------------------------------------------------------
   examples:update:
