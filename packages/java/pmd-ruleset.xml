@@ -1,0 +1,41 @@
+<?xml version="1.0"?>
+<ruleset name="html-to-markdown Java Rules"
+         xmlns="http://pmd.sourceforge.net/ruleset/2.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://pmd.sourceforge.net/ruleset/2.0.0 https://pmd.sourceforge.io/ruleset_2_0_0.xsd">
+
+    <description>
+        PMD rules for html-to-markdown Java Panama FFI bindings.
+        Relaxed rules for FFI code that requires defensive programming patterns.
+    </description>
+
+    <!-- Use standard Java rulesets as base -->
+    <rule ref="category/java/bestpractices.xml">
+        <!-- Allow throwing NullPointerException for explicit null checks -->
+        <exclude name="AvoidThrowingNullPointerException"/>
+        <!-- Allow catching Throwable in FFI boundary code -->
+        <exclude name="AvoidCatchingGenericException"/>
+    </rule>
+
+    <rule ref="category/java/codestyle.xml">
+        <!-- Allow non-final local variables -->
+        <exclude name="LocalVariableCouldBeFinal"/>
+        <exclude name="MethodArgumentCouldBeFinal"/>
+        <!-- Allow multiple return statements for guard clauses -->
+        <exclude name="OnlyOneReturn"/>
+        <!-- Allow detailed comments -->
+        <exclude name="CommentSize"/>
+    </rule>
+
+    <rule ref="category/java/design.xml">
+        <!-- FFI error handling may require higher cyclomatic complexity -->
+        <exclude name="CyclomaticComplexity"/>
+        <!-- Exception classes don't need serialVersionUID -->
+        <exclude name="MissingSerialVersionUID"/>
+        <!-- Allow throwing RuntimeException for FFI errors -->
+        <exclude name="AvoidThrowingRawExceptionTypes"/>
+    </rule>
+
+    <rule ref="category/java/errorprone.xml"/>
+    <rule ref="category/java/performance.xml"/>
+</ruleset>
