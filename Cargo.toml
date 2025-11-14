@@ -13,7 +13,7 @@ members = [
 ]
 
 [workspace.package]
-version = "2.7.2"
+version = "2.7.3"
 edition = "2024"
 authors = ["Na'aman Hirschfeld <nhirschfeld@gmail.com>"]
 license = "MIT"
@@ -25,7 +25,7 @@ rust-version = "1.85"
 
 [workspace.dependencies]
 # Core library
-html-to-markdown-rs = { version = "2.7.2", path = "crates/html-to-markdown" }
+html-to-markdown-rs = { version = "2.7.3", path = "crates/html-to-markdown" }
 
 # HTML parsing
 tl = "0.7"

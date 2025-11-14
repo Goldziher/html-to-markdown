@@ -10,11 +10,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Rust Toolchain Settings** – All crates (including the Ruby binding) now inherit `edition = "2024"` and `rust-version = "1.85"` from the workspace to keep toolchain configuration centralized.
 - **GitHub Actions Workflow DRY** – Created 17 reusable composite actions (8 build actions + 9 smoke test actions) to eliminate ~267 lines of duplication between CI and publish workflows.
 - **Toolchain Management** – Migrated to official GitHub Actions parameters for Ruby Bundler 2.7.2 and PHP Composer 2.9.1, removing manual installation scripts.
+- **HTML Preprocessing Architecture** – Replaced two-stage preprocessing (string-based + DOM-based) with unified DOM traversal filtering. Content inside navigation-hinted containers (e.g., `<div class="nav-menu"><h1>Title</h1></div>`) now preserves the content while skipping only the container tag, eliminating data loss issues. Preprocessing is now limited to minimal pre-parse sanitization (DOCTYPE removal and malformed angle bracket escaping).
 
 ### Fixed
 - **Windows PHP Extension Build** – Replaced php-windows-builder orchestration with direct `cargo build` matching ext-php-rs's proven approach, resolving LLVM 19 MMX header incompatibilities and Zend symbol linking errors.
 - **Linux PHP Build** – Added php-config path capture and parameter passing to build-php-linux action, fixing "php-config executable not found" errors.
 - **Ruby Linux Build** – Set LD_LIBRARY_PATH on Linux builds to match magnus best practices, preventing potential "strings.h not found" errors.
+- **Content Preservation in Navigation Containers** – Tags marked for filtering during DOM traversal now use a three-way classification (Process/SkipTag/DropSubtree) instead of always dropping entire subtrees, preventing loss of content inside divs/spans with navigation-related classes while still removing true navigation elements (`<nav>`, `<form>`).
 
 ## [2.7.2] - 2025-11-12
 
