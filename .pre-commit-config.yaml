@@ -24,12 +24,12 @@ repos:
     hooks:
       - id: pyproject-fmt
   - repo: https://github.com/oxc-project/mirrors-oxlint
-    rev: v1.25.0
+    rev: v1.28.0
     hooks:
       - id: oxlint
         args: ["--fix"]
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.14.4
+    rev: v0.14.5
     hooks:
       - id: ruff
         args: ["--fix", "--unsafe-fixes"]
@@ -38,7 +38,7 @@ repos:
     rev: v2.4.1
     hooks:
       - id: codespell
-        exclude: ^test_documents/|^scripts/|pnpm-lock\.yaml|^uv\.lock
+        exclude: ^test_documents/|^scripts/|pnpm-lock\.yaml|^uv\.lock|pmd-ruleset\.xml
         additional_dependencies:
           - tomli
   - repo: https://github.com/doublify/pre-commit-rust
@@ -47,6 +47,12 @@ repos:
       - id: fmt
       - id: cargo-check
       - id: clippy
+  - repo: https://github.com/gherynos/pre-commit-java
+    rev: v0.6.27
+    hooks:
+      - id: cpd
+      - id: checkstyle
+        args: ["-c", "packages/java/checkstyle.xml"]
   - repo: local
     hooks:
       - id: mypy
