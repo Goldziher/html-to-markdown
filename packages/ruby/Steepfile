@@ -1,0 +1,34 @@
+# frozen_string_literal: true
+
+# Steepfile for type checking html-to-markdown Ruby gem
+
+target :lib do
+  signature "sig"
+
+  check "lib"
+
+  # Configure libraries
+  library "pathname"
+  library "open3"
+
+  # Ignore vendor directory
+  ignore "vendor"
+
+  # Ignore specs during type checking (they're checked separately)
+  ignore "spec"
+
+  # Ignore bin directory
+  ignore "bin"
+end
+
+target :spec do
+  signature "sig"
+
+  check "spec"
+
+  library "pathname"
+  library "open3"
+
+  # Include RSpec types if available
+  # library "rspec"
+end

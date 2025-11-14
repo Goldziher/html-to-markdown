@@ -1,0 +1,21 @@
+module HtmlToMarkdown
+  module CLI
+    # Run the CLI with the given arguments
+    #
+    # @param argv Command-line arguments (defaults to ARGV)
+    # @param stdout Output stream for standard output
+    # @param stderr Output stream for standard error
+    # @return Exit code (0 for success, non-zero for failure)
+    def self.run: (
+      ?Array[String] argv,
+      ?stdout: IO,
+      ?stderr: IO
+    ) -> Integer
+
+    def self?.run: (
+      ?Array[String] argv,
+      ?stdout: IO,
+      ?stderr: IO
+    ) -> Integer
+  end
+end
