@@ -198,58 +198,6 @@ def update_uv_lock(file_path: Path, version: str) -> tuple[bool, str, str]:
     return True, old_version, version
 
 
-def update_pom_xml(file_path: Path, version: str) -> tuple[bool, str, str]:
-    """
-    Update Maven pom.xml version.
-
-    Returns: (changed, old_version, new_version)
-    """
-    content = file_path.read_text()
-    match = re.search(r"<version>([^<]+)</version>", content)
-    old_version = match.group(1) if match else "NOT FOUND"
-
-    if old_version == version:
-        return False, old_version, version
-
-    # Update the version field (only the first occurrence in <project>)
-    new_content = re.sub(
-        r"(<artifactId>html-to-markdown</artifactId>\s*\n\s*<version>)[^<]+(</version>)",
-        rf"\g<1>{version}\g<2>",
-        content,
-        count=1,
-    )
-
-    file_path.write_text(new_content)
-    return True, old_version, version
-
-
-def update_readme_examples(file_path: Path, version: str) -> tuple[bool, str, str]:
-    """
-    Update version strings in README files (specifically for Java examples).
-
-    Returns: (changed, old_version, new_version)
-    """
-    content = file_path.read_text()
-
-    # Pattern to match version strings like 2.7.2 in Maven/Gradle dependency examples
-    pattern = r"(<version>|:html-to-markdown:)(\d+\.\d+\.\d+)"
-    matches = list(re.finditer(pattern, content))
-
-    if not matches:
-        return False, "N/A", version
-
-    old_version = matches[0].group(2) if matches else "NOT FOUND"
-
-    if old_version == version:
-        return False, old_version, version
-
-    # Replace all version occurrences in Maven/Gradle examples
-    new_content = re.sub(pattern, rf"\g<1>{version}", content)
-
-    file_path.write_text(new_content)
-    return True, old_version, version
-
-
 def main() -> None:
     repo_root = get_repo_root()
 
@@ -351,28 +299,6 @@ def main() -> None:
         rel_path = uv_lock.relative_to(repo_root)
         if changed:
             print(f"✓ {rel_path}: {old_ver} → {new_ver}")
-            updated_files.append(str(rel_path))
-        else:
-            unchanged_files.append(str(rel_path))
-
-    # Update Java pom.xml
-    pom_xml = repo_root / "packages/java/pom.xml"
-    if pom_xml.exists():
-        changed, old_ver, new_ver = update_pom_xml(pom_xml, version)
-        rel_path = pom_xml.relative_to(repo_root)
-        if changed:
-            print(f"✓ {rel_path}: {old_ver} → {new_ver}")
-            updated_files.append(str(rel_path))
-        else:
-            unchanged_files.append(str(rel_path))
-
-    # Update Java README examples
-    java_readme = repo_root / "packages/java/README.md"
-    if java_readme.exists():
-        changed, old_ver, new_ver = update_readme_examples(java_readme, version)
-        rel_path = java_readme.relative_to(repo_root)
-        if changed:
-            print(f"✓ {rel_path}: {old_ver} → {new_ver} (examples)")
             updated_files.append(str(rel_path))
         else:
             unchanged_files.append(str(rel_path))

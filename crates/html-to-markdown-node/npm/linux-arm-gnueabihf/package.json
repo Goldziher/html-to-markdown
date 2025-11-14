@@ -1,6 +1,6 @@
 {
   "name": "html-to-markdown-node-linux-arm-gnueabihf",
-  "version": "2.7.3",
+  "version": "2.7.2",
   "cpu": [
     "arm"
   ],

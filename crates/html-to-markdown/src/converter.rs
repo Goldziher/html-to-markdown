@@ -1269,9 +1269,9 @@ fn convert_html_impl(
     options: &ConversionOptions,
     inline_collector: Option<InlineCollectorHandle>,
 ) -> Result<String> {
-    // Prepare HTML before parsing: remove DOCTYPE and escape malformed angle brackets
-    let sanitized = prepare_html(html);
-    let html_len = sanitized.len();
+    // Normalize problematic HTML constructs before parsing
+    let preprocessed = preprocess_html(html);
+    let preprocessed_len = preprocessed.len();
 
     enum ParsedDom<'a> {
         Borrowed(tl::VDom<'a>),
@@ -1280,9 +1280,7 @@ fn convert_html_impl(
 
     let parser_options = tl::ParserOptions::default();
     let mut _dom_storage: Option<ParsedDom> = None;
-
-    // Parse HTML (borrowed or owned depending on whether escaping was needed)
-    let dom_ref = match sanitized {
+    let dom_ref = match preprocessed {
         Cow::Borrowed(s) => {
             let dom = tl::parse(s, parser_options)
                 .map_err(|_| crate::error::ConversionError::ParseError("Failed to parse HTML".to_string()))?;
@@ -1307,7 +1305,7 @@ fn convert_html_impl(
 
     let parser = dom_ref.parser();
     let dom_ctx = build_dom_context(dom_ref, parser);
-    let mut output = String::with_capacity(html_len);
+    let mut output = String::with_capacity(preprocessed_len);
 
     // Check for hOCR document and extract metadata by checking all top-level children
     let mut is_hocr = false;
@@ -1409,6 +1407,147 @@ fn convert_html_impl(
     }
 }
 
+fn preprocess_html(input: &str) -> Cow<'_, str> {
+    const SELF_CLOSING: [(&[u8], &str); 3] = [(b"<br/>", "<br>"), (b"<hr/>", "<hr>"), (b"<img/>", "<img>")];
+    const TAGS: [&[u8]; 2] = [b"script", b"style"];
+    const SVG: &[u8] = b"svg";
+    const DOCTYPE: &[u8] = b"doctype";
+
+    let bytes = input.as_bytes();
+    let len = bytes.len();
+    if len == 0 {
+        return Cow::Borrowed(input);
+    }
+
+    let mut idx = 0;
+    let mut last = 0;
+    let mut output: Option<String> = None;
+    let mut svg_depth = 0usize;
+
+    while idx < len {
+        if bytes[idx] == b'<' {
+            let mut replaced = false;
+            for (pattern, replacement) in &SELF_CLOSING {
+                if bytes[idx..].starts_with(pattern) {
+                    let out = output.get_or_insert_with(|| String::with_capacity(input.len()));
+                    out.push_str(&input[last..idx]);
+                    out.push_str(replacement);
+                    idx += pattern.len();
+                    last = idx;
+                    replaced = true;
+                    break;
+                }
+            }
+            if replaced {
+                continue;
+            }
+
+            if matches_tag_start(bytes, idx + 1, SVG) {
+                if let Some(open_end) = find_tag_end(bytes, idx + 1 + SVG.len()) {
+                    svg_depth += 1;
+                    idx = open_end;
+                    continue;
+                }
+            } else if matches_end_tag_start(bytes, idx + 1, SVG) {
+                if let Some(close_end) = find_tag_end(bytes, idx + 2 + SVG.len()) {
+                    if svg_depth > 0 {
+                        svg_depth = svg_depth.saturating_sub(1);
+                    }
+                    idx = close_end;
+                    continue;
+                }
+            }
+
+            if svg_depth == 0 {
+                let mut handled = false;
+                for tag in TAGS {
+                    if matches_tag_start(bytes, idx + 1, tag) {
+                        if let Some(open_end) = find_tag_end(bytes, idx + 1 + tag.len()) {
+                            let remove_end = find_closing_tag(bytes, open_end, tag).unwrap_or(len);
+                            let out = output.get_or_insert_with(|| String::with_capacity(input.len()));
+                            out.push_str(&input[last..idx]);
+                            out.push_str(&input[idx..open_end]);
+                            out.push_str("</");
+                            out.push_str(str::from_utf8(tag).unwrap());
+                            out.push('>');
+
+                            last = remove_end;
+                            idx = remove_end;
+                            handled = true;
+                        }
+                    }
+
+                    if handled {
+                        break;
+                    }
+                }
+
+                if handled {
+                    continue;
+                }
+
+                if idx + 2 < len && bytes[idx + 1] == b'!' {
+                    let mut cursor = idx + 2;
+                    while cursor < len && bytes[cursor].is_ascii_whitespace() {
+                        cursor += 1;
+                    }
+
+                    if cursor + DOCTYPE.len() <= len
+                        && bytes[cursor..cursor + DOCTYPE.len()].eq_ignore_ascii_case(DOCTYPE)
+                    {
+                        if let Some(end) = find_tag_end(bytes, cursor + DOCTYPE.len()) {
+                            let out = output.get_or_insert_with(|| String::with_capacity(input.len()));
+                            out.push_str(&input[last..idx]);
+                            last = end;
+                            idx = end;
+                            continue;
+                        }
+                    }
+                }
+            }
+
+            let is_valid_tag = if idx + 1 < len {
+                match bytes[idx + 1] {
+                    b'!' => {
+                        idx + 2 < len
+                            && (bytes[idx + 2] == b'-'
+                                || bytes[idx + 2].is_ascii_alphabetic()
+                                || bytes[idx + 2].is_ascii_uppercase())
+                    }
+                    b'/' => {
+                        idx + 2 < len && (bytes[idx + 2].is_ascii_alphabetic() || bytes[idx + 2].is_ascii_uppercase())
+                    }
+                    b'?' => true,
+                    c if c.is_ascii_alphabetic() || c.is_ascii_uppercase() => true,
+                    _ => false,
+                }
+            } else {
+                false
+            };
+
+            if !is_valid_tag {
+                let out = output.get_or_insert_with(|| String::with_capacity(input.len() + 4));
+                out.push_str(&input[last..idx]);
+                out.push_str("&lt;");
+                idx += 1;
+                last = idx;
+                continue;
+            }
+        }
+
+        idx += 1;
+    }
+
+    if let Some(mut out) = output {
+        if last < len {
+            out.push_str(&input[last..]);
+        }
+        Cow::Owned(out)
+    } else {
+        Cow::Borrowed(input)
+    }
+}
+
 #[cfg(test)]
 fn normalize_self_closing_tags(input: &str) -> Cow<'_, str> {
     const REPLACEMENTS: [(&[u8], &str); 3] = [(b"<br/>", "<br>"), (b"<hr/>", "<hr>"), (b"<img/>", "<img>")];
@@ -1461,12 +1600,8 @@ fn normalize_self_closing_tags(input: &str) -> Cow<'_, str> {
 /// - `1<2` becomes `1&lt;2`
 /// - `<div>1<2</div>` becomes `<div>1&lt;2</div>`
 /// - `<script>1 < 2</script>` remains unchanged (handled by script stripping)
-///
-/// Prepare HTML for parsing by removing DOCTYPE and escaping malformed angle brackets.
-/// This is the preprocessing step that runs before HTML parsing.
-fn prepare_html(input: &str) -> Cow<'_, str> {
-    const DOCTYPE: &[u8] = b"doctype";
-
+#[cfg(test)]
+fn escape_malformed_angle_brackets(input: &str) -> Cow<'_, str> {
     let bytes = input.as_bytes();
     let len = bytes.len();
     let mut idx = 0;
@@ -1475,44 +1610,18 @@ fn prepare_html(input: &str) -> Cow<'_, str> {
 
     while idx < len {
         if bytes[idx] == b'<' {
-            // Check for DOCTYPE declaration and remove it
-            if idx + 2 < len && bytes[idx + 1] == b'!' {
-                let mut cursor = idx + 2;
-                // Skip whitespace after <!
-                while cursor < len && bytes[cursor].is_ascii_whitespace() {
-                    cursor += 1;
-                }
-
-                // Check if this is a DOCTYPE declaration
-                if cursor + DOCTYPE.len() <= len && bytes[cursor..cursor + DOCTYPE.len()].eq_ignore_ascii_case(DOCTYPE)
-                {
-                    // Find the end of the DOCTYPE declaration
-                    let mut end = cursor + DOCTYPE.len();
-                    while end < len && bytes[end] != b'>' {
-                        end += 1;
-                    }
-                    if end < len {
-                        end += 1; // Include the '>'
-                    }
-
-                    // Remove the DOCTYPE by skipping it
-                    let out = output.get_or_insert_with(|| String::with_capacity(input.len()));
-                    out.push_str(&input[last..idx]);
-                    last = end;
-                    idx = end;
-                    continue;
-                }
-            }
-
             // Check if this is a valid tag start
             if idx + 1 < len {
                 let next = bytes[idx + 1];
 
-                // Valid tag patterns: <tagname, </tagname, <!--
+                // Valid tag patterns: <tagname, </tagname, <!doctype, <!--
                 let is_valid_tag = match next {
                     b'!' => {
-                        // Comment (DOCTYPE already handled above)
-                        idx + 2 < len && bytes[idx + 2] == b'-'
+                        // DOCTYPE or comment
+                        idx + 2 < len
+                            && (bytes[idx + 2] == b'-'
+                                || bytes[idx + 2].is_ascii_alphabetic()
+                                || bytes[idx + 2].is_ascii_uppercase())
                     }
                     b'/' => {
                         // Closing tag
@@ -1571,90 +1680,57 @@ fn tag_name_eq(name: Cow<'_, str>, needle: &str) -> bool {
     name.eq_ignore_ascii_case(needle)
 }
 
-/// Determines how a tag should be handled during filtering
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum TagDisposition {
-    /// Process tag normally (convert to markdown)
-    Process,
-    /// Skip this tag but process its children
-    /// Example: <div class="nav-menu"><h1>Title</h1></div> → # Title
-    SkipTag,
-    /// Drop entire subtree (tag + all children)
-    /// Example: <script>...</script>, <nav>...</nav>
-    DropSubtree,
-}
-
-/// Classify a tag for filtering based on preprocessing options
-fn classify_tag_for_filtering(
+fn should_drop_for_preprocessing(
     node_handle: &tl::NodeHandle,
     tag_name: &str,
     tag: &tl::HTMLTag,
     parser: &tl::Parser,
     dom_ctx: &DomContext,
     options: &ConversionOptions,
-) -> TagDisposition {
+) -> bool {
     if !options.preprocessing.enabled {
-        return TagDisposition::Process;
+        return false;
     }
 
-    // Always drop scripts and styles (entire subtree)
-    if matches!(tag_name, "script" | "style") {
-        return TagDisposition::DropSubtree;
-    }
-
-    // Navigation removal logic
     if options.preprocessing.remove_navigation {
-        // Always drop <nav> entirely
-        if tag_name == "nav" {
-            return TagDisposition::DropSubtree;
-        }
-
         let has_nav_hint = element_has_navigation_hint(tag);
+
+        if tag_name == "nav" {
+            return true;
+        }
 
         if tag_name == "header" {
             let inside_semantic_content = has_semantic_content_ancestor(node_handle, parser, dom_ctx);
             if !inside_semantic_content {
-                // Drop header + children when outside semantic content (likely site chrome)
-                return TagDisposition::DropSubtree;
+                return true;
+            }
+            if has_nav_hint {
+                return true;
             }
         } else if tag_name == "footer" || tag_name == "aside" {
             if has_nav_hint {
-                let inside_semantic_content = has_semantic_content_ancestor(node_handle, parser, dom_ctx);
-                if !inside_semantic_content {
-                    // Skip the tag but process children
-                    return TagDisposition::SkipTag;
-                }
+                return true;
             }
         } else if has_nav_hint && !matches!(tag_name, "main" | "article" | "html" | "body" | "head") {
-            let inside_semantic_content = has_semantic_content_ancestor(node_handle, parser, dom_ctx);
-            if !inside_semantic_content {
-                // Skip the tag but process children
-                return TagDisposition::SkipTag;
-            }
+            return true;
         }
     }
 
-    // Form removal logic
     if options.preprocessing.remove_forms {
         if tag_name == "form" {
             let preserves_form = options.preserve_tags.iter().any(|t| t == "form");
-            return if preserves_form {
-                TagDisposition::Process
-            } else {
-                TagDisposition::DropSubtree
-            };
-        }
-
-        // Skip form controls but process their text content
-        if matches!(
+            if !preserves_form {
+                return true;
+            }
+        } else if matches!(
             tag_name,
             "button" | "select" | "textarea" | "label" | "fieldset" | "legend"
         ) {
-            return TagDisposition::SkipTag;
+            return true;
         }
     }
 
-    TagDisposition::Process
+    false
 }
 
 fn has_semantic_content_ancestor(node_handle: &tl::NodeHandle, parser: &tl::Parser, dom_ctx: &DomContext) -> bool {
@@ -1934,6 +2010,89 @@ fn strip_script_and_style_sections(input: &str) -> Cow<'_, str> {
     } else {
         Cow::Borrowed(input)
     }
+}
+
+fn matches_tag_start(bytes: &[u8], mut start: usize, tag: &[u8]) -> bool {
+    if start >= bytes.len() {
+        return false;
+    }
+
+    if start + tag.len() > bytes.len() {
+        return false;
+    }
+
+    if !bytes[start..start + tag.len()].eq_ignore_ascii_case(tag) {
+        return false;
+    }
+
+    start += tag.len();
+
+    match bytes.get(start) {
+        Some(b'>' | b'/' | b' ' | b'\t' | b'\n' | b'\r') => true,
+        Some(_) => false,
+        None => true,
+    }
+}
+
+fn find_tag_end(bytes: &[u8], mut idx: usize) -> Option<usize> {
+    let len = bytes.len();
+    let mut in_quote: Option<u8> = None;
+
+    while idx < len {
+        match bytes[idx] {
+            b'"' | b'\'' => {
+                if let Some(current) = in_quote {
+                    if current == bytes[idx] {
+                        in_quote = None;
+                    }
+                } else {
+                    in_quote = Some(bytes[idx]);
+                }
+            }
+            b'>' if in_quote.is_none() => return Some(idx + 1),
+            _ => {}
+        }
+        idx += 1;
+    }
+
+    None
+}
+
+fn find_closing_tag(bytes: &[u8], mut idx: usize, tag: &[u8]) -> Option<usize> {
+    let len = bytes.len();
+    let mut depth = 1usize;
+
+    while idx < len {
+        if bytes[idx] == b'<' {
+            if matches_tag_start(bytes, idx + 1, tag) {
+                if let Some(next) = find_tag_end(bytes, idx + 1 + tag.len()) {
+                    depth += 1;
+                    idx = next;
+                    continue;
+                }
+            } else if matches_end_tag_start(bytes, idx + 1, tag) {
+                if let Some(close) = find_tag_end(bytes, idx + 2 + tag.len()) {
+                    depth -= 1;
+                    if depth == 0 {
+                        return Some(close);
+                    }
+                    idx = close;
+                    continue;
+                }
+            }
+        }
+
+        idx += 1;
+    }
+
+    None
+}
+
+fn matches_end_tag_start(bytes: &[u8], start: usize, tag: &[u8]) -> bool {
+    if start >= bytes.len() || bytes[start] != b'/' {
+        return false;
+    }
+    matches_tag_start(bytes, start + 1, tag)
 }
 
 /// Check if an element is inline (not block-level).
@@ -2325,36 +2484,14 @@ fn walk_node(
         tl::Node::Tag(tag) => {
             let tag_name = normalized_tag_name(tag.name().as_utf8_str());
 
-            // New classification system for filtering
-            match classify_tag_for_filtering(node_handle, tag_name.as_ref(), tag, parser, dom_ctx, options) {
-                TagDisposition::DropSubtree => {
-                    // Drop entire subtree - don't process children
-                    trim_trailing_whitespace(output);
-                    if options.debug {
-                        eprintln!("[DEBUG] Dropping <{}> and all children", tag_name);
-                    }
-                    return;
+            if should_drop_for_preprocessing(node_handle, tag_name.as_ref(), tag, parser, dom_ctx, options) {
+                trim_trailing_whitespace(output);
+                if options.debug {
+                    eprintln!("[DEBUG] Dropping <{}> subtree due to preprocessing settings", tag_name);
                 }
-
-                TagDisposition::SkipTag => {
-                    // Skip this tag but process children
-                    trim_trailing_whitespace(output);
-                    if options.debug {
-                        eprintln!("[DEBUG] Skipping <{}> tag, processing children", tag_name);
-                    }
-                    let children = tag.children();
-                    for child_handle in children.top().iter() {
-                        walk_node(child_handle, parser, output, options, ctx, depth + 1, dom_ctx);
-                    }
-                    return;
-                }
-
-                TagDisposition::Process => {
-                    // Fall through to normal processing
-                }
+                return;
             }
 
-            // Existing strip_tags logic (unchanged)
             if options.strip_tags.iter().any(|t| t.as_str() == tag_name) {
                 let children = tag.children();
                 {
