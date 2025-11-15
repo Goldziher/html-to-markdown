@@ -57,8 +57,17 @@ repos:
     rev: v1.63.4
     hooks:
       - id: golangci-lint
-        args: ["--config", ".golangci.yml", "./packages/go/...", "./examples/go-smoke/..."]
-        files: ^packages/go/|^examples/go-smoke/
+        name: golangci-lint (packages/go)
+        args: ["--config", "../.golangci.yml"]
+        files: ^packages/go/
+        pass_filenames: false
+        entry: bash -c 'cd packages/go && golangci-lint run --config ../../.golangci.yml ./...'
+      - id: golangci-lint
+        name: golangci-lint (examples/go-smoke)
+        args: ["--config", "../.golangci.yml"]
+        files: ^examples/go-smoke/
+        pass_filenames: false
+        entry: bash -c 'cd examples/go-smoke && golangci-lint run --config ../../.golangci.yml ./...'
   - repo: local
     hooks:
       - id: mypy
