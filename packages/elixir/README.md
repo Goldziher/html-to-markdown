@@ -35,6 +35,11 @@ mix deps.get
 mix compile
 ```
 
+## Prerequisites
+
+- Elixir **1.19+** running on **OTP 28** (matches CI + release automation targets)
+- Rust toolchain (stable) with `cargo` available
+
 ## Usage
 
 ```elixir
