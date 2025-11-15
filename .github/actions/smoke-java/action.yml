@@ -21,9 +21,9 @@ runs:
         if [[ -n "${{ inputs.jar-path }}" ]]; then
           version="$(
             python3 - <<'PY'
-            import os
-            import xml.etree.ElementTree as ET
-            from pathlib import Path
+import os
+import xml.etree.ElementTree as ET
+from pathlib import Path
 
             pom = Path(os.environ["GITHUB_WORKSPACE"]) / "examples" / "java-smoke" / "pom.xml"
             ns = {"m": "http://maven.apache.org/POM/4.0.0"}
@@ -42,7 +42,7 @@ runs:
             if not version:
                 raise SystemExit("Unable to determine html-to-markdown version from examples/java-smoke/pom.xml")
 
-            print(version)
+print(version)
         PY
           )"
 
@@ -54,11 +54,32 @@ runs:
             -Dversion="$version" \
             -Dpackaging=jar \
             -DgeneratePom=true
+
+          # Build the native library so the smoke test can load it
+          pushd "${GITHUB_WORKSPACE}" >/dev/null
+          cargo build -p html-to-markdown-ffi --release
+          popd >/dev/null
         else
           # Install from local packages/java/target
           pushd "${GITHUB_WORKSPACE}/packages/java" >/dev/null
           mvn install -DskipTests -Dgpg.skip=true
           popd >/dev/null
+        fi
+
+        lib_dir="$(
+          python3 - <<'PY'
+import os
+from pathlib import Path
+
+print(Path(os.environ["GITHUB_WORKSPACE"]) / "target" / "release")
+PY
+        )"
+
+        extra_java_flags="--enable-preview --enable-native-access=ALL-UNNAMED -Djava.library.path=${lib_dir}"
+        if [[ -n "${JAVA_TOOL_OPTIONS:-}" ]]; then
+          export JAVA_TOOL_OPTIONS="${JAVA_TOOL_OPTIONS} ${extra_java_flags}"
+        else
+          export JAVA_TOOL_OPTIONS="${extra_java_flags}"
         fi
 
         # Compile and run the smoke test
