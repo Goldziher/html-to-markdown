@@ -489,3 +489,36 @@ jobs:
 
       - name: Smoke C# install
         uses: ./.github/actions/smoke-csharp
+
+  elixir:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup Elixir
+        uses: erlef/setup-beam@v1
+        with:
+          elixir-version: "1.17"
+          otp-version: "27.0"
+
+      - name: Setup Rust
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+
+      - name: Install Hex/Rebar
+        run: |
+          mix local.hex --force
+          mix local.rebar --force
+
+      - name: Install dependencies
+        working-directory: packages/elixir
+        run: mix deps.get
+
+      - name: Run tests
+        working-directory: packages/elixir
+        run: MIX_ENV=test mix test
+
+      - name: Credo lint
+        working-directory: packages/elixir
+        run: MIX_ENV=dev mix credo --strict

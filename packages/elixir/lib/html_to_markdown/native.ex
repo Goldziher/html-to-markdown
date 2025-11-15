@@ -8,5 +8,8 @@ defmodule HtmlToMarkdown.Native do
     mode: (Mix.env() == :prod && :release) || :debug
 
   def convert(_html), do: :erlang.nif_error(:nif_not_loaded)
-  def convert_with_options(_html, _opts), do: :erlang.nif_error(:nif_not_loaded)
+  def convert_with_options_map(_html, _options), do: :erlang.nif_error(:nif_not_loaded)
+  def convert_with_handle(_html, _handle), do: :erlang.nif_error(:nif_not_loaded)
+  def create_options_handle(_options), do: :erlang.nif_error(:nif_not_loaded)
+  def convert_with_inline_images(_html, _options, _config), do: :erlang.nif_error(:nif_not_loaded)
 end
