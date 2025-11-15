@@ -1297,9 +1297,10 @@ jobs:
 
       - name: Publish to Hex.pm
         uses: erlangpack/github-action@v3
+        working-directory: packages/elixir
         with:
-          command: publish
-          path: packages/elixir
+          entryPoint: mix
+          args: hex.publish --yes
         env:
           HEX_API_KEY: ${{ secrets.HEX_TOKEN }}
 
@@ -1326,16 +1327,21 @@ jobs:
           path: dist/nuget
 
       - name: Publish package to NuGet.org
+        env:
+          DOTNET_NOLOGO: true
+          NUGET_API_KEY: ${{ secrets.NUGET_API_KEY || secrets.NUGET_KEY }}
         run: |
           set -euo pipefail
+          if [ -z "${NUGET_API_KEY:-}" ]; then
+            echo "NuGet API key secret missing (define NUGET_API_KEY or NUGET_KEY)" >&2
+            exit 1
+          fi
           for pkg in dist/nuget/*.nupkg; do
             dotnet nuget push "$pkg" \
-              --api-key "${{ secrets.NUGET_API_KEY }}" \
+              --api-key "$NUGET_API_KEY" \
               --source https://api.nuget.org/v3/index.json \
               --skip-duplicate
           done
-        env:
-          DOTNET_NOLOGO: true
 
   publish-maven:
     name: Publish Maven package
