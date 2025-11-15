@@ -21,28 +21,28 @@ runs:
         if [[ -n "${{ inputs.jar-path }}" ]]; then
           version="$(
             python3 - <<'PY'
-import os
-import xml.etree.ElementTree as ET
-from pathlib import Path
+            import os
+            import xml.etree.ElementTree as ET
+            from pathlib import Path
 
-pom = Path(os.environ["GITHUB_WORKSPACE"]) / "examples" / "java-smoke" / "pom.xml"
-ns = {"m": "http://maven.apache.org/POM/4.0.0"}
+            pom = Path(os.environ["GITHUB_WORKSPACE"]) / "examples" / "java-smoke" / "pom.xml"
+            ns = {"m": "http://maven.apache.org/POM/4.0.0"}
 
-tree = ET.parse(pom)
-version = None
-for dep in tree.findall(".//m:dependency", ns):
-    gid = dep.find("m:groupId", ns)
-    aid = dep.find("m:artifactId", ns)
-    ver = dep.find("m:version", ns)
-    if gid is not None and aid is not None and gid.text and aid.text:
-        if gid.text.strip() == "io.github.goldziher" and aid.text.strip() == "html-to-markdown":
-            version = (ver.text if ver is not None else "").strip()
-            break
+            tree = ET.parse(pom)
+            version = None
+            for dep in tree.findall(".//m:dependency", ns):
+                gid = dep.find("m:groupId", ns)
+                aid = dep.find("m:artifactId", ns)
+                ver = dep.find("m:version", ns)
+                if gid is not None and aid is not None and gid.text and aid.text:
+                    if gid.text.strip() == "io.github.goldziher" and aid.text.strip() == "html-to-markdown":
+                        version = (ver.text if ver is not None else "").strip()
+                        break
 
-if not version:
-    raise SystemExit("Unable to determine html-to-markdown version from examples/java-smoke/pom.xml")
+            if not version:
+                raise SystemExit("Unable to determine html-to-markdown version from examples/java-smoke/pom.xml")
 
-print(version)
+            print(version)
 PY
           )"
 
