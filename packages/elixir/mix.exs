@@ -25,6 +25,7 @@ defmodule HtmlToMarkdown.MixProject do
 
   defp deps do
     [
+      {:jason, "~> 1.4", runtime: false},
       {:rustler, "~> 0.33.0", runtime: false},
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false}
     ]

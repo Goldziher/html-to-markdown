@@ -60,6 +60,7 @@ struct Args {
 enum Language {
     Php,
     Ruby,
+    Elixir,
     Python,
     Node,
     Wasm,
@@ -74,6 +75,7 @@ impl fmt::Display for Language {
         match self {
             Language::Php => write!(f, "PHP"),
             Language::Ruby => write!(f, "Ruby"),
+            Language::Elixir => write!(f, "Elixir"),
             Language::Python => write!(f, "Python"),
             Language::Node => write!(f, "Node"),
             Language::Wasm => write!(f, "WASM"),
@@ -171,6 +173,7 @@ fn main() -> Result<()> {
         args.languages = vec![
             Language::Php,
             Language::Ruby,
+            Language::Elixir,
             Language::Python,
             Language::Node,
             Language::Wasm,
@@ -323,6 +326,11 @@ fn run_script(
             );
             (cmd, repo_root.join("packages/ruby"))
         }
+        Language::Elixir => {
+            let mut cmd = Command::new("mix");
+            cmd.arg("run").arg("scripts/benchmark.exs");
+            (cmd, repo_root.join("packages/elixir"))
+        }
         Language::Python => {
             let mut cmd = Command::new("uv");
             cmd.arg("run").arg("python").arg("bin/benchmark.py");
@@ -405,6 +413,10 @@ fn run_script(
         }
         Language::Rust => bail!("Rust benchmarking is handled internally"),
     };
+
+    if matches!(language, Language::Elixir) {
+        command.env("MIX_ENV", "prod");
+    }
 
     command
         .arg("--file")
