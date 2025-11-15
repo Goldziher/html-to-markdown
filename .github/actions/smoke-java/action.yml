@@ -43,7 +43,7 @@ runs:
                 raise SystemExit("Unable to determine html-to-markdown version from examples/java-smoke/pom.xml")
 
             print(version)
-PY
+        PY
           )"
 
           # Install the JAR to local Maven repository
