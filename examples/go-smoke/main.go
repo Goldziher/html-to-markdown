@@ -61,7 +61,7 @@ func main() {
 		log.Fatalf("Conversion failed: %v", err)
 	}
 	if markdown4 == "" {
-		fmt.Println("✓ Empty string correctly returns empty result\n")
+		fmt.Println("✓ Empty string correctly returns empty result")
 	} else {
 		fmt.Printf("✗ Expected empty result, got: %s\n\n", markdown4)
 		os.Exit(1)
