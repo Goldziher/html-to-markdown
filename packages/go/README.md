@@ -69,6 +69,21 @@ go test -v
 go test -bench=.
 ```
 
+## Performance
+
+The Rust-backed implementation provides excellent performance:
+
+| Document Type          | Size   | Ops/sec  | Throughput |
+| ---------------------- | ------ | -------- | ---------- |
+| Lists (Timeline)       | 129 KB | 1,306    | 165.0 MB/s |
+| Tables (Countries)     | 360 KB | 330      | 116.1 MB/s |
+| Medium (Python)        | 656 KB | 151      | 96.9 MB/s  |
+| Large (Rust)           | 567 KB | 165      | 91.4 MB/s  |
+| Small (Intro)          | 463 KB | 201      | 91.1 MB/s  |
+| HOCR German PDF        | 44 KB  | 2,542    | 108.4 MB/s |
+| HOCR Invoice           | 4 KB   | 26,369   | 107.9 MB/s |
+| HOCR Embedded Tables   | 37 KB  | 2,765    | 100.4 MB/s |
+
 ## Publishing
 
 Go packages are published by pushing to GitHub. Users import directly:

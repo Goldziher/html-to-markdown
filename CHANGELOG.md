@@ -7,7 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [2.8.0] - 2025-11-14
+## [2.8.0] - 2025-11-15
+
+### Added
+- **Java, C#, and Go Bindings (First Release)** – First public release of official Java (JNA), C# (.NET), and Go (CGO) language bindings. All three are integrated into the unified `task bench:bindings` harness and ship with comprehensive performance data in their READMEs. C# leads at ~1.4k ops/sec (≈171 MB/s), Go at ~1.3k ops/sec (≈165 MB/s), and Java at ~1.0k ops/sec (≈126 MB/s) on the 129 KB Wikipedia lists fixture.
 
 ### Changed
 - **BREAKING: Preprocessing Disabled by Default** – HTML preprocessing is now disabled by default in the library API to prevent silent content loss. Previously, `<nav>`, `<form>`, and related elements (along with all their children) were dropped by default, causing important content inside these tags to be lost. Users who want preprocessing must now explicitly enable it via `PreprocessingOptions { enabled: true, ... }`. The CLI behavior is unchanged (preprocessing has always been opt-in with `--preprocess`).
@@ -19,6 +22,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Windows PHP Extension Build** – Replaced php-windows-builder orchestration with direct `cargo build` matching ext-php-rs's proven approach, resolving LLVM 19 MMX header incompatibilities and Zend symbol linking errors.
 - **Linux PHP Build** – Added php-config path capture and parameter passing to build-php-linux action, fixing "php-config executable not found" errors.
 - **Ruby Linux Build** – Set LD_LIBRARY_PATH on Linux builds to match magnus best practices, preventing potential "strings.h not found" errors.
+- **golangci-lint CI** – Split golangci-lint pre-commit hook into separate invocations for `packages/go` and `examples/go-smoke` modules, fixing "directory prefix does not contain main module" errors by running each check from within its Go module directory.
+- **Windows Go CGO Smoke Test** – Documented MSVC/MinGW toolchain incompatibility and skip Windows Go smoke test with informative message, as Go CGO uses MinGW which cannot link against MSVC-compiled Rust FFI libraries.
+- **Go Code Quality** – Removed redundant newline in `examples/go-smoke/main.go` fmt.Println call (detected by newly-working golangci-lint).
 
 ## [2.7.2] - 2025-11-12
 
