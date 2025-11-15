@@ -76,7 +76,11 @@ jobs:
         uses: erlef/setup-beam@v1
         with:
           elixir-version: "1.19"
-          otp-version: "28.0"
+          otp-version: "28.1"
+
+      - name: Install Elixir dependencies
+        working-directory: packages/elixir
+        run: mix deps.get
 
       - name: Setup Ruby
         uses: ruby/setup-ruby@v1
@@ -507,7 +511,7 @@ jobs:
         uses: erlef/setup-beam@v1
         with:
           elixir-version: "1.19"
-          otp-version: "28.0"
+          otp-version: "28.1"
 
       - name: Setup Rust
         uses: actions-rust-lang/setup-rust-toolchain@v1

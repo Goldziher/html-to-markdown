@@ -17,11 +17,12 @@ tasks:
       - task: php:install
       - task: go:install
       - task: csharp:install
+      - task: java:install
       - task: elixir:install
       - task: rust:build
 
   update:
-    desc: "Update dependencies across Rust, JavaScript, Python, Ruby, PHP, Go, and C#"
+    desc: "Update dependencies across Rust, JavaScript, Python, Ruby, PHP, Go, C#, Elixir, and Java"
     cmds:
       - echo "Updating Rust crates..."
       - task: rust:update
@@ -37,6 +38,10 @@ tasks:
       - task: go:update
       - echo "Updating C# dependencies..."
       - task: csharp:update
+      - echo "Updating Elixir dependencies..."
+      - task: elixir:update
+      - echo "Updating Java dependencies..."
+      - task: java:update
       - echo "Updating smoke test fixtures..."
       - task: examples:update
 
@@ -57,6 +62,7 @@ tasks:
       - task: go:test
       - task: csharp:test
       - task: elixir:test
+      - task: java:test
 
   lint:
     desc: "Run linters across the repo"
@@ -69,6 +75,7 @@ tasks:
       - task: go:lint
       - task: csharp:lint
       - task: elixir:lint
+      - task: java:lint
 
   fmt:
     desc: "Format code for all languages"
@@ -463,6 +470,12 @@ tasks:
       - MIX_ENV=dev mix deps.get
       - MIX_ENV=dev mix compile
 
+  elixir:update:
+    desc: "Update Elixir dependencies"
+    dir: packages/elixir
+    cmds:
+      - MIX_ENV=dev mix deps.update --all
+
   elixir:test:
     desc: "Run Elixir tests"
     dir: packages/elixir
@@ -481,7 +494,42 @@ tasks:
     cmds:
       - MIX_ENV=dev mix format
 
-  # C# tasks -----------------------------------------------------------------
+# Java tasks -----------------------------------------------------------------
+  java:install:
+    desc: "Verify Java (JDK 22+) and Maven are installed"
+    cmds:
+      - |
+        if ! command -v java >/dev/null 2>&1; then
+          echo "ERROR: Java (JDK 22+) is not installed. Please install Temurin or Oracle JDK."
+          exit 1
+        fi
+        java -version
+      - |
+        if ! command -v mvn >/dev/null 2>&1; then
+          echo "ERROR: Maven is not installed. Please install Maven 3.9+."
+          exit 1
+        fi
+        mvn -v
+
+  java:update:
+    desc: "Update Java dependencies (Maven)"
+    dir: packages/java
+    cmds:
+      - mvn -B versions:update-properties -DgenerateBackupPoms=false
+
+  java:test:
+    desc: "Run Java tests"
+    cmds:
+      - cargo build --release -p html-to-markdown-ffi
+      - cmd: cd packages/java && mvn -B test
+
+  java:lint:
+    desc: "Verify Java project builds without tests"
+    dir: packages/java
+    cmds:
+      - mvn -B -DskipTests package
+
+# C# tasks -----------------------------------------------------------------
   csharp:install:
     desc: "Verify .NET SDK is installed"
     cmds:

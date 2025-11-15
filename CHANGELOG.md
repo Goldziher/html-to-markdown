@@ -10,6 +10,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - **Elixir bindings** – New `html_to_markdown` Hex package built with Rustler, exposing the Rust core converter to Elixir with configurable options plus `convert/2` and `convert!/2`.
 
+## [2.8.2] - 2025-11-15
+
+### Changed
+- **Unified Version Sync** – `scripts/sync_versions.py` now updates Elixir `@version` declarations, the C# `.csproj`, and the Java `pom.xml` (alongside every npm/pyproject/Gemfile manifest). `task sync-versions` bumps the entire multi-language stack to **2.8.2** in one shot.
+- **CI / Release Toolchains** – GitHub Actions now installs Elixir dependencies ahead of Credo and runs on **Elixir 1.19 + OTP 28.1**, matching the README prerequisites and preventing per-job regex recompilation warnings.
+- **Taskfile Coverage** – Added `elixir:update` plus full `java:{install,update,test,lint}` tasks so `task setup`, `task update`, `task test`, and `task lint` cover every published runtime (Go, C#, Elixir, Java) just like the CI workflows.
+
 ## [2.8.1] - 2025-11-15
 
 ### Fixed
