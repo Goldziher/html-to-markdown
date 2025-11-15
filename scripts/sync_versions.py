@@ -205,13 +205,48 @@ def update_mix_version(file_path: Path, version: str) -> tuple[bool, str, str]:
     Returns: (changed, old_version, new_version)
     """
     content = file_path.read_text()
-    match = re.search(r'@version\s*=\s*"([^"]+)"', content)
+    match = re.search(r'@version\s*=?\s*"([^"]+)"', content)
     old_version = match.group(1) if match else "NOT FOUND"
 
     if old_version == version:
         return False, old_version, version
 
-    new_content = re.sub(r'(@version\s*=\s*)"[^"]+"', rf'\1"{version}"', content, count=1)
+    new_content = re.sub(r'(@version\s*=?\s*)"[^"]+"', rf'\1"{version}"', content, count=1)
+    file_path.write_text(new_content)
+    return True, old_version, version
+
+
+def update_csproj_version(file_path: Path, version: str) -> tuple[bool, str, str]:
+    """Update <Version> tags inside .csproj files."""
+    content = file_path.read_text()
+    match = re.search(r"<Version>([^<]+)</Version>", content)
+    old_version = match.group(1) if match else "NOT FOUND"
+
+    if old_version == version:
+        return False, old_version, version
+
+    new_content = re.sub(r"(<Version>)[^<]+(</Version>)", rf"\g<1>{version}\2", content, count=1)
+    file_path.write_text(new_content)
+    return True, old_version, version
+
+
+def update_pom_version(file_path: Path, version: str) -> tuple[bool, str, str]:
+    """Update the primary <version> tag for the Java package."""
+    content = file_path.read_text()
+    pattern = re.compile(
+        r"(<artifactId>\s*html-to-markdown\s*</artifactId>\s*<version>)([^<]+)(</version>)",
+        re.IGNORECASE | re.DOTALL,
+    )
+    match = pattern.search(content)
+    old_version = match.group(2).strip() if match else "NOT FOUND"
+
+    if old_version == version:
+        return False, old_version, version
+
+    new_content, count = pattern.subn(lambda m: f"{m.group(1)}{version}{m.group(3)}", content, count=1)
+    if count == 0:
+        return False, old_version, version
+
     file_path.write_text(new_content)
     return True, old_version, version
 
@@ -317,6 +352,28 @@ def main() -> None:
         rel_path = node_binding_index.relative_to(repo_root)
         if changed:
             print(f"✓ {rel_path}: updated binding version guards to {version}")
+            updated_files.append(str(rel_path))
+        else:
+            unchanged_files.append(str(rel_path))
+
+    # Update C# package version
+    csproj = repo_root / "packages/csharp/HtmlToMarkdown/HtmlToMarkdown.csproj"
+    if csproj.exists():
+        changed, old_ver, new_ver = update_csproj_version(csproj, version)
+        rel_path = csproj.relative_to(repo_root)
+        if changed:
+            print(f"✓ {rel_path}: {old_ver} → {new_ver}")
+            updated_files.append(str(rel_path))
+        else:
+            unchanged_files.append(str(rel_path))
+
+    # Update Java pom version
+    pom = repo_root / "packages/java/pom.xml"
+    if pom.exists():
+        changed, old_ver, new_ver = update_pom_version(pom, version)
+        rel_path = pom.relative_to(repo_root)
+        if changed:
+            print(f"✓ {rel_path}: {old_ver} → {new_ver}")
             updated_files.append(str(rel_path))
         else:
             unchanged_files.append(str(rel_path))
