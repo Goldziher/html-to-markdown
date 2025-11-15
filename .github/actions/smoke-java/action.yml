@@ -30,7 +30,7 @@ runs:
         else
           # Install from local packages/java/target
           pushd "${GITHUB_WORKSPACE}/packages/java" >/dev/null
-          mvn install -DskipTests
+          mvn install -DskipTests -Dgpg.skip=true
           popd >/dev/null
         fi
 
