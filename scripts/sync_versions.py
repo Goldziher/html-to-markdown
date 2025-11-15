@@ -378,6 +378,17 @@ def main() -> None:
         else:
             unchanged_files.append(str(rel_path))
 
+    # Update Java smoke test pom to keep dependency versions aligned
+    smoke_pom = repo_root / "examples/java-smoke/pom.xml"
+    if smoke_pom.exists():
+        changed, old_ver, new_ver = update_pom_version(smoke_pom, version)
+        rel_path = smoke_pom.relative_to(repo_root)
+        if changed:
+            print(f"✓ {rel_path}: {old_ver} → {new_ver}")
+            updated_files.append(str(rel_path))
+        else:
+            unchanged_files.append(str(rel_path))
+
     # Update uv.lock version pin
     uv_lock = repo_root / "uv.lock"
     if uv_lock.exists():
