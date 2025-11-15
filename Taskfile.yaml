@@ -291,14 +291,14 @@ tasks:
     desc: "Install Python dependencies via uv"
     dir: packages/python
     cmds:
-      - uv sync --all-extras
+      - uv sync --all-extras --no-install-workspace
 
   python:update:
     desc: "Update Python dependencies"
     cmds:
       - uv run uv-bump --pyproject-toml pyproject.toml
       - uv run uv-bump --pyproject-toml packages/python/pyproject.toml
-      - uv sync --all-extras --upgrade
+      - uv sync --all-extras --upgrade --no-install-workspace
 
   python:test:
     desc: "Run Python tests (build CLI first for proxy tests)"
