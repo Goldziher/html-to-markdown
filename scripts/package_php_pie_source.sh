@@ -50,6 +50,11 @@ fi
 mkdir -p "$WORKSPACE_DIR/packages/ruby"
 rsync -a --exclude 'target' --exclude 'native/target' "$ROOT/packages/ruby/" "$WORKSPACE_DIR/packages/ruby/"
 
+# Include the Elixir Rustler binding to satisfy workspace members referenced by the PHP PIE build.
+mkdir -p "$WORKSPACE_DIR/packages/elixir"
+rsync -a --exclude '_build' --exclude 'deps' --exclude 'native/html_to_markdown_elixir/target' \
+  "$ROOT/packages/elixir/" "$WORKSPACE_DIR/packages/elixir/"
+
 # Mirror workspace for packages/php-ext to satisfy configure scripts that resolve relative paths.
 WORKSPACE_ALT_DIR="$STAGING/packages/php-ext/workspace"
 mkdir -p "$WORKSPACE_ALT_DIR"
