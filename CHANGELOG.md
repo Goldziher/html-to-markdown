@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.8.1] - 2025-11-15
+
+### Fixed
+- **Release Pipeline** – Bumped all package manifests to v2.8.1 so the publish workflow can push fresh artifacts after the v2.8.0 smoke-test fixes (PyPI, npm, and RubyGems refuse re-uploads of the same version).
+
 ## [2.8.0] - 2025-11-15
 
 ### Added
