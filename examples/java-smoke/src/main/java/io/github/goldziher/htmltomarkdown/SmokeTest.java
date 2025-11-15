@@ -1,7 +1,5 @@
 package io.github.goldziher.htmltomarkdown;
 
-import io.github.goldziher.HtmlToMarkdown;
-
 /**
  * Smoke test for the html-to-markdown Java bindings.
  */
