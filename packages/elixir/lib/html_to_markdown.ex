@@ -1,74 +1,170 @@
 defmodule HtmlToMarkdown do
   @moduledoc """
-  Elixir bindings for the Rust html-to-markdown engine.
+  High-level Elixir interface for the Rust html-to-markdown engine.
   """
 
-  alias HtmlToMarkdown.Error
-  alias HtmlToMarkdown.Native
+  alias HtmlToMarkdown.{
+    Error,
+    InlineImage,
+    InlineImageConfig,
+    InlineImageWarning,
+    Native,
+    Options
+  }
 
-  @type option ::
-          {:wrap, boolean()}
-          | {:wrap_width, pos_integer()}
-          | {:heading_style, :atx | :atx_closed | :underlined}
-          | {:list_indent_type, :spaces | :tabs}
-          | {:newline_style, :spaces | :backslash}
-          | {:code_block_style, :indented | :backticks | :tildes}
-          | {:whitespace, :normalized | :strict}
-          | {:convert_as_inline, boolean()}
-          | {:debug, boolean()}
-          | {:preprocessing,
-             %{
-               optional(:enabled) => boolean(),
-               optional(:preset) => :minimal | :standard | :aggressive,
-               optional(:remove_navigation) => boolean(),
-               optional(:remove_forms) => boolean()
-             }}
+  @type options_input :: Options.t() | map() | keyword() | nil
+  @type inline_config_input :: InlineImageConfig.t() | map() | keyword() | nil
 
   @doc """
-  Convert `html` to Markdown. Returns `{:ok, markdown}` or `{:error, reason}`.
-  """
-  @spec convert(String.t(), Enumerable.t()) :: {:ok, String.t()} | {:error, term()}
-  def convert(html, opts \\ []) when is_binary(html) do
-    opts = opts |> to_map() |> stringify_keys()
+  Convert HTML to Markdown.
 
-    case call_native(html, opts) do
+  The `options` argument accepts an `%HtmlToMarkdown.Options{}` struct,
+  a map/keyword list with option keys, or `nil` (defaults).
+  """
+  @spec convert(String.t(), options_input()) :: {:ok, String.t()} | {:error, term()}
+  def convert(html, options \\ nil) when is_binary(html) do
+    options_map = normalize_options(options)
+
+    case call_convert(html, options_map) do
       {:ok, markdown} -> {:ok, markdown}
       {:error, reason} -> {:error, reason}
     end
   end
 
   @doc """
-  Convert `html` to Markdown, raising on error.
+  Convert HTML to Markdown and raise on failure.
   """
-  @spec convert!(String.t(), Enumerable.t()) :: String.t()
-  def convert!(html, opts \\ []) when is_binary(html) do
-    case convert(html, opts) do
+  @spec convert!(String.t(), options_input()) :: String.t()
+  def convert!(html, options \\ nil) do
+    case convert(html, options) do
       {:ok, markdown} -> markdown
       {:error, reason} -> raise Error, message: inspect(reason)
     end
   end
 
-  defp call_native(html, %{} = opts) when map_size(opts) == 0 do
-    Native.convert(html)
+  @doc """
+  Convert HTML using a reusable options handle.
+  """
+  @spec convert_with_options(String.t(), reference()) :: {:ok, String.t()} | {:error, term()}
+  def convert_with_options(html, handle) when is_binary(html) do
+    Native.convert_with_handle(html, handle)
   end
 
-  defp call_native(html, opts) do
-    Native.convert_with_options(html, opts)
+  @doc """
+  Variant of `convert_with_options/2` that raises on failure.
+  """
+  @spec convert_with_options!(String.t(), reference()) :: String.t()
+  def convert_with_options!(html, handle) do
+    case convert_with_options(html, handle) do
+      {:ok, markdown} -> markdown
+      {:error, reason} -> raise Error, message: inspect(reason)
+    end
   end
 
-  defp to_map(%{} = map), do: map
-  defp to_map(list) when is_list(list), do: Map.new(list)
-  defp to_map(_), do: %{}
+  @doc """
+  Convert HTML and collect inline image assets.
 
-  defp stringify_keys(value) when is_map(value) do
-    value
-    |> Enum.map(fn {k, v} -> {stringify_key(k), stringify_keys(v)} end)
-    |> Map.new()
+  Returns `{:ok, markdown, inline_images, warnings}`.
+  """
+  @spec convert_with_inline_images(String.t(), options_input(), inline_config_input()) ::
+          {:ok, String.t(), [InlineImage.t()], [InlineImageWarning.t()]}
+          | {:error, term()}
+  def convert_with_inline_images(html, options \\ nil, inline_config \\ nil)
+      when is_binary(html) do
+    options_map = normalize_options(options) || %{}
+
+    with {:ok, config_map} <- InlineImageConfig.to_map_result(inline_config),
+         {:ok, {markdown, images, warnings}} <-
+           Native.convert_with_inline_images(html, options_map, config_map) do
+      {:ok, markdown, Enum.map(images, &into_inline_image/1), Enum.map(warnings, &into_warning/1)}
+    else
+      {:error, reason} -> {:error, reason}
+    end
   end
 
-  defp stringify_keys(value), do: value
+  @doc """
+  Bang variant of `convert_with_inline_images/3`.
+  """
+  @spec convert_with_inline_images!(String.t(), options_input(), inline_config_input()) ::
+          {String.t(), [InlineImage.t()], [InlineImageWarning.t()]}
+  def convert_with_inline_images!(html, options \\ nil, inline_config \\ nil) do
+    case convert_with_inline_images(html, options, inline_config) do
+      {:ok, markdown, images, warnings} -> {markdown, images, warnings}
+      {:error, reason} -> raise Error, message: inspect(reason)
+    end
+  end
 
-  defp stringify_key(key) when is_atom(key), do: Atom.to_string(key)
-  defp stringify_key(key) when is_binary(key), do: key
-  defp stringify_key(other), do: to_string(other)
+  @doc """
+  Create a reusable options handle (opaque reference).
+
+  The handle can be passed to `convert_with_options/2`.
+  """
+  @spec options(options_input()) :: reference()
+  def options(opts \\ nil) do
+    opts_map = normalize_options(opts) || %{}
+
+    case Native.create_options_handle(opts_map) do
+      {:ok, handle} ->
+        handle
+
+      {:error, reason} ->
+        raise Error, message: inspect(reason)
+    end
+  end
+
+  defp call_convert(html, nil), do: Native.convert(html)
+
+  defp call_convert(html, options) when options == %{}, do: Native.convert(html)
+
+  defp call_convert(html, options), do: Native.convert_with_options_map(html, options)
+
+  defp normalize_options(nil), do: nil
+
+  defp normalize_options(options) do
+    options
+    |> Options.new()
+    |> Options.to_map()
+  end
+
+  defp into_inline_image(map) do
+    data = fetch(map, :data)
+    format = fetch(map, :format)
+    filename = fetch(map, :filename)
+    description = fetch(map, :description)
+    dimensions = normalize_dimensions(fetch(map, :dimensions))
+    source = normalize_source(fetch(map, :source))
+    attributes = fetch(map, :attributes) || %{}
+
+    %InlineImage{
+      data: data,
+      format: format,
+      filename: filename,
+      description: description,
+      dimensions: dimensions,
+      source: source,
+      attributes: attributes
+    }
+  end
+
+  defp into_warning(map) do
+    index = fetch(map, :index)
+    message = fetch(map, :message)
+    %InlineImageWarning{index: index, message: message}
+  end
+
+  defp fetch(map, key) when is_atom(key) do
+    Map.get(map, key) || Map.get(map, Atom.to_string(key))
+  end
+
+  defp normalize_source(value) when is_atom(value), do: Atom.to_string(value)
+  defp normalize_source(value) when is_binary(value), do: value
+  defp normalize_source(_), do: "img_data_uri"
+
+  defp normalize_dimensions({width, height}) when is_integer(width) and is_integer(height),
+    do: {width, height}
+
+  defp normalize_dimensions([width, height]) when is_integer(width) and is_integer(height),
+    do: {width, height}
+
+  defp normalize_dimensions(_), do: nil
 end

@@ -11,5 +11,5 @@ name = "html_to_markdown_elixir"
 crate-type = ["cdylib"]
 
 [dependencies]
-html-to-markdown-rs = { path = "../../../../crates/html-to-markdown" }
+html-to-markdown-rs = { path = "../../../../crates/html-to-markdown", features = ["inline-images"] }
 rustler = { version = "0.33" }

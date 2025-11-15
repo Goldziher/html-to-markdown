@@ -650,6 +650,7 @@ jobs:
       - wasm-bindings
       - cli-binaries
       - ruby-gem
+      - elixir-package
       - cargo-packages
     runs-on: ${{ matrix.os }}
     timeout-minutes: 30
@@ -701,6 +702,18 @@ jobs:
         with:
           name: rubygems-${{ steps.ruby_label.outputs.label }}
           path: ruby-gems
+
+      - name: Download Elixir package
+        uses: actions/download-artifact@v6
+        with:
+          name: elixir-hex-package
+          path: elixir-package
+
+      - name: Inspect Elixir package
+        run: |
+          set -euo pipefail
+          ls -l elixir-package
+          tar -tf elixir-package/html_to_markdown-*.tar >/dev/null
 
       - name: Setup Python
         uses: actions/setup-python@v6
@@ -906,6 +919,58 @@ jobs:
           path: packages/ruby/pkg/*.gem
           retention-days: 14
 
+  elixir-package:
+    name: Build Elixir Hex package
+    needs: prepare
+    runs-on: ubuntu-latest
+    env:
+      MIX_ENV: dev
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+        with:
+          ref: ${{ needs.prepare.outputs.checkout_ref }}
+          fetch-depth: 0
+
+      - name: Ensure target commit
+        if: ${{ needs.prepare.outputs.target_sha != '' }}
+        run: git checkout --progress --force ${{ needs.prepare.outputs.target_sha }}
+
+      - name: Setup Elixir
+        uses: erlef/setup-beam@v1
+        with:
+          elixir-version: "1.17"
+          otp-version: "27.0"
+
+      - name: Setup Rust
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+
+      - name: Install Hex and Rebar
+        run: |
+          mix local.hex --force
+          mix local.rebar --force
+
+      - name: Install dependencies
+        working-directory: packages/elixir
+        run: mix deps.get
+
+      - name: Run Elixir tests
+        working-directory: packages/elixir
+        env:
+          MIX_ENV: test
+        run: mix test
+
+      - name: Build Hex package
+        working-directory: packages/elixir
+        run: mix hex.build
+
+      - name: Upload Hex artifact
+        uses: actions/upload-artifact@v5
+        with:
+          name: elixir-hex-package
+          path: packages/elixir/html_to_markdown-*.tar
+          retention-days: 14
+
   cargo-packages:
     name: Package Rust crates
     needs: prepare
@@ -963,7 +1028,7 @@ jobs:
 
   upload-release-artifacts:
     name: Upload Release Artifacts
-    needs: [prepare, python-wheels, python-sdist, php-pie, node-typescript-defs, node-bindings, wasm-bindings, cli-binaries, ruby-gem, cargo-packages, release-smoke]
+    needs: [prepare, python-wheels, python-sdist, php-pie, node-typescript-defs, node-bindings, wasm-bindings, cli-binaries, ruby-gem, elixir-package, cargo-packages, release-smoke]
     if: ${{ needs.prepare.outputs.dry_run != 'true' && needs.prepare.outputs.is_tag == 'true' }}
     runs-on: ubuntu-latest
     permissions:
@@ -987,6 +1052,12 @@ jobs:
           path: dist/cli
           merge-multiple: false
 
+      - name: Download Elixir package
+        uses: actions/download-artifact@v6
+        with:
+          name: elixir-hex-package
+          path: dist/elixir
+
       - name: Upload PHP PIE source bundle
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -1004,6 +1075,15 @@ jobs:
             if [ -f "$archive" ]; then
               gh release upload ${{ needs.prepare.outputs.tag }} "$archive" --clobber
             fi
+          done
+
+      - name: Upload Elixir package
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          shopt -s nullglob
+          for pkg in dist/elixir/*.tar; do
+            gh release upload ${{ needs.prepare.outputs.tag }} "$pkg" --clobber
           done
 
   publish-crates:
@@ -1151,6 +1231,41 @@ jobs:
         run: |
           echo "Dry run requested; gem artifacts ready:" >> $GITHUB_STEP_SUMMARY
           ls -1 html-to-markdown-*.gem >> $GITHUB_STEP_SUMMARY
+
+  publish-hex:
+    name: Publish Hex package
+    needs: [prepare, elixir-package, upload-release-artifacts]
+    if: ${{ needs.prepare.result == 'success' && needs.prepare.outputs.tag && needs.prepare.outputs.dry_run != 'true' && needs.prepare.outputs.is_tag == 'true' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+        with:
+          ref: ${{ needs.prepare.outputs.ref }}
+
+      - name: Setup Elixir
+        uses: erlef/setup-beam@v1
+        with:
+          elixir-version: "1.17"
+          otp-version: "27.0"
+
+      - name: Setup Rust
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+
+      - name: Install Hex/Rebar
+        run: |
+          mix local.hex --force
+          mix local.rebar --force
+
+      - name: Install dependencies
+        working-directory: packages/elixir
+        run: mix deps.get
+
+      - name: Publish to Hex
+        working-directory: packages/elixir
+        env:
+          HEX_API_KEY: ${{ secrets.HEX_TOKEN }}
+        run: mix hex.publish --yes
 
   publish-node:
     name: Publish Node packages
