@@ -2,12 +2,15 @@
 
 High-performance HTML to Markdown converter with a clean Python API (powered by a Rust core). The same engine also drives the Node.js, Ruby, PHP, and WebAssembly bindings, so rendered Markdown stays identical across runtimes. Wheels are published for Linux, macOS, and Windows.
 
-[![Crates.io](https://img.shields.io/crates/v/html-to-markdown-rs.svg)](https://crates.io/crates/html-to-markdown-rs)
+[![Crates.io](https://img.shields.io/crates/v/html-to-markdown.svg)](https://crates.io/crates/html-to-markdown)
 [![npm (node)](https://badge.fury.io/js/html-to-markdown-node.svg)](https://www.npmjs.com/package/html-to-markdown-node)
 [![npm (wasm)](https://badge.fury.io/js/html-to-markdown-wasm.svg)](https://www.npmjs.com/package/html-to-markdown-wasm)
 [![PyPI](https://badge.fury.io/py/html-to-markdown.svg)](https://pypi.org/project/html-to-markdown/)
 [![Packagist](https://img.shields.io/packagist/v/goldziher/html-to-markdown.svg)](https://packagist.org/packages/goldziher/html-to-markdown)
 [![RubyGems](https://badge.fury.io/rb/html-to-markdown.svg)](https://rubygems.org/gems/html-to-markdown)
+[![NuGet](https://img.shields.io/nuget/v/HtmlToMarkdown.svg)](https://www.nuget.org/packages/HtmlToMarkdown/)
+[![Maven Central](https://img.shields.io/maven-central/v/io.github.goldziher/html-to-markdown.svg)](https://central.sonatype.com/artifact/io.github.goldziher/html-to-markdown)
+[![Go Reference](https://pkg.go.dev/badge/github.com/Goldziher/html-to-markdown/packages/go/htmltomarkdown.svg)](https://pkg.go.dev/github.com/Goldziher/html-to-markdown/packages/go/htmltomarkdown)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://github.com/Goldziher/html-to-markdown/blob/main/LICENSE)
 
 ## Installation
@@ -217,7 +220,7 @@ The v1 compatibility layer creates extra Python objects and performs additional 
 
 A compatibility layer is provided to ease migration from v1.x:
 
-- **Compat shim**: `html_to_markdown.v1_compat` exposes `convert_to_markdown`, `convert_to_markdown_stream`, and `markdownify`. Keyword mappings are listed in the [changelog](CHANGELOG.md#v200).
+- **Compat shim**: `html_to_markdown.v1_compat` exposes `convert_to_markdown`, `convert_to_markdown_stream`, and `markdownify`. Keyword mappings are listed in the [changelog](https://github.com/Goldziher/html-to-markdown/blob/main/CHANGELOG.md#v200).
 - **⚠️ Performance warning**: These compatibility functions add 77% overhead. Migrate to v2 API as soon as possible.
 - **CLI**: The Rust CLI replaces the old Python script. New flags are documented via `html-to-markdown --help`.
 - **Removed options**: `code_language_callback`, `strip`, and streaming APIs were removed; use `ConversionOptions`, `PreprocessingOptions`, and the inline-image helpers instead.

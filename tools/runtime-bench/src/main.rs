@@ -64,6 +64,9 @@ enum Language {
     Node,
     Wasm,
     Rust,
+    Java,
+    CSharp,
+    Go,
 }
 
 impl fmt::Display for Language {
@@ -75,6 +78,9 @@ impl fmt::Display for Language {
             Language::Node => write!(f, "Node"),
             Language::Wasm => write!(f, "WASM"),
             Language::Rust => write!(f, "Rust"),
+            Language::Java => write!(f, "Java"),
+            Language::CSharp => write!(f, "C#"),
+            Language::Go => write!(f, "Go"),
         }
     }
 }
@@ -169,6 +175,9 @@ fn main() -> Result<()> {
             Language::Node,
             Language::Wasm,
             Language::Rust,
+            Language::Java,
+            Language::CSharp,
+            Language::Go,
         ];
     }
 
@@ -337,6 +346,62 @@ fn run_script(
                 .arg("tsx")
                 .arg("bin/benchmark.ts");
             (cmd, repo_root.to_path_buf())
+        }
+        Language::Java => {
+            ensure_java_jar(repo_root)?;
+            let mut cmd = Command::new("java");
+            cmd.arg("--enable-preview")
+                .arg("--enable-native-access=ALL-UNNAMED")
+                .arg(format!(
+                    "-Djava.library.path={}",
+                    repo_root.join("target/release").display()
+                ))
+                .arg("-jar")
+                .arg("target/benchmark.jar");
+            (cmd, repo_root.join("packages/java"))
+        }
+        Language::CSharp => {
+            ensure_csharp_dll(repo_root)?;
+            let mut cmd = Command::new("dotnet");
+            cmd.arg("run")
+                .arg("--configuration")
+                .arg("Release")
+                .arg("--project")
+                .arg("Benchmark/Benchmark.csproj")
+                .arg("--");
+            let mut ld_path = repo_root.join("target/release").to_string_lossy().to_string();
+            if let Ok(existing) = env::var("LD_LIBRARY_PATH") {
+                ld_path = format!("{}:{}", ld_path, existing);
+            }
+            cmd.env("LD_LIBRARY_PATH", &ld_path);
+            let mut dyld_path = repo_root.join("target/release").to_string_lossy().to_string();
+            if let Ok(existing) = env::var("DYLD_LIBRARY_PATH") {
+                dyld_path = format!("{}:{}", dyld_path, existing);
+            }
+            cmd.env("DYLD_LIBRARY_PATH", &dyld_path);
+            (cmd, repo_root.join("packages/csharp"))
+        }
+        Language::Go => {
+            ensure_go_lib(repo_root)?;
+            let mut cmd = Command::new("go");
+            cmd.arg("run").arg("bin/benchmark.go");
+            let lib_dir = repo_root.join("target/release").to_string_lossy().to_string();
+
+            // Set CGO_LDFLAGS for link-time library location
+            cmd.env("CGO_LDFLAGS", format!("-L{}", lib_dir));
+
+            // Set runtime library paths
+            let mut ld_path = lib_dir.clone();
+            if let Ok(existing) = env::var("LD_LIBRARY_PATH") {
+                ld_path = format!("{}:{}", ld_path, existing);
+            }
+            cmd.env("LD_LIBRARY_PATH", &ld_path);
+            let mut dyld_path = lib_dir.clone();
+            if let Ok(existing) = env::var("DYLD_LIBRARY_PATH") {
+                dyld_path = format!("{}:{}", dyld_path, existing);
+            }
+            cmd.env("DYLD_LIBRARY_PATH", &dyld_path);
+            (cmd, repo_root.join("packages/go"))
         }
         Language::Rust => bail!("Rust benchmarking is handled internally"),
     };
@@ -593,6 +658,138 @@ fn ruby_runtime_dir() -> Option<PathBuf> {
         return Some(default);
     }
     None
+}
+
+fn ensure_java_jar(repo_root: &Path) -> Result<()> {
+    let java_dir = repo_root.join("packages/java");
+    let jar_path = java_dir.join("target/benchmark.jar");
+
+    if jar_path.exists() {
+        return Ok(());
+    }
+
+    // Build the FFI library first
+    ensure_ffi_library(repo_root)?;
+
+    // Build the main library JAR first
+    println!("Building Java library (mvn package)...");
+    let lib_status = Command::new("mvn")
+        .arg("package")
+        .arg("-DskipTests")
+        .current_dir(&java_dir)
+        .status()?;
+
+    if !lib_status.success() {
+        bail!("Java library build failed with status {lib_status}");
+    }
+
+    // Build the benchmark JAR using the benchmark pom
+    println!("Building Java benchmark JAR (mvn -f benchmark-pom.xml clean package)...");
+    let status = Command::new("mvn")
+        .arg("-f")
+        .arg("benchmark-pom.xml")
+        .arg("clean")
+        .arg("package")
+        .current_dir(&java_dir)
+        .status()?;
+
+    if status.success() && jar_path.exists() {
+        Ok(())
+    } else {
+        bail!("Java benchmark JAR build failed with status {status}");
+    }
+}
+
+fn ensure_csharp_dll(repo_root: &Path) -> Result<()> {
+    // Build the FFI library first
+    ensure_ffi_library(repo_root)?;
+
+    let csharp_dir = repo_root.join("packages/csharp");
+    let benchmark_project = csharp_dir.join("Benchmark/Benchmark.csproj");
+
+    if !benchmark_project.exists() {
+        bail!("C# benchmark project not found at {}", benchmark_project.display());
+    }
+
+    println!("Building C# benchmark project (dotnet build)...");
+    let status = Command::new("dotnet")
+        .arg("build")
+        .arg("--configuration")
+        .arg("Release")
+        .arg("Benchmark/Benchmark.csproj")
+        .current_dir(&csharp_dir)
+        .status()?;
+
+    if !status.success() {
+        bail!("C# benchmark build failed with status {status}");
+    }
+
+    // Copy the native library to the benchmark output directory
+    // so C# P/Invoke can find it
+    let lib_dir = repo_root.join("target/release");
+    let benchmark_output = csharp_dir.join("Benchmark/bin/Release/net9.0");
+
+    #[cfg(target_os = "macos")]
+    let lib_name = "libhtml_to_markdown_ffi.dylib";
+    #[cfg(target_os = "linux")]
+    let lib_name = "libhtml_to_markdown_ffi.so";
+    #[cfg(target_os = "windows")]
+    let lib_name = "html_to_markdown_ffi.dll";
+
+    let src = lib_dir.join(lib_name);
+    let dst = benchmark_output.join(lib_name);
+
+    if !src.exists() {
+        bail!("Native library not found at {}", src.display());
+    }
+
+    println!("Copying native library from {} to {}", src.display(), dst.display());
+    fs::copy(&src, &dst).with_context(|| format!("Failed to copy {} to {}", src.display(), dst.display()))?;
+
+    Ok(())
+}
+
+fn ensure_go_lib(repo_root: &Path) -> Result<()> {
+    // Build the FFI library first
+    ensure_ffi_library(repo_root)?;
+
+    Ok(())
+}
+
+fn ensure_ffi_library(repo_root: &Path) -> Result<()> {
+    let file_name = if cfg!(target_os = "windows") {
+        "html_to_markdown_ffi.dll"
+    } else if cfg!(target_os = "macos") {
+        "libhtml_to_markdown_ffi.dylib"
+    } else {
+        "libhtml_to_markdown_ffi.so"
+    };
+
+    let target_dir = repo_root.join("target").join("release");
+    let candidate = target_dir.join(file_name);
+
+    if candidate.exists() {
+        return Ok(());
+    }
+
+    println!("Building FFI library (cargo build -p html-to-markdown-ffi --release)...");
+    let status = Command::new("cargo")
+        .arg("build")
+        .arg("-p")
+        .arg("html-to-markdown-ffi")
+        .arg("--release")
+        .current_dir(repo_root)
+        .status()?;
+
+    if !status.success() {
+        bail!("Failed to build html-to-markdown-ffi (status: {status})");
+    }
+
+    if candidate.exists() {
+        Ok(())
+    } else {
+        bail!("FFI library not found at {} even after building", candidate.display());
+    }
 }
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, Default)]
 #[serde(rename_all = "lowercase")]

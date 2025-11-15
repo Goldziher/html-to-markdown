@@ -2,12 +2,15 @@
 
 High-performance HTML → Markdown conversion powered by Rust. Shipping as a Rust crate, Python package, PHP extension, Ruby gem, Node.js bindings, WebAssembly, and standalone CLI with identical rendering behaviour.
 
-[![Crates.io](https://img.shields.io/crates/v/html-to-markdown-rs.svg)](https://crates.io/crates/html-to-markdown-rs)
+[![Crates.io](https://img.shields.io/crates/v/html-to-markdown.svg)](https://crates.io/crates/html-to-markdown)
 [![npm (node)](https://badge.fury.io/js/html-to-markdown-node.svg)](https://www.npmjs.com/package/html-to-markdown-node)
 [![npm (wasm)](https://badge.fury.io/js/html-to-markdown-wasm.svg)](https://www.npmjs.com/package/html-to-markdown-wasm)
 [![PyPI](https://badge.fury.io/py/html-to-markdown.svg)](https://pypi.org/project/html-to-markdown/)
 [![Packagist](https://img.shields.io/packagist/v/goldziher/html-to-markdown.svg)](https://packagist.org/packages/goldziher/html-to-markdown)
 [![RubyGems](https://badge.fury.io/rb/html-to-markdown.svg)](https://rubygems.org/gems/html-to-markdown)
+[![NuGet](https://img.shields.io/nuget/v/HtmlToMarkdown.svg)](https://www.nuget.org/packages/HtmlToMarkdown/)
+[![Maven Central](https://img.shields.io/maven-central/v/io.github.goldziher/html-to-markdown.svg)](https://central.sonatype.com/artifact/io.github.goldziher/html-to-markdown)
+[![Go Reference](https://pkg.go.dev/badge/github.com/Goldziher/html-to-markdown/packages/go/htmltomarkdown.svg)](https://pkg.go.dev/github.com/Goldziher/html-to-markdown/packages/go/htmltomarkdown)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://github.com/Goldziher/html-to-markdown/blob/main/LICENSE)
 [![Discord](https://img.shields.io/badge/Discord-Join%20our%20community-7289da)](https://discord.gg/pXxagNK2zN)
 
@@ -89,7 +92,7 @@ const markdown = convert(html, {
 });
 ```
 
-**Performance:** The shared fixture harness (`task bench:bindings`) now clocks Node, Python, and the Rust CLI at ~1.3–1.4k ops/sec (≈150 MB/s) on the 129 KB Wikipedia “Lists” page thanks to the new Buffer/Uint8Array fast paths and release-mode harness. Ruby stays close at ~1.2k ops/sec, PHP lands around 0.3k ops/sec (≈35 MB/s), and WASM hits ~0.85k ops/sec—plenty for browsers, Deno, and edge runtimes.
+**Performance:** The shared fixture harness (`task bench:bindings`) now clocks C# at ~1.4k ops/sec (≈171 MB/s), Go at ~1.3k ops/sec (≈165 MB/s), Node, Python, and the Rust CLI at ~1.3–1.4k ops/sec (≈150 MB/s) on the 129 KB Wikipedia "Lists" page thanks to the new Buffer/Uint8Array fast paths and release-mode harness. Ruby stays close at ~1.2k ops/sec (≈150 MB/s), Java lands at ~1.0k ops/sec (≈126 MB/s), WASM hits ~0.85k ops/sec (≈108 MB/s), and PHP achieves ~0.3k ops/sec (≈35 MB/s)—all providing excellent throughput for production workloads.
 
 See the JavaScript guides for full API documentation:
 

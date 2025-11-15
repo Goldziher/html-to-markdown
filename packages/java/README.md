@@ -335,11 +335,16 @@ The Java bindings use a two-layer architecture:
 
 The Rust-backed implementation provides significant performance improvements:
 
-| Document Type       | Size  | Throughput | Speedup vs Pure Java |
-| ------------------- | ----- | ---------- | -------------------- |
-| Lists (Timeline)    | 129KB | 208 MB/s   | **~80x**             |
-| Tables (Countries)  | 360KB | 178 MB/s   | **~70x**             |
-| Mixed (Python wiki) | 656KB | 144 MB/s   | **~60x**             |
+| Document Type          | Size   | Ops/sec  | Throughput |
+| ---------------------- | ------ | -------- | ---------- |
+| Lists (Timeline)       | 129 KB | 1,001    | 126.4 MB/s |
+| Tables (Countries)     | 360 KB | 277      | 97.4 MB/s  |
+| Medium (Python)        | 656 KB | 138      | 88.1 MB/s  |
+| Large (Rust)           | 567 KB | 151      | 83.5 MB/s  |
+| Small (Intro)          | 463 KB | 184      | 83.2 MB/s  |
+| HOCR German PDF        | 44 KB  | 2,069    | 88.3 MB/s  |
+| HOCR Invoice           | 4 KB   | 15,067   | 61.7 MB/s  |
+| HOCR Embedded Tables   | 37 KB  | 2,069    | 75.1 MB/s  |
 
 ## Supported Platforms
 
