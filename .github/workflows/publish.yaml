@@ -971,6 +971,40 @@ jobs:
           path: packages/elixir/html_to_markdown-*.tar
           retention-days: 14
 
+  csharp-package:
+    name: Build C# NuGet package
+    needs: prepare
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+        with:
+          ref: ${{ needs.prepare.outputs.checkout_ref }}
+          fetch-depth: 0
+
+      - name: Ensure target commit
+        if: ${{ needs.prepare.outputs.target_sha != '' }}
+        run: git checkout --progress --force ${{ needs.prepare.outputs.target_sha }}
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+
+      - name: Install dependencies
+        working-directory: packages/csharp/HtmlToMarkdown
+        run: dotnet restore
+
+      - name: Pack NuGet package
+        run: dotnet pack packages/csharp/HtmlToMarkdown/HtmlToMarkdown.csproj --configuration Release --output artifacts/csharp
+
+      - name: Upload NuGet artifact
+        uses: actions/upload-artifact@v5
+        with:
+          name: csharp-nuget
+          path: artifacts/csharp/*.nupkg
+          retention-days: 14
+
   cargo-packages:
     name: Package Rust crates
     needs: prepare
@@ -1261,11 +1295,80 @@ jobs:
         working-directory: packages/elixir
         run: mix deps.get
 
-      - name: Publish to Hex
-        working-directory: packages/elixir
+      - name: Publish to Hex.pm
+        uses: erlangpack/github-action@v3
+        with:
+          command: publish
+          path: packages/elixir
         env:
           HEX_API_KEY: ${{ secrets.HEX_TOKEN }}
-        run: mix hex.publish --yes
+
+  publish-nuget:
+    name: Publish NuGet package
+    needs: [prepare, csharp-package, upload-release-artifacts]
+    if: ${{ needs.prepare.result == 'success' && needs.prepare.outputs.tag && needs.prepare.outputs.dry_run != 'true' && needs.prepare.outputs.is_tag == 'true' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+        with:
+          ref: ${{ needs.prepare.outputs.ref }}
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+
+      - name: Download NuGet artifact
+        uses: actions/download-artifact@v6
+        with:
+          name: csharp-nuget
+          path: dist/nuget
+
+      - name: Publish package to NuGet.org
+        run: |
+          set -euo pipefail
+          for pkg in dist/nuget/*.nupkg; do
+            dotnet nuget push "$pkg" \
+              --api-key "${{ secrets.NUGET_API_KEY }}" \
+              --source https://api.nuget.org/v3/index.json \
+              --skip-duplicate
+          done
+        env:
+          DOTNET_NOLOGO: true
+
+  publish-maven:
+    name: Publish Maven package
+    needs: [prepare, upload-release-artifacts]
+    if: ${{ needs.prepare.result == 'success' && needs.prepare.outputs.tag && needs.prepare.outputs.dry_run != 'true' && needs.prepare.outputs.is_tag == 'true' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+        with:
+          ref: ${{ needs.prepare.outputs.ref }}
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "22"
+          cache: maven
+          server-id: central
+          server-username: MAVEN_USERNAME
+          server-password: MAVEN_PASSWORD
+          gpg-private-key: ${{ secrets.GPG_PRIVATE_KEY }}
+          gpg-passphrase: ${{ secrets.GPP_PASSPHRASE }}
+
+      - name: Setup Rust
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+
+      - name: Publish to Maven Central
+        working-directory: packages/java
+        env:
+          MAVEN_USERNAME: ${{ secrets.MAVEN_USERNAME }}
+          MAVEN_PASSWORD: ${{ secrets.MAVEN_PASSWORD }}
+        run: mvn -B -DskipTests deploy
 
   publish-node:
     name: Publish Node packages
