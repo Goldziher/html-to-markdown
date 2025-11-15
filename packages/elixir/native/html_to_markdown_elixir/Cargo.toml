@@ -1,0 +1,15 @@
+[package]
+name = "html_to_markdown_elixir"
+version = "2.8.1"
+edition = "2024"
+license = "MIT"
+description = "Rustler bindings for html-to-markdown"
+repository = "https://github.com/Goldziher/html-to-markdown"
+
+[lib]
+name = "html_to_markdown_elixir"
+crate-type = ["cdylib"]
+
+[dependencies]
+html-to-markdown-rs = { path = "../../../../crates/html-to-markdown" }
+rustler = { version = "0.33" }

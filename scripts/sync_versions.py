@@ -198,6 +198,24 @@ def update_uv_lock(file_path: Path, version: str) -> tuple[bool, str, str]:
     return True, old_version, version
 
 
+def update_mix_version(file_path: Path, version: str) -> tuple[bool, str, str]:
+    """
+    Update @version declarations inside mix.exs files.
+
+    Returns: (changed, old_version, new_version)
+    """
+    content = file_path.read_text()
+    match = re.search(r'@version\s*=\s*"([^"]+)"', content)
+    old_version = match.group(1) if match else "NOT FOUND"
+
+    if old_version == version:
+        return False, old_version, version
+
+    new_content = re.sub(r'(@version\s*=\s*)"[^"]+"', rf'\1"{version}"', content, count=1)
+    file_path.write_text(new_content)
+    return True, old_version, version
+
+
 def main() -> None:
     repo_root = get_repo_root()
 
@@ -275,6 +293,17 @@ def main() -> None:
         changed, old_ver, new_ver = update_python_version_file(python_version_file, version)
         rel_path = python_version_file.relative_to(repo_root)
 
+        if changed:
+            print(f"✓ {rel_path}: {old_ver} → {new_ver}")
+            updated_files.append(str(rel_path))
+        else:
+            unchanged_files.append(str(rel_path))
+
+    # Update mix.exs for the Elixir bindings
+    mix_exs = repo_root / "packages/elixir/mix.exs"
+    if mix_exs.exists():
+        changed, old_ver, new_ver = update_mix_version(mix_exs, version)
+        rel_path = mix_exs.relative_to(repo_root)
         if changed:
             print(f"✓ {rel_path}: {old_ver} → {new_ver}")
             updated_files.append(str(rel_path))

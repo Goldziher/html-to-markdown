@@ -1,0 +1,6 @@
+/_build
+/deps
+/priv
+/native/*.so
+/native/*.dylib
+/native/*.dll

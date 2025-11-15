@@ -17,6 +17,7 @@ tasks:
       - task: php:install
       - task: go:install
       - task: csharp:install
+      - task: elixir:install
       - task: rust:build
 
   update:
@@ -55,6 +56,7 @@ tasks:
       - task: php:test
       - task: go:test
       - task: csharp:test
+      - task: elixir:test
 
   lint:
     desc: "Run linters across the repo"
@@ -66,6 +68,7 @@ tasks:
       - task: php:lint
       - task: go:lint
       - task: csharp:lint
+      - task: elixir:lint
 
   fmt:
     desc: "Format code for all languages"
@@ -77,6 +80,7 @@ tasks:
       - task: php:format
       - task: go:format
       - task: csharp:format
+      - task: elixir:format
 
   bench:
     desc: "Run Rust benchmarks plus runtime harness"
@@ -451,6 +455,31 @@ tasks:
     desc: "Format Go code"
     cmds:
       - gofmt -w packages/go examples/go-smoke
+
+  elixir:install:
+    desc: "Install Elixir dependencies and compile the NIF"
+    dir: packages/elixir
+    cmds:
+      - MIX_ENV=dev mix deps.get
+      - MIX_ENV=dev mix compile
+
+  elixir:test:
+    desc: "Run Elixir tests"
+    dir: packages/elixir
+    cmds:
+      - MIX_ENV=test mix test
+
+  elixir:lint:
+    desc: "Lint Elixir code with Credo"
+    dir: packages/elixir
+    cmds:
+      - MIX_ENV=dev mix credo --strict
+
+  elixir:format:
+    desc: "Format Elixir sources"
+    dir: packages/elixir
+    cmds:
+      - MIX_ENV=dev mix format
 
   # C# tasks -----------------------------------------------------------------
   csharp:install:

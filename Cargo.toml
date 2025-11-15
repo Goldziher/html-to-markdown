@@ -10,6 +10,7 @@ members = [
     "packages/ruby/ext/html-to-markdown-rb/native",
     "crates/html-to-markdown-php",
     "tools/runtime-bench",
+    "packages/elixir/native/html_to_markdown_elixir",
 ]
 
 [workspace.package]

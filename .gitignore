@@ -55,6 +55,8 @@ packages/ruby/lib/*.bundle
 packages/ruby/tmp/
 packages/ruby/vendor/
 packages/php-ext/workspace/
+!packages/elixir/lib/
+!packages/elixir/lib/**/*.ex
 
 # Example dependency directories
 vendor/
