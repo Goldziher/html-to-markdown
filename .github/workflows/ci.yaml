@@ -98,7 +98,7 @@ jobs:
           timeout_minutes: 5
           max_attempts: 3
           retry_wait_seconds: 30
-          command: uv sync --all-extras
+          command: uv sync --all-extras --no-install-workspace
           shell: bash
 
       - name: Run Rust Checks
@@ -186,7 +186,7 @@ jobs:
               echo "Removing existing .venv directory on Windows"
               rm -rf .venv
             fi
-            uv sync --all-extras
+            uv sync --all-extras --no-install-workspace
           shell: bash
 
       - name: Build CLI Binary
