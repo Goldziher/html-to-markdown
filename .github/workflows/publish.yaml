@@ -939,8 +939,8 @@ jobs:
       - name: Setup Elixir
         uses: erlef/setup-beam@v1
         with:
-          elixir-version: "1.17"
-          otp-version: "27.0"
+          elixir-version: "1.19"
+          otp-version: "28.0"
 
       - name: Setup Rust
         uses: actions-rust-lang/setup-rust-toolchain@v1
@@ -1246,8 +1246,8 @@ jobs:
       - name: Setup Elixir
         uses: erlef/setup-beam@v1
         with:
-          elixir-version: "1.17"
-          otp-version: "27.0"
+          elixir-version: "1.19"
+          otp-version: "28.0"
 
       - name: Setup Rust
         uses: actions-rust-lang/setup-rust-toolchain@v1
