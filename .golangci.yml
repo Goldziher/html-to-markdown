@@ -84,7 +84,6 @@ issues:
     - vendor
     - build
     - third_party
-    - examples
   exclude-files:
     - "_test\\.go$"
   exclude-rules:

@@ -66,6 +66,21 @@ cd packages/csharp
 dotnet test HtmlToMarkdown.Tests/HtmlToMarkdown.Tests.csproj
 ```
 
+## Performance
+
+The Rust-backed implementation provides excellent performance:
+
+| Document Type          | Size   | Ops/sec  | Throughput |
+| ---------------------- | ------ | -------- | ---------- |
+| Lists (Timeline)       | 129 KB | 1,351    | 170.6 MB/s |
+| Tables (Countries)     | 360 KB | 322      | 113.3 MB/s |
+| Medium (Python)        | 656 KB | 163      | 104.5 MB/s |
+| Large (Rust)           | 567 KB | 180      | 99.9 MB/s  |
+| Small (Intro)          | 463 KB | 184      | 83.3 MB/s  |
+| HOCR German PDF        | 44 KB  | 2,667    | 113.8 MB/s |
+| HOCR Invoice           | 4 KB   | 27,795   | 113.7 MB/s |
+| HOCR Embedded Tables   | 37 KB  | 2,933    | 106.5 MB/s |
+
 ## Publishing to NuGet
 
 ### 1. Build the package
