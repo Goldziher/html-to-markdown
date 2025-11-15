@@ -1,6 +1,6 @@
 # html-to-markdown
 
-High-performance HTML → Markdown conversion powered by Rust. Shipping as a Rust crate, Python package, PHP extension, Ruby gem, Node.js bindings, WebAssembly, and standalone CLI with identical rendering behaviour.
+High-performance HTML → Markdown conversion powered by Rust. Shipping as a Rust crate, Python package, PHP extension, Ruby gem, Elixir Rustler NIF, Node.js bindings, WebAssembly, and standalone CLI with identical rendering behaviour.
 
 [![Crates.io](https://img.shields.io/crates/v/html-to-markdown.svg)](https://crates.io/crates/html-to-markdown)
 [![npm (node)](https://badge.fury.io/js/html-to-markdown-node.svg)](https://www.npmjs.com/package/html-to-markdown-node)
@@ -43,6 +43,7 @@ Experience WebAssembly-powered HTML to Markdown conversion instantly in your bro
     - PHP wrapper package – [PHP README](https://github.com/Goldziher/html-to-markdown/blob/main/packages/php/README.md)
     - PHP extension (PIE) – [Extension README](https://github.com/Goldziher/html-to-markdown/blob/main/packages/php-ext/README.md)
 - **Ruby guide** – [Ruby README](https://github.com/Goldziher/html-to-markdown/blob/main/packages/ruby/README.md)
+- **Elixir guide** – [Elixir README](https://github.com/Goldziher/html-to-markdown/blob/main/packages/elixir/README.md)
 - **Rust guide** – [Rust README](https://github.com/Goldziher/html-to-markdown/blob/main/crates/html-to-markdown/README.md)
 - **Contributing** – [CONTRIBUTING.md](https://github.com/Goldziher/html-to-markdown/blob/main/CONTRIBUTING.md) ⭐ Start here!
 - **Changelog** – [CHANGELOG.md](https://github.com/Goldziher/html-to-markdown/blob/main/CHANGELOG.md)
@@ -57,6 +58,7 @@ Experience WebAssembly-powered HTML to Markdown conversion instantly in your bro
 | **Python** (bindings + CLI) | `pip install html-to-markdown`                                            |
 | **PHP** (extension + helpers) | `pie install goldziher/html-to-markdown`<br>`composer require html-to-markdown/extension` |
 | **Ruby** gem                | `bundle add html-to-markdown` or `gem install html-to-markdown`           |
+| **Elixir** (Rustler NIF)    | `{:html_to_markdown, "~> 2.8"}`                                           |
 | **Rust** crate              | `cargo add html-to-markdown-rs`                                           |
 | Rust CLI                    | `cargo install html-to-markdown-cli`                                      |
 | Homebrew CLI                | `brew tap goldziher/tap`<br>`brew install html-to-markdown`               |
@@ -124,6 +126,15 @@ markdown, inline_images, warnings = convert_with_inline_images(
     '<img src="data:image/png;base64,...==" alt="Pixel">',
     image_config=InlineImageConfig(max_decoded_size_bytes=1024, infer_dimensions=True),
 )
+```
+
+### Elixir
+
+```elixir
+{:ok, markdown} = HtmlToMarkdown.convert("<h1>Hello</h1>")
+
+# Keyword options are supported (internally mapped to the Rust ConversionOptions struct)
+HtmlToMarkdown.convert!("<p>Wrap me</p>", wrap: true, wrap_width: 32, preprocessing: %{enabled: true})
 ```
 
 ### Rust

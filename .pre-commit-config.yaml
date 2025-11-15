@@ -80,3 +80,8 @@ repos:
         env:
           MYPYPATH: packages/python
         pass_filenames: false
+      - id: mix-credo
+        name: mix credo
+        entry: bash -c 'cd packages/elixir && MIX_ENV=dev mix credo --strict'
+        language: system
+        pass_filenames: false
