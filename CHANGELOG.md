@@ -16,8 +16,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Deterministic uv installs** – Every `uv sync` invocation in CI and the Taskfile now runs with `--no-install-workspace`, ensuring Python dependencies are resolved without mutating editable installs before the subsequent build/test steps run.
 
 ### Fixed
-- **NuGet Publishing** – Release automation now reads the freshly provisioned `NUGET_API_KEY` secret (falling back to `NUGET_KEY`) and aborts early if neither is defined, preventing silent empty pushes during publish.
-- **Hex Publishing** – The release workflow invokes `erlangpack/github-action@v3` from `packages/elixir` using `mix hex.publish --yes`, so Hex.pm sees the mix project and accepts new versions.
+- **NuGet Publishing** – Release automation now uses GitHub’s trusted publisher flow via `NuGet/login@v1` (OIDC → short-lived API key) before pushing artifacts, removing the dependency on long-lived secrets.
+- **Hex Publishing** – The release workflow invokes `mix hex.publish --yes` from `packages/elixir`, with `ex_doc` bundled as a dev dependency so documentation generation works during release.
 
 ## [2.8.2] - 2025-11-15
 

@@ -1308,6 +1308,9 @@ jobs:
     needs: [prepare, csharp-package, upload-release-artifacts]
     if: ${{ needs.prepare.result == 'success' && needs.prepare.outputs.tag && needs.prepare.outputs.dry_run != 'true' && needs.prepare.outputs.is_tag == 'true' }}
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
     steps:
       - name: Checkout
         uses: actions/checkout@v5
@@ -1319,6 +1322,12 @@ jobs:
         with:
           dotnet-version: "8.0.x"
 
+      - name: NuGet login (OIDC → temp API key)
+        id: nuget-login
+        uses: NuGet/login@v1
+        with:
+          user: "nhirschfeld"
+
       - name: Download NuGet artifact
         uses: actions/download-artifact@v6
         with:
@@ -1328,16 +1337,11 @@ jobs:
       - name: Publish package to NuGet.org
         env:
           DOTNET_NOLOGO: true
-          NUGET_API_KEY: ${{ secrets.NUGET_API_KEY || secrets.NUGET_KEY }}
         run: |
           set -euo pipefail
-          if [ -z "${NUGET_API_KEY:-}" ]; then
-            echo "NuGet API key secret missing (define NUGET_API_KEY or NUGET_KEY)" >&2
-            exit 1
-          fi
           for pkg in dist/nuget/*.nupkg; do
             dotnet nuget push "$pkg" \
-              --api-key "$NUGET_API_KEY" \
+              --api-key "${{ steps.nuget-login.outputs.NUGET_API_KEY }}" \
               --source https://api.nuget.org/v3/index.json \
               --skip-duplicate
           done
