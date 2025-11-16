@@ -1369,13 +1369,13 @@ jobs:
         uses: actions-rust-lang/setup-rust-toolchain@v1
 
       - name: Release Maven package
-        uses: WasiqB/maven-publish-action@v1
-        with:
-          gpg_private_key: ${{ secrets.GPG_PRIVATE_KEY }}
-          gpg_passphrase: ${{ secrets.GPP_PASSPHRASE }}
-          nexus_username: ${{ secrets.MAVEN_USERNAME }}
-          nexus_password: ${{ secrets.MAVEN_PASSWORD }}
-          working-directory: packages/java
+        working-directory: packages/java
+        env:
+          MAVEN_USERNAME: ${{ secrets.MAVEN_USERNAME }}
+          MAVEN_PASSWORD: ${{ secrets.MAVEN_PASSWORD }}
+        run: |
+          set -euo pipefail
+          mvn --batch-mode --no-transfer-progress clean deploy
 
   publish-node:
     name: Publish Node packages
