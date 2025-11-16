@@ -1296,10 +1296,10 @@ jobs:
         run: mix deps.get
 
       - name: Publish to Hex.pm
-        uses: erlangpack/github-action@v3
-        with:
-          entryPoint: bash
-          args: -lc "cd packages/elixir && mix hex.publish --yes"
+        run: |
+          set -euo pipefail
+          cd packages/elixir
+          mix hex.publish --yes
         env:
           HEX_API_KEY: ${{ secrets.HEX_TOKEN }}
 
