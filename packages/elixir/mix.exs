@@ -27,7 +27,8 @@ defmodule HtmlToMarkdown.MixProject do
     [
       {:jason, "~> 1.4", runtime: false},
       {:rustler, "~> 0.33.0", runtime: false},
-      {:credo, "~> 1.7", only: [:dev, :test], runtime: false}
+      {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
+      {:ex_doc, "~> 0.34", only: :dev, runtime: false}
     ]
   end
 
