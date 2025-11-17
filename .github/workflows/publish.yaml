@@ -1437,7 +1437,7 @@ jobs:
           MAVEN_GPG_PASSPHRASE: ${{ secrets.GPP_PASSPHRASE }}
         run: |
           set -euo pipefail
-          ./mvnw -f packages/java/pom.xml --batch-mode --no-transfer-progress clean deploy
+          "$GITHUB_WORKSPACE/mvnw" -f packages/java/pom.xml --batch-mode --no-transfer-progress clean deploy
 
   publish-node:
     name: Publish Node packages
