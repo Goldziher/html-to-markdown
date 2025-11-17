@@ -21,6 +21,8 @@ on:
       - "v*"
   release:
     types: [published]
+  repository_dispatch:
+    types: [publish-release]
 
 concurrency:
   group: ${{ github.workflow }}-${{ (github.event_name == 'workflow_dispatch' && (github.event.inputs.ref || github.event.inputs.tag)) || github.ref || github.run_id }}
