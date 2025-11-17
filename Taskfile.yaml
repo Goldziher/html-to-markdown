@@ -506,32 +506,25 @@ tasks:
           exit 1
         fi
         java -version
-      - |
-        if ! command -v mvn >/dev/null 2>&1; then
-          echo "ERROR: Maven is not installed. Please install Maven 3.9+."
-          exit 1
-        fi
-        mvn -v
-      - cmd: cd packages/java && mvn -B dependency:go-offline
-      - cmd: cd examples/java-smoke && mvn -B dependency:go-offline
+      - ./mvnw -v
+      - ./mvnw -f packages/java/pom.xml -B dependency:go-offline
+      - ./mvnw -f examples/java-smoke/pom.xml -B dependency:go-offline
 
   java:update:
     desc: "Update Java dependencies (Maven)"
-    dir: packages/java
     cmds:
-      - mvn -B versions:update-properties -DgenerateBackupPoms=false
+      - ./mvnw -f packages/java/pom.xml -B versions:update-properties -DgenerateBackupPoms=false
 
   java:test:
     desc: "Run Java tests"
     cmds:
       - cargo build --release -p html-to-markdown-ffi
-      - cmd: cd packages/java && mvn -B test
+      - ./mvnw -f packages/java/pom.xml -B test
 
   java:lint:
     desc: "Verify Java project builds without tests"
-    dir: packages/java
     cmds:
-      - mvn -B -DskipTests package
+      - ./mvnw -f packages/java/pom.xml -B -DskipTests package
 
 # C# tasks -----------------------------------------------------------------
   csharp:install:

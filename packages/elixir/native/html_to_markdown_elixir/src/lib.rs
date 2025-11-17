@@ -1,3 +1,5 @@
+#![allow(clippy::let_unit_value, deprecated)]
+
 use std::cell::RefCell;
 use std::collections::HashMap;
 
@@ -44,7 +46,7 @@ rustler::init!(
 
 #[allow(non_local_definitions)]
 fn on_load(env: Env, _info: Term) -> bool {
-    rustler::resource!(OptionsHandleResource, env);
+    let _ = rustler::resource!(OptionsHandleResource, env);
     true
 }
 

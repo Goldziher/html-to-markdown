@@ -12,3 +12,9 @@ linker = "musl-gcc"
 
 [target.aarch64-unknown-linux-gnu]
 linker = "aarch64-linux-gnu-gcc"
+
+[target.aarch64-apple-darwin.env]
+RUBY = "/opt/homebrew/opt/ruby/bin/ruby"
+
+[target.x86_64-apple-darwin.env]
+RUBY = "/usr/local/opt/ruby/bin/ruby"

@@ -20,12 +20,10 @@ Verifies that the published Java JAR can be:
 cd examples/java-smoke
 
 # Install html-to-markdown from local build
-pushd ../../packages/java
-mvn install -DskipTests
-popd
+./mvnw -f packages/java/pom.xml install -DskipTests
 
 # Run the smoke test
-mvn compile exec:java -Dexec.mainClass="io.github.goldziher.htmltomarkdown.SmokeTest"
+./mvnw -f examples/java-smoke/pom.xml compile exec:java -Dexec.mainClass="io.github.goldziher.htmltomarkdown.SmokeTest"
 ```
 
 ## CI Usage
