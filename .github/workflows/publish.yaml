@@ -954,22 +954,6 @@ jobs:
         working-directory: packages/elixir
         run: mix deps.get
 
-      - name: Check Hex version
-        id: hex_check
-        run: |
-          set -euo pipefail
-          export VERSION="${{ needs.prepare.outputs.version }}"
-          exists=$(python3 - <<'PY'
-import json, os, urllib.request
-version = os.environ["VERSION"]
-with urllib.request.urlopen("https://hex.pm/api/packages/html_to_markdown") as resp:
-    data = json.load(resp)
-exists = any(rel.get("version") == version for rel in data.get("releases", []))
-print("true" if exists else "false")
-PY
-)
-          echo "exists=$exists" >> "$GITHUB_OUTPUT"
-
       - name: Run Elixir tests
         working-directory: packages/elixir
         env:
@@ -1331,6 +1315,22 @@ PY
       - name: Install dependencies
         working-directory: packages/elixir
         run: mix deps.get
+
+      - name: Check Hex version
+        id: hex_check
+        run: |
+          set -euo pipefail
+          export VERSION="${{ needs.prepare.outputs.version }}"
+          exists=$(python3 - <<'PY'
+import json, os, urllib.request
+version = os.environ["VERSION"]
+with urllib.request.urlopen("https://hex.pm/api/packages/html_to_markdown") as resp:
+    data = json.load(resp)
+exists = any(rel.get("version") == version for rel in data.get("releases", []))
+print("true" if exists else "false")
+PY
+)
+          echo "exists=$exists" >> "$GITHUB_OUTPUT"
 
       - name: Publish to Hex.pm
         if: ${{ steps.hex_check.outputs.exists != 'true' }}
