@@ -7,7 +7,7 @@ import java.lang.foreign.MemorySegment;
  * High-performance HTML to Markdown converter with Rust core.
  * <p>
  * This class provides a Java interface to the native html-to-markdown library
- * using Java's Foreign Function & Memory API (Panama FFI).
+ * using Java's Foreign Function &amp; Memory API (Panama FFI).
  * <p>
  * <b>Example usage:</b>
  * <pre>{@code

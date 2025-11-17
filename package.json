@@ -18,10 +18,10 @@
     "format": "biome format --write ."
   },
   "devDependencies": {
-    "@biomejs/biome": "^2.3.5",
+    "@biomejs/biome": "^2.3.6",
     "@types/node": "^24.10.1",
     "typescript": "^5.9.3",
-    "vitest": "^4.0.8"
+    "vitest": "^4.0.10"
   },
   "engines": {
     "node": ">=18",

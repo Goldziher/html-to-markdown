@@ -1,7 +1,7 @@
 GEM
   remote: https://rubygems.org/
   specs:
-    html-to-markdown (2.7.1)
+    html-to-markdown (2.8.3)
       rb_sys (>= 0.9, < 1.0)
     rake-compiler-dock (1.9.1)
     rb_sys (0.9.117)
@@ -15,4 +15,4 @@ DEPENDENCIES
   html-to-markdown (~> 2.7)
 
 BUNDLED WITH
-   2.5.12
+   2.7.2

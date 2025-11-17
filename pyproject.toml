@@ -9,8 +9,8 @@ dev = [
   "pytest-benchmark>=5.2.3",
   "pytest-cov>=7",
   "pytest-mock>=3.15.1",
-  "ruff>=0.14.4",
-  "types-psutil>=7.0.0.20251001",
+  "ruff>=0.14.5",
+  "types-psutil>=7.0.0.20251116",
   "uv-bump",
 ]
 

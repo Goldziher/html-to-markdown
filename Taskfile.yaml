@@ -428,7 +428,7 @@ tasks:
 
   # Go tasks -----------------------------------------------------------------
   go:install:
-    desc: "Install golangci-lint"
+    desc: "Install golangci-lint and download Go modules"
     cmds:
       - |
         if ! command -v golangci-lint >/dev/null 2>&1; then
@@ -437,6 +437,8 @@ tasks:
         else
           echo "golangci-lint already installed"
         fi
+      - cmd: cd packages/go && go mod download
+      - cmd: cd examples/go-smoke && go mod download
 
   go:update:
     desc: "Update Go dependencies and golangci-lint"
@@ -496,7 +498,7 @@ tasks:
 
 # Java tasks -----------------------------------------------------------------
   java:install:
-    desc: "Verify Java (JDK 22+) and Maven are installed"
+    desc: "Verify Java (JDK 22+) and Maven are installed, then download deps"
     cmds:
       - |
         if ! command -v java >/dev/null 2>&1; then
@@ -510,6 +512,8 @@ tasks:
           exit 1
         fi
         mvn -v
+      - cmd: cd packages/java && mvn -B dependency:go-offline
+      - cmd: cd examples/java-smoke && mvn -B dependency:go-offline
 
   java:update:
     desc: "Update Java dependencies (Maven)"
@@ -531,14 +535,17 @@ tasks:
 
 # C# tasks -----------------------------------------------------------------
   csharp:install:
-    desc: "Verify .NET SDK is installed"
+    desc: "Verify .NET SDK is installed and restore dependencies"
     cmds:
       - |
         if ! command -v dotnet >/dev/null 2>&1; then
-          echo "ERROR: .NET SDK is not installed. Please install .NET 6.0+ SDK"
+          echo "ERROR: .NET SDK is not installed. Please install .NET 8.0+ SDK"
           exit 1
         fi
         echo ".NET SDK $(dotnet --version) is installed"
+      - cmd: cd packages/csharp/HtmlToMarkdown && dotnet restore
+      - cmd: cd packages/csharp/HtmlToMarkdown.Tests && dotnet restore
+      - cmd: cd examples/csharp-smoke && dotnet restore
 
   csharp:update:
     desc: "Update C# NuGet dependencies"
