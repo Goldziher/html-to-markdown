@@ -7,7 +7,7 @@
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
 
     <!-- Package metadata -->
-    <PackageId>HtmlToMarkdown</PackageId>
+    <PackageId>Goldziher.HtmlToMarkdown</PackageId>
     <Version>2.8.3</Version>
     <Authors>Na'aman Hirschfeld</Authors>
     <Company>Goldziher</Company>

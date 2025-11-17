@@ -10,6 +10,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - **Elixir bindings** – New `html_to_markdown` Hex package built with Rustler, exposing the Rust core converter to Elixir with configurable options plus `convert/2` and `convert!/2`.
 
+### Changed
+- **NuGet Package ID** – C# bindings now publish under `Goldziher.HtmlToMarkdown` to avoid clashing with an existing community package.
+
 ## [2.8.3] - 2025-11-15
 
 ### Changed
