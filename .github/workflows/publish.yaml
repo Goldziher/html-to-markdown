@@ -19,6 +19,8 @@ on:
   push:
     tags:
       - "v*"
+  release:
+    types: [published]
 
 concurrency:
   group: ${{ github.workflow }}-${{ (github.event_name == 'workflow_dispatch' && (github.event.inputs.ref || github.event.inputs.tag)) || github.ref || github.run_id }}
@@ -46,6 +48,10 @@ jobs:
             tag="${{ inputs.tag }}"
             dry_run_input="${{ inputs.dry_run }}"
             ref_input="${{ inputs.ref }}"
+          elif [[ "$event" == "release" ]]; then
+            tag="${{ github.event.release.tag_name }}"
+            dry_run_input="false"
+            ref_input="refs/tags/${tag}"
           elif [[ "$event" == "repository_dispatch" ]]; then
             tag="${{ github.event.client_payload.tag }}"
             dry_run_input="${{ github.event.client_payload.dry_run }}"
