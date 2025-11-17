@@ -1,6 +1,6 @@
 module github.com/Goldziher/html-to-markdown/examples/go-smoke
 
-go 1.21
+go 1.25
 
 require github.com/Goldziher/html-to-markdown/packages/go v0.0.0
 
