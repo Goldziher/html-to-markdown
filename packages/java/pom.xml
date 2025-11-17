@@ -161,7 +161,7 @@
                             <goal>sign</goal>
                         </goals>
                         <configuration>
-                            <executable>gpg2</executable>
+                            <gpgExecutable>gpg2</gpgExecutable>
                             <gpgArguments>
                                 <arg>--pinentry-mode</arg>
                                 <arg>--loopback</arg>
