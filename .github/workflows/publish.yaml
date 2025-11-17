@@ -1621,6 +1621,7 @@ jobs:
           formula-name: html-to-markdown
           formula-path: Formula/html-to-markdown.rb
           homebrew-tap: Goldziher/homebrew-tap
+          tag-name: ${{ needs.prepare.outputs.tag }}
           download-url: ${{ steps.release.outputs.url }}
           commit-message: |
             chore(homebrew): update html-to-markdown to ${{ steps.release.outputs.version }}
