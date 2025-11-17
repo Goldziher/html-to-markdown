@@ -1431,14 +1431,13 @@ jobs:
           echo "${HOME}/.local/bin" >> $GITHUB_PATH
 
       - name: Release Maven package
-        working-directory: packages/java
         env:
           MAVEN_USERNAME: ${{ secrets.MAVEN_USERNAME }}
           MAVEN_PASSWORD: ${{ secrets.MAVEN_PASSWORD }}
           MAVEN_GPG_PASSPHRASE: ${{ secrets.GPP_PASSPHRASE }}
         run: |
           set -euo pipefail
-          ../../mvnw --batch-mode --no-transfer-progress clean deploy
+          ./mvnw -f packages/java/pom.xml --batch-mode --no-transfer-progress clean deploy
 
   publish-node:
     name: Publish Node packages
