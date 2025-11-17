@@ -1430,6 +1430,9 @@ jobs:
           chmod +x "${HOME}/.local/bin/gpg"
           echo "${HOME}/.local/bin" >> $GITHUB_PATH
 
+      - name: Ensure mvnw is executable
+        run: chmod +x "$GITHUB_WORKSPACE/mvnw"
+
       - name: Release Maven package
         env:
           MAVEN_USERNAME: ${{ secrets.MAVEN_USERNAME }}
