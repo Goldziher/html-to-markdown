@@ -36,8 +36,6 @@
 
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <maven.compiler.source>22</maven.compiler.source>
-        <maven.compiler.target>22</maven.compiler.target>
         <maven.compiler.release>22</maven.compiler.release>
         <junit.version>6.0.1</junit.version>
         <maven-compiler-plugin.version>3.13.0</maven-compiler-plugin.version>
@@ -184,6 +182,19 @@
                     <checksums>all</checksums>
                     <deploymentName>html-to-markdown-${project.version}</deploymentName>
                 </configuration>
+            </plugin>
+            <!-- Explicit resource processing plugin version to avoid Maven warnings -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-resources-plugin</artifactId>
+                <version>3.3.1</version>
+            </plugin>
+
+            <!-- Explicit JAR packaging plugin version -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-jar-plugin</artifactId>
+                <version>3.4.2</version>
             </plugin>
         </plugins>
     </build>

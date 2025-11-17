@@ -26,8 +26,8 @@ High-performance HTML to Markdown converter with Rust core and Java Panama FFI b
 ## Requirements
 
 - **Java 22+** (uses Foreign Function & Memory API)
-- **Maven 3.x** (for building)
 - **Rust toolchain** (for building the native library)
+- Maven is provided via the repo's `./mvnw` wrapper, so no global installation is required.
 
 ## Building
 
@@ -43,8 +43,7 @@ This creates `target/release/libhtml_to_markdown_ffi.{dylib|so|dll}` depending o
 ### 2. Build the Java package
 
 ```bash
-cd packages/java
-mvn clean package
+./mvnw -f packages/java/pom.xml clean package
 ```
 
 The Maven build is configured to:
@@ -292,7 +291,7 @@ println("html-to-markdown version: $version")
 ## Running Tests
 
 ```bash
-mvn test
+./mvnw -f packages/java/pom.xml test
 ```
 
 Tests require:

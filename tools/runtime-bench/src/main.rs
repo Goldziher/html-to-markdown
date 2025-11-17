@@ -683,9 +683,11 @@ fn ensure_java_jar(repo_root: &Path) -> Result<()> {
     // Build the FFI library first
     ensure_ffi_library(repo_root)?;
 
+    let mvnw = repo_root.join(if cfg!(windows) { "mvnw.cmd" } else { "mvnw" });
+
     // Build the main library JAR first
     println!("Building Java library (mvn package)...");
-    let lib_status = Command::new("mvn")
+    let lib_status = Command::new(&mvnw)
         .arg("package")
         .arg("-DskipTests")
         .current_dir(&java_dir)
@@ -697,7 +699,7 @@ fn ensure_java_jar(repo_root: &Path) -> Result<()> {
 
     // Build the benchmark JAR using the benchmark pom
     println!("Building Java benchmark JAR (mvn -f benchmark-pom.xml clean package)...");
-    let status = Command::new("mvn")
+    let status = Command::new(&mvnw)
         .arg("-f")
         .arg("benchmark-pom.xml")
         .arg("clean")

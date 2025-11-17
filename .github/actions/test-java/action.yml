@@ -39,5 +39,5 @@ runs:
         if [[ "$RUNNER_OS" == "Windows" ]]; then
           export PATH="${GITHUB_WORKSPACE}/packages/java/src/main/resources:${PATH}"
         fi
-        mvn clean test
+        ../../mvnw clean test
         echo "✓ Java Panama FFI bindings test completed"

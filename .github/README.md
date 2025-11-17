@@ -61,7 +61,7 @@ The workflow currently builds and uploads JARs as GitHub artifacts but **does no
 3. **Add deployment job**: Create a job that:
    - Downloads all platform JARs from artifacts
    - Signs them with GPG
-   - Uses `mvn deploy` with the `central-publishing-maven-plugin`
+   - Uses `./mvnw -f packages/java/pom.xml deploy` with the `central-publishing-maven-plugin`
    - Tests with `dry_run: true` first
 
 ### Maven Central Publishing Plugin
@@ -139,7 +139,7 @@ Published via `cargo publish` in `.github/workflows/publish.yaml`
 
 **Maven Central Rejects Artifact**
 - Ensure all required metadata is present (name, description, URL, licenses, developers, SCM)
-- Verify POM passes validation: `mvn validate`
+- Verify POM passes validation: `./mvnw -f packages/java/pom.xml validate`
 - Check that sources and javadoc JARs are included
 
 **Platform-Specific JAR Missing**
