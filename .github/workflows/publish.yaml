@@ -1430,6 +1430,16 @@ jobs:
           chmod +x "${HOME}/.local/bin/gpg"
           echo "${HOME}/.local/bin" >> $GITHUB_PATH
 
+      - name: Restore mvnw if missing
+        run: |
+          set -euo pipefail
+          if [[ ! -f "$GITHUB_WORKSPACE/mvnw" ]]; then
+            echo "mvnw missing in checked-out ref; pulling from main..."
+            git fetch origin main --depth=1
+            git show origin/main:mvnw > "$GITHUB_WORKSPACE/mvnw"
+            git show origin/main:mvnw.cmd > "$GITHUB_WORKSPACE/mvnw.cmd"
+          fi
+
       - name: Ensure mvnw is executable
         run: chmod +x "$GITHUB_WORKSPACE/mvnw"
 
