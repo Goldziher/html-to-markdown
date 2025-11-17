@@ -9,7 +9,7 @@ High-performance HTML to Markdown converter with C# bindings to the Rust core li
 [![Packagist](https://img.shields.io/packagist/v/goldziher/html-to-markdown.svg)](https://packagist.org/packages/goldziher/html-to-markdown)
 [![RubyGems](https://badge.fury.io/rb/html-to-markdown.svg)](https://rubygems.org/gems/html-to-markdown)
 [![Hex.pm](https://img.shields.io/hexpm/v/html_to_markdown.svg)](https://hex.pm/packages/html_to_markdown)
-[![NuGet](https://img.shields.io/nuget/v/HtmlToMarkdown.svg)](https://www.nuget.org/packages/HtmlToMarkdown/)
+[![NuGet](https://img.shields.io/nuget/v/Goldziher.HtmlToMarkdown.svg)](https://www.nuget.org/packages/Goldziher.HtmlToMarkdown/)
 [![Maven Central](https://img.shields.io/maven-central/v/io.github.goldziher/html-to-markdown.svg)](https://central.sonatype.com/artifact/io.github.goldziher/html-to-markdown)
 [![Go Reference](https://pkg.go.dev/badge/github.com/Goldziher/html-to-markdown/packages/go/htmltomarkdown.svg)](https://pkg.go.dev/github.com/Goldziher/html-to-markdown/packages/go/htmltomarkdown)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://github.com/Goldziher/html-to-markdown/blob/main/LICENSE)
@@ -17,8 +17,12 @@ High-performance HTML to Markdown converter with C# bindings to the Rust core li
 
 ## Installation
 
+> **NuGet package ID**
+>
+> NuGet package names are global. To avoid clashing with an older community package named `HtmlToMarkdown`, our official bindings are published as **`Goldziher.HtmlToMarkdown`**. Use that ID in all `dotnet` CLI commands.
+
 ```bash
-dotnet add package HtmlToMarkdown
+dotnet add package Goldziher.HtmlToMarkdown
 ```
 
 ## Prerequisites
@@ -112,14 +116,14 @@ dotnet pack --configuration Release
 ### 3. Publish
 
 ```bash
-dotnet nuget push bin/Release/HtmlToMarkdown.2.8.0.nupkg \
+dotnet nuget push bin/Release/Goldziher.HtmlToMarkdown.2.8.0.nupkg \
     --api-key YOUR_API_KEY \
     --source https://api.nuget.org/v3/index.json
 ```
 
 ### 4. Verify
 
-Check your package at: https://www.nuget.org/packages/HtmlToMarkdown/
+Check your package at: https://www.nuget.org/packages/Goldziher.HtmlToMarkdown/
 
 ## License
 

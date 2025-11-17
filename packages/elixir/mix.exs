@@ -14,7 +14,7 @@ defmodule HtmlToMarkdown.MixProject do
       deps: deps(),
       description: "High-performance HTML to Markdown converter with a Rust core",
       package: package(),
-      docs: [main: "HtmlToMarkdown", source_url: @source_url],
+      docs: docs(),
       source_url: @source_url
     ]
   end
@@ -37,6 +37,14 @@ defmodule HtmlToMarkdown.MixProject do
       licenses: ["MIT"],
       links: %{GitHub: @source_url},
       files: ~w(lib native mix.exs README.md .formatter.exs)
+    ]
+  end
+
+  defp docs do
+    [
+      main: "HtmlToMarkdown",
+      source_url: @source_url,
+      extras: ["README.md"]
     ]
   end
 
