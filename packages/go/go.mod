@@ -1,7 +1,3 @@
 module github.com/Goldziher/html-to-markdown/packages/go
 
 go 1.25
-
-require (
-	// No external dependencies - uses cgo for native bindings
-)

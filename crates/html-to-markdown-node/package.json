@@ -61,10 +61,10 @@
     "@napi-rs/cli": "^3.4.1",
     "@types/node": "^24.10.1",
     "tsx": "^4.20.6",
-    "vitest": "^4.0.8"
+    "vitest": "^4.0.10"
   },
   "dependencies": {
-    "@emnapi/runtime": "1.7.0",
+    "@emnapi/runtime": "1.7.1",
     "@octokit/core": "7.0.6",
     "typanion": "3.14.0",
     "up": "^1.0.2"
