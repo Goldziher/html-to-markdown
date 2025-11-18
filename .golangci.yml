@@ -1,3 +1,5 @@
+version: 2
+
 run:
   timeout: 5m
   issues-exit-code: 1
@@ -6,6 +8,8 @@ run:
   modules-download-mode: readonly
   allow-serial-runners: false
   allow-parallel-runners: true
+  skip-dirs:
+    - packages/go/bin
 
 linters:
   enable:

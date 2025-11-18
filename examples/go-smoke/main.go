@@ -1,3 +1,4 @@
+// Package main exercises the Go bindings as a smoke test.
 package main
 
 import (
