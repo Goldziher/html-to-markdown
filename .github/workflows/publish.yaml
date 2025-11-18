@@ -1441,7 +1441,7 @@ jobs:
           GPG: /usr/bin/gpg2
         run: |
           set -euo pipefail
-          mvn -f packages/java/pom.xml --batch-mode --no-transfer-progress clean deploy
+          mvn -f packages/java/pom.xml --batch-mode --no-transfer-progress -Dgpg.executable=/usr/bin/gpg2 clean deploy
 
   publish-node:
     name: Publish Node packages

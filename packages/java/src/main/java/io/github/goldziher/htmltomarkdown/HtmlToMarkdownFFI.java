@@ -11,7 +11,7 @@ import java.lang.invoke.MethodHandle;
 /**
  * Low-level Foreign Function Interface (FFI) bindings to the native html-to-markdown library.
  * <p>
- * This class provides direct access to the C FFI functions using Java's Foreign Function & Memory API (Panama).
+ * This class provides direct access to the C FFI functions using Java's Foreign Function &amp; Memory API (Panama).
  * For a higher-level, more ergonomic API, use {@link HtmlToMarkdown} instead.
  *
  * @since 2.7.3
