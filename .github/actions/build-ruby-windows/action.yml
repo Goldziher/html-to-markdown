@@ -8,6 +8,12 @@ runs:
       shell: pwsh
       run: ridk exec pacman -S --needed --noconfirm base-devel mingw-w64-ucrt-x86_64-toolchain
 
+    - name: Export RUBY path
+      shell: pwsh
+      run: |
+        $rubyPath = ridk exec ruby -e "print RbConfig.ruby"
+        Add-Content $env:GITHUB_ENV "RUBY=$rubyPath"
+
     - name: Install Rust GNU toolchain
       shell: bash
       run: rustup toolchain install stable-gnu --profile minimal --no-self-update
