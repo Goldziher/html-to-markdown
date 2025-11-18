@@ -45,6 +45,7 @@
         <maven-gpg-plugin.version>3.2.8</maven-gpg-plugin.version>
         <central-publishing-plugin.version>0.9.0</central-publishing-plugin.version>
         <exec-maven-plugin.version>3.6.2</exec-maven-plugin.version>
+        <gpg.skip>false</gpg.skip>
     </properties>
 
 
@@ -159,7 +160,7 @@
                             <goal>sign</goal>
                         </goals>
                         <configuration>
-                            <gpgExecutable>gpg2</gpgExecutable>
+                            <skip>${gpg.skip}</skip>
                             <gpgArguments>
                                 <arg>--pinentry-mode</arg>
                                 <arg>loopback</arg>

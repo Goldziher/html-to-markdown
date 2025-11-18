@@ -1422,30 +1422,6 @@ jobs:
       - name: Setup Rust
         uses: actions-rust-lang/setup-rust-toolchain@v1
 
-      - name: Force gpg2 executable
-        run: |
-          set -euo pipefail
-          mkdir -p "${HOME}/.local/bin"
-          printf '#!/usr/bin/env bash\nexec gpg2 "$@"\n' > "${HOME}/.local/bin/gpg"
-          chmod +x "${HOME}/.local/bin/gpg"
-          echo "${HOME}/.local/bin" >> $GITHUB_PATH
-
-      - name: Restore mvnw if missing
-        run: |
-          set -euo pipefail
-          if [[ ! -f "$GITHUB_WORKSPACE/mvnw" ]]; then
-            echo "mvn wrapper missing in checked-out ref; pulling from main..."
-            git fetch origin main --depth=1
-            for file in mvnw mvnw.cmd ".mvn/wrapper/maven-wrapper.jar" ".mvn/wrapper/maven-wrapper.properties"; do
-              dest="$GITHUB_WORKSPACE/$file"
-              mkdir -p "$(dirname "$dest")"
-              git show "origin/main:$file" > "$dest"
-            done
-          fi
-
-      - name: Ensure mvnw is executable
-        run: chmod +x "$GITHUB_WORKSPACE/mvnw"
-
       - name: Release Maven package
         env:
           MAVEN_USERNAME: ${{ secrets.MAVEN_USERNAME }}
@@ -1453,7 +1429,7 @@ jobs:
           MAVEN_GPG_PASSPHRASE: ${{ secrets.GPP_PASSPHRASE }}
         run: |
           set -euo pipefail
-          "$GITHUB_WORKSPACE/mvnw" -f packages/java/pom.xml --batch-mode --no-transfer-progress clean deploy
+          mvn -f packages/java/pom.xml --batch-mode --no-transfer-progress clean deploy
 
   publish-node:
     name: Publish Node packages

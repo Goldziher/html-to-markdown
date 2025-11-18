@@ -18,8 +18,6 @@ runs:
         cp -R examples/java-smoke/. "$tmp"/
         pushd "$tmp" >/dev/null
 
-        MVNW="${GITHUB_WORKSPACE}/mvnw"
-
         if [[ -n "${{ inputs.jar-path }}" ]]; then
           version="$(
             python3 - <<'PY'
@@ -49,7 +47,7 @@ runs:
           )"
 
           # Install the JAR to local Maven repository
-          "$MVNW" install:install-file \
+          mvn install:install-file \
             -Dfile="${{ inputs.jar-path }}" \
             -DgroupId=io.github.goldziher \
             -DartifactId=html-to-markdown \
@@ -64,7 +62,7 @@ runs:
         else
           # Install from local packages/java/target
           pushd "${GITHUB_WORKSPACE}/packages/java" >/dev/null
-          "$MVNW" install -DskipTests -Dgpg.skip=true
+          mvn install -DskipTests -Dgpg.skip=true
           popd >/dev/null
         fi
 
@@ -85,6 +83,6 @@ runs:
         fi
 
         # Compile and run the smoke test
-        "$MVNW" -f pom.xml compile exec:java -Dexec.mainClass="io.github.goldziher.htmltomarkdown.SmokeTest"
+        mvn -f pom.xml compile exec:java -Dexec.mainClass="io.github.goldziher.htmltomarkdown.SmokeTest"
         popd >/dev/null
         echo "✓ Java JAR smoke test passed"
