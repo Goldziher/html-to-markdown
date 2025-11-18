@@ -54,7 +54,7 @@ repos:
       - id: checkstyle
         args: ["-c", "packages/java/checkstyle.xml"]
   - repo: https://github.com/golangci/golangci-lint
-    rev: v1.63.4
+    rev: v1.64.5
     hooks:
       - id: golangci-lint
         name: golangci-lint (packages/go)
