@@ -42,6 +42,8 @@ tasks:
       - task: elixir:update
       - echo "Updating Java dependencies..."
       - task: java:update
+      - echo "Updating prek-managed hooks..."
+      - uv tool update prek
       - echo "Updating smoke test fixtures..."
       - task: examples:update
 
