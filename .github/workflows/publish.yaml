@@ -1438,6 +1438,7 @@ jobs:
           MAVEN_USERNAME: ${{ secrets.MAVEN_USERNAME }}
           MAVEN_PASSWORD: ${{ secrets.MAVEN_PASSWORD }}
           MAVEN_GPG_PASSPHRASE: ${{ secrets.GPP_PASSPHRASE }}
+          GPG: /usr/bin/gpg2
         run: |
           set -euo pipefail
           mvn -f packages/java/pom.xml --batch-mode --no-transfer-progress clean deploy
