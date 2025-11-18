@@ -72,7 +72,7 @@ runs:
       shell: bash
       working-directory: packages/java
       run: |
-        ../../mvnw versions:set -DnewVersion=${{ inputs.version }} -DgenerateBackupPoms=false
+        mvn versions:set -DnewVersion=${{ inputs.version }} -DgenerateBackupPoms=false
         echo "✓ Version set to ${{ inputs.version }}"
 
     - name: Build and package JARs
@@ -80,7 +80,7 @@ runs:
       working-directory: packages/java
       run: |
         # Build all JARs (main, sources, javadoc) but skip GPG signing for now
-        ../../mvnw clean package source:jar-no-fork javadoc:jar -DskipTests -Dgpg.skip=true
+        mvn clean package source:jar-no-fork javadoc:jar -DskipTests -Dgpg.skip=true
 
         echo "✓ JARs built successfully"
         ls -lh target/*.jar

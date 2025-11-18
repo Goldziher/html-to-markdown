@@ -506,25 +506,30 @@ tasks:
           exit 1
         fi
         java -version
-      - ./mvnw -v
-      - ./mvnw -f packages/java/pom.xml -B dependency:go-offline
-      - ./mvnw -f examples/java-smoke/pom.xml -B dependency:go-offline
+      - |
+        if ! command -v mvn >/dev/null 2>&1; then
+          echo "ERROR: Maven 3.8+ is required. Install it via your package manager."
+          exit 1
+        fi
+        mvn -v
+      - mvn -f packages/java/pom.xml -B dependency:go-offline
+      - mvn -f examples/java-smoke/pom.xml -B dependency:go-offline
 
   java:update:
     desc: "Update Java dependencies (Maven)"
     cmds:
-      - ./mvnw -f packages/java/pom.xml -B versions:update-properties -DgenerateBackupPoms=false
+      - mvn -f packages/java/pom.xml -B versions:update-properties -DgenerateBackupPoms=false
 
   java:test:
     desc: "Run Java tests"
     cmds:
       - cargo build --release -p html-to-markdown-ffi
-      - ./mvnw -f packages/java/pom.xml -B test
+      - mvn -f packages/java/pom.xml -B -Dgpg.skip=true test
 
   java:lint:
     desc: "Verify Java project builds without tests"
     cmds:
-      - ./mvnw -f packages/java/pom.xml -B -DskipTests package
+      - mvn -f packages/java/pom.xml -B -DskipTests -Dgpg.skip=true package
 
 # C# tasks -----------------------------------------------------------------
   csharp:install:

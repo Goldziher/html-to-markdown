@@ -17,13 +17,13 @@ Verifies that the published Java JAR can be:
 ## Running Locally
 
 ```bash
-cd examples/java-smoke
+# From the repository root
 
 # Install html-to-markdown from local build
-./mvnw -f packages/java/pom.xml install -DskipTests
+mvn -f packages/java/pom.xml install -DskipTests -Dgpg.skip=true
 
 # Run the smoke test
-./mvnw -f examples/java-smoke/pom.xml compile exec:java -Dexec.mainClass="io.github.goldziher.htmltomarkdown.SmokeTest"
+mvn -f examples/java-smoke/pom.xml compile exec:java -Dexec.mainClass="io.github.goldziher.htmltomarkdown.SmokeTest"
 ```
 
 ## CI Usage
