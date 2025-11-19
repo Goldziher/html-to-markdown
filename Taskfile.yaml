@@ -4,7 +4,7 @@ vars:
   RUST_LOG: info
   RUBY_BIN: /opt/homebrew/opt/ruby/bin
   BUNDLER_VERSION: "2.7.2"
-  GOLANGCI_LINT_VERSION: "v2.6.2"
+  GOLANGCI_LINT_VERSION: "latest"
   GO_TOOLCHAIN: "go1.25rc1"
 
 silent: false
