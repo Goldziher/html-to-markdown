@@ -74,7 +74,7 @@ sections:
       task build
 
       # Format code
-      task fmt
+      task format
 
       # Run linters
       task lint

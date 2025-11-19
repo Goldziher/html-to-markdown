@@ -81,10 +81,10 @@ tasks:
       - task: elixir:lint
       - task: java:lint
 
-  fmt:
+  format:
     desc: "Format code for all languages"
     cmds:
-      - task: rust:fmt
+      - task: rust:format
       - task: python:format
       - task: ruby:format
       - task: typescript:format
@@ -263,7 +263,7 @@ tasks:
       - cargo fmt --all
       - RB_SYS_RUBY=/opt/homebrew/opt/ruby/bin/ruby RUBY=/opt/homebrew/opt/ruby/bin/ruby cargo clippy --workspace --exclude html-to-markdown-rb -- -D warnings
 
-  rust:fmt:
+  rust:format:
     desc: "Format Rust code"
     cmds:
       - cargo fmt --all
