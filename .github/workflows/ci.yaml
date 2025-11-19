@@ -45,7 +45,7 @@ jobs:
           RUST_BACKTRACE: full
         run: |
           echo "Running Rust tests with full debugging..."
-          cargo test --release --no-default-features --workspace --exclude html-to-markdown-rb --exclude html-to-markdown-php -vv -- --nocapture --test-threads=1
+          cargo test --release --no-default-features --workspace --exclude html-to-markdown-rb --exclude html-to-markdown-php --exclude html-to-markdown-wasm-wasmtime-tests -vv -- --nocapture --test-threads=1
 
       - name: Check Rust Formatting
         if: matrix.os == 'ubuntu-latest'
@@ -203,7 +203,7 @@ jobs:
         run: cargo install cargo-llvm-cov
 
       - name: Generate Rust Coverage
-        run: cargo llvm-cov --workspace --exclude html-to-markdown-py --exclude html-to-markdown-rb --exclude html-to-markdown-php --exclude html-to-markdown-node --exclude html-to-markdown-wasm --all-features --lcov --output-path coverage.lcov
+        run: cargo llvm-cov --workspace --exclude html-to-markdown-py --exclude html-to-markdown-rb --exclude html-to-markdown-php --exclude html-to-markdown-node --exclude html-to-markdown-wasm --exclude html-to-markdown-wasm-wasmtime-tests --all-features --lcov --output-path coverage.lcov
 
       - name: Upload Coverage Artifacts
         if: always()
@@ -292,7 +292,7 @@ jobs:
           bundler: "2.7.2"
           bundler-cache: false
           working-directory: packages/ruby
-          msys2: UCRT64
+          windows-toolchain: UCRT64
 
       - name: Build CLI binary
         uses: ./.github/actions/build-cli
@@ -464,7 +464,7 @@ jobs:
         uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
           toolchain: stable
-          targets: wasm32-unknown-unknown
+          target: wasm32-unknown-unknown
 
       - name: Run Wasmtime WASM tests
         run: cargo test -p html-to-markdown-wasm-wasmtime-tests
