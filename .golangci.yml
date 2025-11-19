@@ -8,8 +8,6 @@ run:
   modules-download-mode: readonly
   allow-serial-runners: false
   allow-parallel-runners: true
-  skip-dirs:
-    - packages/go/bin
 
 linters:
   enable:
@@ -88,6 +86,7 @@ issues:
     - vendor
     - build
     - third_party
+    - packages/go/bin
   exclude-files:
     - "_test\\.go$"
   exclude-rules:

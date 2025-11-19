@@ -53,23 +53,20 @@ repos:
       - id: cpd
       - id: checkstyle
         args: ["-c", "packages/java/checkstyle.xml"]
-  - repo: https://github.com/golangci/golangci-lint
-    rev: v1.64.5
-    hooks:
-      - id: golangci-lint
-        name: golangci-lint (packages/go)
-        args: ["--config", "../.golangci.yml"]
-        files: ^packages/go/
-        pass_filenames: false
-        entry: bash -c 'cd packages/go && golangci-lint run --config ../../.golangci.yml ./...'
-      - id: golangci-lint
-        name: golangci-lint (examples/go-smoke)
-        args: ["--config", "../.golangci.yml"]
-        files: ^examples/go-smoke/
-        pass_filenames: false
-        entry: bash -c 'cd examples/go-smoke && golangci-lint run --config ../../.golangci.yml ./...'
   - repo: local
     hooks:
+      - id: golangci-lint-packages
+        name: golangci-lint (packages/go)
+        entry: bash -c 'cd packages/go && golangci-lint run --config ../../.golangci.yml ./...'
+        language: system
+        files: ^packages/go/
+        pass_filenames: false
+      - id: golangci-lint-examples
+        name: golangci-lint (examples/go-smoke)
+        entry: bash -c 'cd examples/go-smoke && golangci-lint run --config ../../.golangci.yml ./...'
+        language: system
+        files: ^examples/go-smoke/
+        pass_filenames: false
       - id: mypy
         name: mypy
         entry: uv run mypy
@@ -77,8 +74,6 @@ repos:
         language: system
         types: [python]
         exclude: ^scripts/|^examples/
-        env:
-          MYPYPATH: packages/python
         pass_filenames: false
       - id: mix-credo
         name: mix credo

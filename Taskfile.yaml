@@ -4,6 +4,8 @@ vars:
   RUST_LOG: info
   RUBY_BIN: /opt/homebrew/opt/ruby/bin
   BUNDLER_VERSION: "2.7.2"
+  GOLANGCI_LINT_VERSION: "v2.6.2"
+  GO_TOOLCHAIN: "go1.25rc1"
 
 silent: false
 
@@ -433,34 +435,67 @@ tasks:
     desc: "Install golangci-lint and download Go modules"
     cmds:
       - |
-        if ! command -v golangci-lint >/dev/null 2>&1; then
-          echo "Installing golangci-lint..."
-          go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
-        else
-          echo "golangci-lint already installed"
-        fi
-      - cmd: cd packages/go && go mod download
-      - cmd: cd examples/go-smoke && go mod download
+        TOOLCHAIN="${GOTOOLCHAIN_OVERRIDE:-{{.GO_TOOLCHAIN}}}"
+        echo "Installing golangci-lint {{.GOLANGCI_LINT_VERSION}} with toolchain ${TOOLCHAIN}..."
+        GOTOOLCHAIN="${TOOLCHAIN}" go install github.com/golangci/golangci-lint/cmd/golangci-lint@{{.GOLANGCI_LINT_VERSION}}
+      - cmd: |
+          cd packages/go
+          TOOLCHAIN=${GOTOOLCHAIN_OVERRIDE:-{{.GO_TOOLCHAIN}}}
+          GOTOOLCHAIN=${TOOLCHAIN} go mod download
+          GOTOOLCHAIN=${TOOLCHAIN} go get ./...
+          GOTOOLCHAIN=${TOOLCHAIN} go mod tidy
+      - cmd: |
+          cd examples/go-smoke
+          TOOLCHAIN=${GOTOOLCHAIN_OVERRIDE:-{{.GO_TOOLCHAIN}}}
+          GOTOOLCHAIN=${TOOLCHAIN} go mod download
+          GOTOOLCHAIN=${TOOLCHAIN} go get ./...
+          GOTOOLCHAIN=${TOOLCHAIN} go mod tidy
 
   go:update:
     desc: "Update Go dependencies and golangci-lint"
     cmds:
-      - echo "Updating golangci-lint..."
-      - go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
+      - echo "Updating golangci-lint to {{.GOLANGCI_LINT_VERSION}}..."
+      - |
+        TOOLCHAIN="${GOTOOLCHAIN_OVERRIDE:-{{.GO_TOOLCHAIN}}}"
+        GOTOOLCHAIN="${TOOLCHAIN}" go install github.com/golangci/golangci-lint/cmd/golangci-lint@{{.GOLANGCI_LINT_VERSION}}
       - echo "Updating Go module dependencies..."
-      - cmd: cd packages/go && go get -u ./... && go mod tidy
-      - cmd: cd examples/go-smoke && go get -u ./... && go mod tidy
+      - cmd: |
+          cd packages/go
+          TOOLCHAIN=${GOTOOLCHAIN_OVERRIDE:-{{.GO_TOOLCHAIN}}}
+          GOTOOLCHAIN=${TOOLCHAIN} go get -u ./...
+          GOTOOLCHAIN=${TOOLCHAIN} go mod tidy
+          GOTOOLCHAIN=${TOOLCHAIN} go get ./...
+      - cmd: |
+          cd examples/go-smoke
+          TOOLCHAIN=${GOTOOLCHAIN_OVERRIDE:-{{.GO_TOOLCHAIN}}}
+          GOTOOLCHAIN=${TOOLCHAIN} go get -u ./...
+          GOTOOLCHAIN=${TOOLCHAIN} go mod tidy
+          GOTOOLCHAIN=${TOOLCHAIN} go get ./...
 
   go:test:
     desc: "Run Go tests"
     cmds:
       - cargo build --release -p html-to-markdown-ffi
-      - cmd: cd packages/go/htmltomarkdown && LD_LIBRARY_PATH=${GITHUB_WORKSPACE:-$PWD}/target/release:${LD_LIBRARY_PATH:-} DYLD_LIBRARY_PATH=${GITHUB_WORKSPACE:-$PWD}/target/release:${DYLD_LIBRARY_PATH:-} go test -v
+      - cmd: |
+          cd packages/go/htmltomarkdown
+          TOOLCHAIN=${GOTOOLCHAIN_OVERRIDE:-{{.GO_TOOLCHAIN}}}
+          LD_LIBRARY_PATH=${GITHUB_WORKSPACE:-$PWD}/target/release:${LD_LIBRARY_PATH:-} \
+          DYLD_LIBRARY_PATH=${GITHUB_WORKSPACE:-$PWD}/target/release:${DYLD_LIBRARY_PATH:-} \
+          GOTOOLCHAIN=${TOOLCHAIN} go test -v
 
   go:lint:
     desc: "Lint Go code with golangci-lint"
     cmds:
-      - golangci-lint run --config .golangci.yml ./packages/go/... ./examples/go-smoke/...
+      - cmd: |
+          cd packages/go
+          TOOLCHAIN=${GOTOOLCHAIN_OVERRIDE:-{{.GO_TOOLCHAIN}}}
+          GOTOOLCHAIN=${TOOLCHAIN} go fmt ./...
+          golangci-lint run --config ../../.golangci.yml ./...
+      - cmd: |
+          cd examples/go-smoke
+          TOOLCHAIN=${GOTOOLCHAIN_OVERRIDE:-{{.GO_TOOLCHAIN}}}
+          GOTOOLCHAIN=${TOOLCHAIN} go fmt ./...
+          golangci-lint run --config ../../.golangci.yml ./...
 
   go:format:
     desc: "Format Go code"
