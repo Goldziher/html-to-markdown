@@ -11,6 +11,7 @@ members = [
     "crates/html-to-markdown-php",
     "tools/runtime-bench",
     "packages/elixir/native/html_to_markdown_elixir",
+    "e2e/wasm-wasmtime",
 ]
 
 [workspace.package]

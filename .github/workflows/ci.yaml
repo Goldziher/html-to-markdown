@@ -453,6 +453,22 @@ jobs:
         working-directory: crates/html-to-markdown-wasm
         run: cargo test
 
+  wasm-wasmtime:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup Rust
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: stable
+          targets: wasm32-unknown-unknown
+
+      - name: Run Wasmtime WASM tests
+        run: cargo test -p html-to-markdown-wasm-wasmtime-tests
+
   smoke:
     name: Smoke README installs
     runs-on: ${{ matrix.os }}
