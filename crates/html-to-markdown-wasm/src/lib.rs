@@ -3,12 +3,16 @@ use html_to_markdown_rs::{
     NewlineStyle, PreprocessingOptions as RustPreprocessingOptions, PreprocessingPreset, WhitespaceMode,
 };
 use serde::{Deserialize, Serialize};
-use wasm_bindgen::{JsCast, prelude::*};
 
+#[cfg(feature = "js-bindings")]
+use wasm_bindgen::{JsCast, prelude::*};
+#[cfg(feature = "js-bindings")]
 mod inline_images;
+#[cfg(feature = "js-bindings")]
 pub use inline_images::{WasmHtmlExtraction, WasmInlineImage, WasmInlineImageConfig, WasmInlineImageWarning};
 
 /// Initialize panic hook for better error messages in the browser
+#[cfg(feature = "js-bindings")]
 #[wasm_bindgen(start)]
 pub fn init() {
     console_error_panic_hook::set_once();
@@ -358,6 +362,7 @@ impl From<WasmConversionOptions> for RustConversionOptions {
     }
 }
 
+#[cfg(feature = "js-bindings")]
 fn parse_wasm_options(options: JsValue) -> Result<Option<RustConversionOptions>, JsValue> {
     if options.is_undefined() || options.is_null() {
         return Ok(None);
@@ -374,17 +379,20 @@ fn parse_wasm_options(options: JsValue) -> Result<Option<RustConversionOptions>,
     Ok(Some(wasm_options.into()))
 }
 
+#[cfg(feature = "js-bindings")]
 fn bytes_to_string(bytes: js_sys::Uint8Array) -> Result<String, JsValue> {
     let mut buffer = vec![0u8; bytes.length() as usize];
     bytes.copy_to(&mut buffer);
     String::from_utf8(buffer).map_err(|e| JsValue::from_str(&format!("HTML must be valid UTF-8: {}", e)))
 }
 
+#[cfg(feature = "js-bindings")]
 #[wasm_bindgen]
 pub struct WasmConversionOptionsHandle {
     inner: RustConversionOptions,
 }
 
+#[cfg(feature = "js-bindings")]
 #[wasm_bindgen]
 impl WasmConversionOptionsHandle {
     #[wasm_bindgen(constructor)]
@@ -410,6 +418,7 @@ impl WasmConversionOptionsHandle {
 /// const markdown = convert(html);
 /// console.log(markdown); // # Hello World
 /// ```
+#[cfg(feature = "js-bindings")]
 #[wasm_bindgen]
 pub fn convert(html: String, options: JsValue) -> Result<String, JsValue> {
     let rust_options = parse_wasm_options(options)?;
@@ -417,6 +426,7 @@ pub fn convert(html: String, options: JsValue) -> Result<String, JsValue> {
     html_to_markdown_rs::convert(&html, rust_options).map_err(|e| JsValue::from_str(&e.to_string()))
 }
 
+#[cfg(feature = "js-bindings")]
 #[wasm_bindgen(js_name = convertBytes)]
 pub fn convert_bytes(html: js_sys::Uint8Array, options: JsValue) -> Result<String, JsValue> {
     let html = bytes_to_string(html)?;
@@ -424,16 +434,19 @@ pub fn convert_bytes(html: js_sys::Uint8Array, options: JsValue) -> Result<Strin
     html_to_markdown_rs::convert(&html, rust_options).map_err(|e| JsValue::from_str(&e.to_string()))
 }
 
+#[cfg(feature = "js-bindings")]
 #[wasm_bindgen(js_name = createConversionOptionsHandle)]
 pub fn create_conversion_options_handle(options: JsValue) -> Result<WasmConversionOptionsHandle, JsValue> {
     WasmConversionOptionsHandle::new(options)
 }
 
+#[cfg(feature = "js-bindings")]
 #[wasm_bindgen(js_name = convertWithOptionsHandle)]
 pub fn convert_with_options_handle(html: String, handle: &WasmConversionOptionsHandle) -> Result<String, JsValue> {
     html_to_markdown_rs::convert(&html, Some(handle.inner.clone())).map_err(|e| JsValue::from_str(&e.to_string()))
 }
 
+#[cfg(feature = "js-bindings")]
 #[wasm_bindgen(js_name = convertBytesWithOptionsHandle)]
 pub fn convert_bytes_with_options_handle(
     html: js_sys::Uint8Array,
@@ -464,6 +477,7 @@ pub fn convert_bytes_with_options_handle(
 /// console.log(result.markdown);
 /// console.log(result.inlineImages.length);
 /// ```
+#[cfg(feature = "js-bindings")]
 fn convert_with_inline_images_internal(
     html: &str,
     options: JsValue,
@@ -481,6 +495,7 @@ fn convert_with_inline_images_internal(
     Ok(extraction.into())
 }
 
+#[cfg(feature = "js-bindings")]
 #[wasm_bindgen(js_name = convertWithInlineImages)]
 pub fn convert_with_inline_images(
     html: String,
@@ -490,6 +505,7 @@ pub fn convert_with_inline_images(
     convert_with_inline_images_internal(&html, options, image_config)
 }
 
+#[cfg(feature = "js-bindings")]
 #[wasm_bindgen(js_name = convertBytesWithInlineImages)]
 pub fn convert_bytes_with_inline_images(
     html: js_sys::Uint8Array,
@@ -500,7 +516,97 @@ pub fn convert_bytes_with_inline_images(
     convert_with_inline_images_internal(&html, options, image_config)
 }
 
-#[cfg(test)]
+#[cfg(feature = "wasmtime-testing")]
+mod wasmtime_runtime {
+    use super::*;
+    use core::{mem, slice, str};
+    use std::cell::RefCell;
+
+    thread_local! {
+        static RESULT_BUFFER: RefCell<Vec<u8>> = RefCell::new(Vec::new());
+    }
+
+    fn write_result(bytes: &[u8]) -> u32 {
+        RESULT_BUFFER.with(|buf| {
+            let mut buffer = buf.borrow_mut();
+            buffer.clear();
+            buffer.extend_from_slice(bytes);
+            buffer.len() as u32
+        })
+    }
+
+    fn read_utf8(ptr: u32, len: u32) -> String {
+        let slice = unsafe { slice::from_raw_parts(ptr as *const u8, len as usize) };
+        str::from_utf8(slice).expect("input must be valid UTF-8").to_owned()
+    }
+
+    fn parse_options(ptr: u32, len: u32) -> Option<RustConversionOptions> {
+        if len == 0 {
+            return None;
+        }
+        let json = read_utf8(ptr, len);
+        if json.trim().is_empty() {
+            return None;
+        }
+        let wasm_options: WasmConversionOptions = serde_json::from_str(&json).expect("options JSON must be valid");
+        Some(wasm_options.into())
+    }
+
+    fn convert_internal(html_ptr: u32, html_len: u32, options: Option<RustConversionOptions>) -> u32 {
+        let html = read_utf8(html_ptr, html_len);
+        match html_to_markdown_rs::convert(&html, options) {
+            Ok(markdown) => write_result(markdown.as_bytes()),
+            Err(err) => write_result(format!("ERROR:{}", err).as_bytes()),
+        }
+    }
+
+    #[unsafe(no_mangle)]
+    pub extern "C" fn htmd_alloc(len: u32) -> u32 {
+        let mut buffer = vec![0u8; len as usize];
+        let ptr = buffer.as_mut_ptr();
+        mem::forget(buffer);
+        ptr as u32
+    }
+
+    #[unsafe(no_mangle)]
+    pub extern "C" fn htmd_dealloc(ptr: u32, len: u32) {
+        unsafe {
+            Vec::from_raw_parts(ptr as *mut u8, len as usize, len as usize);
+        }
+    }
+
+    #[unsafe(no_mangle)]
+    pub extern "C" fn htmd_result_ptr() -> u32 {
+        RESULT_BUFFER.with(|buf| buf.borrow().as_ptr() as u32)
+    }
+
+    #[unsafe(no_mangle)]
+    pub extern "C" fn htmd_convert(ptr: u32, len: u32) -> u32 {
+        convert_internal(ptr, len, None)
+    }
+
+    #[unsafe(no_mangle)]
+    pub extern "C" fn htmd_convert_with_options(
+        html_ptr: u32,
+        html_len: u32,
+        options_ptr: u32,
+        options_len: u32,
+    ) -> u32 {
+        let options = parse_options(options_ptr, options_len);
+        convert_internal(html_ptr, html_len, options)
+    }
+
+    #[unsafe(no_mangle)]
+    pub extern "C" fn htmd_convert_underlined(html_ptr: u32, html_len: u32) -> u32 {
+        let mut options = html_to_markdown_rs::ConversionOptions::default();
+        options.heading_style = HeadingStyle::Underlined;
+        options.wrap = true;
+        options.wrap_width = 12;
+        convert_internal(html_ptr, html_len, Some(options))
+    }
+}
+
+#[cfg(all(test, feature = "js-bindings"))]
 mod tests {
     use super::*;
     use wasm_bindgen_test::*;

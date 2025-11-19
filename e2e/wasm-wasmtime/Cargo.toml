@@ -1,0 +1,10 @@
+[package]
+name = "html-to-markdown-wasm-wasmtime-tests"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[dev-dependencies]
+anyhow = "1.0"
+wasmtime = "19"
+html-to-markdown-rs = { path = "../../crates/html-to-markdown" }

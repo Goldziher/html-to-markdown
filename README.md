@@ -219,6 +219,20 @@ Need a call-stack view of the Rust core? Run `task flamegraph:rust` (or call the
 
 ## Compatibility (v1 → v2)
 
+## Testing
+
+Use the task runner to execute the entire matrix locally:
+
+```bash
+# All core test suites (Rust, Python, Ruby, Node, PHP, Go, C#, Elixir, Java)
+task test
+
+# Run the Wasmtime-backed WASM integration tests
+task wasm:test:wasmtime
+```
+
+The Wasmtime suite builds the `html-to-markdown-wasm` artifact with the same flags used in CI and drives it through Wasmtime to ensure the non-JS runtime behaves exactly like the browser/Deno builds.
+
 - V2’s Rust core sustains **150–210 MB/s** throughput; V1 averaged **≈ 2.5 MB/s** in its Python/BeautifulSoup implementation (60–80× faster).
 - The Python package offers a compatibility shim in `html_to_markdown.v1_compat` (`convert_to_markdown`, `convert_to_markdown_stream`, `markdownify`). The shim is deprecated, emits `DeprecationWarning` on every call, and will be removed in v3.0—plan migrations now. Details and keyword mappings live in [Python README](https://github.com/Goldziher/html-to-markdown/blob/main/packages/python/README.md#v1-compatibility).
 - CLI flag changes, option renames, and other breaking updates are summarised in [CHANGELOG](https://github.com/Goldziher/html-to-markdown/blob/main/CHANGELOG.md#breaking-changes).

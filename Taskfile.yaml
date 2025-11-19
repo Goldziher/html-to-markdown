@@ -64,6 +64,7 @@ tasks:
       - task: js:test
       - task: php:test
       - task: go:test
+      - task: wasm:test:wasmtime
       - task: csharp:test
       - task: elixir:test
       - task: java:test
@@ -482,6 +483,11 @@ tasks:
           LD_LIBRARY_PATH=${GITHUB_WORKSPACE:-$PWD}/target/release:${LD_LIBRARY_PATH:-} \
           DYLD_LIBRARY_PATH=${GITHUB_WORKSPACE:-$PWD}/target/release:${DYLD_LIBRARY_PATH:-} \
           GOTOOLCHAIN=${TOOLCHAIN} go test -v
+
+  wasm:test:wasmtime:
+    desc: "Run Wasmtime-based WASM e2e tests"
+    cmds:
+      - RUSTC=./scripts/preferred-rustc.sh cargo test -p html-to-markdown-wasm-wasmtime-tests
 
   go:lint:
     desc: "Lint Go code with golangci-lint"
