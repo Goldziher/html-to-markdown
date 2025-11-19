@@ -82,7 +82,7 @@ pnpm test -- --coverage
 
 ```bash
 # Format code (Rust + Python)
-task fmt
+task format
 
 # Run all linters
 task lint
