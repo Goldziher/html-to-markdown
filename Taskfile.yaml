@@ -4,7 +4,7 @@ vars:
   RUST_LOG: info
   RUBY_BIN: /opt/homebrew/opt/ruby/bin
   BUNDLER_VERSION: "2.7.2"
-  GOLANGCI_LINT_VERSION: "latest"
+  GOLANGCI_LINT_VERSION: "v2.6.2"
   GO_TOOLCHAIN: "go1.25rc1"
 
 silent: false
@@ -437,7 +437,7 @@ tasks:
       - |
         TOOLCHAIN="${GOTOOLCHAIN_OVERRIDE:-{{.GO_TOOLCHAIN}}}"
         echo "Installing golangci-lint {{.GOLANGCI_LINT_VERSION}} with toolchain ${TOOLCHAIN}..."
-        GOTOOLCHAIN="${TOOLCHAIN}" go install github.com/golangci/golangci-lint/cmd/golangci-lint@{{.GOLANGCI_LINT_VERSION}}
+        GOTOOLCHAIN="${TOOLCHAIN}" go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@{{.GOLANGCI_LINT_VERSION}}
       - cmd: |
           cd packages/go
           TOOLCHAIN=${GOTOOLCHAIN_OVERRIDE:-{{.GO_TOOLCHAIN}}}
@@ -457,7 +457,7 @@ tasks:
       - echo "Updating golangci-lint to {{.GOLANGCI_LINT_VERSION}}..."
       - |
         TOOLCHAIN="${GOTOOLCHAIN_OVERRIDE:-{{.GO_TOOLCHAIN}}}"
-        GOTOOLCHAIN="${TOOLCHAIN}" go install github.com/golangci/golangci-lint/cmd/golangci-lint@{{.GOLANGCI_LINT_VERSION}}
+        GOTOOLCHAIN="${TOOLCHAIN}" go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@{{.GOLANGCI_LINT_VERSION}}
       - echo "Updating Go module dependencies..."
       - cmd: |
           cd packages/go
