@@ -72,6 +72,18 @@ jobs:
         with:
           components: rustfmt, clippy, llvm-tools-preview
 
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.25"
+          check-latest: true
+
+      - name: Install golangci-lint 2.6.2
+        env:
+          GOTOOLCHAIN: go1.25
+        run: |
+          go install github.com/golangci/golangci-lint/cmd/golangci-lint@v2.6.2
+
       - name: Setup Elixir
         uses: erlef/setup-beam@v1
         with:
