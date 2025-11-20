@@ -37,6 +37,21 @@ fi
 cp "$ROOT/LICENSE" "$STAGING/"
 cp "$ROOT/README.md" "$STAGING/PROJECT-README.md"
 
+# Drop test-only workspace members so cargo metadata matches what
+# we actually ship in the PIE bundle.
+WORKSPACE_CARGO="$WORKSPACE_DIR/Cargo.toml"
+python3 - "$WORKSPACE_CARGO" <<'PY'
+from pathlib import Path
+import sys
+
+cargo_path = Path(sys.argv[1])
+lines = [
+    line for line in cargo_path.read_text().splitlines()
+    if '"e2e/wasm-wasmtime"' not in line
+]
+cargo_path.write_text("\n".join(lines) + "\n")
+PY
+
 # Add all Rust workspace crates plus tooling needed by the workspace members.
 rsync -a --exclude 'target' --exclude 'debug' "$ROOT/crates" "$WORKSPACE_DIR/"
 
