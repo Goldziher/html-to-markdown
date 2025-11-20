@@ -57,7 +57,7 @@ struct ConvertContext {
 ///     </p>
 /// </div>"#;
 ///
-/// let dom = astral_tl::parse(html, astral_tl::ParserOptions::default()).unwrap();
+/// let dom = tl::parse(html, tl::ParserOptions::default()).unwrap();
 /// let (elements, _) = extract_hocr_document(&dom, false);
 /// let markdown = convert_to_markdown(&elements, true);
 /// // Output: "# Document Title\n\nHello World"

@@ -32,7 +32,7 @@ fn test_full_hocr_document_structure() {
 </body>
 </html>"#;
 
-    let dom = astral_tl::parse(hocr, astral_tl::ParserOptions::default()).unwrap();
+    let dom = tl::parse(hocr, tl::ParserOptions::default()).unwrap();
     let (elements, metadata) = extract_hocr_document(&dom, false);
 
     // Verify metadata
@@ -58,7 +58,7 @@ fn test_advanced_properties() {
     </span>
 </div>"#;
 
-    let dom = astral_tl::parse(hocr, astral_tl::ParserOptions::default()).unwrap();
+    let dom = tl::parse(hocr, tl::ParserOptions::default()).unwrap();
     let (elements, _) = extract_hocr_document(&dom, false);
 
     // Find the line element
@@ -100,7 +100,7 @@ fn test_all_logical_elements() {
     <div class="ocr_caption"><span class="ocrx_word" title="bbox 0 0 50 20">Caption</span></div>
 </div>"#;
 
-    let dom = astral_tl::parse(hocr, astral_tl::ParserOptions::default()).unwrap();
+    let dom = tl::parse(hocr, tl::ParserOptions::default()).unwrap();
     let (elements, _) = extract_hocr_document(&dom, false);
 
     let markdown = convert_to_markdown(&elements, true);
@@ -124,7 +124,7 @@ fn test_float_elements() {
     </div>
 </div>"#;
 
-    let dom = astral_tl::parse(hocr, astral_tl::ParserOptions::default()).unwrap();
+    let dom = tl::parse(hocr, tl::ParserOptions::default()).unwrap();
     let (elements, _) = extract_hocr_document(&dom, false);
 
     let markdown = convert_to_markdown(&elements, true);
@@ -140,7 +140,7 @@ fn test_character_level_properties() {
     <span class="ocrx_word" title="bbox 0 0 30 20">ABC</span>
 </span>"#;
 
-    let dom = astral_tl::parse(hocr, astral_tl::ParserOptions::default()).unwrap();
+    let dom = tl::parse(hocr, tl::ParserOptions::default()).unwrap();
     let (elements, _) = extract_hocr_document(&dom, false);
 
     // Find ocr_cinfo
@@ -174,7 +174,7 @@ fn test_page_properties() {
     <p class="ocr_par">Content</p>
 </div>"#;
 
-    let dom = astral_tl::parse(hocr, astral_tl::ParserOptions::default()).unwrap();
+    let dom = tl::parse(hocr, tl::ParserOptions::default()).unwrap();
     let (elements, _) = extract_hocr_document(&dom, false);
 
     // Find page element
@@ -206,7 +206,7 @@ fn test_content_flow_and_order() {
     <p class="ocr_par" title="order 1"><span class="ocrx_word" title="bbox 0 0 50 20">First</span></p>
 </div>"#;
 
-    let dom = astral_tl::parse(hocr, astral_tl::ParserOptions::default()).unwrap();
+    let dom = tl::parse(hocr, tl::ParserOptions::default()).unwrap();
     let (elements, _) = extract_hocr_document(&dom, false);
 
     // Find linear element
@@ -240,7 +240,7 @@ fn test_abstract_and_author() {
     <div class="ocr_author"><span class="ocrx_word" title="bbox 0 0 50 20">John Doe</span></div>
 </div>"#;
 
-    let dom = astral_tl::parse(hocr, astral_tl::ParserOptions::default()).unwrap();
+    let dom = tl::parse(hocr, tl::ParserOptions::default()).unwrap();
     let (elements, _) = extract_hocr_document(&dom, false);
     let markdown = convert_to_markdown(&elements, true);
 
@@ -257,7 +257,7 @@ fn test_separator() {
     <p class="ocr_par"><span class="ocrx_word" title="bbox 0 0 50 20">Text after</span></p>
 </div>"#;
 
-    let dom = astral_tl::parse(hocr, astral_tl::ParserOptions::default()).unwrap();
+    let dom = tl::parse(hocr, tl::ParserOptions::default()).unwrap();
     let (elements, _) = extract_hocr_document(&dom, false);
     let markdown = convert_to_markdown(&elements, true);
 
@@ -274,7 +274,7 @@ fn test_image_elements() {
     <div class="ocr_linedrawing"><span class="ocrx_word" title="bbox 0 0 50 20">Drawing caption</span></div>
 </div>"#;
 
-    let dom = astral_tl::parse(hocr, astral_tl::ParserOptions::default()).unwrap();
+    let dom = tl::parse(hocr, tl::ParserOptions::default()).unwrap();
     let (elements, _) = extract_hocr_document(&dom, false);
     let markdown = convert_to_markdown(&elements, true);
 
@@ -290,7 +290,7 @@ fn test_math_and_chem() {
     <div class="ocr_display"><span class="ocrx_word" title="bbox 0 0 50 20">x^2 + y^2 = z^2</span></div>
 </div>"#;
 
-    let dom = astral_tl::parse(hocr, astral_tl::ParserOptions::default()).unwrap();
+    let dom = tl::parse(hocr, tl::ParserOptions::default()).unwrap();
     let (elements, _) = extract_hocr_document(&dom, false);
     let markdown = convert_to_markdown(&elements, true);
 
@@ -314,7 +314,7 @@ fn test_dropcap_and_glyphs() {
     </span>
 </div>"#;
 
-    let dom = astral_tl::parse(hocr, astral_tl::ParserOptions::default()).unwrap();
+    let dom = tl::parse(hocr, tl::ParserOptions::default()).unwrap();
     let (elements, _) = extract_hocr_document(&dom, false);
     let markdown = convert_to_markdown(&elements, true);
 
@@ -333,7 +333,7 @@ fn test_float_elements_comprehensive() {
     <div class="ocr_textimage"><span class="ocrx_word" title="bbox 0 0 50 20">Text with image</span></div>
 </div>"#;
 
-    let dom = astral_tl::parse(hocr, astral_tl::ParserOptions::default()).unwrap();
+    let dom = tl::parse(hocr, tl::ParserOptions::default()).unwrap();
     let (elements, _) = extract_hocr_document(&dom, false);
     let markdown = convert_to_markdown(&elements, true);
 
@@ -356,7 +356,7 @@ fn test_container_elements() {
     </div>
 </div>"#;
 
-    let dom = astral_tl::parse(hocr, astral_tl::ParserOptions::default()).unwrap();
+    let dom = tl::parse(hocr, tl::ParserOptions::default()).unwrap();
     let (elements, _) = extract_hocr_document(&dom, false);
     let markdown = convert_to_markdown(&elements, true);
 

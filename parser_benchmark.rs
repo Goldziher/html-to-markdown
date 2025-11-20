@@ -130,7 +130,7 @@ fn benchmark_astral_tl() {
     let start = Instant::now();
     let iterations = 10000;
     for _ in 0..iterations {
-        let dom = astral_tl::parse(SIMPLE_HTML, astral_tl::ParserOptions::default()).unwrap();
+        let dom = tl::parse(SIMPLE_HTML, tl::ParserOptions::default()).unwrap();
         std::hint::black_box(dom);
     }
     let duration = start.elapsed();
@@ -145,7 +145,7 @@ fn benchmark_astral_tl() {
     let start = Instant::now();
     let iterations = 1000;
     for _ in 0..iterations {
-        let dom = astral_tl::parse(MEDIUM_HTML, astral_tl::ParserOptions::default()).unwrap();
+        let dom = tl::parse(MEDIUM_HTML, tl::ParserOptions::default()).unwrap();
         std::hint::black_box(dom);
     }
     let duration = start.elapsed();
@@ -162,7 +162,7 @@ fn benchmark_astral_tl() {
 }
 
 fn test_astral_tl_whitespace() {
-    let dom = astral_tl::parse(WHITESPACE_TEST, astral_tl::ParserOptions::default()).unwrap();
+    let dom = tl::parse(WHITESPACE_TEST, tl::ParserOptions::default()).unwrap();
     let parser = dom.parser();
 
     // Extract all text
@@ -179,7 +179,7 @@ fn test_astral_tl_whitespace() {
     println!("  Original: {:?}", WHITESPACE_TEST);
 
     // Test <pre> preservation
-    let dom = astral_tl::parse(PRESERVED_WHITESPACE, astral_tl::ParserOptions::default()).unwrap();
+    let dom = tl::parse(PRESERVED_WHITESPACE, tl::ParserOptions::default()).unwrap();
     let parser = dom.parser();
     let mut text = String::new();
     for node in dom.nodes() {

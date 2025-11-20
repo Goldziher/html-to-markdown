@@ -100,21 +100,21 @@ fn parse_confidence(title: &str) -> f64 {
 }
 
 /// Extract text content from a node
-fn get_text_content(node_handle: &astral_tl::NodeHandle, parser: &astral_tl::Parser) -> String {
+fn get_text_content(node_handle: &tl::NodeHandle, parser: &tl::Parser) -> String {
     let mut text = String::new();
 
     if let Some(node) = node_handle.get(parser) {
         match node {
-            astral_tl::Node::Raw(bytes) => {
+            tl::Node::Raw(bytes) => {
                 text.push_str(&bytes.as_utf8_str());
             }
-            astral_tl::Node::Tag(tag) => {
+            tl::Node::Tag(tag) => {
                 let children = tag.children();
                 for child_handle in children.top().iter() {
                     text.push_str(&get_text_content(child_handle, parser));
                 }
             }
-            astral_tl::Node::Comment(_) => {}
+            tl::Node::Comment(_) => {}
         }
     }
 
@@ -126,14 +126,14 @@ fn get_text_content(node_handle: &astral_tl::NodeHandle, parser: &astral_tl::Par
 /// Walks the DOM and extracts all elements with `ocrx_word` class,
 /// parsing their bbox and confidence information.
 pub fn extract_hocr_words(
-    node_handle: &astral_tl::NodeHandle,
-    parser: &astral_tl::Parser,
+    node_handle: &tl::NodeHandle,
+    parser: &tl::Parser,
     min_confidence: f64,
     debug: bool,
 ) -> Vec<HocrWord> {
     let mut words = Vec::new();
 
-    if let Some(astral_tl::Node::Tag(tag)) = node_handle.get(parser) {
+    if let Some(tl::Node::Tag(tag)) = node_handle.get(parser) {
         let tag_name = tag.name().as_utf8_str();
         let attrs = tag.attributes();
 
@@ -604,7 +604,7 @@ mod tests {
             </div>
         "#;
 
-        let dom = astral_tl::parse(hocr, astral_tl::ParserOptions::default()).unwrap();
+        let dom = tl::parse(hocr, tl::ParserOptions::default()).unwrap();
         let parser = dom.parser();
 
         let mut words = Vec::new();
@@ -632,7 +632,7 @@ mod tests {
             </div>
         "#;
 
-        let dom = astral_tl::parse(hocr, astral_tl::ParserOptions::default()).unwrap();
+        let dom = tl::parse(hocr, tl::ParserOptions::default()).unwrap();
         let parser = dom.parser();
 
         let mut words = Vec::new();
@@ -750,7 +750,7 @@ mod tests {
             </div>
         "#;
 
-        let dom = astral_tl::parse(hocr, astral_tl::ParserOptions::default()).unwrap();
+        let dom = tl::parse(hocr, tl::ParserOptions::default()).unwrap();
         let parser = dom.parser();
 
         let mut words = Vec::new();
