@@ -3421,26 +3421,12 @@ fn walk_node(
                 }
 
                 "hr" => {
-                    let inside_paragraph = ctx.in_paragraph;
                     // CommonMark: ensure a blank line before the hr so it is not interpreted as a setext heading underline
                     if !output.is_empty() {
-                        if inside_paragraph {
-                            if !output.ends_with('\n') {
-                                output.push('\n');
-                            }
-                        } else if needs_blank_line_before_hr(output) {
-                            if output.ends_with("\n\n") {
-                                // already has a blank line
-                            } else if output.ends_with('\n') {
-                                output.push('\n');
-                            } else {
-                                output.push_str("\n\n");
-                            }
-                        } else if output.ends_with("\n\n") {
+                        while output.ends_with('\n') {
                             output.truncate(output.len() - 1);
-                        } else if !output.ends_with('\n') {
-                            output.push('\n');
                         }
+                        output.push('\n');
                     }
                     output.push_str("---\n");
                 }
@@ -5308,27 +5294,6 @@ fn convert_table(
     }
 }
 
-fn needs_blank_line_before_hr(output: &str) -> bool {
-    if output.is_empty() {
-        return false;
-    }
-
-    let trimmed = output.trim_end_matches('\n');
-    if trimmed.is_empty() {
-        return false;
-    }
-
-    if let Some(line) = trimmed.rsplit('\n').find(|line| !line.trim().is_empty()) {
-        let trimmed_line = line.trim_start();
-        if trimmed_line.is_empty() {
-            return false;
-        }
-        return !trimmed_line.starts_with('>');
-    }
-
-    false
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -5558,9 +5523,19 @@ mod tests {
     }
 
     #[test]
-    fn hr_spacing_helper_distinguishes_blockquotes() {
-        assert!(!needs_blank_line_before_hr("> foo\n"));
-        assert!(needs_blank_line_before_hr("paragraph"));
+    fn hr_inside_paragraph_matches_inline_expectation() {
+        let mut options = ConversionOptions::default();
+        options.extract_metadata = false;
+        let markdown = convert_html("<p>Hello<hr>World</p>", &options).unwrap();
+        assert_eq!(markdown, "Hello\n---\nWorld\n");
+    }
+
+    #[test]
+    fn hr_inside_paragraph_matches_inline_expectation_via_public_api() {
+        let mut options = ConversionOptions::default();
+        options.extract_metadata = false;
+        let markdown = crate::convert("<p>Hello<hr>World</p>", Some(options)).unwrap();
+        assert_eq!(markdown, "Hello\n---\nWorld\n");
     }
 
     #[test]
