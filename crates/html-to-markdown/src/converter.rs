@@ -3421,9 +3421,14 @@ fn walk_node(
                 }
 
                 "hr" => {
+                    let inside_paragraph = ctx.in_paragraph;
                     // CommonMark: ensure a blank line before the hr so it is not interpreted as a setext heading underline
                     if !output.is_empty() {
-                        if needs_blank_line_before_hr(output) {
+                        if inside_paragraph {
+                            if !output.ends_with('\n') {
+                                output.push('\n');
+                            }
+                        } else if needs_blank_line_before_hr(output) {
                             if output.ends_with("\n\n") {
                                 // already has a blank line
                             } else if output.ends_with('\n') {
