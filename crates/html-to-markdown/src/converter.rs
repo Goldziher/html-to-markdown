@@ -3411,13 +3411,14 @@ fn walk_node(
                 }
 
                 "hr" => {
-                    // CommonMark: hr needs to be on its own line but doesn't need blank line before
+                    // CommonMark: ensure a blank line before the hr so it is not interpreted as a setext heading underline
                     if !output.is_empty() {
-                        if !output.ends_with('\n') {
+                        if output.ends_with("\n\n") {
+                            // already has a blank line
+                        } else if output.ends_with('\n') {
                             output.push('\n');
-                        } else if output.ends_with("\n\n") {
-                            // Remove extra newline (e.g., after blockquote)
-                            output.truncate(output.len() - 1);
+                        } else {
+                            output.push_str("\n\n");
                         }
                     }
                     output.push_str("---\n");

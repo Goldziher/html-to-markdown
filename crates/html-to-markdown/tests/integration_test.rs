@@ -128,6 +128,13 @@ fn test_horizontal_rule() {
 }
 
 #[test]
+fn test_hr_after_paragraph_keeps_blank_line() {
+    let html = "<p>paragraph</p><hr>";
+    let result = convert(html, None).unwrap();
+    assert_eq!(result, "paragraph\n\n---\n");
+}
+
+#[test]
 fn test_line_break() {
     let html = "<p>Line 1<br>Line 2</p>";
     let result = convert(html, None).unwrap();
