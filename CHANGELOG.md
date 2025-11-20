@@ -7,19 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [2.8.4] - 2025-11-19
+## [2.9.0] - 2025-11-20
 
 ### Added
 - **Elixir bindings** – New `html_to_markdown` Hex package built with Rustler, exposing the Rust core converter to Elixir with configurable options plus `convert/2` and `convert!/2`.
 - **WASM runtime verification** – Added a Wasmtime-backed e2e suite (`e2e/wasm-wasmtime`) plus `task wasm:test:wasmtime` to compile the `html-to-markdown-wasm` artefact for `wasm32-unknown-unknown` and execute it inside Wasmtime. CI now runs these tests to ensure the WASM package works outside the browser runtime.
 
 ### Changed
+- **Astral `tl` parser** – The HTML parser dependency now points to the actively maintained `astral-tl` fork (still imported as `tl`) so comment parsing stays up to date with upstream fixes.
 - **NuGet Package ID** – C# bindings now publish under `Goldziher.HtmlToMarkdown` to avoid clashing with an existing community package.
 - **Wasmtime CI Coverage** – The Wasmtime e2e job now runs on Linux x64, Linux arm64, macOS, and Windows runners so every GitHub-hosted architecture executes the WASM tests.
 
 ### Fixed
 - **PHP PIE source bundle** – Release packaging strips the Wasmtime e2e workspace from the staged `Cargo.toml`, fixing the “failed to load manifest” error in the publish workflow.
-- **Horizontal rule rendering** – `<p>…</p><hr>` now emits a blank line before `---`, keeping the horizontal rule from being misinterpreted as a setext heading.
+- **Horizontal rule rendering** – `<p>…</p><hr>` now emits a blank line before `---` while preserving blockquote spacing so the rule is never misinterpreted as a setext heading.
+- **Empty HTML comments** – Zero-width `<!---->` comment nodes are normalized before parsing, so comment placeholders no longer cause the following content to disappear.
 
 ## [2.8.3] - 2025-11-15
 
@@ -91,7 +93,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Zero-Copy Inline Images** – Node/N-API and WASM bindings now expose `convertInlineImagesBuffer` / `convertBytesWithInlineImages`, letting benchmark harnesses feed `Buffer`/`Uint8Array` data directly without creating intermediate JS strings.
 
 ### Changed
-- **Rust Core Preprocessing** – HTML normalization (self-closing fixes, malformed `<` escaping, script/style stripping) now happens in a single streaming pass that hands owned buffers straight to `astral_tl::parse_owned`, cutting multiple allocations from every conversion.
+- **Rust Core Preprocessing** – HTML normalization (self-closing fixes, malformed `<` escaping, script/style stripping) now happens in a single streaming pass that hands owned buffers straight to `tl::parse_owned`, cutting multiple allocations from every conversion.
 - **Benchmark Harness + Docs** – Re-ran the cross-language runtime suite after the Rust core optimizations and refreshed the README tables, keeping the published throughput numbers (Node/Python/Rust/WASM/PHP) in sync with `tools/runtime-bench/results/latest.json`.
 - **Version Alignment** – Bumped every package (Rust crates, npm packages, PyPI distribution, Ruby gem, PHP extension, WASM bundle) to `2.7.0` via `task sync-versions`.
 

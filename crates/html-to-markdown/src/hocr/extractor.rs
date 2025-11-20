@@ -43,10 +43,10 @@ use super::types::{HocrElement, HocrElementType, HocrMetadata};
 ///         <span class="ocrx_word" title="bbox 100 100 150 130; x_wconf 95">Hello</span>
 ///     </p>
 /// </div>"#;
-/// let dom = astral_tl::parse(html, astral_tl::ParserOptions::default()).unwrap();
+/// let dom = tl::parse(html, tl::ParserOptions::default()).unwrap();
 /// let (elements, metadata) = extract_hocr_document(&dom, false);
 /// ```
-pub fn extract_hocr_document(dom: &astral_tl::VDom, debug: bool) -> (Vec<HocrElement>, HocrMetadata) {
+pub fn extract_hocr_document(dom: &tl::VDom, debug: bool) -> (Vec<HocrElement>, HocrMetadata) {
     let parser = dom.parser();
     let mut elements = Vec::new();
     let metadata = extract_metadata(dom);
@@ -61,15 +61,15 @@ pub fn extract_hocr_document(dom: &astral_tl::VDom, debug: bool) -> (Vec<HocrEle
 
 /// Recursively collect hOCR elements from DOM tree
 fn collect_hocr_elements(
-    node_handle: &astral_tl::NodeHandle,
-    parser: &astral_tl::Parser,
+    node_handle: &tl::NodeHandle,
+    parser: &tl::Parser,
     elements: &mut Vec<HocrElement>,
     debug: bool,
 ) {
     // Try to extract as hOCR element
     if let Some(element) = extract_element(node_handle, parser, debug) {
         elements.push(element);
-    } else if let Some(astral_tl::Node::Tag(tag)) = node_handle.get(parser) {
+    } else if let Some(tl::Node::Tag(tag)) = node_handle.get(parser) {
         // Not an hOCR element, but continue searching in children
         let children = tag.children();
         for child_handle in children.top().iter() {
@@ -79,12 +79,12 @@ fn collect_hocr_elements(
 }
 
 /// Extract hOCR metadata from HTML head (or from orphaned meta tags after sanitization)
-fn extract_metadata(dom: &astral_tl::VDom) -> HocrMetadata {
+fn extract_metadata(dom: &tl::VDom) -> HocrMetadata {
     let mut metadata = HocrMetadata::default();
     let parser = dom.parser();
 
     // Helper function to extract metadata from a single meta tag
-    fn extract_from_meta_tag(meta_tag: &astral_tl::HTMLTag, metadata: &mut HocrMetadata) {
+    fn extract_from_meta_tag(meta_tag: &tl::HTMLTag, metadata: &mut HocrMetadata) {
         let attrs = meta_tag.attributes();
         if let (Some(name), Some(content)) = (attrs.get("name").flatten(), attrs.get("content").flatten()) {
             let name_str = name.as_utf8_str();
@@ -110,8 +110,8 @@ fn extract_metadata(dom: &astral_tl::VDom) -> HocrMetadata {
     }
 
     // Recursively search for meta tags (either inside head or as orphans after sanitization)
-    fn find_meta_tags<'a>(node_handle: &astral_tl::NodeHandle, parser: &'a astral_tl::Parser<'a>, metadata: &mut HocrMetadata) {
-        if let Some(astral_tl::Node::Tag(tag)) = node_handle.get(parser) {
+    fn find_meta_tags<'a>(node_handle: &tl::NodeHandle, parser: &'a tl::Parser<'a>, metadata: &mut HocrMetadata) {
+        if let Some(tl::Node::Tag(tag)) = node_handle.get(parser) {
             let tag_name = tag.name().as_utf8_str();
 
             // Extract from meta tags directly (handles both meta inside head and orphaned meta)
@@ -136,8 +136,8 @@ fn extract_metadata(dom: &astral_tl::VDom) -> HocrMetadata {
 }
 
 /// Extract a single hOCR element and its children
-fn extract_element(node_handle: &astral_tl::NodeHandle, parser: &astral_tl::Parser, debug: bool) -> Option<HocrElement> {
-    if let Some(astral_tl::Node::Tag(tag)) = node_handle.get(parser) {
+fn extract_element(node_handle: &tl::NodeHandle, parser: &tl::Parser, debug: bool) -> Option<HocrElement> {
+    if let Some(tl::Node::Tag(tag)) = node_handle.get(parser) {
         let attrs = tag.attributes();
         let class_attr = attrs.get("class").flatten()?;
         let classes = class_attr.as_utf8_str();
@@ -158,7 +158,7 @@ fn extract_element(node_handle: &astral_tl::NodeHandle, parser: &astral_tl::Pars
 
         let tag_children = tag.children();
         for child_handle in tag_children.top().iter() {
-            if let Some(astral_tl::Node::Raw(bytes)) = child_handle.get(parser) {
+            if let Some(tl::Node::Raw(bytes)) = child_handle.get(parser) {
                 text.push_str(&bytes.as_utf8_str());
             } else if let Some(child_element) = extract_element(child_handle, parser, debug) {
                 children.push(child_element);
@@ -183,7 +183,7 @@ mod tests {
     #[test]
     fn test_extract_simple_word() {
         let html = r#"<span class="ocrx_word" title="bbox 100 50 150 80; x_wconf 95">Hello</span>"#;
-        let dom = astral_tl::parse(html, astral_tl::ParserOptions::default()).unwrap();
+        let dom = tl::parse(html, tl::ParserOptions::default()).unwrap();
         let parser = dom.parser();
 
         let element = extract_element(&dom.children()[0], parser, false).unwrap();
@@ -199,7 +199,7 @@ mod tests {
             <span class="ocrx_word" title="bbox 10 10 50 30; x_wconf 90">First</span>
             <span class="ocrx_word" title="bbox 60 10 100 30; x_wconf 92">Word</span>
         </p>"#;
-        let dom = astral_tl::parse(html, astral_tl::ParserOptions::default()).unwrap();
+        let dom = tl::parse(html, tl::ParserOptions::default()).unwrap();
         let parser = dom.parser();
 
         let element = extract_element(&dom.children()[0], parser, false).unwrap();
@@ -221,7 +221,7 @@ mod tests {
 <div class="ocr_page"></div>
 </body>
 </html>"#;
-        let dom = astral_tl::parse(html, astral_tl::ParserOptions::default()).unwrap();
+        let dom = tl::parse(html, tl::ParserOptions::default()).unwrap();
         let (_, metadata) = extract_hocr_document(&dom, false);
 
         assert_eq!(metadata.ocr_system, Some("tesseract 4.1.1".to_string()));

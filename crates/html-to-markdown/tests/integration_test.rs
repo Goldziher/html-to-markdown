@@ -135,6 +135,13 @@ fn test_hr_after_paragraph_keeps_blank_line() {
 }
 
 #[test]
+fn test_comment_between_paragraphs() {
+    let html = "<p>yes</p><!----><p>but no</p>";
+    let result = convert(html, None).unwrap();
+    assert_eq!(result, "yes\n\nbut no\n");
+}
+
+#[test]
 fn test_line_break() {
     let html = "<p>Line 1<br>Line 2</p>";
     let result = convert(html, None).unwrap();

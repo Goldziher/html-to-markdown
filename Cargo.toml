@@ -30,7 +30,7 @@ rust-version = "1.85"
 html-to-markdown-rs = { version = "2.9.0", path = "crates/html-to-markdown" }
 
 # HTML parsing
-astral-tl = "0.7.9"
+tl = { package = "astral-tl", version = "0.7.9" }
 
 # Utilities
 regex = "1.12"

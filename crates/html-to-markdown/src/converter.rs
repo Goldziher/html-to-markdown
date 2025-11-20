@@ -153,20 +153,20 @@ fn calculate_list_continuation_indent(depth: usize) -> usize {
 ///   <li>Item 2</li>
 /// </ul>
 /// ```
-fn is_loose_list(node_handle: &astral_tl::NodeHandle, parser: &astral_tl::Parser) -> bool {
+fn is_loose_list(node_handle: &tl::NodeHandle, parser: &tl::Parser) -> bool {
     if let Some(node) = node_handle.get(parser) {
-        if let astral_tl::Node::Tag(tag) = node {
+        if let tl::Node::Tag(tag) = node {
             let children = tag.children();
             {
                 for child_handle in children.top().iter() {
                     if let Some(child_node) = child_handle.get(parser) {
-                        if let astral_tl::Node::Tag(child_tag) = child_node {
+                        if let tl::Node::Tag(child_tag) = child_node {
                             if tag_name_eq(child_tag.name().as_utf8_str(), "li") {
                                 let li_children = child_tag.children();
                                 {
                                     for li_child_handle in li_children.top().iter() {
                                         if let Some(li_child_node) = li_child_handle.get(parser) {
-                                            if let astral_tl::Node::Tag(li_child_tag) = li_child_node {
+                                            if let tl::Node::Tag(li_child_tag) = li_child_node {
                                                 if tag_name_eq(li_child_tag.name().as_utf8_str(), "p") {
                                                     return true;
                                                 }
@@ -319,8 +319,8 @@ fn calculate_list_nesting_depth(ctx: &Context) -> usize {
 /// Returns true if the last processed item had block children.
 #[allow(clippy::too_many_arguments)]
 fn process_list_children(
-    node_handle: &astral_tl::NodeHandle,
-    parser: &astral_tl::Parser,
+    node_handle: &tl::NodeHandle,
+    parser: &tl::Parser,
     output: &mut String,
     options: &ConversionOptions,
     ctx: &Context,
@@ -334,12 +334,12 @@ fn process_list_children(
     let mut counter = start_counter;
 
     if let Some(node) = node_handle.get(parser) {
-        if let astral_tl::Node::Tag(tag) = node {
+        if let tl::Node::Tag(tag) = node {
             let children = tag.children();
             {
                 for child_handle in children.top().iter() {
                     if let Some(child_node) = child_handle.get(parser) {
-                        if let astral_tl::Node::Raw(bytes) = child_node {
+                        if let tl::Node::Raw(bytes) = child_node {
                             if bytes.as_utf8_str().trim().is_empty() {
                                 continue;
                             }
@@ -361,7 +361,7 @@ fn process_list_children(
 
                     if is_ordered {
                         if let Some(child_node) = child_handle.get(parser) {
-                            if let astral_tl::Node::Tag(child_tag) = child_node {
+                            if let tl::Node::Tag(child_tag) = child_node {
                                 if tag_name_eq(child_tag.name().as_utf8_str(), "li") {
                                     counter += 1;
                                 }
@@ -422,9 +422,9 @@ struct Context {
 
 struct DomContext {
     parent_map: HashMap<u32, Option<u32>>,
-    children_map: HashMap<u32, Vec<astral_tl::NodeHandle>>,
-    root_children: Vec<astral_tl::NodeHandle>,
-    node_map: HashMap<u32, astral_tl::NodeHandle>,
+    children_map: HashMap<u32, Vec<tl::NodeHandle>>,
+    root_children: Vec<tl::NodeHandle>,
+    node_map: HashMap<u32, tl::NodeHandle>,
 }
 
 fn escape_link_label(text: &str) -> String {
@@ -531,15 +531,15 @@ fn heading_level_from_name(name: &str) -> Option<usize> {
     }
 }
 
-fn find_single_heading_child(node_handle: &astral_tl::NodeHandle, parser: &astral_tl::Parser) -> Option<(usize, astral_tl::NodeHandle)> {
+fn find_single_heading_child(node_handle: &tl::NodeHandle, parser: &tl::Parser) -> Option<(usize, tl::NodeHandle)> {
     let node = node_handle.get(parser)?;
 
-    let astral_tl::Node::Tag(tag) = node else {
+    let tl::Node::Tag(tag) = node else {
         return None;
     };
 
     let children = tag.children();
-    let mut heading_data: Option<(usize, astral_tl::NodeHandle)> = None;
+    let mut heading_data: Option<(usize, tl::NodeHandle)> = None;
 
     for child_handle in children.top().iter() {
         let Some(child_node) = child_handle.get(parser) else {
@@ -547,12 +547,12 @@ fn find_single_heading_child(node_handle: &astral_tl::NodeHandle, parser: &astra
         };
 
         match child_node {
-            astral_tl::Node::Raw(bytes) => {
+            tl::Node::Raw(bytes) => {
                 if !bytes.as_utf8_str().trim().is_empty() {
                     return None;
                 }
             }
-            astral_tl::Node::Tag(child_tag) => {
+            tl::Node::Tag(child_tag) => {
                 let name = normalized_tag_name(child_tag.name().as_utf8_str());
                 if let Some(level) = heading_level_from_name(name.as_ref()) {
                     if heading_data.is_some() {
@@ -680,7 +680,7 @@ fn normalize_heading_text<'a>(text: &'a str) -> Cow<'a, str> {
     Cow::Owned(normalized)
 }
 
-fn build_dom_context(dom: &astral_tl::VDom, parser: &astral_tl::Parser) -> DomContext {
+fn build_dom_context(dom: &tl::VDom, parser: &tl::Parser) -> DomContext {
     let mut ctx = DomContext {
         parent_map: HashMap::new(),
         children_map: HashMap::new(),
@@ -695,13 +695,13 @@ fn build_dom_context(dom: &astral_tl::VDom, parser: &astral_tl::Parser) -> DomCo
     ctx
 }
 
-fn record_node_hierarchy(node_handle: &astral_tl::NodeHandle, parent: Option<u32>, parser: &astral_tl::Parser, ctx: &mut DomContext) {
+fn record_node_hierarchy(node_handle: &tl::NodeHandle, parent: Option<u32>, parser: &tl::Parser, ctx: &mut DomContext) {
     let id = node_handle.get_inner();
     ctx.parent_map.insert(id, parent);
     ctx.node_map.insert(id, *node_handle);
 
     if let Some(node) = node_handle.get(parser) {
-        if let astral_tl::Node::Tag(tag) = node {
+        if let tl::Node::Tag(tag) = node {
             let children: Vec<_> = tag.children().top().iter().copied().collect();
             ctx.children_map.insert(id, children.clone());
             for child in children {
@@ -719,11 +719,11 @@ fn record_node_hierarchy(node_handle: &astral_tl::NodeHandle, parent: Option<u32
 /// Detection criteria:
 /// - meta tag with name="ocr-system" or name="ocr-capabilities"
 /// - Elements with classes: ocr_page, ocrx_word, ocr_carea, ocr_par, ocr_line
-fn is_hocr_document(node_handle: &astral_tl::NodeHandle, parser: &astral_tl::Parser) -> bool {
-    fn check_node(node_handle: &astral_tl::NodeHandle, parser: &astral_tl::Parser) -> bool {
+fn is_hocr_document(node_handle: &tl::NodeHandle, parser: &tl::Parser) -> bool {
+    fn check_node(node_handle: &tl::NodeHandle, parser: &tl::Parser) -> bool {
         if let Some(node) = node_handle.get(parser) {
             match node {
-                astral_tl::Node::Tag(tag) => {
+                tl::Node::Tag(tag) => {
                     let tag_name = normalized_tag_name(tag.name().as_utf8_str());
 
                     if tag_name == "meta" {
@@ -781,12 +781,12 @@ fn is_hocr_document(node_handle: &astral_tl::NodeHandle, parser: &astral_tl::Par
 /// - base-href: Base URL from <base> tag
 /// - canonical: Canonical URL from <link rel="canonical">
 /// - link relations: author, license, alternate links
-fn extract_metadata(node_handle: &astral_tl::NodeHandle, parser: &astral_tl::Parser) -> BTreeMap<String, String> {
+fn extract_metadata(node_handle: &tl::NodeHandle, parser: &tl::Parser) -> BTreeMap<String, String> {
     let mut metadata = BTreeMap::new();
 
-    fn find_head(node_handle: &astral_tl::NodeHandle, parser: &astral_tl::Parser) -> Option<astral_tl::NodeHandle> {
+    fn find_head(node_handle: &tl::NodeHandle, parser: &tl::Parser) -> Option<tl::NodeHandle> {
         if let Some(node) = node_handle.get(parser) {
-            if let astral_tl::Node::Tag(tag) = node {
+            if let tl::Node::Tag(tag) = node {
                 if tag_name_eq(tag.name().as_utf8_str(), "head") {
                     return Some(*node_handle);
                 }
@@ -809,12 +809,12 @@ fn extract_metadata(node_handle: &astral_tl::NodeHandle, parser: &astral_tl::Par
     };
 
     if let Some(head_node) = head_handle.get(parser) {
-        if let astral_tl::Node::Tag(head_tag) = head_node {
+        if let tl::Node::Tag(head_tag) = head_node {
             let children = head_tag.children();
             {
                 for child_handle in children.top().iter() {
                     if let Some(child_node) = child_handle.get(parser) {
-                        if let astral_tl::Node::Tag(child_tag) = child_node {
+                        if let tl::Node::Tag(child_tag) = child_node {
                             let tag_name = normalized_tag_name(child_tag.name().as_utf8_str());
 
                             match tag_name.as_ref() {
@@ -823,7 +823,7 @@ fn extract_metadata(node_handle: &astral_tl::NodeHandle, parser: &astral_tl::Par
                                     {
                                         if let Some(first_child) = title_children.top().iter().next() {
                                             if let Some(text_node) = first_child.get(parser) {
-                                                if let astral_tl::Node::Raw(bytes) = text_node {
+                                                if let tl::Node::Raw(bytes) = text_node {
                                                     let title = text::normalize_whitespace(&bytes.as_utf8_str())
                                                         .trim()
                                                         .to_string();
@@ -948,13 +948,13 @@ fn format_metadata_frontmatter(metadata: &BTreeMap<String, String>) -> String {
 }
 
 /// Check if a handle is an empty inline element (abbr, var, ins, dfn, etc. with no text content).
-fn is_empty_inline_element(node_handle: &astral_tl::NodeHandle, parser: &astral_tl::Parser) -> bool {
+fn is_empty_inline_element(node_handle: &tl::NodeHandle, parser: &tl::Parser) -> bool {
     const EMPTY_WHEN_NO_CONTENT_TAGS: &[&str] = &[
         "abbr", "var", "ins", "dfn", "time", "data", "cite", "q", "mark", "small", "u",
     ];
 
     if let Some(node) = node_handle.get(parser) {
-        if let astral_tl::Node::Tag(tag) = node {
+        if let tl::Node::Tag(tag) = node {
             let tag_name = normalized_tag_name(tag.name().as_utf8_str());
             if EMPTY_WHEN_NO_CONTENT_TAGS.contains(&tag_name.as_ref()) {
                 return get_text_content(node_handle, parser).trim().is_empty();
@@ -965,14 +965,14 @@ fn is_empty_inline_element(node_handle: &astral_tl::NodeHandle, parser: &astral_
 }
 
 /// Get the text content of a node and its children.
-fn get_text_content(node_handle: &astral_tl::NodeHandle, parser: &astral_tl::Parser) -> String {
+fn get_text_content(node_handle: &tl::NodeHandle, parser: &tl::Parser) -> String {
     let mut text = String::with_capacity(64);
     if let Some(node) = node_handle.get(parser) {
         match node {
-            astral_tl::Node::Raw(bytes) => {
+            tl::Node::Raw(bytes) => {
                 text.push_str(&text::decode_html_entities(&bytes.as_utf8_str()));
             }
-            astral_tl::Node::Tag(tag) => {
+            tl::Node::Tag(tag) => {
                 let children = tag.children();
                 {
                     for child_handle in children.top().iter() {
@@ -987,9 +987,9 @@ fn get_text_content(node_handle: &astral_tl::NodeHandle, parser: &astral_tl::Par
 }
 
 /// Serialize an element to HTML string (for SVG and Math elements).
-fn serialize_element(node_handle: &astral_tl::NodeHandle, parser: &astral_tl::Parser) -> String {
+fn serialize_element(node_handle: &tl::NodeHandle, parser: &tl::Parser) -> String {
     if let Some(node) = node_handle.get(parser) {
-        if let astral_tl::Node::Tag(tag) = node {
+        if let tl::Node::Tag(tag) = node {
             let tag_name = normalized_tag_name(tag.name().as_utf8_str());
             let mut html = String::with_capacity(256);
             html.push('<');
@@ -1006,7 +1006,7 @@ fn serialize_element(node_handle: &astral_tl::NodeHandle, parser: &astral_tl::Pa
                 }
             }
 
-            let has_children = tag.children().top().len() > 0;
+            let has_children = !tag.children().top().is_empty();
             if !has_children {
                 html.push_str(" />");
             } else {
@@ -1177,8 +1177,8 @@ fn handle_inline_data_image(
 #[cfg(feature = "inline-images")]
 fn handle_inline_svg(
     collector_ref: &InlineCollectorHandle,
-    node_handle: &astral_tl::NodeHandle,
-    parser: &astral_tl::Parser,
+    node_handle: &tl::NodeHandle,
+    parser: &tl::Parser,
     title_opt: Option<String>,
     attributes: BTreeMap<String, String>,
 ) {
@@ -1237,11 +1237,11 @@ fn handle_inline_svg(
 }
 
 /// Serialize a node to HTML string.
-fn serialize_node(node_handle: &astral_tl::NodeHandle, parser: &astral_tl::Parser) -> String {
+fn serialize_node(node_handle: &tl::NodeHandle, parser: &tl::Parser) -> String {
     if let Some(node) = node_handle.get(parser) {
         match node {
-            astral_tl::Node::Raw(bytes) => bytes.as_utf8_str().to_string(),
-            astral_tl::Node::Tag(_) => serialize_element(node_handle, parser),
+            tl::Node::Raw(bytes) => bytes.as_utf8_str().to_string(),
+            tl::Node::Tag(_) => serialize_element(node_handle, parser),
             _ => String::new(),
         }
     } else {
@@ -1274,15 +1274,15 @@ fn convert_html_impl(
     let preprocessed_len = preprocessed.len();
 
     enum ParsedDom<'a> {
-        Borrowed(astral_tl::VDom<'a>),
-        Owned(astral_tl::VDomGuard),
+        Borrowed(tl::VDom<'a>),
+        Owned(tl::VDomGuard),
     }
 
-    let parser_options = astral_tl::ParserOptions::default();
+    let parser_options = tl::ParserOptions::default();
     let mut _dom_storage: Option<ParsedDom> = None;
     let dom_ref = match preprocessed {
         Cow::Borrowed(s) => {
-            let dom = astral_tl::parse(s, parser_options)
+            let dom = tl::parse(s, parser_options)
                 .map_err(|_| crate::error::ConversionError::ParseError("Failed to parse HTML".to_string()))?;
             _dom_storage = Some(ParsedDom::Borrowed(dom));
             match _dom_storage.as_ref().unwrap() {
@@ -1292,7 +1292,7 @@ fn convert_html_impl(
         }
         Cow::Owned(s) => {
             let guard = unsafe {
-                astral_tl::parse_owned(s, parser_options)
+                tl::parse_owned(s, parser_options)
                     .map_err(|_| crate::error::ConversionError::ParseError("Failed to parse HTML".to_string()))?
             };
             _dom_storage = Some(ParsedDom::Owned(guard));
@@ -1412,6 +1412,7 @@ fn preprocess_html(input: &str) -> Cow<'_, str> {
     const TAGS: [&[u8]; 2] = [b"script", b"style"];
     const SVG: &[u8] = b"svg";
     const DOCTYPE: &[u8] = b"doctype";
+    const EMPTY_COMMENT: &[u8] = b"<!---->";
 
     let bytes = input.as_bytes();
     let len = bytes.len();
@@ -1426,6 +1427,15 @@ fn preprocess_html(input: &str) -> Cow<'_, str> {
 
     while idx < len {
         if bytes[idx] == b'<' {
+            if bytes[idx..].starts_with(EMPTY_COMMENT) {
+                let out = output.get_or_insert_with(|| String::with_capacity(input.len()));
+                out.push_str(&input[last..idx]);
+                out.push_str("<!-- -->");
+                idx += EMPTY_COMMENT.len();
+                last = idx;
+                continue;
+            }
+
             let mut replaced = false;
             for (pattern, replacement) in &SELF_CLOSING {
                 if bytes[idx..].starts_with(pattern) {
@@ -1681,10 +1691,10 @@ fn tag_name_eq(name: Cow<'_, str>, needle: &str) -> bool {
 }
 
 fn should_drop_for_preprocessing(
-    node_handle: &astral_tl::NodeHandle,
+    node_handle: &tl::NodeHandle,
     tag_name: &str,
-    tag: &astral_tl::HTMLTag,
-    parser: &astral_tl::Parser,
+    tag: &tl::HTMLTag,
+    parser: &tl::Parser,
     dom_ctx: &DomContext,
     options: &ConversionOptions,
 ) -> bool {
@@ -1733,11 +1743,11 @@ fn should_drop_for_preprocessing(
     false
 }
 
-fn has_semantic_content_ancestor(node_handle: &astral_tl::NodeHandle, parser: &astral_tl::Parser, dom_ctx: &DomContext) -> bool {
+fn has_semantic_content_ancestor(node_handle: &tl::NodeHandle, parser: &tl::Parser, dom_ctx: &DomContext) -> bool {
     let mut current_id = node_handle.get_inner();
     while let Some(parent_id) = dom_ctx.parent_map.get(&current_id).copied().flatten() {
         if let Some(parent_handle) = dom_ctx.node_map.get(&parent_id) {
-            if let Some(astral_tl::Node::Tag(parent_tag)) = parent_handle.get(parser) {
+            if let Some(tl::Node::Tag(parent_tag)) = parent_handle.get(parser) {
                 let parent_name = normalized_tag_name(parent_tag.name().as_utf8_str());
                 if matches!(parent_name.as_ref(), "main" | "article" | "section") {
                     return true;
@@ -1752,7 +1762,7 @@ fn has_semantic_content_ancestor(node_handle: &astral_tl::NodeHandle, parser: &a
     false
 }
 
-fn tag_has_main_semantics(tag: &astral_tl::HTMLTag) -> bool {
+fn tag_has_main_semantics(tag: &tl::HTMLTag) -> bool {
     if let Some(role_attr) = tag.attributes().get("role") {
         if let Some(role) = role_attr {
             let lowered = role.as_utf8_str().to_ascii_lowercase();
@@ -1787,7 +1797,7 @@ fn tag_has_main_semantics(tag: &astral_tl::HTMLTag) -> bool {
     false
 }
 
-fn element_has_navigation_hint(tag: &astral_tl::HTMLTag) -> bool {
+fn element_has_navigation_hint(tag: &tl::HTMLTag) -> bool {
     if attribute_matches_any(tag, "role", &["navigation", "menubar", "tablist", "toolbar"]) {
         return true;
     }
@@ -1836,7 +1846,7 @@ fn element_has_navigation_hint(tag: &astral_tl::HTMLTag) -> bool {
     attribute_matches_any(tag, "class", NAV_KEYWORDS) || attribute_matches_any(tag, "id", NAV_KEYWORDS)
 }
 
-fn attribute_matches_any(tag: &astral_tl::HTMLTag, attr: &str, keywords: &[&str]) -> bool {
+fn attribute_matches_any(tag: &tl::HTMLTag, attr: &str, keywords: &[&str]) -> bool {
     let Some(attr_value) = tag.attributes().get(attr) else {
         return false;
     };
@@ -1859,7 +1869,7 @@ fn attribute_matches_any(tag: &astral_tl::HTMLTag, attr: &str, keywords: &[&str]
         .any(|token| keywords.iter().any(|kw| token == *kw))
 }
 
-fn attribute_contains_any(tag: &astral_tl::HTMLTag, attr: &str, keywords: &[&str]) -> bool {
+fn attribute_contains_any(tag: &tl::HTMLTag, attr: &str, keywords: &[&str]) -> bool {
     let Some(attr_value) = tag.attributes().get(attr) else {
         return false;
     };
@@ -1873,16 +1883,16 @@ fn attribute_contains_any(tag: &astral_tl::HTMLTag, attr: &str, keywords: &[&str
 /// Serialize a tag and its children back to HTML.
 ///
 /// This is used for the preserve_tags feature to output original HTML for specific elements.
-fn serialize_tag_to_html(handle: &astral_tl::NodeHandle, parser: &astral_tl::Parser) -> String {
+fn serialize_tag_to_html(handle: &tl::NodeHandle, parser: &tl::Parser) -> String {
     let mut html = String::new();
     serialize_node_to_html(handle, parser, &mut html);
     html
 }
 
 /// Recursively serialize a node to HTML.
-fn serialize_node_to_html(handle: &astral_tl::NodeHandle, parser: &astral_tl::Parser, output: &mut String) {
+fn serialize_node_to_html(handle: &tl::NodeHandle, parser: &tl::Parser, output: &mut String) {
     match handle.get(parser) {
-        Some(astral_tl::Node::Tag(tag)) => {
+        Some(tl::Node::Tag(tag)) => {
             let tag_name = normalized_tag_name(tag.name().as_utf8_str());
 
             // Opening tag
@@ -1930,7 +1940,7 @@ fn serialize_node_to_html(handle: &astral_tl::NodeHandle, parser: &astral_tl::Pa
                 output.push('>');
             }
         }
-        Some(astral_tl::Node::Raw(bytes)) => {
+        Some(tl::Node::Raw(bytes)) => {
             if let Ok(text) = std::str::from_utf8(bytes.as_bytes()) {
                 output.push_str(text);
             }
@@ -2151,7 +2161,7 @@ fn is_inline_element(tag_name: &str) -> bool {
     )
 }
 
-fn get_next_sibling_tag(node_handle: &astral_tl::NodeHandle, parser: &astral_tl::Parser, dom_ctx: &DomContext) -> Option<String> {
+fn get_next_sibling_tag(node_handle: &tl::NodeHandle, parser: &tl::Parser, dom_ctx: &DomContext) -> Option<String> {
     let id = node_handle.get_inner();
     let parent = dom_ctx.parent_map.get(&id).copied().flatten();
 
@@ -2166,8 +2176,8 @@ fn get_next_sibling_tag(node_handle: &astral_tl::NodeHandle, parser: &astral_tl:
     for sibling in siblings.iter().skip(position + 1) {
         if let Some(node) = sibling.get(parser) {
             match node {
-                astral_tl::Node::Tag(tag) => return Some(normalized_tag_name(tag.name().as_utf8_str()).into_owned()),
-                astral_tl::Node::Raw(raw) => {
+                tl::Node::Tag(tag) => return Some(normalized_tag_name(tag.name().as_utf8_str()).into_owned()),
+                tl::Node::Raw(raw) => {
                     if !raw.as_utf8_str().trim().is_empty() {
                         return None;
                     }
@@ -2180,7 +2190,7 @@ fn get_next_sibling_tag(node_handle: &astral_tl::NodeHandle, parser: &astral_tl:
     None
 }
 
-fn previous_sibling_is_inline_tag(node_handle: &astral_tl::NodeHandle, parser: &astral_tl::Parser, dom_ctx: &DomContext) -> bool {
+fn previous_sibling_is_inline_tag(node_handle: &tl::NodeHandle, parser: &tl::Parser, dom_ctx: &DomContext) -> bool {
     let id = node_handle.get_inner();
     let parent = dom_ctx.parent_map.get(&id).copied().flatten();
 
@@ -2201,11 +2211,11 @@ fn previous_sibling_is_inline_tag(node_handle: &astral_tl::NodeHandle, parser: &
     for sibling in siblings.iter().take(position).rev() {
         if let Some(node) = sibling.get(parser) {
             match node {
-                astral_tl::Node::Tag(tag) => {
+                tl::Node::Tag(tag) => {
                     let name = normalized_tag_name(tag.name().as_utf8_str());
                     return is_inline_element(name.as_ref()) || matches!(name.as_ref(), "script" | "style");
                 }
-                astral_tl::Node::Raw(raw) => {
+                tl::Node::Raw(raw) => {
                     if raw.as_utf8_str().trim().is_empty() {
                         continue;
                     }
@@ -2219,7 +2229,7 @@ fn previous_sibling_is_inline_tag(node_handle: &astral_tl::NodeHandle, parser: &
     false
 }
 
-fn next_sibling_is_whitespace_text(node_handle: &astral_tl::NodeHandle, parser: &astral_tl::Parser, dom_ctx: &DomContext) -> bool {
+fn next_sibling_is_whitespace_text(node_handle: &tl::NodeHandle, parser: &tl::Parser, dom_ctx: &DomContext) -> bool {
     let id = node_handle.get_inner();
     let parent = dom_ctx.parent_map.get(&id).copied().flatten();
 
@@ -2240,8 +2250,8 @@ fn next_sibling_is_whitespace_text(node_handle: &astral_tl::NodeHandle, parser: 
     for sibling in siblings.iter().skip(position + 1) {
         if let Some(node) = sibling.get(parser) {
             match node {
-                astral_tl::Node::Raw(raw) => return raw.as_utf8_str().trim().is_empty(),
-                astral_tl::Node::Tag(_) => return false,
+                tl::Node::Raw(raw) => return raw.as_utf8_str().trim().is_empty(),
+                tl::Node::Tag(_) => return false,
                 _ => continue,
             }
         }
@@ -2250,7 +2260,7 @@ fn next_sibling_is_whitespace_text(node_handle: &astral_tl::NodeHandle, parser: 
     false
 }
 
-fn next_sibling_is_inline_tag(node_handle: &astral_tl::NodeHandle, parser: &astral_tl::Parser, dom_ctx: &DomContext) -> bool {
+fn next_sibling_is_inline_tag(node_handle: &tl::NodeHandle, parser: &tl::Parser, dom_ctx: &DomContext) -> bool {
     let id = node_handle.get_inner();
     let parent = dom_ctx.parent_map.get(&id).copied().flatten();
 
@@ -2271,11 +2281,11 @@ fn next_sibling_is_inline_tag(node_handle: &astral_tl::NodeHandle, parser: &astr
     for sibling in siblings.iter().skip(position + 1) {
         if let Some(node) = sibling.get(parser) {
             match node {
-                astral_tl::Node::Tag(tag) => {
+                tl::Node::Tag(tag) => {
                     let name = normalized_tag_name(tag.name().as_utf8_str());
                     return is_inline_element(name.as_ref()) || matches!(name.as_ref(), "script" | "style");
                 }
-                astral_tl::Node::Raw(raw) => {
+                tl::Node::Raw(raw) => {
                     if raw.as_utf8_str().trim().is_empty() {
                         continue;
                     }
@@ -2293,8 +2303,8 @@ fn append_inline_suffix(
     output: &mut String,
     suffix: &str,
     has_core_content: bool,
-    node_handle: &astral_tl::NodeHandle,
-    parser: &astral_tl::Parser,
+    node_handle: &tl::NodeHandle,
+    parser: &tl::Parser,
     dom_ctx: &DomContext,
 ) {
     if suffix.is_empty() {
@@ -2311,8 +2321,8 @@ fn append_inline_suffix(
 /// Recursively walk DOM nodes and convert to Markdown.
 #[allow(clippy::only_used_in_recursion)]
 fn walk_node(
-    node_handle: &astral_tl::NodeHandle,
-    parser: &astral_tl::Parser,
+    node_handle: &tl::NodeHandle,
+    parser: &tl::Parser,
     output: &mut String,
     options: &ConversionOptions,
     ctx: &Context,
@@ -2322,7 +2332,7 @@ fn walk_node(
     let Some(node) = node_handle.get(parser) else { return };
 
     match node {
-        astral_tl::Node::Raw(bytes) => {
+        tl::Node::Raw(bytes) => {
             let mut text = text::decode_html_entities(&bytes.as_utf8_str());
 
             if text.is_empty() {
@@ -2481,7 +2491,7 @@ fn walk_node(
             }
         }
 
-        astral_tl::Node::Tag(tag) => {
+        tl::Node::Tag(tag) => {
             let tag_name = normalized_tag_name(tag.name().as_utf8_str());
 
             if should_drop_for_preprocessing(node_handle, tag_name.as_ref(), tag, parser, dom_ctx, options) {
@@ -2583,7 +2593,7 @@ fn walk_node(
                         for (i, child_handle) in child_handles.iter().enumerate() {
                             // Skip whitespace-only text nodes between empty inline elements
                             if let Some(node) = child_handle.get(parser) {
-                                if let astral_tl::Node::Raw(bytes) = node {
+                                if let tl::Node::Raw(bytes) = node {
                                     let text = bytes.as_utf8_str();
                                     if text.trim().is_empty() && i > 0 && i < child_handles.len() - 1 {
                                         let prev = &child_handles[i - 1];
@@ -2723,7 +2733,7 @@ fn walk_node(
 
                         if let Some((heading_level, heading_handle)) = find_single_heading_child(node_handle, parser) {
                             if let Some(heading_node) = heading_handle.get(parser) {
-                                if let astral_tl::Node::Tag(heading_tag) = heading_node {
+                                if let tl::Node::Tag(heading_tag) = heading_node {
                                     let heading_name =
                                         normalized_tag_name(heading_tag.name().as_utf8_str()).into_owned();
                                     let mut heading_text = String::new();
@@ -3413,12 +3423,18 @@ fn walk_node(
                 "hr" => {
                     // CommonMark: ensure a blank line before the hr so it is not interpreted as a setext heading underline
                     if !output.is_empty() {
-                        if output.ends_with("\n\n") {
-                            // already has a blank line
-                        } else if output.ends_with('\n') {
+                        if needs_blank_line_before_hr(output) {
+                            if output.ends_with("\n\n") {
+                                // already has a blank line
+                            } else if output.ends_with('\n') {
+                                output.push('\n');
+                            } else {
+                                output.push_str("\n\n");
+                            }
+                        } else if output.ends_with("\n\n") {
+                            output.truncate(output.len() - 1);
+                        } else if !output.ends_with('\n') {
                             output.push('\n');
-                        } else {
-                            output.push_str("\n\n");
                         }
                     }
                     output.push_str("---\n");
@@ -3490,7 +3506,7 @@ fn walk_node(
                     let children = tag.children();
                     {
                         for child_handle in children.top().iter() {
-                            if let Some(astral_tl::Node::Tag(child_tag)) = child_handle.get(parser) {
+                            if let Some(tl::Node::Tag(child_tag)) = child_handle.get(parser) {
                                 let tag_name = normalized_tag_name(child_tag.name().as_utf8_str());
                                 if matches!(
                                     tag_name.as_ref(),
@@ -3504,10 +3520,10 @@ fn walk_node(
                     }
 
                     fn find_checkbox<'a>(
-                        node_handle: &astral_tl::NodeHandle,
-                        parser: &'a astral_tl::Parser<'a>,
-                    ) -> Option<(bool, astral_tl::NodeHandle)> {
-                        if let Some(astral_tl::Node::Tag(node_tag)) = node_handle.get(parser) {
+                        node_handle: &tl::NodeHandle,
+                        parser: &'a tl::Parser<'a>,
+                    ) -> Option<(bool, tl::NodeHandle)> {
+                        if let Some(tl::Node::Tag(node_tag)) = node_handle.get(parser) {
                             if tag_name_eq(node_tag.name().as_utf8_str(), "input") {
                                 let input_type = node_tag.attributes().get("type").flatten().map(|v| v.as_utf8_str());
 
@@ -3547,7 +3563,7 @@ fn walk_node(
                         output.push(' ');
                         output.push_str(if task_checked { "[x]" } else { "[ ]" });
 
-                        fn is_checkbox_node(node_handle: &astral_tl::NodeHandle, checkbox: &Option<astral_tl::NodeHandle>) -> bool {
+                        fn is_checkbox_node(node_handle: &tl::NodeHandle, checkbox: &Option<tl::NodeHandle>) -> bool {
                             if let Some(cb) = checkbox {
                                 node_handle == cb
                             } else {
@@ -3556,14 +3572,14 @@ fn walk_node(
                         }
 
                         fn contains_checkbox<'a>(
-                            node_handle: &astral_tl::NodeHandle,
-                            parser: &'a astral_tl::Parser<'a>,
-                            checkbox: &Option<astral_tl::NodeHandle>,
+                            node_handle: &tl::NodeHandle,
+                            parser: &'a tl::Parser<'a>,
+                            checkbox: &Option<tl::NodeHandle>,
                         ) -> bool {
                             if is_checkbox_node(node_handle, checkbox) {
                                 return true;
                             }
-                            if let Some(astral_tl::Node::Tag(node_tag)) = node_handle.get(parser) {
+                            if let Some(tl::Node::Tag(node_tag)) = node_handle.get(parser) {
                                 let children = node_tag.children();
                                 {
                                     for child_handle in children.top().iter() {
@@ -3578,13 +3594,13 @@ fn walk_node(
 
                         #[allow(clippy::too_many_arguments)]
                         fn render_li_content<'a>(
-                            node_handle: &astral_tl::NodeHandle,
-                            parser: &'a astral_tl::Parser<'a>,
+                            node_handle: &tl::NodeHandle,
+                            parser: &'a tl::Parser<'a>,
                             output: &mut String,
                             options: &ConversionOptions,
                             ctx: &Context,
                             depth: usize,
-                            checkbox: &Option<astral_tl::NodeHandle>,
+                            checkbox: &Option<tl::NodeHandle>,
                             dom_ctx: &DomContext,
                         ) {
                             if is_checkbox_node(node_handle, checkbox) {
@@ -3592,7 +3608,7 @@ fn walk_node(
                             }
 
                             if contains_checkbox(node_handle, parser, checkbox) {
-                                if let Some(astral_tl::Node::Tag(node_tag)) = node_handle.get(parser) {
+                                if let Some(tl::Node::Tag(node_tag)) = node_handle.get(parser) {
                                     let children = node_tag.children();
                                     {
                                         for child_handle in children.top().iter() {
@@ -3893,7 +3909,7 @@ fn walk_node(
                     let children = tag.children();
                     {
                         for child_handle in children.top().iter() {
-                            let (is_dt, is_dd) = if let Some(astral_tl::Node::Tag(child_tag)) = child_handle.get(parser) {
+                            let (is_dt, is_dd) = if let Some(tl::Node::Tag(child_tag)) = child_handle.get(parser) {
                                 let tag_name = normalized_tag_name(child_tag.name().as_utf8_str());
                                 (tag_name == "dt", tag_name == "dd")
                             } else {
@@ -4113,7 +4129,7 @@ fn walk_node(
                             let children = tag.children();
                             {
                                 for child_handle in children.top().iter() {
-                                    if let Some(astral_tl::Node::Tag(child_tag)) = child_handle.get(parser) {
+                                    if let Some(tl::Node::Tag(child_tag)) = child_handle.get(parser) {
                                         if tag_name_eq(child_tag.name().as_utf8_str(), "source") {
                                             return child_tag
                                                 .attributes()
@@ -4143,7 +4159,7 @@ fn walk_node(
                     let children = tag.children();
                     {
                         for child_handle in children.top().iter() {
-                            let is_source = if let Some(astral_tl::Node::Tag(child_tag)) = child_handle.get(parser) {
+                            let is_source = if let Some(tl::Node::Tag(child_tag)) = child_handle.get(parser) {
                                 tag_name_eq(child_tag.name().as_utf8_str(), "source")
                             } else {
                                 false
@@ -4174,7 +4190,7 @@ fn walk_node(
                             let children = tag.children();
                             {
                                 for child_handle in children.top().iter() {
-                                    if let Some(astral_tl::Node::Tag(child_tag)) = child_handle.get(parser) {
+                                    if let Some(tl::Node::Tag(child_tag)) = child_handle.get(parser) {
                                         if tag_name_eq(child_tag.name().as_utf8_str(), "source") {
                                             return child_tag
                                                 .attributes()
@@ -4204,7 +4220,7 @@ fn walk_node(
                     let children = tag.children();
                     {
                         for child_handle in children.top().iter() {
-                            let is_source = if let Some(astral_tl::Node::Tag(child_tag)) = child_handle.get(parser) {
+                            let is_source = if let Some(tl::Node::Tag(child_tag)) = child_handle.get(parser) {
                                 tag_name_eq(child_tag.name().as_utf8_str(), "source")
                             } else {
                                 false
@@ -4229,7 +4245,7 @@ fn walk_node(
                     let children = tag.children();
                     {
                         for child_handle in children.top().iter() {
-                            if let Some(astral_tl::Node::Tag(child_tag)) = child_handle.get(parser) {
+                            if let Some(tl::Node::Tag(child_tag)) = child_handle.get(parser) {
                                 if tag_name_eq(child_tag.name().as_utf8_str(), "img") {
                                     walk_node(child_handle, parser, output, options, ctx, depth, dom_ctx);
                                     break;
@@ -4266,7 +4282,7 @@ fn walk_node(
                     let children = tag.children();
                     {
                         for child_handle in children.top().iter() {
-                            if let Some(astral_tl::Node::Tag(child_tag)) = child_handle.get(parser) {
+                            if let Some(tl::Node::Tag(child_tag)) = child_handle.get(parser) {
                                 if tag_name_eq(child_tag.name().as_utf8_str(), "title") {
                                     title = get_text_content(child_handle, parser).trim().to_string();
                                     break;
@@ -4615,7 +4631,7 @@ fn walk_node(
                         .top()
                         .iter()
                         .filter_map(|child_handle| {
-                            if let Some(astral_tl::Node::Tag(child_tag)) = child_handle.get(parser) {
+                            if let Some(tl::Node::Tag(child_tag)) = child_handle.get(parser) {
                                 let tag_name = normalized_tag_name(child_tag.name().as_utf8_str());
                                 if matches!(tag_name.as_ref(), "rb" | "rt" | "rtc") {
                                     Some(tag_name.into_owned())
@@ -4639,7 +4655,7 @@ fn walk_node(
                             for child_handle in children.top().iter() {
                                 if let Some(node) = child_handle.get(parser) {
                                     match node {
-                                        astral_tl::Node::Tag(child_tag) => {
+                                        tl::Node::Tag(child_tag) => {
                                             let tag_name = normalized_tag_name(child_tag.name().as_utf8_str());
                                             if tag_name == "rt" {
                                                 let mut annotation = String::new();
@@ -4683,7 +4699,7 @@ fn walk_node(
                                                 );
                                             }
                                         }
-                                        astral_tl::Node::Raw(_) => {
+                                        tl::Node::Raw(_) => {
                                             walk_node(
                                                 child_handle,
                                                 parser,
@@ -4712,7 +4728,7 @@ fn walk_node(
                             for child_handle in children.top().iter() {
                                 if let Some(node) = child_handle.get(parser) {
                                     match node {
-                                        astral_tl::Node::Tag(child_tag) => {
+                                        tl::Node::Tag(child_tag) => {
                                             let tag_name = normalized_tag_name(child_tag.name().as_utf8_str());
                                             if tag_name == "rt" {
                                                 let mut annotation = String::new();
@@ -4748,7 +4764,7 @@ fn walk_node(
                                                 );
                                             }
                                         }
-                                        astral_tl::Node::Raw(_) => {
+                                        tl::Node::Raw(_) => {
                                             walk_node(
                                                 child_handle,
                                                 parser,
@@ -5004,15 +5020,15 @@ fn walk_node(
             }
         }
 
-        astral_tl::Node::Comment(_) => {
+        tl::Node::Comment(_) => {
             // Comments are ignored
         }
     }
 }
 
 /// Get colspan attribute value from element
-fn get_colspan(node_handle: &astral_tl::NodeHandle, parser: &astral_tl::Parser) -> usize {
-    if let Some(astral_tl::Node::Tag(tag)) = node_handle.get(parser) {
+fn get_colspan(node_handle: &tl::NodeHandle, parser: &tl::Parser) -> usize {
+    if let Some(tl::Node::Tag(tag)) = node_handle.get(parser) {
         if let Some(Some(bytes)) = tag.attributes().get("colspan") {
             if let Ok(colspan) = bytes.as_utf8_str().parse::<usize>() {
                 return colspan;
@@ -5023,8 +5039,8 @@ fn get_colspan(node_handle: &astral_tl::NodeHandle, parser: &astral_tl::Parser) 
 }
 
 /// Get both colspan and rowspan in a single lookup
-fn get_colspan_rowspan(node_handle: &astral_tl::NodeHandle, parser: &astral_tl::Parser) -> (usize, usize) {
-    if let Some(astral_tl::Node::Tag(tag)) = node_handle.get(parser) {
+fn get_colspan_rowspan(node_handle: &tl::NodeHandle, parser: &tl::Parser) -> (usize, usize) {
+    if let Some(tl::Node::Tag(tag)) = node_handle.get(parser) {
         let attrs = tag.attributes();
         let colspan = attrs
             .get("colspan")
@@ -5044,8 +5060,8 @@ fn get_colspan_rowspan(node_handle: &astral_tl::NodeHandle, parser: &astral_tl::
 
 /// Convert table cell (td or th)
 fn convert_table_cell(
-    node_handle: &astral_tl::NodeHandle,
-    parser: &astral_tl::Parser,
+    node_handle: &tl::NodeHandle,
+    parser: &tl::Parser,
     output: &mut String,
     options: &ConversionOptions,
     ctx: &Context,
@@ -5059,7 +5075,7 @@ fn convert_table_cell(
         ..ctx.clone()
     };
 
-    if let Some(astral_tl::Node::Tag(tag)) = node_handle.get(parser) {
+    if let Some(tl::Node::Tag(tag)) = node_handle.get(parser) {
         let children = tag.children();
         {
             for child_handle in children.top().iter() {
@@ -5088,8 +5104,8 @@ fn convert_table_cell(
 /// Convert table row (tr)
 #[allow(clippy::too_many_arguments)]
 fn convert_table_row(
-    node_handle: &astral_tl::NodeHandle,
-    parser: &astral_tl::Parser,
+    node_handle: &tl::NodeHandle,
+    parser: &tl::Parser,
     output: &mut String,
     options: &ConversionOptions,
     ctx: &Context,
@@ -5100,11 +5116,11 @@ fn convert_table_row(
     let mut row_text = String::with_capacity(256);
     let mut cells = Vec::new();
 
-    if let Some(astral_tl::Node::Tag(tag)) = node_handle.get(parser) {
+    if let Some(tl::Node::Tag(tag)) = node_handle.get(parser) {
         let children = tag.children();
         {
             for child_handle in children.top().iter() {
-                if let Some(astral_tl::Node::Tag(child_tag)) = child_handle.get(parser) {
+                if let Some(tl::Node::Tag(child_tag)) = child_handle.get(parser) {
                     let cell_name = normalized_tag_name(child_tag.name().as_utf8_str());
                     if cell_name == "th" || cell_name == "td" {
                         cells.push(*child_handle);
@@ -5204,21 +5220,21 @@ fn indent_table_for_list(table_content: &str, list_depth: usize, options: &Conve
 
 /// Convert an entire table element
 fn convert_table(
-    node_handle: &astral_tl::NodeHandle,
-    parser: &astral_tl::Parser,
+    node_handle: &tl::NodeHandle,
+    parser: &tl::Parser,
     output: &mut String,
     options: &ConversionOptions,
     ctx: &Context,
     dom_ctx: &DomContext,
 ) {
-    if let Some(astral_tl::Node::Tag(tag)) = node_handle.get(parser) {
+    if let Some(tl::Node::Tag(tag)) = node_handle.get(parser) {
         let mut row_index = 0;
         let mut rowspan_tracker = std::collections::HashMap::new();
 
         let children = tag.children();
         {
             for child_handle in children.top().iter() {
-                if let Some(astral_tl::Node::Tag(child_tag)) = child_handle.get(parser) {
+                if let Some(tl::Node::Tag(child_tag)) = child_handle.get(parser) {
                     let tag_name = normalized_tag_name(child_tag.name().as_utf8_str());
 
                     match tag_name.as_ref() {
@@ -5244,7 +5260,7 @@ fn convert_table(
                             let section_children = child_tag.children();
                             {
                                 for row_handle in section_children.top().iter() {
-                                    if let Some(astral_tl::Node::Tag(row_tag)) = row_handle.get(parser) {
+                                    if let Some(tl::Node::Tag(row_tag)) = row_handle.get(parser) {
                                         if tag_name_eq(row_tag.name().as_utf8_str(), "tr") {
                                             convert_table_row(
                                                 row_handle,
@@ -5285,6 +5301,27 @@ fn convert_table(
             }
         }
     }
+}
+
+fn needs_blank_line_before_hr(output: &str) -> bool {
+    if output.is_empty() {
+        return false;
+    }
+
+    let trimmed = output.trim_end_matches('\n');
+    if trimmed.is_empty() {
+        return false;
+    }
+
+    if let Some(line) = trimmed.rsplit('\n').find(|line| !line.trim().is_empty()) {
+        let trimmed_line = line.trim_start();
+        if trimmed_line.is_empty() {
+            return false;
+        }
+        return !trimmed_line.starts_with('>');
+    }
+
+    false
 }
 
 #[cfg(test)]
@@ -5513,6 +5550,12 @@ mod tests {
         assert!(stripped.contains("Content"));
         assert!(stripped.contains("<script"));
         assert!(!stripped.contains("1 < 2"));
+    }
+
+    #[test]
+    fn hr_spacing_helper_distinguishes_blockquotes() {
+        assert!(!needs_blank_line_before_hr("> foo\n"));
+        assert!(needs_blank_line_before_hr("paragraph"));
     }
 
     #[test]

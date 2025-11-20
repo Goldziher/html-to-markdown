@@ -21,7 +21,7 @@ inline-images = ["dep:image"]
 crate-type = ["rlib"]
 
 [dependencies]
-astral-tl.workspace = true
+tl.workspace = true
 regex.workspace = true
 once_cell.workspace = true
 thiserror.workspace = true
