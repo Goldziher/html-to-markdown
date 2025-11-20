@@ -91,7 +91,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Zero-Copy Inline Images** – Node/N-API and WASM bindings now expose `convertInlineImagesBuffer` / `convertBytesWithInlineImages`, letting benchmark harnesses feed `Buffer`/`Uint8Array` data directly without creating intermediate JS strings.
 
 ### Changed
-- **Rust Core Preprocessing** – HTML normalization (self-closing fixes, malformed `<` escaping, script/style stripping) now happens in a single streaming pass that hands owned buffers straight to `tl::parse_owned`, cutting multiple allocations from every conversion.
+- **Rust Core Preprocessing** – HTML normalization (self-closing fixes, malformed `<` escaping, script/style stripping) now happens in a single streaming pass that hands owned buffers straight to `astral_tl::parse_owned`, cutting multiple allocations from every conversion.
 - **Benchmark Harness + Docs** – Re-ran the cross-language runtime suite after the Rust core optimizations and refreshed the README tables, keeping the published throughput numbers (Node/Python/Rust/WASM/PHP) in sync with `tools/runtime-bench/results/latest.json`.
 - **Version Alignment** – Bumped every package (Rust crates, npm packages, PyPI distribution, Ruby gem, PHP extension, WASM bundle) to `2.7.0` via `task sync-versions`.
 

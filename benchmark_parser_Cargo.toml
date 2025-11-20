@@ -6,7 +6,7 @@ edition = "2024"
 [dependencies]
 html5ever = "0.35"
 markup5ever_rcdom = "0.35"
-tl = "0.7"
+astral-tl = "0.7.9"
 
 [[bin]]
 name = "parser_benchmark"
