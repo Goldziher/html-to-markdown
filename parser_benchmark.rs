@@ -1,4 +1,4 @@
-//! Benchmark comparing tl vs html5ever for HTML parsing
+//! Benchmark comparing astral-tl vs html5ever for HTML parsing
 //!
 //! Tests:
 //! 1. Parse speed
@@ -123,14 +123,14 @@ fn test_html5ever_whitespace() {
     println!("  Original: {:?}", PRESERVED_WHITESPACE);
 }
 
-fn benchmark_tl() {
-    println!("\n=== TL BENCHMARKS ===\n");
+fn benchmark_astral_tl() {
+    println!("\n=== ASTRAL-TL BENCHMARKS ===\n");
 
     // Simple parse
     let start = Instant::now();
     let iterations = 10000;
     for _ in 0..iterations {
-        let dom = tl::parse(SIMPLE_HTML, tl::ParserOptions::default()).unwrap();
+        let dom = astral_tl::parse(SIMPLE_HTML, astral_tl::ParserOptions::default()).unwrap();
         std::hint::black_box(dom);
     }
     let duration = start.elapsed();
@@ -145,7 +145,7 @@ fn benchmark_tl() {
     let start = Instant::now();
     let iterations = 1000;
     for _ in 0..iterations {
-        let dom = tl::parse(MEDIUM_HTML, tl::ParserOptions::default()).unwrap();
+        let dom = astral_tl::parse(MEDIUM_HTML, astral_tl::ParserOptions::default()).unwrap();
         std::hint::black_box(dom);
     }
     let duration = start.elapsed();
@@ -158,11 +158,11 @@ fn benchmark_tl() {
 
     // Test whitespace handling
     println!("\n--- Whitespace Handling ---");
-    test_tl_whitespace();
+    test_astral_tl_whitespace();
 }
 
-fn test_tl_whitespace() {
-    let dom = tl::parse(WHITESPACE_TEST, tl::ParserOptions::default()).unwrap();
+fn test_astral_tl_whitespace() {
+    let dom = astral_tl::parse(WHITESPACE_TEST, astral_tl::ParserOptions::default()).unwrap();
     let parser = dom.parser();
 
     // Extract all text
@@ -179,7 +179,7 @@ fn test_tl_whitespace() {
     println!("  Original: {:?}", WHITESPACE_TEST);
 
     // Test <pre> preservation
-    let dom = tl::parse(PRESERVED_WHITESPACE, tl::ParserOptions::default()).unwrap();
+    let dom = astral_tl::parse(PRESERVED_WHITESPACE, astral_tl::ParserOptions::default()).unwrap();
     let parser = dom.parser();
     let mut text = String::new();
     for node in dom.nodes() {
@@ -194,17 +194,17 @@ fn test_tl_whitespace() {
 }
 
 fn main() {
-    println!("HTML Parser Benchmark: tl vs html5ever\n");
+    println!("HTML Parser Benchmark: astral-tl vs html5ever\n");
     println!("Testing performance and whitespace handling...\n");
 
     benchmark_html5ever();
-    benchmark_tl();
+    benchmark_astral_tl();
 
     println!("\n=== SUMMARY ===");
     println!("Run this benchmark to compare:");
     println!("1. Parse speed (iterations per second)");
     println!("2. Whitespace handling (preservation vs normalization)");
     println!("\nDecision criteria:");
-    println!("- Migrate if: tl is significantly faster OR preserves whitespace better");
+    println!("- Migrate if: astral-tl is significantly faster OR preserves whitespace better");
     println!("- Stay if: html5ever is comparable and meets requirements");
 }

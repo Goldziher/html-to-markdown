@@ -1,6 +1,6 @@
 {
   "name": "html-to-markdown-node",
-  "version": "2.8.4",
+  "version": "2.9.0",
   "description": "High-performance HTML to Markdown converter - Node.js native bindings",
   "main": "index.js",
   "types": "index.d.ts",
@@ -61,7 +61,7 @@
     "@napi-rs/cli": "^3.4.1",
     "@types/node": "^24.10.1",
     "tsx": "^4.20.6",
-    "vitest": "^4.0.10"
+    "vitest": "^4.0.11"
   },
   "dependencies": {
     "@emnapi/runtime": "1.7.1",

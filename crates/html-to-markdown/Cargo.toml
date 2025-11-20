@@ -9,8 +9,8 @@ homepage.workspace = true
 documentation.workspace = true
 readme = "README.md"
 rust-version.workspace = true
-description = "High-performance HTML to Markdown converter using tl parser. Part of the Kreuzberg ecosystem."
-keywords = ["html", "markdown", "converter", "tl", "doc-processing"]
+description = "High-performance HTML to Markdown converter using the astral-tl parser. Part of the Kreuzberg ecosystem."
+keywords = ["html", "markdown", "converter", "astral-tl", "doc-processing"]
 categories = ["parsing", "text-processing", "web-programming"]
 
 [features]
@@ -21,7 +21,7 @@ inline-images = ["dep:image"]
 crate-type = ["rlib"]
 
 [dependencies]
-tl.workspace = true
+astral-tl.workspace = true
 regex.workspace = true
 once_cell.workspace = true
 thiserror.workspace = true
