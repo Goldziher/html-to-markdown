@@ -15,6 +15,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 - **NuGet Package ID** – C# bindings now publish under `Goldziher.HtmlToMarkdown` to avoid clashing with an existing community package.
+- **Wasmtime CI Coverage** – The Wasmtime e2e job now runs on Linux x64, Linux arm64, macOS, and Windows runners so every GitHub-hosted architecture executes the WASM tests.
+
+### Fixed
+- **PHP PIE source bundle** – Release packaging strips the Wasmtime e2e workspace from the staged `Cargo.toml`, fixing the “failed to load manifest” error in the publish workflow.
+- **Horizontal rule rendering** – `<p>…</p><hr>` now emits a blank line before `---`, keeping the horizontal rule from being misinterpreted as a setext heading.
 
 ## [2.8.3] - 2025-11-15
 
