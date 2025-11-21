@@ -695,6 +695,48 @@ fn build_dom_context(dom: &tl::VDom, parser: &tl::Parser) -> DomContext {
     ctx
 }
 
+/// Detect block elements that were incorrectly nested under inline ancestors.
+fn has_inline_block_misnest(dom_ctx: &DomContext, parser: &tl::Parser) -> bool {
+    for handle in dom_ctx.node_map.values() {
+        if let Some(tl::Node::Tag(tag)) = handle.get(parser) {
+            let tag_name = normalized_tag_name(tag.name().as_utf8_str());
+            if is_block_level_element(tag_name.as_ref()) {
+                let mut current = dom_ctx.parent_map.get(&handle.get_inner()).and_then(|p| *p);
+                while let Some(parent_id) = current {
+                    if let Some(parent_handle) = dom_ctx.node_map.get(&parent_id) {
+                        if let Some(tl::Node::Tag(parent_tag)) = parent_handle.get(parser) {
+                            let parent_name = normalized_tag_name(parent_tag.name().as_utf8_str());
+                            if is_inline_element(parent_name.as_ref()) {
+                                return true;
+                            }
+                        }
+                    }
+                    current = dom_ctx.parent_map.get(&parent_id).and_then(|p| *p);
+                }
+            }
+        }
+    }
+
+    false
+}
+
+/// Round-trip HTML through html5ever to repair malformed trees.
+fn repair_with_html5ever(input: &str) -> Option<String> {
+    use html5ever::serialize::{SerializeOpts, serialize};
+    use html5ever::tendril::TendrilSink;
+    use markup5ever_rcdom::{RcDom, SerializableHandle};
+
+    let dom = html5ever::parse_document(RcDom::default(), Default::default())
+        .from_utf8()
+        .read_from(&mut input.as_bytes())
+        .ok()?;
+
+    let mut buf = Vec::with_capacity(input.len());
+    let handle = SerializableHandle::from(dom.document.clone());
+    serialize(&mut buf, &handle, SerializeOpts::default()).ok()?;
+    String::from_utf8(buf).ok()
+}
+
 fn record_node_hierarchy(node_handle: &tl::NodeHandle, parent: Option<u32>, parser: &tl::Parser, ctx: &mut DomContext) {
     let id = node_handle.get_inner();
     ctx.parent_map.insert(id, parent);
@@ -986,6 +1028,44 @@ fn get_text_content(node_handle: &tl::NodeHandle, parser: &tl::Parser) -> String
     text
 }
 
+/// Collect inline text for link labels, skipping block-level descendants.
+fn collect_link_label_text(children: &[tl::NodeHandle], parser: &tl::Parser) -> (String, Vec<tl::NodeHandle>, bool) {
+    let mut text = String::new();
+    let mut saw_block = false;
+    let mut block_nodes = Vec::new();
+    let mut stack: Vec<_> = children.iter().rev().copied().collect();
+
+    while let Some(handle) = stack.pop() {
+        if let Some(node) = handle.get(parser) {
+            match node {
+                tl::Node::Raw(bytes) => {
+                    text.push_str(&text::decode_html_entities(&bytes.as_utf8_str()));
+                }
+                tl::Node::Tag(tag) => {
+                    let tag_name = normalized_tag_name(tag.name().as_utf8_str());
+                    if is_block_level_element(tag_name.as_ref()) {
+                        saw_block = true;
+                        block_nodes.push(handle);
+                        continue;
+                    }
+
+                    let tag_children = tag.children();
+                    {
+                        let mut child_nodes: Vec<_> = tag_children.top().iter().copied().collect();
+                        child_nodes.reverse();
+                        for child in child_nodes {
+                            stack.push(child);
+                        }
+                    }
+                }
+                _ => {}
+            }
+        }
+    }
+
+    (text, block_nodes, saw_block)
+}
+
 /// Serialize an element to HTML string (for SVG and Math elements).
 fn serialize_element(node_handle: &tl::NodeHandle, parser: &tl::Parser) -> String {
     if let Some(node) = node_handle.get(parser) {
@@ -1270,42 +1350,33 @@ fn convert_html_impl(
     inline_collector: Option<InlineCollectorHandle>,
 ) -> Result<String> {
     // Normalize problematic HTML constructs before parsing
-    let preprocessed = preprocess_html(html);
-    let preprocessed_len = preprocessed.len();
-
-    enum ParsedDom<'a> {
-        Borrowed(tl::VDom<'a>),
-        Owned(tl::VDomGuard),
-    }
+    let mut preprocessed = preprocess_html(html).into_owned();
+    let mut preprocessed_len = preprocessed.len();
 
     let parser_options = tl::ParserOptions::default();
-    let mut _dom_storage: Option<ParsedDom> = None;
-    let dom_ref = match preprocessed {
-        Cow::Borrowed(s) => {
-            let dom = tl::parse(s, parser_options)
-                .map_err(|_| crate::error::ConversionError::ParseError("Failed to parse HTML".to_string()))?;
-            _dom_storage = Some(ParsedDom::Borrowed(dom));
-            match _dom_storage.as_ref().unwrap() {
-                ParsedDom::Borrowed(dom) => dom,
-                ParsedDom::Owned(_) => unreachable!(),
-            }
-        }
-        Cow::Owned(s) => {
-            let guard = unsafe {
-                tl::parse_owned(s, parser_options)
+    let mut dom_guard = unsafe {
+        tl::parse_owned(preprocessed.clone(), parser_options)
+            .map_err(|_| crate::error::ConversionError::ParseError("Failed to parse HTML".to_string()))?
+    };
+    let mut dom_ref = dom_guard.get_ref();
+    let mut parser = dom_ref.parser();
+    let mut dom_ctx = build_dom_context(dom_ref, parser);
+    let mut output = String::with_capacity(preprocessed_len);
+
+    if has_inline_block_misnest(&dom_ctx, parser) {
+        if let Some(repaired_html) = repair_with_html5ever(&preprocessed) {
+            preprocessed = preprocess_html(&repaired_html).into_owned();
+            preprocessed_len = preprocessed.len();
+            dom_guard = unsafe {
+                tl::parse_owned(preprocessed.clone(), parser_options)
                     .map_err(|_| crate::error::ConversionError::ParseError("Failed to parse HTML".to_string()))?
             };
-            _dom_storage = Some(ParsedDom::Owned(guard));
-            match _dom_storage.as_ref().unwrap() {
-                ParsedDom::Owned(guard) => guard.get_ref(),
-                ParsedDom::Borrowed(_) => unreachable!(),
-            }
+            dom_ref = dom_guard.get_ref();
+            parser = dom_ref.parser();
+            dom_ctx = build_dom_context(dom_ref, parser);
+            output = String::with_capacity(preprocessed_len);
         }
-    };
-
-    let parser = dom_ref.parser();
-    let dom_ctx = build_dom_context(dom_ref, parser);
-    let mut output = String::with_capacity(preprocessed_len);
+    }
 
     // Check for hOCR document and extract metadata by checking all top-level children
     let mut is_hocr = false;
@@ -2161,6 +2232,46 @@ fn is_inline_element(tag_name: &str) -> bool {
     )
 }
 
+/// Check if an element is block-level (not inline).
+fn is_block_level_element(tag_name: &str) -> bool {
+    !is_inline_element(tag_name)
+        && matches!(
+            tag_name,
+            "address"
+                | "article"
+                | "aside"
+                | "blockquote"
+                | "canvas"
+                | "dd"
+                | "div"
+                | "dl"
+                | "dt"
+                | "fieldset"
+                | "figcaption"
+                | "figure"
+                | "footer"
+                | "form"
+                | "h1"
+                | "h2"
+                | "h3"
+                | "h4"
+                | "h5"
+                | "h6"
+                | "header"
+                | "hr"
+                | "li"
+                | "main"
+                | "nav"
+                | "ol"
+                | "p"
+                | "pre"
+                | "section"
+                | "table"
+                | "tfoot"
+                | "ul"
+        )
+}
+
 fn get_next_sibling_tag(node_handle: &tl::NodeHandle, parser: &tl::Parser, dom_ctx: &DomContext) -> Option<String> {
     let id = node_handle.get_inner();
     let parent = dom_ctx.parent_map.get(&id).copied().flatten();
@@ -2174,6 +2285,35 @@ fn get_next_sibling_tag(node_handle: &tl::NodeHandle, parser: &tl::Parser, dom_c
     let position = siblings.iter().position(|handle| handle.get_inner() == id)?;
 
     for sibling in siblings.iter().skip(position + 1) {
+        if let Some(node) = sibling.get(parser) {
+            match node {
+                tl::Node::Tag(tag) => return Some(normalized_tag_name(tag.name().as_utf8_str()).into_owned()),
+                tl::Node::Raw(raw) => {
+                    if !raw.as_utf8_str().trim().is_empty() {
+                        return None;
+                    }
+                }
+                _ => {}
+            }
+        }
+    }
+
+    None
+}
+
+fn get_previous_sibling_tag(node_handle: &tl::NodeHandle, parser: &tl::Parser, dom_ctx: &DomContext) -> Option<String> {
+    let id = node_handle.get_inner();
+    let parent = dom_ctx.parent_map.get(&id).copied().flatten();
+
+    let siblings = if let Some(parent_id) = parent {
+        dom_ctx.children_map.get(&parent_id)?
+    } else {
+        &dom_ctx.root_children
+    };
+
+    let position = siblings.iter().position(|handle| handle.get_inner() == id)?;
+
+    for sibling in siblings.iter().take(position).rev() {
         if let Some(node) = sibling.get(parser) {
             match node {
                 tl::Node::Tag(tag) => return Some(normalized_tag_name(tag.name().as_utf8_str()).into_owned()),
@@ -2696,11 +2836,21 @@ fn walk_node(
                         } else if !content.is_empty() {
                             output.push_str(prefix);
                             append_inline_suffix(output, suffix, false, node_handle, parser, dom_ctx);
+                        } else if let Some(class_value) = tag
+                            .attributes()
+                            .get("class")
+                            .and_then(|v| v.as_ref().map(|val| val.as_utf8_str().to_string()))
+                        {
+                            if class_value.contains("caret") && !output.ends_with(' ') {
+                                output.push_str(" > ");
+                            }
                         }
                     }
                 }
 
                 "a" => {
+                    const MAX_LINK_LABEL_LEN: usize = 512;
+
                     let href_attr = tag
                         .attributes()
                         .get("href")
@@ -2713,7 +2863,9 @@ fn walk_node(
                         .map(|v| v.as_utf8_str().to_string());
 
                     if let Some(href) = href_attr {
-                        let raw_text = get_text_content(node_handle, parser).trim().to_string();
+                        let raw_text = text::normalize_whitespace(&get_text_content(node_handle, parser))
+                            .trim()
+                            .to_string();
 
                         let is_autolink = options.autolinks
                             && !options.default_title
@@ -2771,14 +2923,20 @@ fn walk_node(
                             }
                         }
 
-                        let mut content = String::new();
-                        let link_ctx = Context {
-                            inline_depth: ctx.inline_depth + 1,
-                            ..ctx.clone()
-                        };
-                        let children = tag.children();
-                        {
-                            for child_handle in children.top().iter() {
+                        let children: Vec<_> = tag.children().top().iter().copied().collect();
+                        let (inline_label, block_nodes, saw_block) = collect_link_label_text(&children, parser);
+                        let mut label = if saw_block {
+                            text::normalize_whitespace(&inline_label)
+                                .trim()
+                                .trim_matches(&['\n', '\r'][..])
+                                .to_string()
+                        } else {
+                            let mut content = String::new();
+                            let link_ctx = Context {
+                                inline_depth: ctx.inline_depth + 1,
+                                ..ctx.clone()
+                            };
+                            for child_handle in children.iter() {
                                 walk_node(
                                     child_handle,
                                     parser,
@@ -2789,16 +2947,50 @@ fn walk_node(
                                     dom_ctx,
                                 );
                             }
+                            text::normalize_whitespace(&content).trim().to_string()
+                        };
+
+                        if label.is_empty() && saw_block {
+                            let fallback = text::normalize_whitespace(&get_text_content(node_handle, parser));
+                            label = fallback.trim().to_string();
                         }
-                        let escaped_label = escape_link_label(&content);
+
+                        if label.is_empty() && !raw_text.is_empty() {
+                            label = raw_text.clone();
+                        }
+
+                        if label.is_empty() && !href.is_empty() && !children.is_empty() {
+                            label = href.clone();
+                        }
+
+                        if label.len() > MAX_LINK_LABEL_LEN {
+                            label.truncate(MAX_LINK_LABEL_LEN);
+                            label.push('…');
+                        }
+
+                        let escaped_label = escape_link_label(&label);
                         append_markdown_link(
                             output,
                             &escaped_label,
                             href.as_str(),
                             title.as_deref(),
-                            raw_text.as_str(),
+                            label.as_str(),
                             options,
                         );
+
+                        if saw_block {
+                            if !block_nodes.is_empty() && !output.ends_with('\n') {
+                                if ctx.in_list_item {
+                                    add_list_continuation_indent(output, ctx.list_depth, true, options);
+                                } else {
+                                    output.push('\n');
+                                }
+                            }
+
+                            for block_node in block_nodes {
+                                walk_node(&block_node, parser, output, options, ctx, depth + 1, dom_ctx);
+                            }
+                        }
                     } else {
                         let children = tag.children();
                         {
@@ -3396,9 +3588,10 @@ fn walk_node(
                             output.push_str("— <");
                             output.push_str(&url);
                             output.push_str(">\n\n");
-                        } else {
-                            // Add single newline after blockquote (CommonMark spacing)
-                            output.push('\n');
+                        }
+
+                        while output.ends_with('\n') {
+                            output.truncate(output.len() - 1);
                         }
                     }
                 }
@@ -3423,10 +3616,37 @@ fn walk_node(
                 "hr" => {
                     // CommonMark: ensure a blank line before the hr so it is not interpreted as a setext heading underline
                     if !output.is_empty() {
-                        while output.ends_with('\n') {
-                            output.truncate(output.len() - 1);
+                        let prev_tag = get_previous_sibling_tag(node_handle, parser, dom_ctx);
+                        let last_line_is_blockquote = output
+                            .rsplit('\n')
+                            .find(|line| !line.trim().is_empty())
+                            .map(|line| line.trim_start().starts_with('>'))
+                            .unwrap_or(false);
+                        let needs_blank_line = !ctx.in_paragraph
+                            && !matches!(prev_tag.as_deref(), Some("blockquote"))
+                            && !last_line_is_blockquote;
+
+                        if options.debug {
+                            eprintln!(
+                                "[DEBUG] <hr> prev_tag={:?} needs_blank_line={} in_paragraph={}",
+                                prev_tag, needs_blank_line, ctx.in_paragraph
+                            );
                         }
-                        output.push('\n');
+
+                        if ctx.in_paragraph || !needs_blank_line {
+                            if !output.ends_with('\n') {
+                                output.push('\n');
+                            }
+                        } else {
+                            trim_trailing_whitespace(output);
+                            if output.ends_with('\n') {
+                                if !output.ends_with("\n\n") {
+                                    output.push('\n');
+                                }
+                            } else {
+                                output.push_str("\n\n");
+                            }
+                        }
                     }
                     output.push_str("---\n");
                 }
@@ -5180,6 +5400,161 @@ fn convert_table_row(
     }
 }
 
+fn table_has_header(node_handle: &tl::NodeHandle, parser: &tl::Parser) -> bool {
+    if let Some(node) = node_handle.get(parser) {
+        if let tl::Node::Tag(tag) = node {
+            let tag_name = normalized_tag_name(tag.name().as_utf8_str());
+            if tag_name.as_ref() == "th" {
+                return true;
+            }
+            let children = tag.children();
+            for child in children.top().iter() {
+                if table_has_header(child, parser) {
+                    return true;
+                }
+            }
+        }
+    }
+    false
+}
+
+fn table_has_caption(node_handle: &tl::NodeHandle, parser: &tl::Parser) -> bool {
+    if let Some(node) = node_handle.get(parser) {
+        if let tl::Node::Tag(tag) = node {
+            let tag_name = normalized_tag_name(tag.name().as_utf8_str());
+            if tag_name.as_ref() == "caption" {
+                return true;
+            }
+            let children = tag.children();
+            for child in children.top().iter() {
+                if table_has_caption(child, parser) {
+                    return true;
+                }
+            }
+        }
+    }
+    false
+}
+
+fn table_contains_nested_table(node_handle: &tl::NodeHandle, parser: &tl::Parser, is_root: bool) -> bool {
+    if let Some(node) = node_handle.get(parser) {
+        if let tl::Node::Tag(tag) = node {
+            let tag_name = normalized_tag_name(tag.name().as_utf8_str());
+            if !is_root && tag_name.as_ref() == "table" {
+                return true;
+            }
+
+            for child in tag.children().top().iter() {
+                if table_contains_nested_table(child, parser, false) {
+                    return true;
+                }
+            }
+        }
+    }
+    false
+}
+
+fn collect_table_row_counts(
+    node_handle: &tl::NodeHandle,
+    parser: &tl::Parser,
+    counts: &mut Vec<usize>,
+    has_span: &mut bool,
+) {
+    if let Some(node) = node_handle.get(parser) {
+        if let tl::Node::Tag(tag) = node {
+            let tag_name = normalized_tag_name(tag.name().as_utf8_str());
+            match tag_name.as_ref() {
+                "tr" => {
+                    let mut cell_count = 0;
+                    for child in tag.children().top().iter() {
+                        if let Some(tl::Node::Tag(cell_tag)) = child.get(parser) {
+                            let cell_name = normalized_tag_name(cell_tag.name().as_utf8_str());
+                            if cell_name.as_ref() == "td" || cell_name.as_ref() == "th" {
+                                cell_count += 1;
+                                let attrs = cell_tag.attributes();
+                                if attrs.get("colspan").is_some() || attrs.get("rowspan").is_some() {
+                                    *has_span = true;
+                                }
+                            }
+                        }
+                    }
+                    counts.push(cell_count);
+                }
+                _ => {
+                    for child in tag.children().top().iter() {
+                        collect_table_row_counts(child, parser, counts, has_span);
+                    }
+                }
+            }
+        }
+    }
+}
+
+fn count_links(node_handle: &tl::NodeHandle, parser: &tl::Parser) -> usize {
+    let mut total = 0;
+    if let Some(node) = node_handle.get(parser) {
+        if let tl::Node::Tag(tag) = node {
+            let tag_name = normalized_tag_name(tag.name().as_utf8_str());
+            if tag_name.as_ref() == "a" {
+                total += 1;
+            }
+
+            for child in tag.children().top().iter() {
+                total += count_links(child, parser);
+            }
+        }
+    }
+    total
+}
+
+fn append_layout_row(
+    row_handle: &tl::NodeHandle,
+    parser: &tl::Parser,
+    output: &mut String,
+    options: &ConversionOptions,
+    ctx: &Context,
+    dom_ctx: &DomContext,
+) {
+    if let Some(tl::Node::Tag(row_tag)) = row_handle.get(parser) {
+        let mut row_text = String::new();
+        let row_children = row_tag.children();
+        for cell_handle in row_children.top().iter() {
+            if let Some(tl::Node::Tag(cell_tag)) = cell_handle.get(parser) {
+                let cell_name = normalized_tag_name(cell_tag.name().as_utf8_str());
+                if cell_name.as_ref() == "td" || cell_name.as_ref() == "th" {
+                    let mut cell_text = String::new();
+                    let cell_ctx = Context {
+                        convert_as_inline: true,
+                        ..ctx.clone()
+                    };
+                    let cell_children = cell_tag.children();
+                    for cell_child in cell_children.top().iter() {
+                        walk_node(cell_child, parser, &mut cell_text, options, &cell_ctx, 0, dom_ctx);
+                    }
+                    let cell_content = text::normalize_whitespace(&cell_text);
+                    if !cell_content.trim().is_empty() {
+                        if !row_text.is_empty() {
+                            row_text.push(' ');
+                        }
+                        row_text.push_str(cell_content.trim());
+                    }
+                }
+            }
+        }
+
+        let trimmed = row_text.trim();
+        if !trimmed.is_empty() {
+            if !output.is_empty() && !output.ends_with('\n') {
+                output.push('\n');
+            }
+            let formatted = trimmed.strip_prefix("- ").unwrap_or(trimmed).trim_start();
+            output.push_str("- ");
+            output.push_str(formatted);
+            output.push('\n');
+        }
+    }
+}
+
 /// Indent table lines so they stay within their parent list item.
 fn indent_table_for_list(table_content: &str, list_depth: usize, options: &ConversionOptions) -> String {
     if list_depth == 0 {
@@ -5219,6 +5594,54 @@ fn convert_table(
     dom_ctx: &DomContext,
 ) {
     if let Some(tl::Node::Tag(tag)) = node_handle.get(parser) {
+        let mut row_counts = Vec::new();
+        let mut has_span = false;
+        collect_table_row_counts(node_handle, parser, &mut row_counts, &mut has_span);
+
+        let row_count = row_counts.len();
+        let mut distinct_counts: Vec<_> = row_counts.into_iter().filter(|c| *c > 0).collect();
+        distinct_counts.sort_unstable();
+        distinct_counts.dedup();
+
+        let looks_like_layout =
+            table_contains_nested_table(node_handle, parser, true) || has_span || distinct_counts.len() > 1;
+        let link_count = count_links(node_handle, parser);
+        let table_text = text::normalize_whitespace(&get_text_content(node_handle, parser));
+        let is_blank_table = table_text.trim().is_empty();
+
+        if !table_has_header(node_handle, parser)
+            && !table_has_caption(node_handle, parser)
+            && (looks_like_layout || is_blank_table || (row_count <= 2 && link_count >= 3))
+        {
+            if is_blank_table {
+                return;
+            }
+
+            let table_children = tag.children();
+            for child_handle in table_children.top().iter() {
+                if let Some(tl::Node::Tag(child_tag)) = child_handle.get(parser) {
+                    let tag_name = normalized_tag_name(child_tag.name().as_utf8_str());
+                    match tag_name.as_ref() {
+                        "thead" | "tbody" | "tfoot" => {
+                            for row_handle in child_tag.children().top().iter() {
+                                if let Some(tl::Node::Tag(row_tag)) = row_handle.get(parser) {
+                                    if tag_name_eq(row_tag.name().as_utf8_str(), "tr") {
+                                        append_layout_row(row_handle, parser, output, options, ctx, dom_ctx);
+                                    }
+                                }
+                            }
+                        }
+                        "tr" => append_layout_row(child_handle, parser, output, options, ctx, dom_ctx),
+                        _ => {}
+                    }
+                }
+            }
+            if !output.ends_with('\n') {
+                output.push('\n');
+            }
+            return;
+        }
+
         let mut row_index = 0;
         let mut rowspan_tracker = std::collections::HashMap::new();
 

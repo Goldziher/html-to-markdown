@@ -15,7 +15,7 @@ members = [
 ]
 
 [workspace.package]
-version = "2.9.0"
+version = "2.9.1"
 edition = "2024"
 authors = ["Na'aman Hirschfeld <nhirschfeld@gmail.com>"]
 license = "MIT"
@@ -27,10 +27,12 @@ rust-version = "1.85"
 
 [workspace.dependencies]
 # Core library
-html-to-markdown-rs = { version = "2.9.0", path = "crates/html-to-markdown" }
+html-to-markdown-rs = { version = "2.9.1", path = "crates/html-to-markdown" }
 
 # HTML parsing
 tl = { package = "astral-tl", version = "0.7.9" }
+html5ever = "0.35"
+markup5ever_rcdom = "0.35"
 
 # Utilities
 regex = "1.12"
