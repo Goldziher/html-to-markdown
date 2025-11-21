@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.9.1] - 2025-11-22
+
+### Changed
+- **HTML repair fallback** – Minified or malformed pages now reparse via html5ever when inline/block nesting is broken, keeping content that previously vanished (e.g., SPA shells and Hacker News markup).
+- **Link label recovery** – Anchor text fallback prefers child formatting or hrefs only when appropriate, preventing empty labels while keeping CommonMark empty-link semantics intact.
+
+### Fixed
+- **Layout tables to lists** – Headless tables with mixed column counts/spans or nested tables render as list rows instead of broken Markdown tables, restoring Hacker News output.
+- **Issue 121 regressions** – Added fixtures/tests for the empty SPA and malformed Hacker News samples; both now produce full Markdown content without frontmatter noise.
+
 ## [2.9.0] - 2025-11-20
 
 ### Added
