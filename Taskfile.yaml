@@ -11,8 +11,9 @@ silent: false
 
 tasks:
   setup:
-    desc: "Install all language dependencies and build the Rust core"
+    desc: "Install all language dependencies and build the Rust core (idempotent, safe to re-run)"
     cmds:
+      - task: rust:install
       - task: python:install
       - task: js:install
       - task: ruby:install
@@ -22,6 +23,7 @@ tasks:
       - task: java:install
       - task: elixir:install
       - task: rust:build
+      - echo "Setup complete - safe to re-run anytime"
 
   update:
     desc: "Update dependencies across Rust, JavaScript, Python, Ruby, PHP, Go, C#, Elixir, and Java"
@@ -69,8 +71,14 @@ tasks:
       - task: elixir:test
       - task: java:test
 
+  check:
+    desc: "Run all checks without modifications (lint:check + format:check)"
+    cmds:
+      - task: lint:check
+      - task: format:check
+
   lint:
-    desc: "Run linters across the repo"
+    desc: "Run all linters WITH auto-fix enabled"
     cmds:
       - task: rust:lint
       - task: python:lint
@@ -82,8 +90,21 @@ tasks:
       - task: elixir:lint
       - task: java:lint
 
+  lint:check:
+    desc: "Run all linters in check-only mode (no modifications)"
+    cmds:
+      - task: rust:lint:check
+      - task: python:lint:check
+      - task: ruby:lint:check
+      - task: typescript:lint:check
+      - task: php:lint:check
+      - task: go:lint:check
+      - task: csharp:lint:check
+      - task: elixir:lint:check
+      - task: java:lint:check
+
   format:
-    desc: "Format code for all languages"
+    desc: "Format all code with modifications"
     cmds:
       - task: rust:format
       - task: python:format
@@ -93,6 +114,18 @@ tasks:
       - task: go:format
       - task: csharp:format
       - task: elixir:format
+
+  format:check:
+    desc: "Check code formatting without modifications"
+    cmds:
+      - task: rust:format:check
+      - task: python:format:check
+      - task: ruby:format:check
+      - task: typescript:format:check
+      - task: php:format:check
+      - task: go:format:check
+      - task: csharp:format:check
+      - task: elixir:format:check
 
   bench:
     desc: "Run Rust benchmarks plus runtime harness"
@@ -248,6 +281,13 @@ tasks:
       - prek run --all-files
 
   # Rust tasks ----------------------------------------------------------------
+  rust:install:
+    desc: "Install Rust toolchain (if needed)"
+    cmds:
+      - rustup update stable
+      - cargo --version
+      - rustc --version
+
   rust:build:
     desc: "Build all Rust crates"
     cmds:
@@ -258,16 +298,33 @@ tasks:
     cmds:
       - RB_SYS_RUBY=/opt/homebrew/opt/ruby/bin/ruby RUBY=/opt/homebrew/opt/ruby/bin/ruby cargo test --release --no-default-features --workspace --exclude html-to-markdown-rb
 
+  rust:test:coverage:
+    desc: "Generate Rust coverage report (requires cargo-llvm-cov)"
+    cmds:
+      - RB_SYS_RUBY=/opt/homebrew/opt/ruby/bin/ruby RUBY=/opt/homebrew/opt/ruby/bin/ruby cargo llvm-cov --all-features --workspace --exclude html-to-markdown-py --exclude html-to-markdown-rb --lcov --output-path rust-coverage.lcov
+      - RB_SYS_RUBY=/opt/homebrew/opt/ruby/bin/ruby RUBY=/opt/homebrew/opt/ruby/bin/ruby cargo llvm-cov --all-features --summary-only
+
   rust:lint:
-    desc: "Run Rust fmt + clippy"
+    desc: "Run Rust fmt + clippy WITH auto-fix"
     cmds:
       - cargo fmt --all
+      - RB_SYS_RUBY=/opt/homebrew/opt/ruby/bin/ruby RUBY=/opt/homebrew/opt/ruby/bin/ruby cargo clippy --workspace --exclude html-to-markdown-rb --fix --allow-dirty --allow-staged
+
+  rust:lint:check:
+    desc: "Run Rust fmt + clippy WITHOUT auto-fix (check-only)"
+    cmds:
+      - cargo fmt --all --check
       - RB_SYS_RUBY=/opt/homebrew/opt/ruby/bin/ruby RUBY=/opt/homebrew/opt/ruby/bin/ruby cargo clippy --workspace --exclude html-to-markdown-rb -- -D warnings
 
   rust:format:
-    desc: "Format Rust code"
+    desc: "Format Rust code (with modifications)"
     cmds:
       - cargo fmt --all
+
+  rust:format:check:
+    desc: "Check Rust formatting without modifications"
+    cmds:
+      - cargo fmt --all --check
 
   rust:update:
     desc: "Update Rust dependencies"
@@ -279,12 +336,6 @@ tasks:
     desc: "Run Rust benchmarks"
     cmds:
       - RB_SYS_RUBY=/opt/homebrew/opt/ruby/bin/ruby RUBY=/opt/homebrew/opt/ruby/bin/ruby cargo bench --package html-to-markdown-rs
-
-  rust:coverage:
-    desc: "Generate Rust coverage report (requires cargo-llvm-cov)"
-    cmds:
-      - RB_SYS_RUBY=/opt/homebrew/opt/ruby/bin/ruby RUBY=/opt/homebrew/opt/ruby/bin/ruby cargo llvm-cov --all-features --workspace --exclude html-to-markdown-py --exclude html-to-markdown-rb --lcov --output-path rust-coverage.lcov
-      - RB_SYS_RUBY=/opt/homebrew/opt/ruby/bin/ruby RUBY=/opt/homebrew/opt/ruby/bin/ruby cargo llvm-cov --all-features --summary-only
 
   rust:clean:
     desc: "Clean Rust artifacts"
@@ -313,34 +364,43 @@ tasks:
       - cmd: uv run pytest
         dir: packages/python
 
-  python:test:cov:
+  python:test:coverage:
     desc: "Run Python tests with coverage"
     cmds:
       - RB_SYS_RUBY=/opt/homebrew/opt/ruby/bin/ruby RUBY=/opt/homebrew/opt/ruby/bin/ruby cargo build --release --package html-to-markdown-cli
-      - cmd: uv run pytest --cov=html_to_markdown --cov-report=term-missing
+      - cmd: uv run pytest --cov=html_to_markdown --cov-report=lcov:coverage.lcov --cov-report=term
         dir: packages/python
 
   python:lint:
-    desc: "Lint Python code with ruff + mypy"
+    desc: "Lint Python code WITH auto-fix (ruff + mypy)"
+    dir: packages/python
+    cmds:
+      - uv pip install --editable .
+      - uv run ruff check --fix
+      - uv run ruff format
+      - uv run mypy .
+
+  python:lint:check:
+    desc: "Lint Python code WITHOUT auto-fix (check-only)"
     dir: packages/python
     cmds:
       - uv pip install --editable .
       - uv run ruff check
+      - uv run ruff format --check
       - uv run mypy .
 
   python:format:
-    desc: "Format Python code"
+    desc: "Format Python code (with modifications)"
     dir: packages/python
     cmds:
       - uv run ruff check --fix
       - uv run ruff format
 
-  python:coverage:
-    desc: "Generate Python coverage lcov file"
+  python:format:check:
+    desc: "Check Python formatting without modifications"
+    dir: packages/python
     cmds:
-      - RB_SYS_RUBY=/opt/homebrew/opt/ruby/bin/ruby RUBY=/opt/homebrew/opt/ruby/bin/ruby cargo build --release --package html-to-markdown-cli
-      - cmd: uv run pytest --cov=html_to_markdown --cov-report=lcov:coverage.lcov --cov-report=term
-        dir: packages/python
+      - uv run ruff format --check
 
   python:wheel:prep:
     desc: "Prepare CLI binary for wheel packaging"
@@ -352,6 +412,12 @@ tasks:
     dir: packages/python
     cmds:
       - rm -rf build/ dist/ *.egg-info .pytest_cache .ruff_cache .mypy_cache html_to_markdown/bin
+
+  # Alias for backwards compatibility
+  python:coverage:
+    desc: "Alias for python:test:coverage"
+    cmds:
+      - task: python:test:coverage
 
 # Ruby tasks ----------------------------------------------------------------
   ruby:ensure-bundler:
@@ -385,7 +451,16 @@ tasks:
       - cmd: cd packages/ruby && PATH={{.RUBY_BIN}}:$PATH bundle _{{.BUNDLER_VERSION}}_ exec rake spec
 
   ruby:lint:
-    desc: "Lint Ruby code with Rubocop, RBS, and Steep"
+    desc: "Lint Ruby code WITH auto-fix (rubocop + RBS + Steep)"
+    cmds:
+      - task: ruby:ensure-bundler
+      - cmd: cd packages/ruby && BUNDLE_PATH=vendor/bundle PATH={{.RUBY_BIN}}:$PATH bundle _{{.BUNDLER_VERSION}}_ install
+      - cmd: cd packages/ruby && BUNDLE_PATH=vendor/bundle PATH={{.RUBY_BIN}}:$PATH bundle _{{.BUNDLER_VERSION}}_ exec rubocop --config ./.rubocop.yml --autocorrect-all
+      - cmd: cd packages/ruby && BUNDLE_PATH=vendor/bundle PATH={{.RUBY_BIN}}:$PATH bundle _{{.BUNDLER_VERSION}}_ exec rbs validate
+      - cmd: cd packages/ruby && BUNDLE_PATH=vendor/bundle PATH={{.RUBY_BIN}}:$PATH bundle _{{.BUNDLER_VERSION}}_ exec steep check
+
+  ruby:lint:check:
+    desc: "Lint Ruby code WITHOUT auto-fix (check-only)"
     cmds:
       - task: ruby:ensure-bundler
       - cmd: cd packages/ruby && BUNDLE_PATH=vendor/bundle PATH={{.RUBY_BIN}}:$PATH bundle _{{.BUNDLER_VERSION}}_ install
@@ -394,10 +469,16 @@ tasks:
       - cmd: cd packages/ruby && BUNDLE_PATH=vendor/bundle PATH={{.RUBY_BIN}}:$PATH bundle _{{.BUNDLER_VERSION}}_ exec steep check
 
   ruby:format:
-    desc: "Auto-correct Ruby lint issues"
+    desc: "Auto-correct Ruby formatting (with modifications)"
     cmds:
       - task: ruby:ensure-bundler
-      - cmd: cd packages/ruby && PATH={{.RUBY_BIN}}:$PATH bundle _{{.BUNDLER_VERSION}}_ exec rubocop --config ./.rubocop.yml --autocorrect
+      - cmd: cd packages/ruby && PATH={{.RUBY_BIN}}:$PATH bundle _{{.BUNDLER_VERSION}}_ exec rubocop --config ./.rubocop.yml --autocorrect-all
+
+  ruby:format:check:
+    desc: "Check Ruby formatting without modifications"
+    cmds:
+      - task: ruby:ensure-bundler
+      - cmd: cd packages/ruby && PATH={{.RUBY_BIN}}:$PATH bundle _{{.BUNDLER_VERSION}}_ exec rubocop --config ./.rubocop.yml
 
   ruby:clean:
     desc: "Clean Ruby build artifacts"
@@ -407,7 +488,7 @@ tasks:
 
   # PHP tasks ----------------------------------------------------------------
   php:install:
-    desc: "Install PHP dependencies"
+    desc: "Install PHP dependencies via Composer"
     cmds:
       - cmd: cd packages/php && composer install --no-interaction --no-progress
 
@@ -422,14 +503,24 @@ tasks:
       - cmd: cd packages/php && composer run test
 
   php:lint:
-    desc: "Run PHP static analysis and coding standards"
+    desc: "Run PHP static analysis WITH auto-fix (phpstan + phpcbf)"
+    cmds:
+      - cmd: cd packages/php && composer run lint:fix
+
+  php:lint:check:
+    desc: "Run PHP static analysis WITHOUT auto-fix (check-only)"
     cmds:
       - cmd: cd packages/php && composer run lint
 
   php:format:
-    desc: "Format PHP sources"
+    desc: "Format PHP code (with modifications)"
     cmds:
       - cmd: cd packages/php && composer run format
+
+  php:format:check:
+    desc: "Check PHP formatting without modifications"
+    cmds:
+      - cmd: cd packages/php && composer run format:check
 
   # Go tasks -----------------------------------------------------------------
   go:install:
@@ -490,23 +581,42 @@ tasks:
       - RUSTC=./scripts/preferred-rustc.sh cargo test -p html-to-markdown-wasm-wasmtime-tests
 
   go:lint:
-    desc: "Lint Go code with golangci-lint"
+    desc: "Lint Go code WITH auto-fix (golangci-lint)"
     cmds:
       - cmd: |
           cd packages/go
           TOOLCHAIN=${GOTOOLCHAIN_OVERRIDE:-{{.GO_TOOLCHAIN}}}
           GOTOOLCHAIN=${TOOLCHAIN} go fmt ./...
-          golangci-lint run --config ../../.golangci.yml ./...
+          golangci-lint run --config ../../.golangci.yml --fix ./...
       - cmd: |
           cd examples/go-smoke
           TOOLCHAIN=${GOTOOLCHAIN_OVERRIDE:-{{.GO_TOOLCHAIN}}}
           GOTOOLCHAIN=${TOOLCHAIN} go fmt ./...
+          golangci-lint run --config ../../.golangci.yml --fix ./...
+
+  go:lint:check:
+    desc: "Lint Go code WITHOUT auto-fix (check-only)"
+    cmds:
+      - cmd: |
+          cd packages/go
+          TOOLCHAIN=${GOTOOLCHAIN_OVERRIDE:-{{.GO_TOOLCHAIN}}}
+          GOTOOLCHAIN=${TOOLCHAIN} go fmt -l ./...
+          golangci-lint run --config ../../.golangci.yml ./...
+      - cmd: |
+          cd examples/go-smoke
+          TOOLCHAIN=${GOTOOLCHAIN_OVERRIDE:-{{.GO_TOOLCHAIN}}}
+          GOTOOLCHAIN=${TOOLCHAIN} go fmt -l ./...
           golangci-lint run --config ../../.golangci.yml ./...
 
   go:format:
-    desc: "Format Go code"
+    desc: "Format Go code (with modifications)"
     cmds:
       - gofmt -w packages/go examples/go-smoke
+
+  go:format:check:
+    desc: "Check Go formatting without modifications"
+    cmds:
+      - gofmt -l packages/go examples/go-smoke
 
   elixir:install:
     desc: "Install Elixir dependencies and compile the NIF"
@@ -528,16 +638,30 @@ tasks:
       - MIX_ENV=test mix test
 
   elixir:lint:
-    desc: "Lint Elixir code with Credo"
+    desc: "Lint Elixir code WITH auto-fix (Credo + mix format)"
+    dir: packages/elixir
+    cmds:
+      - MIX_ENV=dev mix credo suggest --strict
+      - MIX_ENV=dev mix format
+
+  elixir:lint:check:
+    desc: "Lint Elixir code WITHOUT auto-fix (check-only)"
     dir: packages/elixir
     cmds:
       - MIX_ENV=dev mix credo --strict
+      - MIX_ENV=dev mix format --check-formatted
 
   elixir:format:
-    desc: "Format Elixir sources"
+    desc: "Format Elixir code (with modifications)"
     dir: packages/elixir
     cmds:
       - MIX_ENV=dev mix format
+
+  elixir:format:check:
+    desc: "Check Elixir formatting without modifications"
+    dir: packages/elixir
+    cmds:
+      - MIX_ENV=dev mix format --check-formatted
 
 # Java tasks -----------------------------------------------------------------
   java:install:
@@ -570,9 +694,24 @@ tasks:
       - mvn -f packages/java/pom.xml -B -Dgpg.skip=true test
 
   java:lint:
-    desc: "Verify Java project builds without tests"
+    desc: "Lint Java project (checkstyle + PMD WITH auto-fix where applicable)"
     cmds:
-      - mvn -f packages/java/pom.xml -B -DskipTests -Dgpg.skip=true package
+      - mvn -f packages/java/pom.xml -B -DskipTests -Dgpg.skip=true verify
+
+  java:lint:check:
+    desc: "Lint Java project WITHOUT auto-fix (check-only)"
+    cmds:
+      - mvn -f packages/java/pom.xml -B -DskipTests -Dgpg.skip=true verify
+
+  java:format:
+    desc: "Format Java code (with modifications)"
+    cmds:
+      - mvn -f packages/java/pom.xml -B spotless:apply
+
+  java:format:check:
+    desc: "Check Java formatting without modifications"
+    cmds:
+      - mvn -f packages/java/pom.xml -B spotless:check
 
 # C# tasks -----------------------------------------------------------------
   csharp:install:
@@ -602,17 +741,34 @@ tasks:
       - cmd: cd packages/csharp/HtmlToMarkdown.Tests && LD_LIBRARY_PATH=${GITHUB_WORKSPACE:-$PWD}/../../target/release:${LD_LIBRARY_PATH:-} DYLD_LIBRARY_PATH=${GITHUB_WORKSPACE:-$PWD}/../../target/release:${DYLD_LIBRARY_PATH:-} dotnet test
 
   csharp:lint:
-    desc: "Lint C# code (build with warnings as errors)"
+    desc: "Lint C# code WITH auto-fix"
     cmds:
+      - dotnet format packages/csharp/HtmlToMarkdown/HtmlToMarkdown.csproj
+      - dotnet format packages/csharp/HtmlToMarkdown.Tests/HtmlToMarkdown.Tests.csproj
+      - cmd: cd packages/csharp/HtmlToMarkdown && dotnet build /p:TreatWarningsAsErrors=true
+      - cmd: cd packages/csharp/HtmlToMarkdown.Tests && dotnet build /p:TreatWarningsAsErrors=true
+
+  csharp:lint:check:
+    desc: "Lint C# code WITHOUT auto-fix (check-only)"
+    cmds:
+      - dotnet format packages/csharp/HtmlToMarkdown/HtmlToMarkdown.csproj --verify-no-changes
+      - dotnet format packages/csharp/HtmlToMarkdown.Tests/HtmlToMarkdown.Tests.csproj --verify-no-changes
       - cmd: cd packages/csharp/HtmlToMarkdown && dotnet build /p:TreatWarningsAsErrors=true
       - cmd: cd packages/csharp/HtmlToMarkdown.Tests && dotnet build /p:TreatWarningsAsErrors=true
 
   csharp:format:
-    desc: "Format C# code with dotnet format"
+    desc: "Format C# code (with modifications)"
     cmds:
       - dotnet format packages/csharp/HtmlToMarkdown/HtmlToMarkdown.csproj
       - dotnet format packages/csharp/HtmlToMarkdown.Tests/HtmlToMarkdown.Tests.csproj
       - dotnet format examples/csharp-smoke/csharp-smoke.csproj
+
+  csharp:format:check:
+    desc: "Check C# formatting without modifications"
+    cmds:
+      - dotnet format packages/csharp/HtmlToMarkdown/HtmlToMarkdown.csproj --verify-no-changes
+      - dotnet format packages/csharp/HtmlToMarkdown.Tests/HtmlToMarkdown.Tests.csproj --verify-no-changes
+      - dotnet format examples/csharp-smoke/csharp-smoke.csproj --verify-no-changes
 
   # Example smoke tests ------------------------------------------------------
   examples:update:
@@ -702,14 +858,44 @@ tasks:
       - pnpm --filter html-to-markdown test
 
   typescript:lint:
-    desc: "Lint the TypeScript distribution"
+    desc: "Lint TypeScript WITH auto-fix"
+    cmds:
+      - pnpm --filter html-to-markdown run lint:fix
+
+  typescript:lint:check:
+    desc: "Lint TypeScript WITHOUT auto-fix (check-only)"
     cmds:
       - pnpm --filter html-to-markdown run lint
 
   typescript:format:
-    desc: "Format TypeScript sources"
+    desc: "Format TypeScript code (with modifications)"
     cmds:
-      - pnpm --filter html-to-markdown run lint:fix
+      - pnpm --filter html-to-markdown run format:fix
+
+  typescript:format:check:
+    desc: "Check TypeScript formatting without modifications"
+    cmds:
+      - pnpm --filter html-to-markdown run format:check
+
+  js:lint:
+    desc: "Lint JavaScript/TypeScript WITH auto-fix"
+    cmds:
+      - pnpm run lint:fix
+
+  js:lint:check:
+    desc: "Lint JavaScript/TypeScript WITHOUT auto-fix (check-only)"
+    cmds:
+      - pnpm run lint
+
+  js:format:
+    desc: "Format JavaScript/TypeScript (with modifications)"
+    cmds:
+      - pnpm run format:fix
+
+  js:format:check:
+    desc: "Check JavaScript/TypeScript formatting without modifications"
+    cmds:
+      - pnpm run format:check
 
   # Misc tasks ----------------------------------------------------------------
   sync-versions:

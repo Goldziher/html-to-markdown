@@ -10,6 +10,6 @@ final class ConversionFailed extends RuntimeException
 {
     public static function withMessage(string $message): self
     {
-        return new self(sprintf('Conversion failed: %s', $message));
+        return new self(\sprintf('Conversion failed: %s', $message));
     }
 }

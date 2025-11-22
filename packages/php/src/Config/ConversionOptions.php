@@ -15,7 +15,6 @@ use HtmlToMarkdown\Internal\TypeAssertions;
 
 final readonly class ConversionOptions
 {
-
     public PreprocessingOptions $preprocessing;
 
     /**
@@ -72,97 +71,97 @@ final readonly class ConversionOptions
         $defaults = new self();
 
         return new self(
-            headingStyle: array_key_exists('heading_style', $input)
+            headingStyle: \array_key_exists('heading_style', $input)
                 ? HeadingStyle::fromString(TypeAssertions::string($input['heading_style'], 'heading_style'))
                 : $defaults->headingStyle,
-            listIndentType: array_key_exists('list_indent_type', $input)
+            listIndentType: \array_key_exists('list_indent_type', $input)
                 ? ListIndentType::fromString(TypeAssertions::string($input['list_indent_type'], 'list_indent_type'))
                 : $defaults->listIndentType,
-            listIndentWidth: array_key_exists('list_indent_width', $input)
+            listIndentWidth: \array_key_exists('list_indent_width', $input)
                 ? TypeAssertions::positiveInt($input['list_indent_width'], 'list_indent_width')
                 : $defaults->listIndentWidth,
-            bullets: array_key_exists('bullets', $input)
+            bullets: \array_key_exists('bullets', $input)
                 ? TypeAssertions::string($input['bullets'], 'bullets')
                 : $defaults->bullets,
-            strongEmSymbol: array_key_exists('strong_em_symbol', $input)
+            strongEmSymbol: \array_key_exists('strong_em_symbol', $input)
                 ? self::normalizeStrongSymbol(TypeAssertions::string($input['strong_em_symbol'], 'strong_em_symbol'))
                 : $defaults->strongEmSymbol,
-            escapeAsterisks: array_key_exists('escape_asterisks', $input)
+            escapeAsterisks: \array_key_exists('escape_asterisks', $input)
                 ? TypeAssertions::bool($input['escape_asterisks'], 'escape_asterisks')
                 : $defaults->escapeAsterisks,
-            escapeUnderscores: array_key_exists('escape_underscores', $input)
+            escapeUnderscores: \array_key_exists('escape_underscores', $input)
                 ? TypeAssertions::bool($input['escape_underscores'], 'escape_underscores')
                 : $defaults->escapeUnderscores,
-            escapeMisc: array_key_exists('escape_misc', $input)
+            escapeMisc: \array_key_exists('escape_misc', $input)
                 ? TypeAssertions::bool($input['escape_misc'], 'escape_misc')
                 : $defaults->escapeMisc,
-            escapeAscii: array_key_exists('escape_ascii', $input)
+            escapeAscii: \array_key_exists('escape_ascii', $input)
                 ? TypeAssertions::bool($input['escape_ascii'], 'escape_ascii')
                 : $defaults->escapeAscii,
-            codeLanguage: array_key_exists('code_language', $input)
+            codeLanguage: \array_key_exists('code_language', $input)
                 ? TypeAssertions::string($input['code_language'], 'code_language')
                 : $defaults->codeLanguage,
-            autolinks: array_key_exists('autolinks', $input)
+            autolinks: \array_key_exists('autolinks', $input)
                 ? TypeAssertions::bool($input['autolinks'], 'autolinks')
                 : $defaults->autolinks,
-            defaultTitle: array_key_exists('default_title', $input)
+            defaultTitle: \array_key_exists('default_title', $input)
                 ? TypeAssertions::bool($input['default_title'], 'default_title')
                 : $defaults->defaultTitle,
-            brInTables: array_key_exists('br_in_tables', $input)
+            brInTables: \array_key_exists('br_in_tables', $input)
                 ? TypeAssertions::bool($input['br_in_tables'], 'br_in_tables')
                 : $defaults->brInTables,
-            hocrSpatialTables: array_key_exists('hocr_spatial_tables', $input)
+            hocrSpatialTables: \array_key_exists('hocr_spatial_tables', $input)
                 ? TypeAssertions::bool($input['hocr_spatial_tables'], 'hocr_spatial_tables')
                 : $defaults->hocrSpatialTables,
-            highlightStyle: array_key_exists('highlight_style', $input)
+            highlightStyle: \array_key_exists('highlight_style', $input)
                 ? HighlightStyle::fromString(TypeAssertions::string($input['highlight_style'], 'highlight_style'))
                 : $defaults->highlightStyle,
-            extractMetadata: array_key_exists('extract_metadata', $input)
+            extractMetadata: \array_key_exists('extract_metadata', $input)
                 ? TypeAssertions::bool($input['extract_metadata'], 'extract_metadata')
                 : $defaults->extractMetadata,
-            whitespaceMode: array_key_exists('whitespace_mode', $input)
+            whitespaceMode: \array_key_exists('whitespace_mode', $input)
                 ? WhitespaceMode::fromString(TypeAssertions::string($input['whitespace_mode'], 'whitespace_mode'))
                 : $defaults->whitespaceMode,
-            stripNewlines: array_key_exists('strip_newlines', $input)
+            stripNewlines: \array_key_exists('strip_newlines', $input)
                 ? TypeAssertions::bool($input['strip_newlines'], 'strip_newlines')
                 : $defaults->stripNewlines,
-            wrap: array_key_exists('wrap', $input)
+            wrap: \array_key_exists('wrap', $input)
                 ? TypeAssertions::bool($input['wrap'], 'wrap')
                 : $defaults->wrap,
-            wrapWidth: array_key_exists('wrap_width', $input)
+            wrapWidth: \array_key_exists('wrap_width', $input)
                 ? TypeAssertions::positiveInt($input['wrap_width'], 'wrap_width')
                 : $defaults->wrapWidth,
-            convertAsInline: array_key_exists('convert_as_inline', $input)
+            convertAsInline: \array_key_exists('convert_as_inline', $input)
                 ? TypeAssertions::bool($input['convert_as_inline'], 'convert_as_inline')
                 : $defaults->convertAsInline,
-            subSymbol: array_key_exists('sub_symbol', $input)
+            subSymbol: \array_key_exists('sub_symbol', $input)
                 ? TypeAssertions::string($input['sub_symbol'], 'sub_symbol')
                 : $defaults->subSymbol,
-            supSymbol: array_key_exists('sup_symbol', $input)
+            supSymbol: \array_key_exists('sup_symbol', $input)
                 ? TypeAssertions::string($input['sup_symbol'], 'sup_symbol')
                 : $defaults->supSymbol,
-            newlineStyle: array_key_exists('newline_style', $input)
+            newlineStyle: \array_key_exists('newline_style', $input)
                 ? NewlineStyle::fromString(TypeAssertions::string($input['newline_style'], 'newline_style'))
                 : $defaults->newlineStyle,
-            codeBlockStyle: array_key_exists('code_block_style', $input)
+            codeBlockStyle: \array_key_exists('code_block_style', $input)
                 ? CodeBlockStyle::fromString(TypeAssertions::string($input['code_block_style'], 'code_block_style'))
                 : $defaults->codeBlockStyle,
-            keepInlineImagesIn: array_key_exists('keep_inline_images_in', $input)
+            keepInlineImagesIn: \array_key_exists('keep_inline_images_in', $input)
                 ? TypeAssertions::stringList($input['keep_inline_images_in'], 'keep_inline_images_in')
                 : $defaults->keepInlineImagesIn,
-            encoding: array_key_exists('encoding', $input)
+            encoding: \array_key_exists('encoding', $input)
                 ? TypeAssertions::string($input['encoding'], 'encoding')
                 : $defaults->encoding,
-            debug: array_key_exists('debug', $input)
+            debug: \array_key_exists('debug', $input)
                 ? TypeAssertions::bool($input['debug'], 'debug')
                 : $defaults->debug,
-            stripTags: array_key_exists('strip_tags', $input)
+            stripTags: \array_key_exists('strip_tags', $input)
                 ? TypeAssertions::stringList($input['strip_tags'], 'strip_tags')
                 : $defaults->stripTags,
-            preserveTags: array_key_exists('preserve_tags', $input)
+            preserveTags: \array_key_exists('preserve_tags', $input)
                 ? TypeAssertions::stringList($input['preserve_tags'], 'preserve_tags')
                 : $defaults->preserveTags,
-            preprocessing: array_key_exists('preprocessing', $input)
+            preprocessing: \array_key_exists('preprocessing', $input)
                 ? PreprocessingOptions::fromArray(self::normalizeArray($input['preprocessing'], 'preprocessing'))
                 : $defaults->preprocessing,
         );
@@ -252,7 +251,7 @@ final readonly class ConversionOptions
             $payload['code_block_style'] = $this->codeBlockStyle->value;
         }
         if ($this->keepInlineImagesIn !== $defaults->keepInlineImagesIn && $this->keepInlineImagesIn !== []) {
-            $payload['keep_inline_images_in'] = array_values($this->keepInlineImagesIn);
+            $payload['keep_inline_images_in'] = \array_values($this->keepInlineImagesIn);
         }
         if (!$this->preprocessing->isDefault()) {
             $payload['preprocessing'] = $this->preprocessing->toArray();
@@ -264,10 +263,10 @@ final readonly class ConversionOptions
             $payload['debug'] = $this->debug;
         }
         if ($this->stripTags !== $defaults->stripTags && $this->stripTags !== []) {
-            $payload['strip_tags'] = array_values($this->stripTags);
+            $payload['strip_tags'] = \array_values($this->stripTags);
         }
         if ($this->preserveTags !== $defaults->preserveTags && $this->preserveTags !== []) {
-            $payload['preserve_tags'] = array_values($this->preserveTags);
+            $payload['preserve_tags'] = \array_values($this->preserveTags);
         }
 
         return $payload;
@@ -278,8 +277,8 @@ final readonly class ConversionOptions
      */
     private static function normalizeArray(mixed $value, string $key): array
     {
-        if (!is_array($value)) {
-            throw InvalidOption::because($key, sprintf('expected array, got %s', get_debug_type($value)));
+        if (!\is_array($value)) {
+            throw InvalidOption::because($key, \sprintf('expected array, got %s', \get_debug_type($value)));
         }
 
         return $value;
@@ -287,7 +286,7 @@ final readonly class ConversionOptions
 
     private static function normalizeStrongSymbol(string $value): string
     {
-        $length = mb_strlen($value, 'UTF-8');
+        $length = \mb_strlen($value, 'UTF-8');
         if ($length !== 1) {
             throw InvalidOption::because('strong_em_symbol', 'must be a single character');
         }
@@ -305,7 +304,7 @@ final readonly class ConversionOptions
 
     private function assertSingleCharacter(string $value, string $option): void
     {
-        $length = mb_strlen($value, 'UTF-8');
+        $length = \mb_strlen($value, 'UTF-8');
         if ($length !== 1) {
             throw InvalidOption::because($option, 'must be a single character');
         }

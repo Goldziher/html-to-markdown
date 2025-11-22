@@ -6,8 +6,13 @@ use PhpCsFixer\Config;
 use PhpCsFixer\Finder;
 
 $finder = Finder::create()
-    ->files()
     ->in(__DIR__)
+    ->exclude('vendor')
+    ->exclude('var')
+    ->exclude('pecl')
+    ->exclude('bin')
+    ->files()
+    ->name('*.php')
     ->path('#^src/#')
     ->path('#^tests/#')
     ->notName('*.blade.php');

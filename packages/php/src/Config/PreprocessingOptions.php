@@ -32,16 +32,16 @@ final readonly class PreprocessingOptions
         $defaults = new self();
 
         return new self(
-            enabled: array_key_exists('enabled', $input)
+            enabled: \array_key_exists('enabled', $input)
                 ? TypeAssertions::bool($input['enabled'], 'preprocessing.enabled')
                 : $defaults->enabled,
-            preset: array_key_exists('preset', $input)
+            preset: \array_key_exists('preset', $input)
                 ? PreprocessingPreset::fromString(TypeAssertions::string($input['preset'], 'preprocessing.preset'))
                 : $defaults->preset,
-            removeNavigation: array_key_exists('remove_navigation', $input)
+            removeNavigation: \array_key_exists('remove_navigation', $input)
                 ? TypeAssertions::bool($input['remove_navigation'], 'preprocessing.remove_navigation')
                 : $defaults->removeNavigation,
-            removeForms: array_key_exists('remove_forms', $input)
+            removeForms: \array_key_exists('remove_forms', $input)
                 ? TypeAssertions::bool($input['remove_forms'], 'preprocessing.remove_forms')
                 : $defaults->removeForms,
         );

@@ -27,7 +27,7 @@ final class InlineImageFormat
 
     public function isKnown(): bool
     {
-        return in_array($this->value, self::KNOWN_FORMATS, true);
+        return \in_array($this->value, self::KNOWN_FORMATS, true);
     }
 
     public function equals(self $other): bool

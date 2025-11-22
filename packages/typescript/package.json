@@ -44,6 +44,8 @@
     "clean": "rm -rf dist",
     "lint": "biome check src",
     "lint:fix": "biome check --write src",
+    "format:fix": "biome check --write src",
+    "format:check": "biome check src",
     "test": "pnpm --filter html-to-markdown-node run build && vitest run",
     "test:watch": "vitest"
   },
