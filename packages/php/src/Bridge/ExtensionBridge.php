@@ -21,7 +21,7 @@ final class ExtensionBridge implements ExtensionBridgeContract
     {
         /** @var callable-string $callable */
         $callable = self::CONVERT_FUNCTION;
-        if (!function_exists($callable)) {
+        if (!\function_exists($callable)) {
             throw ExtensionNotLoaded::create();
         }
 
@@ -48,7 +48,7 @@ final class ExtensionBridge implements ExtensionBridgeContract
     ): array {
         /** @var callable-string $callable */
         $callable = self::CONVERT_INLINE_FUNCTION;
-        if (!function_exists($callable)) {
+        if (!\function_exists($callable)) {
             throw ExtensionNotLoaded::create();
         }
 
@@ -59,7 +59,7 @@ final class ExtensionBridge implements ExtensionBridgeContract
             throw ConversionFailed::withMessage($exception->getMessage());
         }
 
-        if (!is_array($payload)) {
+        if (!\is_array($payload)) {
             throw InvalidOption::because(
                 'convert_with_inline_images',
                 'extension returned unexpected payload',

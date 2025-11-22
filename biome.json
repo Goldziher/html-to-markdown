@@ -1,64 +1,64 @@
 {
-  "$schema": "https://biomejs.dev/schemas/2.2.6/schema.json",
-  "vcs": {
-    "enabled": true,
-    "clientKind": "git",
-    "useIgnoreFile": true
-  },
-  "files": {
-    "ignoreUnknown": true,
-    "includes": [
-      "packages/**/*.js",
-      "packages/**/*.jsx",
-      "packages/**/*.ts",
-      "packages/**/*.tsx",
-      "packages/**/*.json",
-      "packages/**/*.jsonc",
-      "crates/**/*.js",
-      "crates/**/*.ts",
-      "crates/**/*.json"
-    ]
-  },
-  "overrides": [
-    {
-      "includes": [
-        "**/html-to-markdown-node/index.js",
-        "**/html-to-markdown-node/index.d.ts",
-        "**/html-to-markdown-wasm/**/*.js",
-        "**/html-to-markdown-wasm/**/*.d.ts",
-        "docs/html_to_markdown_wasm.js",
-        "docs/html_to_markdown_wasm_bg.wasm"
-      ],
-      "linter": {
-        "enabled": false
-      },
-      "formatter": {
-        "enabled": false
-      }
-    }
-  ],
-  "formatter": {
-    "enabled": true,
-    "indentStyle": "space",
-    "indentWidth": 2,
-    "lineWidth": 120
-  },
-  "javascript": {
-    "formatter": {
-      "quoteStyle": "double",
-      "trailingCommas": "all",
-      "semicolons": "always"
-    }
-  },
-  "json": {
-    "formatter": {
-      "trailingCommas": "none"
-    }
-  },
-  "linter": {
-    "enabled": true,
-    "rules": {
-      "recommended": true
-    }
-  }
+	"$schema": "https://biomejs.dev/schemas/2.3.5/schema.json",
+	"vcs": {
+		"enabled": true,
+		"clientKind": "git",
+		"useIgnoreFile": true
+	},
+	"files": {
+		"ignoreUnknown": true,
+		"includes": [
+			"packages/**/*.js",
+			"packages/**/*.jsx",
+			"packages/**/*.ts",
+			"packages/**/*.tsx",
+			"packages/**/*.json",
+			"packages/**/*.jsonc",
+			"crates/**/*.js",
+			"crates/**/*.ts",
+			"crates/**/*.json"
+		]
+	},
+	"overrides": [
+		{
+			"includes": [
+				"**/html-to-markdown-node/index.js",
+				"**/html-to-markdown-node/index.d.ts",
+				"**/html-to-markdown-wasm/**/*.js",
+				"**/html-to-markdown-wasm/**/*.d.ts",
+				"docs/html_to_markdown_wasm.js",
+				"docs/html_to_markdown_wasm_bg.wasm"
+			],
+			"linter": {
+				"enabled": false
+			},
+			"formatter": {
+				"enabled": false
+			}
+		}
+	],
+	"formatter": {
+		"enabled": true,
+		"indentStyle": "tab",
+		"indentWidth": 4,
+		"lineWidth": 120
+	},
+	"javascript": {
+		"formatter": {
+			"quoteStyle": "double",
+			"trailingCommas": "all",
+			"semicolons": "always"
+		}
+	},
+	"json": {
+		"formatter": {
+			"trailingCommas": "none"
+		}
+	},
+	"linter": {
+		"enabled": true,
+		"rules": {
+			"recommended": true
+		}
+	}
 }

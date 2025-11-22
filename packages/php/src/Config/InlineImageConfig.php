@@ -31,16 +31,16 @@ final readonly class InlineImageConfig
         $defaults = new self();
 
         return new self(
-            maxDecodedSizeBytes: array_key_exists('max_decoded_size_bytes', $input)
+            maxDecodedSizeBytes: \array_key_exists('max_decoded_size_bytes', $input)
                 ? TypeAssertions::positiveInt($input['max_decoded_size_bytes'], 'inline_image_config.max_decoded_size_bytes')
                 : $defaults->maxDecodedSizeBytes,
-            filenamePrefix: array_key_exists('filename_prefix', $input)
+            filenamePrefix: \array_key_exists('filename_prefix', $input)
                 ? TypeAssertions::stringOrNull($input['filename_prefix'], 'inline_image_config.filename_prefix')
                 : $defaults->filenamePrefix,
-            captureSvg: array_key_exists('capture_svg', $input)
+            captureSvg: \array_key_exists('capture_svg', $input)
                 ? TypeAssertions::bool($input['capture_svg'], 'inline_image_config.capture_svg')
                 : $defaults->captureSvg,
-            inferDimensions: array_key_exists('infer_dimensions', $input)
+            inferDimensions: \array_key_exists('infer_dimensions', $input)
                 ? TypeAssertions::bool($input['infer_dimensions'], 'inline_image_config.infer_dimensions')
                 : $defaults->inferDimensions,
         );

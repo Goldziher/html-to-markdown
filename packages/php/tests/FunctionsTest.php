@@ -4,10 +4,11 @@ declare(strict_types=1);
 
 namespace HtmlToMarkdown\Tests;
 
-use HtmlToMarkdown\HtmlToMarkdown;
-use HtmlToMarkdown\Value\InlineImageExtraction;
 use function HtmlToMarkdown\convert;
 use function HtmlToMarkdown\convert_with_inline_images;
+
+use HtmlToMarkdown\HtmlToMarkdown;
+use HtmlToMarkdown\Value\InlineImageExtraction;
 
 final class FunctionsTest extends TestCase
 {

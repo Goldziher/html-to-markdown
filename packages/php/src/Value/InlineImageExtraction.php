@@ -22,7 +22,7 @@ final readonly class InlineImageExtraction
      */
     public static function fromExtensionPayload(array $payload): self
     {
-        if (!array_key_exists('markdown', $payload) || !is_string($payload['markdown'])) {
+        if (!\array_key_exists('markdown', $payload) || !\is_string($payload['markdown'])) {
             throw \HtmlToMarkdown\Exception\InvalidOption::because(
                 'inline_image_extraction.markdown',
                 'extension returned unexpected payload',
@@ -30,19 +30,19 @@ final readonly class InlineImageExtraction
         }
 
         $inlineImagesPayload = $payload['inline_images'] ?? [];
-        if (!is_array($inlineImagesPayload)) {
+        if (!\is_array($inlineImagesPayload)) {
             throw \HtmlToMarkdown\Exception\InvalidOption::because(
                 'inline_image_extraction.inline_images',
-                'expected list, got ' . get_debug_type($inlineImagesPayload),
+                'expected list, got ' . \get_debug_type($inlineImagesPayload),
             );
         }
 
         $inlineImages = [];
         foreach ($inlineImagesPayload as $image) {
-            if (!is_array($image)) {
+            if (!\is_array($image)) {
                 throw \HtmlToMarkdown\Exception\InvalidOption::because(
                     'inline_image_extraction.inline_images[]',
-                    'expected array, got ' . get_debug_type($image),
+                    'expected array, got ' . \get_debug_type($image),
                 );
             }
 
@@ -50,16 +50,16 @@ final readonly class InlineImageExtraction
         }
 
         $warningsPayload = $payload['warnings'] ?? [];
-        if (!is_array($warningsPayload)) {
+        if (!\is_array($warningsPayload)) {
             throw \HtmlToMarkdown\Exception\InvalidOption::because(
                 'inline_image_extraction.warnings',
-                'expected list, got ' . get_debug_type($warningsPayload),
+                'expected list, got ' . \get_debug_type($warningsPayload),
             );
         }
 
         $warnings = [];
         foreach ($warningsPayload as $warning) {
-            if (!is_array($warning) || !array_key_exists('index', $warning) || !array_key_exists('message', $warning)) {
+            if (!\is_array($warning) || !\array_key_exists('index', $warning) || !\array_key_exists('message', $warning)) {
                 throw \HtmlToMarkdown\Exception\InvalidOption::because(
                     'inline_image_extraction.warnings[]',
                     'expected array{index:int,message:string}',
@@ -83,7 +83,7 @@ final readonly class InlineImageExtraction
     {
         return [
             'markdown' => $this->markdown,
-            'inline_images' => array_map(
+            'inline_images' => \array_map(
                 static fn (InlineImage $image): array => [
                     'data' => $image->data,
                     'format' => (string) $image->format,
@@ -97,7 +97,7 @@ final readonly class InlineImageExtraction
                 ],
                 $this->inlineImages,
             ),
-            'warnings' => array_map(
+            'warnings' => \array_map(
                 static fn (InlineImageWarning $warning): array => [
                     'index' => $warning->index,
                     'message' => $warning->message,
