@@ -105,10 +105,15 @@ for html in documents:
 from html_to_markdown import ConversionOptions, PreprocessingOptions, convert
 
 options = ConversionOptions(
-    preprocessing=PreprocessingOptions(enabled=True, preset="aggressive"),
+    ...
 )
 
-markdown = convert(scraped_html, options)
+preprocessing = PreprocessingOptions(
+    enabled=True,
+    preset="aggressive",
+)
+
+markdown = convert(scraped_html, options, preprocessing)
 ```
 
 ### Inline Image Extraction
