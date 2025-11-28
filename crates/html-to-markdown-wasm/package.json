@@ -55,7 +55,7 @@
   "devDependencies": {
     "@types/node": "^24.10.1",
     "tsx": "^4.20.6",
-    "vitest": "^4.0.11",
+    "vitest": "^4.0.14",
     "wasm-pack": "^0.13.1"
   },
   "publishConfig": {

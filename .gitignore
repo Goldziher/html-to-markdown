@@ -78,6 +78,11 @@ Thumbs.db
 .benchmarks/
 tools/runtime-bench/results/
 
+# Cache files
+*.cache
+.cache/
+packages/php/.php-cs-fixer.cache
+
 # Environment & virtualenvs
 .env
 .env.local

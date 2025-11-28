@@ -61,7 +61,7 @@
     "@napi-rs/cli": "^3.4.1",
     "@types/node": "^24.10.1",
     "tsx": "^4.20.6",
-    "vitest": "^4.0.11"
+    "vitest": "^4.0.14"
   },
   "dependencies": {
     "@emnapi/runtime": "1.7.1",
