@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.9.2] - 2025-11-28
+
+### Fixed
+- **UTF-8 safety (Fix #127)** – Guarded whitespace trimming against mid-codepoint truncation, eliminating byte-boundary panics on multilingual documents; added fixture and regression test for the reported Ruby-path crash.
+- **Image conversion (Fix #128)** – `<img>` elements with `width`/`height` now render as Markdown images instead of raw HTML; regression test covers inline-data URIs with dimensions.
+
 ## [2.9.1] - 2025-11-22
 
 ### Changed
