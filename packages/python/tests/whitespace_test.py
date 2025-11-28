@@ -149,7 +149,7 @@ def test_empty_elements(convert: Callable[..., str]) -> None:
 
 def test_whitespace_only_elements(convert: Callable[..., str]) -> None:
     assert convert("<div>   </div>", whitespace_mode="normalized").strip() == ""
-    assert "\n\t" in convert("<pre>\n\t</pre>", whitespace_mode="normalized")
+    assert convert("<pre>\n\t</pre>", whitespace_mode="normalized") == "```\n\n\n```\n"
 
 
 def test_complex_real_world_example(convert: Callable[..., str]) -> None:

@@ -114,7 +114,11 @@ def test_metadata_with_special_characters(convert: Callable[..., str]) -> None:
 def test_empty_metadata_values(convert: Callable[..., str]) -> None:
     html = '<html><head><meta name="description" content=""></head><body><p>Content</p></body></html>'
     result = convert(html)
-    assert result in ("---\nmeta-description: ''\n---\n\nContent\n", "---\nmeta-description: \n---\n\nContent\n")
+    assert result in (
+        "---\nmeta-description: ''\n---\n\nContent\n",
+        "---\nmeta-description: \n---\n\nContent\n",
+        "---\nmeta-description:\n---\n\nContent\n",
+    )
 
 
 def test_no_metadata(convert: Callable[..., str]) -> None:

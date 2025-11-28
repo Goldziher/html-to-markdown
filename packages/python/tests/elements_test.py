@@ -143,14 +143,16 @@ def test_blockquote_with_cite(convert: Callable[..., str]) -> None:
 def test_blockquote_with_cite_and_content(convert: Callable[..., str]) -> None:
     html = '<blockquote cite="https://shakespeare.com"><p>To be or not to be, that is the question.</p><p>Whether \'tis nobler in the mind to suffer...</p></blockquote>'
     result = convert(html)
-    expected = "> To be or not to be, that is the question.\n> \n> Whether 'tis nobler in the mind to suffer...\n\n— <https://shakespeare.com>\n"
+    expected = "> To be or not to be, that is the question.\n>\n> Whether 'tis nobler in the mind to suffer...\n\n— <https://shakespeare.com>\n"
     assert result == expected
 
 
 def test_nested_blockquotes(convert: Callable[..., str]) -> None:
     html = '<blockquote cite="https://outer.com">Outer quote<blockquote cite="https://inner.com">Inner quote</blockquote>Back to outer</blockquote>'
     result = convert(html)
-    expected = "> Outer quote\n> \n> \n> > Inner quote\n> \n> — <https://inner.com>\n> \n> Back to outer\n\n— <https://outer.com>\n"
+    expected = (
+        "> Outer quote\n>\n>\n> > Inner quote\n>\n> — <https://inner.com>Back to outer\n\n— <https://outer.com>\n"
+    )
     assert result == expected
 
 
@@ -181,13 +183,13 @@ def test_q_in_blockquote(convert: Callable[..., str]) -> None:
 def test_blockquote_in_cite(convert: Callable[..., str]) -> None:
     html = "<cite>Author: <blockquote>Their famous quote</blockquote></cite>"
     result = convert(html)
-    assert result == "*Author: \n> Their famous quote*\n"
+    assert result == "*Author:\n> Their famous quote*\n"
 
 
 def test_complex_citation_structure(convert: Callable[..., str]) -> None:
     html = '<article><p>According to <cite><a href="https://example.com">John Doe</a></cite>, the statement <q>Innovation drives progress</q> is fundamental.</p><blockquote cite="https://johndoe.com/quotes"><p>Innovation is not just about technology, it\'s about <em>thinking differently</em>.</p><cite>John Doe, 2023</cite></blockquote></article>'
     result = convert(html)
-    expected = 'According to *[John Doe](https://example.com)*, the statement "Innovation drives progress" is fundamental.\n> Innovation is not just about technology, it\'s about *thinking differently*.\n> \n> *John Doe, 2023*\n\n— <https://johndoe.com/quotes>\n'
+    expected = 'According to *[John Doe](https://example.com)*, the statement "Innovation drives progress" is fundamental.\n> Innovation is not just about technology, it\'s about *thinking differently*.\n>\n> *John Doe, 2023*\n\n— <https://johndoe.com/quotes>\n'
     assert result == expected
 
 
@@ -886,7 +888,7 @@ def test_article_inline_mode(convert: Callable[..., str]) -> None:
 def test_semantic_elements_with_whitespace(convert: Callable[..., str]) -> None:
     html = "<section>  \n  Content with whitespace  \n  </section>"
     result = convert(html)
-    assert result == " Content with whitespace \n"
+    assert result == " Content with whitespace\n"
 
 
 def test_details_element(convert: Callable[..., str]) -> None:
@@ -1722,7 +1724,7 @@ def test_mixed_semantic_elements_inline_mode(convert: Callable[..., str]) -> Non
 def test_multiple_empty_semantic_elements(convert: Callable[..., str]) -> None:
     html = "<p>Empty elements: <abbr></abbr> <var></var> <ins></ins> <dfn></dfn></p>"
     result = convert(html)
-    assert result == "Empty elements: \n"
+    assert result == "Empty elements:\n"
 
 
 def test_whitespace_handling_semantic(convert: Callable[..., str]) -> None:

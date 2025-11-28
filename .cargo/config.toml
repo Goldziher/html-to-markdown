@@ -15,4 +15,3 @@ linker = "aarch64-linux-gnu-gcc"
 
 [env]
 RUBY = { value = "scripts/preferred-ruby.sh", relative = true }
-RUSTC = { value = "scripts/preferred-rustc.sh", relative = true }
