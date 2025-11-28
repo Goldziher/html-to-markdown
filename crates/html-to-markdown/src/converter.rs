@@ -3020,10 +3020,6 @@ fn walk_node(
 
                     let title = tag.attributes().get("title").flatten().map(|v| v.as_utf8_str());
 
-                    let width = tag.attributes().get("width").flatten().map(|v| v.as_utf8_str());
-
-                    let height = tag.attributes().get("height").flatten().map(|v| v.as_utf8_str());
-
                     #[cfg(feature = "inline-images")]
                     if let Some(ref collector_ref) = ctx.inline_collector {
                         let mut attributes_map = BTreeMap::new();
@@ -3064,27 +3060,6 @@ fn walk_node(
 
                     if should_use_alt_text {
                         output.push_str(&alt);
-                    } else if width.is_some() || height.is_some() {
-                        output.push_str("<img src='");
-                        output.push_str(&src);
-                        output.push_str("' alt='");
-                        output.push_str(&alt);
-                        output.push_str("' title='");
-                        if let Some(title_text) = &title {
-                            output.push_str(title_text);
-                        }
-                        output.push('\'');
-                        if let Some(w) = &width {
-                            output.push_str(" width='");
-                            output.push_str(w);
-                            output.push('\'');
-                        }
-                        if let Some(h) = &height {
-                            output.push_str(" height='");
-                            output.push_str(h);
-                            output.push('\'');
-                        }
-                        output.push_str(" />");
                     } else {
                         output.push_str("![");
                         output.push_str(&alt);
@@ -5191,7 +5166,21 @@ fn walk_node(
 
                     let len_after = output.len();
                     if len_after > len_before {
-                        let added_content = output[len_before..].to_string();
+                        // Child processing can pop a trailing byte before appending new content,
+                        // so len_before might land inside a multi-byte char; clamp to a safe boundary.
+                        let start_idx = if output.is_char_boundary(len_before) {
+                            len_before
+                        } else {
+                            let capped = len_before.min(output.len());
+                            output
+                                .char_indices()
+                                .map(|(idx, _)| idx)
+                                .take_while(|idx| *idx <= capped)
+                                .last()
+                                .unwrap_or(capped)
+                        };
+
+                        let added_content = output[start_idx..].to_string();
                         if options.debug {
                             eprintln!(
                                 "[DEBUG] <{}> added {:?}, trim={:?}, had_trailing_space={}",
@@ -5215,7 +5204,7 @@ fn walk_node(
                         }
 
                         if added_content.trim().is_empty() && !is_code_block {
-                            output.truncate(len_before);
+                            output.truncate(start_idx);
                             if !had_trailing_space && added_content.contains(' ') {
                                 output.push(' ');
                             }
