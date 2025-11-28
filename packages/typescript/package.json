@@ -1,6 +1,6 @@
 {
   "name": "html-to-markdown",
-  "version": "2.9.1",
+  "version": "2.9.2",
   "description": "High-performance HTML to Markdown converter for TypeScript/Node.js with a Rust core.",
   "keywords": [
     "html",
