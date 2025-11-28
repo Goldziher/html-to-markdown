@@ -12,6 +12,7 @@ This script reads the version from Cargo.toml [workspace.package] and updates:
 import json
 import re
 import sys
+from dataclasses import dataclass
 from pathlib import Path
 
 
@@ -251,6 +252,133 @@ def update_pom_version(file_path: Path, version: str) -> tuple[bool, str, str]:
     return True, old_version, version
 
 
+@dataclass
+class SyncReport:
+    updated: list[str]
+    unchanged: list[str]
+
+    def record(self, rel_path: Path, changed: bool, detail: str | None = None) -> None:
+        if changed:
+            if detail:
+                print(f"✓ {rel_path}: {detail}")
+            else:
+                print(f"✓ {rel_path}")
+            self.updated.append(str(rel_path))
+        else:
+            self.unchanged.append(str(rel_path))
+
+
+def sync_package_jsons(repo_root: Path, version: str, report: SyncReport) -> None:
+    """Sync package.json files, skipping build artifacts/deps."""
+    for pkg_json in repo_root.rglob("package.json"):
+        if any(part in pkg_json.parts for part in ["node_modules", ".git", "target"]):
+            continue
+        if "wasm" in str(pkg_json) and any(part.startswith("dist") for part in pkg_json.parts):
+            continue
+
+        changed, old_ver, new_ver = update_package_json(pkg_json, version)
+        report.record(pkg_json.relative_to(repo_root), changed, f"{old_ver} → {new_ver}")
+
+
+def sync_pyprojects(repo_root: Path, version: str, report: SyncReport) -> None:
+    for pyproject in [
+        repo_root / "packages/python/pyproject.toml",
+        repo_root / "crates/html-to-markdown-py/pyproject.toml",
+    ]:
+        if pyproject.exists():
+            changed, old_ver, new_ver = update_pyproject_toml(pyproject, version)
+            report.record(pyproject.relative_to(repo_root), changed, f"{old_ver} → {new_ver}")
+
+
+def sync_ruby(repo_root: Path, version: str, report: SyncReport) -> None:
+    ruby_version = repo_root / "packages/ruby/lib/html_to_markdown/version.rb"
+    if ruby_version.exists():
+        changed, old_ver, new_ver = update_ruby_version(ruby_version, version)
+        report.record(ruby_version.relative_to(repo_root), changed, f"{old_ver} → {new_ver}")
+
+    gemfile_lock = repo_root / "packages/ruby/Gemfile.lock"
+    if gemfile_lock.exists():
+        changed, old_ver, new_ver = update_gemfile_lock(gemfile_lock, version)
+        report.record(gemfile_lock.relative_to(repo_root), changed, f"{old_ver} → {new_ver}")
+
+
+def sync_python_version_file(repo_root: Path, version: str, report: SyncReport) -> None:
+    python_version_file = repo_root / "packages/python/html_to_markdown/__init__.py"
+    if python_version_file.exists():
+        changed, old_ver, new_ver = update_python_version_file(python_version_file, version)
+        report.record(python_version_file.relative_to(repo_root), changed, f"{old_ver} → {new_ver}")
+
+
+def sync_mix(repo_root: Path, version: str, report: SyncReport) -> None:
+    mix_exs = repo_root / "packages/elixir/mix.exs"
+    if mix_exs.exists():
+        changed, old_ver, new_ver = update_mix_version(mix_exs, version)
+        report.record(mix_exs.relative_to(repo_root), changed, f"{old_ver} → {new_ver}")
+
+
+def sync_node_binding(repo_root: Path, version: str, report: SyncReport) -> None:
+    node_binding_index = repo_root / "crates/html-to-markdown-node/index.js"
+    if node_binding_index.exists():
+        changed, _, _ = update_node_binding_version(node_binding_index, version)
+        report.record(
+            node_binding_index.relative_to(repo_root), changed, f"updated binding version guards to {version}"
+        )
+
+
+def sync_csproj(repo_root: Path, version: str, report: SyncReport) -> None:
+    csproj = repo_root / "packages/csharp/HtmlToMarkdown/HtmlToMarkdown.csproj"
+    if csproj.exists():
+        changed, old_ver, new_ver = update_csproj_version(csproj, version)
+        report.record(csproj.relative_to(repo_root), changed, f"{old_ver} → {new_ver}")
+
+
+def sync_poms(repo_root: Path, version: str, report: SyncReport) -> None:
+    for pom in [repo_root / "packages/java/pom.xml", repo_root / "examples/java-smoke/pom.xml"]:
+        if pom.exists():
+            changed, old_ver, new_ver = update_pom_version(pom, version)
+            report.record(pom.relative_to(repo_root), changed, f"{old_ver} → {new_ver}")
+
+
+def sync_uv_lock(repo_root: Path, version: str, report: SyncReport) -> None:
+    uv_lock = repo_root / "uv.lock"
+    if uv_lock.exists():
+        changed, old_ver, new_ver = update_uv_lock(uv_lock, version)
+        report.record(uv_lock.relative_to(repo_root), changed, f"{old_ver} → {new_ver}")
+
+
+def sync_cargo_versions(repo_root: Path, version: str, report: SyncReport) -> None:
+    for cargo_toml in repo_root.rglob("Cargo.toml"):
+        if "target" in cargo_toml.parts:
+            continue
+        if cargo_toml == repo_root / "Cargo.toml":
+            continue
+
+        content = cargo_toml.read_text()
+        has_hardcoded = re.search(r'^version\s*=\s*"[^"]+"', content, re.MULTILINE)
+        if has_hardcoded and "version.workspace = true" not in content:
+            changed, old_ver, new_ver = update_cargo_toml(cargo_toml, version)
+            report.record(cargo_toml.relative_to(repo_root), changed, f"{old_ver} → {new_ver}")
+
+    for cargo_toml in repo_root.rglob("Cargo.toml"):
+        if "target" in cargo_toml.parts:
+            continue
+        if update_rust_dependency_versions(cargo_toml, version):
+            report.record(
+                cargo_toml.relative_to(repo_root), True, f"updated html-to-markdown-rs dependency → {version}"
+            )
+
+
+def summarize(version: str, report: SyncReport) -> None:
+    print("\n📊 Summary:")
+    print(f"   Updated: {len(report.updated)} files")
+    print(f"   Unchanged: {len(report.unchanged)} files")
+
+    if report.updated:
+        print(f"\n✨ Version sync complete! All files now at {version}\n")
+    else:
+        print(f"\n✨ All files already at {version}\n")
+
+
 def main() -> None:
     repo_root = get_repo_root()
 
@@ -262,185 +390,18 @@ def main() -> None:
 
     print(f"\n📦 Syncing version {version} from Cargo.toml\n")
 
-    updated_files: list[str] = []
-    unchanged_files: list[str] = []
-
-    # Update package.json files (excluding dist/, node_modules/, .git/)
-    for pkg_json in repo_root.rglob("package.json"):
-        # Skip build artifacts and dependencies
-        if any(part in pkg_json.parts for part in ["node_modules", ".git", "target"]):
-            continue
-        # Skip WASM dist directories (these are build artifacts)
-        if "wasm" in str(pkg_json) and any(part.startswith("dist") for part in pkg_json.parts):
-            continue
-
-        changed, old_ver, new_ver = update_package_json(pkg_json, version)
-        rel_path = pkg_json.relative_to(repo_root)
-
-        if changed:
-            print(f"✓ {rel_path}: {old_ver} → {new_ver}")
-            updated_files.append(str(rel_path))
-        else:
-            unchanged_files.append(str(rel_path))
-
-    # Update Python pyproject.toml files
-    for pyproject in [
-        repo_root / "packages/python/pyproject.toml",
-        repo_root / "crates/html-to-markdown-py/pyproject.toml",
-    ]:
-        if pyproject.exists():
-            changed, old_ver, new_ver = update_pyproject_toml(pyproject, version)
-            rel_path = pyproject.relative_to(repo_root)
-
-            if changed:
-                print(f"✓ {rel_path}: {old_ver} → {new_ver}")
-                updated_files.append(str(rel_path))
-            else:
-                unchanged_files.append(str(rel_path))
-
-    # Update Ruby version file
-    ruby_version = repo_root / "packages/ruby/lib/html_to_markdown/version.rb"
-    if ruby_version.exists():
-        changed, old_ver, new_ver = update_ruby_version(ruby_version, version)
-        rel_path = ruby_version.relative_to(repo_root)
-
-        if changed:
-            print(f"✓ {rel_path}: {old_ver} → {new_ver}")
-            updated_files.append(str(rel_path))
-        else:
-            unchanged_files.append(str(rel_path))
-
-    # Update Gemfile.lock for the Ruby gem
-    gemfile_lock = repo_root / "packages/ruby/Gemfile.lock"
-    if gemfile_lock.exists():
-        changed, old_ver, new_ver = update_gemfile_lock(gemfile_lock, version)
-        rel_path = gemfile_lock.relative_to(repo_root)
-
-        if changed:
-            print(f"✓ {rel_path}: {old_ver} → {new_ver}")
-            updated_files.append(str(rel_path))
-        else:
-            unchanged_files.append(str(rel_path))
-
-    # Update Python package __version__
-    python_version_file = repo_root / "packages/python/html_to_markdown/__init__.py"
-    if python_version_file.exists():
-        changed, old_ver, new_ver = update_python_version_file(python_version_file, version)
-        rel_path = python_version_file.relative_to(repo_root)
-
-        if changed:
-            print(f"✓ {rel_path}: {old_ver} → {new_ver}")
-            updated_files.append(str(rel_path))
-        else:
-            unchanged_files.append(str(rel_path))
-
-    # Update mix.exs for the Elixir bindings
-    mix_exs = repo_root / "packages/elixir/mix.exs"
-    if mix_exs.exists():
-        changed, old_ver, new_ver = update_mix_version(mix_exs, version)
-        rel_path = mix_exs.relative_to(repo_root)
-        if changed:
-            print(f"✓ {rel_path}: {old_ver} → {new_ver}")
-            updated_files.append(str(rel_path))
-        else:
-            unchanged_files.append(str(rel_path))
-
-    # Update Node binding runtime version checks
-    node_binding_index = repo_root / "crates/html-to-markdown-node/index.js"
-    if node_binding_index.exists():
-        changed, _, _ = update_node_binding_version(node_binding_index, version)
-        rel_path = node_binding_index.relative_to(repo_root)
-        if changed:
-            print(f"✓ {rel_path}: updated binding version guards to {version}")
-            updated_files.append(str(rel_path))
-        else:
-            unchanged_files.append(str(rel_path))
-
-    # Update C# package version
-    csproj = repo_root / "packages/csharp/HtmlToMarkdown/HtmlToMarkdown.csproj"
-    if csproj.exists():
-        changed, old_ver, new_ver = update_csproj_version(csproj, version)
-        rel_path = csproj.relative_to(repo_root)
-        if changed:
-            print(f"✓ {rel_path}: {old_ver} → {new_ver}")
-            updated_files.append(str(rel_path))
-        else:
-            unchanged_files.append(str(rel_path))
-
-    # Update Java pom version
-    pom = repo_root / "packages/java/pom.xml"
-    if pom.exists():
-        changed, old_ver, new_ver = update_pom_version(pom, version)
-        rel_path = pom.relative_to(repo_root)
-        if changed:
-            print(f"✓ {rel_path}: {old_ver} → {new_ver}")
-            updated_files.append(str(rel_path))
-        else:
-            unchanged_files.append(str(rel_path))
-
-    # Update Java smoke test pom to keep dependency versions aligned
-    smoke_pom = repo_root / "examples/java-smoke/pom.xml"
-    if smoke_pom.exists():
-        changed, old_ver, new_ver = update_pom_version(smoke_pom, version)
-        rel_path = smoke_pom.relative_to(repo_root)
-        if changed:
-            print(f"✓ {rel_path}: {old_ver} → {new_ver}")
-            updated_files.append(str(rel_path))
-        else:
-            unchanged_files.append(str(rel_path))
-
-    # Update uv.lock version pin
-    uv_lock = repo_root / "uv.lock"
-    if uv_lock.exists():
-        changed, old_ver, new_ver = update_uv_lock(uv_lock, version)
-        rel_path = uv_lock.relative_to(repo_root)
-        if changed:
-            print(f"✓ {rel_path}: {old_ver} → {new_ver}")
-            updated_files.append(str(rel_path))
-        else:
-            unchanged_files.append(str(rel_path))
-
-    # Update Cargo.toml files that don't use workspace version
-    print()
-    for cargo_toml in repo_root.rglob("Cargo.toml"):
-        # Skip the workspace Cargo.toml
-        if cargo_toml == repo_root / "Cargo.toml":
-            continue
-        # Skip target directories
-        if "target" in cargo_toml.parts:
-            continue
-
-        content = cargo_toml.read_text()
-        # Only process if it has a hardcoded version (not workspace)
-        if re.search(r'^version\s*=\s*"[^"]+"', content, re.MULTILINE) and "version.workspace = true" not in content:
-            changed, old_ver, new_ver = update_cargo_toml(cargo_toml, version)
-            rel_path = cargo_toml.relative_to(repo_root)
-
-            if changed:
-                print(f"✓ {rel_path}: {old_ver} → {new_ver}")
-                updated_files.append(str(rel_path))
-            else:
-                unchanged_files.append(str(rel_path))
-
-    # Update html-to-markdown-rs dependency pins across Cargo manifests (including the workspace root)
-    for cargo_toml in repo_root.rglob("Cargo.toml"):
-        if "target" in cargo_toml.parts:
-            continue
-
-        if update_rust_dependency_versions(cargo_toml, version):
-            rel_path = cargo_toml.relative_to(repo_root)
-            print(f"✓ {rel_path}: updated html-to-markdown-rs dependency → {version}")
-            updated_files.append(str(rel_path))
-
-    # Summary
-    print("\n📊 Summary:")
-    print(f"   Updated: {len(updated_files)} files")
-    print(f"   Unchanged: {len(unchanged_files)} files")
-
-    if updated_files:
-        print(f"\n✨ Version sync complete! All files now at {version}\n")
-    else:
-        print(f"\n✨ All files already at {version}\n")
+    report = SyncReport(updated=[], unchanged=[])
+    sync_package_jsons(repo_root, version, report)
+    sync_pyprojects(repo_root, version, report)
+    sync_ruby(repo_root, version, report)
+    sync_python_version_file(repo_root, version, report)
+    sync_mix(repo_root, version, report)
+    sync_node_binding(repo_root, version, report)
+    sync_csproj(repo_root, version, report)
+    sync_poms(repo_root, version, report)
+    sync_uv_lock(repo_root, version, report)
+    sync_cargo_versions(repo_root, version, report)
+    summarize(version, report)
 
 
 if __name__ == "__main__":
