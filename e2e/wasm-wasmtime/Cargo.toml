@@ -6,5 +6,5 @@ publish = false
 
 [dev-dependencies]
 anyhow = "1.0"
-wasmtime = "38"
+wasmtime = "39"
 html-to-markdown-rs = { path = "../../crates/html-to-markdown" }

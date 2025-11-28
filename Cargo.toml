@@ -31,8 +31,8 @@ html-to-markdown-rs = { version = "2.9.1", path = "crates/html-to-markdown" }
 
 # HTML parsing
 tl = { package = "astral-tl", version = "0.7.9" }
-html5ever = "0.35"
-markup5ever_rcdom = "0.35"
+html5ever = "0.36"
+markup5ever_rcdom = "0.36"
 
 # Utilities
 regex = "1.12"

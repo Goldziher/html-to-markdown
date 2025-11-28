@@ -8,6 +8,6 @@
     "check": "node index.mjs"
   },
   "dependencies": {
-    "html-to-markdown-node": "^2.8.3"
+    "html-to-markdown-node": "^2.9.1"
   }
 }
