@@ -117,7 +117,13 @@ fn trim_line_end_whitespace(output: &mut String) {
     let mut cleaned = String::with_capacity(output.len());
     for segment in output.split_inclusive('\n') {
         if let Some(line) = segment.strip_suffix('\n') {
-            cleaned.push_str(line.trim_end_matches([' ', '\t']));
+            let retained = if line.ends_with("  ") {
+                // Preserve two-space soft-break markers used for newline_style=Spaces
+                line.trim_end_matches([' ', '\t']).to_string() + "  "
+            } else {
+                line.trim_end_matches([' ', '\t']).to_string()
+            };
+            cleaned.push_str(&retained);
             cleaned.push('\n');
         } else {
             cleaned.push_str(segment.trim_end_matches([' ', '\t']));
