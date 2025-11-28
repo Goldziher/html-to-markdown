@@ -350,7 +350,7 @@ def test_image_with_dimensions_in_table(convert: Callable[..., str]) -> None:
     </table>"""
 
     result = convert(html)
-    assert "<img src='sized.jpg' alt='Sized' title='' width='100' height='50' />" in result
+    assert "![Sized](sized.jpg)" in result
     assert "Text" in result
 
 

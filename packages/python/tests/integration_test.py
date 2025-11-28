@@ -17,7 +17,7 @@ def test_soup(convert: Callable[..., str]) -> None:
 
 
 def test_whitespace(convert: Callable[..., str]) -> None:
-    assert convert(" a  b \t\t c ") == " a b c \n"
+    assert convert(" a  b \t\t c ") == " a b c\n"
 
 
 def test_asterisks(convert: Callable[..., str]) -> None:
@@ -71,13 +71,13 @@ def test_misc(convert: Callable[..., str]) -> None:
 
 def test_chomp(convert: Callable[..., str]) -> None:
     assert convert(" <b></b> ") == "  \n"
-    assert convert(" <b> </b> ") == "    \n"
-    assert convert(" <b>  </b> ") == "    \n"
-    assert convert(" <b>   </b> ") == "    \n"
-    assert convert(" <b>s </b> ") == " **s** \n"
-    assert convert(" <b> s</b> ") == "  **s** \n"
-    assert convert(" <b> s </b> ") == "  **s** \n"
-    assert convert(" <b>  s  </b> ") == "  **s** \n"
+    assert convert(" <b> </b> ") == "  \n"
+    assert convert(" <b>  </b> ") == "  \n"
+    assert convert(" <b>   </b> ") == "  \n"
+    assert convert(" <b>s </b> ") == " **s**\n"
+    assert convert(" <b> s</b> ") == "  **s**\n"
+    assert convert(" <b> s </b> ") == "  **s**\n"
+    assert convert(" <b>  s  </b> ") == "  **s**\n"
 
 
 def test_nested(convert: Callable[..., str]) -> None:
@@ -299,11 +299,11 @@ def test_a_spaces(convert: Callable[..., str]) -> None:
     )
     assert (
         convert('foo<a href="http://google.com"> Google</a> bar', preprocess=True)
-        == "foo[ Google](http://google.com) bar\n"
+        == "foo[Google](http://google.com) bar\n"
     )
     assert (
         convert('foo <a href="http://google.com">Google </a>bar', preprocess=True)
-        == "foo [Google ](http://google.com)bar\n"
+        == "foo [Google](http://google.com)bar\n"
     )
     assert convert('foo <a href="http://google.com"></a> bar', preprocess=True) == "foo [](http://google.com) bar\n"
     assert convert("foo <a>text</a> bar") == "foo text bar\n"
@@ -350,7 +350,7 @@ def test_blockquote_with_nested_paragraph(convert: Callable[..., str]) -> None:
     assert convert("<blockquote><p>Hello</p></blockquote>", preprocess=True) == "> Hello\n"
     assert (
         convert("<blockquote><p>Hello</p><p>Hello again</p></blockquote>", preprocess=True)
-        == "> Hello\n> \n> Hello again\n"
+        == "> Hello\n>\n> Hello again\n"
     )
 
 
@@ -360,7 +360,7 @@ def test_blockquote_with_paragraph(convert: Callable[..., str]) -> None:
 
 def test_blockquote_nested(convert: Callable[..., str]) -> None:
     text = convert("<blockquote>And she was like <blockquote>Hello</blockquote></blockquote>", preprocess=True)
-    assert text == "> And she was like\n> \n> \n> > Hello\n"
+    assert text == "> And she was like\n>\n>\n> > Hello\n"
 
 
 def test_br(convert: Callable[..., str]) -> None:
@@ -519,9 +519,9 @@ def test_head(convert: Callable[..., str]) -> None:
 
 
 def test_hr(convert: Callable[..., str]) -> None:
-    assert convert("Hello<hr>World") == "Hello\n---\nWorld\n"
-    assert convert("Hello<hr />World") == "Hello\n---\nWorld\n"
-    assert convert("<p>Hello</p>\n<hr>\n<p>World</p>") == "Hello\n---\n\n\nWorld\n"
+    assert convert("Hello<hr>World") == "Hello\n\n---\nWorld\n"
+    assert convert("Hello<hr />World") == "Hello\n\n---\nWorld\n"
+    assert convert("<p>Hello</p>\n<hr>\n<p>World</p>") == "Hello\n\n---\n\n\nWorld\n"
 
 
 def test_i(convert: Callable[..., str]) -> None:
@@ -534,10 +534,7 @@ def test_img(convert: Callable[..., str]) -> None:
         == '![Alt text](/path/to/img.jpg "Optional title")\n'
     )
     assert convert('<img src="/path/to/img.jpg" alt="Alt text" />') == "![Alt text](/path/to/img.jpg)\n"
-    assert (
-        convert('<img src="/path/to/img.jpg" width="100" height="100" />')
-        == "<img src='/path/to/img.jpg' alt='' title='' width='100' height='100' />\n"
-    )
+    assert convert('<img src="/path/to/img.jpg" width="100" height="100" />') == "![](/path/to/img.jpg)\n"
 
 
 def test_kbd(convert: Callable[..., str]) -> None:

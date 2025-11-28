@@ -73,13 +73,13 @@ def test_ordered_list_with_tasks(convert: Callable[..., str]) -> None:
 def test_checkbox_without_task_text(convert: Callable[..., str]) -> None:
     html = '<ul><li><input type="checkbox"></li></ul>'
     result = convert(html)
-    assert result == "- [ ] \n"
+    assert result == "- [ ]\n"
 
 
 def test_checkbox_with_only_whitespace(convert: Callable[..., str]) -> None:
     html = '<ul><li><input type="checkbox">   </li></ul>'
     result = convert(html)
-    assert result == "- [ ] \n"
+    assert result == "- [ ]\n"
 
 
 def test_multiple_checkboxes_in_one_item(convert: Callable[..., str]) -> None:

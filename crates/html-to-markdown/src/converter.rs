@@ -115,21 +115,23 @@ fn trim_line_end_whitespace(output: &mut String) {
     }
 
     let mut cleaned = String::with_capacity(output.len());
-    for segment in output.split_inclusive('\n') {
-        if let Some(line) = segment.strip_suffix('\n') {
-            let retained = if line.ends_with("  ") {
-                // Preserve two-space soft-break markers used for newline_style=Spaces
-                line.trim_end_matches([' ', '\t']).to_string() + "  "
-            } else {
-                line.trim_end_matches([' ', '\t']).to_string()
-            };
-            cleaned.push_str(&retained);
+    for (idx, line) in output.split('\n').enumerate() {
+        if idx > 0 {
             cleaned.push('\n');
+        }
+
+        let has_soft_break = line.ends_with("  ");
+        let trimmed = line.trim_end_matches([' ', '\t']);
+
+        if has_soft_break {
+            cleaned.push_str(trimmed);
+            cleaned.push_str("  ");
         } else {
-            cleaned.push_str(segment.trim_end_matches([' ', '\t']));
+            cleaned.push_str(trimmed);
         }
     }
 
+    cleaned.push('\n');
     *output = cleaned;
 }
 
