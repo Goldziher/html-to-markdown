@@ -108,6 +108,25 @@ fn trim_trailing_whitespace(output: &mut String) {
     }
 }
 
+/// Remove trailing spaces/tabs from every line while preserving newlines.
+fn trim_line_end_whitespace(output: &mut String) {
+    if output.is_empty() {
+        return;
+    }
+
+    let mut cleaned = String::with_capacity(output.len());
+    for segment in output.split_inclusive('\n') {
+        if let Some(line) = segment.strip_suffix('\n') {
+            cleaned.push_str(line.trim_end_matches([' ', '\t']));
+            cleaned.push('\n');
+        } else {
+            cleaned.push_str(segment.trim_end_matches([' ', '\t']));
+        }
+    }
+
+    *output = cleaned;
+}
+
 /// Calculate indentation level for list item continuations.
 ///
 /// Returns the number of 4-space indent groups needed for list continuations.
@@ -1469,7 +1488,8 @@ fn convert_html_impl(
         walk_node(child_handle, parser, &mut output, options, &ctx, 0, &dom_ctx);
     }
 
-    // Trim trailing blank lines but preserve final newline
+    // Trim trailing spaces per line, then trim trailing blank lines but preserve final newline
+    trim_line_end_whitespace(&mut output);
     let trimmed = output.trim_end_matches('\n');
     if trimmed.is_empty() {
         Ok(String::new())
