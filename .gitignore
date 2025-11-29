@@ -101,3 +101,5 @@ obj/
 .mcp.json
 AGENTS.md
 CLAUDE.md
+GEMINI.md
+.gemini/

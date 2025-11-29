@@ -3,26 +3,8 @@ name: CI Go
 on:
   push:
     branches: [main]
-    paths:
-      - 'packages/go/**'
-      - 'examples/go-smoke/**'
-      - 'crates/html-to-markdown/**'
-      - 'crates/html-to-markdown-ffi/**'
-      - 'Cargo.toml'
-      - 'Cargo.lock'
-      - '.golangci.yml'
-      - '.github/workflows/ci-go.yaml'
   pull_request:
     branches: [main]
-    paths:
-      - 'packages/go/**'
-      - 'examples/go-smoke/**'
-      - 'crates/html-to-markdown/**'
-      - 'crates/html-to-markdown-ffi/**'
-      - 'Cargo.toml'
-      - 'Cargo.lock'
-      - '.golangci.yml'
-      - '.github/workflows/ci-go.yaml'
 
 concurrency:
   group: ci-go-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
