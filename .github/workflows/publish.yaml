@@ -1430,6 +1430,20 @@ jobs:
       - name: Setup Rust
         uses: actions-rust-lang/setup-rust-toolchain@v1
 
+      - name: Check Maven Central for existing version
+        id: maven_check
+        run: |
+          set -euo pipefail
+          version="${{ needs.prepare.outputs.version }}"
+          base_url="https://repo1.maven.org/maven2/io/github/goldziher/html-to-markdown/${version}"
+          status_code=$(curl -s -o /dev/null -w "%{http_code}" "${base_url}/html-to-markdown-${version}.pom")
+          if [ "$status_code" = "200" ]; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+            echo "Maven artifact ${version} already present at ${base_url}; skipping publish." >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Prefer gpg2 binary
         run: |
           set -euo pipefail
@@ -1442,6 +1456,7 @@ jobs:
           fi
 
       - name: Release Maven package
+        if: ${{ steps.maven_check.outputs.exists != 'true' }}
         env:
           MAVEN_USERNAME: ${{ secrets.MAVEN_USERNAME }}
           MAVEN_PASSWORD: ${{ secrets.MAVEN_PASSWORD }}
@@ -1450,6 +1465,10 @@ jobs:
         run: |
           set -euo pipefail
           mvn -f packages/java/pom.xml --batch-mode --no-transfer-progress -Dgpg.executable=/usr/bin/gpg2 clean deploy
+
+      - name: Maven package already published
+        if: ${{ steps.maven_check.outputs.exists == 'true' }}
+        run: echo "Maven package ${{ needs.prepare.outputs.version }} already published to Central; skipping deploy." >> $GITHUB_STEP_SUMMARY
 
   publish-node:
     name: Publish Node packages
