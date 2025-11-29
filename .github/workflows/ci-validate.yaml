@@ -3,34 +3,8 @@ name: CI Validate
 on:
   push:
     branches: [main]
-    paths:
-      - 'crates/**'
-      - 'packages/**'
-      - 'tools/**'
-      - 'scripts/**'
-      - 'Taskfile.yaml'
-      - '.prek-config.yaml'
-      - 'pyproject.toml'
-      - 'package.json'
-      - 'pnpm-lock.yaml'
-      - 'Cargo.toml'
-      - 'Cargo.lock'
-      - '.github/workflows/ci-validate.yaml'
   pull_request:
     branches: [main]
-    paths:
-      - 'crates/**'
-      - 'packages/**'
-      - 'tools/**'
-      - 'scripts/**'
-      - 'Taskfile.yaml'
-      - '.prek-config.yaml'
-      - 'pyproject.toml'
-      - 'package.json'
-      - 'pnpm-lock.yaml'
-      - 'Cargo.toml'
-      - 'Cargo.lock'
-      - '.github/workflows/ci-validate.yaml'
 
 concurrency:
   group: ci-validate-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}

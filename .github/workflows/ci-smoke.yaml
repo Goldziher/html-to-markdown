@@ -3,30 +3,8 @@ name: CI Smoke
 on:
   push:
     branches: [main]
-    paths:
-      - 'README.md'
-      - 'crates/**'
-      - 'packages/**'
-      - 'examples/**'
-      - 'Cargo.toml'
-      - 'Cargo.lock'
-      - 'package.json'
-      - 'pnpm-lock.yaml'
-      - 'Taskfile.yaml'
-      - '.github/workflows/ci-smoke.yaml'
   pull_request:
     branches: [main]
-    paths:
-      - 'README.md'
-      - 'crates/**'
-      - 'packages/**'
-      - 'examples/**'
-      - 'Cargo.toml'
-      - 'Cargo.lock'
-      - 'package.json'
-      - 'pnpm-lock.yaml'
-      - 'Taskfile.yaml'
-      - '.github/workflows/ci-smoke.yaml'
 
 concurrency:
   group: ci-smoke-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}

@@ -3,26 +3,8 @@ name: CI Rust
 on:
   push:
     branches: [main]
-    paths:
-      - 'crates/html-to-markdown/**'
-      - 'crates/html-to-markdown-cli/**'
-      - 'crates/html-to-markdown-ffi/**'
-      - 'Cargo.toml'
-      - 'Cargo.lock'
-      - 'rustfmt.toml'
-      - 'Taskfile.yaml'
-      - '.github/workflows/ci-rust.yaml'
   pull_request:
     branches: [main]
-    paths:
-      - 'crates/html-to-markdown/**'
-      - 'crates/html-to-markdown-cli/**'
-      - 'crates/html-to-markdown-ffi/**'
-      - 'Cargo.toml'
-      - 'Cargo.lock'
-      - 'rustfmt.toml'
-      - 'Taskfile.yaml'
-      - '.github/workflows/ci-rust.yaml'
 
 concurrency:
   group: ci-rust-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}

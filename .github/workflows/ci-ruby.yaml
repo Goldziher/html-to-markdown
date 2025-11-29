@@ -3,28 +3,8 @@ name: CI Ruby
 on:
   push:
     branches: [main]
-    paths:
-      - 'crates/html-to-markdown/**'
-      - 'crates/html-to-markdown-rb/**'
-      - 'packages/ruby/**'
-      - 'examples/ruby-smoke/**'
-      - 'Cargo.toml'
-      - 'Cargo.lock'
-      - 'Gemfile'
-      - 'Gemfile.lock'
-      - '.github/workflows/ci-ruby.yaml'
   pull_request:
     branches: [main]
-    paths:
-      - 'crates/html-to-markdown/**'
-      - 'crates/html-to-markdown-rb/**'
-      - 'packages/ruby/**'
-      - 'examples/ruby-smoke/**'
-      - 'Cargo.toml'
-      - 'Cargo.lock'
-      - 'Gemfile'
-      - 'Gemfile.lock'
-      - '.github/workflows/ci-ruby.yaml'
 
 concurrency:
   group: ci-ruby-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}

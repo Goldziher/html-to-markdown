@@ -3,30 +3,8 @@ name: CI Python
 on:
   push:
     branches: [main]
-    paths:
-      - 'crates/html-to-markdown/**'
-      - 'crates/html-to-markdown-py/**'
-      - 'packages/python/**'
-      - 'examples/fixtures/**'
-      - 'Cargo.toml'
-      - 'Cargo.lock'
-      - 'pyproject.toml'
-      - 'uv.lock'
-      - 'Taskfile.yaml'
-      - '.github/workflows/ci-python.yaml'
   pull_request:
     branches: [main]
-    paths:
-      - 'crates/html-to-markdown/**'
-      - 'crates/html-to-markdown-py/**'
-      - 'packages/python/**'
-      - 'examples/fixtures/**'
-      - 'Cargo.toml'
-      - 'Cargo.lock'
-      - 'pyproject.toml'
-      - 'uv.lock'
-      - 'Taskfile.yaml'
-      - '.github/workflows/ci-python.yaml'
 
 concurrency:
   group: ci-python-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}

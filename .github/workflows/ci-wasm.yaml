@@ -3,26 +3,8 @@ name: CI WASM
 on:
   push:
     branches: [main]
-    paths:
-      - 'crates/html-to-markdown/**'
-      - 'crates/html-to-markdown-wasm/**'
-      - 'package.json'
-      - 'pnpm-lock.yaml'
-      - 'pnpm-workspace.yaml'
-      - 'tsconfig.base.json'
-      - 'biome.json'
-      - '.github/workflows/ci-wasm.yaml'
   pull_request:
     branches: [main]
-    paths:
-      - 'crates/html-to-markdown/**'
-      - 'crates/html-to-markdown-wasm/**'
-      - 'package.json'
-      - 'pnpm-lock.yaml'
-      - 'pnpm-workspace.yaml'
-      - 'tsconfig.base.json'
-      - 'biome.json'
-      - '.github/workflows/ci-wasm.yaml'
 
 concurrency:
   group: ci-wasm-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
