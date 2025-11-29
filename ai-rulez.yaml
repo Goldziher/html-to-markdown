@@ -168,7 +168,7 @@ rules:
     content: |
       **GitHub Actions · Multi-platform · Coverage enforcement**
 
-      - Main CI: .github/workflows/ci.yaml runs Rust, Python, Ruby, Node, TypeScript, WASM
+      - CI split by domain (Kreuzberg pattern): ci-rust, ci-python, ci-node, ci-wasm, ci-ruby, ci-php, ci-go, ci-java, ci-elixir, ci-smoke, ci-validate
       - Linting & formatting: ruff, clippy, rubocop, biome, phpstan, golangci-lint
       - Test matrix: Python (3.10, 3.12, 3.14-dev), PHP (8.2+), Rust (stable 1.75+)
       - OS matrix: Linux (amd64, arm64), macOS, Windows (where applicable)
@@ -294,7 +294,17 @@ sections:
       │   └── preferred-rustc.sh          # WASM rustc selection
       │
       ├── .github/workflows/
-      │   ├── ci.yaml                     # Main CI pipeline
+      │   ├── ci-rust.yaml                # Rust unit + coverage
+      │   ├── ci-python.yaml              # Python binding + CLI build/tests
+      │   ├── ci-node.yaml                # Node/TypeScript bindings + tests
+      │   ├── ci-wasm.yaml                # WASM builds and Wasmtime tests
+      │   ├── ci-ruby.yaml                # Ruby bindings
+      │   ├── ci-php.yaml                 # PHP bindings
+      │   ├── ci-go.yaml                  # Go linting (golangci-lint)
+      │   ├── ci-java.yaml                # Java Panama bindings
+      │   ├── ci-elixir.yaml              # Elixir bindings
+      │   ├── ci-smoke.yaml               # README install smokes
+      │   └── ci-validate.yaml            # Lint/format/prek validation
       │   └── test-wheels.yaml            # Python wheel testing
       │
       ├── Taskfile.yaml                   # Task automation (PRIMARY DEV INTERFACE)

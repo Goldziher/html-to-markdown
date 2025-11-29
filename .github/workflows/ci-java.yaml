@@ -1,0 +1,43 @@
+name: CI Java
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'crates/html-to-markdown/**'
+      - 'crates/html-to-markdown-ffi/**'
+      - 'packages/java/**'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+      - '.github/workflows/ci-java.yaml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'crates/html-to-markdown/**'
+      - 'crates/html-to-markdown-ffi/**'
+      - 'packages/java/**'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+      - '.github/workflows/ci-java.yaml'
+
+concurrency:
+  group: ci-java-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  java-bindings:
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        java: ["22", "23"]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Test Java Panama FFI bindings
+        uses: ./.github/actions/test-java
+        with:
+          java-version: ${{ matrix.java }}

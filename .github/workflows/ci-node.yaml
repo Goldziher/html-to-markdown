@@ -1,0 +1,69 @@
+name: CI Node
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'crates/html-to-markdown/**'
+      - 'crates/html-to-markdown-node/**'
+      - 'packages/typescript/**'
+      - 'examples/node-smoke/**'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
+      - 'pnpm-workspace.yaml'
+      - 'tsconfig.base.json'
+      - 'biome.json'
+      - '.github/workflows/ci-node.yaml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'crates/html-to-markdown/**'
+      - 'crates/html-to-markdown-node/**'
+      - 'packages/typescript/**'
+      - 'examples/node-smoke/**'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
+      - 'pnpm-workspace.yaml'
+      - 'tsconfig.base.json'
+      - 'biome.json'
+      - '.github/workflows/ci-node.yaml'
+
+concurrency:
+  group: ci-node-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  node-bindings:
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Rust
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+
+      - name: Setup workspace
+        uses: ./.github/actions/setup-node-workspace
+
+      - name: Build NAPI-RS Bindings
+        uses: ./.github/actions/build-node
+
+      - name: Test NAPI-RS Bindings
+        working-directory: crates/html-to-markdown-node
+        run: pnpm test
+
+      - name: Run Rust Tests
+        working-directory: crates/html-to-markdown-node
+        run: cargo test
+
+      - name: Build TypeScript package
+        uses: ./.github/actions/build-typescript
+
+      - name: Test TypeScript package
+        working-directory: packages/typescript
+        run: pnpm test
