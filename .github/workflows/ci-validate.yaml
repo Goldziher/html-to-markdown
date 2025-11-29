@@ -1,0 +1,122 @@
+name: CI Validate
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'crates/**'
+      - 'packages/**'
+      - 'tools/**'
+      - 'scripts/**'
+      - 'Taskfile.yaml'
+      - '.prek-config.yaml'
+      - 'pyproject.toml'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+      - '.github/workflows/ci-validate.yaml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'crates/**'
+      - 'packages/**'
+      - 'tools/**'
+      - 'scripts/**'
+      - 'Taskfile.yaml'
+      - '.prek-config.yaml'
+      - 'pyproject.toml'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+      - '.github/workflows/ci-validate.yaml'
+
+concurrency:
+  group: ci-validate-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  GO_VERSION: "1.25.0-rc.1"
+  GO_TOOLCHAIN: "go1.25rc1"
+  GOLANGCI_LINT_VERSION: "v2.6.2"
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+
+      - name: Setup Rust
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          components: rustfmt, clippy, llvm-tools-preview
+
+      - name: Setup Go
+        uses: actions/setup-go@v6
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          check-latest: true
+
+      - name: Setup Elixir
+        uses: erlef/setup-beam@v1
+        with:
+          elixir-version: "1.19"
+          otp-version: "28.1"
+
+      - name: Install Elixir dependencies
+        working-directory: packages/elixir
+        run: mix deps.get
+
+      - name: Setup Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "3.3"
+          bundler-cache: false
+
+      - name: Install Ruby dependencies for lint
+        working-directory: packages/ruby
+        run: bundle install --jobs 4 --retry 3
+
+      - name: Install Dependencies
+        uses: nick-fields/retry@v3
+        with:
+          timeout_minutes: 5
+          max_attempts: 3
+          retry_wait_seconds: 30
+          command: uv sync --all-extras --no-install-workspace
+          shell: bash
+
+      - name: Run Rust Checks
+        run: |
+          cargo fmt --check
+          cargo clippy --workspace --exclude html-to-markdown-rb --exclude html-to-markdown-php -- -D warnings
+
+      - name: Install prek
+        run: |
+          uv tool install prek
+          echo "$HOME/.local/bin" >> $GITHUB_PATH
+
+      - name: Load Cached Prek Dependencies
+        id: cached-prek-dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/prek/
+          key: prek|${{ env.pythonLocation }}|${{ hashFiles('.pre-commit-config.yaml') }}
+
+      - name: Execute Prek
+        env:
+          SKIP: golangci-lint-packages,golangci-lint-examples
+        run: prek run --show-diff-on-failure --color=always --all-files

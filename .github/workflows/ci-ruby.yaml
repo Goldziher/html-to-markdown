@@ -1,0 +1,105 @@
+name: CI Ruby
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'crates/html-to-markdown/**'
+      - 'crates/html-to-markdown-rb/**'
+      - 'packages/ruby/**'
+      - 'examples/ruby-smoke/**'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+      - 'Gemfile'
+      - 'Gemfile.lock'
+      - '.github/workflows/ci-ruby.yaml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'crates/html-to-markdown/**'
+      - 'crates/html-to-markdown-rb/**'
+      - 'packages/ruby/**'
+      - 'examples/ruby-smoke/**'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+      - 'Gemfile'
+      - 'Gemfile.lock'
+      - '.github/workflows/ci-ruby.yaml'
+
+concurrency:
+  group: ci-ruby-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ruby-bindings:
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        ruby: ["3.2", "3.3"]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Rust
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+
+      - name: Setup Ruby (Unix)
+        if: runner.os != 'Windows'
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: ${{ matrix.ruby }}
+          bundler: "2.7.2"
+          bundler-cache: false
+          working-directory: packages/ruby
+
+      - name: Setup Ruby (Windows)
+        if: runner.os == 'Windows'
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: ${{ matrix.ruby }}
+          bundler: "2.7.2"
+          bundler-cache: false
+          working-directory: packages/ruby
+          windows-toolchain: UCRT64
+
+      - name: Build CLI binary
+        uses: ./.github/actions/build-cli
+
+      - name: Build Ruby extension (Unix)
+        if: runner.os != 'Windows'
+        uses: ./.github/actions/build-ruby-unix
+
+      - name: Run Rubocop (Unix)
+        if: runner.os != 'Windows' && matrix.os == 'ubuntu-latest' && matrix.ruby == '3.3'
+        working-directory: packages/ruby
+        run: bundle exec rubocop --config .rubocop.yml
+
+      - name: Validate RBS signatures (Unix)
+        if: runner.os != 'Windows' && matrix.os == 'ubuntu-latest' && matrix.ruby == '3.3'
+        working-directory: packages/ruby
+        run: bundle exec rbs validate
+
+      - name: Run Steep type checking (Unix)
+        if: runner.os != 'Windows' && matrix.os == 'ubuntu-latest' && matrix.ruby == '3.3'
+        working-directory: packages/ruby
+        run: bundle exec steep check
+
+      - name: Build Ruby extension (Windows)
+        if: runner.os == 'Windows'
+        uses: ./.github/actions/build-ruby-windows
+
+      - name: Run Ruby specs (Unix)
+        if: runner.os != 'Windows'
+        working-directory: packages/ruby
+        run: bundle exec rspec --format progress
+
+      - name: Run Ruby specs (Windows)
+        if: runner.os == 'Windows'
+        working-directory: packages/ruby
+        shell: pwsh
+        run: |
+          $unixPath = ridk exec bash -lc "cygpath -au '$env:GITHUB_WORKSPACE/packages/ruby'"
+          ridk exec bash -lc "cd $unixPath && export RUSTUP_TOOLCHAIN=stable-gnu CC=x86_64-w64-mingw32-gcc CXX=x86_64-w64-mingw32-g++ && bundle exec rspec --format progress"

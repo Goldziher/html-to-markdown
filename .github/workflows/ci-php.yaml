@@ -1,0 +1,71 @@
+name: CI PHP
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'crates/html-to-markdown/**'
+      - 'crates/html-to-markdown-php/**'
+      - 'packages/php/**'
+      - 'packages/php-ext/**'
+      - 'composer.json'
+      - 'composer.lock'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+      - '.github/workflows/ci-php.yaml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'crates/html-to-markdown/**'
+      - 'crates/html-to-markdown-php/**'
+      - 'packages/php/**'
+      - 'packages/php-ext/**'
+      - 'composer.json'
+      - 'composer.lock'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+      - '.github/workflows/ci-php.yaml'
+
+concurrency:
+  group: ci-php-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  php-bindings:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: "8.2"
+          tools: composer:2.9.1
+          coverage: none
+
+      - name: Setup Rust
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+
+      - name: Capture php-config path
+        run: echo "PHP_CONFIG=$(command -v php-config)" >> "$GITHUB_ENV"
+
+      - name: Install Composer dependencies
+        uses: ramsey/composer-install@v3
+        with:
+          working-directory: packages/php
+          dependency-versions: locked
+
+      - name: Build PHP extension
+        uses: ./.github/actions/build-php-linux
+        with:
+          php-config: ${{ env.PHP_CONFIG }}
+
+      - name: Run PHP static analysis
+        working-directory: packages/php
+        run: composer run phpstan
+
+      - name: Run PHP tests
+        working-directory: packages/php
+        run: composer run test

@@ -1,0 +1,55 @@
+name: CI Elixir
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'packages/elixir/**'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+      - '.github/workflows/ci-elixir.yaml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'packages/elixir/**'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+      - '.github/workflows/ci-elixir.yaml'
+
+concurrency:
+  group: ci-elixir-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  elixir:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Elixir
+        uses: erlef/setup-beam@v1
+        with:
+          elixir-version: "1.19"
+          otp-version: "28.1"
+
+      - name: Setup Rust
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+
+      - name: Install Hex/Rebar
+        run: |
+          mix local.hex --force
+          mix local.rebar --force
+
+      - name: Install dependencies
+        working-directory: packages/elixir
+        run: mix deps.get
+
+      - name: Run tests
+        working-directory: packages/elixir
+        run: MIX_ENV=test mix test
+
+      - name: Credo lint
+        working-directory: packages/elixir
+        run: MIX_ENV=dev mix credo --strict

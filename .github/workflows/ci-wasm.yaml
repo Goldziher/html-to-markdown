@@ -1,0 +1,84 @@
+name: CI WASM
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'crates/html-to-markdown/**'
+      - 'crates/html-to-markdown-wasm/**'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
+      - 'pnpm-workspace.yaml'
+      - 'tsconfig.base.json'
+      - 'biome.json'
+      - '.github/workflows/ci-wasm.yaml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'crates/html-to-markdown/**'
+      - 'crates/html-to-markdown-wasm/**'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
+      - 'pnpm-workspace.yaml'
+      - 'tsconfig.base.json'
+      - 'biome.json'
+      - '.github/workflows/ci-wasm.yaml'
+
+concurrency:
+  group: ci-wasm-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  wasm-bindings:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Rust
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          target: wasm32-unknown-unknown
+
+      - name: Install wasm-pack
+        run: curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
+
+      - name: Setup workspace
+        uses: ./.github/actions/setup-node-workspace
+
+      - name: Build WASM (all targets)
+        uses: ./.github/actions/build-wasm
+
+      - name: Test WASM
+        working-directory: crates/html-to-markdown-wasm
+        run: pnpm test
+
+      - name: Run Rust Tests
+        working-directory: crates/html-to-markdown-wasm
+        run: cargo test
+
+  wasm-wasmtime:
+    name: Wasmtime tests (${{ matrix.runner }})
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        runner:
+          - ubuntu-latest
+          - ubuntu-24.04-arm
+          - macos-latest
+          - windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Rust
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: stable
+          target: wasm32-unknown-unknown
+
+      - name: Run Wasmtime WASM tests
+        run: cargo test -p html-to-markdown-wasm-wasmtime-tests
