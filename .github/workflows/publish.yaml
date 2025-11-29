@@ -16,9 +16,6 @@ on:
         description: "Git ref (branch, tag, or commit) to build; defaults to the tag"
         required: false
         type: string
-  push:
-    tags:
-      - "v*"
   release:
     types: [published]
   repository_dispatch:
