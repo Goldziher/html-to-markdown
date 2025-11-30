@@ -26,7 +26,7 @@ jobs:
           coverage: none
 
       - name: Setup Rust
-        uses: actions-rust-lang/setup-rust-toolchain@v1
+        uses: ./.github/actions/setup-rust
 
       - name: Capture php-config path
         run: echo "PHP_CONFIG=$(command -v php-config)" >> "$GITHUB_ENV"

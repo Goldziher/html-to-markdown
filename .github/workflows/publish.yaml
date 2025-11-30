@@ -179,7 +179,7 @@ jobs:
         run: git checkout --progress --force ${{ needs.prepare.outputs.target_sha }}
 
       - name: Setup Rust
-        uses: actions-rust-lang/setup-rust-toolchain@v1
+        uses: ./.github/actions/setup-rust
 
       - name: Set up Python
         uses: actions/setup-python@v6
@@ -224,7 +224,7 @@ jobs:
         run: git checkout --progress --force ${{ needs.prepare.outputs.target_sha }}
 
       - name: Setup Rust
-        uses: actions-rust-lang/setup-rust-toolchain@v1
+        uses: ./.github/actions/setup-rust
         with:
           toolchain: stable
 
@@ -278,7 +278,7 @@ jobs:
         run: git checkout --progress --force ${{ needs.prepare.outputs.target_sha }}
 
       - name: Setup Rust
-        uses: actions-rust-lang/setup-rust-toolchain@v1
+        uses: ./.github/actions/setup-rust
 
       - name: Setup Node
         uses: actions/setup-node@v6
@@ -474,7 +474,7 @@ jobs:
         run: git checkout --progress --force ${{ needs.prepare.outputs.target_sha }}
 
       - name: Setup Rust
-        uses: actions-rust-lang/setup-rust-toolchain@v1
+        uses: ./.github/actions/setup-rust
 
       - name: Add wasm32 target
         run: rustup target add wasm32-unknown-unknown
@@ -554,7 +554,7 @@ jobs:
         run: git checkout --progress --force ${{ needs.prepare.outputs.target_sha }}
 
       - name: Setup Rust
-        uses: actions-rust-lang/setup-rust-toolchain@v1
+        uses: ./.github/actions/setup-rust
 
       - name: Add compilation target
         run: rustup target add ${{ matrix.target }}
@@ -733,7 +733,7 @@ jobs:
           bundler-cache: false
 
       - name: Setup Rust
-        uses: actions-rust-lang/setup-rust-toolchain@v1
+        uses: ./.github/actions/setup-rust
 
       - name: Setup PHP
         if: runner.os == 'Linux'
@@ -948,7 +948,7 @@ jobs:
           otp-version: "28.1"
 
       - name: Setup Rust
-        uses: actions-rust-lang/setup-rust-toolchain@v1
+        uses: ./.github/actions/setup-rust
 
       - name: Install Hex and Rebar
         run: |
@@ -1026,7 +1026,7 @@ jobs:
         run: git checkout --progress --force ${{ needs.prepare.outputs.target_sha }}
 
       - name: Setup Rust
-        uses: actions-rust-lang/setup-rust-toolchain@v1
+        uses: ./.github/actions/setup-rust
 
       - name: Package crates
         env:
@@ -1310,7 +1310,7 @@ jobs:
           otp-version: "28.1"
 
       - name: Setup Rust
-        uses: actions-rust-lang/setup-rust-toolchain@v1
+        uses: ./.github/actions/setup-rust
 
       - name: Install Hex/Rebar
         run: |
@@ -1425,7 +1425,7 @@ jobs:
           gpg-passphrase: ${{ secrets.GPP_PASSPHRASE }}
 
       - name: Setup Rust
-        uses: actions-rust-lang/setup-rust-toolchain@v1
+        uses: ./.github/actions/setup-rust
 
       - name: Check Maven Central for existing version
         id: maven_check
