@@ -34,7 +34,7 @@ jobs:
           python-version: ${{ matrix.python }}
 
       - name: Setup Rust
-        uses: actions-rust-lang/setup-rust-toolchain@v1
+        uses: ./.github/actions/setup-rust
         with:
           components: rustfmt, clippy, llvm-tools-preview
 

@@ -1,0 +1,121 @@
+name: Setup Rust Environment
+description: Install Rust toolchain with caching and optional sccache
+inputs:
+  toolchain:
+    description: Rust toolchain channel or version
+    required: false
+    default: stable
+  components:
+    description: Comma-separated list of Rust components to install
+    required: false
+    default: rustfmt, clippy, llvm-tools-preview
+  target:
+    description: Target triple to install
+    required: false
+    default: ""
+  cache-key-prefix:
+    description: Prefix for cache keys
+    required: false
+    default: rust-build
+  maximize-build-space:
+    description: Whether to maximize build space on Linux runners
+    required: false
+    default: "true"
+  use-sccache:
+    description: Enable sccache as the Rust compiler wrapper
+    required: false
+    default: "true"
+outputs:
+  cache-hit:
+    description: Whether the Rust cache was restored
+    value: ${{ steps.cache-rust.outputs.cache-hit }}
+runs:
+  using: composite
+  steps:
+    - name: Maximize build space (Linux only)
+      if: runner.os == 'Linux' && inputs.maximize-build-space == 'true'
+      shell: bash
+      run: |
+        echo "Freeing up disk space on Linux runner..."
+        sudo rm -rf /usr/share/dotnet
+        sudo rm -rf /usr/local/lib/android
+        sudo rm -rf /opt/ghc
+        sudo rm -rf /usr/local/.ghcup
+        sudo rm -rf /opt/hostedtoolcache/CodeQL
+        docker system prune -af 2>/dev/null || true
+        df -h
+
+    - name: Setup Rust toolchain
+      uses: actions-rust-lang/setup-rust-toolchain@v1
+      with:
+        toolchain: ${{ inputs.toolchain }}
+        components: ${{ inputs.components }}
+        target: ${{ inputs.target }}
+
+    - name: Setup sccache
+      if: inputs.use-sccache == 'true'
+      uses: mozilla-actions/sccache-action@v0.0.9
+
+    - name: Configure sccache environment
+      shell: bash
+      run: |
+        if [ "${{ inputs.use-sccache }}" = "true" ]; then
+          echo "SCCACHE_GHA_ENABLED=true" >> "$GITHUB_ENV"
+          echo "RUSTC_WRAPPER=sccache" >> "$GITHUB_ENV"
+        else
+          echo "SCCACHE_GHA_ENABLED=false" >> "$GITHUB_ENV"
+          echo "RUSTC_WRAPPER=" >> "$GITHUB_ENV"
+        fi
+
+    - name: Generate Cargo.lock hash
+      id: cargo-hash
+      shell: bash
+      run: |
+        set -euo pipefail
+        if [ -f "Cargo.lock" ]; then
+          if command -v sha256sum &> /dev/null; then
+            hash=$(sha256sum Cargo.lock | cut -d' ' -f1)
+          elif command -v shasum &> /dev/null; then
+            hash=$(shasum -a 256 Cargo.lock | cut -d' ' -f1)
+          else
+            hash=$(stat -c %Y Cargo.lock 2>/dev/null || stat -f %m Cargo.lock)
+          fi
+        else
+          hash=$(date +%Y%m%d)
+        fi
+        echo "hash=$hash" >> "$GITHUB_OUTPUT"
+        echo "Using Cargo.lock hash: $hash"
+
+    - name: Cache Rust build artifacts
+      id: cache-rust
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.cargo/registry/index
+          ~/.cargo/registry/cache
+          ~/.cargo/git/db
+          target/
+        key: ${{ inputs.cache-key-prefix }}-${{ runner.os }}-${{ steps.cargo-hash.outputs.hash }}
+        restore-keys: |
+          ${{ inputs.cache-key-prefix }}-${{ runner.os }}-
+
+    - name: Cache cargo-llvm-cov
+      uses: actions/cache@v4
+      with:
+        path: ~/.cargo/bin/cargo-llvm-cov
+        key: cargo-llvm-cov-${{ runner.os }}
+
+    - name: Ensure sccache is on PATH
+      if: inputs.use-sccache == 'true' && env.SCCACHE_PATH != ''
+      shell: bash
+      run: echo "${SCCACHE_PATH}" >> "$GITHUB_PATH"
+
+    - name: Install cargo-llvm-cov if not cached
+      shell: bash
+      run: |
+        if ! command -v cargo-llvm-cov &> /dev/null; then
+          echo "Installing cargo-llvm-cov..."
+          cargo install cargo-llvm-cov
+        else
+          echo "cargo-llvm-cov already installed"
+        fi
