@@ -7,6 +7,7 @@ use html_to_markdown_rs::{
 use magnus::prelude::*;
 use magnus::r_hash::ForEach;
 use magnus::{Error, RArray, RHash, Ruby, Symbol, TryConvert, Value, function, scan_args::scan_args};
+use std::panic::{AssertUnwindSafe, catch_unwind};
 
 #[derive(Clone)]
 #[magnus::wrap(class = "HtmlToMarkdown::Options", free_immediately)]
@@ -29,6 +30,25 @@ fn arg_error(message: impl Into<String>) -> Error {
 fn runtime_error(message: impl Into<String>) -> Error {
     let ruby = Ruby::get().expect("Ruby not initialised");
     Error::new(ruby.exception_runtime_error(), message.into())
+}
+
+fn catch_panic<F, R>(f: F) -> Result<R, Error>
+where
+    F: FnOnce() -> Result<R, Error> + std::panic::UnwindSafe,
+{
+    match catch_unwind(f) {
+        Ok(result) => result,
+        Err(panic_info) => {
+            let msg = if let Some(s) = panic_info.downcast_ref::<String>() {
+                format!("Panic occurred in html-to-markdown: {}", s)
+            } else if let Some(s) = panic_info.downcast_ref::<&str>() {
+                format!("Panic occurred in html-to-markdown: {}", s)
+            } else {
+                "Panic occurred in html-to-markdown: unknown error".to_string()
+            };
+            Err(runtime_error(msg))
+        }
+    }
 }
 
 fn symbol_to_string(value: Value) -> Result<String, Error> {
@@ -390,7 +410,9 @@ fn convert_fn(ruby: &Ruby, args: &[Value]) -> Result<String, Error> {
     let html = parsed.required.0;
     let options = build_conversion_options(ruby, parsed.optional.0)?;
 
-    convert_inner(&html, Some(options)).map_err(conversion_error)
+    catch_panic(AssertUnwindSafe(|| {
+        convert_inner(&html, Some(options)).map_err(conversion_error)
+    }))
 }
 
 fn options_handle_fn(ruby: &Ruby, args: &[Value]) -> Result<OptionsHandle, Error> {
@@ -403,7 +425,11 @@ fn convert_with_options_handle_fn(_ruby: &Ruby, args: &[Value]) -> Result<String
     let parsed = scan_args::<(String, &OptionsHandle), (), (), (), (), ()>(args)?;
     let html = parsed.required.0;
     let handle = parsed.required.1;
-    convert_inner(&html, Some(handle.0.clone())).map_err(conversion_error)
+    let options = handle.0.clone();
+
+    catch_panic(AssertUnwindSafe(|| {
+        convert_inner(&html, Some(options)).map_err(conversion_error)
+    }))
 }
 
 fn convert_with_inline_images_fn(ruby: &Ruby, args: &[Value]) -> Result<Value, Error> {
@@ -412,9 +438,10 @@ fn convert_with_inline_images_fn(ruby: &Ruby, args: &[Value]) -> Result<Value, E
     let options = build_conversion_options(ruby, parsed.optional.0)?;
     let config = build_inline_image_config(ruby, parsed.optional.1)?;
 
-    let extraction = convert_with_inline_images_inner(&html, Some(options), config).map_err(conversion_error)?;
-
-    extraction_to_value(ruby, extraction)
+    catch_panic(AssertUnwindSafe(|| {
+        let extraction = convert_with_inline_images_inner(&html, Some(options), config).map_err(conversion_error)?;
+        extraction_to_value(ruby, extraction)
+    }))
 }
 
 #[magnus::init]
