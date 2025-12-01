@@ -1,3 +1,4 @@
+#[cfg(any(feature = "js-bindings", feature = "wasmtime-testing"))]
 use html_to_markdown_rs::safety::guard_panic;
 use html_to_markdown_rs::{
     CodeBlockStyle, ConversionOptions as RustConversionOptions, HeadingStyle, HighlightStyle, ListIndentType,
