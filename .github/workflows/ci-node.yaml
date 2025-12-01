@@ -3,8 +3,24 @@ name: CI Node
 on:
   push:
     branches: [main]
+    paths:
+      - packages/typescript/**
+      - crates/html-to-markdown-node/**
+      - crates/html-to-markdown/**
+      - package.json
+      - pnpm-lock.yaml
+      - pnpm-workspace.yaml
+      - .github/workflows/ci-node.yaml
   pull_request:
     branches: [main]
+    paths:
+      - packages/typescript/**
+      - crates/html-to-markdown-node/**
+      - crates/html-to-markdown/**
+      - package.json
+      - pnpm-lock.yaml
+      - pnpm-workspace.yaml
+      - .github/workflows/ci-node.yaml
 
 concurrency:
   group: ci-node-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
