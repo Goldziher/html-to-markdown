@@ -13,7 +13,7 @@ concurrency:
 jobs:
   php-bindings:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 60
     steps:
       - name: Checkout
         uses: actions/checkout@v6

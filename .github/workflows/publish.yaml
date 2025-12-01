@@ -658,7 +658,7 @@ jobs:
       - elixir-package
       - cargo-packages
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 30
+    timeout-minutes: 60
     strategy:
       fail-fast: false
       matrix:

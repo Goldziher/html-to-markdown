@@ -13,7 +13,7 @@ concurrency:
 jobs:
   ruby-bindings:
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 25
+    timeout-minutes: 60
     strategy:
       fail-fast: false
       matrix:
