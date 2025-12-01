@@ -39,7 +39,7 @@ If you require Windows support, consider using one of the alternative distributi
 
 ```bash
 pie install goldziher/html-to-markdown        # Native extension via PIE
-composer require html-to-markdown/extension   # Typed PHP API wrappers
+composer require goldziher/html-to-markdown   # Typed PHP API wrappers
 ```
 
 If the extension is not enabled the post-install script prints the steps

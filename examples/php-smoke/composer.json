@@ -3,7 +3,7 @@
   "description": "Smoke test for the html-to-markdown PHP extension + Composer helpers",
   "require": {
     "php": "^8.2",
-    "html-to-markdown/extension": "*"
+    "goldziher/html-to-markdown": "*"
   },
   "minimum-stability": "dev",
   "prefer-stable": true

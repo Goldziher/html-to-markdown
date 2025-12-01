@@ -57,7 +57,7 @@ Experience WebAssembly-powered HTML to Markdown conversion instantly in your bro
 | **WebAssembly** (universal) | `npm install html-to-markdown-wasm`                                       |
 | **Deno**                    | `import { convert } from "npm:html-to-markdown-wasm"`                     |
 | **Python** (bindings + CLI) | `pip install html-to-markdown`                                            |
-| **PHP** (extension + helpers) | `pie install goldziher/html-to-markdown`<br>`composer require html-to-markdown/extension` |
+| **PHP** (extension + helpers) | `pie install goldziher/html-to-markdown`<br>`composer require goldziher/html-to-markdown` |
 | **Ruby** gem                | `bundle add html-to-markdown` or `gem install html-to-markdown`           |
 | **Elixir** (Rustler NIF)    | `{:html_to_markdown, "~> 2.8"}`                                           |
 | **Rust** crate              | `cargo add html-to-markdown-rs`                                           |

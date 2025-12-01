@@ -18,15 +18,27 @@ native `html-to-markdown-node` bindings and adds a TypeScript-friendly API plus 
 cross-platform CLI.
 
 ```bash
-npm install html-to-markdown
+# Native bindings (Node.js/Bun)
+npm install html-to-markdown-node
+
+# WebAssembly (browser/edge/Node without native toolchain)
+npm install html-to-markdown-wasm
 ```
 
 ## Usage
 
 ```ts
-import { convert } from 'html-to-markdown';
+import { convert } from 'html-to-markdown-node';
 
 const markdown = convert('<h1>Hello</h1>');
+```
+
+For WASM/bundler targets:
+
+```ts
+import { convert } from 'html-to-markdown-wasm';
+
+const markdown = convert('<h1>Hello</h1>', null);
 ```
 
 The package re-exports all conversion options exposed by the native bindings. See the
@@ -36,18 +48,19 @@ option descriptions.
 ### File helpers
 
 ```ts
-import { convertFile } from 'html-to-markdown';
+import { convertFile } from 'html-to-markdown-node';
 
 const markdown = await convertFile('input.html');
 ```
 
 ### CLI
 
-```bash
-npx html-to-markdown --input input.html --output output.md
-```
+Use the Rust-native CLI for a packaged command-line interface:
 
-Use `npx html-to-markdown --help` for full usage information.
+```bash
+cargo install html-to-markdown-cli
+html-to-markdown --help
+```
 
 ## Performance (Apple M4)
 

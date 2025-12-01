@@ -600,12 +600,12 @@ tasks:
       - cmd: |
           cd packages/go
           TOOLCHAIN=${GOTOOLCHAIN_OVERRIDE:-{{.GO_TOOLCHAIN}}}
-          GOTOOLCHAIN=${TOOLCHAIN} go fmt -l ./...
+          GOTOOLCHAIN=${TOOLCHAIN} gofmt -l .
           golangci-lint run --config ../../.golangci.yml ./...
       - cmd: |
           cd examples/go-smoke
           TOOLCHAIN=${GOTOOLCHAIN_OVERRIDE:-{{.GO_TOOLCHAIN}}}
-          GOTOOLCHAIN=${TOOLCHAIN} go fmt -l ./...
+          GOTOOLCHAIN=${TOOLCHAIN} gofmt -l .
           golangci-lint run --config ../../.golangci.yml ./...
 
   go:format:

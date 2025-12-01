@@ -26,7 +26,7 @@ php convert.php
 ```bash
 cd examples/php-smoke
 composer config repositories.local path ../../packages/php
-composer update html-to-markdown/extension --prefer-source
+composer update goldziher/html-to-markdown --prefer-source
 php convert.php
 ```
 
