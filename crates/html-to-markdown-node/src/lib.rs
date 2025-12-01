@@ -1,13 +1,23 @@
 #![deny(clippy::all)]
 
+use html_to_markdown_rs::safety::guard_panic;
 use html_to_markdown_rs::{
-    CodeBlockStyle, ConversionOptions as RustConversionOptions, HeadingStyle, HighlightStyle,
+    CodeBlockStyle, ConversionError, ConversionOptions as RustConversionOptions, HeadingStyle, HighlightStyle,
     InlineImageConfig as RustInlineImageConfig, InlineImageFormat, InlineImageSource, ListIndentType, NewlineStyle,
     PreprocessingOptions as RustPreprocessingOptions, PreprocessingPreset, WhitespaceMode,
 };
 use napi::bindgen_prelude::*;
 use napi_derive::napi;
 use std::{collections::HashMap, str};
+
+fn to_js_error(err: ConversionError) -> Error {
+    let message = match &err {
+        ConversionError::Panic(msg) => format!("html-to-markdown panic during conversion: {msg}"),
+        other => other.to_string(),
+    };
+
+    Error::new(Status::GenericFailure, message)
+}
 
 /// Heading style options
 #[napi(string_enum)]
@@ -441,7 +451,7 @@ fn source_to_string(source: &InlineImageSource) -> String {
 #[napi]
 pub fn convert(html: String, options: Option<JsConversionOptions>) -> Result<String> {
     let rust_options = options.map(Into::into);
-    html_to_markdown_rs::convert(&html, rust_options).map_err(|e| Error::new(Status::GenericFailure, e.to_string()))
+    guard_panic(|| html_to_markdown_rs::convert(&html, rust_options)).map_err(to_js_error)
 }
 
 fn buffer_to_str(html: &Buffer) -> Result<&str> {
@@ -454,7 +464,7 @@ fn buffer_to_str(html: &Buffer) -> Result<&str> {
 pub fn convert_buffer(html: Buffer, options: Option<JsConversionOptions>) -> Result<String> {
     let html = buffer_to_str(&html)?;
     let rust_options = options.map(Into::into);
-    html_to_markdown_rs::convert(html, rust_options).map_err(|e| Error::new(Status::GenericFailure, e.to_string()))
+    guard_panic(|| html_to_markdown_rs::convert(html, rust_options)).map_err(to_js_error)
 }
 
 /// Create a reusable ConversionOptions handle.
@@ -466,16 +476,14 @@ pub fn create_conversion_options_handle(options: Option<JsConversionOptions>) ->
 /// Convert HTML using a previously-created ConversionOptions handle.
 #[napi]
 pub fn convert_with_options_handle(html: String, options: &External<RustConversionOptions>) -> Result<String> {
-    html_to_markdown_rs::convert(&html, Some((**options).clone()))
-        .map_err(|e| Error::new(Status::GenericFailure, e.to_string()))
+    guard_panic(|| html_to_markdown_rs::convert(&html, Some((**options).clone()))).map_err(to_js_error)
 }
 
 /// Convert HTML Buffer data using a previously-created ConversionOptions handle.
 #[napi(js_name = "convertBufferWithOptionsHandle")]
 pub fn convert_buffer_with_options_handle(html: Buffer, options: &External<RustConversionOptions>) -> Result<String> {
     let html = buffer_to_str(&html)?;
-    html_to_markdown_rs::convert(html, Some((**options).clone()))
-        .map_err(|e| Error::new(Status::GenericFailure, e.to_string()))
+    guard_panic(|| html_to_markdown_rs::convert(html, Some((**options).clone()))).map_err(to_js_error)
 }
 
 fn convert_inline_images_impl(
@@ -488,8 +496,8 @@ fn convert_inline_images_impl(
         .map(Into::into)
         .unwrap_or_else(|| RustInlineImageConfig::new(5 * 1024 * 1024));
 
-    let extraction = html_to_markdown_rs::convert_with_inline_images(html, rust_options, rust_config)
-        .map_err(|e| Error::new(Status::GenericFailure, e.to_string()))?;
+    let extraction = guard_panic(|| html_to_markdown_rs::convert_with_inline_images(html, rust_options, rust_config))
+        .map_err(to_js_error)?;
 
     let inline_images = extraction
         .inline_images

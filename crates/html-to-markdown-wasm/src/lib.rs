@@ -1,6 +1,8 @@
+use html_to_markdown_rs::safety::guard_panic;
 use html_to_markdown_rs::{
-    CodeBlockStyle, ConversionOptions as RustConversionOptions, HeadingStyle, HighlightStyle, ListIndentType,
-    NewlineStyle, PreprocessingOptions as RustPreprocessingOptions, PreprocessingPreset, WhitespaceMode,
+    CodeBlockStyle, ConversionError, ConversionOptions as RustConversionOptions, HeadingStyle, HighlightStyle,
+    ListIndentType, NewlineStyle, PreprocessingOptions as RustPreprocessingOptions, PreprocessingPreset,
+    WhitespaceMode,
 };
 use serde::{Deserialize, Serialize};
 
@@ -10,6 +12,15 @@ use wasm_bindgen::{JsCast, prelude::*};
 mod inline_images;
 #[cfg(feature = "js-bindings")]
 pub use inline_images::{WasmHtmlExtraction, WasmInlineImage, WasmInlineImageConfig, WasmInlineImageWarning};
+
+#[cfg(feature = "js-bindings")]
+fn to_js_error(err: ConversionError) -> JsValue {
+    let message = match &err {
+        ConversionError::Panic(msg) => format!("html-to-markdown panic during conversion: {msg}"),
+        other => other.to_string(),
+    };
+    JsValue::from_str(&message)
+}
 
 /// Initialize panic hook for better error messages in the browser
 #[cfg(feature = "js-bindings")]
@@ -423,7 +434,7 @@ impl WasmConversionOptionsHandle {
 pub fn convert(html: String, options: JsValue) -> Result<String, JsValue> {
     let rust_options = parse_wasm_options(options)?;
 
-    html_to_markdown_rs::convert(&html, rust_options).map_err(|e| JsValue::from_str(&e.to_string()))
+    guard_panic(|| html_to_markdown_rs::convert(&html, rust_options)).map_err(to_js_error)
 }
 
 #[cfg(feature = "js-bindings")]
@@ -431,7 +442,7 @@ pub fn convert(html: String, options: JsValue) -> Result<String, JsValue> {
 pub fn convert_bytes(html: js_sys::Uint8Array, options: JsValue) -> Result<String, JsValue> {
     let html = bytes_to_string(html)?;
     let rust_options = parse_wasm_options(options)?;
-    html_to_markdown_rs::convert(&html, rust_options).map_err(|e| JsValue::from_str(&e.to_string()))
+    guard_panic(|| html_to_markdown_rs::convert(&html, rust_options)).map_err(to_js_error)
 }
 
 #[cfg(feature = "js-bindings")]
@@ -443,7 +454,7 @@ pub fn create_conversion_options_handle(options: JsValue) -> Result<WasmConversi
 #[cfg(feature = "js-bindings")]
 #[wasm_bindgen(js_name = convertWithOptionsHandle)]
 pub fn convert_with_options_handle(html: String, handle: &WasmConversionOptionsHandle) -> Result<String, JsValue> {
-    html_to_markdown_rs::convert(&html, Some(handle.inner.clone())).map_err(|e| JsValue::from_str(&e.to_string()))
+    guard_panic(|| html_to_markdown_rs::convert(&html, Some(handle.inner.clone()))).map_err(to_js_error)
 }
 
 #[cfg(feature = "js-bindings")]
@@ -453,7 +464,7 @@ pub fn convert_bytes_with_options_handle(
     handle: &WasmConversionOptionsHandle,
 ) -> Result<String, JsValue> {
     let html = bytes_to_string(html)?;
-    html_to_markdown_rs::convert(&html, Some(handle.inner.clone())).map_err(|e| JsValue::from_str(&e.to_string()))
+    guard_panic(|| html_to_markdown_rs::convert(&html, Some(handle.inner.clone()))).map_err(to_js_error)
 }
 
 /// Convert HTML to Markdown while collecting inline images
@@ -489,8 +500,8 @@ fn convert_with_inline_images_internal(
         .map(Into::into)
         .unwrap_or_else(|| html_to_markdown_rs::InlineImageConfig::new(5 * 1024 * 1024));
 
-    let extraction = html_to_markdown_rs::convert_with_inline_images(html, rust_options, rust_config)
-        .map_err(|e| JsValue::from_str(&e.to_string()))?;
+    let extraction = guard_panic(|| html_to_markdown_rs::convert_with_inline_images(html, rust_options, rust_config))
+        .map_err(to_js_error)?;
 
     Ok(extraction.into())
 }
@@ -554,7 +565,7 @@ mod wasmtime_runtime {
 
     fn convert_internal(html_ptr: u32, html_len: u32, options: Option<RustConversionOptions>) -> u32 {
         let html = read_utf8(html_ptr, html_len);
-        match html_to_markdown_rs::convert(&html, options) {
+        match guard_panic(|| html_to_markdown_rs::convert(&html, options)) {
             Ok(markdown) => write_result(markdown.as_bytes()),
             Err(err) => write_result(format!("ERROR:{}", err).as_bytes()),
         }
