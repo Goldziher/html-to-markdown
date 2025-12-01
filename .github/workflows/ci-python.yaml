@@ -3,8 +3,24 @@ name: CI Python
 on:
   push:
     branches: [main]
+    paths:
+      - packages/python/**
+      - crates/html-to-markdown-py/**
+      - crates/html-to-markdown/**
+      - pyproject.toml
+      - uv.lock
+      - uv.toml
+      - .github/workflows/ci-python.yaml
   pull_request:
     branches: [main]
+    paths:
+      - packages/python/**
+      - crates/html-to-markdown-py/**
+      - crates/html-to-markdown/**
+      - pyproject.toml
+      - uv.lock
+      - uv.toml
+      - .github/workflows/ci-python.yaml
 
 concurrency:
   group: ci-python-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
