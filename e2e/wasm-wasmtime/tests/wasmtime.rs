@@ -1,7 +1,7 @@
 use anyhow::{Context, Result};
 use html_to_markdown_rs::{ConversionOptions, HeadingStyle};
 use std::{
-    env,
+    env, fs,
     path::{Path, PathBuf},
     process::{Command, Stdio},
 };
@@ -26,6 +26,25 @@ fn rustup_available() -> bool {
         .unwrap_or(false)
 }
 
+fn rustup_rustc() -> Option<PathBuf> {
+    if !rustup_available() {
+        return None;
+    }
+    let output = Command::new("rustup")
+        .args(["which", "rustc", "--toolchain", "stable"])
+        .output()
+        .ok()?;
+    if !output.status.success() {
+        return None;
+    }
+    let path = String::from_utf8_lossy(&output.stdout).trim().to_string();
+    if path.is_empty() {
+        None
+    } else {
+        Some(PathBuf::from(path))
+    }
+}
+
 fn rustup_cargo() -> Option<PathBuf> {
     if !rustup_available() {
         return None;
@@ -47,7 +66,48 @@ fn cargo_invocation() -> Command {
     }
 }
 
-fn build_wasm_module() -> Result<PathBuf> {
+fn wasm_target_installed() -> bool {
+    let mut rustc_cmd = Command::new("rustc");
+    if let Some(rustc) = rustup_rustc() {
+        rustc_cmd = Command::new(rustc);
+    }
+
+    let output = rustc_cmd
+        .args(["--print", "target-libdir", "--target", "wasm32-unknown-unknown"])
+        .stdout(Stdio::piped())
+        .stderr(Stdio::null())
+        .output();
+    let output = match output {
+        Ok(output) => output,
+        Err(_) => return false,
+    };
+    if !output.status.success() {
+        return false;
+    }
+
+    let libdir = String::from_utf8_lossy(&output.stdout);
+    let libdir_path = Path::new(libdir.trim());
+    if !libdir_path.exists() {
+        return false;
+    }
+
+    fs::read_dir(libdir_path)
+        .map(|entries| {
+            entries.into_iter().any(|entry| {
+                entry
+                    .map(|entry| entry.file_name().to_string_lossy().starts_with("libstd"))
+                    .unwrap_or(false)
+            })
+        })
+        .unwrap_or(false)
+}
+
+fn build_wasm_module() -> Result<Option<PathBuf>> {
+    if !wasm_target_installed() {
+        eprintln!("Skipping WASM wasmtime tests: rust target wasm32-unknown-unknown not installed");
+        return Ok(None);
+    }
+
     let mut command = cargo_invocation();
     command.args([
         "build",
@@ -60,6 +120,10 @@ fn build_wasm_module() -> Result<PathBuf> {
         "--features",
         "wasmtime-testing",
     ]);
+    if let Some(rustc) = rustup_rustc() {
+        command.env("RUSTC", rustc);
+    }
+
     let status = command
         .current_dir(workspace_root())
         .status()
@@ -71,7 +135,7 @@ fn build_wasm_module() -> Result<PathBuf> {
     if !artefact.exists() {
         anyhow::bail!("expected wasm artefact at {}", artefact.display());
     }
-    Ok(artefact)
+    Ok(Some(artefact))
 }
 
 struct WasmHarness {
@@ -85,9 +149,12 @@ struct WasmHarness {
 }
 
 impl WasmHarness {
-    fn new() -> Result<Self> {
+    fn new() -> Result<Option<Self>> {
         let engine = Engine::default();
-        let wasm_path = build_wasm_module()?;
+        let wasm_path = match build_wasm_module()? {
+            Some(path) => path,
+            None => return Ok(None),
+        };
         let module = Module::from_file(&engine, &wasm_path)?;
         let mut store = Store::new(&engine, ());
         let instance = Instance::new(&mut store, &module, &[])?;
@@ -110,7 +177,7 @@ impl WasmHarness {
             .get_typed_func::<(), u32>(&mut store, "htmd_result_ptr")
             .context("htmd_result_ptr export missing")?;
 
-        Ok(Self {
+        Ok(Some(Self {
             store,
             memory,
             alloc,
@@ -118,7 +185,7 @@ impl WasmHarness {
             convert,
             convert_underlined,
             result_ptr,
-        })
+        }))
     }
 
     fn write_buffer(&mut self, bytes: &[u8]) -> Result<(u32, u32)> {
@@ -178,7 +245,9 @@ impl WasmHarness {
 
 #[test]
 fn converts_simple_html_via_wasmtime() -> Result<()> {
-    let mut harness = WasmHarness::new()?;
+    let Some(mut harness) = WasmHarness::new()? else {
+        return Ok(());
+    };
     let html = "<h1>Hello</h1><p>Rust + WASM</p>";
     let output = harness.convert_html(html)?;
     let expected = html_to_markdown_rs::convert(html, None)?;
@@ -188,7 +257,9 @@ fn converts_simple_html_via_wasmtime() -> Result<()> {
 
 #[test]
 fn respects_conversion_options() -> Result<()> {
-    let mut harness = WasmHarness::new()?;
+    let Some(mut harness) = WasmHarness::new()? else {
+        return Ok(());
+    };
     let html = "<h1>Title</h1><p>content here</p>";
     let options = ConversionOptions {
         heading_style: HeadingStyle::Underlined,
