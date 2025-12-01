@@ -63,7 +63,7 @@ jobs:
           components: rustfmt, clippy, llvm-tools-preview
 
       - name: Install cargo-llvm-cov
-        run: cargo install cargo-llvm-cov
+        run: cargo install cargo-llvm-cov --locked --force
 
       - name: Generate Rust Coverage
         run: cargo llvm-cov --workspace --exclude html-to-markdown-py --exclude html-to-markdown-rb --exclude html-to-markdown-php --exclude html-to-markdown-node --exclude html-to-markdown-wasm --exclude html-to-markdown-wasm-wasmtime-tests --all-features --lcov --output-path coverage.lcov
