@@ -2,12 +2,11 @@ use html_to_markdown_rs::{
     CodeBlockStyle, ConversionOptions, HeadingStyle, HighlightStyle, HtmlExtraction, InlineImage, InlineImageConfig,
     InlineImageFormat, InlineImageSource, InlineImageWarning, ListIndentType, NewlineStyle, PreprocessingOptions,
     PreprocessingPreset, WhitespaceMode, convert as convert_inner,
-    convert_with_inline_images as convert_with_inline_images_inner, error::ConversionError,
+    convert_with_inline_images as convert_with_inline_images_inner, error::ConversionError, safety::guard_panic,
 };
 use magnus::prelude::*;
 use magnus::r_hash::ForEach;
 use magnus::{Error, RArray, RHash, Ruby, Symbol, TryConvert, Value, function, scan_args::scan_args};
-use std::panic::{AssertUnwindSafe, catch_unwind};
 
 #[derive(Clone)]
 #[magnus::wrap(class = "HtmlToMarkdown::Options", free_immediately)]
@@ -18,6 +17,9 @@ const DEFAULT_INLINE_IMAGE_LIMIT: u64 = 5 * 1024 * 1024;
 fn conversion_error(err: ConversionError) -> Error {
     match err {
         ConversionError::ConfigError(msg) => arg_error(msg),
+        ConversionError::Panic(message) => {
+            runtime_error(format!("html-to-markdown panic during conversion: {message}"))
+        }
         other => runtime_error(other.to_string()),
     }
 }
@@ -30,25 +32,6 @@ fn arg_error(message: impl Into<String>) -> Error {
 fn runtime_error(message: impl Into<String>) -> Error {
     let ruby = Ruby::get().expect("Ruby not initialised");
     Error::new(ruby.exception_runtime_error(), message.into())
-}
-
-fn catch_panic<F, R>(f: F) -> Result<R, Error>
-where
-    F: FnOnce() -> Result<R, Error> + std::panic::UnwindSafe,
-{
-    match catch_unwind(f) {
-        Ok(result) => result,
-        Err(panic_info) => {
-            let msg = if let Some(s) = panic_info.downcast_ref::<String>() {
-                format!("Panic occurred in html-to-markdown: {}", s)
-            } else if let Some(s) = panic_info.downcast_ref::<&str>() {
-                format!("Panic occurred in html-to-markdown: {}", s)
-            } else {
-                "Panic occurred in html-to-markdown: unknown error".to_string()
-            };
-            Err(runtime_error(msg))
-        }
-    }
 }
 
 fn symbol_to_string(value: Value) -> Result<String, Error> {
@@ -410,9 +393,7 @@ fn convert_fn(ruby: &Ruby, args: &[Value]) -> Result<String, Error> {
     let html = parsed.required.0;
     let options = build_conversion_options(ruby, parsed.optional.0)?;
 
-    catch_panic(AssertUnwindSafe(|| {
-        convert_inner(&html, Some(options)).map_err(conversion_error)
-    }))
+    guard_panic(|| convert_inner(&html, Some(options))).map_err(conversion_error)
 }
 
 fn options_handle_fn(ruby: &Ruby, args: &[Value]) -> Result<OptionsHandle, Error> {
@@ -427,9 +408,7 @@ fn convert_with_options_handle_fn(_ruby: &Ruby, args: &[Value]) -> Result<String
     let handle = parsed.required.1;
     let options = handle.0.clone();
 
-    catch_panic(AssertUnwindSafe(|| {
-        convert_inner(&html, Some(options)).map_err(conversion_error)
-    }))
+    guard_panic(|| convert_inner(&html, Some(options))).map_err(conversion_error)
 }
 
 fn convert_with_inline_images_fn(ruby: &Ruby, args: &[Value]) -> Result<Value, Error> {
@@ -438,10 +417,10 @@ fn convert_with_inline_images_fn(ruby: &Ruby, args: &[Value]) -> Result<Value, E
     let options = build_conversion_options(ruby, parsed.optional.0)?;
     let config = build_inline_image_config(ruby, parsed.optional.1)?;
 
-    catch_panic(AssertUnwindSafe(|| {
-        let extraction = convert_with_inline_images_inner(&html, Some(options), config).map_err(conversion_error)?;
-        extraction_to_value(ruby, extraction)
-    }))
+    let extraction =
+        guard_panic(|| convert_with_inline_images_inner(&html, Some(options), config)).map_err(conversion_error)?;
+
+    extraction_to_value(ruby, extraction)
 }
 
 #[magnus::init]

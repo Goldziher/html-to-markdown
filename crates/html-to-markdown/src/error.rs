@@ -24,6 +24,10 @@ pub enum ConversionError {
     #[error("I/O error: {0}")]
     IoError(#[from] std::io::Error),
 
+    /// Panic caught during conversion to prevent unwinding across FFI boundaries
+    #[error("Internal panic: {0}")]
+    Panic(String),
+
     /// Generic conversion error
     #[error("Conversion error: {0}")]
     Other(String),

@@ -132,6 +132,9 @@ handling, and inline image extraction.
   `php.ini` to include `extension=html_to_markdown`.
 - **Missing Rust toolchain**: install Rust via `rustup` and ensure `cargo` is on
   the `PATH`.
+- **PIE install copies to `/html_to_markdown.so`**: set the extension dir
+  explicitly, e.g. `PHP_EXTENSION_DIR=$(php-config --extension-dir) pie install goldziher/html-to-markdown`
+  (PIE then writes to that directory, and you can enable via `extension=html_to_markdown`).
 - **Composer permissions**: run Composer with `--no-interaction --no-progress`
   in CI to avoid prompts.
 

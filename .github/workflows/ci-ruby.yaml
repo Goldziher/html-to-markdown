@@ -3,8 +3,24 @@ name: CI Ruby
 on:
   push:
     branches: [main]
+    paths:
+      - packages/ruby/**
+      - packages/ruby/ext/**/*
+      - crates/html-to-markdown-rb/**
+      - crates/html-to-markdown/**
+      - Gemfile
+      - Gemfile.lock
+      - .github/workflows/ci-ruby.yaml
   pull_request:
     branches: [main]
+    paths:
+      - packages/ruby/**
+      - packages/ruby/ext/**/*
+      - crates/html-to-markdown-rb/**
+      - crates/html-to-markdown/**
+      - Gemfile
+      - Gemfile.lock
+      - .github/workflows/ci-ruby.yaml
 
 concurrency:
   group: ci-ruby-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}

@@ -15,6 +15,7 @@ pub mod hocr;
 #[cfg(feature = "inline-images")]
 mod inline_images;
 pub mod options;
+pub mod safety;
 pub mod text;
 pub mod wrapper;
 
