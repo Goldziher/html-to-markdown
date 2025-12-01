@@ -8,13 +8,23 @@ use ext_php_rs::binary::Binary;
 use ext_php_rs::boxed::ZBox;
 use ext_php_rs::prelude::*;
 use ext_php_rs::types::{ArrayKey, ZendHashTable, Zval};
+use html_to_markdown_rs::safety::guard_panic;
 use html_to_markdown_rs::{
-    CodeBlockStyle, ConversionOptions, HeadingStyle, HighlightStyle, HtmlExtraction, InlineImage, InlineImageConfig,
-    InlineImageFormat, InlineImageSource, InlineImageWarning, ListIndentType, NewlineStyle, PreprocessingOptions,
-    PreprocessingPreset, WhitespaceMode, convert, convert_with_inline_images,
+    CodeBlockStyle, ConversionError, ConversionOptions, HeadingStyle, HighlightStyle, HtmlExtraction, InlineImage,
+    InlineImageConfig, InlineImageFormat, InlineImageSource, InlineImageWarning, ListIndentType, NewlineStyle,
+    PreprocessingOptions, PreprocessingPreset, WhitespaceMode,
 };
 
 const DEFAULT_INLINE_IMAGE_LIMIT: u64 = 5 * 1024 * 1024;
+
+fn to_php_exception(err: ConversionError) -> PhpException {
+    match err {
+        ConversionError::Panic(message) => {
+            PhpException::default(format!("html-to-markdown panic during conversion: {message}"))
+        }
+        other => PhpException::default(other.to_string()),
+    }
+}
 
 #[php_function]
 #[php(name = "html_to_markdown_convert")]
@@ -24,7 +34,7 @@ pub fn convert_html(html: String, options: Option<&ZendHashTable>) -> PhpResult<
         None => None,
     };
 
-    convert(&html, rust_options).map_err(|err| PhpException::default(err.to_string()))
+    guard_panic(|| html_to_markdown_rs::convert(&html, rust_options)).map_err(to_php_exception)
 }
 
 #[php_function]
@@ -44,8 +54,8 @@ pub fn convert_html_with_inline_images(
         None => InlineImageConfig::new(DEFAULT_INLINE_IMAGE_LIMIT),
     };
 
-    let extraction = convert_with_inline_images(&html, rust_options, config)
-        .map_err(|err| PhpException::default(err.to_string()))?;
+    let extraction = guard_panic(|| html_to_markdown_rs::convert_with_inline_images(&html, rust_options, config))
+        .map_err(to_php_exception)?;
 
     build_html_extraction(extraction)
 }
