@@ -39,8 +39,9 @@ char *html_to_markdown_convert(const char *html);
  *
  * # Safety
  *
- * - Returns a static string that does not need to be freed
- * - May return NULL if no error has occurred
+ * - Returns a pointer to a thread-local buffer; copy it immediately if needed
+ * - Pointer is invalidated by the next call to any `html_to_markdown_*` function
+ * - May return NULL if no error has occurred in this thread
  */
 const char *html_to_markdown_last_error(void);
 
