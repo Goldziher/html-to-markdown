@@ -50,6 +50,8 @@ jobs:
 
       - name: Setup Rust
         uses: ./.github/actions/setup-rust
+        with:
+          maximize-build-space: false
 
       - name: Install wasm-pack
         run: |
