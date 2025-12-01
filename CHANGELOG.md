@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.9.3] - 2025-12-01
+
+### Changed
+- **Version sync** – Bumped the entire workspace (Rust, Python, npm, Ruby, Elixir, Java, C#, Go) to 2.9.3 via `task sync-versions` to prep the next patch release.
+- **Docs & install commands** – Pointed all Composer references to the published `goldziher/html-to-markdown` package and clarified npm usage to the shipped packages (`html-to-markdown-node` / `html-to-markdown-wasm`).
+
+### Fixed
+- **Go lint CI** – Replaced the invalid `go fmt -l` invocations with `gofmt -l` in the Taskfile so `task check`/CI lint runs complete successfully on Go 1.25.
+
 ## [2.9.2] - 2025-11-28
 
 ### Fixed
@@ -101,7 +110,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Version Sync Script** – `scripts/sync_versions.py` updates every `html-to-markdown-rs` dependency pin (workspace root plus downstream crates) to keep cross-language releases in lockstep.
 
 ### Fixed
-- **Smoke Test Coverage** – Verified Node, WASM, Python, Ruby (local gem), PHP (Composer path repo), and Rust installs; documented gaps where external registries still need to publish `html-to-markdown/extension` or `html-to-markdown` 2.7.1 before release.
+- **Smoke Test Coverage** – Verified Node, WASM, Python, Ruby (local gem), PHP (Composer path repo), and Rust installs; documented gaps where external registries still need to publish `goldziher/html-to-markdown` or `html-to-markdown` 2.7.1 before release.
 
 ## [2.7.0] - 2025-11-12
 

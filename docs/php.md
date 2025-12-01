@@ -16,7 +16,7 @@ Install the PHP package and ensure the native extension is available:
 
 ```bash
 pie install goldziher/html-to-markdown
-composer require html-to-markdown/extension
+composer require goldziher/html-to-markdown
 ```
 
 > **Note**

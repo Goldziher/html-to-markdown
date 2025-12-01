@@ -39,7 +39,7 @@ $markdown = convert('<h1>Hello</h1>');
 ```
 
 For a typed API built on top of these primitives, install the
-`html-to-markdown/extension` Composer package which layers enums, value objects,
+`goldziher/html-to-markdown` Composer package which layers enums, value objects,
 and exceptions above the shared Rust engine.
 
 ## Local build

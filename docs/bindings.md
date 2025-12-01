@@ -175,14 +175,14 @@ the Rust engine.
 
 ---
 
-## PHP extension (`html-to-markdown/extension`)
+## PHP extension (`goldziher/html-to-markdown`)
 
 The PHP binding ships as a native extension distributed via
 [PIE](https://github.com/php/pie) and a typed Composer package.
 
 ```bash
 pie install goldziher/html-to-markdown --install-project
-composer require html-to-markdown/extension
+composer require goldziher/html-to-markdown
 ```
 
 Once installed, enable the extension in `php.ini` and use the `HtmlToMarkdown`

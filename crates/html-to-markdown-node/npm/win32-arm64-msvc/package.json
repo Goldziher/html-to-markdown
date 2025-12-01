@@ -1,6 +1,6 @@
 {
   "name": "html-to-markdown-node-win32-arm64-msvc",
-  "version": "2.9.2",
+  "version": "2.9.3",
   "cpu": [
     "arm64"
   ],
