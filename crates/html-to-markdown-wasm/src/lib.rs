@@ -1,11 +1,12 @@
 use html_to_markdown_rs::safety::guard_panic;
 use html_to_markdown_rs::{
-    CodeBlockStyle, ConversionError, ConversionOptions as RustConversionOptions, HeadingStyle, HighlightStyle,
-    ListIndentType, NewlineStyle, PreprocessingOptions as RustPreprocessingOptions, PreprocessingPreset,
-    WhitespaceMode,
+    CodeBlockStyle, ConversionOptions as RustConversionOptions, HeadingStyle, HighlightStyle, ListIndentType,
+    NewlineStyle, PreprocessingOptions as RustPreprocessingOptions, PreprocessingPreset, WhitespaceMode,
 };
 use serde::{Deserialize, Serialize};
 
+#[cfg(feature = "js-bindings")]
+use html_to_markdown_rs::ConversionError;
 #[cfg(feature = "js-bindings")]
 use wasm_bindgen::{JsCast, prelude::*};
 #[cfg(feature = "js-bindings")]
@@ -534,7 +535,7 @@ mod wasmtime_runtime {
     use std::cell::RefCell;
 
     thread_local! {
-        static RESULT_BUFFER: RefCell<Vec<u8>> = RefCell::new(Vec::new());
+        static RESULT_BUFFER: RefCell<Vec<u8>> = const { RefCell::new(Vec::new()) };
     }
 
     fn write_result(bytes: &[u8]) -> u32 {
