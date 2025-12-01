@@ -190,10 +190,12 @@ fn converts_simple_html_via_wasmtime() -> Result<()> {
 fn respects_conversion_options() -> Result<()> {
     let mut harness = WasmHarness::new()?;
     let html = "<h1>Title</h1><p>content here</p>";
-    let mut options = ConversionOptions::default();
-    options.heading_style = HeadingStyle::Underlined;
-    options.wrap = true;
-    options.wrap_width = 12;
+    let options = ConversionOptions {
+        heading_style: HeadingStyle::Underlined,
+        wrap: true,
+        wrap_width: 12,
+        ..Default::default()
+    };
     let expected = html_to_markdown_rs::convert(html, Some(options.clone()))?;
 
     let output = harness.convert_underlined(html)?;
