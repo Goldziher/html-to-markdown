@@ -8,8 +8,7 @@ use std::fs;
 use tempfile::TempDir;
 
 fn cli() -> Command {
-    let mut cmd = Command::new(env!("CARGO_BIN_EXE_html-to-markdown"));
-    cmd
+    Command::new(env!("CARGO_BIN_EXE_html-to-markdown"))
 }
 
 #[test]
