@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.10.0] - 2025-12-02
+
+### Added
+- Centralized panic guarding for all bindings (Python, Node, PHP, WASM, C FFI) using a shared Rust helper so panics surface as language-native errors instead of unwinding across FFI boundaries.
+- C FFI now stores the last error per thread and exposes it via `html_to_markdown_last_error`, with panic and UTF-8/null input diagnostics.
+- Ruby binding now uses the shared panic guard and emits consistent panic messages; specs cover panic interception across conversion entrypoints.
+
+### Changed
+- Wasmtime test harness initializes conversion options via struct literals to reduce clippy noise in CI.
+
 ### Fixed
 - Rust coverage CI now forces `cargo-llvm-cov` reinstall to avoid cached binary conflicts on GitHub runners.
 - PHP smoke tests use the Packagist package name `goldziher/html-to-markdown`, matching README install instructions.

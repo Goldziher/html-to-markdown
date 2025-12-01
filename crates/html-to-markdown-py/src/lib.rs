@@ -1,10 +1,20 @@
+use html_to_markdown_rs::safety::guard_panic;
 use html_to_markdown_rs::{
-    CodeBlockStyle, ConversionOptions as RustConversionOptions, HeadingStyle, HighlightStyle,
+    CodeBlockStyle, ConversionError, ConversionOptions as RustConversionOptions, HeadingStyle, HighlightStyle,
     InlineImageConfig as RustInlineImageConfig, InlineImageFormat, InlineImageSource, ListIndentType, NewlineStyle,
     PreprocessingOptions as RustPreprocessingOptions, PreprocessingPreset, WhitespaceMode,
 };
 use pyo3::prelude::*;
 use pyo3::types::{PyBytes, PyDict};
+
+fn to_py_err(err: ConversionError) -> PyErr {
+    match err {
+        ConversionError::Panic(message) => {
+            pyo3::exceptions::PyRuntimeError::new_err(format!("html-to-markdown panic during conversion: {message}"))
+        }
+        other => pyo3::exceptions::PyValueError::new_err(other.to_string()),
+    }
+}
 
 type PyInlineExtraction = PyResult<(String, Vec<Py<PyAny>>, Vec<Py<PyAny>>)>;
 
@@ -385,14 +395,13 @@ impl ConversionOptionsHandle {
 #[pyo3(signature = (html, options=None))]
 fn convert(html: &str, options: Option<ConversionOptions>) -> PyResult<String> {
     let rust_options = options.map(|opts| opts.to_rust());
-    html_to_markdown_rs::convert(html, rust_options).map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))
+    guard_panic(|| html_to_markdown_rs::convert(html, rust_options)).map_err(to_py_err)
 }
 
 #[pyfunction]
 #[pyo3(signature = (html, handle))]
 fn convert_with_options_handle(html: &str, handle: &ConversionOptionsHandle) -> PyResult<String> {
-    html_to_markdown_rs::convert(html, Some(handle.inner.clone()))
-        .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))
+    guard_panic(|| html_to_markdown_rs::convert(html, Some(handle.inner.clone()))).map_err(to_py_err)
 }
 
 #[pyfunction]
@@ -496,8 +505,8 @@ fn convert_with_inline_images<'py>(
 ) -> PyInlineExtraction {
     let rust_options = options.map(|opts| opts.to_rust());
     let cfg = image_config.unwrap_or_else(|| InlineImageConfig::new(5 * 1024 * 1024, None, true, false));
-    let extraction = html_to_markdown_rs::convert_with_inline_images(html, rust_options, cfg.to_rust())
-        .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))?;
+    let extraction = guard_panic(|| html_to_markdown_rs::convert_with_inline_images(html, rust_options, cfg.to_rust()))
+        .map_err(to_py_err)?;
 
     let images = extraction
         .inline_images

@@ -3,8 +3,18 @@ name: CI Elixir
 on:
   push:
     branches: [main]
+    paths:
+      - packages/elixir/**
+      - crates/html-to-markdown-ffi/**
+      - crates/html-to-markdown/**
+      - .github/workflows/ci-elixir.yaml
   pull_request:
     branches: [main]
+    paths:
+      - packages/elixir/**
+      - crates/html-to-markdown-ffi/**
+      - crates/html-to-markdown/**
+      - .github/workflows/ci-elixir.yaml
 
 concurrency:
   group: ci-elixir-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
