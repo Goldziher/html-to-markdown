@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- Rust coverage CI now forces `cargo-llvm-cov` reinstall to avoid cached binary conflicts on GitHub runners.
+- PHP smoke tests use the Packagist package name `goldziher/html-to-markdown`, matching README install instructions.
+
 ## [2.9.3] - 2025-12-01
 
 ### Changed
