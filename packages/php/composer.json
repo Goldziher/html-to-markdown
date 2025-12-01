@@ -1,5 +1,6 @@
 {
   "name": "goldziher/html-to-markdown",
+  "version": "2.9.3",
   "description": "Modern PHP API for the html_to_markdown native extension powered by the Rust html-to-markdown engine.",
   "type": "library",
   "license": "MIT",
@@ -14,6 +15,9 @@
   },
   "suggest": {
     "ext-html_to_markdown": "Provides native conversion. Install via PIE (goldziher/html-to-markdown) or download the release binary."
+  },
+  "provide": {
+    "ext-html_to_markdown": "*"
   },
   "autoload": {
     "psr-4": {
