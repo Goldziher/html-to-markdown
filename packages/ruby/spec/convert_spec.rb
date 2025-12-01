@@ -35,4 +35,43 @@ RSpec.describe HtmlToMarkdown do
       expect(result).to include('# Hello #')
     end
   end
+
+  describe 'panic handling' do
+    context 'when a Rust panic would occur' do
+      it 'catches panics in convert method' do
+        malformed_html = "#{'<' * 100_000}div#{'>' * 100_000}"
+
+        begin
+          result = described_class.convert(malformed_html)
+          expect(result).to be_a(String)
+        rescue RuntimeError => e
+          expect(e.message).to match(/Panic occurred in html-to-markdown/)
+        end
+      end
+
+      it 'catches panics in convert_with_options method' do
+        malformed_html = "#{'<' * 100_000}div#{'>' * 100_000}"
+        handle = described_class.options(heading_style: :atx)
+
+        begin
+          result = described_class.convert_with_options(malformed_html, handle)
+          expect(result).to be_a(String)
+        rescue RuntimeError => e
+          expect(e.message).to match(/Panic occurred in html-to-markdown/)
+        end
+      end
+
+      it 'catches panics in convert_with_inline_images method' do
+        malformed_html = "#{'<' * 100_000}div#{'>' * 100_000}"
+
+        begin
+          result = described_class.convert_with_inline_images(malformed_html)
+          expect(result).to be_a(Hash)
+          expect(result).to include(:markdown, :inline_images, :warnings)
+        rescue RuntimeError => e
+          expect(e.message).to match(/Panic occurred in html-to-markdown/)
+        end
+      end
+    end
+  end
 end
