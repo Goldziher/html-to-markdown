@@ -45,7 +45,7 @@ RSpec.describe HtmlToMarkdown do
           result = described_class.convert(malformed_html)
           expect(result).to be_a(String)
         rescue RuntimeError => e
-          expect(e.message).to match(/Panic occurred in html-to-markdown/)
+          expect(e.message).to match(/html-to-markdown panic during conversion/)
         end
       end
 
@@ -57,7 +57,7 @@ RSpec.describe HtmlToMarkdown do
           result = described_class.convert_with_options(malformed_html, handle)
           expect(result).to be_a(String)
         rescue RuntimeError => e
-          expect(e.message).to match(/Panic occurred in html-to-markdown/)
+          expect(e.message).to match(/html-to-markdown panic during conversion/)
         end
       end
 
@@ -69,7 +69,7 @@ RSpec.describe HtmlToMarkdown do
           expect(result).to be_a(Hash)
           expect(result).to include(:markdown, :inline_images, :warnings)
         rescue RuntimeError => e
-          expect(e.message).to match(/Panic occurred in html-to-markdown/)
+          expect(e.message).to match(/html-to-markdown panic during conversion/)
         end
       end
     end
