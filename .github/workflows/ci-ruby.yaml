@@ -70,12 +70,12 @@ jobs:
 
       - name: Run Rubocop (Unix)
         if: runner.os != 'Windows' && matrix.os == 'ubuntu-latest' && matrix.ruby == '3.3'
-        run: ../../scripts/ci/ruby/run-rubocop.sh
+        run: ./scripts/ci/ruby/run-rubocop.sh
         shell: bash
 
       - name: Validate RBS signatures (Unix)
         if: runner.os != 'Windows' && matrix.os == 'ubuntu-latest' && matrix.ruby == '3.3'
-        run: ../../scripts/ci/ruby/run-rbs-validate.sh
+        run: ./scripts/ci/ruby/run-rbs-validate.sh
         shell: bash
 
       - name: Run Steep type checking (Unix)
@@ -98,4 +98,4 @@ jobs:
         if: runner.os == 'Windows'
         working-directory: packages/ruby
         shell: pwsh
-        run: ../scripts/ci/ruby/run-rspec-windows.ps1
+        run: ../../scripts/ci/ruby/run-rspec-windows.ps1
