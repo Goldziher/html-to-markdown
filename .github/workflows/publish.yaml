@@ -41,96 +41,110 @@ jobs:
     steps:
       - name: Validate tag and compute version
         id: meta
-        run: |
-          event="${{ github.event_name }}"
-          if [[ "$event" == "workflow_dispatch" ]]; then
-            tag="${{ inputs.tag }}"
-            dry_run_input="${{ inputs.dry_run }}"
-            ref_input="${{ inputs.ref }}"
-          elif [[ "$event" == "release" ]]; then
-            tag="${{ github.event.release.tag_name }}"
-            dry_run_input="false"
-            ref_input="refs/tags/${tag}"
-          elif [[ "$event" == "repository_dispatch" ]]; then
-            tag="${{ github.event.client_payload.tag }}"
-            dry_run_input="${{ github.event.client_payload.dry_run }}"
-            ref_input="${{ github.event.client_payload.ref }}"
-          else
-            tag="${GITHUB_REF_NAME}"
-            dry_run_input="false"
-            ref_input=""
-            if [[ "$tag" == *-pre* ]]; then
-              dry_run_input="true"
-            fi
-          fi
-          if [[ -z "$tag" ]]; then
-            echo "Release tag could not be determined" >&2
-            exit 1
-          fi
-          if [[ "$tag" != v* ]]; then
-            echo "Tag must start with 'v' (e.g., v2.6.0)" >&2
-            exit 1
-          fi
-          version="${tag#v}"
-          if [[ -n "$ref_input" ]]; then
-            ref="$ref_input"
-          else
-            ref="refs/tags/${tag}"
-          fi
-          if [[ "$ref" =~ ^[0-9a-f]{40}$ ]]; then
-            checkout_ref="refs/heads/main"
-            target_sha="$ref"
-          elif [[ "$ref" =~ ^refs/ ]]; then
-            checkout_ref="$ref"
-            target_sha=""
-          else
-            checkout_ref="refs/heads/${ref}"
-            target_sha=""
-          fi
-          if [[ "$ref" =~ ^[0-9a-f]{40}$ ]]; then
-            matrix_ref="main"
-          elif [[ "$ref" =~ ^refs/heads/(.+)$ ]]; then
-            matrix_ref="${BASH_REMATCH[1]}"
-          elif [[ "$ref" =~ ^refs/tags/(.+)$ ]]; then
-            matrix_ref="${BASH_REMATCH[1]}"
-          else
-            matrix_ref="$ref"
-          fi
-          dry_run="$dry_run_input"
-
-          # Determine if this is a tag push
-          if [[ "$ref" =~ ^refs/tags/ ]]; then
-            is_tag="true"
-          else
-            is_tag="false"
-          fi
-
-          cat <<JSON > release-metadata.json
-          {
-            "tag": "$tag",
-            "version": "$version",
-            "ref": "$ref",
-            "checkout_ref": "$checkout_ref",
-            "target_sha": "$target_sha",
-            "matrix_ref": "$matrix_ref",
-            "dry_run": ${dry_run:-false},
-            "is_tag": $is_tag
-          }
-          JSON
-          echo "tag=$tag" >> "$GITHUB_OUTPUT"
-          echo "version=$version" >> "$GITHUB_OUTPUT"
-          echo "ref=$ref" >> "$GITHUB_OUTPUT"
-          echo "dry_run=${dry_run:-false}" >> "$GITHUB_OUTPUT"
-          echo "checkout_ref=$checkout_ref" >> "$GITHUB_OUTPUT"
-          echo "target_sha=$target_sha" >> "$GITHUB_OUTPUT"
-          echo "matrix_ref=$matrix_ref" >> "$GITHUB_OUTPUT"
-          echo "is_tag=$is_tag" >> "$GITHUB_OUTPUT"
+        env:
+          GITHUB_EVENT_NAME: ${{ github.event_name }}
+          GITHUB_REF_NAME: ${{ github.ref_name }}
+          INPUT_TAG: ${{ inputs.tag }}
+          INPUT_DRY_RUN: ${{ inputs.dry_run }}
+          INPUT_REF: ${{ inputs.ref }}
+          EVENT_RELEASE_TAG: ${{ github.event.release.tag_name }}
+          EVENT_DISPATCH_TAG: ${{ github.event.client_payload.tag }}
+          EVENT_DISPATCH_DRY_RUN: ${{ github.event.client_payload.dry_run }}
+          EVENT_DISPATCH_REF: ${{ github.event.client_payload.ref }}
+        run: scripts/publish/validate-and-compute-metadata.sh
       - name: Upload release metadata
         uses: actions/upload-artifact@v5
         with:
           name: release-metadata
           path: release-metadata.json
           retention-days: 14
+
+  check-pypi:
+    name: Check PyPI for existing version
+    needs: prepare
+    if: ${{ needs.prepare.outputs.is_tag == 'true' }}
+    runs-on: ubuntu-latest
+    outputs:
+      exists: ${{ steps.check.outputs.exists }}
+    steps:
+      - name: Check PyPI version
+        id: check
+        env:
+          VERSION: ${{ needs.prepare.outputs.version }}
+        run: scripts/publish/check-pypi-version.sh
+
+  check-npm:
+    name: Check npm for existing versions
+    needs: prepare
+    if: ${{ needs.prepare.outputs.is_tag == 'true' }}
+    runs-on: ubuntu-latest
+    outputs:
+      node_exists: ${{ steps.check.outputs.node_exists }}
+      wasm_exists: ${{ steps.check.outputs.wasm_exists }}
+    steps:
+      - name: Check npm packages
+        id: check
+        env:
+          VERSION: ${{ needs.prepare.outputs.version }}
+        run: scripts/publish/check-npm-packages.sh
+
+  check-rubygems:
+    name: Check RubyGems for existing version
+    needs: prepare
+    if: ${{ needs.prepare.outputs.is_tag == 'true' }}
+    runs-on: ubuntu-latest
+    outputs:
+      exists: ${{ steps.check.outputs.exists }}
+    steps:
+      - name: Check RubyGems version
+        id: check
+        env:
+          VERSION: ${{ needs.prepare.outputs.version }}
+        run: scripts/publish/check-rubygems-version.sh
+
+  check-maven:
+    name: Check Maven Central for existing version
+    needs: prepare
+    if: ${{ needs.prepare.outputs.is_tag == 'true' }}
+    runs-on: ubuntu-latest
+    outputs:
+      exists: ${{ steps.check.outputs.exists }}
+    steps:
+      - name: Check Maven version
+        id: check
+        env:
+          VERSION: ${{ needs.prepare.outputs.version }}
+        run: scripts/publish/check-maven-version.sh
+
+  check-nuget:
+    name: Check NuGet for existing version
+    needs: prepare
+    if: ${{ needs.prepare.outputs.is_tag == 'true' }}
+    runs-on: ubuntu-latest
+    outputs:
+      exists: ${{ steps.check.outputs.exists }}
+    steps:
+      - name: Check NuGet package
+        id: check
+        env:
+          VERSION: ${{ needs.prepare.outputs.version }}
+        run: scripts/publish/check-nuget-version.sh
+
+  check-cratesio:
+    name: Check crates.io for existing versions
+    needs: prepare
+    if: ${{ needs.prepare.outputs.is_tag == 'true' }}
+    runs-on: ubuntu-latest
+    outputs:
+      rs_exists: ${{ steps.check.outputs.rs_exists }}
+      cli_exists: ${{ steps.check.outputs.cli_exists }}
+      all_exist: ${{ steps.check.outputs.all_exist }}
+    steps:
+      - name: Query crates.io
+        id: check
+        env:
+          VERSION: ${{ needs.prepare.outputs.version }}
+        run: scripts/publish/check-cratesio-versions.sh
 
   python-wheels:
     name: Build Python wheels (${{ matrix.os }})
@@ -149,7 +163,10 @@ jobs:
 
       - name: Ensure target commit
         if: ${{ needs.prepare.outputs.target_sha != '' }}
-        run: git checkout --progress --force ${{ needs.prepare.outputs.target_sha }}
+        env:
+          TARGET_SHA: ${{ needs.prepare.outputs.target_sha }}
+        run: scripts/publish/common/ensure-target-commit.sh
+        shell: bash
 
       - name: Build wheels
         uses: ./.github/actions/build-wheels
@@ -176,7 +193,10 @@ jobs:
 
       - name: Ensure target commit
         if: ${{ needs.prepare.outputs.target_sha != '' }}
-        run: git checkout --progress --force ${{ needs.prepare.outputs.target_sha }}
+        env:
+          TARGET_SHA: ${{ needs.prepare.outputs.target_sha }}
+        run: scripts/publish/common/ensure-target-commit.sh
+        shell: bash
 
       - name: Setup Rust
         uses: ./.github/actions/setup-rust
@@ -187,19 +207,20 @@ jobs:
           python-version: "3.13"
 
       - name: Install build dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install maturin
+        run: scripts/publish/python/install-build-deps.sh
+        shell: bash
 
       - name: Build CLI binary for sdist
-        run: cargo build --release --package html-to-markdown-cli
+        run: scripts/publish/python/build-cli-for-sdist.sh
+        shell: bash
 
       - name: Prepare sdist with CLI
-        run: python scripts/prepare_wheel.py
+        run: scripts/publish/python/prepare-sdist-with-cli.sh
+        shell: bash
 
       - name: Build sdist
-        working-directory: packages/python
-        run: maturin sdist --out dist/
+        run: scripts/publish/python/build-sdist.sh
+        shell: bash
 
       - name: Upload sdist
         uses: actions/upload-artifact@v5
@@ -221,7 +242,10 @@ jobs:
 
       - name: Ensure target commit
         if: ${{ needs.prepare.outputs.target_sha != '' }}
-        run: git checkout --progress --force ${{ needs.prepare.outputs.target_sha }}
+        env:
+          TARGET_SHA: ${{ needs.prepare.outputs.target_sha }}
+        run: scripts/publish/common/ensure-target-commit.sh
+        shell: bash
 
       - name: Setup Rust
         uses: ./.github/actions/setup-rust
@@ -236,24 +260,24 @@ jobs:
           coverage: none
 
       - name: Ensure packaging script is executable
-        run: chmod +x scripts/package_php_pie_source.sh
+        run: scripts/publish/php/ensure-package-script-executable.sh
+        shell: bash
 
       - name: Assemble PIE source archive
-        run: ./scripts/package_php_pie_source.sh ${{ needs.prepare.outputs.version }} build/artifacts
+        env:
+          VERSION: ${{ needs.prepare.outputs.version }}
+        run: scripts/publish/php/assemble-pie-archive.sh
+        shell: bash
 
       - name: Download PIE CLI
-        run: |
-          curl -fsSL https://github.com/php/pie/releases/latest/download/pie.phar -o build/pie.phar
+        run: scripts/publish/php/download-pie-cli.sh
+        shell: bash
 
       - name: Verify PIE build from archive
-        run: |
-          set -euo pipefail
-          TMP_DIR=$(mktemp -d)
-          tar -xzf "build/artifacts/php_html_to_markdown-${{ needs.prepare.outputs.version }}-src.tgz" -C "$TMP_DIR"
-          echo "Extracted archive contents:" && ls -R "$TMP_DIR"
-          php build/pie.phar repository:add path "$TMP_DIR"
-          CARGO_BIN="$(command -v cargo)"
-          php build/pie.phar build goldziher/html-to-markdown:*@dev --working-dir "$TMP_DIR" --with-cargo-bin="$CARGO_BIN"
+        env:
+          VERSION: ${{ needs.prepare.outputs.version }}
+        run: scripts/publish/php/verify-pie-archive.sh
+        shell: bash
 
       - name: Upload PIE source archive
         uses: actions/upload-artifact@v5
@@ -275,7 +299,10 @@ jobs:
 
       - name: Ensure target commit
         if: ${{ needs.prepare.outputs.target_sha != '' }}
-        run: git checkout --progress --force ${{ needs.prepare.outputs.target_sha }}
+        env:
+          TARGET_SHA: ${{ needs.prepare.outputs.target_sha }}
+        run: scripts/publish/common/ensure-target-commit.sh
+        shell: bash
 
       - name: Setup Rust
         uses: ./.github/actions/setup-rust
@@ -287,18 +314,16 @@ jobs:
           check-latest: true
 
       - name: Enable corepack
-        run: corepack enable
+        run: scripts/common/enable-corepack.sh
+        shell: bash
 
       - name: Install Node dependencies
-        run: pnpm install --filter html-to-markdown-node...
+        run: scripts/publish/node/install-node-deps.sh
+        shell: bash
 
       - name: Generate TypeScript definitions
-        run: |
-          # Build without --platform to generate index.d.ts
-          pnpm --filter html-to-markdown-node exec napi build --release
-          # Copy index.js (committed) and index.d.ts (generated)
-          mkdir -p typescript-defs
-          cp crates/html-to-markdown-node/index.js crates/html-to-markdown-node/index.d.ts typescript-defs/
+        run: scripts/publish/node/generate-typescript-defs.sh
+        shell: bash
 
       - name: Upload TypeScript definitions
         uses: actions/upload-artifact@v5
@@ -364,18 +389,25 @@ jobs:
 
       - name: Ensure target commit
         if: ${{ needs.prepare.outputs.target_sha != '' }}
-        run: git checkout --progress --force ${{ needs.prepare.outputs.target_sha }}
+        env:
+          TARGET_SHA: ${{ needs.prepare.outputs.target_sha }}
+        run: scripts/publish/common/ensure-target-commit.sh
+        shell: bash
 
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
 
       - name: Add Rust target
         if: ${{ matrix.rust_target != '' }}
-        run: rustup target add ${{ matrix.rust_target }}
+        env:
+          RUST_TARGET: ${{ matrix.rust_target }}
+        run: scripts/publish/common/add-rust-target.sh
+        shell: bash
 
       - name: Install cross
         if: ${{ matrix.use_cross }}
-        run: cargo install cross --git https://github.com/cross-rs/cross --locked
+        run: scripts/publish/cli/install-cross.sh
+        shell: bash
 
       - name: Setup Node
         uses: actions/setup-node@v6
@@ -384,22 +416,26 @@ jobs:
           check-latest: true
 
       - name: Enable corepack
-        run: corepack enable
+        run: scripts/common/enable-corepack.sh
+        shell: bash
 
       - name: Install Node dependencies
-        run: pnpm install --filter html-to-markdown-node...
+        run: scripts/publish/node/install-node-deps.sh
+        shell: bash
 
       - name: Clean npm directory
         if: runner.os != 'Windows'
-        run: rm -rf crates/html-to-markdown-node/npm
+        run: scripts/publish/node/clean-npm-dir.sh
+        shell: bash
 
       - name: Clean npm directory (Windows)
         if: runner.os == 'Windows'
         shell: pwsh
-        run: Remove-Item -Recurse -Force crates/html-to-markdown-node\npm -ErrorAction SilentlyContinue
+        run: scripts/publish/node/clean-npm-dir.ps1
 
       - name: Create npm package structure
-        run: pnpm --filter html-to-markdown-node exec napi create-npm-dirs
+        run: scripts/publish/node/create-npm-package-structure.sh
+        shell: bash
 
       - name: Build native module
         if: runner.os != 'Windows'
@@ -408,16 +444,7 @@ jobs:
           USE_CROSS: ${{ matrix.use_cross }}
           USE_NAPI_CROSS: ${{ matrix.use_napi_cross }}
         shell: bash
-        run: |
-          set -euo pipefail
-          args=(--platform --release --target "$TARGET" --output-dir ./artifacts)
-          if [ "${USE_NAPI_CROSS}" = "true" ]; then
-            args+=(--use-napi-cross)
-          fi
-          if [ "${USE_CROSS}" = "true" ]; then
-            args+=(--use-cross)
-          fi
-          pnpm --filter html-to-markdown-node exec napi build "${args[@]}"
+        run: scripts/publish/node/build-native-module.sh
 
       - name: Build native module (Windows)
         if: runner.os == 'Windows'
@@ -426,30 +453,21 @@ jobs:
           TARGET: ${{ matrix.target }}
           USE_CROSS: ${{ matrix.use_cross }}
           USE_NAPI_CROSS: ${{ matrix.use_napi_cross }}
-        run: |
-          $args = @('--platform', '--release', '--target', $env:TARGET, '--output-dir', './artifacts')
-          if ($env:USE_NAPI_CROSS -eq 'true') { $args += '--use-napi-cross' }
-          if ($env:USE_CROSS -eq 'true') { $args += '--use-cross' }
-          pnpm --filter html-to-markdown-node exec napi build @args
+        run: scripts/publish/node/build-native-module.ps1
 
       - name: Package artifacts
         if: runner.os != 'Windows'
         env:
           TARGET: ${{ matrix.target }}
-        run: |
-          pnpm --filter html-to-markdown-node exec napi artifacts --output-dir ./artifacts
-          test -d crates/html-to-markdown-node/npm || { echo "npm artifact directory missing"; exit 1; }
-          tar -czf node-bindings-$TARGET.tar.gz -C crates/html-to-markdown-node npm
+        run: scripts/publish/node/package-artifacts.sh
+        shell: bash
 
       - name: Package artifacts (Windows)
         if: runner.os == 'Windows'
         shell: pwsh
         env:
           TARGET: ${{ matrix.target }}
-        run: |
-          pnpm --filter html-to-markdown-node exec napi artifacts --output-dir ./artifacts
-          if (-Not (Test-Path crates/html-to-markdown-node\npm)) { throw "npm artifact directory missing" }
-          tar -czf node-bindings-$env:TARGET.tar.gz -C crates/html-to-markdown-node npm
+        run: scripts/publish/node/package-artifacts.ps1
 
       - name: Upload Node artifact
         uses: actions/upload-artifact@v5
@@ -471,19 +489,21 @@ jobs:
 
       - name: Ensure target commit
         if: ${{ needs.prepare.outputs.target_sha != '' }}
-        run: git checkout --progress --force ${{ needs.prepare.outputs.target_sha }}
+        env:
+          TARGET_SHA: ${{ needs.prepare.outputs.target_sha }}
+        run: scripts/publish/common/ensure-target-commit.sh
+        shell: bash
 
       - name: Setup Rust
         uses: ./.github/actions/setup-rust
 
       - name: Add wasm32 target
-        run: rustup target add wasm32-unknown-unknown
+        run: scripts/common/ensure-wasm-target.sh
+        shell: bash
 
       - name: Install wasm-pack
-        run: |
-          if ! command -v wasm-pack >/dev/null 2>&1; then
-            cargo install wasm-pack --locked
-          fi
+        run: scripts/common/install-wasm-pack.sh
+        shell: bash
 
       - name: Setup Node
         uses: actions/setup-node@v6
@@ -492,25 +512,20 @@ jobs:
           check-latest: true
 
       - name: Enable corepack
-        run: corepack enable
+        run: scripts/common/enable-corepack.sh
+        shell: bash
 
       - name: Install dependencies
-        run: pnpm install --filter html-to-markdown-wasm...
+        run: scripts/publish/wasm/install-deps.sh
+        shell: bash
 
       - name: Build WASM bundles
-        run: pnpm --filter html-to-markdown-wasm run build:all
+        run: scripts/publish/wasm/build-bundles.sh
+        shell: bash
 
       - name: Package WASM artifacts
-        run: |
-          set -euo pipefail
-          out_dir="wasm-artifacts"
-          rm -rf "$out_dir"
-          mkdir -p "$out_dir"
-          for folder in dist dist-node dist-web; do
-            if [ -d "crates/html-to-markdown-wasm/$folder" ]; then
-              tar -czf "$out_dir/html-to-markdown-${folder}.tar.gz" -C crates/html-to-markdown-wasm "$folder"
-            fi
-          done
+        run: scripts/publish/wasm/package-artifacts.sh
+        shell: bash
 
       - name: Upload WASM artifacts
         uses: actions/upload-artifact@v5
@@ -551,81 +566,59 @@ jobs:
 
       - name: Ensure target commit
         if: ${{ needs.prepare.outputs.target_sha != '' }}
-        run: git checkout --progress --force ${{ needs.prepare.outputs.target_sha }}
+        env:
+          TARGET_SHA: ${{ needs.prepare.outputs.target_sha }}
+        run: scripts/publish/common/ensure-target-commit.sh
+        shell: bash
 
       - name: Setup Rust
         uses: ./.github/actions/setup-rust
 
       - name: Add compilation target
-        run: rustup target add ${{ matrix.target }}
+        env:
+          RUST_TARGET: ${{ matrix.target }}
+        run: scripts/publish/common/add-rust-target.sh
+        shell: bash
 
       - name: Install build dependencies
         if: runner.os == 'Linux'
-        run: |
-          set -euo pipefail
-          sudo apt-get update
-          case "${{ matrix.target }}" in
-            x86_64-unknown-linux-musl)
-              sudo apt-get install -y musl-tools
-              ;;
-            aarch64-unknown-linux-gnu)
-              sudo apt-get install -y gcc-aarch64-linux-gnu
-              ;;
-          esac
+        env:
+          TARGET: ${{ matrix.target }}
+        run: scripts/publish/cli/install-build-deps-linux.sh
+        shell: bash
 
       - name: Configure cross linker
         if: ${{ matrix.target == 'aarch64-unknown-linux-gnu' }}
-        run: |
-          {
-            echo "CC_aarch64_unknown_linux_gnu=aarch64-linux-gnu-gcc"
-            echo "CXX_aarch64_unknown_linux_gnu=aarch64-linux-gnu-g++"
-            echo "AR_aarch64_unknown_linux_gnu=aarch64-linux-gnu-ar"
-            echo "CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER=aarch64-linux-gnu-gcc"
-          } >> "$GITHUB_ENV"
+        env:
+          TARGET: ${{ matrix.target }}
+        run: scripts/publish/cli/configure-cross-linker.sh
+        shell: bash
 
       - name: Install cross
         if: ${{ matrix.use_cross }}
-        run: cargo install cross --git https://github.com/cross-rs/cross --locked
+        run: scripts/publish/cli/install-cross.sh
+        shell: bash
 
       - name: Build CLI
         shell: bash
-        run: |
-          set -euo pipefail
-          target="${{ matrix.target }}"
-          if [ "${{ matrix.use_cross }}" = "true" ]; then
-            cross build --release --target "$target" --package html-to-markdown-cli
-          else
-            cargo build --release --target "$target" --package html-to-markdown-cli
-          fi
+        env:
+          TARGET: ${{ matrix.target }}
+          USE_CROSS: ${{ matrix.use_cross }}
+        run: scripts/publish/cli/build-cli.sh
 
       - name: Package CLI artifact
         if: runner.os != 'Windows'
         shell: bash
-        run: |
-          set -euo pipefail
-          target="${{ matrix.target }}"
-          stage="cli-${target}"
-          rm -rf "$stage"
-          mkdir -p "$stage"
-          cp "target/${target}/release/html-to-markdown" "$stage/"
-          cp LICENSE "$stage/"
-          cp README.md "$stage/"
-          tar -czf "${stage}.tar.gz" "$stage"
-          rm -rf "$stage"
+        env:
+          TARGET: ${{ matrix.target }}
+        run: scripts/publish/cli/package-cli-artifact.sh
 
       - name: Package CLI artifact (Windows)
         if: runner.os == 'Windows'
         shell: pwsh
-        run: |
-          $target = '${{ matrix.target }}'
-          $stage = "cli-$target"
-          Remove-Item -Recurse -Force $stage -ErrorAction SilentlyContinue
-          New-Item -ItemType Directory -Path $stage | Out-Null
-          Copy-Item "target/$target/release/html-to-markdown.exe" $stage
-          Copy-Item LICENSE $stage
-          Copy-Item README.md $stage
-          Compress-Archive -Path "$stage/*" -DestinationPath "$stage.zip" -Force
-          Remove-Item -Recurse -Force $stage
+        env:
+          TARGET: ${{ matrix.target }}
+        run: scripts/publish/cli/package-cli-artifact.ps1
 
       - name: Upload CLI artifact
         if: runner.os != 'Windows'
@@ -675,7 +668,10 @@ jobs:
 
       - name: Ensure target commit
         if: ${{ needs.prepare.outputs.target_sha != '' }}
-        run: git checkout --progress --force ${{ needs.prepare.outputs.target_sha }}
+        env:
+          TARGET_SHA: ${{ needs.prepare.outputs.target_sha }}
+        run: scripts/publish/common/ensure-target-commit.sh
+        shell: bash
 
       - name: Download Python wheels
         uses: actions/download-artifact@v6
@@ -685,22 +681,10 @@ jobs:
 
       - name: Determine Ruby artifact label
         id: ruby_label
-        run: |
-          case "${{ matrix.os }}" in
-            ubuntu-latest)
-              echo "label=linux" >> "$GITHUB_OUTPUT"
-              ;;
-            macos-latest)
-              echo "label=macos-arm64" >> "$GITHUB_OUTPUT"
-              ;;
-            windows-latest)
-              echo "label=windows-x64" >> "$GITHUB_OUTPUT"
-              ;;
-            *)
-              echo "Unsupported matrix.os=${{ matrix.os }}" >&2
-              exit 1
-              ;;
-          esac
+        env:
+          MATRIX_OS: ${{ matrix.os }}
+        run: scripts/publish/smoke/determine-ruby-artifact-label.sh
+        shell: bash
 
       - name: Download Ruby gems
         uses: actions/download-artifact@v6
@@ -715,10 +699,8 @@ jobs:
           path: elixir-package
 
       - name: Inspect Elixir package
-        run: |
-          set -euo pipefail
-          ls -l elixir-package
-          tar -tf elixir-package/html_to_markdown-*.tar >/dev/null
+        run: scripts/publish/smoke/inspect-elixir-package.sh
+        shell: bash
 
       - name: Setup Python
         uses: actions/setup-python@v6
@@ -744,7 +726,8 @@ jobs:
 
       - name: Capture php-config path
         if: runner.os == 'Linux'
-        run: echo "PHP_CONFIG=$(command -v php-config)" >> "$GITHUB_ENV"
+        run: scripts/ci/smoke/capture-php-config.sh
+        shell: bash
 
       - name: Smoke Python install
         uses: ./.github/actions/smoke-python
@@ -846,26 +829,29 @@ jobs:
 
       - name: Ensure target commit
         if: ${{ needs.prepare.outputs.target_sha != '' }}
-        run: git checkout --progress --force ${{ needs.prepare.outputs.target_sha }}
+        env:
+          TARGET_SHA: ${{ needs.prepare.outputs.target_sha }}
+        run: scripts/publish/common/ensure-target-commit.sh
+        shell: bash
 
       - name: Remove cached CLI binaries
         shell: bash
-        run: rm -f packages/ruby/lib/bin/html-to-markdown*
+        run: scripts/publish/ruby/remove-cached-cli.sh
 
       - name: Install MSYS2 toolchain
         if: runner.os == 'Windows'
         shell: pwsh
-        run: ridk exec pacman -S --needed --noconfirm base-devel mingw-w64-ucrt-x86_64-toolchain
+        run: scripts/publish/ruby/install-msys2-toolchain.ps1
 
       - name: Install Rust (GNU on Windows)
         if: runner.os == 'Windows'
         shell: pwsh
-        run: rustup toolchain install stable-gnu --profile minimal --no-self-update
+        run: scripts/publish/ruby/install-rust-gnu.ps1
 
       - name: Configure bindgen sysroot (Windows)
         if: runner.os == 'Windows'
         shell: bash
-        run: echo "BINDGEN_EXTRA_CLANG_ARGS=--target=x86_64-pc-windows-gnu --sysroot=${RI_DEVKIT//\\/\/}$MSYSTEM_PREFIX" >> "$GITHUB_ENV"
+        run: scripts/publish/ruby/configure-bindgen-windows.sh
 
       - name: Set up Ruby
         uses: ruby/setup-ruby@v1
@@ -876,46 +862,27 @@ jobs:
 
       - name: Install Ruby dependencies (Unix)
         if: runner.os != 'Windows'
-        run: bundle install --jobs 4 --retry 3
-        working-directory: packages/ruby
+        run: scripts/publish/ruby/install-deps-unix.sh
+        shell: bash
 
       - name: Install Ruby dependencies (Windows)
         if: runner.os == 'Windows'
         shell: pwsh
-        run: |
-          $workspace = ridk exec bash -lc "cygpath -au '$env:GITHUB_WORKSPACE'"
-          $gemdir = "$workspace/packages/ruby"
-          ridk exec bash -lc "cd $gemdir && export RUSTUP_TOOLCHAIN=stable-gnu CC=x86_64-w64-mingw32-gcc CXX=x86_64-w64-mingw32-g++ && bundle install --jobs 4 --retry 3"
+        run: scripts/publish/ruby/install-deps-windows.ps1
 
       - name: Build gem artifacts (Unix)
         if: runner.os != 'Windows'
         shell: bash
-        working-directory: packages/ruby
-        run: |
-          set -euo pipefail
-          bundle exec rake clean
-          ruby ../../scripts/prepare_ruby_gem.rb
-          bundle exec rake build
+        run: scripts/publish/ruby/build-gem-unix.sh
 
       - name: Build gem artifacts (Windows)
         if: runner.os == 'Windows'
         shell: pwsh
-        run: |
-          $workspace = ridk exec bash -lc "cygpath -au '$env:GITHUB_WORKSPACE'"
-          $gemdir = "$workspace/packages/ruby"
-          ridk exec bash -lc "cd $workspace && export RUSTUP_TOOLCHAIN=stable-gnu && ruby scripts/prepare_ruby_gem.rb"
-          ridk exec bash -lc "cd $gemdir && export RUSTUP_TOOLCHAIN=stable-gnu CC=x86_64-w64-mingw32-gcc CXX=x86_64-w64-mingw32-g++ && bundle exec rake clean && bundle exec rake build"
+        run: scripts/publish/ruby/build-gem-windows.ps1
 
       - name: Verify gem artifacts
         shell: bash
-        run: |
-          set -euo pipefail
-          shopt -s nullglob
-          files=(packages/ruby/pkg/*.gem)
-          if [ ${#files[@]} -eq 0 ]; then
-            echo "No gems were produced" >&2
-            exit 1
-          fi
+        run: scripts/publish/ruby/verify-gem-artifacts.sh
 
       - name: Upload gem artifacts
         uses: actions/upload-artifact@v5
@@ -939,7 +906,10 @@ jobs:
 
       - name: Ensure target commit
         if: ${{ needs.prepare.outputs.target_sha != '' }}
-        run: git checkout --progress --force ${{ needs.prepare.outputs.target_sha }}
+        env:
+          TARGET_SHA: ${{ needs.prepare.outputs.target_sha }}
+        run: scripts/publish/common/ensure-target-commit.sh
+        shell: bash
 
       - name: Setup Elixir
         uses: erlef/setup-beam@v1
@@ -951,23 +921,20 @@ jobs:
         uses: ./.github/actions/setup-rust
 
       - name: Install Hex and Rebar
-        run: |
-          mix local.hex --force
-          mix local.rebar --force
+        run: scripts/publish/elixir/install-hex-rebar.sh
+        shell: bash
 
       - name: Install dependencies
-        working-directory: packages/elixir
-        run: mix deps.get
+        run: scripts/publish/elixir/install-deps.sh
+        shell: bash
 
       - name: Run Elixir tests
-        working-directory: packages/elixir
-        env:
-          MIX_ENV: test
-        run: mix test
+        run: scripts/publish/elixir/run-tests.sh
+        shell: bash
 
       - name: Build Hex package
-        working-directory: packages/elixir
-        run: mix hex.build
+        run: scripts/publish/elixir/build-hex-package.sh
+        shell: bash
 
       - name: Upload Hex artifact
         uses: actions/upload-artifact@v5
@@ -989,7 +956,10 @@ jobs:
 
       - name: Ensure target commit
         if: ${{ needs.prepare.outputs.target_sha != '' }}
-        run: git checkout --progress --force ${{ needs.prepare.outputs.target_sha }}
+        env:
+          TARGET_SHA: ${{ needs.prepare.outputs.target_sha }}
+        run: scripts/publish/common/ensure-target-commit.sh
+        shell: bash
 
       - name: Setup .NET
         uses: actions/setup-dotnet@v5
@@ -998,10 +968,12 @@ jobs:
 
       - name: Install dependencies
         working-directory: packages/csharp/HtmlToMarkdown
-        run: dotnet restore
+        run: ../../scripts/publish/csharp/restore.sh
+        shell: bash
 
       - name: Pack NuGet package
-        run: dotnet pack packages/csharp/HtmlToMarkdown/HtmlToMarkdown.csproj --configuration Release --output artifacts/csharp
+        run: scripts/publish/csharp/pack.sh
+        shell: bash
 
       - name: Upload NuGet artifact
         uses: actions/upload-artifact@v5
@@ -1023,7 +995,10 @@ jobs:
 
       - name: Ensure target commit
         if: ${{ needs.prepare.outputs.target_sha != '' }}
-        run: git checkout --progress --force ${{ needs.prepare.outputs.target_sha }}
+        env:
+          TARGET_SHA: ${{ needs.prepare.outputs.target_sha }}
+        run: scripts/publish/common/ensure-target-commit.sh
+        shell: bash
 
       - name: Setup Rust
         uses: ./.github/actions/setup-rust
@@ -1031,32 +1006,8 @@ jobs:
       - name: Package crates
         env:
           RELEASE_VERSION: ${{ needs.prepare.outputs.version }}
-        run: |
-          set -euo pipefail
-          cargo package -p html-to-markdown-rs --allow-dirty
-
-          cli_packaged=0
-          cli_status=0
-          cargo package -p html-to-markdown-cli --allow-dirty --no-verify || cli_status=$?
-
-          if [ "$cli_status" -eq 0 ]; then
-            cli_packaged=1
-          else
-            echo "::warning::Skipping html-to-markdown-cli crate packaging; html-to-markdown-rs ${RELEASE_VERSION:-unknown} is not yet available on crates.io."
-            if [ -n "${GITHUB_STEP_SUMMARY:-}" ]; then
-              {
-                echo "### html-to-markdown-cli crate"
-                echo ""
-                echo "- Packaging skipped because html-to-markdown-rs ${RELEASE_VERSION:-unknown} is not yet published to crates.io."
-              } >> "$GITHUB_STEP_SUMMARY"
-            fi
-          fi
-
-          mkdir -p crate-artifacts
-          cp target/package/html-to-markdown-rs-*.crate crate-artifacts/
-          if [ "$cli_packaged" -eq 1 ]; then
-            cp target/package/html-to-markdown-cli-*.crate crate-artifacts/
-          fi
+        run: scripts/publish/crates/package-crates.sh
+        shell: bash
 
       - name: Upload crate packages
         uses: actions/upload-artifact@v5
@@ -1100,35 +1051,29 @@ jobs:
       - name: Upload PHP PIE source bundle
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          gh release upload ${{ needs.prepare.outputs.tag }} \
-            dist/php-pie/php_html_to_markdown-${{ needs.prepare.outputs.version }}-src.tgz \
-            --clobber
+          TAG: ${{ needs.prepare.outputs.tag }}
+          VERSION: ${{ needs.prepare.outputs.version }}
+        run: scripts/publish/upload-php-pie.sh
+        shell: bash
 
       - name: Upload CLI binaries
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          shopt -s nullglob
-          for archive in dist/cli/*/*.{tar.gz,zip}; do
-            if [ -f "$archive" ]; then
-              gh release upload ${{ needs.prepare.outputs.tag }} "$archive" --clobber
-            fi
-          done
+          TAG: ${{ needs.prepare.outputs.tag }}
+        run: scripts/publish/upload-cli-artifacts.sh
+        shell: bash
 
       - name: Upload Elixir package
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          shopt -s nullglob
-          for pkg in dist/elixir/*.tar; do
-            gh release upload ${{ needs.prepare.outputs.tag }} "$pkg" --clobber
-          done
+          TAG: ${{ needs.prepare.outputs.tag }}
+        run: scripts/publish/upload-elixir-package.sh
+        shell: bash
 
   publish-crates:
     name: Publish crates.io packages
-    needs: [prepare, upload-release-artifacts]
-    if: ${{ needs.prepare.result == 'success' && needs.prepare.outputs.tag && needs.prepare.outputs.dry_run != 'true' && needs.prepare.outputs.is_tag == 'true' }}
+    needs: [prepare, upload-release-artifacts, check-cratesio]
+    if: ${{ needs.prepare.result == 'success' && needs.prepare.outputs.tag && needs.prepare.outputs.dry_run != 'true' && needs.prepare.outputs.is_tag == 'true' && needs.check-cratesio.outputs.all_exist != 'true' }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -1140,62 +1085,34 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
 
       - name: Verify Cargo.toml version matches tag
-        run: |
-          cargo_version=$(grep '^version = ' Cargo.toml | head -1 | sed -E 's/version = "(.*)"/\1/')
-          tag_version="${{ needs.prepare.outputs.version }}"
-          if [ "$cargo_version" != "$tag_version" ]; then
-            echo "Version mismatch! Cargo: $cargo_version, tag: $tag_version" >&2
-            exit 1
-          fi
-          echo "Cargo.toml version matches tag: $cargo_version"
-
-      - name: Check crates.io for existing release
-        id: crate_check
         env:
-          VERSION: ${{ needs.prepare.outputs.version }}
-        run: |
-          python - <<'PY' >> "$GITHUB_OUTPUT"
-          import json
-          import os
-          import sys
-          import urllib.request
-          version = os.environ["VERSION"]
-          crates = [
-              ("html-to-markdown-rs", "rs_exists"),
-              ("html-to-markdown-cli", "cli_exists"),
-          ]
-          for crate, key in crates:
-              url = f"https://crates.io/api/v1/crates/{crate}"
-              try:
-                  with urllib.request.urlopen(url) as resp:
-                      data = json.load(resp)
-              except Exception as exc:  # pragma: no cover
-                  print(f"::warning::{crate}: failed to query crates.io ({exc})", file=sys.stderr)
-                  exists = False
-              else:
-                  versions = [item.get("num") for item in data.get("versions", [])]
-                  exists = version in versions
-                  message = "already" if exists else "not yet"
-                  print(f"::notice::{crate} {version} {message} published", file=sys.stderr)
-              print(f"{key}={'true' if exists else 'false'}")
-          PY
+          TAG_VERSION: ${{ needs.prepare.outputs.version }}
+        run: scripts/publish/crates/verify-cargo-version.sh
+        shell: bash
 
       - name: Publish html-to-markdown-rs
-        if: ${{ steps.crate_check.outputs.rs_exists != 'true' }}
-        run: cargo publish -p html-to-markdown-rs --token ${{ secrets.CARGO_TOKEN }}
+        if: ${{ needs.check-cratesio.outputs.rs_exists != 'true' }}
+        env:
+          CARGO_TOKEN: ${{ secrets.CARGO_TOKEN }}
+        run: scripts/publish/crates/publish-rs.sh
+        shell: bash
 
       - name: Wait for indexing
-        if: ${{ steps.crate_check.outputs.rs_exists != 'true' }}
-        run: sleep 30
+        if: ${{ needs.check-cratesio.outputs.rs_exists != 'true' }}
+        run: scripts/publish/crates/wait-for-indexing.sh
+        shell: bash
 
       - name: Publish html-to-markdown-cli
-        if: ${{ steps.crate_check.outputs.cli_exists != 'true' }}
-        run: cargo publish -p html-to-markdown-cli --token ${{ secrets.CARGO_TOKEN }}
+        if: ${{ needs.check-cratesio.outputs.cli_exists != 'true' }}
+        env:
+          CARGO_TOKEN: ${{ secrets.CARGO_TOKEN }}
+        run: scripts/publish/crates/publish-cli.sh
+        shell: bash
 
   publish-pypi:
     name: Publish Python packages to PyPI
-    needs: [prepare, upload-release-artifacts]
-    if: ${{ needs.prepare.result == 'success' && needs.prepare.outputs.tag && needs.prepare.outputs.dry_run != 'true' && needs.prepare.outputs.is_tag == 'true' }}
+    needs: [prepare, upload-release-artifacts, check-pypi]
+    if: ${{ needs.prepare.result == 'success' && needs.prepare.outputs.tag && needs.prepare.outputs.dry_run != 'true' && needs.prepare.outputs.is_tag == 'true' && needs.check-pypi.outputs.exists != 'true' }}
     runs-on: ubuntu-latest
     environment: pypi
     permissions:
@@ -1215,7 +1132,8 @@ jobs:
           path: dist
 
       - name: List artifacts
-        run: ls -R dist
+        run: scripts/publish/python/list-dist.sh
+        shell: bash
 
       - name: Publish to PyPI
         if: ${{ needs.prepare.outputs.dry_run != 'true' }}
@@ -1226,14 +1144,13 @@ jobs:
 
       - name: Dry run summary
         if: ${{ needs.prepare.outputs.dry_run == 'true' }}
-        run: |
-          echo "Dry run requested; artifacts staged for PyPI:" >> $GITHUB_STEP_SUMMARY
-          ls -1 dist >> $GITHUB_STEP_SUMMARY
+        run: scripts/publish/python/dry-run-summary.sh
+        shell: bash
 
   publish-rubygems:
     name: Publish Ruby gems
-    needs: [prepare, upload-release-artifacts]
-    if: ${{ needs.prepare.result == 'success' && needs.prepare.outputs.tag && needs.prepare.outputs.is_tag == 'true' }}
+    needs: [prepare, upload-release-artifacts, check-rubygems]
+    if: ${{ needs.prepare.result == 'success' && needs.prepare.outputs.tag && needs.prepare.outputs.is_tag == 'true' && (needs.prepare.outputs.dry_run == 'true' || needs.check-rubygems.outputs.exists != 'true') }}
     runs-on: ubuntu-latest
     permissions:
       id-token: write
@@ -1246,51 +1163,27 @@ jobs:
           merge-multiple: true
 
       - name: Configure trusted publishing credentials
-        if: ${{ needs.prepare.outputs.dry_run != 'true' }}
+        if: ${{ needs.prepare.outputs.dry_run != 'true' && needs.check-rubygems.outputs.exists != 'true' }}
         uses: rubygems/configure-rubygems-credentials@v1.0.0
 
-      - name: Check RubyGems version
-        id: rubygems_check
-        run: |
-          set -euo pipefail
-          export VERSION="${{ needs.prepare.outputs.version }}"
-          exists=$(python3 - <<'PY'
-          import json, os, urllib.request
-          version = os.environ["VERSION"]
-          with urllib.request.urlopen("https://rubygems.org/api/v1/versions/html-to-markdown.json") as resp:
-              data = json.load(resp)
-          exists = any(entry.get("number") == version for entry in data)
-          print("true" if exists else "false")
-          PY
-          )
-          echo "exists=$exists" >> "$GITHUB_OUTPUT"
-
       - name: Publish gems
-        if: ${{ needs.prepare.outputs.dry_run != 'true' && steps.rubygems_check.outputs.exists != 'true' }}
+        if: ${{ needs.prepare.outputs.dry_run != 'true' && needs.check-rubygems.outputs.exists != 'true' }}
         working-directory: dist
-        run: |
-          set -euo pipefail
-          shopt -s nullglob
-          gems=($(ls html-to-markdown-*.gem | sort))
-          if [ ${#gems[@]} -eq 0 ]; then
-            echo "No gem artifacts found" >&2
-            exit 1
-          fi
-          for gem in "${gems[@]}"; do
-            echo "Pushing ${gem}"
-            gem push "$gem"
-          done
+        run: ../scripts/publish/ruby/publish-gems.sh
+        shell: bash
 
       - name: Ruby gem already published
-        if: ${{ steps.rubygems_check.outputs.exists == 'true' }}
-        run: echo "RubyGem version ${{ needs.prepare.outputs.version }} already published; skipping." >> $GITHUB_STEP_SUMMARY
+        if: ${{ needs.check-rubygems.outputs.exists == 'true' && needs.prepare.outputs.dry_run != 'true' }}
+        env:
+          VERSION: ${{ needs.prepare.outputs.version }}
+        run: scripts/publish/ruby/already-published-summary.sh
+        shell: bash
 
       - name: Dry run summary
         if: ${{ needs.prepare.outputs.dry_run == 'true' }}
         working-directory: dist
-        run: |
-          echo "Dry run requested; gem artifacts ready:" >> $GITHUB_STEP_SUMMARY
-          ls -1 html-to-markdown-*.gem >> $GITHUB_STEP_SUMMARY
+        run: ../scripts/publish/ruby/dry-run-summary.sh
+        shell: bash
 
   publish-hex:
     name: Publish Hex package
@@ -1313,47 +1206,38 @@ jobs:
         uses: ./.github/actions/setup-rust
 
       - name: Install Hex/Rebar
-        run: |
-          mix local.hex --force
-          mix local.rebar --force
+        run: scripts/publish/elixir/install-hex-rebar.sh
+        shell: bash
 
       - name: Install dependencies
-        working-directory: packages/elixir
-        run: mix deps.get
+        run: scripts/publish/elixir/install-deps.sh
+        shell: bash
 
       - name: Check Hex version
         id: hex_check
-        run: |
-          set -euo pipefail
-          export VERSION="${{ needs.prepare.outputs.version }}"
-          exists=$(python3 - <<'PY'
-          import json, os, urllib.request
-          version = os.environ["VERSION"]
-          with urllib.request.urlopen("https://hex.pm/api/packages/html_to_markdown") as resp:
-              data = json.load(resp)
-          exists = any(rel.get("version") == version for rel in data.get("releases", []))
-          print("true" if exists else "false")
-          PY
-          )
-          echo "exists=$exists" >> "$GITHUB_OUTPUT"
+        env:
+          VERSION: ${{ needs.prepare.outputs.version }}
+        run: scripts/publish/elixir/check-hex-version.sh
+        shell: bash
 
       - name: Publish to Hex.pm
         if: ${{ steps.hex_check.outputs.exists != 'true' }}
-        run: |
-          set -euo pipefail
-          cd packages/elixir
-          mix hex.publish --yes
+        run: scripts/publish/elixir/publish-hex.sh
+        shell: bash
         env:
           HEX_API_KEY: ${{ secrets.HEX_TOKEN }}
 
       - name: Hex package already published
         if: ${{ steps.hex_check.outputs.exists == 'true' }}
-        run: echo "Hex package ${{ needs.prepare.outputs.version }} already published; skipping." >> $GITHUB_STEP_SUMMARY
+        env:
+          VERSION: ${{ needs.prepare.outputs.version }}
+        run: scripts/publish/elixir/already-published-summary.sh
+        shell: bash
 
   publish-nuget:
     name: Publish NuGet package
-    needs: [prepare, csharp-package, upload-release-artifacts]
-    if: ${{ needs.prepare.result == 'success' && needs.prepare.outputs.tag && needs.prepare.outputs.dry_run != 'true' && needs.prepare.outputs.is_tag == 'true' }}
+    needs: [prepare, csharp-package, upload-release-artifacts, check-nuget]
+    if: ${{ needs.prepare.result == 'success' && needs.prepare.outputs.tag && needs.prepare.outputs.dry_run != 'true' && needs.prepare.outputs.is_tag == 'true' && needs.check-nuget.outputs.exists != 'true' }}
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -1384,19 +1268,14 @@ jobs:
       - name: Publish package to NuGet.org
         env:
           DOTNET_NOLOGO: true
-        run: |
-          set -euo pipefail
-          for pkg in dist/nuget/*.nupkg; do
-            dotnet nuget push "$pkg" \
-              --api-key "${{ steps.nuget-login.outputs.NUGET_API_KEY }}" \
-              --source https://api.nuget.org/v3/index.json \
-              --skip-duplicate
-          done
+          NUGET_API_KEY: ${{ steps.nuget-login.outputs.NUGET_API_KEY }}
+        run: scripts/publish/nuget/publish-packages.sh
+        shell: bash
 
   publish-maven:
     name: Publish Maven package
-    needs: [prepare, upload-release-artifacts]
-    if: ${{ needs.prepare.result == 'success' && needs.prepare.outputs.tag && needs.prepare.outputs.dry_run != 'true' && needs.prepare.outputs.is_tag == 'true' }}
+    needs: [prepare, upload-release-artifacts, check-maven]
+    if: ${{ needs.prepare.result == 'success' && needs.prepare.outputs.tag && needs.prepare.outputs.dry_run != 'true' && needs.prepare.outputs.is_tag == 'true' && needs.check-maven.outputs.exists != 'true' }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -1405,12 +1284,8 @@ jobs:
           ref: ${{ needs.prepare.outputs.ref }}
 
       - name: Patch legacy Maven GPG arguments
-        run: |
-          set -euo pipefail
-          if grep -q '<arg>--loopback</arg>' packages/java/pom.xml; then
-            sed -i 's/<arg>--loopback<\/arg>/<arg>loopback<\/arg>/g' packages/java/pom.xml
-            echo "Patched legacy --loopback pinentry argument in packages/java/pom.xml" >> "$GITHUB_STEP_SUMMARY"
-          fi
+        run: scripts/publish/maven/patch-legacy-gpg-args.sh
+        shell: bash
 
       - name: Setup Java
         uses: actions/setup-java@v5
@@ -1427,50 +1302,23 @@ jobs:
       - name: Setup Rust
         uses: ./.github/actions/setup-rust
 
-      - name: Check Maven Central for existing version
-        id: maven_check
-        run: |
-          set -euo pipefail
-          version="${{ needs.prepare.outputs.version }}"
-          base_url="https://repo1.maven.org/maven2/io/github/goldziher/html-to-markdown/${version}"
-          status_code=$(curl -s -o /dev/null -w "%{http_code}" "${base_url}/html-to-markdown-${version}.pom")
-          if [ "$status_code" = "200" ]; then
-            echo "exists=true" >> "$GITHUB_OUTPUT"
-            echo "Maven artifact ${version} already present at ${base_url}; skipping publish." >> "$GITHUB_STEP_SUMMARY"
-          else
-            echo "exists=false" >> "$GITHUB_OUTPUT"
-          fi
-
       - name: Prefer gpg2 binary
-        run: |
-          set -euo pipefail
-          if command -v gpg2 >/dev/null 2>&1; then
-            mkdir -p "${HOME}/.local/bin"
-            printf '#!/usr/bin/env bash\nexec gpg2 "$@"\n' > "${HOME}/.local/bin/gpg"
-            chmod +x "${HOME}/.local/bin/gpg"
-            echo "${HOME}/.local/bin" >> "$GITHUB_PATH"
-            echo "PATH=${HOME}/.local/bin:${PATH}" >> "$GITHUB_ENV"
-          fi
+        run: scripts/publish/maven/prefer-gpg2.sh
+        shell: bash
 
       - name: Release Maven package
-        if: ${{ steps.maven_check.outputs.exists != 'true' }}
         env:
           MAVEN_USERNAME: ${{ secrets.MAVEN_USERNAME }}
           MAVEN_PASSWORD: ${{ secrets.MAVEN_PASSWORD }}
           MAVEN_GPG_PASSPHRASE: ${{ secrets.GPP_PASSPHRASE }}
           GPG: /usr/bin/gpg2
-        run: |
-          set -euo pipefail
-          mvn -f packages/java/pom.xml --batch-mode --no-transfer-progress -Dgpg.executable=/usr/bin/gpg2 clean deploy
-
-      - name: Maven package already published
-        if: ${{ steps.maven_check.outputs.exists == 'true' }}
-        run: echo "Maven package ${{ needs.prepare.outputs.version }} already published to Central; skipping deploy." >> $GITHUB_STEP_SUMMARY
+        run: scripts/publish/maven/release-package.sh
+        shell: bash
 
   publish-node:
     name: Publish Node packages
-    needs: [prepare, upload-release-artifacts]
-    if: ${{ needs.prepare.result == 'success' && needs.prepare.outputs.tag && needs.prepare.outputs.dry_run != 'true' && needs.prepare.outputs.is_tag == 'true' }}
+    needs: [prepare, upload-release-artifacts, check-npm]
+    if: ${{ needs.prepare.result == 'success' && needs.prepare.outputs.tag && needs.prepare.outputs.dry_run != 'true' && needs.prepare.outputs.is_tag == 'true' && needs.check-npm.outputs.node_exists != 'true' }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -1498,83 +1346,46 @@ jobs:
           registry-url: https://registry.npmjs.org/
 
       - name: Enable corepack
-        run: corepack enable
+        run: scripts/common/enable-corepack.sh
+        shell: bash
 
       - name: Prepare artifact directory
-        run: |
-          rm -rf crates/html-to-markdown-node/npm
-          mkdir -p crates/html-to-markdown-node
-          for pkg in node-artifacts/*.tar.gz; do
-            tar -xzf "$pkg" -C crates/html-to-markdown-node
-          done
-          # Copy TypeScript definitions to package root
-          cp typescript-defs/index.js typescript-defs/index.d.ts crates/html-to-markdown-node/
+        run: scripts/publish/node/prepare-artifact-directory.sh
+        shell: bash
 
       - name: Node artifacts summary
         if: ${{ needs.prepare.outputs.dry_run == 'true' }}
-        run: |
-          echo "Dry run requested; Node binding tarballs staged:" >> $GITHUB_STEP_SUMMARY
-          find node-artifacts -name '*.tar.gz' -printf '%f\n' >> $GITHUB_STEP_SUMMARY
+        run: scripts/publish/node/dry-run-summary.sh
+        shell: bash
 
       - name: Install workspace dependencies
         if: ${{ needs.prepare.outputs.dry_run != 'true' }}
-        run: pnpm install --filter html-to-markdown-node...
+        run: scripts/publish/node/install-node-deps.sh
+        shell: bash
 
       - name: Pack platform packages
-        run: |
-          cd crates/html-to-markdown-node/npm
-          for dir in */; do
-            if [ -f "$dir/package.json" ]; then
-              (cd "$dir" && npm pack && mv *.tgz ..)
-            fi
-          done
+        run: scripts/publish/node/pack-platform-packages.sh
+        shell: bash
 
       - name: Publish native binary packages
         if: ${{ needs.prepare.outputs.dry_run != 'true' }}
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-        run: |
-          set -euo pipefail
-          shopt -s nullglob
-          for pkg in crates/html-to-markdown-node/npm/*.tgz; do
-            echo "Publishing $pkg"
-            publish_log=$(mktemp)
-            set +e
-            npm publish "$pkg" --access public --ignore-scripts 2>&1 | tee "$publish_log"
-            status=${PIPESTATUS[0]}
-            set -e
-            if [ "$status" -ne 0 ]; then
-              if grep -q "previously published versions" "$publish_log"; then
-                echo "Package $pkg already published; skipping."
-              else
-                exit "$status"
-              fi
-            fi
-          done
+        run: scripts/publish/node/publish-native-packages.sh
+        shell: bash
 
       - name: Publish main Node package
         if: ${{ needs.prepare.outputs.dry_run != 'true' }}
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-        run: |
-          cd crates/html-to-markdown-node
-          publish_log=$(mktemp)
-          set +e
-          pnpm publish --access public --no-git-checks 2>&1 | tee "$publish_log"
-          status=${PIPESTATUS[0]}
-          set -e
-          if [ "$status" -ne 0 ]; then
-            if grep -q "previously published versions" "$publish_log"; then
-              echo "Node package already published; skipping."
-            else
-              exit "$status"
-            fi
-          fi
+        working-directory: crates/html-to-markdown-node
+        run: ../scripts/publish/node/publish-main-package.sh
+        shell: bash
 
   publish-wasm:
     name: Publish WASM package
-    needs: [prepare, upload-release-artifacts]
-    if: ${{ needs.prepare.result == 'success' && needs.prepare.outputs.tag && needs.prepare.outputs.dry_run != 'true' && needs.prepare.outputs.is_tag == 'true' }}
+    needs: [prepare, upload-release-artifacts, check-npm]
+    if: ${{ needs.prepare.result == 'success' && needs.prepare.outputs.tag && needs.prepare.outputs.dry_run != 'true' && needs.prepare.outputs.is_tag == 'true' && needs.check-npm.outputs.wasm_exists != 'true' }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -1595,30 +1406,16 @@ jobs:
           registry-url: https://registry.npmjs.org/
 
       - name: Extract WASM artifacts
-        run: |
-          cd wasm-artifacts
-          for tarball in *.tar.gz; do
-            tar -xzf "$tarball" -C ../crates/html-to-markdown-wasm
-          done
+        run: scripts/publish/wasm/extract-artifacts.sh
+        shell: bash
 
       - name: Publish WASM package
         if: ${{ needs.prepare.outputs.dry_run != 'true' }}
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-        run: |
-          cd crates/html-to-markdown-wasm
-          publish_log=$(mktemp)
-          set +e
-          npm publish --access public 2>&1 | tee "$publish_log"
-          status=${PIPESTATUS[0]}
-          set -e
-          if [ "$status" -ne 0 ]; then
-            if grep -q "previously published versions" "$publish_log"; then
-              echo "WASM package already published; skipping."
-            else
-              exit "$status"
-            fi
-          fi
+        working-directory: crates/html-to-markdown-wasm
+        run: ../scripts/publish/wasm/publish-package.sh
+        shell: bash
 
   publish-homebrew:
     name: Update Homebrew formula
@@ -1628,19 +1425,11 @@ jobs:
     steps:
       - name: Extract release info
         id: release
-        run: |
-          tag="${{ needs.prepare.outputs.tag }}"
-          version="${{ needs.prepare.outputs.version }}"
-          url="https://github.com/Goldziher/html-to-markdown/archive/$tag.tar.gz"
-
-          echo "tag=$tag" >> $GITHUB_OUTPUT
-          echo "version=$version" >> $GITHUB_OUTPUT
-          echo "url=$url" >> $GITHUB_OUTPUT
-
-          echo "Release info:"
-          echo "  Tag: $tag"
-          echo "  Version: $version"
-          echo "  URL: $url"
+        env:
+          TAG: ${{ needs.prepare.outputs.tag }}
+          VERSION: ${{ needs.prepare.outputs.version }}
+        run: scripts/publish/homebrew/extract-release-info.sh
+        shell: bash
 
       - name: Update Homebrew formula
         uses: mislav/bump-homebrew-formula-action@v3

@@ -70,18 +70,19 @@ jobs:
 
       - name: Run Rubocop (Unix)
         if: runner.os != 'Windows' && matrix.os == 'ubuntu-latest' && matrix.ruby == '3.3'
-        working-directory: packages/ruby
-        run: bundle exec rubocop --config .rubocop.yml
+        run: ../../scripts/ci/ruby/run-rubocop.sh
+        shell: bash
 
       - name: Validate RBS signatures (Unix)
         if: runner.os != 'Windows' && matrix.os == 'ubuntu-latest' && matrix.ruby == '3.3'
-        working-directory: packages/ruby
-        run: bundle exec rbs validate
+        run: ../../scripts/ci/ruby/run-rbs-validate.sh
+        shell: bash
 
       - name: Run Steep type checking (Unix)
         if: runner.os != 'Windows' && matrix.os == 'ubuntu-latest' && matrix.ruby == '3.3'
         working-directory: packages/ruby
-        run: bundle exec steep check
+        run: ../../scripts/ci/ruby/run-steep.sh
+        shell: bash
 
       - name: Build Ruby extension (Windows)
         if: runner.os == 'Windows'
@@ -90,12 +91,11 @@ jobs:
       - name: Run Ruby specs (Unix)
         if: runner.os != 'Windows'
         working-directory: packages/ruby
-        run: bundle exec rspec --format progress
+        run: ../../scripts/ci/ruby/run-rspec-unix.sh
+        shell: bash
 
       - name: Run Ruby specs (Windows)
         if: runner.os == 'Windows'
         working-directory: packages/ruby
         shell: pwsh
-        run: |
-          $unixPath = ridk exec bash -lc "cygpath -au '$env:GITHUB_WORKSPACE/packages/ruby'"
-          ridk exec bash -lc "cd $unixPath && export RUSTUP_TOOLCHAIN=stable-gnu CC=x86_64-w64-mingw32-gcc CXX=x86_64-w64-mingw32-g++ && bundle exec rspec --format progress"
+        run: ../scripts/ci/ruby/run-rspec-windows.ps1

@@ -42,12 +42,12 @@ jobs:
           target: wasm32-unknown-unknown
 
       - name: Ensure wasm target installed
-        run: |
-          rustup target add wasm32-unknown-unknown
-          rustc --print target-libdir --target wasm32-unknown-unknown
+        run: scripts/common/ensure-wasm-target.sh
+        shell: bash
 
       - name: Install wasm-pack
-        run: curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
+        run: scripts/common/install-wasm-pack.sh
+        shell: bash
 
       - name: Setup workspace
         uses: ./.github/actions/setup-node-workspace
@@ -57,11 +57,13 @@ jobs:
 
       - name: Test WASM
         working-directory: crates/html-to-markdown-wasm
-        run: pnpm test
+        run: ../../scripts/ci/wasm/test-wasm-bundle.sh
+        shell: bash
 
       - name: Run Rust Tests
         working-directory: crates/html-to-markdown-wasm
-        run: cargo test
+        run: ../../scripts/ci/wasm/test-wasm-rust.sh
+        shell: bash
 
   wasm-wasmtime:
     name: Wasmtime tests (${{ matrix.runner }})
@@ -86,9 +88,9 @@ jobs:
           target: wasm32-unknown-unknown
 
       - name: Ensure wasm target installed
-        run: |
-          rustup target add wasm32-unknown-unknown
-          rustc --print target-libdir --target wasm32-unknown-unknown
+        run: scripts/common/ensure-wasm-target.sh
+        shell: bash
 
       - name: Run Wasmtime WASM tests
-        run: cargo test -p html-to-markdown-wasm-wasmtime-tests
+        run: scripts/ci/wasm/run-wasmtime-tests.sh
+        shell: bash

@@ -69,7 +69,9 @@ jobs:
           shell: bash
 
       - name: Build CLI Binary
-        run: cargo build --release --package html-to-markdown-cli
+        run: scripts/ci/python/build-cli.sh
+        shell: bash
 
       - name: Test
-        run: uv run pytest
+        run: scripts/ci/python/run-pytest.sh
+        shell: bash

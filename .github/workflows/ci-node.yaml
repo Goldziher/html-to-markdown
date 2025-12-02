@@ -48,16 +48,16 @@ jobs:
         uses: ./.github/actions/build-node
 
       - name: Test NAPI-RS Bindings
-        working-directory: crates/html-to-markdown-node
-        run: pnpm test
+        run: scripts/ci/node/test-napi.sh
+        shell: bash
 
       - name: Run Rust Tests
-        working-directory: crates/html-to-markdown-node
-        run: cargo test
+        run: scripts/ci/node/test-napi-cargo.sh
+        shell: bash
 
       - name: Build TypeScript package
         uses: ./.github/actions/build-typescript
 
       - name: Test TypeScript package
-        working-directory: packages/typescript
-        run: pnpm test
+        run: scripts/ci/node/test-typescript.sh
+        shell: bash

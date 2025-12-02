@@ -14,6 +14,8 @@ runs:
       uses: actions/setup-dotnet@v4
       with:
         dotnet-version: '10.0.x'
+      env:
+        DOTNET_INSTALL_DIR: ${{ runner.temp }}/dotnet
 
     - name: Smoke C# install (Unix)
       if: runner.os != 'Windows'

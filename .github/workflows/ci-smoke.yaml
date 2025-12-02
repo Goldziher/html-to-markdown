@@ -74,11 +74,8 @@ jobs:
           maximize-build-space: false
 
       - name: Install wasm-pack
-        run: |
-          set -euo pipefail
-          if ! command -v wasm-pack >/dev/null 2>&1; then
-            cargo install wasm-pack --locked
-          fi
+        run: scripts/common/install-wasm-pack.sh
+        shell: bash
 
       - name: Setup PHP
         if: runner.os == 'Linux'
@@ -89,10 +86,12 @@ jobs:
 
       - name: Capture php-config path
         if: runner.os == 'Linux'
-        run: echo "PHP_CONFIG=$(command -v php-config)" >> "$GITHUB_ENV"
+        run: scripts/ci/smoke/capture-php-config.sh
+        shell: bash
 
       - name: Install pnpm workspace deps
-        run: pnpm install
+        run: scripts/ci/smoke/install-pnpm-deps.sh
+        shell: bash
 
       - name: Build Node bindings
         id: build_node
