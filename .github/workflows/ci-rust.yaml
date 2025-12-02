@@ -52,17 +52,18 @@ jobs:
       - name: Run Rust Tests
         env:
           RUST_BACKTRACE: full
-        run: |
-          echo "Running Rust tests with full debugging..."
-          cargo test --release --no-default-features --workspace --exclude html-to-markdown-rb --exclude html-to-markdown-php --exclude html-to-markdown-wasm-wasmtime-tests -vv -- --nocapture --test-threads=1
+        run: scripts/ci/rust/run-tests.sh
+        shell: bash
 
       - name: Check Rust Formatting
         if: matrix.os == 'ubuntu-latest'
-        run: cargo fmt --check
+        run: scripts/ci/rust/check-fmt.sh
+        shell: bash
 
       - name: Run Clippy
         if: matrix.os == 'ubuntu-latest'
-        run: cargo clippy -- -D warnings
+        run: scripts/ci/rust/run-clippy.sh
+        shell: bash
 
   coverage:
     runs-on: ubuntu-latest
@@ -77,10 +78,12 @@ jobs:
           components: rustfmt, clippy, llvm-tools-preview
 
       - name: Install cargo-llvm-cov
-        run: cargo install cargo-llvm-cov --locked --force
+        run: scripts/ci/rust/install-cargo-llvm-cov.sh
+        shell: bash
 
       - name: Generate Rust Coverage
-        run: cargo llvm-cov --workspace --exclude html-to-markdown-py --exclude html-to-markdown-rb --exclude html-to-markdown-php --exclude html-to-markdown-node --exclude html-to-markdown-wasm --exclude html-to-markdown-wasm-wasmtime-tests --all-features --lcov --output-path coverage.lcov
+        run: scripts/ci/rust/run-llvm-cov.sh
+        shell: bash
 
       - name: Upload Coverage Artifacts
         if: always()

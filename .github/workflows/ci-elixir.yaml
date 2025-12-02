@@ -38,18 +38,20 @@ jobs:
         uses: ./.github/actions/setup-rust
 
       - name: Install Hex/Rebar
-        run: |
-          mix local.hex --force
-          mix local.rebar --force
+        run: scripts/ci/elixir/install-hex-rebar.sh
+        shell: bash
 
       - name: Install dependencies
         working-directory: packages/elixir
-        run: mix deps.get
+        run: ../../scripts/ci/elixir/install-deps.sh
+        shell: bash
 
       - name: Run tests
         working-directory: packages/elixir
-        run: MIX_ENV=test mix test
+        run: ../../scripts/ci/elixir/run-tests.sh
+        shell: bash
 
       - name: Credo lint
         working-directory: packages/elixir
-        run: MIX_ENV=dev mix credo --strict
+        run: ../../scripts/ci/elixir/run-credo.sh
+        shell: bash

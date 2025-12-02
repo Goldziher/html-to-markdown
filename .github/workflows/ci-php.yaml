@@ -45,7 +45,8 @@ jobs:
         uses: ./.github/actions/setup-rust
 
       - name: Capture php-config path
-        run: echo "PHP_CONFIG=$(command -v php-config)" >> "$GITHUB_ENV"
+        run: scripts/ci/php/set-php-config.sh
+        shell: bash
 
       - name: Install Composer dependencies
         uses: ramsey/composer-install@v3
@@ -59,9 +60,9 @@ jobs:
           php-config: ${{ env.PHP_CONFIG }}
 
       - name: Run PHP static analysis
-        working-directory: packages/php
-        run: composer run phpstan
+        run: scripts/ci/php/run-phpstan.sh
+        shell: bash
 
       - name: Run PHP tests
-        working-directory: packages/php
-        run: composer run test
+        run: scripts/ci/php/run-php-tests.sh
+        shell: bash

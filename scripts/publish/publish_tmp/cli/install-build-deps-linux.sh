@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+target="${TARGET:?TARGET is required}"
+
+sudo apt-get update
+case "${target}" in
+  x86_64-unknown-linux-musl)
+    sudo apt-get install -y musl-tools
+    ;;
+  aarch64-unknown-linux-gnu)
+    sudo apt-get install -y gcc-aarch64-linux-gnu
+    ;;
+esac

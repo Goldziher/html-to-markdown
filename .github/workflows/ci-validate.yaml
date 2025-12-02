@@ -57,8 +57,8 @@ jobs:
           otp-version: "28.1"
 
       - name: Install Elixir dependencies
-        working-directory: packages/elixir
-        run: mix deps.get
+        run: scripts/ci/validate/install-elixir-deps.sh
+        shell: bash
 
       - name: Setup Ruby
         uses: ruby/setup-ruby@v1
@@ -67,8 +67,8 @@ jobs:
           bundler-cache: false
 
       - name: Install Ruby dependencies for lint
-        working-directory: packages/ruby
-        run: bundle install --jobs 4 --retry 3
+        run: scripts/ci/validate/install-ruby-deps.sh
+        shell: bash
 
       - name: Install Dependencies
         uses: nick-fields/retry@v3
@@ -80,14 +80,12 @@ jobs:
           shell: bash
 
       - name: Run Rust Checks
-        run: |
-          cargo fmt --check
-          cargo clippy --workspace --exclude html-to-markdown-rb --exclude html-to-markdown-php -- -D warnings
+        run: scripts/ci/validate/run-rust-checks.sh
+        shell: bash
 
       - name: Install prek
-        run: |
-          uv tool install prek
-          echo "$HOME/.local/bin" >> $GITHUB_PATH
+        run: scripts/ci/validate/install-prek.sh
+        shell: bash
 
       - name: Load Cached Prek Dependencies
         id: cached-prek-dependencies
@@ -99,4 +97,5 @@ jobs:
       - name: Execute Prek
         env:
           SKIP: golangci-lint-packages,golangci-lint-examples
-        run: prek run --show-diff-on-failure --color=always --all-files
+        run: scripts/ci/validate/run-prek.sh
+        shell: bash
