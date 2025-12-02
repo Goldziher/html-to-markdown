@@ -1093,6 +1093,14 @@ fn collect_link_label_text(children: &[tl::NodeHandle], parser: &tl::Parser) -> 
     (text, block_nodes, saw_block)
 }
 
+fn normalize_link_label(label: &str) -> String {
+    let collapsed = label
+        .chars()
+        .map(|ch| if ch == '\n' || ch == '\r' { ' ' } else { ch })
+        .collect::<String>();
+    text::normalize_whitespace(&collapsed).trim().to_string()
+}
+
 /// Serialize an element to HTML string (for SVG and Math elements).
 fn serialize_element(node_handle: &tl::NodeHandle, parser: &tl::Parser) -> String {
     if let Some(node) = node_handle.get(parser) {
@@ -2952,12 +2960,39 @@ fn walk_node(
                         }
 
                         let children: Vec<_> = tag.children().top().iter().copied().collect();
-                        let (inline_label, block_nodes, saw_block) = collect_link_label_text(&children, parser);
+                        let (inline_label, _block_nodes, saw_block) = collect_link_label_text(&children, parser);
                         let mut label = if saw_block {
-                            text::normalize_whitespace(&inline_label)
-                                .trim()
-                                .trim_matches(&['\n', '\r'][..])
-                                .to_string()
+                            let mut content = String::new();
+                            let link_ctx = Context {
+                                inline_depth: ctx.inline_depth + 1,
+                                convert_as_inline: true,
+                                ..ctx.clone()
+                            };
+                            for child_handle in children.iter() {
+                                let mut child_buf = String::new();
+                                walk_node(
+                                    child_handle,
+                                    parser,
+                                    &mut child_buf,
+                                    options,
+                                    &link_ctx,
+                                    depth + 1,
+                                    dom_ctx,
+                                );
+                                if !child_buf.trim().is_empty()
+                                    && !content.is_empty()
+                                    && !content.chars().last().map(|c| c.is_whitespace()).unwrap_or(true)
+                                    && !child_buf.chars().next().map(|c| c.is_whitespace()).unwrap_or(true)
+                                {
+                                    content.push(' ');
+                                }
+                                content.push_str(&child_buf);
+                            }
+                            if content.trim().is_empty() {
+                                normalize_link_label(&inline_label)
+                            } else {
+                                normalize_link_label(&content)
+                            }
                         } else {
                             let mut content = String::new();
                             let link_ctx = Context {
@@ -2975,16 +3010,16 @@ fn walk_node(
                                     dom_ctx,
                                 );
                             }
-                            text::normalize_whitespace(&content).trim().to_string()
+                            normalize_link_label(&content)
                         };
 
                         if label.is_empty() && saw_block {
                             let fallback = text::normalize_whitespace(&get_text_content(node_handle, parser));
-                            label = fallback.trim().to_string();
+                            label = normalize_link_label(&fallback);
                         }
 
                         if label.is_empty() && !raw_text.is_empty() {
-                            label = raw_text.clone();
+                            label = normalize_link_label(&raw_text);
                         }
 
                         if label.is_empty() && !href.is_empty() && !children.is_empty() {
@@ -3005,20 +3040,6 @@ fn walk_node(
                             label.as_str(),
                             options,
                         );
-
-                        if saw_block {
-                            if !block_nodes.is_empty() && !output.ends_with('\n') {
-                                if ctx.in_list_item {
-                                    add_list_continuation_indent(output, ctx.list_depth, true, options);
-                                } else {
-                                    output.push('\n');
-                                }
-                            }
-
-                            for block_node in block_nodes {
-                                walk_node(&block_node, parser, output, options, ctx, depth + 1, dom_ctx);
-                            }
-                        }
                     } else {
                         let children = tag.children();
                         {
