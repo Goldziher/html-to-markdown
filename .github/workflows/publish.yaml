@@ -1142,11 +1142,6 @@ jobs:
           packages-dir: dist
           skip-existing: true
 
-      - name: Dry run summary
-        if: ${{ needs.prepare.outputs.dry_run == 'true' }}
-        run: scripts/publish/python/dry-run-summary.sh
-        shell: bash
-
   publish-rubygems:
     name: Publish Ruby gems
     needs: [prepare, upload-release-artifacts, check-rubygems]
@@ -1177,12 +1172,6 @@ jobs:
         env:
           VERSION: ${{ needs.prepare.outputs.version }}
         run: scripts/publish/ruby/already-published-summary.sh
-        shell: bash
-
-      - name: Dry run summary
-        if: ${{ needs.prepare.outputs.dry_run == 'true' }}
-        working-directory: dist
-        run: ../scripts/publish/ruby/dry-run-summary.sh
         shell: bash
 
   publish-hex:
@@ -1351,11 +1340,6 @@ jobs:
 
       - name: Prepare artifact directory
         run: scripts/publish/node/prepare-artifact-directory.sh
-        shell: bash
-
-      - name: Node artifacts summary
-        if: ${{ needs.prepare.outputs.dry_run == 'true' }}
-        run: scripts/publish/node/dry-run-summary.sh
         shell: bash
 
       - name: Install workspace dependencies
