@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.10.1] - 2025-12-02
+
+### Fixed
+- Normalize whitespace inside link labels (collapse newlines and extra spaces) so anchors with messy HTML do not emit multi-line `[]` text.
+- Flatten block children inside `<a>` (e.g., headings/paragraphs nested in anchors) into a single Markdown link instead of duplicating content; regression tests added for the reported Arabic product card case.
+
+### Changed
+- Synced all workspace/package versions to 2.10.1 via `task sync-versions`.
+
 ## [2.10.0] - 2025-12-02
 
 ### Added
