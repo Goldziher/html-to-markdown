@@ -31,7 +31,7 @@ concurrency:
 jobs:
   wasm-bindings:
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 120
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -68,7 +68,7 @@ jobs:
   wasm-wasmtime:
     name: Wasmtime tests (${{ matrix.runner }})
     runs-on: ${{ matrix.runner }}
-    timeout-minutes: 60
+    timeout-minutes: 120
     strategy:
       fail-fast: false
       matrix:

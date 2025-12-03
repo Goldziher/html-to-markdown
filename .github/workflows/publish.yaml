@@ -39,6 +39,12 @@ jobs:
       matrix_ref: ${{ steps.meta.outputs.matrix_ref }}
       is_tag: ${{ steps.meta.outputs.is_tag }}
     steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ inputs.ref || inputs.tag || github.ref }}
+          fetch-depth: 0
+
       - name: Validate tag and compute version
         id: meta
         env:
