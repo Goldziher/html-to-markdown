@@ -73,6 +73,12 @@ jobs:
     outputs:
       exists: ${{ steps.check.outputs.exists }}
     steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.prepare.outputs.checkout_ref }}
+          fetch-depth: 0
+
       - name: Check PyPI version
         id: check
         env:
@@ -88,6 +94,12 @@ jobs:
       node_exists: ${{ steps.check.outputs.node_exists }}
       wasm_exists: ${{ steps.check.outputs.wasm_exists }}
     steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.prepare.outputs.checkout_ref }}
+          fetch-depth: 0
+
       - name: Check npm packages
         id: check
         env:
@@ -102,6 +114,12 @@ jobs:
     outputs:
       exists: ${{ steps.check.outputs.exists }}
     steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.prepare.outputs.checkout_ref }}
+          fetch-depth: 0
+
       - name: Check RubyGems version
         id: check
         env:
@@ -116,6 +134,12 @@ jobs:
     outputs:
       exists: ${{ steps.check.outputs.exists }}
     steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.prepare.outputs.checkout_ref }}
+          fetch-depth: 0
+
       - name: Check Maven version
         id: check
         env:
@@ -130,6 +154,12 @@ jobs:
     outputs:
       exists: ${{ steps.check.outputs.exists }}
     steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.prepare.outputs.checkout_ref }}
+          fetch-depth: 0
+
       - name: Check NuGet package
         id: check
         env:
@@ -146,6 +176,12 @@ jobs:
       cli_exists: ${{ steps.check.outputs.cli_exists }}
       all_exist: ${{ steps.check.outputs.all_exist }}
     steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.prepare.outputs.checkout_ref }}
+          fetch-depth: 0
+
       - name: Query crates.io
         id: check
         env:
