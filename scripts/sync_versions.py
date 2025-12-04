@@ -199,6 +199,19 @@ def update_uv_lock(file_path: Path, version: str) -> tuple[bool, str, str]:
     return True, old_version, version
 
 
+def update_composer_json(file_path: Path, version: str) -> tuple[bool, str, str]:
+    """Update a composer.json file's version field."""
+    data = json.loads(file_path.read_text())
+    old_version = data.get("version", "NOT FOUND")
+
+    if old_version == version:
+        return False, old_version, version
+
+    data["version"] = version
+    file_path.write_text(json.dumps(data, indent=2) + "\n")
+    return True, old_version, version
+
+
 def update_mix_version(file_path: Path, version: str) -> tuple[bool, str, str]:
     """
     Update @version declarations inside mix.exs files.
@@ -368,6 +381,13 @@ def sync_cargo_versions(repo_root: Path, version: str, report: SyncReport) -> No
             )
 
 
+def sync_composer(repo_root: Path, version: str, report: SyncReport) -> None:
+    composer = repo_root / "packages/php/composer.json"
+    if composer.exists():
+        changed, old_ver, new_ver = update_composer_json(composer, version)
+        report.record(composer.relative_to(repo_root), changed, f"{old_ver} → {new_ver}")
+
+
 def summarize(version: str, report: SyncReport) -> None:
     print("\n📊 Summary:")
     print(f"   Updated: {len(report.updated)} files")
@@ -400,6 +420,7 @@ def main() -> None:
     sync_csproj(repo_root, version, report)
     sync_poms(repo_root, version, report)
     sync_uv_lock(repo_root, version, report)
+    sync_composer(repo_root, version, report)
     sync_cargo_versions(repo_root, version, report)
     summarize(version, report)
 
