@@ -158,7 +158,7 @@ fn test_url_handles_frameset_with_noframes() {
 #[test]
 fn test_url_handles_windows_1252_charset() {
     // Includes cp1252-only em dash and accented char
-    let body = [b"<html><body><p>Ca", b"f\xe9 \x97 legacy charset</p></body></html>"].concat();
+    let body = b"<html><body><p>Se\xf1or \x97 legacy charset</p></body></html>".to_vec();
     let (url, handle, _) = serve_once_bytes(body, Some("text/html; charset=windows-1252"));
 
     cli()
@@ -166,7 +166,7 @@ fn test_url_handles_windows_1252_charset() {
         .arg(&url)
         .assert()
         .success()
-        .stdout(predicate::str::contains("Café"))
+        .stdout(predicate::str::contains("Señor"))
         .stdout(predicate::str::contains("legacy charset"));
 
     handle.join().unwrap();
