@@ -1009,8 +1009,7 @@ jobs:
           dotnet-version: "8.0.x"
 
       - name: Install dependencies
-        working-directory: packages/csharp/HtmlToMarkdown
-        run: ../../scripts/publish/csharp/restore.sh
+        run: scripts/publish/csharp/restore.sh packages/csharp/HtmlToMarkdown/HtmlToMarkdown.csproj
         shell: bash
 
       - name: Pack NuGet package
