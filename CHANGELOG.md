@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.11.0] - 2025-12-04
+### Added
+- CLI `--url` flag with optional `--user-agent` override to fetch remote HTML directly, plus charset-aware decoding.
+- New GitHub Pages deploy workflow to publish the `docs/` demo from `main`.
+- Additional CLI integration tests covering URL fetching (including custom UA, legacy markup, frameset/noframes, cp1252 decoding).
+
+### Changed
+- Demo layout now keeps input/output panes equal height and responsive.
+- Rust core handles body-like content accidentally nested in `<head>` more gracefully.
+
 ## [2.10.1] - 2025-12-02
 
 ### Fixed
