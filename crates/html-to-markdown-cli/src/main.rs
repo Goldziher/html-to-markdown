@@ -4,9 +4,15 @@ use html_to_markdown_rs::{
     CodeBlockStyle, ConversionOptions, HeadingStyle, HighlightStyle, ListIndentType, NewlineStyle,
     PreprocessingOptions, PreprocessingPreset, WhitespaceMode, convert,
 };
+use reqwest::blocking::Client;
+use reqwest::header::{CONTENT_TYPE, USER_AGENT};
 use std::fs;
 use std::io::{self, Read, Write as IoWrite};
 use std::path::PathBuf;
+use std::time::Duration;
+
+const DEFAULT_USER_AGENT: &str =
+    "Mozilla/5.0 (compatible; html-to-markdown-cli/2.10; +https://github.com/Goldziher/html-to-markdown)";
 
 /// Convert HTML to Markdown
 ///
@@ -37,6 +43,9 @@ use std::path::PathBuf;
     # Web scraping with preprocessing
     html-to-markdown page.html --preprocess --preset aggressive
 
+    # Fetch remote HTML and convert
+    html-to-markdown --url https://example.com > output.md
+
     # Discord/Slack-friendly (2-space indents)
     html-to-markdown input.html --list-indent-width 2
 
@@ -52,6 +61,14 @@ struct Cli {
     /// Input HTML file (use \"-\" or omit for stdin)
     #[arg(value_name = "FILE")]
     input: Option<String>,
+
+    /// Fetch HTML from a URL (alternative to file/stdin)
+    #[arg(long, value_name = "URL", conflicts_with = "input")]
+    url: Option<String>,
+
+    /// User-Agent header when fetching via --url (default mimics a real browser)
+    #[arg(long = "user-agent", value_name = "UA", requires = "url")]
+    user_agent: Option<String>,
 
     /// Output file (default: stdout)
     #[arg(short = 'o', long = "output", value_name = "FILE")]
@@ -507,6 +524,45 @@ fn decode_bytes(bytes: &[u8], encoding_name: &str) -> Result<String, String> {
     Ok(decoded.into_owned())
 }
 
+fn extract_charset(content_type: &str) -> Option<String> {
+    content_type
+        .split(';')
+        .map(str::trim)
+        .find_map(|part| part.strip_prefix("charset=").map(|v| v.trim_matches('"').to_string()))
+}
+
+fn fetch_url(url: &str, user_agent: &str, default_encoding: &str) -> Result<String, String> {
+    let client = Client::builder()
+        .timeout(Duration::from_secs(15))
+        .redirect(reqwest::redirect::Policy::limited(5))
+        .build()
+        .map_err(|e| format!("Failed to build HTTP client: {}", e))?;
+
+    let response = client
+        .get(url)
+        .header(USER_AGENT, user_agent)
+        .send()
+        .map_err(|e| format!("Failed to fetch '{}': {}", url, e))?;
+
+    let status = response.status();
+    if !status.is_success() {
+        return Err(format!("Request failed for '{}': HTTP {}", url, status));
+    }
+
+    let charset = response
+        .headers()
+        .get(CONTENT_TYPE)
+        .and_then(|value| value.to_str().ok())
+        .and_then(extract_charset);
+
+    let bytes = response
+        .bytes()
+        .map_err(|e| format!("Failed to read response body from '{}': {}", url, e))?;
+
+    let encoding_name = charset.as_deref().unwrap_or(default_encoding);
+    decode_bytes(&bytes, encoding_name)
+}
+
 fn generate_completions(shell: Shell) {
     use clap::CommandFactory;
     use clap_complete::{Shell as ClapShell, generate};
@@ -553,17 +609,33 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     let html = match cli.input.as_deref() {
+        _ if cli.url.is_some() => {
+            let user_agent = cli.user_agent.as_deref().unwrap_or(DEFAULT_USER_AGENT);
+            let fetched = fetch_url(cli.url.as_deref().unwrap(), user_agent, &cli.encoding)?;
+            if cli.debug {
+                eprintln!("Fetched {} bytes from URL", fetched.len());
+            }
+            fetched
+        }
         None | Some("-") => {
             let mut buffer = Vec::new();
             io::stdin()
                 .read_to_end(&mut buffer)
                 .map_err(|e| format!("Error reading from stdin: {}", e))?;
-            decode_bytes(&buffer, &cli.encoding)?
+            let decoded = decode_bytes(&buffer, &cli.encoding)?;
+            if cli.debug {
+                eprintln!("Read {} bytes from stdin", decoded.len());
+            }
+            decoded
         }
         Some(path) => {
             let path = PathBuf::from(path);
             let bytes = fs::read(&path).map_err(|e| format!("Error reading file '{}': {}", path.display(), e))?;
-            decode_bytes(&bytes, &cli.encoding)?
+            let decoded = decode_bytes(&bytes, &cli.encoding)?;
+            if cli.debug {
+                eprintln!("Read {} bytes from file '{}'", decoded.len(), path.display());
+            }
+            decoded
         }
     };
 
@@ -624,6 +696,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     };
 
     let markdown = convert(&html, Some(options)).map_err(|e| format!("Error converting HTML: {}", e))?;
+
+    if cli.debug {
+        eprintln!("Generated {} bytes of markdown", markdown.len());
+    }
 
     match cli.output {
         Some(path) => {
