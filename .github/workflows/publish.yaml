@@ -1159,6 +1159,11 @@ jobs:
     permissions:
       id-token: write
     steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.prepare.outputs.ref }}
+
       - name: Download wheel artifacts
         uses: actions/download-artifact@v6
         with:
@@ -1191,6 +1196,11 @@ jobs:
     permissions:
       id-token: write
     steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.prepare.outputs.ref }}
+
       - name: Download Ruby gem artifacts
         uses: actions/download-artifact@v6
         with:
@@ -1404,7 +1414,7 @@ jobs:
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         working-directory: crates/html-to-markdown-node
-        run: ../scripts/publish/node/publish-main-package.sh
+        run: ../../scripts/publish/node/publish-main-package.sh
         shell: bash
 
   publish-wasm:
@@ -1439,7 +1449,7 @@ jobs:
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         working-directory: crates/html-to-markdown-wasm
-        run: ../scripts/publish/wasm/publish-package.sh
+        run: ../../scripts/publish/wasm/publish-package.sh
         shell: bash
 
   publish-homebrew:
@@ -1448,6 +1458,11 @@ jobs:
     if: ${{ needs.prepare.result == 'success' && needs.prepare.outputs.tag && needs.prepare.outputs.dry_run != 'true' && needs.prepare.outputs.is_tag == 'true' }}
     runs-on: ubuntu-latest
     steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.prepare.outputs.ref }}
+
       - name: Extract release info
         id: release
         env:
