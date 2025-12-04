@@ -135,6 +135,38 @@ fn trim_line_end_whitespace(output: &mut String) {
     *output = cleaned;
 }
 
+/// Remove common leading whitespace from all lines in a code block.
+///
+/// This is used for `<pre>` blocks to normalize indentation by removing
+/// the minimum common whitespace from all non-empty lines.
+fn dedent_code_block(content: &str) -> String {
+    let lines: Vec<&str> = content.lines().collect();
+    if lines.is_empty() {
+        return String::new();
+    }
+
+    // Find minimum indentation among non-empty lines
+    let min_indent = lines
+        .iter()
+        .filter(|line| !line.trim().is_empty())
+        .map(|line| line.chars().take_while(|c| c.is_whitespace()).count())
+        .min()
+        .unwrap_or(0);
+
+    // Remove that amount of leading whitespace from each line
+    lines
+        .iter()
+        .map(|line| {
+            if line.trim().is_empty() {
+                ""
+            } else {
+                &line[min_indent.min(line.len())..]
+            }
+        })
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
 /// Calculate indentation level for list item continuations.
 ///
 /// Returns the number of 4-space indent groups needed for list continuations.
@@ -3489,6 +3521,10 @@ fn walk_node(
                     }
 
                     if !content.is_empty() {
+                        // Trim leading/trailing newlines and dedent
+                        let trimmed = content.trim_matches('\n');
+                        let dedented = dedent_code_block(trimmed);
+                        
                         match options.code_block_style {
                             crate::options::CodeBlockStyle::Indented => {
                                 if !ctx.convert_as_inline && !output.is_empty() && !output.ends_with("\n\n") {
@@ -3499,7 +3535,7 @@ fn walk_node(
                                     }
                                 }
 
-                                let indented = content
+                                let indented = dedented
                                     .lines()
                                     .map(|line| {
                                         if line.is_empty() {
@@ -3534,7 +3570,7 @@ fn walk_node(
                                     output.push_str(&options.code_language);
                                 }
                                 output.push('\n');
-                                output.push_str(&content);
+                                output.push_str(&dedented);
                                 output.push('\n');
                                 output.push_str(fence);
                                 output.push('\n');
@@ -5208,7 +5244,8 @@ fn walk_node(
                         output.push(' ');
                     }
 
-                    if options.whitespace_mode == crate::options::WhitespaceMode::Normalized
+                    if !ctx.in_code
+                        && options.whitespace_mode == crate::options::WhitespaceMode::Normalized
                         && output.ends_with('\n')
                         && !output.ends_with("\n\n")
                     {
