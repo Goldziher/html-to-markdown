@@ -90,6 +90,7 @@ main {
 .converter {
     display: grid;
     gap: 1.5rem;
+    grid-auto-rows: minmax(0, 1fr);
 }
 
 .section-header {
@@ -111,12 +112,16 @@ main {
     padding: 1.5rem;
     border-radius: 0.75rem;
     border: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    min-height: 360px;
 }
 
 textarea,
 .output {
     width: 100%;
-    min-height: 400px;
+    min-height: 320px;
+    flex: 1;
     padding: 1rem;
     border: 1px solid var(--border);
     border-radius: 0.5rem;
@@ -302,8 +307,9 @@ footer a:hover {
     }
 
     .converter {
-        grid-template-columns: 1fr 1fr;
-        grid-template-rows: auto auto;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        grid-template-rows: minmax(0, 1fr) auto;
+        align-items: stretch;
     }
 
     .input-section {
