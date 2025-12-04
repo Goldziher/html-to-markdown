@@ -23,6 +23,7 @@ clap.workspace = true
 clap_complete.workspace = true
 clap_mangen.workspace = true
 encoding_rs.workspace = true
+reqwest = { version = "0.12", default-features = true, features = ["blocking"] }
 
 [dev-dependencies]
 assert_cmd = "2.1"
