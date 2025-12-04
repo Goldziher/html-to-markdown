@@ -5169,7 +5169,28 @@ fn walk_node(
                     }
                 }
 
-                "head" => {}
+                "head" => {
+                    // Malformed pages sometimes place <body> or main content inside <head>.
+                    // Only walk children if we detect non-head content to avoid rendering metadata.
+                    let children = tag.children();
+                    let has_body_like = children.top().iter().any(|child_handle| {
+                        if let Some(tl::Node::Tag(child_tag)) = child_handle.get(parser) {
+                            let child_name = normalized_tag_name(child_tag.name().as_utf8_str());
+                            matches!(
+                                child_name.as_ref(),
+                                "body" | "main" | "article" | "section" | "div" | "p"
+                            )
+                        } else {
+                            false
+                        }
+                    });
+
+                    if has_body_like {
+                        for child_handle in children.top().iter() {
+                            walk_node(child_handle, parser, output, options, ctx, depth + 1, dom_ctx);
+                        }
+                    }
+                }
 
                 "script" | "style" => {}
 
@@ -6227,6 +6248,21 @@ mod tests {
         assert!(result.contains("<table>"), "Should preserve table");
         assert!(!result.contains("<span>"), "Should strip span tag");
         assert!(result.contains("Text"), "Should keep span text content");
+    }
+
+    #[test]
+    fn example_com_remains_visible() {
+        let html = "<!doctype html><html lang=\"en\"><head><title>Example Domain</title><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\"><style>body{background:#eee;width:60vw;margin:15vh auto;font-family:system-ui,sans-serif}h1{font-size:1.5em}div{opacity:0.8}a:link,a:visited{color:#348}</style><body><div><h1>Example Domain</h1><p>This domain is for use in documentation examples without needing permission. Avoid use in operations.<p><a href=\"https://iana.org/domains/example\">Learn more</a></div></body></html>";
+
+        let mut options = ConversionOptions::default();
+        options.extract_metadata = false; // matches CLI default
+        let result = convert_html(html, &options).unwrap();
+
+        assert!(
+            result.contains("Example Domain"),
+            "content unexpectedly missing: {}",
+            result
+        );
     }
 }
 #[test]
