@@ -36,7 +36,7 @@ fetch(`https://registry.npmjs.org/${encodeURIComponent(pkg)}`)
 NODE
 }
 
-node_exists=$(check_pkg "html-to-markdown")
+node_exists=$(check_pkg "html-to-markdown-node")
 wasm_exists=$(check_pkg "html-to-markdown-wasm")
 
 {
