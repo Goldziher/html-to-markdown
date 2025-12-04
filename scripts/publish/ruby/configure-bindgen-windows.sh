@@ -15,4 +15,5 @@ fi
 
 # Normalize Windows-style path to POSIX for clang.
 RI_DEVKIT_POSIX="${RI_DEVKIT//\\/\/}"
+MSYSTEM_PREFIX="${MSYSTEM_PREFIX:-/ucrt64}"
 echo "BINDGEN_EXTRA_CLANG_ARGS=--target=x86_64-pc-windows-gnu --sysroot=${RI_DEVKIT_POSIX}${MSYSTEM_PREFIX}" >> "$GITHUB_ENV"
