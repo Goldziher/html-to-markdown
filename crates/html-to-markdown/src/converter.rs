@@ -3524,7 +3524,7 @@ fn walk_node(
                         // Trim leading/trailing newlines and dedent
                         let trimmed = content.trim_matches('\n');
                         let dedented = dedent_code_block(trimmed);
-                        
+
                         match options.code_block_style {
                             crate::options::CodeBlockStyle::Indented => {
                                 if !ctx.convert_as_inline && !output.is_empty() && !output.ends_with("\n\n") {
