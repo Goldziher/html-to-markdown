@@ -42,6 +42,7 @@ runs:
           refreshenv
 
         CIBW_BEFORE_BUILD_LINUX: >
+          yum install -y openssl-devel &&
           pip install maturin uv &&
           source ~/.cargo/env &&
           python scripts/prepare_wheel.py
