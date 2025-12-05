@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.11.1] - 2025-12-05
+### Fixed
+- Preserve indentation in `<pre><code>` blocks while safely dedenting whitespace across multibyte characters to avoid panics when leading spaces are non-ASCII; regression fixture added for issue #134. Thanks @bbeardsley for the contribution.
+
 ## [2.11.0] - 2025-12-04
 ### Added
 - CLI `--url` flag with optional `--user-agent` override to fetch remote HTML directly, plus charset-aware decoding.
