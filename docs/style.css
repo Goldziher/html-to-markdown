@@ -68,8 +68,8 @@ header h1 {
     display: inline-flex;
     align-items: center;
     gap: 0.5rem;
-    padding: 0.5rem 1rem;
-    background: rgba(255, 255, 255, 0.2);
+    padding: 0.35rem 0.65rem;
+    background: rgba(255, 255, 255, 0.15);
     color: white;
     text-decoration: none;
     border-radius: 0.5rem;
@@ -81,6 +81,11 @@ header h1 {
 .links a:hover {
     background: rgba(255, 255, 255, 0.3);
     transform: translateY(-2px);
+}
+
+.links a img {
+    height: 26px;
+    display: block;
 }
 
 main {
