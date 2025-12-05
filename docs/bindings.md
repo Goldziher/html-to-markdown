@@ -11,7 +11,11 @@ are guaranteed across languages.
 - [WebAssembly / universal JS](#webassembly--universal-js-html-to-markdown-wasm)
 - [Python](#python-html-to-markdown)
 - [Ruby](#ruby-html-to-markdown)
-- [PHP](#php-extension-html-to-markdownextension)
+- [PHP](#php-extension--composer-package-goldziherhtml-to-markdown)
+- [Elixir](#elixir-html_to_markdown)
+- [Go](#go-githubcomgoldziherhtml-to-markdownpackagesgohtmltomarkdown)
+- [Java](#java-iogithubgoldziherhtml-to-markdown)
+- [.NET](#net-goldziherhtmltomarkdown)
 - [Command-line](#command-line-html-to-markdown-cli)
 
 ---
@@ -175,7 +179,7 @@ the Rust engine.
 
 ---
 
-## PHP extension (`goldziher/html-to-markdown`)
+## PHP extension + Composer package (`goldziher/html-to-markdown`)
 
 The PHP binding ships as a native extension distributed via
 [PIE](https://github.com/php/pie) and a typed Composer package.
@@ -188,6 +192,103 @@ composer require goldziher/html-to-markdown
 Once installed, enable the extension in `php.ini` and use the `HtmlToMarkdown`
 service classes or procedural helpers. See [docs/php.md](php.md) for full
 installation, distribution, and usage guidance (including Windows DLLs).
+
+---
+
+## Elixir (`html_to_markdown`)
+
+### Install
+
+```elixir
+{:html_to_markdown, "~> 2.11"}
+```
+
+The package ships a Rustler NIF built from the same Rust core for consistent
+conversion results.
+
+### Usage
+
+```elixir
+{:ok, md} = HtmlToMarkdown.convert("<h1>Hello</h1><p>Elixir</p>")
+IO.puts(md)
+```
+
+---
+
+## Go (`github.com/Goldziher/html-to-markdown/packages/go/htmltomarkdown`)
+
+### Install
+
+```bash
+go get github.com/Goldziher/html-to-markdown/packages/go/htmltomarkdown
+```
+
+The Go package links against the C FFI library built from the Rust core.
+
+### Usage
+
+```go
+package main
+
+import (
+    "fmt"
+    htm "github.com/Goldziher/html-to-markdown/packages/go/htmltomarkdown"
+)
+
+func main() {
+    md, err := htm.Convert("<h1>Hello</h1><p>Go binding</p>", nil)
+    if err != nil {
+        panic(err)
+    }
+    fmt.Println(md)
+}
+```
+
+---
+
+## Java (`io.github.goldziher:html-to-markdown`)
+
+### Install (Maven)
+
+```xml
+<dependency>
+  <groupId>io.github.goldziher</groupId>
+  <artifactId>html-to-markdown</artifactId>
+  <version>2.11.1</version>
+</dependency>
+```
+
+### Usage
+
+```java
+import io.github.goldziher.htmltomarkdown.HtmlToMarkdown;
+
+public class Demo {
+    public static void main(String[] args) {
+        var md = HtmlToMarkdown.convert("<h1>Hello</h1><p>Java binding</p>");
+        System.out.println(md);
+    }
+}
+```
+
+---
+
+## .NET (`Goldziher.HtmlToMarkdown`)
+
+### Install
+
+```bash
+dotnet add package Goldziher.HtmlToMarkdown --version 2.11.1
+```
+
+### Usage
+
+```csharp
+using HtmlToMarkdown;
+
+var md = Converter.Convert("<h1>Hello</h1><p>.NET binding</p>");
+Console.WriteLine(md);
+```
 
 ---
 
