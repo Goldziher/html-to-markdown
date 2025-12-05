@@ -4,6 +4,7 @@ set -euo pipefail
 target="${TARGET:?TARGET is required}"
 
 sudo apt-get update
+sudo apt-get install -y pkg-config libssl-dev
 case "${target}" in
   x86_64-unknown-linux-musl)
     sudo apt-get install -y musl-tools
