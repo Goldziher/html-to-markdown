@@ -145,11 +145,17 @@ fn dedent_code_block(content: &str) -> String {
         return String::new();
     }
 
-    // Find minimum indentation among non-empty lines
+    // Find minimum indentation among non-empty lines using byte offsets
     let min_indent = lines
         .iter()
         .filter(|line| !line.trim().is_empty())
-        .map(|line| line.chars().take_while(|c| c.is_whitespace()).count())
+        .map(|line| {
+            line.char_indices()
+                .take_while(|(_, c)| c.is_whitespace())
+                .map(|(idx, c)| idx + c.len_utf8())
+                .last()
+                .unwrap_or(0)
+        })
         .min()
         .unwrap_or(0);
 
