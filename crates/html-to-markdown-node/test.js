@@ -5,9 +5,9 @@
 const { convert } = require("./index.js");
 
 function assert(condition, message) {
-  if (!condition) {
-    throw new Error(message || "Assertion failed");
-  }
+	if (!condition) {
+		throw new Error(message || "Assertion failed");
+	}
 }
 
 console.log("Testing html-to-markdown-node...\n");
@@ -47,7 +47,7 @@ console.log("Test 4: Performance benchmark");
 const iterations = 1000;
 const start = Date.now();
 for (let i = 0; i < iterations; i++) {
-  convert(html3);
+	convert(html3);
 }
 const elapsed = Date.now() - start;
 const opsPerSec = Math.round((iterations / elapsed) * 1000);

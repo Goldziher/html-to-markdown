@@ -9,16 +9,74 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 const rootDir = path.resolve(__dirname, '..');
-const distDir = path.resolve(rootDir, process.argv[2] || 'dist');
+const args = process.argv.slice(2);
+let distArg = args.find((arg) => !arg.startsWith('--'));
+distArg = distArg || 'dist';
+const flags = new Set(args.filter((arg) => arg.startsWith('--')));
+const typesOnly = flags.has('--types-only');
+
+const distDir = path.resolve(rootDir, distArg);
 const entryPath = path.join(distDir, 'html_to_markdown_wasm.js');
 const dtsPath = path.join(distDir, 'html_to_markdown_wasm.d.ts');
 
-if (!fs.existsSync(entryPath)) {
-  console.error(`[patch-bundler-entry] Missing entry file at ${entryPath}`);
-  process.exit(1);
+const typeDefinitions = `
+export type WasmHeadingStyle = "underlined" | "atx" | "atxClosed";
+export type WasmListIndentType = "spaces" | "tabs";
+export type WasmWhitespaceMode = "normalized" | "strict";
+export type WasmNewlineStyle = "spaces" | "backslash";
+export type WasmCodeBlockStyle = "indented" | "backticks" | "tildes";
+export type WasmHighlightStyle = "doubleEqual" | "html" | "bold" | "none";
+export type WasmPreprocessingPreset = "minimal" | "standard" | "aggressive";
+
+export interface WasmPreprocessingOptions {
+  enabled?: boolean;
+  preset?: WasmPreprocessingPreset;
+  removeNavigation?: boolean;
+  removeForms?: boolean;
 }
 
-const wrapper = `import * as wasmModule from "./html_to_markdown_wasm_bg.wasm";
+export interface WasmConversionOptions {
+  headingStyle?: WasmHeadingStyle;
+  listIndentType?: WasmListIndentType;
+  listIndentWidth?: number;
+  bullets?: string;
+  strongEmSymbol?: string;
+  escapeAsterisks?: boolean;
+  escapeUnderscores?: boolean;
+  escapeMisc?: boolean;
+  escapeAscii?: boolean;
+  codeLanguage?: string;
+  autolinks?: boolean;
+  defaultTitle?: boolean;
+  brInTables?: boolean;
+  hocrSpatialTables?: boolean;
+  highlightStyle?: WasmHighlightStyle;
+  extractMetadata?: boolean;
+  whitespaceMode?: WasmWhitespaceMode;
+  stripNewlines?: boolean;
+  wrap?: boolean;
+  wrapWidth?: number;
+  convertAsInline?: boolean;
+  subSymbol?: string;
+  supSymbol?: string;
+  newlineStyle?: WasmNewlineStyle;
+  codeBlockStyle?: WasmCodeBlockStyle;
+  keepInlineImagesIn?: string[];
+  preprocessing?: WasmPreprocessingOptions | null;
+  encoding?: string;
+  debug?: boolean;
+  stripTags?: string[];
+  preserveTags?: string[];
+}
+`;
+
+if (!typesOnly) {
+  if (!fs.existsSync(entryPath)) {
+    console.error(`[patch-bundler-entry] Missing entry file at ${entryPath}`);
+    process.exit(1);
+  }
+
+  const wrapper = `import * as wasmModule from "./html_to_markdown_wasm_bg.wasm";
 export * from "./html_to_markdown_wasm_bg.js";
 import { __wbg_set_wasm } from "./html_to_markdown_wasm_bg.js";
 
@@ -114,13 +172,29 @@ export async function initWasm() {
 }
 `;
 
-fs.writeFileSync(entryPath, wrapper, 'utf8');
-
-if (fs.existsSync(dtsPath)) {
-  let content = fs.readFileSync(dtsPath, 'utf8');
-  const additions = `\nexport declare function initWasm(): Promise<void>;\nexport declare const wasmReady: Promise<void>;\n`;
-  if (!content.includes('initWasm():')) {
-    content += additions;
-    fs.writeFileSync(dtsPath, content, 'utf8');
-  }
+  fs.writeFileSync(entryPath, wrapper, 'utf8');
 }
+
+if (!fs.existsSync(dtsPath)) {
+  console.error(`[patch-bundler-entry] Missing type definitions at ${dtsPath}`);
+  process.exit(1);
+}
+
+let content = fs.readFileSync(dtsPath, 'utf8');
+
+if (!typesOnly && !content.includes('initWasm():')) {
+  const additions = `\nexport declare function initWasm(): Promise<void>;\nexport declare const wasmReady: Promise<void>;\n`;
+  content += additions;
+}
+
+if (content.includes('options: any')) {
+  content = content.replace(/options: any/g, 'options?: WasmConversionOptions | null');
+}
+
+content = content.replace('readonly attributes: any;', 'readonly attributes: Record<string, string>;');
+
+if (!content.includes('interface WasmConversionOptions')) {
+  content += `\n${typeDefinitions}`;
+}
+
+fs.writeFileSync(dtsPath, content, 'utf8');

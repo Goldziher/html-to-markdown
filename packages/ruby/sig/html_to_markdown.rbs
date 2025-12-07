@@ -15,51 +15,51 @@ module HtmlToMarkdown
   type preprocessing_preset = :minimal | :standard | :aggressive
 
   type preprocessing_options = {
-    enabled: bool,
-    preset: preprocessing_preset,
-    remove_navigation: bool,
-    remove_forms: bool
+    enabled?: bool,
+    preset?: preprocessing_preset,
+    remove_navigation?: bool,
+    remove_forms?: bool
   }
 
   type conversion_options = {
-    heading_style: heading_style,
-    list_indent_type: list_indent_type,
-    list_indent_width: Integer,
-    bullets: String,
-    strong_em_symbol: String,
-    escape_asterisks: bool,
-    escape_underscores: bool,
-    escape_misc: bool,
-    escape_ascii: bool,
-    code_language: String,
-    autolinks: bool,
-    default_title: bool,
-    br_in_tables: bool,
-    hocr_spatial_tables: bool,
-    highlight_style: highlight_style,
-    extract_metadata: bool,
-    whitespace_mode: whitespace_mode,
-    strip_newlines: bool,
-    wrap: bool,
-    wrap_width: Integer,
-    convert_as_inline: bool,
-    sub_symbol: String,
-    sup_symbol: String,
-    newline_style: newline_style,
-    code_block_style: code_block_style,
-    keep_inline_images_in: Array[String],
-    preprocessing: preprocessing_options,
-    encoding: String,
-    debug: bool,
-    strip_tags: Array[String],
-    preserve_tags: Array[String]
+    heading_style?: heading_style,
+    list_indent_type?: list_indent_type,
+    list_indent_width?: Integer,
+    bullets?: String,
+    strong_em_symbol?: String,
+    escape_asterisks?: bool,
+    escape_underscores?: bool,
+    escape_misc?: bool,
+    escape_ascii?: bool,
+    code_language?: String,
+    autolinks?: bool,
+    default_title?: bool,
+    br_in_tables?: bool,
+    hocr_spatial_tables?: bool,
+    highlight_style?: highlight_style,
+    extract_metadata?: bool,
+    whitespace_mode?: whitespace_mode,
+    strip_newlines?: bool,
+    wrap?: bool,
+    wrap_width?: Integer,
+    convert_as_inline?: bool,
+    sub_symbol?: String,
+    sup_symbol?: String,
+    newline_style?: newline_style,
+    code_block_style?: code_block_style,
+    keep_inline_images_in?: Array[String],
+    preprocessing?: preprocessing_options,
+    encoding?: String,
+    debug?: bool,
+    strip_tags?: Array[String],
+    preserve_tags?: Array[String]
   }
 
   type inline_image_config = {
-    max_decoded_size_bytes: Integer,
-    filename_prefix: String?,
-    capture_svg: bool,
-    infer_dimensions: bool
+    max_decoded_size_bytes?: Integer,
+    filename_prefix?: String?,
+    capture_svg?: bool,
+    infer_dimensions?: bool
   }
 
   type inline_image_format = "png" | "jpeg" | "gif" | "bmp" | "webp" | "svg" | String

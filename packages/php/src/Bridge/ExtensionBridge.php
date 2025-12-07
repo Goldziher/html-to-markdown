@@ -9,13 +9,18 @@ use HtmlToMarkdown\Exception\ConversionFailed;
 use HtmlToMarkdown\Exception\ExtensionNotLoaded;
 use HtmlToMarkdown\Exception\InvalidOption;
 
+/**
+ * @phpstan-import-type ConversionOptionsInput from HtmlToMarkdown\Config\ConversionOptions
+ * @phpstan-import-type InlineImageConfigInput from HtmlToMarkdown\Config\InlineImageConfig
+ */
+
 final class ExtensionBridge implements ExtensionBridgeContract
 {
     private const CONVERT_FUNCTION = 'html_to_markdown_convert';
     private const CONVERT_INLINE_FUNCTION = 'html_to_markdown_convert_with_inline_images';
 
     /**
-     * @param array<string, mixed>|null $options
+     * @param ConversionOptionsInput|null $options
      */
     public function convert(string $html, ?array $options = null): string
     {
@@ -36,8 +41,8 @@ final class ExtensionBridge implements ExtensionBridgeContract
     }
 
     /**
-     * @param array<string, mixed>|null $options
-     * @param array<string, mixed>|null $config
+     * @param ConversionOptionsInput|null $options
+     * @param InlineImageConfigInput|null $config
      *
      * @return array<string, mixed>
      */

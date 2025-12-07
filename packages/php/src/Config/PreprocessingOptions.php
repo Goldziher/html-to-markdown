@@ -8,6 +8,14 @@ use HtmlToMarkdown\Enum\PreprocessingPreset;
 use HtmlToMarkdown\Exception\InvalidOption;
 use HtmlToMarkdown\Internal\TypeAssertions;
 
+/**
+ * @phpstan-type PreprocessingOptionsInput array{
+ *     enabled?: bool,
+ *     preset?: value-of<PreprocessingPreset>,
+ *     remove_navigation?: bool,
+ *     remove_forms?: bool
+ * }
+ */
 final readonly class PreprocessingOptions
 {
     public function __construct(
@@ -25,7 +33,7 @@ final readonly class PreprocessingOptions
     }
 
     /**
-     * @param array<string, mixed> $input
+     * @param PreprocessingOptionsInput $input
      */
     public static function fromArray(array $input): self
     {
@@ -58,7 +66,7 @@ final readonly class PreprocessingOptions
     }
 
     /**
-     * @return array<string, mixed>
+     * @return PreprocessingOptionsInput
      */
     public function toArray(): array
     {

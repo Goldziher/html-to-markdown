@@ -4,16 +4,21 @@ declare(strict_types=1);
 
 namespace HtmlToMarkdown\Contract;
 
+/**
+ * @phpstan-import-type ConversionOptionsInput from HtmlToMarkdown\Config\ConversionOptions
+ * @phpstan-import-type InlineImageConfigInput from HtmlToMarkdown\Config\InlineImageConfig
+ */
+
 interface ExtensionBridge
 {
     /**
-     * @param array<string, mixed>|null $options
+     * @param ConversionOptionsInput|null $options
      */
     public function convert(string $html, ?array $options = null): string;
 
     /**
-     * @param array<string, mixed>|null $options
-     * @param array<string, mixed>|null $config
+     * @param ConversionOptionsInput|null $options
+     * @param InlineImageConfigInput|null $config
      *
      * @return array<string, mixed>
      */

@@ -10,6 +10,11 @@ use HtmlToMarkdown\Config\InlineImageConfig;
 use HtmlToMarkdown\Contract\ExtensionBridge as ExtensionBridgeContract;
 use HtmlToMarkdown\Value\InlineImageExtraction;
 
+/**
+ * @phpstan-import-type ConversionOptionsInput from HtmlToMarkdown\Config\ConversionOptions
+ * @phpstan-import-type InlineImageConfigInput from HtmlToMarkdown\Config\InlineImageConfig
+ */
+
 final class Converter
 {
     public function __construct(
@@ -23,7 +28,7 @@ final class Converter
     }
 
     /**
-     * @param ConversionOptions|array<string, mixed>|null $options
+     * @param ConversionOptions|ConversionOptionsInput|null $options
      */
     public function convert(string $html, ConversionOptions|array|null $options = null): string
     {
@@ -31,8 +36,8 @@ final class Converter
     }
 
     /**
-     * @param ConversionOptions|array<string, mixed>|null $options
-     * @param InlineImageConfig|array<string, mixed>|null $config
+     * @param ConversionOptions|ConversionOptionsInput|null $options
+     * @param InlineImageConfig|InlineImageConfigInput|null $config
      */
     public function convertWithInlineImages(
         string $html,
@@ -49,11 +54,8 @@ final class Converter
     }
 
     /**
-     * @param ConversionOptions|array<string, mixed>|null $options
-     */
-    /**
-     * @param ConversionOptions|array<string, mixed>|null $options
-     * @return array<string, mixed>|null
+     * @param ConversionOptions|ConversionOptionsInput|null $options
+     * @phpstan-return ConversionOptionsInput|null
      */
     private function normalizeOptions(ConversionOptions|array|null $options): ?array
     {
@@ -71,11 +73,8 @@ final class Converter
     }
 
     /**
-     * @param InlineImageConfig|array<string, mixed>|null $config
-     */
-    /**
-     * @param InlineImageConfig|array<string, mixed>|null $config
-     * @return array<string, mixed>|null
+     * @param InlineImageConfig|InlineImageConfigInput|null $config
+     * @phpstan-return InlineImageConfigInput|null
      */
     private function normalizeImageConfig(InlineImageConfig|array|null $config): ?array
     {
