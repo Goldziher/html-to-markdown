@@ -24,6 +24,9 @@ on:
       - pnpm-workspace.yaml
       - .github/workflows/ci-wasm.yaml
 
+permissions:
+  contents: read
+
 concurrency:
   group: ci-wasm-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true

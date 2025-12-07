@@ -26,6 +26,9 @@ on:
       - pnpm-workspace.yaml
       - .github/workflows/ci-smoke.yaml
 
+permissions:
+  contents: read
+
 concurrency:
   group: ci-smoke-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true

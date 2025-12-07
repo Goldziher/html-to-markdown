@@ -16,6 +16,9 @@ on:
       - crates/html-to-markdown/**
       - .github/workflows/ci-elixir.yaml
 
+permissions:
+  contents: read
+
 concurrency:
   group: ci-elixir-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true

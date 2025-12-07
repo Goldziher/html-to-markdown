@@ -22,6 +22,9 @@ on:
       - Gemfile.lock
       - .github/workflows/ci-ruby.yaml
 
+permissions:
+  contents: read
+
 concurrency:
   group: ci-ruby-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
