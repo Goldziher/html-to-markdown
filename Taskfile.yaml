@@ -3,7 +3,7 @@ version: "3"
 vars:
   RUST_LOG: info
   RUBY_BIN: /opt/homebrew/opt/ruby/bin
-  BUNDLER_VERSION: "2.7.2"
+  BUNDLER_VERSION: "4.0.0"
   GOLANGCI_LINT_VERSION: "v2.6.2"
   GO_TOOLCHAIN: "go1.25rc1"
 
@@ -436,7 +436,7 @@ tasks:
     dir: packages/ruby
     cmds:
       - task: ruby:ensure-bundler
-      - PATH={{.RUBY_BIN}}:$PATH bundle _{{.BUNDLER_VERSION}}_ update
+      - PATH={{.RUBY_BIN}}:$PATH bundle _{{.BUNDLER_VERSION}}_ update --all
 
   ruby:build:
     desc: "Build Ruby native extension"
@@ -794,7 +794,7 @@ tasks:
     desc: "Update Ruby smoke test dependencies"
     cmds:
       - task: ruby:ensure-bundler
-      - cmd: cd examples/ruby-smoke && PATH={{.RUBY_BIN}}:$PATH bundle _{{.BUNDLER_VERSION}}_ update
+      - cmd: cd examples/ruby-smoke && PATH={{.RUBY_BIN}}:$PATH bundle _{{.BUNDLER_VERSION}}_ update --all
 
   # JavaScript / TypeScript tasks --------------------------------------------
   js:install:
