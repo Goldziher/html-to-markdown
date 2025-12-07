@@ -30,7 +30,7 @@ rust-version = "1.85"
 html-to-markdown-rs = { version = "2.11.1", path = "crates/html-to-markdown" }
 
 # HTML parsing
-tl = { package = "astral-tl", version = "0.7.9" }
+tl = { package = "astral-tl", version = "0.7.11" }
 html5ever = "0.36"
 markup5ever_rcdom = "0.36"
 
@@ -47,10 +47,10 @@ clap_complete = "4.5"
 clap_mangen = "0.2"
 
 # Python bindings
-pyo3 = { version = "0.27.1", features = ["abi3-py310"] }
+pyo3 = { version = "0.27.2", features = ["abi3-py310"] }
 
 # PHP bindings
-ext-php-rs = "0.15.1"
+ext-php-rs = "0.15.2"
 
 [profile.release]
 lto = "thin"

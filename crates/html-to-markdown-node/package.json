@@ -58,10 +58,10 @@
     "clean": "rm -rf dist node_modules *.node"
   },
   "devDependencies": {
-    "@napi-rs/cli": "^3.4.1",
+    "@napi-rs/cli": "^3.5.0",
     "@types/node": "^24.10.1",
-    "tsx": "^4.20.6",
-    "vitest": "^4.0.14"
+    "tsx": "^4.21.0",
+    "vitest": "^4.0.15"
   },
   "dependencies": {
     "@emnapi/runtime": "1.7.1",
