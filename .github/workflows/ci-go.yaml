@@ -22,6 +22,9 @@ on:
       - go.sum
       - .github/workflows/ci-go.yaml
 
+permissions:
+  contents: read
+
 concurrency:
   group: ci-go-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true

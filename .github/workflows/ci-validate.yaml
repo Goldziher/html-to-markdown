@@ -12,6 +12,9 @@ on:
       - "**"
       - ".github/workflows/ci-validate.yaml"
 
+permissions:
+  contents: read
+
 concurrency:
   group: ci-validate-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true

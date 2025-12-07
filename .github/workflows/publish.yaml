@@ -21,6 +21,9 @@ on:
   repository_dispatch:
     types: [publish-release]
 
+permissions:
+  contents: write
+
 concurrency:
   group: ${{ github.workflow }}-${{ (github.event_name == 'workflow_dispatch' && (github.event.inputs.ref || github.event.inputs.tag)) || github.ref || github.run_id }}
   cancel-in-progress: false
@@ -1157,6 +1160,7 @@ jobs:
     runs-on: ubuntu-latest
     environment: pypi
     permissions:
+      contents: read
       id-token: write
     steps:
       - name: Checkout
@@ -1194,6 +1198,7 @@ jobs:
     if: ${{ needs.prepare.result == 'success' && needs.prepare.outputs.tag && needs.prepare.outputs.is_tag == 'true' && (needs.prepare.outputs.dry_run == 'true' || needs.check-rubygems.outputs.exists != 'true') }}
     runs-on: ubuntu-latest
     permissions:
+      contents: read
       id-token: write
     steps:
       - name: Checkout

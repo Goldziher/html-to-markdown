@@ -22,6 +22,9 @@ on:
       - pnpm-workspace.yaml
       - .github/workflows/ci-node.yaml
 
+permissions:
+  contents: read
+
 concurrency:
   group: ci-node-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true

@@ -16,6 +16,9 @@ on:
       - crates/html-to-markdown/**
       - .github/workflows/ci-java.yaml
 
+permissions:
+  contents: read
+
 concurrency:
   group: ci-java-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true

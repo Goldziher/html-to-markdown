@@ -22,6 +22,9 @@ on:
       - uv.toml
       - .github/workflows/ci-python.yaml
 
+permissions:
+  contents: read
+
 concurrency:
   group: ci-python-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
