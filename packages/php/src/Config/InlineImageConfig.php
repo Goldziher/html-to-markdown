@@ -7,6 +7,14 @@ namespace HtmlToMarkdown\Config;
 use HtmlToMarkdown\Exception\InvalidOption;
 use HtmlToMarkdown\Internal\TypeAssertions;
 
+/**
+ * @phpstan-type InlineImageConfigInput array{
+ *     max_decoded_size_bytes?: positive-int,
+ *     filename_prefix?: string|null,
+ *     capture_svg?: bool,
+ *     infer_dimensions?: bool
+ * }
+ */
 final readonly class InlineImageConfig
 {
     public function __construct(
@@ -24,7 +32,7 @@ final readonly class InlineImageConfig
     }
 
     /**
-     * @param array<string, mixed> $input
+     * @param InlineImageConfigInput $input
      */
     public static function fromArray(array $input): self
     {
@@ -47,7 +55,7 @@ final readonly class InlineImageConfig
     }
 
     /**
-     * @return array<string, mixed>
+     * @return InlineImageConfigInput
      */
     public function toArray(): array
     {

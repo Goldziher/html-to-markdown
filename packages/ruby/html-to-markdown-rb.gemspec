@@ -19,6 +19,7 @@ fallback_files = Dir.chdir(__dir__) do
       lib/bin/*
       src/**/*.rs
       spec/**/*.rb
+      sig/**/*.rbs
     ]
   )
 end

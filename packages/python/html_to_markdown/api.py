@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Literal, TypedDict, cast
+from typing import Literal, TypedDict
 
 import html_to_markdown._html_to_markdown as _rust
 from html_to_markdown._html_to_markdown import (
@@ -114,10 +114,7 @@ def convert_with_inline_images(
         image_config = InlineImageConfig()
 
     rust_options = _to_rust_options(options, preprocessing)
-    markdown, images, warnings = cast(
-        "tuple[str, list[InlineImage], list[InlineImageWarning]]",
-        _rust.convert_with_inline_images(html, rust_options, image_config),
-    )
+    markdown, images, warnings = _rust.convert_with_inline_images(html, rust_options, image_config)
     return markdown, list(images), list(warnings)
 
 

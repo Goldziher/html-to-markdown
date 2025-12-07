@@ -9,7 +9,12 @@ use HtmlToMarkdown\Config\InlineImageConfig;
 use HtmlToMarkdown\Value\InlineImageExtraction;
 
 /**
- * @param ConversionOptions|array<string, mixed>|null $options
+ * @phpstan-import-type ConversionOptionsInput from HtmlToMarkdown\Config\ConversionOptions
+ * @phpstan-import-type InlineImageConfigInput from HtmlToMarkdown\Config\InlineImageConfig
+ */
+
+/**
+ * @param ConversionOptions|ConversionOptionsInput|null $options
  */
 function convert(string $html, ConversionOptions|array|null $options = null): string
 {
@@ -17,8 +22,8 @@ function convert(string $html, ConversionOptions|array|null $options = null): st
 }
 
 /**
- * @param ConversionOptions|array<string, mixed>|null $options
- * @param InlineImageConfig|array<string, mixed>|null $config
+ * @param ConversionOptions|ConversionOptionsInput|null $options
+ * @param InlineImageConfig|InlineImageConfigInput|null $config
  */
 function convert_with_inline_images(
     string $html,

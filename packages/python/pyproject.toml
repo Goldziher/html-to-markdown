@@ -7,7 +7,7 @@ requires = [
 
 [project]
 name = "html-to-markdown"
-version = "2.11.1"
+version = "2.11.2"
 description = "High-performance HTML to Markdown converter powered by Rust with a clean Python API"
 readme = "README.md"
 keywords = [
@@ -57,4 +57,8 @@ module-name = "html_to_markdown._html_to_markdown"
 include = [
   { path = "html_to_markdown-*.data/**/*", format = "wheel" },
   { path = "html_to_markdown/bin/*", format = "wheel" },
+  { path = "html_to_markdown/_html_to_markdown.pyi", format = "wheel" },
+  { path = "html_to_markdown/py.typed", format = "wheel" },
+  { path = "html_to_markdown/_html_to_markdown.pyi", format = "sdist" },
+  { path = "html_to_markdown/py.typed", format = "sdist" },
 ]

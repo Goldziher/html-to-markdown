@@ -13,6 +13,42 @@ use HtmlToMarkdown\Enum\WhitespaceMode;
 use HtmlToMarkdown\Exception\InvalidOption;
 use HtmlToMarkdown\Internal\TypeAssertions;
 
+/**
+ * @phpstan-import-type PreprocessingOptionsInput from HtmlToMarkdown\Config\PreprocessingOptions
+ * @phpstan-type ConversionOptionsInput array{
+ *     heading_style?: value-of<HeadingStyle>,
+ *     list_indent_type?: value-of<ListIndentType>,
+ *     list_indent_width?: positive-int,
+ *     bullets?: string,
+ *     strong_em_symbol?: string,
+ *     escape_asterisks?: bool,
+ *     escape_underscores?: bool,
+ *     escape_misc?: bool,
+ *     escape_ascii?: bool,
+ *     code_language?: string,
+ *     autolinks?: bool,
+ *     default_title?: bool,
+ *     br_in_tables?: bool,
+ *     hocr_spatial_tables?: bool,
+ *     highlight_style?: value-of<HighlightStyle>,
+ *     extract_metadata?: bool,
+ *     whitespace_mode?: value-of<WhitespaceMode>,
+ *     strip_newlines?: bool,
+ *     wrap?: bool,
+ *     wrap_width?: positive-int,
+ *     convert_as_inline?: bool,
+ *     sub_symbol?: string,
+ *     sup_symbol?: string,
+ *     newline_style?: value-of<NewlineStyle>,
+ *     code_block_style?: value-of<CodeBlockStyle>,
+ *     keep_inline_images_in?: list<string>,
+ *     encoding?: string,
+ *     debug?: bool,
+ *     strip_tags?: list<string>,
+ *     preserve_tags?: list<string>,
+ *     preprocessing?: PreprocessingOptionsInput
+ * }
+ */
 final readonly class ConversionOptions
 {
     public PreprocessingOptions $preprocessing;
@@ -64,7 +100,7 @@ final readonly class ConversionOptions
     }
 
     /**
-     * @param array<string, mixed> $input
+     * @param ConversionOptionsInput $input
      */
     public static function fromArray(array $input): self
     {
@@ -168,7 +204,7 @@ final readonly class ConversionOptions
     }
 
     /**
-     * @return array<string, mixed>
+     * @return ConversionOptionsInput
      */
     public function toArray(): array
     {
@@ -273,7 +309,7 @@ final readonly class ConversionOptions
     }
 
     /**
-     * @return array<string, mixed>
+     * @return PreprocessingOptionsInput
      */
     private static function normalizeArray(mixed $value, string $key): array
     {
