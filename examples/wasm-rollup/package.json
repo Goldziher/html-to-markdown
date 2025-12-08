@@ -1,0 +1,26 @@
+{
+  "name": "@html-to-markdown/wasm-rollup-example",
+  "version": "2.11.4",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "rollup -c",
+    "dev": "rollup -c -w",
+    "preview": "pnpm dlx serve dist --single"
+  },
+  "dependencies": {
+    "html-to-markdown-wasm": "workspace:*"
+  },
+  "devDependencies": {
+    "@rollup/plugin-commonjs": "^29.0.0",
+    "@rollup/plugin-json": "^6.1.0",
+    "@rollup/plugin-node-resolve": "^16.0.3",
+    "@rollup/plugin-replace": "^6.0.3",
+    "@rollup/plugin-typescript": "^12.3.0",
+    "@rollup/plugin-wasm": "^6.2.2",
+    "@types/node": "^24.10.1",
+    "rollup": "^4.53.3",
+    "tslib": "^2.8.1",
+    "typescript": "^5.9.3"
+  }
+}

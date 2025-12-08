@@ -1,68 +1,68 @@
 {
-  "name": "html-to-markdown-wasm",
-  "version": "2.11.2",
-  "description": "High-performance HTML to Markdown converter - WebAssembly bindings",
-  "main": "dist/html_to_markdown_wasm.js",
-  "types": "dist/html_to_markdown_wasm.d.ts",
-  "exports": {
-    ".": {
-      "import": "./dist/html_to_markdown_wasm.js",
-      "types": "./dist/html_to_markdown_wasm.d.ts",
-      "default": "./dist/html_to_markdown_wasm.js"
-    },
-    "./dist-node": {
-      "import": "./dist-node/html_to_markdown_wasm.js",
-      "require": "./dist-node/html_to_markdown_wasm.js",
-      "types": "./dist-node/html_to_markdown_wasm.d.ts"
-    },
-    "./dist-node/*": "./dist-node/*",
-    "./dist-web": {
-      "import": "./dist-web/html_to_markdown_wasm.js",
-      "types": "./dist-web/html_to_markdown_wasm.d.ts"
-    },
-    "./dist-web/*": "./dist-web/*"
-  },
-  "repository": "https://github.com/Goldziher/html-to-markdown",
-  "homepage": "https://github.com/Goldziher/html-to-markdown",
-  "license": "MIT",
-  "author": "Na'aman Hirschfeld <nhirschfeld@gmail.com>",
-  "bugs": "https://github.com/Goldziher/html-to-markdown/issues",
-  "keywords": [
-    "html",
-    "markdown",
-    "converter",
-    "rust",
-    "wasm",
-    "webassembly"
-  ],
-  "files": [
-    "dist",
-    "dist-node",
-    "dist-web",
-    "README.md"
-  ],
-  "scripts": {
-    "build": "wasm-pack build --target bundler --out-dir dist && node ./scripts/patch-bundler-entry.js",
-    "build:nodejs": "wasm-pack build --target nodejs --out-dir dist-node",
-    "build:web": "wasm-pack build --target web --out-dir dist-web",
-    "build:all": "pnpm run build && pnpm run build:nodejs && pnpm run build:web && pnpm run cleanup:gitignore",
-    "cleanup:gitignore": "node ./scripts/cleanup-gitignore.js",
-    "test": "vitest run",
-    "test:watch": "vitest",
-    "test:wasm-pack": "wasm-pack test --headless --chrome",
-    "clean": "rm -rf dist dist-node dist-web node_modules pkg"
-  },
-  "devDependencies": {
-    "@types/node": "^24.10.1",
-    "tsx": "^4.21.0",
-    "vitest": "^4.0.15",
-    "wasm-pack": "^0.13.1"
-  },
-  "publishConfig": {
-    "registry": "https://registry.npmjs.org/",
-    "access": "public"
-  },
-  "dependencies": {
-    "up": "^1.0.2"
-  }
+	"name": "html-to-markdown-wasm",
+	"version": "2.11.4",
+	"description": "High-performance HTML to Markdown converter - WebAssembly bindings",
+	"main": "dist/html_to_markdown_wasm.js",
+	"types": "dist/html_to_markdown_wasm.d.ts",
+	"exports": {
+		".": {
+			"import": "./dist/html_to_markdown_wasm.js",
+			"types": "./dist/html_to_markdown_wasm.d.ts",
+			"default": "./dist/html_to_markdown_wasm.js"
+		},
+		"./dist-node": {
+			"import": "./dist-node/html_to_markdown_wasm.js",
+			"require": "./dist-node/html_to_markdown_wasm.js",
+			"types": "./dist-node/html_to_markdown_wasm.d.ts"
+		},
+		"./dist-node/*": "./dist-node/*",
+		"./dist-web": {
+			"import": "./dist-web/html_to_markdown_wasm.js",
+			"types": "./dist-web/html_to_markdown_wasm.d.ts"
+		},
+		"./dist-web/*": "./dist-web/*"
+	},
+	"repository": "https://github.com/Goldziher/html-to-markdown",
+	"homepage": "https://github.com/Goldziher/html-to-markdown",
+	"license": "MIT",
+	"author": "Na'aman Hirschfeld <nhirschfeld@gmail.com>",
+	"bugs": "https://github.com/Goldziher/html-to-markdown/issues",
+	"keywords": [
+		"html",
+		"markdown",
+		"converter",
+		"rust",
+		"wasm",
+		"webassembly"
+	],
+	"files": [
+		"dist",
+		"dist-node",
+		"dist-web",
+		"README.md"
+	],
+	"scripts": {
+		"build": "wasm-pack build --target bundler --out-dir dist && node ./scripts/patch-bundler-entry.js",
+		"build:nodejs": "wasm-pack build --target nodejs --out-dir dist-node && node ./scripts/patch-bundler-entry.js dist-node --types-only",
+		"build:web": "wasm-pack build --target web --out-dir dist-web && node ./scripts/patch-bundler-entry.js dist-web --types-only",
+		"build:all": "pnpm run build && pnpm run build:nodejs && pnpm run build:web && pnpm run cleanup:gitignore",
+		"cleanup:gitignore": "node ./scripts/cleanup-gitignore.js",
+		"test": "vitest run",
+		"test:watch": "vitest",
+		"test:wasm-pack": "wasm-pack test --headless --chrome",
+		"clean": "rm -rf dist dist-node dist-web node_modules pkg"
+	},
+	"devDependencies": {
+		"@types/node": "^24.10.1",
+		"tsx": "^4.21.0",
+		"vitest": "^4.0.15",
+		"wasm-pack": "^0.13.1"
+	},
+	"publishConfig": {
+		"registry": "https://registry.npmjs.org/",
+		"access": "public"
+	},
+	"dependencies": {
+		"up": "^1.0.2"
+	}
 }

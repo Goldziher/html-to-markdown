@@ -1,68 +1,68 @@
 {
-  "name": "html-to-markdown",
-  "version": "2.11.2",
-  "description": "High-performance HTML to Markdown converter for TypeScript/Node.js with a Rust core.",
-  "keywords": [
-    "html",
-    "markdown",
-    "converter",
-    "rust",
-    "cli",
-    "napi",
-    "typescript"
-  ],
-  "license": "MIT",
-  "author": {
-    "name": "Na'aman Hirschfeld",
-    "email": "nhirschfeld@gmail.com"
-  },
-  "homepage": "https://github.com/Goldziher/html-to-markdown",
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/Goldziher/html-to-markdown"
-  },
-  "bugs": {
-    "url": "https://github.com/Goldziher/html-to-markdown/issues"
-  },
-  "main": "dist/index.js",
-  "types": "dist/index.d.ts",
-  "exports": {
-    ".": {
-      "types": "./dist/index.d.ts",
-      "default": "./dist/index.js"
-    },
-    "./cli": {
-      "types": "./dist/cli.d.ts",
-      "default": "./dist/cli.js"
-    }
-  },
-  "bin": {
-    "html-to-markdown": "./dist/cli.js"
-  },
-  "scripts": {
-    "build": "pnpm --filter html-to-markdown-node run build && tsc --project tsconfig.json",
-    "clean": "rm -rf dist",
-    "lint": "biome check src",
-    "lint:fix": "biome check --write src",
-    "format:fix": "biome check --write src",
-    "format:check": "biome check src",
-    "test": "pnpm --filter html-to-markdown-node run build && vitest run",
-    "test:watch": "vitest"
-  },
-  "files": [
-    "dist",
-    "README.md"
-  ],
-  "dependencies": {
-    "html-to-markdown-node": "workspace:*"
-  },
-  "devDependencies": {
-    "@biomejs/biome": "^2.3.8",
-    "@types/node": "^24.10.1",
-    "typescript": "^5.9.3",
-    "vitest": "^4.0.15"
-  },
-  "engines": {
-    "node": ">=18"
-  }
+	"name": "html-to-markdown",
+	"version": "2.11.4",
+	"description": "High-performance HTML to Markdown converter for TypeScript/Node.js with a Rust core.",
+	"keywords": [
+		"html",
+		"markdown",
+		"converter",
+		"rust",
+		"cli",
+		"napi",
+		"typescript"
+	],
+	"license": "MIT",
+	"author": {
+		"name": "Na'aman Hirschfeld",
+		"email": "nhirschfeld@gmail.com"
+	},
+	"homepage": "https://github.com/Goldziher/html-to-markdown",
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/Goldziher/html-to-markdown"
+	},
+	"bugs": {
+		"url": "https://github.com/Goldziher/html-to-markdown/issues"
+	},
+	"main": "dist/index.js",
+	"types": "dist/index.d.ts",
+	"exports": {
+		".": {
+			"types": "./dist/index.d.ts",
+			"default": "./dist/index.js"
+		},
+		"./cli": {
+			"types": "./dist/cli.d.ts",
+			"default": "./dist/cli.js"
+		}
+	},
+	"bin": {
+		"html-to-markdown": "./dist/cli.js"
+	},
+	"scripts": {
+		"build": "pnpm --filter html-to-markdown-node run build && tsc --project tsconfig.json",
+		"clean": "rm -rf dist",
+		"lint": "biome check src",
+		"lint:fix": "biome check --write src",
+		"format:fix": "biome check --write src",
+		"format:check": "biome check src",
+		"test": "pnpm --filter html-to-markdown-node run build && vitest run",
+		"test:watch": "vitest"
+	},
+	"files": [
+		"dist",
+		"README.md"
+	],
+	"dependencies": {
+		"html-to-markdown-node": "workspace:*"
+	},
+	"devDependencies": {
+		"@biomejs/biome": "^2.3.8",
+		"@types/node": "^24.10.1",
+		"typescript": "^5.9.3",
+		"vitest": "^4.0.15"
+	},
+	"engines": {
+		"node": ">=18"
+	}
 }

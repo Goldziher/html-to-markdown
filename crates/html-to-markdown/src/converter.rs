@@ -135,6 +135,19 @@ fn trim_line_end_whitespace(output: &mut String) {
     *output = cleaned;
 }
 
+/// Truncate a string at a valid UTF-8 boundary.
+fn truncate_at_char_boundary(value: &mut String, max_len: usize) {
+    if value.len() <= max_len {
+        return;
+    }
+
+    let mut new_len = max_len.min(value.len());
+    while new_len > 0 && !value.is_char_boundary(new_len) {
+        new_len -= 1;
+    }
+    value.truncate(new_len);
+}
+
 /// Remove common leading whitespace from all lines in a code block.
 ///
 /// This is used for `<pre>` blocks to normalize indentation by removing
@@ -3084,7 +3097,7 @@ fn walk_node(
                         }
 
                         if label.len() > MAX_LINK_LABEL_LEN {
-                            label.truncate(MAX_LINK_LABEL_LEN);
+                            truncate_at_char_boundary(&mut label, MAX_LINK_LABEL_LEN);
                             label.push('…');
                         }
 
