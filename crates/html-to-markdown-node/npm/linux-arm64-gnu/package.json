@@ -1,6 +1,6 @@
 {
 	"name": "html-to-markdown-node-linux-arm64-gnu",
-	"version": "2.11.4",
+	"version": "2.12.0",
 	"cpu": [
 		"arm64"
 	],
