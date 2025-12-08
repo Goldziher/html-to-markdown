@@ -43,8 +43,8 @@
 	],
 	"scripts": {
 		"build": "wasm-pack build --target bundler --out-dir dist && node ./scripts/patch-bundler-entry.js",
-		"build:nodejs": "wasm-pack build --target nodejs --out-dir dist-node",
-		"build:web": "wasm-pack build --target web --out-dir dist-web",
+		"build:nodejs": "wasm-pack build --target nodejs --out-dir dist-node && node ./scripts/patch-bundler-entry.js dist-node --types-only",
+		"build:web": "wasm-pack build --target web --out-dir dist-web && node ./scripts/patch-bundler-entry.js dist-web --types-only",
 		"build:all": "pnpm run build && pnpm run build:nodejs && pnpm run build:web && pnpm run cleanup:gitignore",
 		"cleanup:gitignore": "node ./scripts/cleanup-gitignore.js",
 		"test": "vitest run",
