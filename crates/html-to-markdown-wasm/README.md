@@ -97,7 +97,10 @@ console.log(markdown);
 
 > **Heads up for edge runtimes:** Cloudflare Workers, Vite dev servers, and other environments that instantiate `.wasm` files asynchronously must call `await initWasm()` (or `await wasmReady`) once during startup before invoking `convert`. Traditional bundlers (Webpack, Rollup) and Deno/Node imports continue to work without manual initialization.
 
-Need a reference setup? Check out the Rollup example under [`examples/wasm-rollup`](https://github.com/Goldziher/html-to-markdown/blob/main/examples/wasm-rollup), which shows how to bundle the WASM artifact, await `wasmReady`, and render the Markdown output in a browser extension–style environment.
+**Working Examples:**
+- [**Browser with Rollup**](https://github.com/Goldziher/html-to-markdown/tree/main/examples/wasm-rollup) - Using dist-web target in browser
+- [**Node.js**](https://github.com/Goldziher/html-to-markdown/tree/main/examples/wasm-node) - Using dist-node target
+- [**Cloudflare Workers**](https://github.com/Goldziher/html-to-markdown/tree/main/examples/wasm-cloudflare) - Using bundler target with Wrangler
 
 ### Reusing Options Handles
 
@@ -237,6 +240,8 @@ export default {
   }
 };
 ```
+
+> See the full [Cloudflare Workers example](https://github.com/Goldziher/html-to-markdown/tree/main/examples/wasm-cloudflare) with Wrangler configuration.
 
 ## TypeScript
 
