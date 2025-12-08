@@ -3,6 +3,8 @@ packages:
   - crates/html-to-markdown-node
   - crates/html-to-markdown-wasm
   - examples/wasm-rollup
+  - examples/wasm-node
+  - examples/wasm-cloudflare
 
 ignoredBuiltDependencies:
   - esbuild

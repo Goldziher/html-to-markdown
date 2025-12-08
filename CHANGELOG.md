@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.12.0] - 2025-12-08
+
+### Added
+- WebAssembly bundler target now supports Cloudflare Workers, Wrangler, and modern bundlers that provide `WebAssembly.Module` instead of `WebAssembly.Instance`.
+- Three new WASM usage examples demonstrating different deployment targets:
+  - `examples/wasm-node`: Node.js example using dist-node target
+  - `examples/wasm-rollup`: Browser example using dist-web target with Rollup
+  - `examples/wasm-cloudflare`: Cloudflare Workers example using bundler target with Wrangler
+
+### Changed
+- WASM bundler entry point now detects and handles `WebAssembly.Module` instances, building the proper import namespace for wasm-bindgen glue functions.
+
 ## [2.11.4] - 2025-12-08
 
 ### Fixed

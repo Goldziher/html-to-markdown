@@ -112,7 +112,7 @@ if (!typesOnly) {
 
   const wrapper = `import * as wasmModule from "./html_to_markdown_wasm_bg.wasm";
 export * from "./html_to_markdown_wasm_bg.js";
-import { __wbg_set_wasm } from "./html_to_markdown_wasm_bg.js";
+import * as imports_mod from "./html_to_markdown_wasm_bg.js";
 
 const notReadyError = () =>
   new Error("html-to-markdown-wasm: WebAssembly bundle is still initializing. Await initWasm() before calling convert() in runtimes that load WASM asynchronously (e.g., Cloudflare Workers).");
@@ -130,7 +130,7 @@ let wasmExports;
 let initialized = false;
 let initPromise;
 
-__wbg_set_wasm(notReadyProxy);
+imports_mod.__wbg_set_wasm(notReadyProxy);
 
 function asExports(value) {
   if (!value) {
@@ -158,7 +158,7 @@ function asExports(value) {
 
 function finalize(exports) {
   wasmExports = exports;
-  __wbg_set_wasm(exports);
+  imports_mod.__wbg_set_wasm(exports);
   if (typeof exports.__wbindgen_start === "function") {
     exports.__wbindgen_start();
   }
@@ -179,16 +179,38 @@ function trySyncInit() {
 
 trySyncInit();
 
-function ensureInitPromise() {
+async function ensureInitPromise() {
   if (initialized) {
     return Promise.resolve(wasmExports);
   }
   if (!initPromise) {
     initPromise = (async () => {
       let module = wasmModule;
+
+      // Handle promise-wrapped modules
       if (module && typeof module.then === "function") {
         module = await module;
       }
+
+      // Handle function loaders (like @rollup/plugin-wasm)
+      if (module && typeof module.default === "function") {
+        module = await module.default(module);
+      }
+
+      // Handle WebAssembly.Module (Wrangler/esbuild)
+      if (module && module.default instanceof WebAssembly.Module) {
+        const imports = {};
+        imports["./html_to_markdown_wasm_bg.js"] = {};
+        for (const key in imports_mod) {
+          if ((key.startsWith('__wbg_') || key.startsWith('__wbindgen_')) && key !== '__wbg_set_wasm' && typeof imports_mod[key] === 'function') {
+            imports["./html_to_markdown_wasm_bg.js"][key] = imports_mod[key];
+          }
+        }
+        const instance = await WebAssembly.instantiate(module.default, imports);
+        return finalize(instance.exports);
+      }
+
+      // Try standard export detection
       const exports = asExports(module);
       if (!exports) {
         throw new Error("html-to-markdown-wasm: failed to initialize WebAssembly bundle. Call initWasm() with a supported bundler configuration.");

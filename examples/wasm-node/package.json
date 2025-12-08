@@ -1,0 +1,12 @@
+{
+  "name": "@html-to-markdown/wasm-node-example",
+  "version": "2.12.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node src/index.js"
+  },
+  "dependencies": {
+    "html-to-markdown-wasm": "workspace:*"
+  }
+}

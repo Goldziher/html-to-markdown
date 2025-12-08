@@ -1,7 +1,7 @@
-import { convert, initWasm, wasmReady, type WasmConversionOptions } from "html-to-markdown-wasm";
+import init, { convert, type WasmConversionOptions } from "html-to-markdown-wasm/dist-web";
 
 async function ensureWasmReady() {
-  await (wasmReady ?? initWasm());
+  await init();
 }
 
 async function main() {
