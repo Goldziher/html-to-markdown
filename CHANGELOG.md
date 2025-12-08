@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.11.4] - 2025-12-08
+
 ### Fixed
 - Node/WASM bundles now post-process their generated JS files to import the shared `WasmConversionOptions` typedef and emit typed doc comments (including typed inline-image `attributes`), so no `any` annotations leak into the published `dist`, `dist-node`, `dist-web`, or docs bundles.
 
