@@ -18,6 +18,7 @@ const typesOnly = flags.has('--types-only');
 const distDir = path.resolve(rootDir, distArg);
 const entryPath = path.join(distDir, 'html_to_markdown_wasm.js');
 const dtsPath = path.join(distDir, 'html_to_markdown_wasm.d.ts');
+const bgPath = path.join(distDir, 'html_to_markdown_wasm_bg.js');
 
 const typeDefinitions = `
 export type WasmHeadingStyle = "underlined" | "atx" | "atxClosed";
@@ -69,6 +70,39 @@ export interface WasmConversionOptions {
   preserveTags?: string[];
 }
 `;
+
+function injectTypedef(content, specifier) {
+  const typedefBlock = `\n/**\n * @typedef {import("${specifier}").WasmConversionOptions} WasmConversionOptions\n */\n`;
+  if (content.includes('WasmConversionOptions} WasmConversionOptions')) {
+    return content;
+  }
+  if (content.includes('let wasm;')) {
+    return content.replace('let wasm;', `let wasm;${typedefBlock}`);
+  }
+  return `${typedefBlock}${content}`;
+}
+
+function patchJsDoc(targetPath, typeSpecifier) {
+  if (!fs.existsSync(targetPath)) {
+    return;
+  }
+  let jsContent = fs.readFileSync(targetPath, 'utf8');
+  const originalContent = jsContent;
+
+  jsContent = injectTypedef(jsContent, typeSpecifier);
+
+  const optionsPattern = /@param\s+\{any\}\s+options/g;
+  const optionsReplacement = '@param {WasmConversionOptions | null | undefined} [options]';
+  jsContent = jsContent.replace(optionsPattern, optionsReplacement);
+
+  const returnsPattern = /@returns\s+\{any\}/g;
+  const returnsReplacement = '@returns {Record<string, string>}';
+  jsContent = jsContent.replace(returnsPattern, returnsReplacement);
+
+  if (jsContent !== originalContent) {
+    fs.writeFileSync(targetPath, jsContent, 'utf8');
+  }
+}
 
 if (!typesOnly) {
   if (!fs.existsSync(entryPath)) {
@@ -198,3 +232,7 @@ if (!content.includes('interface WasmConversionOptions')) {
 }
 
 fs.writeFileSync(dtsPath, content, 'utf8');
+
+const jsDocTarget = fs.existsSync(bgPath) ? bgPath : entryPath;
+const typeImportSpecifier = './html_to_markdown_wasm';
+patchJsDoc(jsDocTarget, typeImportSpecifier);

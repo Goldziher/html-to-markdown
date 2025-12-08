@@ -1,4 +1,8 @@
 let wasm;
+/**
+ * @typedef {import("../crates/html-to-markdown-wasm/dist/html_to_markdown_wasm.js").WasmConversionOptions} WasmConversionOptions
+ */
+
 
 let cachedUint8ArrayMemory0 = null;
 
@@ -259,7 +263,7 @@ export function init() {
  * console.log(markdown); // # Hello World
  * ```
  * @param {string} html
- * @param {any} options
+ * @param {WasmConversionOptions | null | undefined} [options]
  * @returns {string}
  */
 export function convert(html, options) {
@@ -318,7 +322,7 @@ function _assertClass(instance, klass) {
  * console.log(result.inlineImages.length);
  * ```
  * @param {string} html
- * @param {any} options
+ * @param {WasmConversionOptions | null | undefined} [options]
  * @param {WasmInlineImageConfig | null} [image_config]
  * @returns {WasmHtmlExtraction}
  */
@@ -556,7 +560,7 @@ export class WasmInlineImage {
     }
   }
   /**
-   * @returns {any}
+   * @returns {Record<string, string>}
    */
   get attributes() {
     const ret = wasm.wasminlineimage_attributes(this.__wbg_ptr);
