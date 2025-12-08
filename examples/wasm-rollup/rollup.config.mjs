@@ -5,7 +5,7 @@ import commonjs from "@rollup/plugin-commonjs";
 import json from "@rollup/plugin-json";
 import replace from "@rollup/plugin-replace";
 import typescript from "@rollup/plugin-typescript";
-import wasm from "@rollup/plugin-wasm";
+import copy from "rollup-plugin-copy";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -20,7 +20,14 @@ export default {
     resolve({ browser: true, preferBuiltins: false }),
     commonjs(),
     json(),
-    wasm(),
+    copy({
+      targets: [
+        {
+          src: path.join(__dirname, "../../crates/html-to-markdown-wasm/dist-web/html_to_markdown_wasm_bg.wasm"),
+          dest: path.join(__dirname, "dist"),
+        },
+      ],
+    }),
     typescript({ tsconfig: path.join(__dirname, "tsconfig.json"), sourceMap: true }),
     replace({
       preventAssignment: true,
