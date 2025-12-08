@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.11.3] - 2025-12-08
+### Fixed
+- Prevent link-label truncation from splitting multi-byte characters, which previously triggered a `PanicException` in the Python bindings when processing long anchors (resolves #139) and add a regression test to keep the truncation logic safe.
+
 ## [2.11.2] - 2025-12-07
 ### Added
 - Explicitly ship typing artefacts in every binding: npm packages export `.d.ts` files by default, Ruby gems now include `sig/**/*.rbs` even when building outside git, and the Python wheel bundles `_html_to_markdown.pyi` plus a `py.typed` marker for static type checkers.
