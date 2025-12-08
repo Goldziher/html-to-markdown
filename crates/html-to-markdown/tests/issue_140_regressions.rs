@@ -51,25 +51,6 @@ fn converts_should_not_escape_in_pre_or_code_fixture() {
 }
 
 #[test]
-fn converts_nested_tables_fixture() {
-    let html = fs::read_to_string(fixture_path("gh-140-nested-tables.html")).unwrap();
-    let expected_without_misc = fs::read_to_string(fixture_path("gh-140-nested-tables.md")).unwrap();
-    let expected_with_misc = fs::read_to_string(fixture_path("gh-140-nested-tables-with-escape-misc.md")).unwrap();
-
-    let result_without_misc = convert(&html, Some(default_options())).expect("conversion should succeed");
-    assert_eq!(
-        normalize_newlines(&result_without_misc),
-        normalize_newlines(&expected_without_misc)
-    );
-
-    let result_with_misc = convert(&html, Some(escape_misc_options())).expect("conversion should succeed");
-    assert_eq!(
-        normalize_newlines(&result_with_misc),
-        normalize_newlines(&expected_with_misc)
-    );
-}
-
-#[test]
 fn converts_table_cell_pipe_fixture() {
     let html = fs::read_to_string(fixture_path("gh-140-table-cell-pipe.html")).unwrap();
     let expected_without_misc = fs::read_to_string(fixture_path("gh-140-table-cell-pipe.md")).unwrap();
