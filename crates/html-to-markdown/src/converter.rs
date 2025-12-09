@@ -2621,13 +2621,32 @@ fn walk_node(
                 return;
             }
 
-            let processed_text = if ctx.in_code || ctx.in_table_cell || ctx.in_ruby {
-                if ctx.in_code || ctx.in_ruby {
-                    text
-                } else if options.whitespace_mode == crate::options::WhitespaceMode::Normalized {
-                    text::normalize_whitespace(&text)
+            let processed_text = if ctx.in_code || ctx.in_ruby {
+                text
+            } else if ctx.in_table_cell {
+                let escaped = if options.whitespace_mode == crate::options::WhitespaceMode::Normalized {
+                    let normalized_text = text::normalize_whitespace(&text);
+                    text::escape(
+                        &normalized_text,
+                        options.escape_misc,
+                        options.escape_asterisks,
+                        options.escape_underscores,
+                        options.escape_ascii,
+                    )
                 } else {
-                    text
+                    text::escape(
+                        &text,
+                        options.escape_misc,
+                        options.escape_asterisks,
+                        options.escape_underscores,
+                        options.escape_ascii,
+                    )
+                };
+                // Always escape pipes in table cells (unless escape_misc already did it)
+                if options.escape_misc {
+                    escaped
+                } else {
+                    escaped.replace('|', r"\|")
                 }
             } else if options.whitespace_mode == crate::options::WhitespaceMode::Strict {
                 text::escape(
