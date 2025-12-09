@@ -23,7 +23,16 @@ pub fn wrap_markdown(markdown: &str, options: &ConversionOptions) -> String {
     let mut paragraph_buffer = String::new();
 
     for line in markdown.lines() {
-        if line.starts_with("```") || line.starts_with("    ") {
+        let trimmed = line.trim_start();
+        let is_code_fence = trimmed.starts_with("```");
+        let is_indented_code = line.starts_with("    ")
+            && !is_list_like(trimmed)
+            && !is_numbered_list(trimmed)
+            && !is_heading(trimmed)
+            && !trimmed.starts_with('>')
+            && !trimmed.starts_with('|');
+
+        if is_code_fence || is_indented_code {
             if in_paragraph && !paragraph_buffer.is_empty() {
                 result.push_str(&wrap_line(&paragraph_buffer, options.wrap_width));
                 result.push_str("\n\n");
@@ -31,7 +40,7 @@ pub fn wrap_markdown(markdown: &str, options: &ConversionOptions) -> String {
                 in_paragraph = false;
             }
 
-            if line.starts_with("```") {
+            if is_code_fence {
                 in_code_block = !in_code_block;
             }
             result.push_str(line);
@@ -45,18 +54,12 @@ pub fn wrap_markdown(markdown: &str, options: &ConversionOptions) -> String {
             continue;
         }
 
-        let is_structural = line.starts_with('#')
-            || line.starts_with('*')
-            || line.starts_with('-')
-            || line.starts_with('+')
-            || line.starts_with('>')
-            || line.starts_with('|')
-            || line.starts_with('=')
-            || line
-                .trim()
-                .chars()
-                .next()
-                .is_some_and(|c| c.is_ascii_digit() && line.contains(". "));
+        let is_structural = is_heading(trimmed)
+            || is_list_like(trimmed)
+            || is_numbered_list(trimmed)
+            || trimmed.starts_with('>')
+            || trimmed.starts_with('|')
+            || trimmed.starts_with('=');
 
         if is_structural {
             if in_paragraph && !paragraph_buffer.is_empty() {
@@ -96,6 +99,24 @@ pub fn wrap_markdown(markdown: &str, options: &ConversionOptions) -> String {
     }
 
     result
+}
+
+fn is_list_like(trimmed: &str) -> bool {
+    matches!(trimmed.chars().next(), Some('-' | '*' | '+'))
+}
+
+fn is_numbered_list(trimmed: &str) -> bool {
+    let token = trimmed.split_whitespace().next().unwrap_or("");
+    if token.is_empty() || !(token.ends_with('.') || token.ends_with(')')) {
+        return false;
+    }
+
+    let digits = token.trim_end_matches(['.', ')']);
+    !digits.is_empty() && digits.chars().all(|c| c.is_ascii_digit())
+}
+
+fn is_heading(trimmed: &str) -> bool {
+    trimmed.starts_with('#')
 }
 
 /// Wrap a single line of text at the specified width.
@@ -210,5 +231,19 @@ mod tests {
         assert!(
             result.contains("# This is a very long heading that should not be wrapped even if it exceeds the width")
         );
+    }
+
+    #[test]
+    fn wrap_markdown_preserves_indented_lists_with_links() {
+        let markdown = "- [A](#a)\n  - [B](#b)\n  - [C](#c)\n";
+        let options = ConversionOptions {
+            wrap: true,
+            wrap_width: 20,
+            ..Default::default()
+        };
+
+        let result = wrap_markdown(markdown, &options);
+        let expected = "- [A](#a)\n  - [B](#b)\n  - [C](#c)\n";
+        assert_eq!(result, expected);
     }
 }
