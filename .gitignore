@@ -62,6 +62,7 @@ packages/php-ext/workspace/
 vendor/
 **/vendor/
 **/vendor/bundle/
+.wrangler/
 
 # IDEs
 .vscode/
