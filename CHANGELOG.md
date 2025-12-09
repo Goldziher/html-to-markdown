@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 - Updated dependency locks/manifests to align with the 2.12.1 release.
+- Downgraded Java Maven compiler/source plugins back to 3.x to keep CI builds compatible with Maven 3 runners.
 
 ## [2.12.0] - 2025-12-08
 
