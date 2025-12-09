@@ -68,3 +68,99 @@ fn converts_table_cell_pipe_fixture() {
         normalize_newlines(&expected_with_misc)
     );
 }
+
+#[test]
+fn escapes_only_literal_pipes_in_table_cells() {
+    let html = r#"
+        <table>
+            <thead><tr><th>Type</th><th>Span</th><th>Block</th></tr></thead>
+            <tbody>
+                <tr>
+                    <td>text | content</td>
+                    <td><code>code | span</code></td>
+                    <td><pre>block | content</pre></td>
+                </tr>
+            </tbody>
+        </table>
+    "#;
+
+    let markdown = convert(html, Some(default_options())).expect("conversion should succeed");
+    assert!(
+        markdown.contains("text \\| content"),
+        "literal pipe in text cell should be escaped"
+    );
+    assert!(
+        markdown.contains("`code | span`"),
+        "pipe inside code span should not be escaped"
+    );
+    assert!(
+        !markdown.contains("`code \\| span`"),
+        "code spans must not receive backslash escaping"
+    );
+    assert!(
+        markdown.contains("block | content"),
+        "pre/code blocks should retain literal pipe characters"
+    );
+    assert!(
+        !markdown.contains("block \\| content"),
+        "pre/code block content should not be escaped"
+    );
+
+    let markdown_with_misc = convert(html, Some(escape_misc_options())).expect("conversion should succeed");
+    assert!(
+        markdown_with_misc.contains("text \\| content"),
+        "literal pipe in text cell should be escaped when escape_misc=true"
+    );
+    assert!(
+        markdown_with_misc.contains("`code | span`"),
+        "code span pipe should remain unescaped when escape_misc=true"
+    );
+    assert!(
+        !markdown_with_misc.contains("`code \\| span`"),
+        "code spans must not be escaped when escape_misc=true"
+    );
+}
+
+#[test]
+fn nested_tables_do_not_double_escape_pipes() {
+    let html = r#"
+        <table>
+            <thead><tr><th>Outer A</th><th>Outer B</th></tr></thead>
+            <tbody>
+                <tr>
+                    <td>
+                        <table>
+                            <thead><tr><th>Inner A</th><th>Inner B</th></tr></thead>
+                            <tbody>
+                                <tr><td>Inner | pipe</td><td>B</td></tr>
+                            </tbody>
+                        </table>
+                    </td>
+                    <td>Outer | pipe</td>
+                </tr>
+            </tbody>
+        </table>
+    "#;
+
+    let markdown = convert(html, Some(default_options())).expect("conversion should succeed");
+    assert!(
+        markdown.contains("| Inner A | Inner B |"),
+        "nested table structure should be preserved"
+    );
+    assert!(
+        markdown.contains("Inner \\| pipe"),
+        "literal pipe text inside nested table should be escaped once"
+    );
+    assert!(
+        !markdown.contains("Inner \\\\| pipe"),
+        "nested table text should not be double-escaped"
+    );
+    assert!(
+        markdown.contains("Outer \\| pipe"),
+        "outer cell literal pipe should be escaped"
+    );
+    assert!(
+        !markdown.contains("Outer \\\\| pipe"),
+        "outer cell text should only be escaped once"
+    );
+}
