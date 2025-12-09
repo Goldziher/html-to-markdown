@@ -12,6 +12,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - Escape literal `|` characters inside table cells while leaving pipes inside `<code>` and `<pre>` untouched to avoid rendering backslashes in code spans/blocks (fixes #140).
 - Handle nested tables without double-escaping pipes and add regression coverage for table cells containing code spans/blocks and nested tables.
+- Preserve link-only list items when word wrapping is enabled so nested link lists are not merged or reflowed (fixes #143); added regression fixtures for the reported table-of-contents sample.
+
+### Changed
+- Updated dependency locks/manifests to align with the 2.12.1 release.
 
 ## [2.12.0] - 2025-12-08
 
