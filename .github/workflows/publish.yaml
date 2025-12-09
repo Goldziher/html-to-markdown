@@ -1380,6 +1380,12 @@ jobs:
         with:
           ref: ${{ needs.prepare.outputs.ref }}
 
+      - name: Verify Central credentials
+        shell: bash
+        run: |
+          : "${MAVEN_USERNAME:?Set MAVEN_USERNAME to your Sonatype Central token user (namecode)}"
+          : "${MAVEN_PASSWORD:?Set MAVEN_PASSWORD to your Sonatype Central token password}"
+
       - name: Install Maven 3.9.9
         shell: bash
         run: |
