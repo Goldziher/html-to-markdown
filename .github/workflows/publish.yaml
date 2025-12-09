@@ -129,6 +129,26 @@ jobs:
           VERSION: ${{ needs.prepare.outputs.version }}
         run: scripts/publish/check-rubygems-version.sh
 
+  check-hex:
+    name: Check Hex.pm for existing version
+    needs: prepare
+    if: ${{ needs.prepare.outputs.is_tag == 'true' }}
+    runs-on: ubuntu-latest
+    outputs:
+      exists: ${{ steps.check.outputs.exists }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.prepare.outputs.checkout_ref }}
+          fetch-depth: 0
+
+      - name: Check Hex version
+        id: check
+        env:
+          VERSION: ${{ needs.prepare.outputs.version }}
+        run: scripts/publish/elixir/check-hex-version.sh
+
   check-maven:
     name: Check Maven Central for existing version
     needs: prepare
@@ -190,6 +210,26 @@ jobs:
         env:
           VERSION: ${{ needs.prepare.outputs.version }}
         run: scripts/publish/check-cratesio-versions.sh
+
+  check-homebrew:
+    name: Check Homebrew tap for existing version
+    needs: prepare
+    if: ${{ needs.prepare.outputs.is_tag == 'true' }}
+    runs-on: ubuntu-latest
+    outputs:
+      exists: ${{ steps.check.outputs.exists }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.prepare.outputs.checkout_ref }}
+          fetch-depth: 0
+
+      - name: Check Homebrew formula version
+        id: check
+        env:
+          VERSION: ${{ needs.prepare.outputs.version }}
+        run: scripts/publish/homebrew/check-homebrew-version.sh
 
   python-wheels:
     name: Build Python wheels (${{ matrix.os }})
@@ -1244,8 +1284,8 @@ jobs:
 
   publish-hex:
     name: Publish Hex package
-    needs: [prepare, elixir-package, upload-release-artifacts]
-    if: ${{ needs.prepare.result == 'success' && needs.prepare.outputs.tag && needs.prepare.outputs.dry_run != 'true' && needs.prepare.outputs.is_tag == 'true' }}
+    needs: [prepare, elixir-package, upload-release-artifacts, check-hex]
+    if: ${{ needs.prepare.result == 'success' && needs.prepare.outputs.tag && needs.prepare.outputs.dry_run != 'true' && needs.prepare.outputs.is_tag == 'true' && needs.check-hex.outputs.exists != 'true' }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -1483,8 +1523,8 @@ jobs:
 
   publish-homebrew:
     name: Update Homebrew formula
-    needs: [prepare, upload-release-artifacts]
-    if: ${{ needs.prepare.result == 'success' && needs.prepare.outputs.tag && needs.prepare.outputs.dry_run != 'true' && needs.prepare.outputs.is_tag == 'true' }}
+    needs: [prepare, upload-release-artifacts, check-homebrew]
+    if: ${{ needs.prepare.result == 'success' && needs.prepare.outputs.tag && needs.prepare.outputs.dry_run != 'true' && needs.prepare.outputs.is_tag == 'true' && needs.check-homebrew.outputs.exists != 'true' }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
