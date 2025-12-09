@@ -840,11 +840,16 @@ jobs:
         uses: actions/checkout@v6
 
       - name: Install Maven 3.9.9
+        shell: bash
         run: |
+          set -euo pipefail
           MAVEN_VERSION=3.9.9
-          curl -sL "https://repo.maven.apache.org/maven2/org/apache/maven/apache-maven/${MAVEN_VERSION}/apache-maven-${MAVEN_VERSION}-bin.tar.gz" -o /tmp/maven.tar.gz
-          tar -xzf /tmp/maven.tar.gz -C /tmp
-          echo "/tmp/apache-maven-${MAVEN_VERSION}/bin" >> "$GITHUB_PATH"
+          MAVEN_DIR="${RUNNER_TEMP}/apache-maven-${MAVEN_VERSION}"
+          if [[ ! -d "${MAVEN_DIR}" ]]; then
+            curl -sL "https://repo.maven.apache.org/maven2/org/apache/maven/apache-maven/${MAVEN_VERSION}/apache-maven-${MAVEN_VERSION}-bin.tar.gz" -o "${RUNNER_TEMP}/maven.tar.gz"
+            tar -xzf "${RUNNER_TEMP}/maven.tar.gz" -C "${RUNNER_TEMP}"
+          fi
+          echo "${MAVEN_DIR}/bin" >> "${GITHUB_PATH}"
 
       - name: Setup Java
         uses: actions/setup-java@v5
@@ -1336,11 +1341,16 @@ jobs:
           ref: ${{ needs.prepare.outputs.ref }}
 
       - name: Install Maven 3.9.9
+        shell: bash
         run: |
+          set -euo pipefail
           MAVEN_VERSION=3.9.9
-          curl -sL "https://repo.maven.apache.org/maven2/org/apache/maven/apache-maven/${MAVEN_VERSION}/apache-maven-${MAVEN_VERSION}-bin.tar.gz" -o /tmp/maven.tar.gz
-          tar -xzf /tmp/maven.tar.gz -C /tmp
-          echo "/tmp/apache-maven-${MAVEN_VERSION}/bin" >> "$GITHUB_PATH"
+          MAVEN_DIR="${RUNNER_TEMP}/apache-maven-${MAVEN_VERSION}"
+          if [[ ! -d "${MAVEN_DIR}" ]]; then
+            curl -sL "https://repo.maven.apache.org/maven2/org/apache/maven/apache-maven/${MAVEN_VERSION}/apache-maven-${MAVEN_VERSION}-bin.tar.gz" -o "${RUNNER_TEMP}/maven.tar.gz"
+            tar -xzf "${RUNNER_TEMP}/maven.tar.gz" -C "${RUNNER_TEMP}"
+          fi
+          echo "${MAVEN_DIR}/bin" >> "${GITHUB_PATH}"
 
       - name: Patch legacy Maven GPG arguments
         run: scripts/publish/maven/patch-legacy-gpg-args.sh
