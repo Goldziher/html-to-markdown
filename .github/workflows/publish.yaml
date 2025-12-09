@@ -884,10 +884,16 @@ jobs:
         run: |
           set -euo pipefail
           MAVEN_VERSION=3.9.9
-          MAVEN_DIR="${RUNNER_TEMP}/apache-maven-${MAVEN_VERSION}"
+          # Normalize paths on Windows to avoid tar interpreting "D:" as a host
+          if [[ "${RUNNER_OS:-}" == "Windows" ]]; then
+            TMP_DIR="$(cygpath -u "${RUNNER_TEMP}")"
+          else
+            TMP_DIR="${RUNNER_TEMP}"
+          fi
+          MAVEN_DIR="${TMP_DIR}/apache-maven-${MAVEN_VERSION}"
           if [[ ! -d "${MAVEN_DIR}" ]]; then
-            curl -sL "https://repo.maven.apache.org/maven2/org/apache/maven/apache-maven/${MAVEN_VERSION}/apache-maven-${MAVEN_VERSION}-bin.tar.gz" -o "${RUNNER_TEMP}/maven.tar.gz"
-            tar -xzf "${RUNNER_TEMP}/maven.tar.gz" -C "${RUNNER_TEMP}"
+            curl -sL "https://repo.maven.apache.org/maven2/org/apache/maven/apache-maven/${MAVEN_VERSION}/apache-maven-${MAVEN_VERSION}-bin.tar.gz" -o "${TMP_DIR}/maven.tar.gz"
+            tar -xzf "${TMP_DIR}/maven.tar.gz" -C "${TMP_DIR}"
           fi
           echo "${MAVEN_DIR}/bin" >> "${GITHUB_PATH}"
 
@@ -1391,10 +1397,15 @@ jobs:
         run: |
           set -euo pipefail
           MAVEN_VERSION=3.9.9
-          MAVEN_DIR="${RUNNER_TEMP}/apache-maven-${MAVEN_VERSION}"
+          if [[ "${RUNNER_OS:-}" == "Windows" ]]; then
+            TMP_DIR="$(cygpath -u "${RUNNER_TEMP}")"
+          else
+            TMP_DIR="${RUNNER_TEMP}"
+          fi
+          MAVEN_DIR="${TMP_DIR}/apache-maven-${MAVEN_VERSION}"
           if [[ ! -d "${MAVEN_DIR}" ]]; then
-            curl -sL "https://repo.maven.apache.org/maven2/org/apache/maven/apache-maven/${MAVEN_VERSION}/apache-maven-${MAVEN_VERSION}-bin.tar.gz" -o "${RUNNER_TEMP}/maven.tar.gz"
-            tar -xzf "${RUNNER_TEMP}/maven.tar.gz" -C "${RUNNER_TEMP}"
+            curl -sL "https://repo.maven.apache.org/maven2/org/apache/maven/apache-maven/${MAVEN_VERSION}/apache-maven-${MAVEN_VERSION}-bin.tar.gz" -o "${TMP_DIR}/maven.tar.gz"
+            tar -xzf "${TMP_DIR}/maven.tar.gz" -C "${TMP_DIR}"
           fi
           echo "${MAVEN_DIR}/bin" >> "${GITHUB_PATH}"
 
