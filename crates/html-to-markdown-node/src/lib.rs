@@ -446,10 +446,15 @@ fn source_to_string(source: &InlineImageSource) -> String {
 #[cfg(feature = "metadata")]
 #[napi(object)]
 pub struct JsMetadataConfig {
+    #[napi(js_name = "extract_headers")]
     pub extract_headers: Option<bool>,
+    #[napi(js_name = "extract_links")]
     pub extract_links: Option<bool>,
+    #[napi(js_name = "extract_images")]
     pub extract_images: Option<bool>,
+    #[napi(js_name = "extract_structured_data")]
     pub extract_structured_data: Option<bool>,
+    #[napi(js_name = "max_structured_data_size")]
     pub max_structured_data_size: Option<i64>,
 }
 
@@ -474,12 +479,18 @@ pub struct JsDocumentMetadata {
     pub description: Option<String>,
     pub keywords: Vec<String>,
     pub author: Option<String>,
+    #[napi(js_name = "canonical_url")]
     pub canonical_url: Option<String>,
+    #[napi(js_name = "base_href")]
     pub base_href: Option<String>,
     pub language: Option<String>,
+    #[napi(js_name = "text_direction")]
     pub text_direction: Option<String>, // "ltr" | "rtl" | "auto"
+    #[napi(js_name = "open_graph")]
     pub open_graph: HashMap<String, String>,
+    #[napi(js_name = "twitter_card")]
     pub twitter_card: HashMap<String, String>,
+    #[napi(js_name = "meta_tags")]
     pub meta_tags: HashMap<String, String>,
 }
 
@@ -491,6 +502,7 @@ pub struct JsHeaderMetadata {
     pub text: String,
     pub id: Option<String>,
     pub depth: u32,
+    #[napi(js_name = "html_offset")]
     pub html_offset: u32,
 }
 
@@ -501,6 +513,7 @@ pub struct JsLinkMetadata {
     pub href: String,
     pub text: String,
     pub title: Option<String>,
+    #[napi(js_name = "link_type")]
     pub link_type: String, // "anchor" | "internal" | "external" | "email" | "phone" | "other"
     pub rel: Vec<String>,
     pub attributes: HashMap<String, String>,
@@ -514,7 +527,8 @@ pub struct JsImageMetadata {
     pub alt: Option<String>,
     pub title: Option<String>,
     pub dimensions: Option<Vec<u32>>, // [width, height]
-    pub image_type: String,           // "data_uri" | "inline_svg" | "external" | "relative"
+    #[napi(js_name = "image_type")]
+    pub image_type: String, // "data_uri" | "inline_svg" | "external" | "relative"
     pub attributes: HashMap<String, String>,
 }
 
@@ -522,8 +536,11 @@ pub struct JsImageMetadata {
 #[cfg(feature = "metadata")]
 #[napi(object)]
 pub struct JsStructuredData {
+    #[napi(js_name = "data_type")]
     pub data_type: String, // "json_ld" | "microdata" | "rdfa"
+    #[napi(js_name = "raw_json")]
     pub raw_json: String,
+    #[napi(js_name = "schema_type")]
     pub schema_type: Option<String>,
 }
 
@@ -570,18 +587,86 @@ fn structured_data_type_to_string(data_type: &RustStructuredDataType) -> String 
 
 #[cfg(feature = "metadata")]
 fn convert_document_metadata(doc: RustDocumentMetadata) -> JsDocumentMetadata {
+    // Normalize head metadata keys that come from the Rust collector which preserves
+    // the `meta-*` prefix for head elements. Downstream consumers expect canonical
+    // names without the prefix and with OpenGraph/Twitter keys normalized.
+    let mut title = None;
+    let mut description = None;
+    let mut author = None;
+    let mut canonical_url = None;
+    let mut base_href = None;
+    let mut keywords = Vec::new();
+    let mut open_graph = HashMap::new();
+    let mut twitter_card = HashMap::new();
+    let mut meta_tags = HashMap::new();
+
+    for (raw_key, value) in doc.meta_tags.iter() {
+        let mut key = raw_key.to_lowercase();
+        let value = value.clone();
+
+        if let Some(stripped) = key.strip_prefix("meta-") {
+            key = stripped.to_string();
+        }
+
+        if key.contains(':') {
+            key = key.replace(':', "-");
+        }
+
+        match key.as_str() {
+            "title" => title = Some(value.clone()),
+            "description" => description = Some(value.clone()),
+            "author" => author = Some(value.clone()),
+            "canonical" => canonical_url = Some(value.clone()),
+            "base" | "base-href" => base_href = Some(value.clone()),
+            "keywords" => {
+                keywords = value
+                    .split(',')
+                    .map(|s| s.trim().to_string())
+                    .filter(|s| !s.is_empty())
+                    .collect();
+            }
+            k if k.starts_with("og-") => {
+                let og_key = k.trim_start_matches("og-").replace('-', "_");
+                open_graph.insert(og_key, value.clone());
+            }
+            k if k.starts_with("twitter-") => {
+                let tw_key = k.trim_start_matches("twitter-").replace('-', "_");
+                twitter_card.insert(tw_key, value.clone());
+            }
+            _ => {
+                meta_tags.insert(key, value.clone());
+            }
+        }
+    }
+
     JsDocumentMetadata {
-        title: doc.title,
-        description: doc.description,
-        keywords: doc.keywords,
-        author: doc.author,
-        canonical_url: doc.canonical_url,
-        base_href: doc.base_href,
+        title: doc.title.or(title),
+        description: doc.description.or(description),
+        keywords: if doc.keywords.is_empty() {
+            keywords
+        } else {
+            doc.keywords
+        },
+        author: doc.author.or(author),
+        canonical_url: doc.canonical_url.or(canonical_url),
+        base_href: doc.base_href.or(base_href),
         language: doc.language,
         text_direction: text_direction_to_string(doc.text_direction),
-        open_graph: doc.open_graph.into_iter().collect(),
-        twitter_card: doc.twitter_card.into_iter().collect(),
-        meta_tags: doc.meta_tags.into_iter().collect(),
+        open_graph: if doc.open_graph.is_empty() {
+            open_graph
+        } else {
+            doc.open_graph.into_iter().collect()
+        },
+        twitter_card: if doc.twitter_card.is_empty() {
+            twitter_card
+        } else {
+            doc.twitter_card.into_iter().collect()
+        },
+        meta_tags: if doc.meta_tags.is_empty() {
+            meta_tags
+        } else {
+            doc.meta_tags.into_iter().collect()
+        },
     }
 }
 
