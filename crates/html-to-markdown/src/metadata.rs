@@ -667,7 +667,15 @@ impl MetadataCollector {
     /// * `text` - Link text content
     /// * `title` - Optional title attribute
     /// * `rel` - Comma/space-separated rel attribute value
-    pub(crate) fn add_link(&mut self, href: String, text: String, title: Option<String>, rel: Option<String>) {
+    /// * `attributes` - Additional attributes to capture (e.g., data-* or aria-* values)
+    pub(crate) fn add_link(
+        &mut self,
+        href: String,
+        text: String,
+        title: Option<String>,
+        rel: Option<String>,
+        attributes: BTreeMap<String, String>,
+    ) {
         if !self.config.extract_links {
             return;
         }
@@ -684,7 +692,7 @@ impl MetadataCollector {
             title,
             link_type,
             rel: rel_vec,
-            attributes: BTreeMap::new(),
+            attributes,
         };
 
         self.links.push(link);
@@ -704,6 +712,7 @@ impl MetadataCollector {
         alt: Option<String>,
         title: Option<String>,
         dimensions: Option<(u32, u32)>,
+        attributes: BTreeMap<String, String>,
     ) {
         if !self.config.extract_images {
             return;
@@ -725,7 +734,7 @@ impl MetadataCollector {
             title,
             dimensions,
             image_type,
-            attributes: BTreeMap::new(),
+            attributes,
         };
 
         self.images.push(image);
@@ -1054,6 +1063,7 @@ mod tests {
             "Example".to_string(),
             Some("Visit".to_string()),
             Some("nofollow external".to_string()),
+            BTreeMap::from([("data-id".to_string(), "example".to_string())]),
         );
 
         assert_eq!(collector.links.len(), 1);
@@ -1063,6 +1073,7 @@ mod tests {
         assert_eq!(link.text, "Example");
         assert_eq!(link.link_type, LinkType::External);
         assert_eq!(link.rel, vec!["nofollow", "external"]);
+        assert_eq!(link.attributes.get("data-id"), Some(&"example".to_string()));
     }
 
     #[test]
@@ -1077,8 +1088,20 @@ mod tests {
         let mut collector = MetadataCollector::new(config);
 
         collector.add_header(1, "Title".to_string(), None, 0, 100);
-        collector.add_link("https://example.com".to_string(), "Link".to_string(), None, None);
-        collector.add_image("https://example.com/img.jpg".to_string(), None, None, None);
+        collector.add_link(
+            "https://example.com".to_string(),
+            "Link".to_string(),
+            None,
+            None,
+            BTreeMap::new(),
+        );
+        collector.add_image(
+            "https://example.com/img.jpg".to_string(),
+            None,
+            None,
+            None,
+            BTreeMap::new(),
+        );
         collector.add_json_ld("{}".to_string());
 
         assert!(collector.headers.is_empty());
@@ -1094,7 +1117,13 @@ mod tests {
 
         collector.set_language("en".to_string());
         collector.add_header(1, "Main Title".to_string(), None, 0, 100);
-        collector.add_link("https://example.com".to_string(), "Example".to_string(), None, None);
+        collector.add_link(
+            "https://example.com".to_string(),
+            "Example".to_string(),
+            None,
+            None,
+            BTreeMap::new(),
+        );
 
         let metadata = collector.finish();
 
@@ -1171,9 +1200,21 @@ mod tests {
         let config = MetadataConfig::default();
         let mut collector = MetadataCollector::new(config);
 
-        collector.add_link("#anchor".to_string(), "Anchor".to_string(), None, None);
-        collector.add_link("https://example.com".to_string(), "External".to_string(), None, None);
-        collector.add_link("mailto:test@example.com".to_string(), "Email".to_string(), None, None);
+        collector.add_link("#anchor".to_string(), "Anchor".to_string(), None, None, BTreeMap::new());
+        collector.add_link(
+            "https://example.com".to_string(),
+            "External".to_string(),
+            None,
+            None,
+            BTreeMap::new(),
+        );
+        collector.add_link(
+            "mailto:test@example.com".to_string(),
+            "Email".to_string(),
+            None,
+            None,
+            BTreeMap::new(),
+        );
 
         let categorized = collector.categorize_links();
 

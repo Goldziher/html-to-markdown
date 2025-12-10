@@ -85,9 +85,9 @@ RSpec.describe HtmlToMarkdown do
         markdown, metadata = described_class.convert_with_metadata(html)
 
         expect(metadata[:document][:open_graph]).to include(
-          'og:title' => 'OG Title',
-          'og:description' => 'OG Description',
-          'og:image' => 'https://example.com/image.jpg'
+          'title' => 'OG Title',
+          'description' => 'OG Description',
+          'image' => 'https://example.com/image.jpg'
         )
       end
 
@@ -104,8 +104,8 @@ RSpec.describe HtmlToMarkdown do
         markdown, metadata = described_class.convert_with_metadata(html)
 
         expect(metadata[:document][:twitter_card]).to include(
-          'twitter:card' => 'summary_large_image',
-          'twitter:title' => 'Twitter Title'
+          'card' => 'summary_large_image',
+          'title' => 'Twitter Title'
         )
       end
 
@@ -135,7 +135,7 @@ RSpec.describe HtmlToMarkdown do
         '''
         markdown, metadata = described_class.convert_with_metadata(html)
 
-        expect(metadata[:headers]).to have_length(3)
+        expect(metadata[:headers].length).to eq(3)
         expect(metadata[:headers][0][:level]).to eq(1)
         expect(metadata[:headers][0][:text]).to eq('Main Title')
         expect(metadata[:headers][1][:level]).to eq(2)
@@ -178,7 +178,7 @@ RSpec.describe HtmlToMarkdown do
         markdown, metadata = described_class.convert_with_metadata(html)
 
         links = metadata[:links]
-        expect(links).to have_length(5)
+        expect(links.length).to eq(5)
 
         expect(links[0][:link_type]).to eq('anchor')
         expect(links[1][:link_type]).to eq('external')
@@ -235,7 +235,7 @@ RSpec.describe HtmlToMarkdown do
         markdown, metadata = described_class.convert_with_metadata(html)
 
         images = metadata[:images]
-        expect(images).to have_length(3)
+        expect(images.length).to eq(3)
 
         expect(images[0][:image_type]).to eq('external')
         expect(images[1][:image_type]).to eq('relative')
@@ -257,7 +257,7 @@ RSpec.describe HtmlToMarkdown do
 
         image = metadata[:images][0]
         expect(image[:dimensions]).to be_an(Array)
-        expect(image[:dimensions]).to have_length(2)
+        expect(image[:dimensions].length).to eq(2)
       end
 
       it 'handles missing image attributes' do
@@ -313,7 +313,7 @@ RSpec.describe HtmlToMarkdown do
         markdown, metadata = described_class.convert_with_metadata(html, conv_opts, meta_opts)
 
         expect(markdown).to include('# Heading #')
-        expect(metadata[:headers]).to have_length(1)
+        expect(metadata[:headers].length).to eq(1)
       end
 
       it 'works with nil options' do

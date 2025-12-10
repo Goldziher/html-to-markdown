@@ -3201,9 +3201,23 @@ fn walk_node(
                                 .get("rel")
                                 .flatten()
                                 .map(|v| v.as_utf8_str().to_string());
-                            collector
-                                .borrow_mut()
-                                .add_link(href.clone(), label.clone(), title.clone(), rel_attr);
+                            let mut attributes_map = BTreeMap::new();
+                            for (key, value_opt) in tag.attributes().iter() {
+                                let key_str = key.to_string();
+                                if key_str == "href" {
+                                    continue;
+                                }
+
+                                let value = value_opt.map(|v| v.to_string()).unwrap_or_default();
+                                attributes_map.insert(key_str, value);
+                            }
+                            collector.borrow_mut().add_link(
+                                href.clone(),
+                                label.clone(),
+                                title.clone(),
+                                rel_attr,
+                                attributes_map,
+                            );
                         }
                     } else {
                         let children = tag.children();
@@ -3233,6 +3247,30 @@ fn walk_node(
                         .unwrap_or(Cow::Borrowed(""));
 
                     let title = tag.attributes().get("title").flatten().map(|v| v.as_utf8_str());
+                    #[cfg(feature = "metadata")]
+                    let mut attributes_map = BTreeMap::new();
+                    #[cfg(feature = "metadata")]
+                    let mut width: Option<u32> = None;
+                    #[cfg(feature = "metadata")]
+                    let mut height: Option<u32> = None;
+                    #[cfg(feature = "metadata")]
+                    for (key, value_opt) in tag.attributes().iter() {
+                        let key_str = key.to_string();
+                        if key_str == "src" {
+                            continue;
+                        }
+                        let value = value_opt.map(|v| v.to_string()).unwrap_or_default();
+                        if key_str == "width" {
+                            if let Ok(parsed) = value.parse::<u32>() {
+                                width = Some(parsed);
+                            }
+                        } else if key_str == "height" {
+                            if let Ok(parsed) = value.parse::<u32>() {
+                                height = Some(parsed);
+                            }
+                        }
+                        attributes_map.insert(key_str, value);
+                    }
 
                     #[cfg(feature = "inline-images")]
                     if let Some(ref collector_ref) = ctx.inline_collector {
@@ -3291,11 +3329,16 @@ fn walk_node(
                     #[cfg(feature = "metadata")]
                     if let Some(ref collector) = ctx.metadata_collector {
                         if !src.is_empty() {
+                            let dimensions = match (width, height) {
+                                (Some(w), Some(h)) => Some((w, h)),
+                                _ => None,
+                            };
                             collector.borrow_mut().add_image(
                                 src.to_string(),
                                 if alt.is_empty() { None } else { Some(alt.to_string()) },
                                 title.as_deref().map(|t| t.to_string()),
-                                None,
+                                dimensions,
+                                attributes_map.clone(),
                             );
                         }
                     }
