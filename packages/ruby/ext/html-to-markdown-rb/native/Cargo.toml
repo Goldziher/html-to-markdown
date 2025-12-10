@@ -18,7 +18,8 @@ name = "html_to_markdown_rb"
 crate-type = ["cdylib", "rlib"]
 
 [features]
-default = []
+default = ["metadata"]
+metadata = ["html-to-markdown-rs/metadata"]
 
 [dependencies]
 html-to-markdown-rs = { version = "2.12.1", features = ["inline-images"] }

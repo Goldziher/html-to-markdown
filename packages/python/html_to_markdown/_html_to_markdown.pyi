@@ -114,11 +114,81 @@ class InlineImageWarning(TypedDict):
     index: int
     message: str
 
+class MetadataConfig:
+    extract_headers: bool
+    extract_links: bool
+    extract_images: bool
+    extract_structured_data: bool
+    max_structured_data_size: int
+
+    def __init__(
+        self,
+        *,
+        extract_headers: bool = True,
+        extract_links: bool = True,
+        extract_images: bool = True,
+        extract_structured_data: bool = True,
+        max_structured_data_size: int = 100_000,
+    ) -> None: ...
+
+class DocumentMetadata(TypedDict):
+    title: str | None
+    description: str | None
+    keywords: list[str]
+    author: str | None
+    canonical_url: str | None
+    base_href: str | None
+    language: str | None
+    text_direction: str | None  # "ltr" | "rtl" | "auto" | None
+    open_graph: dict[str, str]
+    twitter_card: dict[str, str]
+    meta_tags: dict[str, str]
+
+class HeaderMetadata(TypedDict):
+    level: int  # 1-6
+    text: str
+    id: str | None
+    depth: int
+    html_offset: int
+
+class LinkMetadata(TypedDict):
+    href: str
+    text: str
+    title: str | None
+    link_type: str  # "anchor" | "internal" | "external" | "email" | "phone" | "other"
+    rel: list[str]
+    attributes: dict[str, str]
+
+class ImageMetadata(TypedDict):
+    src: str
+    alt: str | None
+    title: str | None
+    dimensions: tuple[int, int] | None  # (width, height)
+    image_type: str  # "data_uri" | "inline_svg" | "external" | "relative"
+    attributes: dict[str, str]
+
+class StructuredData(TypedDict):
+    data_type: str  # "json_ld" | "microdata" | "rdfa"
+    raw_json: str
+    schema_type: str | None
+
+class ExtendedMetadata(TypedDict):
+    document: DocumentMetadata
+    headers: list[HeaderMetadata]
+    links: list[LinkMetadata]
+    images: list[ImageMetadata]
+    structured_data: list[StructuredData]
+
 def convert(html: str, options: ConversionOptions | None = None) -> str: ...
 def convert_with_inline_images(
     html: str,
     options: ConversionOptions | None = None,
     image_config: InlineImageConfig | None = None,
 ) -> tuple[str, list[InlineImage], list[InlineImageWarning]]: ...
+def convert_with_metadata(
+    html: str,
+    options: ConversionOptions | None = None,
+    metadata_config: MetadataConfig | None = None,
+) -> tuple[str, ExtendedMetadata]: ...
 def create_options_handle(options: ConversionOptions | None = None) -> ConversionOptionsHandle: ...
 def convert_with_options_handle(html: str, handle: ConversionOptionsHandle) -> str: ...

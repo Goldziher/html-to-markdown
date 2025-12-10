@@ -14,6 +14,11 @@ use html_to_markdown_rs::{
     InlineImageConfig, InlineImageFormat, InlineImageSource, InlineImageWarning, ListIndentType, NewlineStyle,
     PreprocessingOptions, PreprocessingPreset, WhitespaceMode,
 };
+#[cfg(feature = "metadata")]
+use html_to_markdown_rs::metadata::{
+    DocumentMetadata, ExtendedMetadata, HeaderMetadata, ImageMetadata, ImageType, LinkMetadata, LinkType,
+    MetadataConfig, StructuredData, StructuredDataType, TextDirection,
+};
 
 const DEFAULT_INLINE_IMAGE_LIMIT: u64 = 5 * 1024 * 1024;
 
@@ -60,13 +65,50 @@ pub fn convert_html_with_inline_images(
     build_html_extraction(extraction)
 }
 
+#[cfg(feature = "metadata")]
+#[php_function]
+#[php(name = "html_to_markdown_convert_with_metadata")]
+pub fn convert_html_with_metadata(
+    html: String,
+    options: Option<&ZendHashTable>,
+    metadata_config: Option<&ZendHashTable>,
+) -> PhpResult<ZBox<ZendHashTable>> {
+    let rust_options = match options {
+        Some(table) => Some(parse_conversion_options(table)?),
+        None => None,
+    };
+
+    let config = match metadata_config {
+        Some(table) => parse_metadata_config(table)?,
+        None => MetadataConfig::default(),
+    };
+
+    let result = guard_panic(|| html_to_markdown_rs::convert_with_metadata(&html, rust_options, config))
+        .map_err(to_php_exception)?;
+
+    build_metadata_extraction(result.0, result.1)
+}
+
 #[php_module]
 pub fn module(module: ModuleBuilder) -> ModuleBuilder {
-    module
-        .name("html_to_markdown")
-        .version(env!("CARGO_PKG_VERSION"))
-        .function(wrap_function!(convert_html))
-        .function(wrap_function!(convert_html_with_inline_images))
+    #[cfg(not(feature = "metadata"))]
+    {
+        module
+            .name("html_to_markdown")
+            .version(env!("CARGO_PKG_VERSION"))
+            .function(wrap_function!(convert_html))
+            .function(wrap_function!(convert_html_with_inline_images))
+    }
+
+    #[cfg(feature = "metadata")]
+    {
+        module
+            .name("html_to_markdown")
+            .version(env!("CARGO_PKG_VERSION"))
+            .function(wrap_function!(convert_html))
+            .function(wrap_function!(convert_html_with_inline_images))
+            .function(wrap_function!(convert_html_with_metadata))
+    }
 }
 
 fn parse_conversion_options(table: &ZendHashTable) -> PhpResult<ConversionOptions> {
@@ -208,6 +250,40 @@ fn parse_inline_image_config(table: &ZendHashTable) -> PhpResult<InlineImageConf
             }
             "infer_dimensions" => {
                 config.infer_dimensions = read_bool(value, &key_str)?;
+            }
+            _ => {}
+        }
+    }
+
+    Ok(config)
+}
+
+#[cfg(feature = "metadata")]
+fn parse_metadata_config(table: &ZendHashTable) -> PhpResult<MetadataConfig> {
+    let mut config = MetadataConfig::default();
+
+    for (key, value) in table {
+        let key_str = key_to_string(&key)?;
+
+        if value.is_null() {
+            continue;
+        }
+
+        match key_str.as_str() {
+            "extract_headers" => {
+                config.extract_headers = read_bool(value, &key_str)?;
+            }
+            "extract_links" => {
+                config.extract_links = read_bool(value, &key_str)?;
+            }
+            "extract_images" => {
+                config.extract_images = read_bool(value, &key_str)?;
+            }
+            "extract_structured_data" => {
+                config.extract_structured_data = read_bool(value, &key_str)?;
+            }
+            "max_structured_data_size" => {
+                config.max_structured_data_size = read_usize(value, &key_str)?;
             }
             _ => {}
         }
@@ -474,4 +550,226 @@ fn key_to_string(key: &ArrayKey<'_>) -> PhpResult<String> {
 
 fn table_capacity(len: usize) -> u32 {
     len.min(u32::MAX as usize) as u32
+}
+
+#[cfg(feature = "metadata")]
+fn build_metadata_extraction(
+    markdown: String,
+    metadata: ExtendedMetadata,
+) -> PhpResult<ZBox<ZendHashTable>> {
+    let mut result = ZendHashTable::new();
+    result.insert("markdown", markdown)?;
+    result.insert("metadata", build_extended_metadata(metadata)?)?;
+    Ok(result)
+}
+
+#[cfg(feature = "metadata")]
+fn build_extended_metadata(metadata: ExtendedMetadata) -> PhpResult<ZBox<ZendHashTable>> {
+    let mut table = ZendHashTable::new();
+    table.insert("document", build_document_metadata(metadata.document)?)?;
+    table.insert("headers", build_headers_array(metadata.headers)?)?;
+    table.insert("links", build_links_array(metadata.links)?)?;
+    table.insert("images", build_images_array(metadata.images)?)?;
+    table.insert("structured_data", build_structured_data_array(metadata.structured_data)?)?;
+    Ok(table)
+}
+
+#[cfg(feature = "metadata")]
+fn build_document_metadata(doc: DocumentMetadata) -> PhpResult<ZBox<ZendHashTable>> {
+    let mut table = ZendHashTable::new();
+
+    match doc.title {
+        Some(title) => table.insert("title", title)?,
+        None => table.insert("title", ())?,
+    }
+
+    match doc.description {
+        Some(description) => table.insert("description", description)?,
+        None => table.insert("description", ())?,
+    }
+
+    table.insert("keywords", doc.keywords)?;
+
+    match doc.author {
+        Some(author) => table.insert("author", author)?,
+        None => table.insert("author", ())?,
+    }
+
+    match doc.canonical_url {
+        Some(url) => table.insert("canonical_url", url)?,
+        None => table.insert("canonical_url", ())?,
+    }
+
+    match doc.base_href {
+        Some(href) => table.insert("base_href", href)?,
+        None => table.insert("base_href", ())?,
+    }
+
+    match doc.language {
+        Some(lang) => table.insert("language", lang)?,
+        None => table.insert("language", ())?,
+    }
+
+    table.insert("text_direction", text_direction_to_string(doc.text_direction))?;
+    table.insert("open_graph", build_string_map(doc.open_graph)?)?;
+    table.insert("twitter_card", build_string_map(doc.twitter_card)?)?;
+    table.insert("meta_tags", build_string_map(doc.meta_tags)?)?;
+
+    Ok(table)
+}
+
+#[cfg(feature = "metadata")]
+fn build_headers_array(headers: Vec<HeaderMetadata>) -> PhpResult<ZBox<ZendHashTable>> {
+    let mut array = ZendHashTable::with_capacity(table_capacity(headers.len()));
+
+    for header in headers {
+        let mut entry = ZendHashTable::new();
+        entry.insert("level", header.level as i64)?;
+        entry.insert("text", header.text)?;
+
+        match header.id {
+            Some(id) => entry.insert("id", id)?,
+            None => entry.insert("id", ())?,
+        }
+
+        entry.insert("depth", header.depth as i64)?;
+        entry.insert("html_offset", header.html_offset as i64)?;
+
+        array.push(entry)?;
+    }
+
+    Ok(array)
+}
+
+#[cfg(feature = "metadata")]
+fn build_links_array(links: Vec<LinkMetadata>) -> PhpResult<ZBox<ZendHashTable>> {
+    let mut array = ZendHashTable::with_capacity(table_capacity(links.len()));
+
+    for link in links {
+        let mut entry = ZendHashTable::new();
+        entry.insert("href", link.href)?;
+        entry.insert("text", link.text)?;
+
+        match link.title {
+            Some(title) => entry.insert("title", title)?,
+            None => entry.insert("title", ())?,
+        }
+
+        entry.insert("link_type", link_type_to_string(&link.link_type))?;
+        entry.insert("rel", link.rel)?;
+        entry.insert("attributes", build_string_map(link.attributes)?)?;
+
+        array.push(entry)?;
+    }
+
+    Ok(array)
+}
+
+#[cfg(feature = "metadata")]
+fn build_images_array(images: Vec<ImageMetadata>) -> PhpResult<ZBox<ZendHashTable>> {
+    let mut array = ZendHashTable::with_capacity(table_capacity(images.len()));
+
+    for image in images {
+        let mut entry = ZendHashTable::new();
+        entry.insert("src", image.src)?;
+
+        match image.alt {
+            Some(alt) => entry.insert("alt", alt)?,
+            None => entry.insert("alt", ())?,
+        }
+
+        match image.title {
+            Some(title) => entry.insert("title", title)?,
+            None => entry.insert("title", ())?,
+        }
+
+        match image.dimensions {
+            Some((width, height)) => {
+                let mut dims = ZendHashTable::with_capacity(2);
+                dims.push(width as i64)?;
+                dims.push(height as i64)?;
+                entry.insert("dimensions", dims)?;
+            }
+            None => entry.insert("dimensions", ())?,
+        }
+
+        entry.insert("image_type", image_type_to_string(&image.image_type))?;
+        entry.insert("attributes", build_string_map(image.attributes)?)?;
+
+        array.push(entry)?;
+    }
+
+    Ok(array)
+}
+
+#[cfg(feature = "metadata")]
+fn build_structured_data_array(data: Vec<StructuredData>) -> PhpResult<ZBox<ZendHashTable>> {
+    let mut array = ZendHashTable::with_capacity(table_capacity(data.len()));
+
+    for item in data {
+        let mut entry = ZendHashTable::new();
+        entry.insert("data_type", structured_data_type_to_string(&item.data_type))?;
+        entry.insert("raw_json", item.raw_json)?;
+
+        match item.schema_type {
+            Some(schema_type) => entry.insert("schema_type", schema_type)?,
+            None => entry.insert("schema_type", ())?,
+        }
+
+        array.push(entry)?;
+    }
+
+    Ok(array)
+}
+
+#[cfg(feature = "metadata")]
+fn build_string_map(map: BTreeMap<String, String>) -> PhpResult<ZBox<ZendHashTable>> {
+    let mut table = ZendHashTable::with_capacity(table_capacity(map.len()));
+
+    for (key, value) in map {
+        table.insert(key, value)?;
+    }
+
+    Ok(table)
+}
+
+#[cfg(feature = "metadata")]
+fn text_direction_to_string(direction: Option<TextDirection>) -> String {
+    match direction {
+        Some(TextDirection::LeftToRight) => "ltr".to_string(),
+        Some(TextDirection::RightToLeft) => "rtl".to_string(),
+        Some(TextDirection::Auto) => "auto".to_string(),
+        None => "".to_string(),
+    }
+}
+
+#[cfg(feature = "metadata")]
+fn link_type_to_string(link_type: &LinkType) -> &'static str {
+    match link_type {
+        LinkType::Anchor => "anchor",
+        LinkType::Internal => "internal",
+        LinkType::External => "external",
+        LinkType::Email => "email",
+        LinkType::Phone => "phone",
+        LinkType::Other => "other",
+    }
+}
+
+#[cfg(feature = "metadata")]
+fn image_type_to_string(image_type: &ImageType) -> &'static str {
+    match image_type {
+        ImageType::DataUri => "data_uri",
+        ImageType::InlineSvg => "inline_svg",
+        ImageType::External => "external",
+        ImageType::Relative => "relative",
+    }
+}
+
+#[cfg(feature = "metadata")]
+fn structured_data_type_to_string(data_type: &StructuredDataType) -> &'static str {
+    match data_type {
+        StructuredDataType::JsonLd => "json_ld",
+        StructuredDataType::Microdata => "microdata",
+        StructuredDataType::RDFa => "rdfa",
+    }
 }

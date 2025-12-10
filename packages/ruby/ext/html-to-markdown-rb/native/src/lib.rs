@@ -4,6 +4,16 @@ use html_to_markdown_rs::{
     PreprocessingPreset, WhitespaceMode, convert as convert_inner,
     convert_with_inline_images as convert_with_inline_images_inner, error::ConversionError, safety::guard_panic,
 };
+
+#[cfg(feature = "metadata")]
+use html_to_markdown_rs::metadata::{
+    ExtendedMetadata as RustExtendedMetadata, DocumentMetadata as RustDocumentMetadata,
+    HeaderMetadata as RustHeaderMetadata, LinkMetadata as RustLinkMetadata, ImageMetadata as RustImageMetadata,
+    StructuredData as RustStructuredData, TextDirection as RustTextDirection, LinkType as RustLinkType,
+    ImageType as RustImageType, StructuredDataType as RustStructuredDataType, MetadataConfig as RustMetadataConfig,
+};
+#[cfg(feature = "metadata")]
+use html_to_markdown_rs::convert_with_metadata as convert_with_metadata_inner;
 use magnus::prelude::*;
 use magnus::r_hash::ForEach;
 use magnus::{Error, RArray, RHash, Ruby, Symbol, TryConvert, Value, function, scan_args::scan_args};
@@ -423,6 +433,245 @@ fn convert_with_inline_images_fn(ruby: &Ruby, args: &[Value]) -> Result<Value, E
     extraction_to_value(ruby, extraction)
 }
 
+#[cfg(feature = "metadata")]
+fn build_metadata_config(_ruby: &Ruby, config: Option<Value>) -> Result<RustMetadataConfig, Error> {
+    let mut cfg = RustMetadataConfig::default();
+
+    let Some(config) = config else {
+        return Ok(cfg);
+    };
+
+    if config.is_nil() {
+        return Ok(cfg);
+    }
+
+    let hash = RHash::from_value(config).ok_or_else(|| arg_error("metadata_config must be provided as a Hash"))?;
+
+    hash.foreach(|key: Value, val: Value| {
+        let key_name = symbol_to_string(key)?;
+        match key_name.as_str() {
+            "extract_headers" => {
+                cfg.extract_headers = bool::try_convert(val)?;
+            }
+            "extract_links" => {
+                cfg.extract_links = bool::try_convert(val)?;
+            }
+            "extract_images" => {
+                cfg.extract_images = bool::try_convert(val)?;
+            }
+            "extract_structured_data" => {
+                cfg.extract_structured_data = bool::try_convert(val)?;
+            }
+            "max_structured_data_size" => {
+                cfg.max_structured_data_size = usize::try_convert(val)?;
+            }
+            _ => {}
+        }
+        Ok(ForEach::Continue)
+    })?;
+
+    Ok(cfg)
+}
+
+#[cfg(feature = "metadata")]
+fn opt_string_to_ruby(ruby: &Ruby, opt: Option<String>) -> Result<Value, Error> {
+    match opt {
+        Some(val) => Ok(ruby.str_from_slice(val.as_bytes()).as_value()),
+        None => Ok(ruby.qnil().as_value()),
+    }
+}
+
+#[cfg(feature = "metadata")]
+fn btreemap_to_ruby_hash(ruby: &Ruby, map: std::collections::BTreeMap<String, String>) -> Result<Value, Error> {
+    let hash = ruby.hash_new();
+    for (k, v) in map {
+        hash.aset(k, v)?;
+    }
+    Ok(hash.as_value())
+}
+
+#[cfg(feature = "metadata")]
+fn text_direction_to_string(text_direction: Option<RustTextDirection>) -> Option<&'static str> {
+    match text_direction {
+        Some(RustTextDirection::LeftToRight) => Some("ltr"),
+        Some(RustTextDirection::RightToLeft) => Some("rtl"),
+        Some(RustTextDirection::Auto) => Some("auto"),
+        None => None,
+    }
+}
+
+#[cfg(feature = "metadata")]
+fn link_type_to_string(link_type: &RustLinkType) -> &'static str {
+    match link_type {
+        RustLinkType::Anchor => "anchor",
+        RustLinkType::Internal => "internal",
+        RustLinkType::External => "external",
+        RustLinkType::Email => "email",
+        RustLinkType::Phone => "phone",
+        RustLinkType::Other => "other",
+    }
+}
+
+#[cfg(feature = "metadata")]
+fn image_type_to_string(image_type: &RustImageType) -> &'static str {
+    match image_type {
+        RustImageType::DataUri => "data_uri",
+        RustImageType::InlineSvg => "inline_svg",
+        RustImageType::External => "external",
+        RustImageType::Relative => "relative",
+    }
+}
+
+#[cfg(feature = "metadata")]
+fn structured_data_type_to_string(data_type: &RustStructuredDataType) -> &'static str {
+    match data_type {
+        RustStructuredDataType::JsonLd => "json_ld",
+        RustStructuredDataType::Microdata => "microdata",
+        RustStructuredDataType::RDFa => "rdfa",
+    }
+}
+
+#[cfg(feature = "metadata")]
+fn document_metadata_to_ruby(ruby: &Ruby, doc: RustDocumentMetadata) -> Result<Value, Error> {
+    let hash = ruby.hash_new();
+
+    hash.aset(ruby.intern("title"), opt_string_to_ruby(ruby, doc.title)?)?;
+    hash.aset(ruby.intern("description"), opt_string_to_ruby(ruby, doc.description)?)?;
+
+    let keywords = ruby.ary_new();
+    for keyword in doc.keywords {
+        keywords.push(keyword)?;
+    }
+    hash.aset(ruby.intern("keywords"), keywords)?;
+
+    hash.aset(ruby.intern("author"), opt_string_to_ruby(ruby, doc.author)?)?;
+    hash.aset(ruby.intern("canonical_url"), opt_string_to_ruby(ruby, doc.canonical_url)?)?;
+    hash.aset(ruby.intern("base_href"), opt_string_to_ruby(ruby, doc.base_href)?)?;
+    hash.aset(ruby.intern("language"), opt_string_to_ruby(ruby, doc.language)?)?;
+
+    match text_direction_to_string(doc.text_direction) {
+        Some(dir) => hash.aset(ruby.intern("text_direction"), dir)?,
+        None => hash.aset(ruby.intern("text_direction"), ruby.qnil())?,
+    }
+
+    hash.aset(ruby.intern("open_graph"), btreemap_to_ruby_hash(ruby, doc.open_graph)?)?;
+    hash.aset(ruby.intern("twitter_card"), btreemap_to_ruby_hash(ruby, doc.twitter_card)?)?;
+    hash.aset(ruby.intern("meta_tags"), btreemap_to_ruby_hash(ruby, doc.meta_tags)?)?;
+
+    Ok(hash.as_value())
+}
+
+#[cfg(feature = "metadata")]
+fn headers_to_ruby(ruby: &Ruby, headers: Vec<RustHeaderMetadata>) -> Result<Value, Error> {
+    let array = ruby.ary_new();
+    for header in headers {
+        let hash = ruby.hash_new();
+        hash.aset(ruby.intern("level"), header.level)?;
+        hash.aset(ruby.intern("text"), header.text)?;
+        hash.aset(ruby.intern("id"), opt_string_to_ruby(ruby, header.id)?)?;
+        hash.aset(ruby.intern("depth"), header.depth as i64)?;
+        hash.aset(ruby.intern("html_offset"), header.html_offset as i64)?;
+        array.push(hash)?;
+    }
+    Ok(array.as_value())
+}
+
+#[cfg(feature = "metadata")]
+fn links_to_ruby(ruby: &Ruby, links: Vec<RustLinkMetadata>) -> Result<Value, Error> {
+    let array = ruby.ary_new();
+    for link in links {
+        let hash = ruby.hash_new();
+        hash.aset(ruby.intern("href"), link.href)?;
+        hash.aset(ruby.intern("text"), link.text)?;
+        hash.aset(ruby.intern("title"), opt_string_to_ruby(ruby, link.title)?)?;
+        hash.aset(ruby.intern("link_type"), link_type_to_string(&link.link_type))?;
+
+        let rel_array = ruby.ary_new();
+        for r in link.rel {
+            rel_array.push(r)?;
+        }
+        hash.aset(ruby.intern("rel"), rel_array)?;
+
+        hash.aset(ruby.intern("attributes"), btreemap_to_ruby_hash(ruby, link.attributes)?)?;
+        array.push(hash)?;
+    }
+    Ok(array.as_value())
+}
+
+#[cfg(feature = "metadata")]
+fn images_to_ruby(ruby: &Ruby, images: Vec<RustImageMetadata>) -> Result<Value, Error> {
+    let array = ruby.ary_new();
+    for image in images {
+        let hash = ruby.hash_new();
+        hash.aset(ruby.intern("src"), image.src)?;
+        hash.aset(ruby.intern("alt"), opt_string_to_ruby(ruby, image.alt)?)?;
+        hash.aset(ruby.intern("title"), opt_string_to_ruby(ruby, image.title)?)?;
+
+        match image.dimensions {
+            Some((width, height)) => {
+                let dims = ruby.ary_new();
+                dims.push(width as i64)?;
+                dims.push(height as i64)?;
+                hash.aset(ruby.intern("dimensions"), dims)?;
+            }
+            None => {
+                hash.aset(ruby.intern("dimensions"), ruby.qnil())?;
+            }
+        }
+
+        hash.aset(ruby.intern("image_type"), image_type_to_string(&image.image_type))?;
+        hash.aset(ruby.intern("attributes"), btreemap_to_ruby_hash(ruby, image.attributes)?)?;
+        array.push(hash)?;
+    }
+    Ok(array.as_value())
+}
+
+#[cfg(feature = "metadata")]
+fn structured_data_to_ruby(ruby: &Ruby, data: Vec<RustStructuredData>) -> Result<Value, Error> {
+    let array = ruby.ary_new();
+    for item in data {
+        let hash = ruby.hash_new();
+        hash.aset(ruby.intern("data_type"), structured_data_type_to_string(&item.data_type))?;
+        hash.aset(ruby.intern("raw_json"), item.raw_json)?;
+        hash.aset(ruby.intern("schema_type"), opt_string_to_ruby(ruby, item.schema_type)?)?;
+        array.push(hash)?;
+    }
+    Ok(array.as_value())
+}
+
+#[cfg(feature = "metadata")]
+fn extended_metadata_to_ruby(ruby: &Ruby, metadata: RustExtendedMetadata) -> Result<Value, Error> {
+    let hash = ruby.hash_new();
+
+    hash.aset(ruby.intern("document"), document_metadata_to_ruby(ruby, metadata.document)?)?;
+    hash.aset(ruby.intern("headers"), headers_to_ruby(ruby, metadata.headers)?)?;
+    hash.aset(ruby.intern("links"), links_to_ruby(ruby, metadata.links)?)?;
+    hash.aset(ruby.intern("images"), images_to_ruby(ruby, metadata.images)?)?;
+    hash.aset(ruby.intern("structured_data"), structured_data_to_ruby(ruby, metadata.structured_data)?)?;
+
+    Ok(hash.as_value())
+}
+
+#[cfg(feature = "metadata")]
+fn convert_with_metadata_fn(ruby: &Ruby, args: &[Value]) -> Result<Value, Error> {
+    let parsed = scan_args::<(String,), (Option<Value>, Option<Value>), (), (), (), ()>(args)?;
+    let html = parsed.required.0;
+    let options = build_conversion_options(ruby, parsed.optional.0)?;
+    let metadata_config = build_metadata_config(ruby, parsed.optional.1)?;
+
+    let (markdown, metadata) = guard_panic(|| {
+        convert_with_metadata_inner(&html, Some(options), metadata_config)
+    })
+    .map_err(conversion_error)?;
+
+    // Convert to Ruby array [markdown, metadata_hash]
+    let array = ruby.ary_new();
+    array.push(markdown)?;
+    array.push(extended_metadata_to_ruby(ruby, metadata)?)?;
+
+    Ok(array.as_value())
+}
+
 #[magnus::init]
 fn init(ruby: &Ruby) -> Result<(), Error> {
     let module = ruby.define_module("HtmlToMarkdown")?;
@@ -433,6 +682,9 @@ fn init(ruby: &Ruby) -> Result<(), Error> {
         "convert_with_inline_images",
         function!(convert_with_inline_images_fn, -1),
     )?;
+
+    #[cfg(feature = "metadata")]
+    module.define_singleton_method("convert_with_metadata", function!(convert_with_metadata_fn, -1))?;
 
     Ok(())
 }

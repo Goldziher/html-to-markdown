@@ -6,6 +6,7 @@ namespace HtmlToMarkdown;
 
 use HtmlToMarkdown\Config\ConversionOptions;
 use HtmlToMarkdown\Config\InlineImageConfig;
+use HtmlToMarkdown\Value\ExtendedMetadata;
 use HtmlToMarkdown\Value\InlineImageExtraction;
 
 /**
@@ -31,4 +32,17 @@ function convert_with_inline_images(
     InlineImageConfig|array|null $config = null,
 ): InlineImageExtraction {
     return HtmlToMarkdown::convertWithInlineImages($html, $options, $config);
+}
+
+/**
+ * @param ConversionOptions|ConversionOptionsInput|null $options
+ * @param array<string, mixed>|null $metadataConfig
+ * @return array{markdown: string, metadata: ExtendedMetadata}
+ */
+function convert_with_metadata(
+    string $html,
+    ConversionOptions|array|null $options = null,
+    ?array $metadataConfig = null,
+): array {
+    return HtmlToMarkdown::convertWithMetadata($html, $options, $metadataConfig);
 }
