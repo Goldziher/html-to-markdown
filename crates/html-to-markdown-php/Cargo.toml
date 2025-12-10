@@ -21,4 +21,5 @@ html-to-markdown-rs = { workspace = true, features = ["inline-images", "metadata
 ext-php-rs = { workspace = true }
 
 [features]
+default = ["metadata"]
 metadata = ["html-to-markdown-rs/metadata"]
