@@ -23,14 +23,24 @@ RSpec.describe HtmlToMarkdown do
       end
 
       it 'extracts description' do
-        html = '<html><head><meta name="description" content="Page description"></head><body><p>Content</p></body></html>'
+        html = <<~HTML
+          <html>
+            <head><meta name="description" content="Page description"></head>
+            <body><p>Content</p></body>
+          </html>
+        HTML
         _, metadata = described_class.convert_with_metadata(html)
 
         expect(metadata[:document][:description]).to eq('Page description')
       end
 
       it 'extracts keywords' do
-        html = '<html><head><meta name="keywords" content="keyword1, keyword2, keyword3"></head><body><p>Content</p></body></html>'
+        html = <<~HTML
+          <html>
+            <head><meta name="keywords" content="keyword1, keyword2, keyword3"></head>
+            <body><p>Content</p></body>
+          </html>
+        HTML
         _, metadata = described_class.convert_with_metadata(html)
 
         expect(metadata[:document][:keywords]).to include('keyword1', 'keyword2', 'keyword3')
@@ -393,10 +403,15 @@ RSpec.describe HtmlToMarkdown do
       end
     end
 
-    context 'return value structure' do
+    context 'when returning value structure' do
       it 'returns proper metadata hash structure' do
-        html = '<html><head><title>Test</title><base href="https://example.com"></head><body><h1>H1</h1><a href="link">Link</a><img src="img.jpg"></body></html>'
-        markdown, metadata = described_class.convert_with_metadata(html)
+        html = <<~HTML
+          <html>
+            <head><title>Test</title><base href="https://example.com"></head>
+            <body><h1>H1</h1><a href="link">Link</a><img src="img.jpg"></body>
+          </html>
+        HTML
+        _, metadata = described_class.convert_with_metadata(html)
 
         expect(metadata).to include(
           :document,
