@@ -45,6 +45,34 @@ The package re-exports all conversion options exposed by the native bindings. Se
 [core documentation](https://github.com/Goldziher/html-to-markdown) for complete
 option descriptions.
 
+### Metadata extraction
+
+```ts
+import { convertWithMetadata } from 'html-to-markdown-node';
+
+const html = `
+  <html>
+    <head><title>Example</title></head>
+    <body>
+      <h1 id="welcome">Welcome</h1>
+      <a href="https://example.com" rel="nofollow">Example</a>
+      <img src="https://example.com/img.jpg" alt="Hero" width="640" height="480">
+    </body>
+  </html>
+`;
+
+const { markdown, metadata } = await convertWithMetadata(
+  html,
+  { headingStyle: 'Atx' },
+  { extract_links: true, extract_images: true, extract_headers: true },
+);
+
+console.log(markdown);
+console.log(metadata.document.title); // "Example"
+console.log(metadata.links[0].rel);  // ["nofollow"]
+console.log(metadata.images[0].dimensions); // [640, 480]
+```
+
 ### File helpers
 
 ```ts

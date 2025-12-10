@@ -184,6 +184,40 @@ result.inline_images.each do |img|
 end
 ```
 
+### Metadata extraction
+
+```ruby
+require 'html_to_markdown'
+
+html = <<~HTML
+  <html>
+    <head>
+      <title>Example</title>
+      <meta name="description" content="Demo page">
+      <link rel="canonical" href="https://example.com/page">
+    </head>
+    <body>
+      <h1 id="welcome">Welcome</h1>
+      <a href="https://example.com" rel="nofollow external">Example link</a>
+      <img src="https://example.com/image.jpg" alt="Hero" width="640" height="480">
+    </body>
+  </html>
+HTML
+
+markdown, metadata = HtmlToMarkdown.convert_with_metadata(
+  html,
+  { heading_style: :atx },
+  { extract_links: true, extract_images: true, extract_headers: true }
+)
+
+puts markdown
+puts metadata[:document][:title]         # "Example"
+puts metadata[:links].first[:rel]        # ["nofollow", "external"]
+puts metadata[:images].first[:dimensions] # [640, 480]
+```
+
+`metadata` contains document tags (title, description, canonical URL, Open Graph/Twitter cards), enriched links (type, text, `rel`, raw attributes), images (alt, title, inferred dimensions, attributes), headers with depth/offsets, and optional structured data when enabled.
+
 ## CLI
 
 The gem bundles a small proxy for the Rust CLI binary. Use it when you need parity with the standalone `html-to-markdown` executable.

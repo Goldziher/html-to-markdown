@@ -113,6 +113,43 @@ instance containing:
 Use `InlineImageFormat` to inspect the image type and `InlineImageDimensions`
 for width/height when available.
 
+## Metadata extraction
+
+```php
+<?php
+
+use HtmlToMarkdown\Config\ConversionOptions;
+use function HtmlToMarkdown\convert_with_metadata;
+
+$html = <<<'HTML'
+<html>
+  <head>
+    <title>Example</title>
+    <meta name="description" content="Demo page">
+    <link rel="canonical" href="https://example.com/page">
+  </head>
+  <body>
+    <h1 id="welcome">Welcome</h1>
+    <a href="https://example.com" rel="nofollow external">Example link</a>
+    <img src="https://example.com/image.jpg" alt="Hero" width="640" height="480">
+  </body>
+</html>
+HTML;
+
+$result = convert_with_metadata(
+    $html,
+    new ConversionOptions(headingStyle: 'Atx'),
+    ['extract_headers' => true, 'extract_links' => true, 'extract_images' => true],
+);
+
+echo $result['markdown'];
+echo $result['metadata']->document->title;               // "Example"
+echo implode(', ', $result['metadata']->links[0]->rel);  // "nofollow, external"
+[$width, $height] = $result['metadata']->images[0]->dimensions; // 640, 480
+```
+
+`metadata` is returned as an `ExtendedMetadata` value object: document tags (title, description, canonical URL, Open Graph/Twitter), links with `rel` + raw attributes, images with inferred dimensions, headers with depth/offset, and structured data (if enabled). Toggle sections with the associative `$metadataConfig` array.
+
 ## Testing and quality
 
 ```bash
