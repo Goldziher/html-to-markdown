@@ -800,23 +800,37 @@ impl MetadataCollector {
     fn extract_document_metadata(&self) -> DocumentMetadata {
         let mut doc = DocumentMetadata::default();
 
-        for (key, value) in &self.head_metadata {
-            match key.to_lowercase().as_str() {
+        for (raw_key, value) in &self.head_metadata {
+            let mut key = raw_key.to_lowercase();
+
+            if let Some(stripped) = key.strip_prefix("meta-") {
+                key = stripped.to_string();
+            }
+
+            if key.contains(':') {
+                key = key.replace(':', "-");
+            }
+
+            match key.as_str() {
                 "title" => doc.title = Some(value.clone()),
                 "description" => doc.description = Some(value.clone()),
                 "author" => doc.author = Some(value.clone()),
                 "canonical" => doc.canonical_url = Some(value.clone()),
-                "base" => doc.base_href = Some(value.clone()),
-                key if key.starts_with("og:") => {
-                    let og_key = key.strip_prefix("og:").unwrap_or(key);
-                    doc.open_graph.insert(og_key.to_string(), value.clone());
+                "base" | "base-href" => doc.base_href = Some(value.clone()),
+                key if key.starts_with("og-") => {
+                    let og_key = key.trim_start_matches("og-").replace('-', "_");
+                    doc.open_graph.insert(og_key, value.clone());
                 }
-                key if key.starts_with("twitter:") => {
-                    let tw_key = key.strip_prefix("twitter:").unwrap_or(key);
-                    doc.twitter_card.insert(tw_key.to_string(), value.clone());
+                key if key.starts_with("twitter-") => {
+                    let tw_key = key.trim_start_matches("twitter-").replace('-', "_");
+                    doc.twitter_card.insert(tw_key, value.clone());
                 }
                 "keywords" => {
-                    doc.keywords = value.split(',').map(|s| s.trim().to_string()).collect();
+                    doc.keywords = value
+                        .split(',')
+                        .map(|s| s.trim().to_string())
+                        .filter(|s| !s.is_empty())
+                        .collect();
                 }
                 _ => {
                     doc.meta_tags.insert(key.clone(), value.clone());

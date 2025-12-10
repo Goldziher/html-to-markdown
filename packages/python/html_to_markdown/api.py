@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Literal, TypedDict
+from typing import TYPE_CHECKING, Literal, TypedDict
 
 import html_to_markdown._html_to_markdown as _rust
 from html_to_markdown._html_to_markdown import (
@@ -13,11 +13,15 @@ from html_to_markdown.options import ConversionOptions, PreprocessingOptions
 
 _HAS_METADATA = False
 try:
-    from html_to_markdown._html_to_markdown import MetadataConfig
+    from html_to_markdown._html_to_markdown import ExtendedMetadata, MetadataConfig
 
     _HAS_METADATA = True
 except ImportError:
     MetadataConfig = None  # type: ignore[misc,assignment]
+    if TYPE_CHECKING:
+        from html_to_markdown._html_to_markdown import ExtendedMetadata  # pragma: no cover
+    else:
+        ExtendedMetadata = dict[str, object]  # type: ignore[assignment]
 
 
 class InlineImage(TypedDict):
@@ -149,7 +153,7 @@ if _HAS_METADATA:
         options: ConversionOptions | None = None,
         preprocessing: PreprocessingOptions | None = None,
         metadata_config: MetadataConfig | None = None,
-    ) -> tuple[str, dict]:
+    ) -> tuple[str, ExtendedMetadata]:
         """Convert HTML and extract comprehensive metadata.
 
         Args:

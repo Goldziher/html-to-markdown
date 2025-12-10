@@ -231,6 +231,29 @@ mod tests {
     }
 
     #[test]
+    fn test_convert_with_metadata_document_fields() {
+        let html = "<html lang=\"en\"><head><title>Test Article</title><meta name=\"description\" content=\"Desc\"><meta name=\"author\" content=\"Author\"><meta property=\"og:title\" content=\"OG Title\"><meta property=\"og:description\" content=\"OG Desc\"></head><body><h1>Heading</h1></body></html>";
+
+        let (_markdown, metadata) =
+            convert_with_metadata(html, None, MetadataConfig::default()).expect("conversion should succeed");
+
+        assert_eq!(
+            metadata.document.title,
+            Some("Test Article".to_string()),
+            "document: {:?}",
+            metadata.document
+        );
+        assert_eq!(metadata.document.description, Some("Desc".to_string()));
+        assert_eq!(metadata.document.author, Some("Author".to_string()));
+        assert_eq!(metadata.document.language, Some("en".to_string()));
+        assert_eq!(metadata.document.open_graph.get("title"), Some(&"OG Title".to_string()));
+        assert_eq!(
+            metadata.document.open_graph.get("description"),
+            Some(&"OG Desc".to_string())
+        );
+    }
+
+    #[test]
     fn test_convert_with_metadata_empty_config() {
         let html = "<html lang=\"en\"><head><title>Test</title></head><body><h1>Title</h1><a href=\"#\">Link</a></body></html>";
 

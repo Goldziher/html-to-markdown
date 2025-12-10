@@ -1544,14 +1544,10 @@ fn convert_html_impl(
     if let Some(ref collector) = metadata_collector {
         if !is_hocr {
             for child_handle in dom_ref.children().iter() {
-                if let Some(tl::Node::Tag(tag)) = child_handle.get(parser) {
-                    if tag.name().as_utf8_str() == "head" {
-                        let head_meta = extract_metadata(child_handle, parser);
-                        if !head_meta.is_empty() {
-                            collector.borrow_mut().set_head_metadata(head_meta);
-                        }
-                        break;
-                    }
+                let head_meta = extract_metadata(child_handle, parser);
+                if !head_meta.is_empty() {
+                    collector.borrow_mut().set_head_metadata(head_meta);
+                    break;
                 }
             }
         }
