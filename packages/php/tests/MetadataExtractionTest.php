@@ -181,7 +181,10 @@ final class MetadataExtractionTest extends TestCase
             self::assertIsString($link->href);
             self::assertIsString($link->text);
             self::assertIsString($link->linkType);
-            self::assertIsString($link->rel);
+            self::assertIsArray($link->rel);
+            if (count($link->rel) > 0) {
+                self::assertIsString($link->rel[0]);
+            }
             self::assertIsArray($link->attributes);
         }
     }

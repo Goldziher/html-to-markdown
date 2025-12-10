@@ -9,6 +9,7 @@ use HtmlToMarkdown\Internal\TypeAssertions;
 final readonly class LinkMetadata
 {
     /**
+     * @param list<string> $rel
      * @param array<string, string> $attributes
      */
     public function __construct(
@@ -16,7 +17,7 @@ final readonly class LinkMetadata
         public string $text,
         public ?string $title,
         public string $linkType,
-        public string $rel,
+        public array $rel,
         public array $attributes,
     ) {
     }
@@ -33,7 +34,7 @@ final readonly class LinkMetadata
             text: TypeAssertions::string($payload['text'], 'link_metadata.text'),
             title: TypeAssertions::stringOrNull($payload['title'] ?? null, 'link_metadata.title'),
             linkType: TypeAssertions::string($payload['link_type'], 'link_metadata.link_type'),
-            rel: TypeAssertions::string($payload['rel'], 'link_metadata.rel'),
+            rel: TypeAssertions::stringList($payload['rel'], 'link_metadata.rel'),
             attributes: TypeAssertions::stringMap($payload['attributes'] ?? [], 'link_metadata.attributes'),
         );
     }
