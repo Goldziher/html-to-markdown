@@ -1,11 +1,5 @@
 #![deny(clippy::all)]
 
-use html_to_markdown_rs::safety::guard_panic;
-use html_to_markdown_rs::{
-    CodeBlockStyle, ConversionError, ConversionOptions as RustConversionOptions, HeadingStyle, HighlightStyle,
-    InlineImageConfig as RustInlineImageConfig, InlineImageFormat, InlineImageSource, ListIndentType, NewlineStyle,
-    PreprocessingOptions as RustPreprocessingOptions, PreprocessingPreset, WhitespaceMode,
-};
 #[cfg(feature = "metadata")]
 use html_to_markdown_rs::metadata::{
     DocumentMetadata as RustDocumentMetadata, ExtendedMetadata as RustExtendedMetadata,
@@ -13,6 +7,12 @@ use html_to_markdown_rs::metadata::{
     LinkMetadata as RustLinkMetadata, LinkType as RustLinkType, MetadataConfig as RustMetadataConfig,
     StructuredData as RustStructuredData, StructuredDataType as RustStructuredDataType,
     TextDirection as RustTextDirection,
+};
+use html_to_markdown_rs::safety::guard_panic;
+use html_to_markdown_rs::{
+    CodeBlockStyle, ConversionError, ConversionOptions as RustConversionOptions, HeadingStyle, HighlightStyle,
+    InlineImageConfig as RustInlineImageConfig, InlineImageFormat, InlineImageSource, ListIndentType, NewlineStyle,
+    PreprocessingOptions as RustPreprocessingOptions, PreprocessingPreset, WhitespaceMode,
 };
 use napi::bindgen_prelude::*;
 use napi_derive::napi;
@@ -477,7 +477,7 @@ pub struct JsDocumentMetadata {
     pub canonical_url: Option<String>,
     pub base_href: Option<String>,
     pub language: Option<String>,
-    pub text_direction: Option<String>,  // "ltr" | "rtl" | "auto"
+    pub text_direction: Option<String>, // "ltr" | "rtl" | "auto"
     pub open_graph: HashMap<String, String>,
     pub twitter_card: HashMap<String, String>,
     pub meta_tags: HashMap<String, String>,
@@ -501,7 +501,7 @@ pub struct JsLinkMetadata {
     pub href: String,
     pub text: String,
     pub title: Option<String>,
-    pub link_type: String,  // "anchor" | "internal" | "external" | "email" | "phone" | "other"
+    pub link_type: String, // "anchor" | "internal" | "external" | "email" | "phone" | "other"
     pub rel: Vec<String>,
     pub attributes: HashMap<String, String>,
 }
@@ -513,8 +513,8 @@ pub struct JsImageMetadata {
     pub src: String,
     pub alt: Option<String>,
     pub title: Option<String>,
-    pub dimensions: Option<Vec<u32>>,  // [width, height]
-    pub image_type: String,  // "data_uri" | "inline_svg" | "external" | "relative"
+    pub dimensions: Option<Vec<u32>>, // [width, height]
+    pub image_type: String,           // "data_uri" | "inline_svg" | "external" | "relative"
     pub attributes: HashMap<String, String>,
 }
 
@@ -522,7 +522,7 @@ pub struct JsImageMetadata {
 #[cfg(feature = "metadata")]
 #[napi(object)]
 pub struct JsStructuredData {
-    pub data_type: String,  // "json_ld" | "microdata" | "rdfa"
+    pub data_type: String, // "json_ld" | "microdata" | "rdfa"
     pub raw_json: String,
     pub schema_type: Option<String>,
 }
@@ -631,8 +631,7 @@ fn convert_images(images: Vec<RustImageMetadata>) -> Vec<JsImageMetadata> {
 
 #[cfg(feature = "metadata")]
 fn convert_structured_data(data: Vec<RustStructuredData>) -> Vec<JsStructuredData> {
-    data
-        .into_iter()
+    data.into_iter()
         .map(|d| JsStructuredData {
             data_type: structured_data_type_to_string(&d.data_type),
             raw_json: d.raw_json,
@@ -805,8 +804,9 @@ pub fn convert_with_metadata(
     let rust_options = options.map(Into::into);
     let rust_config = metadata_config.map(Into::into).unwrap_or_default();
 
-    let (markdown, metadata) = guard_panic(|| html_to_markdown_rs::convert_with_metadata(&html, rust_options, rust_config))
-        .map_err(to_js_error)?;
+    let (markdown, metadata) =
+        guard_panic(|| html_to_markdown_rs::convert_with_metadata(&html, rust_options, rust_config))
+            .map_err(to_js_error)?;
 
     Ok(JsMetadataExtraction {
         markdown,
@@ -826,8 +826,9 @@ pub fn convert_with_metadata_buffer(
     let rust_options = options.map(Into::into);
     let rust_config = metadata_config.map(Into::into).unwrap_or_default();
 
-    let (markdown, metadata) = guard_panic(|| html_to_markdown_rs::convert_with_metadata(html, rust_options, rust_config))
-        .map_err(to_js_error)?;
+    let (markdown, metadata) =
+        guard_panic(|| html_to_markdown_rs::convert_with_metadata(html, rust_options, rust_config))
+            .map_err(to_js_error)?;
 
     Ok(JsMetadataExtraction {
         markdown,

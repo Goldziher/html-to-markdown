@@ -664,17 +664,13 @@ pub fn convert_with_metadata(
     metadata_config: Option<WasmMetadataConfig>,
 ) -> Result<JsValue, JsValue> {
     let rust_options = parse_wasm_options(options)?;
-    let rust_metadata_config = metadata_config
-        .map(Into::into)
-        .unwrap_or_default();
+    let rust_metadata_config = metadata_config.map(Into::into).unwrap_or_default();
 
-    let (markdown, metadata) = guard_panic(|| {
-        html_to_markdown_rs::convert_with_metadata(&html, rust_options, rust_metadata_config)
-    })
-    .map_err(to_js_error)?;
+    let (markdown, metadata) =
+        guard_panic(|| html_to_markdown_rs::convert_with_metadata(&html, rust_options, rust_metadata_config))
+            .map_err(to_js_error)?;
 
-    let metadata_js =
-        serde_wasm_bindgen::to_value(&metadata).map_err(|e| JsValue::from_str(&e.to_string()))?;
+    let metadata_js = serde_wasm_bindgen::to_value(&metadata).map_err(|e| JsValue::from_str(&e.to_string()))?;
 
     let result = js_sys::Object::new();
     js_sys::Reflect::set(&result, &JsValue::from_str("markdown"), &JsValue::from_str(&markdown))

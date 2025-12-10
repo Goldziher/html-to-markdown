@@ -6,14 +6,15 @@ use html_to_markdown_rs::{
 };
 
 #[cfg(feature = "metadata")]
-use html_to_markdown_rs::metadata::{
-    ExtendedMetadata as RustExtendedMetadata, DocumentMetadata as RustDocumentMetadata,
-    HeaderMetadata as RustHeaderMetadata, LinkMetadata as RustLinkMetadata, ImageMetadata as RustImageMetadata,
-    StructuredData as RustStructuredData, TextDirection as RustTextDirection, LinkType as RustLinkType,
-    ImageType as RustImageType, StructuredDataType as RustStructuredDataType, MetadataConfig as RustMetadataConfig,
-};
-#[cfg(feature = "metadata")]
 use html_to_markdown_rs::convert_with_metadata as convert_with_metadata_inner;
+#[cfg(feature = "metadata")]
+use html_to_markdown_rs::metadata::{
+    DocumentMetadata as RustDocumentMetadata, ExtendedMetadata as RustExtendedMetadata,
+    HeaderMetadata as RustHeaderMetadata, ImageMetadata as RustImageMetadata, ImageType as RustImageType,
+    LinkMetadata as RustLinkMetadata, LinkType as RustLinkType, MetadataConfig as RustMetadataConfig,
+    StructuredData as RustStructuredData, StructuredDataType as RustStructuredDataType,
+    TextDirection as RustTextDirection,
+};
 use magnus::prelude::*;
 use magnus::r_hash::ForEach;
 use magnus::{Error, RArray, RHash, Ruby, Symbol, TryConvert, Value, function, scan_args::scan_args};
@@ -545,7 +546,10 @@ fn document_metadata_to_ruby(ruby: &Ruby, doc: RustDocumentMetadata) -> Result<V
     hash.aset(ruby.intern("keywords"), keywords)?;
 
     hash.aset(ruby.intern("author"), opt_string_to_ruby(ruby, doc.author)?)?;
-    hash.aset(ruby.intern("canonical_url"), opt_string_to_ruby(ruby, doc.canonical_url)?)?;
+    hash.aset(
+        ruby.intern("canonical_url"),
+        opt_string_to_ruby(ruby, doc.canonical_url)?,
+    )?;
     hash.aset(ruby.intern("base_href"), opt_string_to_ruby(ruby, doc.base_href)?)?;
     hash.aset(ruby.intern("language"), opt_string_to_ruby(ruby, doc.language)?)?;
 
@@ -555,7 +559,10 @@ fn document_metadata_to_ruby(ruby: &Ruby, doc: RustDocumentMetadata) -> Result<V
     }
 
     hash.aset(ruby.intern("open_graph"), btreemap_to_ruby_hash(ruby, doc.open_graph)?)?;
-    hash.aset(ruby.intern("twitter_card"), btreemap_to_ruby_hash(ruby, doc.twitter_card)?)?;
+    hash.aset(
+        ruby.intern("twitter_card"),
+        btreemap_to_ruby_hash(ruby, doc.twitter_card)?,
+    )?;
     hash.aset(ruby.intern("meta_tags"), btreemap_to_ruby_hash(ruby, doc.meta_tags)?)?;
 
     Ok(hash.as_value())
@@ -620,7 +627,10 @@ fn images_to_ruby(ruby: &Ruby, images: Vec<RustImageMetadata>) -> Result<Value, 
         }
 
         hash.aset(ruby.intern("image_type"), image_type_to_string(&image.image_type))?;
-        hash.aset(ruby.intern("attributes"), btreemap_to_ruby_hash(ruby, image.attributes)?)?;
+        hash.aset(
+            ruby.intern("attributes"),
+            btreemap_to_ruby_hash(ruby, image.attributes)?,
+        )?;
         array.push(hash)?;
     }
     Ok(array.as_value())
@@ -631,7 +641,10 @@ fn structured_data_to_ruby(ruby: &Ruby, data: Vec<RustStructuredData>) -> Result
     let array = ruby.ary_new();
     for item in data {
         let hash = ruby.hash_new();
-        hash.aset(ruby.intern("data_type"), structured_data_type_to_string(&item.data_type))?;
+        hash.aset(
+            ruby.intern("data_type"),
+            structured_data_type_to_string(&item.data_type),
+        )?;
         hash.aset(ruby.intern("raw_json"), item.raw_json)?;
         hash.aset(ruby.intern("schema_type"), opt_string_to_ruby(ruby, item.schema_type)?)?;
         array.push(hash)?;
@@ -643,11 +656,17 @@ fn structured_data_to_ruby(ruby: &Ruby, data: Vec<RustStructuredData>) -> Result
 fn extended_metadata_to_ruby(ruby: &Ruby, metadata: RustExtendedMetadata) -> Result<Value, Error> {
     let hash = ruby.hash_new();
 
-    hash.aset(ruby.intern("document"), document_metadata_to_ruby(ruby, metadata.document)?)?;
+    hash.aset(
+        ruby.intern("document"),
+        document_metadata_to_ruby(ruby, metadata.document)?,
+    )?;
     hash.aset(ruby.intern("headers"), headers_to_ruby(ruby, metadata.headers)?)?;
     hash.aset(ruby.intern("links"), links_to_ruby(ruby, metadata.links)?)?;
     hash.aset(ruby.intern("images"), images_to_ruby(ruby, metadata.images)?)?;
-    hash.aset(ruby.intern("structured_data"), structured_data_to_ruby(ruby, metadata.structured_data)?)?;
+    hash.aset(
+        ruby.intern("structured_data"),
+        structured_data_to_ruby(ruby, metadata.structured_data)?,
+    )?;
 
     Ok(hash.as_value())
 }
@@ -659,10 +678,8 @@ fn convert_with_metadata_fn(ruby: &Ruby, args: &[Value]) -> Result<Value, Error>
     let options = build_conversion_options(ruby, parsed.optional.0)?;
     let metadata_config = build_metadata_config(ruby, parsed.optional.1)?;
 
-    let (markdown, metadata) = guard_panic(|| {
-        convert_with_metadata_inner(&html, Some(options), metadata_config)
-    })
-    .map_err(conversion_error)?;
+    let (markdown, metadata) =
+        guard_panic(|| convert_with_metadata_inner(&html, Some(options), metadata_config)).map_err(conversion_error)?;
 
     // Convert to Ruby array [markdown, metadata_hash]
     let array = ruby.ary_new();
