@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace HtmlToMarkdown\Value;
 
+use HtmlToMarkdown\Internal\TypeAssertions;
+
 final readonly class StructuredData
 {
     public function __construct(
@@ -21,9 +23,9 @@ final readonly class StructuredData
         self::assertPayload($payload);
 
         return new self(
-            dataType: (string) $payload['data_type'],
-            rawJson: (string) $payload['raw_json'],
-            schemaType: $payload['schema_type'] ?? null,
+            dataType: TypeAssertions::string($payload['data_type'], 'structured_data.data_type'),
+            rawJson: TypeAssertions::string($payload['raw_json'], 'structured_data.raw_json'),
+            schemaType: TypeAssertions::stringOrNull($payload['schema_type'] ?? null, 'structured_data.schema_type'),
         );
     }
 

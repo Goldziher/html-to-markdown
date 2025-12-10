@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace HtmlToMarkdown\Value;
 
+use HtmlToMarkdown\Internal\TypeAssertions;
+
 final readonly class HeaderMetadata
 {
     public function __construct(
@@ -23,11 +25,11 @@ final readonly class HeaderMetadata
         self::assertPayload($payload);
 
         return new self(
-            level: (int) $payload['level'],
-            text: (string) $payload['text'],
-            id: $payload['id'] ?? null,
-            depth: (int) $payload['depth'],
-            htmlOffset: (int) $payload['html_offset'],
+            level: TypeAssertions::positiveInt($payload['level'], 'header_metadata.level'),
+            text: TypeAssertions::string($payload['text'], 'header_metadata.text'),
+            id: TypeAssertions::stringOrNull($payload['id'] ?? null, 'header_metadata.id'),
+            depth: TypeAssertions::positiveInt($payload['depth'], 'header_metadata.depth'),
+            htmlOffset: TypeAssertions::positiveInt($payload['html_offset'], 'header_metadata.html_offset'),
         );
     }
 

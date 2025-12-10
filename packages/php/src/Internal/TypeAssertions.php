@@ -74,4 +74,34 @@ final class TypeAssertions
 
         return \array_values($result);
     }
+
+    /**
+     * @return array<string, string>
+     */
+    public static function stringMap(mixed $value, string $option): array
+    {
+        if (!\is_array($value)) {
+            throw InvalidOption::because($option, \sprintf('expected string map, got %s', \get_debug_type($value)));
+        }
+
+        $result = [];
+        foreach ($value as $key => $entry) {
+            if (!\is_string($key)) {
+                throw InvalidOption::because(
+                    \sprintf('%s key', $option),
+                    \sprintf('expected string key, got %s', \get_debug_type($key)),
+                );
+            }
+            if (!\is_string($entry)) {
+                throw InvalidOption::because(
+                    \sprintf('%s[%s]', $option, $key),
+                    \sprintf('expected string, got %s', \get_debug_type($entry)),
+                );
+            }
+
+            $result[$key] = $entry;
+        }
+
+        return $result;
+    }
 }

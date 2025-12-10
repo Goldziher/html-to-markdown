@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace HtmlToMarkdown\Value;
 
+use HtmlToMarkdown\Internal\TypeAssertions;
+
 final readonly class LinkMetadata
 {
     /**
@@ -27,12 +29,12 @@ final readonly class LinkMetadata
         self::assertPayload($payload);
 
         return new self(
-            href: (string) $payload['href'],
-            text: (string) $payload['text'],
-            title: $payload['title'] ?? null,
-            linkType: (string) $payload['link_type'],
-            rel: (string) $payload['rel'],
-            attributes: self::normalizeStringMap($payload['attributes'] ?? []),
+            href: TypeAssertions::string($payload['href'], 'link_metadata.href'),
+            text: TypeAssertions::string($payload['text'], 'link_metadata.text'),
+            title: TypeAssertions::stringOrNull($payload['title'] ?? null, 'link_metadata.title'),
+            linkType: TypeAssertions::string($payload['link_type'], 'link_metadata.link_type'),
+            rel: TypeAssertions::string($payload['rel'], 'link_metadata.rel'),
+            attributes: TypeAssertions::stringMap($payload['attributes'] ?? [], 'link_metadata.attributes'),
         );
     }
 
@@ -46,25 +48,5 @@ final readonly class LinkMetadata
                 throw \HtmlToMarkdown\Exception\InvalidOption::because("link_metadata.$required", 'missing field in extension payload');
             }
         }
-    }
-
-    /**
-     * @param mixed $map
-     * @return array<string, string>
-     */
-    private static function normalizeStringMap($map): array
-    {
-        if (!is_array($map)) {
-            return [];
-        }
-
-        $result = [];
-        foreach ($map as $key => $value) {
-            if (\is_string($key) && \is_string($value)) {
-                $result[$key] = $value;
-            }
-        }
-
-        return $result;
     }
 }

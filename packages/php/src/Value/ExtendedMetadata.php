@@ -26,20 +26,9 @@ final readonly class ExtendedMetadata
      */
     public static function fromExtensionPayload(array $payload): self
     {
-        if (!\array_key_exists('document', $payload) || !\is_array($payload['document'])) {
-            throw \HtmlToMarkdown\Exception\InvalidOption::because(
-                'extended_metadata.document',
-                'extension returned unexpected payload',
-            );
-        }
+        $documentPayload = \is_array($payload['document'] ?? null) ? $payload['document'] : [];
 
-        $headersPayload = $payload['headers'] ?? [];
-        if (!\is_array($headersPayload)) {
-            throw \HtmlToMarkdown\Exception\InvalidOption::because(
-                'extended_metadata.headers',
-                'expected list, got ' . \get_debug_type($headersPayload),
-            );
-        }
+        $headersPayload = \is_array($payload['headers'] ?? null) ? $payload['headers'] : [];
 
         $headers = [];
         foreach ($headersPayload as $header) {
@@ -53,13 +42,7 @@ final readonly class ExtendedMetadata
             $headers[] = HeaderMetadata::fromExtensionPayload($header);
         }
 
-        $linksPayload = $payload['links'] ?? [];
-        if (!\is_array($linksPayload)) {
-            throw \HtmlToMarkdown\Exception\InvalidOption::because(
-                'extended_metadata.links',
-                'expected list, got ' . \get_debug_type($linksPayload),
-            );
-        }
+        $linksPayload = \is_array($payload['links'] ?? null) ? $payload['links'] : [];
 
         $links = [];
         foreach ($linksPayload as $link) {
@@ -73,13 +56,7 @@ final readonly class ExtendedMetadata
             $links[] = LinkMetadata::fromExtensionPayload($link);
         }
 
-        $imagesPayload = $payload['images'] ?? [];
-        if (!\is_array($imagesPayload)) {
-            throw \HtmlToMarkdown\Exception\InvalidOption::because(
-                'extended_metadata.images',
-                'expected list, got ' . \get_debug_type($imagesPayload),
-            );
-        }
+        $imagesPayload = \is_array($payload['images'] ?? null) ? $payload['images'] : [];
 
         $images = [];
         foreach ($imagesPayload as $image) {
@@ -93,13 +70,7 @@ final readonly class ExtendedMetadata
             $images[] = ImageMetadata::fromExtensionPayload($image);
         }
 
-        $structuredDataPayload = $payload['structured_data'] ?? [];
-        if (!\is_array($structuredDataPayload)) {
-            throw \HtmlToMarkdown\Exception\InvalidOption::because(
-                'extended_metadata.structured_data',
-                'expected list, got ' . \get_debug_type($structuredDataPayload),
-            );
-        }
+        $structuredDataPayload = \is_array($payload['structured_data'] ?? null) ? $payload['structured_data'] : [];
 
         $structuredData = [];
         foreach ($structuredDataPayload as $data) {
@@ -114,7 +85,7 @@ final readonly class ExtendedMetadata
         }
 
         return new self(
-            document: DocumentMetadata::fromExtensionPayload($payload['document']),
+            document: DocumentMetadata::fromExtensionPayload($documentPayload),
             headers: $headers,
             links: $links,
             images: $images,
