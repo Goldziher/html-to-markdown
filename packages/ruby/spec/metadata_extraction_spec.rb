@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
-# rubocop:disable RSpec/ContextWording, Lint/UselessAssignment, Layout/LineLength, \
-#   Lint/ImplicitStringConcatenation, Lint/TripleQuotes
+# rubocop:disable RSpec/ContextWording, Lint/UselessAssignment, Layout/LineLength
+# rubocop:disable Lint/ImplicitStringConcatenation, Lint/TripleQuotes
 
 require 'spec_helper'
 
@@ -427,5 +427,5 @@ RSpec.describe HtmlToMarkdown do
   end
 end
 
-# rubocop:enable RSpec/ContextWording, Lint/UselessAssignment, Layout/LineLength, \
-#   Lint/ImplicitStringConcatenation, Lint/TripleQuotes
+# rubocop:enable RSpec/ContextWording, Lint/UselessAssignment, Layout/LineLength
+# rubocop:enable Lint/ImplicitStringConcatenation, Lint/TripleQuotes
