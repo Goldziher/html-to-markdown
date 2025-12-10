@@ -1,0 +1,1187 @@
+//! Metadata extraction for HTML to Markdown conversion.
+//!
+//! This module provides comprehensive metadata extraction during HTML-to-Markdown
+//! conversion, including document metadata, headers, links, images, and structured data.
+//! The implementation follows a single-pass collector pattern for zero-overhead extraction
+//! when metadata features are disabled.
+//!
+//! # Architecture
+//!
+//! Metadata extraction uses the [`MetadataCollector`] pattern (similar to [`InlineImageCollector`]):
+//! - Single-pass collection during tree traversal
+//! - Zero overhead when disabled via feature flags
+//! - Configurable extraction granularity via [`MetadataConfig`]
+//! - Type-safe APIs for all metadata types
+//!
+//! # Examples
+//!
+//! ```ignore
+//! use html_to_markdown_rs::metadata::{MetadataConfig, ExtendedMetadata};
+//!
+//! // Create collector with configuration
+//! let config = MetadataConfig {
+//!     extract_headers: true,
+//!     extract_links: true,
+//!     extract_images: true,
+//!     extract_structured_data: true,
+//!     max_structured_data_size: 1_000_000,
+//! };
+//!
+//! // Collector is created during HTML parsing and populated during tree walk
+//! // Results are extracted via finish()
+//! let metadata: ExtendedMetadata = collector.finish();
+//! ```
+
+use std::cell::RefCell;
+use std::collections::BTreeMap;
+use std::rc::Rc;
+
+/// Text directionality of document content.
+///
+/// Corresponds to the HTML `dir` attribute and `bdi` element directionality.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "metadata", derive(serde::Serialize, serde::Deserialize))]
+pub enum TextDirection {
+    /// Left-to-right text flow (default for Latin scripts)
+    LeftToRight,
+    /// Right-to-left text flow (Hebrew, Arabic, Urdu, etc.)
+    RightToLeft,
+    /// Automatic directionality detection
+    Auto,
+}
+
+impl std::fmt::Display for TextDirection {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::LeftToRight => write!(f, "ltr"),
+            Self::RightToLeft => write!(f, "rtl"),
+            Self::Auto => write!(f, "auto"),
+        }
+    }
+}
+
+impl TextDirection {
+    /// Parse a text direction from string value.
+    ///
+    /// # Arguments
+    ///
+    /// * `s` - Direction string ("ltr", "rtl", or "auto")
+    ///
+    /// # Returns
+    ///
+    /// `Some(TextDirection)` if valid, `None` otherwise.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use html_to_markdown_rs::metadata::TextDirection;
+    /// assert_eq!(TextDirection::parse("ltr"), Some(TextDirection::LeftToRight));
+    /// assert_eq!(TextDirection::parse("rtl"), Some(TextDirection::RightToLeft));
+    /// assert_eq!(TextDirection::parse("auto"), Some(TextDirection::Auto));
+    /// assert_eq!(TextDirection::parse("invalid"), None);
+    /// ```
+    pub fn parse(s: &str) -> Option<Self> {
+        match s.to_lowercase().as_str() {
+            "ltr" => Some(Self::LeftToRight),
+            "rtl" => Some(Self::RightToLeft),
+            "auto" => Some(Self::Auto),
+            _ => None,
+        }
+    }
+}
+
+/// Link classification based on href value and document context.
+///
+/// Used to categorize links during extraction for filtering and analysis.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "metadata", derive(serde::Serialize, serde::Deserialize))]
+pub enum LinkType {
+    /// Anchor link within same document (href starts with #)
+    Anchor,
+    /// Internal link within same domain
+    Internal,
+    /// External link to different domain
+    External,
+    /// Email link (mailto:)
+    Email,
+    /// Phone link (tel:)
+    Phone,
+    /// Other protocol or unclassifiable
+    Other,
+}
+
+impl std::fmt::Display for LinkType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Anchor => write!(f, "anchor"),
+            Self::Internal => write!(f, "internal"),
+            Self::External => write!(f, "external"),
+            Self::Email => write!(f, "email"),
+            Self::Phone => write!(f, "phone"),
+            Self::Other => write!(f, "other"),
+        }
+    }
+}
+
+/// Image source classification for proper handling and processing.
+///
+/// Determines whether an image is embedded (data URI), inline SVG, external, or relative.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "metadata", derive(serde::Serialize, serde::Deserialize))]
+pub enum ImageType {
+    /// Data URI embedded image (base64 or other encoding)
+    DataUri,
+    /// Inline SVG element
+    InlineSvg,
+    /// External image URL (http/https)
+    External,
+    /// Relative image path
+    Relative,
+}
+
+impl std::fmt::Display for ImageType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::DataUri => write!(f, "data_uri"),
+            Self::InlineSvg => write!(f, "inline_svg"),
+            Self::External => write!(f, "external"),
+            Self::Relative => write!(f, "relative"),
+        }
+    }
+}
+
+/// Structured data format type.
+///
+/// Identifies the schema/format used for structured data markup.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "metadata", derive(serde::Serialize, serde::Deserialize))]
+pub enum StructuredDataType {
+    /// JSON-LD (JSON for Linking Data) script blocks
+    JsonLd,
+    /// HTML5 Microdata attributes (itemscope, itemtype, itemprop)
+    Microdata,
+    /// RDF in Attributes (RDFa) markup
+    RDFa,
+}
+
+impl std::fmt::Display for StructuredDataType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::JsonLd => write!(f, "json_ld"),
+            Self::Microdata => write!(f, "microdata"),
+            Self::RDFa => write!(f, "rdfa"),
+        }
+    }
+}
+
+/// Document-level metadata extracted from `<head>` and top-level elements.
+///
+/// Contains all metadata typically used by search engines, social media platforms,
+/// and browsers for document indexing and presentation.
+///
+/// # Examples
+///
+/// ```
+/// # use html_to_markdown_rs::metadata::DocumentMetadata;
+/// let doc = DocumentMetadata {
+///     title: Some("My Article".to_string()),
+///     description: Some("A great article about Rust".to_string()),
+///     keywords: vec!["rust".to_string(), "programming".to_string()],
+///     ..Default::default()
+/// };
+///
+/// assert_eq!(doc.title, Some("My Article".to_string()));
+/// ```
+#[derive(Debug, Clone, Default)]
+#[cfg_attr(feature = "metadata", derive(serde::Serialize, serde::Deserialize))]
+pub struct DocumentMetadata {
+    /// Document title from `<title>` tag
+    pub title: Option<String>,
+
+    /// Document description from `<meta name="description">` tag
+    pub description: Option<String>,
+
+    /// Document keywords from `<meta name="keywords">` tag, split on commas
+    pub keywords: Vec<String>,
+
+    /// Document author from `<meta name="author">` tag
+    pub author: Option<String>,
+
+    /// Canonical URL from `<link rel="canonical">` tag
+    pub canonical_url: Option<String>,
+
+    /// Base URL from `<base href="">` tag for resolving relative URLs
+    pub base_href: Option<String>,
+
+    /// Document language from `lang` attribute
+    pub language: Option<String>,
+
+    /// Document text direction from `dir` attribute
+    pub text_direction: Option<TextDirection>,
+
+    /// Open Graph metadata (og:* properties) for social media
+    /// Keys like "title", "description", "image", "url", etc.
+    pub open_graph: BTreeMap<String, String>,
+
+    /// Twitter Card metadata (twitter:* properties)
+    /// Keys like "card", "site", "creator", "title", "description", "image", etc.
+    pub twitter_card: BTreeMap<String, String>,
+
+    /// Additional meta tags not covered by specific fields
+    /// Keys are meta name/property attributes, values are content
+    pub meta_tags: BTreeMap<String, String>,
+}
+
+/// Header element metadata with hierarchy tracking.
+///
+/// Captures heading elements (h1-h6) with their text content, identifiers,
+/// and position in the document structure.
+///
+/// # Examples
+///
+/// ```
+/// # use html_to_markdown_rs::metadata::HeaderMetadata;
+/// let header = HeaderMetadata {
+///     level: 1,
+///     text: "Main Title".to_string(),
+///     id: Some("main-title".to_string()),
+///     depth: 0,
+///     html_offset: 145,
+/// };
+///
+/// assert_eq!(header.level, 1);
+/// assert!(header.is_valid());
+/// ```
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "metadata", derive(serde::Serialize, serde::Deserialize))]
+pub struct HeaderMetadata {
+    /// Header level: 1 (h1) through 6 (h6)
+    pub level: u8,
+
+    /// Normalized text content of the header
+    pub text: String,
+
+    /// HTML id attribute if present
+    pub id: Option<String>,
+
+    /// Document tree depth at the header element
+    pub depth: usize,
+
+    /// Byte offset in original HTML document
+    pub html_offset: usize,
+}
+
+impl HeaderMetadata {
+    /// Validate that the header level is within valid range (1-6).
+    ///
+    /// # Returns
+    ///
+    /// `true` if level is 1-6, `false` otherwise.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use html_to_markdown_rs::metadata::HeaderMetadata;
+    /// let valid = HeaderMetadata {
+    ///     level: 3,
+    ///     text: "Title".to_string(),
+    ///     id: None,
+    ///     depth: 2,
+    ///     html_offset: 100,
+    /// };
+    /// assert!(valid.is_valid());
+    ///
+    /// let invalid = HeaderMetadata {
+    ///     level: 7,  // Invalid
+    ///     text: "Title".to_string(),
+    ///     id: None,
+    ///     depth: 2,
+    ///     html_offset: 100,
+    /// };
+    /// assert!(!invalid.is_valid());
+    /// ```
+    pub fn is_valid(&self) -> bool {
+        self.level >= 1 && self.level <= 6
+    }
+}
+
+/// Hyperlink metadata with categorization and attributes.
+///
+/// Represents `<a>` elements with parsed href values, text content, and link type classification.
+///
+/// # Examples
+///
+/// ```
+/// # use html_to_markdown_rs::metadata::{LinkMetadata, LinkType};
+/// let link = LinkMetadata {
+///     href: "https://example.com".to_string(),
+///     text: "Example".to_string(),
+///     title: Some("Visit Example".to_string()),
+///     link_type: LinkType::External,
+///     rel: vec!["nofollow".to_string()],
+///     attributes: Default::default(),
+/// };
+///
+/// assert_eq!(link.link_type, LinkType::External);
+/// assert_eq!(link.text, "Example");
+/// ```
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "metadata", derive(serde::Serialize, serde::Deserialize))]
+pub struct LinkMetadata {
+    /// The href URL value
+    pub href: String,
+
+    /// Link text content (normalized, concatenated if mixed with elements)
+    pub text: String,
+
+    /// Optional title attribute (often shown as tooltip)
+    pub title: Option<String>,
+
+    /// Link type classification
+    pub link_type: LinkType,
+
+    /// Rel attribute values (e.g., "nofollow", "stylesheet", "canonical")
+    pub rel: Vec<String>,
+
+    /// Additional HTML attributes
+    pub attributes: BTreeMap<String, String>,
+}
+
+impl LinkMetadata {
+    /// Classify a link based on href value.
+    ///
+    /// # Arguments
+    ///
+    /// * `href` - The href attribute value
+    ///
+    /// # Returns
+    ///
+    /// Appropriate [`LinkType`] based on protocol and content.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use html_to_markdown_rs::metadata::{LinkMetadata, LinkType};
+    /// assert_eq!(LinkMetadata::classify_link("#section"), LinkType::Anchor);
+    /// assert_eq!(LinkMetadata::classify_link("mailto:test@example.com"), LinkType::Email);
+    /// assert_eq!(LinkMetadata::classify_link("tel:+1234567890"), LinkType::Phone);
+    /// assert_eq!(LinkMetadata::classify_link("https://example.com"), LinkType::External);
+    /// ```
+    pub fn classify_link(href: &str) -> LinkType {
+        if href.starts_with('#') {
+            LinkType::Anchor
+        } else if href.starts_with("mailto:") {
+            LinkType::Email
+        } else if href.starts_with("tel:") {
+            LinkType::Phone
+        } else if href.starts_with("http://") || href.starts_with("https://") {
+            LinkType::External
+        } else if href.starts_with('/') || href.starts_with("../") || href.starts_with("./") {
+            LinkType::Internal
+        } else {
+            LinkType::Other
+        }
+    }
+}
+
+/// Image metadata with source and dimensions.
+///
+/// Captures `<img>` elements and inline `<svg>` elements with metadata
+/// for image analysis and optimization.
+///
+/// # Examples
+///
+/// ```
+/// # use html_to_markdown_rs::metadata::{ImageMetadata, ImageType};
+/// let img = ImageMetadata {
+///     src: "https://example.com/image.jpg".to_string(),
+///     alt: Some("An example image".to_string()),
+///     title: Some("Example".to_string()),
+///     dimensions: Some((800, 600)),
+///     image_type: ImageType::External,
+///     attributes: Default::default(),
+/// };
+///
+/// assert_eq!(img.image_type, ImageType::External);
+/// ```
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "metadata", derive(serde::Serialize, serde::Deserialize))]
+pub struct ImageMetadata {
+    /// Image source (URL, data URI, or SVG content identifier)
+    pub src: String,
+
+    /// Alternative text from alt attribute (for accessibility)
+    pub alt: Option<String>,
+
+    /// Title attribute (often shown as tooltip)
+    pub title: Option<String>,
+
+    /// Image dimensions as (width, height) if available
+    pub dimensions: Option<(u32, u32)>,
+
+    /// Image type classification
+    pub image_type: ImageType,
+
+    /// Additional HTML attributes
+    pub attributes: BTreeMap<String, String>,
+}
+
+/// Structured data block (JSON-LD, Microdata, or RDFa).
+///
+/// Represents machine-readable structured data found in the document.
+/// JSON-LD blocks are collected as raw JSON strings for flexibility.
+///
+/// # Examples
+///
+/// ```
+/// # use html_to_markdown_rs::metadata::{StructuredData, StructuredDataType};
+/// let schema = StructuredData {
+///     data_type: StructuredDataType::JsonLd,
+///     raw_json: r#"{"@context":"https://schema.org","@type":"Article"}"#.to_string(),
+///     schema_type: Some("Article".to_string()),
+/// };
+///
+/// assert_eq!(schema.data_type, StructuredDataType::JsonLd);
+/// ```
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "metadata", derive(serde::Serialize, serde::Deserialize))]
+pub struct StructuredData {
+    /// Type of structured data (JSON-LD, Microdata, RDFa)
+    pub data_type: StructuredDataType,
+
+    /// Raw JSON string (for JSON-LD) or serialized representation
+    pub raw_json: String,
+
+    /// Schema type if detectable (e.g., "Article", "Event", "Product")
+    pub schema_type: Option<String>,
+}
+
+/// Configuration for metadata extraction granularity.
+///
+/// Controls which metadata types are extracted and size limits for safety.
+///
+/// # Examples
+///
+/// ```
+/// # use html_to_markdown_rs::metadata::MetadataConfig;
+/// let config = MetadataConfig {
+///     extract_headers: true,
+///     extract_links: true,
+///     extract_images: true,
+///     extract_structured_data: true,
+///     max_structured_data_size: 1_000_000,
+/// };
+///
+/// assert!(config.extract_headers);
+/// ```
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "metadata", derive(serde::Serialize, serde::Deserialize))]
+pub struct MetadataConfig {
+    /// Extract h1-h6 header elements and their hierarchy
+    pub extract_headers: bool,
+
+    /// Extract anchor (a) elements as links with type classification
+    pub extract_links: bool,
+
+    /// Extract image elements and data URIs
+    pub extract_images: bool,
+
+    /// Extract structured data (JSON-LD, Microdata, RDFa)
+    pub extract_structured_data: bool,
+
+    /// Maximum total size of structured data to collect (bytes)
+    /// Prevents memory exhaustion on malformed or adversarial documents
+    pub max_structured_data_size: usize,
+}
+
+impl Default for MetadataConfig {
+    /// Create default metadata configuration.
+    ///
+    /// Defaults to extracting all metadata types with 1MB limit on structured data.
+    fn default() -> Self {
+        Self {
+            extract_headers: true,
+            extract_links: true,
+            extract_images: true,
+            extract_structured_data: true,
+            max_structured_data_size: 1_000_000, // 1 MB
+        }
+    }
+}
+
+/// Comprehensive metadata extraction result from HTML document.
+///
+/// Contains all extracted metadata types in a single structure,
+/// suitable for serialization and transmission across language boundaries.
+///
+/// # Examples
+///
+/// ```
+/// # use html_to_markdown_rs::metadata::ExtendedMetadata;
+/// let metadata = ExtendedMetadata {
+///     document: Default::default(),
+///     headers: Vec::new(),
+///     links: Vec::new(),
+///     images: Vec::new(),
+///     structured_data: Vec::new(),
+/// };
+///
+/// assert!(metadata.headers.is_empty());
+/// ```
+#[derive(Debug, Clone, Default)]
+#[cfg_attr(feature = "metadata", derive(serde::Serialize, serde::Deserialize))]
+pub struct ExtendedMetadata {
+    /// Document-level metadata (title, description, canonical, etc.)
+    pub document: DocumentMetadata,
+
+    /// Extracted header elements with hierarchy
+    pub headers: Vec<HeaderMetadata>,
+
+    /// Extracted hyperlinks with type classification
+    pub links: Vec<LinkMetadata>,
+
+    /// Extracted images with source and dimensions
+    pub images: Vec<ImageMetadata>,
+
+    /// Extracted structured data blocks
+    pub structured_data: Vec<StructuredData>,
+}
+
+/// Internal metadata collector for single-pass extraction.
+///
+/// Follows the [`InlineImageCollector`](crate::inline_images::InlineImageCollector) pattern
+/// for efficient metadata extraction during tree traversal. Maintains state for:
+/// - Document metadata from head elements
+/// - Header hierarchy tracking
+/// - Link accumulation
+/// - Structured data collection
+/// - Language and directionality attributes
+///
+/// # Architecture
+///
+/// The collector is designed to be:
+/// - **Performant**: Pre-allocated collections, minimal cloning
+/// - **Single-pass**: Collects during main tree walk without separate passes
+/// - **Optional**: Zero overhead when disabled via feature flags
+/// - **Type-safe**: Strict separation of collection and result types
+///
+/// # Internal State
+///
+/// - `head_metadata`: Raw metadata pairs from head element
+/// - `headers`: Collected header elements
+/// - `header_stack`: For tracking nesting depth
+/// - `links`: Collected link elements
+/// - `base_href`: Base URL for relative link resolution
+/// - `json_ld`: JSON-LD script block contents
+/// - `lang`: Document language
+/// - `dir`: Document text direction
+#[derive(Debug)]
+#[allow(dead_code)]
+pub(crate) struct MetadataCollector {
+    head_metadata: BTreeMap<String, String>,
+    headers: Vec<HeaderMetadata>,
+    header_stack: Vec<usize>,
+    links: Vec<LinkMetadata>,
+    images: Vec<ImageMetadata>,
+    json_ld: Vec<String>,
+    structured_data_size: usize,
+    config: MetadataConfig,
+    lang: Option<String>,
+    dir: Option<String>,
+}
+
+#[allow(dead_code)]
+impl MetadataCollector {
+    /// Create a new metadata collector with configuration.
+    ///
+    /// Pre-allocates collections based on typical document sizes
+    /// for efficient append operations during traversal.
+    ///
+    /// # Arguments
+    ///
+    /// * `config` - Extraction configuration specifying which types to collect
+    ///
+    /// # Returns
+    ///
+    /// A new collector ready for use during tree traversal.
+    ///
+    /// # Examples
+    ///
+    /// ```ignore
+    /// let config = MetadataConfig::default();
+    /// let collector = MetadataCollector::new(config);
+    /// ```
+    pub(crate) fn new(config: MetadataConfig) -> Self {
+        Self {
+            head_metadata: BTreeMap::new(),
+            headers: Vec::with_capacity(32),     // Typical docs have ~20-50 headers
+            header_stack: Vec::with_capacity(6), // Max nesting depth is 6
+            links: Vec::with_capacity(64),       // Typical docs have 50-100+ links
+            images: Vec::with_capacity(16),      // Typical docs have 10-20 images
+            json_ld: Vec::with_capacity(4),      // Typically 1-3 JSON-LD blocks
+            structured_data_size: 0,
+            config,
+            lang: None,
+            dir: None,
+        }
+    }
+
+    /// Add a header element to the collection.
+    ///
+    /// Validates that level is in range 1-6 and tracks hierarchy via depth.
+    ///
+    /// # Arguments
+    ///
+    /// * `level` - Header level (1-6)
+    /// * `text` - Normalized header text content
+    /// * `id` - Optional HTML id attribute
+    /// * `depth` - Current document nesting depth
+    /// * `html_offset` - Byte offset in original HTML
+    pub(crate) fn add_header(&mut self, level: u8, text: String, id: Option<String>, depth: usize, html_offset: usize) {
+        if !self.config.extract_headers {
+            return;
+        }
+
+        if !(1..=6).contains(&level) {
+            return;
+        }
+
+        let header = HeaderMetadata {
+            level,
+            text,
+            id,
+            depth,
+            html_offset,
+        };
+
+        self.headers.push(header);
+    }
+
+    /// Add a link element to the collection.
+    ///
+    /// Classifies the link based on href value and stores with metadata.
+    ///
+    /// # Arguments
+    ///
+    /// * `href` - The href attribute value
+    /// * `text` - Link text content
+    /// * `title` - Optional title attribute
+    /// * `rel` - Comma/space-separated rel attribute value
+    pub(crate) fn add_link(&mut self, href: String, text: String, title: Option<String>, rel: Option<String>) {
+        if !self.config.extract_links {
+            return;
+        }
+
+        let link_type = LinkMetadata::classify_link(&href);
+
+        let rel_vec = rel
+            .map(|r| r.split_whitespace().map(|s| s.to_string()).collect::<Vec<_>>())
+            .unwrap_or_default();
+
+        let link = LinkMetadata {
+            href,
+            text,
+            title,
+            link_type,
+            rel: rel_vec,
+            attributes: BTreeMap::new(),
+        };
+
+        self.links.push(link);
+    }
+
+    /// Add an image element to the collection.
+    ///
+    /// # Arguments
+    ///
+    /// * `src` - Image source (URL or data URI)
+    /// * `alt` - Optional alt text
+    /// * `title` - Optional title attribute
+    /// * `dimensions` - Optional (width, height) tuple
+    pub(crate) fn add_image(
+        &mut self,
+        src: String,
+        alt: Option<String>,
+        title: Option<String>,
+        dimensions: Option<(u32, u32)>,
+    ) {
+        if !self.config.extract_images {
+            return;
+        }
+
+        let image_type = if src.starts_with("data:") {
+            ImageType::DataUri
+        } else if src.starts_with("http://") || src.starts_with("https://") {
+            ImageType::External
+        } else if src.starts_with('<') && src.contains("svg") {
+            ImageType::InlineSvg
+        } else {
+            ImageType::Relative
+        };
+
+        let image = ImageMetadata {
+            src,
+            alt,
+            title,
+            dimensions,
+            image_type,
+            attributes: BTreeMap::new(),
+        };
+
+        self.images.push(image);
+    }
+
+    /// Add a JSON-LD structured data block.
+    ///
+    /// Accumulates JSON content with size validation against configured limits.
+    ///
+    /// # Arguments
+    ///
+    /// * `json_content` - Raw JSON string content
+    pub(crate) fn add_json_ld(&mut self, json_content: String) {
+        if !self.config.extract_structured_data {
+            return;
+        }
+
+        let content_size = json_content.len();
+        if self.structured_data_size + content_size > self.config.max_structured_data_size {
+            return; // Skip to avoid memory exhaustion
+        }
+
+        self.structured_data_size += content_size;
+        self.json_ld.push(json_content);
+    }
+
+    /// Set document head metadata from extracted head section.
+    ///
+    /// Merges metadata pairs from head elements (meta, title, link, etc.)
+    /// into the collector's head metadata store.
+    ///
+    /// # Arguments
+    ///
+    /// * `metadata` - BTreeMap of metadata key-value pairs
+    pub(crate) fn set_head_metadata(&mut self, metadata: BTreeMap<String, String>) {
+        self.head_metadata.extend(metadata);
+    }
+
+    /// Set document language attribute.
+    ///
+    /// Usually from `lang` attribute on `<html>` or `<body>` tag.
+    /// Only sets if not already set (first occurrence wins).
+    ///
+    /// # Arguments
+    ///
+    /// * `lang` - Language code (e.g., "en", "es", "fr")
+    pub(crate) fn set_language(&mut self, lang: String) {
+        if self.lang.is_none() {
+            self.lang = Some(lang);
+        }
+    }
+
+    /// Set document text direction attribute.
+    ///
+    /// Usually from `dir` attribute on `<html>` or `<body>` tag.
+    /// Only sets if not already set (first occurrence wins).
+    ///
+    /// # Arguments
+    ///
+    /// * `dir` - Direction string ("ltr", "rtl", or "auto")
+    pub(crate) fn set_text_direction(&mut self, dir: String) {
+        if self.dir.is_none() {
+            self.dir = Some(dir);
+        }
+    }
+
+    /// Extract document metadata from collected head metadata.
+    ///
+    /// Parses head metadata into structured document metadata,
+    /// handling special cases like Open Graph, Twitter Card, keywords, etc.
+    #[allow(dead_code)]
+    fn extract_document_metadata(&self) -> DocumentMetadata {
+        let mut doc = DocumentMetadata::default();
+
+        for (key, value) in &self.head_metadata {
+            match key.to_lowercase().as_str() {
+                "title" => doc.title = Some(value.clone()),
+                "description" => doc.description = Some(value.clone()),
+                "author" => doc.author = Some(value.clone()),
+                "canonical" => doc.canonical_url = Some(value.clone()),
+                "base" => doc.base_href = Some(value.clone()),
+                key if key.starts_with("og:") => {
+                    let og_key = key.strip_prefix("og:").unwrap_or(key);
+                    doc.open_graph.insert(og_key.to_string(), value.clone());
+                }
+                key if key.starts_with("twitter:") => {
+                    let tw_key = key.strip_prefix("twitter:").unwrap_or(key);
+                    doc.twitter_card.insert(tw_key.to_string(), value.clone());
+                }
+                "keywords" => {
+                    doc.keywords = value.split(',').map(|s| s.trim().to_string()).collect();
+                }
+                _ => {
+                    doc.meta_tags.insert(key.clone(), value.clone());
+                }
+            }
+        }
+
+        if let Some(ref lang) = self.lang {
+            doc.language = Some(lang.clone());
+        }
+
+        if let Some(ref dir) = self.dir {
+            if let Some(parsed_dir) = TextDirection::parse(dir) {
+                doc.text_direction = Some(parsed_dir);
+            }
+        }
+
+        doc
+    }
+
+    /// Extract structured data blocks into StructuredData items.
+    #[allow(dead_code)]
+    fn extract_structured_data(&self) -> Vec<StructuredData> {
+        let mut result = Vec::with_capacity(self.json_ld.len());
+
+        for json_str in &self.json_ld {
+            // Try to extract schema type from JSON-LD
+            let schema_type = serde_json::from_str::<serde_json::Value>(json_str)
+                .ok()
+                .and_then(|v| v.get("@type").and_then(|t| t.as_str().map(|s| s.to_string())));
+
+            result.push(StructuredData {
+                data_type: StructuredDataType::JsonLd,
+                raw_json: json_str.clone(),
+                schema_type,
+            });
+        }
+
+        result
+    }
+
+    /// Finish collection and return all extracted metadata.
+    ///
+    /// Performs final processing, validation, and consolidation of all
+    /// collected data into the [`ExtendedMetadata`] output structure.
+    ///
+    /// # Returns
+    ///
+    /// Complete [`ExtendedMetadata`] with all extracted information.
+    #[allow(dead_code)]
+    pub(crate) fn finish(self) -> ExtendedMetadata {
+        // Extract structured data before consuming self
+        let structured_data = self.extract_structured_data();
+        let document = self.extract_document_metadata();
+
+        ExtendedMetadata {
+            document,
+            headers: self.headers,
+            links: self.links,
+            images: self.images,
+            structured_data,
+        }
+    }
+
+    /// Categorize links by type for analysis and filtering.
+    ///
+    /// Separates collected links into groups by [`LinkType`].
+    /// This is an analysis helper method; actual categorization happens during add_link.
+    ///
+    /// # Returns
+    ///
+    /// BTreeMap with LinkType as key and Vec of matching LinkMetadata as value.
+    #[allow(dead_code)]
+    pub(crate) fn categorize_links(&self) -> BTreeMap<String, Vec<&LinkMetadata>> {
+        let mut categorized: BTreeMap<String, Vec<&LinkMetadata>> = BTreeMap::new();
+
+        for link in &self.links {
+            let category = link.link_type.to_string();
+            categorized.entry(category).or_default().push(link);
+        }
+
+        categorized
+    }
+
+    /// Count headers by level for structural analysis.
+    ///
+    /// Returns count of headers at each level (1-6).
+    ///
+    /// # Returns
+    ///
+    /// BTreeMap with level as string key and count as value.
+    #[allow(dead_code)]
+    pub(crate) fn header_counts(&self) -> BTreeMap<String, usize> {
+        let mut counts: BTreeMap<String, usize> = BTreeMap::new();
+
+        for header in &self.headers {
+            *counts.entry(header.level.to_string()).or_insert(0) += 1;
+        }
+
+        counts
+    }
+}
+
+/// Handle to a metadata collector via reference-counted mutable cell.
+///
+/// Used internally for sharing collector state across the tree traversal.
+/// Matches the pattern used for [`InlineImageCollector`](crate::inline_images::InlineImageCollector).
+///
+/// # Examples
+///
+/// ```ignore
+/// let collector = MetadataCollector::new(MetadataConfig::default());
+/// let handle = Rc::new(RefCell::new(collector));
+///
+/// // In tree walk, can be passed and borrowed
+/// handle.borrow_mut().add_header(1, "Title".to_string(), None, 0, 100);
+///
+/// let metadata = handle.take().finish();
+/// ```
+#[allow(dead_code)]
+pub(crate) type MetadataCollectorHandle = Rc<RefCell<MetadataCollector>>;
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_text_direction_parse() {
+        assert_eq!(TextDirection::parse("ltr"), Some(TextDirection::LeftToRight));
+        assert_eq!(TextDirection::parse("rtl"), Some(TextDirection::RightToLeft));
+        assert_eq!(TextDirection::parse("auto"), Some(TextDirection::Auto));
+        assert_eq!(TextDirection::parse("invalid"), None);
+        assert_eq!(TextDirection::parse("LTR"), Some(TextDirection::LeftToRight));
+    }
+
+    #[test]
+    fn test_text_direction_display() {
+        assert_eq!(TextDirection::LeftToRight.to_string(), "ltr");
+        assert_eq!(TextDirection::RightToLeft.to_string(), "rtl");
+        assert_eq!(TextDirection::Auto.to_string(), "auto");
+    }
+
+    #[test]
+    fn test_link_classification() {
+        assert_eq!(LinkMetadata::classify_link("#section"), LinkType::Anchor);
+        assert_eq!(LinkMetadata::classify_link("mailto:test@example.com"), LinkType::Email);
+        assert_eq!(LinkMetadata::classify_link("tel:+1234567890"), LinkType::Phone);
+        assert_eq!(LinkMetadata::classify_link("https://example.com"), LinkType::External);
+        assert_eq!(LinkMetadata::classify_link("http://example.com"), LinkType::External);
+        assert_eq!(LinkMetadata::classify_link("/path/to/page"), LinkType::Internal);
+        assert_eq!(LinkMetadata::classify_link("../relative"), LinkType::Internal);
+        assert_eq!(LinkMetadata::classify_link("./same"), LinkType::Internal);
+    }
+
+    #[test]
+    fn test_header_validation() {
+        let valid = HeaderMetadata {
+            level: 3,
+            text: "Title".to_string(),
+            id: None,
+            depth: 2,
+            html_offset: 100,
+        };
+        assert!(valid.is_valid());
+
+        let invalid_high = HeaderMetadata {
+            level: 7,
+            text: "Title".to_string(),
+            id: None,
+            depth: 2,
+            html_offset: 100,
+        };
+        assert!(!invalid_high.is_valid());
+
+        let invalid_low = HeaderMetadata {
+            level: 0,
+            text: "Title".to_string(),
+            id: None,
+            depth: 2,
+            html_offset: 100,
+        };
+        assert!(!invalid_low.is_valid());
+    }
+
+    #[test]
+    fn test_metadata_collector_new() {
+        let config = MetadataConfig::default();
+        let collector = MetadataCollector::new(config);
+
+        assert_eq!(collector.headers.capacity(), 32);
+        assert_eq!(collector.links.capacity(), 64);
+        assert_eq!(collector.images.capacity(), 16);
+        assert_eq!(collector.json_ld.capacity(), 4);
+    }
+
+    #[test]
+    fn test_metadata_collector_add_header() {
+        let config = MetadataConfig::default();
+        let mut collector = MetadataCollector::new(config);
+
+        collector.add_header(1, "Title".to_string(), Some("title".to_string()), 0, 100);
+        assert_eq!(collector.headers.len(), 1);
+
+        let header = &collector.headers[0];
+        assert_eq!(header.level, 1);
+        assert_eq!(header.text, "Title");
+        assert_eq!(header.id, Some("title".to_string()));
+
+        // Invalid level should not be added
+        collector.add_header(7, "Invalid".to_string(), None, 0, 200);
+        assert_eq!(collector.headers.len(), 1);
+    }
+
+    #[test]
+    fn test_metadata_collector_add_link() {
+        let config = MetadataConfig::default();
+        let mut collector = MetadataCollector::new(config);
+
+        collector.add_link(
+            "https://example.com".to_string(),
+            "Example".to_string(),
+            Some("Visit".to_string()),
+            Some("nofollow external".to_string()),
+        );
+
+        assert_eq!(collector.links.len(), 1);
+
+        let link = &collector.links[0];
+        assert_eq!(link.href, "https://example.com");
+        assert_eq!(link.text, "Example");
+        assert_eq!(link.link_type, LinkType::External);
+        assert_eq!(link.rel, vec!["nofollow", "external"]);
+    }
+
+    #[test]
+    fn test_metadata_collector_respects_config() {
+        let config = MetadataConfig {
+            extract_headers: false,
+            extract_links: false,
+            extract_images: false,
+            extract_structured_data: false,
+            max_structured_data_size: 1_000_000,
+        };
+        let mut collector = MetadataCollector::new(config);
+
+        collector.add_header(1, "Title".to_string(), None, 0, 100);
+        collector.add_link("https://example.com".to_string(), "Link".to_string(), None, None);
+        collector.add_image("https://example.com/img.jpg".to_string(), None, None, None);
+        collector.add_json_ld("{}".to_string());
+
+        assert!(collector.headers.is_empty());
+        assert!(collector.links.is_empty());
+        assert!(collector.images.is_empty());
+        assert!(collector.json_ld.is_empty());
+    }
+
+    #[test]
+    fn test_metadata_collector_finish() {
+        let config = MetadataConfig::default();
+        let mut collector = MetadataCollector::new(config);
+
+        collector.set_language("en".to_string());
+        collector.add_header(1, "Main Title".to_string(), None, 0, 100);
+        collector.add_link("https://example.com".to_string(), "Example".to_string(), None, None);
+
+        let metadata = collector.finish();
+
+        assert_eq!(metadata.document.language, Some("en".to_string()));
+        assert_eq!(metadata.headers.len(), 1);
+        assert_eq!(metadata.links.len(), 1);
+    }
+
+    #[test]
+    fn test_document_metadata_default() {
+        let doc = DocumentMetadata::default();
+
+        assert!(doc.title.is_none());
+        assert!(doc.description.is_none());
+        assert!(doc.keywords.is_empty());
+        assert!(doc.open_graph.is_empty());
+        assert!(doc.twitter_card.is_empty());
+        assert!(doc.meta_tags.is_empty());
+    }
+
+    #[test]
+    fn test_metadata_config_default() {
+        let config = MetadataConfig::default();
+
+        assert!(config.extract_headers);
+        assert!(config.extract_links);
+        assert!(config.extract_images);
+        assert!(config.extract_structured_data);
+        assert_eq!(config.max_structured_data_size, 1_000_000);
+    }
+
+    #[test]
+    fn test_image_type_classification() {
+        let data_uri = ImageMetadata {
+            src: "data:image/png;base64,iVBORw0KG...".to_string(),
+            alt: None,
+            title: None,
+            dimensions: None,
+            image_type: ImageType::DataUri,
+            attributes: BTreeMap::new(),
+        };
+        assert_eq!(data_uri.image_type, ImageType::DataUri);
+
+        let external = ImageMetadata {
+            src: "https://example.com/image.jpg".to_string(),
+            alt: None,
+            title: None,
+            dimensions: None,
+            image_type: ImageType::External,
+            attributes: BTreeMap::new(),
+        };
+        assert_eq!(external.image_type, ImageType::External);
+    }
+
+    #[test]
+    fn test_link_type_display() {
+        assert_eq!(LinkType::Anchor.to_string(), "anchor");
+        assert_eq!(LinkType::Internal.to_string(), "internal");
+        assert_eq!(LinkType::External.to_string(), "external");
+        assert_eq!(LinkType::Email.to_string(), "email");
+        assert_eq!(LinkType::Phone.to_string(), "phone");
+        assert_eq!(LinkType::Other.to_string(), "other");
+    }
+
+    #[test]
+    fn test_structured_data_type_display() {
+        assert_eq!(StructuredDataType::JsonLd.to_string(), "json_ld");
+        assert_eq!(StructuredDataType::Microdata.to_string(), "microdata");
+        assert_eq!(StructuredDataType::RDFa.to_string(), "rdfa");
+    }
+
+    #[test]
+    fn test_categorize_links() {
+        let config = MetadataConfig::default();
+        let mut collector = MetadataCollector::new(config);
+
+        collector.add_link("#anchor".to_string(), "Anchor".to_string(), None, None);
+        collector.add_link("https://example.com".to_string(), "External".to_string(), None, None);
+        collector.add_link("mailto:test@example.com".to_string(), "Email".to_string(), None, None);
+
+        let categorized = collector.categorize_links();
+
+        assert_eq!(categorized.get("anchor").map(|v| v.len()), Some(1));
+        assert_eq!(categorized.get("external").map(|v| v.len()), Some(1));
+        assert_eq!(categorized.get("email").map(|v| v.len()), Some(1));
+    }
+
+    #[test]
+    fn test_header_counts() {
+        let config = MetadataConfig::default();
+        let mut collector = MetadataCollector::new(config);
+
+        collector.add_header(1, "H1".to_string(), None, 0, 100);
+        collector.add_header(2, "H2".to_string(), None, 1, 200);
+        collector.add_header(2, "H2b".to_string(), None, 1, 300);
+        collector.add_header(3, "H3".to_string(), None, 2, 400);
+
+        let counts = collector.header_counts();
+
+        assert_eq!(counts.get("1").copied(), Some(1));
+        assert_eq!(counts.get("2").copied(), Some(2));
+        assert_eq!(counts.get("3").copied(), Some(1));
+    }
+}
