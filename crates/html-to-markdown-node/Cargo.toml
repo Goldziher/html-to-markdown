@@ -23,3 +23,7 @@ mimalloc-rust = "0.2"
 
 [build-dependencies]
 napi-build = "2.2"
+
+[features]
+default = ["metadata"]
+metadata = ["html-to-markdown-rs/metadata"]

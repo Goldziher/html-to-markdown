@@ -133,6 +133,40 @@ if inline_images:
 
 Each inline image is returned as a typed dictionary (`bytes` payload, metadata, and relevant HTML attributes). Warnings are human-readable skip reasons.
 
+### Metadata extraction
+
+```python
+from html_to_markdown import ConversionOptions, MetadataConfig, convert_with_metadata
+
+html = """
+<html>
+  <head>
+    <title>Example</title>
+    <meta name="description" content="Demo page">
+    <link rel="canonical" href="https://example.com/page">
+  </head>
+  <body>
+    <h1 id="welcome">Welcome</h1>
+    <a href="https://example.com" rel="nofollow external">Example link</a>
+    <img src="https://example.com/image.jpg" alt="Hero" width="640" height="480">
+  </body>
+</html>
+"""
+
+markdown, metadata = convert_with_metadata(
+    html,
+    ConversionOptions(heading_style="atx"),
+    MetadataConfig(extract_links=True, extract_images=True, extract_headers=True),
+)
+
+print(markdown)
+print(metadata["document"]["title"])       # "Example"
+print(metadata["links"][0]["rel"])         # ["nofollow", "external"]
+print(metadata["images"][0]["dimensions"]) # (640, 480)
+```
+
+`metadata` includes document-level tags (title, description, canonical URL, Open Graph/Twitter cards), extracted links with `rel` and raw attributes, image metadata with inferred dimensions, and structured headers with depth + offset information. Feature flags in `MetadataConfig` let you keep only the sections you need.
+
 ### hOCR (HTML OCR) Support
 
 ```python

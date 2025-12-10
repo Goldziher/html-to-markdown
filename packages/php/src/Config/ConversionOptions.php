@@ -14,11 +14,11 @@ use HtmlToMarkdown\Exception\InvalidOption;
 use HtmlToMarkdown\Internal\TypeAssertions;
 
 /**
- * @phpstan-import-type PreprocessingOptionsInput from HtmlToMarkdown\Config\PreprocessingOptions
+ * @phpstan-import-type PreprocessingOptionsInput from \HtmlToMarkdown\Config\PreprocessingOptions
  * @phpstan-type ConversionOptionsInput array{
  *     heading_style?: value-of<HeadingStyle>,
  *     list_indent_type?: value-of<ListIndentType>,
- *     list_indent_width?: positive-int,
+ *     list_indent_width?: int,
  *     bullets?: string,
  *     strong_em_symbol?: string,
  *     escape_asterisks?: bool,
@@ -35,7 +35,7 @@ use HtmlToMarkdown\Internal\TypeAssertions;
  *     whitespace_mode?: value-of<WhitespaceMode>,
  *     strip_newlines?: bool,
  *     wrap?: bool,
- *     wrap_width?: positive-int,
+ *     wrap_width?: int,
  *     convert_as_inline?: bool,
  *     sub_symbol?: string,
  *     sup_symbol?: string,
@@ -100,7 +100,7 @@ final readonly class ConversionOptions
     }
 
     /**
-     * @param ConversionOptionsInput $input
+     * @param array<string, mixed> $input
      */
     public static function fromArray(array $input): self
     {
@@ -309,15 +309,19 @@ final readonly class ConversionOptions
     }
 
     /**
+     * @param mixed $value
      * @return PreprocessingOptionsInput
      */
     private static function normalizeArray(mixed $value, string $key): array
     {
         if (!\is_array($value)) {
-            throw InvalidOption::because($key, \sprintf('expected array, got %s', \get_debug_type($value)));
+            throw InvalidOption::because($key, 'expected preprocessing config array');
         }
 
-        return $value;
+        /** @var PreprocessingOptionsInput $normalized */
+        $normalized = $value;
+
+        return PreprocessingOptions::fromArray($normalized)->toArray();
     }
 
     private static function normalizeStrongSymbol(string $value): string

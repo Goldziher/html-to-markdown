@@ -18,6 +18,7 @@ use HtmlToMarkdown\Internal\TypeAssertions;
 final readonly class InlineImageConfig
 {
     public function __construct(
+        /** @phpstan-param positive-int $maxDecodedSizeBytes */
         public int $maxDecodedSizeBytes = 5 * 1024 * 1024,
         public ?string $filenamePrefix = null,
         public bool $captureSvg = true,
@@ -32,7 +33,7 @@ final readonly class InlineImageConfig
     }
 
     /**
-     * @param InlineImageConfigInput $input
+     * @param array<string, mixed> $input
      */
     public static function fromArray(array $input): self
     {
@@ -59,8 +60,11 @@ final readonly class InlineImageConfig
      */
     public function toArray(): array
     {
+        /** @var positive-int $size */
+        $size = $this->maxDecodedSizeBytes;
+
         return [
-            'max_decoded_size_bytes' => $this->maxDecodedSizeBytes,
+            'max_decoded_size_bytes' => $size,
             'filename_prefix' => $this->filenamePrefix,
             'capture_svg' => $this->captureSvg,
             'infer_dimensions' => $this->inferDimensions,

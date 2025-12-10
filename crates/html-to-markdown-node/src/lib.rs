@@ -1,5 +1,13 @@
 #![deny(clippy::all)]
 
+#[cfg(feature = "metadata")]
+use html_to_markdown_rs::metadata::{
+    DocumentMetadata as RustDocumentMetadata, ExtendedMetadata as RustExtendedMetadata,
+    HeaderMetadata as RustHeaderMetadata, ImageMetadata as RustImageMetadata, ImageType as RustImageType,
+    LinkMetadata as RustLinkMetadata, LinkType as RustLinkType, MetadataConfig as RustMetadataConfig,
+    StructuredData as RustStructuredData, StructuredDataType as RustStructuredDataType,
+    TextDirection as RustTextDirection,
+};
 use html_to_markdown_rs::safety::guard_panic;
 use html_to_markdown_rs::{
     CodeBlockStyle, ConversionError, ConversionOptions as RustConversionOptions, HeadingStyle, HighlightStyle,
@@ -432,6 +440,302 @@ fn source_to_string(source: &InlineImageSource) -> String {
     }
 }
 
+// ============= Metadata structs (feature-gated) =============
+
+/// Metadata extraction configuration
+#[cfg(feature = "metadata")]
+#[napi(object)]
+pub struct JsMetadataConfig {
+    #[napi(js_name = "extract_headers")]
+    pub extract_headers: Option<bool>,
+    #[napi(js_name = "extract_links")]
+    pub extract_links: Option<bool>,
+    #[napi(js_name = "extract_images")]
+    pub extract_images: Option<bool>,
+    #[napi(js_name = "extract_structured_data")]
+    pub extract_structured_data: Option<bool>,
+    #[napi(js_name = "max_structured_data_size")]
+    pub max_structured_data_size: Option<i64>,
+}
+
+#[cfg(feature = "metadata")]
+impl From<JsMetadataConfig> for RustMetadataConfig {
+    fn from(val: JsMetadataConfig) -> Self {
+        RustMetadataConfig {
+            extract_headers: val.extract_headers.unwrap_or(true),
+            extract_links: val.extract_links.unwrap_or(true),
+            extract_images: val.extract_images.unwrap_or(true),
+            extract_structured_data: val.extract_structured_data.unwrap_or(true),
+            max_structured_data_size: val.max_structured_data_size.unwrap_or(1_000_000) as usize,
+        }
+    }
+}
+
+/// Document-level metadata
+#[cfg(feature = "metadata")]
+#[napi(object)]
+pub struct JsDocumentMetadata {
+    pub title: Option<String>,
+    pub description: Option<String>,
+    pub keywords: Vec<String>,
+    pub author: Option<String>,
+    #[napi(js_name = "canonical_url")]
+    pub canonical_url: Option<String>,
+    #[napi(js_name = "base_href")]
+    pub base_href: Option<String>,
+    pub language: Option<String>,
+    #[napi(js_name = "text_direction")]
+    pub text_direction: Option<String>, // "ltr" | "rtl" | "auto"
+    #[napi(js_name = "open_graph")]
+    pub open_graph: HashMap<String, String>,
+    #[napi(js_name = "twitter_card")]
+    pub twitter_card: HashMap<String, String>,
+    #[napi(js_name = "meta_tags")]
+    pub meta_tags: HashMap<String, String>,
+}
+
+/// Header element metadata
+#[cfg(feature = "metadata")]
+#[napi(object)]
+pub struct JsHeaderMetadata {
+    pub level: u32,
+    pub text: String,
+    pub id: Option<String>,
+    pub depth: u32,
+    #[napi(js_name = "html_offset")]
+    pub html_offset: u32,
+}
+
+/// Hyperlink metadata
+#[cfg(feature = "metadata")]
+#[napi(object)]
+pub struct JsLinkMetadata {
+    pub href: String,
+    pub text: String,
+    pub title: Option<String>,
+    #[napi(js_name = "link_type")]
+    pub link_type: String, // "anchor" | "internal" | "external" | "email" | "phone" | "other"
+    pub rel: Vec<String>,
+    pub attributes: HashMap<String, String>,
+}
+
+/// Image metadata
+#[cfg(feature = "metadata")]
+#[napi(object)]
+pub struct JsImageMetadata {
+    pub src: String,
+    pub alt: Option<String>,
+    pub title: Option<String>,
+    pub dimensions: Option<Vec<u32>>, // [width, height]
+    #[napi(js_name = "image_type")]
+    pub image_type: String, // "data_uri" | "inline_svg" | "external" | "relative"
+    pub attributes: HashMap<String, String>,
+}
+
+/// Structured data (JSON-LD, Microdata, RDFa)
+#[cfg(feature = "metadata")]
+#[napi(object)]
+pub struct JsStructuredData {
+    #[napi(js_name = "data_type")]
+    pub data_type: String, // "json_ld" | "microdata" | "rdfa"
+    #[napi(js_name = "raw_json")]
+    pub raw_json: String,
+    #[napi(js_name = "schema_type")]
+    pub schema_type: Option<String>,
+}
+
+/// Complete extracted metadata
+#[cfg(feature = "metadata")]
+#[napi(object)]
+pub struct JsExtendedMetadata {
+    pub document: JsDocumentMetadata,
+    pub headers: Vec<JsHeaderMetadata>,
+    pub links: Vec<JsLinkMetadata>,
+    pub images: Vec<JsImageMetadata>,
+    pub structured_data: Vec<JsStructuredData>,
+}
+
+/// Result of conversion with metadata extraction
+#[cfg(feature = "metadata")]
+#[napi(object)]
+pub struct JsMetadataExtraction {
+    pub markdown: String,
+    pub metadata: JsExtendedMetadata,
+}
+
+// ============= Metadata conversion helpers =============
+
+#[cfg(feature = "metadata")]
+fn text_direction_to_string(direction: Option<RustTextDirection>) -> Option<String> {
+    direction.map(|d| d.to_string())
+}
+
+#[cfg(feature = "metadata")]
+fn link_type_to_string(link_type: &RustLinkType) -> String {
+    link_type.to_string()
+}
+
+#[cfg(feature = "metadata")]
+fn image_type_to_string(image_type: &RustImageType) -> String {
+    image_type.to_string()
+}
+
+#[cfg(feature = "metadata")]
+fn structured_data_type_to_string(data_type: &RustStructuredDataType) -> String {
+    data_type.to_string()
+}
+
+#[cfg(feature = "metadata")]
+fn convert_document_metadata(doc: RustDocumentMetadata) -> JsDocumentMetadata {
+    // Normalize head metadata keys that come from the Rust collector which preserves
+    // the `meta-*` prefix for head elements. Downstream consumers expect canonical
+    // names without the prefix and with OpenGraph/Twitter keys normalized.
+    let mut title = None;
+    let mut description = None;
+    let mut author = None;
+    let mut canonical_url = None;
+    let mut base_href = None;
+    let mut keywords = Vec::new();
+    let mut open_graph = HashMap::new();
+    let mut twitter_card = HashMap::new();
+    let mut meta_tags = HashMap::new();
+
+    for (raw_key, value) in doc.meta_tags.iter() {
+        let mut key = raw_key.to_lowercase();
+        let value = value.clone();
+
+        if let Some(stripped) = key.strip_prefix("meta-") {
+            key = stripped.to_string();
+        }
+
+        if key.contains(':') {
+            key = key.replace(':', "-");
+        }
+
+        match key.as_str() {
+            "title" => title = Some(value.clone()),
+            "description" => description = Some(value.clone()),
+            "author" => author = Some(value.clone()),
+            "canonical" => canonical_url = Some(value.clone()),
+            "base" | "base-href" => base_href = Some(value.clone()),
+            "keywords" => {
+                keywords = value
+                    .split(',')
+                    .map(|s| s.trim().to_string())
+                    .filter(|s| !s.is_empty())
+                    .collect();
+            }
+            k if k.starts_with("og-") => {
+                let og_key = k.trim_start_matches("og-").replace('-', "_");
+                open_graph.insert(og_key, value.clone());
+            }
+            k if k.starts_with("twitter-") => {
+                let tw_key = k.trim_start_matches("twitter-").replace('-', "_");
+                twitter_card.insert(tw_key, value.clone());
+            }
+            _ => {
+                meta_tags.insert(key, value.clone());
+            }
+        }
+    }
+
+    JsDocumentMetadata {
+        title: doc.title.or(title),
+        description: doc.description.or(description),
+        keywords: if doc.keywords.is_empty() {
+            keywords
+        } else {
+            doc.keywords
+        },
+        author: doc.author.or(author),
+        canonical_url: doc.canonical_url.or(canonical_url),
+        base_href: doc.base_href.or(base_href),
+        language: doc.language,
+        text_direction: text_direction_to_string(doc.text_direction),
+        open_graph: if doc.open_graph.is_empty() {
+            open_graph
+        } else {
+            doc.open_graph.into_iter().collect()
+        },
+        twitter_card: if doc.twitter_card.is_empty() {
+            twitter_card
+        } else {
+            doc.twitter_card.into_iter().collect()
+        },
+        meta_tags: if doc.meta_tags.is_empty() {
+            meta_tags
+        } else {
+            doc.meta_tags.into_iter().collect()
+        },
+    }
+}
+
+#[cfg(feature = "metadata")]
+fn convert_headers(headers: Vec<RustHeaderMetadata>) -> Vec<JsHeaderMetadata> {
+    headers
+        .into_iter()
+        .map(|h| JsHeaderMetadata {
+            level: h.level as u32,
+            text: h.text,
+            id: h.id,
+            depth: h.depth as u32,
+            html_offset: h.html_offset as u32,
+        })
+        .collect()
+}
+
+#[cfg(feature = "metadata")]
+fn convert_links(links: Vec<RustLinkMetadata>) -> Vec<JsLinkMetadata> {
+    links
+        .into_iter()
+        .map(|l| JsLinkMetadata {
+            href: l.href,
+            text: l.text,
+            title: l.title,
+            link_type: link_type_to_string(&l.link_type),
+            rel: l.rel,
+            attributes: l.attributes.into_iter().collect(),
+        })
+        .collect()
+}
+
+#[cfg(feature = "metadata")]
+fn convert_images(images: Vec<RustImageMetadata>) -> Vec<JsImageMetadata> {
+    images
+        .into_iter()
+        .map(|i| JsImageMetadata {
+            src: i.src,
+            alt: i.alt,
+            title: i.title,
+            dimensions: i.dimensions.map(|(w, h)| vec![w, h]),
+            image_type: image_type_to_string(&i.image_type),
+            attributes: i.attributes.into_iter().collect(),
+        })
+        .collect()
+}
+
+#[cfg(feature = "metadata")]
+fn convert_structured_data(data: Vec<RustStructuredData>) -> Vec<JsStructuredData> {
+    data.into_iter()
+        .map(|d| JsStructuredData {
+            data_type: structured_data_type_to_string(&d.data_type),
+            raw_json: d.raw_json,
+            schema_type: d.schema_type,
+        })
+        .collect()
+}
+
+#[cfg(feature = "metadata")]
+fn convert_metadata(metadata: RustExtendedMetadata) -> JsExtendedMetadata {
+    JsExtendedMetadata {
+        document: convert_document_metadata(metadata.document),
+        headers: convert_headers(metadata.headers),
+        links: convert_links(metadata.links),
+        images: convert_images(metadata.images),
+        structured_data: convert_structured_data(metadata.structured_data),
+    }
+}
+
 /// Convert HTML to Markdown
 ///
 /// # Arguments
@@ -554,6 +858,67 @@ pub fn convert_inline_images_buffer(
 ) -> Result<JsHtmlExtraction> {
     let html = buffer_to_str(&html)?;
     convert_inline_images_impl(html, options, image_config)
+}
+
+/// Convert HTML to Markdown with metadata extraction.
+///
+/// # Arguments
+///
+/// * `html` - The HTML string to convert
+/// * `options` - Optional conversion options
+/// * `metadata_config` - Optional metadata extraction configuration
+///
+/// # Example
+///
+/// ```javascript
+/// const { convertWithMetadata } = require('html-to-markdown');
+///
+/// const html = '<html lang="en"><head><title>Test</title></head><body><h1>Hello</h1></body></html>';
+/// const config = { extractHeaders: true, extractLinks: true };
+/// const result = convertWithMetadata(html, undefined, config);
+/// console.log(result.markdown);
+/// console.log(result.metadata.document.title);
+/// ```
+#[cfg(feature = "metadata")]
+#[napi(js_name = "convertWithMetadata")]
+pub fn convert_with_metadata(
+    html: String,
+    options: Option<JsConversionOptions>,
+    metadata_config: Option<JsMetadataConfig>,
+) -> Result<JsMetadataExtraction> {
+    let rust_options = options.map(Into::into);
+    let rust_config = metadata_config.map(Into::into).unwrap_or_default();
+
+    let (markdown, metadata) =
+        guard_panic(|| html_to_markdown_rs::convert_with_metadata(&html, rust_options, rust_config))
+            .map_err(to_js_error)?;
+
+    Ok(JsMetadataExtraction {
+        markdown,
+        metadata: convert_metadata(metadata),
+    })
+}
+
+/// Convert HTML from Buffer/Uint8Array with metadata extraction without intermediate string allocation.
+#[cfg(feature = "metadata")]
+#[napi(js_name = "convertWithMetadataBuffer")]
+pub fn convert_with_metadata_buffer(
+    html: Buffer,
+    options: Option<JsConversionOptions>,
+    metadata_config: Option<JsMetadataConfig>,
+) -> Result<JsMetadataExtraction> {
+    let html = buffer_to_str(&html)?;
+    let rust_options = options.map(Into::into);
+    let rust_config = metadata_config.map(Into::into).unwrap_or_default();
+
+    let (markdown, metadata) =
+        guard_panic(|| html_to_markdown_rs::convert_with_metadata(html, rust_options, rust_config))
+            .map_err(to_js_error)?;
+
+    Ok(JsMetadataExtraction {
+        markdown,
+        metadata: convert_metadata(metadata),
+    })
 }
 
 #[cfg(all(

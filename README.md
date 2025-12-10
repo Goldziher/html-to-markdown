@@ -102,6 +102,44 @@ See the JavaScript guides for full API documentation:
 - [Node.js/Bun guide](https://github.com/Goldziher/html-to-markdown/tree/main/crates/html-to-markdown-node)
 - [WebAssembly guide](https://github.com/Goldziher/html-to-markdown/tree/main/crates/html-to-markdown-wasm)
 
+### Metadata extraction (all languages)
+
+```typescript
+import { convertWithMetadata } from 'html-to-markdown-node';
+
+const html = `
+  <html>
+    <head>
+      <title>Example</title>
+      <meta name="description" content="Demo page">
+      <link rel="canonical" href="https://example.com/page">
+    </head>
+    <body>
+      <h1 id="welcome">Welcome</h1>
+      <a href="https://example.com" rel="nofollow external">Example link</a>
+      <img src="https://example.com/image.jpg" alt="Hero" width="640" height="480">
+    </body>
+  </html>
+`;
+
+const { markdown, metadata } = await convertWithMetadata(
+  html,
+  { headingStyle: 'Atx' },
+  { extract_links: true, extract_images: true, extract_headers: true },
+);
+
+console.log(markdown);
+// metadata.document.title === 'Example'
+// metadata.links[0].rel === ['nofollow', 'external']
+// metadata.images[0].dimensions === [640, 480]
+```
+
+Equivalent APIs are available in every binding:
+
+- Python: `convert_with_metadata(html, options=None, metadata_config=None)`
+- Ruby: `HtmlToMarkdown.convert_with_metadata(html, options = nil, metadata_config = nil)`
+- PHP: `convert_with_metadata(string $html, ?array $options = null, ?array $metadataConfig = null)`
+
 ### CLI
 
 ```bash

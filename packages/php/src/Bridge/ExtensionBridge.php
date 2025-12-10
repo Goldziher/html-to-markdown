@@ -10,14 +10,15 @@ use HtmlToMarkdown\Exception\ExtensionNotLoaded;
 use HtmlToMarkdown\Exception\InvalidOption;
 
 /**
- * @phpstan-import-type ConversionOptionsInput from HtmlToMarkdown\Config\ConversionOptions
- * @phpstan-import-type InlineImageConfigInput from HtmlToMarkdown\Config\InlineImageConfig
+ * @phpstan-import-type ConversionOptionsInput from \HtmlToMarkdown\Config\ConversionOptions
+ * @phpstan-import-type InlineImageConfigInput from \HtmlToMarkdown\Config\InlineImageConfig
  */
 
 final class ExtensionBridge implements ExtensionBridgeContract
 {
     private const CONVERT_FUNCTION = 'html_to_markdown_convert';
     private const CONVERT_INLINE_FUNCTION = 'html_to_markdown_convert_with_inline_images';
+    private const CONVERT_METADATA_FUNCTION = 'html_to_markdown_convert_with_metadata';
 
     /**
      * @param ConversionOptionsInput|null $options
@@ -67,6 +68,40 @@ final class ExtensionBridge implements ExtensionBridgeContract
         if (!\is_array($payload)) {
             throw InvalidOption::because(
                 'convert_with_inline_images',
+                'extension returned unexpected payload',
+            );
+        }
+
+        return $payload;
+    }
+
+    /**
+     * @param ConversionOptionsInput|null $options
+     * @param array<string, mixed>|null $metadataConfig
+     *
+     * @return array<string, mixed>
+     */
+    public function convertWithMetadata(
+        string $html,
+        ?array $options = null,
+        ?array $metadataConfig = null,
+    ): array {
+        /** @var callable-string $callable */
+        $callable = self::CONVERT_METADATA_FUNCTION;
+        if (!\function_exists($callable)) {
+            throw ExtensionNotLoaded::create();
+        }
+
+        try {
+            /** @var array<string, mixed> $payload */
+            $payload = $callable($html, $options, $metadataConfig);
+        } catch (\Throwable $exception) {
+            throw ConversionFailed::withMessage($exception->getMessage());
+        }
+
+        if (!\is_array($payload)) {
+            throw InvalidOption::because(
+                'convert_with_metadata',
                 'extension returned unexpected payload',
             );
         }
