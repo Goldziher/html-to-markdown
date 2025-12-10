@@ -8,6 +8,7 @@ use HtmlToMarkdown\Bridge\ExtensionBridge;
 use HtmlToMarkdown\Config\ConversionOptions;
 use HtmlToMarkdown\Config\InlineImageConfig;
 use HtmlToMarkdown\Contract\ExtensionBridge as ExtensionBridgeContract;
+use HtmlToMarkdown\Value\ExtendedMetadata;
 use HtmlToMarkdown\Value\InlineImageExtraction;
 
 /**
@@ -51,6 +52,27 @@ final class Converter
         );
 
         return InlineImageExtraction::fromExtensionPayload($payload);
+    }
+
+    /**
+     * @param ConversionOptions|ConversionOptionsInput|null $options
+     * @param array<string, mixed>|null $metadataConfig
+     */
+    public function convertWithMetadata(
+        string $html,
+        ConversionOptions|array|null $options = null,
+        ?array $metadataConfig = null,
+    ): array {
+        $payload = $this->bridge->convertWithMetadata(
+            $html,
+            $this->normalizeOptions($options),
+            $metadataConfig,
+        );
+
+        return [
+            'markdown' => $payload['markdown'] ?? '',
+            'metadata' => ExtendedMetadata::fromExtensionPayload($payload['metadata'] ?? []),
+        ];
     }
 
     /**

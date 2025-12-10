@@ -87,6 +87,74 @@ module HtmlToMarkdown
     warnings: Array[inline_image_warning]
   }
 
+  type metadata_config = {
+    extract_headers?: bool,
+    extract_links?: bool,
+    extract_images?: bool,
+    extract_structured_data?: bool,
+    max_structured_data_size?: Integer
+  }
+
+  type text_direction = "ltr" | "rtl" | "auto" | nil
+
+  type document_metadata = {
+    title: String?,
+    description: String?,
+    keywords: Array[String],
+    author: String?,
+    canonical_url: String?,
+    base_href: String?,
+    language: String?,
+    text_direction: text_direction,
+    open_graph: Hash[String, String],
+    twitter_card: Hash[String, String],
+    meta_tags: Hash[String, String]
+  }
+
+  type header_metadata = {
+    level: Integer,
+    text: String,
+    id: String?,
+    depth: Integer,
+    html_offset: Integer
+  }
+
+  type link_type = "anchor" | "internal" | "external" | "email" | "phone" | "other"
+
+  type link_metadata = {
+    href: String,
+    text: String,
+    title: String?,
+    link_type: link_type,
+    rel: Array[String],
+    attributes: Hash[String, String]
+  }
+
+  type image_type = "data_uri" | "inline_svg" | "external" | "relative"
+
+  type image_metadata = {
+    src: String,
+    alt: String?,
+    title: String?,
+    dimensions: [Integer, Integer]?,
+    image_type: image_type,
+    attributes: Hash[String, String]
+  }
+
+  type structured_data = {
+    data_type: "json_ld" | "microdata" | "rdfa",
+    raw_json: String,
+    schema_type: String?
+  }
+
+  type extended_metadata = {
+    document: document_metadata,
+    headers: Array[header_metadata],
+    links: Array[link_metadata],
+    images: Array[image_metadata],
+    structured_data: Array[structured_data]
+  }
+
   # Native methods (implemented in Rust via Magnus/rb-sys)
   # These are aliased from the Rust extension and available as both module and instance methods
   private
@@ -99,6 +167,11 @@ module HtmlToMarkdown
     conversion_options? options,
     inline_image_config? image_config
   ) -> html_extraction
+  def self.native_convert_with_metadata: (
+    String html,
+    conversion_options? options,
+    metadata_config? metadata_config
+  ) -> [String, extended_metadata]
 
   def native_convert: (String html, conversion_options? options) -> String
   def native_options: (conversion_options? options_hash) -> Options
@@ -108,14 +181,19 @@ module HtmlToMarkdown
     conversion_options? options,
     inline_image_config? image_config
   ) -> html_extraction
+  def native_convert_with_metadata: (
+    String html,
+    conversion_options? options,
+    metadata_config? metadata_config
+  ) -> [String, extended_metadata]
 
   public
 
   # Convert HTML to Markdown with optional configuration
-  def self.convert: (String html, ?conversion_options? options) -> String
+  def self.convert: (String html, ?conversion_options options) -> String
 
   # Create a reusable options handle for performance
-  def self.options: (?conversion_options? options_hash) -> Options
+  def self.options: (?conversion_options options_hash) -> Options
 
   # Convert HTML using a pre-built options handle
   def self.convert_with_options: (String html, Options options_handle) -> String
@@ -123,17 +201,54 @@ module HtmlToMarkdown
   # Convert HTML with inline image extraction
   def self.convert_with_inline_images: (
     String html,
-    ?conversion_options? options,
-    ?inline_image_config? image_config
+    ?conversion_options options,
+    ?inline_image_config image_config
   ) -> html_extraction
 
+  # Convert HTML to Markdown with metadata extraction
+  #
+  # Extracts comprehensive metadata (headers, links, images, structured data) during conversion.
+  #
+  # Args:
+  #   html: HTML string to convert
+  #   options: Optional conversion configuration
+  #   metadata_config: Optional metadata extraction configuration
+  #
+  # Returns:
+  #   Array containing:
+  #   - [0] markdown: String - Converted markdown output
+  #   - [1] metadata: Hash - Extracted metadata with document, headers, links, images, structured_data
+  #
+  # The metadata hash contains:
+  #   - document: Document-level metadata (title, description, lang, etc.)
+  #   - headers: List of header elements with hierarchy
+  #   - links: List of extracted hyperlinks with classification
+  #   - images: List of extracted images with metadata
+  #   - structured_data: List of JSON-LD, Microdata, or RDFa blocks
+  #
+  # Example:
+  #   html = '<html lang="en"><head><title>Test</title></head><body><h1>Hello</h1></body></html>'
+  #   markdown, metadata = HtmlToMarkdown.convert_with_metadata(html)
+  #   puts "Title: #{metadata['document']['title']}"
+  #   puts "Headers: #{metadata['headers'].length}"
+  def self.convert_with_metadata: (
+    String html,
+    ?conversion_options options,
+    ?metadata_config metadata_config
+  ) -> [String, extended_metadata]
+
   # Instance method versions (created by module_function)
-  def convert: (String html, ?conversion_options? options) -> String
-  def options: (?conversion_options? options_hash) -> Options
+  def convert: (String html, ?conversion_options options) -> String
+  def options: (?conversion_options options_hash) -> Options
   def convert_with_options: (String html, Options options_handle) -> String
   def convert_with_inline_images: (
     String html,
-    ?conversion_options? options,
-    ?inline_image_config? image_config
+    ?conversion_options options,
+    ?inline_image_config image_config
   ) -> html_extraction
+  def convert_with_metadata: (
+    String html,
+    ?conversion_options options,
+    ?metadata_config metadata_config
+  ) -> [String, extended_metadata]
 end

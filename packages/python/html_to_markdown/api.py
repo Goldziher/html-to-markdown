@@ -8,10 +8,16 @@ import html_to_markdown._html_to_markdown as _rust
 from html_to_markdown._html_to_markdown import (
     ConversionOptionsHandle as OptionsHandle,
 )
-from html_to_markdown._html_to_markdown import (
-    InlineImageConfig,
-)
+from html_to_markdown._html_to_markdown import InlineImageConfig
 from html_to_markdown.options import ConversionOptions, PreprocessingOptions
+
+_HAS_METADATA = False
+try:
+    from html_to_markdown._html_to_markdown import MetadataConfig
+
+    _HAS_METADATA = True
+except ImportError:
+    MetadataConfig = None  # type: ignore[misc,assignment]
 
 
 class InlineImage(TypedDict):
@@ -136,13 +142,51 @@ def convert_with_handle(html: str, handle: OptionsHandle) -> str:
     return _rust.convert_with_options_handle(html, handle)
 
 
+if _HAS_METADATA:
+
+    def convert_with_metadata(
+        html: str,
+        options: ConversionOptions | None = None,
+        preprocessing: PreprocessingOptions | None = None,
+        metadata_config: MetadataConfig | None = None,
+    ) -> tuple[str, dict]:
+        """Convert HTML and extract comprehensive metadata.
+
+        Args:
+            html: HTML string to convert
+            options: Optional conversion configuration
+            preprocessing: Optional preprocessing configuration
+            metadata_config: Optional metadata extraction configuration
+
+        Returns:
+            Tuple of (markdown, metadata_dict) where metadata_dict contains:
+            - document: Document-level metadata (title, description, lang, etc.)
+            - headers: List of header elements with hierarchy
+            - links: List of extracted hyperlinks with classification
+            - images: List of extracted images with metadata
+            - structured_data: List of JSON-LD, Microdata, or RDFa blocks
+        """
+        if options is None:
+            options = ConversionOptions()
+        if preprocessing is None:
+            preprocessing = PreprocessingOptions()
+        if metadata_config is None:
+            metadata_config = MetadataConfig()
+
+        rust_options = _to_rust_options(options, preprocessing)
+        markdown, metadata = _rust.convert_with_metadata(html, rust_options, metadata_config)
+        return markdown, metadata
+
+
 __all__ = [
     "InlineImage",
     "InlineImageConfig",
     "InlineImageWarning",
+    "MetadataConfig",
     "OptionsHandle",
     "convert",
     "convert_with_handle",
     "convert_with_inline_images",
+    "convert_with_metadata",
     "create_options_handle",
 ]

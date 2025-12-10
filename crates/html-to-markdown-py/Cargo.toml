@@ -29,3 +29,4 @@ image = { version = "0.25", default-features = false, features = ["png"] }
 [features]
 default = []
 extension-module = ["pyo3/extension-module"]
+metadata = ["html-to-markdown-rs/metadata"]

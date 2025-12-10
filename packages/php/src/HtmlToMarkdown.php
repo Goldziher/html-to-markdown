@@ -7,6 +7,7 @@ namespace HtmlToMarkdown;
 use HtmlToMarkdown\Config\ConversionOptions;
 use HtmlToMarkdown\Config\InlineImageConfig;
 use HtmlToMarkdown\Service\Converter as ConverterService;
+use HtmlToMarkdown\Value\ExtendedMetadata;
 use HtmlToMarkdown\Value\InlineImageExtraction;
 
 /**
@@ -34,5 +35,18 @@ final class HtmlToMarkdown
         InlineImageConfig|array|null $config = null,
     ): InlineImageExtraction {
         return ConverterService::create()->convertWithInlineImages($html, $options, $config);
+    }
+
+    /**
+     * @param ConversionOptions|ConversionOptionsInput|null $options
+     * @param array<string, mixed>|null $metadataConfig
+     * @return array{markdown: string, metadata: ExtendedMetadata}
+     */
+    public static function convertWithMetadata(
+        string $html,
+        ConversionOptions|array|null $options = null,
+        ?array $metadataConfig = null,
+    ): array {
+        return ConverterService::create()->convertWithMetadata($html, $options, $metadataConfig);
     }
 }

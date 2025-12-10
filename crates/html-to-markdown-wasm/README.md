@@ -291,6 +291,113 @@ for (const img of result.inlineImages) {
 }
 ```
 
+## Metadata Extraction
+
+Extract document metadata (headers, links, images, structured data) alongside Markdown conversion:
+
+```typescript
+import { convertWithMetadata, WasmMetadataConfig } from 'html-to-markdown-wasm';
+
+const html = `
+  <html lang="en">
+    <head><title>My Article</title></head>
+    <body>
+      <h1>Main Title</h1>
+      <p>Content with <a href="https://example.com">a link</a></p>
+      <img src="https://example.com/image.jpg" alt="Example image">
+    </body>
+  </html>
+`;
+
+const config = new WasmMetadataConfig();
+config.extractHeaders = true;
+config.extractLinks = true;
+config.extractImages = true;
+config.extractStructuredData = true;
+config.maxStructuredDataSize = 1_000_000; // 1MB limit
+
+const result = convertWithMetadata(html, null, config);
+
+console.log(result.markdown);
+console.log('Document metadata:', result.metadata.document);
+// {
+//   title: 'My Article',
+//   language: 'en',
+//   ...
+// }
+
+console.log('Headers:', result.metadata.headers);
+// [
+//   { level: 1, text: 'Main Title', id: undefined, depth: 0, htmlOffset: ... }
+// ]
+
+console.log('Links:', result.metadata.links);
+// [
+//   {
+//     href: 'https://example.com',
+//     text: 'a link',
+//     linkType: 'external',
+//     rel: [],
+//     ...
+//   }
+// ]
+
+console.log('Images:', result.metadata.images);
+// [
+//   {
+//     src: 'https://example.com/image.jpg',
+//     alt: 'Example image',
+//     imageType: 'external',
+//     ...
+//   }
+// ]
+```
+
+### Metadata Configuration
+
+The `WasmMetadataConfig` class controls what metadata is extracted:
+
+```typescript
+import { WasmMetadataConfig } from 'html-to-markdown-wasm';
+
+const config = new WasmMetadataConfig();
+
+// Enable/disable extraction types
+config.extractHeaders = true;              // h1-h6 elements
+config.extractLinks = true;                // <a> elements with link type classification
+config.extractImages = true;               // <img> and <svg> elements
+config.extractStructuredData = true;       // JSON-LD, Microdata, RDFa
+
+// Limit structured data size to prevent memory exhaustion
+config.maxStructuredDataSize = 1_000_000;  // 1MB default
+```
+
+### Metadata Structure
+
+The returned metadata object includes:
+
+- **document**: Document-level metadata (title, description, keywords, language, OG tags, Twitter cards, etc.)
+- **headers**: Array of header elements with level, text, id, and document position
+- **links**: Array of links with href, text, type (anchor/internal/external/email/phone), and rel attributes
+- **images**: Array of images with src, alt text, dimensions, and type classification (dataUri/external/relative/svg)
+- **structuredData**: Array of JSON-LD, Microdata, and RDFa blocks
+
+### Byte-Based Input
+
+Convert bytes directly with metadata extraction:
+
+```typescript
+import { convertBytesWithMetadata, WasmMetadataConfig } from 'html-to-markdown-wasm';
+import { readFileSync } from 'node:fs';
+
+const htmlBytes = readFileSync('article.html');
+const config = new WasmMetadataConfig();
+
+const result = convertBytesWithMetadata(htmlBytes, null, config);
+console.log(result.markdown);
+console.log(result.metadata);
+```
+
 ## Build Targets
 
 Three build targets are provided for different environments:

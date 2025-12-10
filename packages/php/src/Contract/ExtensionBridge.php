@@ -27,4 +27,16 @@ interface ExtensionBridge
         ?array $options = null,
         ?array $config = null,
     ): array;
+
+    /**
+     * @param ConversionOptionsInput|null $options
+     * @param array<string, mixed>|null $metadataConfig
+     *
+     * @return array<string, mixed>
+     */
+    public function convertWithMetadata(
+        string $html,
+        ?array $options = null,
+        ?array $metadataConfig = null,
+    ): array;
 }

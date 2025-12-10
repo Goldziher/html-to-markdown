@@ -15,6 +15,8 @@ V1 API (backward compatibility):
     markdown = convert_to_markdown(html, heading_style="atx")
 """
 
+import contextlib
+
 from html_to_markdown.api import (
     InlineImage,
     InlineImageConfig,
@@ -35,6 +37,10 @@ from html_to_markdown.exceptions import (
 from html_to_markdown.options import ConversionOptions, PreprocessingOptions
 from html_to_markdown.v1_compat import convert_to_markdown, markdownify
 
+# Optional metadata support
+with contextlib.suppress(ImportError):
+    from html_to_markdown.api import MetadataConfig, convert_with_metadata
+
 __all__ = [
     "ConflictingOptionsError",
     "ConversionOptions",
@@ -44,6 +50,7 @@ __all__ = [
     "InlineImageConfig",
     "InlineImageWarning",
     "InvalidParserError",
+    "MetadataConfig",
     "MissingDependencyError",
     "OptionsHandle",
     "PreprocessingOptions",
@@ -51,6 +58,7 @@ __all__ = [
     "convert_to_markdown",
     "convert_with_handle",
     "convert_with_inline_images",
+    "convert_with_metadata",
     "create_options_handle",
     "markdownify",
 ]
