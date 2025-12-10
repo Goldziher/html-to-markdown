@@ -150,15 +150,14 @@ fn truncate_at_char_boundary(value: &mut String, max_len: usize) {
 
 /// Remove common leading whitespace from all lines in a code block.
 ///
-/// This is used for `<pre>` blocks to normalize indentation by removing
-/// the minimum common whitespace from all non-empty lines.
+/// This is useful when HTML authors indent `<pre>` content for readability,
+/// so we can strip the shared indentation without touching meaningful spacing.
 fn dedent_code_block(content: &str) -> String {
     let lines: Vec<&str> = content.lines().collect();
     if lines.is_empty() {
         return String::new();
     }
 
-    // Find minimum indentation among non-empty lines using byte offsets
     let min_indent = lines
         .iter()
         .filter(|line| !line.trim().is_empty())
@@ -172,12 +171,11 @@ fn dedent_code_block(content: &str) -> String {
         .min()
         .unwrap_or(0);
 
-    // Remove that amount of leading whitespace from each line
     lines
         .iter()
         .map(|line| {
             if line.trim().is_empty() {
-                ""
+                *line
             } else {
                 &line[min_indent.min(line.len())..]
             }
@@ -496,6 +494,9 @@ struct Context {
     #[cfg(feature = "inline-images")]
     /// Shared collector for inline images when enabled.
     inline_collector: Option<InlineCollectorHandle>,
+    #[cfg(feature = "metadata")]
+    /// Shared collector for metadata when enabled.
+    metadata_collector: Option<crate::metadata::MetadataCollectorHandle>,
 }
 
 struct DomContext {
@@ -1417,7 +1418,7 @@ fn serialize_node(node_handle: &tl::NodeHandle, parser: &tl::Parser) -> String {
 
 /// Convert HTML to Markdown using tl DOM parser.
 pub fn convert_html(html: &str, options: &ConversionOptions) -> Result<String> {
-    convert_html_impl(html, options, None)
+    convert_html_impl(html, options, None, None)
 }
 
 #[cfg(feature = "inline-images")]
@@ -1426,14 +1427,26 @@ pub(crate) fn convert_html_with_inline_collector(
     options: &ConversionOptions,
     collector: InlineCollectorHandle,
 ) -> Result<String> {
-    convert_html_impl(html, options, Some(collector))
+    convert_html_impl(html, options, Some(collector), None)
+}
+
+#[cfg(feature = "metadata")]
+pub(crate) fn convert_html_with_metadata(
+    html: &str,
+    options: &ConversionOptions,
+    metadata_collector: crate::metadata::MetadataCollectorHandle,
+) -> Result<String> {
+    convert_html_impl(html, options, None, Some(metadata_collector))
 }
 
 #[cfg_attr(not(feature = "inline-images"), allow(unused_variables))]
+#[cfg_attr(not(feature = "metadata"), allow(unused_variables))]
 fn convert_html_impl(
     html: &str,
     options: &ConversionOptions,
     inline_collector: Option<InlineCollectorHandle>,
+    #[cfg(feature = "metadata")] metadata_collector: Option<crate::metadata::MetadataCollectorHandle>,
+    #[cfg(not(feature = "metadata"))] _metadata_collector: Option<()>,
 ) -> Result<String> {
     // Normalize problematic HTML constructs before parsing
     let mut preprocessed = preprocess_html(html).into_owned();
@@ -1526,6 +1539,44 @@ fn convert_html_impl(
         return Ok(output);
     }
 
+    // Extract head metadata if metadata collector is provided
+    #[cfg(feature = "metadata")]
+    if let Some(ref collector) = metadata_collector {
+        if !is_hocr {
+            for child_handle in dom_ref.children().iter() {
+                let head_meta = extract_metadata(child_handle, parser);
+                if !head_meta.is_empty() {
+                    collector.borrow_mut().set_head_metadata(head_meta);
+                    break;
+                }
+            }
+        }
+    }
+
+    // Extract html/body attributes for language and text direction if metadata collector is provided
+    #[cfg(feature = "metadata")]
+    if let Some(ref collector) = metadata_collector {
+        for child_handle in dom_ref.children().iter() {
+            if let Some(tl::Node::Tag(tag)) = child_handle.get(parser) {
+                let tag_name = tag.name().as_utf8_str();
+                if tag_name == "html" || tag_name == "body" {
+                    if let Some(lang) = tag.attributes().get("lang") {
+                        if let Some(lang_bytes) = lang {
+                            let lang_str = lang_bytes.as_utf8_str();
+                            collector.borrow_mut().set_language(lang_str.to_string());
+                        }
+                    }
+                    if let Some(dir) = tag.attributes().get("dir") {
+                        if let Some(dir_bytes) = dir {
+                            let dir_str = dir_bytes.as_utf8_str();
+                            collector.borrow_mut().set_text_direction(dir_str.to_string());
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     let ctx = Context {
         in_code: false,
         list_counter: 0,
@@ -1548,6 +1599,8 @@ fn convert_html_impl(
         in_strong: false,
         #[cfg(feature = "inline-images")]
         inline_collector: inline_collector.clone(),
+        #[cfg(feature = "metadata")]
+        metadata_collector: metadata_collector.clone(),
     };
 
     // Walk all top-level children
@@ -2765,6 +2818,22 @@ fn walk_node(
                 return;
             }
 
+            // NEW: Extract lang/dir from html, head, or body tags
+            #[cfg(feature = "metadata")]
+            if matches!(tag_name.as_ref(), "html" | "head" | "body") {
+                if let Some(ref collector) = ctx.metadata_collector {
+                    let mut c = collector.borrow_mut();
+
+                    if let Some(lang) = tag.attributes().get("lang").flatten() {
+                        c.set_language(lang.as_utf8_str().to_string());
+                    }
+
+                    if let Some(dir) = tag.attributes().get("dir").flatten() {
+                        c.set_text_direction(dir.as_utf8_str().to_string());
+                    }
+                }
+            }
+
             match tag_name.as_ref() {
                 "h1" | "h2" | "h3" | "h4" | "h5" | "h6" => {
                     let level = tag_name.chars().last().and_then(|c| c.to_digit(10)).unwrap_or(1) as usize;
@@ -2794,6 +2863,19 @@ fn walk_node(
                     if !trimmed.is_empty() {
                         let normalized = normalize_heading_text(trimmed);
                         push_heading(output, ctx, options, level, normalized.as_ref());
+
+                        // NEW: Collect header metadata
+                        #[cfg(feature = "metadata")]
+                        if let Some(ref collector) = ctx.metadata_collector {
+                            let id = tag
+                                .attributes()
+                                .get("id")
+                                .flatten()
+                                .map(|v| v.as_utf8_str().to_string());
+                            collector
+                                .borrow_mut()
+                                .add_header(level as u8, normalized.to_string(), id, depth, 0);
+                        }
                     }
                 }
 
@@ -3110,6 +3192,33 @@ fn walk_node(
                             label.as_str(),
                             options,
                         );
+
+                        // NEW: Collect link metadata
+                        #[cfg(feature = "metadata")]
+                        if let Some(ref collector) = ctx.metadata_collector {
+                            let rel_attr = tag
+                                .attributes()
+                                .get("rel")
+                                .flatten()
+                                .map(|v| v.as_utf8_str().to_string());
+                            let mut attributes_map = BTreeMap::new();
+                            for (key, value_opt) in tag.attributes().iter() {
+                                let key_str = key.to_string();
+                                if key_str == "href" {
+                                    continue;
+                                }
+
+                                let value = value_opt.map(|v| v.to_string()).unwrap_or_default();
+                                attributes_map.insert(key_str, value);
+                            }
+                            collector.borrow_mut().add_link(
+                                href.clone(),
+                                label.clone(),
+                                title.clone(),
+                                rel_attr,
+                                attributes_map,
+                            );
+                        }
                     } else {
                         let children = tag.children();
                         {
@@ -3138,6 +3247,30 @@ fn walk_node(
                         .unwrap_or(Cow::Borrowed(""));
 
                     let title = tag.attributes().get("title").flatten().map(|v| v.as_utf8_str());
+                    #[cfg(feature = "metadata")]
+                    let mut attributes_map = BTreeMap::new();
+                    #[cfg(feature = "metadata")]
+                    let mut width: Option<u32> = None;
+                    #[cfg(feature = "metadata")]
+                    let mut height: Option<u32> = None;
+                    #[cfg(feature = "metadata")]
+                    for (key, value_opt) in tag.attributes().iter() {
+                        let key_str = key.to_string();
+                        if key_str == "src" {
+                            continue;
+                        }
+                        let value = value_opt.map(|v| v.to_string()).unwrap_or_default();
+                        if key_str == "width" {
+                            if let Ok(parsed) = value.parse::<u32>() {
+                                width = Some(parsed);
+                            }
+                        } else if key_str == "height" {
+                            if let Ok(parsed) = value.parse::<u32>() {
+                                height = Some(parsed);
+                            }
+                        }
+                        attributes_map.insert(key_str, value);
+                    }
 
                     #[cfg(feature = "inline-images")]
                     if let Some(ref collector_ref) = ctx.inline_collector {
@@ -3184,12 +3317,30 @@ fn walk_node(
                         output.push_str(&alt);
                         output.push_str("](");
                         output.push_str(&src);
-                        if let Some(title_text) = title {
+                        if let Some(ref title_text) = title {
                             output.push_str(" \"");
-                            output.push_str(&title_text);
+                            output.push_str(title_text);
                             output.push('"');
                         }
                         output.push(')');
+                    }
+
+                    // NEW: Collect image metadata
+                    #[cfg(feature = "metadata")]
+                    if let Some(ref collector) = ctx.metadata_collector {
+                        if !src.is_empty() {
+                            let dimensions = match (width, height) {
+                                (Some(w), Some(h)) => Some((w, h)),
+                                _ => None,
+                            };
+                            collector.borrow_mut().add_image(
+                                src.to_string(),
+                                if alt.is_empty() { None } else { Some(alt.to_string()) },
+                                title.as_deref().map(|t| t.to_string()),
+                                dimensions,
+                                attributes_map.clone(),
+                            );
+                        }
                     }
                 }
 
@@ -3559,9 +3710,37 @@ fn walk_node(
                     }
 
                     if !content.is_empty() {
-                        // Trim leading/trailing newlines and dedent
-                        let trimmed = content.trim_matches('\n');
-                        let dedented = dedent_code_block(trimmed);
+                        let leading_newlines = content.chars().take_while(|&c| c == '\n').count();
+                        let trailing_newlines = content.chars().rev().take_while(|&c| c == '\n').count();
+                        let core = content.trim_matches('\n');
+                        let is_whitespace_only = core.trim().is_empty();
+
+                        let processed_content = if options.whitespace_mode == crate::options::WhitespaceMode::Strict {
+                            content
+                        } else {
+                            let mut core_text = if leading_newlines > 0 {
+                                dedent_code_block(core)
+                            } else {
+                                core.to_string()
+                            };
+
+                            if is_whitespace_only {
+                                let mut rebuilt = String::new();
+                                for _ in 0..leading_newlines {
+                                    rebuilt.push('\n');
+                                }
+                                rebuilt.push_str(&core_text);
+                                for _ in 0..trailing_newlines {
+                                    rebuilt.push('\n');
+                                }
+                                rebuilt
+                            } else {
+                                for _ in 0..trailing_newlines {
+                                    core_text.push('\n');
+                                }
+                                core_text
+                            }
+                        };
 
                         match options.code_block_style {
                             crate::options::CodeBlockStyle::Indented => {
@@ -3573,7 +3752,7 @@ fn walk_node(
                                     }
                                 }
 
-                                let indented = dedented
+                                let indented = processed_content
                                     .lines()
                                     .map(|line| {
                                         if line.is_empty() {
@@ -3608,7 +3787,7 @@ fn walk_node(
                                     output.push_str(&options.code_language);
                                 }
                                 output.push('\n');
-                                output.push_str(&dedented);
+                                output.push_str(&processed_content);
                                 output.push('\n');
                                 output.push_str(fence);
                                 output.push('\n');
@@ -5266,7 +5445,19 @@ fn walk_node(
                     }
                 }
 
-                "script" | "style" => {}
+                "script" => {
+                    // NEW: Extract JSON-LD structured data
+                    #[cfg(feature = "metadata")]
+                    if let Some(type_attr) = tag.attributes().get("type").flatten() {
+                        if type_attr.as_utf8_str() == "application/ld+json" {
+                            if let Some(ref collector) = ctx.metadata_collector {
+                                let json = get_text_content(node_handle, parser);
+                                collector.borrow_mut().add_json_ld(json);
+                            }
+                        }
+                    }
+                }
+                "style" => {}
 
                 "span" => {
                     let is_hocr_word = tag.attributes().iter().any(|(name, value)| {

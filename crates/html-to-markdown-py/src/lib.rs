@@ -1,3 +1,11 @@
+#[cfg(feature = "metadata")]
+use html_to_markdown_rs::metadata::{
+    DocumentMetadata as RustDocumentMetadata, ExtendedMetadata as RustExtendedMetadata,
+    HeaderMetadata as RustHeaderMetadata, ImageMetadata as RustImageMetadata, ImageType as RustImageType,
+    LinkMetadata as RustLinkMetadata, LinkType as RustLinkType, MetadataConfig as RustMetadataConfig,
+    StructuredData as RustStructuredData, StructuredDataType as RustStructuredDataType,
+    TextDirection as RustTextDirection,
+};
 use html_to_markdown_rs::safety::guard_panic;
 use html_to_markdown_rs::{
     CodeBlockStyle, ConversionError, ConversionOptions as RustConversionOptions, HeadingStyle, HighlightStyle,
@@ -6,6 +14,8 @@ use html_to_markdown_rs::{
 };
 use pyo3::prelude::*;
 use pyo3::types::{PyBytes, PyDict};
+#[cfg(feature = "metadata")]
+use pyo3::types::{PyList, PyTuple};
 
 fn to_py_err(err: ConversionError) -> PyErr {
     match err {
@@ -107,6 +117,64 @@ impl InlineImageConfig {
         cfg.capture_svg = self.capture_svg;
         cfg.infer_dimensions = self.infer_dimensions;
         cfg
+    }
+}
+
+/// Python wrapper for metadata extraction configuration
+#[cfg(feature = "metadata")]
+#[pyclass]
+#[derive(Clone)]
+struct MetadataConfig {
+    #[pyo3(get, set)]
+    extract_headers: bool,
+    #[pyo3(get, set)]
+    extract_links: bool,
+    #[pyo3(get, set)]
+    extract_images: bool,
+    #[pyo3(get, set)]
+    extract_structured_data: bool,
+    #[pyo3(get, set)]
+    max_structured_data_size: usize,
+}
+
+#[cfg(feature = "metadata")]
+#[pymethods]
+impl MetadataConfig {
+    #[new]
+    #[pyo3(signature = (
+        extract_headers=true,
+        extract_links=true,
+        extract_images=true,
+        extract_structured_data=true,
+        max_structured_data_size=1_000_000
+    ))]
+    fn new(
+        extract_headers: bool,
+        extract_links: bool,
+        extract_images: bool,
+        extract_structured_data: bool,
+        max_structured_data_size: usize,
+    ) -> Self {
+        Self {
+            extract_headers,
+            extract_links,
+            extract_images,
+            extract_structured_data,
+            max_structured_data_size,
+        }
+    }
+}
+
+#[cfg(feature = "metadata")]
+impl MetadataConfig {
+    fn to_rust(&self) -> RustMetadataConfig {
+        RustMetadataConfig {
+            extract_headers: self.extract_headers,
+            extract_links: self.extract_links,
+            extract_images: self.extract_images,
+            extract_structured_data: self.extract_structured_data,
+            max_structured_data_size: self.max_structured_data_size,
+        }
     }
 }
 
@@ -523,6 +591,219 @@ fn convert_with_inline_images<'py>(
     Ok((extraction.markdown, images, warnings))
 }
 
+// ============= Metadata conversion helpers (feature-gated) =============
+
+#[cfg(feature = "metadata")]
+fn opt_string_to_py<'py>(py: Python<'py>, opt: Option<String>) -> PyResult<Py<PyAny>> {
+    match opt {
+        Some(val) => {
+            let str_obj = pyo3::types::PyString::new(py, &val);
+            Ok(str_obj.into())
+        }
+        None => Ok(py.None()),
+    }
+}
+
+#[cfg(feature = "metadata")]
+fn btreemap_to_py<'py>(py: Python<'py>, map: std::collections::BTreeMap<String, String>) -> PyResult<Py<PyAny>> {
+    let dict = PyDict::new(py);
+    for (k, v) in map {
+        dict.set_item(k, v)?;
+    }
+    Ok(dict.into())
+}
+
+#[cfg(feature = "metadata")]
+fn text_direction_to_str<'py>(py: Python<'py>, text_direction: Option<RustTextDirection>) -> Py<PyAny> {
+    match text_direction {
+        Some(RustTextDirection::LeftToRight) => pyo3::types::PyString::new(py, "ltr").into(),
+        Some(RustTextDirection::RightToLeft) => pyo3::types::PyString::new(py, "rtl").into(),
+        Some(RustTextDirection::Auto) => pyo3::types::PyString::new(py, "auto").into(),
+        None => py.None(),
+    }
+}
+
+#[cfg(feature = "metadata")]
+fn link_type_to_str(link_type: &RustLinkType) -> &'static str {
+    match link_type {
+        RustLinkType::Anchor => "anchor",
+        RustLinkType::Internal => "internal",
+        RustLinkType::External => "external",
+        RustLinkType::Email => "email",
+        RustLinkType::Phone => "phone",
+        RustLinkType::Other => "other",
+    }
+}
+
+#[cfg(feature = "metadata")]
+fn image_type_to_str(image_type: &RustImageType) -> &'static str {
+    match image_type {
+        RustImageType::DataUri => "data_uri",
+        RustImageType::InlineSvg => "inline_svg",
+        RustImageType::External => "external",
+        RustImageType::Relative => "relative",
+    }
+}
+
+#[cfg(feature = "metadata")]
+fn structured_data_type_to_str(data_type: &RustStructuredDataType) -> &'static str {
+    match data_type {
+        RustStructuredDataType::JsonLd => "json_ld",
+        RustStructuredDataType::Microdata => "microdata",
+        RustStructuredDataType::RDFa => "rdfa",
+    }
+}
+
+#[cfg(feature = "metadata")]
+fn document_metadata_to_py<'py>(py: Python<'py>, doc: RustDocumentMetadata) -> PyResult<Py<PyAny>> {
+    let dict = PyDict::new(py);
+
+    dict.set_item("title", opt_string_to_py(py, doc.title)?)?;
+    dict.set_item("description", opt_string_to_py(py, doc.description)?)?;
+    dict.set_item("keywords", doc.keywords)?;
+    dict.set_item("author", opt_string_to_py(py, doc.author)?)?;
+    dict.set_item("canonical_url", opt_string_to_py(py, doc.canonical_url)?)?;
+    dict.set_item("base_href", opt_string_to_py(py, doc.base_href)?)?;
+    dict.set_item("language", opt_string_to_py(py, doc.language)?)?;
+    dict.set_item("text_direction", text_direction_to_str(py, doc.text_direction))?;
+    dict.set_item("open_graph", btreemap_to_py(py, doc.open_graph)?)?;
+    dict.set_item("twitter_card", btreemap_to_py(py, doc.twitter_card)?)?;
+    dict.set_item("meta_tags", btreemap_to_py(py, doc.meta_tags)?)?;
+
+    Ok(dict.into())
+}
+
+#[cfg(feature = "metadata")]
+fn headers_to_py<'py>(py: Python<'py>, headers: Vec<RustHeaderMetadata>) -> PyResult<Py<PyAny>> {
+    let list = PyList::empty(py);
+    for header in headers {
+        let dict = PyDict::new(py);
+        dict.set_item("level", header.level)?;
+        dict.set_item("text", header.text)?;
+        dict.set_item("id", opt_string_to_py(py, header.id)?)?;
+        dict.set_item("depth", header.depth)?;
+        dict.set_item("html_offset", header.html_offset)?;
+        list.append(dict)?;
+    }
+    Ok(list.into())
+}
+
+#[cfg(feature = "metadata")]
+fn links_to_py<'py>(py: Python<'py>, links: Vec<RustLinkMetadata>) -> PyResult<Py<PyAny>> {
+    let list = PyList::empty(py);
+    for link in links {
+        let dict = PyDict::new(py);
+        dict.set_item("href", link.href)?;
+        dict.set_item("text", link.text)?;
+        dict.set_item("title", opt_string_to_py(py, link.title)?)?;
+        dict.set_item("link_type", link_type_to_str(&link.link_type))?;
+        dict.set_item("rel", link.rel)?;
+        dict.set_item("attributes", btreemap_to_py(py, link.attributes)?)?;
+        list.append(dict)?;
+    }
+    Ok(list.into())
+}
+
+#[cfg(feature = "metadata")]
+fn images_to_py<'py>(py: Python<'py>, images: Vec<RustImageMetadata>) -> PyResult<Py<PyAny>> {
+    let list = PyList::empty(py);
+    for image in images {
+        let dict = PyDict::new(py);
+        dict.set_item("src", image.src)?;
+        dict.set_item("alt", opt_string_to_py(py, image.alt)?)?;
+        dict.set_item("title", opt_string_to_py(py, image.title)?)?;
+
+        let dims = match image.dimensions {
+            Some((width, height)) => {
+                let tuple = PyTuple::new(py, &[width, height])?;
+                tuple.into()
+            }
+            None => py.None(),
+        };
+        dict.set_item("dimensions", dims)?;
+
+        dict.set_item("image_type", image_type_to_str(&image.image_type))?;
+        dict.set_item("attributes", btreemap_to_py(py, image.attributes)?)?;
+        list.append(dict)?;
+    }
+    Ok(list.into())
+}
+
+#[cfg(feature = "metadata")]
+fn structured_data_to_py<'py>(py: Python<'py>, data: Vec<RustStructuredData>) -> PyResult<Py<PyAny>> {
+    let list = PyList::empty(py);
+    for item in data {
+        let dict = PyDict::new(py);
+        dict.set_item("data_type", structured_data_type_to_str(&item.data_type))?;
+        dict.set_item("raw_json", item.raw_json)?;
+        dict.set_item("schema_type", opt_string_to_py(py, item.schema_type)?)?;
+        list.append(dict)?;
+    }
+    Ok(list.into())
+}
+
+#[cfg(feature = "metadata")]
+fn extended_metadata_to_py<'py>(py: Python<'py>, metadata: RustExtendedMetadata) -> PyResult<Py<PyAny>> {
+    let dict = PyDict::new(py);
+    dict.set_item("document", document_metadata_to_py(py, metadata.document)?)?;
+    dict.set_item("headers", headers_to_py(py, metadata.headers)?)?;
+    dict.set_item("links", links_to_py(py, metadata.links)?)?;
+    dict.set_item("images", images_to_py(py, metadata.images)?)?;
+    dict.set_item("structured_data", structured_data_to_py(py, metadata.structured_data)?)?;
+    Ok(dict.into())
+}
+
+/// Convert HTML to Markdown with metadata extraction.
+///
+/// Extracts comprehensive metadata (headers, links, images, structured data) during conversion.
+///
+/// Args:
+///     html: HTML string to convert
+///     options: Optional conversion configuration
+///     metadata_config: Optional metadata extraction configuration
+///
+/// Returns:
+///     Tuple of (markdown: str, metadata: dict)
+///     The metadata dict contains:
+///     - document: Document-level metadata (title, description, lang, etc.)
+///     - headers: List of header elements with hierarchy
+///     - links: List of extracted hyperlinks with classification
+///     - images: List of extracted images with metadata
+///     - structured_data: List of JSON-LD, Microdata, or RDFa blocks
+///
+/// Raises:
+///     ValueError: Invalid HTML or configuration
+///
+/// Example:
+///     ```ignore
+///     from html_to_markdown import convert_with_metadata, MetadataConfig
+///
+///     html = '<html lang="en"><head><title>Test</title></head><body><h1>Hello</h1></body></html>'
+///     config = MetadataConfig(extract_headers=True, extract_links=True)
+///     markdown, metadata = convert_with_metadata(html, metadata_config=config)
+///
+///     print(f"Title: {metadata['document']['title']}")
+///     print(f"Headers: {len(metadata['headers'])}")
+///     ```
+#[cfg(feature = "metadata")]
+#[pyfunction]
+#[pyo3(signature = (html, options=None, metadata_config=None))]
+fn convert_with_metadata<'py>(
+    py: Python<'py>,
+    html: &str,
+    options: Option<ConversionOptions>,
+    metadata_config: Option<MetadataConfig>,
+) -> PyResult<(String, Py<PyAny>)> {
+    let rust_options = options.map(|opts| opts.to_rust());
+    let cfg = metadata_config.unwrap_or_else(|| MetadataConfig::new(true, true, true, true, 1_000_000));
+    let result = guard_panic(|| html_to_markdown_rs::convert_with_metadata(html, rust_options, cfg.to_rust()))
+        .map_err(to_py_err)?;
+
+    let (markdown, metadata) = result;
+    let metadata_dict = extended_metadata_to_py(py, metadata)?;
+    Ok((markdown, metadata_dict))
+}
+
 /// Python bindings for html-to-markdown
 #[pymodule]
 fn _html_to_markdown(m: &Bound<'_, PyModule>) -> PyResult<()> {
@@ -534,6 +815,11 @@ fn _html_to_markdown(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<ConversionOptionsHandle>()?;
     m.add_function(wrap_pyfunction!(convert_with_inline_images, m)?)?;
     m.add_class::<InlineImageConfig>()?;
+    #[cfg(feature = "metadata")]
+    {
+        m.add_function(wrap_pyfunction!(convert_with_metadata, m)?)?;
+        m.add_class::<MetadataConfig>()?;
+    }
     Ok(())
 }
 

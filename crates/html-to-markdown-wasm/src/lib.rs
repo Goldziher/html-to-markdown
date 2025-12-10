@@ -529,6 +529,180 @@ pub fn convert_bytes_with_inline_images(
     convert_with_inline_images_internal(&html, options, image_config)
 }
 
+/// Metadata extraction configuration
+#[cfg(all(feature = "js-bindings", feature = "metadata"))]
+#[wasm_bindgen]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct WasmMetadataConfig {
+    extract_headers: bool,
+    extract_links: bool,
+    extract_images: bool,
+    extract_structured_data: bool,
+    max_structured_data_size: usize,
+}
+
+#[cfg(all(feature = "js-bindings", feature = "metadata"))]
+#[wasm_bindgen]
+impl WasmMetadataConfig {
+    /// Create a new metadata configuration with defaults
+    ///
+    /// All extraction types enabled by default with 1MB structured data limit
+    #[wasm_bindgen(constructor)]
+    pub fn new() -> Self {
+        Self {
+            extract_headers: true,
+            extract_links: true,
+            extract_images: true,
+            extract_structured_data: true,
+            max_structured_data_size: 1_000_000,
+        }
+    }
+
+    #[wasm_bindgen(getter)]
+    pub fn extract_headers(&self) -> bool {
+        self.extract_headers
+    }
+
+    #[wasm_bindgen(setter)]
+    pub fn set_extract_headers(&mut self, value: bool) {
+        self.extract_headers = value;
+    }
+
+    #[wasm_bindgen(getter)]
+    pub fn extract_links(&self) -> bool {
+        self.extract_links
+    }
+
+    #[wasm_bindgen(setter)]
+    pub fn set_extract_links(&mut self, value: bool) {
+        self.extract_links = value;
+    }
+
+    #[wasm_bindgen(getter)]
+    pub fn extract_images(&self) -> bool {
+        self.extract_images
+    }
+
+    #[wasm_bindgen(setter)]
+    pub fn set_extract_images(&mut self, value: bool) {
+        self.extract_images = value;
+    }
+
+    #[wasm_bindgen(getter)]
+    pub fn extract_structured_data(&self) -> bool {
+        self.extract_structured_data
+    }
+
+    #[wasm_bindgen(setter)]
+    pub fn set_extract_structured_data(&mut self, value: bool) {
+        self.extract_structured_data = value;
+    }
+
+    #[wasm_bindgen(getter)]
+    pub fn max_structured_data_size(&self) -> usize {
+        self.max_structured_data_size
+    }
+
+    #[wasm_bindgen(setter)]
+    pub fn set_max_structured_data_size(&mut self, value: usize) {
+        self.max_structured_data_size = value;
+    }
+}
+
+#[cfg(all(feature = "js-bindings", feature = "metadata"))]
+impl Default for WasmMetadataConfig {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+#[cfg(all(feature = "js-bindings", feature = "metadata"))]
+impl From<WasmMetadataConfig> for html_to_markdown_rs::MetadataConfig {
+    fn from(cfg: WasmMetadataConfig) -> Self {
+        Self {
+            extract_headers: cfg.extract_headers,
+            extract_links: cfg.extract_links,
+            extract_images: cfg.extract_images,
+            extract_structured_data: cfg.extract_structured_data,
+            max_structured_data_size: cfg.max_structured_data_size,
+        }
+    }
+}
+
+/// Convert HTML to Markdown with metadata extraction
+///
+/// # Arguments
+///
+/// * `html` - The HTML string to convert
+/// * `options` - Optional conversion options (as a JavaScript object)
+/// * `metadata_config` - Metadata extraction configuration
+///
+/// # Returns
+///
+/// JavaScript object with `markdown` (string) and `metadata` (object) fields
+///
+/// # Example
+///
+/// ```javascript
+/// import { convertWithMetadata, WasmMetadataConfig } from 'html-to-markdown-wasm';
+///
+/// const html = '<h1>Hello World</h1><a href="https://example.com">Link</a>';
+/// const config = new WasmMetadataConfig();
+/// config.extractHeaders = true;
+/// config.extractLinks = true;
+///
+/// const result = convertWithMetadata(html, null, config);
+/// console.log(result.markdown); // # Hello World\n\n[Link](https://example.com)
+/// console.log(result.metadata.headers); // [{ level: 1, text: "Hello World", ... }]
+/// console.log(result.metadata.links); // [{ href: "https://example.com", text: "Link", ... }]
+/// ```
+#[cfg(all(feature = "js-bindings", feature = "metadata"))]
+#[wasm_bindgen(js_name = convertWithMetadata)]
+pub fn convert_with_metadata(
+    html: String,
+    options: JsValue,
+    metadata_config: Option<WasmMetadataConfig>,
+) -> Result<JsValue, JsValue> {
+    let rust_options = parse_wasm_options(options)?;
+    let rust_metadata_config = metadata_config.map(Into::into).unwrap_or_default();
+
+    let (markdown, metadata) =
+        guard_panic(|| html_to_markdown_rs::convert_with_metadata(&html, rust_options, rust_metadata_config))
+            .map_err(to_js_error)?;
+
+    let metadata_js = serde_wasm_bindgen::to_value(&metadata).map_err(|e| JsValue::from_str(&e.to_string()))?;
+
+    let result = js_sys::Object::new();
+    js_sys::Reflect::set(&result, &JsValue::from_str("markdown"), &JsValue::from_str(&markdown))
+        .map_err(|_| JsValue::from_str("failed to set markdown property"))?;
+    js_sys::Reflect::set(&result, &JsValue::from_str("metadata"), &metadata_js)
+        .map_err(|_| JsValue::from_str("failed to set metadata property"))?;
+
+    Ok(result.into())
+}
+
+/// Convert HTML bytes to Markdown with metadata extraction
+///
+/// # Arguments
+///
+/// * `html` - The HTML bytes to convert
+/// * `options` - Optional conversion options (as a JavaScript object)
+/// * `metadata_config` - Metadata extraction configuration
+///
+/// # Returns
+///
+/// JavaScript object with `markdown` (string) and `metadata` (object) fields
+#[cfg(all(feature = "js-bindings", feature = "metadata"))]
+#[wasm_bindgen(js_name = convertBytesWithMetadata)]
+pub fn convert_bytes_with_metadata(
+    html: js_sys::Uint8Array,
+    options: JsValue,
+    metadata_config: Option<WasmMetadataConfig>,
+) -> Result<JsValue, JsValue> {
+    let html = bytes_to_string(html)?;
+    convert_with_metadata(html, options, metadata_config)
+}
+
 #[cfg(feature = "wasmtime-testing")]
 mod wasmtime_runtime {
     use super::*;
@@ -611,10 +785,12 @@ mod wasmtime_runtime {
 
     #[unsafe(no_mangle)]
     pub extern "C" fn htmd_convert_underlined(html_ptr: u32, html_len: u32) -> u32 {
-        let mut options = html_to_markdown_rs::ConversionOptions::default();
-        options.heading_style = HeadingStyle::Underlined;
-        options.wrap = true;
-        options.wrap_width = 12;
+        let options = html_to_markdown_rs::ConversionOptions {
+            heading_style: HeadingStyle::Underlined,
+            wrap: true,
+            wrap_width: 12,
+            ..Default::default()
+        };
         convert_internal(html_ptr, html_len, Some(options))
     }
 }
@@ -675,5 +851,82 @@ mod tests {
         let js_options = serde_wasm_bindgen::to_value(&options).unwrap();
         let result = convert(html, js_options);
         assert!(result.is_ok());
+    }
+
+    #[cfg(feature = "metadata")]
+    #[wasm_bindgen_test]
+    fn test_metadata_config_new() {
+        let config = WasmMetadataConfig::new();
+        assert!(config.extract_headers());
+        assert!(config.extract_links());
+        assert!(config.extract_images());
+        assert!(config.extract_structured_data());
+        assert_eq!(config.max_structured_data_size(), 1_000_000);
+    }
+
+    #[cfg(feature = "metadata")]
+    #[wasm_bindgen_test]
+    fn test_metadata_config_setters() {
+        let mut config = WasmMetadataConfig::new();
+
+        config.set_extract_headers(false);
+        assert!(!config.extract_headers());
+
+        config.set_extract_links(false);
+        assert!(!config.extract_links());
+
+        config.set_extract_images(false);
+        assert!(!config.extract_images());
+
+        config.set_extract_structured_data(false);
+        assert!(!config.extract_structured_data());
+
+        config.set_max_structured_data_size(500_000);
+        assert_eq!(config.max_structured_data_size(), 500_000);
+    }
+
+    #[cfg(feature = "metadata")]
+    #[wasm_bindgen_test]
+    fn test_convert_with_metadata_basic() {
+        let html = "<h1>Hello World</h1>".to_string();
+        let config = WasmMetadataConfig::new();
+
+        let result = convert_with_metadata(html, JsValue::UNDEFINED, Some(config));
+        assert!(result.is_ok());
+
+        let obj = result.unwrap();
+        assert!(js_sys::Reflect::has(&obj, &JsValue::from_str("markdown")).unwrap());
+        assert!(js_sys::Reflect::has(&obj, &JsValue::from_str("metadata")).unwrap());
+    }
+
+    #[cfg(feature = "metadata")]
+    #[wasm_bindgen_test]
+    fn test_convert_with_metadata_with_headers() {
+        let html = r#"<html><head><title>Test</title></head><body><h1 id="main">Main Title</h1><h2>Subsection</h2></body></html>"#
+            .to_string();
+        let config = WasmMetadataConfig::new();
+
+        let result = convert_with_metadata(html, JsValue::UNDEFINED, Some(config));
+        assert!(result.is_ok());
+
+        let obj = result.unwrap();
+        let markdown = js_sys::Reflect::get(&obj, &JsValue::from_str("markdown")).unwrap();
+        let markdown_str = markdown.as_string().unwrap();
+        assert!(markdown_str.contains("Main Title"));
+    }
+
+    #[cfg(feature = "metadata")]
+    #[wasm_bindgen_test]
+    fn test_convert_bytes_with_metadata() {
+        let html_bytes = vec![60, 104, 49, 62, 72, 101, 108, 108, 111, 60, 47, 104, 49, 62]; // "<h1>Hello</h1>"
+        let uint8 = js_sys::Uint8Array::from(&html_bytes[..]);
+        let config = WasmMetadataConfig::new();
+
+        let result = convert_bytes_with_metadata(uint8, JsValue::UNDEFINED, Some(config));
+        assert!(result.is_ok());
+
+        let obj = result.unwrap();
+        assert!(js_sys::Reflect::has(&obj, &JsValue::from_str("markdown")).unwrap());
+        assert!(js_sys::Reflect::has(&obj, &JsValue::from_str("metadata")).unwrap());
     }
 }
