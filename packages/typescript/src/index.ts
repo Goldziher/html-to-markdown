@@ -28,7 +28,7 @@ export * from "html-to-markdown-node";
  */
 export function hasMetadataSupport(): boolean {
 	try {
-		return typeof convertHtmlWithMetadata === 'function';
+		return typeof convertHtmlWithMetadata === "function";
 	} catch {
 		return false;
 	}

@@ -8,16 +8,16 @@ use ext_php_rs::binary::Binary;
 use ext_php_rs::boxed::ZBox;
 use ext_php_rs::prelude::*;
 use ext_php_rs::types::{ArrayKey, ZendHashTable, Zval};
+#[cfg(feature = "metadata")]
+use html_to_markdown_rs::metadata::{
+    DocumentMetadata, ExtendedMetadata, HeaderMetadata, ImageMetadata, ImageType, LinkMetadata, LinkType,
+    MetadataConfig, StructuredData, StructuredDataType, TextDirection,
+};
 use html_to_markdown_rs::safety::guard_panic;
 use html_to_markdown_rs::{
     CodeBlockStyle, ConversionError, ConversionOptions, HeadingStyle, HighlightStyle, HtmlExtraction, InlineImage,
     InlineImageConfig, InlineImageFormat, InlineImageSource, InlineImageWarning, ListIndentType, NewlineStyle,
     PreprocessingOptions, PreprocessingPreset, WhitespaceMode,
-};
-#[cfg(feature = "metadata")]
-use html_to_markdown_rs::metadata::{
-    DocumentMetadata, ExtendedMetadata, HeaderMetadata, ImageMetadata, ImageType, LinkMetadata, LinkType,
-    MetadataConfig, StructuredData, StructuredDataType, TextDirection,
 };
 
 const DEFAULT_INLINE_IMAGE_LIMIT: u64 = 5 * 1024 * 1024;
@@ -553,10 +553,7 @@ fn table_capacity(len: usize) -> u32 {
 }
 
 #[cfg(feature = "metadata")]
-fn build_metadata_extraction(
-    markdown: String,
-    metadata: ExtendedMetadata,
-) -> PhpResult<ZBox<ZendHashTable>> {
+fn build_metadata_extraction(markdown: String, metadata: ExtendedMetadata) -> PhpResult<ZBox<ZendHashTable>> {
     let mut result = ZendHashTable::new();
     result.insert("markdown", markdown)?;
     result.insert("metadata", build_extended_metadata(metadata)?)?;
@@ -570,7 +567,10 @@ fn build_extended_metadata(metadata: ExtendedMetadata) -> PhpResult<ZBox<ZendHas
     table.insert("headers", build_headers_array(metadata.headers)?)?;
     table.insert("links", build_links_array(metadata.links)?)?;
     table.insert("images", build_images_array(metadata.images)?)?;
-    table.insert("structured_data", build_structured_data_array(metadata.structured_data)?)?;
+    table.insert(
+        "structured_data",
+        build_structured_data_array(metadata.structured_data)?,
+    )?;
     Ok(table)
 }
 
