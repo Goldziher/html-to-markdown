@@ -58,6 +58,7 @@ jobs:
           dependency-versions: locked
 
       - name: Build PHP extension
+        id: build-php-extension
         uses: ./.github/actions/build-php-linux
         with:
           php-config: ${{ env.PHP_CONFIG }}
@@ -69,3 +70,5 @@ jobs:
       - name: Run PHP tests
         run: scripts/ci/php/run-php-tests.sh
         shell: bash
+        env:
+          EXTENSION_PATH: ${{ steps.build-php-extension.outputs.extension-path }}
