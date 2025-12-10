@@ -150,15 +150,14 @@ fn truncate_at_char_boundary(value: &mut String, max_len: usize) {
 
 /// Remove common leading whitespace from all lines in a code block.
 ///
-/// This is used for `<pre>` blocks to normalize indentation by removing
-/// the minimum common whitespace from all non-empty lines.
+/// This is useful when HTML authors indent `<pre>` content for readability,
+/// so we can strip the shared indentation without touching meaningful spacing.
 fn dedent_code_block(content: &str) -> String {
     let lines: Vec<&str> = content.lines().collect();
     if lines.is_empty() {
         return String::new();
     }
 
-    // Find minimum indentation among non-empty lines using byte offsets
     let min_indent = lines
         .iter()
         .filter(|line| !line.trim().is_empty())
@@ -172,12 +171,11 @@ fn dedent_code_block(content: &str) -> String {
         .min()
         .unwrap_or(0);
 
-    // Remove that amount of leading whitespace from each line
     lines
         .iter()
         .map(|line| {
             if line.trim().is_empty() {
-                ""
+                *line
             } else {
                 &line[min_indent.min(line.len())..]
             }
@@ -3673,9 +3671,37 @@ fn walk_node(
                     }
 
                     if !content.is_empty() {
-                        // Trim leading/trailing newlines and dedent
-                        let trimmed = content.trim_matches('\n');
-                        let dedented = dedent_code_block(trimmed);
+                        let leading_newlines = content.chars().take_while(|&c| c == '\n').count();
+                        let trailing_newlines = content.chars().rev().take_while(|&c| c == '\n').count();
+                        let core = content.trim_matches('\n');
+                        let is_whitespace_only = core.trim().is_empty();
+
+                        let processed_content = if options.whitespace_mode == crate::options::WhitespaceMode::Strict {
+                            content
+                        } else {
+                            let mut core_text = if leading_newlines > 0 {
+                                dedent_code_block(core)
+                            } else {
+                                core.to_string()
+                            };
+
+                            if is_whitespace_only {
+                                let mut rebuilt = String::new();
+                                for _ in 0..leading_newlines {
+                                    rebuilt.push('\n');
+                                }
+                                rebuilt.push_str(&core_text);
+                                for _ in 0..trailing_newlines {
+                                    rebuilt.push('\n');
+                                }
+                                rebuilt
+                            } else {
+                                for _ in 0..trailing_newlines {
+                                    core_text.push('\n');
+                                }
+                                core_text
+                            }
+                        };
 
                         match options.code_block_style {
                             crate::options::CodeBlockStyle::Indented => {
@@ -3687,7 +3713,7 @@ fn walk_node(
                                     }
                                 }
 
-                                let indented = dedented
+                                let indented = processed_content
                                     .lines()
                                     .map(|line| {
                                         if line.is_empty() {
@@ -3722,7 +3748,7 @@ fn walk_node(
                                     output.push_str(&options.code_language);
                                 }
                                 output.push('\n');
-                                output.push_str(&dedented);
+                                output.push_str(&processed_content);
                                 output.push('\n');
                                 output.push_str(fence);
                                 output.push('\n');

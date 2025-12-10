@@ -13,7 +13,9 @@ use html_to_markdown_rs::{
     PreprocessingOptions as RustPreprocessingOptions, PreprocessingPreset, WhitespaceMode,
 };
 use pyo3::prelude::*;
-use pyo3::types::{PyBytes, PyDict, PyList, PyTuple};
+use pyo3::types::{PyBytes, PyDict};
+#[cfg(feature = "metadata")]
+use pyo3::types::{PyList, PyTuple};
 
 fn to_py_err(err: ConversionError) -> PyErr {
     match err {
