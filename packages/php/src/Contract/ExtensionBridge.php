@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace HtmlToMarkdown\Contract;
 
 /**
- * @phpstan-import-type ConversionOptionsInput from HtmlToMarkdown\Config\ConversionOptions
- * @phpstan-import-type InlineImageConfigInput from HtmlToMarkdown\Config\InlineImageConfig
+ * @phpstan-import-type ConversionOptionsInput from \HtmlToMarkdown\Config\ConversionOptions
+ * @phpstan-import-type InlineImageConfigInput from \HtmlToMarkdown\Config\InlineImageConfig
  */
 
 interface ExtensionBridge

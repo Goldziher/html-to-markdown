@@ -11,14 +11,15 @@ use HtmlToMarkdown\Value\ExtendedMetadata;
 use HtmlToMarkdown\Value\InlineImageExtraction;
 
 /**
- * @phpstan-import-type ConversionOptionsInput from HtmlToMarkdown\Config\ConversionOptions
- * @phpstan-import-type InlineImageConfigInput from HtmlToMarkdown\Config\InlineImageConfig
+ * @phpstan-import-type ConversionOptionsInput from \HtmlToMarkdown\Config\ConversionOptions
+ * @phpstan-import-type InlineImageConfigInput from \HtmlToMarkdown\Config\InlineImageConfig
  */
 
 final class HtmlToMarkdown
 {
     /**
      * @param ConversionOptions|ConversionOptionsInput|null $options
+     * @phpstan-param ConversionOptions|array<string, mixed>|null $options
      */
     public static function convert(string $html, ConversionOptions|array|null $options = null): string
     {
@@ -28,6 +29,8 @@ final class HtmlToMarkdown
     /**
      * @param ConversionOptions|ConversionOptionsInput|null $options
      * @param InlineImageConfig|InlineImageConfigInput|null $config
+     * @phpstan-param ConversionOptions|array<string, mixed>|null $options
+     * @phpstan-param InlineImageConfig|array<string, mixed>|null $config
      */
     public static function convertWithInlineImages(
         string $html,
@@ -40,7 +43,8 @@ final class HtmlToMarkdown
     /**
      * @param ConversionOptions|ConversionOptionsInput|null $options
      * @param array<string, mixed>|null $metadataConfig
-     * @return array{markdown: string, metadata: ExtendedMetadata}
+     * @phpstan-param ConversionOptions|array<string, mixed>|null $options
+     * @phpstan-return array{markdown: string, metadata: ExtendedMetadata}
      */
     public static function convertWithMetadata(
         string $html,

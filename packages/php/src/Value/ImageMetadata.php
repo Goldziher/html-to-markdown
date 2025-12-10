@@ -4,10 +4,13 @@ declare(strict_types=1);
 
 namespace HtmlToMarkdown\Value;
 
+use HtmlToMarkdown\Internal\TypeAssertions;
+
 final readonly class ImageMetadata
 {
     /**
      * @param array<string, string> $attributes
+     * @param array{0:int,1:int}|null $dimensions
      */
     public function __construct(
         public string $src,
@@ -26,18 +29,15 @@ final readonly class ImageMetadata
     {
         self::assertPayload($payload);
 
-        $dimensions = null;
-        if (\array_key_exists('dimensions', $payload) && \is_array($payload['dimensions']) && \count($payload['dimensions']) === 2) {
-            $dimensions = [(int) $payload['dimensions'][0], (int) $payload['dimensions'][1]];
-        }
+        $dimensions = self::normalizeDimensions($payload['dimensions'] ?? null);
 
         return new self(
-            src: (string) $payload['src'],
-            alt: $payload['alt'] ?? null,
-            title: $payload['title'] ?? null,
+            src: TypeAssertions::string($payload['src'], 'image_metadata.src'),
+            alt: TypeAssertions::stringOrNull($payload['alt'] ?? null, 'image_metadata.alt'),
+            title: TypeAssertions::stringOrNull($payload['title'] ?? null, 'image_metadata.title'),
             dimensions: $dimensions,
-            imageType: (string) $payload['image_type'],
-            attributes: self::normalizeStringMap($payload['attributes'] ?? []),
+            imageType: TypeAssertions::string($payload['image_type'], 'image_metadata.image_type'),
+            attributes: TypeAssertions::stringMap($payload['attributes'] ?? [], 'image_metadata.attributes'),
         );
     }
 
@@ -54,22 +54,25 @@ final readonly class ImageMetadata
     }
 
     /**
-     * @param mixed $map
-     * @return array<string, string>
+     * @param mixed $value
+     * @return array{0:int,1:int}|null
      */
-    private static function normalizeStringMap($map): array
+    private static function normalizeDimensions($value): ?array
     {
-        if (!is_array($map)) {
-            return [];
+        if ($value === null) {
+            return null;
         }
 
-        $result = [];
-        foreach ($map as $key => $value) {
-            if (\is_string($key) && \is_string($value)) {
-                $result[$key] = $value;
-            }
+        if (!\is_array($value) || \count($value) !== 2) {
+            throw \HtmlToMarkdown\Exception\InvalidOption::because(
+                'image_metadata.dimensions',
+                'expected list of two integers',
+            );
         }
 
-        return $result;
+        return [
+            TypeAssertions::positiveInt($value[0] ?? null, 'image_metadata.dimensions.0'),
+            TypeAssertions::positiveInt($value[1] ?? null, 'image_metadata.dimensions.1'),
+        ];
     }
 }

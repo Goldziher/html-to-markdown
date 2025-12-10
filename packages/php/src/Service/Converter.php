@@ -8,12 +8,13 @@ use HtmlToMarkdown\Bridge\ExtensionBridge;
 use HtmlToMarkdown\Config\ConversionOptions;
 use HtmlToMarkdown\Config\InlineImageConfig;
 use HtmlToMarkdown\Contract\ExtensionBridge as ExtensionBridgeContract;
+use HtmlToMarkdown\Internal\TypeAssertions;
 use HtmlToMarkdown\Value\ExtendedMetadata;
 use HtmlToMarkdown\Value\InlineImageExtraction;
 
 /**
- * @phpstan-import-type ConversionOptionsInput from HtmlToMarkdown\Config\ConversionOptions
- * @phpstan-import-type InlineImageConfigInput from HtmlToMarkdown\Config\InlineImageConfig
+ * @phpstan-import-type ConversionOptionsInput from \HtmlToMarkdown\Config\ConversionOptions
+ * @phpstan-import-type InlineImageConfigInput from \HtmlToMarkdown\Config\InlineImageConfig
  */
 
 final class Converter
@@ -30,6 +31,7 @@ final class Converter
 
     /**
      * @param ConversionOptions|ConversionOptionsInput|null $options
+     * @phpstan-param ConversionOptions|array<string, mixed>|null $options
      */
     public function convert(string $html, ConversionOptions|array|null $options = null): string
     {
@@ -39,6 +41,8 @@ final class Converter
     /**
      * @param ConversionOptions|ConversionOptionsInput|null $options
      * @param InlineImageConfig|InlineImageConfigInput|null $config
+     * @phpstan-param ConversionOptions|array<string, mixed>|null $options
+     * @phpstan-param InlineImageConfig|array<string, mixed>|null $config
      */
     public function convertWithInlineImages(
         string $html,
@@ -55,8 +59,10 @@ final class Converter
     }
 
     /**
-     * @param ConversionOptions|ConversionOptionsInput|null $options
+     * @param ConversionOptions|array<string, mixed>|null $options
      * @param array<string, mixed>|null $metadataConfig
+     * @phpstan-param ConversionOptions|array<string, mixed>|null $options
+     * @phpstan-return array{markdown: string, metadata: ExtendedMetadata}
      */
     public function convertWithMetadata(
         string $html,
@@ -69,14 +75,18 @@ final class Converter
             $metadataConfig,
         );
 
+        $markdown = TypeAssertions::string($payload['markdown'] ?? '', 'convert_with_metadata.markdown');
+        $metadataPayload = \is_array($payload['metadata'] ?? null) ? $payload['metadata'] : [];
+
         return [
-            'markdown' => $payload['markdown'] ?? '',
-            'metadata' => ExtendedMetadata::fromExtensionPayload($payload['metadata'] ?? []),
+            'markdown' => $markdown,
+            'metadata' => ExtendedMetadata::fromExtensionPayload($metadataPayload),
         ];
     }
 
     /**
-     * @param ConversionOptions|ConversionOptionsInput|null $options
+     * @param ConversionOptions|array|null $options
+     * @phpstan-param ConversionOptions|array<string, mixed>|null $options
      * @phpstan-return ConversionOptionsInput|null
      */
     private function normalizeOptions(ConversionOptions|array|null $options): ?array
@@ -95,7 +105,8 @@ final class Converter
     }
 
     /**
-     * @param InlineImageConfig|InlineImageConfigInput|null $config
+     * @param InlineImageConfig|array|null $config
+     * @phpstan-param InlineImageConfig|array<string, mixed>|null $config
      * @phpstan-return InlineImageConfigInput|null
      */
     private function normalizeImageConfig(InlineImageConfig|array|null $config): ?array

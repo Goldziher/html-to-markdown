@@ -11,12 +11,6 @@ import {
 	type JsInlineImageConfig,
 	type JsMetadataConfig,
 	type JsMetadataExtraction,
-	type JsDocumentMetadata,
-	type JsHeaderMetadata,
-	type JsLinkMetadata,
-	type JsImageMetadata,
-	type JsStructuredData,
-	type JsExtendedMetadata,
 } from "html-to-markdown-node";
 
 export * from "html-to-markdown-node";
@@ -145,7 +139,8 @@ export function convertWithMetadataBuffer(
 	options?: JsConversionOptions | null | undefined,
 	metadataConfig?: JsMetadataConfig | null | undefined,
 ): JsMetadataExtraction {
-	return convertHtmlWithMetadataBuffer(html, options ?? undefined, metadataConfig ?? undefined);
+	const input = Buffer.isBuffer(html) ? html : Buffer.from(html);
+	return convertHtmlWithMetadataBuffer(input, options ?? undefined, metadataConfig ?? undefined);
 }
 
 /**

@@ -9,12 +9,7 @@ use HtmlToMarkdown\Exception\InvalidOption;
 use HtmlToMarkdown\Internal\TypeAssertions;
 
 /**
- * @phpstan-type PreprocessingOptionsInput array{
- *     enabled?: bool,
- *     preset?: value-of<PreprocessingPreset>,
- *     remove_navigation?: bool,
- *     remove_forms?: bool
- * }
+ * @phpstan-type PreprocessingOptionsInput array<string, bool|string>
  */
 final readonly class PreprocessingOptions
 {

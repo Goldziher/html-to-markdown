@@ -10,8 +10,8 @@ use HtmlToMarkdown\Exception\ExtensionNotLoaded;
 use HtmlToMarkdown\Exception\InvalidOption;
 
 /**
- * @phpstan-import-type ConversionOptionsInput from HtmlToMarkdown\Config\ConversionOptions
- * @phpstan-import-type InlineImageConfigInput from HtmlToMarkdown\Config\InlineImageConfig
+ * @phpstan-import-type ConversionOptionsInput from \HtmlToMarkdown\Config\ConversionOptions
+ * @phpstan-import-type InlineImageConfigInput from \HtmlToMarkdown\Config\InlineImageConfig
  */
 
 final class ExtensionBridge implements ExtensionBridgeContract

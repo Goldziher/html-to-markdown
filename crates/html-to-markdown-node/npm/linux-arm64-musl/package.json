@@ -1,38 +1,38 @@
 {
-  "name": "html-to-markdown-node-linux-arm64-musl",
-  "version": "2.13.0",
-  "cpu": [
-    "arm64"
-  ],
-  "main": "html-to-markdown-node.linux-arm64-musl.node",
-  "files": [
-    "html-to-markdown-node.linux-arm64-musl.node"
-  ],
-  "description": "High-performance HTML to Markdown converter - Node.js native bindings",
-  "keywords": [
-    "html",
-    "markdown",
-    "converter",
-    "rust",
-    "napi",
-    "native"
-  ],
-  "author": "Na'aman Hirschfeld <nhirschfeld@gmail.com>",
-  "homepage": "https://github.com/Goldziher/html-to-markdown",
-  "license": "MIT",
-  "engines": {
-    "node": ">= 10"
-  },
-  "repository": "https://github.com/Goldziher/html-to-markdown",
-  "bugs": "https://github.com/Goldziher/html-to-markdown/issues",
-  "publishConfig": {
-    "registry": "https://registry.npmjs.org/",
-    "access": "public"
-  },
-  "os": [
-    "linux"
-  ],
-  "libc": [
-    "musl"
-  ]
+	"name": "html-to-markdown-node-linux-arm64-musl",
+	"version": "2.13.0",
+	"cpu": [
+		"arm64"
+	],
+	"main": "html-to-markdown-node.linux-arm64-musl.node",
+	"files": [
+		"html-to-markdown-node.linux-arm64-musl.node"
+	],
+	"description": "High-performance HTML to Markdown converter - Node.js native bindings",
+	"keywords": [
+		"html",
+		"markdown",
+		"converter",
+		"rust",
+		"napi",
+		"native"
+	],
+	"author": "Na'aman Hirschfeld <nhirschfeld@gmail.com>",
+	"homepage": "https://github.com/Goldziher/html-to-markdown",
+	"license": "MIT",
+	"engines": {
+		"node": ">= 10"
+	},
+	"repository": "https://github.com/Goldziher/html-to-markdown",
+	"bugs": "https://github.com/Goldziher/html-to-markdown/issues",
+	"publishConfig": {
+		"registry": "https://registry.npmjs.org/",
+		"access": "public"
+	},
+	"os": [
+		"linux"
+	],
+	"libc": [
+		"musl"
+	]
 }
