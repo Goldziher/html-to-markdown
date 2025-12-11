@@ -18,11 +18,12 @@ name = "html-to-markdown"
 path = "src/main.rs"
 
 [dependencies]
-html-to-markdown-rs.workspace = true
+html-to-markdown-rs = { workspace = true, features = ["metadata"] }
 clap.workspace = true
 clap_complete.workspace = true
 clap_mangen.workspace = true
 encoding_rs.workspace = true
+serde_json = "1.0"
 reqwest = { version = "0.12", default-features = false, features = ["blocking", "rustls-tls-native-roots", "gzip", "brotli", "deflate", "charset"] }
 
 [dev-dependencies]

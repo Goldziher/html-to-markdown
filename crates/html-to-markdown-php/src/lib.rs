@@ -270,6 +270,9 @@ fn parse_metadata_config(table: &ZendHashTable) -> PhpResult<MetadataConfig> {
         }
 
         match key_str.as_str() {
+            "extract_document" => {
+                config.extract_document = read_bool(value, &key_str)?;
+            }
             "extract_headers" => {
                 config.extract_headers = read_bool(value, &key_str)?;
             }

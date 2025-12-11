@@ -13,26 +13,27 @@ fn fixture_path(name: &str) -> PathBuf {
 }
 
 fn issue_127_options() -> ConversionOptions {
-    let mut options = ConversionOptions::default();
-    options.heading_style = HeadingStyle::Atx;
-    options.bullets = "-".to_string();
-    options.list_indent_type = ListIndentType::Spaces;
-    options.list_indent_width = 2;
-    options.whitespace_mode = WhitespaceMode::Normalized;
-    options.highlight_style = HighlightStyle::DoubleEqual;
-    options.wrap = false;
-    options.br_in_tables = true;
-    options.code_block_style = CodeBlockStyle::Backticks;
-    options.strip_newlines = true;
-    options.extract_metadata = false;
-    options.hocr_spatial_tables = true;
-    options.preprocessing = PreprocessingOptions {
-        enabled: true,
-        preset: PreprocessingPreset::Minimal,
-        remove_navigation: true,
-        remove_forms: true,
-    };
-    options
+    ConversionOptions {
+        heading_style: HeadingStyle::Atx,
+        bullets: "-".to_string(),
+        list_indent_type: ListIndentType::Spaces,
+        list_indent_width: 2,
+        whitespace_mode: WhitespaceMode::Normalized,
+        highlight_style: HighlightStyle::DoubleEqual,
+        wrap: false,
+        br_in_tables: true,
+        code_block_style: CodeBlockStyle::Backticks,
+        strip_newlines: true,
+        extract_metadata: false,
+        hocr_spatial_tables: true,
+        preprocessing: PreprocessingOptions {
+            enabled: true,
+            preset: PreprocessingPreset::Minimal,
+            remove_navigation: true,
+            remove_forms: true,
+        },
+        ..Default::default()
+    }
 }
 
 #[test]

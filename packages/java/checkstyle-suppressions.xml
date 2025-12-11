@@ -21,4 +21,7 @@
 
     <!-- Suppress package-info requirement for test packages -->
     <suppress checks="JavadocPackage" files=".*[\\/]test[\\/].*"/>
+
+    <!-- Allow magic numbers in test files (test data values) -->
+    <suppress checks="MagicNumber" files=".*Test\.java"/>
 </suppressions>

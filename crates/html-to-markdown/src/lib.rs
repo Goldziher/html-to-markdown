@@ -28,8 +28,8 @@ pub use inline_images::{
 };
 #[cfg(feature = "metadata")]
 pub use metadata::{
-    DocumentMetadata, ExtendedMetadata, HeaderMetadata, ImageMetadata, ImageType, LinkMetadata, LinkType,
-    MetadataConfig, StructuredData, StructuredDataType, TextDirection,
+    DEFAULT_MAX_STRUCTURED_DATA_SIZE, DocumentMetadata, ExtendedMetadata, HeaderMetadata, ImageMetadata, ImageType,
+    LinkMetadata, LinkType, MetadataConfig, StructuredData, StructuredDataType, TextDirection,
 };
 pub use options::{
     CodeBlockStyle, ConversionOptions, HeadingStyle, HighlightStyle, ListIndentType, NewlineStyle,
@@ -122,31 +122,121 @@ pub fn convert_with_inline_images(
 #[cfg(feature = "metadata")]
 /// Convert HTML to Markdown with comprehensive metadata extraction (requires the `metadata` feature).
 ///
-/// Extracts document metadata, headers, links, images, and structured data during conversion.
-/// The metadata is collected in a single pass during tree traversal for efficiency.
+/// Performs HTML-to-Markdown conversion while simultaneously extracting structured metadata in a
+/// single pass for maximum efficiency. Ideal for content analysis, SEO optimization, and document
+/// indexing workflows.
 ///
 /// # Arguments
 ///
-/// * `html` - The HTML string to convert
-/// * `options` - Optional conversion options (defaults to ConversionOptions::default())
-/// * `metadata_cfg` - Configuration for what metadata to extract
+/// * `html` - The HTML string to convert. Will normalize line endings (CRLF → LF).
+/// * `options` - Optional conversion configuration. Defaults to `ConversionOptions::default()` if `None`.
+///   Controls heading style, list indentation, escape behavior, wrapping, and other output formatting.
+/// * `metadata_cfg` - Configuration for metadata extraction granularity. Use `MetadataConfig::default()`
+///   to extract all metadata types, or customize with selective extraction flags.
 ///
 /// # Returns
 ///
-/// A tuple of `(markdown: String, metadata: ExtendedMetadata)` on success.
+/// On success, returns a tuple of:
+/// - `String`: The converted Markdown output
+/// - `ExtendedMetadata`: Comprehensive metadata containing:
+///   - `document`: Title, description, author, language, Open Graph, Twitter Card, and other meta tags
+///   - `headers`: All heading elements (h1-h6) with hierarchy and IDs
+///   - `links`: Hyperlinks classified as anchor, internal, external, email, or phone
+///   - `images`: Image elements with source, dimensions, and alt text
+///   - `structured_data`: JSON-LD, Microdata, and RDFa blocks
 ///
-/// # Example
+/// # Errors
+///
+/// Returns `ConversionError` if:
+/// - HTML parsing fails
+/// - Invalid UTF-8 sequences encountered
+/// - Internal panic during conversion (wrapped in `ConversionError::Panic`)
+/// - Configuration size limits exceeded
+///
+/// # Performance Notes
+///
+/// - Single-pass collection: metadata extraction has minimal overhead
+/// - Zero cost when metadata feature is disabled
+/// - Pre-allocated buffers: typically handles 50+ headers, 100+ links, 20+ images efficiently
+/// - Structured data size-limited to prevent memory exhaustion (configurable)
+///
+/// # Example: Basic Usage
 ///
 /// ```ignore
 /// use html_to_markdown_rs::{convert_with_metadata, MetadataConfig};
 ///
-/// let html = r#"<html lang="en"><head><title>Test</title></head><body><h1 id="main">Hello</h1></body></html>"#;
-/// let (markdown, metadata) = convert_with_metadata(html, None, MetadataConfig::default()).unwrap();
+/// let html = r#"
+///   <html lang="en">
+///     <head><title>My Article</title></head>
+///     <body>
+///       <h1 id="intro">Introduction</h1>
+///       <p>Welcome to <a href="https://example.com">our site</a></p>
+///     </body>
+///   </html>
+/// "#;
 ///
-/// assert_eq!(metadata.document.title, Some("Test".to_string()));
-/// assert_eq!(metadata.headers.len(), 1);
+/// let (markdown, metadata) = convert_with_metadata(html, None, MetadataConfig::default())?;
+///
+/// assert_eq!(metadata.document.title, Some("My Article".to_string()));
 /// assert_eq!(metadata.document.language, Some("en".to_string()));
+/// assert_eq!(metadata.headers[0].text, "Introduction");
+/// assert_eq!(metadata.headers[0].id, Some("intro".to_string()));
+/// assert_eq!(metadata.links.len(), 1);
+/// # Ok::<(), html_to_markdown_rs::ConversionError>(())
 /// ```
+///
+/// # Example: Selective Metadata Extraction
+///
+/// ```ignore
+/// use html_to_markdown_rs::{convert_with_metadata, MetadataConfig};
+///
+/// let html = "<html><body><h1>Title</h1><a href='#anchor'>Link</a></body></html>";
+///
+/// // Extract only headers and document metadata, skip links/images
+/// let config = MetadataConfig {
+///     extract_headers: true,
+///     extract_links: false,
+///     extract_images: false,
+///     extract_structured_data: false,
+///     max_structured_data_size: 0,
+/// };
+///
+/// let (markdown, metadata) = convert_with_metadata(html, None, config)?;
+/// assert!(metadata.headers.len() > 0);
+/// assert!(metadata.links.is_empty());  // Not extracted
+/// # Ok::<(), html_to_markdown_rs::ConversionError>(())
+/// ```
+///
+/// # Example: With Conversion Options and Metadata Config
+///
+/// ```ignore
+/// use html_to_markdown_rs::{convert_with_metadata, ConversionOptions, MetadataConfig, HeadingStyle};
+///
+/// let html = "<html><head><title>Blog Post</title></head><body><h1>Hello</h1></body></html>";
+///
+/// let options = ConversionOptions {
+///     heading_style: HeadingStyle::Atx,
+///     wrap: true,
+///     wrap_width: 80,
+///     ..Default::default()
+/// };
+///
+/// let metadata_cfg = MetadataConfig::default();
+///
+/// let (markdown, metadata) = convert_with_metadata(html, Some(options), metadata_cfg)?;
+/// // Markdown will use ATX-style headings (# H1, ## H2, etc.)
+/// // Wrapped at 80 characters
+/// // All metadata extracted
+/// # Ok::<(), html_to_markdown_rs::ConversionError>(())
+/// ```
+///
+/// # See Also
+///
+/// - [`convert`] - Simple HTML to Markdown conversion without metadata
+/// - [`convert_with_inline_images`] - Conversion with inline image extraction
+/// - [`MetadataConfig`] - Configuration for metadata extraction
+/// - [`ExtendedMetadata`] - Metadata structure documentation
+/// - [`metadata`] module - Detailed type documentation for metadata components
 pub fn convert_with_metadata(
     html: &str,
     options: Option<ConversionOptions>,
@@ -191,11 +281,12 @@ mod tests {
         let html = "<html lang=\"en\" dir=\"ltr\"><head><title>Test Article</title></head><body><h1 id=\"main-title\">Main Title</h1><p>This is a paragraph with a <a href=\"https://example.com\">link</a>.</p><h2>Subsection</h2><p>Another paragraph with <a href=\"#main-title\">internal link</a>.</p><img src=\"https://example.com/image.jpg\" alt=\"Test image\" title=\"Image title\"></body></html>";
 
         let config = MetadataConfig {
+            extract_document: true,
             extract_headers: true,
             extract_links: true,
             extract_images: true,
             extract_structured_data: true,
-            max_structured_data_size: 1_000_000,
+            max_structured_data_size: metadata::DEFAULT_MAX_STRUCTURED_DATA_SIZE,
         };
 
         let (markdown, metadata) = convert_with_metadata(html, None, config).expect("conversion should succeed");
@@ -258,6 +349,7 @@ mod tests {
         let html = "<html lang=\"en\"><head><title>Test</title></head><body><h1>Title</h1><a href=\"#\">Link</a></body></html>";
 
         let config = MetadataConfig {
+            extract_document: false,
             extract_headers: false,
             extract_links: false,
             extract_images: false,

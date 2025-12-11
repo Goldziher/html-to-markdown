@@ -73,4 +73,32 @@ void html_to_markdown_free_string(char *s);
  */
 const char *html_to_markdown_version(void);
 
+/**
+ * Convert HTML to Markdown with metadata extraction.
+ *
+ * # Safety
+ *
+ * - `html` must be a valid null-terminated C string
+ * - `metadata_json_out` must be a valid pointer to a char pointer
+ * - The returned markdown string must be freed with `html_to_markdown_free_string`
+ * - The metadata JSON string (written to metadata_json_out) must be freed with `html_to_markdown_free_string`
+ * - Returns NULL on error (check error with `html_to_markdown_last_error`)
+ *
+ * # Example (C)
+ *
+ * ```c
+ * const char* html = "<html><head><title>Test</title></head><body><h1>Hello</h1></body></html>";
+ * char* metadata_json = NULL;
+ * char* markdown = html_to_markdown_convert_with_metadata(html, &metadata_json);
+ * if (markdown != NULL && metadata_json != NULL) {
+ *     printf("Markdown: %s\n", markdown);
+ *     printf("Metadata: %s\n", metadata_json);
+ *     html_to_markdown_free_string(markdown);
+ *     html_to_markdown_free_string(metadata_json);
+ * }
+ * ```
+ */
+char *html_to_markdown_convert_with_metadata(const char *html,
+                                             char **metadata_json_out);
+
 #endif  /* HTML_TO_MARKDOWN_H */

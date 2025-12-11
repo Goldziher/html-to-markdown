@@ -38,8 +38,13 @@ fn footer_with_navigation_hint_is_removed() {
   </body>
 </html>"#;
 
-    let mut options = ConversionOptions::default();
-    options.preprocessing.enabled = true;
+    let options = ConversionOptions {
+        preprocessing: html_to_markdown_rs::PreprocessingOptions {
+            enabled: true,
+            ..Default::default()
+        },
+        ..Default::default()
+    };
     let markdown = convert(html, Some(options)).unwrap();
     assert!(
         !markdown.contains("processors validation"),

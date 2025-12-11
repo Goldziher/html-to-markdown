@@ -112,9 +112,11 @@ fn test_list_indent_spaces() {
     </li>
     </ul>"#;
 
-    let mut options = ConversionOptions::default();
-    options.list_indent_type = html_to_markdown_rs::ListIndentType::Spaces;
-    options.list_indent_width = 2;
+    let options = ConversionOptions {
+        list_indent_type: html_to_markdown_rs::ListIndentType::Spaces,
+        list_indent_width: 2,
+        ..Default::default()
+    };
 
     let result = convert(html, Some(options)).unwrap();
     assert!(result.contains("- Parent"));
@@ -132,8 +134,10 @@ fn test_list_indent_tabs() {
     </li>
     </ul>"#;
 
-    let mut options = ConversionOptions::default();
-    options.list_indent_type = html_to_markdown_rs::ListIndentType::Tabs;
+    let options = ConversionOptions {
+        list_indent_type: html_to_markdown_rs::ListIndentType::Tabs,
+        ..Default::default()
+    };
 
     let result = convert(html, Some(options)).unwrap();
     assert!(result.contains("- Parent"));
@@ -148,8 +152,10 @@ fn test_custom_bullet_symbols() {
     <li>Item 2</li>
     </ul>"#;
 
-    let mut options = ConversionOptions::default();
-    options.bullets = "*+-".to_string();
+    let options = ConversionOptions {
+        bullets: "*+-".to_string(),
+        ..Default::default()
+    };
 
     let result = convert(html, Some(options)).unwrap();
     // Should use * as the first bullet

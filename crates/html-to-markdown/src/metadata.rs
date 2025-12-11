@@ -1,35 +1,139 @@
 //! Metadata extraction for HTML to Markdown conversion.
 //!
-//! This module provides comprehensive metadata extraction during HTML-to-Markdown
-//! conversion, including document metadata, headers, links, images, and structured data.
+//! This module provides comprehensive, type-safe metadata extraction during HTML-to-Markdown
+//! conversion, enabling content analysis, SEO optimization, and document indexing workflows.
+//! Metadata includes:
+//! - **Document metadata**: Title, description, author, language, canonical URL, Open Graph, Twitter Card
+//! - **Headers**: Heading elements (h1-h6) with hierarchy, IDs, and positions
+//! - **Links**: Hyperlinks with type classification (anchor, internal, external, email, phone)
+//! - **Images**: Image elements with source, alt text, dimensions, and type (data URI, external, etc.)
+//! - **Structured data**: JSON-LD, Microdata, and RDFa blocks
+//!
 //! The implementation follows a single-pass collector pattern for zero-overhead extraction
 //! when metadata features are disabled.
 //!
 //! # Architecture
 //!
 //! Metadata extraction uses the [`MetadataCollector`] pattern (similar to [`InlineImageCollector`]):
-//! - Single-pass collection during tree traversal
-//! - Zero overhead when disabled via feature flags
-//! - Configurable extraction granularity via [`MetadataConfig`]
-//! - Type-safe APIs for all metadata types
+//! - **Single-pass collection**: Metadata is gathered during the primary tree traversal without additional passes
+//! - **Zero overhead when disabled**: Entire module can be compiled out via feature flags
+//! - **Configurable granularity**: Use [`MetadataConfig`] to select which metadata types to extract
+//! - **Type-safe APIs**: All metadata types are enum-based with exhaustive matching
+//! - **Memory-bounded**: Size limits prevent memory exhaustion from adversarial documents
+//! - **Pre-allocated buffers**: Typical documents (32 headers, 64 links, 16 images) handled efficiently
+//!
+//! # Type Overview
+//!
+//! ## Enumerations
+//!
+//! - [`TextDirection`]: Document directionality (LTR, RTL, Auto)
+//! - [`LinkType`]: Link classification (Anchor, Internal, External, Email, Phone, Other)
+//! - [`ImageType`]: Image source type (DataUri, External, Relative, InlineSvg)
+//! - [`StructuredDataType`]: Structured data format (JsonLd, Microdata, RDFa)
+//!
+//! ## Structures
+//!
+//! - [`DocumentMetadata`]: Head-level metadata with maps for Open Graph and Twitter Card
+//! - [`HeaderMetadata`]: Heading element with level (1-6), text, ID, hierarchy depth, and position
+//! - [`LinkMetadata`]: Hyperlink with href, text, title, type, rel attributes, and custom attributes
+//! - [`ImageMetadata`]: Image element with src, alt, title, dimensions, type, and attributes
+//! - [`StructuredData`]: Structured data block with type and raw JSON
+//! - [`MetadataConfig`]: Configuration controlling extraction granularity and size limits
+//! - [`ExtendedMetadata`]: Top-level result containing all extracted metadata
 //!
 //! # Examples
 //!
-//! ```ignore
-//! use html_to_markdown_rs::metadata::{MetadataConfig, ExtendedMetadata};
+//! ## Basic Usage with convert_with_metadata
 //!
-//! // Create collector with configuration
+//! ```ignore
+//! use html_to_markdown_rs::{convert_with_metadata, MetadataConfig};
+//!
+//! let html = r#"
+//!   <html lang="en">
+//!     <head>
+//!       <title>My Article</title>
+//!       <meta name="description" content="An interesting read">
+//!     </head>
+//!     <body>
+//!       <h1 id="main">Title</h1>
+//!       <a href="https://example.com">External Link</a>
+//!       <img src="photo.jpg" alt="A photo">
+//!     </body>
+//!   </html>
+//! "#;
+//!
+//! let config = MetadataConfig::default();
+//! let (markdown, metadata) = convert_with_metadata(html, None, config)?;
+//!
+//! // Access document metadata
+//! assert_eq!(metadata.document.title, Some("My Article".to_string()));
+//! assert_eq!(metadata.document.language, Some("en".to_string()));
+//!
+//! // Access headers
+//! assert_eq!(metadata.headers.len(), 1);
+//! assert_eq!(metadata.headers[0].level, 1);
+//! assert_eq!(metadata.headers[0].id, Some("main".to_string()));
+//!
+//! // Access links
+//! assert_eq!(metadata.links.len(), 1);
+//! assert_eq!(metadata.links[0].link_type, LinkType::External);
+//!
+//! // Access images
+//! assert_eq!(metadata.images.len(), 1);
+//! assert_eq!(metadata.images[0].image_type, ImageType::Relative);
+//! # Ok::<(), html_to_markdown_rs::ConversionError>(())
+//! ```
+//!
+//! ## Selective Extraction
+//!
+//! ```ignore
+//! use html_to_markdown_rs::{convert_with_metadata, MetadataConfig};
+//!
 //! let config = MetadataConfig {
 //!     extract_headers: true,
 //!     extract_links: true,
-//!     extract_images: true,
-//!     extract_structured_data: true,
-//!     max_structured_data_size: 1_000_000,
+//!     extract_images: false,  // Skip images
+//!     extract_structured_data: false,  // Skip structured data
+//!     max_structured_data_size: 0,
 //! };
 //!
-//! // Collector is created during HTML parsing and populated during tree walk
-//! // Results are extracted via finish()
-//! let metadata: ExtendedMetadata = collector.finish();
+//! let (markdown, metadata) = convert_with_metadata(html, None, config)?;
+//! assert_eq!(metadata.images.len(), 0);  // Images not extracted
+//! # Ok::<(), html_to_markdown_rs::ConversionError>(())
+//! ```
+//!
+//! ## Analyzing Link Types
+//!
+//! ```ignore
+//! use html_to_markdown_rs::{convert_with_metadata, MetadataConfig};
+//! use html_to_markdown_rs::metadata::LinkType;
+//!
+//! let (_markdown, metadata) = convert_with_metadata(html, None, MetadataConfig::default())?;
+//!
+//! for link in &metadata.links {
+//!     match link.link_type {
+//!         LinkType::External => println!("External: {}", link.href),
+//!         LinkType::Internal => println!("Internal: {}", link.href),
+//!         LinkType::Anchor => println!("Anchor: {}", link.href),
+//!         LinkType::Email => println!("Email: {}", link.href),
+//!         _ => {}
+//!     }
+//! }
+//! # Ok::<(), html_to_markdown_rs::ConversionError>(())
+//! ```
+//!
+//! # Serialization
+//!
+//! All types in this module support serialization via `serde` when the `metadata` feature is enabled.
+//! This enables easy export to JSON, YAML, or other formats:
+//!
+//! ```ignore
+//! use html_to_markdown_rs::{convert_with_metadata, MetadataConfig};
+//!
+//! let (_markdown, metadata) = convert_with_metadata(html, None, MetadataConfig::default())?;
+//! let json = serde_json::to_string_pretty(&metadata)?;
+//! println!("{}", json);
+//! # Ok::<(), Box<dyn std::error::Error>>(())
 //! ```
 
 use std::cell::RefCell;
@@ -456,6 +560,9 @@ pub struct StructuredData {
     pub schema_type: Option<String>,
 }
 
+/// Default maximum size for structured data extraction (1 MB)
+pub const DEFAULT_MAX_STRUCTURED_DATA_SIZE: usize = 1_000_000;
+
 /// Configuration for metadata extraction granularity.
 ///
 /// Controls which metadata types are extracted and size limits for safety.
@@ -477,6 +584,9 @@ pub struct StructuredData {
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "metadata", derive(serde::Serialize, serde::Deserialize))]
 pub struct MetadataConfig {
+    /// Extract document-level metadata (title, description, author, etc.)
+    pub extract_document: bool,
+
     /// Extract h1-h6 header elements and their hierarchy
     pub extract_headers: bool,
 
@@ -500,11 +610,12 @@ impl Default for MetadataConfig {
     /// Defaults to extracting all metadata types with 1MB limit on structured data.
     fn default() -> Self {
         Self {
+            extract_document: true,
             extract_headers: true,
             extract_links: true,
             extract_images: true,
             extract_structured_data: true,
-            max_structured_data_size: 1_000_000, // 1 MB
+            max_structured_data_size: DEFAULT_MAX_STRUCTURED_DATA_SIZE,
         }
     }
 }
@@ -1079,11 +1190,12 @@ mod tests {
     #[test]
     fn test_metadata_collector_respects_config() {
         let config = MetadataConfig {
+            extract_document: false,
             extract_headers: false,
             extract_links: false,
             extract_images: false,
             extract_structured_data: false,
-            max_structured_data_size: 1_000_000,
+            max_structured_data_size: DEFAULT_MAX_STRUCTURED_DATA_SIZE,
         };
         let mut collector = MetadataCollector::new(config);
 
@@ -1152,7 +1264,7 @@ mod tests {
         assert!(config.extract_links);
         assert!(config.extract_images);
         assert!(config.extract_structured_data);
-        assert_eq!(config.max_structured_data_size, 1_000_000);
+        assert_eq!(config.max_structured_data_size, DEFAULT_MAX_STRUCTURED_DATA_SIZE);
     }
 
     #[test]

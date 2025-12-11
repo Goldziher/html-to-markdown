@@ -57,8 +57,10 @@ fn test_table_rowspan() {
 </td></tr>
 </table>"#;
 
-    let mut options = ConversionOptions::default();
-    options.br_in_tables = true;
+    let options = ConversionOptions {
+        br_in_tables: true,
+        ..Default::default()
+    };
     let result = convert(html, Some(options)).unwrap();
 
     // The cell with rowspan should appear in first data row
@@ -89,8 +91,10 @@ fn test_table_cell_multiline_content() {
 </td></tr>
 </table>"#;
 
-    let mut options = ConversionOptions::default();
-    options.br_in_tables = true;
+    let options = ConversionOptions {
+        br_in_tables: true,
+        ..Default::default()
+    };
     let result = convert(html, Some(options)).unwrap();
 
     assert!(result.contains("| Header 1 | Header 2 |"));

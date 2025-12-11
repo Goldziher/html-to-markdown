@@ -10,18 +10,20 @@ fn fixture_path(name: &str) -> PathBuf {
 }
 
 fn default_options() -> ConversionOptions {
-    let mut options = ConversionOptions::default();
-    options.extract_metadata = false;
-    options.autolinks = false;
-    options
+    ConversionOptions {
+        extract_metadata: false,
+        autolinks: false,
+        ..Default::default()
+    }
 }
 
 fn escape_misc_options() -> ConversionOptions {
-    let mut options = ConversionOptions::default();
-    options.extract_metadata = false;
-    options.autolinks = false;
-    options.escape_misc = true;
-    options
+    ConversionOptions {
+        extract_metadata: false,
+        autolinks: false,
+        escape_misc: true,
+        ..Default::default()
+    }
 }
 
 fn normalize_newlines(input: &str) -> String {

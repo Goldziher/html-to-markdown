@@ -796,6 +796,135 @@ fn test_multiple_options_combined() {
         .stdout(predicate::str::contains("```"));
 }
 
+#[test]
+fn test_with_metadata_flag_alone() {
+    cli()
+        .arg("--with-metadata")
+        .write_stdin("<html><head><title>Test Page</title></head><body><h1>Hello</h1></body></html>")
+        .assert()
+        .success();
+}
+
+#[test]
+fn test_extract_document_flag() {
+    cli()
+        .arg("--with-metadata")
+        .arg("--extract-document")
+        .write_stdin("<html><head><title>Test Page</title><meta name=\"description\" content=\"Test\"></head><body><p>Content</p></body></html>")
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("\"document\""))
+        .stdout(predicate::str::contains("\"title\""))
+        .stdout(predicate::str::contains("Test Page"));
+}
+
+#[test]
+fn test_extract_headers_flag() {
+    cli()
+        .arg("--with-metadata")
+        .arg("--extract-headers")
+        .write_stdin("<html><body><h1>Title</h1><h2>Subtitle</h2><p>Content</p></body></html>")
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("\"headers\""))
+        .stdout(predicate::str::contains("\"level\": 1"))
+        .stdout(predicate::str::contains("Title"));
+}
+
+#[test]
+fn test_extract_links_flag() {
+    cli()
+        .arg("--with-metadata")
+        .arg("--extract-links")
+        .write_stdin(
+            "<html><body><a href=\"https://example.com\">External</a><a href=\"/about\">Internal</a></body></html>",
+        )
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("\"links\""))
+        .stdout(predicate::str::contains("https://example.com"));
+}
+
+#[test]
+fn test_extract_images_flag() {
+    cli()
+        .arg("--with-metadata")
+        .arg("--extract-images")
+        .write_stdin(
+            "<html><body><img src=\"https://example.com/image.jpg\" alt=\"Test Image\"><p>Content</p></body></html>",
+        )
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("\"images\""))
+        .stdout(predicate::str::contains("https://example.com/image.jpg"))
+        .stdout(predicate::str::contains("Test Image"));
+}
+
+#[test]
+fn test_extract_structured_data_flag() {
+    cli()
+        .arg("--with-metadata")
+        .arg("--extract-structured-data")
+        .write_stdin("<html><body><script type=\"application/ld+json\">{\"@context\": \"https://schema.org\"}</script></body></html>")
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("\"structured_data\""));
+}
+
+#[test]
+fn test_combining_multiple_extract_flags() {
+    cli()
+        .arg("--with-metadata")
+        .arg("--extract-document")
+        .arg("--extract-headers")
+        .arg("--extract-links")
+        .arg("--extract-images")
+        .write_stdin(
+            "<html><head><title>Complete</title></head><body>\
+            <h1>Title</h1>\
+            <a href=\"https://example.com\">Link</a>\
+            <img src=\"https://example.com/pic.jpg\" alt=\"Pic\">\
+            </body></html>",
+        )
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("\"document\""))
+        .stdout(predicate::str::contains("\"headers\""))
+        .stdout(predicate::str::contains("\"links\""))
+        .stdout(predicate::str::contains("\"images\""));
+}
+
+#[test]
+fn test_metadata_flags_require_with_metadata() {
+    cli()
+        .arg("--extract-headers")
+        .write_stdin("<html><body><h1>Title</h1></body></html>")
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("required"));
+}
+
+#[test]
+fn test_metadata_with_file_output() {
+    let temp_dir = TempDir::new().unwrap();
+    let output_path = temp_dir.path().join("metadata.json");
+
+    cli()
+        .arg("--with-metadata")
+        .arg("--extract-document")
+        .arg("--extract-headers")
+        .arg("-o")
+        .arg(output_path.to_str().unwrap())
+        .write_stdin("<html><head><title>File Output</title></head><body><h1>Title</h1></body></html>")
+        .assert()
+        .success();
+
+    let output_content = fs::read_to_string(&output_path).unwrap();
+    assert!(output_content.contains("\"markdown\""));
+    assert!(output_content.contains("\"metadata\""));
+    assert!(output_content.contains("File Output"));
+}
+
 fn serve_once(body: &'static str, content_type: Option<&'static str>) -> (String, thread::JoinHandle<()>) {
     let (url, handle, _rx) = serve_once_with_capture(body, content_type);
     (url, handle)

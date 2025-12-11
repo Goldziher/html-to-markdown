@@ -1,3 +1,5 @@
+#[cfg(feature = "metadata")]
+use html_to_markdown_rs::DEFAULT_MAX_STRUCTURED_DATA_SIZE;
 #[cfg(any(feature = "js-bindings", feature = "wasmtime-testing"))]
 use html_to_markdown_rs::safety::guard_panic;
 use html_to_markdown_rs::{
@@ -534,6 +536,7 @@ pub fn convert_bytes_with_inline_images(
 #[wasm_bindgen]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WasmMetadataConfig {
+    extract_document: bool,
     extract_headers: bool,
     extract_links: bool,
     extract_images: bool,
@@ -550,12 +553,23 @@ impl WasmMetadataConfig {
     #[wasm_bindgen(constructor)]
     pub fn new() -> Self {
         Self {
+            extract_document: true,
             extract_headers: true,
             extract_links: true,
             extract_images: true,
             extract_structured_data: true,
-            max_structured_data_size: 1_000_000,
+            max_structured_data_size: DEFAULT_MAX_STRUCTURED_DATA_SIZE,
         }
+    }
+
+    #[wasm_bindgen(getter)]
+    pub fn extract_document(&self) -> bool {
+        self.extract_document
+    }
+
+    #[wasm_bindgen(setter)]
+    pub fn set_extract_document(&mut self, value: bool) {
+        self.extract_document = value;
     }
 
     #[wasm_bindgen(getter)]
@@ -620,6 +634,7 @@ impl Default for WasmMetadataConfig {
 impl From<WasmMetadataConfig> for html_to_markdown_rs::MetadataConfig {
     fn from(cfg: WasmMetadataConfig) -> Self {
         Self {
+            extract_document: cfg.extract_document,
             extract_headers: cfg.extract_headers,
             extract_links: cfg.extract_links,
             extract_images: cfg.extract_images,
@@ -861,7 +876,7 @@ mod tests {
         assert!(config.extract_links());
         assert!(config.extract_images());
         assert!(config.extract_structured_data());
-        assert_eq!(config.max_structured_data_size(), 1_000_000);
+        assert_eq!(config.max_structured_data_size(), DEFAULT_MAX_STRUCTURED_DATA_SIZE);
     }
 
     #[cfg(feature = "metadata")]

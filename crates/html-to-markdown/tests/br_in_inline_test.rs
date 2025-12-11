@@ -51,8 +51,10 @@ fn test_br_inside_italic_tags() {
 #[test]
 fn test_br_with_backslash_style() {
     let html = "<b>Hello<br/></b><b>World</b>";
-    let mut options = ConversionOptions::default();
-    options.newline_style = html_to_markdown_rs::NewlineStyle::Backslash;
+    let options = ConversionOptions {
+        newline_style: html_to_markdown_rs::NewlineStyle::Backslash,
+        ..Default::default()
+    };
     let result = convert(html, Some(options)).unwrap();
 
     assert!(result.contains("**Hello**\\\n**World**"));

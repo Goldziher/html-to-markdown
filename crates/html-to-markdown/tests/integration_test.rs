@@ -178,8 +178,10 @@ fn test_table_rowspan() {
     <div>More content</div>
 </td></tr>
 </table>"#;
-    let mut options = ConversionOptions::default();
-    options.br_in_tables = true;
+    let options = ConversionOptions {
+        br_in_tables: true,
+        ..Default::default()
+    };
     let result = convert(html, Some(options)).unwrap();
     let expected = "\n\n| Header 1 | Header 2 |\n| --- | --- |\n| Spanning cell | First row content<br>Second line |\n|  | Next row<br>More content |\n";
     assert_eq!(result, expected);
