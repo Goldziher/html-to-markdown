@@ -115,6 +115,10 @@ for width/height when available.
 
 ## Metadata extraction
 
+Extract document structure, embedded links, images, and Open Graph metadata alongside Markdown conversion. All metadata is returned as immutable readonly value objects with full PHPStan type safety.
+
+### Quick Start
+
 ```php
 <?php
 
@@ -124,8 +128,8 @@ use function HtmlToMarkdown\convert_with_metadata;
 $html = <<<'HTML'
 <html>
   <head>
-    <title>Example</title>
-    <meta name="description" content="Demo page">
+    <title>Example Article</title>
+    <meta name="description" content="Demo page with metadata">
     <link rel="canonical" href="https://example.com/page">
   </head>
   <body>
@@ -136,19 +140,651 @@ $html = <<<'HTML'
 </html>
 HTML;
 
+// Procedural API
 $result = convert_with_metadata(
     $html,
     new ConversionOptions(headingStyle: 'Atx'),
     ['extract_headers' => true, 'extract_links' => true, 'extract_images' => true],
 );
 
-echo $result['markdown'];
-echo $result['metadata']->document->title;               // "Example"
-echo implode(', ', $result['metadata']->links[0]->rel);  // "nofollow, external"
-[$width, $height] = $result['metadata']->images[0]->dimensions; // 640, 480
+echo $result['markdown'];                                   // # Welcome...
+echo $result['metadata']->document->title;                  // "Example Article"
+echo implode(', ', $result['metadata']->links[0]->rel);     // "nofollow, external"
+echo $result['metadata']->images[0]->dimensions[0];         // 640 (width)
+
+// Object-oriented API
+$converter = \HtmlToMarkdown\Service\Converter::create();
+$result = $converter->convertWithMetadata(
+    $html,
+    new ConversionOptions(headingStyle: 'Atx'),
+    ['extract_links' => true, 'extract_images' => true],
+);
 ```
 
-`metadata` is returned as an `ExtendedMetadata` value object: document tags (title, description, canonical URL, Open Graph/Twitter), links with `rel` + raw attributes, images with inferred dimensions, headers with depth/offset, and structured data (if enabled). Toggle sections with the associative `$metadataConfig` array.
+### Metadata Configuration
+
+Toggle extraction sections via the `$metadataConfig` array (associative):
+
+```php
+<?php
+
+use HtmlToMarkdown\Service\Converter;
+use HtmlToMarkdown\Config\ConversionOptions;
+
+$converter = Converter::create();
+
+$result = $converter->convertWithMetadata(
+    $html,
+    new ConversionOptions(),
+    [
+        'extract_headers'       => true,      // h1-h6 with depth/offset
+        'extract_links'         => true,      // <a> tags with rel + attributes
+        'extract_images'        => true,      // <img> with dimensions
+        'extract_structured_data' => true,   // JSON-LD & microdata
+    ]
+);
+```
+
+All extraction flags default to `false`; only enabled sections are populated in metadata. Set `$metadataConfig = null` or omit flags to get empty collections.
+
+### Metadata Structure (ExtendedMetadata Value Object)
+
+The returned `metadata` is an immutable `ExtendedMetadata` containing five sections:
+
+#### 1. Document Metadata
+
+```php
+<?php
+
+use HtmlToMarkdown\Service\Converter;
+
+$converter = Converter::create();
+$result = $converter->convertWithMetadata(
+    <<<'HTML'
+    <html>
+      <head>
+        <title>Blog Post</title>
+        <meta name="description" content="A detailed guide">
+        <meta name="keywords" content="php, conversion">
+        <meta name="author" content="Jane Doe">
+        <link rel="canonical" href="https://blog.example.com/post/123">
+        <base href="https://assets.example.com/">
+        <meta property="og:title" content="Blog: PHP Guide">
+        <meta property="og:image" content="https://example.com/og.jpg">
+        <meta name="twitter:card" content="summary_large_image">
+        <meta name="twitter:creator" content="@janedoe">
+      </head>
+      <body><h1>Content</h1></body>
+    </html>
+    HTML,
+    null,
+    null  // No extraction flags, but document is always available
+);
+
+$doc = $result['metadata']->document;
+
+// Basic document fields
+echo $doc->title;              // "Blog Post" | null
+echo $doc->description;        // "A detailed guide" | null
+echo implode(', ', $doc->keywords);  // "php, conversion" | null
+echo $doc->author;             // "Jane Doe" | null
+echo $doc->canonicalUrl;       // "https://blog.example.com/post/123" | null
+echo $doc->baseHref;           // "https://assets.example.com/" | null
+echo $doc->language;           // "en" | null (from <html lang="en">)
+echo $doc->textDirection;      // "ltr" | "rtl" | null (from <html dir="rtl">)
+
+// Open Graph tags (property="og:*")
+$og = $doc->openGraph;  // array<string, string>
+echo $og['title'] ?? '';       // "Blog: PHP Guide"
+echo $og['image'] ?? '';       // "https://example.com/og.jpg"
+
+// Twitter Card tags
+$twitter = $doc->twitterCard;  // array<string, string>
+echo $twitter['card'] ?? '';   // "summary_large_image"
+echo $twitter['creator'] ?? ''; // "@janedoe"
+
+// All <meta> tags (name & property attributes)
+$allMeta = $doc->metaTags;     // array<string, string>
+echo $allMeta['description'] ?? '';
+echo $allMeta['og:title'] ?? '';
+```
+
+#### 2. Header/Heading Metadata
+
+Extract all headings with hierarchy depth and position:
+
+```php
+<?php
+
+use HtmlToMarkdown\Service\Converter;
+
+$converter = Converter::create();
+$result = $converter->convertWithMetadata(
+    <<<'HTML'
+    <html>
+      <body>
+        <h1 id="intro">Introduction</h1>
+        <p>Paragraph 1</p>
+        <h2 id="section-a">Section A</h2>
+        <h3 id="subsection">Subsection</h3>
+        <h2 id="section-b">Section B</h2>
+      </body>
+    </html>
+    HTML,
+    null,
+    ['extract_headers' => true],
+);
+
+foreach ($result['metadata']->headers as $header) {
+    // Each header is a readonly HeaderMetadata object
+    echo str_repeat('  ', $header->depth);  // Indentation based on hierarchy
+    echo "{$header->level}: {$header->text}\n";
+
+    // All properties:
+    echo $header->level;       // 1-6 (h1-h6)
+    echo $header->text;        // "Introduction" | "Section A" | ...
+    echo $header->id;          // "intro" | null
+    echo $header->depth;       // 0 for h1, 1 for h2 under h1, 2 for h3, etc.
+    echo $header->htmlOffset;  // Character offset in original HTML
+}
+
+// Output:
+// 1: Introduction
+//   2: Section A
+//     3: Subsection
+//   2: Section B
+```
+
+Use headers for table of contents generation, document outlining, or validation.
+
+#### 3. Link Metadata
+
+Extract all hyperlinks with relationship types and attributes:
+
+```php
+<?php
+
+use HtmlToMarkdown\Service\Converter;
+
+$converter = Converter::create();
+$result = $converter->convertWithMetadata(
+    <<<'HTML'
+    <html>
+      <body>
+        <a href="https://example.com"
+           title="Main Site"
+           rel="nofollow external">External Link</a>
+        <a href="/internal" rel="prefetch">Internal</a>
+        <a href="mailto:support@example.com">Email</a>
+        <a href="#section">Fragment</a>
+      </body>
+    </html>
+    HTML,
+    null,
+    ['extract_links' => true],
+);
+
+foreach ($result['metadata']->links as $link) {
+    // Each link is a readonly LinkMetadata object
+
+    // Core properties
+    echo $link->href;          // "https://example.com" | "/internal" | "mailto:..." | "#section"
+    echo $link->text;          // "External Link" | "Internal" | "Email" | "Fragment"
+    echo $link->title;         // "Main Site" | null
+    echo $link->linkType;      // "external" | "internal" | "email" | "fragment"
+
+    // Relationship (rel attribute as list)
+    echo implode(', ', $link->rel);  // "nofollow external" | "prefetch" | [] | []
+
+    // Raw HTML attributes
+    echo json_encode($link->attributes);  // {"href": "...", "title": "...", "rel": "..."}
+}
+```
+
+Useful for:
+- Link extraction for SEO analysis
+- Finding `rel="nofollow"` or `rel="sponsored"` links
+- Email/phone/fragment detection
+- Building sitemaps (internal links only)
+
+#### 4. Image Metadata
+
+Extract all images with alt text, source, and inferred dimensions:
+
+```php
+<?php
+
+use HtmlToMarkdown\Service\Converter;
+
+$converter = Converter::create();
+$result = $converter->convertWithMetadata(
+    <<<'HTML'
+    <html>
+      <body>
+        <img src="https://example.com/hero.jpg"
+             alt="Hero Image"
+             width="1200"
+             height="600"
+             title="Hero Banner">
+        <img src="/local/thumb.png" alt="">
+        <picture>
+          <source srcset="large.webp" media="(min-width: 768px)">
+          <img src="small.png" alt="Responsive">
+        </picture>
+      </body>
+    </html>
+    HTML,
+    null,
+    ['extract_images' => true],
+);
+
+foreach ($result['metadata']->images as $image) {
+    // Each image is a readonly ImageMetadata object
+
+    // Image properties
+    echo $image->src;          // "https://example.com/hero.jpg" | "/local/thumb.png"
+    echo $image->alt;          // "Hero Image" | "" | null
+    echo $image->title;        // "Hero Banner" | null
+    echo $image->imageType;    // "external_url" | "internal_url" | "data_uri"
+
+    // Dimensions as [width, height] tuple (null if not available)
+    if ($image->dimensions) {
+        [$width, $height] = $image->dimensions;
+        echo "$width x $height";  // "1200 x 600"
+    }
+
+    // Raw HTML attributes (width, height, loading, decoding, etc.)
+    echo json_encode($image->attributes);
+    // {"src": "...", "alt": "...", "width": "1200", "height": "600", "title": "..."}
+}
+```
+
+Useful for:
+- Image inventory and accessibility audit
+- Responsive image analysis
+- SEO: checking alt text coverage
+- Building image galleries
+
+#### 5. Structured Data (JSON-LD, Microdata, RDFa)
+
+Extract embedded JSON-LD scripts, microdata, and RDFa:
+
+```php
+<?php
+
+use HtmlToMarkdown\Service\Converter;
+
+$converter = Converter::create();
+$result = $converter->convertWithMetadata(
+    <<<'HTML'
+    <html>
+      <head>
+        <script type="application/ld+json">
+        {
+          "@context": "https://schema.org",
+          "@type": "BlogPosting",
+          "headline": "Learning PHP Conversion",
+          "author": {"@type": "Person", "name": "Jane Doe"},
+          "datePublished": "2024-01-15"
+        }
+        </script>
+      </head>
+      <body>
+        <article itemscope itemtype="https://schema.org/NewsArticle">
+          <h1 itemprop="headline">Article Title</h1>
+          <span itemprop="author">John Doe</span>
+        </article>
+      </body>
+    </html>
+    HTML,
+    null,
+    ['extract_structured_data' => true],
+);
+
+foreach ($result['metadata']->structuredData as $data) {
+    // Each structured data is a readonly StructuredData object
+
+    echo $data->dataType;      // "json_ld" | "microdata" | "rdfa"
+    echo $data->rawJson;       // Full JSON string (even for microdata/RDFa)
+    echo $data->schemaType;    // "BlogPosting" | "NewsArticle" | null
+
+    // Parse JSON for application logic
+    $parsed = json_decode($data->rawJson, associative: true);
+    echo $parsed['headline'] ?? '';  // "Learning PHP Conversion"
+}
+```
+
+Useful for:
+- Extracting SEO schema (Article, Product, Recipe, etc.)
+- Validating structured data markup
+- Building Knowledge Graph content
+- Analytics and enrichment
+
+### Real-World Examples
+
+#### Example 1: SEO Audit Tool
+
+```php
+<?php
+
+declare(strict_types=1);
+
+use HtmlToMarkdown\Service\Converter;
+use HtmlToMarkdown\Config\ConversionOptions;
+
+class SeoAudit
+{
+    private readonly Converter $converter;
+
+    public function __construct()
+    {
+        $this->converter = Converter::create();
+    }
+
+    /**
+     * @return array{
+     *     title_missing: bool,
+     *     description_missing: bool,
+     *     og_missing: array<string>,
+     *     headings: array<string>,
+     *     images_missing_alt: array<string>,
+     *     external_links: array<string>,
+     *     issues: array<string>,
+     * }
+     */
+    public function audit(string $html): array
+    {
+        $result = $this->converter->convertWithMetadata(
+            $html,
+            new ConversionOptions(),
+            [
+                'extract_headers' => true,
+                'extract_links' => true,
+                'extract_images' => true,
+            ]
+        );
+
+        $doc = $result['metadata']->document;
+        $issues = [];
+
+        // Title check
+        $titleMissing = !$doc->title || strlen($doc->title) === 0;
+        if ($titleMissing) {
+            $issues[] = "Missing page title";
+        }
+
+        // Meta description check
+        $descMissing = !$doc->description || strlen($doc->description) === 0;
+        if ($descMissing) {
+            $issues[] = "Missing meta description";
+        }
+
+        // Open Graph check
+        $ogMissing = [];
+        foreach (['og:title', 'og:image', 'og:description'] as $key) {
+            if (empty($doc->openGraph[str_replace('og:', '', $key)] ?? '')) {
+                $ogMissing[] = $key;
+            }
+        }
+        if (!empty($ogMissing)) {
+            $issues[] = "Missing OG tags: " . implode(', ', $ogMissing);
+        }
+
+        // Heading structure
+        $headings = array_map(
+            static fn ($h) => str_repeat('#', $h->level) . ' ' . $h->text,
+            $result['metadata']->headers
+        );
+
+        // Image alt text check
+        $imagesNoAlt = array_map(
+            static fn ($img) => $img->src,
+            array_filter(
+                $result['metadata']->images,
+                static fn ($img) => !$img->alt || strlen($img->alt) === 0
+            )
+        );
+        if (!empty($imagesNoAlt)) {
+            $issues[] = count($imagesNoAlt) . " images missing alt text";
+        }
+
+        // External links
+        $externalLinks = array_map(
+            static fn ($link) => $link->href,
+            array_filter(
+                $result['metadata']->links,
+                static fn ($link) => $link->linkType === 'external'
+            )
+        );
+
+        return [
+            'title_missing' => $titleMissing,
+            'description_missing' => $descMissing,
+            'og_missing' => $ogMissing,
+            'headings' => $headings,
+            'images_missing_alt' => $imagesNoAlt,
+            'external_links' => $externalLinks,
+            'issues' => $issues,
+        ];
+    }
+}
+
+// Usage
+$audit = new SeoAudit();
+$report = $audit->audit($pageHtml);
+
+if (!empty($report['issues'])) {
+    echo "SEO Issues Found:\n";
+    foreach ($report['issues'] as $issue) {
+        echo "  - $issue\n";
+    }
+}
+```
+
+#### Example 2: Table of Contents Generator
+
+```php
+<?php
+
+declare(strict_types=1);
+
+use HtmlToMarkdown\Service\Converter;
+
+class TableOfContentsGenerator
+{
+    private readonly Converter $converter;
+
+    public function __construct()
+    {
+        $this->converter = Converter::create();
+    }
+
+    public function generate(string $html): string
+    {
+        $result = $this->converter->convertWithMetadata(
+            $html,
+            null,
+            ['extract_headers' => true]
+        );
+
+        $toc = "## Table of Contents\n\n";
+        $lastLevel = 0;
+
+        foreach ($result['metadata']->headers as $header) {
+            if ($header->level < 2) {
+                continue;  // Skip h1
+            }
+
+            $indent = str_repeat('  ', $header->level - 2);
+            $id = $header->id ?: $this->slugify($header->text);
+
+            $toc .= $indent . "- [{$header->text}](#{$id})\n";
+        }
+
+        return $toc;
+    }
+
+    private function slugify(string $text): string
+    {
+        return strtolower(
+            preg_replace('/[^a-z0-9]+/', '-', trim($text)) ?? ''
+        );
+    }
+}
+
+// Usage
+$generator = new TableOfContentsGenerator();
+$toc = $generator->generate($html);
+echo $toc;
+```
+
+#### Example 3: Content Extractor with Asset Tracking
+
+```php
+<?php
+
+declare(strict_types=1);
+
+use HtmlToMarkdown\Service\Converter;
+use HtmlToMarkdown\Config\ConversionOptions;
+
+class ContentExtractor
+{
+    private readonly Converter $converter;
+
+    public function __construct()
+    {
+        $this->converter = Converter::create();
+    }
+
+    /**
+     * @return array{
+     *     markdown: string,
+     *     title: string|null,
+     *     description: string|null,
+     *     assets: array{
+     *         images: list<array{src: string, alt: string|null}>,
+     *         external_links: list<array{href: string, text: string}>,
+     *     },
+     * }
+     */
+    public function extract(string $html): array
+    {
+        $result = $this->converter->convertWithMetadata(
+            $html,
+            new ConversionOptions(headingStyle: 'Atx'),
+            [
+                'extract_links' => true,
+                'extract_images' => true,
+            ]
+        );
+
+        // Collect images
+        $images = array_map(
+            static fn ($img) => [
+                'src' => $img->src,
+                'alt' => $img->alt,
+            ],
+            $result['metadata']->images
+        );
+
+        // Collect external links (deduplicated)
+        $externalLinks = array_values(
+            array_unique(
+                array_map(
+                    static fn ($link) => [
+                        'href' => $link->href,
+                        'text' => $link->text,
+                    ],
+                    array_filter(
+                        $result['metadata']->links,
+                        static fn ($link) => $link->linkType === 'external'
+                    )
+                ),
+                SORT_REGULAR
+            )
+        );
+
+        return [
+            'markdown' => $result['markdown'],
+            'title' => $result['metadata']->document->title,
+            'description' => $result['metadata']->document->description,
+            'assets' => [
+                'images' => $images,
+                'external_links' => $externalLinks,
+            ],
+        ];
+    }
+}
+
+// Usage
+$extractor = new ContentExtractor();
+$extracted = $extractor->extract($html);
+
+file_put_contents('output.md', $extracted['markdown']);
+file_put_contents('assets.json', json_encode($extracted['assets'], JSON_PRETTY_PRINT));
+```
+
+### Error Handling
+
+Metadata extraction is type-safe. PHPStan validates all accesses. Conversion errors are wrapped in `ConversionFailed` exceptions:
+
+```php
+<?php
+
+use HtmlToMarkdown\Service\Converter;
+use HtmlToMarkdown\Exception\ConversionFailed;
+use HtmlToMarkdown\Exception\ExtensionNotLoaded;
+
+$converter = Converter::create();
+
+try {
+    $result = $converter->convertWithMetadata($html);
+} catch (ExtensionNotLoaded $e) {
+    // Extension not installed or enabled
+    echo "Error: {$e->getMessage()}\n";
+} catch (ConversionFailed $e) {
+    // Rust conversion error (malformed HTML, Rust panic, etc.)
+    echo "Conversion failed: {$e->getMessage()}\n";
+}
+```
+
+### Type Safety (PHPStan)
+
+All metadata value objects are readonly with strict types:
+
+```php
+<?php
+
+// PHPStan level: max (inferred from packages/php/phpstan.neon)
+
+$result = $converter->convertWithMetadata($html);
+
+// Type-safe property access (no possibility of null pointer):
+/** @var \HtmlToMarkdown\Value\ExtendedMetadata */
+$metadata = $result['metadata'];
+
+// Each property is typed and readonly
+/** @var string|null */
+$title = $metadata->document->title;
+
+/** @var list<\HtmlToMarkdown\Value\LinkMetadata> */
+$links = $metadata->links;
+
+// Iterate with full type knowledge
+foreach ($links as $link) {
+    // IDE autocomplete, PHPStan checking all accesses
+    echo $link->href;  // string
+    echo $link->text;  // string
+    echo implode(', ', $link->rel);  // list<string>
+}
+```
+
+No `Any` types, no casts, no `@var` suppression needed.
+
+### Performance
+
+Metadata extraction is zero-copy where possible. The Rust core parses structure once and returns all metadata in a single pass alongside Markdown generation.
 
 ## Testing and quality
 
