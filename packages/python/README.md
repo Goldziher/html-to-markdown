@@ -133,17 +133,21 @@ if inline_images:
 
 Each inline image is returned as a typed dictionary (`bytes` payload, metadata, and relevant HTML attributes). Warnings are human-readable skip reasons.
 
-### Metadata extraction
+### Metadata Extraction
+
+Extract comprehensive metadata (title, description, headers, links, images, structured data) during conversion in a single pass.
+
+#### Basic Usage
 
 ```python
-from html_to_markdown import ConversionOptions, MetadataConfig, convert_with_metadata
+from html_to_markdown import convert_with_metadata
 
 html = """
 <html>
   <head>
-    <title>Example</title>
+    <title>Example Article</title>
     <meta name="description" content="Demo page">
-    <link rel="canonical" href="https://example.com/page">
+    <link rel="canonical" href="https://example.com/article">
   </head>
   <body>
     <h1 id="welcome">Welcome</h1>
@@ -153,19 +157,334 @@ html = """
 </html>
 """
 
-markdown, metadata = convert_with_metadata(
-    html,
-    ConversionOptions(heading_style="atx"),
-    MetadataConfig(extract_links=True, extract_images=True, extract_headers=True),
-)
+markdown, metadata = convert_with_metadata(html)
 
 print(markdown)
-print(metadata["document"]["title"])       # "Example"
-print(metadata["links"][0]["rel"])         # ["nofollow", "external"]
+print(metadata["document"]["title"])       # "Example Article"
+print(metadata["headers"][0]["text"])      # "Welcome"
+print(metadata["links"][0]["href"])        # "https://example.com"
 print(metadata["images"][0]["dimensions"]) # (640, 480)
 ```
 
-`metadata` includes document-level tags (title, description, canonical URL, Open Graph/Twitter cards), extracted links with `rel` and raw attributes, image metadata with inferred dimensions, and structured headers with depth + offset information. Feature flags in `MetadataConfig` let you keep only the sections you need.
+#### Configuration
+
+Control which metadata types are extracted using `MetadataConfig`:
+
+```python
+from html_to_markdown import ConversionOptions, MetadataConfig, convert_with_metadata
+
+options = ConversionOptions(heading_style="atx")
+config = MetadataConfig(
+    extract_headers=True,           # h1-h6 elements (default: True)
+    extract_links=True,             # <a> hyperlinks (default: True)
+    extract_images=True,            # <img> elements (default: True)
+    extract_structured_data=True,   # JSON-LD, Microdata, RDFa (default: True)
+    max_structured_data_size=1_000_000,  # Max bytes for structured data (default: 100KB)
+)
+
+markdown, metadata = convert_with_metadata(html, options, config)
+```
+
+#### Metadata Structure
+
+The `metadata` dictionary contains five categories:
+
+```python
+metadata = {
+    "document": {                    # Document-level metadata from <head>
+        "title": str | None,
+        "description": str | None,
+        "keywords": list[str],       # Comma-separated keywords from meta tags
+        "author": str | None,
+        "canonical_url": str | None, # link[rel="canonical"] href
+        "base_href": str | None,
+        "language": str | None,      # lang attribute (e.g., "en")
+        "text_direction": str | None, # "ltr", "rtl", or "auto"
+        "open_graph": dict[str, str], # og:* meta properties
+        "twitter_card": dict[str, str], # twitter:* meta properties
+        "meta_tags": dict[str, str],  # Other meta tag properties
+    },
+    "headers": [                     # h1-h6 elements with hierarchy
+        {
+            "level": int,            # 1-6
+            "text": str,             # Normalized text content
+            "id": str | None,        # HTML id attribute
+            "depth": int,            # Nesting depth in document tree
+            "html_offset": int,      # Byte offset in original HTML
+        },
+        # ... more headers
+    ],
+    "links": [                       # Extracted <a> elements
+        {
+            "href": str,
+            "text": str,
+            "title": str | None,
+            "link_type": str,        # "anchor" | "internal" | "external" | "email" | "phone" | "other"
+            "rel": list[str],        # rel attribute values
+            "attributes": dict[str, str],  # Other HTML attributes
+        },
+        # ... more links
+    ],
+    "images": [                      # Extracted <img> elements
+        {
+            "src": str,              # Image source (URL or data URI)
+            "alt": str | None,
+            "title": str | None,
+            "dimensions": tuple[int, int] | None,  # (width, height)
+            "image_type": str,       # "data_uri" | "inline_svg" | "external" | "relative"
+            "attributes": dict[str, str],
+        },
+        # ... more images
+    ],
+    "structured_data": [             # JSON-LD, Microdata, RDFa blocks
+        {
+            "data_type": str,        # "json_ld" | "microdata" | "rdfa"
+            "raw_json": str,         # JSON string representation
+            "schema_type": str | None,  # Detected schema type (e.g., "Article")
+        },
+        # ... more structured data
+    ],
+}
+```
+
+#### Real-World Use Cases
+
+**Extract Article Metadata for SEO**
+
+```python
+from html_to_markdown import convert_with_metadata
+
+def extract_article_metadata(html: str) -> dict:
+    markdown, metadata = convert_with_metadata(html)
+    doc = metadata["document"]
+
+    return {
+        "title": doc.get("title"),
+        "description": doc.get("description"),
+        "keywords": doc.get("keywords", []),
+        "author": doc.get("author"),
+        "canonical_url": doc.get("canonical_url"),
+        "language": doc.get("language"),
+        "open_graph": doc.get("open_graph", {}),
+        "twitter_card": doc.get("twitter_card", {}),
+        "markdown": markdown,
+    }
+
+# Usage
+seo_data = extract_article_metadata(html)
+print(f"Title: {seo_data['title']}")
+print(f"Language: {seo_data['language']}")
+print(f"OG Image: {seo_data['open_graph'].get('image')}")
+```
+
+**Build Table of Contents**
+
+```python
+from html_to_markdown import convert_with_metadata
+
+def build_table_of_contents(html: str) -> list[dict]:
+    """Generate a nested TOC from header structure."""
+    markdown, metadata = convert_with_metadata(html)
+    headers = metadata["headers"]
+
+    toc = []
+    for header in headers:
+        toc.append({
+            "level": header["level"],
+            "text": header["text"],
+            "anchor": header.get("id") or header["text"].lower().replace(" ", "-"),
+        })
+    return toc
+
+# Usage
+toc = build_table_of_contents(html)
+for item in toc:
+    indent = "  " * (item["level"] - 1)
+    print(f"{indent}- [{item['text']}](#{item['anchor']})")
+```
+
+**Validate Links and Accessibility**
+
+```python
+from html_to_markdown import convert_with_metadata
+
+def check_accessibility(html: str) -> dict:
+    """Find common accessibility and SEO issues."""
+    markdown, metadata = convert_with_metadata(html)
+
+    return {
+        "images_without_alt": [
+            img for img in metadata["images"]
+            if not img.get("alt")
+        ],
+        "links_without_text": [
+            link for link in metadata["links"]
+            if not link.get("text", "").strip()
+        ],
+        "external_links_count": len([
+            link for link in metadata["links"]
+            if link["link_type"] == "external"
+        ]),
+        "broken_anchors": [
+            link for link in metadata["links"]
+            if link["link_type"] == "anchor"
+        ],
+    }
+
+# Usage
+issues = check_accessibility(html)
+if issues["images_without_alt"]:
+    print(f"Found {len(issues['images_without_alt'])} images without alt text")
+```
+
+**Extract Structured Data (JSON-LD, Microdata)**
+
+```python
+from html_to_markdown import convert_with_metadata
+import json
+
+def extract_json_ld_schemas(html: str) -> list[dict]:
+    """Extract all JSON-LD structured data blocks."""
+    markdown, metadata = convert_with_metadata(html)
+
+    schemas = []
+    for block in metadata["structured_data"]:
+        if block["data_type"] == "json_ld":
+            try:
+                schema = json.loads(block["raw_json"])
+                schemas.append({
+                    "type": block.get("schema_type"),
+                    "data": schema,
+                })
+            except json.JSONDecodeError:
+                continue
+    return schemas
+
+# Usage
+schemas = extract_json_ld_schemas(html)
+for schema in schemas:
+    print(f"Found {schema['type']} schema:")
+    print(json.dumps(schema["data"], indent=2))
+```
+
+**Migrate Content with Preservation of Links and Images**
+
+```python
+from html_to_markdown import convert_with_metadata
+
+def migrate_with_manifest(html: str, base_url: str) -> tuple[str, dict]:
+    """Convert to Markdown while capturing all external references."""
+    markdown, metadata = convert_with_metadata(html)
+
+    manifest = {
+        "title": metadata["document"].get("title"),
+        "external_links": [
+            {"url": link["href"], "text": link["text"]}
+            for link in metadata["links"]
+            if link["link_type"] == "external"
+        ],
+        "external_images": [
+            {"url": img["src"], "alt": img.get("alt")}
+            for img in metadata["images"]
+            if img["image_type"] == "external"
+        ],
+    }
+    return markdown, manifest
+
+# Usage
+md, manifest = migrate_with_manifest(html, "https://example.com")
+print(f"Converted: {manifest['title']}")
+print(f"External resources: {len(manifest['external_links'])} links, {len(manifest['external_images'])} images")
+```
+
+#### Feature Detection
+
+Check if metadata extraction is available at runtime:
+
+```python
+from html_to_markdown import convert_with_metadata, convert
+
+try:
+    # Try to use metadata extraction
+    markdown, metadata = convert_with_metadata(html)
+    print(f"Metadata available: {metadata['document'].get('title')}")
+except (NameError, TypeError):
+    # Fallback for builds without metadata feature
+    markdown = convert(html)
+    print("Metadata feature not available, using basic conversion")
+```
+
+#### Error Handling
+
+Metadata extraction is designed to be robust:
+
+```python
+from html_to_markdown import convert_with_metadata, MetadataConfig
+
+# Handle large structured data safely
+config = MetadataConfig(
+    extract_structured_data=True,
+    max_structured_data_size=500_000,  # 500KB limit
+)
+
+try:
+    markdown, metadata = convert_with_metadata(html, metadata_config=config)
+
+    # Safe access with defaults
+    title = metadata["document"].get("title", "Untitled")
+    headers = metadata["headers"] or []
+    images = metadata["images"] or []
+
+except Exception as e:
+    # Handle parsing errors gracefully
+    print(f"Extraction error: {e}")
+    # Fallback to basic conversion
+    from html_to_markdown import convert
+    markdown = convert(html)
+```
+
+#### Performance Considerations
+
+1. **Single-Pass Collection**: Metadata extraction happens during HTML parsing with zero overhead when disabled.
+2. **Memory Efficient**: Collections use reasonable pre-allocations (32 headers, 64 links, 16 images typical).
+3. **Selective Extraction**: Disable unused metadata types in `MetadataConfig` to reduce overhead.
+4. **Structured Data Limits**: Large JSON-LD blocks are skipped if they exceed the size limit to prevent memory exhaustion.
+
+```python
+from html_to_markdown import MetadataConfig, convert_with_metadata
+
+# Optimize for performance
+config = MetadataConfig(
+    extract_headers=True,
+    extract_links=False,  # Skip if not needed
+    extract_images=False, # Skip if not needed
+    extract_structured_data=False,  # Skip if not needed
+)
+
+markdown, metadata = convert_with_metadata(html, metadata_config=config)
+```
+
+#### Differences from Basic Conversion
+
+When `extract_metadata=True` (default in `ConversionOptions`), basic metadata is embedded in a YAML frontmatter block:
+
+```python
+from html_to_markdown import convert, ConversionOptions
+
+# Basic metadata as YAML frontmatter
+options = ConversionOptions(extract_metadata=True)
+markdown = convert(html, options)
+# Output: "---\ntitle: ...\n---\n\nContent..."
+
+# Rich metadata extraction (all metadata types)
+from html_to_markdown import convert_with_metadata
+markdown, full_metadata = convert_with_metadata(html)
+# Returns structured data dict with headers, links, images, etc.
+```
+
+The two approaches serve different purposes:
+- `extract_metadata=True`: Embeds basic metadata in the output Markdown
+- `convert_with_metadata()`: Returns structured metadata for programmatic access
 
 ### hOCR (HTML OCR) Support
 

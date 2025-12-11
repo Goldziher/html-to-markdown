@@ -2,11 +2,11 @@
 
 #[cfg(feature = "metadata")]
 use html_to_markdown_rs::metadata::{
-    DocumentMetadata as RustDocumentMetadata, ExtendedMetadata as RustExtendedMetadata,
-    HeaderMetadata as RustHeaderMetadata, ImageMetadata as RustImageMetadata, ImageType as RustImageType,
-    LinkMetadata as RustLinkMetadata, LinkType as RustLinkType, MetadataConfig as RustMetadataConfig,
-    StructuredData as RustStructuredData, StructuredDataType as RustStructuredDataType,
-    TextDirection as RustTextDirection,
+    DEFAULT_MAX_STRUCTURED_DATA_SIZE, DocumentMetadata as RustDocumentMetadata,
+    ExtendedMetadata as RustExtendedMetadata, HeaderMetadata as RustHeaderMetadata, ImageMetadata as RustImageMetadata,
+    ImageType as RustImageType, LinkMetadata as RustLinkMetadata, LinkType as RustLinkType,
+    MetadataConfig as RustMetadataConfig, StructuredData as RustStructuredData,
+    StructuredDataType as RustStructuredDataType, TextDirection as RustTextDirection,
 };
 use html_to_markdown_rs::safety::guard_panic;
 use html_to_markdown_rs::{
@@ -446,6 +446,8 @@ fn source_to_string(source: &InlineImageSource) -> String {
 #[cfg(feature = "metadata")]
 #[napi(object)]
 pub struct JsMetadataConfig {
+    #[napi(js_name = "extract_document")]
+    pub extract_document: Option<bool>,
     #[napi(js_name = "extract_headers")]
     pub extract_headers: Option<bool>,
     #[napi(js_name = "extract_links")]
@@ -462,11 +464,14 @@ pub struct JsMetadataConfig {
 impl From<JsMetadataConfig> for RustMetadataConfig {
     fn from(val: JsMetadataConfig) -> Self {
         RustMetadataConfig {
+            extract_document: val.extract_document.unwrap_or(true),
             extract_headers: val.extract_headers.unwrap_or(true),
             extract_links: val.extract_links.unwrap_or(true),
             extract_images: val.extract_images.unwrap_or(true),
             extract_structured_data: val.extract_structured_data.unwrap_or(true),
-            max_structured_data_size: val.max_structured_data_size.unwrap_or(1_000_000) as usize,
+            max_structured_data_size: val
+                .max_structured_data_size
+                .unwrap_or(DEFAULT_MAX_STRUCTURED_DATA_SIZE as i64) as usize,
         }
     }
 }

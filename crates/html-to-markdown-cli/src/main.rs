@@ -1,11 +1,13 @@
 use clap::{Parser, ValueEnum};
 use encoding_rs::Encoding;
 use html_to_markdown_rs::{
-    CodeBlockStyle, ConversionOptions, HeadingStyle, HighlightStyle, ListIndentType, NewlineStyle,
-    PreprocessingOptions, PreprocessingPreset, WhitespaceMode, convert,
+    CodeBlockStyle, ConversionOptions, HeadingStyle, HighlightStyle, ListIndentType, MetadataConfig, NewlineStyle,
+    PreprocessingOptions, PreprocessingPreset, WhitespaceMode, convert, convert_with_metadata,
+    metadata::DEFAULT_MAX_STRUCTURED_DATA_SIZE,
 };
 use reqwest::blocking::Client;
 use reqwest::header::{CONTENT_TYPE, USER_AGENT};
+use serde_json::json;
 use std::fs;
 use std::io::{self, Read, Write as IoWrite};
 use std::path::PathBuf;
@@ -32,6 +34,17 @@ const DEFAULT_USER_AGENT: &str =
 
     # Convert and save to file
     html-to-markdown input.html -o output.md
+
+    # Extract metadata with conversion (JSON output to stdout)
+    html-to-markdown input.html --with-metadata
+
+    # Extract specific metadata types
+    html-to-markdown input.html --with-metadata --extract-headers --extract-links
+
+    # Extract all metadata and save output
+    html-to-markdown input.html --with-metadata \\
+        --extract-document --extract-headers --extract-links --extract-images \\
+        -o output.json
 
     # Generate shell completions
     html-to-markdown --generate-completion bash > html-to-markdown.bash
@@ -237,6 +250,54 @@ struct Cli {
     #[arg(long)]
     #[arg(help_heading = "Metadata")]
     extract_metadata: bool,
+
+    /// Extract comprehensive metadata and output as JSON
+    ///
+    /// When enabled, output will be JSON with "markdown" and "metadata" keys.
+    /// Use --extract-document, --extract-headers, etc. to control what metadata is extracted.
+    #[arg(long)]
+    #[arg(help_heading = "Metadata")]
+    with_metadata: bool,
+
+    /// Extract document-level metadata
+    ///
+    /// Requires --with-metadata. Extracts title, description, charset, language, etc.
+    #[arg(long)]
+    #[arg(help_heading = "Metadata")]
+    #[arg(requires = "with_metadata")]
+    extract_document: bool,
+
+    /// Extract header elements
+    ///
+    /// Requires --with-metadata. Extracts h1-h6 headers with hierarchy.
+    #[arg(long)]
+    #[arg(help_heading = "Metadata")]
+    #[arg(requires = "with_metadata")]
+    extract_headers: bool,
+
+    /// Extract link elements
+    ///
+    /// Requires --with-metadata. Extracts anchor tags with types (internal, external, etc.).
+    #[arg(long)]
+    #[arg(help_heading = "Metadata")]
+    #[arg(requires = "with_metadata")]
+    extract_links: bool,
+
+    /// Extract image elements
+    ///
+    /// Requires --with-metadata. Extracts img tags with sources and metadata.
+    #[arg(long)]
+    #[arg(help_heading = "Metadata")]
+    #[arg(requires = "with_metadata")]
+    extract_images: bool,
+
+    /// Extract structured data
+    ///
+    /// Requires --with-metadata. Extracts JSON-LD, Microdata, and RDFa blocks.
+    #[arg(long)]
+    #[arg(help_heading = "Metadata")]
+    #[arg(requires = "with_metadata")]
+    extract_structured_data: bool,
 
     /// Whitespace handling mode
     ///
@@ -695,19 +756,49 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         preserve_tags: Vec::new(), // CLI doesn't have preserve_tags flag yet
     };
 
-    let markdown = convert(&html, Some(options)).map_err(|e| format!("Error converting HTML: {}", e))?;
+    let output_content = if cli.with_metadata {
+        // Build metadata config from CLI flags
+        let metadata_config = MetadataConfig {
+            extract_document: cli.extract_document,
+            extract_headers: cli.extract_headers,
+            extract_links: cli.extract_links,
+            extract_images: cli.extract_images,
+            extract_structured_data: cli.extract_structured_data,
+            max_structured_data_size: DEFAULT_MAX_STRUCTURED_DATA_SIZE,
+        };
 
-    if cli.debug {
-        eprintln!("Generated {} bytes of markdown", markdown.len());
-    }
+        let (markdown, metadata) = convert_with_metadata(&html, Some(options), metadata_config)
+            .map_err(|e| format!("Error converting HTML with metadata: {}", e))?;
+
+        if cli.debug {
+            eprintln!("Generated {} bytes of markdown with metadata", markdown.len());
+        }
+
+        // Build JSON output with both markdown and metadata
+        let output = json!({
+            "markdown": markdown,
+            "metadata": metadata
+        });
+
+        // Pretty-print JSON
+        serde_json::to_string_pretty(&output).map_err(|e| format!("Error serializing JSON: {}", e))?
+    } else {
+        let markdown = convert(&html, Some(options)).map_err(|e| format!("Error converting HTML: {}", e))?;
+
+        if cli.debug {
+            eprintln!("Generated {} bytes of markdown", markdown.len());
+        }
+
+        markdown
+    };
 
     match cli.output {
         Some(path) => {
-            fs::write(&path, markdown.as_bytes())
+            fs::write(&path, output_content.as_bytes())
                 .map_err(|e| format!("Error writing to file '{}': {}", path.display(), e))?;
         }
         None => {
-            print!("{}", markdown);
+            print!("{}", output_content);
         }
     }
 

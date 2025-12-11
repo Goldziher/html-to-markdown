@@ -40,11 +40,18 @@ class HtmlToMarkdownFFI {
         ValueLayout.ADDRESS   // const char* return
     );
 
+    private static final FunctionDescriptor CONVERT_WITH_METADATA_DESC = FunctionDescriptor.of(
+        ValueLayout.ADDRESS,  // char* return (markdown)
+        ValueLayout.ADDRESS,  // const char* html parameter
+        ValueLayout.ADDRESS   // char** metadata_json_out parameter
+    );
+
     // Method handles for native functions
     static final MethodHandle html_to_markdown_convert;
     static final MethodHandle html_to_markdown_free_string;
     static final MethodHandle html_to_markdown_version;
     static final MethodHandle html_to_markdown_last_error;
+    static final MethodHandle html_to_markdown_convert_with_metadata;
 
     static {
         // Load the native library
@@ -72,6 +79,11 @@ class HtmlToMarkdownFFI {
         html_to_markdown_last_error = LINKER.downcallHandle(
             findSymbol("html_to_markdown_last_error"),
             LAST_ERROR_DESC
+        );
+
+        html_to_markdown_convert_with_metadata = LINKER.downcallHandle(
+            findSymbol("html_to_markdown_convert_with_metadata"),
+            CONVERT_WITH_METADATA_DESC
         );
     }
 

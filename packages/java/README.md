@@ -288,6 +288,300 @@ val version = HtmlToMarkdown.getVersion()
 println("html-to-markdown version: $version")
 ```
 
+## Metadata Extraction
+
+The `convertWithMetadata()` method extracts comprehensive document metadata in a single pass while converting HTML to Markdown. This is useful for SEO analysis, content management systems, web crawlers, and document processors.
+
+### Method Signature
+
+```java
+/**
+ * Convert HTML to Markdown with metadata extraction.
+ * <p>
+ * This method converts HTML to Markdown while extracting document metadata
+ * such as titles, headers, links, images, and structured data.
+ *
+ * @param html the HTML string to convert
+ * @return a {@code MetadataExtraction} containing both markdown and metadata
+ * @throws NullPointerException if html is null
+ * @throws ConversionException if the conversion fails
+ *
+ * @since 2.13.0
+ */
+public static MetadataExtraction convertWithMetadata(String html)
+```
+
+### Metadata Record Types
+
+The metadata extraction API uses Java records for type-safe access. All metadata is extracted into an `ExtendedMetadata` object containing:
+
+#### `ExtendedMetadata`
+
+Top-level metadata container with all extracted information:
+
+```java
+public record ExtendedMetadata(
+    DocumentMetadata document,
+    List<HeaderMetadata> headers,
+    List<LinkMetadata> links,
+    List<ImageMetadata> images,
+    List<StructuredData> structuredData
+)
+```
+
+#### `DocumentMetadata`
+
+Document-level metadata from `<head>` and top-level elements:
+
+```java
+public record DocumentMetadata(
+    String title,              // <title> content
+    String description,        // meta[name="description"]
+    List<String> keywords,     // meta[name="keywords"], split on commas
+    String author,             // meta[name="author"]
+    String canonicalUrl,       // <link rel="canonical">
+    String baseHref,           // <base href="">
+    String language,           // lang attribute
+    String textDirection,      // dir attribute (ltr, rtl, auto)
+    Map<String, String> openGraph,    // og:* properties
+    Map<String, String> twitterCard,  // twitter:* properties
+    Map<String, String> metaTags      // Other meta tags
+)
+```
+
+#### `HeaderMetadata`
+
+Header element metadata with hierarchy tracking:
+
+```java
+public record HeaderMetadata(
+    int level,        // Header level (1 for h1, 6 for h6)
+    String text,      // Normalized text content
+    String id,        // HTML id attribute
+    int depth,        // Document tree depth
+    int htmlOffset    // Byte offset in original HTML
+)
+```
+
+#### `LinkMetadata`
+
+Hyperlink metadata with classification:
+
+```java
+public record LinkMetadata(
+    String href,                      // href attribute value
+    String text,                      // Link text content
+    String title,                     // title attribute
+    String linkType,                  // Classification (anchor, internal, external, email, phone, other)
+    List<String> rel,                 // rel attribute values
+    Map<String, String> attributes    // Additional HTML attributes
+)
+```
+
+#### `ImageMetadata`
+
+Image metadata with source and dimensions:
+
+```java
+public record ImageMetadata(
+    String src,                       // Image source (URL, data URI, or SVG identifier)
+    String alt,                       // alt attribute (accessibility)
+    String title,                     // title attribute
+    int[] dimensions,                 // [width, height] if available
+    String imageType,                 // Classification (data_uri, inline_svg, external, relative)
+    Map<String, String> attributes    // Additional HTML attributes
+)
+```
+
+#### `StructuredData`
+
+Machine-readable structured data blocks:
+
+```java
+public record StructuredData(
+    String dataType,   // json_ld, microdata, rdfa
+    String rawJson,    // Raw JSON string (for JSON-LD)
+    String schemaType  // Schema type (e.g., "Article", "Event")
+)
+```
+
+#### `MetadataExtraction`
+
+Result container combining markdown and extracted metadata:
+
+```java
+public record MetadataExtraction(
+    String markdown,
+    ExtendedMetadata metadata
+)
+```
+
+### Metadata Examples
+
+#### Basic Metadata Extraction with Exception Handling
+
+Extract and access document metadata:
+
+```java
+import io.github.goldziher.htmltomarkdown.HtmlToMarkdown;
+import io.github.goldziher.htmltomarkdown.metadata.MetadataExtraction;
+
+public class MetadataExample {
+    public static void main(String[] args) {
+        String html = """
+            <html>
+            <head>
+                <title>My Article</title>
+                <meta name="description" content="An interesting read">
+                <meta name="author" content="Jane Doe">
+                <meta property="og:image" content="image.jpg">
+            </head>
+            <body>
+                <h1>Welcome</h1>
+                <a href="https://example.com">Link</a>
+                <img src="image.jpg" alt="Featured image">
+            </body>
+            </html>
+            """;
+
+        try {
+            MetadataExtraction result = HtmlToMarkdown.convertWithMetadata(html);
+
+            // Access document metadata
+            var doc = result.metadata().document();
+            if (doc.title() != null) {
+                System.out.println("Title: " + doc.title());
+            }
+            if (doc.author() != null) {
+                System.out.println("Author: " + doc.author());
+            }
+
+            // Access Open Graph metadata
+            doc.openGraph().forEach((key, value) ->
+                System.out.println("OG " + key + ": " + value)
+            );
+
+            // Count extracted elements
+            System.out.println("Headers: " + result.metadata().headers().size());
+            System.out.println("Links: " + result.metadata().links().size());
+            System.out.println("Images: " + result.metadata().images().size());
+
+            // Print markdown output
+            System.out.println("\nMarkdown:\n" + result.markdown());
+        } catch (HtmlToMarkdown.ConversionException e) {
+            System.err.println("Conversion failed: " + e.getMessage());
+        }
+    }
+}
+```
+
+#### Processing Headers with Hierarchy
+
+Extract and traverse document structure:
+
+```java
+import io.github.goldziher.htmltomarkdown.HtmlToMarkdown;
+import io.github.goldziher.htmltomarkdown.metadata.HeaderMetadata;
+
+public class HeaderTraversalExample {
+    public static void main(String[] args) {
+        String html = """
+            <html><body>
+                <h1>Main Title</h1>
+                <h2>Section One</h2>
+                <h3>Subsection</h3>
+                <h2>Section Two</h2>
+            </body></html>
+            """;
+
+        try {
+            var result = HtmlToMarkdown.convertWithMetadata(html);
+
+            System.out.println("Document Structure:");
+            for (HeaderMetadata header : result.metadata().headers()) {
+                String indent = "  ".repeat(header.level() - 1);
+                System.out.print(indent + "- Level " + header.level() + ": " + header.text());
+                if (header.id() != null) {
+                    System.out.print(" (#" + header.id() + ")");
+                }
+                System.out.println();
+            }
+        } catch (HtmlToMarkdown.ConversionException e) {
+            System.err.println("Failed: " + e.getMessage());
+        }
+    }
+}
+```
+
+#### Analyzing Links with Type Classification
+
+Extract and filter links by type:
+
+```java
+import io.github.goldziher.htmltomarkdown.HtmlToMarkdown;
+import io.github.goldziher.htmltomarkdown.metadata.LinkMetadata;
+import java.util.List;
+import java.util.stream.Collectors;
+
+public class LinkAnalysisExample {
+    public static void main(String[] args) {
+        String html = """
+            <html><body>
+                <a href="https://external.com">External Site</a>
+                <a href="/internal">Internal Page</a>
+                <a href="#section">Anchor Link</a>
+                <a href="mailto:test@example.com">Email</a>
+                <a href="tel:+1234567890">Phone</a>
+                <a href="https://external.com" rel="nofollow">Nofollow Link</a>
+            </body></html>
+            """;
+
+        try {
+            var result = HtmlToMarkdown.convertWithMetadata(html);
+
+            // Group links by type
+            var linksByType = result.metadata().links().stream()
+                .collect(Collectors.groupingBy(LinkMetadata::linkType));
+
+            // Process external links
+            var external = linksByType.getOrDefault("external", List.of());
+            if (!external.isEmpty()) {
+                System.out.println("External Links: " + external.size());
+                external.forEach(link ->
+                    System.out.println("  - " + link.text() + ": " + link.href())
+                );
+            }
+
+            // Find nofollow links
+            var nofollow = result.metadata().links().stream()
+                .filter(link -> link.rel().contains("nofollow"))
+                .collect(Collectors.toList());
+
+            if (!nofollow.isEmpty()) {
+                System.out.println("\nNofollow Links: " + nofollow.size());
+                nofollow.forEach(link ->
+                    System.out.println("  - " + link.text() + ": " + link.href())
+                );
+            }
+        } catch (HtmlToMarkdown.ConversionException e) {
+            System.err.println("Failed: " + e.getMessage());
+        }
+    }
+}
+```
+
+### Panama FFM Integration Notes
+
+The `convertWithMetadata()` method uses Java's Foreign Function & Memory API (Panama) for FFI integration:
+
+1. **Memory Management**: Uses `Arena` for safe, automatic memory lifecycle management
+2. **String Conversion**: Transparently converts between Java strings and C strings
+3. **JSON Parsing**: Metadata JSON is deserialized to typed Java records using Jackson
+4. **Exception Handling**: All FFI errors are wrapped in `ConversionException` for idiomatic error handling
+5. **Thread Safety**: The Panama FFI calls are thread-safe through proper memory isolation
+
+No manual pointer management is required - `Arena` handles all native memory cleanup.
+
 ## Running Tests
 
 ```bash

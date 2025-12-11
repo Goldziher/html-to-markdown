@@ -1,10 +1,10 @@
 #[cfg(feature = "metadata")]
 use html_to_markdown_rs::metadata::{
-    DocumentMetadata as RustDocumentMetadata, ExtendedMetadata as RustExtendedMetadata,
-    HeaderMetadata as RustHeaderMetadata, ImageMetadata as RustImageMetadata, ImageType as RustImageType,
-    LinkMetadata as RustLinkMetadata, LinkType as RustLinkType, MetadataConfig as RustMetadataConfig,
-    StructuredData as RustStructuredData, StructuredDataType as RustStructuredDataType,
-    TextDirection as RustTextDirection,
+    DEFAULT_MAX_STRUCTURED_DATA_SIZE, DocumentMetadata as RustDocumentMetadata,
+    ExtendedMetadata as RustExtendedMetadata, HeaderMetadata as RustHeaderMetadata, ImageMetadata as RustImageMetadata,
+    ImageType as RustImageType, LinkMetadata as RustLinkMetadata, LinkType as RustLinkType,
+    MetadataConfig as RustMetadataConfig, StructuredData as RustStructuredData,
+    StructuredDataType as RustStructuredDataType, TextDirection as RustTextDirection,
 };
 use html_to_markdown_rs::safety::guard_panic;
 use html_to_markdown_rs::{
@@ -126,6 +126,8 @@ impl InlineImageConfig {
 #[derive(Clone)]
 struct MetadataConfig {
     #[pyo3(get, set)]
+    extract_document: bool,
+    #[pyo3(get, set)]
     extract_headers: bool,
     #[pyo3(get, set)]
     extract_links: bool,
@@ -142,13 +144,15 @@ struct MetadataConfig {
 impl MetadataConfig {
     #[new]
     #[pyo3(signature = (
+        extract_document=true,
         extract_headers=true,
         extract_links=true,
         extract_images=true,
         extract_structured_data=true,
-        max_structured_data_size=1_000_000
+        max_structured_data_size=DEFAULT_MAX_STRUCTURED_DATA_SIZE
     ))]
     fn new(
+        extract_document: bool,
         extract_headers: bool,
         extract_links: bool,
         extract_images: bool,
@@ -156,6 +160,7 @@ impl MetadataConfig {
         max_structured_data_size: usize,
     ) -> Self {
         Self {
+            extract_document,
             extract_headers,
             extract_links,
             extract_images,
@@ -169,6 +174,7 @@ impl MetadataConfig {
 impl MetadataConfig {
     fn to_rust(&self) -> RustMetadataConfig {
         RustMetadataConfig {
+            extract_document: self.extract_document,
             extract_headers: self.extract_headers,
             extract_links: self.extract_links,
             extract_images: self.extract_images,
@@ -753,38 +759,164 @@ fn extended_metadata_to_py<'py>(py: Python<'py>, metadata: RustExtendedMetadata)
     Ok(dict.into())
 }
 
-/// Convert HTML to Markdown with metadata extraction.
+/// Convert HTML to Markdown with comprehensive metadata extraction.
 ///
-/// Extracts comprehensive metadata (headers, links, images, structured data) during conversion.
+/// Performs HTML-to-Markdown conversion while simultaneously extracting structured metadata
+/// including document properties, headers, links, images, and structured data in a single pass.
+/// Ideal for content analysis, SEO workflows, and document indexing.
 ///
 /// Args:
-///     html: HTML string to convert
-///     options: Optional conversion configuration
-///     metadata_config: Optional metadata extraction configuration
+///     html (str): HTML string to convert. Line endings are normalized (CRLF -> LF).
+///     options (ConversionOptions, optional): Conversion configuration controlling output format.
+///         Defaults to standard conversion options if None. Controls:
+///         - heading_style: "atx", "atx_closed", or "underlined"
+///         - list_indent_type: "spaces" or "tabs"
+///         - wrap: Enable text wrapping at specified width
+///         - And many other formatting options
+///     metadata_config (MetadataConfig, optional): Configuration for metadata extraction.
+///         Defaults to extracting all metadata types if None. Configure with:
+///         - extract_headers: bool - Extract h1-h6 heading elements
+///         - extract_links: bool - Extract hyperlinks with type classification
+///         - extract_images: bool - Extract image elements
+///         - extract_structured_data: bool - Extract JSON-LD/Microdata/RDFa
+///         - max_structured_data_size: int - Size limit for structured data (bytes)
 ///
 /// Returns:
-///     Tuple of (markdown: str, metadata: dict)
-///     The metadata dict contains:
-///     - document: Document-level metadata (title, description, lang, etc.)
-///     - headers: List of header elements with hierarchy
-///     - links: List of extracted hyperlinks with classification
-///     - images: List of extracted images with metadata
-///     - structured_data: List of JSON-LD, Microdata, or RDFa blocks
+///     tuple[str, dict]: A tuple of (markdown_string, metadata_dict) where:
+///
+///     markdown_string: str
+///         The converted Markdown output
+///
+///     metadata_dict: dict with keys:
+///         - document: dict containing:
+///             - title: str | None - Document title from <title> tag
+///             - description: str | None - From <meta name="description">
+///             - keywords: list[str] - Keywords from <meta name="keywords">
+///             - author: str | None - Author from <meta name="author">
+///             - language: str | None - Language from lang attribute
+///             - text_direction: str | None - Text direction ("ltr", "rtl", "auto")
+///             - canonical_url: str | None - Canonical URL from <link rel="canonical">
+///             - base_href: str | None - Base URL from <base href="">
+///             - open_graph: dict[str, str] - Open Graph properties (og:*)
+///             - twitter_card: dict[str, str] - Twitter Card properties (twitter:*)
+///             - meta_tags: dict[str, str] - Other meta tags
+///
+///         - headers: list[dict] containing:
+///             - level: int - Header level (1-6)
+///             - text: str - Header text content
+///             - id: str | None - HTML id attribute
+///             - depth: int - Nesting depth in document tree
+///             - html_offset: int - Byte offset in original HTML
+///
+///         - links: list[dict] containing:
+///             - href: str - Link URL
+///             - text: str - Link text content
+///             - title: str | None - Link title attribute
+///             - link_type: str - Type: "anchor", "internal", "external", "email", "phone", "other"
+///             - rel: list[str] - Rel attribute values
+///             - attributes: dict[str, str] - Additional HTML attributes
+///
+///         - images: list[dict] containing:
+///             - src: str - Image source (URL or data URI)
+///             - alt: str | None - Alt text for accessibility
+///             - title: str | None - Title attribute
+///             - dimensions: tuple[int, int] | None - (width, height) if available
+///             - image_type: str - Type: "data_uri", "external", "relative", "inline_svg"
+///             - attributes: dict[str, str] - Additional HTML attributes
+///
+///         - structured_data: list[dict] containing:
+///             - data_type: str - Type: "json_ld", "microdata", or "rdfa"
+///             - raw_json: str - Raw JSON string content
+///             - schema_type: str | None - Schema type (e.g., "Article", "Event")
 ///
 /// Raises:
-///     ValueError: Invalid HTML or configuration
+///     ValueError: If HTML parsing fails or configuration is invalid
+///     RuntimeError: If a panic occurs during conversion
 ///
-/// Example:
+/// Examples:
+///
+///     Basic usage - extract all metadata:
+///
 ///     ```ignore
 ///     from html_to_markdown import convert_with_metadata, MetadataConfig
 ///
-///     html = '<html lang="en"><head><title>Test</title></head><body><h1>Hello</h1></body></html>'
-///     config = MetadataConfig(extract_headers=True, extract_links=True)
-///     markdown, metadata = convert_with_metadata(html, metadata_config=config)
+///     html = '''
+///     <html lang="en">
+///         <head>
+///             <title>My Blog Post</title>
+///             <meta name="description" content="A great article">
+///         </head>
+///         <body>
+///             <h1 id="intro">Introduction</h1>
+///             <p>Read more at <a href="https://example.com">our site</a></p>
+///             <img src="photo.jpg" alt="Beautiful landscape">
+///         </body>
+///     </html>
+///     '''
+///
+///     markdown, metadata = convert_with_metadata(html)
 ///
 ///     print(f"Title: {metadata['document']['title']}")
-///     print(f"Headers: {len(metadata['headers'])}")
+///     # Output: Title: My Blog Post
+///
+///     print(f"Language: {metadata['document']['language']}")
+///     # Output: Language: en
+///
+///     print(f"Headers found: {len(metadata['headers'])}")
+///     # Output: Headers found: 1
+///
+///     for header in metadata['headers']:
+///         print(f"  - {header['text']} (level {header['level']})")
+///     # Output:   - Introduction (level 1)
+///
+///     print(f"External links: {len([l for l in metadata['links'] if l['link_type'] == 'external'])}")
+///     # Output: External links: 1
+///
+///     for img in metadata['images']:
+///         print(f"Image: {img['alt']} ({img['src']})")
+///     # Output: Image: Beautiful landscape (photo.jpg)
 ///     ```
+///
+///     Selective metadata extraction - headers and links only:
+///
+///     ```ignore
+///     from html_to_markdown import convert_with_metadata, MetadataConfig
+///
+///     config = MetadataConfig(
+///         extract_headers=True,
+///         extract_links=True,
+///         extract_images=False,  # Skip image extraction
+///         extract_structured_data=False  # Skip structured data
+///     )
+///
+///     markdown, metadata = convert_with_metadata(html, metadata_config=config)
+///
+///     assert len(metadata['images']) == 0  # Images not extracted
+///     assert len(metadata['headers']) > 0  # Headers extracted
+///     ```
+///
+///     With custom conversion options:
+///
+///     ```ignore
+///     from html_to_markdown import convert_with_metadata, ConversionOptions, MetadataConfig
+///
+///     options = ConversionOptions(
+///         heading_style="atx",  # Use # H1, ## H2 style
+///         wrap=True,
+///         wrap_width=80
+///     )
+///
+///     config = MetadataConfig(extract_headers=True)
+///
+///     markdown, metadata = convert_with_metadata(html, options=options, metadata_config=config)
+///     # Markdown uses ATX-style headings and is wrapped at 80 chars
+///     ```
+///
+/// See Also:
+///     - convert: Simple HTML to Markdown conversion without metadata
+///     - convert_with_inline_images: Extract inline images alongside conversion
+///     - ConversionOptions: Conversion configuration class
+///     - MetadataConfig: Metadata extraction configuration class
 #[cfg(feature = "metadata")]
 #[pyfunction]
 #[pyo3(signature = (html, options=None, metadata_config=None))]
@@ -795,7 +927,8 @@ fn convert_with_metadata<'py>(
     metadata_config: Option<MetadataConfig>,
 ) -> PyResult<(String, Py<PyAny>)> {
     let rust_options = options.map(|opts| opts.to_rust());
-    let cfg = metadata_config.unwrap_or_else(|| MetadataConfig::new(true, true, true, true, 1_000_000));
+    let cfg = metadata_config
+        .unwrap_or_else(|| MetadataConfig::new(true, true, true, true, true, DEFAULT_MAX_STRUCTURED_DATA_SIZE));
     let result = guard_panic(|| html_to_markdown_rs::convert_with_metadata(html, rust_options, cfg.to_rust()))
         .map_err(to_py_err)?;
 

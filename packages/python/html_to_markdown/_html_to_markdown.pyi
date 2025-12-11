@@ -115,6 +115,7 @@ class InlineImageWarning(TypedDict):
     message: str
 
 class MetadataConfig:
+    extract_document: bool
     extract_headers: bool
     extract_links: bool
     extract_images: bool
@@ -124,11 +125,12 @@ class MetadataConfig:
     def __init__(
         self,
         *,
+        extract_document: bool = True,
         extract_headers: bool = True,
         extract_links: bool = True,
         extract_images: bool = True,
         extract_structured_data: bool = True,
-        max_structured_data_size: int = 100_000,
+        max_structured_data_size: int = 1_000_000,
     ) -> None: ...
 
 class DocumentMetadata(TypedDict):

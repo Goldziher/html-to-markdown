@@ -37,4 +37,19 @@ internal static class NativeMethods
     /// <returns>Pointer to static null-terminated error string, or NULL</returns>
     [DllImport(LibraryName, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi)]
     internal static extern IntPtr html_to_markdown_last_error();
+
+    /// <summary>
+    /// Convert HTML to Markdown with metadata extraction.
+    /// </summary>
+    /// <param name="html">Null-terminated HTML string</param>
+    /// <param name="metadata_json_out">Pointer to char pointer for metadata JSON output</param>
+    /// <returns>Pointer to null-terminated Markdown string, or NULL on error</returns>
+    /// <remarks>
+    /// Both the returned markdown string and the metadata JSON string (written to metadata_json_out)
+    /// must be freed with html_to_markdown_free_string.
+    /// </remarks>
+    [DllImport(LibraryName, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi)]
+    internal static extern IntPtr html_to_markdown_convert_with_metadata(
+        IntPtr html,
+        out IntPtr metadata_json_out);
 }
