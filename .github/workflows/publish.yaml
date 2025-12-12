@@ -879,11 +879,16 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
 
-      - name: Install Maven 3.9.9
+      - name: Install Maven (latest)
         shell: bash
         run: |
           set -euo pipefail
-          MAVEN_VERSION=3.9.9
+          MAVEN_VERSION="$(
+            curl -fsSL "https://repo.maven.apache.org/maven2/org/apache/maven/apache-maven/maven-metadata.xml" \
+              | sed -n 's:.*<release>\(.*\)</release>.*:\1:p' \
+              | head -n 1
+          )"
+          : "${MAVEN_VERSION:?Failed to determine Maven version}"
           # Normalize paths on Windows to avoid tar interpreting "D:" as a host
           if [[ "${RUNNER_OS:-}" == "Windows" ]]; then
             TMP_DIR="$(cygpath -u "${RUNNER_TEMP}")"
@@ -1408,11 +1413,16 @@ jobs:
           : "${MAVEN_USERNAME:?Set MAVEN_USERNAME to your Sonatype Central token user (namecode)}"
           : "${MAVEN_PASSWORD:?Set MAVEN_PASSWORD to your Sonatype Central token password}"
 
-      - name: Install Maven 3.9.9
+      - name: Install Maven (latest)
         shell: bash
         run: |
           set -euo pipefail
-          MAVEN_VERSION=3.9.9
+          MAVEN_VERSION="$(
+            curl -fsSL "https://repo.maven.apache.org/maven2/org/apache/maven/apache-maven/maven-metadata.xml" \
+              | sed -n 's:.*<release>\(.*\)</release>.*:\1:p' \
+              | head -n 1
+          )"
+          : "${MAVEN_VERSION:?Failed to determine Maven version}"
           if [[ "${RUNNER_OS:-}" == "Windows" ]]; then
             TMP_DIR="$(cygpath -u "${RUNNER_TEMP}")"
           else
