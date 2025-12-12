@@ -365,8 +365,9 @@ All Python/Rust checks run automatically via prek on commit.
 
     - `CARGO_TOKEN` - From <https://crates.io/settings/tokens>
     - `HOMEBREW_TOKEN` - GitHub token with `repo` scope
-    - `PYPI_TOKEN` - PyPI trusted publishing
-    - `NPM_TOKEN` - From <https://www.npmjs.com/settings/tokens> (automation token)
+    - PyPI uses trusted publishing (OIDC); no `PYPI_TOKEN` secret is required
+    - npm uses trusted publishing (OIDC); no `NPM_TOKEN` secret is required
+    - NuGet uses trusted publishing (OIDC); no `NUGET_API_KEY` secret is required
 
 ### Post-release Verification
 
