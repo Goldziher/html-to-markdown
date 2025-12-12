@@ -1,9 +1,7 @@
 import init, { convert } from "./html_to_markdown_wasm.js";
 
-// State
 let wasmInitialized = false;
 
-// DOM Elements
 const htmlInput = document.getElementById("htmlInput");
 const markdownOutput = document.getElementById("markdownOutput");
 const convertBtn = document.getElementById("convertBtn");
@@ -12,7 +10,6 @@ const clearBtn = document.getElementById("clearBtn");
 const statusEl = document.getElementById("status");
 const wasmStatusEl = document.getElementById("wasmStatus");
 
-// Initialize WASM module
 async function initWasm() {
   try {
     await init();
@@ -22,7 +19,6 @@ async function initWasm() {
     statusEl.textContent = "Ready to convert!";
     statusEl.classList.add("success");
 
-    // Auto-convert the example on load
     performConversion();
   } catch (error) {
     console.error("Failed to initialize WASM:", error);
@@ -34,7 +30,6 @@ async function initWasm() {
   }
 }
 
-// Perform HTML to Markdown conversion
 function performConversion() {
   if (!wasmInitialized) {
     statusEl.textContent = "WASM module not initialized yet...";
@@ -54,18 +49,15 @@ function performConversion() {
   try {
     const startTime = performance.now();
 
-    // Convert HTML to Markdown
     const markdown = convert(html, null);
 
     const endTime = performance.now();
     const duration = (endTime - startTime).toFixed(2);
 
-    // Display result
     markdownOutput.textContent = markdown;
     statusEl.textContent = `✓ Converted in ${duration}ms`;
     statusEl.className = "status success";
 
-    // Reset copy button if it was in copied state
     copyBtn.classList.remove("copied");
   } catch (error) {
     console.error("Conversion error:", error);
@@ -75,7 +67,6 @@ function performConversion() {
   }
 }
 
-// Copy markdown to clipboard
 async function copyToClipboard() {
   const markdown = markdownOutput.textContent;
 
@@ -91,7 +82,6 @@ async function copyToClipboard() {
     statusEl.textContent = "✓ Copied to clipboard!";
     statusEl.className = "status success";
 
-    // Reset button after 2 seconds
     setTimeout(() => {
       copyBtn.classList.remove("copied");
     }, 2000);
@@ -102,7 +92,6 @@ async function copyToClipboard() {
   }
 }
 
-// Clear input
 function clearInput() {
   htmlInput.value = "";
   markdownOutput.textContent = "";
@@ -111,12 +100,10 @@ function clearInput() {
   htmlInput.focus();
 }
 
-// Event Listeners
 convertBtn.addEventListener("click", performConversion);
 copyBtn.addEventListener("click", copyToClipboard);
 clearBtn.addEventListener("click", clearInput);
 
-// Convert on Enter (Ctrl/Cmd + Enter)
 htmlInput.addEventListener("keydown", (e) => {
   if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
     e.preventDefault();
@@ -124,7 +111,6 @@ htmlInput.addEventListener("keydown", (e) => {
   }
 });
 
-// Auto-convert on input (debounced)
 let debounceTimer;
 htmlInput.addEventListener("input", () => {
   clearTimeout(debounceTimer);
@@ -135,5 +121,4 @@ htmlInput.addEventListener("input", () => {
   }, 500);
 });
 
-// Initialize on page load
 initWasm();

@@ -8,7 +8,6 @@ use html_to_markdown_rs::{ConversionOptions, convert};
 
 #[test]
 fn test_strip_tags_prevents_metadata_extraction() {
-    // Issue #146: strip_tags with "meta" should prevent meta tags from being extracted into frontmatter
     let html = r#"<!DOCTYPE html>
 <html>
 <head>
@@ -28,22 +27,18 @@ fn test_strip_tags_prevents_metadata_extraction() {
 
     let result = convert(html, Some(options)).unwrap();
 
-    // The body content should still be present
     assert!(
         result.contains("Main content here"),
         "Body content should be preserved: {}",
         result
     );
 
-    // Title should still be extracted (not stripped)
     assert!(
         result.contains("title: Test Document"),
         "Title should still be extracted in frontmatter: {}",
         result
     );
 
-    // But meta tags should NOT appear in the frontmatter
-    // when strip_tags includes "meta"
     assert!(
         !result.contains("meta-author"),
         "meta-author should NOT be in frontmatter when strip_tags=['meta']: {}",
@@ -63,7 +58,6 @@ fn test_strip_tags_prevents_metadata_extraction() {
 
 #[test]
 fn test_strip_tags_title_prevents_extraction() {
-    // Issue #146: strip_tags with "title" should prevent title extraction into frontmatter
     let html = r#"<!DOCTYPE html>
 <html>
 <head>
@@ -83,14 +77,12 @@ fn test_strip_tags_title_prevents_extraction() {
 
     let result = convert(html, Some(options)).unwrap();
 
-    // Body content should be present
     assert!(
         result.contains("Document Heading") && result.contains("Some content"),
         "Body content should be preserved: {}",
         result
     );
 
-    // Meta tags should still be extracted (title is stripped, not meta)
     assert!(
         result.contains("meta-author"),
         "meta-author should still be extracted when only title is stripped: {}",
@@ -102,7 +94,6 @@ fn test_strip_tags_title_prevents_extraction() {
         result
     );
 
-    // But title should NOT be in the frontmatter
     assert!(
         !result.contains("title: Should Be Stripped"),
         "title should NOT be in frontmatter when strip_tags=['title']: {}",
@@ -112,8 +103,6 @@ fn test_strip_tags_title_prevents_extraction() {
 
 #[test]
 fn test_preserve_tags_prevents_metadata_extraction() {
-    // Issue #146: preserve_tags should also prevent metadata extraction
-    // When a tag is preserved, it should appear as HTML (not stripped and not extracted as metadata)
     let html = r#"<!DOCTYPE html>
 <html>
 <head>
@@ -130,27 +119,22 @@ fn test_preserve_tags_prevents_metadata_extraction() {
 
     let mut options = ConversionOptions::default();
     options.extract_metadata = true;
-    // When preserve_tags is set for "meta", meta tags should be output as HTML
-    // and NOT extracted into the YAML frontmatter
     options.preserve_tags = vec!["meta".to_string()];
 
     let result = convert(html, Some(options)).unwrap();
 
-    // Body content should be present
     assert!(
         result.contains("Body content"),
         "Body content should be preserved: {}",
         result
     );
 
-    // Title should still be extracted (not in preserve_tags)
     assert!(
         result.contains("title: Preserved Title"),
         "title should still be extracted in frontmatter: {}",
         result
     );
 
-    // Meta attributes should NOT appear in YAML frontmatter
     assert!(
         !result.contains("meta-viewport"),
         "meta-viewport should NOT be in YAML frontmatter when preserve_tags=['meta']: {}",

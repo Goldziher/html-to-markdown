@@ -148,7 +148,6 @@ tasks:
     cmds:
       - cargo run --release --manifest-path tools/runtime-bench/Cargo.toml -- --language rust --fixture lists_timeline --flamegraph tools/runtime-bench/results/flamegraph.svg
 
-  # Aliases (backward compatibility with legacy task names) -------------------
   test:rust:
     desc: "Alias for rust:test"
     cmds:
@@ -270,7 +269,6 @@ tasks:
     cmds:
       - prek run --all-files
 
-  # Rust tasks ----------------------------------------------------------------
   rust:install:
     desc: "Install Rust toolchain (if needed)"
     cmds:
@@ -332,7 +330,6 @@ tasks:
     cmds:
       - cargo clean
 
-  # Python tasks --------------------------------------------------------------
   python:install:
     desc: "Install Python dependencies via uv"
     dir: packages/python
@@ -403,13 +400,11 @@ tasks:
     cmds:
       - rm -rf build/ dist/ *.egg-info .pytest_cache .ruff_cache .mypy_cache html_to_markdown/bin
 
-  # Alias for backwards compatibility
   python:coverage:
     desc: "Alias for python:test:coverage"
     cmds:
       - task: python:test:coverage
 
-  # Ruby tasks ----------------------------------------------------------------
   ruby:ensure-bundler:
     desc: "Ensure required Bundler version is installed"
     cmds:
@@ -476,7 +471,6 @@ tasks:
     cmds:
       - rm -rf lib/*.bundle lib/*.so pkg/ tmp/
 
-  # PHP tasks ----------------------------------------------------------------
   php:install:
     desc: "Install PHP dependencies via Composer"
     cmds:
@@ -512,7 +506,6 @@ tasks:
     cmds:
       - cmd: cd packages/php && composer run format:check
 
-  # Go tasks -----------------------------------------------------------------
   go:install:
     desc: "Install golangci-lint and download Go modules"
     cmds:
@@ -653,7 +646,6 @@ tasks:
     cmds:
       - MIX_ENV=dev mix format --check-formatted
 
-  # Java tasks -----------------------------------------------------------------
   java:install:
     desc: "Verify Java (JDK 25+) and Maven are installed, then download deps"
     cmds:
@@ -703,7 +695,6 @@ tasks:
     cmds:
       - MAVEN_OPTS="${MAVEN_OPTS:-} -Dmaven.mainClass=org.apache.maven.cling.MavenCling" ./mvnw -f packages/java/pom.xml -B spotless:check
 
-  # C# tasks -----------------------------------------------------------------
   csharp:install:
     desc: "Verify .NET SDK is installed and restore dependencies"
     cmds:
@@ -760,7 +751,6 @@ tasks:
       - dotnet format packages/csharp/HtmlToMarkdown.Tests/HtmlToMarkdown.Tests.csproj --verify-no-changes
       - dotnet format examples/csharp-smoke/csharp-smoke.csproj --verify-no-changes
 
-  # Example smoke tests ------------------------------------------------------
   examples:update:
     desc: "Update all smoke test dependencies"
     cmds:
@@ -786,7 +776,6 @@ tasks:
       - task: ruby:ensure-bundler
       - cmd: cd examples/ruby-smoke && PATH={{.RUBY_BIN}}:$PATH bundle _{{.BUNDLER_VERSION}}_ update --all
 
-  # JavaScript / TypeScript tasks --------------------------------------------
   js:install:
     desc: "Install pnpm workspace dependencies"
     cmds:
@@ -887,7 +876,6 @@ tasks:
     cmds:
       - pnpm run format:check
 
-  # Misc tasks ----------------------------------------------------------------
   versions:sync:
     desc: "Sync version from Cargo.toml to all package manifests"
     cmds:

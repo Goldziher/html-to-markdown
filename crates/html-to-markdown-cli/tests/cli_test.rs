@@ -1,7 +1,6 @@
 //! Integration tests for the html-to-markdown CLI.
 //!
 //! These tests verify the CLI works correctly with various options and edge cases.
-// spell-checker: disable
 
 use assert_cmd::Command;
 use predicates::prelude::*;
@@ -157,7 +156,6 @@ fn test_url_handles_frameset_with_noframes() {
 
 #[test]
 fn test_url_handles_windows_1252_charset() {
-    // Includes cp1252-only em dash and accented char
     let body = b"<html><body><p>Se\xf1or \x97 legacy charset</p></body></html>".to_vec();
     let (url, handle, _) = serve_once_bytes(body, Some("text/html; charset=windows-1252"));
 

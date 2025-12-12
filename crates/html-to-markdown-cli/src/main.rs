@@ -753,11 +753,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         encoding: cli.encoding.clone(),
         debug: cli.debug,
         strip_tags: cli.strip_tags.unwrap_or(defaults.strip_tags),
-        preserve_tags: Vec::new(), // CLI doesn't have preserve_tags flag yet
+        preserve_tags: Vec::new(),
     };
 
     let output_content = if cli.with_metadata {
-        // Build metadata config from CLI flags
         let metadata_config = MetadataConfig {
             extract_document: cli.extract_document,
             extract_headers: cli.extract_headers,
@@ -774,13 +773,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             eprintln!("Generated {} bytes of markdown with metadata", markdown.len());
         }
 
-        // Build JSON output with both markdown and metadata
         let output = json!({
             "markdown": markdown,
             "metadata": metadata
         });
 
-        // Pretty-print JSON
         serde_json::to_string_pretty(&output).map_err(|e| format!("Error serializing JSON: {}", e))?
     } else {
         let markdown = convert(&html, Some(options)).map_err(|e| format!("Error converting HTML: {}", e))?;

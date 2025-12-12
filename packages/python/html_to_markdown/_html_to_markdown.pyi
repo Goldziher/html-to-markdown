@@ -141,13 +141,13 @@ class DocumentMetadata(TypedDict):
     canonical_url: str | None
     base_href: str | None
     language: str | None
-    text_direction: str | None  # "ltr" | "rtl" | "auto" | None
+    text_direction: str | None
     open_graph: dict[str, str]
     twitter_card: dict[str, str]
     meta_tags: dict[str, str]
 
 class HeaderMetadata(TypedDict):
-    level: int  # 1-6
+    level: int
     text: str
     id: str | None
     depth: int
@@ -157,7 +157,7 @@ class LinkMetadata(TypedDict):
     href: str
     text: str
     title: str | None
-    link_type: str  # "anchor" | "internal" | "external" | "email" | "phone" | "other"
+    link_type: str
     rel: list[str]
     attributes: dict[str, str]
 
@@ -165,12 +165,12 @@ class ImageMetadata(TypedDict):
     src: str
     alt: str | None
     title: str | None
-    dimensions: tuple[int, int] | None  # (width, height)
-    image_type: str  # "data_uri" | "inline_svg" | "external" | "relative"
+    dimensions: tuple[int, int] | None
+    image_type: str
     attributes: dict[str, str]
 
 class StructuredData(TypedDict):
-    data_type: str  # "json_ld" | "microdata" | "rdfa"
+    data_type: str
     raw_json: str
     schema_type: str | None
 

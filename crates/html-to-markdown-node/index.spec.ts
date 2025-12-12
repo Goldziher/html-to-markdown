@@ -19,7 +19,6 @@ import {
 	JsWhitespaceMode,
 } from "./index.js";
 
-// Helper to load test documents
 const loadTestDoc = (path: string): string => {
 	const fullPath = join(__dirname, "../../test_documents", path);
 	return readFileSync(fullPath, "utf-8");
@@ -260,7 +259,6 @@ describe("html-to-markdown-node - NAPI-RS Bindings", () => {
 		});
 
 		it("should handle hOCR spatial tables", () => {
-			// Load hOCR test document
 			const hocr = loadTestDoc("test_data/hocr/comprehensive/valid_file.hocr");
 			const markdown = convert(hocr, {
 				hocrSpatialTables: true,
@@ -337,7 +335,6 @@ describe("html-to-markdown-node - NAPI-RS Bindings", () => {
 				wrap: true,
 				wrapWidth: 80,
 			});
-			// Just verify it doesn't error and returns output
 			expect(markdown.length).toBeGreaterThan(0);
 			expect(markdown).toContain("a");
 		});
@@ -457,7 +454,6 @@ describe("html-to-markdown-node - NAPI-RS Bindings", () => {
 				stripTags: ["div"],
 			});
 			expect(markdown).toContain("Keep this");
-			// Just verify the option is accepted and doesn't error
 			expect(markdown.length).toBeGreaterThan(0);
 		});
 
@@ -536,9 +532,8 @@ describe("html-to-markdown-node - NAPI-RS Bindings", () => {
 				"iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8DwHwAFBQIAX8jx0gAAAABJRU5ErkJggg==";
 			const html = `<img src="data:image/png;base64,${png}" alt="img">`;
 			const result = convertWithInlineImages(html, undefined, {
-				maxDecodedSizeBytes: 1n, // Very small limit
+				maxDecodedSizeBytes: 1n,
 			});
-			// Should warn or not extract due to size
 			expect(result.warnings.length > 0 || result.inlineImages.length === 0).toBe(true);
 		});
 
@@ -647,7 +642,6 @@ describe("html-to-markdown-node - NAPI-RS Bindings", () => {
 			const elapsed = Date.now() - start;
 			const opsPerSec = Math.round((iterations / elapsed) * 1000);
 
-			// Should handle at least 10k ops/sec (very conservative)
 			expect(opsPerSec).toBeGreaterThan(10000);
 		});
 
@@ -656,7 +650,6 @@ describe("html-to-markdown-node - NAPI-RS Bindings", () => {
 			const start = Date.now();
 			convert(doc);
 			const elapsed = Date.now() - start;
-			// Should complete in reasonable time (< 100ms for large doc)
 			expect(elapsed).toBeLessThan(100);
 		});
 	});
@@ -677,13 +670,13 @@ describe("html-to-markdown-node - NAPI-RS Bindings", () => {
 		it("should convert Wikipedia lists timeline", () => {
 			const doc = loadTestDoc("html/wikipedia/lists_timeline.html");
 			const markdown = convert(doc);
-			expect(markdown).toMatch(/-\s+/); // Should have list items
+			expect(markdown).toMatch(/-\s+/);
 		});
 
 		it("should convert Wikipedia tables", () => {
 			const doc = loadTestDoc("html/wikipedia/tables_countries.html");
 			const markdown = convert(doc);
-			expect(markdown).toMatch(/\|/); // Should have table delimiters
+			expect(markdown).toMatch(/\|/);
 		});
 	});
 });

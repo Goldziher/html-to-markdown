@@ -37,7 +37,6 @@ def test_meta_author(convert: Callable[..., str]) -> None:
 def test_base_href(convert: Callable[..., str]) -> None:
     html = '<html><head><base href="https://example.com/"></head><body><p>Content</p></body></html>'
     result = convert(html)
-    # URLs may be quoted in YAML
     assert result in (
         "---\nbase-href: https://example.com/\n---\n\nContent\n",
         '---\nbase-href: "https://example.com/"\n---\n\nContent\n',
@@ -47,7 +46,6 @@ def test_base_href(convert: Callable[..., str]) -> None:
 def test_canonical_link(convert: Callable[..., str]) -> None:
     html = '<html><head><link rel="canonical" href="https://example.com/page"></head><body><p>Content</p></body></html>'
     result = convert(html)
-    # URLs may be quoted in YAML
     assert result in (
         "---\ncanonical: https://example.com/page\n---\n\nContent\n",
         '---\ncanonical: "https://example.com/page"\n---\n\nContent\n',
@@ -67,7 +65,6 @@ def test_open_graph_metadata(convert: Callable[..., str]) -> None:
     result = convert(html)
     assert "meta-og-title: OG Title" in result
     assert "meta-og-description: OG Description" in result
-    # URLs may be quoted in YAML
     assert (
         "meta-og-image: https://example.com/image.jpg" in result
         or 'meta-og-image: "https://example.com/image.jpg"' in result
@@ -97,7 +94,6 @@ def test_multiple_metadata(convert: Callable[..., str]) -> None:
     assert "title: Page Title" in result
     assert "meta-description: Page description" in result
     assert "meta-author: John Doe" in result
-    # URLs may be quoted in YAML
     assert "base-href: https://example.com/" in result or 'base-href: "https://example.com/"' in result
     assert "canonical: https://example.com/page" in result or 'canonical: "https://example.com/page"' in result
 
@@ -105,7 +101,6 @@ def test_multiple_metadata(convert: Callable[..., str]) -> None:
 def test_metadata_with_special_characters(convert: Callable[..., str]) -> None:
     html = "<html><head><title>Title with --> comment closer</title></head><body><p>Content</p></body></html>"
     result = convert(html)
-    # In YAML frontmatter, we need to quote strings with special characters
     assert "title:" in result
     assert "---" in result
     assert "Content\n" in result
@@ -152,7 +147,6 @@ def test_link_relations(convert: Callable[..., str]) -> None:
     <body><p>Content</p></body>
     </html>"""
     result = convert(html)
-    # URLs may be quoted in YAML
     assert "link-author: https://example.com/author" in result or 'link-author: "https://example.com/author"' in result
     assert (
         "link-license: https://example.com/license" in result or 'link-license: "https://example.com/license"' in result
@@ -174,9 +168,8 @@ def test_sorted_metadata_output(convert: Callable[..., str]) -> None:
     <body><p>Content</p></body>
     </html>"""
     result = convert(html)
-    # YAML frontmatter ends with ---
-    metadata_end = result.index("---", 3) + 3  # Find second occurrence of ---
-    metadata_block = result[4 : metadata_end - 3]  # Skip first --- and last ---
+    metadata_end = result.index("---", 3) + 3
+    metadata_block = result[4 : metadata_end - 3]
     lines = [line.strip() for line in metadata_block.split("\n") if line.strip()]
     keys = [line.split(":")[0] for line in lines if ":" in line]
     assert keys == sorted(keys)

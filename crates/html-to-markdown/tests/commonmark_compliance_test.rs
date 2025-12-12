@@ -33,7 +33,6 @@ fn test_commonmark_compliance() {
     let mut failures = Vec::new();
 
     for test in &tests {
-        // Use CommonMark spec defaults: hyphen bullets, 2-space indent
         let options = ConversionOptions {
             bullets: "-".to_string(),
             ..ConversionOptions::default()
@@ -166,9 +165,6 @@ fn test_commonmark_compliance() {
         }
 
         if test.section == "Emphasis and strong emphasis" {
-            // Examples 417/427/464/466 expect nested emphasis markers to stack.
-            // We intentionally normalize nested <strong> output (issue #111), so those cases
-            // are skipped from this compliance subset.
             let passing_examples = [
                 350, 351, 352, 354, 355, 356, 358, 359, 360, 361, 362, 363, 365, 366, 367, 368, 369, 370, 371, 372,
                 374, 375, 378, 379, 380, 381, 383, 384, 385, 386, 387, 388, 391, 392, 393, 395, 396, 397, 398, 400,

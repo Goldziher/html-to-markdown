@@ -151,7 +151,6 @@ function isLikeNone(x) {
 }
 
 function debugString(val) {
-  // primitive types
   const type = typeof val;
   if (type == "number" || type == "boolean" || val == null) {
     return `${val}`;
@@ -175,7 +174,6 @@ function debugString(val) {
       return "Function";
     }
   }
-  // objects
   if (Array.isArray(val)) {
     const length = val.length;
     let debug = "[";
@@ -188,26 +186,20 @@ function debugString(val) {
     debug += "]";
     return debug;
   }
-  // Test for built-in
   const builtInMatches = /\[object ([^\]]+)\]/.exec(toString.call(val));
   let className;
   if (builtInMatches && builtInMatches.length > 1) {
     className = builtInMatches[1];
   } else {
-    // Failed to match the standard '[object ClassName]'
     return toString.call(val);
   }
   if (className == "Object") {
-    // we're a user defined class or Object
-    // JSON.stringify avoids problems with cycles, and is generally much
-    // easier than looping through ownProperties of `val`.
     try {
       return "Object(" + JSON.stringify(val) + ")";
     } catch (_) {
       return "Object";
     }
   }
-  // errors
   if (val instanceof Error) {
     return `${val.name}: ${val.message}\n${val.stack}`;
   }
@@ -947,12 +939,10 @@ function __wbg_get_imports() {
     throw new Error(getStringFromWasm0(arg0, arg1));
   };
   imports.wbg.__wbindgen_cast_2241b6af4c4b2941 = (arg0, arg1) => {
-    // Cast intrinsic for `Ref(String) -> Externref`.
     const ret = getStringFromWasm0(arg0, arg1);
     return addHeapObject(ret);
   };
   imports.wbg.__wbindgen_cast_4625c577ab2ec9ee = (arg0) => {
-    // Cast intrinsic for `U64 -> Externref`.
     const ret = BigInt.asUintN(64, arg0);
     return addHeapObject(ret);
   };

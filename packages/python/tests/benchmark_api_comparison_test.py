@@ -20,7 +20,6 @@ from .conftest import TEST_DOCUMENTS_DIR
 if TYPE_CHECKING:
     from pytest_benchmark.fixture import BenchmarkFixture
 
-# Suppress deprecation warnings for v1 compatibility benchmarks
 pytestmark = pytest.mark.filterwarnings("ignore::DeprecationWarning")
 
 try:

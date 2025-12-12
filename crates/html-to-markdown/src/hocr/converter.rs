@@ -73,7 +73,6 @@ pub fn convert_to_markdown_with_options(
 ) -> String {
     let mut output = String::new();
 
-    // Sort elements by order property if preserve_structure is enabled
     let mut sorted_elements: Vec<_> = elements.iter().collect();
     if preserve_structure {
         sorted_elements.sort_by_key(|e| e.properties.order.unwrap_or(u32::MAX));
@@ -105,14 +104,12 @@ fn convert_element(
     ctx: &mut ConvertContext,
 ) {
     match element.element_type {
-        // Logical structure - headings
         HocrElementType::OcrTitle | HocrElementType::OcrChapter | HocrElementType::OcrPart => {
             if !output.is_empty() && !output.ends_with("\n\n") {
                 output.push_str("\n\n");
             }
             output.push_str("# ");
             append_text_and_children(element, output, depth, preserve_structure, enable_spatial_tables, ctx);
-            // Trim trailing space
             if output.ends_with(' ') {
                 output.pop();
             }
@@ -124,7 +121,6 @@ fn convert_element(
             }
             output.push_str("## ");
             append_text_and_children(element, output, depth, preserve_structure, enable_spatial_tables, ctx);
-            // Trim trailing space
             if output.ends_with(' ') {
                 output.pop();
             }
@@ -136,7 +132,6 @@ fn convert_element(
             }
             output.push_str("### ");
             append_text_and_children(element, output, depth, preserve_structure, enable_spatial_tables, ctx);
-            // Trim trailing space
             if output.ends_with(' ') {
                 output.pop();
             }
@@ -148,14 +143,12 @@ fn convert_element(
             }
             output.push_str("#### ");
             append_text_and_children(element, output, depth, preserve_structure, enable_spatial_tables, ctx);
-            // Trim trailing space
             if output.ends_with(' ') {
                 output.pop();
             }
             output.push_str("\n\n");
         }
 
-        // Paragraphs
         HocrElementType::OcrPar => {
             let bullet_paragraph = is_bullet_paragraph(element);
             if !output.is_empty() {
@@ -192,7 +185,6 @@ fn convert_element(
             }
 
             append_text_and_children(element, output, depth, preserve_structure, enable_spatial_tables, ctx);
-            // Trim trailing space
             if output.ends_with(' ') {
                 output.pop();
             }
@@ -205,7 +197,6 @@ fn convert_element(
             }
         }
 
-        // Blockquotes
         HocrElementType::OcrBlockquote => {
             if !output.is_empty() && !output.ends_with("\n\n") {
                 output.push_str("\n\n");
@@ -227,7 +218,6 @@ fn convert_element(
             output.push('\n');
         }
 
-        // Lines - join with space
         HocrElementType::OcrLine | HocrElementType::OcrxLine => {
             append_text_and_children(element, output, depth, preserve_structure, enable_spatial_tables, ctx);
             if !output.ends_with(' ') && !output.ends_with('\n') {
@@ -235,18 +225,15 @@ fn convert_element(
             }
         }
 
-        // Words - join with space
         HocrElementType::OcrxWord => {
-            // Ensure space before this word if output doesn't end with whitespace or markdown formatting
             if !output.is_empty()
                 && !output.ends_with(' ')
                 && !output.ends_with('\t')
                 && !output.ends_with('\n')
-                && !output.ends_with('*')  // Don't add space after italic/bold markers
-                && !output.ends_with('`')  // Don't add space after code markers
-                && !output.ends_with('_')  // Don't add space after underline markers
+                && !output.ends_with('*')
+                && !output.ends_with('`')
+                && !output.ends_with('_')
                 && !output.ends_with('[')
-            // Don't add space after opening bracket (link/image alt)
             {
                 output.push(' ');
             }
@@ -256,35 +243,30 @@ fn convert_element(
             }
         }
 
-        // Headers and footers as italic
         HocrElementType::OcrHeader | HocrElementType::OcrFooter => {
             if !output.is_empty() && !output.ends_with("\n\n") {
                 output.push_str("\n\n");
             }
             output.push('*');
             append_text_and_children(element, output, depth, preserve_structure, enable_spatial_tables, ctx);
-            // Trim trailing space before closing italic
             if output.ends_with(' ') {
                 output.pop();
             }
             output.push_str("*\n\n");
         }
 
-        // Captions
         HocrElementType::OcrCaption => {
             if !output.is_empty() && !output.ends_with("\n\n") {
                 output.push_str("\n\n");
             }
             output.push('*');
             append_text_and_children(element, output, depth, preserve_structure, enable_spatial_tables, ctx);
-            // Trim trailing space before closing italic
             if output.ends_with(' ') {
                 output.pop();
             }
             output.push_str("*\n\n");
         }
 
-        // Page numbers
         HocrElementType::OcrPageno => {
             if !output.is_empty() && !output.ends_with("\n\n") {
                 output.push_str("\n\n");
@@ -294,7 +276,6 @@ fn convert_element(
             output.push_str("\n---\n\n");
         }
 
-        // Abstract - treat as blockquote or emphasized section
         HocrElementType::OcrAbstract => {
             if !output.is_empty() && !output.ends_with("\n\n") {
                 output.push_str("\n\n");
@@ -307,7 +288,6 @@ fn convert_element(
             output.push_str("\n\n");
         }
 
-        // Author - emphasize
         HocrElementType::OcrAuthor => {
             if !output.is_empty() && !output.ends_with("\n\n") {
                 output.push_str("\n\n");
@@ -320,7 +300,6 @@ fn convert_element(
             output.push_str("*\n\n");
         }
 
-        // Separator - horizontal rule
         HocrElementType::OcrSeparator => {
             if !output.is_empty() && !output.ends_with("\n\n") {
                 output.push_str("\n\n");
@@ -328,19 +307,16 @@ fn convert_element(
             output.push_str("---\n\n");
         }
 
-        // Tables and float elements - containers with context
         HocrElementType::OcrTable => {
             if !output.is_empty() && !output.ends_with("\n\n") {
                 output.push_str("\n\n");
             }
 
-            // Try spatial table reconstruction first
             if enable_spatial_tables {
                 if let Some(table_markdown) = try_spatial_table_reconstruction(element) {
                     output.push_str(&table_markdown);
                     ensure_trailing_blank_line(output);
                 } else {
-                    // Fallback: process children normally
                     let mut sorted_children: Vec<_> = element.children.iter().collect();
                     if preserve_structure {
                         sorted_children.sort_by_key(|e| e.properties.order.unwrap_or(u32::MAX));
@@ -351,7 +327,6 @@ fn convert_element(
                     ensure_trailing_blank_line(output);
                 }
             } else {
-                // Fallback: process children normally
                 let mut sorted_children: Vec<_> = element.children.iter().collect();
                 if preserve_structure {
                     sorted_children.sort_by_key(|e| e.properties.order.unwrap_or(u32::MAX));
@@ -367,7 +342,6 @@ fn convert_element(
             if !output.is_empty() && !output.ends_with("\n\n") {
                 output.push_str("\n\n");
             }
-            // Sort children by order property if preserve_structure is enabled
             let mut sorted_children: Vec<_> = element.children.iter().collect();
             if preserve_structure {
                 sorted_children.sort_by_key(|e| e.properties.order.unwrap_or(u32::MAX));
@@ -378,12 +352,10 @@ fn convert_element(
             ensure_trailing_blank_line(output);
         }
 
-        // Images - markdown image placeholder or alt text
         HocrElementType::OcrImage | HocrElementType::OcrPhoto | HocrElementType::OcrLinedrawing => {
             if !output.is_empty() && !output.ends_with("\n\n") {
                 output.push_str("\n\n");
             }
-            // Extract image path from properties if available
             if let Some(ref image_path) = element.properties.image {
                 output.push_str("![");
                 append_text_and_children(element, output, depth, preserve_structure, enable_spatial_tables, ctx);
@@ -394,12 +366,10 @@ fn convert_element(
                 output.push_str(image_path);
                 output.push_str(")\n\n");
             } else {
-                // No image path, just extract any text content
                 output.push_str("![Image]\n\n");
             }
         }
 
-        // Math and chemistry - wrap in code or special markers
         HocrElementType::OcrMath | HocrElementType::OcrChem => {
             output.push('`');
             append_text_and_children(element, output, depth, preserve_structure, enable_spatial_tables, ctx);
@@ -409,7 +379,6 @@ fn convert_element(
             output.push('`');
         }
 
-        // Display equations - block-level math
         HocrElementType::OcrDisplay => {
             if !output.is_empty() && !output.ends_with("\n\n") {
                 output.push_str("\n\n");
@@ -422,7 +391,6 @@ fn convert_element(
             output.push_str("\n```\n\n");
         }
 
-        // Drop cap - emphasize first letter
         HocrElementType::OcrDropcap => {
             output.push_str("**");
             append_text_and_children(element, output, depth, preserve_structure, enable_spatial_tables, ctx);
@@ -432,12 +400,10 @@ fn convert_element(
             output.push_str("**");
         }
 
-        // Glyphs and character info - just extract text
         HocrElementType::OcrGlyph | HocrElementType::OcrGlyphs | HocrElementType::OcrCinfo => {
             append_text_and_children(element, output, depth, preserve_structure, enable_spatial_tables, ctx);
         }
 
-        // Container elements - just process children
         HocrElementType::OcrPage
         | HocrElementType::OcrCarea
         | HocrElementType::OcrDocument
@@ -445,7 +411,6 @@ fn convert_element(
         | HocrElementType::OcrxBlock
         | HocrElementType::OcrColumn
         | HocrElementType::OcrXycut => {
-            // Sort children by order property if preserve_structure is enabled
             let mut sorted_children: Vec<_> = element.children.iter().collect();
             if preserve_structure {
                 sorted_children.sort_by_key(|e| e.properties.order.unwrap_or(u32::MAX));
@@ -472,7 +437,6 @@ fn convert_element(
             }
         }
 
-        // Skip noise
         HocrElementType::OcrNoise => {}
     }
 }
@@ -527,7 +491,6 @@ fn append_text_and_children(
         }
     }
 
-    // Sort children by order property if preserve_structure is enabled
     let mut sorted_children: Vec<_> = element.children.iter().collect();
     if preserve_structure {
         sorted_children.sort_by_key(|e| e.properties.order.unwrap_or(u32::MAX));
@@ -560,7 +523,6 @@ fn collect_text_tokens(element: &HocrElement, tokens: &mut Vec<String>) {
 /// Collect all word elements recursively from an element tree
 fn collect_words(element: &HocrElement, words: &mut Vec<HocrWord>) {
     if element.element_type == HocrElementType::OcrxWord {
-        // Convert HocrElement to HocrWord if it has bbox data
         if let Some(bbox) = element.properties.bbox {
             let confidence = element.properties.x_wconf.unwrap_or(0.0);
             words.push(HocrWord {
@@ -574,7 +536,6 @@ fn collect_words(element: &HocrElement, words: &mut Vec<HocrWord>) {
         }
     }
 
-    // Recursively collect from children
     for child in &element.children {
         collect_words(child, words);
     }
@@ -628,12 +589,10 @@ fn try_spatial_table_reconstruction(element: &HocrElement) -> Option<String> {
     let mut words = Vec::new();
     collect_words(element, &mut words);
 
-    // Need at least 6 words for a minimal 2x3 table
     if words.len() < 6 {
         return None;
     }
 
-    // Try to reconstruct table with default thresholds
     let table = spatial::reconstruct_table(&words, 50, 0.5, false);
 
     if table.is_empty() || table[0].is_empty() {
@@ -765,7 +724,6 @@ fn collect_code_block(children: &[&HocrElement]) -> Option<(Vec<String>, usize, 
         return None;
     }
 
-    // Determine base indentation metrics
     let mut x_values: Vec<u32> = collected
         .iter()
         .filter(|info| !info.text.is_empty())
@@ -1106,7 +1064,6 @@ fn normalize_code_line(text: &str) -> String {
 
     normalized = normalized.replace('+', " + ");
 
-    // Collapse whitespace to single spaces
     let mut collapsed = String::new();
     let mut last_space = false;
     for ch in normalized.chars() {

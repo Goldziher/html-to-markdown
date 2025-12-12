@@ -6,7 +6,6 @@ package io.github.goldziher.htmltomarkdown;
 public final class SmokeTest {
 
     private SmokeTest() {
-        // Prevent instantiation
     }
 
     /**

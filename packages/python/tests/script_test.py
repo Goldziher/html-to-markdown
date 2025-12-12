@@ -24,7 +24,6 @@ def test_script_with_string_angles_is_ignored() -> None:
     assert "<tag>" not in result
 
 
-# Tests for issue #94: malformed angle brackets in HTML content
 def test_bare_angle_brackets_in_html_body() -> None:
     """Test that bare angle brackets like '1<2' in HTML body don't break parsing."""
     html = """

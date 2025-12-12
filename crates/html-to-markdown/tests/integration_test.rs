@@ -23,7 +23,6 @@ fn test_multiple_paragraphs() {
 fn test_atx_headings() {
     let html = "<h1>H1</h1><h2>H2</h2><h3>H3</h3><h4>H4</h4><h5>H5</h5><h6>H6</h6>";
     let result = convert(html, None).unwrap();
-    // CommonMark-compliant: headings add blank lines for separation
     assert_eq!(result, "# H1\n\n## H2\n\n### H3\n\n#### H4\n\n##### H5\n\n###### H6\n");
 }
 
@@ -145,7 +144,6 @@ fn test_comment_between_paragraphs() {
 fn test_line_break() {
     let html = "<p>Line 1<br>Line 2</p>";
     let result = convert(html, None).unwrap();
-    // Default newline style is two spaces
     assert_eq!(result, "Line 1  \nLine 2\n");
 }
 
@@ -233,7 +231,6 @@ fn test_link_inside_paragraph() {
 fn test_code_with_special_chars() {
     let html = "<code>&lt;html&gt;</code>";
     let result = convert(html, None).unwrap();
-    // HTML entities are decoded
     assert_eq!(result, "`<html>`\n");
 }
 
@@ -248,7 +245,6 @@ fn test_empty_link() {
 fn test_div_as_block() {
     let html = "<div>Block content</div>";
     let result = convert(html, None).unwrap();
-    // Trailing whitespace trimmed
     assert_eq!(result, "Block content\n");
 }
 
@@ -256,7 +252,6 @@ fn test_div_as_block() {
 fn test_multiple_divs() {
     let html = "<div>First</div><div>Second</div>";
     let result = convert(html, None).unwrap();
-    // Trailing whitespace trimmed
     assert_eq!(result, "First\n\nSecond\n");
 }
 
@@ -354,7 +349,6 @@ fn test_malformed_html() {
 fn test_deeply_nested_structure() {
     let html = "<div><div><div><div><p>Deeply nested</p></div></div></div></div>";
     let result = convert(html, None).unwrap();
-    // Trailing whitespace trimmed
     assert_eq!(result, "Deeply nested\n");
 }
 

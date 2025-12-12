@@ -37,7 +37,6 @@ from html_to_markdown.exceptions import (
 from html_to_markdown.options import ConversionOptions, PreprocessingOptions
 from html_to_markdown.v1_compat import convert_to_markdown, markdownify
 
-# Optional metadata support
 with contextlib.suppress(ImportError):
     from html_to_markdown.api import MetadataConfig, convert_with_metadata
 

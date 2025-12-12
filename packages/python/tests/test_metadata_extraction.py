@@ -184,7 +184,6 @@ class TestHeaderHierarchyExtraction:
         _markdown, metadata = convert_with_metadata(html)
         headers = metadata["headers"]
         assert len(headers) == 1
-        # Depth is recorded (may start from 0 or 1 depending on implementation)
         assert "depth" in headers[0]
         assert isinstance(headers[0]["depth"], int)
 
@@ -430,7 +429,6 @@ class TestImageMetadataGathering:
         images = metadata["images"]
         assert "dimensions" in images[0]
         assert "dimensions" in images[1]
-        # Dimensions may or may not be parsed depending on implementation
 
     def test_image_type_external(self) -> None:
         """Test that external images are classified correctly."""
@@ -512,7 +510,6 @@ class TestStructuredDataDetection:
         _markdown, metadata = convert_with_metadata(html)
         assert "structured_data" in metadata
         assert isinstance(metadata["structured_data"], list)
-        # Extraction of JSON-LD may be optional or not fully implemented
 
 
 class TestMetadataConfigFeatureFlags:
@@ -572,7 +569,6 @@ class TestMetadataConfigFeatureFlags:
 
     def test_extract_structured_data_flag(self) -> None:
         """Test that extract_structured_data flag is accepted in MetadataConfig."""
-        # Test that the flag can be set
         config = MetadataConfig(extract_structured_data=True)
         assert config.extract_structured_data is True
 
@@ -594,7 +590,6 @@ class TestMetadataConfigFeatureFlags:
         </body>
         </html>
         """
-        # Extract only headers and links, skip images and structured data
         config = MetadataConfig(
             extract_headers=True,
             extract_links=True,
@@ -631,7 +626,6 @@ class TestEdgeCasesAndMalformedHTML:
         </html>
         """
         _markdown, metadata = convert_with_metadata(html)
-        # Empty strings may be stored or converted to None
         desc = metadata["document"]["description"]
         assert desc == "" or desc is None
 
@@ -646,7 +640,6 @@ class TestEdgeCasesAndMalformedHTML:
         </body>
         """
         _markdown, metadata = convert_with_metadata(html)
-        # Should still extract metadata without error
         assert isinstance(metadata, dict)
         assert "document" in metadata
 
@@ -663,7 +656,6 @@ class TestEdgeCasesAndMalformedHTML:
         """
         _markdown, metadata = convert_with_metadata(html)
         metadata["headers"]
-        # Empty/whitespace headers may or may not be included
 
     def test_deeply_nested_structure(self) -> None:
         """Test extraction from deeply nested HTML."""
@@ -692,7 +684,6 @@ class TestEdgeCasesAndMalformedHTML:
         </html>
         """
         _markdown, metadata = convert_with_metadata(html)
-        # Should not raise an error
         assert isinstance(metadata, dict)
 
     def test_malformed_html_handling(self) -> None:
@@ -706,7 +697,6 @@ class TestEdgeCasesAndMalformedHTML:
         </html>
         """
         _markdown, metadata = convert_with_metadata(html)
-        # Should not raise an error and should return valid metadata structure
         assert isinstance(metadata, dict)
         assert "document" in metadata
 
@@ -871,20 +861,16 @@ class TestRealWorldDocuments:
         """
         _markdown, metadata = convert_with_metadata(html)
 
-        # Document metadata
         assert metadata["document"]["language"] == "en"
         assert metadata["document"]["text_direction"] == "ltr"
 
-        # Headers
         headers = metadata["headers"]
         assert len(headers) >= 4
 
-        # Links
         links = metadata["links"]
         assert len(links) > 0
         assert any(link["link_type"] == "external" for link in links)
 
-        # Images
         images = metadata["images"]
         assert len(images) > 0
 
@@ -939,7 +925,6 @@ class TestRealWorldDocuments:
         _markdown, metadata = convert_with_metadata(html)
 
         doc = metadata["document"]
-        # base_href and canonical_url may or may not be extracted depending on implementation
         assert "base_href" in doc
         assert "canonical_url" in doc
 

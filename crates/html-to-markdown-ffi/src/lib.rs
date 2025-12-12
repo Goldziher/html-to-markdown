@@ -63,7 +63,6 @@ pub unsafe extern "C" fn html_to_markdown_convert(html: *const c_char) -> *mut c
         return ptr::null_mut();
     }
 
-    // SAFETY: Caller must ensure html is a valid null-terminated C string
     let html_str = match unsafe { CStr::from_ptr(html) }.to_str() {
         Ok(s) => s,
         Err(_) => {
@@ -120,7 +119,6 @@ pub unsafe extern "C" fn html_to_markdown_last_error() -> *const c_char {
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn html_to_markdown_free_string(s: *mut c_char) {
     if !s.is_null() {
-        // SAFETY: Caller must ensure s was returned by html_to_markdown_convert
         unsafe { drop(CString::from_raw(s)) };
     }
 }
@@ -174,7 +172,6 @@ pub unsafe extern "C" fn html_to_markdown_convert_with_metadata(
         return ptr::null_mut();
     }
 
-    // SAFETY: Caller must ensure html is a valid null-terminated C string
     let html_str = match unsafe { CStr::from_ptr(html) }.to_str() {
         Ok(s) => s,
         Err(_) => {
@@ -183,7 +180,6 @@ pub unsafe extern "C" fn html_to_markdown_convert_with_metadata(
         }
     };
 
-    // Default metadata config: extract everything
     let metadata_cfg = MetadataConfig {
         extract_document: true,
         extract_headers: true,
@@ -197,7 +193,6 @@ pub unsafe extern "C" fn html_to_markdown_convert_with_metadata(
         Ok((markdown, metadata)) => {
             set_last_error(None);
 
-            // Serialize metadata to JSON
             let metadata_json = match serde_json::to_string(&metadata) {
                 Ok(json) => json,
                 Err(e) => {
@@ -206,7 +201,6 @@ pub unsafe extern "C" fn html_to_markdown_convert_with_metadata(
                 }
             };
 
-            // Convert metadata JSON to C string
             let metadata_c_string = match CString::new(metadata_json) {
                 Ok(s) => s,
                 Err(_) => {
@@ -215,17 +209,13 @@ pub unsafe extern "C" fn html_to_markdown_convert_with_metadata(
                 }
             };
 
-            // Write metadata pointer to output parameter
-            // SAFETY: Caller ensures metadata_json_out is a valid pointer
             unsafe {
                 *metadata_json_out = metadata_c_string.into_raw();
             }
 
-            // Convert markdown to C string
             match CString::new(markdown) {
                 Ok(c_string) => c_string.into_raw(),
                 Err(_) => {
-                    // If we fail to build markdown CString, clear the metadata pointer we already wrote
                     set_last_error(Some("failed to build CString for markdown result".to_string()));
                     unsafe {
                         if !metadata_json_out.is_null() && !(*metadata_json_out).is_null() {
@@ -340,7 +330,6 @@ mod tests {
 
             let metadata_str = CStr::from_ptr(metadata_json).to_str().unwrap();
 
-            // Verify JSON structure contains expected fields
             assert!(metadata_str.contains("\"document\""), "Should have document field");
             assert!(metadata_str.contains("\"headers\""), "Should have headers field");
             assert!(metadata_str.contains("\"links\""), "Should have links field");
@@ -429,7 +418,6 @@ mod tests {
 
             let metadata_str = CStr::from_ptr(metadata_json).to_str().unwrap();
 
-            // Verify comprehensive metadata extraction
             assert!(metadata_str.contains("Complex Document"));
             assert!(metadata_str.contains("Test description"));
             assert!(metadata_str.contains("Test Author"));
@@ -447,18 +435,12 @@ mod tests {
     #[test]
     fn test_convert_with_metadata_error_clears_both_pointers() {
         unsafe {
-            // Test with invalid UTF-8 in HTML (this will cause an error early)
-            // We need to test the scenario where metadata is written but markdown fails.
-            // Since we can't easily trigger markdown CString creation failure with valid input,
-            // we test that both pointers are null on early validation errors.
             let mut metadata_json: *mut c_char = ptr::null_mut();
 
-            // Test null HTML pointer - should leave both null
             let result = html_to_markdown_convert_with_metadata(ptr::null(), &mut metadata_json);
             assert!(result.is_null(), "Markdown pointer should be null on error");
             assert!(metadata_json.is_null(), "Metadata pointer should remain null on error");
 
-            // Test null output parameter - should leave both null
             let html = CString::new("<p>test</p>").unwrap();
             let result2 = html_to_markdown_convert_with_metadata(html.as_ptr(), ptr::null_mut());
             assert!(result2.is_null(), "Markdown pointer should be null on error");
@@ -471,7 +453,6 @@ mod tests {
         unsafe {
             let mut metadata_json: *mut c_char = ptr::null_mut();
 
-            // Test that both pointers are null when conversion fails due to null HTML
             let result = html_to_markdown_convert_with_metadata(ptr::null(), &mut metadata_json);
 
             assert!(result.is_null(), "markdown should be null on error");
@@ -480,7 +461,6 @@ mod tests {
                 "metadata should be null on error (not partially written)"
             );
 
-            // Verify error is set
             let err = html_to_markdown_last_error();
             assert!(!err.is_null(), "error should be set");
         }
@@ -490,7 +470,6 @@ mod tests {
     #[test]
     fn test_convert_with_metadata_null_pointer_safety() {
         unsafe {
-            // Test with null output parameter - should not write anything
             let html = CString::new("<html><head><title>Test</title></head></html>").unwrap();
             let result = html_to_markdown_convert_with_metadata(html.as_ptr(), ptr::null_mut());
 
@@ -511,7 +490,6 @@ mod tests {
 
             let metadata_str = CStr::from_ptr(metadata_json).to_str().unwrap();
 
-            // Verify it's valid JSON by checking structure
             assert!(metadata_str.contains("{"), "Should contain JSON object");
             assert!(metadata_str.contains("}"), "Should contain JSON closing brace");
             assert!(metadata_str.contains("\""), "Should contain JSON quotes");
@@ -529,14 +507,12 @@ mod tests {
                 .unwrap();
             let mut metadata_json: *mut c_char = ptr::null_mut();
 
-            // Perform multiple conversions to check for leaks
             for _ in 0..10 {
                 let result = html_to_markdown_convert_with_metadata(html.as_ptr(), &mut metadata_json);
 
                 assert!(!result.is_null());
                 assert!(!metadata_json.is_null());
 
-                // Properly free resources
                 html_to_markdown_free_string(result);
                 html_to_markdown_free_string(metadata_json);
                 metadata_json = ptr::null_mut();
@@ -556,7 +532,6 @@ mod tests {
             assert!(!metadata_json.is_null());
 
             let metadata_str = CStr::from_ptr(metadata_json).to_str().unwrap();
-            // Verify Unicode was properly handled
             assert!(
                 metadata_str.contains("你好") || metadata_str.contains("\\u"),
                 "Should handle Unicode properly"
@@ -593,7 +568,6 @@ mod tests {
 
             let metadata_str = CStr::from_ptr(metadata_json).to_str().unwrap();
 
-            // Verify all major metadata sections are present
             assert!(metadata_str.contains("document"), "Should have document section");
             assert!(metadata_str.contains("headers"), "Should have headers section");
             assert!(metadata_str.contains("links"), "Should have links section");

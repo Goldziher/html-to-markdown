@@ -63,9 +63,7 @@ fn test_table_rowspan() {
     };
     let result = convert(html, Some(options)).unwrap();
 
-    // The cell with rowspan should appear in first data row
     assert!(result.contains("| Spanning cell | First row content<br>Second line |"));
-    // The second data row should have an empty cell where the rowspan is
     assert!(result.contains("|  | Next row<br>More content |"));
 }
 

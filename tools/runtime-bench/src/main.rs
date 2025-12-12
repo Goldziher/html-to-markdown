@@ -395,10 +395,8 @@ fn run_script(
             cmd.arg("run").arg("bin/benchmark.go");
             let lib_dir = repo_root.join("target/release").to_string_lossy().to_string();
 
-            // Set CGO_LDFLAGS for link-time library location
             cmd.env("CGO_LDFLAGS", format!("-L{}", lib_dir));
 
-            // Set runtime library paths
             let mut ld_path = lib_dir.clone();
             if let Ok(existing) = env::var("LD_LIBRARY_PATH") {
                 ld_path = format!("{}:{}", ld_path, existing);
@@ -680,12 +678,10 @@ fn ensure_java_jar(repo_root: &Path) -> Result<()> {
         return Ok(());
     }
 
-    // Build the FFI library first
     ensure_ffi_library(repo_root)?;
 
     let mvn_cmd = if cfg!(windows) { "mvn.cmd" } else { "mvn" };
 
-    // Build the main library JAR first
     println!("Building Java library (mvn package)...");
     let lib_status = Command::new(mvn_cmd)
         .arg("package")
@@ -697,7 +693,6 @@ fn ensure_java_jar(repo_root: &Path) -> Result<()> {
         bail!("Java library build failed with status {lib_status}");
     }
 
-    // Build the benchmark JAR using the benchmark pom
     println!("Building Java benchmark JAR (mvn -f benchmark-pom.xml clean package)...");
     let status = Command::new(mvn_cmd)
         .arg("-f")
@@ -715,7 +710,6 @@ fn ensure_java_jar(repo_root: &Path) -> Result<()> {
 }
 
 fn ensure_csharp_dll(repo_root: &Path) -> Result<()> {
-    // Build the FFI library first
     ensure_ffi_library(repo_root)?;
 
     let csharp_dir = repo_root.join("packages/csharp");
@@ -738,8 +732,6 @@ fn ensure_csharp_dll(repo_root: &Path) -> Result<()> {
         bail!("C# benchmark build failed with status {status}");
     }
 
-    // Copy the native library to the benchmark output directory
-    // so C# P/Invoke can find it
     let lib_dir = repo_root.join("target/release");
     let benchmark_output = csharp_dir.join("Benchmark/bin/Release/net9.0");
 
@@ -764,7 +756,6 @@ fn ensure_csharp_dll(repo_root: &Path) -> Result<()> {
 }
 
 fn ensure_go_lib(repo_root: &Path) -> Result<()> {
-    // Build the FFI library first
     ensure_ffi_library(repo_root)?;
 
     Ok(())

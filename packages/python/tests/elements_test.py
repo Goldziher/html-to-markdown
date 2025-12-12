@@ -1655,9 +1655,9 @@ def test_u_basic(convert: Callable[..., str]) -> None:
 
 
 def test_u_misspelling(convert: Callable[..., str]) -> None:
-    html = "<p>This word is <u>mispelled</u>.</p>"  # codespell:ignore mispelled
+    html = "<p>This word is <u>mispelled</u>.</p>"
     result = convert(html)
-    assert result == "This word is mispelled.\n"  # codespell:ignore mispelled
+    assert result == "This word is mispelled.\n"
 
 
 def test_u_inline_mode(convert: Callable[..., str]) -> None:
@@ -2319,9 +2319,6 @@ def test_iframe_without_src(convert: Callable[..., str]) -> None:
     assert result == ""
 
 
-# preserve_tags tests
-
-
 def test_preserve_tags_simple_table(convert: Callable[..., str]) -> None:
     html = """<p>Before table</p>
 <table><tr><td>Cell 1</td><td>Cell 2</td></tr></table>
@@ -2368,7 +2365,6 @@ def test_preserve_tags_nested_content(convert: Callable[..., str]) -> None:
 def test_preserve_tags_empty_list(convert: Callable[..., str]) -> None:
     html = "<table><tr><td>Cell</td></tr></table>"
     result = convert(html, preserve_tags=[])
-    # Without preserve_tags, table should be converted to markdown
     assert "<table>" not in result
     assert "Cell" in result
 
@@ -2378,11 +2374,8 @@ def test_preserve_tags_vs_strip_tags(convert: Callable[..., str]) -> None:
 <table><tr><td>Table content</td></tr></table>
 <div>Div content</div>"""
     result = convert(html, preserve_tags=["table"], strip_tags=["div"])
-    # table should be preserved as HTML
     assert "<table>" in result
     assert "Table content" in result
-    # div should be stripped (only text content)
     assert "<div>" not in result
     assert "Div content" in result
-    # p should be converted normally
     assert "Text" in result

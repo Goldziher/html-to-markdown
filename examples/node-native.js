@@ -36,12 +36,10 @@ fn main() {
 </html>
 `;
 
-// Basic conversion
 console.log("=== Basic Conversion ===\n");
 const markdown = convert(html);
 console.log(markdown);
 
-// With custom options
 console.log("\n\n=== With Custom Options ===\n");
 const markdownWithOptions = convert(html, {
   headingStyle: "Atx",
@@ -52,7 +50,6 @@ const markdownWithOptions = convert(html, {
 });
 console.log(markdownWithOptions);
 
-// Benchmark
 console.log("\n\n=== Performance Benchmark ===\n");
 const iterations = 10000;
 const start = Date.now();

@@ -28,15 +28,12 @@ const html = `
 async function main() {
   console.log("=== TypeScript Example ===\n");
 
-  // Basic conversion
   const markdown = await convert(html);
   console.log(markdown);
 
-  // Check which backend is being used
   console.log("\n=== Backend Detection ===");
   console.log(`Using backend: ${getBackend()}`);
 
-  // Type-safe options
   const options: ConversionOptions = {
     headingStyle: HeadingStyle.Atx,
     codeBlockStyle: CodeBlockStyle.Backticks,
@@ -54,7 +51,6 @@ async function main() {
   const markdownWithOptions = await convert(html, options);
   console.log(markdownWithOptions);
 
-  // Error handling
   console.log("\n=== Error Handling ===");
   try {
     const invalidHtml = "<h1>Unclosed tag";

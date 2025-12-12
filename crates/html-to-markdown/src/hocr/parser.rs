@@ -9,7 +9,6 @@ use crate::text::decode_html_entities;
 pub fn parse_properties(title: &str, debug: bool) -> HocrProperties {
     let mut props = HocrProperties::default();
 
-    // Decode HTML entities first
     let title = decode_html_entities(title);
 
     for part in title.split(';') {
@@ -110,7 +109,6 @@ pub fn parse_properties(title: &str, debug: bool) -> HocrProperties {
                     let rest: Vec<&str> = tokens.collect();
                     if !rest.is_empty() {
                         let lpageno_str = rest.join(" ");
-                        // Could be quoted or just a value
                         if let Some(quoted) = parse_quoted_string(part) {
                             props.lpageno = Some(quoted);
                         } else {
@@ -127,7 +125,6 @@ pub fn parse_properties(title: &str, debug: bool) -> HocrProperties {
                     }
                 }
                 "x_source" => {
-                    // Can be multiple quoted strings
                     let sources = parse_all_quoted_strings(part);
                     if !sources.is_empty() {
                         props.x_source = sources;
@@ -139,7 +136,6 @@ pub fn parse_properties(title: &str, debug: bool) -> HocrProperties {
                     }
                 }
                 "x_size" | "x_descenders" | "x_ascenders" => {
-                    // Known but not yet fully supported - store in other
                     let value: Vec<&str> = tokens.collect();
                     if !value.is_empty() {
                         props.other.insert(key.to_string(), value.join(" "));
@@ -149,7 +145,6 @@ pub fn parse_properties(title: &str, debug: bool) -> HocrProperties {
                     if debug {
                         eprintln!("[hOCR] Unknown property: {}", key);
                     }
-                    // Store unknown properties
                     let value: Vec<&str> = tokens.collect();
                     if !value.is_empty() {
                         props.other.insert(key.to_string(), value.join(" "));
@@ -226,7 +221,6 @@ where
     let mut cuts = Vec::new();
     for token in tokens {
         if token.contains(',') {
-            // Complex cut with offsets
             let parts: Vec<u32> = token.split(',').filter_map(|s| s.parse::<u32>().ok()).collect();
             cuts.push(parts);
         } else if let Ok(val) = token.parse::<u32>() {
@@ -260,7 +254,6 @@ where
 }
 
 fn parse_quoted_string(s: &str) -> Option<String> {
-    // Find first occurrence of a quoted string
     if let Some(start) = s.find('"') {
         if let Some(end) = s[start + 1..].find('"') {
             return Some(s[start + 1..start + 1 + end].to_string());

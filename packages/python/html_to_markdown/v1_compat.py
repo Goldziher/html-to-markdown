@@ -136,7 +136,6 @@ def convert_to_markdown(
         )
 
     # ~keep: v1 used indented code blocks by default, but switched to backticks when a language was set
-    # This maintains v1 behavior for backward compatibility
     code_block_style = "backticks" if code_language else "indented"
 
     options = ConversionOptions(

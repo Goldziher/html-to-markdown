@@ -7,7 +7,6 @@
 
 use std::time::Instant;
 
-// Test HTML samples
 const SIMPLE_HTML: &str = r#"<p>Hello <strong>world</strong>!</p>"#;
 
 const MEDIUM_HTML: &str = r#"
@@ -32,7 +31,6 @@ const PRESERVED_WHITESPACE: &str = r#"<pre>  Preserved   spaces  </pre>"#;
 fn benchmark_html5ever() {
     println!("\n=== HTML5EVER BENCHMARKS ===\n");
 
-    // Simple parse
     let start = Instant::now();
     let iterations = 10000;
     for _ in 0..iterations {
@@ -53,7 +51,6 @@ fn benchmark_html5ever() {
         duration.as_micros() as f64 / iterations as f64
     );
 
-    // Medium parse
     let start = Instant::now();
     let iterations = 1000;
     for _ in 0..iterations {
@@ -74,7 +71,6 @@ fn benchmark_html5ever() {
         duration.as_micros() as f64 / iterations as f64
     );
 
-    // Test whitespace handling
     println!("\n--- Whitespace Handling ---");
     test_html5ever_whitespace();
 }
@@ -113,7 +109,6 @@ fn test_html5ever_whitespace() {
     println!("Whitespace test: {:?}", text);
     println!("  Original: {:?}", WHITESPACE_TEST);
 
-    // Test <pre> preservation
     let dom = parse_document(RcDom::default(), Default::default())
         .from_utf8()
         .read_from(&mut PRESERVED_WHITESPACE.as_bytes())
@@ -126,7 +121,6 @@ fn test_html5ever_whitespace() {
 fn benchmark_astral_tl() {
     println!("\n=== ASTRAL-TL BENCHMARKS ===\n");
 
-    // Simple parse
     let start = Instant::now();
     let iterations = 10000;
     for _ in 0..iterations {
@@ -141,7 +135,6 @@ fn benchmark_astral_tl() {
         duration.as_micros() as f64 / iterations as f64
     );
 
-    // Medium parse
     let start = Instant::now();
     let iterations = 1000;
     for _ in 0..iterations {
@@ -156,7 +149,6 @@ fn benchmark_astral_tl() {
         duration.as_micros() as f64 / iterations as f64
     );
 
-    // Test whitespace handling
     println!("\n--- Whitespace Handling ---");
     test_astral_tl_whitespace();
 }
@@ -165,7 +157,6 @@ fn test_astral_tl_whitespace() {
     let dom = tl::parse(WHITESPACE_TEST, tl::ParserOptions::default()).unwrap();
     let parser = dom.parser();
 
-    // Extract all text
     let mut text = String::new();
     for node in dom.nodes() {
         if let Some(tag) = node.as_tag() {
@@ -178,7 +169,6 @@ fn test_astral_tl_whitespace() {
     println!("Whitespace test: {:?}", text);
     println!("  Original: {:?}", WHITESPACE_TEST);
 
-    // Test <pre> preservation
     let dom = tl::parse(PRESERVED_WHITESPACE, tl::ParserOptions::default()).unwrap();
     let parser = dom.parser();
     let mut text = String::new();

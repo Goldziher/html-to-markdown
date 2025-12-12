@@ -51,7 +51,6 @@ pub fn extract_hocr_document(dom: &tl::VDom, debug: bool) -> (Vec<HocrElement>, 
     let mut elements = Vec::new();
     let metadata = extract_metadata(dom);
 
-    // Recursively search for hOCR elements starting from root
     for child_handle in dom.children().iter() {
         collect_hocr_elements(child_handle, parser, &mut elements, debug);
     }
@@ -66,11 +65,9 @@ fn collect_hocr_elements(
     elements: &mut Vec<HocrElement>,
     debug: bool,
 ) {
-    // Try to extract as hOCR element
     if let Some(element) = extract_element(node_handle, parser, debug) {
         elements.push(element);
     } else if let Some(tl::Node::Tag(tag)) = node_handle.get(parser) {
-        // Not an hOCR element, but continue searching in children
         let children = tag.children();
         for child_handle in children.top().iter() {
             collect_hocr_elements(child_handle, parser, elements, debug);
@@ -83,7 +80,6 @@ fn extract_metadata(dom: &tl::VDom) -> HocrMetadata {
     let mut metadata = HocrMetadata::default();
     let parser = dom.parser();
 
-    // Helper function to extract metadata from a single meta tag
     fn extract_from_meta_tag(meta_tag: &tl::HTMLTag, metadata: &mut HocrMetadata) {
         let attrs = meta_tag.attributes();
         if let (Some(name), Some(content)) = (attrs.get("name").flatten(), attrs.get("content").flatten()) {
@@ -109,17 +105,14 @@ fn extract_metadata(dom: &tl::VDom) -> HocrMetadata {
         }
     }
 
-    // Recursively search for meta tags (either inside head or as orphans after sanitization)
     fn find_meta_tags<'a>(node_handle: &tl::NodeHandle, parser: &'a tl::Parser<'a>, metadata: &mut HocrMetadata) {
         if let Some(tl::Node::Tag(tag)) = node_handle.get(parser) {
             let tag_name = tag.name().as_utf8_str();
 
-            // Extract from meta tags directly (handles both meta inside head and orphaned meta)
             if tag_name == "meta" {
                 extract_from_meta_tag(tag, metadata);
             }
 
-            // Recursively search children
             let children = tag.children();
             for child_handle in children.top().iter() {
                 find_meta_tags(child_handle, parser, metadata);
@@ -127,7 +120,6 @@ fn extract_metadata(dom: &tl::VDom) -> HocrMetadata {
         }
     }
 
-    // Search from root
     for child_handle in dom.children().iter() {
         find_meta_tags(child_handle, parser, &mut metadata);
     }
@@ -142,17 +134,14 @@ fn extract_element(node_handle: &tl::NodeHandle, parser: &tl::Parser, debug: boo
         let class_attr = attrs.get("class").flatten()?;
         let classes = class_attr.as_utf8_str();
 
-        // Find hOCR element type from classes
         let element_type = classes.split_whitespace().find_map(HocrElementType::from_class)?;
 
-        // Parse properties from title attribute
         let properties = if let Some(title) = attrs.get("title").flatten() {
             parse_properties(&title.as_utf8_str(), debug)
         } else {
             Default::default()
         };
 
-        // Extract text content and children
         let mut text = String::new();
         let mut children = Vec::new();
 

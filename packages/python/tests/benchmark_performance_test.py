@@ -9,7 +9,6 @@ from html_to_markdown import convert_to_markdown
 if TYPE_CHECKING:
     from pytest_benchmark.fixture import BenchmarkFixture
 
-# Suppress deprecation warnings for v1 compatibility benchmarks
 pytestmark = pytest.mark.filterwarnings("ignore::DeprecationWarning")
 
 try:

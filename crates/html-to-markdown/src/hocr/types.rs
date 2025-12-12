@@ -7,7 +7,6 @@ use std::collections::HashMap;
 /// All hOCR 1.2 element types
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum HocrElementType {
-    // Logical structure
     OcrAbstract,
     OcrAuthor,
     OcrBlockquote,
@@ -21,15 +20,13 @@ pub enum HocrElementType {
     OcrSubsubsection,
     OcrTitle,
 
-    // Typesetting
     OcrCarea,
-    OcrColumn, // deprecated
+    OcrColumn,
     OcrLine,
     OcrLinear,
     OcrPage,
     OcrSeparator,
 
-    // Float elements
     OcrChem,
     OcrDisplay,
     OcrFloat,
@@ -44,7 +41,6 @@ pub enum HocrElementType {
     OcrTextfloat,
     OcrTextimage,
 
-    // Inline elements
     OcrCinfo,
     OcrDropcap,
     OcrGlyph,
@@ -52,7 +48,6 @@ pub enum HocrElementType {
     OcrNoise,
     OcrXycut,
 
-    // Engine-specific
     OcrxBlock,
     OcrxLine,
     OcrxWord,
@@ -141,31 +136,25 @@ pub struct Baseline {
 /// All hOCR properties
 #[derive(Debug, Clone, Default)]
 pub struct HocrProperties {
-    // Layout
     pub bbox: Option<BBox>,
     pub baseline: Option<Baseline>,
     pub textangle: Option<f64>,
     pub poly: Option<Vec<(i32, i32)>>,
 
-    // Confidence
     pub x_wconf: Option<f64>,
     pub x_confs: Vec<f64>,
     pub nlp: Vec<f64>,
 
-    // Font
     pub x_font: Option<String>,
     pub x_fsize: Option<u32>,
 
-    // Content flow
     pub order: Option<u32>,
     pub cflow: Option<String>,
     pub hardbreak: bool,
 
-    // Character-level
     pub cuts: Vec<Vec<u32>>,
     pub x_bboxes: Vec<BBox>,
 
-    // Page
     pub image: Option<String>,
     pub imagemd5: Option<String>,
     pub ppageno: Option<u32>,
@@ -174,7 +163,6 @@ pub struct HocrProperties {
     pub x_source: Vec<String>,
     pub x_scanner: Option<String>,
 
-    // Other
     pub other: HashMap<String, String>,
 }
 

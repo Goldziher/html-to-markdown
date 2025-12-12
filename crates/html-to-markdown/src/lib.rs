@@ -291,15 +291,12 @@ mod tests {
 
         let (markdown, metadata) = convert_with_metadata(html, None, config).expect("conversion should succeed");
 
-        // Verify markdown was generated
         assert!(!markdown.is_empty());
         assert!(markdown.contains("Main Title"));
         assert!(markdown.contains("Subsection"));
 
-        // Verify language and direction were extracted
         assert_eq!(metadata.document.language, Some("en".to_string()));
 
-        // Verify headers were extracted
         assert_eq!(metadata.headers.len(), 2);
         assert_eq!(metadata.headers[0].level, 1);
         assert_eq!(metadata.headers[0].text, "Main Title");
@@ -307,14 +304,12 @@ mod tests {
         assert_eq!(metadata.headers[1].level, 2);
         assert_eq!(metadata.headers[1].text, "Subsection");
 
-        // Verify links were extracted
         assert!(metadata.links.len() >= 2);
         let external_link = metadata.links.iter().find(|l| l.link_type == LinkType::External);
         assert!(external_link.is_some());
         let anchor_link = metadata.links.iter().find(|l| l.link_type == LinkType::Anchor);
         assert!(anchor_link.is_some());
 
-        // Verify images were extracted
         assert_eq!(metadata.images.len(), 1);
         assert_eq!(metadata.images[0].alt, Some("Test image".to_string()));
         assert_eq!(metadata.images[0].title, Some("Image title".to_string()));
@@ -359,11 +354,9 @@ mod tests {
 
         let (_markdown, metadata) = convert_with_metadata(html, None, config).expect("conversion should succeed");
 
-        // With extraction disabled, collections should be empty
         assert!(metadata.headers.is_empty());
         assert!(metadata.links.is_empty());
         assert!(metadata.images.is_empty());
-        // Document metadata extraction includes language from html tag
         assert_eq!(metadata.document.language, Some("en".to_string()));
     }
 
