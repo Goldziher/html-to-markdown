@@ -5,7 +5,7 @@ inputs:
   java-version:
     description: Java version to use
     required: false
-    default: "22"
+    default: "25"
 
 runs:
   using: composite
@@ -39,5 +39,5 @@ runs:
         if [[ "$RUNNER_OS" == "Windows" ]]; then
           export PATH="${GITHUB_WORKSPACE}/packages/java/src/main/resources:${PATH}"
         fi
-        mvn -B -Dgpg.skip=true clean test
+        MAVEN_OPTS="${MAVEN_OPTS:-} -Dmaven.mainClass=org.apache.maven.cling.MavenCling" ../../mvnw -B -f pom.xml -Dgpg.skip=true clean test
         echo "✓ Java Panama FFI bindings test completed"

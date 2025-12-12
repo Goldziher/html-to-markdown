@@ -655,53 +655,53 @@ tasks:
 
   # Java tasks -----------------------------------------------------------------
   java:install:
-    desc: "Verify Java (JDK 22+) and Maven are installed, then download deps"
+    desc: "Verify Java (JDK 25+) and Maven are installed, then download deps"
     cmds:
       - |
         if ! command -v java >/dev/null 2>&1; then
-          echo "ERROR: Java (JDK 22+) is not installed. Please install Temurin or Oracle JDK."
+          echo "ERROR: Java (JDK 25+) is not installed. Please install Temurin or Oracle JDK."
           exit 1
         fi
         java -version
       - |
-        if ! command -v mvn >/dev/null 2>&1; then
-          echo "ERROR: Maven 3.8+ is required. Install it via your package manager."
+        if [[ ! -x ./mvnw ]]; then
+          echo "ERROR: Maven wrapper (./mvnw) is required."
           exit 1
         fi
-        mvn -v
-      - mvn -f packages/java/pom.xml -B dependency:go-offline
-      - mvn -f examples/java-smoke/pom.xml -B dependency:go-offline
+        MAVEN_OPTS="${MAVEN_OPTS:-} -Dmaven.mainClass=org.apache.maven.cling.MavenCling" ./mvnw -v
+      - MAVEN_OPTS="${MAVEN_OPTS:-} -Dmaven.mainClass=org.apache.maven.cling.MavenCling" ./mvnw -f packages/java/pom.xml -B dependency:go-offline
+      - MAVEN_OPTS="${MAVEN_OPTS:-} -Dmaven.mainClass=org.apache.maven.cling.MavenCling" ./mvnw -f examples/java-smoke/pom.xml -B dependency:go-offline
 
   java:update:
     desc: "Update Java dependencies (Maven)"
     cmds:
-      - mvn -f packages/java/pom.xml -B versions:update-properties -DgenerateBackupPoms=false
+      - MAVEN_OPTS="${MAVEN_OPTS:-} -Dmaven.mainClass=org.apache.maven.cling.MavenCling" ./mvnw -f packages/java/pom.xml -B versions:update-properties -DgenerateBackupPoms=false
 
   java:test:
     desc: "Run Java tests"
     cmds:
       - cargo build --release -p html-to-markdown-ffi
-      - mvn -f packages/java/pom.xml -B -Dgpg.skip=true test
+      - MAVEN_OPTS="${MAVEN_OPTS:-} -Dmaven.mainClass=org.apache.maven.cling.MavenCling" ./mvnw -f packages/java/pom.xml -B -Dgpg.skip=true test
 
   java:lint:
     desc: "Lint Java project (checkstyle + PMD WITH auto-fix where applicable)"
     cmds:
-      - mvn -f packages/java/pom.xml -B -DskipTests -Dgpg.skip=true verify
+      - MAVEN_OPTS="${MAVEN_OPTS:-} -Dmaven.mainClass=org.apache.maven.cling.MavenCling" ./mvnw -f packages/java/pom.xml -B -DskipTests -Dgpg.skip=true verify
 
   java:lint:check:
     desc: "Lint Java project WITHOUT auto-fix (check-only)"
     cmds:
-      - mvn -f packages/java/pom.xml -B -DskipTests -Dgpg.skip=true verify
+      - MAVEN_OPTS="${MAVEN_OPTS:-} -Dmaven.mainClass=org.apache.maven.cling.MavenCling" ./mvnw -f packages/java/pom.xml -B -DskipTests -Dgpg.skip=true verify
 
   java:format:
     desc: "Format Java code (with modifications)"
     cmds:
-      - mvn -f packages/java/pom.xml -B spotless:apply
+      - MAVEN_OPTS="${MAVEN_OPTS:-} -Dmaven.mainClass=org.apache.maven.cling.MavenCling" ./mvnw -f packages/java/pom.xml -B spotless:apply
 
   java:format:check:
     desc: "Check Java formatting without modifications"
     cmds:
-      - mvn -f packages/java/pom.xml -B spotless:check
+      - MAVEN_OPTS="${MAVEN_OPTS:-} -Dmaven.mainClass=org.apache.maven.cling.MavenCling" ./mvnw -f packages/java/pom.xml -B spotless:check
 
   # C# tasks -----------------------------------------------------------------
   csharp:install:

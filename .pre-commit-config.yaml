@@ -61,8 +61,10 @@ repos:
     rev: v0.6.30
     hooks:
       - id: cpd
+        exclude: ^\.mvn/wrapper/
       - id: checkstyle
         args: ["-c", "packages/java/checkstyle.xml"]
+        exclude: ^\.mvn/wrapper/
   - repo: local
     hooks:
       - id: golangci-lint-packages
@@ -85,8 +87,50 @@ repos:
         types: [python]
         exclude: ^scripts/|^examples/
         pass_filenames: false
+      - id: rubocop
+        name: rubocop
+        entry: bash -c 'cd packages/ruby && PATH=/opt/homebrew/opt/ruby/bin:$PATH BUNDLE_PATH=vendor/bundle bundle _4.0.0_ install && PATH=/opt/homebrew/opt/ruby/bin:$PATH BUNDLE_PATH=vendor/bundle bundle _4.0.0_ exec rubocop --config ./.rubocop.yml --autocorrect-all'
+        language: system
+        files: ^packages/ruby/
+        pass_filenames: false
+      - id: rbs-validate
+        name: rbs validate
+        entry: bash -c 'cd packages/ruby && PATH=/opt/homebrew/opt/ruby/bin:$PATH BUNDLE_PATH=vendor/bundle bundle _4.0.0_ install && PATH=/opt/homebrew/opt/ruby/bin:$PATH BUNDLE_PATH=vendor/bundle bundle _4.0.0_ exec rbs validate'
+        language: system
+        files: ^packages/ruby/
+        pass_filenames: false
+      - id: steep-check
+        name: steep check
+        entry: bash -c 'cd packages/ruby && PATH=/opt/homebrew/opt/ruby/bin:$PATH BUNDLE_PATH=vendor/bundle bundle _4.0.0_ install && PATH=/opt/homebrew/opt/ruby/bin:$PATH BUNDLE_PATH=vendor/bundle bundle _4.0.0_ exec steep check'
+        language: system
+        files: ^packages/ruby/
+        pass_filenames: false
+      - id: php-lint
+        name: php lint (cs-fixer + phpstan)
+        entry: bash -c 'cd packages/php && composer run lint:fix'
+        language: system
+        files: ^packages/php/
+        pass_filenames: false
+      - id: dotnet-format
+        name: dotnet format
+        entry: bash -c 'dotnet format packages/csharp/HtmlToMarkdown/HtmlToMarkdown.csproj && dotnet format packages/csharp/HtmlToMarkdown.Tests/HtmlToMarkdown.Tests.csproj'
+        language: system
+        files: ^packages/csharp/|^examples/csharp-smoke/
+        pass_filenames: false
       - id: mix-credo
         name: mix credo
         entry: bash -c 'cd packages/elixir && MIX_ENV=dev mix credo --strict'
         language: system
+        pass_filenames: false
+      - id: mix-format
+        name: mix format
+        entry: bash -c 'cd packages/elixir && MIX_ENV=dev mix format --check-formatted'
+        language: system
+        files: ^packages/elixir/
+        pass_filenames: false
+      - id: java-verify
+        name: maven verify (java)
+        entry: bash -c 'MAVEN_OPTS="${MAVEN_OPTS:-} -Dmaven.mainClass=org.apache.maven.cling.MavenCling" ./mvnw -f packages/java/pom.xml -B -DskipTests -Dgpg.skip=true verify'
+        language: system
+        files: ^packages/java/
         pass_filenames: false
