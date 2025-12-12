@@ -25,7 +25,7 @@ High-performance HTML to Markdown converter with Rust core and Java Panama FFI b
 
 ## Requirements
 
-- **Java 22+** (uses Foreign Function & Memory API)
+- **Java 25+** (uses Foreign Function & Memory API)
 - **Rust toolchain** (for building the native library)
 - **Maven 3.8+** (install via Homebrew, apt, choco, etc.)
 
@@ -48,7 +48,7 @@ mvn -f packages/java/pom.xml clean package
 
 The Maven build is configured to:
 - Automatically build the Rust FFI library during `generate-sources` phase
-- Compile Java 22+ code with `--enable-preview` flag
+- Compile Java 25+ code with `--enable-preview` flag
 - Run tests with native access enabled
 
 ## Installation

@@ -376,7 +376,7 @@ func ConvertWithMetadata(html string) (MetadataExtraction, error) {
 	var metadataPtr *C.char
 
 	// Call the native conversion with metadata function
-	result := C.html_to_markdown_convert_with_metadata(cHTML, &metadataPtr)  // nolint:gocritic
+	result := C.html_to_markdown_convert_with_metadata(cHTML, &metadataPtr) // nolint:gocritic
 	if result == nil {
 		// Conversion failed - try to get error message
 		errMsg := C.html_to_markdown_last_error()

@@ -135,11 +135,7 @@ public static class HtmlToMarkdownConverter
             }
 
             // Convert result back to managed string
-            string? markdown = Marshal.PtrToStringAnsi(resultPtr);
-            if (markdown == null)
-            {
-                markdown = string.Empty;
-            }
+            string? markdown = Marshal.PtrToStringAnsi(resultPtr) ?? string.Empty;
 
             // Deserialize metadata JSON
             ExtendedMetadata metadata = new();
