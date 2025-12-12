@@ -137,7 +137,6 @@ impl InlineImageCollector {
             InlineImageFormat::Webp => "webp",
             InlineImageFormat::Svg => "svg",
             // ~keep: Split on MIME type delimiters (+, ., ;) to extract base subtype
-            // e.g., "svg+xml" -> "svg", "vnd.foo.bar" -> "vnd"
             InlineImageFormat::Other(custom) => custom
                 .split(['+', '.', ';'])
                 .next()

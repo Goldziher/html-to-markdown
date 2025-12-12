@@ -120,7 +120,6 @@ fn test_list_indent_spaces() {
 
     let result = convert(html, Some(options)).unwrap();
     assert!(result.contains("- Parent"));
-    // Child should be indented with 2 spaces
     assert!(result.contains("  - Child"));
 }
 
@@ -141,7 +140,6 @@ fn test_list_indent_tabs() {
 
     let result = convert(html, Some(options)).unwrap();
     assert!(result.contains("- Parent"));
-    // Child should be indented with a tab
     assert!(result.contains("\t- Child"));
 }
 
@@ -158,7 +156,6 @@ fn test_custom_bullet_symbols() {
     };
 
     let result = convert(html, Some(options)).unwrap();
-    // Should use * as the first bullet
     assert!(result.contains("* Item 1") || result.contains("* Item 2"));
 }
 
@@ -189,6 +186,5 @@ fn test_list_with_code_block() {
     let result = convert(html, None).unwrap();
     println!("Result:\n{}", result);
     assert!(result.contains("- Item with code:"));
-    // Code blocks in lists are indented, not fenced
     assert!(result.contains("fn main()"));
 }

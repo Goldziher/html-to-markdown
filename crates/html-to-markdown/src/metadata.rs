@@ -572,6 +572,7 @@ pub const DEFAULT_MAX_STRUCTURED_DATA_SIZE: usize = 1_000_000;
 /// ```
 /// # use html_to_markdown_rs::metadata::MetadataConfig;
 /// let config = MetadataConfig {
+///     extract_document: true,
 ///     extract_headers: true,
 ///     extract_links: true,
 ///     extract_images: true,
@@ -725,11 +726,11 @@ impl MetadataCollector {
     pub(crate) fn new(config: MetadataConfig) -> Self {
         Self {
             head_metadata: BTreeMap::new(),
-            headers: Vec::with_capacity(32),     // Typical docs have ~20-50 headers
-            header_stack: Vec::with_capacity(6), // Max nesting depth is 6
-            links: Vec::with_capacity(64),       // Typical docs have 50-100+ links
-            images: Vec::with_capacity(16),      // Typical docs have 10-20 images
-            json_ld: Vec::with_capacity(4),      // Typically 1-3 JSON-LD blocks
+            headers: Vec::with_capacity(32),
+            header_stack: Vec::with_capacity(6),
+            links: Vec::with_capacity(64),
+            images: Vec::with_capacity(16),
+            json_ld: Vec::with_capacity(4),
             structured_data_size: 0,
             config,
             lang: None,
@@ -865,7 +866,7 @@ impl MetadataCollector {
 
         let content_size = json_content.len();
         if self.structured_data_size + content_size > self.config.max_structured_data_size {
-            return; // Skip to avoid memory exhaustion
+            return;
         }
 
         self.structured_data_size += content_size;
@@ -977,7 +978,6 @@ impl MetadataCollector {
         let mut result = Vec::with_capacity(self.json_ld.len());
 
         for json_str in &self.json_ld {
-            // Try to extract schema type from JSON-LD
             let schema_type = serde_json::from_str::<serde_json::Value>(json_str)
                 .ok()
                 .and_then(|v| v.get("@type").and_then(|t| t.as_str().map(|s| s.to_string())));
@@ -1002,7 +1002,6 @@ impl MetadataCollector {
     /// Complete [`ExtendedMetadata`] with all extracted information.
     #[allow(dead_code)]
     pub(crate) fn finish(self) -> ExtendedMetadata {
-        // Extract structured data before consuming self
         let structured_data = self.extract_structured_data();
         let document = self.extract_document_metadata();
 
@@ -1159,7 +1158,6 @@ mod tests {
         assert_eq!(header.text, "Title");
         assert_eq!(header.id, Some("title".to_string()));
 
-        // Invalid level should not be added
         collector.add_header(7, "Invalid".to_string(), None, 0, 200);
         assert_eq!(collector.headers.len(), 1);
     }

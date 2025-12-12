@@ -1,18 +1,13 @@
 $schema: https://github.com/Goldziher/ai-rulez/schema/ai-rules-v2.schema.json
 
 # ==============================================================================
-# PROJECT METADATA
 # ==============================================================================
 metadata:
   name: html-to-markdown
   description: High-performance HTML→Markdown converter with Rust core and polyglot bindings (Python, TypeScript, Ruby, PHP). Focus on performance, accuracy, and language parity.
   version: 2.0.0
 
-# ==============================================================================
-# LANGUAGE & RUNTIME RULES (Project-Specific)
-# ==============================================================================
 rules:
-  # RUST: Core Engine
   - name: Rust 2024 Edition - Core Conversion Engine
     id: rust-core-engine
     content: |
@@ -28,7 +23,6 @@ rules:
       - Never: unwrap in production, unsafe without SAFETY docs, panics in library code
       - Use Sonnet 4.5 for architectural decisions on the Rust core
 
-  # PYTHON: Binding Wrappers
   - name: Python 3.10+ - PyO3 Binding Wrappers
     id: python-binding-wrappers
     content: |
@@ -43,7 +37,6 @@ rules:
       - Never: business logic in Python wrappers; that belongs in Rust
       - Use Haiku 4.5 for binding engineering and integration issues
 
-  # TYPESCRIPT: Node & CLI Wrappers
   - name: TypeScript 5.x - NAPI-RS Bindings & CLI
     id: typescript-napi-cli
     content: |
@@ -58,7 +51,6 @@ rules:
       - Never: any/object types, non-null assertions !, hardcoded CLI commands
       - Use Haiku 4.5 for CLI engineering and TypeScript binding issues
 
-  # RUBY: RBS Type Definitions & Magnus Bindings
   - name: Ruby 3.2+ - Magnus Native Bindings with RBS
     id: ruby-magnus-rbs
     content: |
@@ -74,7 +66,6 @@ rules:
       - Never: business logic duplication; binding code defers to Rust
       - Use Haiku 4.5 for Ruby binding engineering and RBS issues
 
-  # PHP: ext-php-rs Extension + Composer Package
   - name: PHP 8.2+ - ext-php-rs Extension + Composer Package
     id: php-extension-composer
     content: |
@@ -92,9 +83,6 @@ rules:
       - Never: business logic in PHP; all conversion logic lives in Rust
       - Use Haiku 4.5 for PHP binding engineering and Composer issues
 
-# ==============================================================================
-# BUILD & DEPLOYMENT RULES
-# ==============================================================================
   - name: Polyglot Build System & Distribution
     id: polyglot-build
     content: |
@@ -142,9 +130,6 @@ rules:
       - TypeScript: biome check, biome format
       - Never: skip hooks (--no-verify); enforce quality gates
 
-# ==============================================================================
-# TESTING PHILOSOPHY
-# ==============================================================================
   - name: Dual Testing Strategy - Core + Bindings
     id: dual-testing
     content: |
@@ -177,9 +162,6 @@ rules:
       - Wheel builds: separate test-wheels.yaml for PyPI distribution testing
       - Version-gated: tag-based releases trigger multi-platform builds
 
-# ==============================================================================
-# ARCHITECTURE & PATTERNS
-# ==============================================================================
 
 sections:
   - name: Rust Core Architecture
@@ -408,9 +390,6 @@ sections:
 
       **Applies to all tasks in this project** unless explicitly overridden.
 
-# ==============================================================================
-# GIT & COMMIT STANDARDS
-# ==============================================================================
   - name: Git Commit Standards
     id: git-standards
     content: |

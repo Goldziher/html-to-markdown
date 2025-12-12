@@ -44,13 +44,6 @@ repos:
       - id: ruff
         args: ["--fix", "--unsafe-fixes"]
       - id: ruff-format
-  - repo: https://github.com/codespell-project/codespell
-    rev: v2.4.1
-    hooks:
-      - id: codespell
-        exclude: ^test_documents/|^scripts/|pnpm-lock\.yaml|^uv\.lock|pmd-ruleset\.xml
-        additional_dependencies:
-          - tomli
   - repo: https://github.com/doublify/pre-commit-rust
     rev: v1.0
     hooks:

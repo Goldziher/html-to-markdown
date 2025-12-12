@@ -72,14 +72,11 @@ public final class HtmlToMarkdown {
         }
 
         try (Arena arena = Arena.ofConfined()) {
-            // Convert Java string to C string
             MemorySegment htmlSegment = HtmlToMarkdownFFI.toCString(arena, html);
 
-            // Call native conversion function
             MemorySegment resultSegment = (MemorySegment) HtmlToMarkdownFFI.html_to_markdown_convert
                 .invoke(htmlSegment);
 
-            // Check for NULL return (indicates error)
             if (resultSegment == null || resultSegment.address() == 0) {
                 String error = getLastError();
                 throw new ConversionException(
@@ -88,10 +85,8 @@ public final class HtmlToMarkdown {
             }
 
             try {
-                // Convert C string to Java string
                 return HtmlToMarkdownFFI.fromCString(resultSegment);
             } finally {
-                // Free the native string
                 HtmlToMarkdownFFI.html_to_markdown_free_string.invoke(resultSegment);
             }
         } catch (ConversionException e) {
@@ -144,19 +139,15 @@ public final class HtmlToMarkdown {
         }
 
         try (Arena arena = Arena.ofConfined()) {
-            // Convert Java string to C string
             MemorySegment htmlSegment = HtmlToMarkdownFFI.toCString(arena, html);
 
-            // Allocate space for metadata JSON pointer output
             MemorySegment metadataJsonOut = arena.allocate(
                 java.lang.foreign.ValueLayout.ADDRESS
             );
 
-            // Call native conversion with metadata function
             MemorySegment resultSegment = (MemorySegment) HtmlToMarkdownFFI.html_to_markdown_convert_with_metadata
                 .invoke(htmlSegment, metadataJsonOut);
 
-            // Check for NULL return (indicates error)
             if (resultSegment == null || resultSegment.address() == 0) {
                 String error = getLastError();
                 throw new ConversionException(
@@ -165,21 +156,17 @@ public final class HtmlToMarkdown {
             }
 
             try {
-                // Get the markdown string
                 String markdown = HtmlToMarkdownFFI.fromCString(resultSegment);
 
-                // Get the metadata JSON pointer
                 MemorySegment metadataJsonSegment = metadataJsonOut.getAtIndex(
                     java.lang.foreign.ValueLayout.ADDRESS,
                     0
                 );
 
-                // Convert metadata JSON to ExtendedMetadata
                 ExtendedMetadata metadata;
                 if (metadataJsonSegment != null && metadataJsonSegment.address() != 0) {
                     String metadataJson = HtmlToMarkdownFFI.fromCString(metadataJsonSegment);
                     metadata = parseMetadata(metadataJson);
-                    // Free the metadata JSON string
                     HtmlToMarkdownFFI.html_to_markdown_free_string.invoke(metadataJsonSegment);
                 } else {
                     metadata = ExtendedMetadata.empty();
@@ -187,7 +174,6 @@ public final class HtmlToMarkdown {
 
                 return new MetadataExtraction(markdown, metadata);
             } finally {
-                // Free the markdown string
                 HtmlToMarkdownFFI.html_to_markdown_free_string.invoke(resultSegment);
             }
         } catch (ConversionException e) {
@@ -209,19 +195,14 @@ public final class HtmlToMarkdown {
             ObjectMapper mapper = new ObjectMapper();
             JsonNode root = mapper.readTree(jsonStr);
 
-            // Parse document metadata
             DocumentMetadata document = parseDocumentMetadata(mapper, root.get("document"));
 
-            // Parse headers
             List<HeaderMetadata> headers = parseHeaders(root.get("headers"));
 
-            // Parse links
             List<LinkMetadata> links = parseLinks(root.get("links"));
 
-            // Parse images
             List<ImageMetadata> images = parseImages(root.get("images"));
 
-            // Parse structured data
             List<StructuredData> structuredData = parseStructuredData(root.get("structured_data"));
 
             return new ExtendedMetadata(document, headers, links, images, structuredData);
@@ -257,30 +238,25 @@ public final class HtmlToMarkdown {
             try {
                 textDirection = TextDirection.parse(textDirectionStr);
             } catch (IllegalArgumentException e) {
-                // Log or handle invalid text direction - for now, leave as null
                 textDirection = null;
             }
         }
 
-        // Parse keywords
         List<String> keywords = new ArrayList<>();
         if (node.has("keywords") && node.get("keywords").isArray()) {
             node.get("keywords").forEach(kw -> keywords.add(kw.asText()));
         }
 
-        // Parse open graph
         Map<String, String> openGraph = new TreeMap<>();
         if (node.has("open_graph") && node.get("open_graph").isObject()) {
             node.get("open_graph").fields().forEachRemaining(e -> openGraph.put(e.getKey(), e.getValue().asText()));
         }
 
-        // Parse twitter card
         Map<String, String> twitterCard = new TreeMap<>();
         if (node.has("twitter_card") && node.get("twitter_card").isObject()) {
             node.get("twitter_card").fields().forEachRemaining(e -> twitterCard.put(e.getKey(), e.getValue().asText()));
         }
 
-        // Parse meta tags
         Map<String, String> metaTags = new TreeMap<>();
         if (node.has("meta_tags") && node.get("meta_tags").isObject()) {
             node.get("meta_tags").fields().forEachRemaining(e -> metaTags.put(e.getKey(), e.getValue().asText()));
@@ -333,7 +309,6 @@ public final class HtmlToMarkdown {
                 try {
                     linkType = LinkType.parse(linkTypeStr);
                 } catch (IllegalArgumentException e) {
-                    // Default to OTHER if invalid
                     linkType = LinkType.OTHER;
                 }
             }
@@ -373,7 +348,6 @@ public final class HtmlToMarkdown {
                 try {
                     imageType = ImageType.parse(imageTypeStr);
                 } catch (IllegalArgumentException e) {
-                    // Default to RELATIVE if invalid
                     imageType = ImageType.RELATIVE;
                 }
             }
@@ -436,7 +410,6 @@ public final class HtmlToMarkdown {
         }
     }
 
-    // Private constructor to prevent instantiation
     private HtmlToMarkdown() {
         throw new UnsupportedOperationException("Utility class");
     }

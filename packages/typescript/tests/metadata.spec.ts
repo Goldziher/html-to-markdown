@@ -48,16 +48,13 @@ describe("html-to-markdown metadata extraction (TypeScript)", () => {
 		expect(metadata.document.language).toBe("en");
 		expect(metadata.document.canonical_url).toBe("https://example.com/article");
 
-		// Keywords should be split on commas
 		expect(metadata.document.keywords).toContain("markdown");
 		expect(metadata.document.keywords).toContain("html");
 		expect(metadata.document.keywords).toContain("conversion");
 
-		// Open Graph metadata
 		expect(metadata.document.open_graph).toHaveProperty("title", "OG Title");
 		expect(metadata.document.open_graph).toHaveProperty("description", "OG Description");
 
-		// Twitter Card metadata
 		expect(metadata.document.twitter_card).toHaveProperty("card", "summary");
 	});
 
@@ -67,18 +64,15 @@ describe("html-to-markdown metadata extraction (TypeScript)", () => {
 
 		expect(headers.length).toBeGreaterThanOrEqual(3);
 
-		// H1
 		const h1 = headers.find((h) => h.level === 1);
 		expect(h1).toBeDefined();
 		expect(h1?.text).toBe("Main Title");
 		expect(h1?.id).toBe("main-title");
 
-		// H2
 		const h2 = headers.find((h) => h.level === 2);
 		expect(h2).toBeDefined();
 		expect(h2?.text).toBe("Section 1");
 
-		// H3
 		const h3 = headers.find((h) => h.level === 3);
 		expect(h3).toBeDefined();
 		expect(h3?.text).toBe("Subsection");
@@ -90,7 +84,6 @@ describe("html-to-markdown metadata extraction (TypeScript)", () => {
 
 		expect(links.length).toBeGreaterThanOrEqual(4);
 
-		// Check link classification
 		const internalLink = links.find((l) => l.href === "/page");
 		expect(internalLink).toBeDefined();
 		expect(internalLink?.link_type).toBe("internal");
@@ -116,14 +109,12 @@ describe("html-to-markdown metadata extraction (TypeScript)", () => {
 
 		expect(images.length).toBeGreaterThanOrEqual(2);
 
-		// External image
 		const externalImg = images.find((i) => i.src === "https://example.com/image.jpg");
 		expect(externalImg).toBeDefined();
 		expect(externalImg?.image_type).toBe("external");
 		expect(externalImg?.alt).toBe("Test Image");
 		expect(externalImg?.title).toBe("Test Title");
 
-		// Data URI image
 		const dataUriImg = images.find((i) => i.src.startsWith("data:image"));
 		expect(dataUriImg).toBeDefined();
 		expect(dataUriImg?.image_type).toBe("data_uri");
@@ -142,10 +133,8 @@ describe("html-to-markdown metadata extraction (TypeScript)", () => {
 		const result = convertWithMetadata(BASIC_HTML, undefined, config);
 		const metadata = result.metadata;
 
-		// Document metadata is always extracted
 		expect(metadata.document.title).toBe("Test Article");
 
-		// But headers and links should be empty
 		expect(metadata.headers).toHaveLength(0);
 		expect(metadata.links).toHaveLength(0);
 		expect(metadata.images).toHaveLength(0);
@@ -188,11 +177,9 @@ describe("html-to-markdown metadata extraction (TypeScript)", () => {
 		const minimalHtml = "<h1>Title</h1><p>Content</p>";
 		const result = convertWithMetadata(minimalHtml);
 
-		// Document metadata should exist but mostly be empty
 		expect(result.metadata.document.title).toBeUndefined();
 		expect(result.metadata.document.description).toBeUndefined();
 
-		// Should still extract the heading
 		expect(result.metadata.headers.length).toBe(1);
 		expect(result.metadata.headers[0].text).toBe("Title");
 	});
@@ -200,7 +187,6 @@ describe("html-to-markdown metadata extraction (TypeScript)", () => {
 	it("extracts markdown with metadata", () => {
 		const result = convertWithMetadata(BASIC_HTML);
 
-		// Verify markdown was generated
 		expect(result.markdown).toContain("Main Title");
 		expect(result.markdown).toContain("Section 1");
 		expect(result.markdown).toContain("Subsection");
@@ -219,11 +205,9 @@ describe("html-to-markdown metadata extraction (TypeScript)", () => {
 		</html>
 		`;
 
-		// With 1MB limit (default), should work
 		const result1 = convertWithMetadata(htmlWithLargeJson);
 		expect(result1).toHaveProperty("metadata");
 
-		// With 100 byte limit, should respect it
 		const config: JsMetadataConfig = {
 			extract_headers: true,
 			extract_links: true,

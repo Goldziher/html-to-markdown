@@ -45,7 +45,7 @@ mod tests {
 
         let rust_opts: RustConversionOptions = opts.into();
         assert!(matches!(rust_opts.heading_style, HeadingStyle::Atx));
-        assert_eq!(rust_opts.list_indent_width, 2); // default
+        assert_eq!(rust_opts.list_indent_width, 2);
     }
 
     #[test]

@@ -198,7 +198,6 @@ func TestConvertWithMetadata(t *testing.T) {
 				if len(meta.Headers) < 3 {
 					t.Errorf("Expected at least 3 headers, got %d", len(meta.Headers))
 				}
-				// Check first header is level 1
 				if len(meta.Headers) > 0 && meta.Headers[0].Level != 1 {
 					t.Errorf("Expected first header level 1, got %d", meta.Headers[0].Level)
 				}
@@ -222,7 +221,6 @@ func TestConvertWithMetadata(t *testing.T) {
 				if len(meta.Links) < 4 {
 					t.Errorf("Expected at least 4 links, got %d", len(meta.Links))
 				}
-				// Check link types
 				linkTypes := make(map[string]int)
 				for _, link := range meta.Links {
 					linkTypes[string(link.LinkType)]++
@@ -248,7 +246,6 @@ func TestConvertWithMetadata(t *testing.T) {
 				if len(meta.Images) < 2 {
 					t.Errorf("Expected at least 2 images, got %d", len(meta.Images))
 				}
-				// Check image metadata
 				for _, img := range meta.Images {
 					if img.Alt == nil || *img.Alt == "" {
 						t.Error("Expected image to have alt text")
@@ -292,7 +289,6 @@ func TestConvertWithMetadata(t *testing.T) {
 				return md == ""
 			},
 			checkMetadata: func(t *testing.T, meta ExtendedMetadata) {
-				// Empty HTML should produce empty metadata
 			},
 			wantErr: false,
 		},
@@ -390,13 +386,11 @@ func TestMetadataJSONMarshaling(t *testing.T) {
 		t.Fatalf("ConvertWithMetadata failed: %v", err)
 	}
 
-	// Verify metadata can be marshaled back to JSON
 	jsonData, err := json.Marshal(result.Metadata)
 	if err != nil {
 		t.Fatalf("Failed to marshal metadata to JSON: %v", err)
 	}
 
-	// Verify JSON contains expected fields
 	if !strings.Contains(string(jsonData), "\"document\"") {
 		t.Error("Expected 'document' field in metadata JSON")
 	}
@@ -439,7 +433,6 @@ func TestHeaderMetadataValidation(t *testing.T) {
 		t.Errorf("Expected 6 headers, got %d", len(result.Metadata.Headers))
 	}
 
-	// Verify header levels are correct
 	for i, header := range result.Metadata.Headers {
 		expectedLevel := uint8(i + 1)
 		if header.Level != expectedLevel {

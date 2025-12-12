@@ -35,7 +35,6 @@ export default {
     }),
   ],
   onwarn(warning, warn) {
-    // Ignore WASM circular dependency warnings from wasm-bindgen glue code
     if (warning.code === "CIRCULAR_DEPENDENCY" && /html_to_markdown_wasm_bg/.test(warning.message)) {
       return;
     }

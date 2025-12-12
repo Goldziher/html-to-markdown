@@ -944,11 +944,9 @@ fn extract_metadata(
 
                             match tag_name.as_ref() {
                                 "title" => {
-                                    // Skip if title is in strip_tags or preserve_tags
                                     if options.strip_tags.contains(&"title".to_string())
                                         || options.preserve_tags.contains(&"title".to_string())
                                     {
-                                        // Skip extraction
                                     } else {
                                         let title_children = child_tag.children();
                                         {
@@ -978,7 +976,6 @@ fn extract_metadata(
                                     }
                                 }
                                 "meta" => {
-                                    // Skip if meta is in strip_tags or preserve_tags
                                     if !options.strip_tags.contains(&"meta".to_string())
                                         && !options.preserve_tags.contains(&"meta".to_string())
                                     {
@@ -1070,7 +1067,6 @@ fn format_metadata_frontmatter(metadata: &BTreeMap<String, String>) -> String {
 
     let mut lines = vec!["---".to_string()];
     for (key, value) in metadata {
-        // Escape YAML special characters and quote if needed
         let needs_quotes = value.contains(':') || value.contains('#') || value.contains('[') || value.contains(']');
         if needs_quotes {
             let escaped = value.replace('\\', "\\\\").replace('"', "\\\"");
@@ -1178,7 +1174,6 @@ fn serialize_element(node_handle: &tl::NodeHandle, parser: &tl::Parser) -> Strin
             html.push('<');
             html.push_str(&tag_name);
 
-            // Serialize attributes
             for (key, value_opt) in tag.attributes().iter() {
                 html.push(' ');
                 html.push_str(&key);
@@ -1464,7 +1459,6 @@ fn convert_html_impl(
     #[cfg(feature = "metadata")] metadata_collector: Option<crate::metadata::MetadataCollectorHandle>,
     #[cfg(not(feature = "metadata"))] _metadata_collector: Option<()>,
 ) -> Result<String> {
-    // Normalize problematic HTML constructs before parsing
     let mut preprocessed = preprocess_html(html).into_owned();
     let mut preprocessed_len = preprocessed.len();
 
@@ -1493,7 +1487,6 @@ fn convert_html_impl(
         }
     }
 
-    // Check for hOCR document and extract metadata by checking all top-level children
     let mut is_hocr = false;
     for child_handle in dom_ref.children().iter() {
         if is_hocr_document(child_handle, parser) {
@@ -1518,7 +1511,6 @@ fn convert_html_impl(
 
         let (elements, metadata) = extract_hocr_document(dom_ref, options.debug);
 
-        // Extract hOCR metadata as YAML frontmatter
         if options.extract_metadata && !options.convert_as_inline {
             let mut metadata_map = BTreeMap::new();
             if let Some(system) = metadata.ocr_system {
@@ -1555,7 +1547,6 @@ fn convert_html_impl(
         return Ok(output);
     }
 
-    // Extract head metadata if metadata collector is provided
     #[cfg(feature = "metadata")]
     if let Some(ref collector) = metadata_collector {
         if !is_hocr {
@@ -1569,7 +1560,6 @@ fn convert_html_impl(
         }
     }
 
-    // Extract html/body attributes for language and text direction if metadata collector is provided
     #[cfg(feature = "metadata")]
     if let Some(ref collector) = metadata_collector {
         for child_handle in dom_ref.children().iter() {
@@ -1619,12 +1609,10 @@ fn convert_html_impl(
         metadata_collector: metadata_collector.clone(),
     };
 
-    // Walk all top-level children
     for child_handle in dom_ref.children().iter() {
         walk_node(child_handle, parser, &mut output, options, &ctx, 0, &dom_ctx);
     }
 
-    // Trim trailing spaces per line, then trim trailing blank lines but preserve final newline
     trim_line_end_whitespace(&mut output);
     let trimmed = output.trim_end_matches('\n');
     if trimmed.is_empty() {
@@ -1847,43 +1835,31 @@ fn escape_malformed_angle_brackets(input: &str) -> Cow<'_, str> {
 
     while idx < len {
         if bytes[idx] == b'<' {
-            // Check if this is a valid tag start
             if idx + 1 < len {
                 let next = bytes[idx + 1];
 
-                // Valid tag patterns: <tagname, </tagname, <!doctype, <!--
                 let is_valid_tag = match next {
                     b'!' => {
-                        // DOCTYPE or comment
                         idx + 2 < len
                             && (bytes[idx + 2] == b'-'
                                 || bytes[idx + 2].is_ascii_alphabetic()
                                 || bytes[idx + 2].is_ascii_uppercase())
                     }
                     b'/' => {
-                        // Closing tag
                         idx + 2 < len && (bytes[idx + 2].is_ascii_alphabetic() || bytes[idx + 2].is_ascii_uppercase())
                     }
-                    b'?' => {
-                        // XML declaration
-                        true
-                    }
-                    c if c.is_ascii_alphabetic() || c.is_ascii_uppercase() => {
-                        // Opening tag
-                        true
-                    }
+                    b'?' => true,
+                    c if c.is_ascii_alphabetic() || c.is_ascii_uppercase() => true,
                     _ => false,
                 };
 
                 if !is_valid_tag {
-                    // This is a bare `<` that should be escaped
                     let out = output.get_or_insert_with(|| String::with_capacity(input.len() + 4));
                     out.push_str(&input[last..idx]);
                     out.push_str("&lt;");
                     last = idx + 1;
                 }
             } else {
-                // `<` at end of string - escape it
                 let out = output.get_or_insert_with(|| String::with_capacity(input.len() + 4));
                 out.push_str(&input[last..idx]);
                 out.push_str("&lt;");
@@ -2122,11 +2098,9 @@ fn serialize_node_to_html(handle: &tl::NodeHandle, parser: &tl::Parser, output: 
         Some(tl::Node::Tag(tag)) => {
             let tag_name = normalized_tag_name(tag.name().as_utf8_str());
 
-            // Opening tag
             output.push('<');
             output.push_str(&tag_name);
 
-            // Attributes
             for (key, value) in tag.attributes().iter() {
                 output.push(' ');
                 output.push_str(&key);
@@ -2139,13 +2113,11 @@ fn serialize_node_to_html(handle: &tl::NodeHandle, parser: &tl::Parser, output: 
 
             output.push('>');
 
-            // Children
             let children = tag.children();
             for child_handle in children.top().iter() {
                 serialize_node_to_html(child_handle, parser, output);
             }
 
-            // Closing tag (skip for self-closing tags)
             if !matches!(
                 tag_name.as_ref(),
                 "br" | "hr"
@@ -2635,9 +2607,6 @@ fn walk_node(
                 return;
             }
 
-            // Track if the original text contained newlines before strip_newlines is applied.
-            // This is critical because strip_newlines converts '\n' to ' ', which would break
-            // the newline detection logic for whitespace-only nodes.
             let had_newlines = text.contains('\n');
 
             if options.strip_newlines {
@@ -2665,8 +2634,6 @@ fn walk_node(
                     return;
                 }
 
-                // Use had_newlines to determine if the original text (before strip_newlines)
-                // contained newlines, since strip_newlines would have converted them to spaces
                 if had_newlines {
                     if output.is_empty() {
                         return;
@@ -2718,7 +2685,6 @@ fn walk_node(
                         options.escape_ascii,
                     )
                 };
-                // Always escape pipes in table cells (unless escape_misc already did it)
                 if options.escape_misc {
                     escaped
                 } else {
@@ -2782,7 +2748,6 @@ fn walk_node(
                                 eprintln!("[DEBUG] Next sibling tag after newline: {}", next_tag);
                             }
                             if matches!(next_tag.as_str(), "span") {
-                                // Collapse formatting newlines between inline siblings like span
                             } else if ctx.inline_depth > 0 || ctx.convert_as_inline || ctx.in_paragraph {
                                 final_text.push(' ');
                             } else {
@@ -2834,14 +2799,12 @@ fn walk_node(
                 return;
             }
 
-            // Preserve tags: output original HTML
             if options.preserve_tags.iter().any(|t| t.as_str() == tag_name) {
                 let html = serialize_tag_to_html(node_handle, parser);
                 output.push_str(&html);
                 return;
             }
 
-            // NEW: Extract lang/dir from html, head, or body tags
             #[cfg(feature = "metadata")]
             if matches!(tag_name.as_ref(), "html" | "head" | "body") {
                 if let Some(ref collector) = ctx.metadata_collector {
@@ -2887,7 +2850,6 @@ fn walk_node(
                         let normalized = normalize_heading_text(trimmed);
                         push_heading(output, ctx, options, level, normalized.as_ref());
 
-                        // NEW: Collect header metadata
                         #[cfg(feature = "metadata")]
                         if let Some(ref collector) = ctx.metadata_collector {
                             let id = tag
@@ -2942,7 +2904,6 @@ fn walk_node(
                     {
                         let child_handles: Vec<_> = children.top().iter().collect();
                         for (i, child_handle) in child_handles.iter().enumerate() {
-                            // Skip whitespace-only text nodes between empty inline elements
                             if let Some(node) = child_handle.get(parser) {
                                 if let tl::Node::Raw(bytes) = node {
                                     let text = bytes.as_utf8_str();
@@ -3216,7 +3177,6 @@ fn walk_node(
                             options,
                         );
 
-                        // NEW: Collect link metadata
                         #[cfg(feature = "metadata")]
                         if let Some(ref collector) = ctx.metadata_collector {
                             let rel_attr = tag
@@ -3348,7 +3308,6 @@ fn walk_node(
                         output.push(')');
                     }
 
-                    // NEW: Collect image metadata
                     #[cfg(feature = "metadata")]
                     if let Some(ref collector) = ctx.metadata_collector {
                         if !src.is_empty() {
@@ -3859,20 +3818,15 @@ fn walk_node(
                     let trimmed_content = content.trim();
 
                     if !trimmed_content.is_empty() {
-                        // Handle spacing before blockquote
                         if ctx.blockquote_depth > 0 {
-                            // Nested blockquote
                             output.push_str("\n\n\n");
                         } else if !output.is_empty() {
-                            // CommonMark: blockquote needs only single newline before it
                             if !output.ends_with('\n') {
                                 output.push('\n');
                             } else if output.ends_with("\n\n") {
-                                // Remove one trailing newline (paragraph already added \n\n)
                                 output.truncate(output.len() - 1);
                             }
                         }
-                        // If output.is_empty(), add nothing (no leading newline)
 
                         let prefix = "> ";
 
@@ -3882,7 +3836,6 @@ fn walk_node(
                             output.push('\n');
                         }
 
-                        // Add spacing after blockquote
                         if let Some(url) = cite {
                             output.push('\n');
                             output.push_str("— <");
@@ -3914,7 +3867,6 @@ fn walk_node(
                 }
 
                 "hr" => {
-                    // CommonMark: ensure a blank line before the hr so it is not interpreted as a setext heading underline
                     if !output.is_empty() {
                         let prev_tag = get_previous_sibling_tag(node_handle, parser, dom_ctx);
                         let last_line_is_blockquote = output
@@ -4244,7 +4196,6 @@ fn walk_node(
                     }
                     let text = text.trim();
                     if !text.is_empty() {
-                        // Escape dashes in captions to avoid confusion with table separators
                         let escaped_text = text.replace('-', r"\-");
                         output.push('*');
                         output.push_str(&escaped_text);
@@ -4396,7 +4347,6 @@ fn walk_node(
                             output.push_str(trimmed);
                         } else {
                             output.push('"');
-                            // Escape backslashes first, then quotes
                             let escaped = trimmed.replace('\\', r"\\").replace('"', r#"\""#);
                             output.push_str(&escaped);
                             output.push('"');
@@ -5446,8 +5396,6 @@ fn walk_node(
                 }
 
                 "head" => {
-                    // Malformed pages sometimes place <body> or main content inside <head>.
-                    // Only walk children if we detect non-head content to avoid rendering metadata.
                     let children = tag.children();
                     let has_body_like = children.top().iter().any(|child_handle| {
                         if let Some(tl::Node::Tag(child_tag)) = child_handle.get(parser) {
@@ -5468,8 +5416,8 @@ fn walk_node(
                     }
                 }
 
-                "script" => {
-                    // NEW: Extract JSON-LD structured data
+                "script" =>
+                {
                     #[cfg(feature = "metadata")]
                     if let Some(type_attr) = tag.attributes().get("type").flatten() {
                         if type_attr.as_utf8_str() == "application/ld+json" {
@@ -5525,8 +5473,6 @@ fn walk_node(
 
                     let len_after = output.len();
                     if len_after > len_before {
-                        // Child processing can pop a trailing byte before appending new content,
-                        // so len_before might land inside a multi-byte char; clamp to a safe boundary.
                         let start_idx = if output.is_char_boundary(len_before) {
                             len_before
                         } else {
@@ -5550,7 +5496,6 @@ fn walk_node(
                             );
                         }
 
-                        // Don't truncate code blocks (indented or fenced)
                         let is_code_block = added_content.starts_with("    ")
                             || added_content.starts_with("```")
                             || added_content.starts_with("~~~");
@@ -5579,9 +5524,7 @@ fn walk_node(
             }
         }
 
-        tl::Node::Comment(_) => {
-            // Comments are ignored
-        }
+        tl::Node::Comment(_) => {}
     }
 }
 
@@ -5713,9 +5656,7 @@ fn convert_table_row(
             let (colspan, rowspan) = get_colspan_rowspan(cell_handle, parser);
 
             if rowspan > 1 {
-                // Extract the cell content that was just added (without separators)
                 let cell_text = &row_text[cell_start..];
-                // Strip leading space and trailing " |"
                 let cell_content = cell_text
                     .trim_start_matches(' ')
                     .trim_end_matches(" |")
@@ -6010,7 +5951,6 @@ fn convert_table(
                             }
                             let text = text.trim();
                             if !text.is_empty() {
-                                // Escape dashes in captions to avoid confusion with table separators
                                 let escaped_text = text.replace('-', r"\-");
                                 output.push('*');
                                 output.push_str(&escaped_text);
@@ -6141,7 +6081,7 @@ mod tests {
     fn legend_with_inner_strong_is_not_double_wrapped() {
         let html = "<fieldset><legend><strong>Section</strong></legend></fieldset>";
         let mut options = ConversionOptions::default();
-        options.preprocessing.remove_forms = false; // keep form controls for this regression check
+        options.preprocessing.remove_forms = false;
         let result = convert_html(html, &options).unwrap();
         assert_eq!(result.trim(), "**Section**");
     }
@@ -6415,7 +6355,6 @@ mod tests {
 
     #[test]
     fn test_convert_with_malformed_angle_brackets() {
-        // Test the full conversion pipeline (issue #94)
         let html = "<html>1<2\nContent</html>";
         let result = convert_html(html, &ConversionOptions::default()).unwrap();
         assert!(
@@ -6514,10 +6453,9 @@ mod tests {
     #[test]
     fn test_preserve_tags_empty_list() {
         let html = r#"<table><tr><td>Cell</td></tr></table>"#;
-        let options = ConversionOptions::default(); // No preserve_tags
+        let options = ConversionOptions::default();
         let result = convert_html(html, &options).unwrap();
 
-        // Should convert to markdown table (or at least not preserve HTML)
         assert!(
             !result.contains("<table>"),
             "Should not preserve table without preserve_tags"
@@ -6544,7 +6482,7 @@ mod tests {
         let html = "<!doctype html><html lang=\"en\"><head><title>Example Domain</title><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\"><style>body{background:#eee;width:60vw;margin:15vh auto;font-family:system-ui,sans-serif}h1{font-size:1.5em}div{opacity:0.8}a:link,a:visited{color:#348}</style><body><div><h1>Example Domain</h1><p>This domain is for use in documentation examples without needing permission. Avoid use in operations.<p><a href=\"https://iana.org/domains/example\">Learn more</a></div></body></html>";
 
         let mut options = ConversionOptions::default();
-        options.extract_metadata = false; // matches CLI default
+        options.extract_metadata = false;
         let result = convert_html(html, &options).unwrap();
 
         assert!(

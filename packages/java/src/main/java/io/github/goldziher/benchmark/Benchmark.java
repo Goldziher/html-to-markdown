@@ -48,10 +48,8 @@ public class Benchmark {
             Path path = Paths.get(filePath);
             String html = Files.readString(path);
 
-            // Warmup
             HtmlToMarkdown.convert(html);
 
-            // Benchmark
             long startNanos = System.nanoTime();
             for (int i = 0; i < iterations; i++) {
                 HtmlToMarkdown.convert(html);
@@ -63,7 +61,6 @@ public class Benchmark {
             double opsPerSec = iterations / elapsedSeconds;
             double mbPerSec = (bytesProcessed / BYTES_TO_MB) / elapsedSeconds;
 
-            // Output JSON
             Map<String, Object> result = new HashMap<>();
             result.put("language", "java");
             result.put("fixture", path.getFileName().toString());

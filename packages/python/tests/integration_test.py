@@ -111,7 +111,6 @@ def test_code_with_tricky_content(convert: Callable[..., str]) -> None:
 def test_special_tags(convert: Callable[..., str]) -> None:
     assert convert("<!DOCTYPE html>") == ""
 
-    # CDATA sections are preserved as-is during HTML parsing
     assert convert("<![CDATA[foobar]]>") == "<![CDATA[foobar]]>\n"
 
 

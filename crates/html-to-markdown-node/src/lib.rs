@@ -440,8 +440,6 @@ fn source_to_string(source: &InlineImageSource) -> String {
     }
 }
 
-// ============= Metadata structs (feature-gated) =============
-
 /// Metadata extraction configuration
 #[cfg(feature = "metadata")]
 #[napi(object)]
@@ -490,7 +488,7 @@ pub struct JsDocumentMetadata {
     pub base_href: Option<String>,
     pub language: Option<String>,
     #[napi(js_name = "text_direction")]
-    pub text_direction: Option<String>, // "ltr" | "rtl" | "auto"
+    pub text_direction: Option<String>,
     #[napi(js_name = "open_graph")]
     pub open_graph: HashMap<String, String>,
     #[napi(js_name = "twitter_card")]
@@ -519,7 +517,7 @@ pub struct JsLinkMetadata {
     pub text: String,
     pub title: Option<String>,
     #[napi(js_name = "link_type")]
-    pub link_type: String, // "anchor" | "internal" | "external" | "email" | "phone" | "other"
+    pub link_type: String,
     pub rel: Vec<String>,
     pub attributes: HashMap<String, String>,
 }
@@ -531,9 +529,9 @@ pub struct JsImageMetadata {
     pub src: String,
     pub alt: Option<String>,
     pub title: Option<String>,
-    pub dimensions: Option<Vec<u32>>, // [width, height]
+    pub dimensions: Option<Vec<u32>>,
     #[napi(js_name = "image_type")]
-    pub image_type: String, // "data_uri" | "inline_svg" | "external" | "relative"
+    pub image_type: String,
     pub attributes: HashMap<String, String>,
 }
 
@@ -542,7 +540,7 @@ pub struct JsImageMetadata {
 #[napi(object)]
 pub struct JsStructuredData {
     #[napi(js_name = "data_type")]
-    pub data_type: String, // "json_ld" | "microdata" | "rdfa"
+    pub data_type: String,
     #[napi(js_name = "raw_json")]
     pub raw_json: String,
     #[napi(js_name = "schema_type")]
@@ -568,8 +566,6 @@ pub struct JsMetadataExtraction {
     pub metadata: JsExtendedMetadata,
 }
 
-// ============= Metadata conversion helpers =============
-
 #[cfg(feature = "metadata")]
 fn text_direction_to_string(direction: Option<RustTextDirection>) -> Option<String> {
     direction.map(|d| d.to_string())
@@ -592,9 +588,6 @@ fn structured_data_type_to_string(data_type: &RustStructuredDataType) -> String 
 
 #[cfg(feature = "metadata")]
 fn convert_document_metadata(doc: RustDocumentMetadata) -> JsDocumentMetadata {
-    // Normalize head metadata keys that come from the Rust collector which preserves
-    // the `meta-*` prefix for head elements. Downstream consumers expect canonical
-    // names without the prefix and with OpenGraph/Twitter keys normalized.
     let mut title = None;
     let mut description = None;
     let mut author = None;
@@ -983,7 +976,7 @@ mod tests {
 
         let rust_opts: RustConversionOptions = opts.into();
         assert!(matches!(rust_opts.heading_style, HeadingStyle::Atx));
-        assert_eq!(rust_opts.list_indent_width, 2); // default
+        assert_eq!(rust_opts.list_indent_width, 2);
     }
 
     #[test]

@@ -78,21 +78,17 @@ class ConvertWithMetadataTest {
 
     assertEquals(4, metadata.getLinkCount(), "Should have 4 links");
 
-    // Check external link
     LinkMetadata external = metadata.getExternalLinks().get(0);
     assertEquals("https://example.com", external.href(), "External link href should match");
     assertEquals(LinkType.EXTERNAL, external.linkType(), "Should be external");
 
-    // Check internal link
     LinkMetadata internal = metadata.getInternalLinks().get(0);
     assertEquals("/about", internal.href(), "Internal link href should match");
     assertEquals(LinkType.INTERNAL, internal.linkType(), "Should be internal");
 
-    // Check anchor link
     LinkMetadata anchor = metadata.getLinksByType(LinkType.ANCHOR).get(0);
     assertEquals("#top", anchor.href(), "Anchor href should match");
 
-    // Check email link
     LinkMetadata email = metadata.getLinksByType(LinkType.EMAIL).get(0);
     assertEquals("mailto:test@example.com", email.href(), "Email href should match");
   }
@@ -327,7 +323,6 @@ class ConvertWithMetadataTest {
     MetadataExtraction result = HtmlToMarkdown.convertWithMetadata(html);
     ExtendedMetadata metadata = result.getMetadata();
 
-    // Verify document metadata
     DocumentMetadata doc = metadata.document();
     assertEquals("Complex Article", doc.title());
     assertEquals("A complex article", doc.description());
@@ -335,21 +330,17 @@ class ConvertWithMetadataTest {
     assertEquals("https://example.com/article", doc.canonicalUrl());
     assertEquals("en", doc.language());
 
-    // Verify headers
     assertEquals(4, metadata.getHeaderCount());
     assertEquals(1, metadata.getHeadersByLevel(1).size());
     assertEquals(2, metadata.getHeadersByLevel(2).size());
     assertEquals(1, metadata.getHeadersByLevel(3).size());
 
-    // Verify links
     assertEquals(2, metadata.getLinkCount());
     assertEquals(1, metadata.getExternalLinks().size());
     assertEquals(1, metadata.getInternalLinks().size());
 
-    // Verify images
     assertEquals(1, metadata.getImageCount());
 
-    // Verify markdown
     assertTrue(result.getMarkdown().contains("Main Article"));
     assertTrue(result.getMarkdown().contains("Subsection"));
   }
@@ -418,7 +409,6 @@ class ConvertWithMetadataTest {
     MetadataExtraction result = HtmlToMarkdown.convertWithMetadata(html);
     ExtendedMetadata metadata = result.getMetadata();
 
-    // Verify that LinkType enum values match extracted link types
     assertEquals(LinkType.EXTERNAL, metadata.links().get(0).linkType());
     assertEquals(LinkType.INTERNAL, metadata.links().get(1).linkType());
     assertEquals(LinkType.ANCHOR, metadata.links().get(2).linkType());
@@ -437,7 +427,6 @@ class ConvertWithMetadataTest {
     MetadataExtraction result = HtmlToMarkdown.convertWithMetadata(html);
 
     assertEquals(2, result.getImageCount(), "Should have 2 images");
-    // All images should have valid image type values
     for (ImageMetadata img : result.getMetadata().images()) {
       assertNotNull(img.src(), "Image src should not be null");
     }
@@ -542,12 +531,10 @@ class ConvertWithMetadataTest {
     MetadataExtraction result = HtmlToMarkdown.convertWithMetadata(html);
     ExtendedMetadata metadata = result.getMetadata();
 
-    // Verify multiple metadata types are correctly extracted
     assertTrue(metadata.getHeaderCount() >= 2, "Should have at least 2 headers");
     assertEquals(1, metadata.getLinkCount());
     assertEquals(1, metadata.getImageCount());
 
-    // Verify data integrity
     HeaderMetadata h1 = metadata.headers().get(0);
     assertEquals(1, h1.level());
     assertEquals("Main", h1.text());
@@ -565,7 +552,6 @@ class ConvertWithMetadataTest {
 
     MetadataExtraction result = HtmlToMarkdown.convertWithMetadata(html);
 
-    // Should handle empty headers gracefully - empty headers are typically filtered
     assertEquals(1, result.getHeaderCount());
     assertEquals("Non-empty", result.getMetadata().headers().get(0).text());
   }
@@ -577,7 +563,6 @@ class ConvertWithMetadataTest {
 
     MetadataExtraction result = HtmlToMarkdown.convertWithMetadata(html);
 
-    // Should handle links gracefully
     assertTrue(result.getLinkCount() > 0, "Should have at least one link");
   }
 }

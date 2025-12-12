@@ -597,8 +597,6 @@ fn convert_with_inline_images<'py>(
     Ok((extraction.markdown, images, warnings))
 }
 
-// ============= Metadata conversion helpers (feature-gated) =============
-
 #[cfg(feature = "metadata")]
 fn opt_string_to_py<'py>(py: Python<'py>, opt: Option<String>) -> PyResult<Py<PyAny>> {
     match opt {

@@ -681,7 +681,6 @@ fn convert_with_metadata_fn(ruby: &Ruby, args: &[Value]) -> Result<Value, Error>
     let (markdown, metadata) =
         guard_panic(|| convert_with_metadata_inner(&html, Some(options), metadata_config)).map_err(conversion_error)?;
 
-    // Convert to Ruby array [markdown, metadata_hash]
     let array = ruby.ary_new();
     array.push(markdown)?;
     array.push(extended_metadata_to_ruby(ruby, metadata)?)?;

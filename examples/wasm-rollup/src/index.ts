@@ -27,7 +27,6 @@ async function main() {
 
   const markdown = convert(html, options);
 
-  // Attach to DOM for quick smoke testing
   const pre = document.createElement("pre");
   pre.textContent = markdown;
   document.body.append("Rendered Markdown:\n\n", pre);

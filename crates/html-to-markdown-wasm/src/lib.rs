@@ -933,7 +933,7 @@ mod tests {
     #[cfg(feature = "metadata")]
     #[wasm_bindgen_test]
     fn test_convert_bytes_with_metadata() {
-        let html_bytes = vec![60, 104, 49, 62, 72, 101, 108, 108, 111, 60, 47, 104, 49, 62]; // "<h1>Hello</h1>"
+        let html_bytes = vec![60, 104, 49, 62, 72, 101, 108, 108, 111, 60, 47, 104, 49, 62];
         let uint8 = js_sys::Uint8Array::from(&html_bytes[..]);
         let config = WasmMetadataConfig::new();
 

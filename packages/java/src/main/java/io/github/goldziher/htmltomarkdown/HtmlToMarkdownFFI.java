@@ -22,31 +22,29 @@ class HtmlToMarkdownFFI {
     private static final Linker LINKER = Linker.nativeLinker();
     private static final SymbolLookup SYMBOL_LOOKUP;
 
-    // Function descriptors matching the C FFI signatures
     private static final FunctionDescriptor CONVERT_DESC = FunctionDescriptor.of(
-        ValueLayout.ADDRESS,  // char* return
-        ValueLayout.ADDRESS   // const char* html parameter
+        ValueLayout.ADDRESS,
+        ValueLayout.ADDRESS
     );
 
     private static final FunctionDescriptor FREE_STRING_DESC = FunctionDescriptor.ofVoid(
-        ValueLayout.ADDRESS   // char* s parameter
+        ValueLayout.ADDRESS
     );
 
     private static final FunctionDescriptor VERSION_DESC = FunctionDescriptor.of(
-        ValueLayout.ADDRESS   // const char* return
+        ValueLayout.ADDRESS
     );
 
     private static final FunctionDescriptor LAST_ERROR_DESC = FunctionDescriptor.of(
-        ValueLayout.ADDRESS   // const char* return
+        ValueLayout.ADDRESS
     );
 
     private static final FunctionDescriptor CONVERT_WITH_METADATA_DESC = FunctionDescriptor.of(
-        ValueLayout.ADDRESS,  // char* return (markdown)
-        ValueLayout.ADDRESS,  // const char* html parameter
-        ValueLayout.ADDRESS   // char** metadata_json_out parameter
+        ValueLayout.ADDRESS,
+        ValueLayout.ADDRESS,
+        ValueLayout.ADDRESS
     );
 
-    // Method handles for native functions
     static final MethodHandle html_to_markdown_convert;
     static final MethodHandle html_to_markdown_free_string;
     static final MethodHandle html_to_markdown_version;
@@ -54,13 +52,10 @@ class HtmlToMarkdownFFI {
     static final MethodHandle html_to_markdown_convert_with_metadata;
 
     static {
-        // Load the native library
         System.loadLibrary(LIBRARY_NAME);
 
-        // Get symbol lookup for the loaded library
         SYMBOL_LOOKUP = SymbolLookup.loaderLookup();
 
-        // Bind native functions to method handles
         html_to_markdown_convert = LINKER.downcallHandle(
             findSymbol("html_to_markdown_convert"),
             CONVERT_DESC
@@ -125,7 +120,6 @@ class HtmlToMarkdownFFI {
         return addr.reinterpret(Long.MAX_VALUE).getString(0);
     }
 
-    // Private constructor to prevent instantiation
     private HtmlToMarkdownFFI() {
         throw new UnsupportedOperationException("Utility class");
     }

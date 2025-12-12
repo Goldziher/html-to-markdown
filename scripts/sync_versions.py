@@ -47,13 +47,9 @@ def update_package_json(file_path: Path, version: str) -> tuple[bool, str, str]:
     old_version = data.get("version", "N/A")
     changed = False
 
-    # Update main version
     if data.get("version") != version:
         data["version"] = version
         changed = True
-
-    # Note: We don't update optionalDependencies for html-to-markdown-node
-    # because napi prepublish adds them automatically during publish
 
     if changed:
         file_path.write_text(json.dumps(data, indent=2) + "\n")
@@ -112,7 +108,6 @@ def update_cargo_toml(file_path: Path, version: str) -> tuple[bool, str, str]:
     if old_version == version:
         return False, old_version, version
 
-    # Update the version field
     new_content = re.sub(r'^(version\s*=\s*)"[^"]+"', rf'\1"{version}"', content, count=1, flags=re.MULTILINE)
 
     file_path.write_text(new_content)

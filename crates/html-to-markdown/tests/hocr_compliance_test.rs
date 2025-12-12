@@ -35,15 +35,12 @@ fn test_full_hocr_document_structure() {
     let dom = tl::parse(hocr, tl::ParserOptions::default()).unwrap();
     let (elements, metadata) = extract_hocr_document(&dom, false);
 
-    // Verify metadata
     assert_eq!(metadata.ocr_system, Some("tesseract 5.0".to_string()));
     assert_eq!(metadata.ocr_number_of_pages, Some(1));
     assert!(metadata.ocr_capabilities.contains(&"ocr_page".to_string()));
 
-    // Verify structure
     assert!(!elements.is_empty());
 
-    // Convert to markdown
     let markdown = convert_to_markdown(&elements, true);
     assert!(markdown.contains("Document Title"));
     assert!(markdown.contains("Chapter 1"));
@@ -61,7 +58,6 @@ fn test_advanced_properties() {
     let dom = tl::parse(hocr, tl::ParserOptions::default()).unwrap();
     let (elements, _) = extract_hocr_document(&dom, false);
 
-    // Find the line element
     fn find_line(elements: &[HocrElement]) -> Option<&HocrElement> {
         for elem in elements {
             if matches!(elem.element_type, HocrElementType::OcrLine) {
@@ -76,14 +72,12 @@ fn test_advanced_properties() {
 
     let line = find_line(&elements).expect("Should find ocr_line");
 
-    // Verify advanced properties
     assert!(line.properties.baseline.is_some());
     assert_eq!(line.properties.baseline.unwrap().slope, 0.015);
     assert_eq!(line.properties.baseline.unwrap().constant, -18);
     assert_eq!(line.properties.x_font, Some("Arial".to_string()));
     assert_eq!(line.properties.x_fsize, Some(12));
 
-    // Verify word properties
     assert_eq!(line.children.len(), 1);
     assert_eq!(line.children[0].properties.textangle, Some(2.5));
 }
@@ -105,7 +99,6 @@ fn test_all_logical_elements() {
 
     let markdown = convert_to_markdown(&elements, true);
 
-    // Verify conversion
     assert!(markdown.contains("# Part") || markdown.contains("# Chapter"));
     assert!(markdown.contains("## Section"));
     assert!(markdown.contains("### Subsection"));
@@ -129,7 +122,6 @@ fn test_float_elements() {
 
     let markdown = convert_to_markdown(&elements, true);
 
-    // Headers and footers should be in italic
     assert!(markdown.contains("*Header*"));
     assert!(markdown.contains("*Footer*"));
 }
@@ -143,7 +135,6 @@ fn test_character_level_properties() {
     let dom = tl::parse(hocr, tl::ParserOptions::default()).unwrap();
     let (elements, _) = extract_hocr_document(&dom, false);
 
-    // Find ocr_cinfo
     fn find_cinfo(elements: &[HocrElement]) -> Option<&HocrElement> {
         for elem in elements {
             if matches!(elem.element_type, HocrElementType::OcrCinfo) {
@@ -157,10 +148,8 @@ fn test_character_level_properties() {
     }
 
     if let Some(cinfo) = find_cinfo(&elements) {
-        // Verify character-level confidences
         assert_eq!(cinfo.properties.x_confs, vec![95.3, 87.2, 92.1]);
 
-        // Verify character bounding boxes
         assert_eq!(cinfo.properties.x_bboxes.len(), 3);
         assert_eq!(cinfo.properties.x_bboxes[0].x1, 0);
         assert_eq!(cinfo.properties.x_bboxes[1].x1, 10);
@@ -177,7 +166,6 @@ fn test_page_properties() {
     let dom = tl::parse(hocr, tl::ParserOptions::default()).unwrap();
     let (elements, _) = extract_hocr_document(&dom, false);
 
-    // Find page element
     fn find_page(elements: &[HocrElement]) -> Option<&HocrElement> {
         for elem in elements {
             if matches!(elem.element_type, HocrElementType::OcrPage) {
@@ -192,7 +180,6 @@ fn test_page_properties() {
 
     let page = find_page(&elements).expect("Should find ocr_page");
 
-    // Verify page properties
     assert_eq!(page.properties.image, Some("/path/to/image.png".to_string()));
     assert_eq!(page.properties.ppageno, Some(5));
     assert_eq!(page.properties.lpageno, Some("V".to_string()));
@@ -209,7 +196,6 @@ fn test_content_flow_and_order() {
     let dom = tl::parse(hocr, tl::ParserOptions::default()).unwrap();
     let (elements, _) = extract_hocr_document(&dom, false);
 
-    // Find linear element
     fn find_linear(elements: &[HocrElement]) -> Option<&HocrElement> {
         for elem in elements {
             if matches!(elem.element_type, HocrElementType::OcrLinear) {
@@ -224,11 +210,9 @@ fn test_content_flow_and_order() {
 
     let linear = find_linear(&elements).expect("Should find ocr_linear");
 
-    // Verify order properties
     assert_eq!(linear.properties.order, Some(1));
     assert_eq!(linear.properties.cflow, Some("main-flow".to_string()));
 
-    // Verify child order properties
     assert_eq!(linear.children[0].properties.order, Some(2));
     assert_eq!(linear.children[1].properties.order, Some(1));
 }

@@ -10,11 +10,9 @@ import (
 )
 
 func main() {
-	// Display library version
 	version := htmltomarkdown.Version()
 	fmt.Printf("html-to-markdown version: %s\n\n", version)
 
-	// Test 1: Simple HTML conversion
 	html1 := "<h1>Hello World</h1><p>This is a test.</p>"
 	fmt.Println("Test 1: Simple HTML")
 	fmt.Printf("Input:  %s\n", html1)
@@ -25,7 +23,6 @@ func main() {
 	}
 	fmt.Printf("Output:\n%s\n\n", markdown1)
 
-	// Test 2: Complex HTML with various elements
 	html2 := `
 		<html>
 			<head><title>Test Page</title></head>
@@ -49,13 +46,11 @@ func main() {
 	}
 	fmt.Printf("Output:\n%s\n\n", markdown2)
 
-	// Test 3: MustConvert
 	fmt.Println("Test 3: MustConvert (panics on error)")
 	html3 := "<h2>Testing MustConvert</h2>"
 	markdown3 := htmltomarkdown.MustConvert(html3)
 	fmt.Printf("Output: %s\n\n", markdown3)
 
-	// Test 4: Empty string handling
 	fmt.Println("Test 4: Empty string")
 	markdown4, err := htmltomarkdown.Convert("")
 	if err != nil {
@@ -68,7 +63,6 @@ func main() {
 		os.Exit(1)
 	}
 
-	// Test 5: Check for common markdown patterns
 	html5 := `
 		<h1>Heading 1</h1>
 		<h2>Heading 2</h2>
@@ -85,7 +79,6 @@ func main() {
 		log.Fatalf("Conversion failed: %v", err)
 	}
 
-	// Validate output contains expected patterns
 	checks := []string{"Heading 1", "Heading 2", "bold", "italic", "Bullet 1", "Bullet 2"}
 	allPassed := true
 

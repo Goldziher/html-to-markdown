@@ -4,7 +4,6 @@ export default {
   async fetch(request: Request): Promise<Response> {
     if (request.method === "POST") {
       try {
-        // Ensure WASM is initialized before calling convert()
         await (wasmReady ?? initWasm());
 
         const html = await request.text();
@@ -34,7 +33,6 @@ export default {
       }
     }
 
-    // GET request - show landing page
     return new Response(
       `
 <!DOCTYPE html>

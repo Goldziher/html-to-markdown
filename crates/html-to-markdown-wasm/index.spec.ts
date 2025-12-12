@@ -11,7 +11,6 @@ import {
 	WasmInlineImageConfig,
 } from "./dist-node/html_to_markdown_wasm.js";
 
-// Helper to load test documents
 const loadTestDoc = (path: string): string => {
 	const fullPath = join(__dirname, "../../test_documents", path);
 	return readFileSync(fullPath, "utf-8");
@@ -120,7 +119,6 @@ describe("html-to-markdown-wasm - WebAssembly Bindings", () => {
 		it("should convert code blocks with language class", () => {
 			const html = '<pre><code class="language-python">print("hello")</code></pre>';
 			const markdown = convert(html, { codeBlockStyle: "backticks" });
-			// Note: WASM bindings currently don't preserve language annotations in code fences
 			expect(markdown).toContain("```");
 			expect(markdown).toContain('print("hello")');
 		});
@@ -496,7 +494,7 @@ describe("html-to-markdown-wasm - WebAssembly Bindings", () => {
 				convert(html);
 			}
 			const duration = Date.now() - start;
-			expect(duration).toBeLessThan(1000); // Should complete in < 1 second
+			expect(duration).toBeLessThan(1000);
 		});
 
 		it("should handle medium documents", () => {
@@ -555,13 +553,10 @@ describe("html-to-markdown-wasm - WebAssembly Bindings", () => {
 		it("should work with both preserve and strip tags", () => {
 			const html = "<p>Text</p><table><tr><td>Table content</td></tr></table><div>Div content</div>";
 			const markdown = convert(html, { preserveTags: ["table"], stripTags: ["div"] });
-			// table should be preserved as HTML
 			expect(markdown).toContain("<table>");
 			expect(markdown).toContain("Table content");
-			// div should be stripped (only text content)
 			expect(markdown).not.toContain("<div>");
 			expect(markdown).toContain("Div content");
-			// p should be converted normally
 			expect(markdown).toContain("Text");
 		});
 	});
