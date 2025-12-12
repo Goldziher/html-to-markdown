@@ -309,7 +309,6 @@ final readonly class ConversionOptions
     }
 
     /**
-     * @param mixed $value
      * @return PreprocessingOptionsInput
      */
     private static function normalizeArray(mixed $value, string $key): array
