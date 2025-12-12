@@ -54,12 +54,24 @@ pub fn wrap_markdown(markdown: &str, options: &ConversionOptions) -> String {
             continue;
         }
 
-        let is_structural = is_heading(trimmed)
-            || is_list_like(trimmed)
-            || is_numbered_list(trimmed)
-            || trimmed.starts_with('>')
-            || trimmed.starts_with('|')
-            || trimmed.starts_with('=');
+        // Try to parse as a list item (unordered or ordered)
+        if let Some((indent, marker, content)) = parse_list_item(line) {
+            // Flush any pending paragraph
+            if in_paragraph && !paragraph_buffer.is_empty() {
+                result.push_str(&wrap_line(&paragraph_buffer, options.wrap_width));
+                result.push_str("\n\n");
+                paragraph_buffer.clear();
+                in_paragraph = false;
+            }
+
+            // Wrap the list item while preserving structure
+            result.push_str(&wrap_list_item(&indent, &marker, &content, options.wrap_width));
+            continue;
+        }
+
+        // Check other structural elements (headings, blockquotes, tables, horizontal rules)
+        let is_structural =
+            is_heading(trimmed) || trimmed.starts_with('>') || trimmed.starts_with('|') || trimmed.starts_with('=');
 
         if is_structural {
             if in_paragraph && !paragraph_buffer.is_empty() {
@@ -117,6 +129,140 @@ fn is_numbered_list(trimmed: &str) -> bool {
 
 fn is_heading(trimmed: &str) -> bool {
     trimmed.starts_with('#')
+}
+
+/// Parse a list item into its components: (indent, marker, content)
+///
+/// Returns Some((indent, marker, content)) if the line is a valid list item,
+/// None otherwise.
+///
+/// Examples:
+/// - "- text" -> ("", "- ", "text")
+/// - "  - text" -> ("  ", "- ", "text")
+/// - "1. text" -> ("", "1. ", "text")
+/// - "  42) text" -> ("  ", "42) ", "text")
+fn parse_list_item(line: &str) -> Option<(String, String, String)> {
+    let trimmed = line.trim_start();
+    let indent = &line[..line.len() - trimmed.len()];
+
+    // Check for unordered list markers: -, *, +
+    if let Some(rest) = trimmed.strip_prefix('-') {
+        if rest.starts_with(' ') || rest.is_empty() {
+            return Some((indent.to_string(), "- ".to_string(), rest.trim_start().to_string()));
+        }
+    }
+    if let Some(rest) = trimmed.strip_prefix('*') {
+        if rest.starts_with(' ') || rest.is_empty() {
+            return Some((indent.to_string(), "* ".to_string(), rest.trim_start().to_string()));
+        }
+    }
+    if let Some(rest) = trimmed.strip_prefix('+') {
+        if rest.starts_with(' ') || rest.is_empty() {
+            return Some((indent.to_string(), "+ ".to_string(), rest.trim_start().to_string()));
+        }
+    }
+
+    // Check for ordered list (e.g., "1. ", "42) ")
+    let first_token = trimmed.split_whitespace().next()?;
+    if first_token.ends_with('.') || first_token.ends_with(')') {
+        let digits = first_token.trim_end_matches(['.', ')']);
+        if !digits.is_empty() && digits.chars().all(|c| c.is_ascii_digit()) {
+            let marker_len = first_token.len();
+            let rest = trimmed[marker_len..].trim_start();
+            return Some((
+                indent.to_string(),
+                trimmed[..marker_len].to_string() + " ",
+                rest.to_string(),
+            ));
+        }
+    }
+
+    None
+}
+
+/// Wrap a list item while preserving its structure.
+///
+/// The first line of output will be: `<indent><marker><content_start>`
+/// Continuation lines will be: `<indent><spaces_matching_marker><content_continued>`
+///
+/// # Arguments
+/// - `indent`: The leading whitespace (for nested lists)
+/// - `marker`: The list marker (e.g., "- ", "1. ")
+/// - `content`: The text content after the marker
+/// - `width`: The maximum line width
+fn wrap_list_item(indent: &str, marker: &str, content: &str, width: usize) -> String {
+    if content.is_empty() {
+        return format!("{}{}\n", indent, marker.trim_end());
+    }
+
+    let full_marker = format!("{}{}", indent, marker);
+    let continuation_indent = format!("{}{}", indent, " ".repeat(marker.len()));
+
+    // Calculate effective width for first line (accounting for marker)
+    let first_line_prefix_len = full_marker.len();
+    let first_line_width = if width > first_line_prefix_len {
+        width - first_line_prefix_len
+    } else {
+        width
+    };
+
+    // Calculate effective width for continuation lines (accounting for indent)
+    let cont_line_prefix_len = continuation_indent.len();
+    let cont_line_width = if width > cont_line_prefix_len {
+        width - cont_line_prefix_len
+    } else {
+        width
+    };
+
+    // Split content into words
+    let words: Vec<&str> = content.split_whitespace().collect();
+    if words.is_empty() {
+        return format!("{}\n", full_marker.trim_end());
+    }
+
+    let mut result = String::new();
+    let mut current_line = String::new();
+    let mut current_width = first_line_width;
+    let mut is_first_line = true;
+
+    for word in words {
+        let word_len = word.len();
+        let space_needed = if current_line.is_empty() { 0 } else { 1 };
+
+        // Check if adding this word would exceed the current line width
+        if !current_line.is_empty() && current_line.len() + space_needed + word_len > current_width {
+            // Flush current line
+            if is_first_line {
+                result.push_str(&full_marker);
+                is_first_line = false;
+            } else {
+                result.push_str(&continuation_indent);
+            }
+            result.push_str(&current_line);
+            result.push('\n');
+            current_line.clear();
+            current_width = cont_line_width;
+        }
+
+        // Add the word to the current line
+        if !current_line.is_empty() {
+            current_line.push(' ');
+        }
+        current_line.push_str(word);
+    }
+
+    // Flush remaining content
+    if !current_line.is_empty() {
+        if is_first_line {
+            result.push_str(&full_marker);
+        } else {
+            result.push_str(&continuation_indent);
+        }
+        result.push_str(&current_line);
+        result.push('\n');
+    }
+
+    result
 }
 
 /// Wrap a single line of text at the specified width.
@@ -234,16 +380,146 @@ mod tests {
     }
 
     #[test]
-    fn wrap_markdown_preserves_indented_lists_with_links() {
-        let markdown = "- [A](#a)\n  - [B](#b)\n  - [C](#c)\n";
+    fn wrap_markdown_wraps_long_list_items() {
+        let markdown = "- This is a very long list item that should definitely be wrapped when it exceeds the specified wrap width\n- Short item\n";
         let options = ConversionOptions {
             wrap: true,
-            wrap_width: 20,
+            wrap_width: 60,
             ..Default::default()
         };
 
         let result = wrap_markdown(markdown, &options);
-        let expected = "- [A](#a)\n  - [B](#b)\n  - [C](#c)\n";
-        assert_eq!(result, expected);
+
+        // First list item should be wrapped
+        assert!(
+            result.contains("- This is a very long list item that should definitely be\n  wrapped"),
+            "First list item not properly wrapped. Got: {}",
+            result
+        );
+        // Second list item stays on one line
+        assert!(
+            result.contains("- Short item"),
+            "Short list item incorrectly modified. Got: {}",
+            result
+        );
+    }
+
+    #[test]
+    fn wrap_markdown_wraps_ordered_lists() {
+        let markdown = "1. This is a numbered list item with a very long text that should be wrapped at the specified width\n2. Short\n";
+        let options = ConversionOptions {
+            wrap: true,
+            wrap_width: 60,
+            ..Default::default()
+        };
+
+        let result = wrap_markdown(markdown, &options);
+
+        // Should wrap the long ordered list item
+        assert!(
+            result.lines().all(|line| line.len() <= 60 || line.trim().is_empty()),
+            "Some lines exceed wrap width. Got: {}",
+            result
+        );
+        // Should preserve list structure
+        assert!(result.contains("1."), "Lost ordered list marker. Got: {}", result);
+        assert!(
+            result.contains("2."),
+            "Lost second ordered list marker. Got: {}",
+            result
+        );
+    }
+
+    #[test]
+    fn wrap_markdown_preserves_nested_list_structure() {
+        let markdown = "- Item one with some additional text that will need to be wrapped across multiple lines\n  - Nested item with long text that also needs wrapping at the specified width\n  - Short nested\n";
+        let options = ConversionOptions {
+            wrap: true,
+            wrap_width: 50,
+            ..Default::default()
+        };
+
+        let result = wrap_markdown(markdown, &options);
+
+        // Verify list structure is preserved
+        assert!(result.contains("- Item"), "Lost top-level list marker. Got: {}", result);
+        assert!(
+            result.contains("  - Nested"),
+            "Lost nested list structure. Got: {}",
+            result
+        );
+        // All lines should respect wrap width
+        assert!(
+            result.lines().all(|line| line.len() <= 50 || line.trim().is_empty()),
+            "Some lines exceed wrap width. Got: {}",
+            result
+        );
+    }
+
+    #[test]
+    fn wrap_markdown_handles_list_with_links() {
+        let markdown = "- [A](#a) with additional text that is long enough to require wrapping at the configured width\n  - [B](#b) also has more content that needs wrapping\n  - [C](#c)\n";
+        let options = ConversionOptions {
+            wrap: true,
+            wrap_width: 50,
+            ..Default::default()
+        };
+
+        let result = wrap_markdown(markdown, &options);
+
+        // Should preserve links
+        assert!(result.contains("[A](#a)"), "Lost link in list. Got: {}", result);
+        assert!(result.contains("[B](#b)"), "Lost nested link. Got: {}", result);
+        assert!(result.contains("[C](#c)"), "Lost short nested link. Got: {}", result);
+        // Should wrap while preserving structure
+        assert!(
+            result.contains("- [A](#a)"),
+            "Lost list structure with link. Got: {}",
+            result
+        );
+        assert!(
+            result.contains("  - [B](#b)"),
+            "Lost nested list structure. Got: {}",
+            result
+        );
+    }
+
+    #[test]
+    fn wrap_markdown_handles_empty_list_items() {
+        let markdown = "- \n- Item with text\n- \n";
+        let options = ConversionOptions {
+            wrap: true,
+            wrap_width: 40,
+            ..Default::default()
+        };
+
+        let result = wrap_markdown(markdown, &options);
+
+        // Should handle empty items gracefully
+        assert!(result.contains("- "), "Lost list markers. Got: {}", result);
+        assert!(result.contains("Item with text"), "Lost item text. Got: {}", result);
+    }
+
+    #[test]
+    fn wrap_markdown_preserves_indented_lists_with_wrapping() {
+        let markdown = "- [A](#a) with some additional text that makes this line very long and should be wrapped\n  - [B](#b)\n  - [C](#c) with more text that is also quite long and needs wrapping\n";
+        let options = ConversionOptions {
+            wrap: true,
+            wrap_width: 50,
+            ..Default::default()
+        };
+
+        let result = wrap_markdown(markdown, &options);
+
+        // Should wrap but preserve list structure
+        assert!(result.contains("- [A](#a)"), "Lost top-level link. Got: {}", result);
+        assert!(result.contains("  - [B](#b)"), "Lost nested link B. Got: {}", result);
+        assert!(result.contains("  - [C](#c)"), "Lost nested link C. Got: {}", result);
+        // Should have wrapped long lines
+        assert!(
+            result.lines().all(|line| line.len() <= 50),
+            "Some lines exceed wrap width:\n{}",
+            result
+        );
     }
 }

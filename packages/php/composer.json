@@ -1,6 +1,6 @@
 {
 	"name": "goldziher/html-to-markdown",
-	"version": "2.14.0",
+	"version": "2.14.1",
 	"description": "Modern PHP API for the html_to_markdown native extension powered by the Rust html-to-markdown engine.",
 	"type": "library",
 	"license": "MIT",

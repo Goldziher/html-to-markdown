@@ -902,7 +902,11 @@ fn is_hocr_document(node_handle: &tl::NodeHandle, parser: &tl::Parser) -> bool {
 /// - base-href: Base URL from <base> tag
 /// - canonical: Canonical URL from <link rel="canonical">
 /// - link relations: author, license, alternate links
-fn extract_metadata(node_handle: &tl::NodeHandle, parser: &tl::Parser) -> BTreeMap<String, String> {
+fn extract_metadata(
+    node_handle: &tl::NodeHandle,
+    parser: &tl::Parser,
+    options: &ConversionOptions,
+) -> BTreeMap<String, String> {
     let mut metadata = BTreeMap::new();
 
     fn find_head(node_handle: &tl::NodeHandle, parser: &tl::Parser) -> Option<tl::NodeHandle> {
@@ -940,16 +944,23 @@ fn extract_metadata(node_handle: &tl::NodeHandle, parser: &tl::Parser) -> BTreeM
 
                             match tag_name.as_ref() {
                                 "title" => {
-                                    let title_children = child_tag.children();
+                                    // Skip if title is in strip_tags or preserve_tags
+                                    if options.strip_tags.contains(&"title".to_string())
+                                        || options.preserve_tags.contains(&"title".to_string())
                                     {
-                                        if let Some(first_child) = title_children.top().iter().next() {
-                                            if let Some(text_node) = first_child.get(parser) {
-                                                if let tl::Node::Raw(bytes) = text_node {
-                                                    let title = text::normalize_whitespace(&bytes.as_utf8_str())
-                                                        .trim()
-                                                        .to_string();
-                                                    if !title.is_empty() {
-                                                        metadata.insert("title".to_string(), title);
+                                        // Skip extraction
+                                    } else {
+                                        let title_children = child_tag.children();
+                                        {
+                                            if let Some(first_child) = title_children.top().iter().next() {
+                                                if let Some(text_node) = first_child.get(parser) {
+                                                    if let tl::Node::Raw(bytes) = text_node {
+                                                        let title = text::normalize_whitespace(&bytes.as_utf8_str())
+                                                            .trim()
+                                                            .to_string();
+                                                        if !title.is_empty() {
+                                                            metadata.insert("title".to_string(), title);
+                                                        }
                                                     }
                                                 }
                                             }
@@ -967,42 +978,47 @@ fn extract_metadata(node_handle: &tl::NodeHandle, parser: &tl::Parser) -> BTreeM
                                     }
                                 }
                                 "meta" => {
-                                    let mut name_attr = None;
-                                    let mut property_attr = None;
-                                    let mut http_equiv_attr = None;
-                                    let mut content_attr = None;
+                                    // Skip if meta is in strip_tags or preserve_tags
+                                    if !options.strip_tags.contains(&"meta".to_string())
+                                        && !options.preserve_tags.contains(&"meta".to_string())
+                                    {
+                                        let mut name_attr = None;
+                                        let mut property_attr = None;
+                                        let mut http_equiv_attr = None;
+                                        let mut content_attr = None;
 
-                                    if let Some(attr) = child_tag.attributes().get("name") {
-                                        if let Some(bytes) = attr {
-                                            name_attr = Some(bytes.as_utf8_str().to_string());
+                                        if let Some(attr) = child_tag.attributes().get("name") {
+                                            if let Some(bytes) = attr {
+                                                name_attr = Some(bytes.as_utf8_str().to_string());
+                                            }
                                         }
-                                    }
-                                    if let Some(attr) = child_tag.attributes().get("property") {
-                                        if let Some(bytes) = attr {
-                                            property_attr = Some(bytes.as_utf8_str().to_string());
+                                        if let Some(attr) = child_tag.attributes().get("property") {
+                                            if let Some(bytes) = attr {
+                                                property_attr = Some(bytes.as_utf8_str().to_string());
+                                            }
                                         }
-                                    }
-                                    if let Some(attr) = child_tag.attributes().get("http-equiv") {
-                                        if let Some(bytes) = attr {
-                                            http_equiv_attr = Some(bytes.as_utf8_str().to_string());
+                                        if let Some(attr) = child_tag.attributes().get("http-equiv") {
+                                            if let Some(bytes) = attr {
+                                                http_equiv_attr = Some(bytes.as_utf8_str().to_string());
+                                            }
                                         }
-                                    }
-                                    if let Some(attr) = child_tag.attributes().get("content") {
-                                        if let Some(bytes) = attr {
-                                            content_attr = Some(bytes.as_utf8_str().to_string());
+                                        if let Some(attr) = child_tag.attributes().get("content") {
+                                            if let Some(bytes) = attr {
+                                                content_attr = Some(bytes.as_utf8_str().to_string());
+                                            }
                                         }
-                                    }
 
-                                    if let Some(content) = content_attr {
-                                        if let Some(name) = name_attr {
-                                            let key = format!("meta-{}", name.to_lowercase());
-                                            metadata.insert(key, content);
-                                        } else if let Some(property) = property_attr {
-                                            let key = format!("meta-{}", property.to_lowercase().replace(':', "-"));
-                                            metadata.insert(key, content);
-                                        } else if let Some(http_equiv) = http_equiv_attr {
-                                            let key = format!("meta-{}", http_equiv.to_lowercase());
-                                            metadata.insert(key, content);
+                                        if let Some(content) = content_attr {
+                                            if let Some(name) = name_attr {
+                                                let key = format!("meta-{}", name.to_lowercase());
+                                                metadata.insert(key, content);
+                                            } else if let Some(property) = property_attr {
+                                                let key = format!("meta-{}", property.to_lowercase().replace(':', "-"));
+                                                metadata.insert(key, content);
+                                            } else if let Some(http_equiv) = http_equiv_attr {
+                                                let key = format!("meta-{}", http_equiv.to_lowercase());
+                                                metadata.insert(key, content);
+                                            }
                                         }
                                     }
                                 }
@@ -1488,7 +1504,7 @@ fn convert_html_impl(
 
     if options.extract_metadata && !options.convert_as_inline && !is_hocr {
         for child_handle in dom_ref.children().iter() {
-            let metadata = extract_metadata(child_handle, parser);
+            let metadata = extract_metadata(child_handle, parser, options);
             if !metadata.is_empty() {
                 let metadata_frontmatter = format_metadata_frontmatter(&metadata);
                 output.push_str(&metadata_frontmatter);
@@ -1544,7 +1560,7 @@ fn convert_html_impl(
     if let Some(ref collector) = metadata_collector {
         if !is_hocr {
             for child_handle in dom_ref.children().iter() {
-                let head_meta = extract_metadata(child_handle, parser);
+                let head_meta = extract_metadata(child_handle, parser, options);
                 if !head_meta.is_empty() {
                     collector.borrow_mut().set_head_metadata(head_meta);
                     break;
@@ -2619,6 +2635,11 @@ fn walk_node(
                 return;
             }
 
+            // Track if the original text contained newlines before strip_newlines is applied.
+            // This is critical because strip_newlines converts '\n' to ' ', which would break
+            // the newline detection logic for whitespace-only nodes.
+            let had_newlines = text.contains('\n');
+
             if options.strip_newlines {
                 text = text.replace(['\r', '\n'], " ");
             }
@@ -2644,7 +2665,9 @@ fn walk_node(
                     return;
                 }
 
-                if text.contains('\n') {
+                // Use had_newlines to determine if the original text (before strip_newlines)
+                // contained newlines, since strip_newlines would have converted them to spaces
+                if had_newlines {
                     if output.is_empty() {
                         return;
                     }

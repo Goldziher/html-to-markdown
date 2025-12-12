@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.14.1] - 2025-12-12
+
+### Fixed
+- **Issue #147**: Word wrap now works correctly in list items when using the `-w`/`--wrap` flag. List items with long text are properly wrapped while preserving list structure and indentation for both ordered and unordered lists.
+- **Issue #146**: `strip_tags` and `preserve_tags` options now correctly prevent `<meta>` and `<title>` tags from being extracted into YAML frontmatter when `extract_metadata` is enabled.
+- **Issue #145**: `strip_newlines=true` no longer causes excessive whitespace around block elements. Structural whitespace is now properly normalized while still removing newlines within paragraph content.
+
 ## [2.14.0] - 2025-12-11
 
 ### Added
