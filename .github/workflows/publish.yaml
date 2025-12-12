@@ -1385,8 +1385,7 @@ jobs:
       - name: Publish package to NuGet.org
         env:
           DOTNET_NOLOGO: true
-          NUGET_API_KEY: ${{ steps.nuget-login.outputs.NUGET_API_KEY }}
-        run: scripts/publish/nuget/publish-packages.sh
+        run: scripts/publish/nuget/publish-packages.sh --api-key "${{ steps.nuget-login.outputs.NUGET_API_KEY }}"
         shell: bash
 
   publish-maven:
