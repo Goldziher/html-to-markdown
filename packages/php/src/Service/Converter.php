@@ -85,7 +85,6 @@ final class Converter
     }
 
     /**
-     * @param ConversionOptions|array|null $options
      * @phpstan-param ConversionOptions|array<string, mixed>|null $options
      * @phpstan-return ConversionOptionsInput|null
      */
@@ -105,7 +104,6 @@ final class Converter
     }
 
     /**
-     * @param InlineImageConfig|array|null $config
      * @phpstan-param InlineImageConfig|array<string, mixed>|null $config
      * @phpstan-return InlineImageConfigInput|null
      */

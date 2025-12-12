@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace HtmlToMarkdown\Tests;
 
 use function HtmlToMarkdown\convert_with_metadata;
+
 use HtmlToMarkdown\HtmlToMarkdown;
 use HtmlToMarkdown\Value\ExtendedMetadata;
 
@@ -103,7 +104,7 @@ final class MetadataExtractionTest extends TestCase
         $result = convert_with_metadata($html);
 
         self::assertIsArray($result['metadata']->headers);
-        self::assertGreaterThanOrEqual(2, count($result['metadata']->headers));
+        self::assertGreaterThanOrEqual(2, \count($result['metadata']->headers));
     }
 
     public function testMetadataExtractionWithLinks(): void
@@ -162,7 +163,7 @@ final class MetadataExtractionTest extends TestCase
         $html = '<html><body><h1 id="header-1">Test Header</h1></body></html>';
         $result = convert_with_metadata($html);
 
-        if (count($result['metadata']->headers) > 0) {
+        if (\count($result['metadata']->headers) > 0) {
             $header = $result['metadata']->headers[0];
             self::assertIsInt($header->level);
             self::assertIsString($header->text);
@@ -176,13 +177,13 @@ final class MetadataExtractionTest extends TestCase
         $html = '<html><body><a href="https://example.com" title="Example">Link</a></body></html>';
         $result = convert_with_metadata($html);
 
-        if (count($result['metadata']->links) > 0) {
+        if (\count($result['metadata']->links) > 0) {
             $link = $result['metadata']->links[0];
             self::assertIsString($link->href);
             self::assertIsString($link->text);
             self::assertIsString($link->linkType);
             self::assertIsArray($link->rel);
-            if (count($link->rel) > 0) {
+            if (\count($link->rel) > 0) {
                 self::assertIsString($link->rel[0]);
             }
             self::assertIsArray($link->attributes);
@@ -194,7 +195,7 @@ final class MetadataExtractionTest extends TestCase
         $html = '<html><body><img src="https://example.com/image.jpg" alt="Test" title="Image"></body></html>';
         $result = convert_with_metadata($html);
 
-        if (count($result['metadata']->images) > 0) {
+        if (\count($result['metadata']->images) > 0) {
             $image = $result['metadata']->images[0];
             self::assertIsString($image->src);
             self::assertIsString($image->imageType);

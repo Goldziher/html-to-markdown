@@ -4,8 +4,8 @@ vars:
   RUST_LOG: info
   RUBY_BIN: /opt/homebrew/opt/ruby/bin
   BUNDLER_VERSION: "4.0.0"
-  GOLANGCI_LINT_VERSION: "v2.6.2"
-  GO_TOOLCHAIN: "go1.25rc1"
+  GOLANGCI_LINT_VERSION: "v2.7.2"
+  GO_TOOLCHAIN: "go1.25.5"
 
 silent: false
 
@@ -28,28 +28,18 @@ tasks:
   update:
     desc: "Update dependencies across Rust, JavaScript, Python, Ruby, PHP, Go, C#, Elixir, and Java"
     cmds:
-      - echo "Updating Rust crates..."
       - task: rust:update
-      - echo "Updating JavaScript packages..."
       - task: js:update
-      - echo "Updating Ruby gems..."
       - task: ruby:update
-      - echo "Updating Python dependencies..."
       - task: python:update
-      - echo "Updating PHP dependencies..."
       - task: php:update
-      - echo "Updating Go dependencies..."
       - task: go:update
-      - echo "Updating C# dependencies..."
       - task: csharp:update
-      - echo "Updating Elixir dependencies..."
       - task: elixir:update
-      - echo "Updating Java dependencies..."
       - task: java:update
-      - echo "Updating prek-managed hooks..."
-      - uv tool update prek
-      - echo "Updating smoke test fixtures..."
       - task: examples:update
+      - uv tool update prek
+      - prek autoupdate
 
   build:
     desc: "Build Rust core and JavaScript bindings"
@@ -419,7 +409,7 @@ tasks:
     cmds:
       - task: python:test:coverage
 
-# Ruby tasks ----------------------------------------------------------------
+  # Ruby tasks ----------------------------------------------------------------
   ruby:ensure-bundler:
     desc: "Ensure required Bundler version is installed"
     cmds:
@@ -663,7 +653,7 @@ tasks:
     cmds:
       - MIX_ENV=dev mix format --check-formatted
 
-# Java tasks -----------------------------------------------------------------
+  # Java tasks -----------------------------------------------------------------
   java:install:
     desc: "Verify Java (JDK 22+) and Maven are installed, then download deps"
     cmds:
@@ -713,7 +703,7 @@ tasks:
     cmds:
       - mvn -f packages/java/pom.xml -B spotless:check
 
-# C# tasks -----------------------------------------------------------------
+  # C# tasks -----------------------------------------------------------------
   csharp:install:
     desc: "Verify .NET SDK is installed and restore dependencies"
     cmds:
@@ -898,7 +888,7 @@ tasks:
       - pnpm run format:check
 
   # Misc tasks ----------------------------------------------------------------
-  sync-versions:
+  versions:sync:
     desc: "Sync version from Cargo.toml to all package manifests"
     cmds:
       - uv run scripts/sync_versions.py

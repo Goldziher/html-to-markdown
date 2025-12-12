@@ -54,10 +54,9 @@ final readonly class ImageMetadata
     }
 
     /**
-     * @param mixed $value
      * @return array{0:int,1:int}|null
      */
-    private static function normalizeDimensions($value): ?array
+    private static function normalizeDimensions(mixed $value): ?array
     {
         if ($value === null) {
             return null;

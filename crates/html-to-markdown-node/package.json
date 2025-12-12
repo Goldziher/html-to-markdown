@@ -59,7 +59,7 @@
 	},
 	"devDependencies": {
 		"@napi-rs/cli": "^3.5.0",
-		"@types/node": "^24.10.2",
+		"@types/node": "^25.0.1",
 		"tsx": "^4.21.0",
 		"vitest": "^4.0.15"
 	},
