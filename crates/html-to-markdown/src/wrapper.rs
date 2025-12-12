@@ -195,6 +195,10 @@ fn wrap_list_item(indent: &str, marker: &str, content: &str, width: usize) -> St
         return format!("{}{}\n", indent, marker.trim_end());
     }
 
+    if is_single_inline_link(content) {
+        return format!("{}{}{}\n", indent, marker, content.trim());
+    }
+
     let full_marker = format!("{}{}", indent, marker);
     let continuation_indent = format!("{}{}", indent, " ".repeat(marker.len()));
 
@@ -263,6 +267,24 @@ fn wrap_list_item(indent: &str, marker: &str, content: &str, width: usize) -> St
     }
 
     result
+}
+
+fn is_single_inline_link(content: &str) -> bool {
+    let trimmed = content.trim();
+    if !(trimmed.starts_with('[') && trimmed.ends_with(')')) {
+        return false;
+    }
+
+    let Some(mid) = trimmed.find("](") else {
+        return false;
+    };
+
+    let url_part = &trimmed[mid + 2..trimmed.len() - 1];
+    if url_part.chars().any(|c| c.is_whitespace()) {
+        return false;
+    }
+
+    !trimmed[mid + 2..].contains("](")
 }
 
 /// Wrap a single line of text at the specified width.
@@ -521,5 +543,20 @@ mod tests {
             "Some lines exceed wrap width:\n{}",
             result
         );
+    }
+
+    #[test]
+    fn wrap_markdown_does_not_wrap_link_only_items() {
+        let markdown = "- [A very long link label that would exceed wrap width](#a-very-long-link-label)\n  - [Nested very long link label that would also exceed](#nested)\n";
+        let options = ConversionOptions {
+            wrap: true,
+            wrap_width: 30,
+            ..Default::default()
+        };
+
+        let result = wrap_markdown(markdown, &options);
+
+        assert!(result.contains("- [A very long link label that would exceed wrap width](#a-very-long-link-label)"));
+        assert!(result.contains("  - [Nested very long link label that would also exceed](#nested)"));
     }
 }
