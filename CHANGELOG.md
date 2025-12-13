@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.14.2] - 2025-12-13
+
+### Changed
+- CI/release automation: extracted Maven installer logic into `scripts/common/install-maven-latest.sh` and applied repo-wide lint/format cleanups.
+
 ## [2.14.1] - 2025-12-12
 
 ### Fixed
