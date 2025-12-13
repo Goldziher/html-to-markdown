@@ -1271,6 +1271,18 @@ jobs:
           path: dist
           merge-multiple: true
 
+      - name: Setup Ruby
+        if: ${{ needs.prepare.outputs.dry_run != 'true' && needs.check-rubygems.outputs.exists != 'true' }}
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "3.3"
+          bundler-cache: false
+
+      - name: Update RubyGems
+        if: ${{ needs.prepare.outputs.dry_run != 'true' && needs.check-rubygems.outputs.exists != 'true' }}
+        run: gem update --system
+        shell: bash
+
       - name: Configure trusted publishing credentials
         if: ${{ needs.prepare.outputs.dry_run != 'true' && needs.check-rubygems.outputs.exists != 'true' }}
         uses: rubygems/configure-rubygems-credentials@v1.0.0
