@@ -35,6 +35,7 @@ runs:
           exit 0
         fi
 
+        rm -f Gemfile.lock
         bundle config set --local path vendor/bundle
         bundle config set --local local.html-to-markdown "${GITHUB_WORKSPACE}/packages/ruby"
         bundle install
