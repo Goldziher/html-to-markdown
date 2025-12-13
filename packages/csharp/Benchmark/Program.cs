@@ -48,10 +48,8 @@ class Program
         {
             string html = File.ReadAllText(filePath);
 
-            // Warmup
             HtmlToMarkdownConverter.Convert(html);
 
-            // Benchmark
             var stopwatch = Stopwatch.StartNew();
             for (int i = 0; i < iterations; i++)
             {

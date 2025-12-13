@@ -4,8 +4,8 @@ set -euo pipefail
 version="${VERSION:?VERSION is required}"
 
 check_pkg() {
-  pkg="$1"
-  node - <<'NODE' "$pkg" "$version"
+	pkg="$1"
+	node - "$pkg" "$version" <<'NODE'
 const https = require("https");
 const pkg = process.argv[1];
 const version = process.argv[2];
@@ -40,6 +40,6 @@ node_exists=$(check_pkg "html-to-markdown-node")
 wasm_exists=$(check_pkg "html-to-markdown-wasm")
 
 {
-  echo "node_exists=${node_exists}"
-  echo "wasm_exists=${wasm_exists}"
-} >> "${GITHUB_OUTPUT}"
+	echo "node_exists=${node_exists}"
+	echo "wasm_exists=${wasm_exists}"
+} >>"${GITHUB_OUTPUT}"

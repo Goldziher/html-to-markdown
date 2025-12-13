@@ -1,11 +1,8 @@
-# Cargo configuration for the html-to-markdown workspace
 
 [build]
-# Keep incremental builds on locally for faster iterations.
 incremental = true
 
 [net]
-# Use the sparse registry protocol for faster and lighter index fetches.
 git-fetch-with-cli = false
 
 [registries.crates-io]

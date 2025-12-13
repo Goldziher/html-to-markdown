@@ -1,6 +1,4 @@
 #!/usr/bin/env bash
-# Script to rebuild and update the GitHub Pages demo
-
 set -e
 
 echo "🔨 Building WASM package..."

@@ -3,7 +3,8 @@ set -euo pipefail
 
 : "${VERSION:?VERSION is required}"
 
-exists=$(python3 - <<'PY'
+exists=$(
+	python3 - <<'PY'
 import json, os, urllib.request
 version = os.environ["VERSION"]
 with urllib.request.urlopen("https://rubygems.org/api/v1/versions/html-to-markdown.json") as resp:
@@ -13,4 +14,4 @@ print("true" if exists else "false")
 PY
 )
 
-echo "exists=${exists}" >> "${GITHUB_OUTPUT}"
+echo "exists=${exists}" >>"${GITHUB_OUTPUT}"

@@ -9,7 +9,6 @@ Console.WriteLine($"Input:  {html1}");
 var markdown1 = HtmlToMarkdownConverter.Convert(html1);
 Console.WriteLine($"Output:\n{markdown1}\n");
 
-// Test 2: Complex HTML
 Console.WriteLine("Test 2: Complex HTML");
 var html2 = @"
 <html>
@@ -28,7 +27,6 @@ var html2 = @"
 var markdown2 = HtmlToMarkdownConverter.Convert(html2);
 Console.WriteLine($"Output:\n{markdown2}\n");
 
-// Test 3: Empty string handling
 Console.WriteLine("Test 3: Empty string");
 var markdown3 = HtmlToMarkdownConverter.Convert("");
 if (markdown3 == "")
@@ -41,7 +39,6 @@ else
     return 1;
 }
 
-// Test 4: Validation checks
 Console.WriteLine("Test 4: Validation checks");
 var html4 = @"
 <h1>Heading 1</h1>

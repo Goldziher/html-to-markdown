@@ -1,5 +1,3 @@
-# Cargo configuration for Windows PHP extension builds
-# This file is copied to .cargo/config.toml during the build process
 
 [target.x86_64-pc-windows-msvc]
 linker = "rust-lld"
@@ -7,7 +5,5 @@ linker = "rust-lld"
 [target.i686-pc-windows-msvc]
 linker = "rust-lld"
 
-# Set LIBCLANG_PATH for bindgen on Windows
-# Points to the rustup nightly toolchain's lib directory containing libclang.dll
 [env]
 LIBCLANG_PATH = "C:\\Users\\runneradmin\\.rustup\\toolchains\\nightly-x86_64-pc-windows-msvc\\lib"

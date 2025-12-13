@@ -349,7 +349,6 @@ RSpec.describe HtmlToMarkdown do
         HTML
         _, metadata = described_class.convert_with_metadata(html)
 
-        # Structured data extraction may vary by implementation
         expect(metadata[:structured_data]).to be_an(Array)
       end
     end
@@ -382,7 +381,6 @@ RSpec.describe HtmlToMarkdown do
         html = '<html><head><title>  Title with   spaces  </title></head><body><p>Content</p></body></html>'
         _, metadata = described_class.convert_with_metadata(html)
 
-        # Whitespace may be normalized
         expect(metadata[:document][:title]).to match(/Title.*spaces/)
       end
 
@@ -398,7 +396,6 @@ RSpec.describe HtmlToMarkdown do
         HTML
         _, metadata = described_class.convert_with_metadata(html)
 
-        # Last value typically wins, but implementation may vary
         expect(metadata[:document][:author]).to be_a(String)
       end
     end

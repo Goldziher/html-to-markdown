@@ -197,26 +197,21 @@ public class MetadataExtractionTests
 
         var result = HtmlToMarkdownConverter.ConvertWithMetadata(html);
 
-        // Check markdown
         Assert.Contains("Main Heading", result.Markdown);
 
-        // Check document metadata
         Assert.Equal("Complete Test", result.Metadata.Document.Title);
         Assert.Equal("A comprehensive test", result.Metadata.Document.Description);
         Assert.Equal("Test Author", result.Metadata.Document.Author);
         Assert.Equal("en", result.Metadata.Document.Language);
         Assert.Equal("https://example.com/test", result.Metadata.Document.CanonicalUrl);
 
-        // Check headers
         Assert.True(result.Metadata.Headers.Count >= 1);
         Assert.Contains(result.Metadata.Headers, h => h.Level == 1 && h.Text == "Main Heading");
 
-        // Check links
         Assert.True(result.Metadata.Links.Count >= 2);
         Assert.Contains(result.Metadata.Links, l => l.LinkType == LinkType.External);
         Assert.Contains(result.Metadata.Links, l => l.LinkType == LinkType.Internal);
 
-        // Check images
         Assert.True(result.Metadata.Images.Count >= 1);
         Assert.Contains(result.Metadata.Images, i => i.Src == "https://example.com/test.jpg");
     }
@@ -246,7 +241,7 @@ public class MetadataExtractionTests
 
         var invalidHeader = new HeaderMetadata
         {
-            Level = 7,  // Invalid
+            Level = 7,
             Text = "Invalid",
             Depth = 0,
             HtmlOffset = 0
@@ -280,8 +275,6 @@ public class MetadataExtractionTests
         var result = HtmlToMarkdownConverter.ConvertWithMetadata(html);
 
         Assert.NotNull(result.Metadata.Document);
-        // Note: Text direction parsing may be handled by Rust side
-        // This test validates the structure is in place
     }
 
     [Fact]

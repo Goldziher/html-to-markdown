@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+
 """
 Sync version from Cargo.toml workspace to all package manifests.
 

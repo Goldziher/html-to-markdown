@@ -3,7 +3,8 @@ set -euo pipefail
 
 version="${VERSION:?VERSION is required}"
 
-exists=$(python - <<'PY' "$version"
+exists=$(
+	python - "$version" <<'PY'
 import json, sys, urllib.request
 version = sys.argv[1]
 try:
@@ -16,4 +17,4 @@ print("true" if exists else "false")
 PY
 )
 
-echo "exists=${exists}" >> "${GITHUB_OUTPUT}"
+echo "exists=${exists}" >>"${GITHUB_OUTPUT}"

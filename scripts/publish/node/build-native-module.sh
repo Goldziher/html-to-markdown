@@ -7,10 +7,10 @@ use_napi_cross="${USE_NAPI_CROSS:-false}"
 
 args=(--platform --release --target "${target}" --output-dir ./artifacts)
 if [[ "${use_napi_cross}" == "true" ]]; then
-  args+=(--use-napi-cross)
+	args+=(--use-napi-cross)
 fi
 if [[ "${use_cross}" == "true" ]]; then
-  args+=(--use-cross)
+	args+=(--use-cross)
 fi
 
 pnpm --filter html-to-markdown-node exec napi build "${args[@]}"
