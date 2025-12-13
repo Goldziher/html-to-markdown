@@ -777,6 +777,12 @@ jobs:
           name: rubygems-${{ steps.ruby_label.outputs.label }}
           path: ruby-gems
 
+      - name: Locate Ruby gem
+        id: ruby_gem
+        if: runner.os != 'Windows'
+        run: scripts/publish/smoke/locate-ruby-gem.sh ruby-gems
+        shell: bash
+
       - name: Download Elixir package
         uses: actions/download-artifact@v6
         with:
@@ -820,6 +826,8 @@ jobs:
       - name: Smoke Ruby install
         if: runner.os != 'Windows'
         uses: ./.github/actions/smoke-ruby
+        with:
+          gem-file: ${{ steps.ruby_gem.outputs.path }}
 
       - name: Build PHP extension
         if: runner.os == 'Linux'
