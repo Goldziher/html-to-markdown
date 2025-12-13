@@ -14,14 +14,23 @@ runs:
       shell: bash
       run: |
         set -euo pipefail
+        gem_file="${{ inputs.gem-file }}"
+        if [[ -n "${gem_file}" && "${gem_file}" != /* ]]; then
+          gem_file="${GITHUB_WORKSPACE}/${gem_file}"
+        fi
+        if [[ -n "${gem_file}" && ! -f "${gem_file}" ]]; then
+          echo "error: gem file not found: ${gem_file}" >&2
+          exit 1
+        fi
+
         tmp=$(mktemp -d)
         cp -R examples/ruby-smoke/. "$tmp"/
         pushd "$tmp" >/dev/null
         bundle config set --local path vendor/bundle
 
-        if [[ -n "${{ inputs.gem-file }}" ]]; then
+        if [[ -n "${gem_file}" ]]; then
           mkdir -p vendor/local-gems
-          gem unpack "${{ inputs.gem-file }}" --target vendor/local-gems >/dev/null
+          gem unpack "${gem_file}" --target vendor/local-gems >/dev/null
           gem_dir=$(find vendor/local-gems -maxdepth 1 -type d -name 'html-to-markdown-*' | head -n 1)
           bundle config set --local local.html-to-markdown "$gem_dir"
         else
