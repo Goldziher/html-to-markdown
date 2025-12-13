@@ -881,26 +881,7 @@ jobs:
 
       - name: Install Maven (latest)
         shell: bash
-        run: |
-          set -euo pipefail
-          MAVEN_VERSION="$(
-            curl -fsSL "https://repo.maven.apache.org/maven2/org/apache/maven/apache-maven/maven-metadata.xml" \
-              | sed -n 's:.*<release>\(.*\)</release>.*:\1:p' \
-              | head -n 1
-          )"
-          : "${MAVEN_VERSION:?Failed to determine Maven version}"
-          # Normalize paths on Windows to avoid tar interpreting "D:" as a host
-          if [[ "${RUNNER_OS:-}" == "Windows" ]]; then
-            TMP_DIR="$(cygpath -u "${RUNNER_TEMP}")"
-          else
-            TMP_DIR="${RUNNER_TEMP}"
-          fi
-          MAVEN_DIR="${TMP_DIR}/apache-maven-${MAVEN_VERSION}"
-          if [[ ! -d "${MAVEN_DIR}" ]]; then
-            curl -sL "https://repo.maven.apache.org/maven2/org/apache/maven/apache-maven/${MAVEN_VERSION}/apache-maven-${MAVEN_VERSION}-bin.tar.gz" -o "${TMP_DIR}/maven.tar.gz"
-            tar -xzf "${TMP_DIR}/maven.tar.gz" -C "${TMP_DIR}"
-          fi
-          echo "${MAVEN_DIR}/bin" >> "${GITHUB_PATH}"
+        run: bash scripts/common/install-maven-latest.sh
 
       - name: Setup Java
         uses: actions/setup-java@v5
@@ -1415,25 +1396,7 @@ jobs:
 
       - name: Install Maven (latest)
         shell: bash
-        run: |
-          set -euo pipefail
-          MAVEN_VERSION="$(
-            curl -fsSL "https://repo.maven.apache.org/maven2/org/apache/maven/apache-maven/maven-metadata.xml" \
-              | sed -n 's:.*<release>\(.*\)</release>.*:\1:p' \
-              | head -n 1
-          )"
-          : "${MAVEN_VERSION:?Failed to determine Maven version}"
-          if [[ "${RUNNER_OS:-}" == "Windows" ]]; then
-            TMP_DIR="$(cygpath -u "${RUNNER_TEMP}")"
-          else
-            TMP_DIR="${RUNNER_TEMP}"
-          fi
-          MAVEN_DIR="${TMP_DIR}/apache-maven-${MAVEN_VERSION}"
-          if [[ ! -d "${MAVEN_DIR}" ]]; then
-            curl -sL "https://repo.maven.apache.org/maven2/org/apache/maven/apache-maven/${MAVEN_VERSION}/apache-maven-${MAVEN_VERSION}-bin.tar.gz" -o "${TMP_DIR}/maven.tar.gz"
-            tar -xzf "${TMP_DIR}/maven.tar.gz" -C "${TMP_DIR}"
-          fi
-          echo "${MAVEN_DIR}/bin" >> "${GITHUB_PATH}"
+        run: bash scripts/common/install-maven-latest.sh
 
       - name: Patch legacy Maven GPG arguments
         run: scripts/publish/maven/patch-legacy-gpg-args.sh
