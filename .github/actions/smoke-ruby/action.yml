@@ -26,17 +26,17 @@ runs:
         tmp=$(mktemp -d)
         cp -R examples/ruby-smoke/. "$tmp"/
         pushd "$tmp" >/dev/null
-        bundle config set --local path vendor/bundle
 
         if [[ -n "${gem_file}" ]]; then
-          mkdir -p vendor/local-gems
-          gem unpack "${gem_file}" --target vendor/local-gems >/dev/null
-          gem_dir=$(find vendor/local-gems -maxdepth 1 -type d -name 'html-to-markdown-*' | head -n 1)
-          bundle config set --local local.html-to-markdown "$gem_dir"
-        else
-          bundle config set --local local.html-to-markdown "${GITHUB_WORKSPACE}/packages/ruby"
+          gem install "${gem_file}" --no-document
+          ruby app.rb
+          popd >/dev/null
+          echo "✓ Ruby gem smoke test passed"
+          exit 0
         fi
 
+        bundle config set --local path vendor/bundle
+        bundle config set --local local.html-to-markdown "${GITHUB_WORKSPACE}/packages/ruby"
         bundle install
         bundle exec ruby app.rb
         popd >/dev/null
