@@ -50,6 +50,14 @@ repos:
       - id: fmt
       - id: cargo-check
       - id: clippy
+  - repo: https://github.com/koalaman/shellcheck-precommit
+    rev: v0.11.0
+    hooks:
+      - id: shellcheck
+  - repo: https://github.com/scop/pre-commit-shfmt
+    rev: v3.12.0-2
+    hooks:
+      - id: shfmt
   - repo: https://github.com/gherynos/pre-commit-java
     rev: v0.6.30
     hooks:

@@ -33,15 +33,12 @@ public static class HtmlToMarkdownConverter
 
         try
         {
-            // Convert managed string to unmanaged C string
             htmlPtr = Marshal.StringToHGlobalAnsi(html);
 
-            // Call native conversion function
             resultPtr = NativeMethods.html_to_markdown_convert(htmlPtr);
 
             if (resultPtr == IntPtr.Zero)
             {
-                // Conversion failed - try to get error message
                 IntPtr errorPtr = NativeMethods.html_to_markdown_last_error();
                 string? errorMsg = errorPtr != IntPtr.Zero
                     ? Marshal.PtrToStringAnsi(errorPtr)
@@ -51,13 +48,11 @@ public static class HtmlToMarkdownConverter
                     errorMsg ?? "HTML to Markdown conversion failed");
             }
 
-            // Convert result back to managed string
             string? markdown = Marshal.PtrToStringAnsi(resultPtr);
             return markdown ?? string.Empty;
         }
         finally
         {
-            // Free unmanaged memory
             if (htmlPtr != IntPtr.Zero)
             {
                 Marshal.FreeHGlobal(htmlPtr);
@@ -116,15 +111,12 @@ public static class HtmlToMarkdownConverter
 
         try
         {
-            // Convert managed string to unmanaged C string
             htmlPtr = Marshal.StringToHGlobalAnsi(html);
 
-            // Call native conversion function with metadata extraction
             resultPtr = NativeMethods.html_to_markdown_convert_with_metadata(htmlPtr, out metadataPtr);
 
             if (resultPtr == IntPtr.Zero)
             {
-                // Conversion failed - try to get error message
                 IntPtr errorPtr = NativeMethods.html_to_markdown_last_error();
                 string? errorMsg = errorPtr != IntPtr.Zero
                     ? Marshal.PtrToStringAnsi(errorPtr)
@@ -134,10 +126,8 @@ public static class HtmlToMarkdownConverter
                     errorMsg ?? "HTML to Markdown conversion with metadata failed");
             }
 
-            // Convert result back to managed string
             string? markdown = Marshal.PtrToStringAnsi(resultPtr) ?? string.Empty;
 
-            // Deserialize metadata JSON
             ExtendedMetadata metadata = new();
             if (metadataPtr != IntPtr.Zero)
             {
@@ -173,7 +163,6 @@ public static class HtmlToMarkdownConverter
         }
         finally
         {
-            // Free unmanaged memory
             if (htmlPtr != IntPtr.Zero)
             {
                 Marshal.FreeHGlobal(htmlPtr);

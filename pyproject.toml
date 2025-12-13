@@ -39,31 +39,31 @@ format.docstring-code-line-length = 120
 format.docstring-code-format = true
 lint.select = [ "ALL" ]
 lint.ignore = [
-  "ANN401",   # dynamically typed ANY
-  "ASYNC109", # Async function definition with a timeout parameter
-  "ASYNC110", # Use Event instead of sleep in async loop
-  "BLE001",   # Do not catch blind exception - we allow this pattern
-  "COM812",   # Conflicts with formatter
-  "D100",     # pydocstyle - missing docstring in public module
-  "D101",     # pydocstyle - missing docstring in public class
-  "D102",     # pydocstyle - missing docstring in public method
-  "D103",     # pydocstyle - missing docstring in public function
-  "D104",     # pydocstyle - missing docstring in public package
-  "D107",     # pydocstyle - missing docstring in __init__
-  "D205",     # pydocstyle - 1 blank line between summary line and description
-  "D301",     # pydocstyle - use r""" if any backslashes in docstring
-  "E501",     # pycodestyle line too long, handled by ruff format
-  "EM",       # Exception messages
-  "FBT",      # Boolean Args
+  "ANN401",
+  "ASYNC109",
+  "ASYNC110",
+  "BLE001",
+  "COM812",
+  "D100",
+  "D101",
+  "D102",
+  "D103",
+  "D104",
+  "D107",
+  "D205",
+  "D301",
+  "E501",
+  "EM",
+  "FBT",
   "FIX",      # Allow todo and fixme comments
-  "ISC001",   # Conflicts with formatter
-  "PD011",    # Creates false positives
-  "PGH003",   # Required specific mypy ignores
-  "PLR0913",  # Too many arguments - API compatibility functions require this
-  "PLR2004",  # Magic variables
-  "S104",     # Disallows using '0.0.0.0' as a host
+  "ISC001",
+  "PD011",
+  "PGH003",
+  "PLR0913",
+  "PLR2004",
+  "S104",
   "TD",       # Allow todo and fixme comments
-  "TRY",      # Try except block rules too strict
+  "TRY",
 ]
 lint.per-file-ignores."packages/python/tests/**/*.*" = [ "ARG", "D", "PD", "PT006", "PT013", "S" ]
 lint.per-file-ignores."packages/python/tests/benchmark_*_test.py" = [ "T201" ]

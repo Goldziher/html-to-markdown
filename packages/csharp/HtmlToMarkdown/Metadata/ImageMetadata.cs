@@ -19,19 +19,19 @@ public class DimensionsJsonConverter : JsonConverter<(uint Width, uint Height)?>
 
         if (reader.TokenType == JsonTokenType.StartArray)
         {
-            reader.Read(); // Read first element
+            reader.Read();
             if (!reader.TryGetUInt32(out uint width))
             {
                 throw new JsonException("Expected width as uint in dimensions array");
             }
 
-            reader.Read(); // Read second element
+            reader.Read();
             if (!reader.TryGetUInt32(out uint height))
             {
                 throw new JsonException("Expected height as uint in dimensions array");
             }
 
-            reader.Read(); // Read end of array
+            reader.Read();
             return (width, height);
         }
 

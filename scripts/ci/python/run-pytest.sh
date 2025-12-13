@@ -3,4 +3,5 @@ set -euo pipefail
 
 PYTEST_ADDOPTS="${PYTEST_ADDOPTS:--vv --maxfail=1 --durations=25}"
 
-uv run pytest ${PYTEST_ADDOPTS}
+IFS=" " read -r -a pytest_addopts <<<"$PYTEST_ADDOPTS"
+uv run pytest "${pytest_addopts[@]}"

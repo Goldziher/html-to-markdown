@@ -4,7 +4,8 @@ set -euo pipefail
 version="${VERSION:?VERSION is required}"
 pkg="goldziher.htmltomarkdown"
 
-exists=$(python3 - <<'PY' "$pkg" "$version"
+exists=$(
+	python3 - "$pkg" "$version" <<'PY'
 import json, sys, urllib.request
 pkg = sys.argv[1]
 version = sys.argv[2]
@@ -18,4 +19,4 @@ print("true" if exists else "false")
 PY
 )
 
-echo "exists=${exists}" >> "${GITHUB_OUTPUT}"
+echo "exists=${exists}" >>"${GITHUB_OUTPUT}"
