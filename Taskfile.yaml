@@ -608,6 +608,7 @@ tasks:
     desc: "Install Elixir dependencies and compile the NIF"
     dir: packages/elixir
     cmds:
+      - cmd: ../../scripts/publish/elixir/stage-rust-core.sh
       - MIX_ENV=dev mix deps.get
       - MIX_ENV=dev mix compile
 
@@ -621,6 +622,7 @@ tasks:
     desc: "Run Elixir tests"
     dir: packages/elixir
     cmds:
+      - cmd: ../../scripts/publish/elixir/stage-rust-core.sh
       - MIX_ENV=test mix test
 
   elixir:lint:
