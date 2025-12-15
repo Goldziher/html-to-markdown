@@ -1120,7 +1120,7 @@ jobs:
         uses: actions/upload-artifact@v5
         with:
           name: csharp-ffi-${{ matrix.rid }}
-          path: dist/csharp-ffi/${{ matrix.rid }}
+          path: dist/csharp-ffi
           retention-days: 14
 
   cargo-packages:

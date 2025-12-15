@@ -12,6 +12,7 @@ members = [
     "tools/runtime-bench",
     "e2e/wasm-wasmtime",
 ]
+exclude = ["packages/elixir/native/html_to_markdown_elixir"]
 
 [workspace.package]
 version = "2.14.4"
