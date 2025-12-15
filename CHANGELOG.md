@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.14.8] - 2025-12-15
+
+### Fixed
+- Rust crate (`html-to-markdown-rs`): enable the `metadata` feature by default so `convert_with_metadata` is available without extra Cargo features.
+
 ## [2.14.7] - 2025-12-15
 
 ### Fixed
