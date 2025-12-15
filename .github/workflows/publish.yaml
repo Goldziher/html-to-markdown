@@ -1322,7 +1322,7 @@ jobs:
         with:
           pattern: rubygems-*
           path: dist
-          merge-multiple: true
+          merge-multiple: false
 
       - name: Setup Ruby
         if: ${{ needs.prepare.outputs.dry_run != 'true' && needs.check-rubygems.outputs.exists != 'true' }}
