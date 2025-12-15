@@ -1,6 +1,6 @@
 {
   "name": "@html-to-markdown/wasm-cloudflare-example",
-  "version": "2.14.3",
+  "version": "2.14.4",
   "private": true,
   "scripts": {
     "dev": "wrangler dev",
