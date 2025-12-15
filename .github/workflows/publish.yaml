@@ -62,7 +62,7 @@ jobs:
           EVENT_DISPATCH_REF: ${{ github.event.client_payload.ref }}
         run: scripts/publish/validate-and-compute-metadata.sh
       - name: Upload release metadata
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v6
         with:
           name: release-metadata
           path: release-metadata.json
@@ -259,7 +259,7 @@ jobs:
           python-version: "3.13"
 
       - name: Upload wheels
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v6
         with:
           name: python-wheels-${{ matrix.os }}
           path: wheelhouse/*.whl
@@ -308,7 +308,7 @@ jobs:
         shell: bash
 
       - name: Upload sdist
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v6
         with:
           name: python-sdist
           path: packages/python/dist/*.tar.gz
@@ -365,7 +365,7 @@ jobs:
         shell: bash
 
       - name: Upload PIE source archive
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v6
         with:
           name: php-pie-src
           path: build/artifacts/php_html_to_markdown-${{ needs.prepare.outputs.version }}-src.tgz
@@ -411,7 +411,7 @@ jobs:
         shell: bash
 
       - name: Upload TypeScript definitions
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v6
         with:
           name: node-typescript-defs
           path: typescript-defs/
@@ -555,7 +555,7 @@ jobs:
         run: scripts/publish/node/package-artifacts.ps1
 
       - name: Upload Node artifact
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v6
         with:
           name: node-bindings-${{ matrix.target }}
           path: node-bindings-${{ matrix.target }}.tar.gz
@@ -613,7 +613,7 @@ jobs:
         shell: bash
 
       - name: Upload WASM artifacts
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v6
         with:
           name: wasm-bundles
           path: wasm-artifacts/*
@@ -707,7 +707,7 @@ jobs:
 
       - name: Upload CLI artifact
         if: runner.os != 'Windows'
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v6
         with:
           name: cli-${{ matrix.target }}
           path: cli-${{ matrix.target }}.tar.gz
@@ -715,7 +715,7 @@ jobs:
 
       - name: Upload CLI artifact (Windows)
         if: runner.os == 'Windows'
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v6
         with:
           name: cli-${{ matrix.target }}
           path: cli-${{ matrix.target }}.zip
@@ -974,7 +974,7 @@ jobs:
         run: scripts/publish/ruby/verify-gem-artifacts.sh
 
       - name: Upload gem artifacts
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v6
         with:
           name: rubygems-${{ matrix.label }}
           path: packages/ruby/pkg/*.gem
@@ -1026,7 +1026,7 @@ jobs:
         shell: bash
 
       - name: Upload Hex artifact
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v6
         with:
           name: elixir-hex-package
           path: packages/elixir/html_to_markdown-*.tar
@@ -1064,7 +1064,7 @@ jobs:
         shell: bash
 
       - name: Upload NuGet artifact
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v6
         with:
           name: csharp-nuget
           path: artifacts/csharp/*.nupkg
@@ -1098,7 +1098,7 @@ jobs:
         shell: bash
 
       - name: Upload crate packages
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v6
         with:
           name: cargo-crates
           path: crate-artifacts/*.crate
