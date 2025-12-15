@@ -759,7 +759,7 @@ jobs:
         shell: bash
 
       - name: Download Python wheels
-        uses: actions/download-artifact@v6
+        uses: actions/download-artifact@v7
         with:
           name: python-wheels-${{ matrix.os }}
           path: python-wheels
@@ -772,13 +772,13 @@ jobs:
         shell: bash
 
       - name: Download Ruby gems
-        uses: actions/download-artifact@v6
+        uses: actions/download-artifact@v7
         with:
           name: rubygems-${{ steps.ruby_label.outputs.label }}
           path: ruby-gems
 
       - name: Download Elixir package
-        uses: actions/download-artifact@v6
+        uses: actions/download-artifact@v7
         with:
           name: elixir-hex-package
           path: elixir-package
@@ -844,7 +844,7 @@ jobs:
         uses: ./.github/actions/smoke-csharp
 
       - name: Download CLI artifacts
-        uses: actions/download-artifact@v6
+        uses: actions/download-artifact@v7
         with:
           pattern: cli-*
           path: cli-artifacts
@@ -852,7 +852,7 @@ jobs:
 
       - name: Download PHP PIE artifacts
         if: runner.os == 'Linux'
-        uses: actions/download-artifact@v6
+        uses: actions/download-artifact@v7
         with:
           name: php-pie-src
           path: php-pie-artifacts
@@ -1132,20 +1132,20 @@ jobs:
           ref: ${{ needs.prepare.outputs.ref }}
 
       - name: Download PHP PIE artifact
-        uses: actions/download-artifact@v6
+        uses: actions/download-artifact@v7
         with:
           name: php-pie-src
           path: dist/php-pie
 
       - name: Download CLI artifacts
-        uses: actions/download-artifact@v6
+        uses: actions/download-artifact@v7
         with:
           pattern: cli-*
           path: dist/cli
           merge-multiple: false
 
       - name: Download Elixir package
-        uses: actions/download-artifact@v6
+        uses: actions/download-artifact@v7
         with:
           name: elixir-hex-package
           path: dist/elixir
@@ -1227,14 +1227,14 @@ jobs:
           ref: ${{ needs.prepare.outputs.ref }}
 
       - name: Download wheel artifacts
-        uses: actions/download-artifact@v6
+        uses: actions/download-artifact@v7
         with:
           pattern: python-wheels-*
           path: dist
           merge-multiple: true
 
       - name: Download sdist artifact
-        uses: actions/download-artifact@v6
+        uses: actions/download-artifact@v7
         with:
           name: python-sdist
           path: dist
@@ -1265,7 +1265,7 @@ jobs:
           ref: ${{ needs.prepare.outputs.ref }}
 
       - name: Download Ruby gem artifacts
-        uses: actions/download-artifact@v6
+        uses: actions/download-artifact@v7
         with:
           pattern: rubygems-*
           path: dist
@@ -1375,7 +1375,7 @@ jobs:
           user: "nhirschfeld"
 
       - name: Download NuGet artifact
-        uses: actions/download-artifact@v6
+        uses: actions/download-artifact@v7
         with:
           name: csharp-nuget
           path: dist/nuget
@@ -1455,14 +1455,14 @@ jobs:
           ref: ${{ needs.prepare.outputs.ref }}
 
       - name: Download Node artifacts
-        uses: actions/download-artifact@v6
+        uses: actions/download-artifact@v7
         with:
           pattern: node-bindings-*
           path: node-artifacts
           merge-multiple: true
 
       - name: Download TypeScript definitions
-        uses: actions/download-artifact@v6
+        uses: actions/download-artifact@v7
         with:
           name: node-typescript-defs
           path: typescript-defs
@@ -1520,7 +1520,7 @@ jobs:
           ref: ${{ needs.prepare.outputs.ref }}
 
       - name: Download WASM artifacts
-        uses: actions/download-artifact@v6
+        uses: actions/download-artifact@v7
         with:
           name: wasm-bundles
           path: wasm-artifacts
