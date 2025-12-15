@@ -514,7 +514,7 @@ tasks:
         echo "Installing golangci-lint {{.GOLANGCI_LINT_VERSION}} with toolchain ${TOOLCHAIN}..."
         GOTOOLCHAIN="${TOOLCHAIN}" go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@{{.GOLANGCI_LINT_VERSION}}
       - cmd: |
-          cd packages/go
+          cd packages/go/v2
           TOOLCHAIN=${GOTOOLCHAIN_OVERRIDE:-{{.GO_TOOLCHAIN}}}
           GOTOOLCHAIN=${TOOLCHAIN} go mod download
           GOTOOLCHAIN=${TOOLCHAIN} go get ./...
@@ -535,7 +535,7 @@ tasks:
         GOTOOLCHAIN="${TOOLCHAIN}" go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@{{.GOLANGCI_LINT_VERSION}}
       - echo "Updating Go module dependencies..."
       - cmd: |
-          cd packages/go
+          cd packages/go/v2
           TOOLCHAIN=${GOTOOLCHAIN_OVERRIDE:-{{.GO_TOOLCHAIN}}}
           GOTOOLCHAIN=${TOOLCHAIN} go get -u ./...
           GOTOOLCHAIN=${TOOLCHAIN} go mod tidy
@@ -552,7 +552,7 @@ tasks:
     cmds:
       - cargo build --release -p html-to-markdown-ffi
       - cmd: |
-          cd packages/go/htmltomarkdown
+          cd packages/go/v2/htmltomarkdown
           ROOT="{{.TASKFILE_DIR}}"
           TOOLCHAIN=${GOTOOLCHAIN_OVERRIDE:-{{.GO_TOOLCHAIN}}}
           LIBRARY_PATH=${ROOT}/target/release:${LIBRARY_PATH:-} \
@@ -570,10 +570,10 @@ tasks:
     desc: "Lint Go code WITH auto-fix (golangci-lint)"
     cmds:
       - cmd: |
-          cd packages/go
+          cd packages/go/v2
           TOOLCHAIN=${GOTOOLCHAIN_OVERRIDE:-{{.GO_TOOLCHAIN}}}
           GOTOOLCHAIN=${TOOLCHAIN} go fmt ./...
-          golangci-lint run --config ../../.golangci.yml --fix ./...
+          golangci-lint run --config ../../../.golangci.yml --fix ./...
       - cmd: |
           cd examples/go-smoke
           TOOLCHAIN=${GOTOOLCHAIN_OVERRIDE:-{{.GO_TOOLCHAIN}}}
@@ -584,10 +584,10 @@ tasks:
     desc: "Lint Go code WITHOUT auto-fix (check-only)"
     cmds:
       - cmd: |
-          cd packages/go
+          cd packages/go/v2
           TOOLCHAIN=${GOTOOLCHAIN_OVERRIDE:-{{.GO_TOOLCHAIN}}}
           GOTOOLCHAIN=${TOOLCHAIN} gofmt -l .
-          golangci-lint run --config ../../.golangci.yml ./...
+          golangci-lint run --config ../../../.golangci.yml ./...
       - cmd: |
           cd examples/go-smoke
           TOOLCHAIN=${GOTOOLCHAIN_OVERRIDE:-{{.GO_TOOLCHAIN}}}
@@ -597,12 +597,12 @@ tasks:
   go:format:
     desc: "Format Go code (with modifications)"
     cmds:
-      - gofmt -w packages/go examples/go-smoke
+      - gofmt -w packages/go/v2 examples/go-smoke
 
   go:format:check:
     desc: "Check Go formatting without modifications"
     cmds:
-      - gofmt -l packages/go examples/go-smoke
+      - gofmt -l packages/go/v2 examples/go-smoke
 
   elixir:install:
     desc: "Install Elixir dependencies and compile the NIF"

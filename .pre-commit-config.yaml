@@ -69,8 +69,8 @@ repos:
   - repo: local
     hooks:
       - id: golangci-lint-packages
-        name: golangci-lint (packages/go)
-        entry: bash -c 'cd packages/go && golangci-lint run --config ../../.golangci.yml ./...'
+        name: golangci-lint (packages/go/v2)
+        entry: bash -c 'cd packages/go/v2 && golangci-lint run --config ../../../.golangci.yml ./...'
         language: system
         files: ^packages/go/
         pass_filenames: false
