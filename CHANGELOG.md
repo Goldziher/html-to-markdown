@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - Release pipeline: build the C# `osx-x64` native FFI library on `macos-15-intel` (macOS-13 runners are retired), unblocking NuGet publication.
+- Elixir (Hex): package now vendors the Rust core crate so `mix deps.get && mix test` works outside this monorepo.
 
 ## [2.14.3] - 2025-12-15
 
