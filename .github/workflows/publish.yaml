@@ -981,9 +981,19 @@ jobs:
           retention-days: 14
 
   elixir-package:
-    name: Build Elixir Hex package
+    name: Build Elixir Hex package (${{ matrix.label }})
     needs: prepare
-    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            label: linux
+            build_hex: true
+          - os: macos-latest
+            label: macos
+            build_hex: false
+    runs-on: ${{ matrix.os }}
     env:
       MIX_ENV: dev
     steps:
@@ -1022,10 +1032,12 @@ jobs:
         shell: bash
 
       - name: Build Hex package
+        if: ${{ matrix.build_hex }}
         run: scripts/publish/elixir/build-hex-package.sh
         shell: bash
 
       - name: Upload Hex artifact
+        if: ${{ matrix.build_hex }}
         uses: actions/upload-artifact@v6
         with:
           name: elixir-hex-package

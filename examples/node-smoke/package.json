@@ -1,6 +1,6 @@
 {
   "name": "html-to-markdown-node-smoke",
-  "version": "2.14.6",
+  "version": "2.14.7",
   "private": true,
   "type": "module",
   "description": "Smoke test for installing html-to-markdown-node from npm or a local path",
