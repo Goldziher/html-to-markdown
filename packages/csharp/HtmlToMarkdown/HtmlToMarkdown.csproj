@@ -8,7 +8,7 @@
 
     <!-- Package metadata -->
     <PackageId>Goldziher.HtmlToMarkdown</PackageId>
-    <Version>2.14.5</Version>
+    <Version>2.14.6</Version>
     <Authors>Na'aman Hirschfeld</Authors>
     <Company>Goldziher</Company>
     <Description>High-performance HTML to Markdown converter with C# bindings to Rust core</Description>
