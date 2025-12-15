@@ -6,7 +6,7 @@ import (
 	"log"
 	"os"
 
-	"github.com/Goldziher/html-to-markdown/packages/go/htmltomarkdown"
+	"github.com/Goldziher/html-to-markdown/packages/go/v2/htmltomarkdown"
 )
 
 func main() {

@@ -3,6 +3,10 @@
 use std::cell::RefCell;
 use std::collections::HashMap;
 
+use html_to_markdown_rs::convert_with_metadata as convert_with_metadata_inner;
+use html_to_markdown_rs::metadata::{
+    DocumentMetadata, ExtendedMetadata, HeaderMetadata, ImageMetadata, LinkMetadata, MetadataConfig, StructuredData,
+};
 use html_to_markdown_rs::{
     CodeBlockStyle, ConversionOptions, HeadingStyle, HighlightStyle, HtmlExtraction, InlineImage, InlineImageConfig,
     InlineImageFormat, InlineImageSource, ListIndentType, NewlineStyle, PreprocessingOptions, PreprocessingPreset,
@@ -32,6 +36,66 @@ struct InlineImageTerm<'a> {
     attributes: HashMap<String, String>,
 }
 
+#[derive(NifMap)]
+struct DocumentMetadataTerm {
+    title: Option<String>,
+    description: Option<String>,
+    keywords: Vec<String>,
+    author: Option<String>,
+    canonical_url: Option<String>,
+    base_href: Option<String>,
+    language: Option<String>,
+    text_direction: Option<String>,
+    open_graph: HashMap<String, String>,
+    twitter_card: HashMap<String, String>,
+    meta_tags: HashMap<String, String>,
+}
+
+#[derive(NifMap)]
+struct HeaderMetadataTerm {
+    level: u8,
+    text: String,
+    id: Option<String>,
+    depth: u64,
+    html_offset: u64,
+}
+
+#[derive(NifMap)]
+struct LinkMetadataTerm {
+    href: String,
+    text: String,
+    title: Option<String>,
+    link_type: String,
+    rel: Vec<String>,
+    attributes: HashMap<String, String>,
+}
+
+#[derive(NifMap)]
+struct ImageMetadataTerm {
+    src: String,
+    alt: Option<String>,
+    title: Option<String>,
+    dimensions: Option<(u32, u32)>,
+    image_type: String,
+    attributes: HashMap<String, String>,
+}
+
+#[derive(NifMap)]
+struct StructuredDataTerm {
+    data_type: String,
+    raw_json: String,
+    schema_type: Option<String>,
+}
+
+#[derive(NifMap)]
+struct ExtendedMetadataTerm {
+    document: DocumentMetadataTerm,
+    headers: Vec<HeaderMetadataTerm>,
+    links: Vec<LinkMetadataTerm>,
+    images: Vec<ImageMetadataTerm>,
+    structured_data: Vec<StructuredDataTerm>,
+}
+
 rustler::init!(
     "Elixir.HtmlToMarkdown.Native",
     [
@@ -39,7 +103,8 @@ rustler::init!(
         convert_with_options_map,
         convert_with_handle,
         create_options_handle,
-        convert_with_inline_images
+        convert_with_inline_images,
+        convert_with_metadata
     ],
     load = on_load
 );
@@ -160,6 +225,28 @@ fn convert_with_inline_images<'a>(
     }
 }
 
+#[rustler::nif(schedule = "DirtyCpu")]
+fn convert_with_metadata<'a>(
+    env: Env<'a>,
+    html: String,
+    options_term: Term<'a>,
+    config_term: Term<'a>,
+) -> NifResult<Term<'a>> {
+    let options = match decode_options_term(options_term) {
+        Ok(options) => options,
+        Err(err) => return handle_invalid_option_error(env, err),
+    };
+    let config = match decode_metadata_config(config_term) {
+        Ok(config) => config,
+        Err(err) => return handle_invalid_option_error(env, err),
+    };
+
+    match convert_with_metadata_inner(&html, Some(options), config) {
+        Ok((markdown, metadata)) => Ok((atoms::ok(), (markdown, build_metadata(metadata))).encode(env)),
+        Err(err) => Ok((atoms::error(), err.to_string()).encode(env)),
+    }
+}
+
 fn decode_options_term(term: Term) -> NifResult<ConversionOptions> {
     if matches!(term.atom_to_string(), Ok(name) if name == "nil") {
         return Ok(ConversionOptions::default());
@@ -169,6 +256,104 @@ fn decode_options_term(term: Term) -> NifResult<ConversionOptions> {
         .decode()
         .map_err(|_| bad_option_msg("options", "must be provided as a map"))?;
     apply_options(map)
+}
+
+fn decode_metadata_config(term: Term) -> NifResult<MetadataConfig> {
+    if matches!(term.atom_to_string(), Ok(name) if name == "nil") {
+        return Ok(MetadataConfig::default());
+    }
+
+    let map: HashMap<String, Term> = term
+        .decode()
+        .map_err(|_| bad_option_msg("metadata_config", "must be provided as a map"))?;
+
+    let mut cfg = MetadataConfig::default();
+
+    for (key, value) in map.into_iter() {
+        match key.as_str() {
+            "extract_document" => cfg.extract_document = decode_bool(value, "extract_document")?,
+            "extract_headers" => cfg.extract_headers = decode_bool(value, "extract_headers")?,
+            "extract_links" => cfg.extract_links = decode_bool(value, "extract_links")?,
+            "extract_images" => cfg.extract_images = decode_bool(value, "extract_images")?,
+            "extract_structured_data" => cfg.extract_structured_data = decode_bool(value, "extract_structured_data")?,
+            "max_structured_data_size" => {
+                cfg.max_structured_data_size = decode_positive_integer(value, "max_structured_data_size")?
+            }
+            _ => {}
+        }
+    }
+
+    Ok(cfg)
+}
+
+fn build_metadata(metadata: ExtendedMetadata) -> ExtendedMetadataTerm {
+    ExtendedMetadataTerm {
+        document: build_document_metadata(metadata.document),
+        headers: metadata.headers.into_iter().map(build_header_metadata).collect(),
+        links: metadata.links.into_iter().map(build_link_metadata).collect(),
+        images: metadata.images.into_iter().map(build_image_metadata).collect(),
+        structured_data: metadata
+            .structured_data
+            .into_iter()
+            .map(build_structured_data)
+            .collect(),
+    }
+}
+
+fn build_document_metadata(metadata: DocumentMetadata) -> DocumentMetadataTerm {
+    DocumentMetadataTerm {
+        title: metadata.title,
+        description: metadata.description,
+        keywords: metadata.keywords,
+        author: metadata.author,
+        canonical_url: metadata.canonical_url,
+        base_href: metadata.base_href,
+        language: metadata.language,
+        text_direction: metadata.text_direction.map(|td| td.to_string()),
+        open_graph: metadata.open_graph.into_iter().collect(),
+        twitter_card: metadata.twitter_card.into_iter().collect(),
+        meta_tags: metadata.meta_tags.into_iter().collect(),
+    }
+}
+
+fn build_header_metadata(metadata: HeaderMetadata) -> HeaderMetadataTerm {
+    HeaderMetadataTerm {
+        level: metadata.level,
+        text: metadata.text,
+        id: metadata.id,
+        depth: metadata.depth as u64,
+        html_offset: metadata.html_offset as u64,
+    }
+}
+
+fn build_link_metadata(metadata: LinkMetadata) -> LinkMetadataTerm {
+    LinkMetadataTerm {
+        href: metadata.href,
+        text: metadata.text,
+        title: metadata.title,
+        link_type: metadata.link_type.to_string(),
+        rel: metadata.rel,
+        attributes: metadata.attributes.into_iter().collect(),
+    }
+}
+
+fn build_image_metadata(metadata: ImageMetadata) -> ImageMetadataTerm {
+    ImageMetadataTerm {
+        src: metadata.src,
+        alt: metadata.alt,
+        title: metadata.title,
+        dimensions: metadata.dimensions,
+        image_type: metadata.image_type.to_string(),
+        attributes: metadata.attributes.into_iter().collect(),
+    }
+}
+
+fn build_structured_data(metadata: StructuredData) -> StructuredDataTerm {
+    StructuredDataTerm {
+        data_type: metadata.data_type.to_string(),
+        raw_json: metadata.raw_json,
+        schema_type: metadata.schema_type,
+    }
 }
 
 fn apply_options(map: HashMap<String, Term>) -> NifResult<ConversionOptions> {

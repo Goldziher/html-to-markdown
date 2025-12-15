@@ -12,4 +12,5 @@ defmodule HtmlToMarkdown.Native do
   def convert_with_handle(_html, _handle), do: :erlang.nif_error(:nif_not_loaded)
   def create_options_handle(_options), do: :erlang.nif_error(:nif_not_loaded)
   def convert_with_inline_images(_html, _options, _config), do: :erlang.nif_error(:nif_not_loaded)
+  def convert_with_metadata(_html, _options, _config), do: :erlang.nif_error(:nif_not_loaded)
 end

@@ -147,10 +147,13 @@ use std::rc::Rc;
 #[cfg_attr(feature = "metadata", derive(serde::Serialize, serde::Deserialize))]
 pub enum TextDirection {
     /// Left-to-right text flow (default for Latin scripts)
+    #[cfg_attr(feature = "metadata", serde(rename = "ltr"))]
     LeftToRight,
     /// Right-to-left text flow (Hebrew, Arabic, Urdu, etc.)
+    #[cfg_attr(feature = "metadata", serde(rename = "rtl"))]
     RightToLeft,
     /// Automatic directionality detection
+    #[cfg_attr(feature = "metadata", serde(rename = "auto"))]
     Auto,
 }
 
@@ -199,6 +202,7 @@ impl TextDirection {
 /// Used to categorize links during extraction for filtering and analysis.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "metadata", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "metadata", serde(rename_all = "snake_case"))]
 pub enum LinkType {
     /// Anchor link within same document (href starts with #)
     Anchor,
@@ -232,6 +236,7 @@ impl std::fmt::Display for LinkType {
 /// Determines whether an image is embedded (data URI), inline SVG, external, or relative.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "metadata", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "metadata", serde(rename_all = "snake_case"))]
 pub enum ImageType {
     /// Data URI embedded image (base64 or other encoding)
     DataUri,
@@ -259,12 +264,15 @@ impl std::fmt::Display for ImageType {
 /// Identifies the schema/format used for structured data markup.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "metadata", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "metadata", serde(rename_all = "snake_case"))]
 pub enum StructuredDataType {
     /// JSON-LD (JSON for Linking Data) script blocks
+    #[cfg_attr(feature = "metadata", serde(rename = "json_ld"))]
     JsonLd,
     /// HTML5 Microdata attributes (itemscope, itemtype, itemprop)
     Microdata,
     /// RDF in Attributes (RDFa) markup
+    #[cfg_attr(feature = "metadata", serde(rename = "rdfa"))]
     RDFa,
 }
 

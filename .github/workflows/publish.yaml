@@ -1034,7 +1034,7 @@ jobs:
 
   csharp-package:
     name: Build C# NuGet package
-    needs: prepare
+    needs: [prepare, csharp-ffi]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -1055,6 +1055,13 @@ jobs:
         with:
           dotnet-version: "8.0.x"
 
+      - name: Download C# native FFI libraries
+        uses: actions/download-artifact@v5
+        with:
+          pattern: csharp-ffi-*
+          path: dist/csharp-ffi
+          merge-multiple: true
+
       - name: Install dependencies
         run: scripts/publish/csharp/restore.sh packages/csharp/HtmlToMarkdown/HtmlToMarkdown.csproj
         shell: bash
@@ -1068,6 +1075,52 @@ jobs:
         with:
           name: csharp-nuget
           path: artifacts/csharp/*.nupkg
+          retention-days: 14
+
+  csharp-ffi:
+    name: Build C# native FFI libraries
+    needs: prepare
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            rid: linux-x64
+          - os: windows-latest
+            rid: win-x64
+          - os: macos-13
+            rid: osx-x64
+          - os: macos-14
+            rid: osx-arm64
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.prepare.outputs.checkout_ref }}
+          fetch-depth: 0
+
+      - name: Ensure target commit
+        if: ${{ needs.prepare.outputs.target_sha != '' }}
+        env:
+          TARGET_SHA: ${{ needs.prepare.outputs.target_sha }}
+        run: scripts/publish/common/ensure-target-commit.sh
+        shell: bash
+
+      - name: Setup Rust
+        uses: ./.github/actions/setup-rust
+
+      - name: Build FFI library
+        env:
+          RID: ${{ matrix.rid }}
+        run: scripts/publish/csharp/build-ffi.sh "${RID}" dist/csharp-ffi
+        shell: bash
+
+      - name: Upload FFI artifact
+        uses: actions/upload-artifact@v5
+        with:
+          name: csharp-ffi-${{ matrix.rid }}
+          path: dist/csharp-ffi/${{ matrix.rid }}
           retention-days: 14
 
   cargo-packages:

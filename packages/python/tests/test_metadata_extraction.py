@@ -12,17 +12,7 @@ Tests validate end-to-end metadata extraction functionality including:
 
 from __future__ import annotations
 
-import pytest
-
-try:
-    from html_to_markdown import MetadataConfig, convert_with_metadata
-
-    HAS_METADATA = True
-except ImportError:
-    HAS_METADATA = False
-
-
-pytestmark = pytest.mark.skipif(not HAS_METADATA, reason="metadata feature not available")
+from html_to_markdown import MetadataConfig, convert_with_metadata
 
 
 class TestDocumentMetadataExtraction:

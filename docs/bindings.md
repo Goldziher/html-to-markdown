@@ -215,12 +215,12 @@ IO.puts(md)
 
 ---
 
-## Go (`github.com/Goldziher/html-to-markdown/packages/go/htmltomarkdown`)
+## Go (`github.com/Goldziher/html-to-markdown/packages/go/v2/htmltomarkdown`)
 
 ### Install
 
 ```bash
-go get github.com/Goldziher/html-to-markdown/packages/go/htmltomarkdown
+go get github.com/Goldziher/html-to-markdown/packages/go/v2/htmltomarkdown
 ```
 
 The Go package links against the C FFI library built from the Rust core.
@@ -232,7 +232,7 @@ package main
 
 import (
     "fmt"
-    htm "github.com/Goldziher/html-to-markdown/packages/go/htmltomarkdown"
+    htm "github.com/Goldziher/html-to-markdown/packages/go/v2/htmltomarkdown"
 )
 
 func main() {
