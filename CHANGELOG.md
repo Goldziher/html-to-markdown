@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.14.5] - 2025-12-15
+
+### Fixed
+- RubyGems publish: prevent corrupted gem pushes by downloading `rubygems-*` artifacts into separate directories (no merge), and publishing gems recursively with an integrity check.
+
 ## [2.14.4] - 2025-12-15
 
 ### Fixed

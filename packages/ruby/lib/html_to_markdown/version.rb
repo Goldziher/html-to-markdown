@@ -1,5 +1,5 @@
 # frozen_string_literal: true
 
 module HtmlToMarkdown
-  VERSION = '2.14.4'
+  VERSION = '2.14.5'
 end
