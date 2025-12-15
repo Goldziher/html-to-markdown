@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.14.7] - 2025-12-15
+
+### Fixed
+- Elixir (macOS): package now ships a `.cargo/config.toml` so Rustler can compile without requiring user-specific linker flags.
+
 ## [2.14.6] - 2025-12-15
 
 ### Fixed
