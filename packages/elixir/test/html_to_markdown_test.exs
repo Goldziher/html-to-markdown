@@ -77,4 +77,31 @@ defmodule HtmlToMarkdownTest do
     assert is_binary(reason)
     assert String.contains?(reason, "max_decoded_size_bytes")
   end
+
+  test "convert_with_metadata/3 extracts document + headers + links + images" do
+    html = """
+    <html>
+      <head>
+        <title>Example Article</title>
+        <meta name="description" content="Demo page">
+        <link rel="canonical" href="https://example.com/article">
+      </head>
+      <body>
+        <h1 id="welcome">Welcome</h1>
+        <a href="https://example.com" rel="nofollow external">Example link</a>
+        <img src="https://example.com/image.jpg" alt="Hero" width="640" height="480">
+      </body>
+    </html>
+    """
+
+    assert {:ok, _markdown, metadata} = HtmlToMarkdown.convert_with_metadata(html)
+    assert metadata["document"]["title"] == "Example Article"
+    assert metadata["document"]["description"] == "Demo page"
+
+    assert [%{"level" => 1, "text" => "Welcome"} | _] = metadata["headers"]
+    assert [%{"href" => "https://example.com", "link_type" => "external"} | _] = metadata["links"]
+
+    assert [%{"src" => "https://example.com/image.jpg", "image_type" => "external"} | _] =
+             metadata["images"]
+  end
 end

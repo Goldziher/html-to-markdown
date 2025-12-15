@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.14.3] - 2025-12-15
+
+### Fixed
+- **Issue #150 / Discord report**: Python now always exports `convert_with_metadata` (no more `ImportError` on import).
+- **Issue #149**: Blockquote text now word-wraps when `wrap=true`.
+- **FFI JSON parity**: Metadata enums now serialize as snake_case (e.g. `external`, `relative`) to match cross-language expectations.
+- PHP test runner now always builds the extension with the `metadata` feature enabled (avoids missing `html_to_markdown_convert_with_metadata` when the workspace was built with `--no-default-features`).
+
+### Added
+- Elixir: `convert_with_metadata/3` + `MetadataConfig` backed by the Rust metadata extractor.
+
+### Changed
+- WASM: metadata bindings are enabled by default so the published npm package exports `convertWithMetadata`.
+- C# publish pipeline: stage native `html_to_markdown_ffi` libraries into the NuGet package under `runtimes/*/native`.
+- Go: module path now uses semantic import versioning (`.../packages/go/v2`), and docs/examples were updated accordingly.
+- Java: add `.sdkmanrc` for Java 25 + Maven 4; keep `maven-source-plugin` on `3.3.1` because `4.0.0-beta-1` is not compatible with Maven `4.0.0-rc-4`.
+
 ## [2.14.2] - 2025-12-13
 
 ### Changed

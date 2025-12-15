@@ -19,11 +19,11 @@ function detectExtension(string $root): string
     };
 
     $path = $targetDir . DIRECTORY_SEPARATOR . $filename;
-    if (file_exists($path)) {
-        return realpath($path) ?: $path;
-    }
 
-    $command = ['cargo', 'build', '-p', 'html-to-markdown-php', '--release'];
+    // Always (re)build the extension with the metadata feature enabled. Other tasks in this repo
+    // may have built the workspace with `--no-default-features`, leaving behind an extension
+    // binary that is missing `html_to_markdown_convert_with_metadata`.
+    $command = ['cargo', 'build', '-p', 'html-to-markdown-php', '--release', '--features', 'metadata'];
     runProcess($command, $root);
 
     if (file_exists($path)) {

@@ -21,6 +21,9 @@ pub fn wrap_markdown(markdown: &str, options: &ConversionOptions) -> String {
     let mut in_code_block = false;
     let mut in_paragraph = false;
     let mut paragraph_buffer = String::new();
+    let mut in_blockquote_paragraph = false;
+    let mut blockquote_prefix = String::new();
+    let mut blockquote_buffer = String::new();
 
     for line in markdown.lines() {
         let trimmed = line.trim_start();
@@ -52,6 +55,66 @@ pub fn wrap_markdown(markdown: &str, options: &ConversionOptions) -> String {
             result.push_str(line);
             result.push('\n');
             continue;
+        }
+
+        if let Some((prefix, content)) = parse_blockquote_line(line) {
+            if in_paragraph && !paragraph_buffer.is_empty() {
+                result.push_str(&wrap_line(&paragraph_buffer, options.wrap_width));
+                result.push_str("\n\n");
+                paragraph_buffer.clear();
+                in_paragraph = false;
+            }
+
+            let mut normalized_prefix = prefix;
+            if !normalized_prefix.ends_with(' ') {
+                normalized_prefix.push(' ');
+            }
+
+            if content.is_empty() {
+                if in_blockquote_paragraph && !blockquote_buffer.is_empty() {
+                    result.push_str(&wrap_blockquote_paragraph(
+                        &blockquote_prefix,
+                        &blockquote_buffer,
+                        options.wrap_width,
+                    ));
+                    result.push('\n');
+                    blockquote_buffer.clear();
+                    in_blockquote_paragraph = false;
+                }
+                result.push_str(normalized_prefix.trim_end());
+                result.push('\n');
+                continue;
+            }
+
+            if in_blockquote_paragraph && normalized_prefix != blockquote_prefix {
+                result.push_str(&wrap_blockquote_paragraph(
+                    &blockquote_prefix,
+                    &blockquote_buffer,
+                    options.wrap_width,
+                ));
+                result.push('\n');
+                blockquote_buffer.clear();
+                in_blockquote_paragraph = false;
+            }
+
+            if !in_blockquote_paragraph {
+                blockquote_prefix = normalized_prefix;
+                blockquote_buffer.push_str(&content);
+                in_blockquote_paragraph = true;
+            } else {
+                blockquote_buffer.push(' ');
+                blockquote_buffer.push_str(&content);
+            }
+            continue;
+        } else if in_blockquote_paragraph && !blockquote_buffer.is_empty() {
+            result.push_str(&wrap_blockquote_paragraph(
+                &blockquote_prefix,
+                &blockquote_buffer,
+                options.wrap_width,
+            ));
+            result.push('\n');
+            blockquote_buffer.clear();
+            in_blockquote_paragraph = false;
         }
 
         if let Some((indent, marker, content)) = parse_list_item(line) {
@@ -101,12 +164,65 @@ pub fn wrap_markdown(markdown: &str, options: &ConversionOptions) -> String {
         in_paragraph = true;
     }
 
+    if in_blockquote_paragraph && !blockquote_buffer.is_empty() {
+        result.push_str(&wrap_blockquote_paragraph(
+            &blockquote_prefix,
+            &blockquote_buffer,
+            options.wrap_width,
+        ));
+        result.push('\n');
+    }
+
     if in_paragraph && !paragraph_buffer.is_empty() {
         result.push_str(&wrap_line(&paragraph_buffer, options.wrap_width));
         result.push_str("\n\n");
     }
 
     result
+}
+
+fn parse_blockquote_line(line: &str) -> Option<(String, String)> {
+    let trimmed = line.trim_start();
+    if !trimmed.starts_with('>') {
+        return None;
+    }
+
+    let indent_len = line.len() - trimmed.len();
+    let bytes = line.as_bytes();
+    let mut i = indent_len;
+
+    while i < bytes.len() {
+        if bytes[i] != b'>' {
+            break;
+        }
+        i += 1;
+        if i < bytes.len() && bytes[i] == b' ' {
+            i += 1;
+        }
+        while i + 1 < bytes.len() && bytes[i] == b' ' && bytes[i + 1] == b'>' {
+            i += 1;
+        }
+    }
+
+    let prefix = line[..i].to_string();
+    let content = line[i..].trim().to_string();
+    Some((prefix, content))
+}
+
+fn wrap_blockquote_paragraph(prefix: &str, content: &str, width: usize) -> String {
+    let prefix_len = prefix.len();
+    let inner_width = if width > prefix_len { width - prefix_len } else { 1 };
+
+    let wrapped = wrap_line(content, inner_width);
+    let mut out = String::new();
+    for (idx, part) in wrapped.split('\n').enumerate() {
+        if idx > 0 {
+            out.push('\n');
+        }
+        out.push_str(prefix);
+        out.push_str(part);
+    }
+    out
 }
 
 fn is_list_like(trimmed: &str) -> bool {
@@ -360,6 +476,32 @@ mod tests {
         };
         let result = wrap_markdown(markdown, &options);
         assert!(result.lines().all(|line| line.len() <= 40 || line.trim().is_empty()));
+    }
+
+    #[test]
+    fn test_wrap_markdown_blockquote_paragraph() {
+        let markdown = "> This is a very long blockquote line that should wrap at 30 characters\n";
+        let options = ConversionOptions {
+            wrap: true,
+            wrap_width: 30,
+            ..Default::default()
+        };
+        let result = wrap_markdown(markdown, &options);
+        assert!(
+            result.lines().all(|line| line.len() <= 30 || line.trim().is_empty()),
+            "Some lines exceed wrap width. Got: {}",
+            result
+        );
+        assert!(
+            result.contains("> This is a very"),
+            "Missing expected wrapped content. Got: {}",
+            result
+        );
+        assert!(
+            result.lines().filter(|l| l.starts_with("> ")).count() >= 2,
+            "Expected multiple wrapped blockquote lines. Got: {}",
+            result
+        );
     }
 
     #[test]

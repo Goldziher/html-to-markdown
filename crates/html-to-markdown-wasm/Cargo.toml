@@ -14,7 +14,7 @@ rust-version.workspace = true
 crate-type = ["cdylib", "rlib"]
 
 [features]
-default = ["js-bindings"]
+default = ["js-bindings", "metadata"]
 js-bindings = ["wasm-bindgen", "serde-wasm-bindgen", "console_error_panic_hook", "js-sys"]
 metadata = ["html-to-markdown-rs/metadata"]
 wasmtime-testing = []

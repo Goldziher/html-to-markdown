@@ -11,14 +11,14 @@ High-performance HTML to Markdown converter with Go bindings to the Rust core li
 [![Hex.pm](https://img.shields.io/hexpm/v/html_to_markdown.svg)](https://hex.pm/packages/html_to_markdown)
 [![NuGet](https://img.shields.io/nuget/v/Goldziher.HtmlToMarkdown.svg)](https://www.nuget.org/packages/Goldziher.HtmlToMarkdown/)
 [![Maven Central](https://img.shields.io/maven-central/v/io.github.goldziher/html-to-markdown.svg)](https://central.sonatype.com/artifact/io.github.goldziher/html-to-markdown)
-[![Go Reference](https://pkg.go.dev/badge/github.com/Goldziher/html-to-markdown/packages/go/htmltomarkdown.svg)](https://pkg.go.dev/github.com/Goldziher/html-to-markdown/packages/go/htmltomarkdown)
+[![Go Reference](https://pkg.go.dev/badge/github.com/Goldziher/html-to-markdown/packages/go/v2/htmltomarkdown.svg)](https://pkg.go.dev/github.com/Goldziher/html-to-markdown/packages/go/v2/htmltomarkdown)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://github.com/Goldziher/html-to-markdown/blob/main/LICENSE)
 [![Discord](https://img.shields.io/badge/Discord-Join%20our%20community-7289da)](https://discord.gg/pXxagNK2zN)
 
 ## Installation
 
 ```bash
-go get github.com/Goldziher/html-to-markdown/packages/go/htmltomarkdown
+go get github.com/Goldziher/html-to-markdown/packages/go/v2/htmltomarkdown
 ```
 
 ## Prerequisites
@@ -34,6 +34,8 @@ sudo cp target/release/libhtml_to_markdown_ffi.* /usr/local/lib/
 
 # Or set LD_LIBRARY_PATH (Linux) / DYLD_LIBRARY_PATH (macOS)
 export LD_LIBRARY_PATH=$PWD/target/release:$LD_LIBRARY_PATH
+export DYLD_LIBRARY_PATH=$PWD/target/release:$DYLD_LIBRARY_PATH
+export CGO_LDFLAGS="-L$PWD/target/release $CGO_LDFLAGS"
 ```
 
 ## Usage
@@ -45,7 +47,7 @@ import (
     "fmt"
     "log"
 
-    "github.com/Goldziher/html-to-markdown/packages/go/htmltomarkdown"
+    "github.com/Goldziher/html-to-markdown/packages/go/v2/htmltomarkdown"
 )
 
 func main() {
@@ -201,7 +203,7 @@ import (
     "fmt"
     "log"
 
-    "github.com/Goldziher/html-to-markdown/packages/go/htmltomarkdown"
+    "github.com/Goldziher/html-to-markdown/packages/go/v2/htmltomarkdown"
 )
 
 func main() {
@@ -252,7 +254,7 @@ import (
     "fmt"
     "log"
 
-    "github.com/Goldziher/html-to-markdown/packages/go/htmltomarkdown"
+    "github.com/Goldziher/html-to-markdown/packages/go/v2/htmltomarkdown"
 )
 
 func main() {
@@ -295,7 +297,7 @@ import (
     "fmt"
     "log"
 
-    "github.com/Goldziher/html-to-markdown/packages/go/htmltomarkdown"
+    "github.com/Goldziher/html-to-markdown/packages/go/v2/htmltomarkdown"
 )
 
 func main() {
@@ -376,13 +378,13 @@ The Rust-backed implementation provides excellent performance:
 Go packages are published by pushing to GitHub. Users import directly:
 
 ```go
-import "github.com/Goldziher/html-to-markdown/packages/go/htmltomarkdown"
+import "github.com/Goldziher/html-to-markdown/packages/go/v2/htmltomarkdown"
 ```
 
 To use a specific version:
 
 ```bash
-go get github.com/Goldziher/html-to-markdown/packages/go@v2.8.0
+go get github.com/Goldziher/html-to-markdown/packages/go/v2@v2.14.2
 ```
 
 ## License

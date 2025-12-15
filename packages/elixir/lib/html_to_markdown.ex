@@ -8,12 +8,14 @@ defmodule HtmlToMarkdown do
     InlineImage,
     InlineImageConfig,
     InlineImageWarning,
+    MetadataConfig,
     Native,
     Options
   }
 
   @type options_input :: Options.t() | map() | keyword() | nil
   @type inline_config_input :: InlineImageConfig.t() | map() | keyword() | nil
+  @type metadata_config_input :: MetadataConfig.t() | map() | keyword() | nil
 
   @doc """
   Convert HTML to Markdown.
@@ -95,6 +97,38 @@ defmodule HtmlToMarkdown do
   end
 
   @doc """
+  Convert HTML to Markdown and extract metadata.
+
+  Returns `{:ok, markdown, metadata}`.
+  """
+  @spec convert_with_metadata(String.t(), options_input(), metadata_config_input()) ::
+          {:ok, String.t(), map()}
+          | {:error, term()}
+  def convert_with_metadata(html, options \\ nil, metadata_config \\ nil) when is_binary(html) do
+    options_map = normalize_options(options) || %{}
+
+    with {:ok, metadata_map} <- MetadataConfig.to_map_result(metadata_config),
+         {:ok, {markdown, metadata}} <-
+           Native.convert_with_metadata(html, options_map, metadata_map) do
+      {:ok, markdown, normalize_metadata(metadata)}
+    else
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
+  @doc """
+  Bang variant of `convert_with_metadata/3`.
+  """
+  @spec convert_with_metadata!(String.t(), options_input(), metadata_config_input()) ::
+          {String.t(), map()}
+  def convert_with_metadata!(html, options \\ nil, metadata_config \\ nil) do
+    case convert_with_metadata(html, options, metadata_config) do
+      {:ok, markdown, metadata} -> {markdown, metadata}
+      {:error, reason} -> raise Error, message: inspect(reason)
+    end
+  end
+
+  @doc """
   Create a reusable options handle (opaque reference).
 
   The handle can be passed to `convert_with_options/2`.
@@ -167,4 +201,23 @@ defmodule HtmlToMarkdown do
     do: {width, height}
 
   defp normalize_dimensions(_), do: nil
+
+  defp normalize_metadata(value) when is_list(value), do: Enum.map(value, &normalize_metadata/1)
+
+  defp normalize_metadata(value) when is_map(value) do
+    value
+    |> Enum.map(fn {k, v} ->
+      key =
+        cond do
+          is_atom(k) -> Atom.to_string(k)
+          is_binary(k) -> k
+          true -> to_string(k)
+        end
+
+      {key, normalize_metadata(v)}
+    end)
+    |> Map.new()
+  end
+
+  defp normalize_metadata(value), do: value
 end

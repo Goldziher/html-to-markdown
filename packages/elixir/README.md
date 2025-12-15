@@ -12,7 +12,7 @@ The package exposes a fast `HTML -> Markdown` converter implemented with Rustler
 [![Hex.pm](https://img.shields.io/hexpm/v/html_to_markdown.svg)](https://hex.pm/packages/html_to_markdown)
 [![NuGet](https://img.shields.io/nuget/v/Goldziher.HtmlToMarkdown.svg)](https://www.nuget.org/packages/Goldziher.HtmlToMarkdown/)
 [![Maven Central](https://img.shields.io/maven-central/v/io.github.goldziher/html-to-markdown.svg)](https://central.sonatype.com/artifact/io.github.goldziher/html-to-markdown)
-[![Go Reference](https://pkg.go.dev/badge/github.com/Goldziher/html-to-markdown/packages/go/htmltomarkdown.svg)](https://pkg.go.dev/github.com/Goldziher/html-to-markdown/packages/go/htmltomarkdown)
+[![Go Reference](https://pkg.go.dev/badge/github.com/Goldziher/html-to-markdown/packages/go/v2/htmltomarkdown.svg)](https://pkg.go.dev/github.com/Goldziher/html-to-markdown/packages/go/v2/htmltomarkdown)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://github.com/Goldziher/html-to-markdown/blob/main/LICENSE)
 [![Discord](https://img.shields.io/badge/Discord-Join%20our%20community-7289da)](https://discord.gg/pXxagNK2zN)
 
@@ -108,6 +108,31 @@ following fields:
 Warnings are exposed as `%HtmlToMarkdown.InlineImageWarning{index, message}`;
 use `index` to correlate warnings back to the zero-based position in the inline
 image list.
+
+### Metadata extraction
+
+`convert_with_metadata/3` returns Markdown plus a metadata map:
+
+```elixir
+html = """
+<html>
+  <head>
+    <title>Example</title>
+    <meta name="description" content="Demo page">
+  </head>
+  <body>
+    <h1 id="welcome">Welcome</h1>
+    <a href="https://example.com" rel="nofollow external">Example link</a>
+  </body>
+</html>
+"""
+
+{:ok, markdown, metadata} = HtmlToMarkdown.convert_with_metadata(html)
+
+metadata["document"]["title"]        # "Example"
+metadata["headers"] |> hd() |> Map.get("text") # "Welcome"
+metadata["links"]   |> hd() |> Map.get("link_type") # "external"
+```
 
 ## Performance (Apple M4)
 

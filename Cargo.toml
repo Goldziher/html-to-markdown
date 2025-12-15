@@ -15,7 +15,7 @@ members = [
 ]
 
 [workspace.package]
-version = "2.14.2"
+version = "2.14.3"
 edition = "2024"
 authors = ["Na'aman Hirschfeld <nhirschfeld@gmail.com>"]
 license = "MIT"
@@ -26,7 +26,7 @@ readme = "README.md"
 rust-version = "1.85"
 
 [workspace.dependencies]
-html-to-markdown-rs = { version = "2.14.2", path = "crates/html-to-markdown" }
+html-to-markdown-rs = { version = "2.14.3", path = "crates/html-to-markdown" }
 
 tl = { package = "astral-tl", version = "0.7.11" }
 html5ever = "0.36"

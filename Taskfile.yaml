@@ -553,9 +553,12 @@ tasks:
       - cargo build --release -p html-to-markdown-ffi
       - cmd: |
           cd packages/go/htmltomarkdown
+          ROOT="{{.TASKFILE_DIR}}"
           TOOLCHAIN=${GOTOOLCHAIN_OVERRIDE:-{{.GO_TOOLCHAIN}}}
-          LD_LIBRARY_PATH=${GITHUB_WORKSPACE:-$PWD}/target/release:${LD_LIBRARY_PATH:-} \
-          DYLD_LIBRARY_PATH=${GITHUB_WORKSPACE:-$PWD}/target/release:${DYLD_LIBRARY_PATH:-} \
+          LIBRARY_PATH=${ROOT}/target/release:${LIBRARY_PATH:-} \
+          CGO_LDFLAGS="-L${ROOT}/target/release ${CGO_LDFLAGS:-}" \
+          LD_LIBRARY_PATH=${ROOT}/target/release:${LD_LIBRARY_PATH:-} \
+          DYLD_LIBRARY_PATH=${ROOT}/target/release:${DYLD_LIBRARY_PATH:-} \
           GOTOOLCHAIN=${TOOLCHAIN} go test -v
 
   wasm:test:wasmtime:
