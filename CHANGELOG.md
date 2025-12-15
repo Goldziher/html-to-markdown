@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.14.6] - 2025-12-15
+
+### Fixed
+- RubyGems publish: skip duplicate `ruby`-platform gems when multiple CI jobs produce identical artifacts for the same version.
+- Hex publish: ensure the Rust core crate is staged into the Elixir package before publishing.
+
 ## [2.14.5] - 2025-12-15
 
 ### Fixed
