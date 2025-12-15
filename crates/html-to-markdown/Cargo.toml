@@ -14,7 +14,7 @@ keywords = ["html", "markdown", "converter", "astral-tl", "doc-processing"]
 categories = ["parsing", "text-processing", "web-programming"]
 
 [features]
-default = []
+default = ["metadata"]
 inline-images = ["dep:image"]
 metadata = ["dep:serde", "dep:serde_json"]
 
