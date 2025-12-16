@@ -1129,7 +1129,7 @@ jobs:
         shell: bash
 
       - name: Upload FFI artifact
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v6
         with:
           name: csharp-ffi-${{ matrix.rid }}
           path: dist/csharp-ffi
