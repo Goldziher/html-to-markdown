@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.14.10] - 2025-12-16
+
+### Fixed
+- Python: release the GIL during native conversion so `ThreadPoolExecutor` parallelism doesn't regress performance, and always build the extension with metadata support (so `convert_with_metadata` is always available).
+
 ## [2.14.9] - 2025-12-16
 
 ### Fixed

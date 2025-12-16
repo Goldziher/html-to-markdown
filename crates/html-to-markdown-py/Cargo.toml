@@ -19,7 +19,7 @@ crate-type = ["cdylib", "rlib"]
 doctest = false
 
 [dependencies]
-html-to-markdown-rs = { workspace = true, features = ["inline-images"] }
+html-to-markdown-rs = { workspace = true, features = ["inline-images", "metadata"] }
 pyo3.workspace = true
 
 [dev-dependencies]
@@ -29,4 +29,3 @@ image = { version = "0.25", default-features = false, features = ["png"] }
 [features]
 default = []
 extension-module = ["pyo3/extension-module"]
-metadata = ["html-to-markdown-rs/metadata"]
