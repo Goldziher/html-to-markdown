@@ -1068,7 +1068,7 @@ jobs:
           dotnet-version: "8.0.x"
 
       - name: Download C# native FFI libraries
-        uses: actions/download-artifact@v5
+        uses: actions/download-artifact@v7
         with:
           pattern: csharp-ffi-*
           path: dist/csharp-ffi
