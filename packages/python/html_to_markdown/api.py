@@ -164,11 +164,6 @@ def convert_with_metadata(
         - images: List of extracted images with metadata
         - structured_data: List of JSON-LD, Microdata, or RDFa blocks
     """
-    if not hasattr(_rust, "convert_with_metadata"):
-        raise ImportError(
-            "convert_with_metadata is missing from the native extension; this indicates a broken/partial installation."
-        )
-
     if options is None:
         options = ConversionOptions()
     if preprocessing is None:

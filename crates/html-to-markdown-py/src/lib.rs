@@ -1,4 +1,3 @@
-#[cfg(feature = "metadata")]
 use html_to_markdown_rs::metadata::{
     DEFAULT_MAX_STRUCTURED_DATA_SIZE, DocumentMetadata as RustDocumentMetadata,
     ExtendedMetadata as RustExtendedMetadata, HeaderMetadata as RustHeaderMetadata, ImageMetadata as RustImageMetadata,
@@ -14,7 +13,6 @@ use html_to_markdown_rs::{
 };
 use pyo3::prelude::*;
 use pyo3::types::{PyBytes, PyDict};
-#[cfg(feature = "metadata")]
 use pyo3::types::{PyList, PyTuple};
 
 fn to_py_err(err: ConversionError) -> PyErr {
@@ -121,7 +119,6 @@ impl InlineImageConfig {
 }
 
 /// Python wrapper for metadata extraction configuration
-#[cfg(feature = "metadata")]
 #[pyclass]
 #[derive(Clone)]
 struct MetadataConfig {
@@ -139,7 +136,6 @@ struct MetadataConfig {
     max_structured_data_size: usize,
 }
 
-#[cfg(feature = "metadata")]
 #[pymethods]
 impl MetadataConfig {
     #[new]
@@ -170,7 +166,6 @@ impl MetadataConfig {
     }
 }
 
-#[cfg(feature = "metadata")]
 impl MetadataConfig {
     fn to_rust(&self) -> RustMetadataConfig {
         RustMetadataConfig {
@@ -467,15 +462,20 @@ impl ConversionOptionsHandle {
 ///     ```
 #[pyfunction]
 #[pyo3(signature = (html, options=None))]
-fn convert(html: &str, options: Option<ConversionOptions>) -> PyResult<String> {
+fn convert(py: Python<'_>, html: &str, options: Option<ConversionOptions>) -> PyResult<String> {
+    let html = html.to_owned();
     let rust_options = options.map(|opts| opts.to_rust());
-    guard_panic(|| html_to_markdown_rs::convert(html, rust_options)).map_err(to_py_err)
+    py.detach(move || guard_panic(|| html_to_markdown_rs::convert(&html, rust_options)))
+        .map_err(to_py_err)
 }
 
 #[pyfunction]
 #[pyo3(signature = (html, handle))]
-fn convert_with_options_handle(html: &str, handle: &ConversionOptionsHandle) -> PyResult<String> {
-    guard_panic(|| html_to_markdown_rs::convert(html, Some(handle.inner.clone()))).map_err(to_py_err)
+fn convert_with_options_handle(py: Python<'_>, html: &str, handle: &ConversionOptionsHandle) -> PyResult<String> {
+    let html = html.to_owned();
+    let rust_options = handle.inner.clone();
+    py.detach(move || guard_panic(|| html_to_markdown_rs::convert(&html, Some(rust_options))))
+        .map_err(to_py_err)
 }
 
 #[pyfunction]
@@ -577,9 +577,12 @@ fn convert_with_inline_images<'py>(
     options: Option<ConversionOptions>,
     image_config: Option<InlineImageConfig>,
 ) -> PyInlineExtraction {
+    let html = html.to_owned();
     let rust_options = options.map(|opts| opts.to_rust());
     let cfg = image_config.unwrap_or_else(|| InlineImageConfig::new(5 * 1024 * 1024, None, true, false));
-    let extraction = guard_panic(|| html_to_markdown_rs::convert_with_inline_images(html, rust_options, cfg.to_rust()))
+    let rust_cfg = cfg.to_rust();
+    let extraction = py
+        .detach(move || guard_panic(|| html_to_markdown_rs::convert_with_inline_images(&html, rust_options, rust_cfg)))
         .map_err(to_py_err)?;
 
     let images = extraction
@@ -597,7 +600,6 @@ fn convert_with_inline_images<'py>(
     Ok((extraction.markdown, images, warnings))
 }
 
-#[cfg(feature = "metadata")]
 fn opt_string_to_py<'py>(py: Python<'py>, opt: Option<String>) -> PyResult<Py<PyAny>> {
     match opt {
         Some(val) => {
@@ -608,7 +610,6 @@ fn opt_string_to_py<'py>(py: Python<'py>, opt: Option<String>) -> PyResult<Py<Py
     }
 }
 
-#[cfg(feature = "metadata")]
 fn btreemap_to_py<'py>(py: Python<'py>, map: std::collections::BTreeMap<String, String>) -> PyResult<Py<PyAny>> {
     let dict = PyDict::new(py);
     for (k, v) in map {
@@ -617,7 +618,6 @@ fn btreemap_to_py<'py>(py: Python<'py>, map: std::collections::BTreeMap<String, 
     Ok(dict.into())
 }
 
-#[cfg(feature = "metadata")]
 fn text_direction_to_str<'py>(py: Python<'py>, text_direction: Option<RustTextDirection>) -> Py<PyAny> {
     match text_direction {
         Some(RustTextDirection::LeftToRight) => pyo3::types::PyString::new(py, "ltr").into(),
@@ -627,7 +627,6 @@ fn text_direction_to_str<'py>(py: Python<'py>, text_direction: Option<RustTextDi
     }
 }
 
-#[cfg(feature = "metadata")]
 fn link_type_to_str(link_type: &RustLinkType) -> &'static str {
     match link_type {
         RustLinkType::Anchor => "anchor",
@@ -639,7 +638,6 @@ fn link_type_to_str(link_type: &RustLinkType) -> &'static str {
     }
 }
 
-#[cfg(feature = "metadata")]
 fn image_type_to_str(image_type: &RustImageType) -> &'static str {
     match image_type {
         RustImageType::DataUri => "data_uri",
@@ -649,7 +647,6 @@ fn image_type_to_str(image_type: &RustImageType) -> &'static str {
     }
 }
 
-#[cfg(feature = "metadata")]
 fn structured_data_type_to_str(data_type: &RustStructuredDataType) -> &'static str {
     match data_type {
         RustStructuredDataType::JsonLd => "json_ld",
@@ -658,7 +655,6 @@ fn structured_data_type_to_str(data_type: &RustStructuredDataType) -> &'static s
     }
 }
 
-#[cfg(feature = "metadata")]
 fn document_metadata_to_py<'py>(py: Python<'py>, doc: RustDocumentMetadata) -> PyResult<Py<PyAny>> {
     let dict = PyDict::new(py);
 
@@ -677,7 +673,6 @@ fn document_metadata_to_py<'py>(py: Python<'py>, doc: RustDocumentMetadata) -> P
     Ok(dict.into())
 }
 
-#[cfg(feature = "metadata")]
 fn headers_to_py<'py>(py: Python<'py>, headers: Vec<RustHeaderMetadata>) -> PyResult<Py<PyAny>> {
     let list = PyList::empty(py);
     for header in headers {
@@ -692,7 +687,6 @@ fn headers_to_py<'py>(py: Python<'py>, headers: Vec<RustHeaderMetadata>) -> PyRe
     Ok(list.into())
 }
 
-#[cfg(feature = "metadata")]
 fn links_to_py<'py>(py: Python<'py>, links: Vec<RustLinkMetadata>) -> PyResult<Py<PyAny>> {
     let list = PyList::empty(py);
     for link in links {
@@ -708,7 +702,6 @@ fn links_to_py<'py>(py: Python<'py>, links: Vec<RustLinkMetadata>) -> PyResult<P
     Ok(list.into())
 }
 
-#[cfg(feature = "metadata")]
 fn images_to_py<'py>(py: Python<'py>, images: Vec<RustImageMetadata>) -> PyResult<Py<PyAny>> {
     let list = PyList::empty(py);
     for image in images {
@@ -719,7 +712,7 @@ fn images_to_py<'py>(py: Python<'py>, images: Vec<RustImageMetadata>) -> PyResul
 
         let dims = match image.dimensions {
             Some((width, height)) => {
-                let tuple = PyTuple::new(py, &[width, height])?;
+                let tuple = PyTuple::new(py, [width, height])?;
                 tuple.into()
             }
             None => py.None(),
@@ -733,7 +726,6 @@ fn images_to_py<'py>(py: Python<'py>, images: Vec<RustImageMetadata>) -> PyResul
     Ok(list.into())
 }
 
-#[cfg(feature = "metadata")]
 fn structured_data_to_py<'py>(py: Python<'py>, data: Vec<RustStructuredData>) -> PyResult<Py<PyAny>> {
     let list = PyList::empty(py);
     for item in data {
@@ -746,7 +738,6 @@ fn structured_data_to_py<'py>(py: Python<'py>, data: Vec<RustStructuredData>) ->
     Ok(list.into())
 }
 
-#[cfg(feature = "metadata")]
 fn extended_metadata_to_py<'py>(py: Python<'py>, metadata: RustExtendedMetadata) -> PyResult<Py<PyAny>> {
     let dict = PyDict::new(py);
     dict.set_item("document", document_metadata_to_py(py, metadata.document)?)?;
@@ -915,7 +906,6 @@ fn extended_metadata_to_py<'py>(py: Python<'py>, metadata: RustExtendedMetadata)
 ///     - convert_with_inline_images: Extract inline images alongside conversion
 ///     - ConversionOptions: Conversion configuration class
 ///     - MetadataConfig: Metadata extraction configuration class
-#[cfg(feature = "metadata")]
 #[pyfunction]
 #[pyo3(signature = (html, options=None, metadata_config=None))]
 fn convert_with_metadata<'py>(
@@ -924,10 +914,13 @@ fn convert_with_metadata<'py>(
     options: Option<ConversionOptions>,
     metadata_config: Option<MetadataConfig>,
 ) -> PyResult<(String, Py<PyAny>)> {
+    let html = html.to_owned();
     let rust_options = options.map(|opts| opts.to_rust());
     let cfg = metadata_config
         .unwrap_or_else(|| MetadataConfig::new(true, true, true, true, true, DEFAULT_MAX_STRUCTURED_DATA_SIZE));
-    let result = guard_panic(|| html_to_markdown_rs::convert_with_metadata(html, rust_options, cfg.to_rust()))
+    let rust_cfg = cfg.to_rust();
+    let result = py
+        .detach(move || guard_panic(|| html_to_markdown_rs::convert_with_metadata(&html, rust_options, rust_cfg)))
         .map_err(to_py_err)?;
 
     let (markdown, metadata) = result;
@@ -946,11 +939,8 @@ fn _html_to_markdown(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<ConversionOptionsHandle>()?;
     m.add_function(wrap_pyfunction!(convert_with_inline_images, m)?)?;
     m.add_class::<InlineImageConfig>()?;
-    #[cfg(feature = "metadata")]
-    {
-        m.add_function(wrap_pyfunction!(convert_with_metadata, m)?)?;
-        m.add_class::<MetadataConfig>()?;
-    }
+    m.add_function(wrap_pyfunction!(convert_with_metadata, m)?)?;
+    m.add_class::<MetadataConfig>()?;
     Ok(())
 }
 
@@ -960,9 +950,14 @@ mod tests {
 
     #[test]
     fn test_convert_returns_markdown() {
-        let html = "<h1>Hello</h1>";
-        let result = convert(html, None).expect("conversion succeeds");
-        assert!(result.contains("Hello"));
+        Python::initialize();
+        Python::attach(|py| -> PyResult<()> {
+            let html = "<h1>Hello</h1>";
+            let result = convert(py, html, None)?;
+            assert!(result.contains("Hello"));
+            Ok(())
+        })
+        .expect("conversion succeeds");
     }
 
     #[test]
