@@ -1,4 +1,5 @@
 using System.Text.Json.Serialization;
+using HtmlToMarkdown.Serialization;
 
 namespace HtmlToMarkdown.Metadata;
 
@@ -6,7 +7,7 @@ namespace HtmlToMarkdown.Metadata;
 /// Image source classification for proper handling and processing.
 /// Determines whether an image is embedded (data URI), inline SVG, external, or relative.
 /// </summary>
-[JsonConverter(typeof(JsonStringEnumConverter))]
+[JsonConverter(typeof(JsonPropertyNameEnumConverter<ImageType>))]
 public enum ImageType
 {
     /// <summary>

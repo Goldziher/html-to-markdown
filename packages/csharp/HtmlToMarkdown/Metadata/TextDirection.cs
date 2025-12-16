@@ -1,4 +1,5 @@
 using System.Text.Json.Serialization;
+using HtmlToMarkdown.Serialization;
 
 namespace HtmlToMarkdown.Metadata;
 
@@ -6,7 +7,7 @@ namespace HtmlToMarkdown.Metadata;
 /// Represents text directionality of document content.
 /// Corresponds to the HTML `dir` attribute and `bdi` element directionality.
 /// </summary>
-[JsonConverter(typeof(JsonStringEnumConverter))]
+[JsonConverter(typeof(JsonPropertyNameEnumConverter<TextDirection>))]
 public enum TextDirection
 {
     /// <summary>

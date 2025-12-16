@@ -1,4 +1,5 @@
 using System.Text.Json.Serialization;
+using HtmlToMarkdown.Serialization;
 
 namespace HtmlToMarkdown.Metadata;
 
@@ -6,7 +7,7 @@ namespace HtmlToMarkdown.Metadata;
 /// Structured data format type.
 /// Identifies the schema/format used for structured data markup.
 /// </summary>
-[JsonConverter(typeof(JsonStringEnumConverter))]
+[JsonConverter(typeof(JsonPropertyNameEnumConverter<StructuredDataType>))]
 public enum StructuredDataType
 {
     /// <summary>

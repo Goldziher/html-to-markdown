@@ -1,4 +1,5 @@
 using System.Text.Json.Serialization;
+using HtmlToMarkdown.Serialization;
 
 namespace HtmlToMarkdown.Metadata;
 
@@ -6,7 +7,7 @@ namespace HtmlToMarkdown.Metadata;
 /// Link classification based on href value and document context.
 /// Used to categorize links during extraction for filtering and analysis.
 /// </summary>
-[JsonConverter(typeof(JsonStringEnumConverter))]
+[JsonConverter(typeof(JsonPropertyNameEnumConverter<LinkType>))]
 public enum LinkType
 {
     /// <summary>

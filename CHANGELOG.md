@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.14.11] - 2025-12-16
+
+### Fixed
+- C# (NuGet): fix `ConvertWithMetadata()` deserialization for metadata enums (`link_type`, `image_type`, `data_type`, `text_direction`) by honoring the JSON wire values.
+
 ## [2.14.10] - 2025-12-16
 
 ### Fixed
