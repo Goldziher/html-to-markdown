@@ -1688,6 +1688,9 @@ fn preprocess_html(input: &str) -> Cow<'_, str> {
                 for tag in TAGS {
                     if matches_tag_start(bytes, idx + 1, tag) {
                         if let Some(open_end) = find_tag_end(bytes, idx + 1 + tag.len()) {
+                            if tag == b"script" && is_json_ld_script_open_tag(&input[idx..open_end]) {
+                                continue;
+                            }
                             let remove_end = find_closing_tag(bytes, open_end, tag).unwrap_or(len);
                             let out = output.get_or_insert_with(|| String::with_capacity(input.len()));
                             out.push_str(&input[last..idx]);
@@ -1771,6 +1774,70 @@ fn preprocess_html(input: &str) -> Cow<'_, str> {
     } else {
         Cow::Borrowed(input)
     }
+}
+
+fn is_json_ld_script_open_tag(tag: &str) -> bool {
+    let lower = tag.to_ascii_lowercase();
+    let mut rest = lower.as_str();
+
+    while let Some(pos) = rest.find("type") {
+        let before_ok = pos == 0
+            || rest
+                .as_bytes()
+                .get(pos.saturating_sub(1))
+                .is_some_and(|b| b.is_ascii_whitespace() || *b == b'<' || *b == b'/');
+        let after_ok = rest
+            .as_bytes()
+            .get(pos + 4)
+            .is_some_and(|b| b.is_ascii_whitespace() || *b == b'=');
+        if !before_ok || !after_ok {
+            rest = &rest[pos + 4..];
+            continue;
+        }
+
+        let mut i = pos + 4;
+        let bytes = rest.as_bytes();
+        while bytes.get(i).is_some_and(|b| b.is_ascii_whitespace()) {
+            i += 1;
+        }
+        if bytes.get(i) != Some(&b'=') {
+            rest = &rest[pos + 4..];
+            continue;
+        }
+        i += 1;
+        while bytes.get(i).is_some_and(|b| b.is_ascii_whitespace()) {
+            i += 1;
+        }
+
+        if i >= bytes.len() {
+            return false;
+        }
+
+        let value = match bytes[i] {
+            b'"' | b'\'' => {
+                let quote = bytes[i];
+                let start = i + 1;
+                let mut end = start;
+                while end < bytes.len() && bytes[end] != quote {
+                    end += 1;
+                }
+                &rest[start..end]
+            }
+            _ => {
+                let start = i;
+                let mut end = start;
+                while end < bytes.len() && !bytes[end].is_ascii_whitespace() && bytes[end] != b'>' {
+                    end += 1;
+                }
+                &rest[start..end]
+            }
+        };
+
+        let media_type = value.split(';').next().unwrap_or(value).trim();
+        return media_type == "application/ld+json";
+    }
+
+    false
 }
 
 #[cfg(test)]
@@ -5409,6 +5476,29 @@ fn walk_node(
                         }
                     });
 
+                    #[cfg(feature = "metadata")]
+                    if let Some(ref collector) = ctx.metadata_collector {
+                        for child_handle in children.top().iter() {
+                            if let Some(tl::Node::Tag(child_tag)) = child_handle.get(parser) {
+                                let child_name = normalized_tag_name(child_tag.name().as_utf8_str());
+                                if child_name.as_ref() == "script" {
+                                    if let Some(type_attr) = child_tag.attributes().get("type").flatten() {
+                                        let type_value = type_attr.as_utf8_str();
+                                        let type_value = type_value.as_ref();
+                                        let type_value = type_value.split(';').next().unwrap_or(type_value);
+                                        if type_value.trim().eq_ignore_ascii_case("application/ld+json") {
+                                            let json = child_tag.inner_text(parser);
+                                            let json = text::decode_html_entities(json.trim()).to_string();
+                                            if !json.is_empty() {
+                                                collector.borrow_mut().add_json_ld(json);
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
                     if has_body_like {
                         for child_handle in children.top().iter() {
                             walk_node(child_handle, parser, output, options, ctx, depth + 1, dom_ctx);
@@ -5420,10 +5510,16 @@ fn walk_node(
                 {
                     #[cfg(feature = "metadata")]
                     if let Some(type_attr) = tag.attributes().get("type").flatten() {
-                        if type_attr.as_utf8_str() == "application/ld+json" {
+                        let type_value = type_attr.as_utf8_str();
+                        let type_value = type_value.as_ref();
+                        let type_value = type_value.split(';').next().unwrap_or(type_value);
+                        if type_value.trim().eq_ignore_ascii_case("application/ld+json") {
                             if let Some(ref collector) = ctx.metadata_collector {
-                                let json = get_text_content(node_handle, parser);
-                                collector.borrow_mut().add_json_ld(json);
+                                let json = tag.inner_text(parser);
+                                let json = text::decode_html_entities(json.trim()).to_string();
+                                if !json.is_empty() {
+                                    collector.borrow_mut().add_json_ld(json);
+                                }
                             }
                         }
                     }
@@ -6222,6 +6318,13 @@ mod tests {
         let input = "<div>before</div><script>1 < 2</script><p>after</p>";
         let stripped = strip_script_and_style_sections(input);
         assert_eq!(stripped, "<div>before</div><script></script><p>after</p>");
+    }
+
+    #[test]
+    fn preserves_json_ld_script_sections() {
+        let input = r#"<head><script type="application/ld+json">{ "a": 1 }</script></head>"#;
+        let stripped = preprocess_html(input);
+        assert_eq!(stripped, input);
     }
 
     #[test]

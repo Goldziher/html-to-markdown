@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.14.9] - 2025-12-16
+
+### Fixed
+- Structured data: JSON-LD is now extracted from `<script type="application/ld+json">` tags (including when placed in `<head>`), preserving the script contents for parsing.
+
 ## [2.14.8] - 2025-12-15
 
 ### Fixed
