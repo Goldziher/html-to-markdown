@@ -449,6 +449,9 @@ Conversion errors raise `HtmlToMarkdown::Error` (wrapping the Rust error context
 
 Rescue them to provide clearer feedback in your application.
 
+Inputs that look like binary data (e.g., PDF bytes coerced to a string) raise `HtmlToMarkdown::Error` with an
+`Invalid input` message.
+
 ## Consistent Across Languages
 
 The Ruby gem shares the exact Rust core with:

@@ -58,6 +58,11 @@ def test_misc(convert: Callable[..., str]) -> None:
     assert convert("`x`") == "`x`\n"
     assert convert("[text](link)") == "[text](link)\n"
     assert convert("1. x") == "1. x\n"
+
+
+def test_binary_input_rejected(convert: Callable[..., str]) -> None:
+    with pytest.raises(ValueError, match="Invalid input"):
+        convert("PDF\\0DATA")
     assert convert("not a number. x") == "not a number. x\n"
     assert convert("1) x") == "1) x\n"
     assert convert("not a number) x") == "not a number) x\n"

@@ -1,6 +1,6 @@
 {
   "name": "html-to-markdown-monorepo",
-  "version": "2.14.11",
+  "version": "2.15.0",
   "private": true,
   "description": "HTML to Markdown converter - monorepo root",
   "packageManager": "pnpm@10.18.2+sha512.9fb969fa749b3ade6035e0f109f0b8a60b5d08a1a87fdf72e337da90dcc93336e2280ca4e44f2358a649b83c17959e9993e777c2080879f3801e6f0d999ad3dd",
@@ -18,10 +18,10 @@
     "format": "biome format --write ."
   },
   "devDependencies": {
-    "@biomejs/biome": "^2.3.8",
-    "@types/node": "^25.0.1",
+    "@biomejs/biome": "^2.3.10",
+    "@types/node": "^25.0.3",
     "typescript": "^5.9.3",
-    "vitest": "^4.0.15"
+    "vitest": "^4.0.16"
   },
   "engines": {
     "node": ">=18",

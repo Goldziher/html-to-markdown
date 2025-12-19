@@ -749,6 +749,9 @@ try {
 }
 ```
 
+Inputs that look like binary data (e.g., PDF bytes cast to a string) raise `ConversionFailed` with an `Invalid input`
+message.
+
 ### Type Safety (PHPStan)
 
 All metadata value objects are readonly with strict types:

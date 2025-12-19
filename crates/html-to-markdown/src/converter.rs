@@ -5624,12 +5624,18 @@ fn walk_node(
     }
 }
 
+const MAX_TABLE_COLS: usize = 1000;
+
+fn clamp_table_span(value: usize) -> usize {
+    if value == 0 { 1 } else { value.min(MAX_TABLE_COLS) }
+}
+
 /// Get colspan attribute value from element
 fn get_colspan(node_handle: &tl::NodeHandle, parser: &tl::Parser) -> usize {
     if let Some(tl::Node::Tag(tag)) = node_handle.get(parser) {
         if let Some(Some(bytes)) = tag.attributes().get("colspan") {
             if let Ok(colspan) = bytes.as_utf8_str().parse::<usize>() {
-                return colspan;
+                return clamp_table_span(colspan);
             }
         }
     }
@@ -5644,11 +5650,13 @@ fn get_colspan_rowspan(node_handle: &tl::NodeHandle, parser: &tl::Parser) -> (us
             .get("colspan")
             .flatten()
             .and_then(|v| v.as_utf8_str().parse::<usize>().ok())
+            .map(clamp_table_span)
             .unwrap_or(1);
         let rowspan = attrs
             .get("rowspan")
             .flatten()
             .and_then(|v| v.as_utf8_str().parse::<usize>().ok())
+            .map(clamp_table_span)
             .unwrap_or(1);
         (colspan, rowspan)
     } else {
@@ -5773,7 +5781,10 @@ fn convert_table_row(
 
     let is_first_row = row_index == 0;
     if is_first_row {
-        let total_cols = cells.iter().map(|h| get_colspan(h, parser)).sum::<usize>().max(1);
+        let total_cols = cells
+            .iter()
+            .fold(0usize, |acc, h| acc.saturating_add(get_colspan(h, parser)))
+            .clamp(1, MAX_TABLE_COLS);
         output.push_str("| ");
         for i in 0..total_cols {
             if i > 0 {
@@ -6578,6 +6589,18 @@ mod tests {
         assert!(result.contains("<table>"), "Should preserve table");
         assert!(!result.contains("<span>"), "Should strip span tag");
         assert!(result.contains("Text"), "Should keep span text content");
+    }
+
+    #[test]
+    fn test_table_colspan_clamped() {
+        let html = r#"<table><tr><td colspan="9007199254740991">Cell</td></tr></table>"#;
+        let result = convert_html(html, &ConversionOptions::default()).unwrap();
+        let lines: Vec<&str> = result.lines().collect();
+        assert!(lines.len() >= 2, "Expected header separator row");
+        let header_sep = lines[1];
+        let col_count = header_sep.matches("---").count();
+        assert!(col_count <= MAX_TABLE_COLS, "Colspan should be clamped");
+        assert!(result.len() < 50_000, "Output should stay bounded");
     }
 
     #[test]
