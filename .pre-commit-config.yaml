@@ -90,25 +90,25 @@ repos:
         pass_filenames: false
       - id: rubocop
         name: rubocop
-        entry: bash -c 'cd packages/ruby && PATH=/opt/homebrew/opt/ruby/bin:$PATH BUNDLE_PATH=vendor/bundle bundle _4.0.0_ install && PATH=/opt/homebrew/opt/ruby/bin:$PATH BUNDLE_PATH=vendor/bundle bundle _4.0.0_ exec rubocop --config ./.rubocop.yml --autocorrect-all'
+        entry: bash -c 'cd packages/ruby && BUNDLE_PATH=vendor/bundle bundle install && BUNDLE_PATH=vendor/bundle bundle exec rubocop --config ./.rubocop.yml --autocorrect-all'
         language: system
         files: ^packages/ruby/
         pass_filenames: false
       - id: rbs-validate
         name: rbs validate
-        entry: bash -c 'cd packages/ruby && PATH=/opt/homebrew/opt/ruby/bin:$PATH BUNDLE_PATH=vendor/bundle bundle _4.0.0_ install && PATH=/opt/homebrew/opt/ruby/bin:$PATH BUNDLE_PATH=vendor/bundle bundle _4.0.0_ exec rbs validate'
+        entry: bash -c 'cd packages/ruby && BUNDLE_PATH=vendor/bundle bundle install && BUNDLE_PATH=vendor/bundle bundle exec rbs validate'
         language: system
         files: ^packages/ruby/
         pass_filenames: false
       - id: steep-check
         name: steep check
-        entry: bash -c 'cd packages/ruby && PATH=/opt/homebrew/opt/ruby/bin:$PATH BUNDLE_PATH=vendor/bundle bundle _4.0.0_ install && PATH=/opt/homebrew/opt/ruby/bin:$PATH BUNDLE_PATH=vendor/bundle bundle _4.0.0_ exec steep check'
+        entry: bash -c 'cd packages/ruby && BUNDLE_PATH=vendor/bundle bundle install && BUNDLE_PATH=vendor/bundle bundle exec steep check'
         language: system
         files: ^packages/ruby/
         pass_filenames: false
       - id: php-lint
         name: php lint (cs-fixer + phpstan)
-        entry: bash -c 'cd packages/php && composer run lint:fix'
+        entry: bash -c 'cd packages/php && composer install --no-interaction --no-progress && composer run lint:fix'
         language: system
         files: ^packages/php/
         pass_filenames: false
