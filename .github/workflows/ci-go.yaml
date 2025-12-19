@@ -75,5 +75,5 @@ jobs:
 
       - name: Run golangci-lint
         working-directory: ${{ matrix.module }}
-        run: ../../scripts/ci/go/run-golangci-lint.sh
+        run: ${{ github.workspace }}/scripts/ci/go/run-golangci-lint.sh
         shell: bash
