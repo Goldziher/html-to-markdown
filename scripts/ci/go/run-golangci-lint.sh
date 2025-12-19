@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-golangci-lint run --config ../../.golangci.yml ./...
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
+
+golangci-lint run --config "${ROOT_DIR}/.golangci.yml" ./...
