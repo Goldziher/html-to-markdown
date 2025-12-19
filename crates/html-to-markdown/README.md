@@ -42,6 +42,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 ```
 
+## Error Handling
+
+Conversion returns a `Result<String, ConversionError>`. Inputs that look like binary data are rejected with
+`ConversionError::InvalidInput` to prevent runaway allocations. Table `colspan`/`rowspan` values are also clamped
+internally to keep output sizes bounded.
+
 ## Configuration
 
 ```rust

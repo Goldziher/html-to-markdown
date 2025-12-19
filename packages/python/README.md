@@ -443,6 +443,8 @@ except Exception as e:
     markdown = convert(html)
 ```
 
+If the input looks like binary data (e.g., PDF bytes), `convert()` raises `ValueError` with an `Invalid input` message.
+
 #### Performance Considerations
 
 1. **Single-Pass Collection**: Metadata extraction happens during HTML parsing with zero overhead when disabled.

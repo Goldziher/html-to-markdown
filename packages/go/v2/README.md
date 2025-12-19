@@ -20,7 +20,7 @@ High-performance HTML to Markdown converter with Go bindings to the Rust core li
 This module uses semantic import versioning (`/v2`) and lives in a subdirectory.
 
 - Import path: `github.com/Goldziher/html-to-markdown/packages/go/v2`
-- Tag format (Go module): `packages/go/vX.Y.Z` (example: `packages/go/v2.14.11`)
+- Tag format (Go module): `packages/go/vX.Y.Z` (example: `packages/go/v2.15.0`)
 
 ```bash
 go get github.com/Goldziher/html-to-markdown/packages/go/v2/htmltomarkdown

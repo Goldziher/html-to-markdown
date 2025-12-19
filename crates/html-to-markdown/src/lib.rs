@@ -36,6 +36,36 @@ pub use options::{
     PreprocessingOptions, PreprocessingPreset, WhitespaceMode,
 };
 
+const BINARY_SCAN_LIMIT: usize = 8192;
+const BINARY_CONTROL_RATIO: f64 = 0.3;
+
+fn validate_input(html: &str) -> Result<()> {
+    let bytes = html.as_bytes();
+    if bytes.is_empty() {
+        return Ok(());
+    }
+
+    let sample_len = bytes.len().min(BINARY_SCAN_LIMIT);
+    let mut control_count = 0usize;
+
+    for &byte in &bytes[..sample_len] {
+        if byte == 0 {
+            return Err(ConversionError::InvalidInput("binary data detected".to_string()));
+        }
+        let is_control = (byte < 0x09) || (0x0E..0x20).contains(&byte);
+        if is_control {
+            control_count += 1;
+        }
+    }
+
+    let control_ratio = control_count as f64 / sample_len as f64;
+    if control_ratio > BINARY_CONTROL_RATIO {
+        return Err(ConversionError::InvalidInput("binary data detected".to_string()));
+    }
+
+    Ok(())
+}
+
 /// Convert HTML to Markdown.
 ///
 /// # Arguments
@@ -53,6 +83,7 @@ pub use options::{
 /// assert!(markdown.contains("Hello World"));
 /// ```
 pub fn convert(html: &str, options: Option<ConversionOptions>) -> Result<String> {
+    validate_input(html)?;
     let options = options.unwrap_or_default();
 
     let normalized_html = if html.contains('\r') {
@@ -88,6 +119,7 @@ pub fn convert_with_inline_images(
     use std::cell::RefCell;
     use std::rc::Rc;
 
+    validate_input(html)?;
     let options = options.unwrap_or_default();
 
     let normalized_html = if html.contains('\r') {
@@ -245,6 +277,7 @@ pub fn convert_with_metadata(
     use std::cell::RefCell;
     use std::rc::Rc;
 
+    validate_input(html)?;
     let options = options.unwrap_or_default();
 
     let normalized_html = if html.contains('\r') {
@@ -387,5 +420,23 @@ mod tests {
             .filter(|l| l.link_type == LinkType::Internal)
             .collect();
         assert_eq!(internal_links.len(), 2);
+    }
+}
+
+#[cfg(test)]
+mod basic_tests {
+    use super::*;
+
+    #[test]
+    fn test_binary_input_rejected() {
+        let html = "PDF\0DATA";
+        let result = convert(html, None);
+        assert!(matches!(result, Err(ConversionError::InvalidInput(_))));
+    }
+
+    #[test]
+    fn test_plain_text_allowed() {
+        let result = convert("Just text", None).unwrap();
+        assert!(result.contains("Just text"));
     }
 }

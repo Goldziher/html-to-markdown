@@ -45,6 +45,11 @@ The package re-exports all conversion options exposed by the native bindings. Se
 [core documentation](https://github.com/Goldziher/html-to-markdown) for complete
 option descriptions.
 
+## Error Handling
+
+Conversion errors raise `Error` with a Rust-provided message. Inputs that look like binary data (e.g., PDF bytes
+coerced to a string) are rejected with an `Invalid input` message.
+
 ### File Helpers
 
 ```ts

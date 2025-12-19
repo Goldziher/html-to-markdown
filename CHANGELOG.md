@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.15.0] - 2025-12-19
+
+### Fixed
+- Rust core: clamp table `colspan`/`rowspan` to prevent pathological allocations on malformed HTML.
+- Rust core: reject binary-like inputs early to avoid OOMs when non-HTML data is passed to `convert`.
+
 ## [2.14.11] - 2025-12-16
 
 ### Fixed

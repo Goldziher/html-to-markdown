@@ -28,6 +28,10 @@ pub enum ConversionError {
     #[error("Internal panic: {0}")]
     Panic(String),
 
+    /// Invalid input data
+    #[error("Invalid input: {0}")]
+    InvalidInput(String),
+
     /// Generic conversion error
     #[error("Conversion error: {0}")]
     Other(String),

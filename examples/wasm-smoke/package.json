@@ -1,6 +1,6 @@
 {
   "name": "html-to-markdown-wasm-smoke",
-  "version": "2.14.11",
+  "version": "2.15.0",
   "private": true,
   "type": "module",
   "description": "Smoke test for installing html-to-markdown-wasm",
@@ -8,6 +8,6 @@
     "check": "node index.mjs"
   },
   "dependencies": {
-    "html-to-markdown-wasm": "^2.12.1"
+    "html-to-markdown-wasm": "^2.15.0"
   }
 }
