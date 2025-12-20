@@ -97,11 +97,27 @@ impl FrameworkAdapter for NativeAdapter {
         } else {
             None
         };
+        let flamegraph_result_path = flamegraph_path.as_ref().map(|path| {
+            if let Ok(relative) = path.strip_prefix(&config.output_dir) {
+                relative.to_path_buf()
+            } else {
+                path.clone()
+            }
+        });
 
         #[cfg(all(feature = "profiling", not(target_os = "windows")))]
-        if let (Some(profile_guard), Some(path)) = (profiler.take(), flamegraph_path.as_ref()) {
-            let report = profile_guard.finish()?;
-            report.generate_flamegraph(path)?;
+        {
+            let flamegraph_output_path = flamegraph_path.as_ref().map(|path| {
+                if path.is_relative() {
+                    self.repo_root.join(path)
+                } else {
+                    path.clone()
+                }
+            });
+            if let (Some(profile_guard), Some(path)) = (profiler.take(), flamegraph_output_path.as_ref()) {
+                let report = profile_guard.finish()?;
+                report.generate_flamegraph(path)?;
+            }
         }
 
         let memory_stats = capture_memory_stats().ok();
@@ -123,7 +139,7 @@ impl FrameworkAdapter for NativeAdapter {
             },
             resource_stats,
             memory_stats,
-            flamegraph_path,
+            flamegraph_path: flamegraph_result_path,
             statistics,
             success: true,
             error_message: None,

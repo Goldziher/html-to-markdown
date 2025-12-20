@@ -192,10 +192,24 @@ impl FrameworkAdapter for ScriptAdapter {
         let (mut command, working_dir) = self.build_command()?;
         let fixture_path = fixture.resolved_path(&self.repo_root);
         let flamegraph_path = self.flamegraph_path(fixture, config);
+        let flamegraph_output_path = flamegraph_path.as_ref().map(|path| {
+            if path.is_relative() {
+                self.repo_root.join(path)
+            } else {
+                path.clone()
+            }
+        });
+        let flamegraph_result_path = flamegraph_path.as_ref().map(|path| {
+            if let Ok(relative) = path.strip_prefix(&config.output_dir) {
+                relative.to_path_buf()
+            } else {
+                path.clone()
+            }
+        });
 
         let iterations = fixture.iterations.unwrap_or(config.benchmark_iterations as u32).max(1) as usize;
 
-        if let Some(output) = flamegraph_path.as_ref() {
+        if let Some(output) = flamegraph_output_path.as_ref() {
             command.env("HTML_TO_MARKDOWN_PROFILE_OUTPUT", output);
             command.env("HTML_TO_MARKDOWN_PROFILE_ONCE", "true");
         }
@@ -302,7 +316,7 @@ impl FrameworkAdapter for ScriptAdapter {
             },
             resource_stats,
             memory_stats: None,
-            flamegraph_path,
+            flamegraph_path: flamegraph_result_path,
             statistics: None,
             success: true,
             error_message: None,
