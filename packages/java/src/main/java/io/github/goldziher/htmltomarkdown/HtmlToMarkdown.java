@@ -115,7 +115,7 @@ public final class HtmlToMarkdown {
      * Start Rust-side profiling and write a flamegraph to the given output path.
      *
      * @param outputPath path to the flamegraph SVG to write
-     * @param frequency sampling frequency in Hz (defaults to 1000 if <= 0)
+     * @param frequency sampling frequency in Hz (defaults to 1000 if {@code <= 0})
      */
     public static void startProfiling(String outputPath, int frequency) {
         if (outputPath == null || outputPath.isBlank()) {
