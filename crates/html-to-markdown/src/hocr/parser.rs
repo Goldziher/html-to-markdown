@@ -3,15 +3,15 @@
 //! Parses hOCR title attributes into structured properties.
 
 use super::types::{BBox, Baseline, HocrProperties};
-use crate::text::decode_html_entities;
+use crate::text::decode_html_entities_cow;
 
 /// Parse all properties from hOCR title attribute
 pub fn parse_properties(title: &str, debug: bool) -> HocrProperties {
     let mut props = HocrProperties::default();
 
-    let title = decode_html_entities(title);
+    let title = decode_html_entities_cow(title);
 
-    for part in title.split(';') {
+    for part in title.as_ref().split(';') {
         let part = part.trim();
         if part.is_empty() {
             continue;
@@ -161,31 +161,20 @@ fn parse_bbox_coords<'a, I>(tokens: &mut I) -> Option<BBox>
 where
     I: Iterator<Item = &'a str>,
 {
-    let coords: Vec<&str> = tokens.take(4).collect();
-    if coords.len() == 4 {
-        if let (Ok(x1), Ok(y1), Ok(x2), Ok(y2)) = (
-            coords[0].parse::<u32>(),
-            coords[1].parse::<u32>(),
-            coords[2].parse::<u32>(),
-            coords[3].parse::<u32>(),
-        ) {
-            return Some(BBox { x1, y1, x2, y2 });
-        }
-    }
-    None
+    let x1 = tokens.next()?.parse::<u32>().ok()?;
+    let y1 = tokens.next()?.parse::<u32>().ok()?;
+    let x2 = tokens.next()?.parse::<u32>().ok()?;
+    let y2 = tokens.next()?.parse::<u32>().ok()?;
+    Some(BBox { x1, y1, x2, y2 })
 }
 
 fn parse_baseline<'a, I>(tokens: &mut I) -> Option<Baseline>
 where
     I: Iterator<Item = &'a str>,
 {
-    let vals: Vec<&str> = tokens.take(2).collect();
-    if vals.len() == 2 {
-        if let (Ok(slope), Ok(constant)) = (vals[0].parse::<f64>(), vals[1].parse::<i32>()) {
-            return Some(Baseline { slope, constant });
-        }
-    }
-    None
+    let slope = tokens.next()?.parse::<f64>().ok()?;
+    let constant = tokens.next()?.parse::<i32>().ok()?;
+    Some(Baseline { slope, constant })
 }
 
 fn parse_poly<'a, I>(tokens: &mut I) -> Option<Vec<(i32, i32)>>

@@ -73,22 +73,32 @@ pub fn convert_to_markdown_with_options(
 ) -> String {
     let mut output = String::new();
 
-    let mut sorted_elements: Vec<_> = elements.iter().collect();
-    if preserve_structure {
-        sorted_elements.sort_by_key(|e| e.properties.order.unwrap_or(u32::MAX));
-    }
-
     let mut ctx = ConvertContext::default();
 
-    for element in sorted_elements {
-        convert_element(
-            element,
-            &mut output,
-            0,
-            preserve_structure,
-            enable_spatial_tables,
-            &mut ctx,
-        );
+    if preserve_structure && should_sort_children(elements) {
+        let mut sorted_elements: Vec<&HocrElement> = elements.iter().collect();
+        sorted_elements.sort_by_key(|e| e.properties.order.unwrap_or(u32::MAX));
+        for element in sorted_elements {
+            convert_element(
+                element,
+                &mut output,
+                0,
+                preserve_structure,
+                enable_spatial_tables,
+                &mut ctx,
+            );
+        }
+    } else {
+        for element in elements {
+            convert_element(
+                element,
+                &mut output,
+                0,
+                preserve_structure,
+                enable_spatial_tables,
+                &mut ctx,
+            );
+        }
     }
 
     collapse_extra_newlines(&mut output);
@@ -150,7 +160,8 @@ fn convert_element(
         }
 
         HocrElementType::OcrPar => {
-            let bullet_paragraph = is_bullet_paragraph(element);
+            let text_snapshot = element_text_content(element);
+            let bullet_paragraph = is_bullet_paragraph(element, &text_snapshot);
             if !output.is_empty() {
                 if bullet_paragraph {
                     if !output.ends_with('\n') {
@@ -161,7 +172,7 @@ fn convert_element(
                 }
             }
 
-            if let Some(heading) = detect_heading_paragraph(element) {
+            if let Some(heading) = detect_heading_paragraph(element, &text_snapshot) {
                 if !output.is_empty() && !output.ends_with("\n\n") {
                     if output.ends_with('\n') {
                         output.push('\n');
@@ -491,32 +502,54 @@ fn append_text_and_children(
         }
     }
 
-    let mut sorted_children: Vec<_> = element.children.iter().collect();
-    if preserve_structure {
+    if preserve_structure && should_sort_children(&element.children) {
+        let mut sorted_children: Vec<&HocrElement> = element.children.iter().collect();
         sorted_children.sort_by_key(|e| e.properties.order.unwrap_or(u32::MAX));
+        for child in sorted_children {
+            convert_element(child, output, depth + 1, preserve_structure, enable_spatial_tables, ctx);
+        }
+    } else {
+        for child in &element.children {
+            convert_element(child, output, depth + 1, preserve_structure, enable_spatial_tables, ctx);
+        }
+    }
+}
+
+fn should_sort_children(children: &[HocrElement]) -> bool {
+    let mut last = 0u32;
+    let mut saw_any = false;
+
+    for child in children {
+        let order = child.properties.order.unwrap_or(u32::MAX);
+        if saw_any && order < last {
+            return true;
+        }
+        last = order;
+        saw_any = true;
     }
 
-    for child in sorted_children {
-        convert_element(child, output, depth + 1, preserve_structure, enable_spatial_tables, ctx);
-    }
+    false
 }
 
 fn element_text_content(element: &HocrElement) -> String {
-    let mut tokens = Vec::new();
-    collect_text_tokens(element, &mut tokens);
-    tokens.join(" ").replace("  ", " ").trim().to_string()
+    let mut output = String::new();
+    collect_text_tokens(element, &mut output);
+    output
 }
 
-fn collect_text_tokens(element: &HocrElement, tokens: &mut Vec<String>) {
+fn collect_text_tokens(element: &HocrElement, output: &mut String) {
     if element.element_type == HocrElementType::OcrxWord {
         let trimmed = element.text.trim();
         if !trimmed.is_empty() {
-            tokens.push(trimmed.to_string());
+            if !output.is_empty() {
+                output.push(' ');
+            }
+            output.push_str(trimmed);
         }
     }
 
     for child in &element.children {
-        collect_text_tokens(child, tokens);
+        collect_text_tokens(child, output);
     }
 }
 
@@ -541,7 +574,7 @@ fn collect_words(element: &HocrElement, words: &mut Vec<HocrWord>) {
     }
 }
 
-fn detect_heading_paragraph(element: &HocrElement) -> Option<String> {
+fn detect_heading_paragraph(element: &HocrElement, text: &str) -> Option<String> {
     if element.element_type != HocrElementType::OcrPar {
         return None;
     }
@@ -556,22 +589,27 @@ fn detect_heading_paragraph(element: &HocrElement) -> Option<String> {
         return None;
     }
 
-    let text = element_text_content(element);
     if text.is_empty() || text.len() > 60 || text.contains(':') || text.contains('\n') {
         return None;
     }
 
-    let words: Vec<&str> = text.split_whitespace().collect();
-    if words.len() < 2 || words.len() > 8 {
+    let mut word_count = 0usize;
+    let mut uppercase_initial = 0usize;
+    for word in text.split_whitespace() {
+        word_count += 1;
+        if word.chars().next().map(|c| c.is_uppercase()).unwrap_or(false) {
+            uppercase_initial += 1;
+        }
+        if word_count > 8 {
+            return None;
+        }
+    }
+
+    if word_count < 2 {
         return None;
     }
 
-    let uppercase_initial = words
-        .iter()
-        .filter(|word| word.chars().next().map(|c| c.is_uppercase()).unwrap_or(false))
-        .count();
-
-    if uppercase_initial < words.len().saturating_sub(1) {
+    if uppercase_initial < word_count.saturating_sub(1) {
         return None;
     }
 
@@ -579,7 +617,7 @@ fn detect_heading_paragraph(element: &HocrElement) -> Option<String> {
         return None;
     }
 
-    Some(text)
+    Some(text.to_string())
 }
 
 /// Try to detect and reconstruct a table from an element's word children
@@ -609,12 +647,11 @@ fn try_spatial_table_reconstruction(element: &HocrElement) -> Option<String> {
     None
 }
 
-fn is_bullet_paragraph(element: &HocrElement) -> bool {
+fn is_bullet_paragraph(element: &HocrElement, text: &str) -> bool {
     if element.element_type != HocrElementType::OcrPar {
         return false;
     }
 
-    let text = element_text_content(element);
     let trimmed = text.trim_start();
     if trimmed.is_empty() {
         return false;
@@ -658,7 +695,8 @@ fn find_previous_heading(children: &[&HocrElement], idx: usize) -> Option<String
     }
 
     for candidate in children[..idx].iter().rev() {
-        if let Some(text) = detect_heading_paragraph(candidate) {
+        let text_snapshot = element_text_content(candidate);
+        if let Some(text) = detect_heading_paragraph(candidate, &text_snapshot) {
             return Some(text);
         }
     }

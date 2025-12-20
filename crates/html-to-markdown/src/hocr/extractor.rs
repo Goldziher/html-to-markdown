@@ -133,6 +133,9 @@ fn extract_element(node_handle: &tl::NodeHandle, parser: &tl::Parser, debug: boo
         let attrs = tag.attributes();
         let class_attr = attrs.get("class").flatten()?;
         let classes = class_attr.as_utf8_str();
+        if !classes.as_ref().contains("ocr") {
+            return None;
+        }
 
         let element_type = classes.split_whitespace().find_map(HocrElementType::from_class)?;
 
