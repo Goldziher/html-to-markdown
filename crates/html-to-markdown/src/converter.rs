@@ -503,6 +503,7 @@ struct Context {
 struct DomContext {
     parent_map: Vec<Option<u32>>,
     children_map: Vec<Option<Vec<tl::NodeHandle>>>,
+    sibling_index_map: Vec<Option<usize>>,
     root_children: Vec<tl::NodeHandle>,
     node_map: Vec<Option<tl::NodeHandle>>,
     tag_info_map: Vec<Option<TagInfo>>,
@@ -518,6 +519,7 @@ impl DomContext {
             let new_len = idx + 1;
             self.parent_map.resize(new_len, None);
             self.children_map.resize_with(new_len, || None);
+            self.sibling_index_map.resize_with(new_len, || None);
             self.node_map.resize(new_len, None);
             self.tag_info_map.resize_with(new_len, || None);
         }
@@ -535,6 +537,10 @@ impl DomContext {
         self.children_map
             .get(id as usize)
             .and_then(|children| children.as_ref())
+    }
+
+    fn sibling_index(&self, id: u32) -> Option<usize> {
+        self.sibling_index_map.get(id as usize).copied().flatten()
     }
 
     fn tag_info(&self, id: u32) -> Option<&TagInfo> {
@@ -840,13 +846,17 @@ fn build_dom_context(dom: &tl::VDom, parser: &tl::Parser) -> DomContext {
     let mut ctx = DomContext {
         parent_map: Vec::new(),
         children_map: Vec::new(),
+        sibling_index_map: Vec::new(),
         root_children: dom.children().to_vec(),
         node_map: Vec::new(),
         tag_info_map: Vec::new(),
         text_cache: RefCell::new(LruCache::new(NonZeroUsize::new(TEXT_CACHE_CAPACITY).unwrap())),
     };
 
-    for child_handle in dom.children().iter() {
+    for (index, child_handle) in dom.children().iter().enumerate() {
+        let id = child_handle.get_inner();
+        ctx.ensure_capacity(id);
+        ctx.sibling_index_map[id as usize] = Some(index);
         record_node_hierarchy(child_handle, None, parser, &mut ctx);
     }
 
@@ -925,7 +935,10 @@ fn record_node_hierarchy(node_handle: &tl::NodeHandle, parent: Option<u32>, pars
             });
 
             let children: Vec<_> = tag.children().top().iter().copied().collect();
-            for child in &children {
+            for (index, child) in children.iter().enumerate() {
+                let child_id = child.get_inner();
+                ctx.ensure_capacity(child_id);
+                ctx.sibling_index_map[child_id as usize] = Some(index);
                 record_node_hierarchy(child, Some(id), parser, ctx);
             }
             ctx.children_map[id as usize] = Some(children);
@@ -2590,7 +2603,9 @@ fn get_next_sibling_tag<'a>(
         &dom_ctx.root_children
     };
 
-    let position = siblings.iter().position(|handle| handle.get_inner() == id)?;
+    let position = dom_ctx
+        .sibling_index(id)
+        .or_else(|| siblings.iter().position(|handle| handle.get_inner() == id))?;
 
     for sibling in siblings.iter().skip(position + 1) {
         if let Some(info) = dom_ctx.tag_info(sibling.get_inner()) {
@@ -2622,7 +2637,9 @@ fn get_previous_sibling_tag<'a>(
         &dom_ctx.root_children
     };
 
-    let position = siblings.iter().position(|handle| handle.get_inner() == id)?;
+    let position = dom_ctx
+        .sibling_index(id)
+        .or_else(|| siblings.iter().position(|handle| handle.get_inner() == id))?;
 
     for sibling in siblings.iter().take(position).rev() {
         if let Some(info) = dom_ctx.tag_info(sibling.get_inner()) {
@@ -2654,7 +2671,10 @@ fn previous_sibling_is_inline_tag(node_handle: &tl::NodeHandle, parser: &tl::Par
         &dom_ctx.root_children
     };
 
-    let Some(position) = siblings.iter().position(|handle| handle.get_inner() == id) else {
+    let Some(position) = dom_ctx
+        .sibling_index(id)
+        .or_else(|| siblings.iter().position(|handle| handle.get_inner() == id))
+    else {
         return false;
     };
 
@@ -2689,7 +2709,10 @@ fn next_sibling_is_whitespace_text(node_handle: &tl::NodeHandle, parser: &tl::Pa
         &dom_ctx.root_children
     };
 
-    let Some(position) = siblings.iter().position(|handle| handle.get_inner() == id) else {
+    let Some(position) = dom_ctx
+        .sibling_index(id)
+        .or_else(|| siblings.iter().position(|handle| handle.get_inner() == id))
+    else {
         return false;
     };
 
@@ -2720,7 +2743,10 @@ fn next_sibling_is_inline_tag(node_handle: &tl::NodeHandle, parser: &tl::Parser,
         &dom_ctx.root_children
     };
 
-    let Some(position) = siblings.iter().position(|handle| handle.get_inner() == id) else {
+    let Some(position) = dom_ctx
+        .sibling_index(id)
+        .or_else(|| siblings.iter().position(|handle| handle.get_inner() == id))
+    else {
         return false;
     };
 
