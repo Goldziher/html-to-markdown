@@ -1187,12 +1187,20 @@ fn is_empty_inline_element(node_handle: &tl::NodeHandle, parser: &tl::Parser, do
         "abbr", "var", "ins", "dfn", "time", "data", "cite", "q", "mark", "small", "u",
     ];
 
-    if let Some(node) = node_handle.get(parser) {
-        if let tl::Node::Tag(tag) = node {
-            let tag_name = normalized_tag_name(tag.name().as_utf8_str());
-            if EMPTY_WHEN_NO_CONTENT_TAGS.contains(&tag_name.as_ref()) {
-                return get_text_content(node_handle, parser, dom_ctx).trim().is_empty();
+    let tag_name: Option<Cow<'_, str>> = dom_ctx
+        .tag_info(node_handle.get_inner())
+        .map(|info| Cow::Borrowed(info.name.as_str()))
+        .or_else(|| {
+            if let Some(tl::Node::Tag(tag)) = node_handle.get(parser) {
+                Some(normalized_tag_name(tag.name().as_utf8_str()))
+            } else {
+                None
             }
+        });
+
+    if let Some(tag_name) = tag_name {
+        if EMPTY_WHEN_NO_CONTENT_TAGS.contains(&tag_name.as_ref()) {
+            return get_text_content(node_handle, parser, dom_ctx).trim().is_empty();
         }
     }
     false
@@ -1204,7 +1212,11 @@ fn get_text_content(node_handle: &tl::NodeHandle, parser: &tl::Parser, dom_ctx: 
 }
 
 /// Collect inline text for link labels, skipping block-level descendants.
-fn collect_link_label_text(children: &[tl::NodeHandle], parser: &tl::Parser) -> (String, Vec<tl::NodeHandle>, bool) {
+fn collect_link_label_text(
+    children: &[tl::NodeHandle],
+    parser: &tl::Parser,
+    dom_ctx: &DomContext,
+) -> (String, Vec<tl::NodeHandle>, bool) {
     let mut text = String::new();
     let mut saw_block = false;
     let mut block_nodes = Vec::new();
@@ -1217,20 +1229,24 @@ fn collect_link_label_text(children: &[tl::NodeHandle], parser: &tl::Parser) -> 
                     text.push_str(&text::decode_html_entities(&bytes.as_utf8_str()));
                 }
                 tl::Node::Tag(tag) => {
-                    let tag_name = normalized_tag_name(tag.name().as_utf8_str());
-                    if is_block_level_element(tag_name.as_ref()) {
+                    let is_block = dom_ctx
+                        .tag_info(handle.get_inner())
+                        .map(|info| info.is_block)
+                        .unwrap_or_else(|| {
+                            let tag_name = normalized_tag_name(tag.name().as_utf8_str());
+                            is_block_level_element(tag_name.as_ref())
+                        });
+                    if is_block {
                         saw_block = true;
                         block_nodes.push(handle);
                         continue;
                     }
 
                     let tag_children = tag.children();
-                    {
-                        let mut child_nodes: Vec<_> = tag_children.top().iter().copied().collect();
-                        child_nodes.reverse();
-                        for child in child_nodes {
-                            stack.push(child);
-                        }
+                    let mut child_nodes: Vec<_> = tag_children.top().iter().copied().collect();
+                    child_nodes.reverse();
+                    for child in child_nodes {
+                        stack.push(child);
                     }
                 }
                 _ => {}
@@ -2100,6 +2116,11 @@ fn should_drop_for_preprocessing(
 fn has_semantic_content_ancestor(node_handle: &tl::NodeHandle, parser: &tl::Parser, dom_ctx: &DomContext) -> bool {
     let mut current_id = node_handle.get_inner();
     while let Some(parent_id) = dom_ctx.parent_of(current_id) {
+        if let Some(parent_info) = dom_ctx.tag_info(parent_id) {
+            if matches!(parent_info.name.as_str(), "main" | "article" | "section") {
+                return true;
+            }
+        }
         if let Some(parent_handle) = dom_ctx.node_handle(parent_id) {
             if let Some(tl::Node::Tag(parent_tag)) = parent_handle.get(parser) {
                 let parent_name = normalized_tag_name(parent_tag.name().as_utf8_str());
@@ -3252,7 +3273,8 @@ fn walk_node(
                         }
 
                         let children: Vec<_> = tag.children().top().iter().copied().collect();
-                        let (inline_label, _block_nodes, saw_block) = collect_link_label_text(&children, parser);
+                        let (inline_label, _block_nodes, saw_block) =
+                            collect_link_label_text(&children, parser, dom_ctx);
                         let mut label = if saw_block {
                             let mut content = String::new();
                             let link_ctx = Context {
