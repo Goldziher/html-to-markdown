@@ -863,6 +863,10 @@ fn build_dom_context(dom: &tl::VDom, parser: &tl::Parser) -> DomContext {
     ctx
 }
 
+fn inline_ancestor_allows_block(tag_name: &str) -> bool {
+    matches!(tag_name, "a" | "ins" | "del")
+}
+
 /// Detect block elements that were incorrectly nested under inline ancestors.
 fn has_inline_block_misnest(dom_ctx: &DomContext, parser: &tl::Parser) -> bool {
     for handle in dom_ctx.node_map.iter().flatten() {
@@ -878,13 +882,15 @@ fn has_inline_block_misnest(dom_ctx: &DomContext, parser: &tl::Parser) -> bool {
                 let mut current = dom_ctx.parent_of(handle.get_inner());
                 while let Some(parent_id) = current {
                     if let Some(parent_info) = dom_ctx.tag_info(parent_id) {
-                        if parent_info.is_inline {
+                        if parent_info.is_inline && !inline_ancestor_allows_block(parent_info.name.as_str()) {
                             return true;
                         }
                     } else if let Some(parent_handle) = dom_ctx.node_handle(parent_id) {
                         if let Some(tl::Node::Tag(parent_tag)) = parent_handle.get(parser) {
                             let parent_name = normalized_tag_name(parent_tag.name().as_utf8_str());
-                            if is_inline_element(parent_name.as_ref()) {
+                            if is_inline_element(parent_name.as_ref())
+                                && !inline_ancestor_allows_block(parent_name.as_ref())
+                            {
                                 return true;
                             }
                         }
