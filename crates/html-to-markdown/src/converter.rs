@@ -504,6 +504,7 @@ struct DomContext {
     children_map: Vec<Option<Vec<tl::NodeHandle>>>,
     root_children: Vec<tl::NodeHandle>,
     node_map: Vec<Option<tl::NodeHandle>>,
+    tag_info_map: Vec<Option<TagInfo>>,
 }
 
 impl DomContext {
@@ -514,6 +515,7 @@ impl DomContext {
             self.parent_map.resize(new_len, None);
             self.children_map.resize_with(new_len, || None);
             self.node_map.resize(new_len, None);
+            self.tag_info_map.resize_with(new_len, || None);
         }
     }
 
@@ -530,6 +532,17 @@ impl DomContext {
             .get(id as usize)
             .and_then(|children| children.as_ref())
     }
+
+    fn tag_info(&self, id: u32) -> Option<&TagInfo> {
+        self.tag_info_map.get(id as usize).and_then(|info| info.as_ref())
+    }
+}
+
+struct TagInfo {
+    name: String,
+    is_inline: bool,
+    is_inline_like: bool,
+    is_block: bool,
 }
 
 fn escape_link_label(text: &str) -> String {
@@ -791,6 +804,7 @@ fn build_dom_context(dom: &tl::VDom, parser: &tl::Parser) -> DomContext {
         children_map: Vec::new(),
         root_children: dom.children().to_vec(),
         node_map: Vec::new(),
+        tag_info_map: Vec::new(),
     };
 
     for child_handle in dom.children().iter() {
@@ -804,11 +818,21 @@ fn build_dom_context(dom: &tl::VDom, parser: &tl::Parser) -> DomContext {
 fn has_inline_block_misnest(dom_ctx: &DomContext, parser: &tl::Parser) -> bool {
     for handle in dom_ctx.node_map.iter().flatten() {
         if let Some(tl::Node::Tag(tag)) = handle.get(parser) {
-            let tag_name = normalized_tag_name(tag.name().as_utf8_str());
-            if is_block_level_element(tag_name.as_ref()) {
+            let is_block = dom_ctx
+                .tag_info(handle.get_inner())
+                .map(|info| info.is_block)
+                .unwrap_or_else(|| {
+                    let tag_name = normalized_tag_name(tag.name().as_utf8_str());
+                    is_block_level_element(tag_name.as_ref())
+                });
+            if is_block {
                 let mut current = dom_ctx.parent_of(handle.get_inner());
                 while let Some(parent_id) = current {
-                    if let Some(parent_handle) = dom_ctx.node_handle(parent_id) {
+                    if let Some(parent_info) = dom_ctx.tag_info(parent_id) {
+                        if parent_info.is_inline {
+                            return true;
+                        }
+                    } else if let Some(parent_handle) = dom_ctx.node_handle(parent_id) {
                         if let Some(tl::Node::Tag(parent_tag)) = parent_handle.get(parser) {
                             let parent_name = normalized_tag_name(parent_tag.name().as_utf8_str());
                             if is_inline_element(parent_name.as_ref()) {
@@ -850,6 +874,17 @@ fn record_node_hierarchy(node_handle: &tl::NodeHandle, parent: Option<u32>, pars
 
     if let Some(node) = node_handle.get(parser) {
         if let tl::Node::Tag(tag) = node {
+            let name = normalized_tag_name(tag.name().as_utf8_str()).into_owned();
+            let is_inline = is_inline_element(&name);
+            let is_inline_like = is_inline || matches!(name.as_str(), "script" | "style");
+            let is_block = is_block_level_name(&name, is_inline);
+            ctx.tag_info_map[id as usize] = Some(TagInfo {
+                name,
+                is_inline,
+                is_inline_like,
+                is_block,
+            });
+
             let children: Vec<_> = tag.children().top().iter().copied().collect();
             for child in &children {
                 record_node_hierarchy(child, Some(id), parser, ctx);
@@ -2456,7 +2491,11 @@ fn is_inline_element(tag_name: &str) -> bool {
 
 /// Check if an element is block-level (not inline).
 fn is_block_level_element(tag_name: &str) -> bool {
-    !is_inline_element(tag_name)
+    is_block_level_name(tag_name, is_inline_element(tag_name))
+}
+
+fn is_block_level_name(tag_name: &str, is_inline: bool) -> bool {
+    !is_inline
         && matches!(
             tag_name,
             "address"
@@ -2494,7 +2533,11 @@ fn is_block_level_element(tag_name: &str) -> bool {
         )
 }
 
-fn get_next_sibling_tag(node_handle: &tl::NodeHandle, parser: &tl::Parser, dom_ctx: &DomContext) -> Option<String> {
+fn get_next_sibling_tag<'a>(
+    node_handle: &tl::NodeHandle,
+    parser: &tl::Parser,
+    dom_ctx: &'a DomContext,
+) -> Option<&'a str> {
     let id = node_handle.get_inner();
     let parent = dom_ctx.parent_of(id);
 
@@ -2507,15 +2550,14 @@ fn get_next_sibling_tag(node_handle: &tl::NodeHandle, parser: &tl::Parser, dom_c
     let position = siblings.iter().position(|handle| handle.get_inner() == id)?;
 
     for sibling in siblings.iter().skip(position + 1) {
+        if let Some(info) = dom_ctx.tag_info(sibling.get_inner()) {
+            return Some(info.name.as_str());
+        }
         if let Some(node) = sibling.get(parser) {
-            match node {
-                tl::Node::Tag(tag) => return Some(normalized_tag_name(tag.name().as_utf8_str()).into_owned()),
-                tl::Node::Raw(raw) => {
-                    if !raw.as_utf8_str().trim().is_empty() {
-                        return None;
-                    }
+            if let tl::Node::Raw(raw) = node {
+                if !raw.as_utf8_str().trim().is_empty() {
+                    return None;
                 }
-                _ => {}
             }
         }
     }
@@ -2523,7 +2565,11 @@ fn get_next_sibling_tag(node_handle: &tl::NodeHandle, parser: &tl::Parser, dom_c
     None
 }
 
-fn get_previous_sibling_tag(node_handle: &tl::NodeHandle, parser: &tl::Parser, dom_ctx: &DomContext) -> Option<String> {
+fn get_previous_sibling_tag<'a>(
+    node_handle: &tl::NodeHandle,
+    parser: &tl::Parser,
+    dom_ctx: &'a DomContext,
+) -> Option<&'a str> {
     let id = node_handle.get_inner();
     let parent = dom_ctx.parent_of(id);
 
@@ -2536,15 +2582,14 @@ fn get_previous_sibling_tag(node_handle: &tl::NodeHandle, parser: &tl::Parser, d
     let position = siblings.iter().position(|handle| handle.get_inner() == id)?;
 
     for sibling in siblings.iter().take(position).rev() {
+        if let Some(info) = dom_ctx.tag_info(sibling.get_inner()) {
+            return Some(info.name.as_str());
+        }
         if let Some(node) = sibling.get(parser) {
-            match node {
-                tl::Node::Tag(tag) => return Some(normalized_tag_name(tag.name().as_utf8_str()).into_owned()),
-                tl::Node::Raw(raw) => {
-                    if !raw.as_utf8_str().trim().is_empty() {
-                        return None;
-                    }
+            if let tl::Node::Raw(raw) = node {
+                if !raw.as_utf8_str().trim().is_empty() {
+                    return None;
                 }
-                _ => {}
             }
         }
     }
@@ -2571,19 +2616,15 @@ fn previous_sibling_is_inline_tag(node_handle: &tl::NodeHandle, parser: &tl::Par
     };
 
     for sibling in siblings.iter().take(position).rev() {
+        if let Some(info) = dom_ctx.tag_info(sibling.get_inner()) {
+            return info.is_inline_like;
+        }
         if let Some(node) = sibling.get(parser) {
-            match node {
-                tl::Node::Tag(tag) => {
-                    let name = normalized_tag_name(tag.name().as_utf8_str());
-                    return is_inline_element(name.as_ref()) || matches!(name.as_ref(), "script" | "style");
+            if let tl::Node::Raw(raw) = node {
+                if raw.as_utf8_str().trim().is_empty() {
+                    continue;
                 }
-                tl::Node::Raw(raw) => {
-                    if raw.as_utf8_str().trim().is_empty() {
-                        continue;
-                    }
-                    return false;
-                }
-                _ => continue,
+                return false;
             }
         }
     }
@@ -2641,19 +2682,15 @@ fn next_sibling_is_inline_tag(node_handle: &tl::NodeHandle, parser: &tl::Parser,
     };
 
     for sibling in siblings.iter().skip(position + 1) {
+        if let Some(info) = dom_ctx.tag_info(sibling.get_inner()) {
+            return info.is_inline_like;
+        }
         if let Some(node) = sibling.get(parser) {
-            match node {
-                tl::Node::Tag(tag) => {
-                    let name = normalized_tag_name(tag.name().as_utf8_str());
-                    return is_inline_element(name.as_ref()) || matches!(name.as_ref(), "script" | "style");
+            if let tl::Node::Raw(raw) = node {
+                if raw.as_utf8_str().trim().is_empty() {
+                    continue;
                 }
-                tl::Node::Raw(raw) => {
-                    if raw.as_utf8_str().trim().is_empty() {
-                        continue;
-                    }
-                    return false;
-                }
-                _ => continue,
+                return false;
             }
         }
     }
@@ -2734,7 +2771,7 @@ fn walk_node(
                     }
                     if !output.ends_with("\n\n") {
                         if let Some(next_tag) = get_next_sibling_tag(node_handle, parser, dom_ctx) {
-                            if is_inline_element(&next_tag) {
+                            if is_inline_element(next_tag) {
                                 return;
                             }
                         }
@@ -2841,7 +2878,7 @@ fn walk_node(
                             if options.debug {
                                 eprintln!("[DEBUG] Next sibling tag after newline: {}", next_tag);
                             }
-                            if matches!(next_tag.as_str(), "span") {
+                            if matches!(next_tag, "span") {
                             } else if ctx.inline_depth > 0 || ctx.convert_as_inline || ctx.in_paragraph {
                                 final_text.push(' ');
                             } else {
@@ -3968,9 +4005,8 @@ fn walk_node(
                             .find(|line| !line.trim().is_empty())
                             .map(|line| line.trim_start().starts_with('>'))
                             .unwrap_or(false);
-                        let needs_blank_line = !ctx.in_paragraph
-                            && !matches!(prev_tag.as_deref(), Some("blockquote"))
-                            && !last_line_is_blockquote;
+                        let needs_blank_line =
+                            !ctx.in_paragraph && !matches!(prev_tag, Some("blockquote")) && !last_line_is_blockquote;
 
                         if options.debug {
                             eprintln!(
