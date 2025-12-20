@@ -415,14 +415,33 @@ fn ensure_java_jar(repo_root: &Path) -> Result<()> {
     ensure_ffi_library(repo_root)?;
 
     let mvn_cmd = if cfg!(windows) {
-        PathBuf::from("mvn.cmd")
+        let wrapper = repo_root.join("mvnw.cmd");
+        if wrapper.exists() {
+            wrapper
+        } else {
+            PathBuf::from("mvn.cmd")
+        }
     } else {
-        PathBuf::from("mvn")
+        let wrapper = repo_root.join("mvnw");
+        if wrapper.exists() {
+            wrapper
+        } else {
+            PathBuf::from("mvn")
+        }
     };
+    let maven_main_class = "org.apache.maven.cling.MavenCling";
+    let mut maven_opts = env::var("MAVEN_OPTS").unwrap_or_default();
+    if !maven_opts.contains("maven.mainClass") {
+        if !maven_opts.is_empty() {
+            maven_opts.push(' ');
+        }
+        maven_opts.push_str(&format!("-Dmaven.mainClass={maven_main_class}"));
+    }
 
     let lib_status = Command::new(&mvn_cmd)
         .arg("package")
         .arg("-DskipTests")
+        .env("MAVEN_OPTS", &maven_opts)
         .current_dir(&java_dir)
         .status()
         .map_err(|err| Error::Benchmark(format!("Failed to run mvn package: {err}")))?;
@@ -438,6 +457,7 @@ fn ensure_java_jar(repo_root: &Path) -> Result<()> {
         .arg("benchmark-pom.xml")
         .arg("clean")
         .arg("package")
+        .env("MAVEN_OPTS", &maven_opts)
         .current_dir(&java_dir)
         .status()
         .map_err(|err| Error::Benchmark(format!("Failed to build Java benchmark jar: {err}")))?;
@@ -517,7 +537,9 @@ fn ensure_elixir_vendor(repo_root: &Path) -> Result<()> {
     let vendor_dir = repo_root.join("packages/elixir/native/html_to_markdown_elixir/vendor");
     let vendor_crate = vendor_dir.join("html-to-markdown-rs");
     let vendor_manifest = vendor_crate.join("Cargo.toml");
+    let vendor_workspace = vendor_dir.join("Cargo.toml");
     if vendor_manifest.exists() {
+        ensure_elixir_workspace_manifest(repo_root, &vendor_workspace)?;
         return Ok(());
     }
 
@@ -532,7 +554,51 @@ fn ensure_elixir_vendor(repo_root: &Path) -> Result<()> {
     std::fs::create_dir_all(&vendor_dir)
         .map_err(|err| Error::Benchmark(format!("Failed to create {}: {err}", vendor_dir.display())))?;
     copy_dir_recursive(&source_crate, &vendor_crate)?;
+    ensure_elixir_workspace_manifest(repo_root, &vendor_workspace)?;
     Ok(())
+}
+
+fn ensure_elixir_workspace_manifest(repo_root: &Path, vendor_workspace: &Path) -> Result<()> {
+    if vendor_workspace.exists() {
+        return Ok(());
+    }
+
+    let root_manifest = repo_root.join("Cargo.toml");
+    let root_contents = std::fs::read_to_string(&root_manifest)
+        .map_err(|err| Error::Benchmark(format!("Failed to read {}: {err}", root_manifest.display())))?;
+
+    let workspace_package = extract_toml_section(&root_contents, "[workspace.package]")
+        .ok_or_else(|| Error::Benchmark("Missing [workspace.package] in root Cargo.toml".into()))?;
+    let workspace_deps = extract_toml_section(&root_contents, "[workspace.dependencies]")
+        .ok_or_else(|| Error::Benchmark("Missing [workspace.dependencies] in root Cargo.toml".into()))?;
+
+    let manifest =
+        format!("[workspace]\nmembers = [\"html-to-markdown-rs\"]\n\n{workspace_package}\n\n{workspace_deps}\n");
+
+    std::fs::write(vendor_workspace, manifest).map_err(|err| {
+        Error::Benchmark(format!(
+            "Failed to write Elixir vendor workspace manifest {}: {err}",
+            vendor_workspace.display()
+        ))
+    })?;
+    Ok(())
+}
+
+fn extract_toml_section(contents: &str, header: &str) -> Option<String> {
+    let start = contents.find(header)?;
+    let rest = &contents[start..];
+    let mut lines = rest.lines();
+    let mut section = Vec::new();
+    if let Some(first) = lines.next() {
+        section.push(first);
+    }
+    for line in lines {
+        if line.trim_start().starts_with('[') {
+            break;
+        }
+        section.push(line);
+    }
+    Some(section.join("\n"))
 }
 
 fn copy_dir_recursive(source: &Path, destination: &Path) -> Result<()> {
