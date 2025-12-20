@@ -41,7 +41,7 @@ pub fn convert_html(html: String, options: Option<&ZendHashTable>) -> PhpResult<
         None => None,
     };
 
-    guard_panic(|| profiling::maybe_profile(|| html_to_markdown_rs::convert(&html, rust_options)))
+    guard_panic(|| profiling::maybe_profile(|| html_to_markdown_rs::convert(&html, rust_options.clone())))
         .map_err(to_php_exception)
 }
 

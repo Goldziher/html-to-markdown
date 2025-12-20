@@ -212,6 +212,11 @@ impl FrameworkAdapter for ScriptAdapter {
         if let Some(output) = flamegraph_output_path.as_ref() {
             command.env("HTML_TO_MARKDOWN_PROFILE_OUTPUT", output);
             command.env("HTML_TO_MARKDOWN_PROFILE_ONCE", "true");
+            command.env(
+                "HTML_TO_MARKDOWN_PROFILE_FREQUENCY",
+                config.profile_frequency.to_string(),
+            );
+            command.env("HTML_TO_MARKDOWN_PROFILE_REPEAT", config.profile_repeat.to_string());
         }
 
         command
@@ -294,6 +299,16 @@ impl FrameworkAdapter for ScriptAdapter {
 
         let duration = Duration::from_secs_f64(script_result.elapsed_seconds);
         let file_size = std::fs::metadata(&fixture_path).map(|m| m.len()).unwrap_or_default();
+        let profile_repeat = if flamegraph_output_path.is_some() {
+            config.profile_repeat.max(1)
+        } else {
+            1
+        };
+        let iterations = (script_result.iterations as usize).saturating_mul(profile_repeat);
+        let bytes_processed = (script_result.bytes_processed as u64).saturating_mul(profile_repeat as u64);
+        let duration_secs = duration.as_secs_f64().max(0.000_001);
+        let ops_per_sec = iterations as f64 / duration_secs;
+        let mb_per_sec = (bytes_processed as f64 / (1024.0 * 1024.0)) / duration_secs;
 
         Ok(BenchmarkResult {
             framework: self.name().to_string(),
@@ -303,13 +318,13 @@ impl FrameworkAdapter for ScriptAdapter {
             fixture_format: fixture.format.as_str().to_string(),
             file_extension: fixture.file_extension(),
             file_size,
-            iterations: script_result.iterations as usize,
+            iterations,
             duration,
             metrics: PerformanceMetrics {
-                ops_per_sec: script_result.ops_per_sec,
-                mb_per_sec: script_result.mb_per_sec,
+                ops_per_sec,
+                mb_per_sec,
                 throughput_bytes_per_sec: if duration.as_secs_f64() > 0.0 {
-                    script_result.bytes_processed as f64 / duration.as_secs_f64()
+                    bytes_processed as f64 / duration.as_secs_f64()
                 } else {
                     0.0
                 },

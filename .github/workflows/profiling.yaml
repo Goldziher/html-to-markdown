@@ -39,6 +39,14 @@ on:
         description: "Benchmark mode (single-file or batch)"
         default: "single-file"
         required: false
+      profile_frequency:
+        description: "Profiling sampling frequency (Hz)"
+        default: "2000"
+        required: false
+      profile_repeat:
+        description: "Repeat conversions per profiling capture"
+        default: "5"
+        required: false
 
 permissions:
   contents: read
@@ -49,10 +57,14 @@ env:
   DEFAULT_ITERATIONS: "3"
   DEFAULT_WARMUP: "1"
   DEFAULT_MODE: "single-file"
+  DEFAULT_PROFILE_FREQUENCY: "2000"
+  DEFAULT_PROFILE_REPEAT: "5"
   CARGO_TERM_COLOR: always
   CARGO_INCREMENTAL: 0
   RUSTFLAGS: "-g -C force-frame-pointers=yes"
   RUST_BACKTRACE: short
+  CARGO_PROFILE_RELEASE_DEBUG: 2
+  CARGO_PROFILE_RELEASE_STRIP: none
 
 jobs:
   profiling:
@@ -69,6 +81,8 @@ jobs:
       ITERATIONS: ${{ github.event.inputs.iterations || '3' }}
       WARMUP: ${{ github.event.inputs.warmup || '1' }}
       MODE: ${{ github.event.inputs.mode || 'single-file' }}
+      PROFILE_FREQUENCY: ${{ github.event.inputs.profile_frequency || '2000' }}
+      PROFILE_REPEAT: ${{ github.event.inputs.profile_repeat || '5' }}
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -187,6 +201,8 @@ jobs:
             --iterations "${ITERATIONS}" \
             --warmup "${WARMUP}" \
             --mode "${MODE}" \
+            --profile-frequency "${PROFILE_FREQUENCY}" \
+            --profile-repeat "${PROFILE_REPEAT}" \
             --profile --flamegraphs tools/benchmark-harness/results/flamegraphs \
             --format both --output tools/benchmark-harness/results
 

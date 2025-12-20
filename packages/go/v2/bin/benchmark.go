@@ -45,10 +45,12 @@ func main() {
 	profileOutput := os.Getenv("HTML_TO_MARKDOWN_PROFILE_OUTPUT")
 	profileFrequency := os.Getenv("HTML_TO_MARKDOWN_PROFILE_FREQUENCY")
 	profileOnce := os.Getenv("HTML_TO_MARKDOWN_PROFILE_ONCE")
+	profileRepeat := os.Getenv("HTML_TO_MARKDOWN_PROFILE_REPEAT")
 	if profileOutput != "" {
 		_ = os.Unsetenv("HTML_TO_MARKDOWN_PROFILE_OUTPUT")
 		_ = os.Unsetenv("HTML_TO_MARKDOWN_PROFILE_FREQUENCY")
 		_ = os.Unsetenv("HTML_TO_MARKDOWN_PROFILE_ONCE")
+		_ = os.Unsetenv("HTML_TO_MARKDOWN_PROFILE_REPEAT")
 	}
 
 	// Warmup (avoid profiling the warmup run).
@@ -65,6 +67,9 @@ func main() {
 		}
 		if profileOnce != "" {
 			_ = os.Setenv("HTML_TO_MARKDOWN_PROFILE_ONCE", profileOnce)
+		}
+		if profileRepeat != "" {
+			_ = os.Setenv("HTML_TO_MARKDOWN_PROFILE_REPEAT", profileRepeat)
 		}
 	}
 

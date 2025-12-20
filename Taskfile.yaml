@@ -130,12 +130,12 @@ tasks:
   bench:harness:rust:
     desc: "Run benchmark harness for Rust only with flamegraphs"
     cmds:
-      - cargo run --release --features profiling --manifest-path tools/benchmark-harness/Cargo.toml -- run --fixtures tools/benchmark-harness/fixtures/wikipedia.toml --frameworks rust --profile --flamegraphs tools/benchmark-harness/results/flamegraphs --format both
+      - CARGO_PROFILE_RELEASE_DEBUG=2 CARGO_PROFILE_RELEASE_STRIP=none cargo run --release --features profiling --manifest-path tools/benchmark-harness/Cargo.toml -- run --fixtures tools/benchmark-harness/fixtures/wikipedia.toml --frameworks rust --profile --profile-frequency 2000 --profile-repeat 5 --flamegraphs tools/benchmark-harness/results/flamegraphs --format both
 
   bench:harness:memory:
     desc: "Run benchmark harness with jemalloc memory stats"
     cmds:
-      - cargo run --release --features profiling,memory-profiling --manifest-path tools/benchmark-harness/Cargo.toml -- run --fixtures tools/benchmark-harness/fixtures/wikipedia.toml --frameworks rust --profile --flamegraphs tools/benchmark-harness/results/flamegraphs --format both
+      - CARGO_PROFILE_RELEASE_DEBUG=2 CARGO_PROFILE_RELEASE_STRIP=none cargo run --release --features profiling,memory-profiling --manifest-path tools/benchmark-harness/Cargo.toml -- run --fixtures tools/benchmark-harness/fixtures/wikipedia.toml --frameworks rust --profile --profile-frequency 2000 --profile-repeat 5 --flamegraphs tools/benchmark-harness/results/flamegraphs --format both
 
   bench:harness:index:
     desc: "Generate flamegraph HTML index"

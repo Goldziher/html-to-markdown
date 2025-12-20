@@ -55,7 +55,7 @@ impl FrameworkAdapter for NativeAdapter {
 
         #[cfg(all(feature = "profiling", not(target_os = "windows")))]
         let mut profiler = if config.enable_profiling {
-            Some(ProfileGuard::new(1000)?)
+            Some(ProfileGuard::new(config.profile_frequency)?)
         } else {
             None
         };
