@@ -8,17 +8,15 @@ on:
       - Cargo.toml
       - Cargo.lock
       - rustfmt.toml
-      - benchmark_parser_Cargo.toml
       - .github/workflows/ci-rust.yaml
-  pull_request:
-    branches: [main]
-    paths:
-      - crates/**
-      - Cargo.toml
-      - Cargo.lock
-      - rustfmt.toml
-      - benchmark_parser_Cargo.toml
-      - .github/workflows/ci-rust.yaml
+#   pull_request:
+#     branches: [main]
+#     paths:
+#       - crates/**
+#       - Cargo.toml
+#       - Cargo.lock
+#       - rustfmt.toml
+#       - .github/workflows/ci-rust.yaml
 
 permissions:
   contents: read

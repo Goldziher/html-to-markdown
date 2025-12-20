@@ -78,6 +78,61 @@ public static class HtmlToMarkdownConverter
     }
 
     /// <summary>
+    /// Start Rust-side profiling and write a flamegraph to the given output path.
+    /// </summary>
+    public static void StartProfiling(string outputPath, int frequency = 1000)
+    {
+        if (string.IsNullOrWhiteSpace(outputPath))
+        {
+            throw new ArgumentException("outputPath is required", nameof(outputPath));
+        }
+
+        if (frequency <= 0)
+        {
+            frequency = 1000;
+        }
+
+        IntPtr outputPtr = IntPtr.Zero;
+
+        try
+        {
+            outputPtr = Marshal.StringToHGlobalAnsi(outputPath);
+            bool ok = NativeMethods.html_to_markdown_profile_start(outputPtr, frequency);
+            if (!ok)
+            {
+                IntPtr errorPtr = NativeMethods.html_to_markdown_last_error();
+                string? errorMsg = errorPtr != IntPtr.Zero
+                    ? Marshal.PtrToStringAnsi(errorPtr)
+                    : null;
+                throw new HtmlToMarkdownException(errorMsg ?? "Profiling start failed");
+            }
+        }
+        finally
+        {
+            if (outputPtr != IntPtr.Zero)
+            {
+                Marshal.FreeHGlobal(outputPtr);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Stop Rust-side profiling and flush the flamegraph to disk.
+    /// </summary>
+    public static void StopProfiling()
+    {
+        bool ok = NativeMethods.html_to_markdown_profile_stop();
+        if (!ok)
+        {
+            IntPtr errorPtr = NativeMethods.html_to_markdown_last_error();
+            string? errorMsg = errorPtr != IntPtr.Zero
+                ? Marshal.PtrToStringAnsi(errorPtr)
+                : null;
+            throw new HtmlToMarkdownException(errorMsg ?? "Profiling stop failed");
+        }
+    }
+
+    /// <summary>
     /// Converts HTML to Markdown and extracts comprehensive metadata.
     /// </summary>
     /// <param name="html">The HTML string to convert</param>

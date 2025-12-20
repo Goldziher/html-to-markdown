@@ -110,7 +110,7 @@ rules:
       - task lint: ruff + clippy + phpstan + rubocop + golangci-lint + more
       - task format: ruff fix + cargo fmt + rubocop --autocorrect + biome + phpcbf
       - task cov:all: generate Rust + Python coverage reports (lcov format)
-      - task bench: Rust benchmarks + PHP/Ruby binding harness via tools/runtime-bench
+      - task bench: benchmark harness via tools/benchmark-harness
       - Environment variables in Taskfile (RUST_LOG, RUBY_BIN, BUNDLER_VERSION)
       - Never: manual commands instead of task tasks
 
@@ -266,7 +266,7 @@ sections:
       │   └── go-smoke/                   # Go smoke tests
       │
       ├── tools/
-      │   ├── runtime-bench/              # PHP/Ruby binding benchmarks
+      │   ├── benchmark-harness/          # Rust + binding benchmark harness
       │   └── ...
       │
       ├── scripts/

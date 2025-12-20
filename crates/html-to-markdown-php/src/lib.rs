@@ -14,11 +14,13 @@ use html_to_markdown_rs::metadata::{
     MetadataConfig, StructuredData, StructuredDataType, TextDirection,
 };
 use html_to_markdown_rs::safety::guard_panic;
+mod profiling;
 use html_to_markdown_rs::{
     CodeBlockStyle, ConversionError, ConversionOptions, HeadingStyle, HighlightStyle, HtmlExtraction, InlineImage,
     InlineImageConfig, InlineImageFormat, InlineImageSource, InlineImageWarning, ListIndentType, NewlineStyle,
     PreprocessingOptions, PreprocessingPreset, WhitespaceMode,
 };
+use std::path::PathBuf;
 
 const DEFAULT_INLINE_IMAGE_LIMIT: u64 = 5 * 1024 * 1024;
 
@@ -39,7 +41,23 @@ pub fn convert_html(html: String, options: Option<&ZendHashTable>) -> PhpResult<
         None => None,
     };
 
-    guard_panic(|| html_to_markdown_rs::convert(&html, rust_options)).map_err(to_php_exception)
+    guard_panic(|| profiling::maybe_profile(|| html_to_markdown_rs::convert(&html, rust_options)))
+        .map_err(to_php_exception)
+}
+
+#[php_function]
+#[php(name = "html_to_markdown_profile_start")]
+pub fn profile_start(output_path: String, frequency: Option<i64>) -> PhpResult<bool> {
+    let freq = frequency.unwrap_or(1000) as i32;
+    profiling::start(PathBuf::from(output_path), freq).map_err(to_php_exception)?;
+    Ok(true)
+}
+
+#[php_function]
+#[php(name = "html_to_markdown_profile_stop")]
+pub fn profile_stop() -> PhpResult<bool> {
+    profiling::stop().map_err(to_php_exception)?;
+    Ok(true)
 }
 
 #[php_function]
@@ -98,6 +116,8 @@ pub fn module(module: ModuleBuilder) -> ModuleBuilder {
             .version(env!("CARGO_PKG_VERSION"))
             .function(wrap_function!(convert_html))
             .function(wrap_function!(convert_html_with_inline_images))
+            .function(wrap_function!(profile_start))
+            .function(wrap_function!(profile_stop))
     }
 
     #[cfg(feature = "metadata")]
@@ -108,6 +128,8 @@ pub fn module(module: ModuleBuilder) -> ModuleBuilder {
             .function(wrap_function!(convert_html))
             .function(wrap_function!(convert_html_with_inline_images))
             .function(wrap_function!(convert_html_with_metadata))
+            .function(wrap_function!(profile_start))
+            .function(wrap_function!(profile_stop))
     }
 }
 

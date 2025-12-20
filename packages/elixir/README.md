@@ -136,14 +136,8 @@ metadata["links"]   |> hd() |> Map.get("link_type") # "external"
 
 ## Performance (Apple M4)
 
-Benchmarks use the shared Wikipedia + hOCR fixtures from `tools/runtime-bench`
-and can be re-run locally via:
-
-```bash
-cargo run --release --manifest-path tools/runtime-bench/Cargo.toml -- --language elixir --output tools/runtime-bench/results/elixir.json
-# or:
-task bench:bindings -- --language elixir
-```
+Benchmarks use the shared Wikipedia + hOCR fixtures from the benchmark harness
+in `tools/benchmark-harness`.
 
 | Document               | Size   | Ops/sec | Throughput |
 | ---------------------- | ------ | ------- | ---------- |
@@ -158,7 +152,7 @@ task bench:bindings -- --language elixir
 
 The Elixir binding matches the throughput of the Rust core since conversions
 are executed inside the same NIF. The numbers above help size workloads and
-match the artefacts stored under `tools/runtime-bench/results/elixir.json`.
+will be refreshed once the Elixir harness adapter lands.
 
 ## Testing
 

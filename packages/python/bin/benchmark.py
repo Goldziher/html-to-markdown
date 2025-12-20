@@ -3,11 +3,18 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 import time
 from pathlib import Path
 
-from html_to_markdown import ConversionOptions, convert_with_handle, create_options_handle
+from html_to_markdown import (
+    ConversionOptions,
+    convert_with_handle,
+    create_options_handle,
+    start_profiling,
+    stop_profiling,
+)
 
 
 def parse_args() -> argparse.Namespace:
@@ -43,10 +50,19 @@ def main() -> None:
 
     convert_with_handle(html, options_handle)  # Warmup
 
+    profile_output = os.getenv("HTML_TO_MARKDOWN_PROFILE_OUTPUT")
+    profile_frequency = os.getenv("HTML_TO_MARKDOWN_PROFILE_FREQUENCY")
+    if profile_output:
+        freq = int(profile_frequency) if profile_frequency and profile_frequency.isdigit() else 1000
+        start_profiling(profile_output, freq)
+
     start = time.perf_counter()
     for _ in range(iterations):
         convert_with_handle(html, options_handle)
     elapsed = time.perf_counter() - start
+
+    if profile_output:
+        stop_profiling()
 
     bytes_processed = len(html.encode("utf-8")) * iterations
     ops_per_sec = iterations / elapsed

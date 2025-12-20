@@ -99,7 +99,7 @@ const markdown = convert(html, {
 });
 ```
 
-**Performance:** The shared fixture harness (`task bench:bindings`) now clocks C# at ~1.4k ops/sec (≈171 MB/s), Go at ~1.3k ops/sec (≈165 MB/s), Node, Python, and the Rust CLI at ~1.3–1.4k ops/sec (≈150 MB/s) on the 129 KB Wikipedia "Lists" page thanks to the new Buffer/Uint8Array fast paths and release-mode harness. Ruby stays close at ~1.2k ops/sec (≈150 MB/s), Java lands at ~1.0k ops/sec (≈126 MB/s), WASM hits ~0.85k ops/sec (≈108 MB/s), and PHP achieves ~0.3k ops/sec (≈35 MB/s)—all providing excellent throughput for production workloads.
+**Performance:** The shared fixture harness now lives in `tools/benchmark-harness` and is used to track Rust + binding throughput over time.
 
 See the JavaScript guides for full API documentation:
 
@@ -572,7 +572,7 @@ Benchmarked on Apple M4 with complex real-world documents (Wikipedia articles, t
 
 ### Operations per Second (higher is better)
 
-Derived directly from `tools/runtime-bench/results/latest.json` (Apple M4, shared fixtures):
+Derived directly from `tools/benchmark-harness/results/results.json` (Apple M4, shared fixtures):
 
 | Fixture                | Node.js (NAPI) | WASM | Python (PyO3) | Speedup (Node vs Python) |
 | ---------------------- | -------------- | ---- | ------------- | ------------------------ |
@@ -603,11 +603,11 @@ Derived directly from `tools/runtime-bench/results/latest.json` (Apple M4, share
 - **Python remains competitive** but now sits below Node/Rust (~4.0 k average ops/sec); stick to the v2 API to avoid the deprecated compatibility shim.
 - **Elixir matches the Rust core** because the Rustler NIF executes the same `ConversionOptions` pipeline—benchmarks land between 170–1,460 ops/sec on the Wikipedia fixtures and >20 k ops/sec on micro HOCR payloads.
 - **PHP and WASM stay in the 35–70 MB/s band**, which is plenty for Composer queues or edge runtimes as long as the extension/module is built ahead of time.
-- **Rust CLI results now mirror the bindings**, since `task bench:bindings` runs the harness with `cargo run --release` by default—profile there, then push optimizations down into each FFI layer.
+- **Rust CLI results now mirror the bindings**, since `task bench:harness` runs the harness with `cargo run --release` by default—profile there, then push optimizations down into each FFI layer.
 
 ### Runtime Benchmarks (PHP / Ruby / Python / Node / WASM)
 
-Measured on Apple M4 using the fixture-driven runtime harness in `tools/runtime-bench` (`task bench:bindings`). Every binding consumes the exact same HTML fixtures and hOCR samples from `test_documents/`:
+Measured on Apple M4 using the fixture-driven benchmark harness in `tools/benchmark-harness` (`task bench:harness`). Every binding consumes the exact same HTML fixtures and hOCR samples from `test_documents/`:
 
 | Document            | Size     | Ruby ops/sec | PHP ops/sec | Python ops/sec | Node ops/sec | WASM ops/sec | Elixir ops/sec | Rust ops/sec |
 | ------------------- | -------- | ------------ | ----------- | -------------- | ------------ | ------------ | -------------- | ------------ |
@@ -620,11 +620,11 @@ Measured on Apple M4 using the fixture-driven runtime harness in `tools/runtime-
 | HOCR Invoice        | 4 KB     | 25,740       | 8,781       | 23,500         | 27,326       | 7,775        | 20,424         | **31,345**   |
 | HOCR Embedded Tables| 37 KB    | 3,328        | 1,194       | 3,464          | **3,475**    | 1,667        | 3,366          | 3,080        |
 
-The harness shells out to each runtime’s lightweight benchmark driver (`packages/*/bin/benchmark.*`, `crates/*/bin/benchmark.ts`), feeds fixtures defined in `tools/runtime-bench/fixtures/*.toml`, and writes machine-readable JSON reports (`tools/runtime-bench/results/latest.json`) for regression tracking. Add new languages or scenarios by extending those fixture files and drivers.
+The harness shells out to each runtime’s lightweight benchmark driver (`packages/*/bin/benchmark.*`), feeds fixtures defined in `tools/benchmark-harness/fixtures/*.toml`, and writes machine-readable JSON reports (`tools/benchmark-harness/results/results.json`) for regression tracking. Add new languages or scenarios by extending those fixture files and drivers.
 
-Use `task bench:bindings` to regenerate throughput numbers across all bindings or `task bench:bindings:profile` to capture CPU/memory samples while the benchmarks run. To focus on specific languages or fixtures (for example, `task bench:bindings -- --language elixir`), pass `--language` / `--fixture` directly to `cargo run --manifest-path tools/runtime-bench/Cargo.toml -- …`.
+Use `task bench:harness` to regenerate throughput numbers across the Rust/Python/Ruby/PHP bindings or `task bench:harness:memory` to capture CPU/memory samples while the benchmarks run. To focus on specific languages, pass `--frameworks` directly to `cargo run --manifest-path tools/benchmark-harness/Cargo.toml -- run …`.
 
-Need a call-stack view of the Rust core? Run `task flamegraph:rust` (or call the harness with `--language rust --flamegraph path.svg`) to profile a fixture and dump a ready-to-inspect flamegraph in `tools/runtime-bench/results/`.
+Need a call-stack view of the Rust core? Run `task bench:harness:rust` (or call the harness with `--frameworks rust --profile --flamegraphs path`) to profile a fixture and dump a ready-to-inspect flamegraph in `tools/benchmark-harness/results/`.
 
 **Note on Python performance**: The current Python bindings have optimization opportunities. The v2 API with direct `convert()` calls performs best; avoid the v1 compatibility layer for performance-critical applications.
 

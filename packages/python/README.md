@@ -35,7 +35,7 @@ Apple M4 • Real Wikipedia documents • `convert()` (Python)
 
 ### Benchmark Fixtures (Apple M4)
 
-Pulled directly from `tools/runtime-bench` (`task bench:bindings -- --language python`) so they stay in lockstep with the Rust core:
+Pulled directly from `tools/benchmark-harness` (`task bench:harness`) so they stay in lockstep with the Rust core:
 
 | Document               | Size   | ops/sec (Python) |
 | ---------------------- | ------ | ---------------- |
@@ -48,7 +48,7 @@ Pulled directly from `tools/runtime-bench` (`task bench:bindings -- --language p
 | hOCR Invoice           | 4 KB   | 23,500           |
 | hOCR Embedded Tables   | 37 KB  | 3,464            |
 
-> Re-run locally with `task bench:bindings -- --language python --output tmp.json` to compare against CI history.
+> Re-run locally with `cargo run --release --manifest-path tools/benchmark-harness/Cargo.toml -- run --frameworks python --output tools/benchmark-harness/results` to compare against CI history.
 
 ## Quick Start
 

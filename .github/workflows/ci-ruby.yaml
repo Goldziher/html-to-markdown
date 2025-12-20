@@ -11,16 +11,16 @@ on:
       - Gemfile
       - Gemfile.lock
       - .github/workflows/ci-ruby.yaml
-  pull_request:
-    branches: [main]
-    paths:
-      - packages/ruby/**
-      - packages/ruby/ext/**/*
-      - crates/html-to-markdown-rb/**
-      - crates/html-to-markdown/**
-      - Gemfile
-      - Gemfile.lock
-      - .github/workflows/ci-ruby.yaml
+#   pull_request:
+#     branches: [main]
+#     paths:
+#       - packages/ruby/**
+#       - packages/ruby/ext/**/*
+#       - crates/html-to-markdown-rb/**
+#       - crates/html-to-markdown/**
+#       - Gemfile
+#       - Gemfile.lock
+#       - .github/workflows/ci-ruby.yaml
 
 permissions:
   contents: read

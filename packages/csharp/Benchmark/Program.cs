@@ -50,12 +50,29 @@ class Program
 
             HtmlToMarkdownConverter.Convert(html);
 
+            string? profileOutput = Environment.GetEnvironmentVariable("HTML_TO_MARKDOWN_PROFILE_OUTPUT");
+            if (!string.IsNullOrWhiteSpace(profileOutput))
+            {
+                string? freqEnv = Environment.GetEnvironmentVariable("HTML_TO_MARKDOWN_PROFILE_FREQUENCY");
+                int frequency = 1000;
+                if (!string.IsNullOrWhiteSpace(freqEnv) && int.TryParse(freqEnv, out int parsed))
+                {
+                    frequency = parsed;
+                }
+                HtmlToMarkdownConverter.StartProfiling(profileOutput, frequency);
+            }
+
             var stopwatch = Stopwatch.StartNew();
             for (int i = 0; i < iterations; i++)
             {
                 HtmlToMarkdownConverter.Convert(html);
             }
             stopwatch.Stop();
+
+            if (!string.IsNullOrWhiteSpace(profileOutput))
+            {
+                HtmlToMarkdownConverter.StopProfiling();
+            }
 
             double elapsedSeconds = stopwatch.Elapsed.TotalSeconds;
             int bytesProcessed = Encoding.UTF8.GetByteCount(html) * iterations;

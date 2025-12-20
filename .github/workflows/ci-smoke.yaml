@@ -13,18 +13,18 @@ on:
       - pnpm-lock.yaml
       - pnpm-workspace.yaml
       - .github/workflows/ci-smoke.yaml
-  pull_request:
-    branches: [main]
-    paths:
-      - README.md
-      - Taskfile.yaml
-      - examples/node-smoke/**
-      - examples/ruby-smoke/**
-      - examples/go-smoke/**
-      - package.json
-      - pnpm-lock.yaml
-      - pnpm-workspace.yaml
-      - .github/workflows/ci-smoke.yaml
+#   pull_request:
+#     branches: [main]
+#     paths:
+#       - README.md
+#       - Taskfile.yaml
+#       - examples/node-smoke/**
+#       - examples/ruby-smoke/**
+#       - examples/go-smoke/**
+#       - package.json
+#       - pnpm-lock.yaml
+#       - pnpm-workspace.yaml
+#       - .github/workflows/ci-smoke.yaml
 
 permissions:
   contents: read

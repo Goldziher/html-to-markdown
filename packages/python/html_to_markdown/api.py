@@ -137,6 +137,16 @@ def create_options_handle(
     return _rust.create_options_handle(rust_options)
 
 
+def start_profiling(output_path: str, frequency: int | None = None) -> None:
+    """Start Rust-side profiling and write a flamegraph to output_path."""
+    _rust.start_profiling(output_path, frequency)
+
+
+def stop_profiling() -> None:
+    """Stop Rust-side profiling and flush the flamegraph."""
+    _rust.stop_profiling()
+
+
 def convert_with_handle(html: str, handle: OptionsHandle) -> str:
     """Convert HTML using a pre-parsed ConversionOptions handle."""
     return _rust.convert_with_options_handle(html, handle)
@@ -187,4 +197,6 @@ __all__ = [
     "convert_with_inline_images",
     "convert_with_metadata",
     "create_options_handle",
+    "start_profiling",
+    "stop_profiling",
 ]

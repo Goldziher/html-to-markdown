@@ -13,6 +13,7 @@ use html_to_markdown_rs::{ConversionError, convert};
 
 #[cfg(feature = "metadata")]
 use html_to_markdown_rs::{MetadataConfig, convert_with_metadata, metadata::DEFAULT_MAX_STRUCTURED_DATA_SIZE};
+mod profiling;
 
 thread_local! {
     static LAST_ERROR: RefCell<Option<CString>> = const { RefCell::new(None) };
@@ -36,6 +37,61 @@ fn last_error_ptr() -> *const c_char {
 
 fn capture_error(err: ConversionError) {
     set_last_error(Some(err.to_string()));
+}
+
+/// Start Rust-side profiling and write a flamegraph to the specified path.
+///
+/// Returns 1 on success, 0 on failure. Use `html_to_markdown_last_error` to inspect failures.
+///
+/// # Safety
+///
+/// - `output` must be a valid, null-terminated UTF-8 C string for the duration of the call.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn html_to_markdown_profile_start(output: *const c_char, frequency: i32) -> bool {
+    if output.is_null() {
+        set_last_error(Some("output path was null".to_string()));
+        return false;
+    }
+
+    let output_str = match unsafe { CStr::from_ptr(output) }.to_str() {
+        Ok(s) => s,
+        Err(_) => {
+            set_last_error(Some("output path must be valid UTF-8".to_string()));
+            return false;
+        }
+    };
+
+    match profiling::start(output_str.into(), frequency) {
+        Ok(()) => {
+            set_last_error(None);
+            true
+        }
+        Err(err) => {
+            capture_error(err);
+            false
+        }
+    }
+}
+
+/// Stop Rust-side profiling and flush the flamegraph.
+///
+/// Returns 1 on success, 0 on failure. Use `html_to_markdown_last_error` to inspect failures.
+///
+/// # Safety
+///
+/// - This must only be called after a successful `html_to_markdown_profile_start`.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn html_to_markdown_profile_stop() -> bool {
+    match profiling::stop() {
+        Ok(()) => {
+            set_last_error(None);
+            true
+        }
+        Err(err) => {
+            capture_error(err);
+            false
+        }
+    }
 }
 
 /// Convert HTML to Markdown using default options.
@@ -71,7 +127,7 @@ pub unsafe extern "C" fn html_to_markdown_convert(html: *const c_char) -> *mut c
         }
     };
 
-    match guard_panic(|| convert(html_str, None)) {
+    match guard_panic(|| profiling::maybe_profile(|| convert(html_str, None))) {
         Ok(markdown) => {
             set_last_error(None);
             match CString::new(markdown) {
@@ -189,7 +245,7 @@ pub unsafe extern "C" fn html_to_markdown_convert_with_metadata(
         max_structured_data_size: DEFAULT_MAX_STRUCTURED_DATA_SIZE,
     };
 
-    match guard_panic(|| convert_with_metadata(html_str, None, metadata_cfg)) {
+    match guard_panic(|| profiling::maybe_profile(|| convert_with_metadata(html_str, None, metadata_cfg))) {
         Ok((markdown, metadata)) => {
             set_last_error(None);
 

@@ -11,6 +11,7 @@ import java.util.Map;
 
 public class Benchmark {
     private static final int DEFAULT_ITERATIONS = 50;
+    private static final int DEFAULT_PROFILING_FREQUENCY = 1000;
     private static final double NANOS_TO_SECONDS = 1_000_000_000.0;
     private static final double BYTES_TO_MB = 1024.0 * 1024.0;
 
@@ -50,11 +51,29 @@ public class Benchmark {
 
             HtmlToMarkdown.convert(html);
 
+            String profileOutput = System.getenv("HTML_TO_MARKDOWN_PROFILE_OUTPUT");
+            if (profileOutput != null && !profileOutput.isBlank()) {
+                int frequency = DEFAULT_PROFILING_FREQUENCY;
+                String freqEnv = System.getenv("HTML_TO_MARKDOWN_PROFILE_FREQUENCY");
+                if (freqEnv != null && !freqEnv.isBlank()) {
+                    try {
+                        frequency = Integer.parseInt(freqEnv);
+                    } catch (NumberFormatException ignored) {
+                        frequency = DEFAULT_PROFILING_FREQUENCY;
+                    }
+                }
+                HtmlToMarkdown.startProfiling(profileOutput, frequency);
+            }
+
             long startNanos = System.nanoTime();
             for (int i = 0; i < iterations; i++) {
                 HtmlToMarkdown.convert(html);
             }
             long endNanos = System.nanoTime();
+
+            if (profileOutput != null && !profileOutput.isBlank()) {
+                HtmlToMarkdown.stopProfiling();
+            }
 
             double elapsedSeconds = (endNanos - startNanos) / NANOS_TO_SECONDS;
             int bytesProcessed = html.getBytes().length * iterations;

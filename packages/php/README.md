@@ -72,7 +72,7 @@ $extraction = convert_with_inline_images('<img src="data:image/png;base64,Zm9v" 
 
 ## Performance (Apple M4)
 
-Captured via `task bench:bindings -- --language php` so they match the data in the root README:
+Captured via `task bench:harness` so they match the data in the root README:
 
 | Document               | Size   | ops/sec (PHP) |
 | ---------------------- | ------ | ------------- |

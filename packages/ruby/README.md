@@ -69,7 +69,7 @@ Apple M4 • Real Wikipedia documents • `HtmlToMarkdown.convert` (Ruby)
 
 ### Benchmark Fixtures (Apple M4)
 
-Measured via `task bench:bindings -- --language ruby` with the shared Wikipedia + hOCR suite:
+Measured via `task bench:harness` with the shared Wikipedia + hOCR suite:
 
 | Document               | Size   | ops/sec (Ruby) |
 | ---------------------- | ------ | -------------- |

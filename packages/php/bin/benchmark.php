@@ -51,12 +51,23 @@ $payloadSizeBytes = strlen($html);
 // Warmup once to ensure caches/allocations are primed
 $converter->convert($html, $conversionOptions);
 
+$profileOutput = getenv('HTML_TO_MARKDOWN_PROFILE_OUTPUT') ?: null;
+if ($profileOutput !== null && function_exists('html_to_markdown_profile_start')) {
+    $frequency = getenv('HTML_TO_MARKDOWN_PROFILE_FREQUENCY');
+    $freqValue = $frequency !== false ? (int) $frequency : 1000;
+    html_to_markdown_profile_start($profileOutput, $freqValue);
+}
+
 $start = hrtime(true);
 for ($i = 0; $i < $iterations; $i++) {
     $converter->convert($html, $conversionOptions);
 }
 $durationNs = hrtime(true) - $start;
 $durationSeconds = $durationNs / 1_000_000_000;
+
+if ($profileOutput !== null && function_exists('html_to_markdown_profile_stop')) {
+    html_to_markdown_profile_stop();
+}
 
 $bytesProcessed = $payloadSizeBytes * $iterations;
 $opsPerSecond = $iterations / $durationSeconds;

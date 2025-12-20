@@ -52,4 +52,16 @@ internal static class NativeMethods
     internal static extern IntPtr html_to_markdown_convert_with_metadata(
         IntPtr html,
         out IntPtr metadata_json_out);
+
+    /// <summary>
+    /// Start Rust-side profiling and write a flamegraph to the given path.
+    /// </summary>
+    [DllImport(LibraryName, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi)]
+    internal static extern bool html_to_markdown_profile_start(IntPtr outputPath, int frequency);
+
+    /// <summary>
+    /// Stop Rust-side profiling and flush the flamegraph.
+    /// </summary>
+    [DllImport(LibraryName, CallingConvention = CallingConvention.Cdecl)]
+    internal static extern bool html_to_markdown_profile_stop();
 }

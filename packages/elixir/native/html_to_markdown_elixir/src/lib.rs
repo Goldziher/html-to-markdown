@@ -12,8 +12,10 @@ use html_to_markdown_rs::{
     InlineImageFormat, InlineImageSource, ListIndentType, NewlineStyle, PreprocessingOptions, PreprocessingPreset,
     WhitespaceMode, convert as convert_inner, convert_with_inline_images as convert_with_inline_images_inner,
 };
+mod profiling;
 use rustler::types::binary::{Binary, OwnedBinary};
 use rustler::{Encoder, Env, Error, NifMap, NifResult, ResourceArc, Term};
+use std::path::PathBuf;
 
 const DEFAULT_INLINE_LIMIT: u64 = 5 * 1024 * 1024;
 
@@ -104,7 +106,9 @@ rustler::init!(
         convert_with_handle,
         create_options_handle,
         convert_with_inline_images,
-        convert_with_metadata
+        convert_with_metadata,
+        start_profiling,
+        stop_profiling
     ],
     load = on_load
 );
@@ -142,7 +146,7 @@ mod atoms {
 
 #[rustler::nif(schedule = "DirtyCpu")]
 fn convert<'a>(env: Env<'a>, html: String) -> NifResult<Term<'a>> {
-    match convert_inner(&html, None) {
+    match profiling::maybe_profile(|| convert_inner(&html, None)) {
         Ok(markdown) => Ok((atoms::ok(), markdown).encode(env)),
         Err(err) => Ok((atoms::error(), err.to_string()).encode(env)),
     }
@@ -155,7 +159,7 @@ fn convert_with_options_map<'a>(env: Env<'a>, html: String, options_term: Term<'
         Err(err) => return handle_invalid_option_error(env, err),
     };
 
-    match convert_inner(&html, Some(options)) {
+    match profiling::maybe_profile(|| convert_inner(&html, Some(options))) {
         Ok(markdown) => Ok((atoms::ok(), markdown).encode(env)),
         Err(err) => Ok((atoms::error(), err.to_string()).encode(env)),
     }
@@ -167,8 +171,25 @@ fn convert_with_handle<'a>(
     html: String,
     handle: ResourceArc<OptionsHandleResource>,
 ) -> NifResult<Term<'a>> {
-    match convert_inner(&html, Some(handle.0.clone())) {
+    match profiling::maybe_profile(|| convert_inner(&html, Some(handle.0.clone()))) {
         Ok(markdown) => Ok((atoms::ok(), markdown).encode(env)),
+        Err(err) => Ok((atoms::error(), err.to_string()).encode(env)),
+    }
+}
+
+#[rustler::nif]
+fn start_profiling<'a>(env: Env<'a>, output: String, frequency: Option<i32>) -> NifResult<Term<'a>> {
+    let freq = frequency.unwrap_or(1000);
+    match profiling::start(PathBuf::from(output), freq) {
+        Ok(()) => Ok(atoms::ok().encode(env)),
+        Err(err) => Ok((atoms::error(), err.to_string()).encode(env)),
+    }
+}
+
+#[rustler::nif]
+fn stop_profiling<'a>(env: Env<'a>) -> NifResult<Term<'a>> {
+    match profiling::stop() {
+        Ok(()) => Ok(atoms::ok().encode(env)),
         Err(err) => Ok((atoms::error(), err.to_string()).encode(env)),
     }
 }

@@ -1,13 +1,7 @@
 #!/usr/bin/env tsx
 import fs from "node:fs";
 import path from "node:path";
-import { createRequire } from "node:module";
-
-const require = createRequire(import.meta.url);
-const wasm = require("../dist-node/html_to_markdown_wasm.js");
-if (typeof wasm.init === "function") {
-  wasm.init();
-}
+import { convert } from "html-to-markdown-wasm/dist-node";
 
 type Format = "html" | "hocr";
 
@@ -38,7 +32,7 @@ function parseArgs(): Args {
   if (!parsed.file) {
     throw new Error("Missing --file parameter");
   }
-  if (!["html", "hocr"].includes(parsed.format ?? "")) {
+  if (!parsed.format || !["html", "hocr"].includes(parsed.format)) {
     throw new Error(`Unsupported format: ${parsed.format}`);
   }
 
@@ -60,18 +54,18 @@ function main() {
     throw new Error(`Fixture not found: ${fixturePath}`);
   }
 
-  const html = fs.readFileSync(fixturePath);
-  const optionsHandle = wasm.createConversionOptionsHandle(buildOptions(args.format));
+  const html = fs.readFileSync(fixturePath, "utf8");
+  const options = buildOptions(args.format);
 
-  wasm.convertBytesWithOptionsHandle(html, optionsHandle); // Warmup
+  convert(html, options);
 
   const start = process.hrtime.bigint();
   for (let i = 0; i < args.iterations; i += 1) {
-    wasm.convertBytesWithOptionsHandle(html, optionsHandle);
+    convert(html, options);
   }
   const elapsedSeconds = Number(process.hrtime.bigint() - start) / 1e9;
 
-  const bytesProcessed = html.byteLength * args.iterations;
+  const bytesProcessed = Buffer.byteLength(html) * args.iterations;
   const opsPerSec = args.iterations / elapsedSeconds;
   const mbPerSec = (bytesProcessed / (1024 * 1024)) / elapsedSeconds;
 

@@ -9,6 +9,7 @@ use html_to_markdown_rs::metadata::{
     StructuredDataType as RustStructuredDataType, TextDirection as RustTextDirection,
 };
 use html_to_markdown_rs::safety::guard_panic;
+mod profiling;
 use html_to_markdown_rs::{
     CodeBlockStyle, ConversionError, ConversionOptions as RustConversionOptions, HeadingStyle, HighlightStyle,
     InlineImageConfig as RustInlineImageConfig, InlineImageFormat, InlineImageSource, ListIndentType, NewlineStyle,
@@ -753,7 +754,18 @@ fn convert_metadata(metadata: RustExtendedMetadata) -> JsExtendedMetadata {
 #[napi]
 pub fn convert(html: String, options: Option<JsConversionOptions>) -> Result<String> {
     let rust_options = options.map(Into::into);
-    guard_panic(|| html_to_markdown_rs::convert(&html, rust_options)).map_err(to_js_error)
+    guard_panic(|| profiling::maybe_profile(|| html_to_markdown_rs::convert(&html, rust_options))).map_err(to_js_error)
+}
+
+#[napi]
+pub fn start_profiling(output_path: String, frequency: Option<i32>) -> Result<()> {
+    let freq = frequency.unwrap_or(1000);
+    profiling::start(output_path.into(), freq).map_err(to_js_error)
+}
+
+#[napi]
+pub fn stop_profiling() -> Result<()> {
+    profiling::stop().map_err(to_js_error)
 }
 
 fn buffer_to_str(html: &Buffer) -> Result<&str> {
@@ -766,7 +778,7 @@ fn buffer_to_str(html: &Buffer) -> Result<&str> {
 pub fn convert_buffer(html: Buffer, options: Option<JsConversionOptions>) -> Result<String> {
     let html = buffer_to_str(&html)?;
     let rust_options = options.map(Into::into);
-    guard_panic(|| html_to_markdown_rs::convert(html, rust_options)).map_err(to_js_error)
+    guard_panic(|| profiling::maybe_profile(|| html_to_markdown_rs::convert(html, rust_options))).map_err(to_js_error)
 }
 
 /// Create a reusable ConversionOptions handle.
@@ -778,14 +790,16 @@ pub fn create_conversion_options_handle(options: Option<JsConversionOptions>) ->
 /// Convert HTML using a previously-created ConversionOptions handle.
 #[napi]
 pub fn convert_with_options_handle(html: String, options: &External<RustConversionOptions>) -> Result<String> {
-    guard_panic(|| html_to_markdown_rs::convert(&html, Some((**options).clone()))).map_err(to_js_error)
+    guard_panic(|| profiling::maybe_profile(|| html_to_markdown_rs::convert(&html, Some((**options).clone()))))
+        .map_err(to_js_error)
 }
 
 /// Convert HTML Buffer data using a previously-created ConversionOptions handle.
 #[napi(js_name = "convertBufferWithOptionsHandle")]
 pub fn convert_buffer_with_options_handle(html: Buffer, options: &External<RustConversionOptions>) -> Result<String> {
     let html = buffer_to_str(&html)?;
-    guard_panic(|| html_to_markdown_rs::convert(html, Some((**options).clone()))).map_err(to_js_error)
+    guard_panic(|| profiling::maybe_profile(|| html_to_markdown_rs::convert(html, Some((**options).clone()))))
+        .map_err(to_js_error)
 }
 
 fn convert_inline_images_impl(

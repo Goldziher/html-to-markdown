@@ -46,7 +46,7 @@ Universal WebAssembly bindings with **excellent performance** across all JavaScr
 
 ### Benchmark Fixtures (Apple M4)
 
-Numbers captured via `task bench:bindings -- --language wasm` using the shared Wikipedia + hOCR suite:
+Numbers captured via the shared fixture harness in `tools/benchmark-harness`:
 
 | Document               | Size   | ops/sec (WASM) |
 | ---------------------- | ------ | -------------- |

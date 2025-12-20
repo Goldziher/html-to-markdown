@@ -525,7 +525,7 @@ Test coverage includes:
 
 ## Performance (Apple M4)
 
-This package wraps the native `html-to-markdown-node` bindings, so throughput matches the Node README. Benchmarks come from `task bench:bindings -- --language node` and use shared Wikipedia + hOCR fixtures:
+This package wraps the native `html-to-markdown-node` bindings, so throughput matches the Node README. Benchmarks come from the shared fixture harness in `tools/benchmark-harness`:
 
 | Document               | Size   | ops/sec |
 | ---------------------- | ------ | ------- |
@@ -538,4 +538,4 @@ This package wraps the native `html-to-markdown-node` bindings, so throughput ma
 | hOCR Invoice           | 4 KB   | 27,326  |
 | hOCR Embedded Tables   | 37 KB  | 3,475   |
 
-> Run `task bench:bindings -- --language node` to regenerate the data locally.
+> Run `task bench:harness -- --frameworks node` to regenerate the data locally.
