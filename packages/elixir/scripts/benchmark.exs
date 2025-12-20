@@ -26,18 +26,26 @@ end
 
 html = File.read!(file)
 
+profile_output = System.get_env("HTML_TO_MARKDOWN_PROFILE_OUTPUT")
+profile_frequency = System.get_env("HTML_TO_MARKDOWN_PROFILE_FREQUENCY")
+profile_once = System.get_env("HTML_TO_MARKDOWN_PROFILE_ONCE")
+
+if profile_output && profile_output != "" do
+  System.delete_env("HTML_TO_MARKDOWN_PROFILE_OUTPUT")
+  System.delete_env("HTML_TO_MARKDOWN_PROFILE_FREQUENCY")
+  System.delete_env("HTML_TO_MARKDOWN_PROFILE_ONCE")
+end
+
 _ = HtmlToMarkdown.convert(html, if(format == "hocr", do: [hocr_spatial_tables: false], else: []))
 
-profile_output = System.get_env("HTML_TO_MARKDOWN_PROFILE_OUTPUT")
 if profile_output && profile_output != "" do
-  freq_env = System.get_env("HTML_TO_MARKDOWN_PROFILE_FREQUENCY") || "1000"
-  frequency =
-    case Integer.parse(freq_env) do
-      {value, _} -> value
-      :error -> 1000
-    end
-
-  HtmlToMarkdown.start_profiling(profile_output, frequency)
+  System.put_env("HTML_TO_MARKDOWN_PROFILE_OUTPUT", profile_output)
+  if profile_frequency && profile_frequency != "" do
+    System.put_env("HTML_TO_MARKDOWN_PROFILE_FREQUENCY", profile_frequency)
+  end
+  if profile_once && profile_once != "" do
+    System.put_env("HTML_TO_MARKDOWN_PROFILE_ONCE", profile_once)
+  end
 end
 
 start = System.monotonic_time()
@@ -45,10 +53,6 @@ Enum.each(1..iterations, fn _ ->
   HtmlToMarkdown.convert(html, if(format == "hocr", do: [hocr_spatial_tables: false], else: []))
 end)
 finish = System.monotonic_time()
-
-if profile_output && profile_output != "" do
-  HtmlToMarkdown.stop_profiling()
-end
 
 elapsed_seconds = System.convert_time_unit(finish - start, :native, :microsecond) / 1_000_000
 bytes_processed = byte_size(html) * iterations

@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strconv"
 	"time"
 
 	"github.com/Goldziher/html-to-markdown/packages/go/v2/htmltomarkdown"
@@ -43,23 +42,29 @@ func main() {
 
 	html := string(htmlBytes)
 
-	// Warmup
+	profileOutput := os.Getenv("HTML_TO_MARKDOWN_PROFILE_OUTPUT")
+	profileFrequency := os.Getenv("HTML_TO_MARKDOWN_PROFILE_FREQUENCY")
+	profileOnce := os.Getenv("HTML_TO_MARKDOWN_PROFILE_ONCE")
+	if profileOutput != "" {
+		_ = os.Unsetenv("HTML_TO_MARKDOWN_PROFILE_OUTPUT")
+		_ = os.Unsetenv("HTML_TO_MARKDOWN_PROFILE_FREQUENCY")
+		_ = os.Unsetenv("HTML_TO_MARKDOWN_PROFILE_ONCE")
+	}
+
+	// Warmup (avoid profiling the warmup run).
 	_, err = htmltomarkdown.Convert(html)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Warmup conversion failed: %v\n", err)
 		os.Exit(1)
 	}
 
-	profileOutput := os.Getenv("HTML_TO_MARKDOWN_PROFILE_OUTPUT")
 	if profileOutput != "" {
-		freq := 1000
-		if env := os.Getenv("HTML_TO_MARKDOWN_PROFILE_FREQUENCY"); env != "" {
-			if parsed, err := strconv.Atoi(env); err == nil {
-				freq = parsed
-			}
+		_ = os.Setenv("HTML_TO_MARKDOWN_PROFILE_OUTPUT", profileOutput)
+		if profileFrequency != "" {
+			_ = os.Setenv("HTML_TO_MARKDOWN_PROFILE_FREQUENCY", profileFrequency)
 		}
-		if err := htmltomarkdown.StartProfiling(profileOutput, freq); err != nil {
-			fmt.Fprintf(os.Stderr, "Profiling start failed: %v\n", err)
+		if profileOnce != "" {
+			_ = os.Setenv("HTML_TO_MARKDOWN_PROFILE_ONCE", profileOnce)
 		}
 	}
 
@@ -73,12 +78,6 @@ func main() {
 		}
 	}
 	elapsed := time.Since(start).Seconds()
-
-	if profileOutput != "" {
-		if err := htmltomarkdown.StopProfiling(); err != nil {
-			fmt.Fprintf(os.Stderr, "Profiling stop failed: %v\n", err)
-		}
-	}
 
 	bytesProcessed := len(htmlBytes) * (*iterations)
 	opsPerSec := float64(*iterations) / elapsed

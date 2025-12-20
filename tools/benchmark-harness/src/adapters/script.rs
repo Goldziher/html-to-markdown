@@ -486,7 +486,12 @@ fn ensure_java_jar(repo_root: &Path) -> Result<()> {
         maven_opts.push_str("--add-opens=java.base/sun.misc=ALL-UNNAMED");
     }
 
-    let maven_skip_args = ["-DskipTests", "-Dgpg.skip=true", "-Dmaven.javadoc.skip=true"];
+    let maven_skip_args = [
+        "-DskipTests",
+        "-Dmaven.test.skip=true",
+        "-Dgpg.skip=true",
+        "-Dmaven.javadoc.skip=true",
+    ];
 
     let lib_status = Command::new(&mvn_cmd)
         .arg("install")
