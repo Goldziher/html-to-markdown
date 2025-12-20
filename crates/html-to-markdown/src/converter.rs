@@ -586,7 +586,6 @@ impl DomContext {
 
 struct TagInfo {
     name: String,
-    is_inline: bool,
     is_inline_like: bool,
     is_block: bool,
 }
@@ -865,47 +864,6 @@ fn build_dom_context(dom: &tl::VDom, parser: &tl::Parser) -> DomContext {
     ctx
 }
 
-fn inline_ancestor_allows_block(tag_name: &str) -> bool {
-    matches!(tag_name, "a" | "ins" | "del")
-}
-
-/// Detect block elements that were incorrectly nested under inline ancestors.
-fn has_inline_block_misnest(dom_ctx: &DomContext, parser: &tl::Parser) -> bool {
-    for handle in dom_ctx.node_map.iter().flatten() {
-        if let Some(tl::Node::Tag(tag)) = handle.get(parser) {
-            let is_block = dom_ctx
-                .tag_info(handle.get_inner())
-                .map(|info| info.is_block)
-                .unwrap_or_else(|| {
-                    let tag_name = normalized_tag_name(tag.name().as_utf8_str());
-                    is_block_level_element(tag_name.as_ref())
-                });
-            if is_block {
-                let mut current = dom_ctx.parent_of(handle.get_inner());
-                while let Some(parent_id) = current {
-                    if let Some(parent_info) = dom_ctx.tag_info(parent_id) {
-                        if parent_info.is_inline && !inline_ancestor_allows_block(parent_info.name.as_str()) {
-                            return true;
-                        }
-                    } else if let Some(parent_handle) = dom_ctx.node_handle(parent_id) {
-                        if let Some(tl::Node::Tag(parent_tag)) = parent_handle.get(parser) {
-                            let parent_name = normalized_tag_name(parent_tag.name().as_utf8_str());
-                            if is_inline_element(parent_name.as_ref())
-                                && !inline_ancestor_allows_block(parent_name.as_ref())
-                            {
-                                return true;
-                            }
-                        }
-                    }
-                    current = dom_ctx.parent_of(parent_id);
-                }
-            }
-        }
-    }
-
-    false
-}
-
 /// Round-trip HTML through html5ever to repair malformed trees.
 fn repair_with_html5ever(input: &str) -> Option<String> {
     use html5ever::serialize::{SerializeOpts, serialize};
@@ -937,7 +895,6 @@ fn record_node_hierarchy(node_handle: &tl::NodeHandle, parent: Option<u32>, pars
             let is_block = is_block_level_name(&name, is_inline);
             ctx.tag_info_map[id as usize] = Some(TagInfo {
                 name,
-                is_inline,
                 is_inline_like,
                 is_block,
             });
@@ -1584,29 +1541,25 @@ fn convert_html_impl(
     let mut preprocessed_len = preprocessed.len();
 
     let parser_options = tl::ParserOptions::default();
-    let mut dom_guard = unsafe {
-        tl::parse_owned(preprocessed.clone(), parser_options)
-            .map_err(|_| crate::error::ConversionError::ParseError("Failed to parse HTML".to_string()))?
-    };
-    let mut dom_ref = dom_guard.get_ref();
-    let mut parser = dom_ref.parser();
-    let mut dom_ctx = build_dom_context(dom_ref, parser);
-    let mut output = String::with_capacity(preprocessed_len);
-
-    if has_inline_block_misnest(&dom_ctx, parser) {
-        if let Some(repaired_html) = repair_with_html5ever(&preprocessed) {
-            preprocessed = preprocess_html(&repaired_html).into_owned();
-            preprocessed_len = preprocessed.len();
-            dom_guard = unsafe {
-                tl::parse_owned(preprocessed.clone(), parser_options)
+    let dom_guard = match unsafe { tl::parse_owned(preprocessed.clone(), parser_options) } {
+        Ok(dom) => dom,
+        Err(_) => {
+            if let Some(repaired_html) = repair_with_html5ever(&preprocessed) {
+                preprocessed = preprocess_html(&repaired_html).into_owned();
+                preprocessed_len = preprocessed.len();
+                unsafe { tl::parse_owned(preprocessed.clone(), parser_options) }
                     .map_err(|_| crate::error::ConversionError::ParseError("Failed to parse HTML".to_string()))?
-            };
-            dom_ref = dom_guard.get_ref();
-            parser = dom_ref.parser();
-            dom_ctx = build_dom_context(dom_ref, parser);
-            output = String::with_capacity(preprocessed_len);
+            } else {
+                return Err(crate::error::ConversionError::ParseError(
+                    "Failed to parse HTML".to_string(),
+                ));
+            }
         }
-    }
+    };
+    let dom_ref = dom_guard.get_ref();
+    let parser = dom_ref.parser();
+    let dom_ctx = build_dom_context(dom_ref, parser);
+    let mut output = String::with_capacity(preprocessed_len);
 
     let mut is_hocr = false;
     for child_handle in dom_ref.children().iter() {
