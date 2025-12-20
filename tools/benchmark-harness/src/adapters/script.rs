@@ -163,9 +163,10 @@ impl ScriptAdapter {
                     dyld_path = format!("{}:{}", dyld_path, existing);
                 }
                 cmd.env("DYLD_LIBRARY_PATH", &dyld_path);
-                Ok((cmd, self.repo_root.join("packages/go")))
+                Ok((cmd, self.repo_root.join("packages/go/v2")))
             }
             ScriptLanguage::Elixir => {
+                ensure_elixir_vendor(&self.repo_root)?;
                 let mut cmd = Command::new("mix");
                 cmd.arg("run").arg("scripts/benchmark.exs");
                 cmd.env("MIX_ENV", "prod");
@@ -414,19 +415,9 @@ fn ensure_java_jar(repo_root: &Path) -> Result<()> {
     ensure_ffi_library(repo_root)?;
 
     let mvn_cmd = if cfg!(windows) {
-        let wrapper = repo_root.join("mvnw.cmd");
-        if wrapper.exists() {
-            wrapper
-        } else {
-            PathBuf::from("mvn.cmd")
-        }
+        PathBuf::from("mvn.cmd")
     } else {
-        let wrapper = repo_root.join("mvnw");
-        if wrapper.exists() {
-            wrapper
-        } else {
-            PathBuf::from("mvn")
-        }
+        PathBuf::from("mvn")
     };
 
     let lib_status = Command::new(&mvn_cmd)
@@ -519,6 +510,58 @@ fn ensure_csharp_dll(repo_root: &Path) -> Result<()> {
 
 fn ensure_go_lib(repo_root: &Path) -> Result<()> {
     ensure_ffi_library(repo_root)?;
+    Ok(())
+}
+
+fn ensure_elixir_vendor(repo_root: &Path) -> Result<()> {
+    let vendor_dir = repo_root.join("packages/elixir/native/html_to_markdown_elixir/vendor");
+    let vendor_crate = vendor_dir.join("html-to-markdown-rs");
+    let vendor_manifest = vendor_crate.join("Cargo.toml");
+    if vendor_manifest.exists() {
+        return Ok(());
+    }
+
+    let source_crate = repo_root.join("crates/html-to-markdown");
+    if !source_crate.exists() {
+        return Err(Error::Benchmark(format!(
+            "Missing Rust crate for Elixir vendor at {}",
+            source_crate.display()
+        )));
+    }
+
+    std::fs::create_dir_all(&vendor_dir)
+        .map_err(|err| Error::Benchmark(format!("Failed to create {}: {err}", vendor_dir.display())))?;
+    copy_dir_recursive(&source_crate, &vendor_crate)?;
+    Ok(())
+}
+
+fn copy_dir_recursive(source: &Path, destination: &Path) -> Result<()> {
+    if destination.exists() {
+        std::fs::remove_dir_all(destination)
+            .map_err(|err| Error::Benchmark(format!("Failed to remove {}: {err}", destination.display())))?;
+    }
+    std::fs::create_dir_all(destination)
+        .map_err(|err| Error::Benchmark(format!("Failed to create {}: {err}", destination.display())))?;
+
+    for entry in std::fs::read_dir(source)
+        .map_err(|err| Error::Benchmark(format!("Failed to read {}: {err}", source.display())))?
+    {
+        let entry =
+            entry.map_err(|err| Error::Benchmark(format!("Failed to read entry in {}: {err}", source.display())))?;
+        let entry_path = entry.path();
+        let target_path = destination.join(entry.file_name());
+        if entry_path.is_dir() {
+            copy_dir_recursive(&entry_path, &target_path)?;
+        } else {
+            std::fs::copy(&entry_path, &target_path).map_err(|err| {
+                Error::Benchmark(format!(
+                    "Failed to copy {} to {}: {err}",
+                    entry_path.display(),
+                    target_path.display()
+                ))
+            })?;
+        }
+    }
     Ok(())
 }
 
