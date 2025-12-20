@@ -1,15 +1,14 @@
 use html_to_markdown_rs::metadata::{
     DEFAULT_MAX_STRUCTURED_DATA_SIZE, DocumentMetadata as RustDocumentMetadata,
     ExtendedMetadata as RustExtendedMetadata, HeaderMetadata as RustHeaderMetadata, ImageMetadata as RustImageMetadata,
-    ImageType as RustImageType, LinkMetadata as RustLinkMetadata, LinkType as RustLinkType,
-    MetadataConfig as RustMetadataConfig, StructuredData as RustStructuredData,
-    StructuredDataType as RustStructuredDataType, TextDirection as RustTextDirection,
+    LinkMetadata as RustLinkMetadata, MetadataConfig as RustMetadataConfig, StructuredData as RustStructuredData,
+    TextDirection as RustTextDirection,
 };
 use html_to_markdown_rs::safety::guard_panic;
 mod profiling;
 use html_to_markdown_rs::{
     CodeBlockStyle, ConversionError, ConversionOptions as RustConversionOptions, HeadingStyle, HighlightStyle,
-    InlineImageConfig as RustInlineImageConfig, InlineImageFormat, InlineImageSource, ListIndentType, NewlineStyle,
+    InlineImageConfig as RustInlineImageConfig, ListIndentType, NewlineStyle,
     PreprocessingOptions as RustPreprocessingOptions, PreprocessingPreset, WhitespaceMode,
 };
 use pyo3::prelude::*;
@@ -504,29 +503,10 @@ fn create_options_handle(options: Option<ConversionOptions>) -> ConversionOption
     ConversionOptionsHandle::new_with_options(options)
 }
 
-fn inline_image_format_to_str(format: &InlineImageFormat) -> String {
-    match format {
-        InlineImageFormat::Png => "png".to_string(),
-        InlineImageFormat::Jpeg => "jpeg".to_string(),
-        InlineImageFormat::Gif => "gif".to_string(),
-        InlineImageFormat::Bmp => "bmp".to_string(),
-        InlineImageFormat::Webp => "webp".to_string(),
-        InlineImageFormat::Svg => "svg".to_string(),
-        InlineImageFormat::Other(other) => other.clone(),
-    }
-}
-
-fn inline_image_source_to_str(source: &InlineImageSource) -> &'static str {
-    match source {
-        InlineImageSource::ImgDataUri => "img_data_uri",
-        InlineImageSource::SvgElement => "svg_element",
-    }
-}
-
 fn inline_image_to_py<'py>(py: Python<'py>, image: html_to_markdown_rs::InlineImage) -> PyResult<Py<PyAny>> {
     let dict = PyDict::new(py);
     dict.set_item("data", PyBytes::new(py, &image.data))?;
-    dict.set_item("format", inline_image_format_to_str(&image.format))?;
+    dict.set_item("format", image.format.to_string())?;
 
     match image.filename {
         Some(filename) => dict.set_item("filename", filename)?,
@@ -544,7 +524,7 @@ fn inline_image_to_py<'py>(py: Python<'py>, image: html_to_markdown_rs::InlineIm
         dict.set_item("dimensions", py.None())?;
     }
 
-    dict.set_item("source", inline_image_source_to_str(&image.source))?;
+    dict.set_item("source", image.source.to_string())?;
 
     let attrs = PyDict::new(py);
     for (key, value) in image.attributes {
@@ -640,38 +620,8 @@ fn btreemap_to_py<'py>(py: Python<'py>, map: std::collections::BTreeMap<String, 
 
 fn text_direction_to_str<'py>(py: Python<'py>, text_direction: Option<RustTextDirection>) -> Py<PyAny> {
     match text_direction {
-        Some(RustTextDirection::LeftToRight) => pyo3::types::PyString::new(py, "ltr").into(),
-        Some(RustTextDirection::RightToLeft) => pyo3::types::PyString::new(py, "rtl").into(),
-        Some(RustTextDirection::Auto) => pyo3::types::PyString::new(py, "auto").into(),
+        Some(direction) => pyo3::types::PyString::new(py, &direction.to_string()).into(),
         None => py.None(),
-    }
-}
-
-fn link_type_to_str(link_type: &RustLinkType) -> &'static str {
-    match link_type {
-        RustLinkType::Anchor => "anchor",
-        RustLinkType::Internal => "internal",
-        RustLinkType::External => "external",
-        RustLinkType::Email => "email",
-        RustLinkType::Phone => "phone",
-        RustLinkType::Other => "other",
-    }
-}
-
-fn image_type_to_str(image_type: &RustImageType) -> &'static str {
-    match image_type {
-        RustImageType::DataUri => "data_uri",
-        RustImageType::InlineSvg => "inline_svg",
-        RustImageType::External => "external",
-        RustImageType::Relative => "relative",
-    }
-}
-
-fn structured_data_type_to_str(data_type: &RustStructuredDataType) -> &'static str {
-    match data_type {
-        RustStructuredDataType::JsonLd => "json_ld",
-        RustStructuredDataType::Microdata => "microdata",
-        RustStructuredDataType::RDFa => "rdfa",
     }
 }
 
@@ -714,7 +664,7 @@ fn links_to_py<'py>(py: Python<'py>, links: Vec<RustLinkMetadata>) -> PyResult<P
         dict.set_item("href", link.href)?;
         dict.set_item("text", link.text)?;
         dict.set_item("title", opt_string_to_py(py, link.title)?)?;
-        dict.set_item("link_type", link_type_to_str(&link.link_type))?;
+        dict.set_item("link_type", link.link_type.to_string())?;
         dict.set_item("rel", link.rel)?;
         dict.set_item("attributes", btreemap_to_py(py, link.attributes)?)?;
         list.append(dict)?;
@@ -739,7 +689,7 @@ fn images_to_py<'py>(py: Python<'py>, images: Vec<RustImageMetadata>) -> PyResul
         };
         dict.set_item("dimensions", dims)?;
 
-        dict.set_item("image_type", image_type_to_str(&image.image_type))?;
+        dict.set_item("image_type", image.image_type.to_string())?;
         dict.set_item("attributes", btreemap_to_py(py, image.attributes)?)?;
         list.append(dict)?;
     }
@@ -750,7 +700,7 @@ fn structured_data_to_py<'py>(py: Python<'py>, data: Vec<RustStructuredData>) ->
     let list = PyList::empty(py);
     for item in data {
         let dict = PyDict::new(py);
-        dict.set_item("data_type", structured_data_type_to_str(&item.data_type))?;
+        dict.set_item("data_type", item.data_type.to_string())?;
         dict.set_item("raw_json", item.raw_json)?;
         dict.set_item("schema_type", opt_string_to_py(py, item.schema_type)?)?;
         list.append(dict)?;

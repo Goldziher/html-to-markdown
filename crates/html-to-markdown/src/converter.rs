@@ -881,6 +881,49 @@ fn repair_with_html5ever(input: &str) -> Option<String> {
     String::from_utf8(buf).ok()
 }
 
+fn has_custom_element_tags(input: &str) -> bool {
+    let bytes = input.as_bytes();
+    let mut idx = 0;
+
+    while idx < bytes.len() {
+        if bytes[idx] == b'<' {
+            idx += 1;
+            if idx >= bytes.len() {
+                break;
+            }
+            if bytes[idx] == b'!' {
+                idx += 1;
+                continue;
+            }
+            if bytes[idx] == b'/' {
+                idx += 1;
+                if idx >= bytes.len() {
+                    break;
+                }
+            }
+            if !bytes[idx].is_ascii_alphabetic() {
+                idx += 1;
+                continue;
+            }
+
+            let start = idx;
+            while idx < bytes.len() {
+                let b = bytes[idx];
+                if b == b'>' || b == b'/' || b.is_ascii_whitespace() {
+                    break;
+                }
+                if b == b'-' && idx > start {
+                    return true;
+                }
+                idx += 1;
+            }
+        }
+        idx += 1;
+    }
+
+    false
+}
+
 fn record_node_hierarchy(node_handle: &tl::NodeHandle, parent: Option<u32>, parser: &tl::Parser, ctx: &mut DomContext) {
     let id = node_handle.get_inner();
     ctx.ensure_capacity(id);
@@ -1541,7 +1584,7 @@ fn convert_html_impl(
     let mut preprocessed_len = preprocessed.len();
 
     let parser_options = tl::ParserOptions::default();
-    let dom_guard = match unsafe { tl::parse_owned(preprocessed.clone(), parser_options) } {
+    let mut dom_guard = match unsafe { tl::parse_owned(preprocessed.clone(), parser_options) } {
         Ok(dom) => dom,
         Err(_) => {
             if let Some(repaired_html) = repair_with_html5ever(&preprocessed) {
@@ -1556,6 +1599,17 @@ fn convert_html_impl(
             }
         }
     };
+
+    if has_custom_element_tags(&preprocessed) {
+        if let Some(repaired_html) = repair_with_html5ever(&preprocessed) {
+            let repaired = preprocess_html(&repaired_html).into_owned();
+            if let Ok(dom) = unsafe { tl::parse_owned(repaired.clone(), parser_options) } {
+                preprocessed = repaired;
+                preprocessed_len = preprocessed.len();
+                dom_guard = dom;
+            }
+        }
+    }
     let dom_ref = dom_guard.get_ref();
     let parser = dom_ref.parser();
     let dom_ctx = build_dom_context(dom_ref, parser);

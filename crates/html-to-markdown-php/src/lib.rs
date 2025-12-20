@@ -10,15 +10,15 @@ use ext_php_rs::prelude::*;
 use ext_php_rs::types::{ArrayKey, ZendHashTable, Zval};
 #[cfg(feature = "metadata")]
 use html_to_markdown_rs::metadata::{
-    DocumentMetadata, ExtendedMetadata, HeaderMetadata, ImageMetadata, ImageType, LinkMetadata, LinkType,
-    MetadataConfig, StructuredData, StructuredDataType, TextDirection,
+    DocumentMetadata, ExtendedMetadata, HeaderMetadata, ImageMetadata, LinkMetadata, MetadataConfig, StructuredData,
+    TextDirection,
 };
 use html_to_markdown_rs::safety::guard_panic;
 mod profiling;
 use html_to_markdown_rs::{
     CodeBlockStyle, ConversionError, ConversionOptions, HeadingStyle, HighlightStyle, HtmlExtraction, InlineImage,
-    InlineImageConfig, InlineImageFormat, InlineImageSource, InlineImageWarning, ListIndentType, NewlineStyle,
-    PreprocessingOptions, PreprocessingPreset, WhitespaceMode,
+    InlineImageConfig, InlineImageWarning, ListIndentType, NewlineStyle, PreprocessingOptions, PreprocessingPreset,
+    WhitespaceMode,
 };
 use std::path::PathBuf;
 
@@ -499,7 +499,7 @@ fn build_inline_images(images: Vec<InlineImage>) -> PhpResult<ZBox<ZendHashTable
 fn build_inline_image_entry(image: InlineImage) -> PhpResult<ZBox<ZendHashTable>> {
     let mut entry = ZendHashTable::new();
     entry.insert("data", Binary::from(image.data))?;
-    entry.insert("format", inline_image_format_to_string(&image.format))?;
+    entry.insert("format", image.format.to_string())?;
 
     match image.filename {
         Some(filename) => entry.insert("filename", filename)?,
@@ -520,7 +520,7 @@ fn build_inline_image_entry(image: InlineImage) -> PhpResult<ZBox<ZendHashTable>
         None => entry.insert("dimensions", ())?,
     }
 
-    entry.insert("source", inline_image_source_to_string(&image.source))?;
+    entry.insert("source", image.source.to_string())?;
     entry.insert("attributes", build_attribute_table(image.attributes)?)?;
 
     Ok(entry)
@@ -547,25 +547,6 @@ fn build_warnings(warnings: Vec<InlineImageWarning>) -> PhpResult<ZBox<ZendHashT
     }
 
     Ok(table)
-}
-
-fn inline_image_format_to_string(format: &InlineImageFormat) -> String {
-    match format {
-        InlineImageFormat::Png => "png".to_string(),
-        InlineImageFormat::Jpeg => "jpeg".to_string(),
-        InlineImageFormat::Gif => "gif".to_string(),
-        InlineImageFormat::Bmp => "bmp".to_string(),
-        InlineImageFormat::Webp => "webp".to_string(),
-        InlineImageFormat::Svg => "svg".to_string(),
-        InlineImageFormat::Other(other) => other.clone(),
-    }
-}
-
-fn inline_image_source_to_string(source: &InlineImageSource) -> &'static str {
-    match source {
-        InlineImageSource::ImgDataUri => "img_data_uri",
-        InlineImageSource::SvgElement => "svg_element",
-    }
 }
 
 fn key_to_string(key: &ArrayKey<'_>) -> PhpResult<String> {
@@ -680,7 +661,7 @@ fn build_links_array(links: Vec<LinkMetadata>) -> PhpResult<ZBox<ZendHashTable>>
             None => entry.insert("title", ())?,
         }
 
-        entry.insert("link_type", link_type_to_string(&link.link_type))?;
+        entry.insert("link_type", link.link_type.to_string())?;
         entry.insert("rel", link.rel)?;
         entry.insert("attributes", build_string_map(link.attributes)?)?;
 
@@ -718,7 +699,7 @@ fn build_images_array(images: Vec<ImageMetadata>) -> PhpResult<ZBox<ZendHashTabl
             None => entry.insert("dimensions", ())?,
         }
 
-        entry.insert("image_type", image_type_to_string(&image.image_type))?;
+        entry.insert("image_type", image.image_type.to_string())?;
         entry.insert("attributes", build_string_map(image.attributes)?)?;
 
         array.push(entry)?;
@@ -733,7 +714,7 @@ fn build_structured_data_array(data: Vec<StructuredData>) -> PhpResult<ZBox<Zend
 
     for item in data {
         let mut entry = ZendHashTable::new();
-        entry.insert("data_type", structured_data_type_to_string(&item.data_type))?;
+        entry.insert("data_type", item.data_type.to_string())?;
         entry.insert("raw_json", item.raw_json)?;
 
         match item.schema_type {
@@ -760,41 +741,5 @@ fn build_string_map(map: BTreeMap<String, String>) -> PhpResult<ZBox<ZendHashTab
 
 #[cfg(feature = "metadata")]
 fn text_direction_to_string(direction: Option<TextDirection>) -> String {
-    match direction {
-        Some(TextDirection::LeftToRight) => "ltr".to_string(),
-        Some(TextDirection::RightToLeft) => "rtl".to_string(),
-        Some(TextDirection::Auto) => "auto".to_string(),
-        None => "".to_string(),
-    }
-}
-
-#[cfg(feature = "metadata")]
-fn link_type_to_string(link_type: &LinkType) -> &'static str {
-    match link_type {
-        LinkType::Anchor => "anchor",
-        LinkType::Internal => "internal",
-        LinkType::External => "external",
-        LinkType::Email => "email",
-        LinkType::Phone => "phone",
-        LinkType::Other => "other",
-    }
-}
-
-#[cfg(feature = "metadata")]
-fn image_type_to_string(image_type: &ImageType) -> &'static str {
-    match image_type {
-        ImageType::DataUri => "data_uri",
-        ImageType::InlineSvg => "inline_svg",
-        ImageType::External => "external",
-        ImageType::Relative => "relative",
-    }
-}
-
-#[cfg(feature = "metadata")]
-fn structured_data_type_to_string(data_type: &StructuredDataType) -> &'static str {
-    match data_type {
-        StructuredDataType::JsonLd => "json_ld",
-        StructuredDataType::Microdata => "microdata",
-        StructuredDataType::RDFa => "rdfa",
-    }
+    direction.map(|dir| dir.to_string()).unwrap_or_default()
 }

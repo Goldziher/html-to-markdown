@@ -39,11 +39,34 @@ pub enum InlineImageFormat {
     Other(String),
 }
 
+impl std::fmt::Display for InlineImageFormat {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Png => write!(f, "png"),
+            Self::Jpeg => write!(f, "jpeg"),
+            Self::Gif => write!(f, "gif"),
+            Self::Bmp => write!(f, "bmp"),
+            Self::Webp => write!(f, "webp"),
+            Self::Svg => write!(f, "svg"),
+            Self::Other(custom) => write!(f, "{custom}"),
+        }
+    }
+}
+
 /// Source of the inline image.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum InlineImageSource {
     ImgDataUri,
     SvgElement,
+}
+
+impl std::fmt::Display for InlineImageSource {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::ImgDataUri => write!(f, "img_data_uri"),
+            Self::SvgElement => write!(f, "svg_element"),
+        }
+    }
 }
 
 /// Information about an extracted inline image.

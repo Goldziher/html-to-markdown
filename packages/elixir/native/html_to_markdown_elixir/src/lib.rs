@@ -9,8 +9,8 @@ use html_to_markdown_rs::metadata::{
 };
 use html_to_markdown_rs::{
     CodeBlockStyle, ConversionOptions, HeadingStyle, HighlightStyle, HtmlExtraction, InlineImage, InlineImageConfig,
-    InlineImageFormat, InlineImageSource, ListIndentType, NewlineStyle, PreprocessingOptions, PreprocessingPreset,
-    WhitespaceMode, convert as convert_inner, convert_with_inline_images as convert_with_inline_images_inner,
+    ListIndentType, NewlineStyle, PreprocessingOptions, PreprocessingPreset, WhitespaceMode, convert as convert_inner,
+    convert_with_inline_images as convert_with_inline_images_inner,
 };
 mod profiling;
 use rustler::types::binary::{Binary, OwnedBinary};
@@ -634,32 +634,13 @@ fn build_inline_image<'a>(env: Env<'a>, image: InlineImage) -> NifResult<InlineI
 
     Ok(InlineImageTerm {
         data: binary,
-        format: inline_image_format_to_string(format),
+        format: format.to_string(),
         filename,
         description,
         dimensions,
-        source: inline_image_source_to_string(source),
+        source: source.to_string(),
         attributes: attr_map,
     })
-}
-
-fn inline_image_format_to_string(format: InlineImageFormat) -> String {
-    match format {
-        InlineImageFormat::Png => "png".to_string(),
-        InlineImageFormat::Jpeg => "jpeg".to_string(),
-        InlineImageFormat::Gif => "gif".to_string(),
-        InlineImageFormat::Bmp => "bmp".to_string(),
-        InlineImageFormat::Webp => "webp".to_string(),
-        InlineImageFormat::Svg => "svg".to_string(),
-        InlineImageFormat::Other(other) => other,
-    }
-}
-
-fn inline_image_source_to_string(source: InlineImageSource) -> String {
-    match source {
-        InlineImageSource::ImgDataUri => "img_data_uri".to_string(),
-        InlineImageSource::SvgElement => "svg_element".to_string(),
-    }
 }
 
 fn handle_invalid_option_error<'a>(env: Env<'a>, err: Error) -> NifResult<Term<'a>> {

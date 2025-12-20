@@ -4,15 +4,13 @@
 use html_to_markdown_rs::metadata::{
     DEFAULT_MAX_STRUCTURED_DATA_SIZE, DocumentMetadata as RustDocumentMetadata,
     ExtendedMetadata as RustExtendedMetadata, HeaderMetadata as RustHeaderMetadata, ImageMetadata as RustImageMetadata,
-    ImageType as RustImageType, LinkMetadata as RustLinkMetadata, LinkType as RustLinkType,
-    MetadataConfig as RustMetadataConfig, StructuredData as RustStructuredData,
-    StructuredDataType as RustStructuredDataType, TextDirection as RustTextDirection,
+    LinkMetadata as RustLinkMetadata, MetadataConfig as RustMetadataConfig, StructuredData as RustStructuredData,
 };
 use html_to_markdown_rs::safety::guard_panic;
 mod profiling;
 use html_to_markdown_rs::{
     CodeBlockStyle, ConversionError, ConversionOptions as RustConversionOptions, HeadingStyle, HighlightStyle,
-    InlineImageConfig as RustInlineImageConfig, InlineImageFormat, InlineImageSource, ListIndentType, NewlineStyle,
+    InlineImageConfig as RustInlineImageConfig, ListIndentType, NewlineStyle,
     PreprocessingOptions as RustPreprocessingOptions, PreprocessingPreset, WhitespaceMode,
 };
 use napi::bindgen_prelude::*;
@@ -422,25 +420,6 @@ pub struct JsHtmlExtraction {
     pub warnings: Vec<JsInlineImageWarning>,
 }
 
-fn format_to_string(format: &InlineImageFormat) -> String {
-    match format {
-        InlineImageFormat::Png => "png".to_string(),
-        InlineImageFormat::Jpeg => "jpeg".to_string(),
-        InlineImageFormat::Gif => "gif".to_string(),
-        InlineImageFormat::Bmp => "bmp".to_string(),
-        InlineImageFormat::Webp => "webp".to_string(),
-        InlineImageFormat::Svg => "svg".to_string(),
-        InlineImageFormat::Other(s) => s.clone(),
-    }
-}
-
-fn source_to_string(source: &InlineImageSource) -> String {
-    match source {
-        InlineImageSource::ImgDataUri => "img_data_uri".to_string(),
-        InlineImageSource::SvgElement => "svg_element".to_string(),
-    }
-}
-
 /// Metadata extraction configuration
 #[cfg(feature = "metadata")]
 #[napi(object)]
@@ -568,104 +547,19 @@ pub struct JsMetadataExtraction {
 }
 
 #[cfg(feature = "metadata")]
-fn text_direction_to_string(direction: Option<RustTextDirection>) -> Option<String> {
-    direction.map(|d| d.to_string())
-}
-
-#[cfg(feature = "metadata")]
-fn link_type_to_string(link_type: &RustLinkType) -> String {
-    link_type.to_string()
-}
-
-#[cfg(feature = "metadata")]
-fn image_type_to_string(image_type: &RustImageType) -> String {
-    image_type.to_string()
-}
-
-#[cfg(feature = "metadata")]
-fn structured_data_type_to_string(data_type: &RustStructuredDataType) -> String {
-    data_type.to_string()
-}
-
-#[cfg(feature = "metadata")]
 fn convert_document_metadata(doc: RustDocumentMetadata) -> JsDocumentMetadata {
-    let mut title = None;
-    let mut description = None;
-    let mut author = None;
-    let mut canonical_url = None;
-    let mut base_href = None;
-    let mut keywords = Vec::new();
-    let mut open_graph = HashMap::new();
-    let mut twitter_card = HashMap::new();
-    let mut meta_tags = HashMap::new();
-
-    for (raw_key, value) in doc.meta_tags.iter() {
-        let mut key = raw_key.to_lowercase();
-        let value = value.clone();
-
-        if let Some(stripped) = key.strip_prefix("meta-") {
-            key = stripped.to_string();
-        }
-
-        if key.contains(':') {
-            key = key.replace(':', "-");
-        }
-
-        match key.as_str() {
-            "title" => title = Some(value.clone()),
-            "description" => description = Some(value.clone()),
-            "author" => author = Some(value.clone()),
-            "canonical" => canonical_url = Some(value.clone()),
-            "base" | "base-href" => base_href = Some(value.clone()),
-            "keywords" => {
-                keywords = value
-                    .split(',')
-                    .map(|s| s.trim().to_string())
-                    .filter(|s| !s.is_empty())
-                    .collect();
-            }
-            k if k.starts_with("og-") => {
-                let og_key = k.trim_start_matches("og-").replace('-', "_");
-                open_graph.insert(og_key, value.clone());
-            }
-            k if k.starts_with("twitter-") => {
-                let tw_key = k.trim_start_matches("twitter-").replace('-', "_");
-                twitter_card.insert(tw_key, value.clone());
-            }
-            _ => {
-                meta_tags.insert(key, value.clone());
-            }
-        }
-    }
-
     JsDocumentMetadata {
-        title: doc.title.or(title),
-        description: doc.description.or(description),
-        keywords: if doc.keywords.is_empty() {
-            keywords
-        } else {
-            doc.keywords
-        },
-        author: doc.author.or(author),
-        canonical_url: doc.canonical_url.or(canonical_url),
-        base_href: doc.base_href.or(base_href),
+        title: doc.title,
+        description: doc.description,
+        keywords: doc.keywords,
+        author: doc.author,
+        canonical_url: doc.canonical_url,
+        base_href: doc.base_href,
         language: doc.language,
-        text_direction: text_direction_to_string(doc.text_direction),
-        open_graph: if doc.open_graph.is_empty() {
-            open_graph
-        } else {
-            doc.open_graph.into_iter().collect()
-        },
-        twitter_card: if doc.twitter_card.is_empty() {
-            twitter_card
-        } else {
-            doc.twitter_card.into_iter().collect()
-        },
-        meta_tags: if doc.meta_tags.is_empty() {
-            meta_tags
-        } else {
-            doc.meta_tags.into_iter().collect()
-        },
+        text_direction: doc.text_direction.map(|dir| dir.to_string()),
+        open_graph: doc.open_graph.into_iter().collect(),
+        twitter_card: doc.twitter_card.into_iter().collect(),
+        meta_tags: doc.meta_tags.into_iter().collect(),
     }
 }
 
@@ -691,7 +585,7 @@ fn convert_links(links: Vec<RustLinkMetadata>) -> Vec<JsLinkMetadata> {
             href: l.href,
             text: l.text,
             title: l.title,
-            link_type: link_type_to_string(&l.link_type),
+            link_type: l.link_type.to_string(),
             rel: l.rel,
             attributes: l.attributes.into_iter().collect(),
         })
@@ -707,7 +601,7 @@ fn convert_images(images: Vec<RustImageMetadata>) -> Vec<JsImageMetadata> {
             alt: i.alt,
             title: i.title,
             dimensions: i.dimensions.map(|(w, h)| vec![w, h]),
-            image_type: image_type_to_string(&i.image_type),
+            image_type: i.image_type.to_string(),
             attributes: i.attributes.into_iter().collect(),
         })
         .collect()
@@ -717,7 +611,7 @@ fn convert_images(images: Vec<RustImageMetadata>) -> Vec<JsImageMetadata> {
 fn convert_structured_data(data: Vec<RustStructuredData>) -> Vec<JsStructuredData> {
     data.into_iter()
         .map(|d| JsStructuredData {
-            data_type: structured_data_type_to_string(&d.data_type),
+            data_type: d.data_type.to_string(),
             raw_json: d.raw_json,
             schema_type: d.schema_type,
         })
@@ -822,11 +716,11 @@ fn convert_inline_images_impl(
         .into_iter()
         .map(|img| JsInlineImage {
             data: img.data.into(),
-            format: format_to_string(&img.format),
+            format: img.format.to_string(),
             filename: img.filename,
             description: img.description,
             dimensions: img.dimensions.map(|(w, h)| vec![w, h]),
-            source: source_to_string(&img.source),
+            source: img.source.to_string(),
             attributes: img.attributes.into_iter().collect(),
         })
         .collect();
