@@ -98,6 +98,10 @@ obj/
 *.exe
 *.pdb
 
+# Allow benchmark harness entrypoint under packages/go/bin
+!packages/go/bin/
+!packages/go/bin/benchmark.go
+
 # AI Rules generated files
 .claude/agents/
 .mcp.json
