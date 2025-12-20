@@ -2450,6 +2450,11 @@ fn matches_end_tag_start(bytes: &[u8], start: usize, tag: &[u8]) -> bool {
     matches_tag_start(bytes, start + 1, tag)
 }
 
+fn has_more_than_one_char(text: &str) -> bool {
+    let mut chars = text.chars();
+    chars.next().is_some() && chars.next().is_some()
+}
+
 /// Check if an element is inline (not block-level).
 fn is_inline_element(tag_name: &str) -> bool {
     matches!(
@@ -2769,7 +2774,9 @@ fn walk_node(
                 return;
             }
 
-            let had_newlines = text.contains('\n');
+            let text_ref = text.as_ref();
+            let had_newlines = text_ref.contains('\n');
+            let has_double_newline = text_ref.contains("\n\n") || text_ref.contains("\r\n\r\n");
 
             if options.strip_newlines {
                 text = Cow::Owned(text.replace(['\r', '\n'], " "));
@@ -2786,7 +2793,7 @@ fn walk_node(
                         output.push_str(text.as_ref());
                         return;
                     }
-                    if text.contains("\n\n") || text.contains("\r\n\r\n") {
+                    if has_double_newline {
                         if !output.ends_with("\n\n") {
                             output.push('\n');
                         }
@@ -2813,7 +2820,7 @@ fn walk_node(
                 if previous_sibling_is_inline_tag(node_handle, parser, dom_ctx)
                     && next_sibling_is_inline_tag(node_handle, parser, dom_ctx)
                 {
-                    if text.chars().count() > 1 {
+                    if has_more_than_one_char(text.as_ref()) {
                         if !output.ends_with(' ') {
                             output.push(' ');
                         }
