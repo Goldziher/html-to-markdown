@@ -134,47 +134,20 @@ pub fn normalize_whitespace(text: &str) -> String {
 
 pub fn normalize_whitespace_cow(text: &str) -> Cow<'_, str> {
     let mut prev_was_space = false;
-    let mut output: Option<String> = None;
-    let mut last = 0usize;
 
-    for (idx, ch) in text.char_indices() {
+    for ch in text.chars() {
         let is_space = ch == ' ' || ch == '\t' || is_unicode_space(ch);
         if is_space {
             if prev_was_space || ch != ' ' {
-                let out = output.get_or_insert_with(|| {
-                    let mut s = String::with_capacity(text.len());
-                    if last > 0 {
-                        s.push_str(&text[..last]);
-                    }
-                    s
-                });
-                if !prev_was_space {
-                    out.push(' ');
-                }
-                last = idx + ch.len_utf8();
+                return Cow::Owned(normalize_whitespace(text));
             }
             prev_was_space = true;
         } else {
-            if let Some(out) = output.as_mut() {
-                if last < idx {
-                    out.push_str(&text[last..idx]);
-                }
-                out.push(ch);
-                last = idx + ch.len_utf8();
-            }
             prev_was_space = false;
         }
     }
 
-    match output {
-        Some(mut out) => {
-            if last < text.len() {
-                out.push_str(&text[last..]);
-            }
-            Cow::Owned(out)
-        }
-        None => Cow::Borrowed(text),
-    }
+    Cow::Borrowed(text)
 }
 
 /// Decode common HTML entities.

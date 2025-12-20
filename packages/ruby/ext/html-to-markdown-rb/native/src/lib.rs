@@ -1,8 +1,8 @@
 use html_to_markdown_rs::{
     CodeBlockStyle, ConversionOptions, HeadingStyle, HighlightStyle, HtmlExtraction, InlineImage, InlineImageConfig,
-    InlineImageFormat, InlineImageSource, InlineImageWarning, ListIndentType, NewlineStyle, PreprocessingOptions,
-    PreprocessingPreset, WhitespaceMode, convert as convert_inner,
-    convert_with_inline_images as convert_with_inline_images_inner, error::ConversionError, safety::guard_panic,
+    InlineImageWarning, ListIndentType, NewlineStyle, PreprocessingOptions, PreprocessingPreset, WhitespaceMode,
+    convert as convert_inner, convert_with_inline_images as convert_with_inline_images_inner, error::ConversionError,
+    safety::guard_panic,
 };
 
 #[cfg(feature = "metadata")]
@@ -11,10 +11,8 @@ mod profiling;
 #[cfg(feature = "metadata")]
 use html_to_markdown_rs::metadata::{
     DocumentMetadata as RustDocumentMetadata, ExtendedMetadata as RustExtendedMetadata,
-    HeaderMetadata as RustHeaderMetadata, ImageMetadata as RustImageMetadata, ImageType as RustImageType,
-    LinkMetadata as RustLinkMetadata, LinkType as RustLinkType, MetadataConfig as RustMetadataConfig,
-    StructuredData as RustStructuredData, StructuredDataType as RustStructuredDataType,
-    TextDirection as RustTextDirection,
+    HeaderMetadata as RustHeaderMetadata, ImageMetadata as RustImageMetadata, LinkMetadata as RustLinkMetadata,
+    MetadataConfig as RustMetadataConfig, StructuredData as RustStructuredData, TextDirection as RustTextDirection,
 };
 use magnus::prelude::*;
 use magnus::r_hash::ForEach;
@@ -330,15 +328,7 @@ fn inline_image_to_value(ruby: &Ruby, image: InlineImage) -> Result<Value, Error
     let data_value = ruby.str_from_slice(&data);
     hash.aset(ruby.intern("data"), data_value)?;
 
-    let format_value = match format {
-        InlineImageFormat::Png => "png".to_string(),
-        InlineImageFormat::Jpeg => "jpeg".to_string(),
-        InlineImageFormat::Gif => "gif".to_string(),
-        InlineImageFormat::Bmp => "bmp".to_string(),
-        InlineImageFormat::Webp => "webp".to_string(),
-        InlineImageFormat::Svg => "svg".to_string(),
-        InlineImageFormat::Other(other) => other,
-    };
+    let format_value = format.to_string();
     hash.aset(ruby.intern("format"), format_value)?;
 
     match filename {
@@ -360,10 +350,7 @@ fn inline_image_to_value(ruby: &Ruby, image: InlineImage) -> Result<Value, Error
         hash.aset(ruby.intern("dimensions"), ruby.qnil())?;
     }
 
-    let source_value = match source {
-        InlineImageSource::ImgDataUri => "img_data_uri",
-        InlineImageSource::SvgElement => "svg_element",
-    };
+    let source_value = source.to_string();
     hash.aset(ruby.intern("source"), source_value)?;
 
     let attrs = ruby.hash_new();
@@ -494,44 +481,8 @@ fn btreemap_to_ruby_hash(ruby: &Ruby, map: std::collections::BTreeMap<String, St
 }
 
 #[cfg(feature = "metadata")]
-fn text_direction_to_string(text_direction: Option<RustTextDirection>) -> Option<&'static str> {
-    match text_direction {
-        Some(RustTextDirection::LeftToRight) => Some("ltr"),
-        Some(RustTextDirection::RightToLeft) => Some("rtl"),
-        Some(RustTextDirection::Auto) => Some("auto"),
-        None => None,
-    }
-}
-
-#[cfg(feature = "metadata")]
-fn link_type_to_string(link_type: &RustLinkType) -> &'static str {
-    match link_type {
-        RustLinkType::Anchor => "anchor",
-        RustLinkType::Internal => "internal",
-        RustLinkType::External => "external",
-        RustLinkType::Email => "email",
-        RustLinkType::Phone => "phone",
-        RustLinkType::Other => "other",
-    }
-}
-
-#[cfg(feature = "metadata")]
-fn image_type_to_string(image_type: &RustImageType) -> &'static str {
-    match image_type {
-        RustImageType::DataUri => "data_uri",
-        RustImageType::InlineSvg => "inline_svg",
-        RustImageType::External => "external",
-        RustImageType::Relative => "relative",
-    }
-}
-
-#[cfg(feature = "metadata")]
-fn structured_data_type_to_string(data_type: &RustStructuredDataType) -> &'static str {
-    match data_type {
-        RustStructuredDataType::JsonLd => "json_ld",
-        RustStructuredDataType::Microdata => "microdata",
-        RustStructuredDataType::RDFa => "rdfa",
-    }
+fn text_direction_to_string(text_direction: Option<RustTextDirection>) -> Option<String> {
+    text_direction.map(|direction| direction.to_string())
 }
 
 #[cfg(feature = "metadata")]
@@ -593,7 +544,7 @@ fn links_to_ruby(ruby: &Ruby, links: Vec<RustLinkMetadata>) -> Result<Value, Err
         hash.aset(ruby.intern("href"), link.href)?;
         hash.aset(ruby.intern("text"), link.text)?;
         hash.aset(ruby.intern("title"), opt_string_to_ruby(ruby, link.title)?)?;
-        hash.aset(ruby.intern("link_type"), link_type_to_string(&link.link_type))?;
+        hash.aset(ruby.intern("link_type"), link.link_type.to_string())?;
 
         let rel_array = ruby.ary_new();
         for r in link.rel {
@@ -628,7 +579,7 @@ fn images_to_ruby(ruby: &Ruby, images: Vec<RustImageMetadata>) -> Result<Value, 
             }
         }
 
-        hash.aset(ruby.intern("image_type"), image_type_to_string(&image.image_type))?;
+        hash.aset(ruby.intern("image_type"), image.image_type.to_string())?;
         hash.aset(
             ruby.intern("attributes"),
             btreemap_to_ruby_hash(ruby, image.attributes)?,
@@ -643,10 +594,7 @@ fn structured_data_to_ruby(ruby: &Ruby, data: Vec<RustStructuredData>) -> Result
     let array = ruby.ary_new();
     for item in data {
         let hash = ruby.hash_new();
-        hash.aset(
-            ruby.intern("data_type"),
-            structured_data_type_to_string(&item.data_type),
-        )?;
+        hash.aset(ruby.intern("data_type"), item.data_type.to_string())?;
         hash.aset(ruby.intern("raw_json"), item.raw_json)?;
         hash.aset(ruby.intern("schema_type"), opt_string_to_ruby(ruby, item.schema_type)?)?;
         array.push(hash)?;

@@ -1,4 +1,4 @@
-use html_to_markdown_rs::{InlineImageConfig as RustInlineImageConfig, InlineImageFormat, InlineImageSource};
+use html_to_markdown_rs::InlineImageConfig as RustInlineImageConfig;
 use js_sys::Uint8Array;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -108,11 +108,11 @@ impl WasmInlineImage {
     pub fn from_rust(img: html_to_markdown_rs::InlineImage) -> Self {
         Self {
             data: img.data,
-            format: format_to_string(&img.format),
+            format: img.format.to_string(),
             filename: img.filename,
             description: img.description,
             dimensions: img.dimensions,
-            source: source_to_string(&img.source),
+            source: img.source.to_string(),
             attributes: img.attributes.into_iter().collect(),
         }
     }
@@ -181,24 +181,5 @@ impl From<html_to_markdown_rs::HtmlExtraction> for WasmHtmlExtraction {
             inline_images: val.inline_images.into_iter().map(WasmInlineImage::from_rust).collect(),
             warnings: val.warnings.into_iter().map(Into::into).collect(),
         }
-    }
-}
-
-fn format_to_string(format: &InlineImageFormat) -> String {
-    match format {
-        InlineImageFormat::Png => "png".to_string(),
-        InlineImageFormat::Jpeg => "jpeg".to_string(),
-        InlineImageFormat::Gif => "gif".to_string(),
-        InlineImageFormat::Bmp => "bmp".to_string(),
-        InlineImageFormat::Webp => "webp".to_string(),
-        InlineImageFormat::Svg => "svg".to_string(),
-        InlineImageFormat::Other(s) => s.clone(),
-    }
-}
-
-fn source_to_string(source: &InlineImageSource) -> String {
-    match source {
-        InlineImageSource::ImgDataUri => "img_data_uri".to_string(),
-        InlineImageSource::SvgElement => "svg_element".to_string(),
     }
 }
