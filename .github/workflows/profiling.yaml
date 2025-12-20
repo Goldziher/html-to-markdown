@@ -44,7 +44,7 @@ permissions:
   contents: read
 
 env:
-  DEFAULT_FRAMEWORKS: "rust"
+  DEFAULT_FRAMEWORKS: "rust,python,ruby,php,node,wasm,go,java,csharp,elixir"
   DEFAULT_FIXTURES: "tools/benchmark-harness/fixtures/wikipedia.toml"
   DEFAULT_ITERATIONS: "3"
   DEFAULT_WARMUP: "1"
