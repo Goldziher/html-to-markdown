@@ -41,13 +41,14 @@
 //! assert_eq!(markdown, "# Title\n\nParagraph with **bold** text.\n");
 //! ```
 
-#[cfg(feature = "inline-images")]
+use lru::LruCache;
 use std::cell::RefCell;
 use std::collections::BTreeMap;
 #[cfg(feature = "inline-images")]
 use std::rc::Rc;
 
 use std::borrow::Cow;
+use std::num::NonZeroUsize;
 use std::str;
 
 use crate::error::Result;
@@ -505,7 +506,10 @@ struct DomContext {
     root_children: Vec<tl::NodeHandle>,
     node_map: Vec<Option<tl::NodeHandle>>,
     tag_info_map: Vec<Option<TagInfo>>,
+    text_cache: RefCell<LruCache<u32, String>>,
 }
+
+const TEXT_CACHE_CAPACITY: usize = 4096;
 
 impl DomContext {
     fn ensure_capacity(&mut self, id: u32) {
@@ -535,6 +539,40 @@ impl DomContext {
 
     fn tag_info(&self, id: u32) -> Option<&TagInfo> {
         self.tag_info_map.get(id as usize).and_then(|info| info.as_ref())
+    }
+
+    fn text_content(&self, node_handle: &tl::NodeHandle, parser: &tl::Parser) -> String {
+        let id = node_handle.get_inner();
+        let cached = {
+            let mut cache = self.text_cache.borrow_mut();
+            cache.get(&id).cloned()
+        };
+        if let Some(value) = cached {
+            return value;
+        }
+
+        let value = self.text_content_uncached(node_handle, parser);
+        self.text_cache.borrow_mut().put(id, value.clone());
+        value
+    }
+
+    fn text_content_uncached(&self, node_handle: &tl::NodeHandle, parser: &tl::Parser) -> String {
+        let mut text = String::with_capacity(64);
+        if let Some(node) = node_handle.get(parser) {
+            match node {
+                tl::Node::Raw(bytes) => {
+                    text.push_str(&text::decode_html_entities(&bytes.as_utf8_str()));
+                }
+                tl::Node::Tag(tag) => {
+                    let children = tag.children();
+                    for child_handle in children.top().iter() {
+                        text.push_str(&self.text_content(child_handle, parser));
+                    }
+                }
+                _ => {}
+            }
+        }
+        text
     }
 }
 
@@ -805,6 +843,7 @@ fn build_dom_context(dom: &tl::VDom, parser: &tl::Parser) -> DomContext {
         root_children: dom.children().to_vec(),
         node_map: Vec::new(),
         tag_info_map: Vec::new(),
+        text_cache: RefCell::new(LruCache::new(NonZeroUsize::new(TEXT_CACHE_CAPACITY).unwrap())),
     };
 
     for child_handle in dom.children().iter() {
@@ -1143,7 +1182,7 @@ fn format_metadata_frontmatter(metadata: &BTreeMap<String, String>) -> String {
 }
 
 /// Check if a handle is an empty inline element (abbr, var, ins, dfn, etc. with no text content).
-fn is_empty_inline_element(node_handle: &tl::NodeHandle, parser: &tl::Parser) -> bool {
+fn is_empty_inline_element(node_handle: &tl::NodeHandle, parser: &tl::Parser, dom_ctx: &DomContext) -> bool {
     const EMPTY_WHEN_NO_CONTENT_TAGS: &[&str] = &[
         "abbr", "var", "ins", "dfn", "time", "data", "cite", "q", "mark", "small", "u",
     ];
@@ -1152,7 +1191,7 @@ fn is_empty_inline_element(node_handle: &tl::NodeHandle, parser: &tl::Parser) ->
         if let tl::Node::Tag(tag) = node {
             let tag_name = normalized_tag_name(tag.name().as_utf8_str());
             if EMPTY_WHEN_NO_CONTENT_TAGS.contains(&tag_name.as_ref()) {
-                return get_text_content(node_handle, parser).trim().is_empty();
+                return get_text_content(node_handle, parser, dom_ctx).trim().is_empty();
             }
         }
     }
@@ -1160,25 +1199,8 @@ fn is_empty_inline_element(node_handle: &tl::NodeHandle, parser: &tl::Parser) ->
 }
 
 /// Get the text content of a node and its children.
-fn get_text_content(node_handle: &tl::NodeHandle, parser: &tl::Parser) -> String {
-    let mut text = String::with_capacity(64);
-    if let Some(node) = node_handle.get(parser) {
-        match node {
-            tl::Node::Raw(bytes) => {
-                text.push_str(&text::decode_html_entities(&bytes.as_utf8_str()));
-            }
-            tl::Node::Tag(tag) => {
-                let children = tag.children();
-                {
-                    for child_handle in children.top().iter() {
-                        text.push_str(&get_text_content(child_handle, parser));
-                    }
-                }
-            }
-            _ => {}
-        }
-    }
-    text
+fn get_text_content(node_handle: &tl::NodeHandle, parser: &tl::Parser, dom_ctx: &DomContext) -> String {
+    dom_ctx.text_content(node_handle, parser)
 }
 
 /// Collect inline text for link labels, skipping block-level descendants.
@@ -3044,8 +3066,8 @@ fn walk_node(
                                     if text.trim().is_empty() && i > 0 && i < child_handles.len() - 1 {
                                         let prev = &child_handles[i - 1];
                                         let next = &child_handles[i + 1];
-                                        if is_empty_inline_element(prev, parser)
-                                            && is_empty_inline_element(next, parser)
+                                        if is_empty_inline_element(prev, parser, dom_ctx)
+                                            && is_empty_inline_element(next, parser, dom_ctx)
                                         {
                                             continue;
                                         }
@@ -3169,7 +3191,7 @@ fn walk_node(
                         .map(|v| v.as_utf8_str().to_string());
 
                     if let Some(href) = href_attr {
-                        let raw_text = text::normalize_whitespace(&get_text_content(node_handle, parser))
+                        let raw_text = text::normalize_whitespace(&get_text_content(node_handle, parser, dom_ctx))
                             .trim()
                             .to_string();
 
@@ -3284,7 +3306,7 @@ fn walk_node(
                         };
 
                         if label.is_empty() && saw_block {
-                            let fallback = text::normalize_whitespace(&get_text_content(node_handle, parser));
+                            let fallback = text::normalize_whitespace(&get_text_content(node_handle, parser, dom_ctx));
                             label = normalize_link_label(&fallback);
                         }
 
@@ -4878,7 +4900,7 @@ fn walk_node(
                         for child_handle in children.top().iter() {
                             if let Some(tl::Node::Tag(child_tag)) = child_handle.get(parser) {
                                 if tag_name_eq(child_tag.name().as_utf8_str(), "title") {
-                                    title = get_text_content(child_handle, parser).trim().to_string();
+                                    title = get_text_content(child_handle, parser, dom_ctx).trim().to_string();
                                     break;
                                 }
                             }
@@ -4926,7 +4948,7 @@ fn walk_node(
                 }
 
                 "math" => {
-                    let text_content = get_text_content(node_handle, parser).trim().to_string();
+                    let text_content = get_text_content(node_handle, parser, dom_ctx).trim().to_string();
 
                     if text_content.is_empty() {
                         return;
@@ -6068,7 +6090,7 @@ fn convert_table(
         let looks_like_layout =
             table_contains_nested_table(node_handle, parser, true) || has_span || distinct_counts.len() > 1;
         let link_count = count_links(node_handle, parser);
-        let table_text = text::normalize_whitespace(&get_text_content(node_handle, parser));
+        let table_text = text::normalize_whitespace(&get_text_content(node_handle, parser, dom_ctx));
         let is_blank_table = table_text.trim().is_empty();
 
         if !table_has_header(node_handle, parser)
