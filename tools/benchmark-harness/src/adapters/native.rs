@@ -46,7 +46,13 @@ impl FrameworkAdapter for NativeAdapter {
     fn run(&self, fixture: &Fixture, config: &BenchmarkConfig) -> Result<BenchmarkResult> {
         let html = self.read_fixture(fixture)?;
         let options = Self::build_options(fixture.format);
-        let iterations = fixture.iterations.unwrap_or(config.benchmark_iterations as u32).max(1) as usize;
+        let base_iterations = fixture.iterations.unwrap_or(config.benchmark_iterations as u32).max(1) as usize;
+        let profile_repeat = if config.enable_profiling {
+            config.profile_repeat.max(1)
+        } else {
+            1
+        };
+        let iterations = base_iterations.saturating_mul(profile_repeat);
 
         for _ in 0..config.warmup_iterations.max(1) {
             convert(&html, Some(options.clone()))

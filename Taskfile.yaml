@@ -142,6 +142,11 @@ tasks:
     cmds:
       - cargo run --release --manifest-path tools/benchmark-harness/Cargo.toml -- generate-flamegraph-index --flamegraphs tools/benchmark-harness/results/flamegraphs --output tools/benchmark-harness/results/flamegraphs/index.html
 
+  bench:harness:consolidate:
+    desc: "Consolidate benchmark results under .benchmarks"
+    cmds:
+      - cargo run --release --manifest-path tools/benchmark-harness/Cargo.toml -- consolidate --input .benchmarks --output tools/benchmark-harness/results-consolidated
+
   test:rust:
     desc: "Alias for rust:test"
     cmds:
