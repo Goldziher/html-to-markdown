@@ -1,6 +1,6 @@
 args = System.argv()
 
-{options, _} =
+{options, _, _} =
   OptionParser.parse(args,
     switches: [file: :string, iterations: :integer, format: :string]
   )
