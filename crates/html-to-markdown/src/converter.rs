@@ -230,27 +230,41 @@ fn calculate_list_continuation_indent(depth: usize) -> usize {
 ///   <li>Item 2</li>
 /// </ul>
 /// ```
-fn is_loose_list(node_handle: &tl::NodeHandle, parser: &tl::Parser) -> bool {
+fn is_loose_list(node_handle: &tl::NodeHandle, parser: &tl::Parser, dom_ctx: &DomContext) -> bool {
     if let Some(node) = node_handle.get(parser) {
         if let tl::Node::Tag(tag) = node {
             let children = tag.children();
             {
                 for child_handle in children.top().iter() {
-                    if let Some(child_node) = child_handle.get(parser) {
-                        if let tl::Node::Tag(child_tag) = child_node {
-                            if tag_name_eq(child_tag.name().as_utf8_str(), "li") {
-                                let li_children = child_tag.children();
-                                {
-                                    for li_child_handle in li_children.top().iter() {
-                                        if let Some(li_child_node) = li_child_handle.get(parser) {
-                                            if let tl::Node::Tag(li_child_tag) = li_child_node {
-                                                if tag_name_eq(li_child_tag.name().as_utf8_str(), "p") {
-                                                    return true;
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
+                    let is_li = dom_ctx
+                        .tag_info(child_handle.get_inner())
+                        .map(|info| info.name == "li")
+                        .unwrap_or_else(|| {
+                            matches!(
+                                child_handle.get(parser),
+                                Some(tl::Node::Tag(child_tag))
+                                    if tag_name_eq(child_tag.name().as_utf8_str(), "li")
+                            )
+                        });
+                    if !is_li {
+                        continue;
+                    }
+
+                    if let Some(tl::Node::Tag(child_tag)) = child_handle.get(parser) {
+                        let li_children = child_tag.children();
+                        for li_child_handle in li_children.top().iter() {
+                            let is_p = dom_ctx
+                                .tag_info(li_child_handle.get_inner())
+                                .map(|info| info.name == "p")
+                                .unwrap_or_else(|| {
+                                    matches!(
+                                        li_child_handle.get(parser),
+                                        Some(tl::Node::Tag(li_child_tag))
+                                            if tag_name_eq(li_child_tag.name().as_utf8_str(), "p")
+                                    )
+                                });
+                            if is_p {
+                                return true;
                             }
                         }
                     }
@@ -437,7 +451,11 @@ fn process_list_children(
                     walk_node(child_handle, parser, output, options, &list_ctx, depth, dom_ctx);
 
                     if is_ordered {
-                        if let Some(child_node) = child_handle.get(parser) {
+                        if let Some(info) = dom_ctx.tag_info(child_handle.get_inner()) {
+                            if info.name == "li" {
+                                counter += 1;
+                            }
+                        } else if let Some(child_node) = child_handle.get(parser) {
                             if let tl::Node::Tag(child_tag) = child_node {
                                 if tag_name_eq(child_tag.name().as_utf8_str(), "li") {
                                     counter += 1;
@@ -1247,7 +1265,9 @@ fn collect_link_label_text(
         if let Some(node) = handle.get(parser) {
             match node {
                 tl::Node::Raw(bytes) => {
-                    text.push_str(&text::decode_html_entities(&bytes.as_utf8_str()));
+                    let raw = bytes.as_utf8_str();
+                    let decoded = text::decode_html_entities_cow(raw.as_ref());
+                    text.push_str(decoded.as_ref());
                 }
                 tl::Node::Tag(tag) => {
                     let is_block = dom_ctx
@@ -1263,11 +1283,15 @@ fn collect_link_label_text(
                         continue;
                     }
 
-                    let tag_children = tag.children();
-                    let mut child_nodes: Vec<_> = tag_children.top().iter().copied().collect();
-                    child_nodes.reverse();
-                    for child in child_nodes {
-                        stack.push(child);
+                    if let Some(children) = dom_ctx.children_of(handle.get_inner()) {
+                        for child in children.iter().rev() {
+                            stack.push(*child);
+                        }
+                    } else {
+                        let tag_children = tag.children();
+                        let mut child_nodes: Vec<_> = tag_children.top().iter().copied().collect();
+                        child_nodes.reverse();
+                        stack.extend(child_nodes);
                     }
                 }
                 _ => {}
@@ -1279,11 +1303,30 @@ fn collect_link_label_text(
 }
 
 fn normalize_link_label(label: &str) -> String {
-    let collapsed = label
-        .chars()
-        .map(|ch| if ch == '\n' || ch == '\r' { ' ' } else { ch })
-        .collect::<String>();
-    text::normalize_whitespace(&collapsed).trim().to_string()
+    let mut needs_collapse = false;
+    for ch in label.chars() {
+        if ch == '\n' || ch == '\r' {
+            needs_collapse = true;
+            break;
+        }
+    }
+
+    let collapsed = if needs_collapse {
+        let mut collapsed = String::with_capacity(label.len());
+        for ch in label.chars() {
+            if ch == '\n' || ch == '\r' {
+                collapsed.push(' ');
+            } else {
+                collapsed.push(ch);
+            }
+        }
+        Cow::Owned(collapsed)
+    } else {
+        Cow::Borrowed(label)
+    };
+
+    let normalized = text::normalize_whitespace_cow(collapsed.as_ref());
+    normalized.as_ref().trim().to_string()
 }
 
 /// Serialize an element to HTML string (for SVG and Math elements).
@@ -4133,7 +4176,7 @@ fn walk_node(
                     add_list_leading_separator(output, ctx);
 
                     let nested_depth = calculate_list_nesting_depth(ctx);
-                    let is_loose = is_loose_list(node_handle, parser);
+                    let is_loose = is_loose_list(node_handle, parser, dom_ctx);
 
                     process_list_children(
                         node_handle,
@@ -4156,7 +4199,7 @@ fn walk_node(
                     add_list_leading_separator(output, ctx);
 
                     let nested_depth = calculate_list_nesting_depth(ctx);
-                    let is_loose = is_loose_list(node_handle, parser);
+                    let is_loose = is_loose_list(node_handle, parser, dom_ctx);
 
                     let start = tag
                         .attributes()
@@ -4195,7 +4238,15 @@ fn walk_node(
                     let children = tag.children();
                     {
                         for child_handle in children.top().iter() {
-                            if let Some(tl::Node::Tag(child_tag)) = child_handle.get(parser) {
+                            if let Some(info) = dom_ctx.tag_info(child_handle.get_inner()) {
+                                if matches!(
+                                    info.name.as_str(),
+                                    "p" | "div" | "blockquote" | "pre" | "table" | "hr" | "dl"
+                                ) {
+                                    has_block_children = true;
+                                    break;
+                                }
+                            } else if let Some(tl::Node::Tag(child_tag)) = child_handle.get(parser) {
                                 let tag_name = normalized_tag_name(child_tag.name().as_utf8_str());
                                 if matches!(
                                     tag_name.as_ref(),
@@ -5842,9 +5893,33 @@ fn convert_table_cell(
 
     if let Some(tl::Node::Tag(tag)) = node_handle.get(parser) {
         let children = tag.children();
-        {
+        let has_tag_child = children
+            .top()
+            .iter()
+            .any(|child_handle| matches!(child_handle.get(parser), Some(tl::Node::Tag(_))));
+
+        if has_tag_child {
             for child_handle in children.top().iter() {
                 walk_node(child_handle, parser, &mut text, options, &cell_ctx, 0, dom_ctx);
+            }
+        } else {
+            let raw = dom_ctx.text_content(node_handle, parser);
+            let normalized = if options.whitespace_mode == crate::options::WhitespaceMode::Normalized {
+                text::normalize_whitespace_cow(raw.as_str())
+            } else {
+                Cow::Borrowed(raw.as_str())
+            };
+            let escaped = text::escape(
+                normalized.as_ref(),
+                options.escape_misc,
+                options.escape_asterisks,
+                options.escape_underscores,
+                options.escape_ascii,
+            );
+            if options.escape_misc {
+                text = escaped;
+            } else {
+                text = escaped.replace('|', r"\|");
             }
         }
     }
@@ -5875,6 +5950,7 @@ fn convert_table_row(
     options: &ConversionOptions,
     ctx: &Context,
     row_index: usize,
+    has_span: bool,
     rowspan_tracker: &mut std::collections::HashMap<usize, (String, usize)>,
     dom_ctx: &DomContext,
 ) {
@@ -5885,6 +5961,12 @@ fn convert_table_row(
         let children = tag.children();
         {
             for child_handle in children.top().iter() {
+                if let Some(info) = dom_ctx.tag_info(child_handle.get_inner()) {
+                    if info.name == "th" || info.name == "td" {
+                        cells.push(*child_handle);
+                    }
+                    continue;
+                }
                 if let Some(tl::Node::Tag(child_tag)) = child_handle.get(parser) {
                     let cell_name = normalized_tag_name(child_tag.name().as_utf8_str());
                     if cell_name == "th" || cell_name == "td" {
@@ -5895,42 +5977,48 @@ fn convert_table_row(
         }
     }
 
-    let mut col_index = 0;
-    let mut cell_iter = cells.iter();
+    if has_span {
+        let mut col_index = 0;
+        let mut cell_iter = cells.iter();
 
-    loop {
-        if let Some((_content, remaining_rows)) = rowspan_tracker.get_mut(&col_index) {
-            if *remaining_rows > 0 {
-                row_text.push(' ');
-                row_text.push_str(" |");
-                *remaining_rows -= 1;
-                if *remaining_rows == 0 {
-                    rowspan_tracker.remove(&col_index);
+        loop {
+            if let Some((_content, remaining_rows)) = rowspan_tracker.get_mut(&col_index) {
+                if *remaining_rows > 0 {
+                    row_text.push(' ');
+                    row_text.push_str(" |");
+                    *remaining_rows -= 1;
+                    if *remaining_rows == 0 {
+                        rowspan_tracker.remove(&col_index);
+                    }
+                    col_index += 1;
+                    continue;
                 }
-                col_index += 1;
-                continue;
+            }
+
+            if let Some(cell_handle) = cell_iter.next() {
+                let cell_start = row_text.len();
+                convert_table_cell(cell_handle, parser, &mut row_text, options, ctx, "", dom_ctx);
+
+                let (colspan, rowspan) = get_colspan_rowspan(cell_handle, parser);
+
+                if rowspan > 1 {
+                    let cell_text = &row_text[cell_start..];
+                    let cell_content = cell_text
+                        .trim_start_matches(' ')
+                        .trim_end_matches(" |")
+                        .trim()
+                        .to_string();
+                    rowspan_tracker.insert(col_index, (cell_content, rowspan - 1));
+                }
+
+                col_index += colspan;
+            } else {
+                break;
             }
         }
-
-        if let Some(cell_handle) = cell_iter.next() {
-            let cell_start = row_text.len();
+    } else {
+        for cell_handle in cells.iter() {
             convert_table_cell(cell_handle, parser, &mut row_text, options, ctx, "", dom_ctx);
-
-            let (colspan, rowspan) = get_colspan_rowspan(cell_handle, parser);
-
-            if rowspan > 1 {
-                let cell_text = &row_text[cell_start..];
-                let cell_content = cell_text
-                    .trim_start_matches(' ')
-                    .trim_end_matches(" |")
-                    .trim()
-                    .to_string();
-                rowspan_tracker.insert(col_index, (cell_content, rowspan - 1));
-            }
-
-            col_index += colspan;
-        } else {
-            break;
         }
     }
 
@@ -5955,111 +6043,85 @@ fn convert_table_row(
     }
 }
 
-fn table_has_header(node_handle: &tl::NodeHandle, parser: &tl::Parser) -> bool {
-    if let Some(node) = node_handle.get(parser) {
-        if let tl::Node::Tag(tag) = node {
-            let tag_name = normalized_tag_name(tag.name().as_utf8_str());
-            if tag_name.as_ref() == "th" {
-                return true;
-            }
-            let children = tag.children();
-            for child in children.top().iter() {
-                if table_has_header(child, parser) {
-                    return true;
-                }
-            }
-        }
-    }
-    false
+#[derive(Default)]
+struct TableScan {
+    row_counts: Vec<usize>,
+    has_span: bool,
+    has_header: bool,
+    has_caption: bool,
+    has_nested_table: bool,
+    link_count: usize,
+    has_text: bool,
 }
 
-fn table_has_caption(node_handle: &tl::NodeHandle, parser: &tl::Parser) -> bool {
-    if let Some(node) = node_handle.get(parser) {
-        if let tl::Node::Tag(tag) = node {
-            let tag_name = normalized_tag_name(tag.name().as_utf8_str());
-            if tag_name.as_ref() == "caption" {
-                return true;
-            }
-            let children = tag.children();
-            for child in children.top().iter() {
-                if table_has_caption(child, parser) {
-                    return true;
-                }
-            }
-        }
-    }
-    false
+fn scan_table(node_handle: &tl::NodeHandle, parser: &tl::Parser, dom_ctx: &DomContext) -> TableScan {
+    let mut scan = TableScan::default();
+    scan_table_node(node_handle, parser, dom_ctx, true, &mut scan);
+    scan
 }
 
-fn table_contains_nested_table(node_handle: &tl::NodeHandle, parser: &tl::Parser, is_root: bool) -> bool {
-    if let Some(node) = node_handle.get(parser) {
-        if let tl::Node::Tag(tag) = node {
-            let tag_name = normalized_tag_name(tag.name().as_utf8_str());
-            if !is_root && tag_name.as_ref() == "table" {
-                return true;
-            }
-
-            for child in tag.children().top().iter() {
-                if table_contains_nested_table(child, parser, false) {
-                    return true;
-                }
-            }
-        }
-    }
-    false
-}
-
-fn collect_table_row_counts(
+fn scan_table_node(
     node_handle: &tl::NodeHandle,
     parser: &tl::Parser,
-    counts: &mut Vec<usize>,
-    has_span: &mut bool,
+    dom_ctx: &DomContext,
+    is_root: bool,
+    scan: &mut TableScan,
 ) {
     if let Some(node) = node_handle.get(parser) {
-        if let tl::Node::Tag(tag) = node {
-            let tag_name = normalized_tag_name(tag.name().as_utf8_str());
-            match tag_name.as_ref() {
-                "tr" => {
-                    let mut cell_count = 0;
-                    for child in tag.children().top().iter() {
-                        if let Some(tl::Node::Tag(cell_tag)) = child.get(parser) {
-                            let cell_name = normalized_tag_name(cell_tag.name().as_utf8_str());
-                            if cell_name.as_ref() == "td" || cell_name.as_ref() == "th" {
-                                cell_count += 1;
-                                let attrs = cell_tag.attributes();
-                                if attrs.get("colspan").is_some() || attrs.get("rowspan").is_some() {
-                                    *has_span = true;
+        match node {
+            tl::Node::Raw(bytes) => {
+                if !scan.has_text {
+                    let raw = bytes.as_utf8_str();
+                    let decoded = text::decode_html_entities_cow(raw.as_ref());
+                    if !decoded.trim().is_empty() {
+                        scan.has_text = true;
+                    }
+                }
+            }
+            tl::Node::Tag(tag) => {
+                let tag_name: Cow<'_, str> = dom_ctx
+                    .tag_info(node_handle.get_inner())
+                    .map(|info| Cow::Borrowed(info.name.as_str()))
+                    .unwrap_or_else(|| normalized_tag_name(tag.name().as_utf8_str()).into_owned().into());
+
+                match tag_name.as_ref() {
+                    "a" => scan.link_count += 1,
+                    "caption" => scan.has_caption = true,
+                    "th" => scan.has_header = true,
+                    "table" if !is_root => scan.has_nested_table = true,
+                    "tr" => {
+                        let mut cell_count = 0;
+                        for child in tag.children().top().iter() {
+                            if let Some(tl::Node::Tag(cell_tag)) = child.get(parser) {
+                                let cell_name: Cow<'_, str> = dom_ctx
+                                    .tag_info(child.get_inner())
+                                    .map(|info| Cow::Borrowed(info.name.as_str()))
+                                    .unwrap_or_else(|| {
+                                        normalized_tag_name(cell_tag.name().as_utf8_str()).into_owned().into()
+                                    });
+                                if matches!(cell_name.as_ref(), "td" | "th") {
+                                    cell_count += 1;
+                                    let attrs = cell_tag.attributes();
+                                    if attrs.get("colspan").is_some() || attrs.get("rowspan").is_some() {
+                                        scan.has_span = true;
+                                    }
                                 }
                             }
+                            scan_table_node(child, parser, dom_ctx, false, scan);
                         }
+                        scan.row_counts.push(cell_count);
+                        return;
                     }
-                    counts.push(cell_count);
+                    _ => {}
                 }
-                _ => {
-                    for child in tag.children().top().iter() {
-                        collect_table_row_counts(child, parser, counts, has_span);
-                    }
+
+                for child in tag.children().top().iter() {
+                    scan_table_node(child, parser, dom_ctx, false, scan);
                 }
             }
+            _ => {}
         }
     }
-}
-
-fn count_links(node_handle: &tl::NodeHandle, parser: &tl::Parser) -> usize {
-    let mut total = 0;
-    if let Some(node) = node_handle.get(parser) {
-        if let tl::Node::Tag(tag) = node {
-            let tag_name = normalized_tag_name(tag.name().as_utf8_str());
-            if tag_name.as_ref() == "a" {
-                total += 1;
-            }
-
-            for child in tag.children().top().iter() {
-                total += count_links(child, parser);
-            }
-        }
-    }
-    total
 }
 
 fn append_layout_row(
@@ -6075,8 +6137,11 @@ fn append_layout_row(
         let row_children = row_tag.children();
         for cell_handle in row_children.top().iter() {
             if let Some(tl::Node::Tag(cell_tag)) = cell_handle.get(parser) {
-                let cell_name = normalized_tag_name(cell_tag.name().as_utf8_str());
-                if cell_name.as_ref() == "td" || cell_name.as_ref() == "th" {
+                let cell_name: Cow<'_, str> = dom_ctx
+                    .tag_info(cell_handle.get_inner())
+                    .map(|info| Cow::Borrowed(info.name.as_str()))
+                    .unwrap_or_else(|| normalized_tag_name(cell_tag.name().as_utf8_str()).into_owned().into());
+                if matches!(cell_name.as_ref(), "td" | "th") {
                     let mut cell_text = String::new();
                     let cell_ctx = Context {
                         convert_as_inline: true,
@@ -6086,7 +6151,7 @@ fn append_layout_row(
                     for cell_child in cell_children.top().iter() {
                         walk_node(cell_child, parser, &mut cell_text, options, &cell_ctx, 0, dom_ctx);
                     }
-                    let cell_content = text::normalize_whitespace(&cell_text);
+                    let cell_content = text::normalize_whitespace_cow(&cell_text);
                     if !cell_content.trim().is_empty() {
                         if !row_text.is_empty() {
                             row_text.push(' ');
@@ -6149,23 +6214,18 @@ fn convert_table(
     dom_ctx: &DomContext,
 ) {
     if let Some(tl::Node::Tag(tag)) = node_handle.get(parser) {
-        let mut row_counts = Vec::new();
-        let mut has_span = false;
-        collect_table_row_counts(node_handle, parser, &mut row_counts, &mut has_span);
-
-        let row_count = row_counts.len();
-        let mut distinct_counts: Vec<_> = row_counts.into_iter().filter(|c| *c > 0).collect();
+        let table_scan = scan_table(node_handle, parser, dom_ctx);
+        let row_count = table_scan.row_counts.len();
+        let mut distinct_counts: Vec<_> = table_scan.row_counts.iter().copied().filter(|c| *c > 0).collect();
         distinct_counts.sort_unstable();
         distinct_counts.dedup();
 
-        let looks_like_layout =
-            table_contains_nested_table(node_handle, parser, true) || has_span || distinct_counts.len() > 1;
-        let link_count = count_links(node_handle, parser);
-        let table_text = text::normalize_whitespace(&get_text_content(node_handle, parser, dom_ctx));
-        let is_blank_table = table_text.trim().is_empty();
+        let looks_like_layout = table_scan.has_nested_table || table_scan.has_span || distinct_counts.len() > 1;
+        let link_count = table_scan.link_count;
+        let is_blank_table = !table_scan.has_text;
 
-        if !table_has_header(node_handle, parser)
-            && !table_has_caption(node_handle, parser)
+        if !table_scan.has_header
+            && !table_scan.has_caption
             && (looks_like_layout || is_blank_table || (row_count <= 2 && link_count >= 3))
         {
             if is_blank_table {
@@ -6204,7 +6264,10 @@ fn convert_table(
         {
             for child_handle in children.top().iter() {
                 if let Some(tl::Node::Tag(child_tag)) = child_handle.get(parser) {
-                    let tag_name = normalized_tag_name(child_tag.name().as_utf8_str());
+                    let tag_name: Cow<'_, str> = dom_ctx
+                        .tag_info(child_handle.get_inner())
+                        .map(|info| Cow::Borrowed(info.name.as_str()))
+                        .unwrap_or_else(|| normalized_tag_name(child_tag.name().as_utf8_str()).into_owned().into());
 
                     match tag_name.as_ref() {
                         "caption" => {
@@ -6237,6 +6300,7 @@ fn convert_table(
                                                 options,
                                                 ctx,
                                                 row_index,
+                                                table_scan.has_span,
                                                 &mut rowspan_tracker,
                                                 dom_ctx,
                                             );
@@ -6255,6 +6319,7 @@ fn convert_table(
                                 options,
                                 ctx,
                                 row_index,
+                                table_scan.has_span,
                                 &mut rowspan_tracker,
                                 dom_ctx,
                             );
