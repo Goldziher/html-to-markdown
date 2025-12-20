@@ -197,6 +197,14 @@ pub fn decode_html_entities(text: &str) -> String {
     html_escape::decode_html_entities(text).into_owned()
 }
 
+pub fn decode_html_entities_cow(text: &str) -> Cow<'_, str> {
+    if !text.contains('&') {
+        return Cow::Borrowed(text);
+    }
+
+    html_escape::decode_html_entities(text)
+}
+
 /// Check if a character is a unicode space character.
 ///
 /// Includes: non-breaking space, various width spaces, etc.

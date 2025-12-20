@@ -567,7 +567,9 @@ impl DomContext {
         if let Some(node) = node_handle.get(parser) {
             match node {
                 tl::Node::Raw(bytes) => {
-                    text.push_str(&text::decode_html_entities(&bytes.as_utf8_str()));
+                    let raw = bytes.as_utf8_str();
+                    let decoded = text::decode_html_entities_cow(raw.as_ref());
+                    text.push_str(decoded.as_ref());
                 }
                 tl::Node::Tag(tag) => {
                     let children = tag.children();
@@ -2807,7 +2809,8 @@ fn walk_node(
 
     match node {
         tl::Node::Raw(bytes) => {
-            let mut text = text::decode_html_entities(&bytes.as_utf8_str());
+            let raw = bytes.as_utf8_str();
+            let mut text = text::decode_html_entities_cow(raw.as_ref());
 
             if text.is_empty() {
                 return;
@@ -2816,18 +2819,18 @@ fn walk_node(
             let had_newlines = text.contains('\n');
 
             if options.strip_newlines {
-                text = text.replace(['\r', '\n'], " ");
+                text = Cow::Owned(text.replace(['\r', '\n'], " "));
             }
 
             if text.trim().is_empty() {
                 if ctx.in_code {
-                    output.push_str(&text);
+                    output.push_str(text.as_ref());
                     return;
                 }
 
                 if options.whitespace_mode == crate::options::WhitespaceMode::Strict {
                     if ctx.convert_as_inline || ctx.in_table_cell || ctx.in_list_item {
-                        output.push_str(&text);
+                        output.push_str(text.as_ref());
                         return;
                     }
                     if text.contains("\n\n") || text.contains("\r\n\r\n") {
@@ -2836,7 +2839,7 @@ fn walk_node(
                         }
                         return;
                     }
-                    output.push_str(&text);
+                    output.push_str(text.as_ref());
                     return;
                 }
 
@@ -2862,19 +2865,19 @@ fn walk_node(
                             output.push(' ');
                         }
                     } else {
-                        output.push_str(&text);
+                        output.push_str(text.as_ref());
                     }
                 } else {
-                    output.push_str(&text);
+                    output.push_str(text.as_ref());
                 }
                 return;
             }
 
             let processed_text = if ctx.in_code || ctx.in_ruby {
-                text
+                text.into_owned()
             } else if ctx.in_table_cell {
                 let escaped = if options.whitespace_mode == crate::options::WhitespaceMode::Normalized {
-                    let normalized_text = text::normalize_whitespace_cow(&text);
+                    let normalized_text = text::normalize_whitespace_cow(text.as_ref());
                     text::escape(
                         normalized_text.as_ref(),
                         options.escape_misc,
@@ -2884,7 +2887,7 @@ fn walk_node(
                     )
                 } else {
                     text::escape(
-                        &text,
+                        text.as_ref(),
                         options.escape_misc,
                         options.escape_asterisks,
                         options.escape_underscores,
@@ -2898,7 +2901,7 @@ fn walk_node(
                 }
             } else if options.whitespace_mode == crate::options::WhitespaceMode::Strict {
                 text::escape(
-                    &text,
+                    text.as_ref(),
                     options.escape_misc,
                     options.escape_asterisks,
                     options.escape_underscores,
@@ -2908,7 +2911,7 @@ fn walk_node(
                 let has_trailing_single_newline =
                     text.ends_with('\n') && !text.ends_with("\n\n") && !text.ends_with("\r\n\r\n");
 
-                let normalized_text = text::normalize_whitespace_cow(&text);
+                let normalized_text = text::normalize_whitespace_cow(text.as_ref());
 
                 let (prefix, suffix, core) = text::chomp(normalized_text.as_ref());
 
