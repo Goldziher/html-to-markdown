@@ -2874,9 +2874,9 @@ fn walk_node(
                 text
             } else if ctx.in_table_cell {
                 let escaped = if options.whitespace_mode == crate::options::WhitespaceMode::Normalized {
-                    let normalized_text = text::normalize_whitespace(&text);
+                    let normalized_text = text::normalize_whitespace_cow(&text);
                     text::escape(
-                        &normalized_text,
+                        normalized_text.as_ref(),
                         options.escape_misc,
                         options.escape_asterisks,
                         options.escape_underscores,
@@ -2908,9 +2908,9 @@ fn walk_node(
                 let has_trailing_single_newline =
                     text.ends_with('\n') && !text.ends_with("\n\n") && !text.ends_with("\r\n\r\n");
 
-                let normalized_text = text::normalize_whitespace(&text);
+                let normalized_text = text::normalize_whitespace_cow(&text);
 
-                let (prefix, suffix, core) = text::chomp(&normalized_text);
+                let (prefix, suffix, core) = text::chomp(normalized_text.as_ref());
 
                 let skip_prefix = output.ends_with("\n\n")
                     || output.ends_with("* ")
