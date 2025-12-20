@@ -11,16 +11,16 @@ on:
       - composer.json
       - composer.lock
       - .github/workflows/ci-php.yaml
-  pull_request:
-    branches: [main]
-    paths:
-      - packages/php/**
-      - packages/php-ext/**
-      - crates/html-to-markdown-php/**
-      - crates/html-to-markdown/**
-      - composer.json
-      - composer.lock
-      - .github/workflows/ci-php.yaml
+#   pull_request:
+#     branches: [main]
+#     paths:
+#       - packages/php/**
+#       - packages/php-ext/**
+#       - crates/html-to-markdown-php/**
+#       - crates/html-to-markdown/**
+#       - composer.json
+#       - composer.lock
+#       - .github/workflows/ci-php.yaml
 
 permissions:
   contents: read

@@ -118,35 +118,29 @@ tasks:
       - task: elixir:format:check
 
   bench:
-    desc: "Run Rust benchmarks plus runtime harness"
+    desc: "Run benchmark harness"
     cmds:
-      - task: rust:bench
-      - task: bench:bindings
+      - task: bench:harness
 
-  bench:bindings:
-    desc: "Benchmark PHP and Ruby bindings via runtime harness"
+  bench:harness:
+    desc: "Run benchmark harness for Rust + bindings"
     cmds:
-      - cargo run --release --manifest-path tools/runtime-bench/Cargo.toml -- --output tools/runtime-bench/results/latest.json
+      - cargo run --release --manifest-path tools/benchmark-harness/Cargo.toml -- run --fixtures tools/benchmark-harness/fixtures/wikipedia.toml --frameworks rust,python,ruby,php,node,wasm,go,java,csharp,elixir --format both --output tools/benchmark-harness/results
 
-  bench:bindings:php:
-    desc: "Benchmark PHP binding only"
+  bench:harness:rust:
+    desc: "Run benchmark harness for Rust only with flamegraphs"
     cmds:
-      - cargo run --release --manifest-path tools/runtime-bench/Cargo.toml -- --language php --output tools/runtime-bench/results/php.json
+      - cargo run --release --features profiling --manifest-path tools/benchmark-harness/Cargo.toml -- run --fixtures tools/benchmark-harness/fixtures/wikipedia.toml --frameworks rust --profile --flamegraphs tools/benchmark-harness/results/flamegraphs --format both
 
-  bench:bindings:ruby:
-    desc: "Benchmark Ruby binding only"
+  bench:harness:memory:
+    desc: "Run benchmark harness with jemalloc memory stats"
     cmds:
-      - cargo run --release --manifest-path tools/runtime-bench/Cargo.toml -- --language ruby --output tools/runtime-bench/results/ruby.json
+      - cargo run --release --features profiling,memory-profiling --manifest-path tools/benchmark-harness/Cargo.toml -- run --fixtures tools/benchmark-harness/fixtures/wikipedia.toml --frameworks rust --profile --flamegraphs tools/benchmark-harness/results/flamegraphs --format both
 
-  bench:bindings:profile:
-    desc: "Benchmark PHP and Ruby bindings with resource profiling"
+  bench:harness:index:
+    desc: "Generate flamegraph HTML index"
     cmds:
-      - cargo run --release --manifest-path tools/runtime-bench/Cargo.toml -- --profile --output tools/runtime-bench/results/profile.json
-
-  flamegraph:rust:
-    desc: "Generate a flamegraph for the Rust core (lists_timeline fixture)"
-    cmds:
-      - cargo run --release --manifest-path tools/runtime-bench/Cargo.toml -- --language rust --fixture lists_timeline --flamegraph tools/runtime-bench/results/flamegraph.svg
+      - cargo run --release --manifest-path tools/benchmark-harness/Cargo.toml -- generate-flamegraph-index --flamegraphs tools/benchmark-harness/results/flamegraphs --output tools/benchmark-harness/results/flamegraphs/index.html
 
   test:rust:
     desc: "Alias for rust:test"
@@ -240,11 +234,6 @@ tasks:
       - task: cov:rust
       - task: cov:python
 
-  bench:rust:
-    desc: "Alias for rust:bench"
-    cmds:
-      - task: rust:bench
-
   bench:all:
     desc: "Alias for bench"
     cmds:
@@ -319,11 +308,6 @@ tasks:
     cmds:
       - cargo upgrade --incompatible
       - cargo update
-
-  rust:bench:
-    desc: "Run Rust benchmarks"
-    cmds:
-      - RB_SYS_RUBY=/opt/homebrew/opt/ruby/bin/ruby RUBY=/opt/homebrew/opt/ruby/bin/ruby cargo bench --package html-to-markdown-rs
 
   rust:clean:
     desc: "Clean Rust artifacts"

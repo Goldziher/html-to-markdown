@@ -26,6 +26,8 @@ from html_to_markdown.api import (
     convert_with_inline_images,
     convert_with_metadata,
     create_options_handle,
+    start_profiling,
+    stop_profiling,
 )
 from html_to_markdown.exceptions import (
     ConflictingOptionsError,
@@ -57,6 +59,8 @@ __all__ = [
     "convert_with_metadata",
     "create_options_handle",
     "markdownify",
+    "start_profiling",
+    "stop_profiling",
 ]
 
 __version__ = "2.15.0"

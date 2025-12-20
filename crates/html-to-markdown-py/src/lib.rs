@@ -6,6 +6,7 @@ use html_to_markdown_rs::metadata::{
     StructuredDataType as RustStructuredDataType, TextDirection as RustTextDirection,
 };
 use html_to_markdown_rs::safety::guard_panic;
+mod profiling;
 use html_to_markdown_rs::{
     CodeBlockStyle, ConversionError, ConversionOptions as RustConversionOptions, HeadingStyle, HighlightStyle,
     InlineImageConfig as RustInlineImageConfig, InlineImageFormat, InlineImageSource, ListIndentType, NewlineStyle,
@@ -14,6 +15,7 @@ use html_to_markdown_rs::{
 use pyo3::prelude::*;
 use pyo3::types::{PyBytes, PyDict};
 use pyo3::types::{PyList, PyTuple};
+use std::path::PathBuf;
 
 fn to_py_err(err: ConversionError) -> PyErr {
     match err {
@@ -22,6 +24,20 @@ fn to_py_err(err: ConversionError) -> PyErr {
         }
         other => pyo3::exceptions::PyValueError::new_err(other.to_string()),
     }
+}
+
+#[pyfunction]
+fn start_profiling(output_path: &str, frequency: Option<i32>) -> PyResult<()> {
+    let path = PathBuf::from(output_path);
+    let freq = frequency.unwrap_or(1000);
+    profiling::start(path, freq).map_err(to_py_err)?;
+    Ok(())
+}
+
+#[pyfunction]
+fn stop_profiling() -> PyResult<()> {
+    profiling::stop().map_err(to_py_err)?;
+    Ok(())
 }
 
 type PyInlineExtraction = PyResult<(String, Vec<Py<PyAny>>, Vec<Py<PyAny>>)>;
@@ -465,7 +481,7 @@ impl ConversionOptionsHandle {
 fn convert(py: Python<'_>, html: &str, options: Option<ConversionOptions>) -> PyResult<String> {
     let html = html.to_owned();
     let rust_options = options.map(|opts| opts.to_rust());
-    py.detach(move || guard_panic(|| html_to_markdown_rs::convert(&html, rust_options)))
+    py.detach(move || guard_panic(|| profiling::maybe_profile(|| html_to_markdown_rs::convert(&html, rust_options))))
         .map_err(to_py_err)
 }
 
@@ -474,8 +490,10 @@ fn convert(py: Python<'_>, html: &str, options: Option<ConversionOptions>) -> Py
 fn convert_with_options_handle(py: Python<'_>, html: &str, handle: &ConversionOptionsHandle) -> PyResult<String> {
     let html = html.to_owned();
     let rust_options = handle.inner.clone();
-    py.detach(move || guard_panic(|| html_to_markdown_rs::convert(&html, Some(rust_options))))
-        .map_err(to_py_err)
+    py.detach(move || {
+        guard_panic(|| profiling::maybe_profile(|| html_to_markdown_rs::convert(&html, Some(rust_options))))
+    })
+    .map_err(to_py_err)
 }
 
 #[pyfunction]
@@ -941,6 +959,8 @@ fn _html_to_markdown(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<InlineImageConfig>()?;
     m.add_function(wrap_pyfunction!(convert_with_metadata, m)?)?;
     m.add_class::<MetadataConfig>()?;
+    m.add_function(wrap_pyfunction!(start_profiling, m)?)?;
+    m.add_function(wrap_pyfunction!(stop_profiling, m)?)?;
     Ok(())
 }
 

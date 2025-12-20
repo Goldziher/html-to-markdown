@@ -45,11 +45,23 @@ class HtmlToMarkdownFFI {
         ValueLayout.ADDRESS
     );
 
+    private static final FunctionDescriptor PROFILE_START_DESC = FunctionDescriptor.of(
+        ValueLayout.JAVA_BOOLEAN,
+        ValueLayout.ADDRESS,
+        ValueLayout.JAVA_INT
+    );
+
+    private static final FunctionDescriptor PROFILE_STOP_DESC = FunctionDescriptor.of(
+        ValueLayout.JAVA_BOOLEAN
+    );
+
     static final MethodHandle html_to_markdown_convert;
     static final MethodHandle html_to_markdown_free_string;
     static final MethodHandle html_to_markdown_version;
     static final MethodHandle html_to_markdown_last_error;
     static final MethodHandle html_to_markdown_convert_with_metadata;
+    static final MethodHandle html_to_markdown_profile_start;
+    static final MethodHandle html_to_markdown_profile_stop;
 
     static {
         System.loadLibrary(LIBRARY_NAME);
@@ -79,6 +91,16 @@ class HtmlToMarkdownFFI {
         html_to_markdown_convert_with_metadata = LINKER.downcallHandle(
             findSymbol("html_to_markdown_convert_with_metadata"),
             CONVERT_WITH_METADATA_DESC
+        );
+
+        html_to_markdown_profile_start = LINKER.downcallHandle(
+            findSymbol("html_to_markdown_profile_start"),
+            PROFILE_START_DESC
+        );
+
+        html_to_markdown_profile_stop = LINKER.downcallHandle(
+            findSymbol("html_to_markdown_profile_stop"),
+            PROFILE_STOP_DESC
         );
     }
 

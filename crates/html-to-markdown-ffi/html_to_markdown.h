@@ -13,6 +13,28 @@
 #include <stdlib.h>
 
 /**
+ * Start Rust-side profiling and write a flamegraph to the specified path.
+ *
+ * Returns 1 on success, 0 on failure. Use `html_to_markdown_last_error` to inspect failures.
+ *
+ * # Safety
+ *
+ * - `output` must be a valid, null-terminated UTF-8 C string for the duration of the call.
+ */
+bool html_to_markdown_profile_start(const char *output, int32_t frequency);
+
+/**
+ * Stop Rust-side profiling and flush the flamegraph.
+ *
+ * Returns 1 on success, 0 on failure. Use `html_to_markdown_last_error` to inspect failures.
+ *
+ * # Safety
+ *
+ * - This must only be called after a successful `html_to_markdown_profile_start`.
+ */
+bool html_to_markdown_profile_stop(void);
+
+/**
  * Convert HTML to Markdown using default options.
  *
  * # Safety

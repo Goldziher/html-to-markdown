@@ -4,9 +4,16 @@ import path from "node:path";
 import { createRequire } from "node:module";
 
 const require = createRequire(import.meta.url);
-const { convertBufferWithOptionsHandle, createConversionOptionsHandle } = require("../index.js") as {
+const {
+  convertBufferWithOptionsHandle,
+  createConversionOptionsHandle,
+  startProfiling,
+  stopProfiling,
+} = require("../index.js") as {
   convertBufferWithOptionsHandle: (html: Buffer, handle: unknown) => string;
   createConversionOptionsHandle: (options?: Record<string, unknown>) => unknown;
+  startProfiling?: (outputPath: string, frequency?: number) => void;
+  stopProfiling?: () => void;
 };
 
 type Format = "html" | "hocr";
@@ -65,11 +72,22 @@ function main() {
 
   convertBufferWithOptionsHandle(html, optionsHandle);
 
+  const profileOutput = process.env.HTML_TO_MARKDOWN_PROFILE_OUTPUT;
+  if (profileOutput && startProfiling) {
+    const freqEnv = process.env.HTML_TO_MARKDOWN_PROFILE_FREQUENCY;
+    const frequency = freqEnv ? Number.parseInt(freqEnv, 10) : 1000;
+    startProfiling(profileOutput, Number.isFinite(frequency) ? frequency : 1000);
+  }
+
   const start = process.hrtime.bigint();
   for (let i = 0; i < args.iterations; i += 1) {
     convertBufferWithOptionsHandle(html, optionsHandle);
   }
   const elapsedSeconds = Number(process.hrtime.bigint() - start) / 1e9;
+
+  if (profileOutput && stopProfiling) {
+    stopProfiling();
+  }
 
   const bytesProcessed = html.byteLength * args.iterations;
   const opsPerSec = args.iterations / elapsedSeconds;

@@ -1,20 +1,11 @@
-use std::{
-    sync::{
-        Arc, Mutex,
-        atomic::{AtomicBool, Ordering},
-    },
-    thread::{self, JoinHandle},
-    time::Duration,
+use crate::types::ResourceStats;
+use std::sync::{
+    Arc, Mutex,
+    atomic::{AtomicBool, Ordering},
 };
-
-use serde::Serialize;
+use std::thread::{self, JoinHandle};
+use std::time::Duration;
 use sysinfo::{Pid, ProcessRefreshKind, ProcessesToUpdate, System};
-
-#[derive(Debug, Default, Clone, Copy, Serialize)]
-pub struct ResourceStats {
-    pub peak_memory_bytes: u64,
-    pub avg_cpu_percent: f64,
-}
 
 #[derive(Debug, Clone, Copy)]
 struct ResourceSample {
@@ -31,12 +22,11 @@ pub struct ResourceMonitor {
 impl ResourceMonitor {
     pub fn start(child_pid: u32, interval: Duration) -> Option<Self> {
         let pid = pid_from(child_pid)?;
-
-        let running = Arc::new(AtomicBool::new(true));
         let samples = Arc::new(Mutex::new(Vec::new()));
+        let running = Arc::new(AtomicBool::new(true));
 
-        let running_clone = Arc::clone(&running);
         let samples_clone = Arc::clone(&samples);
+        let running_clone = Arc::clone(&running);
 
         let handle = thread::spawn(move || {
             let mut system = System::new();
@@ -84,12 +74,29 @@ impl ResourceStats {
 
         let peak_memory_bytes = samples.iter().map(|s| s.memory_bytes).max().unwrap_or_default();
         let avg_cpu_percent = samples.iter().map(|s| s.cpu_percent).sum::<f64>() / samples.len() as f64;
+        let mut memories: Vec<u64> = samples.iter().map(|s| s.memory_bytes).collect();
+        memories.sort_unstable();
+
+        let p50_memory_bytes = percentile(&memories, 0.50);
+        let p95_memory_bytes = percentile(&memories, 0.95);
+        let p99_memory_bytes = percentile(&memories, 0.99);
 
         Self {
             peak_memory_bytes,
             avg_cpu_percent,
+            p50_memory_bytes,
+            p95_memory_bytes,
+            p99_memory_bytes,
         }
     }
+}
+
+fn percentile(values: &[u64], percentile: f64) -> u64 {
+    if values.is_empty() {
+        return 0;
+    }
+    let idx = ((values.len() as f64 - 1.0) * percentile).round() as usize;
+    values[idx.min(values.len() - 1)]
 }
 
 fn pid_from(child_pid: u32) -> Option<Pid> {

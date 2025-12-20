@@ -7,6 +7,7 @@ use html_to_markdown_rs::{
 
 #[cfg(feature = "metadata")]
 use html_to_markdown_rs::convert_with_metadata as convert_with_metadata_inner;
+mod profiling;
 #[cfg(feature = "metadata")]
 use html_to_markdown_rs::metadata::{
     DocumentMetadata as RustDocumentMetadata, ExtendedMetadata as RustExtendedMetadata,
@@ -18,6 +19,7 @@ use html_to_markdown_rs::metadata::{
 use magnus::prelude::*;
 use magnus::r_hash::ForEach;
 use magnus::{Error, RArray, RHash, Ruby, Symbol, TryConvert, Value, function, scan_args::scan_args};
+use std::path::PathBuf;
 
 #[derive(Clone)]
 #[magnus::wrap(class = "HtmlToMarkdown::Options", free_immediately)]
@@ -404,7 +406,7 @@ fn convert_fn(ruby: &Ruby, args: &[Value]) -> Result<String, Error> {
     let html = parsed.required.0;
     let options = build_conversion_options(ruby, parsed.optional.0)?;
 
-    guard_panic(|| convert_inner(&html, Some(options))).map_err(conversion_error)
+    guard_panic(|| profiling::maybe_profile(|| convert_inner(&html, Some(options)))).map_err(conversion_error)
 }
 
 fn options_handle_fn(ruby: &Ruby, args: &[Value]) -> Result<OptionsHandle, Error> {
@@ -419,7 +421,7 @@ fn convert_with_options_handle_fn(_ruby: &Ruby, args: &[Value]) -> Result<String
     let handle = parsed.required.1;
     let options = handle.0.clone();
 
-    guard_panic(|| convert_inner(&html, Some(options))).map_err(conversion_error)
+    guard_panic(|| profiling::maybe_profile(|| convert_inner(&html, Some(options)))).map_err(conversion_error)
 }
 
 fn convert_with_inline_images_fn(ruby: &Ruby, args: &[Value]) -> Result<Value, Error> {
@@ -688,6 +690,23 @@ fn convert_with_metadata_fn(ruby: &Ruby, args: &[Value]) -> Result<Value, Error>
     Ok(array.as_value())
 }
 
+fn start_profiling_fn(_ruby: &Ruby, args: &[Value]) -> Result<bool, Error> {
+    let output = args.first().ok_or_else(|| arg_error("output_path required"))?;
+    let output: String = String::try_convert(*output)?;
+    let freq = if let Some(value) = args.get(1) {
+        i32::try_convert(*value)?
+    } else {
+        1000
+    };
+    profiling::start(PathBuf::from(output), freq).map_err(conversion_error)?;
+    Ok(true)
+}
+
+fn stop_profiling_fn(_ruby: &Ruby, _args: &[Value]) -> Result<bool, Error> {
+    profiling::stop().map_err(conversion_error)?;
+    Ok(true)
+}
+
 #[magnus::init]
 fn init(ruby: &Ruby) -> Result<(), Error> {
     let module = ruby.define_module("HtmlToMarkdown")?;
@@ -701,6 +720,8 @@ fn init(ruby: &Ruby) -> Result<(), Error> {
 
     #[cfg(feature = "metadata")]
     module.define_singleton_method("convert_with_metadata", function!(convert_with_metadata_fn, -1))?;
+    module.define_singleton_method("start_profiling", function!(start_profiling_fn, -1))?;
+    module.define_singleton_method("stop_profiling", function!(stop_profiling_fn, -1))?;
 
     Ok(())
 }

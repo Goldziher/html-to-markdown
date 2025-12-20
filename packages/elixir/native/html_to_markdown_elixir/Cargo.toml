@@ -13,3 +13,6 @@ crate-type = ["cdylib"]
 [dependencies]
 html-to-markdown-rs = { path = "vendor/html-to-markdown-rs", features = ["inline-images", "metadata"] }
 rustler = { version = "0.37" }
+
+[target.'cfg(not(target_os = "windows"))'.dependencies]
+pprof = { version = "0.15", features = ["flamegraph"] }

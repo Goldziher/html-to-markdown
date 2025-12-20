@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Flamegraphs</title>
+    <style>
+      body {
+        margin: 0;
+        padding: 32px;
+        font-family: "IBM Plex Sans", "Segoe UI", sans-serif;
+        background: #f6f3ed;
+        color: #1f1b16;
+      }
+      h1 {
+        margin: 0 0 16px;
+      }
+      ul {
+        list-style: none;
+        padding: 0;
+      }
+      li {
+        margin-bottom: 8px;
+      }
+      a {
+        color: #c75c2b;
+        text-decoration: none;
+      }
+      a:hover {
+        text-decoration: underline;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Flamegraphs</h1>
+    <ul>
+      {% for flamegraph in flamegraphs %}
+      <li><a href="{{ flamegraph }}">{{ flamegraph }}</a></li>
+      {% endfor %}
+    </ul>
+  </body>
+</html>

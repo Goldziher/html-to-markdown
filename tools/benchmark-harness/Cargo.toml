@@ -1,0 +1,41 @@
+[package]
+name = "benchmark-harness"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[[bin]]
+name = "benchmark-harness"
+path = "src/main.rs"
+
+[dependencies]
+html-to-markdown-rs = { workspace = true }
+clap = { workspace = true, features = ["derive"] }
+serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+
+# Fixtures
+toml = "0.9"
+
+# Monitoring
+sysinfo = "0.37"
+
+# Templates
+minijinja = { version = "2.14", features = ["json"] }
+
+# Profiling
+pprof = { version = "0.15", features = ["flamegraph"], optional = true }
+tikv-jemallocator = { version = "0.6", optional = true }
+tikv-jemalloc-ctl = { version = "0.6", features = ["stats"], optional = true }
+
+[features]
+default = []
+profiling = ["pprof"]
+memory-profiling = ["tikv-jemallocator", "tikv-jemalloc-ctl"]
+
+[profile.release]
+debug = 1

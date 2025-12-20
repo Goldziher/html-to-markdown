@@ -12,17 +12,17 @@ on:
       - pnpm-lock.yaml
       - pnpm-workspace.yaml
       - .github/workflows/ci-wasm.yaml
-  pull_request:
-    branches: [main]
-    paths:
-      - crates/html-to-markdown-wasm/**
-      - crates/html-to-markdown-wasm-wasi/**
-      - e2e/wasm-wasmtime/**
-      - crates/html-to-markdown/**
-      - package.json
-      - pnpm-lock.yaml
-      - pnpm-workspace.yaml
-      - .github/workflows/ci-wasm.yaml
+#   pull_request:
+#     branches: [main]
+#     paths:
+#       - crates/html-to-markdown-wasm/**
+#       - crates/html-to-markdown-wasm-wasi/**
+#       - e2e/wasm-wasmtime/**
+#       - crates/html-to-markdown/**
+#       - package.json
+#       - pnpm-lock.yaml
+#       - pnpm-workspace.yaml
+#       - .github/workflows/ci-wasm.yaml
 
 permissions:
   contents: read

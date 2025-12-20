@@ -46,7 +46,7 @@ Native NAPI-RS bindings deliver **the fastest HTML to Markdown conversion** avai
 
 ### Benchmark Fixtures (Apple M4)
 
-`task bench:bindings` feeds identical Wikipedia + hOCR fixtures into every binding. Node keeps pace with the Rust CLI across the board:
+The shared benchmark harness lives in `tools/benchmark-harness`. Node keeps pace with the Rust CLI across the board:
 
 | Document               | Size   | ops/sec (Node) |
 | ---------------------- | ------ | -------------- |
@@ -59,7 +59,7 @@ Native NAPI-RS bindings deliver **the fastest HTML to Markdown conversion** avai
 | hOCR Invoice           | 4 KB   | 27,326         |
 | hOCR Embedded Tables   | 37 KB  | 3,475          |
 
-> Run `task bench:bindings -- --language node` locally to regenerate these numbers.
+> Run `task bench:harness -- --frameworks node` to regenerate these numbers.
 
 ## Installation
 

@@ -70,9 +70,17 @@ end
 
 convert_document(html, options_handle)
 
+profile_output = ENV.fetch('HTML_TO_MARKDOWN_PROFILE_OUTPUT', nil)
+if profile_output && HtmlToMarkdown.respond_to?(:start_profiling)
+  freq = Integer(ENV.fetch('HTML_TO_MARKDOWN_PROFILE_FREQUENCY', '1000'), 10)
+  HtmlToMarkdown.start_profiling(profile_output, freq)
+end
+
 start = Process.clock_gettime(Process::CLOCK_MONOTONIC)
 iterations.times { convert_document(html, options_handle) }
 elapsed = Process.clock_gettime(Process::CLOCK_MONOTONIC) - start
+
+HtmlToMarkdown.stop_profiling if profile_output && HtmlToMarkdown.respond_to?(:stop_profiling)
 
 payload_size_bytes = html.bytesize
 bytes_processed = payload_size_bytes * iterations

@@ -19,12 +19,15 @@ package htmltomarkdown
 
 // #cgo LDFLAGS: -lhtml_to_markdown_ffi
 // #include <stdlib.h>
+// #include <stdbool.h>
 //
 // extern char* html_to_markdown_convert(const char* html);
 // extern void html_to_markdown_free_string(char* s);
 // extern const char* html_to_markdown_version();
 // extern const char* html_to_markdown_last_error();
 // extern char* html_to_markdown_convert_with_metadata(const char* html, char** metadata_json);
+// extern bool html_to_markdown_profile_start(const char* output, int32_t frequency);
+// extern bool html_to_markdown_profile_stop(void);
 import "C"
 import (
 	"encoding/json"
@@ -95,6 +98,41 @@ func Version() string {
 		return "unknown"
 	}
 	return C.GoString(cVersion)
+}
+
+// StartProfiling begins Rust-side profiling and writes a flamegraph to outputPath.
+func StartProfiling(outputPath string, frequency int) error {
+	if outputPath == "" {
+		return errors.New("output path is required")
+	}
+	if frequency <= 0 {
+		frequency = 1000
+	}
+	cOutput := C.CString(outputPath)
+	defer C.free(unsafe.Pointer(cOutput))
+
+	ok := C.html_to_markdown_profile_start(cOutput, C.int32_t(frequency))
+	if !bool(ok) {
+		errMsg := C.html_to_markdown_last_error()
+		if errMsg != nil {
+			return errors.New(C.GoString(errMsg))
+		}
+		return errors.New("profiling start failed")
+	}
+	return nil
+}
+
+// StopProfiling stops Rust-side profiling and flushes the flamegraph.
+func StopProfiling() error {
+	ok := C.html_to_markdown_profile_stop()
+	if !bool(ok) {
+		errMsg := C.html_to_markdown_last_error()
+		if errMsg != nil {
+			return errors.New(C.GoString(errMsg))
+		}
+		return errors.New("profiling stop failed")
+	}
+	return nil
 }
 
 // TextDirection represents the directionality of text content.

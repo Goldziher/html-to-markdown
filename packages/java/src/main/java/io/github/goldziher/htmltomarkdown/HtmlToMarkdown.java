@@ -49,6 +49,7 @@ import java.util.TreeMap;
  * @since 2.7.3
  */
 public final class HtmlToMarkdown {
+    private static final int DEFAULT_PROFILING_FREQUENCY = 1000;
 
     /**
      * Convert HTML to Markdown using default options.
@@ -107,6 +108,54 @@ public final class HtmlToMarkdown {
             return HtmlToMarkdownFFI.fromCString(versionSegment);
         } catch (Throwable e) {
             throw new RuntimeException("Failed to get library version", e);
+        }
+    }
+
+    /**
+     * Start Rust-side profiling and write a flamegraph to the given output path.
+     *
+     * @param outputPath path to the flamegraph SVG to write
+     * @param frequency sampling frequency in Hz (defaults to 1000 if <= 0)
+     */
+    public static void startProfiling(String outputPath, int frequency) {
+        if (outputPath == null || outputPath.isBlank()) {
+            throw new IllegalArgumentException("outputPath is required");
+        }
+        int freq = frequency > 0 ? frequency : DEFAULT_PROFILING_FREQUENCY;
+
+        try (Arena arena = Arena.ofConfined()) {
+            MemorySegment outputSegment = HtmlToMarkdownFFI.toCString(arena, outputPath);
+            boolean ok = (boolean) HtmlToMarkdownFFI.html_to_markdown_profile_start
+                .invoke(outputSegment, freq);
+            if (!ok) {
+                String error = getLastError();
+                throw new ConversionException(
+                    error != null ? error : "Profiling start failed"
+                );
+            }
+        } catch (ConversionException e) {
+            throw e;
+        } catch (Throwable e) {
+            throw new ConversionException("Failed to start profiling", e);
+        }
+    }
+
+    /**
+     * Stop Rust-side profiling and flush the flamegraph to disk.
+     */
+    public static void stopProfiling() {
+        try {
+            boolean ok = (boolean) HtmlToMarkdownFFI.html_to_markdown_profile_stop.invoke();
+            if (!ok) {
+                String error = getLastError();
+                throw new ConversionException(
+                    error != null ? error : "Profiling stop failed"
+                );
+            }
+        } catch (ConversionException e) {
+            throw e;
+        } catch (Throwable e) {
+            throw new ConversionException("Failed to stop profiling", e);
         }
     }
 

@@ -146,6 +146,22 @@ defmodule HtmlToMarkdown do
     end
   end
 
+  @doc """
+  Start Rust-side profiling and write a flamegraph to the given output path.
+  """
+  @spec start_profiling(String.t(), integer()) :: :ok | {:error, term()}
+  def start_profiling(output_path, frequency \\ 1000) when is_binary(output_path) do
+    Native.start_profiling(output_path, frequency)
+  end
+
+  @doc """
+  Stop Rust-side profiling and flush the flamegraph.
+  """
+  @spec stop_profiling() :: :ok | {:error, term()}
+  def stop_profiling do
+    Native.stop_profiling()
+  end
+
   defp call_convert(html, nil), do: Native.convert(html)
 
   defp call_convert(html, options) when options == %{}, do: Native.convert(html)

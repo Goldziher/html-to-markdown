@@ -20,6 +20,9 @@ crate-type = ["cdylib"]
 html-to-markdown-rs = { workspace = true, features = ["inline-images", "metadata"] }
 ext-php-rs = { workspace = true }
 
+[target.'cfg(not(target_os = "windows"))'.dependencies]
+pprof = { version = "0.15", features = ["flamegraph"] }
+
 [features]
 default = ["metadata"]
 metadata = ["html-to-markdown-rs/metadata"]
