@@ -43,7 +43,7 @@
 
 #[cfg(feature = "inline-images")]
 use std::cell::RefCell;
-use std::collections::{BTreeMap, HashMap};
+use std::collections::BTreeMap;
 #[cfg(feature = "inline-images")]
 use std::rc::Rc;
 
@@ -500,10 +500,36 @@ struct Context {
 }
 
 struct DomContext {
-    parent_map: HashMap<u32, Option<u32>>,
-    children_map: HashMap<u32, Vec<tl::NodeHandle>>,
+    parent_map: Vec<Option<u32>>,
+    children_map: Vec<Option<Vec<tl::NodeHandle>>>,
     root_children: Vec<tl::NodeHandle>,
-    node_map: HashMap<u32, tl::NodeHandle>,
+    node_map: Vec<Option<tl::NodeHandle>>,
+}
+
+impl DomContext {
+    fn ensure_capacity(&mut self, id: u32) {
+        let idx = id as usize;
+        if self.parent_map.len() <= idx {
+            let new_len = idx + 1;
+            self.parent_map.resize(new_len, None);
+            self.children_map.resize_with(new_len, || None);
+            self.node_map.resize(new_len, None);
+        }
+    }
+
+    fn parent_of(&self, id: u32) -> Option<u32> {
+        self.parent_map.get(id as usize).copied().flatten()
+    }
+
+    fn node_handle(&self, id: u32) -> Option<&tl::NodeHandle> {
+        self.node_map.get(id as usize).and_then(|node| node.as_ref())
+    }
+
+    fn children_of(&self, id: u32) -> Option<&Vec<tl::NodeHandle>> {
+        self.children_map
+            .get(id as usize)
+            .and_then(|children| children.as_ref())
+    }
 }
 
 fn escape_link_label(text: &str) -> String {
@@ -761,10 +787,10 @@ fn normalize_heading_text<'a>(text: &'a str) -> Cow<'a, str> {
 
 fn build_dom_context(dom: &tl::VDom, parser: &tl::Parser) -> DomContext {
     let mut ctx = DomContext {
-        parent_map: HashMap::new(),
-        children_map: HashMap::new(),
+        parent_map: Vec::new(),
+        children_map: Vec::new(),
         root_children: dom.children().to_vec(),
-        node_map: HashMap::new(),
+        node_map: Vec::new(),
     };
 
     for child_handle in dom.children().iter() {
@@ -776,13 +802,13 @@ fn build_dom_context(dom: &tl::VDom, parser: &tl::Parser) -> DomContext {
 
 /// Detect block elements that were incorrectly nested under inline ancestors.
 fn has_inline_block_misnest(dom_ctx: &DomContext, parser: &tl::Parser) -> bool {
-    for handle in dom_ctx.node_map.values() {
+    for handle in dom_ctx.node_map.iter().flatten() {
         if let Some(tl::Node::Tag(tag)) = handle.get(parser) {
             let tag_name = normalized_tag_name(tag.name().as_utf8_str());
             if is_block_level_element(tag_name.as_ref()) {
-                let mut current = dom_ctx.parent_map.get(&handle.get_inner()).and_then(|p| *p);
+                let mut current = dom_ctx.parent_of(handle.get_inner());
                 while let Some(parent_id) = current {
-                    if let Some(parent_handle) = dom_ctx.node_map.get(&parent_id) {
+                    if let Some(parent_handle) = dom_ctx.node_handle(parent_id) {
                         if let Some(tl::Node::Tag(parent_tag)) = parent_handle.get(parser) {
                             let parent_name = normalized_tag_name(parent_tag.name().as_utf8_str());
                             if is_inline_element(parent_name.as_ref()) {
@@ -790,7 +816,7 @@ fn has_inline_block_misnest(dom_ctx: &DomContext, parser: &tl::Parser) -> bool {
                             }
                         }
                     }
-                    current = dom_ctx.parent_map.get(&parent_id).and_then(|p| *p);
+                    current = dom_ctx.parent_of(parent_id);
                 }
             }
         }
@@ -818,16 +844,17 @@ fn repair_with_html5ever(input: &str) -> Option<String> {
 
 fn record_node_hierarchy(node_handle: &tl::NodeHandle, parent: Option<u32>, parser: &tl::Parser, ctx: &mut DomContext) {
     let id = node_handle.get_inner();
-    ctx.parent_map.insert(id, parent);
-    ctx.node_map.insert(id, *node_handle);
+    ctx.ensure_capacity(id);
+    ctx.parent_map[id as usize] = parent;
+    ctx.node_map[id as usize] = Some(*node_handle);
 
     if let Some(node) = node_handle.get(parser) {
         if let tl::Node::Tag(tag) = node {
             let children: Vec<_> = tag.children().top().iter().copied().collect();
-            ctx.children_map.insert(id, children.clone());
-            for child in children {
-                record_node_hierarchy(&child, Some(id), parser, ctx);
+            for child in &children {
+                record_node_hierarchy(child, Some(id), parser, ctx);
             }
+            ctx.children_map[id as usize] = Some(children);
         }
     }
 }
@@ -2015,8 +2042,8 @@ fn should_drop_for_preprocessing(
 
 fn has_semantic_content_ancestor(node_handle: &tl::NodeHandle, parser: &tl::Parser, dom_ctx: &DomContext) -> bool {
     let mut current_id = node_handle.get_inner();
-    while let Some(parent_id) = dom_ctx.parent_map.get(&current_id).copied().flatten() {
-        if let Some(parent_handle) = dom_ctx.node_map.get(&parent_id) {
+    while let Some(parent_id) = dom_ctx.parent_of(current_id) {
+        if let Some(parent_handle) = dom_ctx.node_handle(parent_id) {
             if let Some(tl::Node::Tag(parent_tag)) = parent_handle.get(parser) {
                 let parent_name = normalized_tag_name(parent_tag.name().as_utf8_str());
                 if matches!(parent_name.as_ref(), "main" | "article" | "section") {
@@ -2469,10 +2496,10 @@ fn is_block_level_element(tag_name: &str) -> bool {
 
 fn get_next_sibling_tag(node_handle: &tl::NodeHandle, parser: &tl::Parser, dom_ctx: &DomContext) -> Option<String> {
     let id = node_handle.get_inner();
-    let parent = dom_ctx.parent_map.get(&id).copied().flatten();
+    let parent = dom_ctx.parent_of(id);
 
     let siblings = if let Some(parent_id) = parent {
-        dom_ctx.children_map.get(&parent_id)?
+        dom_ctx.children_of(parent_id)?
     } else {
         &dom_ctx.root_children
     };
@@ -2498,10 +2525,10 @@ fn get_next_sibling_tag(node_handle: &tl::NodeHandle, parser: &tl::Parser, dom_c
 
 fn get_previous_sibling_tag(node_handle: &tl::NodeHandle, parser: &tl::Parser, dom_ctx: &DomContext) -> Option<String> {
     let id = node_handle.get_inner();
-    let parent = dom_ctx.parent_map.get(&id).copied().flatten();
+    let parent = dom_ctx.parent_of(id);
 
     let siblings = if let Some(parent_id) = parent {
-        dom_ctx.children_map.get(&parent_id)?
+        dom_ctx.children_of(parent_id)?
     } else {
         &dom_ctx.root_children
     };
@@ -2527,10 +2554,10 @@ fn get_previous_sibling_tag(node_handle: &tl::NodeHandle, parser: &tl::Parser, d
 
 fn previous_sibling_is_inline_tag(node_handle: &tl::NodeHandle, parser: &tl::Parser, dom_ctx: &DomContext) -> bool {
     let id = node_handle.get_inner();
-    let parent = dom_ctx.parent_map.get(&id).copied().flatten();
+    let parent = dom_ctx.parent_of(id);
 
     let siblings = if let Some(parent_id) = parent {
-        if let Some(children) = dom_ctx.children_map.get(&parent_id) {
+        if let Some(children) = dom_ctx.children_of(parent_id) {
             children
         } else {
             return false;
@@ -2566,10 +2593,10 @@ fn previous_sibling_is_inline_tag(node_handle: &tl::NodeHandle, parser: &tl::Par
 
 fn next_sibling_is_whitespace_text(node_handle: &tl::NodeHandle, parser: &tl::Parser, dom_ctx: &DomContext) -> bool {
     let id = node_handle.get_inner();
-    let parent = dom_ctx.parent_map.get(&id).copied().flatten();
+    let parent = dom_ctx.parent_of(id);
 
     let siblings = if let Some(parent_id) = parent {
-        if let Some(children) = dom_ctx.children_map.get(&parent_id) {
+        if let Some(children) = dom_ctx.children_of(parent_id) {
             children
         } else {
             return false;
@@ -2597,10 +2624,10 @@ fn next_sibling_is_whitespace_text(node_handle: &tl::NodeHandle, parser: &tl::Pa
 
 fn next_sibling_is_inline_tag(node_handle: &tl::NodeHandle, parser: &tl::Parser, dom_ctx: &DomContext) -> bool {
     let id = node_handle.get_inner();
-    let parent = dom_ctx.parent_map.get(&id).copied().flatten();
+    let parent = dom_ctx.parent_of(id);
 
     let siblings = if let Some(parent_id) = parent {
-        if let Some(children) = dom_ctx.children_map.get(&parent_id) {
+        if let Some(children) = dom_ctx.children_of(parent_id) {
             children
         } else {
             return false;
