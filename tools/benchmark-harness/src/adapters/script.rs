@@ -220,6 +220,17 @@ impl FrameworkAdapter for ScriptAdapter {
         let resource_stats = monitor.map(|m| m.stop()).unwrap_or_default();
 
         if !output.status.success() {
+            let stderr_tail = tail_lines(&String::from_utf8_lossy(&output.stderr), 5);
+            let error_message = if stderr_tail.is_empty() {
+                format!("{} exited with status {}", self.name(), output.status)
+            } else {
+                format!(
+                    "{} exited with status {} (stderr tail: {})",
+                    self.name(),
+                    output.status,
+                    stderr_tail
+                )
+            };
             return Ok(BenchmarkResult {
                 framework: self.name().to_string(),
                 fixture_id: fixture.id.clone(),
@@ -236,14 +247,36 @@ impl FrameworkAdapter for ScriptAdapter {
                 flamegraph_path: None,
                 statistics: None,
                 success: false,
-                error_message: Some(format!("{} exited with status {}", self.name(), output.status)),
+                error_message: Some(error_message),
             });
         }
 
         let stdout = String::from_utf8(output.stdout)
             .map_err(|err| Error::Benchmark(format!("Invalid UTF-8 from {}: {err}", self.name())))?;
-        let script_result: ScriptResult = serde_json::from_str(stdout.trim())
-            .map_err(|err| Error::Benchmark(format!("Failed to parse {} output: {err}", self.name())))?;
+        let script_result: ScriptResult = match serde_json::from_str(stdout.trim()) {
+            Ok(result) => result,
+            Err(err) => {
+                if let Some(line) = extract_json_line(&stdout) {
+                    serde_json::from_str(&line)
+                        .map_err(|err| Error::Benchmark(format!("Failed to parse {} output: {err}", self.name())))?
+                } else {
+                    let stdout_tail = tail_lines(&stdout, 5);
+                    let stderr_tail = tail_lines(&String::from_utf8_lossy(&output.stderr), 5);
+                    let mut context = String::new();
+                    if !stdout_tail.is_empty() {
+                        context.push_str(&format!(" stdout tail: {}", stdout_tail));
+                    }
+                    if !stderr_tail.is_empty() {
+                        context.push_str(&format!(" stderr tail: {}", stderr_tail));
+                    }
+                    return Err(Error::Benchmark(format!(
+                        "Failed to parse {} output: {err}.{}",
+                        self.name(),
+                        context
+                    )));
+                }
+            }
+        };
 
         let duration = Duration::from_secs_f64(script_result.elapsed_seconds);
         let file_size = std::fs::metadata(&fixture_path).map(|m| m.len()).unwrap_or_default();
@@ -446,22 +479,18 @@ fn ensure_java_jar(repo_root: &Path) -> Result<()> {
         }
         maven_opts.push_str("--enable-native-access=ALL-UNNAMED");
     }
-    if !maven_opts.contains("-Dgpg.skip=true") {
+    if !maven_opts.contains("--add-opens=java.base/sun.misc=ALL-UNNAMED") {
         if !maven_opts.is_empty() {
             maven_opts.push(' ');
         }
-        maven_opts.push_str("-Dgpg.skip=true");
+        maven_opts.push_str("--add-opens=java.base/sun.misc=ALL-UNNAMED");
     }
-    if !maven_opts.contains("-Dmaven.javadoc.skip=true") {
-        if !maven_opts.is_empty() {
-            maven_opts.push(' ');
-        }
-        maven_opts.push_str("-Dmaven.javadoc.skip=true");
-    }
+
+    let maven_skip_args = ["-DskipTests", "-Dgpg.skip=true", "-Dmaven.javadoc.skip=true"];
 
     let lib_status = Command::new(&mvn_cmd)
         .arg("install")
-        .arg("-DskipTests")
+        .args(maven_skip_args)
         .env("MAVEN_OPTS", &maven_opts)
         .current_dir(&java_dir)
         .status()
@@ -478,6 +507,7 @@ fn ensure_java_jar(repo_root: &Path) -> Result<()> {
         .arg("benchmark-pom.xml")
         .arg("clean")
         .arg("package")
+        .args(maven_skip_args)
         .env("MAVEN_OPTS", &maven_opts)
         .current_dir(&java_dir)
         .status()
@@ -652,6 +682,29 @@ fn extract_toml_section(contents: &str, header: &str) -> Option<String> {
         section.push(line);
     }
     Some(section.join("\n"))
+}
+
+fn extract_json_line(output: &str) -> Option<String> {
+    for line in output.lines().rev() {
+        let trimmed = line.trim();
+        if trimmed.starts_with('{') && trimmed.ends_with('}') {
+            return Some(trimmed.to_string());
+        }
+    }
+    None
+}
+
+fn tail_lines(output: &str, max_lines: usize) -> String {
+    let lines: Vec<&str> = output
+        .lines()
+        .filter(|line| !line.trim().is_empty())
+        .rev()
+        .take(max_lines)
+        .collect();
+    if lines.is_empty() {
+        return String::new();
+    }
+    lines.into_iter().rev().collect::<Vec<_>>().join(" | ")
 }
 
 fn copy_dir_recursive(source: &Path, destination: &Path) -> Result<()> {
