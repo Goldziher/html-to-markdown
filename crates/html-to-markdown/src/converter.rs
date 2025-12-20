@@ -2910,7 +2910,10 @@ fn walk_node(
         }
 
         tl::Node::Tag(tag) => {
-            let tag_name = normalized_tag_name(tag.name().as_utf8_str());
+            let tag_name = match dom_ctx.tag_info(node_handle.get_inner()) {
+                Some(info) => Cow::Borrowed(info.name.as_str()),
+                None => normalized_tag_name(tag.name().as_utf8_str()),
+            };
 
             if should_drop_for_preprocessing(node_handle, tag_name.as_ref(), tag, parser, dom_ctx, options) {
                 trim_trailing_whitespace(output);
@@ -2920,7 +2923,7 @@ fn walk_node(
                 return;
             }
 
-            if options.strip_tags.iter().any(|t| t.as_str() == tag_name) {
+            if options.strip_tags.iter().any(|t| t.as_str() == tag_name.as_ref()) {
                 let children = tag.children();
                 {
                     for child_handle in children.top().iter() {
@@ -2930,7 +2933,7 @@ fn walk_node(
                 return;
             }
 
-            if options.preserve_tags.iter().any(|t| t.as_str() == tag_name) {
+            if options.preserve_tags.iter().any(|t| t.as_str() == tag_name.as_ref()) {
                 let html = serialize_tag_to_html(node_handle, parser);
                 output.push_str(&html);
                 return;
