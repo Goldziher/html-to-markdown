@@ -58,8 +58,13 @@ jobs:
   profiling:
     runs-on: ubuntu-latest
     timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        framework: [rust, python, ruby, php, node, wasm, go, java, csharp, elixir]
+    name: profiling-${{ matrix.framework }}
     env:
-      FRAMEWORKS: ${{ github.event.inputs.frameworks || 'rust,python,ruby,php,node,wasm,go,java,csharp,elixir' }}
+      FRAMEWORKS: ${{ matrix.framework }}
       FIXTURES: ${{ github.event.inputs.fixtures || 'tools/benchmark-harness/fixtures/wikipedia.toml' }}
       ITERATIONS: ${{ github.event.inputs.iterations || '3' }}
       WARMUP: ${{ github.event.inputs.warmup || '1' }}
@@ -74,53 +79,53 @@ jobs:
           components: llvm-tools-preview
 
       - name: Setup Python + uv
-        if: contains(env.FRAMEWORKS, 'python')
+        if: env.FRAMEWORKS == 'python'
         uses: astral-sh/setup-uv@v7
         with:
           enable-cache: true
 
       - name: Setup Python runtime
-        if: contains(env.FRAMEWORKS, 'python')
+        if: env.FRAMEWORKS == 'python'
         uses: actions/setup-python@v6
         with:
           python-version: "3.12"
 
       - name: Install Python deps
-        if: contains(env.FRAMEWORKS, 'python')
+        if: env.FRAMEWORKS == 'python'
         run: uv sync --all-extras --no-install-workspace
 
       - name: Setup Node workspace
-        if: contains(env.FRAMEWORKS, 'node') || contains(env.FRAMEWORKS, 'wasm')
+        if: env.FRAMEWORKS == 'node' || env.FRAMEWORKS == 'wasm'
         uses: ./.github/actions/setup-node-workspace
 
       - name: Install wasm-pack
-        if: contains(env.FRAMEWORKS, 'wasm')
+        if: env.FRAMEWORKS == 'wasm'
         run: scripts/common/install-wasm-pack.sh
         shell: bash
 
       - name: Ensure wasm target installed
-        if: contains(env.FRAMEWORKS, 'wasm')
+        if: env.FRAMEWORKS == 'wasm'
         run: scripts/common/ensure-wasm-target.sh
         shell: bash
 
       - name: Setup Ruby
-        if: contains(env.FRAMEWORKS, 'ruby')
+        if: env.FRAMEWORKS == 'ruby'
         uses: ruby/setup-ruby@v1
         with:
           ruby-version: "3.2"
 
       - name: Install Ruby deps
-        if: contains(env.FRAMEWORKS, 'ruby')
+        if: env.FRAMEWORKS == 'ruby'
         working-directory: packages/ruby
         run: bundle install
 
       - name: Build Ruby extension
-        if: contains(env.FRAMEWORKS, 'ruby')
+        if: env.FRAMEWORKS == 'ruby'
         working-directory: packages/ruby
         run: bundle exec rake compile
 
       - name: Setup PHP
-        if: contains(env.FRAMEWORKS, 'php')
+        if: env.FRAMEWORKS == 'php'
         uses: shivammathur/setup-php@v2
         with:
           php-version: "8.2"
@@ -128,12 +133,12 @@ jobs:
           coverage: none
 
       - name: Capture php-config path
-        if: contains(env.FRAMEWORKS, 'php')
+        if: env.FRAMEWORKS == 'php'
         run: scripts/ci/php/set-php-config.sh
         shell: bash
 
       - name: Install PHP deps
-        if: contains(env.FRAMEWORKS, 'php')
+        if: env.FRAMEWORKS == 'php'
         uses: ramsey/composer-install@v3
         with:
           working-directory: packages/php
@@ -142,34 +147,34 @@ jobs:
           COMPOSER_AUTH: '{"github-oauth":{"github.com":"${{ secrets.GITHUB_TOKEN }}"}}'
 
       - name: Setup Go
-        if: contains(env.FRAMEWORKS, 'go')
+        if: env.FRAMEWORKS == 'go'
         uses: actions/setup-go@v6
         with:
           go-version: "1.25.5"
           check-latest: true
 
       - name: Setup Java
-        if: contains(env.FRAMEWORKS, 'java')
+        if: env.FRAMEWORKS == 'java'
         uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: "25"
 
       - name: Setup .NET
-        if: contains(env.FRAMEWORKS, 'csharp')
+        if: env.FRAMEWORKS == 'csharp'
         uses: actions/setup-dotnet@v5
         with:
           dotnet-version: "10.0.x"
 
       - name: Setup Elixir
-        if: contains(env.FRAMEWORKS, 'elixir')
+        if: env.FRAMEWORKS == 'elixir'
         uses: erlef/setup-beam@v1
         with:
           elixir-version: "1.19"
           otp-version: "28.1"
 
       - name: Install Elixir deps
-        if: contains(env.FRAMEWORKS, 'elixir')
+        if: env.FRAMEWORKS == 'elixir'
         working-directory: packages/elixir
         run: mix deps.get
 
@@ -188,5 +193,5 @@ jobs:
       - name: Upload results
         uses: actions/upload-artifact@v4
         with:
-          name: benchmark-harness-results
+          name: benchmark-harness-results-${{ matrix.framework }}
           path: tools/benchmark-harness/results

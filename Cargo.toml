@@ -53,6 +53,7 @@ lto = "thin"
 codegen-units = 1
 opt-level = 3
 strip = true
+debug = 1
 
 [patch.crates-io]
 html-to-markdown-rs = { path = "crates/html-to-markdown" }

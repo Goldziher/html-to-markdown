@@ -170,6 +170,7 @@ impl ScriptAdapter {
                 let mut cmd = Command::new("mix");
                 cmd.arg("run").arg("scripts/benchmark.exs");
                 cmd.env("MIX_ENV", "prod");
+                cmd.env("MIX_QUIET", "1");
                 Ok((cmd, self.repo_root.join("packages/elixir")))
             }
         }
@@ -437,9 +438,21 @@ fn ensure_java_jar(repo_root: &Path) -> Result<()> {
         }
         maven_opts.push_str(&format!("-Dmaven.mainClass={maven_main_class}"));
     }
+    if !maven_opts.contains("--enable-native-access") {
+        if !maven_opts.is_empty() {
+            maven_opts.push(' ');
+        }
+        maven_opts.push_str("--enable-native-access=ALL-UNNAMED");
+    }
+    if !maven_opts.contains("--add-opens=java.base/sun.misc=ALL-UNNAMED") {
+        if !maven_opts.is_empty() {
+            maven_opts.push(' ');
+        }
+        maven_opts.push_str("--add-opens=java.base/sun.misc=ALL-UNNAMED");
+    }
 
     let lib_status = Command::new(&mvn_cmd)
-        .arg("package")
+        .arg("install")
         .arg("-DskipTests")
         .env("MAVEN_OPTS", &maven_opts)
         .current_dir(&java_dir)

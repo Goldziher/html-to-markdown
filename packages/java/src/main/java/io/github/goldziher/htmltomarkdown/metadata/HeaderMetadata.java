@@ -42,7 +42,7 @@ public record HeaderMetadata(int level, String text, String id, int depth, int h
    *
    * @return true if level is 1-6, false otherwise
    *
-   * @example HeaderMetadata with level 3 returns true
+   * @apiNote For example, a header with level 3 returns true.
    */
   public boolean isValid() {
     return level >= MIN_HEADER_LEVEL && level <= MAX_HEADER_LEVEL;

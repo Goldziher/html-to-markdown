@@ -48,7 +48,7 @@ public record LinkMetadata(
    * @param href The href attribute value
    * @return Appropriate LinkType based on protocol and content
    *
-   * @example LinkMetadata.classifyLink("#section") returns LinkType.ANCHOR
+   * @apiNote For example, {@code LinkMetadata.classifyLink("#section")} returns {@code LinkType.ANCHOR}.
    */
   public static LinkType classifyLink(String href) {
     if (href == null) {
