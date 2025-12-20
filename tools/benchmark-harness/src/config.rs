@@ -18,6 +18,8 @@ pub struct BenchmarkConfig {
     pub sample_interval_ms: u64,
     pub timeout: Duration,
     pub enable_profiling: bool,
+    pub profile_frequency: i32,
+    pub profile_repeat: usize,
     pub flamegraph_dir: Option<PathBuf>,
 }
 
@@ -32,6 +34,8 @@ impl Default for BenchmarkConfig {
             sample_interval_ms: 10,
             timeout: Duration::from_secs(300),
             enable_profiling: false,
+            profile_frequency: 1000,
+            profile_repeat: 1,
             flamegraph_dir: None,
         }
     }
@@ -47,6 +51,12 @@ impl BenchmarkConfig {
         }
         if self.timeout.as_secs() == 0 {
             return Err(crate::Error::Config("timeout must be > 0".to_string()));
+        }
+        if self.profile_frequency <= 0 {
+            return Err(crate::Error::Config("profile_frequency must be > 0".to_string()));
+        }
+        if self.profile_repeat == 0 {
+            return Err(crate::Error::Config("profile_repeat must be > 0".to_string()));
         }
         Ok(())
     }

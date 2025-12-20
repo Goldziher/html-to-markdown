@@ -61,6 +61,12 @@ enum Commands {
         #[arg(long)]
         profile: bool,
 
+        #[arg(long, default_value = "1000")]
+        profile_frequency: i32,
+
+        #[arg(long, default_value = "1")]
+        profile_repeat: usize,
+
         #[arg(long)]
         flamegraphs: Option<PathBuf>,
 
@@ -128,6 +134,8 @@ fn main() -> Result<()> {
             warmup,
             iterations,
             profile,
+            profile_frequency,
+            profile_repeat,
             flamegraphs,
             format,
         } => {
@@ -148,6 +156,8 @@ fn main() -> Result<()> {
                 warmup_iterations: warmup,
                 benchmark_iterations: iterations,
                 enable_profiling: profile || flamegraph_dir.is_some(),
+                profile_frequency,
+                profile_repeat,
                 flamegraph_dir,
                 ..Default::default()
             };
@@ -197,6 +207,7 @@ fn main() -> Result<()> {
 
             let json_path = output.join("results.json");
             let html_path = output.join("report.html");
+            let summary_path = output.join("summary.json");
 
             match format {
                 OutputFormat::Json => {
@@ -210,6 +221,7 @@ fn main() -> Result<()> {
                     benchmark_harness::write_html_report(&results, &html_path)?;
                 }
             }
+            benchmark_harness::write_summary_json(&results, &summary_path)?;
 
             Ok(())
         }

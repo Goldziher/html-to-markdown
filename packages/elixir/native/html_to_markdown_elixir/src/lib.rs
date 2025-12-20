@@ -159,7 +159,7 @@ fn convert_with_options_map<'a>(env: Env<'a>, html: String, options_term: Term<'
         Err(err) => return handle_invalid_option_error(env, err),
     };
 
-    match profiling::maybe_profile(|| convert_inner(&html, Some(options))) {
+    match profiling::maybe_profile(|| convert_inner(&html, Some(options.clone()))) {
         Ok(markdown) => Ok((atoms::ok(), markdown).encode(env)),
         Err(err) => Ok((atoms::error(), err.to_string()).encode(env)),
     }

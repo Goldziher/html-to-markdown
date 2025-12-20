@@ -1,6 +1,7 @@
 use crate::types::BenchmarkResult;
 use crate::{Error, Result};
 use minijinja::{Environment, context};
+use std::collections::HashMap;
 use std::fs;
 use std::path::Path;
 
@@ -27,15 +28,43 @@ pub fn write_html_report(results: &[BenchmarkResult], output_path: &Path) -> Res
         .map_err(|err| Error::Serialization(format!("Failed to load template: {err}")))?;
 
     let summary = build_summary(results);
-    let rows = results.iter().map(ReportRow::from).collect::<Vec<_>>();
+    let framework_summary = build_framework_summary(results);
+    let fixture_summary = build_fixture_summary(results);
+    let output_dir = output_path.parent().unwrap_or_else(|| Path::new("."));
+    let rows = results
+        .iter()
+        .map(|result| ReportRow::from_result(result, output_dir))
+        .collect::<Vec<_>>();
 
     let rendered = env
         .get_template("report")
         .map_err(|err| Error::Serialization(format!("Failed to get template: {err}")))?
-        .render(context! { results => rows, summary => summary })
+        .render(context! {
+            results => rows,
+            summary => summary,
+            frameworks => framework_summary,
+            fixtures => fixture_summary
+        })
         .map_err(|err| Error::Serialization(format!("Failed to render template: {err}")))?;
 
     fs::write(output_path, rendered).map_err(Error::Io)?;
+    Ok(())
+}
+
+pub fn write_summary_json(results: &[BenchmarkResult], output_path: &Path) -> Result<()> {
+    if let Some(parent) = output_path.parent() {
+        fs::create_dir_all(parent).map_err(Error::Io)?;
+    }
+
+    let summary = SummaryReport {
+        overall: build_summary(results),
+        frameworks: build_framework_summary(results),
+        fixtures: build_fixture_summary(results),
+    };
+
+    let json = serde_json::to_string_pretty(&summary)
+        .map_err(|err| Error::Serialization(format!("Failed to serialize summary: {err}")))?;
+    fs::write(output_path, json).map_err(Error::Io)?;
     Ok(())
 }
 
@@ -44,8 +73,8 @@ fn build_summary(results: &[BenchmarkResult]) -> SummaryStats {
     let successes = results.iter().filter(|r| r.success).count();
     let failures = total.saturating_sub(successes);
 
-    let avg_ops = average(results.iter().map(|r| r.metrics.ops_per_sec));
-    let avg_mb = average(results.iter().map(|r| r.metrics.mb_per_sec));
+    let avg_ops = average(results.iter().filter(|r| r.success).map(|r| r.metrics.ops_per_sec));
+    let avg_mb = average(results.iter().filter(|r| r.success).map(|r| r.metrics.mb_per_sec));
 
     SummaryStats {
         total,
@@ -54,6 +83,76 @@ fn build_summary(results: &[BenchmarkResult]) -> SummaryStats {
         avg_ops,
         avg_mb,
     }
+}
+
+fn build_framework_summary(results: &[BenchmarkResult]) -> Vec<FrameworkSummary> {
+    let mut by_framework: HashMap<&str, Vec<&BenchmarkResult>> = HashMap::new();
+    for result in results {
+        by_framework.entry(&result.framework).or_default().push(result);
+    }
+
+    let mut summaries = by_framework
+        .into_iter()
+        .map(|(framework, entries)| {
+            let successes = entries.iter().filter(|r| r.success).collect::<Vec<_>>();
+            let median_ops = median(successes.iter().map(|r| r.metrics.ops_per_sec).collect());
+            let median_mb = median(successes.iter().map(|r| r.metrics.mb_per_sec).collect());
+            let peak_memory_mb = successes
+                .iter()
+                .map(|r| r.resource_stats.peak_memory_bytes as f64 / 1_048_576.0)
+                .fold(0.0, f64::max);
+            let avg_cpu_percent = average(successes.iter().map(|r| r.resource_stats.avg_cpu_percent));
+
+            FrameworkSummary {
+                framework: framework.to_string(),
+                runs: entries.len(),
+                successes: successes.len(),
+                median_ops,
+                median_mb,
+                peak_memory_mb,
+                avg_cpu_percent,
+            }
+        })
+        .collect::<Vec<_>>();
+
+    summaries.sort_by(|a, b| a.framework.cmp(&b.framework));
+    summaries
+}
+
+fn build_fixture_summary(results: &[BenchmarkResult]) -> Vec<FixtureSummary> {
+    let mut by_fixture: HashMap<(&str, &str), Vec<&BenchmarkResult>> = HashMap::new();
+    for result in results {
+        by_fixture
+            .entry((&result.fixture_name, &result.fixture_format))
+            .or_default()
+            .push(result);
+    }
+
+    let mut summaries = by_fixture
+        .into_iter()
+        .map(|((fixture, format), entries)| {
+            let successes = entries.iter().filter(|r| r.success).collect::<Vec<_>>();
+            let median_ops = median(successes.iter().map(|r| r.metrics.ops_per_sec).collect());
+            let median_mb = median(successes.iter().map(|r| r.metrics.mb_per_sec).collect());
+            let peak_memory_mb = successes
+                .iter()
+                .map(|r| r.resource_stats.peak_memory_bytes as f64 / 1_048_576.0)
+                .fold(0.0, f64::max);
+
+            FixtureSummary {
+                fixture: fixture.to_string(),
+                format: format.to_string(),
+                runs: entries.len(),
+                successes: successes.len(),
+                median_ops,
+                median_mb,
+                peak_memory_mb,
+            }
+        })
+        .collect::<Vec<_>>();
+
+    summaries.sort_by(|a, b| a.fixture.cmp(&b.fixture));
+    summaries
 }
 
 fn average<I>(values: I) -> f64
@@ -70,6 +169,14 @@ where
     if count == 0.0 { 0.0 } else { total / count }
 }
 
+fn median(mut values: Vec<f64>) -> f64 {
+    if values.is_empty() {
+        return 0.0;
+    }
+    values.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+    values[values.len() / 2]
+}
+
 #[derive(serde::Serialize)]
 struct SummaryStats {
     total: usize,
@@ -77,6 +184,41 @@ struct SummaryStats {
     failures: usize,
     avg_ops: f64,
     avg_mb: f64,
+}
+
+#[derive(serde::Serialize)]
+struct FrameworkSummary {
+    framework: String,
+    runs: usize,
+    successes: usize,
+    median_ops: f64,
+    median_mb: f64,
+    peak_memory_mb: f64,
+    avg_cpu_percent: f64,
+}
+
+#[derive(serde::Serialize)]
+struct FixtureSummary {
+    fixture: String,
+    format: String,
+    runs: usize,
+    successes: usize,
+    median_ops: f64,
+    median_mb: f64,
+    peak_memory_mb: f64,
+}
+
+#[derive(serde::Serialize)]
+struct SummaryReport {
+    overall: SummaryStats,
+    frameworks: Vec<FrameworkSummary>,
+    fixtures: Vec<FixtureSummary>,
+}
+
+#[derive(serde::Serialize)]
+struct Hotspot {
+    name: String,
+    samples: usize,
 }
 
 #[derive(serde::Serialize)]
@@ -90,10 +232,24 @@ struct ReportRow {
     peak_memory_mb: f64,
     avg_cpu_percent: f64,
     flamegraph_path: Option<String>,
+    hotspots: Vec<Hotspot>,
 }
 
-impl From<&BenchmarkResult> for ReportRow {
-    fn from(result: &BenchmarkResult) -> Self {
+impl ReportRow {
+    fn from_result(result: &BenchmarkResult, output_dir: &Path) -> Self {
+        let hotspots = result
+            .flamegraph_path
+            .as_ref()
+            .and_then(|path| {
+                let resolved = if path.is_relative() {
+                    output_dir.join(path)
+                } else {
+                    path.clone()
+                };
+                extract_flamegraph_hotspots(&resolved, 5).ok()
+            })
+            .unwrap_or_default();
+
         Self {
             framework: result.framework.clone(),
             fixture_name: result.fixture_name.clone(),
@@ -107,6 +263,55 @@ impl From<&BenchmarkResult> for ReportRow {
                 .flamegraph_path
                 .as_ref()
                 .map(|path| path.to_string_lossy().to_string()),
+            hotspots,
         }
     }
+}
+
+fn extract_flamegraph_hotspots(path: &Path, limit: usize) -> Result<Vec<Hotspot>> {
+    let data = fs::read_to_string(path).map_err(Error::Io)?;
+    let mut totals: HashMap<String, usize> = HashMap::new();
+
+    for chunk in data.split("<title>").skip(1) {
+        let Some(end) = chunk.find("</title>") else { continue };
+        let title = &chunk[..end];
+        let (name, meta) = match title.rsplit_once(" (") {
+            Some((name, meta)) => (name, meta.trim_end_matches(')')),
+            None => continue,
+        };
+        let samples = parse_samples(meta);
+        if samples == 0 {
+            continue;
+        }
+        if should_ignore_frame(name) {
+            continue;
+        }
+        *totals.entry(name.to_string()).or_insert(0) += samples;
+    }
+
+    let mut entries = totals
+        .into_iter()
+        .map(|(name, samples)| Hotspot { name, samples })
+        .collect::<Vec<_>>();
+    entries.sort_by(|a, b| b.samples.cmp(&a.samples));
+    entries.truncate(limit);
+    Ok(entries)
+}
+
+fn parse_samples(meta: &str) -> usize {
+    let mut digits = String::new();
+    for ch in meta.chars() {
+        if ch.is_ascii_digit() || ch == ',' {
+            digits.push(ch);
+        } else {
+            break;
+        }
+    }
+    digits.replace(',', "").parse::<usize>().unwrap_or(0)
+}
+
+fn should_ignore_frame(name: &str) -> bool {
+    matches!(name, "all" | "__libc_start_main" | "_start")
+        || name.starts_with("benchmark-harne")
+        || name.starts_with("benchmark-harness")
 }

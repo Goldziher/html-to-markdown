@@ -6,6 +6,7 @@ use std::sync::{Mutex, OnceLock};
 const ENV_OUTPUT: &str = "HTML_TO_MARKDOWN_PROFILE_OUTPUT";
 const ENV_FREQUENCY: &str = "HTML_TO_MARKDOWN_PROFILE_FREQUENCY";
 const ENV_ONCE: &str = "HTML_TO_MARKDOWN_PROFILE_ONCE";
+const ENV_REPEAT: &str = "HTML_TO_MARKDOWN_PROFILE_REPEAT";
 
 static PROFILED_ONCE: AtomicBool = AtomicBool::new(false);
 
@@ -96,9 +97,9 @@ pub fn stop() -> Result<()> {
 }
 
 #[cfg(not(target_os = "windows"))]
-pub fn maybe_profile<T, F>(f: F) -> Result<T>
+pub fn maybe_profile<T, F>(mut f: F) -> Result<T>
 where
-    F: FnOnce() -> Result<T>,
+    F: FnMut() -> Result<T>,
 {
     if let Ok(state) = state().lock() {
         if state.guard.is_some() {
@@ -124,6 +125,12 @@ where
         return f();
     }
 
+    let repeat = std::env::var(ENV_REPEAT)
+        .ok()
+        .and_then(|value| value.parse::<usize>().ok())
+        .unwrap_or(1)
+        .max(1);
+
     let frequency = std::env::var(ENV_FREQUENCY)
         .ok()
         .and_then(|value| value.parse::<i32>().ok())
@@ -135,25 +142,29 @@ where
         .build()
         .map_err(|err| ConversionError::Other(format!("Profiling init failed: {err}")))?;
 
-    let result = f();
+    let mut last_result = None;
+    for _ in 0..repeat {
+        let value = f()?;
+        last_result = Some(value);
+    }
+    let result =
+        last_result.ok_or_else(|| ConversionError::Other("Profiling repeat produced no result".to_string()))?;
 
-    if result.is_ok() {
-        if let Some(parent) = output_path.parent() {
-            std::fs::create_dir_all(parent).map_err(ConversionError::IoError)?;
-        }
-
-        let report = guard
-            .report()
-            .build()
-            .map_err(|err| ConversionError::Other(format!("Profiling report failed: {err}")))?;
-
-        let file = std::fs::File::create(&output_path).map_err(ConversionError::IoError)?;
-        report
-            .flamegraph(file)
-            .map_err(|err| ConversionError::Other(format!("Flamegraph write failed: {err}")))?;
+    if let Some(parent) = output_path.parent() {
+        std::fs::create_dir_all(parent).map_err(ConversionError::IoError)?;
     }
 
-    result
+    let report = guard
+        .report()
+        .build()
+        .map_err(|err| ConversionError::Other(format!("Profiling report failed: {err}")))?;
+
+    let file = std::fs::File::create(&output_path).map_err(ConversionError::IoError)?;
+    report
+        .flamegraph(file)
+        .map_err(|err| ConversionError::Other(format!("Flamegraph write failed: {err}")))?;
+
+    Ok(result)
 }
 
 #[cfg(target_os = "windows")]

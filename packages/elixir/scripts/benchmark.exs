@@ -29,11 +29,13 @@ html = File.read!(file)
 profile_output = System.get_env("HTML_TO_MARKDOWN_PROFILE_OUTPUT")
 profile_frequency = System.get_env("HTML_TO_MARKDOWN_PROFILE_FREQUENCY")
 profile_once = System.get_env("HTML_TO_MARKDOWN_PROFILE_ONCE")
+profile_repeat = System.get_env("HTML_TO_MARKDOWN_PROFILE_REPEAT")
 
 if profile_output && profile_output != "" do
   System.delete_env("HTML_TO_MARKDOWN_PROFILE_OUTPUT")
   System.delete_env("HTML_TO_MARKDOWN_PROFILE_FREQUENCY")
   System.delete_env("HTML_TO_MARKDOWN_PROFILE_ONCE")
+  System.delete_env("HTML_TO_MARKDOWN_PROFILE_REPEAT")
 end
 
 _ = HtmlToMarkdown.convert(html, if(format == "hocr", do: [hocr_spatial_tables: false], else: []))
@@ -45,6 +47,9 @@ if profile_output && profile_output != "" do
   end
   if profile_once && profile_once != "" do
     System.put_env("HTML_TO_MARKDOWN_PROFILE_ONCE", profile_once)
+  end
+  if profile_repeat && profile_repeat != "" do
+    System.put_env("HTML_TO_MARKDOWN_PROFILE_REPEAT", profile_repeat)
   end
 end
 

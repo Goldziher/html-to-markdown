@@ -754,7 +754,8 @@ fn convert_metadata(metadata: RustExtendedMetadata) -> JsExtendedMetadata {
 #[napi]
 pub fn convert(html: String, options: Option<JsConversionOptions>) -> Result<String> {
     let rust_options = options.map(Into::into);
-    guard_panic(|| profiling::maybe_profile(|| html_to_markdown_rs::convert(&html, rust_options))).map_err(to_js_error)
+    guard_panic(|| profiling::maybe_profile(|| html_to_markdown_rs::convert(&html, rust_options.clone())))
+        .map_err(to_js_error)
 }
 
 #[napi]
@@ -778,7 +779,8 @@ fn buffer_to_str(html: &Buffer) -> Result<&str> {
 pub fn convert_buffer(html: Buffer, options: Option<JsConversionOptions>) -> Result<String> {
     let html = buffer_to_str(&html)?;
     let rust_options = options.map(Into::into);
-    guard_panic(|| profiling::maybe_profile(|| html_to_markdown_rs::convert(html, rust_options))).map_err(to_js_error)
+    guard_panic(|| profiling::maybe_profile(|| html_to_markdown_rs::convert(html, rust_options.clone())))
+        .map_err(to_js_error)
 }
 
 /// Create a reusable ConversionOptions handle.

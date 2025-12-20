@@ -481,8 +481,10 @@ impl ConversionOptionsHandle {
 fn convert(py: Python<'_>, html: &str, options: Option<ConversionOptions>) -> PyResult<String> {
     let html = html.to_owned();
     let rust_options = options.map(|opts| opts.to_rust());
-    py.detach(move || guard_panic(|| profiling::maybe_profile(|| html_to_markdown_rs::convert(&html, rust_options))))
-        .map_err(to_py_err)
+    py.detach(move || {
+        guard_panic(|| profiling::maybe_profile(|| html_to_markdown_rs::convert(&html, rust_options.clone())))
+    })
+    .map_err(to_py_err)
 }
 
 #[pyfunction]
@@ -491,7 +493,7 @@ fn convert_with_options_handle(py: Python<'_>, html: &str, handle: &ConversionOp
     let html = html.to_owned();
     let rust_options = handle.inner.clone();
     py.detach(move || {
-        guard_panic(|| profiling::maybe_profile(|| html_to_markdown_rs::convert(&html, Some(rust_options))))
+        guard_panic(|| profiling::maybe_profile(|| html_to_markdown_rs::convert(&html, Some(rust_options.clone()))))
     })
     .map_err(to_py_err)
 }

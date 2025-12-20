@@ -78,6 +78,17 @@
         color: #7b2f0f;
         font-size: 12px;
       }
+      h2 {
+        margin: 24px 0 12px;
+        font-size: 18px;
+      }
+      .hotspots {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+        font-size: 12px;
+        color: var(--muted);
+      }
     </style>
   </head>
   <body>
@@ -108,6 +119,61 @@
           <div>{{ "%.1f" | format(summary.avg_mb) }}</div>
         </div>
       </section>
+      <h2>Framework Summary</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Framework</th>
+            <th>Runs</th>
+            <th>Successes</th>
+            <th>Median Ops/sec</th>
+            <th>Median MB/sec</th>
+            <th>Peak Mem (MB)</th>
+            <th>Avg CPU</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for item in frameworks %}
+          <tr>
+            <td>{{ item.framework }}</td>
+            <td>{{ item.runs }}</td>
+            <td>{{ item.successes }}</td>
+            <td>{{ "%.1f" | format(item.median_ops) }}</td>
+            <td>{{ "%.1f" | format(item.median_mb) }}</td>
+            <td>{{ "%.1f" | format(item.peak_memory_mb) }}</td>
+            <td>{{ "%.1f" | format(item.avg_cpu_percent) }}%</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      <h2>Fixture Summary</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Fixture</th>
+            <th>Format</th>
+            <th>Runs</th>
+            <th>Successes</th>
+            <th>Median Ops/sec</th>
+            <th>Median MB/sec</th>
+            <th>Peak Mem (MB)</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for item in fixtures %}
+          <tr>
+            <td>{{ item.fixture }}</td>
+            <td><span class="pill">{{ item.format }}</span></td>
+            <td>{{ item.runs }}</td>
+            <td>{{ item.successes }}</td>
+            <td>{{ "%.1f" | format(item.median_ops) }}</td>
+            <td>{{ "%.1f" | format(item.median_mb) }}</td>
+            <td>{{ "%.1f" | format(item.peak_memory_mb) }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      <h2>Detailed Runs</h2>
       <table>
         <thead>
           <tr>
@@ -120,6 +186,7 @@
             <th>Peak Mem (MB)</th>
             <th>Avg CPU</th>
             <th>Flamegraph</th>
+            <th>Hotspots</th>
           </tr>
         </thead>
         <tbody>
@@ -136,6 +203,17 @@
             <td>
               {% if result.flamegraph_path %}
                 <a href="{{ result.flamegraph_path }}">svg</a>
+              {% else %}
+                -
+              {% endif %}
+            </td>
+            <td>
+              {% if result.hotspots | length > 0 %}
+                <div class="hotspots">
+                  {% for hotspot in result.hotspots %}
+                    <span>{{ hotspot.name }} ({{ hotspot.samples }})</span>
+                  {% endfor %}
+                </div>
               {% else %}
                 -
               {% endif %}
