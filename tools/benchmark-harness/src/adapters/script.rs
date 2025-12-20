@@ -151,6 +151,7 @@ impl ScriptAdapter {
                 cmd.arg("run").arg("bin/benchmark.go");
                 let lib_dir = self.repo_root.join("target/release").to_string_lossy().to_string();
                 cmd.env("CGO_LDFLAGS", format!("-L{}", lib_dir));
+                cmd.env("GODEBUG", "cgocheck=0");
 
                 let mut ld_path = lib_dir.clone();
                 if let Ok(existing) = env::var("LD_LIBRARY_PATH") {
@@ -167,6 +168,7 @@ impl ScriptAdapter {
             }
             ScriptLanguage::Elixir => {
                 ensure_elixir_vendor(&self.repo_root)?;
+                patch_elixir_toml_deps(&self.repo_root)?;
                 let mut cmd = Command::new("mix");
                 cmd.arg("run").arg("scripts/benchmark.exs");
                 cmd.env("MIX_ENV", "prod");
@@ -444,11 +446,17 @@ fn ensure_java_jar(repo_root: &Path) -> Result<()> {
         }
         maven_opts.push_str("--enable-native-access=ALL-UNNAMED");
     }
-    if !maven_opts.contains("--add-opens=java.base/sun.misc=ALL-UNNAMED") {
+    if !maven_opts.contains("-Dgpg.skip=true") {
         if !maven_opts.is_empty() {
             maven_opts.push(' ');
         }
-        maven_opts.push_str("--add-opens=java.base/sun.misc=ALL-UNNAMED");
+        maven_opts.push_str("-Dgpg.skip=true");
+    }
+    if !maven_opts.contains("-Dmaven.javadoc.skip=true") {
+        if !maven_opts.is_empty() {
+            maven_opts.push(' ');
+        }
+        maven_opts.push_str("-Dmaven.javadoc.skip=true");
     }
 
     let lib_status = Command::new(&mvn_cmd)
@@ -568,6 +576,38 @@ fn ensure_elixir_vendor(repo_root: &Path) -> Result<()> {
         .map_err(|err| Error::Benchmark(format!("Failed to create {}: {err}", vendor_dir.display())))?;
     copy_dir_recursive(&source_crate, &vendor_crate)?;
     ensure_elixir_workspace_manifest(repo_root, &vendor_workspace)?;
+    Ok(())
+}
+
+fn patch_elixir_toml_deps(repo_root: &Path) -> Result<()> {
+    let toml_decoder = repo_root.join("packages/elixir/deps/toml/lib/decoder.ex");
+    if !toml_decoder.exists() {
+        return Ok(());
+    }
+
+    let contents = std::fs::read_to_string(&toml_decoder).map_err(|err| {
+        Error::Benchmark(format!(
+            "Failed to read Elixir toml decoder {}: {err}",
+            toml_decoder.display()
+        ))
+    })?;
+
+    let updated = contents
+        .replace("in '-_'", "in ~c\"-_\"")
+        .replace("in '-+'", "in ~c\"-+\"")
+        .replace("in 'eE'", "in ~c\"eE\"")
+        .replace("in '_e.'", "in ~c\"_e.\"")
+        .replace("in 'e.'", "in ~c\"e.\"");
+
+    if updated != contents {
+        std::fs::write(&toml_decoder, updated).map_err(|err| {
+            Error::Benchmark(format!(
+                "Failed to write Elixir toml decoder {}: {err}",
+                toml_decoder.display()
+            ))
+        })?;
+    }
+
     Ok(())
 }
 

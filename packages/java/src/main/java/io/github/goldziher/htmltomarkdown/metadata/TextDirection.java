@@ -39,7 +39,7 @@ public enum TextDirection {
    * @return the {@code TextDirection}
    * @throws IllegalArgumentException if the string is null or unknown
    *
-   * @apiNote For example, {@code TextDirection.parse("ltr")} returns {@code TextDirection.LEFT_TO_RIGHT}.
+   * For example, {@code TextDirection.parse("ltr")} returns {@code TextDirection.LEFT_TO_RIGHT}.
    */
   public static TextDirection parse(String s) {
     if (s == null) {
