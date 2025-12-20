@@ -413,9 +413,23 @@ fn ensure_java_jar(repo_root: &Path) -> Result<()> {
 
     ensure_ffi_library(repo_root)?;
 
-    let mvn_cmd = if cfg!(windows) { "mvn.cmd" } else { "mvn" };
+    let mvn_cmd = if cfg!(windows) {
+        let wrapper = repo_root.join("mvnw.cmd");
+        if wrapper.exists() {
+            wrapper
+        } else {
+            PathBuf::from("mvn.cmd")
+        }
+    } else {
+        let wrapper = repo_root.join("mvnw");
+        if wrapper.exists() {
+            wrapper
+        } else {
+            PathBuf::from("mvn")
+        }
+    };
 
-    let lib_status = Command::new(mvn_cmd)
+    let lib_status = Command::new(&mvn_cmd)
         .arg("package")
         .arg("-DskipTests")
         .current_dir(&java_dir)
@@ -428,7 +442,7 @@ fn ensure_java_jar(repo_root: &Path) -> Result<()> {
         )));
     }
 
-    let status = Command::new(mvn_cmd)
+    let status = Command::new(&mvn_cmd)
         .arg("-f")
         .arg("benchmark-pom.xml")
         .arg("clean")

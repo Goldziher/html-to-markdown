@@ -51,7 +51,7 @@ env:
   DEFAULT_MODE: "single-file"
   CARGO_TERM_COLOR: always
   CARGO_INCREMENTAL: 0
-  RUSTFLAGS: "-g"
+  RUSTFLAGS: "-g -C force-frame-pointers=yes"
   RUST_BACKTRACE: short
 
 jobs:
@@ -59,11 +59,11 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 90
     env:
-      FRAMEWORKS: ${{ inputs.frameworks }}
-      FIXTURES: ${{ inputs.fixtures }}
-      ITERATIONS: ${{ inputs.iterations }}
-      WARMUP: ${{ inputs.warmup }}
-      MODE: ${{ inputs.mode }}
+      FRAMEWORKS: ${{ github.event.inputs.frameworks || 'rust,python,ruby,php,node,wasm,go,java,csharp,elixir' }}
+      FIXTURES: ${{ github.event.inputs.fixtures || 'tools/benchmark-harness/fixtures/wikipedia.toml' }}
+      ITERATIONS: ${{ github.event.inputs.iterations || '3' }}
+      WARMUP: ${{ github.event.inputs.warmup || '1' }}
+      MODE: ${{ github.event.inputs.mode || 'single-file' }}
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -155,15 +155,11 @@ jobs:
           distribution: temurin
           java-version: "25"
 
-      - name: Install Maven
-        if: contains(env.FRAMEWORKS, 'java')
-        run: sudo apt-get update && sudo apt-get install -y maven
-
       - name: Setup .NET
         if: contains(env.FRAMEWORKS, 'csharp')
         uses: actions/setup-dotnet@v5
         with:
-          dotnet-version: "9.0.x"
+          dotnet-version: "10.0.x"
 
       - name: Setup Elixir
         if: contains(env.FRAMEWORKS, 'elixir')
@@ -172,13 +168,13 @@ jobs:
           elixir-version: "1.19"
           otp-version: "28.1"
 
+      - name: Install Elixir deps
+        if: contains(env.FRAMEWORKS, 'elixir')
+        working-directory: packages/elixir
+        run: mix deps.get
+
       - name: Run benchmark harness
         run: |
-          FRAMEWORKS="${FRAMEWORKS:-${DEFAULT_FRAMEWORKS}}"
-          FIXTURES="${FIXTURES:-${DEFAULT_FIXTURES}}"
-          ITERATIONS="${ITERATIONS:-${DEFAULT_ITERATIONS}}"
-          WARMUP="${WARMUP:-${DEFAULT_WARMUP}}"
-          MODE="${MODE:-${DEFAULT_MODE}}"
           cargo run --release --features profiling,memory-profiling \
             --manifest-path tools/benchmark-harness/Cargo.toml -- \
             run --fixtures "${FIXTURES}" \
