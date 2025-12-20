@@ -4,8 +4,10 @@ static ALLOC: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
 
 use benchmark_harness::adapters::{NativeAdapter, ScriptAdapter, ScriptLanguage};
 use benchmark_harness::fixture::load_fixtures;
+use benchmark_harness::types::BenchmarkResult;
 use benchmark_harness::{AdapterRegistry, BenchmarkConfig, BenchmarkMode, BenchmarkRunner, Result};
 use clap::{Parser, Subcommand, ValueEnum};
+use std::env;
 use std::path::{Path, PathBuf};
 
 #[derive(Parser)]
@@ -35,6 +37,14 @@ enum Commands {
         #[arg(long)]
         flamegraphs: PathBuf,
         #[arg(long)]
+        output: PathBuf,
+    },
+
+    /// Consolidate benchmark results from multiple result directories
+    Consolidate {
+        #[arg(short, long)]
+        input: PathBuf,
+        #[arg(short, long, default_value = "tools/benchmark-harness/results-consolidated")]
         output: PathBuf,
     },
 
@@ -124,6 +134,26 @@ fn main() -> Result<()> {
         Commands::GenerateFlamegraphIndex { flamegraphs, output } => {
             generate_flamegraph_index(&flamegraphs, &output)?;
             println!("✓ Flamegraph index generated: {}", output.display());
+            Ok(())
+        }
+        Commands::Consolidate { input, output } => {
+            let results = collect_results(&input, &output)?;
+            if results.is_empty() {
+                return Err(benchmark_harness::Error::Config(format!(
+                    "No results.json files found under {}",
+                    input.display()
+                )));
+            }
+
+            let json_path = output.join("results.json");
+            let html_path = output.join("report.html");
+            let summary_path = output.join("summary.json");
+
+            benchmark_harness::write_json_results(&results, &json_path)?;
+            benchmark_harness::write_html_report(&results, &html_path)?;
+            benchmark_harness::write_summary_json(&results, &summary_path)?;
+
+            println!("✓ Consolidated {} result(s) into {}", results.len(), output.display());
             Ok(())
         }
         Commands::Run {
@@ -265,4 +295,61 @@ fn generate_flamegraph_index(flamegraph_dir: &Path, output: &Path) -> Result<()>
 
     std::fs::write(output, html).map_err(benchmark_harness::Error::Io)?;
     Ok(())
+}
+
+fn collect_results(input: &Path, output: &Path) -> Result<Vec<BenchmarkResult>> {
+    let mut files = Vec::new();
+    if input.is_file() {
+        files.push(input.to_path_buf());
+    } else {
+        collect_results_files(input, &mut files)?;
+    }
+
+    let output_root = to_absolute_path(output)?;
+    let mut results = Vec::new();
+    for file in files {
+        if file.file_name().and_then(|name| name.to_str()) != Some("results.json") {
+            continue;
+        }
+        let raw = std::fs::read_to_string(&file).map_err(benchmark_harness::Error::Io)?;
+        let mut entries: Vec<BenchmarkResult> = serde_json::from_str(&raw).map_err(|err| {
+            benchmark_harness::Error::Serialization(format!("Failed to parse {}: {err}", file.display()))
+        })?;
+
+        let base_dir = file.parent().unwrap_or_else(|| Path::new("."));
+        for entry in &mut entries {
+            if let Some(path) = entry.flamegraph_path.clone() {
+                let absolute = if path.is_absolute() { path } else { base_dir.join(path) };
+                let normalized = if let Ok(relative) = absolute.strip_prefix(&output_root) {
+                    relative.to_path_buf()
+                } else {
+                    absolute
+                };
+                entry.flamegraph_path = Some(normalized);
+            }
+        }
+        results.extend(entries);
+    }
+
+    Ok(results)
+}
+
+fn collect_results_files(dir: &Path, files: &mut Vec<PathBuf>) -> Result<()> {
+    for entry in std::fs::read_dir(dir).map_err(benchmark_harness::Error::Io)? {
+        let entry = entry.map_err(benchmark_harness::Error::Io)?;
+        let path = entry.path();
+        if path.is_dir() {
+            collect_results_files(&path, files)?;
+        } else if path.file_name().and_then(|name| name.to_str()) == Some("results.json") {
+            files.push(path);
+        }
+    }
+    Ok(())
+}
+
+fn to_absolute_path(path: &Path) -> Result<PathBuf> {
+    if path.is_absolute() {
+        return Ok(path.to_path_buf());
+    }
+    Ok(env::current_dir().map_err(benchmark_harness::Error::Io)?.join(path))
 }
