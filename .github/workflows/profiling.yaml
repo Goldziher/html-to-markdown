@@ -9,6 +9,14 @@ on:
       - tools/benchmark-harness/**
       - test_documents/**
       - .github/workflows/profiling.yaml
+  pull_request:
+    branches: [main]
+    paths:
+      - crates/**
+      - packages/**
+      - tools/benchmark-harness/**
+      - test_documents/**
+      - .github/workflows/profiling.yaml
   workflow_dispatch:
     inputs:
       frameworks:
