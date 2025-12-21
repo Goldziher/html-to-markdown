@@ -1661,7 +1661,6 @@ fn convert_html_impl(
         ));
     };
     let parser = dom.parser();
-    let dom_ctx = build_dom_context(&dom, parser, preprocessed_len);
     let mut output = String::with_capacity(preprocessed_len.saturating_add(preprocessed_len / 4));
 
     let mut is_hocr = false;
@@ -1669,17 +1668,6 @@ fn convert_html_impl(
         if is_hocr_document(child_handle, parser) {
             is_hocr = true;
             break;
-        }
-    }
-
-    if options.extract_metadata && !options.convert_as_inline && !is_hocr {
-        for child_handle in dom.children().iter() {
-            let metadata = extract_metadata(child_handle, parser, options);
-            if !metadata.is_empty() {
-                let metadata_frontmatter = format_metadata_frontmatter(&metadata);
-                output.push_str(&metadata_frontmatter);
-                break;
-            }
         }
     }
 
@@ -1722,6 +1710,19 @@ fn convert_html_impl(
         output.push('\n');
 
         return Ok(output);
+    }
+
+    let dom_ctx = build_dom_context(&dom, parser, preprocessed_len);
+
+    if options.extract_metadata && !options.convert_as_inline {
+        for child_handle in dom.children().iter() {
+            let metadata = extract_metadata(child_handle, parser, options);
+            if !metadata.is_empty() {
+                let metadata_frontmatter = format_metadata_frontmatter(&metadata);
+                output.push_str(&metadata_frontmatter);
+                break;
+            }
+        }
     }
 
     #[cfg(feature = "metadata")]

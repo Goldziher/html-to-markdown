@@ -53,6 +53,7 @@
 		"clean": "rm -rf dist dist-node dist-web node_modules pkg"
 	},
 	"devDependencies": {
+		"0x": "^6.0.0",
 		"@types/node": "^25.0.3",
 		"tsx": "^4.21.0",
 		"vitest": "^4.0.16",

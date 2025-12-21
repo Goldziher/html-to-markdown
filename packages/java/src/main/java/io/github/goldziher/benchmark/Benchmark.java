@@ -11,6 +11,7 @@ import java.util.Map;
 
 public class Benchmark {
     private static final int DEFAULT_ITERATIONS = 50;
+    private static final int DEFAULT_WARMUP = 3;
     private static final int DEFAULT_PROFILING_FREQUENCY = 1000;
     private static final double NANOS_TO_SECONDS = 1_000_000_000.0;
     private static final double BYTES_TO_MB = 1024.0 * 1024.0;
@@ -18,6 +19,7 @@ public class Benchmark {
     public static void main(String[] args) {
         String filePath = null;
         int iterations = DEFAULT_ITERATIONS;
+        int warmup = DEFAULT_WARMUP;
         String format = "html";
         String scenario = "convert-default";
 
@@ -31,6 +33,11 @@ public class Benchmark {
                 case "--iterations":
                     if (i + 1 < args.length) {
                         iterations = Integer.parseInt(args[++i]);
+                    }
+                    break;
+                case "--warmup":
+                    if (i + 1 < args.length) {
+                        warmup = Integer.parseInt(args[++i]);
                     }
                     break;
                 case "--format":
@@ -60,7 +67,21 @@ public class Benchmark {
             Path path = Paths.get(filePath);
             String html = Files.readString(path);
 
-            runScenario(html, scenario);
+            String warmupEnv = System.getenv("HTML_TO_MARKDOWN_BENCH_WARMUP");
+            if (warmupEnv != null && !warmupEnv.isBlank()) {
+                try {
+                    warmup = Integer.parseInt(warmupEnv);
+                } catch (NumberFormatException ignored) {
+                    warmup = DEFAULT_WARMUP;
+                }
+            }
+            if (warmup < 0) {
+                warmup = 0;
+            }
+
+            for (int i = 0; i < warmup; i++) {
+                runScenario(html, scenario);
+            }
 
             String profileOutput = System.getenv("HTML_TO_MARKDOWN_PROFILE_OUTPUT");
             if (profileOutput != null && !profileOutput.isBlank()) {
