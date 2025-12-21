@@ -1,12 +1,6 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import {
-	convertJson,
-	convertWithInlineImagesJson,
-	convertWithMetadataJson,
-	startProfiling,
-	stopProfiling,
-} from "html-to-markdown-node";
+import { convert, convertWithInlineImages, convertWithMetadata, startProfiling, stopProfiling } from "html-to-markdown-node";
 
 type Scenario =
 	| "convert-default"
@@ -71,27 +65,26 @@ const html = readFileSync(filePath, "utf8");
 const bytesProcessedPerIteration = Buffer.byteLength(html, "utf8");
 
 const conversionOptions = options.format === "hocr" ? { hocrSpatialTables: false } : undefined;
-const optionsJson = conversionOptions ? JSON.stringify(conversionOptions) : undefined;
 
 const runScenario = (): void => {
 	switch (options.scenario) {
 		case "convert-default":
-			convertJson(html, undefined);
+			convert(html);
 			break;
 		case "convert-options":
-			convertJson(html, optionsJson);
+			convert(html, conversionOptions);
 			break;
 		case "inline-images-default":
-			convertWithInlineImagesJson(html, undefined, undefined);
+			convertWithInlineImages(html, undefined, undefined);
 			break;
 		case "inline-images-options":
-			convertWithInlineImagesJson(html, optionsJson, undefined);
+			convertWithInlineImages(html, conversionOptions, undefined);
 			break;
 		case "metadata-default":
-			convertWithMetadataJson(html, undefined, undefined);
+			convertWithMetadata(html, undefined, undefined);
 			break;
 		case "metadata-options":
-			convertWithMetadataJson(html, optionsJson, undefined);
+			convertWithMetadata(html, conversionOptions, undefined);
 			break;
 		default:
 			throw new Error(`Unsupported scenario: ${options.scenario}`);
