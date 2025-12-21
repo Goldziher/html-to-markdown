@@ -53,7 +53,7 @@ impl ScriptAdapter {
         if cfg!(target_os = "windows") {
             return false;
         }
-        !matches!(self.language, ScriptLanguage::Wasm)
+        true
     }
 
     fn flamegraph_path(
@@ -182,6 +182,81 @@ impl ScriptAdapter {
             }
         }
     }
+
+    fn run_wasm_profile(
+        &self,
+        fixture: &Fixture,
+        scenario: BenchmarkScenario,
+        config: &BenchmarkConfig,
+        output: &Path,
+    ) -> Result<()> {
+        let output_dir = output.parent().unwrap_or(&config.output_dir).join(format!(
+            "wasm-profile-{}-{}",
+            fixture.id,
+            scenario.as_str()
+        ));
+        std::fs::create_dir_all(&output_dir)
+            .map_err(|err| Error::Benchmark(format!("Failed to create {}: {err}", output_dir.display())))?;
+
+        let iterations = fixture.iterations.unwrap_or(config.benchmark_iterations as u32).max(1) as usize;
+        let fixture_path = fixture.resolved_path(&self.repo_root);
+
+        let mut cmd = Command::new("pnpm");
+        cmd.arg("--filter")
+            .arg("html-to-markdown-wasm")
+            .arg("exec")
+            .arg("0x")
+            .arg("--output-dir")
+            .arg(&output_dir)
+            .arg("--")
+            .arg("tsx")
+            .arg("bin/benchmark.ts")
+            .arg("--file")
+            .arg(&fixture_path)
+            .arg("--iterations")
+            .arg(iterations.to_string())
+            .arg("--scenario")
+            .arg(scenario.as_str())
+            .arg("--format")
+            .arg(match fixture.format {
+                FixtureFormat::Html => "html",
+                FixtureFormat::Hocr => "hocr",
+            });
+
+        cmd.env("HTML_TO_MARKDOWN_BENCH_WARMUP", config.warmup_iterations.to_string());
+        cmd.stdout(Stdio::null()).stderr(Stdio::null());
+        cmd.current_dir(&self.repo_root);
+
+        let status = cmd
+            .status()
+            .map_err(|err| Error::Benchmark(format!("Failed to run wasm profiler: {err}")))?;
+        if !status.success() {
+            return Err(Error::Benchmark(format!("Wasm profiling failed with status {status}")));
+        }
+
+        let flamegraph = output_dir.join("flamegraph.svg");
+        if !flamegraph.exists() {
+            return Err(Error::Benchmark(format!(
+                "Wasm profiling did not produce {}",
+                flamegraph.display()
+            )));
+        }
+
+        if let Some(parent) = output.parent() {
+            std::fs::create_dir_all(parent)
+                .map_err(|err| Error::Benchmark(format!("Failed to create {}: {err}", parent.display())))?;
+        }
+
+        std::fs::copy(&flamegraph, output).map_err(|err| {
+            Error::Benchmark(format!(
+                "Failed to copy wasm flamegraph {} to {}: {err}",
+                flamegraph.display(),
+                output.display()
+            ))
+        })?;
+
+        Ok(())
+    }
 }
 
 impl FrameworkAdapter for ScriptAdapter {
@@ -225,15 +300,25 @@ impl FrameworkAdapter for ScriptAdapter {
         let iterations = fixture.iterations.unwrap_or(config.benchmark_iterations as u32).max(1) as usize;
 
         if let Some(output) = flamegraph_output_path.as_ref() {
-            command.env("HTML_TO_MARKDOWN_PROFILE_OUTPUT", output);
-            command.env("HTML_TO_MARKDOWN_PROFILE_ONCE", "true");
-            command.env(
-                "HTML_TO_MARKDOWN_PROFILE_FREQUENCY",
-                config.profile_frequency.to_string(),
-            );
-            command.env("HTML_TO_MARKDOWN_PROFILE_REPEAT", config.profile_repeat.to_string());
+            if matches!(self.language, ScriptLanguage::Wasm) {
+                self.run_wasm_profile(fixture, scenario, config, output)?;
+            } else {
+                command.env("HTML_TO_MARKDOWN_PROFILE_OUTPUT", output);
+                command.env("HTML_TO_MARKDOWN_PROFILE_ONCE", "true");
+                command.env(
+                    "HTML_TO_MARKDOWN_PROFILE_FREQUENCY",
+                    config.profile_frequency.to_string(),
+                );
+                let repeat = if matches!(self.language, ScriptLanguage::Elixir) {
+                    config.profile_repeat.max(5)
+                } else {
+                    config.profile_repeat
+                };
+                command.env("HTML_TO_MARKDOWN_PROFILE_REPEAT", repeat.to_string());
+            }
         }
 
+        command.env("HTML_TO_MARKDOWN_BENCH_WARMUP", config.warmup_iterations.to_string());
         command.env("HTML_TO_MARKDOWN_FAST_FFI", "1");
 
         command

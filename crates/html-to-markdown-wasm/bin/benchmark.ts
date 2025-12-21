@@ -20,6 +20,7 @@ type Scenario =
 interface Args {
   file: string;
   iterations: number;
+  warmup: number;
   format: Format;
   scenario: Scenario;
 }
@@ -28,6 +29,7 @@ function parseArgs(): Args {
   const args = process.argv.slice(2);
   const parsed: Partial<Args> = {
     iterations: 50,
+    warmup: 1,
     format: "html",
     scenario: "convert-default",
   };
@@ -42,6 +44,14 @@ function parseArgs(): Args {
       parsed.scenario = (args[++i] ?? "convert-default") as Scenario;
     } else if (arg === "--format") {
       parsed.format = (args[++i] ?? "html").toLowerCase() as Format;
+    }
+  }
+
+  const warmupEnv = process.env.HTML_TO_MARKDOWN_BENCH_WARMUP;
+  if (warmupEnv) {
+    const parsedWarmup = Number.parseInt(warmupEnv, 10);
+    if (Number.isFinite(parsedWarmup)) {
+      parsed.warmup = Math.max(0, parsedWarmup);
     }
   }
 
@@ -109,7 +119,9 @@ function main() {
   const htmlBytes = new TextEncoder().encode(html);
   const options = buildOptions(args.format);
 
-  runScenario(htmlBytes, args.scenario, options);
+  for (let i = 0; i < (args.warmup ?? 1); i += 1) {
+    runScenario(htmlBytes, args.scenario, options);
+  }
 
   const start = process.hrtime.bigint();
   for (let i = 0; i < args.iterations; i += 1) {
