@@ -42,7 +42,7 @@
 //! ```
 
 use lru::LruCache;
-use std::cell::RefCell;
+use std::cell::{OnceCell, RefCell};
 use std::collections::BTreeMap;
 #[cfg(feature = "inline-images")]
 use std::rc::Rc;
@@ -240,7 +240,7 @@ fn is_loose_list(node_handle: &tl::NodeHandle, parser: &tl::Parser, dom_ctx: &Do
             {
                 for child_handle in children.top().iter() {
                     let is_li = dom_ctx
-                        .tag_info(child_handle.get_inner())
+                        .tag_info(child_handle.get_inner(), parser)
                         .map(|info| info.name == "li")
                         .unwrap_or_else(|| {
                             matches!(
@@ -257,7 +257,7 @@ fn is_loose_list(node_handle: &tl::NodeHandle, parser: &tl::Parser, dom_ctx: &Do
                         let li_children = child_tag.children();
                         for li_child_handle in li_children.top().iter() {
                             let is_p = dom_ctx
-                                .tag_info(li_child_handle.get_inner())
+                                .tag_info(li_child_handle.get_inner(), parser)
                                 .map(|info| info.name == "p")
                                 .unwrap_or_else(|| {
                                     matches!(
@@ -463,7 +463,7 @@ fn process_list_children(
 }
 
 fn is_list_item(node_handle: &tl::NodeHandle, parser: &tl::Parser, dom_ctx: &DomContext) -> bool {
-    if let Some(info) = dom_ctx.tag_info(node_handle.get_inner()) {
+    if let Some(info) = dom_ctx.tag_info(node_handle.get_inner(), parser) {
         return info.name == "li";
     }
     matches!(
@@ -537,7 +537,7 @@ struct DomContext {
     sibling_index_map: Vec<Option<usize>>,
     root_children: Vec<tl::NodeHandle>,
     node_map: Vec<Option<tl::NodeHandle>>,
-    tag_info_map: Vec<Option<TagInfo>>,
+    tag_info_map: Vec<OnceCell<Option<TagInfo>>>,
     text_cache: RefCell<LruCache<u32, String>>,
 }
 
@@ -552,7 +552,7 @@ impl DomContext {
             self.children_map.resize_with(new_len, || None);
             self.sibling_index_map.resize_with(new_len, || None);
             self.node_map.resize(new_len, None);
-            self.tag_info_map.resize_with(new_len, || None);
+            self.tag_info_map.resize_with(new_len, OnceCell::new);
         }
     }
 
@@ -574,8 +574,28 @@ impl DomContext {
         self.sibling_index_map.get(id as usize).copied().flatten()
     }
 
-    fn tag_info(&self, id: u32) -> Option<&TagInfo> {
-        self.tag_info_map.get(id as usize).and_then(|info| info.as_ref())
+    fn tag_info(&self, id: u32, parser: &tl::Parser) -> Option<&TagInfo> {
+        self.tag_info_map
+            .get(id as usize)
+            .and_then(|cell| cell.get_or_init(|| self.build_tag_info(id, parser)).as_ref())
+    }
+
+    fn build_tag_info(&self, id: u32, parser: &tl::Parser) -> Option<TagInfo> {
+        let node_handle = self.node_handle(id)?;
+        match node_handle.get(parser) {
+            Some(tl::Node::Tag(tag)) => {
+                let name = normalized_tag_name(tag.name().as_utf8_str()).into_owned();
+                let is_inline = is_inline_element(&name);
+                let is_inline_like = is_inline || matches!(name.as_str(), "script" | "style");
+                let is_block = is_block_level_name(&name, is_inline);
+                Some(TagInfo {
+                    name,
+                    is_inline_like,
+                    is_block,
+                })
+            }
+            _ => None,
+        }
     }
 
     fn text_content(&self, node_handle: &tl::NodeHandle, parser: &tl::Parser) -> String {
@@ -901,8 +921,8 @@ fn build_dom_context(dom: &tl::VDom, parser: &tl::Parser, input_len: usize) -> D
 }
 
 fn text_cache_capacity_for_input(input_len: usize) -> NonZeroUsize {
-    let target = (input_len / 512).clamp(128, TEXT_CACHE_CAPACITY);
-    NonZeroUsize::new(target).unwrap_or_else(|| NonZeroUsize::new(128).unwrap())
+    let target = (input_len / 1024).clamp(32, TEXT_CACHE_CAPACITY);
+    NonZeroUsize::new(target).unwrap_or_else(|| NonZeroUsize::new(32).unwrap())
 }
 
 /// Round-trip HTML through html5ever to repair malformed trees.
@@ -971,27 +991,15 @@ fn record_node_hierarchy(node_handle: &tl::NodeHandle, parent: Option<u32>, pars
     ctx.parent_map[id as usize] = parent;
     ctx.node_map[id as usize] = Some(*node_handle);
 
-    if let Some(node) = node_handle.get(parser) {
-        if let tl::Node::Tag(tag) = node {
-            let name = normalized_tag_name(tag.name().as_utf8_str()).into_owned();
-            let is_inline = is_inline_element(&name);
-            let is_inline_like = is_inline || matches!(name.as_str(), "script" | "style");
-            let is_block = is_block_level_name(&name, is_inline);
-            ctx.tag_info_map[id as usize] = Some(TagInfo {
-                name,
-                is_inline_like,
-                is_block,
-            });
-
-            let children: Vec<_> = tag.children().top().iter().copied().collect();
-            for (index, child) in children.iter().enumerate() {
-                let child_id = child.get_inner();
-                ctx.ensure_capacity(child_id);
-                ctx.sibling_index_map[child_id as usize] = Some(index);
-                record_node_hierarchy(child, Some(id), parser, ctx);
-            }
-            ctx.children_map[id as usize] = Some(children);
+    if let Some(tl::Node::Tag(tag)) = node_handle.get(parser) {
+        let children: Vec<_> = tag.children().top().iter().copied().collect();
+        for (index, child) in children.iter().enumerate() {
+            let child_id = child.get_inner();
+            ctx.ensure_capacity(child_id);
+            ctx.sibling_index_map[child_id as usize] = Some(index);
+            record_node_hierarchy(child, Some(id), parser, ctx);
         }
+        ctx.children_map[id as usize] = Some(children);
     }
 }
 
@@ -1268,7 +1276,7 @@ fn is_empty_inline_element(node_handle: &tl::NodeHandle, parser: &tl::Parser, do
     ];
 
     let tag_name: Option<Cow<'_, str>> = dom_ctx
-        .tag_info(node_handle.get_inner())
+        .tag_info(node_handle.get_inner(), parser)
         .map(|info| Cow::Borrowed(info.name.as_str()))
         .or_else(|| {
             if let Some(tl::Node::Tag(tag)) = node_handle.get(parser) {
@@ -1312,7 +1320,7 @@ fn collect_link_label_text(
                 }
                 tl::Node::Tag(tag) => {
                     let is_block = dom_ctx
-                        .tag_info(handle.get_inner())
+                        .tag_info(handle.get_inner(), parser)
                         .map(|info| info.is_block)
                         .unwrap_or_else(|| {
                             let tag_name = normalized_tag_name(tag.name().as_utf8_str());
@@ -2290,7 +2298,7 @@ fn should_drop_for_preprocessing(
 fn has_semantic_content_ancestor(node_handle: &tl::NodeHandle, parser: &tl::Parser, dom_ctx: &DomContext) -> bool {
     let mut current_id = node_handle.get_inner();
     while let Some(parent_id) = dom_ctx.parent_of(current_id) {
-        if let Some(parent_info) = dom_ctx.tag_info(parent_id) {
+        if let Some(parent_info) = dom_ctx.tag_info(parent_id, parser) {
             if matches!(parent_info.name.as_str(), "main" | "article" | "section") {
                 return true;
             }
@@ -2774,7 +2782,7 @@ fn get_next_sibling_tag<'a>(
         .or_else(|| siblings.iter().position(|handle| handle.get_inner() == id))?;
 
     for sibling in siblings.iter().skip(position + 1) {
-        if let Some(info) = dom_ctx.tag_info(sibling.get_inner()) {
+        if let Some(info) = dom_ctx.tag_info(sibling.get_inner(), parser) {
             return Some(info.name.as_str());
         }
         if let Some(node) = sibling.get(parser) {
@@ -2808,7 +2816,7 @@ fn get_previous_sibling_tag<'a>(
         .or_else(|| siblings.iter().position(|handle| handle.get_inner() == id))?;
 
     for sibling in siblings.iter().take(position).rev() {
-        if let Some(info) = dom_ctx.tag_info(sibling.get_inner()) {
+        if let Some(info) = dom_ctx.tag_info(sibling.get_inner(), parser) {
             return Some(info.name.as_str());
         }
         if let Some(node) = sibling.get(parser) {
@@ -2845,7 +2853,7 @@ fn previous_sibling_is_inline_tag(node_handle: &tl::NodeHandle, parser: &tl::Par
     };
 
     for sibling in siblings.iter().take(position).rev() {
-        if let Some(info) = dom_ctx.tag_info(sibling.get_inner()) {
+        if let Some(info) = dom_ctx.tag_info(sibling.get_inner(), parser) {
             return info.is_inline_like;
         }
         if let Some(node) = sibling.get(parser) {
@@ -2917,7 +2925,7 @@ fn next_sibling_is_inline_tag(node_handle: &tl::NodeHandle, parser: &tl::Parser,
     };
 
     for sibling in siblings.iter().skip(position + 1) {
-        if let Some(info) = dom_ctx.tag_info(sibling.get_inner()) {
+        if let Some(info) = dom_ctx.tag_info(sibling.get_inner(), parser) {
             return info.is_inline_like;
         }
         if let Some(node) = sibling.get(parser) {
@@ -3148,7 +3156,7 @@ fn walk_node(
         }
 
         tl::Node::Tag(tag) => {
-            let tag_name = match dom_ctx.tag_info(node_handle.get_inner()) {
+            let tag_name = match dom_ctx.tag_info(node_handle.get_inner(), parser) {
                 Some(info) => Cow::Borrowed(info.name.as_str()),
                 None => normalized_tag_name(tag.name().as_utf8_str()),
             };
@@ -4345,7 +4353,7 @@ fn walk_node(
                     let children = tag.children();
                     {
                         for child_handle in children.top().iter() {
-                            if let Some(info) = dom_ctx.tag_info(child_handle.get_inner()) {
+                            if let Some(info) = dom_ctx.tag_info(child_handle.get_inner(), parser) {
                                 if matches!(
                                     info.name.as_str(),
                                     "p" | "div" | "blockquote" | "pre" | "table" | "hr" | "dl"
@@ -5995,7 +6003,7 @@ fn collect_table_cells(
     if let Some(tl::Node::Tag(tag)) = node_handle.get(parser) {
         let children = tag.children();
         for child_handle in children.top().iter() {
-            if let Some(info) = dom_ctx.tag_info(child_handle.get_inner()) {
+            if let Some(info) = dom_ctx.tag_info(child_handle.get_inner(), parser) {
                 if info.name == "th" || info.name == "td" {
                     cells.push(*child_handle);
                 }
@@ -6020,7 +6028,7 @@ fn table_total_columns(node_handle: &tl::NodeHandle, parser: &tl::Parser, dom_ct
         for child_handle in children.top().iter() {
             if let Some(tl::Node::Tag(child_tag)) = child_handle.get(parser) {
                 let tag_name: Cow<'_, str> = dom_ctx
-                    .tag_info(child_handle.get_inner())
+                    .tag_info(child_handle.get_inner(), parser)
                     .map(|info| Cow::Borrowed(info.name.as_str()))
                     .unwrap_or_else(|| normalized_tag_name(child_tag.name().as_utf8_str()).into_owned().into());
                 match tag_name.as_ref() {
@@ -6052,7 +6060,7 @@ fn table_total_columns(node_handle: &tl::NodeHandle, parser: &tl::Parser, dom_ct
 }
 
 fn is_tag_name(node_handle: &tl::NodeHandle, parser: &tl::Parser, dom_ctx: &DomContext, name: &str) -> bool {
-    if let Some(info) = dom_ctx.tag_info(node_handle.get_inner()) {
+    if let Some(info) = dom_ctx.tag_info(node_handle.get_inner(), parser) {
         return info.name == name;
     }
     matches!(
@@ -6251,7 +6259,7 @@ fn scan_table_node(
             }
             tl::Node::Tag(tag) => {
                 let tag_name: Cow<'_, str> = dom_ctx
-                    .tag_info(node_handle.get_inner())
+                    .tag_info(node_handle.get_inner(), parser)
                     .map(|info| Cow::Borrowed(info.name.as_str()))
                     .unwrap_or_else(|| normalized_tag_name(tag.name().as_utf8_str()).into_owned().into());
 
@@ -6265,7 +6273,7 @@ fn scan_table_node(
                         for child in tag.children().top().iter() {
                             if let Some(tl::Node::Tag(cell_tag)) = child.get(parser) {
                                 let cell_name: Cow<'_, str> = dom_ctx
-                                    .tag_info(child.get_inner())
+                                    .tag_info(child.get_inner(), parser)
                                     .map(|info| Cow::Borrowed(info.name.as_str()))
                                     .unwrap_or_else(|| {
                                         normalized_tag_name(cell_tag.name().as_utf8_str()).into_owned().into()
@@ -6309,7 +6317,7 @@ fn append_layout_row(
         for cell_handle in row_children.top().iter() {
             if let Some(tl::Node::Tag(cell_tag)) = cell_handle.get(parser) {
                 let cell_name: Cow<'_, str> = dom_ctx
-                    .tag_info(cell_handle.get_inner())
+                    .tag_info(cell_handle.get_inner(), parser)
                     .map(|info| Cow::Borrowed(info.name.as_str()))
                     .unwrap_or_else(|| normalized_tag_name(cell_tag.name().as_utf8_str()).into_owned().into());
                 if matches!(cell_name.as_ref(), "td" | "th") {
@@ -6439,7 +6447,7 @@ fn convert_table(
             for child_handle in children.top().iter() {
                 if let Some(tl::Node::Tag(child_tag)) = child_handle.get(parser) {
                     let tag_name: Cow<'_, str> = dom_ctx
-                        .tag_info(child_handle.get_inner())
+                        .tag_info(child_handle.get_inner(), parser)
                         .map(|info| Cow::Borrowed(info.name.as_str()))
                         .unwrap_or_else(|| normalized_tag_name(child_tag.name().as_utf8_str()).into_owned().into());
 
