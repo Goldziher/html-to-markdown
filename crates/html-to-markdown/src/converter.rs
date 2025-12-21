@@ -580,6 +580,16 @@ impl DomContext {
             .and_then(|cell| cell.get_or_init(|| self.build_tag_info(id, parser)).as_ref())
     }
 
+    fn tag_name_for<'a>(&'a self, node_handle: &tl::NodeHandle, parser: &'a tl::Parser) -> Option<Cow<'a, str>> {
+        if let Some(info) = self.tag_info(node_handle.get_inner(), parser) {
+            return Some(Cow::Borrowed(info.name.as_str()));
+        }
+        if let Some(tl::Node::Tag(tag)) = node_handle.get(parser) {
+            return Some(normalized_tag_name(tag.name().as_utf8_str()));
+        }
+        None
+    }
+
     fn build_tag_info(&self, id: u32, parser: &tl::Parser) -> Option<TagInfo> {
         let node_handle = self.node_handle(id)?;
         match node_handle.get(parser) {
@@ -5810,8 +5820,7 @@ fn walk_node(
                 "head" => {
                     let children = tag.children();
                     let has_body_like = children.top().iter().any(|child_handle| {
-                        if let Some(tl::Node::Tag(child_tag)) = child_handle.get(parser) {
-                            let child_name = normalized_tag_name(child_tag.name().as_utf8_str());
+                        if let Some(child_name) = dom_ctx.tag_name_for(child_handle, parser) {
                             matches!(
                                 child_name.as_ref(),
                                 "body" | "main" | "article" | "section" | "div" | "p"
@@ -5826,7 +5835,9 @@ fn walk_node(
                         if let Some(ref collector) = ctx.metadata_collector {
                             for child_handle in children.top().iter() {
                                 if let Some(tl::Node::Tag(child_tag)) = child_handle.get(parser) {
-                                    let child_name = normalized_tag_name(child_tag.name().as_utf8_str());
+                                    let child_name = dom_ctx
+                                        .tag_name_for(child_handle, parser)
+                                        .unwrap_or_else(|| normalized_tag_name(child_tag.name().as_utf8_str()));
                                     if child_name.as_ref() == "script" {
                                         if let Some(type_attr) = child_tag.attributes().get("type").flatten() {
                                             let type_value = type_attr.as_utf8_str();
@@ -6029,15 +6040,8 @@ fn collect_table_cells(
     if let Some(tl::Node::Tag(tag)) = node_handle.get(parser) {
         let children = tag.children();
         for child_handle in children.top().iter() {
-            if let Some(info) = dom_ctx.tag_info(child_handle.get_inner(), parser) {
-                if info.name == "th" || info.name == "td" {
-                    cells.push(*child_handle);
-                }
-                continue;
-            }
-            if let Some(tl::Node::Tag(child_tag)) = child_handle.get(parser) {
-                let cell_name = normalized_tag_name(child_tag.name().as_utf8_str());
-                if cell_name == "th" || cell_name == "td" {
+            if let Some(cell_name) = dom_ctx.tag_name_for(child_handle, parser) {
+                if cell_name.as_ref() == "th" || cell_name.as_ref() == "td" {
                     cells.push(*child_handle);
                 }
             }
@@ -6053,10 +6057,9 @@ fn table_total_columns(node_handle: &tl::NodeHandle, parser: &tl::Parser, dom_ct
         let children = tag.children();
         for child_handle in children.top().iter() {
             if let Some(tl::Node::Tag(child_tag)) = child_handle.get(parser) {
-                let tag_name: Cow<'_, str> = dom_ctx
-                    .tag_info(child_handle.get_inner(), parser)
-                    .map(|info| Cow::Borrowed(info.name.as_str()))
-                    .unwrap_or_else(|| normalized_tag_name(child_tag.name().as_utf8_str()).into_owned().into());
+                let tag_name = dom_ctx
+                    .tag_name_for(child_handle, parser)
+                    .unwrap_or_else(|| normalized_tag_name(child_tag.name().as_utf8_str()));
                 match tag_name.as_ref() {
                     "thead" | "tbody" | "tfoot" => {
                         for row_handle in child_tag.children().top().iter() {
