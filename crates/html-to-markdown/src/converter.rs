@@ -3178,12 +3178,13 @@ fn walk_node(
             };
 
             if ctx.in_list_item && processed_text.contains("\n\n") {
-                let parts: Vec<&str> = processed_text.split("\n\n").collect();
-                for (i, part) in parts.iter().enumerate() {
-                    if i > 0 {
+                let mut first = true;
+                for part in processed_text.split("\n\n") {
+                    if !first {
                         output.push_str("\n\n");
                         output.push_str(&" ".repeat(4 * ctx.list_depth));
                     }
+                    first = false;
                     output.push_str(part.trim());
                 }
             } else {
