@@ -220,7 +220,9 @@ fn convert_with_inline_images<'a>(
         Err(err) => return handle_invalid_option_error(env, err),
     };
 
-    match profiling::maybe_profile(|| convert_with_inline_images_inner(&html, Some(options), config)) {
+    let options = options.clone();
+    let config = config.clone();
+    match profiling::maybe_profile(|| convert_with_inline_images_inner(&html, Some(options.clone()), config.clone())) {
         Ok(HtmlExtraction {
             markdown,
             inline_images,
@@ -261,7 +263,9 @@ fn convert_with_metadata<'a>(
         Err(err) => return handle_invalid_option_error(env, err),
     };
 
-    match profiling::maybe_profile(|| convert_with_metadata_inner(&html, Some(options), config)) {
+    let options = options.clone();
+    let config = config.clone();
+    match profiling::maybe_profile(|| convert_with_metadata_inner(&html, Some(options.clone()), config.clone())) {
         Ok((markdown, metadata)) => Ok((atoms::ok(), (markdown, build_metadata(metadata))).encode(env)),
         Err(err) => Ok((atoms::error(), err.to_string()).encode(env)),
     }

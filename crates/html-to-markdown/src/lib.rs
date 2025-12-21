@@ -91,37 +91,6 @@ fn fast_text_only(html: &str) -> Option<String> {
     Some(output)
 }
 
-#[cfg(feature = "inline-images")]
-fn has_inline_image_targets(html: &str) -> bool {
-    let bytes = html.as_bytes();
-    contains_ascii_case_insensitive(bytes, b"<svg") || contains_ascii_case_insensitive(bytes, b"data:")
-}
-
-fn contains_ascii_case_insensitive(haystack: &[u8], needle: &[u8]) -> bool {
-    if needle.is_empty() || haystack.len() < needle.len() {
-        return false;
-    }
-
-    let needle_len = needle.len();
-    let max = haystack.len() - needle_len;
-    for start in 0..=max {
-        if !haystack[start].eq_ignore_ascii_case(&needle[0]) {
-            continue;
-        }
-        let mut matched = true;
-        for i in 1..needle_len {
-            if !haystack[start + i].eq_ignore_ascii_case(&needle[i]) {
-                matched = false;
-                break;
-            }
-        }
-        if matched {
-            return true;
-        }
-    }
-    false
-}
-
 #[cfg(any(feature = "serde", feature = "metadata"))]
 fn parse_json<T: serde::de::DeserializeOwned>(json: &str) -> Result<T> {
     serde_json::from_str(json).map_err(|err| ConversionError::ConfigError(err.to_string()))
@@ -209,21 +178,6 @@ pub fn convert_with_inline_images(
     let options = options.unwrap_or_default();
 
     let normalized_html = normalize_line_endings(html);
-
-    if !has_inline_image_targets(normalized_html.as_ref()) {
-        let markdown = converter::convert_html(normalized_html.as_ref(), &options)?;
-        let markdown = if options.wrap {
-            wrapper::wrap_markdown(&markdown, &options)
-        } else {
-            markdown
-        };
-
-        return Ok(HtmlExtraction {
-            markdown,
-            inline_images: Vec::new(),
-            warnings: Vec::new(),
-        });
-    }
 
     let collector = Rc::new(RefCell::new(inline_images::InlineImageCollector::new(image_cfg)?));
 
