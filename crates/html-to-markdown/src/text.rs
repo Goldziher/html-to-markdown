@@ -39,6 +39,64 @@ pub fn escape(
         return String::new();
     }
 
+    if !escape_misc && !escape_asterisks && !escape_underscores && !escape_ascii {
+        return text.to_string();
+    }
+
+    if escape_ascii
+        && !text.as_bytes().iter().any(|b| {
+            matches!(
+                b,
+                b'!' | b'"'
+                    | b'#'
+                    | b'$'
+                    | b'%'
+                    | b'&'
+                    | b'\''
+                    | b'('
+                    | b')'
+                    | b'*'
+                    | b'+'
+                    | b','
+                    | b'-'
+                    | b'.'
+                    | b'/'
+                    | b':'
+                    | b';'
+                    | b'<'
+                    | b'='
+                    | b'>'
+                    | b'?'
+                    | b'@'
+                    | b'['
+                    | b'\\'
+                    | b']'
+                    | b'^'
+                    | b'_'
+                    | b'`'
+                    | b'{'
+                    | b'|'
+                    | b'}'
+                    | b'~'
+            )
+        })
+    {
+        return text.to_string();
+    }
+
+    if !escape_ascii && escape_misc && !escape_asterisks && !escape_underscores {
+        let needs_misc = text.as_bytes().iter().any(|b| {
+            matches!(
+                b,
+                b'\\' | b'&' | b'<' | b'`' | b'[' | b']' | b'>' | b'~' | b'#' | b'=' | b'+' | b'|' | b'-'
+            )
+        });
+        let needs_numbered = text.as_bytes().iter().any(|b| matches!(b, b'.' | b')'));
+        if !needs_misc && !needs_numbered {
+            return text.to_string();
+        }
+    }
+
     let mut result = text.to_string();
 
     if escape_ascii {
