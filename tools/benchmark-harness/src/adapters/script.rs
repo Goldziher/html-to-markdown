@@ -649,10 +649,23 @@ fn ensure_java_jar(repo_root: &Path) -> Result<()> {
         "-Dgpg.skip=true",
         "-Dmaven.javadoc.skip=true",
     ];
+    let java_release = env::var("HTML_TO_MARKDOWN_JAVA_RELEASE")
+        .ok()
+        .and_then(|value| value.trim().parse::<u32>().ok())
+        .unwrap_or(25);
+    if let Some(version) = detect_java_release() {
+        if version < java_release {
+            return Err(Error::Benchmark(format!(
+                "Java {java_release}+ required for benchmarks (found {version})."
+            )));
+        }
+    }
+    let release_flag = format!("-Dmaven.compiler.release={java_release}");
 
     let lib_status = Command::new(&mvn_cmd)
         .arg("install")
         .args(maven_skip_args)
+        .arg(&release_flag)
         .env("MAVEN_OPTS", &maven_opts)
         .current_dir(&java_dir)
         .status()
@@ -670,6 +683,7 @@ fn ensure_java_jar(repo_root: &Path) -> Result<()> {
         .arg("clean")
         .arg("package")
         .args(maven_skip_args)
+        .arg(&release_flag)
         .env("MAVEN_OPTS", &maven_opts)
         .current_dir(&java_dir)
         .status()
@@ -682,6 +696,24 @@ fn ensure_java_jar(repo_root: &Path) -> Result<()> {
             "Java benchmark JAR build failed with status {status}"
         )))
     }
+}
+
+fn detect_java_release() -> Option<u32> {
+    let output = Command::new("java").arg("-version").output().ok()?;
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let text = if stderr.is_empty() { stdout } else { stderr };
+    let mut digits = String::new();
+    let mut started = false;
+    for ch in text.chars() {
+        if ch.is_ascii_digit() {
+            digits.push(ch);
+            started = true;
+        } else if started {
+            break;
+        }
+    }
+    if digits.is_empty() { None } else { digits.parse().ok() }
 }
 
 fn ensure_csharp_dll(repo_root: &Path) -> Result<()> {
