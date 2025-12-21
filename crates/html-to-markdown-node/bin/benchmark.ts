@@ -1,237 +1,144 @@
-#!/usr/bin/env tsx
-import fs from "node:fs";
-import path from "node:path";
-import { createRequire } from "node:module";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
+import {
+	convertJson,
+	convertWithInlineImagesJson,
+	convertWithMetadataJson,
+	startProfiling,
+	stopProfiling,
+} from "html-to-markdown-node";
 
-const require = createRequire(import.meta.url);
-const {
-  convertBuffer,
-  convertBufferWithOptionsHandle,
-  convertInlineImagesBuffer,
-  convertInlineImagesBufferWithOptionsHandle,
-  convertWithMetadataBuffer,
-  convertWithMetadataBufferWithOptionsHandle,
-  convertWithMetadataBufferWithMetadataHandle,
-  convertWithMetadataBufferWithOptionsAndMetadataHandle,
-  createConversionOptionsHandle,
-  createMetadataConfigHandle,
-  startProfiling,
-  stopProfiling,
-} = require("../index.js") as {
-  convertBuffer: (html: Buffer, options?: Record<string, unknown>) => string;
-  convertBufferWithOptionsHandle: (html: Buffer, options: unknown) => string;
-  convertInlineImagesBuffer: (
-    html: Buffer,
-    options?: Record<string, unknown>,
-    imageConfig?: Record<string, unknown>,
-  ) => { markdown: string };
-  convertInlineImagesBufferWithOptionsHandle: (
-    html: Buffer,
-    options: unknown,
-    imageConfig?: Record<string, unknown>,
-  ) => { markdown: string };
-  convertWithMetadataBuffer: (
-    html: Buffer,
-    options?: Record<string, unknown>,
-    metadataConfig?: Record<string, unknown>,
-  ) => { markdown: string };
-  convertWithMetadataBufferWithOptionsHandle: (
-    html: Buffer,
-    options: unknown,
-    metadataConfig?: Record<string, unknown>,
-  ) => { markdown: string };
-  convertWithMetadataBufferWithMetadataHandle: (html: Buffer, metadataConfig: unknown) => { markdown: string };
-  convertWithMetadataBufferWithOptionsAndMetadataHandle: (
-    html: Buffer,
-    options: unknown,
-    metadataConfig: unknown,
-  ) => { markdown: string };
-  createConversionOptionsHandle: (options?: Record<string, unknown>) => unknown;
-  createMetadataConfigHandle: (config?: Record<string, unknown>) => unknown;
-  startProfiling?: (outputPath: string, frequency?: number) => void;
-  stopProfiling?: () => void;
+type Scenario =
+	| "convert-default"
+	| "convert-options"
+	| "inline-images-default"
+	| "inline-images-options"
+	| "metadata-default"
+	| "metadata-options";
+
+const args = process.argv.slice(2);
+const options: {
+	file?: string;
+	iterations: number;
+	format: "html" | "hocr";
+	scenario: Scenario;
+} = {
+	iterations: 50,
+	format: "html",
+	scenario: "convert-default",
 };
 
-type Format = "html" | "hocr";
-type Scenario =
-  | "convert-default"
-  | "convert-options"
-  | "inline-images-default"
-  | "inline-images-options"
-  | "metadata-default"
-  | "metadata-options";
-
-interface Args {
-  file: string;
-  iterations: number;
-  format: Format;
-  scenario: Scenario;
+for (let i = 0; i < args.length; i += 1) {
+	const arg = args[i];
+	if (arg === "--file" && args[i + 1]) {
+		options.file = args[i + 1];
+		i += 1;
+	} else if (arg === "--iterations" && args[i + 1]) {
+		options.iterations = Math.max(1, Number.parseInt(args[i + 1] ?? "1", 10) || 1);
+		i += 1;
+	} else if (arg === "--format" && args[i + 1]) {
+		const format = args[i + 1]?.toLowerCase();
+		if (format === "html" || format === "hocr") {
+			options.format = format;
+		}
+		i += 1;
+	} else if (arg === "--scenario" && args[i + 1]) {
+		options.scenario = args[i + 1] as Scenario;
+		i += 1;
+	}
 }
 
-function parseArgs(): Args {
-  const args = process.argv.slice(2);
-  const parsed: Partial<Args> = {
-    iterations: 50,
-    format: "html",
-    scenario: "convert-default",
-  };
-
-  for (let i = 0; i < args.length; i += 1) {
-    const arg = args[i];
-    if (arg === "--file") {
-      parsed.file = args[++i];
-    } else if (arg === "--iterations") {
-      parsed.iterations = Math.max(1, Number.parseInt(args[++i] ?? "1", 10));
-    } else if (arg === "--scenario") {
-      parsed.scenario = (args[++i] ?? "convert-default") as Scenario;
-    } else if (arg === "--format") {
-      parsed.format = (args[++i] ?? "html").toLowerCase() as Format;
-    }
-  }
-
-  if (!parsed.file) {
-    throw new Error("Missing --file parameter");
-  }
-  if (!["html", "hocr"].includes(parsed.format ?? "")) {
-    throw new Error(`Unsupported format: ${parsed.format}`);
-  }
-  if (
-    ![
-      "convert-default",
-      "convert-options",
-      "inline-images-default",
-      "inline-images-options",
-      "metadata-default",
-      "metadata-options",
-    ].includes(parsed.scenario ?? "")
-  ) {
-    throw new Error(`Unsupported scenario: ${parsed.scenario}`);
-  }
-
-  return parsed as Args;
+if (!options.file) {
+	console.error("Error: --file is required");
+	process.exit(1);
 }
 
-function buildOptions(format: Format) {
-  if (format === "hocr") {
-    return { hocrSpatialTables: false };
-  }
-  return {};
+const supportedScenarios: Scenario[] = [
+	"convert-default",
+	"convert-options",
+	"inline-images-default",
+	"inline-images-options",
+	"metadata-default",
+	"metadata-options",
+];
+if (!supportedScenarios.includes(options.scenario)) {
+	console.error(`Unsupported scenario: ${options.scenario}`);
+	process.exit(1);
 }
 
-function buildMetadataConfig() {
-  return {
-    extract_document: true,
-    extract_headers: true,
-    extract_links: true,
-    extract_images: true,
-    extract_structured_data: true,
-  };
+const filePath = resolve(options.file);
+const html = readFileSync(filePath, "utf8");
+const bytesProcessedPerIteration = Buffer.byteLength(html, "utf8");
+
+const conversionOptions = options.format === "hocr" ? { hocrSpatialTables: false } : undefined;
+const optionsJson = conversionOptions ? JSON.stringify(conversionOptions) : undefined;
+
+const runScenario = (): void => {
+	switch (options.scenario) {
+		case "convert-default":
+			convertJson(html, undefined);
+			break;
+		case "convert-options":
+			convertJson(html, optionsJson);
+			break;
+		case "inline-images-default":
+			convertWithInlineImagesJson(html, undefined, undefined);
+			break;
+		case "inline-images-options":
+			convertWithInlineImagesJson(html, optionsJson, undefined);
+			break;
+		case "metadata-default":
+			convertWithMetadataJson(html, undefined, undefined);
+			break;
+		case "metadata-options":
+			convertWithMetadataJson(html, optionsJson, undefined);
+			break;
+		default:
+			throw new Error(`Unsupported scenario: ${options.scenario}`);
+	}
+};
+
+const warmup = Math.max(
+	0,
+	Number.parseInt(process.env.HTML_TO_MARKDOWN_BENCH_WARMUP ?? "0", 10) || 0,
+);
+for (let i = 0; i < warmup; i += 1) {
+	runScenario();
 }
 
-function runScenario(
-  html: Buffer,
-  scenario: Scenario,
-  options: Record<string, unknown>,
-  handle: unknown | null,
-  metadataHandle: unknown | null,
-) {
-  switch (scenario) {
-    case "convert-default":
-      convertBuffer(html);
-      break;
-    case "convert-options":
-      if (!handle) {
-        throw new Error("Options handle required for convert-options scenario");
-      }
-      convertBufferWithOptionsHandle(html, handle);
-      break;
-    case "inline-images-default":
-      convertInlineImagesBuffer(html);
-      break;
-    case "inline-images-options":
-      if (!handle) {
-        throw new Error("Options handle required for inline-images-options scenario");
-      }
-      convertInlineImagesBufferWithOptionsHandle(html, handle);
-      break;
-    case "metadata-default":
-      if (metadataHandle) {
-        convertWithMetadataBufferWithMetadataHandle(html, metadataHandle);
-      } else {
-        convertWithMetadataBuffer(html, undefined, buildMetadataConfig());
-      }
-      break;
-    case "metadata-options":
-      if (!handle) {
-        throw new Error("Options handle required for metadata-options scenario");
-      }
-      if (metadataHandle) {
-        convertWithMetadataBufferWithOptionsAndMetadataHandle(html, handle, metadataHandle);
-      } else {
-        convertWithMetadataBufferWithOptionsHandle(html, handle, buildMetadataConfig());
-      }
-      break;
-  }
+const profileOutput = process.env.HTML_TO_MARKDOWN_PROFILE_OUTPUT;
+if (profileOutput) {
+	const frequency = Math.max(
+		1,
+		Number.parseInt(process.env.HTML_TO_MARKDOWN_PROFILE_FREQUENCY ?? "1000", 10) || 1000,
+	);
+	startProfiling(profileOutput, frequency);
 }
 
-function main() {
-  const args = parseArgs();
-  const fixturePath = path.resolve(process.cwd(), args.file);
+const start = process.hrtime.bigint();
+for (let i = 0; i < options.iterations; i += 1) {
+	runScenario();
+}
+const elapsedSeconds = Number(process.hrtime.bigint() - start) / 1_000_000_000;
 
-  if (!fs.existsSync(fixturePath)) {
-    throw new Error(`Fixture not found: ${fixturePath}`);
-  }
-
-  const html = fs.readFileSync(fixturePath);
-  const options = buildOptions(args.format);
-  const metadataConfig =
-    args.scenario === "metadata-default" || args.scenario === "metadata-options"
-      ? buildMetadataConfig()
-      : null;
-  const handle =
-    args.scenario === "convert-options" ||
-    args.scenario === "inline-images-options" ||
-    args.scenario === "metadata-options"
-      ? createConversionOptionsHandle(options)
-      : null;
-  const metadataHandle = metadataConfig ? createMetadataConfigHandle(metadataConfig) : null;
-
-  runScenario(html, args.scenario, options, handle, metadataHandle);
-
-  const profileOutput = process.env.HTML_TO_MARKDOWN_PROFILE_OUTPUT;
-  if (profileOutput && startProfiling) {
-    const freqEnv = process.env.HTML_TO_MARKDOWN_PROFILE_FREQUENCY;
-    const frequency = freqEnv ? Number.parseInt(freqEnv, 10) : 1000;
-    startProfiling(profileOutput, Number.isFinite(frequency) ? frequency : 1000);
-  }
-
-  const start = process.hrtime.bigint();
-  for (let i = 0; i < args.iterations; i += 1) {
-    runScenario(html, args.scenario, options, handle, metadataHandle);
-  }
-  const elapsedSeconds = Number(process.hrtime.bigint() - start) / 1e9;
-
-  if (profileOutput && stopProfiling) {
-    stopProfiling();
-  }
-
-  const bytesProcessed = html.byteLength * args.iterations;
-  const opsPerSec = args.iterations / elapsedSeconds;
-  const mbPerSec = (bytesProcessed / (1024 * 1024)) / elapsedSeconds;
-
-  const result = {
-    language: "node",
-    fixture: path.basename(fixturePath),
-    fixture_path: fixturePath,
-    scenario: args.scenario,
-    iterations: args.iterations,
-    elapsed_seconds: elapsedSeconds,
-    ops_per_sec: opsPerSec,
-    mb_per_sec: mbPerSec,
-    bytes_processed: bytesProcessed,
-  };
-
-  console.log(JSON.stringify(result));
+if (profileOutput) {
+	stopProfiling();
 }
 
-main();
+const bytesProcessed = bytesProcessedPerIteration * options.iterations;
+const opsPerSec = options.iterations / elapsedSeconds;
+const mbPerSec = bytesProcessed / (1024 * 1024) / elapsedSeconds;
+
+const result = {
+	language: "node",
+	fixture: filePath.split("/").pop() ?? filePath,
+	fixture_path: filePath,
+	scenario: options.scenario,
+	iterations: options.iterations,
+	elapsed_seconds: elapsedSeconds,
+	ops_per_sec: opsPerSec,
+	mb_per_sec: mbPerSec,
+	bytes_processed: bytesProcessed,
+};
+
+console.log(JSON.stringify(result));
