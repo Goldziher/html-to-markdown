@@ -1105,6 +1105,17 @@ fn extract_metadata(
     let strip_meta = options.strip_tags.iter().any(|tag| tag.eq_ignore_ascii_case("meta"));
     let preserve_meta = options.preserve_tags.iter().any(|tag| tag.eq_ignore_ascii_case("meta"));
 
+    fn normalize_meta_key(prefix: &str, value: &str) -> String {
+        let mut key = String::with_capacity(prefix.len() + value.len());
+        key.push_str(prefix);
+        for byte in value.bytes() {
+            let lower = byte.to_ascii_lowercase();
+            let normalized = if lower == b':' { b'-' } else { lower };
+            key.push(normalized as char);
+        }
+        key
+    }
+
     fn find_head(node_handle: &tl::NodeHandle, parser: &tl::Parser) -> Option<tl::NodeHandle> {
         if let Some(node) = node_handle.get(parser) {
             if let tl::Node::Tag(tag) = node {
@@ -1171,59 +1182,27 @@ fn extract_metadata(
                                 }
                                 "meta" => {
                                     if !strip_meta && !preserve_meta {
-                                        let mut name_attr = None;
-                                        let mut property_attr = None;
-                                        let mut http_equiv_attr = None;
-                                        let mut content_attr = None;
+                                        let content = if let Some(Some(bytes)) = child_tag.attributes().get("content") {
+                                            Some(bytes.as_utf8_str().to_string())
+                                        } else {
+                                            None
+                                        };
 
-                                        if let Some(attr) = child_tag.attributes().get("name") {
-                                            if let Some(bytes) = attr {
-                                                name_attr = Some(bytes.as_utf8_str().to_string());
-                                            }
-                                        }
-                                        if let Some(attr) = child_tag.attributes().get("property") {
-                                            if let Some(bytes) = attr {
-                                                property_attr = Some(bytes.as_utf8_str().to_string());
-                                            }
-                                        }
-                                        if let Some(attr) = child_tag.attributes().get("http-equiv") {
-                                            if let Some(bytes) = attr {
-                                                http_equiv_attr = Some(bytes.as_utf8_str().to_string());
-                                            }
-                                        }
-                                        if let Some(attr) = child_tag.attributes().get("content") {
-                                            if let Some(bytes) = attr {
-                                                content_attr = Some(bytes.as_utf8_str().to_string());
-                                            }
-                                        }
+                                        if let Some(content) = content {
+                                            let key_source = if let Some(Some(bytes)) =
+                                                child_tag.attributes().get("name")
+                                            {
+                                                Some(bytes.as_utf8_str())
+                                            } else if let Some(Some(bytes)) = child_tag.attributes().get("property") {
+                                                Some(bytes.as_utf8_str())
+                                            } else if let Some(Some(bytes)) = child_tag.attributes().get("http-equiv") {
+                                                Some(bytes.as_utf8_str())
+                                            } else {
+                                                None
+                                            };
 
-                                        if let Some(content) = content_attr {
-                                            if let Some(name) = name_attr {
-                                                let mut key = String::with_capacity("meta-".len() + name.len());
-                                                key.push_str("meta-");
-                                                key.push_str(&name);
-                                                key.make_ascii_lowercase();
-                                                if key.as_bytes().contains(&b':') {
-                                                    key = key.replace(':', "-");
-                                                }
-                                                metadata.insert(key, content);
-                                            } else if let Some(property) = property_attr {
-                                                let mut key = String::with_capacity("meta-".len() + property.len());
-                                                key.push_str("meta-");
-                                                key.push_str(&property);
-                                                key.make_ascii_lowercase();
-                                                if key.as_bytes().contains(&b':') {
-                                                    key = key.replace(':', "-");
-                                                }
-                                                metadata.insert(key, content);
-                                            } else if let Some(http_equiv) = http_equiv_attr {
-                                                let mut key = String::with_capacity("meta-".len() + http_equiv.len());
-                                                key.push_str("meta-");
-                                                key.push_str(&http_equiv);
-                                                key.make_ascii_lowercase();
-                                                if key.as_bytes().contains(&b':') {
-                                                    key = key.replace(':', "-");
-                                                }
+                                            if let Some(key_source) = key_source {
+                                                let key = normalize_meta_key("meta-", key_source.as_ref());
                                                 metadata.insert(key, content);
                                             }
                                         }
@@ -1512,8 +1491,6 @@ fn handle_inline_data_image(
         return;
     }
 
-    let subtype_lower = subtype_raw.to_ascii_lowercase();
-
     let mut is_base64 = false;
     let mut inline_name: Option<String> = None;
     for segment in segments {
@@ -1534,6 +1511,20 @@ fn handle_inline_data_image(
     use base64::{Engine as _, engine::general_purpose::STANDARD};
 
     let payload_clean = payload.trim();
+    let max_size = collector.max_decoded_size();
+    let max_encoded = max_size.saturating_div(3).saturating_mul(4).saturating_add(4);
+    if payload_clean.len() as u64 > max_encoded {
+        collector.warn_skip(
+            index,
+            format!(
+                "encoded payload ({} bytes) exceeds configured max ({})",
+                payload_clean.len(),
+                max_size
+            ),
+        );
+        return;
+    }
+
     let decoded = match STANDARD.decode(payload_clean) {
         Ok(bytes) => bytes,
         Err(_) => {
@@ -1547,7 +1538,6 @@ fn handle_inline_data_image(
         return;
     }
 
-    let max_size = collector.max_decoded_size();
     if decoded.len() as u64 > max_size {
         collector.warn_skip(
             index,
@@ -1560,14 +1550,20 @@ fn handle_inline_data_image(
         return;
     }
 
-    let format = match subtype_lower.as_str() {
-        "png" => InlineImageFormat::Png,
-        "jpeg" | "jpg" => InlineImageFormat::Jpeg,
-        "gif" => InlineImageFormat::Gif,
-        "bmp" => InlineImageFormat::Bmp,
-        "webp" => InlineImageFormat::Webp,
-        "svg+xml" => InlineImageFormat::Svg,
-        other => InlineImageFormat::Other(other.to_string()),
+    let format = if subtype_raw.eq_ignore_ascii_case("png") {
+        InlineImageFormat::Png
+    } else if subtype_raw.eq_ignore_ascii_case("jpeg") || subtype_raw.eq_ignore_ascii_case("jpg") {
+        InlineImageFormat::Jpeg
+    } else if subtype_raw.eq_ignore_ascii_case("gif") {
+        InlineImageFormat::Gif
+    } else if subtype_raw.eq_ignore_ascii_case("bmp") {
+        InlineImageFormat::Bmp
+    } else if subtype_raw.eq_ignore_ascii_case("webp") {
+        InlineImageFormat::Webp
+    } else if subtype_raw.eq_ignore_ascii_case("svg+xml") {
+        InlineImageFormat::Svg
+    } else {
+        InlineImageFormat::Other(subtype_raw.to_ascii_lowercase())
     };
 
     let description = non_empty_trimmed(alt).or_else(|| title.and_then(non_empty_trimmed));
