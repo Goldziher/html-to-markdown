@@ -43,8 +43,7 @@
 
 use lru::LruCache;
 use std::cell::{OnceCell, RefCell};
-use std::collections::BTreeMap;
-#[cfg(feature = "inline-images")]
+use std::collections::{BTreeMap, HashSet};
 use std::rc::Rc;
 
 use std::borrow::Cow;
@@ -513,6 +512,12 @@ struct Context {
     in_ruby: bool,
     /// Are we inside a `<strong>` / `<b>` element?
     in_strong: bool,
+    /// Tag names that should be stripped during conversion.
+    strip_tags: Rc<HashSet<String>>,
+    /// Tag names that should be preserved as raw HTML.
+    preserve_tags: Rc<HashSet<String>>,
+    /// Tag names that allow inline images inside headings.
+    keep_inline_images_in: Rc<HashSet<String>>,
     #[cfg(feature = "inline-images")]
     /// Shared collector for inline images when enabled.
     inline_collector: Option<InlineCollectorHandle>,
@@ -873,8 +878,8 @@ fn push_heading(output: &mut String, ctx: &Context, options: &ConversionOptions,
     }
 }
 
-fn heading_allows_inline_images(tag_name: &str, options: &ConversionOptions) -> bool {
-    options.keep_inline_images_in.iter().any(|t| t == tag_name)
+fn heading_allows_inline_images(tag_name: &str, keep_inline_images_in: &HashSet<String>) -> bool {
+    keep_inline_images_in.contains(tag_name)
 }
 
 fn normalize_heading_text<'a>(text: &'a str) -> Cow<'a, str> {
@@ -1895,6 +1900,9 @@ fn convert_html_impl(
         in_paragraph: false,
         in_ruby: false,
         in_strong: false,
+        strip_tags: Rc::new(options.strip_tags.iter().cloned().collect()),
+        preserve_tags: Rc::new(options.preserve_tags.iter().cloned().collect()),
+        keep_inline_images_in: Rc::new(options.keep_inline_images_in.iter().cloned().collect()),
         #[cfg(feature = "inline-images")]
         inline_collector: inline_collector.clone(),
         #[cfg(feature = "metadata")]
@@ -3197,7 +3205,7 @@ fn walk_node(
                 return;
             }
 
-            if options.strip_tags.iter().any(|t| t.as_str() == tag_name.as_ref()) {
+            if ctx.strip_tags.contains(tag_name.as_ref()) {
                 let children = tag.children();
                 {
                     for child_handle in children.top().iter() {
@@ -3207,7 +3215,7 @@ fn walk_node(
                 return;
             }
 
-            if options.preserve_tags.iter().any(|t| t.as_str() == tag_name.as_ref()) {
+            if ctx.preserve_tags.contains(tag_name.as_ref()) {
                 let html = serialize_tag_to_html(node_handle, parser);
                 output.push_str(&html);
                 return;
@@ -3236,7 +3244,10 @@ fn walk_node(
                     let heading_ctx = Context {
                         in_heading: true,
                         convert_as_inline: true,
-                        heading_allow_inline_images: heading_allows_inline_images(tag_name.as_ref(), options),
+                        heading_allow_inline_images: heading_allows_inline_images(
+                            tag_name.as_ref(),
+                            &ctx.keep_inline_images_in,
+                        ),
                         ..ctx.clone()
                     };
                     let children = tag.children();
@@ -3476,7 +3487,7 @@ fn walk_node(
                                         convert_as_inline: true,
                                         heading_allow_inline_images: heading_allows_inline_images(
                                             &heading_name,
-                                            options,
+                                            &ctx.keep_inline_images_in,
                                         ),
                                         ..ctx.clone()
                                     };
