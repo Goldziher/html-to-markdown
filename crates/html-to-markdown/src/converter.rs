@@ -519,6 +519,16 @@ struct Context {
     #[cfg(feature = "metadata")]
     /// Shared collector for metadata when enabled.
     metadata_collector: Option<crate::metadata::MetadataCollectorHandle>,
+    #[cfg(feature = "metadata")]
+    metadata_wants_document: bool,
+    #[cfg(feature = "metadata")]
+    metadata_wants_headers: bool,
+    #[cfg(feature = "metadata")]
+    metadata_wants_links: bool,
+    #[cfg(feature = "metadata")]
+    metadata_wants_images: bool,
+    #[cfg(feature = "metadata")]
+    metadata_wants_structured_data: bool,
 }
 
 struct DomContext {
@@ -1809,6 +1819,26 @@ fn convert_html_impl(
         }
     }
 
+    #[cfg(feature = "metadata")]
+    let (
+        metadata_wants_document,
+        metadata_wants_headers,
+        metadata_wants_links,
+        metadata_wants_images,
+        metadata_wants_structured_data,
+    ) = if let Some(ref collector) = metadata_collector {
+        let guard = collector.borrow();
+        (
+            guard.wants_document(),
+            guard.wants_headers(),
+            guard.wants_links(),
+            guard.wants_images(),
+            guard.wants_structured_data(),
+        )
+    } else {
+        (false, false, false, false, false)
+    };
+
     let ctx = Context {
         in_code: false,
         list_counter: 0,
@@ -1833,6 +1863,16 @@ fn convert_html_impl(
         inline_collector: inline_collector.clone(),
         #[cfg(feature = "metadata")]
         metadata_collector: metadata_collector.clone(),
+        #[cfg(feature = "metadata")]
+        metadata_wants_document,
+        #[cfg(feature = "metadata")]
+        metadata_wants_headers,
+        #[cfg(feature = "metadata")]
+        metadata_wants_links,
+        #[cfg(feature = "metadata")]
+        metadata_wants_images,
+        #[cfg(feature = "metadata")]
+        metadata_wants_structured_data,
     };
 
     for child_handle in dom.children().iter() {
@@ -3138,18 +3178,16 @@ fn walk_node(
             }
 
             #[cfg(feature = "metadata")]
-            if matches!(tag_name.as_ref(), "html" | "head" | "body") {
+            if matches!(tag_name.as_ref(), "html" | "head" | "body") && ctx.metadata_wants_document {
                 if let Some(ref collector) = ctx.metadata_collector {
-                    if collector.borrow().wants_document() {
-                        let mut c = collector.borrow_mut();
+                    let mut c = collector.borrow_mut();
 
-                        if let Some(lang) = tag.attributes().get("lang").flatten() {
-                            c.set_language(lang.as_utf8_str().to_string());
-                        }
+                    if let Some(lang) = tag.attributes().get("lang").flatten() {
+                        c.set_language(lang.as_utf8_str().to_string());
+                    }
 
-                        if let Some(dir) = tag.attributes().get("dir").flatten() {
-                            c.set_text_direction(dir.as_utf8_str().to_string());
-                        }
+                    if let Some(dir) = tag.attributes().get("dir").flatten() {
+                        c.set_text_direction(dir.as_utf8_str().to_string());
                     }
                 }
             }
@@ -3185,8 +3223,8 @@ fn walk_node(
                         push_heading(output, ctx, options, level, normalized.as_ref());
 
                         #[cfg(feature = "metadata")]
-                        if let Some(ref collector) = ctx.metadata_collector {
-                            if collector.borrow().wants_headers() {
+                        if ctx.metadata_wants_headers {
+                            if let Some(ref collector) = ctx.metadata_collector {
                                 let id = tag
                                     .attributes()
                                     .get("id")
@@ -3518,8 +3556,8 @@ fn walk_node(
                         );
 
                         #[cfg(feature = "metadata")]
-                        if let Some(ref collector) = ctx.metadata_collector {
-                            if collector.borrow().wants_links() {
+                        if ctx.metadata_wants_links {
+                            if let Some(ref collector) = ctx.metadata_collector {
                                 let rel_attr = tag
                                     .attributes()
                                     .get("rel")
@@ -3575,30 +3613,28 @@ fn walk_node(
                     #[cfg(feature = "metadata")]
                     let mut metadata_payload: Option<ImageMetadataPayload> = None;
                     #[cfg(feature = "metadata")]
-                    if let Some(ref collector) = ctx.metadata_collector {
-                        if collector.borrow().wants_images() {
-                            let mut attributes_map = BTreeMap::new();
-                            let mut width: Option<u32> = None;
-                            let mut height: Option<u32> = None;
-                            for (key, value_opt) in tag.attributes().iter() {
-                                let key_str = key.to_string();
-                                if key_str == "src" {
-                                    continue;
-                                }
-                                let value = value_opt.map(|v| v.to_string()).unwrap_or_default();
-                                if key_str == "width" {
-                                    if let Ok(parsed) = value.parse::<u32>() {
-                                        width = Some(parsed);
-                                    }
-                                } else if key_str == "height" {
-                                    if let Ok(parsed) = value.parse::<u32>() {
-                                        height = Some(parsed);
-                                    }
-                                }
-                                attributes_map.insert(key_str, value);
+                    if ctx.metadata_wants_images {
+                        let mut attributes_map = BTreeMap::new();
+                        let mut width: Option<u32> = None;
+                        let mut height: Option<u32> = None;
+                        for (key, value_opt) in tag.attributes().iter() {
+                            let key_str = key.to_string();
+                            if key_str == "src" {
+                                continue;
                             }
-                            metadata_payload = Some((attributes_map, width, height));
+                            let value = value_opt.map(|v| v.to_string()).unwrap_or_default();
+                            if key_str == "width" {
+                                if let Ok(parsed) = value.parse::<u32>() {
+                                    width = Some(parsed);
+                                }
+                            } else if key_str == "height" {
+                                if let Ok(parsed) = value.parse::<u32>() {
+                                    height = Some(parsed);
+                                }
+                            }
+                            attributes_map.insert(key_str, value);
                         }
+                        metadata_payload = Some((attributes_map, width, height));
                     }
 
                     #[cfg(feature = "inline-images")]
@@ -3646,20 +3682,22 @@ fn walk_node(
                     }
 
                     #[cfg(feature = "metadata")]
-                    if let Some(ref collector) = ctx.metadata_collector {
-                        if let Some((attributes_map, width, height)) = metadata_payload {
-                            if !src.is_empty() {
-                                let dimensions = match (width, height) {
-                                    (Some(w), Some(h)) => Some((w, h)),
-                                    _ => None,
-                                };
-                                collector.borrow_mut().add_image(
-                                    src.to_string(),
-                                    if alt.is_empty() { None } else { Some(alt.to_string()) },
-                                    title.as_deref().map(|t| t.to_string()),
-                                    dimensions,
-                                    attributes_map,
-                                );
+                    if ctx.metadata_wants_images {
+                        if let Some(ref collector) = ctx.metadata_collector {
+                            if let Some((attributes_map, width, height)) = metadata_payload {
+                                if !src.is_empty() {
+                                    let dimensions = match (width, height) {
+                                        (Some(w), Some(h)) => Some((w, h)),
+                                        _ => None,
+                                    };
+                                    collector.borrow_mut().add_image(
+                                        src.to_string(),
+                                        if alt.is_empty() { None } else { Some(alt.to_string()) },
+                                        title.as_deref().map(|t| t.to_string()),
+                                        dimensions,
+                                        attributes_map,
+                                    );
+                                }
                             }
                         }
                     }
@@ -5756,8 +5794,8 @@ fn walk_node(
                     });
 
                     #[cfg(feature = "metadata")]
-                    if let Some(ref collector) = ctx.metadata_collector {
-                        if collector.borrow().wants_structured_data() {
+                    if ctx.metadata_wants_structured_data {
+                        if let Some(ref collector) = ctx.metadata_collector {
                             for child_handle in children.top().iter() {
                                 if let Some(tl::Node::Tag(child_tag)) = child_handle.get(parser) {
                                     let child_name = normalized_tag_name(child_tag.name().as_utf8_str());
@@ -5794,14 +5832,14 @@ fn walk_node(
                         let type_value = type_attr.as_utf8_str();
                         let type_value = type_value.as_ref();
                         let type_value = type_value.split(';').next().unwrap_or(type_value);
-                        if type_value.trim().eq_ignore_ascii_case("application/ld+json") {
+                        if type_value.trim().eq_ignore_ascii_case("application/ld+json")
+                            && ctx.metadata_wants_structured_data
+                        {
                             if let Some(ref collector) = ctx.metadata_collector {
-                                if collector.borrow().wants_structured_data() {
-                                    let json = tag.inner_text(parser);
-                                    let json = text::decode_html_entities(json.trim()).to_string();
-                                    if !json.is_empty() {
-                                        collector.borrow_mut().add_json_ld(json);
-                                    }
+                                let json = tag.inner_text(parser);
+                                let json = text::decode_html_entities(json.trim()).to_string();
+                                if !json.is_empty() {
+                                    collector.borrow_mut().add_json_ld(json);
                                 }
                             }
                         }
