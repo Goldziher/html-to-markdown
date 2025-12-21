@@ -3665,26 +3665,28 @@ fn walk_node(
 
                     #[cfg(feature = "inline-images")]
                     if let Some(ref collector_ref) = ctx.inline_collector {
-                        let mut attributes_map = BTreeMap::new();
-                        for (key, value_opt) in tag.attributes().iter() {
-                            let key_str = key.to_string();
-                            let keep = key_str == "width"
-                                || key_str == "height"
-                                || key_str == "filename"
-                                || key_str == "aria-label"
-                                || key_str.starts_with("data-");
-                            if keep {
-                                let value = value_opt.map(|value| value.to_string()).unwrap_or_default();
-                                attributes_map.insert(key_str, value);
+                        if src.trim_start().starts_with("data:") {
+                            let mut attributes_map = BTreeMap::new();
+                            for (key, value_opt) in tag.attributes().iter() {
+                                let key_str = key.to_string();
+                                let keep = key_str == "width"
+                                    || key_str == "height"
+                                    || key_str == "filename"
+                                    || key_str == "aria-label"
+                                    || key_str.starts_with("data-");
+                                if keep {
+                                    let value = value_opt.map(|value| value.to_string()).unwrap_or_default();
+                                    attributes_map.insert(key_str, value);
+                                }
                             }
+                            handle_inline_data_image(
+                                collector_ref,
+                                src.as_ref(),
+                                alt.as_ref(),
+                                title.as_deref(),
+                                attributes_map,
+                            );
                         }
-                        handle_inline_data_image(
-                            collector_ref,
-                            src.as_ref(),
-                            alt.as_ref(),
-                            title.as_deref(),
-                            attributes_map,
-                        );
                     }
 
                     let keep_as_markdown = ctx.in_heading && ctx.heading_allow_inline_images;
