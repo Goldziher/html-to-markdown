@@ -14,7 +14,7 @@ rust-version.workspace = true
 crate-type = ["cdylib", "staticlib"]
 
 [dependencies]
-html-to-markdown-rs = { workspace = true, features = ["inline-images"] }
+html-to-markdown-rs = { workspace = true, features = ["inline-images", "metadata"] }
 serde_json = "1.0"
 
 [target.'cfg(not(target_os = "windows"))'.dependencies]

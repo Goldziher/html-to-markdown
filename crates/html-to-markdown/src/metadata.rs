@@ -613,6 +613,19 @@ pub struct MetadataConfig {
     pub max_structured_data_size: usize,
 }
 
+/// Partial update for MetadataConfig.
+#[derive(Debug, Clone, Default)]
+#[cfg_attr(any(feature = "serde", feature = "metadata"), derive(serde::Deserialize))]
+#[cfg_attr(any(feature = "serde", feature = "metadata"), serde(rename_all = "camelCase"))]
+pub struct MetadataConfigUpdate {
+    pub extract_document: Option<bool>,
+    pub extract_headers: Option<bool>,
+    pub extract_links: Option<bool>,
+    pub extract_images: Option<bool>,
+    pub extract_structured_data: Option<bool>,
+    pub max_structured_data_size: Option<usize>,
+}
+
 impl Default for MetadataConfig {
     /// Create default metadata configuration.
     ///
@@ -626,6 +639,41 @@ impl Default for MetadataConfig {
             extract_structured_data: true,
             max_structured_data_size: DEFAULT_MAX_STRUCTURED_DATA_SIZE,
         }
+    }
+}
+
+impl MetadataConfig {
+    pub fn apply_update(&mut self, update: MetadataConfigUpdate) {
+        if let Some(extract_document) = update.extract_document {
+            self.extract_document = extract_document;
+        }
+        if let Some(extract_headers) = update.extract_headers {
+            self.extract_headers = extract_headers;
+        }
+        if let Some(extract_links) = update.extract_links {
+            self.extract_links = extract_links;
+        }
+        if let Some(extract_images) = update.extract_images {
+            self.extract_images = extract_images;
+        }
+        if let Some(extract_structured_data) = update.extract_structured_data {
+            self.extract_structured_data = extract_structured_data;
+        }
+        if let Some(max_structured_data_size) = update.max_structured_data_size {
+            self.max_structured_data_size = max_structured_data_size;
+        }
+    }
+
+    pub fn from_update(update: MetadataConfigUpdate) -> Self {
+        let mut config = Self::default();
+        config.apply_update(update);
+        config
+    }
+}
+
+impl From<MetadataConfigUpdate> for MetadataConfig {
+    fn from(update: MetadataConfigUpdate) -> Self {
+        Self::from_update(update)
     }
 }
 

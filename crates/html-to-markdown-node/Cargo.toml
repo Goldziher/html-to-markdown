@@ -14,7 +14,7 @@ rust-version.workspace = true
 crate-type = ["cdylib"]
 
 [dependencies]
-html-to-markdown-rs = { workspace = true, features = ["inline-images"] }
+html-to-markdown-rs = { workspace = true, features = ["inline-images", "metadata", "serde"] }
 napi = { version = "3.4", default-features = false, features = ["napi8"] }
 napi-derive = "3.3"
 

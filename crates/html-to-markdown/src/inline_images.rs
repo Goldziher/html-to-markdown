@@ -15,6 +15,20 @@ pub struct InlineImageConfig {
     pub infer_dimensions: bool,
 }
 
+/// Default maximum size for inline image extraction (5 MB).
+pub const DEFAULT_INLINE_IMAGE_LIMIT: u64 = 5 * 1024 * 1024;
+
+/// Partial update for InlineImageConfig.
+#[derive(Debug, Clone, Default)]
+#[cfg_attr(any(feature = "serde", feature = "metadata"), derive(serde::Deserialize))]
+#[cfg_attr(any(feature = "serde", feature = "metadata"), serde(rename_all = "camelCase"))]
+pub struct InlineImageConfigUpdate {
+    pub max_decoded_size_bytes: Option<u64>,
+    pub filename_prefix: Option<String>,
+    pub capture_svg: Option<bool>,
+    pub infer_dimensions: Option<bool>,
+}
+
 impl InlineImageConfig {
     /// Create a new configuration with required maximum decoded size.
     pub fn new(max_decoded_size_bytes: u64) -> Self {
@@ -24,6 +38,27 @@ impl InlineImageConfig {
             capture_svg: true,
             infer_dimensions: false,
         }
+    }
+
+    pub fn apply_update(&mut self, update: InlineImageConfigUpdate) {
+        if let Some(max_decoded_size_bytes) = update.max_decoded_size_bytes {
+            self.max_decoded_size_bytes = max_decoded_size_bytes;
+        }
+        if let Some(filename_prefix) = update.filename_prefix {
+            self.filename_prefix = Some(filename_prefix);
+        }
+        if let Some(capture_svg) = update.capture_svg {
+            self.capture_svg = capture_svg;
+        }
+        if let Some(infer_dimensions) = update.infer_dimensions {
+            self.infer_dimensions = infer_dimensions;
+        }
+    }
+
+    pub fn from_update(update: InlineImageConfigUpdate) -> Self {
+        let mut config = Self::new(DEFAULT_INLINE_IMAGE_LIMIT);
+        config.apply_update(update);
+        config
     }
 }
 

@@ -2,16 +2,17 @@
 
 #[cfg(feature = "metadata")]
 use html_to_markdown_rs::metadata::{
-    DEFAULT_MAX_STRUCTURED_DATA_SIZE, DocumentMetadata as RustDocumentMetadata,
-    ExtendedMetadata as RustExtendedMetadata, HeaderMetadata as RustHeaderMetadata, ImageMetadata as RustImageMetadata,
-    LinkMetadata as RustLinkMetadata, MetadataConfig as RustMetadataConfig, StructuredData as RustStructuredData,
+    DocumentMetadata as RustDocumentMetadata, ExtendedMetadata as RustExtendedMetadata,
+    HeaderMetadata as RustHeaderMetadata, ImageMetadata as RustImageMetadata, LinkMetadata as RustLinkMetadata,
+    MetadataConfig as RustMetadataConfig, StructuredData as RustStructuredData,
 };
 use html_to_markdown_rs::safety::guard_panic;
 mod profiling;
 use html_to_markdown_rs::{
-    CodeBlockStyle, ConversionError, ConversionOptions as RustConversionOptions, HeadingStyle, HighlightStyle,
-    InlineImageConfig as RustInlineImageConfig, ListIndentType, NewlineStyle,
-    PreprocessingOptions as RustPreprocessingOptions, PreprocessingPreset, WhitespaceMode,
+    CodeBlockStyle, ConversionError, ConversionOptions as RustConversionOptions, ConversionOptionsUpdate,
+    DEFAULT_INLINE_IMAGE_LIMIT, HeadingStyle, HighlightStyle, InlineImageConfig as RustInlineImageConfig,
+    InlineImageConfigUpdate, ListIndentType, NewlineStyle, PreprocessingOptions as RustPreprocessingOptions,
+    PreprocessingOptionsUpdate, PreprocessingPreset, WhitespaceMode,
 };
 use napi::bindgen_prelude::*;
 use napi_derive::napi;
@@ -24,6 +25,44 @@ fn to_js_error(err: ConversionError) -> Error {
     };
 
     Error::new(Status::GenericFailure, message)
+}
+
+fn parse_options_json(options_json: Option<String>) -> Result<Option<RustConversionOptions>> {
+    let Some(json) = options_json else {
+        return Ok(None);
+    };
+
+    if json.trim().is_empty() {
+        return Ok(None);
+    }
+
+    let options = html_to_markdown_rs::conversion_options_from_json(&json).map_err(to_js_error)?;
+    Ok(Some(options))
+}
+
+fn parse_inline_image_config_json(config_json: Option<String>) -> Result<RustInlineImageConfig> {
+    let Some(json) = config_json else {
+        return Ok(RustInlineImageConfig::new(DEFAULT_INLINE_IMAGE_LIMIT));
+    };
+
+    if json.trim().is_empty() {
+        return Ok(RustInlineImageConfig::new(DEFAULT_INLINE_IMAGE_LIMIT));
+    }
+
+    html_to_markdown_rs::inline_image_config_from_json(&json).map_err(to_js_error)
+}
+
+#[cfg(feature = "metadata")]
+fn parse_metadata_config_json(config_json: Option<String>) -> Result<RustMetadataConfig> {
+    let Some(json) = config_json else {
+        return Ok(RustMetadataConfig::default());
+    };
+
+    if json.trim().is_empty() {
+        return Ok(RustMetadataConfig::default());
+    }
+
+    html_to_markdown_rs::metadata_config_from_json(&json).map_err(to_js_error)
 }
 
 /// Heading style options
@@ -173,14 +212,23 @@ pub struct JsPreprocessingOptions {
     pub remove_forms: Option<bool>,
 }
 
+impl From<JsPreprocessingOptions> for PreprocessingOptionsUpdate {
+    fn from(val: JsPreprocessingOptions) -> Self {
+        Self {
+            enabled: val.enabled,
+            preset: val.preset.map(Into::into),
+            remove_navigation: val.remove_navigation,
+            remove_forms: val.remove_forms,
+        }
+    }
+}
+
 impl From<JsPreprocessingOptions> for RustPreprocessingOptions {
     fn from(val: JsPreprocessingOptions) -> Self {
-        RustPreprocessingOptions {
-            enabled: val.enabled.unwrap_or(false),
-            preset: val.preset.map(Into::into).unwrap_or(PreprocessingPreset::Standard),
-            remove_navigation: val.remove_navigation.unwrap_or(true),
-            remove_forms: val.remove_forms.unwrap_or(true),
-        }
+        let update: PreprocessingOptionsUpdate = val.into();
+        let mut opts = RustPreprocessingOptions::default();
+        opts.apply_update(update);
+        opts
     }
 }
 
@@ -251,105 +299,47 @@ pub struct JsConversionOptions {
     pub preserve_tags: Option<Vec<String>>,
 }
 
+impl From<JsConversionOptions> for ConversionOptionsUpdate {
+    fn from(val: JsConversionOptions) -> Self {
+        Self {
+            heading_style: val.heading_style.map(Into::into),
+            list_indent_type: val.list_indent_type.map(Into::into),
+            list_indent_width: val.list_indent_width.map(|value| value as usize),
+            bullets: val.bullets,
+            strong_em_symbol: val.strong_em_symbol.and_then(|s| s.chars().next()),
+            escape_asterisks: val.escape_asterisks,
+            escape_underscores: val.escape_underscores,
+            escape_misc: val.escape_misc,
+            escape_ascii: val.escape_ascii,
+            code_language: val.code_language,
+            autolinks: val.autolinks,
+            default_title: val.default_title,
+            br_in_tables: val.br_in_tables,
+            hocr_spatial_tables: val.hocr_spatial_tables,
+            highlight_style: val.highlight_style.map(Into::into),
+            extract_metadata: val.extract_metadata,
+            whitespace_mode: val.whitespace_mode.map(Into::into),
+            strip_newlines: val.strip_newlines,
+            wrap: val.wrap,
+            wrap_width: val.wrap_width.map(|value| value as usize),
+            convert_as_inline: val.convert_as_inline,
+            sub_symbol: val.sub_symbol,
+            sup_symbol: val.sup_symbol,
+            newline_style: val.newline_style.map(Into::into),
+            code_block_style: val.code_block_style.map(Into::into),
+            keep_inline_images_in: val.keep_inline_images_in,
+            preprocessing: val.preprocessing.map(Into::into),
+            encoding: val.encoding,
+            debug: val.debug,
+            strip_tags: val.strip_tags,
+            preserve_tags: val.preserve_tags,
+        }
+    }
+}
+
 impl From<JsConversionOptions> for RustConversionOptions {
     fn from(val: JsConversionOptions) -> Self {
-        let mut opts = RustConversionOptions::default();
-
-        if let Some(heading_style) = val.heading_style {
-            opts.heading_style = heading_style.into();
-        }
-        if let Some(list_indent_type) = val.list_indent_type {
-            opts.list_indent_type = list_indent_type.into();
-        }
-        if let Some(list_indent_width) = val.list_indent_width {
-            opts.list_indent_width = list_indent_width as usize;
-        }
-        if let Some(bullets) = val.bullets {
-            opts.bullets = bullets;
-        }
-        if let Some(strong_em_symbol) = val.strong_em_symbol.and_then(|s| s.chars().next()) {
-            opts.strong_em_symbol = strong_em_symbol;
-        }
-        if let Some(escape_asterisks) = val.escape_asterisks {
-            opts.escape_asterisks = escape_asterisks;
-        }
-        if let Some(escape_underscores) = val.escape_underscores {
-            opts.escape_underscores = escape_underscores;
-        }
-        if let Some(escape_misc) = val.escape_misc {
-            opts.escape_misc = escape_misc;
-        }
-        if let Some(escape_ascii) = val.escape_ascii {
-            opts.escape_ascii = escape_ascii;
-        }
-        if let Some(code_language) = val.code_language {
-            opts.code_language = code_language;
-        }
-        if let Some(autolinks) = val.autolinks {
-            opts.autolinks = autolinks;
-        }
-        if let Some(default_title) = val.default_title {
-            opts.default_title = default_title;
-        }
-        if let Some(br_in_tables) = val.br_in_tables {
-            opts.br_in_tables = br_in_tables;
-        }
-        if let Some(hocr_spatial_tables) = val.hocr_spatial_tables {
-            opts.hocr_spatial_tables = hocr_spatial_tables;
-        }
-        if let Some(highlight_style) = val.highlight_style {
-            opts.highlight_style = highlight_style.into();
-        }
-        if let Some(extract_metadata) = val.extract_metadata {
-            opts.extract_metadata = extract_metadata;
-        }
-        if let Some(whitespace_mode) = val.whitespace_mode {
-            opts.whitespace_mode = whitespace_mode.into();
-        }
-        if let Some(strip_newlines) = val.strip_newlines {
-            opts.strip_newlines = strip_newlines;
-        }
-        if let Some(wrap) = val.wrap {
-            opts.wrap = wrap;
-        }
-        if let Some(wrap_width) = val.wrap_width {
-            opts.wrap_width = wrap_width as usize;
-        }
-        if let Some(convert_as_inline) = val.convert_as_inline {
-            opts.convert_as_inline = convert_as_inline;
-        }
-        if let Some(sub_symbol) = val.sub_symbol {
-            opts.sub_symbol = sub_symbol;
-        }
-        if let Some(sup_symbol) = val.sup_symbol {
-            opts.sup_symbol = sup_symbol;
-        }
-        if let Some(newline_style) = val.newline_style {
-            opts.newline_style = newline_style.into();
-        }
-        if let Some(code_block_style) = val.code_block_style {
-            opts.code_block_style = code_block_style.into();
-        }
-        if let Some(keep_inline_images_in) = val.keep_inline_images_in {
-            opts.keep_inline_images_in = keep_inline_images_in;
-        }
-        if let Some(preprocessing) = val.preprocessing {
-            opts.preprocessing = preprocessing.into();
-        }
-        if let Some(encoding) = val.encoding {
-            opts.encoding = encoding;
-        }
-        if let Some(debug) = val.debug {
-            opts.debug = debug;
-        }
-        if let Some(strip_tags) = val.strip_tags {
-            opts.strip_tags = strip_tags;
-        }
-        if let Some(preserve_tags) = val.preserve_tags {
-            opts.preserve_tags = preserve_tags;
-        }
-
-        opts
+        RustConversionOptions::from(ConversionOptionsUpdate::from(val))
     }
 }
 
@@ -366,17 +356,21 @@ pub struct JsInlineImageConfig {
     pub infer_dimensions: Option<bool>,
 }
 
+impl From<JsInlineImageConfig> for InlineImageConfigUpdate {
+    fn from(val: JsInlineImageConfig) -> Self {
+        Self {
+            max_decoded_size_bytes: val.max_decoded_size_bytes.map(|b| b.get_u64().1),
+            filename_prefix: val.filename_prefix,
+            capture_svg: val.capture_svg,
+            infer_dimensions: val.infer_dimensions,
+        }
+    }
+}
+
 impl From<JsInlineImageConfig> for RustInlineImageConfig {
     fn from(val: JsInlineImageConfig) -> Self {
-        let max_size = val
-            .max_decoded_size_bytes
-            .map(|b| b.get_u64().1)
-            .unwrap_or(5 * 1024 * 1024);
-
-        let mut cfg = RustInlineImageConfig::new(max_size);
-        cfg.filename_prefix = val.filename_prefix;
-        cfg.capture_svg = val.capture_svg.unwrap_or(true);
-        cfg.infer_dimensions = val.infer_dimensions.unwrap_or(false);
+        let mut cfg = RustInlineImageConfig::new(DEFAULT_INLINE_IMAGE_LIMIT);
+        cfg.apply_update(InlineImageConfigUpdate::from(val));
         cfg
     }
 }
@@ -441,16 +435,15 @@ pub struct JsMetadataConfig {
 #[cfg(feature = "metadata")]
 impl From<JsMetadataConfig> for RustMetadataConfig {
     fn from(val: JsMetadataConfig) -> Self {
-        RustMetadataConfig {
-            extract_document: val.extract_document.unwrap_or(true),
-            extract_headers: val.extract_headers.unwrap_or(true),
-            extract_links: val.extract_links.unwrap_or(true),
-            extract_images: val.extract_images.unwrap_or(true),
-            extract_structured_data: val.extract_structured_data.unwrap_or(true),
-            max_structured_data_size: val
-                .max_structured_data_size
-                .unwrap_or(DEFAULT_MAX_STRUCTURED_DATA_SIZE as i64) as usize,
-        }
+        let update = html_to_markdown_rs::MetadataConfigUpdate {
+            extract_document: val.extract_document,
+            extract_headers: val.extract_headers,
+            extract_links: val.extract_links,
+            extract_images: val.extract_images,
+            extract_structured_data: val.extract_structured_data,
+            max_structured_data_size: val.max_structured_data_size.map(|value| value as usize),
+        };
+        RustMetadataConfig::from(update)
     }
 }
 
@@ -652,6 +645,13 @@ pub fn convert(html: String, options: Option<JsConversionOptions>) -> Result<Str
         .map_err(to_js_error)
 }
 
+#[napi(js_name = "convertJson")]
+pub fn convert_json(html: String, options_json: Option<String>) -> Result<String> {
+    let rust_options = parse_options_json(options_json)?;
+    guard_panic(|| profiling::maybe_profile(|| html_to_markdown_rs::convert(&html, rust_options.clone())))
+        .map_err(to_js_error)
+}
+
 #[napi]
 pub fn start_profiling(output_path: String, frequency: Option<i32>) -> Result<()> {
     let freq = frequency.unwrap_or(1000);
@@ -677,10 +677,24 @@ pub fn convert_buffer(html: Buffer, options: Option<JsConversionOptions>) -> Res
         .map_err(to_js_error)
 }
 
+#[napi(js_name = "convertBufferJson")]
+pub fn convert_buffer_json(html: Buffer, options_json: Option<String>) -> Result<String> {
+    let html = buffer_to_str(&html)?;
+    let rust_options = parse_options_json(options_json)?;
+    guard_panic(|| profiling::maybe_profile(|| html_to_markdown_rs::convert(html, rust_options.clone())))
+        .map_err(to_js_error)
+}
+
 /// Create a reusable ConversionOptions handle.
 #[napi]
 pub fn create_conversion_options_handle(options: Option<JsConversionOptions>) -> External<RustConversionOptions> {
     External::new(options.map(Into::into).unwrap_or_default())
+}
+
+#[napi(js_name = "createConversionOptionsHandleJson")]
+pub fn create_conversion_options_handle_json(options_json: Option<String>) -> Result<External<RustConversionOptions>> {
+    let rust_options = parse_options_json(options_json)?;
+    Ok(External::new(rust_options.unwrap_or_default()))
 }
 
 /// Convert HTML using a previously-created ConversionOptions handle.
@@ -706,7 +720,48 @@ fn convert_inline_images_impl(
     let rust_options = options.map(Into::into);
     let rust_config = image_config
         .map(Into::into)
-        .unwrap_or_else(|| RustInlineImageConfig::new(5 * 1024 * 1024));
+        .unwrap_or_else(|| RustInlineImageConfig::new(DEFAULT_INLINE_IMAGE_LIMIT));
+
+    let extraction = guard_panic(|| html_to_markdown_rs::convert_with_inline_images(html, rust_options, rust_config))
+        .map_err(to_js_error)?;
+
+    let inline_images = extraction
+        .inline_images
+        .into_iter()
+        .map(|img| JsInlineImage {
+            data: img.data.into(),
+            format: img.format.to_string(),
+            filename: img.filename,
+            description: img.description,
+            dimensions: img.dimensions.map(|(w, h)| vec![w, h]),
+            source: img.source.to_string(),
+            attributes: img.attributes.into_iter().collect(),
+        })
+        .collect();
+
+    let warnings = extraction
+        .warnings
+        .into_iter()
+        .map(|w| JsInlineImageWarning {
+            index: w.index as u32,
+            message: w.message,
+        })
+        .collect();
+
+    Ok(JsHtmlExtraction {
+        markdown: extraction.markdown,
+        inline_images,
+        warnings,
+    })
+}
+
+fn convert_inline_images_json_impl(
+    html: &str,
+    options_json: Option<String>,
+    image_config_json: Option<String>,
+) -> Result<JsHtmlExtraction> {
+    let rust_options = parse_options_json(options_json)?;
+    let rust_config = parse_inline_image_config_json(image_config_json)?;
 
     let extraction = guard_panic(|| html_to_markdown_rs::convert_with_inline_images(html, rust_options, rust_config))
         .map_err(to_js_error)?;
@@ -757,6 +812,15 @@ pub fn convert_with_inline_images(
     convert_inline_images_impl(&html, options, image_config)
 }
 
+#[napi(js_name = "convertWithInlineImagesJson")]
+pub fn convert_with_inline_images_json(
+    html: String,
+    options_json: Option<String>,
+    image_config_json: Option<String>,
+) -> Result<JsHtmlExtraction> {
+    convert_inline_images_json_impl(&html, options_json, image_config_json)
+}
+
 /// Convert inline images from Buffer/Uint8Array input without an intermediate string allocation.
 #[napi(js_name = "convertInlineImagesBuffer")]
 pub fn convert_inline_images_buffer(
@@ -766,6 +830,16 @@ pub fn convert_inline_images_buffer(
 ) -> Result<JsHtmlExtraction> {
     let html = buffer_to_str(&html)?;
     convert_inline_images_impl(html, options, image_config)
+}
+
+#[napi(js_name = "convertInlineImagesBufferJson")]
+pub fn convert_inline_images_buffer_json(
+    html: Buffer,
+    options_json: Option<String>,
+    image_config_json: Option<String>,
+) -> Result<JsHtmlExtraction> {
+    let html = buffer_to_str(&html)?;
+    convert_inline_images_json_impl(html, options_json, image_config_json)
 }
 
 /// Convert HTML to Markdown with metadata extraction.
@@ -807,6 +881,16 @@ pub fn convert_with_metadata(
     })
 }
 
+#[cfg(feature = "metadata")]
+#[napi(js_name = "convertWithMetadataJson")]
+pub fn convert_with_metadata_json(
+    html: String,
+    options_json: Option<String>,
+    metadata_config_json: Option<String>,
+) -> Result<JsMetadataExtraction> {
+    convert_metadata_json_impl(&html, options_json, metadata_config_json)
+}
+
 /// Convert HTML from Buffer/Uint8Array with metadata extraction without intermediate string allocation.
 #[cfg(feature = "metadata")]
 #[napi(js_name = "convertWithMetadataBuffer")]
@@ -818,6 +902,37 @@ pub fn convert_with_metadata_buffer(
     let html = buffer_to_str(&html)?;
     let rust_options = options.map(Into::into);
     let rust_config = metadata_config.map(Into::into).unwrap_or_default();
+
+    let (markdown, metadata) =
+        guard_panic(|| html_to_markdown_rs::convert_with_metadata(html, rust_options, rust_config))
+            .map_err(to_js_error)?;
+
+    Ok(JsMetadataExtraction {
+        markdown,
+        metadata: convert_metadata(metadata),
+    })
+}
+
+/// Convert HTML from Buffer/Uint8Array with metadata extraction using JSON config.
+#[cfg(feature = "metadata")]
+#[napi(js_name = "convertWithMetadataBufferJson")]
+pub fn convert_with_metadata_buffer_json(
+    html: Buffer,
+    options_json: Option<String>,
+    metadata_config_json: Option<String>,
+) -> Result<JsMetadataExtraction> {
+    let html = buffer_to_str(&html)?;
+    convert_metadata_json_impl(html, options_json, metadata_config_json)
+}
+
+#[cfg(feature = "metadata")]
+fn convert_metadata_json_impl(
+    html: &str,
+    options_json: Option<String>,
+    metadata_config_json: Option<String>,
+) -> Result<JsMetadataExtraction> {
+    let rust_options = parse_options_json(options_json)?;
+    let rust_config = parse_metadata_config_json(metadata_config_json)?;
 
     let (markdown, metadata) =
         guard_panic(|| html_to_markdown_rs::convert_with_metadata(html, rust_options, rust_config))

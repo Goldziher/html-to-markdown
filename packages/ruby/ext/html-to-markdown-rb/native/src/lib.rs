@@ -1,6 +1,7 @@
 use html_to_markdown_rs::{
-    CodeBlockStyle, ConversionOptions, HeadingStyle, HighlightStyle, HtmlExtraction, InlineImage, InlineImageConfig,
-    InlineImageWarning, ListIndentType, NewlineStyle, PreprocessingOptions, PreprocessingPreset, WhitespaceMode,
+    CodeBlockStyle, ConversionOptions, ConversionOptionsUpdate, DEFAULT_INLINE_IMAGE_LIMIT, HeadingStyle,
+    HighlightStyle, HtmlExtraction, InlineImage, InlineImageConfig, InlineImageConfigUpdate, InlineImageWarning,
+    ListIndentType, NewlineStyle, PreprocessingOptionsUpdate, PreprocessingPreset, WhitespaceMode,
     convert as convert_inner, convert_with_inline_images as convert_with_inline_images_inner, error::ConversionError,
     safety::guard_panic,
 };
@@ -22,8 +23,6 @@ use std::path::PathBuf;
 #[derive(Clone)]
 #[magnus::wrap(class = "HtmlToMarkdown::Options", free_immediately)]
 struct OptionsHandle(ConversionOptions);
-
-const DEFAULT_INLINE_IMAGE_LIMIT: u64 = 5 * 1024 * 1024;
 
 fn conversion_error(err: ConversionError) -> Error {
     match err {
@@ -120,43 +119,43 @@ fn parse_vec_of_strings(value: Value) -> Result<Vec<String>, Error> {
     array.to_vec::<String>()
 }
 
-fn parse_preprocessing_options(_ruby: &Ruby, value: Value) -> Result<PreprocessingOptions, Error> {
+fn parse_preprocessing_options(_ruby: &Ruby, value: Value) -> Result<PreprocessingOptionsUpdate, Error> {
     let hash = RHash::from_value(value).ok_or_else(|| arg_error("expected preprocessing to be a Hash"))?;
 
-    let mut opts = PreprocessingOptions::default();
+    let mut update = PreprocessingOptionsUpdate::default();
 
     hash.foreach(|key: Value, val: Value| {
         let key_name = symbol_to_string(key)?;
         match key_name.as_str() {
             "enabled" => {
-                opts.enabled = bool::try_convert(val)?;
+                update.enabled = Some(bool::try_convert(val)?);
             }
             "preset" => {
-                opts.preset = parse_preset(val)?;
+                update.preset = Some(parse_preset(val)?);
             }
             "remove_navigation" => {
-                opts.remove_navigation = bool::try_convert(val)?;
+                update.remove_navigation = Some(bool::try_convert(val)?);
             }
             "remove_forms" => {
-                opts.remove_forms = bool::try_convert(val)?;
+                update.remove_forms = Some(bool::try_convert(val)?);
             }
             _ => {}
         }
         Ok(ForEach::Continue)
     })?;
 
-    Ok(opts)
+    Ok(update)
 }
 
 fn build_conversion_options(ruby: &Ruby, options: Option<Value>) -> Result<ConversionOptions, Error> {
-    let mut opts = ConversionOptions::default();
+    let mut update = ConversionOptionsUpdate::default();
 
     let Some(options) = options else {
-        return Ok(opts);
+        return Ok(ConversionOptions::default());
     };
 
     if options.is_nil() {
-        return Ok(opts);
+        return Ok(ConversionOptions::default());
     }
 
     let hash = RHash::from_value(options).ok_or_else(|| arg_error("options must be provided as a Hash"))?;
@@ -165,16 +164,16 @@ fn build_conversion_options(ruby: &Ruby, options: Option<Value>) -> Result<Conve
         let key_name = symbol_to_string(key)?;
         match key_name.as_str() {
             "heading_style" => {
-                opts.heading_style = parse_heading_style(val)?;
+                update.heading_style = Some(parse_heading_style(val)?);
             }
             "list_indent_type" => {
-                opts.list_indent_type = parse_list_indent_type(val)?;
+                update.list_indent_type = Some(parse_list_indent_type(val)?);
             }
             "list_indent_width" => {
-                opts.list_indent_width = usize::try_convert(val)?;
+                update.list_indent_width = Some(usize::try_convert(val)?);
             }
             "bullets" => {
-                opts.bullets = String::try_convert(val)?;
+                update.bullets = Some(String::try_convert(val)?);
             }
             "strong_em_symbol" => {
                 let value = String::try_convert(val)?;
@@ -185,103 +184,103 @@ fn build_conversion_options(ruby: &Ruby, options: Option<Value>) -> Result<Conve
                 if chars.next().is_some() {
                     return Err(arg_error("strong_em_symbol must be a single character"));
                 }
-                opts.strong_em_symbol = ch;
+                update.strong_em_symbol = Some(ch);
             }
             "escape_asterisks" => {
-                opts.escape_asterisks = bool::try_convert(val)?;
+                update.escape_asterisks = Some(bool::try_convert(val)?);
             }
             "escape_underscores" => {
-                opts.escape_underscores = bool::try_convert(val)?;
+                update.escape_underscores = Some(bool::try_convert(val)?);
             }
             "escape_misc" => {
-                opts.escape_misc = bool::try_convert(val)?;
+                update.escape_misc = Some(bool::try_convert(val)?);
             }
             "escape_ascii" => {
-                opts.escape_ascii = bool::try_convert(val)?;
+                update.escape_ascii = Some(bool::try_convert(val)?);
             }
             "code_language" => {
-                opts.code_language = String::try_convert(val)?;
+                update.code_language = Some(String::try_convert(val)?);
             }
             "autolinks" => {
-                opts.autolinks = bool::try_convert(val)?;
+                update.autolinks = Some(bool::try_convert(val)?);
             }
             "default_title" => {
-                opts.default_title = bool::try_convert(val)?;
+                update.default_title = Some(bool::try_convert(val)?);
             }
             "br_in_tables" => {
-                opts.br_in_tables = bool::try_convert(val)?;
+                update.br_in_tables = Some(bool::try_convert(val)?);
             }
             "hocr_spatial_tables" => {
-                opts.hocr_spatial_tables = bool::try_convert(val)?;
+                update.hocr_spatial_tables = Some(bool::try_convert(val)?);
             }
             "highlight_style" => {
-                opts.highlight_style = parse_highlight_style(val)?;
+                update.highlight_style = Some(parse_highlight_style(val)?);
             }
             "extract_metadata" => {
-                opts.extract_metadata = bool::try_convert(val)?;
+                update.extract_metadata = Some(bool::try_convert(val)?);
             }
             "whitespace_mode" => {
-                opts.whitespace_mode = parse_whitespace_mode(val)?;
+                update.whitespace_mode = Some(parse_whitespace_mode(val)?);
             }
             "strip_newlines" => {
-                opts.strip_newlines = bool::try_convert(val)?;
+                update.strip_newlines = Some(bool::try_convert(val)?);
             }
             "wrap" => {
-                opts.wrap = bool::try_convert(val)?;
+                update.wrap = Some(bool::try_convert(val)?);
             }
             "wrap_width" => {
-                opts.wrap_width = usize::try_convert(val)?;
+                update.wrap_width = Some(usize::try_convert(val)?);
             }
             "convert_as_inline" => {
-                opts.convert_as_inline = bool::try_convert(val)?;
+                update.convert_as_inline = Some(bool::try_convert(val)?);
             }
             "sub_symbol" => {
-                opts.sub_symbol = String::try_convert(val)?;
+                update.sub_symbol = Some(String::try_convert(val)?);
             }
             "sup_symbol" => {
-                opts.sup_symbol = String::try_convert(val)?;
+                update.sup_symbol = Some(String::try_convert(val)?);
             }
             "newline_style" => {
-                opts.newline_style = parse_newline_style(val)?;
+                update.newline_style = Some(parse_newline_style(val)?);
             }
             "code_block_style" => {
-                opts.code_block_style = parse_code_block_style(val)?;
+                update.code_block_style = Some(parse_code_block_style(val)?);
             }
             "keep_inline_images_in" => {
-                opts.keep_inline_images_in = parse_vec_of_strings(val)?;
+                update.keep_inline_images_in = Some(parse_vec_of_strings(val)?);
             }
             "preprocessing" => {
-                opts.preprocessing = parse_preprocessing_options(ruby, val)?;
+                update.preprocessing = Some(parse_preprocessing_options(ruby, val)?);
             }
             "encoding" => {
-                opts.encoding = String::try_convert(val)?;
+                update.encoding = Some(String::try_convert(val)?);
             }
             "debug" => {
-                opts.debug = bool::try_convert(val)?;
+                update.debug = Some(bool::try_convert(val)?);
             }
             "strip_tags" => {
-                opts.strip_tags = parse_vec_of_strings(val)?;
+                update.strip_tags = Some(parse_vec_of_strings(val)?);
             }
             "preserve_tags" => {
-                opts.preserve_tags = parse_vec_of_strings(val)?;
+                update.preserve_tags = Some(parse_vec_of_strings(val)?);
             }
             _ => {}
         }
         Ok(ForEach::Continue)
     })?;
 
-    Ok(opts)
+    Ok(ConversionOptions::from(update))
 }
 
 fn build_inline_image_config(_ruby: &Ruby, config: Option<Value>) -> Result<InlineImageConfig, Error> {
-    let mut cfg = InlineImageConfig::new(DEFAULT_INLINE_IMAGE_LIMIT);
+    let mut update = InlineImageConfigUpdate::default();
 
     let Some(config) = config else {
-        return Ok(cfg);
+        return Ok(InlineImageConfig::new(DEFAULT_INLINE_IMAGE_LIMIT));
     };
 
     if config.is_nil() {
-        return Ok(cfg);
+        return Ok(InlineImageConfig::new(DEFAULT_INLINE_IMAGE_LIMIT));
     }
 
     let hash = RHash::from_value(config).ok_or_else(|| arg_error("inline image config must be provided as a Hash"))?;
@@ -290,27 +289,27 @@ fn build_inline_image_config(_ruby: &Ruby, config: Option<Value>) -> Result<Inli
         let key_name = symbol_to_string(key)?;
         match key_name.as_str() {
             "max_decoded_size_bytes" => {
-                cfg.max_decoded_size_bytes = u64::try_convert(val)?;
+                update.max_decoded_size_bytes = Some(u64::try_convert(val)?);
             }
             "filename_prefix" => {
-                cfg.filename_prefix = if val.is_nil() {
+                update.filename_prefix = if val.is_nil() {
                     None
                 } else {
                     Some(String::try_convert(val)?)
                 };
             }
             "capture_svg" => {
-                cfg.capture_svg = bool::try_convert(val)?;
+                update.capture_svg = Some(bool::try_convert(val)?);
             }
             "infer_dimensions" => {
-                cfg.infer_dimensions = bool::try_convert(val)?;
+                update.infer_dimensions = Some(bool::try_convert(val)?);
             }
             _ => {}
         }
         Ok(ForEach::Continue)
     })?;
 
-    Ok(cfg)
+    Ok(InlineImageConfig::from_update(update))
 }
 
 fn inline_image_to_value(ruby: &Ruby, image: InlineImage) -> Result<Value, Error> {

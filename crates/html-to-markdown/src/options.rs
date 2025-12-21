@@ -14,9 +14,9 @@ pub enum HeadingStyle {
 
 impl HeadingStyle {
     pub fn parse(value: &str) -> Self {
-        match value {
+        match normalize_token(value).as_str() {
             "atx" => Self::Atx,
-            "atx_closed" => Self::AtxClosed,
+            "atxclosed" => Self::AtxClosed,
             _ => Self::Underlined,
         }
     }
@@ -32,7 +32,7 @@ pub enum ListIndentType {
 
 impl ListIndentType {
     pub fn parse(value: &str) -> Self {
-        match value {
+        match normalize_token(value).as_str() {
             "tabs" => Self::Tabs,
             _ => Self::Spaces,
         }
@@ -49,7 +49,7 @@ pub enum WhitespaceMode {
 
 impl WhitespaceMode {
     pub fn parse(value: &str) -> Self {
-        match value {
+        match normalize_token(value).as_str() {
             "strict" => Self::Strict,
             _ => Self::Normalized,
         }
@@ -68,7 +68,7 @@ pub enum NewlineStyle {
 
 impl NewlineStyle {
     pub fn parse(value: &str) -> Self {
-        match value {
+        match normalize_token(value).as_str() {
             "backslash" => Self::Backslash,
             _ => Self::Spaces,
         }
@@ -89,7 +89,7 @@ pub enum CodeBlockStyle {
 
 impl CodeBlockStyle {
     pub fn parse(value: &str) -> Self {
-        match value {
+        match normalize_token(value).as_str() {
             "backticks" => Self::Backticks,
             "tildes" => Self::Tildes,
             _ => Self::Indented,
@@ -113,8 +113,8 @@ pub enum HighlightStyle {
 
 impl HighlightStyle {
     pub fn parse(value: &str) -> Self {
-        match value {
-            "double-equal" => Self::DoubleEqual,
+        match normalize_token(value).as_str() {
+            "doubleequal" => Self::DoubleEqual,
             "html" => Self::Html,
             "bold" => Self::Bold,
             "none" => Self::None,
@@ -130,6 +130,16 @@ pub enum PreprocessingPreset {
     #[default]
     Standard,
     Aggressive,
+}
+
+impl PreprocessingPreset {
+    pub fn parse(value: &str) -> Self {
+        match normalize_token(value).as_str() {
+            "minimal" => Self::Minimal,
+            "aggressive" => Self::Aggressive,
+            _ => Self::Standard,
+        }
+    }
 }
 
 /// Main conversion options.
@@ -230,6 +240,44 @@ pub struct ConversionOptions {
     pub preserve_tags: Vec<String>,
 }
 
+/// Partial update for ConversionOptions.
+#[derive(Debug, Clone, Default)]
+#[cfg_attr(any(feature = "serde", feature = "metadata"), derive(serde::Deserialize))]
+#[cfg_attr(any(feature = "serde", feature = "metadata"), serde(rename_all = "camelCase"))]
+pub struct ConversionOptionsUpdate {
+    pub heading_style: Option<HeadingStyle>,
+    pub list_indent_type: Option<ListIndentType>,
+    pub list_indent_width: Option<usize>,
+    pub bullets: Option<String>,
+    pub strong_em_symbol: Option<char>,
+    pub escape_asterisks: Option<bool>,
+    pub escape_underscores: Option<bool>,
+    pub escape_misc: Option<bool>,
+    pub escape_ascii: Option<bool>,
+    pub code_language: Option<String>,
+    pub autolinks: Option<bool>,
+    pub default_title: Option<bool>,
+    pub br_in_tables: Option<bool>,
+    pub hocr_spatial_tables: Option<bool>,
+    pub highlight_style: Option<HighlightStyle>,
+    pub extract_metadata: Option<bool>,
+    pub whitespace_mode: Option<WhitespaceMode>,
+    pub strip_newlines: Option<bool>,
+    pub wrap: Option<bool>,
+    pub wrap_width: Option<usize>,
+    pub convert_as_inline: Option<bool>,
+    pub sub_symbol: Option<String>,
+    pub sup_symbol: Option<String>,
+    pub newline_style: Option<NewlineStyle>,
+    pub code_block_style: Option<CodeBlockStyle>,
+    pub keep_inline_images_in: Option<Vec<String>>,
+    pub preprocessing: Option<PreprocessingOptionsUpdate>,
+    pub encoding: Option<String>,
+    pub debug: Option<bool>,
+    pub strip_tags: Option<Vec<String>>,
+    pub preserve_tags: Option<Vec<String>>,
+}
+
 impl Default for ConversionOptions {
     fn default() -> Self {
         Self {
@@ -268,6 +316,116 @@ impl Default for ConversionOptions {
     }
 }
 
+impl ConversionOptions {
+    pub fn apply_update(&mut self, update: ConversionOptionsUpdate) {
+        if let Some(heading_style) = update.heading_style {
+            self.heading_style = heading_style;
+        }
+        if let Some(list_indent_type) = update.list_indent_type {
+            self.list_indent_type = list_indent_type;
+        }
+        if let Some(list_indent_width) = update.list_indent_width {
+            self.list_indent_width = list_indent_width;
+        }
+        if let Some(bullets) = update.bullets {
+            self.bullets = bullets;
+        }
+        if let Some(strong_em_symbol) = update.strong_em_symbol {
+            self.strong_em_symbol = strong_em_symbol;
+        }
+        if let Some(escape_asterisks) = update.escape_asterisks {
+            self.escape_asterisks = escape_asterisks;
+        }
+        if let Some(escape_underscores) = update.escape_underscores {
+            self.escape_underscores = escape_underscores;
+        }
+        if let Some(escape_misc) = update.escape_misc {
+            self.escape_misc = escape_misc;
+        }
+        if let Some(escape_ascii) = update.escape_ascii {
+            self.escape_ascii = escape_ascii;
+        }
+        if let Some(code_language) = update.code_language {
+            self.code_language = code_language;
+        }
+        if let Some(autolinks) = update.autolinks {
+            self.autolinks = autolinks;
+        }
+        if let Some(default_title) = update.default_title {
+            self.default_title = default_title;
+        }
+        if let Some(br_in_tables) = update.br_in_tables {
+            self.br_in_tables = br_in_tables;
+        }
+        if let Some(hocr_spatial_tables) = update.hocr_spatial_tables {
+            self.hocr_spatial_tables = hocr_spatial_tables;
+        }
+        if let Some(highlight_style) = update.highlight_style {
+            self.highlight_style = highlight_style;
+        }
+        if let Some(extract_metadata) = update.extract_metadata {
+            self.extract_metadata = extract_metadata;
+        }
+        if let Some(whitespace_mode) = update.whitespace_mode {
+            self.whitespace_mode = whitespace_mode;
+        }
+        if let Some(strip_newlines) = update.strip_newlines {
+            self.strip_newlines = strip_newlines;
+        }
+        if let Some(wrap) = update.wrap {
+            self.wrap = wrap;
+        }
+        if let Some(wrap_width) = update.wrap_width {
+            self.wrap_width = wrap_width;
+        }
+        if let Some(convert_as_inline) = update.convert_as_inline {
+            self.convert_as_inline = convert_as_inline;
+        }
+        if let Some(sub_symbol) = update.sub_symbol {
+            self.sub_symbol = sub_symbol;
+        }
+        if let Some(sup_symbol) = update.sup_symbol {
+            self.sup_symbol = sup_symbol;
+        }
+        if let Some(newline_style) = update.newline_style {
+            self.newline_style = newline_style;
+        }
+        if let Some(code_block_style) = update.code_block_style {
+            self.code_block_style = code_block_style;
+        }
+        if let Some(keep_inline_images_in) = update.keep_inline_images_in {
+            self.keep_inline_images_in = keep_inline_images_in;
+        }
+        if let Some(preprocessing) = update.preprocessing {
+            self.preprocessing.apply_update(preprocessing);
+        }
+        if let Some(encoding) = update.encoding {
+            self.encoding = encoding;
+        }
+        if let Some(debug) = update.debug {
+            self.debug = debug;
+        }
+        if let Some(strip_tags) = update.strip_tags {
+            self.strip_tags = strip_tags;
+        }
+        if let Some(preserve_tags) = update.preserve_tags {
+            self.preserve_tags = preserve_tags;
+        }
+    }
+
+    pub fn from_update(update: ConversionOptionsUpdate) -> Self {
+        let mut options = Self::default();
+        options.apply_update(update);
+        options
+    }
+}
+
+impl From<ConversionOptionsUpdate> for ConversionOptions {
+    fn from(update: ConversionOptionsUpdate) -> Self {
+        Self::from_update(update)
+    }
+}
+
 /// HTML preprocessing options.
 #[derive(Debug, Clone)]
 pub struct PreprocessingOptions {
@@ -284,6 +442,55 @@ pub struct PreprocessingOptions {
     pub remove_forms: bool,
 }
 
+/// Partial update for PreprocessingOptions.
+#[derive(Debug, Clone, Default)]
+#[cfg_attr(any(feature = "serde", feature = "metadata"), derive(serde::Deserialize))]
+#[cfg_attr(any(feature = "serde", feature = "metadata"), serde(rename_all = "camelCase"))]
+pub struct PreprocessingOptionsUpdate {
+    pub enabled: Option<bool>,
+    pub preset: Option<PreprocessingPreset>,
+    pub remove_navigation: Option<bool>,
+    pub remove_forms: Option<bool>,
+}
+
+fn normalize_token(value: &str) -> String {
+    let mut out = String::with_capacity(value.len());
+    for ch in value.chars() {
+        if ch.is_ascii_alphanumeric() {
+            out.push(ch.to_ascii_lowercase());
+        }
+    }
+    out
+}
+
+#[cfg(any(feature = "serde", feature = "metadata"))]
+mod serde_impls {
+    use super::*;
+    use serde::Deserialize;
+
+    macro_rules! impl_deserialize_from_parse {
+        ($ty:ty, $parser:expr) => {
+            impl<'de> Deserialize<'de> for $ty {
+                fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+                where
+                    D: serde::Deserializer<'de>,
+                {
+                    let value = String::deserialize(deserializer)?;
+                    Ok($parser(&value))
+                }
+            }
+        };
+    }
+
+    impl_deserialize_from_parse!(HeadingStyle, HeadingStyle::parse);
+    impl_deserialize_from_parse!(ListIndentType, ListIndentType::parse);
+    impl_deserialize_from_parse!(WhitespaceMode, WhitespaceMode::parse);
+    impl_deserialize_from_parse!(NewlineStyle, NewlineStyle::parse);
+    impl_deserialize_from_parse!(CodeBlockStyle, CodeBlockStyle::parse);
+    impl_deserialize_from_parse!(HighlightStyle, HighlightStyle::parse);
+    impl_deserialize_from_parse!(PreprocessingPreset, PreprocessingPreset::parse);
+}
+
 impl Default for PreprocessingOptions {
     fn default() -> Self {
         Self {
@@ -292,5 +499,34 @@ impl Default for PreprocessingOptions {
             remove_navigation: true,
             remove_forms: true,
         }
+    }
+}
+
+impl PreprocessingOptions {
+    pub fn apply_update(&mut self, update: PreprocessingOptionsUpdate) {
+        if let Some(enabled) = update.enabled {
+            self.enabled = enabled;
+        }
+        if let Some(preset) = update.preset {
+            self.preset = preset;
+        }
+        if let Some(remove_navigation) = update.remove_navigation {
+            self.remove_navigation = remove_navigation;
+        }
+        if let Some(remove_forms) = update.remove_forms {
+            self.remove_forms = remove_forms;
+        }
+    }
+
+    pub fn from_update(update: PreprocessingOptionsUpdate) -> Self {
+        let mut options = Self::default();
+        options.apply_update(update);
+        options
+    }
+}
+
+impl From<PreprocessingOptionsUpdate> for PreprocessingOptions {
+    fn from(update: PreprocessingOptionsUpdate) -> Self {
+        Self::from_update(update)
     }
 }

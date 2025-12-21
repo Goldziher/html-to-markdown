@@ -2,10 +2,10 @@ import { readFile } from "node:fs/promises";
 import type { Readable } from "node:stream";
 
 import {
-	convert as convertHtml,
-	convertWithInlineImages as convertHtmlWithInlineImages,
-	convertWithMetadata as convertHtmlWithMetadata,
-	convertWithMetadataBuffer as convertHtmlWithMetadataBuffer,
+	convertJson as convertHtmlJson,
+	convertWithInlineImagesJson as convertHtmlWithInlineImagesJson,
+	convertWithMetadataBufferJson as convertHtmlWithMetadataBufferJson,
+	convertWithMetadataJson as convertHtmlWithMetadataJson,
 	type JsConversionOptions,
 	type JsHtmlExtraction,
 	type JsInlineImageConfig,
@@ -15,6 +15,15 @@ import {
 
 export * from "html-to-markdown-node";
 
+const jsonReplacer = (_key: string, value: unknown): unknown => (typeof value === "bigint" ? Number(value) : value);
+
+const toJson = (value: unknown): string | undefined => {
+	if (value == null) {
+		return undefined;
+	}
+	return JSON.stringify(value, jsonReplacer);
+};
+
 /**
  * Check if metadata extraction functionality is available.
  *
@@ -22,7 +31,7 @@ export * from "html-to-markdown-node";
  */
 export function hasMetadataSupport(): boolean {
 	try {
-		return typeof convertHtmlWithMetadata === "function";
+		return typeof convertHtmlWithMetadataJson === "function";
 	} catch {
 		return false;
 	}
@@ -33,7 +42,7 @@ export function hasMetadataSupport(): boolean {
  */
 export async function convertFile(filePath: string, options?: JsConversionOptions | null | undefined): Promise<string> {
 	const html = await readFile(filePath, "utf8");
-	return convertHtml(html, options ?? undefined);
+	return convertHtmlJson(html, toJson(options ?? undefined));
 }
 
 /**
@@ -45,7 +54,7 @@ export async function convertFileWithInlineImages(
 	imageConfig?: JsInlineImageConfig | null | undefined,
 ): Promise<JsHtmlExtraction> {
 	const html = await readFile(filePath, "utf8");
-	return convertHtmlWithInlineImages(html, options ?? undefined, imageConfig ?? undefined);
+	return convertHtmlWithInlineImagesJson(html, toJson(options ?? undefined), toJson(imageConfig ?? undefined));
 }
 
 /**
@@ -61,7 +70,7 @@ export async function convertStream(
 		html += typeof chunk === "string" ? chunk : chunk.toString("utf8");
 	}
 
-	return convertHtml(html, options ?? undefined);
+	return convertHtmlJson(html, toJson(options ?? undefined));
 }
 
 /**
@@ -78,7 +87,7 @@ export async function convertStreamWithInlineImages(
 		html += typeof chunk === "string" ? chunk : chunk.toString("utf8");
 	}
 
-	return convertHtmlWithInlineImages(html, options ?? undefined, imageConfig ?? undefined);
+	return convertHtmlWithInlineImagesJson(html, toJson(options ?? undefined), toJson(imageConfig ?? undefined));
 }
 
 /**
@@ -125,7 +134,7 @@ export function convertWithMetadata(
 	options?: JsConversionOptions | null | undefined,
 	metadataConfig?: JsMetadataConfig | null | undefined,
 ): JsMetadataExtraction {
-	return convertHtmlWithMetadata(html, options ?? undefined, metadataConfig ?? undefined);
+	return convertHtmlWithMetadataJson(html, toJson(options ?? undefined), toJson(metadataConfig ?? undefined));
 }
 
 /**
@@ -140,7 +149,7 @@ export function convertWithMetadataBuffer(
 	metadataConfig?: JsMetadataConfig | null | undefined,
 ): JsMetadataExtraction {
 	const input = Buffer.isBuffer(html) ? html : Buffer.from(html);
-	return convertHtmlWithMetadataBuffer(input, options ?? undefined, metadataConfig ?? undefined);
+	return convertHtmlWithMetadataBufferJson(input, toJson(options ?? undefined), toJson(metadataConfig ?? undefined));
 }
 
 /**

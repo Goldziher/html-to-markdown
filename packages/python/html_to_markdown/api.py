@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import json
+from dataclasses import asdict
 from typing import TYPE_CHECKING, Literal, TypedDict
 
 import html_to_markdown._html_to_markdown as _rust
@@ -39,52 +41,60 @@ class InlineImageWarning(TypedDict):
     message: str
 
 
-def _to_rust_preprocessing(options: PreprocessingOptions) -> _rust.PreprocessingOptions:
-    return _rust.PreprocessingOptions(
-        enabled=options.enabled,
-        preset=options.preset,
-        remove_navigation=options.remove_navigation,
-        remove_forms=options.remove_forms,
-    )
+def _to_camel_case(name: str) -> str:
+    parts = name.split("_")
+    return parts[0] + "".join(part.capitalize() for part in parts[1:])
 
 
-def _to_rust_options(
-    options: ConversionOptions,
-    preprocessing: PreprocessingOptions,
-) -> _rust.ConversionOptions:
-    return _rust.ConversionOptions(
-        heading_style=options.heading_style,
-        list_indent_type=options.list_indent_type,
-        list_indent_width=options.list_indent_width,
-        bullets=options.bullets,
-        strong_em_symbol=options.strong_em_symbol,
-        escape_asterisks=options.escape_asterisks,
-        escape_underscores=options.escape_underscores,
-        escape_misc=options.escape_misc,
-        escape_ascii=options.escape_ascii,
-        code_language=options.code_language,
-        autolinks=options.autolinks,
-        default_title=options.default_title,
-        br_in_tables=options.br_in_tables,
-        hocr_spatial_tables=options.hocr_spatial_tables,
-        highlight_style=options.highlight_style,
-        extract_metadata=options.extract_metadata,
-        whitespace_mode=options.whitespace_mode,
-        strip_newlines=options.strip_newlines,
-        wrap=options.wrap,
-        wrap_width=options.wrap_width,
-        convert_as_inline=options.convert_as_inline,
-        sub_symbol=options.sub_symbol,
-        sup_symbol=options.sup_symbol,
-        newline_style=options.newline_style,
-        code_block_style=options.code_block_style,
-        keep_inline_images_in=list(options.keep_inline_images_in) if options.keep_inline_images_in else [],
-        preprocessing=_to_rust_preprocessing(preprocessing),
-        encoding=options.encoding,
-        debug=options.debug,
-        strip_tags=list(options.strip_tags) if options.strip_tags else [],
-        preserve_tags=list(options.preserve_tags) if options.preserve_tags else [],
-    )
+def _normalize_value(value: object) -> object:
+    if isinstance(value, set):
+        return list(value)
+    if isinstance(value, dict):
+        return {_to_camel_case(k): _normalize_value(v) for k, v in value.items() if v is not None}
+    if isinstance(value, list):
+        return [_normalize_value(v) for v in value]
+    return value
+
+
+def _normalize_payload(payload: dict[str, object]) -> dict[str, object]:
+    result: dict[str, object] = {}
+    for key, value in payload.items():
+        if value is None:
+            continue
+        result[_to_camel_case(key)] = _normalize_value(value)
+    return result
+
+
+def _options_payload(options: ConversionOptions, preprocessing: PreprocessingOptions) -> dict[str, object]:
+    payload: dict[str, object] = asdict(options)
+    payload["preprocessing"] = asdict(preprocessing)
+    return _normalize_payload(payload)
+
+
+def _inline_image_config_payload(config: InlineImageConfig | dict[str, object]) -> dict[str, object]:
+    if isinstance(config, dict):
+        return _normalize_payload(config)
+    payload = {
+        "max_decoded_size_bytes": config.max_decoded_size_bytes,
+        "filename_prefix": config.filename_prefix,
+        "capture_svg": config.capture_svg,
+        "infer_dimensions": config.infer_dimensions,
+    }
+    return _normalize_payload(payload)
+
+
+def _metadata_config_payload(config: MetadataConfig | dict[str, object]) -> dict[str, object]:
+    if isinstance(config, dict):
+        return _normalize_payload(config)
+    payload = {
+        "extract_document": config.extract_document,
+        "extract_headers": config.extract_headers,
+        "extract_links": config.extract_links,
+        "extract_images": config.extract_images,
+        "extract_structured_data": config.extract_structured_data,
+        "max_structured_data_size": config.max_structured_data_size,
+    }
+    return _normalize_payload(payload)
 
 
 def convert(
@@ -101,8 +111,8 @@ def convert(
     if preprocessing is None:
         preprocessing = PreprocessingOptions()
 
-    rust_options = _to_rust_options(options, preprocessing)
-    return _rust.convert(html, rust_options)
+    payload = _options_payload(options, preprocessing)
+    return _rust.convert_json(html, json.dumps(payload))
 
 
 def convert_with_inline_images(
@@ -119,8 +129,13 @@ def convert_with_inline_images(
     if image_config is None:
         image_config = InlineImageConfig()
 
-    rust_options = _to_rust_options(options, preprocessing)
-    markdown, images, warnings = _rust.convert_with_inline_images(html, rust_options, image_config)
+    payload = _options_payload(options, preprocessing)
+    config_payload = _inline_image_config_payload(image_config)
+    markdown, images, warnings = _rust.convert_with_inline_images_json(
+        html,
+        json.dumps(payload),
+        json.dumps(config_payload),
+    )
     return markdown, list(images), list(warnings)
 
 
@@ -133,8 +148,8 @@ def create_options_handle(
         options = ConversionOptions()
     if preprocessing is None:
         preprocessing = PreprocessingOptions()
-    rust_options = _to_rust_options(options, preprocessing)
-    return _rust.create_options_handle(rust_options)
+    payload = _options_payload(options, preprocessing)
+    return _rust.create_options_handle_json(json.dumps(payload))
 
 
 def start_profiling(output_path: str, frequency: int | None = None) -> None:
@@ -181,8 +196,13 @@ def convert_with_metadata(
     if metadata_config is None:
         metadata_config = MetadataConfig()
 
-    rust_options = _to_rust_options(options, preprocessing)
-    markdown, metadata = _rust.convert_with_metadata(html, rust_options, metadata_config)
+    payload = _options_payload(options, preprocessing)
+    metadata_payload = _metadata_config_payload(metadata_config)
+    markdown, metadata = _rust.convert_with_metadata_json(
+        html,
+        json.dumps(payload),
+        json.dumps(metadata_payload),
+    )
     return markdown, metadata
 
 

@@ -24,16 +24,17 @@ pub mod wrapper;
 pub use error::{ConversionError, Result};
 #[cfg(feature = "inline-images")]
 pub use inline_images::{
-    HtmlExtraction, InlineImage, InlineImageConfig, InlineImageFormat, InlineImageSource, InlineImageWarning,
+    DEFAULT_INLINE_IMAGE_LIMIT, HtmlExtraction, InlineImage, InlineImageConfig, InlineImageConfigUpdate,
+    InlineImageFormat, InlineImageSource, InlineImageWarning,
 };
 #[cfg(feature = "metadata")]
 pub use metadata::{
     DEFAULT_MAX_STRUCTURED_DATA_SIZE, DocumentMetadata, ExtendedMetadata, HeaderMetadata, ImageMetadata, ImageType,
-    LinkMetadata, LinkType, MetadataConfig, StructuredData, StructuredDataType, TextDirection,
+    LinkMetadata, LinkType, MetadataConfig, MetadataConfigUpdate, StructuredData, StructuredDataType, TextDirection,
 };
 pub use options::{
-    CodeBlockStyle, ConversionOptions, HeadingStyle, HighlightStyle, ListIndentType, NewlineStyle,
-    PreprocessingOptions, PreprocessingPreset, WhitespaceMode,
+    CodeBlockStyle, ConversionOptions, ConversionOptionsUpdate, HeadingStyle, HighlightStyle, ListIndentType,
+    NewlineStyle, PreprocessingOptions, PreprocessingOptionsUpdate, PreprocessingPreset, WhitespaceMode,
 };
 
 const BINARY_SCAN_LIMIT: usize = 8192;
@@ -64,6 +65,34 @@ fn validate_input(html: &str) -> Result<()> {
     }
 
     Ok(())
+}
+
+#[cfg(any(feature = "serde", feature = "metadata"))]
+fn parse_json<T: serde::de::DeserializeOwned>(json: &str) -> Result<T> {
+    serde_json::from_str(json).map_err(|err| ConversionError::ConfigError(err.to_string()))
+}
+
+#[cfg(any(feature = "serde", feature = "metadata"))]
+pub fn conversion_options_from_json(json: &str) -> Result<ConversionOptions> {
+    let update: ConversionOptionsUpdate = parse_json(json)?;
+    Ok(ConversionOptions::from(update))
+}
+
+#[cfg(any(feature = "serde", feature = "metadata"))]
+pub fn conversion_options_update_from_json(json: &str) -> Result<ConversionOptionsUpdate> {
+    parse_json(json)
+}
+
+#[cfg(all(feature = "inline-images", any(feature = "serde", feature = "metadata")))]
+pub fn inline_image_config_from_json(json: &str) -> Result<InlineImageConfig> {
+    let update: InlineImageConfigUpdate = parse_json(json)?;
+    Ok(InlineImageConfig::from_update(update))
+}
+
+#[cfg(all(feature = "metadata", any(feature = "serde", feature = "metadata")))]
+pub fn metadata_config_from_json(json: &str) -> Result<MetadataConfig> {
+    let update: MetadataConfigUpdate = parse_json(json)?;
+    Ok(MetadataConfig::from(update))
 }
 
 /// Convert HTML to Markdown.

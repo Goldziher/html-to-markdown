@@ -1,4 +1,6 @@
-use html_to_markdown_rs::InlineImageConfig as RustInlineImageConfig;
+use html_to_markdown_rs::{
+    DEFAULT_INLINE_IMAGE_LIMIT, InlineImageConfig as RustInlineImageConfig, InlineImageConfigUpdate,
+};
 use js_sys::Uint8Array;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -20,7 +22,9 @@ impl WasmInlineImageConfig {
     #[wasm_bindgen(constructor)]
     pub fn new(max_decoded_size_bytes: Option<f64>) -> Self {
         Self {
-            max_decoded_size_bytes: max_decoded_size_bytes.map(|n| n as u64).unwrap_or(5 * 1024 * 1024),
+            max_decoded_size_bytes: max_decoded_size_bytes
+                .map(|n| n as u64)
+                .unwrap_or(DEFAULT_INLINE_IMAGE_LIMIT),
             filename_prefix: None,
             capture_svg: true,
             infer_dimensions: false,
@@ -45,10 +49,14 @@ impl WasmInlineImageConfig {
 
 impl From<WasmInlineImageConfig> for RustInlineImageConfig {
     fn from(val: WasmInlineImageConfig) -> Self {
-        let mut cfg = RustInlineImageConfig::new(val.max_decoded_size_bytes);
-        cfg.filename_prefix = val.filename_prefix;
-        cfg.capture_svg = val.capture_svg;
-        cfg.infer_dimensions = val.infer_dimensions;
+        let update = InlineImageConfigUpdate {
+            max_decoded_size_bytes: Some(val.max_decoded_size_bytes),
+            filename_prefix: val.filename_prefix,
+            capture_svg: Some(val.capture_svg),
+            infer_dimensions: Some(val.infer_dimensions),
+        };
+        let mut cfg = RustInlineImageConfig::new(DEFAULT_INLINE_IMAGE_LIMIT);
+        cfg.apply_update(update);
         cfg
     }
 }
