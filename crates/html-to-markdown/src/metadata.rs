@@ -1099,15 +1099,28 @@ impl MetadataCollector {
         let mut result = Vec::with_capacity(json_ld.len());
 
         for json_str in json_ld {
-            let schema_type = Self::scan_schema_type(&json_str).or_else(|| {
-                if json_str.contains("\"@type\"") {
-                    serde_json::from_str::<serde_json::Value>(&json_str)
-                        .ok()
-                        .and_then(|v| v.get("@type").and_then(|t| t.as_str().map(|s| s.to_string())))
-                } else {
-                    None
-                }
-            });
+            let schema_type = Self::scan_schema_type(&json_str)
+                .or_else(|| {
+                    if json_str.contains("\"@type\"") {
+                        serde_json::from_str::<serde_json::Value>(&json_str)
+                            .ok()
+                            .and_then(|v| v.get("@type").and_then(|t| t.as_str().map(|s| s.to_string())))
+                    } else {
+                        None
+                    }
+                })
+                .or_else(|| {
+                    if !json_str.contains("\"@graph\"") {
+                        return None;
+                    }
+
+                    let value = serde_json::from_str::<serde_json::Value>(&json_str).ok()?;
+                    let graph = value.get("@graph")?;
+                    let items = graph.as_array()?;
+                    items
+                        .iter()
+                        .find_map(|item| item.get("@type").and_then(|t| t.as_str().map(|s| s.to_string())))
+                });
 
             result.push(StructuredData {
                 data_type: StructuredDataType::JsonLd,
@@ -1144,9 +1157,10 @@ impl MetadataCollector {
             while i < bytes.len() && bytes[i].is_ascii_whitespace() {
                 i += 1;
             }
-        }
-
-        if i >= bytes.len() || bytes[i] != b'"' {
+            if i >= bytes.len() || bytes[i] != b'"' {
+                return None;
+            }
+        } else if bytes[i] != b'"' {
             return None;
         }
 
