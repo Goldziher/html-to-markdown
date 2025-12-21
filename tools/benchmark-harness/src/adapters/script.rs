@@ -63,10 +63,19 @@ impl ScriptAdapter {
         config: &BenchmarkConfig,
     ) -> Option<PathBuf> {
         if config.enable_profiling && self.supports_profiling() {
-            config
-                .flamegraph_dir
-                .as_ref()
-                .map(|dir| dir.join(format!("{}-{}-{}.svg", self.name(), fixture.id, scenario.as_str())))
+            let extension = match self.language {
+                ScriptLanguage::Wasm => "html",
+                _ => "svg",
+            };
+            config.flamegraph_dir.as_ref().map(|dir| {
+                dir.join(format!(
+                    "{}-{}-{}.{}",
+                    self.name(),
+                    fixture.id,
+                    scenario.as_str(),
+                    extension
+                ))
+            })
         } else {
             None
         }
@@ -209,6 +218,8 @@ impl ScriptAdapter {
             .arg("--output-dir")
             .arg(&output_dir)
             .arg("--")
+            .arg("node")
+            .arg("--import")
             .arg("tsx")
             .arg("bin/benchmark.ts")
             .arg("--file")
@@ -234,7 +245,7 @@ impl ScriptAdapter {
             return Err(Error::Benchmark(format!("Wasm profiling failed with status {status}")));
         }
 
-        let flamegraph = output_dir.join("flamegraph.svg");
+        let flamegraph = output_dir.join("flamegraph.html");
         if !flamegraph.exists() {
             return Err(Error::Benchmark(format!(
                 "Wasm profiling did not produce {}",
