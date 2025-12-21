@@ -11,16 +11,16 @@ on:
       - go.mod
       - go.sum
       - .github/workflows/ci-go.yaml
-#   pull_request:
-#     branches: [main]
-#     paths:
-#       - packages/go/**
-#       - examples/go-smoke/**
-#       - crates/html-to-markdown-ffi/**
-#       - crates/html-to-markdown/**
-#       - go.mod
-#       - go.sum
-#       - .github/workflows/ci-go.yaml
+  pull_request:
+    branches: [main]
+    paths:
+      - packages/go/**
+      - examples/go-smoke/**
+      - crates/html-to-markdown-ffi/**
+      - crates/html-to-markdown/**
+      - go.mod
+      - go.sum
+      - .github/workflows/ci-go.yaml
 
 permissions:
   contents: read

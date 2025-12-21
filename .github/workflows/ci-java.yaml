@@ -8,13 +8,13 @@ on:
       - crates/html-to-markdown-ffi/**
       - crates/html-to-markdown/**
       - .github/workflows/ci-java.yaml
-#   pull_request:
-#     branches: [main]
-#     paths:
-#       - packages/java/**
-#       - crates/html-to-markdown-ffi/**
-#       - crates/html-to-markdown/**
-#       - .github/workflows/ci-java.yaml
+  pull_request:
+    branches: [main]
+    paths:
+      - packages/java/**
+      - crates/html-to-markdown-ffi/**
+      - crates/html-to-markdown/**
+      - .github/workflows/ci-java.yaml
 
 permissions:
   contents: read
