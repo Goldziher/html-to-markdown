@@ -11,7 +11,10 @@ const {
   convertInlineImagesBufferWithOptionsHandle,
   convertWithMetadataBuffer,
   convertWithMetadataBufferWithOptionsHandle,
+  convertWithMetadataBufferWithMetadataHandle,
+  convertWithMetadataBufferWithOptionsAndMetadataHandle,
   createConversionOptionsHandle,
+  createMetadataConfigHandle,
   startProfiling,
   stopProfiling,
 } = require("../index.js") as {
@@ -37,7 +40,14 @@ const {
     options: unknown,
     metadataConfig?: Record<string, unknown>,
   ) => { markdown: string };
+  convertWithMetadataBufferWithMetadataHandle: (html: Buffer, metadataConfig: unknown) => { markdown: string };
+  convertWithMetadataBufferWithOptionsAndMetadataHandle: (
+    html: Buffer,
+    options: unknown,
+    metadataConfig: unknown,
+  ) => { markdown: string };
   createConversionOptionsHandle: (options?: Record<string, unknown>) => unknown;
+  createMetadataConfigHandle: (config?: Record<string, unknown>) => unknown;
   startProfiling?: (outputPath: string, frequency?: number) => void;
   stopProfiling?: () => void;
 };
@@ -123,6 +133,7 @@ function runScenario(
   scenario: Scenario,
   options: Record<string, unknown>,
   handle: unknown | null,
+  metadataHandle: unknown | null,
 ) {
   switch (scenario) {
     case "convert-default":
@@ -144,13 +155,21 @@ function runScenario(
       convertInlineImagesBufferWithOptionsHandle(html, handle);
       break;
     case "metadata-default":
-      convertWithMetadataBuffer(html, undefined, buildMetadataConfig());
+      if (metadataHandle) {
+        convertWithMetadataBufferWithMetadataHandle(html, metadataHandle);
+      } else {
+        convertWithMetadataBuffer(html, undefined, buildMetadataConfig());
+      }
       break;
     case "metadata-options":
       if (!handle) {
         throw new Error("Options handle required for metadata-options scenario");
       }
-      convertWithMetadataBufferWithOptionsHandle(html, handle, buildMetadataConfig());
+      if (metadataHandle) {
+        convertWithMetadataBufferWithOptionsAndMetadataHandle(html, handle, metadataHandle);
+      } else {
+        convertWithMetadataBufferWithOptionsHandle(html, handle, buildMetadataConfig());
+      }
       break;
   }
 }
@@ -165,14 +184,19 @@ function main() {
 
   const html = fs.readFileSync(fixturePath);
   const options = buildOptions(args.format);
+  const metadataConfig =
+    args.scenario === "metadata-default" || args.scenario === "metadata-options"
+      ? buildMetadataConfig()
+      : null;
   const handle =
     args.scenario === "convert-options" ||
     args.scenario === "inline-images-options" ||
     args.scenario === "metadata-options"
       ? createConversionOptionsHandle(options)
       : null;
+  const metadataHandle = metadataConfig ? createMetadataConfigHandle(metadataConfig) : null;
 
-  runScenario(html, args.scenario, options, handle);
+  runScenario(html, args.scenario, options, handle, metadataHandle);
 
   const profileOutput = process.env.HTML_TO_MARKDOWN_PROFILE_OUTPUT;
   if (profileOutput && startProfiling) {
@@ -183,7 +207,7 @@ function main() {
 
   const start = process.hrtime.bigint();
   for (let i = 0; i < args.iterations; i += 1) {
-    runScenario(html, args.scenario, options, handle);
+    runScenario(html, args.scenario, options, handle, metadataHandle);
   }
   const elapsedSeconds = Number(process.hrtime.bigint() - start) / 1e9;
 

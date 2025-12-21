@@ -83,6 +83,7 @@ jobs:
       MODE: ${{ github.event.inputs.mode || 'single-file' }}
       PROFILE_FREQUENCY: ${{ github.event.inputs.profile_frequency || '2000' }}
       PROFILE_REPEAT: ${{ github.event.inputs.profile_repeat || '5' }}
+      HTML_TO_MARKDOWN_CARGO_FEATURES: profiling
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -107,6 +108,10 @@ jobs:
       - name: Install Python deps
         if: env.FRAMEWORKS == 'python'
         run: uv sync --all-extras --no-install-workspace
+
+      - name: Build Python extension with profiling
+        if: env.FRAMEWORKS == 'python'
+        run: uv pip install --editable packages/python --config-settings=--features=profiling
 
       - name: Setup Node workspace
         if: env.FRAMEWORKS == 'node' || env.FRAMEWORKS == 'wasm'

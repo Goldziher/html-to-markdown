@@ -697,6 +697,22 @@ pub fn create_conversion_options_handle_json(options_json: Option<String>) -> Re
     Ok(External::new(rust_options.unwrap_or_default()))
 }
 
+/// Create a reusable MetadataConfig handle.
+#[cfg(feature = "metadata")]
+#[napi]
+pub fn create_metadata_config_handle(metadata_config: Option<JsMetadataConfig>) -> External<RustMetadataConfig> {
+    External::new(metadata_config.map(Into::into).unwrap_or_default())
+}
+
+#[cfg(feature = "metadata")]
+#[napi(js_name = "createMetadataConfigHandleJson")]
+pub fn create_metadata_config_handle_json(
+    metadata_config_json: Option<String>,
+) -> Result<External<RustMetadataConfig>> {
+    let rust_config = parse_metadata_config_json(metadata_config_json)?;
+    Ok(External::new(rust_config))
+}
+
 /// Convert HTML using a previously-created ConversionOptions handle.
 #[napi]
 pub fn convert_with_options_handle(html: String, options: &External<RustConversionOptions>) -> Result<String> {
@@ -1007,6 +1023,44 @@ pub fn convert_with_metadata_buffer_with_options_handle(
     let html = buffer_to_str(&html)?;
     let rust_config = metadata_config.map(Into::into).unwrap_or_default();
 
+    let (markdown, metadata) =
+        guard_panic(|| html_to_markdown_rs::convert_with_metadata(html, Some((**options).clone()), rust_config))
+            .map_err(to_js_error)?;
+
+    Ok(JsMetadataExtraction {
+        markdown,
+        metadata: convert_metadata(metadata),
+    })
+}
+
+/// Convert HTML from Buffer/Uint8Array with metadata extraction using a metadata handle.
+#[cfg(feature = "metadata")]
+#[napi(js_name = "convertWithMetadataBufferWithMetadataHandle")]
+pub fn convert_with_metadata_buffer_with_metadata_handle(
+    html: Buffer,
+    metadata_config: &External<RustMetadataConfig>,
+) -> Result<JsMetadataExtraction> {
+    let html = buffer_to_str(&html)?;
+    let rust_config = (**metadata_config).clone();
+    let (markdown, metadata) =
+        guard_panic(|| html_to_markdown_rs::convert_with_metadata(html, None, rust_config)).map_err(to_js_error)?;
+
+    Ok(JsMetadataExtraction {
+        markdown,
+        metadata: convert_metadata(metadata),
+    })
+}
+
+/// Convert HTML from Buffer/Uint8Array with metadata extraction using options + metadata handles.
+#[cfg(feature = "metadata")]
+#[napi(js_name = "convertWithMetadataBufferWithOptionsAndMetadataHandle")]
+pub fn convert_with_metadata_buffer_with_options_and_metadata_handle(
+    html: Buffer,
+    options: &External<RustConversionOptions>,
+    metadata_config: &External<RustMetadataConfig>,
+) -> Result<JsMetadataExtraction> {
+    let html = buffer_to_str(&html)?;
+    let rust_config = (**metadata_config).clone();
     let (markdown, metadata) =
         guard_panic(|| html_to_markdown_rs::convert_with_metadata(html, Some((**options).clone()), rust_config))
             .map_err(to_js_error)?;
