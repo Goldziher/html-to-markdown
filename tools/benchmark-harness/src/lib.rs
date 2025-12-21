@@ -10,7 +10,7 @@ pub mod registry;
 pub mod runner;
 pub mod types;
 
-pub use crate::config::{BenchmarkConfig, BenchmarkMode};
+pub use crate::config::{BenchmarkConfig, BenchmarkMode, BenchmarkScenario};
 pub use crate::error::{Error, Result};
 pub use crate::fixture::{Fixture, FixtureFormat, FixtureSet};
 pub use crate::output::{write_html_report, write_json_results, write_summary_json};

@@ -2,12 +2,13 @@ args = System.argv()
 
 {options, _, _} =
   OptionParser.parse(args,
-    switches: [file: :string, iterations: :integer, format: :string]
+    switches: [file: :string, iterations: :integer, format: :string, scenario: :string]
   )
 
 file = options[:file]
 iterations = max(options[:iterations] || 50, 1)
 format = (options[:format] || "html") |> String.downcase()
+scenario = options[:scenario] || "convert-default"
 
 if is_nil(file) do
   IO.puts(:stderr, "Error: --file is required")
@@ -19,12 +20,29 @@ if format not in ["html", "hocr"] do
   System.halt(1)
 end
 
+supported_scenarios = [
+  "convert-default",
+  "convert-options",
+  "inline-images-default",
+  "inline-images-options",
+  "metadata-default",
+  "metadata-options"
+]
+
+if scenario not in supported_scenarios do
+  IO.puts(:stderr, "Unsupported scenario: #{scenario}")
+  System.halt(1)
+end
+
 unless File.exists?(file) do
   IO.puts(:stderr, "Fixture not found: #{file}")
   System.halt(1)
 end
 
 html = File.read!(file)
+options_map = if(format == "hocr", do: [hocr_spatial_tables: false], else: [])
+inline_config = HtmlToMarkdown.InlineImageConfig.new(nil)
+metadata_config = HtmlToMarkdown.MetadataConfig.new(nil)
 
 profile_output = System.get_env("HTML_TO_MARKDOWN_PROFILE_OUTPUT")
 profile_frequency = System.get_env("HTML_TO_MARKDOWN_PROFILE_FREQUENCY")
@@ -38,7 +56,29 @@ if profile_output && profile_output != "" do
   System.delete_env("HTML_TO_MARKDOWN_PROFILE_REPEAT")
 end
 
-_ = HtmlToMarkdown.convert(html, if(format == "hocr", do: [hocr_spatial_tables: false], else: []))
+run_scenario = fn ->
+  case scenario do
+    "convert-default" ->
+      HtmlToMarkdown.convert(html)
+
+    "convert-options" ->
+      HtmlToMarkdown.convert(html, options_map)
+
+    "inline-images-default" ->
+      HtmlToMarkdown.convert_with_inline_images(html, nil, inline_config)
+
+    "inline-images-options" ->
+      HtmlToMarkdown.convert_with_inline_images(html, options_map, inline_config)
+
+    "metadata-default" ->
+      HtmlToMarkdown.convert_with_metadata(html, nil, metadata_config)
+
+    "metadata-options" ->
+      HtmlToMarkdown.convert_with_metadata(html, options_map, metadata_config)
+  end
+end
+
+_ = run_scenario.()
 
 if profile_output && profile_output != "" do
   System.put_env("HTML_TO_MARKDOWN_PROFILE_OUTPUT", profile_output)
@@ -55,7 +95,7 @@ end
 
 start = System.monotonic_time()
 Enum.each(1..iterations, fn _ ->
-  HtmlToMarkdown.convert(html, if(format == "hocr", do: [hocr_spatial_tables: false], else: []))
+  run_scenario.()
 end)
 finish = System.monotonic_time()
 
@@ -68,7 +108,7 @@ fixture = Path.basename(file)
 
 json =
   "{\"language\":\"elixir\",\"fixture\":\"#{fixture}\"," <>
-    "\"fixture_path\":\"#{file}\",\"iterations\":#{iterations}," <>
+    "\"fixture_path\":\"#{file}\",\"scenario\":\"#{scenario}\",\"iterations\":#{iterations}," <>
     "\"elapsed_seconds\":#{Float.round(elapsed_seconds, 8)}," <>
     "\"ops_per_sec\":#{Float.round(ops_per_sec, 4)}," <>
     "\"mb_per_sec\":#{Float.round(mb_per_sec, 4)}," <>

@@ -22,7 +22,8 @@ end
 
 options = {
   iterations: 50,
-  format: 'html'
+  format: 'html',
+  scenario: 'convert-default'
 }
 
 OptionParser.new do |parser|
@@ -34,6 +35,10 @@ OptionParser.new do |parser|
 
   parser.on('--iterations N', Integer, 'Number of conversion iterations (default: 50)') do |n|
     options[:iterations] = n.positive? ? n : 1
+  end
+
+  parser.on('--scenario SCENARIO', 'Scenario to benchmark') do |scenario|
+    options[:scenario] = scenario
   end
 
   parser.on('--format FORMAT', 'Fixture format (html or hocr)') do |format|
@@ -56,19 +61,40 @@ unless %w[html hocr].include?(options[:format])
   exit 1
 end
 
+supported_scenarios = %w[
+  convert-default
+  convert-options
+  inline-images-default
+  inline-images-options
+  metadata-default
+  metadata-options
+]
+unless supported_scenarios.include?(options[:scenario])
+  warn "Unsupported scenario: #{options[:scenario]}"
+  exit 1
+end
+
 html = File.binread(fixture)
 html.force_encoding(Encoding::UTF_8)
 html.freeze
 iterations = options[:iterations]
-options_handle = HtmlToMarkdown.options(
-  options[:format] == 'hocr' ? { hocr_spatial_tables: false } : nil
-)
+conversion_options = options[:format] == 'hocr' ? { hocr_spatial_tables: false } : {}
 
-def convert_document(html, options_handle)
-  HtmlToMarkdown.convert_with_options(html, options_handle)
+SCENARIO_RUNNERS = {
+  'convert-default' => ->(html, _options) { HtmlToMarkdown.convert(html) },
+  'convert-options' => ->(html, options) { HtmlToMarkdown.convert(html, options) },
+  'inline-images-default' => ->(html, _options) { HtmlToMarkdown.convert_with_inline_images(html, nil, nil) },
+  'inline-images-options' => ->(html, options) { HtmlToMarkdown.convert_with_inline_images(html, options, nil) },
+  'metadata-default' => ->(html, _options) { HtmlToMarkdown.convert_with_metadata(html, nil, nil) },
+  'metadata-options' => ->(html, options) { HtmlToMarkdown.convert_with_metadata(html, options, nil) }
+}.freeze
+
+def run_scenario(html, scenario, options)
+  runner = SCENARIO_RUNNERS.fetch(scenario) { raise ArgumentError, "Unsupported scenario: #{scenario}" }
+  runner.call(html, options)
 end
 
-convert_document(html, options_handle)
+run_scenario(html, options[:scenario], conversion_options)
 
 profile_output = ENV.fetch('HTML_TO_MARKDOWN_PROFILE_OUTPUT', nil)
 if profile_output && HtmlToMarkdown.respond_to?(:start_profiling)
@@ -77,7 +103,7 @@ if profile_output && HtmlToMarkdown.respond_to?(:start_profiling)
 end
 
 start = Process.clock_gettime(Process::CLOCK_MONOTONIC)
-iterations.times { convert_document(html, options_handle) }
+iterations.times { run_scenario(html, options[:scenario], conversion_options) }
 elapsed = Process.clock_gettime(Process::CLOCK_MONOTONIC) - start
 
 HtmlToMarkdown.stop_profiling if profile_output && HtmlToMarkdown.respond_to?(:stop_profiling)
@@ -91,6 +117,7 @@ payload = %({
   "language":"ruby",
   "fixture":"#{json_escape(File.basename(fixture))}",
   "fixture_path":"#{json_escape(fixture)}",
+  "scenario":"#{json_escape(options[:scenario])}",
   "iterations":#{iterations},
   "elapsed_seconds":#{format('%.8f', elapsed)},
   "ops_per_sec":#{format('%.4f', ops_per_sec)},

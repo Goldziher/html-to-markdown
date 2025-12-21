@@ -16,6 +16,7 @@ type BenchmarkResult struct {
 	Language       string  `json:"language"`
 	Fixture        string  `json:"fixture"`
 	FixturePath    string  `json:"fixture_path"`
+	Scenario       string  `json:"scenario"`
 	Iterations     int     `json:"iterations"`
 	ElapsedSeconds float64 `json:"elapsed_seconds"`
 	OpsPerSec      float64 `json:"ops_per_sec"`
@@ -27,10 +28,16 @@ func main() {
 	filePath := flag.String("file", "", "Path to the HTML/HOCR fixture")
 	iterations := flag.Int("iterations", 50, "Number of iterations")
 	_ = flag.String("format", "html", "Fixture format (html or hocr)")
+	scenario := flag.String("scenario", "convert-default", "Scenario to benchmark")
 	flag.Parse()
 
 	if *filePath == "" {
 		fmt.Fprintln(os.Stderr, "Error: --file is required")
+		os.Exit(1)
+	}
+
+	if *scenario != "convert-default" && *scenario != "metadata-default" {
+		fmt.Fprintf(os.Stderr, "Unsupported scenario: %s\n", *scenario)
 		os.Exit(1)
 	}
 
@@ -54,7 +61,7 @@ func main() {
 	}
 
 	// Warmup (avoid profiling the warmup run).
-	_, err = htmltomarkdown.Convert(html)
+	err = runScenario(html, *scenario)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Warmup conversion failed: %v\n", err)
 		os.Exit(1)
@@ -76,7 +83,7 @@ func main() {
 	// Benchmark
 	start := time.Now()
 	for i := 0; i < *iterations; i++ {
-		_, err = htmltomarkdown.Convert(html)
+		err = runScenario(html, *scenario)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Conversion failed: %v\n", err)
 			os.Exit(1)
@@ -92,6 +99,7 @@ func main() {
 		Language:       "go",
 		Fixture:        filepath.Base(*filePath),
 		FixturePath:    *filePath,
+		Scenario:       *scenario,
 		Iterations:     *iterations,
 		ElapsedSeconds: elapsed,
 		OpsPerSec:      opsPerSec,
@@ -103,5 +111,16 @@ func main() {
 	if err := encoder.Encode(result); err != nil {
 		fmt.Fprintf(os.Stderr, "Error encoding JSON: %v\n", err)
 		os.Exit(1)
+	}
+}
+
+func runScenario(html string, scenario string) error {
+	switch scenario {
+	case "metadata-default":
+		_, err := htmltomarkdown.ConvertWithMetadata(html)
+		return err
+	default:
+		_, err := htmltomarkdown.Convert(html)
+		return err
 	}
 }

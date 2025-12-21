@@ -152,6 +152,7 @@
           <tr>
             <th>Fixture</th>
             <th>Format</th>
+            <th>Scenario</th>
             <th>Runs</th>
             <th>Successes</th>
             <th>Median Ops/sec</th>
@@ -164,6 +165,7 @@
           <tr>
             <td>{{ item.fixture }}</td>
             <td><span class="pill">{{ item.format }}</span></td>
+            <td><span class="pill">{{ item.scenario }}</span></td>
             <td>{{ item.runs }}</td>
             <td>{{ item.successes }}</td>
             <td>{{ "%.1f" | format(item.median_ops) }}</td>
@@ -180,6 +182,7 @@
             <th>Framework</th>
             <th>Fixture</th>
             <th>Format</th>
+            <th>Scenario</th>
             <th>Ops/sec</th>
             <th>MB/sec</th>
             <th>Duration (ms)</th>
@@ -195,6 +198,7 @@
             <td>{{ result.framework }}</td>
             <td>{{ result.fixture_name }}</td>
             <td><span class="pill">{{ result.fixture_format }}</span></td>
+            <td><span class="pill">{{ result.scenario }}</span></td>
             <td>{{ "%.1f" | format(result.ops_per_sec) }}</td>
             <td>{{ "%.1f" | format(result.mb_per_sec) }}</td>
             <td>{{ "%.1f" | format(result.duration_ms) }}</td>

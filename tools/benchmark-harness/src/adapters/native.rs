@@ -1,12 +1,15 @@
 use crate::adapter::FrameworkAdapter;
-use crate::config::BenchmarkConfig;
+use crate::config::{BenchmarkConfig, BenchmarkScenario};
 use crate::fixture::{Fixture, FixtureFormat};
 use crate::monitoring::ResourceMonitor;
 #[cfg(all(feature = "profiling", not(target_os = "windows")))]
 use crate::profiling::ProfileGuard;
 use crate::types::{BenchmarkResult, DurationStatistics, IterationResult, MemoryStats, PerformanceMetrics};
 use crate::{Error, Result};
-use html_to_markdown_rs::{ConversionOptions, convert};
+use html_to_markdown_rs::{
+    ConversionOptions, DEFAULT_INLINE_IMAGE_LIMIT, InlineImageConfig, MetadataConfig, convert,
+    convert_with_inline_images, convert_with_metadata,
+};
 use std::path::PathBuf;
 use std::time::{Duration, Instant};
 
@@ -32,6 +35,23 @@ impl NativeAdapter {
         }
         options
     }
+
+    fn run_scenario(html: &str, scenario: BenchmarkScenario, options: Option<ConversionOptions>) -> Result<()> {
+        match scenario {
+            BenchmarkScenario::ConvertDefault | BenchmarkScenario::ConvertWithOptions => {
+                convert(html, options).map_err(|err| Error::Benchmark(format!("Conversion failed: {err}")))?;
+            }
+            BenchmarkScenario::InlineImagesDefault | BenchmarkScenario::InlineImagesWithOptions => {
+                let _ = convert_with_inline_images(html, options, InlineImageConfig::new(DEFAULT_INLINE_IMAGE_LIMIT))
+                    .map_err(|err| Error::Benchmark(format!("Inline image conversion failed: {err}")))?;
+            }
+            BenchmarkScenario::MetadataDefault | BenchmarkScenario::MetadataWithOptions => {
+                let _ = convert_with_metadata(html, options, MetadataConfig::default())
+                    .map_err(|err| Error::Benchmark(format!("Metadata conversion failed: {err}")))?;
+            }
+        }
+        Ok(())
+    }
 }
 
 impl FrameworkAdapter for NativeAdapter {
@@ -43,9 +63,15 @@ impl FrameworkAdapter for NativeAdapter {
         matches!(format, FixtureFormat::Html | FixtureFormat::Hocr)
     }
 
-    fn run(&self, fixture: &Fixture, config: &BenchmarkConfig) -> Result<BenchmarkResult> {
+    fn run(&self, fixture: &Fixture, scenario: BenchmarkScenario, config: &BenchmarkConfig) -> Result<BenchmarkResult> {
         let html = self.read_fixture(fixture)?;
-        let options = Self::build_options(fixture.format);
+        let base_options = Self::build_options(fixture.format);
+        let options = match scenario {
+            BenchmarkScenario::ConvertWithOptions
+            | BenchmarkScenario::InlineImagesWithOptions
+            | BenchmarkScenario::MetadataWithOptions => Some(base_options),
+            _ => None,
+        };
         let base_iterations = fixture.iterations.unwrap_or(config.benchmark_iterations as u32).max(1) as usize;
         let profile_repeat = if config.enable_profiling {
             config.profile_repeat.max(1)
@@ -55,8 +81,7 @@ impl FrameworkAdapter for NativeAdapter {
         let iterations = base_iterations.saturating_mul(profile_repeat);
 
         for _ in 0..config.warmup_iterations.max(1) {
-            convert(&html, Some(options.clone()))
-                .map_err(|err| Error::Benchmark(format!("Warmup conversion failed: {err}")))?;
+            Self::run_scenario(&html, scenario, options.clone())?;
         }
 
         #[cfg(all(feature = "profiling", not(target_os = "windows")))]
@@ -72,8 +97,7 @@ impl FrameworkAdapter for NativeAdapter {
         let start = Instant::now();
         for iteration in 0..iterations {
             let iter_start = Instant::now();
-            convert(&html, Some(options.clone()))
-                .map_err(|err| Error::Benchmark(format!("Conversion failed: {err}")))?;
+            Self::run_scenario(&html, scenario, options.clone())?;
             iteration_results.push(IterationResult {
                 iteration,
                 duration: iter_start.elapsed(),
@@ -99,7 +123,7 @@ impl FrameworkAdapter for NativeAdapter {
             config
                 .flamegraph_dir
                 .clone()
-                .map(|dir| dir.join(format!("{}-{}.svg", self.name(), fixture.id)))
+                .map(|dir| dir.join(format!("{}-{}-{}.svg", self.name(), fixture.id, scenario.as_str())))
         } else {
             None
         };
@@ -130,6 +154,7 @@ impl FrameworkAdapter for NativeAdapter {
 
         Ok(BenchmarkResult {
             framework: self.name().to_string(),
+            scenario: scenario.as_str().to_string(),
             fixture_id: fixture.id.clone(),
             fixture_name: fixture.name.clone(),
             fixture_path: fixture.resolved_path(&self.repo_root),

@@ -10,8 +10,11 @@ from pathlib import Path
 
 from html_to_markdown import (
     ConversionOptions,
-    convert_with_handle,
-    create_options_handle,
+    InlineImageConfig,
+    MetadataConfig,
+    convert,
+    convert_with_inline_images,
+    convert_with_metadata,
     start_profiling,
     stop_profiling,
 )
@@ -22,6 +25,19 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--file", required=True, help="Path to the HTML/HOCR fixture")
     parser.add_argument("--iterations", type=int, default=50, help="Number of iterations")
     parser.add_argument(
+        "--scenario",
+        default="convert-default",
+        choices=(
+            "convert-default",
+            "convert-options",
+            "inline-images-default",
+            "inline-images-options",
+            "metadata-default",
+            "metadata-options",
+        ),
+        help="Benchmark scenario to run",
+    )
+    parser.add_argument(
         "--format",
         choices=("html", "hocr"),
         default="html",
@@ -30,10 +46,27 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def build_options(fixture_format: str) -> ConversionOptions | None:
+def build_options(fixture_format: str) -> ConversionOptions:
     if fixture_format == "hocr":
         return ConversionOptions(hocr_spatial_tables=False)
-    return None
+    return ConversionOptions()
+
+
+def run_scenario(html: str, scenario: str, options: ConversionOptions) -> None:
+    if scenario == "convert-default":
+        convert(html)
+    elif scenario == "convert-options":
+        convert(html, options)
+    elif scenario == "inline-images-default":
+        convert_with_inline_images(html, None, None, InlineImageConfig())
+    elif scenario == "inline-images-options":
+        convert_with_inline_images(html, options, None, InlineImageConfig())
+    elif scenario == "metadata-default":
+        convert_with_metadata(html, None, None, MetadataConfig())
+    elif scenario == "metadata-options":
+        convert_with_metadata(html, options, None, MetadataConfig())
+    else:
+        raise SystemExit(f"Unsupported scenario: {scenario}")
 
 
 def main() -> None:
@@ -46,9 +79,7 @@ def main() -> None:
 
     html = fixture.read_text(encoding="utf-8")
     options = build_options(args.format)
-    options_handle = create_options_handle(options)
-
-    convert_with_handle(html, options_handle)  # Warmup
+    run_scenario(html, args.scenario, options)  # Warmup
 
     profile_output = os.getenv("HTML_TO_MARKDOWN_PROFILE_OUTPUT")
     profile_frequency = os.getenv("HTML_TO_MARKDOWN_PROFILE_FREQUENCY")
@@ -58,7 +89,7 @@ def main() -> None:
 
     start = time.perf_counter()
     for _ in range(iterations):
-        convert_with_handle(html, options_handle)
+        run_scenario(html, args.scenario, options)
     elapsed = time.perf_counter() - start
 
     if profile_output:
@@ -72,6 +103,7 @@ def main() -> None:
         "language": "python",
         "fixture": fixture.name,
         "fixture_path": str(fixture),
+        "scenario": args.scenario,
         "iterations": iterations,
         "elapsed_seconds": elapsed,
         "ops_per_sec": ops_per_sec,

@@ -19,6 +19,7 @@ public class Benchmark {
         String filePath = null;
         int iterations = DEFAULT_ITERATIONS;
         String format = "html";
+        String scenario = "convert-default";
 
         for (int i = 0; i < args.length; i++) {
             switch (args[i]) {
@@ -37,6 +38,11 @@ public class Benchmark {
                         format = args[++i];
                     }
                     break;
+                case "--scenario":
+                    if (i + 1 < args.length) {
+                        scenario = args[++i];
+                    }
+                    break;
             }
         }
 
@@ -45,11 +51,16 @@ public class Benchmark {
             System.exit(1);
         }
 
+        if (!scenario.equals("convert-default") && !scenario.equals("metadata-default")) {
+            System.err.println("Unsupported scenario: " + scenario);
+            System.exit(1);
+        }
+
         try {
             Path path = Paths.get(filePath);
             String html = Files.readString(path);
 
-            HtmlToMarkdown.convert(html);
+            runScenario(html, scenario);
 
             String profileOutput = System.getenv("HTML_TO_MARKDOWN_PROFILE_OUTPUT");
             if (profileOutput != null && !profileOutput.isBlank()) {
@@ -67,7 +78,7 @@ public class Benchmark {
 
             long startNanos = System.nanoTime();
             for (int i = 0; i < iterations; i++) {
-                HtmlToMarkdown.convert(html);
+                runScenario(html, scenario);
             }
             long endNanos = System.nanoTime();
 
@@ -84,6 +95,7 @@ public class Benchmark {
             result.put("language", "java");
             result.put("fixture", path.getFileName().toString());
             result.put("fixture_path", filePath);
+            result.put("scenario", scenario);
             result.put("iterations", iterations);
             result.put("elapsed_seconds", elapsedSeconds);
             result.put("ops_per_sec", opsPerSec);
@@ -116,5 +128,13 @@ public class Benchmark {
         }
         sb.append("}");
         return sb.toString();
+    }
+
+    private static void runScenario(String html, String scenario) {
+        if ("metadata-default".equals(scenario)) {
+            HtmlToMarkdown.convertWithMetadata(html);
+        } else {
+            HtmlToMarkdown.convert(html);
+        }
     }
 }

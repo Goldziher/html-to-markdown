@@ -5,7 +5,7 @@ static ALLOC: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
 use benchmark_harness::adapters::{NativeAdapter, ScriptAdapter, ScriptLanguage};
 use benchmark_harness::fixture::load_fixtures;
 use benchmark_harness::types::BenchmarkResult;
-use benchmark_harness::{AdapterRegistry, BenchmarkConfig, BenchmarkMode, BenchmarkRunner, Result};
+use benchmark_harness::{AdapterRegistry, BenchmarkConfig, BenchmarkMode, BenchmarkRunner, BenchmarkScenario, Result};
 use clap::{Parser, Subcommand, ValueEnum};
 use std::env;
 use std::path::{Path, PathBuf};
@@ -80,6 +80,9 @@ enum Commands {
         #[arg(long)]
         flamegraphs: Option<PathBuf>,
 
+        #[arg(long, value_enum, value_delimiter = ',')]
+        scenarios: Vec<CliScenario>,
+
         #[arg(long, value_enum, default_value = "json")]
         format: OutputFormat,
     },
@@ -100,11 +103,40 @@ enum OutputFormat {
     Both,
 }
 
+#[derive(Debug, Clone, Copy, ValueEnum)]
+enum CliScenario {
+    #[value(name = "convert-default")]
+    ConvertDefault,
+    #[value(name = "convert-options")]
+    ConvertWithOptions,
+    #[value(name = "inline-images-default")]
+    InlineImagesDefault,
+    #[value(name = "inline-images-options")]
+    InlineImagesWithOptions,
+    #[value(name = "metadata-default")]
+    MetadataDefault,
+    #[value(name = "metadata-options")]
+    MetadataWithOptions,
+}
+
 impl From<CliMode> for BenchmarkMode {
     fn from(mode: CliMode) -> Self {
         match mode {
             CliMode::SingleFile => BenchmarkMode::SingleFile,
             CliMode::Batch => BenchmarkMode::Batch,
+        }
+    }
+}
+
+impl From<CliScenario> for BenchmarkScenario {
+    fn from(scenario: CliScenario) -> Self {
+        match scenario {
+            CliScenario::ConvertDefault => BenchmarkScenario::ConvertDefault,
+            CliScenario::ConvertWithOptions => BenchmarkScenario::ConvertWithOptions,
+            CliScenario::InlineImagesDefault => BenchmarkScenario::InlineImagesDefault,
+            CliScenario::InlineImagesWithOptions => BenchmarkScenario::InlineImagesWithOptions,
+            CliScenario::MetadataDefault => BenchmarkScenario::MetadataDefault,
+            CliScenario::MetadataWithOptions => BenchmarkScenario::MetadataWithOptions,
         }
     }
 }
@@ -167,6 +199,7 @@ fn main() -> Result<()> {
             profile_frequency,
             profile_repeat,
             flamegraphs,
+            scenarios,
             format,
         } => {
             let repo_root = repo_root()?;
@@ -179,12 +212,19 @@ fn main() -> Result<()> {
                 }
             });
 
+            let scenarios = if scenarios.is_empty() {
+                BenchmarkScenario::all()
+            } else {
+                scenarios.into_iter().map(Into::into).collect()
+            };
+
             let config = BenchmarkConfig {
                 fixtures_path: fixtures_path.clone(),
                 output_dir: output.clone(),
                 benchmark_mode: mode.into(),
                 warmup_iterations: warmup,
                 benchmark_iterations: iterations,
+                scenarios,
                 enable_profiling: profile || flamegraph_dir.is_some(),
                 profile_frequency,
                 profile_repeat,
