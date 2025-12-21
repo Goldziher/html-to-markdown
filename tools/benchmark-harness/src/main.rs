@@ -117,6 +117,8 @@ enum CliScenario {
     MetadataDefault,
     #[value(name = "metadata-options")]
     MetadataWithOptions,
+    #[value(name = "metadata-raw")]
+    MetadataRaw,
 }
 
 impl From<CliMode> for BenchmarkMode {
@@ -137,6 +139,7 @@ impl From<CliScenario> for BenchmarkScenario {
             CliScenario::InlineImagesWithOptions => BenchmarkScenario::InlineImagesWithOptions,
             CliScenario::MetadataDefault => BenchmarkScenario::MetadataDefault,
             CliScenario::MetadataWithOptions => BenchmarkScenario::MetadataWithOptions,
+            CliScenario::MetadataRaw => BenchmarkScenario::MetadataRaw,
         }
     }
 }

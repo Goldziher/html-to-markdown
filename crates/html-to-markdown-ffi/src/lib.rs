@@ -7,6 +7,7 @@ use std::cell::RefCell;
 use std::ffi::{CStr, CString};
 use std::os::raw::c_char;
 use std::ptr;
+use std::slice;
 
 use html_to_markdown_rs::safety::guard_panic;
 use html_to_markdown_rs::{ConversionError, convert};
@@ -17,6 +18,21 @@ mod profiling;
 
 thread_local! {
     static LAST_ERROR: RefCell<Option<CString>> = const { RefCell::new(None) };
+}
+
+fn bytes_to_c_string(mut bytes: Vec<u8>, context: &str) -> Result<CString, String> {
+    if bytes.contains(&0) {
+        return Err(format!("{context} contained an interior null byte"));
+    }
+
+    bytes.reserve(1);
+    bytes.push(0);
+
+    Ok(unsafe { CString::from_vec_unchecked(bytes) })
+}
+
+fn string_to_c_string(value: String, context: &str) -> Result<CString, String> {
+    bytes_to_c_string(value.into_bytes(), context)
 }
 
 fn set_last_error(message: Option<String>) {
@@ -130,10 +146,117 @@ pub unsafe extern "C" fn html_to_markdown_convert(html: *const c_char) -> *mut c
     match guard_panic(|| profiling::maybe_profile(|| convert(html_str, None))) {
         Ok(markdown) => {
             set_last_error(None);
-            match CString::new(markdown) {
+            match string_to_c_string(markdown, "markdown result") {
                 Ok(c_string) => c_string.into_raw(),
-                Err(_) => {
-                    set_last_error(Some("failed to build CString for markdown result".to_string()));
+                Err(err) => {
+                    set_last_error(Some(format!("failed to build CString for markdown result: {err}")));
+                    ptr::null_mut()
+                }
+            }
+        }
+        Err(err) => {
+            capture_error(err);
+            ptr::null_mut()
+        }
+    }
+}
+
+/// Convert HTML to Markdown using default options, returning the output length.
+///
+/// # Safety
+///
+/// - `html` must be a valid null-terminated C string
+/// - `len_out` must be a valid pointer to a size_t
+/// - The returned string must be freed with `html_to_markdown_free_string`
+/// - Returns NULL on error
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn html_to_markdown_convert_with_len(html: *const c_char, len_out: *mut usize) -> *mut c_char {
+    if html.is_null() {
+        set_last_error(Some("html pointer was null".to_string()));
+        return ptr::null_mut();
+    }
+
+    if len_out.is_null() {
+        set_last_error(Some("len_out pointer was null".to_string()));
+        return ptr::null_mut();
+    }
+
+    let html_str = match unsafe { CStr::from_ptr(html) }.to_str() {
+        Ok(s) => s,
+        Err(_) => {
+            set_last_error(Some("html must be valid UTF-8".to_string()));
+            return ptr::null_mut();
+        }
+    };
+
+    match guard_panic(|| profiling::maybe_profile(|| convert(html_str, None))) {
+        Ok(markdown) => {
+            set_last_error(None);
+            match string_to_c_string(markdown, "markdown result") {
+                Ok(c_string) => {
+                    unsafe {
+                        *len_out = c_string.as_bytes().len();
+                    }
+                    c_string.into_raw()
+                }
+                Err(err) => {
+                    set_last_error(Some(format!("failed to build CString for markdown result: {err}")));
+                    ptr::null_mut()
+                }
+            }
+        }
+        Err(err) => {
+            capture_error(err);
+            ptr::null_mut()
+        }
+    }
+}
+
+/// Convert UTF-8 HTML bytes to Markdown and return the output length.
+///
+/// # Safety
+///
+/// - `html` must point to `len` bytes of UTF-8 data
+/// - `len_out` must be a valid pointer to a size_t
+/// - The returned string must be freed with `html_to_markdown_free_string`
+/// - Returns NULL on error
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn html_to_markdown_convert_bytes_with_len(
+    html: *const u8,
+    len: usize,
+    len_out: *mut usize,
+) -> *mut c_char {
+    if html.is_null() {
+        set_last_error(Some("html pointer was null".to_string()));
+        return ptr::null_mut();
+    }
+
+    if len_out.is_null() {
+        set_last_error(Some("len_out pointer was null".to_string()));
+        return ptr::null_mut();
+    }
+
+    let html_bytes = unsafe { slice::from_raw_parts(html, len) };
+    let html_str = match std::str::from_utf8(html_bytes) {
+        Ok(s) => s,
+        Err(_) => {
+            set_last_error(Some("html must be valid UTF-8".to_string()));
+            return ptr::null_mut();
+        }
+    };
+
+    match guard_panic(|| profiling::maybe_profile(|| convert(html_str, None))) {
+        Ok(markdown) => {
+            set_last_error(None);
+            match string_to_c_string(markdown, "markdown result") {
+                Ok(c_string) => {
+                    unsafe {
+                        *len_out = c_string.as_bytes().len();
+                    }
+                    c_string.into_raw()
+                }
+                Err(err) => {
+                    set_last_error(Some(format!("failed to build CString for markdown result: {err}")));
                     ptr::null_mut()
                 }
             }
@@ -249,7 +372,7 @@ pub unsafe extern "C" fn html_to_markdown_convert_with_metadata(
         Ok((markdown, metadata)) => {
             set_last_error(None);
 
-            let metadata_json = match serde_json::to_string(&metadata) {
+            let metadata_json = match serde_json::to_vec(&metadata) {
                 Ok(json) => json,
                 Err(e) => {
                     set_last_error(Some(format!("failed to serialize metadata to JSON: {}", e)));
@@ -257,10 +380,10 @@ pub unsafe extern "C" fn html_to_markdown_convert_with_metadata(
                 }
             };
 
-            let metadata_c_string = match CString::new(metadata_json) {
+            let metadata_c_string = match bytes_to_c_string(metadata_json, "metadata JSON") {
                 Ok(s) => s,
-                Err(_) => {
-                    set_last_error(Some("failed to build CString for metadata JSON".to_string()));
+                Err(err) => {
+                    set_last_error(Some(format!("failed to build CString for metadata JSON: {err}")));
                     return ptr::null_mut();
                 }
             };
@@ -269,14 +392,224 @@ pub unsafe extern "C" fn html_to_markdown_convert_with_metadata(
                 *metadata_json_out = metadata_c_string.into_raw();
             }
 
-            match CString::new(markdown) {
+            match string_to_c_string(markdown, "markdown result") {
                 Ok(c_string) => c_string.into_raw(),
-                Err(_) => {
-                    set_last_error(Some("failed to build CString for markdown result".to_string()));
+                Err(err) => {
+                    set_last_error(Some(format!("failed to build CString for markdown result: {err}")));
                     unsafe {
                         if !metadata_json_out.is_null() && !(*metadata_json_out).is_null() {
                             html_to_markdown_free_string(*metadata_json_out);
                             *metadata_json_out = ptr::null_mut();
+                        }
+                    }
+                    ptr::null_mut()
+                }
+            }
+        }
+        Err(err) => {
+            capture_error(err);
+            ptr::null_mut()
+        }
+    }
+}
+
+/// Convert HTML to Markdown with metadata extraction, returning output lengths.
+///
+/// # Safety
+///
+/// - `html` must be a valid null-terminated C string
+/// - `metadata_json_out` must be a valid pointer to a char pointer
+/// - `markdown_len_out` and `metadata_len_out` must be valid pointers to size_t
+/// - The returned markdown string must be freed with `html_to_markdown_free_string`
+/// - The metadata JSON string (written to metadata_json_out) must be freed with `html_to_markdown_free_string`
+/// - Returns NULL on error (check error with `html_to_markdown_last_error`)
+#[cfg(feature = "metadata")]
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn html_to_markdown_convert_with_metadata_with_len(
+    html: *const c_char,
+    metadata_json_out: *mut *mut c_char,
+    markdown_len_out: *mut usize,
+    metadata_len_out: *mut usize,
+) -> *mut c_char {
+    if html.is_null() {
+        set_last_error(Some("html pointer was null".to_string()));
+        return ptr::null_mut();
+    }
+
+    if metadata_json_out.is_null() {
+        set_last_error(Some("metadata_json_out pointer was null".to_string()));
+        return ptr::null_mut();
+    }
+
+    if markdown_len_out.is_null() || metadata_len_out.is_null() {
+        set_last_error(Some("length output pointer was null".to_string()));
+        return ptr::null_mut();
+    }
+
+    let html_str = match unsafe { CStr::from_ptr(html) }.to_str() {
+        Ok(s) => s,
+        Err(_) => {
+            set_last_error(Some("html must be valid UTF-8".to_string()));
+            return ptr::null_mut();
+        }
+    };
+
+    let metadata_cfg = MetadataConfig {
+        extract_document: true,
+        extract_headers: true,
+        extract_links: true,
+        extract_images: true,
+        extract_structured_data: true,
+        max_structured_data_size: DEFAULT_MAX_STRUCTURED_DATA_SIZE,
+    };
+
+    match guard_panic(|| profiling::maybe_profile(|| convert_with_metadata(html_str, None, metadata_cfg.clone()))) {
+        Ok((markdown, metadata)) => {
+            set_last_error(None);
+
+            let metadata_json = match serde_json::to_vec(&metadata) {
+                Ok(json) => json,
+                Err(e) => {
+                    set_last_error(Some(format!("failed to serialize metadata to JSON: {}", e)));
+                    return ptr::null_mut();
+                }
+            };
+
+            let metadata_c_string = match bytes_to_c_string(metadata_json, "metadata JSON") {
+                Ok(s) => s,
+                Err(err) => {
+                    set_last_error(Some(format!("failed to build CString for metadata JSON: {err}")));
+                    return ptr::null_mut();
+                }
+            };
+
+            unsafe {
+                *metadata_len_out = metadata_c_string.as_bytes().len();
+                *metadata_json_out = metadata_c_string.into_raw();
+            }
+
+            match string_to_c_string(markdown, "markdown result") {
+                Ok(c_string) => {
+                    unsafe {
+                        *markdown_len_out = c_string.as_bytes().len();
+                    }
+                    c_string.into_raw()
+                }
+                Err(err) => {
+                    set_last_error(Some(format!("failed to build CString for markdown result: {err}")));
+                    unsafe {
+                        if !metadata_json_out.is_null() && !(*metadata_json_out).is_null() {
+                            html_to_markdown_free_string(*metadata_json_out);
+                            *metadata_json_out = ptr::null_mut();
+                        }
+                        if !metadata_len_out.is_null() {
+                            *metadata_len_out = 0;
+                        }
+                    }
+                    ptr::null_mut()
+                }
+            }
+        }
+        Err(err) => {
+            capture_error(err);
+            ptr::null_mut()
+        }
+    }
+}
+
+/// Convert UTF-8 HTML bytes to Markdown with metadata extraction and return output lengths.
+///
+/// # Safety
+///
+/// - `html` must point to `len` bytes of UTF-8 data
+/// - `metadata_json_out` must be a valid pointer to a char pointer
+/// - `markdown_len_out` and `metadata_len_out` must be valid pointers to size_t
+/// - The returned markdown string must be freed with `html_to_markdown_free_string`
+/// - The metadata JSON string (written to metadata_json_out) must be freed with `html_to_markdown_free_string`
+/// - Returns NULL on error (check error with `html_to_markdown_last_error`)
+#[cfg(feature = "metadata")]
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn html_to_markdown_convert_with_metadata_bytes_with_len(
+    html: *const u8,
+    len: usize,
+    metadata_json_out: *mut *mut c_char,
+    markdown_len_out: *mut usize,
+    metadata_len_out: *mut usize,
+) -> *mut c_char {
+    if html.is_null() {
+        set_last_error(Some("html pointer was null".to_string()));
+        return ptr::null_mut();
+    }
+
+    if metadata_json_out.is_null() {
+        set_last_error(Some("metadata_json_out pointer was null".to_string()));
+        return ptr::null_mut();
+    }
+
+    if markdown_len_out.is_null() || metadata_len_out.is_null() {
+        set_last_error(Some("length output pointer was null".to_string()));
+        return ptr::null_mut();
+    }
+
+    let html_bytes = unsafe { slice::from_raw_parts(html, len) };
+    let html_str = match std::str::from_utf8(html_bytes) {
+        Ok(s) => s,
+        Err(_) => {
+            set_last_error(Some("html must be valid UTF-8".to_string()));
+            return ptr::null_mut();
+        }
+    };
+
+    let metadata_cfg = MetadataConfig {
+        extract_document: true,
+        extract_headers: true,
+        extract_links: true,
+        extract_images: true,
+        extract_structured_data: true,
+        max_structured_data_size: DEFAULT_MAX_STRUCTURED_DATA_SIZE,
+    };
+
+    match guard_panic(|| profiling::maybe_profile(|| convert_with_metadata(html_str, None, metadata_cfg.clone()))) {
+        Ok((markdown, metadata)) => {
+            set_last_error(None);
+
+            let metadata_json = match serde_json::to_vec(&metadata) {
+                Ok(json) => json,
+                Err(e) => {
+                    set_last_error(Some(format!("failed to serialize metadata to JSON: {}", e)));
+                    return ptr::null_mut();
+                }
+            };
+
+            let metadata_c_string = match bytes_to_c_string(metadata_json, "metadata JSON") {
+                Ok(s) => s,
+                Err(err) => {
+                    set_last_error(Some(format!("failed to build CString for metadata JSON: {err}")));
+                    return ptr::null_mut();
+                }
+            };
+
+            unsafe {
+                *metadata_len_out = metadata_c_string.as_bytes().len();
+                *metadata_json_out = metadata_c_string.into_raw();
+            }
+
+            match string_to_c_string(markdown, "markdown result") {
+                Ok(c_string) => {
+                    unsafe {
+                        *markdown_len_out = c_string.as_bytes().len();
+                    }
+                    c_string.into_raw()
+                }
+                Err(err) => {
+                    set_last_error(Some(format!("failed to build CString for markdown result: {err}")));
+                    unsafe {
+                        if !metadata_json_out.is_null() && !(*metadata_json_out).is_null() {
+                            html_to_markdown_free_string(*metadata_json_out);
+                            *metadata_json_out = ptr::null_mut();
+                        }
+                        if !metadata_len_out.is_null() {
+                            *metadata_len_out = 0;
                         }
                     }
                     ptr::null_mut()
@@ -394,6 +727,30 @@ mod tests {
 
             html_to_markdown_free_string(result);
             html_to_markdown_free_string(metadata_json);
+        }
+    }
+
+    #[test]
+    fn test_convert_with_len_reports_length() {
+        unsafe {
+            let html = CString::new("<p>hello</p>").unwrap();
+            let mut len: usize = 0;
+            let result = html_to_markdown_convert_with_len(html.as_ptr(), &mut len);
+            assert!(!result.is_null());
+            assert!(len > 0);
+            html_to_markdown_free_string(result);
+        }
+    }
+
+    #[test]
+    fn test_convert_bytes_with_len_reports_length() {
+        unsafe {
+            let html = b"<p>hello</p>";
+            let mut len: usize = 0;
+            let result = html_to_markdown_convert_bytes_with_len(html.as_ptr(), html.len(), &mut len);
+            assert!(!result.is_null());
+            assert!(len > 0);
+            html_to_markdown_free_string(result);
         }
     }
 
@@ -573,6 +930,53 @@ mod tests {
                 html_to_markdown_free_string(metadata_json);
                 metadata_json = ptr::null_mut();
             }
+        }
+    }
+
+    #[cfg(feature = "metadata")]
+    #[test]
+    fn test_convert_with_metadata_with_len_reports_lengths() {
+        unsafe {
+            let html = CString::new("<html><body><p>hello</p></body></html>").unwrap();
+            let mut metadata_json: *mut c_char = ptr::null_mut();
+            let mut markdown_len: usize = 0;
+            let mut metadata_len: usize = 0;
+            let result = html_to_markdown_convert_with_metadata_with_len(
+                html.as_ptr(),
+                &mut metadata_json,
+                &mut markdown_len,
+                &mut metadata_len,
+            );
+            assert!(!result.is_null());
+            assert!(!metadata_json.is_null());
+            assert!(markdown_len > 0);
+            assert!(metadata_len > 0);
+            html_to_markdown_free_string(result);
+            html_to_markdown_free_string(metadata_json);
+        }
+    }
+
+    #[cfg(feature = "metadata")]
+    #[test]
+    fn test_convert_with_metadata_bytes_with_len_reports_lengths() {
+        unsafe {
+            let html = b"<html><body><p>hello</p></body></html>";
+            let mut metadata_json: *mut c_char = ptr::null_mut();
+            let mut markdown_len: usize = 0;
+            let mut metadata_len: usize = 0;
+            let result = html_to_markdown_convert_with_metadata_bytes_with_len(
+                html.as_ptr(),
+                html.len(),
+                &mut metadata_json,
+                &mut markdown_len,
+                &mut metadata_len,
+            );
+            assert!(!result.is_null());
+            assert!(!metadata_json.is_null());
+            assert!(markdown_len > 0);
+            assert!(metadata_len > 0);
+            html_to_markdown_free_string(result);
+            html_to_markdown_free_string(metadata_json);
         }
     }
 

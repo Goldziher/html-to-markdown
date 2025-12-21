@@ -18,6 +18,30 @@ internal static class NativeMethods
     internal static extern IntPtr html_to_markdown_convert(IntPtr html);
 
     /// <summary>
+    /// Convert HTML to Markdown and return the output length.
+    /// </summary>
+    /// <param name="html">Null-terminated HTML string</param>
+    /// <param name="len_out">Output length of markdown bytes (excluding null terminator)</param>
+    /// <returns>Pointer to null-terminated Markdown string, or NULL on error</returns>
+    [DllImport(LibraryName, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi)]
+    internal static extern IntPtr html_to_markdown_convert_with_len(
+        IntPtr html,
+        out nuint len_out);
+
+    /// <summary>
+    /// Convert UTF-8 HTML bytes to Markdown and return the output length.
+    /// </summary>
+    /// <param name="html">Pointer to UTF-8 bytes</param>
+    /// <param name="html_len">Length of UTF-8 bytes</param>
+    /// <param name="len_out">Output length of markdown bytes (excluding null terminator)</param>
+    /// <returns>Pointer to null-terminated Markdown string, or NULL on error</returns>
+    [DllImport(LibraryName, CallingConvention = CallingConvention.Cdecl)]
+    internal static extern IntPtr html_to_markdown_convert_bytes_with_len(
+        IntPtr html,
+        nuint html_len,
+        out nuint len_out);
+
+    /// <summary>
     /// Free a string returned by html_to_markdown_convert.
     /// </summary>
     /// <param name="ptr">Pointer to string to free</param>
@@ -52,6 +76,38 @@ internal static class NativeMethods
     internal static extern IntPtr html_to_markdown_convert_with_metadata(
         IntPtr html,
         out IntPtr metadata_json_out);
+
+    /// <summary>
+    /// Convert HTML to Markdown with metadata extraction and return output lengths.
+    /// </summary>
+    /// <param name="html">Null-terminated HTML string</param>
+    /// <param name="metadata_json_out">Pointer to char pointer for metadata JSON output</param>
+    /// <param name="markdown_len_out">Output length of markdown bytes (excluding null terminator)</param>
+    /// <param name="metadata_len_out">Output length of metadata JSON bytes (excluding null terminator)</param>
+    /// <returns>Pointer to null-terminated Markdown string, or NULL on error</returns>
+    [DllImport(LibraryName, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi)]
+    internal static extern IntPtr html_to_markdown_convert_with_metadata_with_len(
+        IntPtr html,
+        out IntPtr metadata_json_out,
+        out nuint markdown_len_out,
+        out nuint metadata_len_out);
+
+    /// <summary>
+    /// Convert UTF-8 HTML bytes to Markdown with metadata extraction and return output lengths.
+    /// </summary>
+    /// <param name="html">Pointer to UTF-8 bytes</param>
+    /// <param name="html_len">Length of UTF-8 bytes</param>
+    /// <param name="metadata_json_out">Pointer to char pointer for metadata JSON output</param>
+    /// <param name="markdown_len_out">Output length of markdown bytes (excluding null terminator)</param>
+    /// <param name="metadata_len_out">Output length of metadata JSON bytes (excluding null terminator)</param>
+    /// <returns>Pointer to null-terminated Markdown string, or NULL on error</returns>
+    [DllImport(LibraryName, CallingConvention = CallingConvention.Cdecl)]
+    internal static extern IntPtr html_to_markdown_convert_with_metadata_bytes_with_len(
+        IntPtr html,
+        nuint html_len,
+        out IntPtr metadata_json_out,
+        out nuint markdown_len_out,
+        out nuint metadata_len_out);
 
     /// <summary>
     /// Start Rust-side profiling and write a flamegraph to the given path.

@@ -45,7 +45,9 @@ impl NativeAdapter {
                 let _ = convert_with_inline_images(html, options, InlineImageConfig::new(DEFAULT_INLINE_IMAGE_LIMIT))
                     .map_err(|err| Error::Benchmark(format!("Inline image conversion failed: {err}")))?;
             }
-            BenchmarkScenario::MetadataDefault | BenchmarkScenario::MetadataWithOptions => {
+            BenchmarkScenario::MetadataDefault
+            | BenchmarkScenario::MetadataWithOptions
+            | BenchmarkScenario::MetadataRaw => {
                 let _ = convert_with_metadata(html, options, MetadataConfig::default())
                     .map_err(|err| Error::Benchmark(format!("Metadata conversion failed: {err}")))?;
             }
