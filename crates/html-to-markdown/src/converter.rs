@@ -985,6 +985,26 @@ fn record_node_hierarchy(node_handle: &tl::NodeHandle, parent: Option<u32>, pars
     }
 }
 
+fn may_be_hocr(input: &str) -> bool {
+    let bytes = input.as_bytes();
+    if bytes.len() < 3 {
+        return false;
+    }
+    let mut idx = 0;
+    while idx + 2 < bytes.len() {
+        let b0 = bytes[idx];
+        if b0 == b'o' || b0 == b'O' {
+            let b1 = bytes[idx + 1];
+            let b2 = bytes[idx + 2];
+            if (b1 == b'c' || b1 == b'C') && (b2 == b'r' || b2 == b'R') {
+                return true;
+            }
+        }
+        idx += 1;
+    }
+    false
+}
+
 /// Check if a document is an hOCR (HTML-based OCR) document.
 ///
 /// hOCR documents should have metadata extraction disabled to avoid
@@ -1664,10 +1684,12 @@ fn convert_html_impl(
     let mut output = String::with_capacity(preprocessed_len.saturating_add(preprocessed_len / 4));
 
     let mut is_hocr = false;
-    for child_handle in dom.children().iter() {
-        if is_hocr_document(child_handle, parser) {
-            is_hocr = true;
-            break;
+    if may_be_hocr(preprocessed.as_ref()) {
+        for child_handle in dom.children().iter() {
+            if is_hocr_document(child_handle, parser) {
+                is_hocr = true;
+                break;
+            }
         }
     }
 
@@ -1714,51 +1736,76 @@ fn convert_html_impl(
 
     let dom_ctx = build_dom_context(&dom, parser, preprocessed_len);
 
-    if options.extract_metadata && !options.convert_as_inline {
-        for child_handle in dom.children().iter() {
-            let metadata = extract_metadata(child_handle, parser, options);
-            if !metadata.is_empty() {
-                let metadata_frontmatter = format_metadata_frontmatter(&metadata);
-                output.push_str(&metadata_frontmatter);
-                break;
-            }
-        }
-    }
-
+    let wants_frontmatter = options.extract_metadata && !options.convert_as_inline;
     #[cfg(feature = "metadata")]
-    if let Some(ref collector) = metadata_collector {
-        let wants_document = collector.borrow().wants_document();
-        if !is_hocr && wants_document {
-            for child_handle in dom.children().iter() {
-                let head_meta = extract_metadata(child_handle, parser, options);
-                if !head_meta.is_empty() {
-                    collector.borrow_mut().set_head_metadata(head_meta);
-                    break;
+    let wants_document = metadata_collector
+        .as_ref()
+        .map(|collector| collector.borrow().wants_document())
+        .unwrap_or(false);
+    #[cfg(not(feature = "metadata"))]
+    let wants_document = false;
+
+    if wants_frontmatter || wants_document {
+        let mut head_metadata: Option<BTreeMap<String, String>> = None;
+        #[cfg(feature = "metadata")]
+        let mut document_lang: Option<String> = None;
+        #[cfg(feature = "metadata")]
+        let mut document_dir: Option<String> = None;
+
+        for child_handle in dom.children().iter() {
+            if head_metadata.is_none() {
+                let metadata = extract_metadata(child_handle, parser, options);
+                if !metadata.is_empty() {
+                    head_metadata = Some(metadata);
                 }
             }
-        }
-    }
 
-    #[cfg(feature = "metadata")]
-    if let Some(ref collector) = metadata_collector {
-        if collector.borrow().wants_document() {
-            for child_handle in dom.children().iter() {
+            #[cfg(feature = "metadata")]
+            if wants_document {
                 if let Some(tl::Node::Tag(tag)) = child_handle.get(parser) {
                     let tag_name = tag.name().as_utf8_str();
                     if tag_name == "html" || tag_name == "body" {
-                        if let Some(lang) = tag.attributes().get("lang") {
-                            if let Some(lang_bytes) = lang {
-                                let lang_str = lang_bytes.as_utf8_str();
-                                collector.borrow_mut().set_language(lang_str.to_string());
+                        if document_lang.is_none() {
+                            if let Some(lang) = tag.attributes().get("lang") {
+                                if let Some(lang_bytes) = lang {
+                                    document_lang = Some(lang_bytes.as_utf8_str().to_string());
+                                }
                             }
                         }
-                        if let Some(dir) = tag.attributes().get("dir") {
-                            if let Some(dir_bytes) = dir {
-                                let dir_str = dir_bytes.as_utf8_str();
-                                collector.borrow_mut().set_text_direction(dir_str.to_string());
+                        if document_dir.is_none() {
+                            if let Some(dir) = tag.attributes().get("dir") {
+                                if let Some(dir_bytes) = dir {
+                                    document_dir = Some(dir_bytes.as_utf8_str().to_string());
+                                }
                             }
                         }
                     }
+                }
+            }
+        }
+
+        if wants_frontmatter {
+            if let Some(metadata) = head_metadata.as_ref() {
+                if !metadata.is_empty() {
+                    let metadata_frontmatter = format_metadata_frontmatter(metadata);
+                    output.push_str(&metadata_frontmatter);
+                }
+            }
+        }
+
+        #[cfg(feature = "metadata")]
+        if wants_document {
+            if let Some(ref collector) = metadata_collector {
+                if let Some(metadata) = head_metadata {
+                    if !metadata.is_empty() {
+                        collector.borrow_mut().set_head_metadata(metadata);
+                    }
+                }
+                if let Some(lang) = document_lang {
+                    collector.borrow_mut().set_language(lang);
+                }
+                if let Some(dir) = document_dir {
+                    collector.borrow_mut().set_text_direction(dir);
                 }
             }
         }
