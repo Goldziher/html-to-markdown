@@ -1015,38 +1015,39 @@ impl MetadataCollector {
     /// Parses head metadata into structured document metadata,
     /// handling special cases like Open Graph, Twitter Card, keywords, etc.
     #[allow(dead_code)]
-    fn extract_document_metadata(&self) -> DocumentMetadata {
+    fn extract_document_metadata(
+        head_metadata: BTreeMap<String, String>,
+        lang: Option<String>,
+        dir: Option<String>,
+    ) -> DocumentMetadata {
         let mut doc = DocumentMetadata::default();
 
-        for (raw_key, value) in &self.head_metadata {
+        for (raw_key, value) in head_metadata {
             let mut key = raw_key.as_str();
+            let mut replaced_key: Option<String> = None;
 
             if let Some(stripped) = key.strip_prefix("meta-") {
                 key = stripped;
             }
 
-            let owned_key = if key.as_bytes().contains(&b':') {
-                Some(key.replace(':', "-"))
-            } else {
-                None
-            };
-            if let Some(ref replaced) = owned_key {
-                key = replaced.as_str();
+            if key.as_bytes().contains(&b':') {
+                replaced_key = Some(key.replace(':', "-"));
+                key = replaced_key.as_deref().unwrap_or(key);
             }
 
             match key {
-                "title" => doc.title = Some(value.clone()),
-                "description" => doc.description = Some(value.clone()),
-                "author" => doc.author = Some(value.clone()),
-                "canonical" => doc.canonical_url = Some(value.clone()),
-                "base" | "base-href" => doc.base_href = Some(value.clone()),
+                "title" => doc.title = Some(value),
+                "description" => doc.description = Some(value),
+                "author" => doc.author = Some(value),
+                "canonical" => doc.canonical_url = Some(value),
+                "base" | "base-href" => doc.base_href = Some(value),
                 key if key.starts_with("og-") => {
                     let og_key = if key.as_bytes().contains(&b'-') {
                         key.trim_start_matches("og-").replace('-', "_")
                     } else {
                         key.trim_start_matches("og-").to_string()
                     };
-                    doc.open_graph.insert(og_key, value.clone());
+                    doc.open_graph.insert(og_key, value);
                 }
                 key if key.starts_with("twitter-") => {
                     let tw_key = if key.as_bytes().contains(&b'-') {
@@ -1054,7 +1055,7 @@ impl MetadataCollector {
                     } else {
                         key.trim_start_matches("twitter-").to_string()
                     };
-                    doc.twitter_card.insert(tw_key, value.clone());
+                    doc.twitter_card.insert(tw_key, value);
                 }
                 "keywords" => {
                     doc.keywords = value
@@ -1064,17 +1065,24 @@ impl MetadataCollector {
                         .collect();
                 }
                 _ => {
-                    doc.meta_tags.insert(key.to_string(), value.clone());
+                    let meta_key = if key.as_ptr() == raw_key.as_ptr() && key.len() == raw_key.len() {
+                        raw_key
+                    } else if let Some(replaced) = replaced_key {
+                        replaced
+                    } else {
+                        key.to_string()
+                    };
+                    doc.meta_tags.insert(meta_key, value);
                 }
             }
         }
 
-        if let Some(ref lang) = self.lang {
-            doc.language = Some(lang.clone());
+        if let Some(lang) = lang {
+            doc.language = Some(lang);
         }
 
-        if let Some(ref dir) = self.dir {
-            if let Some(parsed_dir) = TextDirection::parse(dir) {
+        if let Some(dir) = dir {
+            if let Some(parsed_dir) = TextDirection::parse(&dir) {
                 doc.text_direction = Some(parsed_dir);
             }
         }
@@ -1084,17 +1092,17 @@ impl MetadataCollector {
 
     /// Extract structured data blocks into StructuredData items.
     #[allow(dead_code)]
-    fn extract_structured_data(&self) -> Vec<StructuredData> {
-        let mut result = Vec::with_capacity(self.json_ld.len());
+    fn extract_structured_data(json_ld: Vec<String>) -> Vec<StructuredData> {
+        let mut result = Vec::with_capacity(json_ld.len());
 
-        for json_str in &self.json_ld {
-            let schema_type = serde_json::from_str::<serde_json::Value>(json_str)
+        for json_str in json_ld {
+            let schema_type = serde_json::from_str::<serde_json::Value>(&json_str)
                 .ok()
                 .and_then(|v| v.get("@type").and_then(|t| t.as_str().map(|s| s.to_string())));
 
             result.push(StructuredData {
                 data_type: StructuredDataType::JsonLd,
-                raw_json: json_str.clone(),
+                raw_json: json_str,
                 schema_type,
             });
         }
@@ -1112,8 +1120,8 @@ impl MetadataCollector {
     /// Complete [`ExtendedMetadata`] with all extracted information.
     #[allow(dead_code)]
     pub(crate) fn finish(self) -> ExtendedMetadata {
-        let structured_data = self.extract_structured_data();
-        let document = self.extract_document_metadata();
+        let structured_data = Self::extract_structured_data(self.json_ld);
+        let document = Self::extract_document_metadata(self.head_metadata, self.lang, self.dir);
 
         ExtendedMetadata {
             document,
