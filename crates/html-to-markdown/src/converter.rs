@@ -5832,9 +5832,12 @@ fn walk_node(
                                             let type_value = type_value.split(';').next().unwrap_or(type_value);
                                             if type_value.trim().eq_ignore_ascii_case("application/ld+json") {
                                                 let json = child_tag.inner_text(parser);
-                                                let json = text::decode_html_entities(json.trim()).to_string();
+                                                let json = json.trim();
                                                 if !json.is_empty() {
-                                                    collector.borrow_mut().add_json_ld(json);
+                                                    let json = text::decode_html_entities(json).to_string();
+                                                    if !json.is_empty() {
+                                                        collector.borrow_mut().add_json_ld(json);
+                                                    }
                                                 }
                                             }
                                         }
@@ -5863,9 +5866,12 @@ fn walk_node(
                         {
                             if let Some(ref collector) = ctx.metadata_collector {
                                 let json = tag.inner_text(parser);
-                                let json = text::decode_html_entities(json.trim()).to_string();
+                                let json = json.trim();
                                 if !json.is_empty() {
-                                    collector.borrow_mut().add_json_ld(json);
+                                    let json = text::decode_html_entities(json).to_string();
+                                    if !json.is_empty() {
+                                        collector.borrow_mut().add_json_ld(json);
+                                    }
                                 }
                             }
                         }
