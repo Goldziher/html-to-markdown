@@ -1584,11 +1584,19 @@ fn handle_inline_svg(
     title_opt: Option<String>,
     attributes: BTreeMap<String, String>,
 ) {
-    {
+    let max_size = {
         let borrow = collector_ref.borrow();
         if !borrow.capture_svg() {
             return;
         }
+        borrow.max_decoded_size()
+    };
+
+    if max_size == 0 {
+        let mut collector = collector_ref.borrow_mut();
+        let index = collector.next_index();
+        collector.warn_skip(index, "max SVG payload size is zero");
+        return;
     }
 
     let mut collector = collector_ref.borrow_mut();
@@ -1601,7 +1609,6 @@ fn handle_inline_svg(
     }
 
     let data = serialized.into_bytes();
-    let max_size = collector.max_decoded_size();
     if data.len() as u64 > max_size {
         collector.warn_skip(
             index,
