@@ -661,7 +661,9 @@ tasks:
   java:update:
     desc: "Update Java dependencies (Maven)"
     cmds:
-      - MAVEN_OPTS="${MAVEN_OPTS:-} -Dmaven.mainClass=org.apache.maven.cling.MavenCling" ./mvnw -f packages/java/pom.xml -B versions:update-properties -DgenerateBackupPoms=false
+      - MAVEN_OPTS="${MAVEN_OPTS:-} -Dmaven.mainClass=org.apache.maven.cling.MavenCling" ./mvnw -f packages/java/pom.xml -B versions:display-plugin-updates -DprocessPlugins=true -DprocessPluginDependencies=true
+      - MAVEN_OPTS="${MAVEN_OPTS:-} -Dmaven.mainClass=org.apache.maven.cling.MavenCling" ./mvnw -f packages/java/pom.xml -B versions:display-property-updates
+      - MAVEN_OPTS="${MAVEN_OPTS:-} -Dmaven.mainClass=org.apache.maven.cling.MavenCling" ./mvnw -f packages/java/pom.xml -B versions:update-properties -DgenerateBackupPoms=false -DincludeProperties=junit.version,maven-compiler-plugin.version,maven-surefire-plugin.version,maven-javadoc-plugin.version,maven-gpg-plugin.version,maven-install-plugin.version,central-publishing-plugin.version,exec-maven-plugin.version,spotless-maven-plugin.version
 
   java:test:
     desc: "Run Java tests"

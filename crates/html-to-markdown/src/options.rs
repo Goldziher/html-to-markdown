@@ -12,12 +12,31 @@ pub enum HeadingStyle {
     AtxClosed,
 }
 
+impl HeadingStyle {
+    pub fn parse(value: &str) -> Self {
+        match value {
+            "atx" => Self::Atx,
+            "atx_closed" => Self::AtxClosed,
+            _ => Self::Underlined,
+        }
+    }
+}
+
 /// List indentation type.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum ListIndentType {
     #[default]
     Spaces,
     Tabs,
+}
+
+impl ListIndentType {
+    pub fn parse(value: &str) -> Self {
+        match value {
+            "tabs" => Self::Tabs,
+            _ => Self::Spaces,
+        }
+    }
 }
 
 /// Whitespace handling mode.
@@ -28,6 +47,15 @@ pub enum WhitespaceMode {
     Strict,
 }
 
+impl WhitespaceMode {
+    pub fn parse(value: &str) -> Self {
+        match value {
+            "strict" => Self::Strict,
+            _ => Self::Normalized,
+        }
+    }
+}
+
 /// Newline style.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum NewlineStyle {
@@ -36,6 +64,15 @@ pub enum NewlineStyle {
     Spaces,
     /// Backslash at end of line
     Backslash,
+}
+
+impl NewlineStyle {
+    pub fn parse(value: &str) -> Self {
+        match value {
+            "backslash" => Self::Backslash,
+            _ => Self::Spaces,
+        }
+    }
 }
 
 /// Code block style.
@@ -50,6 +87,16 @@ pub enum CodeBlockStyle {
     Tildes,
 }
 
+impl CodeBlockStyle {
+    pub fn parse(value: &str) -> Self {
+        match value {
+            "backticks" => Self::Backticks,
+            "tildes" => Self::Tildes,
+            _ => Self::Indented,
+        }
+    }
+}
+
 /// Highlight style for `<mark>` elements.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum HighlightStyle {
@@ -62,6 +109,18 @@ pub enum HighlightStyle {
     Bold,
     /// Plain text (no formatting)
     None,
+}
+
+impl HighlightStyle {
+    pub fn parse(value: &str) -> Self {
+        match value {
+            "double-equal" => Self::DoubleEqual,
+            "html" => Self::Html,
+            "bold" => Self::Bold,
+            "none" => Self::None,
+            _ => Self::None,
+        }
+    }
 }
 
 /// Preprocessing preset levels.

@@ -450,23 +450,23 @@ fn process_list_children(
 
                     walk_node(child_handle, parser, output, options, &list_ctx, depth, dom_ctx);
 
-                    if is_ordered {
-                        if let Some(info) = dom_ctx.tag_info(child_handle.get_inner()) {
-                            if info.name == "li" {
-                                counter += 1;
-                            }
-                        } else if let Some(child_node) = child_handle.get(parser) {
-                            if let tl::Node::Tag(child_tag) = child_node {
-                                if tag_name_eq(child_tag.name().as_utf8_str(), "li") {
-                                    counter += 1;
-                                }
-                            }
-                        }
+                    if is_ordered && is_list_item(child_handle, parser, dom_ctx) {
+                        counter += 1;
                     }
                 }
             }
         }
     }
+}
+
+fn is_list_item(node_handle: &tl::NodeHandle, parser: &tl::Parser, dom_ctx: &DomContext) -> bool {
+    if let Some(info) = dom_ctx.tag_info(node_handle.get_inner()) {
+        return info.name == "li";
+    }
+    matches!(
+        node_handle.get(parser),
+        Some(tl::Node::Tag(tag)) if tag_name_eq(tag.name().as_utf8_str(), "li")
+    )
 }
 
 /// Conversion context to track state during traversal
@@ -502,8 +502,8 @@ struct Context {
     prev_item_had_blocks: bool,
     /// Are we inside a heading element (h1-h6)?
     in_heading: bool,
-    /// Current heading tag (h1, h2, etc.) if in_heading is true
-    heading_tag: Option<String>,
+    /// Whether inline images should remain markdown inside the current heading.
+    heading_allow_inline_images: bool,
     /// Are we inside a paragraph element?
     in_paragraph: bool,
     /// Are we inside a ruby element?
@@ -830,6 +830,10 @@ fn push_heading(output: &mut String, ctx: &Context, options: &ConversionOptions,
     }
 }
 
+fn heading_allows_inline_images(tag_name: &str, options: &ConversionOptions) -> bool {
+    options.keep_inline_images_in.iter().any(|t| t == tag_name)
+}
+
 fn normalize_heading_text<'a>(text: &'a str) -> Cow<'a, str> {
     if !text.contains('\n') && !text.contains('\r') {
         return Cow::Borrowed(text);
@@ -861,7 +865,8 @@ fn normalize_heading_text<'a>(text: &'a str) -> Cow<'a, str> {
     Cow::Owned(normalized)
 }
 
-fn build_dom_context(dom: &tl::VDom, parser: &tl::Parser) -> DomContext {
+fn build_dom_context(dom: &tl::VDom, parser: &tl::Parser, input_len: usize) -> DomContext {
+    let cache_capacity = text_cache_capacity_for_input(input_len);
     let mut ctx = DomContext {
         parent_map: Vec::new(),
         children_map: Vec::new(),
@@ -869,7 +874,7 @@ fn build_dom_context(dom: &tl::VDom, parser: &tl::Parser) -> DomContext {
         root_children: dom.children().to_vec(),
         node_map: Vec::new(),
         tag_info_map: Vec::new(),
-        text_cache: RefCell::new(LruCache::new(NonZeroUsize::new(TEXT_CACHE_CAPACITY).unwrap())),
+        text_cache: RefCell::new(LruCache::new(cache_capacity)),
     };
 
     for (index, child_handle) in dom.children().iter().enumerate() {
@@ -880,6 +885,11 @@ fn build_dom_context(dom: &tl::VDom, parser: &tl::Parser) -> DomContext {
     }
 
     ctx
+}
+
+fn text_cache_capacity_for_input(input_len: usize) -> NonZeroUsize {
+    let target = (input_len / 512).clamp(128, TEXT_CACHE_CAPACITY);
+    NonZeroUsize::new(target).unwrap_or_else(|| NonZeroUsize::new(128).unwrap())
 }
 
 /// Round-trip HTML through html5ever to repair malformed trees.
@@ -1626,40 +1636,33 @@ fn convert_html_impl(
     let mut preprocessed = preprocess_html(html).into_owned();
     let mut preprocessed_len = preprocessed.len();
 
-    let parser_options = tl::ParserOptions::default();
-    let mut dom_guard = match unsafe { tl::parse_owned(preprocessed.clone(), parser_options) } {
-        Ok(dom) => dom,
-        Err(_) => {
-            if let Some(repaired_html) = repair_with_html5ever(&preprocessed) {
-                preprocessed = preprocess_html(&repaired_html).into_owned();
-                preprocessed_len = preprocessed.len();
-                unsafe { tl::parse_owned(preprocessed.clone(), parser_options) }
-                    .map_err(|_| crate::error::ConversionError::ParseError("Failed to parse HTML".to_string()))?
-            } else {
-                return Err(crate::error::ConversionError::ParseError(
-                    "Failed to parse HTML".to_string(),
-                ));
-            }
-        }
-    };
-
     if has_custom_element_tags(&preprocessed) {
         if let Some(repaired_html) = repair_with_html5ever(&preprocessed) {
             let repaired = preprocess_html(&repaired_html).into_owned();
-            if let Ok(dom) = unsafe { tl::parse_owned(repaired.clone(), parser_options) } {
-                preprocessed = repaired;
-                preprocessed_len = preprocessed.len();
-                dom_guard = dom;
-            }
+            preprocessed = repaired;
+            preprocessed_len = preprocessed.len();
         }
     }
-    let dom_ref = dom_guard.get_ref();
-    let parser = dom_ref.parser();
-    let dom_ctx = build_dom_context(dom_ref, parser);
+    let parser_options = tl::ParserOptions::default();
+    let dom = loop {
+        if let Ok(dom) = tl::parse(&preprocessed, parser_options) {
+            break dom;
+        }
+        if let Some(repaired_html) = repair_with_html5ever(&preprocessed) {
+            preprocessed = preprocess_html(&repaired_html).into_owned();
+            preprocessed_len = preprocessed.len();
+            continue;
+        }
+        return Err(crate::error::ConversionError::ParseError(
+            "Failed to parse HTML".to_string(),
+        ));
+    };
+    let parser = dom.parser();
+    let dom_ctx = build_dom_context(&dom, parser, preprocessed_len);
     let mut output = String::with_capacity(preprocessed_len);
 
     let mut is_hocr = false;
-    for child_handle in dom_ref.children().iter() {
+    for child_handle in dom.children().iter() {
         if is_hocr_document(child_handle, parser) {
             is_hocr = true;
             break;
@@ -1667,7 +1670,7 @@ fn convert_html_impl(
     }
 
     if options.extract_metadata && !options.convert_as_inline && !is_hocr {
-        for child_handle in dom_ref.children().iter() {
+        for child_handle in dom.children().iter() {
             let metadata = extract_metadata(child_handle, parser, options);
             if !metadata.is_empty() {
                 let metadata_frontmatter = format_metadata_frontmatter(&metadata);
@@ -1680,7 +1683,7 @@ fn convert_html_impl(
     if is_hocr {
         use crate::hocr::{convert_to_markdown_with_options as convert_hocr_to_markdown, extract_hocr_document};
 
-        let (elements, metadata) = extract_hocr_document(dom_ref, options.debug);
+        let (elements, metadata) = extract_hocr_document(&dom, options.debug);
 
         if options.extract_metadata && !options.convert_as_inline {
             let mut metadata_map = BTreeMap::new();
@@ -1721,7 +1724,7 @@ fn convert_html_impl(
     #[cfg(feature = "metadata")]
     if let Some(ref collector) = metadata_collector {
         if !is_hocr {
-            for child_handle in dom_ref.children().iter() {
+            for child_handle in dom.children().iter() {
                 let head_meta = extract_metadata(child_handle, parser, options);
                 if !head_meta.is_empty() {
                     collector.borrow_mut().set_head_metadata(head_meta);
@@ -1733,7 +1736,7 @@ fn convert_html_impl(
 
     #[cfg(feature = "metadata")]
     if let Some(ref collector) = metadata_collector {
-        for child_handle in dom_ref.children().iter() {
+        for child_handle in dom.children().iter() {
             if let Some(tl::Node::Tag(tag)) = child_handle.get(parser) {
                 let tag_name = tag.name().as_utf8_str();
                 if tag_name == "html" || tag_name == "body" {
@@ -1770,7 +1773,7 @@ fn convert_html_impl(
         loose_list: false,
         prev_item_had_blocks: false,
         in_heading: false,
-        heading_tag: None,
+        heading_allow_inline_images: false,
         in_paragraph: false,
         in_ruby: false,
         in_strong: false,
@@ -1780,7 +1783,7 @@ fn convert_html_impl(
         metadata_collector: metadata_collector.clone(),
     };
 
-    for child_handle in dom_ref.children().iter() {
+    for child_handle in dom.children().iter() {
         walk_node(child_handle, parser, &mut output, options, &ctx, 0, &dom_ctx);
     }
 
@@ -1948,67 +1951,75 @@ fn preprocess_html(input: &str) -> Cow<'_, str> {
 }
 
 fn is_json_ld_script_open_tag(tag: &str) -> bool {
-    let lower = tag.to_ascii_lowercase();
-    let mut rest = lower.as_str();
-
-    while let Some(pos) = rest.find("type") {
-        let before_ok = pos == 0
-            || rest
-                .as_bytes()
-                .get(pos.saturating_sub(1))
-                .is_some_and(|b| b.is_ascii_whitespace() || *b == b'<' || *b == b'/');
-        let after_ok = rest
-            .as_bytes()
-            .get(pos + 4)
-            .is_some_and(|b| b.is_ascii_whitespace() || *b == b'=');
-        if !before_ok || !after_ok {
-            rest = &rest[pos + 4..];
-            continue;
-        }
-
-        let mut i = pos + 4;
-        let bytes = rest.as_bytes();
-        while bytes.get(i).is_some_and(|b| b.is_ascii_whitespace()) {
-            i += 1;
-        }
-        if bytes.get(i) != Some(&b'=') {
-            rest = &rest[pos + 4..];
-            continue;
-        }
-        i += 1;
-        while bytes.get(i).is_some_and(|b| b.is_ascii_whitespace()) {
-            i += 1;
-        }
-
-        if i >= bytes.len() {
-            return false;
-        }
-
-        let value = match bytes[i] {
-            b'"' | b'\'' => {
-                let quote = bytes[i];
-                let start = i + 1;
-                let mut end = start;
-                while end < bytes.len() && bytes[end] != quote {
-                    end += 1;
-                }
-                &rest[start..end]
+    let bytes = tag.as_bytes();
+    let mut idx = 0;
+    while idx + 4 <= bytes.len() {
+        if eq_ascii_case_insensitive(&bytes[idx..], b"type") {
+            let before_ok = idx == 0
+                || bytes
+                    .get(idx.saturating_sub(1))
+                    .is_some_and(|b| b.is_ascii_whitespace() || *b == b'<' || *b == b'/');
+            let after_ok = bytes
+                .get(idx + 4)
+                .is_some_and(|b| b.is_ascii_whitespace() || *b == b'=');
+            if !before_ok || !after_ok {
+                idx += 4;
+                continue;
             }
-            _ => {
-                let start = i;
-                let mut end = start;
-                while end < bytes.len() && !bytes[end].is_ascii_whitespace() && bytes[end] != b'>' {
-                    end += 1;
-                }
-                &rest[start..end]
-            }
-        };
 
-        let media_type = value.split(';').next().unwrap_or(value).trim();
-        return media_type == "application/ld+json";
+            let mut i = idx + 4;
+            while bytes.get(i).is_some_and(|b| b.is_ascii_whitespace()) {
+                i += 1;
+            }
+            if bytes.get(i) != Some(&b'=') {
+                idx += 4;
+                continue;
+            }
+            i += 1;
+            while bytes.get(i).is_some_and(|b| b.is_ascii_whitespace()) {
+                i += 1;
+            }
+            if i >= bytes.len() {
+                return false;
+            }
+
+            let (value_start, value_end) = match bytes[i] {
+                b'"' | b'\'' => {
+                    let quote = bytes[i];
+                    let start = i + 1;
+                    let mut end = start;
+                    while end < bytes.len() && bytes[end] != quote {
+                        end += 1;
+                    }
+                    (start, end)
+                }
+                _ => {
+                    let start = i;
+                    let mut end = start;
+                    while end < bytes.len() && !bytes[end].is_ascii_whitespace() && bytes[end] != b'>' {
+                        end += 1;
+                    }
+                    (start, end)
+                }
+            };
+
+            let value = &tag[value_start..value_end];
+            let media_type = value.split(';').next().unwrap_or(value).trim();
+            return eq_ascii_case_insensitive(media_type.as_bytes(), b"application/ld+json");
+        }
+        idx += 1;
     }
-
     false
+}
+
+fn eq_ascii_case_insensitive(haystack: &[u8], needle: &[u8]) -> bool {
+    if haystack.len() < needle.len() {
+        return false;
+    }
+    haystack
+        .iter()
+        .zip(needle.iter())
+        .all(|(a, b)| a.eq_ignore_ascii_case(b))
 }
 
 #[cfg(test)]
@@ -3097,7 +3108,7 @@ fn walk_node(
                     let heading_ctx = Context {
                         in_heading: true,
                         convert_as_inline: true,
-                        heading_tag: Some(tag_name.to_string()),
+                        heading_allow_inline_images: heading_allows_inline_images(tag_name.as_ref(), options),
                         ..ctx.clone()
                     };
                     let children = tag.children();
@@ -3333,7 +3344,10 @@ fn walk_node(
                                     let heading_ctx = Context {
                                         in_heading: true,
                                         convert_as_inline: true,
-                                        heading_tag: Some(heading_name),
+                                        heading_allow_inline_images: heading_allows_inline_images(
+                                            &heading_name,
+                                            options,
+                                        ),
                                         ..ctx.clone()
                                     };
                                     walk_node(
@@ -3549,19 +3563,10 @@ fn walk_node(
                         );
                     }
 
-                    let keep_as_markdown = ctx.in_heading
-                        && ctx
-                            .heading_tag
-                            .as_ref()
-                            .is_some_and(|tag| options.keep_inline_images_in.iter().any(|t| t == tag));
+                    let keep_as_markdown = ctx.in_heading && ctx.heading_allow_inline_images;
 
                     let should_use_alt_text = !keep_as_markdown
-                        && (ctx.convert_as_inline
-                            || (ctx.in_heading
-                                && ctx
-                                    .heading_tag
-                                    .as_ref()
-                                    .is_none_or(|tag| !options.keep_inline_images_in.iter().any(|t| t == tag))));
+                        && (ctx.convert_as_inline || (ctx.in_heading && !ctx.heading_allow_inline_images));
 
                     if should_use_alt_text {
                         output.push_str(&alt);
@@ -5874,6 +5879,82 @@ fn get_colspan_rowspan(node_handle: &tl::NodeHandle, parser: &tl::Parser) -> (us
     }
 }
 
+fn collect_table_cells(
+    node_handle: &tl::NodeHandle,
+    parser: &tl::Parser,
+    dom_ctx: &DomContext,
+    cells: &mut Vec<tl::NodeHandle>,
+) {
+    cells.clear();
+    if let Some(tl::Node::Tag(tag)) = node_handle.get(parser) {
+        let children = tag.children();
+        for child_handle in children.top().iter() {
+            if let Some(info) = dom_ctx.tag_info(child_handle.get_inner()) {
+                if info.name == "th" || info.name == "td" {
+                    cells.push(*child_handle);
+                }
+                continue;
+            }
+            if let Some(tl::Node::Tag(child_tag)) = child_handle.get(parser) {
+                let cell_name = normalized_tag_name(child_tag.name().as_utf8_str());
+                if cell_name == "th" || cell_name == "td" {
+                    cells.push(*child_handle);
+                }
+            }
+        }
+    }
+}
+
+fn table_total_columns(node_handle: &tl::NodeHandle, parser: &tl::Parser, dom_ctx: &DomContext) -> usize {
+    let mut max_cols = 0usize;
+    let mut cells = Vec::new();
+
+    if let Some(tl::Node::Tag(tag)) = node_handle.get(parser) {
+        let children = tag.children();
+        for child_handle in children.top().iter() {
+            if let Some(tl::Node::Tag(child_tag)) = child_handle.get(parser) {
+                let tag_name: Cow<'_, str> = dom_ctx
+                    .tag_info(child_handle.get_inner())
+                    .map(|info| Cow::Borrowed(info.name.as_str()))
+                    .unwrap_or_else(|| normalized_tag_name(child_tag.name().as_utf8_str()).into_owned().into());
+                match tag_name.as_ref() {
+                    "thead" | "tbody" | "tfoot" => {
+                        for row_handle in child_tag.children().top().iter() {
+                            if is_tag_name(row_handle, parser, dom_ctx, "tr") {
+                                collect_table_cells(row_handle, parser, dom_ctx, &mut cells);
+                                let col_count = cells
+                                    .iter()
+                                    .fold(0usize, |acc, h| acc.saturating_add(get_colspan(h, parser)));
+                                max_cols = max_cols.max(col_count);
+                            }
+                        }
+                    }
+                    "tr" => {
+                        collect_table_cells(child_handle, parser, dom_ctx, &mut cells);
+                        let col_count = cells
+                            .iter()
+                            .fold(0usize, |acc, h| acc.saturating_add(get_colspan(h, parser)));
+                        max_cols = max_cols.max(col_count);
+                    }
+                    _ => {}
+                }
+            }
+        }
+    }
+
+    max_cols.clamp(1, MAX_TABLE_COLS)
+}
+
+fn is_tag_name(node_handle: &tl::NodeHandle, parser: &tl::Parser, dom_ctx: &DomContext, name: &str) -> bool {
+    if let Some(info) = dom_ctx.tag_info(node_handle.get_inner()) {
+        return info.name == name;
+    }
+    matches!(
+        node_handle.get(parser),
+        Some(tl::Node::Tag(tag)) if tag_name_eq(tag.name().as_utf8_str(), name)
+    )
+}
+
 /// Convert table cell (td or th)
 fn convert_table_cell(
     node_handle: &tl::NodeHandle,
@@ -5926,12 +6007,20 @@ fn convert_table_cell(
 
     let text = text.trim();
     let text = if options.br_in_tables {
-        text.split('\n')
-            .filter(|s| !s.is_empty())
-            .collect::<Vec<_>>()
-            .join("<br>")
-    } else {
+        let mut joined = String::with_capacity(text.len());
+        let mut first = true;
+        for segment in text.split('\n').filter(|s| !s.is_empty()) {
+            if !first {
+                joined.push_str("<br>");
+            }
+            first = false;
+            joined.push_str(segment);
+        }
+        joined
+    } else if text.contains('\n') {
         text.replace('\n', " ")
+    } else {
+        text.to_string()
     };
 
     let colspan = get_colspan(node_handle, parser);
@@ -5951,67 +6040,46 @@ fn convert_table_row(
     ctx: &Context,
     row_index: usize,
     has_span: bool,
-    rowspan_tracker: &mut std::collections::HashMap<usize, (String, usize)>,
+    rowspan_tracker: &mut [Option<usize>],
+    total_cols: usize,
+    header_cols: usize,
     dom_ctx: &DomContext,
 ) {
     let mut row_text = String::with_capacity(256);
     let mut cells = Vec::new();
 
-    if let Some(tl::Node::Tag(tag)) = node_handle.get(parser) {
-        let children = tag.children();
-        {
-            for child_handle in children.top().iter() {
-                if let Some(info) = dom_ctx.tag_info(child_handle.get_inner()) {
-                    if info.name == "th" || info.name == "td" {
-                        cells.push(*child_handle);
-                    }
-                    continue;
-                }
-                if let Some(tl::Node::Tag(child_tag)) = child_handle.get(parser) {
-                    let cell_name = normalized_tag_name(child_tag.name().as_utf8_str());
-                    if cell_name == "th" || cell_name == "td" {
-                        cells.push(*child_handle);
-                    }
-                }
-            }
-        }
-    }
+    collect_table_cells(node_handle, parser, dom_ctx, &mut cells);
 
     if has_span {
         let mut col_index = 0;
         let mut cell_iter = cells.iter();
 
         loop {
-            if let Some((_content, remaining_rows)) = rowspan_tracker.get_mut(&col_index) {
-                if *remaining_rows > 0 {
-                    row_text.push(' ');
-                    row_text.push_str(" |");
-                    *remaining_rows -= 1;
-                    if *remaining_rows == 0 {
-                        rowspan_tracker.remove(&col_index);
+            if col_index < total_cols {
+                if let Some(Some(remaining_rows)) = rowspan_tracker.get_mut(col_index) {
+                    if *remaining_rows > 0 {
+                        row_text.push(' ');
+                        row_text.push_str(" |");
+                        *remaining_rows -= 1;
+                        if *remaining_rows == 0 {
+                            rowspan_tracker[col_index] = None;
+                        }
+                        col_index += 1;
+                        continue;
                     }
-                    col_index += 1;
-                    continue;
                 }
             }
 
             if let Some(cell_handle) = cell_iter.next() {
-                let cell_start = row_text.len();
                 convert_table_cell(cell_handle, parser, &mut row_text, options, ctx, "", dom_ctx);
 
                 let (colspan, rowspan) = get_colspan_rowspan(cell_handle, parser);
 
-                if rowspan > 1 {
-                    let cell_text = &row_text[cell_start..];
-                    let cell_content = cell_text
-                        .trim_start_matches(' ')
-                        .trim_end_matches(" |")
-                        .trim()
-                        .to_string();
-                    rowspan_tracker.insert(col_index, (cell_content, rowspan - 1));
+                if rowspan > 1 && col_index < total_cols {
+                    rowspan_tracker[col_index] = Some(rowspan - 1);
                 }
 
-                col_index += colspan;
+                col_index = col_index.saturating_add(colspan);
             } else {
                 break;
             }
@@ -6028,10 +6096,7 @@ fn convert_table_row(
 
     let is_first_row = row_index == 0;
     if is_first_row {
-        let total_cols = cells
-            .iter()
-            .fold(0usize, |acc, h| acc.saturating_add(get_colspan(h, parser)))
-            .clamp(1, MAX_TABLE_COLS);
+        let total_cols = header_cols.clamp(1, MAX_TABLE_COLS);
         output.push_str("| ");
         for i in 0..total_cols {
             if i > 0 {
@@ -6258,7 +6323,10 @@ fn convert_table(
         }
 
         let mut row_index = 0;
-        let mut rowspan_tracker = std::collections::HashMap::new();
+        let total_cols = table_total_columns(node_handle, parser, dom_ctx);
+        let mut first_row_cols: Option<usize> = None;
+        let mut rowspan_tracker = vec![None; total_cols];
+        let mut row_cells = Vec::new();
 
         let children = tag.children();
         {
@@ -6293,6 +6361,13 @@ fn convert_table(
                                 for row_handle in section_children.top().iter() {
                                     if let Some(tl::Node::Tag(row_tag)) = row_handle.get(parser) {
                                         if tag_name_eq(row_tag.name().as_utf8_str(), "tr") {
+                                            if first_row_cols.is_none() {
+                                                collect_table_cells(row_handle, parser, dom_ctx, &mut row_cells);
+                                                let cols = row_cells
+                                                    .iter()
+                                                    .fold(0usize, |acc, h| acc.saturating_add(get_colspan(h, parser)));
+                                                first_row_cols = Some(cols.clamp(1, MAX_TABLE_COLS));
+                                            }
                                             convert_table_row(
                                                 row_handle,
                                                 parser,
@@ -6302,6 +6377,8 @@ fn convert_table(
                                                 row_index,
                                                 table_scan.has_span,
                                                 &mut rowspan_tracker,
+                                                total_cols,
+                                                first_row_cols.unwrap_or(total_cols),
                                                 dom_ctx,
                                             );
                                             row_index += 1;
@@ -6312,6 +6389,13 @@ fn convert_table(
                         }
 
                         "tr" => {
+                            if first_row_cols.is_none() {
+                                collect_table_cells(child_handle, parser, dom_ctx, &mut row_cells);
+                                let cols = row_cells
+                                    .iter()
+                                    .fold(0usize, |acc, h| acc.saturating_add(get_colspan(h, parser)));
+                                first_row_cols = Some(cols.clamp(1, MAX_TABLE_COLS));
+                            }
                             convert_table_row(
                                 child_handle,
                                 parser,
@@ -6321,6 +6405,8 @@ fn convert_table(
                                 row_index,
                                 table_scan.has_span,
                                 &mut rowspan_tracker,
+                                total_cols,
+                                first_row_cols.unwrap_or(total_cols),
                                 dom_ctx,
                             );
                             row_index += 1;
