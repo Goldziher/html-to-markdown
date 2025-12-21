@@ -22,7 +22,7 @@ thiserror = { workspace = true }
 toml = "0.9"
 
 # Monitoring
-sysinfo = "0.37"
+sysinfo = "0.36"
 
 # Templates
 minijinja = { version = "2.14", features = ["json"] }

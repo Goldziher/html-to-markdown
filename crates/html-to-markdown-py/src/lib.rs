@@ -14,6 +14,7 @@ use html_to_markdown_rs::{
 use pyo3::prelude::*;
 use pyo3::types::{PyBytes, PyDict};
 use pyo3::types::{PyList, PyTuple};
+use std::panic::UnwindSafe;
 use std::path::PathBuf;
 
 fn to_py_err(err: ConversionError) -> PyErr {
@@ -23,6 +24,13 @@ fn to_py_err(err: ConversionError) -> PyErr {
         }
         other => pyo3::exceptions::PyValueError::new_err(other.to_string()),
     }
+}
+
+fn run_with_guard_and_profile<F, T>(f: F) -> html_to_markdown_rs::Result<T>
+where
+    F: FnMut() -> html_to_markdown_rs::Result<T> + UnwindSafe,
+{
+    guard_panic(|| profiling::maybe_profile(f))
 }
 
 #[pyfunction]
@@ -373,15 +381,8 @@ impl ConversionOptions {
     /// Convert to Rust ConversionOptions
     fn to_rust(&self) -> RustConversionOptions {
         RustConversionOptions {
-            heading_style: match self.heading_style.as_str() {
-                "atx" => HeadingStyle::Atx,
-                "atx_closed" => HeadingStyle::AtxClosed,
-                _ => HeadingStyle::Underlined,
-            },
-            list_indent_type: match self.list_indent_type.as_str() {
-                "tabs" => ListIndentType::Tabs,
-                _ => ListIndentType::Spaces,
-            },
+            heading_style: HeadingStyle::parse(self.heading_style.as_str()),
+            list_indent_type: ListIndentType::parse(self.list_indent_type.as_str()),
             list_indent_width: self.list_indent_width,
             bullets: self.bullets.clone(),
             strong_em_symbol: self.strong_em_symbol,
@@ -394,32 +395,17 @@ impl ConversionOptions {
             default_title: self.default_title,
             br_in_tables: self.br_in_tables,
             hocr_spatial_tables: self.hocr_spatial_tables,
-            highlight_style: match self.highlight_style.as_str() {
-                "double-equal" => HighlightStyle::DoubleEqual,
-                "html" => HighlightStyle::Html,
-                "bold" => HighlightStyle::Bold,
-                _ => HighlightStyle::None,
-            },
+            highlight_style: HighlightStyle::parse(self.highlight_style.as_str()),
             extract_metadata: self.extract_metadata,
-            whitespace_mode: match self.whitespace_mode.as_str() {
-                "strict" => WhitespaceMode::Strict,
-                _ => WhitespaceMode::Normalized,
-            },
+            whitespace_mode: WhitespaceMode::parse(self.whitespace_mode.as_str()),
             strip_newlines: self.strip_newlines,
             wrap: self.wrap,
             wrap_width: self.wrap_width,
             convert_as_inline: self.convert_as_inline,
             sub_symbol: self.sub_symbol.clone(),
             sup_symbol: self.sup_symbol.clone(),
-            newline_style: match self.newline_style.as_str() {
-                "backslash" => NewlineStyle::Backslash,
-                _ => NewlineStyle::Spaces,
-            },
-            code_block_style: match self.code_block_style.as_str() {
-                "backticks" => CodeBlockStyle::Backticks,
-                "tildes" => CodeBlockStyle::Tildes,
-                _ => CodeBlockStyle::Indented,
-            },
+            newline_style: NewlineStyle::parse(self.newline_style.as_str()),
+            code_block_style: CodeBlockStyle::parse(self.code_block_style.as_str()),
             keep_inline_images_in: self.keep_inline_images_in.clone(),
             preprocessing: self.preprocessing.to_rust(),
             encoding: self.encoding.clone(),
@@ -480,10 +466,8 @@ impl ConversionOptionsHandle {
 fn convert(py: Python<'_>, html: &str, options: Option<ConversionOptions>) -> PyResult<String> {
     let html = html.to_owned();
     let rust_options = options.map(|opts| opts.to_rust());
-    py.detach(move || {
-        guard_panic(|| profiling::maybe_profile(|| html_to_markdown_rs::convert(&html, rust_options.clone())))
-    })
-    .map_err(to_py_err)
+    py.detach(move || run_with_guard_and_profile(|| html_to_markdown_rs::convert(&html, rust_options.clone())))
+        .map_err(to_py_err)
 }
 
 #[pyfunction]
@@ -491,10 +475,8 @@ fn convert(py: Python<'_>, html: &str, options: Option<ConversionOptions>) -> Py
 fn convert_with_options_handle(py: Python<'_>, html: &str, handle: &ConversionOptionsHandle) -> PyResult<String> {
     let html = html.to_owned();
     let rust_options = handle.inner.clone();
-    py.detach(move || {
-        guard_panic(|| profiling::maybe_profile(|| html_to_markdown_rs::convert(&html, Some(rust_options.clone()))))
-    })
-    .map_err(to_py_err)
+    py.detach(move || run_with_guard_and_profile(|| html_to_markdown_rs::convert(&html, Some(rust_options.clone()))))
+        .map_err(to_py_err)
 }
 
 #[pyfunction]
@@ -582,7 +564,11 @@ fn convert_with_inline_images<'py>(
     let cfg = image_config.unwrap_or_else(|| InlineImageConfig::new(5 * 1024 * 1024, None, true, false));
     let rust_cfg = cfg.to_rust();
     let extraction = py
-        .detach(move || guard_panic(|| html_to_markdown_rs::convert_with_inline_images(&html, rust_options, rust_cfg)))
+        .detach(move || {
+            run_with_guard_and_profile(|| {
+                html_to_markdown_rs::convert_with_inline_images(&html, rust_options.clone(), rust_cfg.clone())
+            })
+        })
         .map_err(to_py_err)?;
 
     let images = extraction
@@ -890,7 +876,11 @@ fn convert_with_metadata<'py>(
         .unwrap_or_else(|| MetadataConfig::new(true, true, true, true, true, DEFAULT_MAX_STRUCTURED_DATA_SIZE));
     let rust_cfg = cfg.to_rust();
     let result = py
-        .detach(move || guard_panic(|| html_to_markdown_rs::convert_with_metadata(&html, rust_options, rust_cfg)))
+        .detach(move || {
+            run_with_guard_and_profile(|| {
+                html_to_markdown_rs::convert_with_metadata(&html, rust_options.clone(), rust_cfg.clone())
+            })
+        })
         .map_err(to_py_err)?;
 
     let (markdown, metadata) = result;

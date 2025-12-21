@@ -10,7 +10,7 @@
     "html-to-markdown-wasm": "workspace:*"
   },
   "devDependencies": {
-    "@cloudflare/workers-types": "^4.20251219.0",
+    "@cloudflare/workers-types": "^4.20251221.0",
     "typescript": "^5.9.3",
     "wrangler": "^4.56.0"
   }
