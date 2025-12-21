@@ -188,12 +188,16 @@ impl TextDirection {
     /// assert_eq!(TextDirection::parse("invalid"), None);
     /// ```
     pub fn parse(s: &str) -> Option<Self> {
-        match s.to_lowercase().as_str() {
-            "ltr" => Some(Self::LeftToRight),
-            "rtl" => Some(Self::RightToLeft),
-            "auto" => Some(Self::Auto),
-            _ => None,
+        if s.eq_ignore_ascii_case("ltr") {
+            return Some(Self::LeftToRight);
         }
+        if s.eq_ignore_ascii_case("rtl") {
+            return Some(Self::RightToLeft);
+        }
+        if s.eq_ignore_ascii_case("auto") {
+            return Some(Self::Auto);
+        }
+        None
     }
 }
 
@@ -1015,28 +1019,41 @@ impl MetadataCollector {
         let mut doc = DocumentMetadata::default();
 
         for (raw_key, value) in &self.head_metadata {
-            let mut key = raw_key.to_lowercase();
+            let mut key = raw_key.as_str();
 
             if let Some(stripped) = key.strip_prefix("meta-") {
-                key = stripped.to_string();
+                key = stripped;
             }
 
-            if key.contains(':') {
-                key = key.replace(':', "-");
+            let owned_key = if key.as_bytes().contains(&b':') {
+                Some(key.replace(':', "-"))
+            } else {
+                None
+            };
+            if let Some(ref replaced) = owned_key {
+                key = replaced.as_str();
             }
 
-            match key.as_str() {
+            match key {
                 "title" => doc.title = Some(value.clone()),
                 "description" => doc.description = Some(value.clone()),
                 "author" => doc.author = Some(value.clone()),
                 "canonical" => doc.canonical_url = Some(value.clone()),
                 "base" | "base-href" => doc.base_href = Some(value.clone()),
                 key if key.starts_with("og-") => {
-                    let og_key = key.trim_start_matches("og-").replace('-', "_");
+                    let og_key = if key.as_bytes().contains(&b'-') {
+                        key.trim_start_matches("og-").replace('-', "_")
+                    } else {
+                        key.trim_start_matches("og-").to_string()
+                    };
                     doc.open_graph.insert(og_key, value.clone());
                 }
                 key if key.starts_with("twitter-") => {
-                    let tw_key = key.trim_start_matches("twitter-").replace('-', "_");
+                    let tw_key = if key.as_bytes().contains(&b'-') {
+                        key.trim_start_matches("twitter-").replace('-', "_")
+                    } else {
+                        key.trim_start_matches("twitter-").to_string()
+                    };
                     doc.twitter_card.insert(tw_key, value.clone());
                 }
                 "keywords" => {
@@ -1047,7 +1064,7 @@ impl MetadataCollector {
                         .collect();
                 }
                 _ => {
-                    doc.meta_tags.insert(key.clone(), value.clone());
+                    doc.meta_tags.insert(key.to_string(), value.clone());
                 }
             }
         }

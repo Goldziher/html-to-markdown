@@ -1097,6 +1097,13 @@ fn extract_metadata(
     options: &ConversionOptions,
 ) -> BTreeMap<String, String> {
     let mut metadata = BTreeMap::new();
+    let strip_title = options.strip_tags.iter().any(|tag| tag.eq_ignore_ascii_case("title"));
+    let preserve_title = options
+        .preserve_tags
+        .iter()
+        .any(|tag| tag.eq_ignore_ascii_case("title"));
+    let strip_meta = options.strip_tags.iter().any(|tag| tag.eq_ignore_ascii_case("meta"));
+    let preserve_meta = options.preserve_tags.iter().any(|tag| tag.eq_ignore_ascii_case("meta"));
 
     fn find_head(node_handle: &tl::NodeHandle, parser: &tl::Parser) -> Option<tl::NodeHandle> {
         if let Some(node) = node_handle.get(parser) {
@@ -1133,9 +1140,7 @@ fn extract_metadata(
 
                             match tag_name.as_ref() {
                                 "title" => {
-                                    if options.strip_tags.contains(&"title".to_string())
-                                        || options.preserve_tags.contains(&"title".to_string())
-                                    {
+                                    if strip_title || preserve_title {
                                     } else {
                                         let title_children = child_tag.children();
                                         {
@@ -1165,9 +1170,7 @@ fn extract_metadata(
                                     }
                                 }
                                 "meta" => {
-                                    if !options.strip_tags.contains(&"meta".to_string())
-                                        && !options.preserve_tags.contains(&"meta".to_string())
-                                    {
+                                    if !strip_meta && !preserve_meta {
                                         let mut name_attr = None;
                                         let mut property_attr = None;
                                         let mut http_equiv_attr = None;
@@ -1196,13 +1199,31 @@ fn extract_metadata(
 
                                         if let Some(content) = content_attr {
                                             if let Some(name) = name_attr {
-                                                let key = format!("meta-{}", name.to_lowercase());
+                                                let mut key = String::with_capacity("meta-".len() + name.len());
+                                                key.push_str("meta-");
+                                                key.push_str(&name);
+                                                key.make_ascii_lowercase();
+                                                if key.as_bytes().contains(&b':') {
+                                                    key = key.replace(':', "-");
+                                                }
                                                 metadata.insert(key, content);
                                             } else if let Some(property) = property_attr {
-                                                let key = format!("meta-{}", property.to_lowercase().replace(':', "-"));
+                                                let mut key = String::with_capacity("meta-".len() + property.len());
+                                                key.push_str("meta-");
+                                                key.push_str(&property);
+                                                key.make_ascii_lowercase();
+                                                if key.as_bytes().contains(&b':') {
+                                                    key = key.replace(':', "-");
+                                                }
                                                 metadata.insert(key, content);
                                             } else if let Some(http_equiv) = http_equiv_attr {
-                                                let key = format!("meta-{}", http_equiv.to_lowercase());
+                                                let mut key = String::with_capacity("meta-".len() + http_equiv.len());
+                                                key.push_str("meta-");
+                                                key.push_str(&http_equiv);
+                                                key.make_ascii_lowercase();
+                                                if key.as_bytes().contains(&b':') {
+                                                    key = key.replace(':', "-");
+                                                }
                                                 metadata.insert(key, content);
                                             }
                                         }
@@ -1224,13 +1245,17 @@ fn extract_metadata(
                                     }
 
                                     if let (Some(rel), Some(href)) = (rel_attr, href_attr) {
-                                        let rel_lower = rel.to_lowercase();
+                                        let mut rel_lower = rel;
+                                        rel_lower.make_ascii_lowercase();
                                         match rel_lower.as_str() {
                                             "canonical" => {
                                                 metadata.insert("canonical".to_string(), href);
                                             }
                                             "author" | "license" | "alternate" => {
-                                                metadata.insert(format!("link-{}", rel_lower), href);
+                                                let mut key = String::with_capacity("link-".len() + rel_lower.len());
+                                                key.push_str("link-");
+                                                key.push_str(&rel_lower);
+                                                metadata.insert(key, href);
                                             }
                                             _ => {}
                                         }
