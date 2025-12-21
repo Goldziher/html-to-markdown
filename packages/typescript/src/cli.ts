@@ -3,13 +3,22 @@ import { promises as fs } from "node:fs";
 import { stderr, stdin, stdout } from "node:process";
 
 import {
-	convert as convertHtml,
-	convertWithInlineImages,
+	convertJson as convertHtmlJson,
+	convertWithInlineImagesJson,
 	type JsConversionOptions,
 	type JsInlineImageConfig,
 } from "html-to-markdown-node";
 
 import { convertStream, convertStreamWithInlineImages } from "./index";
+
+const jsonReplacer = (_key: string, value: unknown): unknown => (typeof value === "bigint" ? Number(value) : value);
+
+const toJson = (value: unknown): string | undefined => {
+	if (value == null) {
+		return undefined;
+	}
+	return JSON.stringify(value, jsonReplacer);
+};
 
 interface CliOptions {
 	input?: string;
@@ -118,7 +127,7 @@ async function writeOutput(content: string, path?: string): Promise<void> {
 
 async function writeInlineImages(
 	extractionPath: string,
-	inlineData: Awaited<ReturnType<typeof convertWithInlineImages>>,
+	inlineData: Awaited<ReturnType<typeof convertWithInlineImagesJson>>,
 ): Promise<void> {
 	const payload = {
 		markdown: inlineData.markdown,
@@ -150,7 +159,7 @@ async function main(): Promise<void> {
 		if (inlineImages) {
 			const inlineResult =
 				typeof inputContent === "string"
-					? convertWithInlineImages(inputContent, options, inlineImageConfig)
+					? convertWithInlineImagesJson(inputContent, toJson(options), toJson(inlineImageConfig))
 					: await convertStreamWithInlineImages(inputContent, options, inlineImageConfig);
 
 			if (output) {
@@ -168,7 +177,7 @@ async function main(): Promise<void> {
 				);
 			}
 		} else if (typeof inputContent === "string") {
-			const markdown = convertHtml(inputContent, options);
+			const markdown = convertHtmlJson(inputContent, toJson(options));
 			await writeOutput(markdown, output);
 		} else {
 			const markdown = await convertStream(inputContent, options);

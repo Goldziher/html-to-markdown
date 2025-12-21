@@ -8,16 +8,15 @@ use html_to_markdown_rs::metadata::{
     DocumentMetadata, ExtendedMetadata, HeaderMetadata, ImageMetadata, LinkMetadata, MetadataConfig, StructuredData,
 };
 use html_to_markdown_rs::{
-    CodeBlockStyle, ConversionOptions, HeadingStyle, HighlightStyle, HtmlExtraction, InlineImage, InlineImageConfig,
-    ListIndentType, NewlineStyle, PreprocessingOptions, PreprocessingPreset, WhitespaceMode, convert as convert_inner,
-    convert_with_inline_images as convert_with_inline_images_inner,
+    CodeBlockStyle, ConversionOptions, ConversionOptionsUpdate, DEFAULT_INLINE_IMAGE_LIMIT, HeadingStyle,
+    HighlightStyle, HtmlExtraction, InlineImage, InlineImageConfig, InlineImageConfigUpdate, ListIndentType,
+    MetadataConfigUpdate, NewlineStyle, PreprocessingOptionsUpdate, PreprocessingPreset, WhitespaceMode,
+    convert as convert_inner, convert_with_inline_images as convert_with_inline_images_inner,
 };
 mod profiling;
 use rustler::types::binary::{Binary, OwnedBinary};
 use rustler::{Encoder, Env, Error, NifMap, NifResult, ResourceArc, Term};
 use std::path::PathBuf;
-
-const DEFAULT_INLINE_LIMIT: u64 = 5 * 1024 * 1024;
 
 struct OptionsHandleResource(ConversionOptions);
 
@@ -288,23 +287,25 @@ fn decode_metadata_config(term: Term) -> NifResult<MetadataConfig> {
         .decode()
         .map_err(|_| bad_option_msg("metadata_config", "must be provided as a map"))?;
 
-    let mut cfg = MetadataConfig::default();
+    let mut update = MetadataConfigUpdate::default();
 
     for (key, value) in map.into_iter() {
         match key.as_str() {
-            "extract_document" => cfg.extract_document = decode_bool(value, "extract_document")?,
-            "extract_headers" => cfg.extract_headers = decode_bool(value, "extract_headers")?,
-            "extract_links" => cfg.extract_links = decode_bool(value, "extract_links")?,
-            "extract_images" => cfg.extract_images = decode_bool(value, "extract_images")?,
-            "extract_structured_data" => cfg.extract_structured_data = decode_bool(value, "extract_structured_data")?,
+            "extract_document" => update.extract_document = Some(decode_bool(value, "extract_document")?),
+            "extract_headers" => update.extract_headers = Some(decode_bool(value, "extract_headers")?),
+            "extract_links" => update.extract_links = Some(decode_bool(value, "extract_links")?),
+            "extract_images" => update.extract_images = Some(decode_bool(value, "extract_images")?),
+            "extract_structured_data" => {
+                update.extract_structured_data = Some(decode_bool(value, "extract_structured_data")?)
+            }
             "max_structured_data_size" => {
-                cfg.max_structured_data_size = decode_positive_integer(value, "max_structured_data_size")?
+                update.max_structured_data_size = Some(decode_positive_integer(value, "max_structured_data_size")?)
             }
             _ => {}
         }
     }
 
-    Ok(cfg)
+    Ok(MetadataConfig::from(update))
 }
 
 fn build_metadata(metadata: ExtendedMetadata) -> ExtendedMetadataTerm {
@@ -378,76 +379,82 @@ fn build_structured_data(metadata: StructuredData) -> StructuredDataTerm {
 }
 
 fn apply_options(map: HashMap<String, Term>) -> NifResult<ConversionOptions> {
-    let mut options = ConversionOptions::default();
+    let mut update = ConversionOptionsUpdate::default();
 
     for (key, value) in map.into_iter() {
         match key.as_str() {
-            "heading_style" => options.heading_style = parse_heading_style(value)?,
-            "list_indent_type" => options.list_indent_type = parse_list_indent_type(value)?,
-            "list_indent_width" => options.list_indent_width = decode_positive_integer(value, "list_indent_width")?,
-            "bullets" => options.bullets = decode_string(value, "bullets")?,
+            "heading_style" => update.heading_style = Some(parse_heading_style(value)?),
+            "list_indent_type" => update.list_indent_type = Some(parse_list_indent_type(value)?),
+            "list_indent_width" => {
+                update.list_indent_width = Some(decode_positive_integer(value, "list_indent_width")?)
+            }
+            "bullets" => update.bullets = Some(decode_string(value, "bullets")?),
             "strong_em_symbol" => {
                 let symbol = decode_string(value, "strong_em_symbol")?;
                 let mut chars = symbol.chars();
                 let ch = chars.next().ok_or_else(|| bad_option("strong_em_symbol"))?;
-                options.strong_em_symbol = ch;
+                update.strong_em_symbol = Some(ch);
             }
-            "escape_asterisks" => options.escape_asterisks = decode_bool(value, "escape_asterisks")?,
-            "escape_underscores" => options.escape_underscores = decode_bool(value, "escape_underscores")?,
-            "escape_misc" => options.escape_misc = decode_bool(value, "escape_misc")?,
-            "escape_ascii" => options.escape_ascii = decode_bool(value, "escape_ascii")?,
-            "code_language" => options.code_language = decode_string(value, "code_language")?,
-            "encoding" => options.encoding = decode_string(value, "encoding")?,
-            "autolinks" => options.autolinks = decode_bool(value, "autolinks")?,
-            "default_title" => options.default_title = decode_bool(value, "default_title")?,
+            "escape_asterisks" => update.escape_asterisks = Some(decode_bool(value, "escape_asterisks")?),
+            "escape_underscores" => update.escape_underscores = Some(decode_bool(value, "escape_underscores")?),
+            "escape_misc" => update.escape_misc = Some(decode_bool(value, "escape_misc")?),
+            "escape_ascii" => update.escape_ascii = Some(decode_bool(value, "escape_ascii")?),
+            "code_language" => update.code_language = Some(decode_string(value, "code_language")?),
+            "encoding" => update.encoding = Some(decode_string(value, "encoding")?),
+            "autolinks" => update.autolinks = Some(decode_bool(value, "autolinks")?),
+            "default_title" => update.default_title = Some(decode_bool(value, "default_title")?),
             "keep_inline_images_in" => {
-                options.keep_inline_images_in = decode_string_list(value, "keep_inline_images_in")?
+                update.keep_inline_images_in = Some(decode_string_list(value, "keep_inline_images_in")?)
             }
-            "br_in_tables" => options.br_in_tables = decode_bool(value, "br_in_tables")?,
-            "hocr_spatial_tables" => options.hocr_spatial_tables = decode_bool(value, "hocr_spatial_tables")?,
-            "highlight_style" => options.highlight_style = parse_highlight_style(value)?,
-            "extract_metadata" => options.extract_metadata = decode_bool(value, "extract_metadata")?,
-            "whitespace_mode" => options.whitespace_mode = parse_whitespace_mode(value)?,
-            "strip_newlines" => options.strip_newlines = decode_bool(value, "strip_newlines")?,
-            "wrap" => options.wrap = decode_bool(value, "wrap")?,
-            "wrap_width" => options.wrap_width = decode_positive_integer(value, "wrap_width")?,
-            "strip_tags" => options.strip_tags = decode_string_list(value, "strip_tags")?,
-            "preserve_tags" => options.preserve_tags = decode_string_list(value, "preserve_tags")?,
-            "convert_as_inline" => options.convert_as_inline = decode_bool(value, "convert_as_inline")?,
-            "sub_symbol" => options.sub_symbol = decode_string(value, "sub_symbol")?,
-            "sup_symbol" => options.sup_symbol = decode_string(value, "sup_symbol")?,
-            "newline_style" => options.newline_style = parse_newline_style(value)?,
-            "code_block_style" => options.code_block_style = parse_code_block_style(value)?,
-            "preprocessing" => apply_preprocessing(&mut options.preprocessing, value)?,
-            "debug" => options.debug = decode_bool(value, "debug")?,
+            "br_in_tables" => update.br_in_tables = Some(decode_bool(value, "br_in_tables")?),
+            "hocr_spatial_tables" => update.hocr_spatial_tables = Some(decode_bool(value, "hocr_spatial_tables")?),
+            "highlight_style" => update.highlight_style = Some(parse_highlight_style(value)?),
+            "extract_metadata" => update.extract_metadata = Some(decode_bool(value, "extract_metadata")?),
+            "whitespace_mode" => update.whitespace_mode = Some(parse_whitespace_mode(value)?),
+            "strip_newlines" => update.strip_newlines = Some(decode_bool(value, "strip_newlines")?),
+            "wrap" => update.wrap = Some(decode_bool(value, "wrap")?),
+            "wrap_width" => update.wrap_width = Some(decode_positive_integer(value, "wrap_width")?),
+            "strip_tags" => update.strip_tags = Some(decode_string_list(value, "strip_tags")?),
+            "preserve_tags" => update.preserve_tags = Some(decode_string_list(value, "preserve_tags")?),
+            "convert_as_inline" => update.convert_as_inline = Some(decode_bool(value, "convert_as_inline")?),
+            "sub_symbol" => update.sub_symbol = Some(decode_string(value, "sub_symbol")?),
+            "sup_symbol" => update.sup_symbol = Some(decode_string(value, "sup_symbol")?),
+            "newline_style" => update.newline_style = Some(parse_newline_style(value)?),
+            "code_block_style" => update.code_block_style = Some(parse_code_block_style(value)?),
+            "preprocessing" => update.preprocessing = Some(decode_preprocessing(value)?),
+            "debug" => update.debug = Some(decode_bool(value, "debug")?),
             _ => {}
         }
     }
 
-    Ok(options)
+    Ok(ConversionOptions::from(update))
 }
 
-fn apply_preprocessing(options: &mut PreprocessingOptions, term: Term) -> NifResult<()> {
+fn decode_preprocessing(term: Term) -> NifResult<PreprocessingOptionsUpdate> {
     let map: HashMap<String, Term> = term
         .decode()
         .map_err(|_| bad_option_msg("preprocessing", "must be provided as a map"))?;
 
+    let mut update = PreprocessingOptionsUpdate::default();
+
     for (key, value) in map.into_iter() {
         match key.as_str() {
-            "enabled" => options.enabled = decode_bool(value, "preprocessing.enabled")?,
-            "preset" => options.preset = parse_preset(value)?,
-            "remove_navigation" => options.remove_navigation = decode_bool(value, "preprocessing.remove_navigation")?,
-            "remove_forms" => options.remove_forms = decode_bool(value, "preprocessing.remove_forms")?,
+            "enabled" => update.enabled = Some(decode_bool(value, "preprocessing.enabled")?),
+            "preset" => update.preset = Some(parse_preset(value)?),
+            "remove_navigation" => {
+                update.remove_navigation = Some(decode_bool(value, "preprocessing.remove_navigation")?)
+            }
+            "remove_forms" => update.remove_forms = Some(decode_bool(value, "preprocessing.remove_forms")?),
             _ => {}
         }
     }
 
-    Ok(())
+    Ok(update)
 }
 
 fn decode_inline_image_config(term: Term) -> NifResult<InlineImageConfig> {
     if matches!(term.atom_to_string(), Ok(name) if name == "nil") {
-        return Ok(InlineImageConfig::new(DEFAULT_INLINE_LIMIT));
+        return Ok(InlineImageConfig::new(DEFAULT_INLINE_IMAGE_LIMIT));
     }
 
     let map: HashMap<String, Term> = term
@@ -469,33 +476,38 @@ fn decode_inline_image_config(term: Term) -> NifResult<InlineImageConfig> {
                 ));
             }
         },
-        None => DEFAULT_INLINE_LIMIT,
+        None => DEFAULT_INLINE_IMAGE_LIMIT,
     };
 
-    let mut config = InlineImageConfig::new(max_bytes);
+    let mut update = InlineImageConfigUpdate::default();
+    update.max_decoded_size_bytes = Some(max_bytes);
 
     if let Some(value) = map.get("filename_prefix") {
         let prefix = value
             .decode::<String>()
             .map_err(|_| bad_option_msg("inline_image_config.filename_prefix", "must be a string"))?;
         if !prefix.trim().is_empty() {
-            config.filename_prefix = Some(prefix);
+            update.filename_prefix = Some(prefix);
         }
     }
 
     if let Some(value) = map.get("capture_svg") {
-        config.capture_svg = value
-            .decode::<bool>()
-            .map_err(|_| bad_option_msg("inline_image_config.capture_svg", "must be a boolean"))?;
+        update.capture_svg = Some(
+            value
+                .decode::<bool>()
+                .map_err(|_| bad_option_msg("inline_image_config.capture_svg", "must be a boolean"))?,
+        );
     }
 
     if let Some(value) = map.get("infer_dimensions") {
-        config.infer_dimensions = value
-            .decode::<bool>()
-            .map_err(|_| bad_option_msg("inline_image_config.infer_dimensions", "must be a boolean"))?;
+        update.infer_dimensions = Some(
+            value
+                .decode::<bool>()
+                .map_err(|_| bad_option_msg("inline_image_config.infer_dimensions", "must be a boolean"))?,
+        );
     }
 
-    Ok(config)
+    Ok(InlineImageConfig::from_update(update))
 }
 
 fn decode_string_list(term: Term, field: &'static str) -> NifResult<Vec<String>> {

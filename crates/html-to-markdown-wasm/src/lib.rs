@@ -3,8 +3,9 @@ use html_to_markdown_rs::DEFAULT_MAX_STRUCTURED_DATA_SIZE;
 #[cfg(any(feature = "js-bindings", feature = "wasmtime-testing"))]
 use html_to_markdown_rs::safety::guard_panic;
 use html_to_markdown_rs::{
-    CodeBlockStyle, ConversionOptions as RustConversionOptions, HeadingStyle, HighlightStyle, ListIndentType,
-    NewlineStyle, PreprocessingOptions as RustPreprocessingOptions, PreprocessingPreset, WhitespaceMode,
+    CodeBlockStyle, ConversionOptions as RustConversionOptions, ConversionOptionsUpdate, DEFAULT_INLINE_IMAGE_LIMIT,
+    HeadingStyle, HighlightStyle, ListIndentType, MetadataConfigUpdate, NewlineStyle, PreprocessingOptionsUpdate,
+    PreprocessingPreset, WhitespaceMode,
 };
 use serde::{Deserialize, Serialize};
 
@@ -196,13 +197,13 @@ fn default_true() -> bool {
     true
 }
 
-impl From<WasmPreprocessingOptions> for RustPreprocessingOptions {
+impl From<WasmPreprocessingOptions> for PreprocessingOptionsUpdate {
     fn from(val: WasmPreprocessingOptions) -> Self {
-        RustPreprocessingOptions {
-            enabled: val.enabled,
-            preset: val.preset.map(Into::into).unwrap_or(PreprocessingPreset::Standard),
-            remove_navigation: val.remove_navigation,
-            remove_forms: val.remove_forms,
+        Self {
+            enabled: Some(val.enabled),
+            preset: val.preset.map(Into::into),
+            remove_navigation: Some(val.remove_navigation),
+            remove_forms: Some(val.remove_forms),
         }
     }
 }
@@ -275,105 +276,47 @@ pub struct WasmConversionOptions {
     pub preserve_tags: Option<Vec<String>>,
 }
 
+impl From<WasmConversionOptions> for ConversionOptionsUpdate {
+    fn from(val: WasmConversionOptions) -> Self {
+        Self {
+            heading_style: val.heading_style.map(Into::into),
+            list_indent_type: val.list_indent_type.map(Into::into),
+            list_indent_width: val.list_indent_width,
+            bullets: val.bullets,
+            strong_em_symbol: val.strong_em_symbol,
+            escape_asterisks: val.escape_asterisks,
+            escape_underscores: val.escape_underscores,
+            escape_misc: val.escape_misc,
+            escape_ascii: val.escape_ascii,
+            code_language: val.code_language,
+            autolinks: val.autolinks,
+            default_title: val.default_title,
+            br_in_tables: val.br_in_tables,
+            hocr_spatial_tables: val.hocr_spatial_tables,
+            highlight_style: val.highlight_style.map(Into::into),
+            extract_metadata: val.extract_metadata,
+            whitespace_mode: val.whitespace_mode.map(Into::into),
+            strip_newlines: val.strip_newlines,
+            wrap: val.wrap,
+            wrap_width: val.wrap_width,
+            convert_as_inline: val.convert_as_inline,
+            sub_symbol: val.sub_symbol,
+            sup_symbol: val.sup_symbol,
+            newline_style: val.newline_style.map(Into::into),
+            code_block_style: val.code_block_style.map(Into::into),
+            keep_inline_images_in: val.keep_inline_images_in,
+            preprocessing: val.preprocessing.map(Into::into),
+            encoding: val.encoding,
+            debug: val.debug,
+            strip_tags: val.strip_tags,
+            preserve_tags: val.preserve_tags,
+        }
+    }
+}
+
 impl From<WasmConversionOptions> for RustConversionOptions {
     fn from(val: WasmConversionOptions) -> Self {
-        let mut opts = RustConversionOptions::default();
-
-        if let Some(heading_style) = val.heading_style {
-            opts.heading_style = heading_style.into();
-        }
-        if let Some(list_indent_type) = val.list_indent_type {
-            opts.list_indent_type = list_indent_type.into();
-        }
-        if let Some(list_indent_width) = val.list_indent_width {
-            opts.list_indent_width = list_indent_width;
-        }
-        if let Some(bullets) = val.bullets {
-            opts.bullets = bullets;
-        }
-        if let Some(strong_em_symbol) = val.strong_em_symbol {
-            opts.strong_em_symbol = strong_em_symbol;
-        }
-        if let Some(escape_asterisks) = val.escape_asterisks {
-            opts.escape_asterisks = escape_asterisks;
-        }
-        if let Some(escape_underscores) = val.escape_underscores {
-            opts.escape_underscores = escape_underscores;
-        }
-        if let Some(escape_misc) = val.escape_misc {
-            opts.escape_misc = escape_misc;
-        }
-        if let Some(escape_ascii) = val.escape_ascii {
-            opts.escape_ascii = escape_ascii;
-        }
-        if let Some(code_language) = val.code_language {
-            opts.code_language = code_language;
-        }
-        if let Some(autolinks) = val.autolinks {
-            opts.autolinks = autolinks;
-        }
-        if let Some(default_title) = val.default_title {
-            opts.default_title = default_title;
-        }
-        if let Some(br_in_tables) = val.br_in_tables {
-            opts.br_in_tables = br_in_tables;
-        }
-        if let Some(hocr_spatial_tables) = val.hocr_spatial_tables {
-            opts.hocr_spatial_tables = hocr_spatial_tables;
-        }
-        if let Some(highlight_style) = val.highlight_style {
-            opts.highlight_style = highlight_style.into();
-        }
-        if let Some(extract_metadata) = val.extract_metadata {
-            opts.extract_metadata = extract_metadata;
-        }
-        if let Some(whitespace_mode) = val.whitespace_mode {
-            opts.whitespace_mode = whitespace_mode.into();
-        }
-        if let Some(strip_newlines) = val.strip_newlines {
-            opts.strip_newlines = strip_newlines;
-        }
-        if let Some(wrap) = val.wrap {
-            opts.wrap = wrap;
-        }
-        if let Some(wrap_width) = val.wrap_width {
-            opts.wrap_width = wrap_width;
-        }
-        if let Some(convert_as_inline) = val.convert_as_inline {
-            opts.convert_as_inline = convert_as_inline;
-        }
-        if let Some(sub_symbol) = val.sub_symbol {
-            opts.sub_symbol = sub_symbol;
-        }
-        if let Some(sup_symbol) = val.sup_symbol {
-            opts.sup_symbol = sup_symbol;
-        }
-        if let Some(newline_style) = val.newline_style {
-            opts.newline_style = newline_style.into();
-        }
-        if let Some(code_block_style) = val.code_block_style {
-            opts.code_block_style = code_block_style.into();
-        }
-        if let Some(keep_inline_images_in) = val.keep_inline_images_in {
-            opts.keep_inline_images_in = keep_inline_images_in;
-        }
-        if let Some(preprocessing) = val.preprocessing {
-            opts.preprocessing = preprocessing.into();
-        }
-        if let Some(encoding) = val.encoding {
-            opts.encoding = encoding;
-        }
-        if let Some(debug) = val.debug {
-            opts.debug = debug;
-        }
-        if let Some(strip_tags) = val.strip_tags {
-            opts.strip_tags = strip_tags;
-        }
-        if let Some(preserve_tags) = val.preserve_tags {
-            opts.preserve_tags = preserve_tags;
-        }
-
-        opts
+        RustConversionOptions::from(ConversionOptionsUpdate::from(val))
     }
 }
 
@@ -389,9 +332,9 @@ fn parse_wasm_options(options: JsValue) -> Result<Option<RustConversionOptions>,
         }
     }
 
-    let wasm_options: WasmConversionOptions = serde_wasm_bindgen::from_value(options)
+    let update: html_to_markdown_rs::ConversionOptionsUpdate = serde_wasm_bindgen::from_value(options)
         .map_err(|e| JsValue::from_str(&format!("Failed to parse options: {}", e)))?;
-    Ok(Some(wasm_options.into()))
+    Ok(Some(update.into()))
 }
 
 #[cfg(feature = "js-bindings")]
@@ -502,7 +445,7 @@ fn convert_with_inline_images_internal(
 
     let rust_config = image_config
         .map(Into::into)
-        .unwrap_or_else(|| html_to_markdown_rs::InlineImageConfig::new(5 * 1024 * 1024));
+        .unwrap_or_else(|| html_to_markdown_rs::InlineImageConfig::new(DEFAULT_INLINE_IMAGE_LIMIT));
 
     let extraction = guard_panic(|| html_to_markdown_rs::convert_with_inline_images(html, rust_options, rust_config))
         .map_err(to_js_error)?;
@@ -633,14 +576,15 @@ impl Default for WasmMetadataConfig {
 #[cfg(all(feature = "js-bindings", feature = "metadata"))]
 impl From<WasmMetadataConfig> for html_to_markdown_rs::MetadataConfig {
     fn from(cfg: WasmMetadataConfig) -> Self {
-        Self {
-            extract_document: cfg.extract_document,
-            extract_headers: cfg.extract_headers,
-            extract_links: cfg.extract_links,
-            extract_images: cfg.extract_images,
-            extract_structured_data: cfg.extract_structured_data,
-            max_structured_data_size: cfg.max_structured_data_size,
-        }
+        let update = MetadataConfigUpdate {
+            extract_document: Some(cfg.extract_document),
+            extract_headers: Some(cfg.extract_headers),
+            extract_links: Some(cfg.extract_links),
+            extract_images: Some(cfg.extract_images),
+            extract_structured_data: Some(cfg.extract_structured_data),
+            max_structured_data_size: Some(cfg.max_structured_data_size),
+        };
+        html_to_markdown_rs::MetadataConfig::from(update)
     }
 }
 

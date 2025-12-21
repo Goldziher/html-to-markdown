@@ -16,13 +16,12 @@ use html_to_markdown_rs::metadata::{
 use html_to_markdown_rs::safety::guard_panic;
 mod profiling;
 use html_to_markdown_rs::{
-    CodeBlockStyle, ConversionError, ConversionOptions, HeadingStyle, HighlightStyle, HtmlExtraction, InlineImage,
-    InlineImageConfig, InlineImageWarning, ListIndentType, NewlineStyle, PreprocessingOptions, PreprocessingPreset,
-    WhitespaceMode,
+    CodeBlockStyle, ConversionError, ConversionOptions, ConversionOptionsUpdate, DEFAULT_INLINE_IMAGE_LIMIT,
+    HeadingStyle, HighlightStyle, HtmlExtraction, InlineImage, InlineImageConfig, InlineImageConfigUpdate,
+    InlineImageWarning, ListIndentType, MetadataConfigUpdate, NewlineStyle, PreprocessingOptionsUpdate,
+    PreprocessingPreset, WhitespaceMode,
 };
 use std::path::PathBuf;
-
-const DEFAULT_INLINE_IMAGE_LIMIT: u64 = 5 * 1024 * 1024;
 
 fn to_php_exception(err: ConversionError) -> PhpException {
     match err {
@@ -134,7 +133,7 @@ pub fn module(module: ModuleBuilder) -> ModuleBuilder {
 }
 
 fn parse_conversion_options(table: &ZendHashTable) -> PhpResult<ConversionOptions> {
-    let mut opts = ConversionOptions::default();
+    let mut update = ConversionOptionsUpdate::default();
 
     for (key, value) in table {
         let key_str = key_to_string(&key)?;
@@ -145,107 +144,107 @@ fn parse_conversion_options(table: &ZendHashTable) -> PhpResult<ConversionOption
 
         match key_str.as_str() {
             "heading_style" => {
-                opts.heading_style = parse_heading_style(value, &key_str)?;
+                update.heading_style = Some(parse_heading_style(value, &key_str)?);
             }
             "list_indent_type" => {
-                opts.list_indent_type = parse_list_indent_type(value, &key_str)?;
+                update.list_indent_type = Some(parse_list_indent_type(value, &key_str)?);
             }
             "list_indent_width" => {
-                opts.list_indent_width = read_usize(value, &key_str)?;
+                update.list_indent_width = Some(read_usize(value, &key_str)?);
             }
             "bullets" => {
-                opts.bullets = read_string(value, &key_str)?;
+                update.bullets = Some(read_string(value, &key_str)?);
             }
             "strong_em_symbol" => {
-                opts.strong_em_symbol = parse_single_char(value, &key_str)?;
+                update.strong_em_symbol = Some(parse_single_char(value, &key_str)?);
             }
             "escape_asterisks" => {
-                opts.escape_asterisks = read_bool(value, &key_str)?;
+                update.escape_asterisks = Some(read_bool(value, &key_str)?);
             }
             "escape_underscores" => {
-                opts.escape_underscores = read_bool(value, &key_str)?;
+                update.escape_underscores = Some(read_bool(value, &key_str)?);
             }
             "escape_misc" => {
-                opts.escape_misc = read_bool(value, &key_str)?;
+                update.escape_misc = Some(read_bool(value, &key_str)?);
             }
             "escape_ascii" => {
-                opts.escape_ascii = read_bool(value, &key_str)?;
+                update.escape_ascii = Some(read_bool(value, &key_str)?);
             }
             "code_language" => {
-                opts.code_language = read_string(value, &key_str)?;
+                update.code_language = Some(read_string(value, &key_str)?);
             }
             "autolinks" => {
-                opts.autolinks = read_bool(value, &key_str)?;
+                update.autolinks = Some(read_bool(value, &key_str)?);
             }
             "default_title" => {
-                opts.default_title = read_bool(value, &key_str)?;
+                update.default_title = Some(read_bool(value, &key_str)?);
             }
             "br_in_tables" => {
-                opts.br_in_tables = read_bool(value, &key_str)?;
+                update.br_in_tables = Some(read_bool(value, &key_str)?);
             }
             "hocr_spatial_tables" => {
-                opts.hocr_spatial_tables = read_bool(value, &key_str)?;
+                update.hocr_spatial_tables = Some(read_bool(value, &key_str)?);
             }
             "highlight_style" => {
-                opts.highlight_style = parse_highlight_style(value, &key_str)?;
+                update.highlight_style = Some(parse_highlight_style(value, &key_str)?);
             }
             "extract_metadata" => {
-                opts.extract_metadata = read_bool(value, &key_str)?;
+                update.extract_metadata = Some(read_bool(value, &key_str)?);
             }
             "whitespace_mode" => {
-                opts.whitespace_mode = parse_whitespace_mode(value, &key_str)?;
+                update.whitespace_mode = Some(parse_whitespace_mode(value, &key_str)?);
             }
             "strip_newlines" => {
-                opts.strip_newlines = read_bool(value, &key_str)?;
+                update.strip_newlines = Some(read_bool(value, &key_str)?);
             }
             "wrap" => {
-                opts.wrap = read_bool(value, &key_str)?;
+                update.wrap = Some(read_bool(value, &key_str)?);
             }
             "wrap_width" => {
-                opts.wrap_width = read_usize(value, &key_str)?;
+                update.wrap_width = Some(read_usize(value, &key_str)?);
             }
             "convert_as_inline" => {
-                opts.convert_as_inline = read_bool(value, &key_str)?;
+                update.convert_as_inline = Some(read_bool(value, &key_str)?);
             }
             "sub_symbol" => {
-                opts.sub_symbol = read_string(value, &key_str)?;
+                update.sub_symbol = Some(read_string(value, &key_str)?);
             }
             "sup_symbol" => {
-                opts.sup_symbol = read_string(value, &key_str)?;
+                update.sup_symbol = Some(read_string(value, &key_str)?);
             }
             "newline_style" => {
-                opts.newline_style = parse_newline_style(value, &key_str)?;
+                update.newline_style = Some(parse_newline_style(value, &key_str)?);
             }
             "code_block_style" => {
-                opts.code_block_style = parse_code_block_style(value, &key_str)?;
+                update.code_block_style = Some(parse_code_block_style(value, &key_str)?);
             }
             "keep_inline_images_in" => {
-                opts.keep_inline_images_in = read_string_list(value, &key_str)?;
+                update.keep_inline_images_in = Some(read_string_list(value, &key_str)?);
             }
             "preprocessing" => {
-                opts.preprocessing = parse_preprocessing_options(value, &key_str)?;
+                update.preprocessing = Some(parse_preprocessing_options(value, &key_str)?);
             }
             "encoding" => {
-                opts.encoding = read_string(value, &key_str)?;
+                update.encoding = Some(read_string(value, &key_str)?);
             }
             "debug" => {
-                opts.debug = read_bool(value, &key_str)?;
+                update.debug = Some(read_bool(value, &key_str)?);
             }
             "strip_tags" => {
-                opts.strip_tags = read_string_list(value, &key_str)?;
+                update.strip_tags = Some(read_string_list(value, &key_str)?);
             }
             "preserve_tags" => {
-                opts.preserve_tags = read_string_list(value, &key_str)?;
+                update.preserve_tags = Some(read_string_list(value, &key_str)?);
             }
             _ => {}
         }
     }
 
-    Ok(opts)
+    Ok(ConversionOptions::from(update))
 }
 
 fn parse_inline_image_config(table: &ZendHashTable) -> PhpResult<InlineImageConfig> {
-    let mut config = InlineImageConfig::new(DEFAULT_INLINE_IMAGE_LIMIT);
+    let mut update = InlineImageConfigUpdate::default();
 
     for (key, value) in table {
         let key_str = key_to_string(&key)?;
@@ -262,27 +261,27 @@ fn parse_inline_image_config(table: &ZendHashTable) -> PhpResult<InlineImageConf
                         "max_decoded_size_bytes must be greater than zero".to_string(),
                     ));
                 }
-                config.max_decoded_size_bytes = size;
+                update.max_decoded_size_bytes = Some(size);
             }
             "filename_prefix" => {
-                config.filename_prefix = Some(read_string(value, &key_str)?);
+                update.filename_prefix = Some(read_string(value, &key_str)?);
             }
             "capture_svg" => {
-                config.capture_svg = read_bool(value, &key_str)?;
+                update.capture_svg = Some(read_bool(value, &key_str)?);
             }
             "infer_dimensions" => {
-                config.infer_dimensions = read_bool(value, &key_str)?;
+                update.infer_dimensions = Some(read_bool(value, &key_str)?);
             }
             _ => {}
         }
     }
 
-    Ok(config)
+    Ok(InlineImageConfig::from_update(update))
 }
 
 #[cfg(feature = "metadata")]
 fn parse_metadata_config(table: &ZendHashTable) -> PhpResult<MetadataConfig> {
-    let mut config = MetadataConfig::default();
+    let mut update = MetadataConfigUpdate::default();
 
     for (key, value) in table {
         let key_str = key_to_string(&key)?;
@@ -293,36 +292,36 @@ fn parse_metadata_config(table: &ZendHashTable) -> PhpResult<MetadataConfig> {
 
         match key_str.as_str() {
             "extract_document" => {
-                config.extract_document = read_bool(value, &key_str)?;
+                update.extract_document = Some(read_bool(value, &key_str)?);
             }
             "extract_headers" => {
-                config.extract_headers = read_bool(value, &key_str)?;
+                update.extract_headers = Some(read_bool(value, &key_str)?);
             }
             "extract_links" => {
-                config.extract_links = read_bool(value, &key_str)?;
+                update.extract_links = Some(read_bool(value, &key_str)?);
             }
             "extract_images" => {
-                config.extract_images = read_bool(value, &key_str)?;
+                update.extract_images = Some(read_bool(value, &key_str)?);
             }
             "extract_structured_data" => {
-                config.extract_structured_data = read_bool(value, &key_str)?;
+                update.extract_structured_data = Some(read_bool(value, &key_str)?);
             }
             "max_structured_data_size" => {
-                config.max_structured_data_size = read_usize(value, &key_str)?;
+                update.max_structured_data_size = Some(read_usize(value, &key_str)?);
             }
             _ => {}
         }
     }
 
-    Ok(config)
+    Ok(MetadataConfig::from(update))
 }
 
-fn parse_preprocessing_options(value: &Zval, key: &str) -> PhpResult<PreprocessingOptions> {
+fn parse_preprocessing_options(value: &Zval, key: &str) -> PhpResult<PreprocessingOptionsUpdate> {
     let table = value
         .array()
         .ok_or_else(|| PhpException::default(format!("'{key}' must be an associative array")))?;
 
-    let mut opts = PreprocessingOptions::default();
+    let mut update = PreprocessingOptionsUpdate::default();
 
     for (entry_key, entry_value) in table {
         let entry_name = key_to_string(&entry_key)?;
@@ -333,22 +332,22 @@ fn parse_preprocessing_options(value: &Zval, key: &str) -> PhpResult<Preprocessi
 
         match entry_name.as_str() {
             "enabled" => {
-                opts.enabled = read_bool(entry_value, &format!("{key}.enabled"))?;
+                update.enabled = Some(read_bool(entry_value, &format!("{key}.enabled"))?);
             }
             "preset" => {
-                opts.preset = parse_preprocessing_preset(entry_value, &format!("{key}.preset"))?;
+                update.preset = Some(parse_preprocessing_preset(entry_value, &format!("{key}.preset"))?);
             }
             "remove_navigation" => {
-                opts.remove_navigation = read_bool(entry_value, &format!("{key}.remove_navigation"))?;
+                update.remove_navigation = Some(read_bool(entry_value, &format!("{key}.remove_navigation"))?);
             }
             "remove_forms" => {
-                opts.remove_forms = read_bool(entry_value, &format!("{key}.remove_forms"))?;
+                update.remove_forms = Some(read_bool(entry_value, &format!("{key}.remove_forms"))?);
             }
             _ => {}
         }
     }
 
-    Ok(opts)
+    Ok(update)
 }
 
 fn parse_heading_style(value: &Zval, key: &str) -> PhpResult<HeadingStyle> {
