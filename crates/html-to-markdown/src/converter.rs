@@ -3112,6 +3112,7 @@ fn walk_node(
                     options.escape_ascii,
                 )
             } else {
+                let has_double_newline = text.contains("\n\n") || text.contains("\r\n\r\n");
                 let has_trailing_single_newline =
                     text.ends_with('\n') && !text.ends_with("\n\n") && !text.ends_with("\r\n\r\n");
 
@@ -3129,7 +3130,7 @@ fn walk_node(
                         && prefix == " "
                         && !previous_sibling_is_inline_tag(node_handle, parser, dom_ctx));
 
-                let mut final_text = String::new();
+                let mut final_text = String::with_capacity(prefix.len() + core.len() + suffix.len() + 2);
                 if !skip_prefix && !prefix.is_empty() {
                     final_text.push_str(prefix);
                 }
@@ -3154,7 +3155,7 @@ fn walk_node(
                         );
                     }
                     if !at_paragraph_break {
-                        if text.contains("\n\n") || text.contains("\r\n\r\n") {
+                        if has_double_newline {
                             final_text.push('\n');
                         } else if let Some(next_tag) = get_next_sibling_tag(node_handle, parser, dom_ctx) {
                             if options.debug {
@@ -3178,11 +3179,12 @@ fn walk_node(
             };
 
             if ctx.in_list_item && processed_text.contains("\n\n") {
+                let indent = " ".repeat(4 * ctx.list_depth);
                 let mut first = true;
                 for part in processed_text.split("\n\n") {
                     if !first {
                         output.push_str("\n\n");
-                        output.push_str(&" ".repeat(4 * ctx.list_depth));
+                        output.push_str(&indent);
                     }
                     first = false;
                     output.push_str(part.trim());
