@@ -933,6 +933,9 @@ impl MetadataCollector {
         }
 
         let content_size = json_content.len();
+        if content_size > self.config.max_structured_data_size {
+            return;
+        }
         if self.structured_data_size + content_size > self.config.max_structured_data_size {
             return;
         }
