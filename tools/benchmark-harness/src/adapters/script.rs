@@ -1,5 +1,5 @@
 use crate::adapter::FrameworkAdapter;
-use crate::config::BenchmarkConfig;
+use crate::config::{BenchmarkConfig, BenchmarkScenario};
 use crate::fixture::{Fixture, FixtureFormat};
 use crate::monitoring::ResourceMonitor;
 use crate::types::{BenchmarkResult, PerformanceMetrics};
@@ -56,12 +56,17 @@ impl ScriptAdapter {
         !matches!(self.language, ScriptLanguage::Wasm)
     }
 
-    fn flamegraph_path(&self, fixture: &Fixture, config: &BenchmarkConfig) -> Option<PathBuf> {
+    fn flamegraph_path(
+        &self,
+        fixture: &Fixture,
+        scenario: BenchmarkScenario,
+        config: &BenchmarkConfig,
+    ) -> Option<PathBuf> {
         if config.enable_profiling && self.supports_profiling() {
             config
                 .flamegraph_dir
                 .as_ref()
-                .map(|dir| dir.join(format!("{}-{}.svg", self.name(), fixture.id)))
+                .map(|dir| dir.join(format!("{}-{}-{}.svg", self.name(), fixture.id, scenario.as_str())))
         } else {
             None
         }
@@ -188,10 +193,20 @@ impl FrameworkAdapter for ScriptAdapter {
         matches!(format, FixtureFormat::Html | FixtureFormat::Hocr)
     }
 
-    fn run(&self, fixture: &Fixture, config: &BenchmarkConfig) -> Result<BenchmarkResult> {
+    fn supports_scenario(&self, scenario: BenchmarkScenario) -> bool {
+        match self.language {
+            ScriptLanguage::Java | ScriptLanguage::CSharp | ScriptLanguage::Go => matches!(
+                scenario,
+                BenchmarkScenario::ConvertDefault | BenchmarkScenario::MetadataDefault
+            ),
+            _ => true,
+        }
+    }
+
+    fn run(&self, fixture: &Fixture, scenario: BenchmarkScenario, config: &BenchmarkConfig) -> Result<BenchmarkResult> {
         let (mut command, working_dir) = self.build_command()?;
         let fixture_path = fixture.resolved_path(&self.repo_root);
-        let flamegraph_path = self.flamegraph_path(fixture, config);
+        let flamegraph_path = self.flamegraph_path(fixture, scenario, config);
         let flamegraph_output_path = flamegraph_path.as_ref().map(|path| {
             if path.is_relative() {
                 self.repo_root.join(path)
@@ -224,6 +239,8 @@ impl FrameworkAdapter for ScriptAdapter {
             .arg(&fixture_path)
             .arg("--iterations")
             .arg(iterations.to_string())
+            .arg("--scenario")
+            .arg(scenario.as_str())
             .arg("--format")
             .arg(fixture.format.as_str())
             .current_dir(&working_dir)
@@ -252,6 +269,7 @@ impl FrameworkAdapter for ScriptAdapter {
             };
             return Ok(BenchmarkResult {
                 framework: self.name().to_string(),
+                scenario: scenario.as_str().to_string(),
                 fixture_id: fixture.id.clone(),
                 fixture_name: fixture.name.clone(),
                 fixture_path: fixture_path.clone(),
@@ -312,6 +330,7 @@ impl FrameworkAdapter for ScriptAdapter {
 
         Ok(BenchmarkResult {
             framework: self.name().to_string(),
+            scenario: script_result.scenario.unwrap_or_else(|| scenario.as_str().to_string()),
             fixture_id: fixture.id.clone(),
             fixture_name: fixture.name.clone(),
             fixture_path: fixture_path.clone(),
@@ -346,6 +365,8 @@ struct ScriptResult {
     fixture: String,
     #[serde(default)]
     fixture_path: Option<PathBuf>,
+    #[serde(default)]
+    scenario: Option<String>,
     iterations: u32,
     elapsed_seconds: f64,
     ops_per_sec: f64,

@@ -120,17 +120,17 @@ fn build_framework_summary(results: &[BenchmarkResult]) -> Vec<FrameworkSummary>
 }
 
 fn build_fixture_summary(results: &[BenchmarkResult]) -> Vec<FixtureSummary> {
-    let mut by_fixture: HashMap<(&str, &str), Vec<&BenchmarkResult>> = HashMap::new();
+    let mut by_fixture: HashMap<(&str, &str, &str), Vec<&BenchmarkResult>> = HashMap::new();
     for result in results {
         by_fixture
-            .entry((&result.fixture_name, &result.fixture_format))
+            .entry((&result.fixture_name, &result.fixture_format, &result.scenario))
             .or_default()
             .push(result);
     }
 
     let mut summaries = by_fixture
         .into_iter()
-        .map(|((fixture, format), entries)| {
+        .map(|((fixture, format, scenario), entries)| {
             let successes = entries.iter().filter(|r| r.success).collect::<Vec<_>>();
             let median_ops = median(successes.iter().map(|r| r.metrics.ops_per_sec).collect());
             let median_mb = median(successes.iter().map(|r| r.metrics.mb_per_sec).collect());
@@ -142,6 +142,7 @@ fn build_fixture_summary(results: &[BenchmarkResult]) -> Vec<FixtureSummary> {
             FixtureSummary {
                 fixture: fixture.to_string(),
                 format: format.to_string(),
+                scenario: scenario.to_string(),
                 runs: entries.len(),
                 successes: successes.len(),
                 median_ops,
@@ -151,7 +152,10 @@ fn build_fixture_summary(results: &[BenchmarkResult]) -> Vec<FixtureSummary> {
         })
         .collect::<Vec<_>>();
 
-    summaries.sort_by(|a, b| a.fixture.cmp(&b.fixture));
+    summaries.sort_by(|a, b| match a.fixture.cmp(&b.fixture) {
+        std::cmp::Ordering::Equal => a.scenario.cmp(&b.scenario),
+        other => other,
+    });
     summaries
 }
 
@@ -201,6 +205,7 @@ struct FrameworkSummary {
 struct FixtureSummary {
     fixture: String,
     format: String,
+    scenario: String,
     runs: usize,
     successes: usize,
     median_ops: f64,
@@ -224,6 +229,7 @@ struct Hotspot {
 #[derive(serde::Serialize)]
 struct ReportRow {
     framework: String,
+    scenario: String,
     fixture_name: String,
     fixture_format: String,
     ops_per_sec: f64,
@@ -252,6 +258,7 @@ impl ReportRow {
 
         Self {
             framework: result.framework.clone(),
+            scenario: result.scenario.clone(),
             fixture_name: result.fixture_name.clone(),
             fixture_format: result.fixture_format.clone(),
             ops_per_sec: result.metrics.ops_per_sec,

@@ -12,7 +12,7 @@ name = "benchmark-harness"
 path = "src/main.rs"
 
 [dependencies]
-html-to-markdown-rs = { workspace = true }
+html-to-markdown-rs = { workspace = true, features = ["inline-images", "metadata"] }
 clap = { workspace = true, features = ["derive"] }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }

@@ -5,23 +5,41 @@ import { createRequire } from "node:module";
 
 const require = createRequire(import.meta.url);
 const {
-  convertBufferWithOptionsHandle,
-  createConversionOptionsHandle,
+  convertBuffer,
+  convertInlineImagesBuffer,
+  convertWithMetadataBuffer,
   startProfiling,
   stopProfiling,
 } = require("../index.js") as {
-  convertBufferWithOptionsHandle: (html: Buffer, handle: unknown) => string;
-  createConversionOptionsHandle: (options?: Record<string, unknown>) => unknown;
+  convertBuffer: (html: Buffer, options?: Record<string, unknown>) => string;
+  convertInlineImagesBuffer: (
+    html: Buffer,
+    options?: Record<string, unknown>,
+    imageConfig?: Record<string, unknown>,
+  ) => { markdown: string };
+  convertWithMetadataBuffer: (
+    html: Buffer,
+    options?: Record<string, unknown>,
+    metadataConfig?: Record<string, unknown>,
+  ) => { markdown: string };
   startProfiling?: (outputPath: string, frequency?: number) => void;
   stopProfiling?: () => void;
 };
 
 type Format = "html" | "hocr";
+type Scenario =
+  | "convert-default"
+  | "convert-options"
+  | "inline-images-default"
+  | "inline-images-options"
+  | "metadata-default"
+  | "metadata-options";
 
 interface Args {
   file: string;
   iterations: number;
   format: Format;
+  scenario: Scenario;
 }
 
 function parseArgs(): Args {
@@ -29,6 +47,7 @@ function parseArgs(): Args {
   const parsed: Partial<Args> = {
     iterations: 50,
     format: "html",
+    scenario: "convert-default",
   };
 
   for (let i = 0; i < args.length; i += 1) {
@@ -37,6 +56,8 @@ function parseArgs(): Args {
       parsed.file = args[++i];
     } else if (arg === "--iterations") {
       parsed.iterations = Math.max(1, Number.parseInt(args[++i] ?? "1", 10));
+    } else if (arg === "--scenario") {
+      parsed.scenario = (args[++i] ?? "convert-default") as Scenario;
     } else if (arg === "--format") {
       parsed.format = (args[++i] ?? "html").toLowerCase() as Format;
     }
@@ -48,6 +69,18 @@ function parseArgs(): Args {
   if (!["html", "hocr"].includes(parsed.format ?? "")) {
     throw new Error(`Unsupported format: ${parsed.format}`);
   }
+  if (
+    ![
+      "convert-default",
+      "convert-options",
+      "inline-images-default",
+      "inline-images-options",
+      "metadata-default",
+      "metadata-options",
+    ].includes(parsed.scenario ?? "")
+  ) {
+    throw new Error(`Unsupported scenario: ${parsed.scenario}`);
+  }
 
   return parsed as Args;
 }
@@ -56,7 +89,40 @@ function buildOptions(format: Format) {
   if (format === "hocr") {
     return { hocrSpatialTables: false };
   }
-  return undefined;
+  return {};
+}
+
+function buildMetadataConfig() {
+  return {
+    extract_document: true,
+    extract_headers: true,
+    extract_links: true,
+    extract_images: true,
+    extract_structured_data: true,
+  };
+}
+
+function runScenario(html: Buffer, scenario: Scenario, options: Record<string, unknown>) {
+  switch (scenario) {
+    case "convert-default":
+      convertBuffer(html);
+      break;
+    case "convert-options":
+      convertBuffer(html, options);
+      break;
+    case "inline-images-default":
+      convertInlineImagesBuffer(html);
+      break;
+    case "inline-images-options":
+      convertInlineImagesBuffer(html, options);
+      break;
+    case "metadata-default":
+      convertWithMetadataBuffer(html, undefined, buildMetadataConfig());
+      break;
+    case "metadata-options":
+      convertWithMetadataBuffer(html, options, buildMetadataConfig());
+      break;
+  }
 }
 
 function main() {
@@ -68,9 +134,9 @@ function main() {
   }
 
   const html = fs.readFileSync(fixturePath);
-  const optionsHandle = createConversionOptionsHandle(buildOptions(args.format));
+  const options = buildOptions(args.format);
 
-  convertBufferWithOptionsHandle(html, optionsHandle);
+  runScenario(html, args.scenario, options);
 
   const profileOutput = process.env.HTML_TO_MARKDOWN_PROFILE_OUTPUT;
   if (profileOutput && startProfiling) {
@@ -81,7 +147,7 @@ function main() {
 
   const start = process.hrtime.bigint();
   for (let i = 0; i < args.iterations; i += 1) {
-    convertBufferWithOptionsHandle(html, optionsHandle);
+    runScenario(html, args.scenario, options);
   }
   const elapsedSeconds = Number(process.hrtime.bigint() - start) / 1e9;
 
@@ -97,6 +163,7 @@ function main() {
     language: "node",
     fixture: path.basename(fixturePath),
     fixture_path: fixturePath,
+    scenario: args.scenario,
     iterations: args.iterations,
     elapsed_seconds: elapsedSeconds,
     ops_per_sec: opsPerSec,

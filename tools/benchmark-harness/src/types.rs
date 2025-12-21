@@ -5,6 +5,8 @@ use std::time::Duration;
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BenchmarkResult {
     pub framework: String,
+    #[serde(default = "default_scenario")]
+    pub scenario: String,
     pub fixture_id: String,
     pub fixture_name: String,
     pub fixture_path: PathBuf,
@@ -25,6 +27,10 @@ pub struct BenchmarkResult {
     pub success: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub error_message: Option<String>,
+}
+
+fn default_scenario() -> String {
+    "convert-default".to_string()
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]

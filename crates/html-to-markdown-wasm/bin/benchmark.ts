@@ -1,14 +1,27 @@
 #!/usr/bin/env tsx
 import fs from "node:fs";
 import path from "node:path";
-import { convert } from "html-to-markdown-wasm/dist-node";
+import {
+  WasmMetadataConfig,
+  convertBytes,
+  convertBytesWithInlineImages,
+  convertBytesWithMetadata,
+} from "html-to-markdown-wasm/dist-node";
 
 type Format = "html" | "hocr";
+type Scenario =
+  | "convert-default"
+  | "convert-options"
+  | "inline-images-default"
+  | "inline-images-options"
+  | "metadata-default"
+  | "metadata-options";
 
 interface Args {
   file: string;
   iterations: number;
   format: Format;
+  scenario: Scenario;
 }
 
 function parseArgs(): Args {
@@ -16,6 +29,7 @@ function parseArgs(): Args {
   const parsed: Partial<Args> = {
     iterations: 50,
     format: "html",
+    scenario: "convert-default",
   };
 
   for (let i = 0; i < args.length; i += 1) {
@@ -24,6 +38,8 @@ function parseArgs(): Args {
       parsed.file = args[++i];
     } else if (arg === "--iterations") {
       parsed.iterations = Math.max(1, Number.parseInt(args[++i] ?? "1", 10));
+    } else if (arg === "--scenario") {
+      parsed.scenario = (args[++i] ?? "convert-default") as Scenario;
     } else if (arg === "--format") {
       parsed.format = (args[++i] ?? "html").toLowerCase() as Format;
     }
@@ -35,6 +51,18 @@ function parseArgs(): Args {
   if (!parsed.format || !["html", "hocr"].includes(parsed.format)) {
     throw new Error(`Unsupported format: ${parsed.format}`);
   }
+  if (
+    ![
+      "convert-default",
+      "convert-options",
+      "inline-images-default",
+      "inline-images-options",
+      "metadata-default",
+      "metadata-options",
+    ].includes(parsed.scenario ?? "")
+  ) {
+    throw new Error(`Unsupported scenario: ${parsed.scenario}`);
+  }
 
   return parsed as Args;
 }
@@ -43,7 +71,30 @@ function buildOptions(format: Format) {
   if (format === "hocr") {
     return { hocrSpatialTables: false };
   }
-  return undefined;
+  return {};
+}
+
+function runScenario(htmlBytes: Uint8Array, scenario: Scenario, options: Record<string, unknown>) {
+  switch (scenario) {
+    case "convert-default":
+      convertBytes(htmlBytes, undefined);
+      break;
+    case "convert-options":
+      convertBytes(htmlBytes, options);
+      break;
+    case "inline-images-default":
+      convertBytesWithInlineImages(htmlBytes, undefined, undefined);
+      break;
+    case "inline-images-options":
+      convertBytesWithInlineImages(htmlBytes, options, undefined);
+      break;
+    case "metadata-default":
+      convertBytesWithMetadata(htmlBytes, undefined, new WasmMetadataConfig());
+      break;
+    case "metadata-options":
+      convertBytesWithMetadata(htmlBytes, options, new WasmMetadataConfig());
+      break;
+  }
 }
 
 function main() {
@@ -55,13 +106,14 @@ function main() {
   }
 
   const html = fs.readFileSync(fixturePath, "utf8");
+  const htmlBytes = new TextEncoder().encode(html);
   const options = buildOptions(args.format);
 
-  convert(html, options);
+  runScenario(htmlBytes, args.scenario, options);
 
   const start = process.hrtime.bigint();
   for (let i = 0; i < args.iterations; i += 1) {
-    convert(html, options);
+    runScenario(htmlBytes, args.scenario, options);
   }
   const elapsedSeconds = Number(process.hrtime.bigint() - start) / 1e9;
 
@@ -73,6 +125,7 @@ function main() {
     language: "wasm",
     fixture: path.basename(fixturePath),
     fixture_path: fixturePath,
+    scenario: args.scenario,
     iterations: args.iterations,
     elapsed_seconds: elapsedSeconds,
     ops_per_sec: opsPerSec,

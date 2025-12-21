@@ -7,11 +7,24 @@ using HtmlToMarkdown;
 
 class Program
 {
+    static void RunScenario(string html, string scenario)
+    {
+        if (scenario == "metadata-default")
+        {
+            HtmlToMarkdownConverter.ConvertWithMetadata(html);
+        }
+        else
+        {
+            HtmlToMarkdownConverter.Convert(html);
+        }
+    }
+
     static void Main(string[] args)
     {
         string? filePath = null;
         int iterations = 50;
         string format = "html";
+        string scenario = "convert-default";
 
         for (int i = 0; i < args.Length; i++)
         {
@@ -35,6 +48,12 @@ class Program
                         format = args[++i];
                     }
                     break;
+                case "--scenario":
+                    if (i + 1 < args.Length)
+                    {
+                        scenario = args[++i];
+                    }
+                    break;
             }
         }
 
@@ -44,11 +63,17 @@ class Program
             Environment.Exit(1);
         }
 
+        if (scenario != "convert-default" && scenario != "metadata-default")
+        {
+            Console.Error.WriteLine($"Unsupported scenario: {scenario}");
+            Environment.Exit(1);
+        }
+
         try
         {
             string html = File.ReadAllText(filePath);
 
-            HtmlToMarkdownConverter.Convert(html);
+            RunScenario(html, scenario);
 
             string? profileOutput = Environment.GetEnvironmentVariable("HTML_TO_MARKDOWN_PROFILE_OUTPUT");
             if (!string.IsNullOrWhiteSpace(profileOutput))
@@ -65,7 +90,7 @@ class Program
             var stopwatch = Stopwatch.StartNew();
             for (int i = 0; i < iterations; i++)
             {
-                HtmlToMarkdownConverter.Convert(html);
+                RunScenario(html, scenario);
             }
             stopwatch.Stop();
 
@@ -84,6 +109,7 @@ class Program
                 language = "csharp",
                 fixture = Path.GetFileName(filePath),
                 fixture_path = filePath,
+                scenario,
                 iterations,
                 elapsed_seconds = elapsedSeconds,
                 ops_per_sec = opsPerSec,

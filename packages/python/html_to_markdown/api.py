@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 from dataclasses import asdict
-from typing import TYPE_CHECKING, Literal, TypedDict
+from typing import TYPE_CHECKING, Literal, TypedDict, cast
 
 import html_to_markdown._html_to_markdown as _rust
 from html_to_markdown._html_to_markdown import (
@@ -17,6 +17,8 @@ from html_to_markdown._html_to_markdown import (
 from html_to_markdown.options import ConversionOptions, PreprocessingOptions
 
 if TYPE_CHECKING:
+    from collections.abc import Mapping
+
     from html_to_markdown._html_to_markdown import ExtendedMetadata  # pragma: no cover
 else:
     ExtendedMetadata = dict[str, object]  # type: ignore[assignment]
@@ -56,7 +58,7 @@ def _normalize_value(value: object) -> object:
     return value
 
 
-def _normalize_payload(payload: dict[str, object]) -> dict[str, object]:
+def _normalize_payload(payload: Mapping[str, object]) -> dict[str, object]:
     result: dict[str, object] = {}
     for key, value in payload.items():
         if value is None:
@@ -66,8 +68,8 @@ def _normalize_payload(payload: dict[str, object]) -> dict[str, object]:
 
 
 def _options_payload(options: ConversionOptions, preprocessing: PreprocessingOptions) -> dict[str, object]:
-    payload: dict[str, object] = asdict(options)
-    payload["preprocessing"] = asdict(preprocessing)
+    payload = cast("dict[str, object]", asdict(options))
+    payload["preprocessing"] = cast("dict[str, object]", asdict(preprocessing))
     return _normalize_payload(payload)
 
 

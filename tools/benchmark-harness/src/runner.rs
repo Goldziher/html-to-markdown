@@ -1,5 +1,6 @@
 use crate::adapter::FrameworkAdapter;
 use crate::config::BenchmarkConfig;
+use crate::config::BenchmarkScenario;
 use crate::fixture::Fixture;
 use crate::registry::AdapterRegistry;
 use crate::types::{BenchmarkResult, PerformanceMetrics, ResourceStats};
@@ -34,14 +35,19 @@ impl BenchmarkRunner {
         let mut results = Vec::new();
 
         for fixture in fixtures {
-            for adapter in &adapters {
-                if !adapter.supports_format(fixture.format) {
-                    continue;
-                }
+            for scenario in &self.config.scenarios {
+                for adapter in &adapters {
+                    if !adapter.supports_format(fixture.format) {
+                        continue;
+                    }
+                    if !adapter.supports_scenario(*scenario) {
+                        continue;
+                    }
 
-                let result = run_adapter(adapter.clone(), fixture, &self.config)
-                    .unwrap_or_else(|err| failed_result(adapter.clone(), fixture, err));
-                results.push(result);
+                    let result = run_adapter(adapter.clone(), fixture, *scenario, &self.config)
+                        .unwrap_or_else(|err| failed_result(adapter.clone(), fixture, *scenario, err));
+                    results.push(result);
+                }
             }
         }
 
@@ -52,14 +58,21 @@ impl BenchmarkRunner {
 fn run_adapter(
     adapter: Arc<dyn FrameworkAdapter>,
     fixture: &Fixture,
+    scenario: BenchmarkScenario,
     config: &BenchmarkConfig,
 ) -> Result<BenchmarkResult> {
-    adapter.run(fixture, config)
+    adapter.run(fixture, scenario, config)
 }
 
-fn failed_result(adapter: Arc<dyn FrameworkAdapter>, fixture: &Fixture, err: Error) -> BenchmarkResult {
+fn failed_result(
+    adapter: Arc<dyn FrameworkAdapter>,
+    fixture: &Fixture,
+    scenario: BenchmarkScenario,
+    err: Error,
+) -> BenchmarkResult {
     BenchmarkResult {
         framework: adapter.name().to_string(),
+        scenario: scenario.as_str().to_string(),
         fixture_id: fixture.id.clone(),
         fixture_name: fixture.name.clone(),
         fixture_path: fixture.path.clone(),

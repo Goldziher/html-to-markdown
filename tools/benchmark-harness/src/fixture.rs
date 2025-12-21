@@ -97,12 +97,85 @@ pub fn load_fixtures_from_file(path: &Path) -> Result<Vec<Fixture>> {
 }
 
 pub fn load_fixtures_from_dir(dir: &Path) -> Result<Vec<Fixture>> {
-    let mut fixtures = Vec::new();
+    let mut toml_files = Vec::new();
     for entry in std::fs::read_dir(dir).map_err(Error::Io)? {
         let entry = entry.map_err(Error::Io)?;
         let path = entry.path();
         if path.extension().and_then(|ext| ext.to_str()) == Some("toml") {
+            toml_files.push(path);
+        }
+    }
+
+    if !toml_files.is_empty() {
+        let mut fixtures = Vec::new();
+        for path in toml_files {
             fixtures.extend(load_fixtures_from_file(&path)?);
+        }
+        return Ok(fixtures);
+    }
+
+    load_fixtures_from_documents(dir)
+}
+
+fn load_fixtures_from_documents(dir: &Path) -> Result<Vec<Fixture>> {
+    let cwd = std::env::current_dir().map_err(Error::Io)?;
+    let mut fixtures = Vec::new();
+    let mut stack = vec![dir.to_path_buf()];
+
+    while let Some(path) = stack.pop() {
+        for entry in std::fs::read_dir(&path).map_err(Error::Io)? {
+            let entry = entry.map_err(Error::Io)?;
+            let entry_path = entry.path();
+            if entry_path.is_dir() {
+                stack.push(entry_path);
+                continue;
+            }
+
+            let extension = entry_path
+                .extension()
+                .and_then(|ext| ext.to_str())
+                .unwrap_or("")
+                .to_ascii_lowercase();
+            let format = match extension.as_str() {
+                "html" | "htm" => FixtureFormat::Html,
+                "hocr" => FixtureFormat::Hocr,
+                _ => continue,
+            };
+
+            let relative_path = entry_path
+                .strip_prefix(&cwd)
+                .unwrap_or(entry_path.as_path())
+                .to_path_buf();
+
+            let relative_to_dir = entry_path.strip_prefix(dir).unwrap_or(entry_path.as_path());
+            let id = sanitize_id(relative_to_dir);
+            let name = entry_path
+                .file_stem()
+                .and_then(|stem| stem.to_str())
+                .unwrap_or(id.as_str())
+                .to_string();
+            let category = relative_to_dir.parent().and_then(|parent| {
+                if parent.as_os_str().is_empty() {
+                    None
+                } else {
+                    Some(path_to_category(parent))
+                }
+            });
+
+            let file_size = std::fs::metadata(&entry_path).map(|m| m.len()).unwrap_or(0);
+            let iterations = Some(suggested_iterations(file_size));
+
+            let fixture = Fixture {
+                id,
+                name,
+                path: relative_path,
+                category,
+                iterations,
+                format,
+            };
+
+            fixture.validate(dir)?;
+            fixtures.push(fixture);
         }
     }
 
@@ -113,5 +186,50 @@ pub fn load_fixtures_from_dir(dir: &Path) -> Result<Vec<Fixture>> {
         )));
     }
 
+    fixtures.sort_by(|a, b| a.id.cmp(&b.id));
     Ok(fixtures)
+}
+
+fn suggested_iterations(file_size: u64) -> u32 {
+    if file_size < 25_000 {
+        15
+    } else if file_size < 100_000 {
+        10
+    } else if file_size < 500_000 {
+        7
+    } else if file_size < 2_000_000 {
+        5
+    } else {
+        3
+    }
+}
+
+fn sanitize_id(path: &Path) -> String {
+    let mut id = String::new();
+    let mut prev_dash = false;
+
+    for ch in path.to_string_lossy().chars() {
+        let mapped = if ch.is_ascii_alphanumeric() {
+            ch.to_ascii_lowercase()
+        } else {
+            '-'
+        };
+        if mapped == '-' {
+            if prev_dash {
+                continue;
+            }
+            prev_dash = true;
+        } else {
+            prev_dash = false;
+        }
+        id.push(mapped);
+    }
+
+    id.trim_matches('-').to_string()
+}
+
+fn path_to_category(path: &Path) -> String {
+    let mut category = path.to_string_lossy().replace(std::path::MAIN_SEPARATOR, "/");
+    category.make_ascii_lowercase();
+    category
 }
