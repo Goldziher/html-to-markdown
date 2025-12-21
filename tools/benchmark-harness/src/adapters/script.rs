@@ -108,11 +108,11 @@ impl ScriptAdapter {
             ScriptLanguage::Node => {
                 ensure_node_binding(&self.repo_root)?;
                 let mut cmd = Command::new("pnpm");
-                cmd.arg("--filter")
-                    .arg("html-to-markdown-node")
+                cmd.arg("-C")
+                    .arg("crates/html-to-markdown-node")
                     .arg("exec")
                     .arg("tsx")
-                    .arg("crates/html-to-markdown-node/bin/benchmark.ts");
+                    .arg("bin/benchmark.ts");
                 Ok((cmd, self.repo_root.to_path_buf()))
             }
             ScriptLanguage::Wasm => {
