@@ -112,7 +112,7 @@ impl ScriptAdapter {
                     .arg("html-to-markdown-node")
                     .arg("exec")
                     .arg("tsx")
-                    .arg("bin/benchmark.ts");
+                    .arg("crates/html-to-markdown-node/bin/benchmark.ts");
                 Ok((cmd, self.repo_root.to_path_buf()))
             }
             ScriptLanguage::Wasm => {
