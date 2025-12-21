@@ -546,6 +546,7 @@ struct DomContext {
     prev_inline_like_map: Vec<OnceCell<bool>>,
     next_inline_like_map: Vec<OnceCell<bool>>,
     next_tag_map: Vec<OnceCell<Option<u32>>>,
+    next_whitespace_map: Vec<OnceCell<bool>>,
     text_cache: RefCell<LruCache<u32, String>>,
 }
 
@@ -564,6 +565,7 @@ impl DomContext {
             self.prev_inline_like_map.resize_with(new_len, OnceCell::new);
             self.next_inline_like_map.resize_with(new_len, OnceCell::new);
             self.next_tag_map.resize_with(new_len, OnceCell::new);
+            self.next_whitespace_map.resize_with(new_len, OnceCell::new);
         }
     }
 
@@ -684,6 +686,46 @@ impl DomContext {
                                     continue;
                                 }
                                 return false;
+                            }
+                        }
+                    }
+
+                    false
+                })
+            })
+            .unwrap_or(false)
+    }
+
+    fn next_whitespace_text(&self, node_handle: &tl::NodeHandle, parser: &tl::Parser) -> bool {
+        let id = node_handle.get_inner();
+        self.next_whitespace_map
+            .get(id as usize)
+            .map(|cell| {
+                *cell.get_or_init(|| {
+                    let parent = self.parent_of(id);
+                    let siblings = if let Some(parent_id) = parent {
+                        if let Some(children) = self.children_of(parent_id) {
+                            children
+                        } else {
+                            return false;
+                        }
+                    } else {
+                        &self.root_children
+                    };
+
+                    let Some(position) = self
+                        .sibling_index(id)
+                        .or_else(|| siblings.iter().position(|handle| handle.get_inner() == id))
+                    else {
+                        return false;
+                    };
+
+                    for sibling in siblings.iter().skip(position + 1) {
+                        if let Some(node) = sibling.get(parser) {
+                            match node {
+                                tl::Node::Raw(raw) => return raw.as_utf8_str().trim().is_empty(),
+                                tl::Node::Tag(_) => return false,
+                                _ => continue,
                             }
                         }
                     }
@@ -1063,6 +1105,7 @@ fn build_dom_context(dom: &tl::VDom, parser: &tl::Parser, input_len: usize) -> D
         prev_inline_like_map: Vec::new(),
         next_inline_like_map: Vec::new(),
         next_tag_map: Vec::new(),
+        next_whitespace_map: Vec::new(),
         text_cache: RefCell::new(LruCache::new(cache_capacity)),
     };
 
@@ -2987,37 +3030,7 @@ fn previous_sibling_is_inline_tag(node_handle: &tl::NodeHandle, parser: &tl::Par
 }
 
 fn next_sibling_is_whitespace_text(node_handle: &tl::NodeHandle, parser: &tl::Parser, dom_ctx: &DomContext) -> bool {
-    let id = node_handle.get_inner();
-    let parent = dom_ctx.parent_of(id);
-
-    let siblings = if let Some(parent_id) = parent {
-        if let Some(children) = dom_ctx.children_of(parent_id) {
-            children
-        } else {
-            return false;
-        }
-    } else {
-        &dom_ctx.root_children
-    };
-
-    let Some(position) = dom_ctx
-        .sibling_index(id)
-        .or_else(|| siblings.iter().position(|handle| handle.get_inner() == id))
-    else {
-        return false;
-    };
-
-    for sibling in siblings.iter().skip(position + 1) {
-        if let Some(node) = sibling.get(parser) {
-            match node {
-                tl::Node::Raw(raw) => return raw.as_utf8_str().trim().is_empty(),
-                tl::Node::Tag(_) => return false,
-                _ => continue,
-            }
-        }
-    }
-
-    false
+    dom_ctx.next_whitespace_text(node_handle, parser)
 }
 
 fn next_sibling_is_inline_tag(node_handle: &tl::NodeHandle, parser: &tl::Parser, dom_ctx: &DomContext) -> bool {
