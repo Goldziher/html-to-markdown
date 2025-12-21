@@ -1209,34 +1209,20 @@ fn extract_metadata(
                                     }
                                 }
                                 "link" => {
-                                    let mut rel_attr = None;
-                                    let mut href_attr = None;
+                                    if let (Some(Some(rel_bytes)), Some(Some(href_bytes))) =
+                                        (child_tag.attributes().get("rel"), child_tag.attributes().get("href"))
+                                    {
+                                        let rel = rel_bytes.as_utf8_str();
+                                        let href = href_bytes.as_utf8_str();
 
-                                    if let Some(attr) = child_tag.attributes().get("rel") {
-                                        if let Some(bytes) = attr {
-                                            rel_attr = Some(bytes.as_utf8_str().to_string());
-                                        }
-                                    }
-                                    if let Some(attr) = child_tag.attributes().get("href") {
-                                        if let Some(bytes) = attr {
-                                            href_attr = Some(bytes.as_utf8_str().to_string());
-                                        }
-                                    }
-
-                                    if let (Some(rel), Some(href)) = (rel_attr, href_attr) {
-                                        let mut rel_lower = rel;
-                                        rel_lower.make_ascii_lowercase();
-                                        match rel_lower.as_str() {
-                                            "canonical" => {
-                                                metadata.insert("canonical".to_string(), href);
-                                            }
-                                            "author" | "license" | "alternate" => {
-                                                let mut key = String::with_capacity("link-".len() + rel_lower.len());
-                                                key.push_str("link-");
-                                                key.push_str(&rel_lower);
-                                                metadata.insert(key, href);
-                                            }
-                                            _ => {}
+                                        if rel.eq_ignore_ascii_case("canonical") {
+                                            metadata.insert("canonical".to_string(), href.to_string());
+                                        } else if rel.eq_ignore_ascii_case("author") {
+                                            metadata.insert("link-author".to_string(), href.to_string());
+                                        } else if rel.eq_ignore_ascii_case("license") {
+                                            metadata.insert("link-license".to_string(), href.to_string());
+                                        } else if rel.eq_ignore_ascii_case("alternate") {
+                                            metadata.insert("link-alternate".to_string(), href.to_string());
                                         }
                                     }
                                 }
@@ -1631,7 +1617,7 @@ fn handle_inline_svg(
     let description = attributes
         .get("aria-label")
         .and_then(|value| non_empty_trimmed(value))
-        .or_else(|| title_opt.clone().and_then(|t| non_empty_trimmed(&t)));
+        .or_else(|| title_opt.as_deref().and_then(non_empty_trimmed));
 
     let filename_candidate = attributes
         .get("data-filename")
