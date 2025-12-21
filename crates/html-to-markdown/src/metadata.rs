@@ -1096,13 +1096,15 @@ impl MetadataCollector {
         let mut result = Vec::with_capacity(json_ld.len());
 
         for json_str in json_ld {
-            let schema_type = if json_str.contains("\"@type\"") {
-                serde_json::from_str::<serde_json::Value>(&json_str)
-                    .ok()
-                    .and_then(|v| v.get("@type").and_then(|t| t.as_str().map(|s| s.to_string())))
-            } else {
-                None
-            };
+            let schema_type = Self::scan_schema_type(&json_str).or_else(|| {
+                if json_str.contains("\"@type\"") {
+                    serde_json::from_str::<serde_json::Value>(&json_str)
+                        .ok()
+                        .and_then(|v| v.get("@type").and_then(|t| t.as_str().map(|s| s.to_string())))
+                } else {
+                    None
+                }
+            });
 
             result.push(StructuredData {
                 data_type: StructuredDataType::JsonLd,
@@ -1112,6 +1114,63 @@ impl MetadataCollector {
         }
 
         result
+    }
+
+    fn scan_schema_type(json_str: &str) -> Option<String> {
+        let needle = "\"@type\"";
+        let start = json_str.find(needle)? + needle.len();
+        let bytes = json_str.as_bytes();
+        let mut i = start;
+
+        while i < bytes.len() && bytes[i].is_ascii_whitespace() {
+            i += 1;
+        }
+        if i >= bytes.len() || bytes[i] != b':' {
+            return None;
+        }
+        i += 1;
+        while i < bytes.len() && bytes[i].is_ascii_whitespace() {
+            i += 1;
+        }
+        if i >= bytes.len() {
+            return None;
+        }
+
+        if bytes[i] == b'[' {
+            i += 1;
+            while i < bytes.len() && bytes[i].is_ascii_whitespace() {
+                i += 1;
+            }
+        }
+
+        if i >= bytes.len() || bytes[i] != b'"' {
+            return None;
+        }
+
+        let start_quote = i;
+        i += 1;
+        let mut escaped = false;
+        while i < bytes.len() {
+            let byte = bytes[i];
+            if escaped {
+                escaped = false;
+                i += 1;
+                continue;
+            }
+            if byte == b'\\' {
+                escaped = true;
+                i += 1;
+                continue;
+            }
+            if byte == b'"' {
+                let end_quote = i;
+                let slice = &json_str[start_quote..=end_quote];
+                return serde_json::from_str::<String>(slice).ok();
+            }
+            i += 1;
+        }
+
+        None
     }
 
     /// Finish collection and return all extracted metadata.
