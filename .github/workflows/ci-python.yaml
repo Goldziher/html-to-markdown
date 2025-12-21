@@ -11,16 +11,16 @@ on:
       - uv.lock
       - uv.toml
       - .github/workflows/ci-python.yaml
-#   pull_request:
-#     branches: [main]
-#     paths:
-#       - packages/python/**
-#       - crates/html-to-markdown-py/**
-#       - crates/html-to-markdown/**
-#       - pyproject.toml
-#       - uv.lock
-#       - uv.toml
-#       - .github/workflows/ci-python.yaml
+  pull_request:
+    branches: [main]
+    paths:
+      - packages/python/**
+      - crates/html-to-markdown-py/**
+      - crates/html-to-markdown/**
+      - pyproject.toml
+      - uv.lock
+      - uv.toml
+      - .github/workflows/ci-python.yaml
 
 permissions:
   contents: read

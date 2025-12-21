@@ -11,16 +11,16 @@ on:
       - pnpm-lock.yaml
       - pnpm-workspace.yaml
       - .github/workflows/ci-node.yaml
-#   pull_request:
-#     branches: [main]
-#     paths:
-#       - packages/typescript/**
-#       - crates/html-to-markdown-node/**
-#       - crates/html-to-markdown/**
-#       - package.json
-#       - pnpm-lock.yaml
-#       - pnpm-workspace.yaml
-#       - .github/workflows/ci-node.yaml
+  pull_request:
+    branches: [main]
+    paths:
+      - packages/typescript/**
+      - crates/html-to-markdown-node/**
+      - crates/html-to-markdown/**
+      - package.json
+      - pnpm-lock.yaml
+      - pnpm-workspace.yaml
+      - .github/workflows/ci-node.yaml
 
 permissions:
   contents: read
