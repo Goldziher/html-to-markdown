@@ -3072,11 +3072,7 @@ fn walk_node(
     match node {
         tl::Node::Raw(bytes) => {
             let raw = bytes.as_utf8_str();
-            let mut text = if raw.as_bytes().contains(&b'&') {
-                text::decode_html_entities_cow(raw.as_ref())
-            } else {
-                Cow::Borrowed(raw.as_ref())
-            };
+            let mut text = text::decode_html_entities_cow(raw.as_ref());
 
             if text.is_empty() {
                 return;
@@ -3086,7 +3082,7 @@ fn walk_node(
             let had_newlines = text_ref.contains('\n');
             let has_double_newline = text_ref.contains("\n\n") || text_ref.contains("\r\n\r\n");
 
-            if options.strip_newlines && (text_ref.contains('\n') || text_ref.contains('\r')) {
+            if options.strip_newlines {
                 text = Cow::Owned(text.replace(['\r', '\n'], " "));
             }
 
