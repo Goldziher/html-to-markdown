@@ -8,7 +8,7 @@ use serde::Deserialize;
 use std::env;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
-use std::time::Duration;
+use std::time::{Duration, SystemTime};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ScriptLanguage {
@@ -280,10 +280,18 @@ impl FrameworkAdapter for ScriptAdapter {
     }
 
     fn supports_scenario(&self, scenario: BenchmarkScenario) -> bool {
+        if matches!(scenario, BenchmarkScenario::MetadataRaw) {
+            return matches!(self.language, ScriptLanguage::CSharp);
+        }
+
         match self.language {
-            ScriptLanguage::Java | ScriptLanguage::CSharp | ScriptLanguage::Go => matches!(
+            ScriptLanguage::Java | ScriptLanguage::Go => matches!(
                 scenario,
                 BenchmarkScenario::ConvertDefault | BenchmarkScenario::MetadataDefault
+            ),
+            ScriptLanguage::CSharp => matches!(
+                scenario,
+                BenchmarkScenario::ConvertDefault | BenchmarkScenario::MetadataDefault | BenchmarkScenario::MetadataRaw
             ),
             _ => true,
         }
@@ -945,7 +953,7 @@ fn ensure_ffi_library(repo_root: &Path) -> Result<()> {
     let target_dir = repo_root.join("target").join("release");
     let candidate = target_dir.join(file_name);
 
-    if candidate.exists() {
+    if candidate.exists() && !ffi_needs_rebuild(repo_root, &candidate)? {
         return Ok(());
     }
 
@@ -974,6 +982,30 @@ fn ensure_ffi_library(repo_root: &Path) -> Result<()> {
             candidate.display()
         )))
     }
+}
+
+fn ffi_needs_rebuild(repo_root: &Path, candidate: &Path) -> Result<bool> {
+    let lib_meta = std::fs::metadata(candidate)
+        .map_err(|err| Error::Benchmark(format!("Failed to read metadata for {}: {err}", candidate.display())))?;
+    let lib_modified = lib_meta.modified().unwrap_or(SystemTime::UNIX_EPOCH);
+
+    let ffi_dir = repo_root.join("crates/html-to-markdown-ffi");
+    let inputs = [
+        ffi_dir.join("Cargo.toml"),
+        ffi_dir.join("src/lib.rs"),
+        ffi_dir.join("cbindgen.toml"),
+    ];
+
+    for path in inputs {
+        let meta = std::fs::metadata(&path)
+            .map_err(|err| Error::Benchmark(format!("Failed to read metadata for {}: {err}", path.display())))?;
+        let modified = meta.modified().unwrap_or(SystemTime::UNIX_EPOCH);
+        if modified > lib_modified {
+            return Ok(true);
+        }
+    }
+
+    Ok(false)
 }
 
 fn cargo_features() -> Option<String> {

@@ -31,12 +31,13 @@ public static class HtmlToMarkdownConverter
 
         IntPtr htmlPtr = IntPtr.Zero;
         IntPtr resultPtr = IntPtr.Zero;
+        nuint resultLen = 0;
 
         try
         {
             htmlPtr = StringToUtf8Ptr(html);
 
-            resultPtr = NativeMethods.html_to_markdown_convert(htmlPtr);
+            resultPtr = NativeMethods.html_to_markdown_convert_with_len(htmlPtr, out resultLen);
 
             if (resultPtr == IntPtr.Zero)
             {
@@ -49,7 +50,7 @@ public static class HtmlToMarkdownConverter
                     errorMsg ?? "HTML to Markdown conversion failed");
             }
 
-            return PtrToStringUtf8(resultPtr) ?? string.Empty;
+            return PtrToStringUtf8(resultPtr, resultLen) ?? string.Empty;
         }
         finally
         {
@@ -58,6 +59,54 @@ public static class HtmlToMarkdownConverter
                 Marshal.FreeCoTaskMem(htmlPtr);
             }
 
+            if (resultPtr != IntPtr.Zero)
+            {
+                NativeMethods.html_to_markdown_free_string(resultPtr);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Converts UTF-8 HTML bytes to Markdown using default options.
+    /// </summary>
+    /// <param name="html">UTF-8 encoded HTML bytes</param>
+    /// <returns>The converted Markdown string</returns>
+    /// <exception cref="HtmlToMarkdownException">Thrown when conversion fails</exception>
+    public static unsafe string Convert(ReadOnlySpan<byte> html)
+    {
+        if (html.IsEmpty)
+        {
+            return string.Empty;
+        }
+
+        IntPtr resultPtr = IntPtr.Zero;
+        nuint resultLen = 0;
+
+        fixed (byte* htmlPtr = html)
+        {
+            resultPtr = NativeMethods.html_to_markdown_convert_bytes_with_len(
+                (IntPtr)htmlPtr,
+                (nuint)html.Length,
+                out resultLen);
+        }
+
+        if (resultPtr == IntPtr.Zero)
+        {
+            IntPtr errorPtr = NativeMethods.html_to_markdown_last_error();
+            string? errorMsg = errorPtr != IntPtr.Zero
+                ? PtrToStringUtf8(errorPtr)
+                : null;
+
+            throw new HtmlToMarkdownException(
+                errorMsg ?? "HTML to Markdown conversion failed");
+        }
+
+        try
+        {
+            return PtrToStringUtf8(resultPtr, resultLen) ?? string.Empty;
+        }
+        finally
+        {
             if (resultPtr != IntPtr.Zero)
             {
                 NativeMethods.html_to_markdown_free_string(resultPtr);
@@ -163,12 +212,18 @@ public static class HtmlToMarkdownConverter
         IntPtr htmlPtr = IntPtr.Zero;
         IntPtr resultPtr = IntPtr.Zero;
         IntPtr metadataPtr = IntPtr.Zero;
+        nuint resultLen = 0;
+        nuint metadataLen = 0;
 
         try
         {
             htmlPtr = StringToUtf8Ptr(html);
 
-            resultPtr = NativeMethods.html_to_markdown_convert_with_metadata(htmlPtr, out metadataPtr);
+            resultPtr = NativeMethods.html_to_markdown_convert_with_metadata_with_len(
+                htmlPtr,
+                out metadataPtr,
+                out resultLen,
+                out metadataLen);
 
             if (resultPtr == IntPtr.Zero)
             {
@@ -181,8 +236,8 @@ public static class HtmlToMarkdownConverter
                     errorMsg ?? "HTML to Markdown conversion with metadata failed");
             }
 
-            string markdown = PtrToStringUtf8(resultPtr) ?? string.Empty;
-            ExtendedMetadata metadata = DeserializeMetadata(metadataPtr);
+            string markdown = PtrToStringUtf8(resultPtr, resultLen) ?? string.Empty;
+            ExtendedMetadata metadata = DeserializeMetadata(metadataPtr, metadataLen);
 
             return new MetadataExtraction
             {
@@ -209,16 +264,231 @@ public static class HtmlToMarkdownConverter
         }
     }
 
-    private static ExtendedMetadata DeserializeMetadata(IntPtr metadataPtr)
+    /// <summary>
+    /// Converts UTF-8 HTML bytes to Markdown and extracts comprehensive metadata.
+    /// </summary>
+    /// <param name="html">UTF-8 encoded HTML bytes</param>
+    /// <returns>A MetadataExtraction result containing both markdown and extracted metadata</returns>
+    /// <exception cref="HtmlToMarkdownException">Thrown when conversion or metadata extraction fails</exception>
+    /// <exception cref="JsonException">Thrown when metadata JSON deserialization fails</exception>
+    public static unsafe MetadataExtraction ConvertWithMetadata(ReadOnlySpan<byte> html)
     {
-        if (metadataPtr == IntPtr.Zero)
+        if (html.IsEmpty)
+        {
+            return new MetadataExtraction
+            {
+                Markdown = string.Empty,
+                Metadata = new ExtendedMetadata()
+            };
+        }
+
+        IntPtr resultPtr = IntPtr.Zero;
+        IntPtr metadataPtr = IntPtr.Zero;
+        nuint resultLen = 0;
+        nuint metadataLen = 0;
+
+        fixed (byte* htmlPtr = html)
+        {
+            resultPtr = NativeMethods.html_to_markdown_convert_with_metadata_bytes_with_len(
+                (IntPtr)htmlPtr,
+                (nuint)html.Length,
+                out metadataPtr,
+                out resultLen,
+                out metadataLen);
+        }
+
+        if (resultPtr == IntPtr.Zero)
+        {
+            IntPtr errorPtr = NativeMethods.html_to_markdown_last_error();
+            string? errorMsg = errorPtr != IntPtr.Zero
+                ? PtrToStringUtf8(errorPtr)
+                : null;
+
+            throw new HtmlToMarkdownException(
+                errorMsg ?? "HTML to Markdown conversion with metadata failed");
+        }
+
+        try
+        {
+            string markdown = PtrToStringUtf8(resultPtr, resultLen) ?? string.Empty;
+            ExtendedMetadata metadata = DeserializeMetadata(metadataPtr, metadataLen);
+
+            return new MetadataExtraction
+            {
+                Markdown = markdown,
+                Metadata = metadata
+            };
+        }
+        finally
+        {
+            if (resultPtr != IntPtr.Zero)
+            {
+                NativeMethods.html_to_markdown_free_string(resultPtr);
+            }
+
+            if (metadataPtr != IntPtr.Zero)
+            {
+                NativeMethods.html_to_markdown_free_string(metadataPtr);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Converts HTML to Markdown and returns metadata JSON without deserializing it.
+    /// </summary>
+    /// <param name="html">The HTML string to convert</param>
+    /// <returns>A MetadataExtractionJson result containing markdown and raw metadata JSON</returns>
+    /// <exception cref="ArgumentNullException">Thrown when html is null</exception>
+    /// <exception cref="HtmlToMarkdownException">Thrown when conversion or metadata extraction fails</exception>
+    public static MetadataExtractionJson ConvertWithMetadataJson(string html)
+    {
+        if (html == null)
+        {
+            throw new ArgumentNullException(nameof(html));
+        }
+
+        if (string.IsNullOrEmpty(html))
+        {
+            return new MetadataExtractionJson
+            {
+                Markdown = string.Empty,
+                MetadataJson = string.Empty
+            };
+        }
+
+        IntPtr htmlPtr = IntPtr.Zero;
+        IntPtr resultPtr = IntPtr.Zero;
+        IntPtr metadataPtr = IntPtr.Zero;
+        nuint resultLen = 0;
+        nuint metadataLen = 0;
+
+        try
+        {
+            htmlPtr = StringToUtf8Ptr(html);
+
+            resultPtr = NativeMethods.html_to_markdown_convert_with_metadata_with_len(
+                htmlPtr,
+                out metadataPtr,
+                out resultLen,
+                out metadataLen);
+
+            if (resultPtr == IntPtr.Zero)
+            {
+                IntPtr errorPtr = NativeMethods.html_to_markdown_last_error();
+                string? errorMsg = errorPtr != IntPtr.Zero
+                    ? PtrToStringUtf8(errorPtr)
+                    : null;
+
+                throw new HtmlToMarkdownException(
+                    errorMsg ?? "HTML to Markdown conversion with metadata failed");
+            }
+
+            string markdown = PtrToStringUtf8(resultPtr, resultLen) ?? string.Empty;
+            string metadataJson = PtrToStringUtf8(metadataPtr, metadataLen) ?? string.Empty;
+
+            return new MetadataExtractionJson
+            {
+                Markdown = markdown,
+                MetadataJson = metadataJson
+            };
+        }
+        finally
+        {
+            if (htmlPtr != IntPtr.Zero)
+            {
+                Marshal.FreeCoTaskMem(htmlPtr);
+            }
+
+            if (resultPtr != IntPtr.Zero)
+            {
+                NativeMethods.html_to_markdown_free_string(resultPtr);
+            }
+
+            if (metadataPtr != IntPtr.Zero)
+            {
+                NativeMethods.html_to_markdown_free_string(metadataPtr);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Converts UTF-8 HTML bytes to Markdown and returns metadata JSON without deserializing it.
+    /// </summary>
+    /// <param name="html">UTF-8 encoded HTML bytes</param>
+    /// <returns>A MetadataExtractionJson result containing markdown and raw metadata JSON</returns>
+    /// <exception cref="HtmlToMarkdownException">Thrown when conversion or metadata extraction fails</exception>
+    public static unsafe MetadataExtractionJson ConvertWithMetadataJson(ReadOnlySpan<byte> html)
+    {
+        if (html.IsEmpty)
+        {
+            return new MetadataExtractionJson
+            {
+                Markdown = string.Empty,
+                MetadataJson = string.Empty
+            };
+        }
+
+        IntPtr resultPtr = IntPtr.Zero;
+        IntPtr metadataPtr = IntPtr.Zero;
+        nuint resultLen = 0;
+        nuint metadataLen = 0;
+
+        fixed (byte* htmlPtr = html)
+        {
+            resultPtr = NativeMethods.html_to_markdown_convert_with_metadata_bytes_with_len(
+                (IntPtr)htmlPtr,
+                (nuint)html.Length,
+                out metadataPtr,
+                out resultLen,
+                out metadataLen);
+        }
+
+        if (resultPtr == IntPtr.Zero)
+        {
+            IntPtr errorPtr = NativeMethods.html_to_markdown_last_error();
+            string? errorMsg = errorPtr != IntPtr.Zero
+                ? PtrToStringUtf8(errorPtr)
+                : null;
+
+            throw new HtmlToMarkdownException(
+                errorMsg ?? "HTML to Markdown conversion with metadata failed");
+        }
+
+        try
+        {
+            string markdown = PtrToStringUtf8(resultPtr, resultLen) ?? string.Empty;
+            string metadataJson = PtrToStringUtf8(metadataPtr, metadataLen) ?? string.Empty;
+
+            return new MetadataExtractionJson
+            {
+                Markdown = markdown,
+                MetadataJson = metadataJson
+            };
+        }
+        finally
+        {
+            if (resultPtr != IntPtr.Zero)
+            {
+                NativeMethods.html_to_markdown_free_string(resultPtr);
+            }
+
+            if (metadataPtr != IntPtr.Zero)
+            {
+                NativeMethods.html_to_markdown_free_string(metadataPtr);
+            }
+        }
+    }
+
+    private static ExtendedMetadata DeserializeMetadata(IntPtr metadataPtr, nuint metadataLen)
+    {
+        if (metadataPtr == IntPtr.Zero || metadataLen == 0)
         {
             return new ExtendedMetadata();
         }
 
         try
         {
-            return DeserializeMetadataUtf8(metadataPtr) ?? new ExtendedMetadata();
+            return DeserializeMetadataUtf8(metadataPtr, metadataLen) ?? new ExtendedMetadata();
         }
         catch (JsonException ex)
         {
@@ -232,12 +502,28 @@ public static class HtmlToMarkdownConverter
         return ptr == IntPtr.Zero ? null : Marshal.PtrToStringUTF8(ptr);
     }
 
+    private static string? PtrToStringUtf8(IntPtr ptr, nuint length)
+    {
+        if (ptr == IntPtr.Zero || length == 0)
+        {
+            return null;
+        }
+
+        int normalizedLength = NormalizeLength(ptr, length, "Converted string exceeds maximum length.");
+        if (normalizedLength == 0)
+        {
+            return string.Empty;
+        }
+
+        return Marshal.PtrToStringUTF8(ptr, normalizedLength);
+    }
+
     private static IntPtr StringToUtf8Ptr(string value)
     {
         return Marshal.StringToCoTaskMemUTF8(value);
     }
 
-    private static unsafe ExtendedMetadata? DeserializeMetadataUtf8(IntPtr metadataPtr)
+    private static unsafe ExtendedMetadata? DeserializeMetadataUtf8(IntPtr metadataPtr, nuint metadataLen)
     {
         byte* data = (byte*)metadataPtr;
         if (data == null)
@@ -245,19 +531,34 @@ public static class HtmlToMarkdownConverter
             return null;
         }
 
-        int length = 0;
-        while (data[length] != 0)
-        {
-            length++;
-        }
-
+        int length = NormalizeLength(metadataPtr, metadataLen, "Metadata JSON exceeds maximum length.");
         if (length == 0)
         {
             return null;
         }
-
         ReadOnlySpan<byte> json = new ReadOnlySpan<byte>(data, length);
         return JsonSerializer.Deserialize(json, MetadataJsonContext.Default.ExtendedMetadata);
+    }
+
+    private static unsafe int NormalizeLength(IntPtr ptr, nuint length, string overflowMessage)
+    {
+        if (length == 0)
+        {
+            return 0;
+        }
+
+        if (length > int.MaxValue)
+        {
+            throw new HtmlToMarkdownException(overflowMessage);
+        }
+
+        byte* data = (byte*)ptr;
+        if (data != null && data[length - 1] == 0)
+        {
+            length--;
+        }
+
+        return (int)length;
     }
 }
 

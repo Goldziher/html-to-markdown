@@ -17,6 +17,7 @@ pub enum BenchmarkScenario {
     InlineImagesWithOptions,
     MetadataDefault,
     MetadataWithOptions,
+    MetadataRaw,
 }
 
 impl BenchmarkScenario {
@@ -28,6 +29,7 @@ impl BenchmarkScenario {
             Self::InlineImagesWithOptions,
             Self::MetadataDefault,
             Self::MetadataWithOptions,
+            Self::MetadataRaw,
         ]
     }
 
@@ -39,6 +41,7 @@ impl BenchmarkScenario {
             Self::InlineImagesWithOptions => "inline-images-options",
             Self::MetadataDefault => "metadata-default",
             Self::MetadataWithOptions => "metadata-options",
+            Self::MetadataRaw => "metadata-raw",
         }
     }
 }

@@ -1,17 +1,20 @@
 using System;
 using System.IO;
-using System.Text;
 using System.Text.Json;
 using System.Diagnostics;
 using HtmlToMarkdown;
 
 class Program
 {
-    static void RunScenario(string html, string scenario)
+    static void RunScenario(byte[] html, string scenario)
     {
         if (scenario == "metadata-default")
         {
             HtmlToMarkdownConverter.ConvertWithMetadata(html);
+        }
+        else if (scenario == "metadata-raw")
+        {
+            HtmlToMarkdownConverter.ConvertWithMetadataJson(html);
         }
         else
         {
@@ -63,7 +66,7 @@ class Program
             Environment.Exit(1);
         }
 
-        if (scenario != "convert-default" && scenario != "metadata-default")
+        if (scenario != "convert-default" && scenario != "metadata-default" && scenario != "metadata-raw")
         {
             Console.Error.WriteLine($"Unsupported scenario: {scenario}");
             Environment.Exit(1);
@@ -71,7 +74,7 @@ class Program
 
         try
         {
-            string html = File.ReadAllText(filePath);
+            byte[] html = File.ReadAllBytes(filePath);
 
             RunScenario(html, scenario);
 
@@ -100,7 +103,7 @@ class Program
             }
 
             double elapsedSeconds = stopwatch.Elapsed.TotalSeconds;
-            int bytesProcessed = Encoding.UTF8.GetByteCount(html) * iterations;
+            int bytesProcessed = html.Length * iterations;
             double opsPerSec = iterations / elapsedSeconds;
             double mbPerSec = (bytesProcessed / (1024.0 * 1024.0)) / elapsedSeconds;
 
