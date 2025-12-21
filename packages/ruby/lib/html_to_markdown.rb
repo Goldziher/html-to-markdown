@@ -12,9 +12,11 @@ module HtmlToMarkdown
   class << self
     alias native_convert convert
     alias native_convert_with_inline_images convert_with_inline_images
+    alias native_convert_with_inline_images_handle convert_with_inline_images_handle
     alias native_options options
     alias native_convert_with_options convert_with_options
     alias native_convert_with_metadata convert_with_metadata
+    alias native_convert_with_metadata_handle convert_with_metadata_handle
   end
 
   module_function
@@ -29,6 +31,10 @@ module HtmlToMarkdown
 
   def convert_with_inline_images(html, options = nil, image_config = nil)
     native_convert_with_inline_images(html.to_s, options, image_config)
+  end
+
+  def convert_with_inline_images_handle(html, options_handle, image_config = nil)
+    native_convert_with_inline_images_handle(html.to_s, options_handle, image_config)
   end
 
   def options(options_hash = nil)
@@ -159,5 +165,9 @@ module HtmlToMarkdown
   # @see ConversionOptions Detailed conversion configuration
   def convert_with_metadata(html, options = nil, metadata_config = nil)
     native_convert_with_metadata(html.to_s, options, metadata_config)
+  end
+
+  def convert_with_metadata_handle(html, options_handle, metadata_config = nil)
+    native_convert_with_metadata_handle(html.to_s, options_handle, metadata_config)
   end
 end

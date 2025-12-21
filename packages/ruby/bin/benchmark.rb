@@ -79,22 +79,37 @@ html.force_encoding(Encoding::UTF_8)
 html.freeze
 iterations = options[:iterations]
 conversion_options = options[:format] == 'hocr' ? { hocr_spatial_tables: false } : {}
+options_handle = if %w[convert-options inline-images-options metadata-options].include?(options[:scenario])
+                   HtmlToMarkdown.options(conversion_options)
+                 end
 
 SCENARIO_RUNNERS = {
-  'convert-default' => ->(html, _options) { HtmlToMarkdown.convert(html) },
-  'convert-options' => ->(html, options) { HtmlToMarkdown.convert(html, options) },
-  'inline-images-default' => ->(html, _options) { HtmlToMarkdown.convert_with_inline_images(html, nil, nil) },
-  'inline-images-options' => ->(html, options) { HtmlToMarkdown.convert_with_inline_images(html, options, nil) },
-  'metadata-default' => ->(html, _options) { HtmlToMarkdown.convert_with_metadata(html, nil, nil) },
-  'metadata-options' => ->(html, options) { HtmlToMarkdown.convert_with_metadata(html, options, nil) }
+  'convert-default' => ->(html, _options, _handle) { HtmlToMarkdown.convert(html) },
+  'convert-options' => lambda do |html, _options, handle|
+    raise ArgumentError, 'options handle required' unless handle
+
+    HtmlToMarkdown.convert_with_options(html, handle)
+  end,
+  'inline-images-default' => ->(html, _options, _handle) { HtmlToMarkdown.convert_with_inline_images(html, nil, nil) },
+  'inline-images-options' => lambda do |html, _options, handle|
+    raise ArgumentError, 'options handle required' unless handle
+
+    HtmlToMarkdown.convert_with_inline_images_handle(html, handle, nil)
+  end,
+  'metadata-default' => ->(html, _options, _handle) { HtmlToMarkdown.convert_with_metadata(html, nil, nil) },
+  'metadata-options' => lambda do |html, _options, handle|
+    raise ArgumentError, 'options handle required' unless handle
+
+    HtmlToMarkdown.convert_with_metadata_handle(html, handle, nil)
+  end
 }.freeze
 
-def run_scenario(html, scenario, options)
+def run_scenario(html, scenario, options, handle)
   runner = SCENARIO_RUNNERS.fetch(scenario) { raise ArgumentError, "Unsupported scenario: #{scenario}" }
-  runner.call(html, options)
+  runner.call(html, options, handle)
 end
 
-run_scenario(html, options[:scenario], conversion_options)
+run_scenario(html, options[:scenario], conversion_options, options_handle)
 
 profile_output = ENV.fetch('HTML_TO_MARKDOWN_PROFILE_OUTPUT', nil)
 if profile_output && HtmlToMarkdown.respond_to?(:start_profiling)
@@ -103,7 +118,7 @@ if profile_output && HtmlToMarkdown.respond_to?(:start_profiling)
 end
 
 start = Process.clock_gettime(Process::CLOCK_MONOTONIC)
-iterations.times { run_scenario(html, options[:scenario], conversion_options) }
+iterations.times { run_scenario(html, options[:scenario], conversion_options, options_handle) }
 elapsed = Process.clock_gettime(Process::CLOCK_MONOTONIC) - start
 
 HtmlToMarkdown.stop_profiling if profile_output && HtmlToMarkdown.respond_to?(:stop_profiling)

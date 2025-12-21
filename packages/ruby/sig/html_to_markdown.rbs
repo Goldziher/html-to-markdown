@@ -162,11 +162,21 @@ module HtmlToMarkdown
   def self.native_convert: (String html, conversion_options? options) -> String
   def self.native_options: (conversion_options? options_hash) -> Options
   def self.native_convert_with_options: (String html, Options options_handle) -> String
+  def self.native_convert_with_inline_images_handle: (
+    String html,
+    Options options_handle,
+    inline_image_config? image_config
+  ) -> html_extraction
   def self.native_convert_with_inline_images: (
     String html,
     conversion_options? options,
     inline_image_config? image_config
   ) -> html_extraction
+  def self.native_convert_with_metadata_handle: (
+    String html,
+    Options options_handle,
+    metadata_config? metadata_config
+  ) -> [String, extended_metadata]
   def self.native_convert_with_metadata: (
     String html,
     conversion_options? options,
@@ -176,11 +186,21 @@ module HtmlToMarkdown
   def native_convert: (String html, conversion_options? options) -> String
   def native_options: (conversion_options? options_hash) -> Options
   def native_convert_with_options: (String html, Options options_handle) -> String
+  def native_convert_with_inline_images_handle: (
+    String html,
+    Options options_handle,
+    inline_image_config? image_config
+  ) -> html_extraction
   def native_convert_with_inline_images: (
     String html,
     conversion_options? options,
     inline_image_config? image_config
   ) -> html_extraction
+  def native_convert_with_metadata_handle: (
+    String html,
+    Options options_handle,
+    metadata_config? metadata_config
+  ) -> [String, extended_metadata]
   def native_convert_with_metadata: (
     String html,
     conversion_options? options,
@@ -197,6 +217,11 @@ module HtmlToMarkdown
 
   # Convert HTML using a pre-built options handle
   def self.convert_with_options: (String html, Options options_handle) -> String
+  def self.convert_with_inline_images_handle: (
+    String html,
+    Options options_handle,
+    ?inline_image_config image_config
+  ) -> html_extraction
 
   # Convert HTML with inline image extraction
   def self.convert_with_inline_images: (
@@ -236,11 +261,21 @@ module HtmlToMarkdown
     ?conversion_options options,
     ?metadata_config metadata_config
   ) -> [String, extended_metadata]
+  def self.convert_with_metadata_handle: (
+    String html,
+    Options options_handle,
+    ?metadata_config metadata_config
+  ) -> [String, extended_metadata]
 
   # Instance method versions (created by module_function)
   def convert: (String html, ?conversion_options options) -> String
   def options: (?conversion_options options_hash) -> Options
   def convert_with_options: (String html, Options options_handle) -> String
+  def convert_with_inline_images_handle: (
+    String html,
+    Options options_handle,
+    ?inline_image_config image_config
+  ) -> html_extraction
   def convert_with_inline_images: (
     String html,
     ?conversion_options options,
@@ -249,6 +284,11 @@ module HtmlToMarkdown
   def convert_with_metadata: (
     String html,
     ?conversion_options options,
+    ?metadata_config metadata_config
+  ) -> [String, extended_metadata]
+  def convert_with_metadata_handle: (
+    String html,
+    Options options_handle,
     ?metadata_config metadata_config
   ) -> [String, extended_metadata]
 end

@@ -188,6 +188,11 @@ def convert_with_inline_images(
     options: ConversionOptions | None = None,
     image_config: InlineImageConfig | None = None,
 ) -> tuple[str, list[InlineImage], list[InlineImageWarning]]: ...
+def convert_with_inline_images_handle(
+    html: str,
+    handle: ConversionOptionsHandle,
+    image_config: InlineImageConfig | None = None,
+) -> tuple[str, list[InlineImage], list[InlineImageWarning]]: ...
 def convert_with_inline_images_json(
     html: str,
     options_json: str | None = None,
@@ -196,6 +201,11 @@ def convert_with_inline_images_json(
 def convert_with_metadata(
     html: str,
     options: ConversionOptions | None = None,
+    metadata_config: MetadataConfig | None = None,
+) -> tuple[str, ExtendedMetadata]: ...
+def convert_with_metadata_handle(
+    html: str,
+    handle: ConversionOptionsHandle,
     metadata_config: MetadataConfig | None = None,
 ) -> tuple[str, ExtendedMetadata]: ...
 def convert_with_metadata_json(

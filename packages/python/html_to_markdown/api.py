@@ -141,6 +141,19 @@ def convert_with_inline_images(
     return markdown, list(images), list(warnings)
 
 
+def convert_with_inline_images_handle(
+    html: str,
+    handle: OptionsHandle,
+    image_config: InlineImageConfig | None = None,
+) -> tuple[str, list[InlineImage], list[InlineImageWarning]]:
+    """Convert HTML and extract inline images using a pre-built options handle."""
+    if image_config is None:
+        image_config = InlineImageConfig()
+
+    markdown, images, warnings = _rust.convert_with_inline_images_handle(html, handle, image_config)
+    return markdown, list(images), list(warnings)
+
+
 def create_options_handle(
     options: ConversionOptions | None = None,
     preprocessing: PreprocessingOptions | None = None,
@@ -208,6 +221,19 @@ def convert_with_metadata(
     return markdown, metadata
 
 
+def convert_with_metadata_handle(
+    html: str,
+    handle: OptionsHandle,
+    metadata_config: MetadataConfig | None = None,
+) -> tuple[str, ExtendedMetadata]:
+    """Convert HTML and extract metadata using a pre-built options handle."""
+    if metadata_config is None:
+        metadata_config = MetadataConfig()
+
+    markdown, metadata = _rust.convert_with_metadata_handle(html, handle, metadata_config)
+    return markdown, metadata
+
+
 __all__ = [
     "InlineImage",
     "InlineImageConfig",
@@ -217,7 +243,9 @@ __all__ = [
     "convert",
     "convert_with_handle",
     "convert_with_inline_images",
+    "convert_with_inline_images_handle",
     "convert_with_metadata",
+    "convert_with_metadata_handle",
     "create_options_handle",
     "start_profiling",
     "stop_profiling",

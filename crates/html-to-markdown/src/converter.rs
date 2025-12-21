@@ -62,6 +62,9 @@ type InlineCollectorHandle = Rc<RefCell<InlineImageCollector>>;
 #[cfg(not(feature = "inline-images"))]
 type InlineCollectorHandle = ();
 
+#[cfg(feature = "metadata")]
+type ImageMetadataPayload = (BTreeMap<String, String>, Option<u32>, Option<u32>);
+
 /// Chomp whitespace from inline element content, preserving line breaks.
 ///
 /// Similar to text::chomp but handles line breaks from <br> tags specially.
@@ -1659,7 +1662,7 @@ fn convert_html_impl(
     };
     let parser = dom.parser();
     let dom_ctx = build_dom_context(&dom, parser, preprocessed_len);
-    let mut output = String::with_capacity(preprocessed_len);
+    let mut output = String::with_capacity(preprocessed_len.saturating_add(preprocessed_len / 4));
 
     let mut is_hocr = false;
     for child_handle in dom.children().iter() {
@@ -1723,7 +1726,8 @@ fn convert_html_impl(
 
     #[cfg(feature = "metadata")]
     if let Some(ref collector) = metadata_collector {
-        if !is_hocr {
+        let wants_document = collector.borrow().wants_document();
+        if !is_hocr && wants_document {
             for child_handle in dom.children().iter() {
                 let head_meta = extract_metadata(child_handle, parser, options);
                 if !head_meta.is_empty() {
@@ -1736,20 +1740,22 @@ fn convert_html_impl(
 
     #[cfg(feature = "metadata")]
     if let Some(ref collector) = metadata_collector {
-        for child_handle in dom.children().iter() {
-            if let Some(tl::Node::Tag(tag)) = child_handle.get(parser) {
-                let tag_name = tag.name().as_utf8_str();
-                if tag_name == "html" || tag_name == "body" {
-                    if let Some(lang) = tag.attributes().get("lang") {
-                        if let Some(lang_bytes) = lang {
-                            let lang_str = lang_bytes.as_utf8_str();
-                            collector.borrow_mut().set_language(lang_str.to_string());
+        if collector.borrow().wants_document() {
+            for child_handle in dom.children().iter() {
+                if let Some(tl::Node::Tag(tag)) = child_handle.get(parser) {
+                    let tag_name = tag.name().as_utf8_str();
+                    if tag_name == "html" || tag_name == "body" {
+                        if let Some(lang) = tag.attributes().get("lang") {
+                            if let Some(lang_bytes) = lang {
+                                let lang_str = lang_bytes.as_utf8_str();
+                                collector.borrow_mut().set_language(lang_str.to_string());
+                            }
                         }
-                    }
-                    if let Some(dir) = tag.attributes().get("dir") {
-                        if let Some(dir_bytes) = dir {
-                            let dir_str = dir_bytes.as_utf8_str();
-                            collector.borrow_mut().set_text_direction(dir_str.to_string());
+                        if let Some(dir) = tag.attributes().get("dir") {
+                            if let Some(dir_bytes) = dir {
+                                let dir_str = dir_bytes.as_utf8_str();
+                                collector.borrow_mut().set_text_direction(dir_str.to_string());
+                            }
                         }
                     }
                 }
@@ -3088,14 +3094,16 @@ fn walk_node(
             #[cfg(feature = "metadata")]
             if matches!(tag_name.as_ref(), "html" | "head" | "body") {
                 if let Some(ref collector) = ctx.metadata_collector {
-                    let mut c = collector.borrow_mut();
+                    if collector.borrow().wants_document() {
+                        let mut c = collector.borrow_mut();
 
-                    if let Some(lang) = tag.attributes().get("lang").flatten() {
-                        c.set_language(lang.as_utf8_str().to_string());
-                    }
+                        if let Some(lang) = tag.attributes().get("lang").flatten() {
+                            c.set_language(lang.as_utf8_str().to_string());
+                        }
 
-                    if let Some(dir) = tag.attributes().get("dir").flatten() {
-                        c.set_text_direction(dir.as_utf8_str().to_string());
+                        if let Some(dir) = tag.attributes().get("dir").flatten() {
+                            c.set_text_direction(dir.as_utf8_str().to_string());
+                        }
                     }
                 }
             }
@@ -3132,14 +3140,16 @@ fn walk_node(
 
                         #[cfg(feature = "metadata")]
                         if let Some(ref collector) = ctx.metadata_collector {
-                            let id = tag
-                                .attributes()
-                                .get("id")
-                                .flatten()
-                                .map(|v| v.as_utf8_str().to_string());
-                            collector
-                                .borrow_mut()
-                                .add_header(level as u8, normalized.to_string(), id, depth, 0);
+                            if collector.borrow().wants_headers() {
+                                let id = tag
+                                    .attributes()
+                                    .get("id")
+                                    .flatten()
+                                    .map(|v| v.as_utf8_str().to_string());
+                                collector
+                                    .borrow_mut()
+                                    .add_header(level as u8, normalized.to_string(), id, depth, 0);
+                            }
                         }
                     }
                 }
@@ -3463,28 +3473,30 @@ fn walk_node(
 
                         #[cfg(feature = "metadata")]
                         if let Some(ref collector) = ctx.metadata_collector {
-                            let rel_attr = tag
-                                .attributes()
-                                .get("rel")
-                                .flatten()
-                                .map(|v| v.as_utf8_str().to_string());
-                            let mut attributes_map = BTreeMap::new();
-                            for (key, value_opt) in tag.attributes().iter() {
-                                let key_str = key.to_string();
-                                if key_str == "href" {
-                                    continue;
-                                }
+                            if collector.borrow().wants_links() {
+                                let rel_attr = tag
+                                    .attributes()
+                                    .get("rel")
+                                    .flatten()
+                                    .map(|v| v.as_utf8_str().to_string());
+                                let mut attributes_map = BTreeMap::new();
+                                for (key, value_opt) in tag.attributes().iter() {
+                                    let key_str = key.to_string();
+                                    if key_str == "href" {
+                                        continue;
+                                    }
 
-                                let value = value_opt.map(|v| v.to_string()).unwrap_or_default();
-                                attributes_map.insert(key_str, value);
+                                    let value = value_opt.map(|v| v.to_string()).unwrap_or_default();
+                                    attributes_map.insert(key_str, value);
+                                }
+                                collector.borrow_mut().add_link(
+                                    href.clone(),
+                                    label.clone(),
+                                    title.clone(),
+                                    rel_attr,
+                                    attributes_map,
+                                );
                             }
-                            collector.borrow_mut().add_link(
-                                href.clone(),
-                                label.clone(),
-                                title.clone(),
-                                rel_attr,
-                                attributes_map,
-                            );
                         }
                     } else {
                         let children = tag.children();
@@ -3515,28 +3527,32 @@ fn walk_node(
 
                     let title = tag.attributes().get("title").flatten().map(|v| v.as_utf8_str());
                     #[cfg(feature = "metadata")]
-                    let mut attributes_map = BTreeMap::new();
+                    let mut metadata_payload: Option<ImageMetadataPayload> = None;
                     #[cfg(feature = "metadata")]
-                    let mut width: Option<u32> = None;
-                    #[cfg(feature = "metadata")]
-                    let mut height: Option<u32> = None;
-                    #[cfg(feature = "metadata")]
-                    for (key, value_opt) in tag.attributes().iter() {
-                        let key_str = key.to_string();
-                        if key_str == "src" {
-                            continue;
-                        }
-                        let value = value_opt.map(|v| v.to_string()).unwrap_or_default();
-                        if key_str == "width" {
-                            if let Ok(parsed) = value.parse::<u32>() {
-                                width = Some(parsed);
+                    if let Some(ref collector) = ctx.metadata_collector {
+                        if collector.borrow().wants_images() {
+                            let mut attributes_map = BTreeMap::new();
+                            let mut width: Option<u32> = None;
+                            let mut height: Option<u32> = None;
+                            for (key, value_opt) in tag.attributes().iter() {
+                                let key_str = key.to_string();
+                                if key_str == "src" {
+                                    continue;
+                                }
+                                let value = value_opt.map(|v| v.to_string()).unwrap_or_default();
+                                if key_str == "width" {
+                                    if let Ok(parsed) = value.parse::<u32>() {
+                                        width = Some(parsed);
+                                    }
+                                } else if key_str == "height" {
+                                    if let Ok(parsed) = value.parse::<u32>() {
+                                        height = Some(parsed);
+                                    }
+                                }
+                                attributes_map.insert(key_str, value);
                             }
-                        } else if key_str == "height" {
-                            if let Ok(parsed) = value.parse::<u32>() {
-                                height = Some(parsed);
-                            }
+                            metadata_payload = Some((attributes_map, width, height));
                         }
-                        attributes_map.insert(key_str, value);
                     }
 
                     #[cfg(feature = "inline-images")]
@@ -3585,18 +3601,20 @@ fn walk_node(
 
                     #[cfg(feature = "metadata")]
                     if let Some(ref collector) = ctx.metadata_collector {
-                        if !src.is_empty() {
-                            let dimensions = match (width, height) {
-                                (Some(w), Some(h)) => Some((w, h)),
-                                _ => None,
-                            };
-                            collector.borrow_mut().add_image(
-                                src.to_string(),
-                                if alt.is_empty() { None } else { Some(alt.to_string()) },
-                                title.as_deref().map(|t| t.to_string()),
-                                dimensions,
-                                attributes_map.clone(),
-                            );
+                        if let Some((attributes_map, width, height)) = metadata_payload {
+                            if !src.is_empty() {
+                                let dimensions = match (width, height) {
+                                    (Some(w), Some(h)) => Some((w, h)),
+                                    _ => None,
+                                };
+                                collector.borrow_mut().add_image(
+                                    src.to_string(),
+                                    if alt.is_empty() { None } else { Some(alt.to_string()) },
+                                    title.as_deref().map(|t| t.to_string()),
+                                    dimensions,
+                                    attributes_map,
+                                );
+                            }
                         }
                     }
                 }
@@ -5693,19 +5711,21 @@ fn walk_node(
 
                     #[cfg(feature = "metadata")]
                     if let Some(ref collector) = ctx.metadata_collector {
-                        for child_handle in children.top().iter() {
-                            if let Some(tl::Node::Tag(child_tag)) = child_handle.get(parser) {
-                                let child_name = normalized_tag_name(child_tag.name().as_utf8_str());
-                                if child_name.as_ref() == "script" {
-                                    if let Some(type_attr) = child_tag.attributes().get("type").flatten() {
-                                        let type_value = type_attr.as_utf8_str();
-                                        let type_value = type_value.as_ref();
-                                        let type_value = type_value.split(';').next().unwrap_or(type_value);
-                                        if type_value.trim().eq_ignore_ascii_case("application/ld+json") {
-                                            let json = child_tag.inner_text(parser);
-                                            let json = text::decode_html_entities(json.trim()).to_string();
-                                            if !json.is_empty() {
-                                                collector.borrow_mut().add_json_ld(json);
+                        if collector.borrow().wants_structured_data() {
+                            for child_handle in children.top().iter() {
+                                if let Some(tl::Node::Tag(child_tag)) = child_handle.get(parser) {
+                                    let child_name = normalized_tag_name(child_tag.name().as_utf8_str());
+                                    if child_name.as_ref() == "script" {
+                                        if let Some(type_attr) = child_tag.attributes().get("type").flatten() {
+                                            let type_value = type_attr.as_utf8_str();
+                                            let type_value = type_value.as_ref();
+                                            let type_value = type_value.split(';').next().unwrap_or(type_value);
+                                            if type_value.trim().eq_ignore_ascii_case("application/ld+json") {
+                                                let json = child_tag.inner_text(parser);
+                                                let json = text::decode_html_entities(json.trim()).to_string();
+                                                if !json.is_empty() {
+                                                    collector.borrow_mut().add_json_ld(json);
+                                                }
                                             }
                                         }
                                     }
@@ -5730,10 +5750,12 @@ fn walk_node(
                         let type_value = type_value.split(';').next().unwrap_or(type_value);
                         if type_value.trim().eq_ignore_ascii_case("application/ld+json") {
                             if let Some(ref collector) = ctx.metadata_collector {
-                                let json = tag.inner_text(parser);
-                                let json = text::decode_html_entities(json.trim()).to_string();
-                                if !json.is_empty() {
-                                    collector.borrow_mut().add_json_ld(json);
+                                if collector.borrow().wants_structured_data() {
+                                    let json = tag.inner_text(parser);
+                                    let json = text::decode_html_entities(json.trim()).to_string();
+                                    if !json.is_empty() {
+                                        collector.borrow_mut().add_json_ld(json);
+                                    }
                                 }
                             }
                         }

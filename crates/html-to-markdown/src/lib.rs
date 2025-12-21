@@ -67,6 +67,61 @@ fn validate_input(html: &str) -> Result<()> {
     Ok(())
 }
 
+fn normalize_line_endings(html: &str) -> Cow<'_, str> {
+    if html.contains('\r') {
+        Cow::Owned(html.replace("\r\n", "\n").replace('\r', "\n"))
+    } else {
+        Cow::Borrowed(html)
+    }
+}
+
+fn fast_text_only(html: &str) -> Option<String> {
+    if html.contains('<') {
+        return None;
+    }
+
+    let decoded = text::decode_html_entities_cow(html);
+    let trimmed = decoded.trim_end_matches('\n');
+    if trimmed.is_empty() {
+        return Some(String::new());
+    }
+    let mut output = String::with_capacity(trimmed.len() + 1);
+    output.push_str(trimmed);
+    output.push('\n');
+    Some(output)
+}
+
+#[cfg(feature = "inline-images")]
+fn has_inline_image_targets(html: &str) -> bool {
+    let bytes = html.as_bytes();
+    contains_ascii_case_insensitive(bytes, b"<svg") || contains_ascii_case_insensitive(bytes, b"data:")
+}
+
+fn contains_ascii_case_insensitive(haystack: &[u8], needle: &[u8]) -> bool {
+    if needle.is_empty() || haystack.len() < needle.len() {
+        return false;
+    }
+
+    let needle_len = needle.len();
+    let max = haystack.len() - needle_len;
+    for start in 0..=max {
+        if !haystack[start].eq_ignore_ascii_case(&needle[0]) {
+            continue;
+        }
+        let mut matched = true;
+        for i in 1..needle_len {
+            if !haystack[start + i].eq_ignore_ascii_case(&needle[i]) {
+                matched = false;
+                break;
+            }
+        }
+        if matched {
+            return true;
+        }
+    }
+    false
+}
+
 #[cfg(any(feature = "serde", feature = "metadata"))]
 fn parse_json<T: serde::de::DeserializeOwned>(json: &str) -> Result<T> {
     serde_json::from_str(json).map_err(|err| ConversionError::ConfigError(err.to_string()))
@@ -115,11 +170,13 @@ pub fn convert(html: &str, options: Option<ConversionOptions>) -> Result<String>
     validate_input(html)?;
     let options = options.unwrap_or_default();
 
-    let normalized_html = if html.contains('\r') {
-        Cow::Owned(html.replace("\r\n", "\n").replace('\r', "\n"))
-    } else {
-        Cow::Borrowed(html)
-    };
+    let normalized_html = normalize_line_endings(html);
+
+    if !options.wrap {
+        if let Some(markdown) = fast_text_only(normalized_html.as_ref()) {
+            return Ok(markdown);
+        }
+    }
 
     let markdown = converter::convert_html(normalized_html.as_ref(), &options)?;
 
@@ -151,11 +208,22 @@ pub fn convert_with_inline_images(
     validate_input(html)?;
     let options = options.unwrap_or_default();
 
-    let normalized_html = if html.contains('\r') {
-        Cow::Owned(html.replace("\r\n", "\n").replace('\r', "\n"))
-    } else {
-        Cow::Borrowed(html)
-    };
+    let normalized_html = normalize_line_endings(html);
+
+    if !has_inline_image_targets(normalized_html.as_ref()) {
+        let markdown = converter::convert_html(normalized_html.as_ref(), &options)?;
+        let markdown = if options.wrap {
+            wrapper::wrap_markdown(&markdown, &options)
+        } else {
+            markdown
+        };
+
+        return Ok(HtmlExtraction {
+            markdown,
+            inline_images: Vec::new(),
+            warnings: Vec::new(),
+        });
+    }
 
     let collector = Rc::new(RefCell::new(inline_images::InlineImageCollector::new(image_cfg)?));
 
@@ -308,12 +376,12 @@ pub fn convert_with_metadata(
 
     validate_input(html)?;
     let options = options.unwrap_or_default();
+    if !metadata_cfg.any_enabled() {
+        let markdown = convert(html, Some(options))?;
+        return Ok((markdown, ExtendedMetadata::default()));
+    }
 
-    let normalized_html = if html.contains('\r') {
-        Cow::Owned(html.replace("\r\n", "\n").replace('\r', "\n"))
-    } else {
-        Cow::Borrowed(html)
-    };
+    let normalized_html = normalize_line_endings(html);
 
     let metadata_collector = Rc::new(RefCell::new(metadata::MetadataCollector::new(metadata_cfg)));
 

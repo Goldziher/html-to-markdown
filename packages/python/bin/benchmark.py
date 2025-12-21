@@ -12,9 +12,14 @@ from html_to_markdown import (
     ConversionOptions,
     InlineImageConfig,
     MetadataConfig,
+    OptionsHandle,
     convert,
+    convert_with_handle,
     convert_with_inline_images,
+    convert_with_inline_images_handle,
     convert_with_metadata,
+    convert_with_metadata_handle,
+    create_options_handle,
     start_profiling,
     stop_profiling,
 )
@@ -52,19 +57,25 @@ def build_options(fixture_format: str) -> ConversionOptions:
     return ConversionOptions()
 
 
-def run_scenario(html: str, scenario: str, options: ConversionOptions) -> None:
+def run_scenario(html: str, scenario: str, handle: OptionsHandle | None) -> None:
     if scenario == "convert-default":
         convert(html)
     elif scenario == "convert-options":
-        convert(html, options)
+        if handle is None:
+            raise SystemExit("Options handle required for convert-options scenario")
+        convert_with_handle(html, handle)
     elif scenario == "inline-images-default":
         convert_with_inline_images(html, None, None, InlineImageConfig())
     elif scenario == "inline-images-options":
-        convert_with_inline_images(html, options, None, InlineImageConfig())
+        if handle is None:
+            raise SystemExit("Options handle required for inline-images-options scenario")
+        convert_with_inline_images_handle(html, handle, InlineImageConfig())
     elif scenario == "metadata-default":
         convert_with_metadata(html, None, None, MetadataConfig())
     elif scenario == "metadata-options":
-        convert_with_metadata(html, options, None, MetadataConfig())
+        if handle is None:
+            raise SystemExit("Options handle required for metadata-options scenario")
+        convert_with_metadata_handle(html, handle, MetadataConfig())
     else:
         raise SystemExit(f"Unsupported scenario: {scenario}")
 
@@ -79,7 +90,12 @@ def main() -> None:
 
     html = fixture.read_text(encoding="utf-8")
     options = build_options(args.format)
-    run_scenario(html, args.scenario, options)  # Warmup
+    handle = (
+        create_options_handle(options)
+        if args.scenario in {"convert-options", "inline-images-options", "metadata-options"}
+        else None
+    )
+    run_scenario(html, args.scenario, handle)  # Warmup
 
     profile_output = os.getenv("HTML_TO_MARKDOWN_PROFILE_OUTPUT")
     profile_frequency = os.getenv("HTML_TO_MARKDOWN_PROFILE_FREQUENCY")
@@ -89,7 +105,7 @@ def main() -> None:
 
     start = time.perf_counter()
     for _ in range(iterations):
-        run_scenario(html, args.scenario, options)
+        run_scenario(html, args.scenario, handle)
     elapsed = time.perf_counter() - start
 
     if profile_output:

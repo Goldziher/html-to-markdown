@@ -422,6 +422,19 @@ fn convert_with_inline_images_fn(ruby: &Ruby, args: &[Value]) -> Result<Value, E
     extraction_to_value(ruby, extraction)
 }
 
+fn convert_with_inline_images_handle_fn(ruby: &Ruby, args: &[Value]) -> Result<Value, Error> {
+    let parsed = scan_args::<(String, &OptionsHandle), (Option<Value>,), (), (), (), ()>(args)?;
+    let html = parsed.required.0;
+    let handle = parsed.required.1;
+    let options = handle.0.clone();
+    let config = build_inline_image_config(ruby, parsed.optional.0)?;
+
+    let extraction =
+        guard_panic(|| convert_with_inline_images_inner(&html, Some(options), config)).map_err(conversion_error)?;
+
+    extraction_to_value(ruby, extraction)
+}
+
 #[cfg(feature = "metadata")]
 fn build_metadata_config(_ruby: &Ruby, config: Option<Value>) -> Result<RustMetadataConfig, Error> {
     let mut cfg = RustMetadataConfig::default();
@@ -439,6 +452,9 @@ fn build_metadata_config(_ruby: &Ruby, config: Option<Value>) -> Result<RustMeta
     hash.foreach(|key: Value, val: Value| {
         let key_name = symbol_to_string(key)?;
         match key_name.as_str() {
+            "extract_document" => {
+                cfg.extract_document = bool::try_convert(val)?;
+            }
             "extract_headers" => {
                 cfg.extract_headers = bool::try_convert(val)?;
             }
@@ -637,6 +653,24 @@ fn convert_with_metadata_fn(ruby: &Ruby, args: &[Value]) -> Result<Value, Error>
     Ok(array.as_value())
 }
 
+#[cfg(feature = "metadata")]
+fn convert_with_metadata_handle_fn(ruby: &Ruby, args: &[Value]) -> Result<Value, Error> {
+    let parsed = scan_args::<(String, &OptionsHandle), (Option<Value>,), (), (), (), ()>(args)?;
+    let html = parsed.required.0;
+    let handle = parsed.required.1;
+    let options = handle.0.clone();
+    let metadata_config = build_metadata_config(ruby, parsed.optional.0)?;
+
+    let (markdown, metadata) =
+        guard_panic(|| convert_with_metadata_inner(&html, Some(options), metadata_config)).map_err(conversion_error)?;
+
+    let array = ruby.ary_new();
+    array.push(markdown)?;
+    array.push(extended_metadata_to_ruby(ruby, metadata)?)?;
+
+    Ok(array.as_value())
+}
+
 fn start_profiling_fn(_ruby: &Ruby, args: &[Value]) -> Result<bool, Error> {
     let output = args.first().ok_or_else(|| arg_error("output_path required"))?;
     let output: String = String::try_convert(*output)?;
@@ -664,9 +698,18 @@ fn init(ruby: &Ruby) -> Result<(), Error> {
         "convert_with_inline_images",
         function!(convert_with_inline_images_fn, -1),
     )?;
+    module.define_singleton_method(
+        "convert_with_inline_images_handle",
+        function!(convert_with_inline_images_handle_fn, -1),
+    )?;
 
     #[cfg(feature = "metadata")]
     module.define_singleton_method("convert_with_metadata", function!(convert_with_metadata_fn, -1))?;
+    #[cfg(feature = "metadata")]
+    module.define_singleton_method(
+        "convert_with_metadata_handle",
+        function!(convert_with_metadata_handle_fn, -1),
+    )?;
     module.define_singleton_method("start_profiling", function!(start_profiling_fn, -1))?;
     module.define_singleton_method("stop_profiling", function!(stop_profiling_fn, -1))?;
 
