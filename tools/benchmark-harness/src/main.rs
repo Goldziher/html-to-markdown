@@ -169,7 +169,7 @@ fn main() -> Result<()> {
             Ok(())
         }
         Commands::Consolidate { input, output } => {
-            let results = collect_results(&input, &output)?;
+            let results = collect_results(&input)?;
             if results.is_empty() {
                 return Err(benchmark_harness::Error::Config(format!(
                     "No results.json files found under {}",
@@ -337,7 +337,7 @@ fn generate_flamegraph_index(flamegraph_dir: &Path, output: &Path) -> Result<()>
     Ok(())
 }
 
-fn collect_results(input: &Path, output: &Path) -> Result<Vec<BenchmarkResult>> {
+fn collect_results(input: &Path) -> Result<Vec<BenchmarkResult>> {
     let mut files = Vec::new();
     if input.is_file() {
         files.push(input.to_path_buf());
@@ -345,7 +345,6 @@ fn collect_results(input: &Path, output: &Path) -> Result<Vec<BenchmarkResult>> 
         collect_results_files(input, &mut files)?;
     }
 
-    let output_root = to_absolute_path(output)?;
     let mut results = Vec::new();
     for file in files {
         if file.file_name().and_then(|name| name.to_str()) != Some("results.json") {
@@ -359,13 +358,12 @@ fn collect_results(input: &Path, output: &Path) -> Result<Vec<BenchmarkResult>> 
         let base_dir = file.parent().unwrap_or_else(|| Path::new("."));
         for entry in &mut entries {
             if let Some(path) = entry.flamegraph_path.clone() {
-                let absolute = if path.is_absolute() { path } else { base_dir.join(path) };
-                let normalized = if let Ok(relative) = absolute.strip_prefix(&output_root) {
-                    relative.to_path_buf()
+                let absolute = if path.is_absolute() {
+                    path
                 } else {
-                    absolute
+                    to_absolute_path(base_dir)?.join(path)
                 };
-                entry.flamegraph_path = Some(normalized);
+                entry.flamegraph_path = Some(absolute);
             }
         }
         results.extend(entries);

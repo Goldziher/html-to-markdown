@@ -643,6 +643,14 @@ impl Default for MetadataConfig {
 }
 
 impl MetadataConfig {
+    pub fn any_enabled(&self) -> bool {
+        self.extract_document
+            || self.extract_headers
+            || self.extract_links
+            || self.extract_images
+            || self.extract_structured_data
+    }
+
     pub fn apply_update(&mut self, update: MetadataConfigUpdate) {
         if let Some(extract_document) = update.extract_document {
             self.extract_document = extract_document;
@@ -938,6 +946,9 @@ impl MetadataCollector {
     ///
     /// * `metadata` - BTreeMap of metadata key-value pairs
     pub(crate) fn set_head_metadata(&mut self, metadata: BTreeMap<String, String>) {
+        if !self.config.extract_document {
+            return;
+        }
         self.head_metadata.extend(metadata);
     }
 
@@ -950,6 +961,9 @@ impl MetadataCollector {
     ///
     /// * `lang` - Language code (e.g., "en", "es", "fr")
     pub(crate) fn set_language(&mut self, lang: String) {
+        if !self.config.extract_document {
+            return;
+        }
         if self.lang.is_none() {
             self.lang = Some(lang);
         }
@@ -964,9 +978,32 @@ impl MetadataCollector {
     ///
     /// * `dir` - Direction string ("ltr", "rtl", or "auto")
     pub(crate) fn set_text_direction(&mut self, dir: String) {
+        if !self.config.extract_document {
+            return;
+        }
         if self.dir.is_none() {
             self.dir = Some(dir);
         }
+    }
+
+    pub(crate) fn wants_document(&self) -> bool {
+        self.config.extract_document
+    }
+
+    pub(crate) fn wants_headers(&self) -> bool {
+        self.config.extract_headers
+    }
+
+    pub(crate) fn wants_links(&self) -> bool {
+        self.config.extract_links
+    }
+
+    pub(crate) fn wants_images(&self) -> bool {
+        self.config.extract_images
+    }
+
+    pub(crate) fn wants_structured_data(&self) -> bool {
+        self.config.extract_structured_data
     }
 
     /// Extract document metadata from collected head metadata.

@@ -6,15 +6,25 @@ import { createRequire } from "node:module";
 const require = createRequire(import.meta.url);
 const {
   convertBuffer,
+  convertBufferWithOptionsHandle,
   convertInlineImagesBuffer,
+  convertInlineImagesBufferWithOptionsHandle,
   convertWithMetadataBuffer,
+  convertWithMetadataBufferWithOptionsHandle,
+  createConversionOptionsHandle,
   startProfiling,
   stopProfiling,
 } = require("../index.js") as {
   convertBuffer: (html: Buffer, options?: Record<string, unknown>) => string;
+  convertBufferWithOptionsHandle: (html: Buffer, options: unknown) => string;
   convertInlineImagesBuffer: (
     html: Buffer,
     options?: Record<string, unknown>,
+    imageConfig?: Record<string, unknown>,
+  ) => { markdown: string };
+  convertInlineImagesBufferWithOptionsHandle: (
+    html: Buffer,
+    options: unknown,
     imageConfig?: Record<string, unknown>,
   ) => { markdown: string };
   convertWithMetadataBuffer: (
@@ -22,6 +32,12 @@ const {
     options?: Record<string, unknown>,
     metadataConfig?: Record<string, unknown>,
   ) => { markdown: string };
+  convertWithMetadataBufferWithOptionsHandle: (
+    html: Buffer,
+    options: unknown,
+    metadataConfig?: Record<string, unknown>,
+  ) => { markdown: string };
+  createConversionOptionsHandle: (options?: Record<string, unknown>) => unknown;
   startProfiling?: (outputPath: string, frequency?: number) => void;
   stopProfiling?: () => void;
 };
@@ -102,25 +118,39 @@ function buildMetadataConfig() {
   };
 }
 
-function runScenario(html: Buffer, scenario: Scenario, options: Record<string, unknown>) {
+function runScenario(
+  html: Buffer,
+  scenario: Scenario,
+  options: Record<string, unknown>,
+  handle: unknown | null,
+) {
   switch (scenario) {
     case "convert-default":
       convertBuffer(html);
       break;
     case "convert-options":
-      convertBuffer(html, options);
+      if (!handle) {
+        throw new Error("Options handle required for convert-options scenario");
+      }
+      convertBufferWithOptionsHandle(html, handle);
       break;
     case "inline-images-default":
       convertInlineImagesBuffer(html);
       break;
     case "inline-images-options":
-      convertInlineImagesBuffer(html, options);
+      if (!handle) {
+        throw new Error("Options handle required for inline-images-options scenario");
+      }
+      convertInlineImagesBufferWithOptionsHandle(html, handle);
       break;
     case "metadata-default":
       convertWithMetadataBuffer(html, undefined, buildMetadataConfig());
       break;
     case "metadata-options":
-      convertWithMetadataBuffer(html, options, buildMetadataConfig());
+      if (!handle) {
+        throw new Error("Options handle required for metadata-options scenario");
+      }
+      convertWithMetadataBufferWithOptionsHandle(html, handle, buildMetadataConfig());
       break;
   }
 }
@@ -135,8 +165,14 @@ function main() {
 
   const html = fs.readFileSync(fixturePath);
   const options = buildOptions(args.format);
+  const handle =
+    args.scenario === "convert-options" ||
+    args.scenario === "inline-images-options" ||
+    args.scenario === "metadata-options"
+      ? createConversionOptionsHandle(options)
+      : null;
 
-  runScenario(html, args.scenario, options);
+  runScenario(html, args.scenario, options, handle);
 
   const profileOutput = process.env.HTML_TO_MARKDOWN_PROFILE_OUTPUT;
   if (profileOutput && startProfiling) {
@@ -147,7 +183,7 @@ function main() {
 
   const start = process.hrtime.bigint();
   for (let i = 0; i < args.iterations; i += 1) {
-    runScenario(html, args.scenario, options);
+    runScenario(html, args.scenario, options, handle);
   }
   const elapsedSeconds = Number(process.hrtime.bigint() - start) / 1e9;
 

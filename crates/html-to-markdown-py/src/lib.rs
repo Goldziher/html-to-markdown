@@ -677,6 +677,42 @@ fn convert_with_inline_images_json<'py>(
     Ok((extraction.markdown, images, warnings))
 }
 
+/// Convert HTML to Markdown with inline images using a pre-parsed options handle.
+#[pyfunction]
+#[pyo3(signature = (html, handle, image_config=None))]
+fn convert_with_inline_images_handle<'py>(
+    py: Python<'py>,
+    html: &str,
+    handle: &ConversionOptionsHandle,
+    image_config: Option<InlineImageConfig>,
+) -> PyInlineExtraction {
+    let html = html.to_owned();
+    let rust_options = Some(handle.inner.clone());
+    let cfg = image_config.unwrap_or_else(|| InlineImageConfig::new(DEFAULT_INLINE_IMAGE_LIMIT, None, true, false));
+    let rust_cfg = cfg.to_rust();
+    let extraction = py
+        .detach(move || {
+            run_with_guard_and_profile(|| {
+                html_to_markdown_rs::convert_with_inline_images(&html, rust_options.clone(), rust_cfg.clone())
+            })
+        })
+        .map_err(to_py_err)?;
+
+    let images = extraction
+        .inline_images
+        .into_iter()
+        .map(|image| inline_image_to_py(py, image))
+        .collect::<PyResult<Vec<_>>>()?;
+
+    let warnings = extraction
+        .warnings
+        .into_iter()
+        .map(|warning| warning_to_py(py, warning))
+        .collect::<PyResult<Vec<_>>>()?;
+
+    Ok((extraction.markdown, images, warnings))
+}
+
 fn opt_string_to_py<'py>(py: Python<'py>, opt: Option<String>) -> PyResult<Py<PyAny>> {
     match opt {
         Some(val) => {
@@ -1003,6 +1039,33 @@ fn convert_with_metadata_json(
     let metadata_dict = extended_metadata_to_py(py, metadata)?;
     Ok((markdown, metadata_dict))
 }
+
+/// Convert HTML to Markdown with metadata using a pre-parsed options handle.
+#[pyfunction]
+#[pyo3(signature = (html, handle, metadata_config=None))]
+fn convert_with_metadata_handle<'py>(
+    py: Python<'py>,
+    html: &str,
+    handle: &ConversionOptionsHandle,
+    metadata_config: Option<MetadataConfig>,
+) -> PyResult<(String, Py<PyAny>)> {
+    let html = html.to_owned();
+    let rust_options = Some(handle.inner.clone());
+    let cfg = metadata_config
+        .unwrap_or_else(|| MetadataConfig::new(true, true, true, true, true, DEFAULT_MAX_STRUCTURED_DATA_SIZE));
+    let rust_cfg = cfg.to_rust();
+    let result = py
+        .detach(move || {
+            run_with_guard_and_profile(|| {
+                html_to_markdown_rs::convert_with_metadata(&html, rust_options.clone(), rust_cfg.clone())
+            })
+        })
+        .map_err(to_py_err)?;
+
+    let (markdown, metadata) = result;
+    let metadata_dict = extended_metadata_to_py(py, metadata)?;
+    Ok((markdown, metadata_dict))
+}
 /// Python bindings for html-to-markdown
 #[pymodule]
 fn _html_to_markdown(m: &Bound<'_, PyModule>) -> PyResult<()> {
@@ -1016,9 +1079,11 @@ fn _html_to_markdown(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<ConversionOptionsHandle>()?;
     m.add_function(wrap_pyfunction!(convert_with_inline_images, m)?)?;
     m.add_function(wrap_pyfunction!(convert_with_inline_images_json, m)?)?;
+    m.add_function(wrap_pyfunction!(convert_with_inline_images_handle, m)?)?;
     m.add_class::<InlineImageConfig>()?;
     m.add_function(wrap_pyfunction!(convert_with_metadata, m)?)?;
     m.add_function(wrap_pyfunction!(convert_with_metadata_json, m)?)?;
+    m.add_function(wrap_pyfunction!(convert_with_metadata_handle, m)?)?;
     m.add_class::<MetadataConfig>()?;
     m.add_function(wrap_pyfunction!(start_profiling, m)?)?;
     m.add_function(wrap_pyfunction!(stop_profiling, m)?)?;

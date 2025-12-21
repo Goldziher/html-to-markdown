@@ -234,6 +234,8 @@ impl FrameworkAdapter for ScriptAdapter {
             command.env("HTML_TO_MARKDOWN_PROFILE_REPEAT", config.profile_repeat.to_string());
         }
 
+        command.env("HTML_TO_MARKDOWN_FAST_FFI", "1");
+
         command
             .arg("--file")
             .arg(&fixture_path)

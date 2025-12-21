@@ -19,6 +19,13 @@ where
     F: FnOnce() -> Result<T>,
     F: UnwindSafe,
 {
+    if std::env::var("HTML_TO_MARKDOWN_FAST_FFI")
+        .ok()
+        .is_some_and(|value| matches!(value.as_str(), "1" | "true" | "yes"))
+    {
+        return f();
+    }
+
     match panic::catch_unwind(AssertUnwindSafe(f)) {
         Ok(result) => result,
         Err(payload) => Err(ConversionError::Panic(panic_message(payload))),

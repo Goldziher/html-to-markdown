@@ -643,53 +643,55 @@ tasks:
   java:install:
     desc: "Verify Java (JDK 25+) and Maven are installed, then download deps"
     cmds:
-      - |
-        if ! command -v java >/dev/null 2>&1; then
-          echo "ERROR: Java (JDK 25+) is not installed. Please install Temurin or Oracle JDK."
-          exit 1
-        fi
-        java -version
-      - |
-        if [[ ! -x ./mvnw ]]; then
-          echo "ERROR: Maven wrapper (./mvnw) is required."
-          exit 1
-        fi
-        MAVEN_OPTS="${MAVEN_OPTS:-} -Dmaven.mainClass=org.apache.maven.cling.MavenCling" ./mvnw -v
-      - MAVEN_OPTS="${MAVEN_OPTS:-} -Dmaven.mainClass=org.apache.maven.cling.MavenCling" ./mvnw -f packages/java/pom.xml -B dependency:go-offline
-      - MAVEN_OPTS="${MAVEN_OPTS:-} -Dmaven.mainClass=org.apache.maven.cling.MavenCling" ./mvnw -f examples/java-smoke/pom.xml -B dependency:go-offline
+      - >-
+        bash -lc 'source "$HOME/.sdkman/bin/sdkman-init.sh" && sdk env && if ! command -v java >/dev/null 2>&1; then echo "ERROR: Java (JDK 25+) is not installed. Please install Temurin or Oracle JDK."; exit 1; fi; java -version'
+      - >-
+        bash -lc 'source "$HOME/.sdkman/bin/sdkman-init.sh" && sdk env && if [[ ! -x ./mvnw ]]; then echo "ERROR: Maven wrapper (./mvnw) is required."; exit 1; fi; MAVEN_OPTS="${MAVEN_OPTS:-} -Dmaven.mainClass=org.apache.maven.cling.MavenCling" ./mvnw -v'
+      - >-
+        bash -lc 'source "$HOME/.sdkman/bin/sdkman-init.sh" && sdk env && MAVEN_OPTS="${MAVEN_OPTS:-} -Dmaven.mainClass=org.apache.maven.cling.MavenCling" ./mvnw -f packages/java/pom.xml -B dependency:go-offline'
+      - >-
+        bash -lc 'source "$HOME/.sdkman/bin/sdkman-init.sh" && sdk env && MAVEN_OPTS="${MAVEN_OPTS:-} -Dmaven.mainClass=org.apache.maven.cling.MavenCling" ./mvnw -f examples/java-smoke/pom.xml -B dependency:go-offline'
 
   java:update:
     desc: "Update Java dependencies (Maven)"
     cmds:
-      - MAVEN_OPTS="${MAVEN_OPTS:-} -Dmaven.mainClass=org.apache.maven.cling.MavenCling" ./mvnw -f packages/java/pom.xml -B versions:display-plugin-updates -DprocessPlugins=true -DprocessPluginDependencies=true
-      - MAVEN_OPTS="${MAVEN_OPTS:-} -Dmaven.mainClass=org.apache.maven.cling.MavenCling" ./mvnw -f packages/java/pom.xml -B versions:display-property-updates
-      - MAVEN_OPTS="${MAVEN_OPTS:-} -Dmaven.mainClass=org.apache.maven.cling.MavenCling" ./mvnw -f packages/java/pom.xml -B versions:update-properties -DgenerateBackupPoms=false -DincludeProperties=junit.version,maven-compiler-plugin.version,maven-surefire-plugin.version,maven-javadoc-plugin.version,maven-gpg-plugin.version,maven-install-plugin.version,central-publishing-plugin.version,exec-maven-plugin.version,spotless-maven-plugin.version
+      - >-
+        bash -lc 'source "$HOME/.sdkman/bin/sdkman-init.sh" && sdk env && MAVEN_OPTS="${MAVEN_OPTS:-} -Dmaven.mainClass=org.apache.maven.cling.MavenCling" ./mvnw -f packages/java/pom.xml -B versions:display-plugin-updates -DprocessPlugins=true -DprocessPluginDependencies=true'
+      - >-
+        bash -lc 'source "$HOME/.sdkman/bin/sdkman-init.sh" && sdk env && MAVEN_OPTS="${MAVEN_OPTS:-} -Dmaven.mainClass=org.apache.maven.cling.MavenCling" ./mvnw -f packages/java/pom.xml -B versions:display-property-updates'
+      - >-
+        bash -lc 'source "$HOME/.sdkman/bin/sdkman-init.sh" && sdk env && MAVEN_OPTS="${MAVEN_OPTS:-} -Dmaven.mainClass=org.apache.maven.cling.MavenCling" ./mvnw -f packages/java/pom.xml -B versions:update-properties -DgenerateBackupPoms=false -DincludeProperties=junit.version,maven-compiler-plugin.version,maven-surefire-plugin.version,maven-javadoc-plugin.version,maven-gpg-plugin.version,maven-install-plugin.version,central-publishing-plugin.version,exec-maven-plugin.version,spotless-maven-plugin.version'
 
   java:test:
     desc: "Run Java tests"
     cmds:
       - cargo build --release -p html-to-markdown-ffi
-      - MAVEN_OPTS="${MAVEN_OPTS:-} -Dmaven.mainClass=org.apache.maven.cling.MavenCling" ./mvnw -f packages/java/pom.xml -B -Dgpg.skip=true test
+      - >-
+        bash -lc 'source "$HOME/.sdkman/bin/sdkman-init.sh" && sdk env && MAVEN_OPTS="${MAVEN_OPTS:-} -Dmaven.mainClass=org.apache.maven.cling.MavenCling" ./mvnw -f packages/java/pom.xml -B -Dgpg.skip=true test'
 
   java:lint:
     desc: "Lint Java project (checkstyle + PMD WITH auto-fix where applicable)"
     cmds:
-      - MAVEN_OPTS="${MAVEN_OPTS:-} -Dmaven.mainClass=org.apache.maven.cling.MavenCling" ./mvnw -f packages/java/pom.xml -B -DskipTests -Dgpg.skip=true verify
+      - >-
+        bash -lc 'source "$HOME/.sdkman/bin/sdkman-init.sh" && sdk env && MAVEN_OPTS="${MAVEN_OPTS:-} -Dmaven.mainClass=org.apache.maven.cling.MavenCling" ./mvnw -f packages/java/pom.xml -B -DskipTests -Dgpg.skip=true verify'
 
   java:lint:check:
     desc: "Lint Java project WITHOUT auto-fix (check-only)"
     cmds:
-      - MAVEN_OPTS="${MAVEN_OPTS:-} -Dmaven.mainClass=org.apache.maven.cling.MavenCling" ./mvnw -f packages/java/pom.xml -B -DskipTests -Dgpg.skip=true verify
+      - >-
+        bash -lc 'source "$HOME/.sdkman/bin/sdkman-init.sh" && sdk env && MAVEN_OPTS="${MAVEN_OPTS:-} -Dmaven.mainClass=org.apache.maven.cling.MavenCling" ./mvnw -f packages/java/pom.xml -B -DskipTests -Dgpg.skip=true verify'
 
   java:format:
     desc: "Format Java code (with modifications)"
     cmds:
-      - MAVEN_OPTS="${MAVEN_OPTS:-} -Dmaven.mainClass=org.apache.maven.cling.MavenCling" ./mvnw -f packages/java/pom.xml -B spotless:apply
+      - >-
+        bash -lc 'source "$HOME/.sdkman/bin/sdkman-init.sh" && sdk env && MAVEN_OPTS="${MAVEN_OPTS:-} -Dmaven.mainClass=org.apache.maven.cling.MavenCling" ./mvnw -f packages/java/pom.xml -B spotless:apply'
 
   java:format:check:
     desc: "Check Java formatting without modifications"
     cmds:
-      - MAVEN_OPTS="${MAVEN_OPTS:-} -Dmaven.mainClass=org.apache.maven.cling.MavenCling" ./mvnw -f packages/java/pom.xml -B spotless:check
+      - >-
+        bash -lc 'source "$HOME/.sdkman/bin/sdkman-init.sh" && sdk env && MAVEN_OPTS="${MAVEN_OPTS:-} -Dmaven.mainClass=org.apache.maven.cling.MavenCling" ./mvnw -f packages/java/pom.xml -B spotless:check'
 
   csharp:install:
     desc: "Verify .NET SDK is installed and restore dependencies"

@@ -77,9 +77,11 @@ Thumbs.db
 
 # Benchmarks
 .benchmarks/
+benchmark-harness-results-*/
 tools/runtime-bench/results/
 tools/benchmark-harness/results/
 tools/benchmark-harness/artifacts/
+tools/benchmark-harness/artifacts-*/
 tools/benchmark-harness/results-consolidated/
 
 # Cache files
