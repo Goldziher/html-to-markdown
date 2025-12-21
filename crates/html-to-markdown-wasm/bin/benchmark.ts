@@ -84,7 +84,12 @@ function buildOptions(format: Format) {
   return {};
 }
 
-function runScenario(htmlBytes: Uint8Array, scenario: Scenario, options: Record<string, unknown>) {
+function runScenario(
+  htmlBytes: Uint8Array,
+  scenario: Scenario,
+  options: Record<string, unknown>,
+  metadataConfig: WasmMetadataConfig,
+) {
   switch (scenario) {
     case "convert-default":
       convertBytes(htmlBytes, undefined);
@@ -99,10 +104,10 @@ function runScenario(htmlBytes: Uint8Array, scenario: Scenario, options: Record<
       convertBytesWithInlineImages(htmlBytes, options, undefined);
       break;
     case "metadata-default":
-      convertBytesWithMetadata(htmlBytes, undefined, new WasmMetadataConfig());
+      convertBytesWithMetadata(htmlBytes, undefined, metadataConfig);
       break;
     case "metadata-options":
-      convertBytesWithMetadata(htmlBytes, options, new WasmMetadataConfig());
+      convertBytesWithMetadata(htmlBytes, options, metadataConfig);
       break;
   }
 }
@@ -118,14 +123,15 @@ function main() {
   const html = fs.readFileSync(fixturePath, "utf8");
   const htmlBytes = new TextEncoder().encode(html);
   const options = buildOptions(args.format);
+  const metadataConfig = new WasmMetadataConfig();
 
   for (let i = 0; i < (args.warmup ?? 1); i += 1) {
-    runScenario(htmlBytes, args.scenario, options);
+  runScenario(htmlBytes, args.scenario, options, metadataConfig);
   }
 
   const start = process.hrtime.bigint();
   for (let i = 0; i < args.iterations; i += 1) {
-    runScenario(htmlBytes, args.scenario, options);
+    runScenario(htmlBytes, args.scenario, options, metadataConfig);
   }
   const elapsedSeconds = Number(process.hrtime.bigint() - start) / 1e9;
 

@@ -487,12 +487,14 @@ fn ensure_php_extension(repo_root: &Path) -> Result<PathBuf> {
         return Ok(candidate);
     }
 
-    let status = Command::new("cargo")
-        .arg("build")
+    let mut cmd = Command::new("cargo");
+    cmd.arg("build")
         .arg("-p")
         .arg("html-to-markdown-php")
         .arg("--release")
-        .current_dir(repo_root)
+        .current_dir(repo_root);
+    apply_cargo_features(&mut cmd);
+    let status = cmd
         .status()
         .map_err(|err| Error::Benchmark(format!("Failed to build php extension: {err}")))?;
 
@@ -518,12 +520,19 @@ fn ensure_node_binding(repo_root: &Path) -> Result<()> {
         return Ok(());
     }
 
-    let status = Command::new("pnpm")
-        .arg("--filter")
+    let mut cmd = Command::new("pnpm");
+    cmd.arg("--filter")
         .arg("html-to-markdown-node")
         .arg("run")
         .arg("build")
-        .current_dir(repo_root)
+        .current_dir(repo_root);
+    if let Some(flags) = cargo_features_flag() {
+        cmd.env("NAPI_RS_CARGO_FLAGS", flags);
+    }
+    if let Some(features) = cargo_features() {
+        cmd.env("NAPI_RS_CARGO_FEATURES", features);
+    }
+    let status = cmd
         .status()
         .map_err(|err| Error::Benchmark(format!("Failed to build node binding: {err}")))?;
 
@@ -906,12 +915,14 @@ fn ensure_ffi_library(repo_root: &Path) -> Result<()> {
         return Ok(());
     }
 
-    let status = Command::new("cargo")
-        .arg("build")
+    let mut cmd = Command::new("cargo");
+    cmd.arg("build")
         .arg("-p")
         .arg("html-to-markdown-ffi")
         .arg("--release")
-        .current_dir(repo_root)
+        .current_dir(repo_root);
+    apply_cargo_features(&mut cmd);
+    let status = cmd
         .status()
         .map_err(|err| Error::Benchmark(format!("Failed to build FFI library: {err}")))?;
 
@@ -928,5 +939,22 @@ fn ensure_ffi_library(repo_root: &Path) -> Result<()> {
             "FFI library not found at {} even after building",
             candidate.display()
         )))
+    }
+}
+
+fn cargo_features() -> Option<String> {
+    env::var("HTML_TO_MARKDOWN_CARGO_FEATURES")
+        .ok()
+        .map(|value| value.trim().to_string())
+        .filter(|value| !value.is_empty())
+}
+
+fn cargo_features_flag() -> Option<String> {
+    cargo_features().map(|value| format!("--features {value}"))
+}
+
+fn apply_cargo_features(command: &mut Command) {
+    if let Some(features) = cargo_features() {
+        command.arg("--features").arg(features);
     }
 }

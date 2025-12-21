@@ -18,11 +18,12 @@ html-to-markdown-rs = { workspace = true, features = ["inline-images", "metadata
 serde_json = "1.0"
 
 [target.'cfg(not(target_os = "windows"))'.dependencies]
-pprof = { version = "0.15", features = ["flamegraph"] }
+pprof = { version = "0.15", features = ["flamegraph"], optional = true }
 
 [features]
 default = ["metadata"]
 metadata = ["html-to-markdown-rs/metadata"]
+profiling = ["dep:pprof"]
 
 [build-dependencies]
 cbindgen = "0.29"

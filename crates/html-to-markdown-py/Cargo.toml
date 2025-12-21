@@ -23,7 +23,7 @@ html-to-markdown-rs = { workspace = true, features = ["inline-images", "metadata
 pyo3.workspace = true
 
 [target.'cfg(not(target_os = "windows"))'.dependencies]
-pprof = { version = "0.15", features = ["flamegraph"] }
+pprof = { version = "0.15", features = ["flamegraph"], optional = true }
 
 [dev-dependencies]
 base64 = "0.22"
@@ -32,3 +32,4 @@ image = { version = "0.25", default-features = false, features = ["png"] }
 [features]
 default = []
 extension-module = ["pyo3/extension-module"]
+profiling = ["dep:pprof"]

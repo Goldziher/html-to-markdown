@@ -15,4 +15,8 @@ html-to-markdown-rs = { path = "vendor/html-to-markdown-rs", features = ["inline
 rustler = { version = "0.37" }
 
 [target.'cfg(not(target_os = "windows"))'.dependencies]
-pprof = { version = "0.15", features = ["flamegraph"] }
+pprof = { version = "0.15", features = ["flamegraph"], optional = true }
+
+[features]
+default = []
+profiling = ["dep:pprof"]

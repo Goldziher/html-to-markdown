@@ -17,16 +17,16 @@ categories = ["api-bindings"]
 name = "html_to_markdown_rb"
 crate-type = ["cdylib", "rlib"]
 
-[features]
-default = ["metadata"]
-metadata = ["html-to-markdown-rs/metadata"]
-
 [dependencies]
 html-to-markdown-rs = { version = "2.15.0", features = ["inline-images"] }
 magnus = { git = "https://github.com/matsadler/magnus", rev = "f6db11769efb517427bf7f121f9c32e18b059b38", features = ["rb-sys"] }
 
 [target.'cfg(not(target_os = "windows"))'.dependencies]
-pprof = { version = "0.15", features = ["flamegraph"] }
+pprof = { version = "0.15", features = ["flamegraph"], optional = true }
 
 [dev-dependencies]
 pretty_assertions = "1.4"
+[features]
+default = ["metadata"]
+metadata = ["html-to-markdown-rs/metadata"]
+profiling = ["dep:pprof"]

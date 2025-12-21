@@ -19,7 +19,7 @@ napi = { version = "3.4", default-features = false, features = ["napi8"] }
 napi-derive = "3.3"
 
 [target.'cfg(not(target_os = "windows"))'.dependencies]
-pprof = { version = "0.15", features = ["flamegraph"] }
+pprof = { version = "0.15", features = ["flamegraph"], optional = true }
 
 [target.'cfg(all(any(windows, unix), target_arch = "x86_64", not(target_env = "musl")))'.dependencies]
 mimalloc-rust = "0.2"
@@ -30,3 +30,4 @@ napi-build = "2.2"
 [features]
 default = ["metadata"]
 metadata = ["html-to-markdown-rs/metadata"]
+profiling = ["dep:pprof"]
