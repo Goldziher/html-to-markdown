@@ -90,19 +90,19 @@ repos:
         pass_filenames: false
       - id: rubocop
         name: rubocop
-        entry: bash -c 'cd packages/ruby && BUNDLE_PATH=vendor/bundle bundle install && BUNDLE_PATH=vendor/bundle bundle exec rubocop --config ./.rubocop.yml --autocorrect-all'
+        entry: bash -c 'set -euo pipefail; cd packages/ruby; export BUNDLE_PATH=vendor/bundle; ../../scripts/preferred-ruby.sh -S gem list -i bundler -v 4.0.0 || ../../scripts/preferred-ruby.sh -S gem install bundler -v 4.0.0 --no-document; ../../scripts/preferred-ruby.sh -S bundle install; ../../scripts/preferred-ruby.sh -S bundle exec rubocop --config ./.rubocop.yml --autocorrect-all'
         language: system
         files: ^packages/ruby/
         pass_filenames: false
       - id: rbs-validate
         name: rbs validate
-        entry: bash -c 'cd packages/ruby && BUNDLE_PATH=vendor/bundle bundle install && BUNDLE_PATH=vendor/bundle bundle exec rbs validate'
+        entry: bash -c 'set -euo pipefail; cd packages/ruby; export BUNDLE_PATH=vendor/bundle; ../../scripts/preferred-ruby.sh -S gem list -i bundler -v 4.0.0 || ../../scripts/preferred-ruby.sh -S gem install bundler -v 4.0.0 --no-document; ../../scripts/preferred-ruby.sh -S bundle install; ../../scripts/preferred-ruby.sh -S bundle exec rbs validate'
         language: system
         files: ^packages/ruby/
         pass_filenames: false
       - id: steep-check
         name: steep check
-        entry: bash -c 'cd packages/ruby && BUNDLE_PATH=vendor/bundle bundle install && BUNDLE_PATH=vendor/bundle bundle exec steep check'
+        entry: bash -c 'set -euo pipefail; cd packages/ruby; export BUNDLE_PATH=vendor/bundle; ../../scripts/preferred-ruby.sh -S gem list -i bundler -v 4.0.0 || ../../scripts/preferred-ruby.sh -S gem install bundler -v 4.0.0 --no-document; ../../scripts/preferred-ruby.sh -S bundle install; ../../scripts/preferred-ruby.sh -S bundle exec steep check'
         language: system
         files: ^packages/ruby/
         pass_filenames: false
