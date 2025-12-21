@@ -986,16 +986,21 @@ fn record_node_hierarchy(node_handle: &tl::NodeHandle, parent: Option<u32>, pars
 }
 
 fn may_be_hocr(input: &str) -> bool {
-    const HOCR_HINTS: [&str; 7] = [
-        "ocr_page",
-        "ocrx_word",
-        "ocr_carea",
-        "ocr_par",
-        "ocr_line",
-        "ocr-system",
-        "ocr-capabilities",
-    ];
-    HOCR_HINTS.iter().any(|hint| input.contains(hint))
+    let bytes = input.as_bytes();
+    if bytes.len() < 4 {
+        return false;
+    }
+    let mut idx = 0;
+    while idx + 3 < bytes.len() {
+        if bytes[idx] == b'o' && bytes[idx + 1] == b'c' && bytes[idx + 2] == b'r' {
+            match bytes[idx + 3] {
+                b'_' | b'-' | b'x' => return true,
+                _ => {}
+            }
+        }
+        idx += 1;
+    }
+    false
 }
 
 /// Check if a document is an hOCR (HTML-based OCR) document.
