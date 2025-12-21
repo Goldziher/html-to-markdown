@@ -1096,9 +1096,13 @@ impl MetadataCollector {
         let mut result = Vec::with_capacity(json_ld.len());
 
         for json_str in json_ld {
-            let schema_type = serde_json::from_str::<serde_json::Value>(&json_str)
-                .ok()
-                .and_then(|v| v.get("@type").and_then(|t| t.as_str().map(|s| s.to_string())));
+            let schema_type = if json_str.contains("\"@type\"") {
+                serde_json::from_str::<serde_json::Value>(&json_str)
+                    .ok()
+                    .and_then(|v| v.get("@type").and_then(|t| t.as_str().map(|s| s.to_string())))
+            } else {
+                None
+            };
 
             result.push(StructuredData {
                 data_type: StructuredDataType::JsonLd,
