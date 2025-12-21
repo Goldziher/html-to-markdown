@@ -277,6 +277,9 @@ impl ReportRow {
 
 fn extract_flamegraph_hotspots(path: &Path, limit: usize) -> Result<Vec<Hotspot>> {
     let data = fs::read_to_string(path).map_err(Error::Io)?;
+    if let Some(hotspots) = extract_0x_hotspots(&data, limit) {
+        return Ok(hotspots);
+    }
     let mut totals: HashMap<String, usize> = HashMap::new();
 
     for chunk in data.split("<title>").skip(1) {
@@ -305,6 +308,81 @@ fn extract_flamegraph_hotspots(path: &Path, limit: usize) -> Result<Vec<Hotspot>
     Ok(entries)
 }
 
+fn extract_0x_hotspots(data: &str, limit: usize) -> Option<Vec<Hotspot>> {
+    let start = data.find("visualizer(")? + "visualizer(".len();
+    let tail = &data[start..];
+    let end = tail.find(");")?;
+    let payload = tail[..end].trim();
+    if payload.is_empty() {
+        return None;
+    }
+
+    let mut totals: HashMap<String, usize> = HashMap::new();
+    let mut index = 0;
+    while let Some(pos) = payload[index..].find("\"name\":\"") {
+        let name_start = index + pos + "\"name\":\"".len();
+        let mut name = String::new();
+        let mut escaped = false;
+        let mut cursor = name_start;
+        for (offset, ch) in payload[name_start..].char_indices() {
+            cursor = name_start + offset;
+            if escaped {
+                name.push(ch);
+                escaped = false;
+                continue;
+            }
+            if ch == '\\' {
+                escaped = true;
+                continue;
+            }
+            if ch == '"' {
+                cursor += 1;
+                break;
+            }
+            name.push(ch);
+        }
+
+        if name.is_empty() || should_ignore_frame(&name) {
+            index = cursor;
+            continue;
+        }
+
+        if let Some(value_pos) = payload[cursor..].find("\"value\":") {
+            let mut value_index = cursor + value_pos + "\"value\":".len();
+            while let Some(ch) = payload[value_index..].chars().next() {
+                if ch.is_whitespace() {
+                    value_index += ch.len_utf8();
+                } else {
+                    break;
+                }
+            }
+            let mut value_str = String::new();
+            for ch in payload[value_index..].chars() {
+                if ch.is_ascii_digit() || ch == '.' {
+                    value_str.push(ch);
+                } else {
+                    break;
+                }
+            }
+            if let Ok(value) = value_str.parse::<f64>() {
+                if value > 0.0 {
+                    *totals.entry(name).or_insert(0) += value as usize;
+                }
+            }
+        }
+
+        index = cursor;
+    }
+
+    let mut entries = totals
+        .into_iter()
+        .map(|(name, samples)| Hotspot { name, samples })
+        .collect::<Vec<_>>();
+    entries.sort_by(|a, b| b.samples.cmp(&a.samples));
+    entries.truncate(limit);
+    Some(entries)
+}
+
 fn parse_samples(meta: &str) -> usize {
     let mut digits = String::new();
     for ch in meta.chars() {
@@ -318,7 +396,7 @@ fn parse_samples(meta: &str) -> usize {
 }
 
 fn should_ignore_frame(name: &str) -> bool {
-    matches!(name, "all" | "__libc_start_main" | "_start")
+    matches!(name, "all" | "all stacks" | "__libc_start_main" | "_start")
         || name.starts_with("benchmark-harne")
         || name.starts_with("benchmark-harness")
 }
