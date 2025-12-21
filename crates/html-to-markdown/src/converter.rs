@@ -1279,19 +1279,23 @@ fn format_metadata_frontmatter(metadata: &BTreeMap<String, String>) -> String {
         return String::new();
     }
 
-    let mut lines = vec!["---".to_string()];
+    let mut output = String::from("---\n");
     for (key, value) in metadata {
         let needs_quotes = value.contains(':') || value.contains('#') || value.contains('[') || value.contains(']');
+        output.push_str(key);
+        output.push_str(": ");
         if needs_quotes {
             let escaped = value.replace('\\', "\\\\").replace('"', "\\\"");
-            lines.push(format!("{}: \"{}\"", key, escaped));
+            output.push('"');
+            output.push_str(&escaped);
+            output.push('"');
         } else {
-            lines.push(format!("{}: {}", key, value));
+            output.push_str(value);
         }
+        output.push('\n');
     }
-    lines.push("---".to_string());
-
-    lines.join("\n") + "\n\n"
+    output.push_str("---\n\n");
+    output
 }
 
 /// Check if a handle is an empty inline element (abbr, var, ins, dfn, etc. with no text content).
