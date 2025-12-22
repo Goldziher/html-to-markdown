@@ -39,14 +39,14 @@ Pulled directly from `tools/benchmark-harness` (`task bench:harness`) so they st
 
 | Document               | Size   | ops/sec (Python) |
 | ---------------------- | ------ | ---------------- |
-| Lists (Timeline)       | 129 KB | 1,405            |
-| Tables (Countries)     | 360 KB | 352              |
-| Medium (Python)        | 657 KB | 158              |
-| Large (Rust)           | 567 KB | 183              |
-| Small (Intro)          | 463 KB | 223              |
-| hOCR German PDF        | 44 KB  | 2,991            |
-| hOCR Invoice           | 4 KB   | 23,500           |
-| hOCR Embedded Tables   | 37 KB  | 3,464            |
+| Lists (Timeline)       | 129 KB | 3,266            |
+| Tables (Countries)     | 360 KB | 935              |
+| Medium (Python)        | 657 KB | 472              |
+| Large (Rust)           | 567 KB | 543              |
+| Small (Intro)          | 463 KB | 634              |
+| hOCR German PDF        | 44 KB  | 7,645            |
+| hOCR Invoice           | 4 KB   | 83,330           |
+| hOCR Embedded Tables   | 37 KB  | 8,177            |
 
 > Re-run locally with `cargo run --release --manifest-path tools/benchmark-harness/Cargo.toml -- run --frameworks python --output tools/benchmark-harness/results` to compare against CI history.
 

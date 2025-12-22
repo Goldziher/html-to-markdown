@@ -568,65 +568,24 @@ See the language-specific READMEs for complete configuration, hOCR workflows, an
 
 ## Performance
 
-Benchmarked on Apple M4 with complex real-world documents (Wikipedia articles, tables, lists):
+Benchmarked on Apple M4 using the shared fixture harness in `tools/benchmark-harness` (latest consolidated run: `20409971461`).
 
-### Operations per Second (higher is better)
+### Comparative Throughput (Median Across Fixtures)
 
-Derived directly from `tools/benchmark-harness/results/results.json` (Apple M4, shared fixtures):
+| Runtime | Median ops/sec | Median throughput (MB/s) | Peak memory (MB) | Successes |
+| ------- | -------------- | ------------------------ | ---------------- | --------- |
+| Rust | 1,060.3 | 116.4 | 171.3 | 56/56 |
+| Go | 1,496.3 | 131.1 | 22.9 | 16/16 |
+| Ruby | 2,155.5 | 300.4 | 280.3 | 48/48 |
+| PHP | 2,357.7 | 308.0 | 223.5 | 48/48 |
+| Elixir | 1,564.1 | 269.1 | 384.7 | 48/48 |
+| C# | 1,234.2 | 272.4 | 187.8 | 16/16 |
+| Java | 1,298.7 | 167.1 | 527.2 | 16/16 |
+| WASM | 1,485.8 | 157.6 | 95.3 | 48/48 |
+| Node.js (NAPI) | 2,054.2 | 306.5 | 95.4 | 48/48 |
+| Python (PyO3) | 3,120.3 | 307.5 | 83.5 | 48/48 |
 
-| Fixture                | Node.js (NAPI) | WASM | Python (PyO3) | Speedup (Node vs Python) |
-| ---------------------- | -------------- | ---- | ------------- | ------------------------ |
-| **Lists (Timeline)**   | 1,308          | 882  | 1,405         | **0.9×**                 |
-| **Tables (Countries)** | 331            | 242  | 352           | **0.9×**                 |
-| **Medium (Python)**    | 150            | 121  | 158           | **1.0×**                 |
-| **Large (Rust)**       | 163            | 124  | 183           | **0.9×**                 |
-| **Small (Intro)**      | 208            | 163  | 223           | **0.9×**                 |
-| **HOCR German PDF**    | 2,944          | 1,637| 2,991         | **1.0×**                 |
-| **HOCR Invoice**       | 27,326         | 7,775| 23,500        | **1.2×**                 |
-| **HOCR Tables**        | 3,475          | 1,667| 3,464         | **1.0×**                 |
-
-### Average Performance Summary
-
-| Implementation        | Avg ops/sec (fixtures) | vs Python | Notes |
-| --------------------- | ---------------------- | --------- | ----- |
-| **Rust CLI/Binary**   | **4,996**              | **1.2× faster** | Preprocessing now stays in one pass + reuses `parse_owned`, so the CLI leads every fixture |
-| **Node.js (NAPI-RS)** | **4,488**              | 1.0×      | Buffer/handle combo keeps Node within ~10 % of the Rust core while serving JS runtimes |
-| **Ruby (magnus)**     | **4,278**              | 0.9×      | Still extremely fast; ~25 k ops/sec on HOCR invoices without extra work |
-| **Python (PyO3)**     | **4,034**              | baseline  | Release-mode harness plus handle reuse keep it competitive, but it now trails Node/Rust |
-| **WebAssembly**       | **1,576**              | 0.4×      | Portable option for Deno/browsers/edge using the new byte APIs |
-| **PHP (ext)**         | **1,480**              | 0.4×      | Composer extension holds steady at 35–70 MB/s once the PIE build is installed |
-
-### Key Insights
-
-- **Rust now leads throughput**: the fused preprocessing + `parse_owned` pathway pushes the CLI to ~1.7 k ops/sec on the 129 KB lists page and ~31 k ops/sec on the HOCR invoice fixture.
-- **Node.js trails by only a few percent** after the buffer/handle work—~1.3 k ops/sec on the lists fixture and 27 k ops/sec on HOCR invoices without any UTF-16 copies.
-- **Python remains competitive** but now sits below Node/Rust (~4.0 k average ops/sec); stick to the v2 API to avoid the deprecated compatibility shim.
-- **Elixir matches the Rust core** because the Rustler NIF executes the same `ConversionOptions` pipeline—benchmarks land between 170–1,460 ops/sec on the Wikipedia fixtures and >20 k ops/sec on micro HOCR payloads.
-- **PHP and WASM stay in the 35–70 MB/s band**, which is plenty for Composer queues or edge runtimes as long as the extension/module is built ahead of time.
-- **Rust CLI results now mirror the bindings**, since `task bench:harness` runs the harness with `cargo run --release` by default—profile there, then push optimizations down into each FFI layer.
-
-### Runtime Benchmarks (PHP / Ruby / Python / Node / WASM)
-
-Measured on Apple M4 using the fixture-driven benchmark harness in `tools/benchmark-harness` (`task bench:harness`). Every binding consumes the exact same HTML fixtures and hOCR samples from `test_documents/`:
-
-| Document            | Size     | Ruby ops/sec | PHP ops/sec | Python ops/sec | Node ops/sec | WASM ops/sec | Elixir ops/sec | Rust ops/sec |
-| ------------------- | -------- | ------------ | ----------- | -------------- | ------------ | ------------ | -------------- | ------------ |
-| Lists (Timeline)    | 129 KB   | 1,349        | 533         | 1,405          | 1,308        | 882          | 1,463          | **1,700**    |
-| Tables (Countries)  | 360 KB   | 326          | 118         | 352            | 331          | 242          | 357            | **416**      |
-| Medium (Python)     | 657 KB   | 157          | 59          | 158            | 150          | 121          | 171            | **190**      |
-| Large (Rust)        | 567 KB   | 174          | 65          | 183            | 163          | 124          | 174            | **220**      |
-| Small (Intro)       | 463 KB   | 214          | 83          | 223            | 208          | 163          | 247            | **258**      |
-| HOCR German PDF     | 44 KB    | 2,936        | 1,007       | **2,991**      | 2,944        | 1,637        | 3,113          | 2,760        |
-| HOCR Invoice        | 4 KB     | 25,740       | 8,781       | 23,500         | 27,326       | 7,775        | 20,424         | **31,345**   |
-| HOCR Embedded Tables| 37 KB    | 3,328        | 1,194       | 3,464          | **3,475**    | 1,667        | 3,366          | 3,080        |
-
-The harness shells out to each runtime’s lightweight benchmark driver (`packages/*/bin/benchmark.*`), feeds fixtures defined in `tools/benchmark-harness/fixtures/*.toml`, and writes machine-readable JSON reports (`tools/benchmark-harness/results/results.json`) for regression tracking. Add new languages or scenarios by extending those fixture files and drivers.
-
-Use `task bench:harness` to regenerate throughput numbers across the Rust/Python/Ruby/PHP bindings or `task bench:harness:memory` to capture CPU/memory samples while the benchmarks run. To focus on specific languages, pass `--frameworks` directly to `cargo run --manifest-path tools/benchmark-harness/Cargo.toml -- run …`.
-
-Need a call-stack view of the Rust core? Run `task bench:harness:rust` (or call the harness with `--frameworks rust --profile --flamegraphs path`) to profile a fixture and dump a ready-to-inspect flamegraph in `tools/benchmark-harness/results/`.
-
-**Note on Python performance**: The current Python bindings have optimization opportunities. The v2 API with direct `convert()` calls performs best; avoid the v1 compatibility layer for performance-critical applications.
+Use `task bench:harness` to regenerate throughput numbers across the bindings, `task bench:harness:memory` for CPU/memory samples, and `task bench:harness:rust` for flamegraphs.
 
 ## Compatibility (v1 → v2)
 

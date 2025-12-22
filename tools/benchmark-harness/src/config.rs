@@ -60,6 +60,8 @@ pub struct BenchmarkConfig {
     pub profile_frequency: i32,
     pub profile_repeat: usize,
     pub flamegraph_dir: Option<PathBuf>,
+    pub include_rust_baseline: bool,
+    pub framework_label_override: Option<String>,
 }
 
 impl Default for BenchmarkConfig {
@@ -77,11 +79,19 @@ impl Default for BenchmarkConfig {
             profile_frequency: 1000,
             profile_repeat: 1,
             flamegraph_dir: None,
+            include_rust_baseline: false,
+            framework_label_override: None,
         }
     }
 }
 
 impl BenchmarkConfig {
+    pub fn framework_label(&self, default: &str) -> String {
+        self.framework_label_override
+            .clone()
+            .unwrap_or_else(|| default.to_string())
+    }
+
     pub fn validate(&self) -> crate::Result<()> {
         if self.benchmark_iterations == 0 {
             return Err(crate::Error::Config("benchmark_iterations must be > 0".to_string()));

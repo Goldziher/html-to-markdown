@@ -640,14 +640,14 @@ The Rust-backed implementation provides significant performance improvements:
 
 | Document Type          | Size   | Ops/sec  | Throughput |
 | ---------------------- | ------ | -------- | ---------- |
-| Lists (Timeline)       | 129 KB | 1,001    | 126.4 MB/s |
-| Tables (Countries)     | 360 KB | 277      | 97.4 MB/s  |
-| Medium (Python)        | 656 KB | 138      | 88.1 MB/s  |
-| Large (Rust)           | 567 KB | 151      | 83.5 MB/s  |
-| Small (Intro)          | 463 KB | 184      | 83.2 MB/s  |
-| HOCR German PDF        | 44 KB  | 2,069    | 88.3 MB/s  |
-| HOCR Invoice           | 4 KB   | 15,067   | 61.7 MB/s  |
-| HOCR Embedded Tables   | 37 KB  | 2,069    | 75.1 MB/s  |
+| Lists (Timeline)       | 129 KB | 2,308    | 291.5 MB/s |
+| Tables (Countries)     | 360 KB | 773      | 272.0 MB/s |
+| Medium (Python)        | 656 KB | 403      | 258.5 MB/s |
+| Large (Rust)           | 567 KB | 445      | 246.1 MB/s |
+| Small (Intro)          | 463 KB | 572      | 259.0 MB/s |
+| HOCR German PDF        | 44 KB  | 4,757    | 202.9 MB/s |
+| HOCR Invoice           | 4 KB   | 29,006   | 118.7 MB/s |
+| HOCR Embedded Tables   | 37 KB  | 5,042    | 183.0 MB/s |
 
 ## Supported Platforms
 

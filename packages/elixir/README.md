@@ -141,14 +141,14 @@ in `tools/benchmark-harness`.
 
 | Document               | Size   | Ops/sec | Throughput |
 | ---------------------- | ------ | ------- | ---------- |
-| Lists (Timeline)       | 129 KB | 1,463   | 184.8 MB/s |
-| Tables (Countries)     | 360 KB |   357   | 125.5 MB/s |
-| Medium (Python)        | 656 KB |   171   | 109.9 MB/s |
-| Large (Rust)           | 567 KB |   174   |  96.4 MB/s |
-| Small (Intro)          | 463 KB |   247   | 111.9 MB/s |
-| HOCR German PDF        |  44 KB | 3,113   | 132.8 MB/s |
-| HOCR Embedded Tables   |  37 KB | 3,366   | 122.2 MB/s |
-| HOCR Invoice           |   4 KB | 20,424  |  83.6 MB/s |
+| Lists (Timeline)       | 129 KB | 2,547   | 321.7 MB/s |
+| Tables (Countries)     | 360 KB |   835   | 293.8 MB/s |
+| Medium (Python)        | 656 KB |   439   | 281.5 MB/s |
+| Large (Rust)           | 567 KB |   485   | 268.7 MB/s |
+| Small (Intro)          | 463 KB |   581   | 262.9 MB/s |
+| HOCR German PDF        |  44 KB | 7,106   | 303.1 MB/s |
+| HOCR Embedded Tables   |  37 KB | 6,231   | 226.1 MB/s |
+| HOCR Invoice           |   4 KB | 62,657  | 256.4 MB/s |
 
 The Elixir binding matches the throughput of the Rust core since conversions
 are executed inside the same NIF. The numbers above help size workloads and

@@ -209,6 +209,7 @@ jobs:
             --profile-frequency "${PROFILE_FREQUENCY}" \
             --profile-repeat "${PROFILE_REPEAT}" \
             --profile --flamegraphs tools/benchmark-harness/results/flamegraphs \
+            --rust-baseline \
             --format both --output tools/benchmark-harness/results
 
       - name: Upload results

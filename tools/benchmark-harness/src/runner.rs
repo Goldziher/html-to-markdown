@@ -44,8 +44,22 @@ impl BenchmarkRunner {
                         continue;
                     }
 
+                    if self.config.include_rust_baseline && adapter.name() == "rust" {
+                        let mut baseline_config = self.config.clone();
+                        baseline_config.enable_profiling = false;
+                        baseline_config.flamegraph_dir = None;
+                        baseline_config.profile_repeat = 1;
+                        baseline_config.framework_label_override = Some("rust-baseline".to_string());
+
+                        let result =
+                            run_adapter(adapter.clone(), fixture, *scenario, &baseline_config).unwrap_or_else(|err| {
+                                failed_result(adapter.clone(), fixture, *scenario, &baseline_config, err)
+                            });
+                        results.push(result);
+                    }
+
                     let result = run_adapter(adapter.clone(), fixture, *scenario, &self.config)
-                        .unwrap_or_else(|err| failed_result(adapter.clone(), fixture, *scenario, err));
+                        .unwrap_or_else(|err| failed_result(adapter.clone(), fixture, *scenario, &self.config, err));
                     results.push(result);
                 }
             }
@@ -68,10 +82,11 @@ fn failed_result(
     adapter: Arc<dyn FrameworkAdapter>,
     fixture: &Fixture,
     scenario: BenchmarkScenario,
+    config: &BenchmarkConfig,
     err: Error,
 ) -> BenchmarkResult {
     BenchmarkResult {
-        framework: adapter.name().to_string(),
+        framework: config.framework_label(adapter.name()),
         scenario: scenario.as_str().to_string(),
         fixture_id: fixture.id.clone(),
         fixture_name: fixture.name.clone(),

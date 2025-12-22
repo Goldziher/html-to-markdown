@@ -1,6 +1,6 @@
 [package]
 name = "html-to-markdown-rust-smoke"
-version = "2.15.0"
+version = "2.16.0"
 edition = "2021"
 
 [workspace]
