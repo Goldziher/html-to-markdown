@@ -16,6 +16,16 @@ on:
         description: "Git ref (branch, tag, or commit) to build; defaults to the tag"
         required: false
         type: string
+      force_republish_java:
+        description: "Force republish Java artifacts even if the version exists"
+        required: false
+        type: boolean
+        default: false
+      force_republish_wasm:
+        description: "Force republish WASM package even if the version exists"
+        required: false
+        type: boolean
+        default: false
   release:
     types: [published]
   repository_dispatch:
@@ -41,6 +51,8 @@ jobs:
       target_sha: ${{ steps.meta.outputs.target_sha }}
       matrix_ref: ${{ steps.meta.outputs.matrix_ref }}
       is_tag: ${{ steps.meta.outputs.is_tag }}
+      force_republish_java: ${{ steps.republish.outputs.force_republish_java }}
+      force_republish_wasm: ${{ steps.republish.outputs.force_republish_wasm }}
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -61,6 +73,18 @@ jobs:
           EVENT_DISPATCH_DRY_RUN: ${{ github.event.client_payload.dry_run }}
           EVENT_DISPATCH_REF: ${{ github.event.client_payload.ref }}
         run: scripts/publish/validate-and-compute-metadata.sh
+      - name: Resolve republish flags
+        id: republish
+        env:
+          INPUT_FORCE_REPUBLISH_JAVA: ${{ inputs.force_republish_java }}
+          INPUT_FORCE_REPUBLISH_WASM: ${{ inputs.force_republish_wasm }}
+          EVENT_DISPATCH_FORCE_REPUBLISH_JAVA: ${{ github.event.client_payload.force_republish_java }}
+          EVENT_DISPATCH_FORCE_REPUBLISH_WASM: ${{ github.event.client_payload.force_republish_wasm }}
+        run: |
+          force_java="${INPUT_FORCE_REPUBLISH_JAVA:-${EVENT_DISPATCH_FORCE_REPUBLISH_JAVA:-false}}"
+          force_wasm="${INPUT_FORCE_REPUBLISH_WASM:-${EVENT_DISPATCH_FORCE_REPUBLISH_WASM:-false}}"
+          echo "force_republish_java=${force_java}" >>"$GITHUB_OUTPUT"
+          echo "force_republish_wasm=${force_wasm}" >>"$GITHUB_OUTPUT"
       - name: Upload release metadata
         uses: actions/upload-artifact@v6
         with:
@@ -1454,7 +1478,7 @@ jobs:
   publish-maven:
     name: Publish Maven package
     needs: [prepare, upload-release-artifacts, check-maven]
-    if: ${{ needs.prepare.result == 'success' && needs.prepare.outputs.tag && needs.prepare.outputs.dry_run != 'true' && needs.prepare.outputs.is_tag == 'true' && needs.check-maven.outputs.exists != 'true' }}
+    if: ${{ needs.prepare.result == 'success' && needs.prepare.outputs.tag && needs.prepare.outputs.dry_run != 'true' && needs.prepare.outputs.is_tag == 'true' && (needs.check-maven.outputs.exists != 'true' || needs.prepare.outputs.force_republish_java == 'true') }}
     runs-on: ubuntu-latest
     env:
       MAVEN_USERNAME: ${{ secrets.MAVEN_USERNAME }}
@@ -1573,7 +1597,7 @@ jobs:
   publish-wasm:
     name: Publish WASM package
     needs: [prepare, upload-release-artifacts, check-npm]
-    if: ${{ needs.prepare.result == 'success' && needs.prepare.outputs.tag && needs.prepare.outputs.dry_run != 'true' && needs.prepare.outputs.is_tag == 'true' && needs.check-npm.outputs.wasm_exists != 'true' }}
+    if: ${{ needs.prepare.result == 'success' && needs.prepare.outputs.tag && needs.prepare.outputs.dry_run != 'true' && needs.prepare.outputs.is_tag == 'true' && (needs.check-npm.outputs.wasm_exists != 'true' || needs.prepare.outputs.force_republish_wasm == 'true') }}
     runs-on: ubuntu-latest
     permissions:
       id-token: write
