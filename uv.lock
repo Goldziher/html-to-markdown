@@ -5,22 +5,7 @@ requires-python = ">=3.10"
 [manifest]
 members = [
     "html-to-markdown",
-]
-
-[manifest.dependency-groups]
-dev = [
-    { name = "covdefaults", specifier = ">=2.3" },
-    { name = "memray", marker = "sys_platform != 'win32'", specifier = ">=1.19.1" },
-    { name = "mypy", specifier = ">=1.19.1" },
-    { name = "pre-commit", specifier = ">=4.5.1" },
-    { name = "psutil", marker = "sys_platform != 'win32'", specifier = ">=7.1.2" },
-    { name = "pytest", specifier = ">=9.0.2" },
-    { name = "pytest-benchmark", specifier = ">=5.2.3" },
-    { name = "pytest-cov", specifier = ">=7" },
-    { name = "pytest-mock", specifier = ">=3.15.1" },
-    { name = "ruff", specifier = ">=0.14.10" },
-    { name = "types-psutil", specifier = ">=7.1.3.20251211" },
-    { name = "uv-bump", git = "https://github.com/Goldziher/uv-bump" },
+    "html-to-markdown-workspace",
 ]
 
 [[package]]
@@ -191,6 +176,45 @@ wheels = [
 name = "html-to-markdown"
 version = "2.16.0"
 source = { editable = "packages/python" }
+
+[[package]]
+name = "html-to-markdown-workspace"
+version = "0.0.0"
+source = { editable = "." }
+
+[package.dev-dependencies]
+dev = [
+    { name = "covdefaults" },
+    { name = "memray", marker = "sys_platform != 'win32'" },
+    { name = "mypy" },
+    { name = "pre-commit" },
+    { name = "psutil", marker = "sys_platform != 'win32'" },
+    { name = "pytest" },
+    { name = "pytest-benchmark" },
+    { name = "pytest-cov" },
+    { name = "pytest-mock" },
+    { name = "ruff" },
+    { name = "types-psutil" },
+    { name = "uv-bump" },
+]
+
+[package.metadata]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "covdefaults", specifier = ">=2.3" },
+    { name = "memray", marker = "sys_platform != 'win32'", specifier = ">=1.19.1" },
+    { name = "mypy", specifier = ">=1.19.1" },
+    { name = "pre-commit", specifier = ">=4.5.1" },
+    { name = "psutil", marker = "sys_platform != 'win32'", specifier = ">=7.1.2" },
+    { name = "pytest", specifier = ">=9.0.2" },
+    { name = "pytest-benchmark", specifier = ">=5.2.3" },
+    { name = "pytest-cov", specifier = ">=7" },
+    { name = "pytest-mock", specifier = ">=3.15.1" },
+    { name = "ruff", specifier = ">=0.14.10" },
+    { name = "types-psutil", specifier = ">=7.1.3.20251211" },
+    { name = "uv-bump", git = "https://github.com/Goldziher/uv-bump" },
+]
 
 [[package]]
 name = "identify"

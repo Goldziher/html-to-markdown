@@ -1,3 +1,4 @@
+import os
 import subprocess
 import sys
 import warnings
@@ -15,6 +16,14 @@ def find_cli_binary() -> Path:
     Raises:
         FileNotFoundError: If the binary cannot be found.
     """
+    env_override = os.environ.get("HTML_TO_MARKDOWN_CLI")
+    if env_override:
+        override_path = Path(env_override)
+        if override_path.exists() and override_path.is_file():
+            return override_path
+        msg = f"html-to-markdown CLI binary not found at HTML_TO_MARKDOWN_CLI={env_override}"
+        raise FileNotFoundError(msg)
+
     binary_name = "html-to-markdown.exe" if sys.platform == "win32" else "html-to-markdown"
 
     module_dir = Path(__file__).resolve().parent
