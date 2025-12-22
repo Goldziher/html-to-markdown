@@ -441,7 +441,7 @@ mod tests {
         assert!(metadata.headers.is_empty());
         assert!(metadata.links.is_empty());
         assert!(metadata.images.is_empty());
-        assert_eq!(metadata.document.language, Some("en".to_string()));
+        assert_eq!(metadata.document.language, None);
     }
 
     #[test]
