@@ -159,21 +159,30 @@ fn fast_text_only(html: &str, options: &ConversionOptions) -> Option<String> {
         return Some(String::new());
     }
 
+    let normalized = if options.whitespace_mode == WhitespaceMode::Normalized {
+        text::normalize_whitespace_cow(trimmed)
+    } else {
+        Cow::Borrowed(trimmed)
+    };
+
     let escaped =
         if options.escape_misc || options.escape_asterisks || options.escape_underscores || options.escape_ascii {
             text::escape(
-                trimmed,
+                normalized.as_ref(),
                 options.escape_misc,
                 options.escape_asterisks,
                 options.escape_underscores,
                 options.escape_ascii,
             )
         } else {
-            trimmed.to_string()
+            normalized.into_owned()
         };
 
     let mut output = String::with_capacity(escaped.len() + 1);
     output.push_str(&escaped);
+    while output.ends_with(' ') || output.ends_with('\t') {
+        output.pop();
+    }
     output.push('\n');
     Some(output)
 }
