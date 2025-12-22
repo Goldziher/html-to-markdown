@@ -22,8 +22,9 @@ public class ConverterTests
     [Fact]
     public void Convert_NullInput_ThrowsArgumentNullException()
     {
+        string? html = null;
         Assert.Throws<ArgumentNullException>(() =>
-            HtmlToMarkdownConverter.Convert(null!));
+            HtmlToMarkdownConverter.Convert(html!));
     }
 
     [Fact]

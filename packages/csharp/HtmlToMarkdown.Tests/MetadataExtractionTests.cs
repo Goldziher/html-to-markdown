@@ -169,8 +169,9 @@ public class MetadataExtractionTests
     [Fact]
     public void ConvertWithMetadata_NullInput_ThrowsArgumentNullException()
     {
+        string? html = null;
         Assert.Throws<ArgumentNullException>(() =>
-            HtmlToMarkdownConverter.ConvertWithMetadata(null!));
+            HtmlToMarkdownConverter.ConvertWithMetadata(html!));
     }
 
     [Fact]
