@@ -1,3 +1,22 @@
+[build-system]
+build-backend = "setuptools.build_meta"
+requires = [ "setuptools>=69" ]
+
+[project]
+name = "html-to-markdown-workspace"
+version = "0.0.0"
+description = "Workspace-only metadata for tooling."
+requires-python = ">=3.10"
+
+classifiers = [
+  "Programming Language :: Python :: 3 :: Only",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Programming Language :: Python :: 3.14",
+]
+
 [dependency-groups]
 dev = [
   "covdefaults>=2.3",
@@ -13,6 +32,9 @@ dev = [
   "types-psutil>=7.1.3.20251211",
   "uv-bump",
 ]
+
+[tool.setuptools]
+packages = [  ]
 
 [tool.uv]
 default-groups = [ "dev" ]

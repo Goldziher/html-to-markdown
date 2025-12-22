@@ -216,14 +216,6 @@ pub fn stop() -> Result<()> {
 }
 
 #[cfg(any(target_os = "windows", not(feature = "profiling")))]
-pub fn maybe_profile<T, F>(mut f: F) -> Result<T>
-where
-    F: FnMut() -> Result<T>,
-{
-    f()
-}
-
-#[cfg(target_os = "windows")]
 pub fn maybe_profile<T, F>(f: F) -> Result<T>
 where
     F: FnOnce() -> Result<T>,
