@@ -61,11 +61,6 @@ def translate_v1_args_to_v2(argv: list[str]) -> list[str]:
         RemovedV1FlagError: If a v1 flag has been removed in v2.
     """
     translated = []
-    escape_defaults = {
-        "asterisks": {"enabled": True, "seen": False},
-        "underscores": {"enabled": True, "seen": False},
-        "misc": {"enabled": True, "seen": False},
-    }
     removed_flags = {"--strip", "--convert"}
     redundant_flags = {
         "--no-escape-asterisks",
@@ -74,6 +69,12 @@ def translate_v1_args_to_v2(argv: list[str]) -> list[str]:
         "--no-wrap",
         "--no-autolinks",
         "--no-extract-metadata",
+    }
+    v1_mode = any(arg in redundant_flags or arg == "--preprocess-html" for arg in argv)
+    escape_defaults = {
+        "asterisks": {"enabled": v1_mode, "seen": False},
+        "underscores": {"enabled": v1_mode, "seen": False},
+        "misc": {"enabled": v1_mode, "seen": False},
     }
     disable_escape_flags = {
         "--no-escape-asterisks": "asterisks",
