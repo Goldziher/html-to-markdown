@@ -630,7 +630,7 @@ fn ensure_java_jar(repo_root: &Path) -> Result<()> {
             PathBuf::from("mvn")
         }
     };
-    let maven_main_class = "org.apache.maven.cling.MavenCling";
+    let maven_main_class = "org.apache.maven.cli.MavenCli";
     let mut maven_opts = env::var("MAVEN_OPTS").unwrap_or_default();
     if !maven_opts.contains("maven.mainClass") {
         if !maven_opts.is_empty() {
@@ -643,6 +643,12 @@ fn ensure_java_jar(repo_root: &Path) -> Result<()> {
             maven_opts.push(' ');
         }
         maven_opts.push_str("--enable-native-access=ALL-UNNAMED");
+    }
+    if !maven_opts.contains("sun.misc.unsafe.memory.access") {
+        if !maven_opts.is_empty() {
+            maven_opts.push(' ');
+        }
+        maven_opts.push_str("-Dsun.misc.unsafe.memory.access=allow");
     }
     if !maven_opts.contains("--add-opens=java.base/sun.misc=ALL-UNNAMED") {
         if !maven_opts.is_empty() {
