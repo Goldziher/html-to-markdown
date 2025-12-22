@@ -148,7 +148,7 @@ fn normalize_line_endings(html: &str) -> Cow<'_, str> {
     }
 }
 
-fn fast_text_only(html: &str) -> Option<String> {
+fn fast_text_only(html: &str, options: &ConversionOptions) -> Option<String> {
     if html.contains('<') {
         return None;
     }
@@ -158,8 +158,22 @@ fn fast_text_only(html: &str) -> Option<String> {
     if trimmed.is_empty() {
         return Some(String::new());
     }
-    let mut output = String::with_capacity(trimmed.len() + 1);
-    output.push_str(trimmed);
+
+    let escaped =
+        if options.escape_misc || options.escape_asterisks || options.escape_underscores || options.escape_ascii {
+            text::escape(
+                trimmed,
+                options.escape_misc,
+                options.escape_asterisks,
+                options.escape_underscores,
+                options.escape_ascii,
+            )
+        } else {
+            trimmed.to_string()
+        };
+
+    let mut output = String::with_capacity(escaped.len() + 1);
+    output.push_str(&escaped);
     output.push('\n');
     Some(output)
 }
@@ -215,7 +229,7 @@ pub fn convert(html: &str, options: Option<ConversionOptions>) -> Result<String>
     let normalized_html = normalize_line_endings(html);
 
     if !options.wrap {
-        if let Some(markdown) = fast_text_only(normalized_html.as_ref()) {
+        if let Some(markdown) = fast_text_only(normalized_html.as_ref(), &options) {
             return Ok(markdown);
         }
     }
@@ -576,5 +590,17 @@ mod basic_tests {
     fn test_plain_text_allowed() {
         let result = convert("Just text", None).unwrap();
         assert!(result.contains("Just text"));
+    }
+
+    #[test]
+    fn test_plain_text_escaped_when_enabled() {
+        let options = ConversionOptions {
+            escape_asterisks: true,
+            escape_underscores: true,
+            ..ConversionOptions::default()
+        };
+        let result = convert("Text *asterisks* _underscores_", Some(options)).unwrap();
+        assert!(result.contains(r"\*asterisks\*"));
+        assert!(result.contains(r"\_underscores\_"));
     }
 }

@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- Fast-path plain-text conversions now honor escape flags (asterisks/underscores/misc/ASCII).
+
 ## [2.16.0] - 2025-12-22
 
 ### Added
