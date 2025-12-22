@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.16.1] - 2025-12-22
+
 ### Fixed
 - Fast-path plain-text conversions now honor escape flags (asterisks/underscores/misc/ASCII).
 - Fast-path plain-text conversions now normalize whitespace and trim trailing spaces.
