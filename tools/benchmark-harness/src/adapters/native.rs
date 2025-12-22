@@ -155,7 +155,7 @@ impl FrameworkAdapter for NativeAdapter {
         let memory_stats = capture_memory_stats().ok();
 
         Ok(BenchmarkResult {
-            framework: self.name().to_string(),
+            framework: config.framework_label(self.name()),
             scenario: scenario.as_str().to_string(),
             fixture_id: fixture.id.clone(),
             fixture_name: fixture.name.clone(),

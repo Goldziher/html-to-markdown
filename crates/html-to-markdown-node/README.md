@@ -50,14 +50,14 @@ The shared benchmark harness lives in `tools/benchmark-harness`. Node keeps pace
 
 | Document               | Size   | ops/sec (Node) |
 | ---------------------- | ------ | -------------- |
-| Lists (Timeline)       | 129 KB | 1,308          |
-| Tables (Countries)     | 360 KB | 331            |
-| Medium (Python)        | 657 KB | 150            |
-| Large (Rust)           | 567 KB | 163            |
-| Small (Intro)          | 463 KB | 208            |
-| hOCR German PDF        | 44 KB  | 2,944          |
-| hOCR Invoice           | 4 KB   | 27,326         |
-| hOCR Embedded Tables   | 37 KB  | 3,475          |
+| Lists (Timeline)       | 129 KB | 3,137          |
+| Tables (Countries)     | 360 KB | 932            |
+| Medium (Python)        | 657 KB | 460            |
+| Large (Rust)           | 567 KB | 554            |
+| Small (Intro)          | 463 KB | 627            |
+| hOCR German PDF        | 44 KB  | 8,724          |
+| hOCR Invoice           | 4 KB   | 96,138         |
+| hOCR Embedded Tables   | 37 KB  | 9,591          |
 
 > Run `task bench:harness -- --frameworks node` to regenerate these numbers.
 

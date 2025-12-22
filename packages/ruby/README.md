@@ -73,14 +73,14 @@ Measured via `task bench:harness` with the shared Wikipedia + hOCR suite:
 
 | Document               | Size   | ops/sec (Ruby) |
 | ---------------------- | ------ | -------------- |
-| Lists (Timeline)       | 129 KB | 1,349          |
-| Tables (Countries)     | 360 KB | 326            |
-| Medium (Python)        | 657 KB | 157            |
-| Large (Rust)           | 567 KB | 174            |
-| Small (Intro)          | 463 KB | 214            |
-| hOCR German PDF        | 44 KB  | 2,936          |
-| hOCR Invoice           | 4 KB   | 25,740         |
-| hOCR Embedded Tables   | 37 KB  | 3,328          |
+| Lists (Timeline)       | 129 KB | 3,156          |
+| Tables (Countries)     | 360 KB | 921            |
+| Medium (Python)        | 657 KB | 469            |
+| Large (Rust)           | 567 KB | 534            |
+| Small (Intro)          | 463 KB | 629            |
+| hOCR German PDF        | 44 KB  | 7,250          |
+| hOCR Invoice           | 4 KB   | 83,883         |
+| hOCR Embedded Tables   | 37 KB  | 7,890          |
 
 > These numbers line up with the Python/Node bindings because everything flows through the same Rust engine.
 

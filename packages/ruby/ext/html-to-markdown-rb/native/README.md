@@ -62,6 +62,21 @@ Apple M4 • Real Wikipedia documents • `HtmlToMarkdown.convert` (Ruby)
 
 > Same core, same benchmarks: the Ruby extension stays within single-digit % of the Rust CLI and mirrors the Python/Node numbers.
 
+### Benchmark Fixtures (Apple M4)
+
+Measured via `task bench:harness` with the shared Wikipedia + hOCR suite:
+
+| Document               | Size   | ops/sec (Ruby) |
+| ---------------------- | ------ | -------------- |
+| Lists (Timeline)       | 129 KB | 3,156          |
+| Tables (Countries)     | 360 KB | 921            |
+| Medium (Python)        | 657 KB | 469            |
+| Large (Rust)           | 567 KB | 534            |
+| Small (Intro)          | 463 KB | 629            |
+| hOCR German PDF        | 44 KB  | 7,250          |
+| hOCR Invoice           | 4 KB   | 83,883         |
+| hOCR Embedded Tables   | 37 KB  | 7,890          |
+
 ## Quick Start
 
 ```ruby

@@ -374,7 +374,7 @@ impl FrameworkAdapter for ScriptAdapter {
                 )
             };
             return Ok(BenchmarkResult {
-                framework: self.name().to_string(),
+                framework: config.framework_label(self.name()),
                 scenario: scenario.as_str().to_string(),
                 fixture_id: fixture.id.clone(),
                 fixture_name: fixture.name.clone(),
@@ -435,7 +435,7 @@ impl FrameworkAdapter for ScriptAdapter {
         let mb_per_sec = (bytes_processed as f64 / (1024.0 * 1024.0)) / duration_secs;
 
         Ok(BenchmarkResult {
-            framework: self.name().to_string(),
+            framework: config.framework_label(self.name()),
             scenario: script_result.scenario.unwrap_or_else(|| scenario.as_str().to_string()),
             fixture_id: fixture.id.clone(),
             fixture_name: fixture.name.clone(),

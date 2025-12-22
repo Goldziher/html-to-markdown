@@ -80,6 +80,9 @@ enum Commands {
         #[arg(long)]
         flamegraphs: Option<PathBuf>,
 
+        #[arg(long)]
+        rust_baseline: bool,
+
         #[arg(long, value_enum, value_delimiter = ',')]
         scenarios: Vec<CliScenario>,
 
@@ -202,6 +205,7 @@ fn main() -> Result<()> {
             profile_frequency,
             profile_repeat,
             flamegraphs,
+            rust_baseline,
             scenarios,
             format,
         } => {
@@ -232,6 +236,7 @@ fn main() -> Result<()> {
                 profile_frequency,
                 profile_repeat,
                 flamegraph_dir,
+                include_rust_baseline: rust_baseline,
                 ..Default::default()
             };
             config.validate()?;

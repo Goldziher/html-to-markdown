@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.16.0] - 2025-12-21
+
+### Added
+- Profiling harness and workflow for Rust core and bindings with consolidated flamegraph output.
+- Benchmark scenarios for inline images, metadata extraction, and raw metadata output across fixtures.
+- WASM profiling support with warmups and stable flamegraph parsing.
+- FFI byte-based conversion path plus metadata-raw benchmark coverage.
+
+### Changed
+- Bench harness now supports expanded fixture coverage and results consolidation.
+- Java benchmarks align on JDK 25 for consistent profiling runs.
+
+### Fixed
+- Node benchmark harness now runs from the package directory and uses native bindings.
+- Profiling stability fixes across Go, Elixir, Java, and WASM adapters.
+
+### Performance
+- Rust core conversion: metadata extraction, inline image handling, tag/whitespace caches, and text assembly hot paths.
+- Bindings interop: tighter metadata serialization/deserialization paths.
+- Rust bench harness (local, Apple M4): median ops/sec improved 18.8× on Wikipedia fixtures (53.7 → 1009.1).
+
 ## [2.15.0] - 2025-12-19
 
 ### Fixed
