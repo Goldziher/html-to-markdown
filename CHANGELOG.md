@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [2.16.0] - 2025-12-21
+## [2.16.0] - 2025-12-22
 
 ### Added
 - Profiling harness and workflow for Rust core and bindings with consolidated flamegraph output.
@@ -22,6 +22,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - Node benchmark harness now runs from the package directory and uses native bindings.
 - Profiling stability fixes across Go, Elixir, Java, and WASM adapters.
+- Binary input detection now flags compressed/magic signatures and UTF-16 data with clearer errors.
 
 ### Performance
 - Rust core conversion: metadata extraction, inline image handling, tag/whitespace caches, and text assembly hot paths.
