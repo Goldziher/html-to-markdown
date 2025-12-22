@@ -5,7 +5,7 @@ inputs:
   java-version:
     description: Java version to use
     required: false
-    default: "25"
+    default: "24"
   platform:
     description: Platform identifier (linux, macos, windows)
     required: true
@@ -72,7 +72,8 @@ runs:
       shell: bash
       working-directory: packages/java
       run: |
-        mvn versions:set -DnewVersion=${{ inputs.version }} -DgenerateBackupPoms=false
+        MAVEN_OPTS="${MAVEN_OPTS:-} --enable-native-access=ALL-UNNAMED -Dsun.misc.unsafe.memory.access=allow" \
+          mvn versions:set -DnewVersion=${{ inputs.version }} -DgenerateBackupPoms=false
         echo "✓ Version set to ${{ inputs.version }}"
 
     - name: Build and package JARs
@@ -80,7 +81,8 @@ runs:
       working-directory: packages/java
       run: |
         # Build all JARs (main, sources, javadoc) but skip GPG signing for now
-        mvn clean package source:jar-no-fork javadoc:jar -DskipTests -Dgpg.skip=true
+        MAVEN_OPTS="${MAVEN_OPTS:-} --enable-native-access=ALL-UNNAMED -Dsun.misc.unsafe.memory.access=allow" \
+          mvn clean package source:jar-no-fork javadoc:jar -DskipTests -Dgpg.skip=true
 
         echo "✓ JARs built successfully"
         ls -lh target/*.jar
