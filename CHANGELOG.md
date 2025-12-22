@@ -10,7 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - Fast-path plain-text conversions now honor escape flags (asterisks/underscores/misc/ASCII).
 - Fast-path plain-text conversions now normalize whitespace and trim trailing spaces.
-- Python CLI proxy now applies v1 escape defaults only when v1-only flags are used.
+- Python CLI proxy now only applies v1 translation defaults when v1-only flags are present.
 
 ## [2.16.0] - 2025-12-22
 
