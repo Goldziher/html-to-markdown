@@ -131,7 +131,7 @@ repos:
         pass_filenames: false
       - id: java-verify
         name: maven verify (java)
-        entry: bash -lc 'source "$HOME/.sdkman/bin/sdkman-init.sh" && sdk env && MAVEN_OPTS="${MAVEN_OPTS:-} --enable-native-access=ALL-UNNAMED -Dsun.misc.unsafe.memory.access=allow" ./mvnw -f packages/java/pom.xml -B -DskipTests -Dgpg.skip=true verify'
+        entry: bash -lc 'if [ -f "$HOME/.sdkman/bin/sdkman-init.sh" ]; then source "$HOME/.sdkman/bin/sdkman-init.sh" && sdk env; fi; MAVEN_OPTS="${MAVEN_OPTS:-} --enable-native-access=ALL-UNNAMED -Dsun.misc.unsafe.memory.access=allow" ./mvnw -f packages/java/pom.xml -B -DskipTests -Dgpg.skip=true verify'
         language: system
         files: ^packages/java/
         pass_filenames: false
