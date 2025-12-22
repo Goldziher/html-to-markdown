@@ -61,31 +61,51 @@ def translate_v1_args_to_v2(argv: list[str]) -> list[str]:
         RemovedV1FlagError: If a v1 flag has been removed in v2.
     """
     translated = []
+    escape_defaults = {
+        "asterisks": {"enabled": True, "seen": False},
+        "underscores": {"enabled": True, "seen": False},
+        "misc": {"enabled": True, "seen": False},
+    }
+    removed_flags = {"--strip", "--convert"}
+    redundant_flags = {
+        "--no-escape-asterisks",
+        "--no-escape-underscores",
+        "--no-escape-misc",
+        "--no-wrap",
+        "--no-autolinks",
+        "--no-extract-metadata",
+    }
+    disable_escape_flags = {
+        "--no-escape-asterisks": "asterisks",
+        "--no-escape-underscores": "underscores",
+        "--no-escape-misc": "misc",
+    }
+    enable_escape_flags = {
+        "--escape-asterisks": "asterisks",
+        "--escape-underscores": "underscores",
+        "--escape-misc": "misc",
+    }
     i = 0
     while i < len(argv):
         arg = argv[i]
 
-        if arg in ("--strip", "--convert"):
+        if arg in removed_flags:
             raise RemovedV1FlagError(
                 flag=arg,
                 reason=f"{arg} option has been removed in v2.",
                 migration="Remove this flag from your command. The feature is no longer available.",
             )
 
-        if arg in (
-            "--no-escape-asterisks",
-            "--no-escape-underscores",
-            "--no-escape-misc",
-            "--no-wrap",
-            "--no-autolinks",
-            "--no-extract-metadata",
-        ):
+        if arg in redundant_flags:
             warnings.warn(
                 f"'{arg}' is deprecated and redundant in v2. "
                 f"These options are now disabled by default. Remove this flag.",
                 DeprecationWarning,
                 stacklevel=2,
             )
+            escape_key = disable_escape_flags.get(arg)
+            if escape_key:
+                escape_defaults[escape_key]["enabled"] = False
 
         elif arg == "--preprocess-html":
             warnings.warn(
@@ -96,19 +116,31 @@ def translate_v1_args_to_v2(argv: list[str]) -> list[str]:
             translated.append("--preprocess")
 
         elif arg in (
-            "--escape-asterisks",
-            "--escape-underscores",
-            "--escape-misc",
+            *enable_escape_flags.keys(),
             "--autolinks",
             "--extract-metadata",
             "--wrap",
         ):
             translated.append(arg)
+            escape_key = enable_escape_flags.get(arg)
+            if escape_key:
+                escape_defaults[escape_key]["enabled"] = True
+                escape_defaults[escape_key]["seen"] = True
 
         else:
             translated.append(arg)
 
         i += 1
+
+    default_flags = {
+        "asterisks": "--escape-asterisks",
+        "underscores": "--escape-underscores",
+        "misc": "--escape-misc",
+    }
+    for key, flag in default_flags.items():
+        state = escape_defaults[key]
+        if state["enabled"] and not state["seen"]:
+            translated.append(flag)
 
     return translated
 
