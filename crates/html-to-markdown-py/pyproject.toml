@@ -4,7 +4,7 @@ requires = [ "maturin>=1.9,<2" ]
 
 [project]
 name = "html-to-markdown"
-version = "2.16.0"
+version = "2.16.1"
 description = "A modern, type-safe library for converting HTML to Markdown with comprehensive HTML5 support"
 readme = "../../README.md"
 keywords = [ "converter", "html", "html5", "markdown", "parser" ]
