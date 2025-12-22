@@ -153,7 +153,10 @@ fn fast_text_only(html: &str, options: &ConversionOptions) -> Option<String> {
         return None;
     }
 
-    let decoded = text::decode_html_entities_cow(html);
+    let mut decoded = text::decode_html_entities_cow(html);
+    if options.strip_newlines && (decoded.contains('\n') || decoded.contains('\r')) {
+        decoded = Cow::Owned(decoded.replace(&['\r', '\n'][..], " "));
+    }
     let trimmed = decoded.trim_end_matches('\n');
     if trimmed.is_empty() {
         return Some(String::new());
