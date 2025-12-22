@@ -622,11 +622,23 @@ pub struct MetadataConfig {
 #[cfg_attr(any(feature = "serde", feature = "metadata"), derive(serde::Deserialize))]
 #[cfg_attr(any(feature = "serde", feature = "metadata"), serde(rename_all = "camelCase"))]
 pub struct MetadataConfigUpdate {
+    #[cfg_attr(any(feature = "serde", feature = "metadata"), serde(alias = "extract_document"))]
     pub extract_document: Option<bool>,
+    #[cfg_attr(any(feature = "serde", feature = "metadata"), serde(alias = "extract_headers"))]
     pub extract_headers: Option<bool>,
+    #[cfg_attr(any(feature = "serde", feature = "metadata"), serde(alias = "extract_links"))]
     pub extract_links: Option<bool>,
+    #[cfg_attr(any(feature = "serde", feature = "metadata"), serde(alias = "extract_images"))]
     pub extract_images: Option<bool>,
+    #[cfg_attr(
+        any(feature = "serde", feature = "metadata"),
+        serde(alias = "extract_structured_data")
+    )]
     pub extract_structured_data: Option<bool>,
+    #[cfg_attr(
+        any(feature = "serde", feature = "metadata"),
+        serde(alias = "max_structured_data_size")
+    )]
     pub max_structured_data_size: Option<usize>,
 }
 

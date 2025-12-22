@@ -1,11 +1,14 @@
+#[cfg(feature = "js-bindings")]
+use html_to_markdown_rs::DEFAULT_INLINE_IMAGE_LIMIT;
 #[cfg(feature = "metadata")]
 use html_to_markdown_rs::DEFAULT_MAX_STRUCTURED_DATA_SIZE;
+#[cfg(all(feature = "js-bindings", feature = "metadata"))]
+use html_to_markdown_rs::MetadataConfigUpdate;
 #[cfg(any(feature = "js-bindings", feature = "wasmtime-testing"))]
 use html_to_markdown_rs::safety::guard_panic;
 use html_to_markdown_rs::{
-    CodeBlockStyle, ConversionOptions as RustConversionOptions, ConversionOptionsUpdate, DEFAULT_INLINE_IMAGE_LIMIT,
-    HeadingStyle, HighlightStyle, ListIndentType, MetadataConfigUpdate, NewlineStyle, PreprocessingOptionsUpdate,
-    PreprocessingPreset, WhitespaceMode,
+    CodeBlockStyle, ConversionOptions as RustConversionOptions, ConversionOptionsUpdate, HeadingStyle, HighlightStyle,
+    ListIndentType, NewlineStyle, PreprocessingOptionsUpdate, PreprocessingPreset, WhitespaceMode,
 };
 use serde::{Deserialize, Serialize};
 
