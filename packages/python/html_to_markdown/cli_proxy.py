@@ -48,6 +48,23 @@ def find_cli_binary() -> Path:
     raise FileNotFoundError(msg)
 
 
+V1_ONLY_FLAGS = {
+    "--strip",
+    "--convert",
+    "--preprocess-html",
+    "--no-escape-asterisks",
+    "--no-escape-underscores",
+    "--no-escape-misc",
+    "--no-wrap",
+    "--no-autolinks",
+    "--no-extract-metadata",
+}
+
+
+def uses_v1_translation(argv: list[str]) -> bool:
+    return any(arg in V1_ONLY_FLAGS for arg in argv)
+
+
 def translate_v1_args_to_v2(argv: list[str]) -> list[str]:
     """Translate v1 CLI arguments to v2 format.
 
@@ -70,11 +87,10 @@ def translate_v1_args_to_v2(argv: list[str]) -> list[str]:
         "--no-autolinks",
         "--no-extract-metadata",
     }
-    v1_mode = any(arg in redundant_flags or arg == "--preprocess-html" for arg in argv)
     escape_defaults = {
-        "asterisks": {"enabled": v1_mode, "seen": False},
-        "underscores": {"enabled": v1_mode, "seen": False},
-        "misc": {"enabled": v1_mode, "seen": False},
+        "asterisks": {"enabled": True, "seen": False},
+        "underscores": {"enabled": True, "seen": False},
+        "misc": {"enabled": True, "seen": False},
     }
     disable_escape_flags = {
         "--no-escape-asterisks": "asterisks",
@@ -160,7 +176,7 @@ def main(argv: list[str]) -> str:
     cli_binary = find_cli_binary()
 
     try:
-        translated_args = translate_v1_args_to_v2(argv)
+        translated_args = translate_v1_args_to_v2(argv) if uses_v1_translation(argv) else argv
     except (RemovedV1FlagError, RedundantV1FlagError) as e:
         sys.stderr.write(f"\n❌ Error: {e.flag}\n\n")
         sys.stderr.write(f"   {e.reason}\n\n")
