@@ -17,17 +17,17 @@
 //	}
 package htmltomarkdown
 
-// #cgo LDFLAGS: -lhtml_to_markdown_ffi
 // #include <stdlib.h>
 // #include <stdbool.h>
+// #include <stdint.h>
 //
-// extern char* html_to_markdown_convert(const char* html);
-// extern void html_to_markdown_free_string(char* s);
-// extern const char* html_to_markdown_version();
-// extern const char* html_to_markdown_last_error();
-// extern char* html_to_markdown_convert_with_metadata(const char* html, char** metadata_json);
-// extern bool html_to_markdown_profile_start(const char* output, int32_t frequency);
-// extern bool html_to_markdown_profile_stop(void);
+// char* html_to_markdown_convert_proxy(const char* html);
+// void html_to_markdown_free_string_proxy(char* s);
+// const char* html_to_markdown_version_proxy(void);
+// const char* html_to_markdown_last_error_proxy(void);
+// char* html_to_markdown_convert_with_metadata_proxy(const char* html, char** metadata_json);
+// bool html_to_markdown_profile_start_proxy(const char* output, int32_t frequency);
+// bool html_to_markdown_profile_stop_proxy(void);
 import "C"
 import (
 	"encoding/json"
@@ -51,19 +51,22 @@ func Convert(html string) (string, error) {
 	if html == "" {
 		return "", nil
 	}
+	if err := ensureFFILoaded(); err != nil {
+		return "", err
+	}
 
 	cHTML := C.CString(html)
 	defer C.free(unsafe.Pointer(cHTML))
 
-	result := C.html_to_markdown_convert(cHTML)
+	result := C.html_to_markdown_convert_proxy(cHTML)
 	if result == nil {
-		errMsg := C.html_to_markdown_last_error()
+		errMsg := C.html_to_markdown_last_error_proxy()
 		if errMsg != nil {
 			return "", errors.New(C.GoString(errMsg))
 		}
 		return "", errors.New("html to markdown conversion failed")
 	}
-	defer C.html_to_markdown_free_string(result)
+	defer C.html_to_markdown_free_string_proxy(result)
 
 	markdown := C.GoString(result)
 	return markdown, nil
@@ -93,7 +96,10 @@ func MustConvert(html string) string {
 //	version := htmltomarkdown.Version()
 //	fmt.Printf("Using html-to-markdown version: %s\n", version)
 func Version() string {
-	cVersion := C.html_to_markdown_version()
+	if err := ensureFFILoaded(); err != nil {
+		return "unknown"
+	}
+	cVersion := C.html_to_markdown_version_proxy()
 	if cVersion == nil {
 		return "unknown"
 	}
@@ -105,15 +111,18 @@ func StartProfiling(outputPath string, frequency int) error {
 	if outputPath == "" {
 		return errors.New("output path is required")
 	}
+	if err := ensureFFILoaded(); err != nil {
+		return err
+	}
 	if frequency <= 0 {
 		frequency = 1000
 	}
 	cOutput := C.CString(outputPath)
 	defer C.free(unsafe.Pointer(cOutput))
 
-	ok := C.html_to_markdown_profile_start(cOutput, C.int32_t(frequency))
+	ok := C.html_to_markdown_profile_start_proxy(cOutput, C.int32_t(frequency))
 	if !bool(ok) {
-		errMsg := C.html_to_markdown_last_error()
+		errMsg := C.html_to_markdown_last_error_proxy()
 		if errMsg != nil {
 			return errors.New(C.GoString(errMsg))
 		}
@@ -124,9 +133,12 @@ func StartProfiling(outputPath string, frequency int) error {
 
 // StopProfiling stops Rust-side profiling and flushes the flamegraph.
 func StopProfiling() error {
-	ok := C.html_to_markdown_profile_stop()
+	if err := ensureFFILoaded(); err != nil {
+		return err
+	}
+	ok := C.html_to_markdown_profile_stop_proxy()
 	if !bool(ok) {
-		errMsg := C.html_to_markdown_last_error()
+		errMsg := C.html_to_markdown_last_error_proxy()
 		if errMsg != nil {
 			return errors.New(C.GoString(errMsg))
 		}
@@ -344,6 +356,9 @@ func ConvertWithMetadata(html string) (MetadataExtraction, error) {
 			Metadata: ExtendedMetadata{},
 		}, nil
 	}
+	if err := ensureFFILoaded(); err != nil {
+		return MetadataExtraction{}, err
+	}
 
 	cHTML := C.CString(html)
 	defer C.free(unsafe.Pointer(cHTML))
@@ -351,19 +366,19 @@ func ConvertWithMetadata(html string) (MetadataExtraction, error) {
 	// Allocate output pointer for metadata JSON
 	var metadataPtr *C.char
 
-	result := C.html_to_markdown_convert_with_metadata(cHTML, &metadataPtr) // nolint:gocritic
+	result := C.html_to_markdown_convert_with_metadata_proxy(cHTML, &metadataPtr) // nolint:gocritic
 	if result == nil {
-		errMsg := C.html_to_markdown_last_error()
+		errMsg := C.html_to_markdown_last_error_proxy()
 		if errMsg != nil {
 			return MetadataExtraction{}, errors.New(C.GoString(errMsg))
 		}
 		return MetadataExtraction{}, errors.New("html to markdown conversion with metadata failed")
 	}
 
-	defer C.html_to_markdown_free_string(result)
+	defer C.html_to_markdown_free_string_proxy(result)
 
 	if metadataPtr != nil {
-		defer C.html_to_markdown_free_string(metadataPtr)
+		defer C.html_to_markdown_free_string_proxy(metadataPtr)
 	}
 
 	markdown := C.GoString(result)
