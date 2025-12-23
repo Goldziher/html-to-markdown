@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.17.0] - 2025-12-22
+
+### Added
+- Go binding now auto-downloads the native FFI library from GitHub Releases with cache/override controls.
+- Release pipeline now publishes per-platform Go FFI artifacts for Go installs.
+
 ## [2.16.1] - 2025-12-22
 
 ### Fixed

@@ -1159,6 +1159,55 @@ jobs:
           path: dist/csharp-ffi
           retention-days: 14
 
+  go-ffi:
+    name: Build Go native FFI libraries (${{ matrix.platform }})
+    needs: prepare
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            platform: linux-x64
+          - os: ubuntu-24.04-arm
+            platform: linux-arm64
+          - os: windows-latest
+            platform: windows-x64
+          - os: macos-15-intel
+            platform: darwin-x64
+          - os: macos-14
+            platform: darwin-arm64
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.prepare.outputs.checkout_ref }}
+          fetch-depth: 0
+
+      - name: Ensure target commit
+        if: ${{ needs.prepare.outputs.target_sha != '' }}
+        env:
+          TARGET_SHA: ${{ needs.prepare.outputs.target_sha }}
+        run: scripts/publish/common/ensure-target-commit.sh
+        shell: bash
+
+      - name: Setup Rust
+        uses: ./.github/actions/setup-rust
+
+      - name: Package Go FFI library
+        env:
+          PLATFORM: ${{ matrix.platform }}
+          VERSION: ${{ needs.prepare.outputs.version }}
+        run: scripts/publish/go/package-ffi.sh "${PLATFORM}" "${VERSION}" dist/go-ffi
+        shell: bash
+
+      - name: Upload Go FFI artifact
+        uses: actions/upload-artifact@v6
+        with:
+          name: go-ffi-${{ matrix.platform }}
+          path: dist/go-ffi
+          retention-days: 14
+
   cargo-packages:
     name: Package Rust crates
     needs: prepare
@@ -1206,6 +1255,7 @@ jobs:
         wasm-bindings,
         cli-binaries,
         ruby-gem,
+        go-ffi,
         elixir-package,
         cargo-packages,
         release-smoke,
@@ -1233,6 +1283,13 @@ jobs:
           path: dist/cli
           merge-multiple: false
 
+      - name: Download Go FFI artifacts
+        uses: actions/download-artifact@v7
+        with:
+          pattern: go-ffi-*
+          path: dist/go-ffi
+          merge-multiple: false
+
       - name: Download Elixir package
         uses: actions/download-artifact@v7
         with:
@@ -1252,6 +1309,13 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAG: ${{ needs.prepare.outputs.tag }}
         run: scripts/publish/upload-cli-artifacts.sh
+        shell: bash
+
+      - name: Upload Go FFI artifacts
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ needs.prepare.outputs.tag }}
+        run: scripts/publish/upload-go-ffi-artifacts.sh
         shell: bash
 
       - name: Upload Elixir package

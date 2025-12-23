@@ -28,19 +28,21 @@ go get github.com/Goldziher/html-to-markdown/packages/go/v2/htmltomarkdown
 
 ## Prerequisites
 
-The native library `libhtml_to_markdown_ffi` must be available:
+The Go bindings auto-download a prebuilt `html_to_markdown_ffi` library from GitHub
+releases on first use. You can override or disable this behavior if needed:
 
 ```bash
-# Build the FFI library
-cargo build --release -p html-to-markdown-ffi
+# Use a custom library path
+export HTML_TO_MARKDOWN_FFI_PATH="/path/to/libhtml_to_markdown_ffi.so"
 
-# Copy to system library path (Linux/macOS)
-sudo cp target/release/libhtml_to_markdown_ffi.* /usr/local/lib/
+# Disable downloads (requires HTML_TO_MARKDOWN_FFI_PATH)
+export HTML_TO_MARKDOWN_FFI_DISABLE_DOWNLOAD=1
 
-# Or set LD_LIBRARY_PATH (Linux) / DYLD_LIBRARY_PATH (macOS)
-export LD_LIBRARY_PATH=$PWD/target/release:$LD_LIBRARY_PATH
-export DYLD_LIBRARY_PATH=$PWD/target/release:$DYLD_LIBRARY_PATH
-export CGO_LDFLAGS="-L$PWD/target/release $CGO_LDFLAGS"
+# Override cache location
+export HTML_TO_MARKDOWN_FFI_CACHE_DIR="$HOME/.cache/html-to-markdown"
+
+# Override the downloaded version
+export HTML_TO_MARKDOWN_FFI_VERSION="2.0.0"
 ```
 
 ## Usage
@@ -66,6 +68,32 @@ func main() {
     fmt.Println(markdown)
 }
 ```
+
+## How the binding works
+
+The Go binding calls into the Rust FFI library at runtime via a dynamic loader. On
+first use, it downloads a prebuilt `html_to_markdown_ffi` binary from the GitHub
+Release that matches your platform, caches it, and then loads it into the process.
+
+Supported platforms (prebuilt):
+- linux/amd64
+- linux/arm64
+- darwin/amd64
+- darwin/arm64
+- windows/amd64
+
+Release asset naming:
+- `html-to-markdown-ffi-<version>-linux-x64.tar.gz`
+- `html-to-markdown-ffi-<version>-linux-arm64.tar.gz`
+- `html-to-markdown-ffi-<version>-darwin-x64.tar.gz`
+- `html-to-markdown-ffi-<version>-darwin-arm64.tar.gz`
+- `html-to-markdown-ffi-<version>-windows-x64.zip`
+
+The loader honors environment overrides:
+- `HTML_TO_MARKDOWN_FFI_PATH`: use a specific library file (skips download).
+- `HTML_TO_MARKDOWN_FFI_DISABLE_DOWNLOAD`: disable downloading (requires `HTML_TO_MARKDOWN_FFI_PATH`).
+- `HTML_TO_MARKDOWN_FFI_CACHE_DIR`: override cache directory.
+- `HTML_TO_MARKDOWN_FFI_VERSION`: override the release version to download.
 
 ## API
 
