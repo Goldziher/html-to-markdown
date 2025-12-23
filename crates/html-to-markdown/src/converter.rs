@@ -480,8 +480,6 @@ struct Context {
     list_counter: usize,
     /// Are we in an ordered list (vs unordered)?
     in_ordered_list: bool,
-    /// Track if previous sibling in dl was a dt
-    last_was_dt: bool,
     /// Blockquote nesting depth
     blockquote_depth: usize,
     /// Are we inside a table cell (td/th)?
@@ -2068,7 +2066,6 @@ fn convert_html_impl(
         in_code: false,
         list_counter: 0,
         in_ordered_list: false,
-        last_was_dt: false,
         blockquote_depth: 0,
         in_table_cell: false,
         convert_as_inline: options.convert_as_inline,
@@ -4862,28 +4859,10 @@ fn walk_node(
                     }
 
                     let mut content = String::new();
-                    let mut in_dt_group = false;
                     let children = tag.children();
                     {
                         for child_handle in children.top().iter() {
-                            let (is_dt, is_dd) = if let Some(tl::Node::Tag(child_tag)) = child_handle.get(parser) {
-                                let tag_name = normalized_tag_name(child_tag.name().as_utf8_str());
-                                (tag_name == "dt", tag_name == "dd")
-                            } else {
-                                (false, false)
-                            };
-
-                            let child_ctx = Context {
-                                last_was_dt: in_dt_group && is_dd,
-                                ..ctx.clone()
-                            };
-                            walk_node(child_handle, parser, &mut content, options, &child_ctx, depth, dom_ctx);
-
-                            if is_dt {
-                                in_dt_group = true;
-                            } else if !is_dd {
-                                in_dt_group = false;
-                            }
+                            walk_node(child_handle, parser, &mut content, options, ctx, depth, dom_ctx);
                         }
                     }
 
@@ -4931,7 +4910,7 @@ fn walk_node(
                         if !trimmed.is_empty() {
                             output.push_str(trimmed);
                         }
-                    } else if ctx.last_was_dt {
+                    } else {
                         if !trimmed.is_empty() {
                             output.push_str(":   ");
                             output.push_str(trimmed);
@@ -4939,9 +4918,6 @@ fn walk_node(
                         } else {
                             output.push_str(":   \n\n");
                         }
-                    } else if !trimmed.is_empty() {
-                        output.push_str(trimmed);
-                        output.push_str("\n\n");
                     }
                 }
 

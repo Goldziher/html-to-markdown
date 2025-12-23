@@ -335,7 +335,7 @@ fn test_definition_list() {
     let html = "<dl><dt>Term</dt><dd>Definition</dd></dl>";
     let result = convert(html, None).unwrap();
     assert!(result.contains("Term"));
-    assert!(result.contains("Definition"));
+    assert!(result.contains(":   Definition"));
 }
 
 #[test]
