@@ -213,7 +213,7 @@ jobs:
             --format both --output tools/benchmark-harness/results
 
       - name: Upload results
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: benchmark-harness-results-${{ matrix.framework }}
           path: tools/benchmark-harness/results
