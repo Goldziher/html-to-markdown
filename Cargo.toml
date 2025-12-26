@@ -48,6 +48,8 @@ pyo3 = { version = "0.27.2", features = ["abi3-py310"] }
 
 ext-php-rs = "0.15.2"
 
+async-trait = "0.1"
+
 [profile.release]
 lto = "thin"
 codegen-units = 1
