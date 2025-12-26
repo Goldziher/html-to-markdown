@@ -126,9 +126,9 @@ mod enabled {
         Ok(())
     }
 
-    pub fn maybe_profile<T, F>(mut f: F) -> Result<T>
+    pub fn maybe_profile<T, F>(f: F) -> Result<T>
     where
-        F: FnMut() -> Result<T>,
+        F: FnOnce() -> Result<T>,
     {
         if PROFILE_ACTIVE.load(Ordering::Relaxed) {
             return f();

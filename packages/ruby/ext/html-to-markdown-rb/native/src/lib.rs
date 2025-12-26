@@ -18,6 +18,7 @@ use html_to_markdown_rs::metadata::{
 use magnus::prelude::*;
 use magnus::r_hash::ForEach;
 use magnus::{Error, RArray, RHash, Ruby, Symbol, TryConvert, Value, function, scan_args::scan_args};
+#[cfg(feature = "profiling")]
 use std::path::PathBuf;
 
 #[derive(Clone)]
@@ -410,6 +411,7 @@ fn convert_with_options_handle_fn(_ruby: &Ruby, args: &[Value]) -> Result<String
     guard_panic(|| profiling::maybe_profile(|| convert_inner(&html, Some(options)))).map_err(conversion_error)
 }
 
+#[cfg(feature = "inline-images")]
 fn convert_with_inline_images_fn(ruby: &Ruby, args: &[Value]) -> Result<Value, Error> {
     let parsed = scan_args::<(String,), (Option<Value>, Option<Value>), (), (), (), ()>(args)?;
     let html = parsed.required.0;
@@ -422,6 +424,7 @@ fn convert_with_inline_images_fn(ruby: &Ruby, args: &[Value]) -> Result<Value, E
     extraction_to_value(ruby, extraction)
 }
 
+#[cfg(feature = "inline-images")]
 fn convert_with_inline_images_handle_fn(ruby: &Ruby, args: &[Value]) -> Result<Value, Error> {
     let parsed = scan_args::<(String, &OptionsHandle), (Option<Value>,), (), (), (), ()>(args)?;
     let html = parsed.required.0;
@@ -671,6 +674,7 @@ fn convert_with_metadata_handle_fn(ruby: &Ruby, args: &[Value]) -> Result<Value,
     Ok(array.as_value())
 }
 
+#[cfg(feature = "profiling")]
 fn start_profiling_fn(_ruby: &Ruby, args: &[Value]) -> Result<bool, Error> {
     let output = args.first().ok_or_else(|| arg_error("output_path required"))?;
     let output: String = String::try_convert(*output)?;
@@ -683,6 +687,7 @@ fn start_profiling_fn(_ruby: &Ruby, args: &[Value]) -> Result<bool, Error> {
     Ok(true)
 }
 
+#[cfg(feature = "profiling")]
 fn stop_profiling_fn(_ruby: &Ruby, _args: &[Value]) -> Result<bool, Error> {
     profiling::stop().map_err(conversion_error)?;
     Ok(true)
@@ -710,7 +715,10 @@ fn init(ruby: &Ruby) -> Result<(), Error> {
         "convert_with_metadata_handle",
         function!(convert_with_metadata_handle_fn, -1),
     )?;
+
+    #[cfg(feature = "profiling")]
     module.define_singleton_method("start_profiling", function!(start_profiling_fn, -1))?;
+    #[cfg(feature = "profiling")]
     module.define_singleton_method("stop_profiling", function!(stop_profiling_fn, -1))?;
 
     Ok(())

@@ -1,3 +1,4 @@
+#[cfg(feature = "metadata")]
 use html_to_markdown_rs::metadata::{
     DEFAULT_MAX_STRUCTURED_DATA_SIZE, DocumentMetadata as RustDocumentMetadata,
     ExtendedMetadata as RustExtendedMetadata, HeaderMetadata as RustHeaderMetadata, ImageMetadata as RustImageMetadata,
@@ -7,12 +8,18 @@ use html_to_markdown_rs::metadata::{
 use html_to_markdown_rs::safety::guard_panic;
 mod profiling;
 use html_to_markdown_rs::{
-    CodeBlockStyle, ConversionError, ConversionOptions as RustConversionOptions, DEFAULT_INLINE_IMAGE_LIMIT,
-    HeadingStyle, HighlightStyle, InlineImageConfig as RustInlineImageConfig, ListIndentType, NewlineStyle,
-    PreprocessingOptions as RustPreprocessingOptions, PreprocessingPreset, WhitespaceMode,
+    CodeBlockStyle, ConversionError, ConversionOptions as RustConversionOptions, HeadingStyle, HighlightStyle,
+    ListIndentType, NewlineStyle, PreprocessingOptions as RustPreprocessingOptions, PreprocessingPreset,
+    WhitespaceMode,
 };
+#[cfg(feature = "inline-images")]
+use html_to_markdown_rs::{DEFAULT_INLINE_IMAGE_LIMIT, InlineImageConfig as RustInlineImageConfig};
 use pyo3::prelude::*;
-use pyo3::types::{PyBytes, PyDict};
+#[cfg(feature = "inline-images")]
+use pyo3::types::PyBytes;
+#[cfg(any(feature = "inline-images", feature = "metadata"))]
+use pyo3::types::PyDict;
+#[cfg(feature = "metadata")]
 use pyo3::types::{PyList, PyTuple};
 use std::panic::UnwindSafe;
 use std::path::PathBuf;
@@ -46,6 +53,7 @@ fn parse_options_json(options_json: Option<&str>) -> PyResult<Option<RustConvers
     Ok(Some(options))
 }
 
+#[cfg(feature = "inline-images")]
 fn parse_inline_image_config_json(config_json: Option<&str>) -> PyResult<RustInlineImageConfig> {
     let Some(json) = config_json else {
         return Ok(RustInlineImageConfig::new(DEFAULT_INLINE_IMAGE_LIMIT));
@@ -58,6 +66,7 @@ fn parse_inline_image_config_json(config_json: Option<&str>) -> PyResult<RustInl
     html_to_markdown_rs::inline_image_config_from_json(json).map_err(to_py_err)
 }
 
+#[cfg(feature = "metadata")]
 fn parse_metadata_config_json(config_json: Option<&str>) -> PyResult<RustMetadataConfig> {
     let Some(json) = config_json else {
         return Ok(RustMetadataConfig::default());
@@ -84,6 +93,7 @@ fn stop_profiling() -> PyResult<()> {
     Ok(())
 }
 
+#[cfg(feature = "inline-images")]
 type PyInlineExtraction = PyResult<(String, Vec<Py<PyAny>>, Vec<Py<PyAny>>)>;
 
 /// Python wrapper for PreprocessingOptions
@@ -131,6 +141,7 @@ impl PreprocessingOptions {
 }
 
 /// Python wrapper for inline image extraction configuration
+#[cfg(feature = "inline-images")]
 #[pyclass]
 #[derive(Clone)]
 struct InlineImageConfig {
@@ -144,6 +155,7 @@ struct InlineImageConfig {
     infer_dimensions: bool,
 }
 
+#[cfg(feature = "inline-images")]
 #[pymethods]
 impl InlineImageConfig {
     #[new]
@@ -168,6 +180,7 @@ impl InlineImageConfig {
     }
 }
 
+#[cfg(feature = "inline-images")]
 impl InlineImageConfig {
     fn to_rust(&self) -> RustInlineImageConfig {
         let mut cfg = RustInlineImageConfig::new(self.max_decoded_size_bytes);
@@ -179,6 +192,7 @@ impl InlineImageConfig {
 }
 
 /// Python wrapper for metadata extraction configuration
+#[cfg(feature = "metadata")]
 #[pyclass]
 #[derive(Clone)]
 struct MetadataConfig {
@@ -196,6 +210,7 @@ struct MetadataConfig {
     max_structured_data_size: usize,
 }
 
+#[cfg(feature = "metadata")]
 #[pymethods]
 impl MetadataConfig {
     #[new]
@@ -226,6 +241,7 @@ impl MetadataConfig {
     }
 }
 
+#[cfg(feature = "metadata")]
 impl MetadataConfig {
     fn to_rust(&self) -> RustMetadataConfig {
         RustMetadataConfig {
@@ -542,6 +558,7 @@ fn create_options_handle_json(options_json: Option<&str>) -> PyResult<Conversion
     Ok(ConversionOptionsHandle::new_with_rust(rust_options))
 }
 
+#[cfg(feature = "inline-images")]
 fn inline_image_to_py<'py>(py: Python<'py>, image: html_to_markdown_rs::InlineImage) -> PyResult<Py<PyAny>> {
     let dict = PyDict::new(py);
     dict.set_item("data", PyBytes::new(py, &image.data))?;
@@ -574,6 +591,7 @@ fn inline_image_to_py<'py>(py: Python<'py>, image: html_to_markdown_rs::InlineIm
     Ok(dict.into())
 }
 
+#[cfg(feature = "inline-images")]
 fn warning_to_py<'py>(py: Python<'py>, warning: html_to_markdown_rs::InlineImageWarning) -> PyResult<Py<PyAny>> {
     let dict = PyDict::new(py);
     dict.set_item("index", warning.index)?;
@@ -608,6 +626,7 @@ fn warning_to_py<'py>(py: Python<'py>, warning: html_to_markdown_rs::InlineImage
 ///     for img in images:
 ///         print(f"Format: {img['format']}, Size: {len(img['data'])} bytes")
 ///     ```
+#[cfg(feature = "inline-images")]
 #[pyfunction]
 #[pyo3(signature = (html, options=None, image_config=None))]
 fn convert_with_inline_images<'py>(
@@ -643,6 +662,7 @@ fn convert_with_inline_images<'py>(
     Ok((extraction.markdown, images, warnings))
 }
 
+#[cfg(feature = "inline-images")]
 #[pyfunction]
 #[pyo3(signature = (html, options_json=None, image_config_json=None))]
 fn convert_with_inline_images_json<'py>(
@@ -678,6 +698,7 @@ fn convert_with_inline_images_json<'py>(
 }
 
 /// Convert HTML to Markdown with inline images using a pre-parsed options handle.
+#[cfg(feature = "inline-images")]
 #[pyfunction]
 #[pyo3(signature = (html, handle, image_config=None))]
 fn convert_with_inline_images_handle<'py>(
@@ -713,6 +734,7 @@ fn convert_with_inline_images_handle<'py>(
     Ok((extraction.markdown, images, warnings))
 }
 
+#[cfg(feature = "metadata")]
 fn opt_string_to_py<'py>(py: Python<'py>, opt: Option<String>) -> PyResult<Py<PyAny>> {
     match opt {
         Some(val) => {
@@ -723,6 +745,7 @@ fn opt_string_to_py<'py>(py: Python<'py>, opt: Option<String>) -> PyResult<Py<Py
     }
 }
 
+#[cfg(feature = "metadata")]
 fn btreemap_to_py<'py>(py: Python<'py>, map: std::collections::BTreeMap<String, String>) -> PyResult<Py<PyAny>> {
     let dict = PyDict::new(py);
     for (k, v) in map {
@@ -731,6 +754,7 @@ fn btreemap_to_py<'py>(py: Python<'py>, map: std::collections::BTreeMap<String, 
     Ok(dict.into())
 }
 
+#[cfg(feature = "metadata")]
 fn text_direction_to_str<'py>(py: Python<'py>, text_direction: Option<RustTextDirection>) -> Py<PyAny> {
     match text_direction {
         Some(direction) => pyo3::types::PyString::new(py, &direction.to_string()).into(),
@@ -738,6 +762,7 @@ fn text_direction_to_str<'py>(py: Python<'py>, text_direction: Option<RustTextDi
     }
 }
 
+#[cfg(feature = "metadata")]
 fn document_metadata_to_py<'py>(py: Python<'py>, doc: RustDocumentMetadata) -> PyResult<Py<PyAny>> {
     let dict = PyDict::new(py);
 
@@ -756,6 +781,7 @@ fn document_metadata_to_py<'py>(py: Python<'py>, doc: RustDocumentMetadata) -> P
     Ok(dict.into())
 }
 
+#[cfg(feature = "metadata")]
 fn headers_to_py<'py>(py: Python<'py>, headers: Vec<RustHeaderMetadata>) -> PyResult<Py<PyAny>> {
     let list = PyList::empty(py);
     for header in headers {
@@ -770,6 +796,7 @@ fn headers_to_py<'py>(py: Python<'py>, headers: Vec<RustHeaderMetadata>) -> PyRe
     Ok(list.into())
 }
 
+#[cfg(feature = "metadata")]
 fn links_to_py<'py>(py: Python<'py>, links: Vec<RustLinkMetadata>) -> PyResult<Py<PyAny>> {
     let list = PyList::empty(py);
     for link in links {
@@ -785,6 +812,7 @@ fn links_to_py<'py>(py: Python<'py>, links: Vec<RustLinkMetadata>) -> PyResult<P
     Ok(list.into())
 }
 
+#[cfg(feature = "metadata")]
 fn images_to_py<'py>(py: Python<'py>, images: Vec<RustImageMetadata>) -> PyResult<Py<PyAny>> {
     let list = PyList::empty(py);
     for image in images {
@@ -809,6 +837,7 @@ fn images_to_py<'py>(py: Python<'py>, images: Vec<RustImageMetadata>) -> PyResul
     Ok(list.into())
 }
 
+#[cfg(feature = "metadata")]
 fn structured_data_to_py<'py>(py: Python<'py>, data: Vec<RustStructuredData>) -> PyResult<Py<PyAny>> {
     let list = PyList::empty(py);
     for item in data {
@@ -821,6 +850,7 @@ fn structured_data_to_py<'py>(py: Python<'py>, data: Vec<RustStructuredData>) ->
     Ok(list.into())
 }
 
+#[cfg(feature = "metadata")]
 fn extended_metadata_to_py<'py>(py: Python<'py>, metadata: RustExtendedMetadata) -> PyResult<Py<PyAny>> {
     let dict = PyDict::new(py);
     dict.set_item("document", document_metadata_to_py(py, metadata.document)?)?;
@@ -989,6 +1019,7 @@ fn extended_metadata_to_py<'py>(py: Python<'py>, metadata: RustExtendedMetadata)
 ///     - convert_with_inline_images: Extract inline images alongside conversion
 ///     - ConversionOptions: Conversion configuration class
 ///     - MetadataConfig: Metadata extraction configuration class
+#[cfg(feature = "metadata")]
 #[pyfunction]
 #[pyo3(signature = (html, options=None, metadata_config=None))]
 fn convert_with_metadata<'py>(
@@ -1015,6 +1046,7 @@ fn convert_with_metadata<'py>(
     Ok((markdown, metadata_dict))
 }
 
+#[cfg(feature = "metadata")]
 #[pyfunction]
 #[pyo3(signature = (html, options_json=None, metadata_config_json=None))]
 fn convert_with_metadata_json(
@@ -1041,6 +1073,7 @@ fn convert_with_metadata_json(
 }
 
 /// Convert HTML to Markdown with metadata using a pre-parsed options handle.
+#[cfg(feature = "metadata")]
 #[pyfunction]
 #[pyo3(signature = (html, handle, metadata_config=None))]
 fn convert_with_metadata_handle<'py>(
@@ -1077,14 +1110,20 @@ fn _html_to_markdown(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<ConversionOptions>()?;
     m.add_class::<PreprocessingOptions>()?;
     m.add_class::<ConversionOptionsHandle>()?;
-    m.add_function(wrap_pyfunction!(convert_with_inline_images, m)?)?;
-    m.add_function(wrap_pyfunction!(convert_with_inline_images_json, m)?)?;
-    m.add_function(wrap_pyfunction!(convert_with_inline_images_handle, m)?)?;
-    m.add_class::<InlineImageConfig>()?;
-    m.add_function(wrap_pyfunction!(convert_with_metadata, m)?)?;
-    m.add_function(wrap_pyfunction!(convert_with_metadata_json, m)?)?;
-    m.add_function(wrap_pyfunction!(convert_with_metadata_handle, m)?)?;
-    m.add_class::<MetadataConfig>()?;
+    #[cfg(feature = "inline-images")]
+    {
+        m.add_function(wrap_pyfunction!(convert_with_inline_images, m)?)?;
+        m.add_function(wrap_pyfunction!(convert_with_inline_images_json, m)?)?;
+        m.add_function(wrap_pyfunction!(convert_with_inline_images_handle, m)?)?;
+        m.add_class::<InlineImageConfig>()?;
+    }
+    #[cfg(feature = "metadata")]
+    {
+        m.add_function(wrap_pyfunction!(convert_with_metadata, m)?)?;
+        m.add_function(wrap_pyfunction!(convert_with_metadata_json, m)?)?;
+        m.add_function(wrap_pyfunction!(convert_with_metadata_handle, m)?)?;
+        m.add_class::<MetadataConfig>()?;
+    }
     m.add_function(wrap_pyfunction!(start_profiling, m)?)?;
     m.add_function(wrap_pyfunction!(stop_profiling, m)?)?;
     Ok(())

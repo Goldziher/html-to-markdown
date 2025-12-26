@@ -359,7 +359,15 @@ pub struct JsInlineImageConfig {
 impl From<JsInlineImageConfig> for InlineImageConfigUpdate {
     fn from(val: JsInlineImageConfig) -> Self {
         Self {
-            max_decoded_size_bytes: val.max_decoded_size_bytes.map(|b| b.get_u64().1),
+            max_decoded_size_bytes: val.max_decoded_size_bytes.map(|b| {
+                let (lossless, value, _negative) = b.get_u64();
+                if !lossless {
+                    // Value doesn't fit in u64, use maximum u64 value as safe fallback
+                    u64::MAX
+                } else {
+                    value
+                }
+            }),
             filename_prefix: val.filename_prefix,
             capture_svg: val.capture_svg,
             infer_dimensions: val.infer_dimensions,
@@ -728,19 +736,7 @@ pub fn convert_buffer_with_options_handle(html: Buffer, options: &External<RustC
         .map_err(to_js_error)
 }
 
-fn convert_inline_images_impl(
-    html: &str,
-    options: Option<JsConversionOptions>,
-    image_config: Option<JsInlineImageConfig>,
-) -> Result<JsHtmlExtraction> {
-    let rust_options = options.map(Into::into);
-    let rust_config = image_config
-        .map(Into::into)
-        .unwrap_or_else(|| RustInlineImageConfig::new(DEFAULT_INLINE_IMAGE_LIMIT));
-
-    let extraction = guard_panic(|| html_to_markdown_rs::convert_with_inline_images(html, rust_options, rust_config))
-        .map_err(to_js_error)?;
-
+fn build_js_extraction(extraction: html_to_markdown_rs::HtmlExtraction) -> JsHtmlExtraction {
     let inline_images = extraction
         .inline_images
         .into_iter()
@@ -764,11 +760,27 @@ fn convert_inline_images_impl(
         })
         .collect();
 
-    Ok(JsHtmlExtraction {
+    JsHtmlExtraction {
         markdown: extraction.markdown,
         inline_images,
         warnings,
-    })
+    }
+}
+
+fn convert_inline_images_impl(
+    html: &str,
+    options: Option<JsConversionOptions>,
+    image_config: Option<JsInlineImageConfig>,
+) -> Result<JsHtmlExtraction> {
+    let rust_options = options.map(Into::into);
+    let rust_config = image_config
+        .map(Into::into)
+        .unwrap_or_else(|| RustInlineImageConfig::new(DEFAULT_INLINE_IMAGE_LIMIT));
+
+    let extraction = guard_panic(|| html_to_markdown_rs::convert_with_inline_images(html, rust_options, rust_config))
+        .map_err(to_js_error)?;
+
+    Ok(build_js_extraction(extraction))
 }
 
 fn convert_inline_images_with_handle_impl(
@@ -784,34 +796,7 @@ fn convert_inline_images_with_handle_impl(
     let extraction = guard_panic(|| html_to_markdown_rs::convert_with_inline_images(html, rust_options, rust_config))
         .map_err(to_js_error)?;
 
-    let inline_images = extraction
-        .inline_images
-        .into_iter()
-        .map(|img| JsInlineImage {
-            data: img.data.into(),
-            format: img.format.to_string(),
-            filename: img.filename,
-            description: img.description,
-            dimensions: img.dimensions.map(|(w, h)| vec![w, h]),
-            source: img.source.to_string(),
-            attributes: img.attributes.into_iter().collect(),
-        })
-        .collect();
-
-    let warnings = extraction
-        .warnings
-        .into_iter()
-        .map(|w| JsInlineImageWarning {
-            index: w.index as u32,
-            message: w.message,
-        })
-        .collect();
-
-    Ok(JsHtmlExtraction {
-        markdown: extraction.markdown,
-        inline_images,
-        warnings,
-    })
+    Ok(build_js_extraction(extraction))
 }
 
 fn convert_inline_images_json_impl(
@@ -825,34 +810,7 @@ fn convert_inline_images_json_impl(
     let extraction = guard_panic(|| html_to_markdown_rs::convert_with_inline_images(html, rust_options, rust_config))
         .map_err(to_js_error)?;
 
-    let inline_images = extraction
-        .inline_images
-        .into_iter()
-        .map(|img| JsInlineImage {
-            data: img.data.into(),
-            format: img.format.to_string(),
-            filename: img.filename,
-            description: img.description,
-            dimensions: img.dimensions.map(|(w, h)| vec![w, h]),
-            source: img.source.to_string(),
-            attributes: img.attributes.into_iter().collect(),
-        })
-        .collect();
-
-    let warnings = extraction
-        .warnings
-        .into_iter()
-        .map(|w| JsInlineImageWarning {
-            index: w.index as u32,
-            message: w.message,
-        })
-        .collect();
-
-    Ok(JsHtmlExtraction {
-        markdown: extraction.markdown,
-        inline_images,
-        warnings,
-    })
+    Ok(build_js_extraction(extraction))
 }
 
 /// Convert HTML to Markdown while collecting inline images
