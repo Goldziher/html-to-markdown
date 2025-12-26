@@ -6,6 +6,12 @@ use html_to_markdown_rs::{
     safety::guard_panic,
 };
 
+#[cfg(feature = "visitor")]
+use html_to_markdown_rs::{
+    convert_with_visitor as convert_with_visitor_inner,
+    visitor::{HtmlVisitor, NodeContext, NodeType, VisitResult},
+};
+
 #[cfg(feature = "metadata")]
 use html_to_markdown_rs::convert_with_metadata as convert_with_metadata_inner;
 mod profiling;
@@ -17,13 +23,852 @@ use html_to_markdown_rs::metadata::{
 };
 use magnus::prelude::*;
 use magnus::r_hash::ForEach;
+use magnus::value::ReprValue;
 use magnus::{Error, RArray, RHash, Ruby, Symbol, TryConvert, Value, function, scan_args::scan_args};
+#[cfg(feature = "visitor")]
+use std::panic::AssertUnwindSafe;
 #[cfg(feature = "profiling")]
 use std::path::PathBuf;
 
 #[derive(Clone)]
 #[magnus::wrap(class = "HtmlToMarkdown::Options", free_immediately)]
 struct OptionsHandle(ConversionOptions);
+
+// =============================================================================
+// VISITOR PATTERN IMPLEMENTATION
+// =============================================================================
+
+#[cfg(feature = "visitor")]
+#[derive(Clone)]
+struct RubyVisitorWrapper {
+    ruby_visitor: Value,
+}
+
+#[cfg(feature = "visitor")]
+impl RubyVisitorWrapper {
+    fn new(ruby_visitor: Value) -> Self {
+        Self { ruby_visitor }
+    }
+
+    fn call_visitor_method(&self, method_name: &str, args: &[Value]) -> Result<VisitResult, Error> {
+        let ruby = Ruby::get().expect("Ruby not initialized");
+        let result: Value = self.ruby_visitor.funcall(method_name, args)?;
+
+        // Result should be a Hash with at least :type key
+        let hash = RHash::from_value(result)
+            .ok_or_else(|| arg_error(format!("visitor method {} must return a Hash", method_name)))?;
+
+        let type_value: Value = hash.get(ruby.intern("type")).ok_or_else(|| {
+            arg_error(format!(
+                "visitor method {} result Hash must have :type key",
+                method_name
+            ))
+        })?;
+
+        let type_str = symbol_to_string(type_value)?;
+
+        match type_str.as_str() {
+            "continue" => Ok(VisitResult::Continue),
+            "custom" => {
+                let output_value: Value = hash.get(ruby.intern("output")).ok_or_else(|| {
+                    arg_error(format!(
+                        "visitor method {} with type :custom must provide :output string",
+                        method_name
+                    ))
+                })?;
+                let output = String::try_convert(output_value)?;
+                Ok(VisitResult::Custom(output))
+            }
+            "skip" => Ok(VisitResult::Skip),
+            "preserve_html" => Ok(VisitResult::PreserveHtml),
+            "error" => {
+                let message_value: Value = hash.get(ruby.intern("message")).ok_or_else(|| {
+                    arg_error(format!(
+                        "visitor method {} with type :error must provide :message string",
+                        method_name
+                    ))
+                })?;
+                let message = String::try_convert(message_value)?;
+                Ok(VisitResult::Error(message))
+            }
+            other => Err(arg_error(format!(
+                "visitor method {} returned invalid type: {}",
+                method_name, other
+            ))),
+        }
+    }
+
+    fn ruby_to_node_context(&self, ctx: &NodeContext, ruby: &Ruby) -> Result<Value, Error> {
+        let hash = ruby.hash_new();
+
+        // node_type
+        let node_type_str = match ctx.node_type {
+            NodeType::Text => "text",
+            NodeType::Element => "element",
+            NodeType::Heading => "heading",
+            NodeType::Paragraph => "paragraph",
+            NodeType::Div => "div",
+            NodeType::Blockquote => "blockquote",
+            NodeType::Pre => "pre",
+            NodeType::Hr => "hr",
+            NodeType::List => "list",
+            NodeType::ListItem => "list_item",
+            NodeType::DefinitionList => "definition_list",
+            NodeType::DefinitionTerm => "definition_term",
+            NodeType::DefinitionDescription => "definition_description",
+            NodeType::Table => "table",
+            NodeType::TableRow => "table_row",
+            NodeType::TableCell => "table_cell",
+            NodeType::TableHeader => "table_header",
+            NodeType::TableBody => "table_body",
+            NodeType::TableHead => "table_head",
+            NodeType::TableFoot => "table_foot",
+            NodeType::Link => "link",
+            NodeType::Image => "image",
+            NodeType::Strong => "strong",
+            NodeType::Em => "em",
+            NodeType::Code => "code",
+            NodeType::Strikethrough => "strikethrough",
+            NodeType::Underline => "underline",
+            NodeType::Subscript => "subscript",
+            NodeType::Superscript => "superscript",
+            NodeType::Mark => "mark",
+            NodeType::Small => "small",
+            NodeType::Br => "br",
+            NodeType::Span => "span",
+            NodeType::Article => "article",
+            NodeType::Section => "section",
+            NodeType::Nav => "nav",
+            NodeType::Aside => "aside",
+            NodeType::Header => "header",
+            NodeType::Footer => "footer",
+            NodeType::Main => "main",
+            NodeType::Figure => "figure",
+            NodeType::Figcaption => "figcaption",
+            NodeType::Time => "time",
+            NodeType::Details => "details",
+            NodeType::Summary => "summary",
+            NodeType::Form => "form",
+            NodeType::Input => "input",
+            NodeType::Select => "select",
+            NodeType::Option => "option",
+            NodeType::Button => "button",
+            NodeType::Textarea => "textarea",
+            NodeType::Label => "label",
+            NodeType::Fieldset => "fieldset",
+            NodeType::Legend => "legend",
+            NodeType::Audio => "audio",
+            NodeType::Video => "video",
+            NodeType::Picture => "picture",
+            NodeType::Source => "source",
+            NodeType::Iframe => "iframe",
+            NodeType::Svg => "svg",
+            NodeType::Canvas => "canvas",
+            NodeType::Ruby => "ruby",
+            NodeType::Rt => "rt",
+            NodeType::Rp => "rp",
+            NodeType::Abbr => "abbr",
+            NodeType::Kbd => "kbd",
+            NodeType::Samp => "samp",
+            NodeType::Var => "var",
+            NodeType::Cite => "cite",
+            NodeType::Q => "q",
+            NodeType::Del => "del",
+            NodeType::Ins => "ins",
+            NodeType::Data => "data",
+            NodeType::Meter => "meter",
+            NodeType::Progress => "progress",
+            NodeType::Output => "output",
+            NodeType::Template => "template",
+            NodeType::Slot => "slot",
+            NodeType::Html => "html",
+            NodeType::Head => "head",
+            NodeType::Body => "body",
+            NodeType::Title => "title",
+            NodeType::Meta => "meta",
+            NodeType::LinkTag => "link_tag",
+            NodeType::Style => "style",
+            NodeType::Script => "script",
+            NodeType::Base => "base",
+            NodeType::Custom => "custom",
+        };
+        hash.aset(ruby.intern("node_type"), ruby.intern(node_type_str))?;
+
+        // tag_name
+        hash.aset(ruby.intern("tag_name"), ctx.tag_name.as_str())?;
+
+        // attributes (as a Hash)
+        let attrs_hash = ruby.hash_new();
+        for (key, value) in &ctx.attributes {
+            attrs_hash.aset(key.as_str(), value.as_str())?;
+        }
+        hash.aset(ruby.intern("attributes"), attrs_hash)?;
+
+        // depth
+        hash.aset(ruby.intern("depth"), ctx.depth as i64)?;
+
+        // index_in_parent
+        hash.aset(ruby.intern("index_in_parent"), ctx.index_in_parent as i64)?;
+
+        // parent_tag
+        match &ctx.parent_tag {
+            Some(tag) => hash.aset(ruby.intern("parent_tag"), tag.as_str())?,
+            None => hash.aset(ruby.intern("parent_tag"), ruby.qnil())?,
+        }
+
+        // is_inline
+        hash.aset(ruby.intern("is_inline"), ctx.is_inline)?;
+
+        Ok(hash.as_value())
+    }
+}
+
+#[cfg(feature = "visitor")]
+impl std::fmt::Debug for RubyVisitorWrapper {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("RubyVisitorWrapper")
+            .field("ruby_visitor", &self.ruby_visitor)
+            .finish()
+    }
+}
+
+#[cfg(feature = "visitor")]
+impl HtmlVisitor for RubyVisitorWrapper {
+    fn visit_element_start(&mut self, ctx: &NodeContext) -> VisitResult {
+        if let Ok(ruby) = Ruby::get() {
+            if let Ok(node_ctx) = self.ruby_to_node_context(ctx, &ruby) {
+                if let Ok(result) = self.call_visitor_method("visit_element_start", &[node_ctx]) {
+                    return result;
+                }
+            }
+        }
+        VisitResult::Continue
+    }
+
+    fn visit_element_end(&mut self, ctx: &NodeContext, output: &str) -> VisitResult {
+        if let Ok(ruby) = Ruby::get() {
+            if let Ok(node_ctx) = self.ruby_to_node_context(ctx, &ruby) {
+                if let Ok(result) = self.call_visitor_method(
+                    "visit_element_end",
+                    &[node_ctx, ruby.str_from_slice(output.as_bytes()).as_value()],
+                ) {
+                    return result;
+                }
+            }
+        }
+        VisitResult::Continue
+    }
+
+    fn visit_text(&mut self, ctx: &NodeContext, text: &str) -> VisitResult {
+        if let Ok(ruby) = Ruby::get() {
+            if let Ok(node_ctx) = self.ruby_to_node_context(ctx, &ruby) {
+                if let Ok(result) = self.call_visitor_method(
+                    "visit_text",
+                    &[node_ctx, ruby.str_from_slice(text.as_bytes()).as_value()],
+                ) {
+                    return result;
+                }
+            }
+        }
+        VisitResult::Continue
+    }
+
+    fn visit_link(&mut self, ctx: &NodeContext, href: &str, text: &str, title: Option<&str>) -> VisitResult {
+        if let Ok(ruby) = Ruby::get() {
+            if let Ok(node_ctx) = self.ruby_to_node_context(ctx, &ruby) {
+                let title_val = match title {
+                    Some(t) => ruby.str_from_slice(t.as_bytes()).as_value(),
+                    None => ruby.qnil().as_value(),
+                };
+                if let Ok(result) = self.call_visitor_method(
+                    "visit_link",
+                    &[
+                        node_ctx,
+                        ruby.str_from_slice(href.as_bytes()).as_value(),
+                        ruby.str_from_slice(text.as_bytes()).as_value(),
+                        title_val,
+                    ],
+                ) {
+                    return result;
+                }
+            }
+        }
+        VisitResult::Continue
+    }
+
+    fn visit_image(&mut self, ctx: &NodeContext, src: &str, alt: &str, title: Option<&str>) -> VisitResult {
+        if let Ok(ruby) = Ruby::get() {
+            if let Ok(node_ctx) = self.ruby_to_node_context(ctx, &ruby) {
+                let title_val = match title {
+                    Some(t) => ruby.str_from_slice(t.as_bytes()).as_value(),
+                    None => ruby.qnil().as_value(),
+                };
+                if let Ok(result) = self.call_visitor_method(
+                    "visit_image",
+                    &[
+                        node_ctx,
+                        ruby.str_from_slice(src.as_bytes()).as_value(),
+                        ruby.str_from_slice(alt.as_bytes()).as_value(),
+                        title_val,
+                    ],
+                ) {
+                    return result;
+                }
+            }
+        }
+        VisitResult::Continue
+    }
+
+    fn visit_heading(&mut self, ctx: &NodeContext, level: u32, text: &str, id: Option<&str>) -> VisitResult {
+        if let Ok(ruby) = Ruby::get() {
+            if let Ok(node_ctx) = self.ruby_to_node_context(ctx, &ruby) {
+                let id_val = match id {
+                    Some(i) => ruby.str_from_slice(i.as_bytes()).as_value(),
+                    None => ruby.qnil().as_value(),
+                };
+                if let Ok(result) = self.call_visitor_method(
+                    "visit_heading",
+                    &[
+                        node_ctx,
+                        ruby.integer_from_i64(level as i64).as_value(),
+                        ruby.str_from_slice(text.as_bytes()).as_value(),
+                        id_val,
+                    ],
+                ) {
+                    return result;
+                }
+            }
+        }
+        VisitResult::Continue
+    }
+
+    fn visit_code_block(&mut self, ctx: &NodeContext, lang: Option<&str>, code: &str) -> VisitResult {
+        if let Ok(ruby) = Ruby::get() {
+            if let Ok(node_ctx) = self.ruby_to_node_context(ctx, &ruby) {
+                let lang_val = match lang {
+                    Some(l) => ruby.str_from_slice(l.as_bytes()).as_value(),
+                    None => ruby.qnil().as_value(),
+                };
+                if let Ok(result) = self.call_visitor_method(
+                    "visit_code_block",
+                    &[node_ctx, lang_val, ruby.str_from_slice(code.as_bytes()).as_value()],
+                ) {
+                    return result;
+                }
+            }
+        }
+        VisitResult::Continue
+    }
+
+    fn visit_code_inline(&mut self, ctx: &NodeContext, code: &str) -> VisitResult {
+        if let Ok(ruby) = Ruby::get() {
+            if let Ok(node_ctx) = self.ruby_to_node_context(ctx, &ruby) {
+                if let Ok(result) = self.call_visitor_method(
+                    "visit_code_inline",
+                    &[node_ctx, ruby.str_from_slice(code.as_bytes()).as_value()],
+                ) {
+                    return result;
+                }
+            }
+        }
+        VisitResult::Continue
+    }
+
+    fn visit_list_item(&mut self, ctx: &NodeContext, ordered: bool, marker: &str, text: &str) -> VisitResult {
+        if let Ok(ruby) = Ruby::get() {
+            if let Ok(node_ctx) = self.ruby_to_node_context(ctx, &ruby) {
+                let ordered_val = if ordered {
+                    ruby.qtrue().as_value()
+                } else {
+                    ruby.qfalse().as_value()
+                };
+                if let Ok(result) = self.call_visitor_method(
+                    "visit_list_item",
+                    &[
+                        node_ctx,
+                        ordered_val,
+                        ruby.str_from_slice(marker.as_bytes()).as_value(),
+                        ruby.str_from_slice(text.as_bytes()).as_value(),
+                    ],
+                ) {
+                    return result;
+                }
+            }
+        }
+        VisitResult::Continue
+    }
+
+    fn visit_list_start(&mut self, ctx: &NodeContext, ordered: bool) -> VisitResult {
+        if let Ok(ruby) = Ruby::get() {
+            if let Ok(node_ctx) = self.ruby_to_node_context(ctx, &ruby) {
+                let ordered_val = if ordered {
+                    ruby.qtrue().as_value()
+                } else {
+                    ruby.qfalse().as_value()
+                };
+                if let Ok(result) = self.call_visitor_method("visit_list_start", &[node_ctx, ordered_val]) {
+                    return result;
+                }
+            }
+        }
+        VisitResult::Continue
+    }
+
+    fn visit_list_end(&mut self, ctx: &NodeContext, ordered: bool, output: &str) -> VisitResult {
+        if let Ok(ruby) = Ruby::get() {
+            if let Ok(node_ctx) = self.ruby_to_node_context(ctx, &ruby) {
+                let ordered_val = if ordered {
+                    ruby.qtrue().as_value()
+                } else {
+                    ruby.qfalse().as_value()
+                };
+                if let Ok(result) = self.call_visitor_method(
+                    "visit_list_end",
+                    &[node_ctx, ordered_val, ruby.str_from_slice(output.as_bytes()).as_value()],
+                ) {
+                    return result;
+                }
+            }
+        }
+        VisitResult::Continue
+    }
+
+    fn visit_table_start(&mut self, ctx: &NodeContext) -> VisitResult {
+        if let Ok(ruby) = Ruby::get() {
+            if let Ok(node_ctx) = self.ruby_to_node_context(ctx, &ruby) {
+                if let Ok(result) = self.call_visitor_method("visit_table_start", &[node_ctx]) {
+                    return result;
+                }
+            }
+        }
+        VisitResult::Continue
+    }
+
+    fn visit_table_row(&mut self, ctx: &NodeContext, cells: &[String], is_header: bool) -> VisitResult {
+        if let Ok(ruby) = Ruby::get() {
+            if let Ok(node_ctx) = self.ruby_to_node_context(ctx, &ruby) {
+                let cells_array = ruby.ary_new();
+                for cell in cells {
+                    let _ = cells_array.push(ruby.str_from_slice(cell.as_bytes()).as_value());
+                }
+                let is_header_val = if is_header {
+                    ruby.qtrue().as_value()
+                } else {
+                    ruby.qfalse().as_value()
+                };
+                if let Ok(result) =
+                    self.call_visitor_method("visit_table_row", &[node_ctx, cells_array.as_value(), is_header_val])
+                {
+                    return result;
+                }
+            }
+        }
+        VisitResult::Continue
+    }
+
+    fn visit_table_end(&mut self, ctx: &NodeContext, output: &str) -> VisitResult {
+        if let Ok(ruby) = Ruby::get() {
+            if let Ok(node_ctx) = self.ruby_to_node_context(ctx, &ruby) {
+                if let Ok(result) = self.call_visitor_method(
+                    "visit_table_end",
+                    &[node_ctx, ruby.str_from_slice(output.as_bytes()).as_value()],
+                ) {
+                    return result;
+                }
+            }
+        }
+        VisitResult::Continue
+    }
+
+    fn visit_blockquote(&mut self, ctx: &NodeContext, content: &str, depth: usize) -> VisitResult {
+        if let Ok(ruby) = Ruby::get() {
+            if let Ok(node_ctx) = self.ruby_to_node_context(ctx, &ruby) {
+                if let Ok(result) = self.call_visitor_method(
+                    "visit_blockquote",
+                    &[
+                        node_ctx,
+                        ruby.str_from_slice(content.as_bytes()).as_value(),
+                        ruby.integer_from_i64(depth as i64).as_value(),
+                    ],
+                ) {
+                    return result;
+                }
+            }
+        }
+        VisitResult::Continue
+    }
+
+    fn visit_strong(&mut self, ctx: &NodeContext, text: &str) -> VisitResult {
+        if let Ok(ruby) = Ruby::get() {
+            if let Ok(node_ctx) = self.ruby_to_node_context(ctx, &ruby) {
+                if let Ok(result) = self.call_visitor_method(
+                    "visit_strong",
+                    &[node_ctx, ruby.str_from_slice(text.as_bytes()).as_value()],
+                ) {
+                    return result;
+                }
+            }
+        }
+        VisitResult::Continue
+    }
+
+    fn visit_emphasis(&mut self, ctx: &NodeContext, text: &str) -> VisitResult {
+        if let Ok(ruby) = Ruby::get() {
+            if let Ok(node_ctx) = self.ruby_to_node_context(ctx, &ruby) {
+                if let Ok(result) = self.call_visitor_method(
+                    "visit_emphasis",
+                    &[node_ctx, ruby.str_from_slice(text.as_bytes()).as_value()],
+                ) {
+                    return result;
+                }
+            }
+        }
+        VisitResult::Continue
+    }
+
+    fn visit_strikethrough(&mut self, ctx: &NodeContext, text: &str) -> VisitResult {
+        if let Ok(ruby) = Ruby::get() {
+            if let Ok(node_ctx) = self.ruby_to_node_context(ctx, &ruby) {
+                if let Ok(result) = self.call_visitor_method(
+                    "visit_strikethrough",
+                    &[node_ctx, ruby.str_from_slice(text.as_bytes()).as_value()],
+                ) {
+                    return result;
+                }
+            }
+        }
+        VisitResult::Continue
+    }
+
+    fn visit_underline(&mut self, ctx: &NodeContext, text: &str) -> VisitResult {
+        if let Ok(ruby) = Ruby::get() {
+            if let Ok(node_ctx) = self.ruby_to_node_context(ctx, &ruby) {
+                if let Ok(result) = self.call_visitor_method(
+                    "visit_underline",
+                    &[node_ctx, ruby.str_from_slice(text.as_bytes()).as_value()],
+                ) {
+                    return result;
+                }
+            }
+        }
+        VisitResult::Continue
+    }
+
+    fn visit_subscript(&mut self, ctx: &NodeContext, text: &str) -> VisitResult {
+        if let Ok(ruby) = Ruby::get() {
+            if let Ok(node_ctx) = self.ruby_to_node_context(ctx, &ruby) {
+                if let Ok(result) = self.call_visitor_method(
+                    "visit_subscript",
+                    &[node_ctx, ruby.str_from_slice(text.as_bytes()).as_value()],
+                ) {
+                    return result;
+                }
+            }
+        }
+        VisitResult::Continue
+    }
+
+    fn visit_superscript(&mut self, ctx: &NodeContext, text: &str) -> VisitResult {
+        if let Ok(ruby) = Ruby::get() {
+            if let Ok(node_ctx) = self.ruby_to_node_context(ctx, &ruby) {
+                if let Ok(result) = self.call_visitor_method(
+                    "visit_superscript",
+                    &[node_ctx, ruby.str_from_slice(text.as_bytes()).as_value()],
+                ) {
+                    return result;
+                }
+            }
+        }
+        VisitResult::Continue
+    }
+
+    fn visit_mark(&mut self, ctx: &NodeContext, text: &str) -> VisitResult {
+        if let Ok(ruby) = Ruby::get() {
+            if let Ok(node_ctx) = self.ruby_to_node_context(ctx, &ruby) {
+                if let Ok(result) = self.call_visitor_method(
+                    "visit_mark",
+                    &[node_ctx, ruby.str_from_slice(text.as_bytes()).as_value()],
+                ) {
+                    return result;
+                }
+            }
+        }
+        VisitResult::Continue
+    }
+
+    fn visit_line_break(&mut self, ctx: &NodeContext) -> VisitResult {
+        if let Ok(ruby) = Ruby::get() {
+            if let Ok(node_ctx) = self.ruby_to_node_context(ctx, &ruby) {
+                if let Ok(result) = self.call_visitor_method("visit_line_break", &[node_ctx]) {
+                    return result;
+                }
+            }
+        }
+        VisitResult::Continue
+    }
+
+    fn visit_horizontal_rule(&mut self, ctx: &NodeContext) -> VisitResult {
+        if let Ok(ruby) = Ruby::get() {
+            if let Ok(node_ctx) = self.ruby_to_node_context(ctx, &ruby) {
+                if let Ok(result) = self.call_visitor_method("visit_horizontal_rule", &[node_ctx]) {
+                    return result;
+                }
+            }
+        }
+        VisitResult::Continue
+    }
+
+    fn visit_custom_element(&mut self, ctx: &NodeContext, tag_name: &str, html: &str) -> VisitResult {
+        if let Ok(ruby) = Ruby::get() {
+            if let Ok(node_ctx) = self.ruby_to_node_context(ctx, &ruby) {
+                if let Ok(result) = self.call_visitor_method(
+                    "visit_custom_element",
+                    &[
+                        node_ctx,
+                        ruby.str_from_slice(tag_name.as_bytes()).as_value(),
+                        ruby.str_from_slice(html.as_bytes()).as_value(),
+                    ],
+                ) {
+                    return result;
+                }
+            }
+        }
+        VisitResult::Continue
+    }
+
+    fn visit_definition_list_start(&mut self, ctx: &NodeContext) -> VisitResult {
+        if let Ok(ruby) = Ruby::get() {
+            if let Ok(node_ctx) = self.ruby_to_node_context(ctx, &ruby) {
+                if let Ok(result) = self.call_visitor_method("visit_definition_list_start", &[node_ctx]) {
+                    return result;
+                }
+            }
+        }
+        VisitResult::Continue
+    }
+
+    fn visit_definition_term(&mut self, ctx: &NodeContext, text: &str) -> VisitResult {
+        if let Ok(ruby) = Ruby::get() {
+            if let Ok(node_ctx) = self.ruby_to_node_context(ctx, &ruby) {
+                if let Ok(result) = self.call_visitor_method(
+                    "visit_definition_term",
+                    &[node_ctx, ruby.str_from_slice(text.as_bytes()).as_value()],
+                ) {
+                    return result;
+                }
+            }
+        }
+        VisitResult::Continue
+    }
+
+    fn visit_definition_description(&mut self, ctx: &NodeContext, text: &str) -> VisitResult {
+        if let Ok(ruby) = Ruby::get() {
+            if let Ok(node_ctx) = self.ruby_to_node_context(ctx, &ruby) {
+                if let Ok(result) = self.call_visitor_method(
+                    "visit_definition_description",
+                    &[node_ctx, ruby.str_from_slice(text.as_bytes()).as_value()],
+                ) {
+                    return result;
+                }
+            }
+        }
+        VisitResult::Continue
+    }
+
+    fn visit_definition_list_end(&mut self, ctx: &NodeContext, output: &str) -> VisitResult {
+        if let Ok(ruby) = Ruby::get() {
+            if let Ok(node_ctx) = self.ruby_to_node_context(ctx, &ruby) {
+                if let Ok(result) = self.call_visitor_method(
+                    "visit_definition_list_end",
+                    &[node_ctx, ruby.str_from_slice(output.as_bytes()).as_value()],
+                ) {
+                    return result;
+                }
+            }
+        }
+        VisitResult::Continue
+    }
+
+    fn visit_form(&mut self, ctx: &NodeContext, action: Option<&str>, method: Option<&str>) -> VisitResult {
+        if let Ok(ruby) = Ruby::get() {
+            if let Ok(node_ctx) = self.ruby_to_node_context(ctx, &ruby) {
+                let action_val = match action {
+                    Some(a) => ruby.str_from_slice(a.as_bytes()).as_value(),
+                    None => ruby.qnil().as_value(),
+                };
+                let method_val = match method {
+                    Some(m) => ruby.str_from_slice(m.as_bytes()).as_value(),
+                    None => ruby.qnil().as_value(),
+                };
+                if let Ok(result) = self.call_visitor_method("visit_form", &[node_ctx, action_val, method_val]) {
+                    return result;
+                }
+            }
+        }
+        VisitResult::Continue
+    }
+
+    fn visit_input(
+        &mut self,
+        ctx: &NodeContext,
+        input_type: &str,
+        name: Option<&str>,
+        value: Option<&str>,
+    ) -> VisitResult {
+        if let Ok(ruby) = Ruby::get() {
+            if let Ok(node_ctx) = self.ruby_to_node_context(ctx, &ruby) {
+                let name_val = match name {
+                    Some(n) => ruby.str_from_slice(n.as_bytes()).as_value(),
+                    None => ruby.qnil().as_value(),
+                };
+                let value_val = match value {
+                    Some(v) => ruby.str_from_slice(v.as_bytes()).as_value(),
+                    None => ruby.qnil().as_value(),
+                };
+                if let Ok(result) = self.call_visitor_method(
+                    "visit_input",
+                    &[
+                        node_ctx,
+                        ruby.str_from_slice(input_type.as_bytes()).as_value(),
+                        name_val,
+                        value_val,
+                    ],
+                ) {
+                    return result;
+                }
+            }
+        }
+        VisitResult::Continue
+    }
+
+    fn visit_button(&mut self, ctx: &NodeContext, text: &str) -> VisitResult {
+        if let Ok(ruby) = Ruby::get() {
+            if let Ok(node_ctx) = self.ruby_to_node_context(ctx, &ruby) {
+                if let Ok(result) = self.call_visitor_method(
+                    "visit_button",
+                    &[node_ctx, ruby.str_from_slice(text.as_bytes()).as_value()],
+                ) {
+                    return result;
+                }
+            }
+        }
+        VisitResult::Continue
+    }
+
+    fn visit_audio(&mut self, ctx: &NodeContext, src: Option<&str>) -> VisitResult {
+        if let Ok(ruby) = Ruby::get() {
+            if let Ok(node_ctx) = self.ruby_to_node_context(ctx, &ruby) {
+                let src_val = match src {
+                    Some(s) => ruby.str_from_slice(s.as_bytes()).as_value(),
+                    None => ruby.qnil().as_value(),
+                };
+                if let Ok(result) = self.call_visitor_method("visit_audio", &[node_ctx, src_val]) {
+                    return result;
+                }
+            }
+        }
+        VisitResult::Continue
+    }
+
+    fn visit_video(&mut self, ctx: &NodeContext, src: Option<&str>) -> VisitResult {
+        if let Ok(ruby) = Ruby::get() {
+            if let Ok(node_ctx) = self.ruby_to_node_context(ctx, &ruby) {
+                let src_val = match src {
+                    Some(s) => ruby.str_from_slice(s.as_bytes()).as_value(),
+                    None => ruby.qnil().as_value(),
+                };
+                if let Ok(result) = self.call_visitor_method("visit_video", &[node_ctx, src_val]) {
+                    return result;
+                }
+            }
+        }
+        VisitResult::Continue
+    }
+
+    fn visit_iframe(&mut self, ctx: &NodeContext, src: Option<&str>) -> VisitResult {
+        if let Ok(ruby) = Ruby::get() {
+            if let Ok(node_ctx) = self.ruby_to_node_context(ctx, &ruby) {
+                let src_val = match src {
+                    Some(s) => ruby.str_from_slice(s.as_bytes()).as_value(),
+                    None => ruby.qnil().as_value(),
+                };
+                if let Ok(result) = self.call_visitor_method("visit_iframe", &[node_ctx, src_val]) {
+                    return result;
+                }
+            }
+        }
+        VisitResult::Continue
+    }
+
+    fn visit_details(&mut self, ctx: &NodeContext, open: bool) -> VisitResult {
+        if let Ok(ruby) = Ruby::get() {
+            if let Ok(node_ctx) = self.ruby_to_node_context(ctx, &ruby) {
+                let open_val = if open {
+                    ruby.qtrue().as_value()
+                } else {
+                    ruby.qfalse().as_value()
+                };
+                if let Ok(result) = self.call_visitor_method("visit_details", &[node_ctx, open_val]) {
+                    return result;
+                }
+            }
+        }
+        VisitResult::Continue
+    }
+
+    fn visit_summary(&mut self, ctx: &NodeContext, text: &str) -> VisitResult {
+        if let Ok(ruby) = Ruby::get() {
+            if let Ok(node_ctx) = self.ruby_to_node_context(ctx, &ruby) {
+                if let Ok(result) = self.call_visitor_method(
+                    "visit_summary",
+                    &[node_ctx, ruby.str_from_slice(text.as_bytes()).as_value()],
+                ) {
+                    return result;
+                }
+            }
+        }
+        VisitResult::Continue
+    }
+
+    fn visit_figure_start(&mut self, ctx: &NodeContext) -> VisitResult {
+        if let Ok(ruby) = Ruby::get() {
+            if let Ok(node_ctx) = self.ruby_to_node_context(ctx, &ruby) {
+                if let Ok(result) = self.call_visitor_method("visit_figure_start", &[node_ctx]) {
+                    return result;
+                }
+            }
+        }
+        VisitResult::Continue
+    }
+
+    fn visit_figcaption(&mut self, ctx: &NodeContext, text: &str) -> VisitResult {
+        if let Ok(ruby) = Ruby::get() {
+            if let Ok(node_ctx) = self.ruby_to_node_context(ctx, &ruby) {
+                if let Ok(result) = self.call_visitor_method(
+                    "visit_figcaption",
+                    &[node_ctx, ruby.str_from_slice(text.as_bytes()).as_value()],
+                ) {
+                    return result;
+                }
+            }
+        }
+        VisitResult::Continue
+    }
+
+    fn visit_figure_end(&mut self, ctx: &NodeContext, output: &str) -> VisitResult {
+        if let Ok(ruby) = Ruby::get() {
+            if let Ok(node_ctx) = self.ruby_to_node_context(ctx, &ruby) {
+                if let Ok(result) = self.call_visitor_method(
+                    "visit_figure_end",
+                    &[node_ctx, ruby.str_from_slice(output.as_bytes()).as_value()],
+                ) {
+                    return result;
+                }
+            }
+        }
+        VisitResult::Continue
+    }
+}
 
 fn conversion_error(err: ConversionError) -> Error {
     match err {
@@ -674,6 +1519,27 @@ fn convert_with_metadata_handle_fn(ruby: &Ruby, args: &[Value]) -> Result<Value,
     Ok(array.as_value())
 }
 
+#[cfg(feature = "visitor")]
+fn convert_with_visitor_fn(ruby: &Ruby, args: &[Value]) -> Result<String, Error> {
+    let parsed = scan_args::<(String,), (Option<Value>, Option<Value>), (), (), (), ()>(args)?;
+    let html = parsed.required.0;
+    let options = build_conversion_options(ruby, parsed.optional.0)?;
+
+    // Extract the visitor object
+    let visitor_value = parsed
+        .optional
+        .1
+        .ok_or_else(|| arg_error("visitor keyword argument is required"))?;
+
+    let visitor_wrapper = RubyVisitorWrapper::new(visitor_value);
+    let visitor_handle = std::rc::Rc::new(std::cell::RefCell::new(visitor_wrapper));
+
+    guard_panic(AssertUnwindSafe(|| {
+        profiling::maybe_profile(|| convert_with_visitor_inner(&html, Some(options), Some(visitor_handle)))
+    }))
+    .map_err(conversion_error)
+}
+
 #[cfg(feature = "profiling")]
 fn start_profiling_fn(_ruby: &Ruby, args: &[Value]) -> Result<bool, Error> {
     let output = args.first().ok_or_else(|| arg_error("output_path required"))?;
@@ -715,6 +1581,9 @@ fn init(ruby: &Ruby) -> Result<(), Error> {
         "convert_with_metadata_handle",
         function!(convert_with_metadata_handle_fn, -1),
     )?;
+
+    #[cfg(feature = "visitor")]
+    module.define_singleton_method("convert_with_visitor", function!(convert_with_visitor_fn, -1))?;
 
     #[cfg(feature = "profiling")]
     module.define_singleton_method("start_profiling", function!(start_profiling_fn, -1))?;
