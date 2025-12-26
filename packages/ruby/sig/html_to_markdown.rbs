@@ -6,6 +6,32 @@ module HtmlToMarkdown
   class Options
   end
 
+  # Visitor context information passed to visitor callbacks
+  class NodeContext
+    attr_reader node_type: Symbol
+    attr_reader tag_name: String
+    attr_reader attributes: Hash[String, String]
+    attr_reader depth: Integer
+    attr_reader index_in_parent: Integer
+    attr_reader parent_tag: String | nil
+    attr_reader is_inline: bool
+  end
+
+  # Result of a visitor callback
+  type visitor_result = {
+    type: :continue,
+  } | {
+    type: :custom,
+    output: String,
+  } | {
+    type: :skip,
+  } | {
+    type: :preserve_html,
+  } | {
+    type: :error,
+    message: String,
+  }
+
   type heading_style = :underlined | :atx | :atx_closed
   type list_indent_type = :spaces | :tabs
   type highlight_style = :double_equal | :html | :bold | :none
@@ -183,6 +209,11 @@ module HtmlToMarkdown
     conversion_options? options,
     metadata_config? metadata_config
   ) -> [String, extended_metadata]
+  def self.native_convert_with_visitor: (
+    String html,
+    conversion_options? options,
+    visitor? visitor
+  ) -> String
 
   def native_convert: (String html, conversion_options? options) -> String
   def native_options: (conversion_options? options_hash) -> Options
@@ -207,6 +238,14 @@ module HtmlToMarkdown
     conversion_options? options,
     metadata_config? metadata_config
   ) -> [String, extended_metadata]
+  def native_convert_with_visitor: (
+    String html,
+    conversion_options? options,
+    visitor? visitor
+  ) -> String
+
+  # Visitor interface for customizing conversion behavior
+  type visitor = Object
 
   public
 
@@ -230,6 +269,75 @@ module HtmlToMarkdown
     ?conversion_options options,
     ?inline_image_config image_config
   ) -> html_extraction
+
+  # Convert HTML to Markdown with a custom visitor
+  #
+  # The visitor object can implement any of the following methods:
+  #   - visit_element_start(ctx) -> visitor_result
+  #   - visit_element_end(ctx, output) -> visitor_result
+  #   - visit_text(ctx, text) -> visitor_result
+  #   - visit_link(ctx, href, text, title) -> visitor_result
+  #   - visit_image(ctx, src, alt, title) -> visitor_result
+  #   - visit_heading(ctx, level, text, id) -> visitor_result
+  #   - visit_code_block(ctx, lang, code) -> visitor_result
+  #   - visit_code_inline(ctx, code) -> visitor_result
+  #   - visit_list_item(ctx, ordered, marker, text) -> visitor_result
+  #   - visit_list_start(ctx, ordered) -> visitor_result
+  #   - visit_list_end(ctx, ordered, output) -> visitor_result
+  #   - visit_table_start(ctx) -> visitor_result
+  #   - visit_table_row(ctx, cells, is_header) -> visitor_result
+  #   - visit_table_end(ctx, output) -> visitor_result
+  #   - visit_blockquote(ctx, content, depth) -> visitor_result
+  #   - visit_strong(ctx, text) -> visitor_result
+  #   - visit_emphasis(ctx, text) -> visitor_result
+  #   - visit_strikethrough(ctx, text) -> visitor_result
+  #   - visit_underline(ctx, text) -> visitor_result
+  #   - visit_subscript(ctx, text) -> visitor_result
+  #   - visit_superscript(ctx, text) -> visitor_result
+  #   - visit_mark(ctx, text) -> visitor_result
+  #   - visit_line_break(ctx) -> visitor_result
+  #   - visit_horizontal_rule(ctx) -> visitor_result
+  #   - visit_custom_element(ctx, tag_name, html) -> visitor_result
+  #   - visit_definition_list_start(ctx) -> visitor_result
+  #   - visit_definition_term(ctx, text) -> visitor_result
+  #   - visit_definition_description(ctx, text) -> visitor_result
+  #   - visit_definition_list_end(ctx, output) -> visitor_result
+  #   - visit_form(ctx, action, method) -> visitor_result
+  #   - visit_input(ctx, input_type, name, value) -> visitor_result
+  #   - visit_button(ctx, text) -> visitor_result
+  #   - visit_audio(ctx, src) -> visitor_result
+  #   - visit_video(ctx, src) -> visitor_result
+  #   - visit_iframe(ctx, src) -> visitor_result
+  #   - visit_details(ctx, open) -> visitor_result
+  #   - visit_summary(ctx, text) -> visitor_result
+  #   - visit_figure_start(ctx) -> visitor_result
+  #   - visit_figcaption(ctx, text) -> visitor_result
+  #   - visit_figure_end(ctx, output) -> visitor_result
+  #
+  # Each method should return a Hash with at least :type key:
+  #   { type: :continue } - Continue with default behavior
+  #   { type: :custom, output: "..." } - Replace with custom markdown
+  #   { type: :skip } - Skip this element entirely
+  #   { type: :preserve_html } - Keep original HTML
+  #   { type: :error, message: "..." } - Stop conversion with error
+  #
+  # Args:
+  #   html: HTML string to convert
+  #   options: Optional conversion configuration
+  #   visitor: Visitor object that responds to visitor callback methods
+  #
+  # Returns:
+  #   markdown: String - Converted markdown output
+  #
+  # Example:
+  #   class MyVisitor
+  #     def visit_link(ctx, href, text, title = nil)
+  #       { type: :custom, output: "[#{text}](#{href})" }
+  #     end
+  #   end
+  #
+  #   HtmlToMarkdown.convert_with_visitor(html, visitor: MyVisitor.new)
+  def self.convert_with_visitor: (String html, ?conversion_options options, visitor: visitor) -> String
 
   # Convert HTML to Markdown with metadata extraction
   #
@@ -282,6 +390,7 @@ module HtmlToMarkdown
     ?conversion_options options,
     ?inline_image_config image_config
   ) -> html_extraction
+  def convert_with_visitor: (String html, ?conversion_options options, visitor: visitor) -> String
   def convert_with_metadata: (
     String html,
     ?conversion_options options,
