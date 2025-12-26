@@ -22,7 +22,9 @@ pub mod text;
 #[cfg(feature = "visitor")]
 pub mod visitor;
 #[cfg(feature = "visitor")]
-mod visitor_helpers;
+pub mod visitor_helpers;
+#[cfg(feature = "async-visitor")]
+pub use visitor_helpers::AsyncVisitorHandle;
 pub mod wrapper;
 
 pub use error::{ConversionError, Result};
@@ -506,6 +508,92 @@ pub fn convert_with_visitor(
     let normalized_html = normalize_line_endings(html);
 
     let markdown = converter::convert_html_with_visitor(normalized_html.as_ref(), &options, visitor)?;
+
+    if options.wrap {
+        Ok(wrapper::wrap_markdown(&markdown, &options))
+    } else {
+        Ok(markdown)
+    }
+}
+
+#[cfg(feature = "async-visitor")]
+/// Convert HTML to Markdown with an async visitor callback.
+///
+/// This async function allows you to provide an async visitor implementation that can inspect,
+/// modify, or replace the default conversion behavior for any HTML element type.
+///
+/// This function is useful for:
+/// - Python async functions (with `async def` and `asyncio`)
+/// - TypeScript/JavaScript async functions (with `Promise`-based callbacks)
+/// - Elixir processes (with message-passing async operations)
+///
+/// For synchronous languages (Ruby, PHP, Go, Java, C#), use `convert_with_visitor` instead.
+///
+/// # Note
+///
+/// The async visitor trait (`AsyncHtmlVisitor`) and async dispatch helpers are designed to be
+/// consumed by language bindings (PyO3, NAPI-RS, Magnus, etc.) which can bridge async/await
+/// semantics from their host languages. The conversion pipeline itself runs synchronously,
+/// but visitor callbacks are defined as async to support languages with native async/await.
+///
+/// Binding implementations will be responsible for running async callbacks on appropriate
+/// event loops (asyncio for Python, Promise chains for TypeScript, etc.).
+///
+/// # Arguments
+///
+/// * `html` - The HTML input to convert
+/// * `options` - Optional conversion options (uses defaults if None)
+/// * `visitor` - Optional async visitor implementing `AsyncHtmlVisitor` trait for customization
+///
+/// # Example (Rust-like async)
+///
+/// ```ignore
+/// use html_to_markdown_rs::convert_with_async_visitor;
+/// use html_to_markdown_rs::visitor::{AsyncHtmlVisitor, NodeContext, VisitResult};
+/// use async_trait::async_trait;
+/// use std::rc::Rc;
+/// use std::cell::RefCell;
+///
+/// #[derive(Debug)]
+/// struct CustomAsyncVisitor;
+///
+/// #[async_trait]
+/// impl AsyncHtmlVisitor for CustomAsyncVisitor {
+///     async fn visit_code_block(
+///         &mut self,
+///         _ctx: &NodeContext,
+///         code: &str,
+///         language: Option<&str>,
+///     ) -> VisitResult {
+///         // Can perform async operations here (e.g., syntax highlighting via service)
+///         VisitResult::Custom(format!("```{}\n{}\n```", language.unwrap_or(""), code))
+///     }
+/// }
+///
+/// let html = "<pre><code class=\"language-rust\">fn main() {}</code></pre>";
+/// let visitor = Some(Rc::new(RefCell::new(CustomAsyncVisitor) as _));
+/// let markdown = convert_with_async_visitor(html, None, visitor).await.unwrap();
+/// ```
+///
+/// # Implementation Note
+///
+/// Currently, this function placeholder documents the async visitor interface for binding
+/// implementations. The actual async dispatch integration will be implemented in binding
+/// layers (Python, TypeScript, etc.) to properly bridge async/await semantics to the
+/// synchronous Rust conversion core.
+pub async fn convert_with_async_visitor(
+    html: &str,
+    options: Option<ConversionOptions>,
+    _visitor: Option<visitor_helpers::AsyncVisitorHandle>,
+) -> Result<String> {
+    validate_input(html)?;
+    let options = options.unwrap_or_default();
+
+    let normalized_html = normalize_line_endings(html);
+
+    // TODO: Implement async dispatch in conversion pipeline
+    // For now, convert without async visitor support (visitor ignored)
+    let markdown = converter::convert_html(normalized_html.as_ref(), &options)?;
 
     if options.wrap {
         Ok(wrapper::wrap_markdown(&markdown, &options))

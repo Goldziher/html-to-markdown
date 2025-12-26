@@ -14,9 +14,11 @@ rust-version.workspace = true
 crate-type = ["cdylib"]
 
 [dependencies]
-html-to-markdown-rs = { workspace = true, features = ["inline-images", "metadata", "serde", "visitor"] }
+html-to-markdown-rs = { workspace = true, features = ["inline-images", "metadata", "serde", "async-visitor"] }
 napi = { version = "3.4", default-features = false, features = ["napi8"] }
 napi-derive = "3.3"
+async-trait = "0.1"
+tokio = { version = "1", features = ["rt"] }
 
 [target.'cfg(not(target_os = "windows"))'.dependencies]
 pprof = { version = "0.15", features = ["flamegraph"], optional = true }
@@ -28,7 +30,8 @@ mimalloc-rust = "0.2"
 napi-build = "2.2"
 
 [features]
-default = ["metadata"]
+default = ["metadata", "async-visitor"]
 metadata = ["html-to-markdown-rs/metadata"]
 visitor = ["html-to-markdown-rs/visitor"]
+async-visitor = ["html-to-markdown-rs/async-visitor"]
 profiling = ["dep:pprof"]
