@@ -88,6 +88,7 @@ module HtmlToMarkdown
   }
 
   type metadata_config = {
+    extract_document?: bool,
     extract_headers?: bool,
     extract_links?: bool,
     extract_images?: bool,
