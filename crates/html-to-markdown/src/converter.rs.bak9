@@ -56,6 +56,11 @@ use crate::inline_images::{InlineImageCollector, InlineImageFormat, InlineImageS
 use crate::options::{ConversionOptions, HeadingStyle, ListIndentType};
 use crate::text;
 
+#[cfg(feature = "visitor")]
+use crate::visitor_helpers::build_node_context;
+#[cfg(feature = "visitor")]
+use crate::visitor::NodeType;
+
 #[cfg(feature = "inline-images")]
 type InlineCollectorHandle = Rc<RefCell<InlineImageCollector>>;
 #[cfg(not(feature = "inline-images"))]
@@ -411,7 +416,7 @@ fn calculate_list_nesting_depth(ctx: &Context) -> usize {
 /// This is used to determine proper spacing between list items.
 /// Returns true if the last processed item had block children.
 #[allow(clippy::too_many_arguments)]
-fn process_list_children(
+fn process_list_children<'v>(
     node_handle: &tl::NodeHandle,
     parser: &tl::Parser,
     output: &mut String,
@@ -423,7 +428,9 @@ fn process_list_children(
     nested_depth: usize,
     start_counter: usize,
     dom_ctx: &DomContext,
-) {
+    #[cfg(feature = "visitor")] visitor: &mut Option<&mut dyn crate::visitor::HtmlVisitor>,
+    #[cfg(not(feature = "visitor"))] _visitor: &mut Option<&mut ()>,
+) -> Result<()> {
     let mut counter = start_counter;
 
     if let Some(node) = node_handle.get(parser) {
@@ -450,7 +457,7 @@ fn process_list_children(
                         ..ctx.clone()
                     };
 
-                    walk_node(child_handle, parser, output, options, &list_ctx, depth, dom_ctx);
+                    walk_node(child_handle, parser, output, options, &list_ctx, depth, dom_ctx, visitor)?;
 
                     if is_ordered && is_list_item(child_handle, parser, dom_ctx) {
                         counter += 1;
@@ -459,6 +466,7 @@ fn process_list_children(
             }
         }
     }
+    Ok(())
 }
 
 fn is_list_item(node_handle: &tl::NodeHandle, parser: &tl::Parser, dom_ctx: &DomContext) -> bool {
@@ -469,6 +477,33 @@ fn is_list_item(node_handle: &tl::NodeHandle, parser: &tl::Parser, dom_ctx: &Dom
         node_handle.get(parser),
         Some(tl::Node::Tag(tag)) if tag_name_eq(tag.name().as_utf8_str(), "li")
     )
+}
+
+/// Extract attributes from a tag into a BTreeMap for visitor context.
+#[cfg(feature = "visitor")]
+#[allow(dead_code)]
+#[inline]
+fn extract_attributes(tag: &tl::HTMLTag) -> BTreeMap<String, String> {
+    let mut map = BTreeMap::new();
+    for (key, value_opt) in tag.attributes().iter() {
+        let value = value_opt.as_ref().map(|v| v.to_string()).unwrap_or_default();
+        map.insert(key.to_string(), value);
+    }
+    map
+}
+
+/// Get the parent tag name from DOM context.
+#[cfg(feature = "visitor")]
+#[allow(dead_code)]
+fn get_parent_tag(node_handle: &tl::NodeHandle, parser: &tl::Parser, dom_ctx: &DomContext) -> Option<String> {
+    let node_id = node_handle.get_inner();
+    let parent_id = dom_ctx.parent_of(node_id)?;
+    let parent_node = dom_ctx.node_handle(parent_id)?;
+    if let Some(tl::Node::Tag(tag)) = parent_node.get(parser) {
+        Some(tag.name().as_utf8_str().to_string())
+    } else {
+        None
+    }
 }
 
 /// Conversion context to track state during traversal
@@ -535,11 +570,7 @@ struct Context {
     #[cfg(feature = "metadata")]
     metadata_wants_structured_data: bool,
     #[cfg(feature = "visitor")]
-    /// Optional visitor for custom HTML traversal callbacks.
-    visitor: Option<crate::visitor::VisitorHandle>,
-    #[cfg(feature = "visitor")]
-    /// Stores the first visitor error encountered during traversal.
-    visitor_error: Rc<RefCell<Option<String>>>,
+    visitor: Option<Rc<RefCell<dyn crate::visitor::HtmlVisitor>>>,
 }
 
 struct DomContext {
@@ -1865,7 +1896,7 @@ fn serialize_node(node_handle: &tl::NodeHandle, parser: &tl::Parser) -> String {
 
 /// Convert HTML to Markdown using tl DOM parser.
 pub fn convert_html(html: &str, options: &ConversionOptions) -> Result<String> {
-    convert_html_impl(html, options, None, None, None)
+    convert_html_impl(html, options, None, None, &mut None)
 }
 
 #[cfg(feature = "inline-images")]
@@ -1874,7 +1905,7 @@ pub(crate) fn convert_html_with_inline_collector(
     options: &ConversionOptions,
     collector: InlineCollectorHandle,
 ) -> Result<String> {
-    convert_html_impl(html, options, Some(collector), None, None)
+    convert_html_impl(html, options, Some(collector), None, &mut None)
 }
 
 #[cfg(feature = "metadata")]
@@ -1883,16 +1914,16 @@ pub(crate) fn convert_html_with_metadata(
     options: &ConversionOptions,
     metadata_collector: crate::metadata::MetadataCollectorHandle,
 ) -> Result<String> {
-    convert_html_impl(html, options, None, Some(metadata_collector), None)
+    convert_html_impl(html, options, None, Some(metadata_collector), &mut None)
 }
 
 #[cfg(feature = "visitor")]
-pub(crate) fn convert_html_with_visitor(
+pub(crate) fn convert_html_with_visitor<V: crate::visitor::HtmlVisitor>(
     html: &str,
     options: &ConversionOptions,
-    visitor: Option<crate::visitor::VisitorHandle>,
+    visitor: &mut V,
 ) -> Result<String> {
-    convert_html_impl(html, options, None, None, visitor)
+    convert_html_impl(html, options, None, None, Some(visitor))
 }
 
 #[cfg_attr(not(feature = "inline-images"), allow(unused_variables))]
@@ -1904,8 +1935,8 @@ fn convert_html_impl(
     inline_collector: Option<InlineCollectorHandle>,
     #[cfg(feature = "metadata")] metadata_collector: Option<crate::metadata::MetadataCollectorHandle>,
     #[cfg(not(feature = "metadata"))] _metadata_collector: Option<()>,
-    #[cfg(feature = "visitor")] visitor: Option<crate::visitor::VisitorHandle>,
-    #[cfg(not(feature = "visitor"))] _visitor: Option<()>,
+    #[cfg(feature = "visitor")] visitor: &mut Option<&mut dyn crate::visitor::HtmlVisitor>,
+    #[cfg(not(feature = "visitor"))] _visitor: &mut Option<&mut ()>,
 ) -> Result<String> {
     let mut preprocessed = preprocess_html(html).into_owned();
     let mut preprocessed_len = preprocessed.len();
@@ -2119,20 +2150,10 @@ fn convert_html_impl(
         metadata_wants_images,
         #[cfg(feature = "metadata")]
         metadata_wants_structured_data,
-        #[cfg(feature = "visitor")]
-        visitor: visitor.clone(),
-        #[cfg(feature = "visitor")]
-        visitor_error: Rc::new(RefCell::new(None)),
     };
 
     for child_handle in dom.children().iter() {
-        walk_node(child_handle, parser, &mut output, options, &ctx, 0, &dom_ctx);
-    }
-
-    // Check for visitor errors
-    #[cfg(feature = "visitor")]
-    if let Some(err) = ctx.visitor_error.borrow().as_ref() {
-        return Err(crate::error::ConversionError::Visitor(err.clone()));
+        walk_node(child_handle, parser, &mut output, options, &ctx, 0, &dom_ctx, &mut visitor)?;
     }
 
     trim_line_end_whitespace(&mut output);
@@ -3086,7 +3107,8 @@ fn append_inline_suffix(
 
 /// Recursively walk DOM nodes and convert to Markdown.
 #[allow(clippy::only_used_in_recursion)]
-fn walk_node(
+#[cfg_attr(not(feature = "visitor"), allow(unused_variables))]
+fn walk_node<'v>(
     node_handle: &tl::NodeHandle,
     parser: &tl::Parser,
     output: &mut String,
@@ -3094,8 +3116,10 @@ fn walk_node(
     ctx: &Context,
     depth: usize,
     dom_ctx: &DomContext,
-) {
-    let Some(node) = node_handle.get(parser) else { return };
+    #[cfg(feature = "visitor")] visitor: &mut Option<&mut dyn crate::visitor::HtmlVisitor>,
+    #[cfg(not(feature = "visitor"))] _visitor: &mut Option<&mut ()>,
+) -> Result<()> {
+    let Some(node) = node_handle.get(parser) else { return Ok(()) };
 
     match node {
         tl::Node::Raw(bytes) => {
@@ -3266,53 +3290,48 @@ fn walk_node(
                 final_text
             };
 
+            // Dispatch visitor callback for text nodes
             #[cfg(feature = "visitor")]
-            let final_text = if let Some(ref visitor_handle) = ctx.visitor {
-                use crate::visitor::{NodeContext, NodeType, VisitResult};
-                use std::collections::BTreeMap;
-
-                let node_ctx = NodeContext {
-                    node_type: NodeType::Text,
-                    tag_name: String::new(),
-                    attributes: BTreeMap::new(),
+            if let Some(ref visitor) = ctx.visitor {
+                let node_ctx = build_node_context(
+                    NodeType::Text,
+                    "",  // text nodes have no tag
+                    &BTreeMap::new(),  // no attributes
                     depth,
-                    index_in_parent: 0,
-                    parent_tag: None,
-                    is_inline: true,
-                };
+                    0,  // index not critical
+                    None,  // no parent needed for text
+                    true,  // text is inline
+                );
 
-                let mut visitor = visitor_handle.borrow_mut();
-                match visitor.visit_text(&node_ctx, &processed_text) {
-                    VisitResult::Continue => processed_text,
-                    VisitResult::Custom(custom) => {
-                        // If we're inside elements that collect text for their own visitors
-                        // (headings, links), ignore Custom transformations
-                        if ctx.inline_depth > 0 || ctx.in_heading {
-                            processed_text
-                        } else {
-                            custom
-                        }
+                let visit_result = visitor.borrow_mut().visit_text(&node_ctx, processed_text.as_ref());
+                match visit_result {
+                    crate::visitor::VisitResult::Continue => {
+                        // Continue with default processing
                     }
-                    VisitResult::Skip => return,
-                    VisitResult::Error(err) => {
-                        if ctx.visitor_error.borrow().is_none() {
-                            *ctx.visitor_error.borrow_mut() = Some(err);
-                        }
+                    crate::visitor::VisitResult::Custom(custom) => {
+                        output.push_str(&custom);
                         return;
                     }
-                    VisitResult::PreserveHtml => processed_text,
+                    crate::visitor::VisitResult::Skip => {
+                        // Skip processing, don't output anything
+                        return;
+                    }
+                    crate::visitor::VisitResult::PreserveHtml => {
+                        // For text nodes, preserve means output as-is
+                        output.push_str(processed_text.as_ref());
+                        return;
+                    }
+                    crate::visitor::VisitResult::Error(err) => {
+                        eprintln!("Visitor error for text node: {}", err);
+                        // Continue with default processing on error
+                    }
                 }
-            } else {
-                processed_text
-            };
+            }
 
-            #[cfg(not(feature = "visitor"))]
-            let final_text = processed_text;
-
-            if ctx.in_list_item && final_text.contains("\n\n") {
+            if ctx.in_list_item && processed_text.contains("\n\n") {
                 let indent = " ".repeat(4 * ctx.list_depth);
                 let mut first = true;
-                for part in final_text.split("\n\n") {
+                for part in processed_text.split("\n\n") {
                     if !first {
                         output.push_str("\n\n");
                         output.push_str(&indent);
@@ -3321,7 +3340,7 @@ fn walk_node(
                     output.push_str(part.trim());
                 }
             } else {
-                output.push_str(&final_text);
+                output.push_str(&processed_text);
             }
         }
 
@@ -3330,41 +3349,6 @@ fn walk_node(
                 Some(info) => Cow::Borrowed(info.name.as_str()),
                 None => normalized_tag_name(tag.name().as_utf8_str()),
             };
-
-            #[cfg(feature = "visitor")]
-            if let Some(ref visitor_handle) = ctx.visitor {
-                use crate::visitor::{NodeContext, NodeType};
-                use std::collections::BTreeMap;
-
-                let attributes: BTreeMap<String, String> = tag
-                    .attributes()
-                    .iter()
-                    .filter_map(|(k, v)| v.as_ref().map(|val| (k.to_string(), val.to_string())))
-                    .collect();
-
-                let node_ctx = NodeContext {
-                    node_type: NodeType::Element,
-                    tag_name: tag_name.to_string(),
-                    attributes,
-                    depth,
-                    index_in_parent: 0, // TODO: track this properly
-                    parent_tag: None,   // TODO: track this properly
-                    is_inline: !is_block_level_element(&tag_name),
-                };
-
-                let mut visitor = visitor_handle.borrow_mut();
-                match visitor.visit_element_start(&node_ctx) {
-                    crate::visitor::VisitResult::Continue => {}
-                    crate::visitor::VisitResult::Skip => return,
-                    crate::visitor::VisitResult::Error(msg) => {
-                        if options.debug {
-                            eprintln!("[DEBUG] Visitor error on <{}>: {}", tag_name, msg);
-                        }
-                        return;
-                    }
-                    _ => {} // Custom or PreserveHtml - continue for now
-                }
-            }
 
             if should_drop_for_preprocessing(node_handle, tag_name.as_ref(), tag, parser, dom_ctx, options) {
                 trim_trailing_whitespace(output);
@@ -3378,7 +3362,7 @@ fn walk_node(
                 let children = tag.children();
                 {
                     for child_handle in children.top().iter() {
-                        walk_node(child_handle, parser, output, options, ctx, depth + 1, dom_ctx);
+                        walk_node(child_handle, parser, output, options, ctx, depth + 1, dom_ctx, visitor)?;
                     }
                 }
                 return;
@@ -3417,6 +3401,8 @@ fn walk_node(
                             tag_name.as_ref(),
                             &ctx.keep_inline_images_in,
                         ),
+                        #[cfg(feature = "visitor")]
+                        visitor: None,  // Disable visitor callbacks when collecting heading text
                         ..ctx.clone()
                     };
                     let children = tag.children();
@@ -3430,77 +3416,58 @@ fn walk_node(
                                 &heading_ctx,
                                 depth + 1,
                                 dom_ctx,
-                            );
+
+                                visitor,
+                            )?;
                         }
                     }
                     let trimmed = text.trim();
                     if !trimmed.is_empty() {
                         let normalized = normalize_heading_text(trimmed);
 
+                        // Visitor callback integration
                         #[cfg(feature = "visitor")]
-                        let heading_output = if let Some(ref visitor_handle) = ctx.visitor {
-                            use crate::visitor::{NodeContext, NodeType, VisitResult};
-                            use std::collections::BTreeMap;
-
-                            let id_attr = tag
-                                .attributes()
-                                .get("id")
-                                .flatten()
-                                .map(|v| v.as_utf8_str().to_string());
-
-                            let attributes: BTreeMap<String, String> = tag
-                                .attributes()
-                                .iter()
-                                .filter_map(|(k, v)| v.as_ref().map(|val| (k.to_string(), val.to_string())))
-                                .collect();
-
-                            let node_ctx = NodeContext {
-                                node_type: NodeType::Heading,
-                                tag_name: tag_name.to_string(),
-                                attributes,
+                        if let Some(ref visitor) = ctx.visitor {
+                            let attributes = extract_attributes(&tag);
+                            let node_ctx = build_node_context(
+                                NodeType::Heading,
+                                tag_name.as_ref(),
+                                &attributes,
                                 depth,
-                                index_in_parent: 0,
-                                parent_tag: None,
-                                is_inline: false,
-                            };
+                                0,
+                                get_parent_tag(node_handle, parser, dom_ctx).as_deref(),
+                                false,  // headings are block-level
+                            );
 
-                            let mut visitor = visitor_handle.borrow_mut();
-                            match visitor.visit_heading(&node_ctx, level as u32, &normalized, id_attr.as_deref()) {
-                                VisitResult::Continue => {
-                                    let mut buf = String::new();
-                                    push_heading(&mut buf, ctx, options, level, normalized.as_ref());
-                                    Some(buf)
+                            let id_attr = attributes.get("id").map(|s| s.as_str());
+
+                            let visit_result = visitor.borrow_mut().visit_heading(&node_ctx, level as u32, normalized.as_ref(), id_attr);
+                            match visit_result {
+                                crate::visitor::VisitResult::Continue => {
+                                    // Continue with default heading processing
                                 }
-                                VisitResult::Custom(custom) => Some(custom),
-                                VisitResult::Skip => None,
-                                VisitResult::Error(err) => {
-                                    if ctx.visitor_error.borrow().is_none() {
-                                        *ctx.visitor_error.borrow_mut() = Some(err);
-                                    }
-                                    None
+                                crate::visitor::VisitResult::Custom(custom) => {
+                                    output.push_str(&custom);
+                                    return;
                                 }
-                                VisitResult::PreserveHtml => {
-                                    let mut buf = String::new();
-                                    push_heading(&mut buf, ctx, options, level, normalized.as_ref());
-                                    Some(buf)
+                                crate::visitor::VisitResult::Skip => {
+                                    // Skip this heading entirely
+                                    return;
+                                }
+                                crate::visitor::VisitResult::PreserveHtml => {
+                                    let mut html_output = String::new();
+                                    serialize_node_to_html(node_handle, parser, &mut html_output);
+                                    output.push_str(&html_output);
+                                    return;
+                                }
+                                crate::visitor::VisitResult::Error(err) => {
+                                    eprintln!("Visitor error for heading: {}", err);
+                                    // Continue with default processing on error
                                 }
                             }
-                        } else {
-                            let mut buf = String::new();
-                            push_heading(&mut buf, ctx, options, level, normalized.as_ref());
-                            Some(buf)
-                        };
-
-                        #[cfg(not(feature = "visitor"))]
-                        let heading_output = {
-                            let mut buf = String::new();
-                            push_heading(&mut buf, ctx, options, level, normalized.as_ref());
-                            Some(buf)
-                        };
-
-                        if let Some(heading_text) = heading_output {
-                            output.push_str(&heading_text);
                         }
+
+                        push_heading(output, ctx, options, level, normalized.as_ref());
 
                         #[cfg(feature = "metadata")]
                         if ctx.metadata_wants_headers {
@@ -3572,7 +3539,7 @@ fn walk_node(
                                     }
                                 }
                             }
-                            walk_node(child_handle, parser, output, options, &p_ctx, depth + 1, dom_ctx);
+                            walk_node(child_handle, parser, output, options, &p_ctx, depth + 1, dom_ctx, visitor)?;
                         }
                     }
 
@@ -3588,7 +3555,7 @@ fn walk_node(
                         let children = tag.children();
                         {
                             for child_handle in children.top().iter() {
-                                walk_node(child_handle, parser, output, options, ctx, depth + 1, dom_ctx);
+                                walk_node(child_handle, parser, output, options, ctx, depth + 1, dom_ctx, visitor)?;
                             }
                         }
                     } else {
@@ -3609,91 +3576,27 @@ fn walk_node(
                                     &strong_ctx,
                                     depth + 1,
                                     dom_ctx,
-                                );
+
+                                    visitor,
+                                )?;
                             }
                         }
-
-                        #[cfg(feature = "visitor")]
-                        let strong_output = if let Some(ref visitor_handle) = ctx.visitor {
-                            use crate::visitor::{NodeContext, NodeType, VisitResult};
-                            use std::collections::BTreeMap;
-
-                            let text_content = get_text_content(node_handle, parser, dom_ctx);
-                            let attributes: BTreeMap<String, String> = tag
-                                .attributes()
-                                .iter()
-                                .filter_map(|(k, v)| v.as_ref().map(|val| (k.to_string(), val.to_string())))
-                                .collect();
-
-                            let node_ctx = NodeContext {
-                                node_type: NodeType::Strong,
-                                tag_name: tag_name.to_string(),
-                                attributes,
-                                depth,
-                                index_in_parent: 0,
-                                parent_tag: None,
-                                is_inline: true,
-                            };
-
-                            let mut visitor = visitor_handle.borrow_mut();
-                            match visitor.visit_strong(&node_ctx, &text_content) {
-                                VisitResult::Continue => None,
-                                VisitResult::Custom(custom) => Some(custom),
-                                VisitResult::Skip => Some(String::new()),
-                                VisitResult::PreserveHtml => Some(serialize_node(node_handle, parser)),
-                                VisitResult::Error(err) => {
-                                    if ctx.visitor_error.borrow().is_none() {
-                                        *ctx.visitor_error.borrow_mut() = Some(err);
-                                    }
-                                    None
-                                }
+                        let (prefix, suffix, trimmed) = chomp_inline(&content);
+                        if !content.trim().is_empty() {
+                            output.push_str(prefix);
+                            if ctx.in_strong {
+                                output.push_str(trimmed);
+                            } else {
+                                output.push(options.strong_em_symbol);
+                                output.push(options.strong_em_symbol);
+                                output.push_str(trimmed);
+                                output.push(options.strong_em_symbol);
+                                output.push(options.strong_em_symbol);
                             }
-                        } else {
-                            None
-                        };
-
-                        #[cfg(feature = "visitor")]
-                        if let Some(custom_output) = strong_output {
-                            output.push_str(&custom_output);
-                        } else {
-                            let (prefix, suffix, trimmed) = chomp_inline(&content);
-                            if !content.trim().is_empty() {
-                                output.push_str(prefix);
-                                if ctx.in_strong {
-                                    output.push_str(trimmed);
-                                } else {
-                                    output.push(options.strong_em_symbol);
-                                    output.push(options.strong_em_symbol);
-                                    output.push_str(trimmed);
-                                    output.push(options.strong_em_symbol);
-                                    output.push(options.strong_em_symbol);
-                                }
-                                append_inline_suffix(output, suffix, !trimmed.is_empty(), node_handle, parser, dom_ctx);
-                            } else if !content.is_empty() {
-                                output.push_str(prefix);
-                                append_inline_suffix(output, suffix, false, node_handle, parser, dom_ctx);
-                            }
-                        }
-
-                        #[cfg(not(feature = "visitor"))]
-                        {
-                            let (prefix, suffix, trimmed) = chomp_inline(&content);
-                            if !content.trim().is_empty() {
-                                output.push_str(prefix);
-                                if ctx.in_strong {
-                                    output.push_str(trimmed);
-                                } else {
-                                    output.push(options.strong_em_symbol);
-                                    output.push(options.strong_em_symbol);
-                                    output.push_str(trimmed);
-                                    output.push(options.strong_em_symbol);
-                                    output.push(options.strong_em_symbol);
-                                }
-                                append_inline_suffix(output, suffix, !trimmed.is_empty(), node_handle, parser, dom_ctx);
-                            } else if !content.is_empty() {
-                                output.push_str(prefix);
-                                append_inline_suffix(output, suffix, false, node_handle, parser, dom_ctx);
-                            }
+                            append_inline_suffix(output, suffix, !trimmed.is_empty(), node_handle, parser, dom_ctx);
+                        } else if !content.is_empty() {
+                            output.push_str(prefix);
+                            append_inline_suffix(output, suffix, false, node_handle, parser, dom_ctx);
                         }
                     }
                 }
@@ -3703,7 +3606,7 @@ fn walk_node(
                         let children = tag.children();
                         {
                             for child_handle in children.top().iter() {
-                                walk_node(child_handle, parser, output, options, ctx, depth + 1, dom_ctx);
+                                walk_node(child_handle, parser, output, options, ctx, depth + 1, dom_ctx, visitor)?;
                             }
                         }
                     } else {
@@ -3715,94 +3618,26 @@ fn walk_node(
                                 ..ctx.clone()
                             };
                             for child_handle in children.top().iter() {
-                                walk_node(child_handle, parser, &mut content, options, &em_ctx, depth + 1, dom_ctx);
+                                walk_node(child_handle, parser, &mut content, options, &em_ctx, depth + 1, dom_ctx, visitor)?;
                             }
                         }
-
-                        #[cfg(feature = "visitor")]
-                        let em_output = if let Some(ref visitor_handle) = ctx.visitor {
-                            use crate::visitor::{NodeContext, NodeType, VisitResult};
-                            use std::collections::BTreeMap;
-
-                            let text_content = get_text_content(node_handle, parser, dom_ctx);
-                            let attributes: BTreeMap<String, String> = tag
-                                .attributes()
-                                .iter()
-                                .filter_map(|(k, v)| v.as_ref().map(|val| (k.to_string(), val.to_string())))
-                                .collect();
-
-                            let node_ctx = NodeContext {
-                                node_type: NodeType::Em,
-                                tag_name: tag_name.to_string(),
-                                attributes,
-                                depth,
-                                index_in_parent: 0,
-                                parent_tag: None,
-                                is_inline: true,
-                            };
-
-                            let mut visitor = visitor_handle.borrow_mut();
-                            match visitor.visit_emphasis(&node_ctx, &text_content) {
-                                VisitResult::Continue => None,
-                                VisitResult::Custom(custom) => Some(custom),
-                                VisitResult::Skip => Some(String::new()),
-                                VisitResult::PreserveHtml => Some(serialize_node(node_handle, parser)),
-                                VisitResult::Error(err) => {
-                                    if ctx.visitor_error.borrow().is_none() {
-                                        *ctx.visitor_error.borrow_mut() = Some(err);
-                                    }
-                                    None
-                                }
-                            }
-                        } else {
-                            None
-                        };
-
-                        #[cfg(feature = "visitor")]
-                        if let Some(custom_output) = em_output {
-                            output.push_str(&custom_output);
-                        } else {
-                            let (prefix, suffix, trimmed) = chomp_inline(&content);
-                            if !content.trim().is_empty() {
-                                output.push_str(prefix);
-                                output.push(options.strong_em_symbol);
-                                output.push_str(trimmed);
-                                output.push(options.strong_em_symbol);
-                                append_inline_suffix(output, suffix, !trimmed.is_empty(), node_handle, parser, dom_ctx);
-                            } else if !content.is_empty() {
-                                output.push_str(prefix);
-                                append_inline_suffix(output, suffix, false, node_handle, parser, dom_ctx);
-                            } else if let Some(class_value) = tag
-                                .attributes()
-                                .get("class")
-                                .and_then(|v| v.as_ref().map(|val| val.as_utf8_str().to_string()))
-                            {
-                                if class_value.contains("caret") && !output.ends_with(' ') {
-                                    output.push_str(" > ");
-                                }
-                            }
-                        }
-
-                        #[cfg(not(feature = "visitor"))]
+                        let (prefix, suffix, trimmed) = chomp_inline(&content);
+                        if !content.trim().is_empty() {
+                            output.push_str(prefix);
+                            output.push(options.strong_em_symbol);
+                            output.push_str(trimmed);
+                            output.push(options.strong_em_symbol);
+                            append_inline_suffix(output, suffix, !trimmed.is_empty(), node_handle, parser, dom_ctx);
+                        } else if !content.is_empty() {
+                            output.push_str(prefix);
+                            append_inline_suffix(output, suffix, false, node_handle, parser, dom_ctx);
+                        } else if let Some(class_value) = tag
+                            .attributes()
+                            .get("class")
+                            .and_then(|v| v.as_ref().map(|val| val.as_utf8_str().to_string()))
                         {
-                            let (prefix, suffix, trimmed) = chomp_inline(&content);
-                            if !content.trim().is_empty() {
-                                output.push_str(prefix);
-                                output.push(options.strong_em_symbol);
-                                output.push_str(trimmed);
-                                output.push(options.strong_em_symbol);
-                                append_inline_suffix(output, suffix, !trimmed.is_empty(), node_handle, parser, dom_ctx);
-                            } else if !content.is_empty() {
-                                output.push_str(prefix);
-                                append_inline_suffix(output, suffix, false, node_handle, parser, dom_ctx);
-                            } else if let Some(class_value) = tag
-                                .attributes()
-                                .get("class")
-                                .and_then(|v| v.as_ref().map(|val| val.as_utf8_str().to_string()))
-                            {
-                                if class_value.contains("caret") && !output.ends_with(' ') {
-                                    output.push_str(" > ");
-                                }
+                            if class_value.contains("caret") && !output.ends_with(' ') {
+                                output.push_str(" > ");
                             }
                         }
                     }
@@ -3866,7 +3701,9 @@ fn walk_node(
                                         &heading_ctx,
                                         depth + 1,
                                         dom_ctx,
-                                    );
+
+                                        visitor,
+                                    )?;
                                     let trimmed_heading = heading_text.trim();
                                     if !trimmed_heading.is_empty() {
                                         let escaped_label = escape_link_label(trimmed_heading);
@@ -3906,7 +3743,9 @@ fn walk_node(
                                     &link_ctx,
                                     depth + 1,
                                     dom_ctx,
-                                );
+
+                                    visitor,
+                                )?;
                                 if !child_buf.trim().is_empty()
                                     && !content.is_empty()
                                     && !content.chars().last().map(|c| c.is_whitespace()).unwrap_or(true)
@@ -3936,7 +3775,9 @@ fn walk_node(
                                     &link_ctx,
                                     depth + 1,
                                     dom_ctx,
-                                );
+
+                                    visitor,
+                                )?;
                             }
                             normalize_link_label(&content)
                         };
@@ -3959,83 +3800,55 @@ fn walk_node(
                             label.push('…');
                         }
 
-                        let escaped_label = escape_link_label(&label);
-
+                        // Visitor callback integration for links
                         #[cfg(feature = "visitor")]
-                        let link_output = if let Some(ref visitor_handle) = ctx.visitor {
-                            use crate::visitor::{NodeContext, NodeType, VisitResult};
-                            use std::collections::BTreeMap;
-
-                            let attributes: BTreeMap<String, String> = tag
-                                .attributes()
-                                .iter()
-                                .filter_map(|(k, v)| v.as_ref().map(|val| (k.to_string(), val.to_string())))
-                                .collect();
-
-                            let node_ctx = NodeContext {
-                                node_type: NodeType::Link,
-                                tag_name: "a".to_string(),
-                                attributes,
+                        if let Some(ref visitor) = ctx.visitor {
+                            let attributes = extract_attributes(&tag);
+                            let node_ctx = build_node_context(
+                                NodeType::Link,
+                                "a",
+                                &attributes,
                                 depth,
-                                index_in_parent: 0,
-                                parent_tag: None,
-                                is_inline: true,
-                            };
+                                0,  // index would need parent tracking
+                                get_parent_tag(node_handle, parser, dom_ctx).as_deref(),
+                                true,  // links are inline
+                            );
 
-                            let mut visitor = visitor_handle.borrow_mut();
-                            match visitor.visit_link(&node_ctx, &href, &label, title.as_deref()) {
-                                VisitResult::Continue => {
-                                    let mut buf = String::new();
-                                    append_markdown_link(
-                                        &mut buf,
-                                        &escaped_label,
-                                        href.as_str(),
-                                        title.as_deref(),
-                                        label.as_str(),
-                                        options,
-                                    );
-                                    Some(buf)
+                            let visit_result = visitor.borrow_mut().visit_link(&node_ctx, href.as_str(), &label, title.as_deref());
+                            match visit_result {
+                                crate::visitor::VisitResult::Continue => {
+                                    // Continue with default link processing
                                 }
-                                VisitResult::Custom(custom) => Some(custom),
-                                VisitResult::Skip => None,
-                                VisitResult::Error(err) => {
-                                    if ctx.visitor_error.borrow().is_none() {
-                                        *ctx.visitor_error.borrow_mut() = Some(err);
-                                    }
-                                    None
+                                crate::visitor::VisitResult::Custom(custom) => {
+                                    output.push_str(&custom);
+                                    return;
                                 }
-                                VisitResult::PreserveHtml => Some(serialize_node(node_handle, parser)),
+                                crate::visitor::VisitResult::Skip => {
+                                    // Skip this link entirely
+                                    return;
+                                }
+                                crate::visitor::VisitResult::PreserveHtml => {
+                                    let mut html_output = String::new();
+                                    serialize_node_to_html(node_handle, parser, &mut html_output);
+                                    output.push_str(&html_output);
+                                    return;
+                                }
+                                crate::visitor::VisitResult::Error(err) => {
+                                    eprintln!("Visitor error for link: {}", err);
+                                    // Continue with default processing on error
+                                }
                             }
-                        } else {
-                            let mut buf = String::new();
-                            append_markdown_link(
-                                &mut buf,
-                                &escaped_label,
-                                href.as_str(),
-                                title.as_deref(),
-                                label.as_str(),
-                                options,
-                            );
-                            Some(buf)
-                        };
-
-                        #[cfg(not(feature = "visitor"))]
-                        let link_output = {
-                            let mut buf = String::new();
-                            append_markdown_link(
-                                &mut buf,
-                                &escaped_label,
-                                href.as_str(),
-                                title.as_deref(),
-                                label.as_str(),
-                                options,
-                            );
-                            Some(buf)
-                        };
-
-                        if let Some(link_text) = link_output {
-                            output.push_str(&link_text);
                         }
+
+                        let escaped_label = escape_link_label(&label);
+                        append_markdown_link(
+                            output,
+                            &escaped_label,
+                            href.as_str(),
+                            title.as_deref(),
+                            label.as_str(),
+                            options,
+                        );
 
                         #[cfg(feature = "metadata")]
                         if ctx.metadata_wants_links {
@@ -4068,7 +3881,7 @@ fn walk_node(
                         let children = tag.children();
                         {
                             for child_handle in children.top().iter() {
-                                walk_node(child_handle, parser, output, options, ctx, depth + 1, dom_ctx);
+                                walk_node(child_handle, parser, output, options, ctx, depth + 1, dom_ctx, visitor)?;
                             }
                         }
                     }
@@ -4092,6 +3905,45 @@ fn walk_node(
                         .unwrap_or(Cow::Borrowed(""));
 
                     let title = tag.attributes().get("title").flatten().map(|v| v.as_utf8_str());
+
+                    // Visitor callback integration for image elements
+                    #[cfg(feature = "visitor")]
+                    if let Some(ref visitor) = ctx.visitor {
+                        let attributes = extract_attributes(&tag);
+                        let node_ctx = build_node_context(
+                            NodeType::Image,
+                            "img",
+                            &attributes,
+                            depth,
+                            0,  // index_in_parent
+                            get_parent_tag(&node_handle, parser, dom_ctx).as_deref(),
+                            true,  // images are inline
+                        );
+
+                        let visit_result = visitor.borrow_mut().visit_image(&node_ctx, src.as_ref(), alt.as_ref(), title.as_deref());
+                        match visit_result {
+                            crate::visitor::VisitResult::Continue => {
+                                // Continue with default image processing
+                            }
+                            crate::visitor::VisitResult::Custom(custom) => {
+                                output.push_str(&custom);
+                                return;
+                            }
+                            crate::visitor::VisitResult::Skip => {
+                                // Skip this image entirely
+                                return;
+                            }
+                            crate::visitor::VisitResult::PreserveHtml => {
+                                serialize_node_to_html(&node_handle, parser, output);
+                                return;
+                            }
+                            crate::visitor::VisitResult::Error(err) => {
+                                eprintln!("Visitor error for image: {}", err);
+                                // Continue with default processing on error
+                            }
+                        }
+                    }
+
                     #[cfg(feature = "metadata")]
                     let mut metadata_payload: Option<ImageMetadataPayload> = None;
                     #[cfg(feature = "metadata")]
@@ -4150,98 +4002,19 @@ fn walk_node(
                     let should_use_alt_text = !keep_as_markdown
                         && (ctx.convert_as_inline || (ctx.in_heading && !ctx.heading_allow_inline_images));
 
-                    #[cfg(feature = "visitor")]
-                    let image_output = if let Some(ref visitor_handle) = ctx.visitor {
-                        use crate::visitor::{NodeContext, NodeType, VisitResult};
-                        use std::collections::BTreeMap;
-
-                        let attributes: BTreeMap<String, String> = tag
-                            .attributes()
-                            .iter()
-                            .filter_map(|(k, v)| v.as_ref().map(|val| (k.to_string(), val.to_string())))
-                            .collect();
-
-                        let node_ctx = NodeContext {
-                            node_type: NodeType::Image,
-                            tag_name: "img".to_string(),
-                            attributes,
-                            depth,
-                            index_in_parent: 0,
-                            parent_tag: None,
-                            is_inline: true,
-                        };
-
-                        let mut visitor = visitor_handle.borrow_mut();
-                        match visitor.visit_image(&node_ctx, &src, &alt, title.as_deref()) {
-                            VisitResult::Continue => {
-                                let mut buf = String::new();
-                                if should_use_alt_text {
-                                    buf.push_str(&alt);
-                                } else {
-                                    buf.push_str("![");
-                                    buf.push_str(&alt);
-                                    buf.push_str("](");
-                                    buf.push_str(&src);
-                                    if let Some(ref title_text) = title {
-                                        buf.push_str(" \"");
-                                        buf.push_str(title_text);
-                                        buf.push('"');
-                                    }
-                                    buf.push(')');
-                                }
-                                Some(buf)
-                            }
-                            VisitResult::Custom(custom) => Some(custom),
-                            VisitResult::Skip => None,
-                            VisitResult::Error(err) => {
-                                if ctx.visitor_error.borrow().is_none() {
-                                    *ctx.visitor_error.borrow_mut() = Some(err);
-                                }
-                                None
-                            }
-                            VisitResult::PreserveHtml => Some(serialize_node(node_handle, parser)),
-                        }
+                    if should_use_alt_text {
+                        output.push_str(&alt);
                     } else {
-                        let mut buf = String::new();
-                        if should_use_alt_text {
-                            buf.push_str(&alt);
-                        } else {
-                            buf.push_str("![");
-                            buf.push_str(&alt);
-                            buf.push_str("](");
-                            buf.push_str(&src);
-                            if let Some(ref title_text) = title {
-                                buf.push_str(" \"");
-                                buf.push_str(title_text);
-                                buf.push('"');
-                            }
-                            buf.push(')');
+                        output.push_str("![");
+                        output.push_str(&alt);
+                        output.push_str("](");
+                        output.push_str(&src);
+                        if let Some(ref title_text) = title {
+                            output.push_str(" \"");
+                            output.push_str(title_text);
+                            output.push('"');
                         }
-                        Some(buf)
-                    };
-
-                    #[cfg(not(feature = "visitor"))]
-                    let image_output = {
-                        let mut buf = String::new();
-                        if should_use_alt_text {
-                            buf.push_str(&alt);
-                        } else {
-                            buf.push_str("![");
-                            buf.push_str(&alt);
-                            buf.push_str("](");
-                            buf.push_str(&src);
-                            if let Some(ref title_text) = title {
-                                buf.push_str(" \"");
-                                buf.push_str(title_text);
-                                buf.push('"');
-                            }
-                            buf.push(')');
-                        }
-                        Some(buf)
-                    };
-
-                    if let Some(img_text) = image_output {
-                        output.push_str(&img_text);
+                        output.push(')');
                     }
 
                     #[cfg(feature = "metadata")]
@@ -4271,7 +4044,7 @@ fn walk_node(
                         let children = tag.children();
                         {
                             for child_handle in children.top().iter() {
-                                walk_node(child_handle, parser, output, options, ctx, depth + 1, dom_ctx);
+                                walk_node(child_handle, parser, output, options, ctx, depth + 1, dom_ctx, visitor)?;
                             }
                         }
                     } else {
@@ -4282,7 +4055,7 @@ fn walk_node(
                                 let children = tag.children();
                                 {
                                     for child_handle in children.top().iter() {
-                                        walk_node(child_handle, parser, output, options, ctx, depth + 1, dom_ctx);
+                                        walk_node(child_handle, parser, output, options, ctx, depth + 1, dom_ctx, visitor)?;
                                     }
                                 }
                                 output.push_str("==");
@@ -4292,7 +4065,7 @@ fn walk_node(
                                 let children = tag.children();
                                 {
                                     for child_handle in children.top().iter() {
-                                        walk_node(child_handle, parser, output, options, ctx, depth + 1, dom_ctx);
+                                        walk_node(child_handle, parser, output, options, ctx, depth + 1, dom_ctx, visitor)?;
                                     }
                                 }
                                 output.push_str("</mark>");
@@ -4307,7 +4080,7 @@ fn walk_node(
                                 let children = tag.children();
                                 {
                                     for child_handle in children.top().iter() {
-                                        walk_node(child_handle, parser, output, options, &bold_ctx, depth + 1, dom_ctx);
+                                        walk_node(child_handle, parser, output, options, &bold_ctx, depth + 1, dom_ctx, visitor)?;
                                     }
                                 }
                                 output.push_str(&symbol);
@@ -4316,7 +4089,7 @@ fn walk_node(
                                 let children = tag.children();
                                 {
                                     for child_handle in children.top().iter() {
-                                        walk_node(child_handle, parser, output, options, ctx, depth + 1, dom_ctx);
+                                        walk_node(child_handle, parser, output, options, ctx, depth + 1, dom_ctx, visitor)?;
                                     }
                                 }
                             }
@@ -4329,7 +4102,7 @@ fn walk_node(
                         let children = tag.children();
                         {
                             for child_handle in children.top().iter() {
-                                walk_node(child_handle, parser, output, options, ctx, depth + 1, dom_ctx);
+                                walk_node(child_handle, parser, output, options, ctx, depth + 1, dom_ctx, visitor)?;
                             }
                         }
                     } else {
@@ -4337,79 +4110,19 @@ fn walk_node(
                         let children = tag.children();
                         {
                             for child_handle in children.top().iter() {
-                                walk_node(child_handle, parser, &mut content, options, ctx, depth + 1, dom_ctx);
+                                walk_node(child_handle, parser, &mut content, options, ctx, depth + 1, dom_ctx, visitor)?;
                             }
                         }
-
-                        #[cfg(feature = "visitor")]
-                        let strikethrough_output = if let Some(ref visitor_handle) = ctx.visitor {
-                            use crate::visitor::{NodeContext, NodeType, VisitResult};
-                            use std::collections::BTreeMap;
-
-                            let text_content = get_text_content(node_handle, parser, dom_ctx);
-                            let attributes: BTreeMap<String, String> = tag
-                                .attributes()
-                                .iter()
-                                .filter_map(|(k, v)| v.as_ref().map(|val| (k.to_string(), val.to_string())))
-                                .collect();
-
-                            let node_ctx = NodeContext {
-                                node_type: NodeType::Strikethrough,
-                                tag_name: tag_name.to_string(),
-                                attributes,
-                                depth,
-                                index_in_parent: 0,
-                                parent_tag: None,
-                                is_inline: true,
-                            };
-
-                            let mut visitor = visitor_handle.borrow_mut();
-                            match visitor.visit_strikethrough(&node_ctx, &text_content) {
-                                VisitResult::Continue => None,
-                                VisitResult::Custom(custom) => Some(custom),
-                                VisitResult::Skip => Some(String::new()),
-                                VisitResult::PreserveHtml => Some(serialize_node(node_handle, parser)),
-                                VisitResult::Error(err) => {
-                                    if ctx.visitor_error.borrow().is_none() {
-                                        *ctx.visitor_error.borrow_mut() = Some(err);
-                                    }
-                                    None
-                                }
-                            }
-                        } else {
-                            None
-                        };
-
-                        #[cfg(feature = "visitor")]
-                        if let Some(custom_output) = strikethrough_output {
-                            output.push_str(&custom_output);
-                        } else {
-                            let (prefix, suffix, trimmed) = chomp_inline(&content);
-                            if !content.trim().is_empty() {
-                                output.push_str(prefix);
-                                output.push_str("~~");
-                                output.push_str(trimmed);
-                                output.push_str("~~");
-                                append_inline_suffix(output, suffix, !trimmed.is_empty(), node_handle, parser, dom_ctx);
-                            } else if !content.is_empty() {
-                                output.push_str(prefix);
-                                append_inline_suffix(output, suffix, false, node_handle, parser, dom_ctx);
-                            }
-                        }
-
-                        #[cfg(not(feature = "visitor"))]
-                        {
-                            let (prefix, suffix, trimmed) = chomp_inline(&content);
-                            if !content.trim().is_empty() {
-                                output.push_str(prefix);
-                                output.push_str("~~");
-                                output.push_str(trimmed);
-                                output.push_str("~~");
-                                append_inline_suffix(output, suffix, !trimmed.is_empty(), node_handle, parser, dom_ctx);
-                            } else if !content.is_empty() {
-                                output.push_str(prefix);
-                                append_inline_suffix(output, suffix, false, node_handle, parser, dom_ctx);
-                            }
+                        let (prefix, suffix, trimmed) = chomp_inline(&content);
+                        if !content.trim().is_empty() {
+                            output.push_str(prefix);
+                            output.push_str("~~");
+                            output.push_str(trimmed);
+                            output.push_str("~~");
+                            append_inline_suffix(output, suffix, !trimmed.is_empty(), node_handle, parser, dom_ctx);
+                        } else if !content.is_empty() {
+                            output.push_str(prefix);
+                            append_inline_suffix(output, suffix, false, node_handle, parser, dom_ctx);
                         }
                     }
                 }
@@ -4419,145 +4132,24 @@ fn walk_node(
                     let children = tag.children();
                     {
                         for child_handle in children.top().iter() {
-                            walk_node(child_handle, parser, &mut content, options, ctx, depth + 1, dom_ctx);
+                            walk_node(child_handle, parser, &mut content, options, ctx, depth + 1, dom_ctx, visitor)?;
                         }
                     }
-
-                    #[cfg(feature = "visitor")]
-                    let underline_output = if let Some(ref visitor_handle) = ctx.visitor {
-                        use crate::visitor::{NodeContext, NodeType, VisitResult};
-                        use std::collections::BTreeMap;
-
-                        let text_content = get_text_content(node_handle, parser, dom_ctx);
-                        let attributes: BTreeMap<String, String> = tag
-                            .attributes()
-                            .iter()
-                            .filter_map(|(k, v)| v.as_ref().map(|val| (k.to_string(), val.to_string())))
-                            .collect();
-
-                        let node_ctx = NodeContext {
-                            node_type: NodeType::Underline,
-                            tag_name: tag_name.to_string(),
-                            attributes,
-                            depth,
-                            index_in_parent: 0,
-                            parent_tag: None,
-                            is_inline: true,
-                        };
-
-                        let mut visitor = visitor_handle.borrow_mut();
-                        match visitor.visit_underline(&node_ctx, &text_content) {
-                            VisitResult::Continue => None,
-                            VisitResult::Custom(custom) => Some(custom),
-                            VisitResult::Skip => Some(String::new()),
-                            VisitResult::PreserveHtml => Some(serialize_node(node_handle, parser)),
-                            VisitResult::Error(err) => {
-                                if ctx.visitor_error.borrow().is_none() {
-                                    *ctx.visitor_error.borrow_mut() = Some(err);
-                                }
-                                None
-                            }
-                        }
-                    } else {
-                        None
-                    };
-
-                    #[cfg(feature = "visitor")]
-                    if let Some(custom_output) = underline_output {
-                        output.push_str(&custom_output);
-                    } else {
-                        let (prefix, suffix, trimmed) = chomp_inline(&content);
-                        if !trimmed.is_empty() {
-                            output.push_str(prefix);
-                            output.push_str("==");
-                            output.push_str(trimmed);
-                            output.push_str("==");
-                            append_inline_suffix(output, suffix, !trimmed.is_empty(), node_handle, parser, dom_ctx);
-                        }
-                    }
-
-                    #[cfg(not(feature = "visitor"))]
-                    {
-                        let (prefix, suffix, trimmed) = chomp_inline(&content);
-                        if !trimmed.is_empty() {
-                            output.push_str(prefix);
-                            output.push_str("==");
-                            output.push_str(trimmed);
-                            output.push_str("==");
-                            append_inline_suffix(output, suffix, !trimmed.is_empty(), node_handle, parser, dom_ctx);
-                        }
+                    let (prefix, suffix, trimmed) = chomp_inline(&content);
+                    if !trimmed.is_empty() {
+                        output.push_str(prefix);
+                        output.push_str("==");
+                        output.push_str(trimmed);
+                        output.push_str("==");
+                        append_inline_suffix(output, suffix, !trimmed.is_empty(), node_handle, parser, dom_ctx);
                     }
                 }
 
-                "u" => {
-                    #[cfg(feature = "visitor")]
-                    if let Some(ref visitor_handle) = ctx.visitor {
-                        use crate::visitor::{NodeContext, NodeType, VisitResult};
-                        use std::collections::BTreeMap;
-
-                        let text_content = get_text_content(node_handle, parser, dom_ctx);
-                        let attributes: BTreeMap<String, String> = tag
-                            .attributes()
-                            .iter()
-                            .filter_map(|(k, v)| v.as_ref().map(|val| (k.to_string(), val.to_string())))
-                            .collect();
-
-                        let node_ctx = NodeContext {
-                            node_type: NodeType::Underline,
-                            tag_name: tag_name.to_string(),
-                            attributes,
-                            depth,
-                            index_in_parent: 0,
-                            parent_tag: None,
-                            is_inline: true,
-                        };
-
-                        let mut visitor = visitor_handle.borrow_mut();
-                        match visitor.visit_underline(&node_ctx, &text_content) {
-                            VisitResult::Continue => {
-                                let children = tag.children();
-                                for child_handle in children.top().iter() {
-                                    walk_node(child_handle, parser, output, options, ctx, depth + 1, dom_ctx);
-                                }
-                            }
-                            VisitResult::Custom(custom) => {
-                                output.push_str(&custom);
-                            }
-                            VisitResult::Skip => {}
-                            VisitResult::PreserveHtml => {
-                                output.push_str(&serialize_node(node_handle, parser));
-                            }
-                            VisitResult::Error(err) => {
-                                if ctx.visitor_error.borrow().is_none() {
-                                    *ctx.visitor_error.borrow_mut() = Some(err);
-                                }
-                                let children = tag.children();
-                                for child_handle in children.top().iter() {
-                                    walk_node(child_handle, parser, output, options, ctx, depth + 1, dom_ctx);
-                                }
-                            }
-                        }
-                    } else {
-                        let children = tag.children();
-                        for child_handle in children.top().iter() {
-                            walk_node(child_handle, parser, output, options, ctx, depth + 1, dom_ctx);
-                        }
-                    }
-
-                    #[cfg(not(feature = "visitor"))]
-                    {
-                        let children = tag.children();
-                        for child_handle in children.top().iter() {
-                            walk_node(child_handle, parser, output, options, ctx, depth + 1, dom_ctx);
-                        }
-                    }
-                }
-
-                "small" => {
+                "u" | "small" => {
                     let children = tag.children();
                     {
                         for child_handle in children.top().iter() {
-                            walk_node(child_handle, parser, output, options, ctx, depth + 1, dom_ctx);
+                            walk_node(child_handle, parser, output, options, ctx, depth + 1, dom_ctx, visitor)?;
                         }
                     }
                 }
@@ -4569,7 +4161,7 @@ fn walk_node(
                     let children = tag.children();
                     {
                         for child_handle in children.top().iter() {
-                            walk_node(child_handle, parser, output, options, ctx, depth + 1, dom_ctx);
+                            walk_node(child_handle, parser, output, options, ctx, depth + 1, dom_ctx, visitor)?;
                         }
                     }
                     if !ctx.in_code && !options.sub_symbol.is_empty() {
@@ -4588,7 +4180,7 @@ fn walk_node(
                     let children = tag.children();
                     {
                         for child_handle in children.top().iter() {
-                            walk_node(child_handle, parser, output, options, ctx, depth + 1, dom_ctx);
+                            walk_node(child_handle, parser, output, options, ctx, depth + 1, dom_ctx, visitor)?;
                         }
                     }
                     if !ctx.in_code && !options.sup_symbol.is_empty() {
@@ -4617,7 +4209,9 @@ fn walk_node(
                                 &code_ctx,
                                 depth + 1,
                                 dom_ctx,
-                            );
+
+                                visitor,
+                            )?;
                         }
                     }
                     let normalized = text::normalize_whitespace(&content);
@@ -4639,7 +4233,7 @@ fn walk_node(
                     let children = tag.children();
                     {
                         for child_handle in children.top().iter() {
-                            walk_node(child_handle, parser, &mut content, options, ctx, depth + 1, dom_ctx);
+                            walk_node(child_handle, parser, &mut content, options, ctx, depth + 1, dom_ctx, visitor)?;
                         }
                     }
                     let (prefix, suffix, trimmed) = chomp_inline(&content);
@@ -4657,7 +4251,7 @@ fn walk_node(
                     let children = tag.children();
                     {
                         for child_handle in children.top().iter() {
-                            walk_node(child_handle, parser, &mut content, options, ctx, depth + 1, dom_ctx);
+                            walk_node(child_handle, parser, &mut content, options, ctx, depth + 1, dom_ctx, visitor)?;
                         }
                     }
                     let (prefix, suffix, trimmed) = chomp_inline(&content);
@@ -4675,7 +4269,7 @@ fn walk_node(
                     let children = tag.children();
                     {
                         for child_handle in children.top().iter() {
-                            walk_node(child_handle, parser, &mut content, options, ctx, depth + 1, dom_ctx);
+                            walk_node(child_handle, parser, &mut content, options, ctx, depth + 1, dom_ctx, visitor)?;
                         }
                     }
                     let trimmed = content.trim();
@@ -4698,7 +4292,7 @@ fn walk_node(
                     let children = tag.children();
                     {
                         for child_handle in children.top().iter() {
-                            walk_node(child_handle, parser, output, options, ctx, depth + 1, dom_ctx);
+                            walk_node(child_handle, parser, output, options, ctx, depth + 1, dom_ctx, visitor)?;
                         }
                     }
                 }
@@ -4724,162 +4318,69 @@ fn walk_node(
                                     &code_ctx,
                                     depth + 1,
                                     dom_ctx,
-                                );
+
+                                    visitor,
+                                )?;
                             }
                         }
 
                         let trimmed = &content;
 
                         if !content.trim().is_empty() {
-                            #[cfg(feature = "visitor")]
-                            let code_output = if let Some(ref visitor_handle) = ctx.visitor {
-                                use crate::visitor::{NodeContext, NodeType, VisitResult};
-                                use std::collections::BTreeMap;
+                            let contains_backtick = trimmed.contains('`');
 
-                                let attributes: BTreeMap<String, String> = tag
-                                    .attributes()
-                                    .iter()
-                                    .filter_map(|(k, v)| v.as_ref().map(|val| (k.to_string(), val.to_string())))
-                                    .collect();
+                            let needs_delimiter_spaces = {
+                                let first_char = trimmed.chars().next();
+                                let last_char = trimmed.chars().last();
+                                let starts_with_space = first_char == Some(' ');
+                                let ends_with_space = last_char == Some(' ');
+                                let starts_with_backtick = first_char == Some('`');
+                                let ends_with_backtick = last_char == Some('`');
+                                let all_spaces = trimmed.chars().all(|c| c == ' ');
 
-                                let node_ctx = NodeContext {
-                                    node_type: NodeType::Code,
-                                    tag_name: tag_name.to_string(),
-                                    attributes,
-                                    depth,
-                                    index_in_parent: 0,
-                                    parent_tag: None,
-                                    is_inline: true,
-                                };
-
-                                let mut visitor = visitor_handle.borrow_mut();
-                                match visitor.visit_code_inline(&node_ctx, trimmed) {
-                                    VisitResult::Continue => None,
-                                    VisitResult::Custom(custom) => Some(custom),
-                                    VisitResult::Skip => Some(String::new()),
-                                    VisitResult::PreserveHtml => Some(serialize_node(node_handle, parser)),
-                                    VisitResult::Error(err) => {
-                                        if ctx.visitor_error.borrow().is_none() {
-                                            *ctx.visitor_error.borrow_mut() = Some(err);
-                                        }
-                                        None
-                                    }
-                                }
-                            } else {
-                                None
+                                all_spaces
+                                    || starts_with_backtick
+                                    || ends_with_backtick
+                                    || (starts_with_space && ends_with_space && contains_backtick)
                             };
 
-                            #[cfg(feature = "visitor")]
-                            if let Some(custom_output) = code_output {
-                                output.push_str(&custom_output);
+                            let (num_backticks, needs_spaces) = if contains_backtick {
+                                let max_consecutive = trimmed
+                                    .chars()
+                                    .fold((0, 0), |(max, current), c| {
+                                        if c == '`' {
+                                            let new_current = current + 1;
+                                            (max.max(new_current), new_current)
+                                        } else {
+                                            (max, 0)
+                                        }
+                                    })
+                                    .0;
+                                let num = if max_consecutive == 1 { 2 } else { 1 };
+                                (num, needs_delimiter_spaces)
                             } else {
-                                let contains_backtick = trimmed.contains('`');
+                                (1, needs_delimiter_spaces)
+                            };
 
-                                let needs_delimiter_spaces = {
-                                    let first_char = trimmed.chars().next();
-                                    let last_char = trimmed.chars().last();
-                                    let starts_with_space = first_char == Some(' ');
-                                    let ends_with_space = last_char == Some(' ');
-                                    let starts_with_backtick = first_char == Some('`');
-                                    let ends_with_backtick = last_char == Some('`');
-                                    let all_spaces = trimmed.chars().all(|c| c == ' ');
-
-                                    all_spaces
-                                        || starts_with_backtick
-                                        || ends_with_backtick
-                                        || (starts_with_space && ends_with_space && contains_backtick)
-                                };
-
-                                let (num_backticks, needs_spaces) = if contains_backtick {
-                                    let max_consecutive = trimmed
-                                        .chars()
-                                        .fold((0, 0), |(max, current), c| {
-                                            if c == '`' {
-                                                let new_current = current + 1;
-                                                (max.max(new_current), new_current)
-                                            } else {
-                                                (max, 0)
-                                            }
-                                        })
-                                        .0;
-                                    let num = if max_consecutive == 1 { 2 } else { 1 };
-                                    (num, needs_delimiter_spaces)
-                                } else {
-                                    (1, needs_delimiter_spaces)
-                                };
-
-                                for _ in 0..num_backticks {
-                                    output.push('`');
-                                }
-                                if needs_spaces {
-                                    output.push(' ');
-                                }
-                                output.push_str(trimmed);
-                                if needs_spaces {
-                                    output.push(' ');
-                                }
-                                for _ in 0..num_backticks {
-                                    output.push('`');
-                                }
+                            for _ in 0..num_backticks {
+                                output.push('`');
                             }
-
-                            #[cfg(not(feature = "visitor"))]
-                            {
-                                let contains_backtick = trimmed.contains('`');
-
-                                let needs_delimiter_spaces = {
-                                    let first_char = trimmed.chars().next();
-                                    let last_char = trimmed.chars().last();
-                                    let starts_with_space = first_char == Some(' ');
-                                    let ends_with_space = last_char == Some(' ');
-                                    let starts_with_backtick = first_char == Some('`');
-                                    let ends_with_backtick = last_char == Some('`');
-                                    let all_spaces = trimmed.chars().all(|c| c == ' ');
-
-                                    all_spaces
-                                        || starts_with_backtick
-                                        || ends_with_backtick
-                                        || (starts_with_space && ends_with_space && contains_backtick)
-                                };
-
-                                let (num_backticks, needs_spaces) = if contains_backtick {
-                                    let max_consecutive = trimmed
-                                        .chars()
-                                        .fold((0, 0), |(max, current), c| {
-                                            if c == '`' {
-                                                let new_current = current + 1;
-                                                (max.max(new_current), new_current)
-                                            } else {
-                                                (max, 0)
-                                            }
-                                        })
-                                        .0;
-                                    let num = if max_consecutive == 1 { 2 } else { 1 };
-                                    (num, needs_delimiter_spaces)
-                                } else {
-                                    (1, needs_delimiter_spaces)
-                                };
-
-                                for _ in 0..num_backticks {
-                                    output.push('`');
-                                }
-                                if needs_spaces {
-                                    output.push(' ');
-                                }
-                                output.push_str(trimmed);
-                                if needs_spaces {
-                                    output.push(' ');
-                                }
-                                for _ in 0..num_backticks {
-                                    output.push('`');
-                                }
+                            if needs_spaces {
+                                output.push(' ');
+                            }
+                            output.push_str(trimmed);
+                            if needs_spaces {
+                                output.push(' ');
+                            }
+                            for _ in 0..num_backticks {
+                                output.push('`');
                             }
                         }
                     } else {
                         let children = tag.children();
                         {
                             for child_handle in children.top().iter() {
-                                walk_node(child_handle, parser, output, options, &code_ctx, depth + 1, dom_ctx);
+                                walk_node(child_handle, parser, output, options, &code_ctx, depth + 1, dom_ctx, visitor)?;
                             }
                         }
                     }
@@ -4889,34 +4390,6 @@ fn walk_node(
                     let code_ctx = Context {
                         in_code: true,
                         ..ctx.clone()
-                    };
-
-                    // Extract language from nested <code> tag if present
-                    let language: Option<String> = {
-                        let children = tag.children();
-                        let mut lang: Option<String> = None;
-                        for child_handle in children.top().iter() {
-                            if let Some(tl::Node::Tag(child_tag)) = child_handle.get(parser) {
-                                if child_tag.name() == "code" {
-                                    if let Some(class_attr) = child_tag.attributes().get("class") {
-                                        if let Some(class_bytes) = class_attr {
-                                            let class_str = class_bytes.as_utf8_str();
-                                            for cls in class_str.split_whitespace() {
-                                                if let Some(stripped) = cls.strip_prefix("language-") {
-                                                    lang = Some(String::from(stripped));
-                                                    break;
-                                                } else if let Some(stripped) = cls.strip_prefix("lang-") {
-                                                    lang = Some(String::from(stripped));
-                                                    break;
-                                                }
-                                            }
-                                        }
-                                    }
-                                    break;
-                                }
-                            }
-                        }
-                        lang
                     };
 
                     let mut content = String::with_capacity(256);
@@ -4931,7 +4404,9 @@ fn walk_node(
                                 &code_ctx,
                                 depth + 1,
                                 dom_ctx,
-                            );
+
+                                visitor,
+                            )?;
                         }
                     }
 
@@ -4968,155 +4443,55 @@ fn walk_node(
                             }
                         };
 
-                        #[cfg(feature = "visitor")]
-                        let code_block_output = if let Some(ref visitor_handle) = ctx.visitor {
-                            use crate::visitor::{NodeContext, NodeType, VisitResult};
-                            use std::collections::BTreeMap;
-
-                            let attributes: BTreeMap<String, String> = tag
-                                .attributes()
-                                .iter()
-                                .filter_map(|(k, v)| v.as_ref().map(|val| (k.to_string(), val.to_string())))
-                                .collect();
-
-                            let node_ctx = NodeContext {
-                                node_type: NodeType::Pre,
-                                tag_name: tag_name.to_string(),
-                                attributes,
-                                depth,
-                                index_in_parent: 0,
-                                parent_tag: None,
-                                is_inline: false,
-                            };
-
-                            let mut visitor = visitor_handle.borrow_mut();
-                            match visitor.visit_code_block(&node_ctx, language.as_deref(), &processed_content) {
-                                VisitResult::Continue => None,
-                                VisitResult::Custom(custom) => Some(custom),
-                                VisitResult::Skip => Some(String::new()),
-                                VisitResult::PreserveHtml => Some(serialize_node(node_handle, parser)),
-                                VisitResult::Error(err) => {
-                                    if ctx.visitor_error.borrow().is_none() {
-                                        *ctx.visitor_error.borrow_mut() = Some(err);
-                                    }
-                                    None
-                                }
-                            }
-                        } else {
-                            None
-                        };
-
-                        #[cfg(feature = "visitor")]
-                        if let Some(custom_output) = code_block_output {
-                            output.push_str(&custom_output);
-                        } else {
-                            match options.code_block_style {
-                                crate::options::CodeBlockStyle::Indented => {
-                                    if !ctx.convert_as_inline && !output.is_empty() && !output.ends_with("\n\n") {
-                                        if output.ends_with('\n') {
-                                            output.push('\n');
-                                        } else {
-                                            output.push_str("\n\n");
-                                        }
-                                    }
-
-                                    let indented = processed_content
-                                        .lines()
-                                        .map(|line| {
-                                            if line.is_empty() {
-                                                String::new()
-                                            } else {
-                                                format!("    {}", line)
-                                            }
-                                        })
-                                        .collect::<Vec<_>>()
-                                        .join("\n");
-                                    output.push_str(&indented);
-
-                                    output.push_str("\n\n");
-                                }
-                                crate::options::CodeBlockStyle::Backticks | crate::options::CodeBlockStyle::Tildes => {
-                                    if !ctx.convert_as_inline && !output.is_empty() && !output.ends_with("\n\n") {
-                                        if output.ends_with('\n') {
-                                            output.push('\n');
-                                        } else {
-                                            output.push_str("\n\n");
-                                        }
-                                    }
-
-                                    let fence = if options.code_block_style == crate::options::CodeBlockStyle::Backticks
-                                    {
-                                        "```"
+                        match options.code_block_style {
+                            crate::options::CodeBlockStyle::Indented => {
+                                if !ctx.convert_as_inline && !output.is_empty() && !output.ends_with("\n\n") {
+                                    if output.ends_with('\n') {
+                                        output.push('\n');
                                     } else {
-                                        "~~~"
-                                    };
-
-                                    output.push_str(fence);
-                                    if !options.code_language.is_empty() {
-                                        output.push_str(&options.code_language);
+                                        output.push_str("\n\n");
                                     }
-                                    output.push('\n');
-                                    output.push_str(&processed_content);
-                                    output.push('\n');
-                                    output.push_str(fence);
-                                    output.push('\n');
                                 }
+
+                                let indented = processed_content
+                                    .lines()
+                                    .map(|line| {
+                                        if line.is_empty() {
+                                            String::new()
+                                        } else {
+                                            format!("    {}", line)
+                                        }
+                                    })
+                                    .collect::<Vec<_>>()
+                                    .join("\n");
+                                output.push_str(&indented);
+
+                                output.push_str("\n\n");
                             }
-                        }
-
-                        #[cfg(not(feature = "visitor"))]
-                        {
-                            match options.code_block_style {
-                                crate::options::CodeBlockStyle::Indented => {
-                                    if !ctx.convert_as_inline && !output.is_empty() && !output.ends_with("\n\n") {
-                                        if output.ends_with('\n') {
-                                            output.push('\n');
-                                        } else {
-                                            output.push_str("\n\n");
-                                        }
-                                    }
-
-                                    let indented = processed_content
-                                        .lines()
-                                        .map(|line| {
-                                            if line.is_empty() {
-                                                String::new()
-                                            } else {
-                                                format!("    {}", line)
-                                            }
-                                        })
-                                        .collect::<Vec<_>>()
-                                        .join("\n");
-                                    output.push_str(&indented);
-
-                                    output.push_str("\n\n");
-                                }
-                                crate::options::CodeBlockStyle::Backticks | crate::options::CodeBlockStyle::Tildes => {
-                                    if !ctx.convert_as_inline && !output.is_empty() && !output.ends_with("\n\n") {
-                                        if output.ends_with('\n') {
-                                            output.push('\n');
-                                        } else {
-                                            output.push_str("\n\n");
-                                        }
-                                    }
-
-                                    let fence = if options.code_block_style == crate::options::CodeBlockStyle::Backticks
-                                    {
-                                        "```"
+                            crate::options::CodeBlockStyle::Backticks | crate::options::CodeBlockStyle::Tildes => {
+                                if !ctx.convert_as_inline && !output.is_empty() && !output.ends_with("\n\n") {
+                                    if output.ends_with('\n') {
+                                        output.push('\n');
                                     } else {
-                                        "~~~"
-                                    };
-
-                                    output.push_str(fence);
-                                    if !options.code_language.is_empty() {
-                                        output.push_str(&options.code_language);
+                                        output.push_str("\n\n");
                                     }
-                                    output.push('\n');
-                                    output.push_str(&processed_content);
-                                    output.push('\n');
-                                    output.push_str(fence);
-                                    output.push('\n');
                                 }
+
+                                let fence = if options.code_block_style == crate::options::CodeBlockStyle::Backticks {
+                                    "```"
+                                } else {
+                                    "~~~"
+                                };
+
+                                output.push_str(fence);
+                                if !options.code_language.is_empty() {
+                                    output.push_str(&options.code_language);
+                                }
+                                output.push('\n');
+                                output.push_str(&processed_content);
+                                output.push('\n');
+                                output.push_str(fence);
+                                output.push('\n');
                             }
                         }
                     }
@@ -5127,7 +4502,7 @@ fn walk_node(
                         let children = tag.children();
                         {
                             for child_handle in children.top().iter() {
-                                walk_node(child_handle, parser, output, options, ctx, depth + 1, dom_ctx);
+                                walk_node(child_handle, parser, output, options, ctx, depth + 1, dom_ctx, visitor)?;
                             }
                         }
                         return;
@@ -5155,58 +4530,14 @@ fn walk_node(
                                 &blockquote_ctx,
                                 depth + 1,
                                 dom_ctx,
-                            );
+
+                                visitor,
+                            )?;
                         }
                     }
 
                     let trimmed_content = content.trim();
 
-                    // Visitor integration: call before default processing
-                    #[cfg(feature = "visitor")]
-                    if let Some(ref visitor) = ctx.visitor {
-                        use crate::visitor::{NodeContext, NodeType, VisitResult};
-                        use std::collections::BTreeMap;
-
-                        let attributes: BTreeMap<String, String> = tag
-                            .attributes()
-                            .iter()
-                            .filter_map(|(k, v)| v.as_ref().map(|val| (k.to_string(), val.to_string())))
-                            .collect();
-
-                        let node_ctx = NodeContext {
-                            node_type: NodeType::Blockquote,
-                            tag_name: "blockquote".to_string(),
-                            attributes,
-                            depth,
-                            index_in_parent: 0,
-                            parent_tag: None,
-                            is_inline: false,
-                        };
-
-                        let mut visitor_ref = visitor.borrow_mut();
-                        match visitor_ref.visit_blockquote(&node_ctx, trimmed_content, ctx.blockquote_depth) {
-                            VisitResult::Continue => {
-                                // Continue with default processing below
-                            }
-                            VisitResult::Custom(custom) => {
-                                output.push_str(&custom);
-                                return;
-                            }
-                            VisitResult::Skip => return,
-                            VisitResult::PreserveHtml => {
-                                let mut html_output = String::new();
-                                serialize_node_to_html(node_handle, parser, &mut html_output);
-                                output.push_str(&html_output);
-                                return;
-                            }
-                            VisitResult::Error(err) => {
-                                if ctx.visitor_error.borrow().is_none() {
-                                    *ctx.visitor_error.borrow_mut() = Some(err);
-                                }
-                                return;
-                            }
-                        }
-                    }
                     if !trimmed_content.is_empty() {
                         if ctx.blockquote_depth > 0 {
                             output.push_str("\n\n\n");
@@ -5298,63 +4629,6 @@ fn walk_node(
                     let nested_depth = calculate_list_nesting_depth(ctx);
                     let is_loose = is_loose_list(node_handle, parser, dom_ctx);
 
-                    #[cfg(feature = "visitor")]
-                    let list_output_start = output.len();
-
-                    #[cfg(feature = "visitor")]
-                    let mut list_start_custom: Option<String> = None;
-
-                    #[cfg(feature = "visitor")]
-                    if let Some(ref visitor_handle) = ctx.visitor {
-                        use crate::visitor::{NodeContext, NodeType, VisitResult};
-                        use std::collections::BTreeMap;
-
-                        let attributes: BTreeMap<String, String> = tag
-                            .attributes()
-                            .iter()
-                            .filter_map(|(k, v)| v.as_ref().map(|val| (k.to_string(), val.to_string())))
-                            .collect();
-
-                        let parent_tag = dom_ctx
-                            .parent_of(node_handle.get_inner())
-                            .and_then(|pid| dom_ctx.tag_name_for(&dom_ctx.node_handle(pid).copied()?, parser))
-                            .map(|s| s.to_string());
-
-                        let index = dom_ctx.sibling_index(node_handle.get_inner()).unwrap_or(0);
-
-                        let node_ctx = NodeContext {
-                            node_type: NodeType::List,
-                            tag_name: "ul".to_string(),
-                            attributes,
-                            depth,
-                            index_in_parent: index,
-                            parent_tag,
-                            is_inline: false,
-                        };
-
-                        let mut visitor = visitor_handle.borrow_mut();
-                        match visitor.visit_list_start(&node_ctx, false) {
-                            VisitResult::Continue => { /* continue */ }
-                            VisitResult::Custom(custom) => {
-                                // Store custom LIST_START to prepend later (don't add to output yet)
-                                list_start_custom = Some(custom);
-                            }
-                            VisitResult::Skip => {
-                                return;
-                            }
-                            VisitResult::PreserveHtml => {
-                                serialize_node_to_html(node_handle, parser, output);
-                                return;
-                            }
-                            VisitResult::Error(err) => {
-                                if ctx.visitor_error.borrow().is_none() {
-                                    *ctx.visitor_error.borrow_mut() = Some(err);
-                                }
-                                return;
-                            }
-                        }
-                    }
-
                     process_list_children(
                         node_handle,
                         parser,
@@ -5367,73 +4641,11 @@ fn walk_node(
                         nested_depth,
                         1,
                         dom_ctx,
-                    );
+
+                        visitor,
+                    )?;
 
                     add_nested_list_trailing_separator(output, ctx);
-
-                    #[cfg(feature = "visitor")]
-                    if let Some(ref visitor_handle) = ctx.visitor {
-                        use crate::visitor::{NodeContext, NodeType, VisitResult};
-                        use std::collections::BTreeMap;
-
-                        let attributes: BTreeMap<String, String> = tag
-                            .attributes()
-                            .iter()
-                            .filter_map(|(k, v)| v.as_ref().map(|val| (k.to_string(), val.to_string())))
-                            .collect();
-
-                        let parent_tag = dom_ctx
-                            .parent_of(node_handle.get_inner())
-                            .and_then(|pid| dom_ctx.tag_name_for(&dom_ctx.node_handle(pid).copied()?, parser))
-                            .map(|s| s.to_string());
-
-                        let index = dom_ctx.sibling_index(node_handle.get_inner()).unwrap_or(0);
-
-                        let node_ctx = NodeContext {
-                            node_type: NodeType::List,
-                            tag_name: "ul".to_string(),
-                            attributes,
-                            depth,
-                            index_in_parent: index,
-                            parent_tag,
-                            is_inline: false,
-                        };
-
-                        let list_content = &output[list_output_start..];
-
-                        let mut visitor = visitor_handle.borrow_mut();
-                        match visitor.visit_list_end(&node_ctx, false, list_content) {
-                            VisitResult::Continue => {
-                                // If there was a custom list_start, prepend it now
-                                if let Some(custom_start) = list_start_custom {
-                                    output.insert_str(list_output_start, &custom_start);
-                                }
-                            }
-                            VisitResult::Custom(custom) => {
-                                // Combine: custom_start + children + custom_end
-                                let children_output = output[list_output_start..].to_string();
-                                output.truncate(list_output_start);
-                                if let Some(custom_start) = list_start_custom {
-                                    output.push_str(&custom_start);
-                                }
-                                output.push_str(&children_output);
-                                output.push_str(&custom);
-                            }
-                            VisitResult::Skip => {
-                                output.truncate(list_output_start);
-                            }
-                            VisitResult::PreserveHtml => {
-                                output.truncate(list_output_start);
-                                serialize_node_to_html(node_handle, parser, output);
-                            }
-                            VisitResult::Error(err) => {
-                                if ctx.visitor_error.borrow().is_none() {
-                                    *ctx.visitor_error.borrow_mut() = Some(err);
-                                }
-                                output.truncate(list_output_start);
-                            }
-                        }
-                    }
                 }
 
                 "ol" => {
@@ -5449,63 +4661,6 @@ fn walk_node(
                         .and_then(|v| v.as_utf8_str().parse::<usize>().ok())
                         .unwrap_or(1);
 
-                    #[cfg(feature = "visitor")]
-                    let list_output_start = output.len();
-
-                    #[cfg(feature = "visitor")]
-                    let mut list_start_custom: Option<String> = None;
-
-                    #[cfg(feature = "visitor")]
-                    if let Some(ref visitor_handle) = ctx.visitor {
-                        use crate::visitor::{NodeContext, NodeType, VisitResult};
-                        use std::collections::BTreeMap;
-
-                        let attributes: BTreeMap<String, String> = tag
-                            .attributes()
-                            .iter()
-                            .filter_map(|(k, v)| v.as_ref().map(|val| (k.to_string(), val.to_string())))
-                            .collect();
-
-                        let parent_tag = dom_ctx
-                            .parent_of(node_handle.get_inner())
-                            .and_then(|pid| dom_ctx.tag_name_for(&dom_ctx.node_handle(pid).copied()?, parser))
-                            .map(|s| s.to_string());
-
-                        let index = dom_ctx.sibling_index(node_handle.get_inner()).unwrap_or(0);
-
-                        let node_ctx = NodeContext {
-                            node_type: NodeType::List,
-                            tag_name: "ol".to_string(),
-                            attributes,
-                            depth,
-                            index_in_parent: index,
-                            parent_tag,
-                            is_inline: false,
-                        };
-
-                        let mut visitor = visitor_handle.borrow_mut();
-                        match visitor.visit_list_start(&node_ctx, true) {
-                            VisitResult::Continue => { /* continue */ }
-                            VisitResult::Custom(custom) => {
-                                // Store custom LIST_START to prepend later (don't add to output yet)
-                                list_start_custom = Some(custom);
-                            }
-                            VisitResult::Skip => {
-                                return;
-                            }
-                            VisitResult::PreserveHtml => {
-                                serialize_node_to_html(node_handle, parser, output);
-                                return;
-                            }
-                            VisitResult::Error(err) => {
-                                if ctx.visitor_error.borrow().is_none() {
-                                    *ctx.visitor_error.borrow_mut() = Some(err);
-                                }
-                                return;
-                            }
-                        }
-                    }
-
                     process_list_children(
                         node_handle,
                         parser,
@@ -5518,73 +4673,11 @@ fn walk_node(
                         nested_depth,
                         start,
                         dom_ctx,
-                    );
+
+                        visitor,
+                    )?;
 
                     add_nested_list_trailing_separator(output, ctx);
-
-                    #[cfg(feature = "visitor")]
-                    if let Some(ref visitor_handle) = ctx.visitor {
-                        use crate::visitor::{NodeContext, NodeType, VisitResult};
-                        use std::collections::BTreeMap;
-
-                        let attributes: BTreeMap<String, String> = tag
-                            .attributes()
-                            .iter()
-                            .filter_map(|(k, v)| v.as_ref().map(|val| (k.to_string(), val.to_string())))
-                            .collect();
-
-                        let parent_tag = dom_ctx
-                            .parent_of(node_handle.get_inner())
-                            .and_then(|pid| dom_ctx.tag_name_for(&dom_ctx.node_handle(pid).copied()?, parser))
-                            .map(|s| s.to_string());
-
-                        let index = dom_ctx.sibling_index(node_handle.get_inner()).unwrap_or(0);
-
-                        let node_ctx = NodeContext {
-                            node_type: NodeType::List,
-                            tag_name: "ol".to_string(),
-                            attributes,
-                            depth,
-                            index_in_parent: index,
-                            parent_tag,
-                            is_inline: false,
-                        };
-
-                        let list_content = &output[list_output_start..];
-
-                        let mut visitor = visitor_handle.borrow_mut();
-                        match visitor.visit_list_end(&node_ctx, true, list_content) {
-                            VisitResult::Continue => {
-                                // If there was a custom list_start, prepend it now
-                                if let Some(custom_start) = list_start_custom {
-                                    output.insert_str(list_output_start, &custom_start);
-                                }
-                            }
-                            VisitResult::Custom(custom) => {
-                                // Combine: custom_start + children + custom_end
-                                let children_output = output[list_output_start..].to_string();
-                                output.truncate(list_output_start);
-                                if let Some(custom_start) = list_start_custom {
-                                    output.push_str(&custom_start);
-                                }
-                                output.push_str(&children_output);
-                                output.push_str(&custom);
-                            }
-                            VisitResult::Skip => {
-                                output.truncate(list_output_start);
-                            }
-                            VisitResult::PreserveHtml => {
-                                output.truncate(list_output_start);
-                                serialize_node_to_html(node_handle, parser, output);
-                            }
-                            VisitResult::Error(err) => {
-                                if ctx.visitor_error.borrow().is_none() {
-                                    *ctx.visitor_error.borrow_mut() = Some(err);
-                                }
-                                output.truncate(list_output_start);
-                            }
-                        }
-                    }
                 }
 
                 "li" => {
@@ -5723,12 +4816,14 @@ fn walk_node(
                                                 depth,
                                                 checkbox,
                                                 dom_ctx,
-                                            );
+
+                                                visitor,
+                                            )?;
                                         }
                                     }
                                 }
                             } else {
-                                walk_node(node_handle, parser, output, options, ctx, depth, dom_ctx);
+                                walk_node(node_handle, parser, output, options, ctx, depth, dom_ctx, visitor)?;
                             }
                         }
 
@@ -5745,7 +4840,9 @@ fn walk_node(
                                     depth + 1,
                                     &checkbox_node,
                                     dom_ctx,
-                                );
+
+                                    visitor,
+                                )?;
                             }
                         }
                         output.push(' ');
@@ -5769,105 +4866,11 @@ fn walk_node(
                         let children = tag.children();
                         {
                             for child_handle in children.top().iter() {
-                                walk_node(child_handle, parser, output, options, &li_ctx, depth + 1, dom_ctx);
+                                walk_node(child_handle, parser, output, options, &li_ctx, depth + 1, dom_ctx, visitor)?;
                             }
                         }
 
                         trim_trailing_whitespace(output);
-
-                        // Call visitor callback for list item AFTER content is rendered
-                        #[cfg(feature = "visitor")]
-                        if let Some(ref visitor_handle) = ctx.visitor {
-                            use crate::visitor::{NodeContext, NodeType, VisitResult};
-                            use std::collections::BTreeMap;
-
-                            let attributes: BTreeMap<String, String> = tag
-                                .attributes()
-                                .iter()
-                                .filter_map(|(k, v)| v.as_ref().map(|val| (k.to_string(), val.to_string())))
-                                .collect();
-
-                            let parent_tag = dom_ctx
-                                .parent_of(node_handle.get_inner())
-                                .and_then(|pid| dom_ctx.tag_name_for(&dom_ctx.node_handle(pid).copied()?, parser))
-                                .map(|s| s.to_string());
-
-                            let index = dom_ctx.sibling_index(node_handle.get_inner()).unwrap_or(0);
-
-                            let node_ctx = NodeContext {
-                                node_type: NodeType::ListItem,
-                                tag_name: "li".to_string(),
-                                attributes,
-                                depth,
-                                index_in_parent: index,
-                                parent_tag,
-                                is_inline: false,
-                            };
-
-                            // Extract marker and text from the output
-                            let last_line_start = output.rfind('\n').map(|pos| pos + 1).unwrap_or(0);
-                            let last_line = &output[last_line_start..];
-
-                            // Extract marker and text - need to use String to avoid lifetime issues
-                            let (marker, text_content) = if is_task_list {
-                                let task_marker = if task_checked { "- [x]" } else { "- [ ]" };
-                                let text_start = last_line
-                                    .find(task_marker)
-                                    .map(|pos| pos + task_marker.len())
-                                    .unwrap_or(0);
-                                (task_marker.to_string(), last_line[text_start..].trim().to_string())
-                            } else if ctx.in_ordered_list {
-                                let marker_text = format!("{}.", ctx.list_counter);
-                                let text_start = last_line
-                                    .find(&marker_text)
-                                    .map(|pos| pos + marker_text.len())
-                                    .unwrap_or(0);
-                                (marker_text, last_line[text_start..].trim().to_string())
-                            } else {
-                                let bullets: Vec<char> = options.bullets.chars().collect();
-                                let bullet_index = if ctx.ul_depth > 0 { ctx.ul_depth - 1 } else { 0 };
-                                let bullet = bullets.get(bullet_index % bullets.len()).copied().unwrap_or('*');
-                                let bullet_str = bullet.to_string();
-                                let text_start = last_line.find(bullet).map(|pos| pos + 1).unwrap_or(0);
-                                (bullet_str, last_line[text_start..].trim().to_string())
-                            };
-
-                            let mut visitor = visitor_handle.borrow_mut();
-                            match visitor.visit_list_item(&node_ctx, ctx.in_ordered_list, &marker, &text_content) {
-                                VisitResult::Continue => { /* continue */ }
-                                VisitResult::Custom(custom) => {
-                                    // Replace the last line with custom output
-                                    output.truncate(last_line_start);
-                                    output.push_str(&custom);
-                                    // Add newline after custom output (skip default newline logic below)
-                                    if !ctx.in_table_cell && !output.ends_with('\n') {
-                                        output.push('\n');
-                                    }
-                                    return;
-                                }
-                                VisitResult::Skip => {
-                                    // Remove the list item
-                                    output.truncate(last_line_start);
-                                    return;
-                                }
-                                VisitResult::PreserveHtml => {
-                                    // Replace with HTML
-                                    output.truncate(last_line_start);
-                                    serialize_node_to_html(node_handle, parser, output);
-                                    // Add newline after HTML
-                                    if !ctx.in_table_cell && !output.ends_with('\n') {
-                                        output.push('\n');
-                                    }
-                                    return;
-                                }
-                                VisitResult::Error(err) => {
-                                    if ctx.visitor_error.borrow().is_none() {
-                                        *ctx.visitor_error.borrow_mut() = Some(err);
-                                    }
-                                    return;
-                                }
-                            }
-                        }
                     }
 
                     if !ctx.in_table_cell {
@@ -5887,7 +4890,7 @@ fn walk_node(
 
                 "table" => {
                     let mut table_output = String::new();
-                    convert_table(node_handle, parser, &mut table_output, options, ctx, dom_ctx, depth);
+                    convert_table(node_handle, parser, &mut table_output, options, ctx, dom_ctx);
 
                     if ctx.in_list_item {
                         let has_caption = table_output.starts_with('*');
@@ -5924,7 +4927,7 @@ fn walk_node(
                     let children = tag.children();
                     {
                         for child_handle in children.top().iter() {
-                            walk_node(child_handle, parser, &mut text, options, ctx, depth + 1, dom_ctx);
+                            walk_node(child_handle, parser, &mut text, options, ctx, depth + 1, dom_ctx, visitor)?;
                         }
                     }
                     let text = text.trim();
@@ -5943,7 +4946,7 @@ fn walk_node(
                         let children = tag.children();
                         {
                             for child_handle in children.top().iter() {
-                                walk_node(child_handle, parser, output, options, ctx, depth, dom_ctx);
+                                walk_node(child_handle, parser, output, options, ctx, depth, dom_ctx, visitor)?;
                             }
                         }
                         return;
@@ -5953,7 +4956,7 @@ fn walk_node(
                     let children = tag.children();
                     {
                         for child_handle in children.top().iter() {
-                            walk_node(child_handle, parser, &mut content, options, ctx, depth, dom_ctx);
+                            walk_node(child_handle, parser, &mut content, options, ctx, depth, dom_ctx, visitor)?;
                         }
                     }
                     if content.trim().is_empty() {
@@ -5976,7 +4979,7 @@ fn walk_node(
                         let children = tag.children();
                         {
                             for child_handle in children.top().iter() {
-                                walk_node(child_handle, parser, output, options, ctx, depth, dom_ctx);
+                                walk_node(child_handle, parser, output, options, ctx, depth, dom_ctx, visitor)?;
                             }
                         }
                         return;
@@ -5990,7 +4993,7 @@ fn walk_node(
                     let children = tag.children();
                     {
                         for child_handle in children.top().iter() {
-                            walk_node(child_handle, parser, &mut figure_content, options, ctx, depth, dom_ctx);
+                            walk_node(child_handle, parser, &mut figure_content, options, ctx, depth, dom_ctx, visitor)?;
                         }
                     }
 
@@ -6014,7 +5017,7 @@ fn walk_node(
                     let children = tag.children();
                     {
                         for child_handle in children.top().iter() {
-                            walk_node(child_handle, parser, &mut text, options, ctx, depth + 1, dom_ctx);
+                            walk_node(child_handle, parser, &mut text, options, ctx, depth + 1, dom_ctx, visitor)?;
                         }
                     }
                     let text = text.trim();
@@ -6041,7 +5044,7 @@ fn walk_node(
                     let children = tag.children();
                     {
                         for child_handle in children.top().iter() {
-                            walk_node(child_handle, parser, output, options, ctx, depth, dom_ctx);
+                            walk_node(child_handle, parser, output, options, ctx, depth, dom_ctx, visitor)?;
                         }
                     }
                 }
@@ -6051,7 +5054,7 @@ fn walk_node(
                     let children = tag.children();
                     {
                         for child_handle in children.top().iter() {
-                            walk_node(child_handle, parser, &mut content, options, ctx, depth + 1, dom_ctx);
+                            walk_node(child_handle, parser, &mut content, options, ctx, depth + 1, dom_ctx, visitor)?;
                         }
                     }
                     let trimmed = content.trim();
@@ -6071,7 +5074,7 @@ fn walk_node(
                     let children = tag.children();
                     {
                         for child_handle in children.top().iter() {
-                            walk_node(child_handle, parser, &mut content, options, ctx, depth + 1, dom_ctx);
+                            walk_node(child_handle, parser, &mut content, options, ctx, depth + 1, dom_ctx, visitor)?;
                         }
                     }
                     let trimmed = content.trim();
@@ -6092,7 +5095,7 @@ fn walk_node(
                         let children = tag.children();
                         {
                             for child_handle in children.top().iter() {
-                                walk_node(child_handle, parser, output, options, ctx, depth, dom_ctx);
+                                walk_node(child_handle, parser, output, options, ctx, depth, dom_ctx, visitor)?;
                             }
                         }
                         return;
@@ -6114,7 +5117,7 @@ fn walk_node(
                                 last_was_dt: in_dt_group && is_dd,
                                 ..ctx.clone()
                             };
-                            walk_node(child_handle, parser, &mut content, options, &child_ctx, depth, dom_ctx);
+                            walk_node(child_handle, parser, &mut content, options, &child_ctx, depth, dom_ctx, visitor)?;
 
                             if is_dt {
                                 in_dt_group = true;
@@ -6139,7 +5142,7 @@ fn walk_node(
                     let children = tag.children();
                     {
                         for child_handle in children.top().iter() {
-                            walk_node(child_handle, parser, &mut content, options, ctx, depth + 1, dom_ctx);
+                            walk_node(child_handle, parser, &mut content, options, ctx, depth + 1, dom_ctx, visitor)?;
                         }
                     }
                     let trimmed = content.trim();
@@ -6158,7 +5161,7 @@ fn walk_node(
                     let children = tag.children();
                     {
                         for child_handle in children.top().iter() {
-                            walk_node(child_handle, parser, &mut content, options, ctx, depth + 1, dom_ctx);
+                            walk_node(child_handle, parser, &mut content, options, ctx, depth + 1, dom_ctx, visitor)?;
                         }
                     }
 
@@ -6187,7 +5190,7 @@ fn walk_node(
                         let children = tag.children();
                         {
                             for child_handle in children.top().iter() {
-                                walk_node(child_handle, parser, output, options, ctx, depth, dom_ctx);
+                                walk_node(child_handle, parser, output, options, ctx, depth, dom_ctx, visitor)?;
                             }
                         }
                         return;
@@ -6197,7 +5200,7 @@ fn walk_node(
                     let children = tag.children();
                     {
                         for child_handle in children.top().iter() {
-                            walk_node(child_handle, parser, &mut content, options, ctx, depth, dom_ctx);
+                            walk_node(child_handle, parser, &mut content, options, ctx, depth, dom_ctx, visitor)?;
                         }
                     }
                     let trimmed = content.trim();
@@ -6227,7 +5230,9 @@ fn walk_node(
                                 &summary_ctx,
                                 depth + 1,
                                 dom_ctx,
-                            );
+
+                                visitor,
+                            )?;
                         }
                     }
                     let trimmed = content.trim();
@@ -6249,7 +5254,7 @@ fn walk_node(
                         let children = tag.children();
                         {
                             for child_handle in children.top().iter() {
-                                walk_node(child_handle, parser, output, options, ctx, depth, dom_ctx);
+                                walk_node(child_handle, parser, output, options, ctx, depth, dom_ctx, visitor)?;
                             }
                         }
                         return;
@@ -6260,7 +5265,7 @@ fn walk_node(
                     let children = tag.children();
                     {
                         for child_handle in children.top().iter() {
-                            walk_node(child_handle, parser, output, options, ctx, depth, dom_ctx);
+                            walk_node(child_handle, parser, output, options, ctx, depth, dom_ctx, visitor)?;
                         }
                     }
 
@@ -6292,7 +5297,7 @@ fn walk_node(
                     let children = tag.children();
                     {
                         for child_handle in children.top().iter() {
-                            walk_node(child_handle, parser, output, &menu_options, &list_ctx, depth, dom_ctx);
+                            walk_node(child_handle, parser, output, &menu_options, &list_ctx, depth, dom_ctx, visitor)?;
                         }
                     }
 
@@ -6360,7 +5365,7 @@ fn walk_node(
                             };
 
                             if !is_source {
-                                walk_node(child_handle, parser, &mut fallback, options, ctx, depth + 1, dom_ctx);
+                                walk_node(child_handle, parser, &mut fallback, options, ctx, depth + 1, dom_ctx, visitor)?;
                             }
                         }
                     }
@@ -6421,7 +5426,7 @@ fn walk_node(
                             };
 
                             if !is_source {
-                                walk_node(child_handle, parser, &mut fallback, options, ctx, depth + 1, dom_ctx);
+                                walk_node(child_handle, parser, &mut fallback, options, ctx, depth + 1, dom_ctx, visitor)?;
                             }
                         }
                     }
@@ -6441,7 +5446,7 @@ fn walk_node(
                         for child_handle in children.top().iter() {
                             if let Some(tl::Node::Tag(child_tag)) = child_handle.get(parser) {
                                 if tag_name_eq(child_tag.name().as_utf8_str(), "img") {
-                                    walk_node(child_handle, parser, output, options, ctx, depth, dom_ctx);
+                                    walk_node(child_handle, parser, output, options, ctx, depth, dom_ctx, visitor)?;
                                     break;
                                 }
                             }
@@ -6568,7 +5573,7 @@ fn walk_node(
                         let children = tag.children();
                         {
                             for child_handle in children.top().iter() {
-                                walk_node(child_handle, parser, output, options, ctx, depth, dom_ctx);
+                                walk_node(child_handle, parser, output, options, ctx, depth, dom_ctx, visitor)?;
                             }
                         }
                         return;
@@ -6578,7 +5583,7 @@ fn walk_node(
                     let children = tag.children();
                     {
                         for child_handle in children.top().iter() {
-                            walk_node(child_handle, parser, &mut content, options, ctx, depth, dom_ctx);
+                            walk_node(child_handle, parser, &mut content, options, ctx, depth, dom_ctx, visitor)?;
                         }
                     }
                     let trimmed = content.trim();
@@ -6596,7 +5601,7 @@ fn walk_node(
                         let children = tag.children();
                         {
                             for child_handle in children.top().iter() {
-                                walk_node(child_handle, parser, output, options, ctx, depth, dom_ctx);
+                                walk_node(child_handle, parser, output, options, ctx, depth, dom_ctx, visitor)?;
                             }
                         }
                         return;
@@ -6605,7 +5610,7 @@ fn walk_node(
                     let children = tag.children();
                     {
                         for child_handle in children.top().iter() {
-                            walk_node(child_handle, parser, &mut content, options, ctx, depth, dom_ctx);
+                            walk_node(child_handle, parser, &mut content, options, ctx, depth, dom_ctx, visitor)?;
                         }
                     }
                     let trimmed = content.trim();
@@ -6635,7 +5640,9 @@ fn walk_node(
                                 &legend_ctx,
                                 depth + 1,
                                 dom_ctx,
-                            );
+
+                                visitor,
+                            )?;
                         }
                     }
                     let trimmed = content.trim();
@@ -6657,7 +5664,7 @@ fn walk_node(
                     let children = tag.children();
                     {
                         for child_handle in children.top().iter() {
-                            walk_node(child_handle, parser, &mut content, options, ctx, depth + 1, dom_ctx);
+                            walk_node(child_handle, parser, &mut content, options, ctx, depth + 1, dom_ctx, visitor)?;
                         }
                     }
                     let trimmed = content.trim();
@@ -6676,7 +5683,7 @@ fn walk_node(
                     let children = tag.children();
                     {
                         for child_handle in children.top().iter() {
-                            walk_node(child_handle, parser, output, options, ctx, depth + 1, dom_ctx);
+                            walk_node(child_handle, parser, output, options, ctx, depth + 1, dom_ctx, visitor)?;
                         }
                     }
 
@@ -6690,7 +5697,7 @@ fn walk_node(
                     let children = tag.children();
                     {
                         for child_handle in children.top().iter() {
-                            walk_node(child_handle, parser, output, options, ctx, depth + 1, dom_ctx);
+                            walk_node(child_handle, parser, output, options, ctx, depth + 1, dom_ctx, visitor)?;
                         }
                     }
 
@@ -6706,7 +5713,7 @@ fn walk_node(
                     let children = tag.children();
                     {
                         for child_handle in children.top().iter() {
-                            walk_node(child_handle, parser, &mut text, options, ctx, depth + 1, dom_ctx);
+                            walk_node(child_handle, parser, &mut text, options, ctx, depth + 1, dom_ctx, visitor)?;
                         }
                     }
                     let trimmed = text.trim();
@@ -6742,7 +5749,7 @@ fn walk_node(
                     let children = tag.children();
                     {
                         for child_handle in children.top().iter() {
-                            walk_node(child_handle, parser, output, options, ctx, depth + 1, dom_ctx);
+                            walk_node(child_handle, parser, output, options, ctx, depth + 1, dom_ctx, visitor)?;
                         }
                     }
                 }
@@ -6752,7 +5759,7 @@ fn walk_node(
                     let children = tag.children();
                     {
                         for child_handle in children.top().iter() {
-                            walk_node(child_handle, parser, output, options, ctx, depth + 1, dom_ctx);
+                            walk_node(child_handle, parser, output, options, ctx, depth + 1, dom_ctx, visitor)?;
                         }
                     }
 
@@ -6766,7 +5773,7 @@ fn walk_node(
                     let children = tag.children();
                     {
                         for child_handle in children.top().iter() {
-                            walk_node(child_handle, parser, output, options, ctx, depth + 1, dom_ctx);
+                            walk_node(child_handle, parser, output, options, ctx, depth + 1, dom_ctx, visitor)?;
                         }
                     }
 
@@ -6780,7 +5787,7 @@ fn walk_node(
                     let children = tag.children();
                     {
                         for child_handle in children.top().iter() {
-                            walk_node(child_handle, parser, output, options, ctx, depth + 1, dom_ctx);
+                            walk_node(child_handle, parser, output, options, ctx, depth + 1, dom_ctx, visitor)?;
                         }
                     }
 
@@ -6794,7 +5801,7 @@ fn walk_node(
                     let children = tag.children();
                     {
                         for child_handle in children.top().iter() {
-                            walk_node(child_handle, parser, output, options, ctx, depth + 1, dom_ctx);
+                            walk_node(child_handle, parser, output, options, ctx, depth + 1, dom_ctx, visitor)?;
                         }
                     }
 
@@ -6808,7 +5815,7 @@ fn walk_node(
                     let children = tag.children();
                     {
                         for child_handle in children.top().iter() {
-                            walk_node(child_handle, parser, output, options, ctx, depth + 1, dom_ctx);
+                            walk_node(child_handle, parser, output, options, ctx, depth + 1, dom_ctx, visitor)?;
                         }
                     }
 
@@ -6861,7 +5868,9 @@ fn walk_node(
                                                     &ruby_ctx,
                                                     depth,
                                                     dom_ctx,
-                                                );
+
+                                                    visitor,
+                                                )?;
                                                 if !current_base.is_empty() {
                                                     output.push_str(current_base.trim());
                                                     current_base.clear();
@@ -6880,7 +5889,9 @@ fn walk_node(
                                                     &ruby_ctx,
                                                     depth,
                                                     dom_ctx,
-                                                );
+
+                                                    visitor,
+                                                )?;
                                             } else if tag_name != "rp" {
                                                 walk_node(
                                                     child_handle,
@@ -6890,7 +5901,9 @@ fn walk_node(
                                                     &ruby_ctx,
                                                     depth,
                                                     dom_ctx,
-                                                );
+
+                                                    visitor,
+                                                )?;
                                             }
                                         }
                                         tl::Node::Raw(_) => {
@@ -6902,7 +5915,9 @@ fn walk_node(
                                                 &ruby_ctx,
                                                 depth,
                                                 dom_ctx,
-                                            );
+
+                                                visitor,
+                                            )?;
                                         }
                                         _ => {}
                                     }
@@ -6934,7 +5949,9 @@ fn walk_node(
                                                     &ruby_ctx,
                                                     depth,
                                                     dom_ctx,
-                                                );
+
+                                                    visitor,
+                                                )?;
                                                 rt_annotations.push(annotation);
                                             } else if tag_name == "rtc" {
                                                 walk_node(
@@ -6945,7 +5962,9 @@ fn walk_node(
                                                     &ruby_ctx,
                                                     depth,
                                                     dom_ctx,
-                                                );
+
+                                                    visitor,
+                                                )?;
                                             } else if tag_name != "rp" {
                                                 walk_node(
                                                     child_handle,
@@ -6955,7 +5974,9 @@ fn walk_node(
                                                     &ruby_ctx,
                                                     depth,
                                                     dom_ctx,
-                                                );
+
+                                                    visitor,
+                                                )?;
                                             }
                                         }
                                         tl::Node::Raw(_) => {
@@ -6967,7 +5988,9 @@ fn walk_node(
                                                 &ruby_ctx,
                                                 depth,
                                                 dom_ctx,
-                                            );
+
+                                                visitor,
+                                            )?;
                                         }
                                         _ => {}
                                     }
@@ -7003,7 +6026,7 @@ fn walk_node(
                     let children = tag.children();
                     {
                         for child_handle in children.top().iter() {
-                            walk_node(child_handle, parser, &mut text, options, ctx, depth + 1, dom_ctx);
+                            walk_node(child_handle, parser, &mut text, options, ctx, depth + 1, dom_ctx, visitor)?;
                         }
                     }
                     output.push_str(text.trim());
@@ -7014,7 +6037,7 @@ fn walk_node(
                     let children = tag.children();
                     {
                         for child_handle in children.top().iter() {
-                            walk_node(child_handle, parser, &mut text, options, ctx, depth + 1, dom_ctx);
+                            walk_node(child_handle, parser, &mut text, options, ctx, depth + 1, dom_ctx, visitor)?;
                         }
                     }
                     let trimmed = text.trim();
@@ -7033,7 +6056,7 @@ fn walk_node(
                     let children = tag.children();
                     {
                         for child_handle in children.top().iter() {
-                            walk_node(child_handle, parser, &mut content, options, ctx, depth + 1, dom_ctx);
+                            walk_node(child_handle, parser, &mut content, options, ctx, depth + 1, dom_ctx, visitor)?;
                         }
                     }
                     let trimmed = content.trim();
@@ -7046,7 +6069,7 @@ fn walk_node(
                     let children = tag.children();
                     {
                         for child_handle in children.top().iter() {
-                            walk_node(child_handle, parser, output, options, ctx, depth, dom_ctx);
+                            walk_node(child_handle, parser, output, options, ctx, depth, dom_ctx, visitor)?;
                         }
                     }
                 }
@@ -7056,7 +6079,7 @@ fn walk_node(
                         let children = tag.children();
                         {
                             for child_handle in children.top().iter() {
-                                walk_node(child_handle, parser, output, options, ctx, depth + 1, dom_ctx);
+                                walk_node(child_handle, parser, output, options, ctx, depth + 1, dom_ctx, visitor)?;
                             }
                         }
                         return;
@@ -7092,7 +6115,7 @@ fn walk_node(
                     let children = tag.children();
                     {
                         for child_handle in children.top().iter() {
-                            walk_node(child_handle, parser, output, options, ctx, depth, dom_ctx);
+                            walk_node(child_handle, parser, output, options, ctx, depth, dom_ctx, visitor)?;
                         }
                     }
 
@@ -7173,7 +6196,7 @@ fn walk_node(
 
                     if has_body_like {
                         for child_handle in children.top().iter() {
-                            walk_node(child_handle, parser, output, options, ctx, depth + 1, dom_ctx);
+                            walk_node(child_handle, parser, output, options, ctx, depth + 1, dom_ctx, visitor)?;
                         }
                     }
                 }
@@ -7228,7 +6251,7 @@ fn walk_node(
                     let children = tag.children();
                     {
                         for child_handle in children.top().iter() {
-                            walk_node(child_handle, parser, output, options, ctx, depth, dom_ctx);
+                            walk_node(child_handle, parser, output, options, ctx, depth, dom_ctx, visitor)?;
                         }
                     }
                 }
@@ -7240,7 +6263,7 @@ fn walk_node(
                     let children = tag.children();
                     {
                         for child_handle in children.top().iter() {
-                            walk_node(child_handle, parser, output, options, ctx, depth, dom_ctx);
+                            walk_node(child_handle, parser, output, options, ctx, depth, dom_ctx, visitor)?;
                         }
                     }
 
@@ -7299,6 +6322,7 @@ fn walk_node(
 
         tl::Node::Comment(_) => {}
     }
+    Ok(())
 }
 
 const MAX_TABLE_COLS: usize = 1000;
@@ -7435,7 +6459,7 @@ fn convert_table_cell(
 
         if has_tag_child {
             for child_handle in children.top().iter() {
-                walk_node(child_handle, parser, &mut text, options, &cell_ctx, 0, dom_ctx);
+                walk_node(child_handle, parser, &mut text, options, &cell_ctx, 0, dom_ctx, visitor)?;
             }
         } else {
             let raw = dom_ctx.text_content(node_handle, parser);
@@ -7498,80 +6522,11 @@ fn convert_table_row(
     total_cols: usize,
     header_cols: usize,
     dom_ctx: &DomContext,
-    depth: usize,
-    is_header: bool,
 ) {
     let mut row_text = String::with_capacity(256);
     let mut cells = Vec::new();
 
     collect_table_cells(node_handle, parser, dom_ctx, &mut cells);
-
-    // Collect cell contents for visitor
-    #[cfg(feature = "visitor")]
-    let cell_contents: Vec<String> = if ctx.visitor.is_some() {
-        cells
-            .iter()
-            .map(|cell_handle| {
-                let mut text = String::new();
-                let cell_ctx = Context {
-                    in_table_cell: true,
-                    ..ctx.clone()
-                };
-                if let Some(tl::Node::Tag(tag)) = cell_handle.get(parser) {
-                    for child_handle in tag.children().top().iter() {
-                        walk_node(child_handle, parser, &mut text, options, &cell_ctx, 0, dom_ctx);
-                    }
-                }
-                text::normalize_whitespace_cow(&text).trim().to_string()
-            })
-            .collect()
-    } else {
-        Vec::new()
-    };
-
-    #[cfg(feature = "visitor")]
-    if let Some(ref visitor_handle) = ctx.visitor {
-        use crate::visitor::{NodeContext, NodeType, VisitResult};
-        use std::collections::BTreeMap;
-
-        if let Some(tl::Node::Tag(tag)) = node_handle.get(parser) {
-            let attributes: BTreeMap<String, String> = tag
-                .attributes()
-                .iter()
-                .filter_map(|(k, v)| v.as_ref().map(|val| (k.to_string(), val.to_string())))
-                .collect();
-
-            let node_ctx = NodeContext {
-                node_type: NodeType::TableRow,
-                tag_name: "tr".to_string(),
-                attributes,
-                depth,
-                index_in_parent: row_index,
-                parent_tag: Some("table".to_string()),
-                is_inline: false,
-            };
-
-            let mut visitor = visitor_handle.borrow_mut();
-            match visitor.visit_table_row(&node_ctx, &cell_contents, is_header) {
-                VisitResult::Continue => {}
-                VisitResult::Skip => return,
-                VisitResult::Custom(custom) => {
-                    output.push_str(&custom);
-                    return;
-                }
-                VisitResult::Error(err) => {
-                    if ctx.visitor_error.borrow().is_none() {
-                        *ctx.visitor_error.borrow_mut() = Some(err);
-                    }
-                    return;
-                }
-                VisitResult::PreserveHtml => {
-                    output.push_str(&serialize_node(node_handle, parser));
-                    return;
-                }
-            }
-        }
-    }
 
     if has_span {
         let mut col_index = 0;
@@ -7737,7 +6692,7 @@ fn append_layout_row(
                     };
                     let cell_children = cell_tag.children();
                     for cell_child in cell_children.top().iter() {
-                        walk_node(cell_child, parser, &mut cell_text, options, &cell_ctx, 0, dom_ctx);
+                        walk_node(cell_child, parser, &mut cell_text, options, &cell_ctx, 0, dom_ctx, visitor)?;
                     }
                     let cell_content = text::normalize_whitespace_cow(&cell_text);
                     if !cell_content.trim().is_empty() {
@@ -7800,57 +6755,8 @@ fn convert_table(
     options: &ConversionOptions,
     ctx: &Context,
     dom_ctx: &DomContext,
-    depth: usize,
 ) {
     if let Some(tl::Node::Tag(tag)) = node_handle.get(parser) {
-        #[cfg(feature = "visitor")]
-        let table_output_start = output.len();
-
-        #[cfg(feature = "visitor")]
-        let mut table_start_custom: Option<String> = None;
-
-        #[cfg(feature = "visitor")]
-        if let Some(ref visitor_handle) = ctx.visitor {
-            use crate::visitor::{NodeContext, NodeType, VisitResult};
-            use std::collections::BTreeMap;
-
-            let attributes: BTreeMap<String, String> = tag
-                .attributes()
-                .iter()
-                .filter_map(|(k, v)| v.as_ref().map(|val| (k.to_string(), val.to_string())))
-                .collect();
-
-            let node_ctx = NodeContext {
-                node_type: NodeType::Table,
-                tag_name: "table".to_string(),
-                attributes,
-                depth,
-                index_in_parent: 0,
-                parent_tag: None,
-                is_inline: false,
-            };
-
-            let mut visitor = visitor_handle.borrow_mut();
-            match visitor.visit_table_start(&node_ctx) {
-                VisitResult::Continue => {}
-                VisitResult::Skip => return,
-                VisitResult::Custom(custom) => {
-                    // Store custom TABLE_START to prepend later (don't add to output yet or return)
-                    table_start_custom = Some(custom);
-                }
-                VisitResult::Error(err) => {
-                    if ctx.visitor_error.borrow().is_none() {
-                        *ctx.visitor_error.borrow_mut() = Some(err);
-                    }
-                    return;
-                }
-                VisitResult::PreserveHtml => {
-                    output.push_str(&serialize_node(node_handle, parser));
-                    return;
-                }
-            }
-        }
-
         let table_scan = scan_table(node_handle, parser, dom_ctx);
         let row_count = table_scan.row_counts.len();
         let mut distinct_counts: Vec<_> = table_scan.row_counts.iter().copied().filter(|c| *c > 0).collect();
@@ -7915,7 +6821,7 @@ fn convert_table(
                             let grandchildren = child_tag.children();
                             {
                                 for grandchild_handle in grandchildren.top().iter() {
-                                    walk_node(grandchild_handle, parser, &mut text, options, ctx, 0, dom_ctx);
+                                    walk_node(grandchild_handle, parser, &mut text, options, ctx, 0, dom_ctx, visitor)?;
                                 }
                             }
                             let text = text.trim();
@@ -7928,7 +6834,6 @@ fn convert_table(
                         }
 
                         "thead" | "tbody" | "tfoot" => {
-                            let is_header_section = tag_name.as_ref() == "thead";
                             let section_children = child_tag.children();
                             {
                                 for row_handle in section_children.top().iter() {
@@ -7953,9 +6858,9 @@ fn convert_table(
                                                 total_cols,
                                                 first_row_cols.unwrap_or(total_cols),
                                                 dom_ctx,
-                                                depth + 1,
-                                                is_header_section,
-                                            );
+
+                                                visitor,
+                                            )?;
                                             row_index += 1;
                                         }
                                     }
@@ -7983,9 +6888,9 @@ fn convert_table(
                                 total_cols,
                                 first_row_cols.unwrap_or(total_cols),
                                 dom_ctx,
-                                depth + 1,
-                                row_index == 0,
-                            );
+
+                                visitor,
+                            )?;
                             row_index += 1;
                         }
 
@@ -7993,62 +6898,6 @@ fn convert_table(
 
                         _ => {}
                     }
-                }
-            }
-        }
-
-        #[cfg(feature = "visitor")]
-        if let Some(ref visitor_handle) = ctx.visitor {
-            use crate::visitor::{NodeContext, NodeType, VisitResult};
-            use std::collections::BTreeMap;
-
-            let attributes: BTreeMap<String, String> = tag
-                .attributes()
-                .iter()
-                .filter_map(|(k, v)| v.as_ref().map(|val| (k.to_string(), val.to_string())))
-                .collect();
-
-            let node_ctx = NodeContext {
-                node_type: NodeType::Table,
-                tag_name: "table".to_string(),
-                attributes,
-                depth,
-                index_in_parent: 0,
-                parent_tag: None,
-                is_inline: false,
-            };
-
-            let table_content = &output[table_output_start..];
-
-            let mut visitor = visitor_handle.borrow_mut();
-            match visitor.visit_table_end(&node_ctx, table_content) {
-                VisitResult::Continue => {
-                    // If there was a custom table_start, prepend it now
-                    if let Some(custom_start) = table_start_custom {
-                        output.insert_str(table_output_start, &custom_start);
-                    }
-                }
-                VisitResult::Custom(custom) => {
-                    // Combine: custom_start + rows + custom_end
-                    let rows_output = output[table_output_start..].to_string();
-                    output.truncate(table_output_start);
-                    if let Some(custom_start) = table_start_custom {
-                        output.push_str(&custom_start);
-                    }
-                    output.push_str(&rows_output);
-                    output.push_str(&custom);
-                }
-                VisitResult::Skip => {
-                    output.truncate(table_output_start);
-                }
-                VisitResult::Error(err) => {
-                    if ctx.visitor_error.borrow().is_none() {
-                        *ctx.visitor_error.borrow_mut() = Some(err);
-                    }
-                }
-                VisitResult::PreserveHtml => {
-                    output.truncate(table_output_start);
-                    output.push_str(&serialize_node(node_handle, parser));
                 }
             }
         }

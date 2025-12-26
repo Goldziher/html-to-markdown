@@ -19,6 +19,10 @@ pub mod metadata;
 pub mod options;
 pub mod safety;
 pub mod text;
+#[cfg(feature = "visitor")]
+pub mod visitor;
+#[cfg(feature = "visitor")]
+mod visitor_helpers;
 pub mod wrapper;
 
 pub use error::{ConversionError, Result};
@@ -453,6 +457,61 @@ pub fn convert_with_metadata(
     let metadata = metadata_collector.finish();
 
     Ok((markdown, metadata))
+}
+
+/// Convert HTML to Markdown with a custom visitor callback.
+///
+/// This function allows you to provide a visitor implementation that can inspect,
+/// modify, or replace the default conversion behavior for any HTML element type.
+///
+/// # Arguments
+///
+/// * `html` - The HTML input to convert
+/// * `options` - Optional conversion options (uses defaults if None)
+/// * `visitor` - Mutable reference to visitor implementation for customization
+///
+/// # Example
+///
+/// ```ignore
+/// use html_to_markdown_rs::convert_with_visitor;
+/// use html_to_markdown_rs::visitor::{HtmlVisitor, NodeContext, VisitResult};
+///
+/// #[derive(Debug)]
+/// struct CustomVisitor;
+///
+/// impl HtmlVisitor for CustomVisitor {
+///     fn visit_code_block(
+///         &mut self,
+///         _ctx: &NodeContext,
+///         code: &str,
+///         language: Option<&str>,
+///     ) -> VisitResult {
+///         VisitResult::Custom(format!("```{}\n{}\n```", language.unwrap_or(""), code))
+///     }
+/// }
+///
+/// let html = "<pre><code class=\"language-rust\">fn main() {}</code></pre>";
+/// let mut visitor = CustomVisitor;
+/// let markdown = convert_with_visitor(html, None, &mut visitor).unwrap();
+/// ```
+#[cfg(feature = "visitor")]
+pub fn convert_with_visitor(
+    html: &str,
+    options: Option<ConversionOptions>,
+    visitor: Option<visitor::VisitorHandle>,
+) -> Result<String> {
+    validate_input(html)?;
+    let options = options.unwrap_or_default();
+
+    let normalized_html = normalize_line_endings(html);
+
+    let markdown = converter::convert_html_with_visitor(normalized_html.as_ref(), &options, visitor)?;
+
+    if options.wrap {
+        Ok(wrapper::wrap_markdown(&markdown, &options))
+    } else {
+        Ok(markdown)
+    }
 }
 
 #[cfg(all(test, feature = "metadata"))]

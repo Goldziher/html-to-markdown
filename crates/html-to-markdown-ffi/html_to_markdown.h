@@ -13,6 +13,351 @@
 #include <stdlib.h>
 
 /**
+ * Result type enumeration for visitor callbacks.
+ *
+ * Indicates what action the conversion engine should take after a callback.
+ */
+typedef enum HtmlToMarkdownVisitResultType {
+  /**
+   * Continue with default conversion behavior
+   */
+  Continue = 0,
+  /**
+   * Replace default output with custom markdown (requires custom_output set)
+   */
+  Custom = 1,
+  /**
+   * Skip this element entirely
+   */
+  Skip = 2,
+  /**
+   * Preserve original HTML verbatim
+   */
+  PreserveHtml = 3,
+  /**
+   * Stop conversion with error (requires error_message set)
+   */
+  Error = 4,
+} HtmlToMarkdownVisitResultType;
+
+typedef struct Option_HtmlToMarkdownVisitAudioCallback Option_HtmlToMarkdownVisitAudioCallback;
+
+typedef struct Option_HtmlToMarkdownVisitBlockquoteCallback Option_HtmlToMarkdownVisitBlockquoteCallback;
+
+typedef struct Option_HtmlToMarkdownVisitButtonCallback Option_HtmlToMarkdownVisitButtonCallback;
+
+typedef struct Option_HtmlToMarkdownVisitCodeBlockCallback Option_HtmlToMarkdownVisitCodeBlockCallback;
+
+typedef struct Option_HtmlToMarkdownVisitCodeInlineCallback Option_HtmlToMarkdownVisitCodeInlineCallback;
+
+typedef struct Option_HtmlToMarkdownVisitCustomElementCallback Option_HtmlToMarkdownVisitCustomElementCallback;
+
+typedef struct Option_HtmlToMarkdownVisitDefinitionDescriptionCallback Option_HtmlToMarkdownVisitDefinitionDescriptionCallback;
+
+typedef struct Option_HtmlToMarkdownVisitDefinitionListEndCallback Option_HtmlToMarkdownVisitDefinitionListEndCallback;
+
+typedef struct Option_HtmlToMarkdownVisitDefinitionListStartCallback Option_HtmlToMarkdownVisitDefinitionListStartCallback;
+
+typedef struct Option_HtmlToMarkdownVisitDefinitionTermCallback Option_HtmlToMarkdownVisitDefinitionTermCallback;
+
+typedef struct Option_HtmlToMarkdownVisitDetailsCallback Option_HtmlToMarkdownVisitDetailsCallback;
+
+typedef struct Option_HtmlToMarkdownVisitElementEndCallback Option_HtmlToMarkdownVisitElementEndCallback;
+
+typedef struct Option_HtmlToMarkdownVisitElementStartCallback Option_HtmlToMarkdownVisitElementStartCallback;
+
+typedef struct Option_HtmlToMarkdownVisitEmphasisCallback Option_HtmlToMarkdownVisitEmphasisCallback;
+
+typedef struct Option_HtmlToMarkdownVisitFigcaptionCallback Option_HtmlToMarkdownVisitFigcaptionCallback;
+
+typedef struct Option_HtmlToMarkdownVisitFigureEndCallback Option_HtmlToMarkdownVisitFigureEndCallback;
+
+typedef struct Option_HtmlToMarkdownVisitFigureStartCallback Option_HtmlToMarkdownVisitFigureStartCallback;
+
+typedef struct Option_HtmlToMarkdownVisitFormCallback Option_HtmlToMarkdownVisitFormCallback;
+
+typedef struct Option_HtmlToMarkdownVisitHeadingCallback Option_HtmlToMarkdownVisitHeadingCallback;
+
+typedef struct Option_HtmlToMarkdownVisitHorizontalRuleCallback Option_HtmlToMarkdownVisitHorizontalRuleCallback;
+
+typedef struct Option_HtmlToMarkdownVisitIframeCallback Option_HtmlToMarkdownVisitIframeCallback;
+
+typedef struct Option_HtmlToMarkdownVisitImageCallback Option_HtmlToMarkdownVisitImageCallback;
+
+typedef struct Option_HtmlToMarkdownVisitInputCallback Option_HtmlToMarkdownVisitInputCallback;
+
+typedef struct Option_HtmlToMarkdownVisitLineBreakCallback Option_HtmlToMarkdownVisitLineBreakCallback;
+
+typedef struct Option_HtmlToMarkdownVisitLinkCallback Option_HtmlToMarkdownVisitLinkCallback;
+
+typedef struct Option_HtmlToMarkdownVisitListEndCallback Option_HtmlToMarkdownVisitListEndCallback;
+
+typedef struct Option_HtmlToMarkdownVisitListItemCallback Option_HtmlToMarkdownVisitListItemCallback;
+
+typedef struct Option_HtmlToMarkdownVisitListStartCallback Option_HtmlToMarkdownVisitListStartCallback;
+
+typedef struct Option_HtmlToMarkdownVisitMarkCallback Option_HtmlToMarkdownVisitMarkCallback;
+
+typedef struct Option_HtmlToMarkdownVisitStrikethroughCallback Option_HtmlToMarkdownVisitStrikethroughCallback;
+
+typedef struct Option_HtmlToMarkdownVisitStrongCallback Option_HtmlToMarkdownVisitStrongCallback;
+
+typedef struct Option_HtmlToMarkdownVisitSubscriptCallback Option_HtmlToMarkdownVisitSubscriptCallback;
+
+typedef struct Option_HtmlToMarkdownVisitSummaryCallback Option_HtmlToMarkdownVisitSummaryCallback;
+
+typedef struct Option_HtmlToMarkdownVisitSuperscriptCallback Option_HtmlToMarkdownVisitSuperscriptCallback;
+
+typedef struct Option_HtmlToMarkdownVisitTableEndCallback Option_HtmlToMarkdownVisitTableEndCallback;
+
+typedef struct Option_HtmlToMarkdownVisitTableRowCallback Option_HtmlToMarkdownVisitTableRowCallback;
+
+typedef struct Option_HtmlToMarkdownVisitTableStartCallback Option_HtmlToMarkdownVisitTableStartCallback;
+
+typedef struct Option_HtmlToMarkdownVisitTextCallback Option_HtmlToMarkdownVisitTextCallback;
+
+typedef struct Option_HtmlToMarkdownVisitUnderlineCallback Option_HtmlToMarkdownVisitUnderlineCallback;
+
+typedef struct Option_HtmlToMarkdownVisitVideoCallback Option_HtmlToMarkdownVisitVideoCallback;
+
+/**
+ * Opaque handle to a visitor instance.
+ *
+ * Returned by `html_to_markdown_visitor_create()` and passed to
+ * `html_to_markdown_convert_with_visitor()`. Contains ownership of the
+ * underlying CVisitorWrapper.
+ */
+typedef void *HtmlToMarkdownVisitor;
+
+/**
+ * Complete callback table for visitor (C-compatible).
+ *
+ * Contains all callback function pointers for visitor events.
+ * Set unused callbacks to NULL for default behavior.
+ *
+ * # Example
+ *
+ * ```c
+ * html_to_markdown_visitor_callbacks_t callbacks = {
+ *     .user_data = my_context_ptr,
+ *     .visit_text = my_visit_text_fn,
+ *     .visit_link = my_visit_link_fn,
+ *     // Leave others NULL for defaults
+ *     .visit_image = NULL,
+ *     .visit_heading = NULL,
+ * };
+ * ```
+ */
+typedef struct HtmlToMarkdownVisitorCallbacks {
+  /**
+   * User-provided context pointer passed to all callbacks
+   */
+  void *user_data;
+  /**
+   * Called for text nodes (most frequent)
+   */
+  struct Option_HtmlToMarkdownVisitTextCallback visit_text;
+  /**
+   * Called before entering any element
+   */
+  struct Option_HtmlToMarkdownVisitElementStartCallback visit_element_start;
+  /**
+   * Called after exiting any element
+   */
+  struct Option_HtmlToMarkdownVisitElementEndCallback visit_element_end;
+  /**
+   * Called for anchor links
+   */
+  struct Option_HtmlToMarkdownVisitLinkCallback visit_link;
+  /**
+   * Called for images
+   */
+  struct Option_HtmlToMarkdownVisitImageCallback visit_image;
+  /**
+   * Called for headings
+   */
+  struct Option_HtmlToMarkdownVisitHeadingCallback visit_heading;
+  /**
+   * Called for code blocks
+   */
+  struct Option_HtmlToMarkdownVisitCodeBlockCallback visit_code_block;
+  /**
+   * Called for inline code
+   */
+  struct Option_HtmlToMarkdownVisitCodeInlineCallback visit_code_inline;
+  /**
+   * Called for list items
+   */
+  struct Option_HtmlToMarkdownVisitListItemCallback visit_list_item;
+  /**
+   * Called before processing a list
+   */
+  struct Option_HtmlToMarkdownVisitListStartCallback visit_list_start;
+  /**
+   * Called after processing a list
+   */
+  struct Option_HtmlToMarkdownVisitListEndCallback visit_list_end;
+  /**
+   * Called before processing a table
+   */
+  struct Option_HtmlToMarkdownVisitTableStartCallback visit_table_start;
+  /**
+   * Called for table rows
+   */
+  struct Option_HtmlToMarkdownVisitTableRowCallback visit_table_row;
+  /**
+   * Called after processing a table
+   */
+  struct Option_HtmlToMarkdownVisitTableEndCallback visit_table_end;
+  /**
+   * Called for blockquotes
+   */
+  struct Option_HtmlToMarkdownVisitBlockquoteCallback visit_blockquote;
+  /**
+   * Called for strong text
+   */
+  struct Option_HtmlToMarkdownVisitStrongCallback visit_strong;
+  /**
+   * Called for emphasis text
+   */
+  struct Option_HtmlToMarkdownVisitEmphasisCallback visit_emphasis;
+  /**
+   * Called for strikethrough text
+   */
+  struct Option_HtmlToMarkdownVisitStrikethroughCallback visit_strikethrough;
+  /**
+   * Called for underline text
+   */
+  struct Option_HtmlToMarkdownVisitUnderlineCallback visit_underline;
+  /**
+   * Called for subscript text
+   */
+  struct Option_HtmlToMarkdownVisitSubscriptCallback visit_subscript;
+  /**
+   * Called for superscript text
+   */
+  struct Option_HtmlToMarkdownVisitSuperscriptCallback visit_superscript;
+  /**
+   * Called for mark text
+   */
+  struct Option_HtmlToMarkdownVisitMarkCallback visit_mark;
+  /**
+   * Called for line breaks
+   */
+  struct Option_HtmlToMarkdownVisitLineBreakCallback visit_line_break;
+  /**
+   * Called for horizontal rules
+   */
+  struct Option_HtmlToMarkdownVisitHorizontalRuleCallback visit_horizontal_rule;
+  /**
+   * Called for custom elements
+   */
+  struct Option_HtmlToMarkdownVisitCustomElementCallback visit_custom_element;
+  /**
+   * Called before processing a definition list
+   */
+  struct Option_HtmlToMarkdownVisitDefinitionListStartCallback visit_definition_list_start;
+  /**
+   * Called for definition terms
+   */
+  struct Option_HtmlToMarkdownVisitDefinitionTermCallback visit_definition_term;
+  /**
+   * Called for definition descriptions
+   */
+  struct Option_HtmlToMarkdownVisitDefinitionDescriptionCallback visit_definition_description;
+  /**
+   * Called after processing a definition list
+   */
+  struct Option_HtmlToMarkdownVisitDefinitionListEndCallback visit_definition_list_end;
+  /**
+   * Called for form elements
+   */
+  struct Option_HtmlToMarkdownVisitFormCallback visit_form;
+  /**
+   * Called for input elements
+   */
+  struct Option_HtmlToMarkdownVisitInputCallback visit_input;
+  /**
+   * Called for button elements
+   */
+  struct Option_HtmlToMarkdownVisitButtonCallback visit_button;
+  /**
+   * Called for audio elements
+   */
+  struct Option_HtmlToMarkdownVisitAudioCallback visit_audio;
+  /**
+   * Called for video elements
+   */
+  struct Option_HtmlToMarkdownVisitVideoCallback visit_video;
+  /**
+   * Called for iframe elements
+   */
+  struct Option_HtmlToMarkdownVisitIframeCallback visit_iframe;
+  /**
+   * Called for details elements
+   */
+  struct Option_HtmlToMarkdownVisitDetailsCallback visit_details;
+  /**
+   * Called for summary elements
+   */
+  struct Option_HtmlToMarkdownVisitSummaryCallback visit_summary;
+  /**
+   * Called before processing a figure
+   */
+  struct Option_HtmlToMarkdownVisitFigureStartCallback visit_figure_start;
+  /**
+   * Called for figcaption elements
+   */
+  struct Option_HtmlToMarkdownVisitFigcaptionCallback visit_figcaption;
+  /**
+   * Called after processing a figure
+   */
+  struct Option_HtmlToMarkdownVisitFigureEndCallback visit_figure_end;
+} HtmlToMarkdownVisitorCallbacks;
+
+/**
+ * Result of a visitor callback (C-compatible).
+ *
+ * Returned by all visitor callback functions. Only certain fields are meaningful
+ * depending on `result_type`:
+ *
+ * - **Continue**: No additional fields needed
+ * - **Custom**: `custom_output` must point to a malloc'd string (NULL-terminated)
+ * - **Skip**: No additional fields needed
+ * - **PreserveHtml**: No additional fields needed
+ * - **Error**: `error_message` must point to a malloc'd string (NULL-terminated)
+ *
+ * # Memory Ownership
+ *
+ * - `custom_output` and `error_message` are OWNED BY THE CALLBACK
+ * - The FFI layer will free these strings after processing
+ * - MUST be allocated with malloc/calloc; will be freed with free()
+ *
+ * # Safety
+ *
+ * The conversion engine guarantees:
+ * - This struct is only valid during the callback and for the return statement
+ * - Allocated strings are freed immediately after callback returns
+ * - No references to callback data persist after return
+ */
+typedef struct HtmlToMarkdownVisitResult {
+  /**
+   * The action to take (Continue, Custom, Skip, etc.)
+   */
+  enum HtmlToMarkdownVisitResultType result_type;
+  /**
+   * Custom markdown output (only if result_type == Custom)
+   * Must be malloc'd NULL-terminated string; ownership transfers to FFI layer
+   */
+  char *custom_output;
+  /**
+   * Error message (only if result_type == Error)
+   * Must be malloc'd NULL-terminated string; ownership transfers to FFI layer
+   */
+  char *error_message;
+} HtmlToMarkdownVisitResult;
+
+/**
  * Start Rust-side profiling and write a flamegraph to the specified path.
  *
  * Returns 1 on success, 0 on failure. Use `html_to_markdown_last_error` to inspect failures.
@@ -81,17 +426,6 @@ char *html_to_markdown_convert_with_len(const char *html, uintptr_t *len_out);
 char *html_to_markdown_convert_bytes_with_len(const uint8_t *html,
                                               uintptr_t len,
                                               uintptr_t *len_out);
-
-/**
- * Get the last error message from a failed conversion.
- *
- * # Safety
- *
- * - Returns a pointer to a thread-local buffer; copy it immediately if needed
- * - Pointer is invalidated by the next call to any `html_to_markdown_*` function
- * - May return NULL if no error has occurred in this thread
- */
-const char *html_to_markdown_last_error(void);
 
 /**
  * Free a string returned by html_to_markdown_convert.
@@ -183,5 +517,301 @@ char *html_to_markdown_convert_with_metadata_bytes_with_len(const uint8_t *html,
                                                             char **metadata_json_out,
                                                             uintptr_t *markdown_len_out,
                                                             uintptr_t *metadata_len_out);
+
+/**
+ * Get the last error message from a failed conversion.
+ *
+ * # Safety
+ *
+ * - Returns a pointer to a thread-local buffer; copy it immediately if needed
+ * - Pointer is invalidated by the next call to any `html_to_markdown_*` function
+ * - May return NULL if no error has occurred in this thread
+ */
+const char *html_to_markdown_last_error(void);
+
+/**
+ * Create a new visitor instance from a callback table.
+ *
+ * Allocates a visitor handle that can be used with `html_to_markdown_convert_with_visitor()`.
+ * The visitor is NOT thread-safe; each thread must create its own visitor.
+ *
+ * # Arguments
+ *
+ * - `callbacks`: Pointer to callback table. Must be valid for the entire lifetime
+ *               of the returned visitor handle.
+ *
+ * # Returns
+ *
+ * - Non-NULL: Opaque visitor handle (pass to convert functions)
+ * - NULL: Failed to create visitor; call `html_to_markdown_last_error()` for details
+ *
+ * # Safety
+ *
+ * - `callbacks` must point to a valid `HtmlToMarkdownVisitorCallbacks` struct
+ * - `callbacks` must remain valid until visitor is freed
+ * - Returned handle must be freed with `html_to_markdown_visitor_free()`
+ * - Returned handle is NOT thread-safe; don't share across threads
+ *
+ * # Example
+ *
+ * ```c
+ * html_to_markdown_visitor_callbacks_t callbacks = {0};
+ * callbacks.visit_text = my_visit_text;
+ * void *visitor = html_to_markdown_visitor_create(&callbacks);
+ * if (visitor == NULL) {
+ *     fprintf(stderr, "Failed: %s\n", html_to_markdown_last_error());
+ *     return 1;
+ * }
+ * // Use visitor...
+ * html_to_markdown_visitor_free(visitor);
+ * ```
+ */
+HtmlToMarkdownVisitor html_to_markdown_visitor_create(const struct HtmlToMarkdownVisitorCallbacks *callbacks);
+
+/**
+ * Free a visitor instance created by `html_to_markdown_visitor_create()`.
+ *
+ * Deallocates all resources associated with the visitor.
+ * After this call, the visitor handle is invalid and must not be used.
+ *
+ * # Arguments
+ *
+ * - `visitor`: Visitor handle from `html_to_markdown_visitor_create()`.
+ *             NULL pointers are safe (no-op).
+ *
+ * # Safety
+ *
+ * - `visitor` must be a handle previously returned by `html_to_markdown_visitor_create()`
+ * - `visitor` must not be used after this call
+ * - Calling with NULL is safe but unnecessary
+ *
+ * # Example
+ *
+ * ```c
+ * void *visitor = html_to_markdown_visitor_create(&callbacks);
+ * // Use visitor in conversions...
+ * html_to_markdown_visitor_free(visitor);
+ * visitor = NULL; // Good practice to avoid use-after-free
+ * ```
+ */
+void html_to_markdown_visitor_free(HtmlToMarkdownVisitor visitor);
+
+/**
+ * Convert HTML to Markdown using a custom visitor.
+ *
+ * Performs HTML→Markdown conversion with visitor callbacks invoked at each element.
+ * Returns the length of the output markdown.
+ *
+ * # Arguments
+ *
+ * - `html`: Null-terminated UTF-8 C string containing HTML
+ * - `visitor`: Visitor handle from `html_to_markdown_visitor_create()`
+ * - `len_out`: Pointer to size_t where output length will be written.
+ *            Can be NULL if length is not needed.
+ *
+ * # Returns
+ *
+ * - Non-NULL: Pointer to malloc'd markdown string (NULL-terminated).
+ *            Length written to *len_out if len_out is not NULL.
+ *            Must be freed with `html_to_markdown_free_string()`.
+ * - NULL: Conversion failed; call `html_to_markdown_last_error()` for details
+ *
+ * # Safety
+ *
+ * - `html` must be a valid null-terminated UTF-8 C string
+ * - `visitor` must be a handle from `html_to_markdown_visitor_create()`
+ * - `len_out` (if not NULL) must be a valid pointer to size_t
+ * - Returned string must be freed with `html_to_markdown_free_string()`
+ * - Visitor callbacks are invoked on the calling thread (must not block or panic)
+ *
+ * # Errors
+ *
+ * - HTML parsing errors (malformed HTML)
+ * - Visitor callback returning Error result
+ * - Memory allocation failures
+ * - UTF-8 encoding errors
+ *
+ * # Example
+ *
+ * ```c
+ * const char *html = "<h1>Title</h1><p>Content</p>";
+ * void *visitor = html_to_markdown_visitor_create(&callbacks);
+ * size_t out_len = 0;
+ * char *md = html_to_markdown_convert_with_visitor(html, visitor, &out_len);
+ * if (md == NULL) {
+ *     fprintf(stderr, "Failed: %s\n", html_to_markdown_last_error());
+ * } else {
+ *     printf("Output length: %zu\n%s\n", out_len, md);
+ *     html_to_markdown_free_string(md);
+ * }
+ * html_to_markdown_visitor_free(visitor);
+ * ```
+ */
+char *html_to_markdown_convert_with_visitor(const char *html,
+                                            HtmlToMarkdownVisitor visitor,
+                                            uintptr_t *len_out);
+
+/**
+ * Convert UTF-8 HTML bytes to Markdown using a custom visitor.
+ *
+ * Variant of `html_to_markdown_convert_with_visitor()` that accepts raw byte pointers
+ * instead of null-terminated C strings. Useful for data with embedded nulls or
+ * when length is already known.
+ *
+ * # Arguments
+ *
+ * - `html`: Pointer to UTF-8 bytes (NOT null-terminated)
+ * - `len`: Number of bytes pointed to by html
+ * - `visitor`: Visitor handle from `html_to_markdown_visitor_create()`
+ * - `len_out`: Pointer to size_t where output length will be written (can be NULL)
+ *
+ * # Returns
+ *
+ * - Non-NULL: Pointer to malloc'd markdown string (NULL-terminated).
+ *            Must be freed with `html_to_markdown_free_string()`.
+ * - NULL: Conversion failed; call `html_to_markdown_last_error()` for details
+ *
+ * # Safety
+ *
+ * - `html` must point to at least `len` bytes of valid data
+ * - Data must be valid UTF-8
+ * - `len` must be accurate (not larger than allocated buffer)
+ * - `visitor` must be a handle from `html_to_markdown_visitor_create()`
+ * - `len_out` (if not NULL) must point to a valid size_t
+ *
+ * # Example
+ *
+ * ```c
+ * const uint8_t *html_bytes = (const uint8_t *)input_data;
+ * size_t html_len = 1024;
+ * void *visitor = html_to_markdown_visitor_create(&callbacks);
+ * size_t out_len = 0;
+ * char *md = html_to_markdown_convert_bytes_with_visitor(html_bytes, html_len, visitor, &out_len);
+ * if (md != NULL) {
+ *     printf("%s\n", md);
+ *     html_to_markdown_free_string(md);
+ * }
+ * html_to_markdown_visitor_free(visitor);
+ * ```
+ */
+char *html_to_markdown_convert_bytes_with_visitor(const uint8_t *html,
+                                                  uintptr_t len,
+                                                  HtmlToMarkdownVisitor visitor,
+                                                  uintptr_t *len_out);
+
+/**
+ * Create a VisitResult with Continue action.
+ *
+ * Helper function to construct a Continue result without custom output.
+ * Equivalent to: `result = {0}; result.result_type = HTML_TO_MARKDOWN_VISIT_CONTINUE;`
+ *
+ * # Returns
+ *
+ * `HtmlToMarkdownVisitResult` with Continue action.
+ *
+ * # Example
+ *
+ * ```c
+ * HtmlToMarkdownVisitResult result = html_to_markdown_visit_result_continue();
+ * return result;
+ * ```
+ */
+struct HtmlToMarkdownVisitResult html_to_markdown_visit_result_continue(void);
+
+/**
+ * Create a VisitResult with Custom action.
+ *
+ * Helper function to construct a Custom result. The `output` string should be
+ * allocated with malloc() and will be freed by the FFI layer after use.
+ *
+ * # Arguments
+ *
+ * - `output`: malloc'd null-terminated C string with custom markdown
+ *
+ * # Returns
+ *
+ * `HtmlToMarkdownVisitResult` with Custom action.
+ *
+ * # Safety
+ *
+ * - `output` must be malloc'd (will be freed with free())
+ * - `output` must be NULL-terminated
+ *
+ * # Example
+ *
+ * ```c
+ * char *custom = (char *)malloc(100);
+ * snprintf(custom, 100, "Custom markdown here");
+ * HtmlToMarkdownVisitResult result = html_to_markdown_visit_result_custom(custom);
+ * return result;
+ * ```
+ */
+struct HtmlToMarkdownVisitResult html_to_markdown_visit_result_custom(char *output);
+
+/**
+ * Create a VisitResult with Skip action.
+ *
+ * Helper function to construct a Skip result (element and children omitted from output).
+ *
+ * # Returns
+ *
+ * `HtmlToMarkdownVisitResult` with Skip action.
+ *
+ * # Example
+ *
+ * ```c
+ * HtmlToMarkdownVisitResult result = html_to_markdown_visit_result_skip();
+ * return result;
+ * ```
+ */
+struct HtmlToMarkdownVisitResult html_to_markdown_visit_result_skip(void);
+
+/**
+ * Create a VisitResult with PreserveHtml action.
+ *
+ * Helper function to construct a PreserveHtml result (raw HTML included verbatim).
+ *
+ * # Returns
+ *
+ * `HtmlToMarkdownVisitResult` with PreserveHtml action.
+ *
+ * # Example
+ *
+ * ```c
+ * HtmlToMarkdownVisitResult result = html_to_markdown_visit_result_preserve_html();
+ * return result;
+ * ```
+ */
+struct HtmlToMarkdownVisitResult html_to_markdown_visit_result_preserve_html(void);
+
+/**
+ * Create a VisitResult with Error action.
+ *
+ * Helper function to construct an Error result. The `message` string should be
+ * allocated with malloc() and will be freed by the FFI layer after use.
+ *
+ * # Arguments
+ *
+ * - `message`: malloc'd null-terminated C string with error message
+ *
+ * # Returns
+ *
+ * `HtmlToMarkdownVisitResult` with Error action.
+ *
+ * # Safety
+ *
+ * - `message` must be malloc'd (will be freed with free())
+ * - `message` must be NULL-terminated
+ *
+ * # Example
+ *
+ * ```c
+ * char *error_msg = (char *)malloc(100);
+ * snprintf(error_msg, 100, "Unexpected element type");
+ * HtmlToMarkdownVisitResult result = html_to_markdown_visit_result_error(error_msg);
+ * return result;
+ * ```
+ */
+struct HtmlToMarkdownVisitResult html_to_markdown_visit_result_error(char *message);
 
 #endif  /* HTML_TO_MARKDOWN_H */

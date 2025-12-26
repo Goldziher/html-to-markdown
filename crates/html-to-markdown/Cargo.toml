@@ -17,6 +17,7 @@ categories = ["parsing", "text-processing", "web-programming"]
 default = ["metadata"]
 inline-images = ["dep:image"]
 metadata = ["dep:serde", "dep:serde_json"]
+visitor = []
 serde = ["dep:serde", "dep:serde_json"]
 
 [lib]
