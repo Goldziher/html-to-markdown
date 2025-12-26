@@ -8,6 +8,8 @@ use html_to_markdown_rs::metadata::{
 };
 use html_to_markdown_rs::safety::guard_panic;
 mod profiling;
+#[cfg(feature = "visitor")]
+use html_to_markdown_rs::visitor::{HtmlVisitor, NodeContext as RustNodeContext, VisitResult as RustVisitResult};
 use html_to_markdown_rs::{
     CodeBlockStyle, ConversionError, ConversionOptions as RustConversionOptions, ConversionOptionsUpdate,
     DEFAULT_INLINE_IMAGE_LIMIT, HeadingStyle, HighlightStyle, InlineImageConfig as RustInlineImageConfig,
@@ -634,6 +636,193 @@ fn convert_metadata(metadata: RustExtendedMetadata) -> JsExtendedMetadata {
 ///
 /// # Arguments
 ///
+// ============================================================================
+// Visitor Pattern Support
+// ============================================================================
+
+#[cfg(feature = "visitor")]
+#[napi(object)]
+pub struct JsNodeContext {
+    pub node_type: String,
+    pub tag_name: String,
+    pub attributes: HashMap<String, String>,
+    pub depth: u32,
+    pub index_in_parent: u32,
+    pub parent_tag: Option<String>,
+    pub is_inline: bool,
+}
+
+#[cfg(feature = "visitor")]
+#[napi(object)]
+pub struct JsVisitResult {
+    #[napi(js_name = "type")]
+    pub result_type: String,
+    pub output: Option<String>,
+}
+
+/// NAPI-RS Visitor Bridge Implementation
+///
+/// # Architecture Notes
+///
+/// The sync/async mismatch between the Rust `HtmlVisitor` trait (which is inherently
+/// synchronous, returning `VisitResult` not `Future<VisitResult>`) and JavaScript's
+/// callback model creates a fundamental challenge:
+///
+/// 1. **Rust Core (Synchronous)**: The HtmlVisitor trait requires synchronous visitor
+///    methods that return `VisitResult` immediately. This is essential for the HTML
+///    parsing loop in the Rust core.
+///
+/// 2. **JS Callbacks**: Calling JS functions through NAPI requires access to the V8
+///    `Env` (JavaScript environment), which is only available in the native function
+///    context. Within a sync visitor method, we don't have this context.
+///
+/// 3. **NAPI-RS Limitations**: ThreadsafeFunction would require async/await, but we're
+///    in a synchronous context. There's no built-in way to block on a V8 call from
+///    within native code during conversion.
+///
+/// # Current Implementation Strategy
+///
+/// Rather than an incomplete implementation, we provide a documented placeholder that:
+/// - Accepts visitor objects at the JavaScript boundary
+/// - Validates that callback methods exist
+/// - Reserves the capability for future enhancement when NAPI-RS or V8 provides
+///   better blocking mechanisms
+///
+/// # Recommended Alternatives for Users
+///
+/// For visitor pattern support in Node.js, consider:
+/// 1. Use the Python binding (supports full async visitor via asyncio)
+/// 2. Use the Ruby binding (supports full visitor pattern)
+/// 3. Implement visitor logic in JavaScript after conversion instead of during
+/// 4. Process the conversion result through post-conversion filtering/transformation
+///
+#[cfg(feature = "visitor")]
+#[derive(Debug, Clone)]
+struct JsVisitorBridge {
+    // Placeholder to indicate visitor was initialized with callbacks
+    // Full callback invocation requires architectural changes
+    #[allow(dead_code)]
+    has_callbacks: bool,
+}
+
+#[cfg(feature = "visitor")]
+unsafe impl Send for JsVisitorBridge {}
+
+#[cfg(feature = "visitor")]
+impl std::panic::RefUnwindSafe for JsVisitorBridge {}
+
+#[cfg(feature = "visitor")]
+impl JsVisitorBridge {
+    fn new(_env: Env, visitor_obj: Option<Object>) -> Self {
+        let has_callbacks = if let Some(obj) = visitor_obj {
+            // Just check if the object exists and has some callback properties
+            // Full implementation would require passing Env through visitor context
+            let callback_names = [
+                "visitElementStart",
+                "visitElementEnd",
+                "visitText",
+                "visitLink",
+                "visitImage",
+                "visitHeading",
+                "visitCodeBlock",
+                "visitCodeInline",
+            ];
+
+            callback_names
+                .iter()
+                .any(|name| obj.get_named_property::<Object>(name).is_ok())
+        } else {
+            false
+        };
+
+        JsVisitorBridge { has_callbacks }
+    }
+
+    #[allow(dead_code)]
+    fn node_context_to_js(ctx: &RustNodeContext) -> JsNodeContext {
+        let mut attributes = HashMap::new();
+        for (k, v) in &ctx.attributes {
+            attributes.insert(k.clone(), v.clone());
+        }
+
+        JsNodeContext {
+            node_type: format!("{:?}", ctx.node_type),
+            tag_name: ctx.tag_name.clone(),
+            attributes,
+            depth: ctx.depth as u32,
+            index_in_parent: ctx.index_in_parent as u32,
+            parent_tag: ctx.parent_tag.clone(),
+            is_inline: ctx.is_inline,
+        }
+    }
+
+    #[allow(dead_code)]
+    fn visit_result_from_js(js_result: &JsVisitResult) -> RustVisitResult {
+        match js_result.result_type.to_lowercase().as_str() {
+            "continue" => RustVisitResult::Continue,
+            "custom" => RustVisitResult::Custom(js_result.output.clone().unwrap_or_default()),
+            "skip" => RustVisitResult::Skip,
+            "preservehtml" => RustVisitResult::PreserveHtml,
+            "error" => RustVisitResult::Error(js_result.output.clone().unwrap_or_else(|| "Unknown error".to_string())),
+            _ => RustVisitResult::Continue,
+        }
+    }
+}
+
+#[cfg(feature = "visitor")]
+impl HtmlVisitor for JsVisitorBridge {
+    fn visit_element_start(&mut self, _ctx: &RustNodeContext) -> RustVisitResult {
+        // Visitor callbacks are not yet implemented in Node.js binding.
+        // This is due to the architectural mismatch between:
+        // - Synchronous Rust visitor trait (returns VisitResult)
+        // - NAPI-RS which requires V8 Env context to call JS functions
+        // - Sync/async boundary that can't be crossed from sync context
+        //
+        // See VISITOR_IMPLEMENTATION_NOTES above for alternatives.
+        RustVisitResult::Continue
+    }
+
+    fn visit_element_end(&mut self, _ctx: &RustNodeContext, _output: &str) -> RustVisitResult {
+        RustVisitResult::Continue
+    }
+
+    fn visit_text(&mut self, _ctx: &RustNodeContext, _text: &str) -> RustVisitResult {
+        RustVisitResult::Continue
+    }
+
+    fn visit_link(
+        &mut self,
+        _ctx: &RustNodeContext,
+        _href: &str,
+        _text: &str,
+        _title: Option<&str>,
+    ) -> RustVisitResult {
+        RustVisitResult::Continue
+    }
+
+    fn visit_image(&mut self, _ctx: &RustNodeContext, _src: &str, _alt: &str, _title: Option<&str>) -> RustVisitResult {
+        RustVisitResult::Continue
+    }
+
+    fn visit_heading(
+        &mut self,
+        _ctx: &RustNodeContext,
+        _level: u32,
+        _text: &str,
+        _id: Option<&str>,
+    ) -> RustVisitResult {
+        RustVisitResult::Continue
+    }
+
+    fn visit_code_block(&mut self, _ctx: &RustNodeContext, _lang: Option<&str>, _code: &str) -> RustVisitResult {
+        RustVisitResult::Continue
+    }
+
+    fn visit_code_inline(&mut self, _ctx: &RustNodeContext, _code: &str) -> RustVisitResult {
+        RustVisitResult::Continue
+    }
+}
+
 /// * `html` - The HTML string to convert
 /// * `options` - Optional conversion options
 ///
@@ -651,6 +840,82 @@ pub fn convert(html: String, options: Option<JsConversionOptions>) -> Result<Str
     let rust_options = options.map(Into::into);
     guard_panic(|| profiling::maybe_profile(|| html_to_markdown_rs::convert(&html, rust_options.clone())))
         .map_err(to_js_error)
+}
+
+/// Convert HTML to Markdown with a custom visitor object (experimental/limited).
+///
+/// # Status
+///
+/// **IMPORTANT**: Visitor callbacks are not currently implemented in the Node.js binding.
+/// This API accepts visitor objects but does not invoke their callback methods during
+/// conversion. It exists as a placeholder for future implementation.
+///
+/// # Why Callbacks Aren't Implemented
+///
+/// The Node.js binding faces an architectural limitation:
+/// - The Rust `HtmlVisitor` trait is synchronous (methods return `VisitResult`, not `Future`)
+/// - NAPI-RS requires access to the V8 environment (`Env`) to call JavaScript functions
+/// - This `Env` is only available in the NAPI function context, not within sync visitor methods
+/// - Calling JS functions from deep within the Rust conversion loop would require either:
+///   - A blocking V8 call (not supported by NAPI-RS)
+///   - Refactoring the Rust core to be async (not feasible)
+///   - Complex inter-thread communication (performance impact)
+///
+/// # Alternatives for Node.js Users
+///
+/// Instead of using visitor callbacks, consider:
+/// 1. **Python binding**: Supports full async visitor pattern via `asyncio`
+/// 2. **Ruby binding**: Supports full synchronous visitor pattern
+/// 3. **Post-conversion processing**: Transform the markdown result in JavaScript after conversion
+/// 4. **Preprocessing**: Manipulate the HTML before calling `convert()`
+///
+/// # Arguments
+///
+/// * `html` - The HTML string to convert
+/// * `options` - Optional conversion options
+/// * `visitor` - Visitor object (accepted but not invoked; reserved for future use)
+///
+/// # Example
+///
+/// ```javascript
+/// const { convertWithVisitor } = require('html-to-markdown-node');
+///
+/// const html = '<h1>Hello World</h1>';
+/// const visitor = {
+///   visitElementStart: () => { /* not called */ },
+///   visitElementEnd: () => { /* not called */ },
+/// };
+///
+/// const markdown = convertWithVisitor(html, undefined, visitor);
+/// // Returns: # Hello World
+/// // (visitor callbacks are currently ignored)
+/// ```
+#[cfg(feature = "visitor")]
+#[napi(js_name = "convertWithVisitor")]
+pub fn convert_with_visitor(
+    env: Env,
+    html: String,
+    options: Option<JsConversionOptions>,
+    visitor: Object,
+) -> Result<String> {
+    use std::panic::AssertUnwindSafe;
+    use std::panic::catch_unwind;
+
+    let rust_options = options.map(Into::into);
+    let bridge = JsVisitorBridge::new(env, Some(visitor));
+    let visitor_rc = std::rc::Rc::new(std::cell::RefCell::new(bridge));
+
+    // Use catch_unwind with AssertUnwindSafe instead of guard_panic
+    let result = catch_unwind(AssertUnwindSafe(|| {
+        profiling::maybe_profile(|| html_to_markdown_rs::convert_with_visitor(&html, rust_options, Some(visitor_rc)))
+    }));
+
+    match result {
+        Ok(conversion_result) => conversion_result.map_err(to_js_error),
+        Err(_) => Err(to_js_error(ConversionError::Panic(
+            "Panic during conversion".to_string(),
+        ))),
+    }
 }
 
 #[napi(js_name = "convertJson")]
