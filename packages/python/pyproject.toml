@@ -54,6 +54,7 @@ urls.Repository = "https://github.com/Goldziher/html-to-markdown.git"
 [tool.maturin]
 manifest-path = "../../crates/html-to-markdown-py/Cargo.toml"
 module-name = "html_to_markdown._html_to_markdown"
+features = [ "inline-images", "metadata", "visitor" ]
 include = [
   { path = "html_to_markdown-*.data/**/*", format = "wheel" },
   { path = "html_to_markdown/bin/*", format = "wheel" },

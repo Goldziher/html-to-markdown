@@ -1,4 +1,4 @@
-from typing import Literal, TypedDict
+from typing import Literal, TypeAlias, TypedDict
 
 class PreprocessingOptions:
     enabled: bool
@@ -216,5 +216,38 @@ def convert_with_metadata_json(
 def create_options_handle(options: ConversionOptions | None = None) -> ConversionOptionsHandle: ...
 def create_options_handle_json(options_json: str | None = None) -> ConversionOptionsHandle: ...
 def convert_with_options_handle(html: str, handle: ConversionOptionsHandle) -> str: ...
+
+class NodeContext(TypedDict):
+    node_type: str
+    """Coarse-grained node type classification (e.g., 'text', 'element', 'heading')"""
+    tag_name: str
+    """Raw HTML tag name (e.g., 'div', 'h1', 'custom-element')"""
+    attributes: dict[str, str]
+    """All HTML attributes as key-value pairs"""
+    depth: int
+    """Depth in the DOM tree (0 = root)"""
+    index_in_parent: int
+    """Index among siblings (0-based)"""
+    parent_tag: str | None
+    """Parent element's tag name (None if root)"""
+    is_inline: bool
+    """Whether this element is treated as inline vs block"""
+
+VisitResult: TypeAlias = dict[str, str]
+"""Result of a visitor callback.
+
+Allows visitors to control the conversion flow. Must be a dictionary with a 'type' key:
+- {'type': 'continue'} - Continue with default conversion
+- {'type': 'skip'} - Skip this element entirely
+- {'type': 'preserve_html'} - Preserve original HTML
+- {'type': 'custom', 'output': 'markdown'} - Replace with custom markdown
+- {'type': 'error', 'message': 'error message'} - Stop with error
+"""
+
+def convert_with_visitor(
+    html: str,
+    options: ConversionOptions | None = None,
+    visitor: object | None = None,
+) -> str: ...
 def start_profiling(output_path: str, frequency: int | None = None) -> None: ...
 def stop_profiling() -> None: ...

@@ -415,6 +415,216 @@ Tests cover:
 - Return value structure validation
 - Integration with conversion options
 
+## Visitor Pattern
+
+The visitor pattern allows you to customize HTML→Markdown conversion by providing callbacks for specific HTML elements. This enables fine-grained control over how individual elements are rendered.
+
+### Basic Example
+
+```ruby
+require 'html_to_markdown'
+
+class MyVisitor
+  def visit_link(ctx, href, text, title = nil)
+    # Customize link conversion
+    { type: :custom, output: "[#{text}](#{href})" }
+  end
+
+  def visit_image(ctx, src, alt, title = nil)
+    # Skip all images
+    { type: :skip }
+  end
+end
+
+html = '<a href="/page">Link</a><img src="pic.jpg">'
+result = HtmlToMarkdown.convert_with_visitor(html, visitor: MyVisitor.new)
+puts result
+# => [Link](/page)
+```
+
+### Visitor Context
+
+Each visitor callback receives a `NodeContext` object with metadata about the current element:
+
+```ruby
+class DetailedVisitor
+  def visit_link(ctx, href, text, title = nil)
+    # ctx.node_type     => :link
+    # ctx.tag_name      => "a"
+    # ctx.attributes    => {"href" => "...", ...}
+    # ctx.depth         => Integer
+    # ctx.parent_tag    => String or nil
+    # ctx.is_inline     => true/false
+
+    { type: :continue }  # Use default conversion
+  end
+end
+```
+
+### Return Value Types
+
+Each visitor callback must return a hash with at least a `:type` key. The following types are supported:
+
+- **`:continue`** - Use default conversion for this element
+  ```ruby
+  { type: :continue }
+  ```
+
+- **`:custom`** - Replace with custom markdown output
+  ```ruby
+  { type: :custom, output: "[Click here](#{href})" }
+  ```
+
+- **`:skip`** - Omit this element entirely
+  ```ruby
+  { type: :skip }
+  ```
+
+- **`:preserve_html`** - Keep original HTML without conversion
+  ```ruby
+  { type: :preserve_html }
+  ```
+
+- **`:error`** - Stop conversion with an error message
+  ```ruby
+  { type: :error, message: "Unsupported element type" }
+  ```
+
+### Supported Visitor Methods
+
+Implement any of these methods in your visitor class to customize specific elements:
+
+**Element Lifecycle**
+- `visit_element_start(ctx)` - Called when entering an element
+- `visit_element_end(ctx, output)` - Called when leaving an element
+
+**Content**
+- `visit_text(ctx, text)` - Plain text nodes
+- `visit_line_break(ctx)` - Line breaks (`<br>`)
+- `visit_horizontal_rule(ctx)` - Horizontal rules (`<hr>`)
+
+**Inline Formatting**
+- `visit_link(ctx, href, text, title = nil)` - Hyperlinks
+- `visit_image(ctx, src, alt, title = nil)` - Images
+- `visit_code_inline(ctx, code)` - Inline code
+- `visit_strong(ctx, text)` - Bold text
+- `visit_emphasis(ctx, text)` - Italic text
+- `visit_strikethrough(ctx, text)` - Strikethrough
+- `visit_underline(ctx, text)` - Underlined text
+- `visit_subscript(ctx, text)` - Subscript
+- `visit_superscript(ctx, text)` - Superscript
+- `visit_mark(ctx, text)` - Highlighted text
+
+**Block Formatting**
+- `visit_heading(ctx, level, text, id = nil)` - Headers (h1-h6)
+- `visit_code_block(ctx, lang = nil, code)` - Code blocks
+- `visit_blockquote(ctx, content, depth)` - Block quotes
+
+**Lists**
+- `visit_list_start(ctx, ordered)` - List opening
+- `visit_list_item(ctx, ordered, marker, text)` - Individual list items
+- `visit_list_end(ctx, ordered, output)` - List closing
+
+**Tables**
+- `visit_table_start(ctx)` - Table opening
+- `visit_table_row(ctx, cells, is_header)` - Table rows
+- `visit_table_end(ctx, output)` - Table closing
+
+**Advanced Elements**
+- `visit_definition_list_start(ctx)` - Definition list opening
+- `visit_definition_term(ctx, text)` - Definition terms
+- `visit_definition_description(ctx, text)` - Definition descriptions
+- `visit_definition_list_end(ctx, output)` - Definition list closing
+- `visit_figure_start(ctx)` - Figure opening
+- `visit_figcaption(ctx, text)` - Figure captions
+- `visit_figure_end(ctx, output)` - Figure closing
+- `visit_form(ctx, action, method)` - Forms
+- `visit_input(ctx, input_type, name, value)` - Form inputs
+- `visit_button(ctx, text)` - Buttons
+- `visit_details(ctx, open)` - Collapsible details
+- `visit_summary(ctx, text)` - Summary elements
+- `visit_audio(ctx, src)` - Audio elements
+- `visit_video(ctx, src)` - Video elements
+- `visit_iframe(ctx, src)` - Embedded iframes
+- `visit_custom_element(ctx, tag_name, html)` - Unknown/custom elements
+
+### Full Example
+
+```ruby
+require 'html_to_markdown'
+
+class CustomVisitor
+  def visit_heading(ctx, level, text, id = nil)
+    # Add custom IDs to headings
+    { type: :custom, output: "#{'#' * level} #{text} {#custom-#{id}}" }
+  end
+
+  def visit_link(ctx, href, text, title = nil)
+    # Convert external links to footnotes
+    if href.start_with?('http')
+      { type: :custom, output: "#{text}[^1]" }
+    else
+      { type: :continue }
+    end
+  end
+
+  def visit_code_block(ctx, lang = nil, code)
+    # Wrap code blocks in custom markers
+    marker = "```#{lang || 'text'}"
+    { type: :custom, output: "#{marker}\n#{code}\n```" }
+  end
+
+  def visit_image(ctx, src, alt, title = nil)
+    # Filter images by source
+    if src.include?('ads')
+      { type: :skip }  # Skip ad images
+    else
+      { type: :continue }
+    end
+  end
+end
+
+html = <<~HTML
+  <h1 id="intro">Introduction</h1>
+  <p>Check out <a href="https://example.com">this link</a>!</p>
+  <pre><code class="language-ruby">puts "Hello"</code></pre>
+  <img src="/ads/banner.jpg" alt="Ad">
+  <img src="/content/diagram.jpg" alt="Diagram">
+HTML
+
+result = HtmlToMarkdown.convert_with_visitor(
+  html,
+  visitor: CustomVisitor.new,
+  heading_style: :atx
+)
+
+puts result
+```
+
+### Type Safety with RBS
+
+All visitor types are defined in `sig/html_to_markdown.rbs` for full type safety with Steep:
+
+```ruby
+# Type definitions available:
+# - visitor_result - Return type for all visitor callbacks
+# - NodeContext - Parameter type with node metadata
+
+steep check  # Validate visitor implementation
+```
+
+Implement visitor callbacks with proper type hints to catch errors early:
+
+```ruby
+require 'html_to_markdown'
+
+class TypedVisitor
+  def visit_link(ctx : HtmlToMarkdown::NodeContext, href : String, text : String, title : String | nil = nil) : HtmlToMarkdown::visitor_result
+    { type: :custom, output: "[#{text}](#{href})" }
+  end
+end
+```
+
 ## CLI
 
 The gem bundles a small proxy for the Rust CLI binary. Use it when you need parity with the standalone `html-to-markdown` executable.

@@ -500,6 +500,165 @@ markdown = convert(hocr_html)
 markdown = convert(hocr_html)
 ```
 
+## Visitor Pattern
+
+The visitor pattern allows you to customize HTML→Markdown conversion by providing callbacks for specific HTML elements. This is useful for implementing domain-specific transformations, element filtering, or custom formatting rules.
+
+### Basic Example
+
+```python
+from html_to_markdown import convert_with_visitor
+
+class MyVisitor:
+    def visit_link(self, ctx, href, text, title):
+        # Customize link conversion
+        return {"type": "custom", "output": f"[{text}]({href})"}
+
+    def visit_image(self, ctx, src, alt, title):
+        # Skip all images
+        return {"type": "skip"}
+
+html = '<a href="/page">Link</a><img src="pic.jpg">'
+result = convert_with_visitor(html, visitor=MyVisitor())
+# Images are skipped, links are rendered with custom format
+```
+
+### Visitor Methods
+
+Define methods in your visitor class for specific HTML elements:
+
+- `visit_link(ctx, href, text, title)` – Handle `<a>` elements
+- `visit_image(ctx, src, alt, title)` – Handle `<img>` elements
+- `visit_paragraph(ctx, children)` – Handle `<p>` elements
+- `visit_heading(ctx, level, children)` – Handle `<h1>`...`<h6>`
+- `visit_list(ctx, ordered, children)` – Handle `<ul>` and `<ol>`
+- `visit_code_block(ctx, language, code)` – Handle `<pre><code>` blocks
+
+Visitor methods receive a context object (`ctx`) with conversion state and the element-specific attributes.
+
+### VisitResult Types
+
+Return a dictionary from visitor methods to control conversion behavior:
+
+**Continue with default conversion:**
+```python
+def visit_link(self, ctx, href, text, title):
+    return {"type": "continue"}
+```
+
+**Use custom markdown output:**
+```python
+def visit_link(self, ctx, href, text, title):
+    return {"type": "custom", "output": f"→ [{text}]({href})"}
+```
+
+**Skip element entirely:**
+```python
+def visit_image(self, ctx, src, alt, title):
+    return {"type": "skip"}  # Image is not rendered
+```
+
+**Preserve original HTML:**
+```python
+def visit_video(self, ctx, src):
+    return {"type": "preserve_html"}  # Keep as `<video src="..."></video>`
+```
+
+**Stop conversion with error:**
+```python
+def visit_link(self, ctx, href, text, title):
+    if not href.startswith(("http://", "https://", "/")):
+        return {"type": "error", "message": f"Invalid URL: {href}"}
+    return {"type": "continue"}
+```
+
+### Full Example: Content Filtering
+
+```python
+from html_to_markdown import convert_with_visitor
+
+class ContentFilter:
+    """Filter out ads, tracking, and external links."""
+
+    def visit_link(self, ctx, href, text, title):
+        # Only allow internal links
+        if href.startswith("/") or href.startswith("https://example.com"):
+            return {"type": "continue"}
+        return {"type": "skip"}
+
+    def visit_image(self, ctx, src, alt, title):
+        # Skip tracking pixels and ads
+        if "tracking" in src or "ad" in src.lower():
+            return {"type": "skip"}
+        return {"type": "continue"}
+
+html = """
+<p>Read more: <a href="https://ads.com">Click here</a></p>
+<p><a href="/about">About us</a></p>
+<img src="/tracking.gif" alt="tracker" />
+<img src="/logo.png" alt="Logo" />
+"""
+
+result = convert_with_visitor(html, visitor=ContentFilter())
+# External links and tracking pixels are removed, local content preserved
+```
+
+### Advanced Example: Custom Link Formatting
+
+```python
+from html_to_markdown import convert_with_visitor, ConversionOptions
+
+class LinkFormatter:
+    """Convert links to footnote-style references."""
+
+    def __init__(self):
+        self.links = []
+        self.link_index = 0
+
+    def visit_link(self, ctx, href, text, title):
+        self.link_index += 1
+        self.links.append({
+            "index": self.link_index,
+            "href": href,
+            "text": text,
+        })
+        return {
+            "type": "custom",
+            "output": f"{text}[{self.link_index}]"
+        }
+
+formatter = LinkFormatter()
+html = '<p>Visit <a href="https://example.com">Example</a> and <a href="https://rust-lang.org">Rust</a>.</p>'
+markdown = convert_with_visitor(html, visitor=formatter)
+
+# Add footnotes
+markdown += "\n\n"
+for link in formatter.links:
+    markdown += f"[{link['index']}] {link['href']}\n"
+
+# Output: "Visit Example[1] and Rust[2].\n\n[1] https://example.com\n[2] https://rust-lang.org"
+```
+
+### Error Handling
+
+Visitor errors are collected and reported at the end of conversion:
+
+```python
+from html_to_markdown import convert_with_visitor
+
+class StrictValidator:
+    def visit_image(self, ctx, src, alt, title):
+        if not alt:
+            return {"type": "error", "message": "Image missing alt text"}
+        return {"type": "continue"}
+
+html = '<img src="pic.jpg" />'
+try:
+    result = convert_with_visitor(html, visitor=StrictValidator())
+except ValueError as e:
+    print(f"Conversion failed: {e}")
+```
+
 ## CLI (same engine)
 
 ```bash
