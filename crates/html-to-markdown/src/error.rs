@@ -32,6 +32,11 @@ pub enum ConversionError {
     #[error("Invalid input: {0}")]
     InvalidInput(String),
 
+    /// Visitor callback error
+    #[cfg(feature = "visitor")]
+    #[error("Visitor error: {0}")]
+    Visitor(String),
+
     /// Generic conversion error
     #[error("Conversion error: {0}")]
     Other(String),

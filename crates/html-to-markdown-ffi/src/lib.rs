@@ -3,23 +3,25 @@
 //! Provides a C-compatible API that can be consumed by Java (Panama FFM),
 //! Go (cgo), C# (P/Invoke), Zig, and other languages with C FFI support.
 
-use std::cell::RefCell;
 use std::ffi::{CStr, CString};
 use std::os::raw::c_char;
 use std::ptr;
 use std::slice;
 
+use html_to_markdown_rs::convert;
 use html_to_markdown_rs::safety::guard_panic;
-use html_to_markdown_rs::{ConversionError, convert};
 
 #[cfg(feature = "metadata")]
 use html_to_markdown_rs::{MetadataConfig, convert_with_metadata, metadata::DEFAULT_MAX_STRUCTURED_DATA_SIZE};
+mod error;
 mod profiling;
+mod strings;
+pub mod visitor;
 
-thread_local! {
-    static LAST_ERROR: RefCell<Option<CString>> = const { RefCell::new(None) };
-}
+pub use error::html_to_markdown_last_error;
+use error::{capture_error, set_last_error};
 
+#[allow(dead_code)]
 fn bytes_to_c_string(mut bytes: Vec<u8>, context: &str) -> Result<CString, String> {
     if bytes.contains(&0) {
         return Err(format!("{context} contained an interior null byte"));
@@ -31,28 +33,9 @@ fn bytes_to_c_string(mut bytes: Vec<u8>, context: &str) -> Result<CString, Strin
     Ok(unsafe { CString::from_vec_unchecked(bytes) })
 }
 
+#[allow(dead_code)]
 fn string_to_c_string(value: String, context: &str) -> Result<CString, String> {
     bytes_to_c_string(value.into_bytes(), context)
-}
-
-fn set_last_error(message: Option<String>) {
-    LAST_ERROR.with(|cell| {
-        let mut slot = cell.borrow_mut();
-        *slot = message.and_then(|msg| CString::new(msg).ok());
-    });
-}
-
-fn last_error_ptr() -> *const c_char {
-    LAST_ERROR.with(|cell| {
-        cell.borrow()
-            .as_ref()
-            .map(|cstr| cstr.as_ptr() as *const c_char)
-            .unwrap_or(ptr::null())
-    })
-}
-
-fn capture_error(err: ConversionError) {
-    set_last_error(Some(err.to_string()));
 }
 
 /// Start Rust-side profiling and write a flamegraph to the specified path.
@@ -266,18 +249,6 @@ pub unsafe extern "C" fn html_to_markdown_convert_bytes_with_len(
             ptr::null_mut()
         }
     }
-}
-
-/// Get the last error message from a failed conversion.
-///
-/// # Safety
-///
-/// - Returns a pointer to a thread-local buffer; copy it immediately if needed
-/// - Pointer is invalidated by the next call to any `html_to_markdown_*` function
-/// - May return NULL if no error has occurred in this thread
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn html_to_markdown_last_error() -> *const c_char {
-    last_error_ptr()
 }
 
 /// Free a string returned by html_to_markdown_convert.

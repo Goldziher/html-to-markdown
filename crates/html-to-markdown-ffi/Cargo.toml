@@ -14,8 +14,9 @@ rust-version.workspace = true
 crate-type = ["cdylib", "staticlib"]
 
 [dependencies]
-html-to-markdown-rs = { workspace = true, features = ["inline-images", "metadata"] }
+html-to-markdown-rs = { workspace = true, features = ["inline-images", "metadata", "visitor"] }
 serde_json = "1.0"
+libc = "0.2"
 
 [target.'cfg(not(target_os = "windows"))'.dependencies]
 pprof = { version = "0.15", features = ["flamegraph"], optional = true }
@@ -24,6 +25,7 @@ pprof = { version = "0.15", features = ["flamegraph"], optional = true }
 default = ["metadata"]
 metadata = ["html-to-markdown-rs/metadata"]
 profiling = ["dep:pprof"]
+visitor = ["html-to-markdown-rs/visitor"]
 
 [build-dependencies]
 cbindgen = "0.29"
