@@ -29,4 +29,4 @@ reqwest = { version = "0.12", default-features = false, features = ["blocking", 
 [dev-dependencies]
 assert_cmd = "2.1"
 predicates = "3.1"
-tempfile = "3.23"
+tempfile = "3.24"

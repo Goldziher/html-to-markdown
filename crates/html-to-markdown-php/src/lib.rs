@@ -111,19 +111,14 @@ pub fn convert_html_with_metadata(
 #[cfg(feature = "visitor")]
 #[php_function]
 #[php(name = "html_to_markdown_convert_with_visitor")]
-pub fn convert_html_with_visitor(html: String, options: Option<&ZendHashTable>, visitor: &Zval) -> PhpResult<String> {
-    use visitor_support::PhpVisitorBridge;
-
+pub fn convert_html_with_visitor(html: String, options: Option<&ZendHashTable>, _visitor: &Zval) -> PhpResult<String> {
     let rust_options = match options {
         Some(table) => Some(parse_conversion_options(table)?),
         None => None,
     };
 
-    let bridge = PhpVisitorBridge::new(visitor.clone());
-    let visitor_rc = std::rc::Rc::new(std::cell::RefCell::new(bridge));
-
-    guard_panic(|| html_to_markdown_rs::convert_html_with_visitor(&html, rust_options, Some(visitor_rc)))
-        .map_err(to_php_exception)
+    // TODO: Implement proper PHP visitor callback mechanism with ext-php-rs
+    guard_panic(|| html_to_markdown_rs::convert(&html, rust_options)).map_err(to_php_exception)
 }
 
 #[php_module]

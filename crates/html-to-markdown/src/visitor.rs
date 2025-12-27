@@ -48,7 +48,6 @@ pub enum NodeType {
     /// Generic element node
     Element,
 
-    // === Block Elements ===
     /// Heading elements (h1-h6)
     Heading,
     /// Paragraph element
@@ -62,7 +61,6 @@ pub enum NodeType {
     /// Horizontal rule
     Hr,
 
-    // === Lists ===
     /// Ordered or unordered list (ul, ol)
     List,
     /// List item (li)
@@ -74,7 +72,6 @@ pub enum NodeType {
     /// Definition description (dd)
     DefinitionDescription,
 
-    // === Tables ===
     /// Table element
     Table,
     /// Table row (tr)
@@ -90,7 +87,6 @@ pub enum NodeType {
     /// Table foot (tfoot)
     TableFoot,
 
-    // === Inline Formatting ===
     /// Anchor link (a)
     Link,
     /// Image (img)
@@ -118,7 +114,6 @@ pub enum NodeType {
     /// Span element
     Span,
 
-    // === Semantic HTML5 ===
     /// Article element
     Article,
     /// Section element
@@ -144,7 +139,6 @@ pub enum NodeType {
     /// Summary element
     Summary,
 
-    // === Forms ===
     /// Form element
     Form,
     /// Input element
@@ -164,7 +158,6 @@ pub enum NodeType {
     /// Legend element
     Legend,
 
-    // === Media ===
     /// Audio element
     Audio,
     /// Video element
@@ -180,7 +173,6 @@ pub enum NodeType {
     /// Canvas element
     Canvas,
 
-    // === Advanced ===
     /// Ruby annotation
     Ruby,
     /// Ruby text
@@ -216,7 +208,6 @@ pub enum NodeType {
     /// Slot element
     Slot,
 
-    // === Document Structure ===
     /// HTML root element
     Html,
     /// Head element
@@ -236,7 +227,6 @@ pub enum NodeType {
     /// Base element
     Base,
 
-    // === Custom/Unknown ===
     /// Custom element (web components) or unknown tag
     Custom,
 }
@@ -333,8 +323,6 @@ pub type VisitorHandle = std::rc::Rc<std::cell::RefCell<dyn HtmlVisitor>>;
 /// - Return `VisitResult::Continue` quickly for elements you don't need to customize
 /// - Avoid heavy computation in visitor methods; consider caching if needed
 pub trait HtmlVisitor: std::fmt::Debug {
-    // === Generic Hooks ===
-
     /// Called before entering any element.
     ///
     /// This is the first callback invoked for every HTML element, allowing
@@ -351,8 +339,6 @@ pub trait HtmlVisitor: std::fmt::Debug {
         VisitResult::Continue
     }
 
-    // === Text Nodes ===
-
     /// Visit text nodes (most frequent callback - ~100+ per document).
     ///
     /// # Arguments
@@ -361,8 +347,6 @@ pub trait HtmlVisitor: std::fmt::Debug {
     fn visit_text(&mut self, _ctx: &NodeContext, _text: &str) -> VisitResult {
         VisitResult::Continue
     }
-
-    // === Links and Images ===
 
     /// Visit anchor links `<a href="...">`.
     ///
@@ -386,8 +370,6 @@ pub trait HtmlVisitor: std::fmt::Debug {
         VisitResult::Continue
     }
 
-    // === Headings ===
-
     /// Visit heading elements `<h1>` through `<h6>`.
     ///
     /// # Arguments
@@ -398,8 +380,6 @@ pub trait HtmlVisitor: std::fmt::Debug {
     fn visit_heading(&mut self, _ctx: &NodeContext, _level: u32, _text: &str, _id: Option<&str>) -> VisitResult {
         VisitResult::Continue
     }
-
-    // === Code ===
 
     /// Visit code blocks `<pre><code>`.
     ///
@@ -419,8 +399,6 @@ pub trait HtmlVisitor: std::fmt::Debug {
     fn visit_code_inline(&mut self, _ctx: &NodeContext, _code: &str) -> VisitResult {
         VisitResult::Continue
     }
-
-    // === Lists ===
 
     /// Visit list items `<li>`.
     ///
@@ -443,8 +421,6 @@ pub trait HtmlVisitor: std::fmt::Debug {
         VisitResult::Continue
     }
 
-    // === Tables ===
-
     /// Called before processing a table `<table>`.
     fn visit_table_start(&mut self, _ctx: &NodeContext) -> VisitResult {
         VisitResult::Continue
@@ -465,8 +441,6 @@ pub trait HtmlVisitor: std::fmt::Debug {
         VisitResult::Continue
     }
 
-    // === Blockquotes ===
-
     /// Visit blockquote elements `<blockquote>`.
     ///
     /// # Arguments
@@ -476,8 +450,6 @@ pub trait HtmlVisitor: std::fmt::Debug {
     fn visit_blockquote(&mut self, _ctx: &NodeContext, _content: &str, _depth: usize) -> VisitResult {
         VisitResult::Continue
     }
-
-    // === Inline Formatting ===
 
     /// Visit strong/bold elements `<strong>`, `<b>`.
     fn visit_strong(&mut self, _ctx: &NodeContext, _text: &str) -> VisitResult {
@@ -514,8 +486,6 @@ pub trait HtmlVisitor: std::fmt::Debug {
         VisitResult::Continue
     }
 
-    // === Breaks ===
-
     /// Visit line break elements `<br>`.
     fn visit_line_break(&mut self, _ctx: &NodeContext) -> VisitResult {
         VisitResult::Continue
@@ -526,8 +496,6 @@ pub trait HtmlVisitor: std::fmt::Debug {
         VisitResult::Continue
     }
 
-    // === Custom/Unknown Elements ===
-
     /// Visit custom elements (web components) or unknown tags.
     ///
     /// # Arguments
@@ -537,8 +505,6 @@ pub trait HtmlVisitor: std::fmt::Debug {
     fn visit_custom_element(&mut self, _ctx: &NodeContext, _tag_name: &str, _html: &str) -> VisitResult {
         VisitResult::Continue
     }
-
-    // === Definition Lists ===
 
     /// Visit definition list `<dl>`.
     fn visit_definition_list_start(&mut self, _ctx: &NodeContext) -> VisitResult {
@@ -559,8 +525,6 @@ pub trait HtmlVisitor: std::fmt::Debug {
     fn visit_definition_list_end(&mut self, _ctx: &NodeContext, _output: &str) -> VisitResult {
         VisitResult::Continue
     }
-
-    // === Forms ===
 
     /// Visit form elements `<form>`.
     fn visit_form(&mut self, _ctx: &NodeContext, _action: Option<&str>, _method: Option<&str>) -> VisitResult {
@@ -583,8 +547,6 @@ pub trait HtmlVisitor: std::fmt::Debug {
         VisitResult::Continue
     }
 
-    // === Media ===
-
     /// Visit audio elements `<audio>`.
     fn visit_audio(&mut self, _ctx: &NodeContext, _src: Option<&str>) -> VisitResult {
         VisitResult::Continue
@@ -599,8 +561,6 @@ pub trait HtmlVisitor: std::fmt::Debug {
     fn visit_iframe(&mut self, _ctx: &NodeContext, _src: Option<&str>) -> VisitResult {
         VisitResult::Continue
     }
-
-    // === Semantic HTML5 ===
 
     /// Visit details elements `<details>`.
     fn visit_details(&mut self, _ctx: &NodeContext, _open: bool) -> VisitResult {
@@ -662,8 +622,6 @@ pub trait HtmlVisitor: std::fmt::Debug {
 #[cfg(feature = "async-visitor")]
 #[async_trait]
 pub trait AsyncHtmlVisitor: std::fmt::Debug + Send + Sync {
-    // === Generic Hooks ===
-
     /// Called before entering any element (async version).
     async fn visit_element_start(&mut self, _ctx: &NodeContext) -> VisitResult {
         VisitResult::Continue
@@ -674,14 +632,10 @@ pub trait AsyncHtmlVisitor: std::fmt::Debug + Send + Sync {
         VisitResult::Continue
     }
 
-    // === Text Nodes ===
-
     /// Visit text nodes (async version - most frequent callback - ~100+ per document).
     async fn visit_text(&mut self, _ctx: &NodeContext, _text: &str) -> VisitResult {
         VisitResult::Continue
     }
-
-    // === Links and Images ===
 
     /// Visit anchor links `<a href="...">` (async version).
     async fn visit_link(&mut self, _ctx: &NodeContext, _href: &str, _text: &str, _title: Option<&str>) -> VisitResult {
@@ -693,14 +647,10 @@ pub trait AsyncHtmlVisitor: std::fmt::Debug + Send + Sync {
         VisitResult::Continue
     }
 
-    // === Headings ===
-
     /// Visit heading elements `<h1>` through `<h6>` (async version).
     async fn visit_heading(&mut self, _ctx: &NodeContext, _level: u32, _text: &str, _id: Option<&str>) -> VisitResult {
         VisitResult::Continue
     }
-
-    // === Code ===
 
     /// Visit code blocks `<pre><code>` (async version).
     async fn visit_code_block(&mut self, _ctx: &NodeContext, _lang: Option<&str>, _code: &str) -> VisitResult {
@@ -711,8 +661,6 @@ pub trait AsyncHtmlVisitor: std::fmt::Debug + Send + Sync {
     async fn visit_code_inline(&mut self, _ctx: &NodeContext, _code: &str) -> VisitResult {
         VisitResult::Continue
     }
-
-    // === Lists ===
 
     /// Visit list items `<li>` (async version).
     async fn visit_list_item(&mut self, _ctx: &NodeContext, _ordered: bool, _marker: &str, _text: &str) -> VisitResult {
@@ -729,8 +677,6 @@ pub trait AsyncHtmlVisitor: std::fmt::Debug + Send + Sync {
         VisitResult::Continue
     }
 
-    // === Tables ===
-
     /// Called before processing a table `<table>` (async version).
     async fn visit_table_start(&mut self, _ctx: &NodeContext) -> VisitResult {
         VisitResult::Continue
@@ -746,14 +692,10 @@ pub trait AsyncHtmlVisitor: std::fmt::Debug + Send + Sync {
         VisitResult::Continue
     }
 
-    // === Blockquotes ===
-
     /// Visit blockquote elements `<blockquote>` (async version).
     async fn visit_blockquote(&mut self, _ctx: &NodeContext, _content: &str, _depth: usize) -> VisitResult {
         VisitResult::Continue
     }
-
-    // === Inline Formatting ===
 
     /// Visit strong/bold elements `<strong>`, `<b>` (async version).
     async fn visit_strong(&mut self, _ctx: &NodeContext, _text: &str) -> VisitResult {
@@ -790,8 +732,6 @@ pub trait AsyncHtmlVisitor: std::fmt::Debug + Send + Sync {
         VisitResult::Continue
     }
 
-    // === Breaks ===
-
     /// Visit line break elements `<br>` (async version).
     async fn visit_line_break(&mut self, _ctx: &NodeContext) -> VisitResult {
         VisitResult::Continue
@@ -802,14 +742,10 @@ pub trait AsyncHtmlVisitor: std::fmt::Debug + Send + Sync {
         VisitResult::Continue
     }
 
-    // === Custom/Unknown Elements ===
-
     /// Visit custom elements (web components) or unknown tags (async version).
     async fn visit_custom_element(&mut self, _ctx: &NodeContext, _tag_name: &str, _html: &str) -> VisitResult {
         VisitResult::Continue
     }
-
-    // === Definition Lists ===
 
     /// Visit definition list `<dl>` (async version).
     async fn visit_definition_list_start(&mut self, _ctx: &NodeContext) -> VisitResult {
@@ -830,8 +766,6 @@ pub trait AsyncHtmlVisitor: std::fmt::Debug + Send + Sync {
     async fn visit_definition_list_end(&mut self, _ctx: &NodeContext, _output: &str) -> VisitResult {
         VisitResult::Continue
     }
-
-    // === Forms ===
 
     /// Visit form elements `<form>` (async version).
     async fn visit_form(&mut self, _ctx: &NodeContext, _action: Option<&str>, _method: Option<&str>) -> VisitResult {
@@ -854,8 +788,6 @@ pub trait AsyncHtmlVisitor: std::fmt::Debug + Send + Sync {
         VisitResult::Continue
     }
 
-    // === Media ===
-
     /// Visit audio elements `<audio>` (async version).
     async fn visit_audio(&mut self, _ctx: &NodeContext, _src: Option<&str>) -> VisitResult {
         VisitResult::Continue
@@ -870,8 +802,6 @@ pub trait AsyncHtmlVisitor: std::fmt::Debug + Send + Sync {
     async fn visit_iframe(&mut self, _ctx: &NodeContext, _src: Option<&str>) -> VisitResult {
         VisitResult::Continue
     }
-
-    // === Semantic HTML5 ===
 
     /// Visit details elements `<details>` (async version).
     async fn visit_details(&mut self, _ctx: &NodeContext, _open: bool) -> VisitResult {
@@ -969,7 +899,6 @@ mod tests {
             is_inline: true,
         };
 
-        // All default implementations should return Continue
         matches!(visitor.visit_element_start(&ctx), VisitResult::Continue);
         matches!(visitor.visit_element_end(&ctx, "output"), VisitResult::Continue);
         matches!(visitor.visit_text(&ctx, "text"), VisitResult::Continue);

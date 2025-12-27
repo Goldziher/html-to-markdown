@@ -19,16 +19,13 @@ const fs = require("fs");
 const path = require("path");
 const { performance } = require("perf_hooks");
 
-// Try to use the local package, fallback to installed
 let htmlToMarkdown;
 try {
-  // Try from local build
   htmlToMarkdown = require(
     path.join(__dirname, "../packages/typescript/dist/index.js")
   );
 } catch {
   try {
-    // Fallback to package
     htmlToMarkdown = require("html-to-markdown");
   } catch (e) {
     console.error("Error: Could not load html-to-markdown module");
@@ -148,17 +145,14 @@ class ComplexVisitor {
     this.invocations++;
     const nodeType = node.type || "";
 
-    // Track statistics
     if (!(nodeType in this.stats)) {
       this.stats[nodeType] = 0;
     }
     this.stats[nodeType]++;
 
-    // Track depth
     const depth = node.depth || 0;
     this.depths.push(depth);
 
-    // Do some computation
     if (node.attributes) {
       const attrCount = Object.keys(node.attributes).length;
       this.stats["attrs_total"] = (this.stats["attrs_total"] || 0) + attrCount;
@@ -175,11 +169,10 @@ function measureGCPauses(fn, iterations = 1) {
     return { time: fn(iterations), pauses: [] };
   }
 
-  global.gc(); // Clean up before test
+  global.gc();
   const gcPauses = [];
   let lastGc = 0;
 
-  // Note: We can't directly hook GC, so we estimate by measuring heap
   const heapBefore = process.memoryUsage().heapUsed;
 
   const start = performance.now();
@@ -205,15 +198,12 @@ function benchmarkWithVisitor(html, visitor, iterations = 10) {
     (iter) => {
       for (let i = 0; i < iter; i++) {
         try {
-          // Try to call with visitor - this might not be implemented yet
           if (htmlToMarkdown.convertWithVisitor) {
             htmlToMarkdown.convertWithVisitor(html, { visitor });
           } else {
-            // Fallback to regular convert
             htmlToMarkdown.convert(html);
           }
         } catch (e) {
-          // Visitor pattern might not be implemented
         }
       }
     },
@@ -245,27 +235,22 @@ function profileScenario(name, html, VisitorClass, iterations = 10) {
 
   const elementCount = countElements(html);
 
-  // Warm up
   console.log("  Warming up...");
   benchmarkBaseline(html, 2);
 
-  // Baseline
   console.log("  Running baseline...");
   const baseline = benchmarkBaseline(html, iterations);
   const baselineAvg = baseline.time / iterations;
 
-  // With visitor
   console.log(`  Running ${name} visitor...`);
   const visitor = new VisitorClass();
   const visitorResult = benchmarkWithVisitor(html, visitor, iterations);
   const visitorAvg = visitorResult.time / iterations;
 
-  // Calculate overhead
   const overheadMs = visitorResult.time - baseline.time;
   const overheadPercent =
     baseline.time > 0 ? (overheadMs / baseline.time) * 100 : 0;
 
-  // Per-callback timing
   const callbackCount = visitor.invocations || 0;
   const avgCallbackTimeUs =
     callbackCount > 0 ? (overheadMs * 1000) / callbackCount : 0;
@@ -335,12 +320,10 @@ function parseArgs() {
 function main() {
   const args = parseArgs();
 
-  // Create output directory
   if (!fs.existsSync(args.output)) {
     fs.mkdirSync(args.output, { recursive: true });
   }
 
-  // Select HTML file
   const htmlMap = {
     small: "small_html.html",
     medium: "medium_python.html",
@@ -378,7 +361,6 @@ function main() {
     results.push(metrics);
   }
 
-  // Write JSON results
   const jsonPath = path.join(args.output, "results.json");
   const output = {
     htmlSize: html.length,
@@ -404,7 +386,6 @@ function main() {
   fs.writeFileSync(jsonPath, JSON.stringify(output, null, 2));
   console.log(`\n\nResults written to ${jsonPath}`);
 
-  // Print summary
   console.log("\n\nSummary");
   console.log("=======");
   for (const result of results) {

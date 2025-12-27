@@ -524,8 +524,6 @@ func TestMustConvertWithVisitor_Success(t *testing.T) {
 }
 
 func TestMustConvertWithVisitor_Panic(t *testing.T) {
-	// This would panic, so we skip it for safety
-	// In real testing, you might use a recover() pattern
 	t.Skip("Skipping panic test for MustConvertWithVisitor")
 }
 

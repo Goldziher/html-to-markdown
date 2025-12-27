@@ -30,38 +30,29 @@ interface NodeContext {
  * All callback methods are optional and return promises.
  */
 interface Visitor {
-	// Generic element callbacks
 	visitElementStart?: (ctx: NodeContext) => Promise<VisitResult>;
 	visitElementEnd?: (ctx: NodeContext, output: string) => Promise<VisitResult>;
 
-	// Text nodes
 	visitText?: (ctx: NodeContext, text: string) => Promise<VisitResult>;
 
-	// Links and images
 	visitLink?: (ctx: NodeContext, href: string, text: string, title?: string) => Promise<VisitResult>;
 	visitImage?: (ctx: NodeContext, src: string, alt: string, title?: string) => Promise<VisitResult>;
 
-	// Headings
 	visitHeading?: (ctx: NodeContext, level: number, text: string, id?: string) => Promise<VisitResult>;
 
-	// Code
 	visitCodeBlock?: (ctx: NodeContext, lang?: string, code?: string) => Promise<VisitResult>;
 	visitCodeInline?: (ctx: NodeContext, code: string) => Promise<VisitResult>;
 
-	// Lists
 	visitListStart?: (ctx: NodeContext) => Promise<VisitResult>;
 	visitListEnd?: (ctx: NodeContext, output: string) => Promise<VisitResult>;
 	visitListItem?: (ctx: NodeContext) => Promise<VisitResult>;
 
-	// Tables
 	visitTableStart?: (ctx: NodeContext) => Promise<VisitResult>;
 	visitTableEnd?: (ctx: NodeContext, output: string) => Promise<VisitResult>;
 	visitTableRow?: (ctx: NodeContext) => Promise<VisitResult>;
 
-	// Block elements
 	visitBlockquote?: (ctx: NodeContext) => Promise<VisitResult>;
 
-	// Inline formatting
 	visitStrong?: (ctx: NodeContext, text: string) => Promise<VisitResult>;
 	visitEmphasis?: (ctx: NodeContext, text: string) => Promise<VisitResult>;
 	visitStrikethrough?: (ctx: NodeContext, text: string) => Promise<VisitResult>;
@@ -70,32 +61,26 @@ interface Visitor {
 	visitSuperscript?: (ctx: NodeContext, text: string) => Promise<VisitResult>;
 	visitMark?: (ctx: NodeContext, text: string) => Promise<VisitResult>;
 
-	// Special elements
 	visitLineBreak?: (ctx: NodeContext) => Promise<VisitResult>;
 	visitHorizontalRule?: (ctx: NodeContext) => Promise<VisitResult>;
 	visitCustomElement?: (ctx: NodeContext) => Promise<VisitResult>;
 
-	// Definition lists
 	visitDefinitionListStart?: (ctx: NodeContext) => Promise<VisitResult>;
 	visitDefinitionListEnd?: (ctx: NodeContext, output: string) => Promise<VisitResult>;
 	visitDefinitionTerm?: (ctx: NodeContext) => Promise<VisitResult>;
 	visitDefinitionDescription?: (ctx: NodeContext) => Promise<VisitResult>;
 
-	// Form elements
 	visitForm?: (ctx: NodeContext) => Promise<VisitResult>;
 	visitInput?: (ctx: NodeContext) => Promise<VisitResult>;
 	visitButton?: (ctx: NodeContext, text?: string) => Promise<VisitResult>;
 
-	// Media elements
 	visitAudio?: (ctx: NodeContext, src?: string) => Promise<VisitResult>;
 	visitVideo?: (ctx: NodeContext, src?: string) => Promise<VisitResult>;
 	visitIframe?: (ctx: NodeContext, src?: string) => Promise<VisitResult>;
 
-	// Details/Summary
 	visitDetails?: (ctx: NodeContext) => Promise<VisitResult>;
 	visitSummary?: (ctx: NodeContext) => Promise<VisitResult>;
 
-	// Figure elements
 	visitFigureStart?: (ctx: NodeContext) => Promise<VisitResult>;
 	visitFigureEnd?: (ctx: NodeContext, output: string) => Promise<VisitResult>;
 	visitFigcaption?: (ctx: NodeContext) => Promise<VisitResult>;
@@ -245,9 +230,7 @@ describe("html-to-markdown visitor API (TypeScript)", () => {
 
 			try {
 				await convertWithVisitor(html, undefined, visitor);
-				// Implementation may or may not throw on error result
 			} catch (error) {
-				// Error handling is implementation-dependent
 				expect(error).toBeDefined();
 			}
 		});
@@ -267,7 +250,6 @@ describe("html-to-markdown visitor API (TypeScript)", () => {
 			const html = "<div id='test' class='container'>Text</div>";
 			await convertWithVisitor(html, undefined, visitor);
 
-			// Verify NodeContext structure even if callbacks aren't invoked
 			const expectedProperties = [
 				"nodeType",
 				"tagName",
@@ -278,7 +260,6 @@ describe("html-to-markdown visitor API (TypeScript)", () => {
 				"isInline",
 			];
 
-			// Type checking happens at compile time
 			const dummyContext: NodeContext = {
 				nodeType: "Element",
 				tagName: "div",
@@ -695,7 +676,6 @@ describe("html-to-markdown visitor API (TypeScript)", () => {
 		it("should handle async operations in visitor callbacks", async () => {
 			const visitor: Visitor = {
 				visitLink: async (ctx, href, text, title) => {
-					// Simulate async operation
 					await new Promise((resolve) => setTimeout(resolve, 1));
 					return { type: "continue" };
 				},
@@ -945,7 +925,6 @@ describe("html-to-markdown visitor API (TypeScript)", () => {
 				isInline: false,
 			};
 
-			// These should all type-check correctly
 			const tagName: string = ctx.tagName;
 			const depth: number = ctx.depth;
 			const isInline: boolean = ctx.isInline;

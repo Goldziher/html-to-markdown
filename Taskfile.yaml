@@ -717,7 +717,7 @@ tasks:
     desc: "Run C# tests"
     cmds:
       - cargo build --release -p html-to-markdown-ffi
-      - cmd: cd packages/csharp/HtmlToMarkdown.Tests && LD_LIBRARY_PATH=${GITHUB_WORKSPACE:-$PWD}/../../target/release:${LD_LIBRARY_PATH:-} DYLD_LIBRARY_PATH=${GITHUB_WORKSPACE:-$PWD}/../../target/release:${DYLD_LIBRARY_PATH:-} dotnet test
+      - cmd: cd packages/csharp/HtmlToMarkdown.Tests && LD_LIBRARY_PATH={{.TASKFILE_DIR}}/target/release:${LD_LIBRARY_PATH:-} DYLD_LIBRARY_PATH={{.TASKFILE_DIR}}/target/release:${DYLD_LIBRARY_PATH:-} dotnet test
 
   csharp:lint:
     desc: "Lint C# code WITH auto-fix"

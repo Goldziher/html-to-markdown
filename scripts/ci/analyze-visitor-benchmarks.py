@@ -158,14 +158,12 @@ def main() -> int:
 
     args = parser.parse_args()
 
-    # Parse thresholds
     try:
         thresholds = json.loads(args.thresholds)
     except json.JSONDecodeError:
         print("Error: Invalid JSON in --thresholds argument", file=sys.stderr)
         return 1
 
-    # Load all results
     baseline_results = load_results(args.baseline)
     callbacks_results = load_results(args.callbacks)
     custom_results = load_results(args.custom)
@@ -173,7 +171,6 @@ def main() -> int:
 
     framework = args.framework
 
-    # Extract data
     baseline_data = extract_benchmark_data(baseline_results, framework)
     callbacks_data = extract_benchmark_data(callbacks_results, framework)
     custom_data = extract_benchmark_data(custom_results, framework)
@@ -183,20 +180,17 @@ def main() -> int:
         print(f"Error: No benchmark data found for framework '{framework}'", file=sys.stderr)
         return 1
 
-    # Check each comparison category
     all_passed = True
     messages = []
 
-    # No-op visitor (baseline)
     passed, regressions = check_regressions(
         baseline_data,
-        baseline_data,  # Self-comparison for baseline
+        baseline_data,
         thresholds.get("baseline", 10),
         "baseline",
     )
     print_summary(baseline_data, baseline_data, "no-op visitor (baseline)", thresholds.get("baseline", 10))
 
-    # Simple callbacks
     passed, regressions = check_regressions(
         baseline_data, callbacks_data, thresholds.get("callbacks", 30), "simple callbacks"
     )
@@ -204,7 +198,6 @@ def main() -> int:
     messages.extend(regressions)
     print_summary(baseline_data, callbacks_data, "simple callbacks", thresholds.get("callbacks", 30))
 
-    # Custom transformations
     passed, regressions = check_regressions(
         baseline_data, custom_data, thresholds.get("custom", 40), "custom transformations"
     )
@@ -212,7 +205,6 @@ def main() -> int:
     messages.extend(regressions)
     print_summary(baseline_data, custom_data, "custom transforms", thresholds.get("custom", 40))
 
-    # Complex visitors
     passed, regressions = check_regressions(
         baseline_data, complex_data, thresholds.get("complex", 60), "complex visitors"
     )
@@ -220,7 +212,6 @@ def main() -> int:
     messages.extend(regressions)
     print_summary(baseline_data, complex_data, "complex visitors", thresholds.get("complex", 60))
 
-    # Print summary
     print(f"\n{'=' * 70}")
     if all_passed:
         print("✓ All visitor benchmarks passed regression checks")

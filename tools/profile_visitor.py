@@ -27,7 +27,6 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any
 
-# Add packages to path
 sys.path.insert(0, str(Path(__file__).parent.parent / "packages" / "python"))
 
 from html_to_markdown import convert, convert_with_visitor
@@ -117,16 +116,13 @@ class ComplexVisitor:
         self.invocations += 1
         node_type = node.get("type", "")
 
-        # Track statistics
         if node_type not in self.stats:
             self.stats[node_type] = 0
         self.stats[node_type] += 1
 
-        # Track depth
         depth = node.get("depth", 0)
         self.depths.append(depth)
 
-        # Do some computation
         if node.get("attributes"):
             attr_count = len(node.get("attributes", {}))
             self.stats["attrs_total"] = self.stats.get("attrs_total", 0) + attr_count
@@ -145,7 +141,7 @@ def benchmark_with_visitor(
             convert_with_visitor(html, visitor=visitor)
 
     elapsed = time.perf_counter() - start
-    return elapsed * 1000  # Convert to milliseconds
+    return elapsed * 1000
 
 
 def benchmark_baseline(html: str, iterations: int = 10) -> float:
@@ -156,7 +152,7 @@ def benchmark_baseline(html: str, iterations: int = 10) -> float:
         convert(html)
 
     elapsed = time.perf_counter() - start
-    return elapsed * 1000  # Convert to milliseconds
+    return elapsed * 1000
 
 
 def profile_scenario(
@@ -168,23 +164,18 @@ def profile_scenario(
     """Profile a specific scenario."""
     element_count = count_elements(html)
 
-    # Warm up
     benchmark_baseline(html, iterations=2)
 
-    # Baseline (no visitor)
     baseline_ms = benchmark_baseline(html, iterations=iterations)
     baseline_avg = baseline_ms / iterations
 
-    # With visitor
     visitor = visitor_class()
     visitor_ms = benchmark_with_visitor(html, visitor, iterations=iterations)
     visitor_avg = visitor_ms / iterations
 
-    # Calculate overhead
     overhead_ms = visitor_ms - baseline_ms
     overhead_percent = (overhead_ms / baseline_ms) * 100 if baseline_ms > 0 else 0
 
-    # Per-callback timing
     callback_count = visitor.invocations if hasattr(visitor, "invocations") else 0
     avg_callback_time_us = (overhead_ms * 1000 / callback_count) if callback_count > 0 else 0
 
@@ -212,19 +203,18 @@ def profile_with_cprofile(
     profiler = cProfile.Profile()
     profiler.enable()
 
-    for _ in range(5):  # Fewer iterations for profiling
+    for _ in range(5):
         with contextlib.suppress(Exception):
             convert_with_visitor(html, visitor=visitor)
 
     profiler.disable()
 
-    # Save stats
     stats_path = output_dir / f"profile_{scenario_name}.txt"
     with stats_path.open("w") as f:
         stats = pstats.Stats(profiler, stream=f)
         stats.strip_dirs()
         stats.sort_stats("cumulative")
-        stats.print_stats(30)  # Top 30 functions
+        stats.print_stats(30)
 
 
 def main() -> None:
@@ -245,10 +235,8 @@ def main() -> None:
 
     args = parser.parse_args()
 
-    # Create output directory
     args.output.mkdir(parents=True, exist_ok=True)
 
-    # Select HTML file
     html_map = {
         "small": "small_html.html",
         "medium": "medium_python.html",
@@ -257,7 +245,6 @@ def main() -> None:
     html_file = html_map.get(args.html, "medium_python.html")
     html = load_test_html(html_file)
 
-    # Define scenarios
     scenarios = [
         ("no-op", NoOpVisitor),
         ("simple", SimpleVisitor),
@@ -279,12 +266,10 @@ def main() -> None:
         )
         results.append(metrics)
 
-        # Generate cProfile if requested
         if args.cprofile:
             visitor = visitor_class()
             profile_with_cprofile(html, visitor, scenario_name, args.output)
 
-    # Write JSON results
     json_path = args.output / "results.json"
     with json_path.open("w") as f:
         json.dump(

@@ -372,12 +372,7 @@ impl From<JsInlineImageConfig> for InlineImageConfigUpdate {
         Self {
             max_decoded_size_bytes: val.max_decoded_size_bytes.map(|b| {
                 let (lossless, value, _negative) = b.get_u64();
-                if !lossless {
-                    // Value doesn't fit in u64, use maximum u64 value as safe fallback
-                    u64::MAX
-                } else {
-                    value
-                }
+                if !lossless { u64::MAX } else { value }
             }),
             filename_prefix: val.filename_prefix,
             capture_svg: val.capture_svg,
@@ -645,9 +640,6 @@ fn convert_metadata(metadata: RustExtendedMetadata) -> JsExtendedMetadata {
 ///
 /// # Arguments
 ///
-// ============================================================================
-// Async Visitor Pattern Support with ThreadsafeFunction Integration
-// ============================================================================
 
 #[cfg(feature = "async-visitor")]
 #[napi(object)]
@@ -897,11 +889,6 @@ impl JsVisitorBridge {
 #[cfg(feature = "async-visitor")]
 #[async_trait]
 impl AsyncHtmlVisitor for JsVisitorBridge {
-    // AsyncHtmlVisitor implementation with ThreadsafeFunction support
-    // All methods are async stubs that return Continue
-    // Full callback invocation will be integrated when the async visitor
-    // dispatch is implemented in the conversion pipeline
-
     async fn visit_element_start(&mut self, _ctx: &RustNodeContext) -> RustVisitResult {
         RustVisitResult::Continue
     }
@@ -1186,25 +1173,19 @@ pub fn convert_with_visitor(
 
     let mut bridge = JsVisitorBridge::new();
 
-    // Macro to extract visitor callbacks and build ThreadsafeFunctions
     macro_rules! extract_fn {
         ($method_name:literal, $field:ident) => {
             if let Ok(func) = visitor.get_named_property::<Function<String, Promise<String>>>($method_name) {
-                // Build a ThreadsafeFunction with a callback that passes String arguments to JavaScript
-                // The callback transforms the Rust String input into JavaScript arguments
-                if let Ok(tsfn) = func.build_threadsafe_function::<String>().build_callback(
-                    |ctx: napi::threadsafe_function::ThreadsafeCallContext<String>| {
-                        // Return the string as-is to be passed to the JavaScript function
-                        Ok(ctx.value)
-                    },
-                ) {
+                if let Ok(tsfn) = func
+                    .build_threadsafe_function::<String>()
+                    .build_callback(|ctx: napi::threadsafe_function::ThreadsafeCallContext<String>| Ok(ctx.value))
+                {
                     bridge.$field = Some(Arc::new(tsfn));
                 }
             }
         };
     }
 
-    // Extract all 41 visitor callbacks
     extract_fn!("visitElementStart", visit_element_start_fn);
     extract_fn!("visitElementEnd", visit_element_end_fn);
     extract_fn!("visitText", visit_text_fn);
@@ -1246,13 +1227,11 @@ pub fn convert_with_visitor(
     extract_fn!("visitFigcaption", visit_figcaption_fn);
     extract_fn!("visitFigureEnd", visit_figure_end_fn);
 
-    // Create tokio runtime for async visitor dispatch
     let rt = tokio::runtime::Builder::new_current_thread()
         .enable_all()
         .build()
         .map_err(|e| napi::Error::new(napi::Status::GenericFailure, format!("Failed to create runtime: {}", e)))?;
 
-    // Execute async visitor conversion
     let result = rt
         .block_on(async {
             html_to_markdown_rs::convert_with_async_visitor(

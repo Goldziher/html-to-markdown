@@ -214,7 +214,6 @@ public class VisitorTests
         Assert.Contains("CUSTOM", result);
     }
 
-    // === Helper Visitor Implementations ===
 
     private class SimpleVisitor : IVisitor
     {

@@ -34,27 +34,96 @@ use std::path::PathBuf;
 #[magnus::wrap(class = "HtmlToMarkdown::Options", free_immediately)]
 struct OptionsHandle(ConversionOptions);
 
-// =============================================================================
-// VISITOR PATTERN IMPLEMENTATION
-// =============================================================================
-
 #[cfg(feature = "visitor")]
 #[derive(Clone)]
 struct RubyVisitorWrapper {
     ruby_visitor: Value,
+    last_error: std::rc::Rc<std::cell::RefCell<Option<String>>>,
 }
 
 #[cfg(feature = "visitor")]
 impl RubyVisitorWrapper {
     fn new(ruby_visitor: Value) -> Self {
-        Self { ruby_visitor }
+        Self {
+            ruby_visitor,
+            last_error: std::rc::Rc::new(std::cell::RefCell::new(None)),
+        }
+    }
+
+    fn utf8_str(&self, ruby: &Ruby, s: &str) -> Value {
+        match ruby.eval::<Value>(&format!("String.new({:?}, encoding: 'UTF-8')", s)) {
+            Ok(val) => val,
+            Err(_) => {
+                let str_val = ruby.str_from_slice(s.as_bytes());
+                str_val.as_value()
+            }
+        }
     }
 
     fn call_visitor_method(&self, method_name: &str, args: &[Value]) -> Result<VisitResult, Error> {
         let ruby = Ruby::get().expect("Ruby not initialized");
-        let result: Value = self.ruby_visitor.funcall(method_name, args)?;
 
-        // Result should be a Hash with at least :type key
+        let result: Value = match args.len() {
+            0 => match self.ruby_visitor.funcall::<&str, (), Value>(method_name, ()) {
+                Ok(val) => val,
+                Err(e) => {
+                    *self.last_error.borrow_mut() =
+                        Some(format!("Visitor error in {}: {}", method_name, e.to_string()));
+                    return Err(e);
+                }
+            },
+            1 => match self
+                .ruby_visitor
+                .funcall::<&str, (Value,), Value>(method_name, (args[0],))
+            {
+                Ok(val) => val,
+                Err(e) => {
+                    *self.last_error.borrow_mut() =
+                        Some(format!("Visitor error in {}: {}", method_name, e.to_string()));
+                    return Err(e);
+                }
+            },
+            2 => match self
+                .ruby_visitor
+                .funcall::<&str, (Value, Value), Value>(method_name, (args[0], args[1]))
+            {
+                Ok(val) => val,
+                Err(e) => {
+                    *self.last_error.borrow_mut() =
+                        Some(format!("Visitor error in {}: {}", method_name, e.to_string()));
+                    return Err(e);
+                }
+            },
+            3 => match self
+                .ruby_visitor
+                .funcall::<&str, (Value, Value, Value), Value>(method_name, (args[0], args[1], args[2]))
+            {
+                Ok(val) => val,
+                Err(e) => {
+                    *self.last_error.borrow_mut() =
+                        Some(format!("Visitor error in {}: {}", method_name, e.to_string()));
+                    return Err(e);
+                }
+            },
+            4 => match self
+                .ruby_visitor
+                .funcall::<&str, (Value, Value, Value, Value), Value>(method_name, (args[0], args[1], args[2], args[3]))
+            {
+                Ok(val) => val,
+                Err(e) => {
+                    *self.last_error.borrow_mut() =
+                        Some(format!("Visitor error in {}: {}", method_name, e.to_string()));
+                    return Err(e);
+                }
+            },
+            _ => {
+                return Err(arg_error(format!(
+                    "Unsupported number of visitor method arguments: {}",
+                    args.len()
+                )));
+            }
+        };
+
         let hash = RHash::from_value(result)
             .ok_or_else(|| arg_error(format!("visitor method {} must return a Hash", method_name)))?;
 
@@ -101,7 +170,6 @@ impl RubyVisitorWrapper {
     fn ruby_to_node_context(&self, ctx: &NodeContext, ruby: &Ruby) -> Result<Value, Error> {
         let hash = ruby.hash_new();
 
-        // node_type
         let node_type_str = match ctx.node_type {
             NodeType::Text => "text",
             NodeType::Element => "element",
@@ -194,29 +262,23 @@ impl RubyVisitorWrapper {
         };
         hash.aset(ruby.intern("node_type"), ruby.intern(node_type_str))?;
 
-        // tag_name
         hash.aset(ruby.intern("tag_name"), ctx.tag_name.as_str())?;
 
-        // attributes (as a Hash)
         let attrs_hash = ruby.hash_new();
         for (key, value) in &ctx.attributes {
             attrs_hash.aset(key.as_str(), value.as_str())?;
         }
         hash.aset(ruby.intern("attributes"), attrs_hash)?;
 
-        // depth
         hash.aset(ruby.intern("depth"), ctx.depth as i64)?;
 
-        // index_in_parent
         hash.aset(ruby.intern("index_in_parent"), ctx.index_in_parent as i64)?;
 
-        // parent_tag
         match &ctx.parent_tag {
             Some(tag) => hash.aset(ruby.intern("parent_tag"), tag.as_str())?,
             None => hash.aset(ruby.intern("parent_tag"), ruby.qnil())?,
         }
 
-        // is_inline
         hash.aset(ruby.intern("is_inline"), ctx.is_inline)?;
 
         Ok(hash.as_value())
@@ -262,10 +324,7 @@ impl HtmlVisitor for RubyVisitorWrapper {
     fn visit_text(&mut self, ctx: &NodeContext, text: &str) -> VisitResult {
         if let Ok(ruby) = Ruby::get() {
             if let Ok(node_ctx) = self.ruby_to_node_context(ctx, &ruby) {
-                if let Ok(result) = self.call_visitor_method(
-                    "visit_text",
-                    &[node_ctx, ruby.str_from_slice(text.as_bytes()).as_value()],
-                ) {
+                if let Ok(result) = self.call_visitor_method("visit_text", &[node_ctx, self.utf8_str(&ruby, text)]) {
                     return result;
                 }
             }
@@ -1523,21 +1582,41 @@ fn convert_with_metadata_handle_fn(ruby: &Ruby, args: &[Value]) -> Result<Value,
 fn convert_with_visitor_fn(ruby: &Ruby, args: &[Value]) -> Result<String, Error> {
     let parsed = scan_args::<(String,), (Option<Value>, Option<Value>), (), (), (), ()>(args)?;
     let html = parsed.required.0;
-    let options = build_conversion_options(ruby, parsed.optional.0)?;
 
-    // Extract the visitor object
-    let visitor_value = parsed
-        .optional
-        .1
-        .ok_or_else(|| arg_error("visitor keyword argument is required"))?;
+    let options = match parsed.optional.0 {
+        Some(opt_val) => match <&OptionsHandle>::try_convert(opt_val) {
+            Ok(handle) => handle.0.clone(),
+            Err(_) => build_conversion_options(ruby, Some(opt_val))?,
+        },
+        None => ConversionOptions::default(),
+    };
+
+    let visitor_value = match parsed.optional.1 {
+        Some(val) => {
+            if val.is_nil() {
+                return guard_panic(AssertUnwindSafe(|| {
+                    profiling::maybe_profile(|| convert_inner(&html, Some(options)))
+                }))
+                .map_err(conversion_error);
+            }
+            val
+        }
+        None => return Err(arg_error("visitor argument is required")),
+    };
 
     let visitor_wrapper = RubyVisitorWrapper::new(visitor_value);
-    let visitor_handle = std::rc::Rc::new(std::cell::RefCell::new(visitor_wrapper));
+    let visitor_handle = std::rc::Rc::new(std::cell::RefCell::new(visitor_wrapper.clone()));
 
-    guard_panic(AssertUnwindSafe(|| {
+    let result = guard_panic(AssertUnwindSafe(|| {
         profiling::maybe_profile(|| convert_with_visitor_inner(&html, Some(options), Some(visitor_handle)))
     }))
-    .map_err(conversion_error)
+    .map_err(conversion_error)?;
+
+    if let Some(error_msg) = visitor_wrapper.last_error.borrow().as_ref() {
+        return Err(runtime_error(error_msg.clone()));
+    }
+
+    Ok(result)
 }
 
 #[cfg(feature = "profiling")]

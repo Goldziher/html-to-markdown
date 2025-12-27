@@ -22,7 +22,7 @@ libc = "0.2"
 pprof = { version = "0.15", features = ["flamegraph"], optional = true }
 
 [features]
-default = ["metadata"]
+default = ["metadata", "visitor"]
 metadata = ["html-to-markdown-rs/metadata"]
 profiling = ["dep:pprof"]
 visitor = ["html-to-markdown-rs/visitor"]

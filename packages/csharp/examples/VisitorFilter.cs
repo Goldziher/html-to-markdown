@@ -25,7 +25,6 @@ public class VisitorFilter
                 <p>Final paragraph.</p>
             </article>";
 
-        // Create a visitor that filters out sidebars and figures
         var visitor = new FilteringVisitor();
 
         var markdown = HtmlToMarkdownConverter.ConvertWithVisitor(html, visitor);
@@ -50,14 +49,12 @@ public class FilteringVisitor : IVisitor
 
     public VisitResult VisitElementStart(NodeContext context)
     {
-        // Skip aside elements (sidebars)
         if (context.TagName == "aside")
         {
             SkippedCount++;
             return VisitResult.Skip();
         }
 
-        // Skip figure elements
         if (context.TagName == "figure")
         {
             SkippedCount++;
@@ -69,8 +66,6 @@ public class FilteringVisitor : IVisitor
 
     public VisitResult VisitImage(NodeContext context, string src, string alt, string? title)
     {
-        // Preserve images as-is instead of converting to markdown
-        // This keeps them as <img> tags in the output
         PreservedCount++;
         return VisitResult.PreserveHtml();
     }

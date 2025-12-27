@@ -28,15 +28,12 @@ public final class StringUtils {
             return (MemorySegment) method.invoke(arena, str);
         } catch (Exception e) {
             byte[] bytes = str.getBytes(java.nio.charset.StandardCharsets.UTF_8);
-            // Allocate space for bytes plus null terminator using arena allocation
             long allocationSize = (long) bytes.length + 1;
             MemorySegment segment = arena.allocate(
                     allocationSize, ValueLayout.JAVA_BYTE.byteAlignment());
-            // Copy bytes
             for (int i = 0; i < bytes.length; i++) {
                 segment.setAtIndex(ValueLayout.JAVA_BYTE, i, bytes[i]);
             }
-            // Add null terminator
             segment.setAtIndex(ValueLayout.JAVA_BYTE, bytes.length, (byte) 0);
             return segment;
         }

@@ -15,13 +15,11 @@ impl HtmlVisitor for CodeVisitor {
     fn visit_code_block(&mut self, _ctx: &NodeContext, lang: Option<&str>, code: &str) -> VisitResult {
         let lang_str = lang.unwrap_or("unknown").to_string();
         self.code_blocks.push(format!("[{}] {}", lang_str, code.trim()));
-        // Custom output for code blocks - wrap in custom markers
         VisitResult::Custom(format!("```{}\n{}\n```", lang.unwrap_or(""), code))
     }
 
     fn visit_code_inline(&mut self, _ctx: &NodeContext, code: &str) -> VisitResult {
         self.inline_codes.push(code.to_string());
-        // Custom output for inline code - wrap in different markers
         VisitResult::Custom(format!("`{}`", code))
     }
 }
@@ -75,7 +73,6 @@ fn test_code_block_skip() {
     let result = convert_with_visitor(html, None, Some(visitor));
     assert!(result.is_ok());
     let markdown = result.unwrap();
-    // Code block should be skipped
     assert!(!markdown.contains("skipped code"));
 }
 

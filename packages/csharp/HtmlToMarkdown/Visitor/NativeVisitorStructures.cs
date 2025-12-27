@@ -8,9 +8,6 @@ namespace HtmlToMarkdown.Visitor;
 /// </summary>
 internal static class NativeVisitorStructures
 {
-    // Native callback function delegates
-    // Note: All delegates MUST have explicit Cdecl calling convention for proper FFI interop
-    // on all platforms (Windows, Linux, macOS)
     [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
     public delegate NativeVisitResult VisitElementStartCallback(
         IntPtr userData,
@@ -262,8 +259,6 @@ internal static class NativeVisitorStructures
         IntPtr ctx,
         IntPtr output);
 
-    // Native visit result enum
-    // Must use explicit int type to match C FFI layout
     [Serializable]
     public enum NativeVisitResultType : int
     {
@@ -274,7 +269,6 @@ internal static class NativeVisitorStructures
         Error = 4
     }
 
-    // Native visit result struct
     [StructLayout(LayoutKind.Sequential)]
     public struct NativeVisitResult
     {
@@ -283,7 +277,6 @@ internal static class NativeVisitorStructures
         public IntPtr ErrorMessage;
     }
 
-    // Native attribute struct
     [StructLayout(LayoutKind.Sequential)]
     public struct NativeAttribute
     {
@@ -291,8 +284,6 @@ internal static class NativeVisitorStructures
         public IntPtr Value;
     }
 
-    // Native node type enum
-    // Must use explicit int type to match C FFI layout (C uses i32/int32_t)
     public enum NativeNodeType : int
     {
         Text = 0,
@@ -385,7 +376,6 @@ internal static class NativeVisitorStructures
         Custom = 87
     }
 
-    // Native node context struct
     [StructLayout(LayoutKind.Sequential)]
     public struct NativeNodeContext
     {
@@ -399,14 +389,13 @@ internal static class NativeVisitorStructures
         public bool IsInline;
     }
 
-    // Native visitor struct with all callback pointers
     [StructLayout(LayoutKind.Sequential)]
     public struct NativeVisitor
     {
         public IntPtr UserData;
+        public IntPtr VisitText;
         public IntPtr VisitElementStart;
         public IntPtr VisitElementEnd;
-        public IntPtr VisitText;
         public IntPtr VisitLink;
         public IntPtr VisitImage;
         public IntPtr VisitHeading;

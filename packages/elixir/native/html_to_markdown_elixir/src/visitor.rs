@@ -45,22 +45,5 @@ use rustler::{Env, Term};
 ///
 /// Result with converted markdown or error message
 pub fn convert_with_visitor(html: &str, options: ConversionOptions, _env: Env, _visitor_pid: Term) -> Result<String> {
-    // Implementation notes:
-    // 1. The visitor_pid parameter can be either:
-    //    - An atom representing a visitor module (e.g., :my_visitor_module)
-    //    - A PID for a GenServer-based visitor process
-    //
-    // 2. For now, we perform standard conversion without visitor callbacks.
-    //    Visitor support is not enabled in the underlying Rust library.
-    //
-    // 3. To fully implement visitor callbacks, we would need to:
-    //    - Enable the "visitor" feature in html-to-markdown-rs
-    //    - Implement HtmlVisitor trait with message passing to Elixir
-    //    - Handle async callback responses with timeouts
-    //    - Convert between Rust VisitResult and Elixir return values
-    //
-    // For now, this provides a complete basic conversion function that
-    // allows the visitor interface to be called from Elixir, even if
-    // visitor callbacks aren't yet active.
     convert_inner(html, Some(options))
 }

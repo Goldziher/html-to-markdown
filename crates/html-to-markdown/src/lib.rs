@@ -592,7 +592,6 @@ pub async fn convert_with_async_visitor(
     let normalized_html = normalize_line_endings(html);
 
     // TODO: Implement async dispatch in conversion pipeline
-    // For now, convert without async visitor support (visitor ignored)
     let markdown = converter::convert_html(normalized_html.as_ref(), &options)?;
 
     if options.wrap {

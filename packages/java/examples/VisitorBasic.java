@@ -21,7 +21,6 @@ public class VisitorBasic {
     static class UppercaseHeadingVisitor implements Visitor {
         @Override
         public VisitResult visitHeading(NodeContext ctx, int level, String text, String id) {
-            // Create custom output with uppercase text
             String prefix = "#".repeat(level);
             String output = prefix + " " + text.toUpperCase();
             return new VisitResult.Custom(output);
@@ -36,17 +35,12 @@ public class VisitorBasic {
             <p>More content here.</p>
             """;
 
-        // Convert with default behavior
         System.out.println("=== Default Conversion ===");
         String defaultMarkdown = HtmlToMarkdown.convert(html);
         System.out.println(defaultMarkdown);
 
-        // Convert with visitor - uppercase headings
         System.out.println("\n=== With Visitor (Uppercase Headings) ===");
         Visitor visitor = new UppercaseHeadingVisitor();
-        // Note: convertWithVisitor would be implemented in HtmlToMarkdown
-        // String customMarkdown = HtmlToMarkdown.convertWithVisitor(html, visitor);
-        // System.out.println(customMarkdown);
         System.out.println("(Implementation coming soon in v2.17.1+)");
     }
 }

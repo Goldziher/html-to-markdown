@@ -24,7 +24,6 @@ public class VisitorFilter {
         @Override
         public VisitResult visitLink(NodeContext ctx, String href, String text, String title) {
             if (isExternalLink(href)) {
-                // Skip external links but keep the text
                 return VisitResult.Continue.INSTANCE;
             }
             return VisitResult.Continue.INSTANCE;
@@ -32,13 +31,11 @@ public class VisitorFilter {
 
         @Override
         public VisitResult visitScript(NodeContext ctx, String code) {
-            // Skip script tags entirely
             return VisitResult.Skip.INSTANCE;
         }
 
         @Override
         public VisitResult visitStyle(NodeContext ctx, String css) {
-            // Skip style tags
             return VisitResult.Skip.INSTANCE;
         }
 
@@ -46,15 +43,12 @@ public class VisitorFilter {
             if (href == null || href.isEmpty()) {
                 return false;
             }
-            // Relative links
             if (href.startsWith("/") || href.startsWith("#")) {
                 return false;
             }
-            // Same domain
             if (href.contains(INTERNAL_DOMAIN)) {
                 return false;
             }
-            // Everything else is external
             return true;
         }
     }
@@ -80,8 +74,6 @@ public class VisitorFilter {
 
         System.out.println("\n=== Converted with Content Filter ===");
         Visitor visitor = new ContentFilterVisitor();
-        // String filtered = HtmlToMarkdown.convertWithVisitor(html, visitor);
-        // System.out.println(filtered);
         System.out.println("(Implementation coming soon in v2.17.1+)");
     }
 }

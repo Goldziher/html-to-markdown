@@ -46,7 +46,6 @@ describe("html-to-markdown async visitor (TypeScript)", () => {
 		</html>
 	`;
 
-	// Test Case 1: Basic async visitor callback
 	describe("basic async visitor", () => {
 		it("should call async visitText callback and return markdown", async () => {
 			const visitor = {
@@ -81,12 +80,10 @@ describe("html-to-markdown async visitor (TypeScript)", () => {
 		});
 	});
 
-	// Test Case 2: Async callbacks with delays
 	describe("async callbacks with delays", () => {
 		it("should properly await async callbacks with delays and return result", async () => {
 			const visitor = {
 				visitText: async () => {
-					// Simulate async work
 					await new Promise((resolve) => setTimeout(resolve, 1));
 					return { type: "continue" };
 				},
@@ -100,7 +97,6 @@ describe("html-to-markdown async visitor (TypeScript)", () => {
 		it("should handle async operations without blocking", async () => {
 			const visitor = {
 				visitText: async () => {
-					// Simulate async work
 					await new Promise((resolve) => setTimeout(resolve, 1));
 					return { type: "continue" };
 				},
@@ -111,12 +107,10 @@ describe("html-to-markdown async visitor (TypeScript)", () => {
 			const duration = Date.now() - startTime;
 
 			expect(result).toBeTruthy();
-			// Should complete in reasonable time
 			expect(duration).toBeLessThan(5000);
 		});
 	});
 
-	// Test Case 3: Link visitor callback
 	describe("link visitor callbacks", () => {
 		it("should call visitLink with async callback and process HTML", async () => {
 			const visitor = {
@@ -133,7 +127,6 @@ describe("html-to-markdown async visitor (TypeScript)", () => {
 		it("should handle visitLink with async processing without errors", async () => {
 			const visitor = {
 				visitLink: async () => {
-					// Simulate async work
 					await new Promise((resolve) => setTimeout(resolve, 1));
 					return { type: "continue" };
 				},
@@ -145,7 +138,6 @@ describe("html-to-markdown async visitor (TypeScript)", () => {
 		});
 	});
 
-	// Test Case 4: Image visitor callback
 	describe("image visitor callbacks", () => {
 		it("should call visitImage with async callback without errors", async () => {
 			const visitor = {
@@ -160,14 +152,10 @@ describe("html-to-markdown async visitor (TypeScript)", () => {
 		});
 	});
 
-	// Test Case 5: Heading visitor callback
 	describe("heading visitor callbacks", () => {
 		it("should call visitHeading with async callback without errors", async () => {
-			// No count tracking needed
-
 			const visitor = {
 				visitHeading: async () => {
-					// Visitor called
 					return { type: "continue" };
 				},
 			};
@@ -175,11 +163,9 @@ describe("html-to-markdown async visitor (TypeScript)", () => {
 			const result = await convertWithVisitor(BASIC_HTML, undefined, visitor);
 
 			expect(result).toBeTruthy();
-			// Visitor executed
 		});
 	});
 
-	// Test Case 6: Code block visitor callback
 	describe("code block visitor callbacks", () => {
 		it("should call visitCodeBlock with async callback", async () => {
 			const visitor = {
@@ -206,7 +192,6 @@ describe("html-to-markdown async visitor (TypeScript)", () => {
 		});
 	});
 
-	// Test Case 7: Text formatting visitor callbacks
 	describe("text formatting visitor callbacks", () => {
 		const FORMATTED_HTML = "<strong>bold</strong> <em>italic</em> <s>strike</s>";
 
@@ -250,7 +235,6 @@ describe("html-to-markdown async visitor (TypeScript)", () => {
 		});
 	});
 
-	// Test Case 8: List visitor callbacks
 	describe("list visitor callbacks", () => {
 		it("should call visitListStart and visitListEnd with async callbacks", async () => {
 			const visitor = {
@@ -273,7 +257,6 @@ describe("html-to-markdown async visitor (TypeScript)", () => {
 		});
 	});
 
-	// Test Case 9: Blockquote visitor callback
 	describe("blockquote visitor callbacks", () => {
 		it("should call visitBlockquote with async callback", async () => {
 			const visitor = {
@@ -289,7 +272,6 @@ describe("html-to-markdown async visitor (TypeScript)", () => {
 		});
 	});
 
-	// Test Case 10: Table visitor callbacks
 	describe("table visitor callbacks", () => {
 		it("should call visitTableStart and visitTableEnd with async callbacks", async () => {
 			const visitor = {
@@ -312,7 +294,6 @@ describe("html-to-markdown async visitor (TypeScript)", () => {
 		});
 	});
 
-	// Test Case 11: ConversionOptions integration
 	describe("async visitor with ConversionOptions", () => {
 		it("should respect heading style in ConversionOptions with async visitor", async () => {
 			const options: JsConversionOptions = {
@@ -373,7 +354,6 @@ describe("html-to-markdown async visitor (TypeScript)", () => {
 		});
 	});
 
-	// Test Case 12: Error handling in async visitors
 	describe("error handling with async visitors", () => {
 		it("should handle rejected promises in visitText", async () => {
 			const visitor = {
@@ -383,13 +363,9 @@ describe("html-to-markdown async visitor (TypeScript)", () => {
 				},
 			};
 
-			// The native implementation should handle errors gracefully
-			// and either continue processing or throw appropriately
 			try {
 				await convertWithVisitor(BASIC_HTML, undefined, visitor);
-				// If no error, that's acceptable - the implementation handles it
 			} catch (error) {
-				// If an error is thrown, it should be an Error instance
 				expect(error).toBeInstanceOf(Error);
 			}
 		});
@@ -409,7 +385,6 @@ describe("html-to-markdown async visitor (TypeScript)", () => {
 		it("should handle timeout in async callback", async () => {
 			const visitor = {
 				visitText: async () => {
-					// Simulate a long-running operation
 					await new Promise((resolve) => setTimeout(resolve, 100));
 					return { type: "continue" };
 				},
@@ -421,7 +396,6 @@ describe("html-to-markdown async visitor (TypeScript)", () => {
 		});
 	});
 
-	// Test Case 13: Context information in async callbacks
 	describe("context information in async visitor callbacks", () => {
 		it("should handle visitor with element start context", async () => {
 			const visitor = {
@@ -477,7 +451,6 @@ describe("html-to-markdown async visitor (TypeScript)", () => {
 		});
 	});
 
-	// Test Case 14: Selective visitor implementation
 	describe("selective async visitor implementation", () => {
 		it("should handle visitor with only one callback defined", async () => {
 			const visitor = {
@@ -524,7 +497,6 @@ describe("html-to-markdown async visitor (TypeScript)", () => {
 		});
 	});
 
-	// Test Case 15: Visitor return values
 	describe("visitor return value handling", () => {
 		it("should handle continue return value", async () => {
 			const visitor = {
@@ -563,7 +535,6 @@ describe("html-to-markdown async visitor (TypeScript)", () => {
 		});
 	});
 
-	// Test Case 16: Async visitor state tracking
 	describe("async visitor state tracking", () => {
 		it("should maintain state across multiple async callbacks", async () => {
 			const visitor = {
@@ -593,7 +564,6 @@ describe("html-to-markdown async visitor (TypeScript)", () => {
 		});
 	});
 
-	// Test Case 17: Line break and horizontal rule visitors
 	describe("line break and horizontal rule visitors", () => {
 		const HTML_WITH_BREAKS = `
 			<p>Line 1<br/>Line 2</p>
@@ -632,7 +602,6 @@ describe("html-to-markdown async visitor (TypeScript)", () => {
 		});
 	});
 
-	// Test Case 18: Integration with content manipulation
 	describe("content manipulation through async visitor", () => {
 		it("should allow content transformation via visitText", async () => {
 			const visitor = {
@@ -663,7 +632,6 @@ describe("html-to-markdown async visitor (TypeScript)", () => {
 		});
 	});
 
-	// Test Case 19: Sync methods still work
 	describe("backward compatibility with sync patterns", () => {
 		it("should handle synchronous-style visitor methods", async () => {
 			const visitor = {
@@ -678,7 +646,6 @@ describe("html-to-markdown async visitor (TypeScript)", () => {
 		});
 	});
 
-	// Test Case 20: Special HTML elements
 	describe("special HTML element visitors", () => {
 		const SPECIAL_HTML = `
 			<details>
@@ -734,7 +701,6 @@ describe("html-to-markdown async visitor (TypeScript)", () => {
 		});
 	});
 
-	// Test Case 21: Edge cases and complex scenarios
 	describe("edge cases and complex scenarios", () => {
 		it("should handle empty HTML", async () => {
 			const visitor = {
@@ -826,7 +792,6 @@ describe("html-to-markdown async visitor (TypeScript)", () => {
 		});
 	});
 
-	// Test Case 22: Performance and stress testing
 	describe("performance and stress testing", () => {
 		it("should handle many text nodes efficiently", async () => {
 			const textHtml = `<p>${"word ".repeat(1000)}</p>`;
@@ -842,7 +807,6 @@ describe("html-to-markdown async visitor (TypeScript)", () => {
 			const duration = Date.now() - startTime;
 
 			expect(result).toBeTruthy();
-			// Should complete in reasonable time (< 10 seconds)
 			expect(duration).toBeLessThan(10000);
 		});
 
@@ -864,7 +828,6 @@ describe("html-to-markdown async visitor (TypeScript)", () => {
 		});
 	});
 
-	// Test Case 23: Visitor behavior verification
 	describe("visitor behavior verification", () => {
 		it("should visit elements with async callbacks", async () => {
 			const visitor = {

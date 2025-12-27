@@ -54,10 +54,6 @@ where
     guard_panic(|| profiling::maybe_profile(f))
 }
 
-// =============================================================================
-// ASYNC EVENT LOOP SUPPORT
-// =============================================================================
-
 #[cfg(feature = "async-visitor")]
 pub static PYTHON_TASK_LOCALS: OnceCell<TaskLocals> = OnceCell::new();
 
@@ -1141,10 +1137,6 @@ fn convert_with_metadata_handle<'py>(
     Ok((markdown, metadata_dict))
 }
 
-// =============================================================================
-// VISITOR PATTERN SUPPORT
-// =============================================================================
-
 #[cfg(feature = "visitor")]
 mod visitor_support {
     use super::*;
@@ -1166,7 +1158,6 @@ mod visitor_support {
 
         /// Convert a Python dictionary result to a VisitResult enum.
         fn result_from_dict(result_dict: &Bound<'_, pyo3::types::PyDict>) -> PyResult<VisitResult> {
-            // Get the result type (required)
             let result_type: String = result_dict
                 .get_item("type")?
                 .ok_or_else(|| pyo3::exceptions::PyTypeError::new_err("Visitor result dict must have 'type' key"))?
@@ -1205,33 +1196,26 @@ mod visitor_support {
         fn context_to_dict<'a>(py: Python<'a>, ctx: &NodeContext) -> PyResult<Bound<'a, pyo3::types::PyDict>> {
             let dict = pyo3::types::PyDict::new(py);
 
-            // node_type as string
             let node_type_str = format!("{:?}", ctx.node_type).to_lowercase();
             dict.set_item("node_type", node_type_str)?;
 
-            // tag_name
             dict.set_item("tag_name", &ctx.tag_name)?;
 
-            // attributes as dict
             let attrs_dict = pyo3::types::PyDict::new(py);
             for (k, v) in &ctx.attributes {
                 attrs_dict.set_item(k, v)?;
             }
             dict.set_item("attributes", attrs_dict)?;
 
-            // depth
             dict.set_item("depth", ctx.depth)?;
 
-            // index_in_parent
             dict.set_item("index_in_parent", ctx.index_in_parent)?;
 
-            // parent_tag
             match &ctx.parent_tag {
                 Some(tag) => dict.set_item("parent_tag", tag)?,
                 None => dict.set_item("parent_tag", py.None())?,
             }
 
-            // is_inline
             dict.set_item("is_inline", ctx.is_inline)?;
 
             Ok(dict)
@@ -1244,28 +1228,22 @@ mod visitor_support {
             method_name: &str,
             args: &[Bound<'_, PyAny>],
         ) -> PyResult<VisitResult> {
-            // Try to get the method from the visitor object
             let visitor_bound = self.visitor.bind(py);
             let method = match visitor_bound.getattr(method_name) {
                 Ok(m) => m,
                 Err(_) => {
-                    // Method not defined - return Continue
                     return Ok(VisitResult::Continue);
                 }
             };
 
-            // Build tuple from args
             let args_tuple = pyo3::types::PyTuple::new(py, args)?;
 
-            // Call the method with the arguments tuple
             let result = method.call(args_tuple, None)?;
 
-            // If None returned, default to Continue
             if result.is_none() {
                 return Ok(VisitResult::Continue);
             }
 
-            // Extract result dictionary
             let result_dict: Bound<'_, pyo3::types::PyDict> = result.extract()?;
 
             Self::result_from_dict(&result_dict)
@@ -1846,10 +1824,6 @@ mod visitor_support {
         }
     }
 
-    // =============================================================================
-    // ASYNC VISITOR BRIDGE (requires async-visitor feature)
-    // =============================================================================
-
     #[cfg(feature = "async-visitor")]
     #[derive(Debug)]
     pub struct PyAsyncVisitorBridge {
@@ -1866,7 +1840,6 @@ mod visitor_support {
 
         /// Convert a Python dictionary result to a VisitResult enum.
         fn result_from_dict(result_dict: &Bound<'_, pyo3::types::PyDict>) -> PyResult<VisitResult> {
-            // Get the result type (required)
             let result_type: String = result_dict
                 .get_item("type")?
                 .ok_or_else(|| pyo3::exceptions::PyTypeError::new_err("Visitor result dict must have 'type' key"))?
@@ -1905,33 +1878,26 @@ mod visitor_support {
         fn context_to_dict<'a>(py: Python<'a>, ctx: &NodeContext) -> PyResult<Bound<'a, pyo3::types::PyDict>> {
             let dict = pyo3::types::PyDict::new(py);
 
-            // node_type as string
             let node_type_str = format!("{:?}", ctx.node_type).to_lowercase();
             dict.set_item("node_type", node_type_str)?;
 
-            // tag_name
             dict.set_item("tag_name", &ctx.tag_name)?;
 
-            // attributes as dict
             let attrs_dict = pyo3::types::PyDict::new(py);
             for (k, v) in &ctx.attributes {
                 attrs_dict.set_item(k, v)?;
             }
             dict.set_item("attributes", attrs_dict)?;
 
-            // depth
             dict.set_item("depth", ctx.depth)?;
 
-            // index_in_parent
             dict.set_item("index_in_parent", ctx.index_in_parent)?;
 
-            // parent_tag
             match &ctx.parent_tag {
                 Some(tag) => dict.set_item("parent_tag", tag)?,
                 None => dict.set_item("parent_tag", py.None())?,
             }
 
-            // is_inline
             dict.set_item("is_inline", ctx.is_inline)?;
 
             Ok(dict)
@@ -1944,29 +1910,23 @@ mod visitor_support {
             method_name: &str,
             args: &[Bound<'_, PyAny>],
         ) -> PyResult<VisitResult> {
-            // Try to get the method from the visitor object
             let visitor_guard = self.visitor.lock().unwrap();
             let visitor_bound = visitor_guard.bind(py);
             let method = match visitor_bound.getattr(method_name) {
                 Ok(m) => m,
                 Err(_) => {
-                    // Method not defined - return Continue
                     return Ok(VisitResult::Continue);
                 }
             };
 
-            // Build tuple from args
             let args_tuple = pyo3::types::PyTuple::new(py, args)?;
 
-            // Call the method with the arguments tuple
             let result = method.call(args_tuple, None)?;
 
-            // If None returned, default to Continue
             if result.is_none() {
                 return Ok(VisitResult::Continue);
             }
 
-            // Extract result dictionary
             let result_dict: Bound<'_, pyo3::types::PyDict> = result.extract()?;
 
             Self::result_from_dict(&result_dict)
@@ -1975,10 +1935,6 @@ mod visitor_support {
 
     #[cfg(feature = "async-visitor")]
     impl HtmlVisitor for PyAsyncVisitorBridge {
-        // Delegate all visitor methods to the synchronous implementation
-        // The async visitor support works through the pyo3-async-runtimes integration
-        // at the Python function level, not at the trait level.
-
         fn visit_element_start(&mut self, ctx: &NodeContext) -> VisitResult {
             Python::attach(|py| {
                 let ctx_dict = match Self::context_to_dict(py, ctx) {
@@ -2566,25 +2522,20 @@ fn convert_with_visitor(
     let html = html.to_owned();
     let rust_options = options.map(|opts| opts.to_rust());
 
-    // If no visitor provided, just do normal conversion
     let Some(visitor_py) = visitor else {
         return py
             .detach(move || run_with_guard_and_profile(|| html_to_markdown_rs::convert(&html, rust_options.clone())))
             .map_err(to_py_err);
     };
 
-    // Create bridge and wrap for the visitor trait
-    // Use Arc<Mutex> to make it Send for py.detach()
     let bridge = visitor_support::PyVisitorBridge::new(visitor_py);
     let visitor_handle = std::sync::Arc::new(std::sync::Mutex::new(bridge));
 
     py.detach(move || {
         run_with_guard_and_profile(|| {
-            // Convert Arc<Mutex<>> to Rc<RefCell<>> for the Rust API
             let rc_visitor: Rc<RefCell<dyn HtmlVisitor>> = {
                 Python::attach(|py| {
                     let guard = visitor_handle.lock().unwrap();
-                    // Create a temporary Rc by cloning the Py<PyAny> reference
                     let bridge_copy = visitor_support::PyVisitorBridge::new(guard.visitor.clone_ref(py));
                     Rc::new(RefCell::new(bridge_copy)) as Rc<RefCell<dyn HtmlVisitor>>
                 })
@@ -2635,12 +2586,8 @@ fn convert_with_async_visitor(
     options: Option<ConversionOptions>,
     visitor: Option<Py<PyAny>>,
 ) -> PyResult<String> {
-    // Initialize Python event loop if needed
     init_python_event_loop(py)?;
 
-    // For now, delegate to synchronous visitor implementation
-    // The async event loop initialization ensures Python has a running event loop
-    // Visitor methods can be async and will be executed synchronously by pyo3-async-runtimes
     convert_with_visitor(py, html, options, visitor)
 }
 
@@ -2654,8 +2601,6 @@ fn convert_with_async_visitor(
     options: Option<ConversionOptions>,
     visitor: Option<Py<PyAny>>,
 ) -> PyResult<String> {
-    // Delegate to synchronous visitor implementation
-    // This provides the async-compatible naming convention
     convert_with_visitor(py, html, options, visitor)
 }
 

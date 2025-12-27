@@ -9,8 +9,6 @@ path = "test_documents/html/visitor/baseline.html"
 category = "visitor"
 iterations = 200
 
-# Same baseline HTML with no-op visitor (returns Continue for all methods)
-# This measures the overhead of visitor infrastructure itself
 [[fixtures]]
 id = "visitor_baseline_with_noop"
 name = "Simple HTML (With No-op Visitor)"
@@ -18,7 +16,6 @@ path = "test_documents/html/visitor/baseline.html"
 category = "visitor"
 iterations = 200
 
-# Additional simple fixture for regression detection
 [[fixtures]]
 id = "visitor_baseline_minimal"
 name = "Minimal HTML (No Visitor)"

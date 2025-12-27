@@ -303,13 +303,11 @@ where
         return Ok(VisitorDispatch::Continue);
     };
 
-    // Create the future while holding the RefCell borrow, then drop it before awaiting
     let future = {
         let mut visitor_ref = visitor_rc.borrow_mut();
         callback(&mut *visitor_ref)
-    }; // RefCell borrow is dropped here
+    };
 
-    // Now await without holding the RefCell
     let result = future.await;
 
     match result {
@@ -367,7 +365,6 @@ macro_rules! try_visitor {
 
         match dispatch {
             $crate::visitor_helpers::VisitorDispatch::Continue => {
-                // Continue with default behavior
             }
             $crate::visitor_helpers::VisitorDispatch::Custom(output) => {
                 return Ok(output);
@@ -376,8 +373,6 @@ macro_rules! try_visitor {
                 return Ok(String::new());
             }
             $crate::visitor_helpers::VisitorDispatch::PreserveHtml => {
-                // Caller must handle PreserveHtml case
-                // For now, we treat it as Continue
                 // TODO: Implement HTML preservation logic
             }
         }
@@ -493,7 +488,6 @@ macro_rules! try_async_visitor {
 
         match dispatch {
             $crate::visitor_helpers::VisitorDispatch::Continue => {
-                // Continue with default behavior
             }
             $crate::visitor_helpers::VisitorDispatch::Custom(output) => {
                 return Ok(output);
@@ -502,8 +496,6 @@ macro_rules! try_async_visitor {
                 return Ok(String::new());
             }
             $crate::visitor_helpers::VisitorDispatch::PreserveHtml => {
-                // Caller must handle PreserveHtml case
-                // For now, we treat it as Continue
                 // TODO: Implement HTML preservation logic
             }
         }

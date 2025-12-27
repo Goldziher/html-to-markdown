@@ -69,7 +69,6 @@ public class VisitorAnalytics {
          */
         private String extractDomain(String url) {
             try {
-                // Simple extraction: find domain between :// and next /
                 int start = url.indexOf("://") + PROTOCOL_SEPARATOR_LENGTH;
                 int end = url.indexOf("/", start);
                 if (end == -1) {
@@ -141,8 +140,6 @@ public class VisitorAnalytics {
 
         System.out.println("\n=== Analyzing HTML ===");
         DocumentAnalyticsVisitor visitor = new DocumentAnalyticsVisitor();
-        // Simulate visitor by manually calling methods with parsed data
-        // In real usage: HtmlToMarkdown.convertWithVisitor(html, visitor);
 
         visitor.visitHeading(null, 1, "Web Development Guide", null);
         visitor.visitLink(null, "https://html.spec.whatwg.org", "HTML5", null);

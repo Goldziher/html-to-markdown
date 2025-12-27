@@ -24,12 +24,10 @@ class LinkHighlighter extends AbstractVisitor
 {
     public function visitLink(NodeContext $context, string $href, string $text, ?string $title): array
     {
-        // Use custom output to add extra formatting
         return VisitResult::custom(">> [{$text}]({$href}) <<");
     }
 }
 
-// Example HTML
 $html = <<<'HTML'
 <article>
     <h1>Welcome to My Blog</h1>
@@ -37,15 +35,11 @@ $html = <<<'HTML'
 </article>
 HTML;
 
-// Convert without visitor (default behavior)
 echo "Default conversion:\n";
 echo HtmlToMarkdown::convert($html);
 echo "\n---\n\n";
 
-// Convert with custom visitor
 echo "With custom visitor (if supported):\n";
-// Note: The convert_with_visitor function requires the PHP extension
-// to be compiled with visitor support
 try {
     $visitor = new LinkHighlighter();
     $markdown = HtmlToMarkdown::convertWithVisitor($html, null, $visitor);

@@ -17,10 +17,8 @@ public class VisitorBasic
                 <a href=""https://example.com"">Click here</a>
             </div>";
 
-        // Create a custom visitor that tracks visited elements
         var visitor = new BasicTrackingVisitor();
 
-        // Convert HTML to Markdown while tracking elements
         var markdown = HtmlToMarkdownConverter.ConvertWithVisitor(html, visitor);
 
         Console.WriteLine("=== Markdown Output ===");

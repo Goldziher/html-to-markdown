@@ -4,7 +4,6 @@ defmodule HtmlToMarkdown.VisitorTest do
 
   describe "visitor behaviour" do
     test "visitor module defines behaviour callbacks" do
-      # Verify the Visitor module has the convert_with_visitor function
       assert function_exported?(HtmlToMarkdown.Visitor, :convert_with_visitor, 3)
     end
 
@@ -50,7 +49,6 @@ defmodule HtmlToMarkdown.VisitorTest do
         use HtmlToMarkdown.Visitor
       end
 
-      # Empty or nil should still work, or produce an error
       result = HtmlToMarkdown.Visitor.convert_with_visitor("", ErrorVisitor, nil)
 
       assert is_tuple(result)
@@ -405,7 +403,6 @@ defmodule HtmlToMarkdown.VisitorTest do
       html = "<a href='http://example.com'>Link</a>"
       {:ok, markdown} = HtmlToMarkdown.Visitor.convert_with_visitor(html, CustomVisitor, nil)
 
-      # Result will depend on native implementation
       assert is_binary(markdown)
     end
 
@@ -443,14 +440,11 @@ defmodule HtmlToMarkdown.VisitorTest do
       defmodule ErrorVisitor do
         use HtmlToMarkdown.Visitor
 
-        # Note: Visitor callbacks in the Rust NIF are currently a placeholder.
-        # This test verifies the callback definition is valid.
         def handle_link(_context, _href, _text, _title) do
           {:error, "Links not allowed"}
         end
       end
 
-      # Test that the visitor module is valid
       assert function_exported?(ErrorVisitor, :handle_link, 4)
     end
   end
@@ -461,8 +455,6 @@ defmodule HtmlToMarkdown.VisitorTest do
         use HtmlToMarkdown.Visitor
 
         def handle_link(_context, _href, _text, _title) do
-          # Note: This is a simplified approach - real state management
-          # would require GenServer or Agent
           :continue
         end
       end

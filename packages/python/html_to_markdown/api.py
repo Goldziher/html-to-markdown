@@ -277,9 +277,6 @@ def convert_with_visitor(
     if visitor is None:
         return convert(html, options, preprocessing)
 
-    # Pass None as options parameter and let Rust use defaults
-    # The visitor is the key feature here
-    # Note: options and preprocessing are not used here intentionally
     return _rust.convert_with_visitor(html, None, visitor)
 
 
@@ -317,7 +314,6 @@ def convert_with_async_visitor(
     if visitor is None:
         return _rust.convert(html, None)
 
-    # Note: payload is computed for documentation but not passed to Rust
     _options_payload(options, PreprocessingOptions())
     return _rust.convert_with_async_visitor(html, None, visitor)
 

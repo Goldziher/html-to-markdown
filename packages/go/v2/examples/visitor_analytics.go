@@ -125,7 +125,6 @@ func ExampleVisitorAnalytics() {
 		log.Fatal(err)
 	}
 
-	// Print statistics
 	fmt.Println("Document Statistics:")
 	fmt.Println(strings.Repeat("=", 50))
 	fmt.Printf("Headings:           %d (max level: H%d)\n", stats.HeadingCount, stats.MaxHeadingLevel)

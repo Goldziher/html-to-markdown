@@ -93,10 +93,6 @@ use html_to_markdown_rs::visitor::{HtmlVisitor, NodeContext, NodeType, VisitResu
 use crate::error::{capture_error, set_last_error};
 use crate::strings::string_to_c_string;
 
-// ============================================================================
-// C TYPES FOR VISITOR CALLBACKS
-// ============================================================================
-
 /// Opaque handle to a visitor instance.
 ///
 /// Returned by `html_to_markdown_visitor_create()` and passed to
@@ -195,7 +191,6 @@ pub enum HtmlToMarkdownNodeType {
     Code = 15,
     Strong = 16,
     Em = 17,
-    // ... (other 40+ node types omitted for brevity; full enum in implementation)
     Custom = 255,
 }
 
@@ -221,7 +216,6 @@ impl From<NodeType> for HtmlToMarkdownNodeType {
             NodeType::Code => Code,
             NodeType::Strong => Strong,
             NodeType::Em => Em,
-            // Map all other types to Custom for now
             _ => Custom,
         }
     }
@@ -1221,10 +1215,6 @@ pub struct HtmlToMarkdownVisitorCallbacks {
     pub visit_figure_end: Option<HtmlToMarkdownVisitFigureEndCallback>,
 }
 
-// ============================================================================
-// INTERNAL WRAPPER FOR BRIDGING C CALLBACKS TO RUST TRAIT
-// ============================================================================
-
 /// Internal wrapper implementing HtmlVisitor trait from C callbacks.
 ///
 /// Bridges the gap between:
@@ -1271,12 +1261,10 @@ impl CVisitorWrapper {
     /// These strings remain valid only during the callback execution. After the callback returns,
     /// the strings are cleared and the pointers become invalid.
     fn build_node_context(&self, ctx: &NodeContext) -> HtmlToMarkdownNodeContext {
-        // Store tag name as CString in temporary storage
         let c_tag_name = CString::new(ctx.tag_name.clone()).unwrap_or_else(|_| CString::new("").unwrap());
         let tag_name_ptr = c_tag_name.as_ptr();
         *self.temp_tag_name.borrow_mut() = Some(c_tag_name);
 
-        // Store parent tag as CString in temporary storage
         let parent_tag_ptr = if let Some(parent) = &ctx.parent_tag {
             let c_parent = CString::new(parent.clone()).unwrap_or_else(|_| CString::new("").unwrap());
             let ptr = c_parent.as_ptr();
@@ -1286,11 +1274,9 @@ impl CVisitorWrapper {
             ptr::null()
         };
 
-        // Build attribute array with NULL terminator
         let mut attrs = Vec::new();
         let mut attr_strings = Vec::new();
 
-        // Convert BTreeMap attributes to C array
         for (key, value) in &ctx.attributes {
             let c_key = CString::new(key.clone()).unwrap_or_default();
             let c_value = CString::new(value.clone()).unwrap_or_default();
@@ -1306,13 +1292,11 @@ impl CVisitorWrapper {
             attr_strings.push(c_value);
         }
 
-        // Add NULL terminator to mark end of array
         attrs.push(HtmlToMarkdownAttribute {
             key: ptr::null(),
             value: ptr::null(),
         });
 
-        // Store attribute strings to keep them alive during callback
         *self.temp_attribute_strings.borrow_mut() = attr_strings;
         let attributes_ptr = if attrs.is_empty() {
             ptr::null()
@@ -1351,9 +1335,7 @@ impl CVisitorWrapper {
                 if result.custom_output.is_null() {
                     VisitResult::Continue
                 } else {
-                    // SAFETY: Callback allocated with malloc; convert and take ownership
                     let output = unsafe { CStr::from_ptr(result.custom_output).to_string_lossy().into_owned() };
-                    // Free the malloc'd memory
                     unsafe { libc::free(result.custom_output as *mut std::ffi::c_void) };
                     VisitResult::Custom(output)
                 }
@@ -1364,9 +1346,7 @@ impl CVisitorWrapper {
                 if result.error_message.is_null() {
                     VisitResult::Error("unknown error".to_string())
                 } else {
-                    // SAFETY: Callback allocated with malloc; convert and take ownership
                     let msg = unsafe { CStr::from_ptr(result.error_message).to_string_lossy().into_owned() };
-                    // Free the malloc'd memory
                     unsafe { libc::free(result.error_message as *mut std::ffi::c_void) };
                     VisitResult::Error(msg)
                 }
@@ -1386,12 +1366,9 @@ impl std::fmt::Debug for CVisitorWrapper {
 impl HtmlVisitor for CVisitorWrapper {
     fn visit_text(&mut self, ctx: &NodeContext, text: &str) -> VisitResult {
         if let Some(callback) = self.callbacks.visit_text {
-            // Create temporary C strings for callback
-            // SAFETY: These strings are only used for the callback and immediately after freed
             let c_text_string = std::ffi::CString::new(text).unwrap_or_else(|_| std::ffi::CString::new("").unwrap());
             let c_text = c_text_string.as_ptr();
 
-            // Create context structure (attributes and strings are stored in temporary storage)
             let c_ctx = self.build_node_context(ctx);
 
             let result = unsafe { callback(self.callbacks.user_data, &c_ctx, c_text) };
@@ -1582,7 +1559,6 @@ impl HtmlVisitor for CVisitorWrapper {
 
     fn visit_table_row(&mut self, ctx: &NodeContext, cells: &[String], is_header: bool) -> VisitResult {
         if let Some(callback) = self.callbacks.visit_table_row {
-            // Convert cells to C strings and create an array of pointers
             let c_cells: Vec<std::ffi::CString> = cells
                 .iter()
                 .map(|cell| {
@@ -2018,10 +1994,6 @@ impl HtmlVisitor for CVisitorWrapper {
     }
 }
 
-// ============================================================================
-// PUBLIC FFI FUNCTIONS
-// ============================================================================
-
 /// Create a new visitor instance from a callback table.
 ///
 /// Allocates a visitor handle that can be used with `html_to_markdown_convert_with_visitor()`.
@@ -2103,7 +2075,6 @@ pub unsafe extern "C" fn html_to_markdown_visitor_free(visitor: HtmlToMarkdownVi
         return;
     }
     let _handle = unsafe { Box::from_raw(visitor as *mut Rc<RefCell<CVisitorWrapper>>) };
-    // Box is dropped here, deallocating the handle
 }
 
 /// Convert HTML to Markdown using a custom visitor.

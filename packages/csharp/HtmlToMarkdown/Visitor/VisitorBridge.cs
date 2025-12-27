@@ -26,7 +26,6 @@ internal sealed class VisitorBridge : IDisposable
     private readonly GCHandle _gcHandle;
     private IntPtr _nativeVisitorHandle = IntPtr.Zero;
 
-    // Keep delegates alive to prevent GC
     private readonly Dictionary<string, Delegate> _delegateCache = new();
 
     public VisitorBridge(IVisitor visitor)
@@ -37,10 +36,9 @@ internal sealed class VisitorBridge : IDisposable
 
     public IntPtr CreateNativeVisitor()
     {
-        // Create delegate callbacks to keep references alive
+        var visitTextCb = (NativeVisitorStructures.VisitTextCallback)VisitTextCallback;
         var visitElementStartCb = (NativeVisitorStructures.VisitElementStartCallback)VisitElementStartCallback;
         var visitElementEndCb = (NativeVisitorStructures.VisitElementEndCallback)VisitElementEndCallback;
-        var visitTextCb = (NativeVisitorStructures.VisitTextCallback)VisitTextCallback;
         var visitLinkCb = (NativeVisitorStructures.VisitLinkCallback)VisitLinkCallback;
         var visitImageCb = (NativeVisitorStructures.VisitImageCallback)VisitImageCallback;
         var visitHeadingCb = (NativeVisitorStructures.VisitHeadingCallback)VisitHeadingCallback;
@@ -79,10 +77,9 @@ internal sealed class VisitorBridge : IDisposable
         var visitFigCaptionCb = (NativeVisitorStructures.VisitFigCaptionCallback)VisitFigCaptionCallback;
         var visitFigureEndCb = (NativeVisitorStructures.VisitFigureEndCallback)VisitFigureEndCallback;
 
-        // Store delegates to prevent GC
+        _delegateCache["VisitText"] = visitTextCb;
         _delegateCache["VisitElementStart"] = visitElementStartCb;
         _delegateCache["VisitElementEnd"] = visitElementEndCb;
-        _delegateCache["VisitText"] = visitTextCb;
         _delegateCache["VisitLink"] = visitLinkCb;
         _delegateCache["VisitImage"] = visitImageCb;
         _delegateCache["VisitHeading"] = visitHeadingCb;
@@ -124,9 +121,9 @@ internal sealed class VisitorBridge : IDisposable
         var nativeVisitor = new NativeVisitorStructures.NativeVisitor
         {
             UserData = GCHandle.ToIntPtr(_gcHandle),
+            VisitText = Marshal.GetFunctionPointerForDelegate(visitTextCb),
             VisitElementStart = Marshal.GetFunctionPointerForDelegate(visitElementStartCb),
             VisitElementEnd = Marshal.GetFunctionPointerForDelegate(visitElementEndCb),
-            VisitText = Marshal.GetFunctionPointerForDelegate(visitTextCb),
             VisitLink = Marshal.GetFunctionPointerForDelegate(visitLinkCb),
             VisitImage = Marshal.GetFunctionPointerForDelegate(visitImageCb),
             VisitHeading = Marshal.GetFunctionPointerForDelegate(visitHeadingCb),
@@ -166,7 +163,6 @@ internal sealed class VisitorBridge : IDisposable
             VisitFigureEnd = Marshal.GetFunctionPointerForDelegate(visitFigureEndCb),
         };
 
-        // Allocate and marshal the native struct
         var nativePtr = Marshal.AllocHGlobal(Marshal.SizeOf<NativeVisitorStructures.NativeVisitor>());
         Marshal.StructureToPtr(nativeVisitor, nativePtr, false);
 
@@ -193,7 +189,6 @@ internal sealed class VisitorBridge : IDisposable
     {
         var nativeCtx = Marshal.PtrToStructure<NativeVisitorStructures.NativeNodeContext>(ctx);
 
-        // Unmarshal attributes
         var attributes = new List<Attribute>();
         if (nativeCtx.Attributes != IntPtr.Zero)
         {
@@ -260,16 +255,12 @@ internal sealed class VisitorBridge : IDisposable
             return null;
         }
 
-        // IMPORTANT: Copy the string immediately to avoid use-after-free
-        // The Rust FFI layer frees string memory after the callback returns,
-        // so we must copy the data before returning to Rust
         try
         {
             return Marshal.PtrToStringUTF8(ptr);
         }
         catch (AccessViolationException)
         {
-            // If the pointer is no longer valid, return empty string
             return string.Empty;
         }
     }
@@ -284,11 +275,10 @@ internal sealed class VisitorBridge : IDisposable
         var bytes = Encoding.UTF8.GetBytes(value);
         var ptr = Marshal.AllocHGlobal(bytes.Length + 1);
         Marshal.Copy(bytes, 0, ptr, bytes.Length);
-        Marshal.WriteByte(ptr, bytes.Length, 0); // null terminator
+        Marshal.WriteByte(ptr, bytes.Length, 0);
         return ptr;
     }
 
-    // Callback implementations
     private NativeVisitorStructures.NativeVisitResult VisitElementStartCallback(IntPtr userData, IntPtr ctx)
     {
         try

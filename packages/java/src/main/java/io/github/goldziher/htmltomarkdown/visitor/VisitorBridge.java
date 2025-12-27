@@ -44,7 +44,6 @@ final class VisitorBridge {
     /** Result type: error occurred. */
     private static final int RESULT_TYPE_ERROR = 4;
 
-    // C struct layout definitions matching FFI types
 
     /** C struct layout for html_to_markdown_attribute_t. */
     private static final StructLayout ATTRIBUTE_LAYOUT =
@@ -68,14 +67,14 @@ final class VisitorBridge {
     private static final StructLayout NODE_CONTEXT_LAYOUT =
             MemoryLayout.structLayout(
                 ValueLayout.JAVA_INT.withName("node_type"),
-                MemoryLayout.paddingLayout(4), // alignment to 8 bytes
+                MemoryLayout.paddingLayout(4),
                 ValueLayout.ADDRESS.withName("tag_name"),
                 ValueLayout.ADDRESS.withName("attributes"),
-                ValueLayout.JAVA_LONG.withName("depth"),  // usize is 64-bit on 64-bit systems
-                ValueLayout.JAVA_LONG.withName("index_in_parent"),  // usize
+                ValueLayout.JAVA_LONG.withName("depth"),
+                ValueLayout.JAVA_LONG.withName("index_in_parent"),
                 ValueLayout.ADDRESS.withName("parent_tag"),
                 ValueLayout.JAVA_BOOLEAN.withName("is_inline"),
-                MemoryLayout.paddingLayout(7)  // padding for 8-byte alignment
+                MemoryLayout.paddingLayout(7)
             ).withName("html_to_markdown_node_context_t");
 
     /** Bit shift for encoding type in long value. */
@@ -121,13 +120,9 @@ final class VisitorBridge {
         } else if (result instanceof VisitResult.PreserveHtml) {
             return RESULT_TYPE_PRESERVE_HTML;
         } else if (result instanceof VisitResult.Custom custom) {
-            // Allocate the custom output string and return its full address
-            // (type is stored in a separate C struct field, not in pointer encoding)
             MemorySegment str = allocateString(custom.customOutput());
             return str.address();
         } else if (result instanceof VisitResult.Error error) {
-            // Allocate the error message string and return its full address
-            // (type is stored in a separate C struct field, not in pointer encoding)
             MemorySegment str = allocateString(error.errorMessage());
             return str.address();
         }
@@ -219,46 +214,38 @@ final class VisitorBridge {
                     "Invalid node context pointer");
         }
 
-        // Reinterpret the memory segment to match our struct layout
         MemorySegment ctx = ctxPtr.reinterpret(NODE_CONTEXT_LAYOUT.byteSize());
 
-        // Read node_type field (int32, offset 0)
         int nodeTypeValue = ctx.get(ValueLayout.JAVA_INT,
             NODE_CONTEXT_LAYOUT.byteOffset(
                 MemoryLayout.PathElement.groupElement("node_type")));
         NodeType nodeType = NodeType.fromCValue(nodeTypeValue);
 
-        // Read tag_name field (pointer, after alignment padding at offset 8)
         MemorySegment tagNamePtr = ctx.get(ValueLayout.ADDRESS,
             NODE_CONTEXT_LAYOUT.byteOffset(
                 MemoryLayout.PathElement.groupElement("tag_name")));
         String tagName = fromCString(tagNamePtr);
 
-        // Read attributes array pointer
         MemorySegment attributesPtr = ctx.get(ValueLayout.ADDRESS,
             NODE_CONTEXT_LAYOUT.byteOffset(
                 MemoryLayout.PathElement.groupElement("attributes")));
         List<Attribute> attributes = parseAttributes(attributesPtr);
 
-        // Read depth field (usize / 64-bit on 64-bit systems)
         long depthValue = ctx.get(ValueLayout.JAVA_LONG,
             NODE_CONTEXT_LAYOUT.byteOffset(
                 MemoryLayout.PathElement.groupElement("depth")));
         int depth = (int) depthValue;
 
-        // Read index_in_parent field (usize / 64-bit on 64-bit systems)
         long indexValue = ctx.get(ValueLayout.JAVA_LONG,
             NODE_CONTEXT_LAYOUT.byteOffset(
                 MemoryLayout.PathElement.groupElement("index_in_parent")));
         int indexInParent = (int) indexValue;
 
-        // Read parent_tag field (pointer to string)
         MemorySegment parentTagPtr = ctx.get(ValueLayout.ADDRESS,
             NODE_CONTEXT_LAYOUT.byteOffset(
                 MemoryLayout.PathElement.groupElement("parent_tag")));
         String parentTag = fromCString(parentTagPtr);
 
-        // Read is_inline field (boolean)
         boolean isInline = ctx.get(ValueLayout.JAVA_BOOLEAN,
             NODE_CONTEXT_LAYOUT.byteOffset(
                 MemoryLayout.PathElement.groupElement("is_inline")));

@@ -18,16 +18,12 @@ serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
 thiserror = { workspace = true }
 
-# Fixtures
 toml = "0.9"
 
-# Monitoring
 sysinfo = "0.36"
 
-# Templates
 minijinja = { version = "2.14", features = ["json"] }
 
-# Profiling
 pprof = { version = "0.15", features = ["flamegraph"], optional = true }
 tikv-jemallocator = { version = "0.6", optional = true }
 tikv-jemalloc-ctl = { version = "0.6", features = ["stats"], optional = true }
