@@ -417,7 +417,17 @@ Tests cover:
 
 ## Visitor Pattern
 
-The visitor pattern allows you to customize HTML→Markdown conversion by providing callbacks for specific HTML elements. This enables fine-grained control over how individual elements are rendered.
+The visitor pattern allows you to customize HTML→Markdown conversion by providing callbacks for specific HTML elements. This enables fine-grained control over how individual elements are rendered without duplicating conversion logic.
+
+Ruby visitors are **synchronous** — all 40+ visitor methods execute in the same call stack during tree traversal, making it easy to maintain state across multiple elements.
+
+### Overview
+
+The visitor pattern is useful for:
+- Custom element handling (e.g., stripping ads, rewriting links)
+- Domain-specific markdown dialects (e.g., footnotes, custom admonition syntax)
+- Analytics or extraction during conversion (e.g., counting headings, collecting metadata)
+- Conditional rendering based on element context
 
 ### Basic Example
 
@@ -442,188 +452,343 @@ puts result
 # => [Link](/page)
 ```
 
-### Visitor Context
+### NodeContext: Element Metadata
 
-Each visitor callback receives a `NodeContext` object with metadata about the current element:
+Each visitor callback receives a `NodeContext` object with comprehensive metadata about the current element:
 
 ```ruby
 class DetailedVisitor
   def visit_link(ctx, href, text, title = nil)
-    # ctx.node_type     => :link
-    # ctx.tag_name      => "a"
-    # ctx.attributes    => {"href" => "...", ...}
-    # ctx.depth         => Integer
-    # ctx.parent_tag    => String or nil
-    # ctx.is_inline     => true/false
+    # ctx.node_type     => :link (Symbol identifier for element type)
+    # ctx.tag_name      => "a" (HTML tag name)
+    # ctx.attributes    => {"href" => "...", "class" => "..."}
+    # ctx.depth         => Integer (nesting depth from root)
+    # ctx.index_in_parent => Integer (position among siblings)
+    # ctx.parent_tag    => "p" (tag of parent element, or nil)
+    # ctx.is_inline     => true/false (inline vs block context)
 
     { type: :continue }  # Use default conversion
   end
 end
 ```
 
-### Return Value Types
-
-Each visitor callback must return a hash with at least a `:type` key. The following types are supported:
-
-- **`:continue`** - Use default conversion for this element
-  ```ruby
-  { type: :continue }
-  ```
-
-- **`:custom`** - Replace with custom markdown output
-  ```ruby
-  { type: :custom, output: "[Click here](#{href})" }
-  ```
-
-- **`:skip`** - Omit this element entirely
-  ```ruby
-  { type: :skip }
-  ```
-
-- **`:preserve_html`** - Keep original HTML without conversion
-  ```ruby
-  { type: :preserve_html }
-  ```
-
-- **`:error`** - Stop conversion with an error message
-  ```ruby
-  { type: :error, message: "Unsupported element type" }
-  ```
-
-### Supported Visitor Methods
-
-Implement any of these methods in your visitor class to customize specific elements:
-
-**Element Lifecycle**
-- `visit_element_start(ctx)` - Called when entering an element
-- `visit_element_end(ctx, output)` - Called when leaving an element
-
-**Content**
-- `visit_text(ctx, text)` - Plain text nodes
-- `visit_line_break(ctx)` - Line breaks (`<br>`)
-- `visit_horizontal_rule(ctx)` - Horizontal rules (`<hr>`)
-
-**Inline Formatting**
-- `visit_link(ctx, href, text, title = nil)` - Hyperlinks
-- `visit_image(ctx, src, alt, title = nil)` - Images
-- `visit_code_inline(ctx, code)` - Inline code
-- `visit_strong(ctx, text)` - Bold text
-- `visit_emphasis(ctx, text)` - Italic text
-- `visit_strikethrough(ctx, text)` - Strikethrough
-- `visit_underline(ctx, text)` - Underlined text
-- `visit_subscript(ctx, text)` - Subscript
-- `visit_superscript(ctx, text)` - Superscript
-- `visit_mark(ctx, text)` - Highlighted text
-
-**Block Formatting**
-- `visit_heading(ctx, level, text, id = nil)` - Headers (h1-h6)
-- `visit_code_block(ctx, lang = nil, code)` - Code blocks
-- `visit_blockquote(ctx, content, depth)` - Block quotes
-
-**Lists**
-- `visit_list_start(ctx, ordered)` - List opening
-- `visit_list_item(ctx, ordered, marker, text)` - Individual list items
-- `visit_list_end(ctx, ordered, output)` - List closing
-
-**Tables**
-- `visit_table_start(ctx)` - Table opening
-- `visit_table_row(ctx, cells, is_header)` - Table rows
-- `visit_table_end(ctx, output)` - Table closing
-
-**Advanced Elements**
-- `visit_definition_list_start(ctx)` - Definition list opening
-- `visit_definition_term(ctx, text)` - Definition terms
-- `visit_definition_description(ctx, text)` - Definition descriptions
-- `visit_definition_list_end(ctx, output)` - Definition list closing
-- `visit_figure_start(ctx)` - Figure opening
-- `visit_figcaption(ctx, text)` - Figure captions
-- `visit_figure_end(ctx, output)` - Figure closing
-- `visit_form(ctx, action, method)` - Forms
-- `visit_input(ctx, input_type, name, value)` - Form inputs
-- `visit_button(ctx, text)` - Buttons
-- `visit_details(ctx, open)` - Collapsible details
-- `visit_summary(ctx, text)` - Summary elements
-- `visit_audio(ctx, src)` - Audio elements
-- `visit_video(ctx, src)` - Video elements
-- `visit_iframe(ctx, src)` - Embedded iframes
-- `visit_custom_element(ctx, tag_name, html)` - Unknown/custom elements
-
-### Full Example
+Use context information to make intelligent decisions:
 
 ```ruby
-require 'html_to_markdown'
-
-class CustomVisitor
-  def visit_heading(ctx, level, text, id = nil)
-    # Add custom IDs to headings
-    { type: :custom, output: "#{'#' * level} #{text} {#custom-#{id}}" }
-  end
-
+class SmartVisitor
   def visit_link(ctx, href, text, title = nil)
-    # Convert external links to footnotes
+    # Only rewrite external links
     if href.start_with?('http')
-      { type: :custom, output: "#{text}[^1]" }
+      { type: :custom, output: "[#{text}](#{href}){.external}" }
     else
+      # Keep internal links as-is
       { type: :continue }
     end
   end
 
-  def visit_code_block(ctx, lang = nil, code)
-    # Wrap code blocks in custom markers
-    marker = "```#{lang || 'text'}"
-    { type: :custom, output: "#{marker}\n#{code}\n```" }
+  def visit_heading(ctx, level, text, id = nil)
+    # Only add custom styling to top-level headings
+    if ctx.depth == 1 && level == 1
+      { type: :custom, output: "#{'#' * level} #{text} {.title}" }
+    else
+      { type: :continue }
+    end
+  end
+end
+```
+
+### VisitResult: Return Types
+
+Every visitor callback must return a hash with a `:type` key. The supported result types are:
+
+#### Continue (Use Default Behavior)
+```ruby
+def visit_link(ctx, href, text, title = nil)
+  { type: :continue }  # Rust engine handles conversion
+end
+```
+Tells the converter to use its default behavior for this element. Useful when you want to skip certain elements but keep the majority unchanged.
+
+#### Custom (Replace with Custom Output)
+```ruby
+def visit_heading(ctx, level, text, id = nil)
+  { type: :custom, output: "#{'#' * level} #{text}" }
+end
+```
+Replace the element's markdown with your custom output string. You're responsible for generating valid markdown.
+
+#### Skip (Omit Element)
+```ruby
+def visit_image(ctx, src, alt, title = nil)
+  # Remove all images from output
+  { type: :skip }
+end
+```
+Removes the element entirely from the output. Useful for filtering unwanted content (ads, tracking pixels, etc.).
+
+#### Preserve HTML (Keep Original HTML)
+```ruby
+def visit_custom_element(ctx, tag_name, html)
+  # Keep unknown HTML as-is
+  { type: :preserve_html }
+end
+```
+Leaves the element in its original HTML form without markdown conversion. Useful for preserving custom HTML that markdown doesn't support.
+
+#### Error (Stop Conversion)
+```ruby
+def visit_input(ctx, input_type, name, value)
+  # Stop conversion if we encounter forms
+  { type: :error, message: "Forms are not supported" }
+end
+```
+Halts conversion immediately and raises `HtmlToMarkdown::Error` with your message. Use this for fail-fast validation.
+
+### Supported Visitor Methods
+
+Implement any of these 40+ methods in your visitor class:
+
+**Element Lifecycle** (called on all elements)
+- `visit_element_start(ctx)` → `visitor_result` - Called when entering any element
+- `visit_element_end(ctx, output)` → `visitor_result` - Called when leaving any element
+
+**Text Content**
+- `visit_text(ctx, text)` → `visitor_result` - Plain text nodes
+- `visit_line_break(ctx)` → `visitor_result` - Line breaks (`<br>`)
+- `visit_horizontal_rule(ctx)` → `visitor_result` - Horizontal rules (`<hr>`)
+
+**Inline Formatting** (text-level elements)
+- `visit_link(ctx, href, text, title = nil)` → `visitor_result` - Hyperlinks (`<a>`)
+- `visit_image(ctx, src, alt, title = nil)` → `visitor_result` - Images (`<img>`)
+- `visit_code_inline(ctx, code)` → `visitor_result` - Inline code (`<code>`)
+- `visit_strong(ctx, text)` → `visitor_result` - Bold text (`<strong>`, `<b>`)
+- `visit_emphasis(ctx, text)` → `visitor_result` - Italic text (`<em>`, `<i>`)
+- `visit_strikethrough(ctx, text)` → `visitor_result` - Strikethrough (`<del>`, `<s>`)
+- `visit_underline(ctx, text)` → `visitor_result` - Underlined text (`<u>`)
+- `visit_subscript(ctx, text)` → `visitor_result` - Subscript (`<sub>`)
+- `visit_superscript(ctx, text)` → `visitor_result` - Superscript (`<sup>`)
+- `visit_mark(ctx, text)` → `visitor_result` - Highlighted text (`<mark>`)
+
+**Block Formatting** (block-level elements)
+- `visit_heading(ctx, level, text, id = nil)` → `visitor_result` - Headers (`<h1>`-`<h6>`)
+- `visit_code_block(ctx, lang = nil, code)` → `visitor_result` - Code blocks (`<pre><code>`)
+- `visit_blockquote(ctx, content, depth)` → `visitor_result` - Block quotes (`<blockquote>`)
+
+**Lists**
+- `visit_list_start(ctx, ordered)` → `visitor_result` - List opening (`<ul>`, `<ol>`)
+- `visit_list_item(ctx, ordered, marker, text)` → `visitor_result` - List items (`<li>`)
+- `visit_list_end(ctx, ordered, output)` → `visitor_result` - List closing
+
+**Tables**
+- `visit_table_start(ctx)` → `visitor_result` - Table opening (`<table>`)
+- `visit_table_row(ctx, cells, is_header)` → `visitor_result` - Table rows (`<tr>`)
+- `visit_table_end(ctx, output)` → `visitor_result` - Table closing
+
+**Advanced Elements**
+- `visit_definition_list_start(ctx)` → `visitor_result` - Definition list opening (`<dl>`)
+- `visit_definition_term(ctx, text)` → `visitor_result` - Definition terms (`<dt>`)
+- `visit_definition_description(ctx, text)` → `visitor_result` - Definition descriptions (`<dd>`)
+- `visit_definition_list_end(ctx, output)` → `visitor_result` - Definition list closing
+- `visit_figure_start(ctx)` → `visitor_result` - Figure opening (`<figure>`)
+- `visit_figcaption(ctx, text)` → `visitor_result` - Figure captions (`<figcaption>`)
+- `visit_figure_end(ctx, output)` → `visitor_result` - Figure closing
+- `visit_form(ctx, action, method)` → `visitor_result` - Forms (`<form>`)
+- `visit_input(ctx, input_type, name, value)` → `visitor_result` - Form inputs (`<input>`)
+- `visit_button(ctx, text)` → `visitor_result` - Buttons (`<button>`)
+- `visit_details(ctx, open)` → `visitor_result` - Collapsible details (`<details>`)
+- `visit_summary(ctx, text)` → `visitor_result` - Summary elements (`<summary>`)
+- `visit_audio(ctx, src)` → `visitor_result` - Audio elements (`<audio>`)
+- `visit_video(ctx, src)` → `visitor_result` - Video elements (`<video>`)
+- `visit_iframe(ctx, src)` → `visitor_result` - Embedded iframes (`<iframe>`)
+- `visit_custom_element(ctx, tag_name, html)` → `visitor_result` - Unknown/custom elements
+
+### Practical Examples
+
+#### Custom Image Handling
+
+Filter and rewrite images based on source:
+
+```ruby
+class ImageFilterVisitor
+  attr_reader :images
+
+  def initialize
+    @images = []
   end
 
   def visit_image(ctx, src, alt, title = nil)
-    # Filter images by source
-    if src.include?('ads')
-      { type: :skip }  # Skip ad images
+    # Skip tracking pixels
+    return { type: :skip } if src.include?('tracking') || src.include?('beacon')
+
+    # Rewrite CDN URLs
+    if src.start_with?('//cdn.example.com')
+      rewritten = src.sub('//cdn.example.com', 'https://cdn.local')
+      @images << { src: rewritten, alt: alt }
+      { type: :custom, output: "![#{alt}](#{rewritten})" }
     else
+      @images << { src: src, alt: alt }
+      { type: :continue }
+    end
+  end
+end
+
+html = '<img src="//cdn.example.com/image.jpg" alt="Logo"><img src="/tracking/pixel.gif">'
+visitor = ImageFilterVisitor.new
+result = HtmlToMarkdown.convert_with_visitor(html, visitor: visitor)
+
+puts result
+# => ![Logo](https://cdn.local/image.jpg)
+
+puts "Collected images: #{visitor.images.inspect}"
+# => [{:src=>"https://cdn.local/image.jpg", :alt=>"Logo"}]
+```
+
+#### Link Modification and Analytics
+
+Track link types and rewrite external links:
+
+```ruby
+class LinkAnalyticsVisitor
+  attr_reader :stats
+
+  def initialize
+    @stats = { internal: 0, external: 0, email: 0, total_links: [] }
+  end
+
+  def visit_link(ctx, href, text, title = nil)
+    @stats[:total_links] << href
+
+    if href.start_with?('mailto:')
+      @stats[:email] += 1
+      { type: :continue }
+    elsif href.start_with?('http')
+      @stats[:external] += 1
+      # Add tracking parameter to external links
+      tracked = "#{href}#{href.include?('?') ? '&' : '?'}utm_source=markdown"
+      { type: :custom, output: "[#{text}](#{tracked})" }
+    else
+      @stats[:internal] += 1
       { type: :continue }
     end
   end
 end
 
 html = <<~HTML
-  <h1 id="intro">Introduction</h1>
-  <p>Check out <a href="https://example.com">this link</a>!</p>
-  <pre><code class="language-ruby">puts "Hello"</code></pre>
-  <img src="/ads/banner.jpg" alt="Ad">
-  <img src="/content/diagram.jpg" alt="Diagram">
+  <a href="/home">Home</a>
+  <a href="https://example.com">External</a>
+  <a href="mailto:test@example.com">Email</a>
 HTML
 
-result = HtmlToMarkdown.convert_with_visitor(
-  html,
-  visitor: CustomVisitor.new,
-  heading_style: :atx
-)
+visitor = LinkAnalyticsVisitor.new
+result = HtmlToMarkdown.convert_with_visitor(html, visitor: visitor)
 
-puts result
+puts "Link stats: #{visitor.stats.inspect}"
+# => {:internal=>1, :external=>1, :email=>1, :total_links=>["/home", "https://example.com", "mailto:test@example.com"]}
+```
+
+#### Custom Markdown Dialect (Footnotes)
+
+Convert external links to a footnote-based dialect:
+
+```ruby
+class FootnoteVisitor
+  attr_reader :footnotes
+
+  def initialize
+    @footnotes = []
+  end
+
+  def visit_link(ctx, href, text, title = nil)
+    if href.start_with?('http')
+      # External links become footnotes
+      fn_num = @footnotes.length + 1
+      @footnotes << { num: fn_num, href: href, title: title }
+      { type: :custom, output: "#{text}[^#{fn_num}]" }
+    else
+      # Internal links stay as links
+      { type: :continue }
+    end
+  end
+
+  def footnotes_section
+    return "" if @footnotes.empty?
+
+    lines = ["\n\n---\n\n"]
+    @footnotes.each do |fn|
+      lines << "[^#{fn[:num]}]: #{fn[:href]}"
+      lines << " \"#{fn[:title]}\"" if fn[:title]
+      lines << "\n"
+    end
+    lines.join
+  end
+end
+
+html = <<~HTML
+  <p>Check out <a href="https://example.com">this site</a> and <a href="https://github.com">GitHub</a>.</p>
+  <p><a href="/local/page">Local link</a> stays unchanged.</p>
+HTML
+
+visitor = FootnoteVisitor.new
+result = HtmlToMarkdown.convert_with_visitor(html, visitor: visitor)
+
+puts result + visitor.footnotes_section
+# => Check out this site[^1] and GitHub[^2].
+#
+#    Local link stays unchanged.
+#
+#    ---
+#
+#    [^1]: https://example.com
+#    [^2]: https://github.com
 ```
 
 ### Type Safety with RBS
 
-All visitor types are defined in `sig/html_to_markdown.rbs` for full type safety with Steep:
+All visitor types are defined in `sig/html_to_markdown.rbs` for full type safety with [Steep](https://github.com/soutaro/steep):
 
 ```ruby
 # Type definitions available:
-# - visitor_result - Return type for all visitor callbacks
-# - NodeContext - Parameter type with node metadata
+# - HtmlToMarkdown::visitor_result - Return type for all callbacks
+# - HtmlToMarkdown::NodeContext - Parameter type with element metadata
 
-steep check  # Validate visitor implementation
+steep check  # Validate your visitor implementation
 ```
 
-Implement visitor callbacks with proper type hints to catch errors early:
+Implement callbacks with full type annotations to catch errors at type-check time:
 
 ```ruby
 require 'html_to_markdown'
 
 class TypedVisitor
-  def visit_link(ctx : HtmlToMarkdown::NodeContext, href : String, text : String, title : String | nil = nil) : HtmlToMarkdown::visitor_result
+  def visit_link(
+    ctx : HtmlToMarkdown::NodeContext,
+    href : String,
+    text : String,
+    title : String | nil = nil
+  ) : HtmlToMarkdown::visitor_result
     { type: :custom, output: "[#{text}](#{href})" }
   end
+
+  def visit_image(
+    ctx : HtmlToMarkdown::NodeContext,
+    src : String,
+    alt : String | nil,
+    title : String | nil = nil
+  ) : HtmlToMarkdown::visitor_result
+    # Return type is validated against visitor_result union
+    { type: :skip }
+  end
 end
+
+# Type check your visitor
+# $ steep check
 ```
+
+Type safety ensures:
+- All callback signatures match RBS definitions
+- Return types are valid `visitor_result` variants
+- Context parameter types are correct
+- Early detection of mistakes via LSP in your editor
 
 ## CLI
 
