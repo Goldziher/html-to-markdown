@@ -1,12 +1,12 @@
 using System;
+using System.Diagnostics;
 using System.IO;
 using System.Text.Json;
-using System.Diagnostics;
 using HtmlToMarkdown;
 
-class Program
+internal class Program
 {
-    static void RunScenario(byte[] html, string scenario)
+    private static void RunScenario(byte[] html, string scenario)
     {
         if (scenario == "metadata-default")
         {
@@ -22,7 +22,7 @@ class Program
         }
     }
 
-    static void Main(string[] args)
+    private static void Main(string[] args)
     {
         string? filePath = null;
         int iterations = 50;

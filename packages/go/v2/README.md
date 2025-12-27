@@ -372,6 +372,283 @@ func main() {
 }
 ```
 
+## Visitor Pattern
+
+The visitor pattern allows you to customize HTML to Markdown conversion by intercepting and modifying the conversion process for specific HTML elements. This enables use cases like custom transformations, content filtering, validation, and analytics.
+
+### Overview
+
+The visitor pattern provides:
+- **Node-level customization**: Transform individual HTML elements
+- **Fine-grained control**: Implement only the callbacks you need
+- **Composable visitors**: Combine multiple visitors for complex transformations
+- **Statistics and analytics**: Extract information during conversion
+- **Content filtering**: Remove or replace elements based on criteria
+- **Format transformation**: Convert elements to custom output
+
+### Core Types
+
+#### VisitResultType
+
+Controls how the converter proceeds after a visitor callback:
+
+```go
+const (
+	// VisitContinue - use default conversion behavior
+	VisitContinue VisitResultType = 0
+
+	// VisitCustom - replace output with CustomOutput field
+	VisitCustom VisitResultType = 1
+
+	// VisitSkip - omit element and all children from output
+	VisitSkip VisitResultType = 2
+
+	// VisitPreserveHTML - keep original HTML instead of converting
+	VisitPreserveHTML VisitResultType = 3
+
+	// VisitError - halt conversion and report error
+	VisitError VisitResultType = 4
+)
+```
+
+#### NodeContext
+
+Information about the current HTML node being visited:
+
+```go
+type NodeContext struct {
+	NodeType      uint32  // Coarse-grained type classification
+	TagName       string  // HTML tag name (e.g., "div", "h1")
+	ParentTag     string  // Parent element's tag name
+	Depth         uint64  // Depth in DOM tree (0 = root)
+	IndexInParent uint64  // Index among siblings (0-based)
+	IsInline      bool    // Whether element is inline vs block
+}
+```
+
+#### VisitResult
+
+Result from a visitor callback:
+
+```go
+type VisitResult struct {
+	ResultType   VisitResultType  // Action to take
+	CustomOutput string           // Custom markdown (if ResultType == VisitCustom)
+	ErrorMessage string           // Error message (if ResultType == VisitError)
+}
+```
+
+### Methods Reference
+
+The `Visitor` struct provides 40+ callback fields for different HTML elements:
+
+#### Generic Callbacks
+
+- `OnElementStart(ctx *NodeContext) *VisitResult` - Before entering any element
+- `OnElementEnd(ctx *NodeContext, output string) *VisitResult` - After exiting element
+- `OnText(ctx *NodeContext, text string) *VisitResult` - Text nodes (most frequent callback)
+
+#### Content Callbacks
+
+- `OnLink(ctx, href, text, title) *VisitResult` - Links `<a href="...">`
+- `OnImage(ctx, src, alt, title) *VisitResult` - Images `<img>`
+- `OnHeading(ctx, level, text, id) *VisitResult` - Headings `<h1>-<h6>`
+- `OnCodeBlock(ctx, lang, code) *VisitResult` - Code blocks `<pre><code>`
+- `OnCodeInline(ctx, code) *VisitResult` - Inline code `<code>`
+
+#### Formatting Callbacks
+
+- `OnStrong(ctx, text) *VisitResult` - Bold `<strong>`, `<b>`
+- `OnEmphasis(ctx, text) *VisitResult` - Italic `<em>`, `<i>`
+- `OnStrikethrough(ctx, text) *VisitResult` - Strikethrough `<s>`, `<del>`, `<strike>`
+- `OnUnderline(ctx, text) *VisitResult` - Underline `<u>`, `<ins>`
+- `OnSubscript(ctx, text) *VisitResult` - Subscript `<sub>`
+- `OnSuperscript(ctx, text) *VisitResult` - Superscript `<sup>`
+- `OnMark(ctx, text) *VisitResult` - Highlight `<mark>`
+
+#### List Callbacks
+
+- `OnListStart(ctx, ordered) *VisitResult` - Before `<ul>` or `<ol>`
+- `OnListItem(ctx, ordered, marker, text) *VisitResult` - List items `<li>`
+- `OnListEnd(ctx, ordered, output) *VisitResult` - After list
+
+#### Table Callbacks
+
+- `OnTableStart(ctx) *VisitResult` - Before `<table>`
+- `OnTableRow(ctx, cells, isHeader) *VisitResult` - Table rows `<tr>`
+- `OnTableEnd(ctx, output) *VisitResult` - After table
+
+#### Block Callbacks
+
+- `OnBlockquote(ctx, content, depth) *VisitResult` - Blockquotes `<blockquote>`
+- `OnLineBreak(ctx) *VisitResult` - Line breaks `<br>`
+- `OnHorizontalRule(ctx) *VisitResult` - Horizontal rules `<hr>`
+
+#### Definition List Callbacks
+
+- `OnDefinitionListStart(ctx) *VisitResult` - Before `<dl>`
+- `OnDefinitionTerm(ctx, text) *VisitResult` - Definition terms `<dt>`
+- `OnDefinitionDescription(ctx, text) *VisitResult` - Descriptions `<dd>`
+- `OnDefinitionListEnd(ctx, output) *VisitResult` - After `</dl>`
+
+#### Form Callbacks
+
+- `OnForm(ctx, action, method) *VisitResult` - Forms `<form>`
+- `OnInput(ctx, type, name, value) *VisitResult` - Input fields `<input>`
+- `OnButton(ctx, text) *VisitResult` - Buttons `<button>`
+
+#### Media Callbacks
+
+- `OnAudio(ctx, src) *VisitResult` - Audio `<audio>`
+- `OnVideo(ctx, src) *VisitResult` - Video `<video>`
+- `OnIframe(ctx, src) *VisitResult` - Embedded content `<iframe>`
+
+#### Semantic HTML5 Callbacks
+
+- `OnDetails(ctx, open) *VisitResult` - Collapsible sections `<details>`
+- `OnSummary(ctx, text) *VisitResult` - Summary text `<summary>`
+- `OnFigureStart(ctx) *VisitResult` - Before `<figure>`
+- `OnFigcaption(ctx, text) *VisitResult` - Figure captions `<figcaption>`
+- `OnFigureEnd(ctx, output) *VisitResult` - After figure
+
+#### Custom Callbacks
+
+- `OnCustomElement(ctx, tagName, html) *VisitResult` - Unknown or custom elements
+
+### Usage Examples
+
+#### Example 1: Transform Links
+
+```go
+html := `<a href="https://example.com">Click here</a>`
+
+visitor := &htmltomarkdown.Visitor{
+	OnLink: func(ctx *htmltomarkdown.NodeContext, href, text, title string) *htmltomarkdown.VisitResult {
+		// Custom link formatting with URL doubled
+		return &htmltomarkdown.VisitResult{
+			ResultType: htmltomarkdown.VisitCustom,
+			CustomOutput: fmt.Sprintf("[%s](%s) [%s]", text, href, href),
+		}
+	},
+}
+
+markdown, err := htmltomarkdown.ConvertWithVisitor(html, visitor)
+// Output: [Click here](https://example.com) [https://example.com]
+```
+
+#### Example 2: Filter Content
+
+```go
+html := `
+<p>Public content</p>
+<img src="secret.jpg" alt="Secret image" />
+<p>More public content</p>
+`
+
+visitor := &htmltomarkdown.Visitor{
+	OnImage: func(ctx *htmltomarkdown.NodeContext, src, alt, title string) *htmltomarkdown.VisitResult {
+		// Skip all images from output
+		return &htmltomarkdown.VisitResult{ResultType: htmltomarkdown.VisitSkip}
+	},
+}
+
+markdown, err := htmltomarkdown.ConvertWithVisitor(html, visitor)
+// Images are removed from output
+```
+
+#### Example 3: Extract Metadata
+
+```go
+html := `<h1>Title</h1><h2>Subtitle</h2><p>Content</p>`
+
+var headings []string
+
+visitor := &htmltomarkdown.Visitor{
+	OnHeading: func(ctx *htmltomarkdown.NodeContext, level uint32, text, id string) *htmltomarkdown.VisitResult {
+		headings = append(headings, fmt.Sprintf("H%d: %s", level, text))
+		return &htmltomarkdown.VisitResult{ResultType: htmltomarkdown.VisitContinue}
+	},
+}
+
+markdown, err := htmltomarkdown.ConvertWithVisitor(html, visitor)
+// headings = ["H1: Title", "H2: Subtitle"]
+```
+
+#### Example 4: Remove Formatting
+
+```go
+html := `<p>Text with <strong>bold</strong> and <em>italic</em>.</p>`
+
+visitor := &htmltomarkdown.Visitor{
+	OnStrong: func(ctx *htmltomarkdown.NodeContext, text string) *htmltomarkdown.VisitResult {
+		// Replace bold with plain text
+		return &htmltomarkdown.VisitResult{
+			ResultType: htmltomarkdown.VisitCustom,
+			CustomOutput: text,
+		}
+	},
+	OnEmphasis: func(ctx *htmltomarkdown.NodeContext, text string) *htmltomarkdown.VisitResult {
+		// Replace italic with plain text
+		return &htmltomarkdown.VisitResult{
+			ResultType: htmltomarkdown.VisitCustom,
+			CustomOutput: text,
+		}
+	},
+}
+
+markdown, err := htmltomarkdown.ConvertWithVisitor(html, visitor)
+// Output: Text with bold and italic.
+```
+
+### Visitor Implementation Tips
+
+1. **Only implement needed callbacks** - You don't need to implement all callbacks
+2. **Copy string data** - NodeContext strings are only valid during the callback
+3. **Use VisitCustom for replacement** - Return custom output to replace element
+4. **Use VisitSkip to omit** - Skip elements and their children entirely
+5. **Keep text processing fast** - Text callbacks are called 100+ times per document
+
+### Performance Considerations
+
+1. **Minimal Callbacks**: Only implement callbacks you need
+2. **Fast Text Processing**: Text callbacks are called frequently (100+ times per document)
+3. **Memory Efficiency**: Avoid allocating memory for every callback
+4. **Early Returns**: Return quickly from callbacks when possible
+5. **String Copies**: Only copy strings if you need to persist them
+
+### Examples
+
+See the `examples/` directory for complete examples:
+
+- `visitor_basic.go` - Basic transformation examples
+- `visitor_filter.go` - Content filtering and validation
+- `visitor_analytics.go` - Statistics and content extraction
+
+Run examples:
+
+```bash
+go run examples/visitor_basic.go
+go run examples/visitor_filter.go
+go run examples/visitor_analytics.go
+```
+
+### API Functions
+
+#### `ConvertWithVisitor(html string, visitor *Visitor) (string, error)`
+
+Converts HTML to Markdown using a custom visitor. The visitor allows you to intercept and customize the conversion process for specific HTML elements.
+
+```go
+markdown, err := htmltomarkdown.ConvertWithVisitor(html, visitor)
+if err != nil {
+	log.Fatal(err)
+}
+```
+
+#### `MustConvertWithVisitor(html string, visitor *Visitor) string`
+
+Like `ConvertWithVisitor` but panics if an error occurs.
+
 ## Memory Management Notes
 
 The Go bindings handle C FFI memory automatically:

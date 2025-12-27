@@ -17,7 +17,7 @@ categories = ["api-bindings"]
 crate-type = ["cdylib"]
 
 [dependencies]
-html-to-markdown-rs = { workspace = true, features = ["inline-images", "metadata"] }
+html-to-markdown-rs = { workspace = true, features = ["inline-images", "metadata", "visitor"] }
 ext-php-rs = { workspace = true }
 
 [target.'cfg(not(target_os = "windows"))'.dependencies]
@@ -26,4 +26,5 @@ pprof = { version = "0.15", features = ["flamegraph"], optional = true }
 [features]
 default = ["metadata"]
 metadata = ["html-to-markdown-rs/metadata"]
+visitor = ["html-to-markdown-rs/visitor"]
 profiling = ["dep:pprof"]
