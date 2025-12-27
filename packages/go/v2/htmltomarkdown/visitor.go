@@ -306,6 +306,8 @@ import "C"
 
 import (
 	"errors"
+	"regexp"
+	"strings"
 	"sync"
 	"unsafe"
 )
@@ -314,19 +316,14 @@ import (
 type VisitResultType int
 
 const (
-	// VisitContinue uses default conversion behavior for this node.
 	VisitContinue VisitResultType = 0
 
-	// VisitCustom replaces output with caller-provided markdown.
 	VisitCustom VisitResultType = 1
 
-	// VisitSkip omits this element and all children from output.
 	VisitSkip VisitResultType = 2
 
-	// VisitPreserveHTML includes raw HTML instead of converting.
 	VisitPreserveHTML VisitResultType = 3
 
-	// VisitError halts conversion and reports error.
 	VisitError VisitResultType = 4
 )
 
@@ -335,22 +332,16 @@ const (
 // This struct provides metadata about the current element during visitor callbacks.
 // All string pointers are valid only during the callback invocation.
 type NodeContext struct {
-	// NodeType is the coarse-grained type classification.
 	NodeType uint32
 
-	// TagName is the raw HTML tag name (e.g., "div", "h1").
 	TagName string
 
-	// ParentTag is the parent element's tag name, or empty if root.
 	ParentTag string
 
-	// Depth is the depth in the DOM tree (0 = root).
 	Depth uint64
 
-	// IndexInParent is the index among siblings (0-based).
 	IndexInParent uint64
 
-	// IsInline indicates whether the element is inline vs block.
 	IsInline bool
 }
 
@@ -358,13 +349,10 @@ type NodeContext struct {
 //
 // It communicates to the converter how to proceed after visiting a node.
 type VisitResult struct {
-	// ResultType indicates the action to take.
 	ResultType VisitResultType
 
-	// CustomOutput is the custom markdown output (only if ResultType == VisitCustom).
 	CustomOutput string
 
-	// ErrorMessage is the error message (only if ResultType == VisitError).
 	ErrorMessage string
 }
 
@@ -373,124 +361,84 @@ type VisitResult struct {
 // Implement the callback fields you need and set others to nil.
 // Each callback receives a NodeContext with metadata about the current element.
 type Visitor struct {
-	// OnText is called for each text node.
 	OnText func(ctx *NodeContext, text string) *VisitResult
 
-	// OnElementStart is called before entering any HTML element.
 	OnElementStart func(ctx *NodeContext) *VisitResult
 
-	// OnElementEnd is called after exiting any HTML element with default output.
 	OnElementEnd func(ctx *NodeContext, output string) *VisitResult
 
-	// OnLink is called for anchor links <a href="...">.
 	OnLink func(ctx *NodeContext, href, text, title string) *VisitResult
 
-	// OnImage is called for image elements <img src="..." alt="...">.
 	OnImage func(ctx *NodeContext, src, alt, title string) *VisitResult
 
-	// OnHeading is called for heading elements <h1> through <h6>.
 	OnHeading func(ctx *NodeContext, level uint32, text, id string) *VisitResult
 
-	// OnCodeBlock is called for code blocks <pre><code>.
 	OnCodeBlock func(ctx *NodeContext, lang, code string) *VisitResult
 
-	// OnCodeInline is called for inline code <code>.
 	OnCodeInline func(ctx *NodeContext, code string) *VisitResult
 
-	// OnListStart is called before processing a list <ul> or <ol>.
 	OnListStart func(ctx *NodeContext, ordered bool) *VisitResult
 
-	// OnListItem is called for list items <li>.
 	OnListItem func(ctx *NodeContext, ordered bool, marker, text string) *VisitResult
 
-	// OnListEnd is called after processing a list.
 	OnListEnd func(ctx *NodeContext, ordered bool, output string) *VisitResult
 
-	// OnTableStart is called before processing a table <table>.
 	OnTableStart func(ctx *NodeContext) *VisitResult
 
-	// OnTableRow is called for table rows <tr>.
 	OnTableRow func(ctx *NodeContext, cells []string, isHeader bool) *VisitResult
 
-	// OnTableEnd is called after processing a table.
 	OnTableEnd func(ctx *NodeContext, output string) *VisitResult
 
-	// OnBlockquote is called for blockquote elements <blockquote>.
 	OnBlockquote func(ctx *NodeContext, content string, depth uint64) *VisitResult
 
-	// OnStrong is called for strong/bold elements <strong>, <b>.
 	OnStrong func(ctx *NodeContext, text string) *VisitResult
 
-	// OnEmphasis is called for emphasis/italic elements <em>, <i>.
 	OnEmphasis func(ctx *NodeContext, text string) *VisitResult
 
-	// OnStrikethrough is called for strikethrough elements <s>, <del>, <strike>.
 	OnStrikethrough func(ctx *NodeContext, text string) *VisitResult
 
-	// OnUnderline is called for underline elements <u>, <ins>.
 	OnUnderline func(ctx *NodeContext, text string) *VisitResult
 
-	// OnSubscript is called for subscript elements <sub>.
 	OnSubscript func(ctx *NodeContext, text string) *VisitResult
 
-	// OnSuperscript is called for superscript elements <sup>.
 	OnSuperscript func(ctx *NodeContext, text string) *VisitResult
 
-	// OnMark is called for mark/highlight elements <mark>.
 	OnMark func(ctx *NodeContext, text string) *VisitResult
 
-	// OnLineBreak is called for line break elements <br>.
 	OnLineBreak func(ctx *NodeContext) *VisitResult
 
-	// OnHorizontalRule is called for horizontal rule elements <hr>.
 	OnHorizontalRule func(ctx *NodeContext) *VisitResult
 
-	// OnCustomElement is called for custom elements or unknown tags.
 	OnCustomElement func(ctx *NodeContext, tagName, html string) *VisitResult
 
-	// OnDefinitionListStart is called before processing a definition list <dl>.
 	OnDefinitionListStart func(ctx *NodeContext) *VisitResult
 
-	// OnDefinitionTerm is called for definition terms <dt>.
 	OnDefinitionTerm func(ctx *NodeContext, text string) *VisitResult
 
-	// OnDefinitionDescription is called for definition descriptions <dd>.
 	OnDefinitionDescription func(ctx *NodeContext, text string) *VisitResult
 
-	// OnDefinitionListEnd is called after processing a definition list.
 	OnDefinitionListEnd func(ctx *NodeContext, output string) *VisitResult
 
-	// OnForm is called for form elements <form>.
 	OnForm func(ctx *NodeContext, action, method string) *VisitResult
 
-	// OnInput is called for input elements <input>.
 	OnInput func(ctx *NodeContext, inputType, name, value string) *VisitResult
 
-	// OnButton is called for button elements <button>.
 	OnButton func(ctx *NodeContext, text string) *VisitResult
 
-	// OnAudio is called for audio elements <audio>.
 	OnAudio func(ctx *NodeContext, src string) *VisitResult
 
-	// OnVideo is called for video elements <video>.
 	OnVideo func(ctx *NodeContext, src string) *VisitResult
 
-	// OnIframe is called for iframe elements <iframe>.
 	OnIframe func(ctx *NodeContext, src string) *VisitResult
 
-	// OnDetails is called for details elements <details>.
 	OnDetails func(ctx *NodeContext, open bool) *VisitResult
 
-	// OnSummary is called for summary elements <summary>.
 	OnSummary func(ctx *NodeContext, text string) *VisitResult
 
-	// OnFigureStart is called before processing a figure <figure>.
 	OnFigureStart func(ctx *NodeContext) *VisitResult
 
-	// OnFigcaption is called for figcaption elements <figcaption>.
 	OnFigcaption func(ctx *NodeContext, text string) *VisitResult
 
-	// OnFigureEnd is called after processing a figure.
 	OnFigureEnd func(ctx *NodeContext, output string) *VisitResult
 }
 
@@ -577,11 +525,9 @@ func ConvertWithVisitor(html string, visitor *Visitor) (string, error) {
 		return "", err
 	}
 
-	// Store visitor in a thread-safe registry for callback access
 	visitorID := storeVisitor(visitor)
 	defer deleteVisitor(visitorID)
 
-	// First: Perform standard HTML to Markdown conversion
 	cHTML := C.CString(html)
 	defer C.free(unsafe.Pointer(cHTML))
 
@@ -597,10 +543,6 @@ func ConvertWithVisitor(html string, visitor *Visitor) (string, error) {
 
 	markdown := C.GoString(result)
 
-	// Second: Process converted markdown through visitor callbacks
-	// For now, just call callbacks on simple patterns (this is a post-processing approach)
-	// The Go callbacks are invoked for introspection but don't modify the output
-	// A full AST-based implementation would require parsing markdown back into an AST
 	processMarkdownWithVisitor(markdown, visitor, visitorID)
 
 	return markdown, nil
@@ -610,12 +552,273 @@ func ConvertWithVisitor(html string, visitor *Visitor) (string, error) {
 // This is a simplified post-processing approach. A full implementation would
 // parse markdown into an AST and walk the tree with proper context tracking.
 func processMarkdownWithVisitor(markdown string, visitor *Visitor, visitorID uint64) {
-	// Placeholder: invoke callbacks for detected patterns
-	// In a full implementation, this would parse markdown into an AST
-	// and properly invoke visitor methods for each element
-	_ = markdown
-	_ = visitor
-	_ = visitorID
+	if visitor == nil {
+		return
+	}
+
+	ctx := &NodeContext{
+		NodeType:      0,
+		TagName:       "",
+		ParentTag:     "",
+		Depth:         0,
+		IndexInParent: 0,
+		IsInline:      false,
+	}
+
+	lines := strings.Split(markdown, "\n")
+	inList := false
+	inTable := false
+	inDefList := false
+
+	for i, line := range lines {
+		origLine := line
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+
+		isListItem := strings.HasPrefix(line, "- ") || strings.HasPrefix(line, "* ") ||
+			regexp.MustCompile(`^\d+\.\s`).MatchString(line)
+		if isListItem && !inList {
+			inList = true
+			if visitor.OnListStart != nil {
+				ordered := regexp.MustCompile(`^\d+\.`).MatchString(line)
+				visitor.OnListStart(ctx, ordered)
+			}
+		} else if !isListItem && inList && !strings.HasPrefix(line, " ") {
+			inList = false
+			if visitor.OnListEnd != nil {
+				visitor.OnListEnd(ctx, false, markdown[i:])
+			}
+		}
+
+		isTableRow := strings.HasPrefix(line, "|")
+		if isTableRow && !inTable {
+			inTable = true
+			if visitor.OnTableStart != nil {
+				visitor.OnTableStart(ctx)
+			}
+		} else if !isTableRow && inTable && !strings.HasPrefix(line, "|") {
+			inTable = false
+			if visitor.OnTableEnd != nil {
+				visitor.OnTableEnd(ctx, "")
+			}
+		}
+
+		if strings.HasPrefix(line, "#") {
+			if visitor.OnElementStart != nil && len(origLine) > 0 && (origLine[0] != ' ' && origLine[0] != '\t') {
+				visitor.OnElementStart(ctx)
+			}
+
+			if visitor.OnHeading != nil {
+				level := 0
+				for j := 0; j < len(line); j++ {
+					if line[j] == '#' {
+						level++
+					} else {
+						break
+					}
+				}
+				text := strings.TrimSpace(line[level:])
+				visitor.OnHeading(ctx, uint32(level), text, "")
+			}
+
+			if visitor.OnElementEnd != nil && len(origLine) > 0 && (origLine[0] != ' ' && origLine[0] != '\t') {
+				visitor.OnElementEnd(ctx, line)
+			}
+		}
+
+		if len(line) > 0 && !strings.HasPrefix(line, "#") && !strings.HasPrefix(line, ">") &&
+			!isListItem && !isTableRow && line != "---" && line != "***" && line != "___" {
+			if !strings.HasPrefix(line, "![") && !strings.HasPrefix(line, "[") {
+				if visitor.OnElementStart != nil && len(origLine) > 0 && (origLine[0] != ' ' && origLine[0] != '\t') {
+					visitor.OnElementStart(ctx)
+				}
+				if visitor.OnElementEnd != nil && len(origLine) > 0 && (origLine[0] != ' ' && origLine[0] != '\t') {
+					visitor.OnElementEnd(ctx, line)
+				}
+			}
+		}
+
+		if strings.Contains(line, "[") && strings.Contains(line, "](") && visitor.OnLink != nil {
+			re := regexp.MustCompile(`\[([^\]]+)\]\(([^)]+)\)`)
+			matches := re.FindAllStringSubmatch(line, -1)
+			for _, match := range matches {
+				if len(match) >= 3 {
+					visitor.OnLink(ctx, match[2], match[1], "")
+				}
+			}
+		}
+
+		if strings.Contains(line, "![") && strings.Contains(line, "](") && visitor.OnImage != nil {
+			re := regexp.MustCompile(`!\[([^\]]*)\]\(([^)]+)\)`)
+			matches := re.FindAllStringSubmatch(line, -1)
+			for _, match := range matches {
+				if len(match) >= 3 {
+					visitor.OnImage(ctx, match[2], match[1], "")
+				}
+			}
+		}
+
+		if strings.HasPrefix(line, "```") && visitor.OnCodeBlock != nil {
+			visitor.OnCodeBlock(ctx, "", line)
+		}
+
+		if strings.Contains(line, "`") && visitor.OnCodeInline != nil {
+			re := regexp.MustCompile("`([^`]+)`")
+			matches := re.FindAllStringSubmatch(line, -1)
+			for _, match := range matches {
+				if len(match) >= 2 {
+					visitor.OnCodeInline(ctx, match[1])
+				}
+			}
+		}
+
+		if isListItem {
+			if visitor.OnListItem != nil {
+				text := strings.TrimPrefix(strings.TrimPrefix(line, "- "), "* ")
+				text = regexp.MustCompile(`^\d+\.\s`).ReplaceAllString(text, "")
+				marker := "-"
+				if strings.HasPrefix(line, "* ") {
+					marker = "*"
+				}
+				ordered := regexp.MustCompile(`^\d+\.`).MatchString(line)
+				visitor.OnListItem(ctx, ordered, marker, text)
+			}
+		}
+
+		if isTableRow && visitor.OnTableRow != nil {
+			cells := strings.Split(line, "|")
+			cleanCells := make([]string, 0)
+			for _, cell := range cells {
+				cell = strings.TrimSpace(cell)
+				if cell != "" && cell != "-" {
+					cleanCells = append(cleanCells, cell)
+				}
+			}
+			if len(cleanCells) > 0 {
+				isHeader := strings.Contains(line, "---") || strings.Contains(line, "---|")
+				visitor.OnTableRow(ctx, cleanCells, isHeader)
+			}
+		}
+
+		if strings.HasPrefix(line, ">") && visitor.OnBlockquote != nil {
+			text := strings.TrimPrefix(line, ">")
+			text = strings.TrimSpace(text)
+			visitor.OnBlockquote(ctx, text, 0)
+		}
+
+		if (line == "---" || line == "***" || line == "___") && visitor.OnHorizontalRule != nil {
+			visitor.OnHorizontalRule(ctx)
+		}
+
+		isMaybeDefinitionLine := len(line) > 0 && !strings.HasPrefix(line, "#") &&
+			!strings.HasPrefix(line, "-") && !strings.HasPrefix(line, "*") &&
+			!strings.HasPrefix(line, ">") && !strings.HasPrefix(line, "|") &&
+			line != "---" && line != "***" && line != "___" &&
+			!strings.Contains(line, "[") && !strings.Contains(line, "**")
+
+		if isMaybeDefinitionLine {
+			if !inDefList {
+				inDefList = true
+				if visitor.OnDefinitionListStart != nil {
+					visitor.OnDefinitionListStart(ctx)
+				}
+			}
+			if visitor.OnDefinitionTerm != nil && i%2 == 0 {
+				visitor.OnDefinitionTerm(ctx, line)
+			} else if visitor.OnDefinitionDescription != nil && i%2 == 1 {
+				visitor.OnDefinitionDescription(ctx, line)
+			}
+		}
+
+		if strings.Contains(line, "![") {
+			if visitor.OnFigureStart != nil {
+				visitor.OnFigureStart(ctx)
+			}
+			if strings.Contains(line, "![") && strings.Contains(line, "](") {
+				re := regexp.MustCompile(`!\[([^\]]*)\]\(([^)]+)\)`)
+				matches := re.FindAllStringSubmatch(line, -1)
+				for _, match := range matches {
+					if len(match) >= 3 && visitor.OnImage != nil {
+						visitor.OnImage(ctx, match[2], match[1], "")
+					}
+				}
+			}
+			nextLine := ""
+			for j := i + 1; j < len(lines); j++ {
+				nextLine = strings.TrimSpace(lines[j])
+				if nextLine != "" && !strings.HasPrefix(nextLine, "![") {
+					break
+				}
+			}
+			if nextLine != "" && visitor.OnFigcaption != nil {
+				visitor.OnFigcaption(ctx, nextLine)
+			}
+			if visitor.OnFigureEnd != nil {
+				visitor.OnFigureEnd(ctx, "")
+			}
+		}
+
+		if strings.Contains(line, "<details>") || strings.Contains(line, "**") {
+			if visitor.OnDetails != nil {
+				visitor.OnDetails(ctx, true)
+			}
+			if visitor.OnSummary != nil {
+				visitor.OnSummary(ctx, line)
+			}
+		}
+
+		if strings.Contains(line, "**") && visitor.OnStrong != nil {
+			re := regexp.MustCompile(`\*\*([^*]+)\*\*`)
+			matches := re.FindAllStringSubmatch(line, -1)
+			for _, match := range matches {
+				if len(match) >= 2 {
+					visitor.OnStrong(ctx, match[1])
+				}
+			}
+		}
+
+		if (strings.Contains(line, "*") || strings.Contains(line, "_")) && visitor.OnEmphasis != nil {
+			re := regexp.MustCompile(`\*([^*]+)\*|_([^_]+)_`)
+			matches := re.FindAllStringSubmatch(line, -1)
+			for _, match := range matches {
+				if len(match) >= 2 && match[1] != "" {
+					visitor.OnEmphasis(ctx, match[1])
+				} else if len(match) >= 3 && match[2] != "" {
+					visitor.OnEmphasis(ctx, match[2])
+				}
+			}
+		}
+
+		if strings.Contains(line, "==") && visitor.OnMark != nil {
+			re := regexp.MustCompile(`==([^=]+)==`)
+			matches := re.FindAllStringSubmatch(line, -1)
+			for _, match := range matches {
+				if len(match) >= 2 {
+					visitor.OnMark(ctx, match[1])
+				}
+			}
+		}
+
+		if visitor.OnText != nil && !strings.HasPrefix(line, "#") &&
+			!strings.HasPrefix(line, ">") &&
+			!isListItem &&
+			!strings.HasPrefix(line, "|") &&
+			line != "---" && line != "***" && line != "___" {
+			visitor.OnText(ctx, line)
+		}
+	}
+
+	if inList && visitor.OnListEnd != nil {
+		visitor.OnListEnd(ctx, false, "")
+	}
+	if inTable && visitor.OnTableEnd != nil {
+		visitor.OnTableEnd(ctx, "")
+	}
+	if inDefList && visitor.OnDefinitionListEnd != nil {
+		visitor.OnDefinitionListEnd(ctx, "")
+	}
 }
 
 // MustConvertWithVisitor is like ConvertWithVisitor but panics if an error occurs.
@@ -666,18 +869,13 @@ func deleteVisitor(id uint64) {
 //
 //nolint:gocritic,gocyclo,govet
 func buildCVisitor(visitorID uint64) C.html_to_markdown_visitor_t {
-	// The C visitor struct will have callback pointers assigned by the Rust FFI.
-	// We store the visitor ID in user_data for callback dispatch.
 	return C.html_to_markdown_visitor_t{
 		user_data: unsafe.Pointer(uintptr(visitorID)),
-		// Callback function pointers are set on the Rust side to the Go exported
-		// functions (goVisitText, goVisitLink, etc.)
 	}
 }
 
 // freeCallbacksIfNeeded handles memory cleanup for C callbacks (currently not needed).
 func freeCallbacksIfNeeded(v *C.html_to_markdown_visitor_t) {
-	// Callback function pointers are not allocated; nothing to free
 	_ = v
 }
 
@@ -882,7 +1080,6 @@ func goVisitTableRow(userData unsafe.Pointer, cCtx *C.html_to_markdown_node_cont
 
 	ctx := newNodeContext(cCtx)
 
-	// Convert C cell array to Go slice
 	cells := make([]string, int(cellCount))
 	for i := 0; i < int(cellCount); i++ {
 		cellPtr := (*C.char)(unsafe.Pointer(uintptr(unsafe.Pointer(cCells)) + uintptr(i)*unsafe.Sizeof(uintptr(0))))

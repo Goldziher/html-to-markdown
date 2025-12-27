@@ -133,7 +133,6 @@ class TestBasicVisitorCallbacks:
         html = "<p>Test</p>"
         result = convert_with_visitor(html, visitor=visitor)
 
-        # The visitor is called, if not never, it's likely implemented
         assert "Test" in result
 
 
@@ -397,7 +396,6 @@ class TestErrorHandling:
         visitor = CrashingVisitor()
         html = "<p>This will crash</p>"
 
-        # Exceptions in visitor methods may be caught and converted to conversion errors
         with contextlib.suppress(Exception):
             convert_with_visitor(html, visitor=visitor)
 
@@ -411,14 +409,10 @@ class TestErrorHandling:
         visitor = InvalidResultVisitor()
         html = "<p>Test</p>"
 
-        # Invalid result types may be caught or treated as 'continue'
-        # depending on implementation
         try:
             result = convert_with_visitor(html, visitor=visitor)
-            # If it doesn't error, it should still produce output
             assert isinstance(result, str)
         except Exception:
-            # Also acceptable to raise an error
             pass
 
     def test_error_result_with_empty_message(self) -> None:
@@ -1001,13 +995,10 @@ class TestVisitorReturnValueValidation:
         visitor = BadCustomVisitor()
         html = "<p>Test</p>"
 
-        # Missing 'output' key in custom result - may be caught or treated gracefully
         try:
             result = convert_with_visitor(html, visitor=visitor)
-            # If it doesn't error, it processed anyway
             assert isinstance(result, str)
         except Exception:
-            # Expected - missing required key
             pass
 
     def test_error_must_have_message_key(self) -> None:
@@ -1020,13 +1011,10 @@ class TestVisitorReturnValueValidation:
         visitor = BadErrorVisitor()
         html = "<p>Test</p>"
 
-        # Missing 'message' key in error result - may be caught or produce error
         try:
             result = convert_with_visitor(html, visitor=visitor)
-            # If no error, it processed anyway
             assert isinstance(result, str)
         except Exception:
-            # Expected - error type usually requires message
             pass
 
     def test_valid_visit_result_types(self) -> None:

@@ -18,7 +18,6 @@ on:
       - test_documents/**
       - .github/workflows/profiling.yaml
   schedule:
-    # Run visitor benchmarks weekly on Monday at 2 AM UTC
     - cron: '0 2 * * 1'
   workflow_dispatch:
     inputs:
@@ -336,7 +335,6 @@ jobs:
   visitor-benchmarks-schedule:
     runs-on: ubuntu-latest
     timeout-minutes: 180
-    # Run weekly on Monday at 2 AM UTC
     if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     strategy:
       fail-fast: false

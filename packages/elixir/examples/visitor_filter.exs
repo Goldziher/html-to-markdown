@@ -1,5 +1,4 @@
 #!/usr/bin/env elixir
-# Link Filtering Visitor Example
 # Demonstrates filtering external links during conversion
 
 defmodule LinkFilterVisitor do
@@ -20,15 +19,12 @@ defmodule LinkFilterVisitor do
   @impl true
   def handle_link(_context, href, text, _title) do
     cond do
-      # Keep internal links (no protocol or same domain)
       not String.contains?(href, "://") ->
         :continue
 
-      # Remove external links - convert to plain text
       not String.contains?(href, @domain) ->
         {:custom, text}
 
-      # Keep internal links with protocol
       true ->
         :continue
     end
@@ -37,7 +33,6 @@ defmodule LinkFilterVisitor do
   end
 end
 
-# Example HTML with various link types
 html = """
 <article>
   <h1>Article Title</h1>
@@ -62,7 +57,6 @@ IO.puts("Original HTML:")
 IO.puts(html)
 IO.puts("")
 
-# Convert with link filtering (removing external links)
 {:ok, markdown} = HtmlToMarkdown.Visitor.convert_with_visitor(html, LinkFilterVisitor, nil)
 
 IO.puts("Converted to Markdown (external links removed):")

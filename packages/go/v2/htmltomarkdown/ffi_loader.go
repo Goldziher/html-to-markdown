@@ -189,7 +189,7 @@ import (
 )
 
 const (
-	defaultFFIVersion = "2.17.0"
+	defaultFFIVersion = "2.16.0"
 	githubRepo        = "Goldziher/html-to-markdown"
 
 	archAMD64    = "amd64"

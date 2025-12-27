@@ -37,7 +37,6 @@ class AdAndImageFilter extends AbstractVisitor
     {
         $attributes = $context->attributes;
 
-        // Check for ad-related classes
         if (isset($attributes['class'])) {
             $classes = explode(' ', $attributes['class']);
             foreach ($classes as $class) {
@@ -51,7 +50,6 @@ class AdAndImageFilter extends AbstractVisitor
     }
 }
 
-// Example HTML with ads and promotional images
 $html = <<<'HTML'
 <article>
     <h1>News Article</h1>
@@ -72,12 +70,10 @@ $html = <<<'HTML'
 </article>
 HTML;
 
-// Convert without filtering
 echo "Default conversion (with ads):\n";
 echo HtmlToMarkdown::convert($html);
 echo "\n---\n\n";
 
-// Convert with filtering
 echo "Filtered conversion (ads removed):\n";
 try {
     $filter = new AdAndImageFilter();

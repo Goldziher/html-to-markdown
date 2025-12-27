@@ -30,7 +30,6 @@ public interface IVisitor
         return VisitResult.Continue();
     }
 
-    // === Text Nodes ===
 
     /// <summary>
     /// Called for text nodes (most frequent callback - 100+ per document).
@@ -43,7 +42,6 @@ public interface IVisitor
         return VisitResult.Continue();
     }
 
-    // === Links and Images ===
 
     /// <summary>
     /// Called for anchor links &lt;a href="..."&gt;.
@@ -71,7 +69,6 @@ public interface IVisitor
         return VisitResult.Continue();
     }
 
-    // === Headings ===
 
     /// <summary>
     /// Called for heading elements &lt;h1&gt; through &lt;h6&gt;.
@@ -86,7 +83,6 @@ public interface IVisitor
         return VisitResult.Continue();
     }
 
-    // === Code ===
 
     /// <summary>
     /// Called for code blocks &lt;pre&gt;&lt;code&gt;.
@@ -111,7 +107,6 @@ public interface IVisitor
         return VisitResult.Continue();
     }
 
-    // === Lists ===
 
     /// <summary>
     /// Called for list items &lt;li&gt;.
@@ -149,7 +144,6 @@ public interface IVisitor
         return VisitResult.Continue();
     }
 
-    // === Tables ===
 
     /// <summary>
     /// Called before processing a table &lt;table&gt;.
@@ -184,7 +178,6 @@ public interface IVisitor
         return VisitResult.Continue();
     }
 
-    // === Blockquotes ===
 
     /// <summary>
     /// Called for blockquote elements &lt;blockquote&gt;.
@@ -198,7 +191,6 @@ public interface IVisitor
         return VisitResult.Continue();
     }
 
-    // === Inline Formatting ===
 
     /// <summary>
     /// Called for strong/bold elements &lt;strong&gt;, &lt;b&gt;.
@@ -277,7 +269,6 @@ public interface IVisitor
         return VisitResult.Continue();
     }
 
-    // === Breaks ===
 
     /// <summary>
     /// Called for line break elements &lt;br&gt;.
@@ -299,7 +290,6 @@ public interface IVisitor
         return VisitResult.Continue();
     }
 
-    // === Custom/Unknown Elements ===
 
     /// <summary>
     /// Called for custom elements (web components) or unknown tags.
@@ -313,7 +303,6 @@ public interface IVisitor
         return VisitResult.Continue();
     }
 
-    // === Definition Lists ===
 
     /// <summary>
     /// Called before processing a definition list &lt;dl&gt;.
@@ -358,7 +347,6 @@ public interface IVisitor
         return VisitResult.Continue();
     }
 
-    // === Forms ===
 
     /// <summary>
     /// Called for form elements &lt;form&gt;.
@@ -396,7 +384,6 @@ public interface IVisitor
         return VisitResult.Continue();
     }
 
-    // === Media ===
 
     /// <summary>
     /// Called for audio elements &lt;audio&gt;.
@@ -431,7 +418,6 @@ public interface IVisitor
         return VisitResult.Continue();
     }
 
-    // === Semantic HTML5 ===
 
     /// <summary>
     /// Called for details elements &lt;details&gt;.

@@ -121,7 +121,6 @@ internal static class NativeMethods
     [DllImport(LibraryName, CallingConvention = CallingConvention.Cdecl)]
     internal static extern bool html_to_markdown_profile_stop();
 
-    // === Visitor Pattern API ===
 
     /// <summary>
     /// Create a visitor instance from a visitor callbacks structure.

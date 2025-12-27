@@ -37,13 +37,10 @@ public class VisitorAnalytics
             </body>
             </html>";
 
-        // Create an analytics visitor
         var analytics = new AnalyticsVisitor();
 
-        // Convert HTML to Markdown
         var markdown = HtmlToMarkdownConverter.ConvertWithVisitor(html, analytics);
 
-        // Display analytics
         Console.WriteLine("=== Document Analytics ===\n");
         Console.WriteLine($"Headings: {analytics.HeadingCount}");
         Console.WriteLine($"Links: {analytics.LinkCount}");
@@ -94,7 +91,6 @@ public class AnalyticsVisitor : IVisitor
     {
         TotalElements++;
 
-        // Count element types
         if (!string.IsNullOrEmpty(context.TagName))
         {
             if (!ElementCounts.ContainsKey(context.TagName))

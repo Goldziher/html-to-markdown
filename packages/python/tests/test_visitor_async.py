@@ -24,7 +24,7 @@ class AsyncVisitorWithAllMethods:
 
     async def on_element(self, context: dict[str, Any]) -> dict[str, str]:
         """Async visitor method for elements."""
-        await asyncio.sleep(0.001)  # Simulate async work
+        await asyncio.sleep(0.001)
         self.async_called_count += 1
         self.visited_nodes.append(context)
         return {"type": "continue"}
@@ -129,7 +129,7 @@ class AsyncVisitorWithAsyncWork:
 
     async def on_element(self, context: dict[str, Any]) -> dict[str, str]:
         """Process elements with async work simulation."""
-        await asyncio.sleep(0.002)  # Simulate I/O work
+        await asyncio.sleep(0.002)
 
         tag_name = context.get("tag_name", "")
         self.processed_elements[tag_name] = self.processed_elements.get(tag_name, 0) + 1
@@ -168,9 +168,6 @@ class AsyncVisitorWithContextInfo:
         return {"type": "continue"}
 
 
-# Basic async conversion tests
-
-
 @pytest.mark.asyncio
 async def test_convert_with_async_visitor_is_callable() -> None:
     """Test that convert_with_async_visitor is importable and callable."""
@@ -191,7 +188,7 @@ async def test_async_visitor_basic_conversion() -> None:
     assert isinstance(result, str)
     assert "Hello" in result
     assert "World" in result
-    assert visitor.calls  # Visitor was called
+    assert visitor.calls
 
 
 @pytest.mark.asyncio
@@ -204,7 +201,6 @@ async def test_async_visitor_with_options() -> None:
     result = convert_with_async_visitor(html, options, visitor=visitor)
 
     assert isinstance(result, str)
-    # Atx closed style includes closing hashes
     assert "#" in result
     assert "Title" in result
 
@@ -225,9 +221,6 @@ async def test_async_visitor_with_multiple_options() -> None:
     assert isinstance(result, str)
     assert "Test" in result
     assert "Item 1" in result
-
-
-# Async method tests
 
 
 @pytest.mark.asyncio
@@ -254,7 +247,6 @@ async def test_async_visitor_mixed_sync_async_methods() -> None:
     assert isinstance(result, str)
     assert "Title" in result
     assert "Paragraph" in result
-    # Both sync and async should be called
     assert visitor.async_called_count > 0
     assert visitor.sync_called_count > 0
 
@@ -269,10 +261,7 @@ async def test_async_visitor_only_sync_methods() -> None:
 
     assert isinstance(result, str)
     assert "Test paragraph" in result
-    assert visitor.calls  # Visitor methods were called
-
-
-# Async work simulation tests
+    assert visitor.calls
 
 
 @pytest.mark.asyncio
@@ -285,7 +274,6 @@ async def test_async_visitor_performs_async_work() -> None:
 
     assert isinstance(result, str)
     assert visitor.processed_elements
-    # Should have processed multiple elements
     assert len(visitor.processed_elements) > 0
 
 
@@ -299,13 +287,9 @@ async def test_async_visitor_maintains_order() -> None:
 
     assert isinstance(result, str)
     assert len(visitor.contexts) > 0
-    # All headings should be in result
     assert "First" in result
     assert "Second" in result
     assert "Third" in result
-
-
-# Custom output tests
 
 
 @pytest.mark.asyncio
@@ -332,9 +316,6 @@ async def test_async_visitor_custom_paragraph() -> None:
     assert "CUSTOM" in result or "Test" in result
 
 
-# Skip and preserve tests
-
-
 @pytest.mark.asyncio
 async def test_async_visitor_skip_elements() -> None:
     """Test async visitor skipping certain elements."""
@@ -345,7 +326,6 @@ async def test_async_visitor_skip_elements() -> None:
 
     assert isinstance(result, str)
     assert "Keep" in result
-    # Script content should not appear in markdown
     assert "console.log" not in result
 
 
@@ -361,16 +341,12 @@ async def test_async_visitor_preserve_html() -> None:
     assert "Content" in result
 
 
-# Error handling tests
-
-
 @pytest.mark.asyncio
 async def test_async_visitor_with_error_handling() -> None:
     """Test error handling in async visitor."""
     html = "<p>Normal content</p>"
     visitor = AsyncVisitorWithError(error_on_tag="nonexistent")
 
-    # Should not raise, just process normally
     result = convert_with_async_visitor(html, visitor=visitor)
     assert isinstance(result, str)
 
@@ -386,7 +362,6 @@ async def test_async_visitor_context_contains_expected_keys() -> None:
     assert isinstance(result, str)
     assert visitor.contexts
 
-    # Check that at least one context has expected keys
     has_complete_context = False
     for ctx in visitor.contexts:
         required_keys = {"tag_name", "attributes", "depth"}
@@ -395,9 +370,6 @@ async def test_async_visitor_context_contains_expected_keys() -> None:
             break
 
     assert has_complete_context or visitor.contexts
-
-
-# Options integration tests
 
 
 @pytest.mark.asyncio
@@ -423,7 +395,6 @@ async def test_async_visitor_with_wrap_options() -> None:
     result = convert_with_async_visitor(html, options, visitor=visitor)
 
     assert isinstance(result, str)
-    # Long text should be preserved
     assert "very long" in result or "paragraph" in result
 
 
@@ -441,9 +412,6 @@ async def test_async_visitor_with_code_options() -> None:
 
     assert isinstance(result, str)
     assert "hello" in result
-
-
-# Asyncio integration tests
 
 
 @pytest.mark.asyncio
@@ -465,10 +433,8 @@ async def test_async_visitor_concurrent_calls() -> None:
 
     async def convert_one(html: str) -> str:
         visitor = AsyncVisitorOnlyAsyncMethods()
-        # Note: Convert is synchronous, but we're testing in async context
         return convert_with_async_visitor(html, visitor=visitor)
 
-    # Convert multiple HTML snippets
     results = await asyncio.gather(
         asyncio.to_thread(convert_one, "<p>First</p>"),
         asyncio.to_thread(convert_one, "<p>Second</p>"),
@@ -515,9 +481,6 @@ async def test_async_visitor_with_complex_html() -> None:
     assert "bold" in result or "Item 1" in result
 
 
-# None visitor tests
-
-
 @pytest.mark.asyncio
 async def test_async_converter_with_none_visitor() -> None:
     """Test that convert_with_async_visitor works with visitor=None."""
@@ -537,9 +500,6 @@ async def test_async_converter_with_implicit_none_visitor() -> None:
 
     assert isinstance(result, str)
     assert "Test" in result
-
-
-# Empty and edge case tests
 
 
 @pytest.mark.asyncio
@@ -574,7 +534,6 @@ async def test_async_visitor_with_special_characters() -> None:
     result = convert_with_async_visitor(html, visitor=visitor)
 
     assert isinstance(result, str)
-    # Unicode should be preserved or properly handled
     assert "你好" in result or "à" in result or len(result) > 0
 
 
@@ -584,14 +543,10 @@ async def test_async_visitor_with_malformed_html() -> None:
     html = "<p>Unclosed paragraph<h1>Heading</p></h1>"
     visitor = AsyncVisitorOnlyAsyncMethods()
 
-    # Should handle gracefully
     result = convert_with_async_visitor(html, visitor=visitor)
 
     assert isinstance(result, str)
     assert "Unclosed" in result or "Heading" in result
-
-
-# Return value validation tests
 
 
 @pytest.mark.asyncio
@@ -657,13 +612,9 @@ async def test_async_visitor_attributes_captured() -> None:
     assert "Link" in result or "example.com" in result
 
 
-# Performance and stress tests
-
-
 @pytest.mark.asyncio
 async def test_async_visitor_many_elements() -> None:
     """Test async visitor with many HTML elements."""
-    # Generate HTML with many elements
     items = "".join([f"<li>Item {i}</li>" for i in range(100)])
     html = f"<ul>{items}</ul>"
 
@@ -679,7 +630,6 @@ async def test_async_visitor_many_elements() -> None:
 @pytest.mark.asyncio
 async def test_async_visitor_deeply_nested() -> None:
     """Test async visitor with deeply nested structure."""
-    # Create nested divs
     html = "<div>"
     for i in range(10):
         html += f"<div>Level {i}"
@@ -693,9 +643,6 @@ async def test_async_visitor_deeply_nested() -> None:
 
     assert isinstance(result, str)
     assert "Content" in result
-
-
-# Integration with options tests
 
 
 @pytest.mark.asyncio
@@ -730,12 +677,10 @@ async def test_async_visitor_strong_em_symbol() -> None:
     """Test async visitor with different emphasis symbols."""
     html = "<p><strong>bold</strong> and <em>italic</em></p>"
 
-    # Test with asterisk (default)
     options_ast = ConversionOptions(strong_em_symbol="*")
     visitor_ast = AsyncVisitorOnlyAsyncMethods()
     result_ast = convert_with_async_visitor(html, options_ast, visitor=visitor_ast)
 
-    # Test with underscore
     options_under = ConversionOptions(strong_em_symbol="_")
     visitor_under = AsyncVisitorOnlyAsyncMethods()
     result_under = convert_with_async_visitor(html, options_under, visitor=visitor_under)
@@ -744,9 +689,6 @@ async def test_async_visitor_strong_em_symbol() -> None:
     assert isinstance(result_under, str)
     assert "bold" in result_ast
     assert "italic" in result_ast
-
-
-# Return type validation
 
 
 @pytest.mark.asyncio
@@ -778,5 +720,4 @@ async def test_async_visitor_reproducible_output() -> None:
         result = convert_with_async_visitor(html, options, visitor=visitor)
         results.append(result)
 
-    # All results should be identical
     assert results[0] == results[1] == results[2]

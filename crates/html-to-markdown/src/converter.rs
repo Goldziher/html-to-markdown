@@ -834,6 +834,34 @@ impl DomContext {
         }
         text
     }
+
+    /// Get the parent tag name for a given node ID.
+    ///
+    /// Returns the tag name of the parent element if it exists and is a tag,
+    /// otherwise returns None.
+    fn parent_tag_name(&self, node_id: u32, parser: &tl::Parser) -> Option<String> {
+        let parent_id = self.parent_of(node_id)?;
+        let parent_handle = self.node_handle(parent_id)?;
+
+        if let Some(info) = self.tag_info(parent_id, parser) {
+            return Some(info.name.clone());
+        }
+
+        if let Some(tl::Node::Tag(tag)) = parent_handle.get(parser) {
+            let name = normalized_tag_name(tag.name().as_utf8_str());
+            return Some(name.into_owned());
+        }
+
+        None
+    }
+
+    /// Get the index of a node among its siblings.
+    ///
+    /// Returns the 0-based index if the node has siblings,
+    /// otherwise returns None.
+    fn get_sibling_index(&self, node_id: u32) -> Option<usize> {
+        self.sibling_index(node_id)
+    }
 }
 
 struct TagInfo {
@@ -2129,7 +2157,6 @@ fn convert_html_impl(
         walk_node(child_handle, parser, &mut output, options, &ctx, 0, &dom_ctx);
     }
 
-    // Check for visitor errors
     #[cfg(feature = "visitor")]
     if let Some(err) = ctx.visitor_error.borrow().as_ref() {
         return Err(crate::error::ConversionError::Visitor(err.clone()));
@@ -3271,13 +3298,17 @@ fn walk_node(
                 use crate::visitor::{NodeContext, NodeType, VisitResult};
                 use std::collections::BTreeMap;
 
+                let node_id = node_handle.get_inner();
+                let parent_tag = dom_ctx.parent_tag_name(node_id, parser);
+                let index_in_parent = dom_ctx.get_sibling_index(node_id).unwrap_or(0);
+
                 let node_ctx = NodeContext {
                     node_type: NodeType::Text,
                     tag_name: String::new(),
                     attributes: BTreeMap::new(),
                     depth,
-                    index_in_parent: 0,
-                    parent_tag: None,
+                    index_in_parent,
+                    parent_tag,
                     is_inline: true,
                 };
 
@@ -3285,8 +3316,6 @@ fn walk_node(
                 match visitor.visit_text(&node_ctx, &processed_text) {
                     VisitResult::Continue => processed_text,
                     VisitResult::Custom(custom) => {
-                        // If we're inside elements that collect text for their own visitors
-                        // (headings, links), ignore Custom transformations
                         if ctx.inline_depth > 0 || ctx.in_heading {
                             processed_text
                         } else {
@@ -3342,27 +3371,49 @@ fn walk_node(
                     .filter_map(|(k, v)| v.as_ref().map(|val| (k.to_string(), val.to_string())))
                     .collect();
 
+                let node_id = node_handle.get_inner();
+                let parent_tag = dom_ctx.parent_tag_name(node_id, parser);
+                let index_in_parent = dom_ctx.get_sibling_index(node_id).unwrap_or(0);
+
                 let node_ctx = NodeContext {
                     node_type: NodeType::Element,
                     tag_name: tag_name.to_string(),
                     attributes,
                     depth,
-                    index_in_parent: 0, // TODO: track this properly
-                    parent_tag: None,   // TODO: track this properly
+                    index_in_parent,
+                    parent_tag,
                     is_inline: !is_block_level_element(&tag_name),
                 };
 
-                let mut visitor = visitor_handle.borrow_mut();
-                match visitor.visit_element_start(&node_ctx) {
+                let visitor_start_result = {
+                    let mut visitor = visitor_handle.borrow_mut();
+                    visitor.visit_element_start(&node_ctx)
+                };
+
+                match visitor_start_result {
                     crate::visitor::VisitResult::Continue => {}
                     crate::visitor::VisitResult::Skip => return,
+                    crate::visitor::VisitResult::Custom(custom_output) => {
+                        output.push_str(&custom_output);
+
+                        #[cfg(feature = "visitor")]
+                        if let Some(ref visitor_handle) = ctx.visitor {
+                            if !matches!(tag_name.as_ref(), "table") {
+                                let element_content = &custom_output;
+                                let mut visitor = visitor_handle.borrow_mut();
+                                let _ = visitor.visit_element_end(&node_ctx, element_content);
+                            }
+                        }
+
+                        return;
+                    }
                     crate::visitor::VisitResult::Error(msg) => {
                         if options.debug {
                             eprintln!("[DEBUG] Visitor error on <{}>: {}", tag_name, msg);
                         }
                         return;
                     }
-                    _ => {} // Custom or PreserveHtml - continue for now
+                    _ => {}
                 }
             }
 
@@ -3404,6 +3455,8 @@ fn walk_node(
                     }
                 }
             }
+
+            let element_output_start = output.len();
 
             match tag_name.as_ref() {
                 "h1" | "h2" | "h3" | "h4" | "h5" | "h6" => {
@@ -3454,13 +3507,17 @@ fn walk_node(
                                 .filter_map(|(k, v)| v.as_ref().map(|val| (k.to_string(), val.to_string())))
                                 .collect();
 
+                            let node_id = node_handle.get_inner();
+                            let parent_tag = dom_ctx.parent_tag_name(node_id, parser);
+                            let index_in_parent = dom_ctx.get_sibling_index(node_id).unwrap_or(0);
+
                             let node_ctx = NodeContext {
                                 node_type: NodeType::Heading,
                                 tag_name: tag_name.to_string(),
                                 attributes,
                                 depth,
-                                index_in_parent: 0,
-                                parent_tag: None,
+                                index_in_parent,
+                                parent_tag,
                                 is_inline: false,
                             };
 
@@ -3625,13 +3682,17 @@ fn walk_node(
                                 .filter_map(|(k, v)| v.as_ref().map(|val| (k.to_string(), val.to_string())))
                                 .collect();
 
+                            let node_id = node_handle.get_inner();
+                            let parent_tag = dom_ctx.parent_tag_name(node_id, parser);
+                            let index_in_parent = dom_ctx.get_sibling_index(node_id).unwrap_or(0);
+
                             let node_ctx = NodeContext {
                                 node_type: NodeType::Strong,
                                 tag_name: tag_name.to_string(),
                                 attributes,
                                 depth,
-                                index_in_parent: 0,
-                                parent_tag: None,
+                                index_in_parent,
+                                parent_tag,
                                 is_inline: true,
                             };
 
@@ -3731,13 +3792,17 @@ fn walk_node(
                                 .filter_map(|(k, v)| v.as_ref().map(|val| (k.to_string(), val.to_string())))
                                 .collect();
 
+                            let node_id = node_handle.get_inner();
+                            let parent_tag = dom_ctx.parent_tag_name(node_id, parser);
+                            let index_in_parent = dom_ctx.get_sibling_index(node_id).unwrap_or(0);
+
                             let node_ctx = NodeContext {
                                 node_type: NodeType::Em,
                                 tag_name: tag_name.to_string(),
                                 attributes,
                                 depth,
-                                index_in_parent: 0,
-                                parent_tag: None,
+                                index_in_parent,
+                                parent_tag,
                                 is_inline: true,
                             };
 
@@ -3972,13 +4037,17 @@ fn walk_node(
                                 .filter_map(|(k, v)| v.as_ref().map(|val| (k.to_string(), val.to_string())))
                                 .collect();
 
+                            let node_id = node_handle.get_inner();
+                            let parent_tag = dom_ctx.parent_tag_name(node_id, parser);
+                            let index_in_parent = dom_ctx.get_sibling_index(node_id).unwrap_or(0);
+
                             let node_ctx = NodeContext {
                                 node_type: NodeType::Link,
                                 tag_name: "a".to_string(),
                                 attributes,
                                 depth,
-                                index_in_parent: 0,
-                                parent_tag: None,
+                                index_in_parent,
+                                parent_tag,
                                 is_inline: true,
                             };
 
@@ -4161,13 +4230,17 @@ fn walk_node(
                             .filter_map(|(k, v)| v.as_ref().map(|val| (k.to_string(), val.to_string())))
                             .collect();
 
+                        let node_id = node_handle.get_inner();
+                        let parent_tag = dom_ctx.parent_tag_name(node_id, parser);
+                        let index_in_parent = dom_ctx.get_sibling_index(node_id).unwrap_or(0);
+
                         let node_ctx = NodeContext {
                             node_type: NodeType::Image,
                             tag_name: "img".to_string(),
                             attributes,
                             depth,
-                            index_in_parent: 0,
-                            parent_tag: None,
+                            index_in_parent,
+                            parent_tag,
                             is_inline: true,
                         };
 
@@ -4353,13 +4426,17 @@ fn walk_node(
                                 .filter_map(|(k, v)| v.as_ref().map(|val| (k.to_string(), val.to_string())))
                                 .collect();
 
+                            let node_id = node_handle.get_inner();
+                            let parent_tag = dom_ctx.parent_tag_name(node_id, parser);
+                            let index_in_parent = dom_ctx.get_sibling_index(node_id).unwrap_or(0);
+
                             let node_ctx = NodeContext {
                                 node_type: NodeType::Strikethrough,
                                 tag_name: tag_name.to_string(),
                                 attributes,
                                 depth,
-                                index_in_parent: 0,
-                                parent_tag: None,
+                                index_in_parent,
+                                parent_tag,
                                 is_inline: true,
                             };
 
@@ -4435,13 +4512,17 @@ fn walk_node(
                             .filter_map(|(k, v)| v.as_ref().map(|val| (k.to_string(), val.to_string())))
                             .collect();
 
+                        let node_id = node_handle.get_inner();
+                        let parent_tag = dom_ctx.parent_tag_name(node_id, parser);
+                        let index_in_parent = dom_ctx.get_sibling_index(node_id).unwrap_or(0);
+
                         let node_ctx = NodeContext {
                             node_type: NodeType::Underline,
                             tag_name: tag_name.to_string(),
                             attributes,
                             depth,
-                            index_in_parent: 0,
-                            parent_tag: None,
+                            index_in_parent,
+                            parent_tag,
                             is_inline: true,
                         };
 
@@ -4502,13 +4583,17 @@ fn walk_node(
                             .filter_map(|(k, v)| v.as_ref().map(|val| (k.to_string(), val.to_string())))
                             .collect();
 
+                        let node_id = node_handle.get_inner();
+                        let parent_tag = dom_ctx.parent_tag_name(node_id, parser);
+                        let index_in_parent = dom_ctx.get_sibling_index(node_id).unwrap_or(0);
+
                         let node_ctx = NodeContext {
                             node_type: NodeType::Underline,
                             tag_name: tag_name.to_string(),
                             attributes,
                             depth,
-                            index_in_parent: 0,
-                            parent_tag: None,
+                            index_in_parent,
+                            parent_tag,
                             is_inline: true,
                         };
 
@@ -4742,13 +4827,17 @@ fn walk_node(
                                     .filter_map(|(k, v)| v.as_ref().map(|val| (k.to_string(), val.to_string())))
                                     .collect();
 
+                                let node_id = node_handle.get_inner();
+                                let parent_tag = dom_ctx.parent_tag_name(node_id, parser);
+                                let index_in_parent = dom_ctx.get_sibling_index(node_id).unwrap_or(0);
+
                                 let node_ctx = NodeContext {
                                     node_type: NodeType::Code,
                                     tag_name: tag_name.to_string(),
                                     attributes,
                                     depth,
-                                    index_in_parent: 0,
-                                    parent_tag: None,
+                                    index_in_parent,
+                                    parent_tag,
                                     is_inline: true,
                                 };
 
@@ -4891,7 +4980,6 @@ fn walk_node(
                         ..ctx.clone()
                     };
 
-                    // Extract language from nested <code> tag if present
                     let language: Option<String> = {
                         let children = tag.children();
                         let mut lang: Option<String> = None;
@@ -4979,13 +5067,17 @@ fn walk_node(
                                 .filter_map(|(k, v)| v.as_ref().map(|val| (k.to_string(), val.to_string())))
                                 .collect();
 
+                            let node_id = node_handle.get_inner();
+                            let parent_tag = dom_ctx.parent_tag_name(node_id, parser);
+                            let index_in_parent = dom_ctx.get_sibling_index(node_id).unwrap_or(0);
+
                             let node_ctx = NodeContext {
                                 node_type: NodeType::Pre,
                                 tag_name: tag_name.to_string(),
                                 attributes,
                                 depth,
-                                index_in_parent: 0,
-                                parent_tag: None,
+                                index_in_parent,
+                                parent_tag,
                                 is_inline: false,
                             };
 
@@ -5161,7 +5253,6 @@ fn walk_node(
 
                     let trimmed_content = content.trim();
 
-                    // Visitor integration: call before default processing
                     #[cfg(feature = "visitor")]
                     if let Some(ref visitor) = ctx.visitor {
                         use crate::visitor::{NodeContext, NodeType, VisitResult};
@@ -5173,21 +5264,23 @@ fn walk_node(
                             .filter_map(|(k, v)| v.as_ref().map(|val| (k.to_string(), val.to_string())))
                             .collect();
 
+                        let node_id = node_handle.get_inner();
+                        let parent_tag = dom_ctx.parent_tag_name(node_id, parser);
+                        let index_in_parent = dom_ctx.get_sibling_index(node_id).unwrap_or(0);
+
                         let node_ctx = NodeContext {
                             node_type: NodeType::Blockquote,
                             tag_name: "blockquote".to_string(),
                             attributes,
                             depth,
-                            index_in_parent: 0,
-                            parent_tag: None,
+                            index_in_parent,
+                            parent_tag,
                             is_inline: false,
                         };
 
                         let mut visitor_ref = visitor.borrow_mut();
                         match visitor_ref.visit_blockquote(&node_ctx, trimmed_content, ctx.blockquote_depth) {
-                            VisitResult::Continue => {
-                                // Continue with default processing below
-                            }
+                            VisitResult::Continue => {}
                             VisitResult::Custom(custom) => {
                                 output.push_str(&custom);
                                 return;
@@ -5334,9 +5427,8 @@ fn walk_node(
 
                         let mut visitor = visitor_handle.borrow_mut();
                         match visitor.visit_list_start(&node_ctx, false) {
-                            VisitResult::Continue => { /* continue */ }
+                            VisitResult::Continue => {}
                             VisitResult::Custom(custom) => {
-                                // Store custom LIST_START to prepend later (don't add to output yet)
                                 list_start_custom = Some(custom);
                             }
                             VisitResult::Skip => {
@@ -5404,13 +5496,11 @@ fn walk_node(
                         let mut visitor = visitor_handle.borrow_mut();
                         match visitor.visit_list_end(&node_ctx, false, list_content) {
                             VisitResult::Continue => {
-                                // If there was a custom list_start, prepend it now
                                 if let Some(custom_start) = list_start_custom {
                                     output.insert_str(list_output_start, &custom_start);
                                 }
                             }
                             VisitResult::Custom(custom) => {
-                                // Combine: custom_start + children + custom_end
                                 let children_output = output[list_output_start..].to_string();
                                 output.truncate(list_output_start);
                                 if let Some(custom_start) = list_start_custom {
@@ -5485,9 +5575,8 @@ fn walk_node(
 
                         let mut visitor = visitor_handle.borrow_mut();
                         match visitor.visit_list_start(&node_ctx, true) {
-                            VisitResult::Continue => { /* continue */ }
+                            VisitResult::Continue => {}
                             VisitResult::Custom(custom) => {
-                                // Store custom LIST_START to prepend later (don't add to output yet)
                                 list_start_custom = Some(custom);
                             }
                             VisitResult::Skip => {
@@ -5555,13 +5644,11 @@ fn walk_node(
                         let mut visitor = visitor_handle.borrow_mut();
                         match visitor.visit_list_end(&node_ctx, true, list_content) {
                             VisitResult::Continue => {
-                                // If there was a custom list_start, prepend it now
                                 if let Some(custom_start) = list_start_custom {
                                     output.insert_str(list_output_start, &custom_start);
                                 }
                             }
                             VisitResult::Custom(custom) => {
-                                // Combine: custom_start + children + custom_end
                                 let children_output = output[list_output_start..].to_string();
                                 output.truncate(list_output_start);
                                 if let Some(custom_start) = list_start_custom {
@@ -5775,7 +5862,6 @@ fn walk_node(
 
                         trim_trailing_whitespace(output);
 
-                        // Call visitor callback for list item AFTER content is rendered
                         #[cfg(feature = "visitor")]
                         if let Some(ref visitor_handle) = ctx.visitor {
                             use crate::visitor::{NodeContext, NodeType, VisitResult};
@@ -5804,11 +5890,9 @@ fn walk_node(
                                 is_inline: false,
                             };
 
-                            // Extract marker and text from the output
                             let last_line_start = output.rfind('\n').map(|pos| pos + 1).unwrap_or(0);
                             let last_line = &output[last_line_start..];
 
-                            // Extract marker and text - need to use String to avoid lifetime issues
                             let (marker, text_content) = if is_task_list {
                                 let task_marker = if task_checked { "- [x]" } else { "- [ ]" };
                                 let text_start = last_line
@@ -5834,27 +5918,22 @@ fn walk_node(
 
                             let mut visitor = visitor_handle.borrow_mut();
                             match visitor.visit_list_item(&node_ctx, ctx.in_ordered_list, &marker, &text_content) {
-                                VisitResult::Continue => { /* continue */ }
+                                VisitResult::Continue => {}
                                 VisitResult::Custom(custom) => {
-                                    // Replace the last line with custom output
                                     output.truncate(last_line_start);
                                     output.push_str(&custom);
-                                    // Add newline after custom output (skip default newline logic below)
                                     if !ctx.in_table_cell && !output.ends_with('\n') {
                                         output.push('\n');
                                     }
                                     return;
                                 }
                                 VisitResult::Skip => {
-                                    // Remove the list item
                                     output.truncate(last_line_start);
                                     return;
                                 }
                                 VisitResult::PreserveHtml => {
-                                    // Replace with HTML
                                     output.truncate(last_line_start);
                                     serialize_node_to_html(node_handle, parser, output);
-                                    // Add newline after HTML
                                     if !ctx.in_table_cell && !output.ends_with('\n') {
                                         output.push('\n');
                                     }
@@ -5943,7 +6022,7 @@ fn walk_node(
                         let children = tag.children();
                         {
                             for child_handle in children.top().iter() {
-                                walk_node(child_handle, parser, output, options, ctx, depth, dom_ctx);
+                                walk_node(child_handle, parser, output, options, ctx, depth + 1, dom_ctx);
                             }
                         }
                         return;
@@ -5953,7 +6032,7 @@ fn walk_node(
                     let children = tag.children();
                     {
                         for child_handle in children.top().iter() {
-                            walk_node(child_handle, parser, &mut content, options, ctx, depth, dom_ctx);
+                            walk_node(child_handle, parser, &mut content, options, ctx, depth + 1, dom_ctx);
                         }
                     }
                     if content.trim().is_empty() {
@@ -7092,7 +7171,7 @@ fn walk_node(
                     let children = tag.children();
                     {
                         for child_handle in children.top().iter() {
-                            walk_node(child_handle, parser, output, options, ctx, depth, dom_ctx);
+                            walk_node(child_handle, parser, output, options, ctx, depth + 1, dom_ctx);
                         }
                     }
 
@@ -7240,7 +7319,7 @@ fn walk_node(
                     let children = tag.children();
                     {
                         for child_handle in children.top().iter() {
-                            walk_node(child_handle, parser, output, options, ctx, depth, dom_ctx);
+                            walk_node(child_handle, parser, output, options, ctx, depth + 1, dom_ctx);
                         }
                     }
 
@@ -7292,6 +7371,54 @@ fn walk_node(
                                 );
                             }
                         }
+                    }
+                }
+            }
+
+            #[cfg(feature = "visitor")]
+            if !matches!(tag_name.as_ref(), "table") {
+                if let Some(ref visitor_handle) = ctx.visitor {
+                    use crate::visitor::{NodeContext, NodeType, VisitResult};
+                    use std::collections::BTreeMap;
+
+                    let attributes: BTreeMap<String, String> = tag
+                        .attributes()
+                        .iter()
+                        .filter_map(|(k, v)| v.as_ref().map(|val| (k.to_string(), val.to_string())))
+                        .collect();
+
+                    let node_id = node_handle.get_inner();
+                    let parent_tag = dom_ctx.parent_tag_name(node_id, parser);
+                    let index_in_parent = dom_ctx.get_sibling_index(node_id).unwrap_or(0);
+
+                    let node_ctx = NodeContext {
+                        node_type: NodeType::Element,
+                        tag_name: tag_name.to_string(),
+                        attributes,
+                        depth,
+                        index_in_parent,
+                        parent_tag,
+                        is_inline: !is_block_level_element(&tag_name),
+                    };
+
+                    let element_content = &output[element_output_start..];
+
+                    let mut visitor = visitor_handle.borrow_mut();
+                    match visitor.visit_element_end(&node_ctx, element_content) {
+                        VisitResult::Continue => {}
+                        VisitResult::Custom(custom) => {
+                            output.truncate(element_output_start);
+                            output.push_str(&custom);
+                        }
+                        VisitResult::Skip => {
+                            output.truncate(element_output_start);
+                        }
+                        VisitResult::Error(err) => {
+                            if ctx.visitor_error.borrow().is_none() {
+                                *ctx.visitor_error.borrow_mut() = Some(err);
+                            }
+                        }
+                        VisitResult::PreserveHtml => {}
                     }
                 }
             }
@@ -7506,7 +7633,6 @@ fn convert_table_row(
 
     collect_table_cells(node_handle, parser, dom_ctx, &mut cells);
 
-    // Collect cell contents for visitor
     #[cfg(feature = "visitor")]
     let cell_contents: Vec<String> = if ctx.visitor.is_some() {
         cells
@@ -7820,13 +7946,17 @@ fn convert_table(
                 .filter_map(|(k, v)| v.as_ref().map(|val| (k.to_string(), val.to_string())))
                 .collect();
 
+            let node_id = node_handle.get_inner();
+            let parent_tag = dom_ctx.parent_tag_name(node_id, parser);
+            let index_in_parent = dom_ctx.get_sibling_index(node_id).unwrap_or(0);
+
             let node_ctx = NodeContext {
                 node_type: NodeType::Table,
                 tag_name: "table".to_string(),
                 attributes,
                 depth,
-                index_in_parent: 0,
-                parent_tag: None,
+                index_in_parent,
+                parent_tag,
                 is_inline: false,
             };
 
@@ -7835,7 +7965,6 @@ fn convert_table(
                 VisitResult::Continue => {}
                 VisitResult::Skip => return,
                 VisitResult::Custom(custom) => {
-                    // Store custom TABLE_START to prepend later (don't add to output yet or return)
                     table_start_custom = Some(custom);
                 }
                 VisitResult::Error(err) => {
@@ -8008,13 +8137,17 @@ fn convert_table(
                 .filter_map(|(k, v)| v.as_ref().map(|val| (k.to_string(), val.to_string())))
                 .collect();
 
+            let node_id = node_handle.get_inner();
+            let parent_tag = dom_ctx.parent_tag_name(node_id, parser);
+            let index_in_parent = dom_ctx.get_sibling_index(node_id).unwrap_or(0);
+
             let node_ctx = NodeContext {
                 node_type: NodeType::Table,
                 tag_name: "table".to_string(),
                 attributes,
                 depth,
-                index_in_parent: 0,
-                parent_tag: None,
+                index_in_parent,
+                parent_tag,
                 is_inline: false,
             };
 
@@ -8023,13 +8156,11 @@ fn convert_table(
             let mut visitor = visitor_handle.borrow_mut();
             match visitor.visit_table_end(&node_ctx, table_content) {
                 VisitResult::Continue => {
-                    // If there was a custom table_start, prepend it now
                     if let Some(custom_start) = table_start_custom {
                         output.insert_str(table_output_start, &custom_start);
                     }
                 }
                 VisitResult::Custom(custom) => {
-                    // Combine: custom_start + rows + custom_end
                     let rows_output = output[table_output_start..].to_string();
                     output.truncate(table_output_start);
                     if let Some(custom_start) = table_start_custom {

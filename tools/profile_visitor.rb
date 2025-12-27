@@ -2,26 +2,13 @@
 # frozen_string_literal: true
 
 ##
-# Profile visitor callback overhead in html-to-markdown Ruby binding.
-#
-# Measures:
-#   - Visitor callback invocation overhead
-#   - Context marshalling cost
 #   - Result conversion overhead
-#   - GC impact of visitor callbacks
-#
-# Test scenarios:
-#   - no-op: Visitor with empty callbacks
-#   - simple: Simple text extraction
-#   - custom_output: Building custom output
-#   - complex: Multiple operations per callback
 
 require 'json'
 require 'benchmark'
 require 'fileutils'
 require 'pathname'
 
-# Add local gem to load path
 lib_path = File.expand_path('../packages/ruby/lib', __dir__)
 $LOAD_PATH.unshift(lib_path) if File.directory?(lib_path)
 
@@ -167,15 +154,12 @@ class ComplexVisitor
 
     node_type = node['type'] || ''
 
-    # Track statistics
     @stats[node_type] ||= 0
     @stats[node_type] += 1
 
-    # Track depth
     depth = node['depth'] || 0
     @depths << depth
 
-    # Do some computation
     if node['attributes'].is_a?(Hash)
       attr_count = node['attributes'].length
       @stats['attrs_total'] ||= 0
@@ -192,11 +176,10 @@ def benchmark_with_visitor(html, visitor, iterations = 10)
       begin
         HtmlToMarkdown.convert_with_visitor(html, visitor: visitor)
       rescue StandardError
-        # Visitor pattern might not be fully implemented
         nil
       end
     end
-  end.real * 1000  # Convert to milliseconds
+  end.real * 1000
 end
 
 ##
@@ -206,7 +189,7 @@ def benchmark_baseline(html, iterations = 10)
     iterations.times do
       HtmlToMarkdown.convert(html)
     end
-  end.real * 1000  # Convert to milliseconds
+  end.real * 1000
 end
 
 ##
@@ -218,26 +201,21 @@ def profile_scenario(name, html, visitor_class, iterations = 10)
 
   element_count = count_elements(html)
 
-  # Warm up
   puts "  Warming up..."
   benchmark_baseline(html, 2)
 
-  # Baseline
   puts "  Running baseline..."
   baseline_ms = benchmark_baseline(html, iterations)
   baseline_avg = baseline_ms / iterations
 
-  # With visitor
   puts "  Running #{name} visitor..."
   visitor = visitor_class.new
   visitor_ms = benchmark_with_visitor(html, visitor, iterations)
   visitor_avg = visitor_ms / iterations
 
-  # Calculate overhead
   overhead_ms = visitor_ms - baseline_ms
   overhead_percent = baseline_ms > 0 ? (overhead_ms / baseline_ms) * 100 : 0
 
-  # Per-callback timing
   callback_count = visitor.invocations || 0
   avg_callback_time_us = callback_count > 0 ? (overhead_ms * 1000 / callback_count) : 0
 
@@ -298,10 +276,8 @@ end
 def main
   options = parse_args
 
-  # Create output directory
   FileUtils.mkdir_p(options[:output])
 
-  # Select HTML file
   html_map = {
     'small' => 'small_html.html',
     'medium' => 'medium_python.html',
@@ -337,7 +313,6 @@ def main
     results << metrics
   end
 
-  # Write JSON results
   json_path = File.join(options[:output], 'results.json')
   output_data = {
     html_size: html.length,
@@ -350,7 +325,6 @@ def main
   File.write(json_path, JSON.pretty_generate(output_data))
   puts "\n\nResults written to #{json_path}"
 
-  # Print summary
   puts "\n\nSummary"
   puts "======="
   results.each do |result|

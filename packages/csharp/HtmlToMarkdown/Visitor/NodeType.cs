@@ -6,11 +6,9 @@ namespace HtmlToMarkdown.Visitor;
 /// </summary>
 public enum NodeType
 {
-    // Text and Generic
     Text = 0,
     Element = 1,
 
-    // Block Elements
     Heading = 2,
     Paragraph = 3,
     Div = 4,
@@ -18,14 +16,12 @@ public enum NodeType
     Pre = 6,
     HorizontalRule = 7,
 
-    // Lists
     List = 8,
     ListItem = 9,
     DefinitionList = 10,
     DefinitionTerm = 11,
     DefinitionDescription = 12,
 
-    // Tables
     Table = 13,
     TableRow = 14,
     TableCell = 15,
@@ -34,7 +30,6 @@ public enum NodeType
     TableHead = 18,
     TableFoot = 19,
 
-    // Inline Formatting
     Link = 20,
     Image = 21,
     Strong = 22,
@@ -49,7 +44,6 @@ public enum NodeType
     LineBreak = 31,
     Span = 32,
 
-    // Semantic HTML5
     Article = 33,
     Section = 34,
     Nav = 35,
@@ -63,7 +57,6 @@ public enum NodeType
     Details = 43,
     Summary = 44,
 
-    // Forms
     Form = 45,
     Input = 46,
     Select = 47,
@@ -74,7 +67,6 @@ public enum NodeType
     FieldSet = 52,
     Legend = 53,
 
-    // Media
     Audio = 54,
     Video = 55,
     Picture = 56,
@@ -83,7 +75,6 @@ public enum NodeType
     Svg = 59,
     Canvas = 60,
 
-    // Advanced/Semantic
     Ruby = 61,
     Rt = 62,
     Rp = 63,
@@ -102,7 +93,6 @@ public enum NodeType
     Template = 76,
     Slot = 77,
 
-    // Document Structure
     Html = 78,
     Head = 79,
     Body = 80,
@@ -113,6 +103,5 @@ public enum NodeType
     Script = 85,
     Base = 86,
 
-    // Custom/Unknown
     Custom = 87
 }

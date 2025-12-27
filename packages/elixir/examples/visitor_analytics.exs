@@ -1,5 +1,4 @@
 #!/usr/bin/env elixir
-# Analytics Visitor Example
 # Demonstrates collecting statistics during conversion
 
 defmodule AnalyticsVisitor do
@@ -16,7 +15,6 @@ defmodule AnalyticsVisitor do
 
   use HtmlToMarkdown.Visitor
 
-  # Use Agent for state management
   def start_link do
     Agent.start_link(fn ->
       %{
@@ -36,7 +34,6 @@ defmodule AnalyticsVisitor do
 
   @impl true
   def handle_element_start(context) do
-    # Track max depth
     _depth = Map.get(context, :depth, 0)
     :continue
   end
@@ -44,30 +41,25 @@ defmodule AnalyticsVisitor do
   @impl true
   def handle_heading(context, level, _text, _id) do
     _depth = Map.get(context, :depth, 0)
-    # Track heading by level
     :continue
   end
 
   @impl true
   def handle_link(_context, _href, _text, _title) do
-    # Track link
     :continue
   end
 
   @impl true
   def handle_image(_context, _src, _alt, _title) do
-    # Track image
     :continue
   end
 
   @impl true
   def handle_code_block(_context, _lang, _code) do
-    # Track code block
     :continue
   end
 end
 
-# Example HTML with various elements
 html = """
 <article>
   <h1>Main Article</h1>

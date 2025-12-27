@@ -1,6 +1,4 @@
 #!/usr/bin/env elixir
-# Basic Visitor Pattern Example
-# Demonstrates core visitor functionality
 
 defmodule BasicVisitor do
   @moduledoc """
@@ -28,7 +26,6 @@ defmodule BasicVisitor do
   end
 end
 
-# Example HTML
 html = """
 <html>
 <head><title>Example</title></head>

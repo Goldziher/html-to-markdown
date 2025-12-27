@@ -22,10 +22,8 @@ func ExampleVisitorBasic() {
 	</html>
 	`
 
-	// Create a visitor that customizes link formatting
 	visitor := &htmltomarkdown.Visitor{
 		OnLink: func(ctx *htmltomarkdown.NodeContext, href, text, title string) *htmltomarkdown.VisitResult {
-			// Custom link formatting: [text](url) + URL
 			customOutput := fmt.Sprintf("[%s](%s) [%s]", strings.TrimSpace(text), href, href)
 			return &htmltomarkdown.VisitResult{
 				ResultType:   htmltomarkdown.VisitCustom,
@@ -43,7 +41,6 @@ func ExampleVisitorBasic() {
 	fmt.Println(markdown)
 	fmt.Println()
 
-	// Output will show custom link formatting with URLs doubled
 }
 
 // ExampleVisitorHeadings demonstrates extracting heading information.

@@ -51,6 +51,11 @@ urls.Homepage = "https://github.com/Goldziher/html-to-markdown"
 urls.Issues = "https://github.com/Goldziher/html-to-markdown/issues"
 urls.Repository = "https://github.com/Goldziher/html-to-markdown.git"
 
+[dependency-groups]
+dev = [
+  "pytest-asyncio>=1.3",
+]
+
 [tool.maturin]
 manifest-path = "../../crates/html-to-markdown-py/Cargo.toml"
 module-name = "html_to_markdown._html_to_markdown"

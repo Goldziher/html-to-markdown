@@ -6,15 +6,75 @@ require 'spec_helper'
 RSpec.describe HtmlToMarkdown do
   describe '.convert_with_visitor' do
     # ============================================================================
-    # Basic Visitor Callbacks - Each visitor method is tested independently
     # ============================================================================
+
+    def create_visitor(**overrides)
+      visitor = double(Object)
+
+      default_methods = {
+        visit_element_start: { type: :continue },
+        visit_element_end: { type: :continue },
+        visit_text: { type: :continue },
+        visit_link: { type: :continue },
+        visit_image: { type: :continue },
+        visit_heading: { type: :continue },
+        visit_code_block: { type: :continue },
+        visit_code_inline: { type: :continue },
+        visit_list_item: { type: :continue },
+        visit_list_start: { type: :continue },
+        visit_list_end: { type: :continue },
+        visit_table_start: { type: :continue },
+        visit_table_row: { type: :continue },
+        visit_table_end: { type: :continue },
+        visit_blockquote: { type: :continue },
+        visit_strong: { type: :continue },
+        visit_emphasis: { type: :continue },
+        visit_strikethrough: { type: :continue },
+        visit_underline: { type: :continue },
+        visit_subscript: { type: :continue },
+        visit_superscript: { type: :continue },
+        visit_mark: { type: :continue },
+        visit_line_break: { type: :continue },
+        visit_horizontal_rule: { type: :continue },
+        visit_custom_element: { type: :continue },
+        visit_definition_list_start: { type: :continue },
+        visit_definition_term: { type: :continue },
+        visit_definition_description: { type: :continue },
+        visit_definition_list_end: { type: :continue },
+        visit_form: { type: :continue },
+        visit_input: { type: :continue },
+        visit_button: { type: :continue },
+        visit_audio: { type: :continue },
+        visit_video: { type: :continue },
+        visit_iframe: { type: :continue },
+        visit_details: { type: :continue },
+        visit_summary: { type: :continue },
+        visit_figure_start: { type: :continue },
+        visit_figcaption: { type: :continue },
+        visit_figure_end: { type: :continue },
+      }
+
+      default_methods.each do |method_name, return_value|
+        allow(visitor).to receive(method_name).and_return(return_value)
+      end
+
+      overrides.each do |method_name, behavior|
+        if behavior.is_a?(Proc)
+          allow(visitor).to receive(method_name, &behavior)
+        else
+          allow(visitor).to receive(method_name).and_return(behavior)
+        end
+      end
+
+      visitor
+    end
+
 
     context 'visit_text callback' do
       it 'is called for text nodes' do
         html = '<p>Hello World</p>'
-        visitor = double(Object)
+        visitor = create_visitor
 
-        allow(visitor).to receive(:visit_text).and_call_original
         allow(visitor).to receive(:visit_text).and_return({ type: :continue })
 
         result = described_class.convert_with_visitor(html, nil, visitor)
@@ -25,7 +85,7 @@ RSpec.describe HtmlToMarkdown do
       it 'receives text content and context' do
         html = '<p>Test content</p>'
         visited_texts = []
-        visitor = double(Object)
+        visitor = create_visitor
 
         allow(visitor).to receive(:visit_text) do |_ctx, text|
           visited_texts << text
@@ -38,7 +98,7 @@ RSpec.describe HtmlToMarkdown do
 
       it 'validates node context for text node' do
         html = '<p>Hello</p>'
-        visitor = double(Object)
+        visitor = create_visitor
         captured_ctx = nil
 
         allow(visitor).to receive(:visit_text) do |ctx, _text|
@@ -57,7 +117,7 @@ RSpec.describe HtmlToMarkdown do
     context 'visit_link callback' do
       it 'is called for anchor links' do
         html = '<a href="https://example.com">Click here</a>'
-        visitor = double(Object)
+        visitor = create_visitor
 
         allow(visitor).to receive(:visit_link).and_return({ type: :continue })
 
@@ -68,7 +128,7 @@ RSpec.describe HtmlToMarkdown do
       it 'receives href, text, and optional title' do
         html = '<a href="https://example.com" title="Example">Click</a>'
         link_data = nil
-        visitor = double(Object)
+        visitor = create_visitor
 
         allow(visitor).to receive(:visit_link) do |ctx, href, text, title|
           link_data = { ctx: ctx, href: href, text: text, title: title }
@@ -86,7 +146,7 @@ RSpec.describe HtmlToMarkdown do
       it 'handles links without title attribute' do
         html = '<a href="/path">Link</a>'
         link_data = nil
-        visitor = double(Object)
+        visitor = create_visitor
 
         allow(visitor).to receive(:visit_link) do |_ctx, href, text, title|
           link_data = { href: href, text: text, title: title }
@@ -100,7 +160,7 @@ RSpec.describe HtmlToMarkdown do
 
       it 'validates node context contains link metadata' do
         html = '<a href="https://example.com">Link</a>'
-        visitor = double(Object)
+        visitor = create_visitor
         captured_ctx = nil
 
         allow(visitor).to receive(:visit_link) do |ctx, _href, _text, _title|
@@ -118,7 +178,7 @@ RSpec.describe HtmlToMarkdown do
     context 'visit_image callback' do
       it 'is called for image elements' do
         html = '<img src="image.jpg" alt="An image">'
-        visitor = double(Object)
+        visitor = create_visitor
 
         allow(visitor).to receive(:visit_image).and_return({ type: :continue })
 
@@ -129,7 +189,7 @@ RSpec.describe HtmlToMarkdown do
       it 'receives src, alt, and optional title' do
         html = '<img src="photo.jpg" alt="Beautiful" title="Photo">'
         image_data = nil
-        visitor = double(Object)
+        visitor = create_visitor
 
         allow(visitor).to receive(:visit_image) do |ctx, src, alt, title|
           image_data = { ctx: ctx, src: src, alt: alt, title: title }
@@ -146,7 +206,7 @@ RSpec.describe HtmlToMarkdown do
       it 'handles images without title attribute' do
         html = '<img src="pic.png" alt="Picture">'
         image_data = nil
-        visitor = double(Object)
+        visitor = create_visitor
 
         allow(visitor).to receive(:visit_image) do |_ctx, src, alt, title|
           image_data = { src: src, alt: alt, title: title }
@@ -162,7 +222,7 @@ RSpec.describe HtmlToMarkdown do
     context 'visit_heading callback' do
       it 'is called for heading elements' do
         html = '<h1>Title</h1>'
-        visitor = double(Object)
+        visitor = create_visitor
 
         allow(visitor).to receive(:visit_heading).and_return({ type: :continue })
 
@@ -173,7 +233,7 @@ RSpec.describe HtmlToMarkdown do
       it 'receives heading level, text, and optional id' do
         html = '<h2 id="section">Chapter</h2>'
         heading_data = nil
-        visitor = double(Object)
+        visitor = create_visitor
 
         allow(visitor).to receive(:visit_heading) do |ctx, level, text, id|
           heading_data = { ctx: ctx, level: level, text: text, id: id }
@@ -190,7 +250,7 @@ RSpec.describe HtmlToMarkdown do
       it 'handles headings without id attribute' do
         html = '<h3>Subsection</h3>'
         heading_data = nil
-        visitor = double(Object)
+        visitor = create_visitor
 
         allow(visitor).to receive(:visit_heading) do |_ctx, level, text, id|
           heading_data = { level: level, text: text, id: id }
@@ -204,7 +264,7 @@ RSpec.describe HtmlToMarkdown do
 
       it 'supports all heading levels (h1-h6)' do
         heading_levels = []
-        visitor = double(Object)
+        visitor = create_visitor
 
         allow(visitor).to receive(:visit_heading) do |_ctx, level, _text, _id|
           heading_levels << level
@@ -221,7 +281,7 @@ RSpec.describe HtmlToMarkdown do
     context 'visit_element_start callback' do
       it 'is called when entering an element' do
         html = '<div><p>Content</p></div>'
-        visitor = double(Object)
+        visitor = create_visitor
 
         allow(visitor).to receive(:visit_element_start).and_return({ type: :continue })
 
@@ -232,7 +292,7 @@ RSpec.describe HtmlToMarkdown do
       it 'receives node context with tag information' do
         html = '<section id="main" class="container">Text</section>'
         contexts = []
-        visitor = double(Object)
+        visitor = create_visitor
 
         allow(visitor).to receive(:visit_element_start) do |ctx|
           contexts << ctx
@@ -250,7 +310,7 @@ RSpec.describe HtmlToMarkdown do
     context 'visit_element_end callback' do
       it 'is called when exiting an element' do
         html = '<div>Content</div>'
-        visitor = double(Object)
+        visitor = create_visitor
 
         allow(visitor).to receive(:visit_element_end).and_return({ type: :continue })
 
@@ -261,7 +321,7 @@ RSpec.describe HtmlToMarkdown do
       it 'receives context and generated output' do
         html = '<p>Text content</p>'
         element_end_data = nil
-        visitor = double(Object)
+        visitor = create_visitor
 
         allow(visitor).to receive(:visit_element_end) do |ctx, output|
           element_end_data = { ctx: ctx, output: output }
@@ -275,14 +335,11 @@ RSpec.describe HtmlToMarkdown do
       end
     end
 
-    # ============================================================================
-    # VisitResult Types - Test all result variants
-    # ============================================================================
 
     context 'VisitResult::Continue' do
       it 'continues with default behavior' do
         html = '<p>Hello</p>'
-        visitor = double(Object)
+        visitor = create_visitor
 
         allow(visitor).to receive(:visit_text).and_return({ type: :continue })
 
@@ -293,7 +350,7 @@ RSpec.describe HtmlToMarkdown do
       it 'allows chaining of multiple visitors' do
         html = '<p>Test</p>'
         calls = []
-        visitor = double(Object)
+        visitor = create_visitor
 
         allow(visitor).to receive(:visit_text) do |_ctx, text|
           calls << text
@@ -308,7 +365,7 @@ RSpec.describe HtmlToMarkdown do
     context 'VisitResult::Custom' do
       it 'replaces element output with custom text' do
         html = '<p>Original</p>'
-        visitor = double(Object)
+        visitor = create_visitor
 
         allow(visitor).to receive(:visit_text).and_return({ type: :custom, output: 'MODIFIED' })
 
@@ -318,7 +375,7 @@ RSpec.describe HtmlToMarkdown do
 
       it 'overrides link rendering' do
         html = '<a href="https://example.com">Link</a>'
-        visitor = double(Object)
+        visitor = create_visitor
 
         allow(visitor).to receive(:visit_link).and_return({ type: :custom, output: '**CUSTOM LINK**' })
 
@@ -328,7 +385,7 @@ RSpec.describe HtmlToMarkdown do
 
       it 'overrides image rendering' do
         html = '<img src="test.jpg" alt="Test">'
-        visitor = double(Object)
+        visitor = create_visitor
 
         allow(visitor).to receive(:visit_image).and_return({ type: :custom, output: '[IMAGE PLACEHOLDER]' })
 
@@ -338,7 +395,7 @@ RSpec.describe HtmlToMarkdown do
 
       it 'overrides heading rendering' do
         html = '<h1>Title</h1>'
-        visitor = double(Object)
+        visitor = create_visitor
 
         allow(visitor).to receive(:visit_heading).and_return({ type: :custom, output: '>>> TITLE <<<' })
 
@@ -348,7 +405,7 @@ RSpec.describe HtmlToMarkdown do
 
       it 'supports unicode in custom output' do
         html = '<p>Text</p>'
-        visitor = double(Object)
+        visitor = create_visitor
 
         allow(visitor).to receive(:visit_text).and_return({ type: :custom, output: '✓ Custom ✨' })
 
@@ -361,7 +418,7 @@ RSpec.describe HtmlToMarkdown do
     context 'VisitResult::Skip' do
       it 'removes element from output entirely' do
         html = '<p>Keep</p><img src="skip.jpg" alt="Skip">'
-        visitor = double(Object)
+        visitor = create_visitor
 
         allow(visitor).to receive(:visit_image).and_return({ type: :skip })
 
@@ -378,7 +435,7 @@ RSpec.describe HtmlToMarkdown do
 
       it 'skips link entirely' do
         html = '<p>Before <a href="#">hidden</a> after</p>'
-        visitor = double(Object)
+        visitor = create_visitor
 
         allow(visitor).to receive(:visit_link).and_return({ type: :skip })
 
@@ -396,7 +453,7 @@ RSpec.describe HtmlToMarkdown do
       it 'skips multiple elements selectively' do
         html = '<p>1</p><img src="a.jpg" alt="A"><p>2</p><img src="b.jpg" alt="B"><p>3</p>'
         image_count = 0
-        visitor = double(Object)
+        visitor = create_visitor
 
         allow(visitor).to receive(:visit_image) do
           image_count += 1
@@ -420,7 +477,7 @@ RSpec.describe HtmlToMarkdown do
     context 'VisitResult::PreserveHtml' do
       it 'preserves element as raw HTML in output' do
         html = '<p>Text <span class="custom">styled</span> here</p>'
-        visitor = double(Object)
+        visitor = create_visitor
 
         allow(visitor).to receive_messages(
           visit_element_start: { type: :continue },
@@ -429,13 +486,12 @@ RSpec.describe HtmlToMarkdown do
         )
 
         result = described_class.convert_with_visitor(html, nil, visitor)
-        # Result should contain HTML representation
         expect(result).to be_a(String)
       end
 
       it 'preserves links as HTML' do
         html = '<p><a href="javascript:alert()">Click</a></p>'
-        visitor = double(Object)
+        visitor = create_visitor
 
         allow(visitor).to receive(:visit_link).and_return({ type: :preserve_html })
 
@@ -453,7 +509,7 @@ RSpec.describe HtmlToMarkdown do
     context 'VisitResult::Error' do
       it 'stops conversion with error message' do
         html = '<p>Text</p>'
-        visitor = double(Object)
+        visitor = create_visitor
 
         allow(visitor).to receive(:visit_text).and_return({ type: :error, message: 'Custom conversion error' })
 
@@ -464,7 +520,7 @@ RSpec.describe HtmlToMarkdown do
 
       it 'includes custom error message' do
         html = '<img src="invalid" alt="Bad">'
-        visitor = double(Object)
+        visitor = create_visitor
 
         allow(visitor).to receive(:visit_image).and_return({ type: :error, message: 'Unsupported image format' })
 
@@ -481,7 +537,7 @@ RSpec.describe HtmlToMarkdown do
       it 'halts conversion at error point' do
         html = '<h1>Title</h1><p>Paragraph</p>'
         visited_elements = []
-        visitor = double(Object)
+        visitor = create_visitor
 
         allow(visitor).to receive(:visit_heading) do |_ctx, _level, _text, _id|
           visited_elements << :heading
@@ -502,15 +558,12 @@ RSpec.describe HtmlToMarkdown do
       end
     end
 
-    # ============================================================================
-    # NodeContext Validation
-    # ============================================================================
 
     context 'NodeContext validation' do
       it 'provides tag_name in context' do
         html = '<article>Content</article>'
         contexts = []
-        visitor = double(Object)
+        visitor = create_visitor
 
         allow(visitor).to receive(:visit_element_start) do |ctx|
           contexts << ctx
@@ -525,7 +578,7 @@ RSpec.describe HtmlToMarkdown do
 
       it 'provides attributes hash in context' do
         html = '<div data-id="123" class="box">Content</div>'
-        visitor = double(Object)
+        visitor = create_visitor
         captured_ctx = nil
 
         allow(visitor).to receive(:visit_element_start) do |ctx|
@@ -543,7 +596,7 @@ RSpec.describe HtmlToMarkdown do
       it 'provides depth information' do
         html = '<div><section><p>Nested</p></section></div>'
         depths = {}
-        visitor = double(Object)
+        visitor = create_visitor
 
         allow(visitor).to receive(:visit_element_start) do |ctx|
           depths[ctx[:tag_name]] = ctx[:depth]
@@ -552,14 +605,13 @@ RSpec.describe HtmlToMarkdown do
 
         described_class.convert_with_visitor(html, nil, visitor)
 
-        # Verify depth increases with nesting
         expect(depths['div']).to be < depths['section']
         expect(depths['section']).to be < depths['p']
       end
 
       it 'provides parent_tag information' do
         html = '<ul><li>Item</li></ul>'
-        visitor = double(Object)
+        visitor = create_visitor
         li_parent = nil
 
         allow(visitor).to receive(:visit_element_start) do |ctx|
@@ -575,7 +627,7 @@ RSpec.describe HtmlToMarkdown do
       it 'provides is_inline flag' do
         html = '<p><strong>Bold</strong> and <em>italic</em></p>'
         inline_elements = []
-        visitor = double(Object)
+        visitor = create_visitor
 
         allow(visitor).to receive(:visit_element_start) do |ctx|
           inline_elements << ctx[:tag_name] if ctx[:is_inline]
@@ -591,7 +643,7 @@ RSpec.describe HtmlToMarkdown do
       it 'provides index_in_parent information' do
         html = '<ol><li>First</li><li>Second</li><li>Third</li></ol>'
         indices = []
-        visitor = double(Object)
+        visitor = create_visitor
 
         allow(visitor).to receive(:visit_element_start) do |ctx|
           indices << ctx[:index_in_parent] if ctx[:tag_name] == 'li'
@@ -605,14 +657,11 @@ RSpec.describe HtmlToMarkdown do
       end
     end
 
-    # ============================================================================
-    # Error Handling
-    # ============================================================================
 
     context 'error handling' do
       it 'handles visitor exceptions gracefully' do
         html = '<p>Text</p>'
-        visitor = double(Object)
+        visitor = create_visitor
 
         allow(visitor).to receive(:visit_text) do
           raise 'Visitor error'
@@ -631,9 +680,8 @@ RSpec.describe HtmlToMarkdown do
 
       it 'handles missing visitor methods' do
         html = '<p>Text</p>'
-        visitor = double(Object)
+        visitor = create_visitor
 
-        # Don't define any methods, they should be optional
         allow(visitor).to receive_messages(
           visit_element_start: { type: :continue },
           visit_element_end: { type: :continue }
@@ -645,15 +693,12 @@ RSpec.describe HtmlToMarkdown do
       end
     end
 
-    # ============================================================================
-    # Integration with ConversionOptions
-    # ============================================================================
 
     context 'integration with ConversionOptions' do
       it 'accepts ConversionOptions with visitor' do
         html = '<h1>Title</h1>'
         options = described_class.options(heading_style: :atx)
-        visitor = double(Object)
+        visitor = create_visitor
 
         allow(visitor).to receive_messages(
           visit_element_start: { type: :continue },
@@ -669,7 +714,7 @@ RSpec.describe HtmlToMarkdown do
       it 'accepts options hash with visitor' do
         html = '<h2>Heading</h2>'
         options = { heading_style: :atx }
-        visitor = double(Object)
+        visitor = create_visitor
 
         allow(visitor).to receive_messages(
           visit_element_start: { type: :continue },
@@ -685,7 +730,7 @@ RSpec.describe HtmlToMarkdown do
       it 'respects heading_style in options with visitor override' do
         html = '<h1>Title</h1>'
         options = { heading_style: :atx_closed }
-        visitor = double(Object)
+        visitor = create_visitor
 
         allow(visitor).to receive_messages(
           visit_element_start: { type: :continue },
@@ -699,15 +744,12 @@ RSpec.describe HtmlToMarkdown do
       end
     end
 
-    # ============================================================================
-    # Multiple Visitor Methods
-    # ============================================================================
 
     context 'multiple visitor methods' do
       it 'calls multiple methods for complex HTML' do
         html = '<h1>Title</h1><p>Text with <a href="#link">link</a> and <img src="pic.jpg" alt="pic"></p>'
         calls = []
-        visitor = double(Object)
+        visitor = create_visitor
 
         allow(visitor).to receive(:visit_heading) do |_ctx, _level, _text, _id|
           calls << :heading
@@ -743,9 +785,8 @@ RSpec.describe HtmlToMarkdown do
 
       it 'allows selective overrides of specific callbacks' do
         html = '<h1>Title</h1><p><a href="#">Link</a></p>'
-        visitor = double(Object)
+        visitor = create_visitor
 
-        # Link is not overridden, uses default
         allow(visitor).to receive_messages(visit_heading: { type: :custom, output: '>>> HEADING <<<' },
                                            visit_text: { type: :continue })
 
@@ -762,7 +803,7 @@ RSpec.describe HtmlToMarkdown do
 
       it 'supports different results for different elements' do
         html = '<h1>Header</h1><img src="skip.jpg" alt="skip"><p>Text</p>'
-        visitor = double(Object)
+        visitor = create_visitor
 
         allow(visitor).to receive_messages(visit_heading: { type: :custom, output: 'CUSTOM HEADING' },
                                            visit_image: { type: :skip }, visit_text: { type: :continue })
@@ -778,15 +819,12 @@ RSpec.describe HtmlToMarkdown do
       end
     end
 
-    # ============================================================================
-    # Nested Elements
-    # ============================================================================
 
     context 'nested elements' do
       it 'visits deeply nested elements in order' do
         html = '<div><ul><li><strong>Nested <em>content</em></strong></li></ul></div>'
         visited_tags = []
-        visitor = double(Object)
+        visitor = create_visitor
 
         allow(visitor).to receive(:visit_element_start) do |ctx|
           visited_tags << ctx[:tag_name]
@@ -800,7 +838,6 @@ RSpec.describe HtmlToMarkdown do
 
         described_class.convert_with_visitor(html, nil, visitor)
 
-        # Verify nested structure is traversed
         expect(visited_tags).to include('div')
         expect(visited_tags).to include('ul')
         expect(visited_tags).to include('li')
@@ -811,7 +848,7 @@ RSpec.describe HtmlToMarkdown do
       it 'provides correct depth for nested elements' do
         html = '<div><div><p>Deep</p></div></div>'
         depths = {}
-        visitor = double(Object)
+        visitor = create_visitor
 
         allow(visitor).to receive(:visit_element_start) do |ctx|
           depths[ctx[:tag_name]] ||= []
@@ -826,15 +863,13 @@ RSpec.describe HtmlToMarkdown do
 
         described_class.convert_with_visitor(html, nil, visitor)
 
-        # First div should have lower depth than second div
         expect(depths['div'].first).to be < depths['div'].last
-        # P should be deepest
         expect(depths['p'].first).to be > depths['div'].last
       end
 
       it 'handles custom output in nested context' do
         html = '<ul><li><a href="#">link</a></li></ul>'
-        visitor = double(Object)
+        visitor = create_visitor
 
         allow(visitor).to receive(:visit_link).and_return({ type: :custom, output: '[MODIFIED]' })
 
@@ -850,7 +885,7 @@ RSpec.describe HtmlToMarkdown do
 
       it 'allows skipping nested elements' do
         html = '<div><p>Keep</p><span>Skip this</span><p>Keep too</p></div>'
-        visitor = double(Object)
+        visitor = create_visitor
 
         allow(visitor).to receive(:visit_element_start) do |ctx|
           if ctx[:tag_name] == 'span'
@@ -871,14 +906,11 @@ RSpec.describe HtmlToMarkdown do
       end
     end
 
-    # ============================================================================
-    # Coverage for Less Common Elements
-    # ============================================================================
 
     context 'less common visitor methods' do
       it 'calls visit_strong for bold elements' do
         html = '<strong>Bold</strong>'
-        visitor = double(Object)
+        visitor = create_visitor
 
         allow(visitor).to receive(:visit_strong).and_return({ type: :continue })
 
@@ -894,7 +926,7 @@ RSpec.describe HtmlToMarkdown do
 
       it 'calls visit_emphasis for italic elements' do
         html = '<em>Italic</em>'
-        visitor = double(Object)
+        visitor = create_visitor
 
         allow(visitor).to receive(:visit_emphasis).and_return({ type: :continue })
 
@@ -910,7 +942,7 @@ RSpec.describe HtmlToMarkdown do
 
       it 'calls visit_code_block for pre/code' do
         html = '<pre><code>function() {}</code></pre>'
-        visitor = double(Object)
+        visitor = create_visitor
 
         allow(visitor).to receive(:visit_code_block).and_return({ type: :continue })
 
@@ -926,7 +958,7 @@ RSpec.describe HtmlToMarkdown do
 
       it 'calls visit_blockquote for quotes' do
         html = '<blockquote>Quote text</blockquote>'
-        visitor = double(Object)
+        visitor = create_visitor
 
         allow(visitor).to receive(:visit_blockquote).and_return({ type: :continue })
 
@@ -942,7 +974,7 @@ RSpec.describe HtmlToMarkdown do
 
       it 'calls visit_list_item for list items' do
         html = '<ul><li>Item</li></ul>'
-        visitor = double(Object)
+        visitor = create_visitor
 
         allow(visitor).to receive(:visit_list_item).and_return({ type: :continue })
 
@@ -959,15 +991,12 @@ RSpec.describe HtmlToMarkdown do
       end
     end
 
-    # ============================================================================
-    # Unicode and Special Characters
-    # ============================================================================
 
     context 'unicode and special characters' do
       it 'handles unicode text in visitor' do
         html = '<p>日本語テキスト</p>'
         text_received = nil
-        visitor = double(Object)
+        visitor = create_visitor
 
         allow(visitor).to receive(:visit_text) do |_ctx, text|
           text_received = text
@@ -980,7 +1009,7 @@ RSpec.describe HtmlToMarkdown do
 
       it 'handles unicode in custom output' do
         html = '<p>Text</p>'
-        visitor = double(Object)
+        visitor = create_visitor
 
         allow(visitor).to receive(:visit_text).and_return({ type: :custom, output: '引用：引用' })
 
@@ -991,7 +1020,7 @@ RSpec.describe HtmlToMarkdown do
       it 'handles HTML entities in visitor' do
         html = '<p>&lt;code&gt; and &amp; symbols</p>'
         text_received = nil
-        visitor = double(Object)
+        visitor = create_visitor
 
         allow(visitor).to receive(:visit_text) do |_ctx, text|
           text_received = text
@@ -1004,14 +1033,11 @@ RSpec.describe HtmlToMarkdown do
       end
     end
 
-    # ============================================================================
-    # State Management in Visitor
-    # ============================================================================
 
     context 'state management in visitor' do
       it 'allows visitor to maintain state across calls' do
         html = '<p>One</p><p>Two</p><p>Three</p>'
-        visitor = double(Object)
+        visitor = create_visitor
         element_count = 0
 
         allow(visitor).to receive(:visit_element_start) do |ctx|
@@ -1030,7 +1056,7 @@ RSpec.describe HtmlToMarkdown do
 
       it 'allows visitor to conditionally modify based on accumulated state' do
         html = '<p>A</p><p>B</p><p>C</p>'
-        visitor = double(Object)
+        visitor = create_visitor
         paragraph_count = 0
 
         allow(visitor).to receive(:visit_element_start) do |ctx|
@@ -1056,14 +1082,11 @@ RSpec.describe HtmlToMarkdown do
       end
     end
 
-    # ============================================================================
-    # Edge Cases
-    # ============================================================================
 
     context 'edge cases' do
       it 'handles empty HTML' do
         html = ''
-        visitor = double(Object)
+        visitor = create_visitor
 
         allow(visitor).to receive_messages(
           visit_element_start: { type: :continue },
@@ -1077,7 +1100,7 @@ RSpec.describe HtmlToMarkdown do
 
       it 'handles HTML with only whitespace' do
         html = '   \n\t   '
-        visitor = double(Object)
+        visitor = create_visitor
 
         allow(visitor).to receive_messages(
           visit_element_start: { type: :continue },
@@ -1092,7 +1115,7 @@ RSpec.describe HtmlToMarkdown do
       it 'handles very long text content' do
         long_text = 'A' * 10_000
         html = "<p>#{long_text}</p>"
-        visitor = double(Object)
+        visitor = create_visitor
         text_received = nil
 
         allow(visitor).to receive(:visit_text) do |_ctx, text|
@@ -1105,9 +1128,8 @@ RSpec.describe HtmlToMarkdown do
       end
 
       it 'handles deeply nested HTML (stress test)' do
-        # Create deeply nested HTML
         html = "#{'<div>' * 50}Deep#{'</div>' * 50}"
-        visitor = double(Object)
+        visitor = create_visitor
         element_count = 0
 
         allow(visitor).to receive(:visit_element_start) do |_ctx|
@@ -1127,7 +1149,7 @@ RSpec.describe HtmlToMarkdown do
 
       it 'handles self-closing tags' do
         html = '<p>Before<br/>After</p>'
-        visitor = double(Object)
+        visitor = create_visitor
 
         allow(visitor).to receive(:visit_line_break).and_return({ type: :continue })
 
@@ -1144,7 +1166,7 @@ RSpec.describe HtmlToMarkdown do
 
       it 'handles malformed HTML gracefully' do
         html = '<p>Unclosed <div>tag<p>Another'
-        visitor = double(Object)
+        visitor = create_visitor
 
         allow(visitor).to receive_messages(
           visit_element_start: { type: :continue },
@@ -1152,7 +1174,6 @@ RSpec.describe HtmlToMarkdown do
           visit_text: { type: :continue }
         )
 
-        # Should not raise, HTML parser should handle it
         expect do
           described_class.convert_with_visitor(html, nil, visitor)
         end.not_to raise_error

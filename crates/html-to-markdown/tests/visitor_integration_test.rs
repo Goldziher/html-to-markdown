@@ -96,7 +96,6 @@ struct ContextCheckingVisitor {
 
 impl HtmlVisitor for ContextCheckingVisitor {
     fn visit_heading(&mut self, ctx: &NodeContext, _level: u32, _text: &str, _id: Option<&str>) -> VisitResult {
-        // Verify context fields are populated
         assert_eq!(ctx.node_type, NodeType::Heading);
         assert_eq!(ctx.tag_name, "h1");
 
@@ -201,7 +200,6 @@ fn test_preserving_visitor_keeps_html() {
 
     let result = convert_with_visitor(html, None, Some(visitor)).expect("conversion failed");
 
-    // When preserving HTML, the original HTML should be in the output
     assert!(
         result.contains("<a") && result.contains("href"),
         "Should preserve HTML tags when PreserveHtml is returned, got: {}",
@@ -215,8 +213,6 @@ fn test_visitor_receives_node_context() {
     let visitor = Rc::new(RefCell::new(ContextCheckingVisitor::default()));
 
     let _result = convert_with_visitor(html, None, Some(visitor)).expect("conversion failed");
-
-    // The assertions happen inside the visitor's visit_heading method
 }
 
 #[test]
@@ -241,7 +237,6 @@ fn test_visitor_works_with_complex_document() {
 
     let result = convert_with_visitor(html, None, Some(visitor)).expect("conversion failed");
 
-    // Verify custom formatting is applied
     assert!(result.contains("[H1:"));
     assert!(result.contains("[H2:"));
     assert!(result.contains("[H3:"));
@@ -267,7 +262,6 @@ fn test_visitor_with_conversion_options() {
 
     let result = convert_with_visitor(html, Some(options), Some(visitor)).expect("conversion failed");
 
-    // Verify options are still respected with visitor
     assert!(
         result.contains(r"\*") || result.contains(r"\_"),
         "Should respect escape options with visitor, got: {}",
@@ -291,7 +285,6 @@ fn test_visitor_continue_result_produces_default_markdown() {
 
     let result = convert_with_visitor(html, None, Some(visitor)).expect("conversion failed");
 
-    // Should produce normal markdown when Continue is returned
     assert!(
         result.contains("# Title"),
         "Continue should produce default markdown, got: {}",
@@ -322,7 +315,6 @@ fn test_visitor_skip_vs_continue() {
 
     let result = convert_with_visitor(html, None, Some(visitor)).expect("conversion failed");
 
-    // First link should be skipped, second should appear
     assert!(!result.contains("/first"));
     assert!(result.contains("/second"));
 }
@@ -346,12 +338,9 @@ fn test_nested_elements_invoke_visitor() {
 
     let result = convert_with_visitor(html, None, Some(visitor)).expect("conversion failed");
 
-    // Should see custom text formatting and link formatting
     assert!(result.contains("[TEXT:"));
     assert!(result.contains("[LINK:"));
 }
-
-// New tests for error propagation and newly integrated elements
 
 #[test]
 fn test_visitor_error_stops_conversion() {
@@ -600,7 +589,6 @@ fn test_no_double_visit_in_links() {
     let visitor = Rc::new(RefCell::new(CountingVisitor::default()));
     let _result = convert_with_visitor(html, None, Some(visitor.clone())).expect("conversion failed");
 
-    // With the fix, text inside links should only be visited once
     assert_eq!(
         visitor.borrow().text_visits,
         1,
@@ -631,7 +619,6 @@ fn test_no_double_visit_in_headings() {
     let visitor = Rc::new(RefCell::new(CountingVisitor::default()));
     let _result = convert_with_visitor(html, None, Some(visitor.clone())).expect("conversion failed");
 
-    // With the fix, text inside headings should only be visited once
     assert_eq!(
         visitor.borrow().text_visits,
         1,

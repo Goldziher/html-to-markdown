@@ -512,13 +512,10 @@ public static class HtmlToMarkdownConverter
 
         try
         {
-            // Create native visitor
             var nativeVisitorHandle = bridge.CreateNativeVisitor();
 
-            // Convert HTML to UTF-8 ptr
             htmlPtr = StringToUtf8Ptr(html);
 
-            // Call FFI conversion with visitor
             resultPtr = NativeMethods.html_to_markdown_convert_with_visitor(
                 htmlPtr,
                 nativeVisitorHandle,
@@ -579,10 +576,8 @@ public static class HtmlToMarkdownConverter
 
         try
         {
-            // Create native visitor
             var nativeVisitorHandle = bridge.CreateNativeVisitor();
 
-            // Call FFI conversion with visitor
             fixed (byte* htmlPtr = html)
             {
                 resultPtr = NativeMethods.html_to_markdown_convert_bytes_with_visitor(

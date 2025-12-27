@@ -141,7 +141,6 @@ class ContentAnalytics extends AbstractVisitor
     }
 }
 
-// Example HTML with various content types
 $html = <<<'HTML'
 <article>
     <h1>Complete Guide to Web Development</h1>
@@ -172,10 +171,8 @@ $html = <<<'HTML'
 </article>
 HTML;
 
-// Create analytics visitor
 $analytics = new ContentAnalytics();
 
-// Convert with analytics
 try {
     $markdown = HtmlToMarkdown::convertWithVisitor($html, null, $analytics);
 
@@ -184,13 +181,11 @@ try {
     echo $markdown;
     echo "\n\n";
 
-    // Display statistics
     echo $analytics->getReport();
 } catch (Throwable $e) {
     echo "Note: Analytics example requires the PHP extension with visitor support\n";
     echo "Error: " . $e->getMessage() . "\n";
 
-    // Still show what the report would look like after a normal conversion
     echo "\nExample statistics (if extension was available):\n";
     HtmlToMarkdown::convert($html);
 }

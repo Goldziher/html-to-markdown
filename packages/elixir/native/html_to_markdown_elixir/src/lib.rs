@@ -203,11 +203,9 @@ fn convert_with_visitor<'a>(
     options_term: Term<'a>,
     visitor_pid: Term<'a>,
 ) -> NifResult<Term<'a>> {
-    // Try to decode as a resource handle (reference) first
     let options = if let Ok(handle) = options_term.decode::<ResourceArc<OptionsHandleResource>>() {
         handle.0.clone()
     } else {
-        // Fall back to decoding as options map
         match decode_options_term(options_term) {
             Ok(options) => options,
             Err(err) => return handle_invalid_option_error(env, err),

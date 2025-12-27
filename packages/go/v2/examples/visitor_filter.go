@@ -27,16 +27,12 @@ func ExampleVisitorFilter() {
 
 	visitor := &htmltomarkdown.Visitor{
 		OnLink: func(ctx *htmltomarkdown.NodeContext, href, text, title string) *htmltomarkdown.VisitResult {
-			// Only allow internal links
 			if strings.HasPrefix(href, "/") || strings.HasPrefix(href, "#") {
-				// Keep internal link with default behavior
 				return &htmltomarkdown.VisitResult{ResultType: htmltomarkdown.VisitContinue}
 			}
-			// Skip external links (don't output them)
 			return &htmltomarkdown.VisitResult{ResultType: htmltomarkdown.VisitSkip}
 		},
 		OnCustomElement: func(ctx *htmltomarkdown.NodeContext, tagName, html string) *htmltomarkdown.VisitResult {
-			// Skip all custom elements
 			return &htmltomarkdown.VisitResult{ResultType: htmltomarkdown.VisitSkip}
 		},
 	}
@@ -72,7 +68,6 @@ func main() {
 
 	visitor := &htmltomarkdown.Visitor{
 		OnCodeBlock: func(ctx *htmltomarkdown.NodeContext, lang, code string) *htmltomarkdown.VisitResult {
-			// Convert code blocks to quoted text
 			codeLines := strings.Split(strings.TrimSpace(code), "\n")
 			var output strings.Builder
 			for _, line := range codeLines {
@@ -86,7 +81,6 @@ func main() {
 			}
 		},
 		OnCodeInline: func(ctx *htmltomarkdown.NodeContext, code string) *htmltomarkdown.VisitResult {
-			// Convert inline code to regular text
 			return &htmltomarkdown.VisitResult{
 				ResultType:   htmltomarkdown.VisitCustom,
 				CustomOutput: fmt.Sprintf("\"%s\"", code),
@@ -130,7 +124,6 @@ func ExampleVisitorValidateLinks() {
 
 	visitor := &htmltomarkdown.Visitor{
 		OnLink: func(ctx *htmltomarkdown.NodeContext, href, text, title string) *htmltomarkdown.VisitResult {
-			// Validate links
 			var issue string
 			switch {
 			case href == "":
@@ -167,7 +160,6 @@ func ExampleVisitorValidateLinks() {
 
 // isValidURL is a simple URL validator.
 func isValidURL(url string) bool {
-	// Simple regex for basic URL validation
 	pattern := `^(https?|ftp|file)://|^/|^#|^mailto:`
 	match, err := regexp.MatchString(pattern, url)
 	if err != nil {
@@ -193,7 +185,6 @@ func ExampleVisitorRemoveImages() {
 
 	visitor := &htmltomarkdown.Visitor{
 		OnImage: func(ctx *htmltomarkdown.NodeContext, src, alt, title string) *htmltomarkdown.VisitResult {
-			// Skip all images
 			return &htmltomarkdown.VisitResult{ResultType: htmltomarkdown.VisitSkip}
 		},
 	}

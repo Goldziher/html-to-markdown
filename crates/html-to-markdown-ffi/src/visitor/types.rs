@@ -21,10 +21,6 @@
 
 use std::os::raw::{c_char, c_void};
 
-// =============================================================================
-// ENUMS
-// =============================================================================
-
 /// Node type enumeration covering all HTML element types.
 ///
 /// Maps directly to the Rust `NodeType` enum. This enum categorizes HTML elements
@@ -45,11 +41,9 @@ use std::os::raw::{c_char, c_void};
 #[repr(C)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum html_to_markdown_node_type_t {
-    // === Text and Generic ===
     HTML_TO_MARKDOWN_NODE_TEXT = 0,
     HTML_TO_MARKDOWN_NODE_ELEMENT = 1,
 
-    // === Block Elements ===
     HTML_TO_MARKDOWN_NODE_HEADING = 2,
     HTML_TO_MARKDOWN_NODE_PARAGRAPH = 3,
     HTML_TO_MARKDOWN_NODE_DIV = 4,
@@ -57,14 +51,12 @@ pub enum html_to_markdown_node_type_t {
     HTML_TO_MARKDOWN_NODE_PRE = 6,
     HTML_TO_MARKDOWN_NODE_HR = 7,
 
-    // === Lists ===
     HTML_TO_MARKDOWN_NODE_LIST = 8,
     HTML_TO_MARKDOWN_NODE_LIST_ITEM = 9,
     HTML_TO_MARKDOWN_NODE_DEFINITION_LIST = 10,
     HTML_TO_MARKDOWN_NODE_DEFINITION_TERM = 11,
     HTML_TO_MARKDOWN_NODE_DEFINITION_DESCRIPTION = 12,
 
-    // === Tables ===
     HTML_TO_MARKDOWN_NODE_TABLE = 13,
     HTML_TO_MARKDOWN_NODE_TABLE_ROW = 14,
     HTML_TO_MARKDOWN_NODE_TABLE_CELL = 15,
@@ -73,7 +65,6 @@ pub enum html_to_markdown_node_type_t {
     HTML_TO_MARKDOWN_NODE_TABLE_HEAD = 18,
     HTML_TO_MARKDOWN_NODE_TABLE_FOOT = 19,
 
-    // === Inline Formatting ===
     HTML_TO_MARKDOWN_NODE_LINK = 20,
     HTML_TO_MARKDOWN_NODE_IMAGE = 21,
     HTML_TO_MARKDOWN_NODE_STRONG = 22,
@@ -88,7 +79,6 @@ pub enum html_to_markdown_node_type_t {
     HTML_TO_MARKDOWN_NODE_BR = 31,
     HTML_TO_MARKDOWN_NODE_SPAN = 32,
 
-    // === Semantic HTML5 ===
     HTML_TO_MARKDOWN_NODE_ARTICLE = 33,
     HTML_TO_MARKDOWN_NODE_SECTION = 34,
     HTML_TO_MARKDOWN_NODE_NAV = 35,
@@ -102,7 +92,6 @@ pub enum html_to_markdown_node_type_t {
     HTML_TO_MARKDOWN_NODE_DETAILS = 43,
     HTML_TO_MARKDOWN_NODE_SUMMARY = 44,
 
-    // === Forms ===
     HTML_TO_MARKDOWN_NODE_FORM = 45,
     HTML_TO_MARKDOWN_NODE_INPUT = 46,
     HTML_TO_MARKDOWN_NODE_SELECT = 47,
@@ -113,7 +102,6 @@ pub enum html_to_markdown_node_type_t {
     HTML_TO_MARKDOWN_NODE_FIELDSET = 52,
     HTML_TO_MARKDOWN_NODE_LEGEND = 53,
 
-    // === Media ===
     HTML_TO_MARKDOWN_NODE_AUDIO = 54,
     HTML_TO_MARKDOWN_NODE_VIDEO = 55,
     HTML_TO_MARKDOWN_NODE_PICTURE = 56,
@@ -122,7 +110,6 @@ pub enum html_to_markdown_node_type_t {
     HTML_TO_MARKDOWN_NODE_SVG = 59,
     HTML_TO_MARKDOWN_NODE_CANVAS = 60,
 
-    // === Advanced/Semantic ===
     HTML_TO_MARKDOWN_NODE_RUBY = 61,
     HTML_TO_MARKDOWN_NODE_RT = 62,
     HTML_TO_MARKDOWN_NODE_RP = 63,
@@ -141,7 +128,6 @@ pub enum html_to_markdown_node_type_t {
     HTML_TO_MARKDOWN_NODE_TEMPLATE = 76,
     HTML_TO_MARKDOWN_NODE_SLOT = 77,
 
-    // === Document Structure ===
     HTML_TO_MARKDOWN_NODE_HTML = 78,
     HTML_TO_MARKDOWN_NODE_HEAD = 79,
     HTML_TO_MARKDOWN_NODE_BODY = 80,
@@ -152,7 +138,6 @@ pub enum html_to_markdown_node_type_t {
     HTML_TO_MARKDOWN_NODE_SCRIPT = 85,
     HTML_TO_MARKDOWN_NODE_BASE = 86,
 
-    // === Custom/Unknown ===
     HTML_TO_MARKDOWN_NODE_CUSTOM = 87,
 }
 
@@ -182,10 +167,6 @@ pub enum html_to_markdown_visit_result_type_t {
     /// Stop conversion and report error (from `error_message` field).
     HTML_TO_MARKDOWN_VISIT_ERROR = 4,
 }
-
-// =============================================================================
-// STRUCTS
-// =============================================================================
 
 /// Attribute pair in a NULL-terminated array.
 ///
@@ -366,7 +347,6 @@ pub struct html_to_markdown_visitor_t {
     /// Use this to maintain visitor state (e.g., counters, context stacks).
     pub user_data: *mut c_void,
 
-    // === Generic Hooks ===
     /// Called before entering any HTML element.
     ///
     /// Signature: `(void *user_data, const NodeContext *ctx) -> VisitResult`
@@ -388,7 +368,6 @@ pub struct html_to_markdown_visitor_t {
         ) -> html_to_markdown_visit_result_t,
     >,
 
-    // === Text Nodes ===
     /// Visit text nodes (most frequent callback - 100+ per document).
     ///
     /// Signature: `(void *user_data, const NodeContext *ctx, const char *text) -> VisitResult`
@@ -400,7 +379,6 @@ pub struct html_to_markdown_visitor_t {
         ) -> html_to_markdown_visit_result_t,
     >,
 
-    // === Links and Images ===
     /// Visit anchor links `<a href="...">`.
     ///
     /// Signature: `(void *user_data, const NodeContext *ctx, const char *href, const char *text, const char *title) -> VisitResult`
@@ -429,7 +407,6 @@ pub struct html_to_markdown_visitor_t {
         ) -> html_to_markdown_visit_result_t,
     >,
 
-    // === Headings ===
     /// Visit heading elements `<h1>` through `<h6>`.
     ///
     /// Signature: `(void *user_data, const NodeContext *ctx, uint32_t level, const char *text, const char *id) -> VisitResult`
@@ -444,7 +421,6 @@ pub struct html_to_markdown_visitor_t {
         ) -> html_to_markdown_visit_result_t,
     >,
 
-    // === Code ===
     /// Visit code blocks `<pre><code>`.
     ///
     /// Signature: `(void *user_data, const NodeContext *ctx, const char *lang, const char *code) -> VisitResult`
@@ -469,7 +445,6 @@ pub struct html_to_markdown_visitor_t {
         ) -> html_to_markdown_visit_result_t,
     >,
 
-    // === Lists ===
     /// Visit list items `<li>`.
     ///
     /// Signature: `(void *user_data, const NodeContext *ctx, bool ordered, const char *marker, const char *text) -> VisitResult`
@@ -506,7 +481,6 @@ pub struct html_to_markdown_visitor_t {
         ) -> html_to_markdown_visit_result_t,
     >,
 
-    // === Tables ===
     /// Called before processing a table `<table>`.
     ///
     /// Signature: `(void *user_data, const NodeContext *ctx) -> VisitResult`
@@ -542,7 +516,6 @@ pub struct html_to_markdown_visitor_t {
         ) -> html_to_markdown_visit_result_t,
     >,
 
-    // === Blockquotes ===
     /// Visit blockquote elements `<blockquote>`.
     ///
     /// Signature: `(void *user_data, const NodeContext *ctx, const char *content, size_t depth) -> VisitResult`
@@ -555,7 +528,6 @@ pub struct html_to_markdown_visitor_t {
         ) -> html_to_markdown_visit_result_t,
     >,
 
-    // === Inline Formatting ===
     /// Visit strong/bold elements `<strong>`, `<b>`.
     ///
     /// Signature: `(void *user_data, const NodeContext *ctx, const char *text) -> VisitResult`
@@ -633,7 +605,6 @@ pub struct html_to_markdown_visitor_t {
         ) -> html_to_markdown_visit_result_t,
     >,
 
-    // === Breaks ===
     /// Visit line break elements `<br>`.
     ///
     /// Signature: `(void *user_data, const NodeContext *ctx) -> VisitResult`
@@ -654,7 +625,6 @@ pub struct html_to_markdown_visitor_t {
         ) -> html_to_markdown_visit_result_t,
     >,
 
-    // === Custom/Unknown Elements ===
     /// Visit custom elements (web components) or unknown tags.
     ///
     /// Signature: `(void *user_data, const NodeContext *ctx, const char *tag_name, const char *html) -> VisitResult`
@@ -667,7 +637,6 @@ pub struct html_to_markdown_visitor_t {
         ) -> html_to_markdown_visit_result_t,
     >,
 
-    // === Definition Lists ===
     /// Visit definition list `<dl>`.
     ///
     /// Signature: `(void *user_data, const NodeContext *ctx) -> VisitResult`
@@ -711,7 +680,6 @@ pub struct html_to_markdown_visitor_t {
         ) -> html_to_markdown_visit_result_t,
     >,
 
-    // === Forms ===
     /// Visit form elements `<form>`.
     ///
     /// Signature: `(void *user_data, const NodeContext *ctx, const char *action, const char *method) -> VisitResult`
@@ -750,7 +718,6 @@ pub struct html_to_markdown_visitor_t {
         ) -> html_to_markdown_visit_result_t,
     >,
 
-    // === Media ===
     /// Visit audio elements `<audio>`.
     ///
     /// Signature: `(void *user_data, const NodeContext *ctx, const char *src) -> VisitResult`
@@ -787,7 +754,6 @@ pub struct html_to_markdown_visitor_t {
         ) -> html_to_markdown_visit_result_t,
     >,
 
-    // === Semantic HTML5 ===
     /// Visit details elements `<details>`.
     ///
     /// Signature: `(void *user_data, const NodeContext *ctx, bool open) -> VisitResult`
@@ -842,10 +808,6 @@ pub struct html_to_markdown_visitor_t {
         ) -> html_to_markdown_visit_result_t,
     >,
 }
-
-// =============================================================================
-// TYPE ALIASES for convenience
-// =============================================================================
 
 /// Convenience alias for visitor node type enumeration.
 pub type CNodeType = html_to_markdown_node_type_t;

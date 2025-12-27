@@ -235,10 +235,8 @@ class VisitorTest {
                 NodeType.ELEMENT, "div", original, 0, 0, null, false
             );
 
-            // Modify original list
             original.add(new Attribute("id", "main"));
 
-            // Context should not be affected
             assertEquals(1, ctx.attributes().size());
         }
     }
@@ -409,7 +407,6 @@ class VisitorTest {
             Visitor visitor = new Visitor() {
                 @Override
                 public VisitResult visitHeading(NodeContext ctx, int level, String text, String id) {
-                    // Validate context
                     assertEquals(NodeType.HEADING, ctx.nodeType());
                     assertEquals("h1", ctx.tagName());
                     assertTrue(level >= 1 && level <= 6);
@@ -579,10 +576,8 @@ class VisitorTest {
 
             attrs.add(new Attribute("class", "new"));
 
-            // Context should be unaffected
             assertEquals(1, ctx.attributes().size());
 
-            // Returned attributes should be unmodifiable
             assertThrows(UnsupportedOperationException.class,
                 () -> ctx.attributes().add(new Attribute("data", "value")));
         }
@@ -598,10 +593,8 @@ class VisitorTest {
                 NodeType.ELEMENT, "div", original, 0, 0, null, false
             );
 
-            // Clear original
             original.clear();
 
-            // Context should still have attributes
             assertEquals(2, ctx.attributes().size());
         }
     }
