@@ -60,7 +60,6 @@ func main() {
 		_ = os.Unsetenv("HTML_TO_MARKDOWN_PROFILE_REPEAT")
 	}
 
-	// Warmup (avoid profiling the warmup run).
 	err = runScenario(html, *scenario)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Warmup conversion failed: %v\n", err)
@@ -80,7 +79,6 @@ func main() {
 		}
 	}
 
-	// Benchmark
 	start := time.Now()
 	for i := 0; i < *iterations; i++ {
 		err = runScenario(html, *scenario)

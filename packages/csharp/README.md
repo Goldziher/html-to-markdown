@@ -401,6 +401,279 @@ cd packages/csharp
 dotnet test HtmlToMarkdown.Tests/HtmlToMarkdown.Tests.csproj
 ```
 
+## Visitor Pattern
+
+The visitor pattern provides fine-grained control over HTML element processing during conversion. Implement the `IVisitor` interface to intercept visitor callbacks for specific element types, modify conversion behavior, track metadata, or filter content.
+
+### Basic Usage
+
+```csharp
+using HtmlToMarkdown;
+using HtmlToMarkdown.Visitor;
+
+// Create a custom visitor
+class MyVisitor : IVisitor
+{
+    public VisitResult VisitHeading(NodeContext context, int level, string text, string? id)
+    {
+        Console.WriteLine($"H{level}: {text}");
+        return VisitResult.Continue();  // Use default conversion
+    }
+
+    public VisitResult VisitLink(NodeContext context, string href, string text, string? title)
+    {
+        // Example: replace links to a specific domain
+        if (href.Contains("blocked-site.com"))
+            return VisitResult.Skip();  // Omit this link entirely
+
+        return VisitResult.Continue();
+    }
+}
+
+var html = "<h1>Welcome</h1><p>See <a href=\"https://example.com\">example</a></p>";
+var visitor = new MyVisitor();
+var markdown = HtmlToMarkdownConverter.ConvertWithVisitor(html, visitor);
+```
+
+### IVisitor Interface
+
+The `IVisitor` interface includes 40+ callback methods for customizing element processing:
+
+#### Generic Hooks
+- `VisitResult VisitElementStart(NodeContext context)` — Before entering any HTML element
+- `VisitResult VisitElementEnd(NodeContext context, string output)` — After exiting any element with default output
+
+#### Text and Content
+- `VisitResult VisitText(NodeContext context, string text)` — Text nodes (most frequent: 100+ per document)
+- `VisitResult VisitCodeBlock(NodeContext context, string? lang, string code)` — Code blocks `<pre><code>`
+- `VisitResult VisitCodeInline(NodeContext context, string code)` — Inline code `<code>`
+
+#### Document Structure
+- `VisitResult VisitHeading(NodeContext context, int level, string text, string? id)` — Headings `<h1>-<h6>`
+- `VisitResult VisitBlockquote(NodeContext context, string content, int depth)` — Blockquotes `<blockquote>`
+
+#### Links and Images
+- `VisitResult VisitLink(NodeContext context, string href, string text, string? title)` — Anchor links `<a>`
+- `VisitResult VisitImage(NodeContext context, string src, string alt, string? title)` — Images `<img>`
+
+#### Lists
+- `VisitResult VisitListStart(NodeContext context, bool ordered)` — Before list `<ul>/<ol>`
+- `VisitResult VisitListItem(NodeContext context, bool ordered, string marker, string text)` — List items `<li>`
+- `VisitResult VisitListEnd(NodeContext context, bool ordered, string output)` — After list
+
+#### Tables
+- `VisitResult VisitTableStart(NodeContext context)` — Before table `<table>`
+- `VisitResult VisitTableRow(NodeContext context, IReadOnlyList<string> cells, bool isHeader)` — Table rows `<tr>`
+- `VisitResult VisitTableEnd(NodeContext context, string output)` — After table
+
+#### Inline Formatting
+- `VisitResult VisitStrong(NodeContext context, string text)` — Bold `<strong>/<b>`
+- `VisitResult VisitEmphasis(NodeContext context, string text)` — Italic `<em>/<i>`
+- `VisitResult VisitStrikethrough(NodeContext context, string text)` — Strikethrough `<s>/<del>`
+- `VisitResult VisitUnderline(NodeContext context, string text)` — Underline `<u>/<ins>`
+- `VisitResult VisitSubscript(NodeContext context, string text)` — Subscript `<sub>`
+- `VisitResult VisitSuperscript(NodeContext context, string text)` — Superscript `<sup>`
+- `VisitResult VisitMark(NodeContext context, string text)` — Highlight `<mark>`
+
+#### Breaks and Separators
+- `VisitResult VisitLineBreak(NodeContext context)` — Line breaks `<br>`
+- `VisitResult VisitHorizontalRule(NodeContext context)` — Horizontal rules `<hr>`
+
+#### Forms
+- `VisitResult VisitForm(NodeContext context, string? action, string? method)` — Form elements `<form>`
+- `VisitResult VisitInput(NodeContext context, string inputType, string? name, string? value)` — Input fields `<input>`
+- `VisitResult VisitButton(NodeContext context, string text)` — Buttons `<button>`
+
+#### Media
+- `VisitResult VisitAudio(NodeContext context, string? src)` — Audio elements `<audio>`
+- `VisitResult VisitVideo(NodeContext context, string? src)` — Video elements `<video>`
+- `VisitResult VisitIFrame(NodeContext context, string? src)` — Embedded frames `<iframe>`
+
+#### Semantic HTML5
+- `VisitResult VisitDetails(NodeContext context, bool open)` — Disclosure triangles `<details>`
+- `VisitResult VisitSummary(NodeContext context, string text)` — Summary text `<summary>`
+- `VisitResult VisitFigureStart(NodeContext context)` — Figures `<figure>`
+- `VisitResult VisitFigCaption(NodeContext context, string text)` — Figure captions `<figcaption>`
+
+#### Definition Lists
+- `VisitResult VisitDefinitionListStart(NodeContext context)` — Definition lists `<dl>`
+- `VisitResult VisitDefinitionTerm(NodeContext context, string text)` — Terms `<dt>`
+- `VisitResult VisitDefinitionDescription(NodeContext context, string text)` — Descriptions `<dd>`
+
+#### Custom Elements
+- `VisitResult VisitCustomElement(NodeContext context, string tagName, string html)` — Web components and unknown tags
+
+All callback methods have default implementations that return `VisitResult.Continue()`. Override only the callbacks you need.
+
+### VisitResult Types
+
+Control how the converter proceeds after a visitor callback:
+
+```csharp
+// Continue with default conversion behavior
+return VisitResult.Continue();
+
+// Replace element output with custom markdown
+return VisitResult.Custom("**custom markdown**");
+
+// Skip element and all children entirely
+return VisitResult.Skip();
+
+// Preserve original HTML instead of converting
+return VisitResult.PreserveHtml();
+
+// Stop conversion and report error
+return VisitResult.Error("Conversion error: " + ex.Message);
+```
+
+### NodeContext Properties
+
+Visitor callbacks receive a `NodeContext` providing metadata about the current element:
+
+```csharp
+public class NodeContext
+{
+    // Element classification
+    public NodeType NodeType { get; }
+    public string TagName { get; }
+
+    // Attributes
+    public IReadOnlyList<Attribute> Attributes { get; }
+    public string? GetAttribute(string key);
+    public bool HasAttribute(string key);
+
+    // DOM position
+    public int Depth { get; }
+    public int IndexInParent { get; }
+    public string? ParentTag { get; }
+
+    // Inline vs block
+    public bool IsInline { get; }
+}
+```
+
+### Examples
+
+#### Example 1: Track Document Structure
+
+```csharp
+class StructureVisitor : IVisitor
+{
+    public List<(int Level, string Text)> Headings { get; } = new();
+    public List<(string Href, string Text)> Links { get; } = new();
+
+    public VisitResult VisitHeading(NodeContext context, int level, string text, string? id)
+    {
+        Headings.Add((level, text));
+        return VisitResult.Continue();
+    }
+
+    public VisitResult VisitLink(NodeContext context, string href, string text, string? title)
+    {
+        Links.Add((href, text));
+        return VisitResult.Continue();
+    }
+}
+
+var visitor = new StructureVisitor();
+HtmlToMarkdownConverter.ConvertWithVisitor(html, visitor);
+
+foreach (var (level, text) in visitor.Headings)
+{
+    Console.WriteLine($"H{level}: {text}");
+}
+```
+
+#### Example 2: Filter Content
+
+```csharp
+class FilterVisitor : IVisitor
+{
+    public VisitResult VisitElementStart(NodeContext context)
+    {
+        // Skip all advertisement divs
+        if (context.TagName == "div" && context.GetAttribute("class")?.Contains("ad") == true)
+            return VisitResult.Skip();
+
+        // Skip script and style tags
+        if (context.TagName is "script" or "style")
+            return VisitResult.Skip();
+
+        return VisitResult.Continue();
+    }
+
+    public VisitResult VisitImage(NodeContext context, string src, string alt, string? title)
+    {
+        // Skip tracking pixels and social share buttons
+        if (src.Contains("pixel") || src.Contains("tracking"))
+            return VisitResult.Skip();
+
+        return VisitResult.Continue();
+    }
+}
+```
+
+#### Example 3: Customize Output
+
+```csharp
+class CustomizingVisitor : IVisitor
+{
+    public VisitResult VisitLink(NodeContext context, string href, string text, string? title)
+    {
+        // Convert external links to reference-style markdown
+        var uri = new Uri(href, UriKind.RelativeOrAbsolute);
+        if (uri.IsAbsoluteUri && uri.Host != "example.com")
+        {
+            // Return custom markdown with footnote
+            return VisitResult.Custom($"[{text}][^external-{href.GetHashCode()}]");
+        }
+
+        return VisitResult.Continue();
+    }
+
+    public VisitResult VisitHeading(NodeContext context, int level, string text, string? id)
+    {
+        // Add custom attributes to headings
+        if (string.IsNullOrEmpty(id))
+        {
+            var slugId = text.ToLower().Replace(" ", "-");
+            return VisitResult.Custom($"{'#'}{level} {text} {{#{slugId}}}");
+        }
+
+        return VisitResult.Continue();
+    }
+}
+```
+
+### Performance Notes
+
+- Text callbacks (`VisitText`) are called 100+ times per document — keep them fast
+- Visitor state is isolated per conversion (thread-safe by design)
+- Delegates are marshalled once at visitor creation time (no per-callback overhead)
+- All string conversions from C FFI happen automatically (UTF-8 safe)
+
+### Error Handling
+
+Exceptions in visitor callbacks are caught and converted to `VisitResult.Error()`. The error message is propagated to the caller:
+
+```csharp
+class SafeVisitor : IVisitor
+{
+    public VisitResult VisitLink(NodeContext context, string href, string text, string? title)
+    {
+        try
+        {
+            var uri = new Uri(href);  // May throw for invalid URIs
+            return VisitResult.Continue();
+        }
+        catch (UriFormatException ex)
+        {
+            return VisitResult.Error($"Invalid link URI: {ex.Message}");
+        }
+    }
+}
+```
+
 ## Performance
 
 The Rust-backed implementation provides excellent performance:

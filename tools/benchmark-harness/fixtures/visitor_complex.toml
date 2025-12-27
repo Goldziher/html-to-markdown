@@ -1,0 +1,37 @@
+title = "Visitor Complex Overhead Fixtures"
+description = "Worst-case overhead benchmarks with multiple active callbacks, nested elements, and state tracking"
+
+[[fixtures]]
+id = "visitor_complex_nested_lists"
+name = "Deeply Nested Lists with Callbacks"
+path = "test_documents/html/visitor/complex.html"
+category = "visitor"
+iterations = 100
+
+[[fixtures]]
+id = "visitor_complex_tables"
+name = "Complex Tables with Callbacks"
+path = "test_documents/html/visitor/complex.html"
+category = "visitor"
+iterations = 95
+
+[[fixtures]]
+id = "visitor_complex_formatting"
+name = "Mixed Formatting with Multiple Callbacks"
+path = "test_documents/html/visitor/complex.html"
+category = "visitor"
+iterations = 90
+
+[[fixtures]]
+id = "visitor_complex_mixed_lists"
+name = "Mixed Nested Lists with State"
+path = "test_documents/html/visitor/complex.html"
+category = "visitor"
+iterations = 85
+
+[[fixtures]]
+id = "visitor_complex_all_active"
+name = "All Callbacks Active (Worst Case)"
+path = "test_documents/html/visitor/complex.html"
+category = "visitor"
+iterations = 80

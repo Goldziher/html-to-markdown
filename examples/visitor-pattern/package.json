@@ -1,0 +1,19 @@
+{
+  "name": "html-to-markdown-visitor-pattern-examples",
+  "version": "1.0.0",
+  "description": "Visitor pattern examples for html-to-markdown",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "cdn-rewrite": "tsx cdn-rewrite.ts",
+    "content-filter": "tsx content-filter.ts",
+    "async-validation": "tsx async-validation.ts"
+  },
+  "dependencies": {
+    "html-to-markdown": "^2.0.0"
+  },
+  "devDependencies": {
+    "tsx": "^4.0.0",
+    "@types/node": "^20.0.0"
+  }
+}

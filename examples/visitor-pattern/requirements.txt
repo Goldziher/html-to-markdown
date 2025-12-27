@@ -1,0 +1,3 @@
+# Python dependencies for visitor pattern examples
+html-to-markdown>=2.0.0
+aiohttp>=3.9.0  # For async URL validation example

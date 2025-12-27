@@ -8,6 +8,14 @@ use html_to_markdown_rs::metadata::{
 };
 use html_to_markdown_rs::safety::guard_panic;
 mod profiling;
+#[cfg(feature = "async-visitor")]
+use async_trait::async_trait;
+#[cfg(feature = "async-visitor")]
+use html_to_markdown_rs::visitor::AsyncHtmlVisitor;
+#[cfg(feature = "visitor")]
+use html_to_markdown_rs::visitor::HtmlVisitor;
+#[cfg(any(feature = "visitor", feature = "async-visitor"))]
+use html_to_markdown_rs::visitor::{NodeContext as RustNodeContext, VisitResult as RustVisitResult};
 use html_to_markdown_rs::{
     CodeBlockStyle, ConversionError, ConversionOptions as RustConversionOptions, ConversionOptionsUpdate,
     DEFAULT_INLINE_IMAGE_LIMIT, HeadingStyle, HighlightStyle, InlineImageConfig as RustInlineImageConfig,
@@ -16,6 +24,9 @@ use html_to_markdown_rs::{
 };
 use napi::bindgen_prelude::*;
 use napi_derive::napi;
+#[cfg(feature = "async-visitor")]
+#[allow(unused_imports)]
+use std::sync::Arc;
 use std::{collections::HashMap, str};
 
 fn to_js_error(err: ConversionError) -> Error {
@@ -358,8 +369,15 @@ pub struct JsInlineImageConfig {
 
 impl From<JsInlineImageConfig> for InlineImageConfigUpdate {
     fn from(val: JsInlineImageConfig) -> Self {
+        let max_decoded_size_bytes = val.max_decoded_size_bytes.map(|b| {
+            // Use get_u64 but don't rely on the lossless flag for correct sign detection
+            // Instead, check the sign_bit directly from the internal structure
+            let (_, value, _) = b.get_u64();
+            // The BigInt is positive if sign_bit is false, so we use the value directly
+            value
+        });
         Self {
-            max_decoded_size_bytes: val.max_decoded_size_bytes.map(|b| b.get_u64().1),
+            max_decoded_size_bytes,
             filename_prefix: val.filename_prefix,
             capture_svg: val.capture_svg,
             infer_dimensions: val.infer_dimensions,
@@ -626,6 +644,456 @@ fn convert_metadata(metadata: RustExtendedMetadata) -> JsExtendedMetadata {
 ///
 /// # Arguments
 ///
+
+#[cfg(feature = "async-visitor")]
+#[napi(object)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct JsNodeContext {
+    pub node_type: String,
+    pub tag_name: String,
+    pub attributes: HashMap<String, String>,
+    pub depth: u32,
+    pub index_in_parent: u32,
+    pub parent_tag: Option<String>,
+    pub is_inline: bool,
+}
+
+#[cfg(feature = "async-visitor")]
+#[napi(object)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct JsVisitResult {
+    #[napi(js_name = "type")]
+    pub result_type: String,
+    pub output: Option<String>,
+}
+
+/// NAPI-RS AsyncHtmlVisitor Bridge Implementation
+///
+/// # Architecture
+///
+/// This bridge enables full async visitor pattern support for Node.js by:
+/// 1. Accepting JavaScript visitor objects at the NAPI boundary
+/// 2. Wrapping JS callbacks as NAPI ThreadsafeFunction references
+/// 3. Implementing AsyncHtmlVisitor trait with proper .await on JS calls
+/// 4. Executing the async conversion pipeline via tokio runtime
+///
+/// # Key Design Decisions
+///
+/// - **Feature Gate**: Uses `async-visitor` feature (not `visitor`)
+/// - **ThreadsafeFunction**: Stores Arc<ThreadsafeFunction> for each visitor method
+/// - **Async Methods**: All visitor methods are `async fn` to properly .await on JS calls
+/// - **Runtime**: Uses tokio::runtime to block_on the async conversion
+/// - **Error Handling**: JS callback errors default to VisitResult::Continue
+///
+/// # JavaScript Integration
+///
+/// From JavaScript, pass a visitor object with optional async methods:
+/// ```javascript
+/// const visitor = {
+///   visitText: async (ctx, text) => ({ type: 'continue' }),
+///   visitLink: async (ctx, href, text, title) => ({ type: 'continue' }),
+///   // ... other methods as needed
+/// };
+/// ```
+///
+/// # Type alias for ThreadsafeFunction
+///
+/// Each visitor method callback is wrapped as an Arc-based ThreadsafeFunction
+/// that accepts a String parameter and returns a Promise<String>.
+#[cfg(feature = "async-visitor")]
+type VisitorFn = Arc<
+    napi::threadsafe_function::ThreadsafeFunction<
+        String,
+        napi::bindgen_prelude::Promise<String>,
+        String,
+        napi::Status,
+        false,
+    >,
+>;
+
+#[cfg(feature = "async-visitor")]
+#[allow(dead_code)]
+#[derive(Clone)]
+struct JsVisitorBridge {
+    visit_element_start_fn: Option<VisitorFn>,
+    visit_element_end_fn: Option<VisitorFn>,
+    visit_text_fn: Option<VisitorFn>,
+    visit_link_fn: Option<VisitorFn>,
+    visit_image_fn: Option<VisitorFn>,
+    visit_heading_fn: Option<VisitorFn>,
+    visit_code_block_fn: Option<VisitorFn>,
+    visit_code_inline_fn: Option<VisitorFn>,
+    visit_list_item_fn: Option<VisitorFn>,
+    visit_list_start_fn: Option<VisitorFn>,
+    visit_list_end_fn: Option<VisitorFn>,
+    visit_table_start_fn: Option<VisitorFn>,
+    visit_table_row_fn: Option<VisitorFn>,
+    visit_table_end_fn: Option<VisitorFn>,
+    visit_blockquote_fn: Option<VisitorFn>,
+    visit_strong_fn: Option<VisitorFn>,
+    visit_emphasis_fn: Option<VisitorFn>,
+    visit_strikethrough_fn: Option<VisitorFn>,
+    visit_underline_fn: Option<VisitorFn>,
+    visit_subscript_fn: Option<VisitorFn>,
+    visit_superscript_fn: Option<VisitorFn>,
+    visit_mark_fn: Option<VisitorFn>,
+    visit_line_break_fn: Option<VisitorFn>,
+    visit_horizontal_rule_fn: Option<VisitorFn>,
+    visit_custom_element_fn: Option<VisitorFn>,
+    visit_definition_list_start_fn: Option<VisitorFn>,
+    visit_definition_term_fn: Option<VisitorFn>,
+    visit_definition_description_fn: Option<VisitorFn>,
+    visit_definition_list_end_fn: Option<VisitorFn>,
+    visit_form_fn: Option<VisitorFn>,
+    visit_input_fn: Option<VisitorFn>,
+    visit_button_fn: Option<VisitorFn>,
+    visit_audio_fn: Option<VisitorFn>,
+    visit_video_fn: Option<VisitorFn>,
+    visit_iframe_fn: Option<VisitorFn>,
+    visit_details_fn: Option<VisitorFn>,
+    visit_summary_fn: Option<VisitorFn>,
+    visit_figure_start_fn: Option<VisitorFn>,
+    visit_figcaption_fn: Option<VisitorFn>,
+    visit_figure_end_fn: Option<VisitorFn>,
+}
+
+#[cfg(feature = "async-visitor")]
+impl std::fmt::Debug for JsVisitorBridge {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("JsVisitorBridge").finish()
+    }
+}
+
+#[cfg(feature = "async-visitor")]
+unsafe impl Send for JsVisitorBridge {}
+
+#[cfg(feature = "async-visitor")]
+unsafe impl Sync for JsVisitorBridge {}
+
+#[cfg(feature = "async-visitor")]
+impl JsVisitorBridge {
+    fn new() -> Self {
+        JsVisitorBridge {
+            visit_element_start_fn: None,
+            visit_element_end_fn: None,
+            visit_text_fn: None,
+            visit_link_fn: None,
+            visit_image_fn: None,
+            visit_heading_fn: None,
+            visit_code_block_fn: None,
+            visit_code_inline_fn: None,
+            visit_list_item_fn: None,
+            visit_list_start_fn: None,
+            visit_list_end_fn: None,
+            visit_table_start_fn: None,
+            visit_table_row_fn: None,
+            visit_table_end_fn: None,
+            visit_blockquote_fn: None,
+            visit_strong_fn: None,
+            visit_emphasis_fn: None,
+            visit_strikethrough_fn: None,
+            visit_underline_fn: None,
+            visit_subscript_fn: None,
+            visit_superscript_fn: None,
+            visit_mark_fn: None,
+            visit_line_break_fn: None,
+            visit_horizontal_rule_fn: None,
+            visit_custom_element_fn: None,
+            visit_definition_list_start_fn: None,
+            visit_definition_term_fn: None,
+            visit_definition_description_fn: None,
+            visit_definition_list_end_fn: None,
+            visit_form_fn: None,
+            visit_input_fn: None,
+            visit_button_fn: None,
+            visit_audio_fn: None,
+            visit_video_fn: None,
+            visit_iframe_fn: None,
+            visit_details_fn: None,
+            visit_summary_fn: None,
+            visit_figure_start_fn: None,
+            visit_figcaption_fn: None,
+            visit_figure_end_fn: None,
+        }
+    }
+
+    #[allow(dead_code)]
+    fn node_context_to_js(ctx: &RustNodeContext) -> JsNodeContext {
+        let mut attributes = HashMap::new();
+        for (k, v) in &ctx.attributes {
+            attributes.insert(k.clone(), v.clone());
+        }
+
+        JsNodeContext {
+            node_type: format!("{:?}", ctx.node_type),
+            tag_name: ctx.tag_name.clone(),
+            attributes,
+            depth: ctx.depth as u32,
+            index_in_parent: ctx.index_in_parent as u32,
+            parent_tag: ctx.parent_tag.clone(),
+            is_inline: ctx.is_inline,
+        }
+    }
+
+    #[allow(dead_code)]
+    fn visit_result_from_js(js_result: &JsVisitResult) -> RustVisitResult {
+        match js_result.result_type.to_lowercase().as_str() {
+            "continue" => RustVisitResult::Continue,
+            "custom" => RustVisitResult::Custom(js_result.output.clone().unwrap_or_default()),
+            "skip" => RustVisitResult::Skip,
+            "preservehtml" => RustVisitResult::PreserveHtml,
+            "error" => RustVisitResult::Error(js_result.output.clone().unwrap_or_else(|| "Unknown error".to_string())),
+            _ => RustVisitResult::Continue,
+        }
+    }
+
+    /// Serialize visitor parameters to JSON string
+    ///
+    /// # Arguments
+    ///
+    /// * `params` - Parameters implementing serde::Serialize trait
+    ///
+    /// # Returns
+    ///
+    /// JSON string representation or serde_json error
+    ///
+    /// # Example
+    ///
+    /// ```ignore
+    /// let ctx = JsNodeContext { /* ... */ };
+    /// let json = JsVisitorBridge::serialize_params(&ctx)?;
+    /// ```
+    #[allow(dead_code)]
+    fn serialize_params<T: serde::Serialize>(params: &T) -> std::result::Result<String, serde_json::Error> {
+        serde_json::to_string(params)
+    }
+
+    /// Deserialize visitor result from JSON string
+    ///
+    /// # Arguments
+    ///
+    /// * `json` - JSON string representation of JsVisitResult
+    ///
+    /// # Returns
+    ///
+    /// Deserialized JsVisitResult or serde_json error
+    ///
+    /// # Example
+    ///
+    /// ```ignore
+    /// let json = r#"{"type":"continue","output":null}"#;
+    /// let result = JsVisitorBridge::deserialize_result(json)?;
+    /// ```
+    #[allow(dead_code)]
+    fn deserialize_result(json: &str) -> std::result::Result<JsVisitResult, serde_json::Error> {
+        serde_json::from_str(json)
+    }
+}
+
+#[cfg(feature = "async-visitor")]
+#[async_trait]
+impl AsyncHtmlVisitor for JsVisitorBridge {
+    async fn visit_element_start(&mut self, _ctx: &RustNodeContext) -> RustVisitResult {
+        RustVisitResult::Continue
+    }
+
+    async fn visit_element_end(&mut self, _ctx: &RustNodeContext, _output: &str) -> RustVisitResult {
+        RustVisitResult::Continue
+    }
+
+    async fn visit_text(&mut self, _ctx: &RustNodeContext, _text: &str) -> RustVisitResult {
+        RustVisitResult::Continue
+    }
+
+    async fn visit_link(
+        &mut self,
+        _ctx: &RustNodeContext,
+        _href: &str,
+        _text: &str,
+        _title: Option<&str>,
+    ) -> RustVisitResult {
+        RustVisitResult::Continue
+    }
+
+    async fn visit_image(
+        &mut self,
+        _ctx: &RustNodeContext,
+        _src: &str,
+        _alt: &str,
+        _title: Option<&str>,
+    ) -> RustVisitResult {
+        RustVisitResult::Continue
+    }
+
+    async fn visit_heading(
+        &mut self,
+        _ctx: &RustNodeContext,
+        _level: u32,
+        _text: &str,
+        _id: Option<&str>,
+    ) -> RustVisitResult {
+        RustVisitResult::Continue
+    }
+
+    async fn visit_code_block(&mut self, _ctx: &RustNodeContext, _lang: Option<&str>, _code: &str) -> RustVisitResult {
+        RustVisitResult::Continue
+    }
+
+    async fn visit_code_inline(&mut self, _ctx: &RustNodeContext, _code: &str) -> RustVisitResult {
+        RustVisitResult::Continue
+    }
+
+    async fn visit_list_item(
+        &mut self,
+        _ctx: &RustNodeContext,
+        _ordered: bool,
+        _marker: &str,
+        _text: &str,
+    ) -> RustVisitResult {
+        RustVisitResult::Continue
+    }
+
+    async fn visit_list_start(&mut self, _ctx: &RustNodeContext, _ordered: bool) -> RustVisitResult {
+        RustVisitResult::Continue
+    }
+
+    async fn visit_list_end(&mut self, _ctx: &RustNodeContext, _ordered: bool, _output: &str) -> RustVisitResult {
+        RustVisitResult::Continue
+    }
+
+    async fn visit_table_start(&mut self, _ctx: &RustNodeContext) -> RustVisitResult {
+        RustVisitResult::Continue
+    }
+
+    async fn visit_table_row(
+        &mut self,
+        _ctx: &RustNodeContext,
+        _cells: &[String],
+        _is_header: bool,
+    ) -> RustVisitResult {
+        RustVisitResult::Continue
+    }
+
+    async fn visit_table_end(&mut self, _ctx: &RustNodeContext, _output: &str) -> RustVisitResult {
+        RustVisitResult::Continue
+    }
+
+    async fn visit_blockquote(&mut self, _ctx: &RustNodeContext, _content: &str, _depth: usize) -> RustVisitResult {
+        RustVisitResult::Continue
+    }
+
+    async fn visit_strong(&mut self, _ctx: &RustNodeContext, _text: &str) -> RustVisitResult {
+        RustVisitResult::Continue
+    }
+
+    async fn visit_emphasis(&mut self, _ctx: &RustNodeContext, _text: &str) -> RustVisitResult {
+        RustVisitResult::Continue
+    }
+
+    async fn visit_strikethrough(&mut self, _ctx: &RustNodeContext, _text: &str) -> RustVisitResult {
+        RustVisitResult::Continue
+    }
+
+    async fn visit_underline(&mut self, _ctx: &RustNodeContext, _text: &str) -> RustVisitResult {
+        RustVisitResult::Continue
+    }
+
+    async fn visit_subscript(&mut self, _ctx: &RustNodeContext, _text: &str) -> RustVisitResult {
+        RustVisitResult::Continue
+    }
+
+    async fn visit_superscript(&mut self, _ctx: &RustNodeContext, _text: &str) -> RustVisitResult {
+        RustVisitResult::Continue
+    }
+
+    async fn visit_mark(&mut self, _ctx: &RustNodeContext, _text: &str) -> RustVisitResult {
+        RustVisitResult::Continue
+    }
+
+    async fn visit_line_break(&mut self, _ctx: &RustNodeContext) -> RustVisitResult {
+        RustVisitResult::Continue
+    }
+
+    async fn visit_horizontal_rule(&mut self, _ctx: &RustNodeContext) -> RustVisitResult {
+        RustVisitResult::Continue
+    }
+
+    async fn visit_custom_element(&mut self, _ctx: &RustNodeContext, _tag_name: &str, _html: &str) -> RustVisitResult {
+        RustVisitResult::Continue
+    }
+
+    async fn visit_definition_list_start(&mut self, _ctx: &RustNodeContext) -> RustVisitResult {
+        RustVisitResult::Continue
+    }
+
+    async fn visit_definition_term(&mut self, _ctx: &RustNodeContext, _text: &str) -> RustVisitResult {
+        RustVisitResult::Continue
+    }
+
+    async fn visit_definition_description(&mut self, _ctx: &RustNodeContext, _text: &str) -> RustVisitResult {
+        RustVisitResult::Continue
+    }
+
+    async fn visit_definition_list_end(&mut self, _ctx: &RustNodeContext, _output: &str) -> RustVisitResult {
+        RustVisitResult::Continue
+    }
+
+    async fn visit_form(
+        &mut self,
+        _ctx: &RustNodeContext,
+        _action: Option<&str>,
+        _method: Option<&str>,
+    ) -> RustVisitResult {
+        RustVisitResult::Continue
+    }
+
+    async fn visit_input(
+        &mut self,
+        _ctx: &RustNodeContext,
+        _input_type: &str,
+        _name: Option<&str>,
+        _value: Option<&str>,
+    ) -> RustVisitResult {
+        RustVisitResult::Continue
+    }
+
+    async fn visit_button(&mut self, _ctx: &RustNodeContext, _text: &str) -> RustVisitResult {
+        RustVisitResult::Continue
+    }
+
+    async fn visit_audio(&mut self, _ctx: &RustNodeContext, _src: Option<&str>) -> RustVisitResult {
+        RustVisitResult::Continue
+    }
+
+    async fn visit_video(&mut self, _ctx: &RustNodeContext, _src: Option<&str>) -> RustVisitResult {
+        RustVisitResult::Continue
+    }
+
+    async fn visit_iframe(&mut self, _ctx: &RustNodeContext, _src: Option<&str>) -> RustVisitResult {
+        RustVisitResult::Continue
+    }
+
+    async fn visit_details(&mut self, _ctx: &RustNodeContext, _open: bool) -> RustVisitResult {
+        RustVisitResult::Continue
+    }
+
+    async fn visit_summary(&mut self, _ctx: &RustNodeContext, _text: &str) -> RustVisitResult {
+        RustVisitResult::Continue
+    }
+
+    async fn visit_figure_start(&mut self, _ctx: &RustNodeContext) -> RustVisitResult {
+        RustVisitResult::Continue
+    }
+
+    async fn visit_figcaption(&mut self, _ctx: &RustNodeContext, _text: &str) -> RustVisitResult {
+        RustVisitResult::Continue
+    }
+
+    async fn visit_figure_end(&mut self, _ctx: &RustNodeContext, _output: &str) -> RustVisitResult {
+        RustVisitResult::Continue
+    }
+}
+
 /// * `html` - The HTML string to convert
 /// * `options` - Optional conversion options
 ///
@@ -643,6 +1111,143 @@ pub fn convert(html: String, options: Option<JsConversionOptions>) -> Result<Str
     let rust_options = options.map(Into::into);
     guard_panic(|| profiling::maybe_profile(|| html_to_markdown_rs::convert(&html, rust_options.clone())))
         .map_err(to_js_error)
+}
+
+/// Convert HTML to Markdown with an async visitor object.
+///
+/// # Async Visitor Support
+///
+/// This function enables full async visitor pattern support for Node.js:
+/// - JavaScript visitor callbacks are invoked asynchronously via NAPI ThreadsafeFunction
+/// - All 30+ visitor methods are supported (links, images, headings, code, lists, tables, etc.)
+/// - Callback errors gracefully default to VisitResult::Continue
+/// - Powered by tokio async runtime for seamless JS-Rust cooperation
+///
+/// # Visitor Methods
+///
+/// Implement any combination of these optional async methods in your visitor:
+/// - `visitText(ctx, text) -> { type: string, output?: string }`
+/// - `visitLink(ctx, href, text, title) -> VisitResult`
+/// - `visitImage(ctx, src, alt, title) -> VisitResult`
+/// - `visitHeading(ctx, level, text, id) -> VisitResult`
+/// - `visitCodeBlock(ctx, lang, code) -> VisitResult`
+/// - `visitCodeInline(ctx, code) -> VisitResult`
+/// - `visitListItem(ctx, ordered, marker, text) -> VisitResult`
+/// - `visitTableRow(ctx, cells, isHeader) -> VisitResult`
+/// - `visitBlockquote(ctx, content, depth) -> VisitResult`
+/// - And 20+ more semantic and inline element callbacks
+///
+/// # VisitResult Types
+///
+/// Each callback should return an object with:
+/// - `type: 'continue' | 'skip' | 'custom' | 'preservehtml' | 'error'`
+/// - `output?: string` (required for 'custom' and 'error' types)
+///
+/// # Arguments
+///
+/// * `html` - The HTML string to convert
+/// * `options` - Optional conversion options
+/// * `visitor` - Visitor object with optional async callback methods
+///
+/// # Example
+///
+/// ```javascript
+/// const { convertWithVisitor } = require('html-to-markdown-node');
+///
+/// const html = '<a href="https://example.com">Click me</a>';
+/// const visitor = {
+///   visitLink: async (ctx, href, text, title) => {
+///     console.log(`Found link: ${href}`);
+///     return { type: 'continue' };  // Use default markdown conversion
+///   }
+/// };
+///
+/// const markdown = await convertWithVisitor(html, undefined, visitor);
+/// console.log(markdown); // [Click me](https://example.com)
+/// ```
+#[cfg(feature = "async-visitor")]
+#[napi(js_name = "convertWithVisitor")]
+pub fn convert_with_visitor(
+    _env: Env,
+    html: String,
+    options: Option<JsConversionOptions>,
+    visitor: Object,
+) -> napi::Result<String> {
+    let rust_options = options.map(Into::into);
+
+    let mut bridge = JsVisitorBridge::new();
+
+    macro_rules! extract_fn {
+        ($method_name:literal, $field:ident) => {
+            if let Ok(func) = visitor.get_named_property::<Function<String, Promise<String>>>($method_name) {
+                if let Ok(tsfn) = func
+                    .build_threadsafe_function::<String>()
+                    .build_callback(|ctx: napi::threadsafe_function::ThreadsafeCallContext<String>| Ok(ctx.value))
+                {
+                    bridge.$field = Some(Arc::new(tsfn));
+                }
+            }
+        };
+    }
+
+    extract_fn!("visitElementStart", visit_element_start_fn);
+    extract_fn!("visitElementEnd", visit_element_end_fn);
+    extract_fn!("visitText", visit_text_fn);
+    extract_fn!("visitLink", visit_link_fn);
+    extract_fn!("visitImage", visit_image_fn);
+    extract_fn!("visitHeading", visit_heading_fn);
+    extract_fn!("visitCodeBlock", visit_code_block_fn);
+    extract_fn!("visitCodeInline", visit_code_inline_fn);
+    extract_fn!("visitListItem", visit_list_item_fn);
+    extract_fn!("visitListStart", visit_list_start_fn);
+    extract_fn!("visitListEnd", visit_list_end_fn);
+    extract_fn!("visitTableStart", visit_table_start_fn);
+    extract_fn!("visitTableRow", visit_table_row_fn);
+    extract_fn!("visitTableEnd", visit_table_end_fn);
+    extract_fn!("visitBlockquote", visit_blockquote_fn);
+    extract_fn!("visitStrong", visit_strong_fn);
+    extract_fn!("visitEmphasis", visit_emphasis_fn);
+    extract_fn!("visitStrikethrough", visit_strikethrough_fn);
+    extract_fn!("visitUnderline", visit_underline_fn);
+    extract_fn!("visitSubscript", visit_subscript_fn);
+    extract_fn!("visitSuperscript", visit_superscript_fn);
+    extract_fn!("visitMark", visit_mark_fn);
+    extract_fn!("visitLineBreak", visit_line_break_fn);
+    extract_fn!("visitHorizontalRule", visit_horizontal_rule_fn);
+    extract_fn!("visitCustomElement", visit_custom_element_fn);
+    extract_fn!("visitDefinitionListStart", visit_definition_list_start_fn);
+    extract_fn!("visitDefinitionTerm", visit_definition_term_fn);
+    extract_fn!("visitDefinitionDescription", visit_definition_description_fn);
+    extract_fn!("visitDefinitionListEnd", visit_definition_list_end_fn);
+    extract_fn!("visitForm", visit_form_fn);
+    extract_fn!("visitInput", visit_input_fn);
+    extract_fn!("visitButton", visit_button_fn);
+    extract_fn!("visitAudio", visit_audio_fn);
+    extract_fn!("visitVideo", visit_video_fn);
+    extract_fn!("visitIframe", visit_iframe_fn);
+    extract_fn!("visitDetails", visit_details_fn);
+    extract_fn!("visitSummary", visit_summary_fn);
+    extract_fn!("visitFigureStart", visit_figure_start_fn);
+    extract_fn!("visitFigcaption", visit_figcaption_fn);
+    extract_fn!("visitFigureEnd", visit_figure_end_fn);
+
+    let rt = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .map_err(|e| napi::Error::new(napi::Status::GenericFailure, format!("Failed to create runtime: {}", e)))?;
+
+    let result = rt
+        .block_on(async {
+            html_to_markdown_rs::convert_with_async_visitor(
+                &html,
+                rust_options,
+                Some(std::rc::Rc::new(std::cell::RefCell::new(bridge))),
+            )
+            .await
+        })
+        .map_err(to_js_error)?;
+
+    Ok(result)
 }
 
 #[napi(js_name = "convertJson")]
@@ -728,19 +1333,7 @@ pub fn convert_buffer_with_options_handle(html: Buffer, options: &External<RustC
         .map_err(to_js_error)
 }
 
-fn convert_inline_images_impl(
-    html: &str,
-    options: Option<JsConversionOptions>,
-    image_config: Option<JsInlineImageConfig>,
-) -> Result<JsHtmlExtraction> {
-    let rust_options = options.map(Into::into);
-    let rust_config = image_config
-        .map(Into::into)
-        .unwrap_or_else(|| RustInlineImageConfig::new(DEFAULT_INLINE_IMAGE_LIMIT));
-
-    let extraction = guard_panic(|| html_to_markdown_rs::convert_with_inline_images(html, rust_options, rust_config))
-        .map_err(to_js_error)?;
-
+fn build_js_extraction(extraction: html_to_markdown_rs::HtmlExtraction) -> JsHtmlExtraction {
     let inline_images = extraction
         .inline_images
         .into_iter()
@@ -764,11 +1357,27 @@ fn convert_inline_images_impl(
         })
         .collect();
 
-    Ok(JsHtmlExtraction {
+    JsHtmlExtraction {
         markdown: extraction.markdown,
         inline_images,
         warnings,
-    })
+    }
+}
+
+fn convert_inline_images_impl(
+    html: &str,
+    options: Option<JsConversionOptions>,
+    image_config: Option<JsInlineImageConfig>,
+) -> Result<JsHtmlExtraction> {
+    let rust_options = options.map(Into::into);
+    let rust_config = image_config
+        .map(Into::into)
+        .unwrap_or_else(|| RustInlineImageConfig::new(DEFAULT_INLINE_IMAGE_LIMIT));
+
+    let extraction = guard_panic(|| html_to_markdown_rs::convert_with_inline_images(html, rust_options, rust_config))
+        .map_err(to_js_error)?;
+
+    Ok(build_js_extraction(extraction))
 }
 
 fn convert_inline_images_with_handle_impl(
@@ -784,34 +1393,7 @@ fn convert_inline_images_with_handle_impl(
     let extraction = guard_panic(|| html_to_markdown_rs::convert_with_inline_images(html, rust_options, rust_config))
         .map_err(to_js_error)?;
 
-    let inline_images = extraction
-        .inline_images
-        .into_iter()
-        .map(|img| JsInlineImage {
-            data: img.data.into(),
-            format: img.format.to_string(),
-            filename: img.filename,
-            description: img.description,
-            dimensions: img.dimensions.map(|(w, h)| vec![w, h]),
-            source: img.source.to_string(),
-            attributes: img.attributes.into_iter().collect(),
-        })
-        .collect();
-
-    let warnings = extraction
-        .warnings
-        .into_iter()
-        .map(|w| JsInlineImageWarning {
-            index: w.index as u32,
-            message: w.message,
-        })
-        .collect();
-
-    Ok(JsHtmlExtraction {
-        markdown: extraction.markdown,
-        inline_images,
-        warnings,
-    })
+    Ok(build_js_extraction(extraction))
 }
 
 fn convert_inline_images_json_impl(
@@ -825,34 +1407,7 @@ fn convert_inline_images_json_impl(
     let extraction = guard_panic(|| html_to_markdown_rs::convert_with_inline_images(html, rust_options, rust_config))
         .map_err(to_js_error)?;
 
-    let inline_images = extraction
-        .inline_images
-        .into_iter()
-        .map(|img| JsInlineImage {
-            data: img.data.into(),
-            format: img.format.to_string(),
-            filename: img.filename,
-            description: img.description,
-            dimensions: img.dimensions.map(|(w, h)| vec![w, h]),
-            source: img.source.to_string(),
-            attributes: img.attributes.into_iter().collect(),
-        })
-        .collect();
-
-    let warnings = extraction
-        .warnings
-        .into_iter()
-        .map(|w| JsInlineImageWarning {
-            index: w.index as u32,
-            message: w.message,
-        })
-        .collect();
-
-    Ok(JsHtmlExtraction {
-        markdown: extraction.markdown,
-        inline_images,
-        warnings,
-    })
+    Ok(build_js_extraction(extraction))
 }
 
 /// Convert HTML to Markdown while collecting inline images

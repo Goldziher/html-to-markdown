@@ -9,6 +9,7 @@ use HtmlToMarkdown\Config\InlineImageConfig;
 use HtmlToMarkdown\Service\Converter as ConverterService;
 use HtmlToMarkdown\Value\ExtendedMetadata;
 use HtmlToMarkdown\Value\InlineImageExtraction;
+use HtmlToMarkdown\Visitor\HtmlVisitor;
 
 /**
  * @phpstan-import-type ConversionOptionsInput from \HtmlToMarkdown\Config\ConversionOptions
@@ -52,5 +53,19 @@ final class HtmlToMarkdown
         ?array $metadataConfig = null,
     ): array {
         return ConverterService::create()->convertWithMetadata($html, $options, $metadataConfig);
+    }
+
+    /**
+     * Convert HTML with a custom visitor for advanced control.
+     *
+     * @param ConversionOptions|ConversionOptionsInput|null $options
+     * @phpstan-param ConversionOptions|array<string, mixed>|null $options
+     */
+    public static function convertWithVisitor(
+        string $html,
+        ConversionOptions|array|null $options = null,
+        ?HtmlVisitor $visitor = null,
+    ): string {
+        return ConverterService::create()->convertWithVisitor($html, $options, $visitor);
     }
 }

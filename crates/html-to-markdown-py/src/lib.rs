@@ -1,3 +1,4 @@
+#[cfg(feature = "metadata")]
 use html_to_markdown_rs::metadata::{
     DEFAULT_MAX_STRUCTURED_DATA_SIZE, DocumentMetadata as RustDocumentMetadata,
     ExtendedMetadata as RustExtendedMetadata, HeaderMetadata as RustHeaderMetadata, ImageMetadata as RustImageMetadata,
@@ -6,16 +7,36 @@ use html_to_markdown_rs::metadata::{
 };
 use html_to_markdown_rs::safety::guard_panic;
 mod profiling;
+#[cfg(feature = "visitor")]
+use html_to_markdown_rs::visitor::{HtmlVisitor, NodeContext, VisitResult};
 use html_to_markdown_rs::{
-    CodeBlockStyle, ConversionError, ConversionOptions as RustConversionOptions, DEFAULT_INLINE_IMAGE_LIMIT,
-    HeadingStyle, HighlightStyle, InlineImageConfig as RustInlineImageConfig, ListIndentType, NewlineStyle,
-    PreprocessingOptions as RustPreprocessingOptions, PreprocessingPreset, WhitespaceMode,
+    CodeBlockStyle, ConversionError, ConversionOptions as RustConversionOptions, HeadingStyle, HighlightStyle,
+    ListIndentType, NewlineStyle, PreprocessingOptions as RustPreprocessingOptions, PreprocessingPreset,
+    WhitespaceMode,
 };
+#[cfg(feature = "inline-images")]
+use html_to_markdown_rs::{DEFAULT_INLINE_IMAGE_LIMIT, InlineImageConfig as RustInlineImageConfig};
+#[cfg(feature = "async-visitor")]
+use once_cell::sync::OnceCell;
 use pyo3::prelude::*;
-use pyo3::types::{PyBytes, PyDict};
+#[cfg(feature = "inline-images")]
+use pyo3::types::PyBytes;
+#[cfg(any(feature = "inline-images", feature = "metadata"))]
+use pyo3::types::PyDict;
+#[cfg(feature = "metadata")]
 use pyo3::types::{PyList, PyTuple};
+#[cfg(feature = "async-visitor")]
+use pyo3_async_runtimes::TaskLocals;
+#[cfg(feature = "visitor")]
+use std::cell::RefCell;
 use std::panic::UnwindSafe;
 use std::path::PathBuf;
+#[cfg(feature = "visitor")]
+use std::rc::Rc;
+#[cfg(feature = "async-visitor")]
+use std::sync::Arc;
+#[cfg(feature = "async-visitor")]
+use std::sync::Mutex;
 
 fn to_py_err(err: ConversionError) -> PyErr {
     match err {
@@ -33,6 +54,26 @@ where
     guard_panic(|| profiling::maybe_profile(f))
 }
 
+#[cfg(feature = "async-visitor")]
+pub static PYTHON_TASK_LOCALS: OnceCell<TaskLocals> = OnceCell::new();
+
+#[cfg(feature = "async-visitor")]
+fn init_python_event_loop(py: Python) -> PyResult<()> {
+    if PYTHON_TASK_LOCALS.get().is_some() {
+        return Ok(());
+    }
+
+    let asyncio = py.import("asyncio")?;
+    let event_loop = asyncio.call_method0("new_event_loop")?;
+    let task_locals = TaskLocals::new(event_loop).copy_context(py)?;
+
+    PYTHON_TASK_LOCALS
+        .set(task_locals)
+        .map_err(|_| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>("Python async context already initialized"))?;
+
+    Ok(())
+}
+
 fn parse_options_json(options_json: Option<&str>) -> PyResult<Option<RustConversionOptions>> {
     let Some(json) = options_json else {
         return Ok(None);
@@ -46,6 +87,7 @@ fn parse_options_json(options_json: Option<&str>) -> PyResult<Option<RustConvers
     Ok(Some(options))
 }
 
+#[cfg(feature = "inline-images")]
 fn parse_inline_image_config_json(config_json: Option<&str>) -> PyResult<RustInlineImageConfig> {
     let Some(json) = config_json else {
         return Ok(RustInlineImageConfig::new(DEFAULT_INLINE_IMAGE_LIMIT));
@@ -58,6 +100,7 @@ fn parse_inline_image_config_json(config_json: Option<&str>) -> PyResult<RustInl
     html_to_markdown_rs::inline_image_config_from_json(json).map_err(to_py_err)
 }
 
+#[cfg(feature = "metadata")]
 fn parse_metadata_config_json(config_json: Option<&str>) -> PyResult<RustMetadataConfig> {
     let Some(json) = config_json else {
         return Ok(RustMetadataConfig::default());
@@ -84,6 +127,7 @@ fn stop_profiling() -> PyResult<()> {
     Ok(())
 }
 
+#[cfg(feature = "inline-images")]
 type PyInlineExtraction = PyResult<(String, Vec<Py<PyAny>>, Vec<Py<PyAny>>)>;
 
 /// Python wrapper for PreprocessingOptions
@@ -131,6 +175,7 @@ impl PreprocessingOptions {
 }
 
 /// Python wrapper for inline image extraction configuration
+#[cfg(feature = "inline-images")]
 #[pyclass]
 #[derive(Clone)]
 struct InlineImageConfig {
@@ -144,6 +189,7 @@ struct InlineImageConfig {
     infer_dimensions: bool,
 }
 
+#[cfg(feature = "inline-images")]
 #[pymethods]
 impl InlineImageConfig {
     #[new]
@@ -168,6 +214,7 @@ impl InlineImageConfig {
     }
 }
 
+#[cfg(feature = "inline-images")]
 impl InlineImageConfig {
     fn to_rust(&self) -> RustInlineImageConfig {
         let mut cfg = RustInlineImageConfig::new(self.max_decoded_size_bytes);
@@ -179,6 +226,7 @@ impl InlineImageConfig {
 }
 
 /// Python wrapper for metadata extraction configuration
+#[cfg(feature = "metadata")]
 #[pyclass]
 #[derive(Clone)]
 struct MetadataConfig {
@@ -196,6 +244,7 @@ struct MetadataConfig {
     max_structured_data_size: usize,
 }
 
+#[cfg(feature = "metadata")]
 #[pymethods]
 impl MetadataConfig {
     #[new]
@@ -226,6 +275,7 @@ impl MetadataConfig {
     }
 }
 
+#[cfg(feature = "metadata")]
 impl MetadataConfig {
     fn to_rust(&self) -> RustMetadataConfig {
         RustMetadataConfig {
@@ -542,6 +592,7 @@ fn create_options_handle_json(options_json: Option<&str>) -> PyResult<Conversion
     Ok(ConversionOptionsHandle::new_with_rust(rust_options))
 }
 
+#[cfg(feature = "inline-images")]
 fn inline_image_to_py<'py>(py: Python<'py>, image: html_to_markdown_rs::InlineImage) -> PyResult<Py<PyAny>> {
     let dict = PyDict::new(py);
     dict.set_item("data", PyBytes::new(py, &image.data))?;
@@ -574,6 +625,7 @@ fn inline_image_to_py<'py>(py: Python<'py>, image: html_to_markdown_rs::InlineIm
     Ok(dict.into())
 }
 
+#[cfg(feature = "inline-images")]
 fn warning_to_py<'py>(py: Python<'py>, warning: html_to_markdown_rs::InlineImageWarning) -> PyResult<Py<PyAny>> {
     let dict = PyDict::new(py);
     dict.set_item("index", warning.index)?;
@@ -608,6 +660,7 @@ fn warning_to_py<'py>(py: Python<'py>, warning: html_to_markdown_rs::InlineImage
 ///     for img in images:
 ///         print(f"Format: {img['format']}, Size: {len(img['data'])} bytes")
 ///     ```
+#[cfg(feature = "inline-images")]
 #[pyfunction]
 #[pyo3(signature = (html, options=None, image_config=None))]
 fn convert_with_inline_images<'py>(
@@ -643,6 +696,7 @@ fn convert_with_inline_images<'py>(
     Ok((extraction.markdown, images, warnings))
 }
 
+#[cfg(feature = "inline-images")]
 #[pyfunction]
 #[pyo3(signature = (html, options_json=None, image_config_json=None))]
 fn convert_with_inline_images_json<'py>(
@@ -678,6 +732,7 @@ fn convert_with_inline_images_json<'py>(
 }
 
 /// Convert HTML to Markdown with inline images using a pre-parsed options handle.
+#[cfg(feature = "inline-images")]
 #[pyfunction]
 #[pyo3(signature = (html, handle, image_config=None))]
 fn convert_with_inline_images_handle<'py>(
@@ -713,6 +768,7 @@ fn convert_with_inline_images_handle<'py>(
     Ok((extraction.markdown, images, warnings))
 }
 
+#[cfg(feature = "metadata")]
 fn opt_string_to_py<'py>(py: Python<'py>, opt: Option<String>) -> PyResult<Py<PyAny>> {
     match opt {
         Some(val) => {
@@ -723,6 +779,7 @@ fn opt_string_to_py<'py>(py: Python<'py>, opt: Option<String>) -> PyResult<Py<Py
     }
 }
 
+#[cfg(feature = "metadata")]
 fn btreemap_to_py<'py>(py: Python<'py>, map: std::collections::BTreeMap<String, String>) -> PyResult<Py<PyAny>> {
     let dict = PyDict::new(py);
     for (k, v) in map {
@@ -731,13 +788,18 @@ fn btreemap_to_py<'py>(py: Python<'py>, map: std::collections::BTreeMap<String, 
     Ok(dict.into())
 }
 
+#[cfg(feature = "metadata")]
 fn text_direction_to_str<'py>(py: Python<'py>, text_direction: Option<RustTextDirection>) -> Py<PyAny> {
     match text_direction {
-        Some(direction) => pyo3::types::PyString::new(py, &direction.to_string()).into(),
+        Some(direction) => pyo3::types::PyString::new(py, &direction.to_string())
+            .as_any()
+            .to_owned()
+            .into(),
         None => py.None(),
     }
 }
 
+#[cfg(feature = "metadata")]
 fn document_metadata_to_py<'py>(py: Python<'py>, doc: RustDocumentMetadata) -> PyResult<Py<PyAny>> {
     let dict = PyDict::new(py);
 
@@ -756,6 +818,7 @@ fn document_metadata_to_py<'py>(py: Python<'py>, doc: RustDocumentMetadata) -> P
     Ok(dict.into())
 }
 
+#[cfg(feature = "metadata")]
 fn headers_to_py<'py>(py: Python<'py>, headers: Vec<RustHeaderMetadata>) -> PyResult<Py<PyAny>> {
     let list = PyList::empty(py);
     for header in headers {
@@ -770,6 +833,7 @@ fn headers_to_py<'py>(py: Python<'py>, headers: Vec<RustHeaderMetadata>) -> PyRe
     Ok(list.into())
 }
 
+#[cfg(feature = "metadata")]
 fn links_to_py<'py>(py: Python<'py>, links: Vec<RustLinkMetadata>) -> PyResult<Py<PyAny>> {
     let list = PyList::empty(py);
     for link in links {
@@ -785,6 +849,7 @@ fn links_to_py<'py>(py: Python<'py>, links: Vec<RustLinkMetadata>) -> PyResult<P
     Ok(list.into())
 }
 
+#[cfg(feature = "metadata")]
 fn images_to_py<'py>(py: Python<'py>, images: Vec<RustImageMetadata>) -> PyResult<Py<PyAny>> {
     let list = PyList::empty(py);
     for image in images {
@@ -809,6 +874,7 @@ fn images_to_py<'py>(py: Python<'py>, images: Vec<RustImageMetadata>) -> PyResul
     Ok(list.into())
 }
 
+#[cfg(feature = "metadata")]
 fn structured_data_to_py<'py>(py: Python<'py>, data: Vec<RustStructuredData>) -> PyResult<Py<PyAny>> {
     let list = PyList::empty(py);
     for item in data {
@@ -821,6 +887,7 @@ fn structured_data_to_py<'py>(py: Python<'py>, data: Vec<RustStructuredData>) ->
     Ok(list.into())
 }
 
+#[cfg(feature = "metadata")]
 fn extended_metadata_to_py<'py>(py: Python<'py>, metadata: RustExtendedMetadata) -> PyResult<Py<PyAny>> {
     let dict = PyDict::new(py);
     dict.set_item("document", document_metadata_to_py(py, metadata.document)?)?;
@@ -989,6 +1056,7 @@ fn extended_metadata_to_py<'py>(py: Python<'py>, metadata: RustExtendedMetadata)
 ///     - convert_with_inline_images: Extract inline images alongside conversion
 ///     - ConversionOptions: Conversion configuration class
 ///     - MetadataConfig: Metadata extraction configuration class
+#[cfg(feature = "metadata")]
 #[pyfunction]
 #[pyo3(signature = (html, options=None, metadata_config=None))]
 fn convert_with_metadata<'py>(
@@ -1015,6 +1083,7 @@ fn convert_with_metadata<'py>(
     Ok((markdown, metadata_dict))
 }
 
+#[cfg(feature = "metadata")]
 #[pyfunction]
 #[pyo3(signature = (html, options_json=None, metadata_config_json=None))]
 fn convert_with_metadata_json(
@@ -1041,6 +1110,7 @@ fn convert_with_metadata_json(
 }
 
 /// Convert HTML to Markdown with metadata using a pre-parsed options handle.
+#[cfg(feature = "metadata")]
 #[pyfunction]
 #[pyo3(signature = (html, handle, metadata_config=None))]
 fn convert_with_metadata_handle<'py>(
@@ -1066,6 +1136,1474 @@ fn convert_with_metadata_handle<'py>(
     let metadata_dict = extended_metadata_to_py(py, metadata)?;
     Ok((markdown, metadata_dict))
 }
+
+#[cfg(feature = "visitor")]
+mod visitor_support {
+    use super::*;
+
+    /// PyO3 wrapper around a Python visitor object.
+    ///
+    /// This struct bridges Python callbacks to the Rust HtmlVisitor trait.
+    /// It holds a reference to a Python object and calls its methods dynamically.
+    #[derive(Debug)]
+    pub struct PyVisitorBridge {
+        pub visitor: Py<PyAny>,
+    }
+
+    impl PyVisitorBridge {
+        /// Create a new bridge wrapping a Python visitor object.
+        pub fn new(visitor: Py<PyAny>) -> Self {
+            Self { visitor }
+        }
+
+        /// Convert a Python dictionary result to a VisitResult enum.
+        fn result_from_dict(result_dict: &Bound<'_, pyo3::types::PyDict>) -> PyResult<VisitResult> {
+            let result_type: String = result_dict
+                .get_item("type")?
+                .ok_or_else(|| pyo3::exceptions::PyTypeError::new_err("Visitor result dict must have 'type' key"))?
+                .extract()?;
+
+            match result_type.as_str() {
+                "continue" => Ok(VisitResult::Continue),
+                "skip" => Ok(VisitResult::Skip),
+                "preserve_html" => Ok(VisitResult::PreserveHtml),
+                "custom" => {
+                    let output: String = result_dict
+                        .get_item("output")?
+                        .ok_or_else(|| {
+                            pyo3::exceptions::PyTypeError::new_err("Visitor 'custom' result must have 'output' key")
+                        })?
+                        .extract()?;
+                    Ok(VisitResult::Custom(output))
+                }
+                "error" => {
+                    let message: String = result_dict
+                        .get_item("message")?
+                        .ok_or_else(|| {
+                            pyo3::exceptions::PyTypeError::new_err("Visitor 'error' result must have 'message' key")
+                        })?
+                        .extract()?;
+                    Ok(VisitResult::Error(message))
+                }
+                unknown => Err(pyo3::exceptions::PyValueError::new_err(format!(
+                    "Unknown visitor result type: {}",
+                    unknown
+                ))),
+            }
+        }
+
+        /// Convert NodeContext to a Python dictionary.
+        fn context_to_dict<'a>(py: Python<'a>, ctx: &NodeContext) -> PyResult<Bound<'a, pyo3::types::PyDict>> {
+            let dict = pyo3::types::PyDict::new(py);
+
+            let node_type_str = format!("{:?}", ctx.node_type).to_lowercase();
+            dict.set_item("node_type", node_type_str)?;
+
+            dict.set_item("tag_name", &ctx.tag_name)?;
+
+            let attrs_dict = pyo3::types::PyDict::new(py);
+            for (k, v) in &ctx.attributes {
+                attrs_dict.set_item(k, v)?;
+            }
+            dict.set_item("attributes", attrs_dict)?;
+
+            dict.set_item("depth", ctx.depth)?;
+
+            dict.set_item("index_in_parent", ctx.index_in_parent)?;
+
+            match &ctx.parent_tag {
+                Some(tag) => dict.set_item("parent_tag", tag)?,
+                None => dict.set_item("parent_tag", py.None())?,
+            }
+
+            dict.set_item("is_inline", ctx.is_inline)?;
+
+            Ok(dict)
+        }
+
+        /// Call a Python visitor method and convert the result.
+        fn call_visitor_method(
+            &self,
+            py: Python<'_>,
+            method_name: &str,
+            args: &[Bound<'_, PyAny>],
+        ) -> PyResult<VisitResult> {
+            let visitor_bound = self.visitor.bind(py);
+            let method = match visitor_bound.getattr(method_name) {
+                Ok(m) => m,
+                Err(_) => {
+                    return Ok(VisitResult::Continue);
+                }
+            };
+
+            let args_tuple = pyo3::types::PyTuple::new(py, args)?;
+
+            let result = method.call(args_tuple, None)?;
+
+            if result.is_none() {
+                return Ok(VisitResult::Continue);
+            }
+
+            let result_dict: Bound<'_, pyo3::types::PyDict> = result.extract()?;
+
+            Self::result_from_dict(&result_dict)
+        }
+    }
+
+    impl HtmlVisitor for PyVisitorBridge {
+        fn visit_element_start(&mut self, ctx: &NodeContext) -> VisitResult {
+            Python::attach(|py| {
+                let ctx_dict = match Self::context_to_dict(py, ctx) {
+                    Ok(d) => d,
+                    Err(_) => return VisitResult::Continue,
+                };
+                let args: Vec<Bound<'_, PyAny>> = vec![ctx_dict.as_any().clone()];
+                self.call_visitor_method(py, "visit_element_start", &args)
+                    .unwrap_or(VisitResult::Continue)
+            })
+        }
+
+        fn visit_element_end(&mut self, ctx: &NodeContext, output: &str) -> VisitResult {
+            Python::attach(|py| {
+                let ctx_dict = match Self::context_to_dict(py, ctx) {
+                    Ok(d) => d,
+                    Err(_) => return VisitResult::Continue,
+                };
+                let output_py: Bound<'_, PyAny> = pyo3::types::PyString::new(py, output).as_any().clone();
+                let args: Vec<Bound<'_, PyAny>> = vec![ctx_dict.as_any().clone(), output_py];
+                self.call_visitor_method(py, "visit_element_end", &args)
+                    .unwrap_or(VisitResult::Continue)
+            })
+        }
+
+        fn visit_text(&mut self, ctx: &NodeContext, text: &str) -> VisitResult {
+            Python::attach(|py| {
+                let ctx_dict = match Self::context_to_dict(py, ctx) {
+                    Ok(d) => d,
+                    Err(_) => return VisitResult::Continue,
+                };
+                let text_py: Bound<'_, PyAny> = pyo3::types::PyString::new(py, text).as_any().clone();
+                let args: Vec<Bound<'_, PyAny>> = vec![ctx_dict.as_any().clone(), text_py];
+                self.call_visitor_method(py, "visit_text", &args)
+                    .unwrap_or(VisitResult::Continue)
+            })
+        }
+
+        fn visit_link(&mut self, ctx: &NodeContext, href: &str, text: &str, title: Option<&str>) -> VisitResult {
+            Python::attach(|py| {
+                let ctx_dict = match Self::context_to_dict(py, ctx) {
+                    Ok(d) => d,
+                    Err(_) => return VisitResult::Continue,
+                };
+                let href_py: Bound<'_, PyAny> = pyo3::types::PyString::new(py, href).as_any().clone();
+                let text_py: Bound<'_, PyAny> = pyo3::types::PyString::new(py, text).as_any().clone();
+                let title_py: Bound<'_, PyAny> = match title {
+                    Some(t) => pyo3::types::PyString::new(py, t).as_any().clone(),
+                    None => py.None().bind(py).clone(),
+                };
+                let args: Vec<Bound<'_, PyAny>> = vec![ctx_dict.as_any().clone(), href_py, text_py, title_py];
+                self.call_visitor_method(py, "visit_link", &args)
+                    .unwrap_or(VisitResult::Continue)
+            })
+        }
+
+        fn visit_image(&mut self, ctx: &NodeContext, src: &str, alt: &str, title: Option<&str>) -> VisitResult {
+            Python::attach(|py| {
+                let ctx_dict = match Self::context_to_dict(py, ctx) {
+                    Ok(d) => d,
+                    Err(_) => return VisitResult::Continue,
+                };
+                let src_py: Bound<'_, PyAny> = pyo3::types::PyString::new(py, src).as_any().clone();
+                let alt_py: Bound<'_, PyAny> = pyo3::types::PyString::new(py, alt).as_any().clone();
+                let title_py: Bound<'_, PyAny> = match title {
+                    Some(t) => pyo3::types::PyString::new(py, t).as_any().clone(),
+                    None => py.None().bind(py).clone(),
+                };
+                let args: Vec<Bound<'_, PyAny>> = vec![ctx_dict.as_any().clone(), src_py, alt_py, title_py];
+                self.call_visitor_method(py, "visit_image", &args)
+                    .unwrap_or(VisitResult::Continue)
+            })
+        }
+
+        fn visit_heading(&mut self, ctx: &NodeContext, level: u32, text: &str, id: Option<&str>) -> VisitResult {
+            Python::attach(|py| {
+                let ctx_dict = match Self::context_to_dict(py, ctx) {
+                    Ok(d) => d,
+                    Err(_) => return VisitResult::Continue,
+                };
+                let level_py: Bound<'_, PyAny> = pyo3::types::PyInt::new(py, level).as_any().clone();
+                let text_py: Bound<'_, PyAny> = pyo3::types::PyString::new(py, text).as_any().clone();
+                let id_py: Bound<'_, PyAny> = match id {
+                    Some(i) => pyo3::types::PyString::new(py, i).as_any().clone(),
+                    None => py.None().bind(py).clone(),
+                };
+                let args: Vec<Bound<'_, PyAny>> = vec![ctx_dict.as_any().clone(), level_py, text_py, id_py];
+                self.call_visitor_method(py, "visit_heading", &args)
+                    .unwrap_or(VisitResult::Continue)
+            })
+        }
+
+        fn visit_code_block(&mut self, ctx: &NodeContext, lang: Option<&str>, code: &str) -> VisitResult {
+            Python::attach(|py| {
+                let ctx_dict = match Self::context_to_dict(py, ctx) {
+                    Ok(d) => d,
+                    Err(_) => return VisitResult::Continue,
+                };
+                let lang_py: Bound<'_, PyAny> = match lang {
+                    Some(l) => pyo3::types::PyString::new(py, l).as_any().clone(),
+                    None => py.None().bind(py).clone(),
+                };
+                let code_py: Bound<'_, PyAny> = pyo3::types::PyString::new(py, code).as_any().clone();
+                let args: Vec<Bound<'_, PyAny>> = vec![ctx_dict.as_any().clone(), lang_py, code_py];
+                self.call_visitor_method(py, "visit_code_block", &args)
+                    .unwrap_or(VisitResult::Continue)
+            })
+        }
+
+        fn visit_code_inline(&mut self, ctx: &NodeContext, code: &str) -> VisitResult {
+            Python::attach(|py| {
+                let ctx_dict = match Self::context_to_dict(py, ctx) {
+                    Ok(d) => d,
+                    Err(_) => return VisitResult::Continue,
+                };
+                let code_py: Bound<'_, PyAny> = pyo3::types::PyString::new(py, code).as_any().clone();
+                let args: Vec<Bound<'_, PyAny>> = vec![ctx_dict.as_any().clone(), code_py];
+                self.call_visitor_method(py, "visit_code_inline", &args)
+                    .unwrap_or(VisitResult::Continue)
+            })
+        }
+
+        fn visit_list_item(&mut self, ctx: &NodeContext, ordered: bool, marker: &str, text: &str) -> VisitResult {
+            Python::attach(|py| {
+                let ctx_dict = match Self::context_to_dict(py, ctx) {
+                    Ok(d) => d,
+                    Err(_) => return VisitResult::Continue,
+                };
+                let ordered_py: Bound<'_, PyAny> = pyo3::types::PyBool::new(py, ordered).as_any().clone();
+                let marker_py: Bound<'_, PyAny> = pyo3::types::PyString::new(py, marker).as_any().clone();
+                let text_py: Bound<'_, PyAny> = pyo3::types::PyString::new(py, text).as_any().clone();
+                let args: Vec<Bound<'_, PyAny>> = vec![ctx_dict.as_any().clone(), ordered_py, marker_py, text_py];
+                self.call_visitor_method(py, "visit_list_item", &args)
+                    .unwrap_or(VisitResult::Continue)
+            })
+        }
+
+        fn visit_list_start(&mut self, ctx: &NodeContext, ordered: bool) -> VisitResult {
+            Python::attach(|py| {
+                let ctx_dict = match Self::context_to_dict(py, ctx) {
+                    Ok(d) => d,
+                    Err(_) => return VisitResult::Continue,
+                };
+                let ordered_py: Bound<'_, PyAny> = pyo3::types::PyBool::new(py, ordered).as_any().clone();
+                let args: Vec<Bound<'_, PyAny>> = vec![ctx_dict.as_any().clone(), ordered_py];
+                self.call_visitor_method(py, "visit_list_start", &args)
+                    .unwrap_or(VisitResult::Continue)
+            })
+        }
+
+        fn visit_list_end(&mut self, ctx: &NodeContext, ordered: bool, output: &str) -> VisitResult {
+            Python::attach(|py| {
+                let ctx_dict = match Self::context_to_dict(py, ctx) {
+                    Ok(d) => d,
+                    Err(_) => return VisitResult::Continue,
+                };
+                let ordered_py: Bound<'_, PyAny> = pyo3::types::PyBool::new(py, ordered).as_any().clone();
+                let output_py: Bound<'_, PyAny> = pyo3::types::PyString::new(py, output).as_any().clone();
+                let args: Vec<Bound<'_, PyAny>> = vec![ctx_dict.as_any().clone(), ordered_py, output_py];
+                self.call_visitor_method(py, "visit_list_end", &args)
+                    .unwrap_or(VisitResult::Continue)
+            })
+        }
+
+        fn visit_table_start(&mut self, ctx: &NodeContext) -> VisitResult {
+            Python::attach(|py| {
+                let ctx_dict = match Self::context_to_dict(py, ctx) {
+                    Ok(d) => d,
+                    Err(_) => return VisitResult::Continue,
+                };
+                let args: Vec<Bound<'_, PyAny>> = vec![ctx_dict.as_any().clone()];
+                self.call_visitor_method(py, "visit_table_start", &args)
+                    .unwrap_or(VisitResult::Continue)
+            })
+        }
+
+        fn visit_table_row(&mut self, ctx: &NodeContext, cells: &[String], is_header: bool) -> VisitResult {
+            Python::attach(|py| {
+                let ctx_dict = match Self::context_to_dict(py, ctx) {
+                    Ok(d) => d,
+                    Err(_) => return VisitResult::Continue,
+                };
+                let cells_py: Bound<'_, PyAny> = match pyo3::types::PyList::new(py, cells) {
+                    Ok(list) => list.as_any().clone(),
+                    Err(_) => return VisitResult::Continue,
+                };
+                let is_header_py: Bound<'_, PyAny> = pyo3::types::PyBool::new(py, is_header).as_any().clone();
+                let args: Vec<Bound<'_, PyAny>> = vec![ctx_dict.as_any().clone(), cells_py, is_header_py];
+                self.call_visitor_method(py, "visit_table_row", &args)
+                    .unwrap_or(VisitResult::Continue)
+            })
+        }
+
+        fn visit_table_end(&mut self, ctx: &NodeContext, output: &str) -> VisitResult {
+            Python::attach(|py| {
+                let ctx_dict = match Self::context_to_dict(py, ctx) {
+                    Ok(d) => d,
+                    Err(_) => return VisitResult::Continue,
+                };
+                let output_py: Bound<'_, PyAny> = pyo3::types::PyString::new(py, output).as_any().clone();
+                let args: Vec<Bound<'_, PyAny>> = vec![ctx_dict.as_any().clone(), output_py];
+                self.call_visitor_method(py, "visit_table_end", &args)
+                    .unwrap_or(VisitResult::Continue)
+            })
+        }
+
+        fn visit_blockquote(&mut self, ctx: &NodeContext, content: &str, depth: usize) -> VisitResult {
+            Python::attach(|py| {
+                let ctx_dict = match Self::context_to_dict(py, ctx) {
+                    Ok(d) => d,
+                    Err(_) => return VisitResult::Continue,
+                };
+                let content_py: Bound<'_, PyAny> = pyo3::types::PyString::new(py, content).as_any().clone();
+                let depth_py: Bound<'_, PyAny> = pyo3::types::PyInt::new(py, depth).as_any().clone();
+                let args: Vec<Bound<'_, PyAny>> = vec![ctx_dict.as_any().clone(), content_py, depth_py];
+                self.call_visitor_method(py, "visit_blockquote", &args)
+                    .unwrap_or(VisitResult::Continue)
+            })
+        }
+
+        fn visit_strong(&mut self, ctx: &NodeContext, text: &str) -> VisitResult {
+            Python::attach(|py| {
+                let ctx_dict = match Self::context_to_dict(py, ctx) {
+                    Ok(d) => d,
+                    Err(_) => return VisitResult::Continue,
+                };
+                let text_py: Bound<'_, PyAny> = pyo3::types::PyString::new(py, text).as_any().clone();
+                let args: Vec<Bound<'_, PyAny>> = vec![ctx_dict.as_any().clone(), text_py];
+                self.call_visitor_method(py, "visit_strong", &args)
+                    .unwrap_or(VisitResult::Continue)
+            })
+        }
+
+        fn visit_emphasis(&mut self, ctx: &NodeContext, text: &str) -> VisitResult {
+            Python::attach(|py| {
+                let ctx_dict = match Self::context_to_dict(py, ctx) {
+                    Ok(d) => d,
+                    Err(_) => return VisitResult::Continue,
+                };
+                let text_py: Bound<'_, PyAny> = pyo3::types::PyString::new(py, text).as_any().clone();
+                let args: Vec<Bound<'_, PyAny>> = vec![ctx_dict.as_any().clone(), text_py];
+                self.call_visitor_method(py, "visit_emphasis", &args)
+                    .unwrap_or(VisitResult::Continue)
+            })
+        }
+
+        fn visit_strikethrough(&mut self, ctx: &NodeContext, text: &str) -> VisitResult {
+            Python::attach(|py| {
+                let ctx_dict = match Self::context_to_dict(py, ctx) {
+                    Ok(d) => d,
+                    Err(_) => return VisitResult::Continue,
+                };
+                let text_py: Bound<'_, PyAny> = pyo3::types::PyString::new(py, text).as_any().clone();
+                let args: Vec<Bound<'_, PyAny>> = vec![ctx_dict.as_any().clone(), text_py];
+                self.call_visitor_method(py, "visit_strikethrough", &args)
+                    .unwrap_or(VisitResult::Continue)
+            })
+        }
+
+        fn visit_underline(&mut self, ctx: &NodeContext, text: &str) -> VisitResult {
+            Python::attach(|py| {
+                let ctx_dict = match Self::context_to_dict(py, ctx) {
+                    Ok(d) => d,
+                    Err(_) => return VisitResult::Continue,
+                };
+                let text_py: Bound<'_, PyAny> = pyo3::types::PyString::new(py, text).as_any().clone();
+                let args: Vec<Bound<'_, PyAny>> = vec![ctx_dict.as_any().clone(), text_py];
+                self.call_visitor_method(py, "visit_underline", &args)
+                    .unwrap_or(VisitResult::Continue)
+            })
+        }
+
+        fn visit_subscript(&mut self, ctx: &NodeContext, text: &str) -> VisitResult {
+            Python::attach(|py| {
+                let ctx_dict = match Self::context_to_dict(py, ctx) {
+                    Ok(d) => d,
+                    Err(_) => return VisitResult::Continue,
+                };
+                let text_py: Bound<'_, PyAny> = pyo3::types::PyString::new(py, text).as_any().clone();
+                let args: Vec<Bound<'_, PyAny>> = vec![ctx_dict.as_any().clone(), text_py];
+                self.call_visitor_method(py, "visit_subscript", &args)
+                    .unwrap_or(VisitResult::Continue)
+            })
+        }
+
+        fn visit_superscript(&mut self, ctx: &NodeContext, text: &str) -> VisitResult {
+            Python::attach(|py| {
+                let ctx_dict = match Self::context_to_dict(py, ctx) {
+                    Ok(d) => d,
+                    Err(_) => return VisitResult::Continue,
+                };
+                let text_py: Bound<'_, PyAny> = pyo3::types::PyString::new(py, text).as_any().clone();
+                let args: Vec<Bound<'_, PyAny>> = vec![ctx_dict.as_any().clone(), text_py];
+                self.call_visitor_method(py, "visit_superscript", &args)
+                    .unwrap_or(VisitResult::Continue)
+            })
+        }
+
+        fn visit_mark(&mut self, ctx: &NodeContext, text: &str) -> VisitResult {
+            Python::attach(|py| {
+                let ctx_dict = match Self::context_to_dict(py, ctx) {
+                    Ok(d) => d,
+                    Err(_) => return VisitResult::Continue,
+                };
+                let text_py: Bound<'_, PyAny> = pyo3::types::PyString::new(py, text).as_any().clone();
+                let args: Vec<Bound<'_, PyAny>> = vec![ctx_dict.as_any().clone(), text_py];
+                self.call_visitor_method(py, "visit_mark", &args)
+                    .unwrap_or(VisitResult::Continue)
+            })
+        }
+
+        fn visit_line_break(&mut self, ctx: &NodeContext) -> VisitResult {
+            Python::attach(|py| {
+                let ctx_dict = match Self::context_to_dict(py, ctx) {
+                    Ok(d) => d,
+                    Err(_) => return VisitResult::Continue,
+                };
+                let args: Vec<Bound<'_, PyAny>> = vec![ctx_dict.as_any().clone()];
+                self.call_visitor_method(py, "visit_line_break", &args)
+                    .unwrap_or(VisitResult::Continue)
+            })
+        }
+
+        fn visit_horizontal_rule(&mut self, ctx: &NodeContext) -> VisitResult {
+            Python::attach(|py| {
+                let ctx_dict = match Self::context_to_dict(py, ctx) {
+                    Ok(d) => d,
+                    Err(_) => return VisitResult::Continue,
+                };
+                let args: Vec<Bound<'_, PyAny>> = vec![ctx_dict.as_any().clone()];
+                self.call_visitor_method(py, "visit_horizontal_rule", &args)
+                    .unwrap_or(VisitResult::Continue)
+            })
+        }
+
+        fn visit_custom_element(&mut self, ctx: &NodeContext, tag_name: &str, html: &str) -> VisitResult {
+            Python::attach(|py| {
+                let ctx_dict = match Self::context_to_dict(py, ctx) {
+                    Ok(d) => d,
+                    Err(_) => return VisitResult::Continue,
+                };
+                let tag_name_py: Bound<'_, PyAny> = pyo3::types::PyString::new(py, tag_name).as_any().clone();
+                let html_py: Bound<'_, PyAny> = pyo3::types::PyString::new(py, html).as_any().clone();
+                let args: Vec<Bound<'_, PyAny>> = vec![ctx_dict.as_any().clone(), tag_name_py, html_py];
+                self.call_visitor_method(py, "visit_custom_element", &args)
+                    .unwrap_or(VisitResult::Continue)
+            })
+        }
+
+        fn visit_definition_list_start(&mut self, ctx: &NodeContext) -> VisitResult {
+            Python::attach(|py| {
+                let ctx_dict = match Self::context_to_dict(py, ctx) {
+                    Ok(d) => d,
+                    Err(_) => return VisitResult::Continue,
+                };
+                let args: Vec<Bound<'_, PyAny>> = vec![ctx_dict.as_any().clone()];
+                self.call_visitor_method(py, "visit_definition_list_start", &args)
+                    .unwrap_or(VisitResult::Continue)
+            })
+        }
+
+        fn visit_definition_term(&mut self, ctx: &NodeContext, text: &str) -> VisitResult {
+            Python::attach(|py| {
+                let ctx_dict = match Self::context_to_dict(py, ctx) {
+                    Ok(d) => d,
+                    Err(_) => return VisitResult::Continue,
+                };
+                let text_py: Bound<'_, PyAny> = pyo3::types::PyString::new(py, text).as_any().clone();
+                let args: Vec<Bound<'_, PyAny>> = vec![ctx_dict.as_any().clone(), text_py];
+                self.call_visitor_method(py, "visit_definition_term", &args)
+                    .unwrap_or(VisitResult::Continue)
+            })
+        }
+
+        fn visit_definition_description(&mut self, ctx: &NodeContext, text: &str) -> VisitResult {
+            Python::attach(|py| {
+                let ctx_dict = match Self::context_to_dict(py, ctx) {
+                    Ok(d) => d,
+                    Err(_) => return VisitResult::Continue,
+                };
+                let text_py: Bound<'_, PyAny> = pyo3::types::PyString::new(py, text).as_any().clone();
+                let args: Vec<Bound<'_, PyAny>> = vec![ctx_dict.as_any().clone(), text_py];
+                self.call_visitor_method(py, "visit_definition_description", &args)
+                    .unwrap_or(VisitResult::Continue)
+            })
+        }
+
+        fn visit_definition_list_end(&mut self, ctx: &NodeContext, output: &str) -> VisitResult {
+            Python::attach(|py| {
+                let ctx_dict = match Self::context_to_dict(py, ctx) {
+                    Ok(d) => d,
+                    Err(_) => return VisitResult::Continue,
+                };
+                let output_py: Bound<'_, PyAny> = pyo3::types::PyString::new(py, output).as_any().clone();
+                let args: Vec<Bound<'_, PyAny>> = vec![ctx_dict.as_any().clone(), output_py];
+                self.call_visitor_method(py, "visit_definition_list_end", &args)
+                    .unwrap_or(VisitResult::Continue)
+            })
+        }
+
+        fn visit_form(&mut self, ctx: &NodeContext, action: Option<&str>, method: Option<&str>) -> VisitResult {
+            Python::attach(|py| {
+                let ctx_dict = match Self::context_to_dict(py, ctx) {
+                    Ok(d) => d,
+                    Err(_) => return VisitResult::Continue,
+                };
+                let action_py: Bound<'_, PyAny> = match action {
+                    Some(a) => pyo3::types::PyString::new(py, a).as_any().clone(),
+                    None => py.None().bind(py).clone(),
+                };
+                let method_py: Bound<'_, PyAny> = match method {
+                    Some(m) => pyo3::types::PyString::new(py, m).as_any().clone(),
+                    None => py.None().bind(py).clone(),
+                };
+                let args: Vec<Bound<'_, PyAny>> = vec![ctx_dict.as_any().clone(), action_py, method_py];
+                self.call_visitor_method(py, "visit_form", &args)
+                    .unwrap_or(VisitResult::Continue)
+            })
+        }
+
+        fn visit_input(
+            &mut self,
+            ctx: &NodeContext,
+            input_type: &str,
+            name: Option<&str>,
+            value: Option<&str>,
+        ) -> VisitResult {
+            Python::attach(|py| {
+                let ctx_dict = match Self::context_to_dict(py, ctx) {
+                    Ok(d) => d,
+                    Err(_) => return VisitResult::Continue,
+                };
+                let input_type_py: Bound<'_, PyAny> = pyo3::types::PyString::new(py, input_type).as_any().clone();
+                let name_py: Bound<'_, PyAny> = match name {
+                    Some(n) => pyo3::types::PyString::new(py, n).as_any().clone(),
+                    None => py.None().bind(py).clone(),
+                };
+                let value_py: Bound<'_, PyAny> = match value {
+                    Some(v) => pyo3::types::PyString::new(py, v).as_any().clone(),
+                    None => py.None().bind(py).clone(),
+                };
+                let args: Vec<Bound<'_, PyAny>> = vec![ctx_dict.as_any().clone(), input_type_py, name_py, value_py];
+                self.call_visitor_method(py, "visit_input", &args)
+                    .unwrap_or(VisitResult::Continue)
+            })
+        }
+
+        fn visit_button(&mut self, ctx: &NodeContext, text: &str) -> VisitResult {
+            Python::attach(|py| {
+                let ctx_dict = match Self::context_to_dict(py, ctx) {
+                    Ok(d) => d,
+                    Err(_) => return VisitResult::Continue,
+                };
+                let text_py: Bound<'_, PyAny> = pyo3::types::PyString::new(py, text).as_any().clone();
+                let args: Vec<Bound<'_, PyAny>> = vec![ctx_dict.as_any().clone(), text_py];
+                self.call_visitor_method(py, "visit_button", &args)
+                    .unwrap_or(VisitResult::Continue)
+            })
+        }
+
+        fn visit_audio(&mut self, ctx: &NodeContext, src: Option<&str>) -> VisitResult {
+            Python::attach(|py| {
+                let ctx_dict = match Self::context_to_dict(py, ctx) {
+                    Ok(d) => d,
+                    Err(_) => return VisitResult::Continue,
+                };
+                let src_py: Bound<'_, PyAny> = match src {
+                    Some(s) => pyo3::types::PyString::new(py, s).as_any().clone(),
+                    None => py.None().bind(py).clone(),
+                };
+                let args: Vec<Bound<'_, PyAny>> = vec![ctx_dict.as_any().clone(), src_py];
+                self.call_visitor_method(py, "visit_audio", &args)
+                    .unwrap_or(VisitResult::Continue)
+            })
+        }
+
+        fn visit_video(&mut self, ctx: &NodeContext, src: Option<&str>) -> VisitResult {
+            Python::attach(|py| {
+                let ctx_dict = match Self::context_to_dict(py, ctx) {
+                    Ok(d) => d,
+                    Err(_) => return VisitResult::Continue,
+                };
+                let src_py: Bound<'_, PyAny> = match src {
+                    Some(s) => pyo3::types::PyString::new(py, s).as_any().clone(),
+                    None => py.None().bind(py).clone(),
+                };
+                let args: Vec<Bound<'_, PyAny>> = vec![ctx_dict.as_any().clone(), src_py];
+                self.call_visitor_method(py, "visit_video", &args)
+                    .unwrap_or(VisitResult::Continue)
+            })
+        }
+
+        fn visit_iframe(&mut self, ctx: &NodeContext, src: Option<&str>) -> VisitResult {
+            Python::attach(|py| {
+                let ctx_dict = match Self::context_to_dict(py, ctx) {
+                    Ok(d) => d,
+                    Err(_) => return VisitResult::Continue,
+                };
+                let src_py: Bound<'_, PyAny> = match src {
+                    Some(s) => pyo3::types::PyString::new(py, s).as_any().clone(),
+                    None => py.None().bind(py).clone(),
+                };
+                let args: Vec<Bound<'_, PyAny>> = vec![ctx_dict.as_any().clone(), src_py];
+                self.call_visitor_method(py, "visit_iframe", &args)
+                    .unwrap_or(VisitResult::Continue)
+            })
+        }
+
+        fn visit_details(&mut self, ctx: &NodeContext, open: bool) -> VisitResult {
+            Python::attach(|py| {
+                let ctx_dict = match Self::context_to_dict(py, ctx) {
+                    Ok(d) => d,
+                    Err(_) => return VisitResult::Continue,
+                };
+                let open_py: Bound<'_, PyAny> = pyo3::types::PyBool::new(py, open).as_any().clone();
+                let args: Vec<Bound<'_, PyAny>> = vec![ctx_dict.as_any().clone(), open_py];
+                self.call_visitor_method(py, "visit_details", &args)
+                    .unwrap_or(VisitResult::Continue)
+            })
+        }
+
+        fn visit_summary(&mut self, ctx: &NodeContext, text: &str) -> VisitResult {
+            Python::attach(|py| {
+                let ctx_dict = match Self::context_to_dict(py, ctx) {
+                    Ok(d) => d,
+                    Err(_) => return VisitResult::Continue,
+                };
+                let text_py: Bound<'_, PyAny> = pyo3::types::PyString::new(py, text).as_any().clone();
+                let args: Vec<Bound<'_, PyAny>> = vec![ctx_dict.as_any().clone(), text_py];
+                self.call_visitor_method(py, "visit_summary", &args)
+                    .unwrap_or(VisitResult::Continue)
+            })
+        }
+
+        fn visit_figure_start(&mut self, ctx: &NodeContext) -> VisitResult {
+            Python::attach(|py| {
+                let ctx_dict = match Self::context_to_dict(py, ctx) {
+                    Ok(d) => d,
+                    Err(_) => return VisitResult::Continue,
+                };
+                let args: Vec<Bound<'_, PyAny>> = vec![ctx_dict.as_any().clone()];
+                self.call_visitor_method(py, "visit_figure_start", &args)
+                    .unwrap_or(VisitResult::Continue)
+            })
+        }
+
+        fn visit_figcaption(&mut self, ctx: &NodeContext, text: &str) -> VisitResult {
+            Python::attach(|py| {
+                let ctx_dict = match Self::context_to_dict(py, ctx) {
+                    Ok(d) => d,
+                    Err(_) => return VisitResult::Continue,
+                };
+                let text_py: Bound<'_, PyAny> = pyo3::types::PyString::new(py, text).as_any().clone();
+                let args: Vec<Bound<'_, PyAny>> = vec![ctx_dict.as_any().clone(), text_py];
+                self.call_visitor_method(py, "visit_figcaption", &args)
+                    .unwrap_or(VisitResult::Continue)
+            })
+        }
+
+        fn visit_figure_end(&mut self, ctx: &NodeContext, output: &str) -> VisitResult {
+            Python::attach(|py| {
+                let ctx_dict = match Self::context_to_dict(py, ctx) {
+                    Ok(d) => d,
+                    Err(_) => return VisitResult::Continue,
+                };
+                let output_py: Bound<'_, PyAny> = pyo3::types::PyString::new(py, output).as_any().clone();
+                let args: Vec<Bound<'_, PyAny>> = vec![ctx_dict.as_any().clone(), output_py];
+                self.call_visitor_method(py, "visit_figure_end", &args)
+                    .unwrap_or(VisitResult::Continue)
+            })
+        }
+    }
+
+    #[cfg(feature = "async-visitor")]
+    #[derive(Debug)]
+    pub struct PyAsyncVisitorBridge {
+        pub visitor: Arc<Mutex<Py<PyAny>>>,
+    }
+
+    #[cfg(feature = "async-visitor")]
+    impl PyAsyncVisitorBridge {
+        pub fn new(visitor: Py<PyAny>) -> Self {
+            Self {
+                visitor: Arc::new(Mutex::new(visitor)),
+            }
+        }
+
+        /// Convert a Python dictionary result to a VisitResult enum.
+        fn result_from_dict(result_dict: &Bound<'_, pyo3::types::PyDict>) -> PyResult<VisitResult> {
+            let result_type: String = result_dict
+                .get_item("type")?
+                .ok_or_else(|| pyo3::exceptions::PyTypeError::new_err("Visitor result dict must have 'type' key"))?
+                .extract()?;
+
+            match result_type.as_str() {
+                "continue" => Ok(VisitResult::Continue),
+                "skip" => Ok(VisitResult::Skip),
+                "preserve_html" => Ok(VisitResult::PreserveHtml),
+                "custom" => {
+                    let output: String = result_dict
+                        .get_item("output")?
+                        .ok_or_else(|| {
+                            pyo3::exceptions::PyTypeError::new_err("Visitor 'custom' result must have 'output' key")
+                        })?
+                        .extract()?;
+                    Ok(VisitResult::Custom(output))
+                }
+                "error" => {
+                    let message: String = result_dict
+                        .get_item("message")?
+                        .ok_or_else(|| {
+                            pyo3::exceptions::PyTypeError::new_err("Visitor 'error' result must have 'message' key")
+                        })?
+                        .extract()?;
+                    Ok(VisitResult::Error(message))
+                }
+                unknown => Err(pyo3::exceptions::PyValueError::new_err(format!(
+                    "Unknown visitor result type: {}",
+                    unknown
+                ))),
+            }
+        }
+
+        /// Convert NodeContext to a Python dictionary.
+        fn context_to_dict<'a>(py: Python<'a>, ctx: &NodeContext) -> PyResult<Bound<'a, pyo3::types::PyDict>> {
+            let dict = pyo3::types::PyDict::new(py);
+
+            let node_type_str = format!("{:?}", ctx.node_type).to_lowercase();
+            dict.set_item("node_type", node_type_str)?;
+
+            dict.set_item("tag_name", &ctx.tag_name)?;
+
+            let attrs_dict = pyo3::types::PyDict::new(py);
+            for (k, v) in &ctx.attributes {
+                attrs_dict.set_item(k, v)?;
+            }
+            dict.set_item("attributes", attrs_dict)?;
+
+            dict.set_item("depth", ctx.depth)?;
+
+            dict.set_item("index_in_parent", ctx.index_in_parent)?;
+
+            match &ctx.parent_tag {
+                Some(tag) => dict.set_item("parent_tag", tag)?,
+                None => dict.set_item("parent_tag", py.None())?,
+            }
+
+            dict.set_item("is_inline", ctx.is_inline)?;
+
+            Ok(dict)
+        }
+
+        /// Call a Python visitor method and convert the result (supports both sync and async).
+        fn call_visitor_method_sync(
+            &self,
+            py: Python<'_>,
+            method_name: &str,
+            args: &[Bound<'_, PyAny>],
+        ) -> PyResult<VisitResult> {
+            let visitor_guard = self.visitor.lock().unwrap();
+            let visitor_bound = visitor_guard.bind(py);
+            let method = match visitor_bound.getattr(method_name) {
+                Ok(m) => m,
+                Err(_) => {
+                    return Ok(VisitResult::Continue);
+                }
+            };
+
+            let args_tuple = pyo3::types::PyTuple::new(py, args)?;
+
+            let result = method.call(args_tuple, None)?;
+
+            if result.is_none() {
+                return Ok(VisitResult::Continue);
+            }
+
+            let result_dict: Bound<'_, pyo3::types::PyDict> = result.extract()?;
+
+            Self::result_from_dict(&result_dict)
+        }
+    }
+
+    #[cfg(feature = "async-visitor")]
+    impl HtmlVisitor for PyAsyncVisitorBridge {
+        fn visit_element_start(&mut self, ctx: &NodeContext) -> VisitResult {
+            Python::attach(|py| {
+                let ctx_dict = match Self::context_to_dict(py, ctx) {
+                    Ok(d) => d,
+                    Err(_) => return VisitResult::Continue,
+                };
+                let args: Vec<Bound<'_, PyAny>> = vec![ctx_dict.as_any().clone()];
+                self.call_visitor_method_sync(py, "visit_element_start", &args)
+                    .unwrap_or(VisitResult::Continue)
+            })
+        }
+
+        fn visit_element_end(&mut self, ctx: &NodeContext, output: &str) -> VisitResult {
+            Python::attach(|py| {
+                let ctx_dict = match Self::context_to_dict(py, ctx) {
+                    Ok(d) => d,
+                    Err(_) => return VisitResult::Continue,
+                };
+                let output_py: Bound<'_, PyAny> = pyo3::types::PyString::new(py, output).as_any().clone();
+                let args: Vec<Bound<'_, PyAny>> = vec![ctx_dict.as_any().clone(), output_py];
+                self.call_visitor_method_sync(py, "visit_element_end", &args)
+                    .unwrap_or(VisitResult::Continue)
+            })
+        }
+
+        fn visit_text(&mut self, ctx: &NodeContext, text: &str) -> VisitResult {
+            Python::attach(|py| {
+                let ctx_dict = match Self::context_to_dict(py, ctx) {
+                    Ok(d) => d,
+                    Err(_) => return VisitResult::Continue,
+                };
+                let text_py: Bound<'_, PyAny> = pyo3::types::PyString::new(py, text).as_any().clone();
+                let args: Vec<Bound<'_, PyAny>> = vec![ctx_dict.as_any().clone(), text_py];
+                self.call_visitor_method_sync(py, "visit_text", &args)
+                    .unwrap_or(VisitResult::Continue)
+            })
+        }
+
+        fn visit_link(&mut self, ctx: &NodeContext, href: &str, text: &str, title: Option<&str>) -> VisitResult {
+            Python::attach(|py| {
+                let ctx_dict = match Self::context_to_dict(py, ctx) {
+                    Ok(d) => d,
+                    Err(_) => return VisitResult::Continue,
+                };
+                let href_py: Bound<'_, PyAny> = pyo3::types::PyString::new(py, href).as_any().clone();
+                let text_py: Bound<'_, PyAny> = pyo3::types::PyString::new(py, text).as_any().clone();
+                let title_py: Bound<'_, PyAny> = match title {
+                    Some(t) => pyo3::types::PyString::new(py, t).as_any().clone(),
+                    None => py.None().bind(py).clone(),
+                };
+                let args: Vec<Bound<'_, PyAny>> = vec![ctx_dict.as_any().clone(), href_py, text_py, title_py];
+                self.call_visitor_method_sync(py, "visit_link", &args)
+                    .unwrap_or(VisitResult::Continue)
+            })
+        }
+
+        fn visit_image(&mut self, ctx: &NodeContext, src: &str, alt: &str, title: Option<&str>) -> VisitResult {
+            Python::attach(|py| {
+                let ctx_dict = match Self::context_to_dict(py, ctx) {
+                    Ok(d) => d,
+                    Err(_) => return VisitResult::Continue,
+                };
+                let src_py: Bound<'_, PyAny> = pyo3::types::PyString::new(py, src).as_any().clone();
+                let alt_py: Bound<'_, PyAny> = pyo3::types::PyString::new(py, alt).as_any().clone();
+                let title_py: Bound<'_, PyAny> = match title {
+                    Some(t) => pyo3::types::PyString::new(py, t).as_any().clone(),
+                    None => py.None().bind(py).clone(),
+                };
+                let args: Vec<Bound<'_, PyAny>> = vec![ctx_dict.as_any().clone(), src_py, alt_py, title_py];
+                self.call_visitor_method_sync(py, "visit_image", &args)
+                    .unwrap_or(VisitResult::Continue)
+            })
+        }
+
+        fn visit_heading(&mut self, ctx: &NodeContext, level: u32, text: &str, id: Option<&str>) -> VisitResult {
+            Python::attach(|py| {
+                let ctx_dict = match Self::context_to_dict(py, ctx) {
+                    Ok(d) => d,
+                    Err(_) => return VisitResult::Continue,
+                };
+                let level_py: Bound<'_, PyAny> = pyo3::types::PyInt::new(py, level).as_any().clone();
+                let text_py: Bound<'_, PyAny> = pyo3::types::PyString::new(py, text).as_any().clone();
+                let id_py: Bound<'_, PyAny> = match id {
+                    Some(i) => pyo3::types::PyString::new(py, i).as_any().clone(),
+                    None => py.None().bind(py).clone(),
+                };
+                let args: Vec<Bound<'_, PyAny>> = vec![ctx_dict.as_any().clone(), level_py, text_py, id_py];
+                self.call_visitor_method_sync(py, "visit_heading", &args)
+                    .unwrap_or(VisitResult::Continue)
+            })
+        }
+
+        fn visit_code_block(&mut self, ctx: &NodeContext, lang: Option<&str>, code: &str) -> VisitResult {
+            Python::attach(|py| {
+                let ctx_dict = match Self::context_to_dict(py, ctx) {
+                    Ok(d) => d,
+                    Err(_) => return VisitResult::Continue,
+                };
+                let lang_py: Bound<'_, PyAny> = match lang {
+                    Some(l) => pyo3::types::PyString::new(py, l).as_any().clone(),
+                    None => py.None().bind(py).clone(),
+                };
+                let code_py: Bound<'_, PyAny> = pyo3::types::PyString::new(py, code).as_any().clone();
+                let args: Vec<Bound<'_, PyAny>> = vec![ctx_dict.as_any().clone(), lang_py, code_py];
+                self.call_visitor_method_sync(py, "visit_code_block", &args)
+                    .unwrap_or(VisitResult::Continue)
+            })
+        }
+
+        fn visit_code_inline(&mut self, ctx: &NodeContext, code: &str) -> VisitResult {
+            Python::attach(|py| {
+                let ctx_dict = match Self::context_to_dict(py, ctx) {
+                    Ok(d) => d,
+                    Err(_) => return VisitResult::Continue,
+                };
+                let code_py: Bound<'_, PyAny> = pyo3::types::PyString::new(py, code).as_any().clone();
+                let args: Vec<Bound<'_, PyAny>> = vec![ctx_dict.as_any().clone(), code_py];
+                self.call_visitor_method_sync(py, "visit_code_inline", &args)
+                    .unwrap_or(VisitResult::Continue)
+            })
+        }
+
+        fn visit_list_item(&mut self, ctx: &NodeContext, ordered: bool, marker: &str, text: &str) -> VisitResult {
+            Python::attach(|py| {
+                let ctx_dict = match Self::context_to_dict(py, ctx) {
+                    Ok(d) => d,
+                    Err(_) => return VisitResult::Continue,
+                };
+                let ordered_py: Bound<'_, PyAny> = pyo3::types::PyBool::new(py, ordered).as_any().clone();
+                let marker_py: Bound<'_, PyAny> = pyo3::types::PyString::new(py, marker).as_any().clone();
+                let text_py: Bound<'_, PyAny> = pyo3::types::PyString::new(py, text).as_any().clone();
+                let args: Vec<Bound<'_, PyAny>> = vec![ctx_dict.as_any().clone(), ordered_py, marker_py, text_py];
+                self.call_visitor_method_sync(py, "visit_list_item", &args)
+                    .unwrap_or(VisitResult::Continue)
+            })
+        }
+
+        fn visit_list_start(&mut self, ctx: &NodeContext, ordered: bool) -> VisitResult {
+            Python::attach(|py| {
+                let ctx_dict = match Self::context_to_dict(py, ctx) {
+                    Ok(d) => d,
+                    Err(_) => return VisitResult::Continue,
+                };
+                let ordered_py: Bound<'_, PyAny> = pyo3::types::PyBool::new(py, ordered).as_any().clone();
+                let args: Vec<Bound<'_, PyAny>> = vec![ctx_dict.as_any().clone(), ordered_py];
+                self.call_visitor_method_sync(py, "visit_list_start", &args)
+                    .unwrap_or(VisitResult::Continue)
+            })
+        }
+
+        fn visit_list_end(&mut self, ctx: &NodeContext, ordered: bool, output: &str) -> VisitResult {
+            Python::attach(|py| {
+                let ctx_dict = match Self::context_to_dict(py, ctx) {
+                    Ok(d) => d,
+                    Err(_) => return VisitResult::Continue,
+                };
+                let ordered_py: Bound<'_, PyAny> = pyo3::types::PyBool::new(py, ordered).as_any().clone();
+                let output_py: Bound<'_, PyAny> = pyo3::types::PyString::new(py, output).as_any().clone();
+                let args: Vec<Bound<'_, PyAny>> = vec![ctx_dict.as_any().clone(), ordered_py, output_py];
+                self.call_visitor_method_sync(py, "visit_list_end", &args)
+                    .unwrap_or(VisitResult::Continue)
+            })
+        }
+
+        fn visit_table_start(&mut self, ctx: &NodeContext) -> VisitResult {
+            Python::attach(|py| {
+                let ctx_dict = match Self::context_to_dict(py, ctx) {
+                    Ok(d) => d,
+                    Err(_) => return VisitResult::Continue,
+                };
+                let args: Vec<Bound<'_, PyAny>> = vec![ctx_dict.as_any().clone()];
+                self.call_visitor_method_sync(py, "visit_table_start", &args)
+                    .unwrap_or(VisitResult::Continue)
+            })
+        }
+
+        fn visit_table_row(&mut self, ctx: &NodeContext, cells: &[String], is_header: bool) -> VisitResult {
+            Python::attach(|py| {
+                let ctx_dict = match Self::context_to_dict(py, ctx) {
+                    Ok(d) => d,
+                    Err(_) => return VisitResult::Continue,
+                };
+                let cells_py: Bound<'_, PyAny> = match pyo3::types::PyList::new(py, cells) {
+                    Ok(list) => list.as_any().clone(),
+                    Err(_) => return VisitResult::Continue,
+                };
+                let is_header_py: Bound<'_, PyAny> = pyo3::types::PyBool::new(py, is_header).as_any().clone();
+                let args: Vec<Bound<'_, PyAny>> = vec![ctx_dict.as_any().clone(), cells_py, is_header_py];
+                self.call_visitor_method_sync(py, "visit_table_row", &args)
+                    .unwrap_or(VisitResult::Continue)
+            })
+        }
+
+        fn visit_table_end(&mut self, ctx: &NodeContext, output: &str) -> VisitResult {
+            Python::attach(|py| {
+                let ctx_dict = match Self::context_to_dict(py, ctx) {
+                    Ok(d) => d,
+                    Err(_) => return VisitResult::Continue,
+                };
+                let output_py: Bound<'_, PyAny> = pyo3::types::PyString::new(py, output).as_any().clone();
+                let args: Vec<Bound<'_, PyAny>> = vec![ctx_dict.as_any().clone(), output_py];
+                self.call_visitor_method_sync(py, "visit_table_end", &args)
+                    .unwrap_or(VisitResult::Continue)
+            })
+        }
+
+        fn visit_blockquote(&mut self, ctx: &NodeContext, content: &str, depth: usize) -> VisitResult {
+            Python::attach(|py| {
+                let ctx_dict = match Self::context_to_dict(py, ctx) {
+                    Ok(d) => d,
+                    Err(_) => return VisitResult::Continue,
+                };
+                let content_py: Bound<'_, PyAny> = pyo3::types::PyString::new(py, content).as_any().clone();
+                let depth_py: Bound<'_, PyAny> = pyo3::types::PyInt::new(py, depth).as_any().clone();
+                let args: Vec<Bound<'_, PyAny>> = vec![ctx_dict.as_any().clone(), content_py, depth_py];
+                self.call_visitor_method_sync(py, "visit_blockquote", &args)
+                    .unwrap_or(VisitResult::Continue)
+            })
+        }
+
+        fn visit_strong(&mut self, ctx: &NodeContext, text: &str) -> VisitResult {
+            Python::attach(|py| {
+                let ctx_dict = match Self::context_to_dict(py, ctx) {
+                    Ok(d) => d,
+                    Err(_) => return VisitResult::Continue,
+                };
+                let text_py: Bound<'_, PyAny> = pyo3::types::PyString::new(py, text).as_any().clone();
+                let args: Vec<Bound<'_, PyAny>> = vec![ctx_dict.as_any().clone(), text_py];
+                self.call_visitor_method_sync(py, "visit_strong", &args)
+                    .unwrap_or(VisitResult::Continue)
+            })
+        }
+
+        fn visit_emphasis(&mut self, ctx: &NodeContext, text: &str) -> VisitResult {
+            Python::attach(|py| {
+                let ctx_dict = match Self::context_to_dict(py, ctx) {
+                    Ok(d) => d,
+                    Err(_) => return VisitResult::Continue,
+                };
+                let text_py: Bound<'_, PyAny> = pyo3::types::PyString::new(py, text).as_any().clone();
+                let args: Vec<Bound<'_, PyAny>> = vec![ctx_dict.as_any().clone(), text_py];
+                self.call_visitor_method_sync(py, "visit_emphasis", &args)
+                    .unwrap_or(VisitResult::Continue)
+            })
+        }
+
+        fn visit_strikethrough(&mut self, ctx: &NodeContext, text: &str) -> VisitResult {
+            Python::attach(|py| {
+                let ctx_dict = match Self::context_to_dict(py, ctx) {
+                    Ok(d) => d,
+                    Err(_) => return VisitResult::Continue,
+                };
+                let text_py: Bound<'_, PyAny> = pyo3::types::PyString::new(py, text).as_any().clone();
+                let args: Vec<Bound<'_, PyAny>> = vec![ctx_dict.as_any().clone(), text_py];
+                self.call_visitor_method_sync(py, "visit_strikethrough", &args)
+                    .unwrap_or(VisitResult::Continue)
+            })
+        }
+
+        fn visit_underline(&mut self, ctx: &NodeContext, text: &str) -> VisitResult {
+            Python::attach(|py| {
+                let ctx_dict = match Self::context_to_dict(py, ctx) {
+                    Ok(d) => d,
+                    Err(_) => return VisitResult::Continue,
+                };
+                let text_py: Bound<'_, PyAny> = pyo3::types::PyString::new(py, text).as_any().clone();
+                let args: Vec<Bound<'_, PyAny>> = vec![ctx_dict.as_any().clone(), text_py];
+                self.call_visitor_method_sync(py, "visit_underline", &args)
+                    .unwrap_or(VisitResult::Continue)
+            })
+        }
+
+        fn visit_subscript(&mut self, ctx: &NodeContext, text: &str) -> VisitResult {
+            Python::attach(|py| {
+                let ctx_dict = match Self::context_to_dict(py, ctx) {
+                    Ok(d) => d,
+                    Err(_) => return VisitResult::Continue,
+                };
+                let text_py: Bound<'_, PyAny> = pyo3::types::PyString::new(py, text).as_any().clone();
+                let args: Vec<Bound<'_, PyAny>> = vec![ctx_dict.as_any().clone(), text_py];
+                self.call_visitor_method_sync(py, "visit_subscript", &args)
+                    .unwrap_or(VisitResult::Continue)
+            })
+        }
+
+        fn visit_superscript(&mut self, ctx: &NodeContext, text: &str) -> VisitResult {
+            Python::attach(|py| {
+                let ctx_dict = match Self::context_to_dict(py, ctx) {
+                    Ok(d) => d,
+                    Err(_) => return VisitResult::Continue,
+                };
+                let text_py: Bound<'_, PyAny> = pyo3::types::PyString::new(py, text).as_any().clone();
+                let args: Vec<Bound<'_, PyAny>> = vec![ctx_dict.as_any().clone(), text_py];
+                self.call_visitor_method_sync(py, "visit_superscript", &args)
+                    .unwrap_or(VisitResult::Continue)
+            })
+        }
+
+        fn visit_mark(&mut self, ctx: &NodeContext, text: &str) -> VisitResult {
+            Python::attach(|py| {
+                let ctx_dict = match Self::context_to_dict(py, ctx) {
+                    Ok(d) => d,
+                    Err(_) => return VisitResult::Continue,
+                };
+                let text_py: Bound<'_, PyAny> = pyo3::types::PyString::new(py, text).as_any().clone();
+                let args: Vec<Bound<'_, PyAny>> = vec![ctx_dict.as_any().clone(), text_py];
+                self.call_visitor_method_sync(py, "visit_mark", &args)
+                    .unwrap_or(VisitResult::Continue)
+            })
+        }
+
+        fn visit_line_break(&mut self, ctx: &NodeContext) -> VisitResult {
+            Python::attach(|py| {
+                let ctx_dict = match Self::context_to_dict(py, ctx) {
+                    Ok(d) => d,
+                    Err(_) => return VisitResult::Continue,
+                };
+                let args: Vec<Bound<'_, PyAny>> = vec![ctx_dict.as_any().clone()];
+                self.call_visitor_method_sync(py, "visit_line_break", &args)
+                    .unwrap_or(VisitResult::Continue)
+            })
+        }
+
+        fn visit_horizontal_rule(&mut self, ctx: &NodeContext) -> VisitResult {
+            Python::attach(|py| {
+                let ctx_dict = match Self::context_to_dict(py, ctx) {
+                    Ok(d) => d,
+                    Err(_) => return VisitResult::Continue,
+                };
+                let args: Vec<Bound<'_, PyAny>> = vec![ctx_dict.as_any().clone()];
+                self.call_visitor_method_sync(py, "visit_horizontal_rule", &args)
+                    .unwrap_or(VisitResult::Continue)
+            })
+        }
+
+        fn visit_custom_element(&mut self, ctx: &NodeContext, tag_name: &str, html: &str) -> VisitResult {
+            Python::attach(|py| {
+                let ctx_dict = match Self::context_to_dict(py, ctx) {
+                    Ok(d) => d,
+                    Err(_) => return VisitResult::Continue,
+                };
+                let tag_name_py: Bound<'_, PyAny> = pyo3::types::PyString::new(py, tag_name).as_any().clone();
+                let html_py: Bound<'_, PyAny> = pyo3::types::PyString::new(py, html).as_any().clone();
+                let args: Vec<Bound<'_, PyAny>> = vec![ctx_dict.as_any().clone(), tag_name_py, html_py];
+                self.call_visitor_method_sync(py, "visit_custom_element", &args)
+                    .unwrap_or(VisitResult::Continue)
+            })
+        }
+
+        fn visit_definition_list_start(&mut self, ctx: &NodeContext) -> VisitResult {
+            Python::attach(|py| {
+                let ctx_dict = match Self::context_to_dict(py, ctx) {
+                    Ok(d) => d,
+                    Err(_) => return VisitResult::Continue,
+                };
+                let args: Vec<Bound<'_, PyAny>> = vec![ctx_dict.as_any().clone()];
+                self.call_visitor_method_sync(py, "visit_definition_list_start", &args)
+                    .unwrap_or(VisitResult::Continue)
+            })
+        }
+
+        fn visit_definition_term(&mut self, ctx: &NodeContext, text: &str) -> VisitResult {
+            Python::attach(|py| {
+                let ctx_dict = match Self::context_to_dict(py, ctx) {
+                    Ok(d) => d,
+                    Err(_) => return VisitResult::Continue,
+                };
+                let text_py: Bound<'_, PyAny> = pyo3::types::PyString::new(py, text).as_any().clone();
+                let args: Vec<Bound<'_, PyAny>> = vec![ctx_dict.as_any().clone(), text_py];
+                self.call_visitor_method_sync(py, "visit_definition_term", &args)
+                    .unwrap_or(VisitResult::Continue)
+            })
+        }
+
+        fn visit_definition_description(&mut self, ctx: &NodeContext, text: &str) -> VisitResult {
+            Python::attach(|py| {
+                let ctx_dict = match Self::context_to_dict(py, ctx) {
+                    Ok(d) => d,
+                    Err(_) => return VisitResult::Continue,
+                };
+                let text_py: Bound<'_, PyAny> = pyo3::types::PyString::new(py, text).as_any().clone();
+                let args: Vec<Bound<'_, PyAny>> = vec![ctx_dict.as_any().clone(), text_py];
+                self.call_visitor_method_sync(py, "visit_definition_description", &args)
+                    .unwrap_or(VisitResult::Continue)
+            })
+        }
+
+        fn visit_definition_list_end(&mut self, ctx: &NodeContext, output: &str) -> VisitResult {
+            Python::attach(|py| {
+                let ctx_dict = match Self::context_to_dict(py, ctx) {
+                    Ok(d) => d,
+                    Err(_) => return VisitResult::Continue,
+                };
+                let output_py: Bound<'_, PyAny> = pyo3::types::PyString::new(py, output).as_any().clone();
+                let args: Vec<Bound<'_, PyAny>> = vec![ctx_dict.as_any().clone(), output_py];
+                self.call_visitor_method_sync(py, "visit_definition_list_end", &args)
+                    .unwrap_or(VisitResult::Continue)
+            })
+        }
+
+        fn visit_form(&mut self, ctx: &NodeContext, action: Option<&str>, method: Option<&str>) -> VisitResult {
+            Python::attach(|py| {
+                let ctx_dict = match Self::context_to_dict(py, ctx) {
+                    Ok(d) => d,
+                    Err(_) => return VisitResult::Continue,
+                };
+                let action_py: Bound<'_, PyAny> = match action {
+                    Some(a) => pyo3::types::PyString::new(py, a).as_any().clone(),
+                    None => py.None().bind(py).clone(),
+                };
+                let method_py: Bound<'_, PyAny> = match method {
+                    Some(m) => pyo3::types::PyString::new(py, m).as_any().clone(),
+                    None => py.None().bind(py).clone(),
+                };
+                let args: Vec<Bound<'_, PyAny>> = vec![ctx_dict.as_any().clone(), action_py, method_py];
+                self.call_visitor_method_sync(py, "visit_form", &args)
+                    .unwrap_or(VisitResult::Continue)
+            })
+        }
+
+        fn visit_input(
+            &mut self,
+            ctx: &NodeContext,
+            input_type: &str,
+            name: Option<&str>,
+            value: Option<&str>,
+        ) -> VisitResult {
+            Python::attach(|py| {
+                let ctx_dict = match Self::context_to_dict(py, ctx) {
+                    Ok(d) => d,
+                    Err(_) => return VisitResult::Continue,
+                };
+                let input_type_py: Bound<'_, PyAny> = pyo3::types::PyString::new(py, input_type).as_any().clone();
+                let name_py: Bound<'_, PyAny> = match name {
+                    Some(n) => pyo3::types::PyString::new(py, n).as_any().clone(),
+                    None => py.None().bind(py).clone(),
+                };
+                let value_py: Bound<'_, PyAny> = match value {
+                    Some(v) => pyo3::types::PyString::new(py, v).as_any().clone(),
+                    None => py.None().bind(py).clone(),
+                };
+                let args: Vec<Bound<'_, PyAny>> = vec![ctx_dict.as_any().clone(), input_type_py, name_py, value_py];
+                self.call_visitor_method_sync(py, "visit_input", &args)
+                    .unwrap_or(VisitResult::Continue)
+            })
+        }
+
+        fn visit_button(&mut self, ctx: &NodeContext, text: &str) -> VisitResult {
+            Python::attach(|py| {
+                let ctx_dict = match Self::context_to_dict(py, ctx) {
+                    Ok(d) => d,
+                    Err(_) => return VisitResult::Continue,
+                };
+                let text_py: Bound<'_, PyAny> = pyo3::types::PyString::new(py, text).as_any().clone();
+                let args: Vec<Bound<'_, PyAny>> = vec![ctx_dict.as_any().clone(), text_py];
+                self.call_visitor_method_sync(py, "visit_button", &args)
+                    .unwrap_or(VisitResult::Continue)
+            })
+        }
+
+        fn visit_audio(&mut self, ctx: &NodeContext, src: Option<&str>) -> VisitResult {
+            Python::attach(|py| {
+                let ctx_dict = match Self::context_to_dict(py, ctx) {
+                    Ok(d) => d,
+                    Err(_) => return VisitResult::Continue,
+                };
+                let src_py: Bound<'_, PyAny> = match src {
+                    Some(s) => pyo3::types::PyString::new(py, s).as_any().clone(),
+                    None => py.None().bind(py).clone(),
+                };
+                let args: Vec<Bound<'_, PyAny>> = vec![ctx_dict.as_any().clone(), src_py];
+                self.call_visitor_method_sync(py, "visit_audio", &args)
+                    .unwrap_or(VisitResult::Continue)
+            })
+        }
+
+        fn visit_video(&mut self, ctx: &NodeContext, src: Option<&str>) -> VisitResult {
+            Python::attach(|py| {
+                let ctx_dict = match Self::context_to_dict(py, ctx) {
+                    Ok(d) => d,
+                    Err(_) => return VisitResult::Continue,
+                };
+                let src_py: Bound<'_, PyAny> = match src {
+                    Some(s) => pyo3::types::PyString::new(py, s).as_any().clone(),
+                    None => py.None().bind(py).clone(),
+                };
+                let args: Vec<Bound<'_, PyAny>> = vec![ctx_dict.as_any().clone(), src_py];
+                self.call_visitor_method_sync(py, "visit_video", &args)
+                    .unwrap_or(VisitResult::Continue)
+            })
+        }
+
+        fn visit_iframe(&mut self, ctx: &NodeContext, src: Option<&str>) -> VisitResult {
+            Python::attach(|py| {
+                let ctx_dict = match Self::context_to_dict(py, ctx) {
+                    Ok(d) => d,
+                    Err(_) => return VisitResult::Continue,
+                };
+                let src_py: Bound<'_, PyAny> = match src {
+                    Some(s) => pyo3::types::PyString::new(py, s).as_any().clone(),
+                    None => py.None().bind(py).clone(),
+                };
+                let args: Vec<Bound<'_, PyAny>> = vec![ctx_dict.as_any().clone(), src_py];
+                self.call_visitor_method_sync(py, "visit_iframe", &args)
+                    .unwrap_or(VisitResult::Continue)
+            })
+        }
+
+        fn visit_details(&mut self, ctx: &NodeContext, open: bool) -> VisitResult {
+            Python::attach(|py| {
+                let ctx_dict = match Self::context_to_dict(py, ctx) {
+                    Ok(d) => d,
+                    Err(_) => return VisitResult::Continue,
+                };
+                let open_py: Bound<'_, PyAny> = pyo3::types::PyBool::new(py, open).as_any().clone();
+                let args: Vec<Bound<'_, PyAny>> = vec![ctx_dict.as_any().clone(), open_py];
+                self.call_visitor_method_sync(py, "visit_details", &args)
+                    .unwrap_or(VisitResult::Continue)
+            })
+        }
+
+        fn visit_summary(&mut self, ctx: &NodeContext, text: &str) -> VisitResult {
+            Python::attach(|py| {
+                let ctx_dict = match Self::context_to_dict(py, ctx) {
+                    Ok(d) => d,
+                    Err(_) => return VisitResult::Continue,
+                };
+                let text_py: Bound<'_, PyAny> = pyo3::types::PyString::new(py, text).as_any().clone();
+                let args: Vec<Bound<'_, PyAny>> = vec![ctx_dict.as_any().clone(), text_py];
+                self.call_visitor_method_sync(py, "visit_summary", &args)
+                    .unwrap_or(VisitResult::Continue)
+            })
+        }
+
+        fn visit_figure_start(&mut self, ctx: &NodeContext) -> VisitResult {
+            Python::attach(|py| {
+                let ctx_dict = match Self::context_to_dict(py, ctx) {
+                    Ok(d) => d,
+                    Err(_) => return VisitResult::Continue,
+                };
+                let args: Vec<Bound<'_, PyAny>> = vec![ctx_dict.as_any().clone()];
+                self.call_visitor_method_sync(py, "visit_figure_start", &args)
+                    .unwrap_or(VisitResult::Continue)
+            })
+        }
+
+        fn visit_figcaption(&mut self, ctx: &NodeContext, text: &str) -> VisitResult {
+            Python::attach(|py| {
+                let ctx_dict = match Self::context_to_dict(py, ctx) {
+                    Ok(d) => d,
+                    Err(_) => return VisitResult::Continue,
+                };
+                let text_py: Bound<'_, PyAny> = pyo3::types::PyString::new(py, text).as_any().clone();
+                let args: Vec<Bound<'_, PyAny>> = vec![ctx_dict.as_any().clone(), text_py];
+                self.call_visitor_method_sync(py, "visit_figcaption", &args)
+                    .unwrap_or(VisitResult::Continue)
+            })
+        }
+
+        fn visit_figure_end(&mut self, ctx: &NodeContext, output: &str) -> VisitResult {
+            Python::attach(|py| {
+                let ctx_dict = match Self::context_to_dict(py, ctx) {
+                    Ok(d) => d,
+                    Err(_) => return VisitResult::Continue,
+                };
+                let output_py: Bound<'_, PyAny> = pyo3::types::PyString::new(py, output).as_any().clone();
+                let args: Vec<Bound<'_, PyAny>> = vec![ctx_dict.as_any().clone(), output_py];
+                self.call_visitor_method_sync(py, "visit_figure_end", &args)
+                    .unwrap_or(VisitResult::Continue)
+            })
+        }
+    }
+}
+
+/// Convert HTML to Markdown with a custom visitor.
+#[cfg(feature = "visitor")]
+#[pyfunction]
+#[pyo3(signature = (html, options=None, visitor=None))]
+fn convert_with_visitor(
+    py: Python<'_>,
+    html: &str,
+    options: Option<ConversionOptions>,
+    visitor: Option<Py<PyAny>>,
+) -> PyResult<String> {
+    let html = html.to_owned();
+    let rust_options = options.map(|opts| opts.to_rust());
+
+    let Some(visitor_py) = visitor else {
+        return py
+            .detach(move || run_with_guard_and_profile(|| html_to_markdown_rs::convert(&html, rust_options.clone())))
+            .map_err(to_py_err);
+    };
+
+    let bridge = visitor_support::PyVisitorBridge::new(visitor_py);
+    let visitor_handle = std::sync::Arc::new(std::sync::Mutex::new(bridge));
+
+    py.detach(move || {
+        run_with_guard_and_profile(|| {
+            let rc_visitor: Rc<RefCell<dyn HtmlVisitor>> = {
+                Python::attach(|py| {
+                    let guard = visitor_handle.lock().unwrap();
+                    let bridge_copy = visitor_support::PyVisitorBridge::new(guard.visitor.clone_ref(py));
+                    Rc::new(RefCell::new(bridge_copy)) as Rc<RefCell<dyn HtmlVisitor>>
+                })
+            };
+            html_to_markdown_rs::convert_with_visitor(&html, rust_options.clone(), Some(rc_visitor))
+        })
+    })
+    .map_err(to_py_err)
+}
+
+/// Convert HTML to Markdown with a custom visitor (async-compatible version).
+///
+/// This function provides async-compatible support for visitor methods using pyo3-async-runtimes
+/// with proper event loop management. Supports both synchronous and asynchronous visitor methods.
+///
+/// The visitor object should define callback methods that return dictionaries:
+/// - `def visit_text(ctx, text)`: Called for text nodes (can be async)
+/// - `def visit_link(ctx, href, text, title)`: Called for links (can be async)
+/// - And many others...
+///
+/// Each method should return a dict (or coroutine) with a 'type' key:
+/// - `{"type": "continue"}` - Continue with default conversion
+/// - `{"type": "skip"}` - Skip this element
+/// - `{"type": "preserve_html"}` - Preserve original HTML
+/// - `{"type": "custom", "output": "markdown"}` - Custom markdown output
+/// - `{"type": "error", "message": "error"}` - Stop with error
+///
+/// Example:
+///     ```ignore
+///     from html_to_markdown import convert_with_async_visitor
+///     import asyncio
+///
+///     class MyAsyncVisitor:
+///         async def visit_text(self, ctx, text):
+///             # Can perform async operations here
+///             result = await some_async_operation()
+///             return {"type": "continue"}
+///
+///     html = "<h1>Hello</h1><p>World</p>"
+///     markdown = await convert_with_async_visitor(html, visitor=MyAsyncVisitor())
+///     ```
+#[cfg(feature = "async-visitor")]
+#[pyfunction]
+#[pyo3(signature = (html, options=None, visitor=None))]
+fn convert_with_async_visitor(
+    py: Python<'_>,
+    html: &str,
+    options: Option<ConversionOptions>,
+    visitor: Option<Py<PyAny>>,
+) -> PyResult<String> {
+    init_python_event_loop(py)?;
+
+    convert_with_visitor(py, html, options, visitor)
+}
+
+/// Fallback for when async-visitor feature is not enabled
+#[cfg(all(feature = "visitor", not(feature = "async-visitor")))]
+#[pyfunction]
+#[pyo3(signature = (html, options=None, visitor=None))]
+fn convert_with_async_visitor(
+    py: Python<'_>,
+    html: &str,
+    options: Option<ConversionOptions>,
+    visitor: Option<Py<PyAny>>,
+) -> PyResult<String> {
+    convert_with_visitor(py, html, options, visitor)
+}
+
 /// Python bindings for html-to-markdown
 #[pymodule]
 fn _html_to_markdown(m: &Bound<'_, PyModule>) -> PyResult<()> {
@@ -1077,14 +2615,25 @@ fn _html_to_markdown(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<ConversionOptions>()?;
     m.add_class::<PreprocessingOptions>()?;
     m.add_class::<ConversionOptionsHandle>()?;
-    m.add_function(wrap_pyfunction!(convert_with_inline_images, m)?)?;
-    m.add_function(wrap_pyfunction!(convert_with_inline_images_json, m)?)?;
-    m.add_function(wrap_pyfunction!(convert_with_inline_images_handle, m)?)?;
-    m.add_class::<InlineImageConfig>()?;
-    m.add_function(wrap_pyfunction!(convert_with_metadata, m)?)?;
-    m.add_function(wrap_pyfunction!(convert_with_metadata_json, m)?)?;
-    m.add_function(wrap_pyfunction!(convert_with_metadata_handle, m)?)?;
-    m.add_class::<MetadataConfig>()?;
+    #[cfg(feature = "inline-images")]
+    {
+        m.add_function(wrap_pyfunction!(convert_with_inline_images, m)?)?;
+        m.add_function(wrap_pyfunction!(convert_with_inline_images_json, m)?)?;
+        m.add_function(wrap_pyfunction!(convert_with_inline_images_handle, m)?)?;
+        m.add_class::<InlineImageConfig>()?;
+    }
+    #[cfg(feature = "metadata")]
+    {
+        m.add_function(wrap_pyfunction!(convert_with_metadata, m)?)?;
+        m.add_function(wrap_pyfunction!(convert_with_metadata_json, m)?)?;
+        m.add_function(wrap_pyfunction!(convert_with_metadata_handle, m)?)?;
+        m.add_class::<MetadataConfig>()?;
+    }
+    #[cfg(feature = "visitor")]
+    {
+        m.add_function(wrap_pyfunction!(convert_with_visitor, m)?)?;
+        m.add_function(wrap_pyfunction!(convert_with_async_visitor, m)?)?;
+    }
     m.add_function(wrap_pyfunction!(start_profiling, m)?)?;
     m.add_function(wrap_pyfunction!(stop_profiling, m)?)?;
     Ok(())

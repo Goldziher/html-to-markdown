@@ -35,6 +35,8 @@ import (
 	"unsafe"
 )
 
+const unknownValue = "unknown"
+
 // Convert converts HTML to Markdown using default options.
 //
 // It returns the converted Markdown string or an error if the conversion fails.
@@ -97,11 +99,11 @@ func MustConvert(html string) string {
 //	fmt.Printf("Using html-to-markdown version: %s\n", version)
 func Version() string {
 	if err := ensureFFILoaded(); err != nil {
-		return "unknown"
+		return unknownValue
 	}
 	cVersion := C.html_to_markdown_version_proxy()
 	if cVersion == nil {
-		return "unknown"
+		return unknownValue
 	}
 	return C.GoString(cVersion)
 }

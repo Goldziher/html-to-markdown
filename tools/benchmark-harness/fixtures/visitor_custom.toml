@@ -1,0 +1,37 @@
+title = "Visitor Custom Transformation Fixtures"
+description = "Custom transformation overhead measurement with custom VisitResult and markdown generation"
+
+[[fixtures]]
+id = "visitor_custom_basic"
+name = "Basic Custom Transformation"
+path = "test_documents/html/visitor/custom.html"
+category = "visitor"
+iterations = 140
+
+[[fixtures]]
+id = "visitor_custom_links"
+name = "Link Transformation (URL Rewriting)"
+path = "test_documents/html/visitor/custom.html"
+category = "visitor"
+iterations = 130
+
+[[fixtures]]
+id = "visitor_custom_images"
+name = "Image Transformation (Path Modification)"
+path = "test_documents/html/visitor/custom.html"
+category = "visitor"
+iterations = 130
+
+[[fixtures]]
+id = "visitor_custom_sections"
+name = "Section-Aware Transformation (State Tracking)"
+path = "test_documents/html/visitor/custom.html"
+category = "visitor"
+iterations = 120
+
+[[fixtures]]
+id = "visitor_custom_mixed"
+name = "Mixed Custom Transformations"
+path = "test_documents/html/visitor/custom.html"
+category = "visitor"
+iterations = 110

@@ -39,5 +39,5 @@ runs:
         if [[ "$RUNNER_OS" == "Windows" ]]; then
           export PATH="${GITHUB_WORKSPACE}/packages/java/src/main/resources:${PATH}"
         fi
-        MAVEN_OPTS="${MAVEN_OPTS:-} --enable-native-access=ALL-UNNAMED -Dsun.misc.unsafe.memory.access=allow" ../../mvnw -B -f pom.xml -Dgpg.skip=true clean test
+        MAVEN_OPTS="${MAVEN_OPTS:-} --enable-native-access=ALL-UNNAMED -Dsun.misc.unsafe.memory.access=allow" mvn -B -f pom.xml -Dgpg.skip=true clean test
         echo "✓ Java Panama FFI bindings test completed"

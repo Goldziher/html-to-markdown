@@ -8,6 +8,7 @@ use HtmlToMarkdown\Contract\ExtensionBridge as ExtensionBridgeContract;
 use HtmlToMarkdown\Exception\ConversionFailed;
 use HtmlToMarkdown\Exception\ExtensionNotLoaded;
 use HtmlToMarkdown\Exception\InvalidOption;
+use HtmlToMarkdown\Visitor\HtmlVisitor;
 
 /**
  * @phpstan-import-type ConversionOptionsInput from \HtmlToMarkdown\Config\ConversionOptions
@@ -19,6 +20,7 @@ final class ExtensionBridge implements ExtensionBridgeContract
     private const CONVERT_FUNCTION = 'html_to_markdown_convert';
     private const CONVERT_INLINE_FUNCTION = 'html_to_markdown_convert_with_inline_images';
     private const CONVERT_METADATA_FUNCTION = 'html_to_markdown_convert_with_metadata';
+    private const CONVERT_VISITOR_FUNCTION = 'html_to_markdown_convert_with_visitor';
 
     /**
      * @param ConversionOptionsInput|null $options
@@ -107,5 +109,29 @@ final class ExtensionBridge implements ExtensionBridgeContract
         }
 
         return $payload;
+    }
+
+    /**
+     * @param ConversionOptionsInput|null $options
+     */
+    public function convertWithVisitor(
+        string $html,
+        ?array $options = null,
+        ?HtmlVisitor $visitor = null,
+    ): string {
+        /** @var callable-string $callable */
+        $callable = self::CONVERT_VISITOR_FUNCTION;
+        if (!\function_exists($callable)) {
+            throw ExtensionNotLoaded::create();
+        }
+
+        try {
+            /** @var string $result */
+            $result = $callable($html, $options, $visitor);
+        } catch (\Throwable $exception) {
+            throw ConversionFailed::withMessage($exception->getMessage());
+        }
+
+        return $result;
     }
 }

@@ -34,7 +34,7 @@ repos:
       - id: biome-format
       - id: biome-lint
   - repo: https://github.com/oxc-project/mirrors-oxlint
-    rev: v1.34.0
+    rev: v1.35.0
     hooks:
       - id: oxlint
         args: ["--fix"]
@@ -74,12 +74,6 @@ repos:
         language: system
         files: ^packages/go/
         pass_filenames: false
-      - id: golangci-lint-examples
-        name: golangci-lint (examples/go-smoke)
-        entry: bash -c 'cd examples/go-smoke && golangci-lint run --config ../../.golangci.yml ./...'
-        language: system
-        files: ^examples/go-smoke/
-        pass_filenames: false
       - id: mypy
         name: mypy
         entry: uv run mypy
@@ -116,7 +110,7 @@ repos:
         name: dotnet format
         entry: bash -c 'dotnet format packages/csharp/HtmlToMarkdown/HtmlToMarkdown.csproj && dotnet format packages/csharp/HtmlToMarkdown.Tests/HtmlToMarkdown.Tests.csproj'
         language: system
-        files: ^packages/csharp/|^examples/csharp-smoke/
+        files: ^packages/csharp/
         pass_filenames: false
       - id: mix-credo
         name: mix credo
@@ -131,7 +125,7 @@ repos:
         pass_filenames: false
       - id: java-verify
         name: maven verify (java)
-        entry: bash -lc 'if [ -f "$HOME/.sdkman/bin/sdkman-init.sh" ]; then source "$HOME/.sdkman/bin/sdkman-init.sh" && sdk env; fi; MAVEN_OPTS="${MAVEN_OPTS:-} --enable-native-access=ALL-UNNAMED -Dsun.misc.unsafe.memory.access=allow" ./mvnw -f packages/java/pom.xml -B -DskipTests -Dgpg.skip=true verify'
+        entry: bash -lc 'if [ -f "$HOME/.sdkman/bin/sdkman-init.sh" ]; then source "$HOME/.sdkman/bin/sdkman-init.sh" && sdk env; fi; MAVEN_OPTS="${MAVEN_OPTS:-} --enable-native-access=ALL-UNNAMED -Dsun.misc.unsafe.memory.access=allow" mvn -f packages/java/pom.xml -B -DskipTests -Dgpg.skip=true verify'
         language: system
         files: ^packages/java/
         pass_filenames: false

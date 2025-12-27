@@ -9,14 +9,46 @@ import java.nio.file.Paths;
 import java.util.HashMap;
 import java.util.Map;
 
-public class Benchmark {
+/**
+ * Benchmark utility for HTML-to-Markdown conversion performance testing.
+ *
+ * <p>This program measures the performance of the HTML-to-Markdown converter
+ * on real HTML files with configurable iterations and warmup runs.
+ *
+ * @since 2.17.0
+ */
+public final class Benchmark {
+    /**
+     * Default number of benchmark iterations.
+     */
     private static final int DEFAULT_ITERATIONS = 50;
+
+    /**
+     * Default number of warmup iterations.
+     */
     private static final int DEFAULT_WARMUP = 3;
+
+    /**
+     * Default profiling frequency in Hz.
+     */
     private static final int DEFAULT_PROFILING_FREQUENCY = 1000;
+
+    /**
+     * Conversion factor from nanoseconds to seconds.
+     */
     private static final double NANOS_TO_SECONDS = 1_000_000_000.0;
+
+    /**
+     * Conversion factor from bytes to megabytes.
+     */
     private static final double BYTES_TO_MB = 1024.0 * 1024.0;
 
-    public static void main(String[] args) {
+    /**
+     * Main entry point for the benchmark.
+     *
+     * @param args command-line arguments
+     */
+    public static void main(final String[] args) {
         String filePath = null;
         int iterations = DEFAULT_ITERATIONS;
         int warmup = DEFAULT_WARMUP;
@@ -58,7 +90,8 @@ public class Benchmark {
             System.exit(1);
         }
 
-        if (!scenario.equals("convert-default") && !scenario.equals("metadata-default")) {
+        if (!scenario.equals("convert-default")
+                && !scenario.equals("metadata-default")) {
             System.err.println("Unsupported scenario: " + scenario);
             System.exit(1);
         }
@@ -67,7 +100,8 @@ public class Benchmark {
             Path path = Paths.get(filePath);
             String html = Files.readString(path);
 
-            String warmupEnv = System.getenv("HTML_TO_MARKDOWN_BENCH_WARMUP");
+            String warmupEnv =
+                System.getenv("HTML_TO_MARKDOWN_BENCH_WARMUP");
             if (warmupEnv != null && !warmupEnv.isBlank()) {
                 try {
                     warmup = Integer.parseInt(warmupEnv);
@@ -83,10 +117,12 @@ public class Benchmark {
                 runScenario(html, scenario);
             }
 
-            String profileOutput = System.getenv("HTML_TO_MARKDOWN_PROFILE_OUTPUT");
+            String profileOutput =
+                System.getenv("HTML_TO_MARKDOWN_PROFILE_OUTPUT");
             if (profileOutput != null && !profileOutput.isBlank()) {
                 int frequency = DEFAULT_PROFILING_FREQUENCY;
-                String freqEnv = System.getenv("HTML_TO_MARKDOWN_PROFILE_FREQUENCY");
+                String freqEnv =
+                    System.getenv("HTML_TO_MARKDOWN_PROFILE_FREQUENCY");
                 if (freqEnv != null && !freqEnv.isBlank()) {
                     try {
                         frequency = Integer.parseInt(freqEnv);
@@ -131,7 +167,13 @@ public class Benchmark {
         }
     }
 
-    private static String toJson(Map<String, Object> map) {
+    /**
+     * Convert a map to a JSON string representation.
+     *
+     * @param map the map to convert
+     * @return JSON string representation
+     */
+    private static String toJson(final Map<String, Object> map) {
         StringBuilder sb = new StringBuilder("{");
         boolean first = true;
         for (Map.Entry<String, Object> entry : map.entrySet()) {
@@ -151,11 +193,25 @@ public class Benchmark {
         return sb.toString();
     }
 
-    private static void runScenario(String html, String scenario) {
+    /**
+     * Run a benchmark scenario.
+     *
+     * @param html the HTML content to process
+     * @param scenario the scenario name
+     */
+    private static void runScenario(final String html,
+            final String scenario) {
         if ("metadata-default".equals(scenario)) {
             HtmlToMarkdown.convertWithMetadata(html);
         } else {
             HtmlToMarkdown.convert(html);
         }
+    }
+
+    /**
+     * Private constructor to prevent instantiation.
+     */
+    private Benchmark() {
+        throw new UnsupportedOperationException("Utility class");
     }
 }

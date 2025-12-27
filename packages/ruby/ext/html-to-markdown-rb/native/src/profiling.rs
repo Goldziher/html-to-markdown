@@ -182,6 +182,7 @@ pub fn start(_output_path: PathBuf, _frequency: i32) -> Result<()> {
 }
 
 #[cfg(all(not(target_os = "windows"), not(feature = "profiling")))]
+#[allow(dead_code)]
 pub fn start(_output_path: PathBuf, _frequency: i32) -> Result<()> {
     Err(ConversionError::Other(
         "Profiling is disabled; rebuild with the profiling feature".to_string(),
@@ -196,6 +197,7 @@ pub fn stop() -> Result<()> {
 }
 
 #[cfg(all(not(target_os = "windows"), not(feature = "profiling")))]
+#[allow(dead_code)]
 pub fn stop() -> Result<()> {
     Err(ConversionError::Other(
         "Profiling is disabled; rebuild with the profiling feature".to_string(),

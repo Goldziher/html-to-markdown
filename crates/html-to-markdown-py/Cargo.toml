@@ -19,8 +19,12 @@ crate-type = ["cdylib", "rlib"]
 doctest = false
 
 [dependencies]
-html-to-markdown-rs = { workspace = true, features = ["inline-images", "metadata"] }
+html-to-markdown-rs = { workspace = true, features = ["inline-images", "metadata", "visitor", "async-visitor"] }
 pyo3.workspace = true
+pyo3-async-runtimes = { version = "0.27", features = ["tokio-runtime"] }
+tokio = { version = "1", features = ["rt", "rt-multi-thread"] }
+async-trait.workspace = true
+once_cell.workspace = true
 
 [target.'cfg(not(target_os = "windows"))'.dependencies]
 pprof = { version = "0.15", features = ["flamegraph"], optional = true }
@@ -33,3 +37,7 @@ image = { version = "0.25", default-features = false, features = ["png"] }
 default = []
 extension-module = ["pyo3/extension-module"]
 profiling = ["dep:pprof"]
+inline-images = ["html-to-markdown-rs/inline-images"]
+metadata = ["html-to-markdown-rs/metadata"]
+visitor = ["html-to-markdown-rs/visitor"]
+async-visitor = ["html-to-markdown-rs/async-visitor", "visitor"]

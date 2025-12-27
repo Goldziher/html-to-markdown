@@ -176,6 +176,9 @@
                 <configuration>
                     <source>${maven.compiler.release}</source>
                     <doclint>none</doclint>
+                    <additionalJOptions>
+                        <option>--enable-preview</option>
+                    </additionalJOptions>
                 </configuration>
                 <executions>
                     <execution>
