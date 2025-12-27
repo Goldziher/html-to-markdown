@@ -431,52 +431,6 @@ final class VisitorTest extends TestCase
     public function testPhpVisitorCallbacksAreInvokedDuringConversion(): void
     {
         $this->markTestIncomplete('PHP visitor integration not yet fully implemented in ext-php-rs bindings');
-        $callbackTracker = [];
-        $visitor = new class ($callbackTracker) extends AbstractVisitor {
-            /**
-             * @param array<int, array<int|string, mixed>> $tracker
-             * @phpstan-ignore-next-line property.unused
-             */
-            public function __construct(private array &$tracker)
-            {
-            }
-
-            public function visitText(NodeContext $context, string $text): array
-            {
-                $this->tracker[] = ['visitText', $text];
-                return VisitResult::continue();
-            }
-
-            public function visitLink(NodeContext $context, string $href, string $text, ?string $title): array
-            {
-                $this->tracker[] = ['visitLink', $href, $text, $title];
-                return VisitResult::continue();
-            }
-
-            public function visitElementStart(NodeContext $context): array
-            {
-                $this->tracker[] = ['visitElementStart', $context->tagName];
-                return VisitResult::continue();
-            }
-
-            public function visitElementEnd(NodeContext $context, string $output): array
-            {
-                $this->tracker[] = ['visitElementEnd', $context->tagName];
-                return VisitResult::continue();
-            }
-        };
-
-        $html = '<p>Hello <a href="https://example.com">World</a></p>';
-        $markdown = \HtmlToMarkdown\HtmlToMarkdown::convertWithVisitor($html, null, $visitor);
-
-        self::assertNotEmpty($callbackTracker, 'Visitor callbacks were not invoked during conversion');
-        self::assertGreaterThan(0, \count($callbackTracker), 'At least one visitor callback should be invoked');
-
-        $callbackNames = \array_map(fn ($item) => $item[0], $callbackTracker);
-        self::assertContains('visitLink', $callbackNames, 'visitLink callback should be invoked for <a> tag');
-        self::assertContains('visitText', $callbackNames, 'visitText callback should be invoked for text nodes');
-
-        self::assertStringContainsString('[World](https://example.com)', $markdown);
     }
 
     /**
@@ -487,17 +441,6 @@ final class VisitorTest extends TestCase
     public function testPhpVisitorCustomResultsAreHonored(): void
     {
         $this->markTestIncomplete('PHP visitor integration not yet fully implemented in ext-php-rs bindings');
-        $visitor = new class () extends AbstractVisitor {
-            public function visitLink(NodeContext $context, string $href, string $text, ?string $title): array
-            {
-                return VisitResult::custom(">>> LINK: {$text} <<<");
-            }
-        };
-
-        $html = '<p>Check <a href="https://example.com">this link</a> out</p>';
-        $markdown = \HtmlToMarkdown\HtmlToMarkdown::convertWithVisitor($html, null, $visitor);
-
-        self::assertStringContainsString('>>> LINK: this link <<<', $markdown);
     }
 
     /**
@@ -508,19 +451,6 @@ final class VisitorTest extends TestCase
     public function testPhpVisitorCanSkipElements(): void
     {
         $this->markTestIncomplete('PHP visitor integration not yet fully implemented in ext-php-rs bindings');
-        $visitor = new class () extends AbstractVisitor {
-            public function visitImage(NodeContext $context, string $src, string $alt, ?string $title): array
-            {
-                return VisitResult::skip();
-            }
-        };
-
-        $html = '<p>Before image <img src="test.png" alt="test"/> after image</p>';
-        $markdown = \HtmlToMarkdown\HtmlToMarkdown::convertWithVisitor($html, null, $visitor);
-
-        self::assertStringNotContainsString('![', $markdown);
-        self::assertStringContainsString('Before image', $markdown);
-        self::assertStringContainsString('after image', $markdown);
     }
 
     /**
@@ -531,21 +461,6 @@ final class VisitorTest extends TestCase
     public function testPhpVisitorCanPreserveHtml(): void
     {
         $this->markTestIncomplete('PHP visitor integration not yet fully implemented in ext-php-rs bindings');
-        $visitor = new class () extends AbstractVisitor {
-            public function visitCustomElement(NodeContext $context, string $tagName, string $html): array
-            {
-                if ($tagName === 'custom-widget') {
-                    return VisitResult::preserveHtml();
-                }
-                return VisitResult::continue();
-            }
-        };
-
-        $html = '<p>Before <custom-widget>Widget Content</custom-widget> after</p>';
-        $markdown = \HtmlToMarkdown\HtmlToMarkdown::convertWithVisitor($html, null, $visitor);
-
-        self::assertStringContainsString('<custom-widget>', $markdown);
-        self::assertStringContainsString('</custom-widget>', $markdown);
     }
 
     /**
@@ -556,39 +471,5 @@ final class VisitorTest extends TestCase
     public function testMultiplePhpVisitorCallbacksInvokedInOrder(): void
     {
         $this->markTestIncomplete('PHP visitor integration not yet fully implemented in ext-php-rs bindings');
-        $callOrder = [];
-        $visitor = new class ($callOrder) extends AbstractVisitor {
-            /**
-             * @param array<int, string> $order
-             * @phpstan-ignore-next-line property.unused
-             */
-            public function __construct(private array &$order)
-            {
-            }
-
-            public function visitElementStart(NodeContext $context): array
-            {
-                $this->order[] = 'start_' . $context->tagName;
-                return VisitResult::continue();
-            }
-
-            public function visitElementEnd(NodeContext $context, string $output): array
-            {
-                $this->order[] = 'end_' . $context->tagName;
-                return VisitResult::continue();
-            }
-
-            public function visitText(NodeContext $context, string $text): array
-            {
-                $this->order[] = 'text';
-                return VisitResult::continue();
-            }
-        };
-
-        $html = '<div><p>Hello</p></div>';
-        \HtmlToMarkdown\HtmlToMarkdown::convertWithVisitor($html, null, $visitor);
-
-        self::assertNotEmpty($callOrder);
-        self::assertGreaterThan(0, \count(\array_filter($callOrder, fn ($c) => \str_starts_with($c, 'start_'))));
     }
 }

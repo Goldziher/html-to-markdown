@@ -2002,7 +2002,7 @@ impl HtmlVisitor for CVisitorWrapper {
 /// # Arguments
 ///
 /// - `callbacks`: Pointer to callback table. Must be valid for the entire lifetime
-///               of the returned visitor handle.
+///   of the returned visitor handle.
 ///
 /// # Returns
 ///
@@ -2053,7 +2053,7 @@ pub unsafe extern "C" fn html_to_markdown_visitor_create(
 /// # Arguments
 ///
 /// - `visitor`: Visitor handle from `html_to_markdown_visitor_create()`.
-///             NULL pointers are safe (no-op).
+///   NULL pointers are safe (no-op).
 ///
 /// # Safety
 ///
@@ -2087,13 +2087,13 @@ pub unsafe extern "C" fn html_to_markdown_visitor_free(visitor: HtmlToMarkdownVi
 /// - `html`: Null-terminated UTF-8 C string containing HTML
 /// - `visitor`: Visitor handle from `html_to_markdown_visitor_create()`
 /// - `len_out`: Pointer to size_t where output length will be written.
-///            Can be NULL if length is not needed.
+///   Can be NULL if length is not needed.
 ///
 /// # Returns
 ///
 /// - Non-NULL: Pointer to malloc'd markdown string (NULL-terminated).
-///            Length written to *len_out if len_out is not NULL.
-///            Must be freed with `html_to_markdown_free_string()`.
+///   Length written to *len_out if len_out is not NULL.
+///   Must be freed with `html_to_markdown_free_string()`.
 /// - NULL: Conversion failed; call `html_to_markdown_last_error()` for details
 ///
 /// # Safety
@@ -2191,7 +2191,7 @@ pub unsafe extern "C" fn html_to_markdown_convert_with_visitor(
 /// # Returns
 ///
 /// - Non-NULL: Pointer to malloc'd markdown string (NULL-terminated).
-///            Must be freed with `html_to_markdown_free_string()`.
+///   Must be freed with `html_to_markdown_free_string()`.
 /// - NULL: Conversion failed; call `html_to_markdown_last_error()` for details
 ///
 /// # Safety
