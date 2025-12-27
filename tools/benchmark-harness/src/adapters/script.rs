@@ -348,7 +348,13 @@ impl FrameworkAdapter for ScriptAdapter {
             .arg("--scenario")
             .arg(scenario.as_str())
             .arg("--format")
-            .arg(fixture.format.as_str())
+            .arg(fixture.format.as_str());
+
+        if fixture.visitor.as_str() != "none" {
+            command.arg("--visitor").arg(fixture.visitor.as_str());
+        }
+
+        command
             .current_dir(&working_dir)
             .stdout(Stdio::piped())
             .stderr(Stdio::inherit());

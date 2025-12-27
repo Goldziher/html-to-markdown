@@ -1,0 +1,27 @@
+title = "Visitor Baseline Fixtures"
+description = "Baseline comparison benchmarks for visitor pattern overhead measurement (with/without visitor)"
+
+# Baseline benchmark: Standard conversion without visitor pattern
+[[fixtures]]
+id = "visitor_baseline_simple"
+name = "Simple HTML (No Visitor)"
+path = "test_documents/html/visitor/baseline.html"
+category = "visitor"
+iterations = 200
+
+# Same baseline HTML with no-op visitor (returns Continue for all methods)
+# This measures the overhead of visitor infrastructure itself
+[[fixtures]]
+id = "visitor_baseline_with_noop"
+name = "Simple HTML (With No-op Visitor)"
+path = "test_documents/html/visitor/baseline.html"
+category = "visitor"
+iterations = 200
+
+# Additional simple fixture for regression detection
+[[fixtures]]
+id = "visitor_baseline_minimal"
+name = "Minimal HTML (No Visitor)"
+path = "test_documents/html/visitor/baseline.html"
+category = "visitor"
+iterations = 250

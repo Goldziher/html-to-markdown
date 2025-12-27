@@ -1,0 +1,42 @@
+title = "Visitor Callbacks Fixtures"
+description = "Callback overhead measurement benchmarks with simple visitor callbacks (no-op returns)"
+
+# Benchmark with visitor that has simple callbacks for text nodes
+[[fixtures]]
+id = "visitor_callbacks_text"
+name = "Text Callbacks (visit_text)"
+path = "test_documents/html/visitor/callbacks.html"
+category = "visitor"
+iterations = 180
+
+# Benchmark with visitor callbacks for links
+[[fixtures]]
+id = "visitor_callbacks_links"
+name = "Link Callbacks (visit_link)"
+path = "test_documents/html/visitor/callbacks.html"
+category = "visitor"
+iterations = 170
+
+# Benchmark with visitor callbacks for images
+[[fixtures]]
+id = "visitor_callbacks_images"
+name = "Image Callbacks (visit_image)"
+path = "test_documents/html/visitor/callbacks.html"
+category = "visitor"
+iterations = 170
+
+# Benchmark with visitor callbacks for headings
+[[fixtures]]
+id = "visitor_callbacks_headings"
+name = "Heading Callbacks (visit_heading)"
+path = "test_documents/html/visitor/callbacks.html"
+category = "visitor"
+iterations = 180
+
+# Benchmark with multiple callback types active simultaneously
+[[fixtures]]
+id = "visitor_callbacks_multiple"
+name = "Multiple Callbacks Active"
+path = "test_documents/html/visitor/callbacks.html"
+category = "visitor"
+iterations = 150
