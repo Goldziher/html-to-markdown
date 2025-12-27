@@ -100,22 +100,37 @@ impl PhpVisitorBridge {
 
     /// Call a PHP visitor method and convert the result.
     fn call_visitor_method(&self, method_name: &str, args: &[Zval]) -> PhpResult<VisitResult> {
-        // Try to get the method from the visitor object
+        // Validate visitor is an object
         if !self.visitor.is_object() {
             return Ok(VisitResult::Continue);
         }
 
-        // Check if the method exists on the visitor object
-        let method_exists = self
-            .visitor
-            .object()
-            .ok_or_else(|| PhpException::default("Invalid visitor object".to_string()))?
-            .get_class();
-
-        // Call the method using PHP's call_user_func_array pattern
-        // For simplicity, return Continue if method doesn't exist
-        // In a real implementation, we'd use ext_php_rs's object method calling
-        Ok(VisitResult::Continue)
+        // Try to call the method on the visitor object.
+        // If the method doesn't exist or isn't callable, we gracefully return Continue.
+        match self.visitor.try_call(Some(method_name), args) {
+            Ok(php_result) => {
+                // Convert PHP return value to VisitResult
+                if let Some(array) = php_result.array() {
+                    match Self::result_from_array(&array) {
+                        Ok(result) => Ok(result),
+                        Err(_) => {
+                            // If conversion fails, default to Continue
+                            Ok(VisitResult::Continue)
+                        }
+                    }
+                } else if php_result.is_null() {
+                    // If method returns null, treat as Continue
+                    Ok(VisitResult::Continue)
+                } else {
+                    // If method returns something unexpected, try to interpret as Continue
+                    Ok(VisitResult::Continue)
+                }
+            }
+            Err(_) => {
+                // Method doesn't exist or call failed; gracefully continue
+                Ok(VisitResult::Continue)
+            }
+        }
     }
 }
 

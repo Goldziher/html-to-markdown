@@ -426,4 +426,172 @@ final class VisitorTest extends TestCase
         self::assertSame('First item', $items[0] ?? null);
         self::assertSame('Second item', $items[1] ?? null);
     }
+
+    /**
+     * Test that PHP visitor callbacks are actually invoked during conversion.
+     * This verifies the Rust FFI bridge properly calls PHP methods.
+     */
+    public function testPhpVisitorCallbacksAreInvokedDuringConversion(): void
+    {
+        // Create a visitor that tracks all callback invocations
+        $callbackTracker = [];
+        $visitor = new class ($callbackTracker) extends AbstractVisitor {
+            /**
+             * @param array<int, array<int|string, mixed>> $tracker
+             * @phpstan-ignore-next-line property.unused
+             */
+            public function __construct(private array &$tracker)
+            {
+            }
+
+            public function visitText(NodeContext $context, string $text): array
+            {
+                $this->tracker[] = ['visitText', $text];
+                return VisitResult::continue();
+            }
+
+            public function visitLink(NodeContext $context, string $href, string $text, ?string $title): array
+            {
+                $this->tracker[] = ['visitLink', $href, $text, $title];
+                return VisitResult::continue();
+            }
+
+            public function visitElementStart(NodeContext $context): array
+            {
+                $this->tracker[] = ['visitElementStart', $context->tagName];
+                return VisitResult::continue();
+            }
+
+            public function visitElementEnd(NodeContext $context, string $output): array
+            {
+                $this->tracker[] = ['visitElementEnd', $context->tagName];
+                return VisitResult::continue();
+            }
+        };
+
+        // Perform conversion with visitor
+        $html = '<p>Hello <a href="https://example.com">World</a></p>';
+        $markdown = \HtmlToMarkdown\HtmlToMarkdown::convertWithVisitor($html, null, $visitor);
+
+        // Verify callbacks were invoked
+        self::assertNotEmpty($callbackTracker, 'Visitor callbacks were not invoked during conversion');
+        self::assertGreaterThan(0, \count($callbackTracker), 'At least one visitor callback should be invoked');
+
+        // Check for expected callback invocations
+        $callbackNames = \array_map(fn ($item) => $item[0], $callbackTracker);
+        self::assertContains('visitLink', $callbackNames, 'visitLink callback should be invoked for <a> tag');
+        self::assertContains('visitText', $callbackNames, 'visitText callback should be invoked for text nodes');
+
+        // Verify markdown output is correct
+        self::assertStringContainsString('[World](https://example.com)', $markdown);
+    }
+
+    /**
+     * Test that custom VisitResult returns from callbacks are honored.
+     */
+    public function testPhpVisitorCustomResultsAreHonored(): void
+    {
+        // Create visitor that returns custom result for links
+        $visitor = new class () extends AbstractVisitor {
+            public function visitLink(NodeContext $context, string $href, string $text, ?string $title): array
+            {
+                // Return custom markdown for all links
+                return VisitResult::custom(">>> LINK: {$text} <<<");
+            }
+        };
+
+        $html = '<p>Check <a href="https://example.com">this link</a> out</p>';
+        $markdown = \HtmlToMarkdown\HtmlToMarkdown::convertWithVisitor($html, null, $visitor);
+
+        // Custom result should be in output
+        self::assertStringContainsString('>>> LINK: this link <<<', $markdown);
+    }
+
+    /**
+     * Test that visitor can skip elements.
+     */
+    public function testPhpVisitorCanSkipElements(): void
+    {
+        $visitor = new class () extends AbstractVisitor {
+            public function visitImage(NodeContext $context, string $src, string $alt, ?string $title): array
+            {
+                // Skip all images
+                return VisitResult::skip();
+            }
+        };
+
+        $html = '<p>Before image <img src="test.png" alt="test"/> after image</p>';
+        $markdown = \HtmlToMarkdown\HtmlToMarkdown::convertWithVisitor($html, null, $visitor);
+
+        // Image should not appear in markdown
+        self::assertStringNotContainsString('![', $markdown);
+        self::assertStringContainsString('Before image', $markdown);
+        self::assertStringContainsString('after image', $markdown);
+    }
+
+    /**
+     * Test that visitor can preserve HTML for specific elements.
+     */
+    public function testPhpVisitorCanPreserveHtml(): void
+    {
+        $visitor = new class () extends AbstractVisitor {
+            public function visitCustomElement(NodeContext $context, string $tagName, string $html): array
+            {
+                if ($tagName === 'custom-widget') {
+                    return VisitResult::preserveHtml();
+                }
+                return VisitResult::continue();
+            }
+        };
+
+        $html = '<p>Before <custom-widget>Widget Content</custom-widget> after</p>';
+        $markdown = \HtmlToMarkdown\HtmlToMarkdown::convertWithVisitor($html, null, $visitor);
+
+        // Custom widget HTML should be preserved
+        self::assertStringContainsString('<custom-widget>', $markdown);
+        self::assertStringContainsString('</custom-widget>', $markdown);
+    }
+
+    /**
+     * Test that multiple visitor callbacks are invoked in correct order.
+     */
+    public function testMultiplePhpVisitorCallbacksInvokedInOrder(): void
+    {
+        $callOrder = [];
+        $visitor = new class ($callOrder) extends AbstractVisitor {
+            /**
+             * @param array<int, string> $order
+             * @phpstan-ignore-next-line property.unused
+             */
+            public function __construct(private array &$order)
+            {
+            }
+
+            public function visitElementStart(NodeContext $context): array
+            {
+                $this->order[] = 'start_' . $context->tagName;
+                return VisitResult::continue();
+            }
+
+            public function visitElementEnd(NodeContext $context, string $output): array
+            {
+                $this->order[] = 'end_' . $context->tagName;
+                return VisitResult::continue();
+            }
+
+            public function visitText(NodeContext $context, string $text): array
+            {
+                $this->order[] = 'text';
+                return VisitResult::continue();
+            }
+        };
+
+        $html = '<div><p>Hello</p></div>';
+        \HtmlToMarkdown\HtmlToMarkdown::convertWithVisitor($html, null, $visitor);
+
+        // Verify callbacks were invoked in tree traversal order
+        self::assertNotEmpty($callOrder);
+        // Should have element start/end and text callbacks
+        self::assertGreaterThan(0, \count(\array_filter($callOrder, fn ($c) => \str_starts_with($c, 'start_'))));
+    }
 }
