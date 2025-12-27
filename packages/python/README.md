@@ -502,7 +502,16 @@ markdown = convert(hocr_html)
 
 ## Visitor Pattern
 
-The visitor pattern allows you to customize HTML→Markdown conversion by providing callbacks for specific HTML elements. This is useful for implementing domain-specific transformations, element filtering, or custom formatting rules.
+The visitor pattern allows you to customize HTML→Markdown conversion by providing callbacks for specific HTML elements. This is useful for implementing domain-specific transformations, element filtering, or custom formatting rules. Python supports **both synchronous and asynchronous visitor methods** with seamless asyncio integration.
+
+### Overview
+
+Visitors intercept HTML element conversion, allowing you to:
+- **Filter content**: Skip certain elements (ads, tracking pixels, etc.)
+- **Transform output**: Replace default Markdown with custom formatting
+- **Validate**: Enforce constraints (e.g., alt text on images)
+- **Enrich**: Add metadata or side effects during conversion
+- **Preserve HTML**: Keep unsupported elements as raw HTML
 
 ### Basic Example
 
@@ -523,18 +532,32 @@ result = convert_with_visitor(html, visitor=MyVisitor())
 # Images are skipped, links are rendered with custom format
 ```
 
-### Visitor Methods
+### NodeContext
 
-Define methods in your visitor class for specific HTML elements:
+Every visitor method receives a `ctx` parameter (NodeContext) with rich information about the current element:
 
-- `visit_link(ctx, href, text, title)` – Handle `<a>` elements
-- `visit_image(ctx, src, alt, title)` – Handle `<img>` elements
-- `visit_paragraph(ctx, children)` – Handle `<p>` elements
-- `visit_heading(ctx, level, children)` – Handle `<h1>`...`<h6>`
-- `visit_list(ctx, ordered, children)` – Handle `<ul>` and `<ol>`
-- `visit_code_block(ctx, language, code)` – Handle `<pre><code>` blocks
+```python
+class MyVisitor:
+    def visit_heading(self, ctx, level, text, id):
+        # ctx is a dictionary with:
+        print(ctx["node_type"])        # "element", "text", "heading", etc.
+        print(ctx["tag_name"])         # "h1", "h2", "div", etc.
+        print(ctx["attributes"])       # {"class": "title", "id": "intro", ...}
+        print(ctx["depth"])            # Nesting depth in DOM tree (0 = root)
+        print(ctx["index_in_parent"])  # Index among siblings
+        print(ctx["parent_tag"])       # Parent element's tag, or None
+        print(ctx["is_inline"])        # Boolean: inline vs block
+        return {"type": "continue"}
+```
 
-Visitor methods receive a context object (`ctx`) with conversion state and the element-specific attributes.
+**Context Structure:**
+- `node_type` (str): Coarse element classification ("text", "element", "heading", etc.)
+- `tag_name` (str): Raw HTML tag name ("div", "h1", "custom-element", etc.)
+- `attributes` (dict[str, str]): All HTML attributes as key-value pairs
+- `depth` (int): Nesting depth in DOM tree (0 = root)
+- `index_in_parent` (int): Zero-based index among siblings
+- `parent_tag` (str | None): Parent element's tag, or None if root
+- `is_inline` (bool): Whether treated as inline vs block
 
 ### VisitResult Types
 
@@ -572,7 +595,130 @@ def visit_link(self, ctx, href, text, title):
     return {"type": "continue"}
 ```
 
-### Full Example: Content Filtering
+### All Visitor Methods (40+)
+
+The visitor pattern supports the following methods. You only need to define the ones relevant to your use case:
+
+**Text & Inline Elements:**
+- `visit_text(ctx, text)` – Plain text nodes
+- `visit_strong(ctx, text)` – Bold text (`<strong>`, `<b>`)
+- `visit_emphasis(ctx, text)` – Italic text (`<em>`, `<i>`)
+- `visit_strikethrough(ctx, text)` – Strikethrough (`<s>`, `<del>`)
+- `visit_underline(ctx, text)` – Underlined text (`<u>`)
+- `visit_subscript(ctx, text)` – Subscript (`<sub>`)
+- `visit_superscript(ctx, text)` – Superscript (`<sup>`)
+- `visit_mark(ctx, text)` – Highlighted/marked text (`<mark>`)
+- `visit_code_inline(ctx, code)` – Inline code (`<code>`)
+- `visit_line_break(ctx)` – Line breaks (`<br>`)
+
+**Links & Media:**
+- `visit_link(ctx, href, text, title)` – Hyperlinks (`<a>`)
+- `visit_image(ctx, src, alt, title)` – Images (`<img>`)
+- `visit_audio(ctx, src)` – Audio files (`<audio>`)
+- `visit_video(ctx, src)` – Video files (`<video>`)
+- `visit_iframe(ctx, src)` – Embedded content (`<iframe>`)
+
+**Block Elements:**
+- `visit_element_start(ctx)` – Element opening tag
+- `visit_element_end(ctx, output)` – Element closing tag
+- `visit_heading(ctx, level, text, id)` – Headers (`<h1>`–`<h6>`)
+- `visit_code_block(ctx, lang, code)` – Code blocks (`<pre><code>`)
+- `visit_blockquote(ctx, content, depth)` – Block quotes (`<blockquote>`)
+- `visit_horizontal_rule(ctx)` – Horizontal rule (`<hr>`)
+
+**Lists:**
+- `visit_list_start(ctx, ordered)` – List start (`<ul>`, `<ol>`)
+- `visit_list_item(ctx, ordered, marker, text)` – List item (`<li>`)
+- `visit_list_end(ctx, ordered, output)` – List end
+- `visit_definition_list_start(ctx)` – Definition list start (`<dl>`)
+- `visit_definition_term(ctx, text)` – Definition term (`<dt>`)
+- `visit_definition_description(ctx, text)` – Definition description (`<dd>`)
+- `visit_definition_list_end(ctx, output)` – Definition list end
+
+**Tables:**
+- `visit_table_start(ctx)` – Table start (`<table>`)
+- `visit_table_row(ctx, cells, is_header)` – Table row (`<tr>`)
+- `visit_table_end(ctx, output)` – Table end
+
+**Semantic Elements:**
+- `visit_figure_start(ctx)` – Figure start (`<figure>`)
+- `visit_figcaption(ctx, text)` – Figure caption (`<figcaption>`)
+- `visit_figure_end(ctx, output)` – Figure end
+- `visit_details(ctx, open)` – Collapsible details (`<details>`)
+- `visit_summary(ctx, text)` – Summary for details (`<summary>`)
+
+**Forms:**
+- `visit_form(ctx, action, method)` – Form element (`<form>`)
+- `visit_input(ctx, input_type, name, value)` – Input field (`<input>`)
+- `visit_button(ctx, text)` – Button (`<button>`)
+
+**Custom:**
+- `visit_custom_element(ctx, tag_name, html)` – Unknown elements
+
+### Sync & Async Support
+
+Python visitors support **both synchronous and asynchronous methods**. Mix and match as needed:
+
+**Synchronous visitor:**
+```python
+from html_to_markdown import convert_with_visitor
+
+class SyncVisitor:
+    def visit_link(self, ctx, href, text, title):
+        print(f"Processing link: {href}")
+        return {"type": "continue"}
+
+markdown = convert_with_visitor(html, visitor=SyncVisitor())
+```
+
+**Asynchronous visitor:**
+```python
+import asyncio
+from html_to_markdown import convert_with_async_visitor
+
+class AsyncVisitor:
+    async def visit_link(self, ctx, href, text, title):
+        # Async I/O: fetch metadata, validate URL, etc.
+        response = await some_async_function(href)
+        return {"type": "custom", "output": f"[{text}]({href})"}
+
+    def visit_image(self, ctx, src, alt, title):
+        # Sync methods work too
+        return {"type": "skip"}
+
+markdown = convert_with_async_visitor(html, visitor=AsyncVisitor())
+```
+
+The async runtime is handled transparently via pyo3-async-runtimes for proper asyncio integration.
+
+### Practical Examples
+
+#### Example 1: Custom Image Handling
+
+```python
+from html_to_markdown import convert_with_visitor
+
+class ImageOptimizer:
+    """Customize image Markdown with CDN optimization."""
+
+    def __init__(self, cdn_url):
+        self.cdn_url = cdn_url
+
+    def visit_image(self, ctx, src, alt, title):
+        # Rewrite URLs to use CDN
+        optimized_src = f"{self.cdn_url}?src={src}"
+        return {
+            "type": "custom",
+            "output": f"![{alt}]({optimized_src} \"{title or alt}\")"
+        }
+
+html = '<p><img src="/images/logo.png" alt="Logo" /></p>'
+optimizer = ImageOptimizer("https://cdn.example.com/image")
+markdown = convert_with_visitor(html, visitor=optimizer)
+# Output: ![Logo](https://cdn.example.com/image?src=/images/logo.png "Logo")
+```
+
+#### Example 2: Content Filtering
 
 ```python
 from html_to_markdown import convert_with_visitor
@@ -590,25 +736,32 @@ class ContentFilter:
         # Skip tracking pixels and ads
         if "tracking" in src or "ad" in src.lower():
             return {"type": "skip"}
+        if src.endswith((".gif", ".png")) and int(ctx["attributes"].get("width", 0)) < 10:
+            return {"type": "skip"}  # Skip tiny images
         return {"type": "continue"}
+
+    def visit_iframe(self, ctx, src):
+        # Block iframes entirely
+        return {"type": "skip"}
 
 html = """
 <p>Read more: <a href="https://ads.com">Click here</a></p>
 <p><a href="/about">About us</a></p>
-<img src="/tracking.gif" alt="tracker" />
+<img src="/tracking.gif" alt="tracker" width="1" />
 <img src="/logo.png" alt="Logo" />
+<iframe src="https://evil.com/tracker"></iframe>
 """
 
 result = convert_with_visitor(html, visitor=ContentFilter())
-# External links and tracking pixels are removed, local content preserved
+# External links, tracking pixels, and iframes are removed
 ```
 
-### Advanced Example: Custom Link Formatting
+#### Example 3: Link Footnote References
 
 ```python
 from html_to_markdown import convert_with_visitor, ConversionOptions
 
-class LinkFormatter:
+class LinkFootnoteFormatter:
     """Convert links to footnote-style references."""
 
     def __init__(self):
@@ -621,22 +774,104 @@ class LinkFormatter:
             "index": self.link_index,
             "href": href,
             "text": text,
+            "title": title,
         })
+        # Return link text with superscript index
         return {
             "type": "custom",
             "output": f"{text}[{self.link_index}]"
         }
 
-formatter = LinkFormatter()
-html = '<p>Visit <a href="https://example.com">Example</a> and <a href="https://rust-lang.org">Rust</a>.</p>'
+formatter = LinkFootnoteFormatter()
+html = '''
+<p>Visit <a href="https://example.com" title="Example Site">Example</a>
+and <a href="https://rust-lang.org">Rust</a> for more info.</p>
+'''
+
 markdown = convert_with_visitor(html, visitor=formatter)
 
-# Add footnotes
+# Append footnote references
 markdown += "\n\n"
 for link in formatter.links:
-    markdown += f"[{link['index']}] {link['href']}\n"
+    title_text = f' - {link["title"]}' if link["title"] else ""
+    markdown += f"[{link['index']}]: {link['href']}{title_text}\n"
 
-# Output: "Visit Example[1] and Rust[2].\n\n[1] https://example.com\n[2] https://rust-lang.org"
+# Output:
+# Visit Example[1] and Rust[2] for more info.
+#
+# [1]: https://example.com - Example Site
+# [2]: https://rust-lang.org
+```
+
+#### Example 4: Validate Accessibility
+
+```python
+from html_to_markdown import convert_with_visitor
+
+class AccessibilityValidator:
+    """Enforce accessibility requirements during conversion."""
+
+    def __init__(self):
+        self.errors = []
+
+    def visit_image(self, ctx, src, alt, title):
+        if not alt or not alt.strip():
+            self.errors.append(f"Image missing alt text: {src}")
+            return {"type": "error", "message": "Image missing alt text"}
+        return {"type": "continue"}
+
+    def visit_link(self, ctx, href, text, title):
+        if not text or not text.strip():
+            self.errors.append(f"Link has no text: {href}")
+            return {"type": "error", "message": "Link text is empty"}
+        return {"type": "continue"}
+
+html = '''
+<p><a href="/page">Good link</a></p>
+<p><a href="/bad"></a></p>
+<p><img src="pic.jpg" alt="A picture" /></p>
+<p><img src="bad.jpg" /></p>
+'''
+
+validator = AccessibilityValidator()
+try:
+    markdown = convert_with_visitor(html, visitor=validator)
+except ValueError as e:
+    print(f"Validation failed: {e}")
+    print(f"Errors: {validator.errors}")
+    # Output:
+    # Errors: ['Link has no text: /bad', 'Image missing alt text: bad.jpg']
+```
+
+#### Example 5: Asynchronous URL Validation
+
+```python
+import asyncio
+from html_to_markdown import convert_with_async_visitor
+
+class AsyncLinkValidator:
+    """Validate links asynchronously."""
+
+    async def visit_link(self, ctx, href, text, title):
+        # Check if URL is reachable
+        if href.startswith("http"):
+            try:
+                # In real code, use httpx or similar async HTTP library
+                is_valid = await self.check_url(href)
+                if not is_valid:
+                    return {"type": "custom", "output": f"[{text}]({href}) ⚠️ dead link"}
+            except Exception:
+                pass
+        return {"type": "continue"}
+
+    async def check_url(self, url):
+        # Placeholder for actual async URL validation
+        await asyncio.sleep(0.1)
+        return not url.endswith(".invalid")
+
+html = '<p><a href="https://example.com">Valid</a> <a href="https://dead.invalid">Dead</a></p>'
+markdown = convert_with_async_visitor(html, visitor=AsyncLinkValidator())
+# Asynchronous validation happens during conversion
 ```
 
 ### Error Handling
@@ -652,12 +887,43 @@ class StrictValidator:
             return {"type": "error", "message": "Image missing alt text"}
         return {"type": "continue"}
 
-html = '<img src="pic.jpg" />'
+    def visit_link(self, ctx, href, text, title):
+        if not text.strip():
+            return {"type": "error", "message": "Empty link text"}
+        return {"type": "continue"}
+
+html = '<img src="pic.jpg" /><a href="/page"></a>'
 try:
     result = convert_with_visitor(html, visitor=StrictValidator())
 except ValueError as e:
     print(f"Conversion failed: {e}")
+    # ValueError contains all collected visitor errors
 ```
+
+### Combining with Options
+
+Visitors work seamlessly with all conversion options:
+
+```python
+from html_to_markdown import convert_with_visitor, ConversionOptions
+
+visitor = MyVisitor()
+options = ConversionOptions(
+    heading_style="atx",
+    list_indent_width=2,
+    wrap=True,
+    wrap_width=80,
+)
+
+markdown = convert_with_visitor(html, options=options, visitor=visitor)
+```
+
+### Performance Considerations
+
+1. **Minimal overhead**: Only called for elements where your visitor has methods
+2. **Async methods**: Use `convert_with_async_visitor()` for async I/O (validation, fetch, etc.)
+3. **Stateful visitors**: Safe to collect data across elements (see footnote and validation examples)
+4. **Native integration**: pyo3-async-runtimes handles Python async/await transparently
 
 ## CLI (same engine)
 
