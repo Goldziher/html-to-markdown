@@ -523,6 +523,477 @@ Test coverage includes:
 - Special characters and encoding
 - Size limits for structured data
 
+## Visitor Pattern
+
+The visitor pattern allows you to customize HTML→Markdown conversion by providing callbacks for specific HTML elements. This is useful for implementing domain-specific transformations, element filtering, custom formatting rules, and analytics during conversion. TypeScript visitors support **both synchronous and asynchronous methods** with seamless async/await integration.
+
+### Overview
+
+Visitors intercept HTML element conversion, allowing you to:
+- **Filter content**: Skip certain elements (ads, tracking pixels, unwanted sections)
+- **Transform output**: Replace default Markdown with custom formatting (footnotes, admonitions, etc.)
+- **Validate**: Enforce constraints during conversion (e.g., alt text on images, link validation)
+- **Enrich**: Add metadata or side effects during conversion (analytics, link tracking)
+- **Preserve HTML**: Keep unsupported elements as raw HTML instead of attempting conversion
+
+The visitor pattern is essential for domain-specific markdown dialects, custom markdown rendering, and content processing pipelines where you need fine-grained control over specific elements.
+
+### Basic Example
+
+```typescript
+import { convertWithVisitor } from 'html-to-markdown-node';
+
+interface MyVisitor {
+  visitLink?(ctx: NodeContext, href: string, text: string, title?: string): VisitResult;
+  visitImage?(ctx: NodeContext, src: string, alt?: string, title?: string): VisitResult;
+}
+
+const visitor: MyVisitor = {
+  visitLink: (ctx, href, text, title) => {
+    // Customize link conversion
+    return { type: 'custom', output: `[${text}](${href})` };
+  },
+  visitImage: (ctx, src, alt, title) => {
+    // Skip all images
+    return { type: 'skip' };
+  },
+};
+
+const html = '<a href="/page">Link</a><img src="pic.jpg" />';
+const markdown = convertWithVisitor(html, { visitor });
+// Output: [Link](/page)
+// Images are removed from output
+```
+
+### NodeContext: Element Metadata
+
+Every visitor method receives a `ctx` parameter (NodeContext) with comprehensive information about the current element:
+
+```typescript
+interface NodeContext {
+  nodeType: string;        // "text" | "element" | "heading" | "link" | etc.
+  tagName: string;         // Raw HTML tag name ("a", "img", "div", etc.)
+  attributes: Record<string, string>; // All HTML attributes as key-value pairs
+  depth: number;           // Nesting depth in DOM tree (0 = root)
+  indexInParent: number;   // Zero-based index among siblings
+  parentTag: string | null; // Parent element's tag, or null if root
+  isInline: boolean;       // Whether treated as inline vs block element
+}
+```
+
+Use context information to make intelligent decisions:
+
+```typescript
+interface SmartVisitor {
+  visitLink?(ctx: NodeContext, href: string, text: string, title?: string): VisitResult;
+}
+
+const visitor: SmartVisitor = {
+  visitLink: (ctx, href, text, title) => {
+    // Only rewrite external links
+    if (href.startsWith('http')) {
+      return {
+        type: 'custom',
+        output: `[${text}](${href}){.external}`,
+      };
+    }
+    // Keep internal links as-is
+    return { type: 'continue' };
+  },
+};
+```
+
+### VisitResult Types
+
+Return a visitor result from visitor methods to control conversion behavior:
+
+**Continue with default conversion:**
+```typescript
+visitLink: (ctx, href, text, title) => {
+  return { type: 'continue' };
+}
+```
+
+**Use custom markdown output:**
+```typescript
+visitLink: (ctx, href, text, title) => {
+  return { type: 'custom', output: `[${text}](${href})` };
+}
+```
+
+**Skip element entirely:**
+```typescript
+visitImage: (ctx, src, alt, title) => {
+  return { type: 'skip' };  // Image is not rendered
+}
+```
+
+**Preserve original HTML:**
+```typescript
+visitVideo: (ctx, src) => {
+  return { type: 'preserveHtml' };  // Keep as `<video src="..."></video>`
+}
+```
+
+**Stop conversion with error:**
+```typescript
+visitLink: (ctx, href, text, title) => {
+  if (!href.startsWith(('http://', 'https://', '/'))) {
+    return { type: 'error', message: `Invalid URL: ${href}` };
+  }
+  return { type: 'continue' };
+}
+```
+
+### Visitor Methods Reference
+
+The visitor pattern supports the following 41 methods. Implement only the ones relevant to your use case:
+
+**Text & Inline Elements:**
+- `visitText(ctx, text)` – Plain text nodes
+- `visitStrong(ctx, text)` – Bold text (`<strong>`, `<b>`)
+- `visitEmphasis(ctx, text)` – Italic text (`<em>`, `<i>`)
+- `visitStrikethrough(ctx, text)` – Strikethrough (`<s>`, `<del>`)
+- `visitUnderline(ctx, text)` – Underlined text (`<u>`)
+- `visitSubscript(ctx, text)` – Subscript (`<sub>`)
+- `visitSuperscript(ctx, text)` – Superscript (`<sup>`)
+- `visitMark(ctx, text)` – Highlighted/marked text (`<mark>`)
+- `visitCodeInline(ctx, code)` – Inline code (`<code>`)
+- `visitLineBreak(ctx)` – Line breaks (`<br>`)
+
+**Links & Media:**
+- `visitLink(ctx, href, text, title?)` – Hyperlinks (`<a>`)
+- `visitImage(ctx, src, alt?, title?)` – Images (`<img>`)
+- `visitAudio(ctx, src)` – Audio files (`<audio>`)
+- `visitVideo(ctx, src)` – Video files (`<video>`)
+- `visitIframe(ctx, src)` – Embedded content (`<iframe>`)
+
+**Block Elements:**
+- `visitElementStart(ctx)` – Element opening (all elements)
+- `visitElementEnd(ctx, output)` – Element closing (all elements)
+- `visitHeading(ctx, level, text, id?)` – Headers (`<h1>`–`<h6>`)
+- `visitCodeBlock(ctx, lang?, code)` – Code blocks (`<pre><code>`)
+- `visitBlockquote(ctx, content, depth)` – Block quotes (`<blockquote>`)
+- `visitHorizontalRule(ctx)` – Horizontal rule (`<hr>`)
+
+**Lists:**
+- `visitListStart(ctx, ordered)` – List start (`<ul>`, `<ol>`)
+- `visitListItem(ctx, ordered, marker, text)` – List item (`<li>`)
+- `visitListEnd(ctx, ordered, output)` – List end
+
+**Tables:**
+- `visitTableStart(ctx)` – Table start (`<table>`)
+- `visitTableRow(ctx, cells, isHeader)` – Table row (`<tr>`)
+- `visitTableEnd(ctx, output)` – Table end
+
+**Advanced Elements:**
+- `visitDefinitionListStart(ctx)` – Definition list start (`<dl>`)
+- `visitDefinitionTerm(ctx, text)` – Definition term (`<dt>`)
+- `visitDefinitionDescription(ctx, text)` – Definition description (`<dd>`)
+- `visitDefinitionListEnd(ctx, output)` – Definition list end
+- `visitFigureStart(ctx)` – Figure start (`<figure>`)
+- `visitFigcaption(ctx, text)` – Figure caption (`<figcaption>`)
+- `visitFigureEnd(ctx, output)` – Figure end
+- `visitDetails(ctx, open)` – Collapsible details (`<details>`)
+- `visitSummary(ctx, text)` – Summary elements (`<summary>`)
+
+**Forms:**
+- `visitForm(ctx, action, method)` – Form element (`<form>`)
+- `visitInput(ctx, inputType, name, value)` – Input field (`<input>`)
+- `visitButton(ctx, text)` – Button (`<button>`)
+
+**Custom:**
+- `visitCustomElement(ctx, tagName, html)` – Unknown/custom elements
+
+### Practical Examples
+
+#### Example 1: Custom Image Handling
+
+Rewrite images with CDN optimization:
+
+```typescript
+import { convertWithVisitor, NodeContext, VisitResult } from 'html-to-markdown-node';
+
+interface ImageOptimizer {
+  cdnUrl: string;
+  visitImage?(ctx: NodeContext, src: string, alt?: string, title?: string): VisitResult;
+}
+
+const optimizer: ImageOptimizer = {
+  cdnUrl: 'https://cdn.example.com/image',
+  visitImage: function(ctx, src, alt, title) {
+    // Rewrite URLs to use CDN
+    const optimizedSrc = `${this.cdnUrl}?src=${encodeURIComponent(src)}`;
+    return {
+      type: 'custom',
+      output: `![${alt || ''}](${optimizedSrc} "${title || alt || ''}")`,
+    };
+  },
+};
+
+const html = '<p><img src="/images/logo.png" alt="Logo" /></p>';
+const markdown = convertWithVisitor(html, { visitor: optimizer });
+// Output: ![Logo](https://cdn.example.com/image?src=%2Fimages%2Flogo.png "Logo")
+```
+
+#### Example 2: Content Filtering
+
+Filter out ads, tracking pixels, and external links:
+
+```typescript
+interface ContentFilter {
+  visitLink?(ctx: NodeContext, href: string, text: string, title?: string): VisitResult;
+  visitImage?(ctx: NodeContext, src: string, alt?: string, title?: string): VisitResult;
+  visitIframe?(ctx: NodeContext, src: string): VisitResult;
+}
+
+const filter: ContentFilter = {
+  visitLink: (ctx, href, text, title) => {
+    // Only allow internal links
+    if (href.startsWith('/') || href.startsWith('https://example.com')) {
+      return { type: 'continue' };
+    }
+    return { type: 'skip' };
+  },
+  visitImage: (ctx, src, alt, title) => {
+    // Skip tracking pixels and ads
+    if (src.includes('tracking') || src.toLowerCase().includes('ad')) {
+      return { type: 'skip' };
+    }
+    // Skip tiny images (likely tracking pixels)
+    const width = parseInt(ctx.attributes.width || '0', 10);
+    if (width > 0 && width < 10) {
+      return { type: 'skip' };
+    }
+    return { type: 'continue' };
+  },
+  visitIframe: (ctx, src) => {
+    // Block iframes entirely
+    return { type: 'skip' };
+  },
+};
+
+const html = `
+  <p>Read more: <a href="https://ads.com">Click here</a></p>
+  <p><a href="/about">About us</a></p>
+  <img src="/tracking.gif" alt="tracker" width="1" />
+  <img src="/logo.png" alt="Logo" />
+  <iframe src="https://evil.com/tracker"></iframe>
+`;
+
+const markdown = convertWithVisitor(html, { visitor: filter });
+// External links, tracking pixels, and iframes are removed
+```
+
+#### Example 3: Link Footnote References
+
+Convert external links to footnote-style references:
+
+```typescript
+interface LinkFootnoteFormatter {
+  links: Array<{
+    index: number;
+    href: string;
+    text: string;
+    title?: string;
+  }>;
+  linkIndex: number;
+  visitLink?(ctx: NodeContext, href: string, text: string, title?: string): VisitResult;
+  footnotesSection(): string;
+}
+
+const formatter: LinkFootnoteFormatter = {
+  links: [],
+  linkIndex: 0,
+  visitLink(ctx, href, text, title) {
+    this.linkIndex++;
+    this.links.push({
+      index: this.linkIndex,
+      href,
+      text,
+      title,
+    });
+    // Return link text with superscript index
+    return {
+      type: 'custom',
+      output: `${text}[^${this.linkIndex}]`,
+    };
+  },
+  footnotesSection() {
+    if (this.links.length === 0) return '';
+
+    const lines = ['\n\n---\n\n'];
+    for (const link of this.links) {
+      lines.push(`[^${link.index}]: ${link.href}`);
+      if (link.title) {
+        lines.push(` "${link.title}"`);
+      }
+      lines.push('\n');
+    }
+    return lines.join('');
+  },
+};
+
+const html = `
+  <p>Visit <a href="https://example.com" title="Example Site">Example</a>
+  and <a href="https://rust-lang.org">Rust</a> for more info.</p>
+`;
+
+const markdown = convertWithVisitor(html, { visitor: formatter });
+const fullMarkdown = markdown + formatter.footnotesSection();
+
+// Output:
+// Visit Example[^1] and Rust[^2] for more info.
+//
+// ---
+//
+// [^1]: https://example.com "Example Site"
+// [^2]: https://rust-lang.org
+```
+
+#### Example 4: Analytics and Content Extraction
+
+Track link types and image usage during conversion:
+
+```typescript
+interface ContentAnalytics {
+  stats: {
+    internal: number;
+    external: number;
+    email: number;
+    images: number;
+    totalLinks: string[];
+  };
+  visitLink?(ctx: NodeContext, href: string, text: string, title?: string): VisitResult;
+  visitImage?(ctx: NodeContext, src: string, alt?: string, title?: string): VisitResult;
+}
+
+const analytics: ContentAnalytics = {
+  stats: {
+    internal: 0,
+    external: 0,
+    email: 0,
+    images: 0,
+    totalLinks: [],
+  },
+  visitLink(ctx, href, text, title) {
+    this.stats.totalLinks.push(href);
+
+    if (href.startsWith('mailto:')) {
+      this.stats.email++;
+    } else if (href.startsWith('http')) {
+      this.stats.external++;
+      // Add tracking parameter to external links
+      const separator = href.includes('?') ? '&' : '?';
+      const tracked = `${href}${separator}utm_source=markdown`;
+      return {
+        type: 'custom',
+        output: `[${text}](${tracked})`,
+      };
+    } else {
+      this.stats.internal++;
+    }
+    return { type: 'continue' };
+  },
+  visitImage(ctx, src, alt, title) {
+    this.stats.images++;
+    return { type: 'continue' };
+  },
+};
+
+const html = `
+  <a href="/home">Home</a>
+  <a href="https://example.com">External</a>
+  <a href="mailto:test@example.com">Email</a>
+  <img src="/logo.png" alt="Logo" />
+`;
+
+const markdown = convertWithVisitor(html, { visitor: analytics });
+console.log('Link stats:', analytics.stats);
+// => { internal: 1, external: 1, email: 1, images: 1, totalLinks: [...] }
+```
+
+#### Example 5: Asynchronous Visitor with URL Validation
+
+TypeScript visitors support async methods for I/O operations:
+
+```typescript
+interface AsyncLinkValidator {
+  visitLink?(ctx: NodeContext, href: string, text: string, title?: string): VisitResult | Promise<VisitResult>;
+  checkUrl(url: string): Promise<boolean>;
+}
+
+const validator: AsyncLinkValidator = {
+  async visitLink(ctx, href, text, title) {
+    if (href.startsWith('http')) {
+      try {
+        const isValid = await this.checkUrl(href);
+        if (!isValid) {
+          return {
+            type: 'custom',
+            output: `[${text}](${href}) [dead]`,
+          };
+        }
+      } catch (e) {
+        // Silently continue on error
+      }
+    }
+    return { type: 'continue' };
+  },
+  async checkUrl(url: string): Promise<boolean> {
+    try {
+      const response = await fetch(url, { method: 'HEAD', timeout: 5000 });
+      return response.ok;
+    } catch {
+      return false;
+    }
+  },
+};
+
+const html = '<p><a href="https://example.com">Valid</a> <a href="https://dead.invalid">Dead</a></p>';
+const markdown = await convertWithVisitor(html, { visitor: validator });
+// Asynchronous validation happens during conversion
+```
+
+### Integration with ConversionOptions
+
+Visitors work seamlessly with all conversion options:
+
+```typescript
+import { convertWithVisitor, ConversionOptions } from 'html-to-markdown-node';
+
+interface MyVisitor {
+  visitLink?(ctx: NodeContext, href: string, text: string, title?: string): VisitResult;
+}
+
+const visitor: MyVisitor = {
+  visitLink: (ctx, href, text) => {
+    return { type: 'custom', output: `[${text}](${href})` };
+  },
+};
+
+const options: ConversionOptions = {
+  headingStyle: 'atx',
+  listIndentWidth: 2,
+  wrap: true,
+  wrapWidth: 80,
+};
+
+const markdown = convertWithVisitor(html, { options, visitor });
+```
+
+### Performance Considerations
+
+1. **Minimal overhead**: Visitor methods are only called for elements where you define callbacks; elements without visitor methods use fast default conversion.
+
+2. **Async methods**: Use async visitor methods for I/O operations (URL validation, API calls, database lookups) without blocking the main thread.
+
+3. **Stateful visitors**: It's safe to collect data across elements (see analytics and footnote examples) because visitor methods execute in order during tree traversal.
+
+4. **Memory efficiency**: Avoid storing large intermediate results in visitor state; process and discard data as conversion progresses.
+
+5. **Error handling**: Return `{ type: 'error', message }` to fail fast and halt conversion; don't throw exceptions from visitor methods.
+
 ## Performance (Apple M4)
 
 This package wraps the native `html-to-markdown-node` bindings, so throughput matches the Node README. Benchmarks come from the shared fixture harness in `tools/benchmark-harness`:

@@ -795,7 +795,10 @@ fn btreemap_to_py<'py>(py: Python<'py>, map: std::collections::BTreeMap<String, 
 #[cfg(feature = "metadata")]
 fn text_direction_to_str<'py>(py: Python<'py>, text_direction: Option<RustTextDirection>) -> Py<PyAny> {
     match text_direction {
-        Some(direction) => pyo3::types::PyString::new(py, &direction.to_string()).as_any().clone(),
+        Some(direction) => pyo3::types::PyString::new(py, &direction.to_string())
+            .as_any()
+            .to_owned()
+            .into(),
         None => py.None(),
     }
 }
