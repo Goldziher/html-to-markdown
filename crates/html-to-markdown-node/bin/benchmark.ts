@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { convert, convertWithInlineImages, convertWithMetadata, startProfiling, stopProfiling } from "html-to-markdown-node";
+import { convert, convertWithInlineImages, convertWithMetadata, convertWithVisitor, startProfiling, stopProfiling } from "html-to-markdown-node";
 
 type Scenario =
 	| "convert-default"
@@ -10,12 +10,15 @@ type Scenario =
 	| "metadata-default"
 	| "metadata-options";
 
+type VisitorType = "noop" | "simple" | "custom" | "complex";
+
 const args = process.argv.slice(2);
 const options: {
 	file?: string;
 	iterations: number;
 	format: "html" | "hocr";
 	scenario: Scenario;
+	visitor?: VisitorType;
 } = {
 	iterations: 50,
 	format: "html",
@@ -38,6 +41,12 @@ for (let i = 0; i < args.length; i += 1) {
 		i += 1;
 	} else if (arg === "--scenario" && args[i + 1]) {
 		options.scenario = args[i + 1] as Scenario;
+		i += 1;
+	} else if (arg === "--visitor" && args[i + 1]) {
+		const visitor = args[i + 1];
+		if (["noop", "simple", "custom", "complex"].includes(visitor)) {
+			options.visitor = visitor as VisitorType;
+		}
 		i += 1;
 	}
 }
@@ -66,7 +75,88 @@ const bytesProcessedPerIteration = Buffer.byteLength(html, "utf8");
 
 const conversionOptions = options.format === "hocr" ? { hocrSpatialTables: false } : undefined;
 
+// Visitor factory functions
+function createNoopVisitor(): object {
+	return {
+		visitText: () => "continue",
+		visitHeading: () => "continue",
+		visitParagraph: () => "continue",
+		visitLink: () => "continue",
+		visitImage: () => "continue",
+		visitStrong: () => "continue",
+		visitEm: () => "continue",
+		visitCode: () => "continue",
+		visitBr: () => "continue",
+	};
+}
+
+function createSimpleVisitor(): object {
+	return {
+		textCount: 0,
+		linkCount: 0,
+		imageCount: 0,
+		visitText: () => "continue",
+		visitHeading: () => "continue",
+		visitParagraph: () => "continue",
+		visitLink: () => "continue",
+		visitImage: () => "continue",
+		visitStrong: () => "continue",
+		visitEm: () => "continue",
+		visitCode: () => "continue",
+		visitBr: () => "continue",
+	};
+}
+
+function createCustomVisitor(): object {
+	return {
+		visitText: () => "continue",
+		visitHeading: () => "continue",
+		visitParagraph: () => "continue",
+		visitLink: (_ctx: unknown, href: string, text: string) => ["custom", `LINK[${text}](${href})`],
+		visitImage: (_ctx: unknown, src: string, alt: string) => ["custom", `![${alt}](${src})`],
+		visitStrong: () => "continue",
+		visitEm: () => "continue",
+		visitCode: () => "continue",
+		visitBr: () => "continue",
+	};
+}
+
+function createComplexVisitor(): object {
+	return {
+		texts: 0,
+		links: 0,
+		images: 0,
+		headings: 0,
+		visitText: () => "continue",
+		visitHeading: () => "continue",
+		visitParagraph: () => "continue",
+		visitLink: (_ctx: unknown, href: string, text: string) => ["custom", `[${text}](${href})`],
+		visitImage: () => "skip",
+		visitStrong: () => "continue",
+		visitEm: () => "continue",
+		visitCode: () => "continue",
+		visitBr: () => "continue",
+	};
+}
+
+// Create visitor if specified
+let visitor: object | undefined;
+if (options.visitor) {
+	const visitorCreators: Record<VisitorType, () => object> = {
+		noop: createNoopVisitor,
+		simple: createSimpleVisitor,
+		custom: createCustomVisitor,
+		complex: createComplexVisitor,
+	};
+	visitor = visitorCreators[options.visitor]();
+}
+
 const runScenario = (): void => {
+	if (visitor) {
+		convertWithVisitor(html, undefined, visitor);
+		return;
+	}
+
 	switch (options.scenario) {
 		case "convert-default":
 			convert(html);

@@ -17,6 +17,9 @@ on:
       - tools/benchmark-harness/**
       - test_documents/**
       - .github/workflows/profiling.yaml
+  schedule:
+    # Run visitor benchmarks weekly on Monday at 2 AM UTC
+    - cron: '0 2 * * 1'
   workflow_dispatch:
     inputs:
       frameworks:
@@ -217,3 +220,237 @@ jobs:
         with:
           name: benchmark-harness-results-${{ matrix.framework }}
           path: tools/benchmark-harness/results
+
+  visitor-benchmarks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        framework: [python, ruby, typescript]
+    name: visitor-benchmark-${{ matrix.framework }}
+    env:
+      FRAMEWORKS: ${{ matrix.framework }}
+      HTML_TO_MARKDOWN_CARGO_FEATURES: visitor
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Rust
+        uses: ./.github/actions/setup-rust
+
+      - name: Setup Python + uv
+        if: env.FRAMEWORKS == 'python'
+        uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+
+      - name: Setup Python runtime
+        if: env.FRAMEWORKS == 'python'
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Install Python deps
+        if: env.FRAMEWORKS == 'python'
+        run: uv sync --all-extras --no-install-workspace
+
+      - name: Build Python extension
+        if: env.FRAMEWORKS == 'python'
+        run: uv pip install --editable packages/python --config-settings=--features=visitor
+
+      - name: Setup Ruby
+        if: env.FRAMEWORKS == 'ruby'
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "3.2"
+
+      - name: Install Ruby deps
+        if: env.FRAMEWORKS == 'ruby'
+        working-directory: packages/ruby
+        run: bundle install
+
+      - name: Build Ruby extension
+        if: env.FRAMEWORKS == 'ruby'
+        working-directory: packages/ruby
+        run: bundle exec rake compile
+
+      - name: Setup Node workspace
+        if: env.FRAMEWORKS == 'typescript'
+        uses: ./.github/actions/setup-node-workspace
+
+      - name: Run visitor benchmark - Baseline
+        run: |
+          cargo run --release --features visitor \
+            --manifest-path tools/benchmark-harness/Cargo.toml -- \
+            run --fixtures "tools/benchmark-harness/fixtures/visitor_baseline.toml" \
+            --frameworks "${FRAMEWORKS}" \
+            --iterations 3 --warmup 1 \
+            --format both --output tools/benchmark-harness/results/visitor-baseline
+
+      - name: Run visitor benchmark - Callbacks
+        run: |
+          cargo run --release --features visitor \
+            --manifest-path tools/benchmark-harness/Cargo.toml -- \
+            run --fixtures "tools/benchmark-harness/fixtures/visitor_callbacks.toml" \
+            --frameworks "${FRAMEWORKS}" \
+            --iterations 3 --warmup 1 \
+            --format both --output tools/benchmark-harness/results/visitor-callbacks
+
+      - name: Run visitor benchmark - Custom
+        run: |
+          cargo run --release --features visitor \
+            --manifest-path tools/benchmark-harness/Cargo.toml -- \
+            run --fixtures "tools/benchmark-harness/fixtures/visitor_custom.toml" \
+            --frameworks "${FRAMEWORKS}" \
+            --iterations 3 --warmup 1 \
+            --format both --output tools/benchmark-harness/results/visitor-custom
+
+      - name: Run visitor benchmark - Complex
+        run: |
+          cargo run --release --features visitor \
+            --manifest-path tools/benchmark-harness/Cargo.toml -- \
+            run --fixtures "tools/benchmark-harness/fixtures/visitor_complex.toml" \
+            --frameworks "${FRAMEWORKS}" \
+            --iterations 3 --warmup 1 \
+            --format both --output tools/benchmark-harness/results/visitor-complex
+
+      - name: Analyze performance regressions
+        run: |
+          python3 scripts/ci/analyze-visitor-benchmarks.py \
+            --baseline tools/benchmark-harness/results/visitor-baseline/results.json \
+            --callbacks tools/benchmark-harness/results/visitor-callbacks/results.json \
+            --custom tools/benchmark-harness/results/visitor-custom/results.json \
+            --complex tools/benchmark-harness/results/visitor-complex/results.json \
+            --framework "${FRAMEWORKS}" \
+            --thresholds '{"baseline": 10, "callbacks": 30, "complex": 60}'
+
+      - name: Upload visitor benchmark results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: visitor-benchmark-results-${{ matrix.framework }}
+          path: tools/benchmark-harness/results/visitor-*
+          retention-days: 90
+
+  visitor-benchmarks-schedule:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    # Run weekly on Monday at 2 AM UTC
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    strategy:
+      fail-fast: false
+      matrix:
+        framework: [rust, python, ruby, typescript, node, php, go, java, csharp]
+    name: visitor-benchmark-schedule-${{ matrix.framework }}
+    env:
+      FRAMEWORKS: ${{ matrix.framework }}
+      HTML_TO_MARKDOWN_CARGO_FEATURES: visitor
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Rust
+        uses: ./.github/actions/setup-rust
+
+      - name: Setup Python + uv
+        if: env.FRAMEWORKS == 'python'
+        uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+
+      - name: Setup Python runtime
+        if: env.FRAMEWORKS == 'python'
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Install Python deps
+        if: env.FRAMEWORKS == 'python'
+        run: uv sync --all-extras --no-install-workspace
+
+      - name: Build Python extension
+        if: env.FRAMEWORKS == 'python'
+        run: uv pip install --editable packages/python --config-settings=--features=visitor
+
+      - name: Setup Ruby
+        if: env.FRAMEWORKS == 'ruby'
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "3.2"
+
+      - name: Install Ruby deps
+        if: env.FRAMEWORKS == 'ruby'
+        working-directory: packages/ruby
+        run: bundle install
+
+      - name: Build Ruby extension
+        if: env.FRAMEWORKS == 'ruby'
+        working-directory: packages/ruby
+        run: bundle exec rake compile
+
+      - name: Setup Node workspace
+        if: env.FRAMEWORKS == 'typescript' || env.FRAMEWORKS == 'node'
+        uses: ./.github/actions/setup-node-workspace
+
+      - name: Setup PHP
+        if: env.FRAMEWORKS == 'php'
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: "8.2"
+          tools: composer:2.9.1
+          coverage: none
+
+      - name: Capture php-config path
+        if: env.FRAMEWORKS == 'php'
+        run: scripts/ci/php/set-php-config.sh
+        shell: bash
+
+      - name: Install PHP deps
+        if: env.FRAMEWORKS == 'php'
+        uses: ramsey/composer-install@v3
+        with:
+          working-directory: packages/php
+          dependency-versions: locked
+        env:
+          COMPOSER_AUTH: '{"github-oauth":{"github.com":"${{ secrets.GITHUB_TOKEN }}"}}'
+
+      - name: Setup Go
+        if: env.FRAMEWORKS == 'go'
+        uses: actions/setup-go@v6
+        with:
+          go-version: "1.25.5"
+          check-latest: true
+
+      - name: Setup Java
+        if: env.FRAMEWORKS == 'java'
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "24"
+
+      - name: Setup .NET
+        if: env.FRAMEWORKS == 'csharp'
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: "10.0.x"
+
+      - name: Run comprehensive visitor benchmarks
+        run: |
+          mkdir -p tools/benchmark-harness/results/visitor-comprehensive
+          for fixture in visitor_baseline visitor_callbacks visitor_custom visitor_complex; do
+            cargo run --release --features visitor \
+              --manifest-path tools/benchmark-harness/Cargo.toml -- \
+              run --fixtures "tools/benchmark-harness/fixtures/${fixture}.toml" \
+              --frameworks "${FRAMEWORKS}" \
+              --iterations 5 --warmup 2 \
+              --format both --output tools/benchmark-harness/results/visitor-comprehensive/${fixture}
+          done
+
+      - name: Upload comprehensive visitor benchmark results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: visitor-benchmark-comprehensive-${{ matrix.framework }}
+          path: tools/benchmark-harness/results/visitor-comprehensive
+          retention-days: 180

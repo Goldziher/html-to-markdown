@@ -27,6 +27,29 @@ pub struct FixtureSet {
     pub fixtures: Vec<Fixture>,
 }
 
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, Default, PartialEq, Eq)]
+#[serde(rename_all = "kebab-case")]
+pub enum VisitorType {
+    #[default]
+    None,
+    Noop,
+    Simple,
+    Custom,
+    Complex,
+}
+
+impl VisitorType {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            VisitorType::None => "none",
+            VisitorType::Noop => "noop",
+            VisitorType::Simple => "simple",
+            VisitorType::Custom => "custom",
+            VisitorType::Complex => "complex",
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Fixture {
     pub id: String,
@@ -38,6 +61,8 @@ pub struct Fixture {
     pub iterations: Option<u32>,
     #[serde(default)]
     pub format: FixtureFormat,
+    #[serde(default)]
+    pub visitor: VisitorType,
 }
 
 impl Fixture {
@@ -172,6 +197,7 @@ fn load_fixtures_from_documents(dir: &Path) -> Result<Vec<Fixture>> {
                 category,
                 iterations,
                 format,
+                visitor: VisitorType::default(),
             };
 
             fixture.validate(dir)?;

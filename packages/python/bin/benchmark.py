@@ -20,6 +20,7 @@ from html_to_markdown import (
     convert_with_inline_images_handle,
     convert_with_metadata,
     convert_with_metadata_handle,
+    convert_with_visitor,
     create_options_handle,
     start_profiling,
     stop_profiling,
@@ -52,6 +53,12 @@ def parse_args() -> argparse.Namespace:
         default="html",
         help="Fixture format to guide option defaults",
     )
+    parser.add_argument(
+        "--visitor",
+        choices=("noop", "simple", "custom", "complex"),
+        default=None,
+        help="Visitor type to use during conversion",
+    )
     return parser.parse_args()
 
 
@@ -59,6 +66,157 @@ def build_options(fixture_format: str) -> ConversionOptions:
     if fixture_format == "hocr":
         return ConversionOptions(hocr_spatial_tables=False)
     return ConversionOptions()
+
+
+class NoopVisitor:
+    def visit_text(self, _ctx: object, _text: str) -> str:
+        return "continue"
+
+    def visit_heading(self, _ctx: object, _level: int, _text: str, _element_id: str) -> str:
+        return "continue"
+
+    def visit_paragraph(self, _ctx: object, _text: str) -> str:
+        return "continue"
+
+    def visit_link(self, _ctx: object, _href: str, _text: str, _title: str) -> str:
+        return "continue"
+
+    def visit_image(self, _ctx: object, _src: str, _alt: str, _title: str) -> str:
+        return "continue"
+
+    def visit_strong(self, _ctx: object, _text: str) -> str:
+        return "continue"
+
+    def visit_em(self, _ctx: object, _text: str) -> str:
+        return "continue"
+
+    def visit_code(self, _ctx: object, _text: str) -> str:
+        return "continue"
+
+    def visit_br(self, _ctx: object) -> str:
+        return "continue"
+
+
+def create_noop_visitor() -> object:
+    """Create a no-op visitor that returns Continue for all methods."""
+    return NoopVisitor()
+
+
+class SimpleVisitor:
+    def __init__(self) -> None:
+        self.text_count = 0
+        self.link_count = 0
+        self.image_count = 0
+
+    def visit_text(self, _ctx: object, _text: str) -> str:
+        self.text_count += 1
+        return "continue"
+
+    def visit_heading(self, _ctx: object, _level: int, _text: str, _element_id: str) -> str:
+        return "continue"
+
+    def visit_paragraph(self, _ctx: object, _text: str) -> str:
+        return "continue"
+
+    def visit_link(self, _ctx: object, _href: str, _text: str, _title: str) -> str:
+        self.link_count += 1
+        return "continue"
+
+    def visit_image(self, _ctx: object, _src: str, _alt: str, _title: str) -> str:
+        self.image_count += 1
+        return "continue"
+
+    def visit_strong(self, _ctx: object, _text: str) -> str:
+        return "continue"
+
+    def visit_em(self, _ctx: object, _text: str) -> str:
+        return "continue"
+
+    def visit_code(self, _ctx: object, _text: str) -> str:
+        return "continue"
+
+    def visit_br(self, _ctx: object) -> str:
+        return "continue"
+
+
+def create_simple_visitor() -> object:
+    """Create a simple visitor with basic callbacks."""
+    return SimpleVisitor()
+
+
+class CustomVisitor:
+    def visit_text(self, _ctx: object, _text: str) -> str:
+        return "continue"
+
+    def visit_heading(self, _ctx: object, _level: int, _text: str, _element_id: str) -> str:
+        return "continue"
+
+    def visit_paragraph(self, _ctx: object, _text: str) -> str:
+        return "continue"
+
+    def visit_link(self, _ctx: object, _href: str, text: str, _title: str) -> tuple[str, str]:
+        return ("custom", f"LINK[{text}]({_href})")
+
+    def visit_image(self, _ctx: object, src: str, alt: str, _title: str) -> tuple[str, str]:
+        return ("custom", f"![{alt}]({src})")
+
+    def visit_strong(self, _ctx: object, _text: str) -> str:
+        return "continue"
+
+    def visit_em(self, _ctx: object, _text: str) -> str:
+        return "continue"
+
+    def visit_code(self, _ctx: object, _text: str) -> str:
+        return "continue"
+
+    def visit_br(self, _ctx: object) -> str:
+        return "continue"
+
+
+def create_custom_visitor() -> object:
+    """Create a custom output visitor that modifies conversion."""
+    return CustomVisitor()
+
+
+class ComplexVisitor:
+    def __init__(self) -> None:
+        self.stats: dict[str, int] = {"texts": 0, "links": 0, "images": 0, "headings": 0}
+
+    def visit_text(self, _ctx: object, _text: str) -> str:
+        self.stats["texts"] += 1
+        return "continue"
+
+    def visit_heading(self, _ctx: object, _level: int, _text: str, _element_id: str) -> str:
+        self.stats["headings"] += 1
+        return "continue"
+
+    def visit_paragraph(self, _ctx: object, _text: str) -> str:
+        return "continue"
+
+    def visit_link(self, _ctx: object, _href: str, text: str, _title: str) -> tuple[str, str]:
+        self.stats["links"] += 1
+        return ("custom", f"[{text}]({_href})")
+
+    def visit_image(self, _ctx: object, _src: str, _alt: str, _title: str) -> str:
+        self.stats["images"] += 1
+        return "skip"
+
+    def visit_strong(self, _ctx: object, _text: str) -> str:
+        return "continue"
+
+    def visit_em(self, _ctx: object, _text: str) -> str:
+        return "continue"
+
+    def visit_code(self, _ctx: object, _text: str) -> str:
+        return "continue"
+
+    def visit_br(self, _ctx: object) -> str:
+        return "continue"
+
+
+def create_complex_visitor() -> object:
+    """Create a complex visitor with multiple callbacks."""
+    return ComplexVisitor()
 
 
 def require_handle(handle: OptionsHandle | None, scenario: str) -> OptionsHandle:
@@ -78,7 +236,13 @@ def run_scenario(
     scenario: str,
     handle: OptionsHandle | None,
     metadata_config: MetadataConfig | None,
+    visitor: object | None = None,
 ) -> None:
+    if visitor is not None:
+        # When visitor is provided, use convert_with_visitor for all scenarios
+        convert_with_visitor(html, None, visitor)  # type: ignore[arg-type]
+        return
+
     handlers: dict[str, Callable[[], object]] = {
         "convert-default": lambda: convert(html),
         "convert-options": lambda: convert_with_handle(html, require_handle(handle, "convert-options")),
@@ -117,7 +281,21 @@ def main() -> None:
         else None
     )
     metadata_config = MetadataConfig() if "metadata" in args.scenario else None
-    run_scenario(html, args.scenario, handle, metadata_config)  # Warmup
+
+    # Create visitor if specified
+    visitor = None
+    if args.visitor:
+        visitor_creators = {
+            "noop": create_noop_visitor,
+            "simple": create_simple_visitor,
+            "custom": create_custom_visitor,
+            "complex": create_complex_visitor,
+        }
+        creator = visitor_creators.get(args.visitor)
+        if creator:
+            visitor = creator()
+
+    run_scenario(html, args.scenario, handle, metadata_config, visitor)  # Warmup
 
     profile_output = os.getenv("HTML_TO_MARKDOWN_PROFILE_OUTPUT")
     profile_frequency = os.getenv("HTML_TO_MARKDOWN_PROFILE_FREQUENCY")
@@ -127,7 +305,7 @@ def main() -> None:
 
     start = time.perf_counter()
     for _ in range(iterations):
-        run_scenario(html, args.scenario, handle, metadata_config)
+        run_scenario(html, args.scenario, handle, metadata_config, visitor)
     elapsed = time.perf_counter() - start
 
     if profile_output:
