@@ -281,7 +281,7 @@ public enum NodeType {
      * @return the corresponding Java NodeType
      * @throws IllegalArgumentException if the value is not recognized
      */
-    public static NodeType fromCValue(int cValue) {
+    public static NodeType fromCValue(final int cValue) {
         return values()[cValue];
     }
 

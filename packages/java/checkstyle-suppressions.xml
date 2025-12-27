@@ -16,6 +16,9 @@
     <!-- Suppress MissingJavadocMethod for exception constructors -->
     <suppress checks="MissingJavadocMethod" files="HtmlToMarkdown\.java" lines="125-131"/>
 
+    <!-- Suppress HiddenField in VisitorBridge constructor (parameters shadow fields by design) -->
+    <suppress checks="HiddenField" files="VisitorBridge\.java" lines="99"/>
+
     <!-- Allow star imports for test assertions -->
     <suppress checks="AvoidStarImport" files=".*Test\.java"/>
 
