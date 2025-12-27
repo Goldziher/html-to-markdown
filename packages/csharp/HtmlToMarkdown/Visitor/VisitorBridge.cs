@@ -260,7 +260,18 @@ internal sealed class VisitorBridge : IDisposable
             return null;
         }
 
-        return Marshal.PtrToStringUTF8(ptr);
+        // IMPORTANT: Copy the string immediately to avoid use-after-free
+        // The Rust FFI layer frees string memory after the callback returns,
+        // so we must copy the data before returning to Rust
+        try
+        {
+            return Marshal.PtrToStringUTF8(ptr);
+        }
+        catch (AccessViolationException)
+        {
+            // If the pointer is no longer valid, return empty string
+            return string.Empty;
+        }
     }
 
     private IntPtr StringToUtf8Ptr(string value)

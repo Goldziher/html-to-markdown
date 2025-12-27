@@ -2,7 +2,9 @@ package io.github.goldziher.htmltomarkdown.visitor;
 
 import io.github.goldziher.htmltomarkdown.util.StringUtils;
 import java.lang.foreign.Arena;
+import java.lang.foreign.MemoryLayout;
 import java.lang.foreign.MemorySegment;
+import java.lang.foreign.StructLayout;
 import java.lang.foreign.ValueLayout;
 import java.util.ArrayList;
 import java.util.List;
@@ -42,6 +44,40 @@ final class VisitorBridge {
     /** Result type: error occurred. */
     private static final int RESULT_TYPE_ERROR = 4;
 
+    // C struct layout definitions matching FFI types
+
+    /** C struct layout for html_to_markdown_attribute_t. */
+    private static final StructLayout ATTRIBUTE_LAYOUT =
+            MemoryLayout.structLayout(
+                ValueLayout.ADDRESS.withName("key"),
+                ValueLayout.ADDRESS.withName("value")
+            ).withName("html_to_markdown_attribute_t");
+
+    /** C struct layout for html_to_markdown_node_context_t.
+     *
+     * Rust struct layout:
+     * - node_type: enum (i32, 4 bytes)
+     * - padding: 4 bytes (64-bit alignment)
+     * - tag_name: *const c_char (8 bytes on 64-bit)
+     * - attributes: *const html_to_markdown_attribute_t (8 bytes)
+     * - depth: usize (8 bytes on 64-bit)
+     * - index_in_parent: usize (8 bytes on 64-bit)
+     * - parent_tag: *const c_char (8 bytes)
+     * - is_inline: bool (1 byte)
+     */
+    private static final StructLayout NODE_CONTEXT_LAYOUT =
+            MemoryLayout.structLayout(
+                ValueLayout.JAVA_INT.withName("node_type"),
+                MemoryLayout.paddingLayout(4), // alignment to 8 bytes
+                ValueLayout.ADDRESS.withName("tag_name"),
+                ValueLayout.ADDRESS.withName("attributes"),
+                ValueLayout.JAVA_LONG.withName("depth"),  // usize is 64-bit on 64-bit systems
+                ValueLayout.JAVA_LONG.withName("index_in_parent"),  // usize
+                ValueLayout.ADDRESS.withName("parent_tag"),
+                ValueLayout.JAVA_BOOLEAN.withName("is_inline"),
+                MemoryLayout.paddingLayout(7)  // padding for 8-byte alignment
+            ).withName("html_to_markdown_node_context_t");
+
     /** Bit shift for encoding type in long value. */
     private static final int TYPE_SHIFT = 32;
 
@@ -71,8 +107,11 @@ final class VisitorBridge {
     /**
      * Convert a VisitResult to C-compatible format.
      *
+     * <p>For Custom and Error results, returns a struct with the allocated string
+     * pointer and type. For other results, type field indicates the action.
+     *
      * @param result the Java VisitResult
-     * @return encoded result as a long (type | encoded_pointer)
+     * @return encoded result containing both type and pointer (without bit loss)
      */
     long encodeResult(final VisitResult result) {
         if (result instanceof VisitResult.Continue) {
@@ -82,13 +121,15 @@ final class VisitorBridge {
         } else if (result instanceof VisitResult.PreserveHtml) {
             return RESULT_TYPE_PRESERVE_HTML;
         } else if (result instanceof VisitResult.Custom custom) {
-            long encoded = ((long) RESULT_TYPE_CUSTOM) << TYPE_SHIFT;
+            // Allocate the custom output string and return its full address
+            // (type is stored in a separate C struct field, not in pointer encoding)
             MemorySegment str = allocateString(custom.customOutput());
-            return encoded | (str.address() & ADDRESS_MASK);
+            return str.address();
         } else if (result instanceof VisitResult.Error error) {
-            long encoded = ((long) RESULT_TYPE_ERROR) << TYPE_SHIFT;
+            // Allocate the error message string and return its full address
+            // (type is stored in a separate C struct field, not in pointer encoding)
             MemorySegment str = allocateString(error.errorMessage());
-            return encoded | (str.address() & ADDRESS_MASK);
+            return str.address();
         }
         return RESULT_TYPE_CONTINUE;
     }
@@ -164,8 +205,13 @@ final class VisitorBridge {
     /**
      * Parse node context from C structure.
      *
+     * <p>Reads a html_to_markdown_node_context_t struct from native memory
+     * and converts all fields to Java types. All string pointers are borrowed
+     * from Rust and valid only during callback execution.
+     *
      * @param ctxPtr pointer to C NodeContext struct
-     * @return Java NodeContext
+     * @return Java NodeContext with parsed data
+     * @throws IllegalArgumentException if pointer is null or invalid
      */
     NodeContext parseNodeContext(final MemorySegment ctxPtr) {
         if (ctxPtr == null || ctxPtr.address() == 0) {
@@ -173,16 +219,53 @@ final class VisitorBridge {
                     "Invalid node context pointer");
         }
 
-        NodeType nodeType = NodeType.TEXT;
-        String tagName = "";
-        List<Attribute> attributes = List.of();
-        int depth = 0;
-        int indexInParent = 0;
-        String parentTag = null;
-        boolean isInline = false;
+        // Reinterpret the memory segment to match our struct layout
+        MemorySegment ctx = ctxPtr.reinterpret(NODE_CONTEXT_LAYOUT.byteSize());
+
+        // Read node_type field (int32, offset 0)
+        int nodeTypeValue = ctx.get(ValueLayout.JAVA_INT,
+            NODE_CONTEXT_LAYOUT.byteOffset(
+                MemoryLayout.PathElement.groupElement("node_type")));
+        NodeType nodeType = NodeType.fromCValue(nodeTypeValue);
+
+        // Read tag_name field (pointer, after alignment padding at offset 8)
+        MemorySegment tagNamePtr = ctx.get(ValueLayout.ADDRESS,
+            NODE_CONTEXT_LAYOUT.byteOffset(
+                MemoryLayout.PathElement.groupElement("tag_name")));
+        String tagName = fromCString(tagNamePtr);
+
+        // Read attributes array pointer
+        MemorySegment attributesPtr = ctx.get(ValueLayout.ADDRESS,
+            NODE_CONTEXT_LAYOUT.byteOffset(
+                MemoryLayout.PathElement.groupElement("attributes")));
+        List<Attribute> attributes = parseAttributes(attributesPtr);
+
+        // Read depth field (usize / 64-bit on 64-bit systems)
+        long depthValue = ctx.get(ValueLayout.JAVA_LONG,
+            NODE_CONTEXT_LAYOUT.byteOffset(
+                MemoryLayout.PathElement.groupElement("depth")));
+        int depth = (int) depthValue;
+
+        // Read index_in_parent field (usize / 64-bit on 64-bit systems)
+        long indexValue = ctx.get(ValueLayout.JAVA_LONG,
+            NODE_CONTEXT_LAYOUT.byteOffset(
+                MemoryLayout.PathElement.groupElement("index_in_parent")));
+        int indexInParent = (int) indexValue;
+
+        // Read parent_tag field (pointer to string)
+        MemorySegment parentTagPtr = ctx.get(ValueLayout.ADDRESS,
+            NODE_CONTEXT_LAYOUT.byteOffset(
+                MemoryLayout.PathElement.groupElement("parent_tag")));
+        String parentTag = fromCString(parentTagPtr);
+
+        // Read is_inline field (boolean)
+        boolean isInline = ctx.get(ValueLayout.JAVA_BOOLEAN,
+            NODE_CONTEXT_LAYOUT.byteOffset(
+                MemoryLayout.PathElement.groupElement("is_inline")));
 
         return new NodeContext(nodeType,
-                tagName != null ? tagName : "", attributes,
+                tagName != null ? tagName : "",
+                attributes,
                 depth, indexInParent, parentTag, isInline);
     }
 

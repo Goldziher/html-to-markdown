@@ -9,20 +9,26 @@ namespace HtmlToMarkdown.Visitor;
 internal static class NativeVisitorStructures
 {
     // Native callback function delegates
+    // Note: All delegates MUST have explicit Cdecl calling convention for proper FFI interop
+    // on all platforms (Windows, Linux, macOS)
+    [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
     public delegate NativeVisitResult VisitElementStartCallback(
         IntPtr userData,
         IntPtr ctx);
 
+    [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
     public delegate NativeVisitResult VisitElementEndCallback(
         IntPtr userData,
         IntPtr ctx,
         IntPtr output);
 
+    [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
     public delegate NativeVisitResult VisitTextCallback(
         IntPtr userData,
         IntPtr ctx,
         IntPtr text);
 
+    [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
     public delegate NativeVisitResult VisitLinkCallback(
         IntPtr userData,
         IntPtr ctx,
@@ -30,6 +36,7 @@ internal static class NativeVisitorStructures
         IntPtr text,
         IntPtr title);
 
+    [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
     public delegate NativeVisitResult VisitImageCallback(
         IntPtr userData,
         IntPtr ctx,
@@ -37,6 +44,7 @@ internal static class NativeVisitorStructures
         IntPtr alt,
         IntPtr title);
 
+    [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
     public delegate NativeVisitResult VisitHeadingCallback(
         IntPtr userData,
         IntPtr ctx,
@@ -44,17 +52,20 @@ internal static class NativeVisitorStructures
         IntPtr text,
         IntPtr id);
 
+    [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
     public delegate NativeVisitResult VisitCodeBlockCallback(
         IntPtr userData,
         IntPtr ctx,
         IntPtr lang,
         IntPtr code);
 
+    [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
     public delegate NativeVisitResult VisitCodeInlineCallback(
         IntPtr userData,
         IntPtr ctx,
         IntPtr code);
 
+    [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
     public delegate NativeVisitResult VisitListItemCallback(
         IntPtr userData,
         IntPtr ctx,
@@ -62,21 +73,25 @@ internal static class NativeVisitorStructures
         IntPtr marker,
         IntPtr text);
 
+    [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
     public delegate NativeVisitResult VisitListStartCallback(
         IntPtr userData,
         IntPtr ctx,
         bool ordered);
 
+    [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
     public delegate NativeVisitResult VisitListEndCallback(
         IntPtr userData,
         IntPtr ctx,
         bool ordered,
         IntPtr output);
 
+    [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
     public delegate NativeVisitResult VisitTableStartCallback(
         IntPtr userData,
         IntPtr ctx);
 
+    [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
     public delegate NativeVisitResult VisitTableRowCallback(
         IntPtr userData,
         IntPtr ctx,
@@ -84,91 +99,109 @@ internal static class NativeVisitorStructures
         nuint cellCount,
         bool isHeader);
 
+    [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
     public delegate NativeVisitResult VisitTableEndCallback(
         IntPtr userData,
         IntPtr ctx,
         IntPtr output);
 
+    [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
     public delegate NativeVisitResult VisitBlockquoteCallback(
         IntPtr userData,
         IntPtr ctx,
         IntPtr content,
         nuint depth);
 
+    [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
     public delegate NativeVisitResult VisitStrongCallback(
         IntPtr userData,
         IntPtr ctx,
         IntPtr text);
 
+    [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
     public delegate NativeVisitResult VisitEmphasisCallback(
         IntPtr userData,
         IntPtr ctx,
         IntPtr text);
 
+    [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
     public delegate NativeVisitResult VisitStrikethroughCallback(
         IntPtr userData,
         IntPtr ctx,
         IntPtr text);
 
+    [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
     public delegate NativeVisitResult VisitUnderlineCallback(
         IntPtr userData,
         IntPtr ctx,
         IntPtr text);
 
+    [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
     public delegate NativeVisitResult VisitSubscriptCallback(
         IntPtr userData,
         IntPtr ctx,
         IntPtr text);
 
+    [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
     public delegate NativeVisitResult VisitSuperscriptCallback(
         IntPtr userData,
         IntPtr ctx,
         IntPtr text);
 
+    [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
     public delegate NativeVisitResult VisitMarkCallback(
         IntPtr userData,
         IntPtr ctx,
         IntPtr text);
 
+    [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
     public delegate NativeVisitResult VisitLineBreakCallback(
         IntPtr userData,
         IntPtr ctx);
 
+    [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
     public delegate NativeVisitResult VisitHorizontalRuleCallback(
         IntPtr userData,
         IntPtr ctx);
 
+    [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
     public delegate NativeVisitResult VisitCustomElementCallback(
         IntPtr userData,
         IntPtr ctx,
         IntPtr tagName,
         IntPtr html);
 
+    [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
     public delegate NativeVisitResult VisitDefinitionListStartCallback(
         IntPtr userData,
         IntPtr ctx);
 
+    [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
     public delegate NativeVisitResult VisitDefinitionTermCallback(
         IntPtr userData,
         IntPtr ctx,
         IntPtr text);
 
+    [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
     public delegate NativeVisitResult VisitDefinitionDescriptionCallback(
         IntPtr userData,
         IntPtr ctx,
         IntPtr text);
 
+    [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
     public delegate NativeVisitResult VisitDefinitionListEndCallback(
         IntPtr userData,
         IntPtr ctx,
         IntPtr output);
 
+    [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
     public delegate NativeVisitResult VisitFormCallback(
         IntPtr userData,
         IntPtr ctx,
         IntPtr action,
         IntPtr method);
 
+    [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
     public delegate NativeVisitResult VisitInputCallback(
         IntPtr userData,
         IntPtr ctx,
@@ -176,53 +209,63 @@ internal static class NativeVisitorStructures
         IntPtr name,
         IntPtr value);
 
+    [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
     public delegate NativeVisitResult VisitButtonCallback(
         IntPtr userData,
         IntPtr ctx,
         IntPtr text);
 
+    [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
     public delegate NativeVisitResult VisitAudioCallback(
         IntPtr userData,
         IntPtr ctx,
         IntPtr src);
 
+    [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
     public delegate NativeVisitResult VisitVideoCallback(
         IntPtr userData,
         IntPtr ctx,
         IntPtr src);
 
+    [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
     public delegate NativeVisitResult VisitIFrameCallback(
         IntPtr userData,
         IntPtr ctx,
         IntPtr src);
 
+    [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
     public delegate NativeVisitResult VisitDetailsCallback(
         IntPtr userData,
         IntPtr ctx,
         bool open);
 
+    [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
     public delegate NativeVisitResult VisitSummaryCallback(
         IntPtr userData,
         IntPtr ctx,
         IntPtr text);
 
+    [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
     public delegate NativeVisitResult VisitFigureStartCallback(
         IntPtr userData,
         IntPtr ctx);
 
+    [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
     public delegate NativeVisitResult VisitFigCaptionCallback(
         IntPtr userData,
         IntPtr ctx,
         IntPtr text);
 
+    [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
     public delegate NativeVisitResult VisitFigureEndCallback(
         IntPtr userData,
         IntPtr ctx,
         IntPtr output);
 
     // Native visit result enum
+    // Must use explicit int type to match C FFI layout
     [Serializable]
-    public enum NativeVisitResultType
+    public enum NativeVisitResultType : int
     {
         Continue = 0,
         Custom = 1,
@@ -249,7 +292,8 @@ internal static class NativeVisitorStructures
     }
 
     // Native node type enum
-    public enum NativeNodeType
+    // Must use explicit int type to match C FFI layout (C uses i32/int32_t)
+    public enum NativeNodeType : int
     {
         Text = 0,
         Element = 1,
