@@ -582,6 +582,316 @@ The `convertWithMetadata()` method uses Java's Foreign Function & Memory API (Pa
 
 No manual pointer management is required - `Arena` handles all native memory cleanup.
 
+## Visitor Pattern
+
+The visitor pattern enables fine-grained control over HTML-to-Markdown conversion by allowing custom logic to intercept and process specific HTML elements during traversal. This is useful for filtering content, customizing output format, extracting metadata, analytics, and content analysis.
+
+### Overview
+
+The visitor pattern provides a callback-based API that integrates with Panama FFI to invoke Java methods as the converter traverses the DOM tree. Each visitor method corresponds to an HTML element type.
+
+### Core Interfaces
+
+#### `Visitor` Interface
+
+The main visitor interface with 40+ optional callback methods:
+
+```java
+public interface Visitor {
+    // Generic element callbacks
+    default VisitResult visitElementStart(NodeContext ctx) { ... }
+    default VisitResult visitElementEnd(NodeContext ctx, String output) { ... }
+
+    // Text nodes
+    default VisitResult visitText(NodeContext ctx, String text) { ... }
+
+    // Links and images
+    default VisitResult visitLink(NodeContext ctx, String href, String text, String title) { ... }
+    default VisitResult visitImage(NodeContext ctx, String src, String alt, String title) { ... }
+
+    // Headings
+    default VisitResult visitHeading(NodeContext ctx, int level, String text, String id) { ... }
+
+    // Code
+    default VisitResult visitCodeBlock(NodeContext ctx, String lang, String code) { ... }
+    default VisitResult visitCodeInline(NodeContext ctx, String code) { ... }
+
+    // Lists
+    default VisitResult visitListStart(NodeContext ctx, boolean ordered) { ... }
+    default VisitResult visitListItem(NodeContext ctx, boolean ordered, String marker, String text) { ... }
+    default VisitResult visitListEnd(NodeContext ctx, boolean ordered, String output) { ... }
+
+    // Tables
+    default VisitResult visitTableStart(NodeContext ctx) { ... }
+    default VisitResult visitTableRow(NodeContext ctx, List<String> cells, boolean isHeader) { ... }
+    default VisitResult visitTableEnd(NodeContext ctx, String output) { ... }
+
+    // And many more (blockquotes, formatting, forms, media, semantic HTML5, etc.)
+}
+```
+
+#### `VisitResult` Sealed Interface
+
+Controls how the converter proceeds after a callback:
+
+```java
+public sealed interface VisitResult {
+    // Continue with default conversion
+    record Continue() implements VisitResult { }
+
+    // Replace with custom markdown
+    record Custom(String customOutput) implements VisitResult { }
+
+    // Skip element and children
+    record Skip() implements VisitResult { }
+
+    // Preserve original HTML
+    record PreserveHtml() implements VisitResult { }
+
+    // Report error and stop
+    record Error(String errorMessage) implements VisitResult { }
+}
+```
+
+#### `NodeContext` Record
+
+Provides metadata about the element being visited:
+
+```java
+public record NodeContext(
+    NodeType nodeType,           // Element type classification
+    String tagName,              // HTML tag name ("div", "h1", etc.)
+    List<Attribute> attributes,  // HTML attributes
+    int depth,                   // DOM depth (0 = root)
+    int indexInParent,           // Position among siblings
+    String parentTag,            // Parent element tag
+    boolean isInline             // Inline vs block element
+) {
+    public boolean isHeading() { ... }
+    public boolean isTextNode() { ... }
+    public String getAttributeValue(String name) { ... }
+    public boolean hasAttribute(String name) { ... }
+}
+```
+
+### Usage Examples
+
+#### Example 1: Filter External Links
+
+```java
+public class ExternalLinkFilter implements Visitor {
+    private static final String INTERNAL_DOMAIN = "example.com";
+
+    @Override
+    public VisitResult visitLink(NodeContext ctx, String href, String text, String title) {
+        if (href != null && !href.startsWith("/") && !href.contains(INTERNAL_DOMAIN)) {
+            // Skip external links
+            return VisitResult.Skip.INSTANCE;
+        }
+        return VisitResult.Continue.INSTANCE;
+    }
+}
+
+// Usage
+String html = "<p><a href=\"https://external.com\">Bad</a> <a href=\"/page\">Good</a></p>";
+Visitor visitor = new ExternalLinkFilter();
+// String result = HtmlToMarkdown.convertWithVisitor(html, visitor);
+```
+
+#### Example 2: Custom Heading Format
+
+```java
+public class CustomHeadingFormat implements Visitor {
+    @Override
+    public VisitResult visitHeading(NodeContext ctx, int level, String text, String id) {
+        // Custom format: >>> Heading <<<
+        String custom = ">".repeat(level) + " " + text + " " + "<".repeat(level);
+        return new VisitResult.Custom(custom);
+    }
+}
+```
+
+#### Example 3: Document Analytics
+
+```java
+public class DocumentAnalytics implements Visitor {
+    private int linkCount = 0;
+    private int imageCount = 0;
+    private Map<Integer, Integer> headingLevels = new TreeMap<>();
+
+    @Override
+    public VisitResult visitLink(NodeContext ctx, String href, String text, String title) {
+        linkCount++;
+        return VisitResult.Continue.INSTANCE;
+    }
+
+    @Override
+    public VisitResult visitImage(NodeContext ctx, String src, String alt, String title) {
+        imageCount++;
+        return VisitResult.Continue.INSTANCE;
+    }
+
+    @Override
+    public VisitResult visitHeading(NodeContext ctx, int level, String text, String id) {
+        headingLevels.put(level, headingLevels.getOrDefault(level, 0) + 1);
+        return VisitResult.Continue.INSTANCE;
+    }
+
+    public void printStats() {
+        System.out.println("Links: " + linkCount);
+        System.out.println("Images: " + imageCount);
+        System.out.println("Headings by level: " + headingLevels);
+    }
+}
+```
+
+#### Example 4: Remove Script and Style Tags
+
+```java
+public class ContentSanitizer implements Visitor {
+    @Override
+    public VisitResult visitCustomElement(NodeContext ctx, String tagName, String html) {
+        if ("script".equals(tagName) || "style".equals(tagName)) {
+            return VisitResult.Skip.INSTANCE;
+        }
+        return VisitResult.Continue.INSTANCE;
+    }
+}
+```
+
+#### Example 5: Attribute Extraction
+
+```java
+public class AttributeCollector implements Visitor {
+    private Map<String, Integer> classNames = new HashMap<>();
+
+    @Override
+    public VisitResult visitElementStart(NodeContext ctx) {
+        String className = ctx.getAttributeValue("class");
+        if (className != null && !className.isEmpty()) {
+            classNames.put(className, classNames.getOrDefault(className, 0) + 1);
+        }
+        return VisitResult.Continue.INSTANCE;
+    }
+
+    public Map<String, Integer> getClassFrequency() {
+        return classNames;
+    }
+}
+```
+
+### All Visitor Methods
+
+The `Visitor` interface provides the following callback methods (all with default implementations returning `Continue`):
+
+#### Generic Element Hooks
+- `visitElementStart(NodeContext)` - Before processing any element
+- `visitElementEnd(NodeContext, String)` - After processing element with default output
+
+#### Text Nodes
+- `visitText(NodeContext, String)` - Text node (called frequently, optimize for performance)
+
+#### Links and Media
+- `visitLink(NodeContext, String, String, String)` - `<a>` elements
+- `visitImage(NodeContext, String, String, String)` - `<img>` elements
+- `visitAudio(NodeContext, String)` - `<audio>` elements
+- `visitVideo(NodeContext, String)` - `<video>` elements
+- `visitIframe(NodeContext, String)` - `<iframe>` elements
+
+#### Headings
+- `visitHeading(NodeContext, int, String, String)` - `<h1>` through `<h6>`
+
+#### Code
+- `visitCodeBlock(NodeContext, String, String)` - `<pre><code>` blocks
+- `visitCodeInline(NodeContext, String)` - `<code>` inline
+
+#### Lists
+- `visitListStart(NodeContext, boolean)` - `<ul>` / `<ol>` start
+- `visitListItem(NodeContext, boolean, String, String)` - `<li>` elements
+- `visitListEnd(NodeContext, boolean, String)` - `<ul>` / `<ol>` end
+- `visitDefinitionListStart(NodeContext)` - `<dl>` start
+- `visitDefinitionTerm(NodeContext, String)` - `<dt>` elements
+- `visitDefinitionDescription(NodeContext, String)` - `<dd>` elements
+- `visitDefinitionListEnd(NodeContext, String)` - `<dl>` end
+
+#### Tables
+- `visitTableStart(NodeContext)` - `<table>` start
+- `visitTableRow(NodeContext, List<String>, boolean)` - `<tr>` rows
+- `visitTableEnd(NodeContext, String)` - `</table>` end
+
+#### Blockquotes
+- `visitBlockquote(NodeContext, String, int)` - `<blockquote>` elements
+
+#### Inline Formatting
+- `visitStrong(NodeContext, String)` - `<strong>` / `<b>`
+- `visitEmphasis(NodeContext, String)` - `<em>` / `<i>`
+- `visitStrikethrough(NodeContext, String)` - `<s>` / `<del>` / `<strike>`
+- `visitUnderline(NodeContext, String)` - `<u>` / `<ins>`
+- `visitSubscript(NodeContext, String)` - `<sub>`
+- `visitSuperscript(NodeContext, String)` - `<sup>`
+- `visitMark(NodeContext, String)` - `<mark>`
+
+#### Breaks
+- `visitLineBreak(NodeContext)` - `<br>`
+- `visitHorizontalRule(NodeContext)` - `<hr>`
+
+#### Forms
+- `visitForm(NodeContext, String, String)` - `<form>` elements
+- `visitInput(NodeContext, String, String, String)` - `<input>` elements
+- `visitButton(NodeContext, String)` - `<button>` elements
+
+#### Semantic HTML5
+- `visitDetails(NodeContext, boolean)` - `<details>` elements
+- `visitSummary(NodeContext, String)` - `<summary>` elements
+- `visitFigureStart(NodeContext)` - `<figure>` start
+- `visitFigcaption(NodeContext, String)` - `<figcaption>` elements
+- `visitFigureEnd(NodeContext, String)` - `</figure>` end
+
+#### Custom Elements
+- `visitCustomElement(NodeContext, String, String)` - Web components and unknown tags
+
+### NodeType Enum
+
+All supported HTML element types:
+
+```
+TEXT, ELEMENT, HEADING, PARAGRAPH, DIV, BLOCKQUOTE, PRE, HR,
+LIST, LIST_ITEM, DEFINITION_LIST, DEFINITION_TERM, DEFINITION_DESCRIPTION,
+TABLE, TABLE_ROW, TABLE_CELL, TABLE_HEADER, TABLE_BODY, TABLE_HEAD, TABLE_FOOT,
+LINK, IMAGE, STRONG, EM, CODE, STRIKETHROUGH, UNDERLINE, SUBSCRIPT, SUPERSCRIPT,
+MARK, SMALL, BR, SPAN,
+ARTICLE, SECTION, NAV, ASIDE, HEADER, FOOTER, MAIN, FIGURE, FIGCAPTION, TIME, DETAILS, SUMMARY,
+FORM, INPUT, SELECT, OPTION, BUTTON, TEXTAREA, LABEL, FIELDSET, LEGEND,
+AUDIO, VIDEO, PICTURE, SOURCE, IFRAME, SVG, CANVAS,
+RUBY, RT, RP, ABBR, KBD, SAMP, VAR, CITE, Q, DEL, INS, DATA, METER, PROGRESS, OUTPUT, TEMPLATE, SLOT,
+HTML, HEAD, BODY, TITLE, META, LINK_TAG, STYLE, SCRIPT, BASE,
+CUSTOM
+```
+
+### Performance Considerations
+
+1. **Text Node Callback Frequency**: `visitText()` is called 100+ times per document. Return `Continue` quickly unless modifying text.
+
+2. **Memory Safety**: String data in callbacks is borrowed from Rust. Copy immediately if you need to persist data beyond the callback.
+
+3. **Thread Safety**: If sharing a visitor across threads, ensure all callback methods are thread-safe. The underlying converter is thread-safe.
+
+4. **Avoid Blocking Operations**: Callbacks execute synchronously during traversal. Avoid I/O, network calls, or other blocking operations.
+
+5. **State Accumulation**: Use instance fields to accumulate statistics or analyze documents without modifying output.
+
+### Panama FFI Integration
+
+The visitor pattern integrates with Panama FFI through:
+
+1. **Callback Registration**: Java visitor methods are registered with the Rust converter via `VisitorBridge`
+2. **Memory Marshaling**: `NodeContext` and other data types are marshaled between Java and C representations
+3. **String Conversion**: Transparent UTF-8 string conversion between Java and C
+4. **Result Translation**: `VisitResult` types are converted to C-compatible enum values
+5. **Error Handling**: Conversion errors from visitors propagate as `ConversionException`
+
+No manual pointer management is required - the bridge handles all FFI complexity.
+
 ## Running Tests
 
 ```bash

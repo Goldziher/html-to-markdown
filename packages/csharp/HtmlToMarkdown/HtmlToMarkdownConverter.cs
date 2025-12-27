@@ -2,6 +2,7 @@ using System.Runtime.InteropServices;
 using System.Text.Json;
 using HtmlToMarkdown.Metadata;
 using HtmlToMarkdown.Serialization;
+using HtmlToMarkdown.Visitor;
 
 namespace HtmlToMarkdown;
 
@@ -476,6 +477,142 @@ public static class HtmlToMarkdownConverter
             {
                 NativeMethods.html_to_markdown_free_string(metadataPtr);
             }
+        }
+    }
+
+    /// <summary>
+    /// Converts HTML to Markdown using a custom visitor pattern.
+    /// </summary>
+    /// <param name="html">The HTML string to convert</param>
+    /// <param name="visitor">The custom visitor implementation</param>
+    /// <returns>The converted Markdown string</returns>
+    /// <exception cref="ArgumentNullException">Thrown when html or visitor is null</exception>
+    /// <exception cref="HtmlToMarkdownException">Thrown when conversion fails</exception>
+    public static string ConvertWithVisitor(string html, IVisitor visitor)
+    {
+        if (html == null)
+        {
+            throw new ArgumentNullException(nameof(html));
+        }
+
+        if (visitor == null)
+        {
+            throw new ArgumentNullException(nameof(visitor));
+        }
+
+        if (string.IsNullOrEmpty(html))
+        {
+            return string.Empty;
+        }
+
+        var bridge = new VisitorBridge(visitor);
+        IntPtr htmlPtr = IntPtr.Zero;
+        IntPtr resultPtr = IntPtr.Zero;
+        nuint resultLen = 0;
+
+        try
+        {
+            // Create native visitor
+            var nativeVisitorHandle = bridge.CreateNativeVisitor();
+
+            // Convert HTML to UTF-8 ptr
+            htmlPtr = StringToUtf8Ptr(html);
+
+            // Call FFI conversion with visitor
+            resultPtr = NativeMethods.html_to_markdown_convert_with_visitor(
+                htmlPtr,
+                nativeVisitorHandle,
+                out resultLen);
+
+            if (resultPtr == IntPtr.Zero)
+            {
+                IntPtr errorPtr = NativeMethods.html_to_markdown_last_error();
+                string? errorMsg = errorPtr != IntPtr.Zero
+                    ? PtrToStringUtf8(errorPtr)
+                    : null;
+
+                throw new HtmlToMarkdownException(
+                    errorMsg ?? "HTML to Markdown conversion with visitor failed");
+            }
+
+            return PtrToStringUtf8(resultPtr, resultLen) ?? string.Empty;
+        }
+        finally
+        {
+            if (htmlPtr != IntPtr.Zero)
+            {
+                Marshal.FreeCoTaskMem(htmlPtr);
+            }
+
+            if (resultPtr != IntPtr.Zero)
+            {
+                NativeMethods.html_to_markdown_free_string(resultPtr);
+            }
+
+            bridge.Dispose();
+        }
+    }
+
+    /// <summary>
+    /// Converts UTF-8 HTML bytes to Markdown using a custom visitor pattern.
+    /// </summary>
+    /// <param name="html">UTF-8 encoded HTML bytes</param>
+    /// <param name="visitor">The custom visitor implementation</param>
+    /// <returns>The converted Markdown string</returns>
+    /// <exception cref="ArgumentNullException">Thrown when visitor is null</exception>
+    /// <exception cref="HtmlToMarkdownException">Thrown when conversion fails</exception>
+    public static unsafe string ConvertWithVisitor(ReadOnlySpan<byte> html, IVisitor visitor)
+    {
+        if (visitor == null)
+        {
+            throw new ArgumentNullException(nameof(visitor));
+        }
+
+        if (html.IsEmpty)
+        {
+            return string.Empty;
+        }
+
+        var bridge = new VisitorBridge(visitor);
+        IntPtr resultPtr = IntPtr.Zero;
+        nuint resultLen = 0;
+
+        try
+        {
+            // Create native visitor
+            var nativeVisitorHandle = bridge.CreateNativeVisitor();
+
+            // Call FFI conversion with visitor
+            fixed (byte* htmlPtr = html)
+            {
+                resultPtr = NativeMethods.html_to_markdown_convert_bytes_with_visitor(
+                    (IntPtr)htmlPtr,
+                    (nuint)html.Length,
+                    nativeVisitorHandle,
+                    out resultLen);
+            }
+
+            if (resultPtr == IntPtr.Zero)
+            {
+                IntPtr errorPtr = NativeMethods.html_to_markdown_last_error();
+                string? errorMsg = errorPtr != IntPtr.Zero
+                    ? PtrToStringUtf8(errorPtr)
+                    : null;
+
+                throw new HtmlToMarkdownException(
+                    errorMsg ?? "HTML to Markdown conversion with visitor failed");
+            }
+
+            return PtrToStringUtf8(resultPtr, resultLen) ?? string.Empty;
+        }
+        finally
+        {
+            if (resultPtr != IntPtr.Zero)
+            {
+                NativeMethods.html_to_markdown_free_string(resultPtr);
+            }
+
+            bridge.Dispose();
         }
     }
 

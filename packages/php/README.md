@@ -801,6 +801,282 @@ The test runner compiles the Rust extension into `target/release` and loads it
 when executing PHPUnit. Tests cover conversion parity, option parsing, warning
 handling, and inline image extraction.
 
+## Visitor Pattern
+
+The visitor pattern enables advanced customization of HTML-to-Markdown conversion by intercepting and modifying how specific HTML elements are processed. This is useful for:
+
+- **Content filtering**: Remove ads, scripts, or unwanted elements
+- **Custom transformations**: Apply domain-specific formatting rules
+- **Analytics & reporting**: Gather statistics about content structure
+- **Content validation**: Enforce specific conversion patterns
+
+### Overview
+
+A visitor object implements the `HtmlVisitor` interface and receives callbacks for each HTML element as it's traversed during conversion. Each callback can:
+- Return `VisitResult::continue()` to use default markdown conversion
+- Return `VisitResult::skip()` to exclude the element
+- Return `VisitResult::preserveHtml()` to keep the element as raw HTML
+- Return `VisitResult::custom($markdown)` to provide custom output
+- Return `VisitResult::error($message)` to stop conversion
+
+### Visitor Interface
+
+The `HtmlVisitor` interface defines 41 visitor methods covering all HTML element types:
+
+**Structural Elements:**
+- `visitElementStart(NodeContext $ctx): array` – Opening tag encountered
+- `visitElementEnd(NodeContext $ctx, string $output): array` – Closing tag with generated output
+
+**Text & Content:**
+- `visitText(NodeContext $ctx, string $text): array` – Text nodes
+- `visitLink(NodeContext $ctx, string $href, string $text, ?string $title): array` – Hyperlinks
+- `visitImage(NodeContext $ctx, string $src, string $alt, ?string $title): array` – Images
+
+**Headings & Formatting:**
+- `visitHeading(NodeContext $ctx, int $level, string $text, ?string $id): array` – h1-h6 elements
+- `visitStrong(NodeContext $ctx, string $text): array` – Bold text
+- `visitEmphasis(NodeContext $ctx, string $text): array` – Italic text
+- `visitStrikethrough(NodeContext $ctx, string $text): array` – Strike-through
+- `visitUnderline(NodeContext $ctx, string $text): array` – Underlined text
+- `visitSubscript(NodeContext $ctx, string $text): array` – Subscripts
+- `visitSuperscript(NodeContext $ctx, string $text): array` – Superscripts
+- `visitMark(NodeContext $ctx, string $text): array` – Highlighted text
+
+**Code & Verbatim:**
+- `visitCodeBlock(NodeContext $ctx, ?string $lang, string $code): array` – Code blocks
+- `visitCodeInline(NodeContext $ctx, string $code): array` – Inline code
+
+**Lists & Tables:**
+- `visitListStart(NodeContext $ctx, bool $ordered): array` – List opening
+- `visitListItem(NodeContext $ctx, bool $ordered, string $marker, string $text): array` – List item
+- `visitListEnd(NodeContext $ctx, bool $ordered, string $output): array` – List closing
+- `visitTableStart(NodeContext $ctx): array` – Table opening
+- `visitTableRow(NodeContext $ctx, array $cells, bool $isHeader): array` – Table row
+- `visitTableEnd(NodeContext $ctx, string $output): array` – Table closing
+
+**Semantic Elements:**
+- `visitBlockquote(NodeContext $ctx, string $content, int $depth): array` – Block quotes
+- `visitHorizontalRule(NodeContext $ctx): array` – Horizontal rules
+- `visitLineBreak(NodeContext $ctx): array` – Line breaks
+
+**Definition Lists:**
+- `visitDefinitionListStart(NodeContext $ctx): array` – Definition list opening
+- `visitDefinitionTerm(NodeContext $ctx, string $text): array` – Definition term
+- `visitDefinitionDescription(NodeContext $ctx, string $text): array` – Definition description
+- `visitDefinitionListEnd(NodeContext $ctx, string $output): array` – Definition list closing
+
+**Forms & Interactive:**
+- `visitForm(NodeContext $ctx, ?string $action, ?string $method): array` – Form elements
+- `visitInput(NodeContext $ctx, string $inputType, ?string $name, ?string $value): array` – Input fields
+- `visitButton(NodeContext $ctx, string $text): array` – Buttons
+
+**Media & Embedding:**
+- `visitAudio(NodeContext $ctx, ?string $src): array` – Audio elements
+- `visitVideo(NodeContext $ctx, ?string $src): array` – Video elements
+- `visitIframe(NodeContext $ctx, ?string $src): array` – Embedded iframes
+
+**Details & Summary:**
+- `visitDetails(NodeContext $ctx, bool $open): array` – Disclosure triangles
+- `visitSummary(NodeContext $ctx, string $text): array` – Summary text
+
+**Figures & Captions:**
+- `visitFigureStart(NodeContext $ctx): array` – Figure opening
+- `visitFigcaption(NodeContext $ctx, string $text): array` – Figure caption
+- `visitFigureEnd(NodeContext $ctx, string $output): array` – Figure closing
+
+**Custom Elements:**
+- `visitCustomElement(NodeContext $ctx, string $tagName, string $html): array` – Unknown/custom elements
+
+### NodeContext
+
+Every visitor method receives a `NodeContext` object providing information about the current element:
+
+```php
+<?php
+
+use HtmlToMarkdown\Visitor\NodeContext;
+
+// NodeContext properties:
+$context->nodeType;        // "element", "text", etc.
+$context->tagName;         // "div", "a", "img", etc.
+$context->attributes;      // array<string, string> HTML attributes
+$context->depth;           // int – nesting depth
+$context->indexInParent;   // int – position among siblings
+$context->parentTag;       // ?string – parent element tag name
+$context->isInline;        // bool – whether element is inline
+```
+
+### AbstractVisitor
+
+For convenience, extend `AbstractVisitor` to override only the methods you need:
+
+```php
+<?php
+
+use HtmlToMarkdown\Visitor\AbstractVisitor;
+use HtmlToMarkdown\Visitor\NodeContext;
+use HtmlToMarkdown\Visitor\VisitResult;
+
+class MyVisitor extends AbstractVisitor
+{
+    public function visitImage(NodeContext $context, string $src, string $alt, ?string $title): array
+    {
+        // Skip all images
+        return VisitResult::skip();
+    }
+
+    public function visitLink(NodeContext $context, string $href, string $text, ?string $title): array
+    {
+        // Use custom markdown format
+        return VisitResult::custom("[{$text}]({$href})");
+    }
+}
+```
+
+All other methods inherit `AbstractVisitor`'s default `return VisitResult::continue()` implementation.
+
+### Example: Content Filtering
+
+Filter out ads and images from HTML:
+
+```php
+<?php
+
+use HtmlToMarkdown\Visitor\AbstractVisitor;
+use HtmlToMarkdown\Visitor\NodeContext;
+use HtmlToMarkdown\Visitor\VisitResult;
+use HtmlToMarkdown\HtmlToMarkdown;
+
+class ContentFilter extends AbstractVisitor
+{
+    public function visitImage(NodeContext $context, string $src, string $alt, ?string $title): array
+    {
+        return VisitResult::skip();  // Remove all images
+    }
+
+    public function visitElementStart(NodeContext $context): array
+    {
+        // Skip elements with "ad-" class prefix
+        $classes = $context->attributes['class'] ?? '';
+        if (str_contains($classes, 'ad-')) {
+            return VisitResult::skip();
+        }
+        return VisitResult::continue();
+    }
+}
+
+$html = '<p>Content</p><img src="pic.png"><div class="ad-sidebar">Ad</div>';
+$filter = new ContentFilter();
+$markdown = HtmlToMarkdown::convertWithVisitor($html, null, $filter);
+// Images and ad divs are removed
+```
+
+### Example: Analytics & Statistics
+
+Gather content statistics during conversion:
+
+```php
+<?php
+
+use HtmlToMarkdown\Visitor\AbstractVisitor;
+use HtmlToMarkdown\Visitor\NodeContext;
+use HtmlToMarkdown\Visitor\VisitResult;
+use HtmlToMarkdown\HtmlToMarkdown;
+
+class Analytics extends AbstractVisitor
+{
+    public int $linkCount = 0;
+    public array $links = [];
+
+    public function visitLink(NodeContext $ctx, string $href, string $text, ?string $title): array
+    {
+        $this->linkCount++;
+        $this->links[] = ['href' => $href, 'text' => $text];
+        return VisitResult::continue();
+    }
+}
+
+$html = '<a href="/page1">Link 1</a><a href="/page2">Link 2</a>';
+$analytics = new Analytics();
+$markdown = HtmlToMarkdown::convertWithVisitor($html, null, $analytics);
+
+echo "Found " . $analytics->linkCount . " links\n";  // Found 2 links
+foreach ($analytics->links as $link) {
+    echo $link['href'] . ": " . $link['text'] . "\n";
+}
+// /page1: Link 1
+// /page2: Link 2
+```
+
+### Example: Custom Transformations
+
+Apply domain-specific conversion rules:
+
+```php
+<?php
+
+use HtmlToMarkdown\Visitor\AbstractVisitor;
+use HtmlToMarkdown\Visitor\NodeContext;
+use HtmlToMarkdown\Visitor\VisitResult;
+use HtmlToMarkdown\HtmlToMarkdown;
+
+class DocsFormatter extends AbstractVisitor
+{
+    public function visitHeading(NodeContext $ctx, int $level, string $text, ?string $id): array
+    {
+        // Add anchor links to headings
+        if ($id) {
+            return VisitResult::custom(str_repeat('#', $level) . " {$text} {#$id}");
+        }
+        return VisitResult::continue();
+    }
+
+    public function visitCodeBlock(NodeContext $ctx, ?string $lang, string $code): array
+    {
+        // Always fence code blocks, even if not hinted
+        $lang = $lang ?? 'plaintext';
+        return VisitResult::custom("```{$lang}\n{$code}\n```");
+    }
+}
+
+$html = '<h1 id="intro">Introduction</h1><code>example</code>';
+$formatter = new DocsFormatter();
+$markdown = HtmlToMarkdown::convertWithVisitor($html, null, $formatter);
+```
+
+### Usage
+
+Convert HTML with a visitor:
+
+```php
+<?php
+
+use HtmlToMarkdown\HtmlToMarkdown;
+use HtmlToMarkdown\Config\ConversionOptions;
+
+// Functional API
+$markdown = HtmlToMarkdown::convertWithVisitor(
+    $html,
+    new ConversionOptions(),
+    $visitor
+);
+
+// Object-oriented API
+use HtmlToMarkdown\Service\Converter;
+
+$converter = Converter::create();
+$markdown = $converter->convertWithVisitor($html, $options, $visitor);
+```
+
+### Performance Tips
+
+- **Lazy initialization**: Only process data if needed (e.g., check class attributes before extracting analytics)
+- **Early returns**: Return `skip()` as soon as you determine an element should be filtered
+- **Stateless visitors**: Keep visitor state minimal to avoid memory overhead on large documents
+- **Visitor composition**: Chain multiple small visitors instead of one large one
+
+See `examples/visitor_*.php` for complete examples demonstrating filtering, analytics, and custom transformations.
+
 ## Troubleshooting
 
 - **Extension not found**: build with `cargo build -p html-to-markdown-php --release`

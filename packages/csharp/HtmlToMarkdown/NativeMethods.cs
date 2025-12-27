@@ -120,4 +120,49 @@ internal static class NativeMethods
     /// </summary>
     [DllImport(LibraryName, CallingConvention = CallingConvention.Cdecl)]
     internal static extern bool html_to_markdown_profile_stop();
+
+    // === Visitor Pattern API ===
+
+    /// <summary>
+    /// Create a visitor instance from a visitor callbacks structure.
+    /// </summary>
+    /// <param name="visitor">Pointer to visitor callbacks structure</param>
+    /// <returns>Opaque visitor handle, or IntPtr.Zero on error</returns>
+    [DllImport(LibraryName, CallingConvention = CallingConvention.Cdecl)]
+    internal static extern IntPtr html_to_markdown_visitor_create(IntPtr visitor);
+
+    /// <summary>
+    /// Free a visitor instance.
+    /// </summary>
+    /// <param name="visitor">Opaque visitor handle from html_to_markdown_visitor_create</param>
+    [DllImport(LibraryName, CallingConvention = CallingConvention.Cdecl)]
+    internal static extern void html_to_markdown_visitor_free(IntPtr visitor);
+
+    /// <summary>
+    /// Convert HTML using a visitor pattern.
+    /// </summary>
+    /// <param name="html">Null-terminated HTML string</param>
+    /// <param name="visitor">Opaque visitor handle</param>
+    /// <param name="len_out">Output length of markdown bytes (excluding null terminator)</param>
+    /// <returns>Pointer to null-terminated Markdown string, or NULL on error</returns>
+    [DllImport(LibraryName, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi)]
+    internal static extern IntPtr html_to_markdown_convert_with_visitor(
+        IntPtr html,
+        IntPtr visitor,
+        out nuint len_out);
+
+    /// <summary>
+    /// Convert UTF-8 HTML bytes using a visitor pattern.
+    /// </summary>
+    /// <param name="html">Pointer to UTF-8 bytes</param>
+    /// <param name="html_len">Length of UTF-8 bytes</param>
+    /// <param name="visitor">Opaque visitor handle</param>
+    /// <param name="len_out">Output length of markdown bytes (excluding null terminator)</param>
+    /// <returns>Pointer to null-terminated Markdown string, or NULL on error</returns>
+    [DllImport(LibraryName, CallingConvention = CallingConvention.Cdecl)]
+    internal static extern IntPtr html_to_markdown_convert_bytes_with_visitor(
+        IntPtr html,
+        nuint html_len,
+        IntPtr visitor,
+        out nuint len_out);
 }

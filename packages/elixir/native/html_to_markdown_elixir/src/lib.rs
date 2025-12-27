@@ -14,6 +14,8 @@ use html_to_markdown_rs::{
     convert as convert_inner, convert_with_inline_images as convert_with_inline_images_inner,
 };
 mod profiling;
+mod visitor;
+
 use rustler::types::binary::{Binary, OwnedBinary};
 use rustler::{Encoder, Env, Error, NifMap, NifResult, ResourceArc, Term};
 use std::path::PathBuf;
@@ -107,7 +109,8 @@ rustler::init!(
         convert_with_inline_images,
         convert_with_metadata,
         start_profiling,
-        stop_profiling
+        stop_profiling,
+        convert_with_visitor
     ],
     load = on_load
 );
@@ -189,6 +192,30 @@ fn start_profiling<'a>(env: Env<'a>, output: String, frequency: Option<i32>) -> 
 fn stop_profiling<'a>(env: Env<'a>) -> NifResult<Term<'a>> {
     match profiling::stop() {
         Ok(()) => Ok(atoms::ok().encode(env)),
+        Err(err) => Ok((atoms::error(), err.to_string()).encode(env)),
+    }
+}
+
+#[rustler::nif(schedule = "DirtyCpu")]
+fn convert_with_visitor<'a>(
+    env: Env<'a>,
+    html: String,
+    options_term: Term<'a>,
+    visitor_pid: Term<'a>,
+) -> NifResult<Term<'a>> {
+    // Try to decode as a resource handle (reference) first
+    let options = if let Ok(handle) = options_term.decode::<ResourceArc<OptionsHandleResource>>() {
+        handle.0.clone()
+    } else {
+        // Fall back to decoding as options map
+        match decode_options_term(options_term) {
+            Ok(options) => options,
+            Err(err) => return handle_invalid_option_error(env, err),
+        }
+    };
+
+    match visitor::convert_with_visitor(&html, options, env, visitor_pid) {
+        Ok(markdown) => Ok((atoms::ok(), markdown).encode(env)),
         Err(err) => Ok((atoms::error(), err.to_string()).encode(env)),
     }
 }

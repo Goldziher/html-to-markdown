@@ -11,6 +11,7 @@ use HtmlToMarkdown\Contract\ExtensionBridge as ExtensionBridgeContract;
 use HtmlToMarkdown\Internal\TypeAssertions;
 use HtmlToMarkdown\Value\ExtendedMetadata;
 use HtmlToMarkdown\Value\InlineImageExtraction;
+use HtmlToMarkdown\Visitor\HtmlVisitor;
 
 /**
  * @phpstan-import-type ConversionOptionsInput from \HtmlToMarkdown\Config\ConversionOptions
@@ -82,6 +83,27 @@ final class Converter
             'markdown' => $markdown,
             'metadata' => ExtendedMetadata::fromExtensionPayload($metadataPayload),
         ];
+    }
+
+    /**
+     * Convert HTML with a custom visitor for advanced control.
+     *
+     * The visitor object should implement HtmlVisitor interface or have
+     * methods matching the visitor callback signatures.
+     *
+     * @param ConversionOptions|ConversionOptionsInput|null $options
+     * @phpstan-param ConversionOptions|array<string, mixed>|null $options
+     */
+    public function convertWithVisitor(
+        string $html,
+        ConversionOptions|array|null $options = null,
+        ?HtmlVisitor $visitor = null,
+    ): string {
+        return $this->bridge->convertWithVisitor(
+            $html,
+            $this->normalizeOptions($options),
+            $visitor,
+        );
     }
 
     /**

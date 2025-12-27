@@ -15,6 +15,8 @@ use html_to_markdown_rs::metadata::{
 };
 use html_to_markdown_rs::safety::guard_panic;
 mod profiling;
+#[cfg(feature = "visitor")]
+mod visitor_support;
 use html_to_markdown_rs::{
     CodeBlockStyle, ConversionError, ConversionOptions, ConversionOptionsUpdate, DEFAULT_INLINE_IMAGE_LIMIT,
     HeadingStyle, HighlightStyle, HtmlExtraction, InlineImage, InlineImageConfig, InlineImageConfigUpdate,
@@ -106,30 +108,45 @@ pub fn convert_html_with_metadata(
     build_metadata_extraction(result.0, result.1)
 }
 
+#[cfg(feature = "visitor")]
+#[php_function]
+#[php(name = "html_to_markdown_convert_with_visitor")]
+pub fn convert_html_with_visitor(html: String, options: Option<&ZendHashTable>, visitor: &Zval) -> PhpResult<String> {
+    use visitor_support::PhpVisitorBridge;
+
+    let rust_options = match options {
+        Some(table) => Some(parse_conversion_options(table)?),
+        None => None,
+    };
+
+    let bridge = PhpVisitorBridge::new(visitor.clone());
+    let visitor_rc = std::rc::Rc::new(std::cell::RefCell::new(bridge));
+
+    guard_panic(|| html_to_markdown_rs::convert_html_with_visitor(&html, rust_options, Some(visitor_rc)))
+        .map_err(to_php_exception)
+}
+
 #[php_module]
 pub fn module(module: ModuleBuilder) -> ModuleBuilder {
-    #[cfg(not(feature = "metadata"))]
-    {
-        module
-            .name("html_to_markdown")
-            .version(env!("CARGO_PKG_VERSION"))
-            .function(wrap_function!(convert_html))
-            .function(wrap_function!(convert_html_with_inline_images))
-            .function(wrap_function!(profile_start))
-            .function(wrap_function!(profile_stop))
-    }
+    let mut builder = module
+        .name("html_to_markdown")
+        .version(env!("CARGO_PKG_VERSION"))
+        .function(wrap_function!(convert_html))
+        .function(wrap_function!(convert_html_with_inline_images))
+        .function(wrap_function!(profile_start))
+        .function(wrap_function!(profile_stop));
 
     #[cfg(feature = "metadata")]
     {
-        module
-            .name("html_to_markdown")
-            .version(env!("CARGO_PKG_VERSION"))
-            .function(wrap_function!(convert_html))
-            .function(wrap_function!(convert_html_with_inline_images))
-            .function(wrap_function!(convert_html_with_metadata))
-            .function(wrap_function!(profile_start))
-            .function(wrap_function!(profile_stop))
+        builder = builder.function(wrap_function!(convert_html_with_metadata));
     }
+
+    #[cfg(feature = "visitor")]
+    {
+        builder = builder.function(wrap_function!(convert_html_with_visitor));
+    }
+
+    builder
 }
 
 fn parse_conversion_options(table: &ZendHashTable) -> PhpResult<ConversionOptions> {
