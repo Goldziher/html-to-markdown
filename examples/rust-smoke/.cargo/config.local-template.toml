@@ -1,2 +1,0 @@
-[patch.crates-io]
-html-to-markdown-rs = { path = "../../crates/html-to-markdown" }

@@ -88,6 +88,22 @@ lint.ignore = [
   "TD",       # Allow todo and fixme comments
   "TRY",
 ]
+lint.per-file-ignores."examples/**/*.py" = [
+  "ANN",
+  "ARG",
+  "B007",
+  "C901",
+  "D",       # Allow missing docstrings in examples
+  "INP001",
+  "PERF401",
+  "PLC0415",
+  "PLR0912",
+  "PLR0915",
+  "PLW2901", # Allow loop variable reassignment
+  "PTH123",
+  "S",
+  "T201",
+]
 lint.per-file-ignores."packages/python/tests/**/*.*" = [ "ARG", "D", "PD", "PT006", "PT013", "S" ]
 lint.per-file-ignores."packages/python/tests/benchmark_*_test.py" = [ "T201" ]
 lint.per-file-ignores."scripts/*.py" = [ "INP001", "S607", "T201" ]

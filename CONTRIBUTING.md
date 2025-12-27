@@ -231,7 +231,7 @@ cargo build --release --package html-to-markdown-cli
 
 ### CI Workflows
 
-- **ci-*.yaml**: Kreuzberg-style, path-filtered workflows (rust, python, node, wasm, ruby, php, go, java, elixir, smoke, validate)
+- **ci-*.yaml**: Kreuzberg-style, path-filtered workflows (rust, python, node, wasm, ruby, php, go, java, elixir, validate)
 - **test-wheels.yaml**: Builds and tests wheels (manual or on Rust/config changes)
 - All workflows must pass before merging
 

@@ -140,7 +140,7 @@ rules:
       - TypeScript binding: packages/typescript/tests → 80%+ coverage (vitest)
       - Ruby binding: packages/ruby/spec → 80%+ coverage (rspec)
       - PHP binding: packages/php/tests → 80%+ coverage (phpunit)
-  - Go FFI: packages/go/v2/htmltomarkdown (black-box tests with cgo bindings)
+      - Go FFI: packages/go/v2/htmltomarkdown (black-box tests with cgo bindings)
       - Java FFI: packages/java (JNI tests with cargo build -p html-to-markdown-ffi)
       - C#/.NET: packages/csharp (P/Invoke tests with html-to-markdown-ffi)
       - Fixture-driven: JSON/YAML fixtures in examples/fixtures/ with schemas
@@ -153,7 +153,7 @@ rules:
     content: |
       **GitHub Actions · Multi-platform · Coverage enforcement**
 
-      - CI split by domain (Kreuzberg pattern): ci-rust, ci-python, ci-node, ci-wasm, ci-ruby, ci-php, ci-go, ci-java, ci-elixir, ci-smoke, ci-validate
+      - CI split by domain (Kreuzberg pattern): ci-rust, ci-python, ci-node, ci-wasm, ci-ruby, ci-php, ci-go, ci-java, ci-elixir, ci-validate
       - Linting & formatting: ruff, clippy, rubocop, biome, phpstan, golangci-lint
       - Test matrix: Python (3.10, 3.12, 3.14-dev), PHP (8.2+), Rust (stable 1.75+)
       - OS matrix: Linux (amd64, arm64), macOS, Windows (where applicable)
@@ -261,9 +261,9 @@ sections:
       │
       ├── examples/
       │   ├── fixtures/                   # HTML test fixtures (JSON/YAML)
-      │   ├── node-smoke/                 # Node.js smoke tests
-      │   ├── ruby-smoke/                 # Ruby smoke tests
-      │   └── go-smoke/                   # Go smoke tests
+      │   ├── visitor-pattern/            # Visitor pattern guide + examples
+      │   ├── metadata-extraction/        # Metadata extraction guide + examples
+      │   └── performance/                # Performance guide + benchmarks
       │
       ├── tools/
       │   ├── benchmark-harness/          # Rust + binding benchmark harness
@@ -285,7 +285,6 @@ sections:
       │   ├── ci-go.yaml                  # Go linting (golangci-lint)
       │   ├── ci-java.yaml                # Java Panama bindings
       │   ├── ci-elixir.yaml              # Elixir bindings
-      │   ├── ci-smoke.yaml               # README install smokes
       │   └── ci-validate.yaml            # Lint/format/prek validation
       │   └── test-wheels.yaml            # Python wheel testing
       │

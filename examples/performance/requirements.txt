@@ -1,0 +1,7 @@
+# Performance Examples for html-to-markdown
+
+# Core library
+html-to-markdown>=2.0.0
+
+# Optional: Memory profiling (for advanced memory analysis)
+memory-profiler>=0.61.0

@@ -21,55 +21,32 @@ High-performance HTML to Markdown converter with a clean Python API (powered by 
 pip install html-to-markdown
 ```
 
+Requires Python 3.10+. Wheels are published for Linux, macOS, and Windows on PyPI.
+
 ## Performance Snapshot
 
 Apple M4 • Real Wikipedia documents • `convert()` (Python)
 
-| Document            | Size  | Latency | Throughput | Docs/sec |
-| ------------------- | ----- | ------- | ---------- | -------- |
-| Lists (Timeline)    | 129KB | 0.62ms  | 208 MB/s   | 1,613    |
-| Tables (Countries)  | 360KB | 2.02ms  | 178 MB/s   | 495      |
-| Mixed (Python wiki) | 656KB | 4.56ms  | 144 MB/s   | 219      |
+| Document            | Size  | Latency | Throughput |
+| ------------------- | ----- | ------- | ---------- |
+| Lists (Timeline)    | 129KB | 0.62ms  | 208 MB/s   |
+| Tables (Countries)  | 360KB | 2.02ms  | 178 MB/s   |
+| Mixed (Python wiki) | 656KB | 4.56ms  | 144 MB/s   |
 
-> V1 averaged ~2.5 MB/s (Python/BeautifulSoup). V2's Rust engine delivers 60–80× higher throughput.
-
-### Benchmark Fixtures (Apple M4)
-
-Pulled directly from `tools/benchmark-harness` (`task bench:harness`) so they stay in lockstep with the Rust core:
-
-| Document               | Size   | ops/sec (Python) |
-| ---------------------- | ------ | ---------------- |
-| Lists (Timeline)       | 129 KB | 3,266            |
-| Tables (Countries)     | 360 KB | 935              |
-| Medium (Python)        | 657 KB | 472              |
-| Large (Rust)           | 567 KB | 543              |
-| Small (Intro)          | 463 KB | 634              |
-| hOCR German PDF        | 44 KB  | 7,645            |
-| hOCR Invoice           | 4 KB   | 83,330           |
-| hOCR Embedded Tables   | 37 KB  | 8,177            |
-
-> Re-run locally with `cargo run --release --manifest-path tools/benchmark-harness/Cargo.toml -- run --frameworks python --output tools/benchmark-harness/results` to compare against CI history.
+See [Performance Guide](../../examples/performance/) for detailed benchmarks.
 
 ## Quick Start
+
+Basic conversion:
 
 ```python
 from html_to_markdown import convert
 
-html = """
-<h1>Welcome</h1>
-<p>This is <strong>fast</strong> Rust-powered conversion!</p>
-<ul>
-    <li>Blazing fast</li>
-    <li>Type safe</li>
-    <li>Easy to use</li>
-</ul>
-"""
-
+html = "<h1>Hello</h1><p>This is <strong>fast</strong>!</p>"
 markdown = convert(html)
-print(markdown)
 ```
 
-## Configuration (v2 API)
+With conversion options:
 
 ```python
 from html_to_markdown import ConversionOptions, convert
@@ -77,946 +54,109 @@ from html_to_markdown import ConversionOptions, convert
 options = ConversionOptions(
     heading_style="atx",
     list_indent_width=2,
-    bullets="*+-",
 )
-options.escape_asterisks = True
-options.code_language = "python"
-options.extract_metadata = True
-
 markdown = convert(html, options)
 ```
 
-### Reusing Parsed Options
+With async support:
 
-Avoid re-parsing the same option dictionaries inside hot loops by building a reusable handle:
-
-```python
-from html_to_markdown import ConversionOptions, convert_with_handle, create_options_handle
-
-handle = create_options_handle(ConversionOptions(hocr_spatial_tables=False))
-
-for html in documents:
-    markdown = convert_with_handle(html, handle)
-```
-
-### HTML Preprocessing
-
-```python
-from html_to_markdown import ConversionOptions, PreprocessingOptions, convert
-
-options = ConversionOptions(
-    ...
-)
-
-preprocessing = PreprocessingOptions(
-    enabled=True,
-    preset="aggressive",
-)
-
-markdown = convert(scraped_html, options, preprocessing)
-```
-
-### Inline Image Extraction
-
-```python
-from html_to_markdown import InlineImageConfig, convert_with_inline_images
-
-markdown, inline_images, warnings = convert_with_inline_images(
-    '<p><img src="data:image/png;base64,...==" alt="Pixel" width="1" height="1"></p>',
-    image_config=InlineImageConfig(max_decoded_size_bytes=1024, infer_dimensions=True),
-)
-
-if inline_images:
-    first = inline_images[0]
-    print(first["format"], first["dimensions"], first["attributes"])  # e.g. "png", (1, 1), {"width": "1"}
-```
-
-Each inline image is returned as a typed dictionary (`bytes` payload, metadata, and relevant HTML attributes). Warnings are human-readable skip reasons.
-
-### Metadata Extraction
-
-Extract comprehensive metadata (title, description, headers, links, images, structured data) during conversion in a single pass.
-
-#### Basic Usage
-
-```python
-from html_to_markdown import convert_with_metadata
-
-html = """
-<html>
-  <head>
-    <title>Example Article</title>
-    <meta name="description" content="Demo page">
-    <link rel="canonical" href="https://example.com/article">
-  </head>
-  <body>
-    <h1 id="welcome">Welcome</h1>
-    <a href="https://example.com" rel="nofollow external">Example link</a>
-    <img src="https://example.com/image.jpg" alt="Hero" width="640" height="480">
-  </body>
-</html>
-"""
-
-markdown, metadata = convert_with_metadata(html)
-
-print(markdown)
-print(metadata["document"]["title"])       # "Example Article"
-print(metadata["headers"][0]["text"])      # "Welcome"
-print(metadata["links"][0]["href"])        # "https://example.com"
-print(metadata["images"][0]["dimensions"]) # (640, 480)
-```
-
-#### Configuration
-
-Control which metadata types are extracted using `MetadataConfig`:
-
-```python
-from html_to_markdown import ConversionOptions, MetadataConfig, convert_with_metadata
-
-options = ConversionOptions(heading_style="atx")
-config = MetadataConfig(
-    extract_headers=True,           # h1-h6 elements (default: True)
-    extract_links=True,             # <a> hyperlinks (default: True)
-    extract_images=True,            # <img> elements (default: True)
-    extract_structured_data=True,   # JSON-LD, Microdata, RDFa (default: True)
-    max_structured_data_size=1_000_000,  # Max bytes for structured data (default: 100KB)
-)
-
-markdown, metadata = convert_with_metadata(html, options, config)
-```
-
-#### Metadata Structure
-
-The `metadata` dictionary contains five categories:
-
-```python
-metadata = {
-    "document": {                    # Document-level metadata from <head>
-        "title": str | None,
-        "description": str | None,
-        "keywords": list[str],       # Comma-separated keywords from meta tags
-        "author": str | None,
-        "canonical_url": str | None, # link[rel="canonical"] href
-        "base_href": str | None,
-        "language": str | None,      # lang attribute (e.g., "en")
-        "text_direction": str | None, # "ltr", "rtl", or "auto"
-        "open_graph": dict[str, str], # og:* meta properties
-        "twitter_card": dict[str, str], # twitter:* meta properties
-        "meta_tags": dict[str, str],  # Other meta tag properties
-    },
-    "headers": [                     # h1-h6 elements with hierarchy
-        {
-            "level": int,            # 1-6
-            "text": str,             # Normalized text content
-            "id": str | None,        # HTML id attribute
-            "depth": int,            # Nesting depth in document tree
-            "html_offset": int,      # Byte offset in original HTML
-        },
-        # ... more headers
-    ],
-    "links": [                       # Extracted <a> elements
-        {
-            "href": str,
-            "text": str,
-            "title": str | None,
-            "link_type": str,        # "anchor" | "internal" | "external" | "email" | "phone" | "other"
-            "rel": list[str],        # rel attribute values
-            "attributes": dict[str, str],  # Other HTML attributes
-        },
-        # ... more links
-    ],
-    "images": [                      # Extracted <img> elements
-        {
-            "src": str,              # Image source (URL or data URI)
-            "alt": str | None,
-            "title": str | None,
-            "dimensions": tuple[int, int] | None,  # (width, height)
-            "image_type": str,       # "data_uri" | "inline_svg" | "external" | "relative"
-            "attributes": dict[str, str],
-        },
-        # ... more images
-    ],
-    "structured_data": [             # JSON-LD, Microdata, RDFa blocks
-        {
-            "data_type": str,        # "json_ld" | "microdata" | "rdfa"
-            "raw_json": str,         # JSON string representation
-            "schema_type": str | None,  # Detected schema type (e.g., "Article")
-        },
-        # ... more structured data
-    ],
-}
-```
-
-#### Real-World Use Cases
-
-**Extract Article Metadata for SEO**
-
-```python
-from html_to_markdown import convert_with_metadata
-
-def extract_article_metadata(html: str) -> dict:
-    markdown, metadata = convert_with_metadata(html)
-    doc = metadata["document"]
-
-    return {
-        "title": doc.get("title"),
-        "description": doc.get("description"),
-        "keywords": doc.get("keywords", []),
-        "author": doc.get("author"),
-        "canonical_url": doc.get("canonical_url"),
-        "language": doc.get("language"),
-        "open_graph": doc.get("open_graph", {}),
-        "twitter_card": doc.get("twitter_card", {}),
-        "markdown": markdown,
-    }
-
-# Usage
-seo_data = extract_article_metadata(html)
-print(f"Title: {seo_data['title']}")
-print(f"Language: {seo_data['language']}")
-print(f"OG Image: {seo_data['open_graph'].get('image')}")
-```
-
-**Build Table of Contents**
-
-```python
-from html_to_markdown import convert_with_metadata
-
-def build_table_of_contents(html: str) -> list[dict]:
-    """Generate a nested TOC from header structure."""
-    markdown, metadata = convert_with_metadata(html)
-    headers = metadata["headers"]
-
-    toc = []
-    for header in headers:
-        toc.append({
-            "level": header["level"],
-            "text": header["text"],
-            "anchor": header.get("id") or header["text"].lower().replace(" ", "-"),
-        })
-    return toc
-
-# Usage
-toc = build_table_of_contents(html)
-for item in toc:
-    indent = "  " * (item["level"] - 1)
-    print(f"{indent}- [{item['text']}](#{item['anchor']})")
-```
-
-**Validate Links and Accessibility**
-
-```python
-from html_to_markdown import convert_with_metadata
-
-def check_accessibility(html: str) -> dict:
-    """Find common accessibility and SEO issues."""
-    markdown, metadata = convert_with_metadata(html)
-
-    return {
-        "images_without_alt": [
-            img for img in metadata["images"]
-            if not img.get("alt")
-        ],
-        "links_without_text": [
-            link for link in metadata["links"]
-            if not link.get("text", "").strip()
-        ],
-        "external_links_count": len([
-            link for link in metadata["links"]
-            if link["link_type"] == "external"
-        ]),
-        "broken_anchors": [
-            link for link in metadata["links"]
-            if link["link_type"] == "anchor"
-        ],
-    }
-
-# Usage
-issues = check_accessibility(html)
-if issues["images_without_alt"]:
-    print(f"Found {len(issues['images_without_alt'])} images without alt text")
-```
-
-**Extract Structured Data (JSON-LD, Microdata)**
-
-```python
-from html_to_markdown import convert_with_metadata
-import json
-
-def extract_json_ld_schemas(html: str) -> list[dict]:
-    """Extract all JSON-LD structured data blocks."""
-    markdown, metadata = convert_with_metadata(html)
-
-    schemas = []
-    for block in metadata["structured_data"]:
-        if block["data_type"] == "json_ld":
-            try:
-                schema = json.loads(block["raw_json"])
-                schemas.append({
-                    "type": block.get("schema_type"),
-                    "data": schema,
-                })
-            except json.JSONDecodeError:
-                continue
-    return schemas
-
-# Usage
-schemas = extract_json_ld_schemas(html)
-for schema in schemas:
-    print(f"Found {schema['type']} schema:")
-    print(json.dumps(schema["data"], indent=2))
-```
-
-**Migrate Content with Preservation of Links and Images**
-
-```python
-from html_to_markdown import convert_with_metadata
-
-def migrate_with_manifest(html: str, base_url: str) -> tuple[str, dict]:
-    """Convert to Markdown while capturing all external references."""
-    markdown, metadata = convert_with_metadata(html)
-
-    manifest = {
-        "title": metadata["document"].get("title"),
-        "external_links": [
-            {"url": link["href"], "text": link["text"]}
-            for link in metadata["links"]
-            if link["link_type"] == "external"
-        ],
-        "external_images": [
-            {"url": img["src"], "alt": img.get("alt")}
-            for img in metadata["images"]
-            if img["image_type"] == "external"
-        ],
-    }
-    return markdown, manifest
-
-# Usage
-md, manifest = migrate_with_manifest(html, "https://example.com")
-print(f"Converted: {manifest['title']}")
-print(f"External resources: {len(manifest['external_links'])} links, {len(manifest['external_images'])} images")
-```
-
-#### Feature Detection
-
-Check if metadata extraction is available at runtime:
-
-```python
-from html_to_markdown import convert_with_metadata, convert
-
-try:
-    # Try to use metadata extraction
-    markdown, metadata = convert_with_metadata(html)
-    print(f"Metadata available: {metadata['document'].get('title')}")
-except (NameError, TypeError):
-    # Fallback for builds without metadata feature
-    markdown = convert(html)
-    print("Metadata feature not available, using basic conversion")
-```
-
-#### Error Handling
-
-Metadata extraction is designed to be robust:
-
-```python
-from html_to_markdown import convert_with_metadata, MetadataConfig
-
-# Handle large structured data safely
-config = MetadataConfig(
-    extract_structured_data=True,
-    max_structured_data_size=500_000,  # 500KB limit
-)
-
-try:
-    markdown, metadata = convert_with_metadata(html, metadata_config=config)
-
-    # Safe access with defaults
-    title = metadata["document"].get("title", "Untitled")
-    headers = metadata["headers"] or []
-    images = metadata["images"] or []
-
-except Exception as e:
-    # Handle parsing errors gracefully
-    print(f"Extraction error: {e}")
-    # Fallback to basic conversion
-    from html_to_markdown import convert
-    markdown = convert(html)
-```
-
-If the input looks like binary data (e.g., PDF bytes), `convert()` raises `ValueError` with an `Invalid input` message.
-
-#### Performance Considerations
-
-1. **Single-Pass Collection**: Metadata extraction happens during HTML parsing with zero overhead when disabled.
-2. **Memory Efficient**: Collections use reasonable pre-allocations (32 headers, 64 links, 16 images typical).
-3. **Selective Extraction**: Disable unused metadata types in `MetadataConfig` to reduce overhead.
-4. **Structured Data Limits**: Large JSON-LD blocks are skipped if they exceed the size limit to prevent memory exhaustion.
-
-```python
-from html_to_markdown import MetadataConfig, convert_with_metadata
-
-# Optimize for performance
-config = MetadataConfig(
-    extract_headers=True,
-    extract_links=False,  # Skip if not needed
-    extract_images=False, # Skip if not needed
-    extract_structured_data=False,  # Skip if not needed
-)
-
-markdown, metadata = convert_with_metadata(html, metadata_config=config)
-```
-
-#### Differences from Basic Conversion
-
-When `extract_metadata=True` (default in `ConversionOptions`), basic metadata is embedded in a YAML frontmatter block:
-
-```python
-from html_to_markdown import convert, ConversionOptions
-
-# Basic metadata as YAML frontmatter
-options = ConversionOptions(extract_metadata=True)
-markdown = convert(html, options)
-# Output: "---\ntitle: ...\n---\n\nContent..."
-
-# Rich metadata extraction (all metadata types)
-from html_to_markdown import convert_with_metadata
-markdown, full_metadata = convert_with_metadata(html)
-# Returns structured data dict with headers, links, images, etc.
-```
-
-The two approaches serve different purposes:
-- `extract_metadata=True`: Embeds basic metadata in the output Markdown
-- `convert_with_metadata()`: Returns structured metadata for programmatic access
-
-### hOCR (HTML OCR) Support
-
-```python
-from html_to_markdown import ConversionOptions, convert
-
-# Default: emit structured Markdown directly
-markdown = convert(hocr_html)
-
-# hOCR documents are detected automatically; tables are reconstructed without extra configuration.
-markdown = convert(hocr_html)
-```
-
-## Visitor Pattern
-
-The visitor pattern allows you to customize HTML→Markdown conversion by providing callbacks for specific HTML elements. This is useful for implementing domain-specific transformations, element filtering, or custom formatting rules. Python supports **both synchronous and asynchronous visitor methods** with seamless asyncio integration.
-
-### Overview
-
-Visitors intercept HTML element conversion, allowing you to:
-- **Filter content**: Skip certain elements (ads, tracking pixels, etc.)
-- **Transform output**: Replace default Markdown with custom formatting
-- **Validate**: Enforce constraints (e.g., alt text on images)
-- **Enrich**: Add metadata or side effects during conversion
-- **Preserve HTML**: Keep unsupported elements as raw HTML
-
-### Basic Example
-
-```python
-from html_to_markdown import convert_with_visitor
-
-class MyVisitor:
-    def visit_link(self, ctx, href, text, title):
-        # Customize link conversion
-        return {"type": "custom", "output": f"[{text}]({href})"}
-
-    def visit_image(self, ctx, src, alt, title):
-        # Skip all images
-        return {"type": "skip"}
-
-html = '<a href="/page">Link</a><img src="pic.jpg">'
-result = convert_with_visitor(html, visitor=MyVisitor())
-# Images are skipped, links are rendered with custom format
-```
-
-### NodeContext
-
-Every visitor method receives a `ctx` parameter (NodeContext) with rich information about the current element:
-
-```python
-class MyVisitor:
-    def visit_heading(self, ctx, level, text, id):
-        # ctx is a dictionary with:
-        print(ctx["node_type"])        # "element", "text", "heading", etc.
-        print(ctx["tag_name"])         # "h1", "h2", "div", etc.
-        print(ctx["attributes"])       # {"class": "title", "id": "intro", ...}
-        print(ctx["depth"])            # Nesting depth in DOM tree (0 = root)
-        print(ctx["index_in_parent"])  # Index among siblings
-        print(ctx["parent_tag"])       # Parent element's tag, or None
-        print(ctx["is_inline"])        # Boolean: inline vs block
-        return {"type": "continue"}
-```
-
-**Context Structure:**
-- `node_type` (str): Coarse element classification ("text", "element", "heading", etc.)
-- `tag_name` (str): Raw HTML tag name ("div", "h1", "custom-element", etc.)
-- `attributes` (dict[str, str]): All HTML attributes as key-value pairs
-- `depth` (int): Nesting depth in DOM tree (0 = root)
-- `index_in_parent` (int): Zero-based index among siblings
-- `parent_tag` (str | None): Parent element's tag, or None if root
-- `is_inline` (bool): Whether treated as inline vs block
-
-### VisitResult Types
-
-Return a dictionary from visitor methods to control conversion behavior:
-
-**Continue with default conversion:**
-```python
-def visit_link(self, ctx, href, text, title):
-    return {"type": "continue"}
-```
-
-**Use custom markdown output:**
-```python
-def visit_link(self, ctx, href, text, title):
-    return {"type": "custom", "output": f"→ [{text}]({href})"}
-```
-
-**Skip element entirely:**
-```python
-def visit_image(self, ctx, src, alt, title):
-    return {"type": "skip"}  # Image is not rendered
-```
-
-**Preserve original HTML:**
-```python
-def visit_video(self, ctx, src):
-    return {"type": "preserve_html"}  # Keep as `<video src="..."></video>`
-```
-
-**Stop conversion with error:**
-```python
-def visit_link(self, ctx, href, text, title):
-    if not href.startswith(("http://", "https://", "/")):
-        return {"type": "error", "message": f"Invalid URL: {href}"}
-    return {"type": "continue"}
-```
-
-### All Visitor Methods (40+)
-
-The visitor pattern supports the following methods. You only need to define the ones relevant to your use case:
-
-**Text & Inline Elements:**
-- `visit_text(ctx, text)` – Plain text nodes
-- `visit_strong(ctx, text)` – Bold text (`<strong>`, `<b>`)
-- `visit_emphasis(ctx, text)` – Italic text (`<em>`, `<i>`)
-- `visit_strikethrough(ctx, text)` – Strikethrough (`<s>`, `<del>`)
-- `visit_underline(ctx, text)` – Underlined text (`<u>`)
-- `visit_subscript(ctx, text)` – Subscript (`<sub>`)
-- `visit_superscript(ctx, text)` – Superscript (`<sup>`)
-- `visit_mark(ctx, text)` – Highlighted/marked text (`<mark>`)
-- `visit_code_inline(ctx, code)` – Inline code (`<code>`)
-- `visit_line_break(ctx)` – Line breaks (`<br>`)
-
-**Links & Media:**
-- `visit_link(ctx, href, text, title)` – Hyperlinks (`<a>`)
-- `visit_image(ctx, src, alt, title)` – Images (`<img>`)
-- `visit_audio(ctx, src)` – Audio files (`<audio>`)
-- `visit_video(ctx, src)` – Video files (`<video>`)
-- `visit_iframe(ctx, src)` – Embedded content (`<iframe>`)
-
-**Block Elements:**
-- `visit_element_start(ctx)` – Element opening tag
-- `visit_element_end(ctx, output)` – Element closing tag
-- `visit_heading(ctx, level, text, id)` – Headers (`<h1>`–`<h6>`)
-- `visit_code_block(ctx, lang, code)` – Code blocks (`<pre><code>`)
-- `visit_blockquote(ctx, content, depth)` – Block quotes (`<blockquote>`)
-- `visit_horizontal_rule(ctx)` – Horizontal rule (`<hr>`)
-
-**Lists:**
-- `visit_list_start(ctx, ordered)` – List start (`<ul>`, `<ol>`)
-- `visit_list_item(ctx, ordered, marker, text)` – List item (`<li>`)
-- `visit_list_end(ctx, ordered, output)` – List end
-- `visit_definition_list_start(ctx)` – Definition list start (`<dl>`)
-- `visit_definition_term(ctx, text)` – Definition term (`<dt>`)
-- `visit_definition_description(ctx, text)` – Definition description (`<dd>`)
-- `visit_definition_list_end(ctx, output)` – Definition list end
-
-**Tables:**
-- `visit_table_start(ctx)` – Table start (`<table>`)
-- `visit_table_row(ctx, cells, is_header)` – Table row (`<tr>`)
-- `visit_table_end(ctx, output)` – Table end
-
-**Semantic Elements:**
-- `visit_figure_start(ctx)` – Figure start (`<figure>`)
-- `visit_figcaption(ctx, text)` – Figure caption (`<figcaption>`)
-- `visit_figure_end(ctx, output)` – Figure end
-- `visit_details(ctx, open)` – Collapsible details (`<details>`)
-- `visit_summary(ctx, text)` – Summary for details (`<summary>`)
-
-**Forms:**
-- `visit_form(ctx, action, method)` – Form element (`<form>`)
-- `visit_input(ctx, input_type, name, value)` – Input field (`<input>`)
-- `visit_button(ctx, text)` – Button (`<button>`)
-
-**Custom:**
-- `visit_custom_element(ctx, tag_name, html)` – Unknown elements
-
-### Sync & Async Support
-
-Python visitors support **both synchronous and asynchronous methods**. Mix and match as needed:
-
-**Synchronous visitor:**
-```python
-from html_to_markdown import convert_with_visitor
-
-class SyncVisitor:
-    def visit_link(self, ctx, href, text, title):
-        print(f"Processing link: {href}")
-        return {"type": "continue"}
-
-markdown = convert_with_visitor(html, visitor=SyncVisitor())
-```
-
-**Asynchronous visitor:**
 ```python
 import asyncio
 from html_to_markdown import convert_with_async_visitor
 
 class AsyncVisitor:
     async def visit_link(self, ctx, href, text, title):
-        # Async I/O: fetch metadata, validate URL, etc.
-        response = await some_async_function(href)
-        return {"type": "custom", "output": f"[{text}]({href})"}
-
-    def visit_image(self, ctx, src, alt, title):
-        # Sync methods work too
-        return {"type": "skip"}
+        # Validate URLs asynchronously
+        return {"type": "continue"}
 
 markdown = convert_with_async_visitor(html, visitor=AsyncVisitor())
 ```
 
-The async runtime is handled transparently via pyo3-async-runtimes for proper asyncio integration.
+## API Reference
 
-### Practical Examples
+### Core Functions
 
-#### Example 1: Custom Image Handling
+**`convert(html: str, options?: ConversionOptions, preprocessing?: PreprocessingOptions) -> str`**
 
-```python
-from html_to_markdown import convert_with_visitor
+Basic HTML-to-Markdown conversion. Fast and simple.
 
-class ImageOptimizer:
-    """Customize image Markdown with CDN optimization."""
+**`convert_with_metadata(html: str, options?: ConversionOptions, metadata_config?: MetadataConfig) -> tuple[str, dict]`**
 
-    def __init__(self, cdn_url):
-        self.cdn_url = cdn_url
+Extract Markdown plus comprehensive metadata (headers, links, images, structured data) in a single pass. See [Metadata Extraction Guide](../../examples/metadata-extraction/) for detailed examples.
 
-    def visit_image(self, ctx, src, alt, title):
-        # Rewrite URLs to use CDN
-        optimized_src = f"{self.cdn_url}?src={src}"
-        return {
-            "type": "custom",
-            "output": f"![{alt}]({optimized_src} \"{title or alt}\")"
-        }
+**`convert_with_visitor(html: str, visitor: object, options?: ConversionOptions) -> str`**
 
-html = '<p><img src="/images/logo.png" alt="Logo" /></p>'
-optimizer = ImageOptimizer("https://cdn.example.com/image")
-markdown = convert_with_visitor(html, visitor=optimizer)
-# Output: ![Logo](https://cdn.example.com/image?src=/images/logo.png "Logo")
-```
+Customize conversion with visitor callbacks for element interception. Supports custom filtering, validation, and formatting. See [Visitor Pattern Guide](../../examples/visitor-pattern/) for 5+ practical examples and full API.
 
-#### Example 2: Content Filtering
+**`convert_with_async_visitor(html: str, visitor: object, options?: ConversionOptions) -> str`**
 
-```python
-from html_to_markdown import convert_with_visitor
+Async version of visitor pattern with seamless asyncio integration via pyo3-async-runtimes. Mix sync and async visitor methods freely.
 
-class ContentFilter:
-    """Filter out ads, tracking, and external links."""
+**`convert_with_inline_images(html: str, image_config?: InlineImageConfig) -> tuple[str, list[dict], list[str]]`**
 
-    def visit_link(self, ctx, href, text, title):
-        # Only allow internal links
-        if href.startswith("/") or href.startswith("https://example.com"):
-            return {"type": "continue"}
-        return {"type": "skip"}
+Extract base64-encoded inline images with metadata (format, dimensions, attributes). Returns Markdown, image list, and warnings.
 
-    def visit_image(self, ctx, src, alt, title):
-        # Skip tracking pixels and ads
-        if "tracking" in src or "ad" in src.lower():
-            return {"type": "skip"}
-        if src.endswith((".gif", ".png")) and int(ctx["attributes"].get("width", 0)) < 10:
-            return {"type": "skip"}  # Skip tiny images
-        return {"type": "continue"}
+### Options
 
-    def visit_iframe(self, ctx, src):
-        # Block iframes entirely
-        return {"type": "skip"}
+**`ConversionOptions`** – Key fields:
+- `heading_style`: `"underlined" | "atx" | "atx_closed"` (default: `"underlined"`)
+- `list_indent_width`: spaces per indent level (default: `2`)
+- `bullets`: cycle of bullet characters (default: `"*+-"`)
+- `wrap`: enable text wrapping (default: `False`)
+- `wrap_width`: wrap at column (default: `80`)
+- `code_language`: default fenced code block language
+- `extract_metadata`: embed basic metadata as YAML frontmatter (default: `True`)
 
-html = """
-<p>Read more: <a href="https://ads.com">Click here</a></p>
-<p><a href="/about">About us</a></p>
-<img src="/tracking.gif" alt="tracker" width="1" />
-<img src="/logo.png" alt="Logo" />
-<iframe src="https://evil.com/tracker"></iframe>
-"""
+**`MetadataConfig`** – Selective metadata extraction:
+- `extract_headers`: h1-h6 elements (default: `True`)
+- `extract_links`: hyperlinks (default: `True`)
+- `extract_images`: img elements (default: `True`)
+- `extract_structured_data`: JSON-LD, Microdata, RDFa (default: `True`)
+- `max_structured_data_size`: size limit in bytes (default: `100KB`)
 
-result = convert_with_visitor(html, visitor=ContentFilter())
-# External links, tracking pixels, and iframes are removed
-```
+**`PreprocessingOptions`** – HTML sanitization:
+- `enabled`: robust handling of malformed HTML (default: `True` since v2.4.2)
+- `preset`: `"minimal" | "standard" | "aggressive"` (default: `"standard"`)
 
-#### Example 3: Link Footnote References
+## Examples
 
-```python
-from html_to_markdown import convert_with_visitor, ConversionOptions
+Comprehensive guides with Python examples:
 
-class LinkFootnoteFormatter:
-    """Convert links to footnote-style references."""
+- **[Visitor Pattern](../../examples/visitor-pattern/)** – Custom HTML element callbacks, filtering, validation, URL rewriting, accessibility checks, and async I/O integration. 5+ real-world examples included.
 
-    def __init__(self):
-        self.links = []
-        self.link_index = 0
+- **[Metadata Extraction](../../examples/metadata-extraction/)** – Extract SEO tags, headers, links, images, and structured data. Use cases: SEO analysis, content migration, accessibility audits, table-of-contents generation.
 
-    def visit_link(self, ctx, href, text, title):
-        self.link_index += 1
-        self.links.append({
-            "index": self.link_index,
-            "href": href,
-            "text": text,
-            "title": title,
-        })
-        # Return link text with superscript index
-        return {
-            "type": "custom",
-            "output": f"{text}[{self.link_index}]"
-        }
+- **[Performance & Benchmarking](../../examples/performance/)** – Benchmarks across languages, optimization tips, and the benchmark harness you can run locally.
 
-formatter = LinkFootnoteFormatter()
-html = '''
-<p>Visit <a href="https://example.com" title="Example Site">Example</a>
-and <a href="https://rust-lang.org">Rust</a> for more info.</p>
-'''
-
-markdown = convert_with_visitor(html, visitor=formatter)
-
-# Append footnote references
-markdown += "\n\n"
-for link in formatter.links:
-    title_text = f' - {link["title"]}' if link["title"] else ""
-    markdown += f"[{link['index']}]: {link['href']}{title_text}\n"
-
-# Output:
-# Visit Example[1] and Rust[2] for more info.
-#
-# [1]: https://example.com - Example Site
-# [2]: https://rust-lang.org
-```
-
-#### Example 4: Validate Accessibility
-
-```python
-from html_to_markdown import convert_with_visitor
-
-class AccessibilityValidator:
-    """Enforce accessibility requirements during conversion."""
-
-    def __init__(self):
-        self.errors = []
-
-    def visit_image(self, ctx, src, alt, title):
-        if not alt or not alt.strip():
-            self.errors.append(f"Image missing alt text: {src}")
-            return {"type": "error", "message": "Image missing alt text"}
-        return {"type": "continue"}
-
-    def visit_link(self, ctx, href, text, title):
-        if not text or not text.strip():
-            self.errors.append(f"Link has no text: {href}")
-            return {"type": "error", "message": "Link text is empty"}
-        return {"type": "continue"}
-
-html = '''
-<p><a href="/page">Good link</a></p>
-<p><a href="/bad"></a></p>
-<p><img src="pic.jpg" alt="A picture" /></p>
-<p><img src="bad.jpg" /></p>
-'''
-
-validator = AccessibilityValidator()
-try:
-    markdown = convert_with_visitor(html, visitor=validator)
-except ValueError as e:
-    print(f"Validation failed: {e}")
-    print(f"Errors: {validator.errors}")
-    # Output:
-    # Errors: ['Link has no text: /bad', 'Image missing alt text: bad.jpg']
-```
-
-#### Example 5: Asynchronous URL Validation
-
-```python
-import asyncio
-from html_to_markdown import convert_with_async_visitor
-
-class AsyncLinkValidator:
-    """Validate links asynchronously."""
-
-    async def visit_link(self, ctx, href, text, title):
-        # Check if URL is reachable
-        if href.startswith("http"):
-            try:
-                # In real code, use httpx or similar async HTTP library
-                is_valid = await self.check_url(href)
-                if not is_valid:
-                    return {"type": "custom", "output": f"[{text}]({href}) ⚠️ dead link"}
-            except Exception:
-                pass
-        return {"type": "continue"}
-
-    async def check_url(self, url):
-        # Placeholder for actual async URL validation
-        await asyncio.sleep(0.1)
-        return not url.endswith(".invalid")
-
-html = '<p><a href="https://example.com">Valid</a> <a href="https://dead.invalid">Dead</a></p>'
-markdown = convert_with_async_visitor(html, visitor=AsyncLinkValidator())
-# Asynchronous validation happens during conversion
-```
-
-### Error Handling
-
-Visitor errors are collected and reported at the end of conversion:
-
-```python
-from html_to_markdown import convert_with_visitor
-
-class StrictValidator:
-    def visit_image(self, ctx, src, alt, title):
-        if not alt:
-            return {"type": "error", "message": "Image missing alt text"}
-        return {"type": "continue"}
-
-    def visit_link(self, ctx, href, text, title):
-        if not text.strip():
-            return {"type": "error", "message": "Empty link text"}
-        return {"type": "continue"}
-
-html = '<img src="pic.jpg" /><a href="/page"></a>'
-try:
-    result = convert_with_visitor(html, visitor=StrictValidator())
-except ValueError as e:
-    print(f"Conversion failed: {e}")
-    # ValueError contains all collected visitor errors
-```
-
-### Combining with Options
-
-Visitors work seamlessly with all conversion options:
-
-```python
-from html_to_markdown import convert_with_visitor, ConversionOptions
-
-visitor = MyVisitor()
-options = ConversionOptions(
-    heading_style="atx",
-    list_indent_width=2,
-    wrap=True,
-    wrap_width=80,
-)
-
-markdown = convert_with_visitor(html, options=options, visitor=visitor)
-```
-
-### Performance Considerations
-
-1. **Minimal overhead**: Only called for elements where your visitor has methods
-2. **Async methods**: Use `convert_with_async_visitor()` for async I/O (validation, fetch, etc.)
-3. **Stateful visitors**: Safe to collect data across elements (see footnote and validation examples)
-4. **Native integration**: pyo3-async-runtimes handles Python async/await transparently
-
-## CLI (same engine)
+## CLI
 
 ```bash
 pipx install html-to-markdown  # or: pip install html-to-markdown
 
 html-to-markdown page.html > page.md
 cat page.html | html-to-markdown --heading-style atx > page.md
+html-to-markdown --help
 ```
-
-## API Surface
-
-### `ConversionOptions`
-
-Key fields (see docstring for full matrix):
-
-- `heading_style`: `"underlined" | "atx" | "atx_closed"`
-- `list_indent_width`: spaces per indent level (default 2)
-- `bullets`: cycle of bullet characters (`"*+-"`)
-- `strong_em_symbol`: `"*"` or `"_"`
-- `code_language`: default fenced code block language
-- `wrap`, `wrap_width`: wrap Markdown output
-- `strip_tags`: remove specific HTML tags
-- `preprocessing`: `PreprocessingOptions`
-- `encoding`: input character encoding (informational)
-
-### `PreprocessingOptions`
-
-- `enabled`: enable HTML sanitisation (default: `True` since v2.4.2 for robust malformed HTML handling)
-- `preset`: `"minimal" | "standard" | "aggressive"` (default: `"standard"`)
-- `remove_navigation`: remove navigation elements (default: `True`)
-- `remove_forms`: remove form elements (default: `True`)
-
-**Note:** As of v2.4.2, preprocessing is enabled by default to ensure robust handling of malformed HTML (e.g., bare angle brackets like `1<2` in content). Set `enabled=False` if you need minimal preprocessing.
-
-### `InlineImageConfig`
-
-- `max_decoded_size_bytes`: reject larger payloads
-- `filename_prefix`: generated name prefix (`embedded_image` default)
-- `capture_svg`: collect inline `<svg>` (default `True`)
-- `infer_dimensions`: decode raster images to obtain dimensions (default `False`)
-
-## Performance: V2 vs V1 Compatibility Layer
-
-### ⚠️ Important: Always Use V2 API
-
-The v2 API (`convert()`) is **strongly recommended** for all code. The v1 compatibility layer adds significant overhead and should only be used for gradual migration:
-
-```python
-# ✅ RECOMMENDED - V2 Direct API (Fast)
-from html_to_markdown import convert, ConversionOptions
-
-markdown = convert(html)  # Simple conversion - FAST
-markdown = convert(html, ConversionOptions(heading_style="atx"))  # With options - FAST
-
-# ❌ AVOID - V1 Compatibility Layer (Slow)
-from html_to_markdown import convert_to_markdown
-
-markdown = convert_to_markdown(html, heading_style="atx")  # Adds 77% overhead
-```
-
-### Performance Comparison
-
-Benchmarked on Apple M4 with 25-paragraph HTML document:
-
-| API                      | ops/sec          | Relative Performance | Recommendation      |
-| ------------------------ | ---------------- | -------------------- | ------------------- |
-| **V2 API** (`convert()`) | **129,822**      | baseline             | ✅ **Use this**     |
-| **V1 Compat Layer**      | **67,673**       | **77% slower**       | ⚠️ Migration only   |
-| **CLI**                  | **150-210 MB/s** | Fastest              | ✅ Batch processing |
-
-The v1 compatibility layer creates extra Python objects and performs additional conversions, significantly impacting performance.
-
-### When to Use Each
-
-- **V2 API (`convert()`)**: All new code, production systems, performance-critical applications ← **Use this**
-- **V1 Compat (`convert_to_markdown()`)**: Only for gradual migration from legacy codebases
-- **CLI (`html-to-markdown`)**: Batch processing, shell scripts, maximum throughput
 
 ## v1 Compatibility
 
-A compatibility layer is provided to ease migration from v1.x:
+A compatibility layer eases migration from v1.x:
 
-- **Compat shim**: `html_to_markdown.v1_compat` exposes `convert_to_markdown`, `convert_to_markdown_stream`, and `markdownify`. Keyword mappings are listed in the [changelog](https://github.com/Goldziher/html-to-markdown/blob/main/CHANGELOG.md#v200).
-- **⚠️ Performance warning**: These compatibility functions add 77% overhead. Migrate to v2 API as soon as possible.
-- **CLI**: The Rust CLI replaces the old Python script. New flags are documented via `html-to-markdown --help`.
-- **Removed options**: `code_language_callback`, `strip`, and streaming APIs were removed; use `ConversionOptions`, `PreprocessingOptions`, and the inline-image helpers instead.
+```python
+from html_to_markdown.v1_compat import convert_to_markdown
+
+# V1 API (adds ~77% overhead; for gradual migration only)
+markdown = convert_to_markdown(html, heading_style="atx")
+```
+
+Keyword mappings and removal notes are in the [changelog](https://github.com/Goldziher/html-to-markdown/blob/main/CHANGELOG.md#v200). Always migrate to the V2 API (`convert()`) for production code.
 
 ## Links
 
-- GitHub: [https://github.com/Goldziher/html-to-markdown](https://github.com/Goldziher/html-to-markdown)
-- Discord: [https://discord.gg/pXxagNK2zN](https://discord.gg/pXxagNK2zN)
-- Kreuzberg ecosystem: [https://kreuzberg.dev](https://kreuzberg.dev)
+- **GitHub:** [github.com/Goldziher/html-to-markdown](https://github.com/Goldziher/html-to-markdown)
+- **PyPI:** [pypi.org/project/html-to-markdown](https://pypi.org/project/html-to-markdown/)
+- **Discord:** [discord.gg/pXxagNK2zN](https://discord.gg/pXxagNK2zN)
+- **Kreuzberg Ecosystem:** [kreuzberg.dev](https://kreuzberg.dev)
 
 ## License
 

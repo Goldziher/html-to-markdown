@@ -508,12 +508,6 @@ tasks:
           GOTOOLCHAIN=${TOOLCHAIN} go mod download
           GOTOOLCHAIN=${TOOLCHAIN} go get ./...
           GOTOOLCHAIN=${TOOLCHAIN} go mod tidy
-      - cmd: |
-          cd examples/go-smoke
-          TOOLCHAIN=${GOTOOLCHAIN_OVERRIDE:-{{.GO_TOOLCHAIN}}}
-          GOTOOLCHAIN=${TOOLCHAIN} go mod download
-          GOTOOLCHAIN=${TOOLCHAIN} go get ./...
-          GOTOOLCHAIN=${TOOLCHAIN} go mod tidy
 
   go:update:
     desc: "Update Go dependencies and golangci-lint"
@@ -525,12 +519,6 @@ tasks:
       - echo "Updating Go module dependencies..."
       - cmd: |
           cd packages/go/v2
-          TOOLCHAIN=${GOTOOLCHAIN_OVERRIDE:-{{.GO_TOOLCHAIN}}}
-          GOTOOLCHAIN=${TOOLCHAIN} go get -u ./...
-          GOTOOLCHAIN=${TOOLCHAIN} go mod tidy
-          GOTOOLCHAIN=${TOOLCHAIN} go get ./...
-      - cmd: |
-          cd examples/go-smoke
           TOOLCHAIN=${GOTOOLCHAIN_OVERRIDE:-{{.GO_TOOLCHAIN}}}
           GOTOOLCHAIN=${TOOLCHAIN} go get -u ./...
           GOTOOLCHAIN=${TOOLCHAIN} go mod tidy
@@ -563,11 +551,6 @@ tasks:
           TOOLCHAIN=${GOTOOLCHAIN_OVERRIDE:-{{.GO_TOOLCHAIN}}}
           GOTOOLCHAIN=${TOOLCHAIN} go fmt ./...
           golangci-lint run --config ../../../.golangci.yml --fix ./...
-      - cmd: |
-          cd examples/go-smoke
-          TOOLCHAIN=${GOTOOLCHAIN_OVERRIDE:-{{.GO_TOOLCHAIN}}}
-          GOTOOLCHAIN=${TOOLCHAIN} go fmt ./...
-          golangci-lint run --config ../../.golangci.yml --fix ./...
 
   go:lint:check:
     desc: "Lint Go code WITHOUT auto-fix (check-only)"
@@ -577,21 +560,16 @@ tasks:
           TOOLCHAIN=${GOTOOLCHAIN_OVERRIDE:-{{.GO_TOOLCHAIN}}}
           GOTOOLCHAIN=${TOOLCHAIN} gofmt -l .
           golangci-lint run --config ../../../.golangci.yml ./...
-      - cmd: |
-          cd examples/go-smoke
-          TOOLCHAIN=${GOTOOLCHAIN_OVERRIDE:-{{.GO_TOOLCHAIN}}}
-          GOTOOLCHAIN=${TOOLCHAIN} gofmt -l .
-          golangci-lint run --config ../../.golangci.yml ./...
 
   go:format:
     desc: "Format Go code (with modifications)"
     cmds:
-      - gofmt -w packages/go/v2 examples/go-smoke
+      - gofmt -w packages/go/v2
 
   go:format:check:
     desc: "Check Go formatting without modifications"
     cmds:
-      - gofmt -l packages/go/v2 examples/go-smoke
+      - gofmt -l packages/go/v2
 
   elixir:install:
     desc: "Install Elixir dependencies and compile the NIF"
@@ -649,8 +627,6 @@ tasks:
         bash -lc 'source "$HOME/.sdkman/bin/sdkman-init.sh" && sdk env && if [[ ! -x ./mvnw ]]; then echo "ERROR: Maven wrapper (./mvnw) is required."; exit 1; fi; MAVEN_OPTS="${MAVEN_OPTS:-} --enable-native-access=ALL-UNNAMED -Dsun.misc.unsafe.memory.access=allow" ./mvnw -v'
       - >-
         bash -lc 'source "$HOME/.sdkman/bin/sdkman-init.sh" && sdk env && MAVEN_OPTS="${MAVEN_OPTS:-} --enable-native-access=ALL-UNNAMED -Dsun.misc.unsafe.memory.access=allow" ./mvnw -f packages/java/pom.xml -B dependency:go-offline'
-      - >-
-        bash -lc 'source "$HOME/.sdkman/bin/sdkman-init.sh" && sdk env && MAVEN_OPTS="${MAVEN_OPTS:-} --enable-native-access=ALL-UNNAMED -Dsun.misc.unsafe.memory.access=allow" ./mvnw -f examples/java-smoke/pom.xml -B dependency:go-offline'
 
   java:update:
     desc: "Update Java dependencies (Maven)"
@@ -704,14 +680,12 @@ tasks:
         echo ".NET SDK $(dotnet --version) is installed"
       - cmd: cd packages/csharp/HtmlToMarkdown && dotnet restore
       - cmd: cd packages/csharp/HtmlToMarkdown.Tests && dotnet restore
-      - cmd: cd examples/csharp-smoke && dotnet restore
 
   csharp:update:
     desc: "Update C# NuGet dependencies"
     cmds:
       - cmd: cd packages/csharp/HtmlToMarkdown && dotnet restore --force-evaluate
       - cmd: cd packages/csharp/HtmlToMarkdown.Tests && dotnet restore --force-evaluate
-      - cmd: cd examples/csharp-smoke && dotnet restore --force-evaluate
 
   csharp:test:
     desc: "Run C# tests"
@@ -740,39 +714,13 @@ tasks:
     cmds:
       - dotnet format packages/csharp/HtmlToMarkdown/HtmlToMarkdown.csproj
       - dotnet format packages/csharp/HtmlToMarkdown.Tests/HtmlToMarkdown.Tests.csproj
-      - dotnet format examples/csharp-smoke/csharp-smoke.csproj
 
   csharp:format:check:
     desc: "Check C# formatting without modifications"
     cmds:
       - dotnet format packages/csharp/HtmlToMarkdown/HtmlToMarkdown.csproj --verify-no-changes
       - dotnet format packages/csharp/HtmlToMarkdown.Tests/HtmlToMarkdown.Tests.csproj --verify-no-changes
-      - dotnet format examples/csharp-smoke/csharp-smoke.csproj --verify-no-changes
 
-  examples:update:
-    desc: "Update all smoke test dependencies"
-    cmds:
-      - task: examples:node-smoke:update
-      - task: examples:wasm-smoke:update
-      - task: examples:ruby-smoke:update
-
-  examples:node-smoke:update:
-    desc: "Update Node smoke test dependencies"
-    dir: examples/node-smoke
-    cmds:
-      - pnpm up --latest
-
-  examples:wasm-smoke:update:
-    desc: "Update WASM smoke test dependencies"
-    dir: examples/wasm-smoke
-    cmds:
-      - pnpm up --latest
-
-  examples:ruby-smoke:update:
-    desc: "Update Ruby smoke test dependencies"
-    cmds:
-      - task: ruby:ensure-bundler
-      - cmd: cd examples/ruby-smoke && PATH={{.RUBY_BIN}}:$PATH bundle _{{.BUNDLER_VERSION}}_ update --all
 
   js:install:
     desc: "Install pnpm workspace dependencies"

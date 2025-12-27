@@ -74,12 +74,6 @@ repos:
         language: system
         files: ^packages/go/
         pass_filenames: false
-      - id: golangci-lint-examples
-        name: golangci-lint (examples/go-smoke)
-        entry: bash -c 'cd examples/go-smoke && golangci-lint run --config ../../.golangci.yml ./...'
-        language: system
-        files: ^examples/go-smoke/
-        pass_filenames: false
       - id: mypy
         name: mypy
         entry: uv run mypy
@@ -116,7 +110,7 @@ repos:
         name: dotnet format
         entry: bash -c 'dotnet format packages/csharp/HtmlToMarkdown/HtmlToMarkdown.csproj && dotnet format packages/csharp/HtmlToMarkdown.Tests/HtmlToMarkdown.Tests.csproj'
         language: system
-        files: ^packages/csharp/|^examples/csharp-smoke/
+        files: ^packages/csharp/
         pass_filenames: false
       - id: mix-credo
         name: mix credo
