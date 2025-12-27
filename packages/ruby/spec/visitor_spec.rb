@@ -8,6 +8,7 @@ RSpec.describe HtmlToMarkdown do
     # ============================================================================
     # ============================================================================
 
+    # rubocop:disable Metrics/MethodLength
     def create_visitor(**overrides)
       visitor = double(Object)
 
@@ -51,7 +52,7 @@ RSpec.describe HtmlToMarkdown do
         visit_summary: { type: :continue },
         visit_figure_start: { type: :continue },
         visit_figcaption: { type: :continue },
-        visit_figure_end: { type: :continue },
+        visit_figure_end: { type: :continue }
       }
 
       default_methods.each do |method_name, return_value|
@@ -68,6 +69,7 @@ RSpec.describe HtmlToMarkdown do
 
       visitor
     end
+    # rubocop:enable Metrics/MethodLength
 
     context 'visit_text callback' do
       it 'is called for text nodes' do
