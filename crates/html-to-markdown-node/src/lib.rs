@@ -24,6 +24,9 @@ use html_to_markdown_rs::{
 };
 use napi::bindgen_prelude::*;
 use napi_derive::napi;
+#[cfg(feature = "async-visitor")]
+#[allow(unused_imports)]
+use std::sync::Arc;
 use std::{collections::HashMap, str};
 
 fn to_js_error(err: ConversionError) -> Error {
@@ -648,7 +651,7 @@ fn convert_metadata(metadata: RustExtendedMetadata) -> JsExtendedMetadata {
 
 #[cfg(feature = "async-visitor")]
 #[napi(object)]
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct JsNodeContext {
     pub node_type: String,
     pub tag_name: String,
@@ -661,7 +664,7 @@ pub struct JsNodeContext {
 
 #[cfg(feature = "async-visitor")]
 #[napi(object)]
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct JsVisitResult {
     #[napi(js_name = "type")]
     pub result_type: String,
@@ -697,12 +700,65 @@ pub struct JsVisitResult {
 /// };
 /// ```
 ///
+/// # Type alias for ThreadsafeFunction
+///
+/// Each visitor method callback is wrapped as an Arc-based ThreadsafeFunction
+/// that accepts a String parameter and returns a Promise<String>.
 #[cfg(feature = "async-visitor")]
+type VisitorFn = Arc<
+    napi::threadsafe_function::ThreadsafeFunction<
+        String,
+        napi::bindgen_prelude::Promise<String>,
+        String,
+        napi::Status,
+        false,
+    >,
+>;
+
+#[cfg(feature = "async-visitor")]
+#[allow(dead_code)]
 #[derive(Clone)]
 struct JsVisitorBridge {
-    // For now, we'll store callback methods as extracted functions
-    // but not yet wired with ThreadsafeFunction
-    // This allows compilation while we figure out the right pattern
+    visit_element_start_fn: Option<VisitorFn>,
+    visit_element_end_fn: Option<VisitorFn>,
+    visit_text_fn: Option<VisitorFn>,
+    visit_link_fn: Option<VisitorFn>,
+    visit_image_fn: Option<VisitorFn>,
+    visit_heading_fn: Option<VisitorFn>,
+    visit_code_block_fn: Option<VisitorFn>,
+    visit_code_inline_fn: Option<VisitorFn>,
+    visit_list_item_fn: Option<VisitorFn>,
+    visit_list_start_fn: Option<VisitorFn>,
+    visit_list_end_fn: Option<VisitorFn>,
+    visit_table_start_fn: Option<VisitorFn>,
+    visit_table_row_fn: Option<VisitorFn>,
+    visit_table_end_fn: Option<VisitorFn>,
+    visit_blockquote_fn: Option<VisitorFn>,
+    visit_strong_fn: Option<VisitorFn>,
+    visit_emphasis_fn: Option<VisitorFn>,
+    visit_strikethrough_fn: Option<VisitorFn>,
+    visit_underline_fn: Option<VisitorFn>,
+    visit_subscript_fn: Option<VisitorFn>,
+    visit_superscript_fn: Option<VisitorFn>,
+    visit_mark_fn: Option<VisitorFn>,
+    visit_line_break_fn: Option<VisitorFn>,
+    visit_horizontal_rule_fn: Option<VisitorFn>,
+    visit_custom_element_fn: Option<VisitorFn>,
+    visit_definition_list_start_fn: Option<VisitorFn>,
+    visit_definition_term_fn: Option<VisitorFn>,
+    visit_definition_description_fn: Option<VisitorFn>,
+    visit_definition_list_end_fn: Option<VisitorFn>,
+    visit_form_fn: Option<VisitorFn>,
+    visit_input_fn: Option<VisitorFn>,
+    visit_button_fn: Option<VisitorFn>,
+    visit_audio_fn: Option<VisitorFn>,
+    visit_video_fn: Option<VisitorFn>,
+    visit_iframe_fn: Option<VisitorFn>,
+    visit_details_fn: Option<VisitorFn>,
+    visit_summary_fn: Option<VisitorFn>,
+    visit_figure_start_fn: Option<VisitorFn>,
+    visit_figcaption_fn: Option<VisitorFn>,
+    visit_figure_end_fn: Option<VisitorFn>,
 }
 
 #[cfg(feature = "async-visitor")]
@@ -721,7 +777,48 @@ unsafe impl Sync for JsVisitorBridge {}
 #[cfg(feature = "async-visitor")]
 impl JsVisitorBridge {
     fn new() -> Self {
-        JsVisitorBridge {}
+        JsVisitorBridge {
+            visit_element_start_fn: None,
+            visit_element_end_fn: None,
+            visit_text_fn: None,
+            visit_link_fn: None,
+            visit_image_fn: None,
+            visit_heading_fn: None,
+            visit_code_block_fn: None,
+            visit_code_inline_fn: None,
+            visit_list_item_fn: None,
+            visit_list_start_fn: None,
+            visit_list_end_fn: None,
+            visit_table_start_fn: None,
+            visit_table_row_fn: None,
+            visit_table_end_fn: None,
+            visit_blockquote_fn: None,
+            visit_strong_fn: None,
+            visit_emphasis_fn: None,
+            visit_strikethrough_fn: None,
+            visit_underline_fn: None,
+            visit_subscript_fn: None,
+            visit_superscript_fn: None,
+            visit_mark_fn: None,
+            visit_line_break_fn: None,
+            visit_horizontal_rule_fn: None,
+            visit_custom_element_fn: None,
+            visit_definition_list_start_fn: None,
+            visit_definition_term_fn: None,
+            visit_definition_description_fn: None,
+            visit_definition_list_end_fn: None,
+            visit_form_fn: None,
+            visit_input_fn: None,
+            visit_button_fn: None,
+            visit_audio_fn: None,
+            visit_video_fn: None,
+            visit_iframe_fn: None,
+            visit_details_fn: None,
+            visit_summary_fn: None,
+            visit_figure_start_fn: None,
+            visit_figcaption_fn: None,
+            visit_figure_end_fn: None,
+        }
     }
 
     #[allow(dead_code)]
@@ -752,6 +849,48 @@ impl JsVisitorBridge {
             "error" => RustVisitResult::Error(js_result.output.clone().unwrap_or_else(|| "Unknown error".to_string())),
             _ => RustVisitResult::Continue,
         }
+    }
+
+    /// Serialize visitor parameters to JSON string
+    ///
+    /// # Arguments
+    ///
+    /// * `params` - Parameters implementing serde::Serialize trait
+    ///
+    /// # Returns
+    ///
+    /// JSON string representation or serde_json error
+    ///
+    /// # Example
+    ///
+    /// ```ignore
+    /// let ctx = JsNodeContext { /* ... */ };
+    /// let json = JsVisitorBridge::serialize_params(&ctx)?;
+    /// ```
+    #[allow(dead_code)]
+    fn serialize_params<T: serde::Serialize>(params: &T) -> std::result::Result<String, serde_json::Error> {
+        serde_json::to_string(params)
+    }
+
+    /// Deserialize visitor result from JSON string
+    ///
+    /// # Arguments
+    ///
+    /// * `json` - JSON string representation of JsVisitResult
+    ///
+    /// # Returns
+    ///
+    /// Deserialized JsVisitResult or serde_json error
+    ///
+    /// # Example
+    ///
+    /// ```ignore
+    /// let json = r#"{"type":"continue","output":null}"#;
+    /// let result = JsVisitorBridge::deserialize_result(json)?;
+    /// ```
+    #[allow(dead_code)]
+    fn deserialize_result(json: &str) -> std::result::Result<JsVisitResult, serde_json::Error> {
+        serde_json::from_str(json)
     }
 }
 
@@ -1041,63 +1180,91 @@ pub fn convert_with_visitor(
     _env: Env,
     html: String,
     options: Option<JsConversionOptions>,
-    _visitor: Object,
+    visitor: Object,
 ) -> napi::Result<String> {
     let rust_options = options.map(Into::into);
 
-    // Extract all visitor callback functions from the JavaScript object
-    // For now, validate that the methods exist
-    let _bridge = JsVisitorBridge::new();
+    let mut bridge = JsVisitorBridge::new();
 
-    // List of all 41 visitor callback method names for validation
-    let _visitor_methods = [
-        "visitElementStart",
-        "visitElementEnd",
-        "visitText",
-        "visitLink",
-        "visitImage",
-        "visitHeading",
-        "visitCodeBlock",
-        "visitCodeInline",
-        "visitListItem",
-        "visitListStart",
-        "visitListEnd",
-        "visitTableStart",
-        "visitTableRow",
-        "visitTableEnd",
-        "visitBlockquote",
-        "visitStrong",
-        "visitEmphasis",
-        "visitStrikethrough",
-        "visitUnderline",
-        "visitSubscript",
-        "visitSuperscript",
-        "visitMark",
-        "visitLineBreak",
-        "visitHorizontalRule",
-        "visitCustomElement",
-        "visitDefinitionListStart",
-        "visitDefinitionTerm",
-        "visitDefinitionDescription",
-        "visitDefinitionListEnd",
-        "visitForm",
-        "visitInput",
-        "visitButton",
-        "visitAudio",
-        "visitVideo",
-        "visitIframe",
-        "visitDetails",
-        "visitSummary",
-        "visitFigureStart",
-        "visitFigcaption",
-        "visitFigureEnd",
-    ];
+    // Macro to extract visitor callbacks and build ThreadsafeFunctions
+    macro_rules! extract_fn {
+        ($method_name:literal, $field:ident) => {
+            if let Ok(func) = visitor.get_named_property::<Function<String, Promise<String>>>($method_name) {
+                // Build a ThreadsafeFunction with a callback that passes String arguments to JavaScript
+                // The callback transforms the Rust String input into JavaScript arguments
+                if let Ok(tsfn) = func.build_threadsafe_function::<String>().build_callback(
+                    |ctx: napi::threadsafe_function::ThreadsafeCallContext<String>| {
+                        // Return the string as-is to be passed to the JavaScript function
+                        Ok(ctx.value)
+                    },
+                ) {
+                    bridge.$field = Some(Arc::new(tsfn));
+                }
+            }
+        };
+    }
 
-    // For now, use the synchronous conversion without visitor support
-    // TODO: Implement ThreadsafeFunction extraction and async visitor dispatch
-    // Visitor methods have been identified and can be validated
+    // Extract all 41 visitor callbacks
+    extract_fn!("visitElementStart", visit_element_start_fn);
+    extract_fn!("visitElementEnd", visit_element_end_fn);
+    extract_fn!("visitText", visit_text_fn);
+    extract_fn!("visitLink", visit_link_fn);
+    extract_fn!("visitImage", visit_image_fn);
+    extract_fn!("visitHeading", visit_heading_fn);
+    extract_fn!("visitCodeBlock", visit_code_block_fn);
+    extract_fn!("visitCodeInline", visit_code_inline_fn);
+    extract_fn!("visitListItem", visit_list_item_fn);
+    extract_fn!("visitListStart", visit_list_start_fn);
+    extract_fn!("visitListEnd", visit_list_end_fn);
+    extract_fn!("visitTableStart", visit_table_start_fn);
+    extract_fn!("visitTableRow", visit_table_row_fn);
+    extract_fn!("visitTableEnd", visit_table_end_fn);
+    extract_fn!("visitBlockquote", visit_blockquote_fn);
+    extract_fn!("visitStrong", visit_strong_fn);
+    extract_fn!("visitEmphasis", visit_emphasis_fn);
+    extract_fn!("visitStrikethrough", visit_strikethrough_fn);
+    extract_fn!("visitUnderline", visit_underline_fn);
+    extract_fn!("visitSubscript", visit_subscript_fn);
+    extract_fn!("visitSuperscript", visit_superscript_fn);
+    extract_fn!("visitMark", visit_mark_fn);
+    extract_fn!("visitLineBreak", visit_line_break_fn);
+    extract_fn!("visitHorizontalRule", visit_horizontal_rule_fn);
+    extract_fn!("visitCustomElement", visit_custom_element_fn);
+    extract_fn!("visitDefinitionListStart", visit_definition_list_start_fn);
+    extract_fn!("visitDefinitionTerm", visit_definition_term_fn);
+    extract_fn!("visitDefinitionDescription", visit_definition_description_fn);
+    extract_fn!("visitDefinitionListEnd", visit_definition_list_end_fn);
+    extract_fn!("visitForm", visit_form_fn);
+    extract_fn!("visitInput", visit_input_fn);
+    extract_fn!("visitButton", visit_button_fn);
+    extract_fn!("visitAudio", visit_audio_fn);
+    extract_fn!("visitVideo", visit_video_fn);
+    extract_fn!("visitIframe", visit_iframe_fn);
+    extract_fn!("visitDetails", visit_details_fn);
+    extract_fn!("visitSummary", visit_summary_fn);
+    extract_fn!("visitFigureStart", visit_figure_start_fn);
+    extract_fn!("visitFigcaption", visit_figcaption_fn);
+    extract_fn!("visitFigureEnd", visit_figure_end_fn);
 
-    guard_panic(|| profiling::maybe_profile(|| html_to_markdown_rs::convert(&html, rust_options))).map_err(to_js_error)
+    // Create tokio runtime for async visitor dispatch
+    let rt = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .map_err(|e| napi::Error::new(napi::Status::GenericFailure, format!("Failed to create runtime: {}", e)))?;
+
+    // Execute async visitor conversion
+    let result = rt
+        .block_on(async {
+            html_to_markdown_rs::convert_with_async_visitor(
+                &html,
+                rust_options,
+                Some(std::rc::Rc::new(std::cell::RefCell::new(bridge))),
+            )
+            .await
+        })
+        .map_err(to_js_error)?;
+
+    Ok(result)
 }
 
 #[napi(js_name = "convertJson")]
