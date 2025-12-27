@@ -69,7 +69,6 @@ RSpec.describe HtmlToMarkdown do
       visitor
     end
 
-
     context 'visit_text callback' do
       it 'is called for text nodes' do
         html = '<p>Hello World</p>'
@@ -335,7 +334,6 @@ RSpec.describe HtmlToMarkdown do
       end
     end
 
-
     context 'VisitResult::Continue' do
       it 'continues with default behavior' do
         html = '<p>Hello</p>'
@@ -558,7 +556,6 @@ RSpec.describe HtmlToMarkdown do
       end
     end
 
-
     context 'NodeContext validation' do
       it 'provides tag_name in context' do
         html = '<article>Content</article>'
@@ -657,7 +654,6 @@ RSpec.describe HtmlToMarkdown do
       end
     end
 
-
     context 'error handling' do
       it 'handles visitor exceptions gracefully' do
         html = '<p>Text</p>'
@@ -692,7 +688,6 @@ RSpec.describe HtmlToMarkdown do
         end.not_to raise_error
       end
     end
-
 
     context 'integration with ConversionOptions' do
       it 'accepts ConversionOptions with visitor' do
@@ -743,7 +738,6 @@ RSpec.describe HtmlToMarkdown do
         expect(result).to include('#')
       end
     end
-
 
     context 'multiple visitor methods' do
       it 'calls multiple methods for complex HTML' do
@@ -818,7 +812,6 @@ RSpec.describe HtmlToMarkdown do
         expect(result).to include('Text')
       end
     end
-
 
     context 'nested elements' do
       it 'visits deeply nested elements in order' do
@@ -906,7 +899,6 @@ RSpec.describe HtmlToMarkdown do
       end
     end
 
-
     context 'less common visitor methods' do
       it 'calls visit_strong for bold elements' do
         html = '<strong>Bold</strong>'
@@ -991,7 +983,6 @@ RSpec.describe HtmlToMarkdown do
       end
     end
 
-
     context 'unicode and special characters' do
       it 'handles unicode text in visitor' do
         html = '<p>日本語テキスト</p>'
@@ -1032,7 +1023,6 @@ RSpec.describe HtmlToMarkdown do
         expect(text_received).to include('&')
       end
     end
-
 
     context 'state management in visitor' do
       it 'allows visitor to maintain state across calls' do
@@ -1081,7 +1071,6 @@ RSpec.describe HtmlToMarkdown do
         expect(result).to include('[SECOND_PARAGRAPH]')
       end
     end
-
 
     context 'edge cases' do
       it 'handles empty HTML' do
