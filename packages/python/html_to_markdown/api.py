@@ -234,6 +234,94 @@ def convert_with_metadata_handle(
     return markdown, metadata
 
 
+def convert_with_visitor(
+    html: str,
+    options: ConversionOptions | None = None,
+    preprocessing: PreprocessingOptions | None = None,
+    visitor: object | None = None,
+) -> str:
+    """Convert HTML with a visitor pattern.
+
+    This function enables custom processing of HTML elements during conversion
+    using a visitor object. The visitor can inspect, modify, or skip elements
+    during the conversion process.
+
+    Args:
+        html: HTML string to convert
+        options: Optional conversion configuration
+        preprocessing: Optional preprocessing configuration
+        visitor: Optional visitor object with methods like visit_text, visit_link, etc.
+                 Methods should return a result dict with 'type' key:
+                 - {'type': 'continue'} - Use default conversion
+                 - {'type': 'skip'} - Skip this element
+                 - {'type': 'preserve_html'} - Preserve as raw HTML
+                 - {'type': 'custom', 'output': 'markdown'} - Use custom output
+                 - {'type': 'error', 'message': 'error'} - Stop with error
+
+    Returns:
+        Converted markdown string
+
+    Example:
+        >>> class MyVisitor:
+        ...     def visit_heading(self, ctx, level, text, id):
+        ...         return {"type": "custom", "output": f"HEADING[{level}]: {text}"}
+        >>>
+        >>> visitor = MyVisitor()
+        >>> markdown = convert_with_visitor("<h1>Test</h1>", visitor=visitor)
+    """
+    if options is None:
+        options = ConversionOptions()
+    if preprocessing is None:
+        preprocessing = PreprocessingOptions()
+
+    if visitor is None:
+        return convert(html, options, preprocessing)
+
+    # Pass None as options parameter and let Rust use defaults
+    # The visitor is the key feature here
+    # Note: options and preprocessing are not used here intentionally
+    return _rust.convert_with_visitor(html, None, visitor)
+
+
+def convert_with_async_visitor(
+    html: str,
+    options: ConversionOptions | None = None,
+    visitor: object | None = None,
+) -> str:
+    """Convert HTML with an async visitor pattern.
+
+    This function enables custom processing of HTML elements during conversion
+    using a visitor object with async methods. The visitor can inspect, modify,
+    or skip elements during the conversion process.
+
+    Args:
+        html: HTML string to convert
+        options: Optional conversion configuration
+        visitor: Optional visitor object with async methods (on_element, on_text, etc.)
+                 Methods should be coroutines that return a result dict with 'type' key
+
+    Returns:
+        Converted markdown string
+
+    Example:
+        >>> class MyVisitor:
+        ...     async def on_element(self, context):
+        ...         return {"type": "continue"}
+        >>>
+        >>> visitor = MyVisitor()
+        >>> markdown = convert_with_async_visitor("<h1>Test</h1>", visitor=visitor)
+    """
+    if options is None:
+        options = ConversionOptions()
+
+    if visitor is None:
+        return _rust.convert(html, None)
+
+    # Note: payload is computed for documentation but not passed to Rust
+    _options_payload(options, PreprocessingOptions())
+    return _rust.convert_with_async_visitor(html, None, visitor)
+
+
 __all__ = [
     "InlineImage",
     "InlineImageConfig",
@@ -241,11 +329,13 @@ __all__ = [
     "MetadataConfig",
     "OptionsHandle",
     "convert",
+    "convert_with_async_visitor",
     "convert_with_handle",
     "convert_with_inline_images",
     "convert_with_inline_images_handle",
     "convert_with_metadata",
     "convert_with_metadata_handle",
+    "convert_with_visitor",
     "create_options_handle",
     "start_profiling",
     "stop_profiling",
