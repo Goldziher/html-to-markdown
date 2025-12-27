@@ -839,6 +839,7 @@ impl DomContext {
     ///
     /// Returns the tag name of the parent element if it exists and is a tag,
     /// otherwise returns None.
+    #[cfg_attr(not(feature = "visitor"), allow(dead_code))]
     fn parent_tag_name(&self, node_id: u32, parser: &tl::Parser) -> Option<String> {
         let parent_id = self.parent_of(node_id)?;
         let parent_handle = self.node_handle(parent_id)?;
@@ -859,6 +860,7 @@ impl DomContext {
     ///
     /// Returns the 0-based index if the node has siblings,
     /// otherwise returns None.
+    #[cfg_attr(not(feature = "visitor"), allow(dead_code))]
     fn get_sibling_index(&self, node_id: u32) -> Option<usize> {
         self.sibling_index(node_id)
     }
@@ -3456,6 +3458,7 @@ fn walk_node(
                 }
             }
 
+            #[cfg_attr(not(feature = "visitor"), allow(unused_variables))]
             let element_output_start = output.len();
 
             match tag_name.as_ref() {
@@ -4980,6 +4983,7 @@ fn walk_node(
                         ..ctx.clone()
                     };
 
+                    #[cfg_attr(not(feature = "visitor"), allow(unused_variables))]
                     let language: Option<String> = {
                         let children = tag.children();
                         let mut lang: Option<String> = None;
@@ -7613,6 +7617,7 @@ fn convert_table_cell(
 
 /// Convert table row (tr)
 #[allow(clippy::too_many_arguments)]
+#[cfg_attr(not(feature = "visitor"), allow(unused_variables))]
 fn convert_table_row(
     node_handle: &tl::NodeHandle,
     parser: &tl::Parser,
