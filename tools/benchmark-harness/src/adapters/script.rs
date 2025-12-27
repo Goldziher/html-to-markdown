@@ -429,13 +429,8 @@ impl FrameworkAdapter for ScriptAdapter {
 
         let duration = Duration::from_secs_f64(script_result.elapsed_seconds);
         let file_size = std::fs::metadata(&fixture_path).map(|m| m.len()).unwrap_or_default();
-        let profile_repeat = if flamegraph_output_path.is_some() {
-            config.profile_repeat.max(1)
-        } else {
-            1
-        };
-        let iterations = (script_result.iterations as usize).saturating_mul(profile_repeat);
-        let bytes_processed = (script_result.bytes_processed as u64).saturating_mul(profile_repeat as u64);
+        let iterations = script_result.iterations as usize;
+        let bytes_processed = script_result.bytes_processed as u64;
         let duration_secs = duration.as_secs_f64().max(0.000_001);
         let ops_per_sec = iterations as f64 / duration_secs;
         let mb_per_sec = (bytes_processed as f64 / (1024.0 * 1024.0)) / duration_secs;
