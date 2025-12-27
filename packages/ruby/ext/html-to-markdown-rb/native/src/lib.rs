@@ -67,8 +67,7 @@ impl RubyVisitorWrapper {
             0 => match self.ruby_visitor.funcall::<&str, (), Value>(method_name, ()) {
                 Ok(val) => val,
                 Err(e) => {
-                    *self.last_error.borrow_mut() =
-                        Some(format!("Visitor error in {}: {}", method_name, e.to_string()));
+                    *self.last_error.borrow_mut() = Some(format!("Visitor error in {}: {}", method_name, e));
                     return Err(e);
                 }
             },
@@ -78,8 +77,7 @@ impl RubyVisitorWrapper {
             {
                 Ok(val) => val,
                 Err(e) => {
-                    *self.last_error.borrow_mut() =
-                        Some(format!("Visitor error in {}: {}", method_name, e.to_string()));
+                    *self.last_error.borrow_mut() = Some(format!("Visitor error in {}: {}", method_name, e));
                     return Err(e);
                 }
             },
@@ -89,8 +87,7 @@ impl RubyVisitorWrapper {
             {
                 Ok(val) => val,
                 Err(e) => {
-                    *self.last_error.borrow_mut() =
-                        Some(format!("Visitor error in {}: {}", method_name, e.to_string()));
+                    *self.last_error.borrow_mut() = Some(format!("Visitor error in {}: {}", method_name, e));
                     return Err(e);
                 }
             },
@@ -100,8 +97,7 @@ impl RubyVisitorWrapper {
             {
                 Ok(val) => val,
                 Err(e) => {
-                    *self.last_error.borrow_mut() =
-                        Some(format!("Visitor error in {}: {}", method_name, e.to_string()));
+                    *self.last_error.borrow_mut() = Some(format!("Visitor error in {}: {}", method_name, e));
                     return Err(e);
                 }
             },
@@ -111,8 +107,7 @@ impl RubyVisitorWrapper {
             {
                 Ok(val) => val,
                 Err(e) => {
-                    *self.last_error.borrow_mut() =
-                        Some(format!("Visitor error in {}: {}", method_name, e.to_string()));
+                    *self.last_error.borrow_mut() = Some(format!("Visitor error in {}: {}", method_name, e));
                     return Err(e);
                 }
             },

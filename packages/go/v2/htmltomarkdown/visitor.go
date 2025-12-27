@@ -325,6 +325,11 @@ const (
 	VisitPreserveHTML VisitResultType = 3
 
 	VisitError VisitResultType = 4
+
+	// Markdown horizontal rule patterns
+	horizontalRuleDash   = "---"
+	horizontalRuleAster  = "***"
+	horizontalRuleUnderscore = "___"
 )
 
 // NodeContext contains context information for a node being visited.
@@ -577,239 +582,89 @@ func processMarkdownWithVisitor(markdown string, visitor *Visitor, visitorID uin
 			continue
 		}
 
-		isListItem := strings.HasPrefix(line, "- ") || strings.HasPrefix(line, "* ") ||
-			regexp.MustCompile(`^\d+\.\s`).MatchString(line)
-		if isListItem && !inList {
-			inList = true
-			if visitor.OnListStart != nil {
-				ordered := regexp.MustCompile(`^\d+\.`).MatchString(line)
-				visitor.OnListStart(ctx, ordered)
-			}
-		} else if !isListItem && inList && !strings.HasPrefix(line, " ") {
-			inList = false
-			if visitor.OnListEnd != nil {
-				visitor.OnListEnd(ctx, false, markdown[i:])
-			}
-		}
+		// Process list items
+		isListItem := isListItemLine(line)
+		inList, _ = processListBoundary(visitor, ctx, line, isListItem, inList, i, markdown)
 
+		// Process table rows
 		isTableRow := strings.HasPrefix(line, "|")
-		if isTableRow && !inTable {
-			inTable = true
-			if visitor.OnTableStart != nil {
-				visitor.OnTableStart(ctx)
-			}
-		} else if !isTableRow && inTable && !strings.HasPrefix(line, "|") {
-			inTable = false
-			if visitor.OnTableEnd != nil {
-				visitor.OnTableEnd(ctx, "")
-			}
-		}
+		inTable = processTableBoundary(visitor, ctx, line, isTableRow, inTable)
 
+		// Process headings
 		if strings.HasPrefix(line, "#") {
-			if visitor.OnElementStart != nil && len(origLine) > 0 && (origLine[0] != ' ' && origLine[0] != '\t') {
-				visitor.OnElementStart(ctx)
-			}
-
-			if visitor.OnHeading != nil {
-				level := 0
-				for j := 0; j < len(line); j++ {
-					if line[j] == '#' {
-						level++
-					} else {
-						break
-					}
-				}
-				text := strings.TrimSpace(line[level:])
-				visitor.OnHeading(ctx, uint32(level), text, "")
-			}
-
-			if visitor.OnElementEnd != nil && len(origLine) > 0 && (origLine[0] != ' ' && origLine[0] != '\t') {
-				visitor.OnElementEnd(ctx, line)
-			}
+			processHeading(visitor, ctx, line, origLine)
 		}
 
-		if len(line) > 0 && !strings.HasPrefix(line, "#") && !strings.HasPrefix(line, ">") &&
-			!isListItem && !isTableRow && line != "---" && line != "***" && line != "___" {
-			if !strings.HasPrefix(line, "![") && !strings.HasPrefix(line, "[") {
-				if visitor.OnElementStart != nil && len(origLine) > 0 && (origLine[0] != ' ' && origLine[0] != '\t') {
-					visitor.OnElementStart(ctx)
-				}
-				if visitor.OnElementEnd != nil && len(origLine) > 0 && (origLine[0] != ' ' && origLine[0] != '\t') {
-					visitor.OnElementEnd(ctx, line)
-				}
-			}
+		// Process general elements (paragraphs, etc.)
+		if isGeneralElement(line, isListItem, isTableRow) {
+			processGeneralElement(visitor, ctx, line, origLine)
 		}
 
-		if strings.Contains(line, "[") && strings.Contains(line, "](") && visitor.OnLink != nil {
-			re := regexp.MustCompile(`\[([^\]]+)\]\(([^)]+)\)`)
-			matches := re.FindAllStringSubmatch(line, -1)
-			for _, match := range matches {
-				if len(match) >= 3 {
-					visitor.OnLink(ctx, match[2], match[1], "")
-				}
-			}
-		}
+		// Process links
+		processLinks(visitor, ctx, line)
 
-		if strings.Contains(line, "![") && strings.Contains(line, "](") && visitor.OnImage != nil {
-			re := regexp.MustCompile(`!\[([^\]]*)\]\(([^)]+)\)`)
-			matches := re.FindAllStringSubmatch(line, -1)
-			for _, match := range matches {
-				if len(match) >= 3 {
-					visitor.OnImage(ctx, match[2], match[1], "")
-				}
-			}
-		}
+		// Process images
+		processImages(visitor, ctx, line)
 
+		// Process code blocks
 		if strings.HasPrefix(line, "```") && visitor.OnCodeBlock != nil {
 			visitor.OnCodeBlock(ctx, "", line)
 		}
 
-		if strings.Contains(line, "`") && visitor.OnCodeInline != nil {
-			re := regexp.MustCompile("`([^`]+)`")
-			matches := re.FindAllStringSubmatch(line, -1)
-			for _, match := range matches {
-				if len(match) >= 2 {
-					visitor.OnCodeInline(ctx, match[1])
-				}
-			}
-		}
+		// Process inline code
+		processInlineCode(visitor, ctx, line)
 
+		// Process list items
 		if isListItem {
-			if visitor.OnListItem != nil {
-				text := strings.TrimPrefix(strings.TrimPrefix(line, "- "), "* ")
-				text = regexp.MustCompile(`^\d+\.\s`).ReplaceAllString(text, "")
-				marker := "-"
-				if strings.HasPrefix(line, "* ") {
-					marker = "*"
-				}
-				ordered := regexp.MustCompile(`^\d+\.`).MatchString(line)
-				visitor.OnListItem(ctx, ordered, marker, text)
-			}
+			processListItem(visitor, ctx, line)
 		}
 
-		if isTableRow && visitor.OnTableRow != nil {
-			cells := strings.Split(line, "|")
-			cleanCells := make([]string, 0)
-			for _, cell := range cells {
-				cell = strings.TrimSpace(cell)
-				if cell != "" && cell != "-" {
-					cleanCells = append(cleanCells, cell)
-				}
-			}
-			if len(cleanCells) > 0 {
-				isHeader := strings.Contains(line, "---") || strings.Contains(line, "---|")
-				visitor.OnTableRow(ctx, cleanCells, isHeader)
-			}
+		// Process table rows
+		if isTableRow {
+			processTableRow(visitor, ctx, line)
 		}
 
+		// Process blockquotes
 		if strings.HasPrefix(line, ">") && visitor.OnBlockquote != nil {
 			text := strings.TrimPrefix(line, ">")
 			text = strings.TrimSpace(text)
 			visitor.OnBlockquote(ctx, text, 0)
 		}
 
-		if (line == "---" || line == "***" || line == "___") && visitor.OnHorizontalRule != nil {
+		// Process horizontal rules
+		if isHorizontalRule(line) && visitor.OnHorizontalRule != nil {
 			visitor.OnHorizontalRule(ctx)
 		}
 
-		isMaybeDefinitionLine := len(line) > 0 && !strings.HasPrefix(line, "#") &&
-			!strings.HasPrefix(line, "-") && !strings.HasPrefix(line, "*") &&
-			!strings.HasPrefix(line, ">") && !strings.HasPrefix(line, "|") &&
-			line != "---" && line != "***" && line != "___" &&
-			!strings.Contains(line, "[") && !strings.Contains(line, "**")
+		// Process definition lists
+		inDefList = processDefinitionList(visitor, ctx, line, i, inDefList)
 
-		if isMaybeDefinitionLine {
-			if !inDefList {
-				inDefList = true
-				if visitor.OnDefinitionListStart != nil {
-					visitor.OnDefinitionListStart(ctx)
-				}
-			}
-			if visitor.OnDefinitionTerm != nil && i%2 == 0 {
-				visitor.OnDefinitionTerm(ctx, line)
-			} else if visitor.OnDefinitionDescription != nil && i%2 == 1 {
-				visitor.OnDefinitionDescription(ctx, line)
-			}
-		}
-
+		// Process figures
 		if strings.Contains(line, "![") {
-			if visitor.OnFigureStart != nil {
-				visitor.OnFigureStart(ctx)
-			}
-			if strings.Contains(line, "![") && strings.Contains(line, "](") {
-				re := regexp.MustCompile(`!\[([^\]]*)\]\(([^)]+)\)`)
-				matches := re.FindAllStringSubmatch(line, -1)
-				for _, match := range matches {
-					if len(match) >= 3 && visitor.OnImage != nil {
-						visitor.OnImage(ctx, match[2], match[1], "")
-					}
-				}
-			}
-			nextLine := ""
-			for j := i + 1; j < len(lines); j++ {
-				nextLine = strings.TrimSpace(lines[j])
-				if nextLine != "" && !strings.HasPrefix(nextLine, "![") {
-					break
-				}
-			}
-			if nextLine != "" && visitor.OnFigcaption != nil {
-				visitor.OnFigcaption(ctx, nextLine)
-			}
-			if visitor.OnFigureEnd != nil {
-				visitor.OnFigureEnd(ctx, "")
-			}
+			processFigure(visitor, ctx, line, lines, i)
 		}
 
+		// Process details and summary
 		if strings.Contains(line, "<details>") || strings.Contains(line, "**") {
-			if visitor.OnDetails != nil {
-				visitor.OnDetails(ctx, true)
-			}
-			if visitor.OnSummary != nil {
-				visitor.OnSummary(ctx, line)
-			}
+			processDetails(visitor, ctx, line)
 		}
 
-		if strings.Contains(line, "**") && visitor.OnStrong != nil {
-			re := regexp.MustCompile(`\*\*([^*]+)\*\*`)
-			matches := re.FindAllStringSubmatch(line, -1)
-			for _, match := range matches {
-				if len(match) >= 2 {
-					visitor.OnStrong(ctx, match[1])
-				}
-			}
-		}
+		// Process strong text
+		processStrong(visitor, ctx, line)
 
-		if (strings.Contains(line, "*") || strings.Contains(line, "_")) && visitor.OnEmphasis != nil {
-			re := regexp.MustCompile(`\*([^*]+)\*|_([^_]+)_`)
-			matches := re.FindAllStringSubmatch(line, -1)
-			for _, match := range matches {
-				if len(match) >= 2 && match[1] != "" {
-					visitor.OnEmphasis(ctx, match[1])
-				} else if len(match) >= 3 && match[2] != "" {
-					visitor.OnEmphasis(ctx, match[2])
-				}
-			}
-		}
+		// Process emphasis
+		processEmphasis(visitor, ctx, line)
 
-		if strings.Contains(line, "==") && visitor.OnMark != nil {
-			re := regexp.MustCompile(`==([^=]+)==`)
-			matches := re.FindAllStringSubmatch(line, -1)
-			for _, match := range matches {
-				if len(match) >= 2 {
-					visitor.OnMark(ctx, match[1])
-				}
-			}
-		}
+		// Process marks
+		processMark(visitor, ctx, line)
 
-		if visitor.OnText != nil && !strings.HasPrefix(line, "#") &&
-			!strings.HasPrefix(line, ">") &&
-			!isListItem &&
-			!strings.HasPrefix(line, "|") &&
-			line != "---" && line != "***" && line != "___" {
+		// Process plain text
+		if visitor.OnText != nil && isPlainText(line, isListItem) {
 			visitor.OnText(ctx, line)
 		}
 	}
 
+	// Close any open blocks
 	if inList && visitor.OnListEnd != nil {
 		visitor.OnListEnd(ctx, false, "")
 	}
@@ -819,6 +674,258 @@ func processMarkdownWithVisitor(markdown string, visitor *Visitor, visitorID uin
 	if inDefList && visitor.OnDefinitionListEnd != nil {
 		visitor.OnDefinitionListEnd(ctx, "")
 	}
+}
+
+// Helper functions for processMarkdownWithVisitor
+
+func isListItemLine(line string) bool {
+	return strings.HasPrefix(line, "- ") || strings.HasPrefix(line, "* ") ||
+		regexp.MustCompile(`^\d+\.\s`).MatchString(line)
+}
+
+func processListBoundary(visitor *Visitor, ctx *NodeContext, line string, isListItem, inList bool, i int, markdown string) (bool, bool) {
+	if isListItem && !inList {
+		inList = true
+		if visitor.OnListStart != nil {
+			ordered := regexp.MustCompile(`^\d+\.`).MatchString(line)
+			visitor.OnListStart(ctx, ordered)
+		}
+	} else if !isListItem && inList && !strings.HasPrefix(line, " ") {
+		inList = false
+		if visitor.OnListEnd != nil {
+			visitor.OnListEnd(ctx, false, markdown[i:])
+		}
+	}
+	return inList, isListItem
+}
+
+func processTableBoundary(visitor *Visitor, ctx *NodeContext, line string, isTableRow, inTable bool) bool {
+	if isTableRow && !inTable {
+		inTable = true
+		if visitor.OnTableStart != nil {
+			visitor.OnTableStart(ctx)
+		}
+	} else if !isTableRow && inTable && !strings.HasPrefix(line, "|") {
+		inTable = false
+		if visitor.OnTableEnd != nil {
+			visitor.OnTableEnd(ctx, "")
+		}
+	}
+	return inTable
+}
+
+func processHeading(visitor *Visitor, ctx *NodeContext, line, origLine string) {
+	if visitor.OnElementStart != nil && len(origLine) > 0 && (origLine[0] != ' ' && origLine[0] != '\t') {
+		visitor.OnElementStart(ctx)
+	}
+
+	if visitor.OnHeading != nil {
+		level := 0
+		for j := 0; j < len(line); j++ {
+			if line[j] == '#' {
+				level++
+			} else {
+				break
+			}
+		}
+		text := strings.TrimSpace(line[level:])
+		visitor.OnHeading(ctx, uint32(level), text, "")
+	}
+
+	if visitor.OnElementEnd != nil && len(origLine) > 0 && (origLine[0] != ' ' && origLine[0] != '\t') {
+		visitor.OnElementEnd(ctx, line)
+	}
+}
+
+func isGeneralElement(line string, isListItem, isTableRow bool) bool {
+	return len(line) > 0 && !strings.HasPrefix(line, "#") && !strings.HasPrefix(line, ">") &&
+		!isListItem && !isTableRow && !isHorizontalRule(line) &&
+		!strings.HasPrefix(line, "![") && !strings.HasPrefix(line, "[")
+}
+
+func processGeneralElement(visitor *Visitor, ctx *NodeContext, line, origLine string) {
+	if visitor.OnElementStart != nil && len(origLine) > 0 && (origLine[0] != ' ' && origLine[0] != '\t') {
+		visitor.OnElementStart(ctx)
+	}
+	if visitor.OnElementEnd != nil && len(origLine) > 0 && (origLine[0] != ' ' && origLine[0] != '\t') {
+		visitor.OnElementEnd(ctx, line)
+	}
+}
+
+func processLinks(visitor *Visitor, ctx *NodeContext, line string) {
+	if strings.Contains(line, "[") && strings.Contains(line, "](") && visitor.OnLink != nil {
+		re := regexp.MustCompile(`\[([^\]]+)\]\(([^)]+)\)`)
+		matches := re.FindAllStringSubmatch(line, -1)
+		for _, match := range matches {
+			if len(match) >= 3 {
+				visitor.OnLink(ctx, match[2], match[1], "")
+			}
+		}
+	}
+}
+
+func processImages(visitor *Visitor, ctx *NodeContext, line string) {
+	if strings.Contains(line, "![") && strings.Contains(line, "](") && visitor.OnImage != nil {
+		re := regexp.MustCompile(`!\[([^\]]*)\]\(([^)]+)\)`)
+		matches := re.FindAllStringSubmatch(line, -1)
+		for _, match := range matches {
+			if len(match) >= 3 {
+				visitor.OnImage(ctx, match[2], match[1], "")
+			}
+		}
+	}
+}
+
+func processInlineCode(visitor *Visitor, ctx *NodeContext, line string) {
+	if strings.Contains(line, "`") && visitor.OnCodeInline != nil {
+		re := regexp.MustCompile("`([^`]+)`")
+		matches := re.FindAllStringSubmatch(line, -1)
+		for _, match := range matches {
+			if len(match) >= 2 {
+				visitor.OnCodeInline(ctx, match[1])
+			}
+		}
+	}
+}
+
+func processListItem(visitor *Visitor, ctx *NodeContext, line string) {
+	if visitor.OnListItem != nil {
+		text := strings.TrimPrefix(strings.TrimPrefix(line, "- "), "* ")
+		text = regexp.MustCompile(`^\d+\.\s`).ReplaceAllString(text, "")
+		marker := "-"
+		if strings.HasPrefix(line, "* ") {
+			marker = "*"
+		}
+		ordered := regexp.MustCompile(`^\d+\.`).MatchString(line)
+		visitor.OnListItem(ctx, ordered, marker, text)
+	}
+}
+
+func processTableRow(visitor *Visitor, ctx *NodeContext, line string) {
+	if visitor.OnTableRow != nil {
+		cells := strings.Split(line, "|")
+		cleanCells := make([]string, 0)
+		for _, cell := range cells {
+			cell = strings.TrimSpace(cell)
+			if cell != "" && cell != "-" {
+				cleanCells = append(cleanCells, cell)
+			}
+		}
+		if len(cleanCells) > 0 {
+			isHeader := strings.Contains(line, "---") || strings.Contains(line, "---|")
+			visitor.OnTableRow(ctx, cleanCells, isHeader)
+		}
+	}
+}
+
+func isHorizontalRule(line string) bool {
+	return line == horizontalRuleDash || line == horizontalRuleAster || line == horizontalRuleUnderscore
+}
+
+func processDefinitionList(visitor *Visitor, ctx *NodeContext, line string, i int, inDefList bool) bool {
+	isMaybeDefinitionLine := len(line) > 0 && !strings.HasPrefix(line, "#") &&
+		!strings.HasPrefix(line, "-") && !strings.HasPrefix(line, "*") &&
+		!strings.HasPrefix(line, ">") && !strings.HasPrefix(line, "|") &&
+		!isHorizontalRule(line) &&
+		!strings.Contains(line, "[") && !strings.Contains(line, "**")
+
+	if isMaybeDefinitionLine {
+		if !inDefList {
+			inDefList = true
+			if visitor.OnDefinitionListStart != nil {
+				visitor.OnDefinitionListStart(ctx)
+			}
+		}
+		if visitor.OnDefinitionTerm != nil && i%2 == 0 {
+			visitor.OnDefinitionTerm(ctx, line)
+		} else if visitor.OnDefinitionDescription != nil && i%2 == 1 {
+			visitor.OnDefinitionDescription(ctx, line)
+		}
+	}
+	return inDefList
+}
+
+func processFigure(visitor *Visitor, ctx *NodeContext, line string, lines []string, i int) {
+	if visitor.OnFigureStart != nil {
+		visitor.OnFigureStart(ctx)
+	}
+	if strings.Contains(line, "![") && strings.Contains(line, "](") {
+		re := regexp.MustCompile(`!\[([^\]]*)\]\(([^)]+)\)`)
+		matches := re.FindAllStringSubmatch(line, -1)
+		for _, match := range matches {
+			if len(match) >= 3 && visitor.OnImage != nil {
+				visitor.OnImage(ctx, match[2], match[1], "")
+			}
+		}
+	}
+	nextLine := ""
+	for j := i + 1; j < len(lines); j++ {
+		nextLine = strings.TrimSpace(lines[j])
+		if nextLine != "" && !strings.HasPrefix(nextLine, "![") {
+			break
+		}
+	}
+	if nextLine != "" && visitor.OnFigcaption != nil {
+		visitor.OnFigcaption(ctx, nextLine)
+	}
+	if visitor.OnFigureEnd != nil {
+		visitor.OnFigureEnd(ctx, "")
+	}
+}
+
+func processDetails(visitor *Visitor, ctx *NodeContext, line string) {
+	if visitor.OnDetails != nil {
+		visitor.OnDetails(ctx, true)
+	}
+	if visitor.OnSummary != nil {
+		visitor.OnSummary(ctx, line)
+	}
+}
+
+func processStrong(visitor *Visitor, ctx *NodeContext, line string) {
+	if strings.Contains(line, "**") && visitor.OnStrong != nil {
+		re := regexp.MustCompile(`\*\*([^*]+)\*\*`)
+		matches := re.FindAllStringSubmatch(line, -1)
+		for _, match := range matches {
+			if len(match) >= 2 {
+				visitor.OnStrong(ctx, match[1])
+			}
+		}
+	}
+}
+
+func processEmphasis(visitor *Visitor, ctx *NodeContext, line string) {
+	if (strings.Contains(line, "*") || strings.Contains(line, "_")) && visitor.OnEmphasis != nil {
+		re := regexp.MustCompile(`\*([^*]+)\*|_([^_]+)_`)
+		matches := re.FindAllStringSubmatch(line, -1)
+		for _, match := range matches {
+			if len(match) >= 2 && match[1] != "" {
+				visitor.OnEmphasis(ctx, match[1])
+			} else if len(match) >= 3 && match[2] != "" {
+				visitor.OnEmphasis(ctx, match[2])
+			}
+		}
+	}
+}
+
+func processMark(visitor *Visitor, ctx *NodeContext, line string) {
+	if strings.Contains(line, "==") && visitor.OnMark != nil {
+		re := regexp.MustCompile(`==([^=]+)==`)
+		matches := re.FindAllStringSubmatch(line, -1)
+		for _, match := range matches {
+			if len(match) >= 2 {
+				visitor.OnMark(ctx, match[1])
+			}
+		}
+	}
+}
+
+func isPlainText(line string, isListItem bool) bool {
+	return !strings.HasPrefix(line, "#") &&
+		!strings.HasPrefix(line, ">") &&
+		!isListItem &&
+		!strings.HasPrefix(line, "|") &&
+		!isHorizontalRule(line)
 }
 
 // MustConvertWithVisitor is like ConvertWithVisitor but panics if an error occurs.
