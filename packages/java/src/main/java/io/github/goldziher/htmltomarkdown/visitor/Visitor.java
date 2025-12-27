@@ -37,6 +37,7 @@ public interface Visitor {
         return VisitResult.Continue.INSTANCE;
     }
 
+
     /**
      * Called after exiting any HTML element with the default markdown
      * output.
@@ -63,7 +64,7 @@ public interface Visitor {
     }
 
     /**
-     * Visit anchor links: {@code <a href="...">}.
+     * Visit anchor links: {@code <a href="..."></a>}.
      *
      * @param ctx the node context
      * @param href the link destination
@@ -77,7 +78,7 @@ public interface Visitor {
     }
 
     /**
-     * Visit images: {@code <img src="...">}.
+     * Visit images: {@code <img src="..." />}.
      *
      * @param ctx the node context
      * @param src the image source URL
@@ -91,7 +92,7 @@ public interface Visitor {
     }
 
     /**
-     * Visit heading elements (h1 through h6).
+     * Visit heading elements ({@code <h1>} through {@code <h6>}).
      *
      * @param ctx the node context
      * @param level the heading level (1-6)
@@ -105,7 +106,7 @@ public interface Visitor {
     }
 
     /**
-     * Visit code blocks: pre and code elements.
+     * Visit code blocks: {@code <pre>} and {@code <code>} elements.
      *
      * @param ctx the node context
      * @param lang the language identifier (may be null)
@@ -118,7 +119,7 @@ public interface Visitor {
     }
 
     /**
-     * Visit inline code elements.
+     * Visit inline code elements ({@code <code>}).
      *
      * @param ctx the node context
      * @param code the code content
@@ -144,7 +145,7 @@ public interface Visitor {
     }
 
     /**
-     * Called before processing a list (ul or ol).
+     * Called before processing a list ({@code <ul>} or {@code <ol>}).
      *
      * @param ctx the node context
      * @param ordered true if this is an ordered list
@@ -156,7 +157,7 @@ public interface Visitor {
     }
 
     /**
-     * Called after processing a list (closing ul or ol).
+     * Called after processing a list (closing {@code </ul>} or {@code </ol>}).
      *
      * @param ctx the node context
      * @param ordered true if this is an ordered list
@@ -169,7 +170,7 @@ public interface Visitor {
     }
 
     /**
-     * Called before processing a table element.
+     * Called before processing a table ({@code <table>}).
      *
      * @param ctx the node context
      * @return the visitor result
@@ -179,7 +180,7 @@ public interface Visitor {
     }
 
     /**
-     * Visit table rows (tr elements).
+     * Visit table rows ({@code <tr>}) elements.
      *
      * @param ctx the node context
      * @param cells the cell contents as a list
@@ -192,7 +193,7 @@ public interface Visitor {
     }
 
     /**
-     * Called after processing a table element (closing tag).
+     * Called after processing a table element (closing {@code </table>}).
      *
      * @param ctx the node context
      * @param output the default markdown output
@@ -204,7 +205,7 @@ public interface Visitor {
     }
 
     /**
-     * Visit blockquote elements.
+     * Visit blockquote ({@code <blockquote>}) elements.
      *
      * @param ctx the node context
      * @param content the blockquote content
@@ -217,7 +218,7 @@ public interface Visitor {
     }
 
     /**
-     * Visit strong/bold elements (strong, b).
+     * Visit strong/bold elements ({@code <strong>}, {@code <b>}).
      *
      * @param ctx the node context
      * @param text the element text
@@ -229,7 +230,7 @@ public interface Visitor {
     }
 
     /**
-     * Visit emphasis/italic elements (em, i).
+     * Visit emphasis/italic elements ({@code <em>}, {@code <i>}).
      *
      * @param ctx the node context
      * @param text the element text
@@ -241,7 +242,7 @@ public interface Visitor {
     }
 
     /**
-     * Visit strikethrough elements (s, del, strike).
+     * Visit strikethrough elements ({@code <s>}, {@code <del>}, {@code <strike>}).
      *
      * @param ctx the node context
      * @param text the element text
@@ -253,7 +254,7 @@ public interface Visitor {
     }
 
     /**
-     * Visit underline elements (u, ins).
+     * Visit underline elements ({@code <u>}, {@code <ins>}).
      *
      * @param ctx the node context
      * @param text the element text
@@ -265,7 +266,7 @@ public interface Visitor {
     }
 
     /**
-     * Visit subscript elements (sub).
+     * Visit subscript elements ({@code <sub>}).
      *
      * @param ctx the node context
      * @param text the element text
@@ -277,7 +278,7 @@ public interface Visitor {
     }
 
     /**
-     * Visit superscript elements (sup).
+     * Visit superscript elements ({@code <sup>}).
      *
      * @param ctx the node context
      * @param text the element text
@@ -289,7 +290,7 @@ public interface Visitor {
     }
 
     /**
-     * Visit mark/highlight elements (mark).
+     * Visit mark/highlight ({@code <mark>}) elements.
      *
      * @param ctx the node context
      * @param text the element text
@@ -301,7 +302,7 @@ public interface Visitor {
     }
 
     /**
-     * Visit line break elements (br).
+     * Visit line break ({@code <br>}) elements.
      *
      * @param ctx the node context
      * @return the visitor result
@@ -311,7 +312,7 @@ public interface Visitor {
     }
 
     /**
-     * Visit horizontal rule elements (hr).
+     * Visit horizontal rule ({@code <hr>}) elements.
      *
      * @param ctx the node context
      * @return the visitor result
@@ -334,7 +335,7 @@ public interface Visitor {
     }
 
     /**
-     * Visit definition list (dl element).
+     * Visit definition list ({@code <dl>}) element.
      *
      * @param ctx the node context
      * @return the visitor result
@@ -344,7 +345,7 @@ public interface Visitor {
     }
 
     /**
-     * Visit definition term (dt element).
+     * Visit definition term ({@code <dt>}) element.
      *
      * @param ctx the node context
      * @param text the term text
@@ -356,7 +357,7 @@ public interface Visitor {
     }
 
     /**
-     * Visit definition description (dd element).
+     * Visit definition description ({@code <dd>}) element.
      *
      * @param ctx the node context
      * @param text the description text
@@ -368,7 +369,7 @@ public interface Visitor {
     }
 
     /**
-     * Called after processing a definition list (closing tag).
+     * Called after processing a definition list (closing {@code </dl>}).
      *
      * @param ctx the node context
      * @param output the default markdown output
@@ -380,7 +381,7 @@ public interface Visitor {
     }
 
     /**
-     * Visit form elements (form element).
+     * Visit form ({@code <form>}) elements.
      *
      * @param ctx the node context
      * @param action the form action (may be null)
@@ -393,7 +394,7 @@ public interface Visitor {
     }
 
     /**
-     * Visit input elements (input element).
+     * Visit input ({@code <input>}) elements.
      *
      * @param ctx the node context
      * @param inputType the input type
@@ -407,7 +408,7 @@ public interface Visitor {
     }
 
     /**
-     * Visit button elements (button element).
+     * Visit button ({@code <button>}) elements.
      *
      * @param ctx the node context
      * @param text the button text
@@ -419,7 +420,7 @@ public interface Visitor {
     }
 
     /**
-     * Visit audio elements (audio element).
+     * Visit audio ({@code <audio>}) elements.
      *
      * @param ctx the node context
      * @param src the audio source URL (may be null)
@@ -430,7 +431,7 @@ public interface Visitor {
     }
 
     /**
-     * Visit video elements (video element).
+     * Visit video ({@code <video>}) elements.
      *
      * @param ctx the node context
      * @param src the video source URL (may be null)
@@ -441,7 +442,7 @@ public interface Visitor {
     }
 
     /**
-     * Visit iframe elements (iframe element).
+     * Visit iframe ({@code <iframe>}) elements.
      *
      * @param ctx the node context
      * @param src the iframe source URL (may be null)
@@ -452,7 +453,7 @@ public interface Visitor {
     }
 
     /**
-     * Visit details elements (details element).
+     * Visit details ({@code <details>}) elements.
      *
      * @param ctx the node context
      * @param open true if the details element is open
@@ -464,7 +465,7 @@ public interface Visitor {
     }
 
     /**
-     * Visit summary elements (summary element).
+     * Visit summary ({@code <summary>}) elements.
      *
      * @param ctx the node context
      * @param text the summary text
@@ -476,7 +477,7 @@ public interface Visitor {
     }
 
     /**
-     * Visit figure elements (figure element).
+     * Visit figure ({@code <figure>}) elements.
      *
      * @param ctx the node context
      * @return the visitor result
@@ -486,7 +487,7 @@ public interface Visitor {
     }
 
     /**
-     * Visit figcaption elements (figcaption element).
+     * Visit figcaption ({@code <figcaption>}) elements.
      *
      * @param ctx the node context
      * @param text the caption text
@@ -498,7 +499,7 @@ public interface Visitor {
     }
 
     /**
-     * Called after processing a figure element (closing tag).
+     * Called after processing a figure element (closing {@code </figure>}).
      *
      * @param ctx the node context
      * @param output the default markdown output

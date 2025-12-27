@@ -94,7 +94,7 @@ public record NodeContext(
      * @param name the attribute name
      * @return the attribute value, or null if not found
      */
-    public String getAttributeValue(String name) {
+    public String getAttributeValue(final String name) {
         Objects.requireNonNull(name, "Attribute name cannot be null");
         return attributes.stream()
             .filter(attr -> attr.key().equals(name))
@@ -109,7 +109,7 @@ public record NodeContext(
      * @param name the attribute name
      * @return true if the attribute is present
      */
-    public boolean hasAttribute(String name) {
+    public boolean hasAttribute(final String name) {
         Objects.requireNonNull(name, "Attribute name cannot be null");
         return attributes.stream().anyMatch(attr -> attr.key().equals(name));
     }

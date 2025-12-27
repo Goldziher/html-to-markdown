@@ -13,8 +13,8 @@ import java.util.Objects;
 /**
  * Internal bridge for marshaling Java visitor callbacks to C FFI.
  *
- * <p>This class handles the complex task of converting Java visitor interface calls
- * into C-compatible callbacks via Panama FFI. It manages:
+ * <p>This class handles the complex task of converting Java visitor
+ * interface calls into C-compatible callbacks via Panama FFI. It manages:
  * <ul>
  *   <li>Memory allocation for C structures</li>
  *   <li>String conversion between Java and C</li>
@@ -106,11 +106,13 @@ final class VisitorBridge {
     /**
      * Convert a VisitResult to C-compatible format.
      *
-     * <p>For Custom and Error results, returns a struct with the allocated string
-     * pointer and type. For other results, type field indicates the action.
+     * <p>For Custom and Error results, returns a struct with the
+     * allocated string pointer and type. For other results, type field
+     * indicates the action.
      *
      * @param result the Java VisitResult
-     * @return encoded result containing both type and pointer (without bit loss)
+     * @return encoded result containing both type and pointer (without
+     *     bit loss)
      */
     long encodeResult(final VisitResult result) {
         if (result instanceof VisitResult.Continue) {
