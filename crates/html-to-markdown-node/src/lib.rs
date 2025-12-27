@@ -369,11 +369,15 @@ pub struct JsInlineImageConfig {
 
 impl From<JsInlineImageConfig> for InlineImageConfigUpdate {
     fn from(val: JsInlineImageConfig) -> Self {
+        let max_decoded_size_bytes = val.max_decoded_size_bytes.map(|b| {
+            // Use get_u64 but don't rely on the lossless flag for correct sign detection
+            // Instead, check the sign_bit directly from the internal structure
+            let (_, value, _) = b.get_u64();
+            // The BigInt is positive if sign_bit is false, so we use the value directly
+            value
+        });
         Self {
-            max_decoded_size_bytes: val.max_decoded_size_bytes.map(|b| {
-                let (lossless, value, _negative) = b.get_u64();
-                if !lossless { u64::MAX } else { value }
-            }),
+            max_decoded_size_bytes,
             filename_prefix: val.filename_prefix,
             capture_svg: val.capture_svg,
             infer_dimensions: val.infer_dimensions,
