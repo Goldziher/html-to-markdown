@@ -1,18 +1,44 @@
-# Examples & Smoke Tests
+# Examples
 
-These sub-projects make it easy to reproduce installation issues for every
-binding. Each folder contains a README with detailed instructions for testing
-both the latest published artifact and a local build from this repository.
+This directory contains comprehensive feature guides with working code examples in multiple languages.
 
-| Path | Runtime | Notes |
-| --- | --- | --- |
-| `examples/node-smoke` | Node.js / Bun | Installs `html-to-markdown-node` from npm or a local `pnpm --filter html-to-markdown-node run build`. |
-| `examples/wasm-smoke` | Node.js (WASM) | Loads `html-to-markdown-wasm` via the `dist-node` entry and can swap in the locally-built bundle. |
-| `examples/python-smoke` | Python | Uses a virtual environment plus either PyPI (`pip install -r requirements.txt`) or `pip install ../../packages/python`. |
-| `examples/ruby-smoke` | Ruby | Bundler project that can point at RubyGems or the `packages/ruby` sources via `bundle config local.html-to-markdown`. |
-| `examples/php-smoke` | PHP | Composer project that exercises `html_to_markdown` extension after installing via PIE or a local build. |
-| `examples/rust-smoke` | Rust | Simple binary wired to crates.io by default with an opt-in local patch template. |
+## Feature Guides
 
-Legacy demo files such as `browser.html` and `node-native.js` remain available
-for quick manual testing, but the new smoke tests should be used for release
-validation.
+### Visitor Pattern
+Customize HTML→Markdown conversion with callbacks for specific HTML elements. Use the visitor pattern for domain-specific dialects, content filtering, URL rewriting, and accessibility validation.
+
+→ **[Full Guide with Examples](./visitor-pattern/)** - Python, TypeScript, Ruby code examples included
+
+**Working Examples:**
+- CDN URL rewriting
+- Content filtering (remove ads, tracking)
+- Accessibility validation (alt text, heading hierarchy)
+- Async URL validation
+
+### Metadata Extraction
+Extract comprehensive metadata during conversion: document properties, headers, links, images, and structured data (JSON-LD, Microdata, RDFa).
+
+→ **[Full Guide with Examples](./metadata-extraction/)** - Python, TypeScript, Ruby code examples included
+
+**Working Examples:**
+- SEO metadata extraction (title, description, Open Graph, Twitter Cards)
+- Table of contents generation from headers
+- Link validation and classification
+- Accessibility audit (missing alt text, empty links)
+- Content migration manifest
+
+### Performance & Benchmarking
+Understand performance characteristics across all language bindings, run benchmarks, profile memory usage, and optimize for your use case.
+
+→ **[Full Guide with Examples](./performance/)** - Benchmarking tools and optimization guides
+
+**Working Examples:**
+- Benchmark fixtures (measure latency, throughput, memory)
+- Memory profiling tools
+- Streaming strategies for large files
+
+---
+
+## Legacy Demo Files
+
+Legacy demo files such as `browser.html` and `node-native.js` remain available for quick manual testing.

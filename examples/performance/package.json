@@ -1,0 +1,32 @@
+{
+  "name": "html-to-markdown-performance-examples",
+  "version": "1.0.0",
+  "description": "Performance and benchmarking examples for html-to-markdown",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "bench": "python3 benchmark-fixtures.py",
+    "bench:small": "python3 benchmark-fixtures.py --size small",
+    "bench:medium": "python3 benchmark-fixtures.py --size medium",
+    "bench:large": "python3 benchmark-fixtures.py --size large",
+    "bench:with-options": "python3 benchmark-fixtures.py --all --with-options",
+    "memory": "python3 memory-profiling.py",
+    "memory:small": "python3 memory-profiling.py --size small",
+    "memory:medium": "python3 memory-profiling.py --size medium",
+    "memory:large": "python3 memory-profiling.py --size large",
+    "stream": "python3 streaming-large-files.py",
+    "stream:5mb": "python3 streaming-large-files.py --size 5",
+    "stream:20mb": "python3 streaming-large-files.py --size 20",
+    "stream:100mb": "python3 streaming-large-files.py --size 100"
+  },
+  "keywords": [
+    "html-to-markdown",
+    "performance",
+    "benchmarking",
+    "profiling"
+  ],
+  "engines": {
+    "node": ">=18.0.0",
+    "python": ">=3.10"
+  }
+}

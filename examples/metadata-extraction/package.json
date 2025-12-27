@@ -1,0 +1,27 @@
+{
+  "name": "html-to-markdown-metadata-examples",
+  "version": "1.0.0",
+  "description": "Metadata extraction examples for html-to-markdown",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "seo": "tsx seo-extraction.ts",
+    "toc": "tsx toc-generation.ts"
+  },
+  "keywords": [
+    "html-to-markdown",
+    "metadata",
+    "extraction",
+    "seo",
+    "examples"
+  ],
+  "author": "Na'aman Hirschfeld",
+  "license": "MIT",
+  "dependencies": {
+    "html-to-markdown": "^2.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "tsx": "^4.0.0"
+  }
+}
