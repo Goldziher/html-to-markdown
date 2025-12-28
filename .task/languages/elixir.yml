@@ -6,9 +6,10 @@ internal: true
 
 includes:
   platforms: ../config/platforms.yml
+  _cfg: ../config/vars.yml
 
 vars:
-  ELIXIR_WORK_DIR: "{{.PACKAGES_DIR}}/elixir"
+  ELIXIR_WORK_DIR: "packages/elixir"
 
 env:
   MIX_ENV: "dev"

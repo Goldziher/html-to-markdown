@@ -27,13 +27,13 @@ vars:
   RUST_LOG: "info"
 
   # Root project directories (absolute paths)
-  ROOT: "{{.TASKFILE_DIR}}"
-  CRATES_DIR: "{{.TASKFILE_DIR}}/crates"
-  PACKAGES_DIR: "{{.TASKFILE_DIR}}/packages"
-  SCRIPTS_DIR: "{{.TASKFILE_DIR}}/scripts"
-  TOOLS_DIR: "{{.TASKFILE_DIR}}/tools"
-  TARGET_DIR: "{{.TASKFILE_DIR}}/target"
-  EXAMPLES_DIR: "{{.TASKFILE_DIR}}/examples"
+  ROOT: "{{.ROOT_DIR}}"
+  CRATES_DIR: "{{.ROOT_DIR}}/crates"
+  PACKAGES_DIR: "{{.ROOT_DIR}}/packages"
+  SCRIPTS_DIR: "{{.ROOT_DIR}}/scripts"
+  TOOLS_DIR: "{{.ROOT_DIR}}/tools"
+  TARGET_DIR: "{{.ROOT_DIR}}/target"
+  EXAMPLES_DIR: "{{.ROOT_DIR}}/examples"
 
   # OS Detection - determine operating system
   OS:

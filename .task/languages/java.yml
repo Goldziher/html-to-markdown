@@ -6,10 +6,11 @@ internal: true
 
 includes:
   platforms: ../config/platforms.yml
+  _cfg: ../config/vars.yml
 
 vars:
   BUILD_PROFILE: "{{.BUILD_PROFILE | default \"release\"}}"
-  JAVA_WORK_DIR: "{{.PACKAGES_DIR}}/java"
+  JAVA_WORK_DIR: "packages/java"
   MAVEN_WRAPPER: "./mvnw{{if eq .OS \"windows\"}}.cmd{{end}}"
   MAVEN_OPTS: "--enable-native-access=ALL-UNNAMED"
 

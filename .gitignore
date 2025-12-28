@@ -57,6 +57,7 @@ packages/ruby/vendor/
 packages/php-ext/workspace/
 !packages/elixir/lib/
 !packages/elixir/lib/**/*.ex
+erl_crash.dump
 
 # Example dependency directories
 vendor/

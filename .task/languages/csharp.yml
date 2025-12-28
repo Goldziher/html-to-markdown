@@ -6,10 +6,11 @@ internal: true
 
 includes:
   platforms: ../config/platforms.yml
+  _cfg: ../config/vars.yml
 
 vars:
   BUILD_PROFILE: "{{.BUILD_PROFILE | default \"release\"}}"
-  CSHARP_WORK_DIR: "{{.PACKAGES_DIR}}/csharp"
+  CSHARP_WORK_DIR: "packages/csharp"
 
 tasks:
   install:

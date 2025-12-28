@@ -7,9 +7,10 @@ internal: true
 
 includes:
   platforms: ../config/platforms.yml
+  _cfg: ../config/vars.yml
 
 vars:
-  GO_WORK_DIR: "{{.PACKAGES_DIR}}/go/v2/htmltomarkdown"
+  GO_WORK_DIR: "packages/go/v2/htmltomarkdown"
   FFI_BUILD_DIR: "{{.TARGET_DIR}}/{{.OS}}-{{.ARCH}}/release"
 
 env:

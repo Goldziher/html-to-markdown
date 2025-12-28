@@ -6,9 +6,10 @@ internal: true
 
 includes:
   platforms: ../config/platforms.yml
+  _cfg: ../config/vars.yml
 
 vars:
-  RUBY_WORK_DIR: "{{.PACKAGES_DIR}}/ruby"
+  RUBY_WORK_DIR: "packages/ruby"
 
 env:
   RUBY: "{{.RUBY_BIN}}/ruby"

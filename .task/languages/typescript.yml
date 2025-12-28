@@ -7,10 +7,11 @@ internal: true
 
 includes:
   platforms: ../config/platforms.yml
+  _cfg: ../config/vars.yml
 
 vars:
   PNPM_VERSION: ">=10.17"
-  TYPESCRIPT_WORK_DIR: "{{.PACKAGES_DIR}}/typescript"
+  TYPESCRIPT_WORK_DIR: "packages/typescript"
 
 dir: "{{.TYPESCRIPT_WORK_DIR}}"
 
