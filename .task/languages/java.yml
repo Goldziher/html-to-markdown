@@ -120,17 +120,17 @@ tasks:
         ignore_error: false
 
   format:
-    desc: "Format Java code with fmt-maven-plugin (auto-fix)"
+    desc: "Format Java code with Spotless (auto-fix)"
     silent: false
     cmds:
-      - cmd: cd {{.JAVA_PKG}} && "{{.MAVEN_CMD}}" fmt:format
+      - cmd: cd {{.JAVA_PKG}} && "{{.MAVEN_CMD}}" spotless:apply
         ignore_error: false
 
   format:check:
     desc: "Check Java formatting without modifications"
     silent: false
     cmds:
-      - cmd: cd {{.JAVA_PKG}} && "{{.MAVEN_CMD}}" fmt:check
+      - cmd: cd {{.JAVA_PKG}} && "{{.MAVEN_CMD}}" spotless:check
         ignore_error: false
 
   update:
