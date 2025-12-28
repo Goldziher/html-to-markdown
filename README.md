@@ -1,6 +1,6 @@
 # html-to-markdown
 
-High-performance HTML → Markdown conversion powered by Rust. Shipping as a Rust crate, Python package, PHP extension, Ruby gem, Elixir Rustler NIF, Node.js bindings, WebAssembly, and standalone CLI with identical rendering behaviour.
+High-performance HTML → Markdown conversion powered by Rust. Shipping as a Rust crate, Python package, PHP extension, Ruby gem, Elixir Rustler NIF, Node.js bindings, WebAssembly, and standalone CLI with identical rendering behaviour. Part of the Kreuzberg.dev document intelligence ecosystem. Kreuzberg is a polyglot document intelligence framework with a fast Rust core. We build tools that help developers extract, process, and understand documents at scale, from PDFs to Office files, images, archives, emails, in 50+ formats. We've set out to make high-performance document intelligence faster and more ecological.
 
 [![Crates.io](https://img.shields.io/crates/v/html-to-markdown-rs.svg?logo=rust&label=crates.io)](https://crates.io/crates/html-to-markdown-rs)
 [![npm (node)](https://img.shields.io/npm/v/html-to-markdown-node.svg?logo=npm)](https://www.npmjs.com/package/html-to-markdown-node)
@@ -15,6 +15,7 @@ High-performance HTML → Markdown conversion powered by Rust. Shipping as a Rus
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://github.com/Goldziher/html-to-markdown/blob/main/LICENSE)
 [![Discord](https://img.shields.io/badge/Discord-Join%20our%20community-7289da)](https://discord.gg/pXxagNK2zN)
 
+ 
 ---
 
 ## 🎮 **[Try the Live Demo →](https://goldziher.github.io/html-to-markdown/)**
