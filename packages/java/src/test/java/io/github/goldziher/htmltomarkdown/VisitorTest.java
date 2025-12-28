@@ -295,7 +295,9 @@ class VisitorTest {
     @Test
     @DisplayName("Default visitor returns Continue")
     void testDefaultVisitor() {
-      Visitor visitor = new Visitor() { };
+      Visitor visitor = new Visitor() {
+            // no overrides
+          };
 
       NodeContext ctx = new NodeContext(NodeType.PARAGRAPH, "p", List.of(), 1, 0, "body", false);
 
