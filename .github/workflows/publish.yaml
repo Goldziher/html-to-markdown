@@ -88,7 +88,7 @@ jobs:
       - name: Install Task
         uses: go-task/setup-task@v1
         with:
-          version: latest
+          version: 3.46.4
 
       - name: Upload release metadata
         uses: actions/upload-artifact@v6

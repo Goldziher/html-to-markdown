@@ -35,7 +35,7 @@ jobs:
       - name: Install Task
         uses: go-task/setup-task@v1
         with:
-          version: latest
+          version: 3.46.4
 
       - name: Install uv
         uses: astral-sh/setup-uv@v7
