@@ -2216,6 +2216,7 @@ fn strip_script_and_style_tags(input: &str) -> Cow<'_, str> {
     let mut idx = 0;
     let mut last = 0;
     let mut output: Option<String> = None;
+    let mut svg_depth = 0usize;
 
     // Fast-path: check if there are any < characters at all
     if !bytes.contains(&b'<') {
@@ -2224,6 +2225,27 @@ fn strip_script_and_style_tags(input: &str) -> Cow<'_, str> {
 
     while idx < len {
         if bytes[idx] == b'<' && idx + 1 < len {
+            if matches_tag_start(bytes, idx + 1, b"svg") {
+                if let Some(open_end) = find_tag_end(bytes, idx + 1 + b"svg".len()) {
+                    svg_depth += 1;
+                    idx = open_end;
+                    continue;
+                }
+            } else if matches_end_tag_start(bytes, idx + 1, b"svg") {
+                if let Some(close_end) = find_tag_end(bytes, idx + 2 + b"svg".len()) {
+                    if svg_depth > 0 {
+                        svg_depth = svg_depth.saturating_sub(1);
+                    }
+                    idx = close_end;
+                    continue;
+                }
+            }
+
+            if svg_depth > 0 {
+                idx += 1;
+                continue;
+            }
+
             // Check for </script or </style (closing tags first for safety)
             if bytes[idx + 1] == b'/' && idx + 2 < len {
                 // Match </script>
@@ -2268,7 +2290,13 @@ fn strip_script_and_style_tags(input: &str) -> Cow<'_, str> {
                             if let Some(close_idx) = close_tag {
                                 let out = output.get_or_insert_with(|| String::with_capacity(len));
                                 out.push_str(&input[last..idx]);
-                                out.push(' ');
+                                if idx > 0
+                                    && close_idx < len
+                                    && !bytes[idx - 1].is_ascii_whitespace()
+                                    && !bytes[close_idx].is_ascii_whitespace()
+                                {
+                                    out.push(' ');
+                                }
                                 last = close_idx;
                                 idx = close_idx;
                                 continue;
@@ -2301,7 +2329,13 @@ fn strip_script_and_style_tags(input: &str) -> Cow<'_, str> {
                         if let Some(close_idx) = close_tag {
                             let out = output.get_or_insert_with(|| String::with_capacity(len));
                             out.push_str(&input[last..idx]);
-                            out.push(' ');
+                            if idx > 0
+                                && close_idx < len
+                                && !bytes[idx - 1].is_ascii_whitespace()
+                                && !bytes[close_idx].is_ascii_whitespace()
+                            {
+                                out.push(' ');
+                            }
                             last = close_idx;
                             idx = close_idx;
                             continue;

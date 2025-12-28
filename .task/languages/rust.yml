@@ -68,10 +68,10 @@ tasks:
     silent: false
     cmds:
       - cmd: |
-          RB_SYS_RUBY={{.RUBY_FULL_PATH}} RUBY={{.RUBY_FULL_PATH}} RUST_LOG={{.RUST_LOG}} RUST_BACKTRACE={{.RUST_BACKTRACE}} cargo llvm-cov --all-features --workspace --exclude html-to-markdown-py --exclude html-to-markdown-rb --exclude html-to-markdown-php --lcov --output-path rust-coverage.lcov -j {{.NUM_CPUS}}
+          RB_SYS_RUBY={{.RUBY_FULL_PATH}} RUBY={{.RUBY_FULL_PATH}} RUST_LOG={{.RUST_LOG}} RUST_BACKTRACE={{.RUST_BACKTRACE}} cargo llvm-cov --all-features --workspace --exclude html-to-markdown-py --exclude html-to-markdown-rb --exclude html-to-markdown-php --exclude benchmark-harness --lcov --output-path rust-coverage.lcov -j {{.NUM_CPUS}}
         ignore_error: false
       - cmd: |
-          RB_SYS_RUBY={{.RUBY_FULL_PATH}} RUBY={{.RUBY_FULL_PATH}} cargo llvm-cov --all-features --workspace --exclude html-to-markdown-py --exclude html-to-markdown-rb --exclude html-to-markdown-php --summary-only
+          RB_SYS_RUBY={{.RUBY_FULL_PATH}} RUBY={{.RUBY_FULL_PATH}} cargo llvm-cov --all-features --workspace --exclude html-to-markdown-py --exclude html-to-markdown-rb --exclude html-to-markdown-php --exclude benchmark-harness --summary-only
         ignore_error: false
 
   coverage:
@@ -79,7 +79,7 @@ tasks:
     silent: false
     cmds:
       - cmd: |
-          RB_SYS_RUBY={{.RUBY_FULL_PATH}} RUBY={{.RUBY_FULL_PATH}} RUST_LOG={{.RUST_LOG}} cargo llvm-cov --all-features --workspace --exclude html-to-markdown-py --exclude html-to-markdown-rb --exclude html-to-markdown-php --lcov --output-path rust-coverage.lcov -j {{.NUM_CPUS}}
+          RB_SYS_RUBY={{.RUBY_FULL_PATH}} RUBY={{.RUBY_FULL_PATH}} RUST_LOG={{.RUST_LOG}} cargo llvm-cov --all-features --workspace --exclude html-to-markdown-py --exclude html-to-markdown-rb --exclude html-to-markdown-php --exclude benchmark-harness --lcov --output-path rust-coverage.lcov -j {{.NUM_CPUS}}
         ignore_error: false
 
   lint:
@@ -99,7 +99,7 @@ tasks:
       - cmd: cargo fmt --all --check
         ignore_error: false
       - cmd: |
-          RB_SYS_RUBY={{.RUBY_FULL_PATH}} RUBY={{.RUBY_FULL_PATH}} cargo clippy --workspace --exclude html-to-markdown-rb -- -D warnings -j {{.NUM_CPUS}}
+          RB_SYS_RUBY={{.RUBY_FULL_PATH}} RUBY={{.RUBY_FULL_PATH}} cargo clippy -j {{.NUM_CPUS}} --workspace --exclude html-to-markdown-rb -- -D warnings
         ignore_error: false
 
   format:

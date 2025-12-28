@@ -61,7 +61,7 @@ dev = [
 [tool.maturin]
 manifest-path = "../../crates/html-to-markdown-py/Cargo.toml"
 module-name = "html_to_markdown._html_to_markdown"
-features = [ "inline-images", "metadata", "visitor" ]
+features = [ "inline-images", "metadata", "visitor", "async-visitor" ]
 include = [
   { path = "html_to_markdown-*.data/**/*", format = "wheel" },
   { path = "html_to_markdown/bin/*", format = "wheel" },

@@ -54,6 +54,8 @@ tasks:
     desc: "Run Python tests with pytest"
     silent: false
     cmds:
+      - cmd: cargo build --release --package html-to-markdown-cli
+        ignore_error: false
       - cmd: cd {{.PYTHON_PKG}} && uv run pytest -v tests/
         ignore_error: false
 
@@ -61,6 +63,8 @@ tasks:
     desc: "Run Python tests with coverage for CI (generates lcov)"
     silent: false
     cmds:
+      - cmd: cargo build --release --package html-to-markdown-cli
+        ignore_error: false
       - cmd: cd {{.PYTHON_PKG}} && uv run pytest -v --cov=. --cov-report=lcov:coverage.lcov tests/
         ignore_error: false
 

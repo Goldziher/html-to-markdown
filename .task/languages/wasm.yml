@@ -99,7 +99,7 @@ tasks:
       - cmd: cd {{.WASM_PKG}} && cargo fmt --all --check
         ignore_error: false
       - cmd: |
-          cd {{.WASM_PKG}} && cargo clippy --target {{.WASM_TARGET}} -- -D warnings -j {{.NUM_CPUS}}
+          cd {{.WASM_PKG}} && cargo clippy -j {{.NUM_CPUS}} --target {{.WASM_TARGET}} -- -D warnings
         ignore_error: false
 
   format:
