@@ -3126,6 +3126,33 @@ fn walk_node(
 ) {
     let Some(node) = node_handle.get(parser) else { return };
 
+    // Log entry to walk_node for body and immediate children
+    if options.debug {
+        match node {
+            tl::Node::Tag(tag) => {
+                let tag_name = tag.name().as_utf8_str();
+                if tag_name == "body" || tag_name == "html" || depth <= 2 {
+                    eprintln!(
+                        "[DEBUG-ENTRY] walk_node called: tag={}, depth={}, output_len={}",
+                        tag_name,
+                        depth,
+                        output.len()
+                    );
+                }
+            }
+            tl::Node::Raw(_) => {
+                if depth <= 2 {
+                    eprintln!(
+                        "[DEBUG-ENTRY] walk_node called: Text node at depth={}, output_len={}",
+                        depth,
+                        output.len()
+                    );
+                }
+            }
+            _ => {}
+        }
+    }
+
     match node {
         tl::Node::Raw(bytes) => {
             let raw = bytes.as_utf8_str();
@@ -7313,6 +7340,54 @@ fn walk_node(
                         for child_handle in children.top().iter() {
                             walk_node(child_handle, parser, output, options, ctx, depth, dom_ctx);
                         }
+                    }
+                }
+
+                "body" | "html" => {
+                    // Process children of body/html tags directly without whitespace truncation
+                    // These are structural container tags that should always preserve their content
+                    if options.debug {
+                        eprintln!(
+                            "[DEBUG] Processing <{}> tag at depth={}, output_len_before={}",
+                            tag_name,
+                            depth,
+                            output.len()
+                        );
+                    }
+
+                    let children = tag.children();
+                    let child_count = children.top().len();
+
+                    if options.debug {
+                        eprintln!("[DEBUG] <{}> has {} children", tag_name, child_count);
+                    }
+
+                    {
+                        for (child_index, child_handle) in children.top().iter().enumerate() {
+                            let output_len_before = output.len();
+
+                            if options.debug {
+                                eprintln!(
+                                    "[DEBUG] <{}> processing child {} of {}, output_len_before={}",
+                                    tag_name, child_index, child_count, output_len_before
+                                );
+                            }
+
+                            walk_node(child_handle, parser, output, options, ctx, depth + 1, dom_ctx);
+
+                            let output_len_after = output.len();
+                            if options.debug {
+                                let bytes_added = output_len_after.saturating_sub(output_len_before);
+                                eprintln!(
+                                    "[DEBUG] <{}> child {} complete: added {} bytes (total: {})",
+                                    tag_name, child_index, bytes_added, output_len_after
+                                );
+                            }
+                        }
+                    }
+
+                    if options.debug {
+                        eprintln!("[DEBUG] <{}> tag complete, output_len_after={}", tag_name, output.len());
                     }
                 }
 
