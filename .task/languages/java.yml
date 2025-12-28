@@ -11,7 +11,17 @@ includes:
 vars:
   BUILD_PROFILE: "{{.BUILD_PROFILE | default \"release\"}}"
   JAVA_PKG: "packages/java"
-  MAVEN_WRAPPER: "./mvnw{{if eq .OS \"windows\"}}.cmd{{end}}"
+  MAVEN_CMD:
+    sh: |
+      if [ -x "{{.JAVA_PKG}}/mvnw" ]; then
+        echo "./mvnw"
+      elif [ -f "{{.JAVA_PKG}}/mvnw.cmd" ]; then
+        echo "./mvnw.cmd"
+      elif command -v mvn >/dev/null 2>&1; then
+        echo "mvn"
+      else
+        echo "mvn"
+      fi
   MAVEN_OPTS: "--enable-native-access=ALL-UNNAMED"
 
 env:
@@ -24,9 +34,9 @@ tasks:
     cmds:
       - cmd: cd {{.JAVA_PKG}} && java -version
         ignore_error: false
-      - cmd: cd {{.JAVA_PKG}} && "{{.MAVEN_WRAPPER}}" -v
+      - cmd: cd {{.JAVA_PKG}} && "{{.MAVEN_CMD}}" -v
         ignore_error: false
-      - cmd: cd {{.JAVA_PKG}} && "{{.MAVEN_WRAPPER}}" -B dependency:go-offline
+      - cmd: cd {{.JAVA_PKG}} && "{{.MAVEN_CMD}}" -B dependency:go-offline
         ignore_error: false
 
   build:
@@ -35,7 +45,7 @@ tasks:
     cmds:
       - cmd: "cargo build{{if eq .BUILD_PROFILE \"release\"}} --release{{end}} -p html-to-markdown-ffi"
         ignore_error: false
-      - cmd: "cd {{.JAVA_PKG}} && {{.MAVEN_WRAPPER}} clean package -DskipTests"
+      - cmd: "cd {{.JAVA_PKG}} && {{.MAVEN_CMD}} clean package -DskipTests"
         ignore_error: false
 
   build:dev:
@@ -44,7 +54,7 @@ tasks:
     cmds:
       - cmd: cargo build -p html-to-markdown-ffi
         ignore_error: false
-      - cmd: "cd {{.JAVA_PKG}} && {{.MAVEN_WRAPPER}} clean package -DskipTests"
+      - cmd: "cd {{.JAVA_PKG}} && {{.MAVEN_CMD}} clean package -DskipTests"
         ignore_error: false
 
   build:release:
@@ -53,7 +63,7 @@ tasks:
     cmds:
       - cmd: cargo build --release -p html-to-markdown-ffi
         ignore_error: false
-      - cmd: "cd {{.JAVA_PKG}} && {{.MAVEN_WRAPPER}} clean package -DskipTests"
+      - cmd: "cd {{.JAVA_PKG}} && {{.MAVEN_CMD}} clean package -DskipTests"
         ignore_error: false
 
   build:ci:
@@ -62,7 +72,7 @@ tasks:
     cmds:
       - cmd: cargo build --release -p html-to-markdown-ffi
         ignore_error: false
-      - cmd: "cd {{.JAVA_PKG}} && {{.MAVEN_WRAPPER}} clean package -DskipTests"
+      - cmd: "cd {{.JAVA_PKG}} && {{.MAVEN_CMD}} clean package -DskipTests"
         ignore_error: false
 
   test:
@@ -72,7 +82,7 @@ tasks:
       - cmd: cargo build --release -p html-to-markdown-ffi
         ignore_error: false
       - cmd: |
-          cd {{.JAVA_PKG}} && {{.MAVEN_WRAPPER}} test \
+          cd {{.JAVA_PKG}} && {{.MAVEN_CMD}} test \
             -DFFI_LIB_PATH={{.TASKFILE_DIR}}/target/release
         ignore_error: false
     env:
@@ -87,7 +97,7 @@ tasks:
       - cmd: cargo build --release -p html-to-markdown-ffi
         ignore_error: false
       - cmd: |
-          cd {{.JAVA_PKG}} && {{.MAVEN_WRAPPER}} test jacoco:report \
+          cd {{.JAVA_PKG}} && {{.MAVEN_CMD}} test jacoco:report \
             -DFFI_LIB_PATH={{.TASKFILE_DIR}}/target/release
         ignore_error: false
     env:
@@ -99,40 +109,40 @@ tasks:
     desc: "Note: Java linting is part of Maven build (checkstyle configured in pom.xml)"
     silent: false
     cmds:
-      - cmd: cd {{.JAVA_PKG}} && "{{.MAVEN_WRAPPER}}" checkstyle:check
+      - cmd: cd {{.JAVA_PKG}} && "{{.MAVEN_CMD}}" checkstyle:check
         ignore_error: false
 
   lint:check:
     desc: "Run checkstyle validation (WITHOUT auto-fix)"
     silent: false
     cmds:
-      - cmd: cd {{.JAVA_PKG}} && "{{.MAVEN_WRAPPER}}" checkstyle:check
+      - cmd: cd {{.JAVA_PKG}} && "{{.MAVEN_CMD}}" checkstyle:check
         ignore_error: false
 
   format:
     desc: "Format Java code with fmt-maven-plugin (auto-fix)"
     silent: false
     cmds:
-      - cmd: cd {{.JAVA_PKG}} && "{{.MAVEN_WRAPPER}}" fmt:format
+      - cmd: cd {{.JAVA_PKG}} && "{{.MAVEN_CMD}}" fmt:format
         ignore_error: false
 
   format:check:
     desc: "Check Java formatting without modifications"
     silent: false
     cmds:
-      - cmd: cd {{.JAVA_PKG}} && "{{.MAVEN_WRAPPER}}" fmt:check
+      - cmd: cd {{.JAVA_PKG}} && "{{.MAVEN_CMD}}" fmt:check
         ignore_error: false
 
   update:
     desc: "Update Maven dependencies to latest versions"
     silent: false
     cmds:
-      - cmd: cd {{.JAVA_PKG}} && "{{.MAVEN_WRAPPER}}" versions:use-latest-versions
+      - cmd: cd {{.JAVA_PKG}} && "{{.MAVEN_CMD}}" versions:use-latest-versions
         ignore_error: false
 
   clean:
     desc: "Clean Maven build artifacts and target directory"
     silent: false
     cmds:
-      - cmd: cd {{.JAVA_PKG}} && "{{.MAVEN_WRAPPER}}" clean
+      - cmd: cd {{.JAVA_PKG}} && "{{.MAVEN_CMD}}" clean
         ignore_error: false
