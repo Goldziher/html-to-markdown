@@ -46,6 +46,10 @@ jobs:
         with:
           enable-cache: true
 
+      - name: Install Prek
+        run: scripts/ci/validate/install-prek.sh
+        shell: bash
+
       - name: Set up Python
         uses: actions/setup-python@v6
         with:
