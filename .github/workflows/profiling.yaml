@@ -226,7 +226,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        framework: [python, ruby, typescript]
+        framework: [python, ruby, node]
     name: visitor-benchmark-${{ matrix.framework }}
     env:
       FRAMEWORKS: ${{ matrix.framework }}
@@ -275,7 +275,7 @@ jobs:
         run: bundle exec rake compile
 
       - name: Setup Node workspace
-        if: env.FRAMEWORKS == 'typescript'
+        if: env.FRAMEWORKS == 'node'
         uses: ./.github/actions/setup-node-workspace
 
       - name: Run visitor benchmark - Baseline
@@ -339,7 +339,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        framework: [rust, python, ruby, typescript, node, php, go, java, csharp]
+        framework: [rust, python, ruby, node, php, go, java, csharp]
     name: visitor-benchmark-schedule-${{ matrix.framework }}
     env:
       FRAMEWORKS: ${{ matrix.framework }}
@@ -388,7 +388,7 @@ jobs:
         run: bundle exec rake compile
 
       - name: Setup Node workspace
-        if: env.FRAMEWORKS == 'typescript' || env.FRAMEWORKS == 'node'
+        if: env.FRAMEWORKS == 'node'
         uses: ./.github/actions/setup-node-workspace
 
       - name: Setup PHP

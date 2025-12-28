@@ -8,57 +8,13 @@ RSpec.describe HtmlToMarkdown do
     # ============================================================================
     # ============================================================================
 
-    # rubocop:disable Metrics/MethodLength
-    def create_visitor(**overrides)
-      visitor = double(Object)
-
-      default_methods = {
-        visit_element_start: { type: :continue },
-        visit_element_end: { type: :continue },
-        visit_text: { type: :continue },
-        visit_link: { type: :continue },
-        visit_image: { type: :continue },
-        visit_heading: { type: :continue },
-        visit_code_block: { type: :continue },
-        visit_code_inline: { type: :continue },
-        visit_list_item: { type: :continue },
-        visit_list_start: { type: :continue },
-        visit_list_end: { type: :continue },
-        visit_table_start: { type: :continue },
-        visit_table_row: { type: :continue },
-        visit_table_end: { type: :continue },
-        visit_blockquote: { type: :continue },
-        visit_strong: { type: :continue },
-        visit_emphasis: { type: :continue },
-        visit_strikethrough: { type: :continue },
-        visit_underline: { type: :continue },
-        visit_subscript: { type: :continue },
-        visit_superscript: { type: :continue },
-        visit_mark: { type: :continue },
-        visit_line_break: { type: :continue },
-        visit_horizontal_rule: { type: :continue },
-        visit_custom_element: { type: :continue },
-        visit_definition_list_start: { type: :continue },
-        visit_definition_term: { type: :continue },
-        visit_definition_description: { type: :continue },
-        visit_definition_list_end: { type: :continue },
-        visit_form: { type: :continue },
-        visit_input: { type: :continue },
-        visit_button: { type: :continue },
-        visit_audio: { type: :continue },
-        visit_video: { type: :continue },
-        visit_iframe: { type: :continue },
-        visit_details: { type: :continue },
-        visit_summary: { type: :continue },
-        visit_figure_start: { type: :continue },
-        visit_figcaption: { type: :continue },
-        visit_figure_end: { type: :continue }
-      }
-
-      default_methods.each do |method_name, return_value|
+    def setup_visitor_stubs(visitor, methods)
+      methods.each do |method_name, return_value|
         allow(visitor).to receive(method_name).and_return(return_value)
       end
+    end
 
+    def apply_visitor_overrides(visitor, overrides)
       overrides.each do |method_name, behavior|
         if behavior.is_a?(Proc)
           allow(visitor).to receive(method_name, &behavior)
@@ -66,10 +22,28 @@ RSpec.describe HtmlToMarkdown do
           allow(visitor).to receive(method_name).and_return(behavior)
         end
       end
+    end
 
+    def default_visitor_methods
+      %w[
+        visit_element_start visit_element_end visit_text visit_link visit_image
+        visit_heading visit_code_block visit_code_inline visit_list_item visit_list_start
+        visit_list_end visit_table_start visit_table_row visit_table_end visit_blockquote
+        visit_strong visit_emphasis visit_strikethrough visit_underline visit_subscript
+        visit_superscript visit_mark visit_line_break visit_horizontal_rule visit_custom_element
+        visit_definition_list_start visit_definition_term visit_definition_description
+        visit_definition_list_end visit_form visit_input visit_button visit_audio visit_video
+        visit_iframe visit_details visit_summary visit_figure_start visit_figcaption
+        visit_figure_end
+      ].each_with_object({}) { |name, hash| hash[name.to_sym] = { type: :continue } }
+    end
+
+    def create_visitor(**overrides)
+      visitor = double(Object)
+      setup_visitor_stubs(visitor, default_visitor_methods)
+      apply_visitor_overrides(visitor, overrides)
       visitor
     end
-    # rubocop:enable Metrics/MethodLength
 
     context 'visit_text callback' do
       it 'is called for text nodes' do
