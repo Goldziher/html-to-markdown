@@ -35,7 +35,10 @@ final readonly class LinkMetadata
             title: TypeAssertions::stringOrNull($payload['title'] ?? null, 'link_metadata.title'),
             linkType: TypeAssertions::string($payload['link_type'], 'link_metadata.link_type'),
             rel: TypeAssertions::stringList($payload['rel'], 'link_metadata.rel'),
-            attributes: TypeAssertions::stringMap($payload['attributes'] ?? [], 'link_metadata.attributes'),
+            attributes: TypeAssertions::stringMap(
+                $payload['attributes'] ?? [],
+                'link_metadata.attributes',
+            ),
         );
     }
 

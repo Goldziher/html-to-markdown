@@ -37,7 +37,10 @@ final readonly class ImageMetadata
             title: TypeAssertions::stringOrNull($payload['title'] ?? null, 'image_metadata.title'),
             dimensions: $dimensions,
             imageType: TypeAssertions::string($payload['image_type'], 'image_metadata.image_type'),
-            attributes: TypeAssertions::stringMap($payload['attributes'] ?? [], 'image_metadata.attributes'),
+            attributes: TypeAssertions::stringMap(
+                $payload['attributes'] ?? [],
+                'image_metadata.attributes',
+            ),
         );
     }
 

@@ -25,7 +25,10 @@ final readonly class StructuredData
         return new self(
             dataType: TypeAssertions::string($payload['data_type'], 'structured_data.data_type'),
             rawJson: TypeAssertions::string($payload['raw_json'], 'structured_data.raw_json'),
-            schemaType: TypeAssertions::stringOrNull($payload['schema_type'] ?? null, 'structured_data.schema_type'),
+            schemaType: TypeAssertions::stringOrNull(
+                $payload['schema_type'] ?? null,
+                'structured_data.schema_type',
+            ),
         );
     }
 

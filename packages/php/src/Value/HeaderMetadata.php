@@ -29,7 +29,10 @@ final readonly class HeaderMetadata
             text: TypeAssertions::string($payload['text'], 'header_metadata.text'),
             id: TypeAssertions::stringOrNull($payload['id'] ?? null, 'header_metadata.id'),
             depth: TypeAssertions::positiveInt($payload['depth'], 'header_metadata.depth'),
-            htmlOffset: TypeAssertions::positiveInt($payload['html_offset'], 'header_metadata.html_offset'),
+            htmlOffset: TypeAssertions::positiveInt(
+                $payload['html_offset'],
+                'header_metadata.html_offset',
+            ),
         );
     }
 
