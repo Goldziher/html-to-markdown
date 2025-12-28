@@ -29,7 +29,10 @@ return (new Config())
         'single_quote' => true,
         'phpdoc_to_comment' => false,
         'php_unit_method_casing' => false,
-        'ordered_imports' => true,
+        'ordered_imports' => [
+            'imports_order' => ['class', 'function', 'const'],
+            'sort_algorithm' => 'alpha',
+        ],
         'no_superfluous_phpdoc_tags' => true,
         'native_function_invocation' => ['include' => ['@internal']],
     ])

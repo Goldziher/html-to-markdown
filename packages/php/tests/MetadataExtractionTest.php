@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace HtmlToMarkdown\Tests;
 
-use function HtmlToMarkdown\convert_with_metadata;
-
 use HtmlToMarkdown\HtmlToMarkdown;
 use HtmlToMarkdown\Value\ExtendedMetadata;
+
+use function HtmlToMarkdown\convert_with_metadata;
 
 final class MetadataExtractionTest extends TestCase
 {
