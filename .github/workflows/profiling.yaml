@@ -222,125 +222,13 @@ jobs:
 
   visitor-benchmarks:
     runs-on: ubuntu-latest
-    timeout-minutes: 90
-    strategy:
-      fail-fast: false
-      matrix:
-        framework: [python, ruby, node]
-    name: visitor-benchmark-${{ matrix.framework }}
-    env:
-      FRAMEWORKS: ${{ matrix.framework }}
-      HTML_TO_MARKDOWN_CARGO_FEATURES: visitor
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v6
-
-      - name: Setup Rust
-        uses: ./.github/actions/setup-rust
-
-      - name: Setup Python + uv
-        if: env.FRAMEWORKS == 'python'
-        uses: astral-sh/setup-uv@v7
-        with:
-          enable-cache: true
-
-      - name: Setup Python runtime
-        if: env.FRAMEWORKS == 'python'
-        uses: actions/setup-python@v6
-        with:
-          python-version: "3.12"
-
-      - name: Install Python deps
-        if: env.FRAMEWORKS == 'python'
-        run: uv sync --all-extras --no-install-workspace
-
-      - name: Build Python extension
-        if: env.FRAMEWORKS == 'python'
-        run: uv pip install --editable packages/python --config-settings=--features=visitor
-
-      - name: Setup Ruby
-        if: env.FRAMEWORKS == 'ruby'
-        uses: ruby/setup-ruby@v1
-        with:
-          ruby-version: "3.2"
-
-      - name: Install Ruby deps
-        if: env.FRAMEWORKS == 'ruby'
-        working-directory: packages/ruby
-        run: bundle install
-
-      - name: Build Ruby extension
-        if: env.FRAMEWORKS == 'ruby'
-        working-directory: packages/ruby
-        run: bundle exec rake compile
-
-      - name: Setup Node workspace
-        if: env.FRAMEWORKS == 'node'
-        uses: ./.github/actions/setup-node-workspace
-
-      - name: Run visitor benchmark - Baseline
-        run: |
-          cargo run --release --features visitor \
-            --manifest-path tools/benchmark-harness/Cargo.toml -- \
-            run --fixtures "tools/benchmark-harness/fixtures/visitor_baseline.toml" \
-            --frameworks "${FRAMEWORKS}" \
-            --iterations 3 --warmup 1 \
-            --format both --output tools/benchmark-harness/results/visitor-baseline
-
-      - name: Run visitor benchmark - Callbacks
-        run: |
-          cargo run --release --features visitor \
-            --manifest-path tools/benchmark-harness/Cargo.toml -- \
-            run --fixtures "tools/benchmark-harness/fixtures/visitor_callbacks.toml" \
-            --frameworks "${FRAMEWORKS}" \
-            --iterations 3 --warmup 1 \
-            --format both --output tools/benchmark-harness/results/visitor-callbacks
-
-      - name: Run visitor benchmark - Custom
-        run: |
-          cargo run --release --features visitor \
-            --manifest-path tools/benchmark-harness/Cargo.toml -- \
-            run --fixtures "tools/benchmark-harness/fixtures/visitor_custom.toml" \
-            --frameworks "${FRAMEWORKS}" \
-            --iterations 3 --warmup 1 \
-            --format both --output tools/benchmark-harness/results/visitor-custom
-
-      - name: Run visitor benchmark - Complex
-        run: |
-          cargo run --release --features visitor \
-            --manifest-path tools/benchmark-harness/Cargo.toml -- \
-            run --fixtures "tools/benchmark-harness/fixtures/visitor_complex.toml" \
-            --frameworks "${FRAMEWORKS}" \
-            --iterations 3 --warmup 1 \
-            --format both --output tools/benchmark-harness/results/visitor-complex
-
-      - name: Analyze performance regressions
-        run: |
-          python3 scripts/ci/analyze-visitor-benchmarks.py \
-            --baseline tools/benchmark-harness/results/visitor-baseline/results.json \
-            --callbacks tools/benchmark-harness/results/visitor-callbacks/results.json \
-            --custom tools/benchmark-harness/results/visitor-custom/results.json \
-            --complex tools/benchmark-harness/results/visitor-complex/results.json \
-            --framework "${FRAMEWORKS}" \
-            --thresholds '{"baseline": 10, "callbacks": 30, "complex": 60}'
-
-      - name: Upload visitor benchmark results
-        uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: visitor-benchmark-results-${{ matrix.framework }}
-          path: tools/benchmark-harness/results/visitor-*
-          retention-days: 90
-
-  visitor-benchmarks-schedule:
-    runs-on: ubuntu-latest
     timeout-minutes: 180
     if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     strategy:
       fail-fast: false
       matrix:
         framework: [rust, python, ruby, node, php, go, java, csharp]
-    name: visitor-benchmark-schedule-${{ matrix.framework }}
+    name: visitor-benchmark-${{ matrix.framework }}
     env:
       FRAMEWORKS: ${{ matrix.framework }}
       HTML_TO_MARKDOWN_CARGO_FEATURES: visitor
@@ -445,10 +333,21 @@ jobs:
               --format both --output tools/benchmark-harness/results/visitor-comprehensive/${fixture}
           done
 
-      - name: Upload comprehensive visitor benchmark results
+      - name: Analyze visitor performance regressions
+        if: ${{ contains(fromJson('["python", "ruby", "node"]'), matrix.framework) }}
+        run: |
+          python3 scripts/ci/analyze-visitor-benchmarks.py \
+            --baseline tools/benchmark-harness/results/visitor-comprehensive/visitor_baseline/results.json \
+            --callbacks tools/benchmark-harness/results/visitor-comprehensive/visitor_callbacks/results.json \
+            --custom tools/benchmark-harness/results/visitor-comprehensive/visitor_custom/results.json \
+            --complex tools/benchmark-harness/results/visitor-comprehensive/visitor_complex/results.json \
+            --framework "${FRAMEWORKS}" \
+            --thresholds '{"baseline": 10, "callbacks": 30, "custom": 40, "complex": 60}'
+
+      - name: Upload visitor benchmark results
         uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: visitor-benchmark-comprehensive-${{ matrix.framework }}
+          name: visitor-benchmark-results-${{ matrix.framework }}
           path: tools/benchmark-harness/results/visitor-comprehensive
           retention-days: 180
