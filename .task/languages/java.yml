@@ -10,7 +10,7 @@ includes:
 
 vars:
   BUILD_PROFILE: "{{.BUILD_PROFILE | default \"release\"}}"
-  JAVA_WORK_DIR: "packages/java"
+  JAVA_WORK_DIR: "{{.ROOT_DIR}}/packages/java"
   MAVEN_WRAPPER: "./mvnw{{if eq .OS \"windows\"}}.cmd{{end}}"
   MAVEN_OPTS: "--enable-native-access=ALL-UNNAMED"
 

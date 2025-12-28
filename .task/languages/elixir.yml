@@ -9,7 +9,7 @@ includes:
   _cfg: ../config/vars.yml
 
 vars:
-  ELIXIR_WORK_DIR: "packages/elixir"
+  ELIXIR_WORK_DIR: "{{.ROOT_DIR}}/packages/elixir"
 
 env:
   MIX_ENV: "dev"
@@ -20,6 +20,8 @@ tasks:
     silent: false
     dir: "{{.ELIXIR_WORK_DIR}}"
     cmds:
+      - cmd: pwd && ls -la mix.exs
+        ignore_error: false
       - cmd: mix local.hex --force
         ignore_error: false
       - cmd: mix local.rebar --force

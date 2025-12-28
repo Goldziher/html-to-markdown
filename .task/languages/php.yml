@@ -10,7 +10,7 @@ includes:
 
 vars:
   BUILD_PROFILE: "{{.BUILD_PROFILE | default \"release\"}}"
-  PHP_WORK_DIR: "packages/php"
+  PHP_WORK_DIR: "{{.ROOT_DIR}}/packages/php"
 
 tasks:
   install:

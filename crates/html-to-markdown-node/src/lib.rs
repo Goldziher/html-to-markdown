@@ -13,6 +13,7 @@ use async_trait::async_trait;
 #[cfg(feature = "async-visitor")]
 use html_to_markdown_rs::visitor::AsyncHtmlVisitor;
 #[cfg(feature = "visitor")]
+#[allow(unused_imports)]
 use html_to_markdown_rs::visitor::HtmlVisitor;
 #[cfg(any(feature = "visitor", feature = "async-visitor"))]
 use html_to_markdown_rs::visitor::{NodeContext as RustNodeContext, VisitResult as RustVisitResult};

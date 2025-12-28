@@ -9,7 +9,7 @@ includes:
   _cfg: ../config/vars.yml
 
 vars:
-  RUBY_WORK_DIR: "packages/ruby"
+  RUBY_WORK_DIR: "{{.ROOT_DIR}}/packages/ruby"
 
 env:
   RUBY: "{{.RUBY_BIN}}/ruby"

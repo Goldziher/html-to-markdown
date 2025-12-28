@@ -10,7 +10,7 @@ includes:
 
 vars:
   BUILD_PROFILE: "{{.BUILD_PROFILE | default \"release\"}}"
-  NODE_WORK_DIR: "packages/typescript"
+  NODE_WORK_DIR: "{{.ROOT_DIR}}/packages/typescript"
 
 tasks:
   install:

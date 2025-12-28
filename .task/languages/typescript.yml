@@ -11,7 +11,7 @@ includes:
 
 vars:
   PNPM_VERSION: ">=10.17"
-  TYPESCRIPT_WORK_DIR: "packages/typescript"
+  TYPESCRIPT_WORK_DIR: "{{.ROOT_DIR}}/packages/typescript"
 
 dir: "{{.TYPESCRIPT_WORK_DIR}}"
 

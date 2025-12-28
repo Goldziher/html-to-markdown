@@ -10,7 +10,7 @@ includes:
 
 vars:
   BUILD_PROFILE: "{{.BUILD_PROFILE | default \"release\"}}"
-  CSHARP_WORK_DIR: "packages/csharp"
+  CSHARP_WORK_DIR: "{{.ROOT_DIR}}/packages/csharp"
 
 tasks:
   install:

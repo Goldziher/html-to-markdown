@@ -128,7 +128,7 @@ mod enabled {
 
     pub fn maybe_profile<T, F>(f: F) -> Result<T>
     where
-        F: FnOnce() -> Result<T>,
+        F: Fn() -> Result<T>,
     {
         if PROFILE_ACTIVE.load(Ordering::Relaxed) {
             return f();

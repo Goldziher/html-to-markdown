@@ -10,130 +10,115 @@ includes:
 
 vars:
   BUILD_PROFILE: "{{.BUILD_PROFILE | default \"release\"}}"
-  PYTHON_WORK_DIR: "packages/python"
+  PYTHON_PKG: "packages/python"
 
 tasks:
   install:
     desc: "Install Python dependencies with uv"
     silent: false
-    dir: "{{.PYTHON_WORK_DIR}}"
     cmds:
-      - cmd: uv sync
+      - cmd: cd {{.PYTHON_PKG}} && uv sync
         ignore_error: false
-      - cmd: uv pip install -e .
+      - cmd: cd {{.PYTHON_PKG}} && uv pip install -e .
         ignore_error: false
 
   build:
     desc: "Build Python bindings with maturin ({{.BUILD_PROFILE}} profile)"
     silent: false
-    dir: "{{.PYTHON_WORK_DIR}}"
     cmds:
-      - cmd: maturin develop{{if eq .BUILD_PROFILE "release"}} --release{{end}}
+      - cmd: cd {{.PYTHON_PKG}} && maturin develop{{if eq .BUILD_PROFILE "release"}} --release{{end}}
         ignore_error: false
 
   build:dev:
     desc: "Build Python bindings in debug mode"
     silent: false
-    dir: "{{.PYTHON_WORK_DIR}}"
     cmds:
-      - cmd: maturin develop
+      - cmd: cd {{.PYTHON_PKG}} && maturin develop
         ignore_error: false
 
   build:release:
     desc: "Build Python bindings in release mode"
     silent: false
-    dir: "{{.PYTHON_WORK_DIR}}"
     cmds:
-      - cmd: maturin develop --release
+      - cmd: cd {{.PYTHON_PKG}} && maturin develop --release
         ignore_error: false
 
   build:ci:
     desc: "Build Python bindings for CI (release with debug info)"
     silent: false
-    dir: "{{.PYTHON_WORK_DIR}}"
     cmds:
-      - cmd: maturin develop --release
+      - cmd: cd {{.PYTHON_PKG}} && maturin develop --release
         ignore_error: false
 
   test:
     desc: "Run Python tests with pytest"
     silent: false
-    dir: "{{.PYTHON_WORK_DIR}}"
     cmds:
-      - cmd: pytest -v tests/
+      - cmd: cd {{.PYTHON_PKG}} && uv run pytest -v tests/
         ignore_error: false
 
   test:ci:
     desc: "Run Python tests with coverage for CI (generates lcov)"
     silent: false
-    dir: "{{.PYTHON_WORK_DIR}}"
     cmds:
-      - cmd: pytest -v --cov=. --cov-report=lcov:coverage.lcov tests/
+      - cmd: cd {{.PYTHON_PKG}} && uv run pytest -v --cov=. --cov-report=lcov:coverage.lcov tests/
         ignore_error: false
 
   coverage:
     desc: "Generate Python code coverage report (lcov format)"
     silent: false
-    dir: "{{.PYTHON_WORK_DIR}}"
     cmds:
-      - cmd: pytest -v --cov=. --cov-report=lcov:coverage.lcov tests/
+      - cmd: cd {{.PYTHON_PKG}} && uv run pytest -v --cov=. --cov-report=lcov:coverage.lcov tests/
         ignore_error: false
 
   lint:
     desc: "Lint Python code WITH auto-fix (ruff check --fix)"
     silent: false
-    dir: "{{.PYTHON_WORK_DIR}}"
     cmds:
-      - cmd: ruff check --fix src/ tests/
+      - cmd: cd {{.PYTHON_PKG}} && uv run ruff check --fix src/ tests/
         ignore_error: false
 
   lint:check:
     desc: "Lint Python code WITHOUT auto-fix (check-only)"
     silent: false
-    dir: "{{.PYTHON_WORK_DIR}}"
     cmds:
-      - cmd: ruff check src/ tests/
+      - cmd: cd {{.PYTHON_PKG}} && uv run ruff check src/ tests/
         ignore_error: false
 
   format:
     desc: "Format Python code with ruff format"
     silent: false
-    dir: "{{.PYTHON_WORK_DIR}}"
     cmds:
-      - cmd: ruff format src/ tests/
+      - cmd: cd {{.PYTHON_PKG}} && uv run ruff format src/ tests/
         ignore_error: false
 
   format:check:
     desc: "Check Python formatting without modifications"
     silent: false
-    dir: "{{.PYTHON_WORK_DIR}}"
     cmds:
-      - cmd: ruff format --check src/ tests/
+      - cmd: cd {{.PYTHON_PKG}} && uv run ruff format --check src/ tests/
         ignore_error: false
 
   typecheck:
     desc: "Run mypy type checking in strict mode"
     silent: false
-    dir: "{{.PYTHON_WORK_DIR}}"
     cmds:
-      - cmd: mypy --strict src/ tests/
+      - cmd: cd {{.PYTHON_PKG}} && uv run mypy --strict src/ tests/
         ignore_error: false
 
   update:
     desc: "Update Python dependencies with uv"
     silent: false
-    dir: "{{.PYTHON_WORK_DIR}}"
     cmds:
-      - cmd: uv sync --upgrade
+      - cmd: cd {{.PYTHON_PKG}} && uv sync --upgrade
         ignore_error: false
 
   clean:
     desc: "Clean Python build artifacts"
     silent: false
-    dir: "{{.PYTHON_WORK_DIR}}"
     cmds:
       - cmd: |
-          python -c "
+          cd {{.PYTHON_PKG}} && python -c "
           import shutil, glob
           dirs = ['__pycache__', '.pytest_cache', '.mypy_cache', '.ruff_cache', 'dist', 'build', '.maturin']
           for d in dirs:
@@ -146,7 +131,6 @@ tasks:
   wheel:
     desc: "Build Python wheel distribution"
     silent: false
-    dir: "{{.PYTHON_WORK_DIR}}"
     cmds:
-      - cmd: maturin build --release
+      - cmd: cd {{.PYTHON_PKG}} && maturin build --release
         ignore_error: false

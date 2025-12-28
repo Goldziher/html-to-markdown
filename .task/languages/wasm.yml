@@ -9,7 +9,7 @@ includes:
   _cfg: ../config/vars.yml
 
 vars:
-  WASM_WORK_DIR: "crates/html-to-markdown-wasm"
+  WASM_WORK_DIR: "{{.ROOT_DIR}}/crates/html-to-markdown-wasm"
   WASM_TARGET: "wasm32-unknown-unknown"
   BUILD_PROFILE: "{{.BUILD_PROFILE | default \"release\"}}"
   RUST_LOG: "{{.RUST_LOG | default \"info\"}}"
