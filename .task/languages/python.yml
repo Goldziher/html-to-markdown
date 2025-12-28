@@ -79,35 +79,35 @@ tasks:
     desc: "Lint Python code WITH auto-fix (ruff check --fix)"
     silent: false
     cmds:
-      - cmd: cd {{.PYTHON_PKG}} && uv run ruff check --fix src/ tests/
+      - cmd: cd {{.PYTHON_PKG}} && uv run ruff check --fix html_to_markdown tests/
         ignore_error: false
 
   lint:check:
     desc: "Lint Python code WITHOUT auto-fix (check-only)"
     silent: false
     cmds:
-      - cmd: cd {{.PYTHON_PKG}} && uv run ruff check src/ tests/
+      - cmd: cd {{.PYTHON_PKG}} && uv run ruff check html_to_markdown tests/
         ignore_error: false
 
   format:
     desc: "Format Python code with ruff format"
     silent: false
     cmds:
-      - cmd: cd {{.PYTHON_PKG}} && uv run ruff format src/ tests/
+      - cmd: cd {{.PYTHON_PKG}} && uv run ruff format html_to_markdown tests/
         ignore_error: false
 
   format:check:
     desc: "Check Python formatting without modifications"
     silent: false
     cmds:
-      - cmd: cd {{.PYTHON_PKG}} && uv run ruff format --check src/ tests/
+      - cmd: cd {{.PYTHON_PKG}} && uv run ruff format --check html_to_markdown tests/
         ignore_error: false
 
   typecheck:
     desc: "Run mypy type checking in strict mode"
     silent: false
     cmds:
-      - cmd: cd {{.PYTHON_PKG}} && uv run mypy --strict src/ tests/
+      - cmd: cd {{.PYTHON_PKG}} && uv run mypy --strict html_to_markdown tests/
         ignore_error: false
 
   update:
