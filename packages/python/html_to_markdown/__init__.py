@@ -4,9 +4,9 @@ This package provides high-performance HTML to Markdown conversion
 powered by Rust with a clean Python API.
 
 V2 API (current):
-    from html_to_markdown import convert, ConversionOptions
+    from html_to_markdown import convert, ConversionOptions, ConversionOptionsHandle
 
-    options = ConversionOptions(heading_style="atx")
+    options = ConversionOptionsHandle()  # or use ConversionOptions dataclass
     markdown = convert(html, options)
 
 V1 API (backward compatibility):
@@ -15,6 +15,7 @@ V1 API (backward compatibility):
     markdown = convert_to_markdown(html, heading_style="atx")
 """
 
+from html_to_markdown._html_to_markdown import ConversionOptionsHandle
 from html_to_markdown.api import (
     InlineImage,
     InlineImageConfig,
@@ -46,6 +47,7 @@ from html_to_markdown.v1_compat import convert_to_markdown, markdownify
 __all__ = [
     "ConflictingOptionsError",
     "ConversionOptions",
+    "ConversionOptionsHandle",
     "EmptyHtmlError",
     "HtmlToMarkdownError",
     "InlineImage",
