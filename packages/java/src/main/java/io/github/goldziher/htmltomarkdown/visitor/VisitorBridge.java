@@ -44,6 +44,11 @@ final class VisitorBridge {
     /** Result type: error occurred. */
     private static final int RESULT_TYPE_ERROR = 4;
 
+    /** Padding after node_type to align pointer fields on 64-bit. */
+    private static final long NODE_CONTEXT_PADDING_AFTER_NODE_TYPE = 4;
+
+    /** Padding after is_inline to align struct size on 64-bit. */
+    private static final long NODE_CONTEXT_PADDING_AFTER_IS_INLINE = 7;
 
     /** C struct layout for html_to_markdown_attribute_t. */
     private static final StructLayout ATTRIBUTE_LAYOUT =
@@ -67,14 +72,14 @@ final class VisitorBridge {
     private static final StructLayout NODE_CONTEXT_LAYOUT =
             MemoryLayout.structLayout(
                 ValueLayout.JAVA_INT.withName("node_type"),
-                MemoryLayout.paddingLayout(4),
+                MemoryLayout.paddingLayout(NODE_CONTEXT_PADDING_AFTER_NODE_TYPE),
                 ValueLayout.ADDRESS.withName("tag_name"),
                 ValueLayout.ADDRESS.withName("attributes"),
                 ValueLayout.JAVA_LONG.withName("depth"),
                 ValueLayout.JAVA_LONG.withName("index_in_parent"),
                 ValueLayout.ADDRESS.withName("parent_tag"),
                 ValueLayout.JAVA_BOOLEAN.withName("is_inline"),
-                MemoryLayout.paddingLayout(7)
+                MemoryLayout.paddingLayout(NODE_CONTEXT_PADDING_AFTER_IS_INLINE)
             ).withName("html_to_markdown_node_context_t");
 
     /** Bit shift for encoding type in long value. */
