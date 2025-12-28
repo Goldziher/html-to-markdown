@@ -114,3 +114,5 @@ AGENTS.md
 CLAUDE.md
 GEMINI.md
 .gemini/
+test_documents/html/issues/*.md
+test_documents/html/issues/*_metadata.json

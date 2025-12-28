@@ -1937,7 +1937,10 @@ fn convert_html_impl(
     #[cfg(feature = "visitor")] visitor: Option<crate::visitor::VisitorHandle>,
     #[cfg(not(feature = "visitor"))] _visitor: Option<()>,
 ) -> Result<String> {
-    let mut preprocessed = preprocess_html(html).into_owned();
+    // Strip script and style tags completely to prevent parser confusion from HTML-like content
+    // inside script/style elements. This preserves JSON-LD for metadata extraction.
+    let stripped = strip_script_and_style_tags(html);
+    let mut preprocessed = preprocess_html(&stripped).into_owned();
     let mut preprocessed_len = preprocessed.len();
 
     if has_custom_element_tags(&preprocessed) {
@@ -2171,6 +2174,209 @@ fn convert_html_impl(
     } else {
         Ok(format!("{}\n", trimmed))
     }
+}
+
+/// Strip script and style tags completely from HTML before parsing.
+///
+/// This function performs a fast, single-pass removal of <script> and <style> tags
+/// along with their entire content. It preserves JSON-LD script tags for metadata extraction.
+///
+/// # Performance
+///
+/// Uses a byte-level state machine without regex or allocations in the hot path.
+/// Single pass through the HTML with zero intermediate allocations unless content is removed.
+///
+/// # Arguments
+///
+/// * `input` - HTML string to process
+///
+/// # Returns
+///
+/// A Cow<'_, str> that is:
+/// - Borrowed from input if no script/style tags found
+/// - Owned String with tags removed if any were found
+///
+/// # Examples
+///
+/// ```ignore
+/// let html = r#"<html><head><script>bad code</script></head><body>content</body></html>"#;
+/// let stripped = strip_script_and_style_tags(html);
+/// assert!(!stripped.contains("<script>"));
+/// assert!(stripped.contains("content"));
+/// ```
+#[inline]
+fn strip_script_and_style_tags(input: &str) -> Cow<'_, str> {
+    let bytes = input.as_bytes();
+    let len = bytes.len();
+
+    if len == 0 {
+        return Cow::Borrowed(input);
+    }
+
+    let mut idx = 0;
+    let mut last = 0;
+    let mut output: Option<String> = None;
+
+    // Fast-path: check if there are any < characters at all
+    if !bytes.contains(&b'<') {
+        return Cow::Borrowed(input);
+    }
+
+    while idx < len {
+        if bytes[idx] == b'<' && idx + 1 < len {
+            // Check for </script or </style (closing tags first for safety)
+            if bytes[idx + 1] == b'/' && idx + 2 < len {
+                // Match </script>
+                if idx + 9 <= len && eq_ascii_insensitive(&bytes[idx..idx + 9], b"</script>") {
+                    // This should never happen as we'd already be skipping content
+                    idx += 9;
+                    continue;
+                }
+
+                // Match </style>
+                if idx + 8 <= len && eq_ascii_insensitive(&bytes[idx..idx + 8], b"</style>") {
+                    idx += 8;
+                    continue;
+                }
+            }
+
+            // Check for <script or <style (opening tags)
+            // Match <script (case insensitive)
+            if idx + 7 < len && eq_ascii_insensitive(&bytes[idx..idx + 7], b"<script") {
+                // Check if this is actually "<script" followed by whitespace, >, or attribute
+                let after_tag = bytes[idx + 7];
+                if after_tag == b'>'
+                    || after_tag == b' '
+                    || after_tag == b'\t'
+                    || after_tag == b'\n'
+                    || after_tag == b'\r'
+                {
+                    // Find the opening tag end
+                    let mut tag_end = idx + 7;
+                    while tag_end < len && bytes[tag_end] != b'>' {
+                        tag_end += 1;
+                    }
+
+                    if tag_end < len {
+                        tag_end += 1; // Include the '>'
+
+                        // Check if this is a JSON-LD script tag
+                        let tag_content = &input[idx..tag_end];
+                        if !is_json_ld_script_open_tag(tag_content) {
+                            // Find the closing </script> tag
+                            let close_tag = find_closing_tag_bytes(bytes, tag_end, b"script");
+                            if let Some(close_idx) = close_tag {
+                                let out = output.get_or_insert_with(|| String::with_capacity(len));
+                                out.push_str(&input[last..idx]);
+                                last = close_idx;
+                                idx = close_idx;
+                                continue;
+                            }
+                        }
+                    }
+                }
+            }
+            // Match <style (case insensitive)
+            else if idx + 6 < len && eq_ascii_insensitive(&bytes[idx..idx + 6], b"<style") {
+                // Check if this is actually "<style" followed by whitespace, >, or attribute
+                let after_tag = bytes[idx + 6];
+                if after_tag == b'>'
+                    || after_tag == b' '
+                    || after_tag == b'\t'
+                    || after_tag == b'\n'
+                    || after_tag == b'\r'
+                {
+                    // Find the opening tag end
+                    let mut tag_end = idx + 6;
+                    while tag_end < len && bytes[tag_end] != b'>' {
+                        tag_end += 1;
+                    }
+
+                    if tag_end < len {
+                        tag_end += 1; // Include the '>'
+
+                        // Find the closing </style> tag
+                        let close_tag = find_closing_tag_bytes(bytes, tag_end, b"style");
+                        if let Some(close_idx) = close_tag {
+                            let out = output.get_or_insert_with(|| String::with_capacity(len));
+                            out.push_str(&input[last..idx]);
+                            last = close_idx;
+                            idx = close_idx;
+                            continue;
+                        }
+                    }
+                }
+            }
+        }
+
+        idx += 1;
+    }
+
+    if let Some(mut out) = output {
+        if last < len {
+            out.push_str(&input[last..]);
+        }
+        Cow::Owned(out)
+    } else {
+        Cow::Borrowed(input)
+    }
+}
+
+/// Find the position of a closing tag in bytes.
+/// Returns the position AFTER the closing tag (including the '>').
+/// This is highly optimized for performance and uses a fast-path scan.
+#[inline]
+fn find_closing_tag_bytes(bytes: &[u8], start: usize, tag: &[u8]) -> Option<usize> {
+    let len = bytes.len();
+    let tag_len = tag.len();
+
+    // Fast path: look for the closing tag pattern byte-by-byte
+    // We use a simple byte scan to find '</' then validate the tag name
+    let mut idx = start;
+
+    // Limit search to prevent stack overflow on large files
+    // Look for closing tag within reasonable bounds
+    const MAX_SCAN: usize = 100_000_000; // 100MB limit per tag - prevents pathological cases
+
+    while idx < len && (idx - start) < MAX_SCAN {
+        // Optimization: skip forward to next '<' quickly
+        if bytes[idx] != b'<' {
+            idx += 1;
+            continue;
+        }
+
+        // Check for </ pattern
+        if idx + 2 < len && bytes[idx + 1] == b'/' {
+            // Check if tag name matches
+            if idx + 2 + tag_len <= len && eq_ascii_insensitive(&bytes[idx + 2..idx + 2 + tag_len], tag) {
+                // Ensure it's followed by > or whitespace
+                let after_tag = idx + 2 + tag_len;
+                if after_tag < len && (bytes[after_tag] == b'>' || bytes[after_tag].is_ascii_whitespace()) {
+                    // Find the >
+                    let mut close_idx = after_tag;
+                    while close_idx < len && bytes[close_idx] != b'>' {
+                        close_idx += 1;
+                    }
+                    if close_idx < len {
+                        return Some(close_idx + 1); // Include the '>'
+                    }
+                }
+            }
+        }
+
+        idx += 1;
+    }
+
+    None
+}
+
+/// Compare bytes ignoring ASCII case.
+#[inline]
+fn eq_ascii_insensitive(a: &[u8], b: &[u8]) -> bool {
+    if a.len() != b.len() {
+        return false;
+    }
+    a.iter().zip(b.iter()).all(|(x, y)| x.eq_ignore_ascii_case(y))
 }
 
 fn preprocess_html(input: &str) -> Cow<'_, str> {
@@ -3606,6 +3812,14 @@ fn walk_node(
                 }
 
                 "p" => {
+                    if options.debug {
+                        eprintln!(
+                            "[DEBUG] <p> tag encountered at depth={}, output_len_before={}",
+                            depth,
+                            output.len()
+                        );
+                    }
+
                     let content_start_pos = output.len();
 
                     let is_table_continuation =
@@ -3644,8 +3858,35 @@ fn walk_node(
                     let children = tag.children();
                     {
                         let child_handles: Vec<_> = children.top().iter().collect();
+
+                        if options.debug {
+                            eprintln!("[DEBUG] <p> has {} children", child_handles.len());
+                        }
+
                         for (i, child_handle) in child_handles.iter().enumerate() {
                             if let Some(node) = child_handle.get(parser) {
+                                if options.debug {
+                                    let node_type_str = match node {
+                                        tl::Node::Tag(tag) => {
+                                            let tag_name = normalized_tag_name(tag.name().as_utf8_str());
+                                            format!("Tag({})", tag_name)
+                                        }
+                                        tl::Node::Raw(bytes) => {
+                                            let text = bytes.as_utf8_str();
+                                            format!(
+                                                "Text({})",
+                                                if text.len() > 50 {
+                                                    format!("{}...", &text[..50])
+                                                } else {
+                                                    text.to_string()
+                                                }
+                                            )
+                                        }
+                                        tl::Node::Comment(_) => "Comment".to_string(),
+                                    };
+                                    eprintln!("[DEBUG] <p> child[{}]: {}", i, node_type_str);
+                                }
+
                                 if let tl::Node::Raw(bytes) = node {
                                     let text = bytes.as_utf8_str();
                                     if text.trim().is_empty() && i > 0 && i < child_handles.len() - 1 {
@@ -3654,16 +3895,38 @@ fn walk_node(
                                         if is_empty_inline_element(prev, parser, dom_ctx)
                                             && is_empty_inline_element(next, parser, dom_ctx)
                                         {
+                                            if options.debug {
+                                                eprintln!(
+                                                    "[DEBUG] <p> skipping whitespace-only text node between empty inline elements"
+                                                );
+                                            }
                                             continue;
                                         }
                                     }
                                 }
                             }
+
+                            let output_len_before_child = output.len();
                             walk_node(child_handle, parser, output, options, &p_ctx, depth + 1, dom_ctx);
+                            let output_len_after_child = output.len();
+
+                            if options.debug {
+                                let bytes_added = output_len_after_child.saturating_sub(output_len_before_child);
+                                eprintln!("[DEBUG] <p> child[{}] complete: added {} bytes", i, bytes_added);
+                            }
                         }
                     }
 
                     let has_content = output.len() > content_start_pos;
+
+                    if options.debug {
+                        eprintln!(
+                            "[DEBUG] <p> content_result: has_content={}, bytes_added={}, output_len_after={}",
+                            has_content,
+                            output.len().saturating_sub(content_start_pos),
+                            output.len()
+                        );
+                    }
 
                     if has_content && !ctx.convert_as_inline && !ctx.in_table_cell {
                         output.push_str("\n\n");
