@@ -9,7 +9,7 @@ import pytest
 from html_to_markdown import ConversionOptions, PreprocessingOptions, convert
 
 if TYPE_CHECKING:
-    from pytest_benchmark.fixture import BenchmarkFixture
+    from pytest_benchmark.fixture import BenchmarkFixture  # type: ignore[import-not-found]
 
 try:
     from .performance_test import generate_complex_html

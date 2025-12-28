@@ -23,7 +23,7 @@ except ImportError:
     pytest.skip("psutil not available", allow_module_level=True)
 
 try:
-    import memray
+    import memray  # type: ignore[import-not-found]
 
     MEMRAY_AVAILABLE = True
 except ImportError:

@@ -5,75 +5,32 @@ All notable changes to html-to-markdown will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [2.18.0] - 2025-12-28
 
 ### Added
-- **Visitor Pattern**: Complete implementation across all 8 language bindings (Python, TypeScript, Ruby, PHP, Go, Java, C#, Elixir)
-  - Dual-trait architecture: `HtmlVisitor` (sync) and `AsyncHtmlVisitor` (async) in Rust core
-  - 40+ visitor methods with hooks for every HTML element type (text, links, images, headings, lists, tables, code blocks, etc.)
-  - `NodeContext` metadata: provides tag name, attributes, depth, parent tag, inline status, and sibling index
-  - 5 `VisitResult` types: Continue, Custom, Skip, PreserveHtml, Error
-  - `visit_element_start` and `visit_element_end` callbacks for full element lifecycle control
-  - Comprehensive test coverage: 520+ tests passing at 100% across all bindings
-- **Python**: Full async visitor support with `pyo3-async-runtimes` integration
-  - Supports both sync visitor methods and async coroutines
-  - Complete type stubs (.pyi) with `convert_with_async_visitor()` function
-  - Event loop management with TaskLocals for proper asyncio integration
-- **TypeScript**: Async visitor with NAPI-RS ThreadsafeFunction callbacks
-  - Full type definitions for visitor callbacks
-  - Structured object passing for zero-copy performance
-- **Ruby**: Sync visitor implementation with Magnus FFI
-  - Complete RBS type definitions
-  - Comprehensive README documentation (370+ lines)
-- **PHP**: Visitor support with ext-php-rs Zval-based callbacks
-  - PHPStan level 9 compliant
-  - Callback invocation using `try_call()` pattern
-- **Go**: Thread-safe visitor registry with post-processing markdown parser
-  - 18 focused helper functions for pattern detection
-  - Cyclomatic complexity reduced from 146 to <25
-- **Java**: Panama FFI visitor with MemorySegment marshalling
-  - JDK 21+ compatibility with preview APIs
-  - Proper C struct layout parsing
-- **C#**: P/Invoke visitor with fixed callback struct ordering
-  - UnmanagedFunctionPointer attributes for cross-platform compatibility
-  - Eliminated AccessViolationException in callbacks
-- **Elixir**: Rustler NIF visitor implementation
-  - Process-based callback architecture
-- Visitor benchmarking infrastructure in profiling harness
-  - Baseline, callback overhead, custom transformation, and complex visitor scenarios
-  - Performance regression detection with configurable thresholds
+- **Visitor Pattern**: Complete implementation of visitor pattern for custom HTML element processing across all 8 language bindings (Python, TypeScript, Ruby, PHP, Go, Java, C#, Elixir)
+  - Synchronous and asynchronous visitor support (where applicable per language)
+  - 40+ visitor methods with hooks for every HTML element type (text, links, images, headings, lists, tables, code blocks, and more)
+  - `NodeContext` provides element metadata: tag name, attributes, depth, parent tag, inline status, and sibling index
+  - Control flow options: Continue, Custom (provide custom markdown), Skip, PreserveHtml, or Error
+  - Element lifecycle callbacks: `visit_element_start` and `visit_element_end` for complete control
+  - **Python**: Full async visitor support with `convert_with_async_visitor()` function
+  - **TypeScript**: Async visitor with full type definitions
+  - **Ruby**: Sync visitor implementation with complete RBS type definitions
+  - **PHP**: Full visitor support with PHPStan level 9 compliance
+  - **Go**: Thread-safe visitor registry with markdown post-processing
+  - **Java**: Panama FFI visitor (JDK 21+)
+  - **C#**: P/Invoke visitor with cross-platform compatibility
+  - **Elixir**: Rustler NIF visitor implementation
 
 ### Fixed
-- **Rust core**: Fixed HTML parsing issues with modern websites containing JavaScript (GitHub issue #167)
-  - Implemented fast script/style tag stripping before tl parsing to prevent parser confusion
-  - The tl parser was misinterpreting HTML-like content inside script tags (e.g., `'<div>'` in JavaScript strings) as actual HTML tags
-  - This caused Reuters HTML and similar sites to lose article body content (only metadata was extracted)
-  - Solution: Single-pass O(n) byte-level preprocessor that strips `<script>` and `<style>` tags while preserving JSON-LD for metadata extraction
-  - Zero-copy fast path when no script/style tags exist (Cow optimization)
-  - Performance: no measurable impact on conversion speed
-  - Comprehensive test coverage with 10 tests covering edge cases, large documents, and Reuters-like HTML patterns
-- **Python binding**: Fixed missing `ConversionOptionsHandle` export in public API (GitHub issue #166)
-  - Users can now import `ConversionOptionsHandle` directly from `html_to_markdown` package
-  - Maintained backward compatibility with existing `OptionsHandle` import (both reference the same class)
-  - Updated module docstring to document correct import path
-- **Rust core**: Implemented `visit_element_end` callback invocation for all elements
-- **Rust core**: Fixed NodeContext field population (depth, parent_tag, index_in_parent) - previously hardcoded with TODOs
-- **Rust core**: Added proper depth tracking for nested elements in generic element handlers
-- **Rust core**: Fixed RefCell async safety pattern - create future in scope, drop borrow before await
-- **Clippy**: Removed unnecessary `.to_string()` calls in format! arguments
-- **Clippy**: Corrected doc comment indentation in FFI registry (6 instances)
-- **Go**: Extracted repeated string constants ("***", "---", "___") to eliminate goconst warnings
-- **PHP**: Removed unreachable code in VisitorTest.php (7 phpstan errors resolved)
-- **Java**: Updated maven.compiler.release to 24 to match preview APIs (Arena, MemorySegment)
-- **Java**: Added --enable-preview flag to maven-javadoc-plugin configuration
-- **Build**: Replaced ./mvnw with mvn in pre-commit hooks (Maven wrapper was removed)
-
-### Performance
-- Visitor pattern overhead benchmarked:
-  - No-op visitor: <10% overhead
-  - Simple callbacks: <30% overhead
-  - Complex visitors: <60% overhead
-- Go visitor refactoring improved maintainability without performance regression
+- **HTML parsing for modern websites**: Fixed issue where JavaScript-heavy websites (like Reuters) would lose article body content during conversion (GitHub issue #167)
+  - The parser was incorrectly interpreting HTML-like strings inside `<script>` tags as actual HTML elements
+  - Script and style tags are now properly stripped during preprocessing while preserving JSON-LD metadata
+  - No performance impact on conversion speed
+- **Python API**: Fixed missing `ConversionOptionsHandle` export in public API (GitHub issue #166)
+  - Users can now import `ConversionOptionsHandle` directly from the `html_to_markdown` package
+  - Maintains backward compatibility with existing `OptionsHandle` import
 
 ## [2.17.0] - 2025-12-22
 

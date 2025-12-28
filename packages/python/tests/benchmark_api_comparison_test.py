@@ -18,7 +18,7 @@ from html_to_markdown.v1_compat import convert_to_markdown
 from .conftest import TEST_DOCUMENTS_DIR
 
 if TYPE_CHECKING:
-    from pytest_benchmark.fixture import BenchmarkFixture
+    from pytest_benchmark.fixture import BenchmarkFixture  # type: ignore[import-not-found]
 
 pytestmark = pytest.mark.filterwarnings("ignore::DeprecationWarning")
 

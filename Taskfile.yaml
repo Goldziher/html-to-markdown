@@ -37,7 +37,6 @@ tasks:
       - task: csharp:update
       - task: elixir:update
       - task: java:update
-      - task: examples:update
       - uv tool update prek
       - prek autoupdate
 
@@ -328,8 +327,7 @@ tasks:
   python:update:
     desc: "Update Python dependencies"
     cmds:
-      - uv run uv-bump --pyproject-toml pyproject.toml
-      - uv run uv-bump --pyproject-toml packages/python/pyproject.toml
+      - uv run uv-bump
       - uv sync --all-extras --upgrade --no-install-workspace
 
   python:test:
@@ -632,11 +630,11 @@ tasks:
     desc: "Update Java dependencies (Maven)"
     cmds:
       - >-
-        bash -lc 'source "$HOME/.sdkman/bin/sdkman-init.sh" && sdk env && MAVEN_OPTS="${MAVEN_OPTS:-} --enable-native-access=ALL-UNNAMED -Dsun.misc.unsafe.memory.access=allow" ./mvnw -f packages/java/pom.xml -B versions:display-plugin-updates -DprocessPlugins=true -DprocessPluginDependencies=true'
+        bash -lc 'source "$HOME/.sdkman/bin/sdkman-init.sh" && sdk env && MAVEN_OPTS="${MAVEN_OPTS:-} --enable-native-access=ALL-UNNAMED -Dsun.misc.unsafe.memory.access=allow" mvn -f packages/java/pom.xml -B versions:display-plugin-updates -DprocessPlugins=true -DprocessPluginDependencies=true'
       - >-
-        bash -lc 'source "$HOME/.sdkman/bin/sdkman-init.sh" && sdk env && MAVEN_OPTS="${MAVEN_OPTS:-} --enable-native-access=ALL-UNNAMED -Dsun.misc.unsafe.memory.access=allow" ./mvnw -f packages/java/pom.xml -B versions:display-property-updates'
+        bash -lc 'source "$HOME/.sdkman/bin/sdkman-init.sh" && sdk env && MAVEN_OPTS="${MAVEN_OPTS:-} --enable-native-access=ALL-UNNAMED -Dsun.misc.unsafe.memory.access=allow" mvn -f packages/java/pom.xml -B versions:display-property-updates'
       - >-
-        bash -lc 'source "$HOME/.sdkman/bin/sdkman-init.sh" && sdk env && MAVEN_OPTS="${MAVEN_OPTS:-} --enable-native-access=ALL-UNNAMED -Dsun.misc.unsafe.memory.access=allow" ./mvnw -f packages/java/pom.xml -B versions:update-properties -DgenerateBackupPoms=false -DallowSnapshots=false -DignoreVersions=".*-alpha.*,.*-beta.*,.*-rc.*,.*-cr.*,.*-milestone.*,.*-M[0-9]+.*" -DincludeProperties=junit.version,maven-compiler-plugin.version,maven-surefire-plugin.version,maven-javadoc-plugin.version,maven-gpg-plugin.version,maven-install-plugin.version,central-publishing-plugin.version,exec-maven-plugin.version,spotless-maven-plugin.version,maven-source-plugin.version'
+        bash -lc 'source "$HOME/.sdkman/bin/sdkman-init.sh" && sdk env && MAVEN_OPTS="${MAVEN_OPTS:-} --enable-native-access=ALL-UNNAMED -Dsun.misc.unsafe.memory.access=allow" mvn -f packages/java/pom.xml -B versions:update-properties -DgenerateBackupPoms=false -DallowSnapshots=false -DignoreVersions=".*-alpha.*,.*-beta.*,.*-rc.*,.*-cr.*,.*-milestone.*,.*-M[0-9]+.*" -DincludeProperties=junit.version,maven-compiler-plugin.version,maven-surefire-plugin.version,maven-javadoc-plugin.version,maven-gpg-plugin.version,maven-install-plugin.version,central-publishing-plugin.version,exec-maven-plugin.version,spotless-maven-plugin.version,maven-source-plugin.version'
 
   java:test:
     desc: "Run Java tests"
