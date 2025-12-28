@@ -86,7 +86,7 @@ jobs:
           echo "force_republish_java=${force_java}" >>"$GITHUB_OUTPUT"
           echo "force_republish_wasm=${force_wasm}" >>"$GITHUB_OUTPUT"
       - name: Install Task
-        uses: arduino/setup-task@v2
+        uses: go-task/setup-task@v1
         with:
           version: latest
 

@@ -53,7 +53,7 @@ jobs:
           components: rustfmt, clippy, llvm-tools-preview
 
       - name: Install Task
-        uses: arduino/setup-task@v2
+        uses: go-task/setup-task@v1
         with:
           version: latest
 
@@ -86,7 +86,7 @@ jobs:
           components: rustfmt, clippy, llvm-tools-preview
 
       - name: Install Task
-        uses: arduino/setup-task@v2
+        uses: go-task/setup-task@v1
         with:
           version: latest
 
