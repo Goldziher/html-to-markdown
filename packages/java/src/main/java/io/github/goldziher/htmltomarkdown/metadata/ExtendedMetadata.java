@@ -8,15 +8,14 @@ import java.util.Objects;
 /**
  * Comprehensive metadata extraction result from HTML document.
  *
- * <p>Contains all extracted metadata types in a single structure,
- * suitable for serialization and transmission across language boundaries.
+ * <p>Contains all extracted metadata types in a single structure, suitable for serialization and
+ * transmission across language boundaries.
  *
  * @param document Document-level metadata (title, description, canonical, etc.)
  * @param headers Extracted header elements with hierarchy
  * @param links Extracted hyperlinks with type classification
  * @param images Extracted images with source and dimensions
  * @param structuredData Extracted structured data blocks
- *
  * @since 2.13.0
  */
 @JsonInclude(JsonInclude.Include.NON_NULL)
@@ -96,9 +95,7 @@ public record ExtendedMetadata(
    * @return list of headers at the specified level
    */
   public List<HeaderMetadata> getHeadersByLevel(int level) {
-    return headers.stream()
-        .filter(h -> h.level() == level)
-        .toList();
+    return headers.stream().filter(h -> h.level() == level).toList();
   }
 
   /**
@@ -114,9 +111,7 @@ public record ExtendedMetadata(
     } catch (IllegalArgumentException e) {
       return Collections.emptyList();
     }
-    return links.stream()
-        .filter(l -> l.linkType() == linkType)
-        .toList();
+    return links.stream().filter(l -> l.linkType() == linkType).toList();
   }
 
   /**
@@ -126,9 +121,7 @@ public record ExtendedMetadata(
    * @return list of links of the specified type
    */
   public List<LinkMetadata> getLinksByType(LinkType type) {
-    return links.stream()
-        .filter(l -> l.linkType() == type)
-        .toList();
+    return links.stream().filter(l -> l.linkType() == type).toList();
   }
 
   /**
@@ -162,9 +155,7 @@ public record ExtendedMetadata(
     } catch (IllegalArgumentException e) {
       return Collections.emptyList();
     }
-    return images.stream()
-        .filter(i -> i.imageType() == imageType)
-        .toList();
+    return images.stream().filter(i -> i.imageType() == imageType).toList();
   }
 
   /**
@@ -174,9 +165,7 @@ public record ExtendedMetadata(
    * @return list of images of the specified type
    */
   public List<ImageMetadata> getImagesByType(ImageType type) {
-    return images.stream()
-        .filter(i -> i.imageType() == type)
-        .toList();
+    return images.stream().filter(i -> i.imageType() == type).toList();
   }
 
   /**

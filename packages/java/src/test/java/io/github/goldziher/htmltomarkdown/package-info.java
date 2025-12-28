@@ -1,4 +1,2 @@
-/**
- * Tests for the html-to-markdown Java Panama FFI bindings.
- */
+/** Tests for the html-to-markdown Java Panama FFI bindings. */
 package io.github.goldziher.htmltomarkdown;

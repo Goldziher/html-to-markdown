@@ -6,15 +6,14 @@ import java.util.Objects;
 /**
  * Header element metadata with hierarchy tracking.
  *
- * <p>Captures heading elements (h1-h6) with their text content, identifiers,
- * and position in the document structure.
+ * <p>Captures heading elements (h1-h6) with their text content, identifiers, and position in the
+ * document structure.
  *
  * @param level Header level: 1 (h1) through 6 (h6)
  * @param text Normalized text content of the header
  * @param id HTML id attribute if present
  * @param depth Document tree depth at the header element
  * @param htmlOffset Byte offset in original HTML document
- *
  * @since 2.13.0
  */
 @JsonInclude(JsonInclude.Include.NON_NULL)
@@ -41,8 +40,7 @@ public record HeaderMetadata(int level, String text, String id, int depth, int h
    * Validate that the header level is within valid range (1-6).
    *
    * @return true if level is 1-6, false otherwise
-   *
-   * For example, a header with level 3 returns true.
+   *     <p>For example, a header with level 3 returns true.
    */
   public boolean isValid() {
     return level >= MIN_HEADER_LEVEL && level <= MAX_HEADER_LEVEL;

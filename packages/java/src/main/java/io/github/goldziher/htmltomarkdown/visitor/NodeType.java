@@ -1,296 +1,295 @@
 package io.github.goldziher.htmltomarkdown.visitor;
 
 /**
- * HTML node type enumeration covering all element types supported by the
- * visitor pattern.
+ * HTML node type enumeration covering all element types supported by the visitor pattern.
  *
- * <p>Maps directly to the C FFI NodeType enum. This enum categorizes HTML
- * elements for coarse-grained visitor dispatch.
+ * <p>Maps directly to the C FFI NodeType enum. This enum categorizes HTML elements for
+ * coarse-grained visitor dispatch.
  *
  * @since 2.17.0
  */
 public enum NodeType {
-    /** Text node. */
-    TEXT,
+  /** Text node. */
+  TEXT,
 
-    /** Generic element node. */
-    ELEMENT,
+  /** Generic element node. */
+  ELEMENT,
 
-    /** Heading element (h1-h6). */
-    HEADING,
+  /** Heading element (h1-h6). */
+  HEADING,
 
-    /** Paragraph element. */
-    PARAGRAPH,
+  /** Paragraph element. */
+  PARAGRAPH,
 
-    /** Division element. */
-    DIV,
+  /** Division element. */
+  DIV,
 
-    /** Blockquote element. */
-    BLOCKQUOTE,
+  /** Blockquote element. */
+  BLOCKQUOTE,
 
-    /** Preformatted text element. */
-    PRE,
+  /** Preformatted text element. */
+  PRE,
 
-    /** Horizontal rule element. */
-    HR,
+  /** Horizontal rule element. */
+  HR,
 
-    /** List element (ul, ol, dl). */
-    LIST,
+  /** List element (ul, ol, dl). */
+  LIST,
 
-    /** List item element. */
-    LIST_ITEM,
+  /** List item element. */
+  LIST_ITEM,
 
-    /** Definition list element. */
-    DEFINITION_LIST,
+  /** Definition list element. */
+  DEFINITION_LIST,
 
-    /** Definition term element. */
-    DEFINITION_TERM,
+  /** Definition term element. */
+  DEFINITION_TERM,
 
-    /** Definition description element. */
-    DEFINITION_DESCRIPTION,
+  /** Definition description element. */
+  DEFINITION_DESCRIPTION,
 
-    /** Table element. */
-    TABLE,
+  /** Table element. */
+  TABLE,
 
-    /** Table row element. */
-    TABLE_ROW,
+  /** Table row element. */
+  TABLE_ROW,
 
-    /** Table cell element. */
-    TABLE_CELL,
+  /** Table cell element. */
+  TABLE_CELL,
 
-    /** Table header cell element. */
-    TABLE_HEADER,
+  /** Table header cell element. */
+  TABLE_HEADER,
 
-    /** Table body element. */
-    TABLE_BODY,
+  /** Table body element. */
+  TABLE_BODY,
 
-    /** Table head element. */
-    TABLE_HEAD,
+  /** Table head element. */
+  TABLE_HEAD,
 
-    /** Table foot element. */
-    TABLE_FOOT,
+  /** Table foot element. */
+  TABLE_FOOT,
 
-    /** Link element. */
-    LINK,
+  /** Link element. */
+  LINK,
 
-    /** Image element. */
-    IMAGE,
+  /** Image element. */
+  IMAGE,
 
-    /** Strong/bold element. */
-    STRONG,
+  /** Strong/bold element. */
+  STRONG,
 
-    /** Emphasis/italic element. */
-    EM,
+  /** Emphasis/italic element. */
+  EM,
 
-    /** Code element. */
-    CODE,
+  /** Code element. */
+  CODE,
 
-    /** Strikethrough element. */
-    STRIKETHROUGH,
+  /** Strikethrough element. */
+  STRIKETHROUGH,
 
-    /** Underline element. */
-    UNDERLINE,
+  /** Underline element. */
+  UNDERLINE,
 
-    /** Subscript element. */
-    SUBSCRIPT,
+  /** Subscript element. */
+  SUBSCRIPT,
 
-    /** Superscript element. */
-    SUPERSCRIPT,
+  /** Superscript element. */
+  SUPERSCRIPT,
 
-    /** Mark element. */
-    MARK,
+  /** Mark element. */
+  MARK,
 
-    /** Small element. */
-    SMALL,
+  /** Small element. */
+  SMALL,
 
-    /** Line break element. */
-    BR,
+  /** Line break element. */
+  BR,
 
-    /** Span element. */
-    SPAN,
+  /** Span element. */
+  SPAN,
 
-    /** Article element. */
-    ARTICLE,
+  /** Article element. */
+  ARTICLE,
 
-    /** Section element. */
-    SECTION,
+  /** Section element. */
+  SECTION,
 
-    /** Navigation element. */
-    NAV,
+  /** Navigation element. */
+  NAV,
 
-    /** Aside element. */
-    ASIDE,
+  /** Aside element. */
+  ASIDE,
 
-    /** Header element. */
-    HEADER,
+  /** Header element. */
+  HEADER,
 
-    /** Footer element. */
-    FOOTER,
+  /** Footer element. */
+  FOOTER,
 
-    /** Main element. */
-    MAIN,
+  /** Main element. */
+  MAIN,
 
-    /** Figure element. */
-    FIGURE,
+  /** Figure element. */
+  FIGURE,
 
-    /** Figure caption element. */
-    FIGCAPTION,
+  /** Figure caption element. */
+  FIGCAPTION,
 
-    /** Time element. */
-    TIME,
+  /** Time element. */
+  TIME,
 
-    /** Details element. */
-    DETAILS,
+  /** Details element. */
+  DETAILS,
 
-    /** Summary element. */
-    SUMMARY,
+  /** Summary element. */
+  SUMMARY,
 
-    /** Form element. */
-    FORM,
+  /** Form element. */
+  FORM,
 
-    /** Input element. */
-    INPUT,
+  /** Input element. */
+  INPUT,
 
-    /** Select element. */
-    SELECT,
+  /** Select element. */
+  SELECT,
 
-    /** Option element. */
-    OPTION,
+  /** Option element. */
+  OPTION,
 
-    /** Button element. */
-    BUTTON,
+  /** Button element. */
+  BUTTON,
 
-    /** Textarea element. */
-    TEXTAREA,
+  /** Textarea element. */
+  TEXTAREA,
 
-    /** Label element. */
-    LABEL,
+  /** Label element. */
+  LABEL,
 
-    /** Fieldset element. */
-    FIELDSET,
+  /** Fieldset element. */
+  FIELDSET,
 
-    /** Legend element. */
-    LEGEND,
+  /** Legend element. */
+  LEGEND,
 
-    /** Audio element. */
-    AUDIO,
+  /** Audio element. */
+  AUDIO,
 
-    /** Video element. */
-    VIDEO,
+  /** Video element. */
+  VIDEO,
 
-    /** Picture element. */
-    PICTURE,
+  /** Picture element. */
+  PICTURE,
 
-    /** Source element. */
-    SOURCE,
+  /** Source element. */
+  SOURCE,
 
-    /** Iframe element. */
-    IFRAME,
+  /** Iframe element. */
+  IFRAME,
 
-    /** SVG element. */
-    SVG,
+  /** SVG element. */
+  SVG,
 
-    /** Canvas element. */
-    CANVAS,
+  /** Canvas element. */
+  CANVAS,
 
-    /** Ruby element. */
-    RUBY,
+  /** Ruby element. */
+  RUBY,
 
-    /** Ruby text element. */
-    RT,
+  /** Ruby text element. */
+  RT,
 
-    /** Ruby parenthesis element. */
-    RP,
+  /** Ruby parenthesis element. */
+  RP,
 
-    /** Abbreviation element. */
-    ABBR,
+  /** Abbreviation element. */
+  ABBR,
 
-    /** Keyboard element. */
-    KBD,
+  /** Keyboard element. */
+  KBD,
 
-    /** Sample element. */
-    SAMP,
+  /** Sample element. */
+  SAMP,
 
-    /** Variable element. */
-    VAR,
+  /** Variable element. */
+  VAR,
 
-    /** Citation element. */
-    CITE,
+  /** Citation element. */
+  CITE,
 
-    /** Quote element. */
-    Q,
+  /** Quote element. */
+  Q,
 
-    /** Deleted element. */
-    DEL,
+  /** Deleted element. */
+  DEL,
 
-    /** Inserted element. */
-    INS,
+  /** Inserted element. */
+  INS,
 
-    /** Data element. */
-    DATA,
+  /** Data element. */
+  DATA,
 
-    /** Meter element. */
-    METER,
+  /** Meter element. */
+  METER,
 
-    /** Progress element. */
-    PROGRESS,
+  /** Progress element. */
+  PROGRESS,
 
-    /** Output element. */
-    OUTPUT,
+  /** Output element. */
+  OUTPUT,
 
-    /** Template element. */
-    TEMPLATE,
+  /** Template element. */
+  TEMPLATE,
 
-    /** Slot element. */
-    SLOT,
+  /** Slot element. */
+  SLOT,
 
-    /** HTML root element. */
-    HTML,
+  /** HTML root element. */
+  HTML,
 
-    /** Head element. */
-    HEAD,
+  /** Head element. */
+  HEAD,
 
-    /** Body element. */
-    BODY,
+  /** Body element. */
+  BODY,
 
-    /** Title element. */
-    TITLE,
+  /** Title element. */
+  TITLE,
 
-    /** Meta element. */
-    META,
+  /** Meta element. */
+  META,
 
-    /** Link tag element. */
-    LINK_TAG,
+  /** Link tag element. */
+  LINK_TAG,
 
-    /** Style element. */
-    STYLE,
+  /** Style element. */
+  STYLE,
 
-    /** Script element. */
-    SCRIPT,
+  /** Script element. */
+  SCRIPT,
 
-    /** Base element. */
-    BASE,
+  /** Base element. */
+  BASE,
 
-    /** Custom/unknown element. */
-    CUSTOM;
+  /** Custom/unknown element. */
+  CUSTOM;
 
-    /**
-     * Convert from C FFI node type value to Java enum.
-     *
-     * @param cValue the C FFI enum value
-     * @return the corresponding Java NodeType
-     * @throws IllegalArgumentException if the value is not recognized
-     */
-    public static NodeType fromCValue(final int cValue) {
-        return values()[cValue];
-    }
+  /**
+   * Convert from C FFI node type value to Java enum.
+   *
+   * @param cValue the C FFI enum value
+   * @return the corresponding Java NodeType
+   * @throws IllegalArgumentException if the value is not recognized
+   */
+  public static NodeType fromCValue(final int cValue) {
+    return values()[cValue];
+  }
 
-    /**
-     * Convert to C FFI node type value.
-     *
-     * @return the C FFI enum value
-     */
-    public int toCValue() {
-        return ordinal();
-    }
+  /**
+   * Convert to C FFI node type value.
+   *
+   * @return the C FFI enum value
+   */
+  public int toCValue() {
+    return ordinal();
+  }
 }

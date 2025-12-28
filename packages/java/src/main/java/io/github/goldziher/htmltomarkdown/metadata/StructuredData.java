@@ -7,13 +7,12 @@ import java.util.Objects;
 /**
  * Structured data block (JSON-LD, Microdata, or RDFa).
  *
- * <p>Represents machine-readable structured data found in the document.
- * JSON-LD blocks are collected as raw JSON strings for flexibility.
+ * <p>Represents machine-readable structured data found in the document. JSON-LD blocks are
+ * collected as raw JSON strings for flexibility.
  *
  * @param dataType Type of structured data (JSON-LD, Microdata, RDFa)
  * @param rawJson Raw JSON string (for JSON-LD) or serialized representation
  * @param schemaType Schema type if detectable (e.g., "Article", "Event", "Product")
- *
  * @since 2.13.0
  */
 @JsonInclude(JsonInclude.Include.NON_NULL)

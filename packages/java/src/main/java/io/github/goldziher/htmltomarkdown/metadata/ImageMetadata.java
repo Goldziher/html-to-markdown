@@ -8,8 +8,8 @@ import java.util.Objects;
 /**
  * Image metadata with source and dimensions.
  *
- * <p>Captures {@code <img>} elements and inline {@code <svg>} elements with metadata
- * for image analysis and optimization.
+ * <p>Captures {@code <img>} elements and inline {@code <svg>} elements with metadata for image
+ * analysis and optimization.
  *
  * @param src Image source (URL, data URI, or SVG content identifier)
  * @param alt Alternative text from alt attribute (for accessibility)
@@ -17,12 +17,16 @@ import java.util.Objects;
  * @param dimensions Image dimensions as [width, height] if available
  * @param imageType Image type classification
  * @param attributes Additional HTML attributes
- *
  * @since 2.13.0
  */
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public record ImageMetadata(
-    String src, String alt, String title, int[] dimensions, ImageType imageType, Map<String, String> attributes) {
+    String src,
+    String alt,
+    String title,
+    int[] dimensions,
+    ImageType imageType,
+    Map<String, String> attributes) {
 
   /**
    * Construct an ImageMetadata record.
@@ -93,13 +97,7 @@ public record ImageMetadata(
    * @return a new ImageMetadata with external type
    */
   public static ImageMetadata external(String src, String alt) {
-    return new ImageMetadata(
-        src,
-        alt,
-        null,
-        null,
-        ImageType.EXTERNAL,
-        Collections.emptyMap());
+    return new ImageMetadata(src, alt, null, null, ImageType.EXTERNAL, Collections.emptyMap());
   }
 
   /**
@@ -110,13 +108,7 @@ public record ImageMetadata(
    * @return a new ImageMetadata with relative type
    */
   public static ImageMetadata relative(String src, String alt) {
-    return new ImageMetadata(
-        src,
-        alt,
-        null,
-        null,
-        ImageType.RELATIVE,
-        Collections.emptyMap());
+    return new ImageMetadata(src, alt, null, null, ImageType.RELATIVE, Collections.emptyMap());
   }
 
   /**
@@ -127,12 +119,6 @@ public record ImageMetadata(
    * @return a new ImageMetadata with data_uri type
    */
   public static ImageMetadata dataUri(String dataUri, String alt) {
-    return new ImageMetadata(
-        dataUri,
-        alt,
-        null,
-        null,
-        ImageType.DATA_URI,
-        Collections.emptyMap());
+    return new ImageMetadata(dataUri, alt, null, null, ImageType.DATA_URI, Collections.emptyMap());
   }
 }

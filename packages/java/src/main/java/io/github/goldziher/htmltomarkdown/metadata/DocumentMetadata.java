@@ -7,8 +7,8 @@ import java.util.Objects;
 /**
  * Document-level metadata extracted from {@code <head>} and top-level elements.
  *
- * <p>Contains all metadata typically used by search engines, social media platforms,
- * and browsers for document indexing and presentation.
+ * <p>Contains all metadata typically used by search engines, social media platforms, and browsers
+ * for document indexing and presentation.
  *
  * @param title Document title from {@code <title>} tag
  * @param description Document description from {@code <meta name="description">} tag
@@ -21,7 +21,6 @@ import java.util.Objects;
  * @param openGraph Open Graph metadata (og:* properties) for social media
  * @param twitterCard Twitter Card metadata (twitter:* properties)
  * @param metaTags Additional meta tags not covered by specific fields
- *
  * @since 2.13.0
  */
 @JsonInclude(JsonInclude.Include.NON_NULL)

@@ -38,8 +38,8 @@ public enum TextDirection {
    * @param s the direction string ("ltr", "rtl", or "auto")
    * @return the {@code TextDirection}
    * @throws IllegalArgumentException if the string is null or unknown
-   *
-   * For example, {@code TextDirection.parse("ltr")} returns {@code TextDirection.LEFT_TO_RIGHT}.
+   *     <p>For example, {@code TextDirection.parse("ltr")} returns {@code
+   *     TextDirection.LEFT_TO_RIGHT}.
    */
   public static TextDirection parse(String s) {
     if (s == null) {

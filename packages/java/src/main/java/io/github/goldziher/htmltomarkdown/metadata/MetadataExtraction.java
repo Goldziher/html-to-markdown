@@ -11,7 +11,6 @@ import java.util.Objects;
  *
  * @param markdown The converted Markdown string
  * @param metadata The extracted metadata from the HTML document
- *
  * @since 2.13.0
  */
 @JsonInclude(JsonInclude.Include.NON_NULL)

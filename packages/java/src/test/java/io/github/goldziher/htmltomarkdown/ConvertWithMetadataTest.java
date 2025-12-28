@@ -108,7 +108,8 @@ class ConvertWithMetadataTest {
     assertEquals(2, metadata.getImageCount(), "Should have 2 images");
 
     ImageMetadata external = metadata.getExternalImages().get(0);
-    assertEquals("https://example.com/image.jpg", external.src(), "External image src should match");
+    assertEquals(
+        "https://example.com/image.jpg", external.src(), "External image src should match");
     assertEquals("Test Image", external.alt(), "Alt text should match");
     assertTrue(external.hasDimensions(), "Should have dimensions");
     assertEquals(800, external.getWidth(), "Width should match");
@@ -164,7 +165,8 @@ class ConvertWithMetadataTest {
     DocumentMetadata doc = result.getDocumentMetadata();
 
     assertTrue(doc.twitterCard().containsKey("card"), "Should have twitter:card");
-    assertEquals("summary_large_image", doc.twitterCard().get("card"), "twitter:card value should match");
+    assertEquals(
+        "summary_large_image", doc.twitterCard().get("card"), "twitter:card value should match");
   }
 
   @Test
@@ -268,9 +270,12 @@ class ConvertWithMetadataTest {
   @Test
   @DisplayName("Handle null HTML input")
   void testNullHtmlInput() {
-    assertThrows(NullPointerException.class, () -> {
-      HtmlToMarkdown.convertWithMetadata(null);
-    }, "Should throw NullPointerException for null HTML");
+    assertThrows(
+        NullPointerException.class,
+        () -> {
+          HtmlToMarkdown.convertWithMetadata(null);
+        },
+        "Should throw NullPointerException for null HTML");
   }
 
   @Test

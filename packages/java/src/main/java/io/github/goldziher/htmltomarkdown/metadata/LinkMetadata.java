@@ -18,12 +18,16 @@ import java.util.Objects;
  * @param linkType Link type classification
  * @param rel Rel attribute values (e.g., "nofollow", "stylesheet", "canonical")
  * @param attributes Additional HTML attributes
- *
  * @since 2.13.0
  */
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public record LinkMetadata(
-    String href, String text, String title, LinkType linkType, List<String> rel, Map<String, String> attributes) {
+    String href,
+    String text,
+    String title,
+    LinkType linkType,
+    List<String> rel,
+    Map<String, String> attributes) {
 
   /**
    * Construct a LinkMetadata record.
@@ -47,8 +51,8 @@ public record LinkMetadata(
    *
    * @param href The href attribute value
    * @return Appropriate LinkType based on protocol and content
-   *
-   * For example, {@code LinkMetadata.classifyLink("#section")} returns {@code LinkType.ANCHOR}.
+   *     <p>For example, {@code LinkMetadata.classifyLink("#section")} returns {@code
+   *     LinkType.ANCHOR}.
    */
   public static LinkType classifyLink(String href) {
     if (href == null) {
@@ -77,12 +81,7 @@ public record LinkMetadata(
    */
   public static LinkMetadata external(String href, String text) {
     return new LinkMetadata(
-        href,
-        text,
-        null,
-        LinkType.EXTERNAL,
-        Collections.emptyList(),
-        Collections.emptyMap());
+        href, text, null, LinkType.EXTERNAL, Collections.emptyList(), Collections.emptyMap());
   }
 
   /**
@@ -94,12 +93,7 @@ public record LinkMetadata(
    */
   public static LinkMetadata internal(String href, String text) {
     return new LinkMetadata(
-        href,
-        text,
-        null,
-        LinkType.INTERNAL,
-        Collections.emptyList(),
-        Collections.emptyMap());
+        href, text, null, LinkType.INTERNAL, Collections.emptyList(), Collections.emptyMap());
   }
 
   /**
