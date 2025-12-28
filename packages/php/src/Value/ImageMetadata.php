@@ -51,7 +51,10 @@ final readonly class ImageMetadata
     {
         foreach (['src', 'image_type', 'attributes'] as $required) {
             if (!\array_key_exists($required, $payload)) {
-                throw \HtmlToMarkdown\Exception\InvalidOption::because("image_metadata.$required", 'missing field in extension payload');
+                throw \HtmlToMarkdown\Exception\InvalidOption::because(
+                    "image_metadata.$required",
+                    'missing field in extension payload',
+                );
             }
         }
     }

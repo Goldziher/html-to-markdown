@@ -71,11 +71,19 @@ final readonly class InlineImage
             throw InvalidOption::because('inline_image.format', 'expected string');
         }
 
-        if (\array_key_exists('filename', $payload) && !\in_array($payload['filename'], [null], true) && !\is_string($payload['filename'])) {
+        if (
+            \array_key_exists('filename', $payload)
+            && !\in_array($payload['filename'], [null], true)
+            && !\is_string($payload['filename'])
+        ) {
             throw InvalidOption::because('inline_image.filename', 'expected string or null');
         }
 
-        if (\array_key_exists('description', $payload) && !\in_array($payload['description'], [null], true) && !\is_string($payload['description'])) {
+        if (
+            \array_key_exists('description', $payload)
+            && !\in_array($payload['description'], [null], true)
+            && !\is_string($payload['description'])
+        ) {
             throw InvalidOption::because('inline_image.description', 'expected string or null');
         }
 

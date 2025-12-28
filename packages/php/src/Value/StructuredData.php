@@ -39,7 +39,10 @@ final readonly class StructuredData
     {
         foreach (['data_type', 'raw_json'] as $required) {
             if (!\array_key_exists($required, $payload)) {
-                throw \HtmlToMarkdown\Exception\InvalidOption::because("structured_data.$required", 'missing field in extension payload');
+                throw \HtmlToMarkdown\Exception\InvalidOption::because(
+                    "structured_data.$required",
+                    'missing field in extension payload',
+                );
             }
         }
     }

@@ -49,7 +49,10 @@ final readonly class LinkMetadata
     {
         foreach (['href', 'text', 'link_type', 'rel', 'attributes'] as $required) {
             if (!\array_key_exists($required, $payload)) {
-                throw \HtmlToMarkdown\Exception\InvalidOption::because("link_metadata.$required", 'missing field in extension payload');
+                throw \HtmlToMarkdown\Exception\InvalidOption::because(
+                    "link_metadata.$required",
+                    'missing field in extension payload',
+                );
             }
         }
     }

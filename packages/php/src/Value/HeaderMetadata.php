@@ -43,7 +43,10 @@ final readonly class HeaderMetadata
     {
         foreach (['level', 'text', 'depth', 'html_offset'] as $required) {
             if (!\array_key_exists($required, $payload)) {
-                throw \HtmlToMarkdown\Exception\InvalidOption::because("header_metadata.$required", 'missing field in extension payload');
+                throw \HtmlToMarkdown\Exception\InvalidOption::because(
+                    "header_metadata.$required",
+                    'missing field in extension payload',
+                );
             }
         }
     }

@@ -59,7 +59,11 @@ final readonly class InlineImageExtraction
 
         $warnings = [];
         foreach ($warningsPayload as $warning) {
-            if (!\is_array($warning) || !\array_key_exists('index', $warning) || !\array_key_exists('message', $warning)) {
+            if (
+                !\is_array($warning)
+                || !\array_key_exists('index', $warning)
+                || !\array_key_exists('message', $warning)
+            ) {
                 throw \HtmlToMarkdown\Exception\InvalidOption::because(
                     'inline_image_extraction.warnings[]',
                     'expected array{index:int,message:string}',
