@@ -88,9 +88,9 @@ tasks:
     cmds:
       - cmd: cd {{.WASM_PKG}} && cargo fmt --all
         ignore_error: false
-      - cmd: |
-          cd {{.WASM_PKG}} && rustup target add {{.WASM_TARGET}}
-          cd {{.WASM_PKG}} && rustup run stable cargo clippy --target {{.WASM_TARGET}} --fix --allow-dirty --allow-staged -j {{.NUM_CPUS}}
+      - cmd: cd {{.WASM_PKG}} && rustup target add {{.WASM_TARGET}}
+        ignore_error: false
+      - cmd: cd {{.WASM_PKG}} && rustup run stable cargo clippy --target {{.WASM_TARGET}} --fix --allow-dirty --allow-staged -j {{.NUM_CPUS}}
         ignore_error: false
 
   lint:check:
@@ -99,9 +99,9 @@ tasks:
     cmds:
       - cmd: cd {{.WASM_PKG}} && cargo fmt --all --check
         ignore_error: false
-      - cmd: |
-          cd {{.WASM_PKG}} && rustup target add {{.WASM_TARGET}}
-          cd {{.WASM_PKG}} && rustup run stable cargo clippy -j {{.NUM_CPUS}} --target {{.WASM_TARGET}} -- -D warnings
+      - cmd: cd {{.WASM_PKG}} && rustup target add {{.WASM_TARGET}}
+        ignore_error: false
+      - cmd: cd {{.WASM_PKG}} && rustup run stable cargo clippy -j {{.NUM_CPUS}} --target {{.WASM_TARGET}} -- -D warnings
         ignore_error: false
 
   format:
