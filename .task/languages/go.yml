@@ -10,7 +10,7 @@ includes:
   _cfg: ../config/vars.yml
 
 vars:
-  GO_WORK_DIR: "{{.ROOT_DIR}}/packages/go/v2/htmltomarkdown"
+  GO_PKG: "packages/go/v2/htmltomarkdown"
   FFI_BUILD_DIR: "{{.TARGET_DIR}}/{{.OS}}-{{.ARCH}}/release"
 
 env:
@@ -29,11 +29,10 @@ tasks:
   build:
     desc: "Build Go FFI wrapper (depends on Rust FFI library)"
     silent: false
-    dir: "{{.GO_WORK_DIR}}"
     cmds:
-      - cmd: cargo build{{if eq .BUILD_PROFILE "release"}} --release{{end}} -p html-to-markdown-ffi --quiet
+      - cmd: cd {{.GO_PKG}} && cargo build{{if eq .BUILD_PROFILE "release"}} --release{{end}} -p html-to-markdown-ffi --quiet
         ignore_error: false
-      - cmd: go build -v
+      - cmd: cd {{.GO_PKG}} && go build -v
         env:
           GOTOOLCHAIN: "{{.GO_TOOLCHAIN}}"
           LD_LIBRARY_PATH: '{{if ne .OS "windows"}}{{.TARGET_DIR}}/release{{if .LD_LIBRARY_PATH}}:{{.LD_LIBRARY_PATH}}{{end}}{{end}}'
@@ -45,11 +44,10 @@ tasks:
   build:dev:
     desc: "Build Go FFI wrapper in debug mode"
     silent: false
-    dir: "{{.GO_WORK_DIR}}"
     cmds:
-      - cmd: cargo build -p html-to-markdown-ffi --quiet
+      - cmd: cd {{.GO_PKG}} && cargo build -p html-to-markdown-ffi --quiet
         ignore_error: false
-      - cmd: go build -v
+      - cmd: cd {{.GO_PKG}} && go build -v
         env:
           GOTOOLCHAIN: "{{.GO_TOOLCHAIN}}"
           LD_LIBRARY_PATH: '{{if ne .OS "windows"}}{{.TARGET_DIR}}/debug{{if .LD_LIBRARY_PATH}}:{{.LD_LIBRARY_PATH}}{{end}}{{end}}'
@@ -61,11 +59,10 @@ tasks:
   build:release:
     desc: "Build Go FFI wrapper in release mode"
     silent: false
-    dir: "{{.GO_WORK_DIR}}"
     cmds:
-      - cmd: cargo build --release -p html-to-markdown-ffi --quiet
+      - cmd: cd {{.GO_PKG}} && cargo build --release -p html-to-markdown-ffi --quiet
         ignore_error: false
-      - cmd: go build -v
+      - cmd: cd {{.GO_PKG}} && go build -v
         env:
           GOTOOLCHAIN: "{{.GO_TOOLCHAIN}}"
           LD_LIBRARY_PATH: '{{if ne .OS "windows"}}{{.TARGET_DIR}}/release{{if .LD_LIBRARY_PATH}}:{{.LD_LIBRARY_PATH}}{{end}}{{end}}'
@@ -77,11 +74,10 @@ tasks:
   build:ci:
     desc: "Build Go FFI wrapper for CI"
     silent: false
-    dir: "{{.GO_WORK_DIR}}"
     cmds:
-      - cmd: cargo build --release -p html-to-markdown-ffi --quiet
+      - cmd: cd {{.GO_PKG}} && cargo build --release -p html-to-markdown-ffi --quiet
         ignore_error: false
-      - cmd: go build -v
+      - cmd: cd {{.GO_PKG}} && go build -v
         env:
           GOTOOLCHAIN: "{{.GO_TOOLCHAIN}}"
           LD_LIBRARY_PATH: '{{if ne .OS "windows"}}{{.TARGET_DIR}}/release{{if .LD_LIBRARY_PATH}}:{{.LD_LIBRARY_PATH}}{{end}}{{end}}'
@@ -93,11 +89,10 @@ tasks:
   test:
     desc: "Run Go tests with FFI library path"
     silent: false
-    dir: "{{.GO_WORK_DIR}}"
     cmds:
-      - cmd: cargo build --release -p html-to-markdown-ffi --quiet
+      - cmd: cd {{.GO_PKG}} && cargo build --release -p html-to-markdown-ffi --quiet
         ignore_error: false
-      - cmd: go test -v
+      - cmd: cd {{.GO_PKG}} && go test -v
         env:
           GOTOOLCHAIN: "{{.GO_TOOLCHAIN}}"
           LD_LIBRARY_PATH: '{{if ne .OS "windows"}}{{.TARGET_DIR}}/release{{if .LD_LIBRARY_PATH}}:{{.LD_LIBRARY_PATH}}{{end}}{{end}}'
@@ -109,11 +104,10 @@ tasks:
   test:ci:
     desc: "Run Go tests for CI with verbose output"
     silent: false
-    dir: "{{.GO_WORK_DIR}}"
     cmds:
-      - cmd: cargo build --release -p html-to-markdown-ffi --quiet
+      - cmd: cd {{.GO_PKG}} && cargo build --release -p html-to-markdown-ffi --quiet
         ignore_error: false
-      - cmd: go test -v -coverprofile=coverage.out -covermode=atomic
+      - cmd: cd {{.GO_PKG}} && go test -v -coverprofile=coverage.out -covermode=atomic
         env:
           GOTOOLCHAIN: "{{.GO_TOOLCHAIN}}"
           LD_LIBRARY_PATH: '{{if ne .OS "windows"}}{{.TARGET_DIR}}/release{{if .LD_LIBRARY_PATH}}:{{.LD_LIBRARY_PATH}}{{end}}{{end}}'
@@ -125,9 +119,8 @@ tasks:
   lint:
     desc: "Lint Go code WITH auto-fix (golangci-lint run --fix)"
     silent: false
-    dir: "{{.GO_WORK_DIR}}"
     cmds:
-      - cmd: golangci-lint run --fix
+      - cmd: cd {{.GO_PKG}} && golangci-lint run --fix
         env:
           GOTOOLCHAIN: "{{.GO_TOOLCHAIN}}"
         ignore_error: false
@@ -135,9 +128,8 @@ tasks:
   lint:check:
     desc: "Lint Go code WITHOUT auto-fix (check-only)"
     silent: false
-    dir: "{{.GO_WORK_DIR}}"
     cmds:
-      - cmd: golangci-lint run
+      - cmd: cd {{.GO_PKG}} && golangci-lint run
         env:
           GOTOOLCHAIN: "{{.GO_TOOLCHAIN}}"
         ignore_error: false
@@ -145,9 +137,8 @@ tasks:
   format:
     desc: "Format Go code with gofmt"
     silent: false
-    dir: "{{.GO_WORK_DIR}}"
     cmds:
-      - cmd: gofmt -w .
+      - cmd: cd {{.GO_PKG}} && gofmt -w .
         env:
           GOTOOLCHAIN: "{{.GO_TOOLCHAIN}}"
         ignore_error: false
@@ -155,9 +146,8 @@ tasks:
   format:check:
     desc: "Check Go code formatting without modifications"
     silent: false
-    dir: "{{.GO_WORK_DIR}}"
     cmds:
-      - cmd: gofmt -l .
+      - cmd: cd {{.GO_PKG}} && gofmt -l .
         env:
           GOTOOLCHAIN: "{{.GO_TOOLCHAIN}}"
         ignore_error: false
@@ -165,13 +155,12 @@ tasks:
   update:
     desc: "Update Go dependencies (go get -u ./... && go mod tidy)"
     silent: false
-    dir: "{{.GO_WORK_DIR}}"
     cmds:
-      - cmd: go get -u ./...
+      - cmd: cd {{.GO_PKG}} && go get -u ./...
         env:
           GOTOOLCHAIN: "{{.GO_TOOLCHAIN}}"
         ignore_error: false
-      - cmd: go mod tidy
+      - cmd: cd {{.GO_PKG}} && go mod tidy
         env:
           GOTOOLCHAIN: "{{.GO_TOOLCHAIN}}"
         ignore_error: false

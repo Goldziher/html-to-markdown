@@ -10,15 +10,14 @@ includes:
 
 vars:
   BUILD_PROFILE: "{{.BUILD_PROFILE | default \"release\"}}"
-  PHP_WORK_DIR: "{{.ROOT_DIR}}/packages/php"
+  PHP_PKG: "packages/php"
 
 tasks:
   install:
     desc: "Install PHP dependencies with Composer"
     silent: false
-    dir: "{{.PHP_WORK_DIR}}"
     cmds:
-      - cmd: composer install
+      - cmd: cd {{.PHP_PKG}} && composer install
         ignore_error: false
 
   build:
@@ -54,70 +53,62 @@ tasks:
   test:
     desc: "Run PHPUnit tests for PHP binding"
     silent: false
-    dir: "{{.PHP_WORK_DIR}}"
     cmds:
-      - cmd: vendor/bin/phpunit tests/ --testdox
+      - cmd: cd {{.PHP_PKG}} && vendor/bin/phpunit tests/ --testdox
         ignore_error: false
 
   test:ci:
     desc: "Run PHPUnit tests with coverage for CI"
     silent: false
-    dir: "{{.PHP_WORK_DIR}}"
     cmds:
-      - cmd: vendor/bin/phpunit tests/ --coverage-clover=coverage.xml
+      - cmd: cd {{.PHP_PKG}} && vendor/bin/phpunit tests/ --coverage-clover=coverage.xml
         ignore_error: false
 
   lint:
     desc: "Lint PHP code WITH auto-fix (PHPStan + phpcbf)"
     silent: false
-    dir: "{{.PHP_WORK_DIR}}"
     cmds:
-      - cmd: vendor/bin/phpstan analyse --level 9 src/
+      - cmd: cd {{.PHP_PKG}} && vendor/bin/phpstan analyse --level 9 src/
         ignore_error: false
-      - cmd: vendor/bin/phpcbf --standard=PSR12 src/ tests/
+      - cmd: cd {{.PHP_PKG}} && vendor/bin/phpcbf --standard=PSR12 src/ tests/
         ignore_error: false
 
   lint:check:
     desc: "Lint PHP code WITHOUT auto-fix (PHPStan + phpcs check)"
     silent: false
-    dir: "{{.PHP_WORK_DIR}}"
     cmds:
-      - cmd: vendor/bin/phpstan analyse --level 9 src/
+      - cmd: cd {{.PHP_PKG}} && vendor/bin/phpstan analyse --level 9 src/
         ignore_error: false
-      - cmd: vendor/bin/phpcs --standard=PSR12 src/ tests/
+      - cmd: cd {{.PHP_PKG}} && vendor/bin/phpcs --standard=PSR12 src/ tests/
         ignore_error: false
 
   format:
     desc: "Format PHP code with phpcbf (auto-fix)"
     silent: false
-    dir: "{{.PHP_WORK_DIR}}"
     cmds:
-      - cmd: vendor/bin/phpcbf --standard=PSR12 src/ tests/
+      - cmd: cd {{.PHP_PKG}} && vendor/bin/phpcbf --standard=PSR12 src/ tests/
         ignore_error: false
 
   format:check:
     desc: "Check PHP code formatting without modifications"
     silent: false
-    dir: "{{.PHP_WORK_DIR}}"
     cmds:
-      - cmd: vendor/bin/phpcs --standard=PSR12 src/ tests/
+      - cmd: cd {{.PHP_PKG}} && vendor/bin/phpcs --standard=PSR12 src/ tests/
         ignore_error: false
 
   update:
     desc: "Update PHP dependencies with Composer"
     silent: false
-    dir: "{{.PHP_WORK_DIR}}"
     cmds:
-      - cmd: composer update
+      - cmd: cd {{.PHP_PKG}} && composer update
         ignore_error: false
 
   clean:
     desc: "Clean PHP build artifacts (cross-platform cleanup)"
     silent: false
-    dir: "{{.PHP_WORK_DIR}}"
     cmds:
       - cmd: |
-          php -r "
+          cd {{.PHP_PKG}} && php -r "
           \$files = glob('.php-cs-fixer.cache') ?: [];
           foreach (\$files as \$f) { if (is_file(\$f)) unlink(\$f); }
           \$dirs = ['vendor', 'tmp'];

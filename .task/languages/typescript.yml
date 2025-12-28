@@ -11,20 +11,18 @@ includes:
 
 vars:
   PNPM_VERSION: ">=10.17"
-  TYPESCRIPT_WORK_DIR: "{{.ROOT_DIR}}/packages/typescript"
-
-dir: "{{.TYPESCRIPT_WORK_DIR}}"
+  TS_PKG: "packages/typescript"
 
 tasks:
   install:
     desc: "Install TypeScript package dependencies"
     cmds:
-      - pnpm install
+      - cmd: cd {{.TS_PKG}} && pnpm install
 
   build:
     desc: "Build TypeScript package (production)"
     cmds:
-      - pnpm build
+      - cmd: cd {{.TS_PKG}} && pnpm build
     sources:
       - src/**/*.ts
       - src/**/*.tsx
@@ -36,18 +34,18 @@ tasks:
   build:dev:
     desc: "Build TypeScript package (debug mode)"
     cmds:
-      - cmd: pnpm build:dev || pnpm build
+      - cmd: cd {{.TS_PKG}} && pnpm build:dev || pnpm build
         ignore_error: true
 
   build:release:
     desc: "Build TypeScript package (release mode)"
     cmds:
-      - pnpm build
+      - cmd: cd {{.TS_PKG}} && pnpm build
 
   build:ci:
     desc: "Build TypeScript package (CI mode)"
     cmds:
-      - pnpm build
+      - cmd: cd {{.TS_PKG}} && pnpm build
     sources:
       - src/**/*.ts
       - src/**/*.tsx
@@ -57,7 +55,7 @@ tasks:
   test:
     desc: "Run TypeScript test suite"
     cmds:
-      - pnpm test
+      - cmd: cd {{.TS_PKG}} && pnpm test
     sources:
       - src/**/*.ts
       - tests/**/*.spec.ts
@@ -66,7 +64,7 @@ tasks:
   test:ci:
     desc: "Run TypeScript tests with coverage (CI mode)"
     cmds:
-      - pnpm test:coverage
+      - cmd: cd {{.TS_PKG}} && pnpm test:coverage
     sources:
       - src/**/*.ts
       - tests/**/*.spec.ts
@@ -75,7 +73,7 @@ tasks:
   lint:
     desc: "Lint TypeScript with Biome (auto-fix)"
     cmds:
-      - pnpm lint --fix
+      - cmd: cd {{.TS_PKG}} && pnpm lint --fix
     sources:
       - src/**/*.ts
       - tests/**/*.spec.ts
@@ -84,12 +82,12 @@ tasks:
   lint:check:
     desc: "Check TypeScript with Biome (no auto-fix)"
     cmds:
-      - pnpm lint
+      - cmd: cd {{.TS_PKG}} && pnpm lint
 
   format:
     desc: "Format TypeScript code with Biome"
     cmds:
-      - pnpm format
+      - cmd: cd {{.TS_PKG}} && pnpm format
     sources:
       - src/**/*.ts
       - tests/**/*.spec.ts
@@ -98,12 +96,12 @@ tasks:
   format:check:
     desc: "Check TypeScript code format (Biome)"
     cmds:
-      - pnpm format:check
+      - cmd: cd {{.TS_PKG}} && pnpm format:check
 
   typecheck:
     desc: "Run TypeScript type checking"
     cmds:
-      - cmd: pnpm typecheck
+      - cmd: cd {{.TS_PKG}} && pnpm typecheck
         ignore_error: false
     sources:
       - src/**/*.ts
@@ -113,10 +111,10 @@ tasks:
   update:
     desc: "Update TypeScript package dependencies"
     cmds:
-      - pnpm update
+      - cmd: cd {{.TS_PKG}} && pnpm update
 
   clean:
     desc: "Clean TypeScript build artifacts and cache (cross-platform)"
     cmds:
-      - cmd: node -e "const fs=require('fs'); ['dist','dist-node','dist-web','node_modules','.tsbuildinfo'].forEach(p=>fs.rmSync(p,{recursive:true,force:true}))"
+      - cmd: cd {{.TS_PKG}} && node -e "const fs=require('fs'); ['dist','dist-node','dist-web','node_modules','.tsbuildinfo'].forEach(p=>fs.rmSync(p,{recursive:true,force:true}))"
         ignore_error: true

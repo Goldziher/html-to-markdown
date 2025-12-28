@@ -10,65 +10,59 @@ includes:
 
 vars:
   BUILD_PROFILE: "{{.BUILD_PROFILE | default \"release\"}}"
-  CSHARP_WORK_DIR: "{{.ROOT_DIR}}/packages/csharp"
+  CSHARP_PKG: "packages/csharp"
 
 tasks:
   install:
     desc: "Restore .NET dependencies"
     silent: false
-    dir: "{{.CSHARP_WORK_DIR}}"
     cmds:
-      - cmd: dotnet restore
+      - cmd: cd {{.CSHARP_PKG}} && dotnet restore
         ignore_error: false
 
   build:
     desc: "Build FFI + .NET project ({{.BUILD_PROFILE}} profile)"
     silent: false
-    dir: "{{.CSHARP_WORK_DIR}}"
     cmds:
-      - cmd: cargo build{{if eq .BUILD_PROFILE "release"}} --release{{end}} -p html-to-markdown-ffi
+      - cmd: cd {{.CSHARP_PKG}} && cargo build{{if eq .BUILD_PROFILE "release"}} --release{{end}} -p html-to-markdown-ffi
         ignore_error: false
-      - cmd: dotnet build --configuration {{if eq .BUILD_PROFILE "release"}}Release{{else}}Debug{{end}}
+      - cmd: cd {{.CSHARP_PKG}} && dotnet build --configuration {{if eq .BUILD_PROFILE "release"}}Release{{else}}Debug{{end}}
         ignore_error: false
 
   build:dev:
     desc: "Build FFI + .NET project in debug mode"
     silent: false
-    dir: "{{.CSHARP_WORK_DIR}}"
     cmds:
-      - cmd: cargo build -p html-to-markdown-ffi
+      - cmd: cd {{.CSHARP_PKG}} && cargo build -p html-to-markdown-ffi
         ignore_error: false
-      - cmd: dotnet build --configuration Debug
+      - cmd: cd {{.CSHARP_PKG}} && dotnet build --configuration Debug
         ignore_error: false
 
   build:release:
     desc: "Build FFI + .NET project in release mode"
     silent: false
-    dir: "{{.CSHARP_WORK_DIR}}"
     cmds:
-      - cmd: cargo build --release -p html-to-markdown-ffi
+      - cmd: cd {{.CSHARP_PKG}} && cargo build --release -p html-to-markdown-ffi
         ignore_error: false
-      - cmd: dotnet build --configuration Release
+      - cmd: cd {{.CSHARP_PKG}} && dotnet build --configuration Release
         ignore_error: false
 
   build:ci:
     desc: "Build FFI + .NET project for CI (release)"
     silent: false
-    dir: "{{.CSHARP_WORK_DIR}}"
     cmds:
-      - cmd: cargo build --release -p html-to-markdown-ffi
+      - cmd: cd {{.CSHARP_PKG}} && cargo build --release -p html-to-markdown-ffi
         ignore_error: false
-      - cmd: dotnet build --configuration Release
+      - cmd: cd {{.CSHARP_PKG}} && dotnet build --configuration Release
         ignore_error: false
 
   test:
     desc: "Run .NET tests with library path"
     silent: false
-    dir: "{{.CSHARP_WORK_DIR}}"
     cmds:
-      - cmd: cargo build --release -p html-to-markdown-ffi
+      - cmd: cd {{.CSHARP_PKG}} && cargo build --release -p html-to-markdown-ffi
         ignore_error: false
-      - cmd: dotnet test --no-build --configuration Release
+      - cmd: cd {{.CSHARP_PKG}} && dotnet test --no-build --configuration Release
         ignore_error: false
         env:
           LD_LIBRARY_PATH: '{{if ne .OS "windows"}}{{.TASKFILE_DIR}}/target/release{{if .LD_LIBRARY_PATH}}:{{.LD_LIBRARY_PATH}}{{end}}{{end}}'
@@ -78,11 +72,10 @@ tasks:
   test:ci:
     desc: "Run .NET tests with coverage reporting for CI"
     silent: false
-    dir: "{{.CSHARP_WORK_DIR}}"
     cmds:
-      - cmd: cargo build --release -p html-to-markdown-ffi
+      - cmd: cd {{.CSHARP_PKG}} && cargo build --release -p html-to-markdown-ffi
         ignore_error: false
-      - cmd: dotnet test --configuration Release --collect:"XPlat Code Coverage"
+      - cmd: cd {{.CSHARP_PKG}} && dotnet test --configuration Release --collect:"XPlat Code Coverage"
         ignore_error: false
         env:
           LD_LIBRARY_PATH: '{{if ne .OS "windows"}}{{.TASKFILE_DIR}}/target/release{{if .LD_LIBRARY_PATH}}:{{.LD_LIBRARY_PATH}}{{end}}{{end}}'
@@ -92,57 +85,50 @@ tasks:
   lint:
     desc: "Lint and format C# code WITH auto-fix (dotnet format)"
     silent: false
-    dir: "{{.CSHARP_WORK_DIR}}"
     cmds:
-      - cmd: dotnet format
+      - cmd: cd {{.CSHARP_PKG}} && dotnet format
         ignore_error: false
 
   lint:check:
     desc: "Lint C# code WITHOUT auto-fix (check-only)"
     silent: false
-    dir: "{{.CSHARP_WORK_DIR}}"
     cmds:
-      - cmd: dotnet format --verify-no-changes
+      - cmd: cd {{.CSHARP_PKG}} && dotnet format --verify-no-changes
         ignore_error: false
 
   format:
     desc: "Format C# code with auto-fix (dotnet format)"
     silent: false
-    dir: "{{.CSHARP_WORK_DIR}}"
     cmds:
-      - cmd: dotnet format
+      - cmd: cd {{.CSHARP_PKG}} && dotnet format
         ignore_error: false
 
   format:check:
     desc: "Check C# code formatting without modifications"
     silent: false
-    dir: "{{.CSHARP_WORK_DIR}}"
     cmds:
-      - cmd: dotnet format --verify-no-changes
+      - cmd: cd {{.CSHARP_PKG}} && dotnet format --verify-no-changes
         ignore_error: false
 
   update:
     desc: "Check .NET package updates"
     silent: false
-    dir: "{{.CSHARP_WORK_DIR}}"
     cmds:
-      - cmd: dotnet list package --outdated
+      - cmd: cd {{.CSHARP_PKG}} && dotnet list package --outdated
         ignore_error: false
 
   clean:
     desc: "Clean C# build artifacts (cross-platform cleanup)"
     silent: false
-    dir: "{{.CSHARP_WORK_DIR}}"
     cmds:
-      - cmd: dotnet clean
+      - cmd: cd {{.CSHARP_PKG}} && dotnet clean
         ignore_error: true
-      - cmd: dotnet build-server shutdown
+      - cmd: cd {{.CSHARP_PKG}} && dotnet build-server shutdown
         ignore_error: true
 
   pack:
     desc: "Build C# NuGet package"
     silent: false
-    dir: "{{.CSHARP_WORK_DIR}}"
     cmds:
-      - cmd: dotnet pack --configuration Release
+      - cmd: cd {{.CSHARP_PKG}} && dotnet pack --configuration Release
         ignore_error: false

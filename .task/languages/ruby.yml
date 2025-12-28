@@ -9,7 +9,7 @@ includes:
   _cfg: ../config/vars.yml
 
 vars:
-  RUBY_WORK_DIR: "{{.ROOT_DIR}}/packages/ruby"
+  RUBY_PKG: "packages/ruby"
 
 env:
   RUBY: "{{.RUBY_BIN}}/ruby"
@@ -19,119 +19,104 @@ tasks:
   install:
     desc: "Install Ruby gem dependencies with Bundler"
     silent: false
-    dir: "{{.RUBY_WORK_DIR}}"
     cmds:
-      - cmd: bundle install
+      - cmd: cd {{.RUBY_PKG}} && bundle install
         ignore_error: false
 
   build:
     desc: "Build Ruby gem with Magnus bindings (rake compile)"
     silent: false
-    dir: "{{.RUBY_WORK_DIR}}"
     cmds:
-      - cmd: bundle exec rake compile
+      - cmd: cd {{.RUBY_PKG}} && bundle exec rake compile
         ignore_error: false
 
   build:dev:
     desc: "Build Ruby gem in debug mode (rake compile)"
     silent: false
-    dir: "{{.RUBY_WORK_DIR}}"
     cmds:
-      - cmd: bundle exec rake compile
+      - cmd: cd {{.RUBY_PKG}} && bundle exec rake compile
         ignore_error: false
 
   build:release:
     desc: "Build Ruby gem in release mode (rake compile)"
     silent: false
-    dir: "{{.RUBY_WORK_DIR}}"
     cmds:
-      - cmd: bundle exec rake compile
+      - cmd: cd {{.RUBY_PKG}} && bundle exec rake compile
         ignore_error: false
 
   build:ci:
     desc: "Build Ruby gem for CI (rake compile)"
     silent: false
-    dir: "{{.RUBY_WORK_DIR}}"
     cmds:
-      - cmd: bundle exec rake compile
+      - cmd: cd {{.RUBY_PKG}} && bundle exec rake compile
         ignore_error: false
 
   test:
     desc: "Run RSpec tests for Ruby bindings"
     silent: false
-    dir: "{{.RUBY_WORK_DIR}}"
     cmds:
-      - cmd: bundle exec rspec
+      - cmd: cd {{.RUBY_PKG}} && bundle exec rspec
         ignore_error: false
 
   test:ci:
     desc: "Run RSpec tests with coverage reporting for CI"
     silent: false
-    dir: "{{.RUBY_WORK_DIR}}"
     cmds:
-      - cmd: bundle exec rspec --format progress --format RspecJunitFormatter --out rspec.xml
+      - cmd: cd {{.RUBY_PKG}} && bundle exec rspec --format progress --format RspecJunitFormatter --out rspec.xml
         ignore_error: false
 
   lint:
     desc: "Lint Ruby code WITH auto-fix (bundle exec rubocop --autocorrect)"
     silent: false
-    dir: "{{.RUBY_WORK_DIR}}"
     cmds:
-      - cmd: bundle exec rubocop --autocorrect --config ./.rubocop.yml
+      - cmd: cd {{.RUBY_PKG}} && bundle exec rubocop --autocorrect --config ./.rubocop.yml
         ignore_error: false
 
   lint:check:
     desc: "Lint Ruby code WITHOUT auto-fix (check-only)"
     silent: false
-    dir: "{{.RUBY_WORK_DIR}}"
     cmds:
-      - cmd: bundle exec rubocop --config ./.rubocop.yml
+      - cmd: cd {{.RUBY_PKG}} && bundle exec rubocop --config ./.rubocop.yml
         ignore_error: false
 
   format:
     desc: "Format Ruby code with auto-correct (bundle exec rubocop --autocorrect)"
     silent: false
-    dir: "{{.RUBY_WORK_DIR}}"
     cmds:
-      - cmd: bundle exec rubocop --autocorrect --config ./.rubocop.yml
+      - cmd: cd {{.RUBY_PKG}} && bundle exec rubocop --autocorrect --config ./.rubocop.yml
         ignore_error: false
 
   format:check:
     desc: "Check Ruby code formatting without modifications"
     silent: false
-    dir: "{{.RUBY_WORK_DIR}}"
     cmds:
-      - cmd: bundle exec rubocop --config ./.rubocop.yml
+      - cmd: cd {{.RUBY_PKG}} && bundle exec rubocop --config ./.rubocop.yml
         ignore_error: false
 
   typecheck:
     desc: "Run Steep type checking (bundle exec steep check)"
     silent: false
-    dir: "{{.RUBY_WORK_DIR}}"
     cmds:
-      - cmd: bundle exec steep check
+      - cmd: cd {{.RUBY_PKG}} && bundle exec steep check
         ignore_error: false
 
   update:
     desc: "Update Ruby gem dependencies (bundle update)"
     silent: false
-    dir: "{{.RUBY_WORK_DIR}}"
     cmds:
-      - cmd: bundle update
+      - cmd: cd {{.RUBY_PKG}} && bundle update
         ignore_error: false
 
   clean:
     desc: "Clean Ruby build artifacts (cross-platform cleanup)"
     silent: false
-    dir: "{{.RUBY_WORK_DIR}}"
     cmds:
-      - cmd: ruby -e "require 'fileutils'; ['pkg', 'tmp'].each { |d| FileUtils.rm_rf(d) }; Dir['lib/*.{bundle,so}'].each { |f| File.delete(f) rescue nil }"
+      - cmd: cd {{.RUBY_PKG}} && ruby -e "require 'fileutils'; ['pkg', 'tmp'].each { |d| FileUtils.rm_rf(d) }; Dir['lib/*.{bundle,so}'].each { |f| File.delete(f) rescue nil }"
         ignore_error: true
 
   package:
     desc: "Build Ruby gem package (bundle exec rake package)"
     silent: false
-    dir: "{{.RUBY_WORK_DIR}}"
     cmds:
-      - cmd: bundle exec rake package
+      - cmd: cd {{.RUBY_PKG}} && bundle exec rake package
         ignore_error: false

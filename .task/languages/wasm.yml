@@ -9,7 +9,7 @@ includes:
   _cfg: ../config/vars.yml
 
 vars:
-  WASM_WORK_DIR: "{{.ROOT_DIR}}/crates/html-to-markdown-wasm"
+  WASM_PKG: "crates/html-to-markdown-wasm"
   WASM_TARGET: "wasm32-unknown-unknown"
   BUILD_PROFILE: "{{.BUILD_PROFILE | default \"release\"}}"
   RUST_LOG: "{{.RUST_LOG | default \"info\"}}"
@@ -19,138 +19,122 @@ tasks:
   install:
     desc: "Install wasm-pack and wasm32 target"
     silent: false
-    dir: "{{.WASM_WORK_DIR}}"
     cmds:
-      - cmd: rustup target add {{.WASM_TARGET}}
+      - cmd: cd {{.WASM_PKG}} && rustup target add {{.WASM_TARGET}}
         ignore_error: false
-      - cmd: cargo install wasm-pack --locked
+      - cmd: cd {{.WASM_PKG}} && cargo install wasm-pack --locked
         ignore_error: false
 
   build:
     desc: "Build WASM with wasm-pack ({{.BUILD_PROFILE}} profile)"
     silent: false
-    dir: "{{.WASM_WORK_DIR}}"
     cmds:
       - cmd: |
-          wasm-pack build{{if eq .BUILD_PROFILE "release"}} --release{{else}} --dev{{end}} --target bundler
+          cd {{.WASM_PKG}} && wasm-pack build{{if eq .BUILD_PROFILE "release"}} --release{{else}} --dev{{end}} --target bundler
         ignore_error: false
 
   build:dev:
     desc: "Build WASM in debug mode with wasm-pack"
     silent: false
-    dir: "{{.WASM_WORK_DIR}}"
     cmds:
-      - cmd: wasm-pack build --dev --target bundler
+      - cmd: cd {{.WASM_PKG}} && wasm-pack build --dev --target bundler
         ignore_error: false
 
   build:release:
     desc: "Build WASM in release mode with wasm-pack"
     silent: false
-    dir: "{{.WASM_WORK_DIR}}"
     cmds:
-      - cmd: wasm-pack build --release --target bundler
+      - cmd: cd {{.WASM_PKG}} && wasm-pack build --release --target bundler
         ignore_error: false
 
   build:ci:
     desc: "Build WASM for CI (release optimized)"
     silent: false
-    dir: "{{.WASM_WORK_DIR}}"
     cmds:
-      - cmd: wasm-pack build --release --target bundler
+      - cmd: cd {{.WASM_PKG}} && wasm-pack build --release --target bundler
         ignore_error: false
 
   test:
     desc: "Run WASM tests in Node.js environment"
     silent: false
-    dir: "{{.WASM_WORK_DIR}}"
     cmds:
-      - cmd: wasm-pack test --node --headless
+      - cmd: cd {{.WASM_PKG}} && wasm-pack test --node --headless
         ignore_error: false
 
   test:ci:
     desc: "Run WASM tests in CI with headless browsers"
     silent: false
-    dir: "{{.WASM_WORK_DIR}}"
     cmds:
-      - cmd: wasm-pack test --headless --firefox
+      - cmd: cd {{.WASM_PKG}} && wasm-pack test --headless --firefox
         ignore_error: false
 
   test:node:
     desc: "Run WASM tests in Node.js environment"
     silent: false
-    dir: "{{.WASM_WORK_DIR}}"
     cmds:
-      - cmd: wasm-pack test --node
+      - cmd: cd {{.WASM_PKG}} && wasm-pack test --node
         ignore_error: false
 
   test:browser:
     desc: "Run WASM tests in headless browser (Chrome)"
     silent: false
-    dir: "{{.WASM_WORK_DIR}}"
     cmds:
-      - cmd: wasm-pack test --headless --chrome
+      - cmd: cd {{.WASM_PKG}} && wasm-pack test --headless --chrome
         ignore_error: false
 
   lint:
     desc: "Lint WASM code WITH auto-fix (cargo fmt + cargo clippy --fix)"
     silent: false
-    dir: "{{.WASM_WORK_DIR}}"
     cmds:
-      - cmd: cargo fmt --all
+      - cmd: cd {{.WASM_PKG}} && cargo fmt --all
         ignore_error: false
       - cmd: |
-          cargo clippy --target {{.WASM_TARGET}} --fix --allow-dirty --allow-staged -j {{.NUM_CPUS}}
+          cd {{.WASM_PKG}} && cargo clippy --target {{.WASM_TARGET}} --fix --allow-dirty --allow-staged -j {{.NUM_CPUS}}
         ignore_error: false
 
   lint:check:
     desc: "Lint WASM code WITHOUT auto-fix (check-only)"
     silent: false
-    dir: "{{.WASM_WORK_DIR}}"
     cmds:
-      - cmd: cargo fmt --all --check
+      - cmd: cd {{.WASM_PKG}} && cargo fmt --all --check
         ignore_error: false
       - cmd: |
-          cargo clippy --target {{.WASM_TARGET}} -- -D warnings -j {{.NUM_CPUS}}
+          cd {{.WASM_PKG}} && cargo clippy --target {{.WASM_TARGET}} -- -D warnings -j {{.NUM_CPUS}}
         ignore_error: false
 
   format:
     desc: "Format WASM code (with modifications)"
     silent: false
-    dir: "{{.WASM_WORK_DIR}}"
     cmds:
-      - cmd: cargo fmt --all
+      - cmd: cd {{.WASM_PKG}} && cargo fmt --all
         ignore_error: false
 
   format:check:
     desc: "Check WASM formatting without modifications"
     silent: false
-    dir: "{{.WASM_WORK_DIR}}"
     cmds:
-      - cmd: cargo fmt --all --check
+      - cmd: cd {{.WASM_PKG}} && cargo fmt --all --check
         ignore_error: false
 
   update:
     desc: "Update WASM dependencies"
     silent: false
-    dir: "{{.WASM_WORK_DIR}}"
     cmds:
-      - cmd: cargo update
+      - cmd: cd {{.WASM_PKG}} && cargo update
         ignore_error: false
 
   clean:
     desc: "Clean WASM build artifacts"
     silent: false
-    dir: "{{.WASM_WORK_DIR}}"
     cmds:
-      - cmd: cargo clean
+      - cmd: cd {{.WASM_PKG}} && cargo clean
         ignore_error: false
-      - cmd: rm -rf pkg/
+      - cmd: cd {{.WASM_PKG}} && rm -rf pkg/
         ignore_error: true
 
   pack:
     desc: "Build WASM package with bundler target for distribution"
     silent: false
-    dir: "{{.WASM_WORK_DIR}}"
     cmds:
-      - cmd: wasm-pack build --target bundler --release
+      - cmd: cd {{.WASM_PKG}} && wasm-pack build --target bundler --release
         ignore_error: false

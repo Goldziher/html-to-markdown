@@ -10,110 +10,97 @@ includes:
 
 vars:
   BUILD_PROFILE: "{{.BUILD_PROFILE | default \"release\"}}"
-  NODE_WORK_DIR: "{{.ROOT_DIR}}/packages/typescript"
+  NODE_PKG: "packages/typescript"
 
 tasks:
   install:
     desc: "Install Node.js dependencies with pnpm"
     silent: false
-    dir: "{{.NODE_WORK_DIR}}"
     cmds:
-      - cmd: pnpm install
+      - cmd: cd {{.NODE_PKG}} && pnpm install
         ignore_error: false
 
   build:
     desc: "Build NAPI-RS bindings with {{.BUILD_PROFILE}} profile"
     silent: false
-    dir: "{{.NODE_WORK_DIR}}"
     cmds:
       - cmd: |
-          napi build{{if eq .BUILD_PROFILE "release"}} --release{{end}}
+          cd {{.NODE_PKG}} && napi build{{if eq .BUILD_PROFILE "release"}} --release{{end}}
         ignore_error: false
 
   build:dev:
     desc: "Build NAPI-RS bindings in debug mode"
     silent: false
-    dir: "{{.NODE_WORK_DIR}}"
     cmds:
-      - cmd: napi build
+      - cmd: cd {{.NODE_PKG}} && napi build
         ignore_error: false
 
   build:release:
     desc: "Build NAPI-RS bindings in release mode"
     silent: false
-    dir: "{{.NODE_WORK_DIR}}"
     cmds:
-      - cmd: napi build --release
+      - cmd: cd {{.NODE_PKG}} && napi build --release
         ignore_error: false
 
   build:ci:
     desc: "Build NAPI-RS bindings for CI (release mode)"
     silent: false
-    dir: "{{.NODE_WORK_DIR}}"
     cmds:
-      - cmd: napi build --release
+      - cmd: cd {{.NODE_PKG}} && napi build --release
         ignore_error: false
 
   test:
     desc: "Run Node.js tests with pnpm"
     silent: false
-    dir: "{{.NODE_WORK_DIR}}"
     cmds:
-      - cmd: pnpm test
+      - cmd: cd {{.NODE_PKG}} && pnpm test
         ignore_error: false
 
   test:ci:
     desc: "Run Node.js tests with coverage for CI"
     silent: false
-    dir: "{{.NODE_WORK_DIR}}"
     cmds:
-      - cmd: pnpm test -- --coverage
+      - cmd: cd {{.NODE_PKG}} && pnpm test -- --coverage
         ignore_error: false
 
   lint:
     desc: "Lint Node.js code WITH auto-fix (biome check --apply)"
     silent: false
-    dir: "{{.NODE_WORK_DIR}}"
     cmds:
-      - cmd: pnpm lint --fix
+      - cmd: cd {{.NODE_PKG}} && pnpm lint --fix
         ignore_error: false
 
   lint:check:
     desc: "Lint Node.js code WITHOUT auto-fix (check-only)"
     silent: false
-    dir: "{{.NODE_WORK_DIR}}"
     cmds:
-      - cmd: pnpm lint
+      - cmd: cd {{.NODE_PKG}} && pnpm lint
         ignore_error: false
 
   format:
     desc: "Format Node.js code with prettier/biome"
     silent: false
-    dir: "{{.NODE_WORK_DIR}}"
     cmds:
-      - cmd: pnpm format
+      - cmd: cd {{.NODE_PKG}} && pnpm format
         ignore_error: false
 
   format:check:
     desc: "Check Node.js formatting without modifications"
     silent: false
-    dir: "{{.NODE_WORK_DIR}}"
     cmds:
-      - cmd: pnpm format:check
+      - cmd: cd {{.NODE_PKG}} && pnpm format:check
         ignore_error: false
 
   update:
     desc: "Update Node.js dependencies with pnpm"
     silent: false
-    dir: "{{.NODE_WORK_DIR}}"
     cmds:
-      - cmd: pnpm update
+      - cmd: cd {{.NODE_PKG}} && pnpm update
         ignore_error: false
 
   clean:
     desc: "Clean Node.js build artifacts (cross-platform)"
     silent: false
-    dir: "{{.NODE_WORK_DIR}}"
     cmds:
-      - cmd: node -e "const fs=require('fs'); ['dist','node_modules','.pnpm-debug.log'].forEach(p=>fs.rmSync(p,{recursive:true,force:true}))"
+      - cmd: cd {{.NODE_PKG}} && node -e "const fs=require('fs'); ['dist','node_modules','.pnpm-debug.log'].forEach(p=>fs.rmSync(p,{recursive:true,force:true}))"
         ignore_error: true

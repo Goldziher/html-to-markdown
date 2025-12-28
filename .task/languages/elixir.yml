@@ -9,7 +9,7 @@ includes:
   _cfg: ../config/vars.yml
 
 vars:
-  ELIXIR_WORK_DIR: "{{.ROOT_DIR}}/packages/elixir"
+  ELIXIR_PKG: "packages/elixir"
 
 env:
   MIX_ENV: "dev"
@@ -18,23 +18,21 @@ tasks:
   install:
     desc: "Install Elixir dependencies with Mix"
     silent: false
-    dir: "{{.ELIXIR_WORK_DIR}}"
     cmds:
-      - cmd: pwd && ls -la mix.exs
+      - cmd: cd {{.ELIXIR_PKG}} && pwd && ls -la mix.exs
         ignore_error: false
-      - cmd: mix local.hex --force
+      - cmd: cd {{.ELIXIR_PKG}} && mix local.hex --force
         ignore_error: false
-      - cmd: mix local.rebar --force
+      - cmd: cd {{.ELIXIR_PKG}} && mix local.rebar --force
         ignore_error: false
-      - cmd: mix deps.get
+      - cmd: cd {{.ELIXIR_PKG}} && mix deps.get
         ignore_error: false
 
   build:
     desc: "Build Elixir project with Rustler NIF (dev profile)"
     silent: false
-    dir: "{{.ELIXIR_WORK_DIR}}"
     cmds:
-      - cmd: mix compile
+      - cmd: cd {{.ELIXIR_PKG}} && mix compile
         env:
           MIX_ENV: "dev"
         ignore_error: false
@@ -42,9 +40,8 @@ tasks:
   build:dev:
     desc: "Build Elixir project in dev mode (unoptimized, faster compile)"
     silent: false
-    dir: "{{.ELIXIR_WORK_DIR}}"
     cmds:
-      - cmd: mix compile
+      - cmd: cd {{.ELIXIR_PKG}} && mix compile
         env:
           MIX_ENV: "dev"
         ignore_error: false
@@ -52,9 +49,8 @@ tasks:
   build:release:
     desc: "Build Elixir project in release mode (optimized Rust NIF)"
     silent: false
-    dir: "{{.ELIXIR_WORK_DIR}}"
     cmds:
-      - cmd: mix compile
+      - cmd: cd {{.ELIXIR_PKG}} && mix compile
         env:
           MIX_ENV: "prod"
         ignore_error: false
@@ -62,9 +58,8 @@ tasks:
   build:ci:
     desc: "Build Elixir project for CI (test environment)"
     silent: false
-    dir: "{{.ELIXIR_WORK_DIR}}"
     cmds:
-      - cmd: mix compile
+      - cmd: cd {{.ELIXIR_PKG}} && mix compile
         env:
           MIX_ENV: "test"
         ignore_error: false
@@ -72,9 +67,8 @@ tasks:
   test:
     desc: "Run ExUnit tests for Elixir bindings"
     silent: false
-    dir: "{{.ELIXIR_WORK_DIR}}"
     cmds:
-      - cmd: mix test
+      - cmd: cd {{.ELIXIR_PKG}} && mix test
         env:
           MIX_ENV: "test"
         ignore_error: false
@@ -82,9 +76,8 @@ tasks:
   test:ci:
     desc: "Run ExUnit tests with coverage reporting for CI"
     silent: false
-    dir: "{{.ELIXIR_WORK_DIR}}"
     cmds:
-      - cmd: mix test --cover
+      - cmd: cd {{.ELIXIR_PKG}} && mix test --cover
         env:
           MIX_ENV: "test"
         ignore_error: false
@@ -92,71 +85,63 @@ tasks:
   lint:
     desc: "Lint Elixir code WITH auto-fix (mix format + mix credo --strict)"
     silent: false
-    dir: "{{.ELIXIR_WORK_DIR}}"
     cmds:
-      - cmd: mix format
+      - cmd: cd {{.ELIXIR_PKG}} && mix format
         ignore_error: false
-      - cmd: mix credo --strict
+      - cmd: cd {{.ELIXIR_PKG}} && mix credo --strict
         ignore_error: false
 
   lint:check:
     desc: "Lint Elixir code WITHOUT auto-fix (check-only)"
     silent: false
-    dir: "{{.ELIXIR_WORK_DIR}}"
     cmds:
-      - cmd: mix format --check-formatted
+      - cmd: cd {{.ELIXIR_PKG}} && mix format --check-formatted
         ignore_error: false
-      - cmd: mix credo
+      - cmd: cd {{.ELIXIR_PKG}} && mix credo
         ignore_error: false
 
   format:
     desc: "Format Elixir code with mix format"
     silent: false
-    dir: "{{.ELIXIR_WORK_DIR}}"
     cmds:
-      - cmd: mix format
+      - cmd: cd {{.ELIXIR_PKG}} && mix format
         ignore_error: false
 
   format:check:
     desc: "Check Elixir code formatting without modifications"
     silent: false
-    dir: "{{.ELIXIR_WORK_DIR}}"
     cmds:
-      - cmd: mix format --check-formatted
+      - cmd: cd {{.ELIXIR_PKG}} && mix format --check-formatted
         ignore_error: false
 
   dialyzer:
     desc: "Run Dialyzer for static type analysis"
     silent: false
-    dir: "{{.ELIXIR_WORK_DIR}}"
     cmds:
-      - cmd: mix dialyzer
+      - cmd: cd {{.ELIXIR_PKG}} && mix dialyzer
         ignore_error: false
 
   update:
     desc: "Update Elixir dependencies (mix deps.update --all)"
     silent: false
-    dir: "{{.ELIXIR_WORK_DIR}}"
     cmds:
-      - cmd: mix deps.update --all
+      - cmd: cd {{.ELIXIR_PKG}} && mix deps.update --all
         ignore_error: false
 
   clean:
     desc: "Clean Elixir build artifacts (cross-platform cleanup)"
     silent: false
-    dir: "{{.ELIXIR_WORK_DIR}}"
     cmds:
-      - cmd: mix clean
+      - cmd: cd {{.ELIXIR_PKG}} && mix clean
         ignore_error: false
-      - cmd: mix deps.clean --all
+      - cmd: cd {{.ELIXIR_PKG}} && mix deps.clean --all
         ignore_error: true
 
   release:
     desc: "Build Elixir release (mix release)"
     silent: false
-    dir: "{{.ELIXIR_WORK_DIR}}"
     cmds:
-      - cmd: mix release
+      - cmd: cd {{.ELIXIR_PKG}} && mix release
         env:
           MIX_ENV: "prod"
         ignore_error: false
