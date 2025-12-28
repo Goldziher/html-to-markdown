@@ -100,6 +100,10 @@ jobs:
           command: uv sync --all-extras --no-install-workspace
           shell: bash
 
+      - name: Install PHP Dependencies
+        run: task php:install
+        shell: bash
+
       - name: Run Lint Checks
         run: task lint:check
         shell: bash
