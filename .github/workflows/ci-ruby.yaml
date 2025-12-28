@@ -10,6 +10,8 @@ on:
       - crates/html-to-markdown/**
       - Gemfile
       - Gemfile.lock
+      - .task/**
+      - Taskfile.yaml
       - .github/workflows/ci-ruby.yaml
   pull_request:
     branches: [main]
@@ -20,6 +22,8 @@ on:
       - crates/html-to-markdown/**
       - Gemfile
       - Gemfile.lock
+      - .task/**
+      - Taskfile.yaml
       - .github/workflows/ci-ruby.yaml
 
 permissions:

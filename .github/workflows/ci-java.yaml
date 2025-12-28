@@ -7,6 +7,8 @@ on:
       - packages/java/**
       - crates/html-to-markdown-ffi/**
       - crates/html-to-markdown/**
+      - .task/**
+      - Taskfile.yaml
       - .github/workflows/ci-java.yaml
   pull_request:
     branches: [main]
@@ -14,6 +16,8 @@ on:
       - packages/java/**
       - crates/html-to-markdown-ffi/**
       - crates/html-to-markdown/**
+      - .task/**
+      - Taskfile.yaml
       - .github/workflows/ci-java.yaml
 
 permissions:

@@ -10,6 +10,8 @@ on:
       - pyproject.toml
       - uv.lock
       - uv.toml
+      - .task/**
+      - Taskfile.yaml
       - .github/workflows/ci-python.yaml
   pull_request:
     branches: [main]
@@ -20,6 +22,8 @@ on:
       - pyproject.toml
       - uv.lock
       - uv.toml
+      - .task/**
+      - Taskfile.yaml
       - .github/workflows/ci-python.yaml
 
 permissions:

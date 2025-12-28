@@ -10,6 +10,8 @@ on:
       - package.json
       - pnpm-lock.yaml
       - pnpm-workspace.yaml
+      - .task/**
+      - Taskfile.yaml
       - .github/workflows/ci-node.yaml
   pull_request:
     branches: [main]
@@ -20,6 +22,8 @@ on:
       - package.json
       - pnpm-lock.yaml
       - pnpm-workspace.yaml
+      - .task/**
+      - Taskfile.yaml
       - .github/workflows/ci-node.yaml
 
 permissions:

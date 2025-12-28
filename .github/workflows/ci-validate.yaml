@@ -5,11 +5,15 @@ on:
     branches: [main]
     paths:
       - "**"
+      - .task/**
+      - Taskfile.yaml
       - ".github/workflows/ci-validate.yaml"
   pull_request:
     branches: [main]
     paths:
       - "**"
+      - .task/**
+      - Taskfile.yaml
       - ".github/workflows/ci-validate.yaml"
 
 permissions:

@@ -7,6 +7,8 @@ on:
       - packages/elixir/**
       - crates/html-to-markdown-ffi/**
       - crates/html-to-markdown/**
+      - .task/**
+      - Taskfile.yaml
       - .github/workflows/ci-elixir.yaml
   pull_request:
     branches: [main]
@@ -14,6 +16,8 @@ on:
       - packages/elixir/**
       - crates/html-to-markdown-ffi/**
       - crates/html-to-markdown/**
+      - .task/**
+      - Taskfile.yaml
       - .github/workflows/ci-elixir.yaml
 
 permissions:
