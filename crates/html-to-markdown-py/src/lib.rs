@@ -1270,7 +1270,7 @@ mod visitor_support {
                 })?;
 
                 let fut = pyo3_async_runtimes::into_future_with_locals(locals, result)?;
-                let py_result = py.allow_threads(|| pyo3_async_runtimes::tokio::get_runtime().block_on(fut))??;
+                let py_result: Py<PyAny> = py.detach(|| pyo3_async_runtimes::tokio::get_runtime().block_on(fut))?;
                 let result_dict: Bound<'_, pyo3::types::PyDict> = py_result.bind(py).extract()?;
                 return Self::result_from_dict(&result_dict);
             }
