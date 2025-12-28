@@ -58,14 +58,34 @@ where
 pub static PYTHON_TASK_LOCALS: OnceCell<TaskLocals> = OnceCell::new();
 
 #[cfg(feature = "async-visitor")]
-fn init_python_event_loop(py: Python) -> PyResult<()> {
+fn init_python_event_loop(_py: Python) -> PyResult<()> {
     if PYTHON_TASK_LOCALS.get().is_some() {
         return Ok(());
     }
 
-    let asyncio = py.import("asyncio")?;
-    let event_loop = asyncio.call_method0("new_event_loop")?;
-    let task_locals = TaskLocals::new(event_loop).copy_context(py)?;
+    let (tx, rx) = std::sync::mpsc::channel::<PyResult<TaskLocals>>();
+
+    std::thread::spawn(move || {
+        let result = Python::attach(|py| -> PyResult<()> {
+            let asyncio = py.import("asyncio")?;
+            let event_loop = asyncio.call_method0("new_event_loop")?;
+            asyncio.call_method1("set_event_loop", (event_loop.clone(),))?;
+
+            let locals = TaskLocals::new(event_loop.clone()).copy_context(py)?;
+            let _ = tx.send(Ok(locals));
+
+            event_loop.call_method0("run_forever")?;
+            Ok(())
+        });
+
+        if let Err(err) = result {
+            let _ = tx.send(Err(err));
+        }
+    });
+
+    let task_locals = rx
+        .recv()
+        .map_err(|_| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>("Failed to init async event loop"))??;
 
     PYTHON_TASK_LOCALS
         .set(task_locals)
@@ -1242,6 +1262,17 @@ mod visitor_support {
 
             if result.is_none() {
                 return Ok(VisitResult::Continue);
+            }
+
+            if result.hasattr("__await__")? {
+                let locals = PYTHON_TASK_LOCALS.get().ok_or_else(|| {
+                    pyo3::exceptions::PyRuntimeError::new_err("Async visitor event loop not initialized")
+                })?;
+
+                let fut = pyo3_async_runtimes::into_future_with_locals(locals, result)?;
+                let py_result = py.allow_threads(|| pyo3_async_runtimes::tokio::get_runtime().block_on(fut))??;
+                let result_dict: Bound<'_, pyo3::types::PyDict> = py_result.bind(py).extract()?;
+                return Self::result_from_dict(&result_dict);
             }
 
             let result_dict: Bound<'_, pyo3::types::PyDict> = result.extract()?;

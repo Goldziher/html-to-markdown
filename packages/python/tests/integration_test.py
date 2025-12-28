@@ -670,11 +670,11 @@ def test_pre(convert: Callable[..., str]) -> None:
 
 
 def test_script(convert: Callable[..., str]) -> None:
-    assert convert("foo <script>var foo=42;</script> bar") == "foo  bar\n"
+    assert convert("foo <script>var foo=42;</script> bar") == "foo bar\n"
 
 
 def test_style(convert: Callable[..., str]) -> None:
-    assert convert("foo <style>h1 { font-size: larger }</style> bar") == "foo  bar\n"
+    assert convert("foo <style>h1 { font-size: larger }</style> bar") == "foo bar\n"
 
 
 def test_s(convert: Callable[..., str]) -> None:
