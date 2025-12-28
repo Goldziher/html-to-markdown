@@ -26,7 +26,8 @@ esac
 
 if [[ -z "${lib_path:-}" || ! -f "${lib_path}" ]]; then
 	echo "Failed to locate built html_to_markdown_ffi library for ${rid}" >&2
-	ls -la target/release || true
+	echo "Contents of target/release:" >&2
+	ls -la target/release/*.{dll,dylib,so} 2>/dev/null || ls -la target/release/ || true
 	exit 1
 fi
 

@@ -46,14 +46,20 @@ def load_results(path: str) -> dict[str, Any]:
         return {}
 
 
-def extract_benchmark_data(results: dict[str, Any], framework: str) -> dict[str, BenchmarkResult]:
+def extract_benchmark_data(results: dict[str, Any] | list[Any], framework: str) -> dict[str, BenchmarkResult]:
     """Extract benchmark data for a specific framework."""
     data = {}
 
-    if not results or "benchmarks" not in results:
+    # Handle direct array format from benchmark harness
+    if isinstance(results, list):
+        benchmark_list = results
+    # Handle nested "benchmarks" key format
+    elif isinstance(results, dict) and "benchmarks" in results:
+        benchmark_list = results.get("benchmarks", [])
+    else:
         return data
 
-    for benchmark in results.get("benchmarks", []):
+    for benchmark in benchmark_list:
         if benchmark.get("framework") != framework:
             continue
 

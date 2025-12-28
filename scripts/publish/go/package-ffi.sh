@@ -62,8 +62,12 @@ if [[ "${archive_ext}" == "zip" ]]; then
 			zip -9 -q "${out_dir}/${archive_name}" "${target_name}"
 		)
 	else
+		# Convert Unix paths to Windows paths for PowerShell
+		ps_stage_path="$(cd "${stage_dir}" && pwd -W 2>/dev/null || echo "${stage_dir}")"
+		ps_out_path="$(cd "${out_dir}" && pwd -W 2>/dev/null || echo "${out_dir}")"
+
 		powershell.exe -NoProfile -Command \
-			"Compress-Archive -Path \"${stage_dir}\\${target_name}\" -DestinationPath \"${out_dir}\\${archive_name}\""
+			"Compress-Archive -Path \"${ps_stage_path}\\${target_name}\" -DestinationPath \"${ps_out_path}\\${archive_name}\" -Force"
 	fi
 else
 	tar -czf "${out_dir}/${archive_name}" -C "${stage_dir}" "${target_name}"
