@@ -44,7 +44,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Performance regression detection with configurable thresholds
 
 ### Fixed
-- **Rust core**: Fixed HTML parsing issues with modern websites containing JavaScript (GitHub issue #166/#167)
+- **Rust core**: Fixed HTML parsing issues with modern websites containing JavaScript (GitHub issue #167)
   - Implemented fast script/style tag stripping before tl parsing to prevent parser confusion
   - The tl parser was misinterpreting HTML-like content inside script tags (e.g., `'<div>'` in JavaScript strings) as actual HTML tags
   - This caused Reuters HTML and similar sites to lose article body content (only metadata was extracted)
@@ -52,6 +52,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Zero-copy fast path when no script/style tags exist (Cow optimization)
   - Performance: no measurable impact on conversion speed
   - Comprehensive test coverage with 10 tests covering edge cases, large documents, and Reuters-like HTML patterns
+- **Python binding**: Fixed missing `ConversionOptionsHandle` export in public API (GitHub issue #166)
+  - Users can now import `ConversionOptionsHandle` directly from `html_to_markdown` package
+  - Maintained backward compatibility with existing `OptionsHandle` import (both reference the same class)
+  - Updated module docstring to document correct import path
 - **Rust core**: Implemented `visit_element_end` callback invocation for all elements
 - **Rust core**: Fixed NodeContext field population (depth, parent_tag, index_in_parent) - previously hardcoded with TODOs
 - **Rust core**: Added proper depth tracking for nested elements in generic element handlers
