@@ -3698,6 +3698,19 @@ fn walk_node(
                 "h1" | "h2" | "h3" | "h4" | "h5" | "h6" => {
                     let level = tag_name.chars().last().and_then(|c| c.to_digit(10)).unwrap_or(1) as usize;
 
+                    // Add spacing before heading if needed (similar to paragraph handling)
+                    let needs_leading_sep = !ctx.in_table_cell
+                        && !ctx.in_list_item
+                        && !ctx.convert_as_inline
+                        && ctx.blockquote_depth == 0
+                        && !output.is_empty()
+                        && !output.ends_with("\n\n");
+
+                    if needs_leading_sep {
+                        trim_trailing_whitespace(output);
+                        output.push_str("\n\n");
+                    }
+
                     let mut text = String::new();
                     let heading_ctx = Context {
                         in_heading: true,

@@ -1,4 +1,4 @@
-$schema: https://github.com/Goldziher/ai-rulez/schema/ai-rules-v2.schema.json
+$schema: https://raw.githubusercontent.com/Goldziher/ai-rulez/main/schema/ai-rules-v2.schema.json
 
 # ==============================================================================
 # ==============================================================================
@@ -313,7 +313,7 @@ sections:
 
       ## Quick Setup
       ```bash
-      git clone https://github.com/Goldziher/html-to-markdown.git
+      git clone https://github.com/kreuzberg-dev/html-to-markdown.git
       cd html-to-markdown
 
       # Install all dependencies

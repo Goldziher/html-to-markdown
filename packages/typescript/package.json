@@ -16,13 +16,13 @@
 		"name": "Na'aman Hirschfeld",
 		"email": "nhirschfeld@gmail.com"
 	},
-	"homepage": "https://github.com/Goldziher/html-to-markdown",
+	"homepage": "https://github.com/kreuzberg-dev/html-to-markdown",
 	"repository": {
 		"type": "git",
-		"url": "https://github.com/Goldziher/html-to-markdown"
+		"url": "https://github.com/kreuzberg-dev/html-to-markdown"
 	},
 	"bugs": {
-		"url": "https://github.com/Goldziher/html-to-markdown/issues"
+		"url": "https://github.com/kreuzberg-dev/html-to-markdown/issues"
 	},
 	"main": "dist/index.js",
 	"types": "dist/index.d.ts",

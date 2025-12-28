@@ -175,6 +175,7 @@ mod enabled {
 pub use enabled::{maybe_profile, start, stop};
 
 #[cfg(target_os = "windows")]
+#[allow(dead_code)]
 pub fn start(_output_path: PathBuf, _frequency: i32) -> Result<()> {
     Err(ConversionError::Other(
         "Profiling is not supported on Windows".to_string(),
@@ -190,6 +191,7 @@ pub fn start(_output_path: PathBuf, _frequency: i32) -> Result<()> {
 }
 
 #[cfg(target_os = "windows")]
+#[allow(dead_code)]
 pub fn stop() -> Result<()> {
     Err(ConversionError::Other(
         "Profiling is not supported on Windows".to_string(),

@@ -17,8 +17,8 @@ High-performance HTML to Markdown conversion using native Rust code compiled to 
 [![RubyGems](https://badge.fury.io/rb/html-to-markdown.svg)](https://rubygems.org/gems/html-to-markdown)
 [![NuGet](https://img.shields.io/nuget/v/Goldziher.HtmlToMarkdown.svg)](https://www.nuget.org/packages/Goldziher.HtmlToMarkdown/)
 [![Maven Central](https://img.shields.io/maven-central/v/io.github.goldziher/html-to-markdown.svg)](https://central.sonatype.com/artifact/io.github.goldziher/html-to-markdown)
-[![Go Reference](https://pkg.go.dev/badge/github.com/Goldziher/html-to-markdown/packages/go/v2/htmltomarkdown.svg)](https://pkg.go.dev/github.com/Goldziher/html-to-markdown/packages/go/v2/htmltomarkdown)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://github.com/Goldziher/html-to-markdown/blob/main/LICENSE)
+[![Go Reference](https://pkg.go.dev/badge/github.com/kreuzberg-dev/html-to-markdown/packages/go/v2/htmltomarkdown.svg)](https://pkg.go.dev/github.com/kreuzberg-dev/html-to-markdown/packages/go/v2/htmltomarkdown)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://github.com/kreuzberg-dev/html-to-markdown/blob/main/LICENSE)
 
 ## Performance
 
@@ -257,7 +257,7 @@ Other runtimes:
 
 ## Configuration Options
 
-See [ConversionOptions](https://github.com/Goldziher/html-to-markdown/tree/main/crates/html-to-markdown-node#types) for all available options including:
+See [ConversionOptions](https://github.com/kreuzberg-dev/html-to-markdown/tree/main/crates/html-to-markdown-node#types) for all available options including:
 
 - Heading styles (ATX, underlined, ATX closed)
 - Code block styles (indented, backticks, tildes)
@@ -339,8 +339,8 @@ const markdown = convert(hocrHtml, {
 
 ## Links
 
-- [GitHub Repository](https://github.com/Goldziher/html-to-markdown)
-- [Full Documentation](https://github.com/Goldziher/html-to-markdown/blob/main/README.md)
+- [GitHub Repository](https://github.com/kreuzberg-dev/html-to-markdown)
+- [Full Documentation](https://github.com/kreuzberg-dev/html-to-markdown/blob/main/README.md)
 - [WASM Package](https://www.npmjs.com/package/html-to-markdown-wasm)
 - [Python Package](https://pypi.org/project/html-to-markdown/)
 - [Rust Crate](https://crates.io/crates/html-to-markdown-rs)

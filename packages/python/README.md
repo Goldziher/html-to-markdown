@@ -11,8 +11,8 @@ High-performance HTML to Markdown converter with a clean Python API (powered by 
 [![Hex.pm](https://img.shields.io/hexpm/v/html_to_markdown.svg)](https://hex.pm/packages/html_to_markdown)
 [![NuGet](https://img.shields.io/nuget/v/Goldziher.HtmlToMarkdown.svg)](https://www.nuget.org/packages/Goldziher.HtmlToMarkdown/)
 [![Maven Central](https://img.shields.io/maven-central/v/io.github.goldziher/html-to-markdown.svg)](https://central.sonatype.com/artifact/io.github.goldziher/html-to-markdown)
-[![Go Reference](https://pkg.go.dev/badge/github.com/Goldziher/html-to-markdown/packages/go/v2/htmltomarkdown.svg)](https://pkg.go.dev/github.com/Goldziher/html-to-markdown/packages/go/v2/htmltomarkdown)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://github.com/Goldziher/html-to-markdown/blob/main/LICENSE)
+[![Go Reference](https://pkg.go.dev/badge/github.com/kreuzberg-dev/html-to-markdown/packages/go/v2/htmltomarkdown.svg)](https://pkg.go.dev/github.com/kreuzberg-dev/html-to-markdown/packages/go/v2/htmltomarkdown)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://github.com/kreuzberg-dev/html-to-markdown/blob/main/LICENSE)
 [![Discord](https://img.shields.io/badge/Discord-Join%20our%20community-7289da)](https://discord.gg/pXxagNK2zN)
 
 ## Installation
@@ -149,19 +149,19 @@ from html_to_markdown.v1_compat import convert_to_markdown
 markdown = convert_to_markdown(html, heading_style="atx")
 ```
 
-Keyword mappings and removal notes are in the [changelog](https://github.com/Goldziher/html-to-markdown/blob/main/CHANGELOG.md#v200). Always migrate to the V2 API (`convert()`) for production code.
+Keyword mappings and removal notes are in the [changelog](https://github.com/kreuzberg-dev/html-to-markdown/blob/main/CHANGELOG.md#v200). Always migrate to the V2 API (`convert()`) for production code.
 
 ## Links
 
-- **GitHub:** [github.com/Goldziher/html-to-markdown](https://github.com/Goldziher/html-to-markdown)
+- **GitHub:** [github.com/kreuzberg-dev/html-to-markdown](https://github.com/kreuzberg-dev/html-to-markdown)
 - **PyPI:** [pypi.org/project/html-to-markdown](https://pypi.org/project/html-to-markdown/)
 - **Discord:** [discord.gg/pXxagNK2zN](https://discord.gg/pXxagNK2zN)
 - **Kreuzberg Ecosystem:** [kreuzberg.dev](https://kreuzberg.dev)
 
 ## License
 
-MIT License – see [LICENSE](https://github.com/Goldziher/html-to-markdown/blob/main/LICENSE).
+MIT License – see [LICENSE](https://github.com/kreuzberg-dev/html-to-markdown/blob/main/LICENSE).
 
 ## Support
 
-If you find this library useful, consider [sponsoring the project](https://github.com/sponsors/Goldziher).
+If you find this library useful, consider [sponsoring the project](https://github.com/sponsors/kreuzberg-dev).

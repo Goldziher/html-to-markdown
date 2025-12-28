@@ -22,11 +22,11 @@
 		},
 		"./dist-web/*": "./dist-web/*"
 	},
-	"repository": "https://github.com/Goldziher/html-to-markdown",
-	"homepage": "https://github.com/Goldziher/html-to-markdown",
+	"repository": "https://github.com/kreuzberg-dev/html-to-markdown",
+	"homepage": "https://github.com/kreuzberg-dev/html-to-markdown",
 	"license": "MIT",
 	"author": "Na'aman Hirschfeld <nhirschfeld@gmail.com>",
-	"bugs": "https://github.com/Goldziher/html-to-markdown/issues",
+	"bugs": "https://github.com/kreuzberg-dev/html-to-markdown/issues",
 	"keywords": [
 		"html",
 		"markdown",

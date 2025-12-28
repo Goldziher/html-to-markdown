@@ -36,7 +36,7 @@ Gem::Specification.new do |spec|
     html-to-markdown is a native Ruby extension built on the shared Rust engine that powers the html-to-markdown project.
     It delivers identical HTML-to-Markdown output across languages, exposes inline image extraction, and ships with a CLI for automation workflows.
   DESC
-  spec.homepage      = 'https://github.com/Goldziher/html-to-markdown'
+  spec.homepage      = 'https://github.com/kreuzberg-dev/html-to-markdown'
   spec.license       = 'MIT'
 
   spec.required_ruby_version = Gem::Requirement.new('>= 3.2')
@@ -52,9 +52,9 @@ Gem::Specification.new do |spec|
 
   spec.add_dependency 'rb_sys', '>= 0.9', '< 1.0'
   spec.metadata['rubygems_mfa_required'] = 'true'
-  spec.metadata['homepage_uri'] = 'https://github.com/Goldziher/html-to-markdown'
-  spec.metadata['source_code_uri'] = 'https://github.com/Goldziher/html-to-markdown'
-  spec.metadata['bug_tracker_uri'] = 'https://github.com/Goldziher/html-to-markdown/issues'
-  spec.metadata['changelog_uri'] = 'https://github.com/Goldziher/html-to-markdown/releases'
-  spec.metadata['documentation_uri'] = 'https://github.com/Goldziher/html-to-markdown/blob/main/packages/ruby/README.md'
+  spec.metadata['homepage_uri'] = 'https://github.com/kreuzberg-dev/html-to-markdown'
+  spec.metadata['source_code_uri'] = 'https://github.com/kreuzberg-dev/html-to-markdown'
+  spec.metadata['bug_tracker_uri'] = 'https://github.com/kreuzberg-dev/html-to-markdown/issues'
+  spec.metadata['changelog_uri'] = 'https://github.com/kreuzberg-dev/html-to-markdown/releases'
+  spec.metadata['documentation_uri'] = 'https://github.com/kreuzberg-dev/html-to-markdown/blob/main/packages/ruby/README.md'
 end

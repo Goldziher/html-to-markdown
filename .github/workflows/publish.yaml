@@ -392,7 +392,7 @@ jobs:
         uses: actions/upload-artifact@v6
         with:
           name: php-pie-src
-          path: build/artifacts/php_html_to_markdown-${{ needs.prepare.outputs.version }}-src.tgz
+          path: "build/artifacts/php_html_to_markdown-${{ needs.prepare.outputs.version }}-src.tgz"
           retention-days: 14
 
   node-typescript-defs:
@@ -1722,7 +1722,7 @@ jobs:
         with:
           formula-name: html-to-markdown
           formula-path: Formula/html-to-markdown.rb
-          homebrew-tap: Goldziher/homebrew-tap
+          homebrew-tap: kreuzberg-dev/homebrew-tap
           tag-name: ${{ needs.prepare.outputs.tag }}
           download-url: ${{ steps.release.outputs.url }}
           commit-message: |

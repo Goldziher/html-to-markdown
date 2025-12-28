@@ -11,8 +11,8 @@ High-performance HTML to Markdown converter with Rust core and Java Panama FFI b
 [![Hex.pm](https://img.shields.io/hexpm/v/html_to_markdown.svg)](https://hex.pm/packages/html_to_markdown)
 [![NuGet](https://img.shields.io/nuget/v/Goldziher.HtmlToMarkdown.svg)](https://www.nuget.org/packages/Goldziher.HtmlToMarkdown/)
 [![Maven Central](https://img.shields.io/maven-central/v/io.github.goldziher/html-to-markdown.svg)](https://central.sonatype.com/artifact/io.github.goldziher/html-to-markdown)
-[![Go Reference](https://pkg.go.dev/badge/github.com/Goldziher/html-to-markdown/packages/go/v2/htmltomarkdown.svg)](https://pkg.go.dev/github.com/Goldziher/html-to-markdown/packages/go/v2/htmltomarkdown)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://github.com/Goldziher/html-to-markdown/blob/main/LICENSE)
+[![Go Reference](https://pkg.go.dev/badge/github.com/kreuzberg-dev/html-to-markdown/packages/go/v2/htmltomarkdown.svg)](https://pkg.go.dev/github.com/kreuzberg-dev/html-to-markdown/packages/go/v2/htmltomarkdown)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://github.com/kreuzberg-dev/html-to-markdown/blob/main/LICENSE)
 [![Discord](https://img.shields.io/badge/Discord-Join%20our%20community-7289da)](https://discord.gg/pXxagNK2zN)
 
 ## Features
@@ -979,6 +979,6 @@ See the main repository [CONTRIBUTING.md](../../CONTRIBUTING.md) for guidelines.
 
 ## Links
 
-- [Repository](https://github.com/Goldziher/html-to-markdown)
-- [Issue Tracker](https://github.com/Goldziher/html-to-markdown/issues)
+- [Repository](https://github.com/kreuzberg-dev/html-to-markdown)
+- [Issue Tracker](https://github.com/kreuzberg-dev/html-to-markdown/issues)
 - [Changelog](../../CHANGELOG.md)

@@ -9,7 +9,7 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/Goldziher/html-to-markdown/packages/go/v2/htmltomarkdown"
+	"github.com/kreuzberg-dev/html-to-markdown/packages/go/v2/htmltomarkdown"
 )
 
 type BenchmarkResult struct {

@@ -5,7 +5,7 @@
 //
 // Example usage:
 //
-//	import "github.com/Goldziher/html-to-markdown/packages/go/v2/htmltomarkdown"
+//	import "github.com/kreuzberg-dev/html-to-markdown/packages/go/v2/htmltomarkdown"
 //
 //	func main() {
 //	    html := "<h1>Hello World</h1><p>This is a paragraph.</p>"

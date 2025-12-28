@@ -1,12 +1,12 @@
 {
-  "name": "goldziher/html-to-markdown",
+  "name": "kreuzberg-dev/html-to-markdown",
   "description": "Native html_to_markdown PHP extension built on the Rust html-to-markdown engine.",
   "type": "php-ext",
   "license": "MIT",
-  "homepage": "https://github.com/Goldziher/html-to-markdown",
+  "homepage": "https://github.com/kreuzberg-dev/html-to-markdown",
   "support": {
-    "issues": "https://github.com/Goldziher/html-to-markdown/issues",
-    "source": "https://github.com/Goldziher/html-to-markdown"
+    "issues": "https://github.com/kreuzberg-dev/html-to-markdown/issues",
+    "source": "https://github.com/kreuzberg-dev/html-to-markdown"
   },
   "authors": [
     {

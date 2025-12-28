@@ -981,4 +981,4 @@ ______________________________________________________________________
 
 For changes in v1.x releases, see git history before the v2 rewrite.
 
-[2.0.0]: https://github.com/Goldziher/html-to-markdown/compare/v1.x...v2.0.0
+[2.0.0]: https://github.com/kreuzberg-dev/html-to-markdown/compare/v1.x...v2.0.0

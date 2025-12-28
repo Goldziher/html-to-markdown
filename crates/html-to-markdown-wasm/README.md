@@ -17,8 +17,8 @@ Runs anywhere: Node.js, Deno, Bun, browsers, and edge runtimes.
 [![RubyGems](https://badge.fury.io/rb/html-to-markdown.svg)](https://rubygems.org/gems/html-to-markdown)
 [![NuGet](https://img.shields.io/nuget/v/Goldziher.HtmlToMarkdown.svg)](https://www.nuget.org/packages/Goldziher.HtmlToMarkdown/)
 [![Maven Central](https://img.shields.io/maven-central/v/io.github.goldziher/html-to-markdown.svg)](https://central.sonatype.com/artifact/io.github.goldziher/html-to-markdown)
-[![Go Reference](https://pkg.go.dev/badge/github.com/Goldziher/html-to-markdown/packages/go/v2/htmltomarkdown.svg)](https://pkg.go.dev/github.com/Goldziher/html-to-markdown/packages/go/v2/htmltomarkdown)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://github.com/Goldziher/html-to-markdown/blob/main/LICENSE)
+[![Go Reference](https://pkg.go.dev/badge/github.com/kreuzberg-dev/html-to-markdown/packages/go/v2/htmltomarkdown.svg)](https://pkg.go.dev/github.com/kreuzberg-dev/html-to-markdown/packages/go/v2/htmltomarkdown)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://github.com/kreuzberg-dev/html-to-markdown/blob/main/LICENSE)
 
 ## Performance
 
@@ -98,9 +98,9 @@ console.log(markdown);
 > **Heads up for edge runtimes:** Cloudflare Workers, Vite dev servers, and other environments that instantiate `.wasm` files asynchronously must call `await initWasm()` (or `await wasmReady`) once during startup before invoking `convert`. Traditional bundlers (Webpack, Rollup) and Deno/Node imports continue to work without manual initialization.
 
 **Working Examples:**
-- [**Browser with Rollup**](https://github.com/Goldziher/html-to-markdown/tree/main/examples/wasm-rollup) - Using dist-web target in browser
-- [**Node.js**](https://github.com/Goldziher/html-to-markdown/tree/main/examples/wasm-node) - Using dist-node target
-- [**Cloudflare Workers**](https://github.com/Goldziher/html-to-markdown/tree/main/examples/wasm-cloudflare) - Using bundler target with Wrangler
+- [**Browser with Rollup**](https://github.com/kreuzberg-dev/html-to-markdown/tree/main/examples/wasm-rollup) - Using dist-web target in browser
+- [**Node.js**](https://github.com/kreuzberg-dev/html-to-markdown/tree/main/examples/wasm-node) - Using dist-node target
+- [**Cloudflare Workers**](https://github.com/kreuzberg-dev/html-to-markdown/tree/main/examples/wasm-cloudflare) - Using bundler target with Wrangler
 
 ### Reusing Options Handles
 
@@ -241,7 +241,7 @@ export default {
 };
 ```
 
-> See the full [Cloudflare Workers example](https://github.com/Goldziher/html-to-markdown/tree/main/examples/wasm-cloudflare) with Wrangler configuration.
+> See the full [Cloudflare Workers example](https://github.com/kreuzberg-dev/html-to-markdown/tree/main/examples/wasm-cloudflare) with Wrangler configuration.
 
 ## TypeScript
 
@@ -557,8 +557,8 @@ The same Rust engine ships as native bindings for other ecosystems:
 
 ## Links
 
-- [GitHub Repository](https://github.com/Goldziher/html-to-markdown)
-- [Full Documentation](https://github.com/Goldziher/html-to-markdown/blob/main/README.md)
+- [GitHub Repository](https://github.com/kreuzberg-dev/html-to-markdown)
+- [Full Documentation](https://github.com/kreuzberg-dev/html-to-markdown/blob/main/README.md)
 - [Native Node Package](https://www.npmjs.com/package/html-to-markdown-node)
 - [Python Package](https://pypi.org/project/html-to-markdown/)
 - [PHP Extension & Helpers](https://packagist.org/packages/goldziher/html-to-markdown)

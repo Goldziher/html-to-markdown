@@ -8,7 +8,7 @@ Blazing-fast HTML → Markdown conversion for Ruby, powered by the same Rust eng
 [![PyPI](https://img.shields.io/pypi/v/html-to-markdown.svg?logo=pypi)](https://pypi.org/project/html-to-markdown/)
 [![Packagist](https://img.shields.io/packagist/v/goldziher/html-to-markdown.svg)](https://packagist.org/packages/goldziher/html-to-markdown)
 [![RubyGems](https://badge.fury.io/rb/html-to-markdown.svg)](https://rubygems.org/gems/html-to-markdown)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://github.com/Goldziher/html-to-markdown/blob/main/LICENSE)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://github.com/kreuzberg-dev/html-to-markdown/blob/main/LICENSE)
 
 ## Features
 
@@ -21,10 +21,10 @@ Blazing-fast HTML → Markdown conversion for Ruby, powered by the same Rust eng
 
 ## Documentation & Support
 
-- [GitHub repository](https://github.com/Goldziher/html-to-markdown)
-- [Issue tracker](https://github.com/Goldziher/html-to-markdown/issues)
-- [Changelog](https://github.com/Goldziher/html-to-markdown/blob/main/CHANGELOG.md)
-- [Live demo (WASM)](https://goldziher.github.io/html-to-markdown/)
+- [GitHub repository](https://github.com/kreuzberg-dev/html-to-markdown)
+- [Issue tracker](https://github.com/kreuzberg-dev/html-to-markdown/issues)
+- [Changelog](https://github.com/kreuzberg-dev/html-to-markdown/blob/main/CHANGELOG.md)
+- [Live demo (WASM)](https://kreuzberg-dev.github.io/html-to-markdown/)
 
 ## Installation
 

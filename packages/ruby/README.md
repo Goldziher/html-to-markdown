@@ -11,8 +11,8 @@ Blazing-fast HTML → Markdown conversion for Ruby, powered by the same Rust eng
 [![Hex.pm](https://img.shields.io/hexpm/v/html_to_markdown.svg)](https://hex.pm/packages/html_to_markdown)
 [![NuGet](https://img.shields.io/nuget/v/Goldziher.HtmlToMarkdown.svg)](https://www.nuget.org/packages/Goldziher.HtmlToMarkdown/)
 [![Maven Central](https://img.shields.io/maven-central/v/io.github.goldziher/html-to-markdown.svg)](https://central.sonatype.com/artifact/io.github.goldziher/html-to-markdown)
-[![Go Reference](https://pkg.go.dev/badge/github.com/Goldziher/html-to-markdown/packages/go/v2/htmltomarkdown.svg)](https://pkg.go.dev/github.com/Goldziher/html-to-markdown/packages/go/v2/htmltomarkdown)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://github.com/Goldziher/html-to-markdown/blob/main/LICENSE)
+[![Go Reference](https://pkg.go.dev/badge/github.com/kreuzberg-dev/html-to-markdown/packages/go/v2/htmltomarkdown.svg)](https://pkg.go.dev/github.com/kreuzberg-dev/html-to-markdown/packages/go/v2/htmltomarkdown)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://github.com/kreuzberg-dev/html-to-markdown/blob/main/LICENSE)
 [![Discord](https://img.shields.io/badge/Discord-Join%20our%20community-7289da)](https://discord.gg/pXxagNK2zN)
 
 ## Features
@@ -26,10 +26,10 @@ Blazing-fast HTML → Markdown conversion for Ruby, powered by the same Rust eng
 
 ## Documentation & Support
 
-- [GitHub repository](https://github.com/Goldziher/html-to-markdown)
-- [Issue tracker](https://github.com/Goldziher/html-to-markdown/issues)
-- [Changelog](https://github.com/Goldziher/html-to-markdown/blob/main/CHANGELOG.md)
-- [Live demo (WASM)](https://goldziher.github.io/html-to-markdown/)
+- [GitHub repository](https://github.com/kreuzberg-dev/html-to-markdown)
+- [Issue tracker](https://github.com/kreuzberg-dev/html-to-markdown/issues)
+- [Changelog](https://github.com/kreuzberg-dev/html-to-markdown/blob/main/CHANGELOG.md)
+- [Live demo (WASM)](https://kreuzberg-dev.github.io/html-to-markdown/)
 
 ## Installation
 

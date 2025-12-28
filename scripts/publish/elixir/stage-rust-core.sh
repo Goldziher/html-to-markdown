@@ -58,8 +58,8 @@ replacements = {
     r"^edition\.workspace\s*=\s*true\s*$": 'edition = "2024"',
     r"^authors\.workspace\s*=\s*true\s*$": 'authors = ["Na\'aman Hirschfeld <nhirschfeld@gmail.com>"]',
     r"^license\.workspace\s*=\s*true\s*$": 'license = "MIT"',
-    r"^repository\.workspace\s*=\s*true\s*$": 'repository = "https://github.com/Goldziher/html-to-markdown"',
-    r"^homepage\.workspace\s*=\s*true\s*$": 'homepage = "https://github.com/Goldziher/html-to-markdown"',
+    r"^repository\.workspace\s*=\s*true\s*$": 'repository = "https://github.com/kreuzberg-dev/html-to-markdown"',
+    r"^homepage\.workspace\s*=\s*true\s*$": 'homepage = "https://github.com/kreuzberg-dev/html-to-markdown"',
     r"^documentation\.workspace\s*=\s*true\s*$": 'documentation = "https://docs.rs/html-to-markdown-rs"',
     r"^rust-version\.workspace\s*=\s*true\s*$": 'rust-version = "1.85"',
     r"^tl\.workspace\s*=\s*true\s*$": 'tl = { package = "astral-tl", version = "0.7.11" }',
@@ -69,6 +69,7 @@ replacements = {
     r"^base64\.workspace\s*=\s*true\s*$": 'base64 = "0.22"',
     r"^html5ever\.workspace\s*=\s*true\s*$": 'html5ever = "0.36"',
     r"^markup5ever_rcdom\.workspace\s*=\s*true\s*$": 'markup5ever_rcdom = "0.36"',
+    r"^async-trait\s*=\s*{\s*workspace\s*=\s*true,\s*optional\s*=\s*true\s*}\s*$": 'async-trait = { version = "0.1", optional = true }',
 }
 
 for pattern, replacement in replacements.items():

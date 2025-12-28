@@ -1,10 +1,10 @@
 {
-	"name": "goldziher/html-to-markdown",
+	"name": "kreuzberg-dev/html-to-markdown",
 	"version": "2.18.0",
 	"description": "Modern PHP API for the html_to_markdown native extension powered by the Rust html-to-markdown engine.",
 	"type": "library",
 	"license": "MIT",
-	"homepage": "https://github.com/Goldziher/html-to-markdown",
+	"homepage": "https://github.com/kreuzberg-dev/html-to-markdown",
 	"require": {
 		"php": "^8.2"
 	},
@@ -52,7 +52,7 @@
 	},
 	"extra": {
 		"html-to-markdown": {
-			"binary-base-url": "https://github.com/Goldziher/html-to-markdown/releases/download"
+			"binary-base-url": "https://github.com/kreuzberg-dev/html-to-markdown/releases/download"
 		}
 	},
 	"minimum-stability": "stable",

@@ -11,19 +11,19 @@ High-performance HTML to Markdown converter with Go bindings to the Rust core li
 [![Hex.pm](https://img.shields.io/hexpm/v/html_to_markdown.svg)](https://hex.pm/packages/html_to_markdown)
 [![NuGet](https://img.shields.io/nuget/v/Goldziher.HtmlToMarkdown.svg)](https://www.nuget.org/packages/Goldziher.HtmlToMarkdown/)
 [![Maven Central](https://img.shields.io/maven-central/v/io.github.goldziher/html-to-markdown.svg)](https://central.sonatype.com/artifact/io.github.goldziher/html-to-markdown)
-[![Go Reference](https://pkg.go.dev/badge/github.com/Goldziher/html-to-markdown/packages/go/v2/htmltomarkdown.svg)](https://pkg.go.dev/github.com/Goldziher/html-to-markdown/packages/go/v2/htmltomarkdown)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://github.com/Goldziher/html-to-markdown/blob/main/LICENSE)
+[![Go Reference](https://pkg.go.dev/badge/github.com/kreuzberg-dev/html-to-markdown/packages/go/v2/htmltomarkdown.svg)](https://pkg.go.dev/github.com/kreuzberg-dev/html-to-markdown/packages/go/v2/htmltomarkdown)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://github.com/kreuzberg-dev/html-to-markdown/blob/main/LICENSE)
 [![Discord](https://img.shields.io/badge/Discord-Join%20our%20community-7289da)](https://discord.gg/pXxagNK2zN)
 
 ## Installation
 
 This module uses semantic import versioning (`/v2`) and lives in a subdirectory.
 
-- Import path: `github.com/Goldziher/html-to-markdown/packages/go/v2`
+- Import path: `github.com/kreuzberg-dev/html-to-markdown/packages/go/v2`
 - Tag format (Go module): `packages/go/vX.Y.Z` (example: `packages/go/v2.15.0`)
 
 ```bash
-go get github.com/Goldziher/html-to-markdown/packages/go/v2/htmltomarkdown
+go get github.com/kreuzberg-dev/html-to-markdown/packages/go/v2/htmltomarkdown
 ```
 
 ## Prerequisites
@@ -54,7 +54,7 @@ import (
     "fmt"
     "log"
 
-    "github.com/Goldziher/html-to-markdown/packages/go/v2/htmltomarkdown"
+    "github.com/kreuzberg-dev/html-to-markdown/packages/go/v2/htmltomarkdown"
 )
 
 func main() {
@@ -236,7 +236,7 @@ import (
     "fmt"
     "log"
 
-    "github.com/Goldziher/html-to-markdown/packages/go/v2/htmltomarkdown"
+    "github.com/kreuzberg-dev/html-to-markdown/packages/go/v2/htmltomarkdown"
 )
 
 func main() {
@@ -287,7 +287,7 @@ import (
     "fmt"
     "log"
 
-    "github.com/Goldziher/html-to-markdown/packages/go/v2/htmltomarkdown"
+    "github.com/kreuzberg-dev/html-to-markdown/packages/go/v2/htmltomarkdown"
 )
 
 func main() {
@@ -330,7 +330,7 @@ import (
     "fmt"
     "log"
 
-    "github.com/Goldziher/html-to-markdown/packages/go/v2/htmltomarkdown"
+    "github.com/kreuzberg-dev/html-to-markdown/packages/go/v2/htmltomarkdown"
 )
 
 func main() {
@@ -688,13 +688,13 @@ The Rust-backed implementation provides excellent performance:
 Go packages are published by pushing to GitHub. Users import directly:
 
 ```go
-import "github.com/Goldziher/html-to-markdown/packages/go/v2/htmltomarkdown"
+import "github.com/kreuzberg-dev/html-to-markdown/packages/go/v2/htmltomarkdown"
 ```
 
 To use a specific version:
 
 ```bash
-go get github.com/Goldziher/html-to-markdown/packages/go/v2@v2.14.8
+go get github.com/kreuzberg-dev/html-to-markdown/packages/go/v2@v2.14.8
 ```
 
 ## License

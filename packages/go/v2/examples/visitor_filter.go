@@ -7,7 +7,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/Goldziher/html-to-markdown/packages/go/v2/htmltomarkdown"
+	"github.com/kreuzberg-dev/html-to-markdown/packages/go/v2/htmltomarkdown"
 )
 
 // ExampleVisitorFilter demonstrates filtering content during conversion.

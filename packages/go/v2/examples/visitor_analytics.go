@@ -6,7 +6,7 @@ import (
 	"log"
 	"strings"
 
-	"github.com/Goldziher/html-to-markdown/packages/go/v2/htmltomarkdown"
+	"github.com/kreuzberg-dev/html-to-markdown/packages/go/v2/htmltomarkdown"
 )
 
 // DocumentStats tracks statistics about an HTML document.

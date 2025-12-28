@@ -470,7 +470,7 @@ except Exception as e:
 
 ## Links
 
-- [GitHub Repository](https://github.com/Goldziher/html-to-markdown)
+- [GitHub Repository](https://github.com/kreuzberg-dev/html-to-markdown)
 - [Python Package](https://pypi.org/project/html-to-markdown/)
 - [TypeScript Package](https://www.npmjs.com/package/html-to-markdown-node)
 - [Ruby Gem](https://rubygems.org/gems/html-to-markdown)

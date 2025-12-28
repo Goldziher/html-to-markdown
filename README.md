@@ -4,7 +4,7 @@
 
 
 
-High-performance HTML → Markdown conversion powered by Rust. Shipping as a Rust crate, Python package, PHP extension, Ruby gem, Elixir Rustler NIF, Node.js bindings, WebAssembly, and standalone CLI with identical rendering behaviour. 
+High-performance HTML → Markdown conversion powered by Rust. Shipping as a Rust crate, Python package, PHP extension, Ruby gem, Elixir Rustler NIF, Node.js bindings, WebAssembly, and standalone CLI with identical rendering behaviour.
 
 Part of the Kreuzberg.dev document intelligence ecosystem. Kreuzberg is a polyglot document intelligence framework with a fast Rust core. We build tools that help developers extract, process, and understand documents at scale, from PDFs to Office files, images, archives, emails, in 50+ formats. We've set out to make high-performance document intelligence faster and more ecological.
 
@@ -17,14 +17,14 @@ Part of the Kreuzberg.dev document intelligence ecosystem. Kreuzberg is a polygl
 [![Hex.pm](https://img.shields.io/hexpm/v/html_to_markdown.svg)](https://hex.pm/packages/html_to_markdown)
 [![NuGet](https://img.shields.io/nuget/v/Goldziher.HtmlToMarkdown.svg)](https://www.nuget.org/packages/Goldziher.HtmlToMarkdown/)
 [![Maven Central](https://img.shields.io/maven-central/v/io.github.goldziher/html-to-markdown.svg)](https://central.sonatype.com/artifact/io.github.goldziher/html-to-markdown)
-[![Go Reference](https://pkg.go.dev/badge/github.com/Goldziher/html-to-markdown/packages/go/v2/htmltomarkdown.svg)](https://pkg.go.dev/github.com/Goldziher/html-to-markdown/packages/go/v2/htmltomarkdown)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://github.com/Goldziher/html-to-markdown/blob/main/LICENSE)
+[![Go Reference](https://pkg.go.dev/badge/github.com/kreuzberg-dev/html-to-markdown/packages/go/v2/htmltomarkdown.svg)](https://pkg.go.dev/github.com/kreuzberg-dev/html-to-markdown/packages/go/v2/htmltomarkdown)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://github.com/kreuzberg-dev/html-to-markdown/blob/main/LICENSE)
 [![Discord](https://img.shields.io/badge/Discord-Join%20our%20community-7289da)](https://discord.gg/pXxagNK2zN)
 
- 
+
 ---
 
-## 🎮 **[Try the Live Demo →](https://goldziher.github.io/html-to-markdown/)**
+## 🎮 **[Try the Live Demo →](https://kreuzberg-dev.github.io/html-to-markdown/)**
 
 Experience WebAssembly-powered HTML to Markdown conversion instantly in your browser. No installation needed!
 
@@ -91,7 +91,7 @@ Full language guides: See [Language Guides](#language-guides) below.
 | **Rust** crate              | `cargo add html-to-markdown-rs`                                                                                  |
 | Rust CLI (crates.io)        | `cargo install html-to-markdown-cli`                                                                             |
 | Homebrew CLI                | `brew install html-to-markdown` (core)                                                                          |
-| Releases                    | [GitHub Releases](https://github.com/Goldziher/html-to-markdown/releases)                                        |
+| Releases                    | [GitHub Releases](https://github.com/kreuzberg-dev/html-to-markdown/releases)                                        |
 
 ## Performance
 
@@ -178,7 +178,7 @@ task wasm:test:wasmtime
 - **Discord** – [Join our community](https://discord.gg/pXxagNK2zN)
 - **Ecosystem** – Explore [Kreuzberg](https://kreuzberg.dev) document-processing tools
 - **Contribute** – [CONTRIBUTING.md](./CONTRIBUTING.md)
-- **Sponsor** – [GitHub Sponsors](https://github.com/sponsors/Goldziher)
+- **Sponsor** – [GitHub Sponsors](https://github.com/sponsors/kreuzberg-dev)
 - **Changelog** – [Version history](./CHANGELOG.md)
 
 ## License

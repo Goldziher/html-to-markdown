@@ -11,7 +11,7 @@
 
     <name>html-to-markdown</name>
     <description>High-performance HTML to Markdown converter with Rust core and Java Panama FFI bindings</description>
-    <url>https://github.com/Goldziher/html-to-markdown</url>
+    <url>https://github.com/kreuzberg-dev/html-to-markdown</url>
 
     <licenses>
         <license>
@@ -29,9 +29,9 @@
     </developers>
 
     <scm>
-        <connection>scm:git:git://github.com/Goldziher/html-to-markdown.git</connection>
-        <developerConnection>scm:git:ssh://github.com:Goldziher/html-to-markdown.git</developerConnection>
-        <url>https://github.com/Goldziher/html-to-markdown/tree/main</url>
+        <connection>scm:git:git://github.com/kreuzberg-dev/html-to-markdown.git</connection>
+        <developerConnection>scm:git:ssh://github.com:kreuzberg-dev/html-to-markdown.git</developerConnection>
+        <url>https://github.com/kreuzberg-dev/html-to-markdown/tree/main</url>
     </scm>
 
     <properties>

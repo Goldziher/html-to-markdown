@@ -10,7 +10,7 @@ This crate is the core engine compiled into the Python wheels, Ruby gem, Node.js
 [![Gem Version](https://badge.fury.io/rb/html-to-markdown.svg)](https://rubygems.org/gems/html-to-markdown)
 [![Packagist](https://img.shields.io/packagist/v/goldziher/html-to-markdown.svg)](https://packagist.org/packages/goldziher/html-to-markdown)
 [![docs.rs](https://docs.rs/html-to-markdown-rs/badge.svg)](https://docs.rs/html-to-markdown-rs)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://github.com/Goldziher/html-to-markdown/blob/main/LICENSE)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://github.com/kreuzberg-dev/html-to-markdown/blob/main/LICENSE)
 
 Fast, reliable HTML to Markdown conversion with full CommonMark compliance. Built with `html5ever` for correctness and a DOM-based filter for safe preprocessing.
 
@@ -152,17 +152,17 @@ for (i, img) in extraction.inline_images.iter().enumerate() {
 
 This is the core Rust library. For other languages:
 
-- **JavaScript/TypeScript**: [html-to-markdown-node](https://github.com/Goldziher/html-to-markdown/tree/main/crates/html-to-markdown-node) (NAPI-RS) or [html-to-markdown-wasm](https://github.com/Goldziher/html-to-markdown/tree/main/crates/html-to-markdown-wasm) (WebAssembly)
-- **Python**: [html-to-markdown](https://github.com/Goldziher/html-to-markdown/tree/main/crates/html-to-markdown-py) (PyO3)
-- **PHP**: [html-to-markdown](https://github.com/Goldziher/html-to-markdown/tree/main/packages/php) (PIE + Composer helpers)
-- **Ruby**: [html-to-markdown](https://github.com/Goldziher/html-to-markdown/tree/main/packages/ruby) (Magnus + rb-sys)
-- **CLI**: [html-to-markdown-cli](https://github.com/Goldziher/html-to-markdown/tree/main/crates/html-to-markdown-cli)
+- **JavaScript/TypeScript**: [html-to-markdown-node](https://github.com/kreuzberg-dev/html-to-markdown/tree/main/crates/html-to-markdown-node) (NAPI-RS) or [html-to-markdown-wasm](https://github.com/kreuzberg-dev/html-to-markdown/tree/main/crates/html-to-markdown-wasm) (WebAssembly)
+- **Python**: [html-to-markdown](https://github.com/kreuzberg-dev/html-to-markdown/tree/main/crates/html-to-markdown-py) (PyO3)
+- **PHP**: [html-to-markdown](https://github.com/kreuzberg-dev/html-to-markdown/tree/main/packages/php) (PIE + Composer helpers)
+- **Ruby**: [html-to-markdown](https://github.com/kreuzberg-dev/html-to-markdown/tree/main/packages/ruby) (Magnus + rb-sys)
+- **CLI**: [html-to-markdown-cli](https://github.com/kreuzberg-dev/html-to-markdown/tree/main/crates/html-to-markdown-cli)
 
 ## Documentation
 
-- [Full Documentation](https://github.com/Goldziher/html-to-markdown/blob/main/README.md)
+- [Full Documentation](https://github.com/kreuzberg-dev/html-to-markdown/blob/main/README.md)
 - [API Reference](https://docs.rs/html-to-markdown-rs)
-- [Contributing Guide](https://github.com/Goldziher/html-to-markdown/blob/main/CONTRIBUTING.md)
+- [Contributing Guide](https://github.com/kreuzberg-dev/html-to-markdown/blob/main/CONTRIBUTING.md)
 
 ## Performance
 

@@ -4,7 +4,7 @@ version = "2.18.0"
 edition = "2024"
 license = "MIT"
 description = "Rustler bindings for html-to-markdown"
-repository = "https://github.com/Goldziher/html-to-markdown"
+repository = "https://github.com/kreuzberg-dev/html-to-markdown"
 
 [lib]
 name = "html_to_markdown_elixir"

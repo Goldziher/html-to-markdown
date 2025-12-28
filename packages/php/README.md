@@ -9,8 +9,8 @@
 [![Hex.pm](https://img.shields.io/hexpm/v/html_to_markdown.svg)](https://hex.pm/packages/html_to_markdown)
 [![NuGet](https://img.shields.io/nuget/v/Goldziher.HtmlToMarkdown.svg)](https://www.nuget.org/packages/Goldziher.HtmlToMarkdown/)
 [![Maven Central](https://img.shields.io/maven-central/v/io.github.goldziher/html-to-markdown.svg)](https://central.sonatype.com/artifact/io.github.goldziher/html-to-markdown)
-[![Go Reference](https://pkg.go.dev/badge/github.com/Goldziher/html-to-markdown/packages/go/v2/htmltomarkdown.svg)](https://pkg.go.dev/github.com/Goldziher/html-to-markdown/packages/go/v2/htmltomarkdown)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://github.com/Goldziher/html-to-markdown/blob/main/LICENSE)
+[![Go Reference](https://pkg.go.dev/badge/github.com/kreuzberg-dev/html-to-markdown/packages/go/v2/htmltomarkdown.svg)](https://pkg.go.dev/github.com/kreuzberg-dev/html-to-markdown/packages/go/v2/htmltomarkdown)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://github.com/kreuzberg-dev/html-to-markdown/blob/main/LICENSE)
 [![Discord](https://img.shields.io/badge/Discord-Join%20our%20community-7289da)](https://discord.gg/pXxagNK2zN)
 
 Typed PHP bindings for the `html_to_markdown` native extension generated from
@@ -21,7 +21,7 @@ features (readonly value objects, enums, typed exceptions).
 ## Requirements
 
 - PHP 8.2 or newer
-- `html_to_markdown` native extension (install via PIE `goldziher/html-to-markdown` or download the GitHub release artifacts)
+- `html_to_markdown` native extension (install via PIE `kreuzberg-dev/html-to-markdown` or download the GitHub release artifacts)
 - Composer for dependency management
 
 ## Platform Support
@@ -38,8 +38,8 @@ If you require Windows support, consider using one of the alternative distributi
 ## Installation
 
 ```bash
-pie install goldziher/html-to-markdown        # Native extension via PIE
-composer require goldziher/html-to-markdown   # Typed PHP API wrappers
+pie install kreuzberg-dev/html-to-markdown        # Native extension via PIE
+composer require kreuzberg-dev/html-to-markdown   # Typed PHP API wrappers
 ```
 
 If the extension is not enabled the post-install script prints the steps
@@ -1085,7 +1085,7 @@ See `examples/visitor_*.php` for complete examples demonstrating filtering, anal
 - **Missing Rust toolchain**: install Rust via `rustup` and ensure `cargo` is on
   the `PATH`.
 - **PIE install copies to `/html_to_markdown.so`**: set the extension dir
-  explicitly, e.g. `PHP_EXTENSION_DIR=$(php-config --extension-dir) pie install goldziher/html-to-markdown`
+  explicitly, e.g. `PHP_EXTENSION_DIR=$(php-config --extension-dir) pie install kreuzberg-dev/html-to-markdown`
   (PIE then writes to that directory, and you can enable via `extension=html_to_markdown`).
 - **Composer permissions**: run Composer with `--no-interaction --no-progress`
   in CI to avoid prompts.

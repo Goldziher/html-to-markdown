@@ -9,8 +9,8 @@
 [![Hex.pm](https://img.shields.io/hexpm/v/html_to_markdown.svg)](https://hex.pm/packages/html_to_markdown)
 [![NuGet](https://img.shields.io/nuget/v/Goldziher.HtmlToMarkdown.svg)](https://www.nuget.org/packages/Goldziher.HtmlToMarkdown/)
 [![Maven Central](https://img.shields.io/maven-central/v/io.github.goldziher/html-to-markdown.svg)](https://central.sonatype.com/artifact/io.github.goldziher/html-to-markdown)
-[![Go Reference](https://pkg.go.dev/badge/github.com/Goldziher/html-to-markdown/packages/go/v2/htmltomarkdown.svg)](https://pkg.go.dev/github.com/Goldziher/html-to-markdown/packages/go/v2/htmltomarkdown)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://github.com/Goldziher/html-to-markdown/blob/main/LICENSE)
+[![Go Reference](https://pkg.go.dev/badge/github.com/kreuzberg-dev/html-to-markdown/packages/go/v2/htmltomarkdown.svg)](https://pkg.go.dev/github.com/kreuzberg-dev/html-to-markdown/packages/go/v2/htmltomarkdown)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://github.com/kreuzberg-dev/html-to-markdown/blob/main/LICENSE)
 [![Discord](https://img.shields.io/badge/Discord-Join%20our%20community-7289da)](https://discord.gg/pXxagNK2zN)
 
 High-performance HTML to Markdown converter for Node.js and Bun with full TypeScript support. This package wraps native `html-to-markdown-node` bindings and provides a type-safe API.
@@ -260,7 +260,7 @@ Run `task bench:harness -- --frameworks node` to benchmark locally.
 
 ## Links
 
-- [GitHub](https://github.com/Goldziher/html-to-markdown)
+- [GitHub](https://github.com/kreuzberg-dev/html-to-markdown)
 - [npm Package](https://www.npmjs.com/package/html-to-markdown-node)
 - [WASM Package](https://www.npmjs.com/package/html-to-markdown-wasm)
 - [Discord Community](https://discord.gg/pXxagNK2zN)

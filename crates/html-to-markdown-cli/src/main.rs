@@ -14,7 +14,7 @@ use std::path::PathBuf;
 use std::time::Duration;
 
 const DEFAULT_USER_AGENT: &str =
-    "Mozilla/5.0 (compatible; html-to-markdown-cli/2.10; +https://github.com/Goldziher/html-to-markdown)";
+    "Mozilla/5.0 (compatible; html-to-markdown-cli/2.10; +https://github.com/kreuzberg-dev/html-to-markdown)";
 
 /// Convert HTML to Markdown
 ///
@@ -68,7 +68,7 @@ const DEFAULT_USER_AGENT: &str =
         --bullets '*' \\
         --list-indent-width 2
 
-For more information: https://github.com/Goldziher/html-to-markdown
+For more information: https://github.com/kreuzberg-dev/html-to-markdown
 ")]
 struct Cli {
     /// Input HTML file (use \"-\" or omit for stdin)

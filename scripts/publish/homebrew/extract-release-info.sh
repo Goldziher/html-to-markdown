@@ -3,7 +3,7 @@ set -euo pipefail
 
 tag="${TAG:?TAG is required}"
 version="${VERSION:?VERSION is required}"
-url="https://github.com/Goldziher/html-to-markdown/archive/${tag}.tar.gz"
+url="https://github.com/kreuzberg-dev/html-to-markdown/archive/${tag}.tar.gz"
 
 {
 	echo "tag=${tag}"

@@ -46,10 +46,10 @@ classifiers = [
   "Typing :: Typed",
 ]
 dependencies = [  ]
-urls.Changelog = "https://github.com/Goldziher/html-to-markdown/releases"
-urls.Homepage = "https://github.com/Goldziher/html-to-markdown"
-urls.Issues = "https://github.com/Goldziher/html-to-markdown/issues"
-urls.Repository = "https://github.com/Goldziher/html-to-markdown.git"
+urls.Changelog = "https://github.com/kreuzberg-dev/html-to-markdown/releases"
+urls.Homepage = "https://github.com/kreuzberg-dev/html-to-markdown"
+urls.Issues = "https://github.com/kreuzberg-dev/html-to-markdown/issues"
+urls.Repository = "https://github.com/kreuzberg-dev/html-to-markdown.git"
 
 [dependency-groups]
 dev = [

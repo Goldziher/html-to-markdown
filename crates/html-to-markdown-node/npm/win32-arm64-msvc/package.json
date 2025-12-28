@@ -18,13 +18,13 @@
 		"native"
 	],
 	"author": "Na'aman Hirschfeld <nhirschfeld@gmail.com>",
-	"homepage": "https://github.com/Goldziher/html-to-markdown",
+	"homepage": "https://github.com/kreuzberg-dev/html-to-markdown",
 	"license": "MIT",
 	"engines": {
 		"node": ">= 10"
 	},
-	"repository": "https://github.com/Goldziher/html-to-markdown",
-	"bugs": "https://github.com/Goldziher/html-to-markdown/issues",
+	"repository": "https://github.com/kreuzberg-dev/html-to-markdown",
+	"bugs": "https://github.com/kreuzberg-dev/html-to-markdown/issues",
 	"publishConfig": {
 		"registry": "https://registry.npmjs.org/",
 		"access": "public"

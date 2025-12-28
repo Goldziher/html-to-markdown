@@ -7,14 +7,14 @@
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
 
     <!-- Package metadata -->
-    <PackageId>Goldziher.HtmlToMarkdown</PackageId>
+    <PackageId>KreuzbergDev.HtmlToMarkdown</PackageId>
     <Version>2.18.0</Version>
     <Authors>Na'aman Hirschfeld</Authors>
-    <Company>Goldziher</Company>
+    <Company>kreuzberg-dev</Company>
     <Description>High-performance HTML to Markdown converter with C# bindings to Rust core</Description>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageProjectUrl>https://github.com/Goldziher/html-to-markdown</PackageProjectUrl>
-    <RepositoryUrl>https://github.com/Goldziher/html-to-markdown</RepositoryUrl>
+    <PackageProjectUrl>https://github.com/kreuzberg-dev/html-to-markdown</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/kreuzberg-dev/html-to-markdown</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
     <PackageTags>html;markdown;converter;rust;ffi</PackageTags>
     <PackageReadmeFile>README.md</PackageReadmeFile>
