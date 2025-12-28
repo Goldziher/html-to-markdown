@@ -48,7 +48,10 @@ final class TypeAssertions
             return $value;
         }
 
-        throw InvalidOption::because($option, \sprintf('expected non-negative integer, got %s', \get_debug_type($value)));
+        throw InvalidOption::because(
+            $option,
+            \sprintf('expected non-negative integer, got %s', \get_debug_type($value)),
+        );
     }
 
     /**
@@ -57,7 +60,10 @@ final class TypeAssertions
     public static function stringList(mixed $value, string $option): array
     {
         if (!\is_array($value)) {
-            throw InvalidOption::because($option, \sprintf('expected array of strings, got %s', \get_debug_type($value)));
+            throw InvalidOption::because(
+                $option,
+                \sprintf('expected array of strings, got %s', \get_debug_type($value)),
+            );
         }
 
         $result = [];

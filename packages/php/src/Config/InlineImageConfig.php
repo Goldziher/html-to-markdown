@@ -41,10 +41,16 @@ final readonly class InlineImageConfig
 
         return new self(
             maxDecodedSizeBytes: \array_key_exists('max_decoded_size_bytes', $input)
-                ? TypeAssertions::positiveInt($input['max_decoded_size_bytes'], 'inline_image_config.max_decoded_size_bytes')
+                ? TypeAssertions::positiveInt(
+                    $input['max_decoded_size_bytes'],
+                    'inline_image_config.max_decoded_size_bytes',
+                )
                 : $defaults->maxDecodedSizeBytes,
             filenamePrefix: \array_key_exists('filename_prefix', $input)
-                ? TypeAssertions::stringOrNull($input['filename_prefix'], 'inline_image_config.filename_prefix')
+                ? TypeAssertions::stringOrNull(
+                    $input['filename_prefix'],
+                    'inline_image_config.filename_prefix',
+                )
                 : $defaults->filenamePrefix,
             captureSvg: \array_key_exists('capture_svg', $input)
                 ? TypeAssertions::bool($input['capture_svg'], 'inline_image_config.capture_svg')

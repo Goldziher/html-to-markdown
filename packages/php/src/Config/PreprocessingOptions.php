@@ -83,5 +83,4 @@ final readonly class PreprocessingOptions
             && $this->removeNavigation === $defaults->removeNavigation
             && $this->removeForms === $defaults->removeForms;
     }
-
 }

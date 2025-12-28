@@ -33,7 +33,8 @@ final class MetadataExtractionTest extends TestCase
 
     public function testMetadataExtractionWithDescription(): void
     {
-        $html = '<html><head><meta name="description" content="Page description"></head><body><p>Content</p></body></html>';
+        $html = '<html><head><meta name="description" content="Page description"></head>'
+            . '<body><p>Content</p></body></html>';
         $result = convert_with_metadata($html);
 
         self::assertSame('Page description', $result['metadata']->document->description);
@@ -41,7 +42,8 @@ final class MetadataExtractionTest extends TestCase
 
     public function testMetadataExtractionWithKeywords(): void
     {
-        $html = '<html><head><meta name="keywords" content="keyword1, keyword2, keyword3"></head><body><p>Content</p></body></html>';
+        $html = '<html><head><meta name="keywords" content="keyword1, keyword2, keyword3"></head>'
+            . '<body><p>Content</p></body></html>';
         $result = convert_with_metadata($html);
 
         self::assertIsArray($result['metadata']->document->keywords);
@@ -57,7 +59,8 @@ final class MetadataExtractionTest extends TestCase
 
     public function testMetadataExtractionWithCanonicalLink(): void
     {
-        $html = '<html><head><link rel="canonical" href="https://example.com/page"></head><body><p>Content</p></body></html>';
+        $html = '<html><head><link rel="canonical" href="https://example.com/page"></head>'
+            . '<body><p>Content</p></body></html>';
         $result = convert_with_metadata($html);
 
         self::assertSame('https://example.com/page', $result['metadata']->document->canonicalUrl);
@@ -109,7 +112,8 @@ final class MetadataExtractionTest extends TestCase
 
     public function testMetadataExtractionWithLinks(): void
     {
-        $html = '<html><body><a href="https://example.com">Link 1</a><a href="https://example2.com">Link 2</a></body></html>';
+        $html = '<html><body><a href="https://example.com">Link 1</a>'
+            . '<a href="https://example2.com">Link 2</a></body></html>';
         $result = convert_with_metadata($html);
 
         self::assertIsArray($result['metadata']->links);

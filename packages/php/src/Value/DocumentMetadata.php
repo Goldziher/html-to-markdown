@@ -41,10 +41,16 @@ final readonly class DocumentMetadata
                 ? TypeAssertions::stringList($payload['keywords'], 'document_metadata.keywords')
                 : [],
             author: TypeAssertions::stringOrNull($payload['author'] ?? null, 'document_metadata.author'),
-            canonicalUrl: TypeAssertions::stringOrNull($payload['canonical_url'] ?? null, 'document_metadata.canonical_url'),
+            canonicalUrl: TypeAssertions::stringOrNull(
+                $payload['canonical_url'] ?? null,
+                'document_metadata.canonical_url',
+            ),
             baseHref: TypeAssertions::stringOrNull($payload['base_href'] ?? null, 'document_metadata.base_href'),
             language: TypeAssertions::stringOrNull($payload['language'] ?? null, 'document_metadata.language'),
-            textDirection: TypeAssertions::stringOrNull($payload['text_direction'] ?? null, 'document_metadata.text_direction'),
+            textDirection: TypeAssertions::stringOrNull(
+                $payload['text_direction'] ?? null,
+                'document_metadata.text_direction',
+            ),
             openGraph: TypeAssertions::stringMap($payload['open_graph'] ?? [], 'document_metadata.open_graph'),
             twitterCard: TypeAssertions::stringMap($payload['twitter_card'] ?? [], 'document_metadata.twitter_card'),
             metaTags: TypeAssertions::stringMap($payload['meta_tags'] ?? [], 'document_metadata.meta_tags'),

@@ -115,7 +115,8 @@ function convert_with_inline_images(
  *       - raw_json: string - Raw JSON content
  *       - schema_type?: string - Schema type (e.g., "Article", "Event")
  *
- * @throws \Throwable If HTML parsing fails, configuration is invalid, or conversion fails (thrown by the native extension)
+ * @throws \Throwable If HTML parsing fails, configuration is invalid, or conversion fails
+ *   (thrown by the native extension)
  *
  * @example Basic usage
  * ```php
