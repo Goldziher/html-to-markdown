@@ -1,0 +1,144 @@
+# Cross-platform Java JNI wrapper tasks with Maven
+# Compatible with Windows (PowerShell/cmd), macOS, and Linux
+
+version: "3"
+internal: true
+
+includes:
+  platforms: ../config/platforms.yml
+
+vars:
+  BUILD_PROFILE: "{{.BUILD_PROFILE | default \"release\"}}"
+  JAVA_WORK_DIR: "{{.PACKAGES_DIR}}/java"
+  MAVEN_WRAPPER: "./mvnw{{if eq .OS \"windows\"}}.cmd{{end}}"
+  MAVEN_OPTS: "--enable-native-access=ALL-UNNAMED"
+
+env:
+  MAVEN_OPTS: "{{.MAVEN_OPTS}}"
+
+tasks:
+  install:
+    desc: "Verify Java toolchain and download Maven dependencies"
+    silent: false
+    dir: "{{.JAVA_WORK_DIR}}"
+    cmds:
+      - cmd: java -version
+        ignore_error: false
+      - cmd: "{{.MAVEN_WRAPPER}} -v"
+        ignore_error: false
+      - cmd: "{{.MAVEN_WRAPPER}} -B dependency:go-offline"
+        ignore_error: false
+
+  build:
+    desc: "Build FFI library + Maven package ({{.BUILD_PROFILE}} profile)"
+    silent: false
+    cmds:
+      - cmd: "cargo build{{if eq .BUILD_PROFILE \"release\"}} --release{{end}} -p html-to-markdown-ffi"
+        ignore_error: false
+      - cmd: "cd {{.JAVA_WORK_DIR}} && {{.MAVEN_WRAPPER}} clean package -DskipTests"
+        ignore_error: false
+
+  build:dev:
+    desc: "Build FFI + Maven package in debug mode"
+    silent: false
+    cmds:
+      - cmd: cargo build -p html-to-markdown-ffi
+        ignore_error: false
+      - cmd: "cd {{.JAVA_WORK_DIR}} && {{.MAVEN_WRAPPER}} clean package -DskipTests"
+        ignore_error: false
+
+  build:release:
+    desc: "Build FFI + Maven package in release mode"
+    silent: false
+    cmds:
+      - cmd: cargo build --release -p html-to-markdown-ffi
+        ignore_error: false
+      - cmd: "cd {{.JAVA_WORK_DIR}} && {{.MAVEN_WRAPPER}} clean package -DskipTests"
+        ignore_error: false
+
+  build:ci:
+    desc: "Build FFI + Maven package for CI (release mode)"
+    silent: false
+    cmds:
+      - cmd: cargo build --release -p html-to-markdown-ffi
+        ignore_error: false
+      - cmd: "cd {{.JAVA_WORK_DIR}} && {{.MAVEN_WRAPPER}} clean package -DskipTests"
+        ignore_error: false
+
+  test:
+    desc: "Run Maven tests with FFI library"
+    silent: false
+    cmds:
+      - cmd: cargo build --release -p html-to-markdown-ffi
+        ignore_error: false
+      - cmd: |
+          cd {{.JAVA_WORK_DIR}} && {{.MAVEN_WRAPPER}} test \
+            -DFFI_LIB_PATH={{.TASKFILE_DIR}}/target/release
+        ignore_error: false
+    env:
+      LD_LIBRARY_PATH: '{{if ne .OS "windows"}}{{.TASKFILE_DIR}}/target/release{{if .LD_LIBRARY_PATH}}:{{.LD_LIBRARY_PATH}}{{end}}{{end}}'
+      DYLD_LIBRARY_PATH: '{{if eq .OS "darwin"}}{{.TASKFILE_DIR}}/target/release{{if .DYLD_LIBRARY_PATH}}:{{.DYLD_LIBRARY_PATH}}{{end}}{{end}}'
+      PATH: '{{if eq .OS "windows"}}{{.TASKFILE_DIR}}/target/release;{{end}}{{.PATH}}'
+
+  test:ci:
+    desc: "Run Maven tests with coverage reporting for CI"
+    silent: false
+    cmds:
+      - cmd: cargo build --release -p html-to-markdown-ffi
+        ignore_error: false
+      - cmd: |
+          cd {{.JAVA_WORK_DIR}} && {{.MAVEN_WRAPPER}} test jacoco:report \
+            -DFFI_LIB_PATH={{.TASKFILE_DIR}}/target/release
+        ignore_error: false
+    env:
+      LD_LIBRARY_PATH: '{{if ne .OS "windows"}}{{.TASKFILE_DIR}}/target/release{{if .LD_LIBRARY_PATH}}:{{.LD_LIBRARY_PATH}}{{end}}{{end}}'
+      DYLD_LIBRARY_PATH: '{{if eq .OS "darwin"}}{{.TASKFILE_DIR}}/target/release{{if .DYLD_LIBRARY_PATH}}:{{.DYLD_LIBRARY_PATH}}{{end}}{{end}}'
+      PATH: '{{if eq .OS "windows"}}{{.TASKFILE_DIR}}/target/release;{{end}}{{.PATH}}'
+
+  lint:
+    desc: "Note: Java linting is part of Maven build (checkstyle configured in pom.xml)"
+    silent: false
+    dir: "{{.JAVA_WORK_DIR}}"
+    cmds:
+      - cmd: "{{.MAVEN_WRAPPER}} checkstyle:check"
+        ignore_error: false
+
+  lint:check:
+    desc: "Run checkstyle validation (WITHOUT auto-fix)"
+    silent: false
+    dir: "{{.JAVA_WORK_DIR}}"
+    cmds:
+      - cmd: "{{.MAVEN_WRAPPER}} checkstyle:check"
+        ignore_error: false
+
+  format:
+    desc: "Format Java code with fmt-maven-plugin (auto-fix)"
+    silent: false
+    dir: "{{.JAVA_WORK_DIR}}"
+    cmds:
+      - cmd: "{{.MAVEN_WRAPPER}} fmt:format"
+        ignore_error: false
+
+  format:check:
+    desc: "Check Java formatting without modifications"
+    silent: false
+    dir: "{{.JAVA_WORK_DIR}}"
+    cmds:
+      - cmd: "{{.MAVEN_WRAPPER}} fmt:check"
+        ignore_error: false
+
+  update:
+    desc: "Update Maven dependencies to latest versions"
+    silent: false
+    dir: "{{.JAVA_WORK_DIR}}"
+    cmds:
+      - cmd: "{{.MAVEN_WRAPPER}} versions:use-latest-versions"
+        ignore_error: false
+
+  clean:
+    desc: "Clean Maven build artifacts and target directory"
+    silent: false
+    dir: "{{.JAVA_WORK_DIR}}"
+    cmds:
+      - cmd: "{{.MAVEN_WRAPPER}} clean"
+        ignore_error: false

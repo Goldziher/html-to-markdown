@@ -1,0 +1,26 @@
+[build-system]
+build-backend = "setuptools.build_meta"
+requires = [ "setuptools>=68" ]
+
+[project]
+name = "html-to-markdown-test-app"
+version = "1.0.0"
+description = "Test app for html-to-markdown Python package"
+requires-python = ">=3.10"
+classifiers = [
+  "Programming Language :: Python :: 3 :: Only",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Programming Language :: Python :: 3.14",
+]
+dependencies = [
+  "html-to-markdown>=2.18",
+  "pytest>=8",
+  "pytest-cov>=4.1",
+]
+
+[tool.pytest.ini_options]
+testpaths = [ "tests" ]
+python_files = [ "*_test.py", "test_*.py" ]

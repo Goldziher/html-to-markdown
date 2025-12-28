@@ -1,0 +1,105 @@
+version: "3"
+internal: true
+
+includes:
+  platforms: ../config/platforms.yml
+  rust: ../languages/rust.yml
+  python: ../languages/python.yml
+  node: ../languages/node.yml
+  typescript: ../languages/typescript.yml
+  wasm: ../languages/wasm.yml
+  ruby: ../languages/ruby.yml
+  php: ../languages/php.yml
+  go: ../languages/go.yml
+  java: ../languages/java.yml
+  csharp: ../languages/csharp.yml
+  elixir: ../languages/elixir.yml
+
+tasks:
+  all:
+    desc: "Run tests for all languages"
+    cmds:
+      - task: rust:test
+      - task: python:test
+      - task: node:test
+      - task: typescript:test
+      - task: wasm:test
+      - task: ruby:test
+      - task: php:test
+      - task: go:test
+      - task: java:test
+      - task: csharp:test
+      - task: elixir:test
+
+  all:ci:
+    desc: "Run tests for all languages with coverage (CI mode)"
+    cmds:
+      - task: rust:test:ci
+      - task: python:test:ci
+      - task: node:test:ci
+      - task: typescript:test:ci
+      - task: wasm:test:ci
+      - task: ruby:test:ci
+      - task: php:test:ci
+      - task: go:test:ci
+      - task: java:test:ci
+      - task: csharp:test:ci
+      - task: elixir:test:ci
+
+  core:
+    desc: "Run Rust core tests only"
+    cmds:
+      - task: rust:test
+
+  bindings:
+    desc: "Run binding tests only (skip Rust core)"
+    cmds:
+      - task: python:test
+      - task: node:test
+      - task: typescript:test
+      - task: wasm:test
+      - task: ruby:test
+      - task: php:test
+      - task: go:test
+      - task: java:test
+      - task: csharp:test
+      - task: elixir:test
+
+  wasm:node:
+    desc: "Run WASM tests in Node.js"
+    cmds:
+      - task: wasm:test:node
+
+  wasm:browser:
+    desc: "Run WASM tests in browsers"
+    cmds:
+      - task: wasm:test:browser
+
+  coverage:
+    desc: "Generate coverage reports for all languages"
+    cmds:
+      - task: rust:coverage
+      - task: python:coverage
+      - task: node:coverage
+      - task: typescript:coverage
+      - task: ruby:coverage
+      - task: php:coverage
+
+  coverage:all:
+    desc: "Generate comprehensive coverage reports"
+    cmds:
+      - task: coverage
+      - task: rust:coverage:lcov
+      - task: python:coverage:lcov
+
+  quick:
+    desc: "Run quick tests (Rust core + TypeScript binding)"
+    cmds:
+      - task: rust:test
+      - task: typescript:test
+
+  check:
+    desc: "Run all test suites and verify quality gates"
+    cmds:
+      - task: all
+      - task: coverage:all

@@ -1,0 +1,149 @@
+version: "3"
+internal: true
+
+includes:
+  platforms: ../config/platforms.yml
+
+vars:
+  RUST_LOG: "{{.RUST_LOG | default \"info\"}}"
+  BUILD_PROFILE: "{{.BUILD_PROFILE | default \"release\"}}"
+  RUST_BACKTRACE: "{{.RUST_BACKTRACE | default \"1\"}}"
+  CARGO_TERM_COLOR: "always"
+
+tasks:
+  install:
+    desc: "Install Rust toolchain and components (rustup, cargo)"
+    silent: false
+    cmds:
+      - rustup update stable
+      - rustup component add rustfmt clippy
+      - rustup component add llvm-tools-preview
+      - cargo install cargo-llvm-cov --locked
+      - cargo install cargo-upgrades --locked
+      - cargo --version
+      - rustc --version
+
+  build:
+    desc: "Build all Rust crates with {{.BUILD_PROFILE}} profile"
+    silent: false
+    cmds:
+      - cmd: |
+          RB_SYS_RUBY={{.RUBY_FULL_PATH}} RUBY={{.RUBY_FULL_PATH}} cargo build --workspace --exclude html-to-markdown-rb --profile {{.BUILD_PROFILE}} -j {{.NUM_CPUS}}
+        ignore_error: false
+
+  build:dev:
+    desc: "Build all Rust crates in debug mode"
+    silent: false
+    cmds:
+      - cmd: |
+          RB_SYS_RUBY={{.RUBY_FULL_PATH}} RUBY={{.RUBY_FULL_PATH}} cargo build --workspace --exclude html-to-markdown-rb -j {{.NUM_CPUS}}
+        ignore_error: false
+
+  build:release:
+    desc: "Build all Rust crates in release mode"
+    silent: false
+    cmds:
+      - cmd: |
+          RB_SYS_RUBY={{.RUBY_FULL_PATH}} RUBY={{.RUBY_FULL_PATH}} cargo build --workspace --exclude html-to-markdown-rb --release -j {{.NUM_CPUS}}
+        ignore_error: false
+
+  build:ci:
+    desc: "Build for CI with debug info enabled (no strip)"
+    silent: false
+    cmds:
+      - cmd: |
+          RB_SYS_RUBY={{.RUBY_FULL_PATH}} RUBY={{.RUBY_FULL_PATH}} CARGO_PROFILE_RELEASE_DEBUG=2 CARGO_PROFILE_RELEASE_STRIP=none cargo build --workspace --exclude html-to-markdown-rb --release -j {{.NUM_CPUS}}
+        ignore_error: false
+
+  test:
+    desc: "Run Rust test suite"
+    silent: false
+    cmds:
+      - cmd: |
+          RB_SYS_RUBY={{.RUBY_FULL_PATH}} RUBY={{.RUBY_FULL_PATH}} RUST_LOG={{.RUST_LOG}} RUST_BACKTRACE={{.RUST_BACKTRACE}} cargo test --release --no-default-features --workspace --exclude html-to-markdown-rb -j {{.NUM_CPUS}}
+        ignore_error: false
+
+  test:ci:
+    desc: "Run tests with coverage for CI (generates lcov)"
+    silent: false
+    cmds:
+      - cmd: |
+          RB_SYS_RUBY={{.RUBY_FULL_PATH}} RUBY={{.RUBY_FULL_PATH}} RUST_LOG={{.RUST_LOG}} RUST_BACKTRACE={{.RUST_BACKTRACE}} cargo llvm-cov --all-features --workspace --exclude html-to-markdown-py --exclude html-to-markdown-rb --lcov --output-path rust-coverage.lcov -j {{.NUM_CPUS}}
+        ignore_error: false
+      - cmd: |
+          RB_SYS_RUBY={{.RUBY_FULL_PATH}} RUBY={{.RUBY_FULL_PATH}} cargo llvm-cov --all-features --workspace --exclude html-to-markdown-py --exclude html-to-markdown-rb --summary-only
+        ignore_error: false
+
+  coverage:
+    desc: "Generate code coverage report (lcov format)"
+    silent: false
+    cmds:
+      - cmd: |
+          RB_SYS_RUBY={{.RUBY_FULL_PATH}} RUBY={{.RUBY_FULL_PATH}} RUST_LOG={{.RUST_LOG}} cargo llvm-cov --all-features --workspace --exclude html-to-markdown-py --exclude html-to-markdown-rb --lcov --output-path rust-coverage.lcov -j {{.NUM_CPUS}}
+        ignore_error: false
+
+  lint:
+    desc: "Lint Rust code WITH auto-fix (cargo fmt + cargo clippy --fix)"
+    silent: false
+    cmds:
+      - cmd: cargo fmt --all
+        ignore_error: false
+      - cmd: |
+          RB_SYS_RUBY={{.RUBY_FULL_PATH}} RUBY={{.RUBY_FULL_PATH}} cargo clippy --workspace --exclude html-to-markdown-rb --fix --allow-dirty --allow-staged -j {{.NUM_CPUS}}
+        ignore_error: false
+
+  lint:check:
+    desc: "Lint Rust code WITHOUT auto-fix (check-only)"
+    silent: false
+    cmds:
+      - cmd: cargo fmt --all --check
+        ignore_error: false
+      - cmd: |
+          RB_SYS_RUBY={{.RUBY_FULL_PATH}} RUBY={{.RUBY_FULL_PATH}} cargo clippy --workspace --exclude html-to-markdown-rb -- -D warnings -j {{.NUM_CPUS}}
+        ignore_error: false
+
+  format:
+    desc: "Format Rust code (with modifications)"
+    silent: false
+    cmds:
+      - cmd: cargo fmt --all
+        ignore_error: false
+
+  format:check:
+    desc: "Check Rust formatting without modifications"
+    silent: false
+    cmds:
+      - cmd: cargo fmt --all --check
+        ignore_error: false
+
+  update:
+    desc: "Update Rust dependencies (cargo-upgrades + cargo update)"
+    silent: false
+    cmds:
+      - cmd: cargo upgrade --incompatible
+        ignore_error: false
+      - cmd: cargo update
+        ignore_error: false
+
+  clean:
+    desc: "Clean Rust build artifacts"
+    silent: false
+    cmds:
+      - cmd: cargo clean
+        ignore_error: false
+
+  doc:
+    desc: "Generate and open Rust documentation"
+    silent: false
+    cmds:
+      - cmd: |
+          RB_SYS_RUBY={{.RUBY_FULL_PATH}} RUBY={{.RUBY_FULL_PATH}} cargo doc --workspace --exclude html-to-markdown-rb --all-features --no-deps --open
+        ignore_error: false
+
+  bench:
+    desc: "Run Rust benchmarks"
+    silent: false
+    cmds:
+      - cmd: |
+          RB_SYS_RUBY={{.RUBY_FULL_PATH}} RUBY={{.RUBY_FULL_PATH}} cargo bench --workspace --exclude html-to-markdown-rb -j {{.NUM_CPUS}}
+        ignore_error: false

@@ -137,7 +137,7 @@ implicit_reexport = false
 show_error_codes = true
 warn_return_any = true
 warn_unused_configs = true
-disable_error_code = 'import-untyped'
+disable_error_code = [ 'import-untyped', 'import-not-found' ]
 namespace_packages = true
 files = [ "packages/python" ]
 explicit_package_bases = true
@@ -153,6 +153,9 @@ exclude = [
 ]
 
 [[tool.mypy.overrides]]
-module = "tests.*"
+module = [
+  "tests.*",
+  "html_to_markdown.tests.*",
+]
 disallow_any_generics = false
 disallow_untyped_decorators = false

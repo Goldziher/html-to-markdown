@@ -1,0 +1,90 @@
+version: "3"
+internal: true
+
+includes:
+  platforms: ../config/platforms.yml
+  rust: ../languages/rust.yml
+  python: ../languages/python.yml
+  node: ../languages/node.yml
+  typescript: ../languages/typescript.yml
+  wasm: ../languages/wasm.yml
+  ruby: ../languages/ruby.yml
+  php: ../languages/php.yml
+  go: ../languages/go.yml
+  java: ../languages/java.yml
+  csharp: ../languages/csharp.yml
+  elixir: ../languages/elixir.yml
+
+tasks:
+  all:
+    desc: "Lint all languages WITH auto-fix"
+    silent: false
+    cmds:
+      - task: rust:lint
+      - task: python:lint
+      - task: node:lint
+      - task: typescript:lint
+      - task: wasm:lint
+      - task: ruby:lint
+      - task: php:lint
+      - task: go:lint
+      - task: java:lint
+      - task: csharp:lint
+      - task: elixir:lint
+
+  check:
+    desc: "Lint all languages WITHOUT auto-fix (check-only mode)"
+    silent: false
+    cmds:
+      - task: rust:lint:check
+      - task: python:lint:check
+      - task: node:lint:check
+      - task: typescript:lint:check
+      - task: wasm:lint:check
+      - task: ruby:lint:check
+      - task: php:lint:check
+      - task: go:lint:check
+      - task: java:lint:check
+      - task: csharp:lint:check
+      - task: elixir:lint:check
+
+  format:
+    desc: "Format all code WITH modifications"
+    silent: false
+    cmds:
+      - task: rust:format
+      - task: python:format
+      - task: node:format
+      - task: typescript:format
+      - task: wasm:format
+      - task: ruby:format
+      - task: php:format
+      - task: go:format
+      - task: java:format
+      - task: csharp:format
+      - task: elixir:format
+
+  format:check:
+    desc: "Check formatting WITHOUT modifications"
+    silent: false
+    cmds:
+      - task: rust:format:check
+      - task: python:format:check
+      - task: node:format:check
+      - task: typescript:format:check
+      - task: wasm:format:check
+      - task: ruby:format:check
+      - task: php:format:check
+      - task: go:format:check
+      - task: java:format:check
+      - task: csharp:format:check
+      - task: elixir:format:check
+
+  typecheck:
+    desc: "Run type checking for all languages"
+    silent: false
+    cmds:
+      - task: python:typecheck
+      - task: typescript:typecheck
+      - task: ruby:typecheck
+      - task: elixir:dialyzer

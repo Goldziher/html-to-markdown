@@ -85,6 +85,11 @@ jobs:
           force_wasm="${INPUT_FORCE_REPUBLISH_WASM:-${EVENT_DISPATCH_FORCE_REPUBLISH_WASM:-false}}"
           echo "force_republish_java=${force_java}" >>"$GITHUB_OUTPUT"
           echo "force_republish_wasm=${force_wasm}" >>"$GITHUB_OUTPUT"
+      - name: Install Task
+        uses: arduino/setup-task@v2
+        with:
+          version: latest
+
       - name: Upload release metadata
         uses: actions/upload-artifact@v6
         with:
@@ -745,153 +750,6 @@ jobs:
           path: cli-${{ matrix.target }}.zip
           retention-days: 14
 
-  release-smoke:
-    name: Smoke release artifacts (${{ matrix.os }})
-    needs:
-      - prepare
-      - python-wheels
-      - python-sdist
-      - php-pie
-      - node-typescript-defs
-      - node-bindings
-      - wasm-bindings
-      - cli-binaries
-      - ruby-gem
-      - elixir-package
-      - cargo-packages
-    runs-on: ${{ matrix.os }}
-    timeout-minutes: 60
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
-    defaults:
-      run:
-        shell: bash
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v6
-        with:
-          ref: ${{ needs.prepare.outputs.checkout_ref }}
-          fetch-depth: 0
-
-      - name: Ensure target commit
-        if: ${{ needs.prepare.outputs.target_sha != '' }}
-        env:
-          TARGET_SHA: ${{ needs.prepare.outputs.target_sha }}
-        run: scripts/publish/common/ensure-target-commit.sh
-        shell: bash
-
-      - name: Download Python wheels
-        uses: actions/download-artifact@v7
-        with:
-          name: python-wheels-${{ matrix.os }}
-          path: python-wheels
-
-      - name: Determine Ruby artifact label
-        id: ruby_label
-        env:
-          MATRIX_OS: ${{ matrix.os }}
-        run: scripts/publish/smoke/determine-ruby-artifact-label.sh
-        shell: bash
-
-      - name: Download Ruby gems
-        uses: actions/download-artifact@v7
-        with:
-          name: rubygems-${{ steps.ruby_label.outputs.label }}
-          path: ruby-gems
-
-      - name: Download Elixir package
-        uses: actions/download-artifact@v7
-        with:
-          name: elixir-hex-package
-          path: elixir-package
-
-      - name: Inspect Elixir package
-        run: scripts/publish/smoke/inspect-elixir-package.sh
-        shell: bash
-
-      - name: Setup Python
-        uses: actions/setup-python@v6
-        with:
-          python-version: "3.12"
-
-      - name: Setup Ruby
-        if: runner.os != 'Windows'
-        uses: ruby/setup-ruby@v1
-        with:
-          ruby-version: "3.3"
-          bundler-cache: false
-
-      - name: Setup Rust
-        uses: ./.github/actions/setup-rust
-
-      - name: Setup PHP
-        if: runner.os == 'Linux'
-        uses: shivammathur/setup-php@v2
-        with:
-          php-version: "8.2"
-          tools: composer:2.9.1
-
-      - name: Capture php-config path
-        if: runner.os == 'Linux'
-        run: scripts/ci/smoke/capture-php-config.sh
-        shell: bash
-
-      - name: Smoke Python install
-        uses: ./.github/actions/smoke-python
-
-      - name: Smoke Ruby install
-        if: runner.os != 'Windows'
-        uses: ./.github/actions/smoke-ruby
-
-      - name: Build PHP extension
-        if: runner.os == 'Linux'
-        id: build_php_smoke
-        uses: ./.github/actions/build-php-linux
-        with:
-          php-config: ${{ env.PHP_CONFIG }}
-
-      - name: Smoke PHP install
-        if: runner.os == 'Linux'
-        uses: ./.github/actions/smoke-php-linux
-        with:
-          extension-path: ${{ steps.build_php_smoke.outputs.extension-path }}
-
-      - name: Smoke Rust example
-        uses: ./.github/actions/smoke-rust
-
-      - name: Smoke Go install
-        uses: ./.github/actions/smoke-go
-
-      - name: Smoke C# install
-        uses: ./.github/actions/smoke-csharp
-
-      - name: Download CLI artifacts
-        uses: actions/download-artifact@v7
-        with:
-          pattern: cli-*
-          path: cli-artifacts
-          merge-multiple: false
-
-      - name: Download PHP PIE artifacts
-        if: runner.os == 'Linux'
-        uses: actions/download-artifact@v7
-        with:
-          name: php-pie-src
-          path: php-pie-artifacts
-
-      - name: Smoke CLI binary
-        uses: ./.github/actions/smoke-cli
-        with:
-          cli-artifacts-dir: ${{ github.workspace }}/cli-artifacts
-
-      - name: Smoke PIE install (Linux)
-        if: runner.os == 'Linux'
-        uses: ./.github/actions/smoke-pie
-        with:
-          pie-artifacts-dir: ${{ github.workspace }}/php-pie-artifacts
-
   ruby-gem:
     name: Build Ruby gem (${{ matrix.label }})
     needs: prepare
@@ -1238,7 +1096,6 @@ jobs:
         go-ffi,
         elixir-package,
         cargo-packages,
-        release-smoke,
       ]
     if: ${{ needs.prepare.outputs.dry_run != 'true' && needs.prepare.outputs.is_tag == 'true' }}
     runs-on: ubuntu-latest

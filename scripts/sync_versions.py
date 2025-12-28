@@ -208,6 +208,77 @@ def update_composer_json(file_path: Path, version: str) -> tuple[bool, str, str]
     return True, old_version, version
 
 
+def update_json_dependency(file_path: Path, package_name: str, version_spec: str) -> None:
+    """Update dependency version in package.json or composer.json."""
+    data = json.loads(file_path.read_text())
+
+    # Check dependencies and optionalDependencies
+    for dep_type in ["dependencies", "optionalDependencies", "devDependencies", "require"]:
+        if dep_type in data and package_name in data[dep_type]:
+            data[dep_type][package_name] = version_spec
+
+    file_path.write_text(json.dumps(data, indent=2) + "\n")
+
+
+def update_toml_dependency(file_path: Path, package_name: str, version_spec: str) -> None:
+    """Update dependency version in pyproject.toml."""
+    content = file_path.read_text()
+    # Match dependencies.package_name = "..."
+    pattern = re.compile(rf'({re.escape(package_name)}\s*=\s*)"[^"]+"')
+    updated = pattern.sub(rf'\1"{version_spec}"', content)
+    file_path.write_text(updated)
+
+
+def update_gemfile_dependency(gemfile_path: Path, gem_name: str, version: str) -> None:
+    """Update gem version in Gemfile."""
+    content = gemfile_path.read_text()
+    pattern = re.compile(rf"gem\s+['\"]?{re.escape(gem_name)}['\"]?.*")
+    replacement = f"gem '{gem_name}', '{version}'"
+    updated = pattern.sub(replacement, content)
+    gemfile_path.write_text(updated)
+
+
+def update_go_mod(go_mod_path: Path, module_path: str, version: str) -> None:
+    """Update module version in go.mod."""
+    content = go_mod_path.read_text()
+    pattern = re.compile(rf"{re.escape(module_path)}\s+v[\d\.]+")
+    replacement = f"{module_path} v{version}"
+    updated = pattern.sub(replacement, content)
+    go_mod_path.write_text(updated)
+
+
+def update_pom_dependency(pom_path: Path, group_id: str, artifact_id: str, version: str) -> None:
+    """Update dependency version in pom.xml."""
+    content = pom_path.read_text()
+    # Match dependency block for the artifact
+    pattern = re.compile(
+        rf"(<dependency>.*?<groupId>{re.escape(group_id)}</groupId>.*?<artifactId>{re.escape(artifact_id)}</artifactId>.*?<version>).*?(</version>.*?</dependency>)",
+        re.DOTALL,
+    )
+    replacement = rf"\g<1>{version}\g<2>"
+    updated = pattern.sub(replacement, content)
+    pom_path.write_text(updated)
+
+
+def update_csproj_dependency(csproj_path: Path, package_name: str, version: str) -> None:
+    """Update PackageReference version in .csproj."""
+    content = csproj_path.read_text()
+    pattern = re.compile(rf'(<PackageReference\s+Include="{re.escape(package_name)}"\s+Version=")[^"]+(")')
+    replacement = rf"\g<1>{version}\g<2>"
+    updated = pattern.sub(replacement, content)
+    csproj_path.write_text(updated)
+
+
+def update_mix_dependency(mix_path: Path, package_name: str, version: str) -> None:
+    """Update dependency version in mix.exs."""
+    content = mix_path.read_text()
+    # Match {:package_name, "~> X.Y.Z"}
+    pattern = re.compile(rf'(\{{{re.escape(package_name)},\s*"~>\s*)[^"]+("}})')
+    replacement = rf"\g<1>{version}\g<2>"
+    updated = pattern.sub(replacement, content)
+    mix_path.write_text(updated)
+
+
 def update_mix_version(file_path: Path, version: str) -> tuple[bool, str, str]:
     """
     Update @version declarations inside mix.exs files.
@@ -259,6 +330,65 @@ def update_pom_version(file_path: Path, version: str) -> tuple[bool, str, str]:
 
     file_path.write_text(new_content)
     return True, old_version, version
+
+
+def update_test_apps_versions(repo_root: Path, version: str) -> None:
+    """Update test_apps package manifests with new version."""
+    test_apps_dir = repo_root / "tests" / "test_apps"
+
+    if not test_apps_dir.exists():
+        print("⚠️  test_apps directory not found, skipping")
+        return
+
+    print("\n📦 Updating test_apps manifests...")
+
+    # Update Python pyproject.toml
+    python_toml = test_apps_dir / "python" / "pyproject.toml"
+    if python_toml.exists():
+        update_toml_dependency(python_toml, "html-to-markdown", f">={version}")
+        print(f"  ✓ Python pyproject.toml → html-to-markdown>={version}")
+
+    # Update Node package.json
+    node_pkg = test_apps_dir / "node" / "package.json"
+    if node_pkg.exists():
+        update_json_dependency(node_pkg, "html-to-markdown", f">={version}")
+        print(f"  ✓ Node package.json → html-to-markdown>={version}")
+
+    # Update Ruby Gemfile
+    ruby_gemfile = test_apps_dir / "ruby" / "Gemfile"
+    if ruby_gemfile.exists():
+        update_gemfile_dependency(ruby_gemfile, "html-to-markdown", f">= {version}")
+        print(f"  ✓ Ruby Gemfile → html-to-markdown>={version}")
+
+    # Update PHP composer.json
+    php_composer = test_apps_dir / "php" / "composer.json"
+    if php_composer.exists():
+        update_json_dependency(php_composer, "kreuzberg-dev/html-to-markdown", f">={version}")
+        print(f"  ✓ PHP composer.json → kreuzberg-dev/html-to-markdown>={version}")
+
+    # Update Go go.mod
+    go_mod = test_apps_dir / "go" / "go.mod"
+    if go_mod.exists():
+        update_go_mod(go_mod, "github.com/kreuzberg-dev/html-to-markdown/packages/go/v2", version)
+        print(f"  ✓ Go go.mod → v{version}")
+
+    # Update Java pom.xml
+    java_pom = test_apps_dir / "java" / "pom.xml"
+    if java_pom.exists():
+        update_pom_dependency(java_pom, "dev.kreuzberg", "html-to-markdown", version)
+        print(f"  ✓ Java pom.xml → {version}")
+
+    # Update C# TestApp.csproj
+    csharp_csproj = test_apps_dir / "csharp" / "TestApp.csproj"
+    if csharp_csproj.exists():
+        update_csproj_dependency(csharp_csproj, "HtmlToMarkdown", version)
+        print(f"  ✓ C# TestApp.csproj → {version}")
+
+    # Update Elixir mix.exs
+    elixir_mix = test_apps_dir / "elixir" / "mix.exs"
+    if elixir_mix.exists():
+        update_mix_dependency(elixir_mix, "html_to_markdown", version)
+        print(f"  ✓ Elixir mix.exs → ~> {version}")
 
 
 @dataclass
@@ -418,6 +548,10 @@ def main() -> None:
     sync_uv_lock(repo_root, version, report)
     sync_composer(repo_root, version, report)
     sync_cargo_versions(repo_root, version, report)
+
+    # Update test_apps manifests
+    update_test_apps_versions(repo_root, version)
+
     summarize(version, report)
 
 

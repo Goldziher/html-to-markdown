@@ -117,7 +117,5 @@ GEMINI.md
 .gemini/
 test_documents/html/issues/*.md
 test_documents/html/issues/*_metadata.json
-
-# AI Rules generated files
 .claude/
-/Users/naamanhirschfeld/workspace/kreuzberg-dev/html-to-markdown/.gemini/settings.json
+.gemini/settings.json

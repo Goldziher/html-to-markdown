@@ -1,0 +1,130 @@
+# Cross-platform PHP ext-php-rs extension with Composer wrapper
+# Compatible with Windows (PowerShell/cmd), macOS, and Linux
+
+version: "3"
+internal: true
+
+includes:
+  platforms: ../config/platforms.yml
+
+vars:
+  BUILD_PROFILE: "{{.BUILD_PROFILE | default \"release\"}}"
+  PHP_WORK_DIR: "{{.PACKAGES_DIR}}/php"
+
+tasks:
+  install:
+    desc: "Install PHP dependencies with Composer"
+    silent: false
+    dir: "{{.PHP_WORK_DIR}}"
+    cmds:
+      - cmd: composer install
+        ignore_error: false
+
+  build:
+    desc: "Build PHP extension with Cargo ({{.BUILD_PROFILE}} profile)"
+    silent: false
+    cmds:
+      - cmd: "{{.CARGO_BIN}} build{{if eq .BUILD_PROFILE \"release\"}} --release{{end}} -p html-to-markdown-php"
+        ignore_error: false
+      - cmd: php -m | grep html_to_markdown || echo "Extension not loaded (normal for development)"
+        ignore_error: true
+
+  build:dev:
+    desc: "Build PHP extension in debug mode"
+    silent: false
+    cmds:
+      - cmd: "{{.CARGO_BIN}} build -p html-to-markdown-php"
+        ignore_error: false
+
+  build:release:
+    desc: "Build PHP extension in release mode"
+    silent: false
+    cmds:
+      - cmd: "{{.CARGO_BIN}} build --release -p html-to-markdown-php"
+        ignore_error: false
+
+  build:ci:
+    desc: "Build PHP extension for CI (release mode)"
+    silent: false
+    cmds:
+      - cmd: "{{.CARGO_BIN}} build --release -p html-to-markdown-php"
+        ignore_error: false
+
+  test:
+    desc: "Run PHPUnit tests for PHP binding"
+    silent: false
+    dir: "{{.PHP_WORK_DIR}}"
+    cmds:
+      - cmd: vendor/bin/phpunit tests/ --testdox
+        ignore_error: false
+
+  test:ci:
+    desc: "Run PHPUnit tests with coverage for CI"
+    silent: false
+    dir: "{{.PHP_WORK_DIR}}"
+    cmds:
+      - cmd: vendor/bin/phpunit tests/ --coverage-clover=coverage.xml
+        ignore_error: false
+
+  lint:
+    desc: "Lint PHP code WITH auto-fix (PHPStan + phpcbf)"
+    silent: false
+    dir: "{{.PHP_WORK_DIR}}"
+    cmds:
+      - cmd: vendor/bin/phpstan analyse --level 9 src/
+        ignore_error: false
+      - cmd: vendor/bin/phpcbf --standard=PSR12 src/ tests/
+        ignore_error: false
+
+  lint:check:
+    desc: "Lint PHP code WITHOUT auto-fix (PHPStan + phpcs check)"
+    silent: false
+    dir: "{{.PHP_WORK_DIR}}"
+    cmds:
+      - cmd: vendor/bin/phpstan analyse --level 9 src/
+        ignore_error: false
+      - cmd: vendor/bin/phpcs --standard=PSR12 src/ tests/
+        ignore_error: false
+
+  format:
+    desc: "Format PHP code with phpcbf (auto-fix)"
+    silent: false
+    dir: "{{.PHP_WORK_DIR}}"
+    cmds:
+      - cmd: vendor/bin/phpcbf --standard=PSR12 src/ tests/
+        ignore_error: false
+
+  format:check:
+    desc: "Check PHP code formatting without modifications"
+    silent: false
+    dir: "{{.PHP_WORK_DIR}}"
+    cmds:
+      - cmd: vendor/bin/phpcs --standard=PSR12 src/ tests/
+        ignore_error: false
+
+  update:
+    desc: "Update PHP dependencies with Composer"
+    silent: false
+    dir: "{{.PHP_WORK_DIR}}"
+    cmds:
+      - cmd: composer update
+        ignore_error: false
+
+  clean:
+    desc: "Clean PHP build artifacts (cross-platform cleanup)"
+    silent: false
+    dir: "{{.PHP_WORK_DIR}}"
+    cmds:
+      - cmd: |
+          php -r "
+          \$files = glob('.php-cs-fixer.cache') ?: [];
+          foreach (\$files as \$f) { if (is_file(\$f)) unlink(\$f); }
+          \$dirs = ['vendor', 'tmp'];
+          foreach (\$dirs as \$d) {
+            if (is_dir(\$d)) {
+              \$cmd = PHP_OS_FAMILY === 'Windows' ? 'rmdir /s /q ' : 'rm -rf ';
+              system(\$cmd . escapeshellarg(\$d));
+            }
+          }
+          "
+        ignore_error: true

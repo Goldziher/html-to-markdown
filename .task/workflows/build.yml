@@ -1,0 +1,124 @@
+version: "3"
+internal: true
+
+includes:
+  platforms: ../config/platforms.yml
+  rust: ../languages/rust.yml
+  python: ../languages/python.yml
+  node: ../languages/node.yml
+  typescript: ../languages/typescript.yml
+  wasm: ../languages/wasm.yml
+  ruby: ../languages/ruby.yml
+  php: ../languages/php.yml
+  go: ../languages/go.yml
+  java: ../languages/java.yml
+  csharp: ../languages/csharp.yml
+  elixir: ../languages/elixir.yml
+
+tasks:
+  all:
+    desc: "Build all language bindings and core"
+    cmds:
+      - task: rust:build
+      - task: python:build
+      - task: node:build
+      - task: typescript:build
+      - task: wasm:build
+      - task: ruby:build
+      - task: php:build
+      - task: go:build
+      - task: java:build
+      - task: csharp:build
+      - task: elixir:build
+
+  all:dev:
+    desc: "Build all language bindings in debug mode"
+    cmds:
+      - task: rust:build:dev
+      - task: python:build:dev
+      - task: node:build:dev
+      - task: typescript:build:dev
+      - task: wasm:build:dev
+      - task: ruby:build:dev
+      - task: php:build:dev
+      - task: go:build:dev
+      - task: java:build:dev
+      - task: csharp:build:dev
+      - task: elixir:build:dev
+
+  all:release:
+    desc: "Build all language bindings in release mode"
+    cmds:
+      - task: rust:build:release
+      - task: python:build:release
+      - task: node:build:release
+      - task: typescript:build:release
+      - task: wasm:build:release
+      - task: ruby:build:release
+      - task: php:build:release
+      - task: go:build:release
+      - task: java:build:release
+      - task: csharp:build:release
+      - task: elixir:build:release
+
+  all:ci:
+    desc: "Build all language bindings in CI mode"
+    cmds:
+      - task: rust:build:ci
+      - task: python:build:ci
+      - task: node:build:ci
+      - task: typescript:build:ci
+      - task: wasm:build:ci
+      - task: ruby:build:ci
+      - task: php:build:ci
+      - task: go:build:ci
+      - task: java:build:ci
+      - task: csharp:build:ci
+      - task: elixir:build:ci
+
+  core:
+    desc: "Build Rust core library only"
+    cmds:
+      - task: rust:build
+
+  bindings:
+    desc: "Build all language bindings (skip Rust core)"
+    cmds:
+      - task: python:build
+      - task: node:build
+      - task: typescript:build
+      - task: wasm:build
+      - task: ruby:build
+      - task: php:build
+      - task: go:build
+      - task: java:build
+      - task: csharp:build
+      - task: elixir:build
+
+  bindings:dev:
+    desc: "Build all language bindings in debug mode (skip Rust core)"
+    cmds:
+      - task: python:build:dev
+      - task: node:build:dev
+      - task: typescript:build:dev
+      - task: wasm:build:dev
+      - task: ruby:build:dev
+      - task: php:build:dev
+      - task: go:build:dev
+      - task: java:build:dev
+      - task: csharp:build:dev
+      - task: elixir:build:dev
+
+  bindings:release:
+    desc: "Build all language bindings in release mode (skip Rust core)"
+    cmds:
+      - task: python:build:release
+      - task: node:build:release
+      - task: typescript:build:release
+      - task: wasm:build:release
+      - task: ruby:build:release
+      - task: php:build:release
+      - task: go:build:release
+      - task: java:build:release
+      - task: csharp:build:release
+      - task: elixir:build:release

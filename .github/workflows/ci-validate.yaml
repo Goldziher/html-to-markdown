@@ -32,6 +32,11 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
 
+      - name: Install Task
+        uses: arduino/setup-task@v2
+        with:
+          version: latest
+
       - name: Install uv
         uses: astral-sh/setup-uv@v7
         with:
@@ -65,8 +70,8 @@ jobs:
           elixir-version: "1.19"
           otp-version: "28.1"
 
-      - name: Install Elixir dependencies
-        run: scripts/ci/validate/install-elixir-deps.sh
+      - name: Install Elixir Dependencies
+        run: task elixir:install
         shell: bash
 
       - name: Setup Ruby
@@ -75,8 +80,8 @@ jobs:
           ruby-version: "3.3"
           bundler-cache: false
 
-      - name: Install Ruby dependencies for lint
-        run: scripts/ci/validate/install-ruby-deps.sh
+      - name: Install Ruby Dependencies
+        run: task ruby:install
         shell: bash
 
       - name: Install Dependencies
@@ -88,12 +93,12 @@ jobs:
           command: uv sync --all-extras --no-install-workspace
           shell: bash
 
-      - name: Run Rust Checks
-        run: scripts/ci/validate/run-rust-checks.sh
+      - name: Run Lint Checks
+        run: task lint:check
         shell: bash
 
-      - name: Install prek
-        run: scripts/ci/validate/install-prek.sh
+      - name: Check Code Formatting
+        run: task format:check
         shell: bash
 
       - name: Load Cached Prek Dependencies
@@ -101,10 +106,10 @@ jobs:
         uses: actions/cache@v5
         with:
           path: ~/.cache/prek/
-          key: prek|${{ env.pythonLocation }}|${{ hashFiles('.pre-commit-config.yaml') }}
+          key: prek|${{ env.pythonLocation }}|${{ hashFiles('.prek-config.yaml') }}
 
-      - name: Execute Prek
+      - name: Run Pre-commit Hooks
         env:
           SKIP: golangci-lint-packages,golangci-lint-examples
-        run: scripts/ci/validate/run-prek.sh
+        run: task pre-commit:run
         shell: bash

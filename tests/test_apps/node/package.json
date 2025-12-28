@@ -1,0 +1,19 @@
+{
+  "name": "html-to-markdown-test-app",
+  "version": "1.0.0",
+  "description": "Test app for html-to-markdown npm package",
+  "type": "module",
+  "scripts": {
+    "test": "vitest run",
+    "test:smoke": "vitest run smoke.spec.ts",
+    "test:comprehensive": "vitest run comprehensive.spec.ts"
+  },
+  "dependencies": {
+    "html-to-markdown": ">=2.18.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "typescript": "^5.0.0",
+    "vitest": "^1.0.0"
+  }
+}

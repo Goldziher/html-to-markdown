@@ -1,0 +1,16 @@
+{
+  "name": "kreuzberg-dev/html-to-markdown-test-app",
+  "description": "Test app for html-to-markdown PHP package",
+  "require": {
+    "php": ">=8.2",
+    "kreuzberg-dev/html-to-markdown": ">=2.18.0"
+  },
+  "require-dev": {
+    "phpunit/phpunit": "^10.0"
+  },
+  "autoload-dev": {
+    "psr-4": {
+      "Tests\\": "tests/"
+    }
+  }
+}

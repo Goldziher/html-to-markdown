@@ -42,6 +42,11 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
 
+      - name: Install Task
+        uses: arduino/setup-task@v2
+        with:
+          version: latest
+
       - name: Install uv
         uses: astral-sh/setup-uv@v7
         with:
@@ -71,10 +76,6 @@ jobs:
             uv sync --all-extras --no-install-workspace
           shell: bash
 
-      - name: Build CLI Binary
-        run: scripts/ci/python/build-cli.sh
-        shell: bash
-
-      - name: Test
-        run: scripts/ci/python/run-pytest.sh
+      - name: Run Python Tests
+        run: task python:test:ci
         shell: bash

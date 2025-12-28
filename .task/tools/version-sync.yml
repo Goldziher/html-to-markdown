@@ -1,0 +1,40 @@
+version: "3"
+internal: true
+
+includes:
+  platforms: ../config/platforms.yml
+
+vars:
+  SYNC_SCRIPT: "{{.ROOT}}/scripts/sync_versions.py"
+
+tasks:
+  sync:
+    desc: "Synchronize version across all package manifests"
+    cmds:
+      - python {{.SYNC_SCRIPT}}
+
+  check:
+    desc: "Check if versions are synchronized (dry-run)"
+    cmds:
+      - python {{.SYNC_SCRIPT}} --check
+
+  bump:major:
+    desc: "Bump major version (X.0.0) and sync"
+    cmds:
+      - python {{.SYNC_SCRIPT}} --bump major
+
+  bump:minor:
+    desc: "Bump minor version (0.X.0) and sync"
+    cmds:
+      - python {{.SYNC_SCRIPT}} --bump minor
+
+  bump:patch:
+    desc: "Bump patch version (0.0.X) and sync"
+    cmds:
+      - python {{.SYNC_SCRIPT}} --bump patch
+
+  show:
+    desc: "Show current version from Cargo.toml"
+    cmds:
+      - cmd: grep -m 1 'version = ' Cargo.toml | sed 's/version = "\(.*\)"/\1/'
+        silent: false

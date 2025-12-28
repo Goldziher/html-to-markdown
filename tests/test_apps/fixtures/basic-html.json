@@ -1,0 +1,62 @@
+[
+  {
+    "name": "Simple paragraph",
+    "html": "<p>Hello World</p>",
+    "expectedMarkdown": "Hello World",
+    "options": {}
+  },
+  {
+    "name": "Heading level 1",
+    "html": "<h1>Title</h1>",
+    "expectedMarkdown": "# Title",
+    "options": {}
+  },
+  {
+    "name": "Heading with paragraph",
+    "html": "<h1>Title</h1><p>Content</p>",
+    "expectedMarkdown": "# Title\n\nContent",
+    "options": {}
+  },
+  {
+    "name": "Strong text",
+    "html": "<p>This is <strong>bold</strong> text</p>",
+    "expectedMarkdown": "This is **bold** text",
+    "options": {}
+  },
+  {
+    "name": "Emphasis text",
+    "html": "<p>This is <em>italic</em> text</p>",
+    "expectedMarkdown": "This is *italic* text",
+    "options": {}
+  },
+  {
+    "name": "Unordered list",
+    "html": "<ul><li>Item 1</li><li>Item 2</li></ul>",
+    "expectedMarkdown": "- Item 1\n- Item 2",
+    "options": {}
+  },
+  {
+    "name": "Ordered list",
+    "html": "<ol><li>First</li><li>Second</li></ol>",
+    "expectedMarkdown": "1. First\n2. Second",
+    "options": {}
+  },
+  {
+    "name": "Link",
+    "html": "<a href=\"https://example.com\">Example</a>",
+    "expectedMarkdown": "[Example](https://example.com)",
+    "options": {}
+  },
+  {
+    "name": "Code inline",
+    "html": "<code>console.log('hello')</code>",
+    "expectedMarkdown": "`console.log('hello')`",
+    "options": {}
+  },
+  {
+    "name": "Blockquote",
+    "html": "<blockquote>Quote</blockquote>",
+    "expectedMarkdown": "> Quote",
+    "options": {}
+  }
+]

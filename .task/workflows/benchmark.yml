@@ -1,0 +1,150 @@
+version: "3"
+internal: true
+
+includes:
+  platforms: ../config/platforms.yml
+  rust: ../languages/rust.yml
+
+vars:
+  BENCH_HARNESS_DIR: "{{.TOOLS_DIR}}/benchmark-harness"
+  BENCH_RESULTS_DIR: "{{.BENCH_HARNESS_DIR}}/results"
+
+tasks:
+  rust:
+    desc: "Run Rust benchmarks with Criterion"
+    silent: false
+    cmds:
+      - task: rust:bench
+
+  harness:
+    desc: "Run full benchmark harness across all language bindings"
+    dir: "{{.BENCH_HARNESS_DIR}}"
+    silent: false
+    cmds:
+      - cmd: |
+          cargo run --release
+        ignore_error: false
+
+  harness:rust:
+    desc: "Run benchmark harness for Rust with flamegraphs"
+    dir: "{{.BENCH_HARNESS_DIR}}"
+    silent: false
+    cmds:
+      - cmd: |
+          cargo run --release -- --language rust --profile --flamegraph
+        ignore_error: false
+
+  harness:python:
+    desc: "Run benchmark harness for Python"
+    dir: "{{.BENCH_HARNESS_DIR}}"
+    silent: false
+    cmds:
+      - cmd: |
+          cargo run --release -- --language python
+        ignore_error: false
+
+  harness:node:
+    desc: "Run benchmark harness for Node.js"
+    dir: "{{.BENCH_HARNESS_DIR}}"
+    silent: false
+    cmds:
+      - cmd: |
+          cargo run --release -- --language node
+        ignore_error: false
+
+  harness:typescript:
+    desc: "Run benchmark harness for TypeScript"
+    dir: "{{.BENCH_HARNESS_DIR}}"
+    silent: false
+    cmds:
+      - cmd: |
+          cargo run --release -- --language typescript
+        ignore_error: false
+
+  harness:ruby:
+    desc: "Run benchmark harness for Ruby"
+    dir: "{{.BENCH_HARNESS_DIR}}"
+    silent: false
+    cmds:
+      - cmd: |
+          cargo run --release -- --language ruby
+        ignore_error: false
+
+  harness:php:
+    desc: "Run benchmark harness for PHP"
+    dir: "{{.BENCH_HARNESS_DIR}}"
+    silent: false
+    cmds:
+      - cmd: |
+          cargo run --release -- --language php
+        ignore_error: false
+
+  harness:go:
+    desc: "Run benchmark harness for Go"
+    dir: "{{.BENCH_HARNESS_DIR}}"
+    silent: false
+    cmds:
+      - cmd: |
+          cargo run --release -- --language go
+        ignore_error: false
+
+  harness:java:
+    desc: "Run benchmark harness for Java"
+    dir: "{{.BENCH_HARNESS_DIR}}"
+    silent: false
+    cmds:
+      - cmd: |
+          cargo run --release -- --language java
+        ignore_error: false
+
+  harness:csharp:
+    desc: "Run benchmark harness for C#"
+    dir: "{{.BENCH_HARNESS_DIR}}"
+    silent: false
+    cmds:
+      - cmd: |
+          cargo run --release -- --language csharp
+        ignore_error: false
+
+  harness:elixir:
+    desc: "Run benchmark harness for Elixir"
+    dir: "{{.BENCH_HARNESS_DIR}}"
+    silent: false
+    cmds:
+      - cmd: |
+          cargo run --release -- --language elixir
+        ignore_error: false
+
+  harness:all:
+    desc: "Run benchmark harness for all languages"
+    dir: "{{.BENCH_HARNESS_DIR}}"
+    silent: false
+    cmds:
+      - cmd: |
+          cargo run --release -- --all
+        ignore_error: false
+
+  harness:memory:
+    desc: "Run memory profiling benchmarks"
+    dir: "{{.BENCH_HARNESS_DIR}}"
+    silent: false
+    cmds:
+      - cmd: |
+          cargo run --release -- --memory-profile
+        ignore_error: false
+
+  harness:flamegraph:
+    desc: "Generate flamegraph index from benchmark results"
+    dir: "{{.BENCH_HARNESS_DIR}}"
+    silent: false
+    cmds:
+      - cmd: |
+          cargo run --release -- --generate-index
+        ignore_error: false
+
+  clean:
+    desc: "Clean benchmark results"
+    silent: false
+    cmds:
+      - cmd: rm -rf {{.BENCH_RESULTS_DIR}}
+        ignore_error: true

@@ -41,6 +41,11 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
 
+      - name: Install Task
+        uses: arduino/setup-task@v2
+        with:
+          version: latest
+
       - name: Setup Rust
         uses: ./.github/actions/setup-rust
 
@@ -51,16 +56,16 @@ jobs:
         uses: ./.github/actions/build-node
 
       - name: Test NAPI-RS Bindings
-        run: scripts/ci/node/test-napi.sh
+        run: task node:test
         shell: bash
 
       - name: Run Rust Tests
-        run: scripts/ci/node/test-napi-cargo.sh
+        run: task rust:test
         shell: bash
 
       - name: Build TypeScript package
         uses: ./.github/actions/build-typescript
 
-      - name: Test TypeScript package
-        run: scripts/ci/node/test-typescript.sh
+      - name: Test TypeScript Package
+        run: task typescript:test:ci
         shell: bash

@@ -1,836 +1,418 @@
 version: "3"
 
-vars:
-  RUST_LOG: info
-  RUBY_BIN: /opt/homebrew/opt/ruby/bin
-  BUNDLER_VERSION: "4.0.0"
-  GOLANGCI_LINT_VERSION: "v2.7.2"
-  GO_TOOLCHAIN: "go1.25.5"
+# ============================================================================
+# KREUZBERG THIN ROUTER - html-to-markdown
+# ============================================================================
+# This is the root Taskfile that delegates all work to modular task files.
+# Structure:
+#   - .task/config/vars.yml       -> shared variables and platform detection
+#   - .task/config/platforms.yml  -> platform-specific configuration
+#   - .task/languages/*           -> language-specific build/test/lint tasks
+#   - .task/workflows/*           -> aggregated multi-language workflows
+#   - .task/tools/*               -> utility tasks (version sync, validation, etc.)
+#
+# Command patterns:
+#   task setup         -> installs all dependencies
+#   task test          -> runs all language tests
+#   task lint          -> lints all languages with auto-fix
+#   task format:check  -> checks format without modifications
+#   task rust:build    -> language-specific tasks (delegated to .task/languages/rust.yml)
+#
+# ============================================================================
 
-silent: false
+# === INCLUDES ===
+includes:
+  # Internal configuration (not exposed as tasks)
+  _cfg:
+    taskfile: ./.task/config/vars.yml
+    internal: true
+  _platforms:
+    taskfile: ./.task/config/platforms.yml
+    internal: true
+
+  # Language modules (exposed with prefix: rust:*, python:*, node:*, etc.)
+  rust:
+    taskfile: ./.task/languages/rust.yml
+  python:
+    taskfile: ./.task/languages/python.yml
+  node:
+    taskfile: ./.task/languages/node.yml
+  typescript:
+    taskfile: ./.task/languages/typescript.yml
+  wasm:
+    taskfile: ./.task/languages/wasm.yml
+  ruby:
+    taskfile: ./.task/languages/ruby.yml
+  php:
+    taskfile: ./.task/languages/php.yml
+  go:
+    taskfile: ./.task/languages/go.yml
+  java:
+    taskfile: ./.task/languages/java.yml
+  csharp:
+    taskfile: ./.task/languages/csharp.yml
+  elixir:
+    taskfile: ./.task/languages/elixir.yml
+
+  # Workflow aggregators (internal, used by root-level tasks)
+  _build:
+    taskfile: ./.task/workflows/build.yml
+    internal: true
+  _test:
+    taskfile: ./.task/workflows/test.yml
+    internal: true
+  _lint:
+    taskfile: ./.task/workflows/lint.yml
+    internal: true
+
+  # Benchmark workflow (exposed as benchmark:*)
+  benchmark:
+    taskfile: ./.task/workflows/benchmark.yml
+
+  # Version sync workflow
+  version:
+    taskfile: ./.task/tools/version-sync.yml
+
+  # General tools (flatten to expose pre-commit:*, toml:*, shell:*, etc. at root)
+  _tools:
+    taskfile: ./.task/tools/general.yml
+    flatten: true
+
+# ============================================================================
+# ROOT TASKS - PRIMARY DEVELOPMENT INTERFACE
+# ============================================================================
 
 tasks:
+  # Setup: Install all dependencies across all languages
   setup:
-    desc: "Install all language dependencies and build the Rust core (idempotent, safe to re-run)"
+    desc: "Install all dependencies and setup development environment"
     cmds:
       - task: rust:install
       - task: python:install
-      - task: js:install
+      - task: node:install
+      - task: typescript:install
+      - task: wasm:install
       - task: ruby:install
       - task: php:install
       - task: go:install
-      - task: csharp:install
       - task: java:install
+      - task: csharp:install
       - task: elixir:install
-      - task: rust:build
-      - echo "Setup complete - safe to re-run anytime"
+      - task: pre-commit:install
 
-  update:
-    desc: "Update dependencies across Rust, JavaScript, Python, Ruby, PHP, Go, C#, Elixir, and Java"
-    cmds:
-      - task: rust:update
-      - task: js:update
-      - task: ruby:update
-      - task: python:update
-      - task: php:update
-      - task: go:update
-      - task: csharp:update
-      - task: elixir:update
-      - task: java:update
-      - uv tool update prek
-      - prek autoupdate
-
+  # Build tasks: compile all languages
   build:
-    desc: "Build Rust core and JavaScript bindings"
+    desc: "Build all language bindings (default: release mode)"
     cmds:
-      - task: rust:build
-      - task: js:build
+      - task: _build:all
 
-  test:
-    desc: "Run test suites for all languages"
+  build:dev:
+    desc: "Build all in debug mode"
     cmds:
-      - task: rust:test
-      - task: python:test
-      - task: ruby:test
-      - task: js:test
-      - task: php:test
-      - task: go:test
-      - task: wasm:test:wasmtime
-      - task: csharp:test
-      - task: elixir:test
-      - task: java:test
+      - task: _build:all:dev
 
-  check:
-    desc: "Run all checks without modifications (lint:check + format:check)"
+  build:release:
+    desc: "Build all in release mode"
     cmds:
-      - task: lint:check
-      - task: format:check
+      - task: _build:all:release
 
-  lint:
-    desc: "Run all linters WITH auto-fix enabled"
+  build:ci:
+    desc: "Build all in CI mode"
     cmds:
-      - task: rust:lint
-      - task: python:lint
-      - task: ruby:lint
-      - task: typescript:lint
-      - task: php:lint
-      - task: go:lint
-      - task: csharp:lint
-      - task: elixir:lint
-      - task: java:lint
+      - task: _build:all:ci
 
-  lint:check:
-    desc: "Run all linters in check-only mode (no modifications)"
+  build:core:
+    desc: "Build Rust core library only"
     cmds:
-      - task: rust:lint:check
-      - task: python:lint:check
-      - task: ruby:lint:check
-      - task: typescript:lint:check
-      - task: php:lint:check
-      - task: go:lint:check
-      - task: csharp:lint:check
-      - task: elixir:lint:check
-      - task: java:lint:check
+      - task: _build:core
 
-  format:
-    desc: "Format all code with modifications"
+  build:bindings:
+    desc: "Build all language bindings (skip Rust core)"
     cmds:
-      - task: rust:format
-      - task: python:format
-      - task: ruby:format
-      - task: typescript:format
-      - task: php:format
-      - task: go:format
-      - task: csharp:format
-      - task: elixir:format
-
-  format:check:
-    desc: "Check code formatting without modifications"
-    cmds:
-      - task: rust:format:check
-      - task: python:format:check
-      - task: ruby:format:check
-      - task: typescript:format:check
-      - task: php:format:check
-      - task: go:format:check
-      - task: csharp:format:check
-      - task: elixir:format:check
-
-  bench:
-    desc: "Run benchmark harness"
-    cmds:
-      - task: bench:harness
-
-  bench:harness:
-    desc: "Run benchmark harness for Rust + bindings"
-    cmds:
-      - cargo run --release --manifest-path tools/benchmark-harness/Cargo.toml -- run --fixtures tools/benchmark-harness/fixtures/wikipedia.toml --frameworks rust,python,ruby,php,node,wasm,go,java,csharp,elixir --format both --output tools/benchmark-harness/results
-
-  bench:harness:rust:
-    desc: "Run benchmark harness for Rust only with flamegraphs"
-    cmds:
-      - CARGO_PROFILE_RELEASE_DEBUG=2 CARGO_PROFILE_RELEASE_STRIP=none cargo run --release --features profiling --manifest-path tools/benchmark-harness/Cargo.toml -- run --fixtures tools/benchmark-harness/fixtures/wikipedia.toml --frameworks rust --profile --profile-frequency 2000 --profile-repeat 5 --flamegraphs tools/benchmark-harness/results/flamegraphs --format both
-
-  bench:harness:memory:
-    desc: "Run benchmark harness with jemalloc memory stats"
-    cmds:
-      - CARGO_PROFILE_RELEASE_DEBUG=2 CARGO_PROFILE_RELEASE_STRIP=none cargo run --release --features profiling,memory-profiling --manifest-path tools/benchmark-harness/Cargo.toml -- run --fixtures tools/benchmark-harness/fixtures/wikipedia.toml --frameworks rust --profile --profile-frequency 2000 --profile-repeat 5 --flamegraphs tools/benchmark-harness/results/flamegraphs --format both
-
-  bench:harness:index:
-    desc: "Generate flamegraph HTML index"
-    cmds:
-      - cargo run --release --manifest-path tools/benchmark-harness/Cargo.toml -- generate-flamegraph-index --flamegraphs tools/benchmark-harness/results/flamegraphs --output tools/benchmark-harness/results/flamegraphs/index.html
-
-  bench:harness:consolidate:
-    desc: "Consolidate benchmark results under .benchmarks"
-    cmds:
-      - cargo run --release --manifest-path tools/benchmark-harness/Cargo.toml -- consolidate --input .benchmarks --output tools/benchmark-harness/results-consolidated
-
-  test:rust:
-    desc: "Alias for rust:test"
-    cmds:
-      - task: rust:test
-
-  test:python:
-    desc: "Alias for python:test"
-    cmds:
-      - task: python:test
-
-  test:ruby:
-    desc: "Alias for ruby:test"
-    cmds:
-      - task: ruby:test
-
-  test:node:
-    desc: "Alias for node:test"
-    cmds:
-      - task: node:test
-
-  test:wasm:
-    desc: "Alias for wasm:test"
-    cmds:
-      - task: wasm:test
-
-  test:ts:
-    desc: "Alias for typescript:test"
-    cmds:
-      - task: typescript:test
-
-  test:js:
-    desc: "Alias for js:test"
-    cmds:
-      - task: js:test
+      - task: _build:bindings
 
   build:cli:
     desc: "Build the html-to-markdown CLI binary"
     cmds:
-      - RB_SYS_RUBY=/opt/homebrew/opt/ruby/bin/ruby RUBY=/opt/homebrew/opt/ruby/bin/ruby cargo build --release --package html-to-markdown-cli
+      - task: rust:cli:build
 
-  build:node:
-    desc: "Alias for node:build"
+  # Test tasks: run all test suites
+  test:
+    desc: "Run all test suites across all languages"
     cmds:
-      - task: node:build
+      - task: _test:all
 
-  build:wasm:
-    desc: "Alias for wasm:build"
+  test:ci:
+    desc: "Run all tests with coverage (CI mode)"
     cmds:
-      - task: wasm:build
+      - task: _test:all:ci
 
-  build:ts:
-    desc: "Alias for typescript:build"
+  # Lint tasks: linting with and without auto-fix
+  lint:
+    desc: "Lint all code WITH auto-fix enabled"
     cmds:
-      - task: typescript:build
+      - task: _lint:all
 
-  build:js:
-    desc: "Alias for js:build"
+  lint:check:
+    desc: "Lint all code WITHOUT auto-fix (check-only)"
     cmds:
-      - task: js:build
+      - task: _lint:check
 
+  # Format tasks: formatting with and without modifications
+  format:
+    desc: "Format all code (with modifications)"
+    cmds:
+      - task: _lint:format
+
+  format:check:
+    desc: "Check code formatting without modifications"
+    cmds:
+      - task: _lint:format:check
+
+  # Combined check: format + lint without modifications
+  check:
+    desc: "Run all checks (format + lint, no modifications)"
+    cmds:
+      - task: format:check
+      - task: lint:check
+
+  # Update dependencies: all languages
+  update:
+    desc: "Update all dependencies across all languages"
+    cmds:
+      - task: rust:update
+      - task: python:update
+      - task: node:update
+      - task: typescript:update
+      - task: wasm:update
+      - task: ruby:update
+      - task: php:update
+      - task: go:update
+      - task: java:update
+      - task: csharp:update
+      - task: elixir:update
+      - uv tool update prek
+      - prek autoupdate
+
+  # Version synchronization: propagate version across all manifests
+  versions:sync:
+    desc: "Synchronize version from Cargo.toml to all package manifests"
+    cmds:
+      - task: version:sync
+
+  # Coverage tasks: generate coverage reports
+  cov:rust:
+    desc: "Generate Rust coverage report"
+    cmds:
+      - task: rust:coverage
+
+  cov:python:
+    desc: "Generate Python coverage report"
+    cmds:
+      - task: python:coverage
+
+  cov:all:
+    desc: "Generate coverage for all languages (Rust + Python)"
+    cmds:
+      - task: _test:coverage
+
+  # Benchmark tasks: performance analysis
+  bench:
+    desc: "Run benchmark harness (all frameworks)"
+    cmds:
+      - task: benchmark:harness
+
+  bench:rust:
+    desc: "Run benchmark harness for Rust only with flamegraphs"
+    cmds:
+      - task: benchmark:harness:rust
+
+  bench:memory:
+    desc: "Run benchmark harness with jemalloc memory stats"
+    cmds:
+      - task: benchmark:harness:memory
+
+  bench:index:
+    desc: "Generate flamegraph HTML index"
+    cmds:
+      - task: benchmark:harness:index
+
+  bench:consolidate:
+    desc: "Consolidate benchmark results under .benchmarks"
+    cmds:
+      - task: benchmark:harness:consolidate
+
+  # E2E tests for published packages
+  e2e:smoke:all:
+    desc: "Run smoke tests for all published packages (fast validation)"
+    cmds:
+      - task: e2e:smoke:python
+      - task: e2e:smoke:node
+      - task: e2e:smoke:ruby
+      - task: e2e:smoke:php
+      - task: e2e:smoke:go
+      - task: e2e:smoke:java
+      - task: e2e:smoke:csharp
+      - task: e2e:smoke:elixir
+
+  e2e:smoke:python:
+    desc: "Smoke test Python package from PyPI"
+    dir: tests/test_apps/python
+    cmds:
+      - uv sync
+      - uv run pytest smoke_test.py -v
+
+  e2e:smoke:node:
+    desc: "Smoke test Node package from npm"
+    dir: tests/test_apps/node
+    cmds:
+      - pnpm install
+      - pnpm test:smoke
+
+  e2e:smoke:ruby:
+    desc: "Smoke test Ruby gem from RubyGems"
+    dir: tests/test_apps/ruby
+    cmds:
+      - bundle install
+      - bundle exec rspec smoke_test.rb
+
+  e2e:smoke:php:
+    desc: "Smoke test PHP package from Packagist"
+    dir: tests/test_apps/php
+    cmds:
+      - composer install
+      - vendor/bin/phpunit smoke_test.php
+
+  e2e:smoke:go:
+    desc: "Smoke test Go package from pkg.go.dev"
+    dir: tests/test_apps/go
+    cmds:
+      - go mod download
+      - go test -v -run Smoke
+
+  e2e:smoke:java:
+    desc: "Smoke test Java package from Maven Central"
+    dir: tests/test_apps/java
+    cmds:
+      - ./mvnw{{if eq .OS "windows"}}.cmd{{end}} clean install -DskipTests
+      - ./mvnw{{if eq .OS "windows"}}.cmd{{end}} test -Dtest=SmokeTest
+
+  e2e:smoke:csharp:
+    desc: "Smoke test C# package from NuGet"
+    dir: tests/test_apps/csharp
+    cmds:
+      - dotnet restore
+      - dotnet test --filter FullyQualifiedName~SmokeTest
+
+  e2e:smoke:elixir:
+    desc: "Smoke test Elixir package from Hex.pm"
+    dir: tests/test_apps/elixir
+    cmds:
+      - mix deps.get
+      - mix test test/smoke_test.exs
+
+  # Comprehensive e2e tests (post-release validation)
+  e2e:test:all:
+    desc: "Run comprehensive tests for all published packages"
+    cmds:
+      - task: e2e:test:python
+      - task: e2e:test:node
+      - task: e2e:test:ruby
+      - task: e2e:test:php
+      - task: e2e:test:go
+      - task: e2e:test:java
+      - task: e2e:test:csharp
+      - task: e2e:test:elixir
+
+  e2e:test:python:
+    desc: "Comprehensive tests for Python package"
+    dir: tests/test_apps/python
+    cmds:
+      - uv sync
+      - uv run pytest comprehensive_test.py -v
+
+  e2e:test:node:
+    desc: "Comprehensive tests for Node package"
+    dir: tests/test_apps/node
+    cmds:
+      - pnpm install
+      - pnpm test:comprehensive
+
+  e2e:test:ruby:
+    desc: "Comprehensive tests for Ruby gem"
+    dir: tests/test_apps/ruby
+    cmds:
+      - bundle install
+      - bundle exec rspec comprehensive_test.rb
+
+  e2e:test:php:
+    desc: "Comprehensive tests for PHP package"
+    dir: tests/test_apps/php
+    cmds:
+      - composer install
+      - vendor/bin/phpunit comprehensive_test.php
+
+  e2e:test:go:
+    desc: "Comprehensive tests for Go package"
+    dir: tests/test_apps/go
+    cmds:
+      - go mod download
+      - go test -v -run Comprehensive
+
+  e2e:test:java:
+    desc: "Comprehensive tests for Java package"
+    dir: tests/test_apps/java
+    cmds:
+      - ./mvnw{{if eq .OS "windows"}}.cmd{{end}} test -Dtest=ComprehensiveTest
+
+  e2e:test:csharp:
+    desc: "Comprehensive tests for C# package"
+    dir: tests/test_apps/csharp
+    cmds:
+      - dotnet test --filter FullyQualifiedName~ComprehensiveTest
+
+  e2e:test:elixir:
+    desc: "Comprehensive tests for Elixir package"
+    dir: tests/test_apps/elixir
+    cmds:
+      - mix test test/comprehensive_test.exs
+
+  # Demo tasks
   build:demo:
     desc: "Build the GitHub Pages demo"
     cmds:
       - ./scripts/build-demo.sh
 
   serve:demo:
-    desc: "Serve the GitHub Pages demo locally"
+    desc: "Serve the GitHub Pages demo locally on port 8000"
     dir: docs
     cmds:
       - python3 -m http.server 8000
 
-  build:wheel-prep:
-    desc: "Alias for python:wheel:prep"
-    cmds:
-      - task: python:wheel:prep
-
-  cov:rust:
-    desc: "Alias for rust:coverage"
-    cmds:
-      - task: rust:coverage
-
-  cov:python:
-    desc: "Alias for python:coverage"
-    cmds:
-      - task: python:coverage
-
-  cov:all:
-    desc: "Generate Rust + Python coverage reports"
-    cmds:
-      - task: cov:rust
-      - task: cov:python
-
-  bench:all:
-    desc: "Alias for bench"
-    cmds:
-      - task: bench
-
-  clean:
-    desc: "Remove build artifacts across languages"
-    cmds:
-      - task: rust:clean
-      - task: python:clean
-      - task: ruby:clean
-      - task: js:clean
-
-  pre-commit:install:
-    desc: "Install prek hooks (pre-commit + commit-msg)"
-    cmds:
-      - prek install
-      - prek install --hook-type commit-msg
-
-  pre-commit:run:
-    desc: "Run all pre-commit hooks"
-    cmds:
-      - prek run --all-files
-
-  rust:install:
-    desc: "Install Rust toolchain (if needed)"
-    cmds:
-      - rustup update stable
-      - cargo --version
-      - rustc --version
-
-  rust:build:
-    desc: "Build all Rust crates"
-    cmds:
-      - RB_SYS_RUBY=/opt/homebrew/opt/ruby/bin/ruby RUBY=/opt/homebrew/opt/ruby/bin/ruby cargo build --workspace --exclude html-to-markdown-rb --release
-
-  rust:test:
-    desc: "Run Rust tests"
-    cmds:
-      - RB_SYS_RUBY=/opt/homebrew/opt/ruby/bin/ruby RUBY=/opt/homebrew/opt/ruby/bin/ruby cargo test --release --no-default-features --workspace --exclude html-to-markdown-rb
-
-  rust:test:coverage:
-    desc: "Generate Rust coverage report (requires cargo-llvm-cov)"
-    cmds:
-      - RB_SYS_RUBY=/opt/homebrew/opt/ruby/bin/ruby RUBY=/opt/homebrew/opt/ruby/bin/ruby cargo llvm-cov --all-features --workspace --exclude html-to-markdown-py --exclude html-to-markdown-rb --lcov --output-path rust-coverage.lcov
-      - RB_SYS_RUBY=/opt/homebrew/opt/ruby/bin/ruby RUBY=/opt/homebrew/opt/ruby/bin/ruby cargo llvm-cov --all-features --summary-only
-
-  rust:lint:
-    desc: "Run Rust fmt + clippy WITH auto-fix"
-    cmds:
-      - cargo fmt --all
-      - RB_SYS_RUBY=/opt/homebrew/opt/ruby/bin/ruby RUBY=/opt/homebrew/opt/ruby/bin/ruby cargo clippy --workspace --exclude html-to-markdown-rb --fix --allow-dirty --allow-staged
-
-  rust:lint:check:
-    desc: "Run Rust fmt + clippy WITHOUT auto-fix (check-only)"
-    cmds:
-      - cargo fmt --all --check
-      - RB_SYS_RUBY=/opt/homebrew/opt/ruby/bin/ruby RUBY=/opt/homebrew/opt/ruby/bin/ruby cargo clippy --workspace --exclude html-to-markdown-rb -- -D warnings
-
-  rust:format:
-    desc: "Format Rust code (with modifications)"
-    cmds:
-      - cargo fmt --all
-
-  rust:format:check:
-    desc: "Check Rust formatting without modifications"
-    cmds:
-      - cargo fmt --all --check
-
-  rust:update:
-    desc: "Update Rust dependencies"
-    cmds:
-      - cargo upgrade --incompatible
-      - cargo update
-
-  rust:clean:
-    desc: "Clean Rust artifacts"
-    cmds:
-      - cargo clean
-
-  python:install:
-    desc: "Install Python dependencies via uv"
-    dir: packages/python
-    cmds:
-      - uv sync --all-extras --no-install-workspace
-
-  python:update:
-    desc: "Update Python dependencies"
-    cmds:
-      - uv run uv-bump
-      - uv sync --all-extras --upgrade --no-install-workspace
-
-  python:test:
-    desc: "Run Python tests (build CLI first for proxy tests)"
-    cmds:
-      - RB_SYS_RUBY=/opt/homebrew/opt/ruby/bin/ruby RUBY=/opt/homebrew/opt/ruby/bin/ruby cargo build --release --package html-to-markdown-cli
-      - uv pip install --editable packages/python
-      - cmd: uv run pytest
-        dir: packages/python
-
-  python:test:coverage:
-    desc: "Run Python tests with coverage"
-    cmds:
-      - RB_SYS_RUBY=/opt/homebrew/opt/ruby/bin/ruby RUBY=/opt/homebrew/opt/ruby/bin/ruby cargo build --release --package html-to-markdown-cli
-      - cmd: uv run pytest --cov=html_to_markdown --cov-report=lcov:coverage.lcov --cov-report=term
-        dir: packages/python
-
-  python:lint:
-    desc: "Lint Python code WITH auto-fix (ruff + mypy)"
-    dir: packages/python
-    cmds:
-      - uv pip install --editable .
-      - uv run ruff check --fix
-      - uv run ruff format
-      - uv run mypy .
-
-  python:lint:check:
-    desc: "Lint Python code WITHOUT auto-fix (check-only)"
-    dir: packages/python
-    cmds:
-      - uv pip install --editable .
-      - uv run ruff check
-      - uv run ruff format --check
-      - uv run mypy .
-
-  python:format:
-    desc: "Format Python code (with modifications)"
-    dir: packages/python
-    cmds:
-      - uv run ruff check --fix
-      - uv run ruff format
-
-  python:format:check:
-    desc: "Check Python formatting without modifications"
-    dir: packages/python
-    cmds:
-      - uv run ruff format --check
-
-  python:wheel:prep:
-    desc: "Prepare CLI binary for wheel packaging"
-    cmds:
-      - uv run scripts/prepare_wheel.py
-
-  python:clean:
-    desc: "Clean Python build artifacts"
-    dir: packages/python
-    cmds:
-      - rm -rf build/ dist/ *.egg-info .pytest_cache .ruff_cache .mypy_cache html_to_markdown/bin
-
-  python:coverage:
-    desc: "Alias for python:test:coverage"
-    cmds:
-      - task: python:test:coverage
-
-  ruby:ensure-bundler:
-    desc: "Ensure required Bundler version is installed"
-    cmds:
-      - PATH={{.RUBY_BIN}}:$PATH gem list -i bundler -v {{.BUNDLER_VERSION}} || PATH={{.RUBY_BIN}}:$PATH gem install bundler -v {{.BUNDLER_VERSION}} --no-document
-
-  ruby:install:
-    desc: "Install Ruby dependencies"
-    cmds:
-      - task: ruby:ensure-bundler
-      - cmd: cd packages/ruby && PATH={{.RUBY_BIN}}:$PATH bundle _{{.BUNDLER_VERSION}}_ install
-
-  ruby:update:
-    desc: "Update Ruby dependencies"
-    dir: packages/ruby
-    cmds:
-      - task: ruby:ensure-bundler
-      - PATH={{.RUBY_BIN}}:$PATH bundle _{{.BUNDLER_VERSION}}_ update --all
-
-  ruby:build:
-    desc: "Build Ruby native extension"
-    cmds:
-      - task: ruby:ensure-bundler
-      - cmd: cd packages/ruby && PATH={{.RUBY_BIN}}:$PATH bundle _{{.BUNDLER_VERSION}}_ exec rake compile
-
-  ruby:test:
-    desc: "Run Ruby specs"
-    cmds:
-      - task: ruby:build
-      - cmd: cd packages/ruby && PATH={{.RUBY_BIN}}:$PATH bundle _{{.BUNDLER_VERSION}}_ exec rake spec
-
-  ruby:lint:
-    desc: "Lint Ruby code WITH auto-fix (rubocop + RBS + Steep)"
-    cmds:
-      - task: ruby:ensure-bundler
-      - cmd: cd packages/ruby && BUNDLE_PATH=vendor/bundle PATH={{.RUBY_BIN}}:$PATH bundle _{{.BUNDLER_VERSION}}_ install
-      - cmd: cd packages/ruby && BUNDLE_PATH=vendor/bundle PATH={{.RUBY_BIN}}:$PATH bundle _{{.BUNDLER_VERSION}}_ exec rubocop --config ./.rubocop.yml --autocorrect-all
-      - cmd: cd packages/ruby && BUNDLE_PATH=vendor/bundle PATH={{.RUBY_BIN}}:$PATH bundle _{{.BUNDLER_VERSION}}_ exec rbs validate
-      - cmd: cd packages/ruby && BUNDLE_PATH=vendor/bundle PATH={{.RUBY_BIN}}:$PATH bundle _{{.BUNDLER_VERSION}}_ exec steep check
-
-  ruby:lint:check:
-    desc: "Lint Ruby code WITHOUT auto-fix (check-only)"
-    cmds:
-      - task: ruby:ensure-bundler
-      - cmd: cd packages/ruby && BUNDLE_PATH=vendor/bundle PATH={{.RUBY_BIN}}:$PATH bundle _{{.BUNDLER_VERSION}}_ install
-      - cmd: cd packages/ruby && BUNDLE_PATH=vendor/bundle PATH={{.RUBY_BIN}}:$PATH bundle _{{.BUNDLER_VERSION}}_ exec rubocop --config ./.rubocop.yml
-      - cmd: cd packages/ruby && BUNDLE_PATH=vendor/bundle PATH={{.RUBY_BIN}}:$PATH bundle _{{.BUNDLER_VERSION}}_ exec rbs validate
-      - cmd: cd packages/ruby && BUNDLE_PATH=vendor/bundle PATH={{.RUBY_BIN}}:$PATH bundle _{{.BUNDLER_VERSION}}_ exec steep check
-
-  ruby:format:
-    desc: "Auto-correct Ruby formatting (with modifications)"
-    cmds:
-      - task: ruby:ensure-bundler
-      - cmd: cd packages/ruby && PATH={{.RUBY_BIN}}:$PATH bundle _{{.BUNDLER_VERSION}}_ exec rubocop --config ./.rubocop.yml --autocorrect-all
-
-  ruby:format:check:
-    desc: "Check Ruby formatting without modifications"
-    cmds:
-      - task: ruby:ensure-bundler
-      - cmd: cd packages/ruby && PATH={{.RUBY_BIN}}:$PATH bundle _{{.BUNDLER_VERSION}}_ exec rubocop --config ./.rubocop.yml
-
-  ruby:clean:
-    desc: "Clean Ruby build artifacts"
-    dir: packages/ruby
-    cmds:
-      - rm -rf lib/*.bundle lib/*.so pkg/ tmp/
-
-  php:install:
-    desc: "Install PHP dependencies via Composer"
-    cmds:
-      - cmd: cd packages/php && composer install --no-interaction --no-progress
-
-  php:update:
-    desc: "Update PHP dependencies"
-    cmds:
-      - cmd: cd packages/php && composer update --no-interaction --no-progress
-
-  php:test:
-    desc: "Run PHP test suite"
-    cmds:
-      - cmd: cd packages/php && composer run test
-
-  php:lint:
-    desc: "Run PHP static analysis WITH auto-fix (phpstan + phpcbf)"
-    cmds:
-      - cmd: cd packages/php && composer run lint:fix
-
-  php:lint:check:
-    desc: "Run PHP static analysis WITHOUT auto-fix (check-only)"
-    cmds:
-      - cmd: cd packages/php && composer run lint
-
-  php:format:
-    desc: "Format PHP code (with modifications)"
-    cmds:
-      - cmd: cd packages/php && composer run format
-
-  php:format:check:
-    desc: "Check PHP formatting without modifications"
-    cmds:
-      - cmd: cd packages/php && composer run format:check
-
-  go:install:
-    desc: "Install golangci-lint and download Go modules"
-    cmds:
-      - |
-        TOOLCHAIN="${GOTOOLCHAIN_OVERRIDE:-{{.GO_TOOLCHAIN}}}"
-        echo "Installing golangci-lint {{.GOLANGCI_LINT_VERSION}} with toolchain ${TOOLCHAIN}..."
-        GOTOOLCHAIN="${TOOLCHAIN}" go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@{{.GOLANGCI_LINT_VERSION}}
-      - cmd: |
-          cd packages/go/v2
-          TOOLCHAIN=${GOTOOLCHAIN_OVERRIDE:-{{.GO_TOOLCHAIN}}}
-          GOTOOLCHAIN=${TOOLCHAIN} go mod download
-          GOTOOLCHAIN=${TOOLCHAIN} go get ./...
-          GOTOOLCHAIN=${TOOLCHAIN} go mod tidy
-
-  go:update:
-    desc: "Update Go dependencies and golangci-lint"
-    cmds:
-      - echo "Updating golangci-lint to {{.GOLANGCI_LINT_VERSION}}..."
-      - |
-        TOOLCHAIN="${GOTOOLCHAIN_OVERRIDE:-{{.GO_TOOLCHAIN}}}"
-        GOTOOLCHAIN="${TOOLCHAIN}" go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@{{.GOLANGCI_LINT_VERSION}}
-      - echo "Updating Go module dependencies..."
-      - cmd: |
-          cd packages/go/v2
-          TOOLCHAIN=${GOTOOLCHAIN_OVERRIDE:-{{.GO_TOOLCHAIN}}}
-          GOTOOLCHAIN=${TOOLCHAIN} go get -u ./...
-          GOTOOLCHAIN=${TOOLCHAIN} go mod tidy
-          GOTOOLCHAIN=${TOOLCHAIN} go get ./...
-
-  go:test:
-    desc: "Run Go tests"
-    cmds:
-      - cargo build --release -p html-to-markdown-ffi
-      - cmd: |
-          cd packages/go/v2/htmltomarkdown
-          ROOT="{{.TASKFILE_DIR}}"
-          TOOLCHAIN=${GOTOOLCHAIN_OVERRIDE:-{{.GO_TOOLCHAIN}}}
-          LIBRARY_PATH=${ROOT}/target/release:${LIBRARY_PATH:-} \
-          CGO_LDFLAGS="-L${ROOT}/target/release ${CGO_LDFLAGS:-}" \
-          LD_LIBRARY_PATH=${ROOT}/target/release:${LD_LIBRARY_PATH:-} \
-          DYLD_LIBRARY_PATH=${ROOT}/target/release:${DYLD_LIBRARY_PATH:-} \
-          GOTOOLCHAIN=${TOOLCHAIN} go test -v
-
-  wasm:test:wasmtime:
-    desc: "Run Wasmtime-based WASM e2e tests"
-    cmds:
-      - RUSTC=./scripts/preferred-rustc.sh cargo test -p html-to-markdown-wasm-wasmtime-tests
-
-  go:lint:
-    desc: "Lint Go code WITH auto-fix (golangci-lint)"
-    cmds:
-      - cmd: |
-          cd packages/go/v2
-          TOOLCHAIN=${GOTOOLCHAIN_OVERRIDE:-{{.GO_TOOLCHAIN}}}
-          GOTOOLCHAIN=${TOOLCHAIN} go fmt ./...
-          golangci-lint run --config ../../../.golangci.yml --fix ./...
-
-  go:lint:check:
-    desc: "Lint Go code WITHOUT auto-fix (check-only)"
-    cmds:
-      - cmd: |
-          cd packages/go/v2
-          TOOLCHAIN=${GOTOOLCHAIN_OVERRIDE:-{{.GO_TOOLCHAIN}}}
-          GOTOOLCHAIN=${TOOLCHAIN} gofmt -l .
-          golangci-lint run --config ../../../.golangci.yml ./...
-
-  go:format:
-    desc: "Format Go code (with modifications)"
-    cmds:
-      - gofmt -w packages/go/v2
-
-  go:format:check:
-    desc: "Check Go formatting without modifications"
-    cmds:
-      - gofmt -l packages/go/v2
-
-  elixir:install:
-    desc: "Install Elixir dependencies and compile the NIF"
-    dir: packages/elixir
-    cmds:
-      - cmd: ../../scripts/publish/elixir/stage-rust-core.sh
-      - MIX_ENV=dev mix deps.get
-      - MIX_ENV=dev mix compile
-
-  elixir:update:
-    desc: "Update Elixir dependencies"
-    dir: packages/elixir
-    cmds:
-      - MIX_ENV=dev mix deps.update --all
-
-  elixir:test:
-    desc: "Run Elixir tests"
-    dir: packages/elixir
-    cmds:
-      - cmd: ../../scripts/publish/elixir/stage-rust-core.sh
-      - MIX_ENV=test mix test
-
-  elixir:lint:
-    desc: "Lint Elixir code WITH auto-fix (Credo + mix format)"
-    dir: packages/elixir
-    cmds:
-      - MIX_ENV=dev mix credo suggest --strict
-      - MIX_ENV=dev mix format
-
-  elixir:lint:check:
-    desc: "Lint Elixir code WITHOUT auto-fix (check-only)"
-    dir: packages/elixir
-    cmds:
-      - MIX_ENV=dev mix credo --strict
-      - MIX_ENV=dev mix format --check-formatted
-
-  elixir:format:
-    desc: "Format Elixir code (with modifications)"
-    dir: packages/elixir
-    cmds:
-      - MIX_ENV=dev mix format
-
-  elixir:format:check:
-    desc: "Check Elixir formatting without modifications"
-    dir: packages/elixir
-    cmds:
-      - MIX_ENV=dev mix format --check-formatted
-
-  java:install:
-    desc: "Verify Java (JDK 25+) and Maven are installed, then download deps"
-    cmds:
-      - >-
-        bash -lc 'source "$HOME/.sdkman/bin/sdkman-init.sh" && sdk env && if ! command -v java >/dev/null 2>&1; then echo "ERROR: Java (JDK 25+) is not installed. Please install Temurin or Oracle JDK."; exit 1; fi; java -version'
-      - >-
-        bash -lc 'source "$HOME/.sdkman/bin/sdkman-init.sh" && sdk env && if [[ ! -x ./mvnw ]]; then echo "ERROR: Maven wrapper (./mvnw) is required."; exit 1; fi; MAVEN_OPTS="${MAVEN_OPTS:-} --enable-native-access=ALL-UNNAMED -Dsun.misc.unsafe.memory.access=allow" ./mvnw -v'
-      - >-
-        bash -lc 'source "$HOME/.sdkman/bin/sdkman-init.sh" && sdk env && MAVEN_OPTS="${MAVEN_OPTS:-} --enable-native-access=ALL-UNNAMED -Dsun.misc.unsafe.memory.access=allow" ./mvnw -f packages/java/pom.xml -B dependency:go-offline'
-
-  java:update:
-    desc: "Update Java dependencies (Maven)"
-    cmds:
-      - >-
-        bash -lc 'source "$HOME/.sdkman/bin/sdkman-init.sh" && sdk env && MAVEN_OPTS="${MAVEN_OPTS:-} --enable-native-access=ALL-UNNAMED -Dsun.misc.unsafe.memory.access=allow" mvn -f packages/java/pom.xml -B versions:display-plugin-updates -DprocessPlugins=true -DprocessPluginDependencies=true'
-      - >-
-        bash -lc 'source "$HOME/.sdkman/bin/sdkman-init.sh" && sdk env && MAVEN_OPTS="${MAVEN_OPTS:-} --enable-native-access=ALL-UNNAMED -Dsun.misc.unsafe.memory.access=allow" mvn -f packages/java/pom.xml -B versions:display-property-updates'
-      - >-
-        bash -lc 'source "$HOME/.sdkman/bin/sdkman-init.sh" && sdk env && MAVEN_OPTS="${MAVEN_OPTS:-} --enable-native-access=ALL-UNNAMED -Dsun.misc.unsafe.memory.access=allow" mvn -f packages/java/pom.xml -B versions:update-properties -DgenerateBackupPoms=false -DallowSnapshots=false -DignoreVersions=".*-alpha.*,.*-beta.*,.*-rc.*,.*-cr.*,.*-milestone.*,.*-M[0-9]+.*" -DincludeProperties=junit.version,maven-compiler-plugin.version,maven-surefire-plugin.version,maven-javadoc-plugin.version,maven-gpg-plugin.version,maven-install-plugin.version,central-publishing-plugin.version,exec-maven-plugin.version,spotless-maven-plugin.version,maven-source-plugin.version'
-
-  java:test:
-    desc: "Run Java tests"
-    cmds:
-      - cargo build --release -p html-to-markdown-ffi
-      - >-
-        bash -lc 'source "$HOME/.sdkman/bin/sdkman-init.sh" && sdk env && MAVEN_OPTS="${MAVEN_OPTS:-} --enable-native-access=ALL-UNNAMED -Dsun.misc.unsafe.memory.access=allow" ./mvnw -f packages/java/pom.xml -B -Dgpg.skip=true test'
-
-  java:lint:
-    desc: "Lint Java project (checkstyle + PMD WITH auto-fix where applicable)"
-    cmds:
-      - >-
-        bash -lc 'source "$HOME/.sdkman/bin/sdkman-init.sh" && sdk env && MAVEN_OPTS="${MAVEN_OPTS:-} --enable-native-access=ALL-UNNAMED -Dsun.misc.unsafe.memory.access=allow" ./mvnw -f packages/java/pom.xml -B -DskipTests -Dgpg.skip=true verify'
-
-  java:lint:check:
-    desc: "Lint Java project WITHOUT auto-fix (check-only)"
-    cmds:
-      - >-
-        bash -lc 'source "$HOME/.sdkman/bin/sdkman-init.sh" && sdk env && MAVEN_OPTS="${MAVEN_OPTS:-} --enable-native-access=ALL-UNNAMED -Dsun.misc.unsafe.memory.access=allow" ./mvnw -f packages/java/pom.xml -B -DskipTests -Dgpg.skip=true verify'
-
-  java:format:
-    desc: "Format Java code (with modifications)"
-    cmds:
-      - >-
-        bash -lc 'source "$HOME/.sdkman/bin/sdkman-init.sh" && sdk env && MAVEN_OPTS="${MAVEN_OPTS:-} --enable-native-access=ALL-UNNAMED -Dsun.misc.unsafe.memory.access=allow" ./mvnw -f packages/java/pom.xml -B spotless:apply'
-
-  java:format:check:
-    desc: "Check Java formatting without modifications"
-    cmds:
-      - >-
-        bash -lc 'source "$HOME/.sdkman/bin/sdkman-init.sh" && sdk env && MAVEN_OPTS="${MAVEN_OPTS:-} --enable-native-access=ALL-UNNAMED -Dsun.misc.unsafe.memory.access=allow" ./mvnw -f packages/java/pom.xml -B spotless:check'
-
-  csharp:install:
-    desc: "Verify .NET SDK is installed and restore dependencies"
-    cmds:
-      - |
-        if ! command -v dotnet >/dev/null 2>&1; then
-          echo "ERROR: .NET SDK is not installed. Please install .NET 8.0+ SDK"
-          exit 1
-        fi
-        echo ".NET SDK $(dotnet --version) is installed"
-      - cmd: cd packages/csharp/HtmlToMarkdown && dotnet restore
-      - cmd: cd packages/csharp/HtmlToMarkdown.Tests && dotnet restore
-
-  csharp:update:
-    desc: "Update C# NuGet dependencies"
-    cmds:
-      - cmd: cd packages/csharp/HtmlToMarkdown && dotnet restore --force-evaluate
-      - cmd: cd packages/csharp/HtmlToMarkdown.Tests && dotnet restore --force-evaluate
-
-  csharp:test:
-    desc: "Run C# tests"
-    cmds:
-      - cargo build --release -p html-to-markdown-ffi
-      - cmd: cd packages/csharp/HtmlToMarkdown.Tests && LD_LIBRARY_PATH={{.TASKFILE_DIR}}/target/release:${LD_LIBRARY_PATH:-} DYLD_LIBRARY_PATH={{.TASKFILE_DIR}}/target/release:${DYLD_LIBRARY_PATH:-} dotnet test
-
-  csharp:lint:
-    desc: "Lint C# code WITH auto-fix"
-    cmds:
-      - dotnet format packages/csharp/HtmlToMarkdown/HtmlToMarkdown.csproj
-      - dotnet format packages/csharp/HtmlToMarkdown.Tests/HtmlToMarkdown.Tests.csproj
-      - cmd: cd packages/csharp/HtmlToMarkdown && dotnet build /p:TreatWarningsAsErrors=true
-      - cmd: cd packages/csharp/HtmlToMarkdown.Tests && dotnet build /p:TreatWarningsAsErrors=true
-
-  csharp:lint:check:
-    desc: "Lint C# code WITHOUT auto-fix (check-only)"
-    cmds:
-      - dotnet format packages/csharp/HtmlToMarkdown/HtmlToMarkdown.csproj --verify-no-changes
-      - dotnet format packages/csharp/HtmlToMarkdown.Tests/HtmlToMarkdown.Tests.csproj --verify-no-changes
-      - cmd: cd packages/csharp/HtmlToMarkdown && dotnet build /p:TreatWarningsAsErrors=true
-      - cmd: cd packages/csharp/HtmlToMarkdown.Tests && dotnet build /p:TreatWarningsAsErrors=true
-
-  csharp:format:
-    desc: "Format C# code (with modifications)"
-    cmds:
-      - dotnet format packages/csharp/HtmlToMarkdown/HtmlToMarkdown.csproj
-      - dotnet format packages/csharp/HtmlToMarkdown.Tests/HtmlToMarkdown.Tests.csproj
-
-  csharp:format:check:
-    desc: "Check C# formatting without modifications"
-    cmds:
-      - dotnet format packages/csharp/HtmlToMarkdown/HtmlToMarkdown.csproj --verify-no-changes
-      - dotnet format packages/csharp/HtmlToMarkdown.Tests/HtmlToMarkdown.Tests.csproj --verify-no-changes
-
-
-  js:install:
-    desc: "Install pnpm workspace dependencies"
-    cmds:
-      - pnpm install --frozen-lockfile
-
-  js:update:
-    desc: "Update pnpm workspace dependencies"
-    cmds:
-      - pnpm up --latest -r
-
-  js:build:
-    desc: "Build Node, WASM, and TypeScript packages"
-    cmds:
-      - task: node:build
-      - task: wasm:build
-      - task: typescript:build
-
-  js:test:
-    desc: "Run Node, WASM, and TypeScript tests"
-    cmds:
-      - task: node:test
-      - task: wasm:test
-      - task: typescript:test
-
-  js:clean:
-    desc: "Clean JS/TS build artifacts"
-    cmds:
-      - find crates packages -type d -name "dist" -exec rm -rf {} + 2>/dev/null || true
-      - find crates packages -type d -name "node_modules" -exec rm -rf {} + 2>/dev/null || true
-
-  node:build:
-    desc: "Build Node.js native bindings"
-    cmds:
-      - pnpm --filter html-to-markdown-node run build
-
-  node:test:
-    desc: "Run Node.js binding tests"
-    cmds:
-      - pnpm --filter html-to-markdown-node test
-
-  wasm:build:
-    desc: "Build WebAssembly bindings"
-    cmds:
-      - pnpm --filter html-to-markdown-wasm run build:all
-
-  wasm:test:
-    desc: "Run WebAssembly tests"
-    cmds:
-      - pnpm --filter html-to-markdown-wasm test
-
-  typescript:build:
-    desc: "Build the TypeScript distribution"
-    cmds:
-      - pnpm --filter html-to-markdown run build
-
-  typescript:test:
-    desc: "Test the TypeScript distribution"
-    cmds:
-      - pnpm --filter html-to-markdown test
-
-  typescript:lint:
-    desc: "Lint TypeScript WITH auto-fix"
-    cmds:
-      - pnpm --filter html-to-markdown run lint:fix
-
-  typescript:lint:check:
-    desc: "Lint TypeScript WITHOUT auto-fix (check-only)"
-    cmds:
-      - pnpm --filter html-to-markdown run lint
-
-  typescript:format:
-    desc: "Format TypeScript code (with modifications)"
-    cmds:
-      - pnpm --filter html-to-markdown run format:fix
-
-  typescript:format:check:
-    desc: "Check TypeScript formatting without modifications"
-    cmds:
-      - pnpm --filter html-to-markdown run format:check
-
-  js:lint:
-    desc: "Lint JavaScript/TypeScript WITH auto-fix"
-    cmds:
-      - pnpm run lint:fix
-
-  js:lint:check:
-    desc: "Lint JavaScript/TypeScript WITHOUT auto-fix (check-only)"
-    cmds:
-      - pnpm run lint
-
-  js:format:
-    desc: "Format JavaScript/TypeScript (with modifications)"
-    cmds:
-      - pnpm run format:fix
-
-  js:format:check:
-    desc: "Check JavaScript/TypeScript formatting without modifications"
-    cmds:
-      - pnpm run format:check
-
-  versions:sync:
-    desc: "Sync version from Cargo.toml to all package manifests"
-    cmds:
-      - uv run scripts/sync_versions.py
-
+  # Documentation
   docs:build:
-    desc: "Build documentation site"
+    desc: "Build documentation site with mkdocs"
     cmds:
       - task: python:install
       - uv run mkdocs build --clean --strict
 
+  # Clean artifacts
+  clean:
+    desc: "Remove build artifacts across all languages"
+    cmds:
+      - task: rust:clean
+      - task: python:clean
+      - task: ruby:clean
+      - task: node:clean
+      - task: typescript:clean
+      - task: wasm:clean
+      - task: php:clean
+      - task: go:clean
+      - task: java:clean
+      - task: csharp:clean
+      - task: elixir:clean
+
+  # Default task: show available tasks
   default:
     desc: "List available tasks"
     cmds:

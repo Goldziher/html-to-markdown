@@ -1,0 +1,55 @@
+version: "3"
+internal: true
+
+includes:
+  platforms: ../config/platforms.yml
+
+vars:
+  SCRIPTS_DIR: "{{.TASKFILE_DIR}}/../../scripts"
+
+tasks:
+  pre-commit:install:
+    desc: "Install prek pre-commit hooks for commit and commit-msg"
+    silent: false
+    cmds:
+      - cmd: prek install
+        ignore_error: false
+      - cmd: prek install --hook-type commit-msg
+        ignore_error: false
+
+  pre-commit:run:
+    desc: "Run prek pre-commit hooks on all files"
+    silent: false
+    cmds:
+      - cmd: prek run --all-files
+        ignore_error: false
+
+  pre-commit:uninstall:
+    desc: "Uninstall prek hooks"
+    silent: false
+    cmds:
+      - cmd: prek uninstall
+        ignore_error: true
+      - cmd: prek uninstall --hook-type commit-msg
+        ignore_error: true
+
+  validate:config:
+    desc: "Validate YAML task configuration files"
+    silent: false
+    cmds:
+      - cmd: |
+          for file in {{.TASKFILE_DIR}}/**/*.yml; do
+            echo "Validating $file..."
+            if ! command -v yamllint &> /dev/null; then
+              echo "yamllint not found, skipping validation"
+              break
+            fi
+            yamllint "$file" || exit 1
+          done
+        ignore_error: false
+
+  validate:all:
+    desc: "Validate all project configurations"
+    silent: false
+    cmds:
+      - task: validate:config

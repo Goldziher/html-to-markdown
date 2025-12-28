@@ -1,0 +1,185 @@
+# Cross-platform Go FFI wrapper tasks with CGO bindings
+# Compatible with Windows (PowerShell/cmd), macOS, and Linux
+# Handles library path management for dynamic linking to Rust FFI library
+
+version: "3"
+internal: true
+
+includes:
+  platforms: ../config/platforms.yml
+
+vars:
+  GO_WORK_DIR: "{{.PACKAGES_DIR}}/go/v2/htmltomarkdown"
+  FFI_BUILD_DIR: "{{.TARGET_DIR}}/{{.OS}}-{{.ARCH}}/release"
+
+env:
+  GOTOOLCHAIN: "{{.GO_TOOLCHAIN}}"
+
+tasks:
+  install:
+    desc: "Install golangci-lint for Go linting"
+    silent: false
+    cmds:
+      - cmd: go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@{{.GOLANGCI_LINT_VERSION}}
+        env:
+          GOTOOLCHAIN: "{{.GO_TOOLCHAIN}}"
+        ignore_error: false
+
+  build:
+    desc: "Build Go FFI wrapper (depends on Rust FFI library)"
+    silent: false
+    dir: "{{.GO_WORK_DIR}}"
+    cmds:
+      - cmd: cargo build{{if eq .BUILD_PROFILE "release"}} --release{{end}} -p html-to-markdown-ffi --quiet
+        ignore_error: false
+      - cmd: go build -v
+        env:
+          GOTOOLCHAIN: "{{.GO_TOOLCHAIN}}"
+          LD_LIBRARY_PATH: '{{if ne .OS "windows"}}{{.TARGET_DIR}}/release{{if .LD_LIBRARY_PATH}}:{{.LD_LIBRARY_PATH}}{{end}}{{end}}'
+          DYLD_LIBRARY_PATH: '{{if eq .OS "darwin"}}{{.TARGET_DIR}}/release{{if .DYLD_LIBRARY_PATH}}:{{.DYLD_LIBRARY_PATH}}{{end}}{{end}}'
+          PATH: '{{if eq .OS "windows"}}{{.TARGET_DIR}}/release;{{end}}{{.PATH}}'
+          CGO_LDFLAGS: "-L{{.TARGET_DIR}}/release -lhtml_to_markdown_ffi"
+        ignore_error: false
+
+  build:dev:
+    desc: "Build Go FFI wrapper in debug mode"
+    silent: false
+    dir: "{{.GO_WORK_DIR}}"
+    cmds:
+      - cmd: cargo build -p html-to-markdown-ffi --quiet
+        ignore_error: false
+      - cmd: go build -v
+        env:
+          GOTOOLCHAIN: "{{.GO_TOOLCHAIN}}"
+          LD_LIBRARY_PATH: '{{if ne .OS "windows"}}{{.TARGET_DIR}}/debug{{if .LD_LIBRARY_PATH}}:{{.LD_LIBRARY_PATH}}{{end}}{{end}}'
+          DYLD_LIBRARY_PATH: '{{if eq .OS "darwin"}}{{.TARGET_DIR}}/debug{{if .DYLD_LIBRARY_PATH}}:{{.DYLD_LIBRARY_PATH}}{{end}}{{end}}'
+          PATH: '{{if eq .OS "windows"}}{{.TARGET_DIR}}/debug;{{end}}{{.PATH}}'
+          CGO_LDFLAGS: "-L{{.TARGET_DIR}}/debug -lhtml_to_markdown_ffi"
+        ignore_error: false
+
+  build:release:
+    desc: "Build Go FFI wrapper in release mode"
+    silent: false
+    dir: "{{.GO_WORK_DIR}}"
+    cmds:
+      - cmd: cargo build --release -p html-to-markdown-ffi --quiet
+        ignore_error: false
+      - cmd: go build -v
+        env:
+          GOTOOLCHAIN: "{{.GO_TOOLCHAIN}}"
+          LD_LIBRARY_PATH: '{{if ne .OS "windows"}}{{.TARGET_DIR}}/release{{if .LD_LIBRARY_PATH}}:{{.LD_LIBRARY_PATH}}{{end}}{{end}}'
+          DYLD_LIBRARY_PATH: '{{if eq .OS "darwin"}}{{.TARGET_DIR}}/release{{if .DYLD_LIBRARY_PATH}}:{{.DYLD_LIBRARY_PATH}}{{end}}{{end}}'
+          PATH: '{{if eq .OS "windows"}}{{.TARGET_DIR}}/release;{{end}}{{.PATH}}'
+          CGO_LDFLAGS: "-L{{.TARGET_DIR}}/release -lhtml_to_markdown_ffi"
+        ignore_error: false
+
+  build:ci:
+    desc: "Build Go FFI wrapper for CI"
+    silent: false
+    dir: "{{.GO_WORK_DIR}}"
+    cmds:
+      - cmd: cargo build --release -p html-to-markdown-ffi --quiet
+        ignore_error: false
+      - cmd: go build -v
+        env:
+          GOTOOLCHAIN: "{{.GO_TOOLCHAIN}}"
+          LD_LIBRARY_PATH: '{{if ne .OS "windows"}}{{.TARGET_DIR}}/release{{if .LD_LIBRARY_PATH}}:{{.LD_LIBRARY_PATH}}{{end}}{{end}}'
+          DYLD_LIBRARY_PATH: '{{if eq .OS "darwin"}}{{.TARGET_DIR}}/release{{if .DYLD_LIBRARY_PATH}}:{{.DYLD_LIBRARY_PATH}}{{end}}{{end}}'
+          PATH: '{{if eq .OS "windows"}}{{.TARGET_DIR}}/release;{{end}}{{.PATH}}'
+          CGO_LDFLAGS: "-L{{.TARGET_DIR}}/release -lhtml_to_markdown_ffi"
+        ignore_error: false
+
+  test:
+    desc: "Run Go tests with FFI library path"
+    silent: false
+    dir: "{{.GO_WORK_DIR}}"
+    cmds:
+      - cmd: cargo build --release -p html-to-markdown-ffi --quiet
+        ignore_error: false
+      - cmd: go test -v
+        env:
+          GOTOOLCHAIN: "{{.GO_TOOLCHAIN}}"
+          LD_LIBRARY_PATH: '{{if ne .OS "windows"}}{{.TARGET_DIR}}/release{{if .LD_LIBRARY_PATH}}:{{.LD_LIBRARY_PATH}}{{end}}{{end}}'
+          DYLD_LIBRARY_PATH: '{{if eq .OS "darwin"}}{{.TARGET_DIR}}/release{{if .DYLD_LIBRARY_PATH}}:{{.DYLD_LIBRARY_PATH}}{{end}}{{end}}'
+          PATH: '{{if eq .OS "windows"}}{{.TARGET_DIR}}/release;{{end}}{{.PATH}}'
+          CGO_LDFLAGS: "-L{{.TARGET_DIR}}/release -lhtml_to_markdown_ffi"
+        ignore_error: false
+
+  test:ci:
+    desc: "Run Go tests for CI with verbose output"
+    silent: false
+    dir: "{{.GO_WORK_DIR}}"
+    cmds:
+      - cmd: cargo build --release -p html-to-markdown-ffi --quiet
+        ignore_error: false
+      - cmd: go test -v -coverprofile=coverage.out -covermode=atomic
+        env:
+          GOTOOLCHAIN: "{{.GO_TOOLCHAIN}}"
+          LD_LIBRARY_PATH: '{{if ne .OS "windows"}}{{.TARGET_DIR}}/release{{if .LD_LIBRARY_PATH}}:{{.LD_LIBRARY_PATH}}{{end}}{{end}}'
+          DYLD_LIBRARY_PATH: '{{if eq .OS "darwin"}}{{.TARGET_DIR}}/release{{if .DYLD_LIBRARY_PATH}}:{{.DYLD_LIBRARY_PATH}}{{end}}{{end}}'
+          PATH: '{{if eq .OS "windows"}}{{.TARGET_DIR}}/release;{{end}}{{.PATH}}'
+          CGO_LDFLAGS: "-L{{.TARGET_DIR}}/release -lhtml_to_markdown_ffi"
+        ignore_error: false
+
+  lint:
+    desc: "Lint Go code WITH auto-fix (golangci-lint run --fix)"
+    silent: false
+    dir: "{{.GO_WORK_DIR}}"
+    cmds:
+      - cmd: golangci-lint run --fix
+        env:
+          GOTOOLCHAIN: "{{.GO_TOOLCHAIN}}"
+        ignore_error: false
+
+  lint:check:
+    desc: "Lint Go code WITHOUT auto-fix (check-only)"
+    silent: false
+    dir: "{{.GO_WORK_DIR}}"
+    cmds:
+      - cmd: golangci-lint run
+        env:
+          GOTOOLCHAIN: "{{.GO_TOOLCHAIN}}"
+        ignore_error: false
+
+  format:
+    desc: "Format Go code with gofmt"
+    silent: false
+    dir: "{{.GO_WORK_DIR}}"
+    cmds:
+      - cmd: gofmt -w .
+        env:
+          GOTOOLCHAIN: "{{.GO_TOOLCHAIN}}"
+        ignore_error: false
+
+  format:check:
+    desc: "Check Go code formatting without modifications"
+    silent: false
+    dir: "{{.GO_WORK_DIR}}"
+    cmds:
+      - cmd: gofmt -l .
+        env:
+          GOTOOLCHAIN: "{{.GO_TOOLCHAIN}}"
+        ignore_error: false
+
+  update:
+    desc: "Update Go dependencies (go get -u ./... && go mod tidy)"
+    silent: false
+    dir: "{{.GO_WORK_DIR}}"
+    cmds:
+      - cmd: go get -u ./...
+        env:
+          GOTOOLCHAIN: "{{.GO_TOOLCHAIN}}"
+        ignore_error: false
+      - cmd: go mod tidy
+        env:
+          GOTOOLCHAIN: "{{.GO_TOOLCHAIN}}"
+        ignore_error: false
+
+  clean:
+    desc: "Clean Go build and test caches"
+    silent: false
+    cmds:
+      - cmd: go clean -cache -testcache
+        env:
+          GOTOOLCHAIN: "{{.GO_TOOLCHAIN}}"
+        ignore_error: true

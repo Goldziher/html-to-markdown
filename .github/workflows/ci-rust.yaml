@@ -52,20 +52,25 @@ jobs:
         with:
           components: rustfmt, clippy, llvm-tools-preview
 
+      - name: Install Task
+        uses: arduino/setup-task@v2
+        with:
+          version: latest
+
       - name: Run Rust Tests
         env:
           RUST_BACKTRACE: full
-        run: scripts/ci/rust/run-tests.sh
+        run: task rust:test:ci
         shell: bash
 
       - name: Check Rust Formatting
         if: matrix.os == 'ubuntu-latest'
-        run: scripts/ci/rust/check-fmt.sh
+        run: task rust:lint:check
         shell: bash
 
       - name: Run Clippy
         if: matrix.os == 'ubuntu-latest'
-        run: scripts/ci/rust/run-clippy.sh
+        run: task rust:clippy
         shell: bash
 
   coverage:
@@ -80,12 +85,13 @@ jobs:
         with:
           components: rustfmt, clippy, llvm-tools-preview
 
-      - name: Install cargo-llvm-cov
-        run: scripts/ci/rust/install-cargo-llvm-cov.sh
-        shell: bash
+      - name: Install Task
+        uses: arduino/setup-task@v2
+        with:
+          version: latest
 
       - name: Generate Rust Coverage
-        run: scripts/ci/rust/run-llvm-cov.sh
+        run: task rust:coverage
         shell: bash
 
       - name: Upload Coverage Artifacts
