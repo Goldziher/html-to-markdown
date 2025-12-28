@@ -1,0 +1,8 @@
+$schema: https://raw.githubusercontent.com/Goldziher/ai-rulez/main/schema/mcp-config.schema.json
+version: "1.0"
+mcp_servers:
+    - name: ai-rulez
+      description: AI-Rulez MCP server for configuration management
+      command: ai-rulez
+      args:
+        - mcp

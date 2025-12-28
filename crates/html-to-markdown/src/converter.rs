@@ -2268,6 +2268,7 @@ fn strip_script_and_style_tags(input: &str) -> Cow<'_, str> {
                             if let Some(close_idx) = close_tag {
                                 let out = output.get_or_insert_with(|| String::with_capacity(len));
                                 out.push_str(&input[last..idx]);
+                                out.push(' ');
                                 last = close_idx;
                                 idx = close_idx;
                                 continue;
@@ -2300,6 +2301,7 @@ fn strip_script_and_style_tags(input: &str) -> Cow<'_, str> {
                         if let Some(close_idx) = close_tag {
                             let out = output.get_or_insert_with(|| String::with_capacity(len));
                             out.push_str(&input[last..idx]);
+                            out.push(' ');
                             last = close_idx;
                             idx = close_idx;
                             continue;
@@ -5288,29 +5290,50 @@ fn walk_node(
 
                     #[cfg_attr(not(feature = "visitor"), allow(unused_variables))]
                     let language: Option<String> = {
-                        let children = tag.children();
                         let mut lang: Option<String> = None;
-                        for child_handle in children.top().iter() {
-                            if let Some(tl::Node::Tag(child_tag)) = child_handle.get(parser) {
-                                if child_tag.name() == "code" {
-                                    if let Some(class_attr) = child_tag.attributes().get("class") {
-                                        if let Some(class_bytes) = class_attr {
-                                            let class_str = class_bytes.as_utf8_str();
-                                            for cls in class_str.split_whitespace() {
-                                                if let Some(stripped) = cls.strip_prefix("language-") {
-                                                    lang = Some(String::from(stripped));
-                                                    break;
-                                                } else if let Some(stripped) = cls.strip_prefix("lang-") {
-                                                    lang = Some(String::from(stripped));
-                                                    break;
-                                                }
-                                            }
-                                        }
+
+                        // First, try to extract language from <pre> tag's class attribute
+                        if let Some(class_attr) = tag.attributes().get("class") {
+                            if let Some(class_bytes) = class_attr {
+                                let class_str = class_bytes.as_utf8_str();
+                                for cls in class_str.split_whitespace() {
+                                    if let Some(stripped) = cls.strip_prefix("language-") {
+                                        lang = Some(String::from(stripped));
+                                        break;
+                                    } else if let Some(stripped) = cls.strip_prefix("lang-") {
+                                        lang = Some(String::from(stripped));
+                                        break;
                                     }
-                                    break;
                                 }
                             }
                         }
+
+                        // If not found on <pre>, try to extract from nested <code> tag's class attribute
+                        if lang.is_none() {
+                            let children = tag.children();
+                            for child_handle in children.top().iter() {
+                                if let Some(tl::Node::Tag(child_tag)) = child_handle.get(parser) {
+                                    if child_tag.name() == "code" {
+                                        if let Some(class_attr) = child_tag.attributes().get("class") {
+                                            if let Some(class_bytes) = class_attr {
+                                                let class_str = class_bytes.as_utf8_str();
+                                                for cls in class_str.split_whitespace() {
+                                                    if let Some(stripped) = cls.strip_prefix("language-") {
+                                                        lang = Some(String::from(stripped));
+                                                        break;
+                                                    } else if let Some(stripped) = cls.strip_prefix("lang-") {
+                                                        lang = Some(String::from(stripped));
+                                                        break;
+                                                    }
+                                                }
+                                            }
+                                        }
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+
                         lang
                     };
 
