@@ -84,6 +84,7 @@ tools/benchmark-harness/artifacts/
 tools/benchmark-harness/artifacts-*/
 tools/benchmark-harness/results-consolidated/
 tools/benchmark-harness/results-local-*/
+artifacts/
 
 # Cache files
 *.cache
