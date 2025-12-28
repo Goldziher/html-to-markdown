@@ -86,28 +86,36 @@ tasks:
     desc: "Lint and format C# code WITH auto-fix (dotnet format)"
     silent: false
     cmds:
-      - cmd: cd {{.CSHARP_PKG}} && dotnet format
+      - cmd: cd {{.CSHARP_PKG}} && dotnet format HtmlToMarkdown/HtmlToMarkdown.csproj
+        ignore_error: false
+      - cmd: cd {{.CSHARP_PKG}} && dotnet format HtmlToMarkdown.Tests/HtmlToMarkdown.Tests.csproj
         ignore_error: false
 
   lint:check:
     desc: "Lint C# code WITHOUT auto-fix (check-only)"
     silent: false
     cmds:
-      - cmd: cd {{.CSHARP_PKG}} && dotnet format --verify-no-changes
+      - cmd: cd {{.CSHARP_PKG}} && dotnet format HtmlToMarkdown/HtmlToMarkdown.csproj --verify-no-changes
+        ignore_error: false
+      - cmd: cd {{.CSHARP_PKG}} && dotnet format HtmlToMarkdown.Tests/HtmlToMarkdown.Tests.csproj --verify-no-changes
         ignore_error: false
 
   format:
     desc: "Format C# code with auto-fix (dotnet format)"
     silent: false
     cmds:
-      - cmd: cd {{.CSHARP_PKG}} && dotnet format
+      - cmd: cd {{.CSHARP_PKG}} && dotnet format HtmlToMarkdown/HtmlToMarkdown.csproj
+        ignore_error: false
+      - cmd: cd {{.CSHARP_PKG}} && dotnet format HtmlToMarkdown.Tests/HtmlToMarkdown.Tests.csproj
         ignore_error: false
 
   format:check:
     desc: "Check C# code formatting without modifications"
     silent: false
     cmds:
-      - cmd: cd {{.CSHARP_PKG}} && dotnet format --verify-no-changes
+      - cmd: cd {{.CSHARP_PKG}} && dotnet format HtmlToMarkdown/HtmlToMarkdown.csproj --verify-no-changes
+        ignore_error: false
+      - cmd: cd {{.CSHARP_PKG}} && dotnet format HtmlToMarkdown.Tests/HtmlToMarkdown.Tests.csproj --verify-no-changes
         ignore_error: false
 
   update:
