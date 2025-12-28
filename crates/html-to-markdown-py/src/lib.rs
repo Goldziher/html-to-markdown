@@ -2588,7 +2588,30 @@ fn convert_with_async_visitor(
 ) -> PyResult<String> {
     init_python_event_loop(py)?;
 
-    convert_with_visitor(py, html, options, visitor)
+    let html = html.to_owned();
+    let rust_options = options.map(|opts| opts.to_rust());
+
+    let Some(visitor_py) = visitor else {
+        return py
+            .detach(move || run_with_guard_and_profile(|| html_to_markdown_rs::convert(&html, rust_options.clone())))
+            .map_err(to_py_err);
+    };
+
+    let visitor_handle = std::sync::Arc::new(std::sync::Mutex::new(visitor_py));
+
+    py.detach(move || {
+        run_with_guard_and_profile(|| {
+            let rc_visitor: Rc<RefCell<dyn HtmlVisitor>> = {
+                Python::attach(|py| {
+                    let guard = visitor_handle.lock().unwrap();
+                    let bridge_copy = visitor_support::PyAsyncVisitorBridge::new(guard.clone_ref(py));
+                    Rc::new(RefCell::new(bridge_copy)) as Rc<RefCell<dyn HtmlVisitor>>
+                })
+            };
+            html_to_markdown_rs::convert_with_visitor(&html, rust_options.clone(), Some(rc_visitor))
+        })
+    })
+    .map_err(to_py_err)
 }
 
 /// Fallback for when async-visitor feature is not enabled

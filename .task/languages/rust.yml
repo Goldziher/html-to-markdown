@@ -60,7 +60,7 @@ tasks:
     silent: false
     cmds:
       - cmd: |
-          RB_SYS_RUBY={{.RUBY_FULL_PATH}} RUBY={{.RUBY_FULL_PATH}} RUST_LOG={{.RUST_LOG}} RUST_BACKTRACE={{.RUST_BACKTRACE}} cargo test --release --no-default-features --workspace --exclude html-to-markdown-rb --exclude html-to-markdown-php -j {{.NUM_CPUS}}
+          RB_SYS_RUBY={{.RUBY_FULL_PATH}} RUBY={{.RUBY_FULL_PATH}} RUST_LOG={{.RUST_LOG}} RUST_BACKTRACE={{.RUST_BACKTRACE}} cargo test --release --no-default-features --workspace --exclude html-to-markdown-py --exclude html-to-markdown-rb --exclude html-to-markdown-php -j {{.NUM_CPUS}}
         ignore_error: false
 
   test:ci:

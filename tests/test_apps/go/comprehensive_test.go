@@ -36,7 +36,7 @@ func TestBasicHTMLConversions(t *testing.T) {
 
 	for _, tc := range fixtures {
 		t.Run(tc.Name, func(t *testing.T) {
-			result, err := htmltomarkdown.Convert(tc.HTML, tc.Options)
+			result, err := htmltomarkdown.Convert(tc.HTML)
 			if err != nil {
 				t.Fatalf("conversion failed: %v", err)
 			}

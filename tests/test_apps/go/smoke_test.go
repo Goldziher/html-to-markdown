@@ -12,7 +12,7 @@ func TestPackageImports(t *testing.T) {
 
 func TestBasicConversion(t *testing.T) {
 	html := "<p>Hello World</p>"
-	result, err := htmltomarkdown.Convert(html, nil)
+	result, err := htmltomarkdown.Convert(html)
 	if err != nil {
 		t.Fatalf("conversion failed: %v", err)
 	}
@@ -21,9 +21,9 @@ func TestBasicConversion(t *testing.T) {
 	}
 }
 
-func TestWithOptions(t *testing.T) {
+func TestHeadingConversion(t *testing.T) {
 	html := "<h1>Title</h1>"
-	result, err := htmltomarkdown.Convert(html, nil)
+	result, err := htmltomarkdown.Convert(html)
 	if err != nil {
 		t.Fatalf("conversion failed: %v", err)
 	}
@@ -33,7 +33,7 @@ func TestWithOptions(t *testing.T) {
 }
 
 func TestEmptyInput(t *testing.T) {
-	result, err := htmltomarkdown.Convert("", nil)
+	result, err := htmltomarkdown.Convert("")
 	if err != nil {
 		t.Fatalf("conversion failed: %v", err)
 	}
