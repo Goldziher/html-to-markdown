@@ -1,4 +1,4 @@
 source 'https://rubygems.org'
 
-gem 'html-to-markdown', '>= 2.19.0'
+gem 'html-to-markdown', '>= 2.19.1'
 gem 'rspec', '~> 3.12'
