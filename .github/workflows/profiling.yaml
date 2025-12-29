@@ -345,7 +345,7 @@ jobs:
             --thresholds '{"baseline": 10, "callbacks": 30, "custom": 40, "complex": 60}'
 
       - name: Upload visitor benchmark results
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         if: always()
         with:
           name: visitor-benchmark-results-${{ matrix.framework }}
