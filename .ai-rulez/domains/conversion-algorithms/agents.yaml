@@ -17,9 +17,9 @@ agents:
       - Convert semantic HTML5 elements
       - Apply configurable heading and formatting styles
       - Preserve nested content and inline formatting
-    patterns:
-      - ATX headings: "# h1\n## h2" etc.
-      - Setext headings: "h1\n==\nh2\n--"
+    patterns: |
+      - ATX headings like: `# h1` and `## h2` etc.
+      - Setext headings for h1 and h2 with underline markers
       - Blank lines between block elements
       - Preserve content within blocks
 
@@ -42,11 +42,11 @@ agents:
       - Detect and convert task lists ([ ])
       - Preserve list item content with formatting
       - Handle tight vs loose list detection
-    patterns:
-      - Unordered: "- item" or "* item" or "+ item"
-      - Ordered: "1. item\n2. item"
-      - Nested: Proper indentation at each level
-      - Tasks: "- [x] Done task"
+    patterns: |
+      - Unordered items use -, *, or + prefix
+      - Ordered items use 1., 2., etc.
+      - Nested items have proper indentation at each level
+      - Task items marked with [x] or [ ]
 
   # Table Converter
   - name: table-converter
@@ -67,11 +67,11 @@ agents:
       - Deal with simple colspan/rowspan
       - Escape pipe characters in cells
       - Fallback to list format for complex tables
-    patterns:
-      - GFM pipe table: "| h1 | h2 |\n|---|---|\n"
-      - Alignment: "|---|:-:|--|"
-      - Cell content: Preserve inline formatting
-      - Captions: Extract as text before table
+    patterns: |
+      - GFM pipe tables with headers and separators
+      - Alignment indicated by dashes and colons
+      - Cell content preserves inline formatting
+      - Captions extracted as text before table
 
   # Inline Element Converter
   - name: inline-formatter
@@ -91,12 +91,12 @@ agents:
       - Handle nested emphasis (bold+italic)
       - Avoid double-escaping
       - Preserve content within formatting
-    patterns:
-      - Bold: "**text**"
-      - Italic: "*text*"
-      - Code: "`text`"
-      - Strikethrough: "~~text~~"
-      - Bold+Italic: "***text***"
+    patterns: |
+      - Bold text wrapped in double asterisks
+      - Italic text wrapped in single asterisks
+      - Code text wrapped in backticks
+      - Strikethrough text wrapped in tildes
+      - Combined bold and italic with triple asterisks
 
   # Link & Image Converter
   - name: link-image-converter
@@ -116,12 +116,12 @@ agents:
       - Sanitize URLs with sanitize_url()
       - Support reference-style links if configured
       - Fallback for missing href/src
-    patterns:
-      - Inline link: "[text](url)"
-      - Link with title: "[text](url \"title\")"
-      - Image: "![alt](src)"
-      - Image with title: "![alt](src \"title\")"
-      - Reference: "[text][ref]" + "[ref]: url"
+    patterns: |
+      - Inline links with text and URL in parentheses
+      - Links with optional title attribute
+      - Images with alt text and source
+      - Images with optional title
+      - Reference-style links with separate definitions
 
   # Form Element Handler
   - name: form-converter
@@ -139,11 +139,11 @@ agents:
       - Convert <select> to list of options
       - Handle <fieldset> and <label>
       - Preserve form field labels
-    patterns:
-      - Text input: "[Input: label]" or code block
-      - Checkbox: Task list syntax
-      - Textarea: Code block with label
-      - Select: List of options with selected marked
+    patterns: |
+      - Text input converted to code block or label notation
+      - Checkbox fields use task list syntax
+      - Textarea fields converted to code blocks with labels
+      - Select fields shown as list of options with selection marker
 
   # Text Processor
   - name: text-processor
@@ -161,11 +161,11 @@ agents:
       - Apply whitespace normalization per mode
       - Preserve code content without escaping
       - Handle edge cases (double escaping, etc.)
-    patterns:
-      - Escape: "\\*" for literal "*"
-      - Entity: "&nbsp;" → " " (non-breaking space)
-      - Whitespace: Mode-specific handling
-      - Code: No escaping in backticks
+    patterns: |
+      - Escaping metacharacters with backslash for literals
+      - Entity decoding for HTML named and numeric entities
+      - Whitespace handling depends on configuration mode
+      - Code content preserved without escaping
 
   # Configuration Manager
   - name: converter-configuration-manager
@@ -185,11 +185,11 @@ agents:
       - Configure line break style
       - Validate option values
       - Provide sensible defaults
-    patterns:
-      - Options as builder pattern
-      - Per-converter option application
-      - Option validation and defaults
-      - Configuration composition
+    patterns: |
+      - Builder pattern for constructing options
+      - Applying options per-converter instance
+      - Validation of configuration values
+      - Composing configurations from defaults and overrides
 
   # Visitor Pattern Implementer
   - name: visitor-implementer
@@ -208,11 +208,11 @@ agents:
       - Dispatch to appropriate converters
       - Track visitor state (depth, context)
       - Return proper VisitResult values
-    patterns:
-      - VisitResult::Process - default conversion
-      - VisitResult::Skip - skip element
-      - VisitResult::Custom - custom conversion
-      - Visitor composition for complex customization
+    patterns: |
+      - VisitResult::Process for default element conversion
+      - VisitResult::Skip to skip processing an element
+      - VisitResult::Custom for custom conversion handling
+      - Visitor composition for complex customization scenarios
 
   # Performance Optimizer
   - name: conversion-performance-optimizer
@@ -230,11 +230,11 @@ agents:
       - Optimize string operations
       - Balance speed vs memory usage
       - Benchmark against baselines
-    patterns:
-      - String buffer accumulation
-      - LRU cache for repeated elements
-      - Lazy evaluation where possible
-      - Zero-copy techniques
+    patterns: |
+      - String buffer accumulation for efficient building
+      - LRU cache for memoizing repeated elements
+      - Lazy evaluation where computation can be deferred
+      - Zero-copy techniques to avoid allocations
 
   # Edge Case Handler
   - name: edge-case-handler
@@ -252,11 +252,11 @@ agents:
       - Unknown/custom elements
       - Malformed element structure
       - Fallback conversions
-    patterns:
-      - Empty paragraph: Skip or blank line
-      - Empty list: Skip or placeholder
-      - Deep nesting: Preserve structure
-      - Unknown element: Extract content
+    patterns: |
+      - Empty paragraphs skipped or converted to blank lines
+      - Empty lists skipped or shown with placeholder
+      - Deep nesting preserved with structure intact
+      - Unknown elements have content extracted
 
   # Output Validation
   - name: markdown-validator

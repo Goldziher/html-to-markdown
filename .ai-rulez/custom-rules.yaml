@@ -1,0 +1,516 @@
+# html-to-markdown Custom Rules
+# High-performance HTML→Markdown converter with polyglot bindings
+#
+# Schema: ai-rules-v3
+# Integration: Extends shared ai-rulez rules for HTML conversion domain
+# Last Updated: 2025-12-29
+
+---
+
+# =============================================================================
+# CORE CONVERSION ENGINE
+# =============================================================================
+
+rules:
+
+  - name: html5-parsing-robustness
+    priority: critical
+    description: |
+      Use html5ever for standards-compliant HTML5 parsing. Parsers must handle
+      malformed HTML without panicking. Support multiple encodings with
+      automatic detection. Enforce depth limits to prevent stack overflow.
+
+      Implementation:
+      - Parser: html5ever for HTML5 compliance, tl for performance fallback
+      - Encoding: auto-detect via charset meta tag, BOM detection, encoding_rs
+      - Conversion: UTF-8 normalization before parsing
+      - Depth limit: enforce maximum nesting (default 256 levels)
+      - Error recovery: return best-effort result on parse errors
+      - Malformed HTML: handle unclosed tags, bad attributes gracefully
+
+    scope:
+      - Parser selection and abstraction
+      - Encoding detection and conversion
+      - Depth tracking and enforcement
+      - Error recovery strategy
+      - Malformed HTML handling
+
+  - name: visitor-pattern-conversion
+    priority: critical
+    description: |
+      Implement comprehensive visitor pattern covering 60+ HTML element types.
+      Each element has visit_* method with pre/post hooks. Return VisitResult
+      enum (Process, Skip, Custom) for flexible customization.
+
+      Implementation:
+      - HtmlVisitor trait: all element types covered
+      - Method structure: visit_element() returns VisitResult
+      - Hooks: before and after processing
+      - Customization: users implement HtmlVisitor for custom conversions
+      - Defaults: sensible defaults for each element type
+      - Unknown elements: safe fallback (process content)
+
+    scope:
+      - Visitor trait completeness
+      - Default conversion implementations
+      - Custom visitor support
+      - Hook execution order
+      - Element type coverage
+
+  - name: dom-tree-safe-traversal
+    priority: high
+    description: |
+      Provide safe, panic-free DOM tree traversal with parent(), children(),
+      sibling() methods. Validate pointers before dereferencing. Track visited
+      nodes to detect cycles. Support filtered iteration.
+
+      Implementation:
+      - Traversal: parent(), children(), next_sibling(), prev_sibling()
+      - Safety: return Option/Result, never panic on invalid pointers
+      - Cycle detection: track visited nodes during traversal
+      - Filtering: element-only, text-only, comment filtering
+      - Iteration: breadth-first and depth-first support
+      - Depth tracking: enforce maximum nesting depth
+
+    scope:
+      - Tree traversal API design
+      - Pointer safety guarantees
+      - Cycle detection algorithm
+      - Iterator implementation
+      - Depth limit enforcement
+
+  - name: element-type-identification
+    priority: high
+    description: |
+      Accurately identify all HTML5 element types (60+). Implement NodeType
+      enum (Element, Text, Comment, Document). Provide helpers: is_element(),
+      is_text(), is_void_element(). Map element names to semantic categories.
+
+      Implementation:
+      - NodeType enum: cover all node types
+      - Type checking: is_element(), is_text(), is_comment()
+      - Void elements: br, img, input, hr, meta, link, etc.
+      - Semantic categories: Block, Inline, Form, Table, Media
+      - Case insensitivity: normalize to lowercase internally
+      - Custom elements: configurable support
+
+    scope:
+      - Element type classification
+      - Void element recognition
+      - Semantic categorization
+      - Node type hierarchy
+      - Custom element handling
+
+  - name: attribute-access-and-validation
+    priority: high
+    description: |
+      Provide comprehensive attribute inspection and retrieval. Support
+      case-insensitive matching. Validate attributes before returning.
+      Handle boolean attributes correctly.
+
+      Implementation:
+      - get_attribute(elem, name) → Option<String>
+      - get_attributes(elem) → BTreeMap<String, String>
+      - Case insensitivity: normalize attribute names
+      - Boolean attributes: checked, disabled, selected
+      - Validation: ensure valid attribute values
+      - Helpers: has_class(), get_classes(), get_id()
+
+    scope:
+      - Attribute access methods
+      - Case normalization
+      - Attribute validation
+      - Boolean attribute handling
+      - Helper method implementation
+
+# =============================================================================
+# HTML→MARKDOWN CONVERSION RULES
+# =============================================================================
+
+  - name: block-element-conversion-accuracy
+    priority: high
+    description: |
+      Convert HTML block elements (heading, paragraph, list, table, blockquote)
+      to correct Markdown syntax. Preserve content and structure. Handle
+      complex nesting and edge cases.
+
+      Implementation:
+      - Headings: h1-h6 → # syntax (ATX) or underline (Setext)
+      - Paragraphs: <p> → text + blank line
+      - Lists: <ul>/<ol> with proper indentation and nesting
+      - Tables: <table> → GFM pipe format with alignment
+      - Blockquotes: <blockquote> → "> " prefix per line
+      - Breaks: <hr> → "---"
+
+    scope:
+      - Heading conversion (ATX vs Setext)
+      - Paragraph formatting
+      - List nesting and indentation
+      - Table conversion to pipes
+      - Blockquote formatting
+      - Special block element handling
+
+  - name: inline-element-conversion-correctness
+    priority: high
+    description: |
+      Convert HTML inline elements (emphasis, code, link, image) to Markdown
+      syntax. Preserve inline formatting through nesting. Never double-escape.
+
+      Implementation:
+      - Bold/Italic: <strong>/<b> → **text**, <em>/<i> → *text*
+      - Code: <code> → `text` with backtick count management
+      - Strikethrough: <s>/<del> → ~~text~~ (GFM)
+      - Links: <a> → [text](href) with URL sanitization
+      - Images: <img> → ![alt](src) with alt text preservation
+      - Line breaks: <br> → two spaces + newline or backslash
+
+    scope:
+      - Emphasis conversion
+      - Code formatting and escaping
+      - Link extraction and validation
+      - Image reference handling
+      - Nested inline element handling
+      - Escape sequence generation
+
+  - name: text-content-and-entity-handling
+    priority: high
+    description: |
+      Extract text content preserving whitespace exactly. Decode HTML entities
+      (&nbsp;, &lt;, &#123;, etc.). Apply escaping only when necessary.
+      Support multiple whitespace handling modes.
+
+      Implementation:
+      - Text extraction: preserve all whitespace by default
+      - Entity decoding: named and numeric entities
+      - Escape strategy: Markdown-aware escaping
+      - Whitespace modes: Preserve, Minimal, Collapse (configurable)
+      - CDATA: preserve as literal text
+      - Character validation: handle special characters
+
+    scope:
+      - Text node extraction
+      - Entity decoding algorithm
+      - Escape character detection
+      - Whitespace normalization modes
+      - Special character handling
+
+  - name: markdown-escaping-strategy
+    priority: high
+    description: |
+      Escape Markdown metacharacters in text where necessary. Don't escape
+      within code blocks. Avoid double-escaping. Preserve content accuracy.
+
+      Implementation:
+      - Characters to escape: \ * _ ` [ ] ( ) # + - . ! | > ~
+      - Selective escaping: only before Markdown syntax
+      - Code block handling: no escaping inside code
+      - Double-escape prevention: escape only once
+      - Accuracy validation: content unchanged after unescaping
+
+    scope:
+      - Escape character identification
+      - Selective escaping logic
+      - Code context detection
+      - Double-escape prevention
+      - Content accuracy verification
+
+  - name: link-and-image-sanitization
+    priority: critical
+    description: |
+      Validate URLs before including in Markdown output. Whitelist safe
+      schemes (http, https, mailto, ftp, tel). Block dangerous schemes
+      (javascript, data, vbscript, file). Handle relative URLs safely.
+
+      Implementation:
+      - Scheme whitelisting: http, https, mailto, ftp, tel, sms, geo
+      - Scheme blocking: javascript, data, vbscript, file, etc.
+      - Relative URLs: support /, ./, ../, # anchors
+      - Encoded payloads: decode and validate
+      - URL validation: complete URL structure validation
+      - Fallback: use URL text if href invalid
+
+    scope:
+      - URL scheme validation
+      - Encoding detection and analysis
+      - Relative URL resolution
+      - Fallback URL handling
+      - Integration with sanitization
+
+# =============================================================================
+# SAFETY & SANITIZATION
+# =============================================================================
+
+  - name: binary-and-encoding-detection
+    priority: critical
+    description: |
+      Reject binary and non-UTF-8 input before processing. Detect magic
+      numbers (gzip, zstd, ZIP, PDF). Detect UTF-16 via null bytes. Calculate
+      control character ratio. Return clear error messages.
+
+      Implementation:
+      - Magic number detection: gzip, zstd, ZIP, PDF, etc.
+      - Binary scan: check first 8KB for binary indicators
+      - UTF-16 detection: null byte pattern analysis (>20% threshold)
+      - Control character ratio: >30% threshold triggers rejection
+      - UTF-8 validation: verify byte sequence integrity
+      - Error messages: indicate detected format
+
+    scope:
+      - Magic number database
+      - Binary detection algorithm
+      - Encoding detection patterns
+      - Control character analysis
+      - Error message generation
+
+  - name: html-sanitization-via-ammonia
+    priority: critical
+    description: |
+      Use ammonia crate for production-grade HTML sanitization. Configure
+      element whitelist (allowed tags) and attribute whitelist. Enable URL
+      scheme validation. Set link rel to "noopener noreferrer".
+
+      Implementation:
+      - Ammonia integration: direct dependency configuration
+      - Element whitelist: safe tags only (p, div, h1-h6, etc.)
+      - Attribute whitelist: safe attributes (class, id, href, etc.)
+      - URL validation: scheme whitelist for href/src
+      - Link rel: always set "noopener noreferrer"
+      - Dangerous removal: script, style, iframe, form, etc.
+
+    scope:
+      - Ammonia configuration
+      - Element whitelist design
+      - Attribute whitelist design
+      - URL scheme whitelisting
+      - Link rel attribute management
+
+  - name: xss-prevention-comprehensive
+    priority: critical
+    description: |
+      Prevent all common XSS attack patterns: stored XSS via sanitization,
+      reflected XSS by not trusting input, DOM XSS by using safe Markdown
+      output, CSS injection via style validation. Test against OWASP vectors.
+
+      Implementation:
+      - Input sanitization: ammonia for stored XSS prevention
+      - Output format: Markdown inherently safe (no executable code)
+      - Event handlers: all on* attributes removed
+      - Style attributes: removed or sanitized (configurable)
+      - Data URIs: blocked or validated (configurable)
+      - Testing: OWASP XSS Filter Evasion Cheat Sheet
+
+    scope:
+      - XSS attack vector coverage
+      - Event handler removal
+      - Style attribute strategy
+      - Data URI handling
+      - OWASP compliance
+
+  - name: form-element-neutralization
+    priority: high
+    description: |
+      Remove or neutralize form elements. Remove <form>, formaction
+      attributes, and form event handlers. Convert <input>/<textarea> to
+      code blocks. Don't preserve form action URLs.
+
+      Implementation:
+      - Form removal: strip <form> entirely
+      - Action removal: formaction attributes removed
+      - Handler removal: form event handlers deleted
+      - Input handling: convert to code blocks
+      - Hidden fields: remove <input type="hidden">
+      - Button handling: remove submit/reset buttons
+
+    scope:
+      - Form element removal
+      - Form action URL handling
+      - Event handler removal
+      - Input field conversion
+      - Hidden field detection
+
+  - name: size-and-depth-limits
+    priority: high
+    description: |
+      Enforce strict memory limits to prevent unbounded allocation. Check
+      limits before parsing. Return error with clear message if exceeded.
+      Make limits configurable via SafetyConfig.
+
+      Implementation:
+      - Document size: maximum 50MB (default, configurable)
+      - Nesting depth: maximum 256 levels (default, configurable)
+      - Output size: maximum 100MB (default, configurable)
+      - Check order: validate before parsing begins
+      - Error message: show limit and actual size
+      - Configuration: SafetyConfig builder pattern
+
+    scope:
+      - Size limit configuration
+      - Depth tracking during parsing
+      - Pre-parse validation
+      - Memory allocation bounds
+      - Error reporting
+
+# =============================================================================
+# PERFORMANCE & QUALITY
+# =============================================================================
+
+  - name: conversion-performance-optimization
+    priority: high
+    description: |
+      Maintain fast conversion speed targeting <1ms per 1000 elements. Profile
+      hot paths (list/table conversion). Use string builders instead of
+      concatenation. Cache frequently converted structures. Benchmark with
+      large documents.
+
+      Implementation:
+      - Performance target: <1ms per 1000 elements
+      - Hot path identification: list and table conversion
+      - String building: StringBuilder pattern (not repeated concat)
+      - Caching: frequently accessed structures cached
+      - Benchmarking: criterium benchmarks with large documents
+      - Profiling: flamegraph analysis of hot paths
+
+    scope:
+      - Performance targets and baselines
+      - Hot path optimization
+      - String builder usage
+      - Caching strategy
+      - Benchmark infrastructure
+
+  - name: markdown-output-validation
+    priority: high
+    description: |
+      Ensure generated Markdown is valid and parseable. Validate syntax:
+      no unclosed formatting (bold, italic, code), proper table structure,
+      valid list syntax, valid link/image syntax.
+
+      Implementation:
+      - Syntax validation: check all Markdown structure
+      - Table validation: aligned columns, proper pipes
+      - List validation: consistent indentation, valid items
+      - Link/image validation: proper [text](url) format
+      - Parser testing: validate with Markdown parsers
+      - Regression tests: known conversions unchanged
+
+    scope:
+      - Markdown syntax validation
+      - Structure consistency checks
+      - Format-specific validation rules
+      - Parser integration for validation
+      - Regression test maintenance
+
+  - name: configuration-and-customization-options
+    priority: high
+    description: |
+      Expose configuration for conversion behavior via builder pattern.
+      HeadingStyle (ATX vs Setext), ListIndentType (spaces vs tab), CodeBlockStyle,
+      NewlineStyle, TableFormat, and custom sanitization options.
+
+      Implementation:
+      - ConversionOptions builder: fluent API
+      - HeadingStyle: ATX vs Setext (configurable)
+      - ListIndentType: spaces (2, 4) vs tab
+      - NewlineStyle: two-space vs backslash
+      - TableFormat: GFM pipe format vs alternatives
+      - SafetyConfig: sanitization options (embedded in ConversionOptions)
+
+    scope:
+      - ConversionOptions design
+      - Builder pattern implementation
+      - Option validation
+      - Default value selection
+      - SafetyConfig integration
+
+  - name: custom-visitor-pattern-support
+    priority: medium
+    description: |
+      Allow users to implement HtmlVisitor trait for custom conversions.
+      Override specific element conversions. Access full element context
+      (attributes, position). Compose visitors for complex customization.
+
+      Implementation:
+      - Visitor trait: public, well-documented
+      - Override methods: per-element conversion customization
+      - Context access: element attributes, parent chain, depth
+      - Visitor composition: chain multiple visitors
+      - Examples: documented with real-world examples
+      - Testing: visitor tests in examples/
+
+    scope:
+      - Visitor trait design
+      - Method override patterns
+      - Context provision mechanisms
+      - Visitor composition strategy
+      - Documentation and examples
+
+# =============================================================================
+# CODE QUALITY & RELIABILITY
+# =============================================================================
+
+  - name: comprehensive-test-coverage
+    priority: high
+    description: |
+      Unit tests for each converter function. Integration tests with real
+      HTML samples. Round-trip tests (HTML → MD → HTML). Edge case tests
+      (empty, deeply nested). Performance tests with large documents.
+
+      Implementation:
+      - Unit tests: per converter per element type
+      - Integration tests: real-world HTML samples
+      - Round-trip tests: conversion reversibility where applicable
+      - Edge cases: empty elements, deep nesting, special characters
+      - Performance: benchmarks with 1MB+ documents
+      - Regression: maintained suite of known conversions
+
+    scope:
+      - Test organization per element type
+      - Real HTML sample collection
+      - Round-trip test strategy
+      - Edge case identification
+      - Performance test suite
+      - Regression test maintenance
+
+  - name: error-recovery-and-robustness
+    priority: high
+    description: |
+      Recover gracefully from parse errors. Return best-effort result even
+      on errors. Include error location (line, column) in error messages.
+      Suggest fixes for common errors.
+
+      Implementation:
+      - Error recovery: continue parsing on recoverable errors
+      - Best effort: return usable result with error metadata
+      - Error location: line/column information in errors
+      - Suggestions: actionable remediation suggestions
+      - Logging: detailed error logs for debugging
+      - Testing: error recovery with fuzzing
+
+    scope:
+      - Error recovery strategies
+      - Error location tracking
+      - Error message generation
+      - Recovery suggestion logic
+      - Fuzzing test infrastructure
+
+  - name: documentation-and-examples
+    priority: medium
+    description: |
+      Comprehensive documentation of parser capabilities and conversion
+      options. Include parsing examples in rustdoc. Explain error types
+      and recovery behavior. Provide performance characteristics.
+
+      Implementation:
+      - Rustdoc: all public items with examples
+      - Parser docs: HTML5 version, limitations, differences
+      - Conversion guide: option explanation and examples
+      - Error documentation: error types and recovery
+      - Performance guide: typical times, scaling characteristics
+      - Migration guides: breaking change documentation
+
+    scope:
+      - Rustdoc completeness
+      - Parser documentation
+      - Conversion option guide
+      - Error type documentation
+      - Performance characteristics
+      - Migration guides

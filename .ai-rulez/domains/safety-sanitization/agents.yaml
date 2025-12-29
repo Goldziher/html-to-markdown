@@ -40,11 +40,11 @@ agents:
       - Handle style attributes
       - Preserve safe content
       - Apply URL validation
-    patterns:
-      - Remove: script, style, iframe, object, form, etc.
-      - Whitelist: p, div, a, img, strong, em, etc.
-      - Remove: on*, javascript:, data:, vbscript:
-      - Preserve: text content of removed elements
+    patterns: |
+      - Remove dangerous elements: script, style, iframe, object, form, etc.
+      - Whitelist safe elements: p, div, a, img, strong, em, etc.
+      - Remove event handlers and dangerous URL schemes
+      - Preserve text content of removed elements
 
   # URL Sanitizer
   - name: url-security-validator
@@ -108,11 +108,11 @@ agents:
       - Extract text content from SVG
       - Configure SVG handling strategy
       - Fall back to alt text
-    patterns:
-      - Strip: <script>, <style> with JS
-      - Remove: onload, onclick, etc.
-      - Validate: xlink:href, href, src
-      - Alt: [SVG: description] notation
+    patterns: |
+      - Strip script and style tags with JavaScript
+      - Remove event handlers like onload and onclick
+      - Validate xlink:href, href, and src attributes
+      - Use alt notation like [SVG: description]
 
   # Configuration Security Manager
   - name: safety-configuration-manager
@@ -261,8 +261,8 @@ agents:
       - Ensure no unsafe shortcuts
       - Validate between steps
       - Test end-to-end safety
-    patterns:
-      - validate_input() → sanitize_html() → parse_html()
+    patterns: |
+      - Pipeline: validate_input, sanitize_html, then parse_html
       - Check URLs during conversion
       - Apply escaping in output
       - Never skip validation steps

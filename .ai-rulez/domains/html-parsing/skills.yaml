@@ -59,15 +59,15 @@ skills:
       - Semantic HTML5 elements
       - Void element identification
       - Form control recognition
-    step_by_step:
+    step_by_step: |
       1. Extract element tag name
       2. Normalize to lowercase
       3. Check against element classification tables
-      4. Determine category:
-         - Block: div, p, h1-h6, ul, ol, table, section, etc.
-         - Inline: span, strong, em, code, a, img, etc.
-         - Void: br, img, input, hr, etc.
-         - Semantic: article, section, nav, etc.
+      4. Determine category
+         - Block elements: div, p, h1-h6, ul, ol, table, section
+         - Inline elements: span, strong, em, code, a, img
+         - Void elements: br, img, input, hr
+         - Semantic elements: article, section, nav
       5. Select appropriate conversion handler
     skills_involved:
       - element-taxonomy
@@ -84,15 +84,15 @@ skills:
       - HTML entity decoding
       - Control character handling
       - Text node collection
-    step_by_step:
+    step_by_step: |
       1. Traverse element recursively
       2. Collect all text nodes
-      3. Decode HTML entities (&nbsp; → space)
-      4. Apply whitespace mode:
+      3. Decode HTML entities (e.g., &nbsp; becomes space)
+      4. Apply whitespace mode
          - Preserve: keep as-is
-         - Minimal: trim/normalize internal
+         - Minimal: trim and normalize internal
          - Collapse: HTML5-style collapse
-      5. Handle special cases:
+      5. Handle special cases
          - CDATA sections
          - Script/style content (skip)
       6. Return accumulated text
@@ -111,18 +111,18 @@ skills:
       - Class and ID extraction
       - URL attributes (href, src, srcset)
       - Boolean attribute handling
-    step_by_step:
+    step_by_step: |
       1. Get attribute map from element
-      2. For specific attribute:
+      2. For specific attribute lookup
          a. Lookup by name (case-insensitive)
          b. Return value if present
          c. Return None if absent
-      3. For class attribute:
+      3. For class attribute
          a. Split by whitespace
          b. Return vector of classes
-      4. For ID attribute:
+      4. For ID attribute
          a. Return single ID value
-      5. For URL attributes:
+      5. For URL attributes
          a. Extract value
          b. Pass to URL sanitizer
     skills_involved:
@@ -140,20 +140,20 @@ skills:
       - UTF-16 heuristics
       - Control character ratio
       - Encoding validation
-    step_by_step:
+    step_by_step: |
       1. Get input bytes
-      2. Check magic number prefixes:
-         - 0x1F8B: gzip
-         - 0x28B52FFD: zstd
-         - 0x504B0304: ZIP
-         - 0x25504446: PDF
-      3. If no magic match, scan for binary indicators:
-         a. Count null bytes (UTF-16 detection)
+      2. Check magic number prefixes
+         - 0x1F8B indicates gzip
+         - 0x28B52FFD indicates zstd
+         - 0x504B0304 indicates ZIP
+         - 0x25504446 indicates PDF
+      3. If no magic match, scan for binary indicators
+         a. Count null bytes for UTF-16 detection
          b. Count control characters
          c. Calculate ratios
-      4. Detect UTF-16:
-         - Even null bytes: UTF-16LE
-         - Odd null bytes: UTF-16BE
+      4. Detect UTF-16
+         - Even null bytes indicate UTF-16LE
+         - Odd null bytes indicate UTF-16BE
       5. If binary detected, return specific error
     skills_involved:
       - binary-format-recognition
@@ -170,12 +170,12 @@ skills:
       - BOM detection
       - Encoding auto-detection
       - Conversion to UTF-8
-    step_by_step:
-      1. Check for BOM (Byte Order Mark):
-         - UTF-8 BOM: 0xEFBBBF
-         - UTF-16LE BOM: 0xFFFE
-         - UTF-16BE BOM: 0xFEFF
-      2. If no BOM, check HTML5 meta charset
+    step_by_step: |
+      1. Check for BOM (Byte Order Mark)
+         - UTF-8 BOM is 0xEFBBBF
+         - UTF-16LE BOM is 0xFFFE
+         - UTF-16BE BOM is 0xFEFF
+      2. If no BOM, check HTML5 meta charset tag
       3. If no meta tag, use encoding_rs auto-detection
       4. Validate encoding is supported
       5. Convert bytes to UTF-8 string
@@ -195,22 +195,22 @@ skills:
       - Partial parsing recovery
       - Error context preservation
       - User-friendly messages
-    step_by_step:
+    step_by_step: |
       1. Wrap parser call in Result
       2. Catch parser errors
-      3. Classify error type:
+      3. Classify error type
          - Malformed HTML
          - Size limit exceeded
          - Nesting depth exceeded
          - Encoding error
-      4. If recoverable:
+      4. If recoverable
          a. Attempt partial parse
          b. Continue with best-effort result
-      5. Include error context:
+      5. Include error context
          - Input location
          - Error description
          - Remediation hint
-      6. Return Err(ConversionError::*)
+      6. Return Err(ConversionError)
     skills_involved:
       - error-classification
       - partial-recovery
@@ -226,16 +226,16 @@ skills:
       - Minimal mode (trim/normalize)
       - Collapse mode (HTML5-style)
       - Mode application per element
-    step_by_step:
+    step_by_step: |
       1. Get WhitespaceMode from ConversionOptions
-      2. For text extraction:
-         - Preserve: return text as-is
-         - Minimal: trim() then normalize internal
-         - Collapse: apply HTML5 whitespace rules
-      3. HTML5 collapse rules:
-         a. Replace newline+spaces with space
+      2. For text extraction apply mode
+         - Preserve means return text as-is
+         - Minimal means trim and normalize internal
+         - Collapse means apply HTML5 whitespace rules
+      3. HTML5 collapse rules
+         a. Replace newline and spaces with single space
          b. Collapse multiple spaces to one
-         c. Preserve leading/trailing in some contexts
+         c. Preserve leading and trailing in some contexts
       4. Apply mode consistently across elements
     skills_involved:
       - whitespace-normalization
@@ -252,11 +252,11 @@ skills:
       - Memory allocation patterns
       - Hot path optimization
       - Caching strategies
-    step_by_step:
+    step_by_step: |
       1. Benchmark current parser
       2. Profile with flamegraph
       3. Identify hot paths
-      4. Optimize:
+      4. Optimize code
          a. Reduce string copies
          b. Use reference counting
          c. Implement node caching
@@ -278,14 +278,14 @@ skills:
       - Malformed HTML handling
       - Entity handling per spec
       - Namespace support
-    step_by_step:
+    step_by_step: |
       1. Test against HTML5 spec test suite
-      2. Verify recovery rules for common errors:
-         - Unclosed tags: auto-close per algorithm
-         - Missing required tags: insert implicitly
-         - Mismatched tags: fix and close properly
-      3. Test entity handling (&#123;, &nbsp;, etc.)
-      4. Test namespace support (SVG, MathML)
+      2. Verify recovery rules for common errors
+         - Unclosed tags auto-close per algorithm
+         - Missing required tags insert implicitly
+         - Mismatched tags fix and close properly
+      3. Test entity handling including numeric and named entities
+      4. Test namespace support for SVG and MathML
       5. Document deviations from spec
     skills_involved:
       - html5-spec-knowledge

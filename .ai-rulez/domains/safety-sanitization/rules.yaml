@@ -122,17 +122,17 @@ rules:
     enforcement: URL sanitization tests
 
   - name: JavaScript URL Detection
-    description: Detect and block javascript: URLs
+    description: "Detect and block javascript: URLs"
     guidance: |
-      - Check for "javascript:" prefix (case-insensitive)
-      - Detect URL-encoded javascript: (%6a%61%76%61...)
-      - Detect whitespace variations (javascript : , javascript\t:)
+      - Check for javascript prefix (case-insensitive)
+      - Detect URL-encoded javascript patterns
+      - Detect whitespace variations in URL schemes
       - Return None if detected
       - Test with OWASP URL evasion examples
     enforcement: JavaScript URL tests
 
   - name: Data URI Handling
-    description: Handle data: URIs safely
+    description: "Handle data: URIs safely"
     guidance: |
       - Option 1: Block all data: URIs (safest)
       - Option 2: Allow only safe MIME types (image/*, text/plain)

@@ -1,119 +1,140 @@
 # HTML-to-Markdown Custom Agents
 # Domain-specific agent definitions for HTML parsing, conversion algorithms, and security
 # These agents extend the base ai-rulez agents with specialized expertise for this project
+#
+# Schema: ai-rules-v3
+# Integration: Extends shared ai-rulez agents for HTML-to-Markdown conversion pipeline
+# Last Updated: 2025-12-29
+
+---
+
+# =============================================================================
+# HTML-TO-MARKDOWN CONVERSION AGENTS
+# =============================================================================
+# These agents focus on HTML5 parsing, markdown conversion algorithms,
+# and security/sanitization unique to the conversion pipeline.
 
 agents:
-  # HTML Parsing & DOM Traversal Specialist
-  # Haiku Model: Fast, efficient implementation of DOM-related tasks
-  # Focus: HTML5 parsing, tree walking, element extraction, DOM normalization
-  html-parsing-specialist:
-    role: "html-parsing-specialist"
-    model: "claude-haiku-4-5"
-    description: "HTML parsing and DOM traversal expert"
-    focus_areas:
-      - "HTML5 parsing with html5ever crate"
-      - "DOM tree traversal and node handling"
-      - "Element extraction and selector logic"
-      - "Whitespace normalization"
-      - "HTML entity handling and encoding"
-      - "Nested structure analysis"
-    expertise:
-      - "html5ever parser internals"
-      - "DOM walking algorithms"
-      - "HTML structure validation"
-      - "Character encoding issues"
-    responsibilities:
-      - "Design and implement HTML parsing logic"
-      - "Handle edge cases in DOM traversal"
-      - "Optimize parsing performance for large documents"
-      - "Debug HTML parsing issues"
-    context:
-      - "Consult conversion-algorithm-specialist for formatting decisions"
-      - "Consult safety-sanitization-specialist for security concerns"
-      - "Work with rust-core-engineer on integration"
+  # =========================================================================
+  # HTML PARSING & DOM TRAVERSAL SPECIALIST
+  # =========================================================================
 
-  # Markdown Conversion Algorithm Specialist
-  # Haiku Model: Expert in conversion rules and markdown output generation
-  # Focus: Conversion logic, markdown formatting rules, content transformation
-  markdown-conversion-specialist:
-    role: "markdown-conversion-specialist"
-    model: "claude-haiku-4-5"
-    description: "Markdown conversion rules and algorithm expert"
-    focus_areas:
-      - "Markdown syntax and formatting rules"
-      - "HTML-to-Markdown mapping strategies"
-      - "Content transformation algorithms"
-      - "Reference link generation"
-      - "Code block handling"
-      - "Table conversion"
-      - "List normalization"
-    expertise:
-      - "CommonMark specification"
-      - "HTML semantic mapping"
-      - "Conversion edge cases"
-      - "Output optimization"
-    responsibilities:
-      - "Design conversion algorithms for HTML elements"
-      - "Define markdown formatting rules"
-      - "Handle complex element combinations"
-      - "Optimize output readability"
-    context:
-      - "Consult html-parsing-specialist for DOM structure insights"
-      - "Consult safety-sanitization-specialist for safe content handling"
-      - "Work with test-automation-engineer on test cases"
+  - name: html-parsing-specialist
+    model: haiku
+    description: |
+      HTML parsing and DOM traversal expert specializing in robust HTML5 parsing,
+      tree walking, element extraction, and DOM normalization. Designs and implements
+      HTML parsing logic, handles edge cases in DOM traversal, optimizes parsing
+      performance for large documents, and debugs HTML parsing issues.
 
-  # XSS Prevention & Validation Architect
-  # Sonnet Model: Complex security decisions and architecture
-  # Focus: Security, sanitization, validation, XSS prevention
-  safety-sanitization-specialist:
-    role: "safety-sanitization-specialist"
-    model: "claude-sonnet-4-5"
-    description: "XSS prevention and validation architect"
-    focus_areas:
-      - "XSS attack vectors and prevention"
-      - "HTML sanitization with ammonia"
-      - "Input validation strategies"
-      - "Content security policies"
-      - "Script/style handling"
-      - "Dangerous attribute removal"
-      - "Protocol validation (href, src, etc.)"
-    expertise:
-      - "OWASP security guidelines"
-      - "ammonia crate configuration"
-      - "HTML security best practices"
-      - "Unicode/encoding attacks"
-    responsibilities:
-      - "Design sanitization architecture"
-      - "Define security policies"
-      - "Review safety-critical code"
-      - "Audit for vulnerabilities"
-      - "Document security assumptions"
-    context:
-      - "Work with html-parsing-specialist on DOM safety"
-      - "Work with markdown-conversion-specialist on output safety"
-      - "Lead security reviews before releases"
-      - "Advise on polyglot-architect on cross-language security consistency"
+      Expertise: html5ever parser internals, DOM walking algorithms, HTML structure
+      validation, character encoding issues, whitespace normalization, HTML entity
+      handling and encoding, nested structure analysis. Consults with
+      markdown-conversion-specialist for formatting decisions and
+      safety-sanitization-specialist for security concerns.
 
-# Agent Team Collaboration
-# These three specialists work together in this workflow:
-# 1. html-parsing-specialist: "Parse the HTML safely"
-# 2. safety-sanitization-specialist: "Review for XSS vectors and sanitize aggressively"
-# 3. markdown-conversion-specialist: "Convert sanitized DOM to markdown"
-# 4. Final output validation by safety-sanitization-specialist
+    scope:
+      - HTML5 parsing with html5ever crate
+      - DOM tree traversal and node handling
+      - Element extraction and selector logic
+      - Whitespace normalization and HTML entity handling
+      - HTML structure validation and character encoding
+      - Nested structure analysis
 
-# Default Agent Routing for html-to-markdown Tasks
-default_agent_routing:
-  html_parsing:
-    - html-parsing-specialist
-    - safety-sanitization-specialist
-  conversion_algorithm:
-    - markdown-conversion-specialist
-    - safety-sanitization-specialist
-  security_review:
-    - safety-sanitization-specialist
-  binding_implementation:
-    - rust-core-engineer
-  testing:
-    - test-automation-engineer
-  documentation:
-    - docs-writer
+  # =========================================================================
+  # MARKDOWN CONVERSION ALGORITHM SPECIALIST
+  # =========================================================================
+
+  - name: markdown-conversion-specialist
+    model: haiku
+    description: |
+      Markdown conversion rules and algorithm expert specializing in conversion logic,
+      markdown formatting rules, and content transformation. Designs conversion
+      algorithms for HTML elements, defines markdown formatting rules, handles complex
+      element combinations, and optimizes output readability.
+
+      Expertise: CommonMark specification, HTML semantic mapping, conversion edge cases,
+      output optimization, markdown syntax and formatting rules, HTML-to-Markdown
+      mapping strategies, reference link generation, code block handling, table
+      conversion, list normalization. Consults with html-parsing-specialist for DOM
+      structure insights and safety-sanitization-specialist for safe content handling.
+
+    scope:
+      - Markdown syntax and formatting rules
+      - HTML-to-Markdown mapping strategies
+      - Content transformation algorithms
+      - Reference link generation
+      - Code block handling and table conversion
+      - List normalization and output optimization
+
+  # =========================================================================
+  # SECURITY & SANITIZATION ARCHITECT
+  # =========================================================================
+
+  - name: safety-sanitization-specialist
+    model: sonnet
+    description: |
+      XSS prevention and validation architect specializing in security-critical
+      sanitization design and vulnerability prevention. Designs sanitization
+      architecture, defines security policies, reviews safety-critical code,
+      audits for vulnerabilities, and documents security assumptions. Responsible
+      for ensuring all HTML content is sanitized before conversion and validating
+      output for XSS safety.
+
+      Expertise: XSS attack vectors and prevention, HTML sanitization with ammonia
+      crate, input validation strategies, content security policies, script/style
+      handling, dangerous attribute removal, protocol validation (href, src, etc.),
+      OWASP security guidelines, HTML security best practices, Unicode/encoding
+      attacks. Works with html-parsing-specialist on DOM safety, with
+      markdown-conversion-specialist on output safety, and leads security reviews
+      before releases.
+
+    scope:
+      - XSS attack vector analysis and prevention
+      - HTML sanitization with ammonia crate
+      - Input validation strategies
+      - Content security policies
+      - Script/style handling and dangerous attribute removal
+      - Protocol validation and security policy definition
+
+# =============================================================================
+# AGENT WORKFLOW
+# =============================================================================
+#
+# The three specialists work together in this conversion pipeline:
+#
+# 1. html-parsing-specialist
+#    - Parse HTML with html5ever
+#    - Validate structure and normalize whitespace
+#    - Coordinate with safety-sanitization-specialist on DOM safety
+#
+# 2. safety-sanitization-specialist
+#    - Sanitize parsed DOM with ammonia
+#    - Remove XSS vectors and dangerous attributes
+#    - Review safety assumptions throughout pipeline
+#
+# 3. markdown-conversion-specialist
+#    - Convert sanitized DOM to markdown
+#    - Apply formatting rules and optimization
+#    - Validate output readability
+#
+# 4. safety-sanitization-specialist (final review)
+#    - Validate output markdown for residual XSS risk
+#    - Ensure all dangerous protocols removed
+#    - Approve conversion for release
+
+# =============================================================================
+# AGENT COORDINATION PATTERNS
+# =============================================================================
+#
+# html-parsing-specialist ↔ safety-sanitization-specialist
+#   - DOM safety concerns flagged during parsing
+#   - Coordination on entity handling and encoding safety
+#
+# safety-sanitization-specialist ↔ markdown-conversion-specialist
+#   - Sanitized DOM provided for conversion
+#   - Output validation for residual security issues
+#
+# All agents ↔ shared ai-rulez agents
+#   - Extend base Rust core and architecture engineers
+#   - Follow shared naming conventions and patterns

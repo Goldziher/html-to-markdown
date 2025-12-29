@@ -83,11 +83,11 @@ agents:
       - Decode HTML entities correctly
       - Handle special characters and encodings
       - Normalize whitespace per configuration
-    patterns:
-      - Preserve mode: Keep all whitespace as-is
-      - Minimal mode: Trim leading/trailing, normalize internal
-      - Collapse mode: HTML5-style whitespace collapsing
-      - Entity decoding: &nbsp; &#123; etc.
+    patterns: |
+      - Preserve mode keeps all whitespace as-is
+      - Minimal mode trims and normalizes internal spacing
+      - Collapse mode applies HTML5-style whitespace rules
+      - Entity decoding handles named and numeric entities
 
   # Attribute Access
   - name: attribute-accessor

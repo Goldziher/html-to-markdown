@@ -8,12 +8,12 @@ skills:
       - Setext style (underline)
       - HeadingStyle configuration
       - Content preservation
-    step_by_step:
-      1. Extract heading level (h1=1, h2=2, etc.)
+    step_by_step: |
+      1. Extract heading level from h1, h2, etc.
       2. Extract heading text content
-      3. Check HeadingStyle option:
-         - ATX: Generate "# h1" or "## h2" etc.
-         - Setext: Generate "h1\n==\n==" for h1, "h2\n--\n--" for h2
+      3. Check HeadingStyle option
+         a. ATX mode generates # h1 or ## h2 etc.
+         b. Setext mode generates underlines for h1 and h2
       4. Preserve inline formatting (bold, italic, links)
       5. Add blank line after heading
     skills_involved:
@@ -31,12 +31,12 @@ skills:
       - Inline formatting preservation
       - Blank line separation
       - Whitespace handling
-    step_by_step:
+    step_by_step: |
       1. Extract paragraph content
-      2. Process inline formatting:
-         - Bold: <strong> → **text**
-         - Italic: <em> → *text*
-         - Links: <a> → [text](href)
+      2. Process inline formatting
+         - Bold: convert strong tags to **text**
+         - Italic: convert em tags to *text*
+         - Links: convert a tags to [text](href)
       3. Handle line breaks within paragraph
       4. Trim excessive whitespace
       5. Add blank line after paragraph
@@ -55,18 +55,18 @@ skills:
       - List item processing
       - Nesting and indentation
       - Tight vs loose detection
-    step_by_step:
+    step_by_step: |
       1. Identify list type (ul or ol)
-      2. Process each list item:
+      2. Process each list item
          a. Extract item content
          b. Process nested lists recursively
       3. Determine indentation level
-      4. Choose bullet/number style:
-         - ul: "-" or "*" or "+" per option
-         - ol: "1." "2." etc.
-      5. Detect tight/loose list:
-         - Tight: No blank lines between items
-         - Loose: Blank lines between items
+      4. Choose bullet/number style
+         - ul uses -, *, or + per option
+         - ol uses 1., 2., etc.
+      5. Detect tight/loose list formatting
+         - Tight means no blank lines between items
+         - Loose means blank lines between items
       6. Format output with proper indentation
     skills_involved:
       - recursion-handling
@@ -83,22 +83,22 @@ skills:
       - Cell content and alignment
       - GFM pipe format
       - Header detection
-    step_by_step:
-      1. Extract table structure:
-         - Headers from <thead> or <th> elements
-         - Data from <tbody> or <td> elements
-      2. Collect column alignments:
+    step_by_step: |
+      1. Extract table structure
+         - Headers from thead or th elements
+         - Data from tbody or td elements
+      2. Collect column alignments
          - Extract from align attribute or CSS
-         - Map: left, center, right
-      3. Generate header row: "| h1 | h2 | h3 |"
-      4. Generate separator: "|---|:-:|---|"
-         - ---|  for left
-         - :-:|  for center
-         - --:|  for right
+         - Map to left, center, or right
+      3. Generate header row with pipes and content
+      4. Generate separator row with dashes and colons
+         - dashes only for left alignment
+         - dashes with colons for center
+         - dashes with right colon for right
       5. Generate data rows with proper escaping
-      6. Handle edge cases:
-         - Missing cells: fill with empty
-         - Pipe in content: escape with \|
+      6. Handle edge cases
+         - Missing cells are filled with empty space
+         - Pipe in content is escaped with backslash
     skills_involved:
       - table-structure-analysis
       - alignment-detection
@@ -119,11 +119,11 @@ skills:
       2. Sanitize URL with sanitize_url()
       3. Extract link text
       4. Check for title attribute
-      5. Format: "[text](href)" or "[text](href \"title\")"
-      6. Handle edge cases:
-         - No href: treat as plain text
-         - No text: use href as text
-         - Fragment URLs: preserve #anchor
+      5. Format as [text] with href in parentheses
+      6. Handle edge cases
+         - No href means treat as plain text
+         - No text means use href as text
+         - Fragment URLs preserve anchor
     skills_involved:
       - url-extraction
       - url-sanitization
@@ -139,13 +139,13 @@ skills:
       - alt text handling
       - Responsive images (srcset)
       - Title attribute
-    step_by_step:
+    step_by_step: |
       1. Extract src attribute
       2. Sanitize URL
-      3. Extract alt text (or filename if no alt)
+      3. Extract alt text or use filename if no alt
       4. Check for title attribute
-      5. Format: "![alt](src)" or "![alt](src \"title\")"
-      6. Handle responsive:
+      5. Format as ![alt] with src in parentheses
+      6. Handle responsive images
          - Check srcset attribute
          - Use best-fit source
       7. Handle data URIs if configured
@@ -166,13 +166,13 @@ skills:
       - Nested emphasis
       - Escaping rules
     step_by_step:
-      1. For <strong>, <b>: wrap with "**" on both sides
-      2. For <em>, <i>: wrap with "*" on both sides
-      3. For <del>, <s>: wrap with "~~" on both sides
-      4. For nested emphasis (e.g., bold+italic):
+      1. For strong tags wrap with double asterisks
+      2. For em tags wrap with single asterisk
+      3. For del/s tags wrap with double tildes
+      4. For nested emphasis (bold and italic together)
          a. Detect combination
-         b. Use "***" for bold+italic
-      5. Avoid double-escaping (not "****text****")
+         b. Use triple asterisks
+      5. Avoid double-escaping with too many marks
       6. Preserve content without interpretation
     skills_involved:
       - emphasis-detection
@@ -189,16 +189,16 @@ skills:
       - Content preservation
       - Nested code handling
       - Escape rules
-    step_by_step:
+    step_by_step: |
       1. Extract code content
-      2. Determine backtick count needed:
-         - No backticks in content: use single `
-         - Backticks present: use double `` or more
-      3. Wrap: "`code`" or "``code``"
-      4. Preserve content exactly (no interpretation)
-      5. Handle edge cases:
+      2. Determine backtick count needed
+         - No backticks in content means use single backtick
+         - Backticks present means use double or more
+      3. Wrap code with appropriate backtick count
+      4. Preserve content exactly without interpretation
+      5. Handle edge cases
          - Code with backticks
-         - Code with special chars
+         - Code with special characters
          - Code with entity references
     skills_involved:
       - content-preservation
@@ -215,15 +215,15 @@ skills:
       - Escape rules
       - Context-aware escaping
       - Double-escape prevention
-    step_by_step:
-      1. Identify Markdown metacharacters:
-         \ * _ ` [ ] ( ) # + - . ! | > ~ =
-      2. For each metachar, check if escape needed:
-         - Before Markdown syntax: escape
-         - In code block: no escape
-         - In link text: escape
-      3. Escape with backslash: "\*" for literal "*"
-      4. Verify no double-escaping (no "\\\\*")
+    step_by_step: |
+      1. Identify Markdown metacharacters
+         backslash, asterisk, underscore, backtick, brackets, parens, hash, plus, minus, dot, exclamation, pipe, greater-than, tilde, equals
+      2. For each metachar, check if escape needed
+         - Before Markdown syntax means escape
+         - In code block means no escape
+         - In link text means escape
+      3. Escape with backslash for literal characters
+      4. Verify no double-escaping occurs
       5. Preserve content accuracy
     skills_involved:
       - character-identification
@@ -240,20 +240,20 @@ skills:
       - Numeric entities (&#123;, &#x7B;)
       - Partial entity handling
       - Preservation of decoded text
-    step_by_step:
-      1. Identify HTML entities:
-         - Named: &name;
-         - Decimal: &#123;
-         - Hex: &#x7B;
-      2. Decode each entity:
-         - &nbsp; → " " (non-breaking space)
-         - &lt; → "<"
-         - &gt; → ">"
-         - &amp; → "&"
-         - &#123; → "{"
-      3. Handle partial entities:
-         - "& nbsp" → "& nbsp" (preserve)
-         - "&123" → "&123" (preserve)
+    step_by_step: |
+      1. Identify HTML entities
+         - Named entities like &name;
+         - Decimal entities like &#123;
+         - Hex entities like &#x7B;
+      2. Decode each entity
+         - &nbsp; becomes a space (non-breaking space)
+         - &lt; becomes <
+         - &gt; becomes >
+         - &amp; becomes &
+         - &#123; becomes {
+      3. Handle partial entities
+         - Preserve incomplete entities like & nbsp
+         - Preserve invalid entities like &123
       4. Don't re-encode after decoding
     skills_involved:
       - entity-recognition
@@ -269,17 +269,17 @@ skills:
       - Preserve mode (identity)
       - Minimal mode (trim, normalize internal)
       - Collapse mode (HTML5 rules)
-    step_by_step:
+    step_by_step: |
       1. Get WhitespaceMode from options
-      2. Apply based on mode:
-         - Preserve: no change
-         - Minimal: text.trim() + normalize_internal()
-         - Collapse: apply HTML5 rules
-      3. HTML5 collapse:
-         a. Replace \n + whitespace with space
+      2. Apply based on mode
+         - Preserve means no change
+         - Minimal means trim and normalize
+         - Collapse means apply HTML5 rules
+      3. HTML5 collapse logic
+         a. Replace newline and whitespace with space
          b. Collapse multiple spaces to one
-         c. Remove leading/trailing (context-dependent)
-      4. Preserve line breaks from <br>
+         c. Remove leading and trailing as context-dependent
+      4. Preserve line breaks from br tags
     skills_involved:
       - string-manipulation
       - mode-selection
@@ -295,13 +295,13 @@ skills:
       - Nesting support
       - Content preservation
       - Line-by-line formatting
-    step_by_step:
+    step_by_step: |
       1. Extract blockquote content
       2. Split by lines
-      3. For each line, prefix with "> "
-      4. For nested blockquotes: ">> ", ">>> " etc.
+      3. For each line, prefix with greater-than and space
+      4. For nested blockquotes add multiple greater-than markers
       5. Preserve blank lines within blockquote
-      6. Handle multi-line content (multiple paragraphs)
+      6. Handle multi-line content with multiple paragraphs
     skills_involved:
       - line-processing
       - nesting-management
@@ -317,14 +317,14 @@ skills:
       - Checked state extraction
       - Task list format ([ ] vs [x])
       - Item content processing
-    step_by_step:
-      1. For each <li>, check for <input type="checkbox">
-      2. If found:
+    step_by_step: |
+      1. For each li element, check for input checkbox
+      2. If found
          a. Extract checked attribute
-         b. Format as "- [ ] text" (unchecked)
-         c. Format as "- [x] text" (checked)
+         b. Format as - [ ] text for unchecked
+         c. Format as - [x] text for checked
       3. Process list item content normally
-      4. Handle mixed task/regular lists
+      4. Handle mixed task and regular lists
     skills_involved:
       - element-detection
       - attribute-extraction
@@ -339,15 +339,15 @@ skills:
       - Semantic elements (article, section, nav, aside)
       - Conversion strategy (heading vs section marker)
       - Content preservation
-    step_by_step:
+    step_by_step: |
       1. Identify semantic element type
-      2. Choose conversion strategy:
-         - <article> → Optional heading or section
-         - <section> → Optional heading or section
-         - <nav> → Labeled list or section
-         - <aside> → Blockquote or indented section
-         - <header> → Optional heading
-         - <footer> → Optional separator
+      2. Choose conversion strategy
+         - article elements convert to optional heading or section
+         - section elements convert to optional heading or section
+         - nav elements convert to labeled list or section
+         - aside elements convert to blockquote or indented section
+         - header elements convert to optional heading
+         - footer elements convert to optional separator
       3. Apply strategy based on content
       4. Preserve all content
     skills_involved:
@@ -365,16 +365,16 @@ skills:
       - Label association
       - Fallback formats
     step_by_step:
-      1. Identify input type:
-         - text: code block or [Input: label]
-         - checkbox: task list
-         - radio: list item with marker
-         - hidden: skip entirely
-      2. Extract label from <label> or associated text
-      3. Convert based on type:
-         - Text: code block with label
-         - Checkbox: task list
-         - Select: list of options with selected marked
+      1. Identify input type
+         - text becomes code block or input notation
+         - checkbox becomes task list
+         - radio becomes list item with marker
+         - hidden is skipped entirely
+      2. Extract label from label element or associated text
+      3. Convert based on type
+         - Text inputs become code block with label
+         - Checkbox inputs become task list
+         - Select becomes list of options with selection marked
       4. Preserve field structure
     skills_involved:
       - input-type-detection
@@ -391,12 +391,12 @@ skills:
       - Language annotation
       - Whitespace preservation
       - Indentation style
-    step_by_step:
+    step_by_step: |
       1. Extract code content
       2. Check for language hint (class, data-lang)
-      3. Determine style: backticks or indentation
-      4. If backticks:
-         a. Use ``` fence
+      3. Determine style of backticks or indentation
+      4. If using backticks
+         a. Use fence marker
          b. Add language tag if available
          c. Content on next lines
       5. Preserve all whitespace exactly
@@ -415,14 +415,14 @@ skills:
       - Scheme validation
       - Dangerous URL detection
       - Safe URL formats
-    step_by_step:
-      1. Extract URL from href/src
-      2. Check for dangerous schemes:
-         - Block: javascript:, data:, vbscript:
-      3. Validate safe schemes:
-         - Allow: http, https, mailto, ftp, /, #
-      4. For relative URLs: pass through
-      5. For absolute URLs: validate scheme
+    step_by_step: |
+      1. Extract URL from href or src
+      2. Check for dangerous schemes
+         - Block javascript, data, vbscript
+      3. Validate safe schemes
+         - Allow http, https, mailto, ftp, /, #
+      4. For relative URLs pass through
+      5. For absolute URLs validate scheme
       6. Return sanitized URL or None
     skills_involved:
       - url-parsing
@@ -438,13 +438,13 @@ skills:
       - Valid Markdown syntax
       - Structure preservation
       - Roundtrip testing
-    step_by_step:
+    step_by_step: |
       1. Generate Markdown from HTML
       2. Parse with Markdown validator
       3. Check for syntax errors
       4. Verify structure (headings, lists, tables)
-      5. Round-trip: MD → HTML → MD
-      6. Compare original vs roundtrip
+      5. Round-trip test: Markdown to HTML to Markdown
+      6. Compare original vs roundtrip result
     skills_involved:
       - markdown-parsing
       - structure-analysis
