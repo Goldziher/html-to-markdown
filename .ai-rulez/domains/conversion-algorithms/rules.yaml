@@ -1,0 +1,365 @@
+rules:
+  # Block Element Conversion Rules
+  - name: Heading Conversion Accuracy
+    description: Convert headings to correct Markdown syntax
+    guidance: |
+      - Support both ATX (# style) and Setext (underline) formats
+      - Make heading style configurable via HeadingStyle option
+      - ATX: "# h1\n## h2\n### h3" etc.
+      - Setext: "h1\n==\nh2\n--" (preferred for h1, h2 only)
+      - Preserve heading content with inline formatting
+      - Test h1-h6 conversion
+      - Verify proper spacing around headings
+    enforcement: Heading conversion tests, format validation
+
+  - name: Paragraph Conversion Correctness
+    description: Convert paragraphs to Markdown paragraphs
+    guidance: |
+      - Convert <p> to text followed by blank line
+      - Preserve inline formatting within paragraphs
+      - Handle nested inline elements (bold, italic, links)
+      - Remove extra whitespace but preserve content
+      - Support multi-line paragraphs (from <br> within <p>)
+      - Handle paragraphs with only whitespace
+    enforcement: Paragraph tests, inline format tests
+
+  - name: List Item Nesting & Indentation
+    description: Preserve list structure and nesting depth
+    guidance: |
+      - Support ul, ol, and nested lists
+      - Implement configurable list indentation (spaces or tab)
+      - Indent nested lists relative to parent
+      - Tight vs. loose list detection
+      - Handle mixed list types (ul inside ol)
+      - Preserve list item content (including multiple paragraphs)
+      - Test 3+ levels of nesting
+    enforcement: List nesting tests, indentation tests
+
+  - name: Table Conversion Format
+    description: Convert tables to Markdown pipe format
+    guidance: |
+      - Use GFM pipe table format (|---|---|)
+      - Extract table headers from <thead> or <th> elements
+      - Map table data to rows and columns
+      - Preserve cell alignment (left, center, right)
+      - Escape pipe characters in cell content
+      - Handle missing cells (uneven rows)
+      - Support simple colspan/rowspan (split or merge)
+      - Provide fallback to list format for complex tables
+    enforcement: Table conversion tests, alignment tests
+
+  - name: Blockquote Conversion
+    description: Convert blockquotes to Markdown format
+    guidance: |
+      - Prefix each line with "> "
+      - Support nested blockquotes ("> > ")
+      - Preserve inline formatting within blockquotes
+      - Handle multi-paragraph blockquotes
+      - Blank lines within blockquotes preserved
+    enforcement: Blockquote tests, nesting tests
+
+  # Inline Element Conversion Rules
+  - name: Bold & Italic Conversion
+    description: Convert emphasis tags to Markdown
+    guidance: |
+      - Bold: <strong>, <b> → **text**
+      - Italic: <em>, <i> → *text*
+      - Support nested emphasis (e.g., bold+italic → ***text***)
+      - Avoid double-escaping (no "****text****")
+      - Preserve emphasis across element boundaries
+      - Test with various nesting patterns
+    enforcement: Emphasis conversion tests
+
+  - name: Inline Code Preservation
+    description: Preserve code content without interpretation
+    guidance: |
+      - Convert <code> to backtick-wrapped text
+      - Single backticks for inline code (use double/triple if needed)
+      - Never interpret or format code content
+      - Escape backticks in code if needed
+      - Preserve all whitespace in code
+      - Support <kbd>, <samp>, <var> as code variants
+    enforcement: Code preservation tests, escape tests
+
+  - name: Strikethrough Conversion
+    description: Convert deleted text to strikethrough
+    guidance: |
+      - Support <s>, <strike>, <del> tags
+      - Convert to ~~text~~ (GFM strikethrough)
+      - Preserve content exactly
+      - Test with inline formatting within strikethrough
+    enforcement: Strikethrough tests
+
+  - name: Link Conversion Format
+    description: Convert links to Markdown [text](url) format
+    guidance: |
+      - Extract href and convert to [text](href)
+      - Preserve link text with inline formatting
+      - Optional: Include title attribute as "title"
+      - Sanitize URLs to prevent XSS (use sanitize_url())
+      - Handle fragment URLs (#anchor)
+      - Fallback to URL if no text
+      - Support reference-style links if configured
+      - Test with various URL schemes (http, https, mailto, #)
+    enforcement: Link conversion tests, URL sanitization tests
+
+  - name: Image Conversion Format
+    description: Convert images to Markdown ![alt](src) format
+    guidance: |
+      - Extract src and alt text, convert to ![alt](src)
+      - Preserve alt text exactly
+      - Optional: Include title attribute
+      - Handle responsive images (srcset attribute)
+      - Fallback for images without alt (use filename)
+      - Sanitize image URLs
+      - Support data URIs if configured (inline-images feature)
+      - Test with various image formats
+    enforcement: Image conversion tests, alt text tests
+
+  # Text Handling Rules
+  - name: Markdown Escaping
+    description: Escape Markdown metacharacters in text
+    guidance: |
+      - Escape characters: \ * _ ` [ ] ( ) # + - . ! | > ~
+      - Escape only when necessary (before Markdown syntax)
+      - Don't escape within code blocks
+      - Handle edge cases (double escaping)
+      - Preserve content accuracy after escaping
+      - Test with URLs, code, special chars
+    enforcement: Escaping tests, content accuracy tests
+
+  - name: Entity Decoding
+    description: Decode HTML entities in text content
+    guidance: |
+      - Decode named entities: &nbsp; &lt; &gt; &amp; etc.
+      - Decode numeric entities: &#123; &#x7B; etc.
+      - Handle partial entities gracefully
+      - Preserve decoded content in output
+      - Don't re-encode after decoding
+    enforcement: Entity decoding tests
+
+  - name: Whitespace Normalization
+    description: Normalize whitespace per configuration
+    guidance: |
+      - Preserve mode: Keep all whitespace as-is
+      - Minimal mode: Remove leading/trailing, keep internal
+      - Collapse mode: Collapse multiple spaces to single space
+      - Preserve line breaks from <br> tags
+      - Handle tabs, newlines, spaces consistently
+      - Test each mode thoroughly
+    enforcement: Whitespace mode tests
+
+  # Complex Element Conversion Rules
+  - name: Task List Detection & Conversion
+    description: Detect and convert task list items
+    guidance: |
+      - Detect <input type="checkbox"> in <li>
+      - Convert to "- [ ] text" (unchecked)
+      - Convert to "- [x] text" (checked)
+      - Preserve task item content
+      - Test with mixed task/regular lists
+    enforcement: Task list tests
+
+  - name: Semantic HTML5 Handling
+    description: Convert semantic elements to readable Markdown
+    guidance: |
+      - <article> → optional heading or section marker
+      - <section> → optional heading or section marker
+      - <nav> → labeled section or list
+      - <aside> → blockquote or indented section
+      - <header> → optional heading
+      - <footer> → optional separator or footer marker
+      - Preserve content while converting structure
+      - Make semantic conversion configurable
+    enforcement: Semantic element tests
+
+  - name: Form Element Conversion
+    description: Handle form elements in conversion
+    guidance: |
+      - <input type="text"> → code block or [Input: label]
+      - Checkboxes → task list or [x] notation
+      - <textarea> → code block with explicit label
+      - <select> → list of options with selected marked
+      - <button> → [Button: label] notation
+      - <label> → associate with input
+      - <fieldset> → labeled section
+    enforcement: Form element tests
+
+  - name: Media Element Handling
+    description: Convert audio, video, and embedded content
+    guidance: |
+      - <audio> → [Audio: filename] notation or link
+      - <video> → [Video: filename] notation or link
+      - <iframe> → [Embedded: src] notation or link
+      - <embed>, <object> → [Embedded: type] or skip
+      - Preserve src URLs
+      - Extract and include descriptions
+    enforcement: Media element tests
+
+  - name: Line Break Conversion
+    description: Convert <br> to Markdown line breaks
+    guidance: |
+      - Support two spaces + newline (  \n)
+      - Support backslash newline (\\\n)
+      - Make style configurable via NewlineStyle option
+      - Test with multiple <br> in sequence
+      - Handle <br> at start/end of block elements
+    enforcement: Line break tests
+
+  # Table-Specific Rules
+  - name: Cell Alignment Preservation
+    description: Preserve table cell alignment in Markdown
+    guidance: |
+      - Detect align attribute (left, center, right)
+      - Detect CSS text-align property
+      - Convert to Markdown alignment markers:
+        - Left: |---|
+        - Center: |:-:|
+        - Right: |-:|
+      - Default to left if not specified
+      - Test with mixed alignments
+    enforcement: Alignment tests
+
+  - name: Complex Table Handling
+    description: Handle advanced table features
+    guidance: |
+      - Rowspan/colspan: Split into multiple cells or merge content
+      - Nested tables: Convert to alternatives (list or separate tables)
+      - Missing cells: Fill with empty cells to maintain alignment
+      - Captions: Extract as text before table
+      - Colgroup/col: Ignore (Markdown doesn't support)
+      - Table scope: Preserve in cell content if needed
+    enforcement: Complex table tests
+
+  # Performance & Output Quality Rules
+  - name: Consistent Output Format
+    description: Generate consistent, readable Markdown
+    guidance: |
+      - Standardize spacing (blank lines between blocks)
+      - Consistent indentation for lists/blockquotes
+      - Consistent link/image format
+      - Avoid unnecessary escaping
+      - Format output for readability
+      - Test consistency across documents
+    enforcement: Format consistency tests
+
+  - name: Performance Optimization
+    description: Maintain fast conversion speed
+    guidance: |
+      - Target <1ms per 1000 elements
+      - Profile hot paths (list/table conversion)
+      - Use string builders/buffers (not repeated concatenation)
+      - Cache frequently converted structures
+      - Benchmark with large documents
+      - Document performance characteristics
+    enforcement: Performance benchmarks
+
+  - name: Markdown Validation
+    description: Ensure generated Markdown is valid
+    guidance: |
+      - Validate Markdown syntax
+      - No unclosed formatting (bold, italic, code)
+      - Proper table structure
+      - Valid list syntax
+      - Valid link/image syntax
+      - Test with Markdown validators
+    enforcement: Markdown validation tests
+
+  # Visitor Pattern Integration Rules
+  - name: Visitor Method Coverage
+    description: Implement visitor methods for all elements
+    guidance: |
+      - Visitor trait covers 60+ HTML element types
+      - Each element has visit_* method
+      - Support both pre and post hooks (visit/leave)
+      - Return VisitResult enum (Process, Skip, Custom)
+      - Maintain proper depth tracking
+      - Allow element modification via visitor
+    enforcement: Visitor coverage tests
+
+  - name: Default Visitor Behavior
+    description: Define sensible default conversions
+    guidance: |
+      - Default converter for each element type
+      - Fallback handling (unknown elements)
+      - Skip dangerous elements (script, style)
+      - Process content of unknown elements
+      - Allow visitor overrides for all defaults
+    enforcement: Default behavior tests
+
+  # Configuration & Customization Rules
+  - name: Conversion Options Support
+    description: Expose configuration for conversion behavior
+    guidance: |
+      - HeadingStyle: ATX vs Setext
+      - ListIndentType: Spaces vs Tab
+      - CodeBlockStyle: Backticks vs Indent
+      - NewlineStyle: TwoSpaces vs Backslash
+      - TableFormat: GFM vs alternatives
+      - AllowOptions should be builder pattern
+      - Validate option values
+    enforcement: Configuration tests, option validation
+
+  - name: Custom Converter Support
+    description: Allow custom conversion via visitor pattern
+    guidance: |
+      - Users can implement HtmlVisitor trait
+      - Override specific element conversions
+      - Access full element context (attributes, position)
+      - Return custom Markdown for elements
+      - Compose visitors for complex customization
+      - Document visitor pattern with examples
+    enforcement: Visitor pattern tests, examples
+
+  # Edge Case Handling Rules
+  - name: Empty Elements Handling
+    description: Gracefully handle empty elements
+    guidance: |
+      - Empty paragraphs: Skip or render as blank line
+      - Empty lists: Skip or render with placeholder
+      - Empty tables: Skip or render structure
+      - Empty divs: Skip or preserve nesting
+      - Empty links: Fallback behavior (URL only or skip)
+      - Test empty element handling
+    enforcement: Empty element tests
+
+  - name: Deeply Nested Elements
+    description: Handle extreme nesting gracefully
+    guidance: |
+      - Support 3+ levels of nesting
+      - Proper indentation at each level
+      - Maintain correct structure with deep nesting
+      - Test with 10+ levels of nesting
+    enforcement: Deep nesting tests, stress tests
+
+  # Testing & Validation Rules
+  - name: Conversion Test Coverage
+    description: Comprehensive conversion testing
+    guidance: |
+      - Unit tests for each converter function
+      - Integration tests with real HTML samples
+      - Round-trip tests (HTML → MD → HTML)
+      - Edge case tests (empty, deeply nested, etc.)
+      - Performance tests with large documents
+      - Output validation (valid Markdown)
+    enforcement: Test suite requirements
+
+  - name: Output Validation
+    description: Validate generated Markdown
+    guidance: |
+      - Parse generated Markdown with valid parser
+      - Verify structure preservation
+      - Check for valid syntax
+      - Test with Markdown validators
+      - Benchmark output quality
+    enforcement: Markdown validation tests
+
+  - name: Regression Testing
+    description: Prevent output degradation
+    guidance: |
+      - Maintain test suite of known conversions
+      - Run on every change
+      - Document expected output format
+      - Alert on any output changes
+      - Update tests for intentional changes
+    enforcement: Regression test suite

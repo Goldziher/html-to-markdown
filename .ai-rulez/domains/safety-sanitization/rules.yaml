@@ -1,0 +1,472 @@
+rules:
+  # Input Validation Rules
+  - name: Binary Data Detection
+    description: Reject binary and non-UTF-8 input
+    guidance: |
+      - Check for magic number prefixes (gzip, zstd, ZIP, PDF)
+      - Scan first 8KB for binary indicators
+      - Detect UTF-16 via null byte patterns (>20% threshold)
+      - Calculate control character ratio (>30% threshold)
+      - Verify valid UTF-8 byte sequences
+      - Return clear error messages indicating detected format
+      - Never attempt to parse binary data
+    enforcement: Binary detection tests, magic number coverage
+
+  - name: Size Limit Enforcement
+    description: Prevent unbounded memory allocation
+    guidance: |
+      - Enforce maximum document size (default 50MB)
+      - Enforce maximum nesting depth (default 256 levels)
+      - Enforce maximum output size (default 100MB)
+      - Check limits before parsing
+      - Return error if limits exceeded
+      - Make limits configurable via SafetyConfig
+      - Include limits in error messages
+    enforcement: Size limit tests, memory profiling
+
+  - name: Character Encoding Detection
+    description: Handle multiple character encodings safely
+    guidance: |
+      - Detect encoding from HTML5 charset meta tag
+      - Check for BOM markers (UTF-8, UTF-16, UTF-32)
+      - Use encoding_rs for robust detection
+      - Convert to UTF-8 before parsing
+      - Validate encoding is supported
+      - Fall back to UTF-8 if detection fails
+      - Reject invalid UTF-8 sequences
+    enforcement: Encoding detection tests, conversion tests
+
+  - name: Input Validation Pipeline
+    description: Comprehensive input validation before parsing
+    guidance: |
+      - Implement validate_input() function
+      - Check binary data first
+      - Check size limits
+      - Check encoding validity
+      - Return early on first validation failure
+      - Provide specific error for each failure type
+      - Log validation events for security audit
+    enforcement: Validation pipeline tests
+
+  # HTML Sanitization Rules
+  - name: Ammonia Integration
+    description: Use ammonia for production-grade sanitization
+    guidance: |
+      - Add ammonia as direct dependency
+      - Configure element whitelist (allowed tags)
+      - Configure attribute whitelist (allowed attributes)
+      - Enable URL scheme validation
+      - Set link rel to "noopener noreferrer"
+      - Make sanitization configurable (default: enabled)
+      - Test with OWASP XSS Filter Evasion examples
+    enforcement: Sanitization tests, XSS payload tests
+
+  - name: Element Whitelisting
+    description: Only allow safe HTML elements
+    guidance: |
+      - Always remove: script, style, iframe, object, embed, applet, form
+      - Always remove: meta, link, base, input, button, textarea, select
+      - Safe block elements: p, div, h1-h6, ul, ol, li, blockquote, pre, hr
+      - Safe inline elements: span, strong, em, b, i, code, a, img, br
+      - Safe table elements: table, tr, td, th, thead, tbody, tfoot, caption
+      - Safe semantic: article, section, nav, aside, header, footer
+      - Remove unknown/custom elements
+      - Preserve text content when removing elements
+    enforcement: Element whitelist tests
+
+  - name: Attribute Whitelisting
+    description: Only allow safe attributes on elements
+    guidance: |
+      - Whitelist global attributes: id, class, title, lang, dir, data-*
+      - Whitelist element-specific: href (links), src (images), alt
+      - Whitelist formatting: colspan, rowspan, align (tables)
+      - Remove all event handlers: on*, javascript:
+      - Remove dangerous attributes: style (if configured), srcdoc, action, formaction
+      - Remove URL-based attributes on unsafe elements
+      - Validate attribute values after whitelisting
+    enforcement: Attribute whitelist tests
+
+  - name: Event Handler Removal
+    description: Remove all JavaScript event handlers
+    guidance: |
+      - Remove all attributes matching /^on.*/i
+      - Remove onclick, onload, onerror, onmouseover, etc.
+      - Check both HTML and SVG event handlers
+      - Verify removal in sanitized output
+      - Test with encoded event handlers (if applicable)
+    enforcement: Event handler tests
+
+  - name: Style Attribute Handling
+    description: Sanitize or remove inline styles safely
+    guidance: |
+      - Option 1: Remove style attribute entirely (safest)
+      - Option 2: Sanitize CSS (remove expression, behavior, javascript:)
+      - Option 3: Preserve safe styles only (color, font, text-align)
+      - Make strategy configurable via SafetyConfig
+      - Validate CSS properties if preserving
+      - Test with CSS injection payloads
+      - Default to removal for maximum safety
+    enforcement: Style sanitization tests
+
+  # URL Sanitization Rules
+  - name: URL Scheme Validation
+    description: Validate URLs before including in output
+    guidance: |
+      - Implement sanitize_url(url, whitelist) function
+      - Whitelist safe schemes: http, https, mailto, ftp, tel, sms, geo
+      - Block dangerous schemes: javascript, data, vbscript, file
+      - Support relative URLs (/, ./, ../, #)
+      - Decode URL-encoded payloads and validate
+      - Handle case-insensitive scheme names
+      - Return None for invalid URLs
+    enforcement: URL sanitization tests
+
+  - name: JavaScript URL Detection
+    description: Detect and block javascript: URLs
+    guidance: |
+      - Check for "javascript:" prefix (case-insensitive)
+      - Detect URL-encoded javascript: (%6a%61%76%61...)
+      - Detect whitespace variations (javascript : , javascript\t:)
+      - Return None if detected
+      - Test with OWASP URL evasion examples
+    enforcement: JavaScript URL tests
+
+  - name: Data URI Handling
+    description: Handle data: URIs safely
+    guidance: |
+      - Option 1: Block all data: URIs (safest)
+      - Option 2: Allow only safe MIME types (image/*, text/plain)
+      - Option 3: Validate base64 encoding
+      - Make strategy configurable
+      - Detect data: URIs with malicious content (javascript)
+      - Default to blocking for security
+    enforcement: Data URI tests
+
+  - name: URL Validation Completeness
+    description: Validate all URL attributes
+    guidance: |
+      - Validate href in links, form actions
+      - Validate src in images, iframes, scripts
+      - Validate srcset in responsive images
+      - Validate xlink:href in SVG
+      - Validate all user-controlled URLs
+      - Apply same whitelist to all URLs
+    enforcement: URL validation coverage tests
+
+  # XSS Prevention Rules
+  - name: XSS Attack Vector Mitigation
+    description: Prevent common XSS attack patterns
+    guidance: |
+      - Stored XSS: Sanitize input via ammonia
+      - Reflected XSS: Don't trust URL parameters
+      - DOM XSS: Markdown output cannot execute scripts
+      - CSS Injection: Validate/remove inline styles
+      - Test against OWASP XSS Prevention Cheat Sheet
+      - Test against HTML5 Security Cheat Sheet
+    enforcement: XSS payload tests
+
+  - name: Event Handler Prevention
+    description: Block JavaScript execution via event handlers
+    guidance: |
+      - Remove all on* attributes
+      - Prevent SVG onload handlers
+      - Prevent image onerror handlers
+      - Prevent style event binding
+      - Verify removal in test suite
+    enforcement: Event handler prevention tests
+
+  - name: Markdown-Level Security
+    description: Ensure Markdown output is inherently safe
+    guidance: |
+      - Markdown output cannot contain executable code
+      - Links in Markdown use standard [text](url) format
+      - Code blocks preserve literal text (no interpretation)
+      - Prevent Markdown escaping bypass
+      - Verify output cannot be exploited
+    enforcement: Output security tests
+
+  # SVG & Vector Graphics Rules
+  - name: SVG Script Prevention
+    description: Remove executable content from SVG
+    guidance: |
+      - Remove <script> tags within SVG
+      - Remove <style> with JavaScript bindings
+      - Remove event handler attributes (onload, onclick, etc.)
+      - Remove animation with malicious behavior
+      - Make SVG handling configurable (preserve, sanitize, or strip)
+      - Test SVG XSS payloads
+    enforcement: SVG XSS tests
+
+  - name: SVG URL Validation
+    description: Validate URLs within SVG content
+    guidance: |
+      - Validate xlink:href attributes
+      - Validate href in SVG elements
+      - Validate image src in SVG
+      - Apply same URL whitelist as HTML
+      - Block javascript: and data: URLs
+    enforcement: SVG URL validation tests
+
+  - name: SVG Conversion Strategy
+    description: Define how SVG is handled in conversion
+    guidance: |
+      - Option 1: Extract text content from SVG
+      - Option 2: Use alt text or title attribute
+      - Option 3: Replace with [SVG: description] notation
+      - Option 4: Strip SVG entirely (configurable)
+      - Make strategy configurable via SafetyConfig
+      - Preserve content when extracting
+      - Test with complex SVG
+    enforcement: SVG conversion tests
+
+  # Form Element Safety Rules
+  - name: Form Submission Prevention
+    description: Remove or neutralize form elements
+    guidance: |
+      - Remove <form> elements entirely
+      - Remove formaction attributes
+      - Remove form event handlers
+      - Convert <input> and <textarea> to code blocks
+      - Remove submit/reset buttons
+      - Don't preserve form action URLs
+    enforcement: Form removal tests
+
+  - name: Hidden Input Handling
+    description: Handle hidden form fields safely
+    guidance: |
+      - Remove <input type="hidden">
+      - Don't expose hidden field values
+      - Don't include hidden fields in output
+      - Log if hidden fields detected (security audit)
+    enforcement: Hidden input tests
+
+  # Metadata & Structured Data Rules
+  - name: Meta Tag Removal
+    description: Remove metadata that could expose information
+    guidance: |
+      - Remove all <meta> tags by default
+      - Remove <meta http-equiv> (potential security bypass)
+      - Remove <meta name> (could leak information)
+      - Allow safe OG/Twitter card metadata if configured
+      - Don't preserve referrer, robots, tracking metadata
+    enforcement: Meta tag removal tests
+
+  - name: Structured Data Handling
+    description: Handle JSON-LD and Schema.org safely
+    guidance: |
+      - Remove <script type="application/ld+json"> by default
+      - Structured data can contain XSS payloads
+      - Option to whitelist specific fields if needed
+      - Test JSON-LD injection payloads
+      - Log if structured data detected
+    enforcement: Structured data tests
+
+  - name: Comment Handling
+    description: Decide comment preservation strategy
+    guidance: |
+      - Remove HTML comments by default
+      - Comments can contain sensitive information
+      - Option to preserve comments if configured
+      - Don't expose commented-out code
+      - Strip comments from output
+    enforcement: Comment removal tests
+
+  # Runtime Safety Rules
+  - name: Stack Overflow Prevention
+    description: Prevent stack overflow from deep recursion
+    guidance: |
+      - Track nesting depth during traversal
+      - Enforce maximum depth (default 256 levels)
+      - Return error before stack exhaustion
+      - Test with pathological nested HTML
+      - Make depth limit configurable
+    enforcement: Deep nesting tests, stack overflow tests
+
+  - name: Memory Bounds Enforcement
+    description: Enforce strict memory limits
+    guidance: |
+      - Enforce maximum document size
+      - Enforce maximum output size
+      - Reject documents exceeding limits
+      - Monitor memory allocation
+      - Return error with clear message
+    enforcement: Memory limit tests
+
+  - name: ReDoS Prevention
+    description: Prevent Regular Expression Denial of Service
+    guidance: |
+      - Avoid catastrophic backtracking in regex
+      - Use tested regex patterns
+      - Limit regex match time with timeouts if possible
+      - Test regex with pathological inputs
+      - Use regex crate with good performance
+    enforcement: ReDoS tests, regex review
+
+  - name: Panic Safety
+    description: Ensure sanitization never panics
+    guidance: |
+      - Use Result/Option instead of unwrap/expect
+      - Catch parsing panics with guard_panic()
+      - Return errors instead of panicking
+      - Test sanitization with fuzzing
+      - Ensure safety across all code paths
+    enforcement: Panic safety tests, fuzzing
+
+  # Configuration Rules
+  - name: Safety Configuration Options
+    description: Provide comprehensive safety configuration
+    guidance: |
+      - SafetyConfig struct with options:
+        - sanitize_html: bool (default: true)
+        - max_document_size: usize (default: 50MB)
+        - max_nesting_depth: usize (default: 256)
+        - allowed_tags: Vec
+        - allowed_attributes: Vec
+        - allowed_url_schemes: Option<Vec>
+        - strip_svg: bool
+        - strip_comments: bool
+        - strict_mode: bool
+      - Use builder pattern for configuration
+      - Validate configuration values
+    enforcement: Configuration tests
+
+  - name: Default Safe Configuration
+    description: Defaults prioritize security over functionality
+    guidance: |
+      - sanitize_html: true (enabled by default)
+      - max_document_size: 50MB (reasonable limit)
+      - max_nesting_depth: 256 (stack safety)
+      - Whitelist conservative element/attribute sets
+      - Block dangerous URL schemes by default
+      - Strip SVG by default (configurable)
+      - Strip comments by default
+      - Enable strict mode by default
+    enforcement: Configuration defaults tests
+
+  # Testing & Validation Rules
+  - name: Security Test Coverage
+    description: Comprehensive security testing
+    guidance: |
+      - XSS payload tests (OWASP cheat sheets)
+      - URL injection tests
+      - Encoding bypass tests
+      - Binary detection tests
+      - Size limit enforcement tests
+      - Stack overflow prevention tests
+      - Form submission tests
+      - SVG XSS tests
+      - Fuzzing for robustness
+    enforcement: Security test suite
+
+  - name: XSS Payload Testing
+    description: Test against known XSS attack vectors
+    guidance: |
+      - OWASP XSS Filter Evasion Cheat Sheet
+      - HTML5 Security Cheat Sheet payloads
+      - Browser-specific XSS vectors
+      - Encoding/obfuscation bypasses
+      - Event handler variations
+      - Data URI attacks
+      - SVG XSS patterns
+      - CSS expression attacks
+    enforcement: XSS test suite
+
+  - name: Sanitization Verification
+    description: Verify sanitization is effective
+    guidance: |
+      - Test input → sanitized output
+      - Verify dangerous elements removed
+      - Verify dangerous attributes removed
+      - Verify content preserved
+      - Verify safe attributes preserved
+      - Round-trip tests
+    enforcement: Sanitization verification tests
+
+  - name: Regression Testing
+    description: Prevent security degradation
+    guidance: |
+      - Maintain test suite of known payloads
+      - Run on every change
+      - Document expected sanitization behavior
+      - Alert on any security-relevant changes
+      - Update tests for intentional changes
+    enforcement: Security regression test suite
+
+  # Documentation Rules
+  - name: Safety Documentation
+    description: Document security properties and limitations
+    guidance: |
+      - Document security guarantees and limits
+      - Explain sanitization strategy
+      - List supported/blocked URL schemes
+      - Document XSS prevention mechanisms
+      - Provide security examples
+      - Explain configuration options
+      - Link to OWASP guidelines
+    enforcement: Documentation review
+
+  - name: Configuration Documentation
+    description: Document safety configuration options
+    guidance: |
+      - Document each SafetyConfig option
+      - Explain security implications
+      - Provide configuration examples
+      - Document default values
+      - Explain strict mode behavior
+      - Provide migration guide for option changes
+    enforcement: Configuration docs
+
+  - name: Error Message Clarity
+    description: Provide clear security error messages
+    guidance: |
+      - Binary detection: Name detected format
+      - Size limits: Show limit and actual size
+      - XSS: Indicate which element/attribute removed
+      - URL: Explain why URL blocked (scheme not whitelisted)
+      - Encoding: Suggest UTF-8 conversion
+    enforcement: Error message tests
+
+  # Logging & Audit Rules
+  - name: Security Event Logging
+    description: Log security-relevant events
+    guidance: |
+      - Log binary data detection
+      - Log size limit violations
+      - Log XSS payload detection
+      - Log URL sanitization failures
+      - Log encoding issues
+      - Include timestamp, type, details
+      - Enable for security audit
+      - Don't expose sensitive data in logs
+    enforcement: Logging validation tests
+
+  - name: Audit Trail
+    description: Maintain audit trail of sanitization
+    guidance: |
+      - Track what was removed and why
+      - Record sanitization statistics
+      - Log anomalies (unusual payloads, etc.)
+      - Enable detailed audit mode
+      - Provide audit report generation
+    enforcement: Audit trail tests
+
+  # Integration Rules
+  - name: Safety Integration with Parsing
+    description: Ensure parsing uses validated input
+    guidance: |
+      - Run validate_input() before parsing
+      - Run sanitize_html() before parsing
+      - Never parse untrusted HTML directly
+      - Apply in correct order: validate → sanitize → parse
+      - Check all integration points
+    enforcement: Integration tests
+
+  - name: Safety Integration with Conversion
+    description: Apply safety checks during conversion
+    guidance: |
+      - Sanitize URLs in links/images
+      - Validate element types before conversion
+      - Apply escaped output
+      - Never trust element attributes
+      - Verify output safety
+    enforcement: Output safety tests

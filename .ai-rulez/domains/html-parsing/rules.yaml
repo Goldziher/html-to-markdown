@@ -1,0 +1,242 @@
+rules:
+  # Parser Selection & Configuration Rules
+  - name: Parser Implementation Flexibility
+    description: Support multiple HTML parser implementations with graceful fallback
+    guidance: |
+      - Implement ParserType enum with html5ever and tl variants
+      - Provide factory function for parser selection
+      - Default to html5ever for standards compliance
+      - Allow tl parser for performance-critical paths
+      - Support custom parser trait implementations
+      - Document parser differences and tradeoffs
+    enforcement: Parser abstraction tests, benchmark comparisons
+
+  - name: Parser Robustness
+    description: Parsers must handle malformed HTML without panicking
+    guidance: |
+      - Both html5ever and tl handle malformed HTML gracefully
+      - Validate parser output before using
+      - Test with HTML5 Test Suite examples
+      - Recover from common malformations (unclosed tags, bad attrs)
+      - Preserve as much content as possible on parse error
+      - Return clear error messages for unrecoverable input
+    enforcement: Malformed HTML test suite, fuzzing
+
+  - name: Character Encoding Detection
+    description: Automatically detect and handle multiple character encodings
+    guidance: |
+      - Use encoding_rs for robust encoding detection
+      - Check HTML5 charset meta tag if present
+      - Detect BOM markers (UTF-8, UTF-16, UTF-32)
+      - Convert to UTF-8 before parsing
+      - Preserve original encoding declaration in metadata
+      - Fall back to UTF-8 if detection fails
+      - Validate UTF-8 sequence integrity
+    enforcement: Multi-encoding tests, validation suite
+
+  # DOM Tree Traversal Rules
+  - name: Safe Tree Navigation
+    description: Provide safe, panic-free DOM tree traversal
+    guidance: |
+      - Implement parent(), children(), next_sibling(), prev_sibling()
+      - Validate pointers before dereferencing
+      - Return Option/Result for missing parents/siblings
+      - Track visited nodes to detect cycles
+      - Implement depth-first and breadth-first traversal
+      - Support filtered iteration (skip comments, text-only, etc.)
+    enforcement: Traversal tests, pointer safety audit
+
+  - name: Depth Limit Enforcement
+    description: Prevent stack overflow from deeply nested HTML
+    guidance: |
+      - Track nesting depth during traversal
+      - Enforce maximum depth (default 256 levels)
+      - Return error if depth exceeded
+      - Include depth in error message
+      - Make depth limit configurable via ConversionOptions
+      - Test with pathological nested HTML (1000+ levels)
+    enforcement: Deep nesting tests, stack overflow prevention
+
+  - name: Element Type Identification
+    description: Accurately identify all HTML element types
+    guidance: |
+      - Support 60+ HTML5 element types
+      - Implement NodeType enum (Element, Text, Comment, Document)
+      - Provide is_element(), is_text(), is_void_element() helpers
+      - Map element names to semantic categories (Block, Inline, Form, etc.)
+      - Handle case-insensitive tag names (lowercase internally)
+      - Support custom element detection if configured
+    enforcement: Element coverage tests, tag classification tests
+
+  # Text & Attribute Access Rules
+  - name: Text Content Preservation
+    description: Extract text content preserving whitespace exactly
+    guidance: |
+      - Implement extract_text() for full subtree content
+      - Preserve all whitespace in text nodes (spaces, tabs, newlines)
+      - Don't apply HTML5 whitespace normalization
+      - Decode HTML entities (&nbsp;, &lt;, &#123;, etc.)
+      - Preserve CDATA sections as literal text
+      - Handle special characters correctly
+    enforcement: Whitespace preservation tests, entity decoding tests
+
+  - name: Whitespace Mode Configuration
+    description: Support multiple whitespace handling strategies
+    guidance: |
+      - Implement WhitespaceMode enum: Preserve, Minimal, Collapse
+      - Preserve mode: Keep all whitespace as-is
+      - Minimal mode: Remove leading/trailing, normalize internal
+      - Collapse mode: Collapse sequences to single space (HTML5 default)
+      - Make mode configurable per document
+      - Document mode behavior clearly
+      - Test each mode with edge cases
+    enforcement: Whitespace mode tests, regression tests
+
+  - name: Attribute Access & Retrieval
+    description: Provide comprehensive attribute inspection
+    guidance: |
+      - Implement get_attribute(elem, name) → Option<String>
+      - Implement get_attributes(elem) → BTreeMap<String, String>
+      - Support case-insensitive attribute name matching
+      - Return URL-encoded attribute values as-is (don't decode)
+      - Provide helpers: has_class(), get_classes(), get_id()
+      - Handle boolean attributes (checked, disabled, selected)
+      - Validate attribute values before returning
+    enforcement: Attribute access tests, case sensitivity tests
+
+  # Node Filtering & Iteration Rules
+  - name: Efficient Node Iteration
+    description: Provide memory-efficient node iteration
+    guidance: |
+      - Implement iterator trait for child nodes
+      - Support filtering iterators (skip comments, text-only, elements)
+      - Avoid materializing entire child list in memory
+      - Use lazy evaluation where possible
+      - Document iteration order (document order guaranteed)
+      - Test with large child lists (1000+ children)
+    enforcement: Performance tests, memory profiling
+
+  - name: Void Element Recognition
+    description: Correctly identify void elements (no children)
+    guidance: |
+      - List all void elements: br, img, input, hr, meta, link, etc.
+      - Implement is_void_element(tag) function
+      - Void elements should have no children in parse tree
+      - Don't process children of void elements
+      - Document void element handling
+    enforcement: Void element tests, parser validation
+
+  # Parser Configuration Rules
+  - name: Parser Configuration Options
+    description: Provide comprehensive parser customization
+    guidance: |
+      - Expose ParserConfig struct with options:
+        - parser_type: html5ever | tl
+        - encoding: auto-detect | specified
+        - namespace_handling: enabled | disabled
+        - entity_resolution: decode | preserve
+      - Apply configuration at parse time
+      - Validate configuration values
+      - Document configuration impact on output
+    enforcement: Configuration tests, option validation
+
+  # Performance & Memory Rules
+  - name: Memory Efficiency
+    description: Keep parser memory usage bounded
+    guidance: |
+      - Enforce maximum document size (default 50MB)
+      - Monitor memory allocation during parsing
+      - Use reference counting (Rc/Arc) for shared subtrees
+      - Avoid unnecessary node copying
+      - Implement memory pooling for temporary allocations
+      - Benchmark memory usage on large documents
+    enforcement: Memory profiling, size limit tests
+
+  - name: Parser Performance
+    description: Maintain fast parsing times
+    guidance: |
+      - Target <5ms parsing time for 100KB documents
+      - Profile parser with flamegraphs
+      - Optimize hot paths (child iteration, attribute lookup)
+      - Consider LRU cache for frequently accessed nodes
+      - Use zero-copy parsing where possible
+      - Document performance characteristics
+    enforcement: Performance benchmarks, regression tests
+
+  # Error Handling Rules
+  - name: Parser Error Recovery
+    description: Recover gracefully from parse errors
+    guidance: |
+      - Capture and report parser errors
+      - Continue with partial parse if recoverable
+      - Include error location (line, column) in errors
+      - Suggest fixes for common errors (unclosed tags)
+      - Return best-effort result even on errors
+      - Log detailed error information for debugging
+    enforcement: Error recovery tests, fuzzing
+
+  - name: Clear Error Messages
+    description: Provide actionable error information
+    guidance: |
+      - Include specific error type (binary, encoding, malformed)
+      - Show error location in input
+      - Suggest remediation (decode file, validate HTML, etc.)
+      - Distinguish recoverable from fatal errors
+      - Avoid generic "parse error" messages
+    enforcement: Error message tests, user feedback
+
+  # Testing & Validation Rules
+  - name: Parser Test Coverage
+    description: Comprehensive parser testing
+    guidance: |
+      - Unit tests for each parser implementation
+      - HTML5 spec compliance tests
+      - Malformed HTML test suite
+      - Character encoding tests (UTF-8, Latin-1, etc.)
+      - Large document performance tests
+      - Deep nesting stress tests
+      - Fuzzing for robustness
+    enforcement: Test suite requirements, coverage metrics
+
+  - name: DOM Traversal Tests
+    description: Test all traversal patterns
+    guidance: |
+      - Test parent(), children(), sibling() navigation
+      - Test depth-first and breadth-first traversal
+      - Test filtered iteration (elements-only, text-only)
+      - Test with various tree structures
+      - Verify traversal order correctness
+      - Test with deeply nested HTML
+    enforcement: Traversal test suite
+
+  - name: Integration Tests
+    description: Test parsing with downstream conversion
+    guidance: |
+      - Parse and convert real-world HTML samples
+      - Verify traversal works with actual parsers
+      - Test attribute access during conversion
+      - Test whitespace preservation end-to-end
+      - Benchmark full parse→traverse→convert pipeline
+    enforcement: Integration test suite
+
+  # Documentation Rules
+  - name: Parser Documentation
+    description: Document parser capabilities and limitations
+    guidance: |
+      - Document supported HTML versions (HTML5)
+      - List known limitations (namespace handling, etc.)
+      - Provide parsing examples in rustdoc
+      - Explain parser differences (html5ever vs tl)
+      - Document error types and recovery behavior
+      - Include performance characteristics
+    enforcement: Doc tests, documentation review
+
+  - name: Traversal API Documentation
+    description: Document tree navigation API
+    guidance: |
+      - Include traversal examples
+      - Explain safety properties (no dangling pointers)
+      - Document iterator behavior (order, filtering)
+      - Explain whitespace handling modes
+      - Provide attribute access examples
+    enforcement: Doc tests, documentation completeness

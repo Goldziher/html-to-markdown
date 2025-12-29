@@ -1,0 +1,279 @@
+agents:
+  # Block Element Converter
+  - name: block-element-converter
+    role: Convert HTML block elements to Markdown
+    context:
+      - Source: crates/html-to-markdown/src/converter.rs (block conversion logic)
+      - Source: crates/html-to-markdown/src/visitor.rs (visit_* methods for blocks)
+      - Key concepts:
+          - Heading conversion (ATX vs Setext)
+          - Paragraph formatting
+          - Block quote conversion
+          - Semantic element handling
+    capabilities:
+      - Convert h1-h6 to Markdown headings
+      - Convert p, div, section to paragraphs
+      - Convert blockquote with proper nesting
+      - Convert semantic HTML5 elements
+      - Apply configurable heading and formatting styles
+      - Preserve nested content and inline formatting
+    patterns:
+      - ATX headings: "# h1\n## h2" etc.
+      - Setext headings: "h1\n==\nh2\n--"
+      - Blank lines between block elements
+      - Preserve content within blocks
+
+  # List Converter
+  - name: list-converter
+    role: Convert HTML lists to Markdown lists
+    context:
+      - Source: crates/html-to-markdown/src/converter.rs (list conversion)
+      - Key concepts:
+          - Unordered list conversion
+          - Ordered list conversion
+          - List nesting and indentation
+          - List item processing
+          - Task list detection
+    capabilities:
+      - Convert ul/ol to Markdown lists
+      - Handle nested lists (multiple levels)
+      - Configure list bullet style (-, *, +)
+      - Configure list indentation (spaces or tab)
+      - Detect and convert task lists ([ ])
+      - Preserve list item content with formatting
+      - Handle tight vs loose list detection
+    patterns:
+      - Unordered: "- item" or "* item" or "+ item"
+      - Ordered: "1. item\n2. item"
+      - Nested: Proper indentation at each level
+      - Tasks: "- [x] Done task"
+
+  # Table Converter
+  - name: table-converter
+    role: Convert HTML tables to Markdown tables
+    context:
+      - Source: crates/html-to-markdown/src/converter.rs (table conversion)
+      - Key concepts:
+          - Table structure (thead, tbody, tfoot)
+          - Cell content and alignment
+          - Rowspan/colspan handling
+          - Table header detection
+    capabilities:
+      - Convert table to GFM pipe format
+      - Extract headers from thead or th elements
+      - Map data to rows and columns
+      - Preserve cell alignment (left, center, right)
+      - Handle missing cells and uneven rows
+      - Deal with simple colspan/rowspan
+      - Escape pipe characters in cells
+      - Fallback to list format for complex tables
+    patterns:
+      - GFM pipe table: "| h1 | h2 |\n|---|---|\n"
+      - Alignment: "|---|:-:|--|"
+      - Cell content: Preserve inline formatting
+      - Captions: Extract as text before table
+
+  # Inline Element Converter
+  - name: inline-formatter
+    role: Convert HTML inline formatting to Markdown
+    context:
+      - Source: crates/html-to-markdown/src/converter.rs (inline conversion)
+      - Key concepts:
+          - Bold/italic/emphasis conversion
+          - Code and monospace handling
+          - Strikethrough conversion
+          - Emphasis nesting
+    capabilities:
+      - Convert strong/b to **text**
+      - Convert em/i to *text*
+      - Convert del/s to ~~text~~
+      - Convert code/kbd/samp to `text`
+      - Handle nested emphasis (bold+italic)
+      - Avoid double-escaping
+      - Preserve content within formatting
+    patterns:
+      - Bold: "**text**"
+      - Italic: "*text*"
+      - Code: "`text`"
+      - Strikethrough: "~~text~~"
+      - Bold+Italic: "***text***"
+
+  # Link & Image Converter
+  - name: link-image-converter
+    role: Convert HTML links and images to Markdown
+    context:
+      - Source: crates/html-to-markdown/src/converter.rs (link/image conversion)
+      - Key concepts:
+          - Link extraction (href, text, title)
+          - Image extraction (src, alt, title)
+          - URL sanitization
+          - Reference-style links
+    capabilities:
+      - Convert <a> to [text](href)
+      - Extract and preserve link titles
+      - Convert <img> to ![alt](src)
+      - Handle responsive images (srcset)
+      - Sanitize URLs with sanitize_url()
+      - Support reference-style links if configured
+      - Fallback for missing href/src
+    patterns:
+      - Inline link: "[text](url)"
+      - Link with title: "[text](url \"title\")"
+      - Image: "![alt](src)"
+      - Image with title: "![alt](src \"title\")"
+      - Reference: "[text][ref]" + "[ref]: url"
+
+  # Form Element Handler
+  - name: form-converter
+    role: Convert form elements to Markdown equivalents
+    context:
+      - Key concepts:
+          - Input field conversion
+          - Textarea handling
+          - Select/dropdown conversion
+          - Button representation
+    capabilities:
+      - Convert <input> to code blocks or notations
+      - Detect and convert checkboxes to task lists
+      - Convert <textarea> to code blocks
+      - Convert <select> to list of options
+      - Handle <fieldset> and <label>
+      - Preserve form field labels
+    patterns:
+      - Text input: "[Input: label]" or code block
+      - Checkbox: Task list syntax
+      - Textarea: Code block with label
+      - Select: List of options with selected marked
+
+  # Text Processor
+  - name: text-processor
+    role: Process text content and apply escaping
+    context:
+      - Source: crates/html-to-markdown/src/text.rs
+      - Key concepts:
+          - Markdown escaping
+          - HTML entity decoding
+          - Whitespace handling
+          - Special character handling
+    capabilities:
+      - Escape Markdown metacharacters: \ * _ ` [ ] ( ) # + - . ! | >
+      - Decode HTML entities (&nbsp; &#123;, etc.)
+      - Apply whitespace normalization per mode
+      - Preserve code content without escaping
+      - Handle edge cases (double escaping, etc.)
+    patterns:
+      - Escape: "\\*" for literal "*"
+      - Entity: "&nbsp;" → " " (non-breaking space)
+      - Whitespace: Mode-specific handling
+      - Code: No escaping in backticks
+
+  # Configuration Manager
+  - name: converter-configuration-manager
+    role: Manage conversion options and settings
+    context:
+      - Source: crates/html-to-markdown/src/options.rs
+      - Key concepts:
+          - HeadingStyle options
+          - ListIndentType options
+          - CodeBlockStyle options
+          - NewlineStyle options
+    capabilities:
+      - Apply ConversionOptions to all converters
+      - Select heading style (ATX vs Setext)
+      - Configure list indentation
+      - Configure code block style
+      - Configure line break style
+      - Validate option values
+      - Provide sensible defaults
+    patterns:
+      - Options as builder pattern
+      - Per-converter option application
+      - Option validation and defaults
+      - Configuration composition
+
+  # Visitor Pattern Implementer
+  - name: visitor-implementer
+    role: Implement visitor pattern for element conversion
+    context:
+      - Source: crates/html-to-markdown/src/visitor.rs
+      - Key concepts:
+          - Visitor trait definition
+          - visit_* methods for elements
+          - Pre/post hooks
+          - VisitResult enum
+    capabilities:
+      - Implement HtmlVisitor trait
+      - Provide visit_* methods for all element types
+      - Support custom visitors
+      - Dispatch to appropriate converters
+      - Track visitor state (depth, context)
+      - Return proper VisitResult values
+    patterns:
+      - VisitResult::Process - default conversion
+      - VisitResult::Skip - skip element
+      - VisitResult::Custom - custom conversion
+      - Visitor composition for complex customization
+
+  # Performance Optimizer
+  - name: conversion-performance-optimizer
+    role: Optimize conversion speed and output quality
+    context:
+      - Key concepts:
+          - Conversion speed benchmarks
+          - Output quality metrics
+          - Memory usage patterns
+          - Caching opportunities
+    capabilities:
+      - Profile conversion performance
+      - Identify bottlenecks
+      - Implement converter caching
+      - Optimize string operations
+      - Balance speed vs memory usage
+      - Benchmark against baselines
+    patterns:
+      - String buffer accumulation
+      - LRU cache for repeated elements
+      - Lazy evaluation where possible
+      - Zero-copy techniques
+
+  # Edge Case Handler
+  - name: edge-case-handler
+    role: Handle edge cases and special scenarios
+    context:
+      - Key concepts:
+          - Empty elements
+          - Deeply nested structures
+          - Mixed content types
+          - Unknown elements
+    capabilities:
+      - Handle empty elements gracefully
+      - Process deeply nested structures
+      - Mixed block/inline content
+      - Unknown/custom elements
+      - Malformed element structure
+      - Fallback conversions
+    patterns:
+      - Empty paragraph: Skip or blank line
+      - Empty list: Skip or placeholder
+      - Deep nesting: Preserve structure
+      - Unknown element: Extract content
+
+  # Output Validation
+  - name: markdown-validator
+    role: Validate generated Markdown output
+    context:
+      - Key concepts:
+          - Markdown syntax validation
+          - Structure preservation
+          - Roundtrip testing
+    capabilities:
+      - Parse generated Markdown with validator
+      - Verify structure preservation
+      - Check for valid syntax
+      - Compare with original intent
+      - Detect malformed output
+    patterns:
+      - Validate with markdown parser
+      - Roundtrip HTML → MD → HTML
+      - Structure comparison
+      - Content preservation verification

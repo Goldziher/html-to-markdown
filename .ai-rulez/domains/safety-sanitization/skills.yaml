@@ -1,0 +1,469 @@
+skills:
+  - name: binary-data-detection
+    context: Detect and reject binary input before parsing
+    key_source_files:
+      - crates/html-to-markdown/src/lib.rs (validate_input, detect_binary_magic)
+    master_concepts:
+      - Magic number identification
+      - UTF-16 detection via null bytes
+      - Control character ratio analysis
+      - Format-specific detection
+    step_by_step:
+      1. Get input bytes
+      2. Check for magic number prefixes:
+         - 0x1F8B: gzip compressed
+         - 0x28B52FFD: zstd compressed
+         - 0x504B0304/0505/0708: ZIP archive
+         - 0x25504446: PDF document
+      3. If no magic match, scan first 8KB:
+         a. Count null bytes
+         b. Count control characters
+      4. Calculate ratios:
+         - Null byte ratio > 20%: UTF-16 detected
+         - Control char ratio > 30%: binary detected
+      5. For UTF-16, check even/odd null distribution:
+         - Even nulls (0, 2, 4...): UTF-16LE
+         - Odd nulls (1, 3, 5...): UTF-16BE
+      6. Return specific error message
+    skills_involved:
+      - byte-pattern-matching
+      - ratio-calculation
+      - format-identification
+    when_to_use: Validating untrusted HTML input
+
+  - name: character-encoding-validation
+    context: Detect and convert character encodings safely
+    key_source_files:
+      - crates/html-to-markdown/src/lib.rs
+    master_concepts:
+      - BOM detection
+      - HTML5 charset meta tag
+      - Auto-detection via encoding_rs
+      - Safe UTF-8 conversion
+    step_by_step:
+      1. Check for BOM (Byte Order Mark):
+         - 0xEFBBBF: UTF-8 BOM
+         - 0xFFFE: UTF-16LE BOM
+         - 0xFEFF: UTF-16BE BOM
+      2. If no BOM, check HTML5 meta:
+         - <meta charset="UTF-8">
+         - <meta http-equiv="Content-Type">
+      3. If no meta, auto-detect:
+         - Use encoding_rs crate
+         - Analyze byte patterns
+      4. Validate encoding supported
+      5. Convert to UTF-8:
+         - Use encoding_rs for conversion
+         - Verify valid UTF-8 output
+      6. Handle errors gracefully
+    skills_involved:
+      - bom-parsing
+      - meta-tag-extraction
+      - encoding-conversion
+    when_to_use: Processing non-UTF-8 input HTML
+
+  - name: size-limit-enforcement
+    context: Enforce memory and size limits
+    key_source_files:
+      - crates/html-to-markdown/src/lib.rs
+    master_concepts:
+      - Document size validation
+      - Nesting depth limits
+      - Output size limits
+      - Graceful rejection
+    step_by_step:
+      1. Check document size:
+         - Default limit: 50MB
+         - Configurable via SafetyConfig
+         - Return error if exceeded
+      2. Check nesting depth:
+         - Default limit: 256 levels
+         - Track during parsing
+         - Return error before stack overflow
+      3. Check output size:
+         - Default limit: 100MB
+         - Monitor during conversion
+         - Truncate or error if exceeded
+      4. Include limits in error message
+      5. Log size violation events
+    skills_involved:
+      - size-calculation
+      - limit-enforcement
+      - error-reporting
+    when_to_use: Preventing DoS and resource exhaustion
+
+  - name: ammonia-sanitization
+    context: Use ammonia crate for HTML sanitization
+    key_source_files:
+      - ammonia crate integration
+    master_concepts:
+      - Whitelist configuration
+      - Element filtering
+      - Attribute filtering
+      - URL validation
+    step_by_step:
+      1. Create ammonia::Builder
+      2. Configure element whitelist:
+         - Safe: p, div, h1-h6, ul, ol, li, a, img, strong, em, code
+         - Unsafe: script, style, iframe, form, input, etc.
+      3. Configure attribute whitelist:
+         - Global: id, class, title, lang, dir, data-*
+         - Links: href, target, rel
+         - Images: src, alt, width, height
+         - Tables: colspan, rowspan, align
+      4. Configure URL validation:
+         - Set allowed schemes (http, https, mailto, ftp)
+         - Block dangerous schemes (javascript, data)
+      5. Set link rel to "noopener noreferrer"
+      6. Clean HTML: cleaner.clean(html)
+    skills_involved:
+      - configuration-design
+      - whitelist-management
+      - url-validation
+    when_to_use: Sanitizing untrusted HTML before parsing
+
+  - name: url-scheme-validation
+    context: Validate and sanitize URLs
+    key_source_files:
+      - crates/html-to-markdown/src/safety.rs
+    master_concepts:
+      - Scheme extraction
+      - Whitelist enforcement
+      - Dangerous scheme blocking
+      - URL-encoded bypass detection
+    step_by_step:
+      1. Extract URL from attribute
+      2. Trim and lowercase for checking
+      3. Check for dangerous schemes:
+         - javascript: (case-insensitive)
+         - data: (if blocking)
+         - vbscript:
+         - file:
+      4. Check for encoded bypasses:
+         - %6a%61%76%61%73%63%72%69%70%74: javascript
+         - Decode and check again
+      5. If dangerous detected: return None
+      6. Validate against whitelist:
+         - Safe: http, https, mailto, ftp, tel, sms
+         - Relative: /, ./, #
+      7. Return sanitized URL or None
+    skills_involved:
+      - url-parsing
+      - encoding-detection
+      - whitelist-matching
+    when_to_use: Processing href and src attributes
+
+  - name: xss-payload-detection
+    context: Detect and prevent XSS attack patterns
+    key_source_files:
+      - OWASP XSS cheat sheets
+    master_concepts:
+      - Event handler patterns
+      - JavaScript URL detection
+      - SVG attack vectors
+      - CSS injection patterns
+    step_by_step:
+      1. Detect event handlers:
+         - Pattern: on* attributes (onclick, onerror, etc.)
+         - Remove all on* attributes
+      2. Detect javascript: URLs:
+         - Pattern: javascript: at scheme start
+         - Case-insensitive check
+         - URL-encoded bypass check
+      3. Detect data: URIs:
+         - Pattern: data: with script content
+         - Block or sanitize
+      4. Detect SVG XSS:
+         - <svg> with <script>
+         - SVG with event handlers
+      5. Detect CSS XSS:
+         - expression() in CSS
+         - behavior in CSS
+         - javascript: in CSS URLs
+      6. Test against OWASP cheat sheets
+    skills_involved:
+      - pattern-matching
+      - bypass-detection
+      - attack-vector-knowledge
+    when_to_use: Validating HTML for XSS vulnerabilities
+
+  - name: event-handler-removal
+    context: Remove JavaScript event handlers from HTML
+    key_source_files:
+      - ammonia crate configuration
+    master_concepts:
+      - Event handler attributes
+      - Wildcard pattern matching
+      - SVG event handlers
+      - Complete removal
+    step_by_step:
+      1. Identify event handler attributes:
+         - HTML: onclick, onload, onerror, onmouseover, etc.
+         - SVG: onload, onactivate, onbuild, etc.
+      2. Pattern match: /^on.*/i
+      3. Remove all matching attributes
+      4. Test with encoded variants:
+         - on&#99;lick (&#99; = 'c')
+         - on\nclick (with newline)
+      5. Verify removal in output
+      6. Log removal events
+    skills_involved:
+      - regex-pattern-matching
+      - wildcard-handling
+      - encoding-awareness
+    when_to_use: Sanitizing HTML to prevent event-handler XSS
+
+  - name: svg-security-hardening
+    context: Safely handle SVG elements
+    key_source_files:
+      - SVG security considerations
+    master_concepts:
+      - SVG script removal
+      - SVG event handler blocking
+      - Safe SVG features
+      - Text extraction
+    step_by_step:
+      1. Detect SVG elements
+      2. Remove dangerous content:
+         - <script> within SVG
+         - <style> with JavaScript
+         - Event handlers (onload, onclick, etc.)
+      3. Validate URL attributes:
+         - xlink:href → URL validation
+         - href in SVG → URL validation
+         - image src → URL validation
+      4. Options for SVG handling:
+         a. Strip SVG entirely (safest)
+         b. Remove scripts/handlers (semi-safe)
+         c. Extract text content
+      5. Fallback: Use alt text or title
+    skills_involved:
+      - svg-knowledge
+      - element-removal
+      - url-validation
+    when_to_use: Processing SVG content in HTML
+
+  - name: style-attribute-sanitization
+    context: Sanitize or remove CSS in style attributes
+    key_source_files:
+      - ammonia crate or custom CSS sanitization
+    master_concepts:
+      - CSS injection patterns
+      - Safe CSS properties
+      - Dangerous CSS values
+      - Configuration options
+    step_by_step:
+      1. Decision: Remove or Sanitize?
+         - Remove: safest, simple
+         - Sanitize: preserve styling
+      2. If removing: delete all style attributes
+      3. If sanitizing:
+         a. Parse CSS properties
+         b. Whitelist safe properties:
+            - color, background-color
+            - font-size, font-weight
+            - text-align, margin, padding
+            - border properties
+         c. Block dangerous properties:
+            - expression (IE)
+            - behavior (IE)
+            - binding (Firefox)
+         d. Block dangerous values:
+            - javascript: URLs
+            - expression()
+            - url() with dangerous schemes
+      4. Return sanitized style or remove
+    skills_involved:
+      - css-parsing
+      - property-whitelisting
+      - dangerous-value-detection
+    when_to_use: Processing style attributes
+
+  - name: form-element-neutralization
+    context: Neutralize or remove form elements
+    key_source_files:
+      - ammonia configuration
+    master_concepts:
+      - Form submission prevention
+      - Hidden field handling
+      - Button neutralization
+    step_by_step:
+      1. Remove <form> elements entirely
+      2. Remove formaction attributes
+      3. Remove form event handlers
+      4. Convert <input> to code blocks
+      5. Remove submit/reset buttons
+      6. Handle hidden fields:
+         - Remove <input type="hidden">
+         - Don't expose values
+      7. Convert <textarea> to code blocks
+      8. Convert <select> to list format
+    skills_involved:
+      - form-structure-knowledge
+      - element-removal
+      - fallback-conversion
+    when_to_use: Neutralizing form submission capability
+
+  - name: metadata-handling
+    context: Safely handle metadata and structured data
+    key_source_files:
+      - ammonia configuration
+    master_concepts:
+      - Meta tag removal
+      - Structured data safety
+      - Comment preservation
+      - Information leakage prevention
+    step_by_step:
+      1. Meta tags: Remove by default
+         - Remove all <meta> tags
+         - Prevents http-equiv, tracking
+      2. Structured data:
+         - Remove <script type="application/ld+json">
+         - JSON-LD can contain XSS
+      3. Comments:
+         - Remove by default
+         - Prevent exposing commented code
+      4. Optional: Whitelist safe metadata
+         - OG tags (if configured)
+         - Twitter cards (if configured)
+      5. Log if sensitive data detected
+    skills_involved:
+      - metadata-understanding
+      - information-leakage-prevention
+      - selective-preservation
+    when_to_use: Processing non-content HTML
+
+  - name: security-configuration-design
+    context: Design SafetyConfig for different use cases
+    key_source_files:
+      - SafetyConfig struct definition
+    master_concepts:
+      - Default safe configuration
+      - Strict mode options
+      - Custom whitelists
+      - Trade-offs
+    step_by_step:
+      1. Define SafetyConfig struct:
+         - sanitize_html: bool
+         - max_document_size: usize
+         - max_nesting_depth: usize
+         - allowed_tags: Vec<&str>
+         - allowed_attributes: Vec<&str>
+         - allowed_url_schemes: Option<Vec>
+         - strip_svg: bool
+         - strip_comments: bool
+         - strict_mode: bool
+      2. Set secure defaults:
+         - sanitize_html: true
+         - max_document_size: 50MB
+         - max_nesting_depth: 256
+         - strict_mode: true
+      3. Document each option
+      4. Validate configuration values
+      5. Provide configuration builder
+    skills_involved:
+      - security-design
+      - configuration-management
+      - trade-off-analysis
+    when_to_use: Implementing safety configuration
+
+  - name: security-logging-and-audit
+    context: Log security events for audit trail
+    key_source_files:
+      - Logging implementation
+    master_concepts:
+      - Event types (binary detection, XSS, etc.)
+      - Audit trail creation
+      - Non-exposure of sensitive data
+      - Anomaly detection
+    step_by_step:
+      1. Log binary detection:
+         - Type detected (gzip, PDF, etc.)
+         - Input size
+         - Timestamp
+      2. Log sanitization events:
+         - Elements removed
+         - Attributes removed
+         - URLs blocked
+      3. Log XSS attempts:
+         - Attack vector (event, javascript:, etc.)
+         - Location in HTML
+         - Payload (sanitized)
+      4. Create statistics:
+         - Count by event type
+         - Frequency tracking
+         - Anomaly alerts
+      5. Never log:
+         - Full dangerous payloads
+         - User sensitive data
+    skills_involved:
+      - event-logging
+      - audit-trail-design
+      - privacy-preservation
+    when_to_use: Implementing security monitoring
+
+  - name: xss-test-implementation
+    context: Create comprehensive XSS test suite
+    key_source_files:
+      - OWASP XSS Filter Evasion
+      - HTML5 Security Cheat Sheet
+    master_concepts:
+      - OWASP test cases
+      - HTML5 attack vectors
+      - Browser-specific XSS
+      - Encoding/obfuscation bypasses
+    step_by_step:
+      1. Implement OWASP XSS tests:
+         - Basic: <script>alert(1)</script>
+         - Event: <img onerror=alert(1)>
+         - URL: <a href="javascript:alert(1)">
+      2. Implement HTML5 tests:
+         - SVG: <svg onload=alert(1)>
+         - Data URI: <img src="data:...alert()">
+      3. Test encoding bypasses:
+         - URL encoding: %6a%61%76%61%73%63%72%69%70%74
+         - HTML entities: &#97;lert
+         - Unicode: \u0061lert
+      4. Test browser-specific:
+         - IE: expression(), behavior
+         - Firefox: -moz-binding
+      5. Verify sanitization blocks all tests
+    skills_involved:
+      - attack-vector-knowledge
+      - test-design
+      - bypass-detection
+    when_to_use: Validating security implementation
+
+  - name: sanitization-verification
+    context: Verify sanitization is effective
+    key_source_files:
+      - Test suite
+    master_concepts:
+      - Input → Output comparison
+      - Element removal verification
+      - Content preservation
+      - Edge case validation
+    step_by_step:
+      1. For each XSS payload:
+         a. Run through sanitizer
+         b. Verify dangerous elements removed
+         c. Verify dangerous attrs removed
+         d. Verify content preserved
+      2. Test edge cases:
+         - Empty elements
+         - Encoded attacks
+         - Mixed case attacks
+      3. Round-trip test:
+         - Input → Sanitize → Output
+         - Output → Parse → Verify safe
+      4. Verify no regression:
+         - Safe content preserved
+         - Legitimate attributes kept
+         - Links still work
+      5. Performance check:
+         - Sanitization time < 10ms
+    skills_involved:
+      - regression-testing
+      - edge-case-analysis
+      - performance-measurement
+    when_to_use: Validating sanitization effectiveness

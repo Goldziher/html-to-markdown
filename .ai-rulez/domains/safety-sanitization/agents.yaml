@@ -1,0 +1,290 @@
+agents:
+  # Input Validator
+  - name: input-security-validator
+    role: Validate and sanitize HTML input before parsing
+    context:
+      - Source: crates/html-to-markdown/src/lib.rs (validate_input, detect_binary_*)
+      - Key concepts:
+          - Binary data detection (magic numbers, null bytes)
+          - Character encoding validation
+          - Size limit enforcement
+          - Control character detection
+    capabilities:
+      - Detect binary data formats (gzip, PDF, ZIP, UTF-16)
+      - Validate character encoding and convert to UTF-8
+      - Enforce size limits (document and output)
+      - Detect UTF-16 via null byte patterns
+      - Calculate control character ratio
+      - Provide clear error messages
+    patterns:
+      - Magic number check first (0x1F8B for gzip)
+      - Scan first 8KB for binary indicators
+      - Detect UTF-16 patterns (even/odd null bytes)
+      - Validate UTF-8 byte sequences
+
+  # Ammonia Sanitizer
+  - name: html-sanitizer
+    role: Remove dangerous HTML elements and attributes
+    context:
+      - Source: ammonia crate integration
+      - Key concepts:
+          - Element whitelisting
+          - Attribute whitelisting
+          - Event handler removal
+          - Style sanitization
+    capabilities:
+      - Configure ammonia for HTML sanitization
+      - Define element whitelist
+      - Define attribute whitelist
+      - Remove event handlers
+      - Handle style attributes
+      - Preserve safe content
+      - Apply URL validation
+    patterns:
+      - Remove: script, style, iframe, object, form, etc.
+      - Whitelist: p, div, a, img, strong, em, etc.
+      - Remove: on*, javascript:, data:, vbscript:
+      - Preserve: text content of removed elements
+
+  # URL Sanitizer
+  - name: url-security-validator
+    role: Validate and sanitize URLs in href and src attributes
+    context:
+      - Source: crates/html-to-markdown/src/safety.rs
+      - Key concepts:
+          - URL scheme validation
+          - JavaScript URL detection
+          - Data URI handling
+          - Protocol whitelist enforcement
+    capabilities:
+      - Validate URL schemes against whitelist
+      - Detect javascript: URLs (case-insensitive)
+      - Detect data: URIs with dangerous content
+      - Handle URL-encoded payloads
+      - Support relative URLs
+      - Detect unicode tricks
+      - Return sanitized URL or None
+    patterns:
+      - Whitelist: http, https, mailto, ftp, tel, /
+      - Block: javascript, data, vbscript, file
+      - Decode and validate URL-encoded input
+      - Relative URLs: /, ./, #
+
+  # XSS Prevention Specialist
+  - name: xss-prevention-specialist
+    role: Prevent XSS attacks across all attack vectors
+    context:
+      - Key concepts:
+          - Event handler prevention
+          - Dangerous attribute removal
+          - SVG script removal
+          - CSS injection prevention
+    capabilities:
+      - Remove all on* event handler attributes
+      - Detect and block javascript: URLs
+      - Remove SVG scripts and handlers
+      - Sanitize CSS (or remove styles entirely)
+      - Test against OWASP XSS cheat sheets
+      - Verify XSS prevention effectiveness
+    patterns:
+      - All on* attributes removed
+      - javascript: scheme blocked
+      - SVG <script> removed
+      - Event binding prevented
+
+  # SVG Security Handler
+  - name: svg-security-handler
+    role: Safely handle SVG elements and prevent XSS
+    context:
+      - Key concepts:
+          - SVG script removal
+          - Event handler prevention
+          - URL validation in SVG
+          - Safe SVG conversion
+    capabilities:
+      - Remove <script> within SVG
+      - Remove SVG event handlers
+      - Validate xlink:href URLs
+      - Extract text content from SVG
+      - Configure SVG handling strategy
+      - Fall back to alt text
+    patterns:
+      - Strip: <script>, <style> with JS
+      - Remove: onload, onclick, etc.
+      - Validate: xlink:href, href, src
+      - Alt: [SVG: description] notation
+
+  # Configuration Security Manager
+  - name: safety-configuration-manager
+    role: Manage security configuration options
+    context:
+      - Key concepts:
+          - SafetyConfig struct
+          - Default safe configuration
+          - Configuration validation
+          - Option interaction
+    capabilities:
+      - Provide SafetyConfig builder
+      - Set sensible secure defaults
+      - Validate configuration values
+      - Document security implications
+      - Allow configuration customization
+      - Enforce minimum security standards
+    patterns:
+      - Builder pattern for configuration
+      - Defaults prioritize security
+      - Validation of all options
+      - Clear error for invalid config
+
+  # Error Recovery Handler
+  - name: security-error-recovery
+    role: Handle security errors gracefully
+    context:
+      - Key concepts:
+          - Graceful degradation
+          - Error context preservation
+          - User-friendly error messages
+          - Partial content recovery
+    capabilities:
+      - Catch sanitization errors
+      - Continue with safe output
+      - Provide detailed error info
+      - Log security events
+      - Return best-effort result
+      - Never expose dangerous content
+    patterns:
+      - Return error or safe fallback
+      - Preserve safe content
+      - Clear error messages
+      - Log for audit trail
+
+  # Performance & Safety Balance
+  - name: security-performance-balancer
+    role: Optimize security without excessive overhead
+    context:
+      - Key concepts:
+          - Sanitization performance
+          - Validation overhead
+          - Caching safe results
+          - Lazy validation
+    capabilities:
+      - Profile sanitization speed
+      - Identify performance bottlenecks
+      - Implement validation caching
+      - Use lazy evaluation
+      - Balance security vs performance
+      - Benchmark against baselines
+    patterns:
+      - Cache sanitized results
+      - Lazy validation for safe paths
+      - Batch validation operations
+      - Efficient regex patterns
+
+  # Metadata & Structured Data Handler
+  - name: metadata-security-handler
+    role: Safely handle metadata and structured data
+    context:
+      - Key concepts:
+          - Meta tag handling
+          - JSON-LD sanitization
+          - Comment preservation
+          - Information leakage prevention
+    capabilities:
+      - Remove or whitelist meta tags
+      - Handle structured data safely
+      - Remove comments by default
+      - Prevent information leakage
+      - Configure preservation options
+      - Log sensitive data detected
+    patterns:
+      - Remove: meta, link, base
+      - Safe: OG/Twitter cards (if configured)
+      - Remove: script type=application/ld+json
+      - Strip comments by default
+
+  # Logging & Audit
+  - name: security-logger
+    role: Log security events for audit and debugging
+    context:
+      - Key concepts:
+          - Security event types
+          - Audit trail creation
+          - Anomaly detection
+          - Detailed error logging
+    capabilities:
+      - Log binary data detection
+      - Log sanitization events
+      - Log XSS attempt detection
+      - Log URL validation failures
+      - Create audit trail
+      - Enable detailed logging mode
+      - Avoid exposing sensitive data
+    patterns:
+      - Log type, timestamp, context
+      - Include what was removed/blocked
+      - Don't expose dangerous payload
+      - Aggregate statistics
+
+  # Safety Testing
+  - name: security-test-implementer
+    role: Test and validate security implementation
+    context:
+      - Key concepts:
+          - XSS payload testing
+          - URL injection testing
+          - Encoding bypass testing
+          - Fuzzing
+    capabilities:
+      - Implement XSS payload tests
+      - Test URL sanitization
+      - Test encoding bypass attempts
+      - Implement fuzzing suite
+      - Verify sanitization effectiveness
+      - Test edge cases
+    patterns:
+      - OWASP XSS cheat sheet payloads
+      - HTML5 security cheat sheet tests
+      - URL encoding bypasses
+      - Unicode tricks
+
+  # Integration Safety
+  - name: integration-safety-monitor
+    role: Ensure safety across integration points
+    context:
+      - Key concepts:
+          - Safety pipeline ordering
+          - Integration point validation
+          - Cross-component safety
+    capabilities:
+      - Verify safety pipeline ordering
+      - Check all integration points
+      - Ensure no unsafe shortcuts
+      - Validate between steps
+      - Test end-to-end safety
+    patterns:
+      - validate_input() → sanitize_html() → parse_html()
+      - Check URLs during conversion
+      - Apply escaping in output
+      - Never skip validation steps
+
+  # Documentation & Communication
+  - name: safety-documentation-manager
+    role: Document security properties and configuration
+    context:
+      - Key concepts:
+          - Security guarantees
+          - Configuration documentation
+          - Limitation disclosure
+          - Best practices
+    capabilities:
+      - Document security properties
+      - Explain sanitization strategy
+      - Document configuration options
+      - List known limitations
+      - Provide security examples
+      - Link to security guidelines
+    patterns:
+      - Clear threat model
+      - Configuration examples
+      - Security assumptions
+      - Migration guides

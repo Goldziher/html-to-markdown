@@ -1,0 +1,294 @@
+skills:
+  - name: html-parser-selection
+    context: Choose and configure optimal HTML parser for use case
+    key_source_files:
+      - crates/html-to-markdown/src/wrapper.rs
+      - crates/html-to-markdown/src/converter.rs
+    master_concepts:
+      - html5ever vs tl/astral-tl trade-offs
+      - Parser configuration options
+      - Parser selection heuristics
+      - Fallback behavior
+    step_by_step:
+      1. Evaluate input HTML characteristics
+      2. Consider standards compliance need (html5ever for high confidence)
+      3. Consider performance requirements (tl for known-good HTML)
+      4. Configure selected parser
+      5. Set encoding detection
+      6. Apply namespace handling options
+      7. Configure entity resolution
+    skills_involved:
+      - parser-comparison
+      - performance-requirements-analysis
+      - configuration-design
+    when_to_use: Selecting parser backend or optimizing for specific use case
+
+  - name: safe-dom-traversal
+    context: Navigate DOM tree safely without panics or crashes
+    key_source_files:
+      - crates/html-to-markdown/src/visitor.rs
+      - crates/html-to-markdown/src/visitor_helpers.rs
+    master_concepts:
+      - Parent-child-sibling navigation
+      - Depth-first traversal
+      - Visitor pattern implementation
+      - Depth limit enforcement
+    step_by_step:
+      1. Start from document root
+      2. Implement visitor trait for element processing
+      3. Track depth to enforce limits
+      4. Navigate to children recursively
+      5. Process element content
+      6. Handle void elements (no children)
+      7. Return from leaf nodes
+      8. Validate all pointer operations
+    skills_involved:
+      - pointer-safety
+      - tree-algorithms
+      - visitor-pattern
+      - recursion-management
+    when_to_use: Implementing conversion logic that processes DOM tree
+
+  - name: element-classification
+    context: Accurately identify and classify HTML element types
+    key_source_files:
+      - crates/html-to-markdown/src/visitor.rs (NodeType enum)
+      - crates/html-to-markdown/src/options.rs
+    master_concepts:
+      - Block vs inline categorization
+      - Semantic HTML5 elements
+      - Void element identification
+      - Form control recognition
+    step_by_step:
+      1. Extract element tag name
+      2. Normalize to lowercase
+      3. Check against element classification tables
+      4. Determine category:
+         - Block: div, p, h1-h6, ul, ol, table, section, etc.
+         - Inline: span, strong, em, code, a, img, etc.
+         - Void: br, img, input, hr, etc.
+         - Semantic: article, section, nav, etc.
+      5. Select appropriate conversion handler
+    skills_involved:
+      - element-taxonomy
+      - html-spec-knowledge
+      - pattern-matching
+    when_to_use: Dispatching element conversion or determining nesting rules
+
+  - name: text-extraction-and-preservation
+    context: Extract text content preserving original whitespace
+    key_source_files:
+      - crates/html-to-markdown/src/text.rs
+    master_concepts:
+      - Whitespace preservation vs normalization
+      - HTML entity decoding
+      - Control character handling
+      - Text node collection
+    step_by_step:
+      1. Traverse element recursively
+      2. Collect all text nodes
+      3. Decode HTML entities (&nbsp; → space)
+      4. Apply whitespace mode:
+         - Preserve: keep as-is
+         - Minimal: trim/normalize internal
+         - Collapse: HTML5-style collapse
+      5. Handle special cases:
+         - CDATA sections
+         - Script/style content (skip)
+      6. Return accumulated text
+    skills_involved:
+      - entity-decoding
+      - whitespace-handling
+      - text-normalization
+    when_to_use: Getting text content from elements for conversion
+
+  - name: attribute-access-and-validation
+    context: Safely access and retrieve element attributes
+    key_source_files:
+      - crates/html-to-markdown/src/visitor.rs (NodeContext)
+    master_concepts:
+      - Case-insensitive attribute lookup
+      - Class and ID extraction
+      - URL attributes (href, src, srcset)
+      - Boolean attribute handling
+    step_by_step:
+      1. Get attribute map from element
+      2. For specific attribute:
+         a. Lookup by name (case-insensitive)
+         b. Return value if present
+         c. Return None if absent
+      3. For class attribute:
+         a. Split by whitespace
+         b. Return vector of classes
+      4. For ID attribute:
+         a. Return single ID value
+      5. For URL attributes:
+         a. Extract value
+         b. Pass to URL sanitizer
+    skills_involved:
+      - attribute-parsing
+      - case-sensitivity-handling
+      - string-splitting
+    when_to_use: Extracting href, src, alt, class, id, etc. from elements
+
+  - name: input-binary-detection
+    context: Detect binary and non-UTF-8 input before parsing
+    key_source_files:
+      - crates/html-to-markdown/src/lib.rs (validate_input, detect_binary_*)
+    master_concepts:
+      - Magic number detection
+      - UTF-16 heuristics
+      - Control character ratio
+      - Encoding validation
+    step_by_step:
+      1. Get input bytes
+      2. Check magic number prefixes:
+         - 0x1F8B: gzip
+         - 0x28B52FFD: zstd
+         - 0x504B0304: ZIP
+         - 0x25504446: PDF
+      3. If no magic match, scan for binary indicators:
+         a. Count null bytes (UTF-16 detection)
+         b. Count control characters
+         c. Calculate ratios
+      4. Detect UTF-16:
+         - Even null bytes: UTF-16LE
+         - Odd null bytes: UTF-16BE
+      5. If binary detected, return specific error
+    skills_involved:
+      - binary-format-recognition
+      - byte-pattern-matching
+      - ratio-analysis
+    when_to_use: Validating untrusted HTML input
+
+  - name: character-encoding-detection
+    context: Detect and convert character encodings to UTF-8
+    key_source_files:
+      - crates/html-to-markdown/src/lib.rs
+    master_concepts:
+      - HTML5 charset meta tag
+      - BOM detection
+      - Encoding auto-detection
+      - Conversion to UTF-8
+    step_by_step:
+      1. Check for BOM (Byte Order Mark):
+         - UTF-8 BOM: 0xEFBBBF
+         - UTF-16LE BOM: 0xFFFE
+         - UTF-16BE BOM: 0xFEFF
+      2. If no BOM, check HTML5 meta charset
+      3. If no meta tag, use encoding_rs auto-detection
+      4. Validate encoding is supported
+      5. Convert bytes to UTF-8 string
+      6. Verify valid UTF-8 output
+    skills_involved:
+      - encoding-detection
+      - bom-parsing
+      - character-conversion
+    when_to_use: Handling non-UTF-8 input HTML
+
+  - name: parser-error-handling
+    context: Handle parser errors gracefully with recovery
+    key_source_files:
+      - crates/html-to-markdown/src/error.rs
+    master_concepts:
+      - Error types and classification
+      - Partial parsing recovery
+      - Error context preservation
+      - User-friendly messages
+    step_by_step:
+      1. Wrap parser call in Result
+      2. Catch parser errors
+      3. Classify error type:
+         - Malformed HTML
+         - Size limit exceeded
+         - Nesting depth exceeded
+         - Encoding error
+      4. If recoverable:
+         a. Attempt partial parse
+         b. Continue with best-effort result
+      5. Include error context:
+         - Input location
+         - Error description
+         - Remediation hint
+      6. Return Err(ConversionError::*)
+    skills_involved:
+      - error-classification
+      - partial-recovery
+      - error-message-design
+    when_to_use: Implementing robust parsing with error handling
+
+  - name: whitespace-mode-configuration
+    context: Apply configurable whitespace handling strategy
+    key_source_files:
+      - crates/html-to-markdown/src/options.rs (WhitespaceMode)
+    master_concepts:
+      - Preserve mode (keep all whitespace)
+      - Minimal mode (trim/normalize)
+      - Collapse mode (HTML5-style)
+      - Mode application per element
+    step_by_step:
+      1. Get WhitespaceMode from ConversionOptions
+      2. For text extraction:
+         - Preserve: return text as-is
+         - Minimal: trim() then normalize internal
+         - Collapse: apply HTML5 whitespace rules
+      3. HTML5 collapse rules:
+         a. Replace newline+spaces with space
+         b. Collapse multiple spaces to one
+         c. Preserve leading/trailing in some contexts
+      4. Apply mode consistently across elements
+    skills_involved:
+      - whitespace-normalization
+      - string-manipulation
+      - configuration-application
+    when_to_use: Text extraction and processing
+
+  - name: parser-performance-optimization
+    context: Optimize parser speed and memory usage
+    key_source_files:
+      - crates/html-to-markdown/src/converter.rs
+    master_concepts:
+      - Parser benchmarking
+      - Memory allocation patterns
+      - Hot path optimization
+      - Caching strategies
+    step_by_step:
+      1. Benchmark current parser
+      2. Profile with flamegraph
+      3. Identify hot paths
+      4. Optimize:
+         a. Reduce string copies
+         b. Use reference counting
+         c. Implement node caching
+         d. Lazy evaluation
+      5. Verify correctness after optimization
+      6. Benchmark improvement
+    skills_involved:
+      - performance-profiling
+      - optimization-techniques
+      - memory-management
+    when_to_use: Improving conversion speed for large documents
+
+  - name: html5-spec-compliance
+    context: Ensure HTML5 spec compliance in parsing
+    key_source_files:
+      - crates/html-to-markdown/src/converter.rs
+    master_concepts:
+      - HTML5 spec recovery rules
+      - Malformed HTML handling
+      - Entity handling per spec
+      - Namespace support
+    step_by_step:
+      1. Test against HTML5 spec test suite
+      2. Verify recovery rules for common errors:
+         - Unclosed tags: auto-close per algorithm
+         - Missing required tags: insert implicitly
+         - Mismatched tags: fix and close properly
+      3. Test entity handling (&#123;, &nbsp;, etc.)
+      4. Test namespace support (SVG, MathML)
+      5. Document deviations from spec
+    skills_involved:
+      - html5-spec-knowledge
+      - test-case-design
+      - standard-compliance
+    when_to_use: Ensuring robust parsing of real-world HTML

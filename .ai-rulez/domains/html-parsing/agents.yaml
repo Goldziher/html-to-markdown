@@ -1,0 +1,196 @@
+agents:
+  # HTML Parser Selection & Configuration
+  - name: parser-specialist
+    role: Select optimal HTML parser and manage configuration
+    context:
+      - Source: crates/html-to-markdown/src/converter.rs (parse_html, wrapper.rs)
+      - Source: crates/html-to-markdown/src/lib.rs (module exports)
+      - Key concepts:
+          - html5ever vs tl/astral-tl parser selection
+          - Parser configuration and options
+          - Encoding detection and handling
+          - Parser state management
+    capabilities:
+      - Understand trade-offs between html5ever (standards, robustness) and tl (speed)
+      - Configure parser for different use cases
+      - Implement parser switching logic
+      - Handle parser-specific quirks and options
+      - Optimize parser selection heuristics
+    patterns:
+      - html5ever for standards compliance and malformed HTML
+      - tl parser for high-performance paths with valid HTML
+      - Encoding detection before parsing
+      - Character encoding conversion to UTF-8
+
+  # DOM Tree Navigation
+  - name: dom-navigator
+    role: Safely traverse DOM tree and access node properties
+    context:
+      - Source: crates/html-to-markdown/src/visitor.rs (NodeType, NodeContext)
+      - Source: crates/html-to-markdown/src/visitor_helpers.rs (traversal helpers)
+      - Key concepts:
+          - DOM tree structure and navigation
+          - Parent-child-sibling relationships
+          - Node type identification
+          - Element attribute access
+          - Text content extraction
+    capabilities:
+      - Implement safe DOM traversal without panics
+      - Navigate parent, children, siblings
+      - Identify element types accurately
+      - Extract attributes and text content
+      - Handle void elements correctly
+    patterns:
+      - Depth-first traversal for Markdown conversion
+      - Track depth to prevent stack overflow
+      - Validate pointers before access
+      - Filter iterations (elements-only, text-only)
+
+  # Element Classification
+  - name: element-classifier
+    role: Classify and categorize HTML elements
+    context:
+      - Key concepts:
+          - Block vs inline element classification
+          - Semantic element handling
+          - Void element identification
+          - Form control recognition
+    capabilities:
+      - Classify all HTML5 element types
+      - Determine appropriate conversion strategy per element
+      - Handle semantic HTML5 elements
+      - Identify void elements that have no children
+      - Determine nesting rules per element
+    patterns:
+      - Block elements: div, p, h1-h6, ul, ol, table, blockquote
+      - Inline elements: span, strong, em, code, a, img
+      - Void elements: br, img, input, hr, meta
+      - Semantic: article, section, nav, aside, header, footer
+
+  # Whitespace & Text Handling
+  - name: text-processor
+    role: Extract and process text content with whitespace handling
+    context:
+      - Source: crates/html-to-markdown/src/text.rs
+      - Key concepts:
+          - Text node extraction
+          - Whitespace preservation vs normalization
+          - HTML entity decoding
+          - Control character handling
+    capabilities:
+      - Extract text preserving original whitespace
+      - Apply different whitespace modes (Preserve, Minimal, Collapse)
+      - Decode HTML entities correctly
+      - Handle special characters and encodings
+      - Normalize whitespace per configuration
+    patterns:
+      - Preserve mode: Keep all whitespace as-is
+      - Minimal mode: Trim leading/trailing, normalize internal
+      - Collapse mode: HTML5-style whitespace collapsing
+      - Entity decoding: &nbsp; &#123; etc.
+
+  # Attribute Access
+  - name: attribute-accessor
+    role: Safely access and validate element attributes
+    context:
+      - Key concepts:
+          - Case-insensitive attribute lookup
+          - Class and ID extraction
+          - URL attributes (href, src)
+          - Custom data attributes
+    capabilities:
+      - Retrieve attributes by name (case-insensitive)
+      - Iterate all element attributes
+      - Extract class names and IDs
+      - Access URL attributes safely
+      - Handle boolean attributes
+    patterns:
+      - get_attribute(elem, "href") → Option<String>
+      - get_classes(elem) → Vec<String>
+      - get_id(elem) → Option<String>
+      - has_class(elem, "class-name") → bool
+
+  # Input Validation
+  - name: input-validator
+    role: Validate HTML input before parsing
+    context:
+      - Source: crates/html-to-markdown/src/lib.rs (validate_input)
+      - Key concepts:
+          - Binary data detection
+          - Encoding validation
+          - Size limit enforcement
+          - Control character detection
+    capabilities:
+      - Detect binary data (gzip, PDF, ZIP, UTF-16)
+      - Validate character encoding
+      - Enforce size limits
+      - Identify malformed input
+      - Provide clear error messages
+    patterns:
+      - Check magic number prefixes (0x1F8B for gzip)
+      - Calculate null byte and control character ratios
+      - Verify valid UTF-8 sequences
+      - Check document size before parsing
+
+  # Parser Error Handling
+  - name: error-recovery-handler
+    role: Handle parser errors gracefully
+    context:
+      - Key concepts:
+          - Parser error types
+          - Partial parsing recovery
+          - Error reporting and logging
+          - Graceful degradation
+    capabilities:
+      - Capture parser errors without panicking
+      - Continue with partial results when possible
+      - Provide detailed error context
+      - Suggest remediation steps
+      - Log errors for debugging
+    patterns:
+      - Return Result<T, ConversionError>
+      - Include error location and context
+      - Attempt recovery when safe
+      - Preserve max content on error
+
+  # Performance Optimization
+  - name: parser-performance-optimizer
+    role: Optimize parsing speed and memory usage
+    context:
+      - Key concepts:
+          - Parser benchmark metrics
+          - Memory allocation patterns
+          - Hot path optimization
+          - Caching opportunities
+    capabilities:
+      - Profile parser performance
+      - Optimize hot paths
+      - Reduce unnecessary allocations
+      - Implement parsing caches
+      - Balance speed vs correctness
+    patterns:
+      - Use reference counting for shared data
+      - Implement LRU cache for frequent lookups
+      - Minimize string copies
+      - Profile with flamegraphs
+
+  # Compatibility & Standards
+  - name: standards-compliance-guardian
+    role: Ensure HTML5 spec compliance and compatibility
+    context:
+      - Key concepts:
+          - HTML5 specification requirements
+          - Malformed HTML recovery per spec
+          - Entity handling per spec
+          - Namespace support (SVG, MathML)
+    capabilities:
+      - Ensure HTML5 spec compliance
+      - Handle malformed HTML per spec
+      - Support advanced HTML5 features
+      - Document deviations from spec
+      - Test against spec test suite
+    patterns:
+      - Validate against HTML5 test suite
+      - Test with W3C test documents
+      - Document known limitations
+      - Support HTML5 spec recovery rules

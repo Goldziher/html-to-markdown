@@ -1,0 +1,452 @@
+skills:
+  - name: heading-conversion
+    context: Convert HTML heading tags to Markdown
+    key_source_files:
+      - crates/html-to-markdown/src/converter.rs (convert_heading)
+    master_concepts:
+      - ATX style (#)
+      - Setext style (underline)
+      - HeadingStyle configuration
+      - Content preservation
+    step_by_step:
+      1. Extract heading level (h1=1, h2=2, etc.)
+      2. Extract heading text content
+      3. Check HeadingStyle option:
+         - ATX: Generate "# h1" or "## h2" etc.
+         - Setext: Generate "h1\n==\n==" for h1, "h2\n--\n--" for h2
+      4. Preserve inline formatting (bold, italic, links)
+      5. Add blank line after heading
+    skills_involved:
+      - content-extraction
+      - markdown-formatting
+      - option-application
+    when_to_use: Converting any heading element
+
+  - name: paragraph-conversion
+    context: Convert paragraph tags to Markdown
+    key_source_files:
+      - crates/html-to-markdown/src/converter.rs (convert_p)
+    master_concepts:
+      - Content extraction
+      - Inline formatting preservation
+      - Blank line separation
+      - Whitespace handling
+    step_by_step:
+      1. Extract paragraph content
+      2. Process inline formatting:
+         - Bold: <strong> → **text**
+         - Italic: <em> → *text*
+         - Links: <a> → [text](href)
+      3. Handle line breaks within paragraph
+      4. Trim excessive whitespace
+      5. Add blank line after paragraph
+    skills_involved:
+      - content-extraction
+      - inline-element-conversion
+      - markdown-formatting
+    when_to_use: Converting <p> tags
+
+  - name: list-conversion-and-nesting
+    context: Convert HTML lists to Markdown lists with proper nesting
+    key_source_files:
+      - crates/html-to-markdown/src/converter.rs (convert_list)
+    master_concepts:
+      - Unordered vs ordered lists
+      - List item processing
+      - Nesting and indentation
+      - Tight vs loose detection
+    step_by_step:
+      1. Identify list type (ul or ol)
+      2. Process each list item:
+         a. Extract item content
+         b. Process nested lists recursively
+      3. Determine indentation level
+      4. Choose bullet/number style:
+         - ul: "-" or "*" or "+" per option
+         - ol: "1." "2." etc.
+      5. Detect tight/loose list:
+         - Tight: No blank lines between items
+         - Loose: Blank lines between items
+      6. Format output with proper indentation
+    skills_involved:
+      - recursion-handling
+      - indentation-management
+      - list-structure-analysis
+    when_to_use: Converting <ul>, <ol>, <li> elements
+
+  - name: table-conversion
+    context: Convert HTML tables to Markdown GFM pipe tables
+    key_source_files:
+      - crates/html-to-markdown/src/converter.rs (convert_table)
+    master_concepts:
+      - Table structure (thead, tbody, tfoot)
+      - Cell content and alignment
+      - GFM pipe format
+      - Header detection
+    step_by_step:
+      1. Extract table structure:
+         - Headers from <thead> or <th> elements
+         - Data from <tbody> or <td> elements
+      2. Collect column alignments:
+         - Extract from align attribute or CSS
+         - Map: left, center, right
+      3. Generate header row: "| h1 | h2 | h3 |"
+      4. Generate separator: "|---|:-:|---|"
+         - ---|  for left
+         - :-:|  for center
+         - --:|  for right
+      5. Generate data rows with proper escaping
+      6. Handle edge cases:
+         - Missing cells: fill with empty
+         - Pipe in content: escape with \|
+    skills_involved:
+      - table-structure-analysis
+      - alignment-detection
+      - pipe-escaping
+    when_to_use: Converting <table> elements
+
+  - name: link-conversion
+    context: Convert HTML links to Markdown format
+    key_source_files:
+      - crates/html-to-markdown/src/converter.rs (convert_link)
+    master_concepts:
+      - href extraction
+      - Link text processing
+      - Title attribute handling
+      - URL sanitization
+    step_by_step:
+      1. Extract href attribute
+      2. Sanitize URL with sanitize_url()
+      3. Extract link text
+      4. Check for title attribute
+      5. Format: "[text](href)" or "[text](href \"title\")"
+      6. Handle edge cases:
+         - No href: treat as plain text
+         - No text: use href as text
+         - Fragment URLs: preserve #anchor
+    skills_involved:
+      - url-extraction
+      - url-sanitization
+      - markdown-formatting
+    when_to_use: Converting <a> elements
+
+  - name: image-conversion
+    context: Convert HTML images to Markdown format
+    key_source_files:
+      - crates/html-to-markdown/src/converter.rs (convert_image)
+    master_concepts:
+      - src extraction
+      - alt text handling
+      - Responsive images (srcset)
+      - Title attribute
+    step_by_step:
+      1. Extract src attribute
+      2. Sanitize URL
+      3. Extract alt text (or filename if no alt)
+      4. Check for title attribute
+      5. Format: "![alt](src)" or "![alt](src \"title\")"
+      6. Handle responsive:
+         - Check srcset attribute
+         - Use best-fit source
+      7. Handle data URIs if configured
+    skills_involved:
+      - url-extraction
+      - alt-text-handling
+      - responsive-image-processing
+    when_to_use: Converting <img> elements
+
+  - name: emphasis-and-formatting-conversion
+    context: Convert text emphasis tags to Markdown
+    key_source_files:
+      - crates/html-to-markdown/src/converter.rs
+    master_concepts:
+      - Bold/strong formatting
+      - Italic/emphasis formatting
+      - Strikethrough
+      - Nested emphasis
+      - Escaping rules
+    step_by_step:
+      1. For <strong>, <b>: wrap with "**" on both sides
+      2. For <em>, <i>: wrap with "*" on both sides
+      3. For <del>, <s>: wrap with "~~" on both sides
+      4. For nested emphasis (e.g., bold+italic):
+         a. Detect combination
+         b. Use "***" for bold+italic
+      5. Avoid double-escaping (not "****text****")
+      6. Preserve content without interpretation
+    skills_involved:
+      - emphasis-detection
+      - formatting-composition
+      - escape-management
+    when_to_use: Converting emphasis elements
+
+  - name: inline-code-conversion
+    context: Convert code elements to Markdown
+    key_source_files:
+      - crates/html-to-markdown/src/converter.rs
+    master_concepts:
+      - Backtick wrapping
+      - Content preservation
+      - Nested code handling
+      - Escape rules
+    step_by_step:
+      1. Extract code content
+      2. Determine backtick count needed:
+         - No backticks in content: use single `
+         - Backticks present: use double `` or more
+      3. Wrap: "`code`" or "``code``"
+      4. Preserve content exactly (no interpretation)
+      5. Handle edge cases:
+         - Code with backticks
+         - Code with special chars
+         - Code with entity references
+    skills_involved:
+      - content-preservation
+      - backtick-escaping
+      - special-char-handling
+    when_to_use: Converting <code>, <kbd>, <samp> elements
+
+  - name: markdown-text-escaping
+    context: Escape Markdown metacharacters in text
+    key_source_files:
+      - crates/html-to-markdown/src/text.rs
+    master_concepts:
+      - Metacharacter identification
+      - Escape rules
+      - Context-aware escaping
+      - Double-escape prevention
+    step_by_step:
+      1. Identify Markdown metacharacters:
+         \ * _ ` [ ] ( ) # + - . ! | > ~ =
+      2. For each metachar, check if escape needed:
+         - Before Markdown syntax: escape
+         - In code block: no escape
+         - In link text: escape
+      3. Escape with backslash: "\*" for literal "*"
+      4. Verify no double-escaping (no "\\\\*")
+      5. Preserve content accuracy
+    skills_involved:
+      - character-identification
+      - context-detection
+      - selective-escaping
+    when_to_use: Processing text content in conversion
+
+  - name: html-entity-decoding
+    context: Decode HTML entities in text
+    key_source_files:
+      - crates/html-to-markdown/src/text.rs
+    master_concepts:
+      - Named entities (&nbsp;, &lt;, &amp;)
+      - Numeric entities (&#123;, &#x7B;)
+      - Partial entity handling
+      - Preservation of decoded text
+    step_by_step:
+      1. Identify HTML entities:
+         - Named: &name;
+         - Decimal: &#123;
+         - Hex: &#x7B;
+      2. Decode each entity:
+         - &nbsp; → " " (non-breaking space)
+         - &lt; → "<"
+         - &gt; → ">"
+         - &amp; → "&"
+         - &#123; → "{"
+      3. Handle partial entities:
+         - "& nbsp" → "& nbsp" (preserve)
+         - "&123" → "&123" (preserve)
+      4. Don't re-encode after decoding
+    skills_involved:
+      - entity-recognition
+      - unicode-mapping
+      - error-handling
+    when_to_use: Processing text content with entities
+
+  - name: whitespace-normalization
+    context: Normalize whitespace per configuration
+    key_source_files:
+      - crates/html-to-markdown/src/options.rs (WhitespaceMode)
+    master_concepts:
+      - Preserve mode (identity)
+      - Minimal mode (trim, normalize internal)
+      - Collapse mode (HTML5 rules)
+    step_by_step:
+      1. Get WhitespaceMode from options
+      2. Apply based on mode:
+         - Preserve: no change
+         - Minimal: text.trim() + normalize_internal()
+         - Collapse: apply HTML5 rules
+      3. HTML5 collapse:
+         a. Replace \n + whitespace with space
+         b. Collapse multiple spaces to one
+         c. Remove leading/trailing (context-dependent)
+      4. Preserve line breaks from <br>
+    skills_involved:
+      - string-manipulation
+      - mode-selection
+      - whitespace-analysis
+    when_to_use: Text processing in conversion
+
+  - name: blockquote-conversion
+    context: Convert blockquote elements to Markdown
+    key_source_files:
+      - crates/html-to-markdown/src/converter.rs
+    master_concepts:
+      - Block quote prefix (>)
+      - Nesting support
+      - Content preservation
+      - Line-by-line formatting
+    step_by_step:
+      1. Extract blockquote content
+      2. Split by lines
+      3. For each line, prefix with "> "
+      4. For nested blockquotes: ">> ", ">>> " etc.
+      5. Preserve blank lines within blockquote
+      6. Handle multi-line content (multiple paragraphs)
+    skills_involved:
+      - line-processing
+      - nesting-management
+      - prefix-application
+    when_to_use: Converting <blockquote> elements
+
+  - name: task-list-detection-and-conversion
+    context: Detect and convert checkbox task lists
+    key_source_files:
+      - crates/html-to-markdown/src/converter.rs
+    master_concepts:
+      - Checkbox detection
+      - Checked state extraction
+      - Task list format ([ ] vs [x])
+      - Item content processing
+    step_by_step:
+      1. For each <li>, check for <input type="checkbox">
+      2. If found:
+         a. Extract checked attribute
+         b. Format as "- [ ] text" (unchecked)
+         c. Format as "- [x] text" (checked)
+      3. Process list item content normally
+      4. Handle mixed task/regular lists
+    skills_involved:
+      - element-detection
+      - attribute-extraction
+      - list-formatting
+    when_to_use: Converting lists with checkboxes
+
+  - name: semantic-html5-element-conversion
+    context: Convert semantic HTML5 elements to Markdown
+    key_source_files:
+      - crates/html-to-markdown/src/converter.rs
+    master_concepts:
+      - Semantic elements (article, section, nav, aside)
+      - Conversion strategy (heading vs section marker)
+      - Content preservation
+    step_by_step:
+      1. Identify semantic element type
+      2. Choose conversion strategy:
+         - <article> → Optional heading or section
+         - <section> → Optional heading or section
+         - <nav> → Labeled list or section
+         - <aside> → Blockquote or indented section
+         - <header> → Optional heading
+         - <footer> → Optional separator
+      3. Apply strategy based on content
+      4. Preserve all content
+    skills_involved:
+      - semantic-understanding
+      - strategy-selection
+      - content-mapping
+    when_to_use: Converting semantic HTML5 elements
+
+  - name: form-element-handling
+    context: Convert form elements to Markdown equivalents
+    key_source_files:
+      - crates/html-to-markdown/src/converter.rs
+    master_concepts:
+      - Input type detection
+      - Label association
+      - Fallback formats
+    step_by_step:
+      1. Identify input type:
+         - text: code block or [Input: label]
+         - checkbox: task list
+         - radio: list item with marker
+         - hidden: skip entirely
+      2. Extract label from <label> or associated text
+      3. Convert based on type:
+         - Text: code block with label
+         - Checkbox: task list
+         - Select: list of options with selected marked
+      4. Preserve field structure
+    skills_involved:
+      - input-type-detection
+      - label-extraction
+      - fallback-format-selection
+    when_to_use: Converting form elements
+
+  - name: code-block-conversion
+    context: Convert preformatted and code blocks
+    key_source_files:
+      - crates/html-to-markdown/src/converter.rs
+    master_concepts:
+      - Triple backtick format
+      - Language annotation
+      - Whitespace preservation
+      - Indentation style
+    step_by_step:
+      1. Extract code content
+      2. Check for language hint (class, data-lang)
+      3. Determine style: backticks or indentation
+      4. If backticks:
+         a. Use ``` fence
+         b. Add language tag if available
+         c. Content on next lines
+      5. Preserve all whitespace exactly
+      6. Escape backticks in content if needed
+    skills_involved:
+      - code-extraction
+      - language-detection
+      - whitespace-preservation
+    when_to_use: Converting <pre>, <code> blocks
+
+  - name: url-sanitization
+    context: Validate and sanitize URLs in links/images
+    key_source_files:
+      - crates/html-to-markdown/src/safety.rs
+    master_concepts:
+      - Scheme validation
+      - Dangerous URL detection
+      - Safe URL formats
+    step_by_step:
+      1. Extract URL from href/src
+      2. Check for dangerous schemes:
+         - Block: javascript:, data:, vbscript:
+      3. Validate safe schemes:
+         - Allow: http, https, mailto, ftp, /, #
+      4. For relative URLs: pass through
+      5. For absolute URLs: validate scheme
+      6. Return sanitized URL or None
+    skills_involved:
+      - url-parsing
+      - scheme-validation
+      - security-checking
+    when_to_use: Processing URLs in links and images
+
+  - name: markdown-validation
+    context: Validate generated Markdown syntax
+    key_source_files:
+      - Markdown specification
+    master_concepts:
+      - Valid Markdown syntax
+      - Structure preservation
+      - Roundtrip testing
+    step_by_step:
+      1. Generate Markdown from HTML
+      2. Parse with Markdown validator
+      3. Check for syntax errors
+      4. Verify structure (headings, lists, tables)
+      5. Round-trip: MD → HTML → MD
+      6. Compare original vs roundtrip
+    skills_involved:
+      - markdown-parsing
+      - structure-analysis
+      - comparison
+    when_to_use: Testing conversion output quality

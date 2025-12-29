@@ -2,6 +2,19 @@ $schema: https://raw.githubusercontent.com/Goldziher/ai-rulez/main/schema/ai-rul
 description: High-performance HTML→Markdown converter with Rust core and polyglot bindings (Python, TypeScript, Ruby, PHP). Focus on performance, accuracy, and language parity.
 gitignore: true
 name: html-to-markdown
+
+# Include shared ai-rulez configuration from git repository
+includes:
+  - name: kreuzberg-shared-rules
+    source: https://github.com/kreuzberg-dev/ai-rulez.git
+    ref: main
+    include:
+      - rules
+      - context
+      - skills
+      - agents
+    merge_strategy: local-override
+
 presets:
     - claude
     - gemini
