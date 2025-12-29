@@ -11,6 +11,10 @@ readme.workspace = true
 rust-version.workspace = true
 description = "HTML to Markdown conversion for WebAssembly targets"
 
+# Publishing metadata for npm scoped package
+[package.metadata.wasm-pack.publish]
+registry = "https://registry.npmjs.org/"
+
 [lib]
 crate-type = ["cdylib", "rlib"]
 

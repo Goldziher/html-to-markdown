@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { convert, convertWithInlineImages, convertWithMetadata, convertWithVisitor, startProfiling, stopProfiling } from "html-to-markdown-node";
+import { convert, convertWithInlineImages, convertWithMetadata, convertWithVisitor, startProfiling, stopProfiling } from "@kreuzberg/html-to-markdown-node";
 
 type Scenario =
 	| "convert-default"

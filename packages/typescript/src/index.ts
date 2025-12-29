@@ -11,9 +11,9 @@ import {
 	type JsInlineImageConfig,
 	type JsMetadataConfig,
 	type JsMetadataExtraction,
-} from "html-to-markdown-node";
+} from "@kreuzberg/html-to-markdown-node";
 
-export * from "html-to-markdown-node";
+export * from "@kreuzberg/html-to-markdown-node";
 
 const jsonReplacer = (_key: string, value: unknown): unknown => (typeof value === "bigint" ? Number(value) : value);
 

@@ -241,24 +241,32 @@ jobs:
         run: scripts/publish/check-cratesio-versions.sh
 
   check-homebrew:
-    name: Check Homebrew tap for existing version
+    name: Check if Homebrew formula already published
     needs: prepare
     if: ${{ needs.prepare.outputs.is_tag == 'true' }}
     runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
     outputs:
       exists: ${{ steps.check.outputs.exists }}
     steps:
-      - name: Checkout
-        uses: actions/checkout@v6
-        with:
-          ref: ${{ needs.prepare.outputs.checkout_ref }}
-          fetch-depth: 0
-
-      - name: Check Homebrew formula version
+      - name: Check Homebrew tap for formula
         id: check
+        timeout-minutes: 3
         env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           VERSION: ${{ needs.prepare.outputs.version }}
-        run: scripts/publish/homebrew/check-homebrew-version.sh
+        run: |
+          # Check if Formula/html-to-markdown.rb exists and contains the current version
+          # Use timeout to prevent hanging on API issues
+          if timeout 120s gh api repos/kreuzberg-dev/homebrew-tap/contents/Formula/html-to-markdown.rb --jq '.content' 2>/dev/null | base64 -d | grep -q "version \"${VERSION}\""; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+            echo "Homebrew formula already contains version ${VERSION}" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+            echo "Homebrew formula does not contain version ${VERSION} or check failed" >> "$GITHUB_STEP_SUMMARY"
+          fi
 
   python-wheels:
     name: Build Python wheels (${{ matrix.os }})
@@ -903,8 +911,12 @@ jobs:
 
   csharp-package:
     name: Build C# NuGet package
-    needs: [prepare, csharp-ffi]
+    needs: [prepare, check-nuget, csharp-ffi]
+    if: ${{ needs.prepare.outputs.dry_run != 'true' && needs.prepare.outputs.is_tag == 'true' && needs.check-nuget.outputs.exists != 'true' }}
     runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -948,7 +960,8 @@ jobs:
 
   csharp-ffi:
     name: Build C# native FFI libraries
-    needs: prepare
+    needs: [prepare, check-nuget]
+    if: ${{ needs.prepare.outputs.dry_run != 'true' && needs.prepare.outputs.is_tag == 'true' && needs.check-nuget.outputs.exists != 'true' }}
     strategy:
       fail-fast: false
       matrix:
@@ -962,6 +975,9 @@ jobs:
           - os: macos-14
             rid: osx-arm64
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
+    permissions:
+      contents: read
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -1341,7 +1357,7 @@ jobs:
 
   publish-nuget:
     name: Publish NuGet package
-    needs: [prepare, csharp-package, upload-release-artifacts, check-nuget]
+    needs: [prepare, csharp-package, check-nuget]
     if: ${{ needs.prepare.result == 'success' && needs.prepare.outputs.tag && needs.prepare.outputs.dry_run != 'true' && needs.prepare.outputs.is_tag == 'true' && needs.check-nuget.outputs.exists != 'true' }}
     runs-on: ubuntu-latest
     permissions:
@@ -1358,22 +1374,26 @@ jobs:
         with:
           dotnet-version: "8.0.x"
 
-      - name: NuGet login (OIDC → temp API key)
-        id: nuget-login
-        uses: NuGet/login@v1
-        with:
-          user: "nhirschfeld"
+      - name: Ensure dotnet is available
+        run: scripts/publish/csharp/ensure-dotnet.sh
+        shell: bash
 
       - name: Download NuGet artifact
         uses: actions/download-artifact@v7
         with:
           name: csharp-nuget
-          path: dist/nuget
+          path: dist
 
-      - name: Publish package to NuGet.org
+      - name: Publish to NuGet
+        if: ${{ needs.prepare.outputs.dry_run != 'true' }}
         env:
-          DOTNET_NOLOGO: true
-        run: scripts/publish/nuget/publish-packages.sh --api-key "${{ steps.nuget-login.outputs.NUGET_API_KEY }}"
+          NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
+        run: dotnet nuget push "dist/*.nupkg" --source https://api.nuget.org/v3/index.json --api-key "${{ secrets.NUGET_API_KEY }}" --skip-duplicate && echo "NuGet package published." >> "$GITHUB_STEP_SUMMARY"
+        shell: bash
+
+      - name: Dry run summary
+        if: ${{ needs.prepare.outputs.dry_run == 'true' }}
+        run: (echo "Dry run requested; NuGet publish skipped." && ls -1 dist/*.nupkg) >> "$GITHUB_STEP_SUMMARY"
         shell: bash
 
   publish-maven:
@@ -1486,11 +1506,19 @@ jobs:
 
       - name: Publish native binary packages
         if: ${{ needs.prepare.outputs.dry_run != 'true' }}
+        env:
+          # NOTE: Using NPM_TOKEN for initial scoped package publishing
+          # After first successful publish, we can migrate to trusted publishing
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: scripts/publish/node/publish-native-packages.sh
         shell: bash
 
       - name: Publish main Node package
         if: ${{ needs.prepare.outputs.dry_run != 'true' }}
+        env:
+          # NOTE: Using NPM_TOKEN for initial scoped package publishing
+          # After first successful publish, we can migrate to trusted publishing
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
         working-directory: crates/html-to-markdown-node
         run: ../../scripts/publish/node/publish-main-package.sh
         shell: bash
@@ -1525,26 +1553,172 @@ jobs:
         run: npm install -g npm@latest
         shell: bash
 
-      - name: Extract WASM artifacts
-        run: scripts/publish/wasm/extract-artifacts.sh
+      - name: Configure npm authentication
+        env:
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          cat > ~/.npmrc <<'EOF'
+          //registry.npmjs.org/:_authToken=${NPM_TOKEN}
+          @kreuzberg:registry=https://registry.npmjs.org/
+          EOF
         shell: bash
 
       - name: Publish WASM package
-        if: ${{ needs.prepare.outputs.dry_run != 'true' }}
-        working-directory: crates/html-to-markdown-wasm
-        run: ../../scripts/publish/wasm/publish-package.sh
+        env:
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          cd crates/html-to-markdown-wasm
+          publish_log=$(mktemp)
+          set +e
+          npm publish --access public 2>&1 | tee "${publish_log}"
+          status=${PIPESTATUS[0]}
+          set -e
+          if [[ "${status}" -ne 0 ]]; then
+            if grep -q "previously published versions" "${publish_log}"; then
+              echo "WASM package already published; skipping."
+            else
+              exit "${status}"
+            fi
+          fi
         shell: bash
+
+  homebrew-bottles:
+    name: Build Homebrew bottles (${{ matrix.bottle_tag }})
+    needs: [prepare, check-homebrew]
+    if: |
+      needs.prepare.outputs.is_tag == 'true' &&
+      (needs.check-homebrew.outputs.exists != 'true')
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 180
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-latest
+            bottle_tag: arm64_sequoia
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.prepare.outputs.checkout_ref }}
+          fetch-depth: 0
+
+      - name: Ensure target commit
+        if: ${{ needs.prepare.outputs.target_sha != '' }}
+        run: git checkout --progress --force ${{ needs.prepare.outputs.target_sha }}
+
+      - name: Setup Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-apple-darwin
+
+      - name: Setup Homebrew
+        run: |
+          brew tap homebrew/core
+          brew update
+
+      - name: Extract version
+        id: version
+        env:
+          TAG: ${{ needs.prepare.outputs.tag }}
+        run: |
+          VERSION="${TAG#v}"
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+
+      - name: Build CLI for bottle
+        run: |
+          cargo build --release \
+            -p html-to-markdown-cli
+
+      - name: Create Homebrew bottle
+        id: bottle
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+          TAG: ${{ needs.prepare.outputs.tag }}
+        run: |
+          # Prepare bottle directory structure
+          bottle_dir="/tmp/html-to-markdown-bottle"
+          mkdir -p "${bottle_dir}/bin"
+
+          # Copy the built binary
+          cp target/release/html-to-markdown "${bottle_dir}/bin/"
+
+          # Create bottle tarball
+          cd "${bottle_dir}"
+          bottle_filename="html-to-markdown--${VERSION}.${{ matrix.bottle_tag }}.bottle.tar.gz"
+          tar -czf "${bottle_filename}" bin/
+
+          # Calculate SHA256
+          sha256=$(shasum -a 256 "${bottle_filename}" | cut -d' ' -f1)
+          echo "sha256=${sha256}" >> "$GITHUB_OUTPUT"
+          echo "filename=${bottle_filename}" >> "$GITHUB_OUTPUT"
+
+          # Copy to workspace for artifact upload
+          cp "${bottle_filename}" "${{ github.workspace }}/"
+          echo "Bottle created: ${bottle_filename}"
+          echo "SHA256: ${sha256}"
+
+      - name: Upload bottle artifact
+        uses: actions/upload-artifact@v6
+        with:
+          name: homebrew-bottle-${{ matrix.bottle_tag }}
+          path: html-to-markdown--${{ steps.version.outputs.version }}.${{ matrix.bottle_tag }}.bottle.tar.gz
+          retention-days: 14
+
+  upload-homebrew-bottles:
+    name: Upload Homebrew bottles to GitHub Release
+    needs: [prepare, check-homebrew, homebrew-bottles]
+    if: |
+      always() &&
+      needs.prepare.outputs.dry_run != 'true' &&
+      needs.prepare.outputs.is_tag == 'true' &&
+      (needs.check-homebrew.outputs.exists != 'true') &&
+      needs.homebrew-bottles.result == 'success'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.prepare.outputs.ref }}
+
+      - name: Ensure GitHub release exists
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: scripts/publish/ensure-github-release-exists.sh "${{ needs.prepare.outputs.tag }}"
+
+      - name: Download bottle artifacts
+        uses: actions/download-artifact@v7
+        with:
+          pattern: homebrew-bottle-*
+          path: dist/homebrew
+          merge-multiple: true
+
+      - name: Upload bottles (idempotent)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: scripts/publish/upload-homebrew-bottles.sh "${{ needs.prepare.outputs.tag }}" dist/homebrew
 
   publish-homebrew:
     name: Update Homebrew formula
-    needs: [prepare, upload-release-artifacts, check-homebrew]
-    if: ${{ needs.prepare.result == 'success' && needs.prepare.outputs.tag && needs.prepare.outputs.dry_run != 'true' && needs.prepare.outputs.is_tag == 'true' && needs.check-homebrew.outputs.exists != 'true' }}
+    needs: [prepare, check-homebrew, upload-homebrew-bottles]
+    if: |
+      always() &&
+      needs.prepare.outputs.dry_run != 'true' &&
+      needs.prepare.outputs.is_tag == 'true' &&
+      (needs.check-homebrew.outputs.exists != 'true') &&
+      needs.upload-homebrew-bottles.result == 'success'
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - name: Checkout
         uses: actions/checkout@v6
         with:
-          ref: ${{ needs.prepare.outputs.ref }}
+          ref: ${{ needs.prepare.outputs.checkout_ref }}
 
       - name: Extract release info
         id: release
@@ -1552,19 +1726,33 @@ jobs:
           TAG: ${{ needs.prepare.outputs.tag }}
           VERSION: ${{ needs.prepare.outputs.version }}
         run: scripts/publish/homebrew/extract-release-info.sh
-        shell: bash
 
-      - name: Update Homebrew formula
-        uses: mislav/bump-homebrew-formula-action@v3
+      - name: Download bottle artifacts
+        uses: actions/download-artifact@v7
         with:
-          formula-name: html-to-markdown
-          formula-path: Formula/html-to-markdown.rb
-          homebrew-tap: kreuzberg-dev/homebrew-tap
-          tag-name: ${{ needs.prepare.outputs.tag }}
-          download-url: ${{ steps.release.outputs.url }}
-          commit-message: |
-            chore(homebrew): update html-to-markdown to ${{ steps.release.outputs.version }}
+          pattern: homebrew-bottle-*
+          path: dist/homebrew
+          merge-multiple: true
 
-            Auto-update from release ${{ steps.release.outputs.tag }}
+      - name: Extract bottle hashes
+        id: bottles
         env:
-          COMMITTER_TOKEN: ${{ secrets.HOMEBREW_TOKEN }}
+          TAG: ${{ needs.prepare.outputs.tag }}
+          VERSION: ${{ needs.prepare.outputs.version }}
+        run: scripts/publish/homebrew/extract-bottle-hashes.sh dist/homebrew
+
+      - name: Setup Git credentials
+        env:
+          GH_TOKEN: ${{ secrets.HOMEBREW_TOKEN }}
+        run: |
+          git config --global credential.helper store
+          echo "https://x-access-token:${GH_TOKEN}@github.com" > ~/.git-credentials
+          git config --global user.name "html-to-markdown-bot"
+          git config --global user.email "bot@kreuzberg.dev"
+
+      - name: Update Homebrew formula with bottles
+        env:
+          TAG: ${{ needs.prepare.outputs.tag }}
+          VERSION: ${{ needs.prepare.outputs.version }}
+          DRY_RUN: 'false'
+        run: scripts/publish/homebrew/update-formula-with-bottles.sh dist/homebrew homebrew-tap

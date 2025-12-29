@@ -1,6 +1,6 @@
 {
-	"name": "html-to-markdown",
-	"version": "2.18.0",
+	"name": "@kreuzberg/html-to-markdown",
+	"version": "2.19.0",
 	"description": "High-performance HTML to Markdown converter for TypeScript/Node.js with a Rust core.",
 	"keywords": [
 		"html",
@@ -40,14 +40,14 @@
 		"html-to-markdown": "./dist/cli.js"
 	},
 	"scripts": {
-		"build": "pnpm --filter html-to-markdown-node run build && tsc --project tsconfig.json",
+		"build": "pnpm --filter @kreuzberg/html-to-markdown-node run build && tsc --project tsconfig.json",
 		"clean": "rm -rf dist",
 		"lint": "biome check src",
 		"lint:fix": "biome check --write src",
 		"format:fix": "biome check --write src",
 		"format:check": "biome check src",
-		"test": "pnpm --filter html-to-markdown-node run build && vitest run",
-		"test:coverage": "pnpm --filter html-to-markdown-node run build && vitest run --coverage",
+		"test": "pnpm --filter @kreuzberg/html-to-markdown-node run build && vitest run",
+		"test:coverage": "pnpm --filter @kreuzberg/html-to-markdown-node run build && vitest run --coverage",
 		"test:watch": "vitest"
 	},
 	"files": [
@@ -55,7 +55,7 @@
 		"README.md"
 	],
 	"dependencies": {
-		"html-to-markdown-node": "workspace:*"
+		"@kreuzberg/html-to-markdown-node": "workspace:*"
 	},
 	"devDependencies": {
 		"@biomejs/biome": "^2.3.10",
@@ -66,5 +66,9 @@
 	},
 	"engines": {
 		"node": ">=18"
+	},
+	"publishConfig": {
+		"registry": "https://registry.npmjs.org/",
+		"access": "public"
 	}
 }

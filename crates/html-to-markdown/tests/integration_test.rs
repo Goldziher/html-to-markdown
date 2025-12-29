@@ -83,6 +83,49 @@ fn test_simple_image() {
 }
 
 #[test]
+fn test_graphic_with_url() {
+    let html = "<p><graphic url=\"diagram.svg\" alt=\"Diagram\" /></p>";
+    let result = convert(html, None).unwrap();
+    assert_eq!(result, "![Diagram](diagram.svg)\n");
+}
+
+#[test]
+fn test_graphic_with_href() {
+    let html = "<p><graphic href=\"image.png\" alt=\"Image\" /></p>";
+    let result = convert(html, None).unwrap();
+    assert_eq!(result, "![Image](image.png)\n");
+}
+
+#[test]
+fn test_graphic_with_xlink_href() {
+    let html = "<p><graphic xlink:href=\"chart.svg\" alt=\"Chart\" /></p>";
+    let result = convert(html, None).unwrap();
+    assert_eq!(result, "![Chart](chart.svg)\n");
+}
+
+#[test]
+fn test_graphic_with_src() {
+    let html = "<p><graphic src=\"fallback.jpg\" alt=\"Fallback\" /></p>";
+    let result = convert(html, None).unwrap();
+    assert_eq!(result, "![Fallback](fallback.jpg)\n");
+}
+
+#[test]
+fn test_graphic_with_filename_fallback() {
+    let html = "<p><graphic url=\"image.png\" filename=\"my-image.png\" /></p>";
+    let result = convert(html, None).unwrap();
+    assert_eq!(result, "![my-image.png](image.png)\n");
+}
+
+#[test]
+fn test_graphic_attribute_priority() {
+    // url should take priority over href, xlink:href, src
+    let html = "<p><graphic url=\"priority.svg\" href=\"second.svg\" xlink:href=\"third.svg\" src=\"fourth.svg\" alt=\"Priority\" /></p>";
+    let result = convert(html, None).unwrap();
+    assert_eq!(result, "![Priority](priority.svg)\n");
+}
+
+#[test]
 fn test_unordered_list() {
     let html = "<ul><li>Item 1</li><li>Item 2</li><li>Item 3</li></ul>";
     let result = convert(html, None).unwrap();

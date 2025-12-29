@@ -1,8 +1,8 @@
 # html-to-markdown (TypeScript)
 
 [![Crates.io](https://img.shields.io/crates/v/html-to-markdown-rs.svg?logo=rust&label=crates.io)](https://crates.io/crates/html-to-markdown-rs)
-[![npm (node)](https://img.shields.io/npm/v/html-to-markdown-node.svg?logo=npm)](https://www.npmjs.com/package/html-to-markdown-node)
-[![npm (wasm)](https://img.shields.io/npm/v/html-to-markdown-wasm.svg?logo=npm)](https://www.npmjs.com/package/html-to-markdown-wasm)
+[![npm (node)](https://img.shields.io/npm/v/%40kreuzberg%2Fhtml-to-markdown-node.svg?logo=npm)](https://www.npmjs.com/package/@kreuzberg/html-to-markdown-node)
+[![npm (wasm)](https://img.shields.io/npm/v/%40kreuzberg%2Fhtml-to-markdown-wasm.svg?logo=npm)](https://www.npmjs.com/package/@kreuzberg/html-to-markdown-wasm)
 [![PyPI](https://img.shields.io/pypi/v/html-to-markdown.svg?logo=pypi)](https://pypi.org/project/html-to-markdown/)
 [![Packagist](https://img.shields.io/packagist/v/goldziher/html-to-markdown.svg)](https://packagist.org/packages/goldziher/html-to-markdown)
 [![RubyGems](https://badge.fury.io/rb/html-to-markdown.svg)](https://rubygems.org/gems/html-to-markdown)
@@ -13,26 +13,106 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://github.com/kreuzberg-dev/html-to-markdown/blob/main/LICENSE)
 [![Discord](https://img.shields.io/badge/Discord-Join%20our%20community-7289da)](https://discord.gg/pXxagNK2zN)
 
-High-performance HTML to Markdown converter for Node.js and Bun with full TypeScript support. This package wraps native `html-to-markdown-node` bindings and provides a type-safe API.
+High-performance HTML to Markdown converter for Node.js and Bun with full TypeScript support. This package wraps native `@kreuzberg/html-to-markdown-node` bindings and provides a type-safe API.
 
 ## Installation
 
 ```bash
 # Native bindings (Node.js/Bun) - Recommended
-npm install html-to-markdown-node
-pnpm add html-to-markdown-node
-yarn add html-to-markdown-node
-bun add html-to-markdown-node
+npm install @kreuzberg/html-to-markdown
+pnpm add @kreuzberg/html-to-markdown
+yarn add @kreuzberg/html-to-markdown
+bun add @kreuzberg/html-to-markdown
 
 # WebAssembly (browser/edge/Node without native toolchain)
+npm install @kreuzberg/html-to-markdown-wasm
+```
+
+## Migration Guide (v2.18.x → v2.19.0)
+
+### Breaking Change: Scoped npm Packages
+
+In v2.19.0, npm packages were moved to the `@kreuzberg` scope to align with the Kreuzberg.dev organization.
+
+#### Package Installation Update
+
+**Before (v2.18.x):**
+```bash
+npm install html-to-markdown-node
 npm install html-to-markdown-wasm
 ```
+
+**After (v2.19.0+):**
+```bash
+npm install @kreuzberg/html-to-markdown-node
+npm install @kreuzberg/html-to-markdown-wasm
+```
+
+#### Import Statement Update
+
+**Before:**
+```typescript
+import { convert } from 'html-to-markdown-node';
+import { convert } from 'html-to-markdown-wasm';
+```
+
+**After:**
+```typescript
+import { convert } from '@kreuzberg/html-to-markdown-node';
+import { convert } from '@kreuzberg/html-to-markdown-wasm';
+```
+
+#### TypeScript Declaration Update
+
+Update your TypeScript configuration if you have imports from the old package name:
+
+**Before (tsconfig.json or import aliases):**
+```json
+{
+  "compilerOptions": {
+    "paths": {
+      "html-to-markdown": ["node_modules/html-to-markdown-node"]
+    }
+  }
+}
+```
+
+**After:**
+```json
+{
+  "compilerOptions": {
+    "paths": {
+      "@kreuzberg/html-to-markdown": ["node_modules/@kreuzberg/html-to-markdown-node"]
+    }
+  }
+}
+```
+
+#### Deno Update
+
+**Before:**
+```typescript
+import { convert } from "npm:html-to-markdown-wasm";
+```
+
+**After:**
+```typescript
+import { convert } from "npm:@kreuzberg/html-to-markdown-wasm";
+```
+
+#### Summary of Changes
+
+- All npm packages now use `@kreuzberg` scope
+- `html-to-markdown-node` → `@kreuzberg/html-to-markdown-node`
+- `html-to-markdown-wasm` → `@kreuzberg/html-to-markdown-wasm`
+- TypeScript types and APIs are identical
+- No functional changes to the library
 
 ## Quick Start
 
 **Basic conversion with type safety:**
 ```typescript
-import { convert } from 'html-to-markdown-node';
+import { convert } from '@kreuzberg/html-to-markdown';
 
 const markdown: string = convert('<h1>Hello World</h1>');
 console.log(markdown); // # Hello World
@@ -40,7 +120,7 @@ console.log(markdown); // # Hello World
 
 **With conversion options:**
 ```typescript
-import { convert, ConversionOptions } from 'html-to-markdown-node';
+import { convert, ConversionOptions } from '@kreuzberg/html-to-markdown';
 
 const options: ConversionOptions = {
   headingStyle: 'atx',
@@ -64,7 +144,7 @@ interface ConversionOptions {
 
 **File and stream helpers:**
 ```typescript
-import { convertFile, convertBuffer } from 'html-to-markdown-node';
+import { convertFile, convertBuffer } from '@kreuzberg/html-to-markdown';
 
 // From file
 const markdown = await convertFile('page.html');
@@ -261,8 +341,8 @@ Run `task bench:harness -- --frameworks node` to benchmark locally.
 ## Links
 
 - [GitHub](https://github.com/kreuzberg-dev/html-to-markdown)
-- [npm Package](https://www.npmjs.com/package/html-to-markdown-node)
-- [WASM Package](https://www.npmjs.com/package/html-to-markdown-wasm)
+- [npm Package](https://www.npmjs.com/package/@kreuzberg/html-to-markdown)
+- [WASM Package](https://www.npmjs.com/package/@kreuzberg/html-to-markdown-wasm)
 - [Discord Community](https://discord.gg/pXxagNK2zN)
 
 ## License

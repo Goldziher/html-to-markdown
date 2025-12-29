@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import type { JsConversionOptions } from "html-to-markdown-node";
-import { convertWithVisitor } from "html-to-markdown-node";
+import type { JsConversionOptions } from "@kreuzberg/html-to-markdown-node";
+import { convertWithVisitor } from "@kreuzberg/html-to-markdown-node";
 
 /**
  * VisitResult type representing the result of a visitor callback.

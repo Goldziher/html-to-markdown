@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import type { JsConversionOptions } from "html-to-markdown-node";
+import type { JsConversionOptions } from "@kreuzberg/html-to-markdown-node";
 import { convertWithVisitor, JsHeadingStyle } from "../src/index";
 
 /**

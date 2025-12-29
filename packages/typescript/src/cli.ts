@@ -7,7 +7,7 @@ import {
 	convertWithInlineImagesJson,
 	type JsConversionOptions,
 	type JsInlineImageConfig,
-} from "html-to-markdown-node";
+} from "@kreuzberg/html-to-markdown-node";
 
 import { convertStream, convertStreamWithInlineImages } from "./index";
 

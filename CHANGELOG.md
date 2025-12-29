@@ -5,6 +5,41 @@ All notable changes to html-to-markdown will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.19.0] - 2025-12-29
+
+### Breaking Changes
+
+- **npm package namespace**: All npm packages now use the `@kreuzberg` scope for better organization and discoverability
+  - `html-to-markdown-node` → `@kreuzberg/html-to-markdown-node`
+  - `html-to-markdown-wasm` → `@kreuzberg/html-to-markdown-wasm`
+- **Java package namespace**: Java binding now uses `dev.kreuzberg` package prefix instead of `com.goldziher`
+  - Updated all Maven artifact IDs and Java package names for semantic clarity
+  - Affects all public classes and imports in Java projects
+- **C# namespace**: C# bindings now use `KreuzbergDev` namespace instead of `Goldziher`
+  - Updated NuGet package ID to `KreuzbergDev.HtmlToMarkdown`
+  - All public types now under `KreuzbergDev.HtmlToMarkdown` namespace
+
+### Features
+
+- **XML table support (TEI/JATS formats)**: Added support for TEI (Text Encoding Initiative) and JATS (Journal Article Tag Suite) table elements
+  - `<row>` elements for table rows with proper cell grouping and nesting
+  - `<cell>` elements with full attribute support including `role="head"` for header cells
+  - `<graphic>` elements for figure/image references within cells and content blocks
+  - Proper table structure preservation when converting scientific markup formats
+  - Aligns with CommonMark table output while respecting source document semantics
+
+### Bug Fixes
+
+- Fixed Clippy warnings across Rust core and all binding crates for cleaner compilation
+- Improved test suite with enhanced error messages and edge case coverage
+- Refined table element handling for robustness with malformed markup
+
+### Infrastructure
+
+- **CI/CD improvements**: Enhanced C# workflow for improved reliability and platform coverage
+- **Release distribution**: Added Homebrew bottle support for macOS CLI binary distribution
+- **Version synchronization**: All language bindings now synchronized to v2.19.0
+
 ## [2.18.0] - 2025-12-28
 
 ### Added

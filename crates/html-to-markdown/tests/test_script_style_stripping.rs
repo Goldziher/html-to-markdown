@@ -115,8 +115,10 @@ fn test_preserve_json_ld_script() {
 </body>
 </html>"#;
 
-    let mut options = ConversionOptions::default();
-    options.extract_metadata = true;
+    let options = ConversionOptions {
+        extract_metadata: true,
+        ..Default::default()
+    };
 
     let (markdown, metadata) =
         convert_with_metadata(html, Some(options), MetadataConfig::default()).expect("Failed to convert");
@@ -170,8 +172,10 @@ fn test_multiple_script_tags() {
 </body>
 </html>"#;
 
-    let mut options = ConversionOptions::default();
-    options.extract_metadata = true;
+    let options = ConversionOptions {
+        extract_metadata: true,
+        ..Default::default()
+    };
 
     let (markdown, metadata) =
         convert_with_metadata(html, Some(options), MetadataConfig::default()).expect("Failed to convert");
@@ -229,8 +233,10 @@ fn test_reuters_like_structure() {
 </body>
 </html>"#;
 
-    let mut options = ConversionOptions::default();
-    options.extract_metadata = true;
+    let options = ConversionOptions {
+        extract_metadata: true,
+        ..Default::default()
+    };
 
     let (markdown, metadata) =
         convert_with_metadata(html, Some(options), MetadataConfig::default()).expect("Failed to convert");

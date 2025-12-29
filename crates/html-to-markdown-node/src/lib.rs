@@ -1153,7 +1153,7 @@ pub fn convert(html: String, options: Option<JsConversionOptions>) -> Result<Str
 /// # Example
 ///
 /// ```javascript
-/// const { convertWithVisitor } = require('html-to-markdown-node');
+/// const { convertWithVisitor } = require('@kreuzberg/html-to-markdown-node');
 ///
 /// const html = '<a href="https://example.com">Click me</a>';
 /// const visitor = {

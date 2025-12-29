@@ -1,6 +1,6 @@
 {
-	"name": "html-to-markdown-node",
-	"version": "2.18.0",
+	"name": "@kreuzberg/html-to-markdown-node",
+	"version": "2.19.0",
 	"description": "High-performance HTML to Markdown converter - Node.js native bindings",
 	"main": "index.js",
 	"types": "index.d.ts",
@@ -68,5 +68,16 @@
 		"@octokit/core": "7.0.6",
 		"typanion": "3.14.0",
 		"up": "^1.0.2"
+	},
+	"optionalDependencies": {
+		"@kreuzberg/html-to-markdown-node-darwin-x64": "2.19.0-rc.1",
+		"@kreuzberg/html-to-markdown-node-darwin-arm64": "2.19.0-rc.1",
+		"@kreuzberg/html-to-markdown-node-win32-x64-msvc": "2.19.0-rc.1",
+		"@kreuzberg/html-to-markdown-node-win32-arm64-msvc": "2.19.0-rc.1",
+		"@kreuzberg/html-to-markdown-node-linux-x64-gnu": "2.19.0-rc.1",
+		"@kreuzberg/html-to-markdown-node-linux-x64-musl": "2.19.0-rc.1",
+		"@kreuzberg/html-to-markdown-node-linux-arm64-gnu": "2.19.0-rc.1",
+		"@kreuzberg/html-to-markdown-node-linux-arm64-musl": "2.19.0-rc.1",
+		"@kreuzberg/html-to-markdown-node-linux-arm-gnueabihf": "2.19.0-rc.1"
 	}
 }

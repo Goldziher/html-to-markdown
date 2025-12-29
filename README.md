@@ -9,14 +9,14 @@ High-performance HTML → Markdown conversion powered by Rust. Shipping as a Rus
 Part of the Kreuzberg.dev document intelligence ecosystem. Kreuzberg is a polyglot document intelligence framework with a fast Rust core. We build tools that help developers extract, process, and understand documents at scale, from PDFs to Office files, images, archives, emails, in 50+ formats. We've set out to make high-performance document intelligence faster and more ecological.
 
 [![Crates.io](https://img.shields.io/crates/v/html-to-markdown-rs.svg?logo=rust&label=crates.io)](https://crates.io/crates/html-to-markdown-rs)
-[![npm (node)](https://img.shields.io/npm/v/html-to-markdown-node.svg?logo=npm)](https://www.npmjs.com/package/html-to-markdown-node)
-[![npm (wasm)](https://img.shields.io/npm/v/html-to-markdown-wasm.svg?logo=npm)](https://www.npmjs.com/package/html-to-markdown-wasm)
+[![npm (node)](https://img.shields.io/npm/v/%40kreuzberg%2Fhtml-to-markdown-node.svg?logo=npm)](https://www.npmjs.com/package/@kreuzberg/html-to-markdown-node)
+[![npm (wasm)](https://img.shields.io/npm/v/%40kreuzberg%2Fhtml-to-markdown-wasm.svg?logo=npm)](https://www.npmjs.com/package/@kreuzberg/html-to-markdown-wasm)
 [![PyPI](https://img.shields.io/pypi/v/html-to-markdown.svg?logo=pypi)](https://pypi.org/project/html-to-markdown/)
 [![Packagist](https://img.shields.io/packagist/v/goldziher/html-to-markdown.svg)](https://packagist.org/packages/goldziher/html-to-markdown)
 [![RubyGems](https://badge.fury.io/rb/html-to-markdown.svg)](https://rubygems.org/gems/html-to-markdown)
 [![Hex.pm](https://img.shields.io/hexpm/v/html_to_markdown.svg)](https://hex.pm/packages/html_to_markdown)
-[![NuGet](https://img.shields.io/nuget/v/Goldziher.HtmlToMarkdown.svg)](https://www.nuget.org/packages/Goldziher.HtmlToMarkdown/)
-[![Maven Central](https://img.shields.io/maven-central/v/io.github.goldziher/html-to-markdown.svg)](https://central.sonatype.com/artifact/io.github.goldziher/html-to-markdown)
+[![NuGet](https://img.shields.io/nuget/v/KreuzbergDev.HtmlToMarkdown.svg)](https://www.nuget.org/packages/KreuzbergDev.HtmlToMarkdown/)
+[![Maven Central](https://img.shields.io/maven-central/v/dev.kreuzberg/html-to-markdown.svg)](https://central.sonatype.com/artifact/dev.kreuzberg/html-to-markdown)
 [![Go Reference](https://pkg.go.dev/badge/github.com/kreuzberg-dev/html-to-markdown/packages/go/v2/htmltomarkdown.svg)](https://pkg.go.dev/github.com/kreuzberg-dev/html-to-markdown/packages/go/v2/htmltomarkdown)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://github.com/kreuzberg-dev/html-to-markdown/blob/main/LICENSE)
 [![Discord](https://img.shields.io/badge/Discord-Join%20our%20community-7289da)](https://discord.gg/pXxagNK2zN)
@@ -46,7 +46,7 @@ Experience WebAssembly-powered HTML to Markdown conversion instantly in your bro
 **Node.js / Bun (Native - Fastest):**
 
 ```typescript
-import { convert } from 'html-to-markdown-node';
+import { convert } from '@kreuzberg/html-to-markdown-node';
 
 const html = '<h1>Hello</h1><p>Rust ❤️ Markdown</p>';
 const markdown = convert(html, {
@@ -81,17 +81,19 @@ Full language guides: See [Language Guides](#language-guides) below.
 
 | Target                      | Command(s)                                                                                                       |
 | --------------------------- | ---------------------------------------------------------------------------------------------------------------- |
-| **Node.js/Bun** (native)    | `npm install html-to-markdown-node`                                                                              |
-| **WebAssembly** (universal) | `npm install html-to-markdown-wasm`                                                                              |
-| **Deno**                    | `import { convert } from "npm:html-to-markdown-wasm"`                                                            |
+| **Node.js/Bun** (native)    | `npm install @kreuzberg/html-to-markdown-node`                                                                   |
+| **WebAssembly** (universal) | `npm install @kreuzberg/html-to-markdown-wasm`                                                                   |
+| **Deno**                    | `import { convert } from "npm:@kreuzberg/html-to-markdown-wasm"`                                                 |
 | **Python** (bindings + CLI) | `pip install html-to-markdown`                                                                                   |
 | **PHP** (extension + helpers) | `PHP_EXTENSION_DIR=$(php-config --extension-dir) pie install goldziher/html-to-markdown`<br>`composer require goldziher/html-to-markdown` |
 | **Ruby** gem                | `bundle add html-to-markdown` or `gem install html-to-markdown`                                                  |
 | **Elixir** (Rustler NIF)    | `{:html_to_markdown, "~> 2.8"}`                                                                                  |
 | **Rust** crate              | `cargo add html-to-markdown-rs`                                                                                  |
+| **Java** (Maven)            | `<groupId>dev.kreuzberg</groupId><artifactId>html-to-markdown</artifactId>`                                     |
+| **C#/.NET** (NuGet)         | `dotnet add package KreuzbergDev.HtmlToMarkdown`                                                                 |
 | Rust CLI (crates.io)        | `cargo install html-to-markdown-cli`                                                                             |
 | Homebrew CLI                | `brew install html-to-markdown` (core)                                                                          |
-| Releases                    | [GitHub Releases](https://github.com/kreuzberg-dev/html-to-markdown/releases)                                        |
+| Releases                    | [GitHub Releases](https://github.com/kreuzberg-dev/html-to-markdown/releases)                                    |
 
 ## Performance
 
@@ -167,7 +169,31 @@ task test
 task wasm:test:wasmtime
 ```
 
-## Compatibility (v1 → v2)
+## Compatibility & Migrations
+
+### v2.19.0 Breaking Changes (Package Namespace Updates)
+
+Several language bindings were updated to use new namespaces and package owners:
+
+**npm (JavaScript/TypeScript):**
+- Old: `html-to-markdown-node` → New: `@kreuzberg/html-to-markdown-node`
+- Old: `html-to-markdown-wasm` → New: `@kreuzberg/html-to-markdown-wasm`
+- Update: `npm install @kreuzberg/html-to-markdown-node`
+- Update imports: `import { convert } from '@kreuzberg/html-to-markdown-node'`
+
+**Java:**
+- Old: `io.github.goldziher` → New: `dev.kreuzberg`
+- Update Maven: `<groupId>dev.kreuzberg</groupId>`
+- Update imports: `import dev.kreuzberg.htmltomarkdown.HtmlToMarkdown;`
+
+**C#/.NET:**
+- Old: `Goldziher.HtmlToMarkdown` → New: `KreuzbergDev.HtmlToMarkdown`
+- Update: `dotnet add package KreuzbergDev.HtmlToMarkdown`
+- Namespace remains: `using HtmlToMarkdown;`
+
+**Python, Ruby, PHP, Go, Elixir, Rust:** No changes required.
+
+### v1 → v2 Compatibility
 
 - V2's Rust core sustains **150–210 MB/s** throughput; V1 averaged **≈ 2.5 MB/s** (60–80× faster).
 - Python compatibility shim available in `html_to_markdown.v1_compat` (deprecated; emits warnings; plan migrations now). See [Python README](./packages/python/README.md#v1-compatibility) for keyword mappings.

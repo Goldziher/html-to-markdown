@@ -1,7 +1,7 @@
-# html-to-markdown-wasm
+# @kreuzberg/html-to-markdown-wasm
 
-> **npm package:** `html-to-markdown-wasm` (this README).
-> Use [`html-to-markdown-node`](https://www.npmjs.com/package/html-to-markdown-node) when you only target Node.js or Bun and want native performance.
+> **npm package:** `@kreuzberg/html-to-markdown-wasm` (this README).
+> Use [`@kreuzberg/html-to-markdown-node`](https://www.npmjs.com/package/@kreuzberg/html-to-markdown-node) when you only target Node.js or Bun and want native performance.
 
 Universal HTML to Markdown converter using WebAssembly.
 
@@ -10,15 +10,69 @@ Powered by the same Rust engine as the Node.js, Python, Ruby, and PHP bindings, 
 Runs anywhere: Node.js, Deno, Bun, browsers, and edge runtimes.
 
 [![Crates.io](https://img.shields.io/crates/v/html-to-markdown-rs.svg?logo=rust&label=crates.io)](https://crates.io/crates/html-to-markdown-rs)
-[![npm (node)](https://img.shields.io/npm/v/html-to-markdown-node.svg?logo=npm)](https://www.npmjs.com/package/html-to-markdown-node)
-[![npm (wasm)](https://img.shields.io/npm/v/html-to-markdown-wasm.svg?logo=npm)](https://www.npmjs.com/package/html-to-markdown-wasm)
+[![npm (node)](https://img.shields.io/npm/v/%40kreuzberg%2Fhtml-to-markdown-node.svg?logo=npm)](https://www.npmjs.com/package/@kreuzberg/html-to-markdown-node)
+[![npm (wasm)](https://img.shields.io/npm/v/%40kreuzberg%2Fhtml-to-markdown-wasm.svg?logo=npm)](https://www.npmjs.com/package/@kreuzberg/html-to-markdown-wasm)
 [![PyPI](https://img.shields.io/pypi/v/html-to-markdown.svg?logo=pypi)](https://pypi.org/project/html-to-markdown/)
 [![Packagist](https://img.shields.io/packagist/v/goldziher/html-to-markdown.svg)](https://packagist.org/packages/goldziher/html-to-markdown)
 [![RubyGems](https://badge.fury.io/rb/html-to-markdown.svg)](https://rubygems.org/gems/html-to-markdown)
-[![NuGet](https://img.shields.io/nuget/v/Goldziher.HtmlToMarkdown.svg)](https://www.nuget.org/packages/Goldziher.HtmlToMarkdown/)
-[![Maven Central](https://img.shields.io/maven-central/v/io.github.goldziher/html-to-markdown.svg)](https://central.sonatype.com/artifact/io.github.goldziher/html-to-markdown)
+[![NuGet](https://img.shields.io/nuget/v/KreuzbergDev.HtmlToMarkdown.svg)](https://www.nuget.org/packages/KreuzbergDev.HtmlToMarkdown/)
+[![Maven Central](https://img.shields.io/maven-central/v/dev.kreuzberg/html-to-markdown.svg)](https://central.sonatype.com/artifact/dev.kreuzberg/html-to-markdown)
 [![Go Reference](https://pkg.go.dev/badge/github.com/kreuzberg-dev/html-to-markdown/packages/go/v2/htmltomarkdown.svg)](https://pkg.go.dev/github.com/kreuzberg-dev/html-to-markdown/packages/go/v2/htmltomarkdown)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://github.com/kreuzberg-dev/html-to-markdown/blob/main/LICENSE)
+
+## Migration Guide (v2.18.x → v2.19.0)
+
+> **⚠️ BREAKING CHANGE: Package Namespace Update**
+>
+> In v2.19.0, the npm package namespace changed from `html-to-markdown-wasm` to `@kreuzberg/html-to-markdown-wasm` to reflect the new Kreuzberg.dev organization.
+
+### Install Updated Package
+
+**Before (v2.18.x):**
+```bash
+npm install html-to-markdown-wasm
+```
+
+**After (v2.19.0+):**
+```bash
+npm install @kreuzberg/html-to-markdown-wasm
+```
+
+### Update Import Statements
+
+**Before:**
+```typescript
+import { convert } from 'html-to-markdown-wasm';
+// or
+import { convert } from "npm:html-to-markdown-wasm";  // Deno
+```
+
+**After:**
+```typescript
+import { convert } from '@kreuzberg/html-to-markdown-wasm';
+// or
+import { convert } from "npm:@kreuzberg/html-to-markdown-wasm";  // Deno
+```
+
+### Update Browser ESM Imports
+
+**Before:**
+```javascript
+import init, { convert } from 'https://unpkg.com/html-to-markdown-wasm/dist-web/html_to_markdown_wasm.js';
+```
+
+**After:**
+```javascript
+import init, { convert } from 'https://unpkg.com/@kreuzberg/html-to-markdown-wasm/dist-web/html_to_markdown_wasm.js';
+```
+
+### Summary of Changes
+
+- Package renamed from `html-to-markdown-wasm` to `@kreuzberg/html-to-markdown-wasm`
+- All APIs remain identical
+- Full backward compatibility after updating package name and imports
+
+---
 
 ## Performance
 
@@ -66,18 +120,18 @@ Numbers captured via the shared fixture harness in `tools/benchmark-harness`:
 ### npm / Yarn / pnpm
 
 ```bash
-npm install html-to-markdown-wasm
+npm install @kreuzberg/html-to-markdown-wasm
 # or
-yarn add html-to-markdown-wasm
+yarn add @kreuzberg/html-to-markdown-wasm
 # or
-pnpm add html-to-markdown-wasm
+pnpm add @kreuzberg/html-to-markdown-wasm
 ```
 
 ### Deno
 
 ```typescript
 // Via npm specifier
-import { convert } from "npm:html-to-markdown-wasm";
+import { convert } from "npm:@kreuzberg/html-to-markdown-wasm";
 ```
 
 ## Usage
@@ -85,7 +139,7 @@ import { convert } from "npm:html-to-markdown-wasm";
 ### Basic Conversion
 
 ```javascript
-import { convert } from 'html-to-markdown-wasm';
+import { convert } from '@kreuzberg/html-to-markdown-wasm';
 
 const html = '<h1>Hello World</h1><p>This is <strong>fast</strong>!</p>';
 const markdown = convert(html);
@@ -108,7 +162,7 @@ console.log(markdown);
 import {
   convertWithOptionsHandle,
   createConversionOptionsHandle,
-} from 'html-to-markdown-wasm';
+} from '@kreuzberg/html-to-markdown-wasm';
 
 const handle = createConversionOptionsHandle({ hocrSpatialTables: false });
 const markdown = convertWithOptionsHandle('<h1>Reusable</h1>', handle);
@@ -124,7 +178,7 @@ import {
   convertBytesWithOptionsHandle,
   createConversionOptionsHandle,
   convertBytesWithInlineImages,
-} from 'html-to-markdown-wasm';
+} from '@kreuzberg/html-to-markdown-wasm';
 import { readFileSync } from 'node:fs';
 
 const htmlBytes = readFileSync('input.html'); // Buffer -> Uint8Array
@@ -141,7 +195,7 @@ const inlineExtraction = convertBytesWithInlineImages(htmlBytes, null, {
 ### With Options
 
 ```typescript
-import { convert } from 'html-to-markdown-wasm';
+import { convert } from '@kreuzberg/html-to-markdown-wasm';
 
 const markdown = convert(html, {
   headingStyle: 'atx',
@@ -156,7 +210,7 @@ const markdown = convert(html, {
 ### Preserve Complex HTML (NEW in v2.5)
 
 ```typescript
-import { convert } from 'html-to-markdown-wasm';
+import { convert } from '@kreuzberg/html-to-markdown-wasm';
 
 const html = `
 <h1>Report</h1>
@@ -181,7 +235,7 @@ const markdown = convert(html, { headingStyle: "atx" });
 await Deno.writeTextFile("output.md", markdown);
 ```
 
-> **Performance Tip:** For Node.js/Bun, use [html-to-markdown-node](https://www.npmjs.com/package/html-to-markdown-node) for 1.17× better performance with native bindings.
+> **Performance Tip:** For Node.js/Bun, use [@kreuzberg/html-to-markdown-node](https://www.npmjs.com/package/@kreuzberg/html-to-markdown-node) for 1.17× better performance with native bindings.
 
 ### Browser (ESM)
 
@@ -193,7 +247,7 @@ await Deno.writeTextFile("output.md", markdown);
 </head>
 <body>
   <script type="module">
-    import init, { convert } from 'https://unpkg.com/html-to-markdown-wasm/dist-web/html_to_markdown_wasm.js';
+    import init, { convert } from 'https://unpkg.com/@kreuzberg/html-to-markdown-wasm/dist-web/html_to_markdown_wasm.js';
 
     // Initialize WASM module
     await init();
@@ -211,7 +265,7 @@ await Deno.writeTextFile("output.md", markdown);
 ### Vite / Webpack / Bundlers
 
 ```typescript
-import { convert } from 'html-to-markdown-wasm';
+import { convert } from '@kreuzberg/html-to-markdown-wasm';
 
 const markdown = convert('<h1>Hello</h1>', {
   headingStyle: 'atx',
@@ -222,7 +276,7 @@ const markdown = convert('<h1>Hello</h1>', {
 ### Cloudflare Workers
 
 ```typescript
-import { convert, initWasm, wasmReady } from 'html-to-markdown-wasm';
+import { convert, initWasm, wasmReady } from '@kreuzberg/html-to-markdown-wasm';
 
 // Cloudflare Workers / other edge runtimes instantiate WASM asynchronously.
 // Kick off initialization once at module scope.
@@ -253,7 +307,7 @@ import {
   convertWithInlineImages,
   WasmInlineImageConfig,
   type WasmConversionOptions
-} from 'html-to-markdown-wasm';
+} from '@kreuzberg/html-to-markdown-wasm';
 
 const options: WasmConversionOptions = {
   headingStyle: 'atx',
@@ -271,7 +325,7 @@ const markdown = convert('<h1>Hello</h1>', options);
 Extract and decode inline images (data URIs, SVG):
 
 ```typescript
-import { convertWithInlineImages, WasmInlineImageConfig } from 'html-to-markdown-wasm';
+import { convertWithInlineImages, WasmInlineImageConfig } from '@kreuzberg/html-to-markdown-wasm';
 
 const html = '<img src="data:image/png;base64,iVBORw0..." alt="Logo">';
 
@@ -296,7 +350,7 @@ for (const img of result.inlineImages) {
 Extract document metadata (headers, links, images, structured data) alongside Markdown conversion:
 
 ```typescript
-import { convertWithMetadata, WasmMetadataConfig } from 'html-to-markdown-wasm';
+import { convertWithMetadata, WasmMetadataConfig } from '@kreuzberg/html-to-markdown-wasm';
 
 const html = `
   <html lang="en">
@@ -358,7 +412,7 @@ console.log('Images:', result.metadata.images);
 The `WasmMetadataConfig` class controls what metadata is extracted:
 
 ```typescript
-import { WasmMetadataConfig } from 'html-to-markdown-wasm';
+import { WasmMetadataConfig } from '@kreuzberg/html-to-markdown-wasm';
 
 const config = new WasmMetadataConfig();
 
@@ -387,7 +441,7 @@ The returned metadata object includes:
 Convert bytes directly with metadata extraction:
 
 ```typescript
-import { convertBytesWithMetadata, WasmMetadataConfig } from 'html-to-markdown-wasm';
+import { convertBytesWithMetadata, WasmMetadataConfig } from '@kreuzberg/html-to-markdown-wasm';
 import { readFileSync } from 'node:fs';
 
 const htmlBytes = readFileSync('article.html');
@@ -404,9 +458,9 @@ Three build targets are provided for different environments:
 
 | Target      | Path                              | Use Case                       |
 | ----------- | --------------------------------- | ------------------------------ |
-| **Bundler** | `html-to-markdown-wasm`           | Webpack, Vite, Rollup, esbuild |
-| **Node.js** | `html-to-markdown-wasm/dist-node` | Node.js, Bun (CommonJS/ESM)    |
-| **Web**     | `html-to-markdown-wasm/dist-web`  | Direct browser ESM imports     |
+| **Bundler** | `@kreuzberg/html-to-markdown-wasm`           | Webpack, Vite, Rollup, esbuild |
+| **Node.js** | `@kreuzberg/html-to-markdown-wasm/dist-node` | Node.js, Bun (CommonJS/ESM)    |
+| **Web**     | `@kreuzberg/html-to-markdown-wasm/dist-web`  | Direct browser ESM imports     |
 
 ## Runtime Compatibility
 
@@ -421,7 +475,7 @@ Three build targets are provided for different environments:
 
 ## When to Use
 
-Choose `html-to-markdown-wasm` when:
+Choose `@kreuzberg/html-to-markdown-wasm` when:
 
 - 🌐 Running in browsers or edge runtimes
 - 🦕 Using Deno
@@ -429,7 +483,7 @@ Choose `html-to-markdown-wasm` when:
 - 📦 Building universal libraries
 - 🔄 Need consistent behavior across all platforms
 
-Use [html-to-markdown-node](https://www.npmjs.com/package/html-to-markdown-node) for:
+Use [@kreuzberg/html-to-markdown-node](https://www.npmjs.com/package/@kreuzberg/html-to-markdown-node) for:
 
 - ⚡ Maximum performance in Node.js/Bun (~3× faster)
 - 🖥️ Server-side only applications
@@ -454,7 +508,7 @@ See the [TypeScript definitions](./dist-node/html_to_markdown_wasm.d.ts) for all
 Keep specific HTML tags in their original form:
 
 ```typescript
-import { convert } from 'html-to-markdown-wasm';
+import { convert } from '@kreuzberg/html-to-markdown-wasm';
 
 const html = `
 <p>Before table</p>
@@ -510,7 +564,7 @@ Deno.serve((req) => {
 <pre id="output"></pre>
 
 <script type="module">
-  import init, { convert } from 'https://unpkg.com/html-to-markdown-wasm/dist-web/html_to_markdown_wasm.js';
+  import init, { convert } from 'https://unpkg.com/@kreuzberg/html-to-markdown-wasm/dist-web/html_to_markdown_wasm.js';
 
   await init();
 

@@ -3,14 +3,14 @@
 High-performance HTML to Markdown converter with C# bindings to the Rust core library.
 
 [![Crates.io](https://img.shields.io/crates/v/html-to-markdown-rs.svg?logo=rust&label=crates.io)](https://crates.io/crates/html-to-markdown-rs)
-[![npm (node)](https://img.shields.io/npm/v/html-to-markdown-node.svg?logo=npm)](https://www.npmjs.com/package/html-to-markdown-node)
-[![npm (wasm)](https://img.shields.io/npm/v/html-to-markdown-wasm.svg?logo=npm)](https://www.npmjs.com/package/html-to-markdown-wasm)
+[![npm (node)](https://img.shields.io/npm/v/%40kreuzberg%2Fhtml-to-markdown-node.svg?logo=npm)](https://www.npmjs.com/package/@kreuzberg/html-to-markdown-node)
+[![npm (wasm)](https://img.shields.io/npm/v/%40kreuzberg%2Fhtml-to-markdown-wasm.svg?logo=npm)](https://www.npmjs.com/package/@kreuzberg/html-to-markdown-wasm)
 [![PyPI](https://img.shields.io/pypi/v/html-to-markdown.svg?logo=pypi)](https://pypi.org/project/html-to-markdown/)
 [![Packagist](https://img.shields.io/packagist/v/goldziher/html-to-markdown.svg)](https://packagist.org/packages/goldziher/html-to-markdown)
 [![RubyGems](https://badge.fury.io/rb/html-to-markdown.svg)](https://rubygems.org/gems/html-to-markdown)
 [![Hex.pm](https://img.shields.io/hexpm/v/html_to_markdown.svg)](https://hex.pm/packages/html_to_markdown)
-[![NuGet](https://img.shields.io/nuget/v/Goldziher.HtmlToMarkdown.svg)](https://www.nuget.org/packages/Goldziher.HtmlToMarkdown/)
-[![Maven Central](https://img.shields.io/maven-central/v/io.github.goldziher/html-to-markdown.svg)](https://central.sonatype.com/artifact/io.github.goldziher/html-to-markdown)
+[![NuGet](https://img.shields.io/nuget/v/KreuzbergDev.HtmlToMarkdown.svg)](https://www.nuget.org/packages/KreuzbergDev.HtmlToMarkdown/)
+[![Maven Central](https://img.shields.io/maven-central/v/dev.kreuzberg/html-to-markdown.svg)](https://central.sonatype.com/artifact/dev.kreuzberg/html-to-markdown)
 [![Go Reference](https://pkg.go.dev/badge/github.com/kreuzberg-dev/html-to-markdown/packages/go/v2/htmltomarkdown.svg)](https://pkg.go.dev/github.com/kreuzberg-dev/html-to-markdown/packages/go/v2/htmltomarkdown)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://github.com/kreuzberg-dev/html-to-markdown/blob/main/LICENSE)
 [![Discord](https://img.shields.io/badge/Discord-Join%20our%20community-7289da)](https://discord.gg/pXxagNK2zN)
@@ -19,11 +19,62 @@ High-performance HTML to Markdown converter with C# bindings to the Rust core li
 
 > **NuGet package ID**
 >
-> NuGet package names are global. To avoid clashing with an older community package named `HtmlToMarkdown`, our official bindings are published as **`Goldziher.HtmlToMarkdown`**. Use that ID in all `dotnet` CLI commands.
+> NuGet package names are global. To avoid clashing with an older community package named `HtmlToMarkdown`, our official bindings are published as **`KreuzbergDev.HtmlToMarkdown`**. Use that ID in all `dotnet` CLI commands.
 
+```bash
+dotnet add package KreuzbergDev.HtmlToMarkdown
+```
+
+## Migration Guide (v2.18.x → v2.19.0)
+
+### Breaking Change: Package Owner Update
+
+In v2.19.0, the C#/.NET package owner changed from `Goldziher` to `KreuzbergDev` to reflect the new Kreuzberg.dev organization.
+
+#### NuGet Update
+
+**Before (v2.18.x):**
 ```bash
 dotnet add package Goldziher.HtmlToMarkdown
 ```
+
+**After (v2.19.0+):**
+```bash
+dotnet add package KreuzbergDev.HtmlToMarkdown
+```
+
+#### Project File Update
+
+Update your `.csproj` file:
+
+**Before:**
+```xml
+<PackageReference Include="Goldziher.HtmlToMarkdown" Version="2.18.x" />
+```
+
+**After:**
+```xml
+<PackageReference Include="KreuzbergDev.HtmlToMarkdown" Version="2.19.0" />
+```
+
+#### Using Statement Update
+
+**Before (may also work):**
+```csharp
+using HtmlToMarkdown;
+```
+
+**After (recommended):**
+```csharp
+using HtmlToMarkdown;  // Same namespace, package owner changed
+```
+
+#### Summary of Changes
+
+- Package renamed from `Goldziher.HtmlToMarkdown` to `KreuzbergDev.HtmlToMarkdown`
+- Using statements remain the same
+- All APIs are identical
+- No code changes required beyond updating the package reference
 
 ## Prerequisites
 
@@ -707,14 +758,14 @@ dotnet pack --configuration Release
 ### 3. Publish
 
 ```bash
-dotnet nuget push bin/Release/Goldziher.HtmlToMarkdown.2.8.0.nupkg \
+dotnet nuget push bin/Release/KreuzbergDev.HtmlToMarkdown.2.18.0.nupkg \
     --api-key YOUR_API_KEY \
     --source https://api.nuget.org/v3/index.json
 ```
 
 ### 4. Verify
 
-Check your package at: https://www.nuget.org/packages/Goldziher.HtmlToMarkdown/
+Check your package at: https://www.nuget.org/packages/KreuzbergDev.HtmlToMarkdown/
 
 ## License
 

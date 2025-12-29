@@ -9,8 +9,8 @@ High-performance HTML to Markdown converter with Rust core and Java Panama FFI b
 [![Packagist](https://img.shields.io/packagist/v/goldziher/html-to-markdown.svg)](https://packagist.org/packages/goldziher/html-to-markdown)
 [![RubyGems](https://badge.fury.io/rb/html-to-markdown.svg)](https://rubygems.org/gems/html-to-markdown)
 [![Hex.pm](https://img.shields.io/hexpm/v/html_to_markdown.svg)](https://hex.pm/packages/html_to_markdown)
-[![NuGet](https://img.shields.io/nuget/v/Goldziher.HtmlToMarkdown.svg)](https://www.nuget.org/packages/Goldziher.HtmlToMarkdown/)
-[![Maven Central](https://img.shields.io/maven-central/v/io.github.goldziher/html-to-markdown.svg)](https://central.sonatype.com/artifact/io.github.goldziher/html-to-markdown)
+[![NuGet](https://img.shields.io/nuget/v/KreuzbergDev.HtmlToMarkdown.svg)](https://www.nuget.org/packages/KreuzbergDev.HtmlToMarkdown/)
+[![Maven Central](https://img.shields.io/maven-central/v/dev.kreuzberg/html-to-markdown.svg)](https://central.sonatype.com/artifact/dev.kreuzberg/html-to-markdown)
 [![Go Reference](https://pkg.go.dev/badge/github.com/kreuzberg-dev/html-to-markdown/packages/go/v2/htmltomarkdown.svg)](https://pkg.go.dev/github.com/kreuzberg-dev/html-to-markdown/packages/go/v2/htmltomarkdown)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://github.com/kreuzberg-dev/html-to-markdown/blob/main/LICENSE)
 [![Discord](https://img.shields.io/badge/Discord-Join%20our%20community-7289da)](https://discord.gg/pXxagNK2zN)
@@ -57,9 +57,9 @@ The Maven build is configured to:
 
 ```xml
 <dependency>
-    <groupId>io.github.goldziher</groupId>
+    <groupId>dev.kreuzberg</groupId>
     <artifactId>html-to-markdown</artifactId>
-    <version>2.7.3</version>
+    <version>2.19.0</version>
     <classifier>linux</classifier> <!-- or macos, windows -->
 </dependency>
 ```
@@ -68,7 +68,7 @@ The Maven build is configured to:
 
 ```kotlin
 dependencies {
-    implementation("io.github.goldziher:html-to-markdown:2.7.3:linux") // or macos, windows
+    implementation("dev.kreuzberg:html-to-markdown:2.19.0:linux") // or macos, windows
 }
 ```
 
@@ -76,7 +76,7 @@ dependencies {
 
 ```groovy
 dependencies {
-    implementation 'io.github.goldziher:html-to-markdown:2.7.3:linux' // or macos, windows
+    implementation 'dev.kreuzberg:html-to-markdown:2.19.0:linux' // or macos, windows
 }
 ```
 
@@ -87,7 +87,7 @@ dependencies {
 ### Basic Example (Java)
 
 ```java
-import io.github.goldziher.htmltomarkdown.HtmlToMarkdown;
+import dev.kreuzberg.htmltomarkdown.HtmlToMarkdown;
 
 public class Example {
     public static void main(String[] args) {
@@ -105,7 +105,7 @@ public class Example {
 ### Basic Example (Kotlin)
 
 ```kotlin
-import io.github.goldziher.htmltomarkdown.HtmlToMarkdown
+import dev.kreuzberg.htmltomarkdown.HtmlToMarkdown
 
 fun main() {
     val html = "<h1>Hello World</h1><p>This is a <strong>test</strong>.</p>"
@@ -121,7 +121,7 @@ fun main() {
 ### Converting Complex HTML (Java)
 
 ```java
-import io.github.goldziher.htmltomarkdown.HtmlToMarkdown;
+import dev.kreuzberg.htmltomarkdown.HtmlToMarkdown;
 
 public class ComplexExample {
     public static void main(String[] args) {
@@ -187,7 +187,7 @@ fun main() {
 ### Processing Multiple Documents (Java)
 
 ```java
-import io.github.goldziher.htmltomarkdown.HtmlToMarkdown;
+import dev.kreuzberg.htmltomarkdown.HtmlToMarkdown;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.stream.Collectors;
@@ -237,7 +237,7 @@ fun main() = runBlocking {
 ### Error Handling (Java)
 
 ```java
-import io.github.goldziher.htmltomarkdown.HtmlToMarkdown;
+import dev.kreuzberg.htmltomarkdown.HtmlToMarkdown;
 
 public class ErrorHandlingExample {
     public static void main(String[] args) {
@@ -423,8 +423,8 @@ public record MetadataExtraction(
 Extract and access document metadata:
 
 ```java
-import io.github.goldziher.htmltomarkdown.HtmlToMarkdown;
-import io.github.goldziher.htmltomarkdown.metadata.MetadataExtraction;
+import dev.kreuzberg.htmltomarkdown.HtmlToMarkdown;
+import dev.kreuzberg.htmltomarkdown.metadata.MetadataExtraction;
 
 public class MetadataExample {
     public static void main(String[] args) {
@@ -480,8 +480,8 @@ public class MetadataExample {
 Extract and traverse document structure:
 
 ```java
-import io.github.goldziher.htmltomarkdown.HtmlToMarkdown;
-import io.github.goldziher.htmltomarkdown.metadata.HeaderMetadata;
+import dev.kreuzberg.htmltomarkdown.HtmlToMarkdown;
+import dev.kreuzberg.htmltomarkdown.metadata.HeaderMetadata;
 
 public class HeaderTraversalExample {
     public static void main(String[] args) {
@@ -518,8 +518,8 @@ public class HeaderTraversalExample {
 Extract and filter links by type:
 
 ```java
-import io.github.goldziher.htmltomarkdown.HtmlToMarkdown;
-import io.github.goldziher.htmltomarkdown.metadata.LinkMetadata;
+import dev.kreuzberg.htmltomarkdown.HtmlToMarkdown;
+import dev.kreuzberg.htmltomarkdown.metadata.LinkMetadata;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -891,6 +891,77 @@ The visitor pattern integrates with Panama FFI through:
 5. **Error Handling**: Conversion errors from visitors propagate as `ConversionException`
 
 No manual pointer management is required - the bridge handles all FFI complexity.
+
+## Migration Guide (v2.18.x → v2.19.0)
+
+### Breaking Change: Package Namespace
+
+In v2.19.0, the Java package namespace changed from `io.github.goldziher` to `dev.kreuzberg` to reflect the new Kreuzberg.dev organization.
+
+#### Maven Dependency Update
+
+**Before (v2.18.x):**
+```xml
+<dependency>
+    <groupId>io.github.goldziher</groupId>
+    <artifactId>html-to-markdown</artifactId>
+    <version>2.18.x</version>
+</dependency>
+```
+
+**After (v2.19.0+):**
+```xml
+<dependency>
+    <groupId>dev.kreuzberg</groupId>
+    <artifactId>html-to-markdown</artifactId>
+    <version>2.19.0</version>
+</dependency>
+```
+
+#### Import Statement Updates
+
+Update all Java import statements:
+
+**Before:**
+```java
+import io.github.goldziher.htmltomarkdown.HtmlToMarkdown;
+import io.github.goldziher.htmltomarkdown.metadata.*;
+```
+
+**After:**
+```java
+import dev.kreuzberg.htmltomarkdown.HtmlToMarkdown;
+import dev.kreuzberg.htmltomarkdown.metadata.*;
+```
+
+#### Gradle Build Updates
+
+**Kotlin DSL - Before:**
+```kotlin
+implementation("io.github.goldziher:html-to-markdown:2.18.x")
+```
+
+**Kotlin DSL - After:**
+```kotlin
+implementation("dev.kreuzberg:html-to-markdown:2.19.0")
+```
+
+**Groovy DSL - Before:**
+```groovy
+implementation 'io.github.goldziher:html-to-markdown:2.18.x'
+```
+
+**Groovy DSL - After:**
+```groovy
+implementation 'dev.kreuzberg:html-to-markdown:2.19.0'
+```
+
+#### Summary of Changes
+
+- All public classes moved to `dev.kreuzberg.htmltomarkdown` package
+- All metadata classes moved to `dev.kreuzberg.htmltomarkdown.metadata` package
+- No functional changes to the API
+- Full backward compatibility after import updates
 
 ## Running Tests
 

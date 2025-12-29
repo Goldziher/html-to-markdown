@@ -1,9 +1,9 @@
-package examples;
+package dev.kreuzberg.examples;
 
-import io.github.goldziher.htmltomarkdown.HtmlToMarkdown;
-import io.github.goldziher.htmltomarkdown.visitor.Visitor;
-import io.github.goldziher.htmltomarkdown.visitor.VisitResult;
-import io.github.goldziher.htmltomarkdown.visitor.NodeContext;
+import dev.kreuzberg.htmltomarkdown.HtmlToMarkdown;
+import dev.kreuzberg.htmltomarkdown.visitor.Visitor;
+import dev.kreuzberg.htmltomarkdown.visitor.VisitResult;
+import dev.kreuzberg.htmltomarkdown.visitor.NodeContext;
 
 /**
  * Filtering visitor example.

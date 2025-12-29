@@ -10,6 +10,10 @@ documentation.workspace = true
 readme.workspace = true
 rust-version.workspace = true
 
+# Publishing metadata for npm scoped package
+[package.metadata.napi]
+package-json-name = "@kreuzberg/html-to-markdown-node"
+
 [lib]
 crate-type = ["cdylib"]
 

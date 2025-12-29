@@ -1925,9 +1925,10 @@ pub(crate) fn convert_html_with_visitor(
     convert_html_impl(html, options, None, None, visitor)
 }
 
-#[cfg_attr(not(feature = "inline-images"), allow(unused_variables))]
-#[cfg_attr(not(feature = "metadata"), allow(unused_variables))]
-#[cfg_attr(not(feature = "visitor"), allow(unused_variables))]
+#[cfg_attr(
+    any(not(feature = "inline-images"), not(feature = "metadata"), not(feature = "visitor")),
+    allow(unused_variables)
+)]
 fn convert_html_impl(
     html: &str,
     options: &ConversionOptions,
@@ -2660,7 +2661,7 @@ fn normalize_self_closing_tags(input: &str) -> Cow<'_, str> {
     while idx < bytes.len() {
         let mut matched = false;
         for (pattern, replacement) in &REPLACEMENTS {
-            if bytes[idx..].starts_with(*pattern) {
+            if bytes[idx..].starts_with(pattern) {
                 output.push_str(&input[last..idx]);
                 output.push_str(replacement);
                 idx += pattern.len();
@@ -4657,6 +4658,182 @@ fn walk_node(
 
                     if let Some(img_text) = image_output {
                         output.push_str(&img_text);
+                    }
+
+                    #[cfg(feature = "metadata")]
+                    if ctx.metadata_wants_images {
+                        if let Some(ref collector) = ctx.metadata_collector {
+                            if let Some((attributes_map, width, height)) = metadata_payload {
+                                if !src.is_empty() {
+                                    let dimensions = match (width, height) {
+                                        (Some(w), Some(h)) => Some((w, h)),
+                                        _ => None,
+                                    };
+                                    collector.borrow_mut().add_image(
+                                        src.to_string(),
+                                        if alt.is_empty() { None } else { Some(alt.to_string()) },
+                                        title.as_deref().map(|t| t.to_string()),
+                                        dimensions,
+                                        attributes_map,
+                                    );
+                                }
+                            }
+                        }
+                    }
+                }
+
+                "graphic" => {
+                    use std::borrow::Cow;
+
+                    // Check source attributes in order: url, href, xlink:href, src
+                    let src = tag
+                        .attributes()
+                        .get("url")
+                        .flatten()
+                        .or_else(|| tag.attributes().get("href").flatten())
+                        .or_else(|| tag.attributes().get("xlink:href").flatten())
+                        .or_else(|| tag.attributes().get("src").flatten())
+                        .map(|v| v.as_utf8_str())
+                        .unwrap_or(Cow::Borrowed(""));
+
+                    // Use "alt" attribute, fallback to "filename"
+                    let alt = tag
+                        .attributes()
+                        .get("alt")
+                        .flatten()
+                        .map(|v| v.as_utf8_str())
+                        .or_else(|| tag.attributes().get("filename").flatten().map(|v| v.as_utf8_str()))
+                        .unwrap_or(Cow::Borrowed(""));
+
+                    let title = tag.attributes().get("title").flatten().map(|v| v.as_utf8_str());
+                    #[cfg(feature = "metadata")]
+                    let mut metadata_payload: Option<ImageMetadataPayload> = None;
+                    #[cfg(feature = "metadata")]
+                    if ctx.metadata_wants_images {
+                        let mut attributes_map = BTreeMap::new();
+                        let mut width: Option<u32> = None;
+                        let mut height: Option<u32> = None;
+                        for (key, value_opt) in tag.attributes().iter() {
+                            let key_str = key.to_string();
+                            if key_str == "url" || key_str == "href" || key_str == "xlink:href" || key_str == "src" {
+                                continue;
+                            }
+                            let value = value_opt.map(|v| v.to_string()).unwrap_or_default();
+                            if key_str == "width" {
+                                if let Ok(parsed) = value.parse::<u32>() {
+                                    width = Some(parsed);
+                                }
+                            } else if key_str == "height" {
+                                if let Ok(parsed) = value.parse::<u32>() {
+                                    height = Some(parsed);
+                                }
+                            }
+                            attributes_map.insert(key_str, value);
+                        }
+                        metadata_payload = Some((attributes_map, width, height));
+                    }
+
+                    let keep_as_markdown = ctx.in_heading && ctx.heading_allow_inline_images;
+
+                    let should_use_alt_text = !keep_as_markdown
+                        && (ctx.convert_as_inline || (ctx.in_heading && !ctx.heading_allow_inline_images));
+
+                    #[cfg(feature = "visitor")]
+                    let graphic_output = if let Some(ref visitor_handle) = ctx.visitor {
+                        use crate::visitor::{NodeContext, NodeType, VisitResult};
+                        use std::collections::BTreeMap;
+
+                        let attributes: BTreeMap<String, String> = tag
+                            .attributes()
+                            .iter()
+                            .filter_map(|(k, v)| v.as_ref().map(|val| (k.to_string(), val.to_string())))
+                            .collect();
+
+                        let node_id = node_handle.get_inner();
+                        let parent_tag = dom_ctx.parent_tag_name(node_id, parser);
+                        let index_in_parent = dom_ctx.get_sibling_index(node_id).unwrap_or(0);
+
+                        let node_ctx = NodeContext {
+                            node_type: NodeType::Image,
+                            tag_name: "graphic".to_string(),
+                            attributes,
+                            depth,
+                            index_in_parent,
+                            parent_tag,
+                            is_inline: true,
+                        };
+
+                        let mut visitor = visitor_handle.borrow_mut();
+                        match visitor.visit_image(&node_ctx, &src, &alt, title.as_deref()) {
+                            VisitResult::Continue => {
+                                let mut buf = String::new();
+                                if should_use_alt_text {
+                                    buf.push_str(&alt);
+                                } else {
+                                    buf.push_str("![");
+                                    buf.push_str(&alt);
+                                    buf.push_str("](");
+                                    buf.push_str(&src);
+                                    if let Some(ref title_text) = title {
+                                        buf.push_str(" \"");
+                                        buf.push_str(title_text);
+                                        buf.push('"');
+                                    }
+                                    buf.push(')');
+                                }
+                                Some(buf)
+                            }
+                            VisitResult::Custom(custom) => Some(custom),
+                            VisitResult::Skip => None,
+                            VisitResult::Error(err) => {
+                                if ctx.visitor_error.borrow().is_none() {
+                                    *ctx.visitor_error.borrow_mut() = Some(err);
+                                }
+                                None
+                            }
+                            VisitResult::PreserveHtml => Some(serialize_node(node_handle, parser)),
+                        }
+                    } else {
+                        let mut buf = String::new();
+                        if should_use_alt_text {
+                            buf.push_str(&alt);
+                        } else {
+                            buf.push_str("![");
+                            buf.push_str(&alt);
+                            buf.push_str("](");
+                            buf.push_str(&src);
+                            if let Some(ref title_text) = title {
+                                buf.push_str(" \"");
+                                buf.push_str(title_text);
+                                buf.push('"');
+                            }
+                            buf.push(')');
+                        }
+                        Some(buf)
+                    };
+
+                    #[cfg(not(feature = "visitor"))]
+                    let graphic_output = {
+                        let mut buf = String::new();
+                        if should_use_alt_text {
+                            buf.push_str(&alt);
+                        } else {
+                            buf.push_str("![");
+                            buf.push_str(&alt);
+                            buf.push_str("](");
+                            buf.push_str(&src);
+                            if let Some(ref title_text) = title {
+                                buf.push_str(" \"");
+                                buf.push_str(title_text);
+                                buf.push('"');
+                            }
+                            buf.push(')');
+                        }
+                        Some(buf)
+                    };
+
+                    if let Some(graphic_text) = graphic_output {
+                        output.push_str(&graphic_text);
                     }
 
                     #[cfg(feature = "metadata")]
@@ -7891,7 +8068,7 @@ fn collect_table_cells(
         let children = tag.children();
         for child_handle in children.top().iter() {
             if let Some(cell_name) = dom_ctx.tag_name_for(child_handle, parser) {
-                if cell_name.as_ref() == "th" || cell_name.as_ref() == "td" {
+                if matches!(cell_name.as_ref(), "th" | "td" | "cell") {
                     cells.push(*child_handle);
                 }
             }
@@ -7922,7 +8099,7 @@ fn table_total_columns(node_handle: &tl::NodeHandle, parser: &tl::Parser, dom_ct
                             }
                         }
                     }
-                    "tr" => {
+                    "tr" | "row" => {
                         collect_table_cells(child_handle, parser, dom_ctx, &mut cells);
                         let col_count = cells
                             .iter()
@@ -8215,8 +8392,19 @@ fn scan_table_node(
                     "a" => scan.link_count += 1,
                     "caption" => scan.has_caption = true,
                     "th" => scan.has_header = true,
+                    "cell" => {
+                        // Check if cell has role="head" attribute
+                        if let Some(role) = tag.attributes().get("role") {
+                            if let Some(role_val) = role {
+                                let role_str = role_val.as_utf8_str();
+                                if role_str == "head" {
+                                    scan.has_header = true;
+                                }
+                            }
+                        }
+                    }
                     "table" if !is_root => scan.has_nested_table = true,
-                    "tr" => {
+                    "tr" | "row" => {
                         let mut cell_count = 0;
                         for child in tag.children().top().iter() {
                             if let Some(tl::Node::Tag(cell_tag)) = child.get(parser) {
@@ -8226,7 +8414,7 @@ fn scan_table_node(
                                     .unwrap_or_else(|| {
                                         normalized_tag_name(cell_tag.name().as_utf8_str()).into_owned().into()
                                     });
-                                if matches!(cell_name.as_ref(), "td" | "th") {
+                                if matches!(cell_name.as_ref(), "td" | "th" | "cell") {
                                     cell_count += 1;
                                     let attrs = cell_tag.attributes();
                                     if attrs.get("colspan").is_some() || attrs.get("rowspan").is_some() {
@@ -8268,7 +8456,7 @@ fn append_layout_row(
                     .tag_info(cell_handle.get_inner(), parser)
                     .map(|info| Cow::Borrowed(info.name.as_str()))
                     .unwrap_or_else(|| normalized_tag_name(cell_tag.name().as_utf8_str()).into_owned().into());
-                if matches!(cell_name.as_ref(), "td" | "th") {
+                if matches!(cell_name.as_ref(), "td" | "th" | "cell") {
                     let mut cell_text = String::new();
                     let cell_ctx = Context {
                         convert_as_inline: true,
@@ -8419,13 +8607,14 @@ fn convert_table(
                         "thead" | "tbody" | "tfoot" => {
                             for row_handle in child_tag.children().top().iter() {
                                 if let Some(tl::Node::Tag(row_tag)) = row_handle.get(parser) {
-                                    if tag_name_eq(row_tag.name().as_utf8_str(), "tr") {
+                                    let row_tag_name = normalized_tag_name(row_tag.name().as_utf8_str());
+                                    if matches!(row_tag_name.as_ref(), "tr" | "row") {
                                         append_layout_row(row_handle, parser, output, options, ctx, dom_ctx);
                                     }
                                 }
                             }
                         }
-                        "tr" => append_layout_row(child_handle, parser, output, options, ctx, dom_ctx),
+                        "tr" | "row" => append_layout_row(child_handle, parser, output, options, ctx, dom_ctx),
                         _ => {}
                     }
                 }
@@ -8475,7 +8664,10 @@ fn convert_table(
                             {
                                 for row_handle in section_children.top().iter() {
                                     if let Some(tl::Node::Tag(row_tag)) = row_handle.get(parser) {
-                                        if tag_name_eq(row_tag.name().as_utf8_str(), "tr") {
+                                        let row_tag_name = dom_ctx
+                                            .tag_name_for(row_handle, parser)
+                                            .unwrap_or_else(|| normalized_tag_name(row_tag.name().as_utf8_str()));
+                                        if matches!(row_tag_name.as_ref(), "tr" | "row") {
                                             if first_row_cols.is_none() {
                                                 collect_table_cells(row_handle, parser, dom_ctx, &mut row_cells);
                                                 let cols = row_cells
@@ -8505,7 +8697,7 @@ fn convert_table(
                             }
                         }
 
-                        "tr" => {
+                        "tr" | "row" => {
                             if first_row_cols.is_none() {
                                 collect_table_cells(child_handle, parser, dom_ctx, &mut row_cells);
                                 let cols = row_cells
@@ -8765,8 +8957,10 @@ mod tests {
 
     #[test]
     fn bold_highlight_suppresses_nested_strong() {
-        let mut options = ConversionOptions::default();
-        options.highlight_style = HighlightStyle::Bold;
+        let options = ConversionOptions {
+            highlight_style: HighlightStyle::Bold,
+            ..Default::default()
+        };
         let html = "<p><mark><strong>Hot</strong></mark></p>";
         let result = convert_html(html, &options).unwrap();
         assert_eq!(result.trim(), "**Hot**");
@@ -8792,8 +8986,10 @@ mod tests {
                 <head><title>Example</title></head>
                 <body><p>Hello World</p></body>
             </html>"#;
-        let mut options = ConversionOptions::default();
-        options.extract_metadata = false;
+        let options = ConversionOptions {
+            extract_metadata: false,
+            ..Default::default()
+        };
         let result = convert_html(html, &options).unwrap();
         assert_eq!(result.trim(), "Hello World");
     }
@@ -8836,16 +9032,20 @@ mod tests {
 
     #[test]
     fn hr_inside_paragraph_matches_inline_expectation() {
-        let mut options = ConversionOptions::default();
-        options.extract_metadata = false;
+        let options = ConversionOptions {
+            extract_metadata: false,
+            ..Default::default()
+        };
         let markdown = convert_html("<p>Hello<hr>World</p>", &options).unwrap();
         assert_eq!(markdown, "Hello\n---\nWorld\n");
     }
 
     #[test]
     fn hr_inside_paragraph_matches_inline_expectation_via_public_api() {
-        let mut options = ConversionOptions::default();
-        options.extract_metadata = false;
+        let options = ConversionOptions {
+            extract_metadata: false,
+            ..Default::default()
+        };
         let markdown = crate::convert("<p>Hello<hr>World</p>", Some(options)).unwrap();
         assert_eq!(markdown, "Hello\n---\nWorld\n");
     }
@@ -9094,8 +9294,10 @@ mod tests {
     fn example_com_remains_visible() {
         let html = "<!doctype html><html lang=\"en\"><head><title>Example Domain</title><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\"><style>body{background:#eee;width:60vw;margin:15vh auto;font-family:system-ui,sans-serif}h1{font-size:1.5em}div{opacity:0.8}a:link,a:visited{color:#348}</style><body><div><h1>Example Domain</h1><p>This domain is for use in documentation examples without needing permission. Avoid use in operations.<p><a href=\"https://iana.org/domains/example\">Learn more</a></div></body></html>";
 
-        let mut options = ConversionOptions::default();
-        options.extract_metadata = false;
+        let options = ConversionOptions {
+            extract_metadata: false,
+            ..Default::default()
+        };
         let result = convert_html(html, &options).unwrap();
 
         assert!(

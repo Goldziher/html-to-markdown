@@ -14,9 +14,11 @@ fn test_strip_newlines_preserves_block_spacing() {
     <p>Paragraph two.</p>
 </section>"#;
 
-    let mut options = ConversionOptions::default();
-    options.strip_newlines = true;
-    options.extract_metadata = false;
+    let options = ConversionOptions {
+        strip_newlines: true,
+        extract_metadata: false,
+        ..Default::default()
+    };
     let result = convert(html, Some(options)).unwrap();
 
     let lines: Vec<&str> = result.lines().collect();
@@ -58,9 +60,11 @@ fn test_strip_newlines_removes_inline_newlines() {
 with line breaks
 in the middle</p>"#;
 
-    let mut options = ConversionOptions::default();
-    options.strip_newlines = true;
-    options.extract_metadata = false;
+    let options = ConversionOptions {
+        strip_newlines: true,
+        extract_metadata: false,
+        ..Default::default()
+    };
     let result = convert(html, Some(options)).unwrap();
 
     let text = result.trim();
@@ -94,9 +98,11 @@ fn test_strip_newlines_handles_nested_blocks() {
     </div>
 </section>"#;
 
-    let mut options = ConversionOptions::default();
-    options.strip_newlines = true;
-    options.extract_metadata = false;
+    let options = ConversionOptions {
+        strip_newlines: true,
+        extract_metadata: false,
+        ..Default::default()
+    };
     let result = convert(html, Some(options)).unwrap();
 
     assert!(

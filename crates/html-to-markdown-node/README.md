@@ -1,7 +1,7 @@
-# html-to-markdown-node
+# @kreuzberg/html-to-markdown-node
 
-> **npm package:** `html-to-markdown-node` (this README).
-> Use [`html-to-markdown-wasm`](https://www.npmjs.com/package/html-to-markdown-wasm) for the portable WASM build.
+> **npm package:** `@kreuzberg/html-to-markdown-node` (this README).
+> Use [`@kreuzberg/html-to-markdown-wasm`](https://www.npmjs.com/package/@kreuzberg/html-to-markdown-wasm) for the portable WASM build.
 
 Native Node.js and Bun bindings for html-to-markdown using NAPI-RS v3.
 
@@ -10,15 +10,53 @@ Built on the shared Rust engine that powers the Python wheels, Ruby gem, PHP ext
 High-performance HTML to Markdown conversion using native Rust code compiled to platform-specific binaries.
 
 [![Crates.io](https://img.shields.io/crates/v/html-to-markdown-rs.svg?logo=rust&label=crates.io)](https://crates.io/crates/html-to-markdown-rs)
-[![npm (node)](https://img.shields.io/npm/v/html-to-markdown-node.svg?logo=npm)](https://www.npmjs.com/package/html-to-markdown-node)
-[![npm (wasm)](https://img.shields.io/npm/v/html-to-markdown-wasm.svg?logo=npm)](https://www.npmjs.com/package/html-to-markdown-wasm)
+[![npm (node)](https://img.shields.io/npm/v/%40kreuzberg%2Fhtml-to-markdown-node.svg?logo=npm)](https://www.npmjs.com/package/@kreuzberg/html-to-markdown-node)
+[![npm (wasm)](https://img.shields.io/npm/v/%40kreuzberg%2Fhtml-to-markdown-wasm.svg?logo=npm)](https://www.npmjs.com/package/@kreuzberg/html-to-markdown-wasm)
 [![PyPI](https://img.shields.io/pypi/v/html-to-markdown.svg?logo=pypi)](https://pypi.org/project/html-to-markdown/)
 [![Packagist](https://img.shields.io/packagist/v/goldziher/html-to-markdown.svg)](https://packagist.org/packages/goldziher/html-to-markdown)
 [![RubyGems](https://badge.fury.io/rb/html-to-markdown.svg)](https://rubygems.org/gems/html-to-markdown)
-[![NuGet](https://img.shields.io/nuget/v/Goldziher.HtmlToMarkdown.svg)](https://www.nuget.org/packages/Goldziher.HtmlToMarkdown/)
-[![Maven Central](https://img.shields.io/maven-central/v/io.github.goldziher/html-to-markdown.svg)](https://central.sonatype.com/artifact/io.github.goldziher/html-to-markdown)
+[![NuGet](https://img.shields.io/nuget/v/KreuzbergDev.HtmlToMarkdown.svg)](https://www.nuget.org/packages/KreuzbergDev.HtmlToMarkdown/)
+[![Maven Central](https://img.shields.io/maven-central/v/dev.kreuzberg/html-to-markdown.svg)](https://central.sonatype.com/artifact/dev.kreuzberg/html-to-markdown)
 [![Go Reference](https://pkg.go.dev/badge/github.com/kreuzberg-dev/html-to-markdown/packages/go/v2/htmltomarkdown.svg)](https://pkg.go.dev/github.com/kreuzberg-dev/html-to-markdown/packages/go/v2/htmltomarkdown)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://github.com/kreuzberg-dev/html-to-markdown/blob/main/LICENSE)
+
+## Migration Guide (v2.18.x → v2.19.0)
+
+> **⚠️ BREAKING CHANGE: Package Namespace Update**
+>
+> In v2.19.0, the npm package namespace changed from `html-to-markdown-node` to `@kreuzberg/html-to-markdown-node` to reflect the new Kreuzberg.dev organization.
+
+### Install Updated Package
+
+**Before (v2.18.x):**
+```bash
+npm install html-to-markdown-node
+```
+
+**After (v2.19.0+):**
+```bash
+npm install @kreuzberg/html-to-markdown-node
+```
+
+### Update Import Statements
+
+**Before:**
+```typescript
+import { convert } from 'html-to-markdown-node';
+```
+
+**After:**
+```typescript
+import { convert } from '@kreuzberg/html-to-markdown-node';
+```
+
+### Summary of Changes
+
+- Package renamed from `html-to-markdown-node` to `@kreuzberg/html-to-markdown-node`
+- All APIs remain identical
+- Full backward compatibility after updating package name and imports
+
+---
 
 ## Performance
 
@@ -66,17 +104,17 @@ The shared benchmark harness lives in `tools/benchmark-harness`. Node keeps pace
 ### Node.js
 
 ```bash
-npm install html-to-markdown-node
+npm install @kreuzberg/html-to-markdown-node
 # or
-yarn add html-to-markdown-node
+yarn add @kreuzberg/html-to-markdown-node
 # or
-pnpm add html-to-markdown-node
+pnpm add @kreuzberg/html-to-markdown-node
 ```
 
 ### Bun
 
 ```bash
-bun add html-to-markdown-node
+bun add @kreuzberg/html-to-markdown-node
 ```
 
 ## Usage
@@ -84,7 +122,7 @@ bun add html-to-markdown-node
 ### Basic Conversion
 
 ```javascript
-import { convert } from 'html-to-markdown-node';
+import { convert } from '@kreuzberg/html-to-markdown-node';
 
 const html = '<h1>Hello World</h1><p>This is <strong>fast</strong>!</p>';
 const markdown = convert(html);
@@ -97,7 +135,7 @@ console.log(markdown);
 ### With Options
 
 ```typescript
-import { convert } from 'html-to-markdown-node';
+import { convert } from '@kreuzberg/html-to-markdown-node';
 
 const markdown = convert(html, {
   headingStyle: 'Atx',
@@ -112,7 +150,7 @@ const markdown = convert(html, {
 ### Preserve Complex HTML (NEW in v2.5)
 
 ```typescript
-import { convert } from 'html-to-markdown-node';
+import { convert } from '@kreuzberg/html-to-markdown-node';
 
 const html = `
 <h1>Report</h1>
@@ -138,7 +176,7 @@ const markdown = convert(html, {
 Full TypeScript definitions included:
 
 ```typescript
-import { convert, convertWithInlineImages, type JsConversionOptions } from 'html-to-markdown-node';
+import { convert, convertWithInlineImages, type JsConversionOptions } from '@kreuzberg/html-to-markdown-node';
 
 const options: JsConversionOptions = {
   headingStyle: 'Atx',
@@ -160,7 +198,7 @@ Avoid re-parsing the same options object on every call (benchmarks, tight render
 import {
   createConversionOptionsHandle,
   convertWithOptionsHandle,
-} from 'html-to-markdown-node';
+} from '@kreuzberg/html-to-markdown-node';
 
 const handle = createConversionOptionsHandle({ hocrSpatialTables: false });
 const markdown = convertWithOptionsHandle('<h1>Handles</h1>', handle);
@@ -176,7 +214,7 @@ import {
   convertInlineImagesBuffer,
   convertBufferWithOptionsHandle,
   createConversionOptionsHandle,
-} from 'html-to-markdown-node';
+} from '@kreuzberg/html-to-markdown-node';
 import { readFileSync } from 'node:fs';
 
 const html = readFileSync('fixtures/lists.html'); // Buffer
@@ -196,7 +234,7 @@ const extraction = convertInlineImagesBuffer(html, null, {
 Extract and decode inline images (data URIs, SVG):
 
 ```typescript
-import { convertWithInlineImages } from 'html-to-markdown-node';
+import { convertWithInlineImages } from '@kreuzberg/html-to-markdown-node';
 
 const html = '<img src="data:image/png;base64,iVBORw0..." alt="Logo">';
 
@@ -231,11 +269,11 @@ Pre-built native binaries are provided for:
 
 ✅ **Node.js** 18+ (LTS)
 ✅ **Bun** 1.0+ (full NAPI-RS support)
-❌ **Deno** (use [html-to-markdown-wasm](https://www.npmjs.com/package/html-to-markdown-wasm) instead)
+❌ **Deno** (use [@kreuzberg/html-to-markdown-wasm](https://www.npmjs.com/package/@kreuzberg/html-to-markdown-wasm) instead)
 
 ## When to Use
 
-Choose `html-to-markdown-node` when:
+Choose `@kreuzberg/html-to-markdown-node` when:
 
 - ✅ Running in Node.js or Bun
 - ✅ Maximum performance is required
@@ -275,7 +313,7 @@ See [ConversionOptions](https://github.com/kreuzberg-dev/html-to-markdown/tree/m
 Keep specific HTML tags in their original form instead of converting to Markdown:
 
 ```typescript
-import { convert } from 'html-to-markdown-node';
+import { convert } from '@kreuzberg/html-to-markdown-node';
 
 const html = `
 <p>Before table</p>
@@ -306,7 +344,7 @@ const markdown = convert(html, {
 ### Web Scraping
 
 ```javascript
-const { convert } = require('html-to-markdown-node');
+const { convert } = require('@kreuzberg/html-to-markdown-node');
 
 const scrapedHtml = await fetch('https://example.com').then(r => r.text());
 
@@ -325,7 +363,7 @@ const markdown = convert(scrapedHtml, {
 ### hOCR Document Processing
 
 ```javascript
-const { convert } = require('html-to-markdown-node');
+const { convert } = require('@kreuzberg/html-to-markdown-node');
 const fs = require('fs');
 
 // OCR output from Tesseract in hOCR format

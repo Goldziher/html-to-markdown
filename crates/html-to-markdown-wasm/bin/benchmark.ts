@@ -6,7 +6,7 @@ import {
   convertBytes,
   convertBytesWithInlineImages,
   convertBytesWithMetadata,
-} from "html-to-markdown-wasm/dist-node";
+} from "@kreuzberg/html-to-markdown-wasm/dist-node";
 
 type Format = "html" | "hocr";
 type Scenario =

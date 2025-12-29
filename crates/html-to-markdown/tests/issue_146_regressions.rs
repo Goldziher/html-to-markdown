@@ -21,9 +21,11 @@ fn test_strip_tags_prevents_metadata_extraction() {
 </body>
 </html>"#;
 
-    let mut options = ConversionOptions::default();
-    options.extract_metadata = true;
-    options.strip_tags = vec!["meta".to_string()];
+    let options = ConversionOptions {
+        extract_metadata: true,
+        strip_tags: vec!["meta".to_string()],
+        ..Default::default()
+    };
 
     let result = convert(html, Some(options)).unwrap();
 
@@ -71,9 +73,11 @@ fn test_strip_tags_title_prevents_extraction() {
 </body>
 </html>"#;
 
-    let mut options = ConversionOptions::default();
-    options.extract_metadata = true;
-    options.strip_tags = vec!["title".to_string()];
+    let options = ConversionOptions {
+        extract_metadata: true,
+        strip_tags: vec!["title".to_string()],
+        ..Default::default()
+    };
 
     let result = convert(html, Some(options)).unwrap();
 
@@ -117,9 +121,11 @@ fn test_preserve_tags_prevents_metadata_extraction() {
 </body>
 </html>"#;
 
-    let mut options = ConversionOptions::default();
-    options.extract_metadata = true;
-    options.preserve_tags = vec!["meta".to_string()];
+    let options = ConversionOptions {
+        extract_metadata: true,
+        preserve_tags: vec!["meta".to_string()],
+        ..Default::default()
+    };
 
     let result = convert(html, Some(options)).unwrap();
 
