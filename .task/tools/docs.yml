@@ -1,0 +1,44 @@
+version: '3'
+
+tasks:
+  generate-readme:
+    desc: Generate package READMEs from templates
+    summary: |
+      Generates all package READMEs from Jinja2 templates in scripts/readme_templates/
+      using configuration from scripts/readme_config.yaml and snippets from docs/snippets/.
+
+      This command regenerates all 8 package READMEs:
+      - packages/python/README.md
+      - packages/typescript/README.md
+      - packages/ruby/README.md
+      - packages/php/README.md
+      - packages/go/v2/README.md
+      - packages/java/README.md
+      - packages/csharp/README.md
+      - packages/elixir/README.md
+    cmds:
+      - python3 scripts/generate_readme.py
+
+  generate-readme:check:
+    desc: Validate READMEs match templates (CI mode)
+    summary: |
+      Validates that committed READMEs match what would be generated from templates.
+
+      This is used in CI to ensure no manual edits have been made to generated READMEs.
+      If drift is detected, the CI will fail and the developer should:
+      1. Make changes in templates/config/snippets
+      2. Run 'task docs:generate-readme' to regenerate
+      3. Commit both template changes and regenerated READMEs
+    cmds:
+      - python3 scripts/generate_readme.py --validate
+
+  generate-readme:dry-run:
+    desc: Preview README generation without writing files
+    summary: |
+      Dry-run mode for README generation. Shows what would be generated without
+      modifying any files. Useful for:
+      - Previewing template changes
+      - Debugging template/config issues
+      - Reviewing output before committing
+    cmds:
+      - python3 scripts/generate_readme.py --dry-run

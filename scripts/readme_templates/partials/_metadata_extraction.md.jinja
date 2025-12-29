@@ -1,0 +1,141 @@
+The metadata extraction feature enables comprehensive document analysis during conversion. Extract document properties, headers, links, images, and structured data in a single pass.
+
+**Use Cases:**
+- **SEO analysis** – Extract title, description, Open Graph tags, Twitter cards
+- **Table of contents generation** – Build structured outlines from heading hierarchy
+- **Content migration** – Document all external links and resources
+- **Accessibility audits** – Check for images without alt text, empty links, invalid heading hierarchy
+- **Link validation** – Classify and validate anchor, internal, external, email, and phone links
+
+**Zero Overhead When Disabled:** Metadata extraction adds negligible overhead and happens during the HTML parsing pass. Disable unused metadata types in `MetadataConfig` to optimize further.
+
+### Example: Quick Start
+
+{% if language == 'python' %}
+```python
+from html_to_markdown import convert_with_metadata
+
+html = '<h1>Article</h1><img src="test.jpg" alt="test">'
+markdown, metadata = convert_with_metadata(html)
+
+print(metadata["document"]["title"])      # Document title
+print(metadata["headers"])                 # All h1-h6 elements
+print(metadata["links"])                   # All hyperlinks
+print(metadata["images"])                  # All images with alt text
+print(metadata["structured_data"])        # JSON-LD, Microdata, RDFa
+```
+
+{% elif language == 'typescript' %}
+```typescript
+import { convertWithMetadata } from 'html-to-markdown';
+
+const html = '<h1>Article</h1><img src="test.jpg" alt="test">';
+const { markdown, metadata } = convertWithMetadata(html);
+
+console.log(metadata.document.title);      // Document title
+console.log(metadata.headers);             // All h1-h6 elements
+console.log(metadata.links);               // All hyperlinks
+console.log(metadata.images);              // All images with alt text
+console.log(metadata.structuredData);      // JSON-LD, Microdata, RDFa
+```
+
+{% elif language == 'ruby' %}
+```ruby
+require 'html_to_markdown'
+
+html = '<h1>Article</h1><img src="test.jpg" alt="test">'
+markdown, metadata = HtmlToMarkdown.convert_with_metadata(html)
+
+puts metadata[:document][:title]           # Document title
+puts metadata[:headers]                    # All h1-h6 elements
+puts metadata[:links]                      # All hyperlinks
+puts metadata[:images]                     # All images with alt text
+puts metadata[:structured_data]            # JSON-LD, Microdata, RDFa
+```
+
+{% elif language == 'php' %}
+```php
+<?php
+use HtmlToMarkdown\Converter;
+
+$html = '<h1>Article</h1><img src="test.jpg" alt="test">';
+[$markdown, $metadata] = Converter::convertWithMetadata($html);
+
+echo $metadata['document']['title'];       // Document title
+print_r($metadata['headers']);             // All h1-h6 elements
+print_r($metadata['links']);               // All hyperlinks
+print_r($metadata['images']);              // All images with alt text
+print_r($metadata['structured_data']);     // JSON-LD, Microdata, RDFa
+```
+
+{% elif language == 'go' %}
+```go
+package main
+
+import (
+    "fmt"
+    htm "github.com/kreuzberg-dev/html-to-markdown/packages/go/v2/htmltomarkdown"
+)
+
+func main() {
+    html := `<h1>Article</h1><img src="test.jpg" alt="test">`
+    markdown, metadata, err := htm.ConvertWithMetadata(html, nil, nil)
+
+    fmt.Println(metadata.Document.Title)   // Document title
+    fmt.Println(metadata.Headers)          // All h1-h6 elements
+    fmt.Println(metadata.Links)            // All hyperlinks
+    fmt.Println(metadata.Images)           // All images with alt text
+    fmt.Println(metadata.StructuredData)   // JSON-LD, Microdata, RDFa
+}
+```
+
+{% elif language == 'java' %}
+```java
+import dev.kreuzberg.htmltomarkdown.Converter;
+import dev.kreuzberg.htmltomarkdown.MetadataResult;
+
+public class Main {
+    public static void main(String[] args) {
+        String html = "<h1>Article</h1><img src=\"test.jpg\" alt=\"test\">";
+        MetadataResult result = Converter.convertWithMetadata(html);
+
+        System.out.println(result.metadata.getDocument().getTitle());  // Document title
+        System.out.println(result.metadata.getHeaders());              // All h1-h6 elements
+        System.out.println(result.metadata.getLinks());                // All hyperlinks
+        System.out.println(result.metadata.getImages());               // All images with alt text
+        System.out.println(result.metadata.getStructuredData());       // JSON-LD, Microdata, RDFa
+    }
+}
+```
+
+{% elif language == 'csharp' %}
+```csharp
+using KreuzbergDev.HtmlToMarkdown;
+
+var html = "<h1>Article</h1><img src=\"test.jpg\" alt=\"test\">";
+var (markdown, metadata) = Converter.ConvertWithMetadata(html);
+
+Console.WriteLine(metadata.Document.Title);       // Document title
+Console.WriteLine(string.Join(", ", metadata.Headers));   // All h1-h6 elements
+Console.WriteLine(string.Join(", ", metadata.Links));     // All hyperlinks
+Console.WriteLine(string.Join(", ", metadata.Images));    // All images with alt text
+Console.WriteLine(string.Join(", ", metadata.StructuredData)); // JSON-LD, Microdata, RDFa
+```
+
+{% elif language == 'elixir' %}
+```elixir
+alias HtmlToMarkdown
+
+html = "<h1>Article</h1><img src=\"test.jpg\" alt=\"test\">"
+{markdown, metadata} = HtmlToMarkdown.convert_with_metadata(html)
+
+IO.inspect(metadata.document.title)        # Document title
+IO.inspect(metadata.headers)               # All h1-h6 elements
+IO.inspect(metadata.links)                 # All hyperlinks
+IO.inspect(metadata.images)                # All images with alt text
+IO.inspect(metadata.structured_data)       # JSON-LD, Microdata, RDFa
+```
+
+{% endif %}
+
+For detailed examples including SEO extraction, table-of-contents generation, link validation, and accessibility audits, see the [Metadata Extraction Guide](../../examples/metadata-extraction/).

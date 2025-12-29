@@ -9,7 +9,7 @@
     "preview": "http-server . -p 3000 -c-1"
   },
   "dependencies": {
-    "html-to-markdown-wasm": "workspace:*"
+    "@kreuzberg/html-to-markdown-wasm": "workspace:*"
   },
   "devDependencies": {
     "@rollup/plugin-commonjs": "^29.0.0",

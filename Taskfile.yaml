@@ -73,6 +73,10 @@ includes:
   version:
     taskfile: ./.task/tools/version-sync.yml
 
+  # Documentation generation (exposed as docs:*)
+  docs:
+    taskfile: ./.task/tools/docs.yml
+
   # General tools (flatten to expose pre-commit:*, toml:*, shell:*, etc. at root)
   _tools:
     taskfile: ./.task/tools/general.yml

@@ -48,6 +48,34 @@ importers:
       vitest:
         specifier: ^4.0.16
         version: 4.0.16(@types/node@25.0.3)(tsx@4.21.0)
+    optionalDependencies:
+      '@kreuzberg/html-to-markdown-node-darwin-arm64':
+        specifier: 2.19.0-rc.1
+        version: 2.19.0-rc.1
+      '@kreuzberg/html-to-markdown-node-darwin-x64':
+        specifier: 2.19.0-rc.1
+        version: 2.19.0-rc.1
+      '@kreuzberg/html-to-markdown-node-linux-arm-gnueabihf':
+        specifier: 2.19.0-rc.1
+        version: 2.19.0-rc.1
+      '@kreuzberg/html-to-markdown-node-linux-arm64-gnu':
+        specifier: 2.19.0-rc.1
+        version: 2.19.0-rc.1
+      '@kreuzberg/html-to-markdown-node-linux-arm64-musl':
+        specifier: 2.19.0-rc.1
+        version: 2.19.0-rc.1
+      '@kreuzberg/html-to-markdown-node-linux-x64-gnu':
+        specifier: 2.19.0-rc.1
+        version: 2.19.0-rc.1
+      '@kreuzberg/html-to-markdown-node-linux-x64-musl':
+        specifier: 2.19.0-rc.1
+        version: 2.19.0-rc.1
+      '@kreuzberg/html-to-markdown-node-win32-arm64-msvc':
+        specifier: 2.19.0-rc.1
+        version: 2.19.0-rc.1
+      '@kreuzberg/html-to-markdown-node-win32-x64-msvc':
+        specifier: 2.19.0-rc.1
+        version: 2.19.0-rc.1
 
   crates/html-to-markdown-wasm:
     dependencies:
@@ -70,29 +98,29 @@ importers:
 
   examples/wasm-cloudflare:
     dependencies:
-      html-to-markdown-wasm:
+      '@kreuzberg/html-to-markdown-wasm':
         specifier: workspace:*
         version: link:../../crates/html-to-markdown-wasm
     devDependencies:
       '@cloudflare/workers-types':
-        specifier: ^4.20251228.0
-        version: 4.20251228.0
+        specifier: ^4.20251229.0
+        version: 4.20251229.0
       typescript:
         specifier: ^5.9.3
         version: 5.9.3
       wrangler:
         specifier: ^4.56.0
-        version: 4.56.0(@cloudflare/workers-types@4.20251228.0)
+        version: 4.56.0(@cloudflare/workers-types@4.20251229.0)
 
   examples/wasm-node:
     dependencies:
-      html-to-markdown-wasm:
+      '@kreuzberg/html-to-markdown-wasm':
         specifier: workspace:*
         version: link:../../crates/html-to-markdown-wasm
 
   examples/wasm-rollup:
     dependencies:
-      html-to-markdown-wasm:
+      '@kreuzberg/html-to-markdown-wasm':
         specifier: workspace:*
         version: link:../../crates/html-to-markdown-wasm
     devDependencies:
@@ -132,7 +160,7 @@ importers:
 
   packages/typescript:
     dependencies:
-      html-to-markdown-node:
+      '@kreuzberg/html-to-markdown-node':
         specifier: workspace:*
         version: link:../../crates/html-to-markdown-node
     devDependencies:
@@ -271,8 +299,8 @@ packages:
     cpu: [x64]
     os: [win32]
 
-  '@cloudflare/workers-types@4.20251228.0':
-    resolution: {integrity: sha512-lzE1IjLn5TiStPD5+sGZsPSY9sSFSSIujOWb5f6JMnDWkyNzdZOaEVFvx0sw5ztaWWQjK22hjYW7rgb+OFscjg==}
+  '@cloudflare/workers-types@4.20251229.0':
+    resolution: {integrity: sha512-LgzxDZaT9bQhycQInf7S/fcZCQRTvWWQPE9xnEyedI+CXxWsXAD7hg84kvVyr+KUz+W9Oblzo75g6XZ3HdI5Yg==}
 
   '@cspotcode/source-map-support@0.8.1':
     resolution: {integrity: sha512-IchNf6dN4tHoMFIn/7OE8LWZ19Y6q/67Bmf6vnGREv8RSbBVb9LPJxEcnwrcwX6ixSvaiGoomAUvu4YSxXrVgw==}
@@ -858,6 +886,60 @@ packages:
 
   '@jridgewell/trace-mapping@0.3.9':
     resolution: {integrity: sha512-3Belt6tdc8bPgAtbcmdtNJlirVoTmEb5e2gC94PnkwEW9jI6CAHUeoG85tjWP5WquqfavoMtMwiG4P926ZKKuQ==}
+
+  '@kreuzberg/html-to-markdown-node-darwin-arm64@2.19.0-rc.1':
+    resolution: {integrity: sha512-cQrRAn8sGdYOH9YIKzMsBFFdIxy2IWuIZ7oD5618EFutfIF+DQL5IKQrVungvsfMBoDPX+EJaxfNeCHJpa+CxQ==}
+    engines: {node: '>= 10'}
+    cpu: [arm64]
+    os: [darwin]
+
+  '@kreuzberg/html-to-markdown-node-darwin-x64@2.19.0-rc.1':
+    resolution: {integrity: sha512-mAmkS9t8MGJsFBfeW2hs7VDjuP4DJ/xWWsECm6hskTMIIyNbPeoWNpO2c7donpzwKawXcslHyXODqSrH+j2rdA==}
+    engines: {node: '>= 10'}
+    cpu: [x64]
+    os: [darwin]
+
+  '@kreuzberg/html-to-markdown-node-linux-arm-gnueabihf@2.19.0-rc.1':
+    resolution: {integrity: sha512-f6dv+MVQ91oyaDGnNZrPEE68/bXyvytOlxCiQQfHEGn8uv7dADiQOQXJWdGU4bbOapmLKxbqhR3t9cdgJIbPHw==}
+    engines: {node: '>= 10'}
+    cpu: [arm]
+    os: [linux]
+
+  '@kreuzberg/html-to-markdown-node-linux-arm64-gnu@2.19.0-rc.1':
+    resolution: {integrity: sha512-HLyizX9NyjZvKDKJ2WaEDjMBgIMoofHi9KEJk4kRdMmQuf7gfqFTSOiPbrocHGrLUn1+l3Dis8Gv9Fovhq9c+A==}
+    engines: {node: '>= 10'}
+    cpu: [arm64]
+    os: [linux]
+
+  '@kreuzberg/html-to-markdown-node-linux-arm64-musl@2.19.0-rc.1':
+    resolution: {integrity: sha512-tBqrxI0u4x9n3BozV3EE6AyJcXDjfjDf84jsVih6Bwo2PEJMgMVTeDNSNFqVna062JYziONlPit0LK4qYTBqXQ==}
+    engines: {node: '>= 10'}
+    cpu: [arm64]
+    os: [linux]
+
+  '@kreuzberg/html-to-markdown-node-linux-x64-gnu@2.19.0-rc.1':
+    resolution: {integrity: sha512-Q+xSF13MFuvq8F6h08Gklz+bNl5lG2+ugBc345jiXdzW/ZS9s1wnpt/W9RQxYealMdXo7RCmuAPeSTNi0de/mQ==}
+    engines: {node: '>= 10'}
+    cpu: [x64]
+    os: [linux]
+
+  '@kreuzberg/html-to-markdown-node-linux-x64-musl@2.19.0-rc.1':
+    resolution: {integrity: sha512-+6VjTrKyVY1rzAYxxLfnGR6yNMCuijUVVd7OEPT3+Mt5oUIbMmOCYF29PdclJUr7636va/tXzufF8wylex8CXQ==}
+    engines: {node: '>= 10'}
+    cpu: [x64]
+    os: [linux]
+
+  '@kreuzberg/html-to-markdown-node-win32-arm64-msvc@2.19.0-rc.1':
+    resolution: {integrity: sha512-L4LD93XegRuFLP4WWN1+miB71rfCF3f6Vpz2zfj/gBAZ4T9NHzMBSvz9ox/fgZFePfgwJ//z/3Qm5ONbbd7pbw==}
+    engines: {node: '>= 10'}
+    cpu: [arm64]
+    os: [win32]
+
+  '@kreuzberg/html-to-markdown-node-win32-x64-msvc@2.19.0-rc.1':
+    resolution: {integrity: sha512-LnZk1tA5IfKRb6k56/5OPOud+I8KyrQ7+wuoCE4HmLEPBENB94hjOUQlIgeLg2q5593zPkvTSs8RUzV5F0L2rg==}
+    engines: {node: '>= 10'}
+    cpu: [x64]
+    os: [win32]
 
   '@napi-rs/cli@3.5.0':
     resolution: {integrity: sha512-bJsDvAa9qK9VMkFhr780XWfQlK+GDlAX8qpK20buSmA0ld6nxCtiZ5a0J45zbd0FWT+VTZE1/u8VPH2vLfnVvw==}
@@ -2448,7 +2530,7 @@ snapshots:
   '@cloudflare/workerd-windows-64@1.20251217.0':
     optional: true
 
-  '@cloudflare/workers-types@4.20251228.0': {}
+  '@cloudflare/workers-types@4.20251229.0': {}
 
   '@cspotcode/source-map-support@0.8.1':
     dependencies:
@@ -2838,6 +2920,33 @@ snapshots:
     dependencies:
       '@jridgewell/resolve-uri': 3.1.2
       '@jridgewell/sourcemap-codec': 1.5.5
+
+  '@kreuzberg/html-to-markdown-node-darwin-arm64@2.19.0-rc.1':
+    optional: true
+
+  '@kreuzberg/html-to-markdown-node-darwin-x64@2.19.0-rc.1':
+    optional: true
+
+  '@kreuzberg/html-to-markdown-node-linux-arm-gnueabihf@2.19.0-rc.1':
+    optional: true
+
+  '@kreuzberg/html-to-markdown-node-linux-arm64-gnu@2.19.0-rc.1':
+    optional: true
+
+  '@kreuzberg/html-to-markdown-node-linux-arm64-musl@2.19.0-rc.1':
+    optional: true
+
+  '@kreuzberg/html-to-markdown-node-linux-x64-gnu@2.19.0-rc.1':
+    optional: true
+
+  '@kreuzberg/html-to-markdown-node-linux-x64-musl@2.19.0-rc.1':
+    optional: true
+
+  '@kreuzberg/html-to-markdown-node-win32-arm64-msvc@2.19.0-rc.1':
+    optional: true
+
+  '@kreuzberg/html-to-markdown-node-win32-x64-msvc@2.19.0-rc.1':
+    optional: true
 
   '@napi-rs/cli@3.5.0(@emnapi/runtime@1.7.1)(@types/node@25.0.3)':
     dependencies:
@@ -4216,7 +4325,7 @@ snapshots:
       '@cloudflare/workerd-linux-arm64': 1.20251217.0
       '@cloudflare/workerd-windows-64': 1.20251217.0
 
-  wrangler@4.56.0(@cloudflare/workers-types@4.20251228.0):
+  wrangler@4.56.0(@cloudflare/workers-types@4.20251229.0):
     dependencies:
       '@cloudflare/kv-asset-handler': 0.4.1
       '@cloudflare/unenv-preset': 2.7.13(unenv@2.0.0-rc.24)(workerd@1.20251217.0)
@@ -4227,7 +4336,7 @@ snapshots:
       unenv: 2.0.0-rc.24
       workerd: 1.20251217.0
     optionalDependencies:
-      '@cloudflare/workers-types': 4.20251228.0
+      '@cloudflare/workers-types': 4.20251229.0
       fsevents: 2.3.3
     transitivePeerDependencies:
       - bufferutil

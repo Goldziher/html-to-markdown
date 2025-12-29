@@ -1,332 +1,288 @@
-# HtmlToMarkdown (Elixir)
+# html-to-markdown
 
-Elixir bindings for the Rust [html-to-markdown](https://github.com/kreuzberg-dev/html-to-markdown) engine.
-The package exposes a fast `HTML -> Markdown` converter implemented with Rustler.
+<div align="center" style="display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin: 20px 0;">
+  <!-- Language Bindings -->
+  <a href="https://crates.io/crates/html-to-markdown-rs">
+    <img src="https://img.shields.io/crates/v/html-to-markdown-rs?label=Rust&color=007ec6" alt="Rust">
+  </a>
+  <a href="https://pypi.org/project/html-to-markdown/">
+    <img src="https://img.shields.io/pypi/v/html-to-markdown?label=Python&color=007ec6" alt="Python">
+  </a>
+  <a href="https://www.npmjs.com/package/@kreuzberg/html-to-markdown-node">
+    <img src="https://img.shields.io/npm/v/@kreuzberg/html-to-markdown-node?label=Node.js&color=007ec6" alt="Node.js">
+  </a>
+  <a href="https://www.npmjs.com/package/@kreuzberg/html-to-markdown-wasm">
+    <img src="https://img.shields.io/npm/v/@kreuzberg/html-to-markdown-wasm?label=WASM&color=007ec6" alt="WASM">
+  </a>
+  <a href="https://central.sonatype.com/artifact/dev.kreuzberg/html-to-markdown">
+    <img src="https://img.shields.io/maven-central/v/dev.kreuzberg/html-to-markdown?label=Java&color=007ec6" alt="Java">
+  </a>
+  <a href="https://pkg.go.dev/github.com/kreuzberg-dev/html-to-markdown/packages/go/v2/htmltomarkdown">
+    <img src="https://img.shields.io/badge/Go-v2.19.0-007ec6" alt="Go">
+  </a>
+  <a href="https://www.nuget.org/packages/KreuzbergDev.HtmlToMarkdown/">
+    <img src="https://img.shields.io/nuget/v/KreuzbergDev.HtmlToMarkdown?label=C%23&color=007ec6" alt="C#">
+  </a>
+  <a href="https://packagist.org/packages/goldziher/html-to-markdown">
+    <img src="https://img.shields.io/packagist/v/goldziher/html-to-markdown?label=PHP&color=007ec6" alt="PHP">
+  </a>
+  <a href="https://rubygems.org/gems/html-to-markdown">
+    <img src="https://img.shields.io/gem/v/html-to-markdown?label=Ruby&color=007ec6" alt="Ruby">
+  </a>
+  <a href="https://hex.pm/packages/html_to_markdown">
+    <img src="https://img.shields.io/hexpm/v/html_to_markdown?label=Elixir&color=007ec6" alt="Elixir">
+  </a>
 
-[![Crates.io](https://img.shields.io/crates/v/html-to-markdown-rs.svg?logo=rust&label=crates.io)](https://crates.io/crates/html-to-markdown-rs)
-[![npm (node)](https://img.shields.io/npm/v/html-to-markdown-node.svg?logo=npm)](https://www.npmjs.com/package/html-to-markdown-node)
-[![npm (wasm)](https://img.shields.io/npm/v/html-to-markdown-wasm.svg?logo=npm)](https://www.npmjs.com/package/html-to-markdown-wasm)
-[![PyPI](https://img.shields.io/pypi/v/html-to-markdown.svg?logo=pypi)](https://pypi.org/project/html-to-markdown/)
-[![Packagist](https://img.shields.io/packagist/v/goldziher/html-to-markdown.svg)](https://packagist.org/packages/goldziher/html-to-markdown)
-[![RubyGems](https://badge.fury.io/rb/html-to-markdown.svg)](https://rubygems.org/gems/html-to-markdown)
-[![Hex.pm](https://img.shields.io/hexpm/v/html_to_markdown.svg)](https://hex.pm/packages/html_to_markdown)
-[![NuGet](https://img.shields.io/nuget/v/Goldziher.HtmlToMarkdown.svg)](https://www.nuget.org/packages/Goldziher.HtmlToMarkdown/)
-[![Maven Central](https://img.shields.io/maven-central/v/io.github.goldziher/html-to-markdown.svg)](https://central.sonatype.com/artifact/io.github.goldziher/html-to-markdown)
-[![Go Reference](https://pkg.go.dev/badge/github.com/kreuzberg-dev/html-to-markdown/packages/go/v2/htmltomarkdown.svg)](https://pkg.go.dev/github.com/kreuzberg-dev/html-to-markdown/packages/go/v2/htmltomarkdown)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://github.com/kreuzberg-dev/html-to-markdown/blob/main/LICENSE)
-[![Discord](https://img.shields.io/badge/Discord-Join%20our%20community-7289da)](https://discord.gg/pXxagNK2zN)
+  <!-- Project Info -->
+  <a href="https://github.com/kreuzberg-dev/html-to-markdown/blob/main/LICENSE">
+    <img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="License">
+  </a>
+</div>
+
+<img width="1128" height="191" alt="html-to-markdown" src="https://github.com/user-attachments/assets/419fc06c-8313-4324-b159-4b4d3cfce5c0" />
+
+<div align="center" style="margin-top: 20px;">
+  <a href="https://discord.gg/pXxagNK2zN">
+      <img height="22" src="https://img.shields.io/badge/Discord-Join%20our%20community-7289da?logo=discord&logoColor=white" alt="Discord">
+  </a>
+</div>
+
+
+Elixir bindings for the Rust html-to-markdown engine. The package exposes a fast HTML to Markdown converter implemented with Rustler.
+Ship identical Markdown across every runtime while enjoying native performance with Rustler NIF bindings.
+
 
 ## Installation
 
-Add `:html_to_markdown` to your `mix.exs` dependencies:
+```bash
+Add {:html_to_markdown, "~> 2.19.0"} to mix.exs deps
+```
+
+
+
+Requires Elixir 1.19+ and OTP 28. Add to your `mix.exs`:
 
 ```elixir
 def deps do
   [
-    {:html_to_markdown, "~> 2.8"}
+    {:html_to_markdown, "~> 2.19.0"}
   ]
 end
 ```
 
-Compile the NIF (Rust and cargo are required):
 
-```
-mix deps.get
-mix compile
-```
 
-## Prerequisites
 
-- Elixir **1.19+** running on **OTP 28** (matches CI + release automation targets)
-- Rust toolchain (stable) with `cargo` available
 
-## Usage
+
+## Performance Snapshot
+
+Apple M4 • Real Wikipedia documents • `convert()` (Elixir)
+
+| Document | Size | Ops/sec | Throughput |
+| -------- | ---- | ------- | ---------- |
+| Lists (Timeline) | 129KB | 2,547 | 321.7 MB/s |
+| Tables (Countries) | 360KB | 835 | 293.8 MB/s |
+| Medium (Python) | 656KB | 439 | 281.5 MB/s |
+| Large (Rust) | 567KB | 485 | 268.7 MB/s |
+| Small (Intro) | 463KB | 581 | 262.9 MB/s |
+| HOCR German PDF | 44KB | 7,106 | 303.1 MB/s |
+| HOCR Embedded Tables | 37KB | 6,231 | 226.1 MB/s |
+| HOCR Invoice | 4KB | 62,657 | 256.4 MB/s |
+
+
+See [Performance Guide](../../examples/performance/) for detailed benchmarks.
+
+
+## Quick Start
+
+Basic conversion:
 
 ```elixir
-alias HtmlToMarkdown.{InlineImageConfig, Options}
-
 iex> {:ok, markdown} = HtmlToMarkdown.convert("<h1>Hello</h1>")
 iex> markdown
 "# Hello\n"
+```
 
-iex> HtmlToMarkdown.convert!("<p>Example</p>", wrap: true, wrap_width: 20)
-"Example\n"
 
+
+With conversion options:
+
+```elixir
 # Pre-build reusable options
 iex> handle = HtmlToMarkdown.options(%Options{wrap: true, wrap_width: 40})
 iex> HtmlToMarkdown.convert_with_options("<p>Reusable</p>", handle)
 {:ok, "Reusable\n"}
 ```
 
-Supported options mirror the Rust `ConversionOptions` structure and are exposed
-via the `%HtmlToMarkdown.Options{}` struct (or plain maps/keyword lists). Key
-fields include:
 
-- `heading_style`, `list_indent_type`, `newline_style`, `code_block_style` – atom
-  values (`:atx`, `:tabs`, `:spaces`, etc.) mirroring the Rust enums.
-- `wrap` / `wrap_width` – enable CommonMark soft breaks and configure the column
-  width.
-- `keep_inline_images_in`, `strip_tags`, `preserve_tags` – map sets or lists of
-  tag names that control special handling for certain nodes.
-- `preprocessing` – nested `%HtmlToMarkdown.PreprocessingOptions{}` (or maps)
-  that toggles `:preset`, `:remove_forms`, `:remove_navigation`, etc.
-- `debug` – turns on verbose tracing from the Rust core.
 
-### Inline image extraction
 
-`convert_with_inline_images/3` returns Markdown plus decoded image blobs and
-warnings emitted during extraction:
+
+
+## API Reference
+
+### Core Functions
+
+
+**`HtmlToMarkdown.convert(html, options \\ nil) :: String.t()`**
+
+Basic HTML-to-Markdown conversion. Fast and simple.
+
+**`HtmlToMarkdown.convert_with_metadata(html, options \\ nil, config \\ nil) :: {String.t(), map()}`**
+
+Extract Markdown plus metadata in a single pass. See [Metadata Extraction Guide](../../examples/metadata-extraction/).
+
+**`HtmlToMarkdown.convert_with_inline_images(html, config \\ nil) :: {String.t(), list(map()), list(String.t())}`**
+
+Extract base64-encoded inline images with metadata.
+
+
+
+### Options
+
+**`ConversionOptions`** – Key configuration fields:
+- `heading_style`: Heading format (`"underlined"` | `"atx"` | `"atx_closed"`) — default: `"underlined"`
+- `list_indent_width`: Spaces per indent level — default: `2`
+- `bullets`: Bullet characters cycle — default: `"*+-"`
+- `wrap`: Enable text wrapping — default: `false`
+- `wrap_width`: Wrap at column — default: `80`
+- `code_language`: Default fenced code block language — default: none
+- `extract_metadata`: Embed metadata as YAML frontmatter — default: `false`
+
+**`MetadataConfig`** – Selective metadata extraction:
+- `extract_headers`: h1-h6 elements — default: `true`
+- `extract_links`: Hyperlinks — default: `true`
+- `extract_images`: Image elements — default: `true`
+- `extract_structured_data`: JSON-LD, Microdata, RDFa — default: `true`
+- `max_structured_data_size`: Size limit in bytes — default: `100KB`
+
+
+
+## Metadata Extraction
+
+The metadata extraction feature enables comprehensive document analysis during conversion. Extract document properties, headers, links, images, and structured data in a single pass.
+
+**Use Cases:**
+- **SEO analysis** – Extract title, description, Open Graph tags, Twitter cards
+- **Table of contents generation** – Build structured outlines from heading hierarchy
+- **Content migration** – Document all external links and resources
+- **Accessibility audits** – Check for images without alt text, empty links, invalid heading hierarchy
+- **Link validation** – Classify and validate anchor, internal, external, email, and phone links
+
+**Zero Overhead When Disabled:** Metadata extraction adds negligible overhead and happens during the HTML parsing pass. Disable unused metadata types in `MetadataConfig` to optimize further.
+
+### Example: Quick Start
+
 
 ```elixir
-html = ~S(<p><img src="data:image/png;base64,..." alt="Logo"></p>)
-config = %InlineImageConfig{infer_dimensions: true}
+alias HtmlToMarkdown
 
-{:ok, markdown, inline_images, warnings} =
-  HtmlToMarkdown.convert_with_inline_images(html, %{wrap: false}, config)
+html = "<h1>Article</h1><img src=\"test.jpg\" alt=\"test\">"
+{markdown, metadata} = HtmlToMarkdown.convert_with_metadata(html)
 
-Enum.each(inline_images, fn image ->
-  File.write!("output/#{image.filename}", image.data)
-end)
+IO.inspect(metadata.document.title)        # Document title
+IO.inspect(metadata.headers)               # All h1-h6 elements
+IO.inspect(metadata.links)                 # All hyperlinks
+IO.inspect(metadata.images)                # All images with alt text
+IO.inspect(metadata.structured_data)       # JSON-LD, Microdata, RDFa
 ```
 
-`InlineImageConfig` can be built from a struct, map, or keyword list and accepts
-`max_decoded_size_bytes`, `filename_prefix`, `capture_svg`, and
-`infer_dimensions`. Invalid configs return `{:error, reason}` before any native
-code runs.
 
-Inline images are returned as `%HtmlToMarkdown.InlineImage{}` structs with the
-following fields:
 
-- `data` – raw bytes decoded from the `<img>` or inline `<svg>`.
-- `format` – subtype string (for example `"png"` or `"svg"`).
-- `filename` / `description` – optional DOM metadata.
-- `dimensions` – `{width, height}` tuple when dimension inference is enabled.
-- `source` – `"img_data_uri"` or `"svg_element"` indicating where the payload
-  originated.
-- `attributes` – remaining DOM attributes preserved as a map.
+For detailed examples including SEO extraction, table-of-contents generation, link validation, and accessibility audits, see the [Metadata Extraction Guide](../../examples/metadata-extraction/).
 
-Warnings are exposed as `%HtmlToMarkdown.InlineImageWarning{index, message}`;
-use `index` to correlate warnings back to the zero-based position in the inline
-image list.
 
-### Visitor Pattern
 
-The visitor pattern allows you to intervene in the conversion process and customize
-behavior for specific HTML elements. This is useful for filtering content, collecting
-metadata, applying custom formatting, or implementing content policies.
 
-#### Basic Example
+## Visitor Pattern
 
-Define a visitor module implementing `HtmlToMarkdown.Visitor`:
+The visitor pattern enables custom HTML→Markdown conversion logic by providing callbacks for specific HTML elements during traversal. Use visitors to transform content, filter elements, validate structure, or collect analytics.
+
+**Use Cases:**
+- **Custom Markdown dialects** – Convert to Obsidian, Notion, or other flavors
+- **Content filtering** – Remove tracking pixels, ads, or unwanted elements
+- **URL rewriting** – Rewrite CDN URLs, add query parameters, validate links
+- **Accessibility validation** – Check alt text, heading hierarchy, link text
+- **Analytics** – Track element usage, link destinations, image sources
+
+**Supported Visitor Methods:** 40+ callbacks for text, inline elements, links, images, headings, lists, blocks, and tables.
+
+### Example: Quick Start
+
 
 ```elixir
-defmodule MyLinkFilter do
-  use HtmlToMarkdown.Visitor
+defmodule MyVisitor do
+  def visit_link(ctx, href, text, title) do
+    # Rewrite CDN URLs
+    href = if String.starts_with?(href, "https://old-cdn.com") do
+      String.replace(href, "https://old-cdn.com", "https://new-cdn.com")
+    else
+      href
+    end
+    {:custom, "[#{text}](#{href})"}
+  end
 
-  @impl true
-  def handle_link(_context, _href, text, _title) do
-    # Convert all links to plain text
-    {:custom, text}
+  def visit_image(ctx, src, alt, title) do
+    # Skip tracking pixels
+    if String.contains?(src, "tracking") do
+      :skip
+    else
+      :continue
+    end
   end
 end
 
-html = "<p>Visit <a href='https://example.com'>our site</a> for more!</p>"
-{:ok, markdown} = HtmlToMarkdown.Visitor.convert_with_visitor(html, MyLinkFilter, nil)
-# markdown == "Visit our site for more!\n"
+html = "<a href=\"https://old-cdn.com/file.pdf\">Download</a>"
+markdown = HtmlToMarkdown.convert_with_visitor(html, visitor: MyVisitor)
 ```
 
-#### Available Callbacks
 
-The visitor pattern supports callbacks for all HTML element types:
 
-**Generic Hooks:**
-- `handle_element_start(context)` - called before entering any element
-- `handle_element_end(context, output)` - called after exiting an element
+For comprehensive examples including content filtering, link footnotes, accessibility validation, and asynchronous URL validation, see the [Visitor Pattern Guide](../../examples/visitor-pattern/).
 
-**Text & Formatting:**
-- `handle_text(context, text)` - text nodes
-- `handle_strong(context, text)` - `<strong>`, `<b>`
-- `handle_emphasis(context, text)` - `<em>`, `<i>`
-- `handle_strikethrough(context, text)` - `<s>`, `<del>`, `<strike>`
-- `handle_underline(context, text)` - `<u>`, `<ins>`
-- `handle_subscript(context, text)` - `<sub>`
-- `handle_superscript(context, text)` - `<sup>`
-- `handle_mark(context, text)` - `<mark>`
 
-**Links & Media:**
-- `handle_link(context, href, text, title)` - `<a>` elements
-- `handle_image(context, src, alt, title)` - `<img>` elements
-- `handle_audio(context, src)` - `<audio>` elements
-- `handle_video(context, src)` - `<video>` elements
-- `handle_iframe(context, src)` - `<iframe>` elements
 
-**Code:**
-- `handle_code_block(context, lang, code)` - `<pre><code>` blocks
-- `handle_code_inline(context, code)` - `<code>` inline
+## Examples
 
-**Headings & Structure:**
-- `handle_heading(context, level, text, id)` - `<h1>` through `<h6>`
-- `handle_blockquote(context, content, depth)` - `<blockquote>`
-- `handle_horizontal_rule(context)` - `<hr>`
-- `handle_line_break(context)` - `<br>`
+- [Visitor Pattern Guide](../../examples/visitor-pattern/)
+- [Metadata Extraction Guide](../../examples/metadata-extraction/)
+- [Performance Guide](../../examples/performance/)
 
-**Lists:**
-- `handle_list_start(context, ordered)` - `<ul>` or `<ol>` start
-- `handle_list_item(context, ordered, marker, text)` - `<li>` elements
-- `handle_list_end(context, ordered, output)` - list end
+## Links
 
-**Tables:**
-- `handle_table_start(context)` - `<table>` start
-- `handle_table_row(context, cells, is_header)` - `<tr>` elements
-- `handle_table_end(context, output)` - table end
+- **GitHub:** [github.com/kreuzberg-dev/html-to-markdown](https://github.com/kreuzberg-dev/html-to-markdown)
 
-**Forms:**
-- `handle_form(context, action, method)` - `<form>`
-- `handle_input(context, type, name, value)` - `<input>`
-- `handle_button(context, text)` - `<button>`
+- **Hex.pm:** [hex.pm/packages/html_to_markdown](https://hex.pm/packages/html_to_markdown)
 
-**Definition Lists:**
-- `handle_definition_list_start(context)` - `<dl>` start
-- `handle_definition_term(context, text)` - `<dt>`
-- `handle_definition_description(context, text)` - `<dd>`
-- `handle_definition_list_end(context, output)` - list end
+- **Kreuzberg Ecosystem:** [kreuzberg.dev](https://kreuzberg.dev)
+- **Discord:** [discord.gg/pXxagNK2zN](https://discord.gg/pXxagNK2zN)
 
-**Custom Elements:**
-- `handle_custom_element(context, tag_name, html)` - web components or unknown tags
-- `handle_other(callback, context, args)` - catch-all for unimplemented callbacks
+## Contributing
 
-#### Visit Results
+We welcome contributions! Please see our [Contributing Guide](https://github.com/kreuzberg-dev/html-to-markdown/blob/main/CONTRIBUTING.md) for details on:
 
-Each callback must return one of:
+- Setting up the development environment
+- Running tests locally
+- Submitting pull requests
+- Reporting issues
 
-- `:continue` - proceed with default conversion
-- `{:custom, markdown}` - replace output with custom markdown
-- `:skip` - omit this element entirely
-- `:preserve_html` - include raw HTML verbatim
-- `{:error, reason}` - stop conversion with error
+All contributions must follow our code quality standards (enforced via pre-commit hooks):
 
-#### Node Context
+- Proper test coverage (Rust 95%+, language bindings 80%+)
+- Formatting and linting checks
+- Documentation for public APIs
 
-All callbacks receive a `NodeContext` struct with element metadata:
+## License
 
-```elixir
-%{
-  node_type: :link,           # coarse-grained classification
-  tag_name: "a",              # raw HTML tag name
-  attributes: %{...},         # HTML attributes as a map
-  depth: 2,                   # nesting depth in DOM
-  index_in_parent: 0,         # zero-based sibling index
-  parent_tag: "p",            # parent element's tag (nil if root)
-  is_inline: true             # whether treated as inline vs block
-}
-```
+MIT License – see [LICENSE](https://github.com/kreuzberg-dev/html-to-markdown/blob/main/LICENSE).
 
-#### Advanced Example: Image Collection
+## Support
 
-Use a GenServer to maintain state across callbacks:
+If you find this library useful, consider [sponsoring the project](https://github.com/sponsors/kreuzberg-dev).
 
-```elixir
-defmodule ImageCollector do
-  use GenServer
-  use HtmlToMarkdown.Visitor
+Have questions or run into issues? We're here to help:
 
-  def start_link(_), do: GenServer.start_link(__MODULE__, [])
-
-  def init(_), do: {:ok, []}
-
-  @impl true
-  def handle_image(_context, src, alt, _title) do
-    GenServer.cast(self(), {:collect, src, alt})
-    :continue
-  end
-
-  def handle_cast({:collect, src, alt}, images) do
-    {:noreply, [%{src: src, alt: alt} | images]}
-  end
-end
-
-{:ok, pid} = ImageCollector.start_link(nil)
-{:ok, markdown} = HtmlToMarkdown.Visitor.convert_with_visitor(html, pid, nil)
-# Can query collected images via GenServer API
-```
-
-#### Filtering Example: Remove All Links
-
-```elixir
-defmodule NoLinksVisitor do
-  use HtmlToMarkdown.Visitor
-
-  @impl true
-  def handle_link(_context, _href, text, _title) do
-    # Convert links to plain text
-    {:custom, text}
-  end
-end
-
-html = "<p>Check <a href='#'>this</a> out.</p>"
-{:ok, markdown} = HtmlToMarkdown.Visitor.convert_with_visitor(html, NoLinksVisitor, nil)
-# markdown == "Check this out.\n"
-```
-
-#### Execution Order
-
-Callbacks are invoked during depth-first traversal. For `<div><p>text</p></div>`:
-
-1. `handle_element_start` for `<div>`
-2. `handle_element_start` for `<p>`
-3. `handle_text` for "text"
-4. `handle_element_end` for `<p>`
-5. `handle_element_end` for `</div>`
-
-### Metadata extraction
-
-`convert_with_metadata/3` returns Markdown plus a metadata map:
-
-```elixir
-html = """
-<html>
-  <head>
-    <title>Example</title>
-    <meta name="description" content="Demo page">
-  </head>
-  <body>
-    <h1 id="welcome">Welcome</h1>
-    <a href="https://example.com" rel="nofollow external">Example link</a>
-  </body>
-</html>
-"""
-
-{:ok, markdown, metadata} = HtmlToMarkdown.convert_with_metadata(html)
-
-metadata["document"]["title"]        # "Example"
-metadata["headers"] |> hd() |> Map.get("text") # "Welcome"
-metadata["links"]   |> hd() |> Map.get("link_type") # "external"
-```
-
-## Performance (Apple M4)
-
-Benchmarks use the shared Wikipedia + hOCR fixtures from the benchmark harness
-in `tools/benchmark-harness`.
-
-| Document               | Size   | Ops/sec | Throughput |
-| ---------------------- | ------ | ------- | ---------- |
-| Lists (Timeline)       | 129 KB | 2,547   | 321.7 MB/s |
-| Tables (Countries)     | 360 KB |   835   | 293.8 MB/s |
-| Medium (Python)        | 656 KB |   439   | 281.5 MB/s |
-| Large (Rust)           | 567 KB |   485   | 268.7 MB/s |
-| Small (Intro)          | 463 KB |   581   | 262.9 MB/s |
-| HOCR German PDF        |  44 KB | 7,106   | 303.1 MB/s |
-| HOCR Embedded Tables   |  37 KB | 6,231   | 226.1 MB/s |
-| HOCR Invoice           |   4 KB | 62,657  | 256.4 MB/s |
-
-The Elixir binding matches the throughput of the Rust core since conversions
-are executed inside the same NIF. The numbers above help size workloads and
-will be refreshed once the Elixir harness adapter lands.
-
-## Testing
-
-```bash
-# From the repo root
-task elixir:test
-task elixir:lint
-```
+- **GitHub Issues:** [github.com/kreuzberg-dev/html-to-markdown/issues](https://github.com/kreuzberg-dev/html-to-markdown/issues)
+- **Discussions:** [github.com/kreuzberg-dev/html-to-markdown/discussions](https://github.com/kreuzberg-dev/html-to-markdown/discussions)
+- **Discord Community:** [discord.gg/pXxagNK2zN](https://discord.gg/pXxagNK2zN)

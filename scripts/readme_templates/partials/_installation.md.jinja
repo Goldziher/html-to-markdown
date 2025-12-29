@@ -1,0 +1,90 @@
+```bash
+{{ install_command }}
+```
+
+{% if language == 'python' %}
+Requires Python 3.10+. Wheels are published for Linux, macOS, and Windows on PyPI.
+{% elif language == 'typescript' %}
+
+Requires Node.js 18+ or Bun. Native bindings provide superior performance.
+
+**npm:**
+```bash
+npm install @kreuzberg/html-to-markdown
+```
+
+**pnpm:**
+```bash
+pnpm add @kreuzberg/html-to-markdown
+```
+
+**yarn:**
+```bash
+yarn add @kreuzberg/html-to-markdown
+```
+
+**bun:**
+```bash
+bun add @kreuzberg/html-to-markdown
+```
+
+Alternatively, use the WebAssembly version for browser/edge environments:
+
+```bash
+npm install @kreuzberg/html-to-markdown-wasm
+```
+{% elif language == 'ruby' %}
+
+Requires Ruby 3.2+ with Magnus native extension bindings. Published for Linux, macOS.
+{% elif language == 'php' %}
+
+Requires PHP 8.2+. Install the native extension via PIE:
+
+```bash
+pie install kreuzberg-dev/html-to-markdown
+```
+
+Or use Composer (requires ext-html_to_markdown):
+
+```bash
+composer require goldziher/html-to-markdown
+```
+{% elif language == 'go' %}
+
+Requires Go 1.25+. The FFI library is automatically downloaded from GitHub releases.
+{% elif language == 'java' %}
+
+Requires Java 25+ with Panama FFI support.
+
+**Maven:**
+```xml
+<dependency>
+    <groupId>dev.kreuzberg</groupId>
+    <artifactId>html-to-markdown</artifactId>
+    <version>{{ version }}</version>
+</dependency>
+```
+
+**Gradle (Kotlin DSL):**
+```kotlin
+implementation("dev.kreuzberg:html-to-markdown:{{ version }}")
+```
+{% elif language == 'csharp' %}
+
+Requires .NET 8.0+ SDK.
+
+```bash
+dotnet add package KreuzbergDev.HtmlToMarkdown
+```
+{% elif language == 'elixir' %}
+
+Requires Elixir 1.19+ and OTP 28. Add to your `mix.exs`:
+
+```elixir
+def deps do
+  [
+    {:html_to_markdown, "~> {{ version }}"}
+  ]
+end
+```
+{% endif %}

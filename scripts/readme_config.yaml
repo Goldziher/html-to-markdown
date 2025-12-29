@@ -1,0 +1,356 @@
+version: "2.19.0"
+license: MIT
+discord_url: https://discord.gg/pXxagNK2zN
+banner_url: https://github.com/user-attachments/assets/419fc06c-8313-4324-b159-4b4d3cfce5c0
+
+languages:
+  python:
+    name: Python
+    template: language_package.md.jinja
+    package_manager:
+      - pip
+    package_name: html-to-markdown
+    install_command: "pip install html-to-markdown"
+    description: |
+      High-performance HTML to Markdown converter with a clean Python API (powered by a Rust core).
+      The same engine also drives the Node.js, Ruby, PHP, and WebAssembly bindings, so rendered Markdown
+      stays identical across runtimes. Wheels are published for Linux, macOS, and Windows.
+    features:
+      visitor_pattern: true
+      metadata_extraction: true
+      inline_images: true
+      async_support: true
+      cli_proxy: false
+    performance:
+      platform: "Apple M4"
+      function: "convert()"
+      note: "Real Wikipedia documents"
+      benchmarks:
+        - name: "Lists (Timeline)"
+          size: "129KB"
+          latency: "0.62ms"
+          throughput: "208 MB/s"
+        - name: "Tables (Countries)"
+          size: "360KB"
+          latency: "2.02ms"
+          throughput: "178 MB/s"
+        - name: "Mixed (Python wiki)"
+          size: "656KB"
+          latency: "4.56ms"
+          throughput: "144 MB/s"
+    snippets:
+      basic_usage: "getting-started/basic_usage.md"
+      with_options: "getting-started/with_options.md"
+      async_example: "getting-started/async_example.md"
+      metadata_extraction: "metadata/basic_extraction.md"
+      visitor_basic: "visitor/basic_visitor.md"
+    migration_version: null
+
+  typescript:
+    name: "TypeScript (Node.js)"
+    template: language_package.md.jinja
+    output_path: "packages/typescript/README.md"
+    package_manager:
+      - npm
+      - pnpm
+      - yarn
+      - bun
+    package_name: "@kreuzberg/html-to-markdown"
+    install_command: "npm install @kreuzberg/html-to-markdown"
+    description: |
+      High-performance HTML to Markdown converter for Node.js and Bun with full TypeScript support.
+      This package wraps native `@kreuzberg/html-to-markdown-node` bindings and provides a type-safe API.
+    features:
+      visitor_pattern: true
+      metadata_extraction: true
+      inline_images: true
+      async_support: false
+      cli_proxy: false
+    performance:
+      platform: "Apple M4"
+      function: "convert()"
+      note: "Real Wikipedia documents"
+      benchmarks:
+        - name: "Lists (Timeline)"
+          size: "129KB"
+          latency: "0.58ms"
+          throughput: "222 MB/s"
+        - name: "Tables (Countries)"
+          size: "360KB"
+          latency: "1.89ms"
+          throughput: "190 MB/s"
+        - name: "Mixed (Python wiki)"
+          size: "656KB"
+          latency: "4.21ms"
+          throughput: "156 MB/s"
+    snippets:
+      basic_usage: "getting-started/basic_usage.md"
+      with_options: "getting-started/with_options.md"
+      metadata_extraction: "metadata/basic_extraction.md"
+      visitor_basic: "visitor/basic_visitor.md"
+    migration_version: "2.19.0"
+
+  ruby:
+    name: Ruby
+    template: language_package.md.jinja
+    output_path: "packages/ruby/README.md"
+    package_manager:
+      - gem
+      - bundler
+    package_name: html-to-markdown
+    install_command: "gem install html-to-markdown"
+    description: |
+      Blazing-fast HTML to Markdown conversion for Ruby, powered by the same Rust engine used by our Python, Node.js, WebAssembly, and PHP packages.
+      Ship identical Markdown across every runtime while enjoying native extension performance with Magnus bindings.
+    features:
+      visitor_pattern: true
+      metadata_extraction: true
+      inline_images: true
+      async_support: false
+      cli_proxy: true
+    performance:
+      platform: "Apple M4"
+      function: "convert()"
+      note: "Real Wikipedia documents"
+      benchmarks:
+        - name: "Lists (Timeline)"
+          size: "129KB"
+          latency: "0.71ms"
+          throughput: "182 MB/s"
+        - name: "Tables (Countries)"
+          size: "360KB"
+          latency: "2.15ms"
+          throughput: "167 MB/s"
+        - name: "Mixed (Python wiki)"
+          size: "656KB"
+          latency: "4.89ms"
+          throughput: "134 MB/s"
+    snippets:
+      basic_usage: "getting-started/basic_usage.md"
+      with_options: "getting-started/with_options.md"
+      metadata_extraction: "metadata/basic_extraction.md"
+      visitor_basic: "visitor/basic_visitor.md"
+    migration_version: null
+
+  php:
+    name: PHP
+    template: language_package.md.jinja
+    package_manager:
+      - composer
+      - pie
+    package_name: goldziher/html-to-markdown
+    install_command: "composer require goldziher/html-to-markdown"
+    description: |
+      High-performance HTML to Markdown converter with typed PHP bindings powered by a Rust core.
+      Provides a type-safe API with full PHPStan level 9 support, modern PHP 8.2+ features, and comprehensive metadata extraction.
+    features:
+      visitor_pattern: true
+      metadata_extraction: true
+      inline_images: true
+      async_support: false
+      cli_proxy: false
+    performance:
+      platform: "Apple M4"
+      function: "convert()"
+      note: "Real Wikipedia documents"
+      benchmarks:
+        - name: "Lists (Timeline)"
+          size: "129KB"
+          ops_sec: 3346
+        - name: "Tables (Countries)"
+          size: "360KB"
+          ops_sec: 973
+        - name: "Medium (Python)"
+          size: "657KB"
+          ops_sec: 485
+    snippets:
+      basic_usage: "getting-started/basic_usage.md"
+      with_options: "getting-started/with_options.md"
+      metadata_extraction: "metadata/basic_extraction.md"
+      visitor_basic: "visitor/basic_visitor.md"
+    migration_version: null
+
+  go:
+    name: Go
+    template: language_package.md.jinja
+    output_path: "packages/go/v2/README.md"
+    package_manager:
+      - go
+    package_name: github.com/kreuzberg-dev/html-to-markdown/packages/go/v2/htmltomarkdown
+    install_command: "go get github.com/kreuzberg-dev/html-to-markdown/packages/go/v2/htmltomarkdown"
+    description: |
+      High-performance HTML to Markdown converter with Go bindings to the Rust core library.
+      Supports automatic downloading of prebuilt FFI libraries for Linux, macOS, and Windows with customizable caching.
+    features:
+      visitor_pattern: false
+      metadata_extraction: false
+      inline_images: false
+      async_support: true
+      cli_proxy: false
+    performance:
+      platform: "Apple M4"
+      function: "Convert()"
+      note: "Real Wikipedia documents"
+      benchmarks:
+        - name: "Lists (Timeline)"
+          size: "129KB"
+          latency: "0.46ms"
+          throughput: "277.5 MB/s"
+        - name: "Tables (Countries)"
+          size: "360KB"
+          latency: "1.37ms"
+          throughput: "262.1 MB/s"
+        - name: "Mixed (Python wiki)"
+          size: "656KB"
+          latency: "2.75ms"
+          throughput: "237.9 MB/s"
+    snippets:
+      basic_usage: "getting-started/basic_usage.md"
+      with_options: "getting-started/with_options.md"
+    migration_version: null
+
+  java:
+    name: Java
+    template: language_package.md.jinja
+    output_path: "packages/java/README.md"
+    package_manager:
+      - maven
+      - gradle
+    package_name: dev.kreuzberg:html-to-markdown
+    install_command: |
+      <dependency>
+          <groupId>dev.kreuzberg</groupId>
+          <artifactId>html-to-markdown</artifactId>
+          <version>2.19.0</version>
+          <classifier>linux</classifier> <!-- or macos, windows -->
+      </dependency>
+    description: |
+      High-performance HTML to Markdown converter with Java Panama FFI bindings to the Rust core.
+      Uses Foreign Function & Memory API for zero-dependency, thread-safe conversion with full metadata extraction support.
+    features:
+      visitor_pattern: false
+      metadata_extraction: false
+      inline_images: false
+      async_support: false
+      cli_proxy: false
+    performance:
+      platform: "Apple M4"
+      function: "convert()"
+      note: "Real Wikipedia documents"
+      benchmarks:
+        - name: "Lists (Timeline)"
+          size: "129KB"
+          ops_sec: 2308
+          throughput: "291.5 MB/s"
+        - name: "Tables (Countries)"
+          size: "360KB"
+          ops_sec: 773
+          throughput: "272.0 MB/s"
+        - name: "Mixed (Python)"
+          size: "656KB"
+          ops_sec: 403
+          throughput: "258.5 MB/s"
+    snippets:
+      basic_usage: "getting-started/basic_usage.md"
+      with_options: "getting-started/with_options.md"
+    migration_version: "2.19.0"
+
+  csharp:
+    name: "C# / .NET"
+    template: language_package.md.jinja
+    output_path: "packages/csharp/README.md"
+    package_manager:
+      - nuget
+    package_name: KreuzbergDev.HtmlToMarkdown
+    install_command: "dotnet add package KreuzbergDev.HtmlToMarkdown"
+    description: |
+      High-performance HTML to Markdown converter with C#/.NET bindings using P/Invoke to the Rust core.
+      Provides type-safe record-based APIs for metadata extraction, visitor patterns, and thread-safe concurrent conversion.
+    features:
+      visitor_pattern: false
+      metadata_extraction: false
+      inline_images: false
+      async_support: false
+      cli_proxy: false
+    performance:
+      platform: "Apple M4"
+      function: "Convert()"
+      note: "Real Wikipedia documents"
+      benchmarks:
+        - name: "Lists (Timeline)"
+          size: "129KB"
+          ops_sec: 3111
+          throughput: "392.9 MB/s"
+        - name: "Tables (Countries)"
+          size: "360KB"
+          ops_sec: 853
+          throughput: "300.1 MB/s"
+        - name: "Mixed (Python)"
+          size: "656KB"
+          ops_sec: 456
+          throughput: "292.3 MB/s"
+    snippets:
+      basic_usage: "getting-started/basic_usage.md"
+      with_options: "getting-started/with_options.md"
+    migration_version: "2.19.0"
+
+  elixir:
+    name: Elixir
+    template: language_package.md.jinja
+    output_path: "packages/elixir/README.md"
+    package_manager:
+      - mix
+    package_name: html_to_markdown
+    install_command: "Add {:html_to_markdown, \"~> 2.19.0\"} to mix.exs deps"
+    description: |
+      Elixir bindings for the Rust html-to-markdown engine. The package exposes a fast HTML to Markdown converter implemented with Rustler.
+      Ship identical Markdown across every runtime while enjoying native performance with Rustler NIF bindings.
+    features:
+      visitor_pattern: true
+      metadata_extraction: true
+      inline_images: true
+      async_support: false
+      cli_proxy: false
+    performance:
+      platform: "Apple M4"
+      function: "convert()"
+      note: "Real Wikipedia documents"
+      benchmarks:
+        - name: "Lists (Timeline)"
+          size: "129KB"
+          ops_sec: 2547
+          throughput: "321.7 MB/s"
+        - name: "Tables (Countries)"
+          size: "360KB"
+          ops_sec: 835
+          throughput: "293.8 MB/s"
+        - name: "Medium (Python)"
+          size: "656KB"
+          ops_sec: 439
+          throughput: "281.5 MB/s"
+        - name: "Large (Rust)"
+          size: "567KB"
+          ops_sec: 485
+          throughput: "268.7 MB/s"
+        - name: "Small (Intro)"
+          size: "463KB"
+          ops_sec: 581
+          throughput: "262.9 MB/s"
+        - name: "HOCR German PDF"
+          size: "44KB"
+          ops_sec: 7106
+          throughput: "303.1 MB/s"
+        - name: "HOCR Embedded Tables"
+          size: "37KB"
+          ops_sec: 6231
+          throughput: "226.1 MB/s"
+        - name: "HOCR Invoice"
+          size: "4KB"
+          ops_sec: 62657
+          throughput: "256.4 MB/s"
+    snippets:
+      basic_usage: "getting-started/basic_usage.md"
+      with_options: "getting-started/with_options.md"
+      metadata_extraction: "metadata/basic_extraction.md"
+      visitor_basic: "visitor/basic_visitor.md"
+    migration_version: null

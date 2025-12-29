@@ -1,0 +1,49 @@
+# html-to-markdown
+
+{% include 'partials/_badges.md.jinja' %}
+
+{{ description }}
+
+## Installation
+
+{% include 'partials/_installation.md.jinja' %}
+
+{% if migration_guide %}
+{{ migration_guide }}
+{% endif %}
+
+{% if performance %}
+## Performance Snapshot
+
+{{ performance | render_performance_table(name) }}
+
+See [Performance Guide](../../examples/performance/) for detailed benchmarks.
+{% endif %}
+
+## Quick Start
+
+{% include 'partials/_quick_start.md.jinja' %}
+
+## API Reference
+
+{% include 'partials/_api_reference.md.jinja' %}
+
+{% if features.metadata_extraction %}
+## Metadata Extraction
+
+{% include 'partials/_metadata_extraction.md.jinja' %}
+{% endif %}
+
+{% if features.visitor_pattern %}
+## Visitor Pattern
+
+{% include 'partials/_visitor_pattern.md.jinja' %}
+{% endif %}
+
+## Examples
+
+- [Visitor Pattern Guide](../../examples/visitor-pattern/)
+- [Metadata Extraction Guide](../../examples/metadata-extraction/)
+- [Performance Guide](../../examples/performance/)
+
+{% include 'partials/_footer.md.jinja' %}

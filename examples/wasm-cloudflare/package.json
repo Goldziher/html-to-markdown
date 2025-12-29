@@ -7,10 +7,10 @@
     "deploy": "wrangler deploy"
   },
   "dependencies": {
-    "html-to-markdown-wasm": "workspace:*"
+    "@kreuzberg/html-to-markdown-wasm": "workspace:*"
   },
   "devDependencies": {
-    "@cloudflare/workers-types": "^4.20251228.0",
+    "@cloudflare/workers-types": "^4.20251229.0",
     "typescript": "^5.9.3",
     "wrangler": "^4.56.0"
   }

@@ -1,212 +1,146 @@
 # html-to-markdown
 
-<img width="1128" height="191" alt="Linkedin- Banner (1)" src="https://github.com/user-attachments/assets/f8e91036-20a5-40f9-9fcc-9e6c6e15f1f5" />
+<div align="center" style="display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin: 20px 0;">
+  <!-- Language Bindings -->
+  <a href="https://crates.io/crates/html-to-markdown-rs">
+    <img src="https://img.shields.io/crates/v/html-to-markdown-rs?label=Rust&color=007ec6" alt="Rust">
+  </a>
+  <a href="https://pypi.org/project/html-to-markdown/">
+    <img src="https://img.shields.io/pypi/v/html-to-markdown?label=Python&color=007ec6" alt="Python">
+  </a>
+  <a href="https://www.npmjs.com/package/@kreuzberg/html-to-markdown-node">
+    <img src="https://img.shields.io/npm/v/@kreuzberg/html-to-markdown-node?label=Node.js&color=007ec6" alt="Node.js">
+  </a>
+  <a href="https://www.npmjs.com/package/@kreuzberg/html-to-markdown-wasm">
+    <img src="https://img.shields.io/npm/v/@kreuzberg/html-to-markdown-wasm?label=WASM&color=007ec6" alt="WASM">
+  </a>
+  <a href="https://central.sonatype.com/artifact/dev.kreuzberg/html-to-markdown">
+    <img src="https://img.shields.io/maven-central/v/dev.kreuzberg/html-to-markdown?label=Java&color=007ec6" alt="Java">
+  </a>
+  <a href="https://pkg.go.dev/github.com/kreuzberg-dev/html-to-markdown/packages/go/v2/htmltomarkdown">
+    <img src="https://img.shields.io/badge/Go-v2.19.0-007ec6" alt="Go">
+  </a>
+  <a href="https://www.nuget.org/packages/KreuzbergDev.HtmlToMarkdown/">
+    <img src="https://img.shields.io/nuget/v/KreuzbergDev.HtmlToMarkdown?label=C%23&color=007ec6" alt="C#">
+  </a>
+  <a href="https://packagist.org/packages/goldziher/html-to-markdown">
+    <img src="https://img.shields.io/packagist/v/goldziher/html-to-markdown?label=PHP&color=007ec6" alt="PHP">
+  </a>
+  <a href="https://rubygems.org/gems/html-to-markdown">
+    <img src="https://img.shields.io/gem/v/html-to-markdown?label=Ruby&color=007ec6" alt="Ruby">
+  </a>
+  <a href="https://hex.pm/packages/html_to_markdown">
+    <img src="https://img.shields.io/hexpm/v/html_to_markdown?label=Elixir&color=007ec6" alt="Elixir">
+  </a>
 
+  <!-- Project Info -->
+  <a href="https://github.com/kreuzberg-dev/html-to-markdown/blob/main/LICENSE">
+    <img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="License">
+  </a>
+</div>
 
+<img width="1128" height="191" alt="html-to-markdown" src="https://github.com/user-attachments/assets/419fc06c-8313-4324-b159-4b4d3cfce5c0" />
 
-High-performance HTML → Markdown conversion powered by Rust. Shipping as a Rust crate, Python package, PHP extension, Ruby gem, Elixir Rustler NIF, Node.js bindings, WebAssembly, and standalone CLI with identical rendering behaviour.
+<div align="center" style="margin-top: 20px;">
+  <a href="https://discord.gg/pXxagNK2zN">
+      <img height="22" src="https://img.shields.io/badge/Discord-Join%20our%20community-7289da?logo=discord&logoColor=white" alt="Discord">
+  </a>
+</div>
 
-Part of the Kreuzberg.dev document intelligence ecosystem. Kreuzberg is a polyglot document intelligence framework with a fast Rust core. We build tools that help developers extract, process, and understand documents at scale, from PDFs to Office files, images, archives, emails, in 50+ formats. We've set out to make high-performance document intelligence faster and more ecological.
+High-performance HTML → Markdown conversion powered by Rust. Shipping as a Rust crate, Python package, PHP extension, Ruby gem, Elixir Rustler NIF, Node.js bindings, WebAssembly, and standalone CLI with identical rendering behavior across all runtimes.
 
-[![Crates.io](https://img.shields.io/crates/v/html-to-markdown-rs.svg?logo=rust&label=crates.io)](https://crates.io/crates/html-to-markdown-rs)
-[![npm (node)](https://img.shields.io/npm/v/%40kreuzberg%2Fhtml-to-markdown-node.svg?logo=npm)](https://www.npmjs.com/package/@kreuzberg/html-to-markdown-node)
-[![npm (wasm)](https://img.shields.io/npm/v/%40kreuzberg%2Fhtml-to-markdown-wasm.svg?logo=npm)](https://www.npmjs.com/package/@kreuzberg/html-to-markdown-wasm)
-[![PyPI](https://img.shields.io/pypi/v/html-to-markdown.svg?logo=pypi)](https://pypi.org/project/html-to-markdown/)
-[![Packagist](https://img.shields.io/packagist/v/goldziher/html-to-markdown.svg)](https://packagist.org/packages/goldziher/html-to-markdown)
-[![RubyGems](https://badge.fury.io/rb/html-to-markdown.svg)](https://rubygems.org/gems/html-to-markdown)
-[![Hex.pm](https://img.shields.io/hexpm/v/html_to_markdown.svg)](https://hex.pm/packages/html_to_markdown)
-[![NuGet](https://img.shields.io/nuget/v/KreuzbergDev.HtmlToMarkdown.svg)](https://www.nuget.org/packages/KreuzbergDev.HtmlToMarkdown/)
-[![Maven Central](https://img.shields.io/maven-central/v/dev.kreuzberg/html-to-markdown.svg)](https://central.sonatype.com/artifact/dev.kreuzberg/html-to-markdown)
-[![Go Reference](https://pkg.go.dev/badge/github.com/kreuzberg-dev/html-to-markdown/packages/go/v2/htmltomarkdown.svg)](https://pkg.go.dev/github.com/kreuzberg-dev/html-to-markdown/packages/go/v2/htmltomarkdown)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://github.com/kreuzberg-dev/html-to-markdown/blob/main/LICENSE)
-[![Discord](https://img.shields.io/badge/Discord-Join%20our%20community-7289da)](https://discord.gg/pXxagNK2zN)
+## Key Features
 
+- **Blazing Fast** – Rust-powered core delivers 10-80× faster conversion than pure Python alternatives (150–280 MB/s)
+- **Polyglot** – Native bindings for Rust, Python, TypeScript/Node.js, Ruby, PHP, Go, Java, C#, and Elixir
+- **Smart Conversion** – Handles complex documents including nested tables, code blocks, task lists, and hOCR OCR output
+- **Metadata Extraction** – Extract document metadata (title, description, headers, links, images, structured data) alongside conversion
+- **Visitor Pattern** – Custom callbacks for domain-specific dialects, content filtering, URL rewriting, accessibility validation
+- **Highly Configurable** – Control heading styles, code block fences, list formatting, whitespace handling, and HTML sanitization
+- **Tag Preservation** – Keep specific HTML tags unconverted when markdown isn't expressive enough
+- **Secure by Default** – Built-in HTML sanitization prevents malicious content
+- **Consistent Output** – Identical markdown rendering across all language bindings
 
----
-
-## 🎮 **[Try the Live Demo →](https://kreuzberg-dev.github.io/html-to-markdown/)**
-
-Experience WebAssembly-powered HTML to Markdown conversion instantly in your browser. No installation needed!
-
----
-
-## Why html-to-markdown?
-
-- **Blazing Fast**: Rust-powered core delivers 10-80× faster conversion than pure Python alternatives
-- **Universal**: Works everywhere - Node.js, Bun, Deno, browsers, Python, Rust, and standalone CLI
-- **Smart Conversion**: Handles complex documents including nested tables, code blocks, task lists, and hOCR OCR output
-- **Metadata Extraction**: Extract document metadata (title, description, headers, links, images) alongside conversion
-- **Highly Configurable**: Control heading styles, code block fences, list formatting, whitespace handling, and HTML sanitization
-- **Tag Preservation**: Keep specific HTML tags unconverted when markdown isn't expressive enough
-- **Secure by Default**: Built-in HTML sanitization prevents malicious content
-- **Consistent Output**: Identical markdown rendering across all language bindings
-
-## Quick Start
-
-**Node.js / Bun (Native - Fastest):**
-
-```typescript
-import { convert } from '@kreuzberg/html-to-markdown-node';
-
-const html = '<h1>Hello</h1><p>Rust ❤️ Markdown</p>';
-const markdown = convert(html, {
-  headingStyle: 'Atx',
-  codeBlockStyle: 'Backticks',
-  wrap: true,
-  preserveTags: ['table'],
-});
-```
-
-**Python:**
-
-```python
-from html_to_markdown import convert
-
-html = '<h1>Hello</h1><p>Rust ❤️ Markdown</p>'
-markdown = convert(html, heading_style='Atx', wrap=True)
-```
-
-**Ruby:**
-
-```ruby
-require 'html_to_markdown'
-
-html = '<h1>Hello</h1><p>Rust ❤️ Markdown</p>'
-markdown = HtmlToMarkdown.convert(html, heading_style: :atx, wrap: true)
-```
-
-Full language guides: See [Language Guides](#language-guides) below.
+**[Try the Live Demo →](https://kreuzberg-dev.github.io/html-to-markdown/)**
 
 ## Installation
 
-| Target                      | Command(s)                                                                                                       |
-| --------------------------- | ---------------------------------------------------------------------------------------------------------------- |
-| **Node.js/Bun** (native)    | `npm install @kreuzberg/html-to-markdown-node`                                                                   |
-| **WebAssembly** (universal) | `npm install @kreuzberg/html-to-markdown-wasm`                                                                   |
-| **Deno**                    | `import { convert } from "npm:@kreuzberg/html-to-markdown-wasm"`                                                 |
-| **Python** (bindings + CLI) | `pip install html-to-markdown`                                                                                   |
-| **PHP** (extension + helpers) | `PHP_EXTENSION_DIR=$(php-config --extension-dir) pie install goldziher/html-to-markdown`<br>`composer require goldziher/html-to-markdown` |
-| **Ruby** gem                | `bundle add html-to-markdown` or `gem install html-to-markdown`                                                  |
-| **Elixir** (Rustler NIF)    | `{:html_to_markdown, "~> 2.8"}`                                                                                  |
-| **Rust** crate              | `cargo add html-to-markdown-rs`                                                                                  |
-| **Java** (Maven)            | `<groupId>dev.kreuzberg</groupId><artifactId>html-to-markdown</artifactId>`                                     |
-| **C#/.NET** (NuGet)         | `dotnet add package KreuzbergDev.HtmlToMarkdown`                                                                 |
-| Rust CLI (crates.io)        | `cargo install html-to-markdown-cli`                                                                             |
-| Homebrew CLI                | `brew install html-to-markdown` (core)                                                                          |
-| Releases                    | [GitHub Releases](https://github.com/kreuzberg-dev/html-to-markdown/releases)                                    |
+Each language binding provides comprehensive documentation with installation instructions, examples, and best practices. Choose your platform to get started:
 
-## Performance
+**Scripting Languages:**
+- **[Python](./packages/python/README.md)** – PyPI package, metadata extraction, visitor pattern, CLI included
+- **[Ruby](./packages/ruby/README.md)** – RubyGems package, RBS type definitions, Steep checking
+- **[PHP](./packages/php/README.md)** – Composer package + PIE extension, PHP 8.2+, PHPStan level 9
+- **[Elixir](./packages/elixir/README.md)** – Hex package, Rustler NIF bindings, Elixir 1.19+
 
-Benchmarked on Apple M4 using the shared fixture harness in `tools/benchmark-harness`.
+**JavaScript/TypeScript:**
+- **[Node.js / TypeScript](./packages/typescript/README.md)** – Native NAPI-RS bindings for Node.js/Bun, fastest performance, WebAssembly for browsers/Deno
 
-### Comparative Throughput (Median Across Fixtures)
+**Compiled Languages:**
+- **[Go](./packages/go/v2/README.md)** – Go module with FFI bindings, automatic library download
+- **[Java](./packages/java/README.md)** – Maven Central, Panama Foreign Function & Memory API, Java 24+
+- **[C#](./packages/csharp/README.md)** – NuGet package, .NET 8.0+, P/Invoke FFI bindings
 
-| Runtime | Median ops/sec | Median throughput (MB/s) | Peak memory (MB) | Successes |
-| ------- | -------------- | ------------------------ | ---------------- | --------- |
-| Rust | 1,060.3 | 116.4 | 171.3 | 56/56 |
-| Go | 1,496.3 | 131.1 | 22.9 | 16/16 |
-| Ruby | 2,155.5 | 300.4 | 280.3 | 48/48 |
-| PHP | 2,357.7 | 308.0 | 223.5 | 48/48 |
-| Elixir | 1,564.1 | 269.1 | 384.7 | 48/48 |
-| C# | 1,234.2 | 272.4 | 187.8 | 16/16 |
-| Java | 1,298.7 | 167.1 | 527.2 | 16/16 |
-| WASM | 1,485.8 | 157.6 | 95.3 | 48/48 |
-| Node.js (NAPI) | 2,054.2 | 306.5 | 95.4 | 48/48 |
-| Python (PyO3) | 3,120.3 | 307.5 | 83.5 | 48/48 |
+**Native:**
+- **[Rust](./crates/html-to-markdown/README.md)** – Core library, flexible feature flags, zero-copy APIs
 
-Use `task bench:harness` to regenerate throughput numbers. See [Performance Guide](./examples/performance/) for benchmarking strategies and optimization tips.
+**Command-Line:**
+- **[CLI](https://crates.io/crates/html-to-markdown-cli)** – Cross-platform binary via `cargo install html-to-markdown-cli` or [Homebrew](https://formulae.brew.sh/formula/html-to-markdown)
 
-## Language Guides
+<details>
+<summary><strong>Metadata Extraction</strong></summary>
 
-Complete documentation with examples for each language:
+Extract comprehensive metadata during conversion: title, description, headers, links, images, structured data (JSON-LD, Microdata, RDFa). Use cases: SEO extraction, table-of-contents generation, link validation, accessibility auditing, content migration.
 
-- **Python** – [README](./packages/python/README.md) | PyO3 bindings, metadata extraction, inline images
-- **JavaScript/TypeScript** – [Node.js](./crates/html-to-markdown-node/README.md) | [TypeScript](./packages/typescript/README.md) | [WASM](./crates/html-to-markdown-wasm/README.md)
-- **Ruby** – [README](./packages/ruby/README.md) | Magnus bindings, RBS type definitions, Steep checking
-- **PHP** – [Package](./packages/php/README.md) | [Extension (PIE)](./packages/php-ext/README.md) | ext-php-rs extension
-- **Go** – [README](./packages/go/README.md) | FFI bindings with cgo
-- **Java** – [README](./packages/java/README.md) | Panama FFI, Maven/Gradle setup
-- **C#/.NET** – [README](./packages/csharp/README.md) | P/Invoke FFI, NuGet distribution
-- **Elixir** – [README](./packages/elixir/README.md) | Rustler NIF bindings
-- **Rust** – [README](./crates/html-to-markdown/README.md) | Core library, error handling, advanced features
+**[Metadata Extraction Guide →](./examples/metadata-extraction/)**
 
-## Feature Guides
+</details>
 
-### Visitor Pattern
-Customize HTML→Markdown conversion with callbacks for specific elements. Use cases: domain-specific dialects, content filtering, URL rewriting, accessibility validation.
+<details>
+<summary><strong>Visitor Pattern</strong></summary>
 
-**→ [Full Guide with Examples](./examples/visitor-pattern/)** (Python, TypeScript, Ruby)
+Customize HTML→Markdown conversion with callbacks for specific elements. Intercept links, images, headings, lists, and more. Use cases: domain-specific Markdown dialects (Obsidian, Notion), content filtering, URL rewriting, accessibility validation, analytics.
 
-### Metadata Extraction
-Extract comprehensive metadata during conversion: title, description, headers, links, images, structured data. Use cases: SEO extraction, TOC generation, link validation, accessibility auditing, content migration.
+**[Visitor Pattern Guide →](./examples/visitor-pattern/)**
 
-**→ [Full Guide with Examples](./examples/metadata-extraction/)** (Python, TypeScript, Ruby)
+</details>
 
-### Performance & Benchmarking
-Understand performance characteristics, run benchmarks, optimize for your use case. Includes benchmarking tools, memory profiling, streaming strategies, and optimization tips.
+<details>
+<summary><strong>Performance & Benchmarking</strong></summary>
 
-**→ [Full Guide](./examples/performance/)**
+Rust-powered core delivers 150–280 MB/s throughput (10-80× faster than pure Python alternatives). Includes benchmarking tools, memory profiling, streaming strategies, and optimization tips.
 
-## Examples
+**[Performance Guide →](./examples/performance/)**
 
-Explore working code examples in multiple languages:
+</details>
 
-| Example | Path | Languages |
-| ------- | ---- | --------- |
-| **Visitor Pattern** | [examples/visitor-pattern/](./examples/visitor-pattern/) | Python, TypeScript, Ruby |
-| **Metadata Extraction** | [examples/metadata-extraction/](./examples/metadata-extraction/) | Python, TypeScript, Ruby |
-| **Performance** | [examples/performance/](./examples/performance/) | Benchmarks, profiling, optimization |
+<details>
+<summary><strong>Tag Preservation</strong></summary>
 
-## Testing
+Keep specific HTML tags unconverted when Markdown isn't expressive enough. Useful for tables, SVG, custom elements, or when you need mixed HTML/Markdown output.
 
-Run the test suite locally:
+See language-specific documentation for `preserveTags` configuration.
 
-```bash
-# All core test suites (Rust, Python, Ruby, Node, PHP, Go, C#, Elixir, Java)
-task test
+</details>
 
-# Run the Wasmtime-backed WASM integration tests
-task wasm:test:wasmtime
-```
+<details>
+<summary><strong>Secure by Default</strong></summary>
 
-## Compatibility & Migrations
+Built-in HTML sanitization prevents XSS attacks and malicious content. Powered by ammonia with safe defaults. Configurable via `sanitize` options.
 
-### v2.19.0 Breaking Changes (Package Namespace Updates)
+</details>
 
-Several language bindings were updated to use new namespaces and package owners:
+## Contributing
 
-**npm (JavaScript/TypeScript):**
-- Old: `html-to-markdown-node` → New: `@kreuzberg/html-to-markdown-node`
-- Old: `html-to-markdown-wasm` → New: `@kreuzberg/html-to-markdown-wasm`
-- Update: `npm install @kreuzberg/html-to-markdown-node`
-- Update imports: `import { convert } from '@kreuzberg/html-to-markdown-node'`
+Contributions are welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines on:
 
-**Java:**
-- Old: `io.github.goldziher` → New: `dev.kreuzberg`
-- Update Maven: `<groupId>dev.kreuzberg</groupId>`
-- Update imports: `import dev.kreuzberg.htmltomarkdown.HtmlToMarkdown;`
+- Setting up the development environment
+- Running tests locally (Rust 95%+ coverage, language bindings 80%+)
+- Submitting pull requests
+- Reporting issues
 
-**C#/.NET:**
-- Old: `Goldziher.HtmlToMarkdown` → New: `KreuzbergDev.HtmlToMarkdown`
-- Update: `dotnet add package KreuzbergDev.HtmlToMarkdown`
-- Namespace remains: `using HtmlToMarkdown;`
-
-**Python, Ruby, PHP, Go, Elixir, Rust:** No changes required.
-
-### v1 → v2 Compatibility
-
-- V2's Rust core sustains **150–210 MB/s** throughput; V1 averaged **≈ 2.5 MB/s** (60–80× faster).
-- Python compatibility shim available in `html_to_markdown.v1_compat` (deprecated; emits warnings; plan migrations now). See [Python README](./packages/python/README.md#v1-compatibility) for keyword mappings.
-- CLI flag changes and other breaking updates in [CHANGELOG](./CHANGELOG.md#breaking-changes).
-
-## Community
-
-- **Discord** – [Join our community](https://discord.gg/pXxagNK2zN)
-- **Ecosystem** – Explore [Kreuzberg](https://kreuzberg.dev) document-processing tools
-- **Contribute** – [CONTRIBUTING.md](./CONTRIBUTING.md)
-- **Sponsor** – [GitHub Sponsors](https://github.com/sponsors/kreuzberg-dev)
-- **Changelog** – [Version history](./CHANGELOG.md)
+All contributions must follow code quality standards enforced via pre-commit hooks (prek).
 
 ## License
 
-MIT License – see [LICENSE](./LICENSE) for details.
+MIT License – see [LICENSE](LICENSE) for details. You can use html-to-markdown freely in both commercial and closed-source products with no obligations, no viral effects, and no licensing restrictions.

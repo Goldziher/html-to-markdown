@@ -7,6 +7,6 @@
     "start": "node src/index.js"
   },
   "dependencies": {
-    "html-to-markdown-wasm": "workspace:*"
+    "@kreuzberg/html-to-markdown-wasm": "workspace:*"
   }
 }

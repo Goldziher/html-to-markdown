@@ -132,3 +132,11 @@ jobs:
           SKIP: golangci-lint-packages,golangci-lint-examples
         run: task pre-commit:run
         shell: bash
+
+      - name: Install Python README Dependencies
+        run: pip install pyyaml jinja2
+        shell: bash
+
+      - name: Validate READMEs
+        run: task docs:generate-readme:check
+        shell: bash

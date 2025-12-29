@@ -1,40 +1,103 @@
-# html-to-markdown (TypeScript)
+# html-to-markdown
 
-[![Crates.io](https://img.shields.io/crates/v/html-to-markdown-rs.svg?logo=rust&label=crates.io)](https://crates.io/crates/html-to-markdown-rs)
-[![npm (node)](https://img.shields.io/npm/v/%40kreuzberg%2Fhtml-to-markdown-node.svg?logo=npm)](https://www.npmjs.com/package/@kreuzberg/html-to-markdown-node)
-[![npm (wasm)](https://img.shields.io/npm/v/%40kreuzberg%2Fhtml-to-markdown-wasm.svg?logo=npm)](https://www.npmjs.com/package/@kreuzberg/html-to-markdown-wasm)
-[![PyPI](https://img.shields.io/pypi/v/html-to-markdown.svg?logo=pypi)](https://pypi.org/project/html-to-markdown/)
-[![Packagist](https://img.shields.io/packagist/v/goldziher/html-to-markdown.svg)](https://packagist.org/packages/goldziher/html-to-markdown)
-[![RubyGems](https://badge.fury.io/rb/html-to-markdown.svg)](https://rubygems.org/gems/html-to-markdown)
-[![Hex.pm](https://img.shields.io/hexpm/v/html_to_markdown.svg)](https://hex.pm/packages/html_to_markdown)
-[![NuGet](https://img.shields.io/nuget/v/Goldziher.HtmlToMarkdown.svg)](https://www.nuget.org/packages/Goldziher.HtmlToMarkdown/)
-[![Maven Central](https://img.shields.io/maven-central/v/io.github.goldziher/html-to-markdown.svg)](https://central.sonatype.com/artifact/io.github.goldziher/html-to-markdown)
-[![Go Reference](https://pkg.go.dev/badge/github.com/kreuzberg-dev/html-to-markdown/packages/go/v2/htmltomarkdown.svg)](https://pkg.go.dev/github.com/kreuzberg-dev/html-to-markdown/packages/go/v2/htmltomarkdown)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://github.com/kreuzberg-dev/html-to-markdown/blob/main/LICENSE)
-[![Discord](https://img.shields.io/badge/Discord-Join%20our%20community-7289da)](https://discord.gg/pXxagNK2zN)
+<div align="center" style="display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin: 20px 0;">
+  <!-- Language Bindings -->
+  <a href="https://crates.io/crates/html-to-markdown-rs">
+    <img src="https://img.shields.io/crates/v/html-to-markdown-rs?label=Rust&color=007ec6" alt="Rust">
+  </a>
+  <a href="https://pypi.org/project/html-to-markdown/">
+    <img src="https://img.shields.io/pypi/v/html-to-markdown?label=Python&color=007ec6" alt="Python">
+  </a>
+  <a href="https://www.npmjs.com/package/@kreuzberg/html-to-markdown-node">
+    <img src="https://img.shields.io/npm/v/@kreuzberg/html-to-markdown-node?label=Node.js&color=007ec6" alt="Node.js">
+  </a>
+  <a href="https://www.npmjs.com/package/@kreuzberg/html-to-markdown-wasm">
+    <img src="https://img.shields.io/npm/v/@kreuzberg/html-to-markdown-wasm?label=WASM&color=007ec6" alt="WASM">
+  </a>
+  <a href="https://central.sonatype.com/artifact/dev.kreuzberg/html-to-markdown">
+    <img src="https://img.shields.io/maven-central/v/dev.kreuzberg/html-to-markdown?label=Java&color=007ec6" alt="Java">
+  </a>
+  <a href="https://pkg.go.dev/github.com/kreuzberg-dev/html-to-markdown/packages/go/v2/htmltomarkdown">
+    <img src="https://img.shields.io/badge/Go-v2.19.0-007ec6" alt="Go">
+  </a>
+  <a href="https://www.nuget.org/packages/KreuzbergDev.HtmlToMarkdown/">
+    <img src="https://img.shields.io/nuget/v/KreuzbergDev.HtmlToMarkdown?label=C%23&color=007ec6" alt="C#">
+  </a>
+  <a href="https://packagist.org/packages/goldziher/html-to-markdown">
+    <img src="https://img.shields.io/packagist/v/goldziher/html-to-markdown?label=PHP&color=007ec6" alt="PHP">
+  </a>
+  <a href="https://rubygems.org/gems/html-to-markdown">
+    <img src="https://img.shields.io/gem/v/html-to-markdown?label=Ruby&color=007ec6" alt="Ruby">
+  </a>
+  <a href="https://hex.pm/packages/html_to_markdown">
+    <img src="https://img.shields.io/hexpm/v/html_to_markdown?label=Elixir&color=007ec6" alt="Elixir">
+  </a>
 
-High-performance HTML to Markdown converter for Node.js and Bun with full TypeScript support. This package wraps native `@kreuzberg/html-to-markdown-node` bindings and provides a type-safe API.
+  <!-- Project Info -->
+  <a href="https://github.com/kreuzberg-dev/html-to-markdown/blob/main/LICENSE">
+    <img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="License">
+  </a>
+</div>
+
+<img width="1128" height="191" alt="html-to-markdown" src="https://github.com/user-attachments/assets/419fc06c-8313-4324-b159-4b4d3cfce5c0" />
+
+<div align="center" style="margin-top: 20px;">
+  <a href="https://discord.gg/pXxagNK2zN">
+      <img height="22" src="https://img.shields.io/badge/Discord-Join%20our%20community-7289da?logo=discord&logoColor=white" alt="Discord">
+  </a>
+</div>
+
+
+High-performance HTML to Markdown converter for Node.js and Bun with full TypeScript support.
+This package wraps native `@kreuzberg/html-to-markdown-node` bindings and provides a type-safe API.
+
 
 ## Installation
 
 ```bash
-# Native bindings (Node.js/Bun) - Recommended
 npm install @kreuzberg/html-to-markdown
-pnpm add @kreuzberg/html-to-markdown
-yarn add @kreuzberg/html-to-markdown
-bun add @kreuzberg/html-to-markdown
+```
 
-# WebAssembly (browser/edge/Node without native toolchain)
+
+
+Requires Node.js 18+ or Bun. Native bindings provide superior performance.
+
+**npm:**
+```bash
+npm install @kreuzberg/html-to-markdown
+```
+
+**pnpm:**
+```bash
+pnpm add @kreuzberg/html-to-markdown
+```
+
+**yarn:**
+```bash
+yarn add @kreuzberg/html-to-markdown
+```
+
+**bun:**
+```bash
+bun add @kreuzberg/html-to-markdown
+```
+
+Alternatively, use the WebAssembly version for browser/edge environments:
+
+```bash
 npm install @kreuzberg/html-to-markdown-wasm
 ```
 
-## Migration Guide (v2.18.x → v2.19.0)
 
-### Breaking Change: Scoped npm Packages
+
+
+# Migration Guide: TypeScript v2.18.x → v2.19.0
+
+## Breaking Change: Scoped npm Packages
 
 In v2.19.0, npm packages were moved to the `@kreuzberg` scope to align with the Kreuzberg.dev organization.
 
-#### Package Installation Update
+### Package Installation Update
 
 **Before (v2.18.x):**
 ```bash
@@ -48,7 +111,7 @@ npm install @kreuzberg/html-to-markdown-node
 npm install @kreuzberg/html-to-markdown-wasm
 ```
 
-#### Import Statement Update
+### Import Statement Update
 
 **Before:**
 ```typescript
@@ -62,7 +125,7 @@ import { convert } from '@kreuzberg/html-to-markdown-node';
 import { convert } from '@kreuzberg/html-to-markdown-wasm';
 ```
 
-#### TypeScript Declaration Update
+### TypeScript Declaration Update
 
 Update your TypeScript configuration if you have imports from the old package name:
 
@@ -88,7 +151,7 @@ Update your TypeScript configuration if you have imports from the old package na
 }
 ```
 
-#### Deno Update
+### Deno Update
 
 **Before:**
 ```typescript
@@ -100,7 +163,7 @@ import { convert } from "npm:html-to-markdown-wasm";
 import { convert } from "npm:@kreuzberg/html-to-markdown-wasm";
 ```
 
-#### Summary of Changes
+## Summary of Changes
 
 - All npm packages now use `@kreuzberg` scope
 - `html-to-markdown-node` → `@kreuzberg/html-to-markdown-node`
@@ -108,9 +171,27 @@ import { convert } from "npm:@kreuzberg/html-to-markdown-wasm";
 - TypeScript types and APIs are identical
 - No functional changes to the library
 
+
+
+
+## Performance Snapshot
+
+Apple M4 • Real Wikipedia documents • `convert()` (TypeScript (Node.js))
+
+| Document | Size | Latency | Throughput |
+| -------- | ---- | ------- | ---------- |
+| Lists (Timeline) | 129KB | 0.58ms | 222 MB/s |
+| Tables (Countries) | 360KB | 1.89ms | 190 MB/s |
+| Mixed (Python wiki) | 656KB | 4.21ms | 156 MB/s |
+
+
+See [Performance Guide](../../examples/performance/) for detailed benchmarks.
+
+
 ## Quick Start
 
-**Basic conversion with type safety:**
+Basic conversion:
+
 ```typescript
 import { convert } from '@kreuzberg/html-to-markdown';
 
@@ -118,7 +199,10 @@ const markdown: string = convert('<h1>Hello World</h1>');
 console.log(markdown); // # Hello World
 ```
 
-**With conversion options:**
+
+
+With conversion options:
+
 ```typescript
 import { convert, ConversionOptions } from '@kreuzberg/html-to-markdown';
 
@@ -131,220 +215,196 @@ const options: ConversionOptions = {
 const markdown = convert('<h1>Title</h1><p>Content</p>', options);
 ```
 
-**TypeScript interfaces for type safety:**
-```typescript
-interface ConversionOptions {
-  headingStyle?: 'atx' | 'setext';
-  listIndentWidth?: number;
-  wrap?: boolean;
-  wrapWidth?: number;
-  // ... more options
-}
-```
 
-**File and stream helpers:**
-```typescript
-import { convertFile, convertBuffer } from '@kreuzberg/html-to-markdown';
 
-// From file
-const markdown = await convertFile('page.html');
 
-// From Buffer/Uint8Array
-const buffer = Buffer.from('<h1>Title</h1>');
-const markdown = convertBuffer(buffer);
-```
+
 
 ## API Reference
 
 ### Core Functions
 
-#### `convert(html: string, options?: ConversionOptions): string`
-Convert HTML string to Markdown.
 
-#### `convertBuffer(buffer: Buffer | Uint8Array, options?: ConversionOptions): string`
-Convert HTML from Buffer/Uint8Array (avoids string allocation overhead).
+**`convert(html: string, options?: ConversionOptions): string`**
 
-#### `convertFile(filePath: string, options?: ConversionOptions): Promise<string>`
-Asynchronously convert an HTML file to Markdown.
+Basic HTML-to-Markdown conversion. Fast and simple.
 
-#### `convertStream(stream: NodeJS.ReadableStream, options?: ConversionOptions): Promise<string>`
-Convert HTML from a readable stream (stdin, file stream, network).
+**`convertWithMetadata(html: string, options?: ConversionOptions, config?: MetadataConfig): { markdown: string; metadata: Metadata }`**
 
-### Metadata Extraction Functions
+Extract Markdown plus metadata (headers, links, images, structured data) in a single pass. See [Metadata Extraction Guide](../../examples/metadata-extraction/).
 
-Requires `metadata` feature flag.
+**`convertWithVisitor(html: string, options: { visitor: Visitor } & ConversionOptions): string`**
 
-#### `convertWithMetadata(html: string, options?, metadataConfig?): { markdown: string; metadata: JsExtendedMetadata }`
-Convert and extract document metadata, headers, links, images, and structured data.
+Customize conversion with visitor callbacks for element interception. See [Visitor Pattern Guide](../../examples/visitor-pattern/).
 
-#### `convertWithMetadataBuffer(buffer: Buffer | Uint8Array, options?, metadataConfig?): JsMetadataExtraction`
-Convert from Buffer with metadata extraction.
+**`convertWithAsyncVisitor(html: string, options: { visitor: AsyncVisitor } & ConversionOptions): Promise<string>`**
 
-#### `convertFileWithMetadata(filePath: string, options?, metadataConfig?): Promise<JsMetadataExtraction>`
-Convert HTML file with metadata extraction.
+Async version of visitor pattern for I/O operations.
 
-#### `convertStreamWithMetadata(stream: NodeJS.ReadableStream, options?, metadataConfig?): Promise<JsMetadataExtraction>`
-Convert stream with metadata extraction.
+**`convertWithInlineImages(html: string, config?: InlineImageConfig): { markdown: string; images: ImageData[]; warnings: string[] }`**
 
-#### `hasMetadataSupport(): boolean`
-Check if metadata extraction is available at runtime.
+Extract base64-encoded inline images with metadata.
 
-### Visitor Pattern Functions
 
-Custom element callbacks for fine-grained conversion control.
 
-#### `convertWithVisitor(html: string, config: { visitor: Visitor; options?: ConversionOptions }): string | Promise<string>`
-Convert with visitor callbacks for element interception.
+### Options
 
-#### `convertWithAsyncVisitor(html: string, config: { visitor: AsyncVisitor; options?: ConversionOptions }): Promise<string>`
-Convert with async visitor methods for I/O operations.
+**`ConversionOptions`** – Key configuration fields:
+- `heading_style`: Heading format (`"underlined"` | `"atx"` | `"atx_closed"`) — default: `"underlined"`
+- `list_indent_width`: Spaces per indent level — default: `2`
+- `bullets`: Bullet characters cycle — default: `"*+-"`
+- `wrap`: Enable text wrapping — default: `false`
+- `wrap_width`: Wrap at column — default: `80`
+- `code_language`: Default fenced code block language — default: none
+- `extract_metadata`: Embed metadata as YAML frontmatter — default: `false`
 
-## Type Definitions
+**`MetadataConfig`** – Selective metadata extraction:
+- `extract_headers`: h1-h6 elements — default: `true`
+- `extract_links`: Hyperlinks — default: `true`
+- `extract_images`: Image elements — default: `true`
+- `extract_structured_data`: JSON-LD, Microdata, RDFa — default: `true`
+- `max_structured_data_size`: Size limit in bytes — default: `100KB`
 
-### ConversionOptions
-```typescript
-interface ConversionOptions {
-  headingStyle?: 'atx' | 'setext';           // # Style or underline style
-  bulletListMarker?: '-' | '*' | '+';        // List marker
-  codeBlockStyle?: 'fenced' | 'indented';    // Code block format
-  horizontalRule?: string;                   // --- or *** or ___
-  listIndentWidth?: number;                  // Indentation (default: 4)
-  wrap?: boolean;                            // Enable text wrapping
-  wrapWidth?: number;                        // Wrap column width
-  preserveNotices?: boolean;                 // Keep HTML comments
-  sanitize?: boolean;                        // Remove unsafe HTML (default: true)
-  headingPrefix?: string;                    // Prefix for headings
-  strongDelimiter?: string;                  // ** or __
-  emDelimiter?: string;                      // * or _
-}
-```
 
-### Metadata Types
-```typescript
-interface JsMetadataConfig {
-  extractHeaders?: boolean;              // h1-h6 elements
-  extractLinks?: boolean;                // <a> elements
-  extractImages?: boolean;               // <img> and inline SVG
-  extractStructuredData?: boolean;       // JSON-LD, Microdata, RDFa
-  maxStructuredDataSize?: number;        // Size limit (default: 1MB)
-}
 
-interface JsExtendedMetadata {
-  document: JsDocumentMetadata;
-  headers: JsHeaderMetadata[];
-  links: JsLinkMetadata[];
-  images: JsImageMetadata[];
-  structuredData: JsStructuredData[];
-}
+## Metadata Extraction
 
-interface JsDocumentMetadata {
-  title?: string;
-  description?: string;
-  keywords: string[];
-  author?: string;
-  canonicalUrl?: string;
-  language?: string;
-  textDirection?: 'ltr' | 'rtl' | 'auto';
-  openGraph: Record<string, string>;
-  twitterCard: Record<string, string>;
-  metaTags: Record<string, string>;
-}
-```
+The metadata extraction feature enables comprehensive document analysis during conversion. Extract document properties, headers, links, images, and structured data in a single pass.
 
-### Visitor Types
-```typescript
-interface Visitor {
-  visitText?(ctx: NodeContext, text: string): VisitResult;
-  visitLink?(ctx: NodeContext, href: string, text: string, title?: string): VisitResult;
-  visitImage?(ctx: NodeContext, src: string, alt?: string, title?: string): VisitResult;
-  visitHeading?(ctx: NodeContext, level: number, text: string, id?: string): VisitResult;
-  visitCodeBlock?(ctx: NodeContext, lang?: string, code?: string): VisitResult;
-  // ... 41 total methods for fine-grained control
-}
+**Use Cases:**
+- **SEO analysis** – Extract title, description, Open Graph tags, Twitter cards
+- **Table of contents generation** – Build structured outlines from heading hierarchy
+- **Content migration** – Document all external links and resources
+- **Accessibility audits** – Check for images without alt text, empty links, invalid heading hierarchy
+- **Link validation** – Classify and validate anchor, internal, external, email, and phone links
 
-interface NodeContext {
-  nodeType: string;
-  tagName: string;
-  attributes: Record<string, string>;
-  depth: number;
-  indexInParent: number;
-  parentTag: string | null;
-  isInline: boolean;
-}
+**Zero Overhead When Disabled:** Metadata extraction adds negligible overhead and happens during the HTML parsing pass. Disable unused metadata types in `MetadataConfig` to optimize further.
 
-type VisitResult =
-  | { type: 'continue' }
-  | { type: 'custom'; output: string }
-  | { type: 'skip' }
-  | { type: 'preserveHtml' }
-  | { type: 'error'; message: string };
-```
+### Example: Quick Start
 
-## Error Handling
 
 ```typescript
-try {
-  const markdown = convert(html);
-} catch (error) {
-  if (error instanceof Error) {
-    console.error('Conversion failed:', error.message);
-  }
-}
+import { convertWithMetadata } from 'html-to-markdown';
+
+const html = '<h1>Article</h1><img src="test.jpg" alt="test">';
+const { markdown, metadata } = convertWithMetadata(html);
+
+console.log(metadata.document.title);      // Document title
+console.log(metadata.headers);             // All h1-h6 elements
+console.log(metadata.links);               // All hyperlinks
+console.log(metadata.images);              // All images with alt text
+console.log(metadata.structuredData);      // JSON-LD, Microdata, RDFa
 ```
 
-Inputs with binary data (PDF bytes coerced to strings) raise errors with message: `Invalid input`.
+
+
+For detailed examples including SEO extraction, table-of-contents generation, link validation, and accessibility audits, see the [Metadata Extraction Guide](../../examples/metadata-extraction/).
+
+
+
+
+## Visitor Pattern
+
+The visitor pattern enables custom HTML→Markdown conversion logic by providing callbacks for specific HTML elements during traversal. Use visitors to transform content, filter elements, validate structure, or collect analytics.
+
+**Use Cases:**
+- **Custom Markdown dialects** – Convert to Obsidian, Notion, or other flavors
+- **Content filtering** – Remove tracking pixels, ads, or unwanted elements
+- **URL rewriting** – Rewrite CDN URLs, add query parameters, validate links
+- **Accessibility validation** – Check alt text, heading hierarchy, link text
+- **Analytics** – Track element usage, link destinations, image sources
+
+**Supported Visitor Methods:** 40+ callbacks for text, inline elements, links, images, headings, lists, blocks, and tables.
+
+### Example: Quick Start
+
+
+```typescript
+import { convertWithVisitor, type Visitor, type NodeContext, type VisitResult } from 'html-to-markdown';
+
+const visitor: Visitor = {
+  visitLink(ctx: NodeContext, href: string, text: string, title?: string): VisitResult {
+    // Rewrite CDN URLs
+    if (href.startsWith('https://old-cdn.com')) {
+      href = href.replace('https://old-cdn.com', 'https://new-cdn.com');
+    }
+    return { type: 'custom', output: `[${text}](${href})` };
+  },
+
+  visitImage(ctx: NodeContext, src: string, alt?: string, title?: string): VisitResult {
+    // Skip tracking pixels
+    if (src.includes('tracking')) {
+      return { type: 'skip' };
+    }
+    return { type: 'continue' };
+  },
+};
+
+const html = '<a href="https://old-cdn.com/file.pdf">Download</a>';
+const markdown = convertWithVisitor(html, { visitor });
+```
+
+Async support:
+```typescript
+import { convertWithAsyncVisitor, type AsyncVisitor } from 'html-to-markdown';
+
+const asyncVisitor: AsyncVisitor = {
+  async visitLink(ctx, href, text, title) {
+    const isValid = await validateUrl(href);
+    return isValid ? { type: 'continue' } : { type: 'error', message: `Broken link: ${href}` };
+  },
+};
+
+const markdown = await convertWithAsyncVisitor(html, { visitor: asyncVisitor });
+```
+
+
+
+For comprehensive examples including content filtering, link footnotes, accessibility validation, and asynchronous URL validation, see the [Visitor Pattern Guide](../../examples/visitor-pattern/).
+
+
 
 ## Examples
 
-See comprehensive guides in the examples directory:
-
-- **[Visitor Pattern](../../examples/visitor-pattern/)** - Custom callbacks, filtering, transformations, analytics
-- **[Metadata Extraction](../../examples/metadata-extraction/)** - SEO metadata, TOC generation, link validation
-- **[Performance](../../examples/performance/)** - Benchmarks, optimization strategies
-
-## TypeScript Configuration
-
-For strict type checking:
-
-```json
-{
-  "compilerOptions": {
-    "strict": true,
-    "noUncheckedIndexedAccess": true,
-    "exactOptionalPropertyTypes": true,
-    "noImplicitAny": true,
-    "noImplicitThis": true,
-    "strictNullChecks": true,
-    "strictFunctionTypes": true,
-    "strictPropertyInitialization": true,
-    "noImplicitReturns": true
-  }
-}
-```
-
-All bindings are fully typed with no `any` types. Leverage TypeScript for compile-time safety.
-
-## Performance
-
-Benchmarks from Apple M4 (ops/sec):
-
-| Document            | Size    | ops/sec |
-| ------------------- | ------- | ------- |
-| Small (Intro)       | 463 KB  | 627     |
-| Medium (Python)     | 657 KB  | 460     |
-| Large (Rust)        | 567 KB  | 554     |
-| Lists (Timeline)    | 129 KB  | 3,137   |
-| Tables (Countries)  | 360 KB  | 932     |
-
-Run `task bench:harness -- --frameworks node` to benchmark locally.
+- [Visitor Pattern Guide](../../examples/visitor-pattern/)
+- [Metadata Extraction Guide](../../examples/metadata-extraction/)
+- [Performance Guide](../../examples/performance/)
 
 ## Links
 
-- [GitHub](https://github.com/kreuzberg-dev/html-to-markdown)
-- [npm Package](https://www.npmjs.com/package/@kreuzberg/html-to-markdown)
-- [WASM Package](https://www.npmjs.com/package/@kreuzberg/html-to-markdown-wasm)
-- [Discord Community](https://discord.gg/pXxagNK2zN)
+- **GitHub:** [github.com/kreuzberg-dev/html-to-markdown](https://github.com/kreuzberg-dev/html-to-markdown)
+
+- **npm:** [npmjs.com/@kreuzberg/html-to-markdown-node](https://www.npmjs.com/package/@kreuzberg/html-to-markdown-node)
+- **WASM:** [npmjs.com/@kreuzberg/html-to-markdown-wasm](https://www.npmjs.com/package/@kreuzberg/html-to-markdown-wasm)
+
+- **Kreuzberg Ecosystem:** [kreuzberg.dev](https://kreuzberg.dev)
+- **Discord:** [discord.gg/pXxagNK2zN](https://discord.gg/pXxagNK2zN)
+
+## Contributing
+
+We welcome contributions! Please see our [Contributing Guide](https://github.com/kreuzberg-dev/html-to-markdown/blob/main/CONTRIBUTING.md) for details on:
+
+- Setting up the development environment
+- Running tests locally
+- Submitting pull requests
+- Reporting issues
+
+All contributions must follow our code quality standards (enforced via pre-commit hooks):
+
+- Proper test coverage (Rust 95%+, language bindings 80%+)
+- Formatting and linting checks
+- Documentation for public APIs
 
 ## License
 
-MIT
+MIT License – see [LICENSE](https://github.com/kreuzberg-dev/html-to-markdown/blob/main/LICENSE).
+
+## Support
+
+If you find this library useful, consider [sponsoring the project](https://github.com/sponsors/kreuzberg-dev).
+
+Have questions or run into issues? We're here to help:
+
+- **GitHub Issues:** [github.com/kreuzberg-dev/html-to-markdown/issues](https://github.com/kreuzberg-dev/html-to-markdown/issues)
+- **Discussions:** [github.com/kreuzberg-dev/html-to-markdown/discussions](https://github.com/kreuzberg-dev/html-to-markdown/discussions)
+- **Discord Community:** [discord.gg/pXxagNK2zN](https://discord.gg/pXxagNK2zN)

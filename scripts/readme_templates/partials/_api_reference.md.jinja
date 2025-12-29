@@ -1,0 +1,153 @@
+### Core Functions
+
+{% if language == 'python' %}
+**`convert(html: str, options?: ConversionOptions) -> str`**
+
+Basic HTML-to-Markdown conversion. Fast and simple.
+
+**`convert_with_metadata(html: str, options?: ConversionOptions, metadata_config?: MetadataConfig) -> tuple[str, dict]`**
+
+Extract Markdown plus metadata (headers, links, images, structured data) in a single pass. See [Metadata Extraction Guide](../../examples/metadata-extraction/).
+
+**`convert_with_visitor(html: str, visitor: object, options?: ConversionOptions) -> str`**
+
+Customize conversion with visitor callbacks for element interception. See [Visitor Pattern Guide](../../examples/visitor-pattern/).
+
+**`convert_with_async_visitor(html: str, visitor: object, options?: ConversionOptions) -> str`**
+
+Async version of visitor pattern with asyncio integration.
+
+**`convert_with_inline_images(html: str, image_config?: InlineImageConfig) -> tuple[str, list[dict], list[str]]`**
+
+Extract base64-encoded inline images with metadata.
+
+{% elif language == 'typescript' %}
+**`convert(html: string, options?: ConversionOptions): string`**
+
+Basic HTML-to-Markdown conversion. Fast and simple.
+
+**`convertWithMetadata(html: string, options?: ConversionOptions, config?: MetadataConfig): { markdown: string; metadata: Metadata }`**
+
+Extract Markdown plus metadata (headers, links, images, structured data) in a single pass. See [Metadata Extraction Guide](../../examples/metadata-extraction/).
+
+**`convertWithVisitor(html: string, options: { visitor: Visitor } & ConversionOptions): string`**
+
+Customize conversion with visitor callbacks for element interception. See [Visitor Pattern Guide](../../examples/visitor-pattern/).
+
+**`convertWithAsyncVisitor(html: string, options: { visitor: AsyncVisitor } & ConversionOptions): Promise<string>`**
+
+Async version of visitor pattern for I/O operations.
+
+**`convertWithInlineImages(html: string, config?: InlineImageConfig): { markdown: string; images: ImageData[]; warnings: string[] }`**
+
+Extract base64-encoded inline images with metadata.
+
+{% elif language == 'ruby' %}
+**`convert(html, options: nil) -> String`**
+
+Basic HTML-to-Markdown conversion. Fast and simple.
+
+**`convert_with_metadata(html, options: nil, config: nil) -> [String, Hash]`**
+
+Extract Markdown plus metadata (headers, links, images, structured data) in a single pass. See [Metadata Extraction Guide](../../examples/metadata-extraction/).
+
+**`convert_with_visitor(html, visitor:, options: nil) -> String`**
+
+Customize conversion with visitor callbacks for element interception. See [Visitor Pattern Guide](../../examples/visitor-pattern/).
+
+**`convert_with_inline_images(html, config: nil) -> [String, Array, Array]`**
+
+Extract base64-encoded inline images with metadata.
+
+{% elif language == 'php' %}
+**`Converter::convert(string $html, ?ConversionOptions $options = null): string`**
+
+Basic HTML-to-Markdown conversion. Fast and simple.
+
+**`Converter::convertWithMetadata(string $html, ?ConversionOptions $options = null, ?MetadataConfig $config = null): [string, array]`**
+
+Extract Markdown plus metadata (headers, links, images, structured data) in a single pass. See [Metadata Extraction Guide](../../examples/metadata-extraction/).
+
+**`Converter::convertWithVisitor(string $html, VisitorInterface $visitor, ?ConversionOptions $options = null): string`**
+
+Customize conversion with visitor callbacks for element interception. See [Visitor Pattern Guide](../../examples/visitor-pattern/).
+
+**`Converter::convertWithInlineImages(string $html, ?InlineImageConfig $config = null): [string, array, array]`**
+
+Extract base64-encoded inline images with metadata.
+
+{% elif language == 'go' %}
+**`Convert(html string, options *ConversionOptions) (string, error)`**
+
+Basic HTML-to-Markdown conversion. Fast and simple.
+
+**`ConvertWithMetadata(html string, options *ConversionOptions, config *MetadataConfig) (string, Metadata, error)`**
+
+Extract Markdown plus metadata in a single pass. See [Metadata Extraction Guide](../../examples/metadata-extraction/).
+
+**`ConvertWithInlineImages(html string, config *InlineImageConfig) (string, []ImageData, []string, error)`**
+
+Extract base64-encoded inline images with metadata.
+
+{% elif language == 'java' %}
+**`convert(String html) : String`**
+**`convert(String html, ConversionOptions options) : String`**
+
+Basic HTML-to-Markdown conversion. Fast and simple.
+
+**`convertWithMetadata(String html) : ConversionResult<MetadataResult>`**
+**`convertWithMetadata(String html, ConversionOptions options, MetadataConfig config) : ConversionResult<MetadataResult>`**
+
+Extract Markdown plus metadata in a single pass. See [Metadata Extraction Guide](../../examples/metadata-extraction/).
+
+**`convertWithInlineImages(String html, InlineImageConfig config) : ConversionResult<InlineImagesResult>`**
+
+Extract base64-encoded inline images with metadata.
+
+{% elif language == 'csharp' %}
+**`Convert(string html, ConversionOptions? options = null) : string`**
+
+Basic HTML-to-Markdown conversion. Fast and simple.
+
+**`ConvertWithMetadata(string html, ConversionOptions? options = null, MetadataConfig? config = null) : (string markdown, MetadataResult metadata)`**
+
+Extract Markdown plus metadata in a single pass. See [Metadata Extraction Guide](../../examples/metadata-extraction/).
+
+**`ConvertWithInlineImages(string html, InlineImageConfig? config = null) : (string markdown, InlineImageData[] images, string[] warnings)`**
+
+Extract base64-encoded inline images with metadata.
+
+{% elif language == 'elixir' %}
+**`HtmlToMarkdown.convert(html, options \\ nil) :: String.t()`**
+
+Basic HTML-to-Markdown conversion. Fast and simple.
+
+**`HtmlToMarkdown.convert_with_metadata(html, options \\ nil, config \\ nil) :: {String.t(), map()}`**
+
+Extract Markdown plus metadata in a single pass. See [Metadata Extraction Guide](../../examples/metadata-extraction/).
+
+**`HtmlToMarkdown.convert_with_inline_images(html, config \\ nil) :: {String.t(), list(map()), list(String.t())}`**
+
+Extract base64-encoded inline images with metadata.
+
+{% else %}
+See the [Visitor Pattern Guide](../../examples/visitor-pattern/) and [Metadata Extraction Guide](../../examples/metadata-extraction/) for comprehensive API documentation and examples.
+{% endif %}
+
+### Options
+
+**`ConversionOptions`** – Key configuration fields:
+- `heading_style`: Heading format (`"underlined"` | `"atx"` | `"atx_closed"`) — default: `"underlined"`
+- `list_indent_width`: Spaces per indent level — default: `2`
+- `bullets`: Bullet characters cycle — default: `"*+-"`
+- `wrap`: Enable text wrapping — default: `false`
+- `wrap_width`: Wrap at column — default: `80`
+- `code_language`: Default fenced code block language — default: none
+- `extract_metadata`: Embed metadata as YAML frontmatter — default: `false`
+
+**`MetadataConfig`** – Selective metadata extraction:
+- `extract_headers`: h1-h6 elements — default: `true`
+- `extract_links`: Hyperlinks — default: `true`
+- `extract_images`: Image elements — default: `true`
+- `extract_structured_data`: JSON-LD, Microdata, RDFa — default: `true`
+- `max_structured_data_size`: Size limit in bytes — default: `100KB`
