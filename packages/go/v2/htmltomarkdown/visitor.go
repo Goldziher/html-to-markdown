@@ -327,8 +327,8 @@ const (
 	VisitError VisitResultType = 4
 
 	// Markdown horizontal rule patterns
-	horizontalRuleDash   = "---"
-	horizontalRuleAster  = "***"
+	horizontalRuleDash       = "---"
+	horizontalRuleAster      = "***"
 	horizontalRuleUnderscore = "___"
 )
 

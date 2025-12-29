@@ -266,8 +266,11 @@
                 <version>${spotless-maven-plugin.version}</version>
                 <configuration>
                     <java>
+                        <includes>
+                            <include>src/main/java/**/*.java</include>
+                        </includes>
                         <googleJavaFormat>
-                            <version>1.21.0</version>
+                            <version>1.25.2</version>
                             <style>GOOGLE</style>
                         </googleJavaFormat>
                         <removeUnusedImports/>
