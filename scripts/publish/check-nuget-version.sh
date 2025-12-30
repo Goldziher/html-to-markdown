@@ -2,7 +2,7 @@
 set -euo pipefail
 
 version="${VERSION:?VERSION is required}"
-pkg="goldziher.htmltomarkdown"
+pkg="KreuzbergDev.HtmlToMarkdown"
 
 exists=$(
 	python3 - "$pkg" "$version" <<'PY'

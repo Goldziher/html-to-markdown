@@ -1,7 +1,8 @@
 {
   "name": "kreuzberg-dev/html-to-markdown",
-  "description": "Native html_to_markdown PHP extension built on the Rust html-to-markdown engine.",
-  "type": "php-ext",
+  "version": "2.19.1",
+  "description": "Modern PHP API for the html_to_markdown native extension powered by the Rust html-to-markdown engine.",
+  "type": "library",
   "license": "MIT",
   "homepage": "https://github.com/kreuzberg-dev/html-to-markdown",
   "support": {
@@ -19,7 +20,53 @@
     "php": "^8.2"
   },
   "require-dev": {
-    "php/pie": "^1.0"
+    "friendsofphp/php-cs-fixer": "3.69.*",
+    "php/pie": "^1.0",
+    "phpstan/phpstan": "^1.11",
+    "phpunit/phpunit": "^11.3",
+    "squizlabs/php_codesniffer": "^3.10"
+  },
+  "suggest": {
+    "ext-html_to_markdown": "Provides native conversion. Install via PIE (goldziher/html-to-markdown) or download the release binary."
+  },
+  "provide": {
+    "ext-html_to_markdown": "*"
+  },
+  "autoload": {
+    "psr-4": {
+      "HtmlToMarkdown\\": "packages/php/src/"
+    },
+    "files": ["packages/php/src/functions.php"]
+  },
+  "autoload-dev": {
+    "psr-4": {
+      "HtmlToMarkdown\\Tests\\": "packages/php/tests/"
+    }
+  },
+  "scripts": {
+    "post-install-cmd": ["@php packages/php/bin/install-extension.php"],
+    "post-update-cmd": ["@php packages/php/bin/install-extension.php"],
+    "phpstan": "php -d detect_unicode=0 vendor/bin/phpstan --configuration=packages/php/phpstan.neon",
+    "csfixer": "PHP_CS_FIXER_IGNORE_ENV=1 php vendor/bin/php-cs-fixer fix --config packages/php/php-cs-fixer.php packages/php/src packages/php/tests",
+    "format": "PHP_CS_FIXER_IGNORE_ENV=1 php vendor/bin/php-cs-fixer fix --config packages/php/php-cs-fixer.php packages/php/src packages/php/tests",
+    "format:check": "PHP_CS_FIXER_IGNORE_ENV=1 php vendor/bin/php-cs-fixer fix --config packages/php/php-cs-fixer.php --dry-run packages/php/src packages/php/tests",
+    "test": "php packages/php/bin/run-tests.php",
+    "lint": "@phpstan",
+    "lint:fix": "PHP_CS_FIXER_IGNORE_ENV=1 php vendor/bin/php-cs-fixer fix --config packages/php/php-cs-fixer.php packages/php/src packages/php/tests && php -d detect_unicode=0 vendor/bin/phpstan --configuration=packages/php/phpstan.neon"
+  },
+  "config": {
+    "sort-packages": true,
+    "platform": {
+      "php": "8.2.0"
+    },
+    "allow-plugins": {
+      "phpstan/extension-installer": true
+    }
+  },
+  "extra": {
+    "html-to-markdown": {
+      "binary-base-url": "https://github.com/kreuzberg-dev/html-to-markdown/releases/download"
+    }
   },
   "php-ext": {
     "extension-name": "html_to_markdown",
@@ -33,5 +80,7 @@
         "needs-value": true
       }
     ]
-  }
+  },
+  "minimum-stability": "stable",
+  "prefer-stable": true
 }

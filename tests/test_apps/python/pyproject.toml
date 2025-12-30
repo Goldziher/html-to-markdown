@@ -16,10 +16,14 @@ classifiers = [
   "Programming Language :: Python :: 3.14",
 ]
 dependencies = [
-  "html-to-markdown>=2.18",
+  "html-to-markdown>=2.19",
   "pytest>=8",
   "pytest-cov>=4.1",
 ]
+
+[tool.setuptools]
+packages = [  ]
+py-modules = [  ]
 
 [tool.pytest.ini_options]
 testpaths = [ "tests" ]

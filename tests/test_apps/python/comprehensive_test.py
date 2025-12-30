@@ -6,7 +6,7 @@ from typing import Any
 
 import pytest
 
-from html_to_markdown import convert_html_to_markdown
+from html_to_markdown import convert
 
 
 def load_fixtures(filename: str) -> list[dict[str, Any]]:
@@ -25,7 +25,7 @@ def basic_fixtures() -> list[dict[str, Any]]:
 @pytest.mark.parametrize("test_case", load_fixtures("basic-html.json"), ids=lambda tc: tc["name"])
 def test_basic_html_conversion(test_case: dict[str, Any]) -> None:
     """Test basic HTML conversions from fixtures."""
-    result = convert_html_to_markdown(test_case["html"])
+    result = convert(test_case["html"])
     expected = test_case["expectedMarkdown"]
 
     # Normalize whitespace for comparison

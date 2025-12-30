@@ -23,7 +23,7 @@ describe('comprehensive html-to-markdown tests', () => {
 
   basicFixtures.forEach((testCase) => {
     it(testCase.name, async () => {
-      const { convertHtmlToMarkdown } = await import('html-to-markdown');
+      const { convertHtmlToMarkdown } = await import('@kreuzberg/html-to-markdown');
       const result = convertHtmlToMarkdown(testCase.html, testCase.options);
       expect(result.trim()).toBe(testCase.expectedMarkdown.trim());
     });

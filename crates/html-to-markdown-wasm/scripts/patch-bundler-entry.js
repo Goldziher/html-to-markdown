@@ -258,3 +258,19 @@ fs.writeFileSync(dtsPath, content, 'utf8');
 const jsDocTarget = fs.existsSync(bgPath) ? bgPath : entryPath;
 const typeImportSpecifier = './html_to_markdown_wasm';
 patchJsDoc(jsDocTarget, typeImportSpecifier);
+
+// Fix package.json "files" field to include all necessary files
+const pkgJsonPath = path.join(distDir, 'package.json');
+if (fs.existsSync(pkgJsonPath)) {
+  const pkgJson = JSON.parse(fs.readFileSync(pkgJsonPath, 'utf8'));
+
+  // Use glob patterns to ensure all generated files are included
+  pkgJson.files = [
+    '*.wasm',
+    '*.js',
+    '*.d.ts'
+  ];
+
+  fs.writeFileSync(pkgJsonPath, JSON.stringify(pkgJson, null, 2) + '\n', 'utf8');
+  console.log(`[patch-bundler-entry] Updated package.json files field in ${distArg}`);
+}

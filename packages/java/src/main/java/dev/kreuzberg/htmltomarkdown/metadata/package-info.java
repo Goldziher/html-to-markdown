@@ -7,8 +7,7 @@
  * <ul>
  *   <li>{@link dev.kreuzberg.htmltomarkdown.metadata.MetadataExtraction} - Main result type
  *   <li>{@link dev.kreuzberg.htmltomarkdown.metadata.ExtendedMetadata} - Complete metadata
- *   <li>{@link dev.kreuzberg.htmltomarkdown.metadata.DocumentMetadata} - Document-level
- *       metadata
+ *   <li>{@link dev.kreuzberg.htmltomarkdown.metadata.DocumentMetadata} - Document-level metadata
  *   <li>{@link dev.kreuzberg.htmltomarkdown.metadata.HeaderMetadata} - Heading information
  *   <li>{@link dev.kreuzberg.htmltomarkdown.metadata.LinkMetadata} - Hyperlink information
  *   <li>{@link dev.kreuzberg.htmltomarkdown.metadata.ImageMetadata} - Image information
@@ -21,8 +20,7 @@
  *   <li>{@link dev.kreuzberg.htmltomarkdown.metadata.LinkType} - Link classification
  *   <li>{@link dev.kreuzberg.htmltomarkdown.metadata.ImageType} - Image source type
  *   <li>{@link dev.kreuzberg.htmltomarkdown.metadata.TextDirection} - Text directionality
- *   <li>{@link dev.kreuzberg.htmltomarkdown.metadata.StructuredDataType} - Structured data
- *       format
+ *   <li>{@link dev.kreuzberg.htmltomarkdown.metadata.StructuredDataType} - Structured data format
  * </ul>
  *
  * <h2>Example Usage</h2>

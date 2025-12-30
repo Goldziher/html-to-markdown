@@ -9,8 +9,8 @@
  *
  * <ul>
  *   <li>{@link dev.kreuzberg.htmltomarkdown.visitor.Visitor} - Main visitor interface
- *   <li>{@link dev.kreuzberg.htmltomarkdown.visitor.NodeContext} - Context information for
- *       visited nodes
+ *   <li>{@link dev.kreuzberg.htmltomarkdown.visitor.NodeContext} - Context information for visited
+ *       nodes
  *   <li>{@link dev.kreuzberg.htmltomarkdown.visitor.VisitResult} - Result types controlling
  *       conversion behavior
  *   <li>{@link dev.kreuzberg.htmltomarkdown.visitor.NodeType} - Enumeration of node types
@@ -56,10 +56,10 @@
  * <p><b>Performance Considerations:</b>
  *
  * <ul>
- *   <li>{@link dev.kreuzberg.htmltomarkdown.visitor.Visitor#visitText visitText()} is called
- *       very frequently. Return {@link
- *       dev.kreuzberg.htmltomarkdown.visitor.VisitResult.Continue.INSTANCE} quickly unless
- *       you need to modify text.
+ *   <li>{@link dev.kreuzberg.htmltomarkdown.visitor.Visitor#visitText visitText()} is called very
+ *       frequently. Return {@link
+ *       dev.kreuzberg.htmltomarkdown.visitor.VisitResult.Continue.INSTANCE} quickly unless you need
+ *       to modify text.
  *   <li>String data in callbacks is borrowed from Rust and valid only during the callback. Copy
  *       strings immediately if you need to store them.
  *   <li>Callbacks run synchronously during traversal. Avoid blocking operations.

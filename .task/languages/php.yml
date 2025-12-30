@@ -17,7 +17,7 @@ tasks:
     desc: "Install PHP dependencies with Composer"
     silent: false
     cmds:
-      - cmd: cd {{.PHP_PKG}} && composer install
+      - cmd: composer install
         ignore_error: false
 
   build:
@@ -54,53 +54,53 @@ tasks:
     desc: "Run PHPUnit tests for PHP binding"
     silent: false
     cmds:
-      - cmd: cd {{.PHP_PKG}} && vendor/bin/phpunit tests/ --testdox
+      - cmd: vendor/bin/phpunit packages/php/tests/ --testdox
         ignore_error: false
 
   test:ci:
     desc: "Run PHPUnit tests with coverage for CI"
     silent: false
     cmds:
-      - cmd: cd {{.PHP_PKG}} && vendor/bin/phpunit tests/ --coverage-clover=coverage.xml
+      - cmd: vendor/bin/phpunit packages/php/tests/ --coverage-clover=coverage.xml
         ignore_error: false
 
   lint:
     desc: "Lint PHP code WITH auto-fix (PHPStan + phpcbf)"
     silent: false
     cmds:
-      - cmd: cd {{.PHP_PKG}} && vendor/bin/phpstan analyse --level 9 src/
+      - cmd: vendor/bin/phpstan analyse --level 9 packages/php/src/
         ignore_error: false
-      - cmd: cd {{.PHP_PKG}} && vendor/bin/phpcbf --standard=PSR12 src/ tests/
+      - cmd: vendor/bin/phpcbf --standard=PSR12 packages/php/src/ packages/php/tests/
         ignore_error: false
 
   lint:check:
     desc: "Lint PHP code WITHOUT auto-fix (PHPStan + phpcs check)"
     silent: false
     cmds:
-      - cmd: cd {{.PHP_PKG}} && vendor/bin/phpstan analyse --level 9 src/
+      - cmd: vendor/bin/phpstan analyse --level 9 packages/php/src/
         ignore_error: false
-      - cmd: cd {{.PHP_PKG}} && vendor/bin/phpcs --standard=PSR12 src/ tests/
+      - cmd: vendor/bin/phpcs --standard=PSR12 packages/php/src/ packages/php/tests/
         ignore_error: false
 
   format:
     desc: "Format PHP code with phpcbf (auto-fix)"
     silent: false
     cmds:
-      - cmd: cd {{.PHP_PKG}} && vendor/bin/phpcbf --standard=PSR12 src/ tests/
+      - cmd: vendor/bin/phpcbf --standard=PSR12 packages/php/src/ packages/php/tests/
         ignore_error: false
 
   format:check:
     desc: "Check PHP code formatting without modifications"
     silent: false
     cmds:
-      - cmd: cd {{.PHP_PKG}} && vendor/bin/phpcs --standard=PSR12 src/ tests/
+      - cmd: vendor/bin/phpcs --standard=PSR12 packages/php/src/ packages/php/tests/
         ignore_error: false
 
   update:
     desc: "Update PHP dependencies with Composer"
     silent: false
     cmds:
-      - cmd: cd {{.PHP_PKG}} && composer update
+      - cmd: composer update
         ignore_error: false
 
   clean:
@@ -108,10 +108,10 @@ tasks:
     silent: false
     cmds:
       - cmd: |
-          cd {{.PHP_PKG}} && php -r "
-          \$files = glob('.php-cs-fixer.cache') ?: [];
+          php -r "
+          \$files = glob('packages/php/.php-cs-fixer.cache') ?: [];
           foreach (\$files as \$f) { if (is_file(\$f)) unlink(\$f); }
-          \$dirs = ['vendor', 'tmp'];
+          \$dirs = ['vendor', 'packages/php/tmp'];
           foreach (\$dirs as \$d) {
             if (is_dir(\$d)) {
               \$cmd = PHP_OS_FAMILY === 'Windows' ? 'rmdir /s /q ' : 'rm -rf ';

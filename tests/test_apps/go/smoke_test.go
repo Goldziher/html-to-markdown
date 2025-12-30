@@ -5,12 +5,12 @@ import (
 	htmltomarkdown "github.com/kreuzberg-dev/html-to-markdown/packages/go/v2/htmltomarkdown"
 )
 
-func TestPackageImports(t *testing.T) {
+func TestSmokePackageImports(t *testing.T) {
 	// If we can import, test passes
 	_ = htmltomarkdown.Convert
 }
 
-func TestBasicConversion(t *testing.T) {
+func TestSmokeBasicConversion(t *testing.T) {
 	html := "<p>Hello World</p>"
 	result, err := htmltomarkdown.Convert(html)
 	if err != nil {
@@ -21,7 +21,7 @@ func TestBasicConversion(t *testing.T) {
 	}
 }
 
-func TestHeadingConversion(t *testing.T) {
+func TestSmokeHeadingConversion(t *testing.T) {
 	html := "<h1>Title</h1>"
 	result, err := htmltomarkdown.Convert(html)
 	if err != nil {
@@ -32,7 +32,7 @@ func TestHeadingConversion(t *testing.T) {
 	}
 }
 
-func TestEmptyInput(t *testing.T) {
+func TestSmokeEmptyInput(t *testing.T) {
 	result, err := htmltomarkdown.Convert("")
 	if err != nil {
 		t.Fatalf("conversion failed: %v", err)

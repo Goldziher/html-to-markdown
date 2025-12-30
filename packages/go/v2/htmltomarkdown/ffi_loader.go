@@ -189,7 +189,7 @@ import (
 )
 
 const (
-	defaultFFIVersion = "2.16.0"
+	defaultFFIVersion = "2.19.1"
 	githubRepo        = "kreuzberg-dev/html-to-markdown"
 
 	archAMD64    = "amd64"
@@ -240,12 +240,21 @@ func loadFFI() error {
 		return fmt.Errorf("create FFI cache dir: %w", err)
 	}
 	if err := downloadFile(downloadURL, archivePath); err != nil {
-		return err
+		// Provide helpful diagnostic information
+		return fmt.Errorf("failed to load html-to-markdown FFI library for %s/%s (version %s): %w. "+
+			"Troubleshooting:\n"+
+			"1. Check if version %s is published on GitHub: https://github.com/%s/releases/tag/v%s\n"+
+			"2. For development, set HTML_TO_MARKDOWN_FFI_PATH to a local library path\n"+
+			"3. Override the version with HTML_TO_MARKDOWN_FFI_VERSION environment variable",
+			runtime.GOOS, runtime.GOARCH, version, err, version, githubRepo, version)
 	}
 	if err := extractArchive(archivePath, cacheDir); err != nil {
-		return err
+		return fmt.Errorf("extract FFI archive: %w", err)
 	}
-	return loadFFIFromPath(libPath)
+	if err := loadFFIFromPath(libPath); err != nil {
+		return fmt.Errorf("load FFI from extracted path %s: %w", libPath, err)
+	}
+	return nil
 }
 
 func loadFFIFromPath(path string) error {
@@ -296,7 +305,7 @@ func downloadFile(url string, dest string) error {
 	client := &http.Client{Timeout: 120 * time.Second}
 	resp, err := client.Get(url)
 	if err != nil {
-		return fmt.Errorf("download FFI archive: %w", err)
+		return fmt.Errorf("download FFI archive from %s: %w", url, err)
 	}
 	defer func() {
 		if err := resp.Body.Close(); err != nil {
@@ -304,7 +313,22 @@ func downloadFile(url string, dest string) error {
 		}
 	}()
 	if resp.StatusCode < 200 || resp.StatusCode > 299 {
-		return fmt.Errorf("download FFI archive: unexpected status %s", resp.Status)
+		body, err := io.ReadAll(resp.Body)
+		if err != nil {
+			return fmt.Errorf("download FFI archive: failed to read error response: %w", err)
+		}
+		bodyStr := string(body)
+		if len(bodyStr) > 200 {
+			bodyStr = bodyStr[:200] + "..."
+		}
+		if resp.StatusCode == 404 {
+			return fmt.Errorf("download FFI archive: release not found at %s (404). "+
+				"Make sure the version exists on GitHub releases (https://github.com/%s/releases). "+
+				"You can override with HTML_TO_MARKDOWN_FFI_VERSION or HTML_TO_MARKDOWN_FFI_PATH environment variables. "+
+				"Response: %s",
+				url, githubRepo, bodyStr)
+		}
+		return fmt.Errorf("download FFI archive: unexpected status %s from %s. Response: %s", resp.Status, url, bodyStr)
 	}
 	tmpPath := dest + ".tmp"
 	out, err := os.Create(tmpPath)
