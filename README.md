@@ -42,7 +42,7 @@
 
 <img width="3384" height="573" alt="Linkedin- Banner" src="https://github.com/user-attachments/assets/1bd52e37-c45d-4f5c-8408-ee12997f6cfd" />
 
- 
+
 <div align="center" style="margin-top: 20px;">
   <a href="https://discord.gg/pXxagNK2zN">
       <img height="22" src="https://img.shields.io/badge/Discord-Join%20our%20community-7289da?logo=discord&logoColor=white" alt="Discord">
