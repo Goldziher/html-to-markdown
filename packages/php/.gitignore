@@ -1,3 +1,4 @@
 /vendor/
 /var/
 /.phpunit.result.cache
+tests/test_apps/elixir/deps/

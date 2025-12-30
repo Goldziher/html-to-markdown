@@ -5,6 +5,29 @@ All notable changes to html-to-markdown will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.19.2] - 2025-12-30
+
+### Bug Fixes
+
+- **WASM npm package**: Fixed missing `.d.ts` files in published package by updating `files` field with glob patterns (fixes #172)
+- **Test apps**: Fixed API mismatches across all language test apps (Python, Node.js, WASM, Go, Java, C#)
+  - Python: Changed `convert_html_to_markdown()` to `convert()`
+  - Node.js: Updated to scoped package `@kreuzberg/html-to-markdown`
+  - WASM: Changed `convertHtmlToMarkdown()` to `convert()`
+  - Go: Updated FFI version from 2.16.0 to 2.19.1 with enhanced error handling
+  - Java: Added Maven wrapper files for portability
+  - C#: Updated to `KreuzbergDev.HtmlToMarkdown` package name
+- **Packagist publishing**: Added automated workflow job and moved `composer.json` to repository root
+- **Maven Central publishing**: Fixed GitHub secrets configuration (corrected `GPG_PASSPHRASE` typo)
+- **Go bindings**: Enhanced FFI download error messages with actionable troubleshooting guidance
+- **Pre-commit hooks**: Fixed Go linting errors (errcheck, staticcheck) and formatting violations
+
+### Infrastructure
+
+- Created new WASM test app with comprehensive smoke and integration tests
+- Updated all test apps to version 2.19.0 for consistent validation
+- Enhanced Java package formatting to comply with 120-character line limit
+
 ## [2.19.1] - 2025-12-29
 
 ### Bug Fixes
