@@ -2,7 +2,7 @@ GEM
   remote: https://rubygems.org/
   specs:
     diff-lcs (1.6.2)
-    html-to-markdown (2.19.1)
+    html-to-markdown (2.19.2)
       rb_sys (>= 0.9, < 1.0)
     rake-compiler-dock (1.10.0)
     rb_sys (0.9.123)
@@ -26,12 +26,12 @@ PLATFORMS
   ruby
 
 DEPENDENCIES
-  html-to-markdown (>= 2.19.1)
+  html-to-markdown (~> 2.19.2)
   rspec (~> 3.12)
 
 CHECKSUMS
   diff-lcs (1.6.2) sha256=9ae0d2cba7d4df3075fe8cd8602a8604993efc0dfa934cff568969efb1909962
-  html-to-markdown (2.19.1) sha256=772a6191e1611b5c8364131e115def7a78bf7ec6235662a3e783ca956912fbe0
+  html-to-markdown (2.19.2) sha256=487e613e85dd0664e189f4e2df50895ba996b4203f039350e1062931d8bef742
   rake-compiler-dock (1.10.0) sha256=dd62ee19df2a185a3315697e560cfa8cc9129901332152851e023fab0e94bf11
   rb_sys (0.9.123) sha256=c22ae84d1bca3eec0f13a45ae4ca9ba6eace93d5be270a40a9c0a9a5b92a34e5
   rspec (3.13.2) sha256=206284a08ad798e61f86d7ca3e376718d52c0bc944626b2349266f239f820587

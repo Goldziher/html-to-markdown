@@ -1,12 +1,12 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <TargetFramework>net8.0</TargetFramework>
+    <TargetFramework>net10.0</TargetFramework>
     <IsPackable>false</IsPackable>
     <IsTestProject>true</IsTestProject>
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="KreuzbergDev.HtmlToMarkdown" Version="2.19.1" />
+    <PackageReference Include="KreuzbergDev.HtmlToMarkdown" Version="2.19.2" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.8.0" />
     <PackageReference Include="xUnit" Version="2.6.0" />
     <PackageReference Include="xunit.runner.visualstudio" Version="2.5.4" />

@@ -8,14 +8,14 @@ public class SmokeTest
     [Fact]
     public void TestPackageLoads()
     {
-        Assert.NotNull(typeof(Converter));
+        Assert.NotNull(typeof(HtmlToMarkdownConverter));
     }
 
     [Fact]
     public void TestBasicConversion()
     {
         var html = "<p>Hello World</p>";
-        var result = Converter.Convert(html);
+        var result = HtmlToMarkdownConverter.Convert(html);
         Assert.Contains("Hello World", result);
     }
 
@@ -23,14 +23,14 @@ public class SmokeTest
     public void TestWithOptions()
     {
         var html = "<h1>Title</h1>";
-        var result = Converter.Convert(html);
+        var result = HtmlToMarkdownConverter.Convert(html);
         Assert.StartsWith("#", result);
     }
 
     [Fact]
     public void TestEmptyInput()
     {
-        var result = Converter.Convert("");
+        var result = HtmlToMarkdownConverter.Convert("");
         Assert.Equal("", result);
     }
 }

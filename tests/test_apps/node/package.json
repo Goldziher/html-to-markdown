@@ -9,7 +9,7 @@
     "test:comprehensive": "vitest run comprehensive.spec.ts"
   },
   "dependencies": {
-    "@kreuzberg/html-to-markdown": ">=2.19.0"
+    "@kreuzberg/html-to-markdown": "2.19.0-rc.1"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",

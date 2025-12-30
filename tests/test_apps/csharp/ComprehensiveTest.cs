@@ -1,8 +1,14 @@
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
 using Newtonsoft.Json;
 using Xunit;
 using HtmlToMarkdown;
 
 namespace HtmlToMarkdownTestApp;
+
+#nullable enable
 
 public record TestCase(string Name, string Html, string ExpectedMarkdown, Dictionary<string, object>? Options);
 
@@ -25,7 +31,7 @@ public class ComprehensiveTest
     [MemberData(nameof(BasicHtmlData))]
     public void TestBasicHtmlConversion(TestCase testCase)
     {
-        var result = Converter.Convert(testCase.Html);
+        var result = HtmlToMarkdownConverter.Convert(testCase.Html);
         Assert.Equal(testCase.ExpectedMarkdown.Trim(), result.Trim());
     }
 }

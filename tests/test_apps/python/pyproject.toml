@@ -16,7 +16,7 @@ classifiers = [
   "Programming Language :: Python :: 3.14",
 ]
 dependencies = [
-  "html-to-markdown>=2.19",
+  "html-to-markdown>=2.19.2",
   "pytest>=8",
   "pytest-cov>=4.1",
 ]

@@ -17,7 +17,7 @@ defmodule HtmlToMarkdownTestApp.MixProject do
 
   defp deps do
     [
-      {:html_to_markdown, "~> 2.19"}
+      {:html_to_markdown, "~> 2.19.2"}
     ]
   end
 end
