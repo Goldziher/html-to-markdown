@@ -59,6 +59,10 @@ packages/php-ext/workspace/
 !packages/elixir/lib/**/*.ex
 erl_crash.dump
 
+# Elixir test application dependencies and builds
+tests/test_apps/elixir/deps/
+tests/test_apps/elixir/_build/
+
 # Example dependency directories
 vendor/
 **/vendor/
