@@ -55,10 +55,18 @@ jobs:
         run: scripts/ci/php/set-php-config.sh
         shell: bash
 
-      - name: Install Composer dependencies
+      - name: Install root Composer dependencies
         uses: ramsey/composer-install@v3
         with:
           dependency-versions: locked
+        env:
+          COMPOSER_AUTH: '{"github-oauth":{"github.com":"${{ secrets.GITHUB_TOKEN }}"}}'
+
+      - name: Install PHP package Composer dependencies
+        uses: ramsey/composer-install@v3
+        with:
+          dependency-versions: locked
+          working-directory: packages/php
         env:
           COMPOSER_AUTH: '{"github-oauth":{"github.com":"${{ secrets.GITHUB_TOKEN }}"}}'
 
