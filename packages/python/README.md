@@ -88,7 +88,7 @@ Basic conversion:
 ```python
 from html_to_markdown import convert
 
-html = "<h1>Hello</h1><p>This is <strong>fast</strong>!</p>"
+html = &#34;&lt;h1&gt;Hello&lt;/h1&gt;&lt;p&gt;This is &lt;strong&gt;fast&lt;/strong&gt;!&lt;/p&gt;&#34;
 markdown = convert(html)
 ```
 
@@ -100,7 +100,7 @@ With conversion options:
 from html_to_markdown import ConversionOptions, convert
 
 options = ConversionOptions(
-    heading_style="atx",
+    heading_style=&#34;atx&#34;,
     list_indent_width=2,
 )
 markdown = convert(html, options)
@@ -118,7 +118,7 @@ from html_to_markdown import convert_with_async_visitor
 class AsyncVisitor:
     async def visit_link(self, ctx, href, text, title):
         # Validate URLs asynchronously
-        return {"type": "continue"}
+        return {&#34;type&#34;: &#34;continue&#34;}
 
 markdown = convert_with_async_visitor(html, visitor=AsyncVisitor())
 ```

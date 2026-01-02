@@ -115,14 +115,14 @@ npm install @kreuzberg/html-to-markdown-wasm
 
 **Before:**
 ```typescript
-import { convert } from 'html-to-markdown-node';
-import { convert } from 'html-to-markdown-wasm';
+import { convert } from &#39;html-to-markdown-node&#39;;
+import { convert } from &#39;html-to-markdown-wasm&#39;;
 ```
 
 **After:**
 ```typescript
-import { convert } from '@kreuzberg/html-to-markdown-node';
-import { convert } from '@kreuzberg/html-to-markdown-wasm';
+import { convert } from &#39;@kreuzberg/html-to-markdown-node&#39;;
+import { convert } from &#39;@kreuzberg/html-to-markdown-wasm&#39;;
 ```
 
 ### TypeScript Declaration Update
@@ -132,9 +132,9 @@ Update your TypeScript configuration if you have imports from the old package na
 **Before (tsconfig.json or import aliases):**
 ```json
 {
-  "compilerOptions": {
-    "paths": {
-      "html-to-markdown": ["node_modules/html-to-markdown-node"]
+  &#34;compilerOptions&#34;: {
+    &#34;paths&#34;: {
+      &#34;html-to-markdown&#34;: [&#34;node_modules/html-to-markdown-node&#34;]
     }
   }
 }
@@ -143,9 +143,9 @@ Update your TypeScript configuration if you have imports from the old package na
 **After:**
 ```json
 {
-  "compilerOptions": {
-    "paths": {
-      "@kreuzberg/html-to-markdown": ["node_modules/@kreuzberg/html-to-markdown-node"]
+  &#34;compilerOptions&#34;: {
+    &#34;paths&#34;: {
+      &#34;@kreuzberg/html-to-markdown&#34;: [&#34;node_modules/@kreuzberg/html-to-markdown-node&#34;]
     }
   }
 }
@@ -155,12 +155,12 @@ Update your TypeScript configuration if you have imports from the old package na
 
 **Before:**
 ```typescript
-import { convert } from "npm:html-to-markdown-wasm";
+import { convert } from &#34;npm:html-to-markdown-wasm&#34;;
 ```
 
 **After:**
 ```typescript
-import { convert } from "npm:@kreuzberg/html-to-markdown-wasm";
+import { convert } from &#34;npm:@kreuzberg/html-to-markdown-wasm&#34;;
 ```
 
 ## Summary of Changes
@@ -193,9 +193,9 @@ See [Performance Guide](../../examples/performance/) for detailed benchmarks.
 Basic conversion:
 
 ```typescript
-import { convert } from '@kreuzberg/html-to-markdown';
+import { convert } from &#39;@kreuzberg/html-to-markdown&#39;;
 
-const markdown: string = convert('<h1>Hello World</h1>');
+const markdown: string = convert(&#39;&lt;h1&gt;Hello World&lt;/h1&gt;&#39;);
 console.log(markdown); // # Hello World
 ```
 
@@ -204,15 +204,15 @@ console.log(markdown); // # Hello World
 With conversion options:
 
 ```typescript
-import { convert, ConversionOptions } from '@kreuzberg/html-to-markdown';
+import { convert, ConversionOptions } from &#39;@kreuzberg/html-to-markdown&#39;;
 
 const options: ConversionOptions = {
-  headingStyle: 'atx',
+  headingStyle: &#39;atx&#39;,
   listIndentWidth: 2,
   wrap: true,
 };
 
-const markdown = convert('<h1>Title</h1><p>Content</p>', options);
+const markdown = convert(&#39;&lt;h1&gt;Title&lt;/h1&gt;&lt;p&gt;Content&lt;/p&gt;&#39;, options);
 ```
 
 

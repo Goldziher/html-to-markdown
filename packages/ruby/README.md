@@ -86,9 +86,9 @@ See [Performance Guide](../../examples/performance/) for detailed benchmarks.
 Basic conversion:
 
 ```ruby
-require 'html_to_markdown'
+require &#39;html_to_markdown&#39;
 
-html = "<h1>Hello</h1><p>This is <strong>fast</strong>!</p>"
+html = &#34;&lt;h1&gt;Hello&lt;/h1&gt;&lt;p&gt;This is &lt;strong&gt;fast&lt;/strong&gt;!&lt;/p&gt;&#34;
 markdown = HtmlToMarkdown.convert(html)
 ```
 
@@ -97,9 +97,9 @@ markdown = HtmlToMarkdown.convert(html)
 With conversion options:
 
 ```ruby
-require 'html_to_markdown'
+require &#39;html_to_markdown&#39;
 
-html = "<h1>Hello</h1><p>This is <strong>fast</strong>!</p>"
+html = &#34;&lt;h1&gt;Hello&lt;/h1&gt;&lt;p&gt;This is &lt;strong&gt;fast&lt;/strong&gt;!&lt;/p&gt;&#34;
 markdown = HtmlToMarkdown.convert(html, heading_style: :atx, code_block_style: :fenced)
 ```
 

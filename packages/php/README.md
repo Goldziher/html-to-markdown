@@ -101,10 +101,10 @@ use function HtmlToMarkdown\convert;
 
 // Object-oriented usage
 $converter = Converter::create();
-$markdown = $converter->convert('<h1>Hello</h1><p>This is <strong>fast</strong>!</p>');
+$markdown = $converter-&gt;convert(&#39;&lt;h1&gt;Hello&lt;/h1&gt;&lt;p&gt;This is &lt;strong&gt;fast&lt;/strong&gt;!&lt;/p&gt;&#39;);
 
 // Procedural helper
-$markdown = convert('<h1>Hello</h1>');
+$markdown = convert(&#39;&lt;h1&gt;Hello&lt;/h1&gt;&#39;);
 ```
 
 
@@ -118,11 +118,11 @@ use HtmlToMarkdown\Service\Converter;
 $converter = Converter::create();
 
 $options = new ConversionOptions(
-    headingStyle: 'Atx',
+    headingStyle: &#39;Atx&#39;,
     listIndentWidth: 2,
 );
 
-$markdown = $converter->convert('<h1>Hello</h1>', $options);
+$markdown = $converter-&gt;convert(&#39;&lt;h1&gt;Hello&lt;/h1&gt;&#39;, $options);
 ```
 
 

@@ -55,7 +55,7 @@ Ship identical Markdown across every runtime while enjoying native performance w
 ## Installation
 
 ```bash
-Add {:html_to_markdown, "~> 2.19.0"} to mix.exs deps
+Add {:html_to_markdown, &#34;~&gt; 2.19.0&#34;} to mix.exs deps
 ```
 
 
@@ -99,9 +99,9 @@ See [Performance Guide](../../examples/performance/) for detailed benchmarks.
 Basic conversion:
 
 ```elixir
-iex> {:ok, markdown} = HtmlToMarkdown.convert("<h1>Hello</h1>")
-iex> markdown
-"# Hello\n"
+iex&gt; {:ok, markdown} = HtmlToMarkdown.convert(&#34;&lt;h1&gt;Hello&lt;/h1&gt;&#34;)
+iex&gt; markdown
+&#34;# Hello\n&#34;
 ```
 
 
@@ -110,9 +110,9 @@ With conversion options:
 
 ```elixir
 # Pre-build reusable options
-iex> handle = HtmlToMarkdown.options(%Options{wrap: true, wrap_width: 40})
-iex> HtmlToMarkdown.convert_with_options("<p>Reusable</p>", handle)
-{:ok, "Reusable\n"}
+iex&gt; handle = HtmlToMarkdown.options(%Options{wrap: true, wrap_width: 40})
+iex&gt; HtmlToMarkdown.convert_with_options(&#34;&lt;p&gt;Reusable&lt;/p&gt;&#34;, handle)
+{:ok, &#34;Reusable\n&#34;}
 ```
 
 

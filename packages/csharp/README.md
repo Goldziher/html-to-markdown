@@ -93,12 +93,12 @@ Update your `.csproj` file:
 
 **Before:**
 ```xml
-<PackageReference Include="Goldziher.HtmlToMarkdown" Version="2.18.x" />
+&lt;PackageReference Include=&#34;Goldziher.HtmlToMarkdown&#34; Version=&#34;2.18.x&#34; /&gt;
 ```
 
 **After:**
 ```xml
-<PackageReference Include="KreuzbergDev.HtmlToMarkdown" Version="2.19.0" />
+&lt;PackageReference Include=&#34;KreuzbergDev.HtmlToMarkdown&#34; Version=&#34;2.19.0&#34; /&gt;
 ```
 
 ### Using Statement
@@ -116,7 +116,7 @@ using HtmlToMarkdown;
 ```csharp
 using HtmlToMarkdown;
 
-var html = "<h1>Hello World</h1><p>This is a paragraph.</p>";
+var html = &#34;&lt;h1&gt;Hello World&lt;/h1&gt;&lt;p&gt;This is a paragraph.&lt;/p&gt;&#34;;
 
 try
 {
@@ -125,7 +125,7 @@ try
 }
 catch (HtmlToMarkdownException ex)
 {
-    Console.Error.WriteLine($"Conversion failed: {ex.Message}");
+    Console.Error.WriteLine($&#34;Conversion failed: {ex.Message}&#34;);
 }
 ```
 
@@ -133,7 +133,7 @@ catch (HtmlToMarkdownException ex)
 ```csharp
 using HtmlToMarkdown;
 
-var html = "<h1>Hello World</h1><p>This is a paragraph.</p>";
+var html = &#34;&lt;h1&gt;Hello World&lt;/h1&gt;&lt;p&gt;This is a paragraph.&lt;/p&gt;&#34;;
 
 try
 {
@@ -142,7 +142,7 @@ try
 }
 catch (HtmlToMarkdownException ex)
 {
-    Console.Error.WriteLine($"Conversion failed: {ex.Message}");
+    Console.Error.WriteLine($&#34;Conversion failed: {ex.Message}&#34;);
 }
 ```
 
@@ -220,7 +220,7 @@ Basic conversion:
 ```csharp
 using HtmlToMarkdown;
 
-var html = "<h1>Hello World</h1><p>This is a paragraph.</p>";
+var html = &#34;&lt;h1&gt;Hello World&lt;/h1&gt;&lt;p&gt;This is a paragraph.&lt;/p&gt;&#34;;
 
 try
 {
@@ -229,7 +229,7 @@ try
 }
 catch (HtmlToMarkdownException ex)
 {
-    Console.Error.WriteLine($"Conversion failed: {ex.Message}");
+    Console.Error.WriteLine($&#34;Conversion failed: {ex.Message}&#34;);
 }
 ```
 
@@ -242,21 +242,21 @@ using HtmlToMarkdown;
 
 try
 {
-    string html = """
-        <html>
-        <head>
-            <title>My Article</title>
-            <meta name="description" content="An interesting read">
-            <meta name="author" content="Jane Doe">
-            <meta property="og:image" content="image.jpg">
-        </head>
-        <body>
-            <h1>Welcome</h1>
-            <a href="https://example.com">Link</a>
-            <img src="image.jpg" alt="Featured image">
-        </body>
-        </html>
-        """;
+    string html = &#34;&#34;&#34;
+        &lt;html&gt;
+        &lt;head&gt;
+            &lt;title&gt;My Article&lt;/title&gt;
+            &lt;meta name=&#34;description&#34; content=&#34;An interesting read&#34;&gt;
+            &lt;meta name=&#34;author&#34; content=&#34;Jane Doe&#34;&gt;
+            &lt;meta property=&#34;og:image&#34; content=&#34;image.jpg&#34;&gt;
+        &lt;/head&gt;
+        &lt;body&gt;
+            &lt;h1&gt;Welcome&lt;/h1&gt;
+            &lt;a href=&#34;https://example.com&#34;&gt;Link&lt;/a&gt;
+            &lt;img src=&#34;image.jpg&#34; alt=&#34;Featured image&#34;&gt;
+        &lt;/body&gt;
+        &lt;/html&gt;
+        &#34;&#34;&#34;;
 
     var result = HtmlToMarkdownConverter.ConvertWithMetadata(html);
 
@@ -264,11 +264,11 @@ try
     var doc = result.Metadata.Document;
     if (doc.Title != null)
     {
-        Console.WriteLine($"Title: {doc.Title}");
+        Console.WriteLine($&#34;Title: {doc.Title}&#34;);
     }
     if (doc.Author != null)
     {
-        Console.WriteLine($"Author: {doc.Author}");
+        Console.WriteLine($&#34;Author: {doc.Author}&#34;);
     }
 
     // Access Open Graph metadata
@@ -276,25 +276,25 @@ try
     {
         foreach (var (key, value) in doc.OpenGraph)
         {
-            Console.WriteLine($"OG {key}: {value}");
+            Console.WriteLine($&#34;OG {key}: {value}&#34;);
         }
     }
 
     // Count extracted elements
-    Console.WriteLine($"Headers: {result.Metadata.Headers.Count}");
-    Console.WriteLine($"Links: {result.Metadata.Links.Count}");
-    Console.WriteLine($"Images: {result.Metadata.Images.Count}");
+    Console.WriteLine($&#34;Headers: {result.Metadata.Headers.Count}&#34;);
+    Console.WriteLine($&#34;Links: {result.Metadata.Links.Count}&#34;);
+    Console.WriteLine($&#34;Images: {result.Metadata.Images.Count}&#34;);
 
     // Print markdown output
-    Console.WriteLine($"\nMarkdown:\n{result.Markdown}");
+    Console.WriteLine($&#34;\nMarkdown:\n{result.Markdown}&#34;);
 }
 catch (HtmlToMarkdownException ex)
 {
-    Console.Error.WriteLine($"Conversion failed: {ex.Message}");
+    Console.Error.WriteLine($&#34;Conversion failed: {ex.Message}&#34;);
 }
 catch (JsonException ex)
 {
-    Console.Error.WriteLine($"Metadata parsing failed: {ex.Message}");
+    Console.Error.WriteLine($&#34;Metadata parsing failed: {ex.Message}&#34;);
 }
 ```
 

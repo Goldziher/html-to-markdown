@@ -49,18 +49,18 @@
 
 
 High-performance HTML to Markdown converter with Java Panama FFI bindings to the Rust core.
-Uses Foreign Function & Memory API for zero-dependency, thread-safe conversion with full metadata extraction support.
+Uses Foreign Function &amp; Memory API for zero-dependency, thread-safe conversion with full metadata extraction support.
 
 
 ## Installation
 
 ```bash
-<dependency>
-    <groupId>dev.kreuzberg</groupId>
-    <artifactId>html-to-markdown</artifactId>
-    <version>2.19.0</version>
-    <classifier>linux</classifier> <!-- or macos, windows -->
-</dependency>
+&lt;dependency&gt;
+    &lt;groupId&gt;dev.kreuzberg&lt;/groupId&gt;
+    &lt;artifactId&gt;html-to-markdown&lt;/artifactId&gt;
+    &lt;version&gt;2.19.0&lt;/version&gt;
+    &lt;classifier&gt;linux&lt;/classifier&gt; &lt;!-- or macos, windows --&gt;
+&lt;/dependency&gt;
 
 ```
 
@@ -95,21 +95,21 @@ In v2.19.0, the Java package namespace changed from `io.github.goldziher` to `de
 
 **Before (v2.18.x):**
 ```xml
-<dependency>
-    <groupId>io.github.goldziher</groupId>
-    <artifactId>html-to-markdown</artifactId>
-    <version>2.18.x</version>
-</dependency>
+&lt;dependency&gt;
+    &lt;groupId&gt;io.github.goldziher&lt;/groupId&gt;
+    &lt;artifactId&gt;html-to-markdown&lt;/artifactId&gt;
+    &lt;version&gt;2.18.x&lt;/version&gt;
+&lt;/dependency&gt;
 ```
 
 **After (v2.19.0+):**
 ```xml
-<dependency>
-    <groupId>dev.kreuzberg</groupId>
-    <artifactId>html-to-markdown</artifactId>
-    <version>2.19.0</version>
-    <classifier>linux</classifier> <!-- or macos, windows -->
-</dependency>
+&lt;dependency&gt;
+    &lt;groupId&gt;dev.kreuzberg&lt;/groupId&gt;
+    &lt;artifactId&gt;html-to-markdown&lt;/artifactId&gt;
+    &lt;version&gt;2.19.0&lt;/version&gt;
+    &lt;classifier&gt;linux&lt;/classifier&gt; &lt;!-- or macos, windows --&gt;
+&lt;/dependency&gt;
 ```
 
 ### Import Statement Updates
@@ -132,22 +132,22 @@ import dev.kreuzberg.htmltomarkdown.metadata.*;
 
 **Kotlin DSL - Before:**
 ```kotlin
-implementation("io.github.goldziher:html-to-markdown:2.18.x")
+implementation(&#34;io.github.goldziher:html-to-markdown:2.18.x&#34;)
 ```
 
 **Kotlin DSL - After:**
 ```kotlin
-implementation("dev.kreuzberg:html-to-markdown:2.19.0:linux") // or macos, windows
+implementation(&#34;dev.kreuzberg:html-to-markdown:2.19.0:linux&#34;) // or macos, windows
 ```
 
 **Groovy DSL - Before:**
 ```groovy
-implementation 'io.github.goldziher:html-to-markdown:2.18.x'
+implementation &#39;io.github.goldziher:html-to-markdown:2.18.x&#39;
 ```
 
 **Groovy DSL - After:**
 ```groovy
-implementation 'dev.kreuzberg:html-to-markdown:2.19.0:linux' // or macos, windows
+implementation &#39;dev.kreuzberg:html-to-markdown:2.19.0:linux&#39; // or macos, windows
 ```
 
 ### Code Migration Example
@@ -158,7 +158,7 @@ import io.github.goldziher.htmltomarkdown.HtmlToMarkdown;
 
 public class Example {
     public static void main(String[] args) {
-        String html = "<h1>Hello World</h1><p>This is a <strong>test</strong>.</p>";
+        String html = &#34;&lt;h1&gt;Hello World&lt;/h1&gt;&lt;p&gt;This is a &lt;strong&gt;test&lt;/strong&gt;.&lt;/p&gt;&#34;;
         String markdown = HtmlToMarkdown.convert(html);
         System.out.println(markdown);
     }
@@ -171,7 +171,7 @@ import dev.kreuzberg.htmltomarkdown.HtmlToMarkdown;
 
 public class Example {
     public static void main(String[] args) {
-        String html = "<h1>Hello World</h1><p>This is a <strong>test</strong>.</p>";
+        String html = &#34;&lt;h1&gt;Hello World&lt;/h1&gt;&lt;p&gt;This is a &lt;strong&gt;test&lt;/strong&gt;.&lt;/p&gt;&#34;;
         String markdown = HtmlToMarkdown.convert(html);
         System.out.println(markdown);
     }
@@ -244,7 +244,7 @@ import dev.kreuzberg.htmltomarkdown.HtmlToMarkdown;
 
 public class Example {
     public static void main(String[] args) {
-        String html = "<h1>Hello World</h1><p>This is a <strong>test</strong>.</p>";
+        String html = &#34;&lt;h1&gt;Hello World&lt;/h1&gt;&lt;p&gt;This is a &lt;strong&gt;test&lt;/strong&gt;.&lt;/p&gt;&#34;;
         String markdown = HtmlToMarkdown.convert(html);
         System.out.println(markdown);
         // Output:
@@ -265,21 +265,21 @@ import dev.kreuzberg.htmltomarkdown.metadata.MetadataExtraction;
 
 public class MetadataExample {
     public static void main(String[] args) {
-        String html = """
-            <html>
-            <head>
-                <title>My Article</title>
-                <meta name="description" content="An interesting read">
-                <meta name="author" content="Jane Doe">
-                <meta property="og:image" content="image.jpg">
-            </head>
-            <body>
-                <h1>Welcome</h1>
-                <a href="https://example.com">Link</a>
-                <img src="image.jpg" alt="Featured image">
-            </body>
-            </html>
-            """;
+        String html = &#34;&#34;&#34;
+            &lt;html&gt;
+            &lt;head&gt;
+                &lt;title&gt;My Article&lt;/title&gt;
+                &lt;meta name=&#34;description&#34; content=&#34;An interesting read&#34;&gt;
+                &lt;meta name=&#34;author&#34; content=&#34;Jane Doe&#34;&gt;
+                &lt;meta property=&#34;og:image&#34; content=&#34;image.jpg&#34;&gt;
+            &lt;/head&gt;
+            &lt;body&gt;
+                &lt;h1&gt;Welcome&lt;/h1&gt;
+                &lt;a href=&#34;https://example.com&#34;&gt;Link&lt;/a&gt;
+                &lt;img src=&#34;image.jpg&#34; alt=&#34;Featured image&#34;&gt;
+            &lt;/body&gt;
+            &lt;/html&gt;
+            &#34;&#34;&#34;;
 
         try {
             MetadataExtraction result = HtmlToMarkdown.convertWithMetadata(html);
@@ -287,26 +287,26 @@ public class MetadataExample {
             // Access document metadata
             var doc = result.metadata().document();
             if (doc.title() != null) {
-                System.out.println("Title: " + doc.title());
+                System.out.println(&#34;Title: &#34; + doc.title());
             }
             if (doc.author() != null) {
-                System.out.println("Author: " + doc.author());
+                System.out.println(&#34;Author: &#34; + doc.author());
             }
 
             // Access Open Graph metadata
-            doc.openGraph().forEach((key, value) ->
-                System.out.println("OG " + key + ": " + value)
+            doc.openGraph().forEach((key, value) -&gt;
+                System.out.println(&#34;OG &#34; + key + &#34;: &#34; + value)
             );
 
             // Count extracted elements
-            System.out.println("Headers: " + result.metadata().headers().size());
-            System.out.println("Links: " + result.metadata().links().size());
-            System.out.println("Images: " + result.metadata().images().size());
+            System.out.println(&#34;Headers: &#34; + result.metadata().headers().size());
+            System.out.println(&#34;Links: &#34; + result.metadata().links().size());
+            System.out.println(&#34;Images: &#34; + result.metadata().images().size());
 
             // Print markdown output
-            System.out.println("\nMarkdown:\n" + result.markdown());
+            System.out.println(&#34;\nMarkdown:\n&#34; + result.markdown());
         } catch (HtmlToMarkdown.ConversionException e) {
-            System.err.println("Conversion failed: " + e.getMessage());
+            System.err.println(&#34;Conversion failed: &#34; + e.getMessage());
         }
     }
 }
