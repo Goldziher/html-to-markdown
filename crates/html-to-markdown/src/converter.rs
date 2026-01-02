@@ -8392,6 +8392,12 @@ fn scan_table_node(
                     "a" => scan.link_count += 1,
                     "caption" => scan.has_caption = true,
                     "th" => scan.has_header = true,
+                    "img" | "graphic" => {
+                        // Images with src or alt attributes count as content
+                        if tag.attributes().get("src").is_some() || tag.attributes().get("alt").is_some() {
+                            scan.has_text = true;
+                        }
+                    }
                     "cell" => {
                         // Check if cell has role="head" attribute
                         if let Some(role) = tag.attributes().get("role") {
@@ -8595,7 +8601,8 @@ fn convert_table(
             && !table_scan.has_caption
             && (looks_like_layout || is_blank_table || (row_count <= 2 && link_count >= 3))
         {
-            if is_blank_table {
+            // Skip truly blank tables (no text, no links, no images)
+            if is_blank_table && link_count == 0 {
                 return;
             }
 
@@ -8615,7 +8622,12 @@ fn convert_table(
                             }
                         }
                         "tr" | "row" => append_layout_row(child_handle, parser, output, options, ctx, dom_ctx),
-                        _ => {}
+                        "colgroup" | "col" => {}
+                        _ => {
+                            // Handle non-table-structure elements (like <a>, <img>, etc.) that may be
+                            // direct children of layout tables (e.g., Blogger table wrappers)
+                            walk_node(child_handle, parser, output, options, ctx, depth + 1, dom_ctx);
+                        }
                     }
                 }
             }
@@ -8725,7 +8737,11 @@ fn convert_table(
 
                         "colgroup" | "col" => {}
 
-                        _ => {}
+                        _ => {
+                            // Handle non-table-structure elements (like <a>, <img>, etc.) that may be
+                            // direct children of tables without proper structure (e.g., Blogger table wrappers)
+                            walk_node(child_handle, parser, output, options, ctx, depth + 1, dom_ctx);
+                        }
                     }
                 }
             }

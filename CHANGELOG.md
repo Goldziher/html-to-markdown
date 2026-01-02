@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Bug Fixes
 
+- **Table image processing**: Fixed Issue #175 - images inside Blogger-style HTML tables (e.g., `<table class="tr-caption-container">`) were being stripped during conversion. Enhanced table scanner to recognize images as content and properly process non-table elements like `<a>` and `<img>` that are direct children of table elements.
 - **WASM npm package**: Fixed Issue #172 completely - package was published but missing all WASM binaries and JavaScript wrappers (only 23 KB with 3 files). Created `.npmignore` to include `dist/`, `dist-node/`, and `dist-web/` directories that were excluded by `.gitignore` during npm publish.
 - **PHP Packagist publishing**: Fixed version mismatch that caused Packagist to reject v2.19.2 tag. Updated `sync_versions.py` to synchronize both root `composer.json` and `packages/php/composer.json`.
 - **Test apps**: Fixed relative fixture paths in C#, Java, and Elixir test apps. Updated Elixir tests to handle tuple-returning API. Added Java native library path configuration.

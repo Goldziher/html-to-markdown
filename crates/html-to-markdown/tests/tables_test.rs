@@ -182,3 +182,63 @@ fn test_table_single_column() {
     assert!(result.contains("| Cell 1 |"));
     assert!(result.contains("| Cell 2 |"));
 }
+
+#[test]
+fn test_blogger_table_with_image() {
+    // Regression test for Issue #175: Image tags inside Blogger table wrappers not being processed
+    let html = r#"
+<table class="tr-caption-container">
+  <a href="https://example.com/full-image.jpg">
+    <img border="0" height="480"
+         src="https://blogger.googleusercontent.com/img/test/IMG_0427.JPG"
+         width="640" alt="Test Image" />
+  </a>
+</table>
+"#;
+
+    let result = convert(html, None).unwrap();
+
+    // The image should be converted to markdown (wrapped in a link)
+    assert!(
+        result.contains("!["),
+        "Result should contain markdown image syntax: {}",
+        result
+    );
+    assert!(
+        result.contains("blogger.googleusercontent.com"),
+        "Result should contain image URL: {}",
+        result
+    );
+    assert!(
+        result.contains("example.com/full-image.jpg"),
+        "Result should contain link URL: {}",
+        result
+    );
+}
+
+#[test]
+fn test_table_with_image_no_rows() {
+    // Test that images in tables without proper rows are still processed
+    let html = r#"<table><img src="https://example.com/image.jpg" alt="test image"></table>"#;
+    let result = convert(html, None).unwrap();
+
+    assert!(
+        result.contains("![test image](https://example.com/image.jpg)"),
+        "Image should be converted to markdown: {}",
+        result
+    );
+}
+
+#[test]
+fn test_table_with_link_and_image_no_rows() {
+    // Test that link-wrapped images in tables without proper rows are processed
+    let html =
+        r#"<table><a href="https://example.com"><img src="https://example.com/image.jpg" alt="test"></a></table>"#;
+    let result = convert(html, None).unwrap();
+
+    assert!(
+        result.contains("[![test](https://example.com/image.jpg)](https://example.com)"),
+        "Link-wrapped image should be converted to markdown: {}",
+        result
+    );
+}
