@@ -18,7 +18,7 @@
     <img src="https://img.shields.io/maven-central/v/dev.kreuzberg/html-to-markdown?label=Java&color=007ec6" alt="Java">
   </a>
   <a href="https://pkg.go.dev/github.com/kreuzberg-dev/html-to-markdown/packages/go/v2/htmltomarkdown">
-    <img src="https://img.shields.io/badge/Go-v2.19.1-007ec6" alt="Go">
+    <img src="https://img.shields.io/badge/Go-v2.19.0-007ec6" alt="Go">
   </a>
   <a href="https://www.nuget.org/packages/KreuzbergDev.HtmlToMarkdown/">
     <img src="https://img.shields.io/nuget/v/KreuzbergDev.HtmlToMarkdown?label=C%23&color=007ec6" alt="C#">
@@ -62,64 +62,6 @@ go get github.com/kreuzberg-dev/html-to-markdown/packages/go/v2/htmltomarkdown
 
 Requires Go 1.25+. The FFI library is automatically downloaded from GitHub releases.
 
-## FFI Library Configuration
-
-The Go bindings use a C FFI library compiled from Rust. By default, the library is automatically downloaded from [GitHub releases](https://github.com/kreuzberg-dev/html-to-markdown/releases).
-
-### Environment Variables
-
-Control FFI library loading with these environment variables:
-
-- **`HTML_TO_MARKDOWN_FFI_VERSION`** – Override the default FFI version (default: `2.19.1`)
-  ```bash
-  export HTML_TO_MARKDOWN_FFI_VERSION=2.19.0
-  ```
-
-- **`HTML_TO_MARKDOWN_FFI_PATH`** – Use a local FFI library instead of downloading
-  ```bash
-  export HTML_TO_MARKDOWN_FFI_PATH=/path/to/libhtml_to_markdown_ffi.so
-  ```
-
-- **`HTML_TO_MARKDOWN_FFI_CACHE_DIR`** – Customize where libraries are cached (default: `$HOME/.cache/html-to-markdown/ffi`)
-  ```bash
-  export HTML_TO_MARKDOWN_FFI_CACHE_DIR=/custom/cache/path
-  ```
-
-- **`HTML_TO_MARKDOWN_FFI_DISABLE_DOWNLOAD`** – Disable automatic downloads (useful in offline environments)
-  ```bash
-  export HTML_TO_MARKDOWN_FFI_DISABLE_DOWNLOAD=1
-  ```
-
-### Development
-
-For local development, build the FFI library and point to it:
-
-```bash
-# Build FFI library
-cargo build -p html-to-markdown-ffi --release
-
-# Find the library path (platform-dependent)
-# Linux: target/release/libhtml_to_markdown_ffi.so
-# macOS: target/release/libhtml_to_markdown_ffi.dylib
-# Windows: target/release/html_to_markdown_ffi.dll
-
-export HTML_TO_MARKDOWN_FFI_PATH=$(pwd)/target/release/libhtml_to_markdown_ffi.so
-go test ./...
-```
-
-### Troubleshooting
-
-**"404 Not Found" error:** The default version may be outdated or not published. Options:
-
-1. Update to the latest version:
-   ```bash
-   export HTML_TO_MARKDOWN_FFI_VERSION=2.19.1
-   ```
-
-2. Check [available releases](https://github.com/kreuzberg-dev/html-to-markdown/releases)
-
-3. Build and use a local library (see Development section above)
-
 
 
 
@@ -147,14 +89,14 @@ Basic conversion:
 package main
 
 import (
-    "fmt"
-    "log"
+    &#34;fmt&#34;
+    &#34;log&#34;
 
-    "github.com/kreuzberg-dev/html-to-markdown/packages/go/v2/htmltomarkdown"
+    &#34;github.com/kreuzberg-dev/html-to-markdown/packages/go/v2/htmltomarkdown&#34;
 )
 
 func main() {
-    html := "<h1>Hello World</h1><p>This is a paragraph.</p>"
+    html := &#34;&lt;h1&gt;Hello World&lt;/h1&gt;&lt;p&gt;This is a paragraph.&lt;/p&gt;&#34;
 
     markdown, err := htmltomarkdown.Convert(html)
     if err != nil {
@@ -173,30 +115,30 @@ With conversion options:
 package main
 
 import (
-    "fmt"
-    "log"
+    &#34;fmt&#34;
+    &#34;log&#34;
 
-    "github.com/kreuzberg-dev/html-to-markdown/packages/go/v2/htmltomarkdown"
+    &#34;github.com/kreuzberg-dev/html-to-markdown/packages/go/v2/htmltomarkdown&#34;
 )
 
 func main() {
     // Check library version
     version := htmltomarkdown.Version()
-    fmt.Printf("html-to-markdown version: %s\n", version)
+    fmt.Printf(&#34;html-to-markdown version: %s\n&#34;, version)
 
-    html := "<h1>Hello</h1><p>Welcome</p>"
+    html := &#34;&lt;h1&gt;Hello&lt;/h1&gt;&lt;p&gt;Welcome&lt;/p&gt;&#34;
 
     // Convert with error handling
     markdown, err := htmltomarkdown.Convert(html)
     if err != nil {
-        log.Fatalf("Conversion failed: %v", err)
+        log.Fatalf(&#34;Conversion failed: %v&#34;, err)
     }
 
     fmt.Println(markdown)
 
     // Alternative: Use MustConvert for panicking on error
-    // Useful when you're certain conversion won't fail
-    anotherMarkdown := htmltomarkdown.MustConvert("<p>Safe HTML</p>")
+    // Useful when you&#39;re certain conversion won&#39;t fail
+    anotherMarkdown := htmltomarkdown.MustConvert(&#34;&lt;p&gt;Safe HTML&lt;/p&gt;&#34;)
     fmt.Println(anotherMarkdown)
 }
 ```
