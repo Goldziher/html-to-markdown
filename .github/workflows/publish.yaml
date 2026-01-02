@@ -1668,7 +1668,7 @@ jobs:
 
           # Create bottle tarball
           cd "${bottle_dir}"
-          bottle_filename="html-to-markdown--${VERSION}.${{ matrix.bottle_tag }}.bottle.tar.gz"
+          bottle_filename="html-to-markdown-${VERSION}.${{ matrix.bottle_tag }}.bottle.tar.gz"
           tar -czf "${bottle_filename}" bin/
 
           # Calculate SHA256

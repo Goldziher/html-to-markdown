@@ -21,7 +21,7 @@ echo "Artifacts: $artifacts_dir"
 declare -A bottle_hashes
 declare -a bottle_tags
 
-for bottle in "$artifacts_dir"/html-to-markdown--*.bottle.tar.gz; do
+for bottle in "$artifacts_dir"/html-to-markdown-*.bottle.tar.gz; do
 	if [ -f "$bottle" ]; then
 		filename="$(basename "$bottle")"
 		without_suffix="${filename%.bottle.tar.gz}"
