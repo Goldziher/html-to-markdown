@@ -16,7 +16,7 @@ public class ComprehensiveTest
 {
     private static List<TestCase> LoadFixtures(string filename)
     {
-        var path = Path.Combine("..", "..", "fixtures", filename);
+        var path = Path.Combine("..", "fixtures", filename);
         var json = File.ReadAllText(path);
         return JsonConvert.DeserializeObject<List<TestCase>>(json)!;
     }

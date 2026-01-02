@@ -14,7 +14,7 @@ defmodule HtmlToMarkdownTestApp.ComprehensiveTest do
 
     test "all basic fixtures", %{fixtures: fixtures} do
       Enum.each(fixtures, fn fixture ->
-        result = HtmlToMarkdown.convert(fixture["html"], fixture["options"] || %{})
+        {:ok, result} = HtmlToMarkdown.convert(fixture["html"], fixture["options"] || %{})
         expected = String.trim(fixture["expectedMarkdown"])
         actual = String.trim(result)
 

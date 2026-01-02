@@ -1,6 +1,6 @@
 {
   "name": "html-to-markdown-visitor-pattern-examples",
-  "version": "2.19.2",
+  "version": "2.19.3",
   "description": "Visitor pattern examples for html-to-markdown",
   "private": true,
   "type": "module",

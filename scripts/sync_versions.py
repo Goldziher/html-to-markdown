@@ -508,6 +508,13 @@ def sync_cargo_versions(repo_root: Path, version: str, report: SyncReport) -> No
 
 
 def sync_composer(repo_root: Path, version: str, report: SyncReport) -> None:
+    # Update root composer.json (for Packagist)
+    root_composer = repo_root / "composer.json"
+    if root_composer.exists():
+        changed, old_ver, new_ver = update_composer_json(root_composer, version)
+        report.record(root_composer.relative_to(repo_root), changed, f"{old_ver} → {new_ver}")
+
+    # Update package composer.json
     composer = repo_root / "packages/php/composer.json"
     if composer.exists():
         changed, old_ver, new_ver = update_composer_json(composer, version)

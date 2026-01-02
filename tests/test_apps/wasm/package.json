@@ -1,6 +1,6 @@
 {
   "name": "html-to-markdown-wasm-test-app",
-  "version": "2.19.2",
+  "version": "2.19.3",
   "description": "Test app for html-to-markdown WASM package",
   "type": "module",
   "scripts": {
@@ -9,7 +9,7 @@
     "test:comprehensive": "vitest run comprehensive.spec.ts"
   },
   "dependencies": {
-    "html-to-markdown-wasm": ">=2.19.1"
+    "html-to-markdown-wasm": "2.19.2"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",

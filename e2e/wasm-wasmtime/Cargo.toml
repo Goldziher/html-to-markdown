@@ -1,6 +1,6 @@
 [package]
 name = "html-to-markdown-wasm-wasmtime-tests"
-version = "2.19.2"
+version = "2.19.3"
 edition = "2024"
 publish = false
 

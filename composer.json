@@ -34,7 +34,9 @@
     "psr-4": {
       "HtmlToMarkdown\\": "packages/php/src/"
     },
-    "files": ["packages/php/src/functions.php"]
+    "files": [
+      "packages/php/src/functions.php"
+    ]
   },
   "autoload-dev": {
     "psr-4": {
@@ -42,8 +44,12 @@
     }
   },
   "scripts": {
-    "post-install-cmd": ["@php packages/php/bin/install-extension.php"],
-    "post-update-cmd": ["@php packages/php/bin/install-extension.php"],
+    "post-install-cmd": [
+      "@php packages/php/bin/install-extension.php"
+    ],
+    "post-update-cmd": [
+      "@php packages/php/bin/install-extension.php"
+    ],
     "phpstan": "php -d detect_unicode=0 vendor/bin/phpstan --configuration=packages/php/phpstan.neon",
     "csfixer": "PHP_CS_FIXER_IGNORE_ENV=1 php vendor/bin/php-cs-fixer fix --config packages/php/php-cs-fixer.php packages/php/src packages/php/tests",
     "format": "PHP_CS_FIXER_IGNORE_ENV=1 php vendor/bin/php-cs-fixer fix --config packages/php/php-cs-fixer.php packages/php/src packages/php/tests",
@@ -80,5 +86,6 @@
     ]
   },
   "minimum-stability": "stable",
-  "prefer-stable": true
+  "prefer-stable": true,
+  "version": "2.19.3"
 }

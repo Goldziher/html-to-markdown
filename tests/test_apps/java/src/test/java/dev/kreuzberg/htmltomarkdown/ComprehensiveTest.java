@@ -16,7 +16,7 @@ class ComprehensiveTest {
 
     static Stream<TestCase> basicHtmlProvider() throws IOException {
         ObjectMapper mapper = new ObjectMapper();
-        File fixtureFile = new File("../../fixtures/basic-html.json");
+        File fixtureFile = new File("../fixtures/basic-html.json");
         TestCase[] cases = mapper.readValue(fixtureFile, TestCase[].class);
         return Arrays.stream(cases);
     }
