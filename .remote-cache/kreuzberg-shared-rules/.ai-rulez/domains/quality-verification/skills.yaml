@@ -1,0 +1,11 @@
+# Quality Verification Domain - Skill References
+# Skills for testing, CI/CD, and quality standards
+
+skills:
+  - testing-philosophy-coverage
+  - cicd-pipeline-standards
+  - test-apps-published-package-validation
+  - code-reviewer
+  - fixture-driven-testing-strategy
+  - performance-and-benchmarking-standards
+  - security-and-vulnerability-management

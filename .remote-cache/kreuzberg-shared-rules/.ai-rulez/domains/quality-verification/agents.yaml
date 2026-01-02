@@ -1,0 +1,8 @@
+# Quality Verification Domain - Agent References
+# Agents responsible for testing and code review
+
+agents:
+  - code-reviewer
+  - performance-profiling-specialist
+  - security-auditing-specialist
+  - test-automation-engineer

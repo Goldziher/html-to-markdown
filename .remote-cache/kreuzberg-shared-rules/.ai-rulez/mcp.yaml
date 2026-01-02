@@ -1,0 +1,80 @@
+# AI-Rulez V3 MCP (Model Context Protocol) Servers
+# Configuration for MCP server integrations
+# Documentation: https://github.com/Goldziher/ai-rulez
+
+# Schema reference for IDE validation
+$schema: https://raw.githubusercontent.com/Goldziher/ai-rulez/main/schema/ai-rules-v3-mcp.schema.json
+# Version (required)
+version: "3.0"
+# MCP Servers
+mcp_servers:
+  # GitHub Integration
+  # Useful for PR reviews (code-reviewer agent), issue tracking, and release management
+  # Enables direct interaction with repository workflows and automation
+  - name: github
+    description: GitHub integration for repository operations and automation
+    command: npx
+    args:
+      - "-y"
+      - "@modelcontextprotocol/server-github"
+    env:
+      # Set GITHUB_PERSONAL_ACCESS_TOKEN environment variable or use ${GITHUB_TOKEN}
+      GITHUB_PERSONAL_ACCESS_TOKEN: "${GITHUB_TOKEN}"
+    transport: stdio
+    enabled: true
+    use_cases:
+      - PR reviews (code-reviewer agent)
+      - Issue tracking
+      - Release management
+  # AI-Rulez MCP Server
+  # Configuration management and project-specific settings
+  # Use this for managing AI-Rulez configuration files and project metadata
+  - name: ai-rulez
+    description: AI-Rulez MCP server for configuration management
+    command: ai-rulez
+    args:
+      - mcp
+    transport: stdio
+    enabled: true
+    use_cases:
+      - Configuration file management
+      - Project metadata updates
+      - Agent configuration
+  # Filesystem MCP Server
+  # Code reading and analysis capabilities
+  # Provides direct access to source code for architecture exploration and verification
+  - name: filesystem
+    description: Filesystem operations for code reading and analysis
+    command: null # Built-in MCP server
+    enabled: true
+    scope:
+      - src
+      - crates
+      - packages
+    use_cases:
+      - Architecture exploration
+      - Binding verification
+      - Code navigation and analysis
+  # Cargo Registry MCP Server
+  # Rust-specific dependency and security information
+  # Essential for auditing Rust dependencies and performing security scanning
+  - name: cargo-registry
+    description: Rust crate registry integration for dependency information
+    command: null # Built-in MCP server or via Cargo plugin
+    enabled: true
+    use_cases:
+      - Dependency audits
+      - Security scanning
+      - Version compatibility checks
+  # Web Search MCP Server
+  # Documentation and best practices lookup
+  # Use for researching FFI patterns, language bindings, and Rust ecosystem best practices
+  - name: web-search
+    description: Web search integration for documentation and best practices
+    command: null # Built-in MCP server
+    enabled: true
+    use_cases:
+      - FFI patterns research
+      - Language binding research
+      - Rust ecosystem best practices
+      - External documentation lookup

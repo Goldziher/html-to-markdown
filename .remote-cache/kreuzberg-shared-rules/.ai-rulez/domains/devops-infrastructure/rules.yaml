@@ -1,0 +1,6 @@
+# DevOps & Infrastructure Domain - Rule References
+# Enforcement rules for CI/CD and deployment
+
+rules:
+  - continuous-integration-coverage
+  - task-automation-workflow

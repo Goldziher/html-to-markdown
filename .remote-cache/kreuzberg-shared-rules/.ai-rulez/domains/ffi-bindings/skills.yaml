@@ -1,0 +1,6 @@
+# FFI Bindings Domain - Skill References
+# Skills for C-compatible FFI layer and platform compatibility
+
+skills:
+  - platform-support-cross-platform-compatibility
+  - ffi-and-language-interop-standards

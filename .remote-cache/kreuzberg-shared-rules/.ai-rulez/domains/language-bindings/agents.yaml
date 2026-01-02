@@ -1,0 +1,13 @@
+# Language Bindings Domain - Agent References
+# Agents responsible for language-specific binding implementations
+
+agents:
+  - csharp-bindings-engineer
+  - elixir-bindings-engineer
+  - go-bindings-engineer
+  - java-bindings-engineer
+  - php-bindings-engineer
+  - python-bindings-engineer
+  - ruby-bindings-engineer
+  - typescript-bindings-engineer
+  - wasm-bindings-engineer

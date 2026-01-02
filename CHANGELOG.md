@@ -5,6 +5,15 @@ All notable changes to html-to-markdown will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.19.4] - 2025-01-02
+
+### Bug Fixes
+
+- **Homebrew formula publishing**: Fixed publish workflow script that updates the Homebrew tap formula
+  - Corrected bottle block deletion regex (was looking for `# bottle do` instead of `bottle do`), preventing duplicate bottle blocks from accumulating on each release
+  - Added automatic source tarball SHA256 computation and formula update to ensure correct checksums
+  - Formula now properly replaces old bottle blocks with new ones rather than appending
+
 ## [2.19.3] - 2025-01-02
 
 ### Bug Fixes

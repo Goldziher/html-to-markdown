@@ -1,0 +1,24 @@
+name: "Rust-Only Library"
+description: "Pure Rust library without language bindings. Focus on core library development with high performance and zero unsafe code violations."
+domains:
+  - rust-core
+  - quality-verification
+  - documentation
+  - devops-infrastructure
+  - organizational
+agents:
+  - rust-core-engineer # Haiku: primary Rust developer
+  - test-automation-engineer # Haiku: cargo test, benchmarks
+  - code-reviewer # Haiku: Rust code review
+  - docs-writer # Haiku: Guide/README
+  - api-doc-writer # Haiku: rustdoc comments
+priority_rules:
+  - rust-2024-edition-core-conversion-engine
+  - dual-testing-strategy-core-bindings
+  - continuous-integration-coverage
+  - code-quality
+model_routing:
+  core_implementation: haiku
+  testing: haiku
+  code_review: haiku
+  documentation: haiku

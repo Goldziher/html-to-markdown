@@ -1,0 +1,5 @@
+# FFI Bindings Domain - Rule References
+# Enforcement rules for FFI layer and platform builds
+
+rules:
+  - polyglot-build-system-distribution

@@ -1,0 +1,5 @@
+# FFI Bindings Domain - Agent References
+# FFI layer is managed by rust-core and language binding engineers
+
+agents:
+  - ffi-maintenance-engineer

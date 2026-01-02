@@ -1,0 +1,16 @@
+# Organizational Domain - Skill References
+# Skills for governance and cross-cutting standards
+
+skills:
+  - agent-selection-usage-guidelines
+  - model-routing
+  - git-commit-standards
+  - git-standards
+  - universal-anti-patterns
+  - anti-patterns
+  - core-principles
+  - common-task-commands
+  - polyglot-error-handling-standardization
+  - project-structure
+  - security-and-vulnerability-management
+  - workspace-dependency-management

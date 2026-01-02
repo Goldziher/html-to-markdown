@@ -1,0 +1,6 @@
+# Build & Distribution Domain - Agent References
+# Orchestration managed through Taskfile automation
+
+agents:
+  - dependency-management-coordinator
+  - release-versioning-coordinator

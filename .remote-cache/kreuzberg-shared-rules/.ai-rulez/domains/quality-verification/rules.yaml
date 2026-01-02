@@ -1,0 +1,8 @@
+# Quality Verification Domain - Rule References
+# Enforcement rules for testing and quality gates
+
+rules:
+  - dual-testing-strategy-core-bindings
+  - continuous-integration-coverage
+  - code-quality
+  - code-quality-with-prek

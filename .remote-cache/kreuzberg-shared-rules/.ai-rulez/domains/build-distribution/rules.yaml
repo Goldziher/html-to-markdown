@@ -1,0 +1,7 @@
+# Build & Distribution Domain - Rule References
+# Enforcement rules for build systems and distribution
+
+rules:
+  - polyglot-build-system-distribution
+  - task-automation-workflow
+  - continuous-integration-coverage

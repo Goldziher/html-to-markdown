@@ -1,0 +1,8 @@
+# Documentation Domain - Skill References
+# Skills for multi-language documentation standards
+
+skills:
+  - documentation-standards-language-parity
+  - quick-start
+  - repository-structure-commands
+  - polyglot-api-documentation-examples

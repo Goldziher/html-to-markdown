@@ -1,0 +1,30 @@
+name: "TypeScript-Focused Library"
+description: "Rust core with TypeScript/Node.js and WebAssembly bindings. Ideal for JavaScript/web ecosystems needing high-performance compiled code."
+domains:
+  - rust-core
+  - language-bindings
+  - build-distribution
+  - quality-verification
+  - documentation
+  - devops-infrastructure
+  - organizational
+agents:
+  - rust-core-engineer # Haiku: Rust core
+  - typescript-bindings-engineer # Haiku: NAPI-RS + wasm-bindgen
+  - test-automation-engineer # Haiku: vitest + cargo test
+  - code-reviewer # Haiku: Rust + TypeScript review
+  - docs-writer # Haiku: TypeScript guide
+  - api-doc-writer # Haiku: JSDoc + rustdoc
+priority_rules:
+  - rust-2024-edition-core-conversion-engine
+  - typescript-5x-napi-rs-bindings-cli
+  - dual-testing-strategy-core-bindings
+  - continuous-integration-coverage
+  - polyglot-build-system-distribution
+  - code-quality
+model_routing:
+  core_implementation: haiku
+  binding_implementation: haiku
+  testing: haiku
+  code_review: haiku
+  documentation: haiku

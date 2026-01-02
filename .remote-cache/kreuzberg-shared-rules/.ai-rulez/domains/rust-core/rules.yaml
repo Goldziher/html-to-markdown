@@ -1,0 +1,5 @@
+# Rust Core Domain - Rule References
+# Enforcement rules for Rust core library
+
+rules:
+  - rust-2024-edition-core-conversion-engine

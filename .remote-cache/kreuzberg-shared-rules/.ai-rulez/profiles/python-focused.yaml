@@ -1,0 +1,30 @@
+name: "Python-Focused Library"
+description: "Rust core with Python bindings. Ideal for data science, ML, and scientific computing projects where Python is the primary user interface."
+domains:
+  - rust-core
+  - language-bindings
+  - build-distribution
+  - quality-verification
+  - documentation
+  - devops-infrastructure
+  - organizational
+agents:
+  - rust-core-engineer # Haiku: Rust core
+  - python-bindings-engineer # Haiku: PyO3 bindings
+  - test-automation-engineer # Haiku: pytest + cargo test
+  - code-reviewer # Haiku: Rust + Python review
+  - docs-writer # Haiku: Python guide
+  - api-doc-writer # Haiku: docstrings + rustdoc
+priority_rules:
+  - rust-2024-edition-core-conversion-engine
+  - python-310-pyo3-binding-wrappers
+  - dual-testing-strategy-core-bindings
+  - continuous-integration-coverage
+  - task-automation-workflow
+  - code-quality
+model_routing:
+  core_implementation: haiku
+  binding_implementation: haiku
+  testing: haiku
+  code_review: haiku
+  documentation: haiku

@@ -1,0 +1,40 @@
+name: "Web Framework (Full)"
+description: "HTTP framework with Rust core and bindings for Python, TypeScript, Ruby, and PHP. WASM support for browser-side computation. Suitable for frameworks like Spikard."
+domains:
+  - rust-core
+  - ffi-bindings
+  - language-bindings
+  - build-distribution
+  - quality-verification
+  - documentation
+  - devops-infrastructure
+  - organizational
+agents:
+  - polyglot-architect # Sonnet: framework architecture
+  - rust-core-engineer # Haiku: HTTP core
+  - python-bindings-engineer # Haiku: Django/FastAPI integration
+  - typescript-bindings-engineer # Haiku: Express/Fastify integration
+  - ruby-bindings-engineer # Haiku: Rails/Sinatra integration
+  - php-bindings-engineer # Haiku: Laravel/Symfony integration
+  - test-automation-engineer # Haiku: E2E test generation
+  - code-reviewer # Haiku: Multi-language review
+  - docs-writer # Haiku: Framework guides
+  - api-doc-writer # Haiku: API references
+  - tutorial-writer # Haiku: Framework tutorials
+priority_rules:
+  - rust-2024-edition-core-conversion-engine
+  - python-310-pyo3-binding-wrappers
+  - typescript-5x-napi-rs-bindings-cli
+  - ruby-32-magnus-native-bindings-with-rbs
+  - php-82-ext-php-rs-extension-composer-package
+  - polyglot-build-system-distribution
+  - dual-testing-strategy-core-bindings
+  - continuous-integration-coverage
+  - code-quality
+model_routing:
+  architecture_decisions: sonnet
+  core_implementation: haiku
+  binding_implementation: haiku
+  testing: haiku
+  code_review: haiku
+  documentation: haiku

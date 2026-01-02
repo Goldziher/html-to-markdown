@@ -1,0 +1,223 @@
+# AI-Rulez V3 Configuration
+# Comprehensive module configuration with AI tool presets, model routing, and quality gates
+# Documentation: https://github.com/Goldziher/ai-rulez
+
+# Schema reference for IDE validation
+$schema: https://raw.githubusercontent.com/Goldziher/ai-rulez/main/schema/ai-rules-v3.schema.json
+# Version (required)
+version: "3.0"
+# ============================================================================
+# MODULE METADATA
+# ============================================================================
+# Core module identification and framework compatibility information.
+# This metadata enables proper git-based consumption and integration with
+# dependent projects and frameworks.
+
+# Project name (required)
+name: "ai-rulez"
+# Module type: indicates how this module is distributed and consumed
+# "shared" means this is a reusable module for other projects
+type: "shared"
+# Organizational scope: defines the functional domain this module operates within
+# "polyglot-rust" indicates this is a Rust-focused polyglot tooling module
+scope: "polyglot-rust"
+# Module version: semantic versioning for tracking breaking changes
+module_version: "1.0.0"
+# Description of module functionality
+description: "Comprehensive AI-powered development governance and polyglot module configuration for Rust-based projects with multi-language bindings"
+# Compatible frameworks: frameworks that can consume this module
+# These frameworks provide the runtime context and integration hooks
+compatible_frameworks:
+  - "polyglot-core"
+  - "http-framework"
+  - "conversion-library"
+# Required and optional language support
+# Specifies which languages must be supported (required) and which are nice-to-have (optional)
+languages:
+  required:
+    - "rust"
+  optional:
+    - "python"
+    - "typescript"
+    - "ruby"
+    - "php"
+    - "java"
+    - "go"
+    - "csharp"
+    - "elixir"
+    - "wasm"
+# ============================================================================
+# AI TOOL PRESETS
+# ============================================================================
+# Configures which AI tools and models are available for this module.
+# Each preset can be used independently or combined in profiles.
+presets:
+  # Claude: Primary AI tool with specialized model routing
+  # Uses Sonnet for architecture decisions and Haiku for implementation
+  claude:
+    models:
+      - name: "claude-opus-4-5"
+        role: "primary-architect"
+        description: "Claude Opus 4.5 for complex architecture and design decisions"
+      - name: "claude-sonnet-4-5"
+        role: "architect"
+        description: "Claude Sonnet 4.5 for architecture and system design"
+      - name: "claude-haiku-4-5"
+        role: "implementation"
+        description: "Claude Haiku 4.5 for fast implementation and code generation"
+  # Gemini: Alternative AI tool for diversity
+  gemini:
+    models:
+      - name: "gemini-2.0-flash"
+        role: "implementation"
+        description: "Gemini 2.0 Flash for supplementary implementation tasks"
+  # Codex: Legacy code completion and generation
+  codex:
+    models:
+      - name: "code-davinci-003"
+        role: "implementation"
+        description: "OpenAI Codex for code completion and generation"
+# ============================================================================
+# DEFAULT PROFILE
+# ============================================================================
+# The default profile to use when generating or running AI-assisted tasks.
+# Profiles can combine multiple presets and apply custom configurations.
+default_profile: "full-polyglot"
+# ============================================================================
+# MODEL ROUTING STRATEGY
+# ============================================================================
+# Defines which AI models are used for specific tasks and roles.
+# This ensures optimal model-to-task matching for quality, speed, and cost.
+model_routing:
+  # Architecture tasks: complex decisions requiring deep reasoning
+  # Uses Claude Sonnet for sophisticated polyglot architecture decisions
+  architecture:
+    model: "claude-sonnet-4-5"
+    roles:
+      - "polyglot-architect"
+      - "release-coordinator"
+    rationale: "Requires complex polyglot system design and architectural decisions"
+  # Implementation tasks: code generation and binding development
+  # Uses Claude Haiku for fast, accurate implementation
+  implementation:
+    model: "claude-haiku-4-5"
+    roles:
+      - "binding-engineer-rust"
+      - "binding-engineer-python"
+      - "binding-engineer-typescript"
+      - "binding-engineer-ruby"
+      - "binding-engineer-php"
+      - "binding-engineer-java"
+      - "binding-engineer-go"
+      - "binding-engineer-csharp"
+    rationale: "Fast, accurate code generation for bindings and implementations"
+  # Code review and quality assurance tasks
+  # Uses Claude Haiku for efficient review
+  review:
+    model: "claude-haiku-4-5"
+    roles:
+      - "code-reviewer"
+      - "quality-assurance"
+    rationale: "Efficient review and QA validation"
+  # Documentation and comment generation
+  # Uses Claude Haiku for clear, concise documentation
+  documentation:
+    model: "claude-haiku-4-5"
+    roles:
+      - "documentation-engineer"
+      - "example-generator"
+    rationale: "Clear and comprehensive documentation generation"
+# ============================================================================
+# QUALITY GATES
+# ============================================================================
+# Defines minimum quality standards and testing requirements for this module.
+# These gates ensure consistent quality across all languages and binding implementations.
+quality_gates:
+  # Code coverage thresholds
+  # Rust coverage must meet 95% to ensure robust core functionality
+  rust_coverage_minimum: 95
+  # Binding coverage must meet 80% to ensure proper language interoperability
+  # (Slightly lower than Rust due to language-specific testing constraints)
+  binding_coverage_minimum: 80
+  # Required test types for complete quality validation
+  test_types:
+    - "unit" # Individual function and module tests
+    - "integration" # Cross-module and cross-language integration tests
+    - "doc" # Documentation examples that serve as tests
+    - "e2e" # End-to-end tests for complete workflows
+  # Language parity requirement: all supported languages must have feature parity
+  # Ensures consistent API and behavior across all language bindings
+  language_parity: true
+  # Documentation requirement: all public APIs must be documented
+  documentation_required: true
+# ============================================================================
+# EXTENSION POINTS
+# ============================================================================
+# Allows consuming projects to extend this module with custom agents, rules, and skills.
+# These extension points enable tailored AI behavior without modifying core config.
+extension_points:
+  # Custom agents: project-specific AI agent definitions
+  # Example: custom-agents.yaml in consuming project's .ai-rulez/ directory
+  custom_agents: true
+  # Custom rules: additional AI-assisted development rules
+  # Example: custom-rules.yaml in consuming project's .ai-rulez/ directory
+  custom_rules: true
+  # Custom skills: specialized AI tasks and capabilities
+  # Example: custom-skills/ directory in consuming project's .ai-rulez/
+  custom_skills: true
+  # Project-specific profiles: tailored model routing and presets
+  # Example: project-profiles.yaml in consuming project's .ai-rulez/
+  project_profiles: true
+# ============================================================================
+# VERSIONING CONFIGURATION
+# ============================================================================
+# Manages version synchronization across the polyglot module structure.
+# Ensures all language-specific manifests stay in sync with the source of truth.
+versioning:
+  # Source of truth: the primary file that defines the canonical version
+  # Cargo.toml contains the authoritative version for this Rust-first module
+  source_of_truth: "Cargo.toml"
+  # Sync targets: all package manifests that must be synchronized
+  # Version changes in Cargo.toml must propagate to these files
+  sync_targets:
+    - "Cargo.toml" # Rust package manifest
+    - "pyproject.toml" # Python package metadata
+    - "package.json" # Node.js (TypeScript) package metadata
+    - "pubspec.yaml" # Dart/Flutter (if applicable)
+    - "Gemfile" # Ruby package metadata
+    - "composer.json" # PHP package metadata
+    - "pom.xml" # Java/Maven package metadata
+    - "go.mod" # Go module metadata
+    - ".csproj" # C# project files
+    - "mix.exs" # Elixir package metadata
+  # Versioning strategy: how versions are managed across the structure
+  # "monorepo" indicates a single version for all components in this repository
+  strategy: "monorepo"
+# ============================================================================
+# GIT INTEGRATION
+# ============================================================================
+# Configures git-based behaviors for this module.
+
+# Enable .gitignore management: auto-generate .gitignore from AI-Rulez rules
+gitignore: true
+# ============================================================================
+# NAMED PROFILES
+# ============================================================================
+# Domain combinations that can be selected for different development contexts.
+# Profiles allow switching between different tool and model configurations.
+profiles:
+  # Full polyglot profile: complete tooling for all languages
+  full-polyglot:
+    presets: [claude, gemini]
+    model_routing: "full"
+    languages: [rust, python, typescript, ruby, php, java, go, csharp, elixir, wasm]
+  # Rust-first profile: optimized for primary Rust development
+  rust-first:
+    presets: [claude]
+    model_routing: "architecture-sonnet"
+    languages: [rust]
+  # Lightweight profile: minimal models for rapid iteration
+  lightweight:
+    presets: [claude]
+    model_routing: "haiku-only"
+    languages: [rust, python, typescript]

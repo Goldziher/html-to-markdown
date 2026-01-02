@@ -1,0 +1,12 @@
+# Build & Distribution Domain - Skill References
+# Skills for multi-language build orchestration
+
+skills:
+  - task-automation-build
+  - modular-taskfile-structure
+  - taskfile-best-practices-guidelines
+  - build-profiles
+  - workspace-structure-project-organization
+  - project-structure
+  - release-and-deployment-processes
+  - workspace-dependency-management

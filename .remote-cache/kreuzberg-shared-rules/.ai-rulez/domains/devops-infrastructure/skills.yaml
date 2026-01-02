@@ -1,0 +1,9 @@
+# DevOps & Infrastructure Domain - Skill References
+# Skills for CI/CD pipelines and deployment
+
+skills:
+  - cicd-pipeline-standards
+  - ci-cd-multi-platform-matrix
+  - containerization-docker-standards
+  - monitoring-observability-standards
+  - release-and-deployment-processes

@@ -1,0 +1,29 @@
+default_install_hook_types:
+  - pre-commit
+  - commit-msg
+exclude: ^docs/snippets/|vendor/|node_modules/|target/|v3/|invalid*
+repos:
+  - repo: https://github.com/Goldziher/gitfluff
+    rev: v0.7.0
+    hooks:
+      - id: gitfluff-lint
+        args: ["--write"]
+        stages: [commit-msg]
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-merge-conflict
+      - id: check-added-large-files
+      - id: check-yaml
+        args: ["--allow-multiple-documents"]
+      - id: check-case-conflict
+  - repo: https://github.com/hukkin/mdformat
+    rev: 1.0.0
+    hooks:
+      - id: mdformat
+  - repo: https://github.com/google/yamlfmt
+    rev: v0.14.0
+    hooks:
+      - id: yamlfmt

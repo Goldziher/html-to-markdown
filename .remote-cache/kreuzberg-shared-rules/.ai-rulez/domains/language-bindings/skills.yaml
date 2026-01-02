@@ -1,0 +1,17 @@
+# Language Bindings Domain - Skill References
+# Skills for language-specific binding patterns and standards
+
+skills:
+  - python-kreuzberg-bindings
+  - typescript-kreuzberg-bindings
+  - ruby-kreuzberg-bindings
+  - java-kreuzberg-bindings
+  - go-kreuzberg-bindings
+  - python-modern-performance-standards
+  - ruby-32-with-rbs-steep
+  - typescript-strictest-standards
+  - java-25-with-ffm-api
+  - go-125-standards
+  - elixir-kreuzberg-bindings-rustler-nif
+  - polyglot-bindings
+  - elixir-114-with-exdoc-credo

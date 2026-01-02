@@ -1,0 +1,14 @@
+# Rust Core Domain - Skill References
+# Skills for Rust core development patterns and standards
+
+skills:
+  - rust-latest-edition-standards
+  - rust-kreuzberg-specific-conventions
+  - rust-core-arch
+  - pyo3-performance-patterns
+  - error-handling-strategy
+  - binding-crate-architecture-patterns
+  - memory-safety-optimization-patterns
+  - performance-and-benchmarking-standards
+  - rust-async-await-module-patterns
+  - rust-module-organization-public-api-design
