@@ -1,0 +1,45 @@
+# Build artifacts and dependencies
+node_modules/
+.cargo/
+target/
+pkg/
+
+# Development files
+*.spec.ts
+vitest.config.ts
+tsconfig.json
+
+# Git files
+.git/
+.gitignore
+.github/
+
+# IDE and OS files
+.vscode/
+.idea/
+.DS_Store
+*.swp
+*.swo
+
+# npm scripts (only needed for local dev)
+scripts/
+
+# src and tests (WASM source, not needed in published package)
+src/
+
+# Node package manager lock files (not needed, consumers have their own)
+pnpm-lock.yaml
+package-lock.json
+yarn.lock
+
+# Cargo lock (not for packages)
+Cargo.lock
+
+# Documentation sources
+# (README.md is kept by the "files" field in package.json)
+
+# Allow these through (they're in the "files" field)
+!dist/
+!dist-node/
+!dist-web/
+!README.md
