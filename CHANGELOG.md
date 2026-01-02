@@ -5,6 +5,15 @@ All notable changes to html-to-markdown will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.19.5] - 2025-01-02
+
+### Bug Fixes
+
+- **Homebrew bottle naming**: Fixed bottle filename format to match Homebrew convention
+  - Changed from double-dash (`html-to-markdown--2.19.x`) to single-dash (`html-to-markdown-2.19.x`)
+  - Homebrew constructs bottle URLs based on formula name and version, expecting single dash separator
+  - Fixes bottle download failures when installing via `brew install`
+
 ## [2.19.4] - 2025-01-02
 
 ### Bug Fixes
