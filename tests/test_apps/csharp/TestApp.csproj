@@ -6,7 +6,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="KreuzbergDev.HtmlToMarkdown" Version="2.19.2" />
+    <PackageReference Include="KreuzbergDev.HtmlToMarkdown" Version="2.19.3" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.8.0" />
     <PackageReference Include="xUnit" Version="2.6.0" />
     <PackageReference Include="xunit.runner.visualstudio" Version="2.5.4" />

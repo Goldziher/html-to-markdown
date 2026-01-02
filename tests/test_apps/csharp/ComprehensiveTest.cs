@@ -16,8 +16,11 @@ public class ComprehensiveTest
 {
     private static List<TestCase> LoadFixtures(string filename)
     {
-        var path = Path.Combine("..", "fixtures", filename);
-        var json = File.ReadAllText(path);
+        // Get the directory of the test_apps folder (parent of csharp folder)
+        var testAppsDir = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..", "..", "..");
+        var fixturesPath = Path.Combine(testAppsDir, "fixtures", filename);
+        var fullPath = Path.GetFullPath(fixturesPath);
+        var json = File.ReadAllText(fullPath);
         return JsonConvert.DeserializeObject<List<TestCase>>(json)!;
     }
 

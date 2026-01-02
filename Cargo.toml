@@ -12,7 +12,10 @@ members = [
     "tools/benchmark-harness",
     "e2e/wasm-wasmtime",
 ]
-exclude = ["packages/elixir/native/html_to_markdown_elixir"]
+exclude = [
+    "packages/elixir/native/html_to_markdown_elixir",
+    "tests/test_apps/elixir/deps"
+]
 
 [workspace.package]
 version = "2.19.3"

@@ -9,7 +9,7 @@
     "test:comprehensive": "vitest run comprehensive.spec.ts"
   },
   "dependencies": {
-    "html-to-markdown-wasm": "2.19.2"
+    "html-to-markdown-wasm": "2.19.3"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",
