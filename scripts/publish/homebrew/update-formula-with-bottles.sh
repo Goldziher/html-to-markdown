@@ -63,11 +63,17 @@ done
 
 bottle_block+=$'\n'"  end"
 
+echo "Downloading source tarball to compute SHA256..."
+source_url="https://github.com/kreuzberg-dev/html-to-markdown/archive/$tag.tar.gz"
+source_sha256=$(curl -sL "$source_url" | shasum -a 256 | cut -d' ' -f1)
+echo "  Source SHA256: $source_sha256"
+
 new_formula=$(echo "$formula_content" | sed \
 	-e "s|url \"https://github.com/kreuzberg-dev/html-to-markdown/archive/.*\.tar\.gz\"|url \"https://github.com/kreuzberg-dev/html-to-markdown/archive/$tag.tar.gz\"|" \
+	-e "s|sha256 \"[a-f0-9]\{64\}\"|sha256 \"$source_sha256\"|" \
 	-e "s|version \"[^\"]*\"|version \"$version\"|")
 
-new_formula=$(echo "$new_formula" | sed '/# bottle do/,/# end/d')
+new_formula=$(echo "$new_formula" | sed '/^  bottle do/,/^  end/d')
 
 # Insert bottle block before depends_on line using awk (more reliable than sed for multiline)
 new_formula=$(echo "$new_formula" | awk -v bottle="$bottle_block" '
