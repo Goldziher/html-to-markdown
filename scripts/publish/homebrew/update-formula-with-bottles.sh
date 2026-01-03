@@ -51,8 +51,7 @@ if [ ! -f "$formula_path" ]; then
 	exit 1
 fi
 
-formula_content=$(<"$formula_path")
-
+# Build bottle block
 bottle_block="  bottle do"
 bottle_block+=$'\n'"    root_url \"https://github.com/kreuzberg-dev/html-to-markdown/releases/download/$tag\""
 
@@ -68,20 +67,26 @@ source_url="https://github.com/kreuzberg-dev/html-to-markdown/archive/$tag.tar.g
 source_sha256=$(curl -sL "$source_url" | shasum -a 256 | cut -d' ' -f1)
 echo "  Source SHA256: $source_sha256"
 
-new_formula=$(echo "$formula_content" | sed \
+# Create a temporary file for safer editing
+temp_formula=$(mktemp)
+trap 'rm -f "$temp_formula"' EXIT
+
+# Update URL, SHA256, and version using sed
+sed \
 	-e "s|url \"https://github.com/kreuzberg-dev/html-to-markdown/archive/.*\.tar\.gz\"|url \"https://github.com/kreuzberg-dev/html-to-markdown/archive/$tag.tar.gz\"|" \
 	-e "s|sha256 \"[a-f0-9]\{64\}\"|sha256 \"$source_sha256\"|" \
-	-e "s|version \"[^\"]*\"|version \"$version\"|")
+	"$formula_path" >"$temp_formula"
 
-new_formula=$(echo "$new_formula" | sed '/^  bottle do/,/^  end/d')
+# Remove ALL existing bottle blocks (handles multiple blocks)
+# Use temp file approach for portability (works on both Linux and macOS)
+sed '/^  bottle do/,/^  end/d' "$temp_formula" >"${temp_formula}.cleaned"
+mv "${temp_formula}.cleaned" "$temp_formula"
 
-# Insert bottle block before depends_on line using awk (more reliable than sed for multiline)
-new_formula=$(echo "$new_formula" | awk -v bottle="$bottle_block" '
+# Insert new bottle block before depends_on line using awk
+awk -v bottle="$bottle_block" '
   /^  depends_on/ { print bottle; print ""; }
   { print }
-')
-
-echo "$new_formula" >"$formula_path"
+' "$temp_formula" >"$formula_path"
 
 echo ""
 echo "=== Updated formula ==="

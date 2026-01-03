@@ -1696,7 +1696,7 @@ jobs:
         uses: actions/upload-artifact@v6
         with:
           name: homebrew-bottle-${{ matrix.bottle_tag }}
-          path: html-to-markdown--${{ steps.version.outputs.version }}.${{ matrix.bottle_tag }}.bottle.tar.gz
+          path: html-to-markdown-${{ steps.version.outputs.version }}.${{ matrix.bottle_tag }}.bottle.tar.gz
           retention-days: 14
 
   upload-homebrew-bottles:

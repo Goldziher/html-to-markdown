@@ -11,7 +11,7 @@ fi
 
 echo "Extracting bottle hashes from: $artifacts_dir"
 
-for bottle in "$artifacts_dir"/html-to-markdown--*.bottle.tar.gz; do
+for bottle in "$artifacts_dir"/html-to-markdown-*.bottle.tar.gz; do
 	if [ -f "$bottle" ]; then
 		filename="$(basename "$bottle")"
 
