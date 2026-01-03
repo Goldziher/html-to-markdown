@@ -1692,12 +1692,21 @@ jobs:
           echo "Bottle created: ${bottle_filename}"
           echo "SHA256: ${sha256}"
 
+      - name: Verify bottle file in workspace
+        run: |
+          cd "${{ github.workspace }}"
+          ls -lh html-to-markdown-*.bottle.tar.gz
+          echo "Files in workspace:"
+          ls -la
+        shell: bash
+
       - name: Upload bottle artifact
         uses: actions/upload-artifact@v6
         with:
           name: homebrew-bottle-${{ matrix.bottle_tag }}
           path: html-to-markdown-${{ steps.version.outputs.version }}.${{ matrix.bottle_tag }}.bottle.tar.gz
           retention-days: 14
+          if-no-files-found: error
 
   upload-homebrew-bottles:
     name: Upload Homebrew bottles to GitHub Release
@@ -1728,6 +1737,14 @@ jobs:
           pattern: homebrew-bottle-*
           path: dist/homebrew
           merge-multiple: true
+
+      - name: Verify downloaded artifacts
+        run: |
+          echo "Contents of dist/homebrew:"
+          ls -laR dist/homebrew || echo "dist/homebrew not found"
+          echo "All dist contents:"
+          ls -laR dist || echo "dist not found"
+        shell: bash
 
       - name: Upload bottles (idempotent)
         env:
