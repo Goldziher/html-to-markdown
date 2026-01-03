@@ -5,6 +5,16 @@ All notable changes to html-to-markdown will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.19.6] - 2026-01-03
+
+### Bug Fixes
+
+- **WASM npm package publishing**: Fixed Issue #172 - WASM package was published with only 3 files (LICENSE, package.json, README.md) instead of 25 files
+  - Root cause: publish workflow downloaded WASM artifact tarballs but never extracted them before running `npm publish`
+  - Added extraction step in `.github/workflows/publish.yaml` to unpack dist/, dist-node/, and dist-web/ directories
+  - Added safeguard to remove .gitignore files from dist directories that could exclude content
+  - Complete package now includes all WASM binaries and JavaScript wrappers (7.8 MB unpacked)
+
 ## [2.19.5] - 2025-01-02
 
 ### Bug Fixes

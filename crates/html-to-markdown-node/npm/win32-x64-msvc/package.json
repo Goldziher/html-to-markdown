@@ -1,6 +1,6 @@
 {
 	"name": "@kreuzberg/html-to-markdown-node-win32-x64-msvc",
-	"version": "2.19.5",
+	"version": "2.19.6",
 	"cpu": [
 		"x64"
 	],
