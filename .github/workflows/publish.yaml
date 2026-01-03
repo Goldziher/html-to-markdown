@@ -1564,6 +1564,17 @@ jobs:
           name: wasm-bundles
           path: wasm-artifacts
 
+      - name: Extract WASM artifacts
+        run: scripts/publish/wasm/extract-artifacts.sh
+        shell: bash
+
+      - name: Remove .gitignore files from dist directories
+        run: |
+          rm -f crates/html-to-markdown-wasm/dist/.gitignore
+          rm -f crates/html-to-markdown-wasm/dist-node/.gitignore
+          rm -f crates/html-to-markdown-wasm/dist-web/.gitignore
+        shell: bash
+
       - name: Setup Node
         uses: actions/setup-node@v6
         with:
