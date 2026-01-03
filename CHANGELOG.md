@@ -5,6 +5,16 @@ All notable changes to html-to-markdown will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.19.7] - 2026-01-03
+
+### Improvements
+
+- **Homebrew bottle CI debugging**: Added verification steps to diagnose artifact upload/download issues
+  - Added verification after bottle creation to confirm file exists in workspace
+  - Added `if-no-files-found: error` to fail fast if bottle file not found during upload
+  - Added verification after artifact download to show what was actually retrieved
+  - These steps will help identify why Homebrew bottle artifacts aren't being found in release workflow
+
 ## [2.19.6] - 2026-01-03
 
 ### Bug Fixes

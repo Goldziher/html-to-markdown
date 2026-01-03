@@ -1,6 +1,6 @@
 {
   "name": "@html-to-markdown/wasm-node-example",
-  "version": "2.19.6",
+  "version": "2.19.7",
   "private": true,
   "type": "module",
   "scripts": {
