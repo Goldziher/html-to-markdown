@@ -9,6 +9,7 @@ homepage.workspace = true
 documentation.workspace = true
 readme.workspace = true
 rust-version.workspace = true
+lints.workspace = true
 description = "PHP extension bindings for html-to-markdown powered by ext-php-rs"
 keywords = ["html", "markdown", "php", "bindings"]
 categories = ["api-bindings"]

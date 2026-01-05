@@ -6,6 +6,7 @@ rust-version.workspace = true
 authors.workspace = true
 license.workspace = true
 repository.workspace = true
+lints.workspace = true
 
 [[bin]]
 name = "benchmark-harness"

@@ -9,6 +9,7 @@ homepage.workspace = true
 documentation.workspace = true
 readme = "README.md"
 rust-version.workspace = true
+lints.workspace = true
 description = "High-performance HTML to Markdown converter using the astral-tl parser. Part of the Kreuzberg ecosystem."
 keywords = ["html", "markdown", "converter", "astral-tl", "doc-processing"]
 categories = ["parsing", "text-processing", "web-programming"]

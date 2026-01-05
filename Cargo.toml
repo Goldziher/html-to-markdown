@@ -53,6 +53,17 @@ ext-php-rs = "0.15.2"
 
 async-trait = "0.1"
 
+[workspace.lints.rust]
+unsafe_code = "forbid"
+missing_docs = "warn"
+unused_must_use = "deny"
+
+[workspace.lints.clippy]
+all = { level = "deny", priority = -1 }
+cargo = { level = "deny", priority = -1 }
+pedantic = { level = "deny", priority = -1 }
+nursery = { level = "warn", priority = -1 }
+
 [profile.release]
 lto = "thin"
 codegen-units = 1

@@ -108,12 +108,10 @@ impl PhpVisitorBridge {
         match self.visitor.try_call_method(method_name, borrowed_args) {
             Ok(php_result) => {
                 if let Some(array) = php_result.array() {
-                    match Self::result_from_array(&array) {
+                    match Self::result_from_array(array) {
                         Ok(result) => Ok(result),
                         Err(_) => Ok(VisitResult::Continue),
                     }
-                } else if php_result.is_null() {
-                    Ok(VisitResult::Continue)
                 } else {
                     Ok(VisitResult::Continue)
                 }

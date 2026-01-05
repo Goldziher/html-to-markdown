@@ -1,7 +1,8 @@
 [package]
 name = "html-to-markdown-wasm-wasmtime-tests"
-version = "2.20.0"
-edition = "2024"
+version.workspace = true
+edition.workspace = true
+lints.workspace = true
 publish = false
 
 [dev-dependencies]
