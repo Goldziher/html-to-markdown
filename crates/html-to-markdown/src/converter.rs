@@ -5760,10 +5760,13 @@ fn walk_node(
                         if ctx.blockquote_depth > 0 {
                             output.push_str("\n\n\n");
                         } else if !output.is_empty() {
-                            if !output.ends_with('\n') {
-                                output.push('\n');
-                            } else if output.ends_with("\n\n") {
+                            if output.ends_with("\n\n") {
+                                // Paragraph already added \n\n; blockquote needs just \n
                                 output.truncate(output.len() - 1);
+                            } else if !output.ends_with('\n') {
+                                output.push_str("\n\n");
+                            } else if !output.ends_with("\n\n") {
+                                output.push('\n');
                             }
                         }
 
@@ -5782,8 +5785,13 @@ fn walk_node(
                             output.push_str(">\n\n");
                         }
 
-                        while output.ends_with('\n') {
-                            output.truncate(output.len() - 1);
+                        // Add trailing newlines only when appropriate for proper spacing
+                        // (matching paragraph conditional logic for CommonMark compliance)
+                        if !ctx.convert_as_inline && !ctx.in_table_cell && !ctx.in_list_item {
+                            while output.ends_with('\n') {
+                                output.truncate(output.len() - 1);
+                            }
+                            output.push_str("\n\n");
                         }
                     }
                 }
@@ -5816,7 +5824,10 @@ fn walk_node(
                         let needs_blank_line =
                             !ctx.in_paragraph && !matches!(prev_tag, Some("blockquote")) && !last_line_is_blockquote;
 
-                        if ctx.in_paragraph || !needs_blank_line {
+                        // If previous element was a blockquote, it added \n\n; reduce to \n
+                        if matches!(prev_tag, Some("blockquote")) && output.ends_with("\n\n") {
+                            output.truncate(output.len() - 1);
+                        } else if ctx.in_paragraph || !needs_blank_line {
                             if !output.ends_with('\n') {
                                 output.push('\n');
                             }

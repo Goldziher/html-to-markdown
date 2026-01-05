@@ -33,7 +33,7 @@ fn test_full_hocr_document_structure() {
 </html>"#;
 
     let dom = tl::parse(hocr, tl::ParserOptions::default()).unwrap();
-    let (elements, metadata) = extract_hocr_document(&dom, false);
+    let (elements, metadata) = extract_hocr_document(&dom);
 
     assert_eq!(metadata.ocr_system, Some("tesseract 5.0".to_string()));
     assert_eq!(metadata.ocr_number_of_pages, Some(1));
@@ -56,7 +56,7 @@ fn test_advanced_properties() {
 </div>"#;
 
     let dom = tl::parse(hocr, tl::ParserOptions::default()).unwrap();
-    let (elements, _) = extract_hocr_document(&dom, false);
+    let (elements, _) = extract_hocr_document(&dom);
 
     fn find_line(elements: &[HocrElement]) -> Option<&HocrElement> {
         for elem in elements {
@@ -95,7 +95,7 @@ fn test_all_logical_elements() {
 </div>"#;
 
     let dom = tl::parse(hocr, tl::ParserOptions::default()).unwrap();
-    let (elements, _) = extract_hocr_document(&dom, false);
+    let (elements, _) = extract_hocr_document(&dom);
 
     let markdown = convert_to_markdown(&elements, true);
 
@@ -118,7 +118,7 @@ fn test_float_elements() {
 </div>"#;
 
     let dom = tl::parse(hocr, tl::ParserOptions::default()).unwrap();
-    let (elements, _) = extract_hocr_document(&dom, false);
+    let (elements, _) = extract_hocr_document(&dom);
 
     let markdown = convert_to_markdown(&elements, true);
 
@@ -133,7 +133,7 @@ fn test_character_level_properties() {
 </span>"#;
 
     let dom = tl::parse(hocr, tl::ParserOptions::default()).unwrap();
-    let (elements, _) = extract_hocr_document(&dom, false);
+    let (elements, _) = extract_hocr_document(&dom);
 
     fn find_cinfo(elements: &[HocrElement]) -> Option<&HocrElement> {
         for elem in elements {
@@ -164,7 +164,7 @@ fn test_page_properties() {
 </div>"#;
 
     let dom = tl::parse(hocr, tl::ParserOptions::default()).unwrap();
-    let (elements, _) = extract_hocr_document(&dom, false);
+    let (elements, _) = extract_hocr_document(&dom);
 
     fn find_page(elements: &[HocrElement]) -> Option<&HocrElement> {
         for elem in elements {
@@ -194,7 +194,7 @@ fn test_content_flow_and_order() {
 </div>"#;
 
     let dom = tl::parse(hocr, tl::ParserOptions::default()).unwrap();
-    let (elements, _) = extract_hocr_document(&dom, false);
+    let (elements, _) = extract_hocr_document(&dom);
 
     fn find_linear(elements: &[HocrElement]) -> Option<&HocrElement> {
         for elem in elements {
@@ -225,7 +225,7 @@ fn test_abstract_and_author() {
 </div>"#;
 
     let dom = tl::parse(hocr, tl::ParserOptions::default()).unwrap();
-    let (elements, _) = extract_hocr_document(&dom, false);
+    let (elements, _) = extract_hocr_document(&dom);
     let markdown = convert_to_markdown(&elements, true);
 
     assert!(markdown.contains("**Abstract**"));
@@ -242,7 +242,7 @@ fn test_separator() {
 </div>"#;
 
     let dom = tl::parse(hocr, tl::ParserOptions::default()).unwrap();
-    let (elements, _) = extract_hocr_document(&dom, false);
+    let (elements, _) = extract_hocr_document(&dom);
     let markdown = convert_to_markdown(&elements, true);
 
     assert!(markdown.contains("Text before"));
@@ -259,7 +259,7 @@ fn test_image_elements() {
 </div>"#;
 
     let dom = tl::parse(hocr, tl::ParserOptions::default()).unwrap();
-    let (elements, _) = extract_hocr_document(&dom, false);
+    let (elements, _) = extract_hocr_document(&dom);
     let markdown = convert_to_markdown(&elements, true);
 
     assert!(markdown.contains("![Alt text](/path/to/image.png)"));
@@ -275,7 +275,7 @@ fn test_math_and_chem() {
 </div>"#;
 
     let dom = tl::parse(hocr, tl::ParserOptions::default()).unwrap();
-    let (elements, _) = extract_hocr_document(&dom, false);
+    let (elements, _) = extract_hocr_document(&dom);
     let markdown = convert_to_markdown(&elements, true);
 
     assert!(markdown.contains("`E=mc^2`"));
@@ -299,7 +299,7 @@ fn test_dropcap_and_glyphs() {
 </div>"#;
 
     let dom = tl::parse(hocr, tl::ParserOptions::default()).unwrap();
-    let (elements, _) = extract_hocr_document(&dom, false);
+    let (elements, _) = extract_hocr_document(&dom);
     let markdown = convert_to_markdown(&elements, true);
 
     assert!(markdown.contains("**T**"));
@@ -318,7 +318,7 @@ fn test_float_elements_comprehensive() {
 </div>"#;
 
     let dom = tl::parse(hocr, tl::ParserOptions::default()).unwrap();
-    let (elements, _) = extract_hocr_document(&dom, false);
+    let (elements, _) = extract_hocr_document(&dom);
     let markdown = convert_to_markdown(&elements, true);
 
     assert!(markdown.contains("Float content"));
@@ -341,7 +341,7 @@ fn test_container_elements() {
 </div>"#;
 
     let dom = tl::parse(hocr, tl::ParserOptions::default()).unwrap();
-    let (elements, _) = extract_hocr_document(&dom, false);
+    let (elements, _) = extract_hocr_document(&dom);
     let markdown = convert_to_markdown(&elements, true);
 
     assert!(markdown.contains("Column text"));
