@@ -39,31 +39,9 @@ impl HocrWord {
 /// Parse bbox attribute from hOCR title attribute
 ///
 /// Example: "bbox 100 50 180 80; x_wconf 95" -> (100, 50, 80, 30)
-fn parse_bbox(title: &str, debug: bool) -> Option<(u32, u32, u32, u32)> {
-    let known_attributes = [
-        "bbox",
-        "x_wconf",
-        "baseline",
-        "x_size",
-        "x_descenders",
-        "x_ascenders",
-        "textangle",
-        "poly",
-        "order",
-        "x_font",
-        "x_fsize",
-        "x_confs",
-    ];
-
+fn parse_bbox(title: &str) -> Option<(u32, u32, u32, u32)> {
     for part in title.split(';') {
         let part = part.trim();
-
-        if debug && !part.is_empty() {
-            let attr_name = part.split_whitespace().next().unwrap_or("");
-            if !known_attributes.iter().any(|&k| part.starts_with(k)) {
-                eprintln!("[hOCR] Info: Found unknown title attribute: '{}'", attr_name);
-            }
-        }
 
         if let Some(bbox_str) = part.strip_prefix("bbox ") {
             let coords: Vec<&str> = bbox_str.split_whitespace().collect();
@@ -125,12 +103,7 @@ fn get_text_content(node_handle: &tl::NodeHandle, parser: &tl::Parser) -> String
 ///
 /// Walks the DOM and extracts all elements with `ocrx_word` class,
 /// parsing their bbox and confidence information.
-pub fn extract_hocr_words(
-    node_handle: &tl::NodeHandle,
-    parser: &tl::Parser,
-    min_confidence: f64,
-    debug: bool,
-) -> Vec<HocrWord> {
+pub fn extract_hocr_words(node_handle: &tl::NodeHandle, parser: &tl::Parser, min_confidence: f64) -> Vec<HocrWord> {
     let mut words = Vec::new();
 
     if let Some(tl::Node::Tag(tag)) = node_handle.get(parser) {
@@ -139,33 +112,7 @@ pub fn extract_hocr_words(
 
         let class_attr = attrs.get("class").flatten().map(|v| v.as_utf8_str().to_string());
 
-        if let Some(ref classes) = class_attr {
-            let known_classes = [
-                "ocr_page",
-                "ocr_carea",
-                "ocr_par",
-                "ocr_line",
-                "ocrx_word",
-                "ocr_header",
-                "ocr_footer",
-                "ocr_table",
-                "ocr_caption",
-                "ocr_textfloat",
-                "ocr_separator",
-                "ocr_noise",
-            ];
-
-            let class_list: Vec<&str> = classes.split_whitespace().collect();
-            let has_ocr_class = class_list.iter().any(|c| c.starts_with("ocr"));
-
-            if has_ocr_class && debug {
-                for class in &class_list {
-                    if class.starts_with("ocr") && !known_classes.contains(class) {
-                        eprintln!("[hOCR] Info: Found unhandled hOCR class '{}' on <{}>", class, tag_name);
-                    }
-                }
-            }
-        }
+        // hOCR class validation removed for performance
 
         if tag_name == "span" {
             let is_word = class_attr.as_ref().is_some_and(|c| c.contains("ocrx_word"));
@@ -173,7 +120,7 @@ pub fn extract_hocr_words(
 
             if is_word {
                 let title_str = title.as_deref().unwrap_or("");
-                if let Some((left, top, width, height)) = parse_bbox(title_str, debug) {
+                if let Some((left, top, width, height)) = parse_bbox(title_str) {
                     let confidence = parse_confidence(title_str);
 
                     if confidence >= min_confidence {
@@ -188,35 +135,15 @@ pub fn extract_hocr_words(
                                 height,
                                 confidence,
                             });
-                        } else if debug {
-                            eprintln!(
-                                "[hOCR] Warning: ocrx_word element has no text content (bbox: {})",
-                                title_str
-                            );
                         }
-                    } else if debug {
-                        eprintln!(
-                            "[hOCR] Warning: Word confidence ({:.1}) below threshold ({:.1}): {}",
-                            confidence,
-                            min_confidence,
-                            get_text_content(node_handle, parser).trim()
-                        );
                     }
-                } else if debug {
-                    let text = get_text_content(node_handle, parser);
-                    let trimmed = text.trim();
-                    eprintln!(
-                        "[hOCR] Warning: Failed to parse bbox for ocrx_word element: {} (title: {})",
-                        if trimmed.is_empty() { "<empty>" } else { trimmed },
-                        title_str
-                    );
                 }
             }
         }
 
         let children = tag.children();
         for child_handle in children.top().iter() {
-            words.extend(extract_hocr_words(child_handle, parser, min_confidence, debug));
+            words.extend(extract_hocr_words(child_handle, parser, min_confidence));
         }
     }
 
@@ -320,16 +247,8 @@ pub fn detect_rows(words: &[HocrWord], row_threshold_ratio: f64) -> Vec<u32> {
 /// 1. Detecting column and row positions
 /// 2. Assigning words to cells based on position
 /// 3. Combining words within the same cell
-pub fn reconstruct_table(
-    words: &[HocrWord],
-    column_threshold: u32,
-    row_threshold_ratio: f64,
-    debug: bool,
-) -> Vec<Vec<String>> {
+pub fn reconstruct_table(words: &[HocrWord], column_threshold: u32, row_threshold_ratio: f64) -> Vec<Vec<String>> {
     if words.is_empty() {
-        if debug {
-            eprintln!("[hOCR] Warning: No words to reconstruct table from");
-        }
         return Vec::new();
     }
 
@@ -337,28 +256,12 @@ pub fn reconstruct_table(
     let row_positions = detect_rows(words, row_threshold_ratio);
 
     if col_positions.is_empty() || row_positions.is_empty() {
-        if debug {
-            eprintln!(
-                "[hOCR] Warning: Could not detect table structure (columns: {}, rows: {})",
-                col_positions.len(),
-                row_positions.len()
-            );
-        }
         return Vec::new();
-    }
-
-    if debug {
-        eprintln!(
-            "[hOCR] Detected table structure: {} rows × {} columns",
-            row_positions.len(),
-            col_positions.len()
-        );
     }
 
     let num_rows = row_positions.len();
     let num_cols = col_positions.len();
     let mut table: Vec<Vec<Vec<String>>> = vec![vec![vec![]; num_cols]; num_rows];
-    let mut unassigned_words = 0;
 
     for word in words {
         if let (Some(r), Some(c)) = (
@@ -367,32 +270,8 @@ pub fn reconstruct_table(
         ) {
             if r < num_rows && c < num_cols {
                 table[r][c].push(word.text.clone());
-            } else {
-                unassigned_words += 1;
-                if debug {
-                    eprintln!(
-                        "[hOCR] Warning: Word '{}' assigned to out-of-bounds cell ({}, {})",
-                        word.text, r, c
-                    );
-                }
-            }
-        } else {
-            unassigned_words += 1;
-            if debug {
-                eprintln!(
-                    "[hOCR] Warning: Could not assign word '{}' to any cell (position: {}, {})",
-                    word.text, word.left, word.top
-                );
             }
         }
-    }
-
-    if debug && unassigned_words > 0 {
-        eprintln!(
-            "[hOCR] Warning: {} out of {} words could not be assigned to table cells",
-            unassigned_words,
-            words.len()
-        );
     }
 
     let result: Vec<Vec<String>> = table
@@ -505,14 +384,11 @@ mod tests {
 
     #[test]
     fn test_parse_bbox() {
-        assert_eq!(parse_bbox("bbox 100 50 180 80", false), Some((100, 50, 80, 30)));
-        assert_eq!(parse_bbox("bbox 0 0 100 200", false), Some((0, 0, 100, 200)));
-        assert_eq!(
-            parse_bbox("bbox 100 50 180 80; x_wconf 95", false),
-            Some((100, 50, 80, 30))
-        );
-        assert_eq!(parse_bbox("invalid", false), None);
-        assert_eq!(parse_bbox("bbox 100 50", false), None);
+        assert_eq!(parse_bbox("bbox 100 50 180 80"), Some((100, 50, 80, 30)));
+        assert_eq!(parse_bbox("bbox 0 0 100 200"), Some((0, 0, 100, 200)));
+        assert_eq!(parse_bbox("bbox 100 50 180 80; x_wconf 95"), Some((100, 50, 80, 30)));
+        assert_eq!(parse_bbox("invalid"), None);
+        assert_eq!(parse_bbox("bbox 100 50"), None);
     }
 
     #[test]
@@ -609,7 +485,7 @@ mod tests {
 
         let mut words = Vec::new();
         for child_handle in dom.children().iter() {
-            words.extend(extract_hocr_words(child_handle, parser, 0.0, false));
+            words.extend(extract_hocr_words(child_handle, parser, 0.0));
         }
 
         assert_eq!(words.len(), 2);
@@ -637,7 +513,7 @@ mod tests {
 
         let mut words = Vec::new();
         for child_handle in dom.children().iter() {
-            words.extend(extract_hocr_words(child_handle, parser, 90.0, false));
+            words.extend(extract_hocr_words(child_handle, parser, 90.0));
         }
 
         assert_eq!(words.len(), 2);
@@ -682,7 +558,7 @@ mod tests {
             },
         ];
 
-        let table = reconstruct_table(&words, 50, 0.5, false);
+        let table = reconstruct_table(&words, 50, 0.5);
 
         assert_eq!(table.len(), 2);
         assert_eq!(table[0].len(), 2);
@@ -729,7 +605,7 @@ mod tests {
             },
         ];
 
-        let table = reconstruct_table(&words, 50, 0.5, false);
+        let table = reconstruct_table(&words, 50, 0.5);
 
         assert_eq!(table.len(), 1);
         assert_eq!(table[0].len(), 2);
@@ -755,10 +631,10 @@ mod tests {
 
         let mut words = Vec::new();
         for child_handle in dom.children().iter() {
-            words.extend(extract_hocr_words(child_handle, parser, 0.0, false));
+            words.extend(extract_hocr_words(child_handle, parser, 0.0));
         }
 
-        let table = reconstruct_table(&words, 50, 0.5, false);
+        let table = reconstruct_table(&words, 50, 0.5);
         let markdown = table_to_markdown(&table);
 
         assert_eq!(table.len(), 3);

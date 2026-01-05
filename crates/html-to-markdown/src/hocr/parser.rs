@@ -6,7 +6,7 @@ use super::types::{BBox, Baseline, HocrProperties};
 use crate::text::decode_html_entities_cow;
 
 /// Parse all properties from hOCR title attribute
-pub fn parse_properties(title: &str, debug: bool) -> HocrProperties {
+pub fn parse_properties(title: &str) -> HocrProperties {
     let mut props = HocrProperties::default();
 
     let title = decode_html_entities_cow(title);
@@ -142,9 +142,6 @@ pub fn parse_properties(title: &str, debug: bool) -> HocrProperties {
                     }
                 }
                 _ => {
-                    if debug {
-                        eprintln!("[hOCR] Unknown property: {}", key);
-                    }
                     let value: Vec<&str> = tokens.collect();
                     if !value.is_empty() {
                         props.other.insert(key.to_string(), value.join(" "));
@@ -273,7 +270,7 @@ mod tests {
 
     #[test]
     fn test_parse_bbox() {
-        let props = parse_properties("bbox 100 50 200 150", false);
+        let props = parse_properties("bbox 100 50 200 150");
         assert_eq!(
             props.bbox,
             Some(BBox {
@@ -287,7 +284,7 @@ mod tests {
 
     #[test]
     fn test_parse_baseline() {
-        let props = parse_properties("baseline 0.015 -18", false);
+        let props = parse_properties("baseline 0.015 -18");
         assert_eq!(
             props.baseline,
             Some(Baseline {
@@ -299,7 +296,7 @@ mod tests {
 
     #[test]
     fn test_parse_multiple_properties() {
-        let props = parse_properties("bbox 0 0 100 50; x_wconf 95.5; textangle 7.2", false);
+        let props = parse_properties("bbox 0 0 100 50; x_wconf 95.5; textangle 7.2");
         assert_eq!(
             props.bbox,
             Some(BBox {
@@ -315,20 +312,20 @@ mod tests {
 
     #[test]
     fn test_parse_quoted_strings() {
-        let props = parse_properties("x_font \"Comic Sans MS\"; x_fsize 12", false);
+        let props = parse_properties("x_font \"Comic Sans MS\"; x_fsize 12");
         assert_eq!(props.x_font, Some("Comic Sans MS".to_string()));
         assert_eq!(props.x_fsize, Some(12));
     }
 
     #[test]
     fn test_parse_poly() {
-        let props = parse_properties("poly 0 0 0 10 10 10 10 0", false);
+        let props = parse_properties("poly 0 0 0 10 10 10 10 0");
         assert_eq!(props.poly, Some(vec![(0, 0), (0, 10), (10, 10), (10, 0)]));
     }
 
     #[test]
     fn test_parse_x_confs() {
-        let props = parse_properties("x_confs 37.3 51.23 100", false);
+        let props = parse_properties("x_confs 37.3 51.23 100");
         assert_eq!(props.x_confs, vec![37.3, 51.23, 100.0]);
     }
 }

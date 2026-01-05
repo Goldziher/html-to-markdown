@@ -58,7 +58,7 @@ struct ConvertContext {
 /// </div>"#;
 ///
 /// let dom = tl::parse(html, tl::ParserOptions::default()).unwrap();
-/// let (elements, _) = extract_hocr_document(&dom, false);
+/// let (elements, _) = extract_hocr_document(&dom);
 /// let markdown = convert_to_markdown(&elements, true);
 /// // Output: "# Document Title\n\nHello World"
 /// ```
@@ -631,7 +631,7 @@ fn try_spatial_table_reconstruction(element: &HocrElement) -> Option<String> {
         return None;
     }
 
-    let table = spatial::reconstruct_table(&words, 50, 0.5, false);
+    let table = spatial::reconstruct_table(&words, 50, 0.5);
 
     if table.is_empty() || table[0].is_empty() {
         return None;

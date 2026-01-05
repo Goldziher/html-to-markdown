@@ -44,33 +44,28 @@ use super::types::{HocrElement, HocrElementType, HocrMetadata};
 ///     </p>
 /// </div>"#;
 /// let dom = tl::parse(html, tl::ParserOptions::default()).unwrap();
-/// let (elements, metadata) = extract_hocr_document(&dom, false);
+/// let (elements, metadata) = extract_hocr_document(&dom);
 /// ```
-pub fn extract_hocr_document(dom: &tl::VDom, debug: bool) -> (Vec<HocrElement>, HocrMetadata) {
+pub fn extract_hocr_document(dom: &tl::VDom) -> (Vec<HocrElement>, HocrMetadata) {
     let parser = dom.parser();
     let mut elements = Vec::new();
     let metadata = extract_metadata(dom);
 
     for child_handle in dom.children().iter() {
-        collect_hocr_elements(child_handle, parser, &mut elements, debug);
+        collect_hocr_elements(child_handle, parser, &mut elements);
     }
 
     (elements, metadata)
 }
 
 /// Recursively collect hOCR elements from DOM tree
-fn collect_hocr_elements(
-    node_handle: &tl::NodeHandle,
-    parser: &tl::Parser,
-    elements: &mut Vec<HocrElement>,
-    debug: bool,
-) {
-    if let Some(element) = extract_element(node_handle, parser, debug) {
+fn collect_hocr_elements(node_handle: &tl::NodeHandle, parser: &tl::Parser, elements: &mut Vec<HocrElement>) {
+    if let Some(element) = extract_element(node_handle, parser) {
         elements.push(element);
     } else if let Some(tl::Node::Tag(tag)) = node_handle.get(parser) {
         let children = tag.children();
         for child_handle in children.top().iter() {
-            collect_hocr_elements(child_handle, parser, elements, debug);
+            collect_hocr_elements(child_handle, parser, elements);
         }
     }
 }
@@ -128,7 +123,7 @@ fn extract_metadata(dom: &tl::VDom) -> HocrMetadata {
 }
 
 /// Extract a single hOCR element and its children
-fn extract_element(node_handle: &tl::NodeHandle, parser: &tl::Parser, debug: bool) -> Option<HocrElement> {
+fn extract_element(node_handle: &tl::NodeHandle, parser: &tl::Parser) -> Option<HocrElement> {
     if let Some(tl::Node::Tag(tag)) = node_handle.get(parser) {
         let attrs = tag.attributes();
         let class_attr = attrs.get("class").flatten()?;
@@ -140,7 +135,7 @@ fn extract_element(node_handle: &tl::NodeHandle, parser: &tl::Parser, debug: boo
         let element_type = classes.split_whitespace().find_map(HocrElementType::from_class)?;
 
         let properties = if let Some(title) = attrs.get("title").flatten() {
-            parse_properties(&title.as_utf8_str(), debug)
+            parse_properties(&title.as_utf8_str())
         } else {
             Default::default()
         };
@@ -152,7 +147,7 @@ fn extract_element(node_handle: &tl::NodeHandle, parser: &tl::Parser, debug: boo
         for child_handle in tag_children.top().iter() {
             if let Some(tl::Node::Raw(bytes)) = child_handle.get(parser) {
                 text.push_str(&bytes.as_utf8_str());
-            } else if let Some(child_element) = extract_element(child_handle, parser, debug) {
+            } else if let Some(child_element) = extract_element(child_handle, parser) {
                 children.push(child_element);
             }
         }
@@ -178,7 +173,7 @@ mod tests {
         let dom = tl::parse(html, tl::ParserOptions::default()).unwrap();
         let parser = dom.parser();
 
-        let element = extract_element(&dom.children()[0], parser, false).unwrap();
+        let element = extract_element(&dom.children()[0], parser).unwrap();
         assert!(matches!(element.element_type, HocrElementType::OcrxWord));
         assert_eq!(element.text, "Hello");
         assert!(element.properties.bbox.is_some());
@@ -194,7 +189,7 @@ mod tests {
         let dom = tl::parse(html, tl::ParserOptions::default()).unwrap();
         let parser = dom.parser();
 
-        let element = extract_element(&dom.children()[0], parser, false).unwrap();
+        let element = extract_element(&dom.children()[0], parser).unwrap();
         assert!(matches!(element.element_type, HocrElementType::OcrPar));
         assert_eq!(element.children.len(), 2);
         assert!(matches!(element.children[0].element_type, HocrElementType::OcrxWord));
@@ -214,7 +209,7 @@ mod tests {
 </body>
 </html>"#;
         let dom = tl::parse(html, tl::ParserOptions::default()).unwrap();
-        let (_, metadata) = extract_hocr_document(&dom, false);
+        let (_, metadata) = extract_hocr_document(&dom);
 
         assert_eq!(metadata.ocr_system, Some("tesseract 4.1.1".to_string()));
         assert!(metadata.ocr_capabilities.contains(&"ocr_page".to_string()));

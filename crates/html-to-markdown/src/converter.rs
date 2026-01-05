@@ -1981,7 +1981,7 @@ fn convert_html_impl(
     if is_hocr {
         use crate::hocr::{convert_to_markdown_with_options as convert_hocr_to_markdown, extract_hocr_document};
 
-        let (elements, metadata) = extract_hocr_document(&dom, options.debug);
+        let (elements, metadata) = extract_hocr_document(&dom);
 
         if options.extract_metadata && !options.convert_as_inline {
             let mut metadata_map = BTreeMap::new();
@@ -3374,24 +3374,9 @@ fn walk_node(
         match node {
             tl::Node::Tag(tag) => {
                 let tag_name = tag.name().as_utf8_str();
-                if tag_name == "body" || tag_name == "html" || depth <= 2 {
-                    eprintln!(
-                        "[DEBUG-ENTRY] walk_node called: tag={}, depth={}, output_len={}",
-                        tag_name,
-                        depth,
-                        output.len()
-                    );
-                }
+                if tag_name == "body" || tag_name == "html" || depth <= 2 {}
             }
-            tl::Node::Raw(_) => {
-                if depth <= 2 {
-                    eprintln!(
-                        "[DEBUG-ENTRY] walk_node called: Text node at depth={}, output_len={}",
-                        depth,
-                        output.len()
-                    );
-                }
-            }
+            tl::Node::Raw(_) => if depth <= 2 {},
             _ => {}
         }
     }
@@ -3535,19 +3520,10 @@ fn walk_node(
                     final_text.push_str(suffix);
                 } else if has_trailing_single_newline {
                     let at_paragraph_break = output.ends_with("\n\n");
-                    if options.debug {
-                        eprintln!(
-                            "[DEBUG] Text had trailing single newline that was chomped, at_paragraph_break={}",
-                            at_paragraph_break
-                        );
-                    }
                     if !at_paragraph_break {
                         if has_double_newline {
                             final_text.push('\n');
                         } else if let Some(next_tag) = get_next_sibling_tag(node_handle, parser, dom_ctx) {
-                            if options.debug {
-                                eprintln!("[DEBUG] Next sibling tag after newline: {}", next_tag);
-                            }
                             if matches!(next_tag, "span") {
                             } else if ctx.inline_depth > 0 || ctx.convert_as_inline || ctx.in_paragraph {
                                 final_text.push(' ');
@@ -3679,10 +3655,7 @@ fn walk_node(
 
                         return;
                     }
-                    crate::visitor::VisitResult::Error(msg) => {
-                        if options.debug {
-                            eprintln!("[DEBUG] Visitor error on <{}>: {}", tag_name, msg);
-                        }
+                    crate::visitor::VisitResult::Error(_msg) => {
                         return;
                     }
                     _ => {}
@@ -3691,9 +3664,6 @@ fn walk_node(
 
             if should_drop_for_preprocessing(node_handle, tag_name.as_ref(), tag, parser, dom_ctx, options) {
                 trim_trailing_whitespace(output);
-                if options.debug {
-                    eprintln!("[DEBUG] Dropping <{}> subtree due to preprocessing settings", tag_name);
-                }
                 return;
             }
 
@@ -3862,14 +3832,6 @@ fn walk_node(
                 }
 
                 "p" => {
-                    if options.debug {
-                        eprintln!(
-                            "[DEBUG] <p> tag encountered at depth={}, output_len_before={}",
-                            depth,
-                            output.len()
-                        );
-                    }
-
                     let content_start_pos = output.len();
 
                     let is_table_continuation =
@@ -3909,34 +3871,8 @@ fn walk_node(
                     {
                         let child_handles: Vec<_> = children.top().iter().collect();
 
-                        if options.debug {
-                            eprintln!("[DEBUG] <p> has {} children", child_handles.len());
-                        }
-
                         for (i, child_handle) in child_handles.iter().enumerate() {
                             if let Some(node) = child_handle.get(parser) {
-                                if options.debug {
-                                    let node_type_str = match node {
-                                        tl::Node::Tag(tag) => {
-                                            let tag_name = normalized_tag_name(tag.name().as_utf8_str());
-                                            format!("Tag({})", tag_name)
-                                        }
-                                        tl::Node::Raw(bytes) => {
-                                            let text = bytes.as_utf8_str();
-                                            format!(
-                                                "Text({})",
-                                                if text.len() > 50 {
-                                                    format!("{}...", &text[..50])
-                                                } else {
-                                                    text.to_string()
-                                                }
-                                            )
-                                        }
-                                        tl::Node::Comment(_) => "Comment".to_string(),
-                                    };
-                                    eprintln!("[DEBUG] <p> child[{}]: {}", i, node_type_str);
-                                }
-
                                 if let tl::Node::Raw(bytes) = node {
                                     let text = bytes.as_utf8_str();
                                     if text.trim().is_empty() && i > 0 && i < child_handles.len() - 1 {
@@ -3945,38 +3881,17 @@ fn walk_node(
                                         if is_empty_inline_element(prev, parser, dom_ctx)
                                             && is_empty_inline_element(next, parser, dom_ctx)
                                         {
-                                            if options.debug {
-                                                eprintln!(
-                                                    "[DEBUG] <p> skipping whitespace-only text node between empty inline elements"
-                                                );
-                                            }
                                             continue;
                                         }
                                     }
                                 }
                             }
 
-                            let output_len_before_child = output.len();
                             walk_node(child_handle, parser, output, options, &p_ctx, depth + 1, dom_ctx);
-                            let output_len_after_child = output.len();
-
-                            if options.debug {
-                                let bytes_added = output_len_after_child.saturating_sub(output_len_before_child);
-                                eprintln!("[DEBUG] <p> child[{}] complete: added {} bytes", i, bytes_added);
-                            }
                         }
                     }
 
                     let has_content = output.len() > content_start_pos;
-
-                    if options.debug {
-                        eprintln!(
-                            "[DEBUG] <p> content_result: has_content={}, bytes_added={}, output_len_after={}",
-                            has_content,
-                            output.len().saturating_sub(content_start_pos),
-                            output.len()
-                        );
-                    }
 
                     if has_content && !ctx.convert_as_inline && !ctx.in_table_cell {
                         output.push_str("\n\n");
@@ -5900,13 +5815,6 @@ fn walk_node(
                             .unwrap_or(false);
                         let needs_blank_line =
                             !ctx.in_paragraph && !matches!(prev_tag, Some("blockquote")) && !last_line_is_blockquote;
-
-                        if options.debug {
-                            eprintln!(
-                                "[DEBUG] <hr> prev_tag={:?} needs_blank_line={} in_paragraph={}",
-                                prev_tag, needs_blank_line, ctx.in_paragraph
-                            );
-                        }
 
                         if ctx.in_paragraph || !needs_blank_line {
                             if !output.ends_with('\n') {
@@ -7856,48 +7764,13 @@ fn walk_node(
                 "body" | "html" => {
                     // Process children of body/html tags directly without whitespace truncation
                     // These are structural container tags that should always preserve their content
-                    if options.debug {
-                        eprintln!(
-                            "[DEBUG] Processing <{}> tag at depth={}, output_len_before={}",
-                            tag_name,
-                            depth,
-                            output.len()
-                        );
-                    }
 
                     let children = tag.children();
-                    let child_count = children.top().len();
-
-                    if options.debug {
-                        eprintln!("[DEBUG] <{}> has {} children", tag_name, child_count);
-                    }
 
                     {
-                        for (child_index, child_handle) in children.top().iter().enumerate() {
-                            let output_len_before = output.len();
-
-                            if options.debug {
-                                eprintln!(
-                                    "[DEBUG] <{}> processing child {} of {}, output_len_before={}",
-                                    tag_name, child_index, child_count, output_len_before
-                                );
-                            }
-
+                        for child_handle in children.top().iter() {
                             walk_node(child_handle, parser, output, options, ctx, depth + 1, dom_ctx);
-
-                            let output_len_after = output.len();
-                            if options.debug {
-                                let bytes_added = output_len_after.saturating_sub(output_len_before);
-                                eprintln!(
-                                    "[DEBUG] <{}> child {} complete: added {} bytes (total: {})",
-                                    tag_name, child_index, bytes_added, output_len_after
-                                );
-                            }
                         }
-                    }
-
-                    if options.debug {
-                        eprintln!("[DEBUG] <{}> tag complete, output_len_after={}", tag_name, output.len());
                     }
                 }
 
@@ -7927,37 +7800,15 @@ fn walk_node(
                         };
 
                         let added_content = output[start_idx..].to_string();
-                        if options.debug {
-                            eprintln!(
-                                "[DEBUG] <{}> added {:?}, trim={:?}, had_trailing_space={}",
-                                tag_name,
-                                added_content,
-                                added_content.trim(),
-                                had_trailing_space
-                            );
-                        }
 
                         let is_code_block = added_content.starts_with("    ")
                             || added_content.starts_with("```")
                             || added_content.starts_with("~~~");
 
-                        if options.debug && added_content.trim().is_empty() {
-                            eprintln!(
-                                "[DEBUG] Whitespace-only content, is_code_block={}, will_truncate={}",
-                                is_code_block, !is_code_block
-                            );
-                        }
-
                         if added_content.trim().is_empty() && !is_code_block {
                             output.truncate(start_idx);
                             if !had_trailing_space && added_content.contains(' ') {
                                 output.push(' ');
-                            }
-                            if options.debug {
-                                eprintln!(
-                                    "[DEBUG] Truncated, output now ends with space: {}",
-                                    output.ends_with(' ')
-                                );
                             }
                         }
                     }
