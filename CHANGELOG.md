@@ -5,6 +5,24 @@ All notable changes to html-to-markdown will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.19.8] - 2026-01-05
+
+### Bug Fixes
+
+- **Blockquote newline preservation**: Fixed Issue #176 - Newlines were not preserved when block elements like `<strong>` were directly adjacent to `<blockquote>` elements
+  - Blockquotes now add proper spacing before and after themselves
+  - Fixed blockquote+paragraph spacing to match CommonMark spec
+  - Fixed blockquote+HR spacing to avoid extra newlines
+  - Added comprehensive regression tests to prevent future regressions
+  - Maintains CommonMark compliance (132/132 tests passing)
+
+### Improvements
+
+- **Debug logging cleanup**: Removed extensive debug logging from hOCR processing and core converter
+  - Removed ~30 debug eprintln! statements that were spamming output
+  - Removed unused debug parameters from hOCR functions (parse_properties, reconstruct_table, extract_hocr_document, etc.)
+  - Cleaner output and reduced noise during HTML to Markdown conversion
+
 ## [2.19.7] - 2026-01-03
 
 ### Improvements

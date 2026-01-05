@@ -3,7 +3,7 @@
   "description": "Test app for html-to-markdown PHP package",
   "require": {
     "php": ">=8.2",
-    "kreuzberg-dev/html-to-markdown": ">=2.19.7"
+    "kreuzberg-dev/html-to-markdown": ">=2.19.8"
   },
   "require-dev": {
     "phpunit/phpunit": "^11.0"
