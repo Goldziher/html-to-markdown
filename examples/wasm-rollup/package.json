@@ -1,6 +1,6 @@
 {
   "name": "@html-to-markdown/wasm-rollup-example",
-  "version": "2.19.8",
+  "version": "2.20.0",
   "private": true,
   "type": "module",
   "scripts": {

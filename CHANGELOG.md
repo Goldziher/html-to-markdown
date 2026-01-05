@@ -5,6 +5,25 @@ All notable changes to html-to-markdown will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.20.0] - 2026-01-05
+
+### Dependencies
+
+- **Updated reqwest to 0.13.1**: Migrated to new rustls defaults
+  - rustls is now the default TLS backend (previously native-tls)
+  - aws-lc is the default crypto provider (previously ring)
+  - rustls-platform-verifier is used by default for root certificates
+  - All reqwest features updated to new naming conventions
+- **Updated development dependencies**: Updated pnpm packages, Ruby gems, and pre-commit hooks
+  - oxlint pre-commit hook updated from v1.36.0 to v1.37.0
+  - All language bindings dependencies refreshed
+
+### Infrastructure
+
+- **Fixed C# package update task**: Updated dotnet list command to specify project files explicitly
+  - Prevents "project or solution file could not be found" errors
+  - Now checks both HtmlToMarkdown.csproj and HtmlToMarkdown.Tests.csproj individually
+
 ## [2.19.8] - 2026-01-05
 
 ### Bug Fixes

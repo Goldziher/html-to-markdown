@@ -1,6 +1,6 @@
 {
   "name": "html-to-markdown-performance-examples",
-  "version": "2.19.8",
+  "version": "2.20.0",
   "description": "Performance and benchmarking examples for html-to-markdown",
   "private": true,
   "type": "module",

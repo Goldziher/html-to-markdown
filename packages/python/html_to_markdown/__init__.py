@@ -73,4 +73,4 @@ __all__ = [
     "stop_profiling",
 ]
 
-__version__ = "2.19.8"
+__version__ = "2.20.0"

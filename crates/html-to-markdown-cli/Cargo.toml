@@ -24,7 +24,7 @@ clap_complete.workspace = true
 clap_mangen.workspace = true
 encoding_rs.workspace = true
 serde_json = "1.0"
-reqwest = { version = "0.12", default-features = false, features = ["blocking", "rustls-tls-native-roots", "gzip", "brotli", "deflate", "charset"] }
+reqwest = { version = "0.13.1", default-features = false, features = ["blocking", "rustls", "gzip", "brotli", "deflate", "charset"] }
 
 [dev-dependencies]
 assert_cmd = "2.1"

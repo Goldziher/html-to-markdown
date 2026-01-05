@@ -122,7 +122,9 @@ tasks:
     desc: "Check .NET package updates"
     silent: false
     cmds:
-      - cmd: cd {{.CSHARP_PKG}} && dotnet list package --outdated
+      - cmd: cd {{.CSHARP_PKG}} && dotnet list HtmlToMarkdown/HtmlToMarkdown.csproj package --outdated
+        ignore_error: false
+      - cmd: cd {{.CSHARP_PKG}} && dotnet list HtmlToMarkdown.Tests/HtmlToMarkdown.Tests.csproj package --outdated
         ignore_error: false
 
   clean:

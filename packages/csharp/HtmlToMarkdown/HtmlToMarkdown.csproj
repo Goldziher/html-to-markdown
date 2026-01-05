@@ -8,7 +8,7 @@
 
     <!-- Package metadata -->
     <PackageId>KreuzbergDev.HtmlToMarkdown</PackageId>
-    <Version>2.19.8</Version>
+    <Version>2.20.0</Version>
     <Authors>Na'aman Hirschfeld</Authors>
     <Company>Kreuzberg.dev</Company>
     <Description>High-performance HTML to Markdown converter with C# bindings to Rust core</Description>

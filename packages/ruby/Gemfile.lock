@@ -1,7 +1,7 @@
 PATH
   remote: .
   specs:
-    html-to-markdown (2.19.8)
+    html-to-markdown (2.20.0)
       rb_sys (>= 0.9, < 1.0)
 
 GEM
@@ -28,8 +28,7 @@ GEM
     csv (3.3.5)
     diff-lcs (1.6.2)
     drb (2.2.3)
-    ffi (1.17.2)
-    ffi (1.17.2-arm64-darwin)
+    ffi (1.17.3-arm64-darwin)
     fileutils (1.8.0)
     i18n (1.14.8)
       concurrent-ruby (~> 1.0)
@@ -144,10 +143,9 @@ CHECKSUMS
   csv (3.3.5) sha256=6e5134ac3383ef728b7f02725d9872934f523cb40b961479f69cf3afa6c8e73f
   diff-lcs (1.6.2) sha256=9ae0d2cba7d4df3075fe8cd8602a8604993efc0dfa934cff568969efb1909962
   drb (2.2.3) sha256=0b00d6fdb50995fe4a45dea13663493c841112e4068656854646f418fda13373
-  ffi (1.17.2) sha256=297235842e5947cc3036ebe64077584bff583cd7a4e94e9a02fdec399ef46da6
-  ffi (1.17.2-arm64-darwin) sha256=54dd9789be1d30157782b8de42d8f887a3c3c345293b57ffb6b45b4d1165f813
+  ffi (1.17.3-arm64-darwin) sha256=0c690555d4cee17a7f07c04d59df39b2fba74ec440b19da1f685c6579bb0717f
   fileutils (1.8.0) sha256=8c6b1df54e2540bdb2f39258f08af78853aa70bad52b4d394bbc6424593c6e02
-  html-to-markdown (2.19.8)
+  html-to-markdown (2.20.0)
   i18n (1.14.8) sha256=285778639134865c5e0f6269e0b818256017e8cde89993fdfcbfb64d088824a5
   json (2.18.0) sha256=b10506aee4183f5cf49e0efc48073d7b75843ce3782c68dbeb763351c08fd505
   language_server-protocol (3.17.0.5) sha256=fd1e39a51a28bf3eec959379985a72e296e9f9acfce46f6a79d31ca8760803cc
