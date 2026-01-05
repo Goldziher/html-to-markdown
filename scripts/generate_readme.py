@@ -342,6 +342,9 @@ class ReadmeGenerator:
         except Exception as e:
             raise Exception(f"Failed to render template {template_name}: {e}") from e
 
+        # Ensure content ends with exactly one newline (pre-commit hook requirement)
+        content = content.rstrip() + "\n"
+
         # Write to disk unless dry-run
         if not dry_run:
             output_path.parent.mkdir(parents=True, exist_ok=True)
