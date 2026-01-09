@@ -9,10 +9,13 @@ homepage.workspace = true
 documentation.workspace = true
 readme.workspace = true
 rust-version.workspace = true
-lints.workspace = true
 description = "Command-line interface for html-to-markdown - high-performance HTML to Markdown converter"
 keywords = ["html", "markdown", "cli", "converter", "html5ever"]
 categories = ["command-line-utilities", "text-processing"]
+
+
+[lints]
+workspace = true
 
 [[bin]]
 name = "html-to-markdown"

@@ -9,7 +9,21 @@ homepage.workspace = true
 documentation.workspace = true
 readme.workspace = true
 rust-version.workspace = true
-lints.workspace = true
+description = "C FFI bindings for html-to-markdown-rs"
+keywords = ["html", "markdown", "ffi", "c-bindings"]
+categories = ["parsing", "text-processing", "api-bindings"]
+
+
+[lints.rust]
+unsafe_code = "allow"  # FFI requires unsafe code
+missing_docs = "warn"
+unused_must_use = "deny"
+
+[lints.clippy]
+all = { level = "deny", priority = -1 }
+cargo = { level = "deny", priority = -1 }
+pedantic = { level = "deny", priority = -1 }
+nursery = { level = "warn", priority = -1 }
 
 [lib]
 crate-type = ["cdylib", "staticlib"]

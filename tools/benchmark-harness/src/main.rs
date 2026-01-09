@@ -1,3 +1,8 @@
+//! Benchmark harness CLI for html-to-markdown.
+//!
+//! Provides commands for running benchmarks across different frameworks and languages,
+//! validating fixtures, and generating reports with performance metrics and flamegraphs.
+
 #[cfg(feature = "memory-profiling")]
 #[global_allocator]
 static ALLOC: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
@@ -127,8 +132,8 @@ enum CliScenario {
 impl From<CliMode> for BenchmarkMode {
     fn from(mode: CliMode) -> Self {
         match mode {
-            CliMode::SingleFile => BenchmarkMode::SingleFile,
-            CliMode::Batch => BenchmarkMode::Batch,
+            CliMode::SingleFile => Self::SingleFile,
+            CliMode::Batch => Self::Batch,
         }
     }
 }
@@ -136,17 +141,18 @@ impl From<CliMode> for BenchmarkMode {
 impl From<CliScenario> for BenchmarkScenario {
     fn from(scenario: CliScenario) -> Self {
         match scenario {
-            CliScenario::ConvertDefault => BenchmarkScenario::ConvertDefault,
-            CliScenario::ConvertWithOptions => BenchmarkScenario::ConvertWithOptions,
-            CliScenario::InlineImagesDefault => BenchmarkScenario::InlineImagesDefault,
-            CliScenario::InlineImagesWithOptions => BenchmarkScenario::InlineImagesWithOptions,
-            CliScenario::MetadataDefault => BenchmarkScenario::MetadataDefault,
-            CliScenario::MetadataWithOptions => BenchmarkScenario::MetadataWithOptions,
-            CliScenario::MetadataRaw => BenchmarkScenario::MetadataRaw,
+            CliScenario::ConvertDefault => Self::ConvertDefault,
+            CliScenario::ConvertWithOptions => Self::ConvertWithOptions,
+            CliScenario::InlineImagesDefault => Self::InlineImagesDefault,
+            CliScenario::InlineImagesWithOptions => Self::InlineImagesWithOptions,
+            CliScenario::MetadataDefault => Self::MetadataDefault,
+            CliScenario::MetadataWithOptions => Self::MetadataWithOptions,
+            CliScenario::MetadataRaw => Self::MetadataRaw,
         }
     }
 }
 
+#[allow(clippy::too_many_lines)]
 fn main() -> Result<()> {
     let cli = Cli::parse();
 
@@ -226,7 +232,7 @@ fn main() -> Result<()> {
             };
 
             let config = BenchmarkConfig {
-                fixtures_path: fixtures_path.clone(),
+                fixtures_path,
                 output_dir: output.clone(),
                 benchmark_mode: mode.into(),
                 warmup_iterations: warmup,
@@ -277,7 +283,7 @@ fn main() -> Result<()> {
             )))?;
             registry.register(std::sync::Arc::new(ScriptAdapter::new(
                 ScriptLanguage::Elixir,
-                repo_root.clone(),
+                repo_root,
             )))?;
 
             let runner = BenchmarkRunner::new(config, registry);

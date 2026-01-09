@@ -41,103 +41,191 @@ use std::os::raw::{c_char, c_void};
 #[repr(C)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum html_to_markdown_node_type_t {
+    /// Text node (character data).
     HTML_TO_MARKDOWN_NODE_TEXT = 0,
+    /// Generic element node.
     HTML_TO_MARKDOWN_NODE_ELEMENT = 1,
 
+    /// Heading element (h1-h6).
     HTML_TO_MARKDOWN_NODE_HEADING = 2,
+    /// Paragraph element.
     HTML_TO_MARKDOWN_NODE_PARAGRAPH = 3,
+    /// Division element.
     HTML_TO_MARKDOWN_NODE_DIV = 4,
+    /// Blockquote element.
     HTML_TO_MARKDOWN_NODE_BLOCKQUOTE = 5,
+    /// Preformatted text element.
     HTML_TO_MARKDOWN_NODE_PRE = 6,
+    /// Horizontal rule element.
     HTML_TO_MARKDOWN_NODE_HR = 7,
 
+    /// Unordered or ordered list element.
     HTML_TO_MARKDOWN_NODE_LIST = 8,
+    /// List item element.
     HTML_TO_MARKDOWN_NODE_LIST_ITEM = 9,
+    /// Definition list element (dl).
     HTML_TO_MARKDOWN_NODE_DEFINITION_LIST = 10,
+    /// Definition term element (dt).
     HTML_TO_MARKDOWN_NODE_DEFINITION_TERM = 11,
+    /// Definition description element (dd).
     HTML_TO_MARKDOWN_NODE_DEFINITION_DESCRIPTION = 12,
 
+    /// Table element.
     HTML_TO_MARKDOWN_NODE_TABLE = 13,
+    /// Table row element.
     HTML_TO_MARKDOWN_NODE_TABLE_ROW = 14,
+    /// Table cell element (td).
     HTML_TO_MARKDOWN_NODE_TABLE_CELL = 15,
+    /// Table header cell element (th).
     HTML_TO_MARKDOWN_NODE_TABLE_HEADER = 16,
+    /// Table body section element (tbody).
     HTML_TO_MARKDOWN_NODE_TABLE_BODY = 17,
+    /// Table header section element (thead).
     HTML_TO_MARKDOWN_NODE_TABLE_HEAD = 18,
+    /// Table footer section element (tfoot).
     HTML_TO_MARKDOWN_NODE_TABLE_FOOT = 19,
 
+    /// Anchor/hyperlink element.
     HTML_TO_MARKDOWN_NODE_LINK = 20,
+    /// Image element.
     HTML_TO_MARKDOWN_NODE_IMAGE = 21,
+    /// Strong/bold element.
     HTML_TO_MARKDOWN_NODE_STRONG = 22,
+    /// Emphasis/italic element.
     HTML_TO_MARKDOWN_NODE_EM = 23,
+    /// Inline code element.
     HTML_TO_MARKDOWN_NODE_CODE = 24,
+    /// Strikethrough element.
     HTML_TO_MARKDOWN_NODE_STRIKETHROUGH = 25,
+    /// Underline element.
     HTML_TO_MARKDOWN_NODE_UNDERLINE = 26,
+    /// Subscript element.
     HTML_TO_MARKDOWN_NODE_SUBSCRIPT = 27,
+    /// Superscript element.
     HTML_TO_MARKDOWN_NODE_SUPERSCRIPT = 28,
+    /// Mark/highlight element.
     HTML_TO_MARKDOWN_NODE_MARK = 29,
+    /// Small text element.
     HTML_TO_MARKDOWN_NODE_SMALL = 30,
+    /// Line break element.
     HTML_TO_MARKDOWN_NODE_BR = 31,
+    /// Span element.
     HTML_TO_MARKDOWN_NODE_SPAN = 32,
 
+    /// Article element (HTML5 semantic).
     HTML_TO_MARKDOWN_NODE_ARTICLE = 33,
+    /// Section element (HTML5 semantic).
     HTML_TO_MARKDOWN_NODE_SECTION = 34,
+    /// Navigation element (HTML5 semantic).
     HTML_TO_MARKDOWN_NODE_NAV = 35,
+    /// Aside element (HTML5 semantic).
     HTML_TO_MARKDOWN_NODE_ASIDE = 36,
+    /// Header element (HTML5 semantic).
     HTML_TO_MARKDOWN_NODE_HEADER = 37,
+    /// Footer element (HTML5 semantic).
     HTML_TO_MARKDOWN_NODE_FOOTER = 38,
+    /// Main content element (HTML5 semantic).
     HTML_TO_MARKDOWN_NODE_MAIN = 39,
+    /// Figure element (HTML5 semantic).
     HTML_TO_MARKDOWN_NODE_FIGURE = 40,
+    /// Figure caption element.
     HTML_TO_MARKDOWN_NODE_FIGCAPTION = 41,
+    /// Time element.
     HTML_TO_MARKDOWN_NODE_TIME = 42,
+    /// Details/disclosure widget element.
     HTML_TO_MARKDOWN_NODE_DETAILS = 43,
+    /// Summary element (child of details).
     HTML_TO_MARKDOWN_NODE_SUMMARY = 44,
 
+    /// Form element.
     HTML_TO_MARKDOWN_NODE_FORM = 45,
+    /// Input form control element.
     HTML_TO_MARKDOWN_NODE_INPUT = 46,
+    /// Select dropdown element.
     HTML_TO_MARKDOWN_NODE_SELECT = 47,
+    /// Option element (child of select).
     HTML_TO_MARKDOWN_NODE_OPTION = 48,
+    /// Button element.
     HTML_TO_MARKDOWN_NODE_BUTTON = 49,
+    /// Textarea form control element.
     HTML_TO_MARKDOWN_NODE_TEXTAREA = 50,
+    /// Label element (form label).
     HTML_TO_MARKDOWN_NODE_LABEL = 51,
+    /// Fieldset element (form grouping).
     HTML_TO_MARKDOWN_NODE_FIELDSET = 52,
+    /// Legend element (fieldset caption).
     HTML_TO_MARKDOWN_NODE_LEGEND = 53,
 
+    /// Audio element.
     HTML_TO_MARKDOWN_NODE_AUDIO = 54,
+    /// Video element.
     HTML_TO_MARKDOWN_NODE_VIDEO = 55,
+    /// Picture element (responsive images).
     HTML_TO_MARKDOWN_NODE_PICTURE = 56,
+    /// Source element (media source).
     HTML_TO_MARKDOWN_NODE_SOURCE = 57,
+    /// Iframe element.
     HTML_TO_MARKDOWN_NODE_IFRAME = 58,
+    /// SVG element.
     HTML_TO_MARKDOWN_NODE_SVG = 59,
+    /// Canvas element.
     HTML_TO_MARKDOWN_NODE_CANVAS = 60,
 
+    /// Ruby element (ruby text annotation).
     HTML_TO_MARKDOWN_NODE_RUBY = 61,
+    /// Ruby text (rt) element.
     HTML_TO_MARKDOWN_NODE_RT = 62,
+    /// Ruby parenthesis (rp) element.
     HTML_TO_MARKDOWN_NODE_RP = 63,
+    /// Abbreviation element.
     HTML_TO_MARKDOWN_NODE_ABBR = 64,
+    /// Keyboard input element.
     HTML_TO_MARKDOWN_NODE_KBD = 65,
+    /// Sample output element.
     HTML_TO_MARKDOWN_NODE_SAMP = 66,
+    /// Variable element.
     HTML_TO_MARKDOWN_NODE_VAR = 67,
+    /// Citation element.
     HTML_TO_MARKDOWN_NODE_CITE = 68,
+    /// Inline quotation element.
     HTML_TO_MARKDOWN_NODE_Q = 69,
+    /// Deleted text element.
     HTML_TO_MARKDOWN_NODE_DEL = 70,
+    /// Inserted text element.
     HTML_TO_MARKDOWN_NODE_INS = 71,
+    /// Data element (machine-readable value).
     HTML_TO_MARKDOWN_NODE_DATA = 72,
+    /// Meter element (scalar measurement).
     HTML_TO_MARKDOWN_NODE_METER = 73,
+    /// Progress element (task progress).
     HTML_TO_MARKDOWN_NODE_PROGRESS = 74,
+    /// Output element (computation result).
     HTML_TO_MARKDOWN_NODE_OUTPUT = 75,
+    /// Template element (hidden markup template).
     HTML_TO_MARKDOWN_NODE_TEMPLATE = 76,
+    /// Slot element (shadow DOM slot).
     HTML_TO_MARKDOWN_NODE_SLOT = 77,
 
+    /// HTML root element.
     HTML_TO_MARKDOWN_NODE_HTML = 78,
+    /// Head element (document metadata).
     HTML_TO_MARKDOWN_NODE_HEAD = 79,
+    /// Body element (document body).
     HTML_TO_MARKDOWN_NODE_BODY = 80,
+    /// Title element (document title).
     HTML_TO_MARKDOWN_NODE_TITLE = 81,
+    /// Meta element (metadata).
     HTML_TO_MARKDOWN_NODE_META = 82,
+    /// Link element (document link).
     HTML_TO_MARKDOWN_NODE_LINK_TAG = 83,
+    /// Style element (embedded stylesheet).
     HTML_TO_MARKDOWN_NODE_STYLE = 84,
+    /// Script element (embedded script).
     HTML_TO_MARKDOWN_NODE_SCRIPT = 85,
+    /// Base element (document base URL).
     HTML_TO_MARKDOWN_NODE_BASE = 86,
 
+    /// Custom or unknown element type.
     HTML_TO_MARKDOWN_NODE_CUSTOM = 87,
 }
 

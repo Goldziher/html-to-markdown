@@ -120,7 +120,7 @@ tasks:
     desc: "Update Rust dependencies (cargo-upgrades + cargo update)"
     silent: false
     cmds:
-      - cmd: cargo upgrade --incompatible
+      - cmd: cargo upgrade --incompatible --exclude html5ever
         ignore_error: false
       - cmd: cargo update
         ignore_error: false

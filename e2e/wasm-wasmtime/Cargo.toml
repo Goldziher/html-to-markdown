@@ -2,8 +2,11 @@
 name = "html-to-markdown-wasm-wasmtime-tests"
 version.workspace = true
 edition.workspace = true
-lints.workspace = true
 publish = false
+
+
+[lints]
+workspace = true
 
 [dev-dependencies]
 anyhow = "1.0"

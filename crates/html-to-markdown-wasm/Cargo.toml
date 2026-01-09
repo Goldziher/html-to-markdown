@@ -9,10 +9,23 @@ homepage.workspace = true
 documentation.workspace = true
 readme.workspace = true
 rust-version.workspace = true
-lints.workspace = true
 description = "HTML to Markdown conversion for WebAssembly targets"
+keywords = ["html", "markdown", "wasm", "webassembly"]
+categories = ["parsing", "text-processing", "wasm"]
 
 # Publishing metadata for npm scoped package
+
+[lints.rust]
+unsafe_code = "allow"  # WASM bindings require unsafe code
+missing_docs = "warn"
+unused_must_use = "deny"
+
+[lints.clippy]
+all = { level = "deny", priority = -1 }
+cargo = { level = "deny", priority = -1 }
+pedantic = { level = "deny", priority = -1 }
+nursery = { level = "warn", priority = -1 }
+
 [package.metadata.wasm-pack.publish]
 registry = "https://registry.npmjs.org/"
 

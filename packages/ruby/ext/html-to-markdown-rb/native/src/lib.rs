@@ -51,12 +51,11 @@ impl RubyVisitorWrapper {
     }
 
     fn utf8_str(&self, ruby: &Ruby, s: &str) -> Value {
-        match ruby.eval::<Value>(&format!("String.new({:?}, encoding: 'UTF-8')", s)) {
-            Ok(val) => val,
-            Err(_) => {
-                let str_val = ruby.str_from_slice(s.as_bytes());
-                str_val.as_value()
-            }
+        if let Ok(val) = ruby.eval::<Value>(&format!("String.new({s:?}, encoding: 'UTF-8')")) {
+            val
+        } else {
+            let str_val = ruby.str_from_slice(s.as_bytes());
+            str_val.as_value()
         }
     }
 
@@ -67,7 +66,7 @@ impl RubyVisitorWrapper {
             0 => match self.ruby_visitor.funcall::<&str, (), Value>(method_name, ()) {
                 Ok(val) => val,
                 Err(e) => {
-                    *self.last_error.borrow_mut() = Some(format!("Visitor error in {}: {}", method_name, e));
+                    *self.last_error.borrow_mut() = Some(format!("Visitor error in {method_name}: {e}"));
                     return Err(e);
                 }
             },
@@ -77,7 +76,7 @@ impl RubyVisitorWrapper {
             {
                 Ok(val) => val,
                 Err(e) => {
-                    *self.last_error.borrow_mut() = Some(format!("Visitor error in {}: {}", method_name, e));
+                    *self.last_error.borrow_mut() = Some(format!("Visitor error in {method_name}: {e}"));
                     return Err(e);
                 }
             },
@@ -87,7 +86,7 @@ impl RubyVisitorWrapper {
             {
                 Ok(val) => val,
                 Err(e) => {
-                    *self.last_error.borrow_mut() = Some(format!("Visitor error in {}: {}", method_name, e));
+                    *self.last_error.borrow_mut() = Some(format!("Visitor error in {method_name}: {e}"));
                     return Err(e);
                 }
             },
@@ -97,7 +96,7 @@ impl RubyVisitorWrapper {
             {
                 Ok(val) => val,
                 Err(e) => {
-                    *self.last_error.borrow_mut() = Some(format!("Visitor error in {}: {}", method_name, e));
+                    *self.last_error.borrow_mut() = Some(format!("Visitor error in {method_name}: {e}"));
                     return Err(e);
                 }
             },
@@ -107,7 +106,7 @@ impl RubyVisitorWrapper {
             {
                 Ok(val) => val,
                 Err(e) => {
-                    *self.last_error.borrow_mut() = Some(format!("Visitor error in {}: {}", method_name, e));
+                    *self.last_error.borrow_mut() = Some(format!("Visitor error in {method_name}: {e}"));
                     return Err(e);
                 }
             },
@@ -120,14 +119,11 @@ impl RubyVisitorWrapper {
         };
 
         let hash = RHash::from_value(result)
-            .ok_or_else(|| arg_error(format!("visitor method {} must return a Hash", method_name)))?;
+            .ok_or_else(|| arg_error(format!("visitor method {method_name} must return a Hash")))?;
 
-        let type_value: Value = hash.get(ruby.intern("type")).ok_or_else(|| {
-            arg_error(format!(
-                "visitor method {} result Hash must have :type key",
-                method_name
-            ))
-        })?;
+        let type_value: Value = hash
+            .get(ruby.intern("type"))
+            .ok_or_else(|| arg_error(format!("visitor method {method_name} result Hash must have :type key")))?;
 
         let type_str = symbol_to_string(type_value)?;
 
@@ -136,8 +132,7 @@ impl RubyVisitorWrapper {
             "custom" => {
                 let output_value: Value = hash.get(ruby.intern("output")).ok_or_else(|| {
                     arg_error(format!(
-                        "visitor method {} with type :custom must provide :output string",
-                        method_name
+                        "visitor method {method_name} with type :custom must provide :output string"
                     ))
                 })?;
                 let output = String::try_convert(output_value)?;
@@ -148,16 +143,14 @@ impl RubyVisitorWrapper {
             "error" => {
                 let message_value: Value = hash.get(ruby.intern("message")).ok_or_else(|| {
                     arg_error(format!(
-                        "visitor method {} with type :error must provide :message string",
-                        method_name
+                        "visitor method {method_name} with type :error must provide :message string"
                     ))
                 })?;
                 let message = String::try_convert(message_value)?;
                 Ok(VisitResult::Error(message))
             }
             other => Err(arg_error(format!(
-                "visitor method {} returned invalid type: {}",
-                method_name, other
+                "visitor method {method_name} returned invalid type: {other}"
             ))),
         }
     }
@@ -384,7 +377,7 @@ impl HtmlVisitor for RubyVisitorWrapper {
                     "visit_heading",
                     &[
                         node_ctx,
-                        ruby.integer_from_i64(level as i64).as_value(),
+                        ruby.integer_from_i64(i64::from(level)).as_value(),
                         ruby.str_from_slice(text.as_bytes()).as_value(),
                         id_val,
                     ],
@@ -1242,8 +1235,8 @@ fn inline_image_to_value(ruby: &Ruby, image: InlineImage) -> Result<Value, Error
 
     if let Some((width, height)) = dimensions {
         let dims = ruby.ary_new();
-        dims.push(width as i64)?;
-        dims.push(height as i64)?;
+        dims.push(i64::from(width))?;
+        dims.push(i64::from(height))?;
         hash.aset(ruby.intern("dimensions"), dims)?;
     } else {
         hash.aset(ruby.intern("dimensions"), ruby.qnil())?;
@@ -1487,8 +1480,8 @@ fn images_to_ruby(ruby: &Ruby, images: Vec<RustImageMetadata>) -> Result<Value, 
         match image.dimensions {
             Some((width, height)) => {
                 let dims = ruby.ary_new();
-                dims.push(width as i64)?;
-                dims.push(height as i64)?;
+                dims.push(i64::from(width))?;
+                dims.push(i64::from(height))?;
                 hash.aset(ruby.intern("dimensions"), dims)?;
             }
             None => {

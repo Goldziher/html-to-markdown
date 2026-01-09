@@ -1,3 +1,4 @@
+#![allow(clippy::option_if_let_else)]
 //! Helpers to keep binding entrypoints panic-safe.
 //!
 //! Binding layers (PyO3, NAPI-RS, ext-php-rs, WASM, FFI) must not allow Rust
@@ -16,8 +17,7 @@ use crate::error::{ConversionError, Result};
 /// translate them into language-native errors instead of aborting.
 pub fn guard_panic<F, T>(f: F) -> Result<T>
 where
-    F: FnOnce() -> Result<T>,
-    F: UnwindSafe,
+    F: FnOnce() -> Result<T> + UnwindSafe,
 {
     if std::env::var("HTML_TO_MARKDOWN_FAST_FFI")
         .ok()

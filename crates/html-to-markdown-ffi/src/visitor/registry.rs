@@ -173,24 +173,43 @@ impl Default for HtmlToMarkdownVisitResult {
 #[repr(C)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum HtmlToMarkdownNodeType {
+    /// Text node (character data).
     Text = 0,
+    /// Generic element node.
     Element = 1,
+    /// Heading element (h1-h6).
     Heading = 2,
+    /// Paragraph element.
     Paragraph = 3,
+    /// Division element.
     Div = 4,
+    /// Blockquote element.
     Blockquote = 5,
+    /// Preformatted text element.
     Pre = 6,
+    /// Horizontal rule element.
     Hr = 7,
+    /// Unordered or ordered list element.
     List = 8,
+    /// List item element.
     ListItem = 9,
+    /// Table element.
     Table = 10,
+    /// Table row element.
     TableRow = 11,
+    /// Table cell element.
     TableCell = 12,
+    /// Anchor/hyperlink element.
     Link = 13,
+    /// Image element.
     Image = 14,
+    /// Inline code element.
     Code = 15,
+    /// Strong/bold element.
     Strong = 16,
+    /// Emphasis/italic element.
     Em = 17,
+    /// Custom or unknown element type.
     Custom = 255,
 }
 
@@ -1245,7 +1264,7 @@ struct CVisitorWrapper {
 
 impl CVisitorWrapper {
     /// Create a new visitor wrapper from C callbacks.
-    fn new(callbacks: HtmlToMarkdownVisitorCallbacks) -> Self {
+    const fn new(callbacks: HtmlToMarkdownVisitorCallbacks) -> Self {
         Self {
             callbacks,
             temp_tag_name: RefCell::new(None),
@@ -2283,7 +2302,7 @@ pub unsafe extern "C" fn html_to_markdown_convert_bytes_with_visitor(
 /// return result;
 /// ```
 #[unsafe(no_mangle)]
-pub extern "C" fn html_to_markdown_visit_result_continue() -> HtmlToMarkdownVisitResult {
+pub const extern "C" fn html_to_markdown_visit_result_continue() -> HtmlToMarkdownVisitResult {
     HtmlToMarkdownVisitResult {
         result_type: HtmlToMarkdownVisitResultType::Continue,
         custom_output: ptr::null_mut(),
@@ -2318,7 +2337,7 @@ pub extern "C" fn html_to_markdown_visit_result_continue() -> HtmlToMarkdownVisi
 /// return result;
 /// ```
 #[unsafe(no_mangle)]
-pub extern "C" fn html_to_markdown_visit_result_custom(output: *mut c_char) -> HtmlToMarkdownVisitResult {
+pub const extern "C" fn html_to_markdown_visit_result_custom(output: *mut c_char) -> HtmlToMarkdownVisitResult {
     HtmlToMarkdownVisitResult {
         result_type: HtmlToMarkdownVisitResultType::Custom,
         custom_output: output,
@@ -2341,7 +2360,7 @@ pub extern "C" fn html_to_markdown_visit_result_custom(output: *mut c_char) -> H
 /// return result;
 /// ```
 #[unsafe(no_mangle)]
-pub extern "C" fn html_to_markdown_visit_result_skip() -> HtmlToMarkdownVisitResult {
+pub const extern "C" fn html_to_markdown_visit_result_skip() -> HtmlToMarkdownVisitResult {
     HtmlToMarkdownVisitResult {
         result_type: HtmlToMarkdownVisitResultType::Skip,
         custom_output: ptr::null_mut(),
@@ -2364,7 +2383,7 @@ pub extern "C" fn html_to_markdown_visit_result_skip() -> HtmlToMarkdownVisitRes
 /// return result;
 /// ```
 #[unsafe(no_mangle)]
-pub extern "C" fn html_to_markdown_visit_result_preserve_html() -> HtmlToMarkdownVisitResult {
+pub const extern "C" fn html_to_markdown_visit_result_preserve_html() -> HtmlToMarkdownVisitResult {
     HtmlToMarkdownVisitResult {
         result_type: HtmlToMarkdownVisitResultType::PreserveHtml,
         custom_output: ptr::null_mut(),
@@ -2399,7 +2418,7 @@ pub extern "C" fn html_to_markdown_visit_result_preserve_html() -> HtmlToMarkdow
 /// return result;
 /// ```
 #[unsafe(no_mangle)]
-pub extern "C" fn html_to_markdown_visit_result_error(message: *mut c_char) -> HtmlToMarkdownVisitResult {
+pub const extern "C" fn html_to_markdown_visit_result_error(message: *mut c_char) -> HtmlToMarkdownVisitResult {
     HtmlToMarkdownVisitResult {
         result_type: HtmlToMarkdownVisitResultType::Error,
         custom_output: ptr::null_mut(),

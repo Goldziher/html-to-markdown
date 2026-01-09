@@ -14,7 +14,7 @@ pub struct BenchmarkRunner {
 }
 
 impl BenchmarkRunner {
-    pub fn new(config: BenchmarkConfig, registry: AdapterRegistry) -> Self {
+    pub const fn new(config: BenchmarkConfig, registry: AdapterRegistry) -> Self {
         Self { config, registry }
     }
 

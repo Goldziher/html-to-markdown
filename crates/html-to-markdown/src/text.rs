@@ -190,6 +190,21 @@ pub fn normalize_whitespace(text: &str) -> String {
     result
 }
 
+/// Normalize whitespace in text, returning borrowed or owned result as needed.
+///
+/// This function optimizes memory by returning a borrowed reference when no normalization
+/// is needed, and only allocating a new string when whitespace changes are necessary.
+///
+/// Multiple consecutive spaces, tabs, and Unicode space characters are replaced with
+/// a single ASCII space. Newlines are preserved as-is.
+///
+/// # Arguments
+///
+/// * `text` - The text to normalize
+///
+/// # Returns
+///
+/// `Cow::Borrowed` if text is already normalized, or `Cow::Owned` with normalized text
 pub fn normalize_whitespace_cow(text: &str) -> Cow<'_, str> {
     let mut prev_was_space = false;
 
@@ -228,6 +243,26 @@ pub fn decode_html_entities(text: &str) -> String {
     html_escape::decode_html_entities(text).into_owned()
 }
 
+/// Decode HTML entities in text, returning borrowed or owned result as needed.
+///
+/// This function optimizes memory by returning a borrowed reference when no HTML
+/// entities are present, and only allocating a new string when entity decoding
+/// is necessary.
+///
+/// Decodes common HTML entities like:
+/// - `&quot;` → `"`
+/// - `&apos;` → `'`
+/// - `&lt;` → `<`
+/// - `&gt;` → `>`
+/// - `&amp;` → `&` (decoded last to avoid double-decoding)
+///
+/// # Arguments
+///
+/// * `text` - Text potentially containing HTML entities
+///
+/// # Returns
+///
+/// `Cow::Borrowed` if no entities found, or `Cow::Owned` with entities decoded
 pub fn decode_html_entities_cow(text: &str) -> Cow<'_, str> {
     if !text.contains('&') {
         return Cow::Borrowed(text);
@@ -239,7 +274,7 @@ pub fn decode_html_entities_cow(text: &str) -> Cow<'_, str> {
 /// Check if a character is a unicode space character.
 ///
 /// Includes: non-breaking space, various width spaces, etc.
-fn is_unicode_space(ch: char) -> bool {
+const fn is_unicode_space(ch: char) -> bool {
     matches!(
         ch,
         '\u{00A0}'

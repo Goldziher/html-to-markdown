@@ -33,7 +33,7 @@ impl BenchmarkScenario {
         ]
     }
 
-    pub fn as_str(&self) -> &'static str {
+    pub const fn as_str(&self) -> &'static str {
         match self {
             Self::ConvertDefault => "convert-default",
             Self::ConvertWithOptions => "convert-options",

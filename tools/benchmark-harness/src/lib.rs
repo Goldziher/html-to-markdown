@@ -1,3 +1,7 @@
+#![deny(clippy::correctness, clippy::suspicious)]
+#![warn(clippy::all)]
+#![allow(clippy::pedantic)]
+
 pub mod adapter;
 pub mod adapters;
 pub mod config;

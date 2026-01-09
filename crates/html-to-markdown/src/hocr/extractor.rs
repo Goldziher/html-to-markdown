@@ -1,3 +1,4 @@
+#![allow(clippy::option_if_let_else)]
 //! hOCR element extraction
 //!
 //! Extracts structured hOCR elements from HTML DOM.

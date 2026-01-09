@@ -3,6 +3,10 @@
 //! Provides a C-compatible API that can be consumed by Java (Panama FFM),
 //! Go (cgo), C# (P/Invoke), Zig, and other languages with C FFI support.
 
+#![deny(clippy::correctness, clippy::suspicious)]
+#![warn(clippy::all)]
+#![allow(clippy::pedantic)]
+
 use std::ffi::{CStr, CString};
 use std::os::raw::c_char;
 use std::ptr;
@@ -279,7 +283,7 @@ pub unsafe extern "C" fn html_to_markdown_free_string(s: *mut c_char) {
 ///
 /// - Returns a static string that does not need to be freed
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn html_to_markdown_version() -> *const c_char {
+pub const unsafe extern "C" fn html_to_markdown_version() -> *const c_char {
     concat!(env!("CARGO_PKG_VERSION"), "\0").as_ptr() as *const c_char
 }
 

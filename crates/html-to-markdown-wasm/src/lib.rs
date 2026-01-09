@@ -1,3 +1,7 @@
+#![deny(clippy::correctness, clippy::suspicious)]
+#![warn(clippy::all)]
+#![allow(clippy::pedantic)]
+
 #[cfg(feature = "js-bindings")]
 use html_to_markdown_rs::DEFAULT_INLINE_IMAGE_LIMIT;
 #[cfg(feature = "metadata")]

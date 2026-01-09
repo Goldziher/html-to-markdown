@@ -18,7 +18,7 @@ pub struct NativeAdapter {
 }
 
 impl NativeAdapter {
-    pub fn new(repo_root: PathBuf) -> Self {
+    pub const fn new(repo_root: PathBuf) -> Self {
         Self { repo_root }
     }
 
@@ -198,7 +198,7 @@ fn calculate_statistics(iterations: &[IterationResult]) -> DurationStatistics {
     let variance: f64 = durations
         .iter()
         .map(|d| {
-            let diff = d.as_secs_f64() * 1000.0 - mean_ms;
+            let diff = d.as_secs_f64().mul_add(1000.0, -mean_ms);
             diff * diff
         })
         .sum::<f64>()

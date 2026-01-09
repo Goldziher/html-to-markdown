@@ -524,8 +524,8 @@ fn build_inline_image_entry(image: InlineImage) -> PhpResult<ZBox<ZendHashTable>
     match image.dimensions {
         Some((width, height)) => {
             let mut dims = ZendHashTable::with_capacity(2);
-            dims.push(width as i64)?;
-            dims.push(height as i64)?;
+            dims.push(i64::from(width))?;
+            dims.push(i64::from(height))?;
             entry.insert("dimensions", dims)?;
         }
         None => entry.insert("dimensions", ())?,
@@ -641,7 +641,7 @@ fn build_headers_array(headers: Vec<HeaderMetadata>) -> PhpResult<ZBox<ZendHashT
 
     for header in headers {
         let mut entry = ZendHashTable::new();
-        entry.insert("level", header.level as i64)?;
+        entry.insert("level", i64::from(header.level))?;
         entry.insert("text", header.text)?;
 
         match header.id {
@@ -703,8 +703,8 @@ fn build_images_array(images: Vec<ImageMetadata>) -> PhpResult<ZBox<ZendHashTabl
         match image.dimensions {
             Some((width, height)) => {
                 let mut dims = ZendHashTable::with_capacity(2);
-                dims.push(width as i64)?;
-                dims.push(height as i64)?;
+                dims.push(i64::from(width))?;
+                dims.push(i64::from(height))?;
                 entry.insert("dimensions", dims)?;
             }
             None => entry.insert("dimensions", ())?,

@@ -9,10 +9,13 @@ homepage = "https://github.com/kreuzberg-dev/html-to-markdown"
 documentation = "https://docs.rs/html-to-markdown-rs"
 readme = "README.md"
 rust-version = "1.85"
-lints.workspace = true
 description = "Ruby bindings (Magnus) for html-to-markdown - high-performance HTML to Markdown converter"
 keywords = ["html", "markdown", "ruby", "magnus", "bindings"]
 categories = ["api-bindings"]
+
+
+[lints]
+workspace = true
 
 [lib]
 name = "html_to_markdown_rb"

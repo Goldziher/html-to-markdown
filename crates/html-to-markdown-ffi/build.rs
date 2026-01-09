@@ -1,3 +1,9 @@
+#![allow(missing_docs)]
+
+//! Build script for generating C bindings.
+//!
+//! Uses cbindgen to generate C header files from Rust FFI definitions.
+
 use std::env;
 use std::path::PathBuf;
 

@@ -4,7 +4,19 @@
 //! It uses the astral-tl parser for high-performance HTML parsing and supports 60+ HTML tags.
 //!
 
-#![allow(clippy::collapsible_match)]
+#![allow(
+    clippy::struct_excessive_bools,
+    clippy::too_many_arguments,
+    clippy::too_many_lines,
+    clippy::branches_sharing_code,
+    clippy::trivially_copy_pass_by_ref,
+    clippy::manual_let_else,
+    clippy::collapsible_match,
+    clippy::match_wildcard_for_single_variants,
+    clippy::map_unwrap_or
+)]
+#![warn(clippy::all)]
+#![warn(clippy::pedantic)]
 //! # Architecture
 //!
 //! The conversion process follows these steps:
@@ -66,9 +78,9 @@ type ImageMetadataPayload = (BTreeMap<String, String>, Option<u32>, Option<u32>)
 
 /// Chomp whitespace from inline element content, preserving line breaks.
 ///
-/// Similar to text::chomp but handles line breaks from <br> tags specially.
+/// Similar to `text::chomp` but handles line breaks from `<br>` tags specially.
 /// Line breaks are extracted as suffix to be placed outside formatting.
-/// Returns (prefix, suffix, trimmed_text).
+/// Returns (prefix, suffix, `trimmed_text`).
 fn chomp_inline(text: &str) -> (&str, &str, &str) {
     if text.is_empty() {
         return ("", "", "");
@@ -87,13 +99,10 @@ fn chomp_inline(text: &str) -> (&str, &str, &str) {
     };
 
     let trimmed = if has_trailing_linebreak {
-        if let Some(stripped) = text.strip_suffix("  \n") {
-            stripped.trim()
-        } else if let Some(stripped) = text.strip_suffix("\\\n") {
-            stripped.trim()
-        } else {
-            text.trim()
-        }
+        text.strip_suffix("  \n").map_or_else(
+            || text.strip_suffix("\\\n").map_or_else(|| text.trim(), |s| s.trim()),
+            |s| s.trim(),
+        )
     } else {
         text.trim()
     };
@@ -126,11 +135,9 @@ fn trim_line_end_whitespace(output: &mut String) {
         let has_soft_break = line.ends_with("  ");
         let trimmed = line.trim_end_matches([' ', '\t']);
 
+        cleaned.push_str(trimmed);
         if has_soft_break {
-            cleaned.push_str(trimmed);
             cleaned.push_str("  ");
-        } else {
-            cleaned.push_str(trimmed);
         }
     }
 
@@ -207,7 +214,7 @@ fn dedent_code_block(content: &str) -> String {
 ///     + Level 2      (depth=1)
 ///             Cont   (depth=1: (2*1-1) = 1 group = 4 spaces, total 12 with bullet indent)
 /// ```
-fn calculate_list_continuation_indent(depth: usize) -> usize {
+const fn calculate_list_continuation_indent(depth: usize) -> usize {
     if depth > 0 { 2 * depth - 1 } else { 0 }
 }
 
@@ -232,42 +239,40 @@ fn calculate_list_continuation_indent(depth: usize) -> usize {
 ///   <li>Item 2</li>
 /// </ul>
 /// ```
-fn is_loose_list(node_handle: &tl::NodeHandle, parser: &tl::Parser, dom_ctx: &DomContext) -> bool {
-    if let Some(node) = node_handle.get(parser) {
-        if let tl::Node::Tag(tag) = node {
-            let children = tag.children();
-            {
-                for child_handle in children.top().iter() {
-                    let is_li = dom_ctx
-                        .tag_info(child_handle.get_inner(), parser)
-                        .map(|info| info.name == "li")
-                        .unwrap_or_else(|| {
-                            matches!(
-                                child_handle.get(parser),
-                                Some(tl::Node::Tag(child_tag))
-                                    if tag_name_eq(child_tag.name().as_utf8_str(), "li")
-                            )
-                        });
-                    if !is_li {
-                        continue;
-                    }
+fn is_loose_list(node_handle: tl::NodeHandle, parser: &tl::Parser, dom_ctx: &DomContext) -> bool {
+    if let Some(tl::Node::Tag(tag)) = node_handle.get(parser) {
+        let children = tag.children();
+        {
+            for child_handle in children.top().iter() {
+                let is_li = dom_ctx.tag_info(child_handle.get_inner(), parser).map_or_else(
+                    || {
+                        matches!(
+                            child_handle.get(parser),
+                            Some(tl::Node::Tag(child_tag))
+                                if tag_name_eq(child_tag.name().as_utf8_str(), "li")
+                        )
+                    },
+                    |info| info.name == "li",
+                );
+                if !is_li {
+                    continue;
+                }
 
-                    if let Some(tl::Node::Tag(child_tag)) = child_handle.get(parser) {
-                        let li_children = child_tag.children();
-                        for li_child_handle in li_children.top().iter() {
-                            let is_p = dom_ctx
-                                .tag_info(li_child_handle.get_inner(), parser)
-                                .map(|info| info.name == "p")
-                                .unwrap_or_else(|| {
-                                    matches!(
-                                        li_child_handle.get(parser),
-                                        Some(tl::Node::Tag(li_child_tag))
-                                            if tag_name_eq(li_child_tag.name().as_utf8_str(), "p")
-                                    )
-                                });
-                            if is_p {
-                                return true;
-                            }
+                if let Some(tl::Node::Tag(child_tag)) = child_handle.get(parser) {
+                    let li_children = child_tag.children();
+                    for li_child_handle in li_children.top().iter() {
+                        let is_p = dom_ctx.tag_info(li_child_handle.get_inner(), parser).map_or_else(
+                            || {
+                                matches!(
+                                    li_child_handle.get(parser),
+                                    Some(tl::Node::Tag(li_child_tag))
+                                        if tag_name_eq(li_child_tag.name().as_utf8_str(), "p")
+                                )
+                            },
+                            |info| info.name == "p",
+                        );
+                        if is_p {
+                            return true;
                         }
                     }
                 }
@@ -398,7 +403,7 @@ fn add_nested_list_trailing_separator(output: &mut String, ctx: &Context) {
 /// If we're in a list but NOT in a list item, this is incorrectly nested HTML
 /// and we need to increment the depth. If in a list item, the depth was already
 /// incremented by the <li> element.
-fn calculate_list_nesting_depth(ctx: &Context) -> usize {
+const fn calculate_list_nesting_depth(ctx: &Context) -> usize {
     if ctx.in_list && !ctx.in_list_item {
         ctx.list_depth + 1
     } else {
@@ -412,7 +417,7 @@ fn calculate_list_nesting_depth(ctx: &Context) -> usize {
 /// Returns true if the last processed item had block children.
 #[allow(clippy::too_many_arguments)]
 fn process_list_children(
-    node_handle: &tl::NodeHandle,
+    node_handle: tl::NodeHandle,
     parser: &tl::Parser,
     output: &mut String,
     options: &ConversionOptions,
@@ -426,42 +431,38 @@ fn process_list_children(
 ) {
     let mut counter = start_counter;
 
-    if let Some(node) = node_handle.get(parser) {
-        if let tl::Node::Tag(tag) = node {
-            let children = tag.children();
-            {
-                for child_handle in children.top().iter() {
-                    if let Some(child_node) = child_handle.get(parser) {
-                        if let tl::Node::Raw(bytes) = child_node {
-                            if bytes.as_utf8_str().trim().is_empty() {
-                                continue;
-                            }
-                        }
+    if let Some(tl::Node::Tag(tag)) = node_handle.get(parser) {
+        let children = tag.children();
+        {
+            for child_handle in children.top().iter() {
+                if let Some(tl::Node::Raw(bytes)) = child_handle.get(parser) {
+                    if bytes.as_utf8_str().trim().is_empty() {
+                        continue;
                     }
+                }
 
-                    let list_ctx = Context {
-                        in_ordered_list: is_ordered,
-                        list_counter: if is_ordered { counter } else { 0 },
-                        in_list: true,
-                        list_depth: nested_depth,
-                        ul_depth: if is_ordered { ctx.ul_depth } else { ctx.ul_depth + 1 },
-                        loose_list: is_loose,
-                        prev_item_had_blocks: false,
-                        ..ctx.clone()
-                    };
+                let list_ctx = Context {
+                    in_ordered_list: is_ordered,
+                    list_counter: if is_ordered { counter } else { 0 },
+                    in_list: true,
+                    list_depth: nested_depth,
+                    ul_depth: if is_ordered { ctx.ul_depth } else { ctx.ul_depth + 1 },
+                    loose_list: is_loose,
+                    prev_item_had_blocks: false,
+                    ..ctx.clone()
+                };
 
-                    walk_node(child_handle, parser, output, options, &list_ctx, depth, dom_ctx);
+                walk_node(child_handle, parser, output, options, &list_ctx, depth, dom_ctx);
 
-                    if is_ordered && is_list_item(child_handle, parser, dom_ctx) {
-                        counter += 1;
-                    }
+                if is_ordered && is_list_item(*child_handle, parser, dom_ctx) {
+                    counter += 1;
                 }
             }
         }
     }
 }
 
-fn is_list_item(node_handle: &tl::NodeHandle, parser: &tl::Parser, dom_ctx: &DomContext) -> bool {
+fn is_list_item(node_handle: tl::NodeHandle, parser: &tl::Parser, dom_ctx: &DomContext) -> bool {
     if let Some(info) = dom_ctx.tag_info(node_handle.get_inner(), parser) {
         return info.name == "li";
     }
@@ -473,6 +474,7 @@ fn is_list_item(node_handle: &tl::NodeHandle, parser: &tl::Parser, dom_ctx: &Dom
 
 /// Conversion context to track state during traversal
 #[derive(Debug, Clone)]
+#[allow(clippy::struct_excessive_bools)]
 struct Context {
     /// Are we inside a code-like element (pre, code, kbd, samp)?
     in_code: bool,
@@ -599,7 +601,7 @@ impl DomContext {
             .and_then(|cell| cell.get_or_init(|| self.build_tag_info(id, parser)).as_ref())
     }
 
-    fn tag_name_for<'a>(&'a self, node_handle: &tl::NodeHandle, parser: &'a tl::Parser) -> Option<Cow<'a, str>> {
+    fn tag_name_for<'a>(&'a self, node_handle: tl::NodeHandle, parser: &'a tl::Parser) -> Option<Cow<'a, str>> {
         if let Some(info) = self.tag_info(node_handle.get_inner(), parser) {
             return Some(Cow::Borrowed(info.name.as_str()));
         }
@@ -609,137 +611,124 @@ impl DomContext {
         None
     }
 
-    fn next_tag_name<'a>(&'a self, node_handle: &tl::NodeHandle, parser: &'a tl::Parser) -> Option<&'a str> {
+    fn next_tag_name<'a>(&'a self, node_handle: tl::NodeHandle, parser: &'a tl::Parser) -> Option<&'a str> {
         let next_id = self.next_tag_id(node_handle.get_inner(), parser)?;
         self.tag_info(next_id, parser).map(|info| info.name.as_str())
     }
 
-    fn previous_inline_like(&self, node_handle: &tl::NodeHandle, parser: &tl::Parser) -> bool {
+    fn previous_inline_like(&self, node_handle: tl::NodeHandle, parser: &tl::Parser) -> bool {
         let id = node_handle.get_inner();
-        self.prev_inline_like_map
-            .get(id as usize)
-            .map(|cell| {
-                *cell.get_or_init(|| {
-                    let parent = self.parent_of(id);
-                    let siblings = if let Some(parent_id) = parent {
-                        if let Some(children) = self.children_of(parent_id) {
-                            children
-                        } else {
-                            return false;
-                        }
+        self.prev_inline_like_map.get(id as usize).is_some_and(|cell| {
+            *cell.get_or_init(|| {
+                let parent = self.parent_of(id);
+                let siblings = if let Some(parent_id) = parent {
+                    if let Some(children) = self.children_of(parent_id) {
+                        children
                     } else {
-                        &self.root_children
-                    };
-
-                    let Some(position) = self
-                        .sibling_index(id)
-                        .or_else(|| siblings.iter().position(|handle| handle.get_inner() == id))
-                    else {
                         return false;
-                    };
-
-                    for sibling in siblings.iter().take(position).rev() {
-                        if let Some(info) = self.tag_info(sibling.get_inner(), parser) {
-                            return info.is_inline_like;
-                        }
-                        if let Some(node) = sibling.get(parser) {
-                            if let tl::Node::Raw(raw) = node {
-                                if raw.as_utf8_str().trim().is_empty() {
-                                    continue;
-                                }
-                                return false;
-                            }
-                        }
                     }
+                } else {
+                    &self.root_children
+                };
 
-                    false
-                })
+                let Some(position) = self
+                    .sibling_index(id)
+                    .or_else(|| siblings.iter().position(|handle| handle.get_inner() == id))
+                else {
+                    return false;
+                };
+
+                for sibling in siblings.iter().take(position).rev() {
+                    if let Some(info) = self.tag_info(sibling.get_inner(), parser) {
+                        return info.is_inline_like;
+                    }
+                    if let Some(tl::Node::Raw(raw)) = sibling.get(parser) {
+                        if raw.as_utf8_str().trim().is_empty() {
+                            continue;
+                        }
+                        return false;
+                    }
+                }
+
+                false
             })
-            .unwrap_or(false)
+        })
     }
 
-    fn next_inline_like(&self, node_handle: &tl::NodeHandle, parser: &tl::Parser) -> bool {
+    fn next_inline_like(&self, node_handle: tl::NodeHandle, parser: &tl::Parser) -> bool {
         let id = node_handle.get_inner();
-        self.next_inline_like_map
-            .get(id as usize)
-            .map(|cell| {
-                *cell.get_or_init(|| {
-                    let parent = self.parent_of(id);
-                    let siblings = if let Some(parent_id) = parent {
-                        if let Some(children) = self.children_of(parent_id) {
-                            children
-                        } else {
-                            return false;
-                        }
+        self.next_inline_like_map.get(id as usize).is_some_and(|cell| {
+            *cell.get_or_init(|| {
+                let parent = self.parent_of(id);
+                let siblings = if let Some(parent_id) = parent {
+                    if let Some(children) = self.children_of(parent_id) {
+                        children
                     } else {
-                        &self.root_children
-                    };
-
-                    let Some(position) = self
-                        .sibling_index(id)
-                        .or_else(|| siblings.iter().position(|handle| handle.get_inner() == id))
-                    else {
                         return false;
-                    };
-
-                    for sibling in siblings.iter().skip(position + 1) {
-                        if let Some(info) = self.tag_info(sibling.get_inner(), parser) {
-                            return info.is_inline_like;
-                        }
-                        if let Some(node) = sibling.get(parser) {
-                            if let tl::Node::Raw(raw) = node {
-                                if raw.as_utf8_str().trim().is_empty() {
-                                    continue;
-                                }
-                                return false;
-                            }
-                        }
                     }
+                } else {
+                    &self.root_children
+                };
 
-                    false
-                })
+                let Some(position) = self
+                    .sibling_index(id)
+                    .or_else(|| siblings.iter().position(|handle| handle.get_inner() == id))
+                else {
+                    return false;
+                };
+
+                for sibling in siblings.iter().skip(position + 1) {
+                    if let Some(info) = self.tag_info(sibling.get_inner(), parser) {
+                        return info.is_inline_like;
+                    }
+                    if let Some(tl::Node::Raw(raw)) = sibling.get(parser) {
+                        if raw.as_utf8_str().trim().is_empty() {
+                            continue;
+                        }
+                        return false;
+                    }
+                }
+
+                false
             })
-            .unwrap_or(false)
+        })
     }
 
-    fn next_whitespace_text(&self, node_handle: &tl::NodeHandle, parser: &tl::Parser) -> bool {
+    fn next_whitespace_text(&self, node_handle: tl::NodeHandle, parser: &tl::Parser) -> bool {
         let id = node_handle.get_inner();
-        self.next_whitespace_map
-            .get(id as usize)
-            .map(|cell| {
-                *cell.get_or_init(|| {
-                    let parent = self.parent_of(id);
-                    let siblings = if let Some(parent_id) = parent {
-                        if let Some(children) = self.children_of(parent_id) {
-                            children
-                        } else {
-                            return false;
-                        }
+        self.next_whitespace_map.get(id as usize).is_some_and(|cell| {
+            *cell.get_or_init(|| {
+                let parent = self.parent_of(id);
+                let siblings = if let Some(parent_id) = parent {
+                    if let Some(children) = self.children_of(parent_id) {
+                        children
                     } else {
-                        &self.root_children
-                    };
-
-                    let Some(position) = self
-                        .sibling_index(id)
-                        .or_else(|| siblings.iter().position(|handle| handle.get_inner() == id))
-                    else {
                         return false;
-                    };
+                    }
+                } else {
+                    &self.root_children
+                };
 
-                    for sibling in siblings.iter().skip(position + 1) {
-                        if let Some(node) = sibling.get(parser) {
-                            match node {
-                                tl::Node::Raw(raw) => return raw.as_utf8_str().trim().is_empty(),
-                                tl::Node::Tag(_) => return false,
-                                _ => continue,
-                            }
+                let Some(position) = self
+                    .sibling_index(id)
+                    .or_else(|| siblings.iter().position(|handle| handle.get_inner() == id))
+                else {
+                    return false;
+                };
+
+                for sibling in siblings.iter().skip(position + 1) {
+                    if let Some(node) = sibling.get(parser) {
+                        match node {
+                            tl::Node::Raw(raw) => return raw.as_utf8_str().trim().is_empty(),
+                            tl::Node::Tag(_) => return false,
+                            tl::Node::Comment(_) => {}
                         }
                     }
+                }
 
-                    false
-                })
+                false
             })
-            .unwrap_or(false)
+        })
     }
 
     fn next_tag_id(&self, id: u32, parser: &tl::Parser) -> Option<u32> {
@@ -766,11 +755,9 @@ impl DomContext {
                             }
                             return Some(sibling_id);
                         }
-                        if let Some(node) = sibling.get(parser) {
-                            if let tl::Node::Raw(raw) = node {
-                                if !raw.as_utf8_str().trim().is_empty() {
-                                    return None;
-                                }
+                        if let Some(tl::Node::Raw(raw)) = sibling.get(parser) {
+                            if !raw.as_utf8_str().trim().is_empty() {
+                                return None;
                             }
                         }
                     }
@@ -799,7 +786,7 @@ impl DomContext {
         }
     }
 
-    fn text_content(&self, node_handle: &tl::NodeHandle, parser: &tl::Parser) -> String {
+    fn text_content(&self, node_handle: tl::NodeHandle, parser: &tl::Parser) -> String {
         let id = node_handle.get_inner();
         let cached = {
             let mut cache = self.text_cache.borrow_mut();
@@ -814,7 +801,7 @@ impl DomContext {
         value
     }
 
-    fn text_content_uncached(&self, node_handle: &tl::NodeHandle, parser: &tl::Parser) -> String {
+    fn text_content_uncached(&self, node_handle: tl::NodeHandle, parser: &tl::Parser) -> String {
         let mut text = String::with_capacity(64);
         if let Some(node) = node_handle.get(parser) {
             match node {
@@ -826,10 +813,10 @@ impl DomContext {
                 tl::Node::Tag(tag) => {
                     let children = tag.children();
                     for child_handle in children.top().iter() {
-                        text.push_str(&self.text_content(child_handle, parser));
+                        text.push_str(&self.text_content(*child_handle, parser));
                     }
                 }
-                _ => {}
+                tl::Node::Comment(_) => {}
             }
         }
         text
@@ -936,7 +923,7 @@ fn append_markdown_link(
         if open_count == close_count {
             output.push_str(href);
         } else {
-            let escaped_href = href.replace("(", "\\(").replace(")", "\\)");
+            let escaped_href = href.replace('(', "\\(").replace(')', "\\)");
             output.push_str(&escaped_href);
         }
     }
@@ -976,7 +963,7 @@ fn heading_level_from_name(name: &str) -> Option<usize> {
     }
 }
 
-fn find_single_heading_child(node_handle: &tl::NodeHandle, parser: &tl::Parser) -> Option<(usize, tl::NodeHandle)> {
+fn find_single_heading_child(node_handle: tl::NodeHandle, parser: &tl::Parser) -> Option<(usize, tl::NodeHandle)> {
     let node = node_handle.get(parser)?;
 
     let tl::Node::Tag(tag) = node else {
@@ -1008,7 +995,7 @@ fn find_single_heading_child(node_handle: &tl::NodeHandle, parser: &tl::Parser) 
                     return None;
                 }
             }
-            _ => return None,
+            tl::Node::Comment(_) => return None,
         }
     }
 
@@ -1064,24 +1051,20 @@ fn push_heading(output: &mut String, ctx: &Context, options: &ConversionOptions,
                 output.push_str(text);
                 output.push('\n');
                 output.push_str(&"=".repeat(text.len()));
-                output.push_str(heading_suffix);
             } else if level == 2 {
                 output.push_str(text);
                 output.push('\n');
                 output.push_str(&"-".repeat(text.len()));
-                output.push_str(heading_suffix);
             } else {
                 output.push_str(&"#".repeat(level));
                 output.push(' ');
                 output.push_str(text);
-                output.push_str(heading_suffix);
             }
         }
         HeadingStyle::Atx => {
             output.push_str(&"#".repeat(level));
             output.push(' ');
             output.push_str(text);
-            output.push_str(heading_suffix);
         }
         HeadingStyle::AtxClosed => {
             output.push_str(&"#".repeat(level));
@@ -1089,16 +1072,16 @@ fn push_heading(output: &mut String, ctx: &Context, options: &ConversionOptions,
             output.push_str(text);
             output.push(' ');
             output.push_str(&"#".repeat(level));
-            output.push_str(heading_suffix);
         }
     }
+    output.push_str(heading_suffix);
 }
 
 fn heading_allows_inline_images(tag_name: &str, keep_inline_images_in: &HashSet<String>) -> bool {
     keep_inline_images_in.contains(tag_name)
 }
 
-fn normalize_heading_text<'a>(text: &'a str) -> Cow<'a, str> {
+fn normalize_heading_text(text: &str) -> Cow<'_, str> {
     if !text.contains('\n') && !text.contains('\r') {
         return Cow::Borrowed(text);
     }
@@ -1113,7 +1096,7 @@ fn normalize_heading_text<'a>(text: &'a str) -> Cow<'a, str> {
                     pending_space = true;
                 }
             }
-            ' ' | '\t' if pending_space => continue,
+            ' ' | '\t' if pending_space => {}
             _ => {
                 if pending_space {
                     if !normalized.ends_with(' ') {
@@ -1149,7 +1132,7 @@ fn build_dom_context(dom: &tl::VDom, parser: &tl::Parser, input_len: usize) -> D
         let id = child_handle.get_inner();
         ctx.ensure_capacity(id);
         ctx.sibling_index_map[id as usize] = Some(index);
-        record_node_hierarchy(child_handle, None, parser, &mut ctx);
+        record_node_hierarchy(*child_handle, None, parser, &mut ctx);
     }
 
     ctx
@@ -1162,17 +1145,18 @@ fn text_cache_capacity_for_input(input_len: usize) -> NonZeroUsize {
 
 /// Round-trip HTML through html5ever to repair malformed trees.
 fn repair_with_html5ever(input: &str) -> Option<String> {
+    use html5ever::ParseOpts;
     use html5ever::serialize::{SerializeOpts, serialize};
     use html5ever::tendril::TendrilSink;
     use markup5ever_rcdom::{RcDom, SerializableHandle};
 
-    let dom = html5ever::parse_document(RcDom::default(), Default::default())
+    let dom = html5ever::parse_document(RcDom::default(), ParseOpts::default())
         .from_utf8()
         .read_from(&mut input.as_bytes())
         .ok()?;
 
     let mut buf = Vec::with_capacity(input.len());
-    let handle = SerializableHandle::from(dom.document.clone());
+    let handle = SerializableHandle::from(dom.document);
     serialize(&mut buf, &handle, SerializeOpts::default()).ok()?;
     String::from_utf8(buf).ok()
 }
@@ -1220,11 +1204,11 @@ fn has_custom_element_tags(input: &str) -> bool {
     false
 }
 
-fn record_node_hierarchy(node_handle: &tl::NodeHandle, parent: Option<u32>, parser: &tl::Parser, ctx: &mut DomContext) {
+fn record_node_hierarchy(node_handle: tl::NodeHandle, parent: Option<u32>, parser: &tl::Parser, ctx: &mut DomContext) {
     let id = node_handle.get_inner();
     ctx.ensure_capacity(id);
     ctx.parent_map[id as usize] = parent;
-    ctx.node_map[id as usize] = Some(*node_handle);
+    ctx.node_map[id as usize] = Some(node_handle);
 
     if let Some(tl::Node::Tag(tag)) = node_handle.get(parser) {
         let children: Vec<_> = tag.children().top().iter().copied().collect();
@@ -1232,7 +1216,7 @@ fn record_node_hierarchy(node_handle: &tl::NodeHandle, parent: Option<u32>, pars
             let child_id = child.get_inner();
             ctx.ensure_capacity(child_id);
             ctx.sibling_index_map[child_id as usize] = Some(index);
-            record_node_hierarchy(child, Some(id), parser, ctx);
+            record_node_hierarchy(*child, Some(id), parser, ctx);
         }
         ctx.children_map[id as usize] = Some(children);
     }
@@ -1263,54 +1247,43 @@ fn may_be_hocr(input: &str) -> bool {
 ///
 /// Detection criteria:
 /// - meta tag with name="ocr-system" or name="ocr-capabilities"
-/// - Elements with classes: ocr_page, ocrx_word, ocr_carea, ocr_par, ocr_line
-fn is_hocr_document(node_handle: &tl::NodeHandle, parser: &tl::Parser) -> bool {
-    fn check_node(node_handle: &tl::NodeHandle, parser: &tl::Parser) -> bool {
-        if let Some(node) = node_handle.get(parser) {
-            match node {
-                tl::Node::Tag(tag) => {
-                    let tag_name = normalized_tag_name(tag.name().as_utf8_str());
+/// - Elements with classes: `ocr_page`, `ocrx_word`, `ocr_carea`, `ocr_par`, `ocr_line`
+fn is_hocr_document(node_handle: tl::NodeHandle, parser: &tl::Parser) -> bool {
+    fn check_node(node_handle: tl::NodeHandle, parser: &tl::Parser) -> bool {
+        if let Some(tl::Node::Tag(tag)) = node_handle.get(parser) {
+            let tag_name = normalized_tag_name(tag.name().as_utf8_str());
 
-                    if tag_name == "meta" {
-                        if let Some(name_attr) = tag.attributes().get("name") {
-                            if let Some(name_bytes) = name_attr {
-                                let name_value = name_bytes.as_utf8_str();
-                                if name_value == "ocr-system" || name_value == "ocr-capabilities" {
-                                    return true;
-                                }
-                            }
-                        }
+            if tag_name == "meta" {
+                if let Some(Some(name_bytes)) = tag.attributes().get("name") {
+                    let name_value = name_bytes.as_utf8_str();
+                    if name_value == "ocr-system" || name_value == "ocr-capabilities" {
+                        return true;
                     }
-
-                    if let Some(class_attr) = tag.attributes().get("class") {
-                        if let Some(class_bytes) = class_attr {
-                            let class_value = class_bytes.as_utf8_str();
-                            if class_value.contains("ocr_page")
-                                || class_value.contains("ocrx_word")
-                                || class_value.contains("ocr_carea")
-                                || class_value.contains("ocr_par")
-                                || class_value.contains("ocr_line")
-                            {
-                                return true;
-                            }
-                        }
-                    }
-
-                    let children = tag.children();
-                    {
-                        for child_handle in children.top().iter() {
-                            if check_node(child_handle, parser) {
-                                return true;
-                            }
-                        }
-                    }
-                    false
                 }
-                _ => false,
             }
-        } else {
-            false
+
+            if let Some(Some(class_bytes)) = tag.attributes().get("class") {
+                let class_value = class_bytes.as_utf8_str();
+                if class_value.contains("ocr_page")
+                    || class_value.contains("ocrx_word")
+                    || class_value.contains("ocr_carea")
+                    || class_value.contains("ocr_par")
+                    || class_value.contains("ocr_line")
+                {
+                    return true;
+                }
+            }
+
+            let children = tag.children();
+            {
+                for child_handle in children.top().iter() {
+                    if check_node(*child_handle, parser) {
+                        return true;
+                    }
+                }
+            }
         }
+        false
     }
 
     check_node(node_handle, parser)
@@ -1326,6 +1299,7 @@ fn is_hocr_document(node_handle: &tl::NodeHandle, parser: &tl::Parser) -> bool {
 /// - base-href: Base URL from <base> tag
 /// - canonical: Canonical URL from <link rel="canonical">
 /// - link relations: author, license, alternate links
+#[allow(clippy::too_many_lines, clippy::items_after_statements)]
 fn extract_metadata(
     node_handle: &tl::NodeHandle,
     parser: &tl::Parser,
@@ -1352,17 +1326,15 @@ fn extract_metadata(
     }
 
     fn find_head(node_handle: &tl::NodeHandle, parser: &tl::Parser) -> Option<tl::NodeHandle> {
-        if let Some(node) = node_handle.get(parser) {
-            if let tl::Node::Tag(tag) = node {
-                if tag_name_eq(tag.name().as_utf8_str(), "head") {
-                    return Some(*node_handle);
-                }
-                let children = tag.children();
-                {
-                    for child_handle in children.top().iter() {
-                        if let Some(result) = find_head(child_handle, parser) {
-                            return Some(result);
-                        }
+        if let Some(tl::Node::Tag(tag)) = node_handle.get(parser) {
+            if tag_name_eq(tag.name().as_utf8_str(), "head") {
+                return Some(*node_handle);
+            }
+            let children = tag.children();
+            {
+                for child_handle in children.top().iter() {
+                    if let Some(result) = find_head(child_handle, parser) {
+                        return Some(result);
                     }
                 }
             }
@@ -1375,95 +1347,84 @@ fn extract_metadata(
         None => return metadata,
     };
 
-    if let Some(head_node) = head_handle.get(parser) {
-        if let tl::Node::Tag(head_tag) = head_node {
-            let children = head_tag.children();
-            {
-                for child_handle in children.top().iter() {
-                    if let Some(child_node) = child_handle.get(parser) {
-                        if let tl::Node::Tag(child_tag) = child_node {
-                            let tag_name = normalized_tag_name(child_tag.name().as_utf8_str());
+    if let Some(tl::Node::Tag(head_tag)) = head_handle.get(parser) {
+        let children = head_tag.children();
+        {
+            for child_handle in children.top().iter() {
+                if let Some(tl::Node::Tag(child_tag)) = child_handle.get(parser) {
+                    let tag_name = normalized_tag_name(child_tag.name().as_utf8_str());
 
-                            match tag_name.as_ref() {
-                                "title" => {
-                                    if strip_title || preserve_title {
-                                    } else {
-                                        let title_children = child_tag.children();
-                                        {
-                                            if let Some(first_child) = title_children.top().iter().next() {
-                                                if let Some(text_node) = first_child.get(parser) {
-                                                    if let tl::Node::Raw(bytes) = text_node {
-                                                        let title = text::normalize_whitespace(&bytes.as_utf8_str())
-                                                            .trim()
-                                                            .to_string();
-                                                        if !title.is_empty() {
-                                                            metadata.insert("title".to_string(), title);
-                                                        }
-                                                    }
-                                                }
+                    match tag_name.as_ref() {
+                        "title" => {
+                            if strip_title || preserve_title {
+                            } else {
+                                let title_children = child_tag.children();
+                                {
+                                    if let Some(first_child) = title_children.top().iter().next() {
+                                        if let Some(tl::Node::Raw(bytes)) = first_child.get(parser) {
+                                            let title =
+                                                text::normalize_whitespace(&bytes.as_utf8_str()).trim().to_string();
+                                            if !title.is_empty() {
+                                                metadata.insert("title".to_string(), title);
                                             }
                                         }
                                     }
                                 }
-                                "base" => {
-                                    if let Some(href_attr) = child_tag.attributes().get("href") {
-                                        if let Some(href_bytes) = href_attr {
-                                            let href = href_bytes.as_utf8_str().to_string();
-                                            if !href.is_empty() {
-                                                metadata.insert("base-href".to_string(), href);
-                                            }
-                                        }
-                                    }
-                                }
-                                "meta" => {
-                                    if !strip_meta && !preserve_meta {
-                                        let content = if let Some(Some(bytes)) = child_tag.attributes().get("content") {
-                                            Some(bytes.as_utf8_str().to_string())
-                                        } else {
-                                            None
-                                        };
-
-                                        if let Some(content) = content {
-                                            let key_source = if let Some(Some(bytes)) =
-                                                child_tag.attributes().get("name")
-                                            {
-                                                Some(bytes.as_utf8_str())
-                                            } else if let Some(Some(bytes)) = child_tag.attributes().get("property") {
-                                                Some(bytes.as_utf8_str())
-                                            } else if let Some(Some(bytes)) = child_tag.attributes().get("http-equiv") {
-                                                Some(bytes.as_utf8_str())
-                                            } else {
-                                                None
-                                            };
-
-                                            if let Some(key_source) = key_source {
-                                                let key = normalize_meta_key("meta-", key_source.as_ref());
-                                                metadata.insert(key, content);
-                                            }
-                                        }
-                                    }
-                                }
-                                "link" => {
-                                    if let (Some(Some(rel_bytes)), Some(Some(href_bytes))) =
-                                        (child_tag.attributes().get("rel"), child_tag.attributes().get("href"))
-                                    {
-                                        let rel = rel_bytes.as_utf8_str();
-                                        let href = href_bytes.as_utf8_str();
-
-                                        if rel.eq_ignore_ascii_case("canonical") {
-                                            metadata.insert("canonical".to_string(), href.to_string());
-                                        } else if rel.eq_ignore_ascii_case("author") {
-                                            metadata.insert("link-author".to_string(), href.to_string());
-                                        } else if rel.eq_ignore_ascii_case("license") {
-                                            metadata.insert("link-license".to_string(), href.to_string());
-                                        } else if rel.eq_ignore_ascii_case("alternate") {
-                                            metadata.insert("link-alternate".to_string(), href.to_string());
-                                        }
-                                    }
-                                }
-                                _ => {}
                             }
                         }
+                        "base" => {
+                            if let Some(Some(href_bytes)) = child_tag.attributes().get("href") {
+                                let href = href_bytes.as_utf8_str().to_string();
+                                if !href.is_empty() {
+                                    metadata.insert("base-href".to_string(), href);
+                                }
+                            }
+                        }
+                        "meta" => {
+                            if !strip_meta && !preserve_meta {
+                                let content = if let Some(Some(bytes)) = child_tag.attributes().get("content") {
+                                    Some(bytes.as_utf8_str().to_string())
+                                } else {
+                                    None
+                                };
+
+                                if let Some(content) = content {
+                                    let key_source = if let Some(Some(bytes)) = child_tag.attributes().get("name") {
+                                        Some(bytes.as_utf8_str())
+                                    } else if let Some(Some(bytes)) = child_tag.attributes().get("property") {
+                                        Some(bytes.as_utf8_str())
+                                    } else if let Some(Some(bytes)) = child_tag.attributes().get("http-equiv") {
+                                        Some(bytes.as_utf8_str())
+                                    } else {
+                                        None
+                                    };
+
+                                    if let Some(key_source) = key_source {
+                                        let key = normalize_meta_key("meta-", key_source.as_ref());
+                                        metadata.insert(key, content);
+                                    }
+                                }
+                            }
+                        }
+                        "link" => {
+                            if let (Some(Some(rel_bytes)), Some(Some(href_bytes))) =
+                                (child_tag.attributes().get("rel"), child_tag.attributes().get("href"))
+                            {
+                                let rel = rel_bytes.as_utf8_str();
+                                let href = href_bytes.as_utf8_str();
+
+                                if rel.eq_ignore_ascii_case("canonical") {
+                                    metadata.insert("canonical".to_string(), href.to_string());
+                                } else if rel.eq_ignore_ascii_case("author") {
+                                    metadata.insert("link-author".to_string(), href.to_string());
+                                } else if rel.eq_ignore_ascii_case("license") {
+                                    metadata.insert("link-license".to_string(), href.to_string());
+                                } else if rel.eq_ignore_ascii_case("alternate") {
+                                    metadata.insert("link-alternate".to_string(), href.to_string());
+                                }
+                            }
+                        }
+                        _ => {}
                     }
                 }
             }
@@ -1525,7 +1486,7 @@ fn is_empty_inline_element(node_handle: &tl::NodeHandle, parser: &tl::Parser, do
 
 /// Get the text content of a node and its children.
 fn get_text_content(node_handle: &tl::NodeHandle, parser: &tl::Parser, dom_ctx: &DomContext) -> String {
-    dom_ctx.text_content(node_handle, parser)
+    dom_ctx.text_content(*node_handle, parser)
 }
 
 /// Collect inline text for link labels, skipping block-level descendants.
@@ -1609,40 +1570,38 @@ fn normalize_link_label(label: &str) -> String {
 
 /// Serialize an element to HTML string (for SVG and Math elements).
 fn serialize_element(node_handle: &tl::NodeHandle, parser: &tl::Parser) -> String {
-    if let Some(node) = node_handle.get(parser) {
-        if let tl::Node::Tag(tag) = node {
-            let tag_name = normalized_tag_name(tag.name().as_utf8_str());
-            let mut html = String::with_capacity(256);
-            html.push('<');
-            html.push_str(&tag_name);
+    if let Some(tl::Node::Tag(tag)) = node_handle.get(parser) {
+        let tag_name = normalized_tag_name(tag.name().as_utf8_str());
+        let mut html = String::with_capacity(256);
+        html.push('<');
+        html.push_str(&tag_name);
 
-            for (key, value_opt) in tag.attributes().iter() {
-                html.push(' ');
-                html.push_str(&key);
-                if let Some(value) = value_opt {
-                    html.push_str("=\"");
-                    html.push_str(&value);
-                    html.push('"');
-                }
+        for (key, value_opt) in tag.attributes().iter() {
+            html.push(' ');
+            html.push_str(&key);
+            if let Some(value) = value_opt {
+                html.push_str("=\"");
+                html.push_str(&value);
+                html.push('"');
             }
-
-            let has_children = !tag.children().top().is_empty();
-            if !has_children {
-                html.push_str(" />");
-            } else {
-                html.push('>');
-                let children = tag.children();
-                {
-                    for child_handle in children.top().iter() {
-                        html.push_str(&serialize_node(child_handle, parser));
-                    }
-                }
-                html.push_str("</");
-                html.push_str(&tag_name);
-                html.push('>');
-            }
-            return html;
         }
+
+        let has_children = !tag.children().top().is_empty();
+        if has_children {
+            html.push('>');
+            let children = tag.children();
+            {
+                for child_handle in children.top().iter() {
+                    html.push_str(&serialize_node(child_handle, parser));
+                }
+            }
+            html.push_str("</");
+            html.push_str(&tag_name);
+            html.push('>');
+        } else {
+            html.push_str(" />");
+        }
+        return html;
     }
     String::new()
 }
@@ -1746,12 +1705,11 @@ fn handle_inline_data_image(
         return;
     }
 
-    let decoded = match STANDARD.decode(payload_clean) {
-        Ok(bytes) => bytes,
-        Err(_) => {
-            collector.warn_skip(index, "invalid base64 payload");
-            return;
-        }
+    let decoded = if let Ok(bytes) = STANDARD.decode(payload_clean) {
+        bytes
+    } else {
+        collector.warn_skip(index, "invalid base64 payload");
+        return;
     };
 
     if decoded.is_empty() {
@@ -1929,6 +1887,7 @@ pub(crate) fn convert_html_with_visitor(
     any(not(feature = "inline-images"), not(feature = "metadata"), not(feature = "visitor")),
     allow(unused_variables)
 )]
+#[allow(clippy::too_many_lines)]
 fn convert_html_impl(
     html: &str,
     options: &ConversionOptions,
@@ -1970,8 +1929,8 @@ fn convert_html_impl(
 
     let mut is_hocr = false;
     if may_be_hocr(preprocessed.as_ref()) {
-        for child_handle in dom.children().iter() {
-            if is_hocr_document(child_handle, parser) {
+        for child_handle in dom.children() {
+            if is_hocr_document(*child_handle, parser) {
                 is_hocr = true;
                 break;
             }
@@ -2025,8 +1984,7 @@ fn convert_html_impl(
     #[cfg(feature = "metadata")]
     let wants_document = metadata_collector
         .as_ref()
-        .map(|collector| collector.borrow().wants_document())
-        .unwrap_or(false);
+        .is_some_and(|collector| collector.borrow().wants_document());
     #[cfg(not(feature = "metadata"))]
     let wants_document = false;
 
@@ -2037,7 +1995,7 @@ fn convert_html_impl(
         #[cfg(feature = "metadata")]
         let mut document_dir: Option<String> = None;
 
-        for child_handle in dom.children().iter() {
+        for child_handle in dom.children() {
             if head_metadata.is_none() {
                 let metadata = extract_metadata(child_handle, parser, options);
                 if !metadata.is_empty() {
@@ -2051,17 +2009,13 @@ fn convert_html_impl(
                     let tag_name = tag.name().as_utf8_str();
                     if tag_name == "html" || tag_name == "body" {
                         if document_lang.is_none() {
-                            if let Some(lang) = tag.attributes().get("lang") {
-                                if let Some(lang_bytes) = lang {
-                                    document_lang = Some(lang_bytes.as_utf8_str().to_string());
-                                }
+                            if let Some(Some(lang_bytes)) = tag.attributes().get("lang") {
+                                document_lang = Some(lang_bytes.as_utf8_str().to_string());
                             }
                         }
                         if document_dir.is_none() {
-                            if let Some(dir) = tag.attributes().get("dir") {
-                                if let Some(dir_bytes) = dir {
-                                    document_dir = Some(dir_bytes.as_utf8_str().to_string());
-                                }
+                            if let Some(Some(dir_bytes)) = tag.attributes().get("dir") {
+                                document_dir = Some(dir_bytes.as_utf8_str().to_string());
                             }
                         }
                     }
@@ -2140,9 +2094,9 @@ fn convert_html_impl(
         preserve_tags: Rc::new(options.preserve_tags.iter().cloned().collect()),
         keep_inline_images_in: Rc::new(options.keep_inline_images_in.iter().cloned().collect()),
         #[cfg(feature = "inline-images")]
-        inline_collector: inline_collector.clone(),
+        inline_collector,
         #[cfg(feature = "metadata")]
-        metadata_collector: metadata_collector.clone(),
+        metadata_collector,
         #[cfg(feature = "metadata")]
         metadata_wants_document,
         #[cfg(feature = "metadata")]
@@ -2159,7 +2113,7 @@ fn convert_html_impl(
         visitor_error: Rc::new(RefCell::new(None)),
     };
 
-    for child_handle in dom.children().iter() {
+    for child_handle in dom.children() {
         walk_node(child_handle, parser, &mut output, options, &ctx, 0, &dom_ctx);
     }
 
@@ -2173,7 +2127,7 @@ fn convert_html_impl(
     if trimmed.is_empty() {
         Ok(String::new())
     } else {
-        Ok(format!("{}\n", trimmed))
+        Ok(format!("{trimmed}\n"))
     }
 }
 
@@ -2588,7 +2542,7 @@ fn is_json_ld_script_open_tag(tag: &str) -> bool {
             }
 
             let mut i = idx + 4;
-            while bytes.get(i).is_some_and(|b| b.is_ascii_whitespace()) {
+            while bytes.get(i).is_some_and(u8::is_ascii_whitespace) {
                 i += 1;
             }
             if bytes.get(i) != Some(&b'=') {
@@ -2596,7 +2550,7 @@ fn is_json_ld_script_open_tag(tag: &str) -> bool {
                 continue;
             }
             i += 1;
-            while bytes.get(i).is_some_and(|b| b.is_ascii_whitespace()) {
+            while bytes.get(i).is_some_and(u8::is_ascii_whitespace) {
                 i += 1;
             }
             if i >= bytes.len() {
@@ -2748,8 +2702,8 @@ fn escape_malformed_angle_brackets(input: &str) -> Cow<'_, str> {
     }
 }
 
-fn normalized_tag_name<'a>(raw: Cow<'a, str>) -> Cow<'a, str> {
-    if raw.as_bytes().iter().any(|b| b.is_ascii_uppercase()) {
+fn normalized_tag_name(raw: Cow<'_, str>) -> Cow<'_, str> {
+    if raw.as_bytes().iter().any(u8::is_ascii_uppercase) {
         let mut owned = raw.into_owned();
         owned.make_ascii_lowercase();
         Cow::Owned(owned)
@@ -2840,34 +2794,30 @@ fn has_semantic_content_ancestor(node_handle: &tl::NodeHandle, parser: &tl::Pars
 }
 
 fn tag_has_main_semantics(tag: &tl::HTMLTag) -> bool {
-    if let Some(role_attr) = tag.attributes().get("role") {
-        if let Some(role) = role_attr {
-            let lowered = role.as_utf8_str().to_ascii_lowercase();
-            if matches!(lowered.as_str(), "main" | "article" | "document" | "region") {
-                return true;
-            }
+    if let Some(Some(role)) = tag.attributes().get("role") {
+        let lowered = role.as_utf8_str().to_ascii_lowercase();
+        if matches!(lowered.as_str(), "main" | "article" | "document" | "region") {
+            return true;
         }
     }
 
-    if let Some(class_attr) = tag.attributes().get("class") {
-        if let Some(class_bytes) = class_attr {
-            let class_value = class_bytes.as_utf8_str().to_ascii_lowercase();
-            const MAIN_CLASS_HINTS: &[&str] = &[
-                "mw-body",
-                "mw-parser-output",
-                "content-body",
-                "content-container",
-                "article-body",
-                "article-content",
-                "main-content",
-                "page-content",
-                "entry-content",
-                "post-content",
-                "document-body",
-            ];
-            if MAIN_CLASS_HINTS.iter().any(|hint| class_value.contains(hint)) {
-                return true;
-            }
+    if let Some(Some(class_bytes)) = tag.attributes().get("class") {
+        let class_value = class_bytes.as_utf8_str().to_ascii_lowercase();
+        const MAIN_CLASS_HINTS: &[&str] = &[
+            "mw-body",
+            "mw-parser-output",
+            "content-body",
+            "content-container",
+            "article-body",
+            "article-content",
+            "main-content",
+            "page-content",
+            "entry-content",
+            "post-content",
+            "document-body",
+        ];
+        if MAIN_CLASS_HINTS.iter().any(|hint| class_value.contains(hint)) {
+            return true;
         }
     }
 
@@ -2959,7 +2909,7 @@ fn attribute_contains_any(tag: &tl::HTMLTag, attr: &str, keywords: &[&str]) -> b
 
 /// Serialize a tag and its children back to HTML.
 ///
-/// This is used for the preserve_tags feature to output original HTML for specific elements.
+/// This is used for the `preserve_tags` feature to output original HTML for specific elements.
 fn serialize_tag_to_html(handle: &tl::NodeHandle, parser: &tl::Parser) -> String {
     let mut html = String::new();
     serialize_node_to_html(handle, parser, &mut html);
@@ -3288,7 +3238,7 @@ fn get_next_sibling_tag<'a>(
     parser: &'a tl::Parser,
     dom_ctx: &'a DomContext,
 ) -> Option<&'a str> {
-    dom_ctx.next_tag_name(node_handle, parser)
+    dom_ctx.next_tag_name(*node_handle, parser)
 }
 
 fn get_previous_sibling_tag<'a>(
@@ -3313,11 +3263,9 @@ fn get_previous_sibling_tag<'a>(
         if let Some(info) = dom_ctx.tag_info(sibling.get_inner(), parser) {
             return Some(info.name.as_str());
         }
-        if let Some(node) = sibling.get(parser) {
-            if let tl::Node::Raw(raw) = node {
-                if !raw.as_utf8_str().trim().is_empty() {
-                    return None;
-                }
+        if let Some(tl::Node::Raw(raw)) = sibling.get(parser) {
+            if !raw.as_utf8_str().trim().is_empty() {
+                return None;
             }
         }
     }
@@ -3326,15 +3274,15 @@ fn get_previous_sibling_tag<'a>(
 }
 
 fn previous_sibling_is_inline_tag(node_handle: &tl::NodeHandle, parser: &tl::Parser, dom_ctx: &DomContext) -> bool {
-    dom_ctx.previous_inline_like(node_handle, parser)
+    dom_ctx.previous_inline_like(*node_handle, parser)
 }
 
 fn next_sibling_is_whitespace_text(node_handle: &tl::NodeHandle, parser: &tl::Parser, dom_ctx: &DomContext) -> bool {
-    dom_ctx.next_whitespace_text(node_handle, parser)
+    dom_ctx.next_whitespace_text(*node_handle, parser)
 }
 
 fn next_sibling_is_inline_tag(node_handle: &tl::NodeHandle, parser: &tl::Parser, dom_ctx: &DomContext) -> bool {
-    dom_ctx.next_inline_like(node_handle, parser)
+    dom_ctx.next_inline_like(*node_handle, parser)
 }
 
 fn append_inline_suffix(
@@ -4166,7 +4114,7 @@ fn walk_node(
                             return;
                         }
 
-                        if let Some((heading_level, heading_handle)) = find_single_heading_child(node_handle, parser) {
+                        if let Some((heading_level, heading_handle)) = find_single_heading_child(*node_handle, parser) {
                             if let Some(heading_node) = heading_handle.get(parser) {
                                 if let tl::Node::Tag(heading_tag) = heading_node {
                                     let heading_name =
@@ -4219,7 +4167,7 @@ fn walk_node(
                                 convert_as_inline: true,
                                 ..ctx.clone()
                             };
-                            for child_handle in children.iter() {
+                            for child_handle in &children {
                                 let mut child_buf = String::new();
                                 walk_node(
                                     child_handle,
@@ -4232,8 +4180,8 @@ fn walk_node(
                                 );
                                 if !child_buf.trim().is_empty()
                                     && !content.is_empty()
-                                    && !content.chars().last().map(|c| c.is_whitespace()).unwrap_or(true)
-                                    && !child_buf.chars().next().map(|c| c.is_whitespace()).unwrap_or(true)
+                                    && !content.chars().last().is_none_or(char::is_whitespace)
+                                    && !child_buf.chars().next().is_none_or(char::is_whitespace)
                                 {
                                     content.push(' ');
                                 }
@@ -4250,7 +4198,7 @@ fn walk_node(
                                 inline_depth: ctx.inline_depth + 1,
                                 ..ctx.clone()
                             };
-                            for child_handle in children.iter() {
+                            for child_handle in &children {
                                 walk_node(
                                     child_handle,
                                     parser,
@@ -4408,15 +4356,13 @@ fn walk_node(
                         .attributes()
                         .get("src")
                         .flatten()
-                        .map(|v| v.as_utf8_str())
-                        .unwrap_or(Cow::Borrowed(""));
+                        .map_or(Cow::Borrowed(""), |v| v.as_utf8_str());
 
                     let alt = tag
                         .attributes()
                         .get("alt")
                         .flatten()
-                        .map(|v| v.as_utf8_str())
-                        .unwrap_or(Cow::Borrowed(""));
+                        .map_or(Cow::Borrowed(""), |v| v.as_utf8_str());
 
                     let title = tag.attributes().get("title").flatten().map(|v| v.as_utf8_str());
                     #[cfg(feature = "metadata")]
@@ -4587,7 +4533,7 @@ fn walk_node(
                                     collector.borrow_mut().add_image(
                                         src.to_string(),
                                         if alt.is_empty() { None } else { Some(alt.to_string()) },
-                                        title.as_deref().map(|t| t.to_string()),
+                                        title.as_deref().map(std::string::ToString::to_string),
                                         dimensions,
                                         attributes_map,
                                     );
@@ -4608,8 +4554,7 @@ fn walk_node(
                         .or_else(|| tag.attributes().get("href").flatten())
                         .or_else(|| tag.attributes().get("xlink:href").flatten())
                         .or_else(|| tag.attributes().get("src").flatten())
-                        .map(|v| v.as_utf8_str())
-                        .unwrap_or(Cow::Borrowed(""));
+                        .map_or(Cow::Borrowed(""), |v| v.as_utf8_str());
 
                     // Use "alt" attribute, fallback to "filename"
                     let alt = tag
@@ -4763,7 +4708,7 @@ fn walk_node(
                                     collector.borrow_mut().add_image(
                                         src.to_string(),
                                         if alt.is_empty() { None } else { Some(alt.to_string()) },
-                                        title.as_deref().map(|t| t.to_string()),
+                                        title.as_deref().map(std::string::ToString::to_string),
                                         dimensions,
                                         attributes_map,
                                     );
@@ -5230,7 +5175,14 @@ fn walk_node(
                         ..ctx.clone()
                     };
 
-                    if !ctx.in_code {
+                    if ctx.in_code {
+                        let children = tag.children();
+                        {
+                            for child_handle in children.top().iter() {
+                                walk_node(child_handle, parser, output, options, &code_ctx, depth + 1, dom_ctx);
+                            }
+                        }
+                    } else {
                         let mut content = String::with_capacity(32);
                         let children = tag.children();
                         {
@@ -5396,13 +5348,6 @@ fn walk_node(
                                 for _ in 0..num_backticks {
                                     output.push('`');
                                 }
-                            }
-                        }
-                    } else {
-                        let children = tag.children();
-                        {
-                            for child_handle in children.top().iter() {
-                                walk_node(child_handle, parser, output, options, &code_ctx, depth + 1, dom_ctx);
                             }
                         }
                     }
@@ -5574,7 +5519,7 @@ fn walk_node(
                                             if line.is_empty() {
                                                 String::new()
                                             } else {
-                                                format!("    {}", line)
+                                                format!("    {line}")
                                             }
                                         })
                                         .collect::<Vec<_>>()
@@ -5630,7 +5575,7 @@ fn walk_node(
                                             if line.is_empty() {
                                                 String::new()
                                             } else {
-                                                format!("    {}", line)
+                                                format!("    {line}")
                                             }
                                         })
                                         .collect::<Vec<_>>()
@@ -5819,8 +5764,7 @@ fn walk_node(
                         let last_line_is_blockquote = output
                             .rsplit('\n')
                             .find(|line| !line.trim().is_empty())
-                            .map(|line| line.trim_start().starts_with('>'))
-                            .unwrap_or(false);
+                            .is_some_and(|line| line.trim_start().starts_with('>'));
                         let needs_blank_line =
                             !ctx.in_paragraph && !matches!(prev_tag, Some("blockquote")) && !last_line_is_blockquote;
 
@@ -5849,7 +5793,7 @@ fn walk_node(
                     add_list_leading_separator(output, ctx);
 
                     let nested_depth = calculate_list_nesting_depth(ctx);
-                    let is_loose = is_loose_list(node_handle, parser, dom_ctx);
+                    let is_loose = is_loose_list(*node_handle, parser, dom_ctx);
 
                     #[cfg(feature = "visitor")]
                     let list_output_start = output.len();
@@ -5870,7 +5814,7 @@ fn walk_node(
 
                         let parent_tag = dom_ctx
                             .parent_of(node_handle.get_inner())
-                            .and_then(|pid| dom_ctx.tag_name_for(&dom_ctx.node_handle(pid).copied()?, parser))
+                            .and_then(|pid| dom_ctx.tag_name_for(dom_ctx.node_handle(pid).copied()?, parser))
                             .map(|s| s.to_string());
 
                         let index = dom_ctx.sibling_index(node_handle.get_inner()).unwrap_or(0);
@@ -5908,7 +5852,7 @@ fn walk_node(
                     }
 
                     process_list_children(
-                        node_handle,
+                        *node_handle,
                         parser,
                         output,
                         options,
@@ -5936,7 +5880,7 @@ fn walk_node(
 
                         let parent_tag = dom_ctx
                             .parent_of(node_handle.get_inner())
-                            .and_then(|pid| dom_ctx.tag_name_for(&dom_ctx.node_handle(pid).copied()?, parser))
+                            .and_then(|pid| dom_ctx.tag_name_for(dom_ctx.node_handle(pid).copied()?, parser))
                             .map(|s| s.to_string());
 
                         let index = dom_ctx.sibling_index(node_handle.get_inner()).unwrap_or(0);
@@ -5990,7 +5934,7 @@ fn walk_node(
                     add_list_leading_separator(output, ctx);
 
                     let nested_depth = calculate_list_nesting_depth(ctx);
-                    let is_loose = is_loose_list(node_handle, parser, dom_ctx);
+                    let is_loose = is_loose_list(*node_handle, parser, dom_ctx);
 
                     let start = tag
                         .attributes()
@@ -6018,7 +5962,7 @@ fn walk_node(
 
                         let parent_tag = dom_ctx
                             .parent_of(node_handle.get_inner())
-                            .and_then(|pid| dom_ctx.tag_name_for(&dom_ctx.node_handle(pid).copied()?, parser))
+                            .and_then(|pid| dom_ctx.tag_name_for(dom_ctx.node_handle(pid).copied()?, parser))
                             .map(|s| s.to_string());
 
                         let index = dom_ctx.sibling_index(node_handle.get_inner()).unwrap_or(0);
@@ -6056,7 +6000,7 @@ fn walk_node(
                     }
 
                     process_list_children(
-                        node_handle,
+                        *node_handle,
                         parser,
                         output,
                         options,
@@ -6084,7 +6028,7 @@ fn walk_node(
 
                         let parent_tag = dom_ctx
                             .parent_of(node_handle.get_inner())
-                            .and_then(|pid| dom_ctx.tag_name_for(&dom_ctx.node_handle(pid).copied()?, parser))
+                            .and_then(|pid| dom_ctx.tag_name_for(dom_ctx.node_handle(pid).copied()?, parser))
                             .map(|s| s.to_string());
 
                         let index = dom_ctx.sibling_index(node_handle.get_inner()).unwrap_or(0);
@@ -6335,7 +6279,7 @@ fn walk_node(
 
                             let parent_tag = dom_ctx
                                 .parent_of(node_handle.get_inner())
-                                .and_then(|pid| dom_ctx.tag_name_for(&dom_ctx.node_handle(pid).copied()?, parser))
+                                .and_then(|pid| dom_ctx.tag_name_for(dom_ctx.node_handle(pid).copied()?, parser))
                                 .map(|s| s.to_string());
 
                             let index = dom_ctx.sibling_index(node_handle.get_inner()).unwrap_or(0);
@@ -6350,29 +6294,23 @@ fn walk_node(
                                 is_inline: false,
                             };
 
-                            let last_line_start = output.rfind('\n').map(|pos| pos + 1).unwrap_or(0);
+                            let last_line_start = output.rfind('\n').map_or(0, |pos| pos + 1);
                             let last_line = &output[last_line_start..];
 
                             let (marker, text_content) = if is_task_list {
                                 let task_marker = if task_checked { "- [x]" } else { "- [ ]" };
-                                let text_start = last_line
-                                    .find(task_marker)
-                                    .map(|pos| pos + task_marker.len())
-                                    .unwrap_or(0);
+                                let text_start = last_line.find(task_marker).map_or(0, |pos| pos + task_marker.len());
                                 (task_marker.to_string(), last_line[text_start..].trim().to_string())
                             } else if ctx.in_ordered_list {
                                 let marker_text = format!("{}.", ctx.list_counter);
-                                let text_start = last_line
-                                    .find(&marker_text)
-                                    .map(|pos| pos + marker_text.len())
-                                    .unwrap_or(0);
+                                let text_start = last_line.find(&marker_text).map_or(0, |pos| pos + marker_text.len());
                                 (marker_text, last_line[text_start..].trim().to_string())
                             } else {
                                 let bullets: Vec<char> = options.bullets.chars().collect();
                                 let bullet_index = if ctx.ul_depth > 0 { ctx.ul_depth - 1 } else { 0 };
                                 let bullet = bullets.get(bullet_index % bullets.len()).copied().unwrap_or('*');
                                 let bullet_str = bullet.to_string();
-                                let text_start = last_line.find(bullet).map(|pos| pos + 1).unwrap_or(0);
+                                let text_start = last_line.find(bullet).map_or(0, |pos| pos + 1);
                                 (bullet_str, last_line[text_start..].trim().to_string())
                             };
 
@@ -6642,22 +6580,23 @@ fn walk_node(
                     let children = tag.children();
                     {
                         for child_handle in children.top().iter() {
-                            let (is_dt, is_dd) = if let Some(tl::Node::Tag(child_tag)) = child_handle.get(parser) {
-                                let tag_name = normalized_tag_name(child_tag.name().as_utf8_str());
-                                (tag_name == "dt", tag_name == "dd")
-                            } else {
-                                (false, false)
-                            };
+                            let (is_definition_term, is_definition_description) =
+                                if let Some(tl::Node::Tag(child_tag)) = child_handle.get(parser) {
+                                    let tag_name = normalized_tag_name(child_tag.name().as_utf8_str());
+                                    (tag_name == "dt", tag_name == "dd")
+                                } else {
+                                    (false, false)
+                                };
 
                             let child_ctx = Context {
-                                last_was_dt: in_dt_group && is_dd,
+                                last_was_dt: in_dt_group && is_definition_description,
                                 ..ctx.clone()
                             };
                             walk_node(child_handle, parser, &mut content, options, &child_ctx, depth, dom_ctx);
 
-                            if is_dt {
+                            if is_definition_term {
                                 in_dt_group = true;
-                            } else if !is_dd {
+                            } else if !is_definition_description {
                                 in_dt_group = false;
                             }
                         }
@@ -6708,12 +6647,12 @@ fn walk_node(
                             output.push_str(trimmed);
                         }
                     } else if ctx.last_was_dt {
-                        if !trimmed.is_empty() {
+                        if trimmed.is_empty() {
+                            output.push_str(":   \n\n");
+                        } else {
                             output.push_str(":   ");
                             output.push_str(trimmed);
                             output.push_str("\n\n");
-                        } else {
-                            output.push_str(":   \n\n");
                         }
                     } else if !trimmed.is_empty() {
                         output.push_str(trimmed);
@@ -6995,8 +6934,7 @@ fn walk_node(
                         .attributes()
                         .get("src")
                         .flatten()
-                        .map(|v| v.as_utf8_str())
-                        .unwrap_or(Cow::Borrowed(""));
+                        .map_or(Cow::Borrowed(""), |v| v.as_utf8_str());
 
                     if !src.is_empty() {
                         output.push('[');
@@ -7085,8 +7023,7 @@ fn walk_node(
                         .attributes()
                         .get("display")
                         .flatten()
-                        .map(|v| v.as_utf8_str() == "block")
-                        .unwrap_or(false);
+                        .is_some_and(|v| v.as_utf8_str() == "block");
 
                     if is_display_block && !ctx.in_paragraph && !ctx.convert_as_inline {
                         output.push_str("\n\n");
@@ -7267,8 +7204,7 @@ fn walk_node(
                         .attributes()
                         .get("label")
                         .flatten()
-                        .map(|v| v.as_utf8_str())
-                        .unwrap_or(Cow::Borrowed(""));
+                        .map_or(Cow::Borrowed(""), |v| v.as_utf8_str());
 
                     if !label.is_empty() {
                         let symbol = options.strong_em_symbol.to_string().repeat(2);
@@ -7670,7 +7606,7 @@ fn walk_node(
                 "head" => {
                     let children = tag.children();
                     let has_body_like = children.top().iter().any(|child_handle| {
-                        if let Some(child_name) = dom_ctx.tag_name_for(child_handle, parser) {
+                        if let Some(child_name) = dom_ctx.tag_name_for(*child_handle, parser) {
                             matches!(
                                 child_name.as_ref(),
                                 "body" | "main" | "article" | "section" | "div" | "p"
@@ -7686,7 +7622,7 @@ fn walk_node(
                             for child_handle in children.top().iter() {
                                 if let Some(tl::Node::Tag(child_tag)) = child_handle.get(parser) {
                                     let child_name = dom_ctx
-                                        .tag_name_for(child_handle, parser)
+                                        .tag_name_for(*child_handle, parser)
                                         .unwrap_or_else(|| normalized_tag_name(child_tag.name().as_utf8_str()));
                                     if child_name.as_ref() == "script" {
                                         if let Some(type_attr) = child_tag.attributes().get("type").flatten() {
@@ -7697,7 +7633,7 @@ fn walk_node(
                                                 let json = child_tag.inner_text(parser);
                                                 let json = json.trim();
                                                 if !json.is_empty() {
-                                                    let json = text::decode_html_entities(json).to_string();
+                                                    let json = text::decode_html_entities(json).clone();
                                                     if !json.is_empty() {
                                                         collector.borrow_mut().add_json_ld(json);
                                                     }
@@ -7731,7 +7667,7 @@ fn walk_node(
                                 let json = tag.inner_text(parser);
                                 let json = json.trim();
                                 if !json.is_empty() {
-                                    let json = text::decode_html_entities(json).to_string();
+                                    let json = text::decode_html_entities(json);
                                     if !json.is_empty() {
                                         collector.borrow_mut().add_json_ld(json);
                                     }
@@ -7905,14 +7841,12 @@ fn get_colspan_rowspan(node_handle: &tl::NodeHandle, parser: &tl::Parser) -> (us
             .get("colspan")
             .flatten()
             .and_then(|v| v.as_utf8_str().parse::<usize>().ok())
-            .map(clamp_table_span)
-            .unwrap_or(1);
+            .map_or(1, clamp_table_span);
         let rowspan = attrs
             .get("rowspan")
             .flatten()
             .and_then(|v| v.as_utf8_str().parse::<usize>().ok())
-            .map(clamp_table_span)
-            .unwrap_or(1);
+            .map_or(1, clamp_table_span);
         (colspan, rowspan)
     } else {
         (1, 1)
@@ -7929,7 +7863,7 @@ fn collect_table_cells(
     if let Some(tl::Node::Tag(tag)) = node_handle.get(parser) {
         let children = tag.children();
         for child_handle in children.top().iter() {
-            if let Some(cell_name) = dom_ctx.tag_name_for(child_handle, parser) {
+            if let Some(cell_name) = dom_ctx.tag_name_for(*child_handle, parser) {
                 if matches!(cell_name.as_ref(), "th" | "td" | "cell") {
                     cells.push(*child_handle);
                 }
@@ -7947,7 +7881,7 @@ fn table_total_columns(node_handle: &tl::NodeHandle, parser: &tl::Parser, dom_ct
         for child_handle in children.top().iter() {
             if let Some(tl::Node::Tag(child_tag)) = child_handle.get(parser) {
                 let tag_name = dom_ctx
-                    .tag_name_for(child_handle, parser)
+                    .tag_name_for(*child_handle, parser)
                     .unwrap_or_else(|| normalized_tag_name(child_tag.name().as_utf8_str()));
                 match tag_name.as_ref() {
                     "thead" | "tbody" | "tfoot" => {
@@ -8016,7 +7950,7 @@ fn convert_table_cell(
                 walk_node(child_handle, parser, &mut text, options, &cell_ctx, 0, dom_ctx);
             }
         } else {
-            let raw = dom_ctx.text_content(node_handle, parser);
+            let raw = dom_ctx.text_content(*node_handle, parser);
             let normalized = if options.whitespace_mode == crate::options::WhitespaceMode::Normalized {
                 text::normalize_whitespace_cow(raw.as_str())
             } else {
@@ -8186,7 +8120,7 @@ fn convert_table_row(
             }
         }
     } else {
-        for cell_handle in cells.iter() {
+        for cell_handle in &cells {
             convert_table_cell(cell_handle, parser, &mut row_text, options, ctx, "", dom_ctx);
         }
     }
@@ -8245,10 +8179,10 @@ fn scan_table_node(
                 }
             }
             tl::Node::Tag(tag) => {
-                let tag_name: Cow<'_, str> = dom_ctx
-                    .tag_info(node_handle.get_inner(), parser)
-                    .map(|info| Cow::Borrowed(info.name.as_str()))
-                    .unwrap_or_else(|| normalized_tag_name(tag.name().as_utf8_str()).into_owned().into());
+                let tag_name: Cow<'_, str> = dom_ctx.tag_info(node_handle.get_inner(), parser).map_or_else(
+                    || normalized_tag_name(tag.name().as_utf8_str()).into_owned().into(),
+                    |info| Cow::Borrowed(info.name.as_str()),
+                );
 
                 match tag_name.as_ref() {
                     "a" => scan.link_count += 1,
@@ -8320,10 +8254,10 @@ fn append_layout_row(
         let row_children = row_tag.children();
         for cell_handle in row_children.top().iter() {
             if let Some(tl::Node::Tag(cell_tag)) = cell_handle.get(parser) {
-                let cell_name: Cow<'_, str> = dom_ctx
-                    .tag_info(cell_handle.get_inner(), parser)
-                    .map(|info| Cow::Borrowed(info.name.as_str()))
-                    .unwrap_or_else(|| normalized_tag_name(cell_tag.name().as_utf8_str()).into_owned().into());
+                let cell_name: Cow<'_, str> = dom_ctx.tag_info(cell_handle.get_inner(), parser).map_or_else(
+                    || normalized_tag_name(cell_tag.name().as_utf8_str()).into_owned().into(),
+                    |info| Cow::Borrowed(info.name.as_str()),
+                );
                 if matches!(cell_name.as_ref(), "td" | "th" | "cell") {
                     let mut cell_text = String::new();
                     let cell_ctx = Context {
@@ -8509,10 +8443,10 @@ fn convert_table(
         {
             for child_handle in children.top().iter() {
                 if let Some(tl::Node::Tag(child_tag)) = child_handle.get(parser) {
-                    let tag_name: Cow<'_, str> = dom_ctx
-                        .tag_info(child_handle.get_inner(), parser)
-                        .map(|info| Cow::Borrowed(info.name.as_str()))
-                        .unwrap_or_else(|| normalized_tag_name(child_tag.name().as_utf8_str()).into_owned().into());
+                    let tag_name: Cow<'_, str> = dom_ctx.tag_info(child_handle.get_inner(), parser).map_or_else(
+                        || normalized_tag_name(child_tag.name().as_utf8_str()).into_owned().into(),
+                        |info| Cow::Borrowed(info.name.as_str()),
+                    );
 
                     match tag_name.as_ref() {
                         "caption" => {
@@ -8539,7 +8473,7 @@ fn convert_table(
                                 for row_handle in section_children.top().iter() {
                                     if let Some(tl::Node::Tag(row_tag)) = row_handle.get(parser) {
                                         let row_tag_name = dom_ctx
-                                            .tag_name_for(row_handle, parser)
+                                            .tag_name_for(*row_handle, parser)
                                             .unwrap_or_else(|| normalized_tag_name(row_tag.name().as_utf8_str()));
                                         if matches!(row_tag_name.as_ref(), "tr" | "row") {
                                             if first_row_cols.is_none() {
@@ -8814,7 +8748,7 @@ mod tests {
 
     #[test]
     fn preprocessing_retains_section_headers_inside_articles() {
-        let html = r#"
+        let html = r"
         <article>
             <header>
                 <h2>Section Heading</h2>
@@ -8823,7 +8757,7 @@ mod tests {
                 <p>Section body</p>
             </section>
         </article>
-        "#;
+        ";
         let result = convert_html(html, &ConversionOptions::default()).unwrap();
         assert!(
             result.contains("Section Heading"),
@@ -8846,13 +8780,13 @@ mod tests {
 
     #[test]
     fn atx_heading_swallows_layout_line_breaks() {
-        let html = r#"<h2>
+        let html = r"<h2>
   Heading
   Text
   with
   Line
   Breaks
-</h2>"#;
+</h2>";
         let result = convert_html(html, &ConversionOptions::default()).unwrap();
         assert_eq!(result.trim(), "## Heading Text with Line Breaks");
     }
@@ -9071,7 +9005,7 @@ mod tests {
 
     #[test]
     fn test_preserve_tags_simple_table() {
-        let html = r#"<div><table><tr><td>Cell 1</td><td>Cell 2</td></tr></table><p>Text</p></div>"#;
+        let html = r"<div><table><tr><td>Cell 1</td><td>Cell 2</td></tr></table><p>Text</p></div>";
         let options = ConversionOptions {
             preserve_tags: vec!["table".to_string()],
             ..Default::default()
@@ -9116,7 +9050,7 @@ mod tests {
 
     #[test]
     fn test_preserve_tags_nested_content() {
-        let html = r#"<table><thead><tr><th>Header</th></tr></thead><tbody><tr><td>Data</td></tr></tbody></table>"#;
+        let html = r"<table><thead><tr><th>Header</th></tr></thead><tbody><tr><td>Data</td></tr></tbody></table>";
         let options = ConversionOptions {
             preserve_tags: vec!["table".to_string()],
             ..Default::default()
@@ -9131,7 +9065,7 @@ mod tests {
 
     #[test]
     fn test_preserve_tags_empty_list() {
-        let html = r#"<table><tr><td>Cell</td></tr></table>"#;
+        let html = r"<table><tr><td>Cell</td></tr></table>";
         let options = ConversionOptions::default();
         let result = convert_html(html, &options).unwrap();
 
@@ -9143,7 +9077,7 @@ mod tests {
 
     #[test]
     fn test_preserve_tags_vs_strip_tags() {
-        let html = r#"<table><tr><td>Table</td></tr></table><div><span>Text</span></div>"#;
+        let html = r"<table><tr><td>Table</td></tr></table><div><span>Text</span></div>";
         let options = ConversionOptions {
             preserve_tags: vec!["table".to_string()],
             strip_tags: vec!["span".to_string()],

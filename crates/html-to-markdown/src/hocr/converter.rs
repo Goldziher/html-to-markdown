@@ -1,3 +1,4 @@
+#![allow(clippy::branches_sharing_code, clippy::option_if_let_else)]
 //! hOCR to Markdown conversion
 //!
 //! Converts structured hOCR elements to Markdown while preserving document hierarchy.
@@ -66,6 +67,28 @@ pub fn convert_to_markdown(elements: &[HocrElement], preserve_structure: bool) -
     convert_to_markdown_with_options(elements, preserve_structure, true)
 }
 
+/// Convert hOCR elements to Markdown with advanced options.
+///
+/// Transforms hOCR document structure into clean, readable Markdown with fine-grained
+/// control over structure preservation and spatial table reconstruction behavior.
+///
+/// # Arguments
+///
+/// * `elements` - hOCR elements to convert (typically from `extract_hocr_document`)
+/// * `preserve_structure` - If `true`, sorts elements by their `order` property to respect reading order.
+///   If `false`, elements are processed in their original tree order.
+/// * `enable_spatial_tables` - If `true`, attempts to reconstruct table structure from spatial
+///   positioning of words. If `false`, word positions are ignored and only text content is used.
+///
+/// # Returns
+///
+/// A `String` containing the formatted Markdown output
+///
+/// # Performance
+///
+/// - Spatial table reconstruction is more computationally expensive but produces better table formatting
+/// - For documents without tables, setting `enable_spatial_tables` to `false` improves performance
+/// - Structure preservation requires sorting which adds O(n log n) complexity; disable if not needed
 pub fn convert_to_markdown_with_options(
     elements: &[HocrElement],
     preserve_structure: bool,

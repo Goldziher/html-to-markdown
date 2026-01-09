@@ -19,7 +19,7 @@ thread_local! {
 /// # Arguments
 ///
 /// * `message` - Optional error message. If `None`, clears the error.
-pub(crate) fn set_last_error(message: Option<String>) {
+pub fn set_last_error(message: Option<String>) {
     LAST_ERROR.with(|cell| {
         let mut slot = cell.borrow_mut();
         *slot = message.and_then(|msg| CString::new(msg).ok());
@@ -32,7 +32,7 @@ pub(crate) fn set_last_error(message: Option<String>) {
 ///
 /// Returns a pointer to thread-local storage. The pointer is valid only until
 /// the next call to any function that modifies `LAST_ERROR`.
-pub(crate) fn last_error_ptr() -> *const c_char {
+pub fn last_error_ptr() -> *const c_char {
     LAST_ERROR.with(|cell| {
         cell.borrow()
             .as_ref()
@@ -46,7 +46,7 @@ pub(crate) fn last_error_ptr() -> *const c_char {
 /// # Arguments
 ///
 /// * `err` - The conversion error to capture
-pub(crate) fn capture_error(err: ConversionError) {
+pub fn capture_error(err: ConversionError) {
     set_last_error(Some(err.to_string()));
 }
 

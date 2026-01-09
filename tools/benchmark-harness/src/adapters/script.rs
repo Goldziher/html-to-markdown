@@ -24,17 +24,17 @@ pub enum ScriptLanguage {
 }
 
 impl ScriptLanguage {
-    fn as_str(&self) -> &'static str {
+    const fn as_str(&self) -> &'static str {
         match self {
-            ScriptLanguage::Python => "python",
-            ScriptLanguage::Ruby => "ruby",
-            ScriptLanguage::Php => "php",
-            ScriptLanguage::Node => "node",
-            ScriptLanguage::Wasm => "wasm",
-            ScriptLanguage::Java => "java",
-            ScriptLanguage::CSharp => "csharp",
-            ScriptLanguage::Go => "go",
-            ScriptLanguage::Elixir => "elixir",
+            Self::Python => "python",
+            Self::Ruby => "ruby",
+            Self::Php => "php",
+            Self::Node => "node",
+            Self::Wasm => "wasm",
+            Self::Java => "java",
+            Self::CSharp => "csharp",
+            Self::Go => "go",
+            Self::Elixir => "elixir",
         }
     }
 }
@@ -45,11 +45,11 @@ pub struct ScriptAdapter {
 }
 
 impl ScriptAdapter {
-    pub fn new(language: ScriptLanguage, repo_root: PathBuf) -> Self {
+    pub const fn new(language: ScriptLanguage, repo_root: PathBuf) -> Self {
         Self { language, repo_root }
     }
 
-    fn supports_profiling(&self) -> bool {
+    const fn supports_profiling(&self) -> bool {
         if cfg!(target_os = "windows") {
             return false;
         }
@@ -173,7 +173,7 @@ impl ScriptAdapter {
                 }
                 cmd.env("LD_LIBRARY_PATH", &ld_path);
 
-                let mut dyld_path = lib_dir.clone();
+                let mut dyld_path = lib_dir;
                 if let Ok(existing) = env::var("DYLD_LIBRARY_PATH") {
                     dyld_path = format!("{}:{}", dyld_path, existing);
                 }
@@ -440,7 +440,7 @@ impl FrameworkAdapter for ScriptAdapter {
             scenario: script_result.scenario.unwrap_or_else(|| scenario.as_str().to_string()),
             fixture_id: fixture.id.clone(),
             fixture_name: fixture.name.clone(),
-            fixture_path: fixture_path.clone(),
+            fixture_path,
             fixture_format: fixture.format.as_str().to_string(),
             file_extension: fixture.file_extension(),
             file_size,

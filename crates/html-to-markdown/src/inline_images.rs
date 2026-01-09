@@ -19,19 +19,27 @@ pub struct InlineImageConfig {
 pub const DEFAULT_INLINE_IMAGE_LIMIT: u64 = 5 * 1024 * 1024;
 
 /// Partial update for InlineImageConfig.
+///
+/// This struct uses `Option<T>` to represent optional fields that can be selectively updated.
+/// Only specified fields (Some values) will override existing options; None values leave the
+/// corresponding fields unchanged when applied via [`InlineImageConfig::apply_update`].
 #[derive(Debug, Clone, Default)]
 #[cfg_attr(any(feature = "serde", feature = "metadata"), derive(serde::Deserialize))]
 #[cfg_attr(any(feature = "serde", feature = "metadata"), serde(rename_all = "camelCase"))]
 pub struct InlineImageConfigUpdate {
+    /// Optional maximum decoded size override in bytes.
     pub max_decoded_size_bytes: Option<u64>,
+    /// Optional filename prefix override for generated filenames.
     pub filename_prefix: Option<String>,
+    /// Optional inline SVG capture enablement override.
     pub capture_svg: Option<bool>,
+    /// Optional dimension inference override for raster images.
     pub infer_dimensions: Option<bool>,
 }
 
 impl InlineImageConfig {
     /// Create a new configuration with required maximum decoded size.
-    pub fn new(max_decoded_size_bytes: u64) -> Self {
+    pub const fn new(max_decoded_size_bytes: u64) -> Self {
         Self {
             max_decoded_size_bytes,
             filename_prefix: None,
@@ -40,6 +48,14 @@ impl InlineImageConfig {
         }
     }
 
+    /// Apply a partial update to this inline image configuration.
+    ///
+    /// Any specified fields in the update will override the current values.
+    /// Unspecified fields (None) are left unchanged.
+    ///
+    /// # Arguments
+    ///
+    /// * `update` - Partial inline image options update with fields to override
     pub fn apply_update(&mut self, update: InlineImageConfigUpdate) {
         if let Some(max_decoded_size_bytes) = update.max_decoded_size_bytes {
             self.max_decoded_size_bytes = max_decoded_size_bytes;
@@ -55,6 +71,18 @@ impl InlineImageConfig {
         }
     }
 
+    /// Create new inline image configuration from a partial update.
+    ///
+    /// Creates a new InlineImageConfig struct with defaults, then applies the update.
+    /// Fields not specified in the update keep their default values.
+    ///
+    /// # Arguments
+    ///
+    /// * `update` - Partial inline image options update with fields to set
+    ///
+    /// # Returns
+    ///
+    /// New InlineImageConfig with specified updates applied to defaults
     pub fn from_update(update: InlineImageConfigUpdate) -> Self {
         let mut config = Self::new(DEFAULT_INLINE_IMAGE_LIMIT);
         config.apply_update(update);
@@ -65,12 +93,19 @@ impl InlineImageConfig {
 /// Supported inline image formats derived from the MIME subtype.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum InlineImageFormat {
+    /// PNG (Portable Network Graphics) raster image format.
     Png,
+    /// JPEG (Joint Photographic Experts Group) raster image format.
     Jpeg,
+    /// GIF (Graphics Interchange Format) raster image format.
     Gif,
+    /// BMP (Bitmap) raster image format.
     Bmp,
+    /// WebP modern raster image format.
     Webp,
+    /// SVG (Scalable Vector Graphics) vector format.
     Svg,
+    /// Custom or unrecognized image format; contains the MIME subtype.
     Other(String),
 }
 
@@ -91,7 +126,9 @@ impl std::fmt::Display for InlineImageFormat {
 /// Source of the inline image.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum InlineImageSource {
+    /// Image sourced from an `<img>` tag's `data:` URI.
     ImgDataUri,
+    /// Image sourced from an inline `<svg>` element.
     SvgElement,
 }
 
@@ -107,33 +144,45 @@ impl std::fmt::Display for InlineImageSource {
 /// Information about an extracted inline image.
 #[derive(Debug, Clone)]
 pub struct InlineImage {
+    /// Raw image data as bytes (encoded in its original format).
     pub data: Vec<u8>,
+    /// Detected or inferred image format.
     pub format: InlineImageFormat,
+    /// Generated or extracted filename for the image.
     pub filename: Option<String>,
+    /// Alt text or other descriptive metadata from the source HTML.
     pub description: Option<String>,
+    /// Image dimensions in pixels (width, height); only present if inferred.
     pub dimensions: Option<(u32, u32)>,
+    /// Where the image originated (data URI or SVG element).
     pub source: InlineImageSource,
+    /// Additional HTML attributes from the source element.
     pub attributes: BTreeMap<String, String>,
 }
 
 /// Human-friendly warning emitted during inline image extraction.
 #[derive(Debug, Clone)]
 pub struct InlineImageWarning {
+    /// The index of the image that triggered the warning.
     pub index: usize,
+    /// Descriptive message explaining the warning or issue.
     pub message: String,
 }
 
 /// Output of `convert_with_inline_images`.
 #[derive(Debug, Clone)]
 pub struct HtmlExtraction {
+    /// Converted markdown output.
     pub markdown: String,
+    /// Extracted inline images found in the HTML.
     pub inline_images: Vec<InlineImage>,
+    /// Non-fatal warnings encountered during extraction.
     pub warnings: Vec<InlineImageWarning>,
 }
 
 /// Internal collector that maintains inline image state during traversal.
 #[derive(Debug)]
-pub(crate) struct InlineImageCollector {
+pub struct InlineImageCollector {
     config: InlineImageConfig,
     prefix: String,
     next_index: usize,
@@ -165,19 +214,19 @@ impl InlineImageCollector {
         })
     }
 
-    pub(crate) fn capture_svg(&self) -> bool {
+    pub(crate) const fn capture_svg(&self) -> bool {
         self.config.capture_svg
     }
 
-    pub(crate) fn should_infer_dimensions(&self) -> bool {
+    pub(crate) const fn should_infer_dimensions(&self) -> bool {
         self.config.infer_dimensions
     }
 
-    pub(crate) fn max_decoded_size(&self) -> u64 {
+    pub(crate) const fn max_decoded_size(&self) -> u64 {
         self.config.max_decoded_size_bytes
     }
 
-    pub(crate) fn next_index(&mut self) -> usize {
+    pub(crate) const fn next_index(&mut self) -> usize {
         self.next_index += 1;
         self.next_index
     }
@@ -224,7 +273,7 @@ impl InlineImageCollector {
     }
 
     #[allow(clippy::too_many_arguments)]
-    pub(crate) fn build_image(
+    pub(crate) const fn build_image(
         &self,
         data: Vec<u8>,
         format: InlineImageFormat,

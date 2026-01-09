@@ -9,9 +9,23 @@ homepage.workspace = true
 documentation.workspace = true
 readme.workspace = true
 rust-version.workspace = true
-lints.workspace = true
+description = "Node.js/NAPI bindings for html-to-markdown-rs"
+keywords = ["html", "markdown", "nodejs", "napi"]
+categories = ["parsing", "text-processing", "api-bindings"]
 
 # Publishing metadata for npm scoped package
+
+[lints.rust]
+unsafe_code = "allow"  # NAPI-RS requires unsafe code
+missing_docs = "warn"
+unused_must_use = "deny"
+
+[lints.clippy]
+all = { level = "deny", priority = -1 }
+cargo = { level = "deny", priority = -1 }
+pedantic = { level = "deny", priority = -1 }
+nursery = { level = "warn", priority = -1 }
+
 [package.metadata.napi]
 package-json-name = "@kreuzberg/html-to-markdown-node"
 

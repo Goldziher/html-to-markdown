@@ -6,22 +6,28 @@
 /// Represents a word extracted from hOCR with position and confidence information
 #[derive(Debug, Clone)]
 pub struct HocrWord {
+    /// The text content of the word
     pub text: String,
+    /// X-coordinate of the left edge (pixels)
     pub left: u32,
+    /// Y-coordinate of the top edge (pixels)
     pub top: u32,
+    /// Width of the word bounding box (pixels)
     pub width: u32,
+    /// Height of the word bounding box (pixels)
     pub height: u32,
+    /// OCR confidence score (0.0 to 100.0)
     pub confidence: f64,
 }
 
 impl HocrWord {
     /// Get the right edge position
-    pub fn right(&self) -> u32 {
+    pub const fn right(&self) -> u32 {
         self.left + self.width
     }
 
     /// Get the bottom edge position
-    pub fn bottom(&self) -> u32 {
+    pub const fn bottom(&self) -> u32 {
         self.top + self.height
     }
 

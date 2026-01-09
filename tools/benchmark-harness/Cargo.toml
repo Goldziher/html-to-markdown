@@ -6,7 +6,14 @@ rust-version.workspace = true
 authors.workspace = true
 license.workspace = true
 repository.workspace = true
-lints.workspace = true
+description = "Benchmark harness for html-to-markdown-rs"
+keywords = ["html", "markdown", "benchmark", "performance"]
+categories = ["development-tools"]
+readme = "README.md"
+
+
+[lints]
+workspace = true
 
 [[bin]]
 name = "benchmark-harness"
@@ -21,7 +28,7 @@ thiserror = { workspace = true }
 
 toml = "0.9"
 
-sysinfo = "0.36"
+sysinfo = "0.37"
 
 minijinja = { version = "2.14", features = ["json"] }
 

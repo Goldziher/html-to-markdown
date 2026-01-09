@@ -7,6 +7,8 @@
 //! Enable the `inline-images` Cargo feature to collect embedded data URI images and inline SVG
 //! assets alongside the produced Markdown.
 
+#![allow(clippy::pedantic)]
+
 use std::borrow::Cow;
 
 pub mod converter;
@@ -202,23 +204,87 @@ fn parse_json<T: serde::de::DeserializeOwned>(json: &str) -> Result<T> {
 }
 
 #[cfg(any(feature = "serde", feature = "metadata"))]
+/// Parse JSON string into ConversionOptions.
+///
+/// Deserializes a JSON string into a full set of conversion options.
+/// The JSON can be either a complete or partial options object.
+///
+/// # Arguments
+///
+/// * `json` - JSON string representing conversion options
+///
+/// # Returns
+///
+/// Fully populated ConversionOptions with defaults applied to any unspecified values
+///
+/// # Errors
+///
+/// Returns `ConversionError::ConfigError` if JSON parsing fails or contains invalid option values
 pub fn conversion_options_from_json(json: &str) -> Result<ConversionOptions> {
     let update: ConversionOptionsUpdate = parse_json(json)?;
     Ok(ConversionOptions::from(update))
 }
 
 #[cfg(any(feature = "serde", feature = "metadata"))]
+/// Parse JSON string into partial ConversionOptions update.
+///
+/// Deserializes a JSON string into a partial set of conversion options.
+/// Only specified options are included; unspecified options are None.
+///
+/// # Arguments
+///
+/// * `json` - JSON string representing partial conversion options
+///
+/// # Returns
+///
+/// ConversionOptionsUpdate with only specified fields populated
+///
+/// # Errors
+///
+/// Returns `ConversionError::ConfigError` if JSON parsing fails or contains invalid option values
 pub fn conversion_options_update_from_json(json: &str) -> Result<ConversionOptionsUpdate> {
     parse_json(json)
 }
 
 #[cfg(all(feature = "inline-images", any(feature = "serde", feature = "metadata")))]
+/// Parse JSON string into InlineImageConfig (requires `inline-images` feature).
+///
+/// Deserializes a JSON string into inline image extraction configuration.
+/// The JSON can be either a complete or partial configuration object.
+///
+/// # Arguments
+///
+/// * `json` - JSON string representing inline image configuration
+///
+/// # Returns
+///
+/// Fully populated InlineImageConfig with defaults applied to any unspecified values
+///
+/// # Errors
+///
+/// Returns `ConversionError::ConfigError` if JSON parsing fails or contains invalid configuration values
 pub fn inline_image_config_from_json(json: &str) -> Result<InlineImageConfig> {
     let update: InlineImageConfigUpdate = parse_json(json)?;
     Ok(InlineImageConfig::from_update(update))
 }
 
 #[cfg(all(feature = "metadata", any(feature = "serde", feature = "metadata")))]
+/// Parse JSON string into MetadataConfig (requires `metadata` feature).
+///
+/// Deserializes a JSON string into metadata extraction configuration.
+/// The JSON can be either a complete or partial configuration object.
+///
+/// # Arguments
+///
+/// * `json` - JSON string representing metadata extraction configuration
+///
+/// # Returns
+///
+/// Fully populated MetadataConfig with defaults applied to any unspecified values
+///
+/// # Errors
+///
+/// Returns `ConversionError::ConfigError` if JSON parsing fails or contains invalid configuration values
 pub fn metadata_config_from_json(json: &str) -> Result<MetadataConfig> {
     let update: MetadataConfigUpdate = parse_json(json)?;
     Ok(MetadataConfig::from(update))
@@ -581,6 +647,7 @@ pub fn convert_with_visitor(
 /// implementations. The actual async dispatch integration will be implemented in binding
 /// layers (Python, TypeScript, etc.) to properly bridge async/await semantics to the
 /// synchronous Rust conversion core.
+#[allow(clippy::future_not_send)]
 pub async fn convert_with_async_visitor(
     html: &str,
     options: Option<ConversionOptions>,

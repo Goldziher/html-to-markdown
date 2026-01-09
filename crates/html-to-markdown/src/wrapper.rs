@@ -416,6 +416,7 @@ fn wrap_line(text: &str, width: usize) -> String {
             result.push_str(&current_line);
             current_line.clear();
             current_line.push_str(word);
+            continue;
         }
     }
 

@@ -190,29 +190,29 @@ impl VisitorDispatch {
     /// Check if this dispatch result indicates continuation.
     #[allow(dead_code)]
     #[inline]
-    pub fn is_continue(&self) -> bool {
-        matches!(self, VisitorDispatch::Continue)
+    pub const fn is_continue(&self) -> bool {
+        matches!(self, Self::Continue)
     }
 
     /// Check if this dispatch result contains custom output.
     #[allow(dead_code)]
     #[inline]
-    pub fn is_custom(&self) -> bool {
-        matches!(self, VisitorDispatch::Custom(_))
+    pub const fn is_custom(&self) -> bool {
+        matches!(self, Self::Custom(_))
     }
 
     /// Check if this dispatch result indicates skipping.
     #[allow(dead_code)]
     #[inline]
-    pub fn is_skip(&self) -> bool {
-        matches!(self, VisitorDispatch::Skip)
+    pub const fn is_skip(&self) -> bool {
+        matches!(self, Self::Skip)
     }
 
     /// Check if this dispatch result indicates HTML preservation.
     #[allow(dead_code)]
     #[inline]
-    pub fn is_preserve_html(&self) -> bool {
-        matches!(self, VisitorDispatch::PreserveHtml)
+    pub const fn is_preserve_html(&self) -> bool {
+        matches!(self, Self::PreserveHtml)
     }
 
     /// Extract custom output if present.
@@ -220,7 +220,7 @@ impl VisitorDispatch {
     #[inline]
     pub fn into_custom(self) -> Option<String> {
         match self {
-            VisitorDispatch::Custom(output) => Some(output),
+            Self::Custom(output) => Some(output),
             _ => None,
         }
     }
@@ -230,7 +230,7 @@ impl VisitorDispatch {
     #[inline]
     pub fn as_custom(&self) -> Option<&str> {
         match self {
-            VisitorDispatch::Custom(output) => Some(output),
+            Self::Custom(output) => Some(output),
             _ => None,
         }
     }
@@ -289,7 +289,7 @@ pub type AsyncVisitorHandle = std::rc::Rc<std::cell::RefCell<dyn AsyncHtmlVisito
 /// }
 /// ```
 #[cfg(feature = "async-visitor")]
-#[allow(dead_code)]
+#[allow(dead_code, clippy::future_not_send)]
 #[inline]
 pub async fn dispatch_async_visitor<F, Fut>(
     visitor: &Option<Rc<RefCell<dyn AsyncHtmlVisitor>>>,

@@ -1,4 +1,6 @@
-#![deny(clippy::all)]
+#![deny(clippy::correctness, clippy::suspicious)]
+#![warn(clippy::all)]
+#![allow(clippy::pedantic)]
 
 #[cfg(feature = "metadata")]
 use html_to_markdown_rs::metadata::{
@@ -91,9 +93,9 @@ pub enum JsHeadingStyle {
 impl From<JsHeadingStyle> for HeadingStyle {
     fn from(val: JsHeadingStyle) -> Self {
         match val {
-            JsHeadingStyle::Underlined => HeadingStyle::Underlined,
-            JsHeadingStyle::Atx => HeadingStyle::Atx,
-            JsHeadingStyle::AtxClosed => HeadingStyle::AtxClosed,
+            JsHeadingStyle::Underlined => Self::Underlined,
+            JsHeadingStyle::Atx => Self::Atx,
+            JsHeadingStyle::AtxClosed => Self::AtxClosed,
         }
     }
 }
@@ -108,8 +110,8 @@ pub enum JsListIndentType {
 impl From<JsListIndentType> for ListIndentType {
     fn from(val: JsListIndentType) -> Self {
         match val {
-            JsListIndentType::Spaces => ListIndentType::Spaces,
-            JsListIndentType::Tabs => ListIndentType::Tabs,
+            JsListIndentType::Spaces => Self::Spaces,
+            JsListIndentType::Tabs => Self::Tabs,
         }
     }
 }
@@ -124,8 +126,8 @@ pub enum JsWhitespaceMode {
 impl From<JsWhitespaceMode> for WhitespaceMode {
     fn from(val: JsWhitespaceMode) -> Self {
         match val {
-            JsWhitespaceMode::Normalized => WhitespaceMode::Normalized,
-            JsWhitespaceMode::Strict => WhitespaceMode::Strict,
+            JsWhitespaceMode::Normalized => Self::Normalized,
+            JsWhitespaceMode::Strict => Self::Strict,
         }
     }
 }
@@ -142,8 +144,8 @@ pub enum JsNewlineStyle {
 impl From<JsNewlineStyle> for NewlineStyle {
     fn from(val: JsNewlineStyle) -> Self {
         match val {
-            JsNewlineStyle::Spaces => NewlineStyle::Spaces,
-            JsNewlineStyle::Backslash => NewlineStyle::Backslash,
+            JsNewlineStyle::Spaces => Self::Spaces,
+            JsNewlineStyle::Backslash => Self::Backslash,
         }
     }
 }
@@ -162,9 +164,9 @@ pub enum JsCodeBlockStyle {
 impl From<JsCodeBlockStyle> for CodeBlockStyle {
     fn from(val: JsCodeBlockStyle) -> Self {
         match val {
-            JsCodeBlockStyle::Indented => CodeBlockStyle::Indented,
-            JsCodeBlockStyle::Backticks => CodeBlockStyle::Backticks,
-            JsCodeBlockStyle::Tildes => CodeBlockStyle::Tildes,
+            JsCodeBlockStyle::Indented => Self::Indented,
+            JsCodeBlockStyle::Backticks => Self::Backticks,
+            JsCodeBlockStyle::Tildes => Self::Tildes,
         }
     }
 }
@@ -185,10 +187,10 @@ pub enum JsHighlightStyle {
 impl From<JsHighlightStyle> for HighlightStyle {
     fn from(val: JsHighlightStyle) -> Self {
         match val {
-            JsHighlightStyle::DoubleEqual => HighlightStyle::DoubleEqual,
-            JsHighlightStyle::Html => HighlightStyle::Html,
-            JsHighlightStyle::Bold => HighlightStyle::Bold,
-            JsHighlightStyle::None => HighlightStyle::None,
+            JsHighlightStyle::DoubleEqual => Self::DoubleEqual,
+            JsHighlightStyle::Html => Self::Html,
+            JsHighlightStyle::Bold => Self::Bold,
+            JsHighlightStyle::None => Self::None,
         }
     }
 }
@@ -204,9 +206,9 @@ pub enum JsPreprocessingPreset {
 impl From<JsPreprocessingPreset> for PreprocessingPreset {
     fn from(val: JsPreprocessingPreset) -> Self {
         match val {
-            JsPreprocessingPreset::Minimal => PreprocessingPreset::Minimal,
-            JsPreprocessingPreset::Standard => PreprocessingPreset::Standard,
-            JsPreprocessingPreset::Aggressive => PreprocessingPreset::Aggressive,
+            JsPreprocessingPreset::Minimal => Self::Minimal,
+            JsPreprocessingPreset::Standard => Self::Standard,
+            JsPreprocessingPreset::Aggressive => Self::Aggressive,
         }
     }
 }
@@ -238,7 +240,7 @@ impl From<JsPreprocessingOptions> for PreprocessingOptionsUpdate {
 impl From<JsPreprocessingOptions> for RustPreprocessingOptions {
     fn from(val: JsPreprocessingOptions) -> Self {
         let update: PreprocessingOptionsUpdate = val.into();
-        let mut opts = RustPreprocessingOptions::default();
+        let mut opts = Self::default();
         opts.apply_update(update);
         opts
     }
@@ -351,7 +353,7 @@ impl From<JsConversionOptions> for ConversionOptionsUpdate {
 
 impl From<JsConversionOptions> for RustConversionOptions {
     fn from(val: JsConversionOptions) -> Self {
-        RustConversionOptions::from(ConversionOptionsUpdate::from(val))
+        Self::from(ConversionOptionsUpdate::from(val))
     }
 }
 
@@ -388,7 +390,7 @@ impl From<JsInlineImageConfig> for InlineImageConfigUpdate {
 
 impl From<JsInlineImageConfig> for RustInlineImageConfig {
     fn from(val: JsInlineImageConfig) -> Self {
-        let mut cfg = RustInlineImageConfig::new(DEFAULT_INLINE_IMAGE_LIMIT);
+        let mut cfg = Self::new(DEFAULT_INLINE_IMAGE_LIMIT);
         cfg.apply_update(InlineImageConfigUpdate::from(val));
         cfg
     }
@@ -462,7 +464,7 @@ impl From<JsMetadataConfig> for RustMetadataConfig {
             extract_structured_data: val.extract_structured_data,
             max_structured_data_size: val.max_structured_data_size.map(|value| value as usize),
         };
-        RustMetadataConfig::from(update)
+        Self::from(update)
     }
 }
 
@@ -773,8 +775,8 @@ unsafe impl Sync for JsVisitorBridge {}
 
 #[cfg(feature = "async-visitor")]
 impl JsVisitorBridge {
-    fn new() -> Self {
-        JsVisitorBridge {
+    const fn new() -> Self {
+        Self {
             visit_element_start_fn: None,
             visit_element_end_fn: None,
             visit_text_fn: None,

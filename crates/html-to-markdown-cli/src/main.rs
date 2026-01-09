@@ -1,3 +1,7 @@
+#![deny(clippy::correctness, clippy::suspicious)]
+#![warn(clippy::all)]
+#![allow(clippy::pedantic)]
+
 use clap::{Parser, ValueEnum};
 use encoding_rs::Encoding;
 use html_to_markdown_rs::{
@@ -417,9 +421,9 @@ enum CliHeadingStyle {
 impl From<CliHeadingStyle> for HeadingStyle {
     fn from(style: CliHeadingStyle) -> Self {
         match style {
-            CliHeadingStyle::Atx => HeadingStyle::Atx,
-            CliHeadingStyle::Underlined => HeadingStyle::Underlined,
-            CliHeadingStyle::AtxClosed => HeadingStyle::AtxClosed,
+            CliHeadingStyle::Atx => Self::Atx,
+            CliHeadingStyle::Underlined => Self::Underlined,
+            CliHeadingStyle::AtxClosed => Self::AtxClosed,
         }
     }
 }
@@ -435,8 +439,8 @@ enum CliListIndentType {
 impl From<CliListIndentType> for ListIndentType {
     fn from(indent_type: CliListIndentType) -> Self {
         match indent_type {
-            CliListIndentType::Spaces => ListIndentType::Spaces,
-            CliListIndentType::Tabs => ListIndentType::Tabs,
+            CliListIndentType::Spaces => Self::Spaces,
+            CliListIndentType::Tabs => Self::Tabs,
         }
     }
 }
@@ -452,8 +456,8 @@ enum CliNewlineStyle {
 impl From<CliNewlineStyle> for NewlineStyle {
     fn from(style: CliNewlineStyle) -> Self {
         match style {
-            CliNewlineStyle::Spaces => NewlineStyle::Spaces,
-            CliNewlineStyle::Backslash => NewlineStyle::Backslash,
+            CliNewlineStyle::Spaces => Self::Spaces,
+            CliNewlineStyle::Backslash => Self::Backslash,
         }
     }
 }
@@ -471,9 +475,9 @@ enum CliCodeBlockStyle {
 impl From<CliCodeBlockStyle> for CodeBlockStyle {
     fn from(style: CliCodeBlockStyle) -> Self {
         match style {
-            CliCodeBlockStyle::Indented => CodeBlockStyle::Indented,
-            CliCodeBlockStyle::Backticks => CodeBlockStyle::Backticks,
-            CliCodeBlockStyle::Tildes => CodeBlockStyle::Tildes,
+            CliCodeBlockStyle::Indented => Self::Indented,
+            CliCodeBlockStyle::Backticks => Self::Backticks,
+            CliCodeBlockStyle::Tildes => Self::Tildes,
         }
     }
 }
@@ -493,10 +497,10 @@ enum CliHighlightStyle {
 impl From<CliHighlightStyle> for HighlightStyle {
     fn from(style: CliHighlightStyle) -> Self {
         match style {
-            CliHighlightStyle::DoubleEqual => HighlightStyle::DoubleEqual,
-            CliHighlightStyle::Html => HighlightStyle::Html,
-            CliHighlightStyle::Bold => HighlightStyle::Bold,
-            CliHighlightStyle::None => HighlightStyle::None,
+            CliHighlightStyle::DoubleEqual => Self::DoubleEqual,
+            CliHighlightStyle::Html => Self::Html,
+            CliHighlightStyle::Bold => Self::Bold,
+            CliHighlightStyle::None => Self::None,
         }
     }
 }
@@ -512,8 +516,8 @@ enum CliWhitespaceMode {
 impl From<CliWhitespaceMode> for WhitespaceMode {
     fn from(mode: CliWhitespaceMode) -> Self {
         match mode {
-            CliWhitespaceMode::Normalized => WhitespaceMode::Normalized,
-            CliWhitespaceMode::Strict => WhitespaceMode::Strict,
+            CliWhitespaceMode::Normalized => Self::Normalized,
+            CliWhitespaceMode::Strict => Self::Strict,
         }
     }
 }
@@ -531,9 +535,9 @@ enum CliPreprocessingPreset {
 impl From<CliPreprocessingPreset> for PreprocessingPreset {
     fn from(preset: CliPreprocessingPreset) -> Self {
         match preset {
-            CliPreprocessingPreset::Minimal => PreprocessingPreset::Minimal,
-            CliPreprocessingPreset::Standard => PreprocessingPreset::Standard,
-            CliPreprocessingPreset::Aggressive => PreprocessingPreset::Aggressive,
+            CliPreprocessingPreset::Minimal => Self::Minimal,
+            CliPreprocessingPreset::Standard => Self::Standard,
+            CliPreprocessingPreset::Aggressive => Self::Aggressive,
         }
     }
 }

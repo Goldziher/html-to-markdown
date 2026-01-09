@@ -1,3 +1,7 @@
+#![deny(clippy::correctness, clippy::suspicious)]
+#![warn(clippy::all)]
+#![allow(clippy::pedantic)]
+
 #[cfg(feature = "metadata")]
 use html_to_markdown_rs::metadata::{
     DEFAULT_MAX_STRUCTURED_DATA_SIZE, DocumentMetadata as RustDocumentMetadata,
@@ -168,7 +172,7 @@ struct PreprocessingOptions {
 impl PreprocessingOptions {
     #[new]
     #[pyo3(signature = (enabled=false, preset="standard".to_string(), remove_navigation=true, remove_forms=true))]
-    fn new(enabled: bool, preset: String, remove_navigation: bool, remove_forms: bool) -> Self {
+    const fn new(enabled: bool, preset: String, remove_navigation: bool, remove_forms: bool) -> Self {
         Self {
             enabled,
             preset,
@@ -535,7 +539,7 @@ impl ConversionOptionsHandle {
         Self { inner }
     }
 
-    fn new_with_rust(options: RustConversionOptions) -> Self {
+    const fn new_with_rust(options: RustConversionOptions) -> Self {
         Self { inner: options }
     }
 }
@@ -545,7 +549,7 @@ impl ConversionOptionsHandle {
     #[new]
     #[pyo3(signature = (options=None))]
     fn py_new(options: Option<ConversionOptions>) -> Self {
-        ConversionOptionsHandle::new_with_options(options)
+        Self::new_with_options(options)
     }
 }
 

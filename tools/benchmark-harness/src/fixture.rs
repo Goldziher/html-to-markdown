@@ -11,10 +11,10 @@ pub enum FixtureFormat {
 }
 
 impl FixtureFormat {
-    pub fn as_str(&self) -> &'static str {
+    pub const fn as_str(&self) -> &'static str {
         match self {
-            FixtureFormat::Html => "html",
-            FixtureFormat::Hocr => "hocr",
+            Self::Html => "html",
+            Self::Hocr => "hocr",
         }
     }
 }
@@ -39,13 +39,13 @@ pub enum VisitorType {
 }
 
 impl VisitorType {
-    pub fn as_str(&self) -> &'static str {
+    pub const fn as_str(&self) -> &'static str {
         match self {
-            VisitorType::None => "none",
-            VisitorType::Noop => "noop",
-            VisitorType::Simple => "simple",
-            VisitorType::Custom => "custom",
-            VisitorType::Complex => "complex",
+            Self::None => "none",
+            Self::Noop => "noop",
+            Self::Simple => "simple",
+            Self::Custom => "custom",
+            Self::Complex => "complex",
         }
     }
 }
@@ -216,7 +216,7 @@ fn load_fixtures_from_documents(dir: &Path) -> Result<Vec<Fixture>> {
     Ok(fixtures)
 }
 
-fn suggested_iterations(file_size: u64) -> u32 {
+const fn suggested_iterations(file_size: u64) -> u32 {
     if file_size < 25_000 {
         15
     } else if file_size < 100_000 {
