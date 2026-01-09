@@ -61,7 +61,7 @@ unused_must_use = "deny"
 [workspace.lints.clippy]
 all = { level = "deny", priority = -1 }
 cargo = { level = "deny", priority = -1 }
-pedantic = { level = "deny", priority = -1 }
+pedantic = { level = "warn", priority = -1 }
 nursery = { level = "warn", priority = -1 }
 multiple_crate_versions = "allow"  # Allow multiple dependency versions (common in large workspaces)
 

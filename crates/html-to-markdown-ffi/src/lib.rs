@@ -2,10 +2,9 @@
 //!
 //! Provides a C-compatible API that can be consumed by Java (Panama FFM),
 //! Go (cgo), C# (P/Invoke), Zig, and other languages with C FFI support.
-
+#![allow(clippy::all, clippy::pedantic, clippy::nursery)]
 #![deny(clippy::correctness, clippy::suspicious)]
 #![warn(clippy::all)]
-#![allow(clippy::pedantic)]
 
 use std::ffi::{CStr, CString};
 use std::os::raw::c_char;
@@ -56,12 +55,11 @@ pub unsafe extern "C" fn html_to_markdown_profile_start(output: *const c_char, f
         return false;
     }
 
-    let output_str = match unsafe { CStr::from_ptr(output) }.to_str() {
-        Ok(s) => s,
-        Err(_) => {
-            set_last_error(Some("output path must be valid UTF-8".to_string()));
-            return false;
-        }
+    let output_str = if let Ok(s) = unsafe { CStr::from_ptr(output) }.to_str() {
+        s
+    } else {
+        set_last_error(Some("output path must be valid UTF-8".to_string()));
+        return false;
     };
 
     match profiling::start(output_str.into(), frequency) {
@@ -122,12 +120,11 @@ pub unsafe extern "C" fn html_to_markdown_convert(html: *const c_char) -> *mut c
         return ptr::null_mut();
     }
 
-    let html_str = match unsafe { CStr::from_ptr(html) }.to_str() {
-        Ok(s) => s,
-        Err(_) => {
-            set_last_error(Some("html must be valid UTF-8".to_string()));
-            return ptr::null_mut();
-        }
+    let html_str = if let Ok(s) = unsafe { CStr::from_ptr(html) }.to_str() {
+        s
+    } else {
+        set_last_error(Some("html must be valid UTF-8".to_string()));
+        return ptr::null_mut();
     };
 
     match guard_panic(|| profiling::maybe_profile(|| convert(html_str, None))) {
@@ -153,7 +150,7 @@ pub unsafe extern "C" fn html_to_markdown_convert(html: *const c_char) -> *mut c
 /// # Safety
 ///
 /// - `html` must be a valid null-terminated C string
-/// - `len_out` must be a valid pointer to a size_t
+/// - `len_out` must be a valid pointer to a `size_t`
 /// - The returned string must be freed with `html_to_markdown_free_string`
 /// - Returns NULL on error
 #[unsafe(no_mangle)]
@@ -168,12 +165,11 @@ pub unsafe extern "C" fn html_to_markdown_convert_with_len(html: *const c_char, 
         return ptr::null_mut();
     }
 
-    let html_str = match unsafe { CStr::from_ptr(html) }.to_str() {
-        Ok(s) => s,
-        Err(_) => {
-            set_last_error(Some("html must be valid UTF-8".to_string()));
-            return ptr::null_mut();
-        }
+    let html_str = if let Ok(s) = unsafe { CStr::from_ptr(html) }.to_str() {
+        s
+    } else {
+        set_last_error(Some("html must be valid UTF-8".to_string()));
+        return ptr::null_mut();
     };
 
     match guard_panic(|| profiling::maybe_profile(|| convert(html_str, None))) {
@@ -204,7 +200,7 @@ pub unsafe extern "C" fn html_to_markdown_convert_with_len(html: *const c_char, 
 /// # Safety
 ///
 /// - `html` must point to `len` bytes of UTF-8 data
-/// - `len_out` must be a valid pointer to a size_t
+/// - `len_out` must be a valid pointer to a `size_t`
 /// - The returned string must be freed with `html_to_markdown_free_string`
 /// - Returns NULL on error
 #[unsafe(no_mangle)]
@@ -224,12 +220,11 @@ pub unsafe extern "C" fn html_to_markdown_convert_bytes_with_len(
     }
 
     let html_bytes = unsafe { slice::from_raw_parts(html, len) };
-    let html_str = match std::str::from_utf8(html_bytes) {
-        Ok(s) => s,
-        Err(_) => {
-            set_last_error(Some("html must be valid UTF-8".to_string()));
-            return ptr::null_mut();
-        }
+    let html_str = if let Ok(s) = std::str::from_utf8(html_bytes) {
+        s
+    } else {
+        set_last_error(Some("html must be valid UTF-8".to_string()));
+        return ptr::null_mut();
     };
 
     match guard_panic(|| profiling::maybe_profile(|| convert(html_str, None))) {
@@ -255,7 +250,7 @@ pub unsafe extern "C" fn html_to_markdown_convert_bytes_with_len(
     }
 }
 
-/// Free a string returned by html_to_markdown_convert.
+/// Free a string returned by `html_to_markdown_convert`.
 ///
 /// # Safety
 ///
@@ -284,7 +279,7 @@ pub unsafe extern "C" fn html_to_markdown_free_string(s: *mut c_char) {
 /// - Returns a static string that does not need to be freed
 #[unsafe(no_mangle)]
 pub const unsafe extern "C" fn html_to_markdown_version() -> *const c_char {
-    concat!(env!("CARGO_PKG_VERSION"), "\0").as_ptr() as *const c_char
+    concat!(env!("CARGO_PKG_VERSION"), "\0").as_ptr().cast::<c_char>()
 }
 
 /// Convert HTML to Markdown with metadata extraction.
@@ -294,7 +289,7 @@ pub const unsafe extern "C" fn html_to_markdown_version() -> *const c_char {
 /// - `html` must be a valid null-terminated C string
 /// - `metadata_json_out` must be a valid pointer to a char pointer
 /// - The returned markdown string must be freed with `html_to_markdown_free_string`
-/// - The metadata JSON string (written to metadata_json_out) must be freed with `html_to_markdown_free_string`
+/// - The metadata JSON string (written to `metadata_json_out`) must be freed with `html_to_markdown_free_string`
 /// - Returns NULL on error (check error with `html_to_markdown_last_error`)
 ///
 /// # Example (C)
@@ -326,12 +321,11 @@ pub unsafe extern "C" fn html_to_markdown_convert_with_metadata(
         return ptr::null_mut();
     }
 
-    let html_str = match unsafe { CStr::from_ptr(html) }.to_str() {
-        Ok(s) => s,
-        Err(_) => {
-            set_last_error(Some("html must be valid UTF-8".to_string()));
-            return ptr::null_mut();
-        }
+    let html_str = if let Ok(s) = unsafe { CStr::from_ptr(html) }.to_str() {
+        s
+    } else {
+        set_last_error(Some("html must be valid UTF-8".to_string()));
+        return ptr::null_mut();
     };
 
     let metadata_cfg = MetadataConfig {
@@ -350,7 +344,7 @@ pub unsafe extern "C" fn html_to_markdown_convert_with_metadata(
             let metadata_json = match serde_json::to_vec(&metadata) {
                 Ok(json) => json,
                 Err(e) => {
-                    set_last_error(Some(format!("failed to serialize metadata to JSON: {}", e)));
+                    set_last_error(Some(format!("failed to serialize metadata to JSON: {e}")));
                     return ptr::null_mut();
                 }
             };
@@ -394,9 +388,9 @@ pub unsafe extern "C" fn html_to_markdown_convert_with_metadata(
 ///
 /// - `html` must be a valid null-terminated C string
 /// - `metadata_json_out` must be a valid pointer to a char pointer
-/// - `markdown_len_out` and `metadata_len_out` must be valid pointers to size_t
+/// - `markdown_len_out` and `metadata_len_out` must be valid pointers to `size_t`
 /// - The returned markdown string must be freed with `html_to_markdown_free_string`
-/// - The metadata JSON string (written to metadata_json_out) must be freed with `html_to_markdown_free_string`
+/// - The metadata JSON string (written to `metadata_json_out`) must be freed with `html_to_markdown_free_string`
 /// - Returns NULL on error (check error with `html_to_markdown_last_error`)
 #[cfg(feature = "metadata")]
 #[unsafe(no_mangle)]
@@ -421,12 +415,11 @@ pub unsafe extern "C" fn html_to_markdown_convert_with_metadata_with_len(
         return ptr::null_mut();
     }
 
-    let html_str = match unsafe { CStr::from_ptr(html) }.to_str() {
-        Ok(s) => s,
-        Err(_) => {
-            set_last_error(Some("html must be valid UTF-8".to_string()));
-            return ptr::null_mut();
-        }
+    let html_str = if let Ok(s) = unsafe { CStr::from_ptr(html) }.to_str() {
+        s
+    } else {
+        set_last_error(Some("html must be valid UTF-8".to_string()));
+        return ptr::null_mut();
     };
 
     let metadata_cfg = MetadataConfig {
@@ -445,7 +438,7 @@ pub unsafe extern "C" fn html_to_markdown_convert_with_metadata_with_len(
             let metadata_json = match serde_json::to_vec(&metadata) {
                 Ok(json) => json,
                 Err(e) => {
-                    set_last_error(Some(format!("failed to serialize metadata to JSON: {}", e)));
+                    set_last_error(Some(format!("failed to serialize metadata to JSON: {e}")));
                     return ptr::null_mut();
                 }
             };
@@ -498,9 +491,9 @@ pub unsafe extern "C" fn html_to_markdown_convert_with_metadata_with_len(
 ///
 /// - `html` must point to `len` bytes of UTF-8 data
 /// - `metadata_json_out` must be a valid pointer to a char pointer
-/// - `markdown_len_out` and `metadata_len_out` must be valid pointers to size_t
+/// - `markdown_len_out` and `metadata_len_out` must be valid pointers to `size_t`
 /// - The returned markdown string must be freed with `html_to_markdown_free_string`
-/// - The metadata JSON string (written to metadata_json_out) must be freed with `html_to_markdown_free_string`
+/// - The metadata JSON string (written to `metadata_json_out`) must be freed with `html_to_markdown_free_string`
 /// - Returns NULL on error (check error with `html_to_markdown_last_error`)
 #[cfg(feature = "metadata")]
 #[unsafe(no_mangle)]
@@ -527,12 +520,11 @@ pub unsafe extern "C" fn html_to_markdown_convert_with_metadata_bytes_with_len(
     }
 
     let html_bytes = unsafe { slice::from_raw_parts(html, len) };
-    let html_str = match std::str::from_utf8(html_bytes) {
-        Ok(s) => s,
-        Err(_) => {
-            set_last_error(Some("html must be valid UTF-8".to_string()));
-            return ptr::null_mut();
-        }
+    let html_str = if let Ok(s) = std::str::from_utf8(html_bytes) {
+        s
+    } else {
+        set_last_error(Some("html must be valid UTF-8".to_string()));
+        return ptr::null_mut();
     };
 
     let metadata_cfg = MetadataConfig {
@@ -551,7 +543,7 @@ pub unsafe extern "C" fn html_to_markdown_convert_with_metadata_bytes_with_len(
             let metadata_json = match serde_json::to_vec(&metadata) {
                 Ok(json) => json,
                 Err(e) => {
-                    set_last_error(Some(format!("failed to serialize metadata to JSON: {}", e)));
+                    set_last_error(Some(format!("failed to serialize metadata to JSON: {e}")));
                     return ptr::null_mut();
                 }
             };

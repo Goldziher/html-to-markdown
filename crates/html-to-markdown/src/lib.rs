@@ -1,3 +1,22 @@
+#![allow(
+    clippy::too_many_lines,
+    clippy::option_if_let_else,
+    clippy::match_wildcard_for_single_variants,
+    clippy::needless_pass_by_value,
+    clippy::struct_excessive_bools,
+    clippy::fn_params_excessive_bools,
+    clippy::branches_sharing_code,
+    clippy::match_same_arms,
+    clippy::missing_errors_doc,
+    clippy::items_after_statements,
+    clippy::doc_markdown,
+    clippy::cast_sign_loss,
+    clippy::default_trait_access,
+    clippy::unused_self,
+    clippy::cast_precision_loss,
+    clippy::collapsible_if
+)]
+
 //! High-performance HTML to Markdown converter.
 //!
 //! Built with html5ever for fast, memory-efficient HTML parsing.
@@ -6,9 +25,6 @@
 //!
 //! Enable the `inline-images` Cargo feature to collect embedded data URI images and inline SVG
 //! assets alongside the produced Markdown.
-
-#![allow(clippy::pedantic)]
-
 use std::borrow::Cow;
 
 pub mod converter;
@@ -58,6 +74,7 @@ const BINARY_MAGIC_PREFIXES: &[(&[u8], &str)] = &[
     (b"%PDF-", "PDF data"),
 ];
 
+#[allow(clippy::cast_precision_loss)]
 fn validate_input(html: &str) -> Result<()> {
     let bytes = html.as_bytes();
     if bytes.is_empty() {
@@ -119,6 +136,7 @@ fn detect_binary_magic(bytes: &[u8]) -> Option<&'static str> {
     None
 }
 
+#[allow(clippy::cast_precision_loss)]
 fn detect_utf16_hint(
     bytes: &[u8],
     sample_len: usize,
@@ -135,11 +153,13 @@ fn detect_utf16_hint(
         }
     }
 
+    #[allow(clippy::cast_precision_loss)]
     let nul_ratio = nul_count as f64 / sample_len as f64;
     if nul_ratio < BINARY_UTF16_NULL_RATIO {
         return None;
     }
 
+    #[allow(clippy::cast_precision_loss)]
     let dominant_ratio = (even_nul_count.max(odd_nul_count) as f64) / nul_count as f64;
     if dominant_ratio >= 0.9 {
         Some("UTF-16 data without BOM")
@@ -204,7 +224,7 @@ fn parse_json<T: serde::de::DeserializeOwned>(json: &str) -> Result<T> {
 }
 
 #[cfg(any(feature = "serde", feature = "metadata"))]
-/// Parse JSON string into ConversionOptions.
+/// Parse JSON string into `ConversionOptions`.
 ///
 /// Deserializes a JSON string into a full set of conversion options.
 /// The JSON can be either a complete or partial options object.
@@ -215,7 +235,7 @@ fn parse_json<T: serde::de::DeserializeOwned>(json: &str) -> Result<T> {
 ///
 /// # Returns
 ///
-/// Fully populated ConversionOptions with defaults applied to any unspecified values
+/// Fully populated `ConversionOptions` with defaults applied to any unspecified values
 ///
 /// # Errors
 ///
@@ -226,7 +246,7 @@ pub fn conversion_options_from_json(json: &str) -> Result<ConversionOptions> {
 }
 
 #[cfg(any(feature = "serde", feature = "metadata"))]
-/// Parse JSON string into partial ConversionOptions update.
+/// Parse JSON string into partial `ConversionOptions` update.
 ///
 /// Deserializes a JSON string into a partial set of conversion options.
 /// Only specified options are included; unspecified options are None.
@@ -237,7 +257,7 @@ pub fn conversion_options_from_json(json: &str) -> Result<ConversionOptions> {
 ///
 /// # Returns
 ///
-/// ConversionOptionsUpdate with only specified fields populated
+/// `ConversionOptionsUpdate` with only specified fields populated
 ///
 /// # Errors
 ///
@@ -247,7 +267,7 @@ pub fn conversion_options_update_from_json(json: &str) -> Result<ConversionOptio
 }
 
 #[cfg(all(feature = "inline-images", any(feature = "serde", feature = "metadata")))]
-/// Parse JSON string into InlineImageConfig (requires `inline-images` feature).
+/// Parse JSON string into `InlineImageConfig` (requires `inline-images` feature).
 ///
 /// Deserializes a JSON string into inline image extraction configuration.
 /// The JSON can be either a complete or partial configuration object.
@@ -258,7 +278,7 @@ pub fn conversion_options_update_from_json(json: &str) -> Result<ConversionOptio
 ///
 /// # Returns
 ///
-/// Fully populated InlineImageConfig with defaults applied to any unspecified values
+/// Fully populated `InlineImageConfig` with defaults applied to any unspecified values
 ///
 /// # Errors
 ///
@@ -269,7 +289,7 @@ pub fn inline_image_config_from_json(json: &str) -> Result<InlineImageConfig> {
 }
 
 #[cfg(all(feature = "metadata", any(feature = "serde", feature = "metadata")))]
-/// Parse JSON string into MetadataConfig (requires `metadata` feature).
+/// Parse JSON string into `MetadataConfig` (requires `metadata` feature).
 ///
 /// Deserializes a JSON string into metadata extraction configuration.
 /// The JSON can be either a complete or partial configuration object.
@@ -280,7 +300,7 @@ pub fn inline_image_config_from_json(json: &str) -> Result<InlineImageConfig> {
 ///
 /// # Returns
 ///
-/// Fully populated MetadataConfig with defaults applied to any unspecified values
+/// Fully populated `MetadataConfig` with defaults applied to any unspecified values
 ///
 /// # Errors
 ///
@@ -295,7 +315,7 @@ pub fn metadata_config_from_json(json: &str) -> Result<MetadataConfig> {
 /// # Arguments
 ///
 /// * `html` - The HTML string to convert
-/// * `options` - Optional conversion options (defaults to ConversionOptions::default())
+/// * `options` - Optional conversion options (defaults to `ConversionOptions::default()`)
 ///
 /// # Example
 ///
@@ -306,6 +326,9 @@ pub fn metadata_config_from_json(json: &str) -> Result<MetadataConfig> {
 /// let markdown = convert(html, None).unwrap();
 /// assert!(markdown.contains("Hello World"));
 /// ```
+/// # Errors
+///
+/// Returns an error if HTML parsing fails or if the input contains invalid UTF-8.
 pub fn convert(html: &str, options: Option<ConversionOptions>) -> Result<String> {
     validate_input(html)?;
     let options = options.unwrap_or_default();
@@ -335,8 +358,11 @@ pub fn convert(html: &str, options: Option<ConversionOptions>) -> Result<String>
 /// # Arguments
 ///
 /// * `html` - The HTML string to convert
-/// * `options` - Optional conversion options (defaults to ConversionOptions::default())
+/// * `options` - Optional conversion options (defaults to `ConversionOptions::default()`)
 /// * `image_cfg` - Configuration controlling inline image extraction
+/// # Errors
+///
+/// Returns an error if HTML parsing fails or if the input contains invalid UTF-8.
 pub fn convert_with_inline_images(
     html: &str,
     options: Option<ConversionOptions>,
@@ -397,7 +423,7 @@ pub fn convert_with_inline_images(
 ///   - `headers`: All heading elements (h1-h6) with hierarchy and IDs
 ///   - `links`: Hyperlinks classified as anchor, internal, external, email, or phone
 ///   - `images`: Image elements with source, dimensions, and alt text
-///   - `structured_data`: JSON-LD, Microdata, and RDFa blocks
+///   - `structured_data`: JSON-LD, Microdata, and `RDFa` blocks
 ///
 /// # Errors
 ///
@@ -563,6 +589,9 @@ pub fn convert_with_metadata(
 /// let markdown = convert_with_visitor(html, None, &mut visitor).unwrap();
 /// ```
 #[cfg(feature = "visitor")]
+/// # Errors
+///
+/// Returns an error if HTML parsing fails or if the input contains invalid UTF-8.
 pub fn convert_with_visitor(
     html: &str,
     options: Option<ConversionOptions>,
@@ -598,7 +627,7 @@ pub fn convert_with_visitor(
 /// # Note
 ///
 /// The async visitor trait (`AsyncHtmlVisitor`) and async dispatch helpers are designed to be
-/// consumed by language bindings (PyO3, NAPI-RS, Magnus, etc.) which can bridge async/await
+/// consumed by language bindings (`PyO3`, NAPI-RS, Magnus, etc.) which can bridge async/await
 /// semantics from their host languages. The conversion pipeline itself runs synchronously,
 /// but visitor callbacks are defined as async to support languages with native async/await.
 ///
@@ -648,6 +677,10 @@ pub fn convert_with_visitor(
 /// layers (Python, TypeScript, etc.) to properly bridge async/await semantics to the
 /// synchronous Rust conversion core.
 #[allow(clippy::future_not_send)]
+/// # Errors
+///
+/// Returns an error if HTML parsing fails or if the input contains invalid UTF-8.
+#[allow(clippy::unused_async)]
 pub async fn convert_with_async_visitor(
     html: &str,
     options: Option<ConversionOptions>,

@@ -1,6 +1,6 @@
 #![deny(clippy::correctness, clippy::suspicious)]
 #![warn(clippy::all)]
-#![allow(clippy::pedantic)]
+#![allow(clippy::all, clippy::pedantic, clippy::nursery, missing_docs)]
 
 #[cfg(feature = "metadata")]
 use html_to_markdown_rs::metadata::{
@@ -153,7 +153,7 @@ impl From<JsNewlineStyle> for NewlineStyle {
 /// Code block style
 #[napi(string_enum)]
 pub enum JsCodeBlockStyle {
-    /// Indented code blocks (4 spaces) - CommonMark default
+    /// Indented code blocks (4 spaces) - `CommonMark` default
     Indented,
     /// Fenced code blocks with backticks (```)
     Backticks,
@@ -409,7 +409,7 @@ pub struct JsInlineImage {
     pub description: Option<String>,
     /// Image dimensions (width, height) if available
     pub dimensions: Option<Vec<u32>>,
-    /// Source type (img_data_uri or svg_element)
+    /// Source type (`img_data_uri` or `svg_element`)
     pub source: String,
     /// HTML attributes from the source element
     pub attributes: HashMap<String, String>,
@@ -529,7 +529,7 @@ pub struct JsImageMetadata {
     pub attributes: HashMap<String, String>,
 }
 
-/// Structured data (JSON-LD, Microdata, RDFa)
+/// Structured data (JSON-LD, Microdata, `RDFa`)
 #[cfg(feature = "metadata")]
 #[napi(object)]
 pub struct JsStructuredData {
@@ -582,7 +582,7 @@ fn convert_headers(headers: Vec<RustHeaderMetadata>) -> Vec<JsHeaderMetadata> {
     headers
         .into_iter()
         .map(|h| JsHeaderMetadata {
-            level: h.level as u32,
+            level: u32::from(h.level),
             text: h.text,
             id: h.id,
             depth: h.depth as u32,
@@ -670,23 +670,23 @@ pub struct JsVisitResult {
     pub output: Option<String>,
 }
 
-/// NAPI-RS AsyncHtmlVisitor Bridge Implementation
+/// NAPI-RS `AsyncHtmlVisitor` Bridge Implementation
 ///
 /// # Architecture
 ///
 /// This bridge enables full async visitor pattern support for Node.js by:
 /// 1. Accepting JavaScript visitor objects at the NAPI boundary
-/// 2. Wrapping JS callbacks as NAPI ThreadsafeFunction references
-/// 3. Implementing AsyncHtmlVisitor trait with proper .await on JS calls
+/// 2. Wrapping JS callbacks as NAPI `ThreadsafeFunction` references
+/// 3. Implementing `AsyncHtmlVisitor` trait with proper .await on JS calls
 /// 4. Executing the async conversion pipeline via tokio runtime
 ///
 /// # Key Design Decisions
 ///
 /// - **Feature Gate**: Uses `async-visitor` feature (not `visitor`)
-/// - **ThreadsafeFunction**: Stores Arc<ThreadsafeFunction> for each visitor method
+/// - **`ThreadsafeFunction`**: Stores Arc<ThreadsafeFunction> for each visitor method
 /// - **Async Methods**: All visitor methods are `async fn` to properly .await on JS calls
-/// - **Runtime**: Uses tokio::runtime to block_on the async conversion
-/// - **Error Handling**: JS callback errors default to VisitResult::Continue
+/// - **Runtime**: Uses `tokio::runtime` to `block_on` the async conversion
+/// - **Error Handling**: JS callback errors default to `VisitResult::Continue`
 ///
 /// # JavaScript Integration
 ///
@@ -699,9 +699,9 @@ pub struct JsVisitResult {
 /// };
 /// ```
 ///
-/// # Type alias for ThreadsafeFunction
+/// # Type alias for `ThreadsafeFunction`
 ///
-/// Each visitor method callback is wrapped as an Arc-based ThreadsafeFunction
+/// Each visitor method callback is wrapped as an Arc-based `ThreadsafeFunction`
 /// that accepts a String parameter and returns a Promise<String>.
 #[cfg(feature = "async-visitor")]
 type VisitorFn = Arc<
@@ -854,11 +854,11 @@ impl JsVisitorBridge {
     ///
     /// # Arguments
     ///
-    /// * `params` - Parameters implementing serde::Serialize trait
+    /// * `params` - Parameters implementing `serde::Serialize` trait
     ///
     /// # Returns
     ///
-    /// JSON string representation or serde_json error
+    /// JSON string representation or `serde_json` error
     ///
     /// # Example
     ///
@@ -875,11 +875,11 @@ impl JsVisitorBridge {
     ///
     /// # Arguments
     ///
-    /// * `json` - JSON string representation of JsVisitResult
+    /// * `json` - JSON string representation of `JsVisitResult`
     ///
     /// # Returns
     ///
-    /// Deserialized JsVisitResult or serde_json error
+    /// Deserialized `JsVisitResult` or `serde_json` error
     ///
     /// # Example
     ///
@@ -1121,9 +1121,9 @@ pub fn convert(html: String, options: Option<JsConversionOptions>) -> Result<Str
 /// # Async Visitor Support
 ///
 /// This function enables full async visitor pattern support for Node.js:
-/// - JavaScript visitor callbacks are invoked asynchronously via NAPI ThreadsafeFunction
+/// - JavaScript visitor callbacks are invoked asynchronously via NAPI `ThreadsafeFunction`
 /// - All 30+ visitor methods are supported (links, images, headings, code, lists, tables, etc.)
-/// - Callback errors gracefully default to VisitResult::Continue
+/// - Callback errors gracefully default to `VisitResult::Continue`
 /// - Powered by tokio async runtime for seamless JS-Rust cooperation
 ///
 /// # Visitor Methods
@@ -1140,7 +1140,7 @@ pub fn convert(html: String, options: Option<JsConversionOptions>) -> Result<Str
 /// - `visitBlockquote(ctx, content, depth) -> VisitResult`
 /// - And 20+ more semantic and inline element callbacks
 ///
-/// # VisitResult Types
+/// # `VisitResult` Types
 ///
 /// Each callback should return an object with:
 /// - `type: 'continue' | 'skip' | 'custom' | 'preservehtml' | 'error'`
@@ -1237,7 +1237,7 @@ pub fn convert_with_visitor(
     let rt = tokio::runtime::Builder::new_current_thread()
         .enable_all()
         .build()
-        .map_err(|e| napi::Error::new(napi::Status::GenericFailure, format!("Failed to create runtime: {}", e)))?;
+        .map_err(|e| napi::Error::new(napi::Status::GenericFailure, format!("Failed to create runtime: {e}")))?;
 
     let result = rt
         .block_on(async {
@@ -1272,8 +1272,7 @@ pub fn stop_profiling() -> Result<()> {
 }
 
 fn buffer_to_str(html: &Buffer) -> Result<&str> {
-    str::from_utf8(html.as_ref())
-        .map_err(|e| Error::new(Status::InvalidArg, format!("HTML must be valid UTF-8: {}", e)))
+    str::from_utf8(html.as_ref()).map_err(|e| Error::new(Status::InvalidArg, format!("HTML must be valid UTF-8: {e}")))
 }
 
 /// Convert HTML to Markdown from a Buffer/Uint8Array without creating intermediate JS strings.
@@ -1293,7 +1292,7 @@ pub fn convert_buffer_json(html: Buffer, options_json: Option<String>) -> Result
         .map_err(to_js_error)
 }
 
-/// Create a reusable ConversionOptions handle.
+/// Create a reusable `ConversionOptions` handle.
 #[napi]
 pub fn create_conversion_options_handle(options: Option<JsConversionOptions>) -> External<RustConversionOptions> {
     External::new(options.map(Into::into).unwrap_or_default())
@@ -1305,7 +1304,7 @@ pub fn create_conversion_options_handle_json(options_json: Option<String>) -> Re
     Ok(External::new(rust_options.unwrap_or_default()))
 }
 
-/// Create a reusable MetadataConfig handle.
+/// Create a reusable `MetadataConfig` handle.
 #[cfg(feature = "metadata")]
 #[napi]
 pub fn create_metadata_config_handle(metadata_config: Option<JsMetadataConfig>) -> External<RustMetadataConfig> {
@@ -1321,14 +1320,14 @@ pub fn create_metadata_config_handle_json(
     Ok(External::new(rust_config))
 }
 
-/// Convert HTML using a previously-created ConversionOptions handle.
+/// Convert HTML using a previously-created `ConversionOptions` handle.
 #[napi]
 pub fn convert_with_options_handle(html: String, options: &External<RustConversionOptions>) -> Result<String> {
     guard_panic(|| profiling::maybe_profile(|| html_to_markdown_rs::convert(&html, Some((**options).clone()))))
         .map_err(to_js_error)
 }
 
-/// Convert HTML Buffer data using a previously-created ConversionOptions handle.
+/// Convert HTML Buffer data using a previously-created `ConversionOptions` handle.
 #[napi(js_name = "convertBufferWithOptionsHandle")]
 pub fn convert_buffer_with_options_handle(html: Buffer, options: &External<RustConversionOptions>) -> Result<String> {
     let html = buffer_to_str(&html)?;
@@ -1373,9 +1372,7 @@ fn convert_inline_images_impl(
     image_config: Option<JsInlineImageConfig>,
 ) -> Result<JsHtmlExtraction> {
     let rust_options = options.map(Into::into);
-    let rust_config = image_config
-        .map(Into::into)
-        .unwrap_or_else(|| RustInlineImageConfig::new(DEFAULT_INLINE_IMAGE_LIMIT));
+    let rust_config = image_config.map_or_else(|| RustInlineImageConfig::new(DEFAULT_INLINE_IMAGE_LIMIT), Into::into);
 
     let extraction = guard_panic(|| html_to_markdown_rs::convert_with_inline_images(html, rust_options, rust_config))
         .map_err(to_js_error)?;
@@ -1389,9 +1386,7 @@ fn convert_inline_images_with_handle_impl(
     image_config: Option<JsInlineImageConfig>,
 ) -> Result<JsHtmlExtraction> {
     let rust_options = Some((**options).clone());
-    let rust_config = image_config
-        .map(Into::into)
-        .unwrap_or_else(|| RustInlineImageConfig::new(DEFAULT_INLINE_IMAGE_LIMIT));
+    let rust_config = image_config.map_or_else(|| RustInlineImageConfig::new(DEFAULT_INLINE_IMAGE_LIMIT), Into::into);
 
     let extraction = guard_panic(|| html_to_markdown_rs::convert_with_inline_images(html, rust_options, rust_config))
         .map_err(to_js_error)?;

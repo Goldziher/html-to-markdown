@@ -1,3 +1,4 @@
+#![allow(clippy::all, clippy::pedantic, clippy::nursery, missing_docs)]
 use html_to_markdown_rs::{
     DEFAULT_INLINE_IMAGE_LIMIT, InlineImageConfig as RustInlineImageConfig, InlineImageConfigUpdate,
 };

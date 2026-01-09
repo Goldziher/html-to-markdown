@@ -16,14 +16,14 @@
 //!
 //! - Visitor handles are opaque pointers (void*) representing Box<CVisitorWrapper>
 //! - All pointer validation uses null checks before dereferencing
-//! - Callback results (VisitResult) are returned by value; ownership is clear
+//! - Callback results (`VisitResult`) are returned by value; ownership is clear
 //! - Strings are allocated by callback and must be freed by the FFI layer
 //! - Thread safety: Each thread can have multiple visitor instances; no global state
 //!
 //! # Thread Safety
 //!
 //! - Visitor instances are NOT thread-safe by design (single-threaded visitor use)
-//! - LAST_ERROR is thread-local; safe for concurrent threads with separate visitors
+//! - `LAST_ERROR` is thread-local; safe for concurrent threads with separate visitors
 //! - Visitors MUST NOT be shared across threads
 //!
 //! # Example (C)
@@ -97,7 +97,7 @@ use crate::strings::string_to_c_string;
 ///
 /// Returned by `html_to_markdown_visitor_create()` and passed to
 /// `html_to_markdown_convert_with_visitor()`. Contains ownership of the
-/// underlying CVisitorWrapper.
+/// underlying `CVisitorWrapper`.
 pub type HtmlToMarkdownVisitor = *mut std::ffi::c_void;
 
 /// Result type enumeration for visitor callbacks.
@@ -108,13 +108,13 @@ pub type HtmlToMarkdownVisitor = *mut std::ffi::c_void;
 pub enum HtmlToMarkdownVisitResultType {
     /// Continue with default conversion behavior
     Continue = 0,
-    /// Replace default output with custom markdown (requires custom_output set)
+    /// Replace default output with custom markdown (requires `custom_output` set)
     Custom = 1,
     /// Skip this element entirely
     Skip = 2,
     /// Preserve original HTML verbatim
     PreserveHtml = 3,
-    /// Stop conversion with error (requires error_message set)
+    /// Stop conversion with error (requires `error_message` set)
     Error = 4,
 }
 
@@ -126,14 +126,14 @@ pub enum HtmlToMarkdownVisitResultType {
 /// - **Continue**: No additional fields needed
 /// - **Custom**: `custom_output` must point to a malloc'd string (NULL-terminated)
 /// - **Skip**: No additional fields needed
-/// - **PreserveHtml**: No additional fields needed
+/// - **`PreserveHtml`**: No additional fields needed
 /// - **Error**: `error_message` must point to a malloc'd string (NULL-terminated)
 ///
 /// # Memory Ownership
 ///
 /// - `custom_output` and `error_message` are OWNED BY THE CALLBACK
 /// - The FFI layer will free these strings after processing
-/// - MUST be allocated with malloc/calloc; will be freed with free()
+/// - MUST be allocated with malloc/calloc; will be freed with `free()`
 ///
 /// # Safety
 ///
@@ -147,11 +147,11 @@ pub struct HtmlToMarkdownVisitResult {
     /// The action to take (Continue, Custom, Skip, etc.)
     pub result_type: HtmlToMarkdownVisitResultType,
 
-    /// Custom markdown output (only if result_type == Custom)
+    /// Custom markdown output (only if `result_type` == Custom)
     /// Must be malloc'd NULL-terminated string; ownership transfers to FFI layer
     pub custom_output: *mut c_char,
 
-    /// Error message (only if result_type == Error)
+    /// Error message (only if `result_type` == Error)
     /// Must be malloc'd NULL-terminated string; ownership transfers to FFI layer
     pub error_message: *mut c_char,
 }
@@ -166,10 +166,10 @@ impl Default for HtmlToMarkdownVisitResult {
     }
 }
 
-/// Node type enumeration (mirrors Rust NodeType).
+/// Node type enumeration (mirrors Rust `NodeType`).
 ///
 /// All HTML element types recognized by the converter are represented here.
-/// Used in NodeContext to classify elements during visitor callbacks.
+/// Used in `NodeContext` to classify elements during visitor callbacks.
 #[repr(C)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum HtmlToMarkdownNodeType {
@@ -215,7 +215,10 @@ pub enum HtmlToMarkdownNodeType {
 
 impl From<NodeType> for HtmlToMarkdownNodeType {
     fn from(nt: NodeType) -> Self {
-        use HtmlToMarkdownNodeType::*;
+        use HtmlToMarkdownNodeType::{
+            Blockquote, Code, Custom, Div, Element, Em, Heading, Hr, Image, Link, List, ListItem, Paragraph, Pre,
+            Strong, Table, TableCell, TableRow, Text,
+        };
         match nt {
             NodeType::Text => Text,
             NodeType::Element => Element,
@@ -249,7 +252,7 @@ impl From<NodeType> for HtmlToMarkdownNodeType {
 pub struct HtmlToMarkdownAttribute {
     /// Attribute name (e.g., "href", "class", "id")
     pub key: *const c_char,
-    /// Attribute value (e.g., "https://example.com", "container", "header-1")
+    /// Attribute value (e.g., "<https://example.com>", "container", "header-1")
     pub value: *const c_char,
 }
 
@@ -311,14 +314,14 @@ pub struct HtmlToMarkdownNodeContext {
 ///
 /// # Returns
 ///
-/// `HtmlToMarkdownVisitResult` with result_type and optional custom output.
-/// If custom, allocate the output string with malloc().
+/// `HtmlToMarkdownVisitResult` with `result_type` and optional custom output.
+/// If custom, allocate the output string with `malloc()`.
 ///
 /// # Safety
 ///
 /// - `ctx` is valid only during callback; don't store or dereference after
 /// - `text` is valid only during callback; make a copy if needed
-/// - Returned custom_output MUST be malloc'd; will be freed with free()
+/// - Returned `custom_output` MUST be malloc'd; will be freed with `free()`
 pub type HtmlToMarkdownVisitTextCallback = unsafe extern "C" fn(
     user_data: *mut std::ffi::c_void,
     ctx: *const HtmlToMarkdownNodeContext,
@@ -1234,31 +1237,31 @@ pub struct HtmlToMarkdownVisitorCallbacks {
     pub visit_figure_end: Option<HtmlToMarkdownVisitFigureEndCallback>,
 }
 
-/// Internal wrapper implementing HtmlVisitor trait from C callbacks.
+/// Internal wrapper implementing `HtmlVisitor` trait from C callbacks.
 ///
 /// Bridges the gap between:
-/// - C callback functions (function pointers with void* user_data)
-/// - Rust HtmlVisitor trait (method receivers with &mut self)
+/// - C callback functions (function pointers with void* `user_data`)
+/// - Rust `HtmlVisitor` trait (method receivers with &mut self)
 ///
 /// This wrapper is allocated in a Box and stored as an opaque pointer
-/// in the HtmlToMarkdownVisitor handle.
+/// in the `HtmlToMarkdownVisitor` handle.
 ///
 /// # Design Notes
 ///
-/// - Stores callback function pointers and user_data (owned by caller)
+/// - Stores callback function pointers and `user_data` (owned by caller)
 /// - Attributes and temporary strings are stored in wrapper, valid only during callback
 /// - Callback string parameters are C string pointers (valid only during callback)
 /// - Returned custom output/error strings are malloc'd; we take ownership and free them
 struct CVisitorWrapper {
-    /// C callback table with function pointers and user_data
+    /// C callback table with function pointers and `user_data`
     callbacks: HtmlToMarkdownVisitorCallbacks,
-    /// Temporary storage for tag name CString (valid only during callback)
+    /// Temporary storage for tag name `CString` (valid only during callback)
     temp_tag_name: RefCell<Option<CString>>,
-    /// Temporary storage for parent tag CString (valid only during callback)
+    /// Temporary storage for parent tag `CString` (valid only during callback)
     temp_parent_tag: RefCell<Option<CString>>,
-    /// Temporary storage for attribute array and key/value CStrings
+    /// Temporary storage for attribute array and key/value `CStrings`
     temp_attributes: RefCell<Vec<HtmlToMarkdownAttribute>>,
-    /// Temporary storage for attribute key/value CStrings (kept alive during callback)
+    /// Temporary storage for attribute key/value `CStrings` (kept alive during callback)
     temp_attribute_strings: RefCell<Vec<CString>>,
 }
 
@@ -1274,9 +1277,9 @@ impl CVisitorWrapper {
         }
     }
 
-    /// Build a C NodeContext from a Rust NodeContext.
+    /// Build a C `NodeContext` from a Rust `NodeContext`.
     ///
-    /// Note: The returned context contains pointers to temporary strings stored in RefCell fields.
+    /// Note: The returned context contains pointers to temporary strings stored in `RefCell` fields.
     /// These strings remain valid only during the callback execution. After the callback returns,
     /// the strings are cleared and the pointers become invalid.
     fn build_node_context(&self, ctx: &NodeContext) -> HtmlToMarkdownNodeContext {
@@ -1346,7 +1349,7 @@ impl CVisitorWrapper {
         *self.temp_attribute_strings.borrow_mut() = Vec::new();
     }
 
-    /// Process a VisitResult from a C callback, handling memory cleanup.
+    /// Process a `VisitResult` from a C callback, handling memory cleanup.
     fn process_result(&self, result: HtmlToMarkdownVisitResult) -> VisitResult {
         match result.result_type {
             HtmlToMarkdownVisitResultType::Continue => VisitResult::Continue,
@@ -1355,7 +1358,7 @@ impl CVisitorWrapper {
                     VisitResult::Continue
                 } else {
                     let output = unsafe { CStr::from_ptr(result.custom_output).to_string_lossy().into_owned() };
-                    unsafe { libc::free(result.custom_output as *mut std::ffi::c_void) };
+                    unsafe { libc::free(result.custom_output.cast::<std::ffi::c_void>()) };
                     VisitResult::Custom(output)
                 }
             }
@@ -1366,7 +1369,7 @@ impl CVisitorWrapper {
                     VisitResult::Error("unknown error".to_string())
                 } else {
                     let msg = unsafe { CStr::from_ptr(result.error_message).to_string_lossy().into_owned() };
-                    unsafe { libc::free(result.error_message as *mut std::ffi::c_void) };
+                    unsafe { libc::free(result.error_message.cast::<std::ffi::c_void>()) };
                     VisitResult::Error(msg)
                 }
             }
@@ -1390,7 +1393,7 @@ impl HtmlVisitor for CVisitorWrapper {
 
             let c_ctx = self.build_node_context(ctx);
 
-            let result = unsafe { callback(self.callbacks.user_data, &c_ctx, c_text) };
+            let result = unsafe { callback(self.callbacks.user_data, &raw const c_ctx, c_text) };
             let visit_result = self.process_result(result);
             self.clear_temp_strings();
             visit_result
@@ -1402,7 +1405,7 @@ impl HtmlVisitor for CVisitorWrapper {
     fn visit_element_start(&mut self, ctx: &NodeContext) -> VisitResult {
         if let Some(callback) = self.callbacks.visit_element_start {
             let c_ctx = self.build_node_context(ctx);
-            let result = unsafe { callback(self.callbacks.user_data, &c_ctx) };
+            let result = unsafe { callback(self.callbacks.user_data, &raw const c_ctx) };
             let visit_result = self.process_result(result);
             self.clear_temp_strings();
             visit_result
@@ -1417,7 +1420,7 @@ impl HtmlVisitor for CVisitorWrapper {
                 std::ffi::CString::new(output).unwrap_or_else(|_| std::ffi::CString::new("").unwrap());
             let c_output = c_output_string.as_ptr();
             let c_ctx = self.build_node_context(ctx);
-            let result = unsafe { callback(self.callbacks.user_data, &c_ctx, c_output) };
+            let result = unsafe { callback(self.callbacks.user_data, &raw const c_ctx, c_output) };
             let visit_result = self.process_result(result);
             self.clear_temp_strings();
             visit_result
@@ -1434,10 +1437,10 @@ impl HtmlVisitor for CVisitorWrapper {
 
             let c_href = c_href_string.as_ptr();
             let c_text = c_text_string.as_ptr();
-            let c_title = c_title_string.as_ref().map(|s| s.as_ptr()).unwrap_or(ptr::null());
+            let c_title = c_title_string.as_ref().map_or(ptr::null(), |s| s.as_ptr());
 
             let c_ctx = self.build_node_context(ctx);
-            let result = unsafe { callback(self.callbacks.user_data, &c_ctx, c_href, c_text, c_title) };
+            let result = unsafe { callback(self.callbacks.user_data, &raw const c_ctx, c_href, c_text, c_title) };
             let visit_result = self.process_result(result);
             self.clear_temp_strings();
             visit_result
@@ -1454,10 +1457,10 @@ impl HtmlVisitor for CVisitorWrapper {
 
             let c_src = c_src_string.as_ptr();
             let c_alt = c_alt_string.as_ptr();
-            let c_title = c_title_string.as_ref().map(|s| s.as_ptr()).unwrap_or(ptr::null());
+            let c_title = c_title_string.as_ref().map_or(ptr::null(), |s| s.as_ptr());
 
             let c_ctx = self.build_node_context(ctx);
-            let result = unsafe { callback(self.callbacks.user_data, &c_ctx, c_src, c_alt, c_title) };
+            let result = unsafe { callback(self.callbacks.user_data, &raw const c_ctx, c_src, c_alt, c_title) };
             let visit_result = self.process_result(result);
             self.clear_temp_strings();
             visit_result
@@ -1472,10 +1475,10 @@ impl HtmlVisitor for CVisitorWrapper {
             let c_id_string = id.and_then(|i| std::ffi::CString::new(i).ok());
 
             let c_text = c_text_string.as_ptr();
-            let c_id = c_id_string.as_ref().map(|s| s.as_ptr()).unwrap_or(ptr::null());
+            let c_id = c_id_string.as_ref().map_or(ptr::null(), |s| s.as_ptr());
 
             let c_ctx = self.build_node_context(ctx);
-            let result = unsafe { callback(self.callbacks.user_data, &c_ctx, level, c_text, c_id) };
+            let result = unsafe { callback(self.callbacks.user_data, &raw const c_ctx, level, c_text, c_id) };
             let visit_result = self.process_result(result);
             self.clear_temp_strings();
             visit_result
@@ -1489,11 +1492,11 @@ impl HtmlVisitor for CVisitorWrapper {
             let c_lang_string = lang.and_then(|l| std::ffi::CString::new(l).ok());
             let c_code_string = std::ffi::CString::new(code).unwrap_or_else(|_| std::ffi::CString::new("").unwrap());
 
-            let c_lang = c_lang_string.as_ref().map(|s| s.as_ptr()).unwrap_or(ptr::null());
+            let c_lang = c_lang_string.as_ref().map_or(ptr::null(), |s| s.as_ptr());
             let c_code = c_code_string.as_ptr();
 
             let c_ctx = self.build_node_context(ctx);
-            let result = unsafe { callback(self.callbacks.user_data, &c_ctx, c_lang, c_code) };
+            let result = unsafe { callback(self.callbacks.user_data, &raw const c_ctx, c_lang, c_code) };
             let visit_result = self.process_result(result);
             self.clear_temp_strings();
             visit_result
@@ -1508,7 +1511,7 @@ impl HtmlVisitor for CVisitorWrapper {
             let c_code = c_code_string.as_ptr();
 
             let c_ctx = self.build_node_context(ctx);
-            let result = unsafe { callback(self.callbacks.user_data, &c_ctx, c_code) };
+            let result = unsafe { callback(self.callbacks.user_data, &raw const c_ctx, c_code) };
             let visit_result = self.process_result(result);
             self.clear_temp_strings();
             visit_result
@@ -1527,7 +1530,7 @@ impl HtmlVisitor for CVisitorWrapper {
             let c_text = c_text_string.as_ptr();
 
             let c_ctx = self.build_node_context(ctx);
-            let result = unsafe { callback(self.callbacks.user_data, &c_ctx, ordered, c_marker, c_text) };
+            let result = unsafe { callback(self.callbacks.user_data, &raw const c_ctx, ordered, c_marker, c_text) };
             let visit_result = self.process_result(result);
             self.clear_temp_strings();
             visit_result
@@ -1539,7 +1542,7 @@ impl HtmlVisitor for CVisitorWrapper {
     fn visit_list_start(&mut self, ctx: &NodeContext, ordered: bool) -> VisitResult {
         if let Some(callback) = self.callbacks.visit_list_start {
             let c_ctx = self.build_node_context(ctx);
-            let result = unsafe { callback(self.callbacks.user_data, &c_ctx, ordered) };
+            let result = unsafe { callback(self.callbacks.user_data, &raw const c_ctx, ordered) };
             let visit_result = self.process_result(result);
             self.clear_temp_strings();
             visit_result
@@ -1555,7 +1558,7 @@ impl HtmlVisitor for CVisitorWrapper {
             let c_output = c_output_string.as_ptr();
 
             let c_ctx = self.build_node_context(ctx);
-            let result = unsafe { callback(self.callbacks.user_data, &c_ctx, ordered, c_output) };
+            let result = unsafe { callback(self.callbacks.user_data, &raw const c_ctx, ordered, c_output) };
             let visit_result = self.process_result(result);
             self.clear_temp_strings();
             visit_result
@@ -1567,7 +1570,7 @@ impl HtmlVisitor for CVisitorWrapper {
     fn visit_table_start(&mut self, ctx: &NodeContext) -> VisitResult {
         if let Some(callback) = self.callbacks.visit_table_start {
             let c_ctx = self.build_node_context(ctx);
-            let result = unsafe { callback(self.callbacks.user_data, &c_ctx) };
+            let result = unsafe { callback(self.callbacks.user_data, &raw const c_ctx) };
             let visit_result = self.process_result(result);
             self.clear_temp_strings();
             visit_result
@@ -1590,7 +1593,15 @@ impl HtmlVisitor for CVisitorWrapper {
             let cells_len = c_cell_ptrs.len();
 
             let c_ctx = self.build_node_context(ctx);
-            let result = unsafe { callback(self.callbacks.user_data, &c_ctx, c_cells_ptr, cells_len, is_header) };
+            let result = unsafe {
+                callback(
+                    self.callbacks.user_data,
+                    &raw const c_ctx,
+                    c_cells_ptr,
+                    cells_len,
+                    is_header,
+                )
+            };
             let visit_result = self.process_result(result);
             self.clear_temp_strings();
             visit_result
@@ -1606,7 +1617,7 @@ impl HtmlVisitor for CVisitorWrapper {
             let c_output = c_output_string.as_ptr();
 
             let c_ctx = self.build_node_context(ctx);
-            let result = unsafe { callback(self.callbacks.user_data, &c_ctx, c_output) };
+            let result = unsafe { callback(self.callbacks.user_data, &raw const c_ctx, c_output) };
             let visit_result = self.process_result(result);
             self.clear_temp_strings();
             visit_result
@@ -1622,7 +1633,7 @@ impl HtmlVisitor for CVisitorWrapper {
             let c_content = c_content_string.as_ptr();
 
             let c_ctx = self.build_node_context(ctx);
-            let result = unsafe { callback(self.callbacks.user_data, &c_ctx, c_content, depth) };
+            let result = unsafe { callback(self.callbacks.user_data, &raw const c_ctx, c_content, depth) };
             let visit_result = self.process_result(result);
             self.clear_temp_strings();
             visit_result
@@ -1637,7 +1648,7 @@ impl HtmlVisitor for CVisitorWrapper {
             let c_text = c_text_string.as_ptr();
 
             let c_ctx = self.build_node_context(ctx);
-            let result = unsafe { callback(self.callbacks.user_data, &c_ctx, c_text) };
+            let result = unsafe { callback(self.callbacks.user_data, &raw const c_ctx, c_text) };
             let visit_result = self.process_result(result);
             self.clear_temp_strings();
             visit_result
@@ -1652,7 +1663,7 @@ impl HtmlVisitor for CVisitorWrapper {
             let c_text = c_text_string.as_ptr();
 
             let c_ctx = self.build_node_context(ctx);
-            let result = unsafe { callback(self.callbacks.user_data, &c_ctx, c_text) };
+            let result = unsafe { callback(self.callbacks.user_data, &raw const c_ctx, c_text) };
             let visit_result = self.process_result(result);
             self.clear_temp_strings();
             visit_result
@@ -1667,7 +1678,7 @@ impl HtmlVisitor for CVisitorWrapper {
             let c_text = c_text_string.as_ptr();
 
             let c_ctx = self.build_node_context(ctx);
-            let result = unsafe { callback(self.callbacks.user_data, &c_ctx, c_text) };
+            let result = unsafe { callback(self.callbacks.user_data, &raw const c_ctx, c_text) };
             let visit_result = self.process_result(result);
             self.clear_temp_strings();
             visit_result
@@ -1682,7 +1693,7 @@ impl HtmlVisitor for CVisitorWrapper {
             let c_text = c_text_string.as_ptr();
 
             let c_ctx = self.build_node_context(ctx);
-            let result = unsafe { callback(self.callbacks.user_data, &c_ctx, c_text) };
+            let result = unsafe { callback(self.callbacks.user_data, &raw const c_ctx, c_text) };
             let visit_result = self.process_result(result);
             self.clear_temp_strings();
             visit_result
@@ -1697,7 +1708,7 @@ impl HtmlVisitor for CVisitorWrapper {
             let c_text = c_text_string.as_ptr();
 
             let c_ctx = self.build_node_context(ctx);
-            let result = unsafe { callback(self.callbacks.user_data, &c_ctx, c_text) };
+            let result = unsafe { callback(self.callbacks.user_data, &raw const c_ctx, c_text) };
             let visit_result = self.process_result(result);
             self.clear_temp_strings();
             visit_result
@@ -1712,7 +1723,7 @@ impl HtmlVisitor for CVisitorWrapper {
             let c_text = c_text_string.as_ptr();
 
             let c_ctx = self.build_node_context(ctx);
-            let result = unsafe { callback(self.callbacks.user_data, &c_ctx, c_text) };
+            let result = unsafe { callback(self.callbacks.user_data, &raw const c_ctx, c_text) };
             let visit_result = self.process_result(result);
             self.clear_temp_strings();
             visit_result
@@ -1727,7 +1738,7 @@ impl HtmlVisitor for CVisitorWrapper {
             let c_text = c_text_string.as_ptr();
 
             let c_ctx = self.build_node_context(ctx);
-            let result = unsafe { callback(self.callbacks.user_data, &c_ctx, c_text) };
+            let result = unsafe { callback(self.callbacks.user_data, &raw const c_ctx, c_text) };
             let visit_result = self.process_result(result);
             self.clear_temp_strings();
             visit_result
@@ -1739,7 +1750,7 @@ impl HtmlVisitor for CVisitorWrapper {
     fn visit_line_break(&mut self, ctx: &NodeContext) -> VisitResult {
         if let Some(callback) = self.callbacks.visit_line_break {
             let c_ctx = self.build_node_context(ctx);
-            let result = unsafe { callback(self.callbacks.user_data, &c_ctx) };
+            let result = unsafe { callback(self.callbacks.user_data, &raw const c_ctx) };
             let visit_result = self.process_result(result);
             self.clear_temp_strings();
             visit_result
@@ -1751,7 +1762,7 @@ impl HtmlVisitor for CVisitorWrapper {
     fn visit_horizontal_rule(&mut self, ctx: &NodeContext) -> VisitResult {
         if let Some(callback) = self.callbacks.visit_horizontal_rule {
             let c_ctx = self.build_node_context(ctx);
-            let result = unsafe { callback(self.callbacks.user_data, &c_ctx) };
+            let result = unsafe { callback(self.callbacks.user_data, &raw const c_ctx) };
             let visit_result = self.process_result(result);
             self.clear_temp_strings();
             visit_result
@@ -1770,7 +1781,7 @@ impl HtmlVisitor for CVisitorWrapper {
             let c_html = c_html_string.as_ptr();
 
             let c_ctx = self.build_node_context(ctx);
-            let result = unsafe { callback(self.callbacks.user_data, &c_ctx, c_tag_name, c_html) };
+            let result = unsafe { callback(self.callbacks.user_data, &raw const c_ctx, c_tag_name, c_html) };
             let visit_result = self.process_result(result);
             self.clear_temp_strings();
             visit_result
@@ -1782,7 +1793,7 @@ impl HtmlVisitor for CVisitorWrapper {
     fn visit_definition_list_start(&mut self, ctx: &NodeContext) -> VisitResult {
         if let Some(callback) = self.callbacks.visit_definition_list_start {
             let c_ctx = self.build_node_context(ctx);
-            let result = unsafe { callback(self.callbacks.user_data, &c_ctx) };
+            let result = unsafe { callback(self.callbacks.user_data, &raw const c_ctx) };
             let visit_result = self.process_result(result);
             self.clear_temp_strings();
             visit_result
@@ -1797,7 +1808,7 @@ impl HtmlVisitor for CVisitorWrapper {
             let c_text = c_text_string.as_ptr();
 
             let c_ctx = self.build_node_context(ctx);
-            let result = unsafe { callback(self.callbacks.user_data, &c_ctx, c_text) };
+            let result = unsafe { callback(self.callbacks.user_data, &raw const c_ctx, c_text) };
             let visit_result = self.process_result(result);
             self.clear_temp_strings();
             visit_result
@@ -1812,7 +1823,7 @@ impl HtmlVisitor for CVisitorWrapper {
             let c_text = c_text_string.as_ptr();
 
             let c_ctx = self.build_node_context(ctx);
-            let result = unsafe { callback(self.callbacks.user_data, &c_ctx, c_text) };
+            let result = unsafe { callback(self.callbacks.user_data, &raw const c_ctx, c_text) };
             let visit_result = self.process_result(result);
             self.clear_temp_strings();
             visit_result
@@ -1828,7 +1839,7 @@ impl HtmlVisitor for CVisitorWrapper {
             let c_output = c_output_string.as_ptr();
 
             let c_ctx = self.build_node_context(ctx);
-            let result = unsafe { callback(self.callbacks.user_data, &c_ctx, c_output) };
+            let result = unsafe { callback(self.callbacks.user_data, &raw const c_ctx, c_output) };
             let visit_result = self.process_result(result);
             self.clear_temp_strings();
             visit_result
@@ -1842,11 +1853,11 @@ impl HtmlVisitor for CVisitorWrapper {
             let c_action_string = action.and_then(|a| std::ffi::CString::new(a).ok());
             let c_method_string = method.and_then(|m| std::ffi::CString::new(m).ok());
 
-            let c_action = c_action_string.as_ref().map(|s| s.as_ptr()).unwrap_or(ptr::null());
-            let c_method = c_method_string.as_ref().map(|s| s.as_ptr()).unwrap_or(ptr::null());
+            let c_action = c_action_string.as_ref().map_or(ptr::null(), |s| s.as_ptr());
+            let c_method = c_method_string.as_ref().map_or(ptr::null(), |s| s.as_ptr());
 
             let c_ctx = self.build_node_context(ctx);
-            let result = unsafe { callback(self.callbacks.user_data, &c_ctx, c_action, c_method) };
+            let result = unsafe { callback(self.callbacks.user_data, &raw const c_ctx, c_action, c_method) };
             let visit_result = self.process_result(result);
             self.clear_temp_strings();
             visit_result
@@ -1869,11 +1880,19 @@ impl HtmlVisitor for CVisitorWrapper {
             let c_value_string = value.and_then(|v| std::ffi::CString::new(v).ok());
 
             let c_input_type = c_input_type_string.as_ptr();
-            let c_name = c_name_string.as_ref().map(|s| s.as_ptr()).unwrap_or(ptr::null());
-            let c_value = c_value_string.as_ref().map(|s| s.as_ptr()).unwrap_or(ptr::null());
+            let c_name = c_name_string.as_ref().map_or(ptr::null(), |s| s.as_ptr());
+            let c_value = c_value_string.as_ref().map_or(ptr::null(), |s| s.as_ptr());
 
             let c_ctx = self.build_node_context(ctx);
-            let result = unsafe { callback(self.callbacks.user_data, &c_ctx, c_input_type, c_name, c_value) };
+            let result = unsafe {
+                callback(
+                    self.callbacks.user_data,
+                    &raw const c_ctx,
+                    c_input_type,
+                    c_name,
+                    c_value,
+                )
+            };
             let visit_result = self.process_result(result);
             self.clear_temp_strings();
             visit_result
@@ -1888,7 +1907,7 @@ impl HtmlVisitor for CVisitorWrapper {
             let c_text = c_text_string.as_ptr();
 
             let c_ctx = self.build_node_context(ctx);
-            let result = unsafe { callback(self.callbacks.user_data, &c_ctx, c_text) };
+            let result = unsafe { callback(self.callbacks.user_data, &raw const c_ctx, c_text) };
             let visit_result = self.process_result(result);
             self.clear_temp_strings();
             visit_result
@@ -1900,10 +1919,10 @@ impl HtmlVisitor for CVisitorWrapper {
     fn visit_audio(&mut self, ctx: &NodeContext, src: Option<&str>) -> VisitResult {
         if let Some(callback) = self.callbacks.visit_audio {
             let c_src_string = src.and_then(|s| std::ffi::CString::new(s).ok());
-            let c_src = c_src_string.as_ref().map(|s| s.as_ptr()).unwrap_or(ptr::null());
+            let c_src = c_src_string.as_ref().map_or(ptr::null(), |s| s.as_ptr());
 
             let c_ctx = self.build_node_context(ctx);
-            let result = unsafe { callback(self.callbacks.user_data, &c_ctx, c_src) };
+            let result = unsafe { callback(self.callbacks.user_data, &raw const c_ctx, c_src) };
             let visit_result = self.process_result(result);
             self.clear_temp_strings();
             visit_result
@@ -1915,10 +1934,10 @@ impl HtmlVisitor for CVisitorWrapper {
     fn visit_video(&mut self, ctx: &NodeContext, src: Option<&str>) -> VisitResult {
         if let Some(callback) = self.callbacks.visit_video {
             let c_src_string = src.and_then(|s| std::ffi::CString::new(s).ok());
-            let c_src = c_src_string.as_ref().map(|s| s.as_ptr()).unwrap_or(ptr::null());
+            let c_src = c_src_string.as_ref().map_or(ptr::null(), |s| s.as_ptr());
 
             let c_ctx = self.build_node_context(ctx);
-            let result = unsafe { callback(self.callbacks.user_data, &c_ctx, c_src) };
+            let result = unsafe { callback(self.callbacks.user_data, &raw const c_ctx, c_src) };
             let visit_result = self.process_result(result);
             self.clear_temp_strings();
             visit_result
@@ -1930,10 +1949,10 @@ impl HtmlVisitor for CVisitorWrapper {
     fn visit_iframe(&mut self, ctx: &NodeContext, src: Option<&str>) -> VisitResult {
         if let Some(callback) = self.callbacks.visit_iframe {
             let c_src_string = src.and_then(|s| std::ffi::CString::new(s).ok());
-            let c_src = c_src_string.as_ref().map(|s| s.as_ptr()).unwrap_or(ptr::null());
+            let c_src = c_src_string.as_ref().map_or(ptr::null(), |s| s.as_ptr());
 
             let c_ctx = self.build_node_context(ctx);
-            let result = unsafe { callback(self.callbacks.user_data, &c_ctx, c_src) };
+            let result = unsafe { callback(self.callbacks.user_data, &raw const c_ctx, c_src) };
             let visit_result = self.process_result(result);
             self.clear_temp_strings();
             visit_result
@@ -1945,7 +1964,7 @@ impl HtmlVisitor for CVisitorWrapper {
     fn visit_details(&mut self, ctx: &NodeContext, open: bool) -> VisitResult {
         if let Some(callback) = self.callbacks.visit_details {
             let c_ctx = self.build_node_context(ctx);
-            let result = unsafe { callback(self.callbacks.user_data, &c_ctx, open) };
+            let result = unsafe { callback(self.callbacks.user_data, &raw const c_ctx, open) };
             let visit_result = self.process_result(result);
             self.clear_temp_strings();
             visit_result
@@ -1960,7 +1979,7 @@ impl HtmlVisitor for CVisitorWrapper {
             let c_text = c_text_string.as_ptr();
 
             let c_ctx = self.build_node_context(ctx);
-            let result = unsafe { callback(self.callbacks.user_data, &c_ctx, c_text) };
+            let result = unsafe { callback(self.callbacks.user_data, &raw const c_ctx, c_text) };
             let visit_result = self.process_result(result);
             self.clear_temp_strings();
             visit_result
@@ -1972,7 +1991,7 @@ impl HtmlVisitor for CVisitorWrapper {
     fn visit_figure_start(&mut self, ctx: &NodeContext) -> VisitResult {
         if let Some(callback) = self.callbacks.visit_figure_start {
             let c_ctx = self.build_node_context(ctx);
-            let result = unsafe { callback(self.callbacks.user_data, &c_ctx) };
+            let result = unsafe { callback(self.callbacks.user_data, &raw const c_ctx) };
             let visit_result = self.process_result(result);
             self.clear_temp_strings();
             visit_result
@@ -1987,7 +2006,7 @@ impl HtmlVisitor for CVisitorWrapper {
             let c_text = c_text_string.as_ptr();
 
             let c_ctx = self.build_node_context(ctx);
-            let result = unsafe { callback(self.callbacks.user_data, &c_ctx, c_text) };
+            let result = unsafe { callback(self.callbacks.user_data, &raw const c_ctx, c_text) };
             let visit_result = self.process_result(result);
             self.clear_temp_strings();
             visit_result
@@ -2003,7 +2022,7 @@ impl HtmlVisitor for CVisitorWrapper {
             let c_output = c_output_string.as_ptr();
 
             let c_ctx = self.build_node_context(ctx);
-            let result = unsafe { callback(self.callbacks.user_data, &c_ctx, c_output) };
+            let result = unsafe { callback(self.callbacks.user_data, &raw const c_ctx, c_output) };
             let visit_result = self.process_result(result);
             self.clear_temp_strings();
             visit_result
@@ -2093,7 +2112,7 @@ pub unsafe extern "C" fn html_to_markdown_visitor_free(visitor: HtmlToMarkdownVi
     if visitor.is_null() {
         return;
     }
-    let _handle = unsafe { Box::from_raw(visitor as *mut Rc<RefCell<CVisitorWrapper>>) };
+    let _handle = unsafe { Box::from_raw(visitor.cast::<Rc<RefCell<CVisitorWrapper>>>()) };
 }
 
 /// Convert HTML to Markdown using a custom visitor.
@@ -2105,13 +2124,13 @@ pub unsafe extern "C" fn html_to_markdown_visitor_free(visitor: HtmlToMarkdownVi
 ///
 /// - `html`: Null-terminated UTF-8 C string containing HTML
 /// - `visitor`: Visitor handle from `html_to_markdown_visitor_create()`
-/// - `len_out`: Pointer to size_t where output length will be written.
+/// - `len_out`: Pointer to `size_t` where output length will be written.
 ///   Can be NULL if length is not needed.
 ///
 /// # Returns
 ///
 /// - Non-NULL: Pointer to malloc'd markdown string (NULL-terminated).
-///   Length written to *len_out if len_out is not NULL.
+///   Length written to *`len_out` if `len_out` is not NULL.
 ///   Must be freed with `html_to_markdown_free_string()`.
 /// - NULL: Conversion failed; call `html_to_markdown_last_error()` for details
 ///
@@ -2119,7 +2138,7 @@ pub unsafe extern "C" fn html_to_markdown_visitor_free(visitor: HtmlToMarkdownVi
 ///
 /// - `html` must be a valid null-terminated UTF-8 C string
 /// - `visitor` must be a handle from `html_to_markdown_visitor_create()`
-/// - `len_out` (if not NULL) must be a valid pointer to size_t
+/// - `len_out` (if not NULL) must be a valid pointer to `size_t`
 /// - Returned string must be freed with `html_to_markdown_free_string()`
 /// - Visitor callbacks are invoked on the calling thread (must not block or panic)
 ///
@@ -2161,12 +2180,11 @@ pub unsafe extern "C" fn html_to_markdown_convert_with_visitor(
         return ptr::null_mut();
     }
 
-    let html_str = match unsafe { CStr::from_ptr(html).to_str() } {
-        Ok(s) => s,
-        Err(_) => {
-            set_last_error(Some("html must be valid UTF-8".to_string()));
-            return ptr::null_mut();
-        }
+    let html_str = if let Ok(s) = unsafe { CStr::from_ptr(html).to_str() } {
+        s
+    } else {
+        set_last_error(Some("html must be valid UTF-8".to_string()));
+        return ptr::null_mut();
     };
 
     let handle = unsafe { &*(visitor as *const Rc<RefCell<CVisitorWrapper>>) };
@@ -2205,7 +2223,7 @@ pub unsafe extern "C" fn html_to_markdown_convert_with_visitor(
 /// - `html`: Pointer to UTF-8 bytes (NOT null-terminated)
 /// - `len`: Number of bytes pointed to by html
 /// - `visitor`: Visitor handle from `html_to_markdown_visitor_create()`
-/// - `len_out`: Pointer to size_t where output length will be written (can be NULL)
+/// - `len_out`: Pointer to `size_t` where output length will be written (can be NULL)
 ///
 /// # Returns
 ///
@@ -2219,7 +2237,7 @@ pub unsafe extern "C" fn html_to_markdown_convert_with_visitor(
 /// - Data must be valid UTF-8
 /// - `len` must be accurate (not larger than allocated buffer)
 /// - `visitor` must be a handle from `html_to_markdown_visitor_create()`
-/// - `len_out` (if not NULL) must point to a valid size_t
+/// - `len_out` (if not NULL) must point to a valid `size_t`
 ///
 /// # Example
 ///
@@ -2253,12 +2271,11 @@ pub unsafe extern "C" fn html_to_markdown_convert_bytes_with_visitor(
     }
 
     let html_bytes = unsafe { std::slice::from_raw_parts(html, len) };
-    let html_str = match std::str::from_utf8(html_bytes) {
-        Ok(s) => s,
-        Err(_) => {
-            set_last_error(Some("html must be valid UTF-8".to_string()));
-            return ptr::null_mut();
-        }
+    let html_str = if let Ok(s) = std::str::from_utf8(html_bytes) {
+        s
+    } else {
+        set_last_error(Some("html must be valid UTF-8".to_string()));
+        return ptr::null_mut();
     };
 
     let handle = unsafe { &*(visitor as *const Rc<RefCell<CVisitorWrapper>>) };
@@ -2286,7 +2303,7 @@ pub unsafe extern "C" fn html_to_markdown_convert_bytes_with_visitor(
     }
 }
 
-/// Create a VisitResult with Continue action.
+/// Create a `VisitResult` with Continue action.
 ///
 /// Helper function to construct a Continue result without custom output.
 /// Equivalent to: `result = {0}; result.result_type = HTML_TO_MARKDOWN_VISIT_CONTINUE;`
@@ -2310,10 +2327,10 @@ pub const extern "C" fn html_to_markdown_visit_result_continue() -> HtmlToMarkdo
     }
 }
 
-/// Create a VisitResult with Custom action.
+/// Create a `VisitResult` with Custom action.
 ///
 /// Helper function to construct a Custom result. The `output` string should be
-/// allocated with malloc() and will be freed by the FFI layer after use.
+/// allocated with `malloc()` and will be freed by the FFI layer after use.
 ///
 /// # Arguments
 ///
@@ -2325,7 +2342,7 @@ pub const extern "C" fn html_to_markdown_visit_result_continue() -> HtmlToMarkdo
 ///
 /// # Safety
 ///
-/// - `output` must be malloc'd (will be freed with free())
+/// - `output` must be malloc'd (will be freed with `free()`)
 /// - `output` must be NULL-terminated
 ///
 /// # Example
@@ -2345,7 +2362,7 @@ pub const extern "C" fn html_to_markdown_visit_result_custom(output: *mut c_char
     }
 }
 
-/// Create a VisitResult with Skip action.
+/// Create a `VisitResult` with Skip action.
 ///
 /// Helper function to construct a Skip result (element and children omitted from output).
 ///
@@ -2368,13 +2385,13 @@ pub const extern "C" fn html_to_markdown_visit_result_skip() -> HtmlToMarkdownVi
     }
 }
 
-/// Create a VisitResult with PreserveHtml action.
+/// Create a `VisitResult` with `PreserveHtml` action.
 ///
-/// Helper function to construct a PreserveHtml result (raw HTML included verbatim).
+/// Helper function to construct a `PreserveHtml` result (raw HTML included verbatim).
 ///
 /// # Returns
 ///
-/// `HtmlToMarkdownVisitResult` with PreserveHtml action.
+/// `HtmlToMarkdownVisitResult` with `PreserveHtml` action.
 ///
 /// # Example
 ///
@@ -2391,10 +2408,10 @@ pub const extern "C" fn html_to_markdown_visit_result_preserve_html() -> HtmlToM
     }
 }
 
-/// Create a VisitResult with Error action.
+/// Create a `VisitResult` with Error action.
 ///
 /// Helper function to construct an Error result. The `message` string should be
-/// allocated with malloc() and will be freed by the FFI layer after use.
+/// allocated with `malloc()` and will be freed by the FFI layer after use.
 ///
 /// # Arguments
 ///
@@ -2406,7 +2423,7 @@ pub const extern "C" fn html_to_markdown_visit_result_preserve_html() -> HtmlToM
 ///
 /// # Safety
 ///
-/// - `message` must be malloc'd (will be freed with free())
+/// - `message` must be malloc'd (will be freed with `free()`)
 /// - `message` must be NULL-terminated
 ///
 /// # Example

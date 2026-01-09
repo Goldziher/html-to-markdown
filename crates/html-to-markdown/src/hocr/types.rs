@@ -1,3 +1,4 @@
+#![allow(clippy::cast_precision_loss, clippy::cast_sign_loss, clippy::unused_self)]
 //! hOCR 1.2 type definitions
 //!
 //! Complete type system for hOCR 1.2 specification elements and properties.
@@ -82,7 +83,7 @@ pub enum HocrElementType {
     OcrGlyphs,
     /// Noise or artifacts
     OcrNoise,
-    /// XyZut analysis segment
+    /// `XyZut` analysis segment
     OcrXycut,
 
     /// Block-level element
@@ -95,6 +96,7 @@ pub enum HocrElementType {
 
 impl HocrElementType {
     /// Get element type from class name
+    #[must_use]
     pub fn from_class(class: &str) -> Option<Self> {
         match class {
             "ocr_abstract" => Some(Self::OcrAbstract),
@@ -162,11 +164,13 @@ pub struct BBox {
 
 impl BBox {
     /// Calculate the width from left to right edge
+    #[must_use]
     pub const fn width(&self) -> u32 {
         self.x2.saturating_sub(self.x1)
     }
 
     /// Calculate the height from top to bottom edge
+    #[must_use]
     pub const fn height(&self) -> u32 {
         self.y2.saturating_sub(self.y1)
     }
@@ -225,7 +229,7 @@ pub struct HocrProperties {
     pub ppageno: Option<u32>,
     /// Logical page number/label
     pub lpageno: Option<String>,
-    /// Scanner resolution (dpi_x, dpi_y)
+    /// Scanner resolution (`dpi_x`, `dpi_y`)
     pub scan_res: Option<(u32, u32)>,
     /// Image source file paths
     pub x_source: Vec<String>,
@@ -254,7 +258,7 @@ pub struct HocrElement {
 pub struct HocrMetadata {
     /// Name and version of the OCR system used
     pub ocr_system: Option<String>,
-    /// OCR capabilities supported (e.g., "ocr_page", "ocr_carea")
+    /// OCR capabilities supported (e.g., "`ocr_page`", "`ocr_carea`")
     pub ocr_capabilities: Vec<String>,
     /// Total number of pages in the OCR'd document
     pub ocr_number_of_pages: Option<u32>,

@@ -1,3 +1,4 @@
+#![allow(clippy::cast_precision_loss, clippy::cast_sign_loss, clippy::unused_self)]
 //! Metadata extraction for HTML to Markdown conversion.
 //!
 //! This module provides comprehensive, type-safe metadata extraction during HTML-to-Markdown
@@ -7,7 +8,7 @@
 //! - **Headers**: Heading elements (h1-h6) with hierarchy, IDs, and positions
 //! - **Links**: Hyperlinks with type classification (anchor, internal, external, email, phone)
 //! - **Images**: Image elements with source, alt text, dimensions, and type (data URI, external, etc.)
-//! - **Structured data**: JSON-LD, Microdata, and RDFa blocks
+//! - **Structured data**: JSON-LD, Microdata, and `RDFa` blocks
 //!
 //! The implementation follows a single-pass collector pattern for zero-overhead extraction
 //! when metadata features are disabled.
@@ -28,8 +29,8 @@
 //!
 //! - [`TextDirection`]: Document directionality (LTR, RTL, Auto)
 //! - [`LinkType`]: Link classification (Anchor, Internal, External, Email, Phone, Other)
-//! - [`ImageType`]: Image source type (DataUri, External, Relative, InlineSvg)
-//! - [`StructuredDataType`]: Structured data format (JsonLd, Microdata, RDFa)
+//! - [`ImageType`]: Image source type (`DataUri`, External, Relative, `InlineSvg`)
+//! - [`StructuredDataType`]: Structured data format (`JsonLd`, Microdata, `RDFa`)
 //!
 //! ## Structures
 //!
@@ -43,7 +44,7 @@
 //!
 //! # Examples
 //!
-//! ## Basic Usage with convert_with_metadata
+//! ## Basic Usage with `convert_with_metadata`
 //!
 //! ```ignore
 //! use html_to_markdown_rs::{convert_with_metadata, MetadataConfig};
@@ -187,6 +188,7 @@ impl TextDirection {
     /// assert_eq!(TextDirection::parse("auto"), Some(TextDirection::Auto));
     /// assert_eq!(TextDirection::parse("invalid"), None);
     /// ```
+    #[must_use]
     pub fn parse(s: &str) -> Option<Self> {
         if s.eq_ignore_ascii_case("ltr") {
             return Some(Self::LeftToRight);
@@ -275,7 +277,7 @@ pub enum StructuredDataType {
     JsonLd,
     /// HTML5 Microdata attributes (itemscope, itemtype, itemprop)
     Microdata,
-    /// RDF in Attributes (RDFa) markup
+    /// RDF in Attributes (`RDFa`) markup
     #[cfg_attr(feature = "metadata", serde(rename = "rdfa"))]
     RDFa,
 }
@@ -416,6 +418,7 @@ impl HeaderMetadata {
     /// };
     /// assert!(!invalid.is_valid());
     /// ```
+    #[must_use]
     pub const fn is_valid(&self) -> bool {
         self.level >= 1 && self.level <= 6
     }
@@ -483,6 +486,7 @@ impl LinkMetadata {
     /// assert_eq!(LinkMetadata::classify_link("tel:+1234567890"), LinkType::Phone);
     /// assert_eq!(LinkMetadata::classify_link("https://example.com"), LinkType::External);
     /// ```
+    #[must_use]
     pub fn classify_link(href: &str) -> LinkType {
         if href.starts_with('#') {
             LinkType::Anchor
@@ -542,7 +546,7 @@ pub struct ImageMetadata {
     pub attributes: BTreeMap<String, String>,
 }
 
-/// Structured data block (JSON-LD, Microdata, or RDFa).
+/// Structured data block (JSON-LD, Microdata, or `RDFa`).
 ///
 /// Represents machine-readable structured data found in the document.
 /// JSON-LD blocks are collected as raw JSON strings for flexibility.
@@ -562,7 +566,7 @@ pub struct ImageMetadata {
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "metadata", derive(serde::Serialize, serde::Deserialize))]
 pub struct StructuredData {
-    /// Type of structured data (JSON-LD, Microdata, RDFa)
+    /// Type of structured data (JSON-LD, Microdata, `RDFa`)
     pub data_type: StructuredDataType,
 
     /// Raw JSON string (for JSON-LD) or serialized representation
@@ -588,7 +592,7 @@ pub const DEFAULT_MAX_STRUCTURED_DATA_SIZE: usize = 1_000_000;
 /// - `extract_headers`: Enable heading element extraction (h1-h6) with hierarchy tracking
 /// - `extract_links`: Enable anchor element extraction with link type classification
 /// - `extract_images`: Enable image element extraction with source and dimension metadata
-/// - `extract_structured_data`: Enable structured data extraction (JSON-LD, Microdata, RDFa)
+/// - `extract_structured_data`: Enable structured data extraction (JSON-LD, Microdata, `RDFa`)
 /// - `max_structured_data_size`: Safety limit on total structured data size in bytes
 ///
 /// # Examples
@@ -652,12 +656,12 @@ pub struct MetadataConfig {
     /// - Additional custom attributes
     pub extract_images: bool,
 
-    /// Extract structured data (JSON-LD, Microdata, RDFa).
+    /// Extract structured data (JSON-LD, Microdata, `RDFa`).
     ///
     /// When enabled, collects machine-readable structured data including:
     /// - JSON-LD script blocks with schema detection
     /// - Microdata attributes (itemscope, itemtype, itemprop)
-    /// - RDFa markup
+    /// - `RDFa` markup
     /// - Extracted schema type if detectable
     pub extract_structured_data: bool,
 
@@ -666,11 +670,11 @@ pub struct MetadataConfig {
     /// Prevents memory exhaustion attacks on malformed or adversarial documents
     /// containing excessively large structured data blocks. When the accumulated
     /// size of structured data exceeds this limit, further collection stops.
-    /// Default: 1_000_000 bytes (1 MB)
+    /// Default: `1_000_000` bytes (1 MB)
     pub max_structured_data_size: usize,
 }
 
-/// Partial update for MetadataConfig.
+/// Partial update for `MetadataConfig`.
 ///
 /// This struct uses `Option<T>` to represent optional fields that can be selectively updated.
 /// Only specified fields (Some values) will override existing config; None values leave the
@@ -735,7 +739,7 @@ pub struct MetadataConfigUpdate {
     #[cfg_attr(any(feature = "serde", feature = "metadata"), serde(alias = "extract_images"))]
     pub extract_images: Option<bool>,
 
-    /// Optional override for extracting structured data (JSON-LD, Microdata, RDFa).
+    /// Optional override for extracting structured data (JSON-LD, Microdata, `RDFa`).
     ///
     /// When Some(true), enables structured data extraction; Some(false) disables it.
     /// None leaves the current setting unchanged.
@@ -812,6 +816,7 @@ impl MetadataConfig {
     /// };
     /// assert!(!config.any_enabled());
     /// ```
+    #[must_use]
     pub const fn any_enabled(&self) -> bool {
         self.extract_document
             || self.extract_headers
@@ -874,7 +879,7 @@ impl MetadataConfig {
 
     /// Create new metadata configuration from a partial update.
     ///
-    /// Creates a new MetadataConfig struct with defaults, then applies the update.
+    /// Creates a new `MetadataConfig` struct with defaults, then applies the update.
     /// Fields not specified in the update (None) keep their default values.
     /// This is a convenience method for constructing a configuration from a partial specification
     /// without needing to explicitly call `.default()` first.
@@ -885,7 +890,7 @@ impl MetadataConfig {
     ///
     /// # Returns
     ///
-    /// New MetadataConfig with specified updates applied to defaults
+    /// New `MetadataConfig` with specified updates applied to defaults
     ///
     /// # Examples
     ///
@@ -908,6 +913,7 @@ impl MetadataConfig {
     /// assert!(config.extract_images);  // Default
     /// assert!(config.extract_structured_data);  // Default
     /// ```
+    #[must_use]
     pub fn from_update(update: MetadataConfigUpdate) -> Self {
         let mut config = Self::default();
         config.apply_update(update);
@@ -1095,7 +1101,11 @@ impl MetadataCollector {
         let link_type = LinkMetadata::classify_link(&href);
 
         let rel_vec = rel
-            .map(|r| r.split_whitespace().map(|s| s.to_string()).collect::<Vec<_>>())
+            .map(|r| {
+                r.split_whitespace()
+                    .map(std::string::ToString::to_string)
+                    .collect::<Vec<_>>()
+            })
             .unwrap_or_default();
 
         let link = LinkMetadata {
@@ -1183,7 +1193,7 @@ impl MetadataCollector {
     ///
     /// # Arguments
     ///
-    /// * `metadata` - BTreeMap of metadata key-value pairs
+    /// * `metadata` - `BTreeMap` of metadata key-value pairs
     pub(crate) fn set_head_metadata(&mut self, metadata: BTreeMap<String, String>) {
         if !self.config.extract_document {
             return;
@@ -1325,7 +1335,7 @@ impl MetadataCollector {
         doc
     }
 
-    /// Extract structured data blocks into StructuredData items.
+    /// Extract structured data blocks into `StructuredData` items.
     #[allow(dead_code)]
     fn extract_structured_data(json_ld: Vec<String>) -> Vec<StructuredData> {
         let mut result = Vec::with_capacity(json_ld.len());
@@ -1334,9 +1344,10 @@ impl MetadataCollector {
             let schema_type = Self::scan_schema_type(&json_str)
                 .or_else(|| {
                     if json_str.contains("\"@type\"") {
-                        serde_json::from_str::<serde_json::Value>(&json_str)
-                            .ok()
-                            .and_then(|v| v.get("@type").and_then(|t| t.as_str().map(|s| s.to_string())))
+                        serde_json::from_str::<serde_json::Value>(&json_str).ok().and_then(|v| {
+                            v.get("@type")
+                                .and_then(|t| t.as_str().map(std::string::ToString::to_string))
+                        })
                     } else {
                         None
                     }
@@ -1349,9 +1360,10 @@ impl MetadataCollector {
                     let value = serde_json::from_str::<serde_json::Value>(&json_str).ok()?;
                     let graph = value.get("@graph")?;
                     let items = graph.as_array()?;
-                    items
-                        .iter()
-                        .find_map(|item| item.get("@type").and_then(|t| t.as_str().map(|s| s.to_string())))
+                    items.iter().find_map(|item| {
+                        item.get("@type")
+                            .and_then(|t| t.as_str().map(std::string::ToString::to_string))
+                    })
                 });
 
             result.push(StructuredData {
@@ -1447,11 +1459,11 @@ impl MetadataCollector {
     /// Categorize links by type for analysis and filtering.
     ///
     /// Separates collected links into groups by [`LinkType`].
-    /// This is an analysis helper method; actual categorization happens during add_link.
+    /// This is an analysis helper method; actual categorization happens during `add_link`.
     ///
     /// # Returns
     ///
-    /// BTreeMap with LinkType as key and Vec of matching LinkMetadata as value.
+    /// `BTreeMap` with `LinkType` as key and Vec of matching `LinkMetadata` as value.
     #[allow(dead_code)]
     pub(crate) fn categorize_links(&self) -> BTreeMap<String, Vec<&LinkMetadata>> {
         let mut categorized: BTreeMap<String, Vec<&LinkMetadata>> = BTreeMap::new();
@@ -1470,7 +1482,7 @@ impl MetadataCollector {
     ///
     /// # Returns
     ///
-    /// BTreeMap with level as string key and count as value.
+    /// `BTreeMap` with level as string key and count as value.
     #[allow(dead_code)]
     pub(crate) fn header_counts(&self) -> BTreeMap<String, usize> {
         let mut counts: BTreeMap<String, usize> = BTreeMap::new();

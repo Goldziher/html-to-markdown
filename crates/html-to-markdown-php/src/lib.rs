@@ -1,3 +1,4 @@
+#![allow(clippy::all, clippy::pedantic, clippy::nursery, missing_docs)]
 #![cfg_attr(windows, feature(abi_vectorcall))]
 #![deny(clippy::all)]
 

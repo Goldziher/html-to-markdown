@@ -1,3 +1,4 @@
+#![allow(clippy::cast_precision_loss, clippy::cast_sign_loss, clippy::unused_self)]
 //! hOCR 1.2 document processing.
 //!
 //! Complete hOCR 1.2 specification support for extracting structured content from OCR documents.

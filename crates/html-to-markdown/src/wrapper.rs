@@ -1,6 +1,6 @@
 //! Text wrapping functionality for Markdown output.
 //!
-//! This module provides text wrapping capabilities similar to Python's textwrap.fill(),
+//! This module provides text wrapping capabilities similar to Python's `textwrap.fill()`,
 //! specifically designed to work with Markdown content while preserving formatting.
 
 use crate::options::ConversionOptions;
@@ -12,6 +12,8 @@ use crate::options::ConversionOptions;
 /// - Does not break on hyphens
 /// - Preserves Markdown formatting (links, bold, etc.)
 /// - Only wraps paragraph content, not headers, lists, code blocks, etc.
+#[must_use]
+#[allow(clippy::too_many_lines)]
 pub fn wrap_markdown(markdown: &str, options: &ConversionOptions) -> String {
     if !options.wrap {
         return markdown.to_string();
@@ -97,13 +99,13 @@ pub fn wrap_markdown(markdown: &str, options: &ConversionOptions) -> String {
                 in_blockquote_paragraph = false;
             }
 
-            if !in_blockquote_paragraph {
+            if in_blockquote_paragraph {
+                blockquote_buffer.push(' ');
+                blockquote_buffer.push_str(&content);
+            } else {
                 blockquote_prefix = normalized_prefix;
                 blockquote_buffer.push_str(&content);
                 in_blockquote_paragraph = true;
-            } else {
-                blockquote_buffer.push(' ');
-                blockquote_buffer.push_str(&content);
             }
             continue;
         } else if in_blockquote_paragraph && !blockquote_buffer.is_empty() {
@@ -309,7 +311,7 @@ fn wrap_list_item(indent: &str, marker: &str, content: &str, width: usize) -> St
         return format!("{}{}{}\n", indent, marker, content.trim());
     }
 
-    let full_marker = format!("{}{}", indent, marker);
+    let full_marker = format!("{indent}{marker}");
     let continuation_indent = format!("{}{}", indent, " ".repeat(marker.len()));
 
     let first_line_prefix_len = full_marker.len();
@@ -338,7 +340,7 @@ fn wrap_list_item(indent: &str, marker: &str, content: &str, width: usize) -> St
 
     for word in words {
         let word_len = word.len();
-        let space_needed = if current_line.is_empty() { 0 } else { 1 };
+        let space_needed = usize::from(!current_line.is_empty());
 
         if !current_line.is_empty() && current_line.len() + space_needed + word_len > current_width {
             if is_first_line {
@@ -383,7 +385,7 @@ fn is_single_inline_link(content: &str) -> bool {
     };
 
     let url_part = &trimmed[mid + 2..trimmed.len() - 1];
-    if url_part.chars().any(|c| c.is_whitespace()) {
+    if url_part.chars().any(char::is_whitespace) {
         return false;
     }
 
@@ -393,7 +395,7 @@ fn is_single_inline_link(content: &str) -> bool {
 /// Wrap a single line of text at the specified width.
 ///
 /// This function wraps text without breaking long words or on hyphens,
-/// similar to Python's textwrap.fill() with break_long_words=False and break_on_hyphens=False.
+/// similar to Python's `textwrap.fill()` with `break_long_words=False` and `break_on_hyphens=False`.
 fn wrap_line(text: &str, width: usize) -> String {
     if text.len() <= width {
         return text.to_string();
@@ -416,7 +418,6 @@ fn wrap_line(text: &str, width: usize) -> String {
             result.push_str(&current_line);
             current_line.clear();
             current_line.push_str(word);
-            continue;
         }
     }
 

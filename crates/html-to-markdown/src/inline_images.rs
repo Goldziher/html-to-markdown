@@ -1,3 +1,4 @@
+#![allow(clippy::cast_precision_loss, clippy::cast_sign_loss, clippy::unused_self)]
 use std::collections::BTreeMap;
 
 use crate::error::ConversionError;
@@ -7,7 +8,7 @@ use crate::error::ConversionError;
 pub struct InlineImageConfig {
     /// Maximum allowed decoded size in bytes; larger payloads are rejected.
     pub max_decoded_size_bytes: u64,
-    /// Optional prefix for generated filenames (defaults to "embedded_image").
+    /// Optional prefix for generated filenames (defaults to "`embedded_image`").
     pub filename_prefix: Option<String>,
     /// Whether to capture inline SVG elements (defaults to true).
     pub capture_svg: bool,
@@ -18,7 +19,7 @@ pub struct InlineImageConfig {
 /// Default maximum size for inline image extraction (5 MB).
 pub const DEFAULT_INLINE_IMAGE_LIMIT: u64 = 5 * 1024 * 1024;
 
-/// Partial update for InlineImageConfig.
+/// Partial update for `InlineImageConfig`.
 ///
 /// This struct uses `Option<T>` to represent optional fields that can be selectively updated.
 /// Only specified fields (Some values) will override existing options; None values leave the
@@ -39,6 +40,7 @@ pub struct InlineImageConfigUpdate {
 
 impl InlineImageConfig {
     /// Create a new configuration with required maximum decoded size.
+    #[must_use]
     pub const fn new(max_decoded_size_bytes: u64) -> Self {
         Self {
             max_decoded_size_bytes,
@@ -73,7 +75,7 @@ impl InlineImageConfig {
 
     /// Create new inline image configuration from a partial update.
     ///
-    /// Creates a new InlineImageConfig struct with defaults, then applies the update.
+    /// Creates a new `InlineImageConfig` struct with defaults, then applies the update.
     /// Fields not specified in the update keep their default values.
     ///
     /// # Arguments
@@ -82,7 +84,8 @@ impl InlineImageConfig {
     ///
     /// # Returns
     ///
-    /// New InlineImageConfig with specified updates applied to defaults
+    /// New `InlineImageConfig` with specified updates applied to defaults
+    #[must_use]
     pub fn from_update(update: InlineImageConfigUpdate) -> Self {
         let mut config = Self::new(DEFAULT_INLINE_IMAGE_LIMIT);
         config.apply_update(update);

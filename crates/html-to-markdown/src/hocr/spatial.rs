@@ -1,3 +1,4 @@
+#![allow(clippy::cast_precision_loss, clippy::cast_sign_loss, clippy::unused_self)]
 //! Spatial table reconstruction from hOCR bounding box coordinates
 //!
 //! This module provides functions to detect and reconstruct tabular data from OCR'd text
@@ -22,29 +23,33 @@ pub struct HocrWord {
 
 impl HocrWord {
     /// Get the right edge position
+    #[must_use]
     pub const fn right(&self) -> u32 {
         self.left + self.width
     }
 
     /// Get the bottom edge position
+    #[must_use]
     pub const fn bottom(&self) -> u32 {
         self.top + self.height
     }
 
     /// Get the vertical center position
+    #[must_use]
     pub fn y_center(&self) -> f64 {
-        self.top as f64 + (self.height as f64 / 2.0)
+        f64::from(self.top) + (f64::from(self.height) / 2.0)
     }
 
     /// Get the horizontal center position
+    #[must_use]
     pub fn x_center(&self) -> f64 {
-        self.left as f64 + (self.width as f64 / 2.0)
+        f64::from(self.left) + (f64::from(self.width) / 2.0)
     }
 }
 
 /// Parse bbox attribute from hOCR title attribute
 ///
-/// Example: "bbox 100 50 180 80; x_wconf 95" -> (100, 50, 80, 30)
+/// Example: "bbox 100 50 180 80; `x_wconf` 95" -> (100, 50, 80, 30)
 fn parse_bbox(title: &str) -> Option<(u32, u32, u32, u32)> {
     for part in title.split(';') {
         let part = part.trim();
@@ -70,7 +75,7 @@ fn parse_bbox(title: &str) -> Option<(u32, u32, u32, u32)> {
 
 /// Parse confidence from hOCR title attribute
 ///
-/// Example: "bbox 100 50 180 80; x_wconf 95" -> 95.0
+/// Example: "bbox 100 50 180 80; `x_wconf` 95" -> 95.0
 fn parse_confidence(title: &str) -> f64 {
     for part in title.split(';') {
         let part = part.trim();
@@ -84,6 +89,7 @@ fn parse_confidence(title: &str) -> f64 {
 }
 
 /// Extract text content from a node
+#[allow(clippy::trivially_copy_pass_by_ref)]
 fn get_text_content(node_handle: &tl::NodeHandle, parser: &tl::Parser) -> String {
     let mut text = String::new();
 
@@ -109,6 +115,8 @@ fn get_text_content(node_handle: &tl::NodeHandle, parser: &tl::Parser) -> String
 ///
 /// Walks the DOM and extracts all elements with `ocrx_word` class,
 /// parsing their bbox and confidence information.
+#[must_use]
+#[allow(clippy::trivially_copy_pass_by_ref)]
 pub fn extract_hocr_words(node_handle: &tl::NodeHandle, parser: &tl::Parser, min_confidence: f64) -> Vec<HocrWord> {
     let mut words = Vec::new();
 
@@ -162,6 +170,7 @@ pub fn extract_hocr_words(node_handle: &tl::NodeHandle, parser: &tl::Parser, min
 /// for each detected column.
 ///
 /// Optimized with O(n log n) complexity using sorted insertion.
+#[must_use]
 pub fn detect_columns(words: &[HocrWord], column_threshold: u32) -> Vec<u32> {
     if words.is_empty() {
         return Vec::new();
@@ -205,6 +214,8 @@ pub fn detect_columns(words: &[HocrWord], column_threshold: u32) -> Vec<u32> {
 /// y-position for each detected row.
 ///
 /// Optimized with O(n log n) complexity using sorted insertion.
+#[must_use]
+#[allow(clippy::cast_possible_truncation)]
 pub fn detect_rows(words: &[HocrWord], row_threshold_ratio: f64) -> Vec<u32> {
     if words.is_empty() {
         return Vec::new();
@@ -213,9 +224,9 @@ pub fn detect_rows(words: &[HocrWord], row_threshold_ratio: f64) -> Vec<u32> {
     let mut heights: Vec<u32> = words.iter().map(|w| w.height).collect();
     heights.sort_unstable();
     let median_height = heights[heights.len() / 2];
-    let row_threshold = median_height as f64 * row_threshold_ratio;
+    let row_threshold = f64::from(median_height) * row_threshold_ratio;
 
-    let mut y_centers: Vec<f64> = words.iter().map(|w| w.y_center()).collect();
+    let mut y_centers: Vec<f64> = words.iter().map(HocrWord::y_center).collect();
     y_centers.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
 
     let mut position_groups: Vec<Vec<f64>> = Vec::new();
@@ -253,6 +264,7 @@ pub fn detect_rows(words: &[HocrWord], row_threshold_ratio: f64) -> Vec<u32> {
 /// 1. Detecting column and row positions
 /// 2. Assigning words to cells based on position
 /// 3. Combining words within the same cell
+#[must_use]
 pub fn reconstruct_table(words: &[HocrWord], column_threshold: u32, row_threshold_ratio: f64) -> Vec<Vec<String>> {
     if words.is_empty() {
         return Vec::new();
@@ -299,6 +311,7 @@ pub fn reconstruct_table(words: &[HocrWord], column_threshold: u32, row_threshol
 }
 
 /// Find which row a word belongs to based on its y-center
+#[allow(clippy::cast_possible_truncation)]
 fn find_row_index(row_positions: &[u32], word: &HocrWord) -> Option<usize> {
     let y_center = word.y_center() as u32;
 
@@ -351,6 +364,7 @@ fn remove_empty_rows_and_columns(table: Vec<Vec<String>>) -> Vec<Vec<String>> {
 }
 
 /// Convert table to markdown format
+#[must_use]
 pub fn table_to_markdown(table: &[Vec<String>]) -> String {
     if table.is_empty() {
         return String::new();

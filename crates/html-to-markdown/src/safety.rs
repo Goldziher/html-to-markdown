@@ -1,7 +1,7 @@
 #![allow(clippy::option_if_let_else)]
 //! Helpers to keep binding entrypoints panic-safe.
 //!
-//! Binding layers (PyO3, NAPI-RS, ext-php-rs, WASM, FFI) must not allow Rust
+//! Binding layers (`PyO3`, NAPI-RS, ext-php-rs, WASM, FFI) must not allow Rust
 //! panics to unwind into foreign runtimes. `guard_panic` wraps conversion calls,
 //! converts panics into `ConversionError::Panic`, and preserves the original
 //! error handling path for the caller.
@@ -15,6 +15,7 @@ use crate::error::{ConversionError, Result};
 ///
 /// Panics are captured and surfaced as `ConversionError::Panic` so bindings can
 /// translate them into language-native errors instead of aborting.
+#[allow(clippy::missing_errors_doc)]
 pub fn guard_panic<F, T>(f: F) -> Result<T>
 where
     F: FnOnce() -> Result<T> + UnwindSafe,
@@ -32,6 +33,8 @@ where
     }
 }
 
+#[allow(clippy::trivially_copy_pass_by_ref)]
+#[allow(clippy::needless_pass_by_value)]
 fn panic_message(payload: Box<dyn Any + Send>) -> String {
     if let Some(msg) = payload.downcast_ref::<&str>() {
         (*msg).to_string()

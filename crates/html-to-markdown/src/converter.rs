@@ -5,6 +5,10 @@
 //!
 
 #![allow(
+    clippy::assigning_clones,
+    clippy::useless_let_if_seq,
+    clippy::ref_option,
+    clippy::format_push_string,
     clippy::struct_excessive_bools,
     clippy::too_many_arguments,
     clippy::too_many_lines,
@@ -13,10 +17,19 @@
     clippy::manual_let_else,
     clippy::collapsible_match,
     clippy::match_wildcard_for_single_variants,
-    clippy::map_unwrap_or
+    clippy::map_unwrap_or,
+    clippy::option_if_let_else,
+    clippy::needless_pass_by_value,
+    clippy::match_same_arms,
+    clippy::cast_possible_truncation,
+    clippy::cast_precision_loss,
+    clippy::items_after_statements,
+    clippy::cast_sign_loss,
+    clippy::default_trait_access,
+    clippy::unused_self,
+    clippy::collapsible_if
 )]
-#![warn(clippy::all)]
-#![warn(clippy::pedantic)]
+
 //! # Architecture
 //!
 //! The conversion process follows these steps:
@@ -1249,6 +1262,7 @@ fn may_be_hocr(input: &str) -> bool {
 /// - meta tag with name="ocr-system" or name="ocr-capabilities"
 /// - Elements with classes: `ocr_page`, `ocrx_word`, `ocr_carea`, `ocr_par`, `ocr_line`
 fn is_hocr_document(node_handle: tl::NodeHandle, parser: &tl::Parser) -> bool {
+    #[allow(clippy::trivially_copy_pass_by_ref)]
     fn check_node(node_handle: tl::NodeHandle, parser: &tl::Parser) -> bool {
         if let Some(tl::Node::Tag(tag)) = node_handle.get(parser) {
             let tag_name = normalized_tag_name(tag.name().as_utf8_str());
@@ -1300,6 +1314,7 @@ fn is_hocr_document(node_handle: tl::NodeHandle, parser: &tl::Parser) -> bool {
 /// - canonical: Canonical URL from <link rel="canonical">
 /// - link relations: author, license, alternate links
 #[allow(clippy::too_many_lines, clippy::items_after_statements)]
+#[allow(clippy::trivially_copy_pass_by_ref)]
 fn extract_metadata(
     node_handle: &tl::NodeHandle,
     parser: &tl::Parser,
@@ -1314,6 +1329,7 @@ fn extract_metadata(
     let strip_meta = options.strip_tags.iter().any(|tag| tag.eq_ignore_ascii_case("meta"));
     let preserve_meta = options.preserve_tags.iter().any(|tag| tag.eq_ignore_ascii_case("meta"));
 
+    #[allow(clippy::trivially_copy_pass_by_ref)]
     fn normalize_meta_key(prefix: &str, value: &str) -> String {
         let mut key = String::with_capacity(prefix.len() + value.len());
         key.push_str(prefix);
@@ -1342,9 +1358,8 @@ fn extract_metadata(
         None
     }
 
-    let head_handle = match find_head(node_handle, parser) {
-        Some(h) => h,
-        None => return metadata,
+    let Some(head_handle) = find_head(node_handle, parser) else {
+        return metadata;
     };
 
     if let Some(tl::Node::Tag(head_tag)) = head_handle.get(parser) {
@@ -1435,6 +1450,7 @@ fn extract_metadata(
 }
 
 /// Format metadata as YAML frontmatter.
+#[allow(clippy::trivially_copy_pass_by_ref)]
 fn format_metadata_frontmatter(metadata: &BTreeMap<String, String>) -> String {
     if metadata.is_empty() {
         return String::new();
@@ -1460,6 +1476,7 @@ fn format_metadata_frontmatter(metadata: &BTreeMap<String, String>) -> String {
 }
 
 /// Check if a handle is an empty inline element (abbr, var, ins, dfn, etc. with no text content).
+#[allow(clippy::trivially_copy_pass_by_ref)]
 fn is_empty_inline_element(node_handle: &tl::NodeHandle, parser: &tl::Parser, dom_ctx: &DomContext) -> bool {
     const EMPTY_WHEN_NO_CONTENT_TAGS: &[&str] = &[
         "abbr", "var", "ins", "dfn", "time", "data", "cite", "q", "mark", "small", "u",
@@ -1485,11 +1502,13 @@ fn is_empty_inline_element(node_handle: &tl::NodeHandle, parser: &tl::Parser, do
 }
 
 /// Get the text content of a node and its children.
+#[allow(clippy::trivially_copy_pass_by_ref)]
 fn get_text_content(node_handle: &tl::NodeHandle, parser: &tl::Parser, dom_ctx: &DomContext) -> String {
     dom_ctx.text_content(*node_handle, parser)
 }
 
 /// Collect inline text for link labels, skipping block-level descendants.
+#[allow(clippy::match_wildcard_for_single_variants)]
 fn collect_link_label_text(
     children: &[tl::NodeHandle],
     parser: &tl::Parser,
@@ -1509,13 +1528,13 @@ fn collect_link_label_text(
                     text.push_str(decoded.as_ref());
                 }
                 tl::Node::Tag(tag) => {
-                    let is_block = dom_ctx
-                        .tag_info(handle.get_inner(), parser)
-                        .map(|info| info.is_block)
-                        .unwrap_or_else(|| {
+                    let is_block = dom_ctx.tag_info(handle.get_inner(), parser).map_or_else(
+                        || {
                             let tag_name = normalized_tag_name(tag.name().as_utf8_str());
                             is_block_level_element(tag_name.as_ref())
-                        });
+                        },
+                        |info| info.is_block,
+                    );
                     if is_block {
                         saw_block = true;
                         block_nodes.push(handle);
@@ -1541,6 +1560,7 @@ fn collect_link_label_text(
     (text, block_nodes, saw_block)
 }
 
+#[allow(clippy::trivially_copy_pass_by_ref)]
 fn normalize_link_label(label: &str) -> String {
     let mut needs_collapse = false;
     for ch in label.chars() {
@@ -1569,6 +1589,7 @@ fn normalize_link_label(label: &str) -> String {
 }
 
 /// Serialize an element to HTML string (for SVG and Math elements).
+#[allow(clippy::trivially_copy_pass_by_ref)]
 fn serialize_element(node_handle: &tl::NodeHandle, parser: &tl::Parser) -> String {
     if let Some(tl::Node::Tag(tag)) = node_handle.get(parser) {
         let tag_name = normalized_tag_name(tag.name().as_utf8_str());
@@ -1607,6 +1628,7 @@ fn serialize_element(node_handle: &tl::NodeHandle, parser: &tl::Parser) -> Strin
 }
 
 #[cfg(feature = "inline-images")]
+#[allow(clippy::too_many_lines)]
 fn non_empty_trimmed(value: &str) -> Option<String> {
     let trimmed = value.trim();
     if trimmed.is_empty() {
@@ -1617,6 +1639,8 @@ fn non_empty_trimmed(value: &str) -> Option<String> {
 }
 
 #[cfg(feature = "inline-images")]
+#[allow(clippy::items_after_statements)]
+#[allow(clippy::manual_let_else)]
 fn handle_inline_data_image(
     collector_ref: &InlineCollectorHandle,
     src: &str,
@@ -1770,6 +1794,9 @@ fn handle_inline_data_image(
 }
 
 #[cfg(feature = "inline-images")]
+#[allow(clippy::trivially_copy_pass_by_ref)]
+#[allow(clippy::needless_pass_by_value)]
+#[allow(clippy::option_if_let_else)]
 fn handle_inline_svg(
     collector_ref: &InlineCollectorHandle,
     node_handle: &tl::NodeHandle,
@@ -1839,6 +1866,7 @@ fn handle_inline_svg(
 }
 
 /// Serialize a node to HTML string.
+#[allow(clippy::trivially_copy_pass_by_ref)]
 fn serialize_node(node_handle: &tl::NodeHandle, parser: &tl::Parser) -> String {
     if let Some(node) = node_handle.get(parser) {
         match node {
@@ -1852,6 +1880,7 @@ fn serialize_node(node_handle: &tl::NodeHandle, parser: &tl::Parser) -> String {
 }
 
 /// Convert HTML to Markdown using tl DOM parser.
+#[allow(clippy::missing_errors_doc)]
 pub fn convert_html(html: &str, options: &ConversionOptions) -> Result<String> {
     convert_html_impl(html, options, None, None, None)
 }
@@ -2712,10 +2741,12 @@ fn normalized_tag_name(raw: Cow<'_, str>) -> Cow<'_, str> {
     }
 }
 
+#[allow(clippy::trivially_copy_pass_by_ref)]
 fn tag_name_eq(name: Cow<'_, str>, needle: &str) -> bool {
     name.eq_ignore_ascii_case(needle)
 }
 
+#[allow(clippy::trivially_copy_pass_by_ref)]
 fn should_drop_for_preprocessing(
     node_handle: &tl::NodeHandle,
     tag_name: &str,
@@ -2769,6 +2800,7 @@ fn should_drop_for_preprocessing(
     false
 }
 
+#[allow(clippy::trivially_copy_pass_by_ref)]
 fn has_semantic_content_ancestor(node_handle: &tl::NodeHandle, parser: &tl::Parser, dom_ctx: &DomContext) -> bool {
     let mut current_id = node_handle.get_inner();
     while let Some(parent_id) = dom_ctx.parent_of(current_id) {
@@ -2896,6 +2928,7 @@ fn attribute_matches_any(tag: &tl::HTMLTag, attr: &str, keywords: &[&str]) -> bo
         .any(|token| keywords.iter().any(|kw| token == *kw))
 }
 
+#[allow(clippy::trivially_copy_pass_by_ref)]
 fn attribute_contains_any(tag: &tl::HTMLTag, attr: &str, keywords: &[&str]) -> bool {
     let Some(attr_value) = tag.attributes().get(attr) else {
         return false;
@@ -2910,6 +2943,7 @@ fn attribute_contains_any(tag: &tl::HTMLTag, attr: &str, keywords: &[&str]) -> b
 /// Serialize a tag and its children back to HTML.
 ///
 /// This is used for the `preserve_tags` feature to output original HTML for specific elements.
+#[allow(clippy::trivially_copy_pass_by_ref)]
 fn serialize_tag_to_html(handle: &tl::NodeHandle, parser: &tl::Parser) -> String {
     let mut html = String::new();
     serialize_node_to_html(handle, parser, &mut html);
@@ -2917,6 +2951,7 @@ fn serialize_tag_to_html(handle: &tl::NodeHandle, parser: &tl::Parser) -> String
 }
 
 /// Recursively serialize a node to HTML.
+#[allow(clippy::trivially_copy_pass_by_ref)]
 fn serialize_node_to_html(handle: &tl::NodeHandle, parser: &tl::Parser, output: &mut String) {
     match handle.get(parser) {
         Some(tl::Node::Tag(tag)) => {
@@ -3233,6 +3268,7 @@ fn is_block_level_name(tag_name: &str, is_inline: bool) -> bool {
         )
 }
 
+#[allow(clippy::trivially_copy_pass_by_ref)]
 fn get_next_sibling_tag<'a>(
     node_handle: &tl::NodeHandle,
     parser: &'a tl::Parser,
@@ -3241,6 +3277,7 @@ fn get_next_sibling_tag<'a>(
     dom_ctx.next_tag_name(*node_handle, parser)
 }
 
+#[allow(clippy::trivially_copy_pass_by_ref)]
 fn get_previous_sibling_tag<'a>(
     node_handle: &tl::NodeHandle,
     parser: &tl::Parser,
@@ -3273,18 +3310,22 @@ fn get_previous_sibling_tag<'a>(
     None
 }
 
+#[allow(clippy::trivially_copy_pass_by_ref)]
 fn previous_sibling_is_inline_tag(node_handle: &tl::NodeHandle, parser: &tl::Parser, dom_ctx: &DomContext) -> bool {
     dom_ctx.previous_inline_like(*node_handle, parser)
 }
 
+#[allow(clippy::trivially_copy_pass_by_ref)]
 fn next_sibling_is_whitespace_text(node_handle: &tl::NodeHandle, parser: &tl::Parser, dom_ctx: &DomContext) -> bool {
     dom_ctx.next_whitespace_text(*node_handle, parser)
 }
 
+#[allow(clippy::trivially_copy_pass_by_ref)]
 fn next_sibling_is_inline_tag(node_handle: &tl::NodeHandle, parser: &tl::Parser, dom_ctx: &DomContext) -> bool {
     dom_ctx.next_inline_like(*node_handle, parser)
 }
 
+#[allow(clippy::trivially_copy_pass_by_ref)]
 fn append_inline_suffix(
     output: &mut String,
     suffix: &str,
@@ -3306,6 +3347,8 @@ fn append_inline_suffix(
 
 /// Recursively walk DOM nodes and convert to Markdown.
 #[allow(clippy::only_used_in_recursion)]
+#[allow(clippy::trivially_copy_pass_by_ref)]
+#[allow(clippy::cast_possible_truncation)]
 fn walk_node(
     node_handle: &tl::NodeHandle,
     parser: &tl::Parser,
@@ -6112,6 +6155,7 @@ fn walk_node(
                         }
                     }
 
+                    #[allow(clippy::trivially_copy_pass_by_ref)]
                     fn find_checkbox<'a>(
                         node_handle: &tl::NodeHandle,
                         parser: &'a tl::Parser<'a>,
@@ -7817,11 +7861,13 @@ fn walk_node(
 
 const MAX_TABLE_COLS: usize = 1000;
 
+#[allow(clippy::trivially_copy_pass_by_ref)]
 fn clamp_table_span(value: usize) -> usize {
     if value == 0 { 1 } else { value.min(MAX_TABLE_COLS) }
 }
 
 /// Get colspan attribute value from element
+#[allow(clippy::trivially_copy_pass_by_ref)]
 fn get_colspan(node_handle: &tl::NodeHandle, parser: &tl::Parser) -> usize {
     if let Some(tl::Node::Tag(tag)) = node_handle.get(parser) {
         if let Some(Some(bytes)) = tag.attributes().get("colspan") {
@@ -7834,6 +7880,7 @@ fn get_colspan(node_handle: &tl::NodeHandle, parser: &tl::Parser) -> usize {
 }
 
 /// Get both colspan and rowspan in a single lookup
+#[allow(clippy::trivially_copy_pass_by_ref)]
 fn get_colspan_rowspan(node_handle: &tl::NodeHandle, parser: &tl::Parser) -> (usize, usize) {
     if let Some(tl::Node::Tag(tag)) = node_handle.get(parser) {
         let attrs = tag.attributes();
@@ -7853,6 +7900,7 @@ fn get_colspan_rowspan(node_handle: &tl::NodeHandle, parser: &tl::Parser) -> (us
     }
 }
 
+#[allow(clippy::trivially_copy_pass_by_ref)]
 fn collect_table_cells(
     node_handle: &tl::NodeHandle,
     parser: &tl::Parser,
@@ -7872,6 +7920,7 @@ fn collect_table_cells(
     }
 }
 
+#[allow(clippy::trivially_copy_pass_by_ref)]
 fn table_total_columns(node_handle: &tl::NodeHandle, parser: &tl::Parser, dom_ctx: &DomContext) -> usize {
     let mut max_cols = 0usize;
     let mut cells = Vec::new();
@@ -7911,6 +7960,7 @@ fn table_total_columns(node_handle: &tl::NodeHandle, parser: &tl::Parser, dom_ct
     max_cols.clamp(1, MAX_TABLE_COLS)
 }
 
+#[allow(clippy::trivially_copy_pass_by_ref)]
 fn is_tag_name(node_handle: &tl::NodeHandle, parser: &tl::Parser, dom_ctx: &DomContext, name: &str) -> bool {
     if let Some(info) = dom_ctx.tag_info(node_handle.get_inner(), parser) {
         return info.name == name;
@@ -7922,6 +7972,7 @@ fn is_tag_name(node_handle: &tl::NodeHandle, parser: &tl::Parser, dom_ctx: &DomC
 }
 
 /// Convert table cell (td or th)
+#[allow(clippy::trivially_copy_pass_by_ref)]
 fn convert_table_cell(
     node_handle: &tl::NodeHandle,
     parser: &tl::Parser,
@@ -7999,6 +8050,7 @@ fn convert_table_cell(
 /// Convert table row (tr)
 #[allow(clippy::too_many_arguments)]
 #[cfg_attr(not(feature = "visitor"), allow(unused_variables))]
+#[allow(clippy::trivially_copy_pass_by_ref)]
 fn convert_table_row(
     node_handle: &tl::NodeHandle,
     parser: &tl::Parser,
@@ -8154,12 +8206,14 @@ struct TableScan {
     has_text: bool,
 }
 
+#[allow(clippy::trivially_copy_pass_by_ref)]
 fn scan_table(node_handle: &tl::NodeHandle, parser: &tl::Parser, dom_ctx: &DomContext) -> TableScan {
     let mut scan = TableScan::default();
     scan_table_node(node_handle, parser, dom_ctx, true, &mut scan);
     scan
 }
 
+#[allow(clippy::trivially_copy_pass_by_ref)]
 fn scan_table_node(
     node_handle: &tl::NodeHandle,
     parser: &tl::Parser,
@@ -8241,6 +8295,7 @@ fn scan_table_node(
     }
 }
 
+#[allow(clippy::trivially_copy_pass_by_ref)]
 fn append_layout_row(
     row_handle: &tl::NodeHandle,
     parser: &tl::Parser,
@@ -8322,6 +8377,7 @@ fn indent_table_for_list(table_content: &str, list_depth: usize, options: &Conve
 }
 
 /// Convert an entire table element
+#[allow(clippy::trivially_copy_pass_by_ref)]
 fn convert_table(
     node_handle: &tl::NodeHandle,
     parser: &tl::Parser,

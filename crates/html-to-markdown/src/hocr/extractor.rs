@@ -25,13 +25,13 @@ use super::types::{HocrElement, HocrElementType, HocrMetadata};
 /// # hOCR 1.2 Compliance
 ///
 /// Supports all 40 element types:
-/// - Logical structure (12): ocr_title, ocr_chapter, ocr_section, ocr_par, etc.
-/// - Typesetting (6): ocr_page, ocr_carea, ocr_line, etc.
-/// - Float elements (13): ocr_image, ocr_table, ocr_math, etc.
-/// - Inline elements (6): ocr_dropcap, ocr_glyph, etc.
-/// - Engine-specific (3): ocrx_block, ocrx_line, ocrx_word
+/// - Logical structure (12): `ocr_title`, `ocr_chapter`, `ocr_section`, `ocr_par`, etc.
+/// - Typesetting (6): `ocr_page`, `ocr_carea`, `ocr_line`, etc.
+/// - Float elements (13): `ocr_image`, `ocr_table`, `ocr_math`, etc.
+/// - Inline elements (6): `ocr_dropcap`, `ocr_glyph`, etc.
+/// - Engine-specific (3): `ocrx_block`, `ocrx_line`, `ocrx_word`
 ///
-/// Extracts all 20+ properties from title attributes (bbox, x_wconf, baseline, order, etc.)
+/// Extracts all 20+ properties from title attributes (bbox, `x_wconf`, baseline, order, etc.)
 /// and all 5 metadata fields (ocr-system, ocr-capabilities, ocr-langs, etc.)
 ///
 /// # Example
@@ -47,12 +47,13 @@ use super::types::{HocrElement, HocrElementType, HocrMetadata};
 /// let dom = tl::parse(html, tl::ParserOptions::default()).unwrap();
 /// let (elements, metadata) = extract_hocr_document(&dom);
 /// ```
+#[must_use]
 pub fn extract_hocr_document(dom: &tl::VDom) -> (Vec<HocrElement>, HocrMetadata) {
     let parser = dom.parser();
     let mut elements = Vec::new();
     let metadata = extract_metadata(dom);
 
-    for child_handle in dom.children().iter() {
+    for child_handle in dom.children() {
         collect_hocr_elements(child_handle, parser, &mut elements);
     }
 
@@ -60,6 +61,7 @@ pub fn extract_hocr_document(dom: &tl::VDom) -> (Vec<HocrElement>, HocrMetadata)
 }
 
 /// Recursively collect hOCR elements from DOM tree
+#[allow(clippy::trivially_copy_pass_by_ref)]
 fn collect_hocr_elements(node_handle: &tl::NodeHandle, parser: &tl::Parser, elements: &mut Vec<HocrElement>) {
     if let Some(element) = extract_element(node_handle, parser) {
         elements.push(element);
@@ -85,22 +87,32 @@ fn extract_metadata(dom: &tl::VDom) -> HocrMetadata {
             match name_str.as_ref() {
                 "ocr-system" => metadata.ocr_system = Some(content_str),
                 "ocr-capabilities" => {
-                    metadata.ocr_capabilities = content_str.split_whitespace().map(|s| s.to_string()).collect();
+                    metadata.ocr_capabilities = content_str
+                        .split_whitespace()
+                        .map(std::string::ToString::to_string)
+                        .collect();
                 }
                 "ocr-number-of-pages" => {
                     metadata.ocr_number_of_pages = content_str.parse().ok();
                 }
                 "ocr-langs" => {
-                    metadata.ocr_langs = content_str.split_whitespace().map(|s| s.to_string()).collect();
+                    metadata.ocr_langs = content_str
+                        .split_whitespace()
+                        .map(std::string::ToString::to_string)
+                        .collect();
                 }
                 "ocr-scripts" => {
-                    metadata.ocr_scripts = content_str.split_whitespace().map(|s| s.to_string()).collect();
+                    metadata.ocr_scripts = content_str
+                        .split_whitespace()
+                        .map(std::string::ToString::to_string)
+                        .collect();
                 }
                 _ => {}
             }
         }
     }
 
+    #[allow(clippy::trivially_copy_pass_by_ref)]
     fn find_meta_tags<'a>(node_handle: &tl::NodeHandle, parser: &'a tl::Parser<'a>, metadata: &mut HocrMetadata) {
         if let Some(tl::Node::Tag(tag)) = node_handle.get(parser) {
             let tag_name = tag.name().as_utf8_str();
@@ -116,7 +128,7 @@ fn extract_metadata(dom: &tl::VDom) -> HocrMetadata {
         }
     }
 
-    for child_handle in dom.children().iter() {
+    for child_handle in dom.children() {
         find_meta_tags(child_handle, parser, &mut metadata);
     }
 
@@ -124,6 +136,7 @@ fn extract_metadata(dom: &tl::VDom) -> HocrMetadata {
 }
 
 /// Extract a single hOCR element and its children
+#[allow(clippy::trivially_copy_pass_by_ref)]
 fn extract_element(node_handle: &tl::NodeHandle, parser: &tl::Parser) -> Option<HocrElement> {
     if let Some(tl::Node::Tag(tag)) = node_handle.get(parser) {
         let attrs = tag.attributes();

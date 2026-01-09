@@ -1,3 +1,4 @@
+#![allow(clippy::cast_precision_loss, clippy::cast_sign_loss, clippy::unused_self)]
 //! hOCR property parser
 //!
 //! Parses hOCR title attributes into structured properties.
@@ -6,6 +7,7 @@ use super::types::{BBox, Baseline, HocrProperties};
 use crate::text::decode_html_entities_cow;
 
 /// Parse all properties from hOCR title attribute
+#[must_use]
 pub fn parse_properties(title: &str) -> HocrProperties {
     let mut props = HocrProperties::default();
 

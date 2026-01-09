@@ -6,10 +6,10 @@
 //!
 //! # Memory Ownership Rules
 //!
-//! - **NodeContext**: Borrowed from Rust for callback duration only; do NOT free
-//! - **Strings from NodeContext**: Borrowed; do NOT free (valid only during callback)
-//! - **Custom output in VisitResult**: Owned by caller; must free with `html_to_markdown_free_string`
-//! - **Error messages in VisitResult**: Owned by caller; must free with `html_to_markdown_free_string`
+//! - **`NodeContext`**: Borrowed from Rust for callback duration only; do NOT free
+//! - **Strings from `NodeContext`**: Borrowed; do NOT free (valid only during callback)
+//! - **Custom output in `VisitResult`**: Owned by caller; must free with `html_to_markdown_free_string`
+//! - **Error messages in `VisitResult`**: Owned by caller; must free with `html_to_markdown_free_string`
 //! - **Attributes array**: Borrowed; do NOT free (valid only during callback)
 //!
 //! # String Encoding
@@ -345,7 +345,7 @@ pub struct html_to_markdown_node_context_t {
 /// - **Continue**: Proceed with default behavior; other fields ignored
 /// - **Custom**: Replace element output with `custom_output`; caller must allocate
 /// - **Skip**: Discard element and children; other fields ignored
-/// - **PreserveHtml**: Keep raw HTML; other fields ignored
+/// - **`PreserveHtml`**: Keep raw HTML; other fields ignored
 /// - **Error**: Halt conversion; return `error_message` to caller
 ///
 /// # Memory Ownership

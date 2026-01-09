@@ -23,7 +23,7 @@ typedef enum HtmlToMarkdownVisitResultType {
    */
   Continue = 0,
   /**
-   * Replace default output with custom markdown (requires custom_output set)
+   * Replace default output with custom markdown (requires `custom_output` set)
    */
   Custom = 1,
   /**
@@ -35,7 +35,7 @@ typedef enum HtmlToMarkdownVisitResultType {
    */
   PreserveHtml = 3,
   /**
-   * Stop conversion with error (requires error_message set)
+   * Stop conversion with error (requires `error_message` set)
    */
   Error = 4,
 } HtmlToMarkdownVisitResultType;
@@ -125,7 +125,7 @@ typedef struct Option_HtmlToMarkdownVisitVideoCallback Option_HtmlToMarkdownVisi
  *
  * Returned by `html_to_markdown_visitor_create()` and passed to
  * `html_to_markdown_convert_with_visitor()`. Contains ownership of the
- * underlying CVisitorWrapper.
+ * underlying `CVisitorWrapper`.
  */
 typedef void *HtmlToMarkdownVisitor;
 
@@ -324,14 +324,14 @@ typedef struct HtmlToMarkdownVisitorCallbacks {
  * - **Continue**: No additional fields needed
  * - **Custom**: `custom_output` must point to a malloc'd string (NULL-terminated)
  * - **Skip**: No additional fields needed
- * - **PreserveHtml**: No additional fields needed
+ * - **`PreserveHtml`**: No additional fields needed
  * - **Error**: `error_message` must point to a malloc'd string (NULL-terminated)
  *
  * # Memory Ownership
  *
  * - `custom_output` and `error_message` are OWNED BY THE CALLBACK
  * - The FFI layer will free these strings after processing
- * - MUST be allocated with malloc/calloc; will be freed with free()
+ * - MUST be allocated with malloc/calloc; will be freed with `free()`
  *
  * # Safety
  *
@@ -346,12 +346,12 @@ typedef struct HtmlToMarkdownVisitResult {
    */
   enum HtmlToMarkdownVisitResultType result_type;
   /**
-   * Custom markdown output (only if result_type == Custom)
+   * Custom markdown output (only if `result_type` == Custom)
    * Must be malloc'd NULL-terminated string; ownership transfers to FFI layer
    */
   char *custom_output;
   /**
-   * Error message (only if result_type == Error)
+   * Error message (only if `result_type` == Error)
    * Must be malloc'd NULL-terminated string; ownership transfers to FFI layer
    */
   char *error_message;
@@ -407,7 +407,7 @@ char *html_to_markdown_convert(const char *html);
  * # Safety
  *
  * - `html` must be a valid null-terminated C string
- * - `len_out` must be a valid pointer to a size_t
+ * - `len_out` must be a valid pointer to a `size_t`
  * - The returned string must be freed with `html_to_markdown_free_string`
  * - Returns NULL on error
  */
@@ -419,7 +419,7 @@ char *html_to_markdown_convert_with_len(const char *html, uintptr_t *len_out);
  * # Safety
  *
  * - `html` must point to `len` bytes of UTF-8 data
- * - `len_out` must be a valid pointer to a size_t
+ * - `len_out` must be a valid pointer to a `size_t`
  * - The returned string must be freed with `html_to_markdown_free_string`
  * - Returns NULL on error
  */
@@ -428,7 +428,7 @@ char *html_to_markdown_convert_bytes_with_len(const uint8_t *html,
                                               uintptr_t *len_out);
 
 /**
- * Free a string returned by html_to_markdown_convert.
+ * Free a string returned by `html_to_markdown_convert`.
  *
  * # Safety
  *
@@ -463,7 +463,7 @@ const char *html_to_markdown_version(void);
  * - `html` must be a valid null-terminated C string
  * - `metadata_json_out` must be a valid pointer to a char pointer
  * - The returned markdown string must be freed with `html_to_markdown_free_string`
- * - The metadata JSON string (written to metadata_json_out) must be freed with `html_to_markdown_free_string`
+ * - The metadata JSON string (written to `metadata_json_out`) must be freed with `html_to_markdown_free_string`
  * - Returns NULL on error (check error with `html_to_markdown_last_error`)
  *
  * # Example (C)
@@ -490,9 +490,9 @@ char *html_to_markdown_convert_with_metadata(const char *html,
  *
  * - `html` must be a valid null-terminated C string
  * - `metadata_json_out` must be a valid pointer to a char pointer
- * - `markdown_len_out` and `metadata_len_out` must be valid pointers to size_t
+ * - `markdown_len_out` and `metadata_len_out` must be valid pointers to `size_t`
  * - The returned markdown string must be freed with `html_to_markdown_free_string`
- * - The metadata JSON string (written to metadata_json_out) must be freed with `html_to_markdown_free_string`
+ * - The metadata JSON string (written to `metadata_json_out`) must be freed with `html_to_markdown_free_string`
  * - Returns NULL on error (check error with `html_to_markdown_last_error`)
  */
 char *html_to_markdown_convert_with_metadata_with_len(const char *html,
@@ -507,9 +507,9 @@ char *html_to_markdown_convert_with_metadata_with_len(const char *html,
  *
  * - `html` must point to `len` bytes of UTF-8 data
  * - `metadata_json_out` must be a valid pointer to a char pointer
- * - `markdown_len_out` and `metadata_len_out` must be valid pointers to size_t
+ * - `markdown_len_out` and `metadata_len_out` must be valid pointers to `size_t`
  * - The returned markdown string must be freed with `html_to_markdown_free_string`
- * - The metadata JSON string (written to metadata_json_out) must be freed with `html_to_markdown_free_string`
+ * - The metadata JSON string (written to `metadata_json_out`) must be freed with `html_to_markdown_free_string`
  * - Returns NULL on error (check error with `html_to_markdown_last_error`)
  */
 char *html_to_markdown_convert_with_metadata_bytes_with_len(const uint8_t *html,
@@ -606,13 +606,13 @@ void html_to_markdown_visitor_free(HtmlToMarkdownVisitor visitor);
  *
  * - `html`: Null-terminated UTF-8 C string containing HTML
  * - `visitor`: Visitor handle from `html_to_markdown_visitor_create()`
- * - `len_out`: Pointer to size_t where output length will be written.
+ * - `len_out`: Pointer to `size_t` where output length will be written.
  *   Can be NULL if length is not needed.
  *
  * # Returns
  *
  * - Non-NULL: Pointer to malloc'd markdown string (NULL-terminated).
- *   Length written to *len_out if len_out is not NULL.
+ *   Length written to *`len_out` if `len_out` is not NULL.
  *   Must be freed with `html_to_markdown_free_string()`.
  * - NULL: Conversion failed; call `html_to_markdown_last_error()` for details
  *
@@ -620,7 +620,7 @@ void html_to_markdown_visitor_free(HtmlToMarkdownVisitor visitor);
  *
  * - `html` must be a valid null-terminated UTF-8 C string
  * - `visitor` must be a handle from `html_to_markdown_visitor_create()`
- * - `len_out` (if not NULL) must be a valid pointer to size_t
+ * - `len_out` (if not NULL) must be a valid pointer to `size_t`
  * - Returned string must be freed with `html_to_markdown_free_string()`
  * - Visitor callbacks are invoked on the calling thread (must not block or panic)
  *
@@ -663,7 +663,7 @@ char *html_to_markdown_convert_with_visitor(const char *html,
  * - `html`: Pointer to UTF-8 bytes (NOT null-terminated)
  * - `len`: Number of bytes pointed to by html
  * - `visitor`: Visitor handle from `html_to_markdown_visitor_create()`
- * - `len_out`: Pointer to size_t where output length will be written (can be NULL)
+ * - `len_out`: Pointer to `size_t` where output length will be written (can be NULL)
  *
  * # Returns
  *
@@ -677,7 +677,7 @@ char *html_to_markdown_convert_with_visitor(const char *html,
  * - Data must be valid UTF-8
  * - `len` must be accurate (not larger than allocated buffer)
  * - `visitor` must be a handle from `html_to_markdown_visitor_create()`
- * - `len_out` (if not NULL) must point to a valid size_t
+ * - `len_out` (if not NULL) must point to a valid `size_t`
  *
  * # Example
  *
@@ -700,7 +700,7 @@ char *html_to_markdown_convert_bytes_with_visitor(const uint8_t *html,
                                                   uintptr_t *len_out);
 
 /**
- * Create a VisitResult with Continue action.
+ * Create a `VisitResult` with Continue action.
  *
  * Helper function to construct a Continue result without custom output.
  * Equivalent to: `result = {0}; result.result_type = HTML_TO_MARKDOWN_VISIT_CONTINUE;`
@@ -719,10 +719,10 @@ char *html_to_markdown_convert_bytes_with_visitor(const uint8_t *html,
 struct HtmlToMarkdownVisitResult html_to_markdown_visit_result_continue(void);
 
 /**
- * Create a VisitResult with Custom action.
+ * Create a `VisitResult` with Custom action.
  *
  * Helper function to construct a Custom result. The `output` string should be
- * allocated with malloc() and will be freed by the FFI layer after use.
+ * allocated with `malloc()` and will be freed by the FFI layer after use.
  *
  * # Arguments
  *
@@ -734,7 +734,7 @@ struct HtmlToMarkdownVisitResult html_to_markdown_visit_result_continue(void);
  *
  * # Safety
  *
- * - `output` must be malloc'd (will be freed with free())
+ * - `output` must be malloc'd (will be freed with `free()`)
  * - `output` must be NULL-terminated
  *
  * # Example
@@ -749,7 +749,7 @@ struct HtmlToMarkdownVisitResult html_to_markdown_visit_result_continue(void);
 struct HtmlToMarkdownVisitResult html_to_markdown_visit_result_custom(char *output);
 
 /**
- * Create a VisitResult with Skip action.
+ * Create a `VisitResult` with Skip action.
  *
  * Helper function to construct a Skip result (element and children omitted from output).
  *
@@ -767,13 +767,13 @@ struct HtmlToMarkdownVisitResult html_to_markdown_visit_result_custom(char *outp
 struct HtmlToMarkdownVisitResult html_to_markdown_visit_result_skip(void);
 
 /**
- * Create a VisitResult with PreserveHtml action.
+ * Create a `VisitResult` with `PreserveHtml` action.
  *
- * Helper function to construct a PreserveHtml result (raw HTML included verbatim).
+ * Helper function to construct a `PreserveHtml` result (raw HTML included verbatim).
  *
  * # Returns
  *
- * `HtmlToMarkdownVisitResult` with PreserveHtml action.
+ * `HtmlToMarkdownVisitResult` with `PreserveHtml` action.
  *
  * # Example
  *
@@ -785,10 +785,10 @@ struct HtmlToMarkdownVisitResult html_to_markdown_visit_result_skip(void);
 struct HtmlToMarkdownVisitResult html_to_markdown_visit_result_preserve_html(void);
 
 /**
- * Create a VisitResult with Error action.
+ * Create a `VisitResult` with Error action.
  *
  * Helper function to construct an Error result. The `message` string should be
- * allocated with malloc() and will be freed by the FFI layer after use.
+ * allocated with `malloc()` and will be freed by the FFI layer after use.
  *
  * # Arguments
  *
@@ -800,7 +800,7 @@ struct HtmlToMarkdownVisitResult html_to_markdown_visit_result_preserve_html(voi
  *
  * # Safety
  *
- * - `message` must be malloc'd (will be freed with free())
+ * - `message` must be malloc'd (will be freed with `free()`)
  * - `message` must be NULL-terminated
  *
  * # Example

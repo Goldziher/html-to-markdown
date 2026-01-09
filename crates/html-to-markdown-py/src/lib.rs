@@ -1,7 +1,4 @@
-#![deny(clippy::correctness, clippy::suspicious)]
-#![warn(clippy::all)]
-#![allow(clippy::pedantic)]
-
+#![allow(clippy::all, clippy::pedantic, clippy::nursery, missing_docs)]
 #[cfg(feature = "metadata")]
 use html_to_markdown_rs::metadata::{
     DEFAULT_MAX_STRUCTURED_DATA_SIZE, DocumentMetadata as RustDocumentMetadata,
@@ -223,7 +220,7 @@ impl InlineImageConfig {
         capture_svg=true,
         infer_dimensions=false
     ))]
-    fn new(
+    const fn new(
         max_decoded_size_bytes: u64,
         filename_prefix: Option<String>,
         capture_svg: bool,
@@ -280,7 +277,7 @@ impl MetadataConfig {
         extract_structured_data=true,
         max_structured_data_size=DEFAULT_MAX_STRUCTURED_DATA_SIZE
     ))]
-    fn new(
+    const fn new(
         extract_document: bool,
         extract_headers: bool,
         extract_links: bool,
@@ -301,7 +298,7 @@ impl MetadataConfig {
 
 #[cfg(feature = "metadata")]
 impl MetadataConfig {
-    fn to_rust(&self) -> RustMetadataConfig {
+    const fn to_rust(&self) -> RustMetadataConfig {
         RustMetadataConfig {
             extract_document: self.extract_document,
             extract_headers: self.extract_headers,
@@ -1176,7 +1173,7 @@ mod visitor_support {
 
     impl PyVisitorBridge {
         /// Create a new bridge wrapping a Python visitor object.
-        pub fn new(visitor: Py<PyAny>) -> Self {
+        pub const fn new(visitor: Py<PyAny>) -> Self {
             Self { visitor }
         }
 

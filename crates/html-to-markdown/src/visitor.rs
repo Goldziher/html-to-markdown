@@ -291,7 +291,7 @@ pub enum VisitResult {
     Error(String),
 }
 
-/// Type alias for a visitor handle (Rc-wrapped RefCell for interior mutability).
+/// Type alias for a visitor handle (Rc-wrapped `RefCell` for interior mutability).
 ///
 /// This allows visitors to be passed around and shared while still being mutable.
 pub type VisitorHandle = std::rc::Rc<std::cell::RefCell<dyn HtmlVisitor>>;

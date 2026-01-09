@@ -36,8 +36,7 @@ pub fn last_error_ptr() -> *const c_char {
     LAST_ERROR.with(|cell| {
         cell.borrow()
             .as_ref()
-            .map(|cstr| cstr.as_ptr() as *const c_char)
-            .unwrap_or(ptr::null())
+            .map_or(ptr::null(), |cstr| cstr.as_ptr().cast::<c_char>())
     })
 }
 

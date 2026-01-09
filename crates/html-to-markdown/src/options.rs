@@ -1,3 +1,4 @@
+#![allow(clippy::cast_precision_loss, clippy::cast_sign_loss, clippy::unused_self)]
 //! Configuration options for HTML to Markdown conversion.
 
 /// Heading style options for Markdown output.
@@ -19,6 +20,7 @@ impl HeadingStyle {
     ///
     /// Accepts "atx", "atxclosed", or defaults to Underlined.
     /// Input is normalized (lowercased, alphanumeric only).
+    #[must_use]
     pub fn parse(value: &str) -> Self {
         match normalize_token(value).as_str() {
             "atx" => Self::Atx,
@@ -45,6 +47,7 @@ impl ListIndentType {
     ///
     /// Accepts "tabs" or defaults to Spaces.
     /// Input is normalized (lowercased, alphanumeric only).
+    #[must_use]
     pub fn parse(value: &str) -> Self {
         match normalize_token(value).as_str() {
             "tabs" => Self::Tabs,
@@ -70,6 +73,7 @@ impl WhitespaceMode {
     ///
     /// Accepts "strict" or defaults to Normalized.
     /// Input is normalized (lowercased, alphanumeric only).
+    #[must_use]
     pub fn parse(value: &str) -> Self {
         match normalize_token(value).as_str() {
             "strict" => Self::Strict,
@@ -95,6 +99,7 @@ impl NewlineStyle {
     ///
     /// Accepts "backslash" or defaults to Spaces.
     /// Input is normalized (lowercased, alphanumeric only).
+    #[must_use]
     pub fn parse(value: &str) -> Self {
         match normalize_token(value).as_str() {
             "backslash" => Self::Backslash,
@@ -108,7 +113,7 @@ impl NewlineStyle {
 /// Determines how code blocks (`<pre><code>`) are rendered in Markdown.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum CodeBlockStyle {
-    /// Indented code blocks (4 spaces). Default. CommonMark standard.
+    /// Indented code blocks (4 spaces). Default. `CommonMark` standard.
     #[default]
     Indented,
     /// Fenced code blocks with backticks (```). Supports language hints.
@@ -122,6 +127,7 @@ impl CodeBlockStyle {
     ///
     /// Accepts "backticks", "tildes", or defaults to Indented.
     /// Input is normalized (lowercased, alphanumeric only).
+    #[must_use]
     pub fn parse(value: &str) -> Self {
         match normalize_token(value).as_str() {
             "backticks" => Self::Backticks,
@@ -152,6 +158,7 @@ impl HighlightStyle {
     ///
     /// Accepts "doubleequal", "html", "bold", "none", or defaults to None.
     /// Input is normalized (lowercased, alphanumeric only).
+    #[must_use]
     pub fn parse(value: &str) -> Self {
         match normalize_token(value).as_str() {
             "doubleequal" => Self::DoubleEqual,
@@ -182,6 +189,7 @@ impl PreprocessingPreset {
     ///
     /// Accepts "minimal", "aggressive", or defaults to Standard.
     /// Input is normalized (lowercased, alphanumeric only).
+    #[must_use]
     pub fn parse(value: &str) -> Self {
         match normalize_token(value).as_str() {
             "minimal" => Self::Minimal,
@@ -194,7 +202,7 @@ impl PreprocessingPreset {
 /// Main conversion options for HTML to Markdown conversion.
 #[derive(Debug, Clone)]
 pub struct ConversionOptions {
-    /// Heading style (Underlined, Atx, AtxClosed)
+    /// Heading style (Underlined, Atx, `AtxClosed`)
     pub heading_style: HeadingStyle,
 
     /// List indentation type (Spaces or Tabs)
@@ -218,7 +226,7 @@ pub struct ConversionOptions {
     /// Escape miscellaneous markdown characters (\ & < ` [ > ~ # = + | -)
     pub escape_misc: bool,
 
-    /// Escape all ASCII punctuation characters (for CommonMark spec compliance tests)
+    /// Escape all ASCII punctuation characters (for `CommonMark` spec compliance tests)
     pub escape_ascii: bool,
 
     /// Default code language for fenced code blocks when not specified
@@ -236,7 +244,7 @@ pub struct ConversionOptions {
     /// Enable spatial table reconstruction in hOCR documents (via spatial positioning analysis)
     pub hocr_spatial_tables: bool,
 
-    /// Highlight style for <mark> elements (DoubleEqual, Html, Bold, None)
+    /// Highlight style for <mark> elements (`DoubleEqual`, Html, Bold, None)
     pub highlight_style: HighlightStyle,
 
     /// Extract metadata from HTML (title, description, images, links, etc.)
@@ -248,7 +256,7 @@ pub struct ConversionOptions {
     /// Strip newline characters from HTML before processing
     pub strip_newlines: bool,
 
-    /// Enable automatic text wrapping at wrap_width
+    /// Enable automatic text wrapping at `wrap_width`
     pub wrap: bool,
 
     /// Text wrapping width in characters (default 80)
@@ -288,7 +296,7 @@ pub struct ConversionOptions {
     pub preserve_tags: Vec<String>,
 }
 
-/// Partial update for ConversionOptions.
+/// Partial update for `ConversionOptions`.
 ///
 /// This struct uses `Option<T>` to represent optional fields that can be selectively updated.
 /// Only specified fields (Some values) will override existing options; None values leave the
@@ -297,7 +305,7 @@ pub struct ConversionOptions {
 #[cfg_attr(any(feature = "serde", feature = "metadata"), derive(serde::Deserialize))]
 #[cfg_attr(any(feature = "serde", feature = "metadata"), serde(rename_all = "camelCase"))]
 pub struct ConversionOptionsUpdate {
-    /// Optional heading style override (Underlined, Atx, AtxClosed)
+    /// Optional heading style override (Underlined, Atx, `AtxClosed`)
     pub heading_style: Option<HeadingStyle>,
 
     /// Optional list indentation type override (Spaces or Tabs)
@@ -536,7 +544,7 @@ impl ConversionOptions {
 
     /// Create new conversion options from a partial update.
     ///
-    /// Creates a new ConversionOptions struct with defaults, then applies the update.
+    /// Creates a new `ConversionOptions` struct with defaults, then applies the update.
     /// Fields not specified in the update keep their default values.
     ///
     /// # Arguments
@@ -545,7 +553,8 @@ impl ConversionOptions {
     ///
     /// # Returns
     ///
-    /// New ConversionOptions with specified updates applied to defaults
+    /// New `ConversionOptions` with specified updates applied to defaults
+    #[must_use]
     pub fn from_update(update: ConversionOptionsUpdate) -> Self {
         let mut options = Self::default();
         options.apply_update(update);
@@ -575,7 +584,7 @@ pub struct PreprocessingOptions {
     pub remove_forms: bool,
 }
 
-/// Partial update for PreprocessingOptions.
+/// Partial update for `PreprocessingOptions`.
 ///
 /// This struct uses `Option<T>` to represent optional fields that can be selectively updated.
 /// Only specified fields (Some values) will override existing options; None values leave the
@@ -609,7 +618,9 @@ fn normalize_token(value: &str) -> String {
 
 #[cfg(any(feature = "serde", feature = "metadata"))]
 mod serde_impls {
-    use super::*;
+    use super::{
+        CodeBlockStyle, HeadingStyle, HighlightStyle, ListIndentType, NewlineStyle, PreprocessingPreset, WhitespaceMode,
+    };
     use serde::Deserialize;
 
     macro_rules! impl_deserialize_from_parse {
@@ -655,6 +666,7 @@ impl PreprocessingOptions {
     /// # Arguments
     ///
     /// * `update` - Partial preprocessing options update
+    #[allow(clippy::needless_pass_by_value)]
     pub const fn apply_update(&mut self, update: PreprocessingOptionsUpdate) {
         if let Some(enabled) = update.enabled {
             self.enabled = enabled;
@@ -672,7 +684,7 @@ impl PreprocessingOptions {
 
     /// Create new preprocessing options from a partial update.
     ///
-    /// Creates a new PreprocessingOptions struct with defaults, then applies the update.
+    /// Creates a new `PreprocessingOptions` struct with defaults, then applies the update.
     /// Fields not specified in the update keep their default values.
     ///
     /// # Arguments
@@ -681,7 +693,8 @@ impl PreprocessingOptions {
     ///
     /// # Returns
     ///
-    /// New PreprocessingOptions with specified updates applied to defaults
+    /// New `PreprocessingOptions` with specified updates applied to defaults
+    #[must_use]
     pub fn from_update(update: PreprocessingOptionsUpdate) -> Self {
         let mut options = Self::default();
         options.apply_update(update);

@@ -63,6 +63,7 @@ struct ConvertContext {
 /// let markdown = convert_to_markdown(&elements, true);
 /// // Output: "# Document Title\n\nHello World"
 /// ```
+#[must_use]
 pub fn convert_to_markdown(elements: &[HocrElement], preserve_structure: bool) -> String {
     convert_to_markdown_with_options(elements, preserve_structure, true)
 }
@@ -89,6 +90,7 @@ pub fn convert_to_markdown(elements: &[HocrElement], preserve_structure: bool) -
 /// - Spatial table reconstruction is more computationally expensive but produces better table formatting
 /// - For documents without tables, setting `enable_spatial_tables` to `false` improves performance
 /// - Structure preservation requires sorting which adds O(n log n) complexity; disable if not needed
+#[must_use]
 pub fn convert_to_markdown_with_options(
     elements: &[HocrElement],
     preserve_structure: bool,
@@ -620,7 +622,7 @@ fn detect_heading_paragraph(element: &HocrElement, text: &str) -> Option<String>
     let mut uppercase_initial = 0usize;
     for word in text.split_whitespace() {
         word_count += 1;
-        if word.chars().next().map(|c| c.is_uppercase()).unwrap_or(false) {
+        if word.chars().next().is_some_and(char::is_uppercase) {
             uppercase_initial += 1;
         }
         if word_count > 8 {
@@ -697,7 +699,7 @@ fn is_bullet_paragraph(element: &HocrElement, text: &str) -> bool {
 
     if digit_count > 0 {
         if let Some(&ch) = chars.peek() {
-            if (ch == '.' || ch == ')') && chars.clone().nth(1).map(|c| c.is_whitespace()).unwrap_or(false) {
+            if (ch == '.' || ch == ')') && chars.clone().nth(1).is_some_and(char::is_whitespace) {
                 return true;
             }
         }
@@ -728,7 +730,7 @@ fn find_previous_heading(children: &[&HocrElement], idx: usize) -> Option<String
 }
 
 fn ensure_heading_prefix(output: &mut String, heading: &str) {
-    let snippet = format!("# {}\n\n", heading);
+    let snippet = format!("# {heading}\n\n");
     if output.ends_with(&snippet) {
         return;
     }
@@ -744,6 +746,7 @@ fn ensure_heading_prefix(output: &mut String, heading: &str) {
     output.push_str(&snippet);
 }
 
+#[allow(clippy::cast_possible_truncation)]
 fn collect_code_block(children: &[&HocrElement]) -> Option<(Vec<String>, usize, Option<&'static str>)> {
     let mut collected: Vec<CodeLineInfo> = Vec::new();
     let mut consumed = 0;
@@ -909,7 +912,7 @@ fn extract_code_lines(paragraph: &HocrElement) -> Vec<CodeLineInfo> {
         let mut words = Vec::new();
         collect_line_words(paragraph, &mut words);
         if !words.is_empty() {
-            let x1 = paragraph.properties.bbox.map(|bbox| bbox.x1).unwrap_or(0);
+            let x1 = paragraph.properties.bbox.map_or(0, |bbox| bbox.x1);
             lines.push(CodeLineInfo {
                 text: words.join(" ").trim().to_string(),
                 x1,
@@ -957,7 +960,7 @@ fn is_bullet_like(line: &str) -> bool {
 
     if digit_count > 0 {
         if let Some(&ch) = chars.peek() {
-            if (ch == '.' || ch == ')') && chars.clone().nth(1).map(|c| c.is_whitespace()).unwrap_or(false) {
+            if (ch == '.' || ch == ')') && chars.clone().nth(1).is_some_and(char::is_whitespace) {
                 return true;
             }
         }
@@ -1045,11 +1048,7 @@ fn is_code_paragraph(lines: &[CodeLineInfo]) -> bool {
 
         let has_keyword = (starts_with_keyword(trimmed, "function") && text.contains('('))
             || (starts_with_keyword(trimmed, "return")
-                && trimmed
-                    .chars()
-                    .nth("return".len())
-                    .map(|c| c.is_whitespace())
-                    .unwrap_or(true))
+                && trimmed.chars().nth("return".len()).is_none_or(char::is_whitespace))
             || trimmed.starts_with("console.")
             || starts_with_keyword(trimmed, "async")
             || starts_with_keyword(trimmed, "await")
@@ -1193,11 +1192,7 @@ fn is_confident_code_block(lines: &[CodeLineInfo]) -> bool {
         if (starts_with_keyword(trimmed, "function") && text.contains('('))
             || trimmed.starts_with("console.")
             || (starts_with_keyword(trimmed, "return")
-                && trimmed
-                    .chars()
-                    .nth("return".len())
-                    .map(|c| c.is_whitespace())
-                    .unwrap_or(true))
+                && trimmed.chars().nth("return".len()).is_none_or(char::is_whitespace))
             || starts_with_keyword(trimmed, "async")
             || starts_with_keyword(trimmed, "await")
             || (starts_with_keyword(trimmed, "class") && (text.contains('{') || text.contains(':')))
@@ -1373,8 +1368,7 @@ fn post_process_table(mut table: Vec<Vec<String>>) -> Option<Vec<Vec<String>>> {
     let column_count = header_rows
         .first()
         .or_else(|| data_rows.first())
-        .map(|row| row.len())
-        .unwrap_or(0);
+        .map_or(0, std::vec::Vec::len);
 
     if column_count == 0 {
         return None;
@@ -1437,6 +1431,7 @@ fn post_process_table(mut table: Vec<Vec<String>>) -> Option<Vec<Vec<String>>> {
     Some(processed)
 }
 
+#[allow(clippy::trivially_copy_pass_by_ref)]
 fn merge_header_only_column(table: &mut [Vec<String>], col: usize, header_text: String) {
     if table.is_empty() || table[0].is_empty() {
         return;
@@ -1469,13 +1464,13 @@ fn merge_header_only_column(table: &mut [Vec<String>], col: usize, header_text: 
         }
 
         if col + 1 < table[0].len() {
-            if !table[0][col + 1].trim().is_empty() {
+            if table[0][col + 1].trim().is_empty() {
+                table[0][col + 1] = trimmed.to_string();
+            } else {
                 let mut updated = trimmed.to_string();
                 updated.push(' ');
                 updated.push_str(table[0][col + 1].trim());
                 table[0][col + 1] = updated;
-            } else {
-                table[0][col + 1] = trimmed.to_string();
             }
             for row in table.iter_mut() {
                 row.remove(col);
@@ -1501,10 +1496,10 @@ fn normalize_header_cell(cell: &mut String) {
         text = "bc (V/dec)".to_string();
     }
     if text.starts_with("Polarization resistance") {
-        if !text.contains("(Ω)") {
-            text.push_str(" (Ω)");
-        } else {
+        if text.contains("(Ω)") {
             text = text.replace("(Ω) rate", "(Ω)");
+        } else {
+            text.push_str(" (Ω)");
         }
     }
     if text.starts_with("Corrosion") && text.contains("mm/year") {

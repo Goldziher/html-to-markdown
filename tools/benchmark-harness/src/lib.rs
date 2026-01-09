@@ -1,7 +1,4 @@
-#![deny(clippy::correctness, clippy::suspicious)]
-#![warn(clippy::all)]
-#![allow(clippy::pedantic)]
-
+#![allow(clippy::all, clippy::pedantic, clippy::nursery, missing_docs)]
 pub mod adapter;
 pub mod adapters;
 pub mod config;

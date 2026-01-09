@@ -1,3 +1,4 @@
+#![allow(clippy::cast_precision_loss, clippy::cast_sign_loss, clippy::unused_self)]
 //! Text processing utilities for Markdown conversion.
 
 use regex::Regex;
@@ -11,7 +12,7 @@ static ESCAPE_MISC_RE: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"([\\&<`\[
 static ESCAPE_NUMBERED_LIST_RE: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"([0-9])([.)])").unwrap());
 
 /// Regex for escaping ASCII punctuation (CommonMark spec example 12)
-/// Matches: ! " # $ % & ' ( ) * + , - . / : ; < = > ? @ [ \ ] ^ _ ` { | } ~
+/// Matches: `! " # $ % & ' ( ) * + , - . / : ; < = > ? @ [ \ ] ^ _ \` { | } ~`
 static ESCAPE_ASCII_RE: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"([!\x22#$%&\x27()*+,\-./:;<=>?@\[\\\]^_`{|}~])").unwrap());
 
@@ -23,11 +24,12 @@ static ESCAPE_ASCII_RE: LazyLock<Regex> =
 /// * `escape_misc` - Escape miscellaneous characters (`\` `&` `<` `` ` `` `[` `>` `~` `#` `=` `+` `|` `-`)
 /// * `escape_asterisks` - Escape asterisks (`*`)
 /// * `escape_underscores` - Escape underscores (`_`)
-/// * `escape_ascii` - Escape all ASCII punctuation (for CommonMark spec compliance)
+/// * `escape_ascii` - Escape all ASCII punctuation (for `CommonMark` spec compliance)
 ///
 /// # Returns
 ///
 /// Escaped text
+#[allow(clippy::fn_params_excessive_bools)]
 pub fn escape(
     text: &str,
     escape_misc: bool,
@@ -123,7 +125,7 @@ pub fn escape(
 
 /// Extract boundary whitespace from text (chomp).
 ///
-/// Returns (prefix, suffix, trimmed_text) tuple.
+/// Returns (prefix, suffix, `trimmed_text`) tuple.
 /// Prefix/suffix are " " if original text had leading/trailing whitespace.
 /// However, suffix is "" if the trailing whitespace is only newlines (not spaces/tabs).
 /// This prevents trailing newlines from becoming trailing spaces in the output.

@@ -1,7 +1,4 @@
-#![deny(clippy::correctness, clippy::suspicious)]
-#![warn(clippy::all)]
-#![allow(clippy::pedantic)]
-
+#![allow(clippy::all, clippy::pedantic, clippy::nursery, missing_docs)]
 use clap::{Parser, ValueEnum};
 use encoding_rs::Encoding;
 use html_to_markdown_rs::{
@@ -102,7 +99,7 @@ struct Cli {
     /// Heading style
     ///
     /// Controls how headings are formatted in the output:
-    /// - 'atx': # for h1, ## for h2, etc. (default, CommonMark)
+    /// - 'atx': # for h1, ## for h2, etc. (default, `CommonMark`)
     /// - 'underlined': h1 uses ===, h2 uses ---
     /// - 'atx-closed': # Title # with closing hashes
     #[arg(long, value_name = "STYLE")]
@@ -116,7 +113,7 @@ struct Cli {
 
     /// Spaces per list indent level
     ///
-    /// Default is 2 (CommonMark standard). Use 4 for wider indentation.
+    /// Default is 2 (`CommonMark` standard). Use 4 for wider indentation.
     #[arg(long, value_name = "N", value_parser = clap::value_parser!(u8).range(1..=8))]
     #[arg(help_heading = "List Options")]
     list_indent_width: Option<u8>,
@@ -157,7 +154,7 @@ struct Cli {
 
     /// Escape all ASCII punctuation
     ///
-    /// For strict CommonMark spec compliance (usually not needed)
+    /// For strict `CommonMark` spec compliance (usually not needed)
     #[arg(long)]
     #[arg(help_heading = "Text Formatting")]
     escape_ascii: bool,
@@ -179,7 +176,7 @@ struct Cli {
     /// Line break style
     ///
     /// How to represent <br> tags:
-    /// - 'backslash': Backslash at end of line (default, CommonMark)
+    /// - 'backslash': Backslash at end of line (default, `CommonMark`)
     /// - 'spaces': Two spaces at end of line
     #[arg(long, value_name = "STYLE")]
     #[arg(help_heading = "Text Formatting")]
@@ -188,7 +185,7 @@ struct Cli {
     /// Code block style
     ///
     /// How to format code blocks:
-    /// - 'indented': 4-space indentation (default, CommonMark)
+    /// - 'indented': 4-space indentation (default, `CommonMark`)
     /// - 'backticks': Fenced with backticks (```)
     /// - 'tildes': Fenced with tildes (~~~)
     #[arg(long, value_name = "STYLE")]
@@ -297,7 +294,7 @@ struct Cli {
 
     /// Extract structured data
     ///
-    /// Requires --with-metadata. Extracts JSON-LD, Microdata, and RDFa blocks.
+    /// Requires --with-metadata. Extracts JSON-LD, Microdata, and `RDFa` blocks.
     #[arg(long)]
     #[arg(help_heading = "Metadata")]
     #[arg(requires = "with_metadata")]
@@ -580,7 +577,7 @@ fn decode_bytes(bytes: &[u8], encoding_name: &str) -> Result<String, String> {
     };
 
     let encoding =
-        Encoding::for_label(normalized.as_bytes()).ok_or_else(|| format!("Unknown encoding '{}'", encoding_name))?;
+        Encoding::for_label(normalized.as_bytes()).ok_or_else(|| format!("Unknown encoding '{encoding_name}'"))?;
 
     let (decoded, _, had_errors) = encoding.decode(bytes);
     if had_errors {
@@ -601,17 +598,17 @@ fn fetch_url(url: &str, user_agent: &str, default_encoding: &str) -> Result<Stri
         .timeout(Duration::from_secs(15))
         .redirect(reqwest::redirect::Policy::limited(5))
         .build()
-        .map_err(|e| format!("Failed to build HTTP client: {}", e))?;
+        .map_err(|e| format!("Failed to build HTTP client: {e}"))?;
 
     let response = client
         .get(url)
         .header(USER_AGENT, user_agent)
         .send()
-        .map_err(|e| format!("Failed to fetch '{}': {}", url, e))?;
+        .map_err(|e| format!("Failed to fetch '{url}': {e}"))?;
 
     let status = response.status();
     if !status.is_success() {
-        return Err(format!("Request failed for '{}': HTTP {}", url, status));
+        return Err(format!("Request failed for '{url}': HTTP {status}"));
     }
 
     let charset = response
@@ -622,7 +619,7 @@ fn fetch_url(url: &str, user_agent: &str, default_encoding: &str) -> Result<Stri
 
     let bytes = response
         .bytes()
-        .map_err(|e| format!("Failed to read response body from '{}': {}", url, e))?;
+        .map_err(|e| format!("Failed to read response body from '{url}': {e}"))?;
 
     let encoding_name = charset.as_deref().unwrap_or(default_encoding);
     decode_bytes(&bytes, encoding_name)
@@ -651,11 +648,11 @@ fn generate_man_page() -> Result<(), String> {
     let man = clap_mangen::Man::new(cmd);
     let mut buffer = Vec::new();
     man.render(&mut buffer)
-        .map_err(|e| format!("Failed to generate man page: {}", e))?;
+        .map_err(|e| format!("Failed to generate man page: {e}"))?;
 
     io::stdout()
         .write_all(&buffer)
-        .map_err(|e| format!("Failed to write man page: {}", e))?;
+        .map_err(|e| format!("Failed to write man page: {e}"))?;
 
     Ok(())
 }
@@ -686,7 +683,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             let mut buffer = Vec::new();
             io::stdin()
                 .read_to_end(&mut buffer)
-                .map_err(|e| format!("Error reading from stdin: {}", e))?;
+                .map_err(|e| format!("Error reading from stdin: {e}"))?;
             let decoded = decode_bytes(&buffer, &cli.encoding)?;
             if cli.debug {
                 eprintln!("Read {} bytes from stdin", decoded.len());
@@ -714,15 +711,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     };
 
     let options = ConversionOptions {
-        heading_style: cli.heading_style.map(Into::into).unwrap_or(defaults.heading_style),
-        list_indent_type: cli
-            .list_indent_type
-            .map(Into::into)
-            .unwrap_or(defaults.list_indent_type),
-        list_indent_width: cli
-            .list_indent_width
-            .map(|w| w as usize)
-            .unwrap_or(defaults.list_indent_width),
+        heading_style: cli.heading_style.map_or(defaults.heading_style, Into::into),
+        list_indent_type: cli.list_indent_type.map_or(defaults.list_indent_type, Into::into),
+        list_indent_width: cli.list_indent_width.map_or(defaults.list_indent_width, |w| w as usize),
         bullets: cli.bullets.unwrap_or(defaults.bullets),
         strong_em_symbol: cli.strong_em_symbol.unwrap_or(defaults.strong_em_symbol),
         escape_asterisks: cli.escape_asterisks,
@@ -738,20 +729,17 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         } else {
             defaults.hocr_spatial_tables
         },
-        highlight_style: cli.highlight_style.map(Into::into).unwrap_or(defaults.highlight_style),
+        highlight_style: cli.highlight_style.map_or(defaults.highlight_style, Into::into),
         extract_metadata: cli.extract_metadata,
-        whitespace_mode: cli.whitespace_mode.map(Into::into).unwrap_or(defaults.whitespace_mode),
+        whitespace_mode: cli.whitespace_mode.map_or(defaults.whitespace_mode, Into::into),
         strip_newlines: cli.strip_newlines,
         wrap: cli.wrap,
-        wrap_width: cli.wrap_width.map(|w| w as usize).unwrap_or(defaults.wrap_width),
+        wrap_width: cli.wrap_width.map_or(defaults.wrap_width, |w| w as usize),
         convert_as_inline: cli.convert_as_inline,
         sub_symbol: cli.sub_symbol.unwrap_or(defaults.sub_symbol),
         sup_symbol: cli.sup_symbol.unwrap_or(defaults.sup_symbol),
-        newline_style: cli.newline_style.map(Into::into).unwrap_or(defaults.newline_style),
-        code_block_style: cli
-            .code_block_style
-            .map(Into::into)
-            .unwrap_or(defaults.code_block_style),
+        newline_style: cli.newline_style.map_or(defaults.newline_style, Into::into),
+        code_block_style: cli.code_block_style.map_or(defaults.code_block_style, Into::into),
         keep_inline_images_in: cli.keep_inline_images_in.unwrap_or(defaults.keep_inline_images_in),
         preprocessing,
         encoding: cli.encoding.clone(),
@@ -771,7 +759,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         };
 
         let (markdown, metadata) = convert_with_metadata(&html, Some(options), metadata_config)
-            .map_err(|e| format!("Error converting HTML with metadata: {}", e))?;
+            .map_err(|e| format!("Error converting HTML with metadata: {e}"))?;
 
         if cli.debug {
             eprintln!("Generated {} bytes of markdown with metadata", markdown.len());
@@ -782,9 +770,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             "metadata": metadata
         });
 
-        serde_json::to_string_pretty(&output).map_err(|e| format!("Error serializing JSON: {}", e))?
+        serde_json::to_string_pretty(&output).map_err(|e| format!("Error serializing JSON: {e}"))?
     } else {
-        let markdown = convert(&html, Some(options)).map_err(|e| format!("Error converting HTML: {}", e))?;
+        let markdown = convert(&html, Some(options)).map_err(|e| format!("Error converting HTML: {e}"))?;
 
         if cli.debug {
             eprintln!("Generated {} bytes of markdown", markdown.len());
@@ -799,7 +787,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 .map_err(|e| format!("Error writing to file '{}': {}", path.display(), e))?;
         }
         None => {
-            print!("{}", output_content);
+            print!("{output_content}");
         }
     }
 

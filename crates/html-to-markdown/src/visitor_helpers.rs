@@ -27,7 +27,7 @@ use crate::visitor::{HtmlVisitor, NodeContext, NodeType, VisitResult};
 #[cfg(feature = "async-visitor")]
 use crate::visitor::AsyncHtmlVisitor;
 
-/// Build a NodeContext from current parsing state.
+/// Build a `NodeContext` from current parsing state.
 ///
 /// Creates a complete `NodeContext` suitable for passing to visitor callbacks.
 /// This function collects metadata about the current node from various sources:
@@ -55,7 +55,7 @@ use crate::visitor::AsyncHtmlVisitor;
 /// This function performs minimal allocations:
 /// - Clones `tag_name` (typically 2-10 bytes)
 /// - Clones `parent_tag` if present (typically 2-10 bytes)
-/// - Clones the attributes BTreeMap (heap allocation if non-empty)
+/// - Clones the attributes `BTreeMap` (heap allocation if non-empty)
 ///
 /// For text nodes and simple elements without attributes, allocations are minimal.
 ///
@@ -106,7 +106,7 @@ pub fn build_node_context(
 ///
 /// # Parameters
 ///
-/// - `visitor`: Optional visitor (wrapped in Rc<RefCell<>>)
+/// - `visitor`: Optional visitor (wrapped in Rc<`RefCell`<>>)
 /// - `callback`: Closure that invokes the appropriate visitor method
 ///
 /// # Returns
@@ -122,7 +122,7 @@ pub fn build_node_context(
 ///
 /// - If the visitor panics during callback, the panic propagates normally
 /// - If the visitor returns `VisitResult::Error`, this is converted to `Error::Visitor`
-/// - RefCell borrow failures panic (should never happen with correct usage)
+/// - `RefCell` borrow failures panic (should never happen with correct usage)
 ///
 /// # Performance
 ///
@@ -145,6 +145,9 @@ pub fn build_node_context(
 /// ```
 #[allow(dead_code)]
 #[inline]
+/// # Errors
+///
+/// Returns an error if visitor dispatch fails.
 pub fn dispatch_visitor<F>(visitor: &Option<Rc<RefCell<dyn HtmlVisitor>>>, callback: F) -> Result<VisitorDispatch>
 where
     F: FnOnce(&mut dyn HtmlVisitor) -> VisitResult,
@@ -190,6 +193,7 @@ impl VisitorDispatch {
     /// Check if this dispatch result indicates continuation.
     #[allow(dead_code)]
     #[inline]
+    #[must_use]
     pub const fn is_continue(&self) -> bool {
         matches!(self, Self::Continue)
     }
@@ -197,6 +201,7 @@ impl VisitorDispatch {
     /// Check if this dispatch result contains custom output.
     #[allow(dead_code)]
     #[inline]
+    #[must_use]
     pub const fn is_custom(&self) -> bool {
         matches!(self, Self::Custom(_))
     }
@@ -204,6 +209,7 @@ impl VisitorDispatch {
     /// Check if this dispatch result indicates skipping.
     #[allow(dead_code)]
     #[inline]
+    #[must_use]
     pub const fn is_skip(&self) -> bool {
         matches!(self, Self::Skip)
     }
@@ -211,6 +217,7 @@ impl VisitorDispatch {
     /// Check if this dispatch result indicates HTML preservation.
     #[allow(dead_code)]
     #[inline]
+    #[must_use]
     pub const fn is_preserve_html(&self) -> bool {
         matches!(self, Self::PreserveHtml)
     }
@@ -218,6 +225,7 @@ impl VisitorDispatch {
     /// Extract custom output if present.
     #[allow(dead_code)]
     #[inline]
+    #[must_use]
     pub fn into_custom(self) -> Option<String> {
         match self {
             Self::Custom(output) => Some(output),
@@ -228,6 +236,7 @@ impl VisitorDispatch {
     /// Extract custom output reference if present.
     #[allow(dead_code)]
     #[inline]
+    #[must_use]
     pub fn as_custom(&self) -> Option<&str> {
         match self {
             Self::Custom(output) => Some(output),
@@ -236,7 +245,7 @@ impl VisitorDispatch {
     }
 }
 
-/// Type alias for an async visitor handle (Rc-wrapped RefCell for interior mutability).
+/// Type alias for an async visitor handle (Rc-wrapped `RefCell` for interior mutability).
 ///
 /// This allows async visitors to be passed around and shared while still being mutable.
 #[cfg(feature = "async-visitor")]
@@ -254,7 +263,7 @@ pub type AsyncVisitorHandle = std::rc::Rc<std::cell::RefCell<dyn AsyncHtmlVisito
 ///
 /// # Parameters
 ///
-/// - `visitor`: Optional async visitor (wrapped in Rc<RefCell<>>)
+/// - `visitor`: Optional async visitor (wrapped in Rc<`RefCell`<>>)
 /// - `callback`: Async closure that invokes the appropriate async visitor method
 ///
 /// # Returns
@@ -266,7 +275,7 @@ pub type AsyncVisitorHandle = std::rc::Rc<std::cell::RefCell<dyn AsyncHtmlVisito
 /// # Errors
 ///
 /// - If the visitor returns `VisitResult::Error`, this is converted to `Error::Visitor`
-/// - RefCell borrow failures panic (should never happen with correct usage)
+/// - `RefCell` borrow failures panic (should never happen with correct usage)
 ///
 /// # Performance
 ///
@@ -379,11 +388,11 @@ macro_rules! try_visitor {
     }};
 }
 
-/// Convenience macro for element_start visitor calls with early return.
+/// Convenience macro for `element_start` visitor calls with early return.
 ///
 /// This specialized macro handles the common pattern of calling `visit_element_start`
 /// at the beginning of element processing. Unlike `try_visitor!`, this macro
-/// understands that element_start callbacks typically want to abort processing
+/// understands that `element_start` callbacks typically want to abort processing
 /// entirely if they return anything other than Continue.
 ///
 /// # Syntax
@@ -409,7 +418,7 @@ macro_rules! try_visitor_element_start {
     }};
 }
 
-/// Convenience macro for element_end visitor calls with output inspection.
+/// Convenience macro for `element_end` visitor calls with output inspection.
 ///
 /// This specialized macro handles the common pattern of calling `visit_element_end`
 /// after generating default markdown output. The visitor receives the default
@@ -502,7 +511,7 @@ macro_rules! try_async_visitor {
     }};
 }
 
-/// Convenience macro for async element_start visitor calls with early return.
+/// Convenience macro for async `element_start` visitor calls with early return.
 ///
 /// This is the async version of `try_visitor_element_start!` macro.
 /// It handles the common pattern of calling `visit_element_start` at the beginning
@@ -532,7 +541,7 @@ macro_rules! try_async_visitor_element_start {
     }};
 }
 
-/// Convenience macro for async element_end visitor calls with output inspection.
+/// Convenience macro for async `element_end` visitor calls with output inspection.
 ///
 /// This is the async version of `try_visitor_element_end!` macro.
 /// It handles the common pattern of calling `visit_element_end` after generating
