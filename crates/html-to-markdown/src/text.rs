@@ -1,19 +1,19 @@
 //! Text processing utilities for Markdown conversion.
 
-use once_cell::sync::Lazy;
 use regex::Regex;
 use std::borrow::Cow;
+use std::sync::LazyLock;
 
 /// Regex for escaping miscellaneous characters
-static ESCAPE_MISC_RE: Lazy<Regex> = Lazy::new(|| Regex::new(r"([\\&<`\[\]>~#=+|\-])").unwrap());
+static ESCAPE_MISC_RE: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"([\\&<`\[\]>~#=+|\-])").unwrap());
 
 /// Regex for escaping numbered lists
-static ESCAPE_NUMBERED_LIST_RE: Lazy<Regex> = Lazy::new(|| Regex::new(r"([0-9])([.)])").unwrap());
+static ESCAPE_NUMBERED_LIST_RE: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"([0-9])([.)])").unwrap());
 
 /// Regex for escaping ASCII punctuation (CommonMark spec example 12)
 /// Matches: ! " # $ % & ' ( ) * + , - . / : ; < = > ? @ [ \ ] ^ _ ` { | } ~
-static ESCAPE_ASCII_RE: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r"([!\x22#$%&\x27()*+,\-./:;<=>?@\[\\\]^_`{|}~])").unwrap());
+static ESCAPE_ASCII_RE: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"([!\x22#$%&\x27()*+,\-./:;<=>?@\[\\\]^_`{|}~])").unwrap());
 
 /// Escape Markdown special characters in text.
 ///
