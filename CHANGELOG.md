@@ -5,6 +5,21 @@ All notable changes to html-to-markdown will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.20.1] - 2026-01-09
+
+### Code Quality
+
+- **Resolved all clippy warnings comprehensively**: Fixed 207+ clippy pedantic/nursery warnings across entire workspace
+  - Removed blanket `#![allow(clippy::pedantic)]` directives from all crate roots
+  - Fixed trivial copy pass-by-ref issues in converter functions
+  - Added missing documentation sections (# Errors) to public APIs
+  - Fixed doc markdown formatting (added backticks to technical terms)
+  - Applied selective allows only for architecturally justified cases
+  - FFI/binding layers use targeted allows due to interop constraints
+  - Core library maintains strict clippy compliance
+- **Updated workspace lint configuration**: Changed pedantic lints from deny to warn to allow module-level selective overrides
+- **Dependency modernization**: Migrated from `once_cell::sync::Lazy` to stdlib `std::sync::LazyLock` (stabilized in Rust 1.80+)
+
 ## [2.20.0] - 2026-01-05
 
 ### Dependencies
