@@ -20,9 +20,9 @@ static ESCAPE_ASCII_RE: Lazy<Regex> =
 /// # Arguments
 ///
 /// * `text` - Text to escape
-/// * `escape_misc` - Escape miscellaneous characters (\ & < ` [ > ~ # = + | -)
-/// * `escape_asterisks` - Escape asterisks (*)
-/// * `escape_underscores` - Escape underscores (_)
+/// * `escape_misc` - Escape miscellaneous characters (`\` `&` `<` `` ` `` `[` `>` `~` `#` `=` `+` `|` `-`)
+/// * `escape_asterisks` - Escape asterisks (`*`)
+/// * `escape_underscores` - Escape underscores (`_`)
 /// * `escape_ascii` - Escape all ASCII punctuation (for CommonMark spec compliance)
 ///
 /// # Returns
@@ -128,6 +128,7 @@ pub fn escape(
 /// However, suffix is "" if the trailing whitespace is only newlines (not spaces/tabs).
 /// This prevents trailing newlines from becoming trailing spaces in the output.
 /// The trimmed text has all leading/trailing whitespace removed.
+#[must_use]
 pub fn chomp(text: &str) -> (&str, &str, &str) {
     if text.is_empty() {
         return ("", "", "");
@@ -169,6 +170,7 @@ pub fn chomp(text: &str) -> (&str, &str, &str) {
 /// # Returns
 ///
 /// Normalized text with collapsed spaces/tabs but preserved newlines
+#[must_use]
 pub fn normalize_whitespace(text: &str) -> String {
     let mut result = String::with_capacity(text.len());
     let mut prev_was_space = false;
@@ -205,6 +207,7 @@ pub fn normalize_whitespace(text: &str) -> String {
 /// # Returns
 ///
 /// `Cow::Borrowed` if text is already normalized, or `Cow::Owned` with normalized text
+#[must_use]
 pub fn normalize_whitespace_cow(text: &str) -> Cow<'_, str> {
     let mut prev_was_space = false;
 
@@ -239,6 +242,7 @@ pub fn normalize_whitespace_cow(text: &str) -> Cow<'_, str> {
 /// # Returns
 ///
 /// Text with entities decoded
+#[must_use]
 pub fn decode_html_entities(text: &str) -> String {
     html_escape::decode_html_entities(text).into_owned()
 }
@@ -263,6 +267,7 @@ pub fn decode_html_entities(text: &str) -> String {
 /// # Returns
 ///
 /// `Cow::Borrowed` if no entities found, or `Cow::Owned` with entities decoded
+#[must_use]
 pub fn decode_html_entities_cow(text: &str) -> Cow<'_, str> {
     if !text.contains('&') {
         return Cow::Borrowed(text);
@@ -297,6 +302,7 @@ const fn is_unicode_space(ch: char) -> bool {
 }
 
 /// Underline text with a character.
+#[must_use]
 pub fn underline(text: &str, pad_char: char) -> String {
     let text = text.trim_end();
     if text.is_empty() {
@@ -306,6 +312,7 @@ pub fn underline(text: &str, pad_char: char) -> String {
 }
 
 /// Indent text with a string prefix.
+#[must_use]
 pub fn indent(text: &str, level: usize, indent_str: &str) -> String {
     if text.is_empty() {
         return String::new();
@@ -317,7 +324,7 @@ pub fn indent(text: &str, level: usize, indent_str: &str) -> String {
             if line.is_empty() {
                 String::new()
             } else {
-                format!("{}{}", prefix, line)
+                format!("{prefix}{line}")
             }
         })
         .collect::<Vec<_>>()
