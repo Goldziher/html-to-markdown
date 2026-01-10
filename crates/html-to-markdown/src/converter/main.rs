@@ -570,6 +570,15 @@ fn extract_head_metadata(
                             let content_str = content.as_utf8_str();
                             metadata.insert(name_str.to_string(), content_str.to_string());
                         }
+                        // Also check for property attribute (Open Graph, etc.)
+                        if let (Some(property), Some(content)) = (
+                            child_tag.attributes().get("property").flatten(),
+                            child_tag.attributes().get("content").flatten(),
+                        ) {
+                            let property_str = property.as_utf8_str();
+                            let content_str = content.as_utf8_str();
+                            metadata.insert(property_str.to_string(), content_str.to_string());
+                        }
                     }
                     // Look for title tag
                     if child_tag.name().as_utf8_str().eq_ignore_ascii_case("title") {
@@ -586,6 +595,16 @@ fn extract_head_metadata(
                             metadata.insert("title".to_string(), title_content);
                         }
                     }
+                }
+            }
+        } else {
+            // If this is not a head tag, recursively search children for head tag
+            let children = tag.children();
+            for child_handle in children.top().iter() {
+                let child_metadata = extract_head_metadata(child_handle, parser, _options);
+                if !child_metadata.is_empty() {
+                    metadata.extend(child_metadata);
+                    break; // Only process first head tag found
                 }
             }
         }
