@@ -40,7 +40,7 @@
 </div>
 
 
-<img width="3384" height="573" alt="Linkedin- Banner" src="https://github.com/user-attachments/assets/1bd52e37-c45d-4f5c-8408-ee12997f6cfd" />
+<img width="3384" height="573" alt="Linkedin- Banner" src="https://github.com/user-attachments/assets/478a83da-237b-446b-b3a8-e564c13e00a8" />
 
 
 <div align="center" style="margin-top: 20px;">
