@@ -311,6 +311,8 @@ pub struct JsConversionOptions {
     pub strip_tags: Option<Vec<String>>,
     /// List of HTML tags to preserve as-is in the output
     pub preserve_tags: Option<Vec<String>>,
+    /// Skip image conversion (keep as HTML)
+    pub skip_images: Option<bool>,
 }
 
 impl From<JsConversionOptions> for ConversionOptionsUpdate {
@@ -347,6 +349,7 @@ impl From<JsConversionOptions> for ConversionOptionsUpdate {
             debug: val.debug,
             strip_tags: val.strip_tags,
             preserve_tags: val.preserve_tags,
+            skip_images: val.skip_images,
         }
     }
 }
@@ -1099,6 +1102,7 @@ impl AsyncHtmlVisitor for JsVisitorBridge {
 
 /// * `html` - The HTML string to convert
 /// * `options` - Optional conversion options
+/// * `visitor` - Optional visitor object (when visitor feature is enabled)
 ///
 /// # Example
 ///
@@ -1110,8 +1114,20 @@ impl AsyncHtmlVisitor for JsVisitorBridge {
 /// console.log(markdown); // # Hello World
 /// ```
 #[napi]
-pub fn convert(html: String, options: Option<JsConversionOptions>) -> Result<String> {
+pub fn convert(html: String, options: Option<JsConversionOptions>, visitor: Option<Object>) -> Result<String> {
     let rust_options = options.map(Into::into);
+
+    #[cfg(feature = "visitor")]
+    if visitor.is_some() {
+        // Visitor support for synchronous conversion would require a separate implementation
+        return Err(Error::new(
+            Status::GenericFailure,
+            "Use convertWithVisitor for async visitor support",
+        ));
+    }
+    #[cfg(not(feature = "visitor"))]
+    let _ = visitor;
+
     guard_panic(|| profiling::maybe_profile(|| html_to_markdown_rs::convert(&html, rust_options.clone())))
         .map_err(to_js_error)
 }
@@ -1168,6 +1184,8 @@ pub fn convert(html: String, options: Option<JsConversionOptions>) -> Result<Str
 /// const markdown = await convertWithVisitor(html, undefined, visitor);
 /// console.log(markdown); // [Click me](https://example.com)
 /// ```
+///
+/// @deprecated Use the optional visitor parameter in convert() instead
 #[cfg(feature = "async-visitor")]
 #[napi(js_name = "convertWithVisitor")]
 pub fn convert_with_visitor(
@@ -1374,8 +1392,9 @@ fn convert_inline_images_impl(
     let rust_options = options.map(Into::into);
     let rust_config = image_config.map_or_else(|| RustInlineImageConfig::new(DEFAULT_INLINE_IMAGE_LIMIT), Into::into);
 
-    let extraction = guard_panic(|| html_to_markdown_rs::convert_with_inline_images(html, rust_options, rust_config))
-        .map_err(to_js_error)?;
+    let extraction =
+        guard_panic(|| html_to_markdown_rs::convert_with_inline_images(html, rust_options, rust_config, None))
+            .map_err(to_js_error)?;
 
     Ok(build_js_extraction(extraction))
 }
@@ -1388,8 +1407,9 @@ fn convert_inline_images_with_handle_impl(
     let rust_options = Some((**options).clone());
     let rust_config = image_config.map_or_else(|| RustInlineImageConfig::new(DEFAULT_INLINE_IMAGE_LIMIT), Into::into);
 
-    let extraction = guard_panic(|| html_to_markdown_rs::convert_with_inline_images(html, rust_options, rust_config))
-        .map_err(to_js_error)?;
+    let extraction =
+        guard_panic(|| html_to_markdown_rs::convert_with_inline_images(html, rust_options, rust_config, None))
+            .map_err(to_js_error)?;
 
     Ok(build_js_extraction(extraction))
 }
@@ -1402,8 +1422,9 @@ fn convert_inline_images_json_impl(
     let rust_options = parse_options_json(options_json)?;
     let rust_config = parse_inline_image_config_json(image_config_json)?;
 
-    let extraction = guard_panic(|| html_to_markdown_rs::convert_with_inline_images(html, rust_options, rust_config))
-        .map_err(to_js_error)?;
+    let extraction =
+        guard_panic(|| html_to_markdown_rs::convert_with_inline_images(html, rust_options, rust_config, None))
+            .map_err(to_js_error)?;
 
     Ok(build_js_extraction(extraction))
 }
@@ -1415,12 +1436,24 @@ fn convert_inline_images_json_impl(
 /// * `html` - The HTML string to convert
 /// * `options` - Optional conversion options
 /// * `image_config` - Configuration for inline image extraction
+/// * `visitor` - Optional visitor object (when visitor feature is enabled)
 #[napi]
 pub fn convert_with_inline_images(
     html: String,
     options: Option<JsConversionOptions>,
     image_config: Option<JsInlineImageConfig>,
+    visitor: Option<Object>,
 ) -> Result<JsHtmlExtraction> {
+    #[cfg(feature = "visitor")]
+    if visitor.is_some() {
+        return Err(Error::new(
+            Status::GenericFailure,
+            "Use convertWithVisitor for async visitor support",
+        ));
+    }
+    #[cfg(not(feature = "visitor"))]
+    let _ = visitor;
+
     convert_inline_images_impl(&html, options, image_config)
 }
 
@@ -1482,6 +1515,7 @@ pub fn convert_inline_images_buffer_json(
 /// * `html` - The HTML string to convert
 /// * `options` - Optional conversion options
 /// * `metadata_config` - Optional metadata extraction configuration
+/// * `visitor` - Optional visitor object (when visitor feature is enabled)
 ///
 /// # Example
 ///
@@ -1500,12 +1534,23 @@ pub fn convert_with_metadata(
     html: String,
     options: Option<JsConversionOptions>,
     metadata_config: Option<JsMetadataConfig>,
+    visitor: Option<Object>,
 ) -> Result<JsMetadataExtraction> {
+    #[cfg(feature = "visitor")]
+    if visitor.is_some() {
+        return Err(Error::new(
+            Status::GenericFailure,
+            "Use convertWithVisitor for async visitor support",
+        ));
+    }
+    #[cfg(not(feature = "visitor"))]
+    let _ = visitor;
+
     let rust_options = options.map(Into::into);
     let rust_config = metadata_config.map(Into::into).unwrap_or_default();
 
     let (markdown, metadata) =
-        guard_panic(|| html_to_markdown_rs::convert_with_metadata(&html, rust_options, rust_config))
+        guard_panic(|| html_to_markdown_rs::convert_with_metadata(&html, rust_options, rust_config, None))
             .map_err(to_js_error)?;
 
     Ok(JsMetadataExtraction {
@@ -1524,7 +1569,7 @@ pub fn convert_with_metadata_handle(
 ) -> Result<JsMetadataExtraction> {
     let rust_config = metadata_config.map(Into::into).unwrap_or_default();
     let (markdown, metadata) =
-        guard_panic(|| html_to_markdown_rs::convert_with_metadata(&html, Some((**options).clone()), rust_config))
+        guard_panic(|| html_to_markdown_rs::convert_with_metadata(&html, Some((**options).clone()), rust_config, None))
             .map_err(to_js_error)?;
 
     Ok(JsMetadataExtraction {
@@ -1556,7 +1601,7 @@ pub fn convert_with_metadata_buffer(
     let rust_config = metadata_config.map(Into::into).unwrap_or_default();
 
     let (markdown, metadata) =
-        guard_panic(|| html_to_markdown_rs::convert_with_metadata(html, rust_options, rust_config))
+        guard_panic(|| html_to_markdown_rs::convert_with_metadata(html, rust_options, rust_config, None))
             .map_err(to_js_error)?;
 
     Ok(JsMetadataExtraction {
@@ -1577,7 +1622,7 @@ pub fn convert_with_metadata_buffer_with_options_handle(
     let rust_config = metadata_config.map(Into::into).unwrap_or_default();
 
     let (markdown, metadata) =
-        guard_panic(|| html_to_markdown_rs::convert_with_metadata(html, Some((**options).clone()), rust_config))
+        guard_panic(|| html_to_markdown_rs::convert_with_metadata(html, Some((**options).clone()), rust_config, None))
             .map_err(to_js_error)?;
 
     Ok(JsMetadataExtraction {
@@ -1596,7 +1641,8 @@ pub fn convert_with_metadata_buffer_with_metadata_handle(
     let html = buffer_to_str(&html)?;
     let rust_config = (**metadata_config).clone();
     let (markdown, metadata) =
-        guard_panic(|| html_to_markdown_rs::convert_with_metadata(html, None, rust_config)).map_err(to_js_error)?;
+        guard_panic(|| html_to_markdown_rs::convert_with_metadata(html, None, rust_config, None))
+            .map_err(to_js_error)?;
 
     Ok(JsMetadataExtraction {
         markdown,
@@ -1615,7 +1661,7 @@ pub fn convert_with_metadata_buffer_with_options_and_metadata_handle(
     let html = buffer_to_str(&html)?;
     let rust_config = (**metadata_config).clone();
     let (markdown, metadata) =
-        guard_panic(|| html_to_markdown_rs::convert_with_metadata(html, Some((**options).clone()), rust_config))
+        guard_panic(|| html_to_markdown_rs::convert_with_metadata(html, Some((**options).clone()), rust_config, None))
             .map_err(to_js_error)?;
 
     Ok(JsMetadataExtraction {
@@ -1646,7 +1692,7 @@ fn convert_metadata_json_impl(
     let rust_config = parse_metadata_config_json(metadata_config_json)?;
 
     let (markdown, metadata) =
-        guard_panic(|| html_to_markdown_rs::convert_with_metadata(html, rust_options, rust_config))
+        guard_panic(|| html_to_markdown_rs::convert_with_metadata(html, rust_options, rust_config, None))
             .map_err(to_js_error)?;
 
     Ok(JsMetadataExtraction {
@@ -1708,6 +1754,7 @@ mod tests {
             debug: None,
             strip_tags: None,
             preserve_tags: None,
+            skip_images: None,
         };
 
         let rust_opts: RustConversionOptions = opts.into();

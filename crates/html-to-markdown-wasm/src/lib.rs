@@ -272,6 +272,8 @@ pub struct WasmConversionOptions {
     pub code_block_style: Option<WasmCodeBlockStyle>,
     /// Elements where images should remain as markdown
     pub keep_inline_images_in: Option<Vec<String>>,
+    /// Skip images during conversion
+    pub skip_images: Option<bool>,
     /// Preprocessing options
     pub preprocessing: Option<WasmPreprocessingOptions>,
     /// Source encoding (informational)
@@ -313,6 +315,7 @@ impl From<WasmConversionOptions> for ConversionOptionsUpdate {
             newline_style: val.newline_style.map(Into::into),
             code_block_style: val.code_block_style.map(Into::into),
             keep_inline_images_in: val.keep_inline_images_in,
+            skip_images: val.skip_images,
             preprocessing: val.preprocessing.map(Into::into),
             encoding: val.encoding,
             debug: val.debug,
@@ -389,7 +392,14 @@ impl WasmConversionOptionsHandle {
 pub fn convert(html: String, options: JsValue) -> Result<String, JsValue> {
     let rust_options = parse_wasm_options(options)?;
 
-    guard_panic(|| html_to_markdown_rs::convert(&html, rust_options)).map_err(to_js_error)
+    #[cfg(feature = "visitor")]
+    {
+        guard_panic(|| html_to_markdown_rs::convert(&html, rust_options)).map_err(to_js_error)
+    }
+    #[cfg(not(feature = "visitor"))]
+    {
+        guard_panic(|| html_to_markdown_rs::convert(&html, rust_options)).map_err(to_js_error)
+    }
 }
 
 #[cfg(feature = "js-bindings")]
@@ -397,7 +407,15 @@ pub fn convert(html: String, options: JsValue) -> Result<String, JsValue> {
 pub fn convert_bytes(html: js_sys::Uint8Array, options: JsValue) -> Result<String, JsValue> {
     let html = bytes_to_string(html)?;
     let rust_options = parse_wasm_options(options)?;
-    guard_panic(|| html_to_markdown_rs::convert(&html, rust_options)).map_err(to_js_error)
+
+    #[cfg(feature = "visitor")]
+    {
+        guard_panic(|| html_to_markdown_rs::convert(&html, rust_options)).map_err(to_js_error)
+    }
+    #[cfg(not(feature = "visitor"))]
+    {
+        guard_panic(|| html_to_markdown_rs::convert(&html, rust_options)).map_err(to_js_error)
+    }
 }
 
 #[cfg(feature = "js-bindings")]
@@ -409,7 +427,14 @@ pub fn create_conversion_options_handle(options: JsValue) -> Result<WasmConversi
 #[cfg(feature = "js-bindings")]
 #[wasm_bindgen(js_name = convertWithOptionsHandle)]
 pub fn convert_with_options_handle(html: String, handle: &WasmConversionOptionsHandle) -> Result<String, JsValue> {
-    guard_panic(|| html_to_markdown_rs::convert(&html, Some(handle.inner.clone()))).map_err(to_js_error)
+    #[cfg(feature = "visitor")]
+    {
+        guard_panic(|| html_to_markdown_rs::convert(&html, Some(handle.inner.clone()))).map_err(to_js_error)
+    }
+    #[cfg(not(feature = "visitor"))]
+    {
+        guard_panic(|| html_to_markdown_rs::convert(&html, Some(handle.inner.clone()))).map_err(to_js_error)
+    }
 }
 
 #[cfg(feature = "js-bindings")]
@@ -419,7 +444,15 @@ pub fn convert_bytes_with_options_handle(
     handle: &WasmConversionOptionsHandle,
 ) -> Result<String, JsValue> {
     let html = bytes_to_string(html)?;
-    guard_panic(|| html_to_markdown_rs::convert(&html, Some(handle.inner.clone()))).map_err(to_js_error)
+
+    #[cfg(feature = "visitor")]
+    {
+        guard_panic(|| html_to_markdown_rs::convert(&html, Some(handle.inner.clone()))).map_err(to_js_error)
+    }
+    #[cfg(not(feature = "visitor"))]
+    {
+        guard_panic(|| html_to_markdown_rs::convert(&html, Some(handle.inner.clone()))).map_err(to_js_error)
+    }
 }
 
 /// Convert HTML to Markdown while collecting inline images
@@ -455,8 +488,17 @@ fn convert_with_inline_images_internal(
         .map(Into::into)
         .unwrap_or_else(|| html_to_markdown_rs::InlineImageConfig::new(DEFAULT_INLINE_IMAGE_LIMIT));
 
-    let extraction = guard_panic(|| html_to_markdown_rs::convert_with_inline_images(html, rust_options, rust_config))
-        .map_err(to_js_error)?;
+    let extraction = {
+        #[cfg(feature = "visitor")]
+        {
+            guard_panic(|| html_to_markdown_rs::convert_with_inline_images(html, rust_options, rust_config, None))
+        }
+        #[cfg(not(feature = "visitor"))]
+        {
+            guard_panic(|| html_to_markdown_rs::convert_with_inline_images(html, rust_options, rust_config, None))
+        }
+    }
+    .map_err(to_js_error)?;
 
     Ok(extraction.into())
 }
@@ -633,9 +675,17 @@ pub fn convert_with_metadata(
     let rust_options = parse_wasm_options(options)?;
     let rust_metadata_config = metadata_config.map(Into::into).unwrap_or_default();
 
-    let (markdown, metadata) =
-        guard_panic(|| html_to_markdown_rs::convert_with_metadata(&html, rust_options, rust_metadata_config))
-            .map_err(to_js_error)?;
+    let (markdown, metadata) = {
+        #[cfg(feature = "visitor")]
+        {
+            guard_panic(|| html_to_markdown_rs::convert_with_metadata(&html, rust_options, rust_metadata_config, None))
+        }
+        #[cfg(not(feature = "visitor"))]
+        {
+            guard_panic(|| html_to_markdown_rs::convert_with_metadata(&html, rust_options, rust_metadata_config))
+        }
+    }
+    .map_err(to_js_error)?;
 
     let metadata_js = serde_wasm_bindgen::to_value(&metadata).map_err(|e| JsValue::from_str(&e.to_string()))?;
 
@@ -708,7 +758,17 @@ mod wasmtime_runtime {
 
     fn convert_internal(html_ptr: u32, html_len: u32, options: Option<RustConversionOptions>) -> u32 {
         let html = read_utf8(html_ptr, html_len);
-        match guard_panic(|| html_to_markdown_rs::convert(&html, options)) {
+        let result = {
+            #[cfg(feature = "visitor")]
+            {
+                guard_panic(|| html_to_markdown_rs::convert(&html, options))
+            }
+            #[cfg(not(feature = "visitor"))]
+            {
+                guard_panic(|| html_to_markdown_rs::convert(&html, options))
+            }
+        };
+        match result {
             Ok(markdown) => write_result(markdown.as_bytes()),
             Err(err) => write_result(format!("ERROR:{}", err).as_bytes()),
         }
@@ -808,6 +868,7 @@ mod tests {
             newline_style: None,
             code_block_style: None,
             keep_inline_images_in: None,
+            skip_images: None,
             preprocessing: None,
             encoding: None,
             debug: None,

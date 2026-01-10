@@ -1,6 +1,6 @@
 {
 	"name": "@kreuzberg/html-to-markdown-wasm",
-	"version": "2.20.1",
+	"version": "2.21.0",
 	"description": "High-performance HTML to Markdown converter - WebAssembly bindings",
 	"main": "dist/html_to_markdown_wasm.js",
 	"types": "dist/html_to_markdown_wasm.d.ts",
@@ -61,8 +61,5 @@
 	"publishConfig": {
 		"registry": "https://registry.npmjs.org/",
 		"access": "public"
-	},
-	"dependencies": {
-		"up": "^1.0.2"
 	}
 }

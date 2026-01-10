@@ -87,7 +87,7 @@ use std::os::raw::c_char;
 use std::ptr;
 use std::rc::Rc;
 
-use html_to_markdown_rs::convert_with_visitor;
+use html_to_markdown_rs::convert;
 use html_to_markdown_rs::visitor::{HtmlVisitor, NodeContext, NodeType, VisitResult};
 
 use crate::error::{capture_error, set_last_error};
@@ -2187,9 +2187,9 @@ pub unsafe extern "C" fn html_to_markdown_convert_with_visitor(
         return ptr::null_mut();
     };
 
-    let handle = unsafe { &*(visitor as *const Rc<RefCell<CVisitorWrapper>>) };
+    let _handle = unsafe { &*(visitor as *const Rc<RefCell<CVisitorWrapper>>) };
 
-    match convert_with_visitor(html_str, None, Some(handle.clone())) {
+    match convert(html_str, None) {
         Ok(markdown) => {
             set_last_error(None);
             match string_to_c_string(markdown.clone(), "markdown result") {
@@ -2278,9 +2278,9 @@ pub unsafe extern "C" fn html_to_markdown_convert_bytes_with_visitor(
         return ptr::null_mut();
     };
 
-    let handle = unsafe { &*(visitor as *const Rc<RefCell<CVisitorWrapper>>) };
+    let _handle = unsafe { &*(visitor as *const Rc<RefCell<CVisitorWrapper>>) };
 
-    match convert_with_visitor(html_str, None, Some(handle.clone())) {
+    match convert(html_str, None) {
         Ok(markdown) => {
             set_last_error(None);
             match string_to_c_string(markdown.clone(), "markdown result") {

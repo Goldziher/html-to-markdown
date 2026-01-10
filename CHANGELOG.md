@@ -5,6 +5,32 @@ All notable changes to html-to-markdown will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.21.0] - 2026-01-10
+
+### Added
+
+- **`skip_images` configuration option** - New option to skip all `<img>` elements during conversion, enabling greater control over image handling in the output.
+- **Optional visitor parameter across all convert functions** - Unified API for applying visitor patterns to all conversion modes:
+  - `convert(html, options, visitor)` - Basic conversion with optional visitor
+  - `convert_with_inline_images(html, options, image_cfg, visitor)` - Inline image extraction with optional visitor
+  - `convert_with_metadata(html, options, metadata_cfg, visitor)` - Metadata extraction with optional visitor
+- **Visitor pattern integration with advanced features** - Support for using visitor pattern simultaneously with inline images and metadata extraction, providing complete control over the conversion process.
+- **Comprehensive test coverage** - Added tests validating `skip_images` functionality and visitor pattern integration across all conversion functions and language bindings.
+
+### Changed
+
+- **Visitor parameter unified across all APIs** - The visitor parameter is now optional on all conversion functions, enabling consistent API design across basic, inline-images, and metadata extraction paths.
+- **Improved feature-gated architecture** - Refined the feature gate handling for better flexibility when combining visitor patterns with other optional features.
+
+### Deprecated
+
+- **`convert_with_visitor()` function** - Deprecated in favor of passing visitor as an optional parameter to `convert()`. The dedicated function will be removed in a future major release. Use `convert(html, options, visitor)` instead.
+
+### Fixed
+
+- **Unused dependency warnings in npm packages** - Resolved unused dependency warnings reported during builds of JavaScript/TypeScript packages.
+- **Feature gate handling for visitor combinations** - Fixed issues with feature gate combinations when using visitor patterns alongside inline images and metadata extraction.
+
 ## [2.20.1] - 2026-01-09
 
 ### Code Quality

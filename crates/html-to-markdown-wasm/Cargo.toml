@@ -33,13 +33,14 @@ registry = "https://registry.npmjs.org/"
 crate-type = ["cdylib", "rlib"]
 
 [features]
-default = ["js-bindings", "metadata"]
+default = ["js-bindings", "metadata", "visitor"]
 js-bindings = ["wasm-bindgen", "serde-wasm-bindgen", "console_error_panic_hook", "js-sys"]
 metadata = ["html-to-markdown-rs/metadata"]
+visitor = ["html-to-markdown-rs/visitor"]
 wasmtime-testing = []
 
 [dependencies]
-html-to-markdown-rs = { workspace = true, features = ["inline-images", "metadata"] }
+html-to-markdown-rs = { workspace = true, features = ["inline-images", "metadata", "visitor"] }
 wasm-bindgen = { version = "0.2", optional = true }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"

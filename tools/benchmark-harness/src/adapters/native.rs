@@ -42,13 +42,14 @@ impl NativeAdapter {
                 convert(html, options).map_err(|err| Error::Benchmark(format!("Conversion failed: {err}")))?;
             }
             BenchmarkScenario::InlineImagesDefault | BenchmarkScenario::InlineImagesWithOptions => {
-                let _ = convert_with_inline_images(html, options, InlineImageConfig::new(DEFAULT_INLINE_IMAGE_LIMIT))
-                    .map_err(|err| Error::Benchmark(format!("Inline image conversion failed: {err}")))?;
+                let _ =
+                    convert_with_inline_images(html, options, InlineImageConfig::new(DEFAULT_INLINE_IMAGE_LIMIT), None)
+                        .map_err(|err| Error::Benchmark(format!("Inline image conversion failed: {err}")))?;
             }
             BenchmarkScenario::MetadataDefault
             | BenchmarkScenario::MetadataWithOptions
             | BenchmarkScenario::MetadataRaw => {
-                let _ = convert_with_metadata(html, options, MetadataConfig::default())
+                let _ = convert_with_metadata(html, options, MetadataConfig::default(), None)
                     .map_err(|err| Error::Benchmark(format!("Metadata conversion failed: {err}")))?;
             }
         }

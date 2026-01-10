@@ -626,3 +626,296 @@ fn test_no_double_visit_in_headings() {
         visitor.borrow().text_visits
     );
 }
+
+// ============================================================================
+// Integration tests: Visitor + Feature combinations
+// ============================================================================
+
+/// Test that visitor callbacks work correctly when skip_images option is enabled
+#[test]
+fn test_visitor_with_skip_images() {
+    #[derive(Debug, Default)]
+    struct SkipImageVisitor {
+        image_visits: usize,
+    }
+
+    impl HtmlVisitor for SkipImageVisitor {
+        fn visit_image(&mut self, _ctx: &NodeContext, _src: &str, _alt: &str, _title: Option<&str>) -> VisitResult {
+            self.image_visits += 1;
+            VisitResult::Continue
+        }
+    }
+
+    let html = r#"
+        <p>Some text</p>
+        <img src="/image1.png" alt="Image 1">
+        <img src="/image2.png" alt="Image 2">
+        <p>More text</p>
+    "#;
+
+    // Test with skip_images enabled and visitor
+    let options = {
+        let mut opts = ConversionOptions::default();
+        opts.skip_images = true;
+        opts
+    };
+
+    let visitor = Rc::new(RefCell::new(SkipImageVisitor::default()));
+    let result = convert_with_visitor(html, Some(options), Some(visitor.clone()))
+        .expect("conversion with skip_images and visitor should succeed");
+
+    // When skip_images is true, images should not appear in output
+    assert!(
+        !result.contains("!["),
+        "skip_images should prevent image markdown in output, got: {}",
+        result
+    );
+    assert!(
+        !result.contains("image1.png"),
+        "skip_images should prevent image src in output, got: {}",
+        result
+    );
+
+    // When skip_images is true, the conversion still happens correctly
+    // Images are filtered at the conversion level based on the option
+    // This verifies that skip_images option and visitor parameters work together
+    // without conflicts - both are optional and can be combined
+    assert!(
+        result.contains("Some text") && result.contains("More text"),
+        "Other content should still be present in output, got: {}",
+        result
+    );
+}
+
+/// Test that the main convert() function accepts optional visitor parameter
+#[test]
+fn test_convert_accepts_visitor_parameter() {
+    #[derive(Debug, Default)]
+    struct CountingVisitor {
+        text_count: usize,
+        link_count: usize,
+    }
+
+    impl HtmlVisitor for CountingVisitor {
+        fn visit_text(&mut self, _ctx: &NodeContext, _text: &str) -> VisitResult {
+            self.text_count += 1;
+            VisitResult::Continue
+        }
+
+        fn visit_link(&mut self, _ctx: &NodeContext, _href: &str, _text: &str, _title: Option<&str>) -> VisitResult {
+            self.link_count += 1;
+            VisitResult::Continue
+        }
+    }
+
+    let html = r#"<p>Visit <a href="https://example.com">our site</a> for more info.</p>"#;
+    let visitor = Rc::new(RefCell::new(CountingVisitor::default()));
+
+    // Test using the main convert() function with visitor parameter
+    use html_to_markdown_rs::convert_with_visitor;
+    let _result = convert_with_visitor(html, None, Some(visitor.clone())).expect("convert with visitor should work");
+
+    let borrowed = visitor.borrow();
+    assert!(
+        borrowed.text_count >= 2,
+        "Should visit text nodes, got {} visits",
+        borrowed.text_count
+    );
+    assert_eq!(
+        borrowed.link_count, 1,
+        "Should visit exactly 1 link, got {}",
+        borrowed.link_count
+    );
+}
+
+/// Test visitor + inline_images feature combination
+#[cfg(feature = "inline-images")]
+#[test]
+fn test_convert_with_inline_images_accepts_visitor() {
+    use html_to_markdown_rs::convert_with_inline_images;
+
+    #[derive(Debug, Default)]
+    struct ImageTrackingVisitor {
+        images_seen: usize,
+    }
+
+    impl HtmlVisitor for ImageTrackingVisitor {
+        fn visit_image(&mut self, _ctx: &NodeContext, src: &str, _alt: &str, _title: Option<&str>) -> VisitResult {
+            if !src.starts_with("data:") {
+                self.images_seen += 1;
+            }
+            VisitResult::Continue
+        }
+    }
+
+    let html = r#"
+        <h1>Test Page</h1>
+        <img src="/image.png" alt="Test Image">
+        <p>Some content</p>
+    "#;
+
+    let visitor = Rc::new(RefCell::new(ImageTrackingVisitor::default()));
+
+    // Test convert_with_inline_images with visitor
+    let image_cfg =
+        html_to_markdown_rs::InlineImageConfig::from_update(html_to_markdown_rs::InlineImageConfigUpdate::default());
+    let result = convert_with_inline_images(html, None, image_cfg, Some(visitor.clone()))
+        .expect("convert_with_inline_images with visitor should work");
+
+    // Verify that both visitor and inline image collection worked
+    assert_eq!(
+        visitor.borrow().images_seen,
+        1,
+        "Visitor should count 1 non-data-uri image"
+    );
+
+    // Markdown should still be generated
+    assert!(!result.markdown.is_empty(), "Should produce markdown output");
+}
+
+/// Test visitor + metadata feature combination
+#[cfg(feature = "metadata")]
+#[test]
+fn test_convert_with_metadata_accepts_visitor() {
+    use html_to_markdown_rs::convert_with_metadata;
+
+    #[derive(Debug, Default)]
+    struct MetadataAwareVisitor {
+        heading_count: usize,
+        link_count: usize,
+    }
+
+    impl HtmlVisitor for MetadataAwareVisitor {
+        fn visit_heading(&mut self, _ctx: &NodeContext, _level: u32, _text: &str, _id: Option<&str>) -> VisitResult {
+            self.heading_count += 1;
+            VisitResult::Continue
+        }
+
+        fn visit_link(&mut self, _ctx: &NodeContext, _href: &str, _text: &str, _title: Option<&str>) -> VisitResult {
+            self.link_count += 1;
+            VisitResult::Continue
+        }
+    }
+
+    let html = r#"
+        <html>
+        <head><title>Test Page</title></head>
+        <body>
+            <h1>Main Title</h1>
+            <p>Visit <a href="https://example.com">our site</a>.</p>
+            <h2>Section</h2>
+            <p>More <a href="/page">links</a> here.</p>
+        </body>
+        </html>
+    "#;
+
+    let visitor = Rc::new(RefCell::new(MetadataAwareVisitor::default()));
+
+    // Test convert_with_metadata with visitor
+    let metadata_cfg = html_to_markdown_rs::MetadataConfig::default();
+    let (markdown, metadata) = convert_with_metadata(html, None, metadata_cfg, Some(visitor.clone()))
+        .expect("convert_with_metadata with visitor should work");
+
+    // Verify visitor was invoked
+    let borrowed = visitor.borrow();
+    assert!(
+        borrowed.heading_count >= 2,
+        "Visitor should see at least 2 headings, got {}",
+        borrowed.heading_count
+    );
+    assert_eq!(
+        borrowed.link_count, 2,
+        "Visitor should see 2 links, got {}",
+        borrowed.link_count
+    );
+
+    // Verify metadata was also collected
+    assert_eq!(
+        metadata.document.title,
+        Some("Test Page".to_string()),
+        "Metadata should extract title"
+    );
+    assert!(
+        metadata.headers.len() >= 2,
+        "Metadata should extract at least 2 headers, got {}",
+        metadata.headers.len()
+    );
+    assert_eq!(
+        metadata.links.len(),
+        2,
+        "Metadata should extract 2 links, got {}",
+        metadata.links.len()
+    );
+
+    // Verify markdown was produced
+    assert!(!markdown.is_empty(), "Should produce markdown output");
+}
+
+/// Test visitor + both `inline_images` and `metadata` features together
+#[cfg(all(feature = "inline-images", feature = "metadata"))]
+#[test]
+fn test_convert_with_all_features_and_visitor() {
+    use html_to_markdown_rs::convert_with_inline_images;
+
+    #[derive(Debug, Default)]
+    struct ComprehensiveVisitor {
+        headings: usize,
+        images: usize,
+        links: usize,
+    }
+
+    impl HtmlVisitor for ComprehensiveVisitor {
+        fn visit_heading(&mut self, _ctx: &NodeContext, _level: u32, _text: &str, _id: Option<&str>) -> VisitResult {
+            self.headings += 1;
+            VisitResult::Continue
+        }
+
+        fn visit_image(&mut self, _ctx: &NodeContext, _src: &str, _alt: &str, _title: Option<&str>) -> VisitResult {
+            self.images += 1;
+            VisitResult::Continue
+        }
+
+        fn visit_link(&mut self, _ctx: &NodeContext, _href: &str, _text: &str, _title: Option<&str>) -> VisitResult {
+            self.links += 1;
+            VisitResult::Continue
+        }
+    }
+
+    let html = r#"
+        <html>
+        <body>
+            <h1>Gallery</h1>
+            <img src="/gallery/image1.jpg" alt="Pic 1">
+            <p>See <a href="/more">more</a> content.</p>
+            <h2>Details</h2>
+            <img src="/gallery/image2.jpg" alt="Pic 2">
+            <p>Check <a href="/details">this link</a>.</p>
+        </body>
+        </html>
+    "#;
+
+    let visitor = Rc::new(RefCell::new(ComprehensiveVisitor::default()));
+
+    // Test with inline images feature (metadata feature doesn't affect inline-images function)
+    let image_cfg =
+        html_to_markdown_rs::InlineImageConfig::from_update(html_to_markdown_rs::InlineImageConfigUpdate::default());
+    let result = convert_with_inline_images(html, None, image_cfg, Some(visitor.clone()))
+        .expect("convert_with_inline_images with visitor should work");
+
+    // Verify all visitor callbacks were invoked
+    let borrowed = visitor.borrow();
+    assert!(
+        borrowed.headings >= 2,
+        "Visitor should see at least 2 headings, got {}",
+        borrowed.headings
+    );
+    assert_eq!(
+        borrowed.images, 2,
+        "Visitor should see 2 images, got {}",
+        borrowed.images
+    );
+    assert_eq!(borrowed.links, 2, "Visitor should see 2 links, got {}", borrowed.links);
+
+    // Verify markdown was produced
+    assert!(!result.markdown.is_empty(), "Should produce markdown output");
+}

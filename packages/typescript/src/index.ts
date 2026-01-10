@@ -97,7 +97,7 @@ export async function convertStreamWithInlineImages(
  * links, images, and structured data (JSON-LD, Microdata, RDFa).
  *
  * @param html HTML content to convert
- * @param options Optional conversion configuration
+ * @param options Optional conversion configuration. Supports `skipImages` to skip image conversion
  * @param metadataConfig Optional metadata extraction configuration
  * @returns Object with converted markdown and extracted metadata
  *
@@ -118,7 +118,7 @@ export async function convertStreamWithInlineImages(
  *   </html>
  * `;
  *
- * const { markdown, metadata } = await convertWithMetadata(html, undefined, {
+ * const { markdown, metadata } = convertWithMetadata(html, undefined, {
  *   extractHeaders: true,
  *   extractLinks: true,
  *   extractImages: true,

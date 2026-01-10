@@ -1,6 +1,6 @@
 {
 	"name": "@kreuzberg/html-to-markdown-node",
-	"version": "2.20.1",
+	"version": "2.21.0",
 	"description": "High-performance HTML to Markdown converter - Node.js native bindings",
 	"main": "index.js",
 	"types": "index.d.ts",
@@ -64,10 +64,7 @@
 		"vitest": "^4.0.16"
 	},
 	"dependencies": {
-		"@emnapi/runtime": "1.7.1",
-		"@octokit/core": "7.0.6",
-		"typanion": "3.14.0",
-		"up": "^1.0.2"
+		"@emnapi/runtime": "1.7.1"
 	},
 	"optionalDependencies": {
 		"@kreuzberg/html-to-markdown-node-darwin-x64": "2.19.0-rc.1",

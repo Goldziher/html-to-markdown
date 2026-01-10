@@ -294,6 +294,11 @@ pub struct ConversionOptions {
 
     /// HTML tags to preserve as-is in output (keep original HTML, useful for complex tables)
     pub preserve_tags: Vec<String>,
+
+    /// Skip all images during conversion.
+    /// When enabled, all `<img>` elements are completely omitted from output.
+    /// Useful for text-only extraction or filtering out visual content.
+    pub skip_images: bool,
 }
 
 /// Partial update for `ConversionOptions`.
@@ -397,6 +402,9 @@ pub struct ConversionOptionsUpdate {
 
     /// Optional HTML tags to preserve as-is override in output
     pub preserve_tags: Option<Vec<String>>,
+
+    /// Optional skip images override
+    pub skip_images: Option<bool>,
 }
 
 impl Default for ConversionOptions {
@@ -433,6 +441,7 @@ impl Default for ConversionOptions {
             debug: false,
             strip_tags: Vec::new(),
             preserve_tags: Vec::new(),
+            skip_images: false,
         }
     }
 }
@@ -539,6 +548,9 @@ impl ConversionOptions {
         }
         if let Some(preserve_tags) = update.preserve_tags {
             self.preserve_tags = preserve_tags;
+        }
+        if let Some(skip_images) = update.skip_images {
+            self.skip_images = skip_images;
         }
     }
 

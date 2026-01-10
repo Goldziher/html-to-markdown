@@ -376,6 +376,8 @@ struct ConversionOptions {
     preserve_tags: Vec<String>,
     #[pyo3(get, set)]
     encoding: String,
+    #[pyo3(get, set)]
+    skip_images: bool,
 }
 
 #[pymethods]
@@ -413,7 +415,8 @@ impl ConversionOptions {
         debug=false,
         strip_tags=Vec::new(),
         preserve_tags=Vec::new(),
-        encoding="utf-8".to_string()
+        encoding="utf-8".to_string(),
+        skip_images=false
     ))]
     fn new(
         heading_style: String,
@@ -447,6 +450,7 @@ impl ConversionOptions {
         strip_tags: Vec<String>,
         preserve_tags: Vec<String>,
         encoding: String,
+        skip_images: bool,
     ) -> Self {
         Self {
             heading_style,
@@ -481,6 +485,7 @@ impl ConversionOptions {
             strip_tags,
             preserve_tags,
             encoding,
+            skip_images,
         }
     }
 }
@@ -520,6 +525,7 @@ impl ConversionOptions {
             debug: self.debug,
             strip_tags: self.strip_tags.clone(),
             preserve_tags: self.preserve_tags.clone(),
+            skip_images: self.skip_images,
         }
     }
 }
@@ -555,6 +561,7 @@ impl ConversionOptionsHandle {
 /// Args:
 ///     html: HTML string to convert
 ///     options: Optional conversion configuration
+///     visitor: Optional visitor for custom conversion logic (requires visitor feature)
 ///
 /// Returns:
 ///     Markdown string
@@ -572,10 +579,63 @@ impl ConversionOptionsHandle {
 ///     # With options
 ///     options = ConversionOptions(heading_style="atx")
 ///     markdown = convert(html, options)
+///
+///     # With visitor (visitor feature required)
+///     class CustomVisitor:
+///         def visit_text(self, ctx, text):
+///            return {"type": "continue"}
+///     markdown = convert(html, visitor=CustomVisitor())
 ///     ```
 #[pyfunction]
-#[pyo3(signature = (html, options=None))]
-fn convert(py: Python<'_>, html: &str, options: Option<ConversionOptions>) -> PyResult<String> {
+#[cfg(feature = "visitor")]
+#[pyo3(signature = (html, options=None, visitor=None))]
+fn convert(
+    py: Python<'_>,
+    html: &str,
+    options: Option<ConversionOptions>,
+    visitor: Option<Py<PyAny>>,
+) -> PyResult<String> {
+    let html = html.to_owned();
+    let rust_options = options.map(|opts| opts.to_rust());
+
+    let Some(visitor_py) = visitor else {
+        return py
+            .detach(move || run_with_guard_and_profile(|| html_to_markdown_rs::convert(&html, rust_options.clone())))
+            .map_err(to_py_err);
+    };
+
+    let bridge = visitor_support::PyVisitorBridge::new(visitor_py);
+    let visitor_handle = std::sync::Arc::new(std::sync::Mutex::new(bridge));
+
+    py.detach(move || {
+        run_with_guard_and_profile(|| {
+            let rc_visitor: Rc<RefCell<dyn HtmlVisitor>> = {
+                Python::attach(|py| {
+                    let guard = visitor_handle.lock().unwrap();
+                    let bridge_copy = visitor_support::PyVisitorBridge::new(guard.visitor.clone_ref(py));
+                    Rc::new(RefCell::new(bridge_copy)) as Rc<RefCell<dyn HtmlVisitor>>
+                })
+            };
+            html_to_markdown_rs::convert_with_visitor(&html, rust_options.clone(), Some(rc_visitor))
+        })
+    })
+    .map_err(to_py_err)
+}
+
+#[pyfunction]
+#[cfg(not(feature = "visitor"))]
+#[pyo3(signature = (html, options=None, visitor=None))]
+fn convert(
+    py: Python<'_>,
+    html: &str,
+    options: Option<ConversionOptions>,
+    visitor: Option<Py<PyAny>>,
+) -> PyResult<String> {
+    if visitor.is_some() {
+        return Err(PyErr::new::<pyo3::exceptions::PyNotImplementedError, _>(
+            "Visitor support requires the 'visitor' feature to be enabled",
+        ));
+    }
     let html = html.to_owned();
     let rust_options = options.map(|opts| opts.to_rust());
     py.detach(move || run_with_guard_and_profile(|| html_to_markdown_rs::convert(&html, rust_options.clone())))
@@ -662,6 +722,7 @@ fn warning_to_py<'py>(py: Python<'py>, warning: html_to_markdown_rs::InlineImage
 ///     html: HTML string to convert
 ///     options: Optional conversion configuration
 ///     image_config: Optional image extraction configuration
+///     visitor: Optional visitor for custom conversion logic (requires visitor feature)
 ///
 /// Returns:
 ///     Tuple of (markdown: str, images: List[dict], warnings: List[dict])
@@ -681,15 +742,81 @@ fn warning_to_py<'py>(py: Python<'py>, warning: html_to_markdown_rs::InlineImage
 ///     for img in images:
 ///         print(f"Format: {img['format']}, Size: {len(img['data'])} bytes")
 ///     ```
-#[cfg(feature = "inline-images")]
+#[cfg(all(feature = "inline-images", feature = "visitor"))]
 #[pyfunction]
-#[pyo3(signature = (html, options=None, image_config=None))]
+#[pyo3(signature = (html, options=None, image_config=None, visitor=None))]
 fn convert_with_inline_images<'py>(
     py: Python<'py>,
     html: &str,
     options: Option<ConversionOptions>,
     image_config: Option<InlineImageConfig>,
+    visitor: Option<Py<PyAny>>,
 ) -> PyInlineExtraction {
+    let html = html.to_owned();
+    let rust_options = options.map(|opts| opts.to_rust());
+    let cfg = image_config.unwrap_or_else(|| InlineImageConfig::new(DEFAULT_INLINE_IMAGE_LIMIT, None, true, false));
+    let rust_cfg = cfg.to_rust();
+
+    let extraction = if let Some(visitor_py) = visitor {
+        let bridge = visitor_support::PyVisitorBridge::new(visitor_py);
+        let visitor_handle = std::sync::Arc::new(std::sync::Mutex::new(bridge));
+        py.detach(move || {
+            run_with_guard_and_profile(|| {
+                let rc_visitor: Rc<RefCell<dyn HtmlVisitor>> = {
+                    Python::attach(|py| {
+                        let guard = visitor_handle.lock().unwrap();
+                        let bridge_copy = visitor_support::PyVisitorBridge::new(guard.visitor.clone_ref(py));
+                        Rc::new(RefCell::new(bridge_copy)) as Rc<RefCell<dyn HtmlVisitor>>
+                    })
+                };
+                html_to_markdown_rs::convert_with_inline_images(
+                    &html,
+                    rust_options.clone(),
+                    rust_cfg.clone(),
+                    Some(rc_visitor),
+                )
+            })
+        })
+        .map_err(to_py_err)?
+    } else {
+        py.detach(move || {
+            run_with_guard_and_profile(|| {
+                html_to_markdown_rs::convert_with_inline_images(&html, rust_options.clone(), rust_cfg.clone(), None)
+            })
+        })
+        .map_err(to_py_err)?
+    };
+
+    let images = extraction
+        .inline_images
+        .into_iter()
+        .map(|image| inline_image_to_py(py, image))
+        .collect::<PyResult<Vec<_>>>()?;
+
+    let warnings = extraction
+        .warnings
+        .into_iter()
+        .map(|warning| warning_to_py(py, warning))
+        .collect::<PyResult<Vec<_>>>()?;
+
+    Ok((extraction.markdown, images, warnings))
+}
+
+#[cfg(all(feature = "inline-images", not(feature = "visitor")))]
+#[pyfunction]
+#[pyo3(signature = (html, options=None, image_config=None, visitor=None))]
+fn convert_with_inline_images<'py>(
+    py: Python<'py>,
+    html: &str,
+    options: Option<ConversionOptions>,
+    image_config: Option<InlineImageConfig>,
+    visitor: Option<Py<PyAny>>,
+) -> PyInlineExtraction {
+    if visitor.is_some() {
+        return Err(PyErr::new::<pyo3::exceptions::PyNotImplementedError, _>(
+            "Visitor support requires the 'visitor' feature to be enabled",
+        ));
+    }
     let html = html.to_owned();
     let rust_options = options.map(|opts| opts.to_rust());
     let cfg = image_config.unwrap_or_else(|| InlineImageConfig::new(DEFAULT_INLINE_IMAGE_LIMIT, None, true, false));
@@ -697,7 +824,7 @@ fn convert_with_inline_images<'py>(
     let extraction = py
         .detach(move || {
             run_with_guard_and_profile(|| {
-                html_to_markdown_rs::convert_with_inline_images(&html, rust_options.clone(), rust_cfg.clone())
+                html_to_markdown_rs::convert_with_inline_images(&html, rust_options.clone(), rust_cfg.clone(), None)
             })
         })
         .map_err(to_py_err)?;
@@ -732,7 +859,7 @@ fn convert_with_inline_images_json<'py>(
     let extraction = py
         .detach(move || {
             run_with_guard_and_profile(|| {
-                html_to_markdown_rs::convert_with_inline_images(&html, rust_options.clone(), rust_config.clone())
+                html_to_markdown_rs::convert_with_inline_images(&html, rust_options.clone(), rust_config.clone(), None)
             })
         })
         .map_err(to_py_err)?;
@@ -769,7 +896,7 @@ fn convert_with_inline_images_handle<'py>(
     let extraction = py
         .detach(move || {
             run_with_guard_and_profile(|| {
-                html_to_markdown_rs::convert_with_inline_images(&html, rust_options.clone(), rust_cfg.clone())
+                html_to_markdown_rs::convert_with_inline_images(&html, rust_options.clone(), rust_cfg.clone(), None)
             })
         })
         .map_err(to_py_err)?;
@@ -1077,15 +1204,72 @@ fn extended_metadata_to_py<'py>(py: Python<'py>, metadata: RustExtendedMetadata)
 ///     - convert_with_inline_images: Extract inline images alongside conversion
 ///     - ConversionOptions: Conversion configuration class
 ///     - MetadataConfig: Metadata extraction configuration class
-#[cfg(feature = "metadata")]
+#[cfg(all(feature = "metadata", feature = "visitor"))]
 #[pyfunction]
-#[pyo3(signature = (html, options=None, metadata_config=None))]
+#[pyo3(signature = (html, options=None, metadata_config=None, visitor=None))]
 fn convert_with_metadata<'py>(
     py: Python<'py>,
     html: &str,
     options: Option<ConversionOptions>,
     metadata_config: Option<MetadataConfig>,
+    visitor: Option<Py<PyAny>>,
 ) -> PyResult<(String, Py<PyAny>)> {
+    let html = html.to_owned();
+    let rust_options = options.map(|opts| opts.to_rust());
+    let cfg = metadata_config
+        .unwrap_or_else(|| MetadataConfig::new(true, true, true, true, true, DEFAULT_MAX_STRUCTURED_DATA_SIZE));
+    let rust_cfg = cfg.to_rust();
+
+    let result = if let Some(visitor_py) = visitor {
+        let bridge = visitor_support::PyVisitorBridge::new(visitor_py);
+        let visitor_handle = std::sync::Arc::new(std::sync::Mutex::new(bridge));
+        py.detach(move || {
+            run_with_guard_and_profile(|| {
+                let rc_visitor: Rc<RefCell<dyn HtmlVisitor>> = {
+                    Python::attach(|py| {
+                        let guard = visitor_handle.lock().unwrap();
+                        let bridge_copy = visitor_support::PyVisitorBridge::new(guard.visitor.clone_ref(py));
+                        Rc::new(RefCell::new(bridge_copy)) as Rc<RefCell<dyn HtmlVisitor>>
+                    })
+                };
+                html_to_markdown_rs::convert_with_metadata(
+                    &html,
+                    rust_options.clone(),
+                    rust_cfg.clone(),
+                    Some(rc_visitor),
+                )
+            })
+        })
+        .map_err(to_py_err)?
+    } else {
+        py.detach(move || {
+            run_with_guard_and_profile(|| {
+                html_to_markdown_rs::convert_with_metadata(&html, rust_options.clone(), rust_cfg.clone(), None)
+            })
+        })
+        .map_err(to_py_err)?
+    };
+
+    let (markdown, metadata) = result;
+    let metadata_dict = extended_metadata_to_py(py, metadata)?;
+    Ok((markdown, metadata_dict))
+}
+
+#[cfg(all(feature = "metadata", not(feature = "visitor")))]
+#[pyfunction]
+#[pyo3(signature = (html, options=None, metadata_config=None, visitor=None))]
+fn convert_with_metadata<'py>(
+    py: Python<'py>,
+    html: &str,
+    options: Option<ConversionOptions>,
+    metadata_config: Option<MetadataConfig>,
+    visitor: Option<Py<PyAny>>,
+) -> PyResult<(String, Py<PyAny>)> {
+    if visitor.is_some() {
+        return Err(PyErr::new::<pyo3::exceptions::PyNotImplementedError, _>(
+            "Visitor support requires the 'visitor' feature to be enabled",
+        ));
+    }
     let html = html.to_owned();
     let rust_options = options.map(|opts| opts.to_rust());
     let cfg = metadata_config
@@ -1094,7 +1278,7 @@ fn convert_with_metadata<'py>(
     let result = py
         .detach(move || {
             run_with_guard_and_profile(|| {
-                html_to_markdown_rs::convert_with_metadata(&html, rust_options.clone(), rust_cfg.clone())
+                html_to_markdown_rs::convert_with_metadata(&html, rust_options.clone(), rust_cfg.clone(), None)
             })
         })
         .map_err(to_py_err)?;
@@ -1120,7 +1304,7 @@ fn convert_with_metadata_json(
     let result = py
         .detach(move || {
             run_with_guard_and_profile(|| {
-                html_to_markdown_rs::convert_with_metadata(&html, rust_options.clone(), rust_cfg.clone())
+                html_to_markdown_rs::convert_with_metadata(&html, rust_options.clone(), rust_cfg.clone(), None)
             })
         })
         .map_err(to_py_err)?;
@@ -1148,7 +1332,7 @@ fn convert_with_metadata_handle<'py>(
     let result = py
         .detach(move || {
             run_with_guard_and_profile(|| {
-                html_to_markdown_rs::convert_with_metadata(&html, rust_options.clone(), rust_cfg.clone())
+                html_to_markdown_rs::convert_with_metadata(&html, rust_options.clone(), rust_cfg.clone(), None)
             })
         })
         .map_err(to_py_err)?;
@@ -1265,6 +1449,7 @@ mod visitor_support {
                 return Ok(VisitResult::Continue);
             }
 
+            #[cfg(feature = "async-visitor")]
             if result.hasattr("__await__")? {
                 let locals = PYTHON_TASK_LOCALS.get().ok_or_else(|| {
                     pyo3::exceptions::PyRuntimeError::new_err("Async visitor event loop not initialized")
@@ -2542,6 +2727,24 @@ mod visitor_support {
 }
 
 /// Convert HTML to Markdown with a custom visitor.
+///
+/// Deprecated: Use convert() with the visitor parameter instead. All convert functions now accept optional visitors.
+///
+/// Example:
+///     ```ignore
+///     from html_to_markdown import convert
+///     import warnings
+///
+///     class MyVisitor:
+///         def visit_text(self, ctx, text):
+///             return {"type": "continue"}
+///
+///     # Old way (deprecated):
+///     # markdown = convert_with_visitor(html, visitor=MyVisitor())
+///
+///     # New way (recommended):
+///     markdown = convert(html, visitor=MyVisitor())
+///     ```
 #[cfg(feature = "visitor")]
 #[pyfunction]
 #[pyo3(signature = (html, options=None, visitor=None))]
@@ -2551,6 +2754,9 @@ fn convert_with_visitor(
     options: Option<ConversionOptions>,
     visitor: Option<Py<PyAny>>,
 ) -> PyResult<String> {
+    // NOTE: convert_with_visitor() is deprecated in favor of convert() with visitor parameter.
+    // All convert functions now accept optional visitors. Example: convert(html, visitor=my_visitor)
+
     let html = html.to_owned();
     let rust_options = options.map(|opts| opts.to_rust());
 
@@ -2703,7 +2909,7 @@ mod tests {
         Python::initialize();
         Python::attach(|py| -> PyResult<()> {
             let html = "<h1>Hello</h1>";
-            let result = convert(py, html, None)?;
+            let result = convert(py, html, None, None)?;
             assert!(result.contains("Hello"));
             Ok(())
         })
@@ -2744,6 +2950,7 @@ mod tests {
             Vec::new(),
             Vec::new(),
             "utf-8".to_string(),
+            false,
         );
         let rust_opts = opts.to_rust();
         assert_eq!(rust_opts.list_indent_width, 4);

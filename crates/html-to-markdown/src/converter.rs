@@ -1885,24 +1885,6 @@ pub fn convert_html(html: &str, options: &ConversionOptions) -> Result<String> {
     convert_html_impl(html, options, None, None, None)
 }
 
-#[cfg(feature = "inline-images")]
-pub(crate) fn convert_html_with_inline_collector(
-    html: &str,
-    options: &ConversionOptions,
-    collector: InlineCollectorHandle,
-) -> Result<String> {
-    convert_html_impl(html, options, Some(collector), None, None)
-}
-
-#[cfg(feature = "metadata")]
-pub(crate) fn convert_html_with_metadata(
-    html: &str,
-    options: &ConversionOptions,
-    metadata_collector: crate::metadata::MetadataCollectorHandle,
-) -> Result<String> {
-    convert_html_impl(html, options, None, Some(metadata_collector), None)
-}
-
 #[cfg(feature = "visitor")]
 pub(crate) fn convert_html_with_visitor(
     html: &str,
@@ -1917,7 +1899,7 @@ pub(crate) fn convert_html_with_visitor(
     allow(unused_variables)
 )]
 #[allow(clippy::too_many_lines)]
-fn convert_html_impl(
+pub(crate) fn convert_html_impl(
     html: &str,
     options: &ConversionOptions,
     inline_collector: Option<InlineCollectorHandle>,

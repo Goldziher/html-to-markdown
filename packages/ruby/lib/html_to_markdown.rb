@@ -21,16 +21,16 @@ module HtmlToMarkdown
 
   module_function
 
-  def convert(html, options = nil)
-    native_convert(html.to_s, options)
+  def convert(html, options = nil, visitor = nil)
+    native_convert(html.to_s, options, visitor)
   end
 
   def convert_with_options(html, options_handle)
     native_convert_with_options(html.to_s, options_handle)
   end
 
-  def convert_with_inline_images(html, options = nil, image_config = nil)
-    native_convert_with_inline_images(html.to_s, options, image_config)
+  def convert_with_inline_images(html, options = nil, image_config = nil, visitor = nil)
+    native_convert_with_inline_images(html.to_s, options, image_config, visitor)
   end
 
   def convert_with_inline_images_handle(html, options_handle, image_config = nil)
@@ -163,8 +163,8 @@ module HtmlToMarkdown
   # @see #convert Simple conversion without metadata
   # @see #convert_with_inline_images Extract inline images during conversion
   # @see ConversionOptions Detailed conversion configuration
-  def convert_with_metadata(html, options = nil, metadata_config = nil)
-    native_convert_with_metadata(html.to_s, options, metadata_config)
+  def convert_with_metadata(html, options = nil, metadata_config = nil, visitor = nil)
+    native_convert_with_metadata(html.to_s, options, metadata_config, visitor)
   end
 
   def convert_with_metadata_handle(html, options_handle, metadata_config = nil)

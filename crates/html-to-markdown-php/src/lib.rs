@@ -37,13 +37,21 @@ fn to_php_exception(err: ConversionError) -> PhpException {
 
 #[php_function]
 #[php(name = "html_to_markdown_convert")]
-pub fn convert_html(html: String, options: Option<&ZendHashTable>) -> PhpResult<String> {
+pub fn convert_html(html: String, options: Option<&ZendHashTable>, _visitor: Option<&Zval>) -> PhpResult<String> {
     let rust_options = match options {
         Some(table) => Some(parse_conversion_options(table)?),
         None => None,
     };
 
-    guard_panic(|| profiling::maybe_profile(|| html_to_markdown_rs::convert(&html, rust_options.clone())))
+    // NOTE: PHP visitor support is not yet fully implemented with ext-php-rs.
+    // The visitor parameter is accepted for API compatibility but is currently ignored.
+    convert_with_options(&html, rust_options)
+}
+
+#[inline]
+fn convert_with_options(html: &str, options: Option<ConversionOptions>) -> PhpResult<String> {
+    // NOTE: The PHP binding always enables the visitor feature, so convert always takes 3 args
+    guard_panic(|| profiling::maybe_profile(|| html_to_markdown_rs::convert(html, options.clone())))
         .map_err(to_php_exception)
 }
 
@@ -68,6 +76,7 @@ pub fn convert_html_with_inline_images(
     html: String,
     options: Option<&ZendHashTable>,
     image_config: Option<&ZendHashTable>,
+    _visitor: Option<&Zval>,
 ) -> PhpResult<ZBox<ZendHashTable>> {
     let rust_options = match options {
         Some(table) => Some(parse_conversion_options(table)?),
@@ -79,10 +88,22 @@ pub fn convert_html_with_inline_images(
         None => InlineImageConfig::new(DEFAULT_INLINE_IMAGE_LIMIT),
     };
 
-    let extraction = guard_panic(|| html_to_markdown_rs::convert_with_inline_images(&html, rust_options, config))
-        .map_err(to_php_exception)?;
+    // NOTE: PHP visitor support is not yet fully implemented with ext-php-rs.
+    // The visitor parameter is accepted for API compatibility but is currently ignored.
+    let extraction = convert_with_inline_images_impl(&html, rust_options, config)?;
 
     build_html_extraction(extraction)
+}
+
+#[inline]
+fn convert_with_inline_images_impl(
+    html: &str,
+    options: Option<ConversionOptions>,
+    config: InlineImageConfig,
+) -> PhpResult<HtmlExtraction> {
+    // NOTE: The PHP binding always enables the visitor feature
+    guard_panic(|| html_to_markdown_rs::convert_with_inline_images(html, options, config, None))
+        .map_err(to_php_exception)
 }
 
 #[cfg(feature = "metadata")]
@@ -92,6 +113,7 @@ pub fn convert_html_with_metadata(
     html: String,
     options: Option<&ZendHashTable>,
     metadata_config: Option<&ZendHashTable>,
+    _visitor: Option<&Zval>,
 ) -> PhpResult<ZBox<ZendHashTable>> {
     let rust_options = match options {
         Some(table) => Some(parse_conversion_options(table)?),
@@ -103,23 +125,44 @@ pub fn convert_html_with_metadata(
         None => MetadataConfig::default(),
     };
 
-    let result = guard_panic(|| html_to_markdown_rs::convert_with_metadata(&html, rust_options, config))
-        .map_err(to_php_exception)?;
+    // NOTE: PHP visitor support is not yet fully implemented with ext-php-rs.
+    // The visitor parameter is accepted for API compatibility but is currently ignored.
+    let (markdown, metadata) = convert_with_metadata_impl(&html, rust_options, config)?;
 
-    build_metadata_extraction(result.0, result.1)
+    build_metadata_extraction(markdown, metadata)
+}
+
+#[cfg(feature = "metadata")]
+#[inline]
+fn convert_with_metadata_impl(
+    html: &str,
+    options: Option<ConversionOptions>,
+    config: MetadataConfig,
+) -> PhpResult<(String, ExtendedMetadata)> {
+    // NOTE: The PHP binding always enables the visitor feature
+    guard_panic(|| html_to_markdown_rs::convert_with_metadata(html, options, config, None)).map_err(to_php_exception)
 }
 
 #[cfg(feature = "visitor")]
 #[php_function]
 #[php(name = "html_to_markdown_convert_with_visitor")]
-pub fn convert_html_with_visitor(html: String, options: Option<&ZendHashTable>, _visitor: &Zval) -> PhpResult<String> {
+pub fn convert_html_with_visitor(
+    html: String,
+    options: Option<&ZendHashTable>,
+    _visitor: Option<&Zval>,
+) -> PhpResult<String> {
     let rust_options = match options {
         Some(table) => Some(parse_conversion_options(table)?),
         None => None,
     };
 
+    // NOTE: PHP visitor support is not yet fully implemented with ext-php-rs.
+    // The visitor parameter is accepted for API compatibility but is currently ignored.
     // TODO: Implement proper PHP visitor callback mechanism with ext-php-rs
-    guard_panic(|| html_to_markdown_rs::convert(&html, rust_options)).map_err(to_php_exception)
+    guard_panic(|| {
+        profiling::maybe_profile(|| html_to_markdown_rs::convert_with_visitor(&html, rust_options.clone(), None))
+    })
+    .map_err(to_php_exception)
 }
 
 #[php_module]
@@ -242,6 +285,9 @@ fn parse_conversion_options(table: &ZendHashTable) -> PhpResult<ConversionOption
             }
             "debug" => {
                 update.debug = Some(read_bool(value, &key_str)?);
+            }
+            "skip_images" => {
+                update.skip_images = Some(read_bool(value, &key_str)?);
             }
             "strip_tags" => {
                 update.strip_tags = Some(read_string_list(value, &key_str)?);

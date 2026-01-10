@@ -109,7 +109,7 @@
 //! use html_to_markdown_rs::{convert_with_metadata, MetadataConfig};
 //! use html_to_markdown_rs::metadata::LinkType;
 //!
-//! let (_markdown, metadata) = convert_with_metadata(html, None, MetadataConfig::default())?;
+//! let (_markdown, metadata) = convert_with_metadata(html, None, MetadataConfig::default(), None)?;
 //!
 //! for link in &metadata.links {
 //!     match link.link_type {
@@ -131,7 +131,7 @@
 //! ```ignore
 //! use html_to_markdown_rs::{convert_with_metadata, MetadataConfig};
 //!
-//! let (_markdown, metadata) = convert_with_metadata(html, None, MetadataConfig::default())?;
+//! let (_markdown, metadata) = convert_with_metadata(html, None, MetadataConfig::default(), None)?;
 //! let json = serde_json::to_string_pretty(&metadata)?;
 //! println!("{}", json);
 //! # Ok::<(), Box<dyn std::error::Error>>(())

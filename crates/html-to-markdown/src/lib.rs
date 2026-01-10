@@ -350,7 +350,6 @@ pub fn convert(html: &str, options: Option<ConversionOptions>) -> Result<String>
     }
 }
 
-#[cfg(feature = "inline-images")]
 /// Convert HTML to Markdown while collecting inline image assets (requires the `inline-images` feature).
 ///
 /// Extracts inline image data URIs and inline `<svg>` elements alongside Markdown conversion.
@@ -360,13 +359,17 @@ pub fn convert(html: &str, options: Option<ConversionOptions>) -> Result<String>
 /// * `html` - The HTML string to convert
 /// * `options` - Optional conversion options (defaults to `ConversionOptions::default()`)
 /// * `image_cfg` - Configuration controlling inline image extraction
+/// * `visitor` - Optional visitor for customizing conversion behavior. Only used if `visitor` feature is enabled.
 /// # Errors
 ///
 /// Returns an error if HTML parsing fails or if the input contains invalid UTF-8.
+#[cfg(feature = "inline-images")]
 pub fn convert_with_inline_images(
     html: &str,
     options: Option<ConversionOptions>,
     image_cfg: InlineImageConfig,
+    #[cfg(feature = "visitor")] visitor: Option<visitor::VisitorHandle>,
+    #[cfg(not(feature = "visitor"))] _visitor: Option<()>,
 ) -> Result<HtmlExtraction> {
     use std::cell::RefCell;
     use std::rc::Rc;
@@ -378,8 +381,16 @@ pub fn convert_with_inline_images(
 
     let collector = Rc::new(RefCell::new(inline_images::InlineImageCollector::new(image_cfg)?));
 
-    let markdown =
-        converter::convert_html_with_inline_collector(normalized_html.as_ref(), &options, Rc::clone(&collector))?;
+    #[cfg(feature = "visitor")]
+    let markdown = converter::convert_html_impl(
+        normalized_html.as_ref(),
+        &options,
+        Some(Rc::clone(&collector)),
+        None,
+        visitor,
+    )?;
+    #[cfg(not(feature = "visitor"))]
+    let markdown = converter::convert_html_impl(normalized_html.as_ref(), &options, Some(Rc::clone(&collector)), None)?;
 
     let markdown = if options.wrap {
         wrapper::wrap_markdown(&markdown, &options)
@@ -399,7 +410,6 @@ pub fn convert_with_inline_images(
     })
 }
 
-#[cfg(feature = "metadata")]
 /// Convert HTML to Markdown with comprehensive metadata extraction (requires the `metadata` feature).
 ///
 /// Performs HTML-to-Markdown conversion while simultaneously extracting structured metadata in a
@@ -413,6 +423,7 @@ pub fn convert_with_inline_images(
 ///   Controls heading style, list indentation, escape behavior, wrapping, and other output formatting.
 /// * `metadata_cfg` - Configuration for metadata extraction granularity. Use `MetadataConfig::default()`
 ///   to extract all metadata types, or customize with selective extraction flags.
+/// * `visitor` - Optional visitor for customizing conversion behavior. Only used if `visitor` feature is enabled.
 ///
 /// # Returns
 ///
@@ -455,7 +466,7 @@ pub fn convert_with_inline_images(
 ///   </html>
 /// "#;
 ///
-/// let (markdown, metadata) = convert_with_metadata(html, None, MetadataConfig::default())?;
+/// let (markdown, metadata) = convert_with_metadata(html, None, MetadataConfig::default(), None)?;
 ///
 /// assert_eq!(metadata.document.title, Some("My Article".to_string()));
 /// assert_eq!(metadata.document.language, Some("en".to_string()));
@@ -481,7 +492,7 @@ pub fn convert_with_inline_images(
 ///     max_structured_data_size: 0,
 /// };
 ///
-/// let (markdown, metadata) = convert_with_metadata(html, None, config)?;
+/// let (markdown, metadata) = convert_with_metadata(html, None, config, None)?;
 /// assert!(metadata.headers.len() > 0);
 /// assert!(metadata.links.is_empty());  // Not extracted
 /// # Ok::<(), html_to_markdown_rs::ConversionError>(())
@@ -503,7 +514,7 @@ pub fn convert_with_inline_images(
 ///
 /// let metadata_cfg = MetadataConfig::default();
 ///
-/// let (markdown, metadata) = convert_with_metadata(html, Some(options), metadata_cfg)?;
+/// let (markdown, metadata) = convert_with_metadata(html, Some(options), metadata_cfg, None)?;
 /// // Markdown will use ATX-style headings (# H1, ## H2, etc.)
 /// // Wrapped at 80 characters
 /// // All metadata extracted
@@ -517,10 +528,13 @@ pub fn convert_with_inline_images(
 /// - [`MetadataConfig`] - Configuration for metadata extraction
 /// - [`ExtendedMetadata`] - Metadata structure documentation
 /// - [`metadata`] module - Detailed type documentation for metadata components
+#[cfg(feature = "metadata")]
 pub fn convert_with_metadata(
     html: &str,
     options: Option<ConversionOptions>,
     metadata_cfg: MetadataConfig,
+    #[cfg(feature = "visitor")] visitor: Option<visitor::VisitorHandle>,
+    #[cfg(not(feature = "visitor"))] _visitor: Option<()>,
 ) -> Result<(String, ExtendedMetadata)> {
     use std::cell::RefCell;
     use std::rc::Rc;
@@ -528,7 +542,16 @@ pub fn convert_with_metadata(
     validate_input(html)?;
     let options = options.unwrap_or_default();
     if !metadata_cfg.any_enabled() {
-        let markdown = convert(html, Some(options))?;
+        let normalized_html = normalize_line_endings(html);
+        #[cfg(feature = "visitor")]
+        let markdown = converter::convert_html_impl(normalized_html.as_ref(), &options, None, None, visitor)?;
+        #[cfg(not(feature = "visitor"))]
+        let markdown = converter::convert_html_impl(normalized_html.as_ref(), &options, None, None, None)?;
+        let markdown = if options.wrap {
+            wrapper::wrap_markdown(&markdown, &options)
+        } else {
+            markdown
+        };
         return Ok((markdown, ExtendedMetadata::default()));
     }
 
@@ -536,8 +559,22 @@ pub fn convert_with_metadata(
 
     let metadata_collector = Rc::new(RefCell::new(metadata::MetadataCollector::new(metadata_cfg)));
 
-    let markdown =
-        converter::convert_html_with_metadata(normalized_html.as_ref(), &options, Rc::clone(&metadata_collector))?;
+    #[cfg(feature = "visitor")]
+    let markdown = converter::convert_html_impl(
+        normalized_html.as_ref(),
+        &options,
+        None,
+        Some(Rc::clone(&metadata_collector)),
+        visitor,
+    )?;
+    #[cfg(not(feature = "visitor"))]
+    let markdown = converter::convert_html_impl(
+        normalized_html.as_ref(),
+        &options,
+        None,
+        Some(Rc::clone(&metadata_collector)),
+        None,
+    )?;
 
     let markdown = if options.wrap {
         wrapper::wrap_markdown(&markdown, &options)
@@ -718,7 +755,7 @@ mod tests {
             max_structured_data_size: metadata::DEFAULT_MAX_STRUCTURED_DATA_SIZE,
         };
 
-        let (markdown, metadata) = convert_with_metadata(html, None, config).expect("conversion should succeed");
+        let (markdown, metadata) = convert_with_metadata(html, None, config, None).expect("conversion should succeed");
 
         assert!(!markdown.is_empty());
         assert!(markdown.contains("Main Title"));
@@ -750,7 +787,7 @@ mod tests {
         let html = "<html lang=\"en\"><head><title>Test Article</title><meta name=\"description\" content=\"Desc\"><meta name=\"author\" content=\"Author\"><meta property=\"og:title\" content=\"OG Title\"><meta property=\"og:description\" content=\"OG Desc\"></head><body><h1>Heading</h1></body></html>";
 
         let (_markdown, metadata) =
-            convert_with_metadata(html, None, MetadataConfig::default()).expect("conversion should succeed");
+            convert_with_metadata(html, None, MetadataConfig::default(), None).expect("conversion should succeed");
 
         assert_eq!(
             metadata.document.title,
@@ -781,7 +818,7 @@ mod tests {
             max_structured_data_size: 0,
         };
 
-        let (_markdown, metadata) = convert_with_metadata(html, None, config).expect("conversion should succeed");
+        let (_markdown, metadata) = convert_with_metadata(html, None, config, None).expect("conversion should succeed");
 
         assert!(metadata.headers.is_empty());
         assert!(metadata.links.is_empty());
@@ -795,7 +832,7 @@ mod tests {
 
         let config = MetadataConfig::default();
 
-        let (_markdown, metadata) = convert_with_metadata(html, None, config).expect("conversion should succeed");
+        let (_markdown, metadata) = convert_with_metadata(html, None, config, None).expect("conversion should succeed");
 
         assert_eq!(metadata.images.len(), 1);
         assert_eq!(metadata.images[0].image_type, ImageType::DataUri);
@@ -808,7 +845,7 @@ mod tests {
 
         let config = MetadataConfig::default();
 
-        let (_markdown, metadata) = convert_with_metadata(html, None, config).expect("conversion should succeed");
+        let (_markdown, metadata) = convert_with_metadata(html, None, config, None).expect("conversion should succeed");
 
         let internal_links: Vec<_> = metadata
             .links

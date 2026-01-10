@@ -78,7 +78,8 @@ module HtmlToMarkdown
     encoding?: String,
     debug?: bool,
     strip_tags?: Array[String],
-    preserve_tags?: Array[String]
+    preserve_tags?: Array[String],
+    skip_images?: bool
   }
 
   type inline_image_config = {
@@ -186,7 +187,7 @@ module HtmlToMarkdown
   # These are aliased from the Rust extension and available as both module and instance methods
   private
 
-  def self.native_convert: (String html, conversion_options? options) -> String
+  def self.native_convert: (String html, conversion_options? options, visitor? visitor) -> String
   def self.native_options: (conversion_options? options_hash) -> Options
   def self.native_convert_with_options: (String html, Options options_handle) -> String
   def self.native_convert_with_inline_images_handle: (
@@ -197,7 +198,8 @@ module HtmlToMarkdown
   def self.native_convert_with_inline_images: (
     String html,
     conversion_options? options,
-    inline_image_config? image_config
+    inline_image_config? image_config,
+    visitor? visitor
   ) -> html_extraction
   def self.native_convert_with_metadata_handle: (
     String html,
@@ -207,7 +209,8 @@ module HtmlToMarkdown
   def self.native_convert_with_metadata: (
     String html,
     conversion_options? options,
-    metadata_config? metadata_config
+    metadata_config? metadata_config,
+    visitor? visitor
   ) -> [String, extended_metadata]
   def self.native_convert_with_visitor: (
     String html,
@@ -215,7 +218,7 @@ module HtmlToMarkdown
     visitor? visitor
   ) -> String
 
-  def native_convert: (String html, conversion_options? options) -> String
+  def native_convert: (String html, conversion_options? options, visitor? visitor) -> String
   def native_options: (conversion_options? options_hash) -> Options
   def native_convert_with_options: (String html, Options options_handle) -> String
   def native_convert_with_inline_images_handle: (
@@ -226,7 +229,8 @@ module HtmlToMarkdown
   def native_convert_with_inline_images: (
     String html,
     conversion_options? options,
-    inline_image_config? image_config
+    inline_image_config? image_config,
+    visitor? visitor
   ) -> html_extraction
   def native_convert_with_metadata_handle: (
     String html,
@@ -236,7 +240,8 @@ module HtmlToMarkdown
   def native_convert_with_metadata: (
     String html,
     conversion_options? options,
-    metadata_config? metadata_config
+    metadata_config? metadata_config,
+    visitor? visitor
   ) -> [String, extended_metadata]
   def native_convert_with_visitor: (
     String html,
@@ -249,8 +254,22 @@ module HtmlToMarkdown
 
   public
 
-  # Convert HTML to Markdown with optional configuration
-  def self.convert: (String html, ?conversion_options options) -> String
+  # Convert HTML to Markdown with optional configuration and visitor
+  #
+  # The optional visitor parameter allows customization of conversion behavior for specific elements.
+  # When both options and visitor are provided, the visitor can override default conversions.
+  #
+  # Args:
+  #   html: HTML string to convert
+  #   options: Optional conversion configuration
+  #   visitor: Optional visitor object for customizing conversion
+  #
+  # Returns:
+  #   markdown: String - Converted markdown output
+  #
+  # Example:
+  #   markdown = HtmlToMarkdown.convert(html, { wrap: true }, my_visitor)
+  def self.convert: (String html, ?conversion_options options, ?visitor visitor) -> String
 
   # Create a reusable options handle for performance
   def self.options: (?conversion_options options_hash) -> Options
@@ -264,13 +283,36 @@ module HtmlToMarkdown
   ) -> html_extraction
 
   # Convert HTML with inline image extraction
+  #
+  # Optionally accepts a visitor for customizing conversion behavior.
+  #
+  # Args:
+  #   html: HTML string to convert
+  #   options: Optional conversion configuration
+  #   image_config: Optional inline image extraction configuration
+  #   visitor: Optional visitor object for customizing conversion
+  #
+  # Returns:
+  #   html_extraction: Hash containing markdown, inline_images array, and warnings array
+  #
+  # Example:
+  #   result = HtmlToMarkdown.convert_with_inline_images(html, { wrap: true }, image_config, my_visitor)
   def self.convert_with_inline_images: (
     String html,
     ?conversion_options options,
-    ?inline_image_config image_config
+    ?inline_image_config image_config,
+    ?visitor visitor
   ) -> html_extraction
 
-  # Convert HTML to Markdown with a custom visitor
+  # Convert HTML to Markdown with a custom visitor (deprecated)
+  #
+  # DEPRECATED: Use convert() with the optional visitor parameter instead.
+  # This method is maintained for backward compatibility.
+  #
+  # All convert functions now accept optional visitors:
+  #   - convert(html, options, visitor)
+  #   - convert_with_inline_images(html, options, image_config, visitor)
+  #   - convert_with_metadata(html, options, metadata_config, visitor)
   #
   # The visitor object can implement any of the following methods:
   #   - visit_element_start(ctx) -> visitor_result
@@ -342,11 +384,13 @@ module HtmlToMarkdown
   # Convert HTML to Markdown with metadata extraction
   #
   # Extracts comprehensive metadata (headers, links, images, structured data) during conversion.
+  # Optionally accepts a visitor for customizing conversion behavior.
   #
   # Args:
   #   html: HTML string to convert
   #   options: Optional conversion configuration
   #   metadata_config: Optional metadata extraction configuration
+  #   visitor: Optional visitor object for customizing conversion
   #
   # Returns:
   #   Array containing:
@@ -365,10 +409,14 @@ module HtmlToMarkdown
   #   markdown, metadata = HtmlToMarkdown.convert_with_metadata(html)
   #   puts "Title: #{metadata['document']['title']}"
   #   puts "Headers: #{metadata['headers'].length}"
+  #
+  # Example with visitor:
+  #   markdown, metadata = HtmlToMarkdown.convert_with_metadata(html, options, metadata_config, my_visitor)
   def self.convert_with_metadata: (
     String html,
     ?conversion_options options,
-    ?metadata_config metadata_config
+    ?metadata_config metadata_config,
+    ?visitor visitor
   ) -> [String, extended_metadata]
   def self.convert_with_metadata_handle: (
     String html,
@@ -377,7 +425,7 @@ module HtmlToMarkdown
   ) -> [String, extended_metadata]
 
   # Instance method versions (created by module_function)
-  def convert: (String html, ?conversion_options options) -> String
+  def convert: (String html, ?conversion_options options, ?visitor visitor) -> String
   def options: (?conversion_options options_hash) -> Options
   def convert_with_options: (String html, Options options_handle) -> String
   def convert_with_inline_images_handle: (
@@ -388,13 +436,15 @@ module HtmlToMarkdown
   def convert_with_inline_images: (
     String html,
     ?conversion_options options,
-    ?inline_image_config image_config
+    ?inline_image_config image_config,
+    ?visitor visitor
   ) -> html_extraction
   def convert_with_visitor: (String html, ?conversion_options options, visitor: visitor) -> String
   def convert_with_metadata: (
     String html,
     ?conversion_options options,
-    ?metadata_config metadata_config
+    ?metadata_config metadata_config,
+    ?visitor visitor
   ) -> [String, extended_metadata]
   def convert_with_metadata_handle: (
     String html,

@@ -741,6 +741,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         newline_style: cli.newline_style.map_or(defaults.newline_style, Into::into),
         code_block_style: cli.code_block_style.map_or(defaults.code_block_style, Into::into),
         keep_inline_images_in: cli.keep_inline_images_in.unwrap_or(defaults.keep_inline_images_in),
+        skip_images: false,
         preprocessing,
         encoding: cli.encoding.clone(),
         debug: cli.debug,
@@ -758,7 +759,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             max_structured_data_size: DEFAULT_MAX_STRUCTURED_DATA_SIZE,
         };
 
-        let (markdown, metadata) = convert_with_metadata(&html, Some(options), metadata_config)
+        let (markdown, metadata) = convert_with_metadata(&html, Some(options), metadata_config, None)
             .map_err(|e| format!("Error converting HTML with metadata: {e}"))?;
 
         if cli.debug {

@@ -26,15 +26,6 @@ importers:
       '@emnapi/runtime':
         specifier: 1.7.1
         version: 1.7.1
-      '@octokit/core':
-        specifier: 7.0.6
-        version: 7.0.6
-      typanion:
-        specifier: 3.14.0
-        version: 3.14.0
-      up:
-        specifier: ^1.0.2
-        version: 1.0.2
     devDependencies:
       '@napi-rs/cli':
         specifier: ^3.5.0
@@ -78,10 +69,6 @@ importers:
         version: 2.19.0-rc.1
 
   crates/html-to-markdown-wasm:
-    dependencies:
-      up:
-        specifier: ^1.0.2
-        version: 1.0.2
     devDependencies:
       '@types/node':
         specifier: ^25.0.3
@@ -2495,9 +2482,6 @@ packages:
     resolution: {integrity: sha512-rBJeI5CXAlmy1pV+617WB9J63U6XcazHHF2f2dbJix4XzpUF0RS3Zbj0FGIOCAva5P/d/GBOYaACQ1w+0azUkg==}
     engines: {node: '>= 4.0.0'}
 
-  up@1.0.2:
-    resolution: {integrity: sha512-PKVGUj7i1qMWSR83H3PZpw1h+21wAr1qxqF/8zgTVHS+sHTsu1zvepQDoDJN0Kv49quNJwWgAKDAK2xPy7jocg==}
-
   url-join@4.0.1:
     resolution: {integrity: sha512-jk1+QP6ZJqyOiuEI9AEWQfju/nB2Pw466kbA0LEZljHwKeMgd9WrAEgEGxjPDD2+TNbbb37rTyhEfrCXfuKXnA==}
 
@@ -4571,8 +4555,6 @@ snapshots:
   universal-user-agent@7.0.3: {}
 
   universalify@0.1.2: {}
-
-  up@1.0.2: {}
 
   url-join@4.0.1: {}
 

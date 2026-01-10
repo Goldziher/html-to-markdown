@@ -44,6 +44,7 @@ use HtmlToMarkdown\Internal\TypeAssertions;
  *     keep_inline_images_in?: list<string>,
  *     encoding?: string,
  *     debug?: bool,
+ *     skip_images?: bool,
  *     strip_tags?: list<string>,
  *     preserve_tags?: list<string>,
  *     preprocessing?: PreprocessingOptionsInput
@@ -87,6 +88,7 @@ final readonly class ConversionOptions
         public array $keepInlineImagesIn = [],
         public string $encoding = 'utf-8',
         public bool $debug = false,
+        public bool $skipImages = false,
         public array $stripTags = [],
         public array $preserveTags = [],
         ?PreprocessingOptions $preprocessing = null,
@@ -191,6 +193,9 @@ final readonly class ConversionOptions
             debug: \array_key_exists('debug', $input)
                 ? TypeAssertions::bool($input['debug'], 'debug')
                 : $defaults->debug,
+            skipImages: \array_key_exists('skip_images', $input)
+                ? TypeAssertions::bool($input['skip_images'], 'skip_images')
+                : $defaults->skipImages,
             stripTags: \array_key_exists('strip_tags', $input)
                 ? TypeAssertions::stringList($input['strip_tags'], 'strip_tags')
                 : $defaults->stripTags,
@@ -297,6 +302,9 @@ final readonly class ConversionOptions
         }
         if ($this->debug !== $defaults->debug) {
             $payload['debug'] = $this->debug;
+        }
+        if ($this->skipImages !== $defaults->skipImages) {
+            $payload['skip_images'] = $this->skipImages;
         }
         if ($this->stripTags !== $defaults->stripTags && $this->stripTags !== []) {
             $payload['strip_tags'] = \array_values($this->stripTags);

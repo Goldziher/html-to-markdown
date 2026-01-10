@@ -126,6 +126,65 @@ See language-specific documentation for `preserveTags` configuration.
 </details>
 
 <details>
+<summary><strong>Skipping Images</strong></summary>
+
+Skip all images during conversion using the `skip_images` option. Useful for text-only extraction or when you want to filter out visual content.
+
+**Rust:**
+```rust
+use html_to_markdown_rs::{convert, ConversionOptions};
+
+let options = ConversionOptions {
+    skip_images: true,
+    ..Default::default()
+};
+
+let html = r#"<p>Text with <img src="image.jpg" alt="pic"> image</p>"#;
+let markdown = convert(html, Some(options))?;
+// Output: "Text with  image" (image tags are removed)
+```
+
+**Python:**
+```python
+from html_to_markdown import convert, ConversionOptions
+
+options = ConversionOptions(skip_images=True)
+markdown = convert(html, options)
+```
+
+**TypeScript/Node.js:**
+```typescript
+import { convert, ConversionOptions } from '@kreuzberg/html-to-markdown-node';
+
+const options: ConversionOptions = {
+    skipImages: true,
+};
+
+const markdown = convert(html, options);
+```
+
+**Ruby:**
+```ruby
+require 'html_to_markdown'
+
+options = HtmlToMarkdown::ConversionOptions.new(skip_images: true)
+markdown = HtmlToMarkdown.convert(html, options)
+```
+
+**PHP:**
+```php
+use Goldziher\HtmlToMarkdown\HtmlToMarkdown;
+use Goldziher\HtmlToMarkdown\Options;
+
+$options = new Options(['skip_images' => true]);
+$markdown = HtmlToMarkdown::convert($html, $options);
+```
+
+This option is available across all language bindings. When enabled, all `<img>` tags and their associated markdown image syntax are removed from the output.
+
+</details>
+
+<details>
 <summary><strong>Secure by Default</strong></summary>
 
 Built-in HTML sanitization prevents XSS attacks and malicious content. Powered by ammonia with safe defaults. Configurable via `sanitize` options.

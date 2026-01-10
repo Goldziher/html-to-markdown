@@ -337,7 +337,8 @@ pub unsafe extern "C" fn html_to_markdown_convert_with_metadata(
         max_structured_data_size: DEFAULT_MAX_STRUCTURED_DATA_SIZE,
     };
 
-    match guard_panic(|| profiling::maybe_profile(|| convert_with_metadata(html_str, None, metadata_cfg.clone()))) {
+    match guard_panic(|| profiling::maybe_profile(|| convert_with_metadata(html_str, None, metadata_cfg.clone(), None)))
+    {
         Ok((markdown, metadata)) => {
             set_last_error(None);
 
@@ -431,7 +432,8 @@ pub unsafe extern "C" fn html_to_markdown_convert_with_metadata_with_len(
         max_structured_data_size: DEFAULT_MAX_STRUCTURED_DATA_SIZE,
     };
 
-    match guard_panic(|| profiling::maybe_profile(|| convert_with_metadata(html_str, None, metadata_cfg.clone()))) {
+    match guard_panic(|| profiling::maybe_profile(|| convert_with_metadata(html_str, None, metadata_cfg.clone(), None)))
+    {
         Ok((markdown, metadata)) => {
             set_last_error(None);
 
@@ -536,7 +538,8 @@ pub unsafe extern "C" fn html_to_markdown_convert_with_metadata_bytes_with_len(
         max_structured_data_size: DEFAULT_MAX_STRUCTURED_DATA_SIZE,
     };
 
-    match guard_panic(|| profiling::maybe_profile(|| convert_with_metadata(html_str, None, metadata_cfg.clone()))) {
+    match guard_panic(|| profiling::maybe_profile(|| convert_with_metadata(html_str, None, metadata_cfg.clone(), None)))
+    {
         Ok((markdown, metadata)) => {
             set_last_error(None);
 

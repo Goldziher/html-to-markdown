@@ -1311,8 +1311,8 @@ fn convert_with_inline_images_fn(ruby: &Ruby, args: &[Value]) -> Result<Value, E
     let options = build_conversion_options(ruby, parsed.optional.0)?;
     let config = build_inline_image_config(ruby, parsed.optional.1)?;
 
-    let extraction =
-        guard_panic(|| convert_with_inline_images_inner(&html, Some(options), config)).map_err(conversion_error)?;
+    let extraction = guard_panic(|| convert_with_inline_images_inner(&html, Some(options), config, None))
+        .map_err(conversion_error)?;
 
     extraction_to_value(ruby, extraction)
 }
@@ -1325,8 +1325,8 @@ fn convert_with_inline_images_handle_fn(ruby: &Ruby, args: &[Value]) -> Result<V
     let options = handle.0.clone();
     let config = build_inline_image_config(ruby, parsed.optional.0)?;
 
-    let extraction =
-        guard_panic(|| convert_with_inline_images_inner(&html, Some(options), config)).map_err(conversion_error)?;
+    let extraction = guard_panic(|| convert_with_inline_images_inner(&html, Some(options), config, None))
+        .map_err(conversion_error)?;
 
     extraction_to_value(ruby, extraction)
 }
@@ -1539,8 +1539,8 @@ fn convert_with_metadata_fn(ruby: &Ruby, args: &[Value]) -> Result<Value, Error>
     let options = build_conversion_options(ruby, parsed.optional.0)?;
     let metadata_config = build_metadata_config(ruby, parsed.optional.1)?;
 
-    let (markdown, metadata) =
-        guard_panic(|| convert_with_metadata_inner(&html, Some(options), metadata_config)).map_err(conversion_error)?;
+    let (markdown, metadata) = guard_panic(|| convert_with_metadata_inner(&html, Some(options), metadata_config, None))
+        .map_err(conversion_error)?;
 
     let array = ruby.ary_new();
     array.push(markdown)?;
@@ -1557,8 +1557,8 @@ fn convert_with_metadata_handle_fn(ruby: &Ruby, args: &[Value]) -> Result<Value,
     let options = handle.0.clone();
     let metadata_config = build_metadata_config(ruby, parsed.optional.0)?;
 
-    let (markdown, metadata) =
-        guard_panic(|| convert_with_metadata_inner(&html, Some(options), metadata_config)).map_err(conversion_error)?;
+    let (markdown, metadata) = guard_panic(|| convert_with_metadata_inner(&html, Some(options), metadata_config, None))
+        .map_err(conversion_error)?;
 
     let array = ruby.ary_new();
     array.push(markdown)?;

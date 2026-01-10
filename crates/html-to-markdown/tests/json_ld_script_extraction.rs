@@ -14,7 +14,7 @@ fn extracts_json_ld_from_head_script() {
         </html>
     "#;
 
-    let (_markdown, metadata) = html_to_markdown_rs::convert_with_metadata(html, None, MetadataConfig::default())
+    let (_markdown, metadata) = html_to_markdown_rs::convert_with_metadata(html, None, MetadataConfig::default(), None)
         .expect("convert_with_metadata failed");
 
     assert_eq!(metadata.structured_data.len(), 1);
@@ -35,7 +35,7 @@ fn extracts_json_ld_from_body_script_and_keeps_content() {
         </html>
     "#;
 
-    let (_markdown, metadata) = html_to_markdown_rs::convert_with_metadata(html, None, MetadataConfig::default())
+    let (_markdown, metadata) = html_to_markdown_rs::convert_with_metadata(html, None, MetadataConfig::default(), None)
         .expect("convert_with_metadata failed");
 
     assert_eq!(metadata.structured_data.len(), 1);
