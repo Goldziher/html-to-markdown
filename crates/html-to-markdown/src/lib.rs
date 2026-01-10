@@ -408,7 +408,13 @@ pub fn convert_with_inline_images(
         visitor,
     )?;
     #[cfg(not(feature = "visitor"))]
-    let markdown = converter::convert_html_impl(normalized_html.as_ref(), &options, Some(Rc::clone(&collector)), None)?;
+    let markdown = converter::convert_html_impl(
+        normalized_html.as_ref(),
+        &options,
+        Some(Rc::clone(&collector)),
+        None,
+        None,
+    )?;
 
     let markdown = if options.wrap {
         wrapper::wrap_markdown(&markdown, &options)

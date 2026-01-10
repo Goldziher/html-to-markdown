@@ -1,0 +1,22 @@
+[package]
+name = "html-to-markdown-bindings-common"
+version = "2.21.0"
+edition = "2024"
+authors = ["Kreuzberg <hello@kreuzberg.sh>"]
+license = "MIT OR Apache-2.0"
+description = "Shared utilities for html-to-markdown language bindings"
+repository = "https://github.com/kreuzberg-dev/html-to-markdown"
+readme = "README.md"
+keywords = ["html", "markdown", "bindings", "ffi"]
+categories = ["text-processing", "parsing"]
+
+[dependencies]
+html-to-markdown-rs = { path = "../html-to-markdown", version = "2.21.0" }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+thiserror = "2.0"
+
+[features]
+default = []
+metadata = ["html-to-markdown-rs/metadata"]
+inline-images = ["html-to-markdown-rs/inline-images"]

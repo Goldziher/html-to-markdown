@@ -2,6 +2,7 @@
 resolver = "2"
 members = [
     "crates/html-to-markdown",
+    "crates/html-to-markdown-bindings-common",
     "crates/html-to-markdown-cli",
     "crates/html-to-markdown-ffi",
     "crates/html-to-markdown-node",
