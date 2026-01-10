@@ -5,6 +5,7 @@
 //! - Paragraphs (p)
 //! - Blockquotes (blockquote)
 //! - Preformatted code (pre)
+//! - Tables (table, thead, tbody, tfoot, tr, th, td)
 //!
 //! These handlers are designed to be extracted from the main `converter.rs`
 //! file and integrated once the converter module is refactored.
@@ -20,12 +21,14 @@ pub mod blockquote;
 pub mod heading;
 pub mod paragraph;
 pub mod preformatted;
+pub mod table;
 
 // Re-export for use once converter.rs is refactored
 pub use blockquote::handle as handle_blockquote;
 pub use heading::handle as handle_heading;
 pub use paragraph::handle as handle_paragraph;
 pub use preformatted::handle_pre as handle_preformatted;
+pub use table::handle_table;
 
 /// Dispatches block element handling to the appropriate handler.
 ///
@@ -73,6 +76,10 @@ pub fn dispatch_block_handler(
         }
         "pre" => {
             preformatted::handle_pre(node_handle, parser, output, options, ctx, depth, dom_ctx);
+            true
+        }
+        "table" => {
+            table::handle_table(node_handle, parser, output, options, ctx, dom_ctx, depth);
             true
         }
         _ => false,
