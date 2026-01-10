@@ -1,6 +1,5 @@
 //! Image element handling (img, data URIs, inline image collection).
 
-use std::borrow::Cow;
 use std::collections::BTreeMap;
 
 #[cfg(feature = "inline-images")]

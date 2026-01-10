@@ -10,6 +10,7 @@
 //! - Metadata collection for links (links, URLs, titles, rel attributes)
 //! - Block-level content within links (via inline context)
 
+use crate::converter::utility::content::{is_block_level_element, normalized_tag_name};
 use crate::options::ConversionOptions;
 use std::collections::BTreeMap;
 use tl::{NodeHandle, Parser};
@@ -54,11 +55,10 @@ pub(crate) fn handle(
     dom_ctx: &DomContext,
 ) {
     // Import helper functions from parent converter module
-    use crate::converter::{
-        append_inline_suffix, find_single_heading_child, get_text_content, heading_allows_inline_images,
-        is_block_level_element, normalized_tag_name, push_heading, serialize_node, truncate_at_char_boundary,
-        walk_node,
-    };
+    use crate::converter::block::heading::{heading_allows_inline_images, push_heading};
+    use crate::converter::utility::content::{normalized_tag_name, truncate_at_char_boundary};
+    use crate::converter::utility::serialization::serialize_node;
+    use crate::converter::{find_single_heading_child, get_text_content, walk_node};
 
     let Some(node) = node_handle.get(parser) else {
         return;
@@ -404,7 +404,7 @@ fn escape_link_label(text: &str) -> String {
 /// * `title` - Optional link title attribute
 /// * `raw_text` - Original unprocessed text (for default_title option)
 /// * `options` - Conversion options
-fn append_markdown_link(
+pub(crate) fn append_markdown_link(
     output: &mut String,
     label: &str,
     href: &str,

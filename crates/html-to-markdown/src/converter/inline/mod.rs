@@ -28,15 +28,14 @@ pub mod code;
 pub mod emphasis;
 pub mod link;
 pub mod semantic;
+
+// Re-export types from parent module for submodule access
+pub use super::{Context, DomContext};
 // ruby module would go here if implemented
 // pub mod ruby;
 
-// Re-export handler functions for direct use
-pub use code::handle as handle_code;
-pub use emphasis::handle as handle_emphasis;
-pub use link::handle as handle_link;
-pub use semantic::handle as handle_semantic;
-// pub use ruby::handle as handle_ruby;
+// Re-export handler functions for internal use by dispatcher (crate-private)
+// pub(crate) use ruby::handle as handle_ruby;
 
 /// Dispatches inline element handling to the appropriate handler.
 ///

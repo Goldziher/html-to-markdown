@@ -48,7 +48,7 @@ pub struct TableScan {
 pub fn scan_table(
     node_handle: &tl::NodeHandle,
     parser: &tl::Parser,
-    dom_ctx: &super::super::super::super::converter::DomContext,
+    dom_ctx: &super::super::super::DomContext,
 ) -> TableScan {
     let mut scan = TableScan::default();
     scan_table_node(node_handle, parser, dom_ctx, true, &mut scan);
@@ -69,7 +69,7 @@ pub fn scan_table(
 fn scan_table_node(
     node_handle: &tl::NodeHandle,
     parser: &tl::Parser,
-    dom_ctx: &super::super::super::super::converter::DomContext,
+    dom_ctx: &super::super::super::DomContext,
     is_root: bool,
     scan: &mut TableScan,
 ) {

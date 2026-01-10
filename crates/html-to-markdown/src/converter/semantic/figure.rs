@@ -33,9 +33,9 @@ pub fn handle_figure(
     parser: &tl::Parser,
     output: &mut String,
     options: &crate::options::ConversionOptions,
-    ctx: &super::super::converter::Context,
+    ctx: &super::Context,
     depth: usize,
-    dom_ctx: &super::super::converter::DomContext,
+    dom_ctx: &super::DomContext,
 ) {
     if let Some(tl::Node::Tag(tag)) = node_handle.get(parser) {
         // In inline context, just process children inline
@@ -43,7 +43,7 @@ pub fn handle_figure(
             let children = tag.children();
             {
                 for child_handle in children.top().iter() {
-                    super::super::converter::walk_node(child_handle, parser, output, options, ctx, depth, dom_ctx);
+                    super::walk_node(child_handle, parser, output, options, ctx, depth, dom_ctx);
                 }
             }
             return;
@@ -59,15 +59,7 @@ pub fn handle_figure(
         let children = tag.children();
         {
             for child_handle in children.top().iter() {
-                super::super::converter::walk_node(
-                    child_handle,
-                    parser,
-                    &mut figure_content,
-                    options,
-                    ctx,
-                    depth,
-                    dom_ctx,
-                );
+                super::walk_node(child_handle, parser, &mut figure_content, options, ctx, depth, dom_ctx);
             }
         }
 
@@ -113,16 +105,16 @@ pub fn handle_figcaption(
     parser: &tl::Parser,
     output: &mut String,
     options: &crate::options::ConversionOptions,
-    ctx: &super::super::converter::Context,
+    ctx: &super::Context,
     depth: usize,
-    dom_ctx: &super::super::converter::DomContext,
+    dom_ctx: &super::DomContext,
 ) {
     if let Some(tl::Node::Tag(tag)) = node_handle.get(parser) {
         let mut text = String::new();
         let children = tag.children();
         {
             for child_handle in children.top().iter() {
-                super::super::converter::walk_node(child_handle, parser, &mut text, options, ctx, depth + 1, dom_ctx);
+                super::walk_node(child_handle, parser, &mut text, options, ctx, depth + 1, dom_ctx);
             }
         }
 
@@ -162,9 +154,9 @@ pub fn handle(
     parser: &tl::Parser,
     output: &mut String,
     options: &crate::options::ConversionOptions,
-    ctx: &super::super::converter::Context,
+    ctx: &super::Context,
     depth: usize,
-    dom_ctx: &super::super::converter::DomContext,
+    dom_ctx: &super::DomContext,
 ) {
     match tag_name {
         "figure" => handle_figure(tag_name, node_handle, parser, output, options, ctx, depth, dom_ctx),

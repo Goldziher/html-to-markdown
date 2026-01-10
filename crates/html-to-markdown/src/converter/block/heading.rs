@@ -127,7 +127,7 @@ pub(crate) fn handle(
 }
 
 /// Determine if a heading element should allow inline images.
-fn heading_allows_inline_images(
+pub(crate) fn heading_allows_inline_images(
     tag_name: &str,
     keep_inline_images_in: &std::rc::Rc<std::collections::HashSet<String>>,
 ) -> bool {
@@ -167,7 +167,7 @@ fn normalize_heading_text(text: &str) -> Cow<'_, str> {
 }
 
 /// Format heading output with appropriate markdown syntax.
-fn push_heading(output: &mut String, ctx: &Context, options: &ConversionOptions, level: usize, text: &str) {
+pub(crate) fn push_heading(output: &mut String, ctx: &Context, options: &ConversionOptions, level: usize, text: &str) {
     if text.is_empty() {
         return;
     }
@@ -243,7 +243,7 @@ fn push_heading(output: &mut String, ctx: &Context, options: &ConversionOptions,
 }
 
 /// Get continuation indent string for list items.
-fn continuation_indent_string(list_depth: usize, options: &ConversionOptions) -> Option<String> {
+fn continuation_indent_string(list_depth: usize, _options: &ConversionOptions) -> Option<String> {
     if list_depth == 0 {
         return None;
     }
@@ -258,7 +258,7 @@ fn visitor_heading_output(
     tag_name: &str,
     level: usize,
     normalized: &str,
-    output: &mut String,
+    _output: &mut String,
     options: &ConversionOptions,
     ctx: &Context,
     depth: usize,
@@ -326,5 +326,67 @@ fn visitor_heading_output(
         let mut buf = String::new();
         push_heading(&mut buf, ctx, options, level, normalized);
         Some(buf)
+    }
+}
+
+/// Find a single heading element within a node, filtering out non-heading content.
+///
+/// Returns the heading level and node handle if the node contains exactly one
+/// heading with no other non-whitespace content. Returns None if:
+/// - The node is not a tag
+/// - Multiple headings are found
+/// - Non-whitespace non-heading content exists
+/// - Non-text comments exist
+pub(crate) fn find_single_heading_child(node_handle: NodeHandle, parser: &Parser) -> Option<(usize, NodeHandle)> {
+    let node = node_handle.get(parser)?;
+
+    let tl::Node::Tag(tag) = node else {
+        return None;
+    };
+
+    let children = tag.children();
+    let mut heading_data: Option<(usize, NodeHandle)> = None;
+
+    for child_handle in children.top().iter() {
+        let Some(child_node) = child_handle.get(parser) else {
+            continue;
+        };
+
+        match child_node {
+            tl::Node::Raw(bytes) => {
+                if !bytes.as_utf8_str().trim().is_empty() {
+                    return None;
+                }
+            }
+            tl::Node::Tag(child_tag) => {
+                let name = crate::converter::utility::content::normalized_tag_name(child_tag.name().as_utf8_str());
+                if let Some(level) = heading_level_from_name(name.as_ref()) {
+                    if heading_data.is_some() {
+                        return None;
+                    }
+                    heading_data = Some((level, *child_handle));
+                } else {
+                    return None;
+                }
+            }
+            tl::Node::Comment(_) => return None,
+        }
+    }
+
+    heading_data
+}
+
+/// Extract heading level from tag name (h1-h6).
+///
+/// Returns Some(level) for valid heading tags, None otherwise.
+fn heading_level_from_name(name: &str) -> Option<usize> {
+    match name {
+        "h1" => Some(1),
+        "h2" => Some(2),
+        "h3" => Some(3),
+        "h4" => Some(4),
+        "h5" => Some(5),
+        "h6" => Some(6),
+        _ => None,
     }
 }

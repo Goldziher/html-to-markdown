@@ -24,6 +24,10 @@
 
 pub mod elements;
 
+// Re-export types from parent module for submodule access
+pub(crate) use super::walk_node;
+pub use super::{Context, DomContext};
+
 // Re-export handler function for direct use
 pub use elements::handle as handle_form_elements;
 
@@ -62,9 +66,9 @@ pub fn dispatch_form_handler(
     parser: &tl::Parser,
     output: &mut String,
     options: &crate::options::ConversionOptions,
-    ctx: &super::super::converter::Context,
+    ctx: &super::Context,
     depth: usize,
-    dom_ctx: &super::super::converter::DomContext,
+    dom_ctx: &super::DomContext,
 ) -> bool {
     match tag_name {
         // Form containers and metadata

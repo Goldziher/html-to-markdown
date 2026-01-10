@@ -11,7 +11,7 @@ use std::borrow::Cow;
 const MAX_TABLE_COLS: usize = 1000;
 
 use super::cell::{collect_table_cells, convert_table_cell, get_colspan, get_colspan_rowspan};
-use super::scanner::{TableScan, scan_table};
+use super::scanner::scan_table;
 
 /// Calculate total columns in a table.
 ///
@@ -29,7 +29,7 @@ use super::scanner::{TableScan, scan_table};
 pub fn table_total_columns(
     node_handle: &tl::NodeHandle,
     parser: &tl::Parser,
-    dom_ctx: &super::super::super::super::converter::DomContext,
+    dom_ctx: &super::super::super::DomContext,
 ) -> usize {
     let mut max_cols = 0usize;
     let mut cells = Vec::new();
@@ -85,7 +85,7 @@ pub fn table_total_columns(
 fn is_tag_name(
     node_handle: &tl::NodeHandle,
     parser: &tl::Parser,
-    dom_ctx: &super::super::super::super::converter::DomContext,
+    dom_ctx: &super::super::super::DomContext,
     name: &str,
 ) -> bool {
     if let Some(info) = dom_ctx.tag_info(node_handle.get_inner(), parser) {
@@ -125,13 +125,13 @@ pub fn convert_table_row(
     parser: &tl::Parser,
     output: &mut String,
     options: &crate::options::ConversionOptions,
-    ctx: &super::super::super::super::converter::Context,
+    ctx: &super::super::super::Context,
     row_index: usize,
     has_span: bool,
     rowspan_tracker: &mut [Option<usize>],
     total_cols: usize,
     header_cols: usize,
-    dom_ctx: &super::super::super::super::converter::DomContext,
+    dom_ctx: &super::super::super::DomContext,
     depth: usize,
     is_header: bool,
 ) {
@@ -146,21 +146,13 @@ pub fn convert_table_row(
             .iter()
             .map(|cell_handle| {
                 let mut text = String::new();
-                let cell_ctx = super::super::super::super::converter::Context {
+                let cell_ctx = super::super::super::Context {
                     in_table_cell: true,
                     ..ctx.clone()
                 };
                 if let Some(tl::Node::Tag(tag)) = cell_handle.get(parser) {
                     for child_handle in tag.children().top().iter() {
-                        super::super::super::super::converter::walk_node(
-                            child_handle,
-                            parser,
-                            &mut text,
-                            options,
-                            &cell_ctx,
-                            0,
-                            dom_ctx,
-                        );
+                        super::super::super::walk_node(child_handle, parser, &mut text, options, &cell_ctx, 0, dom_ctx);
                     }
                 }
                 crate::text::normalize_whitespace_cow(&text).trim().to_string()
@@ -207,10 +199,7 @@ pub fn convert_table_row(
                     return;
                 }
                 VisitResult::PreserveHtml => {
-                    output.push_str(&super::super::super::super::converter::serialize_node(
-                        node_handle,
-                        parser,
-                    ));
+                    output.push_str(&super::super::super::serialize_node(node_handle, parser));
                     return;
                 }
             }
@@ -293,8 +282,8 @@ fn append_layout_row(
     parser: &tl::Parser,
     output: &mut String,
     options: &crate::options::ConversionOptions,
-    ctx: &super::super::super::super::converter::Context,
-    dom_ctx: &super::super::super::super::converter::DomContext,
+    ctx: &super::super::super::Context,
+    dom_ctx: &super::super::super::DomContext,
 ) {
     if let Some(tl::Node::Tag(row_tag)) = row_handle.get(parser) {
         let mut row_text = String::new();
@@ -307,13 +296,13 @@ fn append_layout_row(
                 );
                 if matches!(cell_name.as_ref(), "td" | "th" | "cell") {
                     let mut cell_text = String::new();
-                    let cell_ctx = super::super::super::super::converter::Context {
+                    let cell_ctx = super::super::super::Context {
                         convert_as_inline: true,
                         ..ctx.clone()
                     };
                     let cell_children = cell_tag.children();
                     for cell_child in cell_children.top().iter() {
-                        super::super::super::super::converter::walk_node(
+                        super::super::super::walk_node(
                             cell_child,
                             parser,
                             &mut cell_text,
@@ -359,7 +348,7 @@ fn append_layout_row(
 ///
 /// # Returns
 /// Indented table content
-fn indent_table_for_list(
+pub(crate) fn indent_table_for_list(
     table_content: &str,
     list_depth: usize,
     options: &crate::options::ConversionOptions,
@@ -418,8 +407,8 @@ pub fn handle_table(
     parser: &tl::Parser,
     output: &mut String,
     options: &crate::options::ConversionOptions,
-    ctx: &super::super::super::super::converter::Context,
-    dom_ctx: &super::super::super::super::converter::DomContext,
+    ctx: &super::super::super::Context,
+    dom_ctx: &super::super::super::DomContext,
     depth: usize,
 ) {
     if let Some(tl::Node::Tag(tag)) = node_handle.get(parser) {
@@ -468,10 +457,7 @@ pub fn handle_table(
                     return;
                 }
                 VisitResult::PreserveHtml => {
-                    output.push_str(&super::super::super::super::converter::serialize_node(
-                        node_handle,
-                        parser,
-                    ));
+                    output.push_str(&super::super::super::serialize_node(node_handle, parser));
                     return;
                 }
             }
@@ -516,7 +502,7 @@ pub fn handle_table(
                         _ => {
                             // Handle non-table-structure elements (like <a>, <img>, etc.) that may be
                             // direct children of layout tables (e.g., Blogger table wrappers)
-                            super::super::super::super::converter::walk_node(
+                            super::super::super::walk_node(
                                 child_handle,
                                 parser,
                                 output,
@@ -556,7 +542,7 @@ pub fn handle_table(
                             let grandchildren = child_tag.children();
                             {
                                 for grandchild_handle in grandchildren.top().iter() {
-                                    super::super::super::super::converter::walk_node(
+                                    super::super::super::walk_node(
                                         grandchild_handle,
                                         parser,
                                         &mut text,
@@ -646,7 +632,7 @@ pub fn handle_table(
                         _ => {
                             // Handle non-table-structure elements (like <a>, <img>, etc.) that may be
                             // direct children of tables without proper structure (e.g., Blogger table wrappers)
-                            super::super::super::super::converter::walk_node(
+                            super::super::super::walk_node(
                                 child_handle,
                                 parser,
                                 output,
@@ -714,10 +700,7 @@ pub fn handle_table(
                 }
                 VisitResult::PreserveHtml => {
                     output.truncate(table_output_start);
-                    output.push_str(&super::super::super::super::converter::serialize_node(
-                        node_handle,
-                        parser,
-                    ));
+                    output.push_str(&super::super::super::serialize_node(node_handle, parser));
                 }
             }
         }

@@ -15,8 +15,11 @@ pub mod builder;
 pub mod cell;
 pub mod scanner;
 
+// Re-export types from parent module for submodule access
+pub use super::super::{Context, DomContext};
+
 // Re-export for use in converter.rs
-pub use builder::handle as handle_table;
+pub(crate) use builder::handle_table;
 
 /// Dispatches table element handling to the main convert_table function.
 ///
@@ -41,9 +44,9 @@ pub fn dispatch_table_handler(
     parser: &tl::Parser,
     output: &mut String,
     options: &crate::options::ConversionOptions,
-    ctx: &super::super::super::converter::Context,
+    ctx: &super::super::Context,
     depth: usize,
-    dom_ctx: &super::super::super::converter::DomContext,
+    dom_ctx: &super::super::DomContext,
 ) -> bool {
     match tag_name {
         "table" => {

@@ -28,6 +28,10 @@ pub mod figure;
 pub mod sectioning;
 pub mod summary;
 
+// Re-export types from parent module for submodule access
+pub(crate) use super::walk_node;
+pub use super::{Context, DomContext};
+
 // Re-export handler functions for direct use
 pub use attributes::handle as handle_attributes;
 pub use figure::handle as handle_figure;
@@ -70,9 +74,9 @@ pub fn dispatch_semantic_handler(
     parser: &tl::Parser,
     output: &mut String,
     options: &crate::options::ConversionOptions,
-    ctx: &super::super::converter::Context,
+    ctx: &super::Context,
     depth: usize,
-    dom_ctx: &super::super::converter::DomContext,
+    dom_ctx: &super::DomContext,
 ) -> bool {
     match tag_name {
         // Sectioning elements

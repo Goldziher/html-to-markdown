@@ -12,24 +12,24 @@ use tl::HTMLTag;
 /// - `src` (fallback)
 ///
 /// This is commonly used in publishing formats like EPUB.
-pub(crate) fn extract_graphic_src<'a>(tag: &HTMLTag<'a>) -> Cow<'a, str> {
+pub(crate) fn extract_graphic_src<'a>(tag: &'a HTMLTag<'a>) -> Cow<'a, str> {
     tag.attributes()
         .get("url")
         .flatten()
         .or_else(|| tag.attributes().get("href").flatten())
         .or_else(|| tag.attributes().get("xlink:href").flatten())
         .or_else(|| tag.attributes().get("src").flatten())
-        .map_or(Cow::Borrowed(""), |v| v.as_utf8_str())
+        .map_or_else(|| Cow::Borrowed(""), |v| v.as_utf8_str())
 }
 
 /// Extract alt text from graphic element with fallback to filename.
-pub(crate) fn extract_graphic_alt<'a>(tag: &HTMLTag<'a>) -> Cow<'a, str> {
+pub(crate) fn extract_graphic_alt<'a>(tag: &'a HTMLTag<'a>) -> Cow<'a, str> {
     tag.attributes()
         .get("alt")
         .flatten()
         .map(|v| v.as_utf8_str())
         .or_else(|| tag.attributes().get("filename").flatten().map(|v| v.as_utf8_str()))
-        .unwrap_or(Cow::Borrowed(""))
+        .unwrap_or_else(|| Cow::Borrowed(""))
 }
 
 /// Get source attributes to skip during metadata collection.

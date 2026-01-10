@@ -43,7 +43,6 @@ pub(crate) fn handle(
     dom_ctx: &DomContext,
 ) {
     // Import helper functions from parent converter module
-    use crate::converter::{append_inline_suffix, chomp_inline, serialize_node, walk_node};
 
     match tag_name {
         "code" => {
@@ -75,7 +74,7 @@ fn handle_code(
     depth: usize,
     dom_ctx: &DomContext,
 ) {
-    use crate::converter::{append_inline_suffix, chomp_inline, serialize_node, walk_node};
+    use crate::converter::{serialize_node, walk_node};
 
     let Some(node) = node_handle.get(parser) else { return };
 
@@ -178,7 +177,7 @@ fn handle_code(
 /// - Chomp inline handling for prefix/suffix spacing
 /// - Simple single backtick wrapping (no smart escaping for keyboard/sample)
 fn handle_kbd_samp(
-    tag_name: &str,
+    _tag_name: &str,
     node_handle: &NodeHandle,
     parser: &Parser,
     output: &mut String,

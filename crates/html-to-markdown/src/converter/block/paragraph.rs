@@ -112,13 +112,13 @@ fn add_list_continuation_indent(
 }
 
 /// Check if an element is empty (has no text content).
-fn is_empty_inline_element(node_handle: &NodeHandle, parser: &Parser, dom_ctx: &DomContext) -> bool {
+fn is_empty_inline_element(node_handle: &NodeHandle, parser: &Parser, _dom_ctx: &DomContext) -> bool {
     if let Some(node) = node_handle.get(parser) {
         match node {
             tl::Node::Tag(tag) => {
                 let tag_name = tag.name().as_utf8_str();
                 // Elements that are always empty or only contain attributes
-                matches!(tag_name, "br" | "hr" | "img" | "input" | "meta" | "link")
+                matches!(tag_name.as_ref(), "br" | "hr" | "img" | "input" | "meta" | "link")
             }
             _ => false,
         }

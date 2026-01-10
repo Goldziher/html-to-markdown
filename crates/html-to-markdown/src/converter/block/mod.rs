@@ -23,12 +23,10 @@ pub mod paragraph;
 pub mod preformatted;
 pub mod table;
 
-// Re-export for use once converter.rs is refactored
-pub use blockquote::handle as handle_blockquote;
-pub use heading::handle as handle_heading;
-pub use paragraph::handle as handle_paragraph;
-pub use preformatted::handle_pre as handle_preformatted;
-pub use table::handle_table;
+// Re-export types from parent module for submodule access
+pub use super::{Context, DomContext};
+
+// Re-export for internal use by dispatcher (crate-private)
 
 /// Dispatches block element handling to the appropriate handler.
 ///
@@ -57,9 +55,9 @@ pub fn dispatch_block_handler(
     parser: &tl::Parser,
     output: &mut String,
     options: &crate::options::ConversionOptions,
-    ctx: &super::super::converter::Context,
+    ctx: &super::Context,
     depth: usize,
-    dom_ctx: &super::super::converter::DomContext,
+    dom_ctx: &super::DomContext,
 ) -> bool {
     match tag_name {
         "h1" | "h2" | "h3" | "h4" | "h5" | "h6" => {

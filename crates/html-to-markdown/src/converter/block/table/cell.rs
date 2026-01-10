@@ -81,7 +81,7 @@ fn clamp_table_span(value: usize) -> usize {
 pub fn collect_table_cells(
     node_handle: &tl::NodeHandle,
     parser: &tl::Parser,
-    dom_ctx: &super::super::super::super::converter::DomContext,
+    dom_ctx: &super::super::super::DomContext,
     cells: &mut Vec<tl::NodeHandle>,
 ) {
     cells.clear();
@@ -116,13 +116,13 @@ pub fn convert_table_cell(
     parser: &tl::Parser,
     output: &mut String,
     options: &crate::options::ConversionOptions,
-    ctx: &super::super::super::super::converter::Context,
+    ctx: &super::super::super::Context,
     _tag_name: &str,
-    dom_ctx: &super::super::super::super::converter::DomContext,
+    dom_ctx: &super::super::super::DomContext,
 ) {
     let mut text = String::with_capacity(128);
 
-    let cell_ctx = super::super::super::super::converter::Context {
+    let cell_ctx = super::super::super::Context {
         in_table_cell: true,
         ..ctx.clone()
     };
@@ -136,15 +136,7 @@ pub fn convert_table_cell(
 
         if has_tag_child {
             for child_handle in children.top().iter() {
-                super::super::super::super::converter::walk_node(
-                    child_handle,
-                    parser,
-                    &mut text,
-                    options,
-                    &cell_ctx,
-                    0,
-                    dom_ctx,
-                );
+                super::super::super::walk_node(child_handle, parser, &mut text, options, &cell_ctx, 0, dom_ctx);
             }
         } else {
             let raw = dom_ctx.text_content(*node_handle, parser);

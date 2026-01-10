@@ -41,7 +41,6 @@ pub(crate) fn handle(
     dom_ctx: &DomContext,
 ) {
     // Import helper functions from parent converter module
-    use crate::converter::{append_inline_suffix, chomp_inline, get_text_content, serialize_node, walk_node};
 
     match tag_name {
         "mark" => {

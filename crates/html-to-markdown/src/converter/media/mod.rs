@@ -12,13 +12,7 @@ pub mod image;
 pub mod svg;
 
 #[cfg(feature = "inline-images")]
-pub use image::handle_inline_data_image;
-pub use image::heading_allows_inline_images;
-
-pub use graphic::{extract_graphic_alt, extract_graphic_src, should_skip_graphic_attr};
+pub(crate) use image::handle_inline_data_image;
 
 #[cfg(feature = "inline-images")]
-pub use svg::{encode_svg_to_data_uri, handle_inline_svg};
-pub use svg::{serialize_element, serialize_node};
-
-pub use embedded::{extract_media_src, find_source_src, is_source_element, should_output_media_link};
+pub(crate) use svg::handle_inline_svg;

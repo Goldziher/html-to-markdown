@@ -74,7 +74,7 @@ fn collect_hocr_elements(node_handle: &tl::NodeHandle, parser: &tl::Parser, elem
 }
 
 /// Extract hOCR metadata from HTML head (or from orphaned meta tags after sanitization)
-fn extract_metadata(dom: &tl::VDom) -> HocrMetadata {
+pub(crate) fn extract_metadata(dom: &tl::VDom) -> HocrMetadata {
     let mut metadata = HocrMetadata::default();
     let parser = dom.parser();
 

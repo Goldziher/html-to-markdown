@@ -19,8 +19,8 @@ fn trim_trailing_whitespace(output: &mut String) {
 }
 
 /// Check if tag names are equal (case-insensitive).
-fn tag_name_eq(a: &str, b: &str) -> bool {
-    a.eq_ignore_ascii_case(b)
+fn tag_name_eq<'a>(a: impl AsRef<str>, b: &str) -> bool {
+    a.as_ref().eq_ignore_ascii_case(b)
 }
 
 /// Calculate indentation level for list item continuations.

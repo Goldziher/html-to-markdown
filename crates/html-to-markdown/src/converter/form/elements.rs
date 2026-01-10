@@ -14,6 +14,7 @@
 
 // Note: Context and DomContext are defined in converter.rs
 // walk_node is also defined there and must be called via the parent module
+use super::walk_node;
 use std::borrow::Cow;
 
 /// Handles the `<form>` element.
@@ -32,9 +33,9 @@ pub fn handle_form(
     parser: &tl::Parser,
     output: &mut String,
     options: &crate::options::ConversionOptions,
-    ctx: &super::super::converter::Context,
+    ctx: &super::Context,
     depth: usize,
-    dom_ctx: &super::super::converter::DomContext,
+    dom_ctx: &super::DomContext,
 ) {
     if let Some(tl::Node::Tag(tag)) = node_handle.get(parser) {
         // In inline context, just process children inline
@@ -42,7 +43,7 @@ pub fn handle_form(
             let children = tag.children();
             {
                 for child_handle in children.top().iter() {
-                    super::super::converter::walk_node(child_handle, parser, output, options, ctx, depth, dom_ctx);
+                    super::walk_node(child_handle, parser, output, options, ctx, depth, dom_ctx);
                 }
             }
             return;
@@ -87,9 +88,9 @@ pub fn handle_fieldset(
     parser: &tl::Parser,
     output: &mut String,
     options: &crate::options::ConversionOptions,
-    ctx: &super::super::converter::Context,
+    ctx: &super::Context,
     depth: usize,
-    dom_ctx: &super::super::converter::DomContext,
+    dom_ctx: &super::DomContext,
 ) {
     if let Some(tl::Node::Tag(tag)) = node_handle.get(parser) {
         // In inline context, just process children inline
@@ -97,7 +98,7 @@ pub fn handle_fieldset(
             let children = tag.children();
             {
                 for child_handle in children.top().iter() {
-                    super::super::converter::walk_node(child_handle, parser, output, options, ctx, depth, dom_ctx);
+                    super::walk_node(child_handle, parser, output, options, ctx, depth, dom_ctx);
                 }
             }
             return;
@@ -142,9 +143,9 @@ pub fn handle_legend(
     parser: &tl::Parser,
     output: &mut String,
     options: &crate::options::ConversionOptions,
-    ctx: &super::super::converter::Context,
+    ctx: &super::Context,
     depth: usize,
-    dom_ctx: &super::super::converter::DomContext,
+    dom_ctx: &super::DomContext,
 ) {
     if let Some(tl::Node::Tag(tag)) = node_handle.get(parser) {
         let mut content = String::new();
@@ -158,7 +159,7 @@ pub fn handle_legend(
         let children = tag.children();
         {
             for child_handle in children.top().iter() {
-                super::super::converter::walk_node(
+                super::walk_node(
                     child_handle,
                     parser,
                     &mut content,
@@ -201,24 +202,16 @@ pub fn handle_label(
     parser: &tl::Parser,
     output: &mut String,
     options: &crate::options::ConversionOptions,
-    ctx: &super::super::converter::Context,
+    ctx: &super::Context,
     depth: usize,
-    dom_ctx: &super::super::converter::DomContext,
+    dom_ctx: &super::DomContext,
 ) {
     if let Some(tl::Node::Tag(tag)) = node_handle.get(parser) {
         let mut content = String::new();
         let children = tag.children();
         {
             for child_handle in children.top().iter() {
-                super::super::converter::walk_node(
-                    child_handle,
-                    parser,
-                    &mut content,
-                    options,
-                    ctx,
-                    depth + 1,
-                    dom_ctx,
-                );
+                super::walk_node(child_handle, parser, &mut content, options, ctx, depth + 1, dom_ctx);
             }
         }
 
@@ -242,9 +235,9 @@ pub fn handle_input(
     _parser: &tl::Parser,
     _output: &mut String,
     _options: &crate::options::ConversionOptions,
-    _ctx: &super::super::converter::Context,
+    _ctx: &super::Context,
     _depth: usize,
-    _dom_ctx: &super::super::converter::DomContext,
+    _dom_ctx: &super::DomContext,
 ) {
     // Input elements have no text content; render nothing
 }
@@ -264,9 +257,9 @@ pub fn handle_textarea(
     parser: &tl::Parser,
     output: &mut String,
     options: &crate::options::ConversionOptions,
-    ctx: &super::super::converter::Context,
+    ctx: &super::Context,
     depth: usize,
-    dom_ctx: &super::super::converter::DomContext,
+    dom_ctx: &super::DomContext,
 ) {
     if let Some(tl::Node::Tag(tag)) = node_handle.get(parser) {
         let start_len = output.len();
@@ -298,9 +291,9 @@ pub fn handle_select(
     parser: &tl::Parser,
     output: &mut String,
     options: &crate::options::ConversionOptions,
-    ctx: &super::super::converter::Context,
+    ctx: &super::Context,
     depth: usize,
-    dom_ctx: &super::super::converter::DomContext,
+    dom_ctx: &super::DomContext,
 ) {
     if let Some(tl::Node::Tag(tag)) = node_handle.get(parser) {
         let start_len = output.len();
@@ -333,9 +326,9 @@ pub fn handle_option(
     parser: &tl::Parser,
     output: &mut String,
     options: &crate::options::ConversionOptions,
-    ctx: &super::super::converter::Context,
+    ctx: &super::Context,
     depth: usize,
-    dom_ctx: &super::super::converter::DomContext,
+    dom_ctx: &super::DomContext,
 ) {
     if let Some(tl::Node::Tag(tag)) = node_handle.get(parser) {
         let selected = tag.attributes().iter().any(|(name, _)| name.as_ref() == "selected");
@@ -344,7 +337,7 @@ pub fn handle_option(
         let children = tag.children();
         {
             for child_handle in children.top().iter() {
-                super::super::converter::walk_node(child_handle, parser, &mut text, options, ctx, depth + 1, dom_ctx);
+                super::walk_node(child_handle, parser, &mut text, options, ctx, depth + 1, dom_ctx);
             }
         }
 
@@ -376,9 +369,9 @@ pub fn handle_optgroup(
     parser: &tl::Parser,
     output: &mut String,
     options: &crate::options::ConversionOptions,
-    ctx: &super::super::converter::Context,
+    ctx: &super::Context,
     depth: usize,
-    dom_ctx: &super::super::converter::DomContext,
+    dom_ctx: &super::DomContext,
 ) {
     if let Some(tl::Node::Tag(tag)) = node_handle.get(parser) {
         let label = tag
@@ -419,9 +412,9 @@ pub fn handle_button(
     parser: &tl::Parser,
     output: &mut String,
     options: &crate::options::ConversionOptions,
-    ctx: &super::super::converter::Context,
+    ctx: &super::Context,
     depth: usize,
-    dom_ctx: &super::super::converter::DomContext,
+    dom_ctx: &super::DomContext,
 ) {
     if let Some(tl::Node::Tag(tag)) = node_handle.get(parser) {
         let start_len = output.len();
@@ -453,9 +446,9 @@ pub fn handle_progress(
     parser: &tl::Parser,
     output: &mut String,
     options: &crate::options::ConversionOptions,
-    ctx: &super::super::converter::Context,
+    ctx: &super::Context,
     depth: usize,
-    dom_ctx: &super::super::converter::DomContext,
+    dom_ctx: &super::DomContext,
 ) {
     if let Some(tl::Node::Tag(tag)) = node_handle.get(parser) {
         let start_len = output.len();
@@ -487,9 +480,9 @@ pub fn handle_meter(
     parser: &tl::Parser,
     output: &mut String,
     options: &crate::options::ConversionOptions,
-    ctx: &super::super::converter::Context,
+    ctx: &super::Context,
     depth: usize,
-    dom_ctx: &super::super::converter::DomContext,
+    dom_ctx: &super::DomContext,
 ) {
     if let Some(tl::Node::Tag(tag)) = node_handle.get(parser) {
         let start_len = output.len();
@@ -521,9 +514,9 @@ pub fn handle_output(
     parser: &tl::Parser,
     output: &mut String,
     options: &crate::options::ConversionOptions,
-    ctx: &super::super::converter::Context,
+    ctx: &super::Context,
     depth: usize,
-    dom_ctx: &super::super::converter::DomContext,
+    dom_ctx: &super::DomContext,
 ) {
     if let Some(tl::Node::Tag(tag)) = node_handle.get(parser) {
         let start_len = output.len();
@@ -555,9 +548,9 @@ pub fn handle_datalist(
     parser: &tl::Parser,
     output: &mut String,
     options: &crate::options::ConversionOptions,
-    ctx: &super::super::converter::Context,
+    ctx: &super::Context,
     depth: usize,
-    dom_ctx: &super::super::converter::DomContext,
+    dom_ctx: &super::DomContext,
 ) {
     if let Some(tl::Node::Tag(tag)) = node_handle.get(parser) {
         let start_len = output.len();
@@ -583,9 +576,9 @@ pub fn handle(
     parser: &tl::Parser,
     output: &mut String,
     options: &crate::options::ConversionOptions,
-    ctx: &super::super::converter::Context,
+    ctx: &super::Context,
     depth: usize,
-    dom_ctx: &super::super::converter::DomContext,
+    dom_ctx: &super::DomContext,
 ) {
     match tag_name {
         "form" => handle_form(tag_name, node_handle, parser, output, options, ctx, depth, dom_ctx),

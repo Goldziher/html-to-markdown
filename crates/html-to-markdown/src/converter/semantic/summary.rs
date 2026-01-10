@@ -10,6 +10,7 @@
 
 // Note: Context and DomContext are defined in converter.rs
 // walk_node is also defined there and must be called via the parent module
+use super::walk_node;
 
 /// Handles the `<details>` element.
 ///
@@ -28,9 +29,9 @@ pub fn handle_details(
     parser: &tl::Parser,
     output: &mut String,
     options: &crate::options::ConversionOptions,
-    ctx: &super::super::converter::Context,
+    ctx: &super::Context,
     depth: usize,
-    dom_ctx: &super::super::converter::DomContext,
+    dom_ctx: &super::DomContext,
 ) {
     if let Some(tl::Node::Tag(tag)) = node_handle.get(parser) {
         // In inline context, just process children inline
@@ -38,7 +39,7 @@ pub fn handle_details(
             let children = tag.children();
             {
                 for child_handle in children.top().iter() {
-                    super::super::converter::walk_node(child_handle, parser, output, options, ctx, depth, dom_ctx);
+                    super::walk_node(child_handle, parser, output, options, ctx, depth, dom_ctx);
                 }
             }
             return;
@@ -90,9 +91,9 @@ pub fn handle_summary(
     parser: &tl::Parser,
     output: &mut String,
     options: &crate::options::ConversionOptions,
-    ctx: &super::super::converter::Context,
+    ctx: &super::Context,
     depth: usize,
-    dom_ctx: &super::super::converter::DomContext,
+    dom_ctx: &super::DomContext,
 ) {
     if let Some(tl::Node::Tag(tag)) = node_handle.get(parser) {
         let mut content = String::with_capacity(64);
@@ -106,7 +107,7 @@ pub fn handle_summary(
         let children = tag.children();
         {
             for child_handle in children.top().iter() {
-                super::super::converter::walk_node(
+                super::walk_node(
                     child_handle,
                     parser,
                     &mut content,
@@ -159,9 +160,9 @@ pub fn handle_dialog(
     parser: &tl::Parser,
     output: &mut String,
     options: &crate::options::ConversionOptions,
-    ctx: &super::super::converter::Context,
+    ctx: &super::Context,
     depth: usize,
-    dom_ctx: &super::super::converter::DomContext,
+    dom_ctx: &super::DomContext,
 ) {
     if let Some(tl::Node::Tag(tag)) = node_handle.get(parser) {
         // In inline context, just process children inline
@@ -169,7 +170,7 @@ pub fn handle_dialog(
             let children = tag.children();
             {
                 for child_handle in children.top().iter() {
-                    super::super::converter::walk_node(child_handle, parser, output, options, ctx, depth, dom_ctx);
+                    super::walk_node(child_handle, parser, output, options, ctx, depth, dom_ctx);
                 }
             }
             return;
@@ -181,7 +182,7 @@ pub fn handle_dialog(
         let children = tag.children();
         {
             for child_handle in children.top().iter() {
-                super::super::converter::walk_node(child_handle, parser, output, options, ctx, depth, dom_ctx);
+                super::walk_node(child_handle, parser, output, options, ctx, depth, dom_ctx);
             }
         }
 
@@ -206,9 +207,9 @@ pub fn handle(
     parser: &tl::Parser,
     output: &mut String,
     options: &crate::options::ConversionOptions,
-    ctx: &super::super::converter::Context,
+    ctx: &super::Context,
     depth: usize,
-    dom_ctx: &super::super::converter::DomContext,
+    dom_ctx: &super::DomContext,
 ) {
     match tag_name {
         "details" => handle_details(tag_name, node_handle, parser, output, options, ctx, depth, dom_ctx),

@@ -183,3 +183,6 @@ pub(crate) fn handle_ol(
         }
     }
 }
+
+/// Public alias for `handle_ol` to match the expected module interface.
+pub(crate) use handle_ol as handle;

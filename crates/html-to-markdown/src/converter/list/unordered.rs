@@ -176,3 +176,6 @@ pub(crate) fn handle_ul(
         }
     }
 }
+
+/// Public alias for `handle_ul` to match the expected module interface.
+pub(crate) use handle_ul as handle;

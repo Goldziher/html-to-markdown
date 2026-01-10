@@ -92,7 +92,7 @@ pub(crate) fn handle_inline_svg(
 #[allow(clippy::trivially_copy_pass_by_ref)]
 pub(crate) fn serialize_element(node_handle: &NodeHandle, parser: &Parser) -> String {
     if let Some(tl::Node::Tag(tag)) = node_handle.get(parser) {
-        let tag_name = normalized_tag_name(tag.name().as_utf8_str());
+        let tag_name = normalized_tag_name(tag.name().as_utf8_str().as_ref());
         let mut html = String::with_capacity(256);
         html.push('<');
         html.push_str(&tag_name);

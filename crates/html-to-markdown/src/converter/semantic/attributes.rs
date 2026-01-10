@@ -32,24 +32,16 @@ pub fn handle_dfn(
     parser: &tl::Parser,
     output: &mut String,
     options: &crate::options::ConversionOptions,
-    ctx: &super::super::converter::Context,
+    ctx: &super::Context,
     depth: usize,
-    dom_ctx: &super::super::converter::DomContext,
+    dom_ctx: &super::DomContext,
 ) {
     if let Some(tl::Node::Tag(tag)) = node_handle.get(parser) {
         let mut content = String::with_capacity(32);
         let children = tag.children();
         {
             for child_handle in children.top().iter() {
-                super::super::converter::walk_node(
-                    child_handle,
-                    parser,
-                    &mut content,
-                    options,
-                    ctx,
-                    depth + 1,
-                    dom_ctx,
-                );
+                super::walk_node(child_handle, parser, &mut content, options, ctx, depth + 1, dom_ctx);
             }
         }
 
@@ -89,24 +81,16 @@ pub fn handle_abbr(
     parser: &tl::Parser,
     output: &mut String,
     options: &crate::options::ConversionOptions,
-    ctx: &super::super::converter::Context,
+    ctx: &super::Context,
     depth: usize,
-    dom_ctx: &super::super::converter::DomContext,
+    dom_ctx: &super::DomContext,
 ) {
     if let Some(tl::Node::Tag(tag)) = node_handle.get(parser) {
         let mut content = String::with_capacity(32);
         let children = tag.children();
         {
             for child_handle in children.top().iter() {
-                super::super::converter::walk_node(
-                    child_handle,
-                    parser,
-                    &mut content,
-                    options,
-                    ctx,
-                    depth + 1,
-                    dom_ctx,
-                );
+                super::walk_node(child_handle, parser, &mut content, options, ctx, depth + 1, dom_ctx);
             }
         }
 
@@ -144,15 +128,15 @@ pub fn handle_time_data(
     parser: &tl::Parser,
     output: &mut String,
     options: &crate::options::ConversionOptions,
-    ctx: &super::super::converter::Context,
+    ctx: &super::Context,
     depth: usize,
-    dom_ctx: &super::super::converter::DomContext,
+    dom_ctx: &super::DomContext,
 ) {
     if let Some(tl::Node::Tag(tag)) = node_handle.get(parser) {
         let children = tag.children();
         {
             for child_handle in children.top().iter() {
-                super::super::converter::walk_node(child_handle, parser, output, options, ctx, depth + 1, dom_ctx);
+                super::walk_node(child_handle, parser, output, options, ctx, depth + 1, dom_ctx);
             }
         }
     }
@@ -173,24 +157,16 @@ pub fn handle_cite(
     parser: &tl::Parser,
     output: &mut String,
     options: &crate::options::ConversionOptions,
-    ctx: &super::super::converter::Context,
+    ctx: &super::Context,
     depth: usize,
-    dom_ctx: &super::super::converter::DomContext,
+    dom_ctx: &super::DomContext,
 ) {
     if let Some(tl::Node::Tag(tag)) = node_handle.get(parser) {
         let mut content = String::with_capacity(32);
         let children = tag.children();
         {
             for child_handle in children.top().iter() {
-                super::super::converter::walk_node(
-                    child_handle,
-                    parser,
-                    &mut content,
-                    options,
-                    ctx,
-                    depth + 1,
-                    dom_ctx,
-                );
+                super::walk_node(child_handle, parser, &mut content, options, ctx, depth + 1, dom_ctx);
             }
         }
 
@@ -229,24 +205,16 @@ pub fn handle_q(
     parser: &tl::Parser,
     output: &mut String,
     options: &crate::options::ConversionOptions,
-    ctx: &super::super::converter::Context,
+    ctx: &super::Context,
     depth: usize,
-    dom_ctx: &super::super::converter::DomContext,
+    dom_ctx: &super::DomContext,
 ) {
     if let Some(tl::Node::Tag(tag)) = node_handle.get(parser) {
         let mut content = String::with_capacity(32);
         let children = tag.children();
         {
             for child_handle in children.top().iter() {
-                super::super::converter::walk_node(
-                    child_handle,
-                    parser,
-                    &mut content,
-                    options,
-                    ctx,
-                    depth + 1,
-                    dom_ctx,
-                );
+                super::walk_node(child_handle, parser, &mut content, options, ctx, depth + 1, dom_ctx);
             }
         }
 
@@ -274,9 +242,9 @@ pub fn handle(
     parser: &tl::Parser,
     output: &mut String,
     options: &crate::options::ConversionOptions,
-    ctx: &super::super::converter::Context,
+    ctx: &super::Context,
     depth: usize,
-    dom_ctx: &super::super::converter::DomContext,
+    dom_ctx: &super::DomContext,
 ) {
     match tag_name {
         "dfn" => handle_dfn(tag_name, node_handle, parser, output, options, ctx, depth, dom_ctx),
@@ -320,7 +288,7 @@ fn append_inline_suffix(
     _is_nonempty: bool,
     _node_handle: &tl::NodeHandle,
     _parser: &tl::Parser,
-    _dom_ctx: &super::super::converter::DomContext,
+    _dom_ctx: &super::DomContext,
 ) {
     output.push_str(suffix);
 }
