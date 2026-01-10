@@ -1,4 +1,9 @@
 #![allow(clippy::all, clippy::pedantic, clippy::nursery, missing_docs)]
+use html_to_markdown_bindings_common::parse_conversion_options;
+#[cfg(feature = "inline-images")]
+use html_to_markdown_bindings_common::parse_inline_image_config;
+#[cfg(feature = "metadata")]
+use html_to_markdown_bindings_common::parse_metadata_config;
 #[cfg(feature = "metadata")]
 use html_to_markdown_rs::metadata::{
     DEFAULT_MAX_STRUCTURED_DATA_SIZE, DocumentMetadata as RustDocumentMetadata,
@@ -39,12 +44,14 @@ use std::sync::Arc;
 #[cfg(feature = "async-visitor")]
 use std::sync::Mutex;
 
+// Convert ConversionError to PyErr using helper functions from common crate
 fn to_py_err(err: ConversionError) -> PyErr {
-    match err {
-        ConversionError::Panic(message) => {
-            pyo3::exceptions::PyRuntimeError::new_err(format!("html-to-markdown panic during conversion: {message}"))
-        }
-        other => pyo3::exceptions::PyValueError::new_err(other.to_string()),
+    use html_to_markdown_bindings_common::error::{error_message, is_panic_error};
+
+    if is_panic_error(&err) {
+        pyo3::exceptions::PyRuntimeError::new_err(error_message(&err))
+    } else {
+        pyo3::exceptions::PyValueError::new_err(error_message(&err))
     }
 }
 
@@ -93,45 +100,6 @@ fn init_python_event_loop(_py: Python) -> PyResult<()> {
         .map_err(|_| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>("Python async context already initialized"))?;
 
     Ok(())
-}
-
-fn parse_options_json(options_json: Option<&str>) -> PyResult<Option<RustConversionOptions>> {
-    let Some(json) = options_json else {
-        return Ok(None);
-    };
-
-    if json.trim().is_empty() {
-        return Ok(None);
-    }
-
-    let options = html_to_markdown_rs::conversion_options_from_json(json).map_err(to_py_err)?;
-    Ok(Some(options))
-}
-
-#[cfg(feature = "inline-images")]
-fn parse_inline_image_config_json(config_json: Option<&str>) -> PyResult<RustInlineImageConfig> {
-    let Some(json) = config_json else {
-        return Ok(RustInlineImageConfig::new(DEFAULT_INLINE_IMAGE_LIMIT));
-    };
-
-    if json.trim().is_empty() {
-        return Ok(RustInlineImageConfig::new(DEFAULT_INLINE_IMAGE_LIMIT));
-    }
-
-    html_to_markdown_rs::inline_image_config_from_json(json).map_err(to_py_err)
-}
-
-#[cfg(feature = "metadata")]
-fn parse_metadata_config_json(config_json: Option<&str>) -> PyResult<RustMetadataConfig> {
-    let Some(json) = config_json else {
-        return Ok(RustMetadataConfig::default());
-    };
-
-    if json.trim().is_empty() {
-        return Ok(RustMetadataConfig::default());
-    }
-
-    html_to_markdown_rs::metadata_config_from_json(json).map_err(to_py_err)
 }
 
 #[pyfunction]
@@ -646,7 +614,7 @@ fn convert(
 #[pyo3(signature = (html, options_json=None))]
 fn convert_json(py: Python<'_>, html: &str, options_json: Option<&str>) -> PyResult<String> {
     let html = html.to_owned();
-    let rust_options = parse_options_json(options_json)?;
+    let rust_options = parse_conversion_options(options_json).map_err(to_py_err)?;
     py.detach(move || run_with_guard_and_profile(|| html_to_markdown_rs::convert(&html, rust_options.clone())))
         .map_err(to_py_err)
 }
@@ -669,7 +637,9 @@ fn create_options_handle(options: Option<ConversionOptions>) -> ConversionOption
 #[pyfunction]
 #[pyo3(signature = (options_json=None))]
 fn create_options_handle_json(options_json: Option<&str>) -> PyResult<ConversionOptionsHandle> {
-    let rust_options = parse_options_json(options_json)?.unwrap_or_default();
+    let rust_options = parse_conversion_options(options_json)
+        .map_err(to_py_err)?
+        .unwrap_or_default();
     Ok(ConversionOptionsHandle::new_with_rust(rust_options))
 }
 
@@ -854,8 +824,8 @@ fn convert_with_inline_images_json<'py>(
     image_config_json: Option<&str>,
 ) -> PyInlineExtraction {
     let html = html.to_owned();
-    let rust_options = parse_options_json(options_json)?;
-    let rust_config = parse_inline_image_config_json(image_config_json)?;
+    let rust_options = parse_conversion_options(options_json).map_err(to_py_err)?;
+    let rust_config = parse_inline_image_config(image_config_json).map_err(to_py_err)?;
     let extraction = py
         .detach(move || {
             run_with_guard_and_profile(|| {
@@ -1298,8 +1268,8 @@ fn convert_with_metadata_json(
     metadata_config_json: Option<&str>,
 ) -> PyResult<(String, Py<PyAny>)> {
     let html = html.to_owned();
-    let rust_options = parse_options_json(options_json)?;
-    let rust_cfg = parse_metadata_config_json(metadata_config_json)?;
+    let rust_options = parse_conversion_options(options_json).map_err(to_py_err)?;
+    let rust_cfg = parse_metadata_config(metadata_config_json).map_err(to_py_err)?;
 
     let result = py
         .detach(move || {

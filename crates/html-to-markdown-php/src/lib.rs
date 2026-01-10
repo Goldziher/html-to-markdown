@@ -9,6 +9,7 @@ use ext_php_rs::binary::Binary;
 use ext_php_rs::boxed::ZBox;
 use ext_php_rs::prelude::*;
 use ext_php_rs::types::{ArrayKey, ZendHashTable, Zval};
+use html_to_markdown_bindings_common::error::error_message;
 #[cfg(feature = "metadata")]
 use html_to_markdown_rs::metadata::{
     DocumentMetadata, ExtendedMetadata, HeaderMetadata, ImageMetadata, LinkMetadata, MetadataConfig, StructuredData,
@@ -27,12 +28,7 @@ use html_to_markdown_rs::{
 use std::path::PathBuf;
 
 fn to_php_exception(err: ConversionError) -> PhpException {
-    match err {
-        ConversionError::Panic(message) => {
-            PhpException::default(format!("html-to-markdown panic during conversion: {message}"))
-        }
-        other => PhpException::default(other.to_string()),
-    }
+    PhpException::default(error_message(&err))
 }
 
 #[php_function]
