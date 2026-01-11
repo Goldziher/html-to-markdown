@@ -1,3 +1,5 @@
+#![allow(missing_docs)]
+
 //! Tests for script and style tag stripping before parsing.
 //!
 //! This test suite verifies that script and style tags are completely removed

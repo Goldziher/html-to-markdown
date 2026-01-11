@@ -1,3 +1,5 @@
+#![allow(missing_docs)]
+
 //! CommonMark Specification Compliance Tests
 //!
 //! This test suite verifies that our HTML-to-Markdown converter produces

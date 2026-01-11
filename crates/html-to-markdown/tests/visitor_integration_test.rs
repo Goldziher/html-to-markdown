@@ -1,3 +1,5 @@
+#![allow(missing_docs)]
+
 //! Integration tests for the visitor pattern
 //!
 //! These tests verify that visitor callbacks are properly invoked during

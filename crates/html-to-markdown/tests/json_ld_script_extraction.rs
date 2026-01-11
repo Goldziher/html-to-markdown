@@ -1,3 +1,5 @@
+#![allow(missing_docs)]
+
 use html_to_markdown_rs::metadata::MetadataConfig;
 
 #[test]

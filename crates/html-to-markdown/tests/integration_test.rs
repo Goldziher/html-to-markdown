@@ -1,3 +1,5 @@
+#![allow(missing_docs)]
+
 //! Integration tests for HTML to Markdown conversion.
 //!
 //! These tests verify end-to-end conversion of various HTML elements

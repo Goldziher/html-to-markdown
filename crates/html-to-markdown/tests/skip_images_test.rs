@@ -1,3 +1,5 @@
+#![allow(missing_docs)]
+
 //! Tests for the `skip_images` functionality.
 //!
 //! This test suite verifies that the `skip_images` option correctly omits all `<img>` tags
