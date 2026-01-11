@@ -249,42 +249,11 @@ fn main() -> Result<()> {
 
             let mut registry = AdapterRegistry::new();
             registry.register(std::sync::Arc::new(NativeAdapter::new(repo_root.clone())))?;
-            registry.register(std::sync::Arc::new(ScriptAdapter::new(
-                ScriptLanguage::Python,
-                repo_root.clone(),
-            )))?;
-            registry.register(std::sync::Arc::new(ScriptAdapter::new(
-                ScriptLanguage::Ruby,
-                repo_root.clone(),
-            )))?;
-            registry.register(std::sync::Arc::new(ScriptAdapter::new(
-                ScriptLanguage::Php,
-                repo_root.clone(),
-            )))?;
-            registry.register(std::sync::Arc::new(ScriptAdapter::new(
-                ScriptLanguage::Node,
-                repo_root.clone(),
-            )))?;
-            registry.register(std::sync::Arc::new(ScriptAdapter::new(
-                ScriptLanguage::Wasm,
-                repo_root.clone(),
-            )))?;
-            registry.register(std::sync::Arc::new(ScriptAdapter::new(
-                ScriptLanguage::Java,
-                repo_root.clone(),
-            )))?;
-            registry.register(std::sync::Arc::new(ScriptAdapter::new(
-                ScriptLanguage::CSharp,
-                repo_root.clone(),
-            )))?;
-            registry.register(std::sync::Arc::new(ScriptAdapter::new(
-                ScriptLanguage::Go,
-                repo_root.clone(),
-            )))?;
-            registry.register(std::sync::Arc::new(ScriptAdapter::new(
-                ScriptLanguage::Elixir,
-                repo_root,
-            )))?;
+
+            // Register all script language adapters
+            for language in ScriptLanguage::all() {
+                registry.register(std::sync::Arc::new(ScriptAdapter::new(*language, repo_root.clone())))?;
+            }
 
             let runner = BenchmarkRunner::new(config, registry);
             let results = runner.run(&fixtures, &frameworks)?;
