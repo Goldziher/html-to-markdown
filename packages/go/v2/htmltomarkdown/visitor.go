@@ -9,6 +9,18 @@ package htmltomarkdown
 // #include <string.h>
 //
 // // Forward declarations for C types
+// #ifndef HTML_TO_MARKDOWN_TYPES_H
+// #define HTML_TO_MARKDOWN_TYPES_H
+//
+// // Result type enumeration (matching FFI HtmlToMarkdownVisitResultType)
+// typedef enum {
+//     HTML_TO_MARKDOWN_VISIT_CONTINUE = 0,
+//     HTML_TO_MARKDOWN_VISIT_CUSTOM = 1,
+//     HTML_TO_MARKDOWN_VISIT_SKIP = 2,
+//     HTML_TO_MARKDOWN_VISIT_PRESERVE_HTML = 3,
+//     HTML_TO_MARKDOWN_VISIT_ERROR = 4
+// } HtmlToMarkdownVisitResultType;
+//
 // typedef struct {
 //     uint32_t node_type;
 //     const char* tag_name;
@@ -26,6 +38,9 @@ package htmltomarkdown
 //
 // // Callback function pointers (matching Rust FFI signatures)
 // typedef html_to_markdown_visit_result_t (*visit_text_fn)(
+//
+// #endif // HTML_TO_MARKDOWN_TYPES_H
+//
 //     void *user_data,
 //     const html_to_markdown_node_context_t *ctx,
 //     const char *text);
@@ -303,6 +318,7 @@ package htmltomarkdown
 //     const html_to_markdown_visitor_t* callbacks);
 // void html_to_markdown_visitor_free_proxy(void* visitor);
 import "C"
+
 
 import (
 	"errors"

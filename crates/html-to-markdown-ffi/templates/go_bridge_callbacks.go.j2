@@ -7,7 +7,42 @@ package htmltomarkdown
 
 /*
 #include <stdlib.h>
-#include "../../html-to-markdown-ffi/include/html_to_markdown.h"
+#include <stdbool.h>
+#include <stdint.h>
+#include <string.h>
+
+#ifndef HTML_TO_MARKDOWN_TYPES_H
+#define HTML_TO_MARKDOWN_TYPES_H
+
+// Result type enumeration (matching FFI HtmlToMarkdownVisitResultType)
+typedef enum {
+    HTML_TO_MARKDOWN_VISIT_CONTINUE = 0,
+    HTML_TO_MARKDOWN_VISIT_CUSTOM = 1,
+    HTML_TO_MARKDOWN_VISIT_SKIP = 2,
+    HTML_TO_MARKDOWN_VISIT_PRESERVE_HTML = 3,
+    HTML_TO_MARKDOWN_VISIT_ERROR = 4
+} HtmlToMarkdownVisitResultType;
+
+// Forward declarations for C types
+typedef struct {
+    uint32_t node_type;
+    const char* tag_name;
+    const char* parent_tag;
+    size_t depth;
+    size_t index_in_parent;
+    bool is_inline;
+    bool is_first_child;
+    bool is_last_child;
+    bool has_siblings;
+} html_to_markdown_node_context_t;
+
+typedef struct {
+    uint32_t result_type;
+    char* custom_output;
+    char* error_message;
+} html_to_markdown_visit_result_t;
+
+#endif // HTML_TO_MARKDOWN_TYPES_H
 */
 import "C"
 import (
