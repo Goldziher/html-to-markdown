@@ -10,7 +10,6 @@ Adapted from kreuzberg.dev's README generation system.
 
 import argparse
 import logging
-import re
 import sys
 from pathlib import Path
 from typing import Any
@@ -27,6 +26,7 @@ except ImportError:
     print("Error: Jinja2 is required. Install with: pip install pyyaml jinja2")
     sys.exit(1)
 
+from readme_filters import CodeBlockHandler, FilterRegistry, PerformanceTableRenderer
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
@@ -82,15 +82,12 @@ class ReadmeGenerator:
             autoescape=True,
         )
 
-        # Register custom filter - use a lambda to capture self
-        self.jinja_env.filters["include_snippet"] = lambda path, lang: self.include_snippet_filter(path, lang)
-
-        # Also register as a global function for potential use in templates
-        self.jinja_env.globals["include_snippet"] = lambda path, lang: self.include_snippet_filter(path, lang)
-
-        # html-to-markdown specific filters
-        self.jinja_env.filters["render_performance_table"] = self.render_performance_table_filter
-        self.jinja_env.filters["has_migration"] = lambda lang, ver: self.has_migration_guide(lang, ver)
+        # Register all custom filters using the centralized registry
+        FilterRegistry.register_all(
+            self.jinja_env,
+            include_snippet_handler=lambda path, lang: self.include_snippet_filter(path, lang),
+            has_migration_handler=lambda lang, ver: self.has_migration_guide(lang, ver),
+        )
 
         logger.debug("Jinja2 environment configured")
         return self.jinja_env
@@ -132,88 +129,16 @@ class ReadmeGenerator:
 
         # Handle markdown files (extract code block)
         if snippet_path.suffix == ".md":
-            return self._extract_code_block(content, snippet_path)
+            return CodeBlockHandler.extract_code_block(content, snippet_path)
 
         # Handle raw code files (wrap in code fences)
-        return self._wrap_code_block(content, snippet_path, language)
-
-    def _extract_code_block(self, content: str, snippet_path: Path) -> str:
-        """
-        Extract code block from markdown file.
-
-        Looks for the first code block marked with triple backticks.
-
-        Args:
-            content: Markdown file content
-            snippet_path: Path to snippet file
-
-        Returns:
-            Extracted code block with fences
-
-        Raises:
-            ValueError: If no code block found
-        """
-        # Match code blocks with language identifier
-        pattern = r'```(\w+)?\s*(?:title="[^"]*")?\s*\n(.*?)```'
-        match = re.search(pattern, content, re.DOTALL)
-
-        if not match:
-            raise ValueError(
-                f"No code block found in markdown snippet: {snippet_path}\n"
-                "Ensure file contains code wrapped in triple backticks"
-            )
-
-        language = match.group(1) or "text"
-        code = match.group(2).rstrip()
-
-        # Return the complete code block with fences
-        return f"```{language}\n{code}\n```\n"
-
-    def _wrap_code_block(self, content: str, snippet_path: Path, language: str) -> str:
-        """
-        Wrap raw code in markdown code fences.
-
-        Args:
-            content: Raw code content
-            snippet_path: Path to snippet file
-            language: Language for syntax highlighting
-
-        Returns:
-            Code wrapped in markdown fences
-        """
-        # Check if content already has fence markers to prevent double-wrapping
-        content_stripped = content.lstrip()
-        if content_stripped.startswith("```"):
-            # Content already has fences, return as-is
-            return content
-
-        # Determine language from file extension if not provided
-        ext_map = {
-            ".py": "python",
-            ".go": "go",
-            ".java": "java",
-            ".js": "javascript",
-            ".ts": "typescript",
-            ".rb": "ruby",
-            ".php": "php",
-            ".cs": "csharp",
-            ".rs": "rust",
-            ".ex": "elixir",
-            ".exs": "elixir",
-        }
-
-        lang_id = ext_map[language] if language in ext_map else snippet_path.suffix.lstrip(".") or "text"
-
-        code = content.rstrip()
-        return f"```{lang_id}\n{code}\n```\n"
+        return CodeBlockHandler.wrap_code_block(content, snippet_path, language)
 
     def render_performance_table_filter(self, perf_data: dict[str, Any], runtime: str) -> str:
         """
         Render performance table from structured data.
 
-        Supports two benchmark formats:
-        1. latency/throughput (Python, TypeScript, Ruby, Go)
-        2. ops_sec (PHP, Java, C#, Elixir)
+        Delegates to PerformanceTableRenderer for consistent rendering.
 
         Args:
             perf_data: Dict with 'platform', 'function', 'benchmarks' keys
@@ -222,52 +147,7 @@ class ReadmeGenerator:
         Returns:
             Markdown table as string
         """
-        if not perf_data or "benchmarks" not in perf_data:
-            return ""
-
-        platform = perf_data.get("platform", "Unknown")
-        function = perf_data.get("function", "convert()")
-        note = perf_data.get("note", "")
-        benchmarks = perf_data["benchmarks"]
-
-        # Build header
-        header = f"{platform} • {note} • `{function}` ({runtime})\n\n"
-
-        # Detect format from first benchmark
-        if not benchmarks:
-            return header + "\n(No benchmarks available)\n"
-
-        first_bench = benchmarks[0]
-        uses_latency = "latency" in first_bench
-        uses_ops_sec = "ops_sec" in first_bench
-
-        # Build table based on format
-        if uses_latency:
-            # latency/throughput format
-            table = "| Document | Size | Latency | Throughput |\n"
-            table += "| -------- | ---- | ------- | ---------- |\n"
-            for bench in benchmarks:
-                table += f"| {bench['name']} | {bench['size']} | "
-                table += f"{bench['latency']} | {bench['throughput']} |\n"
-        elif uses_ops_sec:
-            # ops_sec format (with optional throughput)
-            has_throughput = "throughput" in first_bench
-            if has_throughput:
-                table = "| Document | Size | Ops/sec | Throughput |\n"
-                table += "| -------- | ---- | ------- | ---------- |\n"
-                for bench in benchmarks:
-                    table += f"| {bench['name']} | {bench['size']} | "
-                    table += f"{bench['ops_sec']:,} | {bench['throughput']} |\n"
-            else:
-                table = "| Document | Size | Ops/sec |\n"
-                table += "| -------- | ---- | ------- |\n"
-                for bench in benchmarks:
-                    table += f"| {bench['name']} | {bench['size']} | {bench['ops_sec']:,} |\n"
-        else:
-            # Fallback for unknown format
-            table = "\n(Unknown benchmark format)\n"
-
-        return header + table
+        return PerformanceTableRenderer.render(perf_data, runtime)
 
     def has_migration_guide(self, lang_code: str, version: str) -> bool:
         """Check if migration guide exists for language/version."""
@@ -293,6 +173,30 @@ class ReadmeGenerator:
         except Exception as e:
             logger.warning("Failed to read migration guide %s: %s", guide_path, e)
             return ""
+
+    def _prepare_template_context(self, lang_code: str, lang_config: dict[str, Any]) -> dict[str, Any]:
+        """
+        Prepare context dictionary for template rendering.
+
+        Args:
+            lang_code: Language code (python, go, etc.)
+            lang_config: Language-specific configuration
+
+        Returns:
+            Complete context dictionary for template
+        """
+        current_version = self.config.get("version", "")
+        migration_guide = self.inject_migration_guide(lang_code, current_version)
+
+        return {
+            "language": lang_code,
+            "version": current_version,
+            "license": self.config.get("license", "MIT"),
+            "discord_url": self.config.get("discord_url", ""),
+            "banner_url": self.config.get("banner_url", ""),
+            "migration_guide": migration_guide,
+            **lang_config,
+        }
 
     def generate_readme(
         self, lang_code: str, lang_config: dict[str, Any], output_path: Path, dry_run: bool = False
@@ -322,20 +226,8 @@ class ReadmeGenerator:
                 f"Template not found: {template_name}\nExpected at: {self.templates_dir / template_name}"
             ) from e
 
-        # Load migration guide if exists
-        current_version = self.config.get("version", "")
-        migration_guide = self.inject_migration_guide(lang_code, current_version)
-
-        # Prepare context for template
-        context = {
-            "language": lang_code,
-            "version": current_version,
-            "license": self.config.get("license", "MIT"),
-            "discord_url": self.config.get("discord_url", ""),
-            "banner_url": self.config.get("banner_url", ""),
-            "migration_guide": migration_guide,
-            **lang_config,
-        }
+        # Prepare context and render template
+        context = self._prepare_template_context(lang_code, lang_config)
 
         try:
             content = template.render(**context)
