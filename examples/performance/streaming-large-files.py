@@ -14,12 +14,14 @@ from __future__ import annotations
 
 import argparse
 import sys
-import time
+from typing import Any
 
 try:
     from html_to_markdown import convert
 except ImportError:
     sys.exit(1)
+
+from utils import TimingMeasurement, print_result_row, print_section_header
 
 
 def create_large_html_file(size_mb: int = 5) -> str:
@@ -109,7 +111,7 @@ def create_large_html_file(size_mb: int = 5) -> str:
     return html
 
 
-def measure_full_conversion(html: str) -> dict[str, float]:
+def measure_full_conversion(html: str) -> dict[str, Any]:
     """
     Measure time and memory for full document conversion.
 
@@ -121,9 +123,8 @@ def measure_full_conversion(html: str) -> dict[str, float]:
     """
     html_size = len(html.encode("utf-8"))
 
-    start = time.perf_counter()
-    markdown = convert(html)
-    elapsed = time.perf_counter() - start
+    with TimingMeasurement() as timer:
+        markdown = convert(html)
 
     markdown_size = len(markdown.encode("utf-8"))
 
@@ -131,8 +132,8 @@ def measure_full_conversion(html: str) -> dict[str, float]:
         "strategy": "full_document",
         "html_size_mb": html_size / (1024 * 1024),
         "markdown_size_mb": markdown_size / (1024 * 1024),
-        "conversion_time_sec": elapsed,
-        "throughput_mb_sec": (html_size / (1024 * 1024)) / elapsed,
+        "conversion_time_sec": timer.elapsed,
+        "throughput_mb_sec": (html_size / (1024 * 1024)) / timer.elapsed,
     }
 
 
@@ -195,7 +196,7 @@ def split_html_into_chunks(
 def measure_chunked_conversion(
     html: str,
     chunk_size_kb: int = 50,
-) -> dict[str, float]:
+) -> dict[str, Any]:
     """
     Measure chunked conversion approach.
 
@@ -209,9 +210,8 @@ def measure_chunked_conversion(
     html_size = len(html.encode("utf-8"))
     chunks = split_html_into_chunks(html, chunk_size_kb=chunk_size_kb)
 
-    start = time.perf_counter()
-    markdowns = [convert(chunk) for chunk in chunks]
-    elapsed = time.perf_counter() - start
+    with TimingMeasurement() as timer:
+        markdowns = [convert(chunk) for chunk in chunks]
 
     combined_markdown = "\n\n".join(markdowns)
     markdown_size = len(combined_markdown.encode("utf-8"))
@@ -221,15 +221,15 @@ def measure_chunked_conversion(
         "num_chunks": len(chunks),
         "html_size_mb": html_size / (1024 * 1024),
         "markdown_size_mb": markdown_size / (1024 * 1024),
-        "conversion_time_sec": elapsed,
-        "throughput_mb_sec": (html_size / (1024 * 1024)) / elapsed,
+        "conversion_time_sec": timer.elapsed,
+        "throughput_mb_sec": (html_size / (1024 * 1024)) / timer.elapsed,
     }
 
 
 def measure_incremental_conversion(
     html: str,
     chunk_size_kb: int = 50,
-) -> dict[str, float]:
+) -> dict[str, Any]:
     """
     Measure incremental conversion (streaming-like approach).
 
@@ -245,40 +245,46 @@ def measure_incremental_conversion(
     html_size = len(html.encode("utf-8"))
     chunks = split_html_into_chunks(html, chunk_size_kb=chunk_size_kb)
 
-    start = time.perf_counter()
-    total_markdown_size = 0
+    with TimingMeasurement() as timer:
+        total_markdown_size = 0
 
-    # Process chunks one at a time (simulating streaming)
-    for chunk in chunks:
-        markdown = convert(chunk)
-        total_markdown_size += len(markdown.encode("utf-8"))
-
-    elapsed = time.perf_counter() - start
+        # Process chunks one at a time (simulating streaming)
+        for chunk in chunks:
+            markdown = convert(chunk)
+            total_markdown_size += len(markdown.encode("utf-8"))
 
     return {
         "strategy": f"incremental_{chunk_size_kb}kb",
         "num_chunks": len(chunks),
         "html_size_mb": html_size / (1024 * 1024),
         "markdown_size_mb": total_markdown_size / (1024 * 1024),
-        "conversion_time_sec": elapsed,
-        "throughput_mb_sec": (html_size / (1024 * 1024)) / elapsed,
+        "conversion_time_sec": timer.elapsed,
+        "throughput_mb_sec": (html_size / (1024 * 1024)) / timer.elapsed,
     }
 
 
-def print_streaming_results(results: list[dict[str, float]]) -> None:
+def print_streaming_results(results: list[dict[str, Any]]) -> None:
     """Print streaming performance results."""
+    print_section_header("Streaming Performance Analysis")
+
     for result in results:
         strategy = result["strategy"]
-        result["html_size_mb"]
-        result["conversion_time_sec"]
-        result["throughput_mb_sec"]
+        html_mb = result["html_size_mb"]
+        time_sec = result["conversion_time_sec"]
+        throughput = result["throughput_mb_sec"]
+
+        print_result_row("Strategy", strategy)
+        print_result_row("HTML size (MB)", f"{html_mb:.2f}")
+        print_result_row("Conversion time (sec)", f"{time_sec:.3f}")
+        print_result_row("Throughput (MB/sec)", f"{throughput:.2f}")
 
         # Add strategy-specific notes
         if "chunked" in strategy or "incremental" in strategy:
-            result.get("num_chunks", 0)
-        else:
-            pass
+            num_chunks = result.get("num_chunks", 0)
+            print_result_row("Number of chunks", num_chunks)
+        print()
 
+    print_section_header("Performance Comparison (vs Full Document)")
     full_result = next((r for r in results if r["strategy"] == "full_document"), None)
     if full_result:
         baseline_time = full_result["conversion_time_sec"]
@@ -286,8 +292,10 @@ def print_streaming_results(results: list[dict[str, float]]) -> None:
 
         for result in results:
             if result["strategy"] != "full_document":
-                result["conversion_time_sec"] / baseline_time
-                result["throughput_mb_sec"] / baseline_throughput
+                time_ratio = result["conversion_time_sec"] / baseline_time
+                throughput_ratio = result["throughput_mb_sec"] / baseline_throughput
+                print_result_row(result["strategy"], f"Time: {time_ratio:.2f}x, Throughput: {throughput_ratio:.2f}x")
+        print()
 
 
 def main() -> None:
