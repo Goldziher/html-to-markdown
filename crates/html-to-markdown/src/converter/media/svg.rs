@@ -1,5 +1,6 @@
 //! SVG and MathML element handling with serialization and base64 encoding.
 
+#[allow(unused_imports)]
 use std::collections::BTreeMap;
 use tl::{NodeHandle, Parser};
 

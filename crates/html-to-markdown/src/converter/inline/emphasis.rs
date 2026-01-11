@@ -9,6 +9,7 @@
 //! - Bootstrap caret detection (.caret class)
 
 use crate::options::ConversionOptions;
+#[allow(unused_imports)]
 use std::collections::BTreeMap;
 use tl::{NodeHandle, Parser};
 
@@ -62,6 +63,7 @@ fn handle_strong(
     depth: usize,
     dom_ctx: &DomContext,
 ) {
+    #[allow(unused_imports)]
     use crate::converter::{append_inline_suffix, chomp_inline, get_text_content, serialize_node, walk_node};
 
     let Some(node) = node_handle.get(parser) else { return };
@@ -197,6 +199,7 @@ fn handle_emphasis(
     depth: usize,
     dom_ctx: &DomContext,
 ) {
+    #[allow(unused_imports)]
     use crate::converter::{append_inline_suffix, chomp_inline, get_text_content, serialize_node, walk_node};
 
     let Some(node) = node_handle.get(parser) else { return };

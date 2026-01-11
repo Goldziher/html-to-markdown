@@ -8,6 +8,7 @@
 
 use crate::options::{ConversionOptions, HeadingStyle};
 use std::borrow::Cow;
+#[allow(unused_imports)]
 use std::collections::BTreeMap;
 use tl::{NodeHandle, Parser};
 

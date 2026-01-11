@@ -11,6 +11,7 @@ use super::utils::{
     process_list_children,
 };
 use crate::options::ConversionOptions;
+#[allow(unused_imports)]
 use std::collections::BTreeMap;
 use tl;
 

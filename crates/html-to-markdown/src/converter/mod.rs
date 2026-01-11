@@ -112,6 +112,7 @@ pub(crate) use self::main::{convert_html_impl, trim_trailing_whitespace, walk_no
 
 // Re-export helper functions from utility modules (migrated from converter_legacy)
 pub(crate) use crate::converter::utility::content::{chomp_inline, get_text_content, normalized_tag_name};
+#[allow(unused_imports)]
 pub(crate) use crate::converter::utility::serialization::{serialize_node, serialize_node_to_html};
 
 // Helper functions migrated to utility modules

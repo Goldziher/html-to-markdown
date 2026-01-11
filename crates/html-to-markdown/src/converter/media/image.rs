@@ -1,5 +1,6 @@
 //! Image element handling (img, data URIs, inline image collection).
 
+#[allow(unused_imports)]
 use std::collections::BTreeMap;
 
 #[cfg(feature = "inline-images")]

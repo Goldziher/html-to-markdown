@@ -57,6 +57,7 @@ pub(crate) fn handle(
     // Import helper functions from parent converter module
     use crate::converter::block::heading::{heading_allows_inline_images, push_heading};
     use crate::converter::utility::content::{normalized_tag_name, truncate_at_char_boundary};
+    #[allow(unused_imports)]
     use crate::converter::utility::serialization::serialize_node;
     use crate::converter::{find_single_heading_child, get_text_content, walk_node};
 

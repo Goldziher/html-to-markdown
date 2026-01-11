@@ -51,11 +51,13 @@ use crate::converter::list::utils::{
 use crate::converter::text::{dedent_code_block, normalize_heading_text};
 use crate::converter::utility::attributes::{is_hocr_document, may_be_hocr};
 use crate::converter::utility::caching::build_dom_context;
+#[allow(unused_imports)]
 use crate::converter::utility::content::{
     chomp_inline, collect_link_label_text, escape_link_label, get_text_content, is_block_level_element,
     is_block_level_name, is_empty_inline_element, normalize_link_label, normalized_tag_name, truncate_at_char_boundary,
 };
 use crate::converter::utility::preprocessing::{preprocess_html, strip_script_and_style_tags};
+#[allow(unused_imports)]
 use crate::converter::utility::serialization::{
     serialize_element, serialize_node, serialize_node_to_html, serialize_tag_to_html,
 };

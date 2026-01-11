@@ -8,6 +8,7 @@
 //! - Visitor callbacks for custom code processing
 
 use crate::options::{CodeBlockStyle, ConversionOptions, WhitespaceMode};
+#[allow(unused_imports)]
 use std::collections::BTreeMap;
 use tl::{NodeHandle, Parser};
 

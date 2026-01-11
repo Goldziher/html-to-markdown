@@ -8,6 +8,7 @@
 //! - Visitor callbacks for custom blockquote processing
 
 use crate::options::ConversionOptions;
+#[allow(unused_imports)]
 use std::collections::BTreeMap;
 use tl::{NodeHandle, Parser};
 

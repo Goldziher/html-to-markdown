@@ -12,6 +12,7 @@
 
 use crate::options::ConversionOptions;
 use crate::text;
+#[allow(unused_imports)]
 use std::collections::BTreeMap;
 use tl::{NodeHandle, Parser};
 
@@ -74,6 +75,7 @@ fn handle_code(
     depth: usize,
     dom_ctx: &DomContext,
 ) {
+    #[allow(unused_imports)]
     use crate::converter::{serialize_node, walk_node};
 
     let Some(node) = node_handle.get(parser) else { return };
