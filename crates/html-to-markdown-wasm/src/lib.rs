@@ -678,7 +678,7 @@ pub fn convert_with_metadata(
         }
         #[cfg(not(feature = "visitor"))]
         {
-            guard_panic(|| html_to_markdown_rs::convert_with_metadata(&html, rust_options, rust_metadata_config))
+            guard_panic(|| html_to_markdown_rs::convert_with_metadata(&html, rust_options, rust_metadata_config, None))
         }
     }
     .map_err(to_js_error)?;
