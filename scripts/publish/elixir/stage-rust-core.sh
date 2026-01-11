@@ -62,7 +62,7 @@ replacements = {
     r"^homepage\.workspace\s*=\s*true\s*$": 'homepage = "https://github.com/kreuzberg-dev/html-to-markdown"',
     r"^documentation\.workspace\s*=\s*true\s*$": 'documentation = "https://docs.rs/html-to-markdown-rs"',
     r"^rust-version\.workspace\s*=\s*true\s*$": 'rust-version = "1.85"',
-    r"^\[lints\]\s*\nworkspace\s*=\s*true\s*$": '[lints]\nrust.unsafe_code = "forbid"\nrust.missing_docs = "warn"\nrust.unused_must_use = "deny"\nclippy.all = { level = "deny", priority = -1 }\nclippy.cargo = { level = "deny", priority = -1 }\nclippy.pedantic = { level = "warn", priority = -1 }\nclippy.nursery = { level = "warn", priority = -1 }\nclippy.multiple_crate_versions = "allow"',
+    r"^\[lints\]\s*\nworkspace\s*=\s*true\s*$": '[lints]\nrust.unsafe_code = "forbid"\nrust.missing_docs = "warn"\nrust.unused_must_use = "deny"',
     r"^tl\.workspace\s*=\s*true\s*$": 'tl = { package = "astral-tl", version = "0.7.11" }',
     r"^regex\.workspace\s*=\s*true\s*$": 'regex = "1.12"',
     r"^once_cell\.workspace\s*=\s*true\s*$": 'once_cell = "1.21"',
