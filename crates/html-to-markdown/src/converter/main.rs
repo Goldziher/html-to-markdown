@@ -509,6 +509,43 @@ pub(crate) fn trim_line_end_whitespace(output: &mut String) {
     *output = cleaned;
 }
 
+/// Check if an inline ancestor element is allowed to contain block-level elements.
+fn inline_ancestor_allows_block(tag_name: &str) -> bool {
+    matches!(tag_name, "a" | "ins" | "del")
+}
+
+/// Detect block elements that were incorrectly nested under inline ancestors.
+fn has_inline_block_misnest(dom_ctx: &DomContext, parser: &tl::Parser) -> bool {
+    for handle in dom_ctx.node_map.iter().flatten() {
+        if let Some(tl::Node::Tag(_tag)) = handle.get(parser) {
+            let is_block = dom_ctx
+                .tag_info(handle.get_inner(), parser)
+                .map(|info| info.is_block)
+                .unwrap_or(false);
+            if is_block {
+                let mut current = dom_ctx.parent_of(handle.get_inner());
+                while let Some(parent_id) = current {
+                    if let Some(parent_info) = dom_ctx.tag_info(parent_id, parser) {
+                        if is_inline_element(&parent_info.name) && !inline_ancestor_allows_block(&parent_info.name) {
+                            return true;
+                        }
+                    } else if let Some(parent_handle) = dom_ctx.node_handle(parent_id) {
+                        if let Some(tl::Node::Tag(parent_tag)) = parent_handle.get(parser) {
+                            let parent_name = normalized_tag_name(parent_tag.name().as_utf8_str());
+                            if is_inline_element(&parent_name) && !inline_ancestor_allows_block(&parent_name) {
+                                return true;
+                            }
+                        }
+                    }
+                    current = dom_ctx.parent_of(parent_id);
+                }
+            }
+        }
+    }
+
+    false
+}
+
 /// Check if HTML contains custom element tags.
 fn has_custom_element_tags(html: &str) -> bool {
     // Custom elements must have a hyphen in their name
@@ -518,11 +555,20 @@ fn has_custom_element_tags(html: &str) -> bool {
 /// Try to repair HTML using html5ever parser.
 ///
 /// Returns Some(repaired_html) if repair was successful, None otherwise.
-fn repair_with_html5ever(html: &str) -> Option<String> {
-    // For now, return None as this would require the html5ever serializer
-    // In a full implementation, this would parse and reserialize with html5ever
-    let _ = html;
-    None
+fn repair_with_html5ever(input: &str) -> Option<String> {
+    use html5ever::serialize::{SerializeOpts, serialize};
+    use html5ever::tendril::TendrilSink;
+    use markup5ever_rcdom::{RcDom, SerializableHandle};
+
+    let dom = html5ever::parse_document(RcDom::default(), Default::default())
+        .from_utf8()
+        .read_from(&mut input.as_bytes())
+        .ok()?;
+
+    let mut buf = Vec::with_capacity(input.len());
+    let handle = SerializableHandle::from(dom.document);
+    serialize(&mut buf, &handle, SerializeOpts::default()).ok()?;
+    String::from_utf8(buf).ok()
 }
 
 /// Format metadata as YAML frontmatter.
@@ -667,7 +713,7 @@ pub(crate) fn convert_html_impl(
         }
     }
     let parser_options = tl::ParserOptions::default();
-    let dom = loop {
+    let mut dom = loop {
         if let Ok(dom) = tl::parse(&preprocessed, parser_options) {
             break dom;
         }
@@ -680,7 +726,7 @@ pub(crate) fn convert_html_impl(
             "Failed to parse HTML".to_string(),
         ));
     };
-    let parser = dom.parser();
+    let mut parser = dom.parser();
     let mut output = String::with_capacity(preprocessed_len.saturating_add(preprocessed_len / 4));
 
     let mut is_hocr = false;
@@ -734,7 +780,23 @@ pub(crate) fn convert_html_impl(
         return Ok(output);
     }
 
-    let dom_ctx = build_dom_context(&dom, parser, preprocessed_len);
+    let mut dom_ctx = build_dom_context(&dom, parser, preprocessed_len);
+
+    // Check for inline-block misnesting and repair if needed
+    if has_inline_block_misnest(&dom_ctx, parser) {
+        if let Some(repaired_html) = repair_with_html5ever(&preprocessed) {
+            // Drop dom to release borrow on preprocessed
+            drop(dom);
+            preprocessed = preprocess_html(&repaired_html).into_owned();
+            preprocessed_len = preprocessed.len();
+            // Re-parse with repaired HTML
+            dom = tl::parse(&preprocessed, parser_options)
+                .map_err(|_| crate::error::ConversionError::ParseError("Failed to parse repaired HTML".to_string()))?;
+            parser = dom.parser();
+            dom_ctx = build_dom_context(&dom, parser, preprocessed_len);
+            output = String::with_capacity(preprocessed_len.saturating_add(preprocessed_len / 4));
+        }
+    }
 
     let wants_frontmatter = options.extract_metadata && !options.convert_as_inline;
     #[cfg(feature = "metadata")]
