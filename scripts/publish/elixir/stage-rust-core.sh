@@ -78,3 +78,24 @@ for pattern, replacement in replacements.items():
 
 path.write_text(text, encoding="utf-8")
 PY
+
+# Add #![allow(unused)] to all converter module files as inner attribute
+# since visitor feature gates many imports that are unused when visitor is disabled
+find "${DEST_DIR}/src/converter" -type f -name "*.rs" -print0 | while IFS= read -r -d '' file; do
+	# Check if file already has #![allow(unused)]
+	if ! grep -q "^\s*#!\[allow(unused)" "$file"; then
+		# Add #![allow(unused)] at the very beginning of the file (before doc comments)
+		python3 - "$file" <<'PYFIX'
+import sys
+from pathlib import Path
+
+path = Path(sys.argv[1])
+text = path.read_text(encoding="utf-8")
+
+# Add inner attribute at the very beginning
+text = '#![allow(unused)]\n' + text
+
+path.write_text(text, encoding="utf-8")
+PYFIX
+	fi
+done
