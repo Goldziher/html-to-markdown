@@ -515,6 +515,9 @@ fn inline_ancestor_allows_block(tag_name: &str) -> bool {
 }
 
 /// Detect block elements that were incorrectly nested under inline ancestors.
+///
+/// Excludes elements inside `<pre>` or `<code>` blocks, as they have special
+/// whitespace preservation rules and should not be repaired.
 fn has_inline_block_misnest(dom_ctx: &DomContext, parser: &tl::Parser) -> bool {
     for handle in dom_ctx.node_map.iter().flatten() {
         if let Some(tl::Node::Tag(_tag)) = handle.get(parser) {
@@ -523,6 +526,24 @@ fn has_inline_block_misnest(dom_ctx: &DomContext, parser: &tl::Parser) -> bool {
                 .map(|info| info.is_block)
                 .unwrap_or(false);
             if is_block {
+                // Check if this block element or any ancestor is pre/code
+                let mut check_parent = Some(handle.get_inner());
+                let mut inside_preformatted = false;
+                while let Some(node_id) = check_parent {
+                    if let Some(info) = dom_ctx.tag_info(node_id, parser) {
+                        if matches!(info.name.as_str(), "pre" | "code") {
+                            inside_preformatted = true;
+                            break;
+                        }
+                    }
+                    check_parent = dom_ctx.parent_of(node_id);
+                }
+
+                // Skip misnesting check for elements inside pre/code blocks
+                if inside_preformatted {
+                    continue;
+                }
+
                 let mut current = dom_ctx.parent_of(handle.get_inner());
                 while let Some(parent_id) = current {
                     if let Some(parent_info) = dom_ctx.tag_info(parent_id, parser) {
@@ -3140,11 +3161,8 @@ pub(crate) fn walk_node(
                         let processed_content = if options.whitespace_mode == crate::options::WhitespaceMode::Strict {
                             content
                         } else {
-                            let mut core_text = if leading_newlines > 0 {
-                                dedent_code_block(core)
-                            } else {
-                                core.to_string()
-                            };
+                            // Always dedent code blocks to remove common leading whitespace
+                            let mut core_text = dedent_code_block(core);
 
                             if is_whitespace_only {
                                 let mut rebuilt = String::new();
