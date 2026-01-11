@@ -13,6 +13,7 @@ This script reads the version from Cargo.toml [workspace.package] and updates:
 import json
 import re
 import sys
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -38,18 +39,90 @@ def get_workspace_version(repo_root: Path) -> str:
     return match.group(1)
 
 
-def update_package_json(file_path: Path, version: str) -> tuple[bool, str, str]:
+# ============================================================================
+# Generic Version Update Helpers
+# ============================================================================
+
+
+def _extract_version_regex(content: str, pattern: str) -> str:
+    """Extract version from content using regex pattern with capturing group."""
+    match = re.search(pattern, content)
+    return match.group(1) if match else "NOT FOUND"
+
+
+def _update_via_regex(
+    file_path: Path, pattern: str, replacement_fn: Callable[[re.Match[str]], str] | str, count: int = 1
+) -> tuple[bool, str, str]:
     """
-    Update a package.json file.
+    Update version via regex pattern matching.
+
+    Args:
+        file_path: Path to file to update
+        pattern: Regex pattern with capture group for old version
+        replacement_fn: Either a format string (\\1, \\2, etc.) or callable(match) -> str
+        count: Max number of replacements
 
     Returns: (changed, old_version, new_version)
     """
+    content = file_path.read_text()
+    old_version = _extract_version_regex(content, pattern)
+
+    if isinstance(replacement_fn, str):
+        new_content, num_replaced = re.subn(pattern, replacement_fn, content, count=count)
+    else:
+        new_content, num_replaced = re.subn(pattern, replacement_fn, content, count=count)
+
+    changed = num_replaced > 0 and new_content != content
+    if changed:
+        file_path.write_text(new_content)
+
+    return changed, old_version, old_version  # old_version used as placeholder until actual new version is extracted
+
+
+def _update_single_regex_field(
+    file_path: Path, field_pattern: str, version: str, quote_char: str = '"', count: int = 1
+) -> tuple[bool, str, str]:
+    """
+    Update single field via regex (e.g., "version = "X.Y.Z"").
+
+    Args:
+        file_path: Path to file
+        field_pattern: Pattern like r'^version\\s*=' (capture group added automatically)
+        version: New version value
+        quote_char: Quote character to use (default: ")
+        count: Max replacements
+
+    Returns: (changed, old_version, new_version)
+    """
+    content = file_path.read_text()
+    # Build full pattern with capture group for extraction
+    quote_esc = re.escape(quote_char)
+    extract_pattern = field_pattern + rf"\s*{quote_esc}([^{quote_esc}]+){quote_esc}"
+    old_version = _extract_version_regex(content, extract_pattern)
+
+    if old_version == version:
+        return False, old_version, version
+
+    # Build replacement pattern that captures the field and replaces the quoted version
+    replacement_pattern = f"({field_pattern})" + rf"\s*{quote_esc}[^{quote_esc}]+{quote_esc}"
+    replacement_text = rf"\1{quote_char}{version}{quote_char}"
+    new_content = re.sub(replacement_pattern, replacement_text, content, count=count, flags=re.MULTILINE)
+
+    if new_content != content:
+        file_path.write_text(new_content)
+        return True, old_version, version
+
+    return False, old_version, version
+
+
+def _update_json_field(file_path: Path, field: str, version: str) -> tuple[bool, str, str]:
+    """Update a JSON field (e.g., "version" in package.json)."""
     data = json.loads(file_path.read_text())
-    old_version = data.get("version", "N/A")
+    old_version = data.get(field, "N/A")
     changed = False
 
-    if data.get("version") != version:
-        data["version"] = version
+    if data.get(field) != version:
+        data[field] = version
         changed = True
 
     if changed:
@@ -58,67 +131,41 @@ def update_package_json(file_path: Path, version: str) -> tuple[bool, str, str]:
     return changed, old_version, version
 
 
+def _update_json_dependency(file_path: Path, package_name: str, version_spec: str) -> None:
+    """Update dependency version in JSON files (package.json, composer.json)."""
+    data = json.loads(file_path.read_text())
+
+    # Check all possible dependency fields
+    for dep_type in ["dependencies", "optionalDependencies", "devDependencies", "require"]:
+        if dep_type in data and package_name in data[dep_type]:
+            data[dep_type][package_name] = version_spec
+
+    file_path.write_text(json.dumps(data, indent=2) + "\n")
+
+
+def update_package_json(file_path: Path, version: str) -> tuple[bool, str, str]:
+    """Update a package.json file."""
+    return _update_json_field(file_path, "version", version)
+
+
 def update_pyproject_toml(file_path: Path, version: str) -> tuple[bool, str, str]:
-    """
-    Update a pyproject.toml file.
-
-    Returns: (changed, old_version, new_version)
-    """
-    content = file_path.read_text()
-    match = re.search(r'^version\s*=\s*"([^"]+)"', content, re.MULTILINE)
-    old_version = match.group(1) if match else "NOT FOUND"
-
-    if old_version == version:
-        return False, old_version, version
-
-    new_content = re.sub(r'^(version\s*=\s*)"[^"]+"', rf'\1"{version}"', content, count=1, flags=re.MULTILINE)
-
-    file_path.write_text(new_content)
-    return True, old_version, version
+    """Update a pyproject.toml file."""
+    return _update_single_regex_field(file_path, r"^version\s*=", version, quote_char='"')
 
 
 def update_ruby_version(file_path: Path, version: str) -> tuple[bool, str, str]:
-    """
-    Update Ruby version.rb file.
-
-    Returns: (changed, old_version, new_version)
-    """
-    content = file_path.read_text()
-    match = re.search(r"VERSION\s*=\s*'([^']+)'", content)
-    old_version = match.group(1) if match else "NOT FOUND"
-
-    if old_version == version:
-        return False, old_version, version
-
-    new_content = re.sub(r"(VERSION\s*=\s*)'[^']+'", rf"\1'{version}'", content)
-
-    file_path.write_text(new_content)
-    return True, old_version, version
+    """Update Ruby version.rb file."""
+    return _update_single_regex_field(file_path, r"VERSION\s*=", version, quote_char="'")
 
 
 def update_cargo_toml(file_path: Path, version: str) -> tuple[bool, str, str]:
-    """
-    Update a Cargo.toml file that has hardcoded version (not using workspace).
-
-    Returns: (changed, old_version, new_version)
-    """
-    content = file_path.read_text()
-    match = re.search(r'^version\s*=\s*"([^"]+)"', content, re.MULTILINE)
-    old_version = match.group(1) if match else "NOT FOUND"
-
-    if old_version == version:
-        return False, old_version, version
-
-    new_content = re.sub(r'^(version\s*=\s*)"[^"]+"', rf'\1"{version}"', content, count=1, flags=re.MULTILINE)
-
-    file_path.write_text(new_content)
-    return True, old_version, version
+    """Update a Cargo.toml file that has hardcoded version (not using workspace)."""
+    return _update_single_regex_field(file_path, r"^version\s*=", version, quote_char='"')
 
 
 def update_rust_dependency_versions(file_path: Path, version: str) -> bool:
     """Update html-to-markdown-rs dependency version pins inside Cargo manifests."""
     content = file_path.read_text()
-
     pattern = re.compile(r'(html-to-markdown-rs\s*=\s*\{\s*version\s*=\s*")([^"]+)(")')
 
     def repl(match: re.Match[str]) -> str:
@@ -133,6 +180,7 @@ def update_rust_dependency_versions(file_path: Path, version: str) -> bool:
 
 
 def update_gemfile_lock(file_path: Path, version: str) -> tuple[bool, str, str]:
+    """Update html-to-markdown version in Gemfile.lock."""
     content = file_path.read_text()
     match = re.search(r"(html-to-markdown\s*\()\s*([^)]+)(\))", content)
     if not match:
@@ -153,6 +201,7 @@ def update_gemfile_lock(file_path: Path, version: str) -> tuple[bool, str, str]:
 
 
 def update_python_version_file(file_path: Path, version: str) -> tuple[bool, str, str]:
+    """Update __version__ in Python __init__.py files."""
     content = file_path.read_text()
     match = re.search(r'(__version__\s*=\s*)"([^"]+)"', content)
     old_version = match.group(2) if match else "NOT FOUND"
@@ -166,6 +215,7 @@ def update_python_version_file(file_path: Path, version: str) -> tuple[bool, str
 
 
 def update_node_binding_version(file_path: Path, version: str) -> tuple[bool, str, str]:
+    """Update version checks in Node binding index.js file."""
     content = file_path.read_text()
     pattern = r"(bindingPackageVersion\s*!==\s*')([0-9]+\.[0-9]+\.[0-9]+)(')"
     new_content, count = re.subn(pattern, rf"\g<1>{version}\g<3>", content)
@@ -180,6 +230,7 @@ def update_node_binding_version(file_path: Path, version: str) -> tuple[bool, st
 
 
 def update_uv_lock(file_path: Path, version: str) -> tuple[bool, str, str]:
+    """Update html-to-markdown version in uv.lock file."""
     content = file_path.read_text()
     pattern = re.compile(r'(name\s*=\s*"html-to-markdown"\s+version\s*=\s*)"([^"]+)"')
     match = pattern.search(content)
@@ -197,33 +248,17 @@ def update_uv_lock(file_path: Path, version: str) -> tuple[bool, str, str]:
 
 def update_composer_json(file_path: Path, version: str) -> tuple[bool, str, str]:
     """Update a composer.json file's version field."""
-    data = json.loads(file_path.read_text())
-    old_version = data.get("version", "NOT FOUND")
-
-    if old_version == version:
-        return False, old_version, version
-
-    data["version"] = version
-    file_path.write_text(json.dumps(data, indent=2) + "\n")
-    return True, old_version, version
+    return _update_json_field(file_path, "version", version)
 
 
 def update_json_dependency(file_path: Path, package_name: str, version_spec: str) -> None:
-    """Update dependency version in package.json or composer.json."""
-    data = json.loads(file_path.read_text())
-
-    # Check dependencies and optionalDependencies
-    for dep_type in ["dependencies", "optionalDependencies", "devDependencies", "require"]:
-        if dep_type in data and package_name in data[dep_type]:
-            data[dep_type][package_name] = version_spec
-
-    file_path.write_text(json.dumps(data, indent=2) + "\n")
+    """Update dependency version in JSON files (package.json, composer.json)."""
+    _update_json_dependency(file_path, package_name, version_spec)
 
 
 def update_toml_dependency(file_path: Path, package_name: str, version_spec: str) -> None:
     """Update dependency version in pyproject.toml."""
     content = file_path.read_text()
-    # Match dependencies.package_name = "..."
     pattern = re.compile(rf'({re.escape(package_name)}\s*=\s*)"[^"]+"')
     updated = pattern.sub(rf'\1"{version_spec}"', content)
     file_path.write_text(updated)
@@ -250,7 +285,6 @@ def update_go_mod(go_mod_path: Path, module_path: str, version: str) -> None:
 def update_pom_dependency(pom_path: Path, group_id: str, artifact_id: str, version: str) -> None:
     """Update dependency version in pom.xml."""
     content = pom_path.read_text()
-    # Match dependency block for the artifact
     pattern = re.compile(
         rf"(<dependency>.*?<groupId>{re.escape(group_id)}</groupId>.*?<artifactId>{re.escape(artifact_id)}</artifactId>.*?<version>).*?(</version>.*?</dependency>)",
         re.DOTALL,
@@ -272,7 +306,6 @@ def update_csproj_dependency(csproj_path: Path, package_name: str, version: str)
 def update_mix_dependency(mix_path: Path, package_name: str, version: str) -> None:
     """Update dependency version in mix.exs."""
     content = mix_path.read_text()
-    # Match {:package_name, "~> X.Y.Z"}
     pattern = re.compile(rf'(\{{{re.escape(package_name)},\s*"~>\s*)[^"]+("}})')
     replacement = rf"\g<1>{version}\g<2>"
     updated = pattern.sub(replacement, content)
@@ -280,11 +313,7 @@ def update_mix_dependency(mix_path: Path, package_name: str, version: str) -> No
 
 
 def update_mix_version(file_path: Path, version: str) -> tuple[bool, str, str]:
-    """
-    Update @version declarations inside mix.exs files.
-
-    Returns: (changed, old_version, new_version)
-    """
+    """Update @version declarations inside mix.exs files."""
     content = file_path.read_text()
     match = re.search(r'@version\s*=?\s*"([^"]+)"', content)
     old_version = match.group(1) if match else "NOT FOUND"
