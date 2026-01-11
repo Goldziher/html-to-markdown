@@ -124,6 +124,8 @@ pub struct Context {
     pub(crate) in_ruby: bool,
     /// Are we inside a `<strong>` / `<b>` element?
     pub(crate) in_strong: bool,
+    /// Are we inside a link element (collecting link label text)?
+    pub(crate) in_link: bool,
     /// Tag names that should be stripped during conversion.
     pub(crate) strip_tags: Rc<HashSet<String>>,
     /// Tag names that should be preserved as raw HTML.
@@ -844,6 +846,7 @@ pub(crate) fn convert_html_impl(
         in_paragraph: false,
         in_ruby: false,
         in_strong: false,
+        in_link: false,
         strip_tags: Rc::new(options.strip_tags.iter().cloned().collect()),
         preserve_tags: Rc::new(options.preserve_tags.iter().cloned().collect()),
         keep_inline_images_in: Rc::new(options.keep_inline_images_in.iter().cloned().collect()),

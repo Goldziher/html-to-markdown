@@ -85,6 +85,15 @@ pub(crate) fn handle(
             .trim()
             .to_string();
 
+        // If we're already inside a link, just render the text content, don't create a nested link
+        if ctx.in_link {
+            let children = tag.children();
+            for child_handle in children.top().iter() {
+                walk_node(child_handle, parser, output, options, ctx, depth + 1, dom_ctx);
+            }
+            return;
+        }
+
         // Check if this should be rendered as an autolink
         let is_autolink = options.autolinks
             && !options.default_title
@@ -153,6 +162,7 @@ pub(crate) fn handle(
             let link_ctx = Context {
                 inline_depth: ctx.inline_depth + 1,
                 convert_as_inline: true,
+                in_link: true,
                 ..ctx.clone()
             };
             for child_handle in &children {
@@ -184,6 +194,7 @@ pub(crate) fn handle(
             let mut content = String::new();
             let link_ctx = Context {
                 inline_depth: ctx.inline_depth + 1,
+                in_link: true,
                 ..ctx.clone()
             };
             for child_handle in &children {
