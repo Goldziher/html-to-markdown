@@ -679,6 +679,14 @@ fn extract_head_metadata(
                             }
                         }
                     }
+                    // Look for base tag with href attribute
+                    if child_tag.name().as_utf8_str().eq_ignore_ascii_case("base") {
+                        if let Some(href_attr) = child_tag.attributes().get("href").flatten() {
+                            let href_str = href_attr.as_utf8_str();
+                            // Store as "base" which will be mapped to base_href in extract_document_metadata
+                            metadata.insert("base".to_string(), href_str.to_string());
+                        }
+                    }
                 }
             }
         } else {
