@@ -14,8 +14,26 @@
     clippy::default_trait_access,
     clippy::unused_self,
     clippy::cast_precision_loss,
-    clippy::collapsible_if
+    clippy::collapsible_if,
+    clippy::too_many_arguments,
+    clippy::collapsible_else_if,
+    clippy::extra_unused_lifetimes,
+    clippy::unnecessary_lazy_evaluations,
+    clippy::must_use_candidate,
+    clippy::trivially_copy_pass_by_ref,
+    clippy::explicit_iter_loop,
+    clippy::missing_const_for_fn,
+    clippy::manual_assert,
+    clippy::return_self_not_must_use,
+    clippy::collapsible_match,
+    clippy::cast_possible_truncation,
+    clippy::map_unwrap_or,
+    clippy::manual_let_else,
+    clippy::used_underscore_binding,
+    clippy::assigning_clones,
+    clippy::uninlined_format_args
 )]
+#![allow(dead_code)]
 
 //! High-performance HTML to Markdown converter.
 //!
@@ -390,7 +408,13 @@ pub fn convert_with_inline_images(
         visitor,
     )?;
     #[cfg(not(feature = "visitor"))]
-    let markdown = converter::convert_html_impl(normalized_html.as_ref(), &options, Some(Rc::clone(&collector)), None)?;
+    let markdown = converter::convert_html_impl(
+        normalized_html.as_ref(),
+        &options,
+        Some(Rc::clone(&collector)),
+        None,
+        None,
+    )?;
 
     let markdown = if options.wrap {
         wrapper::wrap_markdown(&markdown, &options)

@@ -1,0 +1,740 @@
+# Visitor Callback Schema
+# Central definition for all FFI visitor callbacks across Rust, Go, C#, and Java layers
+#
+# This schema drives code generation to eliminate ~2,450 lines of duplicated callback wrappers.
+# Each callback is defined once here and generates code for 4 target languages.
+#
+# Type mapping reference:
+#   string     -> *const c_char (Rust) / *C.char (Go) / string (C#) / String (Java)
+#   bool       -> bool (Rust) / C.bool (Go) / bool (C#) / boolean (Java)
+#   u32        -> u32 (Rust) / C.uint (Go) / uint (C#) / int (Java)
+#   usize      -> usize (Rust) / C.size_t (Go) / nuint (C#) / long (Java)
+#   string[]   -> *const *const c_char (Rust) / **C.char (Go) / string[] (C#) / String[] (Java)
+#   context    -> *const NodeContext (Rust) / *C.NodeContext (Go) / IntPtr (C#) / MemoryAddress (Java)
+
+version: "1.0.0"
+metadata:
+  generated_languages:
+    - rust
+    - go
+    - csharp
+  expected_reduction:
+    rust_ffi: "1,800 → ~500 lines (72%)"
+    go_bridge: "1,220 → ~150 lines (88%)"
+    csharp_bridge: "720 → ~200 lines (72%)"
+  total_callbacks: 40
+
+# Type definitions used across callbacks
+types:
+  context:
+    description: "Node context pointer (valid only during callback)"
+    rust: "*const HtmlToMarkdownNodeContext"
+    go: "*C.html_to_markdown_node_context_t"
+    csharp: "IntPtr"
+    java: "MemoryAddress"
+
+  string:
+    description: "NULL-terminated C string (optional if marked nullable)"
+    rust: "*const c_char"
+    go: "*C.char"
+    csharp: "string"
+    java: "String"
+
+  bool:
+    description: "Boolean value"
+    rust: "bool"
+    go: "C.bool"
+    csharp: "bool"
+    java: "boolean"
+
+  u32:
+    description: "32-bit unsigned integer"
+    rust: "u32"
+    go: "C.uint"
+    csharp: "uint"
+    java: "int"
+
+  usize:
+    description: "Architecture-dependent unsigned size"
+    rust: "usize"
+    go: "C.size_t"
+    csharp: "nuint"
+    java: "long"
+
+  string_array:
+    description: "NULL-terminated array of NULL-terminated strings"
+    rust: "*const *const c_char"
+    go: "**C.char"
+    csharp: "string[]"
+    java: "String[]"
+
+# Callback definitions
+# Categories: context_only, single_string, multiple_strings, structured_data
+callbacks:
+  # Category 1: Context-only callbacks (6 callbacks)
+  - name: element_start
+    category: context_only
+    description: "Called before entering any HTML element (pre-order traversal)"
+    html_elements: "All elements"
+    frequency: high
+    parameters:
+      - name: ctx
+        type: context
+        description: "Node context with element metadata"
+    return: VisitResult
+
+  - name: line_break
+    category: context_only
+    description: "Called for line break elements"
+    html_elements: "<br>, <br/>"
+    frequency: medium
+    parameters:
+      - name: ctx
+        type: context
+        description: "Node context with line break metadata"
+    return: VisitResult
+
+  - name: horizontal_rule
+    category: context_only
+    description: "Called for horizontal rule elements"
+    html_elements: "<hr>, <hr/>"
+    frequency: low
+    parameters:
+      - name: ctx
+        type: context
+        description: "Node context with horizontal rule metadata"
+    return: VisitResult
+
+  - name: table_start
+    category: context_only
+    description: "Called before processing a table element"
+    html_elements: "<table>"
+    frequency: low
+    parameters:
+      - name: ctx
+        type: context
+        description: "Node context with table metadata"
+    return: VisitResult
+
+  - name: definition_list_start
+    category: context_only
+    description: "Called before processing a definition list"
+    html_elements: "<dl>"
+    frequency: low
+    parameters:
+      - name: ctx
+        type: context
+        description: "Node context with definition list metadata"
+    return: VisitResult
+
+  - name: figure_start
+    category: context_only
+    description: "Called before processing a figure element"
+    html_elements: "<figure>"
+    frequency: low
+    parameters:
+      - name: ctx
+        type: context
+        description: "Node context with figure metadata"
+    return: VisitResult
+
+  # Category 2: Context + single string (16 callbacks)
+  - name: text
+    category: single_string
+    description: "Called for each text node in the HTML document"
+    html_elements: "Text nodes"
+    frequency: very_high
+    parameters:
+      - name: ctx
+        type: context
+        description: "Node context"
+      - name: text
+        type: string
+        nullable: false
+        description: "Text content"
+    return: VisitResult
+
+  - name: strong
+    category: single_string
+    description: "Called for strong/bold elements"
+    html_elements: "<strong>, <b>"
+    frequency: medium
+    parameters:
+      - name: ctx
+        type: context
+        description: "Node context with strong element metadata"
+      - name: text
+        type: string
+        nullable: false
+        description: "The text content"
+    return: VisitResult
+
+  - name: emphasis
+    category: single_string
+    description: "Called for emphasis/italic elements"
+    html_elements: "<em>, <i>"
+    frequency: medium
+    parameters:
+      - name: ctx
+        type: context
+        description: "Node context with emphasis element metadata"
+      - name: text
+        type: string
+        nullable: false
+        description: "The text content"
+    return: VisitResult
+
+  - name: strikethrough
+    category: single_string
+    description: "Called for strikethrough elements"
+    html_elements: "<s>, <del>, <strike>"
+    frequency: low
+    parameters:
+      - name: ctx
+        type: context
+        description: "Node context with strikethrough element metadata"
+      - name: text
+        type: string
+        nullable: false
+        description: "The text content"
+    return: VisitResult
+
+  - name: underline
+    category: single_string
+    description: "Called for underline elements"
+    html_elements: "<u>, <ins>"
+    frequency: low
+    parameters:
+      - name: ctx
+        type: context
+        description: "Node context with underline element metadata"
+      - name: text
+        type: string
+        nullable: false
+        description: "The text content"
+    return: VisitResult
+
+  - name: subscript
+    category: single_string
+    description: "Called for subscript elements"
+    html_elements: "<sub>"
+    frequency: low
+    parameters:
+      - name: ctx
+        type: context
+        description: "Node context with subscript element metadata"
+      - name: text
+        type: string
+        nullable: false
+        description: "The text content"
+    return: VisitResult
+
+  - name: superscript
+    category: single_string
+    description: "Called for superscript elements"
+    html_elements: "<sup>"
+    frequency: low
+    parameters:
+      - name: ctx
+        type: context
+        description: "Node context with superscript element metadata"
+      - name: text
+        type: string
+        nullable: false
+        description: "The text content"
+    return: VisitResult
+
+  - name: mark
+    category: single_string
+    description: "Called for mark/highlight elements"
+    html_elements: "<mark>"
+    frequency: low
+    parameters:
+      - name: ctx
+        type: context
+        description: "Node context with mark element metadata"
+      - name: text
+        type: string
+        nullable: false
+        description: "The text content"
+    return: VisitResult
+
+  - name: code_inline
+    category: single_string
+    description: "Called for inline code elements"
+    html_elements: "<code>"
+    frequency: medium
+    parameters:
+      - name: ctx
+        type: context
+        description: "Node context with code metadata"
+      - name: code
+        type: string
+        nullable: false
+        description: "Code content"
+    return: VisitResult
+
+  - name: element_end
+    category: single_string
+    description: "Called after exiting any HTML element (post-order traversal)"
+    html_elements: "All elements"
+    frequency: high
+    parameters:
+      - name: ctx
+        type: context
+        description: "Node context"
+      - name: output
+        type: string
+        nullable: false
+        description: "Default markdown output for the element"
+    return: VisitResult
+
+  - name: table_end
+    category: single_string
+    description: "Called after processing a table element"
+    html_elements: "</table>"
+    frequency: low
+    parameters:
+      - name: ctx
+        type: context
+        description: "Node context with table metadata"
+      - name: output
+        type: string
+        nullable: false
+        description: "The default markdown output for the table"
+    return: VisitResult
+
+  - name: definition_term
+    category: single_string
+    description: "Called for definition term elements"
+    html_elements: "<dt>"
+    frequency: low
+    parameters:
+      - name: ctx
+        type: context
+        description: "Node context with term metadata"
+      - name: text
+        type: string
+        nullable: false
+        description: "The term text"
+    return: VisitResult
+
+  - name: definition_description
+    category: single_string
+    description: "Called for definition description elements"
+    html_elements: "<dd>"
+    frequency: low
+    parameters:
+      - name: ctx
+        type: context
+        description: "Node context with description metadata"
+      - name: text
+        type: string
+        nullable: false
+        description: "The description text"
+    return: VisitResult
+
+  - name: definition_list_end
+    category: single_string
+    description: "Called after processing a definition list"
+    html_elements: "</dl>"
+    frequency: low
+    parameters:
+      - name: ctx
+        type: context
+        description: "Node context with definition list metadata"
+      - name: output
+        type: string
+        nullable: false
+        description: "The default markdown output for the definition list"
+    return: VisitResult
+
+  - name: summary
+    category: single_string
+    description: "Called for summary elements inside details"
+    html_elements: "<summary>"
+    frequency: low
+    parameters:
+      - name: ctx
+        type: context
+        description: "Node context with summary metadata"
+      - name: text
+        type: string
+        nullable: false
+        description: "The summary text"
+    return: VisitResult
+
+  - name: figcaption
+    category: single_string
+    description: "Called for figcaption elements inside figure"
+    html_elements: "<figcaption>"
+    frequency: low
+    parameters:
+      - name: ctx
+        type: context
+        description: "Node context with figcaption metadata"
+      - name: text
+        type: string
+        nullable: false
+        description: "The caption text"
+    return: VisitResult
+
+  # Category 3: Context + multiple strings (13 callbacks)
+  - name: link
+    category: multiple_strings
+    description: "Called for anchor links"
+    html_elements: "<a href=\"...\">"
+    frequency: high
+    parameters:
+      - name: ctx
+        type: context
+        description: "Node context with link metadata"
+      - name: href
+        type: string
+        nullable: false
+        description: "Link URL"
+      - name: text
+        type: string
+        nullable: false
+        description: "Link text (already converted to markdown)"
+      - name: title
+        type: string
+        nullable: true
+        description: "Title attribute, or NULL if not present"
+    return: VisitResult
+
+  - name: image
+    category: multiple_strings
+    description: "Called for image elements"
+    html_elements: "<img src=\"...\" alt=\"...\">"
+    frequency: medium
+    parameters:
+      - name: ctx
+        type: context
+        description: "Node context with image metadata"
+      - name: src
+        type: string
+        nullable: false
+        description: "Image source URL"
+      - name: alt
+        type: string
+        nullable: false
+        description: "Alt text"
+      - name: title
+        type: string
+        nullable: true
+        description: "Title attribute, or NULL if not present"
+    return: VisitResult
+
+  - name: code_block
+    category: multiple_strings
+    description: "Called for code block elements"
+    html_elements: "<pre><code>"
+    frequency: medium
+    parameters:
+      - name: ctx
+        type: context
+        description: "Node context with code block metadata"
+      - name: lang
+        type: string
+        nullable: true
+        description: "Optional language specifier, or NULL if not present"
+      - name: code
+        type: string
+        nullable: false
+        description: "Code content"
+    return: VisitResult
+
+  - name: list_item
+    category: multiple_strings
+    description: "Called for list item elements"
+    html_elements: "<li>"
+    frequency: medium
+    parameters:
+      - name: ctx
+        type: context
+        description: "Node context with list item metadata"
+      - name: ordered
+        type: bool
+        description: "Whether this is in an ordered list"
+      - name: marker
+        type: string
+        nullable: false
+        description: "The list marker string (e.g., \"-\", \"1.\", \"a)\")"
+      - name: text
+        type: string
+        nullable: false
+        description: "The list item content"
+    return: VisitResult
+
+  - name: list_end
+    category: multiple_strings
+    description: "Called after processing a list element"
+    html_elements: "</ul>, </ol>"
+    frequency: medium
+    parameters:
+      - name: ctx
+        type: context
+        description: "Node context with list metadata"
+      - name: ordered
+        type: bool
+        description: "Whether this is an ordered list"
+      - name: output
+        type: string
+        nullable: false
+        description: "The default markdown output for the list"
+    return: VisitResult
+
+  - name: blockquote
+    category: multiple_strings
+    description: "Called for blockquote elements"
+    html_elements: "<blockquote>"
+    frequency: medium
+    parameters:
+      - name: ctx
+        type: context
+        description: "Node context with blockquote metadata"
+      - name: content
+        type: string
+        nullable: false
+        description: "The blockquote content"
+      - name: depth
+        type: usize
+        description: "Nesting depth for nested blockquotes"
+    return: VisitResult
+
+  - name: custom_element
+    category: multiple_strings
+    description: "Called for custom or unknown HTML elements"
+    html_elements: "Unknown elements"
+    frequency: low
+    parameters:
+      - name: ctx
+        type: context
+        description: "Node context with custom element metadata"
+      - name: tag_name
+        type: string
+        nullable: false
+        description: "The tag name"
+      - name: content
+        type: string
+        nullable: false
+        description: "The element's content"
+    return: VisitResult
+
+  - name: form
+    category: multiple_strings
+    description: "Called for form elements"
+    html_elements: "<form>"
+    frequency: low
+    parameters:
+      - name: ctx
+        type: context
+        description: "Node context with form metadata"
+      - name: action
+        type: string
+        nullable: true
+        description: "Form action URL, or NULL"
+      - name: method
+        type: string
+        nullable: true
+        description: "Form method (GET/POST), or NULL"
+    return: VisitResult
+
+  - name: input
+    category: multiple_strings
+    description: "Called for input form elements"
+    html_elements: "<input>"
+    frequency: low
+    parameters:
+      - name: ctx
+        type: context
+        description: "Node context with input metadata"
+      - name: input_type
+        type: string
+        nullable: true
+        description: "Input type (text, checkbox, etc.), or NULL"
+      - name: name
+        type: string
+        nullable: true
+        description: "Input name attribute, or NULL"
+      - name: value
+        type: string
+        nullable: true
+        description: "Input value attribute, or NULL"
+    return: VisitResult
+
+  - name: button
+    category: multiple_strings
+    description: "Called for button elements"
+    html_elements: "<button>"
+    frequency: low
+    parameters:
+      - name: ctx
+        type: context
+        description: "Node context with button metadata"
+      - name: text
+        type: string
+        nullable: false
+        description: "Button text"
+      - name: button_type
+        type: string
+        nullable: true
+        description: "Button type (submit, button, reset), or NULL"
+    return: VisitResult
+
+  - name: audio
+    category: multiple_strings
+    description: "Called for audio elements"
+    html_elements: "<audio>"
+    frequency: low
+    parameters:
+      - name: ctx
+        type: context
+        description: "Node context with audio metadata"
+      - name: src
+        type: string
+        nullable: true
+        description: "Audio source URL, or NULL"
+    return: VisitResult
+
+  - name: video
+    category: multiple_strings
+    description: "Called for video elements"
+    html_elements: "<video>"
+    frequency: low
+    parameters:
+      - name: ctx
+        type: context
+        description: "Node context with video metadata"
+      - name: src
+        type: string
+        nullable: true
+        description: "Video source URL, or NULL"
+    return: VisitResult
+
+  - name: iframe
+    category: multiple_strings
+    description: "Called for iframe elements"
+    html_elements: "<iframe>"
+    frequency: low
+    parameters:
+      - name: ctx
+        type: context
+        description: "Node context with iframe metadata"
+      - name: src
+        type: string
+        nullable: true
+        description: "Iframe source URL, or NULL"
+    return: VisitResult
+
+  # Category 4: Context + structured data (5 callbacks)
+  - name: heading
+    category: structured_data
+    description: "Called for heading elements"
+    html_elements: "<h1> through <h6>"
+    frequency: medium
+    parameters:
+      - name: ctx
+        type: context
+        description: "Node context with heading metadata"
+      - name: level
+        type: u32
+        description: "Heading level (1-6)"
+      - name: text
+        type: string
+        nullable: false
+        description: "Heading text content"
+      - name: id
+        type: string
+        nullable: true
+        description: "ID attribute, or NULL if not present"
+    return: VisitResult
+
+  - name: list_start
+    category: structured_data
+    description: "Called before processing a list element"
+    html_elements: "<ul>, <ol>"
+    frequency: medium
+    parameters:
+      - name: ctx
+        type: context
+        description: "Node context with list metadata"
+      - name: ordered
+        type: bool
+        description: "Whether this is an ordered list (true) or unordered (false)"
+    return: VisitResult
+
+  - name: table_row
+    category: structured_data
+    description: "Called for table row elements"
+    html_elements: "<tr>"
+    frequency: low
+    parameters:
+      - name: ctx
+        type: context
+        description: "Node context with row metadata"
+      - name: cells
+        type: string_array
+        nullable: false
+        description: "Array of cell contents (NULL-terminated array of NULL-terminated strings)"
+      - name: cell_count
+        type: usize
+        description: "Number of cells in the row"
+      - name: is_header
+        type: bool
+        description: "Whether this row is in a header section (true) or body (false)"
+    return: VisitResult
+
+  - name: details
+    category: structured_data
+    description: "Called for details/disclosure elements"
+    html_elements: "<details>"
+    frequency: low
+    parameters:
+      - name: ctx
+        type: context
+        description: "Node context with details metadata"
+      - name: open
+        type: bool
+        description: "Whether the details element is open by default"
+      - name: content
+        type: string
+        nullable: false
+        description: "The details content"
+    return: VisitResult
+
+  - name: figure_end
+    category: structured_data
+    description: "Called after processing a figure element"
+    html_elements: "</figure>"
+    frequency: low
+    parameters:
+      - name: ctx
+        type: context
+        description: "Node context with figure metadata"
+      - name: output
+        type: string
+        nullable: false
+        description: "The default markdown output for the figure"
+    return: VisitResult
+
+# Code generation templates
+# Each template generates code for one target language
+generation:
+  targets:
+    rust:
+      output_file: "crates/html-to-markdown-ffi/src/visitor/registry_generated.rs"
+      template: "templates/rust_ffi_callbacks.rs.j2"
+
+    go:
+      output_file: "packages/go/v2/htmltomarkdown/visitor_generated.go"
+      template: "templates/go_bridge_callbacks.go.j2"
+
+    csharp:
+      output_file: "packages/csharp/HtmlToMarkdown/Visitor/VisitorBridgeGenerated.cs"
+      template: "templates/csharp_bridge_callbacks.cs.j2"
+
+    # java:
+    #   output_file: "packages/java/src/main/java/sh/kreuzberg/htmltomarkdown/visitor/VisitorBridgeGenerated.java"
+    #   template: "templates/java_bridge_callbacks.java.j2"

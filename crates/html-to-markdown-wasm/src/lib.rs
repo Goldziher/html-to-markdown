@@ -28,11 +28,7 @@ pub use inline_images::{WasmHtmlExtraction, WasmInlineImage, WasmInlineImageConf
 
 #[cfg(feature = "js-bindings")]
 fn to_js_error(err: ConversionError) -> JsValue {
-    let message = match &err {
-        ConversionError::Panic(msg) => format!("html-to-markdown panic during conversion: {msg}"),
-        other => other.to_string(),
-    };
-    JsValue::from_str(&message)
+    JsValue::from_str(&html_to_markdown_bindings_common::error::error_message(&err))
 }
 
 /// Initialize panic hook for better error messages in the browser
@@ -682,7 +678,7 @@ pub fn convert_with_metadata(
         }
         #[cfg(not(feature = "visitor"))]
         {
-            guard_panic(|| html_to_markdown_rs::convert_with_metadata(&html, rust_options, rust_metadata_config))
+            guard_panic(|| html_to_markdown_rs::convert_with_metadata(&html, rust_options, rust_metadata_config, None))
         }
     }
     .map_err(to_js_error)?;
@@ -749,11 +745,8 @@ mod wasmtime_runtime {
             return None;
         }
         let json = read_utf8(ptr, len);
-        if json.trim().is_empty() {
-            return None;
-        }
-        let wasm_options: WasmConversionOptions = serde_json::from_str(&json).expect("options JSON must be valid");
-        Some(wasm_options.into())
+        html_to_markdown_bindings_common::json::parse_conversion_options(Some(&json))
+            .expect("options JSON must be valid")
     }
 
     fn convert_internal(html_ptr: u32, html_len: u32, options: Option<RustConversionOptions>) -> u32 {

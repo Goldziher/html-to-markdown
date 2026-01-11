@@ -1,3 +1,5 @@
+#![allow(missing_docs)]
+
 //! Tests for the `skip_images` functionality.
 //!
 //! This test suite verifies that the `skip_images` option correctly omits all `<img>` tags
@@ -22,7 +24,7 @@ fn test_skip_images_enabled() {
         ..Default::default()
     };
 
-    let result = convert(html, Some(options), None).unwrap();
+    let result = convert(html, Some(options)).unwrap();
 
     // Should contain text content
     assert!(result.contains("Here is an image"), "Should contain text before image");
@@ -48,7 +50,7 @@ fn test_skip_images_disabled() {
         ..Default::default()
     };
 
-    let result = convert(html, Some(options), None).unwrap();
+    let result = convert(html, Some(options)).unwrap();
 
     // Should contain text content
     assert!(result.contains("Here is an image"), "Should contain text before image");
@@ -97,7 +99,7 @@ fn test_skip_images_mixed_content() {
         ..Default::default()
     };
 
-    let result = convert(html, Some(options), None).unwrap();
+    let result = convert(html, Some(options)).unwrap();
 
     // Should contain all text content
     assert!(result.contains("Article Title"), "Should contain heading");
@@ -138,7 +140,7 @@ fn test_skip_images_with_base64_data_uri() {
         ..Default::default()
     };
 
-    let result = convert(html, Some(options), None).unwrap();
+    let result = convert(html, Some(options)).unwrap();
 
     // Should contain text
     assert!(result.contains("Before image"), "Should contain text before image");
@@ -167,7 +169,7 @@ fn test_skip_images_with_external_urls() {
         ..Default::default()
     };
 
-    let result = convert(html, Some(options), None).unwrap();
+    let result = convert(html, Some(options)).unwrap();
 
     // Should contain text content
     assert!(result.contains("Photo Gallery"), "Should contain gallery heading");
@@ -207,7 +209,7 @@ fn test_skip_images_preserves_alt_text_context() {
         ..Default::default()
     };
 
-    let result = convert(html, Some(options), None).unwrap();
+    let result = convert(html, Some(options)).unwrap();
 
     // Verify all surrounding text is present and properly ordered
     assert!(result.contains("following image"), "Should contain introductory text");
@@ -242,7 +244,7 @@ fn test_skip_images_inline_vs_block_images() {
         ..Default::default()
     };
 
-    let result = convert(html, Some(options), None).unwrap();
+    let result = convert(html, Some(options)).unwrap();
 
     // Should contain paragraph text
     assert!(result.contains("Start of paragraph"), "Should contain paragraph start");
@@ -267,7 +269,7 @@ fn test_skip_images_with_multiple_attributes() {
         ..Default::default()
     };
 
-    let result = convert(html, Some(options), None).unwrap();
+    let result = convert(html, Some(options)).unwrap();
 
     // Should contain text
     assert!(result.contains("Image with attributes"), "Should contain text");
@@ -291,7 +293,7 @@ fn test_skip_images_empty_document() {
         ..Default::default()
     };
 
-    let result = convert(html, Some(options), None).unwrap();
+    let result = convert(html, Some(options)).unwrap();
 
     // Result should be empty or near-empty (no meaningful content)
     // Just verify no images appear
@@ -314,7 +316,7 @@ fn test_skip_images_with_lists_and_images() {
         ..Default::default()
     };
 
-    let result = convert(html, Some(options), None).unwrap();
+    let result = convert(html, Some(options)).unwrap();
 
     // Should contain list items
     assert!(result.contains("First item"), "Should contain first list item");
@@ -351,7 +353,7 @@ fn test_skip_images_with_table_images() {
         ..Default::default()
     };
 
-    let result = convert(html, Some(options), None).unwrap();
+    let result = convert(html, Some(options)).unwrap();
 
     // Should contain table content
     assert!(result.contains("Cell 1"), "Should contain table cell 1");
@@ -380,7 +382,7 @@ fn test_skip_images_with_figure_figcaption() {
         ..Default::default()
     };
 
-    let result = convert(html, Some(options), None).unwrap();
+    let result = convert(html, Some(options)).unwrap();
 
     // Should contain caption text
     assert!(
@@ -406,7 +408,7 @@ fn test_skip_images_false_with_alt_text() {
         ..Default::default()
     };
 
-    let result = convert(html, Some(options), None).unwrap();
+    let result = convert(html, Some(options)).unwrap();
 
     // Should include image with alt text
     assert!(
@@ -428,7 +430,7 @@ fn test_skip_images_false_without_alt_text() {
         ..Default::default()
     };
 
-    let result = convert(html, Some(options), None).unwrap();
+    let result = convert(html, Some(options)).unwrap();
 
     // Should include image (even without alt text, may use empty alt or URL)
     assert!(result.contains("image.jpg"), "Should contain image URL");
@@ -450,7 +452,7 @@ fn test_skip_images_with_picture_element() {
         ..Default::default()
     };
 
-    let result = convert(html, Some(options), None).unwrap();
+    let result = convert(html, Some(options)).unwrap();
 
     // Should contain text after
     assert!(
@@ -483,7 +485,7 @@ fn test_skip_images_preserves_links_and_formatting() {
         ..Default::default()
     };
 
-    let result = convert(html, Some(options), None).unwrap();
+    let result = convert(html, Some(options)).unwrap();
 
     // Should preserve formatting
     assert!(result.contains("**bold**"), "Should preserve bold");

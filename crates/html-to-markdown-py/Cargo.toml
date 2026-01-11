@@ -24,6 +24,7 @@ doctest = false
 
 [dependencies]
 html-to-markdown-rs = { workspace = true, features = ["inline-images", "metadata", "visitor", "async-visitor"] }
+html-to-markdown-bindings-common = { path = "../html-to-markdown-bindings-common", version = "2.21.0", features = ["metadata", "inline-images"] }
 pyo3.workspace = true
 pyo3-async-runtimes = { version = "0.27", features = ["tokio-runtime"] }
 tokio = { version = "1", features = ["rt", "rt-multi-thread"] }

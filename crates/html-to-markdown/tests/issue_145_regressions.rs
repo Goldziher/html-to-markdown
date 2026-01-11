@@ -1,3 +1,5 @@
+#![allow(missing_docs)]
+
 //! Issue #145 Regression Tests
 //!
 //! Tests for ensuring that `strip_newlines=True` doesn't cause excessive whitespace

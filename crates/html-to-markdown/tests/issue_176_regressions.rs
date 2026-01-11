@@ -1,3 +1,5 @@
+#![allow(missing_docs)]
+
 //! Regression tests for issue #176: Newlines not preserved with adjacent blockquotes
 
 #[test]

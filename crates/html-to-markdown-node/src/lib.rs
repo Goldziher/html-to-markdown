@@ -12,6 +12,9 @@ use html_to_markdown_rs::safety::guard_panic;
 mod profiling;
 #[cfg(feature = "async-visitor")]
 use async_trait::async_trait;
+#[cfg(feature = "metadata")]
+use html_to_markdown_bindings_common::parse_metadata_config;
+use html_to_markdown_bindings_common::{error::error_message, parse_conversion_options, parse_inline_image_config};
 #[cfg(feature = "async-visitor")]
 use html_to_markdown_rs::visitor::AsyncHtmlVisitor;
 #[cfg(feature = "visitor")]
@@ -33,50 +36,7 @@ use std::sync::Arc;
 use std::{collections::HashMap, str};
 
 fn to_js_error(err: ConversionError) -> Error {
-    let message = match &err {
-        ConversionError::Panic(msg) => format!("html-to-markdown panic during conversion: {msg}"),
-        other => other.to_string(),
-    };
-
-    Error::new(Status::GenericFailure, message)
-}
-
-fn parse_options_json(options_json: Option<String>) -> Result<Option<RustConversionOptions>> {
-    let Some(json) = options_json else {
-        return Ok(None);
-    };
-
-    if json.trim().is_empty() {
-        return Ok(None);
-    }
-
-    let options = html_to_markdown_rs::conversion_options_from_json(&json).map_err(to_js_error)?;
-    Ok(Some(options))
-}
-
-fn parse_inline_image_config_json(config_json: Option<String>) -> Result<RustInlineImageConfig> {
-    let Some(json) = config_json else {
-        return Ok(RustInlineImageConfig::new(DEFAULT_INLINE_IMAGE_LIMIT));
-    };
-
-    if json.trim().is_empty() {
-        return Ok(RustInlineImageConfig::new(DEFAULT_INLINE_IMAGE_LIMIT));
-    }
-
-    html_to_markdown_rs::inline_image_config_from_json(&json).map_err(to_js_error)
-}
-
-#[cfg(feature = "metadata")]
-fn parse_metadata_config_json(config_json: Option<String>) -> Result<RustMetadataConfig> {
-    let Some(json) = config_json else {
-        return Ok(RustMetadataConfig::default());
-    };
-
-    if json.trim().is_empty() {
-        return Ok(RustMetadataConfig::default());
-    }
-
-    html_to_markdown_rs::metadata_config_from_json(&json).map_err(to_js_error)
+    Error::new(Status::GenericFailure, error_message(&err))
 }
 
 /// Heading style options
@@ -1273,7 +1233,7 @@ pub fn convert_with_visitor(
 
 #[napi(js_name = "convertJson")]
 pub fn convert_json(html: String, options_json: Option<String>) -> Result<String> {
-    let rust_options = parse_options_json(options_json)?;
+    let rust_options = parse_conversion_options(options_json.as_deref()).map_err(to_js_error)?;
     guard_panic(|| profiling::maybe_profile(|| html_to_markdown_rs::convert(&html, rust_options.clone())))
         .map_err(to_js_error)
 }
@@ -1305,7 +1265,7 @@ pub fn convert_buffer(html: Buffer, options: Option<JsConversionOptions>) -> Res
 #[napi(js_name = "convertBufferJson")]
 pub fn convert_buffer_json(html: Buffer, options_json: Option<String>) -> Result<String> {
     let html = buffer_to_str(&html)?;
-    let rust_options = parse_options_json(options_json)?;
+    let rust_options = parse_conversion_options(options_json.as_deref()).map_err(to_js_error)?;
     guard_panic(|| profiling::maybe_profile(|| html_to_markdown_rs::convert(html, rust_options.clone())))
         .map_err(to_js_error)
 }
@@ -1318,7 +1278,7 @@ pub fn create_conversion_options_handle(options: Option<JsConversionOptions>) ->
 
 #[napi(js_name = "createConversionOptionsHandleJson")]
 pub fn create_conversion_options_handle_json(options_json: Option<String>) -> Result<External<RustConversionOptions>> {
-    let rust_options = parse_options_json(options_json)?;
+    let rust_options = parse_conversion_options(options_json.as_deref()).map_err(to_js_error)?;
     Ok(External::new(rust_options.unwrap_or_default()))
 }
 
@@ -1334,7 +1294,7 @@ pub fn create_metadata_config_handle(metadata_config: Option<JsMetadataConfig>) 
 pub fn create_metadata_config_handle_json(
     metadata_config_json: Option<String>,
 ) -> Result<External<RustMetadataConfig>> {
-    let rust_config = parse_metadata_config_json(metadata_config_json)?;
+    let rust_config = parse_metadata_config(metadata_config_json.as_deref()).map_err(to_js_error)?;
     Ok(External::new(rust_config))
 }
 
@@ -1419,8 +1379,8 @@ fn convert_inline_images_json_impl(
     options_json: Option<String>,
     image_config_json: Option<String>,
 ) -> Result<JsHtmlExtraction> {
-    let rust_options = parse_options_json(options_json)?;
-    let rust_config = parse_inline_image_config_json(image_config_json)?;
+    let rust_options = parse_conversion_options(options_json.as_deref()).map_err(to_js_error)?;
+    let rust_config = parse_inline_image_config(image_config_json.as_deref()).map_err(to_js_error)?;
 
     let extraction =
         guard_panic(|| html_to_markdown_rs::convert_with_inline_images(html, rust_options, rust_config, None))
@@ -1688,8 +1648,8 @@ fn convert_metadata_json_impl(
     options_json: Option<String>,
     metadata_config_json: Option<String>,
 ) -> Result<JsMetadataExtraction> {
-    let rust_options = parse_options_json(options_json)?;
-    let rust_config = parse_metadata_config_json(metadata_config_json)?;
+    let rust_options = parse_conversion_options(options_json.as_deref()).map_err(to_js_error)?;
+    let rust_config = parse_metadata_config(metadata_config_json.as_deref()).map_err(to_js_error)?;
 
     let (markdown, metadata) =
         guard_panic(|| html_to_markdown_rs::convert_with_metadata(html, rust_options, rust_config, None))

@@ -34,6 +34,7 @@ crate-type = ["cdylib"]
 
 [dependencies]
 html-to-markdown-rs = { workspace = true, features = ["inline-images", "metadata", "serde", "async-visitor"] }
+html-to-markdown-bindings-common = { path = "../html-to-markdown-bindings-common", version = "2.21.0", features = ["metadata", "inline-images"] }
 napi = { version = "3.4", default-features = false, features = ["napi8"] }
 napi-derive = "3.3"
 async-trait = "0.1"

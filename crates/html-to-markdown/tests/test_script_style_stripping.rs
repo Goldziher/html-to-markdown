@@ -1,3 +1,5 @@
+#![allow(missing_docs)]
+
 //! Tests for script and style tag stripping before parsing.
 //!
 //! This test suite verifies that script and style tags are completely removed
@@ -121,7 +123,7 @@ fn test_preserve_json_ld_script() {
     };
 
     let (markdown, metadata) =
-        convert_with_metadata(html, Some(options), MetadataConfig::default()).expect("Failed to convert");
+        convert_with_metadata(html, Some(options), MetadataConfig::default(), None).expect("Failed to convert");
 
     println!("Markdown:\n{}", markdown);
     println!("Metadata: {:?}", metadata.document.title);
@@ -178,7 +180,7 @@ fn test_multiple_script_tags() {
     };
 
     let (markdown, metadata) =
-        convert_with_metadata(html, Some(options), MetadataConfig::default()).expect("Failed to convert");
+        convert_with_metadata(html, Some(options), MetadataConfig::default(), None).expect("Failed to convert");
 
     println!("Markdown:\n{}", markdown);
 
@@ -239,7 +241,7 @@ fn test_reuters_like_structure() {
     };
 
     let (markdown, metadata) =
-        convert_with_metadata(html, Some(options), MetadataConfig::default()).expect("Failed to convert");
+        convert_with_metadata(html, Some(options), MetadataConfig::default(), None).expect("Failed to convert");
 
     println!("Markdown output:\n{}", markdown);
     println!("Metadata title: {:?}", metadata.document.title);

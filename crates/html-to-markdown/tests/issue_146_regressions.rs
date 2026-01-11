@@ -1,3 +1,5 @@
+#![allow(missing_docs)]
+
 //! Issue #146 Regression Tests
 //!
 //! Tests for ensuring that `strip_tags` and `preserve_tags` properly prevent

@@ -1,3 +1,5 @@
+#![allow(missing_docs)]
+
 use anyhow::{Context, Result};
 use html_to_markdown_rs::{ConversionOptions, HeadingStyle};
 use std::{
@@ -250,10 +252,7 @@ fn converts_simple_html_via_wasmtime() -> Result<()> {
     };
     let html = "<h1>Hello</h1><p>Rust + WASM</p>";
     let output = harness.convert_html(html)?;
-    #[cfg(not(feature = "visitor"))]
     let expected = html_to_markdown_rs::convert(html, None)?;
-    #[cfg(feature = "visitor")]
-    let expected = html_to_markdown_rs::convert(html, None, None)?;
     assert_eq!(output.trim(), expected.trim());
     Ok(())
 }
@@ -270,10 +269,7 @@ fn respects_conversion_options() -> Result<()> {
         wrap_width: 12,
         ..Default::default()
     };
-    #[cfg(not(feature = "visitor"))]
     let expected = html_to_markdown_rs::convert(html, Some(options.clone()))?;
-    #[cfg(feature = "visitor")]
-    let expected = html_to_markdown_rs::convert(html, Some(options.clone()), None)?;
 
     let output = harness.convert_underlined(html)?;
     assert_eq!(output.trim(), expected.trim());

@@ -1,3 +1,4 @@
+#![allow(missing_docs)]
 #![cfg(feature = "visitor")]
 
 use html_to_markdown_rs::convert_with_visitor;

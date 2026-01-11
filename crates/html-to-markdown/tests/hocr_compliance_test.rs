@@ -1,3 +1,5 @@
+#![allow(missing_docs)]
+
 //! hOCR 1.2 compliance integration tests
 //!
 //! Tests full hOCR specification support across all element types and properties.
