@@ -666,6 +666,19 @@ fn extract_head_metadata(
                             metadata.insert("title".to_string(), title_content);
                         }
                     }
+                    // Look for link tags with rel attribute (e.g., canonical)
+                    if child_tag.name().as_utf8_str().eq_ignore_ascii_case("link") {
+                        if let Some(rel_attr) = child_tag.attributes().get("rel").flatten() {
+                            let rel_str = rel_attr.as_utf8_str();
+                            // Check for canonical link
+                            if rel_str.contains("canonical") {
+                                if let Some(href_attr) = child_tag.attributes().get("href").flatten() {
+                                    let href_str = href_attr.as_utf8_str();
+                                    metadata.insert("canonical".to_string(), href_str.to_string());
+                                }
+                            }
+                        }
+                    }
                 }
             }
         } else {

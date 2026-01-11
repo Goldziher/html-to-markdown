@@ -11,7 +11,6 @@ use super::utils::{
     process_list_children,
 };
 use crate::options::ConversionOptions;
-use std::collections::BTreeMap;
 use tl;
 
 // Type aliases for Context and DomContext to avoid circular imports
@@ -37,6 +36,7 @@ pub(crate) fn handle_ul(
     let nested_depth = calculate_list_nesting_depth(ctx);
     let is_loose = is_loose_list(*node_handle, parser, dom_ctx);
 
+    #[allow(unused_variables)]
     let tag = match node_handle.get(parser) {
         Some(tl::Node::Tag(t)) => t,
         _ => return,
@@ -51,6 +51,7 @@ pub(crate) fn handle_ul(
     #[cfg(feature = "visitor")]
     if let Some(ref visitor_handle) = ctx.visitor {
         use crate::visitor::{NodeContext, NodeType, VisitResult};
+        use std::collections::BTreeMap;
 
         let attributes: BTreeMap<String, String> = tag
             .attributes()
@@ -117,6 +118,7 @@ pub(crate) fn handle_ul(
     #[cfg(feature = "visitor")]
     if let Some(ref visitor_handle) = ctx.visitor {
         use crate::visitor::{NodeContext, NodeType, VisitResult};
+        use std::collections::BTreeMap;
 
         let attributes: BTreeMap<String, String> = tag
             .attributes()

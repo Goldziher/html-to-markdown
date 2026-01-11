@@ -9,7 +9,6 @@
 //! - Visitor callbacks for custom processing (feature-gated)
 
 use crate::options::ConversionOptions;
-use std::collections::BTreeMap;
 use tl::{NodeHandle, Parser};
 
 // Type aliases for Context and DomContext to avoid circular imports
@@ -145,6 +144,7 @@ fn handle_mark(
 ///
 /// Converts to `~~content~~` syntax. Suppresses formatting in code context.
 /// Supports visitor callbacks when the visitor feature is enabled.
+#[allow(unused_variables)]
 fn handle_strikethrough(
     tag_name: &str,
     node_handle: &NodeHandle,
@@ -181,6 +181,7 @@ fn handle_strikethrough(
         let strikethrough_output = if let Some(ref visitor_handle) = ctx.visitor {
             use crate::converter::get_text_content;
             use crate::visitor::{NodeContext, NodeType, VisitResult};
+            use std::collections::BTreeMap;
 
             let text_content = get_text_content(node_handle, parser, dom_ctx);
             let attributes: BTreeMap<String, String> = tag
@@ -288,6 +289,7 @@ fn handle_inserted(
     let underline_output = if let Some(ref visitor_handle) = ctx.visitor {
         use crate::converter::get_text_content;
         use crate::visitor::{NodeContext, NodeType, VisitResult};
+        use std::collections::BTreeMap;
 
         let text_content = get_text_content(node_handle, parser, dom_ctx);
         let attributes: BTreeMap<String, String> = tag
@@ -383,6 +385,7 @@ fn handle_underline(
     if let Some(ref visitor_handle) = ctx.visitor {
         use crate::converter::get_text_content;
         use crate::visitor::{NodeContext, NodeType, VisitResult};
+        use std::collections::BTreeMap;
 
         let text_content = get_text_content(node_handle, parser, dom_ctx);
         let attributes: BTreeMap<String, String> = tag

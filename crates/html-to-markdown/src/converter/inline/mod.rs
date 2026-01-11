@@ -148,8 +148,6 @@ pub fn dispatch_inline_handler(
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-
     /// Test that all expected tags are properly dispatched
     #[test]
     fn test_dispatcher_routes_emphasis_tags() {
