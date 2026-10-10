@@ -1,41 +1,77 @@
 {
-  "author": {
-    "name": "Na'aman Hirschfeld",
-    "email": "naaman@xberg.io"
+  "dependencies": {
+    "@opencode/plugin": "^2.0.20"
   },
-  "contributors": [
-    {
-      "name": "Tobias Perlstein",
-      "email": "tobias@xberg.io"
-    }
-  ],
-  "name": "@xberg-io/opencode-html-to-markdown",
-  "version": "3.17.2",
   "description": "Fast, lossless HTML→Markdown conversion with structured metadata, tables, and document-structure extraction.",
-  "keywords": [
-    "html-to-markdown",
-    "markdown",
-    "html",
-    "conversion",
-    "metadata"
-  ],
-  "homepage": "https://xberg.io",
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/xberg-io/html-to-markdown"
-  },
-  "license": "MIT",
-  "type": "module",
-  "main": ".opencode/plugins/html-to-markdown.js",
   "exports": {
     ".": "./.opencode/plugins/html-to-markdown.js"
   },
   "files": [
-    ".opencode/",
+    ".opencode/ai-rulez-bundle.json",
+    ".opencode/ai-rulez-content.js",
+    ".opencode/commands/html-to-markdown-convert.md",
+    ".opencode/commands/html-to-markdown-metadata.md",
+    ".opencode/plugins/html-to-markdown.js",
+    ".opencode/skills/converting-html/SKILL.md",
+    ".opencode/skills/extracting-metadata/SKILL.md",
+    ".opencode/skills/extracting-tables/SKILL.md",
+    ".opencode/skills/fetching-and-converting-urls/SKILL.md",
+    ".opencode/skills/html-to-markdown/SKILL.md",
+    ".opencode/skills/html-to-markdown/references/cli-reference.md",
+    ".opencode/skills/html-to-markdown/references/configuration.md",
+    ".opencode/skills/html-to-markdown/references/other-bindings.md",
+    ".opencode/skills/html-to-markdown/references/python-api.md",
+    ".opencode/skills/html-to-markdown/references/rust-api.md",
+    ".opencode/skills/html-to-markdown/references/typescript-api.md",
+    ".opencode/skills/using-the-mcp-server/SKILL.md",
+    ".pi/prompts/html-to-markdown-convert.md",
+    ".pi/prompts/html-to-markdown-metadata.md",
+    ".pi/skills/converting-html/SKILL.md",
+    ".pi/skills/extracting-metadata/SKILL.md",
+    ".pi/skills/extracting-tables/SKILL.md",
+    ".pi/skills/fetching-and-converting-urls/SKILL.md",
+    ".pi/skills/html-to-markdown/SKILL.md",
+    ".pi/skills/html-to-markdown/references/cli-reference.md",
+    ".pi/skills/html-to-markdown/references/configuration.md",
+    ".pi/skills/html-to-markdown/references/other-bindings.md",
+    ".pi/skills/html-to-markdown/references/python-api.md",
+    ".pi/skills/html-to-markdown/references/rust-api.md",
+    ".pi/skills/html-to-markdown/references/typescript-api.md",
+    ".pi/skills/using-the-mcp-server/SKILL.md",
+    "README.md",
     "assets/",
-    "README.md"
+    "scripts/"
   ],
-  "dependencies": {
-    "@opencode/plugin": "^2.0.20"
-  }
+  "homepage": "https://xberg.io",
+  "keywords": [
+    "conversion",
+    "html",
+    "html-to-markdown",
+    "markdown",
+    "metadata",
+    "pi-package"
+  ],
+  "license": "MIT",
+  "main": ".opencode/plugins/html-to-markdown.js",
+  "name": "@xberg-io/opencode-html-to-markdown",
+  "pi": {
+    "prompts": [
+      "./.pi/prompts/html-to-markdown-convert.md",
+      "./.pi/prompts/html-to-markdown-metadata.md"
+    ],
+    "skills": [
+      "./.pi/skills/converting-html",
+      "./.pi/skills/extracting-metadata",
+      "./.pi/skills/extracting-tables",
+      "./.pi/skills/fetching-and-converting-urls",
+      "./.pi/skills/html-to-markdown",
+      "./.pi/skills/using-the-mcp-server"
+    ]
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/xberg-io/html-to-markdown"
+  },
+  "type": "module",
+  "version": "3.17.2"
 }

@@ -3379,7 +3379,7 @@ jobs:
   # reported success having published nothing for the tag. ~keep
 
   publish-plugin-opencode:
-    name: Publish OpenCode plugin to npm
+    name: Publish OpenCode and Pi plugin to npm
     needs: [prepare, validate-versions]
     if: >-
       ${{ !cancelled() && needs.prepare.outputs.release_any == 'true'
@@ -3397,6 +3397,27 @@ jobs:
         with:
           node-version: "24"
           registry-url: "https://registry.npmjs.org/"
+      - name: Check out pinned ai-rulez source
+        uses: actions/checkout@v7
+        with:
+          repository: Goldziher/ai-rulez
+          ref: 8dfebd2b8b3700ff134f86886d5b44dca82abc18
+          path: .tools/ai-rulez
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: .tools/ai-rulez/go.mod
+          cache-dependency-path: .tools/ai-rulez/go.sum
+      - name: Build pinned ai-rulez with static native dependencies
+        working-directory: .tools/ai-rulez
+        shell: bash
+        run: |
+          set -euo pipefail
+          eval "$(bash scripts/setup-liter-llm.sh)"
+          mkdir -p "$RUNNER_TEMP/ai-rulez-bin"
+          go build -o "$RUNNER_TEMP/ai-rulez-bin/ai-rulez" ./cmd/ai-rulez
+          echo "$RUNNER_TEMP/ai-rulez-bin" >> "$GITHUB_PATH"
+      - name: Verify generated plugin bundles before publishing
+        run: ai-rulez verify --plugin
       # ~keep validate-versions asserts the plugin *source* pin
       # (plugin/.ai-rulez/config.toml [plugin].version); it says nothing about the rendered
       # bundle this job actually uploads. plugin/package.json is regenerated from that pin
@@ -3426,6 +3447,29 @@ jobs:
           echo "plugin/package.json matches the release at ${expected}"
       # Plain ESM adapter — no build step. Skip if this version is already on npm so a
       # release re-run is idempotent (publish-npm has no built-in skip-existing). ~keep
+      - name: Verify packed OpenCode and Pi resources
+        shell: bash
+        run: |
+          pack_dir="$(mktemp -d)"
+          npm pack ./plugin --ignore-scripts --json --pack-destination "$pack_dir" > "$pack_dir/pack.json"
+          node - "$pack_dir/pack.json" <<'NODE'
+          const fs = require('node:fs');
+          const pkg = require('./plugin/package.json');
+          const files = JSON.parse(fs.readFileSync(process.argv[2], 'utf8'))[0].files.map(file => file.path);
+          for (const prefix of ['.opencode/plugins/', '.pi/skills/', '.pi/prompts/']) {
+            if (!files.some(path => path.startsWith(prefix))) throw new Error(`Missing packed resource: ${prefix}`);
+          }
+          if (!pkg.keywords.includes('pi-package') || !pkg.pi.skills.length || !pkg.pi.prompts.length) {
+            throw new Error('Missing Pi package metadata');
+          }
+          for (const resource of [...pkg.pi.skills, ...pkg.pi.prompts]) {
+            const relative = resource.replace(/^\.\//, '').replace(/\/$/, '');
+            if (!files.some(path => path === relative || path.startsWith(`${relative}/`))) {
+              throw new Error(`Declared Pi resource was not packed: ${resource}`);
+            }
+          }
+          console.log(`Verified ${files.length} packed files for OpenCode and Pi`);
+          NODE
       - name: Skip if already on npm
         id: guard
         run: |

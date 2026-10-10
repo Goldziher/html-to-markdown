@@ -49,6 +49,22 @@ cargo add html-to-markdown-rs                  # Rust
 gem install html-to-markdown                   # Ruby
 ```
 
+### Pi
+
+From a checkout of this repository:
+
+```bash
+pi install ./plugin
+```
+
+After the next plugin release, install the same package used by OpenCode:
+
+```bash
+pi install npm:@xberg-io/opencode-html-to-markdown
+```
+
+Pi loads the bundled skills and prompt templates. Use `/html-to-markdown-convert` or `/html-to-markdown-metadata` with the input as arguments. Install the `html-to-markdown` CLI separately for shell access. This package does not register MCP servers, hooks, or native Pi extensions.
+
 ## Skills shipped
 
 | Skill | Trigger |
@@ -73,7 +89,7 @@ gem install html-to-markdown                   # Ruby
 
 ## MCP server
 
-The plugin auto-registers an MCP server named `html-to-markdown`, launched via
+MCP-capable integrations auto-register a server named `html-to-markdown`, launched via
 `scripts/mcp-launch.sh` (which execs `html-to-markdown mcp`). It exposes two
 tools — `convert_html` (HTML string → Markdown/Djot/plain text, or the full
 `ConversionResult` JSON with `json: true`) and `extract_metadata` (structured

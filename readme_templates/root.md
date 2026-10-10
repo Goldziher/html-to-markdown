@@ -289,6 +289,25 @@ copilot plugin install html-to-markdown@html-to-markdown
 </details>
 
 <details>
+<summary><strong>Pi</strong></summary>
+
+From a checkout of this repository:
+
+```bash
+pi install ./plugin
+```
+
+After the next plugin release, install the same package used by OpenCode:
+
+```bash
+pi install npm:@xberg-io/opencode-html-to-markdown
+```
+
+Pi loads the bundled skills and prompt templates. Use `/html-to-markdown-convert` or `/html-to-markdown-metadata` with the input as arguments. Install the `html-to-markdown` CLI separately for shell access. This package does not register MCP servers, hooks, or native Pi extensions.
+
+</details>
+
+<details>
 <summary><strong>opencode</strong></summary>
 
 Add the package to `opencode.json`:

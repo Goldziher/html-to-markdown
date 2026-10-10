@@ -1,9 +1,9 @@
 // AI-RULEZ :: GENERATED FILE — DO NOT EDIT
-// Content-Hash: blake3:672d70b0ed79a049b892ad6d85d28c19dd1599fc6235b00071fc6a2860c05e71
-// Source-Hash: blake3:ee7b42dfe0189be4c8fc402a02da63aad9356731f32835e48c1312669d63bf3b
+// Content-Hash: blake3:2e612761528e736297ad6fea35c069568eb341e0d28abd11dec8115b1d83d010
+// Source-Hash: blake3:568a4ea7e94a211bb55b0d3df2984bf570265f331b3dbf396e5b3b597fdb358e
 // Schema-Version: v1
 
-import { Plugin } from "@opencode/plugin";
+import { registerBundledContent } from "../ai-rulez-content.js";
 import { spawn } from "node:child_process";
 
 const headingStyle = {
@@ -94,9 +94,10 @@ function styleArgs(args, params) {
   pushOption(args, "--preset", params.preset);
 }
 
-export default Plugin.define({
+export default {
   id: "html-to-markdown",
   async setup(ctx) {
+    await registerBundledContent(ctx);
     await ctx.tool.transform((editor) => {
       editor.add({
         name: "html_to_markdown_convert",
@@ -199,4 +200,4 @@ export default Plugin.define({
       });
     });
   },
-});
+};

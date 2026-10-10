@@ -1,8 +1,13 @@
-version = "4.0"
+version = "5.0"
 name = "html-to-markdown"
 description = "Fast, lossless HTML→Markdown conversion with structured metadata, tables, and document-structure extraction."
+# Pinned by `ai-rulez migrate v5`: the 4.x default. Remove this line to take the v5 default.
+agents_md = false
+# Pinned by `ai-rulez migrate v5`: the 4.x default. Remove this line to take the v5 default.
+gitignore = true
 
 [plugin]
+runtimes = ["claude", "cursor", "codex", "gemini", "kimi", "opencode", "factory", "hermes", "pi"]
 name = "html-to-markdown"
 version = "3.17.2"
 display_name = "html-to-markdown"
@@ -47,3 +52,7 @@ brand_color = "#58FBDA"
 
 [plugin.gemini]
 context_file_name = "GEMINI.md"
+
+# Pinned by `ai-rulez migrate v5`: the 4.x default. Remove this line to take the v5 default.
+[header]
+hashes = "full"
