@@ -2,6 +2,7 @@
 # alef:hash:354d5362cebcde9d92ab178c5a47aa321218010125d9d83b12315c08feb19c6d
 
 [package]
+authors.workspace = true
 name = "html-to-markdown-rs-jni"
 version.workspace = true
 edition = "2024"

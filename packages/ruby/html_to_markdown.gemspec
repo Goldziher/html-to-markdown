@@ -10,7 +10,8 @@
 Gem::Specification.new do |spec|
   spec.name = "html-to-markdown"
   spec.version = "3.17.2"
-  spec.authors       = ["Na'aman Hirschfeld <naaman@xberg.io>"]
+  spec.authors       = ["Na'aman Hirschfeld", "Tobias Perlstein"]
+  spec.email         = ["naaman@xberg.io", "tobias@xberg.io"]
   spec.summary       = "High-performance HTML to Markdown converter"
   spec.description   = "High-performance HTML to Markdown converter"
   spec.homepage      = "https://github.com/xberg-io/html-to-markdown"

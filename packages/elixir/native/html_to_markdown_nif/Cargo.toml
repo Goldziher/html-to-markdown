@@ -4,6 +4,7 @@
 # To verify freshness: alef verify
 
 [package]
+authors = ["Na'aman Hirschfeld <naaman@xberg.io>", "Tobias Perlstein <tobias@xberg.io>"]
 name = "html_to_markdown_nif"
 version = "3.17.2"
 edition = "2024"

@@ -1406,7 +1406,7 @@ path = "../../packages/zig"
 description = "High-performance HTML to Markdown converter"
 license = "MIT"
 repository = "https://github.com/xberg-io/html-to-markdown"
-authors = ["Na'aman Hirschfeld <naaman@xberg.io>"]
+authors = ["Na'aman Hirschfeld <naaman@xberg.io>", "Tobias Perlstein <tobias@xberg.io>"]
 keywords = ["html", "markdown", "converter"]
 
 [crates.readme]
