@@ -1419,12 +1419,18 @@ jobs:
           cache-key-prefix: publish-c-ffi-${{ matrix.platform }}
 
       - uses: xberg-io/actions/install-alef@v1
+        with:
+          version: "0.107.12"
 
-      - name: Build and package C FFI distribution
+      - uses: xberg-io/actions/build-rust-ffi@v1
+        with:
+          crate-name: html-to-markdown-ffi
+          target: ${{ matrix.target }}
+          require-static: "true"
+
+      - name: Package C FFI distribution
         shell: bash
-        run: |
-          alef publish build --lang ffi --target ${{ matrix.target }}
-          alef publish package --lang ffi --target ${{ matrix.target }} -o dist/c-ffi
+        run: alef publish package --lang ffi --target ${{ matrix.target }} -o dist/c-ffi
 
       - uses: actions/upload-artifact@v7
         with:
