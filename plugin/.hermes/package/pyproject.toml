@@ -3,14 +3,6 @@ requires = ['hatchling>=1.27']
 build-backend = 'hatchling.build'
 
 [project]
-authors = [
-  { name = "Na'aman Hirschfeld", email = "naaman@xberg.io" },
-  { name = "Tobias Perlstein", email = "tobias@xberg.io" },
-]
-maintainers = [
-  { name = "Na'aman Hirschfeld", email = "naaman@xberg.io" },
-  { name = "Tobias Perlstein", email = "tobias@xberg.io" },
-]
 name = 'html-to-markdown-hermes-plugin'
 version = '3.17.2'
 description = 'Fast, lossless HTML→Markdown conversion with structured metadata, tables, and document-structure extraction.'

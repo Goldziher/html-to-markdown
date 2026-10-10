@@ -16,6 +16,7 @@ on:
       # while core shipped 3.11.4. ~keep
       - "Cargo.toml"
       - "plugin/**"
+      - "package.json"
       - ".claude-plugin/**"
       - ".agents/plugins/**"
       - ".ai-rulez/config.toml"
@@ -28,6 +29,7 @@ on:
     paths:
       - "Cargo.toml"
       - "plugin/**"
+      - "package.json"
       - ".claude-plugin/**"
       - ".agents/plugins/**"
       - ".ai-rulez/config.toml"
@@ -53,15 +55,37 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-      - name: Install uv
-        uses: astral-sh/setup-uv@v10.2.0
+      - name: Check out pinned ai-rulez source
+        uses: actions/checkout@v7
+        with:
+          repository: Goldziher/ai-rulez
+          ref: 8dfebd2b8b3700ff134f86886d5b44dca82abc18
+          path: .tools/ai-rulez
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: .tools/ai-rulez/go.mod
+          cache-dependency-path: .tools/ai-rulez/go.sum
+      - name: Build pinned ai-rulez with static native dependencies
+        working-directory: .tools/ai-rulez
+        shell: bash
+        run: |
+          set -euo pipefail
+          eval "$(bash scripts/setup-liter-llm.sh)"
+          mkdir -p "$RUNNER_TEMP/ai-rulez-bin"
+          go build -o "$RUNNER_TEMP/ai-rulez-bin/ai-rulez" ./cmd/ai-rulez
+          echo "$RUNNER_TEMP/ai-rulez-bin" >> "$GITHUB_PATH"
       # Plugin version must track the core crate version (task version:sync keeps it pinned).
       - name: Verify plugin version tracks core
         run: python3 scripts/sync_plugin_version.py --check
       # Byte-verify the ai-rulez-generated bundles under plugin/ match plugin/.ai-rulez.
       # Pinned to the ai-rulez version that generates them; bump in lockstep. ~keep
       - name: Verify generated plugin bundles are current
-        run: uvx ai-rulez==4.23.0 verify --recursive --plugin --if-configured
+        run: ai-rulez verify --recursive --plugin --if-configured
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "24"
+      - name: Verify OpenCode tools and bundled content
+        run: node --test scripts/tests/opencode-plugin.test.mjs
 
   launcher-contract:
     name: Launcher contract on ${{ matrix.os }}

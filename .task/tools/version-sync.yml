@@ -6,6 +6,7 @@ includes:
 
 vars:
   ALEF: "alef"
+  AI_RULEZ: "ai-rulez"
 
 tasks:
   sync:
@@ -75,7 +76,7 @@ tasks:
       # Sync the coding-agent plugin: pin plugin/.ai-rulez/config.toml [plugin].version
       # to core, then regenerate the per-runtime bundles under plugin/ from it. ~keep
       - python3 scripts/sync_plugin_version.py
-      - uvx ai-rulez==4.23.0 generate --plugin
+      - "{{.AI_RULEZ}} generate --plugin"
       # ~keep The gate. A bump is not finished because the commands above exited 0 -- each
       # reports only on what it writes. `alef verify` is the only step that looks at the whole
       # managed surface at once. Read its output: it exits 0 while still reporting frozen paths
