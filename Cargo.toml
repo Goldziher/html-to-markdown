@@ -28,7 +28,7 @@ exclude = [
 [workspace.package]
 version = "3.17.2"
 edition = "2024"
-authors = ["Na'aman Hirschfeld <naaman@xberg.io>"]
+authors = ["Na'aman Hirschfeld <naaman@xberg.io>", "Tobias Perlstein <tobias@xberg.io>"]
 description = "High-performance HTML to Markdown converter"
 license = "MIT"
 repository = "https://github.com/xberg-io/html-to-markdown"

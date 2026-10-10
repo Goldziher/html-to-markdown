@@ -3,12 +3,19 @@ build-backend = "hatchling.build"
 requires = ["hatchling"]
 
 [project]
+maintainers = [
+  { name = "Na'aman Hirschfeld", email = "naaman@xberg.io" },
+  { name = "Tobias Perlstein", email = "tobias@xberg.io" },
+]
 name = "html-to-markdown-cli"
 version = "0.1.0"
 description = "CLI proxy for html-to-markdown — downloads and runs the native html-to-markdown binary from GitHub releases."
 readme = "README.md"
 license = { text = "MIT" }
-authors = [{ name = "Na'aman Hirschfeld", email = "naaman@xberg.io" }]
+authors = [
+  { name = "Na'aman Hirschfeld", email = "naaman@xberg.io" },
+  { name = "Tobias Perlstein", email = "tobias@xberg.io" },
+]
 requires-python = ">=3.10"
 classifiers = [
   "Development Status :: 4 - Beta",
