@@ -1,9 +1,9 @@
 
-version = '4.0'
+version = "5.0"
 name = 'html-to-markdown'
 description = 'High-performance HTML to Markdown converter with active Python, TypeScript/Node, Ruby, PHP, Go, Java/JNI, C#, Elixir, R, WebAssembly, Dart, Kotlin Android, Swift, Zig, and C FFI bindings'
 gitignore = true
-presets = ["claude", "codex", "opencode"]
+presets = ["claude", "codex", "opencode", "pi"]
 builtins = [
   'rust',
   'python',
@@ -29,6 +29,7 @@ builtins = [
 compact = true
 [header]
 style = 'minimal'
+hashes = "full"
 
 [[includes]]
 name = 'xberg-core'
