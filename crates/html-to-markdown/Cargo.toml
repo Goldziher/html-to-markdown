@@ -1,4 +1,11 @@
 [package]
+include = [
+    "/Cargo.toml",
+    "/Cargo.lock",
+    "/src/**",
+    "/README.md",
+    "!/src/converter/utility/preprocessing/tests.rs",
+]
 name = "html-to-markdown-rs"
 version.workspace = true
 edition.workspace = true
@@ -12,13 +19,6 @@ rust-version.workspace = true
 description = "High-performance HTML to Markdown converter using the astral-tl parser. Part of the Xberg ecosystem."
 keywords = ["html", "markdown", "converter", "astral-tl", "doc-processing"]
 categories = ["parsing", "text-processing", "web-programming"]
-# ~keep These two tests `include_str!` the CommonMark spec fixture from
-# ~keep `packages/python/tests/`, which is outside this package root and so is not
-# ~keep carried by `cargo package`. Shipping them would publish a crate whose
-# ~keep `cargo test` cannot compile. They are excluded rather than having the
-# ~keep fixture moved in, because that fixture is CC-BY-SA and vendoring it into
-# ~keep the published artifact is a licensing decision, not a packaging one.
-exclude = ["tests/commonmark_compliance_test.rs", "tests/commonmark_spec_fixpoint.rs"]
 
 [package.metadata.cargo-machete]
 ignored = ["once_cell", "ahash"]
