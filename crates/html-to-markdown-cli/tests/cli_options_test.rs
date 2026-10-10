@@ -12,6 +12,38 @@ fn cli() -> Command {
     Command::new(env!("CARGO_BIN_EXE_html-to-markdown"))
 }
 
+#[test]
+fn should_omit_the_abbreviation_title_with_the_flag() {
+    let html = "<p><abbr title=\"last-in, first-out\">LIFO</abbr></p>";
+    cli()
+        .write_stdin(html)
+        .assert()
+        .success()
+        .stdout("LIFO (last-in, first-out)\n");
+    cli()
+        .arg("--no-expand-abbreviations")
+        .write_stdin(html)
+        .assert()
+        .success()
+        .stdout("LIFO\n");
+}
+
+#[test]
+fn should_omit_the_blockquote_citation_with_the_flag() {
+    let html = "<blockquote cite=\"https://example.com/src\"><p>quoted words</p></blockquote>";
+    cli()
+        .write_stdin(html)
+        .assert()
+        .success()
+        .stdout(predicates::str::contains("https://example.com/src"));
+    cli()
+        .arg("--no-blockquote-citations")
+        .write_stdin(html)
+        .assert()
+        .success()
+        .stdout("> quoted words\n");
+}
+
 // A well-known 1x1 transparent PNG, 70 bytes when base64-decoded.
 const TINY_PNG_DATA_URI: &str = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==";
 

@@ -28,6 +28,9 @@ use crate::rcdom::{Handle, NodeData, RcDom};
 /// The private attribute that carries an anchor's origin id through the tree builder.
 const ORIGIN_ATTR: &str = "data-h2m-anchor-origin";
 
+/// The deepest tree the HTML tree builder makes for a repair.
+pub(super) const MAX_REPAIR_DEPTH: usize = 512;
+
 /// Elements that make an anchor non-empty even without text.
 const CONTENT_BEARING: [&str; 14] = [
     "img", "picture", "video", "audio", "svg", "canvas", "iframe", "object", "embed", "input", "math", "button",
@@ -62,14 +65,17 @@ impl TokenSink for AnchorOriginStamper<TreeBuilder<Handle, RcDom>> {
 
     fn process_token(&self, mut token: Token, line_number: u64) -> TokenSinkResult<Self::Handle> {
         let is_tag = matches!(token, Token::TagToken(_));
-        if is_tag && self.inner.sink.repair_limit.get().is_some() {
-            return TokenSinkResult::Script(Rc::clone(&self.inner.sink.document));
-        }
         if let Token::TagToken(ref mut tag) = token {
             self.stamp(tag);
         }
         let result = self.inner.process_token(token, line_number);
-        if is_tag && self.inner.sink.repair_limit.get().is_some() {
+        // ~keep The parse stops only after a tag the tree builder took, so the rest of the
+        // ~keep input starts at a tag boundary and no tag is dropped. It does not stop after a
+        // ~keep raw text start tag: the script or style text would become visible text.
+        if is_tag
+            && self.inner.sink.repair_limit.get().is_some()
+            && !matches!(result, TokenSinkResult::RawData(_) | TokenSinkResult::Plaintext)
+        {
             return TokenSinkResult::Script(Rc::clone(&self.inner.sink.document));
         }
         result
@@ -89,10 +95,12 @@ impl TokenSink for AnchorOriginStamper<TreeBuilder<Handle, RcDom>> {
 /// Drives the tokenizer by hand: `html5ever::parse_document` hard-codes
 /// `Tokenizer<TreeBuilder<..>>` and leaves no room for a sink between the two. The input is
 /// already a `str`, so nothing the `TendrilSink` driver adds (UTF-8 decoding) is lost.
-pub fn parse_with_anchor_origins(html: &str) -> RcDom {
+///
+/// Returns the tree and the input the parse did not read. That input is empty unless the
+/// parse stopped at a limit (`RcDom::repair_limit`).
+pub fn parse_with_anchor_origins(html: &str) -> (RcDom, String) {
     // ~keep Formatting reconstruction can create hundreds of clones per source tag (#809).
     // ~keep Both allocation and depth budgets apply to every HTML5 repair route (#808).
-    const MAX_REPAIR_DEPTH: usize = 512;
     const MAX_NODE_MULTIPLIER: usize = 8;
     const IMPLICIT_NODE_ALLOWANCE: usize = 16;
     let markup_count = html
@@ -123,7 +131,11 @@ pub fn parse_with_anchor_origins(html: &str) -> RcDom {
     } else {
         tokenizer.sink.inner.end();
     }
-    TreeSink::finish(tokenizer.sink.inner.sink)
+    let mut unparsed = String::new();
+    while let Some(chunk) = input.pop_front() {
+        unparsed.push_str(&chunk);
+    }
+    (TreeSink::finish(tokenizer.sink.inner.sink), unparsed)
 }
 
 /// Undo the adoption agency's split of an anchor around a block, then strip every origin stamp.
@@ -267,7 +279,7 @@ mod tests {
     fn bounded_repair_should_cap_tree_builder_depth_on_every_shape() {
         for prefix in ["<table><td>visible", "<b><p>one</p></b>", "<x-custom>"] {
             let html = format!("{prefix}{}tail", "<div>".repeat(2_000));
-            let dom = parse_with_anchor_origins(&html);
+            let (dom, _) = parse_with_anchor_origins(&html);
             let (nodes, depth) = tree_size_and_depth(&dom.document);
             assert!(depth <= 514, "depth={depth}, nodes={nodes}");
         }
@@ -281,13 +293,13 @@ mod tests {
             bold
         });
         let html = format!("<p>{bold}x</p>{}", "<p>y</p>".repeat(1_000));
-        let dom = parse_with_anchor_origins(&html);
+        let (dom, _) = parse_with_anchor_origins(&html);
         let (nodes, _) = tree_size_and_depth(&dom.document);
         assert!(nodes <= (1_251 * 8) + 512, "amplified to {nodes} nodes");
     }
 
     fn repaired(html: &str) -> String {
-        let dom = parse_with_anchor_origins(html);
+        let (dom, _) = parse_with_anchor_origins(html);
         collapse_split_anchors(&dom.document);
         let mut buf = Vec::new();
         serialize(

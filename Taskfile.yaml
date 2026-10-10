@@ -407,7 +407,7 @@ tasks:
     desc: "Run the stray closing tag complexity regression"
     cmds:
       - >-
-        cargo test --locked --profile {{.BUILD_PROFILE | default "release"}}
+        cargo test --locked --release
         -p html-to-markdown-rs --features full,testkit
         --test stray_closing_tags_complexity -- --nocapture
 

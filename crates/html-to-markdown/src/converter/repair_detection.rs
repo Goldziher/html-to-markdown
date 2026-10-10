@@ -9,13 +9,14 @@ use html5ever::tokenizer::{BufferQueue, Tag, TagKind, Token, TokenSink, TokenSin
 
 use super::main_helpers::is_html5_void_element;
 
-const MAX_TRACKED_DEPTH: usize = 512;
+const MAX_TRACKED_DEPTH: usize = super::anchor_origin::MAX_REPAIR_DEPTH;
 
 #[derive(Default)]
 struct RepairDetector {
     stack: RefCell<Vec<LocalName>>,
     head_open: Cell<bool>,
     omitted_head_end: Cell<bool>,
+    paragraph_ended_by_parent: Cell<bool>,
     needed: Cell<bool>,
 }
 
@@ -58,15 +59,22 @@ impl RepairDetector {
             self.omitted_head_end.set(false);
         }
         let mut stack = self.stack.borrow_mut();
-        if let Some(position) = stack.iter().rposition(|name| name == &tag.name) {
-            if &*tag.name != "p"
-                && !stack.iter().any(|name| matches!(&**name, "pre" | "code"))
-                && stack[position + 1..].iter().any(|name| &**name == "p")
-            {
+        let Some(position) = stack.iter().rposition(|name| name == &tag.name) else {
+            // ~keep The end tag of a parent ended this paragraph already, as in valid HTML
+            // ~keep (`<li><p>x</li>`). Only this later `</p>` makes the literal tree differ
+            // ~keep from the browser's: it would end the paragraph a second time (#810).
+            if &*tag.name == "p" && self.paragraph_ended_by_parent.get() {
                 self.needed.set(true);
             }
-            stack.truncate(position);
+            return;
+        };
+        if &*tag.name != "p"
+            && !stack.iter().any(|name| matches!(&**name, "pre" | "code"))
+            && stack[position + 1..].iter().any(|name| &**name == "p")
+        {
+            self.paragraph_ended_by_parent.set(true);
         }
+        stack.truncate(position);
     }
 }
 
@@ -138,6 +146,23 @@ mod tests {
             "<head><title>&lt;h1>fake&lt;/h1></title></head><p>visible</p>",
         ] {
             assert!(!needs_source_tree_repair(html), "{html}");
+        }
+    }
+
+    #[test]
+    fn source_tree_repair_should_wait_for_a_second_paragraph_end() {
+        for html in [
+            "<ul><li><p>x</li></ul>",
+            "<div><p>x</div>",
+            "<div><p>one</div><p>two</p>",
+        ] {
+            assert!(!needs_source_tree_repair(html), "{html}");
+        }
+        for html in [
+            "<div><p>one</div>two</p>rest</div>tail",
+            "<div><p>one</div><div>two</p></div>",
+        ] {
+            assert!(needs_source_tree_repair(html), "{html}");
         }
     }
 }

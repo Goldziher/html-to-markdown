@@ -546,22 +546,32 @@ pub(super) fn repair_with_html5ever_bounded(input: &str) -> Option<(String, Opti
     // ~keep The adoption agency splits an `<a>` around a block into an authored element and
     // ~keep clones; collapse the empty halves before the tree is flattened to a string and
     // ~keep the provenance is gone (issue #493).
-    let dom = parse_with_anchor_origins(&expanded);
+    let (dom, unparsed) = parse_with_anchor_origins(&expanded);
     let limit = dom.repair_limit.get();
     if limit == Some(crate::types::WarningKind::TruncatedInput) {
         tracing::warn!(target: "html_to_markdown::convert", "HTML tree repair exceeded its node budget; continuing with the original structure");
         // ~keep Abandon amplified repair rather than discarding authored text (#809).
-        return Some((input.to_owned(), Some(crate::types::WarningKind::MalformedHtml)));
-    }
-    if let Some(kind) = limit {
-        tracing::warn!(target: "html_to_markdown::convert", ?kind, "HTML tree repair reached its depth limit; retaining the partial tree");
+        return Some((input.to_owned(), limit));
     }
     collapse_split_anchors(&dom.document);
 
     let mut buf = Vec::with_capacity(input.len());
     let handle = SerializableHandle::from(dom.document);
     serialize(&mut buf, &handle, SerializeOpts::default()).ok()?;
-    String::from_utf8(buf).ok().map(|html| (html, limit))
+    let mut html = String::from_utf8(buf).ok()?;
+    if limit.is_some() {
+        tracing::warn!(target: "html_to_markdown::convert", "HTML tree repair reached its depth limit; the rest of the input keeps its original structure");
+        // ~keep The tree builder stopped at its depth limit, so its tree ends at that tag (#808).
+        // ~keep The input after that tag goes into the body as written: no word is lost.
+        const DOCUMENT_END: &str = "</body></html>";
+        let at = if html.ends_with(DOCUMENT_END) {
+            html.len() - DOCUMENT_END.len()
+        } else {
+            html.len()
+        };
+        html.insert_str(at, &unparsed);
+    }
+    Some((html, limit))
 }
 
 /// Rebuild a document when head content precedes an authored `<head>` element.
@@ -693,13 +703,22 @@ pub fn is_inline_element(tag_name: &str) -> bool {
     )
 }
 
-pub fn repair_limit_warning(kind: crate::types::WarningKind) -> crate::types::ProcessingWarning {
+/// Build the warning for a repair that stopped at `limit`.
+///
+/// `limit` is the reason the tree builder reports: `TruncatedInput` for the node budget (the
+/// first parse is kept), `DepthLimitExceeded` for the depth limit (the input after the limit
+/// is kept as written). No text is lost in either case, so the warning kind is
+/// `MalformedHtml` for both.
+pub fn repair_limit_warning(limit: crate::types::WarningKind) -> crate::types::ProcessingWarning {
+    use crate::converter::anchor_origin::MAX_REPAIR_DEPTH;
     crate::types::ProcessingWarning {
-        kind,
-        message: if kind == crate::types::WarningKind::MalformedHtml {
+        kind: crate::types::WarningKind::MalformedHtml,
+        message: if limit == crate::types::WarningKind::TruncatedInput {
             "HTML tree repair exceeded its node budget; continued with the original structure.".to_owned()
         } else {
-            "HTML tree repair reached the depth limit of 512; later input was skipped.".to_owned()
+            format!(
+                "HTML tree repair reached the depth limit of {MAX_REPAIR_DEPTH}; the input after it keeps its original structure."
+            )
         },
     }
 }

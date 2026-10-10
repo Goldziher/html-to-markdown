@@ -58,19 +58,53 @@ fn ordinary_formatting_repair_should_keep_all_text_without_a_budget_warning() {
 }
 
 #[test]
-fn bounded_deep_repair_should_keep_a_repaired_shallow_cell_and_warn() {
+fn should_keep_the_shallow_text_and_warn_when_the_page_is_deeper_than_the_walker_limit() {
     for prefix in ["<table><td>visible", "<b><p>visible</p></b>", "<x-custom>visible"] {
         let html = format!("{prefix}{}tail", "<div>".repeat(20_000));
         let result = convert(&html, ConversionOptions::default()).expect("deep input converts");
         let content = result.content.expect("Markdown exists");
         assert_eq!(content.matches("visible").count(), 1, "{content:?}");
-        assert_eq!(content.matches("tail").count(), 0);
         assert!(
             result
                 .warnings
                 .iter()
                 .any(|warning| warning.kind == html_to_markdown_rs::WarningKind::DepthLimitExceeded)
         );
+    }
+}
+
+#[test]
+fn should_keep_every_word_when_the_repair_stops_at_its_depth_limit() {
+    let open = "<div>".repeat(600);
+    let close = "</div>".repeat(600);
+    for prefix in ["<table><td>visible", "<b><p>visible</p></b>", "<x-custom>visible"] {
+        for html in [format!("{prefix}{open}deep{close}tail"), format!("{prefix}{open}tail")] {
+            let result = convert(
+                &html,
+                ConversionOptions {
+                    max_depth: Some(1_000),
+                    ..Default::default()
+                },
+            )
+            .expect("deep input converts");
+            let content = result.content.expect("Markdown exists");
+            let shape = &html[..prefix.len() + 5];
+            assert!(content.contains("visible"), "{shape}: {content:?}");
+            assert_eq!(content.matches("tail").count(), 1, "{shape}: {content:?}");
+            assert_eq!(
+                content.matches("deep").count(),
+                html.matches("deep").count(),
+                "{shape}: {content:?}"
+            );
+            assert!(
+                result.warnings.iter().any(
+                    |warning| warning.kind == html_to_markdown_rs::WarningKind::MalformedHtml
+                        && warning.message.contains("depth limit of 512")
+                ),
+                "{shape}: {:?}",
+                result.warnings
+            );
+        }
     }
 }
 
@@ -116,5 +150,26 @@ fn deep_repair_should_scale_linearly_on_every_fallback_route() {
                 .any(|(small, medium, large)| *medium < small * 3.0 && *large < medium * 3.0),
             "{measurements:?}"
         );
+    }
+}
+
+#[test]
+fn should_keep_style_text_hidden_when_the_repair_stops_at_a_style_tag() {
+    for depth in 500..=520 {
+        let html = format!(
+            "<b><p>visible</p></b>{}<style>hidden-style</style>tail",
+            "<div>".repeat(depth)
+        );
+        let result = convert(
+            &html,
+            ConversionOptions {
+                max_depth: Some(1_000),
+                ..Default::default()
+            },
+        )
+        .expect("deep input converts");
+        let content = result.content.expect("Markdown exists");
+        assert!(!content.contains("hidden-style"), "depth {depth}: {content:?}");
+        assert_eq!(content.matches("tail").count(), 1, "depth {depth}: {content:?}");
     }
 }

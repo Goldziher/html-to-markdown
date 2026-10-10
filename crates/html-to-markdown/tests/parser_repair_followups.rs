@@ -70,3 +70,38 @@ fn parent_close_before_paragraph_close_should_keep_browser_boundaries() {
         }
     }
 }
+
+#[test]
+fn omitted_paragraph_end_should_convert_as_the_written_end_does() {
+    let pairs = [
+        (
+            "<ul><li><p>one</li><li>two</li></ul>after",
+            "<ul><li><p>one</p></li><li>two</li></ul>after",
+        ),
+        (
+            "<div><p>one</div><p>two</p>after",
+            "<div><p>one</p></div><p>two</p>after",
+        ),
+        (
+            "<blockquote><p>one</blockquote>after",
+            "<blockquote><p>one</p></blockquote>after",
+        ),
+    ];
+    let mut differences = Vec::new();
+    for (omitted, written) in pairs {
+        for tier in [TierStrategy::Auto, TierStrategy::Tier1, TierStrategy::Tier2] {
+            let content = |html: &str| {
+                let options = ConversionOptions {
+                    tier_strategy: tier,
+                    ..Default::default()
+                };
+                convert(html, options).expect("document converts").content
+            };
+            let (left, right) = (content(omitted), content(written));
+            if left != right {
+                differences.push(format!("{tier:?}: {omitted}: {left:?} != {right:?}"));
+            }
+        }
+    }
+    assert!(differences.is_empty(), "{differences:#?}");
+}

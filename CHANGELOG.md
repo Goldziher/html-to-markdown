@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add `expand_abbreviations` and `include_blockquote_citations` options, enabled by default.
 - Keep one blank quote line between lists and blocks, preserving blank lines inside code.
 - Convert repeated unfinished tags, unclosed hidden elements, and inline list fragments with linear scans.
+- Repair a page that ends a paragraph again after the end tag of its parent, or whose head has no end tag; past 512 levels, keep the rest of the input as written, and past the node budget keep the first parse, each with a `malformed_html` warning.
 
 ## [3.17.2] - 2026-10-06
 
