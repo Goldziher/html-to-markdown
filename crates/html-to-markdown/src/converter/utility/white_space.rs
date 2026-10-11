@@ -229,8 +229,22 @@ pub enum TextPlace {
     /// white space only, a `<br>` in a table cell. No text is what [`classify_text`] calls
     /// white space only.
     AfterEmptyElement,
-    /// Text is before the text: another text, or an element that holds text.
+    /// An element that holds text and writes it into the text flow ([`writes_in_text_flow`]) is
+    /// before the text.
+    AfterFlowElement,
+    /// Text is before the text: another text, an element that holds text and writes marks, or
+    /// the line end before an element in the text flow that has no content.
     AfterText,
+}
+
+/// Whether the element `name` writes its content into the text flow with no mark of its own, so
+/// that the white space of its content is white space of the text around it.
+///
+/// ~keep Only `span` is one here, as on `main`. Other elements that write no mark (`small`, `u`,
+/// ~keep `abbr`, an `a` with no address) keep the rule of an element with text.
+#[must_use]
+pub fn writes_in_text_flow(name: &str) -> bool {
+    name == "span"
 }
 
 /// Whether the white space that `decoded` starts with holds a Unicode space: a no-break space
@@ -249,8 +263,10 @@ pub fn starts_with_unicode_space(decoded: &str) -> bool {
 ///
 /// ~keep A no-break space is a character (rule 1): `a <img>&nbsp;b`, `a <span></span>&nbsp;b`
 /// ~keep and `a <span> </span>&nbsp;b` have two spaces: the white space in the `span` is the run
-/// ~keep of the space before it. It joins the space where the two are one run of text (`a &nbsp;b`,
-/// ~keep `<b>a </b>&nbsp;b`, a comment between the two), and where it would start a line or
+/// ~keep of the space before it. After an element in the text flow whose text ends with a space
+/// ~keep it is a character too (`a <span>x </span>&nbsp;b` has two spaces).
+/// ~keep It joins the space where the two are one run of text (`a &nbsp;b`, `<b>a </b>&nbsp;b`,
+/// ~keep a comment between the two, the line end before an empty `span`), and where it would start a line or
 /// ~keep an element: after a `<br>` whose line end is a space (a heading has one line), and as
 /// ~keep the first content of an element (`a <span>&nbsp;x</span>`, the marker of a list item).
 /// ~keep A table cell has no line to start: the `<br>` there is a space between two words, an
@@ -258,7 +274,7 @@ pub fn starts_with_unicode_space(decoded: &str) -> bool {
 /// ~keep (`<td>a<br>&nbsp;b</td>` has two spaces).
 #[must_use]
 pub fn unicode_space_is_kept(written: &str, place: TextPlace) -> bool {
-    written.ends_with(' ') && place == TextPlace::AfterEmptyElement
+    written.ends_with(' ') && matches!(place, TextPlace::AfterEmptyElement | TextPlace::AfterFlowElement)
 }
 
 /// Rule 4 in the full converter, which builds the body of an inline element in a scratch
@@ -472,6 +488,10 @@ mod tests {
             assert_eq!(starts_with_unicode_space(text), starts, "{text:?}");
         }
         assert!(unicode_space_is_kept("a ", TextPlace::AfterEmptyElement));
+        assert!(unicode_space_is_kept("a x ", TextPlace::AfterFlowElement));
+        assert!(!unicode_space_is_kept("a x", TextPlace::AfterFlowElement));
+        assert!(writes_in_text_flow("span"));
+        assert!(!writes_in_text_flow("b"));
         assert!(!unicode_space_is_kept("a ", TextPlace::AfterBreak));
         assert!(!unicode_space_is_kept("a ", TextPlace::ElementStart));
         assert!(!unicode_space_is_kept("a ", TextPlace::AfterText));

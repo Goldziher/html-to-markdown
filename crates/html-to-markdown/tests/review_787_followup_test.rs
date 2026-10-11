@@ -307,8 +307,51 @@ fn should_keep_a_no_break_space_after_an_element_of_white_space_only() {
             "fast: {html}"
         );
     }
-    // ~keep White space before the text of an element does not make the element empty.
-    assert_rows(&[("<p>a <span> <b>x </b></span>&nbsp;b</p>", "a **x** b\n")]);
+    // ~keep An element that writes marks holds no text either when it has only white space.
+    assert_rows(&[("<p>a <b> </b>&nbsp;b</p>", "a  b\n")]);
+}
+
+#[test]
+fn should_keep_a_no_break_space_after_a_span_whose_text_ends_with_a_space() {
+    // ~keep A `span` writes no mark: the space that ends its text is a written space of the
+    // ~keep text, and the no-break space after the `span` is a character, as on `main`. An
+    // ~keep element that writes marks puts its end space outside them, and the two join.
+    assert_rows(&[
+        ("<p>a <span>x </span>&nbsp;b</p>", "a x  b\n"),
+        ("<p>a <span>x </span>\u{a0}b</p>", "a x  b\n"),
+        ("<p>a <span>x\n</span>&nbsp;b</p>", "a x  b\n"),
+        ("<p>a <span> <b>x </b></span>&nbsp;b</p>", "a **x** b\n"),
+        ("<h2>a <span>x </span>&nbsp;b</h2>", "## a x  b\n"),
+        ("<ul><li>a <span>x </span>&nbsp;b</li></ul>", "- a x  b\n"),
+        (
+            "<table><tr><th>h</th></tr><tr><td>a <span>x </span>&nbsp;b</td></tr></table>",
+            "| h      |\n| ------ |\n| a x  b |\n",
+        ),
+        ("<p>a <b>x </b>&nbsp;b</p>", "a **x** b\n"),
+        ("<p>a <span>x</span>&nbsp;b</p>", "a x b\n"),
+    ]);
+}
+
+#[test]
+fn should_write_one_space_for_a_line_end_an_empty_span_and_a_no_break_space() {
+    // ~keep An empty `span` writes nothing: the line end before it and the no-break space after
+    // ~keep it are one run of white space, as on `main`. A space before it is a written space,
+    // ~keep an element that is no `span` is an element with no text, a `span` of white space
+    // ~keep writes its space, and a table cell has no line end: each of these keeps both.
+    assert_rows(&[
+        ("<p>a\n<span></span>&nbsp;b</p>", "a b\n"),
+        ("<p>a\n<span></span>\u{a0}b</p>", "a b\n"),
+        ("<p>a\n<span><!-- c --></span>&nbsp;b</p>", "a b\n"),
+        ("<h2>a\n<span></span>&nbsp;b</h2>", "## a b\n"),
+        ("<ul><li>a\n<span></span>&nbsp;b</li></ul>", "- a b\n"),
+        ("<p>a <span></span>&nbsp;b</p>", "a  b\n"),
+        ("<p>a\n<b></b>&nbsp;b</p>", "a  b\n"),
+        ("<p>a\n<span>\n</span>&nbsp;b</p>", "a  b\n"),
+        (
+            "<table><tr><th>h</th></tr><tr><td>a\n<span></span>&nbsp;b</td></tr></table>",
+            "| h    |\n| ---- |\n| a  b |\n",
+        ),
+    ]);
 }
 
 #[test]

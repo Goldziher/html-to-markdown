@@ -115,19 +115,66 @@ pub fn text_place(
         .unwrap_or_default();
     let previous = before
         .iter()
+        .enumerate()
         .rev()
         .inspect(|_| count_sibling_visits(1))
-        .find(|sibling| !matches!(sibling.get(parser), Some(tl::Node::Comment(_))));
+        .find(|(_, sibling)| !matches!(sibling.get(parser), Some(tl::Node::Comment(_))));
     match previous {
         None => TextPlace::ElementStart,
-        Some(previous)
-            if matches!(previous.get(parser), Some(tl::Node::Tag(_)))
-                && !dom_ctx.holds_text(previous.get_inner(), parser) =>
-        {
-            TextPlace::AfterEmptyElement
+        Some((index, previous)) if matches!(previous.get(parser), Some(tl::Node::Tag(_))) => {
+            place_after_element(previous.get_inner(), &before[..index], parser, dom_ctx, in_cell)
         }
         Some(_) => TextPlace::AfterText,
     }
+}
+
+/// The place of a text that has the element `element` right before it. `before` holds the
+/// siblings before that element.
+///
+/// ~keep An element in the text flow ([`writes_in_text_flow`]) writes no mark: the space that
+/// ~keep ends its text is a written space of the text, and the Unicode space after the element
+/// ~keep is a character after it (`a <span>x </span>&nbsp;b` has two spaces). When it has no
+/// ~keep content it writes nothing, and the line end before it is the white space that the text
+/// ~keep after it starts with: the two are one run (`a\n<span></span>&nbsp;b` has one space). A
+/// ~keep table cell has no line end: the rule of the empty element holds there.
+fn place_after_element(
+    element: u32,
+    before: &[tl::NodeHandle],
+    parser: &tl::Parser,
+    dom_ctx: &DomContext,
+    in_cell: bool,
+) -> crate::converter::utility::white_space::TextPlace {
+    use crate::converter::utility::white_space::{TextPlace, writes_in_text_flow};
+    let in_flow = dom_ctx
+        .tag_info(element, parser)
+        .is_some_and(|info| writes_in_text_flow(&info.name));
+    if dom_ctx.holds_text(element, parser) {
+        return if in_flow {
+            TextPlace::AfterFlowElement
+        } else {
+            TextPlace::AfterText
+        };
+    }
+    let has_no_content = dom_ctx.children_of(element).is_none_or(|children| {
+        children
+            .iter()
+            .all(|child| matches!(child.get(parser), Some(tl::Node::Comment(_)) | None))
+    });
+    if in_flow && !in_cell && has_no_content && ends_with_line_end(before.last(), parser) {
+        TextPlace::AfterText
+    } else {
+        TextPlace::AfterEmptyElement
+    }
+}
+
+/// Whether `node` is a text with visible characters that ends with a line end.
+fn ends_with_line_end(node: Option<&tl::NodeHandle>, parser: &tl::Parser) -> bool {
+    let Some(tl::Node::Raw(raw)) = node.and_then(|node| node.get(parser)) else {
+        return false;
+    };
+    let raw = raw.as_utf8_str();
+    let decoded = crate::text::decode_html_entities_cow(raw.as_ref());
+    decoded.ends_with(['\n', '\r']) && !crate::converter::utility::white_space::is_blank(decoded.as_ref())
 }
 
 /// The block element the content before `node_handle` in its parent ends with: the previous
@@ -521,12 +568,12 @@ mod tests {
             let with_text = format!("<p>{}x {ends}</p>", "<span>a ".repeat(depth));
             let (reads, text) = node_reads_for(&with_text);
             assert_eq!(text.matches('b').count(), depth, "with text: {text:?}");
-            assert!(!text.contains("  "), "with text: {text:?}");
+            assert!(text.contains("x  b  b"), "with text: {text:?}");
             assert!((depth..=3 * depth).contains(&reads), "with text: {reads} nodes");
 
             let white_space = format!("<p>a {}{ends}</p>", "<span> ".repeat(depth));
             let (reads, text) = node_reads_for(&white_space);
-            assert!(text.starts_with("a  b b"), "white space: {text:?}");
+            assert!(text.starts_with("a  b  b"), "white space: {text:?}");
             assert_eq!(text.matches('b').count(), depth, "white space: {text:?}");
             assert!((depth..=3 * depth).contains(&reads), "white space: {reads} nodes");
         }
