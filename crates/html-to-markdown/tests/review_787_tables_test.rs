@@ -57,11 +57,9 @@ fn a_visible_label_with_aria_label_stays_on_the_fast_path() {
 fn an_empty_aria_label_link_still_hands_over_for_its_name() {
     let html = r#"<p><a href="/x" aria-label="n"></a></p>"#;
     let (clean, report) = prescan::run(html);
-    // ~keep Issue #764 decides: the handover of a named link with no text comes first, and its
-    // ~keep reason is `Classifier`. Before the sync: `LinkEmptyLabel`.
     assert!(matches!(
         tier1::run(&clean, &report, &ConversionOptions::default()),
-        Err(tier1::BailReason::Classifier)
+        Err(tier1::BailReason::LinkEmptyLabel)
     ));
     assert_eq!(convert(html, None).unwrap().content.unwrap(), "[n](/x)\n");
 }

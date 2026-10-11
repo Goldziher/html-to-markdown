@@ -373,14 +373,12 @@ fn close_link(state: &mut Tier1State, frame: &OpenTag, options: &ConversionOptio
         keeps_boundary_hard_breaks,
         crate::converter::main_helpers::hard_break_marker(options),
     );
-    // ~keep Tier-2 labels a link whose content gives no text with the name of the link, and
-    // ~keep leaves such a link out when it points into its own page. This scanner has neither
-    // ~keep rule, so it leaves the page to Tier-2.
-    if tier2_if_no_text && href.is_some() && dest.len() == trim_start {
-        return Err(BailReason::Classifier);
-    }
-    // ~keep Tier-2 also decides the label of a link that holds only empty elements, or only a title.
-    if dest.len() == trim_start && (has_nested_tag || title.is_some()) {
+    // ~keep Tier-2 decides what a link with no text writes: the name of the link as its label,
+    // ~keep nothing when the link points into its own page, and the label of a link that holds
+    // ~keep only empty elements, or only a title. This scanner has none of these rules, so it
+    // ~keep leaves the page to Tier-2.
+    let named_or_own_page = tier2_if_no_text && href.is_some();
+    if dest.len() == trim_start && (named_or_own_page || has_nested_tag || title.is_some()) {
         return Err(BailReason::LinkEmptyLabel);
     }
     if let Some(href_str) = href.as_deref() {

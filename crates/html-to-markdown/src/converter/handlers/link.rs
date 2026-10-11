@@ -245,7 +245,7 @@ impl<'a> LinkData<'a> {
     ///
     /// ~keep A link to a place in the page (`#id`) with nothing to read is a heading permalink,
     /// ~keep a "back to top" link or the line anchor of a highlighter. It is left out whatever its
-    /// ~keep content is and whether or not it has a name (#750, #764). A link that names no place
+    /// ~keep content is and whether or not it has a name (pull request #764). A link that names no place
     /// ~keep (`#` alone) is a control that a script runs: it is kept, with its name or an empty
     /// ~keep label, when it has no child or only empty text wrappers (#771), and left out when
     /// ~keep it holds a graphic or an icon (#750).
@@ -358,8 +358,9 @@ impl<'a> LinkData<'a> {
 }
 
 // ~keep Empty presentational wrappers carry no textual or media fallback; preserve their destination
-// ~keep without inserting URL words into document content (#771). Icon fonts and images
-// ~keep still use the link-name/address fallback required by #774 and #775.
+// ~keep without inserting URL words into document content (#771). An icon font or an image is
+// ~keep no empty wrapper: such a link gets its name or its address as the label (#775), except
+// ~keep a link into its own page, which `leads_nowhere_else` leaves out.
 fn empty_text_wrapper_child(handle: &tl::NodeHandle, parser: &tl::Parser<'_>) -> bool {
     let mut pending = vec![*handle];
     while let Some(child) = pending.pop() {
