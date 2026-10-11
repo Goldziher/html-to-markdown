@@ -396,8 +396,8 @@ fn close_link(state: &mut Tier1State, frame: &OpenTag, options: &ConversionOptio
         }
     }
     if let Some(href) = href {
-        // ~keep A line break at the end of the label is content of the label (issue #497).
-        let has_text = dest.len() > trim_start && !dest.ends_with('\n');
+        // ~keep A label with no text has no end: no space goes after such a link.
+        let has_text = dest.len() > trim_start;
         emit_markdown_link_close(dest, trim_start, &href, title.as_deref(), options);
         if ends_with_space && has_text {
             dest.push(' ');

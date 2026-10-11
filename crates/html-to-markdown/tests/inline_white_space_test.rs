@@ -280,7 +280,7 @@ fn a_line_end_before_a_no_break_space_in_pre_is_written_as_it_is() {
         .map(|(html, expected)| (html.as_str(), *expected))
         .collect();
     assert_on_both(&cases);
-    assert_written_as_before(&[(
+    assert_on_each_converter(&[(
         "<pre>one&#13;<span>&nbsp;</span>two</pre>",
         "```\none\r\u{a0}two\n```\n",
         Some("```\none\r\u{a0}two\n```\n"),
