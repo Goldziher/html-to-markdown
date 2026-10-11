@@ -159,3 +159,15 @@ fn should_preserve_an_inert_body_inside_select_when_repairing_misnested_markup()
         "*before*<custom-x><select>A<iframe><p>x</iframe>B<option>C</option></select></custom-x>\n\nvisible\n",
     );
 }
+
+#[test]
+fn should_preserve_a_plain_template_body_when_normalization_is_skipped() {
+    assert_routes(
+        "<p>before</p><template>plain</template><p>visible</p>",
+        ConversionOptions {
+            preserve_tags: vec!["template".to_owned()],
+            ..ConversionOptions::default()
+        },
+        "before\n\n<template>plain</template>\n\nvisible\n",
+    );
+}

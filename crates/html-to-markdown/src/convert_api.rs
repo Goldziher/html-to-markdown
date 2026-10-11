@@ -183,7 +183,7 @@ fn prepare_conversion<'a>(html: &'a str, options: &ConversionOptions) -> Result<
 }
 
 fn try_tier1(prepared: &PreparedConversion<'_>, options: &ConversionOptions) -> Option<ConversionResult> {
-    if !prepared.inert_bodies.is_empty() {
+    if !options.preserve_tags.is_empty() || !prepared.inert_bodies.is_empty() {
         return None;
     }
     let report = crate::converter::prescan::PrescanReport::default();
