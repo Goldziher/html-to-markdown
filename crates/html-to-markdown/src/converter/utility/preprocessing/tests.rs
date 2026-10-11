@@ -572,3 +572,41 @@ fn find_closing_tag_bytes_stays_first_match_for_raw_text_elements() {
     let end = find_closing_tag_bytes(html, start, b"script").expect("closing tag not found");
     assert_eq!(&html[end..], b"tail");
 }
+
+/// The reads of the first pass over `input`: the `<` characters, and the searches that can
+/// read to the end of the page.
+fn first_pass_reads(input: &str) -> (usize, usize) {
+    use super::raw_text::{FirstPass, FirstPassRead, RawTextPage};
+
+    let mut markup = 0;
+    let mut searches = 0;
+    let stripped = FirstPass::new(input, RawTextPage::Source, |read| match read {
+        FirstPassRead::Markup => markup += 1,
+        FirstPassRead::EndTagSearch | FirstPassRead::CommentEndSearch => searches += 1,
+    })
+    .run();
+    assert_eq!(stripped.as_ref(), input, "nothing in the page has an end");
+    (markup, searches)
+}
+
+#[test]
+fn the_first_pass_searches_once_for_an_end_that_the_page_does_not_have() {
+    const STARTS: usize = 2_000;
+    // ~keep The `>` in the comment unit keeps the comments before the last `>` of the page.
+    for unit in ["<textarea>x ", "<script>x ", "<style>x ", "<!-- x> "] {
+        let html = format!("<p>start</p>{}", unit.repeat(STARTS));
+        let (markup, searches) = first_pass_reads(&html);
+        assert_eq!(searches, 1, "{unit:?}: one search, not one for each start");
+        assert!(markup <= STARTS + 2, "{unit:?}: {markup} reads");
+    }
+    let mixed = format!("<p>start</p>{}", "<textarea>x <script>x <style>x ".repeat(STARTS));
+    assert_eq!(first_pass_reads(&mixed).1, 3, "one search for each name");
+}
+
+#[test]
+fn the_first_pass_reads_nothing_after_the_last_tag_end_of_the_page() {
+    for unit in ["<textarea x ", "<script x ", "<a x ", "<svg x ", "</svg x "] {
+        let html = format!("<p>start</p>{}", unit.repeat(2_000));
+        assert_eq!(first_pass_reads(&html), (2, 0), "{unit:?}");
+    }
+}

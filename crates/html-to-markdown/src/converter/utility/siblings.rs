@@ -4,7 +4,6 @@
 //! and inline/block element detection for whitespace handling.
 
 use crate::converter::DomContext;
-use crate::converter::dom_context::draws_nothing;
 
 /// Get the tag name of the next sibling element.
 #[allow(clippy::trivially_copy_pass_by_ref)]
@@ -61,6 +60,23 @@ pub fn previous_content_block<'a>(
     parser: &tl::Parser,
     dom_ctx: &'a DomContext,
 ) -> Option<&'a str> {
+    previous_content_block_through(
+        node_handle,
+        parser,
+        dom_ctx,
+        crate::converter::main_helpers::is_inline_element,
+    )
+}
+
+/// [`previous_content_block`], where the walk looks only into the elements that `looks_into`
+/// accepts. Any other element that is no block ends the walk: no block is found.
+#[allow(clippy::trivially_copy_pass_by_ref)]
+pub fn previous_content_block_through<'a>(
+    node_handle: &tl::NodeHandle,
+    parser: &tl::Parser,
+    dom_ctx: &'a DomContext,
+    looks_into: fn(&str) -> bool,
+) -> Option<&'a str> {
     let id = node_handle.get_inner();
     let siblings = match dom_ctx.parent_of(id) {
         Some(parent_id) => match dom_ctx.children_of(parent_id) {
@@ -80,7 +96,7 @@ pub fn previous_content_block<'a>(
                 if crate::converter::utility::content::is_block_level_element(&info.name) {
                     return Some(info.name.as_str());
                 }
-                if !crate::converter::main_helpers::is_inline_element(&info.name) {
+                if !looks_into(&info.name) {
                     return None;
                 }
                 match dom_ctx.children_of(sibling.get_inner()) {
@@ -99,12 +115,6 @@ pub fn previous_content_block<'a>(
         }
         return None;
     }
-}
-
-/// Check if the previous sibling is an inline tag.
-#[allow(clippy::trivially_copy_pass_by_ref)]
-pub fn previous_sibling_is_inline_tag(node_handle: &tl::NodeHandle, parser: &tl::Parser, dom_ctx: &DomContext) -> bool {
-    dom_ctx.previous_inline_like(*node_handle, parser)
 }
 
 /// Check if the next sibling is whitespace-only text.
@@ -164,11 +174,6 @@ pub fn following_sibling_content(id: u32, parser: &tl::Parser, dom_ctx: &DomCont
 
     for sibling in siblings.iter().skip(position + 1) {
         if let Some(info) = dom_ctx.tag_info(sibling.get_inner(), parser) {
-            // ~keep A script or a style element draws nothing: the scan passes it, as it
-            // ~keep passes a comment.
-            if draws_nothing(&info.name) {
-                continue;
-            }
             return if info.is_inline_like {
                 FollowingContent::Inline
             } else {
@@ -215,6 +220,154 @@ pub fn br_follows_enclosing_elements(id: u32, parser: &tl::Parser, dom_ctx: &Dom
         id = parent;
     }
     false
+}
+
+/// Whether the text that follows `node_handle` starts with a zero-width space. The walk looks
+/// into the elements that only wrap text, leaves such an element at its end (the text node can
+/// be the last content of one) and passes the empty ones, comments and `<wbr>`. Any other
+/// element is content of its own and ends the walk, and so does an element whose `style`
+/// attribute sets `display` or `white-space`: it can be a box of its own
+/// (`display: inline-block`), and a browser keeps the line end before such a box. Inside an
+/// element with such a `style` attribute the answer is no.
+///
+/// ~keep Tier-1 answers the same question on the bytes (`zero_width_space_is_upcoming`).
+#[allow(clippy::trivially_copy_pass_by_ref)]
+pub fn zero_width_space_follows(node_handle: &tl::NodeHandle, parser: &tl::Parser, dom_ctx: &DomContext) -> bool {
+    use crate::converter::utility::content::ZERO_WIDTH_SPACE;
+
+    let mut current = node_handle.get_inner();
+    // ~keep A loop rather than recursion: nested wrappers are attacker-controlled depth. Each
+    // ~keep turn moves forward in the document, so the walk ends.
+    loop {
+        let mut node = loop {
+            if let Some(next) = next_sibling(current, dom_ctx) {
+                break next;
+            }
+            match dom_ctx.parent_of(current) {
+                Some(parent) if is_plain_text_wrapper(parent, parser, dom_ctx) => current = parent,
+                _ => return false,
+            }
+        };
+        loop {
+            match node.get(parser) {
+                Some(tl::Node::Raw(raw)) => {
+                    let raw = raw.as_utf8_str();
+                    let text = crate::text::decode_html_entities_cow(raw.as_ref());
+                    if text.is_empty() {
+                        break;
+                    }
+                    return text.starts_with(ZERO_WIDTH_SPACE)
+                        && !is_inside_display_or_white_space_style(node_handle.get_inner(), parser, dom_ctx);
+                }
+                Some(tl::Node::Tag(_)) => {
+                    if !is_plain_text_wrapper(node.get_inner(), parser, dom_ctx) {
+                        return false;
+                    }
+                    match dom_ctx
+                        .children_of(node.get_inner())
+                        .and_then(|children| children.first())
+                    {
+                        Some(first) => node = *first,
+                        None => break,
+                    }
+                }
+                Some(tl::Node::Comment(_)) => break,
+                None => return false,
+            }
+        }
+        current = node.get_inner();
+    }
+}
+
+/// Whether the element `id` only wraps text (or is a `<wbr>`) and its `style` attribute, if
+/// it has one, sets neither `display` nor `white-space`.
+fn is_plain_text_wrapper(id: u32, parser: &tl::Parser, dom_ctx: &DomContext) -> bool {
+    use crate::converter::utility::content::is_text_wrapper;
+
+    let Some(tl::Node::Tag(tag)) = tl::NodeHandle::new(id).get(parser) else {
+        return false;
+    };
+    dom_ctx
+        .tag_info(id, parser)
+        .is_some_and(|info| info.name == "wbr" || is_text_wrapper(&info.name))
+        && !tag_sets_display_or_white_space(tag)
+}
+
+/// Whether the `style` attribute of `tag` sets `display` or `white-space`.
+fn tag_sets_display_or_white_space(tag: &tl::HTMLTag) -> bool {
+    use crate::converter::utility::attributes::style_attribute_sets_display_or_white_space;
+
+    tag.attributes()
+        .get("style")
+        .flatten()
+        .is_some_and(|style| style_attribute_sets_display_or_white_space(style.as_bytes()))
+}
+
+/// Whether the node `id` is inside an element whose `style` attribute sets `display` or
+/// `white-space`.
+///
+/// ~keep Such an element can keep its line ends (`white-space: pre`), and its content inherits
+/// ~keep that: a browser then shows the line end before a zero-width space.
+/// ~keep Tier-1 answers the same question on its open elements
+/// ~keep (`open_element_sets_display_or_white_space`).
+fn is_inside_display_or_white_space_style(id: u32, parser: &tl::Parser, dom_ctx: &DomContext) -> bool {
+    let mut current = id;
+    while let Some(parent) = dom_ctx.parent_of(current) {
+        if let Some(tl::Node::Tag(tag)) = tl::NodeHandle::new(parent).get(parser)
+            && tag_sets_display_or_white_space(tag)
+        {
+            return true;
+        }
+        current = parent;
+    }
+    false
+}
+
+/// Whether the content of the element `id` starts with a block. White space and comments are
+/// no content, and the walk looks into the elements that only wrap text (`<a><b><div>`).
+///
+/// ~keep A `<span>` writes no marks, so a block that only `<span>` elements wrap breaks the
+/// ~keep line itself and the answer is no.
+/// ~keep Tier-1 answers the same question on the bytes (`upcoming_inline_starts_with_block`).
+pub fn content_starts_with_block(id: u32, parser: &tl::Parser, dom_ctx: &DomContext) -> bool {
+    use crate::converter::utility::content::is_text_wrapper;
+
+    let mut current = id;
+    let mut inside_marks = false;
+    // ~keep A loop rather than recursion: nested wrappers are attacker-controlled depth.
+    loop {
+        let Some(wrapper) = dom_ctx.tag_info(current, parser) else {
+            return false;
+        };
+        if !is_text_wrapper(&wrapper.name) {
+            return false;
+        }
+        inside_marks |= wrapper.name != "span";
+        let first_content = dom_ctx.children_of(current).and_then(|children| {
+            children.iter().find(|child| match child.get(parser) {
+                Some(tl::Node::Raw(raw)) => !raw.as_bytes().iter().all(u8::is_ascii_whitespace),
+                Some(tl::Node::Comment(_)) => false,
+                _ => true,
+            })
+        });
+        let Some(first_content) = first_content else {
+            return false;
+        };
+        match dom_ctx.tag_info(first_content.get_inner(), parser) {
+            Some(info) if info.is_block => return inside_marks,
+            Some(_) => current = first_content.get_inner(),
+            None => return false,
+        }
+    }
+}
+
+/// The node after `id` among the children of its parent.
+fn next_sibling(id: u32, dom_ctx: &DomContext) -> Option<tl::NodeHandle> {
+    let siblings = match dom_ctx.parent_of(id) {
+        Some(parent_id) => dom_ctx.children_of(parent_id)?,
+        None => &dom_ctx.root_children,
+    };
+    siblings.get(dom_ctx.sibling_index(id)? + 1).copied()
 }
 
 /// Append an inline suffix to output, with smart whitespace handling.

@@ -183,3 +183,16 @@ fn should_write_a_control_in_strict_white_space_mode_as_in_the_default_mode() {
         assert_in_mode(html, expected, WhitespaceMode::Strict);
     }
 }
+
+/// Strict mode takes the space before a checkbox at the start of a line too, as it did before
+/// the rules of running text: the two spaces around the checkbox are one.
+#[test]
+fn should_write_one_space_for_a_checkbox_at_a_line_start_in_strict_white_space_mode() {
+    for (html, expected) in [
+        ("<footer> <input type=\"checkbox\"> Logo</footer>", " Logo\n"),
+        ("x<footer> <input type=\"checkbox\"> Logo</footer>", "x\n\n Logo\n"),
+        ("<p>x</p><main> <input type=\"checkbox\"> Logo</main>", "x\n\n Logo\n"),
+    ] {
+        assert_in_mode(html, expected, WhitespaceMode::Strict);
+    }
+}

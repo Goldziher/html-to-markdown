@@ -1,6 +1,6 @@
 use std::borrow::Cow;
 
-use super::raw_text::track_svg_tag;
+use super::raw_text::{CommentEnds, TagSide, raw_text_tag_end, tag_end, track_svg_tag};
 
 /// Normalize bogus HTML comment endings that confuse the `tl` parser.
 pub fn normalize_bogus_comment_endings(input: &str) -> Cow<'_, str> {
@@ -235,6 +235,7 @@ fn normalize_void_tag_case(
     bytes: &[u8],
     idx: usize,
     last: usize,
+    last_gt: usize,
     output: &mut Option<String>,
 ) -> Option<usize> {
     let name_start = idx + 1;
@@ -251,7 +252,12 @@ fn normalize_void_tag_case(
     out.push_str(&input[last..idx]);
     out.push('<');
     out.push_str(&input[name_start..name_end].to_ascii_lowercase());
-    Some(name_end)
+    // ~keep The rest of the tag is read with it: a `<` in an attribute value starts nothing.
+    // ~keep No tag ends after the last `>` of the page.
+    let whole = if idx < last_gt { tag_end(bytes, idx) } else { None };
+    let end = whole.unwrap_or(name_end);
+    out.push_str(&input[name_end..end]);
+    Some(end)
 }
 
 /// Strip a raw-text `<script>` or `<style>` element in `preprocess_html`'s pass, replacing its
@@ -262,8 +268,11 @@ fn normalize_void_tag_case(
 ///
 /// Returns `Some(new_pos)` when a tag was stripped, `None` when `idx` does not start such a tag.
 ///
-/// Extracted from `preprocess_html`'s main scan loop — identical tag matching and JSON-LD
-/// exemption, unchanged.
+/// The start tag is read with `raw_text_tag_end`, the rule of the first pass.
+///
+/// ~keep The first pass removes each element that has an end tag, so the element here has
+/// ~keep none. It is closed at its start tag and the markup after it is written: the rule of
+/// ~keep issue 277 for a start tag with no end tag, in every spelling of the start tag.
 fn strip_raw_text_tag_reopen(
     input: &str,
     bytes: &[u8],
@@ -274,23 +283,21 @@ fn strip_raw_text_tag_reopen(
     const TAGS: [&[u8]; 2] = [b"script", b"style"];
 
     for tag in TAGS {
-        if matches_tag_start(bytes, idx + 1, tag) {
-            if let Some(open_end) = find_tag_end(bytes, idx + 1 + tag.len()) {
-                if tag == b"script" && is_json_ld_script_open_tag(&input[idx..open_end]) {
-                    continue;
-                }
-                let remove_end = find_closing_tag(bytes, open_end, tag).unwrap_or(open_end);
-                let out = output.get_or_insert_with(|| String::with_capacity(input.len()));
-                out.push_str(&input[last..idx]);
-                out.push_str(&input[idx..open_end]);
-                out.push_str("</");
-                if let Ok(tag_str) = str::from_utf8(tag) {
-                    out.push_str(tag_str);
-                }
-                out.push('>');
-
-                return Some(remove_end);
+        if let Some(open_end) = raw_text_tag_end(bytes, idx, tag, TagSide::Start) {
+            if tag == b"script" && is_json_ld_script_open_tag(&input[idx..open_end]) {
+                continue;
             }
+            let remove_end = find_closing_tag(bytes, open_end, tag).unwrap_or(open_end);
+            let out = output.get_or_insert_with(|| String::with_capacity(input.len()));
+            out.push_str(&input[last..idx]);
+            out.push_str(&input[idx..open_end]);
+            out.push_str("</");
+            if let Ok(tag_str) = str::from_utf8(tag) {
+                out.push_str(tag_str);
+            }
+            out.push('>');
+
+            return Some(remove_end);
         }
     }
 
@@ -365,57 +372,58 @@ pub fn preprocess_html(input: &str) -> Cow<'_, str> {
     let mut last = 0;
     let mut output: Option<String> = None;
     let mut svg_depth = 0usize;
+    let mut comments = CommentEnds::default();
+    let last_gt = memchr::memrchr(b'>', bytes).unwrap_or(0);
 
     while idx < len {
-        if bytes[idx] == b'<' {
-            if let Some(new_pos) = collapse_empty_comment(input, bytes, idx, last, &mut output) {
-                last = new_pos;
-                idx = new_pos;
-                continue;
-            }
-
-            if let Some(new_pos) = normalize_self_closing_void(input, bytes, idx, last, &mut output) {
-                last = new_pos;
-                idx = new_pos;
-                continue;
-            }
-
-            if let Some(new_idx) = track_svg_tag(bytes, idx, &mut svg_depth) {
-                idx = new_idx;
-                continue;
-            }
-
-            if svg_depth == 0 {
-                if let Some(new_pos) = normalize_void_tag_case(input, bytes, idx, last, &mut output) {
-                    last = new_pos;
-                    idx = new_pos;
-                    continue;
-                }
-
-                if let Some(new_pos) = strip_raw_text_tag_reopen(input, bytes, idx, last, &mut output) {
-                    last = new_pos;
-                    idx = new_pos;
-                    continue;
-                }
-
-                if let Some(new_pos) = strip_doctype(input, bytes, idx, len, last, &mut output) {
-                    last = new_pos;
-                    idx = new_pos;
-                    continue;
-                }
-            }
-
-            if !looks_like_tag_start(bytes, idx, len) {
-                let out = output.get_or_insert_with(|| String::with_capacity(input.len() + 4));
-                out.push_str(&input[last..idx]);
-                out.push_str("&lt;");
-                idx += 1;
-                last = idx;
-                continue;
-            }
+        if bytes[idx] != b'<' {
+            idx += 1;
+            continue;
+        }
+        let rewritten = collapse_empty_comment(input, bytes, idx, last, &mut output)
+            .or_else(|| normalize_self_closing_void(input, bytes, idx, last, &mut output));
+        if let Some(new_pos) = rewritten {
+            last = new_pos;
+            idx = new_pos;
+            continue;
         }
 
-        idx += 1;
+        if let Some(new_idx) = track_svg_tag(bytes, idx, &mut svg_depth) {
+            idx = new_idx;
+            continue;
+        }
+
+        let rewritten = if svg_depth == 0 {
+            normalize_void_tag_case(input, bytes, idx, last, last_gt, &mut output)
+                .or_else(|| strip_raw_text_tag_reopen(input, bytes, idx, last, &mut output))
+                .or_else(|| strip_doctype(input, bytes, idx, len, last, &mut output))
+        } else {
+            None
+        };
+        if let Some(new_pos) = rewritten {
+            last = new_pos;
+            idx = new_pos;
+            continue;
+        }
+
+        if !looks_like_tag_start(bytes, idx, len) {
+            let out = output.get_or_insert_with(|| String::with_capacity(input.len() + 4));
+            out.push_str(&input[last..idx]);
+            out.push_str("&lt;");
+            idx += 1;
+            last = idx;
+            continue;
+        }
+
+        // ~keep A comment and a tag are read whole, as the first pass reads them: a `<` in a
+        // ~keep comment or in an attribute value starts nothing. No tag ends after the last `>`
+        // ~keep of the page, and no search for the end of a tag starts there.
+        let whole = if svg_depth == 0 && idx < last_gt {
+            comments.end(bytes, idx).or_else(|| tag_end(bytes, idx))
+        } else {
+            None
+        };
+        idx = whole.unwrap_or(idx + 1);
     }
 
     if let Some(mut out) = output {

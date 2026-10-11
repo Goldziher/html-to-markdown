@@ -519,6 +519,7 @@ fn should_look_for_the_task_checkbox_only_before_the_first_content_of_an_item() 
             "- x a\n",
         ),
         (r#"<ul><li><hr><input type="checkbox"> a</li></ul>"#, "- ___\n\n  a\n"),
+        (r#"<ul><li><p>x</p><input type="checkbox"> a</li></ul>"#, "- x\n\n  a\n"),
         (
             r#"<ul><li><ul><li>x</li></ul><input type="checkbox"> a</li></ul>"#,
             "- * x\n\n  a\n",
@@ -585,12 +586,12 @@ fn should_hand_a_control_with_separated_text_to_the_full_converter() {
         assert!(matches!(result, Err(BailReason::FormControl)), "{html}: {result:?}");
     }
     // ~keep An input writes nothing and adds no space in both converters, so the fast converter
-    // ~keep keeps the input.
+    // ~keep keeps the input. The white space on both sides of it is one run, so one space.
     for (html, expected) in [
         ("<p>Name<input>Mail</p>", "NameMail\n"),
         (r#"<p>Name<input type="text" value="typed">Mail</p>"#, "NameMail\n"),
         (r#"<p>Name<input type="radio" checked>Mail</p>"#, "NameMail\n"),
-        ("<p>Name <input> Mail</p>", "Name  Mail\n"),
+        ("<p>Name <input> Mail</p>", "Name Mail\n"),
         ("<p><input>Mail</p>", "Mail\n"),
         (r#"<p>a<input type="hidden" value="t">b</p>"#, "ab\n"),
     ] {

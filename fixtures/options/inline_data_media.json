@@ -56,7 +56,7 @@
       {
         "type": "equals",
         "field": "content",
-        "value": "Before  after\n"
+        "value": "Before after\n"
       }
     ],
     "docs": {

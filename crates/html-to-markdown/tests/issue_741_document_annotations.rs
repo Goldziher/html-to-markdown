@@ -306,7 +306,7 @@ fn should_rollback_strong_annotation_when_specialized_visitor_skips_element() {
     assert_eq!(
         paragraph.content,
         NodeContent::Paragraph {
-            text: "before  after".to_string()
+            text: "before after".to_string()
         }
     );
     assert!(paragraph.annotations.is_empty());

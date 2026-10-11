@@ -176,7 +176,7 @@ fn should_still_delete_leading_whitespace_between_strong_close_and_summary_child
 fn should_keep_whitespace_only_text_between_leading_images_at_document_start() {
     let html = "<p><img src=\"/a.png\" alt=\"a\"> <img src=\"/b.png\" alt=\"b\"> dolor</p>";
     assert_tier1_matches_tier2(html);
-    assert_eq!(run_tier1(html), "![a](/a.png) ![b](/b.png)dolor\n");
+    assert_eq!(run_tier1(html), "![a](/a.png) ![b](/b.png) dolor\n");
 }
 
 #[test]

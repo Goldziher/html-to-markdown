@@ -32,6 +32,40 @@ pub fn decoded_attribute<'a>(tag: &'a tl::HTMLTag<'a>, name: &'a str) -> Option<
     })
 }
 
+/// Whether the value of a `style` attribute sets `display` or `white-space`.
+///
+/// Such an element can be a box of its own (`display: inline-block`) or keep its line ends
+/// (`white-space: pre`). Any other `style` value, the empty one too, changes neither.
+///
+/// ~keep This is no CSS parser: a declaration ends at each `;`, and its property name is the
+/// ~keep text before the first `:`. A `;` in a quoted value starts a declaration here.
+/// ~keep It reads the value as text: a character reference in `style` is no `:` and no letter
+/// ~keep here. Ask [`style_attribute_sets_display_or_white_space`] about source bytes.
+fn style_sets_display_or_white_space(style: &[u8]) -> bool {
+    style.split(|&byte| byte == b';').any(|declaration| {
+        declaration.iter().position(|&byte| byte == b':').is_some_and(|colon| {
+            let name = declaration[..colon].trim_ascii();
+            name.eq_ignore_ascii_case(b"display") || name.eq_ignore_ascii_case(b"white-space")
+        })
+    })
+}
+
+/// Whether a `style` attribute, given as the bytes of its value in the source, sets `display`
+/// or `white-space`.
+///
+/// ~keep The source value carries character references (`white-space&#58;pre` is
+/// ~keep `white-space:pre`), so the value is decoded first, as a browser does.
+/// ~keep Both converters ask this one function: Tier-2 with the parser's attribute, Tier-1 with
+/// ~keep the attribute its scanner collects. Neither of the two decodes a value.
+/// ~keep A value without `&` has no reference and is read as it is, with no allocation.
+pub fn style_attribute_sets_display_or_white_space(source_value: &[u8]) -> bool {
+    if !source_value.contains(&b'&') {
+        return style_sets_display_or_white_space(source_value);
+    }
+    let text = String::from_utf8_lossy(source_value);
+    style_sets_display_or_white_space(crate::text::decode_attribute_value_cow(&text).as_bytes())
+}
+
 /// Check if a tag has main content semantics based on role or class.
 pub fn tag_has_main_semantics(tag: &tl::HTMLTag) -> bool {
     if let Some(Some(role)) = tag.attributes().get("role") {
@@ -180,4 +214,95 @@ pub fn has_semantic_content_ancestor(node_handle: &tl::NodeHandle, parser: &tl::
         current_id = parent_id;
     }
     false
+}
+
+#[cfg(test)]
+mod tests {
+    use super::style_sets_display_or_white_space;
+
+    #[test]
+    fn a_style_with_a_display_or_a_white_space_declaration_sets_one() {
+        for style in [
+            "display:inline-block",
+            "display:block",
+            "white-space:pre",
+            "white-space: pre-wrap",
+            "DISPLAY:none",
+            "White-Space:PRE",
+            "display : inline",
+            " display\t:\tinline",
+            "\n white-space \n : pre",
+            "color:red;display:block",
+            "color:red; white-space:pre;",
+            ";;display:block",
+            "display:",
+        ] {
+            assert!(style_sets_display_or_white_space(style.as_bytes()), "{style:?}");
+        }
+    }
+
+    #[test]
+    fn a_style_with_no_display_and_no_white_space_declaration_sets_none() {
+        for style in [
+            "",
+            " ",
+            ";",
+            "color:red",
+            "color:red;",
+            "display",
+            "display;color:red",
+            "--display:block",
+            "text-white-space-x:pre",
+            "white-space-collapse:preserve",
+            "displays:block",
+            "white space:pre",
+            "color:display",
+            "content:\"display:block\"",
+            ":display",
+        ] {
+            assert!(!style_sets_display_or_white_space(style.as_bytes()), "{style:?}");
+        }
+    }
+
+    #[test]
+    fn a_semicolon_in_a_quoted_value_starts_a_declaration() {
+        assert!(style_sets_display_or_white_space(b"content:\"a;display:x\""));
+    }
+
+    #[test]
+    fn a_source_value_is_decoded_before_it_is_read() {
+        use super::style_attribute_sets_display_or_white_space;
+
+        for value in [
+            "white-space:pre",
+            "white-space&#58;pre",
+            "display&#x3a;inline-block",
+            "display&#X3A;inline-block",
+            "display&colon;inline-block",
+            "dis&#112;lay:inline-block",
+            "DIS&#80;LAY:BLOCK",
+            "color:red&#59;display:block",
+            "&#32;display&#9;:block",
+            "a&amp;b:c;display:block",
+        ] {
+            assert!(
+                style_attribute_sets_display_or_white_space(value.as_bytes()),
+                "{value:?}"
+            );
+        }
+        for value in [
+            "color:red",
+            "color&#58;red",
+            "display-x&#58;1",
+            "white-space&amp;#58;pre",
+            "display&amp;colon;block",
+            "&display:block",
+            "<!-- display:block -->&#58;",
+        ] {
+            assert!(
+                !style_attribute_sets_display_or_white_space(value.as_bytes()),
+                "{value:?}"
+            );
+        }
+    }
 }

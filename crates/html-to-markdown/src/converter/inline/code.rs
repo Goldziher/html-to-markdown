@@ -91,7 +91,12 @@ fn handle_kbd_samp(mut handler: HandlerContext<'_>) {
     let emit_prefix = if trimmed.is_empty() { "" } else { prefix };
     let emit_suffix = if trimmed.is_empty() { "" } else { suffix };
 
-    handler.output.push_str(emit_prefix);
+    crate::converter::utility::content::push_inline_prefix(
+        handler.output,
+        emit_prefix,
+        handler.options,
+        handler.context,
+    );
     emit_kbd_samp_segments(body, emit_prefix.is_empty(), &mut handler);
     append_inline_suffix(
         handler.output,

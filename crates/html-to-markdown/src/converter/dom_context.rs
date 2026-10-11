@@ -64,7 +64,6 @@ pub struct DomContext {
     pub(crate) root_children: Vec<tl::NodeHandle>,
     pub(crate) node_map: Vec<Option<tl::NodeHandle>>,
     pub(crate) tag_info_map: Vec<OnceCell<Option<TagInfo>>>,
-    pub(crate) prev_inline_like_map: Vec<OnceCell<bool>>,
     pub(crate) next_inline_like_map: Vec<OnceCell<bool>>,
     pub(crate) next_tag_map: Vec<OnceCell<Option<u32>>>,
     pub(crate) next_whitespace_map: Vec<OnceCell<bool>>,
@@ -87,7 +86,6 @@ impl DomContext {
             self.sibling_index_map.resize_with(new_len, || None);
             self.node_map.resize(new_len, None);
             self.tag_info_map.resize_with(new_len, OnceCell::new);
-            self.prev_inline_like_map.resize_with(new_len, OnceCell::new);
             self.next_inline_like_map.resize_with(new_len, OnceCell::new);
             self.next_tag_map.resize_with(new_len, OnceCell::new);
             self.next_whitespace_map.resize_with(new_len, OnceCell::new);
@@ -135,48 +133,6 @@ impl DomContext {
     pub(crate) fn next_tag_name<'a>(&'a self, node_handle: tl::NodeHandle, parser: &'a tl::Parser) -> Option<&'a str> {
         let next_id = self.next_tag_id(node_handle.get_inner(), parser)?;
         self.tag_info(next_id, parser).map(|info| info.name.as_str())
-    }
-
-    pub(crate) fn previous_inline_like(&self, node_handle: tl::NodeHandle, parser: &tl::Parser) -> bool {
-        let id = node_handle.get_inner();
-        self.prev_inline_like_map.get(id as usize).is_some_and(|cell| {
-            *cell.get_or_init(|| {
-                let parent = self.parent_of(id);
-                let siblings = if let Some(parent_id) = parent {
-                    if let Some(children) = self.children_of(parent_id) {
-                        children
-                    } else {
-                        return false;
-                    }
-                } else {
-                    &self.root_children
-                };
-
-                let Some(position) = self
-                    .sibling_index(id)
-                    .or_else(|| siblings.iter().position(|handle| handle.get_inner() == id))
-                else {
-                    return false;
-                };
-
-                for sibling in siblings.iter().take(position).rev() {
-                    if let Some(info) = self.tag_info(sibling.get_inner(), parser) {
-                        if draws_nothing(&info.name) {
-                            continue;
-                        }
-                        return info.is_inline_like;
-                    }
-                    if let Some(tl::Node::Raw(raw)) = sibling.get(parser) {
-                        if raw.as_utf8_str().trim().is_empty() {
-                            continue;
-                        }
-                        return false;
-                    }
-                }
-
-                false
-            })
-        })
     }
 
     pub(crate) fn next_inline_like(&self, node_handle: tl::NodeHandle, parser: &tl::Parser) -> bool {

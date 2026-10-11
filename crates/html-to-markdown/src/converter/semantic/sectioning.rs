@@ -63,6 +63,7 @@ pub fn handle(
         if content.trim().is_empty() {
             return;
         }
+        let content = without_leading_space(&content, handler.options, handler.ctx);
 
         // ~keep Inside a list item the section starts at the item's content column (issue #583).
         if handler.ctx.in_list_item && !handler.ctx.in_table_cell && !output.is_empty() {
@@ -71,13 +72,33 @@ pub fn handle(
             output.push_str("\n\n");
         }
 
-        crate::converter::block::horizontal_rule::separate_leading_rule(output, &content, handler.ctx);
-        output.push_str(&content);
+        crate::converter::block::horizontal_rule::separate_leading_rule(output, content, handler.ctx);
+        output.push_str(content);
 
         if content.ends_with('\n') && !content.ends_with("\n\n") {
             output.push('\n');
         } else if !content.ends_with('\n') {
             output.push_str("\n\n");
         }
+    }
+}
+
+/// The content of a sectioning element without the one space it can start with.
+///
+/// ~keep White space at the start of a block is no space. The children are written into a
+/// ~keep buffer of their own, so nothing before them shows that the block starts there: text
+/// ~keep and inline elements write the space that they start with. Two spaces or more are an
+/// ~keep indent (a code block), and the strict mode and code keep all white space.
+fn without_leading_space<'content>(
+    content: &'content str,
+    options: &crate::options::ConversionOptions,
+    ctx: &crate::converter::context::Context,
+) -> &'content str {
+    if crate::converter::utility::content::keeps_source_white_space(options, ctx) {
+        return content;
+    }
+    match content.strip_prefix(' ') {
+        Some(rest) if !rest.starts_with(' ') => rest,
+        _ => content,
     }
 }

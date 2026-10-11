@@ -410,7 +410,7 @@ fn should_read_an_image_element_from_its_alt_attribute_only() {
         ),
         (
             r#"<p>y <img src="data:image/svg+xml,%3Csvg%3E%3Ctext%3Ehi%3C/text%3E%3C/svg%3E"> x</p>"#,
-            "y  x\n",
+            "y x\n",
         ),
     ]);
 }

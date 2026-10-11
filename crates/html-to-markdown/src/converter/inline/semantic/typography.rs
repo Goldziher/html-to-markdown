@@ -267,7 +267,7 @@ pub fn handle_abbreviation(handler: HandlerContext<'_>) {
         return;
     }
 
-    output.push_str(prefix);
+    crate::converter::utility::content::push_inline_prefix(output, prefix, options, ctx);
     output.push_str(trimmed);
 
     if let Some(title) = crate::converter::utility::attributes::decoded_attribute(tag, "title") {

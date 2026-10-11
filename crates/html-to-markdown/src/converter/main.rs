@@ -37,7 +37,9 @@ use crate::options::ConversionOptions;
 use crate::converter::context::{Context, ContextParameters, InlineCollectorHandle};
 use crate::types::structure_collector::StructureCollectorHandle;
 
+mod block_boundary;
 mod parse;
+use self::block_boundary::separate_words_at_block_boundary;
 use self::parse::{ParsedPage, parse_for_conversion};
 
 type ConversionOutput = (
@@ -453,8 +455,15 @@ fn separate_from_block(
     let HandlerContext {
         options, ctx, dom_ctx, ..
     } = handler;
+    if output.is_empty() || ctx.in_code {
+        return;
+    }
     // ~keep A heading or a link label converts inline, but in a cell the text after a block needs the break.
-    if output.is_empty() || (ctx.convert_as_inline && !ctx.in_table_cell) || ctx.in_code {
+    // ~keep The strict mode keeps the white space of the source and writes no space of its own there.
+    if ctx.convert_as_inline && !ctx.in_table_cell {
+        if !crate::converter::utility::content::keeps_source_white_space(options, ctx) {
+            separate_words_at_block_boundary(node, node_handle, parser, output, handler);
+        }
         return;
     }
     if ctx.in_table_cell {
@@ -660,6 +669,7 @@ fn convert_node(node_handle: &tl::NodeHandle, parser: &tl::Parser, output: &mut 
 
     separate_from_block(node, node_handle, parser, output, handler);
 
+    let node_output_start = output.len();
     match node {
         tl::Node::Raw(bytes) => {
             let raw = bytes.as_utf8_str();
@@ -675,6 +685,16 @@ fn convert_node(node_handle: &tl::NodeHandle, parser: &tl::Parser, output: &mut 
         tl::Node::Tag(tag) => convert_tag(node_handle, tag, parser, output, handler),
 
         tl::Node::Comment(_) => {}
+    }
+    // ~keep Whatever wrote content ends the start of the document: text, and also an image, a
+    // ~keep graphic or a form control. Text after it keeps its leading white space (issue #762).
+    // ~keep An element that wrote nothing, or white space only, is not content.
+    if ctx.at_fresh_block_start.get()
+        && output
+            .get(node_output_start..)
+            .is_some_and(|written| !written.trim().is_empty())
+    {
+        ctx.at_fresh_block_start.set(false);
     }
 }
 

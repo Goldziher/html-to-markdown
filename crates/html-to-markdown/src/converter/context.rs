@@ -266,7 +266,9 @@ pub struct Context {
     /// paragraphs, as Google Docs exports) puts a genuine, buffer-sharing paragraph body
     /// at non-zero `inline_depth`.
     pub(crate) block_output_ptr: usize,
-    /// Shared flag: true until the first non-whitespace text content is emitted.
+    /// Shared flag: true until the first node writes content that is not white space. The node
+    /// is text, or an element that writes content of its own (an image, a graphic, a form
+    /// control). `convert_node` clears the flag for every kind of node (issue #762).
     ///
     /// ~keep `block_content_start` cannot answer "is this text node at the very start of a
     /// ~keep fresh block" on its own: it is a byte offset compared against `output.len()`,

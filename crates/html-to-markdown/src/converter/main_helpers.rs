@@ -651,12 +651,6 @@ fn is_start_tag_at(bytes: &[u8], name: &[u8], start: usize) -> bool {
             .is_some_and(|next| next.is_ascii_whitespace() || matches!(next, b'/' | b'>'))
 }
 
-/// Check if text has more than one character.
-pub fn has_more_than_one_char(text: &str) -> bool {
-    let mut chars = text.chars();
-    chars.next().is_some() && chars.next().is_some()
-}
-
 /// Check if an element is inline (not block-level).
 pub fn is_inline_element(tag_name: &str) -> bool {
     matches!(

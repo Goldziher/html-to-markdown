@@ -340,3 +340,142 @@ fn a_textarea_without_a_tag_is_unchanged() {
     assert_eq!(auto, content(html, TierStrategy::Tier2));
     assert!(auto.contains("a & b"), "{auto:?}");
 }
+
+/// The name of a raw-text element in a comment starts no element: the page after it is read.
+#[test]
+fn a_raw_text_start_tag_in_a_comment_starts_nothing() {
+    for (name, element, shown) in [
+        ("textarea", "<textarea>t</textarea>", "\n\nt"),
+        ("script", "<script>x</script>", ""),
+        ("style", "<style>x</style>", ""),
+    ] {
+        let html = format!("<p>before</p><!-- <{name}> --><p>mid <b>bold</b></p>{element}<p>after</p>");
+        for tier_strategy in STRATEGIES {
+            assert_eq!(
+                content(&html, tier_strategy),
+                format!("before\n\nmid **bold**{shown}\n\nafter"),
+                "{tier_strategy:?}: {html:?}"
+            );
+        }
+    }
+}
+
+/// A `textarea` start tag and its end tag in two comments hold nothing: the markup between the
+/// two comments is read as markup.
+#[test]
+fn a_textarea_tag_in_each_of_two_comments_leaves_the_markup_between_them() {
+    let html = "<!--<textarea>--><b>Shown</b><!--</textarea>--><p>after</p>";
+    for tier_strategy in STRATEGIES {
+        assert_eq!(content(html, tier_strategy), "**Shown**\n\nafter", "{tier_strategy:?}");
+    }
+}
+
+/// A `script` or `style` start tag and its end tag in two comments hold nothing either.
+#[test]
+fn a_script_tag_in_each_of_two_comments_leaves_the_markup_between_them() {
+    for name in ["script", "style"] {
+        let html = format!("<!--<{name}>--><b>Shown</b><!--</{name}>--><p>after</p>");
+        for tier_strategy in STRATEGIES {
+            assert_eq!(
+                content(&html, tier_strategy),
+                "**Shown**\n\nafter",
+                "{tier_strategy:?}: {html:?}"
+            );
+        }
+    }
+}
+
+/// The name of a raw-text element in an attribute value starts no element: the title is the
+/// value as written and the page after the link is read.
+#[test]
+fn a_raw_text_start_tag_in_an_attribute_value_starts_nothing() {
+    for (name, element, shown) in [
+        ("textarea", "<textarea>t</textarea>", "\n\nt"),
+        ("script", "<script>x</script>", ""),
+        ("style", "<style>x</style>", ""),
+    ] {
+        for quote in ["\"", "'"] {
+            let html = format!(
+                "<p>before</p><a href=\"/x\" title={quote}<{name}>{quote}>link</a><p>mid <b>bold</b></p>\
+                 {element}<p>after</p>"
+            );
+            for tier_strategy in STRATEGIES {
+                assert_eq!(
+                    content(&html, tier_strategy),
+                    format!("before\n\n[link](/x \"<{name}>\")\n\nmid **bold**{shown}\n\nafter"),
+                    "{tier_strategy:?}: {html:?}"
+                );
+            }
+        }
+    }
+}
+
+/// A whole element of raw text in an attribute value is a part of the value, also on a void
+/// element in upper case, and a start tag in a value with no quotes ends at its `>`.
+#[test]
+fn a_raw_text_element_in_an_attribute_value_is_a_part_of_the_value() {
+    for name in ["script", "style", "textarea"] {
+        let in_a_title = format!("<a href=\"/x\" title=\"<{name}></{name}>\">x</a><p>after <b>bold</b></p>");
+        let in_a_void = format!("<p>before</p><IMG src=\"/i.png\" alt=\"<{name}>\"><p>after <b>bold</b></p>");
+        let no_quotes = format!("<p title=<{name}>y</p><p>after <b>bold</b></p>");
+        for tier_strategy in STRATEGIES {
+            assert_eq!(
+                content(&in_a_title, tier_strategy),
+                format!("[x](/x \"<{name}></{name}>\")\n\nafter **bold**"),
+                "{tier_strategy:?}: {in_a_title:?}"
+            );
+            let markdown = content(&in_a_void, tier_strategy);
+            assert!(
+                markdown.starts_with("before\n\n![") && markdown.ends_with("\n\nafter **bold**"),
+                "{tier_strategy:?}: {in_a_void:?}: {markdown:?}"
+            );
+            assert!(
+                !markdown.contains("</"),
+                "{tier_strategy:?}: {in_a_void:?}: {markdown:?}"
+            );
+            assert_eq!(
+                content(&no_quotes, tier_strategy),
+                "y\n\nafter **bold**",
+                "{tier_strategy:?}: {no_quotes:?}"
+            );
+        }
+    }
+}
+
+/// An apostrophe in an attribute value with no quotes opens no quote in the first pass: the
+/// `textarea` after the tag is an element and the tags inside it are text.
+///
+/// ~keep The full converter only. The fast converter reads the tag of the link with a reader
+/// ~keep of its own, which opens a quote at the apostrophe. It did so before this rule; see
+/// ~keep the issue "an apostrophe in an attribute value with no quotes opens a quote on the
+/// ~keep fast converter".
+#[test]
+fn an_apostrophe_in_an_unquoted_attribute_value_opens_no_quote() {
+    let html = "<p>before</p><a href=/x title=it's>link</a><textarea><b>x</b></textarea><p>it's after</p>";
+    for tier_strategy in [TierStrategy::Auto, TierStrategy::Tier2] {
+        let markdown = content(html, tier_strategy);
+        assert!(
+            markdown.contains("<b>x</b>") && markdown.ends_with("it's after"),
+            "{tier_strategy:?}: {html:?}: {markdown:?}"
+        );
+    }
+}
+
+/// Issue 277: the full converter closes a `script` or `style` start tag with no end tag at
+/// once and writes the markup after it. Each spelling of the start tag follows that rule.
+///
+/// ~keep The fast converter writes nothing after such a start tag. It did so before this rule;
+/// ~keep see the issue "a script or style start tag with no end tag ends the page on the fast
+/// ~keep converter only".
+#[test]
+fn a_raw_text_start_tag_with_no_end_tag_follows_one_rule_in_every_spelling() {
+    let plain = content("<p>a</p><script><p>b</p>", TierStrategy::Tier2);
+    assert_eq!(plain, "a\n\nb");
+    for start_tag in ["<script>", "<script data=it's>", "<script\x0C>", "<style>"] {
+        let html = format!("<p>a</p>{start_tag}<p>b</p>");
+        for tier_strategy in [TierStrategy::Auto, TierStrategy::Tier2] {
+            assert_eq!(content(&html, tier_strategy), plain, "{tier_strategy:?}: {html:?}");
+        }
+        assert_eq!(content(&html, TierStrategy::Tier1), "a", "the fast converter: {html:?}");
+    }
+}
