@@ -233,7 +233,11 @@ pub struct Tier1State {
     /// its ancestor). `close_link` reads it to bail (`BailReason::LinkAutolinkNestedMarkup`)
     /// rather than risk a false negative against Tier-2's tag-stripped autolink
     /// predicate — see that bail reason's doc comment.
-    pub link_stack: Vec<(Option<String>, Option<String>, bool)>,
+    ///
+    /// The last flag says that the link has a name of its own (`aria-label` or `title`) or
+    /// points into its own page. `close_link` reads it to leave such a link with no text to
+    /// Tier-2, which labels the first kind and leaves the second kind out.
+    pub link_stack: Vec<(Option<String>, Option<String>, bool, bool)>,
     /// Byte range of `<head>…</head>` content (between the tags) in the
     /// input the scanner walked.  Populated by the `TagKind::Ignored`
     /// dispatch when a non-void Ignored tag (`<head>`) is encountered, or
@@ -352,6 +356,10 @@ pub struct Tier1State {
     /// so both tiers resolve the same input identically. `None` when `options.base_url`
     /// is unset (the default), making every resolution call a no-op.
     pub effective_base: Option<std::rc::Rc<url::Url>>,
+
+    /// The address of the page, as far as it is known; read when the first link opens. The
+    /// same value Tier-2 holds in `Context::own_page`.
+    pub own_page: std::cell::OnceCell<crate::converter::url_resolve::OwnPage>,
 }
 
 impl Tier1State {
@@ -383,6 +391,7 @@ impl Tier1State {
             list_items_after_text: Vec::new(),
             at_document_start: true,
             effective_base,
+            own_page: std::cell::OnceCell::new(),
         }
     }
 

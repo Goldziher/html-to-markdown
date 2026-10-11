@@ -55,7 +55,8 @@ pub fn handle_dl(node_handle: &tl::NodeHandle, parser: &tl::Parser, output: &mut
         }
     }
 
-    let trimmed = rendered.trim();
+    let trimmed =
+        crate::converter::handlers::blockquote::container_content(tag, parser, &rendered, options.code_block_style);
     if !trimmed.is_empty() {
         // ~keep Inside a list item the list starts at the item's content column (issue #583).
         if ctx.in_list_item && !ctx.in_table_cell && !output.is_empty() {
@@ -236,7 +237,9 @@ pub fn handle_dd(node_handle: &tl::NodeHandle, parser: &tl::Parser, output: &mut
         }
     }
 
-    let trimmed = rendered.trim().to_owned();
+    let trimmed =
+        crate::converter::handlers::blockquote::container_content(tag, parser, &rendered, options.code_block_style)
+            .to_owned();
     if trimmed.is_empty() {
         return;
     }
@@ -250,6 +253,11 @@ pub fn handle_dd(node_handle: &tl::NodeHandle, parser: &tl::Parser, output: &mut
         output.push_str(&trimmed);
     } else {
         crate::converter::block::horizontal_rule::separate_leading_rule(output, &trimmed, ctx);
+        // ~keep Indented code cannot interrupt the paragraph of the term, so a blank line goes
+        // ~keep before a description that starts with it.
+        if trimmed.starts_with([' ', '\t']) && !output.is_empty() && !output.ends_with("\n\n") {
+            output.push_str(if output.ends_with('\n') { "\n" } else { "\n\n" });
+        }
         output.push_str(&trimmed);
         output.push_str("\n\n");
     }

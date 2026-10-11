@@ -1682,7 +1682,7 @@ enum InlineDataMedia {
   /// Write the `data:` URL as the destination, payload included. Default.
   keep,
 
-  /// Write the alt text (the title for an `<svg>`, the fallback content for `<video>` and
+  /// Write the alt text (the text of an `<svg>`, the fallback content for `<video>` and
   /// `<audio>`) without a destination.
   altTextOnly,
 

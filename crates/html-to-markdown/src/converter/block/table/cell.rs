@@ -191,6 +191,10 @@ fn render_cell_content(
         *text = escape_cell_text(normalized.as_ref(), handler.options);
         return;
     }
+    let cell_ctx = handler
+        .ctx
+        .for_cell(*node_handle, parser, handler.dom_ctx, handler.options.br_in_tables);
+    let handler = HandlerContext::new(handler.options, &cell_ctx, handler.depth, handler.dom_ctx);
     for child_handle in children.top().iter() {
         render_cell_child(child_handle, parser, text, handler, deferred_tables);
     }

@@ -81,8 +81,8 @@ pub enum TagKind {
     /// `semantic/figure.rs::handle_figcaption`.
     Figcaption,
     /// `<button>` — clickable button. Tier-2 (`form/elements.rs`'s `handle_button`)
-    /// emits `\n\n` after the button's content in block mode but no leading
-    /// separator; mirror with close-only block-separator semantics.
+    /// emits `\n\n` after the button's content in block mode and no block separator before
+    /// it; mirror with close-only block-separator semantics.
     Button,
 
     /// Raw-text container whose content the scanner skips until the matching close tag.
@@ -396,9 +396,10 @@ static TAGS: phf::Map<&'static [u8], TagSpec> = phf_map! {
     // ~keep close-only block-separator semantics — distinct from Block which also
     // ~keep emits a leading `\n\n` on open.
     b"button"    => block(TagKind::Button),
-    b"progress"  => inline(TagKind::Inline),
-    b"meter"     => inline(TagKind::Inline),
-    b"output"    => inline(TagKind::Inline),
+    // ~keep Tier-2 writes these three with the function that writes a button's content.
+    b"progress"  => block(TagKind::Button),
+    b"meter"     => block(TagKind::Button),
+    b"output"    => block(TagKind::Button),
     b"datalist"  => inline(TagKind::Inline),
 
     b"audio"   => block(TagKind::Block),

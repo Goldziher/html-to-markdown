@@ -343,16 +343,20 @@ impl TreeSink for RcDom {
     }
 
     fn create_element(&self, name: QualName, attrs: Vec<Attribute>, flags: ElementFlags) -> Handle {
-        self.new_node(NodeData::Element {
+        let contents = flags.template.then(|| self.new_node(NodeData::Document));
+        let element = self.new_node(NodeData::Element {
             name,
             attrs: RefCell::new(attrs),
-            template_contents: RefCell::new(if flags.template {
-                Some(self.new_node(NodeData::Document))
-            } else {
-                None
-            }),
+            template_contents: RefCell::new(contents.clone()),
             mathml_annotation_xml_integration_point: flags.mathml_annotation_xml_integration_point,
-        })
+        });
+        // ~keep The contents of a template are not its children, so the depth limit would
+        // ~keep count each template from zero. The contents name the template as their parent,
+        // ~keep and the count goes on through nested templates (issue #808).
+        if let Some(contents) = contents {
+            contents.parent.set(Some(Rc::downgrade(&element)));
+        }
+        element
     }
 
     fn create_comment(&self, text: StrTendril) -> Handle {

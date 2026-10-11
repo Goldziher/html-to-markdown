@@ -50,11 +50,22 @@ fn should_indent_fence_and_following_paragraph_when_code_block_continues_a_list_
 /// ~keep first fenced code item) was not itself a fixpoint: rendering it back to HTML and
 /// ~keep reconverting produced exactly this fully-loose form instead of reproducing itself. This is the
 /// ~keep `commonmark_spec_fixpoint` oracle's own verified-stable form for example 318.
+/// ~keep
+/// ~keep The blank line is between two lines of code. Blank lines at the end of the code are
+/// ~keep dropped in a list item as they are outside of one (issue #769).
 #[test]
 fn should_leave_blank_interior_lines_unindented_but_indent_surrounding_fence_lines() {
+    let html = "<ul><li>a</li><li><pre><code>b\n\nd\n</code></pre></li><li>c</li></ul>";
+    let result = convert(html);
+    assert_eq!(result, "- a\n\n- ```\n  b\n\n  d\n  ```\n\n- c\n", "actual: {result:?}");
+}
+
+/// The blank lines at the end of the code of spec example 318 are not lines of the block.
+#[test]
+fn should_drop_blank_lines_at_the_end_of_a_code_block_in_a_list_item() {
     let html = "<ul><li>a</li><li><pre><code>b\n\n\n</code></pre></li><li>c</li></ul>";
     let result = convert(html);
-    assert_eq!(result, "- a\n\n- ```\n  b\n\n  ```\n\n- c\n", "actual: {result:?}");
+    assert_eq!(result, "- a\n\n- ```\n  b\n  ```\n\n- c\n", "actual: {result:?}");
 }
 
 /// A heading followed by trailing sibling text directly inside the same `<li>` (`CommonMark`

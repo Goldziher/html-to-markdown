@@ -38,7 +38,7 @@ use crate::converter::context::{Context, ContextParameters, InlineCollectorHandl
 use crate::types::structure_collector::StructureCollectorHandle;
 
 mod parse;
-use self::parse::{ParseOutcome, parse_for_conversion};
+use self::parse::{ParsedPage, parse_for_conversion};
 
 type ConversionOutput = (
     String,
@@ -77,19 +77,15 @@ pub fn convert_html_impl(
         document_base_href,
     } = parameters;
     let preserve_menu = options.preserve_tags.iter().any(|tag| tag.eq_ignore_ascii_case("menu"));
-    let (mut preprocessed, mut repair_warning) = prepare_html(html, preserve_menu);
-    let mut attempted_misnest_repair = false;
-    let (dom, dom_ctx) = loop {
-        let repaired = match parse_for_conversion(&preprocessed, preserve_menu, &mut attempted_misnest_repair)? {
-            ParseOutcome::Ready { dom, dom_ctx } => break (dom, dom_ctx),
-            ParseOutcome::Retry(repaired, warning) => {
-                repair_warning = warning.or(repair_warning);
-                repaired
-            }
-        };
-        preprocessed = repaired;
-    };
-    let preprocessed_len = preprocessed.len();
+    let (preprocessed, prepare_limit) = prepare_html(html, preserve_menu);
+    let repaired_page = std::cell::OnceCell::new();
+    let ParsedPage {
+        dom,
+        dom_ctx,
+        len: preprocessed_len,
+        repair_limit,
+    } = parse_for_conversion(&preprocessed, &repaired_page, preserve_menu)?;
+    let repair_warning = repair_limit.or(prepare_limit);
     trace_parse_complete(&dom, preprocessed_len);
     let parser = dom.parser();
     let mut output = String::with_capacity(preprocessed_len.saturating_add(preprocessed_len / 4));
@@ -117,6 +113,7 @@ pub fn convert_html_impl(
             structure_collector: structure_collector.as_ref().map(std::rc::Rc::clone),
             reference_collector: reference_collector.as_ref().map(std::rc::Rc::clone),
             base_url,
+            own_page: crate::converter::url_resolve::OwnPage::of(html, options.base_url.as_deref()),
         },
     );
 
@@ -255,8 +252,8 @@ fn finalize_output(
     if is_plain_text {
         output = extract_plain_text(dom, parser, options);
     } else {
-        trim_line_end_whitespace(&mut output);
-        collapse_excess_blank_lines(&mut output);
+        trim_line_end_whitespace(&mut output, options.code_block_style);
+        collapse_excess_blank_lines(&mut output, options.code_block_style);
     }
     if options.wrap {
         wrap_after_frontmatter(&output, frontmatter, options)
@@ -898,7 +895,7 @@ fn render_preserved_tag(
 
 #[cfg(feature = "metadata")]
 fn collect_document_attributes(tag_name: &str, tag: &tl::HTMLTag<'_>, ctx: &Context) {
-    if !matches!(tag_name, "html" | "head" | "body") || !ctx.metadata_wants_document {
+    if !matches!(tag_name, "html" | "head" | "body") || !ctx.metadata_wants.document {
         return;
     }
     let Some(collector) = ctx.metadata_collector.as_ref() else {

@@ -47,7 +47,7 @@
       "median_ms": 5.4856486,
       "mad_ms": 0.009397044444444447,
       "mb_per_s": 19.51141673181659,
-      "output_bytes": 13009
+      "output_bytes": 12982
     },
     {
       "fixture": "mdream/wikipedia-small.html",
@@ -56,7 +56,7 @@
       "median_ms": 4.2013817499999995,
       "mad_ms": 0.007192083333332988,
       "mb_per_s": 37.692703105715985,
-      "output_bytes": 40654
+      "output_bytes": 40600
     },
     {
       "fixture": "mdream/mdn-array.html",
@@ -65,7 +65,7 @@
       "median_ms": 9.792242166666666,
       "mad_ms": 0.03259875000000001,
       "mb_per_s": 22.540711522261777,
-      "output_bytes": 70691
+      "output_bytes": 70731
     },
     {
       "fixture": "mdream/react-learn.html",
@@ -74,7 +74,7 @@
       "median_ms": 11.2530497,
       "mad_ms": 0.059547700000000425,
       "mb_per_s": 22.469003268139822,
-      "output_bytes": 59205
+      "output_bytes": 58119
     },
     {
       "fixture": "mdream/github-markdown-complete.html",
@@ -83,7 +83,7 @@
       "median_ms": 10.0925849,
       "mad_ms": 0.039093000000000266,
       "mb_per_s": 40.59977344965667,
-      "output_bytes": 45649
+      "output_bytes": 45525
     },
     {
       "fixture": "real-world/wikipedia/small_html.html",
@@ -92,7 +92,7 @@
       "median_ms": 20.702064166666666,
       "mad_ms": 0.23588433333333114,
       "mb_per_s": 44.81605854708142,
-      "output_bytes": 188901
+      "output_bytes": 188840
     },
     {
       "fixture": "real-world/wikipedia/lists_timeline.html",
@@ -101,7 +101,7 @@
       "median_ms": 9.131580333333334,
       "mad_ms": 0.026678916666666552,
       "mb_per_s": 26.314140525404298,
-      "output_bytes": 22256
+      "output_bytes": 22195
     },
     {
       "fixture": "real-world/wikipedia/tables_countries.html",
@@ -110,7 +110,7 @@
       "median_ms": 13.523123875,
       "mad_ms": 0.10901675000000033,
       "mb_per_s": 53.34222606784996,
-      "output_bytes": 183837
+      "output_bytes": 183776
     },
     {
       "fixture": "real-world/wikipedia/medium_python.html",
@@ -119,7 +119,7 @@
       "median_ms": 55.250820000000004,
       "mad_ms": 0.37981900000000124,
       "mb_per_s": 21.474769821837455,
-      "output_bytes": 256956
+      "output_bytes": 256137
     },
     {
       "fixture": "real-world/wikipedia/large_rust.html",
@@ -128,7 +128,7 @@
       "median_ms": 21.6927905,
       "mad_ms": 0.15314100000000153,
       "mb_per_s": 46.82765043913996,
-      "output_bytes": 191367
+      "output_bytes": 191274
     },
     {
       "fixture": "real-world/issues/gh-190/mitrade.html",
@@ -173,7 +173,7 @@
       "median_ms": 1.326241592105263,
       "mad_ms": 0.0045290684885290755,
       "mb_per_s": 33.85789998993207,
-      "output_bytes": 19829
+      "output_bytes": 20036
     },
     {
       "fixture": "real-world/issues/gh-190/ozonekorea.html",
@@ -191,7 +191,7 @@
       "median_ms": 2.02843646,
       "mad_ms": 0.005187359999999863,
       "mb_per_s": 32.65208577172492,
-      "output_bytes": 24895
+      "output_bytes": 24791
     },
     {
       "fixture": "real-world/issues/gh-190/sjsu.html",
@@ -209,7 +209,7 @@
       "median_ms": 2.805736277777778,
       "mad_ms": 0.0058021111111108414,
       "mb_per_s": 55.47636370403781,
-      "output_bytes": 39505
+      "output_bytes": 39529
     },
     {
       "fixture": "real-world/issues/gh-121-hacker-news.html",
@@ -290,7 +290,7 @@
       "median_ms": 0.012293813057529517,
       "mad_ms": 0.00009349611330956766,
       "mb_per_s": 3.6459552997384703,
-      "output_bytes": 120
+      "output_bytes": 111
     }
   ]
 }

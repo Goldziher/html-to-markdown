@@ -137,21 +137,6 @@ fn trim_trailing_inline_whitespace(state: &mut Tier1State) {
     }
 }
 
-/// Collapse runs of 3+ consecutive newlines down to 2, matching Tier-2's
-/// `collapse_excess_blank_lines` post-processing step.
-fn collapse_excess_blank_lines(output: &mut String) {
-    let mut consecutive = 0usize;
-    output.retain(|c| {
-        if c == '\n' {
-            consecutive += 1;
-            consecutive <= 2
-        } else {
-            consecutive = 0;
-            true
-        }
-    });
-}
-
 /// Decode a single HTML entity name (without `&` or `;`) from Tier-1's hot subset
 /// directly into `out`.
 ///

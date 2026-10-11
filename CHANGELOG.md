@@ -7,10 +7,197 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- A checkbox outside a task list item writes nothing.
+  `<p>Agree <input type="checkbox"> to the terms</p>` gave `Agree [ ] to the terms` and now gives
+  `Agree to the terms`. Bracket pairs in running text are link syntax: `[x](optional)` rendered as
+  a link. A table cell that holds only inputs keeps its task brackets: `| [x] |`. A label or a
+  `span` around the checkbox of such a cell does not change that. A list item is a
+  task item only when the checkbox is its first content:
+  `<li>Text <input type="checkbox"> more</li>` gave `- [ ] Text  more` and now gives `- Text more`.
+  The menu switch of many themes, a checkbox before its label, no longer writes `[ ]`
+  ([#757](https://github.com/xberg-io/html-to-markdown/issues/757)).
+- A button, an output, a meter, a progress bar or a text area is a word of its own in running
+  text, also when the source glues it to a word:
+  `<p>Please re<button>load</button>ed the page</p>` gave `Please reload` and now gives
+  `Please re load`. The line still ends after the control
+  ([#752](https://github.com/xberg-io/html-to-markdown/issues/752)).
+- A link whose content gives no text is labelled with the name of the link: its `aria-label`,
+  then its `title`. Before, the label was the address of the link. This changes the default
+  output for every such link, with or without a graphic:
+  `<a href="/page" aria-label="Next page"><i class="fa fa-arrow"></i></a>` gave `[/page](/page)`
+  and gives `[Next page](/page)`. A link with no child node is named too:
+  `<a href="/page" aria-label="Next page"></a>` gave `[](/page)` and gives `[Next page](/page)`.
+  A link with no name keeps its address as its label, or its empty label when it has no child
+  node. A link with
+  a name is also kept when `inline_data_media = drop_element` removes its content.
+- A link into its own page whose content gives no text is left out, whatever that content is
+  (a graphic with no text, an empty element, nothing) and whether or not the link has a name. It
+  is the icon of a heading permalink or of a "back to top" link, and it leads nowhere else:
+  `<h2>Title <a href="#title"><svg>...</svg></a></h2>` gives `## Title`, and
+  `<a href="#top" aria-label="Back to top"></a>` gave `[](#top)` and gives nothing. A link is
+  into its own page when its address, after it is resolved, differs from the address of the page
+  (`base_url`) only by a fragment. A `<base>` element changes what `#part` resolves to, so on such
+  a page `#part` can name another document, and that link is kept. With no `base_url`, a written
+  `#part` is into its own page when the document has no `<base>` element; with one, the link is
+  kept. Such a link that has text is kept with its text.
+- A link whose only content is an inline `<svg>` with no text is no longer labelled `SVG Image`.
+  The link is kept and labelled by the first rule above:
+  `<a href="/page" aria-label="Next"><div><svg>...</svg></div></a>` gives `[Next](/page)`
+  ([#750](https://github.com/xberg-io/html-to-markdown/issues/750)).
+- A code block keeps the indentation that all its lines share. The converter removed it since the
+  fix for [#134](https://github.com/xberg-io/html-to-markdown/issues/134):
+  `<pre>  a = 1\n    b = 2\n</pre>` wrote the lines `"a = 1\n  b = 2"` and now writes
+  `"  a = 1\n    b = 2"`, as the page shows it. Blank lines at the end of a block are dropped. In a
+  list item one blank line at the end stayed and is now dropped too: the middle item of
+  `<ul><li>a</li><li><pre><code>b\n\n\n</code></pre></li><li>c</li></ul>` wrote the fence, `b`, a blank
+  line and the fence, and now writes the fence, `b` and the fence. A code block in a table cell is
+  still one code span and does not keep that indentation
+  ([#782](https://github.com/xberg-io/html-to-markdown/issues/782)).
+- A fenced code block keeps a blank first line. A browser drops one line feed after the `<pre>` tag
+  and shows a second one as a blank line. The converter dropped every line feed at the start of a
+  block: `<pre>\n\na\n</pre>` wrote the fence and `a`, and now writes the fence, a blank line and
+  `a`. An indented code block does not start with a blank line. Strict white space mode writes the
+  start of a block as before.
+- A link, an image, highlighted text and an abbreviation inside a code block or a code span write
+  their text and no Markdown marks, because code shows every character as text:
+  `<pre>Guido &lt;<a href="/mail">guido</a>&gt;</pre>` wrote `Guido <[guido](/mail)>` and now writes
+  `Guido <guido>`. An image in code writes nothing, and an inline `<svg>` in code writes its text in
+  place of a `data:` image. The link and the image stay in the metadata
+  ([#781](https://github.com/xberg-io/html-to-markdown/issues/781)).
+- With `extract_metadata` off, an empty `pre` writes nothing in place of an empty fence, as with the
+  default options.
+
+### Fixed
+
+- A page with a structured data script keeps its text when a text value of the JSON holds a tag.
+  `<script type="application/ld+json">{"a":"<p>"}</script>` in the head made the whole page
+  convert to an empty string, and the same script in the body removed the text after it. The
+  JSON in the metadata keeps the tags of its values: `{"a":"<p>Nice</p>"}` gave `{"a":"Nice"}`
+  and now gives the JSON as written. The end tag of the script can have any spelling a browser
+  reads (`</SCRIPT>`, `</script >`, `</script/>`); each of these also gave an empty page. A type
+  written with a character reference (`application/ld&#43;json`) is read as structured data
+  ([#818](https://github.com/xberg-io/html-to-markdown/issues/818)).
+- The options of a select list are separate words instead of one joined word. A select list
+  with the options `Quickstart`, `Installation` and `Ruby 101` gave
+  `QuickstartInstallationRuby 101` and now gives `Quickstart Installation Ruby 101`; a label, a
+  select list and a text area in one form gave `NameOneTwoarea words` and now give
+  `Name One Two area words`. Both converters give the same text for output, meter and progress
+  elements. Such a control in an inline element (a label, a span, bold text, a custom element)
+  stays in its line, as a browser shows it: `<label><button>One</button></label>items` gave
+  `Oneitems` and now gives `One items`, and `<span><button>One</button></span>items` gave `One`, a
+  blank line and `items`, and now gives `One items`. A block that holds such a control still ends
+  the line after it. An input writes no text and adds no space: `<p>Name<input>Mail</p>` gives
+  `NameMail`. Inside `pre` and code, a button, an output, a meter, a progress bar or a text area
+  adds no space: `<pre>before<button>Go</button>after</pre>` gives `beforeGoafter`. A select list
+  there keeps its options as separate words
+  ([#752](https://github.com/xberg-io/html-to-markdown/issues/752)).
+- The `label` attribute of an option group is no longer written. It is not text of the page: a
+  browser shows it only inside the open list. A select list with the groups `Getting Started`
+  (option `Quickstart`) and `Build` (option `Commands`) gave `**Getting Started**`, a line break,
+  `Quickstart**Build**`, a line break and `Commands`, and now gives `Quickstart Commands`
+  ([#776](https://github.com/xberg-io/html-to-markdown/issues/776)).
+- An element with no end tag ends where the HTML standard says: at the end tag of its parent, or
+  at a start tag that cannot be its content. Before, a paragraph with no end tag stayed open after
+  its parent ended, so each `<div class="note"><p>Note</div>` put the rest of the page two levels
+  deeper, and after 30 such blocks the page was cut at the depth limit with a
+  `depth_limit_exceeded` warning. A page of 80 such blocks and a footer gave 30 notes and no
+  footer; it gives 80 notes and the footer, with no warning. This changes the default output for
+  other pages that omit an end tag: `<div><p>one</div>tail` gave `onetail` and gives `one`, a
+  blank line, `tail`. `<blockquote><p>quoted</blockquote><p>after</p>` gave `after` inside the
+  quote and gives it after the quote. A paragraph after a table whose last cell has no end tag
+  was written into that cell and is written after the table.
+  `<nav><p>one</nav><aside><p>two</aside>tail` gave an empty document and gives `two` and `tail`.
+  `<table><thead><tr><th>a<th>b<tbody><tr><td>c<td>d</table>` gave a table of one cell and gives
+  both rows. A document with no `</head>` wrote its title into the body, or wrote nothing with
+  `extract_metadata = false`; it writes its body. `<p><ruby>a<rt>b<rt>c</ruby> after` gave
+  `a(b(c after))` and gives `a(b)(c) after`. `<h2>one<h3>two</h3>three` gave `## onetwothree` and
+  gives two headings and a paragraph. `<p>one<blockquote>two</blockquote>three` gave a blank line
+  between `one` and the quote and gives none, as the same input with `</p>` written always did.
+  A page that ends with an element open converts as the same page with every end tag written:
+  `<body><article><p>one</article><header>site</header><p>two</p>` gave `one`, `site` and `two`,
+  and gives `one` and `two`, because a `<header>` directly in the body is a page header.
+  `<body><main><p>one</main><header>late</header>` loses `late` by the same rule. A page that
+  omits an end tag is parsed a second time, by the HTML tree builder. Each of 11 recorded
+  Docusaurus pages of 33 to 143 KB takes 1.3 to 6.1 ms more (median 3.2 ms), which is 1.9 to 2.5
+  times as long, and the 70 recorded pages together take 290 ms in place of 252 ms. Pages with
+  every end tag are not affected. The second parse is given up when it holds more than 512
+  elements open, which is the depth a browser builds. Such a page converts as it did before, so
+  its omitted end tags are not repaired and it can still lose its tail. A repair that would
+  lose text is not used: the text of the page is counted before and after the second parse, and
+  a page that comes back with less text converts as it did before. A page that a `<frameset>`
+  replaces is such a page: the tree builder drops the text after `</frameset>`, and the
+  converter writes it. The omitted end tags of such a page are not repaired. A fragment with no
+  `<body>` tag keeps its top-level `<header>` when it is parsed a second time. Before, the second
+  parse read every fragment as a document and dropped that `<header>` as a page header:
+  `<header>h</header><b><p>one</p></b>` gave `**one**` and gives `h` and `**one**`, and
+  `<header>h</header><div><p>one</div>tail` gives `h`, `one` and `tail`. The depth limit and its
+  warning are unchanged for a page that really nests that deep. Past the depth limit, where the
+  converter warns, the number of empty tables before the cut can differ; no text is lost. Two
+  inputs are not repaired: an element that its parent ended and that gets its own end tag later
+  (`<div><p>one</div>two</p>rest</div>tail`), and an unquoted attribute value that runs into an
+  end tag (`<div class=a</div>`)
+  ([#772](https://github.com/xberg-io/html-to-markdown/issues/772)).
+- An inline `<svg>` keeps its text and no longer adds the words `SVG Image`. Its text is its
+  `aria-label`, the `<title>` and `<desc>` of the graphic, its `<text>` elements and the HTML in a
+  `<foreignObject>`, in document order. Style sheets, scripts, metadata and the content of `<defs>`
+  and `<symbol>` are not text, and a `<use>` reference is not followed. A `<switch>` gives the child
+  that a reader of English gets. An element with `display="none"` or `visibility="hidden"` gives
+  nothing, as hidden text outside a graphic gives nothing. `aria-hidden="true"` removes the label,
+  the title and the description. That text is the alt text of the image, and it is what
+  `inline_data_media = alt_text_only`, a heading and plain text output write, with the escaping of
+  any other text. A graphic with no text writes nothing there, and an image with an empty alt text
+  when the payload is kept. An icon link no longer takes the style sheet of its graphic as its
+  label ([#750](https://github.com/xberg-io/html-to-markdown/issues/750)).
+- A graphic in a heading is written as its text also with `extract_metadata = false` and
+  `highlight_style = none`. With those options it was written as a `data:` image, because the fast
+  converter has no rule for a heading. It now leaves a page with a graphic in a heading, with a
+  hidden element in a graphic, or with a link that has a name and no text, to the full converter
+  ([#766](https://github.com/xberg-io/html-to-markdown/issues/766)).
+- Two page shapes no longer take quadratic time in the pass that removes hidden elements: many
+  tag starts with no end (`<a` and a space, repeated), and many attribute values with no closing quote
+  (`<g a="` repeated). A 120 KB page with 40,000 such tag starts in a graphic took 16 seconds;
+  200,000 of them now take 20 milliseconds. The pass reads each tag once. A `<` inside a tag is
+  part of an attribute value there, so an attribute value that holds markup is no longer cut.
+  Other page shapes are still slow
+  ([#765](https://github.com/xberg-io/html-to-markdown/issues/765)).
+
+- Text that is only white space no longer makes the conversion fail when `include_document_structure`
+  is on, and `build_document_structure` no longer panics on it. The Markdown is the same as with the
+  structure off. Neither builder records an empty heading, paragraph or list item
+  ([#749](https://github.com/xberg-io/html-to-markdown/issues/749)).
+- A code block inside a list item keeps the indentation of every line. A line after a blank line got
+  four spaces for each list level in place of its own indentation, so
+  `<ol><li><p>Save this:</p><pre>def f(x):\n    if x:\n\n        return 1\n</pre></li></ol>` wrote
+  `return 1` at the level of `if x:`. It now writes it eight spaces in, as in the page
+  ([#769](https://github.com/xberg-io/html-to-markdown/issues/769)).
+- A code block whose lines are separate block elements has one line for each. A `div`, `section` or
+  other plain container inside a `pre` starts a line and ends a line, as in a browser, and adds no
+  blank line: `<pre><div>a<br></div><div>b<br></div></pre>` wrote `a`, a blank line, `b` and now writes
+  `a`, `b`. An empty container is no line. A line feed between two containers is still a blank line,
+  because a browser shows one ([#770](https://github.com/xberg-io/html-to-markdown/issues/770)).
+- Two or more blank lines in a row inside a fenced code block stay, and so do the spaces at the end of
+  a line of code: `<pre>import a\n\n\nclass B:\n</pre>` wrote one blank line and now writes two. The
+  rules that fold blank lines and trim line ends still apply to the text outside of code
+  ([#783](https://github.com/xberg-io/html-to-markdown/issues/783)).
+- With `code_block_style = indented`, a code block that starts a block quote keeps the four spaces of
+  its first line. Without them a Markdown reader takes the code for a paragraph:
+  `<blockquote><pre>a\nb\n</pre></blockquote>` wrote `> a`, `>     b` and now writes `>     a`,
+  `>     b`. With that style the blank lines and the spaces at the end of a line of code also stay, at
+  the top level, in a block quote and in a list item: `<pre>a   \n\n\nb\n</pre>` wrote
+  `"    a  \n\n    b"` and now writes `"    a   \n\n\n    b"`
+  ([#799](https://github.com/xberg-io/html-to-markdown/issues/799)).
+- With `code_block_style = indented`, a code block that starts the description of a definition list
+  keeps the four spaces of its first line, and a blank line goes between the term and the code:
+  the full converter wrote `"t\na\n    b"` for `<dl><dt>t</dt><dd><pre>a\nb\n</pre></dd></dl>`, and
+  the full and fast converters now write `"t\n\n    a\n    b"`. The spaces at the end of the last
+  line of that code stay too
+  ([#799](https://github.com/xberg-io/html-to-markdown/issues/799)).
 - Add `expand_abbreviations` and `include_blockquote_citations` options, enabled by default.
 - Keep one blank quote line between lists and blocks, preserving blank lines inside code.
 - Convert repeated unfinished tags, unclosed hidden elements, and inline list fragments with linear scans.
-- Repair a page that ends a paragraph again after the end tag of its parent, or whose head has no end tag; past 512 levels, keep the rest of the input as written, and past the node budget keep the first parse, each with a `malformed_html` warning.
+- Repair a page that ends a paragraph again after the end tag of its parent, or whose head has no end tag, from the first parse with no second tokenizer pass; past 512 levels or past the node budget of the repair, keep the first parse with every word of the input and a `malformed_html` warning.
 
 ## [3.17.2] - 2026-10-06
 
@@ -766,231 +953,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   straight out of `[Unreleased]` and leaves it empty on `main` — an Unreleased-only comparison
   would compare zero lines and pass while a released section drifted.
 
-## [3.15.0] - 2026-09-26
-
-### Added
-
-- **`ConversionOptions::base_url`** resolves relative `href`/`src` destinations against a
-  caller-supplied base URL, honoring a document's own `<base href>` the way a browser does.
-  Defaults to `None`, so output is byte-identical for callers who do not set it. Resolution
-  happens identically in both the Tier 1 and Tier 2 rendering paths.
-
-### Changed
-
-- Upgraded `rmcp` to 3.4.1.
-- Repinned the `alef` generator to 0.96.5 and regenerated every binding. Generator drift
-  only; no public API of any binding changed.
-- Split `converter/utility/content.rs` and `converter/inline/link.rs` (each over the
-  1000-line quality gate) into smaller modules, and reduced `convert_table_row`'s cyclomatic
-  complexity by extracting its visitor-hook pre-pass into a separate function. No behavior
-  change; every existing import path is preserved via re-exports.
-
-### Fixed
-
-- **The R binding compiles again.** `ConversionOptions::base_url` is the struct's first
-  `Option<String>`, and alef's extendr backend assigned it a bare `String`, failing the whole R
-  package build with `error[E0308]: expected Option<String>, found String`. Fixed in alef 0.96.5.
-  It went unnoticed for two commits because two independent mechanisms each suppressed the leg.
-  On the commit that introduced the line, `Test: R` was **cancelled**: `ci-e2e.yaml`'s
-  `cancel-in-progress: true` group is keyed on the branch, so the next push to `main` killed the
-  run before R finished. On the commit after that, `Test: R` was **skipped**: the leg is gated on
-  a `packages/r/**`/`crates/html-to-markdown/**` paths filter that commit did not match. Neither
-  state is a failure, so `CI E2E` reported success twice without ever compiling R.
-
-- CI's fixture-snippet validation now really validates the 341 Swift snippets. They had all
-  been reporting `Unavailable` with `no such module 'HtmlToMarkdown'`: Swift 6.3 made
-  `swiftbuild` the default build system, whose bin path holds the `.swiftmodule` files
-  directly and emits no `Modules/` directory, while alef points `-I` at `<bin-path>/Modules`.
-  The session now reconstructs that layout after building. The gate went red without any
-  change to this tree, when the runner's preinstalled Swift moved to 6.4.
-
-## [3.14.3] - 2026-09-19
-
-### Fixed
-
-- **A whitespace-only inline wrapper nested inside another wrapper keeps its separator**
-  ([#504](https://github.com/xberg-io/html-to-markdown/issues/504)).
-  `<h2><strong>Alpha</strong><strong><em><br></em></strong>Beta</h2>` rendered `## **Alpha**Beta`
-  from 3.14.2 on, where 3.14.1 kept the space, and a paragraph or table cell joined the words the
-  same way. Issue #501 taught the shared wrapper emitter that a whitespace-only body at a line
-  start contributes nothing, keyed on the destination buffer being empty -- but the destination
-  can also be an enclosing wrapper's fresh scratch buffer, which is empty mid-line, so the inner
-  `<em>`'s one space was dropped there and the outer `<strong>` came out empty. The line-start
-  rule now fires only on the block's own buffer, using the address test the text-node fallback
-  already uses for the same distinction, so `<mark>`, `<ins>`, `<del>`, `<sub>` and `<sup>`
-  wrappers move with it. A `<br>` inside a wrapper inside a table cell had the same shape on its
-  own since before 3.14.2 -- `<td>Alpha<em><br></em>Beta</td>` -- and now keeps its space too; a
-  cell's own leading `<br>` still contributes nothing. Tier 1 bails on adjacent emphasis, so the
-  change is Tier-2 only.
-- **A newline inside nested transparent inline wrappers still separates the words around it**
-  ([#505](https://github.com/xberg-io/html-to-markdown/issues/505)).
-  `<p><i>Alpha</i><span><span>\n</span></span>Beta</p>` rendered `*Alpha*Beta` where a browser
-  shows a space. Issues #430 and #491 taught the text-node fallback that a lone newline inside
-  an inline wrapper separates words when the wrapper is followed by inline content, but the check
-  looked one level up only: with a second wrapper the inner `<span>` is the last child of the
-  outer one and the newline was dropped. The check now climbs through every transparent inline
-  ancestor that has nothing after it and stops at the first block. Tier 1 already emitted the
-  space, so this was a live cross-tier divergence; the tiers now agree.
-- **An anchor that html5ever's adoption agency splits around a block is emitted once, not twice**
-  ([#493](https://github.com/xberg-io/html-to-markdown/issues/493)).
-  `<a href="/o"><div><a href="/i">Inner</a></div></a>` rendered `[](/o)` and then
-  `[](/o)[Inner](/i)`: the repair legitimately closes the outer `<a>` at the `<div>` and
-  reconstructs it inside, and the clone reached the renderer indistinguishable from an authored
-  element. A renderer rule keyed on shape would either drop a genuine empty anchor (`CommonMark`
-  example 484) or a deliberately authored duplicate, so the fix is at parse time: every `<a>`
-  start tag is stamped with a private origin id before the tree builder sees it, the clones
-  inherit it, and on the repaired tree the halves of a split anchor with no content of their own
-  are unwrapped in place. When no half has content the authored one is kept, so the destination
-  still appears once as `[](/o)`; `<a href="/o"><div>Text<a href="/i">Inner</a></div></a>` keeps
-  the half that carries `Text` and renders `[Text](/o)[Inner](/i)`. Input the repair never runs
-  on, and an anchor the repair leaves whole, are unchanged.
-
-## [3.14.2] - 2026-09-18
-
-### Fixed
-
-- **An `&` that would read as a character reference in a link destination or title now stays
-  literal** ([#498](https://github.com/xberg-io/html-to-markdown/issues/498)). `CommonMark`
-  decodes entity and numeric character references inside destinations and titles, so the
-  decoded `?&plus;` that `<img src="?&amp;plus;">` produced from 3.14.0 on re-parsed as `?+` --
-  a different URL. `<a href>` and `title` had carried the same defect since 3.12, when they
-  started decoding; only `src` was new to it. Such an `&` is now written back as `&amp;`, the
-  form 3.13 emitted and the one non-`CommonMark` consumers of the URL also read correctly. Only a
-  reference the HTML5 decoder really recognises is touched: `?a&b` and `&foo;` are unchanged.
-  Tier 1 wrote a link's `href` straight into the output with no escaping at all, so it now
-  shares Tier 2's `append_url_destination`; that also ends a divergence unrelated to entities,
-  where Tier 1 emitted `[T](/a b(c)` and `[T](/a(b)` against Tier 2's `[T](</a b(c>)` and
-  `[T](/a\(b)`.
-- **An unmatched `[` in a link label or image `alt` is now escaped**
-  ([#499](https://github.com/xberg-io/html-to-markdown/issues/499)). `CommonMark` accepts a
-  bracket in a label only escaped or as a matched pair; an unmatched `]` was already escaped,
-  an unmatched `[` was not. `<img alt="[A;B)" src="S">` rendered `![[A;B)](S)`, which
-  re-parses as a dangling `!` followed by a real `[A;B)](S)` link -- the image was gone. The
-  shared `escape_link_label` helper now escapes every opener left without a closer, so both
-  tiers and every caller (links, images, `<graphic>`, SVG titles, embedded media) move together.
-- **A run of ASCII whitespace at the start of a line is no longer emitted**
-  ([#501](https://github.com/xberg-io/html-to-markdown/issues/501)).
-  `<p>P</p><div><span>    </span><img alt="A" src="S"></div>` rendered the image as
-  `![A](S)` indented by four columns, which `CommonMark` reads as an indented code block, so
-  the image was lost. Issue #460 dropped leading whitespace at the start of a
-  *paragraph*; a `<div>` never set that flag and the run fell through to the verbatim fallback.
-  Leading ASCII whitespace on a line is never Markdown content, so the text-node fallback now
-  drops it at a line start of the block's own buffer, the `<div>` handler measures its content
-  start the way `<p>` does so an inline wrapper's empty scratch buffer is not mistaken for one
-  (its single space must still reach the #481 handling), and a whitespace-only wrapper spliced
-  in at a line start contributes nothing -- `<p>A</p><p><i> </i>B</p>` no longer opens its
-  second paragraph with a stray space. A multi-space run mid-line collapses to one space, as it
-  already did between two inline siblings. A run carrying a decoded `&nbsp;` is untouched. Tier 1
-  already emitted every case this way.
-- **A whitespace-only inline wrapper body no longer vanishes and joins the words around it**
-  ([#502](https://github.com/xberg-io/html-to-markdown/issues/502)).
-  `<b>Alpha</b><b><span>\n</span></b><b>Beta</b>` rendered `**AlphaBeta**`, and
-  `Alpha<i>\n</i>Beta` rendered `AlphaBeta`, where a browser shows a space. Two drops of one
-  shape: a newline-only text node returned early because the wrapper's scratch buffer was empty
-  -- the buffer is fresh per wrapper, so its length says nothing about the document -- and a
-  `<br>` with nothing before it in that buffer left a bare newline that `chomp_inline` did not
-  count as a space. Both now surface as the single separating space issue #481 already gives a
-  literal `<b> </b>`, still suppressed after an existing space; a truly empty `<b></b>` still
-  emits nothing. Tier 1 bails on every one of these shapes, so the change is Tier-2 only.
-- **A headerless table whose rows have different cell counts is padded, not turned into a
-  list** ([#500](https://github.com/xberg-io/html-to-markdown/issues/500)).
-  `<table><tr><td>A</td><td>B</td></tr><tr><td>C</td></tr></table>` rendered `- A B` / `- C`:
-  ragged row lengths alone classified a table as a *layout* table. A headerless table with a
-  short row is ordinary tabular data far more often than it is an email-signature grid, and the
-  regular renderer already pads a short row to the table's width (issue #13), so it now renders
-  `| A | B |`, `| --- | --- |`, `| C |   |`. Layout still triggers on more than one nested table,
-  `colspan`/`rowspan` combined with `border="0"`, a blank table, or a short table dense with
-  links. Tier 1 keeps its stricter bail on ragged rows -- it has no padding of its own -- which
-  only ever sends more input to the path that does. A layout row also **keeps an image as
-  `![alt](src)`** instead of degrading it to alt text: the row is a list item, and list items and
-  data cells keep images by default; only headings degrade them. `keepInlineImagesIn` is no
-  longer needed for that (issue #433), though it still governs headings and links.
-- **A layout row stays on one line across a `<br>` or a blank nested table.** A `<br>` inside a
-  layout cell emitted a hard-break marker, and a nested table that rendered to nothing still
-  emitted the blank line meant to separate content; either put a bare newline inside a list
-  item's line and ended the item. Both were latent -- the Hacker News footer in the gh-121
-  fixture is `<img><table>bar</table><br>links`, and while the spacer image degraded to nothing
-  every separator stayed suppressed -- and keeping the image surfaced them. A `<br>` now follows
-  the settled cell rule its `<div>`/`<p>` continuations already use (issue #470), and an empty
-  table output writes no separator. Across the benchmark corpus this rejoined three split list
-  items in one fixture and changed nothing else; the other movements are images now kept in
-  layout rows and leading whitespace dropped at line starts (#501).
-- **An anchor wrapping a table inside a layout cell keeps its inner links clickable**
-  ([#503](https://github.com/xberg-io/html-to-markdown/issues/503)). Issue #490 renders a
-  wrapped table as a separate block after the link, but refused inside inline contexts, and a
-  cell of a table the layout heuristic turns into a bullet list converts as inline. The nested
-  table was walked into the label instead, where the bracket escaping turned `[One](/one)` and
-  `[Two](/two)` into text; only the outer destination survived. A layout cell is a list item's
-  text, not a link label, and it already holds a bare nested table on the lines after its
-  bullet, so the deferred table now lands there the same way. Headings and true inline labels
-  keep refusing. Tier 1 bails on a table opened inside a link, so this is Tier-2 only.
-
-## [3.14.1] - 2026-09-17
-
-### Fixed
-
-- **A multi-line link label or image `alt` no longer has one of its lines read as block
-  structure** ([#496](https://github.com/xberg-io/html-to-markdown/issues/496)). `CommonMark`
-  parses block structure before inline structure (spec 0.31.2 appendix A), so a continuation
-  line that looks like a block opener ends the paragraph the label lives in and the `[`/`![`
-  never reaches its `]`. `![A\n-\n](S)` produced no image at all -- it produced
-  `<h2>![A</h2><p>](S)</p>`, with the image gone. A hard line break did not help, because it
-  is inline and block parsing has already finished by then, so the reporter's escaping
-  workarounds could not work either. Measured against comrak, 14 of 18 opener shapes destroyed
-  the construct: setext `-` and `=`, all three thematic breaks, ATX headings, both code
-  fences, block quotes, all three bullet markers, both ordered-list delimiters, and HTML
-  blocks. The first non-blank character of a continuation line is now backslash-escaped when
-  that line would open a block *that can interrupt a paragraph* -- ordered lists at their
-  `.`/`)` delimiter, since a digit cannot carry an escape. Lines that open nothing are
-  untouched: four columns of indent (indented code cannot interrupt a paragraph), a type-7
-  HTML block such as a bare `<span>`, `2. x`, `-x`, seven `#`. The label's first line is never
-  escaped -- it is preceded on that same line by the caller's own `[`/`![`. The escaping is
-  unconditional, like the existing bracket escaping and unlike the `escape_misc` family: those
-  decide whether text that merely *looks* like Markdown is emitted verbatim, this decides
-  whether the image or link survives at all. Multi-line `alt` is not exotic -- TeX4ht emits it
-  for every formula it cannot render. Both tiers were affected and both are fixed through the
-  one `escape_link_label` helper they share.
-- **A `<br>` at the very start or end of an `<a>` is no longer dropped**
-  ([#497](https://github.com/xberg-io/html-to-markdown/issues/497)). `<a href="H">A<br></a>B`
-  renders as A, a line break, then B; the converter emitted `[A](H)B`, losing the break
-  entirely. `[A  \n](H)B` re-parses to exactly the original `<a href="H">A<br /></a>B`
-  (verified against comrak), so the break belongs inside the label. Both tiers dropped it for
-  the same reason expressed twice -- the whole label was whitespace-trimmed, and once
-  flattened a `"  \n"` marker is indistinguishable from the incidental whitespace that really
-  does belong before a `</a>` -- and Tier 2 additionally never emitted a *leading* break at
-  all, because its "nothing on this line yet" test compares a fresh label buffer's length
-  against the enclosing block's start offset. A run of breaks at one edge still collapses to a
-  single break (two adjacent markers would put a blank line in the label, and a blank line
-  ends the paragraph, destroying the link), and a label of nothing but breaks still collapses
-  to empty. A heading and a pipe-table cell are single-line and still fold every break to a
-  space. The issue's second example asks for `B[A  \n](H)`, which moves the break to the far
-  side of the label text; the break is preserved where the `<br>` actually was instead --
-  `B[  \nA](H)`, which comrak renders back to the input DOM.
-- Tier 1 no longer emits three spaces where Tier 2 emits one for a `<br>` inside a link inside
-  a table cell (`| [A   -   B](H) |` against `| [A - B](H) |`). Tier 1 folded its hard-break
-  marker late, in `close_table_cell`, which left the marker's two spaces behind; it now folds
-  in `close_link`, which is also what keeps the #496 escaping from firing on a label that is
-  about to become single-line anyway.
-
-- Generated Go and R e2e suites no longer assert against strings their fixtures never
-  specified (alef pin 0.90.0 to 0.91.5). Two independent generator defects were corrupting
-  fixture values on their way into test code: alef's Go emitter rendered a multi-line value as
-  a raw backtick literal and its own writer then trimmed the trailing whitespace off every
-  physical line, so the three assertions carrying a Markdown two-space hard break read
-  `[Alpha\n](url)Beta` where the fixture said `[Alpha  \n](url)Beta`; and alef's R emitter ran
-  every plain string argument through the PascalCase-to-snake_case transform meant only for
-  enum wire values, so `Alpha<span ...>` was emitted as `alpha<span ...>` and
-  `Beta<a ...><br>Alpha</a>` as `beta<a ...><br>_alpha</a>`. The R defect had been silently
-  wrong since the 3.14.0 `paragraph_whitespace_only_span_separates_words` fixture landed; it
-  went unnoticed because the E2E workflow had skipped every language test job on the three
-  preceding commits, so "green" meant "nothing ran". Fixed upstream in alef 0.91.5 rather than
-  by trimming the fixtures. The pin bump also carries alef 0.91.0-0.91.3, which for this repo
-  is limited to a simpler argument-marshalling path in the Node visitor bridge (no API or
-  behaviour change) and dropping its unused `tokio-util` dependency.
-
 ## Archives
 
-- [3.14.0](changelog-archive-6.md)
+- [3.15.0 through 3.14.0](changelog-archive-6.md)
 - [3.13.0 through 3.11.5](changelog-archive-1.md)
 - [3.11.4 through 3.6.21](changelog-archive-2.md)
 - [3.6.20 through 3.2.0](changelog-archive-3.md)

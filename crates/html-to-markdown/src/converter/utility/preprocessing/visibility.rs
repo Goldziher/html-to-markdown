@@ -250,6 +250,46 @@ fn hidden_element_removal_end(
     }
 }
 
+/// What [`find_tag_end`] returns from every position of a page, computed in one pass.
+///
+/// `find_tag_end` walks from a start over quoted values to the next `>`. Its result depends only
+/// on the first quote or `>` at or after the start, so one answer for each of those bytes is the
+/// answer for every start. The answers are filled from the end of the page: a `>` ends the tag
+/// after itself, and a quote has the answer of the byte after its partner.
+struct TagEnds {
+    positions: Vec<usize>,
+    ends: Vec<Option<usize>>,
+}
+
+impl TagEnds {
+    fn new(bytes: &[u8]) -> Self {
+        let positions: Vec<usize> = memchr::memchr3_iter(b'"', b'\'', b'>', bytes).collect();
+        let mut ends = vec![None; positions.len()];
+        let (mut next_double, mut next_single) = (None, None);
+        for index in (0..positions.len()).rev() {
+            let position = positions[index];
+            let next_same: &mut Option<usize> = match bytes[position] {
+                b'>' => {
+                    ends[index] = Some(position + 1);
+                    continue;
+                }
+                b'"' => &mut next_double,
+                _ => &mut next_single,
+            };
+            let end_after_partner = (*next_same).and_then(|partner| ends.get(partner + 1).copied().flatten());
+            ends[index] = end_after_partner;
+            *next_same = Some(index);
+        }
+        Self { positions, ends }
+    }
+
+    /// The result of `find_tag_end(bytes, from)`.
+    fn tag_end(&self, from: usize) -> Option<usize> {
+        let index = self.positions.partition_point(|&position| position < from);
+        self.ends.get(index).copied().flatten()
+    }
+}
+
 pub fn strip_hidden_elements(input: &str) -> Cow<'_, str> {
     let bytes = input.as_bytes();
     let len = bytes.len();
@@ -264,12 +304,11 @@ pub fn strip_hidden_elements(input: &str) -> Cow<'_, str> {
         return Cow::Borrowed(input);
     }
 
-    // ~keep DoS guard: a run of unterminated `<` (no `>` anywhere in the rest of the
-    // ~keep document) makes `find_tag_end` scan to EOF on every single one, turning this
-    // ~keep loop quadratic. Once no `>` remains past `idx`, `find_tag_end` is guaranteed
-    // ~keep to fail regardless of quoting, so `last_gt` lets every remaining iteration
-    // ~keep skip the call in O(1) instead of re-scanning to the end each time.
-    let last_gt = bytes.iter().rposition(|&b| b == b'>');
+    // ~keep A tag start with no end makes `find_tag_end` read to the end of the page: no `>` is
+    // ~keep left, or a quote before it has no partner. A page with many such starts made this
+    // ~keep loop quadratic (#765). After the first scan that fails, the ends come from a table
+    // ~keep that reads the page once.
+    let mut tag_ends: Option<TagEnds> = None;
 
     let mut idx = 0;
     let mut last = 0;
@@ -286,8 +325,17 @@ pub fn strip_hidden_elements(input: &str) -> Cow<'_, str> {
         // ~keep `find_tag_end` scan. Without this, a run like `<<<<<` treats every `<` as a
         // ~keep candidate tag start, and each failing scan re-walks the same suffix.
         let starts_tag_name = idx + 1 < len && bytes[idx + 1].is_ascii_alphabetic();
-        if starts_tag_name && last_gt.is_some_and(|gt| gt > idx) {
-            if let Some(tag_end) = find_tag_end(bytes, idx + 1) {
+        if starts_tag_name {
+            let tag_end = if let Some(table) = &tag_ends {
+                table.tag_end(idx + 1)
+            } else {
+                let tag_end = find_tag_end(bytes, idx + 1);
+                if tag_end.is_none() {
+                    tag_ends = Some(TagEnds::new(bytes));
+                }
+                tag_end
+            };
+            if let Some(tag_end) = tag_end {
                 if let Some(remove_end) = hidden_element_removal_end(input, bytes, idx, tag_end, &mut ends) {
                     let out = output.get_or_insert_with(|| String::with_capacity(len));
                     out.push_str(&input[last..idx]);
@@ -295,6 +343,11 @@ pub fn strip_hidden_elements(input: &str) -> Cow<'_, str> {
                     idx = remove_end;
                     continue;
                 }
+                // ~keep The tag is read once, as a whole. A `<` inside it is part of an attribute,
+                // ~keep not a tag start, and a scan from each one read the same tag again, so a
+                // ~keep page with many tag starts before one `>` took quadratic time (#765).
+                idx = tag_end;
+                continue;
             }
         }
         idx += 1;
@@ -480,7 +533,14 @@ fn css_length_is_zero(value: &str) -> bool {
 /// input is handled defensively — extra whitespace around `:` and `;`, mixed casing, and a
 /// trailing `!important` (with or without a preceding space) are all tolerated.
 pub fn hidden_style_reason(tag: &str) -> Option<HiddenStyleReason> {
-    let style_value = extract_attribute_value(tag, "style")?;
+    style_value_hidden_reason(extract_attribute_value(tag, "style")?)
+}
+
+/// As [`hidden_style_reason`], for the value of a `style` attribute.
+///
+/// ~keep An inline `<svg>` reads its `display` and `visibility` attributes through this function,
+/// ~keep so text in a graphic and text outside one are hidden by the same decision.
+pub fn style_value_hidden_reason(style_value: &str) -> Option<HiddenStyleReason> {
     let (display_hides, visibility_hides, font_size_zero) = scan_visibility_declarations(style_value);
     if display_hides || visibility_hides {
         return Some(HiddenStyleReason::Definitive);
@@ -627,4 +687,33 @@ fn scan_attribute_value<'a>(bytes: &[u8], tag: &'a str, start: usize) -> (&'a st
         end += 1;
     }
     (&tag[val_start..end], end)
+}
+
+#[cfg(test)]
+mod tag_ends_tests {
+    use super::{TagEnds, find_tag_end};
+
+    #[test]
+    fn should_give_the_tag_end_that_a_scan_from_each_byte_gives() {
+        // ~keep Every page of up to eight bytes over the bytes that the scan tells apart.
+        let alphabet = [b'"', b'\'', b'>', b'a'];
+        let mut compared = 0;
+        for len in 0..=8u32 {
+            for mut code in 0..4usize.pow(len) {
+                let page: Vec<u8> = (0..len)
+                    .map(|_| {
+                        let byte = alphabet[code % 4];
+                        code /= 4;
+                        byte
+                    })
+                    .collect();
+                let table = TagEnds::new(&page);
+                for from in 0..=page.len() + 1 {
+                    assert_eq!(table.tag_end(from), find_tag_end(&page, from), "{page:?} from {from}");
+                    compared += 1;
+                }
+            }
+        }
+        assert!(compared > 500_000, "compared only {compared} scans");
+    }
 }

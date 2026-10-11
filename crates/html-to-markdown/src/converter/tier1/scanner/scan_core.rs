@@ -181,11 +181,7 @@ impl<'a> Tier1Scanner<'a> {
             return Ok(());
         }
 
-        // ~keep Tilde fences still require Tier-2; Tier-1 supports indented/backtick pre blocks.
-        if matches!(spec.kind, TagKind::Pre) && self.options.code_block_style == crate::options::CodeBlockStyle::Tildes
-        {
-            return Err(BailReason::Classifier);
-        }
+        self.bail_for_code_rules(spec)?;
 
         let close = parse::find_tag_close(self.bytes, name_end).ok_or(BailReason::LiteralLt { offset: self.pos })?;
 
@@ -231,6 +227,22 @@ impl<'a> Tier1Scanner<'a> {
         Ok(())
     }
 
+    /// Leave to Tier-2 an open tag whose code block rule this scanner does not have.
+    fn bail_for_code_rules(&self, spec: &TagSpec) -> Result<(), BailReason> {
+        // ~keep Tilde fences still require Tier-2; Tier-1 supports indented/backtick pre blocks.
+        if matches!(spec.kind, TagKind::Pre) && self.options.code_block_style == crate::options::CodeBlockStyle::Tildes
+        {
+            return Err(BailReason::Classifier);
+        }
+        // ~keep A link or an image in code writes no marks; Tier-2 knows the rule.
+        if matches!(spec.kind, TagKind::Link | TagKind::Image)
+            && self.state.escape_ctx.intersects(EscapeCtx::CODE | EscapeCtx::PRE)
+        {
+            return Err(BailReason::Classifier);
+        }
+        Ok(())
+    }
+
     fn prepare_open_tag(&mut self, name_lower: &[u8]) -> Result<(), BailReason> {
         // ~keep Only a br or stripped raw-text tag keeps a pending newline join open.
         if !matches!(name_lower, b"br" | b"script" | b"style") {
@@ -251,6 +263,21 @@ impl<'a> Tier1Scanner<'a> {
     }
 
     fn scan_svg(&mut self, name_end: usize) -> Result<bool, BailReason> {
+        // ~keep A heading writes a graphic as its text, and a link in a heading that this leaves
+        // ~keep empty is named or dropped by rules of the full converter. This scanner has none of
+        // ~keep these rules, so it leaves a page with a graphic in a heading to that converter (#766).
+        let in_heading = self
+            .state
+            .stack
+            .iter()
+            .any(|frame| matches!(frame.spec.kind, TagKind::Heading(_)));
+        if in_heading {
+            return Err(BailReason::Classifier);
+        }
+        // ~keep A graphic in code writes its text and no marks; Tier-2 knows the rule.
+        if self.state.escape_ctx.intersects(EscapeCtx::CODE | EscapeCtx::PRE) {
+            return Err(BailReason::Classifier);
+        }
         let tag_open_start = self.pos;
         let Some((close_pos, is_self_closing)) = parse::find_tag_close(self.bytes, name_end) else {
             self.pos = self.bytes.len();
@@ -338,9 +365,23 @@ impl<'a> Tier1Scanner<'a> {
             1
         };
         if matches!(spec.kind, TagKind::Link) {
-            let (href, title) = extract_link_attrs(attrs)?;
-            let href = href.map(|value| self.state.resolve_url(&value).unwrap_or(value));
-            self.state.link_stack.push((href, title, false));
+            let (raw_href, title) = extract_link_attrs(attrs)?;
+            let href = raw_href
+                .as_deref()
+                .map(|value| self.state.resolve_url(value).unwrap_or_else(|| value.to_owned()));
+            let aria_label = find_attr(attrs, b"aria-label").map(decode_attr).transpose()?;
+            let has_name =
+                crate::converter::utility::content::link_accessible_name(aria_label.as_deref(), title.as_deref())
+                    .is_some();
+            let same_page = raw_href.as_deref().zip(href.as_deref()).is_some_and(|(raw, resolved)| {
+                self.state
+                    .own_page
+                    .get_or_init(|| {
+                        crate::converter::url_resolve::OwnPage::of(self.html, self.options.base_url.as_deref())
+                    })
+                    .holds(raw, resolved)
+            });
+            self.state.link_stack.push((href, title, false, has_name || same_page));
         }
         if name_lower == b"abbr" {
             let title = find_attr(attrs, b"title")
@@ -433,9 +474,10 @@ impl<'a> Tier1Scanner<'a> {
             self.text_start = self.pos;
             return Ok(());
         }
-        let (close_start, close_end) = match find_close_tag_range(self.bytes, open_end, name_lower) {
-            Some(pair) => pair,
-            None => (self.bytes.len(), self.bytes.len()),
+        // ~keep With no end tag, the start tag of the body content ends the `<head>`; only the
+        // ~keep HTML tree builder knows where, so Tier-2 converts the document (issue #772).
+        let Some((close_start, close_end)) = find_close_tag_range(self.bytes, open_end, name_lower) else {
+            return Err(BailReason::EofWithOpenBlock { open_count: 1 });
         };
         if self.state.head_range.is_none() {
             self.state.head_range = Some(open_end..close_start);
@@ -619,10 +661,8 @@ fn finish_scan(
         emit_close_for_implicit(&mut state, options, &mut table_probes)?;
     }
 
-    crate::converter::main_helpers::trim_line_end_whitespace(&mut state.output);
-    if state.output.contains("\n\n\n") {
-        collapse_excess_blank_lines(&mut state.output);
-    }
+    crate::converter::main_helpers::trim_line_end_whitespace(&mut state.output, options.code_block_style);
+    crate::converter::main_helpers::collapse_excess_blank_lines(&mut state.output, options.code_block_style);
 
     if !state.output.is_empty() {
         let trimmed_end = state.output.trim_end_matches('\n');

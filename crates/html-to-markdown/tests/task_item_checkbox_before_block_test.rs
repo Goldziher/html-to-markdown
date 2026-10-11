@@ -170,7 +170,8 @@ fn should_keep_the_output_where_a_checkbox_is_text() {
             "`- [ ]`  \n`  > q`\n",
             "`- [ ]`\\\n`  > q`\n",
         ),
-        same(false, format!("<pre>{empty}</pre>"), "```\n- [ ]\n```\n"),
+        // ~keep A line of a code block keeps its line end, so the space after the marker stays.
+        same(false, format!("<pre>{empty}</pre>"), "```\n- [ ] \n```\n"),
         same(false, format!("<pre>{quote}</pre>"), "```\n- [ ]\n  > q\n```\n"),
         (false, format!("<b>{empty}</b>"), "**- [ ]**\n", "*- [ ]*\n"),
         (false, format!("<b>{quote}</b>"), "**- [ ] > q**\n", "*- [ ] > q*\n"),

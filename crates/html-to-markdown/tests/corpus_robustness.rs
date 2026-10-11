@@ -24,12 +24,14 @@
 //! A stack overflow aborts the process and cannot be caught here, by design of the platform;
 //! that case is covered separately by `deep_nesting_overflow.rs`.
 
+use html_to_markdown_rs::ConversionError;
 use html_to_markdown_rs::options::{ConversionOptions, NewlineStyle};
+use std::collections::HashSet;
 use std::panic::{AssertUnwindSafe, catch_unwind};
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex, mpsc};
 use std::thread;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 /// Wall-clock ceiling for a single conversion.
 ///
@@ -57,8 +59,8 @@ fn fixture_root() -> PathBuf {
 /// ~keep levels up from `CARGO_MANIFEST_DIR`, same as `fixture_root`'s
 /// ~keep `tools/benchmark-harness/fixtures`): a checkout that is missing this directory for
 /// ~keep any reason must still run this test at full strength over the in-repo fixtures
-/// ~keep instead of failing or, worse, silently covering nothing. The required corpus is
-/// ~keep asserted non-empty separately.
+/// ~keep instead of failing or, worse, silently covering nothing. The sweep asserts a floor on
+/// ~keep the number of documents it keeps, and the floor counts this folder only when it is there.
 /// ~keep
 /// ~keep Was `../../../test_documents/html` (three levels up, landing outside the repo)
 /// ~keep until this was found and fixed. In CI, and in any clean checkout, nothing exists at
@@ -74,6 +76,18 @@ fn optional_extra_roots() -> Vec<PathBuf> {
         .filter(|p| p.is_dir())
         .collect()
 }
+
+/// The number of distinct documents that the fixture folder holds.
+///
+/// ~keep Source: `git ls-files tools/benchmark-harness/fixtures test_documents/html` with the
+/// ~keep SHA-256 of each `.html` file. The fixture folder holds 29 files, all distinct.
+/// ~keep `test_documents/html` holds 70 files; 16 are copies of a fixture, so it adds 54. If a
+/// ~keep change removes a document, lower the number in that change. A new document needs no
+/// ~keep edit, because the sweep checks a floor.
+const FIXTURE_DOCUMENTS: usize = 29;
+
+/// The number of distinct documents that `test_documents/html` adds to the fixture folder.
+const EXTRA_DOCUMENTS: usize = 54;
 
 fn collect_html(dir: &PathBuf, out: &mut Vec<(String, String)>) {
     let Ok(entries) = std::fs::read_dir(dir) else {
@@ -103,6 +117,7 @@ fn with_hang_guard(budget: Duration, body: impl FnOnce(&Mutex<String>) + Send + 
     let current: Arc<Mutex<String>> = Arc::new(Mutex::new("<none>".to_owned()));
     let worker_view = Arc::clone(&current);
     let (tx, rx) = mpsc::channel();
+    let started = Instant::now();
     thread::Builder::new()
         .stack_size(8 * 1024 * 1024)
         .spawn(move || {
@@ -111,7 +126,9 @@ fn with_hang_guard(budget: Duration, body: impl FnOnce(&Mutex<String>) + Send + 
         })
         .expect("spawn conversion thread");
 
-    if rx.recv_timeout(budget).is_err() {
+    let finished = rx.recv_timeout(budget);
+    println!("sweep took {:?} of its {budget:?} budget", started.elapsed());
+    if finished.is_err() {
         let stuck = current.lock().map_or_else(|e| e.into_inner().clone(), |g| g.clone());
         // ~keep The worker is left running on purpose: it is wedged by definition, and
         // ~keep detaching it lets the failure be reported instead of deadlocking the suite.
@@ -123,11 +140,16 @@ fn with_hang_guard(budget: Duration, body: impl FnOnce(&Mutex<String>) + Send + 
 ///
 /// ~keep A conversion `Err` is a fine outcome -- refusing malformed input is correct
 /// ~keep behaviour, crashing on it is not.
+/// ~keep `convert` catches a panic of the DOM walk and returns it as `ConversionError::Panic`,
+/// ~keep so that variant is the crash and not a refusal. While this function accepted every
+/// ~keep `Err`, it could not see the panic of issue #749.
 fn convert_guarded(html: &str, options: ConversionOptions) -> Result<usize, String> {
-    catch_unwind(AssertUnwindSafe(|| {
-        html_to_markdown_rs::convert(html, Some(options)).map_or(0, |r| r.content.unwrap_or_default().len())
-    }))
-    .map_err(|_| "panicked".to_owned())
+    match catch_unwind(AssertUnwindSafe(|| html_to_markdown_rs::convert(html, Some(options)))) {
+        Ok(Ok(result)) => Ok(result.content.unwrap_or_default().len()),
+        Ok(Err(ConversionError::Panic(message))) => Err(format!("panicked: {message}")),
+        Ok(Err(_)) => Ok(0),
+        Err(_) => Err("panicked".to_owned()),
+    }
 }
 
 fn option_matrix() -> Vec<(&'static str, ConversionOptions)> {
@@ -142,6 +164,25 @@ fn option_matrix() -> Vec<(&'static str, ConversionOptions)> {
         ),
     ]
 }
+
+/// The document structure records text during the same walk, with its own indexes into it.
+///
+/// ~keep A sweep of its own and not a third entry of `option_matrix`: each sweep has one
+/// ~keep wall-clock budget for all its conversions, and the fixture sweep already uses most of
+/// ~keep it on a loaded runner. In the fixture test it runs after the first sweep on the same
+/// ~keep thread, so it takes no core from that sweep. In the two other tests it overlaps the
+/// ~keep fixture sweep for a few seconds, and those sweeps are the cheap ones.
+fn structure_matrix() -> Vec<(&'static str, ConversionOptions)> {
+    vec![(
+        "document structure",
+        ConversionOptions {
+            include_document_structure: true,
+            ..Default::default()
+        },
+    )]
+}
+
+type OptionMatrix = fn() -> Vec<(&'static str, ConversionOptions)>;
 
 fn assert_survives(label: &str, html: &str, options: ConversionOptions, option_label: &str, current: &Mutex<String>) {
     if let Ok(mut slot) = current.lock() {
@@ -165,35 +206,56 @@ fn assert_survives(label: &str, html: &str, options: ConversionOptions, option_l
     }
 }
 
-#[test]
-fn should_survive_every_fixture_in_the_corpus() {
+fn sweep_fixtures(matrix: OptionMatrix) {
     let mut corpus = Vec::new();
     collect_html(&fixture_root(), &mut corpus);
     let root = fixture_root();
     let required = corpus.len();
-    for extra in optional_extra_roots() {
-        collect_html(&extra, &mut corpus);
+    let extra_roots = optional_extra_roots();
+    for extra in &extra_roots {
+        collect_html(extra, &mut corpus);
     }
+    // ~keep `test_documents/html` holds byte for byte copies of 16 of the in-repo fixtures, among
+    // ~keep them the five largest pages. A copy converts to the same result, so the second
+    // ~keep conversion proves nothing and costs the time of the first. Dropping it cut the corpus
+    // ~keep from 12.6 MB to 7.1 MB, and each sweep of it by the same share, which is what keeps a
+    // ~keep sweep with the document structure on inside its budget beside the sweep without it.
+    let collected = corpus.len();
+    let mut seen = HashSet::new();
+    corpus.retain(|(_, html)| seen.insert(html.clone()));
     println!(
-        "corpus: {required} in-repo fixture(s) + {} from optional sibling corpora",
-        corpus.len() - required
+        "corpus: {required} in-repo fixture(s) + {} from optional sibling corpora, {} distinct documents",
+        collected - required,
+        corpus.len()
     );
 
-    // ~keep A corpus that silently resolves to nothing is how this kind of test rots into a
-    // ~keep no-op that passes forever. Fail loudly instead.
+    // ~keep A corpus that silently resolves to nothing, or to a few documents, is how this kind
+    // ~keep of test rots into a no-op that passes forever. Fail loudly instead. The floor counts
+    // ~keep `test_documents/html` only when that folder is there, because the folder is optional.
+    let floor = FIXTURE_DOCUMENTS + if extra_roots.is_empty() { 0 } else { EXTRA_DOCUMENTS };
     assert!(
-        !corpus.is_empty(),
-        "no fixtures found under {} -- the corpus path is wrong, not the corpus empty",
-        root.display()
+        corpus.len() >= floor,
+        "the sweep keeps {} distinct document(s), fewer than the {floor} that the corpus holds \
+         ({FIXTURE_DOCUMENTS} under {}, {} more under test_documents/html) -- the corpus path is \
+         wrong, or the sweep lost documents",
+        corpus.len(),
+        root.display(),
+        floor - FIXTURE_DOCUMENTS
     );
 
     with_hang_guard(CONVERSION_BUDGET, move |current| {
         for (path, html) in &corpus {
-            for (option_label, options) in option_matrix() {
+            for (option_label, options) in matrix() {
                 assert_survives(path, html, options, option_label, current);
             }
         }
     });
+}
+
+#[test]
+fn should_survive_every_fixture_in_the_corpus() {
+    sweep_fixtures(option_matrix);
+    sweep_fixtures(structure_matrix);
 }
 
 /// Deterministic 64-bit PRNG (`SplitMix64`), written here so a failing seed reproduces
@@ -318,17 +380,16 @@ fn generate(seed: u64, max_fragments: usize) -> String {
     html
 }
 
-#[test]
-fn should_survive_generated_adversarial_markup() {
+fn sweep_generated(matrix: OptionMatrix) {
     // ~keep Seeds are the reproducer: a failure names the exact seed, and `generate(seed, n)`
     // ~keep rebuilds that input byte for byte.
     const CASES: u64 = 3_000;
     const MAX_FRAGMENTS: usize = 60;
 
-    with_hang_guard(CONVERSION_BUDGET, |current| {
+    with_hang_guard(CONVERSION_BUDGET, move |current| {
         for seed in 0..CASES {
             let html = generate(seed, MAX_FRAGMENTS);
-            for (option_label, options) in option_matrix() {
+            for (option_label, options) in matrix() {
                 assert_survives(&format!("seed {seed}"), &html, options, option_label, current);
             }
         }
@@ -336,7 +397,12 @@ fn should_survive_generated_adversarial_markup() {
 }
 
 #[test]
-fn should_survive_pathological_shapes() {
+fn should_survive_generated_adversarial_markup() {
+    sweep_generated(option_matrix);
+    sweep_generated(structure_matrix);
+}
+
+fn sweep_pathological(matrix: OptionMatrix) {
     // ~keep Named shapes rather than random ones, for the degenerate inputs a fragment
     // ~keep shuffler is unlikely to build but a hostile document trivially contains.
     let cases: Vec<(&str, String)> = vec![
@@ -369,9 +435,15 @@ fn should_survive_pathological_shapes() {
 
     with_hang_guard(CONVERSION_BUDGET, move |current| {
         for (label, html) in &cases {
-            for (option_label, options) in option_matrix() {
+            for (option_label, options) in matrix() {
                 assert_survives(label, html, options, option_label, current);
             }
         }
     });
+}
+
+#[test]
+fn should_survive_pathological_shapes() {
+    sweep_pathological(option_matrix);
+    sweep_pathological(structure_matrix);
 }

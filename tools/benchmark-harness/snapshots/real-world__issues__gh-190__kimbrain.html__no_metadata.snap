@@ -194,6 +194,7 @@ call_func(
   foo, bar, foo, bar, foo, bar, foo, bar, foo, bar, foo, bar, foo, bar,
   foo, bar, foo, bar, foo, bar, foo, bar, foo, bar, foo, bar, foo, bar);
 
+
 // 매우 긴 함수 인수를 사용해야하는 경우, 가독성을 위해 개행
 call_func(
   bang,
@@ -370,6 +371,7 @@ from rclpy.node import Node
 
 from std_msgs.msg import String
 
+
 class MinimalPublisher(Node):
 
     def __init__(self):
@@ -386,6 +388,7 @@ class MinimalPublisher(Node):
         self.get_logger().info('Publishing: "%s"' % msg.data)
         self.i += 1
 
+
 def main(args=None):
     rclpy.init(args=args)
 
@@ -398,6 +401,7 @@ def main(args=None):
     # when the garbage collector destroys the node object)
     minimal_publisher.destroy_node()
     rclpy.shutdown()
+
 
 if __name__ == '__main__':
     main()
@@ -448,13 +452,13 @@ self.i는 메시지에 넣어
 발행할 숫자겠죠?
 
 ```
-노드 클래스 내부에 있는
-	def timer_callback(self):
-       msg = String()
-       msg.data = 'Hello World: %d' % self.i
-       self.publisher_.publish(msg)
-       self.get_logger().info('Publishing: "%s"' % msg.data)
-       self.i += 1
+ 노드 클래스 내부에 있는
+ 	def timer_callback(self):
+        msg = String()
+        msg.data = 'Hello World: %d' % self.i
+        self.publisher_.publish(msg)
+        self.get_logger().info('Publishing: "%s"' % msg.data)
+        self.i += 1
 ```
 
 def timer_callback은 메시지 형식을 msg라는 변수에 저장하고, data에다가 string을
@@ -481,6 +485,7 @@ def main(args=None):
     # when the garbage collector destroys the node object)
     minimal_publisher.destroy_node()
     rclpy.shutdown()
+
 
 if __name__ == '__main__':
     main()
@@ -541,6 +546,7 @@ from rclpy.node import Node
 
 from std_msgs.msg import String
 
+
 class MinimalSubscriber(Node):
 
     def __init__(self):
@@ -555,6 +561,7 @@ class MinimalSubscriber(Node):
     def listener_callback(self, msg):
         self.get_logger().info('I heard: "%s"' % msg.data)
 
+
 def main(args=None):
     rclpy.init(args=args)
 
@@ -567,6 +574,7 @@ def main(args=None):
     # when the garbage collector destroys the node object)
     minimal_subscriber.destroy_node()
     rclpy.shutdown()
+
 
 if __name__ == '__main__':
     main()
@@ -675,6 +683,7 @@ from rclpy.node import Node
 from std_msgs.msg import String
 from rclpy.qos import QoSProfile
 
+
 class my_publisher(Node):
 
     def __init__(self):
@@ -776,6 +785,7 @@ from rclpy.node import Node
 
 from rclpy.qos import QoSProfile
 
+
 class my_publisher(Node):
 
     def __init__(self):
@@ -792,6 +802,7 @@ class my_publisher(Node):
         self.publisher_.publish()
         self.get_logger().info()
 
+
 def main(args=None):
     rclpy.init(args=args)
 
@@ -804,6 +815,7 @@ def main(args=None):
     # when the garbage collector destroys the node object)
     minimal_publisher.destroy_node()
     rclpy.shutdown()
+
 
 if __name__ == '__main__':
     main()

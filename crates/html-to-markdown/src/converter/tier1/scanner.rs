@@ -43,14 +43,6 @@ const MAX_TAG_NAME_BYTES: usize = 32;
 /// Matches Tier-2's `col_widths.get(i).unwrap_or(0).max(MIN_SEPARATOR_DASHES)`.
 const MIN_SEPARATOR_DASHES: usize = 3;
 
-/// Minimum length of a Markdown code fence (```` ``` ````) per `CommonMark`.
-///
-/// ~keep Mirrors `converter::handlers::code_block::MIN_FENCE_LENGTH`. Not imported
-/// from there: that module is owned by another concurrent edit lane and this
-/// crate's `tier1/` ownership boundary forbids editing it to add a `pub(crate)`
-/// re-export. Reported as a proposed shared-helper extraction (see module docs).
-const MIN_FENCE_LENGTH: usize = 3;
-
 /// Static `TagSpec` used for all unknown custom elements (tag names containing
 /// `-`, e.g. `<x-foo>`, `<my-component>`).
 ///

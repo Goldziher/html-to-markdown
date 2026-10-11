@@ -11,7 +11,8 @@ pub use markup::{find_tag_end, normalize_bogus_comment_endings, normalize_split_
 pub use menu::{PRESERVED_MENU_ATTRIBUTE, normalize_menu_elements, restore_preserved_menu_elements};
 pub use raw_text::{skip_opaque_region, strip_script_and_style_tags};
 pub use visibility::{
-    sanitize_markdown_url, strip_bogus_comments, strip_hidden_elements, tag_has_hidden_attribute, tag_has_hidden_style,
+    HiddenStyleReason, sanitize_markdown_url, strip_bogus_comments, strip_hidden_elements, style_value_hidden_reason,
+    tag_has_hidden_attribute, tag_has_hidden_style,
 };
 
 #[cfg(test)]

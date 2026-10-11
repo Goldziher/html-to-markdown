@@ -18,6 +18,54 @@ use url::Url;
 
 use crate::rcdom::{Handle, NodeData, RcDom};
 
+/// What a conversion knows about the address of the page it converts. It decides whether a
+/// link points into that page.
+///
+/// ~keep The page's address is the caller's `base_url`. It is not the base that links resolve
+/// ~keep against: with a `<base>` element, `#part` names the document of the `<base>`, which can
+/// ~keep be another document. So a link is compared, after it is resolved, with the page's address.
+#[derive(Debug)]
+pub enum OwnPage {
+    /// The caller gave the address of the page.
+    Known(Url),
+    /// No address, and no `<base>` element: a written `#part` is a link into the page.
+    UnknownWithoutBase,
+    /// No address, and a `<base>` element: where `#part` leads is not known.
+    UnknownWithBase,
+}
+
+impl OwnPage {
+    /// Reads the page's address from the options, or else the `<base>` element from `html`,
+    /// the normalized input that both tiers convert.
+    pub fn of(html: &str, caller_base_url: Option<&str>) -> Self {
+        match caller_base_url.and_then(|base| Url::parse(base).ok()) {
+            Some(page) => Self::Known(page),
+            None if document_base_href(html).is_some() => Self::UnknownWithBase,
+            None => Self::UnknownWithoutBase,
+        }
+    }
+
+    /// Whether a link points into this page. `resolved_href` is the link's address after
+    /// [`resolve_attribute_url`]; `raw_href` is the address as the page wrote it.
+    pub fn holds(&self, raw_href: &str, resolved_href: &str) -> bool {
+        match self {
+            Self::Known(page) => {
+                let without_fragment = |url: &Url| {
+                    let mut url = url.clone();
+                    url.set_fragment(None);
+                    url
+                };
+                // ~keep A `#` in an address starts its fragment, so an address with no `#` is the
+                // ~keep page's address at most, and that is a link to the page, not into it.
+                resolved_href.contains('#')
+                    && Url::parse(resolved_href).is_ok_and(|target| without_fragment(&target) == without_fragment(page))
+            }
+            Self::UnknownWithoutBase => raw_href.trim_start().starts_with('#'),
+            Self::UnknownWithBase => false,
+        }
+    }
+}
+
 /// Compute the effective base URL for a conversion.
 ///
 /// ~keep Precedence mirrors a browser's document-base algorithm: the first `<base>`

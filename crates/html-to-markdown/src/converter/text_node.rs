@@ -478,86 +478,109 @@ impl TextProcessor<'_, '_, '_> {
     }
 
     fn emit_processed(&mut self, final_text: &str) {
-        let ctx = self.handler.ctx;
-        let options = self.handler.options;
-        crate::converter::list::utils::indent_list_item_line_start(self.output, ctx, options);
-        let text_start = self.output.len();
-        self.push_processed_text(final_text);
-        let writes_to_block = self.writes_to_block();
-        if !ctx.in_code && options.output_format == crate::options::OutputFormat::Markdown {
-            if writes_to_block {
-                crate::converter::utility::escaping::escape_block_start(
-                    self.output,
-                    text_start,
-                    ctx.in_list_item,
-                    next_sibling_is_inline_tag(self.node_handle, self.parser, self.handler.dom_ctx),
-                );
-            }
-            crate::converter::utility::escaping::escape_continuation_line_start(
-                self.output,
-                text_start,
-                ctx.inline_buffer_after_hard_break,
-            );
-        } else if !ctx.in_code && options.output_format == crate::options::OutputFormat::Djot {
-            if writes_to_block {
-                crate::converter::utility::escaping::escape_djot_list_item_start(
-                    self.output,
-                    text_start,
-                    ctx.in_list_item,
-                );
-            }
-            crate::converter::utility::escaping::escape_djot_continuation_line_start(
-                self.output,
-                text_start,
-                ctx.inline_buffer_after_hard_break,
-            );
-        }
+        push_running_text(
+            self.output,
+            final_text,
+            TextSite {
+                node_handle: self.node_handle,
+                parser: self.parser,
+                options: self.handler.options,
+                ctx: self.handler.ctx,
+                dom_ctx: self.handler.dom_ctx,
+            },
+        );
     }
+}
 
-    fn push_processed_text(&mut self, final_text: &str) {
-        let ctx = self.handler.ctx;
-        if !ctx.in_list_item {
-            self.output.push_str(final_text);
-            return;
-        }
-        if final_text.contains('\n') && !final_text.contains("\n\n") {
-            let mut lines = final_text.split_inclusive('\n').peekable();
-            while let Some(line) = lines.next() {
-                self.output.push_str(line);
-                if lines.peek().is_some() {
-                    crate::converter::list::utils::indent_list_item_line_start(self.output, ctx, self.handler.options);
-                }
-            }
-            return;
-        }
-        if !final_text.contains("\n\n") {
-            self.output.push_str(final_text);
-            return;
-        }
-        let indent = " ".repeat(4 * ctx.list_depth);
-        for (index, part) in final_text.split("\n\n").enumerate() {
-            if index > 0 {
-                self.output.push_str("\n\n");
-                self.output.push_str(&indent);
-            }
-            self.output.push_str(part.trim());
-        }
-    }
+/// Where a piece of running text is written: the node it comes from and the state of the walk.
+#[derive(Clone, Copy)]
+pub struct TextSite<'a> {
+    pub node_handle: &'a tl::NodeHandle,
+    pub parser: &'a tl::Parser<'a>,
+    pub options: &'a crate::options::ConversionOptions,
+    pub ctx: &'a crate::converter::Context,
+    pub dom_ctx: &'a DomContext,
+}
 
-    fn writes_to_block(&self) -> bool {
-        let ctx = self.handler.ctx;
-        let writes_to_task_marker = ctx.task_item_scope == Some((ctx.list_depth, ctx.blockquote_depth))
-            && ctx
-                .first_writer
-                .as_ref()
-                .is_some_and(crate::converter::list::item::FirstWriter::is_open);
-        !ctx.convert_as_inline
-            && !ctx.in_heading
-            && !ctx.in_table_cell
-            && !ctx.in_marker_text()
-            && !writes_to_task_marker
-            && (ctx.block_output_ptr == 0 || std::ptr::from_ref::<String>(self.output) as usize == ctx.block_output_ptr)
+/// Writes escaped running text to `output` as a text node does: the list item indent before it,
+/// and the escape of a block marker where the text starts a line.
+pub fn push_running_text(output: &mut String, final_text: &str, site: TextSite<'_>) {
+    let ctx = site.ctx;
+    let options = site.options;
+    crate::converter::list::utils::indent_list_item_line_start(output, ctx, options);
+    let text_start = output.len();
+    push_processed_text(output, final_text, site);
+    let writes_to_block = writes_to_block(std::ptr::from_ref::<String>(output) as usize, ctx);
+    if !ctx.in_code && options.output_format == crate::options::OutputFormat::Markdown {
+        if writes_to_block {
+            crate::converter::utility::escaping::escape_block_start(
+                output,
+                text_start,
+                ctx.in_list_item,
+                next_sibling_is_inline_tag(site.node_handle, site.parser, site.dom_ctx),
+            );
+        }
+        crate::converter::utility::escaping::escape_continuation_line_start(
+            output,
+            text_start,
+            ctx.inline_buffer_after_hard_break,
+        );
+    } else if !ctx.in_code && options.output_format == crate::options::OutputFormat::Djot {
+        if writes_to_block {
+            crate::converter::utility::escaping::escape_djot_list_item_start(output, text_start, ctx.in_list_item);
+        }
+        crate::converter::utility::escaping::escape_djot_continuation_line_start(
+            output,
+            text_start,
+            ctx.inline_buffer_after_hard_break,
+        );
     }
+}
+
+fn push_processed_text(output: &mut String, final_text: &str, site: TextSite<'_>) {
+    let ctx = site.ctx;
+    // ~keep Code is verbatim. The handler of the code block adds the indent of the list item to
+    // ~keep every line of the finished block, so a blank line in the code starts no paragraph here.
+    if !ctx.in_list_item || ctx.in_code {
+        output.push_str(final_text);
+        return;
+    }
+    if final_text.contains('\n') && !final_text.contains("\n\n") {
+        let mut lines = final_text.split_inclusive('\n').peekable();
+        while let Some(line) = lines.next() {
+            output.push_str(line);
+            if lines.peek().is_some() {
+                crate::converter::list::utils::indent_list_item_line_start(output, ctx, site.options);
+            }
+        }
+        return;
+    }
+    if !final_text.contains("\n\n") {
+        output.push_str(final_text);
+        return;
+    }
+    let indent = " ".repeat(4 * ctx.list_depth);
+    for (index, part) in final_text.split("\n\n").enumerate() {
+        if index > 0 {
+            output.push_str("\n\n");
+            output.push_str(&indent);
+        }
+        output.push_str(part.trim());
+    }
+}
+
+fn writes_to_block(output_ptr: usize, ctx: &crate::converter::Context) -> bool {
+    let writes_to_task_marker = ctx.task_item_scope == Some((ctx.list_depth, ctx.blockquote_depth))
+        && ctx
+            .first_writer
+            .as_ref()
+            .is_some_and(crate::converter::list::item::FirstWriter::is_open);
+    !ctx.convert_as_inline
+        && !ctx.in_heading
+        && !ctx.in_table_cell
+        && !ctx.in_marker_text()
+        && !writes_to_task_marker
+        && (ctx.block_output_ptr == 0 || output_ptr == ctx.block_output_ptr)
 }
 
 /// Remove one source line ending and its following indentation only when it is not a blank line. ~keep

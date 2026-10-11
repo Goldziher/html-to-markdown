@@ -46,6 +46,11 @@ impl TableContentSummary {
         self.has_header |= other.has_header;
         self.has_caption |= other.has_caption;
     }
+
+    /// Whether the scan counted nothing.
+    pub(crate) const fn is_empty(&self) -> bool {
+        !self.has_text && self.link_count == 0 && !self.has_header && !self.has_caption
+    }
 }
 
 /// DOM context that provides efficient access to parent/child relationships and text content.

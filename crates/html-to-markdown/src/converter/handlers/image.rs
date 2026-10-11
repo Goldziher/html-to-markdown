@@ -48,7 +48,7 @@ struct ImageData<'a> {
 pub fn handle_img(tag: &tl::HTMLTag, handler: HandlerContext<'_>) {
     let data = image_data(tag, &handler);
     #[cfg(feature = "metadata")]
-    let metadata = handler.context.metadata_wants_images.then(|| image_metadata(tag));
+    let metadata = handler.context.metadata_wants.images.then(|| image_metadata(tag));
     #[cfg(feature = "inline-images")]
     collect_inline_image(tag, &data, handler.context);
     let inline_data = handler
@@ -165,6 +165,11 @@ fn render_image(
     #[cfg(feature = "visitor")]
     if let std::ops::ControlFlow::Break(result) = visit_image(tag, data, handler) {
         return result;
+    }
+    // ~keep Code shows every character as text, and a browser shows no text for an image. Only
+    // ~keep what a visitor writes for the image is written in code.
+    if handler.context.in_code {
+        return None;
     }
     render_image_default(data, inline_data, should_use_alt_text, handler)
 }

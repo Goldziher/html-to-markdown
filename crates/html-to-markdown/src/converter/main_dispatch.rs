@@ -18,6 +18,14 @@ pub(super) fn dispatch_tag<'a>(
     output: &mut String,
     handler: HandlerContext<'a>,
 ) -> bool {
+    // ~keep In a table cell a code block is one code span, which has no lines.
+    if handler.ctx.in_code_block
+        && !handler.ctx.in_table_cell
+        && crate::converter::handlers::code_block::is_line_element_in_pre(tag_name)
+    {
+        crate::converter::handlers::code_block::handle_line_element_in_pre(node_handle, parser, output, handler);
+        return false;
+    }
     let mut dispatcher = TagDispatcher {
         tag_name,
         node_handle,

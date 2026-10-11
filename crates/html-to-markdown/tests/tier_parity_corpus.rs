@@ -122,6 +122,7 @@ const fn bail_variant_name(reason: &BailReason) -> &'static str {
         BailReason::AdjacentInlineEmphasis => "AdjacentInlineEmphasis",
         BailReason::WhitespaceOnlyInlineEmphasis => "WhitespaceOnlyInlineEmphasis",
         BailReason::InlineMarkerNotReproduced => "InlineMarkerNotReproduced",
+        BailReason::FormControl => "FormControl",
         BailReason::RuleBetweenInlineMarkers => "RuleBetweenInlineMarkers",
     }
 }

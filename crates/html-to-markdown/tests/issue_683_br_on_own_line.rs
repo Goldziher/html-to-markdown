@@ -201,11 +201,14 @@ fn should_keep_the_source_newline_when_no_br_ends_the_line() {
         "First\n<b></b><br>Second",
         "<span>First\n</span><i></i><br>Second",
         "<label>First\n</label><br>Second",
-        "<select><option>First\n</option></select><br>Second",
         "<span>First\n</span><span><br>Second</span>",
     ] {
         assert_eq!(fast(html), full(html, NewlineStyle::Spaces), "{html:?}");
     }
+    // ~keep The fast converter hands a select list to the full converter (issue 752).
+    let select = "<select><option>First\n</option></select><br>Second";
+    assert_eq!(auto(select), full(select, NewlineStyle::Spaces), "{select:?}");
+    assert_eq!(full(select, NewlineStyle::Spaces), "First  \nSecond\n");
     assert_eq!(
         full("<span>First\n</span>Second", NewlineStyle::Spaces),
         "First\nSecond\n"

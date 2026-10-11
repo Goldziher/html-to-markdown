@@ -4,7 +4,7 @@
 //! - Inline code with backtick formatting
 //! - Code block formatting (indented or fenced)
 //! - Language detection from class attributes
-//! - Whitespace normalization and dedenting
+//! - The lines of a code block as they are in the page
 //! - Visitor callback integration
 
 use crate::converter::Context;
@@ -78,14 +78,15 @@ fn min_safe_code_span_delimiter_length(content: &str) -> usize {
 /// - Invoking visitor callbacks when the visitor feature is enabled
 /// - Generating appropriate markdown output with proper escaping
 pub fn handle_code(tag: &tl::HTMLTag, mut handler: HandlerContext<'_>) {
+    if handler.context.code_element_is_transparent() {
+        let context = handler.context;
+        walk_children_to_output(tag, context, &mut handler);
+        return;
+    }
     let code_ctx = Context {
         in_code: true,
         ..handler.context.clone()
     };
-    if handler.context.in_code {
-        walk_children_to_output(tag, &code_ctx, &mut handler);
-        return;
-    }
     let mut content = String::with_capacity(32);
     walk_children(tag, &mut content, &code_ctx, &handler);
     // ~keep An all-whitespace body is a real code span, not an empty element (#481).
@@ -210,7 +211,7 @@ fn emit_inline_code(
 ///
 /// This handler processes code block elements including:
 /// - Extracting language information from class attributes
-/// - Processing whitespace and dedenting code content
+/// - Keeping the lines of the code as they are in the page
 /// - Supporting multiple code block styles (indented, backticks, tildes)
 /// - Invoking visitor callbacks when the visitor feature is enabled
 /// - Generating appropriate markdown output
@@ -235,7 +236,7 @@ pub fn handle_pre(tag: &tl::HTMLTag, handler: HandlerContext<'_>) {
         .map(|offsets| offsets.borrow().clone())
         .unwrap_or_default();
     let segmented = (!offsets.is_empty()).then(|| content.clone());
-    let processed = process_pre_content(content, handler.options.whitespace_mode);
+    let processed = process_pre_content(content, handler.options.whitespace_mode, false);
     #[cfg(feature = "visitor")]
     if let Some(custom_output) = visit_code_block(tag, language.as_deref(), &processed, &handler) {
         handler.output.push_str(&custom_output);
@@ -263,6 +264,50 @@ pub fn handle_pre(tag: &tl::HTMLTag, handler: HandlerContext<'_>) {
     }
 }
 
+/// Whether `tag_name` is a plain block container: inside a code block it starts a line and ends a line.
+///
+/// ~keep A browser renders the content of a `pre` with its line feeds kept, so the text of a code block
+/// ~keep is the lines of that rendering. A block box starts a line and ends a line and adds no line of
+/// ~keep its own: a `<br>` or a line feed at its end is still one break, and an empty one is no line.
+/// ~keep Highlighters write each line of code as such an element. Both tiers read this list.
+pub(in crate::converter) fn is_line_element_in_pre(tag_name: &str) -> bool {
+    matches!(
+        tag_name,
+        "address"
+            | "article"
+            | "aside"
+            | "center"
+            | "dialog"
+            | "div"
+            | "footer"
+            | "header"
+            | "hgroup"
+            | "main"
+            | "nav"
+            | "search"
+            | "section"
+    )
+}
+
+/// Put `output` at the start of a line of the open code block, whose content starts the buffer.
+fn start_pre_line(output: &mut String) {
+    if !output.is_empty() && !output.ends_with('\n') {
+        output.push('\n');
+    }
+}
+
+/// Write the content of a plain block container that is inside a code block, on lines of its own.
+pub(in crate::converter) fn handle_line_element_in_pre(
+    node_handle: &tl::NodeHandle,
+    parser: &tl::Parser,
+    output: &mut String,
+    handler: crate::converter::block::container::HandlerContext<'_>,
+) {
+    start_pre_line(output);
+    crate::converter::block::container::handle_passthrough(node_handle, parser, output, handler);
+    start_pre_line(output);
+}
+
 fn detect_language(tag: &tl::HTMLTag<'_>, parser: &tl::Parser<'_>) -> Option<String> {
     language_from_class(tag).or_else(|| {
         tag.children().top().iter().find_map(|child_handle| {
@@ -288,19 +333,29 @@ fn language_from_class(tag: &tl::HTMLTag<'_>) -> Option<String> {
     })
 }
 
-fn process_pre_content(content: String, whitespace_mode: crate::options::WhitespaceMode) -> String {
-    if whitespace_mode == crate::options::WhitespaceMode::Strict {
-        return content;
-    }
-    let leading_newlines = content.chars().take_while(|&character| character == '\n').count();
-    let trailing_newlines = content.chars().rev().take_while(|&character| character == '\n').count();
-    let core = content.trim_matches('\n');
-    let mut processed = dedent_code_block(core);
-    if core.trim().is_empty() {
-        processed.insert_str(0, &"\n".repeat(leading_newlines));
-    }
-    processed.push_str(&"\n".repeat(trailing_newlines));
-    processed
+/// The text of a code block: the content of the `pre` without the one line feed at its start.
+///
+/// ~keep An HTML parser drops one line feed right after the `<pre>` tag, so a browser shows a
+/// ~keep second one as a blank first line of the code. Every other character is a character of
+/// ~keep the code and stays: indentation that all lines share, blank lines between lines of code,
+/// ~keep spaces at a line end (issues #782, #783). The fence drops the line feeds at the end.
+///
+/// ~keep Strict white space mode writes the start of a block as it did before that rule: the line
+/// ~keep feeds at the start are one blank first line. `tag_feed_dropped` is true for Tier-1, which
+/// ~keep dropped the line feed after the tag in that mode too.
+pub(in crate::converter) fn process_pre_content(
+    mut content: String,
+    whitespace_mode: crate::options::WhitespaceMode,
+    tag_feed_dropped: bool,
+) -> String {
+    let leading = content.len() - content.trim_start_matches('\n').len();
+    let kept = if whitespace_mode == crate::options::WhitespaceMode::Strict {
+        leading.saturating_sub(usize::from(tag_feed_dropped)).min(1)
+    } else {
+        leading.saturating_sub(1)
+    };
+    content.drain(..leading - kept);
+    content
 }
 
 #[cfg(feature = "visitor")]
@@ -450,6 +505,16 @@ fn format_code_block(
     }
 
     separate_code_block(output, ctx);
+    render_code_block(content, language, output, options);
+}
+
+/// Write the code block for `content` in the configured style. Both tiers call it.
+pub(in crate::converter) fn render_code_block(
+    content: &str,
+    language: Option<&str>,
+    output: &mut String,
+    options: &ConversionOptions,
+) {
     match options.code_block_style {
         crate::options::CodeBlockStyle::Indented => format_indented_code_block(content, output),
         crate::options::CodeBlockStyle::Backticks | crate::options::CodeBlockStyle::Tildes => {
@@ -470,7 +535,9 @@ fn separate_code_block(output: &mut String, context: &Context) {
 }
 
 fn format_indented_code_block(content: &str, output: &mut String) {
+    // ~keep Markdown has no indented code block that starts with a blank line.
     let indented = content
+        .trim_start_matches('\n')
         .lines()
         .map(|line| {
             if line.is_empty() {

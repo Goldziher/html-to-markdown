@@ -37,15 +37,18 @@ pub struct ContextParameters {
     pub structure_collector: Option<StructureCollectorHandle>,
     pub reference_collector: Option<ReferenceCollectorHandle>,
     pub base_url: Option<Rc<url::Url>>,
+    pub own_page: crate::converter::url_resolve::OwnPage,
 }
 
+/// The kinds of metadata the collector asks for, read once when the context is made.
 #[cfg(feature = "metadata")]
-struct MetadataPreferences {
-    document: bool,
-    headers: bool,
-    links: bool,
-    images: bool,
-    structured_data: bool,
+#[derive(Clone, Copy)]
+pub struct MetadataPreferences {
+    pub(crate) document: bool,
+    pub(crate) headers: bool,
+    pub(crate) links: bool,
+    pub(crate) images: bool,
+    pub(crate) structured_data: bool,
 }
 
 #[cfg(feature = "metadata")]
@@ -124,6 +127,9 @@ pub struct Context {
     pub(crate) blockquote_depth: usize,
     /// Are we inside a table cell (td/th)?
     pub(crate) in_table_cell: bool,
+    /// Are we inside a table cell (td/th) that holds only inputs and white space? A checkbox
+    /// writes its state there. [`Self::for_cell`] decides it where the cell opens.
+    pub(crate) in_cell_of_inputs: bool,
     /// Are we inside a *layout*-table cell, whose row renders as a list item rather than a
     /// pipe row?
     ///
@@ -303,21 +309,18 @@ pub struct Context {
     /// Shared collector for metadata when enabled.
     pub(crate) metadata_collector: Option<crate::metadata::MetadataCollectorHandle>,
     #[cfg(feature = "metadata")]
-    pub(crate) metadata_wants_document: bool,
-    #[cfg(feature = "metadata")]
-    pub(crate) metadata_wants_headers: bool,
-    #[cfg(feature = "metadata")]
-    pub(crate) metadata_wants_links: bool,
-    #[cfg(feature = "metadata")]
-    pub(crate) metadata_wants_images: bool,
-    #[cfg(feature = "metadata")]
-    pub(crate) metadata_wants_structured_data: bool,
+    /// The kinds of metadata the collector asks for; all false without a collector.
+    pub(crate) metadata_wants: MetadataPreferences,
     #[cfg(feature = "visitor")]
     /// Optional visitor for custom HTML traversal callbacks.
     pub(crate) visitor: Option<crate::visitor::VisitorHandle>,
     #[cfg(feature = "visitor")]
     /// Stores the first visitor error encountered during traversal.
     pub(crate) visitor_error: Rc<RefCell<Option<String>>>,
+    #[cfg(feature = "visitor")]
+    /// When `true`, the visitor of this context is not the visitor of the caller: the walk is
+    /// one that [`Self::unobserved_outside_code`] started, and nothing it writes or calls is seen.
+    pub(crate) is_unobserved: bool,
     /// Optional structure collector for building a [`crate::types::DocumentStructure`].
     ///
     /// Populated when `options.include_document_structure == true`.
@@ -352,6 +355,9 @@ pub struct Context {
     /// `None` when `options.base_url` is unset -- every resolution call becomes a
     /// no-op then, so output is byte-identical to before this option existed.
     pub(crate) base_url: Option<Rc<url::Url>>,
+    /// The address of the page, as far as it is known. A link asks it whether it points into
+    /// the page (see `converter::url_resolve::OwnPage`).
+    pub(crate) own_page: Rc<crate::converter::url_resolve::OwnPage>,
 }
 
 impl Context {
@@ -375,6 +381,7 @@ impl Context {
             in_ordered_list: false,
             blockquote_depth: 0,
             in_table_cell: false,
+            in_cell_of_inputs: false,
             in_layout_cell: false,
             convert_as_inline: options.convert_as_inline,
             inline_depth: 0,
@@ -422,24 +429,19 @@ impl Context {
             #[cfg(feature = "metadata")]
             metadata_collector: parameters.metadata_collector,
             #[cfg(feature = "metadata")]
-            metadata_wants_document: metadata.document,
-            #[cfg(feature = "metadata")]
-            metadata_wants_headers: metadata.headers,
-            #[cfg(feature = "metadata")]
-            metadata_wants_links: metadata.links,
-            #[cfg(feature = "metadata")]
-            metadata_wants_images: metadata.images,
-            #[cfg(feature = "metadata")]
-            metadata_wants_structured_data: metadata.structured_data,
+            metadata_wants: metadata,
             #[cfg(feature = "visitor")]
             visitor: parameters.visitor,
             #[cfg(feature = "visitor")]
             visitor_error: Rc::new(RefCell::new(None)),
+            #[cfg(feature = "visitor")]
+            is_unobserved: false,
             structure_collector: parameters.structure_collector,
             reference_collector: parameters.reference_collector,
             skip_visitor_hooks: false,
             measure_width_only: false,
             base_url: parameters.base_url,
+            own_page: Rc::new(parameters.own_page),
         }
     }
 
@@ -476,6 +478,103 @@ impl Context {
             } else {
                 crate::converter::utility::escaping::ends_with_hard_break(output)
             },
+            ..self.clone()
+        }
+    }
+
+    /// The context for the children of the table cell `cell_handle`: `self` with the answer to
+    /// "does this cell hold only inputs" for that cell.
+    ///
+    /// ~keep Each walk of a cell's children takes its context from here, so the cell is read one
+    /// ~keep time for each walk and not one time for each control in it. A row shares one context
+    /// ~keep between its cells: this copies it only for a cell whose answer differs.
+    pub(crate) fn for_cell(
+        &self,
+        cell_handle: tl::NodeHandle,
+        parser: &tl::Parser,
+        dom_ctx: &crate::converter::DomContext,
+        br_in_tables: bool,
+    ) -> std::borrow::Cow<'_, Self> {
+        let in_cell_of_inputs =
+            crate::converter::block::table::scanner::cell_holds_only_inputs(cell_handle, parser, dom_ctx, br_in_tables);
+        if in_cell_of_inputs == self.in_cell_of_inputs {
+            std::borrow::Cow::Borrowed(self)
+        } else {
+            std::borrow::Cow::Owned(Self {
+                in_cell_of_inputs,
+                ..self.clone()
+            })
+        }
+    }
+
+    /// Whether the visitor of the caller sees this walk.
+    ///
+    /// ~keep A link in code asks what its content writes outside code only when this holds. In
+    /// ~keep an unobserved walk no answer reaches the caller's visitor, so no link there starts
+    /// ~keep an unobserved walk of its own: a link in `<code>` in a link in `<code>` cost twice
+    /// ~keep the walks at each level before.
+    #[cfg(feature = "visitor")]
+    pub(crate) fn has_observer(&self) -> bool {
+        self.visitor.is_some() && !self.is_unobserved
+    }
+
+    /// Whether a `code`, `kbd` or `samp` element writes its content and nothing of its own in
+    /// this walk: it starts no code and adds no code marks.
+    ///
+    /// ~keep A code element in code is such an element. An unobserved walk answers what the
+    /// ~keep content of a link in code writes outside code, so it stays outside code to its end,
+    /// ~keep and a code element in it is still an element in code. When the element started code,
+    /// ~keep an image in it wrote nothing and the link lost its call. When the element wrote code
+    /// ~keep marks, a line break or a space in it was a label and the link got a call.
+    #[cfg(feature = "visitor")]
+    pub(crate) const fn code_element_is_transparent(&self) -> bool {
+        self.in_code || self.is_unobserved
+    }
+
+    /// Whether a `code`, `kbd` or `samp` element writes its content and nothing of its own in
+    /// this walk: a code element in code is such an element.
+    #[cfg(not(feature = "visitor"))]
+    pub(crate) const fn code_element_is_transparent(&self) -> bool {
+        self.in_code
+    }
+
+    /// A copy of this context that writes as outside code and that nothing observes: its visitor
+    /// continues at every call and records nothing, it has no collector, and it shares no flag,
+    /// counter or list state with this context.
+    ///
+    /// ~keep A link in code asks its content what that content writes outside code. The answer
+    /// ~keep comes from the normal traversal with this copy, so every rule of the traversal holds
+    /// ~keep for the answer: a stripped tag, an excluded node, a preset, skipped images. The copy
+    /// ~keep keeps a visitor because the traversal applies a preset only when it has none.
+    #[cfg(feature = "visitor")]
+    pub(crate) fn unobserved_outside_code(&self) -> Self {
+        #[derive(Debug)]
+        struct ContinuesEverywhere;
+        impl crate::visitor::HtmlVisitor for ContinuesEverywhere {}
+
+        Self {
+            in_code: false,
+            in_code_block: false,
+            pre_cell_break_offsets: None,
+            previous_marker: crate::converter::list::utils::PreviousMarker::default(),
+            last_list: crate::converter::list::utils::LastList::default(),
+            item_lines: crate::converter::list::utils::ItemLineScan::default(),
+            first_writer: None,
+            djot_rule_like_text: None,
+            at_fresh_block_start: Rc::new(Cell::new(self.at_fresh_block_start.get())),
+            depth_limit_reached: Rc::new(Cell::new(self.depth_limit_reached.get())),
+            inline_data_replaced: Rc::new(Cell::new(false)),
+            #[cfg(feature = "inline-images")]
+            inline_collector: None,
+            #[cfg(feature = "metadata")]
+            metadata_collector: None,
+            visitor: self.visitor.as_ref().map(|_| -> crate::visitor::VisitorHandle {
+                std::sync::Arc::new(std::sync::Mutex::new(ContinuesEverywhere))
+            }),
+            visitor_error: Rc::new(RefCell::new(None)),
+            is_unobserved: true,
+            structure_collector: None,
+            reference_collector: None,
             ..self.clone()
         }
     }

@@ -144,15 +144,52 @@ pub fn node_is_block_level(handle: &tl::NodeHandle, parser: &tl::Parser, dom_ctx
 }
 
 /// Collect inline text for link labels, skipping block-level descendants.
-#[allow(clippy::match_wildcard_for_single_variants)]
 pub fn collect_link_label_text(
     children: &[tl::NodeHandle],
     parser: &tl::Parser,
     dom_ctx: &DomContext,
 ) -> (String, Vec<tl::NodeHandle>, bool) {
-    let mut text = String::new();
-    let mut saw_block = false;
     let mut block_nodes = Vec::new();
+    let text = walk_link_text(children, parser, dom_ctx, |handle| {
+        block_nodes.push(handle);
+        false
+    });
+    let saw_block = !block_nodes.is_empty();
+    (text, block_nodes, saw_block)
+}
+
+/// The text of every descendant of a link, block-level ones included.
+pub fn link_text_content(children: &[tl::NodeHandle], parser: &tl::Parser, dom_ctx: &DomContext) -> String {
+    walk_link_text(children, parser, dom_ctx, |_| true)
+}
+
+/// The name of a link apart from its content: its `aria-label`, else its `title`. A value of
+/// white space only is no name.
+///
+/// ~keep The order is the order of a browser's accessible name. Both converters ask this one
+/// ~keep function: the full one to label a link whose content gives no text, the fast one to
+/// ~keep leave such a link to the full one.
+pub fn link_accessible_name<'a>(aria_label: Option<&'a str>, title: Option<&'a str>) -> Option<&'a str> {
+    [aria_label, title]
+        .into_iter()
+        .flatten()
+        .map(str::trim)
+        .find(|name| !name.is_empty())
+}
+
+/// Walks the descendants of a link for their text. `enter_block` gets each topmost block-level
+/// element and says whether to read inside it.
+///
+/// ~keep An inline `<svg>` gives the text a reader gets from it, not its text nodes: those hold its
+/// ~keep style sheets and scripts, which became the label of an icon link.
+#[allow(clippy::match_wildcard_for_single_variants)]
+fn walk_link_text(
+    children: &[tl::NodeHandle],
+    parser: &tl::Parser,
+    dom_ctx: &DomContext,
+    mut enter_block: impl FnMut(tl::NodeHandle) -> bool,
+) -> String {
+    let mut text = String::new();
     let mut stack: Vec<_> = children.iter().rev().copied().collect();
 
     while let Some(handle) = stack.pop() {
@@ -165,16 +202,18 @@ pub fn collect_link_label_text(
                 let decoded = text::decode_html_entities_cow(raw.as_ref());
                 text.push_str(decoded.as_ref());
             }
-            tl::Node::Tag(tag) if node_is_block_level(&handle, parser, dom_ctx) => {
-                saw_block = true;
-                block_nodes.push(handle);
+            tl::Node::Tag(tag) if tag.name().as_utf8_str().eq_ignore_ascii_case("svg") => {
+                text.push_str(&crate::converter::media::svg::graphic_text(tag, parser));
             }
-            tl::Node::Tag(tag) => push_label_children(&mut stack, handle, tag, dom_ctx),
+            tl::Node::Tag(tag) => {
+                if !node_is_block_level(&handle, parser, dom_ctx) || enter_block(handle) {
+                    push_label_children(&mut stack, handle, tag, dom_ctx);
+                }
+            }
             _ => {}
         }
     }
-
-    (text, block_nodes, saw_block)
+    text
 }
 
 fn push_label_children(

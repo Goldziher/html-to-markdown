@@ -2,7 +2,7 @@
 
 # Rust (programming language)
 
-[ ] 51 languages
+51 languages
 
 - [Afrikaans](https://af.wikipedia.org/wiki/Rust_(programmeertaal) "Rust (programmeertaal) – Afrikaans")
 - [العربية](https://ar.wikipedia.org/wiki/%D8%B1%D8%B3%D8%AA_(%D9%84%D8%BA%D8%A9_%D8%A8%D8%B1%D9%85%D8%AC%D8%A9) "رست (لغة برمجة) – Arabic")
@@ -272,7 +272,7 @@ default, but adding the `mut` keyword allows the variable to be mutated.[[50]](#
 ```
 fn main() {
     // This code would not compile without adding "mut".
-    let mut foo = 10;
+    let mut foo = 10; 
     println!("The value of foo is {foo}");
     foo = 20;
     println!("The value of foo is {foo}");
@@ -367,7 +367,7 @@ fn main() {
 
 [[edit](/w/index.php?title=Rust_(programming_language)&action=edit&section=13 "Edit section: while loops")]
 
-`[while](/wiki/While_loop "While loop")` can be used
+`while` can be used
 to repeat a block of code while a condition is met.[[56]](#cite_note-FOOTNOTEKlabnikNichols202356-63)
 
 ```
@@ -1603,8 +1603,6 @@ Hidden categories:
 Search
 
 Rust (programming language)
-
-[#](#) [#](#) [#](#) [#](#) [#](#) [#](#) [#](#) [#](#)
 
 51 languages
 

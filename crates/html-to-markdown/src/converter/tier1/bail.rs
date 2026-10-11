@@ -204,8 +204,8 @@ pub enum BailReason {
     /// #583), which this scanner does not track.
     ListItemUnsupportedBlockChild,
 
-    /// A checkbox `<input>` opened inside a list item. Tier-2 writes that item as a task item
-    /// (`- [ ]`), which this scanner does not.
+    /// A checkbox `<input>` opened inside a list item. Tier-2 writes an item that starts with a
+    /// checkbox as a task item (`- [ ]`), which this scanner does not.
     ListItemCheckbox,
 
     /// An `<img>` had an empty (or whitespace-only) `src`, or a `src` that is a
@@ -288,6 +288,12 @@ pub enum BailReason {
     /// `TierStrategy::Auto` -- it is still checked here so the Tier-1/Tier-2 byte-equality
     /// contract holds under a forced Tier-1 run rather than resting on that gate.
     InlineMarkerNotReproduced,
+
+    /// A form control whose text Tier-2 separates from the text around it: `<select>`,
+    /// `<option>`, `<optgroup>`, `<datalist>`, and a `<button>`, `<output>`, `<meter>` or `<progress>` in a
+    /// heading, a summary, a caption, a link, an inline element or code. The space after such a control depends
+    /// on the text that follows it, which this scanner has not read yet.
+    FormControl,
 
     /// An `<hr>` opened between inline markers: inside `<strong>`/`<b>`, `<em>`/`<i>`,
     /// `<var>`/`<dfn>`, `<del>`, `<ins>`, a `<summary>`, a `<figcaption>` or a table caption.
@@ -375,6 +381,7 @@ impl fmt::Display for BailReason {
             Self::AdjacentInlineEmphasis => write!(f, "adjacent strong/emphasis elements would form one delimiter run"),
             Self::WhitespaceOnlyInlineEmphasis => write!(f, "strong/emphasis element with a whitespace-only body"),
             Self::InlineMarkerNotReproduced => write!(f, "inline element whose tier-2 markers tier-1 does not emit"),
+            Self::FormControl => write!(f, "form control whose text tier-2 separates from the text around it"),
             Self::RuleBetweenInlineMarkers => write!(f, "horizontal rule between inline markers"),
         }
     }

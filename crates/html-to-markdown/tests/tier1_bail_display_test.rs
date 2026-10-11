@@ -50,6 +50,7 @@ fn all_variants() -> Vec<BailReason> {
         BailReason::AdjacentInlineEmphasis,
         BailReason::WhitespaceOnlyInlineEmphasis,
         BailReason::InlineMarkerNotReproduced,
+        BailReason::FormControl,
         BailReason::RuleBetweenInlineMarkers,
     ]
 }
@@ -84,6 +85,7 @@ fn should_render_every_bail_reason_with_its_documented_message() {
         "adjacent strong/emphasis elements would form one delimiter run",
         "strong/emphasis element with a whitespace-only body",
         "inline element whose tier-2 markers tier-1 does not emit",
+        "form control whose text tier-2 separates from the text around it",
         "horizontal rule between inline markers",
     ];
     // ~keep Length first: zipping two iterators of different lengths silently compares only the

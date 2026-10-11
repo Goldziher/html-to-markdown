@@ -326,7 +326,7 @@ fn should_leave_no_blank_line_for_an_empty_div_in_a_list_item() {
     for (html, expected) in [
         ("<ul><li>X<div></div>ZZ</li></ul>", "- X\n  ZZ\n"),
         (
-            r#"<ul><li>X<div></div><input type="checkbox">ZZ</li></ul>"#,
+            r#"<ul><li><input type="checkbox">X<div></div>ZZ</li></ul>"#,
             "- [ ] X\n  ZZ\n",
         ),
     ] {

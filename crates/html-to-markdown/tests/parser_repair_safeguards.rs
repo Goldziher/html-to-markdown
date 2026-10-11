@@ -173,3 +173,22 @@ fn should_keep_style_text_hidden_when_the_repair_stops_at_a_style_tag() {
         assert_eq!(content.matches("tail").count(), 1, "depth {depth}: {content:?}");
     }
 }
+
+#[test]
+fn should_convert_three_hundred_open_formatting_elements_inside_the_repair_limit() {
+    let mut html = String::from("<p>");
+    for id in 0..300 {
+        write!(html, "<b id='b{id}'>").expect("write to a string");
+    }
+    html.push('x');
+    let result = convert(
+        &html,
+        ConversionOptions {
+            max_depth: Some(1_000),
+            ..Default::default()
+        },
+    )
+    .expect("open formatting converts");
+    assert_eq!(result.content.as_deref(), Some("**x**\n"));
+    assert!(result.warnings.is_empty(), "{:?}", result.warnings);
+}

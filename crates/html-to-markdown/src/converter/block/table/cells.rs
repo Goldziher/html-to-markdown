@@ -93,6 +93,12 @@ fn append_layout_cell_text(cell_handle: &tl::NodeHandle, row_text: &mut String, 
         convert_as_inline: true,
         in_layout_cell: true,
         cell_allow_inline_images,
+        in_cell_of_inputs: super::scanner::cell_holds_only_inputs(
+            *cell_handle,
+            env.parser,
+            env.dom_ctx,
+            env.options.br_in_tables,
+        ),
         ..env.ctx.clone()
     };
     let cell_children = cell_tag.children();
@@ -464,17 +470,13 @@ fn visitor_cell_text(
 ) -> String {
     let mut text = String::new();
     if let Some(tl::Node::Tag(tag)) = cell_handle.get(env.parser) {
+        let cell_ctx = collect_ctx.for_cell(*cell_handle, env.parser, env.dom_ctx, env.options.br_in_tables);
         for child_handle in tag.children().top().iter() {
             super::super::super::walk_node(
                 child_handle,
                 env.parser,
                 &mut text,
-                crate::converter::block::container::HandlerContext::new(
-                    env.options,
-                    collect_ctx,
-                    depth + 1,
-                    env.dom_ctx,
-                ),
+                crate::converter::block::container::HandlerContext::new(env.options, &cell_ctx, depth + 1, env.dom_ctx),
             );
         }
     }

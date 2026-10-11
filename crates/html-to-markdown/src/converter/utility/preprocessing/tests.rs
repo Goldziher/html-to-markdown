@@ -170,10 +170,13 @@ fn should_preserve_hidden_element_scan_boundaries_and_borrowing() {
         ("<span hidden", "<span hidden", false),
         ("<<span hidden>x</span>終", "<終", true),
         ("< span hidden>x</ span>", "< span hidden>x</ span>", false),
+        // ~keep A `<` inside a tag is part of an attribute value, not the start of an element: the
+        // ~keep value stays whole. The pass used to cut the "element" out of the value, and the
+        // ~keep scan from every such `<` is what made a long tag quadratic (#765).
         (
             "<div title='<span hidden>x</span>'>ok</div>",
-            "<div title=''>ok</div>",
-            true,
+            "<div title='<span hidden>x</span>'>ok</div>",
+            false,
         ),
         ("<i hidden>x</i><b hidden>y</b>z", "z", true),
         (

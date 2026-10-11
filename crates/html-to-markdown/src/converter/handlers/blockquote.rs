@@ -45,7 +45,7 @@ pub fn handle_blockquote(tag: &tl::HTMLTag, mut handler: HandlerContext<'_>) {
                 .unwrap_or(value)
         });
     let content = collect_quote_content(tag, &handler);
-    let trimmed = content.trim();
+    let trimmed = container_content(tag, handler.parser, &content, handler.options.code_block_style);
 
     #[cfg(feature = "visitor")]
     if visit_blockquote(tag, trimmed, &mut handler) {
@@ -55,6 +55,52 @@ pub fn handle_blockquote(tag: &tl::HTMLTag, mut handler: HandlerContext<'_>) {
         render_table_cell_quote(trimmed, cite.as_deref(), &mut handler);
     } else {
         render_quote(trimmed, cite.as_deref(), &mut handler);
+    }
+}
+
+/// The part of `content`, the Markdown of the children of the container `tag`, without the white
+/// space around it.
+///
+/// ~keep Only a code block keeps its indentation at the start of the container. Text that starts
+/// ~keep with spaces (strict white space mode) is not code and loses them.
+///
+/// ~keep `pub` (not `pub(crate)`, which clippy's `redundant_pub_crate` flags here since
+/// ~keep `handlers::blockquote` is itself only `pub` within the crate): the description of a
+/// ~keep definition list in `list/definition.rs` trims its content by the same rule.
+pub fn container_content<'p, 'a, 'c>(
+    tag: &'p tl::HTMLTag<'a>,
+    parser: &'p tl::Parser<'a>,
+    content: &'c str,
+    style: crate::options::CodeBlockStyle,
+) -> &'c str {
+    let kept = crate::converter::code_scan::trimmed_quotes_content_range(content, style);
+    let start = if starts_with_code_block(tag, parser) {
+        kept.start
+    } else {
+        content.len() - content.trim_start().len()
+    };
+    &content[start..kept.end.max(start)]
+}
+
+/// Whether the first content of `tag` is a `pre` element, directly or as the first content of its
+/// first element.
+fn starts_with_code_block<'p, 'a>(tag: &'p tl::HTMLTag<'a>, parser: &'p tl::Parser<'a>) -> bool {
+    let mut current = tag;
+    loop {
+        let first = current
+            .children()
+            .top()
+            .iter()
+            .find_map(|child| match child.get(parser) {
+                Some(tl::Node::Tag(element)) => Some(Some(element)),
+                Some(tl::Node::Raw(text)) if !text.as_utf8_str().trim().is_empty() => Some(None),
+                _ => None,
+            });
+        match first.flatten() {
+            Some(element) if element.name().as_bytes().eq_ignore_ascii_case(b"pre") => return true,
+            Some(element) => current = element,
+            None => return false,
+        }
     }
 }
 
@@ -210,7 +256,13 @@ fn render_quote(content: &str, cite: Option<&str>, handler: &mut HandlerContext<
         && !handler.output.is_empty()
         && !crate::converter::list::utils::line_is_bare_list_marker(handler.output);
     separate_before_quote(handler.output, handler.context);
-    emit_quote_lines(content, list_indent.as_deref(), continuation, handler.output);
+    emit_quote_lines(
+        content,
+        list_indent.as_deref(),
+        continuation,
+        handler.options.code_block_style,
+        handler.output,
+    );
     if let Some(url) = cite {
         handler.output.push('\n');
         if let Some(indent) = list_indent.as_deref() {
@@ -262,14 +314,33 @@ fn separate_before_quote(output: &mut String, context: &Context) {
     }
 }
 
-fn emit_quote_lines(content: &str, indent: Option<&str>, continuation: bool, output: &mut String) {
+fn emit_quote_lines(
+    content: &str,
+    indent: Option<&str>,
+    continuation: bool,
+    style: crate::options::CodeBlockStyle,
+    output: &mut String,
+) {
+    let mut code = crate::converter::code_scan::CodeScan::of_quote_content(style, content);
     // ~keep Every physical quote line needs the list continuation indent to remain in the item (#13).
     for (index, line) in content.lines().enumerate() {
         if (index > 0 || continuation) && indent.is_some() {
             output.push_str(indent.unwrap_or_default());
         }
-        output.push_str("> ");
-        if !line.trim().is_empty() {
+        // ~keep A blank line of the quote is the marker alone: a line of code keeps its line end,
+        // ~keep so no later pass removes a space written here. A line of code that is only
+        // ~keep white space keeps that white space. Only such a line asks whether it is code.
+        let is_space = !line.is_empty() && line.trim().is_empty();
+        let is_code = if is_space {
+            code.is_code(line)
+        } else {
+            code.pass(line);
+            false
+        };
+        if line.is_empty() || (is_space && !is_code) {
+            output.push('>');
+        } else {
+            output.push_str("> ");
             output.push_str(line);
         }
         output.push('\n');

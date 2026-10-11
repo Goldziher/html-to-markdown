@@ -28,6 +28,7 @@ In the formula above the interaction effect is, of course, *dose*gender*type*. T
 ```
                                   Df Sum Sq Mean Sq F value   Pr(>F)
 
+
 dose:gender:type   2    187    93.4  22.367 3.81e-10
 ```
 
@@ -61,13 +62,13 @@ summary(aov2)
 The results of the analyses are shown below (we have only retained the lines with the interaction effects).
 
 ```
-               Df Sum Sq Mean Sq F value   Pr(>F)   
+                Df Sum Sq Mean Sq F value   Pr(>F)   
 
-dose:type     2    249   124.7   28.42 3.57e-12            
+ dose:type     2    249   124.7   28.42 3.57e-12            
 
-                   Df Sum Sq Mean Sq F value   Pr(>F)   
+                    Df Sum Sq Mean Sq F value   Pr(>F)   
 
-dose:type     2  137.2    68.6   17.31 6.74e-08
+ dose:type     2  137.2    68.6   17.31 6.74e-08
 ```
 
 We can notice that both simple second-order interaction effects are significant (p<0.01). So we are dealing with a combined influence of the factors dose and type of employee in both male and female groups. In this situation, we have to examine the *simple main effects* for each factor. This is what we are going to do in the next section.
@@ -90,15 +91,17 @@ aov1 <- aov(effort~dose, data=vitamin_male_blue)
 summary(aov1)
 
 ```
-                Df Sum Sq Mean Sq F value Pr(>F)   
 
-dose          2 2943.5  1471.8   349.9 <2e-16
+                 Df Sum Sq Mean Sq F value Pr(>F)   
+
+ dose          2 2943.5  1471.8   349.9 <2e-16
 ```
 
 The simple main effect for the factor dose on this group is statistically significant (p<0.01). In other words, there is a significant difference between placebo, low dose and high dose levels within the male – blue collar employees category, regarding the resistance to effort. To find out how big the differences are, we use the *TuckeyHSD* function to compute the test with the same name.
 
 ```
 TukeyHSD(aov1)
+
 
                                               diff        lwr       upr   p adj
 
@@ -121,6 +124,7 @@ dose 2 399.6 199.81 45.57 <2e-16
 
 ```
 TukeyHSD(aov1)
+
 
                                             diff        lwr       upr     p adj
 
@@ -207,7 +211,7 @@ Want to share your content on R-bloggers?[click here](https://www.r-bloggers.com
 
 #### Archives
 
-Archives Select MonthMarch 2022 (35)February 2022 (152)January 2022 (154)December 2021 (172)November 2021 (145)October 2021 (199)September 2021 (202)August 2021 (153)July 2021 (171)June 2021 (195)May 2021 (196)April 2021 (183)March 2021 (221)February 2021 (225)January 2021 (252)December 2020 (295)November 2020 (266)October 2020 (276)September 2020 (249)August 2020 (226)July 2020 (268)June 2020 (231)May 2020 (332)April 2020 (326)March 2020 (279)February 2020 (259)January 2020 (250)December 2019 (241)November 2019 (214)October 2019 (230)September 2019 (227)August 2019 (270)July 2019 (258)June 2019 (242)May 2019 (272)April 2019 (289)March 2019 (302)February 2019 (259)January 2019 (282)December 2018 (257)November 2018 (285)October 2018 (298)September 2018 (285)August 2018 (266)July 2018 (327)June 2018 (296)May 2018 (315)April 2018 (296)March 2018 (287)February 2018 (239)January 2018 (328)December 2017 (260)November 2017 (265)October 2017 (287)September 2017 (287)August 2017 (328)July 2017 (279)June 2017 (312)May 2017 (341)April 2017 (319)March 2017 (364)February 2017 (312)January 2017 (364)December 2016 (345)November 2016 (288)October 2016 (298)September 2016 (249)August 2016 (280)July 2016 (322)June 2016 (259)May 2016 (288)April 2016 (258)March 2016 (295)February 2016 (261)January 2016 (334)December 2015 (300)November 2015 (234)October 2015 (255)September 2015 (232)August 2015 (261)July 2015 (240)June 2015 (205)May 2015 (228)April 2015 (203)March 2015 (256)February 2015 (207)January 2015 (237)December 2014 (230)November 2014 (219)October 2014 (212)September 2014 (253)August 2014 (214)July 2014 (226)June 2014 (234)May 2014 (238)April 2014 (256)March 2014 (286)February 2014 (266)January 2014 (260)December 2013 (261)November 2013 (237)October 2013 (233)September 2013 (214)August 2013 (223)July 2013 (254)June 2013 (271)May 2013 (260)April 2013 (278)March 2013 (277)February 2013 (293)January 2013 (340)December 2012 (306)November 2012 (274)October 2012 (304)September 2012 (268)August 2012 (262)July 2012 (247)June 2012 (297)May 2012 (283)April 2012 (295)March 2012 (304)February 2012 (264)January 2012 (278)December 2011 (251)November 2011 (261)October 2011 (280)September 2011 (187)August 2011 (258)July 2011 (219)June 2011 (224)May 2011 (239)April 2011 (267)March 2011 (249)February 2011 (203)January 2011 (209)December 2010 (188)November 2010 (172)October 2010 (219)September 2010 (185)August 2010 (203)July 2010 (175)June 2010 (167)May 2010 (164)April 2010 (152)March 2010 (165)February 2010 (135)January 2010 (121)December 2009 (126)November 2009 (66)October 2009 (87)September 2009 (65)August 2009 (56)July 2009 (64)June 2009 (54)May 2009 (35)April 2009 (38)March 2009 (40)February 2009 (33)January 2009 (42)December 2008 (16)November 2008 (14)October 2008 (10)September 2008 (8)August 2008 (11)July 2008 (7)June 2008 (8)May 2008 (8)April 2008 (4)March 2008 (5)February 2008 (6)January 2008 (10)December 2007 (3)November 2007 (5)October 2007 (9)September 2007 (7)August 2007 (21)July 2007 (9)June 2007 (3)May 2007 (3)April 2007 (1)March 2007 (5)February 2007 (4)November 2006 (1)October 2006 (2)August 2006 (3)July 2006 (1)June 2006 (1)May 2006 (3)April 2006 (1)March 2006 (1)February 2006 (5)January 2006 (1)October 2005 (1)September 2005 (3)May 2005 (1)
+Archives Select Month March 2022 (35) February 2022 (152) January 2022 (154) December 2021 (172) November 2021 (145) October 2021 (199) September 2021 (202) August 2021 (153) July 2021 (171) June 2021 (195) May 2021 (196) April 2021 (183) March 2021 (221) February 2021 (225) January 2021 (252) December 2020 (295) November 2020 (266) October 2020 (276) September 2020 (249) August 2020 (226) July 2020 (268) June 2020 (231) May 2020 (332) April 2020 (326) March 2020 (279) February 2020 (259) January 2020 (250) December 2019 (241) November 2019 (214) October 2019 (230) September 2019 (227) August 2019 (270) July 2019 (258) June 2019 (242) May 2019 (272) April 2019 (289) March 2019 (302) February 2019 (259) January 2019 (282) December 2018 (257) November 2018 (285) October 2018 (298) September 2018 (285) August 2018 (266) July 2018 (327) June 2018 (296) May 2018 (315) April 2018 (296) March 2018 (287) February 2018 (239) January 2018 (328) December 2017 (260) November 2017 (265) October 2017 (287) September 2017 (287) August 2017 (328) July 2017 (279) June 2017 (312) May 2017 (341) April 2017 (319) March 2017 (364) February 2017 (312) January 2017 (364) December 2016 (345) November 2016 (288) October 2016 (298) September 2016 (249) August 2016 (280) July 2016 (322) June 2016 (259) May 2016 (288) April 2016 (258) March 2016 (295) February 2016 (261) January 2016 (334) December 2015 (300) November 2015 (234) October 2015 (255) September 2015 (232) August 2015 (261) July 2015 (240) June 2015 (205) May 2015 (228) April 2015 (203) March 2015 (256) February 2015 (207) January 2015 (237) December 2014 (230) November 2014 (219) October 2014 (212) September 2014 (253) August 2014 (214) July 2014 (226) June 2014 (234) May 2014 (238) April 2014 (256) March 2014 (286) February 2014 (266) January 2014 (260) December 2013 (261) November 2013 (237) October 2013 (233) September 2013 (214) August 2013 (223) July 2013 (254) June 2013 (271) May 2013 (260) April 2013 (278) March 2013 (277) February 2013 (293) January 2013 (340) December 2012 (306) November 2012 (274) October 2012 (304) September 2012 (268) August 2012 (262) July 2012 (247) June 2012 (297) May 2012 (283) April 2012 (295) March 2012 (304) February 2012 (264) January 2012 (278) December 2011 (251) November 2011 (261) October 2011 (280) September 2011 (187) August 2011 (258) July 2011 (219) June 2011 (224) May 2011 (239) April 2011 (267) March 2011 (249) February 2011 (203) January 2011 (209) December 2010 (188) November 2010 (172) October 2010 (219) September 2010 (185) August 2010 (203) July 2010 (175) June 2010 (167) May 2010 (164) April 2010 (152) March 2010 (165) February 2010 (135) January 2010 (121) December 2009 (126) November 2009 (66) October 2009 (87) September 2009 (65) August 2009 (56) July 2009 (64) June 2009 (54) May 2009 (35) April 2009 (38) March 2009 (40) February 2009 (33) January 2009 (42) December 2008 (16) November 2008 (14) October 2008 (10) September 2008 (8) August 2008 (11) July 2008 (7) June 2008 (8) May 2008 (8) April 2008 (4) March 2008 (5) February 2008 (6) January 2008 (10) December 2007 (3) November 2007 (5) October 2007 (9) September 2007 (7) August 2007 (21) July 2007 (9) June 2007 (3) May 2007 (3) April 2007 (1) March 2007 (5) February 2007 (4) November 2006 (1) October 2006 (2) August 2006 (3) July 2006 (1) June 2006 (1) May 2006 (3) April 2006 (1) March 2006 (1) February 2006 (5) January 2006 (1) October 2005 (1) September 2005 (3) May 2005 (1)
 
 #### Other sites
 

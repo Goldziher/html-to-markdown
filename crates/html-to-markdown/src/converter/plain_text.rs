@@ -34,7 +34,7 @@ enum ListContext {
 }
 
 /// Tags whose content should be skipped entirely.
-const SKIP_TAGS: &[&str] = &["script", "style", "head", "template", "noscript", "svg", "math"];
+const SKIP_TAGS: &[&str] = &["script", "style", "head", "template", "noscript", "math"];
 
 /// Block-level tags that should be separated by blank lines.
 const BLOCK_TAGS: &[&str] = &[
@@ -107,7 +107,7 @@ impl WalkState<'_> {
 /// - Block elements get blank-line separation
 /// - `<br>` becomes a newline, `<hr>` a blank line
 /// - `<pre>` preserves internal whitespace
-/// - `<img>` outputs alt text (unless `skip_images` is set)
+/// - `<img>` outputs alt text, and an inline `<svg>` its text (unless `skip_images` is set)
 /// - `<script>`, `<style>`, `<head>`, `<template>`, `<noscript>` are skipped
 /// - Tables: cells separated by tab, rows by newline
 /// - Inline elements are recursed without markers
@@ -340,6 +340,13 @@ fn dispatch_plain_tag(
         "hr" => ensure_blank_line(buf),
         "pre" => walk_plain_pre(tag, parser, buf, list_ctx, state),
         "img" => emit_plain_image(tag, buf, state.options),
+        // ~keep An inline graphic is an image: its text is written like an alt text, and its
+        // ~keep style sheets and scripts are not text of the page.
+        "svg" => {
+            if !state.options.skip_images {
+                buf.push_str(&crate::converter::media::svg::graphic_text(tag, parser));
+            }
+        }
         "table" => {
             ensure_blank_line(buf);
             walk_table(tag, parser, buf, &child_state);

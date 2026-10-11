@@ -54,7 +54,7 @@ fn handle_kbd_samp(mut handler: HandlerContext<'_>) {
     };
 
     let children = tag.children();
-    if handler.context.in_code {
+    if handler.context.code_element_is_transparent() {
         // ~keep A nested `<code>` renders transparently inside an outer code span
         // ~keep (`handlers::code_block::handle_code`); `<kbd>`/`<samp>` wrapped their own
         // ~keep backticks anyway, so the outer span grew a second, nested pair.

@@ -3,6 +3,8 @@
 //! This module contains utility functions used by the main conversion pipeline,
 //! including preprocessing helpers, HTML repair, and metadata formatting.
 
+use crate::converter::code_scan::CodeScan;
+use crate::options::CodeBlockStyle;
 use crate::options::ConversionOptions;
 use crate::options::NewlineStyle;
 use crate::options::conversion::{MAX_CONFIGURABLE_DEPTH, NATIVE_STACK_SAFE_DEPTH};
@@ -179,34 +181,47 @@ pub const fn hard_break_marker(options: &ConversionOptions) -> &'static str {
 /// markdownlint's MD012 rule forbids multiple consecutive blank lines, so the
 /// final emission is normalized here. This intentionally preserves single
 /// blank lines (`\n\n`) — only runs of three or more newlines are collapsed.
-pub fn collapse_excess_blank_lines(output: &mut String) {
+///
+/// The lines of a code block, fenced or indented, are code, not block transitions, and stay as
+/// they are (issue #783).
+pub fn collapse_excess_blank_lines(output: &mut String, style: CodeBlockStyle) {
     if !output.contains("\n\n\n") {
         return;
     }
     let mut cleaned = String::with_capacity(output.len());
+    let mut fences = CodeScan::new(style, output);
     let mut consecutive = 0usize;
-    for ch in output.chars() {
-        if ch == '\n' {
+    for line in output.split_inclusive('\n') {
+        let content = line.strip_suffix('\n').unwrap_or(line);
+        if fences.is_code(content) || !content.is_empty() {
+            consecutive = 1;
+            cleaned.push_str(line);
+        } else {
             consecutive += 1;
             if consecutive <= 2 {
-                cleaned.push(ch);
+                cleaned.push_str(line);
             }
-        } else {
-            consecutive = 0;
-            cleaned.push(ch);
         }
     }
     *output = cleaned;
 }
 
 /// Remove trailing spaces/tabs from every line while preserving newlines.
-pub fn trim_line_end_whitespace(output: &mut String) {
+///
+/// The lines of a code block, fenced or indented, keep their line ends: they are code.
+pub fn trim_line_end_whitespace(output: &mut String, style: CodeBlockStyle) {
     if output.is_empty() {
         return;
     }
 
     let mut cleaned = String::with_capacity(output.len());
+    let mut fences = CodeScan::new(style, output);
     for line in output.split('\n') {
+        if fences.is_code(line) {
+            cleaned.push_str(line);
+            cleaned.push('\n');
+            continue;
+        }
         let content = line.trim_end_matches([' ', '\t']);
         cleaned.push_str(content);
         // ~keep The two-space hard break is only meaningful after content on the same line;
@@ -536,23 +551,29 @@ pub fn expand_xml_self_closing_tags(input: &str) -> String {
 /// semantics do not honour `/>` on unknown elements — without the expansion, the
 /// element would be left open and subsequent siblings would nest inside it, breaking
 /// visitor start/end event pairing (issue #331).
+///
+/// ~keep The tree builder has a node budget and a depth limit on every route (issues #808 and
+/// ~keep #809), and the result names the limit that it reached. At the node budget the result
+/// ~keep is `input` as written. At the depth limit the tree ends at the tag that reached it,
+/// ~keep and the input after that tag follows the tree as written. No word is lost.
 pub(super) fn repair_with_html5ever_bounded(input: &str) -> Option<(String, Option<crate::types::WarningKind>)> {
-    use crate::converter::anchor_origin::{collapse_split_anchors, parse_with_anchor_origins};
+    use crate::converter::anchor_origin::{RepairTree, collapse_split_anchors, parse_with_anchor_origins};
     use crate::rcdom::SerializableHandle;
     use html5ever::serialize::{SerializeOpts, serialize};
 
     let expanded = expand_xml_self_closing_tags(input);
-
+    let RepairTree { dom, limit, unparsed } = parse_with_anchor_origins(&expanded);
+    if limit == Some(crate::types::WarningKind::TruncatedInput) {
+        tracing::warn!(
+            target: "html_to_markdown::convert",
+            "HTML tree repair reached its node budget; continuing with the original structure"
+        );
+        // ~keep Abandon the amplified repair and keep the authored text (issue #809).
+        return Some((input.to_owned(), limit));
+    }
     // ~keep The adoption agency splits an `<a>` around a block into an authored element and
     // ~keep clones; collapse the empty halves before the tree is flattened to a string and
     // ~keep the provenance is gone (issue #493).
-    let (dom, unparsed) = parse_with_anchor_origins(&expanded);
-    let limit = dom.repair_limit.get();
-    if limit == Some(crate::types::WarningKind::TruncatedInput) {
-        tracing::warn!(target: "html_to_markdown::convert", "HTML tree repair exceeded its node budget; continuing with the original structure");
-        // ~keep Abandon amplified repair rather than discarding authored text (#809).
-        return Some((input.to_owned(), limit));
-    }
     collapse_split_anchors(&dom.document);
 
     let mut buf = Vec::with_capacity(input.len());
@@ -560,16 +581,19 @@ pub(super) fn repair_with_html5ever_bounded(input: &str) -> Option<(String, Opti
     serialize(&mut buf, &handle, SerializeOpts::default()).ok()?;
     let mut html = String::from_utf8(buf).ok()?;
     if limit.is_some() {
-        tracing::warn!(target: "html_to_markdown::convert", "HTML tree repair reached its depth limit; the rest of the input keeps its original structure");
-        // ~keep The tree builder stopped at its depth limit, so its tree ends at that tag (#808).
-        // ~keep The input after that tag goes into the body as written: no word is lost.
+        tracing::warn!(
+            target: "html_to_markdown::convert",
+            "HTML tree repair reached its depth limit; the rest of the input keeps its original structure"
+        );
+        // ~keep The input after the last tag of the tree goes into the body as written (issue
+        // ~keep #808). The tree has a `<body>` end tag only when the input wrote a `<body>`.
         const DOCUMENT_END: &str = "</body></html>";
-        let at = if html.ends_with(DOCUMENT_END) {
-            html.len() - DOCUMENT_END.len()
+        let end = if html.ends_with(DOCUMENT_END) {
+            DOCUMENT_END.len()
         } else {
-            html.len()
+            0
         };
-        html.insert_str(at, &unparsed);
+        html.insert_str(html.len() - end, &unparsed);
     }
     Some((html, limit))
 }
@@ -580,9 +604,6 @@ pub(super) fn repair_with_html5ever_bounded(input: &str) -> Option<(String, Opti
 /// start tag. The lightweight parser preserves source nesting, so its tree needs this targeted
 /// repair before either conversion tier reads metadata or renders the body.
 pub fn repair_head_content_before_explicit_head(input: &str) -> Option<(String, Option<crate::types::WarningKind>)> {
-    if super::repair_detection::needs_source_tree_repair(input) {
-        return repair_with_html5ever_bounded(input);
-    }
     let head_start = last_start_tag(input.as_bytes(), b"head")?;
     const HEAD_CONTENT: [&[u8]; 11] = [
         b"base",
@@ -706,9 +727,8 @@ pub fn is_inline_element(tag_name: &str) -> bool {
 /// Build the warning for a repair that stopped at `limit`.
 ///
 /// `limit` is the reason the tree builder reports: `TruncatedInput` for the node budget (the
-/// first parse is kept), `DepthLimitExceeded` for the depth limit (the input after the limit
-/// is kept as written). No text is lost in either case, so the warning kind is
-/// `MalformedHtml` for both.
+/// first parse is kept), `DepthLimitExceeded` for the depth limit (the first parse is kept
+/// too). No text is lost in either case, so the warning kind is `MalformedHtml` for both.
 pub fn repair_limit_warning(limit: crate::types::WarningKind) -> crate::types::ProcessingWarning {
     use crate::converter::anchor_origin::MAX_REPAIR_DEPTH;
     crate::types::ProcessingWarning {
@@ -717,7 +737,7 @@ pub fn repair_limit_warning(limit: crate::types::WarningKind) -> crate::types::P
             "HTML tree repair exceeded its node budget; continued with the original structure.".to_owned()
         } else {
             format!(
-                "HTML tree repair reached the depth limit of {MAX_REPAIR_DEPTH}; the input after it keeps its original structure."
+                "HTML tree repair reached the depth limit of {MAX_REPAIR_DEPTH}; continued with the original structure."
             )
         },
     }
@@ -726,6 +746,22 @@ pub fn repair_limit_warning(limit: crate::types::WarningKind) -> crate::types::P
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn should_give_the_tree_and_the_rest_of_the_input_when_the_repair_passes_the_depth_limit() {
+        let deep = format!("{}x", "<div>".repeat(600));
+
+        let (page, limit) = repair_with_html5ever_bounded(&deep).expect("a page");
+
+        assert_eq!(limit, Some(crate::types::WarningKind::DepthLimitExceeded));
+        assert_eq!(page.matches("<div>").count(), 600);
+        assert!(
+            page.ends_with(&format!("{}x", "<div>".repeat(80))),
+            "{}",
+            &page[page.len() - 40..]
+        );
+        assert!(repair_with_html5ever_bounded("<div><p>one</div>tail").is_some_and(|(_, limit)| limit.is_none()));
+    }
 
     #[test]
     fn test_is_ignorable_before_head() {
@@ -743,42 +779,93 @@ mod tests {
         assert!(is_ignorable_before_head("hello", true));
     }
 
+    fn cleaned(markdown: &str, style: CodeBlockStyle) -> String {
+        let mut output = markdown.to_owned();
+        trim_line_end_whitespace(&mut output, style);
+        collapse_excess_blank_lines(&mut output, style);
+        output
+    }
+
+    #[test]
+    fn should_clean_the_prose_and_not_the_code_of_an_indented_style_document() {
+        let cases = [
+            // A fence line in indented code opens nothing: the prose after it is cleaned.
+            (
+                "    a \t\n    ```\n\n\n\n    b\n\n\n\nx \t\n\n\n\ny\n",
+                "    a \t\n    ```\n\n\n\n    b\n\nx\n\ny\n",
+            ),
+            // The third level of a list is indented by four columns and is not code.
+            (
+                "- a\n  - b\n    - c \t\n\n\n\n    - d \t\n",
+                "- a\n  - b\n    - c\n\n    - d\n",
+            ),
+            // Code in a list item is indented by four columns past the content of the item.
+            (
+                "1. t\n\n       a \t\n\n\n\n       b\n\n\n\n   u \t\n",
+                "1. t\n\n       a \t\n\n\n\n       b\n\n   u\n",
+            ),
+            // A code block that starts on the line of the item marker.
+            ("-     a \t\n\n\n\n      b\n", "-     a \t\n\n\n\n      b\n"),
+            // The blank lines between the code blocks of two items belong to neither.
+            ("-     a\n\n\n\n-     b\n", "-     a\n\n-     b\n"),
+            // Code in a block quote, and prose after the quote.
+            (
+                ">     a \t\n>\n>\n>\n>     b\n\n\n\nx \t\n",
+                ">     a \t\n>\n>\n>\n>     b\n\nx\n",
+            ),
+            // An indented line that continues a paragraph is not code.
+            ("x\n    y \t\n", "x\n    y\n"),
+            // A tab is four columns of indentation.
+            ("\ta \t\n\n\n\n\tb\n", "\ta \t\n\n\n\n\tb\n"),
+        ];
+        for (markdown, expected) in cases {
+            assert_eq!(cleaned(markdown, CodeBlockStyle::Indented), expected, "{markdown:?}");
+        }
+    }
+
+    #[test]
+    fn should_open_a_block_only_on_the_fence_of_the_configured_style() {
+        let markdown = "~~~\na \t\n\n\n\nb\n~~~\n";
+        assert_eq!(cleaned(markdown, CodeBlockStyle::Tildes), markdown);
+        assert_eq!(cleaned(markdown, CodeBlockStyle::Backticks), "~~~\na\n\nb\n~~~\n");
+    }
+
     #[test]
     fn test_trim_line_end_whitespace() {
         let mut s = String::new();
-        trim_line_end_whitespace(&mut s);
+        trim_line_end_whitespace(&mut s, CodeBlockStyle::Backticks);
         assert_eq!("", s.as_str());
 
         let mut s = "\t\n\t\n".to_owned();
-        trim_line_end_whitespace(&mut s);
+        trim_line_end_whitespace(&mut s, CodeBlockStyle::Backticks);
         assert_eq!("", s.as_str());
 
         let mut s = "hello, world  ".to_owned();
-        trim_line_end_whitespace(&mut s);
+        trim_line_end_whitespace(&mut s, CodeBlockStyle::Backticks);
         assert_eq!("hello, world  \n", s.as_str());
 
         let mut s = "hello, world  \n".to_owned();
-        trim_line_end_whitespace(&mut s);
+        trim_line_end_whitespace(&mut s, CodeBlockStyle::Backticks);
         assert_eq!("hello, world  \n", s.as_str());
 
         let mut s = "hello, world  ".to_owned();
-        trim_line_end_whitespace(&mut s);
+        trim_line_end_whitespace(&mut s, CodeBlockStyle::Backticks);
         assert_eq!("hello, world  \n", s.as_str());
 
         let mut s = "hello, world  \n\n\n".to_owned();
-        trim_line_end_whitespace(&mut s);
+        trim_line_end_whitespace(&mut s, CodeBlockStyle::Backticks);
         assert_eq!("hello, world  \n", s.as_str());
 
         let mut s = "hello  \n- world\n".to_owned();
-        trim_line_end_whitespace(&mut s);
+        trim_line_end_whitespace(&mut s, CodeBlockStyle::Backticks);
         assert_eq!("hello  \n- world\n", s.as_str());
 
         let mut s = "hello, world\t\t  ".to_owned();
-        trim_line_end_whitespace(&mut s);
+        trim_line_end_whitespace(&mut s, CodeBlockStyle::Backticks);
         assert_eq!("hello, world  \n", s.as_str());
 
         let mut s = "hello, world\t\t  \n.abc def \t \t".to_owned();
-        trim_line_end_whitespace(&mut s);
+        trim_line_end_whitespace(&mut s, CodeBlockStyle::Backticks);
         assert_eq!("hello, world  \n.abc def\n", s.as_str());
     }
 

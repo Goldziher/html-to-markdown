@@ -150,7 +150,7 @@ fn record_heading(
         })
         .map(|value| value.as_utf8_str().to_string());
 
-    if handler.ctx.metadata_wants_headers {
+    if handler.ctx.metadata_wants.headers {
         if let Some(ref collector) = handler.ctx.metadata_collector {
             collector
                 .borrow_mut()

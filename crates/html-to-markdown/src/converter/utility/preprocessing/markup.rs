@@ -495,8 +495,9 @@ pub fn is_json_ld_script_open_tag(tag: &str) -> bool {
                 }
             };
 
-            let value = &tag[value_start..value_end];
-            let media_type = value.split(';').next().unwrap_or(value).trim();
+            // ~keep The decision reads the decoded value: `ld&#43;json` names the same type.
+            let value = crate::text::decode_attribute_value_cow(&tag[value_start..value_end]);
+            let media_type = value.split(';').next().unwrap_or(&value).trim();
             return eq_ascii_case_insensitive(media_type.as_bytes(), b"application/ld+json");
         }
         idx += 1;

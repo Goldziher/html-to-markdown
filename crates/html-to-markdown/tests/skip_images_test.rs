@@ -42,7 +42,7 @@ fn test_skip_images_skips_svg_output() {
         "Should not include SVG data URIs when skip_images is enabled"
     );
     assert!(
-        !result.contains("SVG Image"),
+        !result.contains("Logo"),
         "Should not include SVG alt text when skip_images is enabled"
     );
 }

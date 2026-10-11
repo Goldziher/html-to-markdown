@@ -38,8 +38,8 @@ pub(super) fn track_svg_tag(bytes: &[u8], idx: usize, svg_depth: &mut usize) -> 
 ///
 /// `open_tag_pattern` is the lowercase opening-tag prefix including `<` (e.g. `b"<script"`);
 /// `close_tag_name` is the bare lowercase tag name for the closing-tag scan (e.g. `b"script"`).
-/// `json_ld_exempt` additionally requires the opening tag not be a `type="application/ld+json"`
-/// script — only meaningful for the script element, so callers stripping `<style>` pass `false`.
+/// `json_ld_exempt` keeps a `type="application/ld+json"` script, with each `<` of its body written
+/// as `&lt;` — only meaningful for the script element, so callers stripping `<style>` pass `false`.
 ///
 /// Returns `Some(new_pos)` when the element was stripped — the caller should set both `last`
 /// and `idx` to it and `continue` the scan — or `None` when `idx` does not start a strippable
@@ -104,17 +104,18 @@ fn strip_raw_text_element(element: RawTextElement<'_>, output: &mut Option<Strin
     }
     tag_end += 1;
 
-    if element.json_ld_exempt {
-        let tag_content = &element.input[element.idx..tag_end];
-        if is_json_ld_script_open_tag(tag_content) {
-            return None;
-        }
-    }
-
-    let close_idx = find_closing_tag_bytes(element.bytes, tag_end, element.close_tag_name)?;
+    let (close_start, close_idx) = find_closing_tag_span(element.bytes, tag_end, element.close_tag_name)?;
 
     let out = output.get_or_insert_with(|| String::with_capacity(element.len));
     out.push_str(&element.input[element.last..element.idx]);
+    if element.json_ld_exempt && is_json_ld_script_open_tag(&element.input[element.idx..tag_end]) {
+        push_structured_data_script(
+            out,
+            &element.input[element.idx + prefix_len..tag_end],
+            &element.input[tag_end..close_start],
+        );
+        return Some(close_idx);
+    }
     if element.idx > 0
         && close_idx < element.len
         && !element.bytes[element.idx - 1].is_ascii_whitespace()
@@ -123,6 +124,26 @@ fn strip_raw_text_element(element: RawTextElement<'_>, output: &mut Option<Strin
         out.push(' ');
     }
     Some(close_idx)
+}
+
+/// Write a structured data script in a form the parser reads as one element with one text.
+/// `attributes` is the open tag after its name, with the `>`; `body` is the text of the script.
+///
+/// ~keep The parser has no raw-text rule: a `<p>` in a JSON string would open an element that
+/// ~keep holds the rest of the page, so each `<` of the body is written as `&lt;`. The metadata
+/// ~keep extraction decodes the reference. The parser also closes an element only with an end
+/// ~keep tag of the same spelling, so the two tag names are written in one spelling: `</SCRIPT>`
+/// ~keep or `</script >` after `<script>` would leave the script open to the end of the page.
+fn push_structured_data_script(out: &mut String, attributes: &str, body: &str) {
+    out.push_str("<script");
+    out.push_str(attributes);
+    for (piece_index, piece) in body.split('<').enumerate() {
+        if piece_index > 0 {
+            out.push_str("&lt;");
+        }
+        out.push_str(piece);
+    }
+    out.push_str("</script>");
 }
 
 /// Strip script and style tags and their content from HTML.
@@ -213,7 +234,7 @@ pub fn strip_script_and_style_tags(input: &str) -> Cow<'_, str> {
 /// ~keep the whole document for every such tag.
 const MAX_CLOSING_TAG_SCAN: usize = 100_000_000;
 
-/// If `idx` starts a `</tag>` (or `</tag ...>`) closing tag matching `tag` (case-insensitively),
+/// If `idx` starts a `</tag>` (or `</tag ...>`, `</tag/>`) closing tag matching `tag` (case-insensitively),
 /// return the index just past its `>`. Returns `None` when `idx` does not start such a tag.
 ///
 /// Extracted from `find_closing_tag_bytes`'s inner match — identical boundary checks and
@@ -227,7 +248,8 @@ fn match_closing_tag_at(bytes: &[u8], idx: usize, len: usize, tag: &[u8]) -> Opt
         return None;
     }
     let after_tag = idx + 2 + tag_len;
-    if after_tag >= len || !(bytes[after_tag] == b'>' || bytes[after_tag].is_ascii_whitespace()) {
+    // ~keep The HTML rule for the end of raw text: the name, then white space, `/` or `>`.
+    if after_tag >= len || !(matches!(bytes[after_tag], b'>' | b'/') || bytes[after_tag].is_ascii_whitespace()) {
         return None;
     }
 
@@ -251,6 +273,12 @@ fn match_closing_tag_at(bytes: &[u8], idx: usize, len: usize, tag: &[u8]) -> Opt
 /// ~keep unify the two functions.
 #[inline]
 pub fn find_closing_tag_bytes(bytes: &[u8], start: usize, tag: &[u8]) -> Option<usize> {
+    find_closing_tag_span(bytes, start, tag).map(|(_, end)| end)
+}
+
+/// The first closing tag as `find_closing_tag_bytes` finds it: the position of its `<` and the
+/// position after its `>`.
+fn find_closing_tag_span(bytes: &[u8], start: usize, tag: &[u8]) -> Option<(usize, usize)> {
     let len = bytes.len();
     let mut idx = start;
 
@@ -264,7 +292,7 @@ pub fn find_closing_tag_bytes(bytes: &[u8], start: usize, tag: &[u8]) -> Option<
         }
 
         if let Some(close_pos) = match_closing_tag_at(bytes, idx, len, tag) {
-            return Some(close_pos);
+            return Some((idx, close_pos));
         }
 
         idx += 1;

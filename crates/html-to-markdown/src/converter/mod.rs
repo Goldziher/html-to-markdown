@@ -91,6 +91,7 @@
 
 mod anchor_origin;
 pub mod block;
+mod code_scan;
 pub mod context;
 pub mod dom_context;
 pub mod form;
@@ -104,6 +105,8 @@ mod main_dispatch;
 mod main_helpers;
 pub mod media;
 mod metadata;
+#[cfg(all(test, feature = "metadata"))]
+mod metadata_preferences_tests;
 pub mod plain_text;
 pub mod preprocessing_helpers;
 pub mod prescan;
@@ -137,5 +140,3 @@ pub use crate::converter::utility::content::{
 pub use crate::converter::utility::serialization::{serialize_node, serialize_node_to_html};
 
 pub use crate::converter::utility::siblings::append_inline_suffix;
-
-mod repair_detection;

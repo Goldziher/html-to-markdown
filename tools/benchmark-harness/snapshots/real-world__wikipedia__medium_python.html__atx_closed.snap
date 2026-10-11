@@ -17,7 +17,7 @@ title: Python (programming language) - Wikipedia
 
 # Python (programming language) #
 
-[ ] 116 languages
+116 languages
 
 - [Afrikaans](https://af.wikipedia.org/wiki/Python_(programmeertaal) "Python (programmeertaal) – Afrikaans")
 - [Alemannisch](https://als.wikipedia.org/wiki/Python_(Programmiersprache) "Python (Programmiersprache) – Alemannic")
@@ -312,20 +312,20 @@ semantic meaning. The recommended indent size is four spaces.[[82]](#cite_note-8
 Python's [statements](/wiki/Statement_(computer_science) "Statement (computer science)") include the following:
 
 - The [assignment](/wiki/Assignment_(computer_science) "Assignment (computer science)") statement, using a single equals sign `=`
-- The `[if](/wiki/If-then-else "If-then-else")` statement, which conditionally executes a block of code, along with `[else](/wiki/Conditional_(computer_programming)#If%E2%80%93then(%E2%80%93else) "Conditional (computer programming)")` and `elif` (a contraction of `[else if](/wiki/Conditional_(computer_programming)#Else_if "Conditional (computer programming)")`)
-- The `[for](/wiki/Foreach#Python "Foreach")` statement, which iterates over an *iterable* object, capturing each
+- The `if` statement, which conditionally executes a block of code, along with `else` and `elif` (a contraction of `else if`)
+- The `for` statement, which iterates over an *iterable* object, capturing each
   element to a local variable for use by the attached block
-- The `[while](/wiki/While_loop#Python "While loop")` statement, which executes a block of code as long as boolean condition is true
-- The `[try](/wiki/Exception_handling_syntax#Python "Exception handling syntax")` statement, which allows exceptions raised in its attached code block to be
+- The `while` statement, which executes a block of code as long as boolean condition is true
+- The `try` statement, which allows exceptions raised in its attached code block to be
   caught and handled by `except` clauses (or new syntax `except*` in Python 3.11 for exception groups[[83]](#cite_note-85)); the `try` statement also ensures that clean-up code in a `finally` block is always run regardless of how the block exits
 - The `raise` statement, used to raise a specified exception or
   re-raise a caught exception
 - The `class` statement, which executes a block of code and attaches
   its local namespace to a [class](/wiki/Class_(computer_science) "Class (computer science)"), for use in object-oriented programming
 - The `def` statement, which defines a [function](/wiki/Function_(computing) "Function (computing)") or [method](/wiki/Method_(computing) "Method (computing)")
-- The `[with](/wiki/Dispose_pattern#Language_constructs "Dispose pattern")` statement, which encloses a code block within a context manager, allowing [resource-acquisition-is-initialization](/wiki/Resource_acquisition_is_initialization "Resource acquisition is initialization") (RAII)-like behavior and replacing a common try/finally idiom[[84]](#cite_note-86) Examples of a context include acquiring a [lock](/wiki/Lock_(computer_science) "Lock (computer science)") before some code is run, and then releasing the lock; or opening and then
+- The `with` statement, which encloses a code block within a context manager, allowing [resource-acquisition-is-initialization](/wiki/Resource_acquisition_is_initialization "Resource acquisition is initialization") (RAII)-like behavior and replacing a common try/finally idiom[[84]](#cite_note-86) Examples of a context include acquiring a [lock](/wiki/Lock_(computer_science) "Lock (computer science)") before some code is run, and then releasing the lock; or opening and then
   closing a [file](/wiki/Computer_file "Computer file")
-- The `[break](/wiki/Break_statement "Break statement")` statement, which exits a loop
+- The `break` statement, which exits a loop
 - The `continue` statement, which skips the rest of the current
   iteration and continues with the next
 - The `del` statement, which removes a variable—deleting the
@@ -333,10 +333,10 @@ Python's [statements](/wiki/Statement_(computer_science) "Statement (computer sc
   is referred to before it is redefined [[c]](#cite_note-87)
 - The `pass` statement, serving as a [NOP](/wiki/NOP_(code) "NOP (code)") (i.e., no operation),
   which is syntactically needed to create an empty code block
-- The `[assert](/wiki/Assertion_(programming) "Assertion (programming)")` statement, used in debugging to check for conditions that should apply
+- The `assert` statement, used in debugging to check for conditions that should apply
 - The `yield` statement, which returns a value from a [generator](/wiki/Generator_(computer_programming)#Python "Generator (computer programming)") function (and also an operator); used to implement [coroutines](/wiki/Coroutine "Coroutine")
 - The `return` statement, used to return a value from a function
-- The `[import](/wiki/Include_directive "Include directive")` and `from` statements, used to import modules whose functions or
+- The `import` and `from` statements, used to import modules whose functions or
   variables can be used in the current program
 - The `match` and `case` statements, analogous to a [switch statement](/wiki/Switch_statement "Switch statement") construct, which compares an expression against one or more cases as a
   control-flow measure
@@ -376,7 +376,7 @@ Python's [expressions](/wiki/Expression_(computer_science) "Expression (computer
 - Python has a type of expression called a *[list comprehension](/wiki/List_comprehension#Python "List comprehension")*, and a more general expression called a *generator expression*.[[64]](#cite_note-AutoNT-59-66)
 - [Anonymous functions](/wiki/Anonymous_function "Anonymous function") are implemented using [lambda expressions](/wiki/Lambda_(programming) "Lambda (programming)"); however, there may be only one expression in each body.
 - Conditional expressions are written as `x if c`  
-`                        else y`.[[93]](#cite_note-AutoNT-60-96) (This is different in operand order from the `[c ? x : y](/wiki/%3F: "?:")` operator common to many other languages.)
+`                        else y`.[[93]](#cite_note-AutoNT-60-96) (This is different in operand order from the `c ? x : y` operator common to many other languages.)
 - Python makes a distinction between [lists](/wiki/List_(computer_science) "List (computer science)") and [tuples](/wiki/Tuple "Tuple"). Lists are written as `[1,`  
 `                        2, 3]`, are mutable, and cannot be used as the keys of dictionaries (since
   dictionary keys must be [immutable](/wiki/Immutable "Immutable") in Python). Tuples, written as `(1,`  
@@ -401,7 +401,7 @@ Python's [expressions](/wiki/Expression_(computer_science) "Expression (computer
   the left-hand side; while iterating, the statement assigns each of the values
   produced on the right to the corresponding expression on the left.[[95]](#cite_note-98)
 - Python has a "string format" operator `%` that functions
-  analogously to `[printf](/wiki/Printf "Printf")` format strings
+  analogously to `printf` format strings
   in the C language—e.g. `"spam=%s eggs=%d" %`  
 `                        ("blah", 2)` evaluates to `"spam=blah eggs=2"`. In Python 2.6+ and 3+, this
   operator was supplemented by the `format()` method of the `str` class, e.g., `"spam={0} eggs={1}".format("blah",`  
@@ -450,7 +450,7 @@ statement such as `a =`
 
 [Methods](/wiki/Method_(computer_programming) "Method (computer programming)") of objects are functions attached to the object's class; the syntax for normal
 methods and functions, `instance.method(argument)`, is [syntactic sugar](/wiki/Syntactic_sugar "Syntactic sugar") for `Class.method(instance,`  
-`                      argument)`. Python methods have an explicit `[self](/wiki/This_(computer_programming) "This (computer programming)")` parameter to access [instance data](/wiki/Instance_data "Instance data"), in contrast to the implicit self (or `this`) parameter in some
+`                      argument)`. Python methods have an explicit `self` parameter to access [instance data](/wiki/Instance_data "Instance data"), in contrast to the implicit self (or `this`) parameter in some
 object-oriented programming languages (e.g., [C++](/wiki/C%2B%2B "C++"), [Java](/wiki/Java_(programming_language) "Java (programming language)"), [Objective-C](/wiki/Objective-C "Objective-C"), [Ruby](/wiki/Ruby_(programming_language) "Ruby (programming language)")).[[97]](#cite_note-AutoNT-61-100) Python also provides methods, often called *dunder methods* (because their
 names begin and end with double underscores); these methods allow user-defined
 classes to modify how they are handled by native operations including length,
@@ -1260,7 +1260,7 @@ developers of [Tcl](/wiki/Tcl "Tcl"),[[240]](#cite_note-AutoNT-99-243) [Erlang](
 155. **[↑](#cite_ref-158)** ["Nuitka Home | Nuitka Home"](http://nuitka.net/). *nuitka.net*. [Archived](https://web.archive.org/web/20200530211233/https://nuitka.net/) from the original on 30 May 2020. Retrieved 18 August 2017.
 156. **[↑](#cite_ref-Guelton_Brunet_Amini_Merlini_2015_p=014001_159-0)** Guelton, Serge; Brunet, Pierrick; Amini, Mehdi; Merlini, Adrien;
      Corbillon, Xavier; Raynaud, Alan (16 March 2015). ["Pythran: enabling static optimization of scientific Python programs"](https://doi.org/10.1088%2F1749-4680%2F8%2F1%2F014001). *Computational Science & Discovery*. **8** (1). IOP
-     Publishing: 014001. [Bibcode](/wiki/Bibcode_(identifier) "Bibcode (identifier)"):[2015CS&D....8a4001G](https://ui.adsabs.harvard.edu/abs/2015CS&D....8a4001G). [doi](/wiki/Doi_(identifier) "Doi (identifier)"):[10.1088/1749-4680/8/1/014001](https://doi.org/10.1088%2F1749-4680%2F8%2F1%2F014001). [ISSN](/wiki/ISSN_(identifier) "ISSN (identifier)") [1749-4699](https://search.worldcat.org/issn/1749-4699).`{{[cite journal](/wiki/Template:Cite_journal "Template:Cite journal")}}`: CS1 maint: article number as page number ([link](/wiki/Category:CS1_maint:_article_number_as_page_number "Category:CS1 maint: article number as page number"))
+     Publishing: 014001. [Bibcode](/wiki/Bibcode_(identifier) "Bibcode (identifier)"):[2015CS&D....8a4001G](https://ui.adsabs.harvard.edu/abs/2015CS&D....8a4001G). [doi](/wiki/Doi_(identifier) "Doi (identifier)"):[10.1088/1749-4680/8/1/014001](https://doi.org/10.1088%2F1749-4680%2F8%2F1%2F014001). [ISSN](/wiki/ISSN_(identifier) "ISSN (identifier)") [1749-4699](https://search.worldcat.org/issn/1749-4699).`{{cite journal}}`: CS1 maint: article number as page number ([link](/wiki/Category:CS1_maint:_article_number_as_page_number "Category:CS1 maint: article number as page number"))
 157. **[↑](#cite_ref-160)** ["The Python → 11l → C++ transpiler"](https://11l-lang.org/transpiler). [Archived](https://web.archive.org/web/20220924233728/https://11l-lang.org/transpiler/) from the original on 24 September 2022. Retrieved 17 July 2022.
 158. **[↑](#cite_ref-161)** ["google/grumpy"](https://github.com/google/grumpy). 10 April 2020. [Archived](https://web.archive.org/web/20200415054919/https://github.com/google/grumpy) from the original on 15 April 2020. Retrieved 25 March 2020 – via GitHub.
 159. **[↑](#cite_ref-162)** ["Projects"](https://opensource.google/projects/). *opensource.google*. [Archived](https://web.archive.org/web/20200424191248/https://opensource.google/projects/) from the original on 24 April 2020. Retrieved 25 March 2020.
@@ -1539,8 +1539,6 @@ Hidden categories:
 Search
 
 Python (programming language)
-
-[#](#) [#](#) [#](#) [#](#) [#](#) [#](#) [#](#) [#](#)
 
 116 languages
 

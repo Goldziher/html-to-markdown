@@ -37,11 +37,8 @@ pub fn handle_mark(handler: HandlerContext<'_>) {
         dom_context: dom_ctx,
     } = handler;
 
-    let Some(node) = node_handle.get(parser) else { return };
-
-    let tag = match node {
-        tl::Node::Tag(tag) => tag,
-        _ => return,
+    let Some(tl::Node::Tag(tag)) = node_handle.get(parser) else {
+        return;
     };
     let site = InlineSite {
         node_handle,
@@ -63,7 +60,8 @@ pub fn handle_mark(handler: HandlerContext<'_>) {
         }
     }
 
-    if ctx.convert_as_inline {
+    // ~keep Code shows every character as text: no highlight marks. The visitor is asked first.
+    if ctx.convert_as_inline || ctx.in_code {
         walk_children(tag, output, ctx, depth, site);
         return;
     }

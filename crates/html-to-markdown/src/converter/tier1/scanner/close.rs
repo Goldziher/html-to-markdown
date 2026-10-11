@@ -23,7 +23,7 @@ fn emit_close_for_implicit(
     match spec.kind {
         TagKind::Paragraph => close_paragraph(state),
         TagKind::Heading(n) => close_heading(state, &frame, n, true, options)?,
-        TagKind::Blockquote => close_blockquote(state, &frame, options.br_in_tables),
+        TagKind::Blockquote => close_blockquote(state, &frame, options),
         TagKind::Pre => close_pre(state, &frame, options),
         // ~keep Strong: suppress close marker when inside summary, or when this
         // frame nested inside another `<strong>` and so never emitted an
@@ -46,7 +46,7 @@ fn emit_close_for_implicit(
         TagKind::Inserted => close_inline_marker(state, &frame, "==")?,
         TagKind::Code => close_code(state, &frame, false, options)?,
         TagKind::Link => close_link(state, &frame, options)?,
-        TagKind::List(ListKind::Definition) => close_dl(state, &frame),
+        TagKind::List(ListKind::Definition) => close_dl(state, &frame, options),
         TagKind::List(kind) => close_list(state, kind),
         TagKind::ListItem => close_list_item(state, &frame)?,
         TagKind::DefinitionTerm => close_dt(state),
@@ -224,7 +224,8 @@ fn escape_heading_closing_sequence(buf: &mut String, content_start: usize, optio
     }
 }
 
-fn close_blockquote(state: &mut Tier1State, frame: &OpenTag, br_in_tables: bool) {
+fn close_blockquote(state: &mut Tier1State, frame: &OpenTag, options: &ConversionOptions) {
+    let (br_in_tables, style) = (options.br_in_tables, options.code_block_style);
     // ~keep Phase GG follow-up: inside a table cell `frame.content_start` indexes
     // into the cell buffer, not `state.output`.  Don't prefix `> ` — Tier-2
     // also sheds the quote marker inside cells (issue #647).
@@ -232,7 +233,7 @@ fn close_blockquote(state: &mut Tier1State, frame: &OpenTag, br_in_tables: bool)
         return;
     }
     let content_start = clamp_to_char_boundary(&state.output, frame.content_start);
-    let content = prepare_blockquote_content(&state.output[content_start..]);
+    let content = prepare_blockquote_content(&state.output[content_start..], style);
     let prefixed = prefix_blockquote_lines(&content);
     state.output.truncate(content_start);
     separate_blockquote_prefix(&mut state.output, frame.prev_escape_ctx);
@@ -282,13 +283,10 @@ fn close_blockquote_in_cell(state: &mut Tier1State, frame: &OpenTag, br_in_table
     true
 }
 
-fn prepare_blockquote_content(content: &str) -> String {
+fn prepare_blockquote_content(content: &str, style: crate::options::CodeBlockStyle) -> String {
     let mut content = content.to_owned();
     crate::converter::main_helpers::trim_trailing_whitespace(&mut content);
-    let leading_len = content
-        .char_indices()
-        .find(|&(_, character)| !character.is_whitespace())
-        .map_or(content.len(), |(index, _)| index);
+    let leading_len = crate::converter::code_scan::quote_content_start(&content, style);
     content.replace_range(0..leading_len, "");
     content
 }
@@ -486,7 +484,6 @@ fn separate_closed_block_in_cell(state: &mut Tier1State, content_start: usize, b
 }
 
 fn close_pre(state: &mut Tier1State, frame: &OpenTag, options: &ConversionOptions) {
-    use crate::options::CodeBlockStyle;
     // ~keep A pipe table cannot contain a fenced block, so render the preformatted
     // ~keep content as one or more code spans and keep real `<br>` nodes between spans.
     if close_pre_in_cell(state, frame, options) {
@@ -495,15 +492,43 @@ fn close_pre(state: &mut Tier1State, frame: &OpenTag, options: &ConversionOption
     let content_start = clamp_to_char_boundary(&state.output, frame.content_start);
     let raw = state.output[content_start..].to_owned();
     state.output.truncate(content_start);
+    // ~keep Tier-2 writes nothing for a `pre` with no content.
+    if raw.is_empty() {
+        state.pre_lang = None;
+        return;
+    }
     // ~keep Render into a scratch buffer first, then (when inside a list item)
     // indent every physical line to the item's continuation column
     // before appending to `state.output` — see `push_list_item_continuation_lines`.
-    let rendered = match options.code_block_style {
-        CodeBlockStyle::Indented | CodeBlockStyle::Tildes => indent_pre_lines(&raw),
-        CodeBlockStyle::Backticks => render_backtick_pre(&raw, state.pre_lang.take(), &options.code_language),
-    };
+    // ~keep The text rule and the renderer are Tier-2's own functions, so the tiers cannot differ.
+    let content = crate::converter::handlers::code_block::process_pre_content(raw, options.whitespace_mode, true);
+    let mut rendered = String::with_capacity(content.len() + 16);
+    crate::converter::handlers::code_block::render_code_block(
+        &content,
+        state.pre_lang.take().as_deref(),
+        &mut rendered,
+        options,
+    );
     push_list_item_continuation_lines(state, &rendered);
     state.pre_lang = None;
+}
+
+/// Start a line of the open code block at the edge of a plain block container, as Tier-2's
+/// `handle_line_element_in_pre` does.
+///
+/// Returns `false` when the element is not such a container, or is not in a code block that has
+/// lines: in a table cell a code block is one code span.
+fn start_line_in_pre(state: &mut Tier1State, name_lower: &[u8]) -> bool {
+    if !state.escape_ctx.contains(EscapeCtx::PRE) || state.in_table_cell() {
+        return false;
+    }
+    if !std::str::from_utf8(name_lower).is_ok_and(crate::converter::handlers::code_block::is_line_element_in_pre) {
+        return false;
+    }
+    // ~keep The blank line that opens the block is before its content, so only content of the
+    // ~keep block can be on the line that ends here.
+    state.ensure_newline();
+    true
 }
 
 fn close_pre_in_cell(state: &mut Tier1State, frame: &OpenTag, options: &ConversionOptions) -> bool {
@@ -530,14 +555,6 @@ fn close_pre_in_cell(state: &mut Tier1State, frame: &OpenTag, options: &Conversi
         );
     }
     true
-}
-
-fn render_backtick_pre(raw: &str, language: Option<String>, default_language: &str) -> String {
-    let fence_length = (longest_consecutive_backtick_run(raw) + 1).max(MIN_FENCE_LENGTH);
-    let fence = std::iter::repeat_n('`', fence_length).collect::<String>();
-    let language = language.as_deref().unwrap_or(default_language);
-    let content = raw.strip_prefix('\n').unwrap_or(raw).trim_end_matches('\n');
-    format!("{fence}{language}\n{content}\n{fence}\n\n")
 }
 
 /// Indent a text node that starts a fresh, still-unindented physical line

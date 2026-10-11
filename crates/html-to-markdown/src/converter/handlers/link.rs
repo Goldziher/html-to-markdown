@@ -19,7 +19,8 @@ use crate::converter::inline::link::{MarkdownLink, append_markdown_link_in_conte
 use crate::converter::main::walk_node;
 use crate::converter::media::inline_data_treatment;
 use crate::converter::utility::content::{
-    collect_link_label_text, get_text_content, node_is_block_level, normalize_link_label, normalized_tag_name,
+    collect_link_label_text, link_accessible_name, link_text_content, node_is_block_level, normalize_link_label,
+    normalized_tag_name,
 };
 use crate::converter::utility::escaping::escape_link_label;
 use crate::options::{ConversionOptions, InlineDataMedia};
@@ -68,6 +69,26 @@ pub fn handle_link(tag: &tl::HTMLTag, mut handler: HandlerContext<'_>) {
         walk_handles_to_output(tag.children().top().iter().copied(), &mut handler);
         return;
     };
+    // ~keep Code shows every character as text, so a link in code writes its text and no marks.
+    // ~keep A visitor sees the links that it sees outside code, and decides what they write.
+    if handler.context.in_code {
+        handler.context.inline_data_replaced.set(false);
+        let text_start = handler.output.len();
+        walk_handles_to_output(data.children.iter().copied(), &mut handler);
+        let text = handler.output.split_off(text_start);
+        #[cfg(feature = "visitor")]
+        let is_shown = handler.context.has_observer() && data.is_shown_to_visitor_in_code(&text, &handler);
+        #[cfg(not(feature = "visitor"))]
+        let is_shown = false;
+        if is_shown {
+            emit_link(tag, &data, &text, false, &mut handler);
+        } else {
+            handler.output.push_str(&text);
+        }
+        #[cfg(feature = "metadata")]
+        record_link_metadata(tag, &data, text.trim(), handler.context);
+        return;
+    }
     if emit_autolink(&data, &mut handler) || emit_heading_link(&data, &mut handler) {
         return;
     }
@@ -76,7 +97,7 @@ pub fn handle_link(tag: &tl::HTMLTag, mut handler: HandlerContext<'_>) {
     let mut label = build_label(&data, &handler);
     apply_label_fallbacks(&data, &mut label, &handler);
     indent_hard_break_continuations(&mut label, handler.context, handler.options);
-    let drop_link = label.is_empty() && handler.context.inline_data_replaced.get();
+    let drop_link = data.is_dropped(&label, &handler);
     let emit_deferred = emit_link(tag, &data, &label, drop_link, &mut handler);
     #[cfg(feature = "metadata")]
     record_link_metadata(tag, &data, &label, handler.context);
@@ -97,21 +118,78 @@ struct LinkData<'a> {
     href_addr_dropped: bool,
     link_allow_inline_images: bool,
     saw_block: bool,
+    aria_label: Option<Cow<'a, str>>,
+    same_page_fragment: bool,
 }
 
 impl<'a> LinkData<'a> {
+    /// The name of the link apart from its content: its `aria-label`, else its `title`.
+    fn accessible_name(&self) -> Option<&str> {
+        link_accessible_name(self.aria_label.as_deref(), self.title.as_deref())
+    }
+
+    /// Whether the link is left out of the output: its content gives no text, and either the
+    /// link points into its own page or the `inline_data_media` choice removed its content.
+    ///
+    /// ~keep A link into its own page with nothing to read is the icon of a heading permalink
+    /// ~keep or of a "back to top" link. It leads nowhere else, so it is left out whatever its
+    /// ~keep content is (a graphic, an empty element, nothing) and whether or not it has a name.
+    fn is_dropped(&self, label: &str, handler: &HandlerContext<'_>) -> bool {
+        label.is_empty() && (handler.context.inline_data_replaced.get() || self.same_page_fragment)
+    }
+
+    /// Whether the link has the visible `<address>` form outside code.
+    fn is_autolink(&self, options: &ConversionOptions) -> bool {
+        // ~keep Deferred tables and dropped data addresses can never use the visible `<href>` form (#120, #490).
+        options.autolinks
+            && !options.default_title
+            && !self.emit_blocks_separately
+            && !self.href.is_empty()
+            && !self.href_addr_dropped
+            && has_uri_scheme(&self.href)
+            && (self.raw_text == self.href || (self.href.starts_with("mailto:") && self.raw_text == self.href[7..]))
+    }
+
+    /// Whether a visitor gets a `visit_link` call for this link in code, where `text` is what the
+    /// content of the link writes there.
+    ///
+    /// ~keep The calls are those of a link outside code, which makes none for a link in the
+    /// ~keep `<address>` form, for a link around one heading, and for a link that is left out (see
+    /// ~keep `is_dropped`). A highlighter writes one empty anchor into its own page for each line
+    /// ~keep of code. An image writes nothing in code, so a link whose text is empty there asks
+    /// ~keep what its content writes outside code (`outside_code`): a link with a label there is
+    /// ~keep not left out, and a heading with a text there makes a heading link.
+    #[cfg(feature = "visitor")]
+    fn is_shown_to_visitor_in_code(&self, text: &str, handler: &HandlerContext<'_>) -> bool {
+        if self.is_autolink(handler.options) {
+            return false;
+        }
+        let heading =
+            find_single_heading_child(*handler.node_handle, handler.parser).filter(|_| !self.href_addr_dropped);
+        if let Some((_, heading_handle)) = heading {
+            let writes_text = |outside: &HandlerContext<'_>| {
+                heading_link_text(heading_handle, outside).is_some_and(|written| !written.trim().is_empty())
+            };
+            if !text.trim().is_empty() || outside_code(handler, writes_text) {
+                return false;
+            }
+        }
+        let mut label = normalize_link_label(text);
+        apply_label_fallbacks(self, &mut label, handler);
+        !self.is_dropped(&label, handler) || outside_code(handler, |outside| !build_label(self, outside).is_empty())
+    }
+
     fn new(tag: &'a tl::HTMLTag<'a>, handler: &HandlerContext<'_>) -> Option<Self> {
-        let href = tag
+        let raw_href = tag
             .attributes()
             .get("href")
             .flatten()
-            .map(|value| text::decode_attribute_value_cow(&value.as_utf8_str()).into_owned())
-            .map(|href| {
-                handler
-                    .context
-                    .resolve_url(&href, handler.node_handle, handler.parser, handler.dom_context)
-                    .unwrap_or(href)
-            })?;
+            .map(|value| text::decode_attribute_value_cow(&value.as_utf8_str()).into_owned())?;
+        let href = handler
+            .context
+            .resolve_url(&raw_href, handler.node_handle, handler.parser, handler.dom_context)
+            .unwrap_or_else(|| raw_href.clone());
+        let same_page_fragment = handler.context.own_page.holds(&raw_href, &href);
         // ~keep Empty titles are absent because Markdown serializers drop `""` on reparse.
         let title =
             crate::converter::utility::attributes::decoded_attribute(tag, "title").filter(|value| !value.is_empty());
@@ -121,7 +199,7 @@ impl<'a> LinkData<'a> {
             .map_or_else(|| tag.children().top().iter().copied().collect(), ToOwned::to_owned);
         let (inline_label, _, saw_block) = collect_link_label_text(&children, handler.parser, handler.dom_context);
         let text_source = if saw_block {
-            get_text_content(handler.node_handle, handler.parser, handler.dom_context)
+            link_text_content(&children, handler.parser, handler.dom_context)
         } else {
             inline_label.clone()
         };
@@ -139,6 +217,8 @@ impl<'a> LinkData<'a> {
                 handler.dom_context,
             ),
             link_allow_inline_images: handler.context.keep_inline_images_in.contains("a"),
+            aria_label: crate::converter::utility::attributes::decoded_attribute(tag, "aria-label"),
+            same_page_fragment,
             href,
             title,
             children,
@@ -151,16 +231,66 @@ impl<'a> LinkData<'a> {
     }
 }
 
+/// What `ask` answers for the link of `handler` when that link is outside code: `ask` gets a
+/// handler that writes as outside code and that nothing observes (see
+/// `Context::unobserved_outside_code`).
+///
+/// ~keep The answer comes from the functions that write a link outside code, run once more on
+/// ~keep the content of this link. No second set of rules says what a label is, so a rule of the
+/// ~keep traversal (a stripped tag, an excluded node, a preset) cannot be missing from the answer.
+/// ~keep No state is shared between a link and a link inside it.
+#[cfg(feature = "visitor")]
+fn outside_code<T>(handler: &HandlerContext<'_>, ask: impl FnOnce(&HandlerContext<'_>) -> T) -> T {
+    let context = handler.context.unobserved_outside_code();
+    let mut unused = String::new();
+    ask(&HandlerContext {
+        node_handle: handler.node_handle,
+        parser: handler.parser,
+        output: &mut unused,
+        options: handler.options,
+        context: &context,
+        depth: handler.depth,
+        dom_context: handler.dom_context,
+    })
+}
+
+/// The text that the one heading of a link writes with the context of `handler`.
+fn heading_link_text(heading_handle: tl::NodeHandle, handler: &HandlerContext<'_>) -> Option<String> {
+    let heading_context = heading_context(heading_handle, handler)?;
+    let mut heading_text = String::new();
+    walk_node(
+        &heading_handle,
+        handler.parser,
+        &mut heading_text,
+        crate::converter::block::container::HandlerContext::new(
+            handler.options,
+            &heading_context,
+            handler.depth + 1,
+            handler.dom_context,
+        ),
+    );
+    Some(heading_text)
+}
+
+/// The context that the one heading of a link is written with.
+fn heading_context(heading_handle: tl::NodeHandle, handler: &HandlerContext<'_>) -> Option<Context> {
+    let tl::Node::Tag(heading_tag) = heading_handle.get(handler.parser)? else {
+        return None;
+    };
+    let heading_name = normalized_tag_name(heading_tag.name().as_utf8_str());
+    Some(Context {
+        in_heading: true,
+        convert_as_inline: true,
+        heading_allow_inline_images: heading_allows_inline_images(
+            &heading_name,
+            &handler.context.keep_inline_images_in,
+        ),
+        ..handler.context.clone()
+    })
+}
+
 fn emit_autolink(data: &LinkData<'_>, handler: &mut HandlerContext<'_>) -> bool {
-    // ~keep Deferred tables and dropped data addresses can never use the visible `<href>` form (#120, #490).
-    let autolink = handler.options.autolinks
-        && !handler.options.default_title
-        && !data.emit_blocks_separately
-        && !data.href.is_empty()
-        && !data.href_addr_dropped
-        && has_uri_scheme(&data.href)
-        && (data.raw_text == data.href || (data.href.starts_with("mailto:") && data.raw_text == data.href[7..]));
-    if !autolink {
+    if !data.is_autolink(handler.options) {
         return false;
     }
     handler.output.push('<');
@@ -180,31 +310,9 @@ fn emit_heading_link(data: &LinkData<'_>, handler: &mut HandlerContext<'_>) -> b
     let Some((level, heading_handle)) = find_single_heading_child(*handler.node_handle, handler.parser) else {
         return false;
     };
-    let Some(tl::Node::Tag(heading_tag)) = heading_handle.get(handler.parser) else {
+    let Some(heading_text) = heading_link_text(heading_handle, handler) else {
         return false;
     };
-    let heading_name = normalized_tag_name(heading_tag.name().as_utf8_str());
-    let heading_context = Context {
-        in_heading: true,
-        convert_as_inline: true,
-        heading_allow_inline_images: heading_allows_inline_images(
-            &heading_name,
-            &handler.context.keep_inline_images_in,
-        ),
-        ..handler.context.clone()
-    };
-    let mut heading_text = String::new();
-    walk_node(
-        &heading_handle,
-        handler.parser,
-        &mut heading_text,
-        crate::converter::block::container::HandlerContext::new(
-            handler.options,
-            &heading_context,
-            handler.depth + 1,
-            handler.dom_context,
-        ),
-    );
     let heading_text = heading_text.trim();
     if heading_text.is_empty() {
         return false;
@@ -246,19 +354,24 @@ fn walk_label(
     normalize_link_label(&walk_label_content(children, convert_as_inline, data, handler))
 }
 
+/// The context that the label of a link is built with outside code.
+fn label_context(data: &LinkData<'_>, handler: &HandlerContext<'_>, merge_child_spacing: bool) -> Context {
+    Context {
+        inline_depth: handler.context.inline_depth + 1,
+        in_link: true,
+        convert_as_inline: handler.context.convert_as_inline || merge_child_spacing,
+        link_allow_inline_images: data.link_allow_inline_images,
+        ..handler.context.clone()
+    }
+}
+
 fn walk_label_content(
     children: &[tl::NodeHandle],
     merge_child_spacing: bool,
     data: &LinkData<'_>,
     handler: &HandlerContext<'_>,
 ) -> String {
-    let link_context = Context {
-        inline_depth: handler.context.inline_depth + 1,
-        in_link: true,
-        convert_as_inline: handler.context.convert_as_inline || merge_child_spacing,
-        link_allow_inline_images: data.link_allow_inline_images,
-        ..handler.context.clone()
-    };
+    let link_context = label_context(data, handler, merge_child_spacing);
     let mut content = String::new();
     if !merge_child_spacing {
         for child in children {
@@ -309,7 +422,17 @@ fn apply_label_fallbacks(data: &LinkData<'_>, label: &mut String, handler: &Hand
     if !data.emit_blocks_separately && label.is_empty() && !data.raw_text.is_empty() {
         *label = normalize_link_label(&data.raw_text);
     }
-    let drop_link = label.is_empty() && handler.context.inline_data_replaced.get();
+    // ~keep A link whose content gives no text, whatever that content is, is named as a browser
+    // ~keep names it: by its `aria-label`, then by its `title`. A named link is also kept when
+    // ~keep `inline_data_media` removed its content. A link with no child node at all is named
+    // ~keep too: its icon comes from a style sheet. Its own address is the last label, for a link
+    // ~keep that has content and no name. A link into its own page is not named: it is left out.
+    if label.is_empty() && !data.same_page_fragment {
+        if let Some(name) = data.accessible_name() {
+            *label = normalize_link_label(name);
+        }
+    }
+    let drop_link = data.is_dropped(label, handler);
     if label.is_empty() && !data.href.is_empty() && !data.children.is_empty() && !drop_link && !data.href_addr_dropped {
         *label = text::escape(
             &data.href,
@@ -345,7 +468,7 @@ fn emit_link(
 }
 
 fn write_link(output: &mut String, data: &LinkData<'_>, label: &str, options: &ConversionOptions, context: &Context) {
-    if data.href_addr_dropped {
+    if data.href_addr_dropped || context.in_code {
         output.push_str(label);
         return;
     }
@@ -439,7 +562,7 @@ fn visit_link(
 
 #[cfg(feature = "metadata")]
 fn record_link_metadata(tag: &tl::HTMLTag<'_>, data: &LinkData<'_>, label: &str, context: &Context) {
-    if !context.metadata_wants_links {
+    if !context.metadata_wants.links {
         return;
     }
     let Some(collector) = context.metadata_collector.as_ref() else {
