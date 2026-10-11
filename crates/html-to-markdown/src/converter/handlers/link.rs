@@ -362,6 +362,9 @@ impl<'a> LinkData<'a> {
         };
         let raw_text = text::normalize_whitespace_cow(&text_source).trim().to_string();
         let (inline_children, deferred) = partition_link_children(&children, handler.parser, handler.dom_context);
+        let holds_element = children
+            .iter()
+            .any(|child| matches!(child.get(handler.parser), Some(tl::Node::Tag(_))));
         Some(Self {
             href_addr_dropped: matches!(
                 inline_data_treatment(handler.options.inline_data_media, &href),
@@ -377,10 +380,12 @@ impl<'a> LinkData<'a> {
             aria_label: crate::converter::utility::attributes::decoded_attribute(tag, "aria-label"),
             same_page_fragment,
             names_place: href.split_once('#').is_some_and(|(_, fragment)| !fragment.is_empty()),
-            // ~keep White space alone is content of the link, not an empty wrapper.
-            empty_span_content: children
-                .iter()
-                .any(|child| matches!(child.get(handler.parser), Some(tl::Node::Tag(_))))
+            // ~keep White space alone is content of a link to another page, not an empty wrapper:
+            // ~keep the address names that link. A link into its own page gets no such label, so
+            // ~keep white space and comments are no content there, as for a link with no child
+            // ~keep (#851).
+            empty_span_content: !children.is_empty()
+                && (same_page_fragment || holds_element)
                 && children
                     .iter()
                     .all(|child| empty_text_wrapper_child(child, handler.parser)),
