@@ -1,6 +1,6 @@
 //! Unit tests of the output: the places after each change, and the count of work.
 
-use super::{Checkpoint, OpenControl, PlainOutput};
+use super::{Checkpoint, ControlEnds, OpenControl, OutputText, PlainOutput};
 
 /// One change of an output.
 #[derive(Clone, Copy)]
@@ -347,6 +347,7 @@ fn a_space_written_before_a_control_moves_the_places_after_it() {
 /// word and each with a space written before it. With `block_ends`, a block ends after
 /// each control.
 fn ends_examined_for(count: usize, block_ends: bool) -> usize {
+    let before = ControlEnds::touched();
     let mut output = PlainOutput::default();
     for _ in 0..count {
         output.push_text("z");
@@ -359,7 +360,7 @@ fn ends_examined_for(count: usize, block_ends: bool) -> usize {
     }
     assert_places_are_true(&output, "after the last control");
     assert_eq!(output.control_ends.as_slice().len(), count);
-    let examined = output.control_ends.touched();
+    let examined = ControlEnds::touched() - before;
     let line = if block_ends { "z X\n\n" } else { "z X " };
     assert_eq!(output.into_text(), line.repeat(count).trim_end_matches(' '));
     examined
@@ -392,14 +393,14 @@ fn removed_elements_after_a_run_of_spaces_cost_a_bounded_count_of_bytes() {
         let mut output = PlainOutput::default();
         output.push_text("b");
         output.push_text(&" ".repeat(count));
-        let written = output.text.work();
+        let written = OutputText::work();
         for _ in 0..count {
             let element = output.open();
             output.end_block();
             assert_eq!(output.since(&element), "\n\n");
             output.rollback(element);
         }
-        let work = output.text.work() - written;
+        let work = OutputText::work() - written;
         assert!(
             work <= 8 * count,
             "{count} removed elements after {count} spaces cost {work} bytes, over 8 for each"
@@ -407,6 +408,55 @@ fn removed_elements_after_a_run_of_spaces_cost_a_bounded_count_of_bytes() {
         assert_eq!(output.len(), count + 1);
         assert_eq!(output.into_text().trim_end_matches(' '), "b");
     }
+}
+
+#[test]
+fn a_loop_that_takes_the_text_out_of_the_output_is_counted() {
+    // ~keep `take` leaves a new text in the output. A loop that takes the text for each
+    // ~keep element, reads all of it and writes it back costs `count * count`, and the
+    // ~keep counter must hold all of it: the bound of 8 for each element in the test above
+    // ~keep fails for this loop. A counter in the text held the last write alone.
+    for count in [1_000_usize, 4_000] {
+        let mut output = PlainOutput::default();
+        output.push_text("b");
+        output.push_text(&" ".repeat(count));
+        let written = OutputText::work();
+        for _ in 0..count {
+            let taken = std::mem::take(&mut output.text).into_string();
+            output.text.push_str(&taken);
+        }
+        let work = OutputText::work() - written;
+        assert!(
+            work >= count * count,
+            "{count} rounds of a text of {count} bytes taken out and written back counted {work} bytes"
+        );
+        assert!(work > 8 * count, "the loop is under the bound of a block end: {work}");
+        assert_eq!(output.len(), count + 1);
+    }
+}
+
+#[test]
+fn control_ends_taken_out_of_the_output_are_counted() {
+    // ~keep The same for the control ends: the count of a search is not lost with the value.
+    let mut output = PlainOutput::default();
+    for _ in 0..8 {
+        let control = output.start_control();
+        output.push_text("X");
+        output.finish_control(control);
+    }
+    let before = ControlEnds::touched();
+    assert_eq!(output.control_ends.first_after(0), 0);
+    let one_search = ControlEnds::touched() - before;
+    assert!(one_search > 0, "a search reads no end");
+    let taken = std::mem::take(&mut output.control_ends);
+    assert_eq!(taken.first_after(0), 0);
+    output.control_ends = taken;
+    assert_eq!(
+        ControlEnds::touched(),
+        before + 2 * one_search,
+        "a search of ends taken out of the output is not counted"
+    );
+    assert_eq!(output.control_ends.as_slice().len(), 8);
 }
 
 #[test]
@@ -419,11 +469,11 @@ fn block_ends_after_line_ends_read_a_bounded_count_of_characters() {
         for _ in 0..count {
             output.push_mark("\n");
         }
-        let written = output.text.work();
+        let written = OutputText::work();
         for _ in 0..count {
             output.end_block();
         }
-        let work = output.text.work() - written;
+        let work = OutputText::work() - written;
         assert!(
             work <= 4 * count,
             "{count} block ends after {count} line ends read {work} characters, over 4 for each"

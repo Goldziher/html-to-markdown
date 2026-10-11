@@ -5,14 +5,26 @@
 //! ~keep move a byte of the text or a control end. Under `cfg(test)` each function adds its
 //! ~keep work to a counter: a test of the output then sees all the work, and a loop that reads
 //! ~keep the whole text or every end for each element cannot stay out of the count.
+//!
+//! ~keep The counters are not fields of the values. `std::mem::take` leaves a new value in
+//! ~keep the output, and a counter in the value starts at 0 again there: a loop that takes the
+//! ~keep text, reads all of it and writes it back was not counted. Each counter is one for
+//! ~keep the thread of the test, so a test reads it before and after the work it measures.
+
+#[cfg(test)]
+thread_local! {
+    /// The count of bytes that the functions of every `OutputText` of this thread wrote,
+    /// moved or gave to a reader.
+    static WORK: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
+    /// The count of ends that the functions of every `ControlEnds` of this thread read or
+    /// moved.
+    static TOUCHED: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
+}
 
 /// The bytes of the text of one output.
 #[derive(Default)]
 pub(super) struct OutputText {
     text: String,
-    /// The count of bytes that the functions here wrote, moved or gave to a reader.
-    #[cfg(test)]
-    work: std::cell::Cell<usize>,
 }
 
 impl OutputText {
@@ -28,22 +40,24 @@ impl OutputText {
         self.text.len()
     }
 
-    /// The text, at the end of the buffer.
+    /// The text, at the end of the buffer: all of it goes to a reader.
     pub(super) fn into_string(self) -> String {
+        #[cfg(test)]
+        Self::count(self.text.len());
         self.text
     }
 
     /// Writes `text` at the end.
     pub(super) fn push_str(&mut self, text: &str) {
         #[cfg(test)]
-        self.count(text.len());
+        Self::count(text.len());
         self.text.push_str(text);
     }
 
     /// Writes `text` at `at`: the bytes after `at` move.
     pub(super) fn insert_str(&mut self, at: usize, text: &str) {
         #[cfg(test)]
-        self.count(self.text.len() - at + text.len());
+        Self::count(self.text.len() - at + text.len());
         self.text.insert_str(at, text);
     }
 
@@ -51,7 +65,7 @@ impl OutputText {
     #[cfg(feature = "visitor")]
     pub(super) fn remove(&mut self, range: std::ops::Range<usize>) {
         #[cfg(test)]
-        self.count(self.text.len() - range.end);
+        Self::count(self.text.len() - range.end);
         self.text.drain(range);
     }
 
@@ -63,7 +77,7 @@ impl OutputText {
     /// The character right before `end`, as text. Empty when `end` is 0.
     pub(super) fn char_before(&self, end: usize) -> &str {
         #[cfg(test)]
-        self.count(1);
+        Self::count(1);
         let head = &self.text[..end];
         head.char_indices().next_back().map_or("", |(start, _)| &head[start..])
     }
@@ -71,7 +85,7 @@ impl OutputText {
     /// The character at `at`, as text. Empty when `at` is the end of the text.
     pub(super) fn char_at(&self, at: usize) -> &str {
         #[cfg(test)]
-        self.count(1);
+        Self::count(1);
         let tail = &self.text[at..];
         tail.chars().next().map_or("", |first| &tail[..first.len_utf8()])
     }
@@ -80,20 +94,20 @@ impl OutputText {
     #[cfg(feature = "visitor")]
     pub(super) fn from(&self, at: usize) -> &str {
         #[cfg(test)]
-        self.count(self.text.len() - at);
+        Self::count(self.text.len() - at);
         &self.text[at..]
     }
 
     /// Adds `bytes` to the count of work.
     #[cfg(test)]
-    fn count(&self, bytes: usize) {
-        self.work.set(self.work.get() + bytes);
+    fn count(bytes: usize) {
+        WORK.with(|work| work.set(work.get() + bytes));
     }
 
-    /// The count of bytes written, moved or given to a reader so far.
+    /// The count of bytes written, moved or given to a reader so far on this thread.
     #[cfg(all(test, feature = "visitor"))]
-    pub(super) const fn work(&self) -> usize {
-        self.work.get()
+    pub(super) fn work() -> usize {
+        WORK.with(std::cell::Cell::get)
     }
 
     /// The whole text, for an assertion. Not counted.
@@ -107,9 +121,6 @@ impl OutputText {
 #[derive(Default)]
 pub(super) struct ControlEnds {
     ends: Vec<usize>,
-    /// The count of ends that the functions here read or moved.
-    #[cfg(test)]
-    touched: std::cell::Cell<usize>,
 }
 
 impl ControlEnds {
@@ -131,7 +142,7 @@ impl ControlEnds {
     /// The end at `index`.
     pub(super) fn get(&self, index: usize) -> usize {
         #[cfg(test)]
-        self.count(1);
+        Self::count(1);
         self.ends[index]
     }
 
@@ -158,7 +169,7 @@ impl ControlEnds {
     /// Adds `by` to each end from the position `first` on.
     pub(super) fn raise_from(&mut self, first: usize, by: usize) {
         #[cfg(test)]
-        self.count(self.len() - first);
+        Self::count(self.len() - first);
         for end in &mut self.ends[first..] {
             *end += by;
         }
@@ -168,7 +179,7 @@ impl ControlEnds {
     #[cfg(feature = "visitor")]
     pub(super) fn lower_from(&mut self, first: usize, by: usize) {
         #[cfg(test)]
-        self.count(self.len() - first);
+        Self::count(self.len() - first);
         for end in &mut self.ends[first..] {
             *end -= by;
         }
@@ -176,14 +187,14 @@ impl ControlEnds {
 
     /// Adds `ends` to the count of work.
     #[cfg(test)]
-    fn count(&self, ends: usize) {
-        self.touched.set(self.touched.get() + ends);
+    fn count(ends: usize) {
+        TOUCHED.with(|touched| touched.set(touched.get() + ends));
     }
 
-    /// The count of ends read or moved so far.
+    /// The count of ends read or moved so far on this thread.
     #[cfg(all(test, feature = "visitor"))]
-    pub(super) const fn touched(&self) -> usize {
-        self.touched.get()
+    pub(super) fn touched() -> usize {
+        TOUCHED.with(std::cell::Cell::get)
     }
 
     /// Every end, for an assertion. Not counted.
