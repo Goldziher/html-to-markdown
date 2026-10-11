@@ -631,7 +631,7 @@ fn may_hold_head_content_outside_head(bytes: &[u8]) -> bool {
     ];
     HEAD_CONTENT
         .iter()
-        .any(|name| first_start_tag(bytes, name).is_some_and(|start| start < head_start))
+        .any(|name| first_start_tag(&bytes[..head_start], name).is_some())
         || title_follows_head_end(bytes)
 }
 
@@ -649,21 +649,23 @@ fn title_follows_head_end(bytes: &[u8]) -> bool {
 }
 
 fn first_start_tag(bytes: &[u8], name: &[u8]) -> Option<usize> {
-    bytes
-        .iter()
-        .enumerate()
-        .find_map(|(start, _)| is_start_tag_at(bytes, name, start).then_some(start))
+    memchr::memchr_iter(b'<', bytes).find(|&start| is_start_tag_at(bytes, name, start))
 }
 
 fn last_start_tag(bytes: &[u8], name: &[u8]) -> Option<usize> {
-    bytes
-        .iter()
-        .enumerate()
+    memchr::memchr_iter(b'<', bytes)
         .rev()
-        .find_map(|(start, _)| is_start_tag_at(bytes, name, start).then_some(start))
+        .find(|&start| is_start_tag_at(bytes, name, start))
+}
+
+#[cfg(test)]
+thread_local! {
+    static START_TAG_CANDIDATE_CHECKS: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
 }
 
 fn is_start_tag_at(bytes: &[u8], name: &[u8], start: usize) -> bool {
+    #[cfg(test)]
+    START_TAG_CANDIDATE_CHECKS.with(|checks| checks.set(checks.get() + 1));
     if bytes.get(start) != Some(&b'<') {
         return false;
     }
@@ -745,6 +747,53 @@ mod tests {
         assert!(repair_with_html5ever(&deep).is_some_and(|repaired| repaired.matches("</div>").count() == 600));
         assert!(repair_with_html5ever_within_depth(&deep).is_none());
         assert!(repair_with_html5ever_within_depth("<div><p>one</div>tail").is_some());
+    }
+
+    #[test]
+    fn should_preserve_head_repair_decisions_at_prefix_boundaries() {
+        for html in [
+            "<head></head><p title=\"<title>x\">é🦀</p>",
+            "<!-- é🦀 --><head></head><p>body</p>",
+            "<tit<head></head><p>body</p>",
+            "<title<head></head><p>body</p>",
+        ] {
+            assert_eq!(repair_head_content_outside_head(html), None, "{html}");
+        }
+        for prefix in ["", "<!-- é🦀 -->"] {
+            let html = format!("{prefix}<title>First</title><head><title>Second</title></head><p>x</p>");
+            let repaired = repair_head_content_outside_head(&html).expect("repair implicit head");
+            // ~keep The repair writes no `<html>` and no `<body>` that the input has no tag for.
+            assert_eq!(
+                repaired,
+                format!("{prefix}<head><title>First</title><title>Second</title></head><p>x</p>")
+            );
+        }
+    }
+
+    #[test]
+    fn should_limit_head_content_searches_to_input_before_the_head() {
+        let html = format!("<head></head>{}", "<p>body</p>".repeat(10_000));
+        START_TAG_CANDIDATE_CHECKS.with(|checks| checks.set(0));
+
+        assert_eq!(repair_head_content_outside_head(&html), None);
+        // ~keep 20,002 checks find the last `<head>` from the end; the head content search reads
+        // ~keep the empty prefix and adds none. The search for a title after `</head>` adds 2
+        // ~keep checks to find `</head>` and one for each of the 20,001 tags from there.
+        START_TAG_CANDIDATE_CHECKS.with(|checks| assert_eq!(checks.get(), 40_005));
+    }
+
+    #[test]
+    fn should_scan_only_markup_candidates_when_finding_head_tags() {
+        let padding = "plain text ".repeat(10_000);
+        let html = format!("{padding}<head>{padding}</head>{padding}<HEAD >{padding}");
+        super::START_TAG_CANDIDATE_CHECKS.with(|checks| checks.set(0));
+
+        assert_eq!(super::first_start_tag(html.as_bytes(), b"head"), Some(padding.len()));
+        assert_eq!(
+            super::last_start_tag(html.as_bytes(), b"head"),
+            Some(padding.len() * 3 + "<head></head>".len())
+        );
+        super::START_TAG_CANDIDATE_CHECKS.with(|checks| assert_eq!(checks.get(), 2));
     }
 
     #[test]
