@@ -56,16 +56,49 @@ pub fn get_previous_sibling_tag<'a>(
     None
 }
 
-/// What stands right before the text `node_handle`: a `<br>`, the start of its parent element,
-/// an element that holds no text, or text. A comment before the text does not count.
+#[cfg(test)]
+thread_local! {
+    /// The sibling entries that `text_place` read on this thread.
+    pub(crate) static TEXT_PLACE_SIBLING_VISITS: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
+}
+
+#[cfg(test)]
+fn count_sibling_visits(visits: usize) {
+    TEXT_PLACE_SIBLING_VISITS.with(|total| total.set(total.get() + visits));
+}
+
+#[cfg(not(test))]
+const fn count_sibling_visits(_visits: usize) {}
+
+/// The index of `id` in `siblings` by a scan from the first sibling, for a node that the index
+/// of the tree does not hold.
+fn scan_for_sibling_index(siblings: &[tl::NodeHandle], id: u32) -> Option<usize> {
+    let position = siblings.iter().position(|sibling| sibling.get_inner() == id);
+    count_sibling_visits(position.map_or(siblings.len(), |position| position + 1));
+    position
+}
+
+/// What stands right before the text `node_handle`: a `<br>` that ends a line, the start of its
+/// parent element, an element that holds no text, or text. A comment before the text does not
+/// count.
+///
+/// ~keep `in_cell` tells that the text is in a table cell. A cell has one line: the `<br>` there
+/// ~keep is a space between two words, an element with no text, also in a heading in the cell.
+/// ~keep The index of the tree gives the position of the text: a scan from the first sibling
+/// ~keep for each text is quadratic in the count of siblings.
 pub fn text_place(
     node_handle: tl::NodeHandle,
     parser: &tl::Parser,
     dom_ctx: &DomContext,
+    in_cell: bool,
 ) -> crate::converter::utility::white_space::TextPlace {
     use crate::converter::utility::white_space::TextPlace;
     if get_previous_sibling_tag(&node_handle, parser, dom_ctx) == Some("br") {
-        return TextPlace::AfterBreak;
+        return if in_cell {
+            TextPlace::AfterEmptyElement
+        } else {
+            TextPlace::AfterBreak
+        };
     }
     let id = node_handle.get_inner();
     let siblings = dom_ctx
@@ -73,13 +106,16 @@ pub fn text_place(
         .map_or(Some(&dom_ctx.root_children), |parent| dom_ctx.children_of(parent));
     let before = siblings
         .and_then(|siblings| {
-            let position = siblings.iter().position(|sibling| sibling.get_inner() == id)?;
-            Some(&siblings[..position])
+            let position = dom_ctx
+                .sibling_index(id)
+                .or_else(|| scan_for_sibling_index(siblings, id))?;
+            siblings.get(..position)
         })
         .unwrap_or_default();
     let previous = before
         .iter()
         .rev()
+        .inspect(|_| count_sibling_visits(1))
         .find(|sibling| !matches!(sibling.get(parser), Some(tl::Node::Comment(_))));
     match previous {
         None => TextPlace::ElementStart,
@@ -433,4 +469,34 @@ pub fn append_inline_suffix(
     }
 
     output.push_str(suffix);
+}
+
+#[cfg(test)]
+mod tests {
+    use super::TEXT_PLACE_SIBLING_VISITS;
+    use crate::{ConversionOptions, TierStrategy, convert};
+
+    /// The sibling entries that `text_place` reads for `count` texts that each start with a
+    /// no-break space after a space and an empty element, all in one paragraph.
+    fn sibling_visits_for(count: usize) -> usize {
+        let html = format!("<p>{}</p>", "a <span></span>&nbsp;b ".repeat(count));
+        let options = ConversionOptions {
+            tier_strategy: TierStrategy::Tier2,
+            ..ConversionOptions::default()
+        };
+        TEXT_PLACE_SIBLING_VISITS.with(|visits| visits.set(0));
+        let result = convert(&html, options).expect("convert HTML");
+        let text = result.content.unwrap_or_default();
+        assert_eq!(text.matches("a  b").count(), count, "every no-break space is kept");
+        TEXT_PLACE_SIBLING_VISITS.with(std::cell::Cell::get)
+    }
+
+    #[test]
+    fn should_read_one_sibling_for_each_text_after_an_empty_element() {
+        // ~keep A scan from the first sibling for each text reads `count * (count + 2)` entries
+        // ~keep more: 1,002,000 at 1,000 texts. The count of entries is the measure, not the time.
+        for count in [1_000, 2_000] {
+            assert_eq!(sibling_visits_for(count), count, "{count} texts");
+        }
+    }
 }

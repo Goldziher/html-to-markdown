@@ -434,7 +434,12 @@ impl TextProcessor<'_, '_, '_> {
             && starts_with_unicode_space(value)
             && unicode_space_is_kept(
                 self.output,
-                text_place(*self.node_handle, self.parser, self.handler.dom_ctx),
+                text_place(
+                    *self.node_handle,
+                    self.parser,
+                    self.handler.dom_ctx,
+                    self.handler.ctx.in_table_cell,
+                ),
             )
     }
 

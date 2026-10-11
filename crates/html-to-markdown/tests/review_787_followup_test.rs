@@ -118,9 +118,9 @@ fn should_keep_a_no_break_space_after_a_space_only_across_an_element_with_no_tex
 fn should_join_a_no_break_space_to_a_space_at_a_line_break_and_at_an_element_start() {
     // ~keep A `<br>` in a heading is a space, and the no-break space after it would start the
     // ~keep line. The no-break space that starts an element joins the space before the element.
-    // ~keep The fast converter writes the row itself when the text starts where the `<br>` or
-    // ~keep the opening tag ends. A comment between the two hides the place from it, and it
-    // ~keep hands the page over. The space that ends an element with text is the same run as
+    // ~keep The fast converter writes the heading rows itself: its `<br>` there is a line end. It
+    // ~keep writes the row of a text that starts where the opening tag ends. A comment hides
+    // ~keep that place, and it hands the page over. The space that ends an element with text is the same run as
     // ~keep the no-break space after the element, as on `main`: the fast converter writes that
     // ~keep row or hands the page over (`None`). A form feed is no Unicode space: the fast
     // ~keep converter answers.
@@ -160,6 +160,116 @@ fn should_keep_a_no_break_space_after_a_space_in_plain_text() {
             };
             assert_eq!(convert_with(html, plain).trim_end_matches('\n'), "a  b", "{html}");
         }
+    }
+}
+
+#[test]
+fn should_keep_a_no_break_space_after_a_space_in_a_table_cell() {
+    // ~keep The fast converter hands both rows over, so each route writes the full converter's cell.
+    let cell = "| h    |\n| ---- |\n| a  b |\n";
+    assert_rows(&[
+        (
+            "<table><tr><th>h</th></tr><tr><td>a <img>&nbsp;b</td></tr></table>",
+            cell,
+        ),
+        (
+            "<table><tr><th>h</th></tr><tr><td>a <span></span>&nbsp;b</td></tr></table>",
+            cell,
+        ),
+    ]);
+}
+
+#[test]
+fn should_write_a_no_break_space_after_a_space_in_code_text_on_the_fast_converter() {
+    // ~keep In `pre` and in a code span no white space rule applies: the no-break space stays the
+    // ~keep character, and the fast converter answers.
+    assert_literal_on_both(
+        &[
+            ("<pre>a <span></span>&nbsp;b</pre>", "```\na \u{a0}b\n```\n"),
+            ("<p><code>a <span></span>&nbsp;b</code></p>", "`a \u{a0}b`\n"),
+        ],
+        &no_metadata(),
+    );
+    assert_rows(&[("<pre>a <img>&nbsp;b</pre>", "```\na \u{a0}b\n```\n")]);
+}
+
+#[test]
+fn should_keep_a_no_break_space_reference_with_no_semicolon_after_a_space() {
+    // ~keep A browser reads `&nbsp` with no semicolon as the no-break space. The fast converter
+    // ~keep hands both rows over: the image has no source, and it does not read that reference.
+    let [_, fast, ..] = paths();
+    let rows = [
+        ("<p>a <img>&nbspb</p>", "ImageMissingSource"),
+        ("<p>a <span></span>&nbsp b</p>", "UnknownEntity"),
+    ];
+    for (html, reason) in rows {
+        for options in paths() {
+            assert_eq!(convert_with(html, options), "a  b\n", "{html}");
+        }
+        let direct = fast_direct(html, &fast);
+        assert!(
+            direct.as_ref().is_err_and(|found| found.starts_with(reason)),
+            "fast: {html}: {direct:?}"
+        );
+    }
+}
+
+#[test]
+fn should_keep_a_no_break_space_after_a_line_break_in_a_table_cell() {
+    // ~keep A `<br>` in a table cell is a space between two words, and the no-break space after
+    // ~keep it is a character, as on `main`. The fast converter does not know the place of a
+    // ~keep text after a `<br>`: it hands each row over. Text after the `<br>` gets one space.
+    let [_, fast, ..] = paths();
+    let kept = "| h    |\n| ---- |\n| a  b |\n";
+    for cell in [
+        "a<br>&nbsp;b",
+        "a<br>&#160;b",
+        "a <br>&nbsp;b",
+        "a<br> &nbsp;b",
+        "a<br><!-- c -->&nbsp;b",
+    ] {
+        let html = format!("<table><tr><th>h</th></tr><tr><td>{cell}</td></tr></table>");
+        for options in paths() {
+            assert_eq!(convert_with(&html, options), kept, "{html}");
+        }
+        assert_eq!(
+            fast_direct(&html, &fast),
+            Err("UnicodeSpaceAfterSpace".to_string()),
+            "fast: {html}"
+        );
+    }
+    assert_rows(&[(
+        "<table><tr><th>h</th></tr><tr><td>a<br>b</td></tr></table>",
+        "| h   |\n| --- |\n| a b |\n",
+    )]);
+}
+
+#[test]
+fn should_keep_a_no_break_space_after_a_line_break_in_a_heading_in_a_table_cell() {
+    // ~keep A heading in a table cell is text of the cell: its `<br>` is a space between two
+    // ~keep words there too, as on `main`. The fast converter hands each row over.
+    let [_, fast, ..] = paths();
+    let kept = "| h    |\n| ---- |\n| a  b |\n";
+    let rows = [
+        ("", "<h2>a<br>&nbsp;b</h2>", kept.to_string()),
+        ("", "<h2>a <br>&nbsp;b</h2>", kept.to_string()),
+        (
+            "",
+            "<h2><b>a<br>&nbsp;b</b></h2>",
+            "| h        |\n| -------- |\n| **a  b** |\n".to_string(),
+        ),
+        ("<h2>t</h2>", "<h3>a<br>&nbsp;b</h3>", format!("## t\n\n{kept}")),
+    ];
+    for (before, cell, expected) in rows {
+        let html = format!("{before}<table><tr><th>h</th></tr><tr><td>{cell}</td></tr></table>");
+        for options in paths() {
+            assert_eq!(convert_with(&html, options), expected, "{html}");
+        }
+        assert_eq!(
+            fast_direct(&html, &fast),
+            Err("UnicodeSpaceAfterSpace".to_string()),
+            "fast: {html}"
+        );
     }
 }
 

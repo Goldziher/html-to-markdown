@@ -221,11 +221,12 @@ pub fn space_is_owed(written: &str) -> bool {
 /// What stands right before a text.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TextPlace {
-    /// A `<br>` is the element before the text.
+    /// A `<br>` that ends a line is the element before the text.
     AfterBreak,
     /// The text is the first content of its parent element.
     ElementStart,
-    /// An element that holds no text is before the text: an image, an empty `span`.
+    /// An element that holds no text is before the text: an image, an empty `span`, a `<br>` in
+    /// a table cell.
     AfterEmptyElement,
     /// Text is before the text: another text, or an element that holds text.
     AfterText,
@@ -250,6 +251,9 @@ pub fn starts_with_unicode_space(decoded: &str) -> bool {
 /// ~keep `<b>a </b>&nbsp;b`, a comment between the two), and where it would start a line or
 /// ~keep an element: after a `<br>` whose line end is a space (a heading has one line), and as
 /// ~keep the first content of an element (`a <span>&nbsp;x</span>`, the marker of a list item).
+/// ~keep A table cell has no line to start: the `<br>` there is a space between two words, an
+/// ~keep element with no text, and the no-break space after it is a character
+/// ~keep (`<td>a<br>&nbsp;b</td>` has two spaces).
 #[must_use]
 pub fn unicode_space_is_kept(written: &str, place: TextPlace) -> bool {
     written.ends_with(' ') && place == TextPlace::AfterEmptyElement
