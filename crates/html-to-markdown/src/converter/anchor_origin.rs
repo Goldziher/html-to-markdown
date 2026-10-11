@@ -563,8 +563,7 @@ mod tests {
         let RepairTree { dom, limit, unparsed } = parse_with_anchor_origins(&page);
         assert_eq!(limit, Some(crate::types::WarningKind::DepthLimitExceeded));
         let built = written(dom);
-        let blocks = built.matches("<div>").count();
-        assert!((508..=MAX_REPAIR_DEPTH).contains(&blocks), "{blocks} blocks");
+        assert_eq!(built.matches("<div>").count(), 511);
         assert!(!built.contains("after"), "{}", &built[built.len() - 40..]);
         assert!(!built.contains("late"));
         assert!(unparsed.contains("after") && unparsed.ends_with("<p>late"));

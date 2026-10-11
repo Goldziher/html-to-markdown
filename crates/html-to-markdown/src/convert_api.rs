@@ -89,7 +89,7 @@ struct PreparedConversion<'a> {
     html: Cow<'a, str>,
     effective_base: Option<std::rc::Rc<url::Url>>,
     metadata_base_href: Option<String>,
-    repair_warning: Option<crate::types::WarningKind>,
+    head_repair_limit: Option<crate::types::WarningKind>,
 }
 
 #[cfg(feature = "metadata")]
@@ -146,9 +146,9 @@ fn prepare_conversion<'a>(html: &'a str, options: &ConversionOptions) -> Result<
     // ~keep explicit `<head>` (issue #592) or a title precedes the body of a page with no
     // ~keep `<head>` (issue #816); browsers place that content in the implicit head.
     let normalized_input = normalize_input(html)?;
-    let (normalized_html, repair_warning) =
+    let (normalized_html, head_repair_limit) =
         crate::converter::repair_head_content_outside_head(normalized_input.as_ref())
-            .map_or((normalized_input, None), |(html, warning)| (Cow::Owned(html), warning));
+            .map_or((normalized_input, None), |(html, limit)| (Cow::Owned(html), limit));
     let document_base_href = (options.base_url.is_some() || options.extract_metadata)
         .then(|| crate::converter::url_resolve::document_base_href(&normalized_html))
         .flatten();
@@ -166,12 +166,14 @@ fn prepare_conversion<'a>(html: &'a str, options: &ConversionOptions) -> Result<
         html: normalized_html,
         effective_base,
         metadata_base_href,
-        repair_warning,
+        head_repair_limit,
     })
 }
 
 fn try_tier1(prepared: &PreparedConversion<'_>, options: &ConversionOptions) -> Option<ConversionResult> {
-    if prepared.repair_warning.is_some() {
+    // ~keep A page on which the head repair reached a limit is not a page for the fast
+    // ~keep converter: the full converter converts it and gives the warning of the limit.
+    if prepared.head_repair_limit.is_some() {
         return None;
     }
     let report = crate::converter::prescan::PrescanReport::default();
@@ -236,11 +238,7 @@ fn run_tier2(prepared: PreparedConversion<'_>, options: ConversionOptions) -> Re
             return Err(crate::error::ConversionError::Panic(panic_message(&*panic_payload)));
         }
     };
-    let mut result = finish_conversion(markdown, document, tables, depth_warning, collectors)?;
-    if let Some(kind) = prepared.repair_warning {
-        result.warnings.push(crate::converter::repair_limit_warning(kind));
-    }
-    Ok(result)
+    finish_conversion(markdown, document, tables, depth_warning, collectors)
 }
 
 #[cfg(any(feature = "metadata", feature = "inline-images"))]
@@ -307,6 +305,7 @@ fn call_converter(
             structure_collector: structure,
             base_url: prepared.effective_base.clone(),
             document_base_href: prepared.metadata_base_href.as_deref(),
+            head_repair_limit: prepared.head_repair_limit,
         },
     )
 }

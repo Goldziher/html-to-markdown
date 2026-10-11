@@ -749,7 +749,7 @@ pub fn is_inline_element(tag_name: &str) -> bool {
 /// `limit` is the reason the tree builder reports: `TruncatedInput` for the node budget (the
 /// first parse is kept), `DepthLimitExceeded` for the depth limit (the first parse is kept
 /// too). No text is lost in either case, so the warning kind is `MalformedHtml` for both.
-pub fn repair_limit_warning(limit: crate::types::WarningKind) -> crate::types::ProcessingWarning {
+pub(super) fn repair_limit_warning(limit: crate::types::WarningKind) -> crate::types::ProcessingWarning {
     use crate::converter::anchor_origin::MAX_REPAIR_DEPTH;
     crate::types::ProcessingWarning {
         kind: crate::types::WarningKind::MalformedHtml,

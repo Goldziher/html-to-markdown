@@ -3,7 +3,7 @@
 
 use std::fmt::Write;
 
-use html_to_markdown_rs::{ConversionOptions, convert};
+use html_to_markdown_rs::{ConversionOptions, TierStrategy, convert};
 
 fn formatting_tags(count: usize) -> String {
     (0..count).fold(String::new(), |mut bold, id| {
@@ -67,11 +67,22 @@ fn page_with_a_title_and_no_head(formatting: usize, paragraphs: usize) -> String
     )
 }
 
-fn convert_with_metadata(html: &str, extract_metadata: bool) -> html_to_markdown_rs::ConversionResult {
+/// The default route and the full converter. With the test kit, the fast converter forced too.
+#[cfg(feature = "testkit")]
+const ROUTES: [TierStrategy; 3] = [TierStrategy::Auto, TierStrategy::Tier2, TierStrategy::Tier1];
+#[cfg(not(feature = "testkit"))]
+const ROUTES: [TierStrategy; 2] = [TierStrategy::Auto, TierStrategy::Tier2];
+
+fn convert_with_metadata(
+    html: &str,
+    extract_metadata: bool,
+    tier_strategy: TierStrategy,
+) -> html_to_markdown_rs::ConversionResult {
     convert(
         html,
         ConversionOptions {
             extract_metadata,
+            tier_strategy,
             max_depth: Some(512),
             ..Default::default()
         },
@@ -83,42 +94,124 @@ fn convert_with_metadata(html: &str, extract_metadata: bool) -> html_to_markdown
 fn should_take_a_title_with_no_head_tag_as_the_document_title_inside_the_node_budget() {
     let html = page_with_a_title_and_no_head(2, 2);
 
-    let with_metadata = convert_with_metadata(&html, true);
-    assert_eq!(
-        with_metadata.content.as_deref(),
-        Some("---\ntitle: T\n---\n\n**x**\n\n**y**\n\n**y**\n")
-    );
-    assert!(with_metadata.warnings.is_empty(), "{:?}", with_metadata.warnings);
+    for route in ROUTES {
+        let with_metadata = convert_with_metadata(&html, true, route);
+        assert_eq!(
+            with_metadata.content.as_deref(),
+            Some("---\ntitle: T\n---\n\n**x**\n\n**y**\n\n**y**\n"),
+            "{route:?}"
+        );
+        assert!(
+            with_metadata.warnings.is_empty(),
+            "{route:?}: {:?}",
+            with_metadata.warnings
+        );
 
-    let without_metadata = convert_with_metadata(&html, false);
-    assert_eq!(without_metadata.content.as_deref(), Some("**x**\n\n**y**\n\n**y**\n"));
-    assert!(without_metadata.warnings.is_empty(), "{:?}", without_metadata.warnings);
+        let without_metadata = convert_with_metadata(&html, false, route);
+        assert_eq!(
+            without_metadata.content.as_deref(),
+            Some("**x**\n\n**y**\n\n**y**\n"),
+            "{route:?}"
+        );
+        assert!(
+            without_metadata.warnings.is_empty(),
+            "{route:?}: {:?}",
+            without_metadata.warnings
+        );
+    }
 }
 
 #[test]
 fn should_keep_a_title_with_no_head_tag_in_the_body_past_the_node_budget() {
     // ~keep The repair that moves the title into the head has the node budget (issue #809).
     // ~keep Past the budget the page keeps its structure as written: the title text is the
-    // ~keep first paragraph and there is no front matter.
+    // ~keep first paragraph and there is no front matter. The head repair and the repair of
+    // ~keep the converter both reach the budget on this page: the conversion gives ONE warning.
+    // ~keep The fast converter does not convert a page that reached a limit, so every route
+    // ~keep gives the text and the warning of the full converter.
     for (formatting, paragraphs) in [(60, 12), (250, 1_000), (250, 4_000)] {
         let html = page_with_a_title_and_no_head(formatting, paragraphs);
         let expected = format!("T\n\n**x**\n{}", "\n**y**\n".repeat(paragraphs));
         for extract_metadata in [true, false] {
-            let result = convert_with_metadata(&html, extract_metadata);
+            for route in ROUTES {
+                let result = convert_with_metadata(&html, extract_metadata, route);
+                let page = format!(
+                    "{formatting} bold elements, {paragraphs} paragraphs, metadata {extract_metadata}, {route:?}"
+                );
+                assert_eq!(result.content.as_deref(), Some(expected.as_str()), "{page}");
+                assert_eq!(result.warnings.len(), 1, "{page}: {:?}", result.warnings);
+                let warning = &result.warnings[0];
+                assert_eq!(warning.kind, html_to_markdown_rs::WarningKind::MalformedHtml, "{page}");
+                assert!(warning.message.contains("node budget"), "{page}: {warning:?}");
+            }
+        }
+    }
+}
+
+#[test]
+fn should_give_one_warning_when_the_head_repair_stops_at_its_depth_limit() {
+    // ~keep The head repair stops at its depth limit and gives back its tree with the rest of
+    // ~keep the input as written. No route converts that page with no warning: the fast
+    // ~keep converter does not take a page that reached a limit.
+    // ~keep In the second page the input after the tree is nine blocks with their end tags
+    // ~keep and a text: nothing in it is malformed, and the warning still comes.
+    let closed = format!(
+        "<title>T</title>{}deep{}tail",
+        "<div>".repeat(600),
+        "</div>".repeat(600)
+    );
+    let balanced_rest = format!("<title>T</title>{}deep{}tail", "<div>".repeat(520), "</div>".repeat(9));
+    for (page, html) in [("closed", &closed), ("balanced rest", &balanced_rest)] {
+        for route in ROUTES {
+            let result = convert(
+                html,
+                ConversionOptions {
+                    tier_strategy: route,
+                    max_depth: Some(1_000),
+                    ..Default::default()
+                },
+            )
+            .expect("deep input converts");
+            let content = result.content.as_deref().expect("Markdown exists");
+            assert_eq!(content.matches("tail").count(), 1, "{page}, {route:?}: {content:?}");
+            assert_eq!(result.warnings.len(), 1, "{page}, {route:?}: {:?}", result.warnings);
+            let warning = &result.warnings[0];
             assert_eq!(
-                result.content.as_deref(),
-                Some(expected.as_str()),
-                "{formatting} bold elements, {paragraphs} paragraphs, metadata {extract_metadata}"
+                warning.kind,
+                html_to_markdown_rs::WarningKind::MalformedHtml,
+                "{page}, {route:?}"
             );
             assert!(
-                result.warnings.iter().any(
-                    |warning| warning.kind == html_to_markdown_rs::WarningKind::MalformedHtml
-                        && warning.message.contains("node budget")
-                ),
-                "{:?}",
-                result.warnings
+                warning.message.contains("depth limit"),
+                "{page}, {route:?}: {warning:?}"
             );
         }
+    }
+}
+
+#[test]
+fn should_give_the_walker_warning_alone_when_the_head_repair_and_the_walker_both_reach_a_limit() {
+    // ~keep The head repair stops at its depth limit on this page, and the converter then
+    // ~keep stops at the depth limit of its walk. The warning of the walk is the one that names
+    // ~keep skipped content, so it is the one warning of the conversion.
+    let html = format!("<title>T</title><p>visible</p>{}tail", "<div>".repeat(20_000));
+    for route in ROUTES {
+        let result = convert(
+            &html,
+            ConversionOptions {
+                tier_strategy: route,
+                ..Default::default()
+            },
+        )
+        .expect("deep input converts");
+        let content = result.content.as_deref().expect("Markdown exists");
+        assert_eq!(content.matches("visible").count(), 1, "{route:?}: {content:?}");
+        assert_eq!(result.warnings.len(), 1, "{route:?}: {:?}", result.warnings);
+        assert_eq!(
+            result.warnings[0].kind,
+            html_to_markdown_rs::WarningKind::DepthLimitExceeded,
+            "{route:?}"
+        );
     }
 }
 

@@ -58,6 +58,11 @@ pub struct ConversionParameters<'a> {
     pub structure_collector: Option<StructureCollectorHandle>,
     pub base_url: Option<std::rc::Rc<url::Url>>,
     pub document_base_href: Option<&'a str>,
+    /// The limit that the head repair reached before this conversion, if it reached one.
+    ///
+    /// ~keep The converter joins it with the limits of its own repairs and gives one warning
+    /// ~keep for the conversion. The caller gives no warning of its own.
+    pub head_repair_limit: Option<crate::types::WarningKind>,
 }
 /// Internal implementation of HTML to Markdown conversion.
 ///
@@ -77,6 +82,7 @@ pub fn convert_html_impl(
         structure_collector,
         base_url,
         document_base_href,
+        head_repair_limit,
     } = parameters;
     let preserve_menu = options.preserve_tags.iter().any(|tag| tag.eq_ignore_ascii_case("menu"));
     let (preprocessed, prepare_limit) = prepare_html(html, preserve_menu);
@@ -87,7 +93,7 @@ pub fn convert_html_impl(
         len: preprocessed_len,
         repair_limit,
     } = parse_for_conversion(&preprocessed, &repaired_page, preserve_menu)?;
-    let repair_warning = repair_limit.or(prepare_limit);
+    let repair_warning = repair_limit.or(prepare_limit).or(head_repair_limit);
     trace_parse_complete(&dom, preprocessed_len);
     let parser = dom.parser();
     let mut output = String::with_capacity(preprocessed_len.saturating_add(preprocessed_len / 4));
