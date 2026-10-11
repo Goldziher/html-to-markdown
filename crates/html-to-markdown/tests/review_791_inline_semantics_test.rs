@@ -78,6 +78,24 @@ fn should_keep_the_word_space_before_a_description_outside_a_list() {
 }
 
 #[test]
+fn should_keep_a_term_apart_outside_a_list() {
+    check("<div>a <dt>t</dt> c</div>", "a t\n\nc\n");
+}
+
+#[test]
+fn should_keep_a_term_apart_in_a_heading() {
+    check("<h2>a<dl><dt>t</dt><dd>b</dd></dl></h2>", "## a t b\n");
+}
+
+#[test]
+fn should_keep_a_term_apart_in_a_link() {
+    check_handed_over(
+        "<p><a href=\"/x\">a<dl><dt>t</dt><dd>b</dd></dl></a></p>",
+        "[a t b](/x)\n",
+    );
+}
+
+#[test]
 fn should_keep_the_space_between_a_paragraph_and_text_in_a_heading() {
     check("<h2><p>One</p>items</h2>", "## One items\n");
 }

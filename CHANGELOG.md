@@ -26,9 +26,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   ([#822](https://github.com/xberg-io/html-to-markdown/issues/822)).
 - A paragraph inside a heading keeps a space between its text and the text after it
   ([#804](https://github.com/xberg-io/html-to-markdown/issues/804)).
-- A term or a description of a definition list in a heading or in a link has a space between it
-  and the text before it.
-- An `<audio>` or `<video>` gets its link when `tier_strategy` is `Tier1`.
+- With `convert_as_inline`, a term or a description of a definition list has a space between it
+  and the text before it: `<dl><dt>t</dt><dd>d</dd></dl>` gives `t d`, was `td`. The same holds
+  in a heading and in a link.
+- An `<audio>` or `<video>` gets its link also when `extract_metadata` is `false` and
+  `highlight_style` is `none`: `<p>x</p><video src="/v.mp4"></video>` gives `x`, then
+  `[video](/v.mp4)`, was `x` only.
 
 ## [3.17.2] - 2026-10-06
 
