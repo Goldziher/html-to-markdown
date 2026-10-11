@@ -66,8 +66,9 @@ pub struct ConversionParameters<'a> {
 }
 /// Internal implementation of HTML to Markdown conversion.
 ///
-/// Returns the converted content, optional document structure, extracted tables, and an
-/// optional depth-limit warning.
+/// Returns the converted content, optional document structure, extracted tables, and at most
+/// one warning: the depth-limit warning of the walk, or else the warning of a repair that
+/// reached a limit.
 pub fn convert_html_impl(
     html: &str,
     options: &ConversionOptions,

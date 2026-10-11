@@ -155,6 +155,11 @@ fn should_give_one_warning_when_the_head_repair_stops_at_its_depth_limit() {
     // ~keep converter does not take a page that reached a limit.
     // ~keep In the second page the input after the tree is nine blocks with their end tags
     // ~keep and a text: nothing in it is malformed, and the warning still comes.
+    // ~keep The converter gives the warning from the limit that it receives from the head
+    // ~keep repair.
+    // ~keep The full converter answers on every route. With these options the default route
+    // ~keep never asks the fast converter: the router selects the full converter. Only the
+    // ~keep forced route asks the fast converter, and there the page is handed over.
     let closed = format!(
         "<title>T</title>{}deep{}tail",
         "<div>".repeat(600),
