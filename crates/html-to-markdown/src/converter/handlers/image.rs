@@ -70,8 +70,10 @@ pub fn handle_img(tag: &tl::HTMLTag, mut handler: HandlerContext<'_>) {
 
 // ~keep An absent image has no inline boundary: adjacent normalized whitespace folds once
 // ~keep (#756). Preserve strict whitespace and a preceding space when the next text has none.
+// ~keep Preformatted text keeps every space: no rule for running text applies in `pre`.
 fn collapse_empty_image_boundary(handler: &mut HandlerContext<'_>) {
     if handler.context.inline_code_links.is_some()
+        || handler.context.in_code_block
         || handler.options.whitespace_mode != crate::options::WhitespaceMode::Normalized
         || !handler.output.ends_with(' ')
     {
@@ -82,14 +84,22 @@ fn collapse_empty_image_boundary(handler: &mut HandlerContext<'_>) {
         .dom_context
         .parent_of(id)
         .and_then(|parent| handler.dom_context.children_of(parent));
-    let next = siblings.and_then(|siblings| {
-        handler
-            .dom_context
-            .get_sibling_index(id)
-            .and_then(|index| siblings.get(index + 1))
-    });
-    if let Some(tl::Node::Raw(raw)) = next.and_then(|handle| handle.get(handler.parser)) {
-        if raw.as_utf8_str().chars().next().is_some_and(char::is_whitespace) {
+    // ~keep The text that follows is the next node that is not a comment, read decoded: `&#32;`
+    // ~keep is a space. Only ASCII white space folds: a no-break space is content.
+    let index = handler.dom_context.get_sibling_index(id);
+    let following = siblings
+        .zip(index)
+        .map(|(siblings, index)| siblings.iter().skip(index + 1));
+    let next = following
+        .into_iter()
+        .flatten()
+        .map(|handle| handle.get(handler.parser))
+        .find(|node| !matches!(node, Some(tl::Node::Comment(_))))
+        .flatten();
+    if let Some(tl::Node::Raw(raw)) = next {
+        let text = raw.as_utf8_str();
+        let decoded = crate::text::decode_html_entities_cow(&text);
+        if decoded.as_bytes().first().is_some_and(u8::is_ascii_whitespace) {
             handler.output.pop();
         }
     }

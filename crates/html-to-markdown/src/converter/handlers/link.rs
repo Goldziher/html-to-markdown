@@ -276,7 +276,7 @@ fn empty_text_wrapper_child(handle: &tl::NodeHandle, parser: &tl::Parser<'_>) ->
                         | "code"
                         | "kbd"
                         | "samp"
-                ) =>
+                ) || plain_wrapper(tag) =>
             {
                 pending.extend(tag.children().top().iter().copied());
             }
@@ -284,6 +284,14 @@ fn empty_text_wrapper_child(handle: &tl::NodeHandle, parser: &tl::Parser<'_>) ->
         }
     }
     true
+}
+
+// ~keep An `i` or a `div` with a class is an icon that a style sheet draws: #774 and the vote
+// ~keep link of the #121 fixture name it by the link address. With no class it shows nothing,
+// ~keep as an empty `span` does.
+fn plain_wrapper(tag: &tl::HTMLTag<'_>) -> bool {
+    tag.attributes().get("class").is_none()
+        && matches!(normalized_tag_name(tag.name().as_utf8_str()).as_ref(), "i" | "div")
 }
 
 fn emit_autolink(data: &LinkData<'_>, handler: &mut HandlerContext<'_>) -> bool {

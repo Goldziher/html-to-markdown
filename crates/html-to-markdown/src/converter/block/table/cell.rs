@@ -226,6 +226,58 @@ pub fn separate_nested_table_following_content(text: &mut String, table_ends: &[
     text.push_str(&original[start..]);
 }
 
+/// Text of a nested table for the width pre-pass, in one walk so issue #406 stays linear.
+/// ~keep The flat form writes one separator between cells and one between rows; the measured
+/// ~keep text has them too, or the rule under the header is short by one character for each.
+#[allow(clippy::trivially_copy_pass_by_ref)]
+pub fn nested_table_width_text(
+    node_handle: &tl::NodeHandle,
+    parser: &tl::Parser,
+    dom_ctx: &super::super::super::DomContext,
+    br_in_tables: bool,
+) -> String {
+    let mut text = String::with_capacity(64);
+    let mut row_gap = false;
+    let mut cell_gap = false;
+    let mut stack = vec![*node_handle];
+    while let Some(handle) = stack.pop() {
+        match handle.get(parser) {
+            Some(tl::Node::Raw(bytes)) => {
+                let raw = bytes.as_utf8_str();
+                let decoded = crate::text::decode_html_entities_cow(raw.as_ref());
+                if decoded.trim().is_empty() {
+                    cell_gap |= !text.is_empty();
+                    continue;
+                }
+                if text.is_empty() {
+                } else if row_gap {
+                    crate::converter::emit_table_cell_break(&mut text, br_in_tables);
+                } else if cell_gap && !text.ends_with(char::is_whitespace) {
+                    text.push(' ');
+                }
+                row_gap = false;
+                cell_gap = false;
+                text.push_str(decoded.as_ref());
+            }
+            Some(tl::Node::Tag(tag)) => {
+                row_gap |= super::utils::is_tag_name(&handle, parser, dom_ctx, "tr");
+                cell_gap |= ["td", "th"]
+                    .iter()
+                    .any(|name| super::utils::is_tag_name(&handle, parser, dom_ctx, name));
+                if let Some(children) = dom_ctx.children_of(handle.get_inner()) {
+                    stack.extend(children.iter().rev().copied());
+                } else {
+                    let first = stack.len();
+                    stack.extend(tag.children().top().iter().copied());
+                    stack[first..].reverse();
+                }
+            }
+            _ => {}
+        }
+    }
+    text
+}
+
 /// ~keep A nested table's structural pipes bypass text-node escaping. It must either be deferred
 /// ~keep from a single-cell row or flattened to cell content with explicit row separators;
 /// ~keep otherwise reparsing widens and eventually truncates the outer row (issues #469/#484/#488).

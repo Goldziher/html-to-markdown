@@ -189,7 +189,9 @@ impl TagDispatcher<'_, '_> {
                 self.output,
                 handler,
             ),
-            "td" | "th" | "tr" | "thead" | "tbody" | "tfoot" if !handler.ctx.in_table_cell => {
+            // ~keep A table handler walks its own rows and cells, so a part that arrives here is
+            // ~keep stray, in a cell too: its tag is ignored and its text is kept (#805).
+            "td" | "th" | "tr" | "thead" | "tbody" | "tfoot" => {
                 crate::converter::block::container::handle_passthrough(
                     self.node_handle,
                     self.parser,
@@ -197,7 +199,7 @@ impl TagDispatcher<'_, '_> {
                     handler,
                 );
             }
-            "wbr" | "thead" | "tbody" | "tfoot" | "tr" | "th" | "td" | "source" => {
+            "wbr" | "source" => {
                 crate::converter::block::container::handle_noop();
             }
             "br" => crate::converter::block::line_break::handle(self.node_handle, self.parser, self.output, handler),
@@ -251,7 +253,12 @@ impl TagDispatcher<'_, '_> {
     /// measuring another table, which keeps issue #406's deeply nested layouts linear.
     fn dispatch_table(&mut self) -> bool {
         if self.handler.ctx.measure_width_only {
-            let text = self.handler.dom_ctx.text_content(*self.node_handle, self.parser);
+            let text = crate::converter::block::table::cell::nested_table_width_text(
+                self.node_handle,
+                self.parser,
+                self.handler.dom_ctx,
+                self.handler.options.br_in_tables,
+            );
             self.output.push_str(text.as_str());
             return true;
         }

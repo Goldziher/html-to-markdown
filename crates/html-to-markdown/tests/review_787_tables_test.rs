@@ -1,4 +1,5 @@
 #![allow(missing_docs)]
+#![cfg(feature = "testkit")]
 use html_to_markdown_rs::{ConversionOptions, TierStrategy, convert, prescan, tier1};
 #[test]
 fn nested_table_keeps_separation_on_both_sides() {
