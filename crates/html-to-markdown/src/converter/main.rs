@@ -39,8 +39,10 @@ use crate::types::structure_collector::StructureCollectorHandle;
 
 mod block_boundary;
 mod parse;
+mod table_parts;
 use self::block_boundary::separate_words_at_block_boundary;
 use self::parse::{ParsedPage, parse_for_conversion};
+use self::table_parts::{is_table_part, walk_table_parts};
 
 type ConversionOutput = (
     String,
@@ -636,6 +638,10 @@ fn parent_is_list(node_handle: &tl::NodeHandle, parser: &tl::Parser, dom_ctx: &D
 /// Recursively walk DOM nodes and convert to Markdown.
 #[allow(clippy::trivially_copy_pass_by_ref)]
 pub fn walk_node(node_handle: &tl::NodeHandle, parser: &tl::Parser, output: &mut String, handler: HandlerContext<'_>) {
+    if is_table_part(node_handle, parser, handler.dom_ctx) {
+        walk_table_parts(node_handle, parser, output, handler);
+        return;
+    }
     let ctx = handler.ctx;
     ctx.last_list.enter(output);
     // ~keep In a task item, the render of each node before the first content reports whether
@@ -698,20 +704,29 @@ fn convert_node(node_handle: &tl::NodeHandle, parser: &tl::Parser, output: &mut 
     }
 }
 
-#[cfg_attr(not(feature = "visitor"), allow(clippy::needless_return))]
-fn convert_tag(
+struct TagCapture<'a> {
+    structure: super::structure_capture::ElementTextCapture,
+    #[cfg(feature = "visitor")]
+    visitor: Option<crate::converter::visitor_hooks::VisitorElementState<'a>>,
+    #[cfg(feature = "visitor")]
+    output_start: usize,
+    #[cfg(not(feature = "visitor"))]
+    marker: std::marker::PhantomData<&'a ()>,
+}
+
+fn begin_tag<'a>(
     node_handle: &tl::NodeHandle,
-    tag: &tl::HTMLTag<'_>,
-    parser: &tl::Parser,
+    tag: &'a tl::HTMLTag<'a>,
+    parser: &'a tl::Parser<'a>,
     output: &mut String,
     handler: HandlerContext<'_>,
-) {
+    dom_ctx: &'a DomContext,
+) -> Option<TagCapture<'a>> {
     let options = handler.options;
     let depth = handler.depth;
-    let dom_ctx = handler.dom_ctx;
+    let ctx = handler.ctx;
     let tag_name = normalized_node_tag_name(node_handle, tag, parser, dom_ctx);
-    let djot_scope = djot_context(node_handle, parser, tag_name.as_ref(), handler);
-    let ctx = djot_scope.as_ref().unwrap_or(handler.ctx);
+    let tag_name = tag_name.as_ref();
     #[cfg(feature = "visitor")]
     let visitor_output_start = output.len();
     #[cfg(feature = "visitor")]
@@ -720,64 +735,93 @@ fn convert_tag(
     } else if let Some(ref visitor_handle) = ctx.visitor {
         use crate::converter::visitor_hooks::{VisitAction, build_visitor_element_state, handle_visitor_element_start};
 
-        let state = build_visitor_element_state(tag_name.as_ref(), node_handle, parser, dom_ctx);
-        let action = handle_visitor_element_start(visitor_handle, tag_name.as_ref(), tag, &state, output, depth);
+        let state = build_visitor_element_state(tag_name, node_handle, parser, dom_ctx);
+        let action = handle_visitor_element_start(visitor_handle, tag_name, tag, &state, output, depth);
 
         match action {
             VisitAction::Continue => Some(state),
-            VisitAction::Skip => return,
+            VisitAction::Skip => return None,
             VisitAction::Custom => {
                 if let Some(replacement) = output.get(visitor_output_start..) {
-                    collect_document_attributes(tag_name.as_ref(), tag, ctx);
-                    super::structure_capture::replace_element_at_start(tag_name.as_ref(), tag, ctx, replacement);
+                    collect_document_attributes(tag_name, tag, ctx);
+                    super::structure_capture::replace_element_at_start(tag_name, tag, ctx, replacement);
                 }
-                return;
+                return None;
             }
-            VisitAction::Error => return,
+            VisitAction::Error => return None,
         }
     } else {
         None
     };
 
     if skip_or_render_tag(
-        tag_name.as_ref(),
+        tag_name,
         node_handle,
         tag,
         parser,
         output,
         HandlerContext::new(options, ctx, depth, dom_ctx),
     ) {
-        return;
+        return None;
     }
-    collect_document_attributes(tag_name.as_ref(), tag, ctx);
-    let structure_capture = super::structure_capture::begin_element(tag_name.as_ref(), tag, ctx);
+    collect_document_attributes(tag_name, tag, ctx);
+    let structure_capture = super::structure_capture::begin_element(tag_name, tag, ctx);
     #[cfg_attr(not(feature = "visitor"), allow(unused_variables))]
     let element_output_start = output.len();
-    strip_breaks_before_block(tag_name.as_ref(), output, options, ctx);
+    strip_breaks_before_block(tag_name, output, options, ctx);
 
-    #[cfg_attr(not(feature = "visitor"), allow(unused_variables))]
-    let stop = super::main_dispatch::dispatch_tag(
-        tag_name.as_ref(),
-        node_handle,
-        tag,
-        parser,
-        output,
-        HandlerContext::new(options, ctx, depth, dom_ctx),
-    );
+    Some(TagCapture {
+        structure: structure_capture,
+        #[cfg(feature = "visitor")]
+        visitor: visitor_element_state,
+        #[cfg(feature = "visitor")]
+        output_start: element_output_start,
+        #[cfg(not(feature = "visitor"))]
+        marker: std::marker::PhantomData,
+    })
+}
 
+fn finish_tag(
+    capture: TagCapture<'_>,
+    tag_name: &str,
+    tag: &tl::HTMLTag<'_>,
+    output: &mut String,
+    handler: HandlerContext<'_>,
+    stop: bool,
+) {
     #[cfg(feature = "visitor")]
     if !stop {
         super::structure_capture::handle_visitor_end(super::structure_capture::VisitorEndCapture {
-            state: visitor_element_state.as_ref(),
-            tag_name: tag_name.as_ref(),
+            state: capture.visitor.as_ref(),
+            tag_name,
             tag,
             output,
-            element_output_start,
-            ctx,
-            depth,
+            element_output_start: capture.output_start,
+            ctx: handler.ctx,
+            depth: handler.depth,
         });
     }
-    super::structure_capture::finish_element(structure_capture, tag_name.as_ref(), tag, ctx);
+    #[cfg(not(feature = "visitor"))]
+    let _ = (output, stop);
+    super::structure_capture::finish_element(capture.structure, tag_name, tag, handler.ctx);
+}
+
+fn convert_tag(
+    node_handle: &tl::NodeHandle,
+    tag: &tl::HTMLTag<'_>,
+    parser: &tl::Parser,
+    output: &mut String,
+    handler: HandlerContext<'_>,
+) {
+    let tag_name = normalized_node_tag_name(node_handle, tag, parser, handler.dom_ctx);
+    let djot_scope = djot_context(node_handle, parser, tag_name.as_ref(), handler);
+    let ctx = djot_scope.as_ref().unwrap_or(handler.ctx);
+    let handler = HandlerContext::new(handler.options, ctx, handler.depth, handler.dom_ctx);
+    let Some(capture) = begin_tag(node_handle, tag, parser, output, handler, handler.dom_ctx) else {
+        return;
+    };
+    let stop = super::main_dispatch::dispatch_tag(tag_name.as_ref(), node_handle, tag, parser, output, handler);
+    finish_tag(capture, tag_name.as_ref(), tag, output, handler, stop);
 }
 
 fn normalized_node_tag_name<'a>(
@@ -820,7 +864,9 @@ fn skip_or_render_tag(
     handler: HandlerContext<'_>,
 ) -> bool {
     if should_skip_tag(tag_name, node_handle, tag, parser, handler) {
-        trim_trailing_whitespace(output);
+        if handler.ctx.inline_code_links.is_none() {
+            trim_trailing_whitespace(output);
+        }
         return true;
     }
     if handler.ctx.strip_tags.contains(tag_name) {
@@ -930,7 +976,7 @@ const fn collect_document_attributes(_tag_name: &str, _tag: &tl::HTMLTag<'_>, _c
 /// ~keep Block dispatch is where a trailing hard-break run becomes knowably
 /// ineffective; container endings handle the no-following-sibling case themselves.
 fn strip_breaks_before_block(tag_name: &str, output: &mut String, options: &ConversionOptions, ctx: &Context) {
-    if options.newline_style == NewlineStyle::Backslash && is_block_level_element(tag_name) {
+    if !ctx.in_code && options.newline_style == NewlineStyle::Backslash && is_block_level_element(tag_name) {
         strip_trailing_backslash_breaks(output, ctx.block_content_start);
     }
 }

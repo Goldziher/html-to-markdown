@@ -241,6 +241,8 @@ jobs:
         }
       - { "name": "Install Task", "uses": "xberg-io/actions/install-task@v1" }
       - { "name": "Install alef", "uses": "xberg-io/actions/install-alef@v1" }
+      # ~keep Alef runs Dart's formatter during generation; without it the freshness check reports formatting drift.
+      - { "name": "Setup Dart", "uses": "dart-lang/setup-dart@v1" }
       # ~keep Alef delegates C# formatting to Poly's clang-format adapter. Ubuntu's clang-format
       # 18 leaves nullable switch assertions unformatted; pin the generator's local formatter
       # version so freshness compares fixture changes rather than formatter-version differences.
@@ -253,6 +255,9 @@ jobs:
       # poly absent this job failed all 16 languages with "poly not found on PATH" before the
       # drift check below ever ran, so the gate could not report on the drift it exists to catch.
       - { "name": "Install poly", "uses": "Goldziher/poly@v0" }
+      # ~keep Alef runs `dart format` on the generated suite; omitting Dart makes freshness
+      # compare unformatted output with committed formatted files.
+      - { "name": "Setup Dart", "uses": "dart-lang/setup-dart@v1" }
       - { "name": "Regenerate e2e suites", "run": "task e2e:generate", "shell": "bash" }
       - name: Fail if generated e2e/ drifted from committed output
         # ~keep `git diff` reports only tracked paths, so a regeneration that ADDS a new suite

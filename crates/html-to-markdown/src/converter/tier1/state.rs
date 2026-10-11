@@ -78,6 +78,8 @@ pub struct TableState {
     /// rendering legitimately introduces unescaped `|` characters that
     /// Tier-2 also emits without escaping.
     pub had_nested_table: bool,
+    /// Ends of flattened nested tables in the current cell; following content is separated at close. ~keep
+    pub nested_table_ends: Vec<usize>,
     /// `colspan` attribute on the currently-open `<td>`/`<th>`.
     ///
     /// Defaults to 1.  On `</td>` / `</th>` close, `close_table_cell` pushes
@@ -215,7 +217,7 @@ pub struct Tier1State {
     /// is emitted as `" (title)"` after the abbreviation text, mirroring
     /// Tier-2's `semantic/attributes.rs::handle_abbr` (line 104-111).
     pub abbr_titles: Vec<Option<String>>,
-    /// Stack of `(href, title, has_nested_tag)` triples for currently-open `<a>`
+    /// Stack of `(href, title, has_nested_tag, has_aria_label)` entries for currently-open `<a>`
     /// elements.
     ///
     /// HTML5 forbids nested `<a>`, but the stack handles malformed input safely.

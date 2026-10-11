@@ -156,7 +156,7 @@ fn should_bail_with_table_nested_table_in_single_cell_row() {
     );
 }
 
-// ~keep ── Control: a sibling cell must keep the pre-existing flatten-and-escape ──────
+// ~keep ── Control: a sibling cell must keep the pre-existing flattened cell content ──────
 // ~keep behavior (issue #469) — the new deferral only ever applies to a row whose nested
 // ~keep table's cell has no sibling cell.
 
@@ -172,8 +172,8 @@ fn should_still_flatten_a_nested_table_that_shares_its_row_with_a_sibling_cell()
     let html = "<table><tr><td><table><tr><td>inner</td></tr></table></td><td>Other</td></tr></table>";
     let out = content(html);
     assert!(
-        out.contains(r"\| inner \|"),
-        "a nested table sharing its row with a sibling must still flatten with escaped pipes: {out:?}"
+        out.contains(r"| inner "),
+        "a nested table sharing its row with a sibling must still flatten to cell content: {out:?}"
     );
 }
 

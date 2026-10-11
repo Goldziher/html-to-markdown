@@ -258,10 +258,9 @@ impl<'a> Tier1Scanner<'a> {
         {
             return Err(BailReason::Classifier);
         }
-        // ~keep A link or an image in code writes no marks; Tier-2 knows the rule.
-        if matches!(spec.kind, TagKind::Link | TagKind::Image)
-            && self.state.escape_ctx.intersects(EscapeCtx::CODE | EscapeCtx::PRE)
-        {
+        // ~keep Tier-2 knows the rule for a link in code. An image in code is its alt text, which
+        // ~keep this scanner writes itself.
+        if matches!(spec.kind, TagKind::Link) && self.state.escape_ctx.intersects(EscapeCtx::CODE | EscapeCtx::PRE) {
             return Err(BailReason::Classifier);
         }
         Ok(())
@@ -400,9 +399,13 @@ impl<'a> Tier1Scanner<'a> {
             if raw_href.is_none() && white_space_is_upcoming(self.html, self.pos, &self.state.stack) {
                 return Err(BailReason::Classifier);
             }
-            let href = raw_href
-                .as_deref()
-                .map(|value| self.state.resolve_url(value).unwrap_or_else(|| value.to_owned()));
+            let href = raw_href.as_deref().map(|value| {
+                self.state
+                    .effective_base
+                    .as_deref()
+                    .and_then(|base| crate::converter::url_resolve::resolve_link_url(base, value))
+                    .unwrap_or_else(|| value.to_owned())
+            });
             let aria_label = find_attr(attrs, b"aria-label").map(decode_attr).transpose()?;
             let has_name =
                 crate::converter::utility::content::link_accessible_name(aria_label.as_deref(), title.as_deref())

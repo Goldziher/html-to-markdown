@@ -379,6 +379,10 @@ fn close_link(state: &mut Tier1State, frame: &OpenTag, options: &ConversionOptio
     if tier2_if_no_text && href.is_some() && dest.len() == trim_start {
         return Err(BailReason::Classifier);
     }
+    // ~keep Tier-2 also decides the label of a link that holds only empty elements, or only a title.
+    if dest.len() == trim_start && (has_nested_tag || title.is_some()) {
+        return Err(BailReason::LinkEmptyLabel);
+    }
     if let Some(href_str) = href.as_deref() {
         if try_emit_autolink(dest, trim_start, frame, href_str, has_nested_tag, options)? {
             return Ok(());
@@ -393,7 +397,7 @@ fn close_link(state: &mut Tier1State, frame: &OpenTag, options: &ConversionOptio
             dest.push('↑');
         }
     }
-    if let Some(href) = href {
+    if let Some(href) = href.filter(|value| !value.is_empty()) {
         emit_markdown_link_close(dest, trim_start, &href, title.as_deref(), options);
         // ~keep A link with no text still writes `[](href)`: content, as in Tier-2's `convert_node`.
         state.end_document_start_if_written(trim_start.saturating_sub(1));

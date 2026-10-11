@@ -73,6 +73,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Links inside `code`, `kbd` and `samp` spans keep their destinations outside the code marks,
+  including links in table cells. Image labels stay literal, and quotes and hidden templates
+  retain their normal behavior ([#813](https://github.com/xberg-io/html-to-markdown/issues/813)).
+- Nested tables in a Markdown cell retain their text without nested table delimiters, with
+  spaces between cells and surrounding content
+  ([#760](https://github.com/xberg-io/html-to-markdown/issues/760)).
+- Stray table rows and cells retain their text
+  ([#805](https://github.com/xberg-io/html-to-markdown/issues/805)). Empty link destinations
+  keep the label as plain text, and empty presentational wrappers follow the same label rule
+  as a bare empty link; named labels and icons retain their fallback names.
+- An image with no source inside `pre` keeps the space on each side of it. Outside `pre`, one
+  space remains when the next text starts with a character reference or follows a comment.
+- A stray cell inside a table cell keeps its text.
+- A link that holds only an empty `div` or an empty `i`, with no class, gets the empty label, as
+  a link that holds an empty `span` does.
+- The rule under a table header is as wide as a cell that holds a nested table.
+- An image in `code`, `kbd`, `samp` or `pre` text is its alt text on the fast path too, as the
+  full converter writes it. The fast path wrote the Markdown image inside the code text.
 - A page with a structured data script keeps its text when a text value of the JSON holds a tag.
   `<script type="application/ld+json">{"a":"<p>"}</script>` in the head made the whole page
   convert to an empty string, and the same script in the body removed the text after it. The

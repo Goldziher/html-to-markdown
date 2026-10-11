@@ -119,6 +119,8 @@ const fn bail_variant_name(reason: &BailReason) -> &'static str {
         BailReason::ImageLazyLoadSrc => "ImageLazyLoadSrc",
         BailReason::BlockquoteCite => "BlockquoteCite",
         BailReason::LinkAutolinkNestedMarkup => "LinkAutolinkNestedMarkup",
+        BailReason::LinkEmptyLabel => "LinkEmptyLabel",
+        BailReason::ImageMissingSource => "ImageMissingSource",
         BailReason::AdjacentInlineEmphasis => "AdjacentInlineEmphasis",
         BailReason::WhitespaceOnlyInlineEmphasis => "WhitespaceOnlyInlineEmphasis",
         BailReason::InlineMarkerNotReproduced => "InlineMarkerNotReproduced",

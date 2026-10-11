@@ -255,6 +255,12 @@ pub enum BailReason {
     /// forever; bail instead so Tier-2 (authoritative) decides.
     LinkAutolinkNestedMarkup,
 
+    /// An empty link label needs DOM-based accessible-name or media fallback. ~keep
+    LinkEmptyLabel,
+
+    /// An image has no source; DOM fallback folds its absent inline boundary. ~keep
+    ImageMissingSource,
+
     /// A `<strong>`/`<b>` or `<em>`/`<i>` opened while the output already ends with that
     /// same tag kind's matching close marker (`**` or a lone `*`), with no intervening
     /// content.
@@ -332,16 +338,7 @@ impl fmt::Display for BailReason {
             Self::TableNestedTableInSingleCellRow => write!(f, "nested <table> inside a data table's single-cell row"),
             Self::TableCaption => write!(f, "<caption> element in table"),
             Self::TableSectionOrder => write!(f, "table sections in unsupported order"),
-            Self::UnknownEntity { name, offset } => {
-                if is_known_reference_name(name) {
-                    write!(
-                        f,
-                        "HTML entity &{name} is missing its closing semicolon at byte offset {offset}"
-                    )
-                } else {
-                    write!(f, "unknown HTML entity &{name} at byte offset {offset}")
-                }
-            }
+            Self::UnknownEntity { name, offset } => display_entity(f, name, *offset),
             Self::DepthLimitExceeded { depth, max_depth } => {
                 write!(
                     f,
@@ -378,12 +375,25 @@ impl fmt::Display for BailReason {
                     "autolink-eligible <a> href had a nested tag inside the label before close"
                 )
             }
+            Self::ImageMissingSource => write!(f, "image has no effective source"),
+            Self::LinkEmptyLabel => write!(f, "empty link label requires DOM-based fallback"),
             Self::AdjacentInlineEmphasis => write!(f, "adjacent strong/emphasis elements would form one delimiter run"),
             Self::WhitespaceOnlyInlineEmphasis => write!(f, "strong/emphasis element with a whitespace-only body"),
             Self::InlineMarkerNotReproduced => write!(f, "inline element whose tier-2 markers tier-1 does not emit"),
             Self::FormControl => write!(f, "form control whose text tier-2 separates from the text around it"),
             Self::RuleBetweenInlineMarkers => write!(f, "horizontal rule between inline markers"),
         }
+    }
+}
+
+fn display_entity(f: &mut fmt::Formatter<'_>, name: &str, offset: usize) -> fmt::Result {
+    if is_known_reference_name(name) {
+        write!(
+            f,
+            "HTML entity &{name} is missing its closing semicolon at byte offset {offset}"
+        )
+    } else {
+        write!(f, "unknown HTML entity &{name} at byte offset {offset}")
     }
 }
 
