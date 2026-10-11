@@ -63,7 +63,10 @@ pub fn handle_figure(
         figure_content = figure_content.replace("\n![", "![");
         figure_content = figure_content.replace(" ![", "![");
 
-        let trimmed = figure_content.trim_matches(|c| c == '\n' || c == ' ' || c == '\t');
+        // ~keep Leading spaces belong to rendered indented code, not outer figure spacing (#819).
+        let trimmed = figure_content
+            .trim_start_matches('\n')
+            .trim_end_matches(['\n', ' ', '\t']);
         if !trimmed.is_empty() {
             crate::converter::block::div::push_block(output, handler.options, handler.ctx, trimmed);
         }
