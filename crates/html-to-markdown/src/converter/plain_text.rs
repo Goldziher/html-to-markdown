@@ -104,6 +104,15 @@ impl WalkState<'_> {
             visitor: self.visitor,
         }
     }
+
+    /// The state for text that a control writes to a buffer of its own. The marker end of a
+    /// list item is a length of the item's buffer, so this state holds none.
+    const fn for_own_buffer(&self) -> Self {
+        WalkState {
+            item_marker_end: None,
+            ..*self
+        }
+    }
 }
 
 /// Extract plain text from a parsed DOM tree.
@@ -405,10 +414,10 @@ fn dispatch_plain_tag(
             buf.end_block();
         }
         // ~keep The Markdown writer writes an option list and an option with the same two functions.
-        "select" | "datalist" => walk_plain_option_list(tag, parser, buf, list_ctx, &child_state),
+        "select" | "datalist" => walk_plain_option_list(tag, parser, buf, list_ctx, &child_state.for_own_buffer()),
         "option" => {
             let mut option = PlainOutput::default();
-            walk_children(tag, parser, &mut option, list_ctx, &child_state);
+            walk_children(tag, parser, &mut option, list_ctx, &child_state.for_own_buffer());
             buf.write_option(&option.into_text());
         }
         _ if spacing::writes_own_text(tag_name) => {

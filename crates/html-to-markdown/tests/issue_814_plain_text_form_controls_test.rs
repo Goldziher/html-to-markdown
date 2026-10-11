@@ -430,6 +430,34 @@ fn a_control_with_a_block_end_and_no_text_after_spaces_adds_no_space_in_plain_te
     assert_plain("<div><img alt=\"b   \"><button><hr></button>ccc</div>", "b\n\nccc\n");
 }
 
+#[test]
+fn a_block_in_an_option_of_a_list_item_is_a_word_of_its_own_in_plain_text() {
+    // ~keep The text before each block is as long as the marker of its list item.
+    assert_plain(
+        "<ul><li><select><option>ab<div>x</div>y</option></select></li></ul>",
+        "- ab x y\n",
+    );
+    assert_plain("<ul><li><select>ab<div>x</div></select></li></ul>", "- ab x\n");
+    assert_plain(
+        "<table><tr><td><ol><li><select><option>abc<p>x</p></option></select></li></ol></td></tr></table>",
+        "1. abc x\n",
+    );
+    // ~keep An option with no list around it writes to a buffer of its own too. Its text keeps
+    // ~keep the lines of the block, as before the rule for form controls.
+    assert_plain("<ul><li><option>ab<div>x</div>y</option></li></ul>", "- ab\n\nx\n\ny\n");
+}
+
+#[test]
+fn twenty_thousand_controls_in_one_paragraph_are_each_a_word_of_their_own_in_plain_text() {
+    // ~keep Each control gets a space written before its text, in the middle of the output.
+    const CONTROLS: usize = 20_000;
+    let html = format!("<p>{}</p>", "z<button>X</button>".repeat(CONTROLS));
+    let plain = converted(&html, options(OutputFormat::Plain, TierStrategy::Tier2));
+    assert_eq!(plain.len(), 4 * CONTROLS);
+    assert_eq!(&plain[..30], "z X z X z X z X z X z X z X z ");
+    assert_eq!(&plain[plain.len() - 30..], "X z X z X z X z X z X z X z X\n");
+}
+
 #[cfg(feature = "visitor")]
 mod with_a_visitor {
     use std::sync::{Arc, Mutex};

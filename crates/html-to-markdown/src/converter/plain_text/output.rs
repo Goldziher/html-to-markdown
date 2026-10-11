@@ -24,6 +24,9 @@ pub(super) struct PlainOutput {
     /// The checkpoints that are open, the outer one first, in rising order of their places.
     #[cfg(feature = "visitor")]
     open_checkpoints: Vec<OpenCheckpoint>,
+    /// The count of control ends that `insert_at` and `shrink_to` read or moved.
+    #[cfg(test)]
+    ends_examined: std::cell::Cell<usize>,
 }
 
 /// The start of a control, as the output keeps it while the control is open.
@@ -277,12 +280,19 @@ impl PlainOutput {
 
     /// Writes `text` at `at`, a character boundary of the text. Each control end, each start
     /// of an open control and each open checkpoint after `at` moves with the text it stands in.
+    ///
+    /// ~keep The control ends rise, so the ends after `at` are the last ones: a binary search
+    /// ~keep finds the first, and only those move. A scan of every end made a line of controls
+    /// ~keep cost the square of their count. The open controls and the open checkpoints are as
+    /// ~keep many as the elements around the place, so each is read.
     fn insert_at(&mut self, at: usize, text: &str) {
         self.text.insert_str(at, text);
-        for end in &mut self.control_ends {
-            if *end > at {
-                *end += text.len();
-            }
+        let after = self.ends_up_to(at);
+        #[cfg(test)]
+        self.ends_examined
+            .set(self.ends_examined.get() + self.control_ends.len() - after);
+        for end in &mut self.control_ends[after..] {
+            *end += text.len();
         }
         for control in &mut self.open_controls {
             if control.at > at {
@@ -314,8 +324,18 @@ impl PlainOutput {
             }
         }
         self.text.truncate(len);
-        let kept = self.control_ends.partition_point(|end| *end <= len);
+        let kept = self.ends_up_to(len);
         self.control_ends.truncate(kept);
+    }
+
+    /// The count of the control ends that are not after `place`: the position of the first end
+    /// after it. A binary search, because the ends rise.
+    fn ends_up_to(&self, place: usize) -> usize {
+        self.control_ends.partition_point(|end| {
+            #[cfg(test)]
+            self.ends_examined.set(self.ends_examined.get() + 1);
+            *end <= place
+        })
     }
 }
 
@@ -636,5 +656,45 @@ mod tests {
         assert_eq!(output.as_str(), "aaa W Y");
         assert_eq!(output.control_ends, [7]);
         assert_eq!(output.into_text(), "aaa W Y");
+    }
+
+    /// The count of control ends that the output examines for `count` controls, each after a
+    /// word and each with a space written before it. With `block_ends`, a block ends after
+    /// each control.
+    fn ends_examined_for(count: usize, block_ends: bool) -> usize {
+        let mut output = PlainOutput::default();
+        for _ in 0..count {
+            output.push_text("z");
+            let control = output.start_control();
+            output.push_text("X");
+            output.finish_control(control);
+            if block_ends {
+                output.end_block();
+            }
+        }
+        assert_places_are_true(&output, "after the last control");
+        assert_eq!(output.control_ends.len(), count);
+        let examined = output.ends_examined.get();
+        let line = if block_ends { "z X\n\n" } else { "z X " };
+        assert_eq!(output.into_text(), line.repeat(count).trim_end_matches(' '));
+        examined
+    }
+
+    #[test]
+    fn controls_one_after_the_other_examine_a_bounded_count_of_control_ends() {
+        // ~keep No control end stands after the place of a space, so only the binary search
+        // ~keep reads ends: at most `ilog2(count) + 2` for each search, 11 and 13 here. A block
+        // ~keep end makes a second search. A scan of every end reads `count * (count - 1) / 2`
+        // ~keep ends for the spaces alone: 499,500 and 7,998,000.
+        for (block_ends, searches) in [(false, 1_usize), (true, 2)] {
+            for (count, reads) in [(1_000_usize, 11_usize), (4_000, 13)] {
+                let examined = ends_examined_for(count, block_ends);
+                let bound = count * reads * searches;
+                assert!(
+                    examined <= bound,
+                    "{count} controls (block ends: {block_ends}) examined {examined} control ends, over {bound}"
+                );
+            }
+        }
     }
 }
