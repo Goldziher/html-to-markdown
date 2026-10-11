@@ -802,7 +802,9 @@ fn skip_or_render_tag(
     handler: HandlerContext<'_>,
 ) -> bool {
     if should_skip_tag(tag_name, node_handle, tag, parser, handler) {
-        trim_trailing_whitespace(output);
+        if handler.ctx.inline_code_links.is_none() {
+            trim_trailing_whitespace(output);
+        }
         return true;
     }
     if handler.ctx.strip_tags.contains(tag_name) {
@@ -912,7 +914,7 @@ const fn collect_document_attributes(_tag_name: &str, _tag: &tl::HTMLTag<'_>, _c
 /// ~keep Block dispatch is where a trailing hard-break run becomes knowably
 /// ineffective; container endings handle the no-following-sibling case themselves.
 fn strip_breaks_before_block(tag_name: &str, output: &mut String, options: &ConversionOptions, ctx: &Context) {
-    if options.newline_style == NewlineStyle::Backslash && is_block_level_element(tag_name) {
+    if !ctx.in_code && options.newline_style == NewlineStyle::Backslash && is_block_level_element(tag_name) {
         strip_trailing_backslash_breaks(output, ctx.block_content_start);
     }
 }

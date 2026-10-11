@@ -83,6 +83,10 @@ enum ScriptKind {
 }
 
 fn handle_script(handler: HandlerContext<'_>, kind: ScriptKind) {
+    if handler.context.in_code {
+        handle_small(handler);
+        return;
+    }
     let Some(tl::Node::Tag(tag)) = handler.node_handle.get(handler.parser) else {
         return;
     };
@@ -98,11 +102,6 @@ fn handle_script(handler: HandlerContext<'_>, kind: ScriptKind) {
     let marker_context = handler.context.inline_buffer(handler.output, !open.is_empty());
     let mut content = String::with_capacity(32);
     collect_children(tag, &mut content, &marker_context, &handler);
-
-    if handler.context.in_code {
-        handler.output.push_str(&content);
-        return;
-    }
 
     #[cfg(feature = "visitor")]
     if let Some(custom_output) = visit_script(tag, kind, &handler) {

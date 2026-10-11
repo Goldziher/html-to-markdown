@@ -1,3 +1,66 @@
+## [3.14.1] - 2026-09-17
+
+### Fixed
+
+- **A multi-line link label or image `alt` no longer has one of its lines read as block
+  structure** ([#496](https://github.com/xberg-io/html-to-markdown/issues/496)). `CommonMark`
+  parses block structure before inline structure (spec 0.31.2 appendix A), so a continuation
+  line that looks like a block opener ends the paragraph the label lives in and the `[`/`![`
+  never reaches its `]`. `![A\n-\n](S)` produced no image at all -- it produced
+  `<h2>![A</h2><p>](S)</p>`, with the image gone. A hard line break did not help, because it
+  is inline and block parsing has already finished by then, so the reporter's escaping
+  workarounds could not work either. Measured against comrak, 14 of 18 opener shapes destroyed
+  the construct: setext `-` and `=`, all three thematic breaks, ATX headings, both code
+  fences, block quotes, all three bullet markers, both ordered-list delimiters, and HTML
+  blocks. The first non-blank character of a continuation line is now backslash-escaped when
+  that line would open a block *that can interrupt a paragraph* -- ordered lists at their
+  `.`/`)` delimiter, since a digit cannot carry an escape. Lines that open nothing are
+  untouched: four columns of indent (indented code cannot interrupt a paragraph), a type-7
+  HTML block such as a bare `<span>`, `2. x`, `-x`, seven `#`. The label's first line is never
+  escaped -- it is preceded on that same line by the caller's own `[`/`![`. The escaping is
+  unconditional, like the existing bracket escaping and unlike the `escape_misc` family: those
+  decide whether text that merely *looks* like Markdown is emitted verbatim, this decides
+  whether the image or link survives at all. Multi-line `alt` is not exotic -- TeX4ht emits it
+  for every formula it cannot render. Both tiers were affected and both are fixed through the
+  one `escape_link_label` helper they share.
+- **A `<br>` at the very start or end of an `<a>` is no longer dropped**
+  ([#497](https://github.com/xberg-io/html-to-markdown/issues/497)). `<a href="H">A<br></a>B`
+  renders as A, a line break, then B; the converter emitted `[A](H)B`, losing the break
+  entirely. `[A  \n](H)B` re-parses to exactly the original `<a href="H">A<br /></a>B`
+  (verified against comrak), so the break belongs inside the label. Both tiers dropped it for
+  the same reason expressed twice -- the whole label was whitespace-trimmed, and once
+  flattened a `"  \n"` marker is indistinguishable from the incidental whitespace that really
+  does belong before a `</a>` -- and Tier 2 additionally never emitted a *leading* break at
+  all, because its "nothing on this line yet" test compares a fresh label buffer's length
+  against the enclosing block's start offset. A run of breaks at one edge still collapses to a
+  single break (two adjacent markers would put a blank line in the label, and a blank line
+  ends the paragraph, destroying the link), and a label of nothing but breaks still collapses
+  to empty. A heading and a pipe-table cell are single-line and still fold every break to a
+  space. The issue's second example asks for `B[A  \n](H)`, which moves the break to the far
+  side of the label text; the break is preserved where the `<br>` actually was instead --
+  `B[  \nA](H)`, which comrak renders back to the input DOM.
+- Tier 1 no longer emits three spaces where Tier 2 emits one for a `<br>` inside a link inside
+  a table cell (`| [A   -   B](H) |` against `| [A - B](H) |`). Tier 1 folded its hard-break
+  marker late, in `close_table_cell`, which left the marker's two spaces behind; it now folds
+  in `close_link`, which is also what keeps the #496 escaping from firing on a label that is
+  about to become single-line anyway.
+
+- Generated Go and R e2e suites no longer assert against strings their fixtures never
+  specified (alef pin 0.90.0 to 0.91.5). Two independent generator defects were corrupting
+  fixture values on their way into test code: alef's Go emitter rendered a multi-line value as
+  a raw backtick literal and its own writer then trimmed the trailing whitespace off every
+  physical line, so the three assertions carrying a Markdown two-space hard break read
+  `[Alpha\n](url)Beta` where the fixture said `[Alpha  \n](url)Beta`; and alef's R emitter ran
+  every plain string argument through the PascalCase-to-snake_case transform meant only for
+  enum wire values, so `Alpha<span ...>` was emitted as `alpha<span ...>` and
+  `Beta<a ...><br>Alpha</a>` as `beta<a ...><br>_alpha</a>`. The R defect had been silently
+  wrong since the 3.14.0 `paragraph_whitespace_only_span_separates_words` fixture landed; it
+  went unnoticed because the E2E workflow had skipped every language test job on the three
+  preceding commits, so "green" meant "nothing ran". Fixed upstream in alef 0.91.5 rather than
+  by trimming the fixtures. The pin bump also carries alef 0.91.0-0.91.3, which for this repo
+  is limited to a simpler argument-marshalling path in the Node visitor bridge (no API or
+  behaviour change) and dropping its unused `tokio-util` dependency.
+
 ## [3.14.0] - 2026-09-16
 
 ### Changed

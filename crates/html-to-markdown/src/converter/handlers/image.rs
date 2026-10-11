@@ -45,7 +45,7 @@ struct ImageData<'a> {
 /// - Handling inline data URIs when the inline-images feature is enabled
 /// - Invoking visitor callbacks when the visitor feature is enabled
 /// - Generating appropriate markdown output
-pub fn handle_img(tag: &tl::HTMLTag, handler: HandlerContext<'_>) {
+pub fn handle_img(tag: &tl::HTMLTag, mut handler: HandlerContext<'_>) {
     let data = image_data(tag, &handler);
     #[cfg(feature = "metadata")]
     let metadata = handler.context.metadata_wants_images.then(|| image_metadata(tag));
@@ -57,12 +57,52 @@ pub fn handle_img(tag: &tl::HTMLTag, handler: HandlerContext<'_>) {
     let rendered = render_image(tag, &data, inline_data, &handler);
     if !handler.options.skip_images {
         if let Some(image_text) = rendered {
+            if data.src.is_empty() && image_text.is_empty() {
+                collapse_empty_image_boundary(&mut handler);
+            }
             handler.output.push_str(&image_text);
         }
     }
     #[cfg(feature = "metadata")]
     record_image_metadata(&data, metadata, handler.context);
     record_image_structure(&data, inline_data, handler.context);
+}
+
+// ~keep An absent image has no inline boundary: adjacent normalized whitespace folds once
+// ~keep (#756). Preserve strict whitespace and a preceding space when the next text has none.
+// ~keep Preformatted text keeps every space: no rule for running text applies in `pre`.
+fn collapse_empty_image_boundary(handler: &mut HandlerContext<'_>) {
+    if handler.context.inline_code_links.is_some()
+        || handler.context.in_code_block
+        || handler.options.whitespace_mode != crate::options::WhitespaceMode::Normalized
+        || !handler.output.ends_with(' ')
+    {
+        return;
+    }
+    let id = handler.node_handle.get_inner();
+    let siblings = handler
+        .dom_context
+        .parent_of(id)
+        .and_then(|parent| handler.dom_context.children_of(parent));
+    // ~keep The text that follows is the next node that is not a comment, read decoded: `&#32;`
+    // ~keep is a space. Only ASCII white space folds: a no-break space is content.
+    let index = handler.dom_context.get_sibling_index(id);
+    let following = siblings
+        .zip(index)
+        .map(|(siblings, index)| siblings.iter().skip(index + 1));
+    let next = following
+        .into_iter()
+        .flatten()
+        .map(|handle| handle.get(handler.parser))
+        .find(|node| !matches!(node, Some(tl::Node::Comment(_))))
+        .flatten();
+    if let Some(tl::Node::Raw(raw)) = next {
+        let text = raw.as_utf8_str();
+        let decoded = crate::text::decode_html_entities_cow(&text);
+        if decoded.as_bytes().first().is_some_and(u8::is_ascii_whitespace) {
+            handler.output.pop();
+        }
+    }
 }
 
 fn image_data<'a>(tag: &'a tl::HTMLTag<'a>, handler: &HandlerContext<'_>) -> ImageData<'a> {
@@ -74,10 +114,14 @@ fn image_data<'a>(tag: &'a tl::HTMLTag<'a>, handler: &HandlerContext<'_>) -> Ima
                 effective_src = Cow::Owned(source_src);
             }
         }
-        let base_resolved =
+        let base_resolved = if effective_src.trim().is_empty() {
+            effective_src = Cow::Borrowed("");
+            None
+        } else {
             handler
                 .context
-                .resolve_url(&effective_src, handler.node_handle, handler.parser, handler.dom_context);
+                .resolve_url(&effective_src, handler.node_handle, handler.parser, handler.dom_context)
+        };
         Cow::Owned(sanitize_markdown_url(base_resolved.as_deref().unwrap_or(&effective_src)).into_owned())
     };
 
@@ -159,12 +203,16 @@ fn render_image(
         || context.cell_allow_inline_images
         || context.link_allow_inline_images;
 
-    let should_use_alt_text = inline_data == InlineDataMedia::AltTextOnly
+    let should_use_alt_text = data.src.is_empty()
+        || inline_data == InlineDataMedia::AltTextOnly
         || (!keep_as_markdown
             && (context.convert_as_inline || (context.in_heading && !context.heading_allow_inline_images)));
     #[cfg(feature = "visitor")]
     if let std::ops::ControlFlow::Break(result) = visit_image(tag, data, handler) {
         return result;
+    }
+    if context.in_code {
+        return (inline_data != InlineDataMedia::DropElement).then(|| data.alt.to_string());
     }
     render_image_default(data, inline_data, should_use_alt_text, handler)
 }

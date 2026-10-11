@@ -627,6 +627,12 @@ pub fn handle_table(
     let Some(visitor_state) = begin_table_visit(node_handle, parser, output, tag, handler) else {
         return;
     };
+    if handler.ctx.in_table_cell && !handler.ctx.in_layout_cell && !handler.ctx.allow_nested_table_markup {
+        super::flatten::render(tag, parser, output, handler);
+        #[cfg(feature = "visitor")]
+        finish_table_visit(node_handle, parser, output, tag, handler, visitor_state);
+        return;
+    }
     let table_scan = scan_table(node_handle, parser, handler.dom_ctx, handler.options.br_in_tables);
     let wrapper_cell = nested_table_wrapper_cell(tag, parser, &table_scan).filter(|(_, cell_depth)| {
         handler.depth + cell_depth + 1 < crate::converter::main_helpers::effective_max_depth(handler.options)

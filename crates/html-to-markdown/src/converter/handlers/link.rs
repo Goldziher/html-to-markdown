@@ -68,6 +68,10 @@ pub fn handle_link(tag: &tl::HTMLTag, mut handler: HandlerContext<'_>) {
         walk_handles_to_output(tag.children().top().iter().copied(), &mut handler);
         return;
     };
+    if handler.context.in_code {
+        emit_code_link(tag, &data, &mut handler);
+        return;
+    }
     if emit_autolink(&data, &mut handler) || emit_heading_link(&data, &mut handler) {
         return;
     }
@@ -76,13 +80,97 @@ pub fn handle_link(tag: &tl::HTMLTag, mut handler: HandlerContext<'_>) {
     let mut label = build_label(&data, &handler);
     apply_label_fallbacks(&data, &mut label, &handler);
     indent_hard_break_continuations(&mut label, handler.context, handler.options);
-    let drop_link = label.is_empty() && handler.context.inline_data_replaced.get();
+    let drop_link = label.is_empty()
+        && handler.context.inline_data_replaced.get()
+        && handler.options.inline_data_media == InlineDataMedia::DropElement;
     let emit_deferred = emit_link(tag, &data, &label, drop_link, &mut handler);
     #[cfg(feature = "metadata")]
     record_link_metadata(tag, &data, &label, handler.context);
     if data.emit_blocks_separately && emit_deferred {
         walk_handles_to_output(data.deferred.iter().copied(), &mut handler);
     }
+}
+
+fn emit_code_link(tag: &tl::HTMLTag<'_>, data: &LinkData<'_>, handler: &mut HandlerContext<'_>) {
+    let context = Context {
+        inline_code_links: None,
+        ..handler.context.clone()
+    };
+    let mut raw = collect_code_link_text(data, &context, handler);
+    if (handler.context.in_table_cell || handler.context.in_heading) && followed_by_break(handler) {
+        raw.truncate(raw.trim_end().len());
+    }
+    if let Some(links) = handler.context.inline_code_links.as_ref().filter(|_| {
+        !handler.context.in_code_block && !data.href.is_empty() && !data.href_addr_dropped && !raw.is_empty()
+    }) {
+        let mut label = String::new();
+        crate::converter::handlers::code_block::emit_inline_code(
+            &raw,
+            &mut label,
+            handler.options,
+            handler.node_handle,
+            handler.parser,
+            handler.dom_context,
+        );
+        let mut markdown = String::new();
+        let mut link_handler = HandlerContext::new((
+            handler.node_handle,
+            handler.parser,
+            &mut markdown,
+            handler.options,
+            &context,
+            handler.depth,
+            handler.dom_context,
+        ));
+        emit_link(tag, data, &label, false, &mut link_handler);
+        if !markdown.is_empty() {
+            let start = handler.output.len();
+            handler.output.push_str(&raw);
+            links.borrow_mut().push(crate::converter::context::InlineCodeLink {
+                range: start..handler.output.len(),
+                markdown,
+            });
+        }
+    } else if handler.context.inline_code_links.is_some() {
+        handler.output.push_str(&raw);
+    } else {
+        emit_link(tag, data, &raw, false, handler);
+    }
+    #[cfg(feature = "metadata")]
+    record_link_metadata(tag, data, raw.trim(), handler.context);
+}
+
+fn followed_by_break(handler: &HandlerContext<'_>) -> bool {
+    let id = handler.node_handle.get_inner();
+    let next = handler
+        .dom_context
+        .parent_of(id)
+        .and_then(|parent| handler.dom_context.children_of(parent))
+        .and_then(|siblings| {
+            handler
+                .dom_context
+                .get_sibling_index(id)
+                .and_then(|index| siblings.get(index + 1))
+        });
+    matches!(next.and_then(|handle| handle.get(handler.parser)), Some(tl::Node::Tag(tag)) if tag.name().as_utf8_str().eq_ignore_ascii_case("br"))
+}
+
+fn collect_code_link_text(data: &LinkData<'_>, context: &Context, handler: &HandlerContext<'_>) -> String {
+    let mut raw = String::new();
+    for child in &data.children {
+        walk_node(
+            child,
+            handler.parser,
+            &mut raw,
+            crate::converter::block::container::HandlerContext::new(
+                handler.options,
+                context,
+                handler.depth + 1,
+                handler.dom_context,
+            ),
+        );
+    }
+    raw
 }
 
 struct LinkData<'a> {
@@ -97,6 +185,8 @@ struct LinkData<'a> {
     href_addr_dropped: bool,
     link_allow_inline_images: bool,
     saw_block: bool,
+    accessible_name: Option<Cow<'a, str>>,
+    empty_span_content: bool,
 }
 
 impl<'a> LinkData<'a> {
@@ -109,7 +199,7 @@ impl<'a> LinkData<'a> {
             .map(|href| {
                 handler
                     .context
-                    .resolve_url(&href, handler.node_handle, handler.parser, handler.dom_context)
+                    .resolve_link_url(&href, handler.node_handle, handler.parser, handler.dom_context)
                     .unwrap_or(href)
             })?;
         // ~keep Empty titles are absent because Markdown serializers drop `""` on reparse.
@@ -139,6 +229,13 @@ impl<'a> LinkData<'a> {
                 handler.dom_context,
             ),
             link_allow_inline_images: handler.context.keep_inline_images_in.contains("a"),
+            accessible_name: crate::converter::utility::attributes::decoded_attribute(tag, "aria-label")
+                .filter(|value| !value.trim().is_empty())
+                .or_else(|| title.clone()),
+            empty_span_content: !children.is_empty()
+                && children
+                    .iter()
+                    .all(|child| empty_text_wrapper_child(child, handler.parser)),
             href,
             title,
             children,
@@ -149,6 +246,52 @@ impl<'a> LinkData<'a> {
             saw_block,
         })
     }
+}
+
+// ~keep Empty presentational wrappers carry no textual or media fallback; preserve their destination
+// ~keep without inserting URL words into document content (#771). Icon fonts and images
+// ~keep still use the link-name/address fallback required by #774 and #775.
+fn empty_text_wrapper_child(handle: &tl::NodeHandle, parser: &tl::Parser<'_>) -> bool {
+    let mut pending = vec![*handle];
+    while let Some(child) = pending.pop() {
+        match child.get(parser) {
+            Some(tl::Node::Raw(raw)) if text::decode_html_entities_cow(&raw.as_utf8_str()).trim().is_empty() => {}
+            Some(tl::Node::Comment(_)) => {}
+            Some(tl::Node::Tag(tag))
+                if matches!(
+                    normalized_tag_name(tag.name().as_utf8_str()).as_ref(),
+                    "span"
+                        | "b"
+                        | "strong"
+                        | "em"
+                        | "mark"
+                        | "del"
+                        | "s"
+                        | "strike"
+                        | "ins"
+                        | "u"
+                        | "small"
+                        | "sub"
+                        | "sup"
+                        | "code"
+                        | "kbd"
+                        | "samp"
+                ) || plain_wrapper(tag) =>
+            {
+                pending.extend(tag.children().top().iter().copied());
+            }
+            _ => return false,
+        }
+    }
+    true
+}
+
+// ~keep An `i` or a `div` with a class is an icon that a style sheet draws: #774 and the vote
+// ~keep link of the #121 fixture name it by the link address. With no class it shows nothing,
+// ~keep as an empty `span` does.
+fn plain_wrapper(tag: &tl::HTMLTag<'_>) -> bool {
+    tag.attributes().get("class").is_none()
+        && matches!(normalized_tag_name(tag.name().as_utf8_str()).as_ref(), "i" | "div")
 }
 
 fn emit_autolink(data: &LinkData<'_>, handler: &mut HandlerContext<'_>) -> bool {
@@ -309,8 +452,21 @@ fn apply_label_fallbacks(data: &LinkData<'_>, label: &mut String, handler: &Hand
     if !data.emit_blocks_separately && label.is_empty() && !data.raw_text.is_empty() {
         *label = normalize_link_label(&data.raw_text);
     }
-    let drop_link = label.is_empty() && handler.context.inline_data_replaced.get();
-    if label.is_empty() && !data.href.is_empty() && !data.children.is_empty() && !drop_link && !data.href_addr_dropped {
+    let drop_link = label.is_empty()
+        && handler.context.inline_data_replaced.get()
+        && handler.options.inline_data_media == InlineDataMedia::DropElement;
+    if label.is_empty() && !drop_link && !data.href_addr_dropped {
+        if let Some(name) = data.accessible_name.as_deref() {
+            *label = normalize_link_label(name);
+        }
+    }
+    if label.is_empty()
+        && !data.href.is_empty()
+        && !data.children.is_empty()
+        && !data.empty_span_content
+        && !drop_link
+        && !data.href_addr_dropped
+    {
         *label = text::escape(
             &data.href,
             handler.options.escape_misc,
@@ -345,7 +501,7 @@ fn emit_link(
 }
 
 fn write_link(output: &mut String, data: &LinkData<'_>, label: &str, options: &ConversionOptions, context: &Context) {
-    if data.href_addr_dropped {
+    if data.href_addr_dropped || data.href.is_empty() || context.in_code_block {
         output.push_str(label);
         return;
     }

@@ -40,13 +40,6 @@ fn validate_table_layout(
     // ~keep If those conditions could apply to this table, we bail rather than
     // emit a GFM table that Tier-2 would have rendered differently.
     // ~keep
-    // ~keep `inconsistent_cols` below is checked in addition to the above, not because
-    // Tier-2 treats ragged rows as layout (it no longer does, issue #500 — the
-    // regular renderer pads a short row to the table's column count instead,
-    // issue #13), but because Tier-1 has no padding logic of its own: bailing on
-    // ragged rows is stricter than Tier-2 needs, which stays parity-safe (it only
-    // ever sends more input to the fallback) without teaching Tier-1 to pad.
-    // ~keep
     // ~keep When a <caption> is present, Tier-2 always takes the GFM path
     // regardless of <th> presence (has_caption short-circuits the layout check).
     let has_caption = table.caption_text.is_some();
@@ -100,10 +93,7 @@ fn render_closed_table(
     table_probes: &mut [TableLayoutProbe],
     options: &ConversionOptions,
 ) {
-    // ~keep Phase HH: a nested table writes its GFM rendering into the parent
-    // cell buffer; the parent's `close_table_cell` then collapses the
-    // resulting newlines to spaces.  An outer table writes to the main
-    // output buffer as before.
+    // ~keep Nested rows write their cell content into the parent buffer (#760).
     if table.inline_mode {
         if let Some(outer) = state.table_stack.last_mut() {
             outer.had_nested_table = true;
@@ -114,26 +104,21 @@ fn render_closed_table(
         if let Some(outer_probe) = table_probes.last_mut() {
             outer_probe.nested_table_count += 1;
         }
-        // ~keep Tier-2's `render_cell_text` (block/table/cell.rs, commit ee77eb2a18)
-        // now escapes the bare `|` a nested table's own row/separator syntax
-        // leaves behind, rendering the nested table into a scratch buffer and
-        // escaping just that fragment before appending it to the outer cell.
-        // Left unescaped, those pipes read as *outer-row* cell boundaries on
-        // reparse and GFM truncates the row, silently dropping the inner
-        // cells — genuine content loss, not a cosmetic difference. Mirror the
-        // same scratch-buffer-then-escape shape here rather than escaping the
-        // whole outer cell buffer, so any literal text already accumulated
-        // alongside the nested table in the same cell is left untouched.
-        let mut nested = String::new();
-        emit_gfm_table(&mut nested, table, options.output_format);
-        if nested.contains('|') {
-            nested = crate::converter::utility::escaping::escape_bare_pipes_outside_code_spans(&nested);
+        // ~keep Markdown tables cannot nest: keep inner cell content and row breaks only (#760).
+        let mut nested = table.caption_text.as_deref().unwrap_or_default().to_string();
+        for row in &table.rows {
+            let mut row_cells = row.iter().filter(|(cell, _)| !cell.is_empty());
+            if let Some((first, _)) = row_cells.next() {
+                if !nested.is_empty() {
+                    crate::converter::main_helpers::emit_table_cell_break(&mut nested, options.br_in_tables);
+                }
+                nested.push_str(first);
+                for (cell, _) in row_cells {
+                    nested.push(' ');
+                    nested.push_str(cell);
+                }
+            }
         }
-        // ~keep Mirrors Tier-2's `fold_nested_table_rows` (block/table/cell.rs, issue #469):
-        // the inner rows are joined with `<br>` under `br_in_tables` and a space
-        // otherwise, so `close_table_cell`'s unconditional newline fold has nothing left
-        // to flatten and both tiers spell the boundary the same way.
-        let nested = crate::converter::block::table::cell::fold_nested_table_rows(&nested, options.br_in_tables);
         let write_nested = |dest: &mut String| {
             if !nested.is_empty() && !dest.trim_end().is_empty() {
                 crate::converter::main_helpers::emit_table_cell_break(dest, options.br_in_tables);
@@ -158,6 +143,11 @@ fn render_closed_table(
             with_cell_scratch(state, write_nested);
         } else {
             write_nested(state.cell_or_output_mut());
+            if !nested.is_empty()
+                && let Some(outer) = state.table_stack.last_mut()
+            {
+                outer.nested_table_ends.push(outer.current_cell.len());
+            }
         }
     } else {
         emit_gfm_table(&mut state.output, table, options.output_format);
@@ -223,12 +213,18 @@ fn close_table_row(state: &mut Tier1State) {
 /// `is_implicit` skips the pipe-escape bail that only applies when the cell
 /// was explicitly closed (implicit closes happen during row/table teardown
 /// where we've already committed to the data we have).
-fn close_table_cell(state: &mut Tier1State, is_implicit: bool) -> Result<(), BailReason> {
+fn close_table_cell(state: &mut Tier1State, is_implicit: bool, options: &ConversionOptions) -> Result<(), BailReason> {
     let Some(ts) = state.table_stack.last_mut() else {
         return Ok(());
     };
     ts.in_cell = false;
     // ~keep Trim the accumulated cell text (matches Tier-2 `text.trim()`).
+    crate::converter::block::table::cell::separate_nested_table_following_content(
+        &mut ts.current_cell,
+        &ts.nested_table_ends,
+        options.br_in_tables,
+    );
+    ts.nested_table_ends.clear();
     let cell_text_raw = ts.current_cell.trim().to_owned();
     // ~keep Replace newlines with spaces — mirrors Tier-2's `cell_text_content`
     // which calls `text.replace('\n', " ")` when `br_in_tables` is false.
@@ -245,13 +241,8 @@ fn close_table_cell(state: &mut Tier1State, is_implicit: bool) -> Result<(), Bai
     // implement pipe escaping.  Implicit closes skip this check because
     // they are triggered during structural teardown, not fresh cell data.
     // ~keep
-    // ~keep Phase HH exception: when a nested table emitted GFM markdown into this
-    // cell, the pipes were already escaped (`|` -> `\|`) by the nested-table
-    // close path above -- see `escape_bare_pipes_outside_code_spans` -- so
-    // `cell_text` still literally contains `|` bytes (an escaped pipe is still
-    // two bytes, one of them `|`) even though Tier-2 no longer emits a bare
-    // one here either (commit ee77eb2a18). `had_nested_table` gates the skip;
-    // reset it so subsequent cells in the same row are still pipe-checked.
+    // ~keep Nested cells have already escaped their content pipes; let those bytes pass
+    // ~keep rather than treating them as outer-cell delimiters. Reset for the next cell.
     let allow_pipes = ts.had_nested_table;
     ts.had_nested_table = false;
     if !is_implicit && !allow_pipes && cell_text.contains('|') {
