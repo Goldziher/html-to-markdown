@@ -2,31 +2,48 @@
 //! form control ended, the places where the open controls started and the places a visitor can
 //! return to.
 //!
-//! ~keep The text is private to this module and no function gives a mutable reference to it
-//! ~keep away, so every change of the text is a function here: `append`, `insert_at` and
-//! ~keep `shrink_to`. Each keeps every control end, every start of an open control and every
-//! ~keep open checkpoint a true place in the text. A caller holds a token for a place, never
-//! ~keep the place.
+//! ~keep The text is private to this module and no function gives a reference to all of it
+//! ~keep away, so every change of the text is a function here: `append`, `insert_at`,
+//! ~keep `shrink_to`, `hide_from` and `cut`. Each keeps every control end, every start of an
+//! ~keep open control and every open checkpoint a true place in the text. A caller holds a
+//! ~keep token for a place, never the place.
+//!
+//! ~keep The end of a block removes the spaces at the end of its line. While a checkpoint
+//! ~keep stands in those spaces, the element of that checkpoint can still be removed, and the
+//! ~keep spaces must be there again. So the output does not remove them then: they stay in
+//! ~keep the text as a hole, bytes that are not part of the text. A return to the checkpoint
+//! ~keep cuts the text at the place of the checkpoint, which never moves, and the hole is
+//! ~keep text again. A commit of the checkpoint removes the bytes of the hole. No function
+//! ~keep reads or copies a run of spaces once for each element after it.
+
+mod counted;
+#[cfg(all(test, feature = "visitor"))]
+mod tests;
 
 use crate::converter::form::spacing;
+use counted::{ControlEnds, OutputText};
 
 /// The text of one buffer of the plain text writer (the page, a table cell, an option list).
 #[derive(Default)]
 pub(super) struct PlainOutput {
-    text: String,
-    /// The lengths of `text` right after each form control wrote its text, in rising order.
-    /// While `text` has the last length and does not end with white space, that control is
-    /// the last thing in it. After other text, a line end or a block the last length says
-    /// nothing.
-    control_ends: Vec<usize>,
+    /// The bytes of the text, the holes included.
+    text: OutputText,
+    /// The lengths of the text right after each form control wrote its text. While the text
+    /// has the last length and does not end with white space, that control is the last thing
+    /// in it. After other text, a line end or a block the last length says nothing.
+    control_ends: ControlEnds,
     /// The controls that are open, the outer one first, in rising order of their starts.
     open_controls: Vec<ControlPlace>,
     /// The checkpoints that are open, the outer one first, in rising order of their places.
     #[cfg(feature = "visitor")]
     open_checkpoints: Vec<OpenCheckpoint>,
-    /// The count of control ends that `insert_at` and `shrink_to` read or moved.
-    #[cfg(test)]
-    ends_examined: std::cell::Cell<usize>,
+    /// The holes, in rising order. Each belongs to an open checkpoint.
+    #[cfg(feature = "visitor")]
+    holes: Vec<Hole>,
+    /// The count of spaces and tabs at the end of the text. `append`, `insert_at`, the end of
+    /// a block and a return to a checkpoint keep it, so the end of a block does not read the
+    /// text to find it.
+    blank_tail: usize,
 }
 
 /// The start of a control, as the output keeps it while the control is open.
@@ -55,10 +72,26 @@ impl OpenControl {
 /// A place in the text to return to, as the output keeps it while the checkpoint is open.
 #[cfg(feature = "visitor")]
 struct OpenCheckpoint {
-    /// The place: a length of the text, never above its length now.
+    /// The place: the length of the text when the checkpoint was opened. Only `insert_at`
+    /// moves it, with the text it stands in.
     at: usize,
-    /// The text that stood right before the place and that a shorter text removed since.
-    removed_before: String,
+    /// The count of spaces and tabs at the end of the text when the checkpoint was opened.
+    blank_tail: usize,
+    /// The count of holes when the checkpoint was opened.
+    holes: usize,
+}
+
+/// A run of spaces and tabs that the end of a block removed from the text while a checkpoint
+/// stood in the run. The bytes from `start` to `end` are in the buffer and are not text.
+#[cfg(feature = "visitor")]
+struct Hole {
+    /// The place of the first byte of the hole.
+    start: usize,
+    /// The place after the last byte of the hole.
+    end: usize,
+    /// The position of the outer checkpoint in the run among the open checkpoints. Its commit
+    /// removes the bytes.
+    owner: usize,
 }
 
 /// An open checkpoint of a `PlainOutput`. `rollback` or `commit` closes it.
@@ -77,22 +110,39 @@ impl Checkpoint {
     }
 }
 
+/// The count of spaces and tabs at the end of `text`.
+fn blank_at_end(text: &str) -> usize {
+    text.len() - text.trim_end_matches([' ', '\t']).len()
+}
+
 impl PlainOutput {
     /// An output with room for `capacity` bytes of text.
     pub(super) fn with_capacity(capacity: usize) -> Self {
         Self {
-            text: String::with_capacity(capacity),
+            text: OutputText::with_capacity(capacity),
             ..Self::default()
         }
     }
 
-    /// The text so far.
-    pub(super) fn as_str(&self) -> &str {
-        &self.text
+    /// The length of the text so far.
+    #[cfg(feature = "visitor")]
+    pub(super) fn len(&self) -> usize {
+        self.text.len() - self.holes.iter().map(|hole| hole.end - hole.start).sum::<usize>()
+    }
+
+    /// The length of the text so far.
+    #[cfg(not(feature = "visitor"))]
+    pub(super) const fn len(&self) -> usize {
+        self.text.len()
+    }
+
+    /// Whether the text ends with a line end.
+    pub(super) fn ends_with_line_end(&self) -> bool {
+        self.text.char_before(self.visible_len()) == "\n"
     }
 
     /// The text, at the end of the buffer. Every control and every checkpoint is closed by
-    /// then.
+    /// then, so no hole is left.
     pub(super) fn into_text(self) -> String {
         debug_assert!(
             self.open_controls.is_empty(),
@@ -100,10 +150,10 @@ impl PlainOutput {
         );
         #[cfg(feature = "visitor")]
         debug_assert!(
-            self.open_checkpoints.is_empty(),
+            self.open_checkpoints.is_empty() && self.holes.is_empty(),
             "a checkpoint is open at the end of the buffer"
         );
-        self.text
+        self.text.into_string()
     }
 
     /// Writes `text`. When a control ends right before it and `text` starts with a word, one
@@ -114,8 +164,9 @@ impl PlainOutput {
     /// ~keep space after a control is written when the next text arrives, so no arm decides
     /// ~keep ahead what follows a control.
     pub(super) fn push_text(&mut self, text: &str) {
-        if self.control_ends.last() == Some(&self.text.len())
-            && spacing::needs_space_before(&self.text)
+        let end = self.visible_len();
+        if self.control_ends.last() == Some(end)
+            && spacing::needs_space_before(self.text.char_before(end))
             && spacing::starts_with_word(text) == Some(true)
         {
             self.append(" ");
@@ -133,7 +184,7 @@ impl PlainOutput {
     pub(super) fn start_control(&mut self) -> OpenControl {
         self.open_controls.push(ControlPlace {
             at: self.text.len(),
-            separate: spacing::needs_space_before(&self.text),
+            separate: spacing::needs_space_before(self.text.char_before(self.visible_len())),
         });
         OpenControl {
             index: self.open_controls.len() - 1,
@@ -152,11 +203,15 @@ impl PlainOutput {
             self.open_controls.len(),
             "the control that finishes is not the last one opened"
         );
-        if let Some(start) = self.open_controls.pop()
-            && let Some(space_owed) = spacing::space_owed_before(start.separate, &self.text[start.at..])
-        {
+        let Some(start) = self.open_controls.pop() else {
+            return;
+        };
+        let at = start.at;
+        #[cfg(feature = "visitor")]
+        let at = self.past_holes(at);
+        if let Some(space_owed) = spacing::space_owed_before(start.separate, self.text.char_at(at)) {
             if space_owed {
-                self.insert_at(start.at, " ");
+                self.insert_at(at, " ");
             }
             self.control_ends.push(self.text.len());
         }
@@ -164,7 +219,8 @@ impl PlainOutput {
 
     /// Writes `text`, the text of one option, to this list of options.
     pub(super) fn write_option(&mut self, text: &str) {
-        if let Some((separator, word)) = spacing::option_word(&self.text, text) {
+        let end = self.visible_len();
+        if let Some((separator, word)) = spacing::option_word(self.text.char_before(end), text) {
             self.append(separator);
             self.append(word);
         }
@@ -182,21 +238,34 @@ impl PlainOutput {
 
     /// Ends the line: the text ends with at least one line end. An empty text stays empty.
     pub(super) fn end_line(&mut self) {
-        if !(self.text.is_empty() || self.text.ends_with('\n')) {
+        let end = self.visible_len();
+        if !(end == 0 || self.text.char_before(end) == "\n") {
             self.append("\n");
         }
     }
 
     /// Ends the block: the text ends with a blank line, and the line before it does not end
     /// with a space or a tab. An empty text stays empty.
+    ///
+    /// ~keep The work does not grow with the spaces at the end or with the line ends at the
+    /// ~keep end: the count of the spaces is kept, and at most two line ends are read.
     pub(super) fn end_block(&mut self) {
-        if self.text.is_empty() {
+        let end = self.visible_len();
+        if end == 0 {
             return;
         }
-        let kept = self.text.trim_end_matches([' ', '\t']).len();
-        self.shrink_to(kept);
-        let line_ends = self.text.chars().rev().take_while(|&c| c == '\n').count();
-        for _ in line_ends..2 {
+        if self.blank_tail > 0 {
+            let kept = end - self.blank_tail;
+            #[cfg(feature = "visitor")]
+            let hidden = self.hide_from(kept);
+            #[cfg(not(feature = "visitor"))]
+            let hidden = false;
+            if !hidden {
+                self.shrink_to(kept);
+            }
+            self.blank_tail = 0;
+        }
+        for _ in self.line_ends_at_end()..2 {
             self.append("\n");
         }
     }
@@ -206,27 +275,43 @@ impl PlainOutput {
     pub(super) fn open(&mut self) -> Checkpoint {
         self.open_checkpoints.push(OpenCheckpoint {
             at: self.text.len(),
-            removed_before: String::new(),
+            blank_tail: self.blank_tail,
+            holes: self.holes.len(),
         });
         Checkpoint {
             index: self.open_checkpoints.len() - 1,
         }
     }
 
-    /// The text written since `checkpoint`.
+    /// The text written since `checkpoint`, the last checkpoint opened.
     #[cfg(feature = "visitor")]
     pub(super) fn since(&self, checkpoint: &Checkpoint) -> &str {
         let start = self
             .open_checkpoints
             .get(checkpoint.index)
-            .map_or(self.text.len(), |open| open.at);
-        &self.text[start..]
+            .map_or(self.text.len(), |open| self.past_holes(open.at));
+        self.text.from(start)
     }
 
-    /// Closes `checkpoint` and keeps the text written since.
+    /// Closes `checkpoint` and keeps the text written since. The spaces that the end of a
+    /// block removed before the checkpoint are removed from the buffer now.
+    ///
+    /// ~keep The bytes after a hole move once for the hole. A checkpoint has one hole at
+    /// ~keep most, so a byte moves at most once for each element around it.
     #[cfg(feature = "visitor")]
     pub(super) fn commit(&mut self, checkpoint: Checkpoint) {
-        self.close(checkpoint);
+        let owner = checkpoint.index;
+        let Some(closed) = self.close(checkpoint) else {
+            return;
+        };
+        let mut index = self.holes.len();
+        while index > closed.holes {
+            index -= 1;
+            if self.holes[index].owner == owner {
+                let hole = self.holes.remove(index);
+                self.cut(hole.start, hole.end);
+            }
+        }
     }
 
     /// Closes `checkpoint` and makes the text what it was when the checkpoint was opened. A
@@ -234,26 +319,17 @@ impl PlainOutput {
     /// ended before it is the last control again.
     ///
     /// ~keep The end of a block removes the spaces at the end of its line, and those can
-    /// ~keep stand before the checkpoint. The output kept them for the checkpoint, and they
-    /// ~keep are written again here: the element that is removed leaves nothing, and the text
-    /// ~keep before it stays as it was.
+    /// ~keep stand before the checkpoint. They are a hole in the buffer since then, and the
+    /// ~keep hole is dropped here: the element that is removed leaves nothing, and the text
+    /// ~keep before it stays as it was. No byte is written again.
     #[cfg(feature = "visitor")]
     pub(super) fn rollback(&mut self, checkpoint: Checkpoint) {
         let Some(closed) = self.close(checkpoint) else {
             return;
         };
+        self.holes.truncate(closed.holes);
         self.shrink_to(closed.at);
-        self.append(&closed.removed_before);
-        // ~keep An outer checkpoint that lost the same spaces has its first place again.
-        for open in &mut self.open_checkpoints {
-            if open.at == closed.at
-                && !open.removed_before.is_empty()
-                && closed.removed_before.starts_with(&open.removed_before)
-            {
-                open.at += open.removed_before.len();
-                open.removed_before.clear();
-            }
-        }
+        self.blank_tail = closed.blank_tail;
     }
 
     /// Takes `checkpoint` from the open checkpoints, with every checkpoint opened after it.
@@ -273,27 +349,87 @@ impl PlainOutput {
         }
     }
 
-    /// Writes `text` at the end of the text.
+    /// The length of the buffer without the holes at its end: the end of the text.
+    #[cfg(feature = "visitor")]
+    fn visible_len(&self) -> usize {
+        self.before_holes(self.text.len())
+    }
+
+    /// The length of the buffer: the end of the text.
+    #[cfg(not(feature = "visitor"))]
+    const fn visible_len(&self) -> usize {
+        self.text.len()
+    }
+
+    /// The place where the text before `place` ends: before each hole that ends at it.
+    #[cfg(feature = "visitor")]
+    fn before_holes(&self, mut place: usize) -> usize {
+        for hole in self.holes.iter().rev() {
+            if hole.end == place {
+                place = hole.start;
+            }
+        }
+        place
+    }
+
+    /// The place where the text after `place` starts: after each hole that `place` stands in
+    /// or at the start of.
+    #[cfg(feature = "visitor")]
+    fn past_holes(&self, mut place: usize) -> usize {
+        for hole in &self.holes {
+            if (hole.start..=hole.end).contains(&place) {
+                place = hole.end;
+            }
+        }
+        place
+    }
+
+    /// The count of line ends at the end of the text, 2 at most.
+    fn line_ends_at_end(&self) -> usize {
+        let mut end = self.visible_len();
+        let mut count = 0;
+        while count < 2 && self.text.char_before(end) == "\n" {
+            count += 1;
+            end -= 1;
+            #[cfg(feature = "visitor")]
+            {
+                end = self.before_holes(end);
+            }
+        }
+        count
+    }
+
+    /// Writes `text` at the end of the buffer.
     fn append(&mut self, text: &str) {
+        let blank = blank_at_end(text);
+        self.blank_tail = if blank == text.len() {
+            self.blank_tail + blank
+        } else {
+            blank
+        };
         self.text.push_str(text);
     }
 
-    /// Writes `text` at `at`, a character boundary of the text. Each control end, each start
-    /// of an open control and each open checkpoint after `at` moves with the text it stands in.
+    /// Writes `text` at `at`, a character boundary of the text that is in no hole. Each
+    /// control end, each start of an open control, each open checkpoint and each hole after
+    /// `at` moves with the text it stands in.
     ///
     /// ~keep The control ends rise, so the ends after `at` are the last ones: a binary search
     /// ~keep finds the first, and only those move. A scan of every end made a line of controls
-    /// ~keep cost the square of their count. The open controls and the open checkpoints are as
-    /// ~keep many as the elements around the place, so each is read.
+    /// ~keep cost the square of their count. The open controls, the open checkpoints and the
+    /// ~keep holes are as many as the elements around the place, so each is read.
     fn insert_at(&mut self, at: usize, text: &str) {
-        self.text.insert_str(at, text);
-        let after = self.ends_up_to(at);
-        #[cfg(test)]
-        self.ends_examined
-            .set(self.ends_examined.get() + self.control_ends.len() - after);
-        for end in &mut self.control_ends[after..] {
-            *end += text.len();
+        if at >= self.text.len() - self.blank_tail {
+            let blank = blank_at_end(text);
+            self.blank_tail = if blank == text.len() {
+                self.blank_tail + blank
+            } else {
+                self.text.len() - at + blank
+            };
         }
+        self.text.insert_str(at, text);
+        let after = self.control_ends.first_after(at);
+        self.control_ends.raise_from(after, text.len());
         for control in &mut self.open_controls {
             if control.at > at {
                 control.at += text.len();
@@ -305,395 +441,78 @@ impl PlainOutput {
                 open.at += text.len();
             }
         }
+        #[cfg(feature = "visitor")]
+        for hole in &mut self.holes {
+            if hole.start >= at {
+                hole.start += text.len();
+                hole.end += text.len();
+            }
+        }
     }
 
     /// Removes the text after `len`, with the record of each control that ended in it. The
-    /// start of an open control after `len` moves to `len`. An open checkpoint after `len`
-    /// moves to `len` and keeps the text removed before it.
+    /// start of an open control after `len` moves to `len`. No open checkpoint stands after
+    /// `len`: the end of a block calls `hide_from` then, and a return removes the text after
+    /// its own checkpoint, the last one.
     ///
-    /// ~keep This is the one function that makes the text shorter.
+    /// ~keep This is the one function that makes the text shorter at its end.
     fn shrink_to(&mut self, len: usize) {
+        #[cfg(feature = "visitor")]
+        debug_assert!(
+            self.open_checkpoints.iter().all(|open| open.at <= len),
+            "an open checkpoint stands in the text that is removed"
+        );
         for control in &mut self.open_controls {
             control.at = control.at.min(len);
         }
-        #[cfg(feature = "visitor")]
-        for open in &mut self.open_checkpoints {
-            if open.at > len {
-                open.removed_before.insert_str(0, &self.text[len..open.at]);
-                open.at = len;
-            }
-        }
         self.text.truncate(len);
-        let kept = self.ends_up_to(len);
+        let kept = self.control_ends.first_after(len);
         self.control_ends.truncate(kept);
     }
 
-    /// The count of the control ends that are not after `place`: the position of the first end
-    /// after it. A binary search, because the ends rise.
-    fn ends_up_to(&self, place: usize) -> usize {
-        self.control_ends.partition_point(|end| {
-            #[cfg(test)]
-            self.ends_examined.set(self.ends_examined.get() + 1);
-            *end <= place
-        })
-    }
-}
-
-#[cfg(all(test, feature = "visitor"))]
-mod tests {
-    use super::{Checkpoint, OpenControl, PlainOutput};
-
-    /// One change of an output.
-    #[derive(Clone, Copy)]
-    enum Step {
-        Text(&'static str),
-        Control(&'static str),
-        Start,
-        Finish,
-        Options(&'static str),
-        EndBlock,
-        Open,
-        Rollback,
-        Commit,
-    }
-
-    /// Fails when the start of an open control is not a place in the text, or when the starts
-    /// do not rise.
-    fn assert_control_starts_are_true(output: &PlainOutput, context: &str) {
-        let starts: Vec<usize> = output.open_controls.iter().map(|control| control.at).collect();
-        assert!(
-            starts
-                .iter()
-                .all(|at| *at <= output.text.len() && output.text.is_char_boundary(*at)),
-            "{context}: the start of an open control is not a place in the text: {starts:?} in {:?}",
-            output.text
-        );
-        assert!(
-            starts.is_sorted(),
-            "{context}: the starts of the open controls do not rise: {starts:?}"
-        );
-    }
-
-    /// Fails when a control end, the start of an open control or an open checkpoint is not a
-    /// place in the text, or when one of the three lists does not rise.
-    fn assert_places_are_true(output: &PlainOutput, context: &str) {
-        assert_control_starts_are_true(output, context);
-        let len = output.text.len();
-        assert!(
-            output.control_ends.iter().all(|end| *end <= len),
-            "{context}: a control end is past the text: {:?} in {:?}",
-            output.control_ends,
-            output.text
-        );
-        assert!(
-            output.control_ends.is_sorted(),
-            "{context}: the control ends do not rise: {:?}",
-            output.control_ends
-        );
-        let places: Vec<usize> = output.open_checkpoints.iter().map(|open| open.at).collect();
-        assert!(
-            places.iter().all(|at| *at <= len && output.text.is_char_boundary(*at)),
-            "{context}: an open checkpoint is not a place in the text: {places:?} in {:?}",
-            output.text
-        );
-        assert!(
-            places.is_sorted(),
-            "{context}: the open checkpoints do not rise: {places:?}"
-        );
-    }
-
-    /// Runs `steps` on a new output, checks the places after each step and returns the text.
-    fn run(steps: &[Step]) -> String {
-        let mut output = PlainOutput::default();
-        let mut open: Vec<Checkpoint> = Vec::new();
-        let mut controls: Vec<OpenControl> = Vec::new();
-        for (index, step) in steps.iter().enumerate() {
-            match *step {
-                Step::Text(text) => output.push_text(text),
-                Step::Control(text) => {
-                    let control = output.start_control();
-                    output.push_text(text);
-                    output.finish_control(control);
-                }
-                Step::Start => controls.push(output.start_control()),
-                Step::Finish => output.finish_control(controls.pop().expect("the table starts before it finishes")),
-                Step::Options(options) => output.write_option_list(options, false),
-                Step::EndBlock => output.end_block(),
-                Step::Open => open.push(output.open()),
-                Step::Rollback => output.rollback(open.pop().expect("the table opens before it closes")),
-                Step::Commit => output.commit(open.pop().expect("the table opens before it closes")),
-            }
-            assert_places_are_true(&output, &format!("step {index}"));
+    /// Makes the spaces and tabs after `kept`, which are the end of the buffer, a hole, when
+    /// an open checkpoint stands in them. Returns whether it did. The record of each control
+    /// that ended in them is removed, and the start of an open control in them moves to
+    /// `kept`, as `shrink_to` does. No byte is read, written or moved.
+    #[cfg(feature = "visitor")]
+    fn hide_from(&mut self, kept: usize) -> bool {
+        let Some(owner) = self.open_checkpoints.iter().position(|open| open.at > kept) else {
+            return false;
+        };
+        for control in &mut self.open_controls {
+            control.at = control.at.min(kept);
         }
-        output.into_text()
+        let ends = self.control_ends.first_after(kept);
+        self.control_ends.truncate(ends);
+        self.holes.push(Hole {
+            start: kept,
+            end: self.text.len(),
+            owner,
+        });
+        true
     }
 
-    #[test]
-    fn a_block_end_below_one_checkpoint_keeps_the_places_true() {
-        use Step::{Commit, EndBlock, Open, Rollback, Text};
-        let table: [(&[Step], &str); 3] = [
-            // ~keep A block end removes spaces before a checkpoint; the rollback writes them again.
-            (
-                &[Text("aaa   "), Open, EndBlock, Text("bcd"), EndBlock, Rollback],
-                "aaa   ",
-            ),
-            // ~keep The same with a commit: the block end stands.
-            (
-                &[Text("aaa   "), Open, EndBlock, Text("bcd"), EndBlock, Commit],
-                "aaa\n\nbcd\n\n",
-            ),
-            // ~keep A checkpoint in an empty text.
-            (&[Open, EndBlock, Text("b"), EndBlock, Rollback, Text("c")], "c"),
-        ];
-        for (steps, expected) in table {
-            assert_eq!(run(steps), expected);
-        }
-    }
-
-    #[test]
-    fn a_block_end_below_two_checkpoints_keeps_the_places_true() {
-        use Step::{Commit, EndBlock, Open, Rollback, Text};
-        let table: [(&[Step], &str); 3] = [
-            // ~keep Two checkpoints, a block end below both, the inner one kept, the outer one not.
-            (
-                &[
-                    Text("aaa "),
-                    Open,
-                    Open,
-                    EndBlock,
-                    Text("b"),
-                    Commit,
-                    Text("c"),
-                    Rollback,
-                ],
-                "aaa ",
-            ),
-            // ~keep Two checkpoints, a block end below both, both returned to.
-            (
-                &[
-                    Text("aaa "),
-                    Open,
-                    Text("b  "),
-                    Open,
-                    EndBlock,
-                    Text("c"),
-                    Rollback,
-                    Rollback,
-                ],
-                "aaa ",
-            ),
-            // ~keep The inner return writes the spaces again; a second block end removes them again.
-            (
-                &[
-                    Text("aa  "),
-                    Open,
-                    Open,
-                    EndBlock,
-                    Text("b"),
-                    Rollback,
-                    EndBlock,
-                    Text("c"),
-                    Rollback,
-                ],
-                "aa  ",
-            ),
-        ];
-        for (steps, expected) in table {
-            assert_eq!(run(steps), expected);
-        }
-    }
-
-    #[test]
-    fn a_control_beside_a_checkpoint_keeps_the_places_true() {
-        use Step::{Commit, Control, EndBlock, Open, Options, Rollback, Text};
-        let table: [(&[Step], &str); 3] = [
-            // ~keep A control before the checkpoint is the last control again after the return.
-            (
-                &[
-                    Text("aaa"),
-                    Control("X"),
-                    Open,
-                    Control("Y"),
-                    Options("one two"),
-                    Rollback,
-                    Text("bbb"),
-                ],
-                "aaa X bbb",
-            ),
-            // ~keep A control that ends with spaces, a block end in a checkpoint, a return.
-            (
-                &[
-                    Text("aaa"),
-                    Control("X   "),
-                    Open,
-                    EndBlock,
-                    Text("\u{e9}b"),
-                    EndBlock,
-                    Rollback,
-                    Text("ccc"),
-                ],
-                "aaa X   ccc",
-            ),
-            // ~keep A control that holds a checkpoint: the space before the control moves no place wrongly.
-            (
-                &[Text("aaa"), Open, Control("W"), Control("Y"), Commit, Text("bbb")],
-                "aaa W Y bbb",
-            ),
-        ];
-        for (steps, expected) in table {
-            assert_eq!(run(steps), expected);
-        }
-    }
-
-    #[test]
-    fn a_block_end_below_the_start_of_an_open_control_keeps_the_places_true() {
-        use Step::{EndBlock, Finish, Open, Rollback, Start, Text};
-        let table: [(&[Step], &str); 5] = [
-            // ~keep A block end in a control removes the spaces before its start: the control
-            // ~keep still ends at the end of its text, and the next word gets its space.
-            (
-                &[Text("b   "), Start, EndBlock, Text("e"), Finish, Text("ccc")],
-                "b\n\ne ccc",
-            ),
-            // ~keep The same with a character of two bytes: the old start was inside it.
-            (
-                &[Text("b   "), Start, EndBlock, Text("\u{e9}"), Finish, Text("ccc")],
-                "b\n\n\u{e9} ccc",
-            ),
-            // ~keep A control that holds a block end and no text.
-            (&[Text("b   "), Start, EndBlock, Finish, Text("ccc")], "b\n\nccc"),
-            // ~keep Two open controls: the block end moves the inner start, and the space of
-            // ~keep the outer control is written at its own start.
-            (
-                &[
-                    Text("a"),
-                    Start,
-                    Text("x  "),
-                    Start,
-                    EndBlock,
-                    Text("e"),
-                    Finish,
-                    Finish,
-                    Text("ccc"),
-                ],
-                "a x\n\ne ccc",
-            ),
-            // ~keep A return to a checkpoint in the control writes the spaces again.
-            (
-                &[
-                    Text("b   "),
-                    Start,
-                    Open,
-                    EndBlock,
-                    Text("e"),
-                    Rollback,
-                    Finish,
-                    Text("ccc"),
-                ],
-                "b   ccc",
-            ),
-        ];
-        for (steps, expected) in table {
-            assert_eq!(run(steps), expected);
-        }
-    }
-
-    #[test]
-    fn text_written_before_the_start_of_an_open_control_moves_the_start() {
-        // ~keep No path of the writer writes text before an open control. `insert_at` keeps
-        // ~keep the start true all the same: the control starts at 3, then at 5.
-        let mut output = PlainOutput::default();
-        output.push_text("aaa");
-        let control = output.start_control();
-        output.push_text("W");
-        output.insert_at(1, "  ");
-        assert_places_are_true(&output, "after the insert");
-        output.finish_control(control);
-        assert_eq!(output.as_str(), "a  aa W");
-        assert_eq!(output.control_ends, [7]);
-        assert_eq!(output.into_text(), "a  aa W");
-    }
-
-    #[test]
-    fn an_outer_checkpoint_has_its_place_again_after_an_inner_return() {
-        let mut output = PlainOutput::default();
-        output.push_text("aa  ");
-        let outer = output.open();
-        let inner = output.open();
-        output.end_block();
-        output.push_text("b");
-        assert_eq!(output.since(&outer), "\n\nb");
-        output.rollback(inner);
-        assert_eq!(output.as_str(), "aa  ");
-        assert_eq!(output.since(&outer), "");
-        output.push_text("c");
-        assert_eq!(output.since(&outer), "c");
-        output.rollback(outer);
-        assert_eq!(output.into_text(), "aa  ");
-    }
-
-    #[test]
-    fn a_space_written_before_a_control_moves_the_places_after_it() {
-        // ~keep The outer control starts at 3 and holds a control that ends at 5 and a
-        // ~keep checkpoint at 5. The space of the outer control is written at 3.
-        let mut output = PlainOutput::default();
-        output.push_text("aaa");
-        let outer = output.start_control();
-        output.push_text("W");
-        let inner = output.start_control();
-        output.push_text("Y");
-        output.finish_control(inner);
-        assert_eq!(output.as_str(), "aaaW Y");
-        assert_eq!(output.control_ends, [6]);
-        let checkpoint = output.open();
-        output.push_text("zz");
-        output.finish_control(outer);
-        assert_eq!(output.as_str(), "aaa W Y zz");
-        assert_eq!(output.control_ends, [7, 10]);
-        assert_places_are_true(&output, "after the space");
-        assert_eq!(output.since(&checkpoint), " zz");
-        output.rollback(checkpoint);
-        assert_eq!(output.as_str(), "aaa W Y");
-        assert_eq!(output.control_ends, [7]);
-        assert_eq!(output.into_text(), "aaa W Y");
-    }
-
-    /// The count of control ends that the output examines for `count` controls, each after a
-    /// word and each with a space written before it. With `block_ends`, a block ends after
-    /// each control.
-    fn ends_examined_for(count: usize, block_ends: bool) -> usize {
-        let mut output = PlainOutput::default();
-        for _ in 0..count {
-            output.push_text("z");
-            let control = output.start_control();
-            output.push_text("X");
-            output.finish_control(control);
-            if block_ends {
-                output.end_block();
-            }
-        }
-        assert_places_are_true(&output, "after the last control");
-        assert_eq!(output.control_ends.len(), count);
-        let examined = output.ends_examined.get();
-        let line = if block_ends { "z X\n\n" } else { "z X " };
-        assert_eq!(output.into_text(), line.repeat(count).trim_end_matches(' '));
-        examined
-    }
-
-    #[test]
-    fn controls_one_after_the_other_examine_a_bounded_count_of_control_ends() {
-        // ~keep No control end stands after the place of a space, so only the binary search
-        // ~keep reads ends: at most `ilog2(count) + 2` for each search, 11 and 13 here. A block
-        // ~keep end makes a second search. A scan of every end reads `count * (count - 1) / 2`
-        // ~keep ends for the spaces alone: 499,500 and 7,998,000.
-        for (block_ends, searches) in [(false, 1_usize), (true, 2)] {
-            for (count, reads) in [(1_000_usize, 11_usize), (4_000, 13)] {
-                let examined = ends_examined_for(count, block_ends);
-                let bound = count * reads * searches;
-                assert!(
-                    examined <= bound,
-                    "{count} controls (block ends: {block_ends}) examined {examined} control ends, over {bound}"
-                );
+    /// Removes the bytes from `start` to `end`, a hole whose checkpoint is committed. Each
+    /// control end and each start of an open control after it moves with its text. Every open
+    /// checkpoint stands before the hole, and so does every other hole: a hole after it has a
+    /// checkpoint after it, which is closed by now.
+    #[cfg(feature = "visitor")]
+    fn cut(&mut self, start: usize, end: usize) {
+        debug_assert!(
+            self.open_checkpoints.iter().all(|open| open.at <= start),
+            "an open checkpoint stands in or after a hole that is removed"
+        );
+        debug_assert!(
+            self.holes.iter().all(|hole| hole.end <= start),
+            "a hole stands after a hole that is removed"
+        );
+        let by = end - start;
+        self.text.remove(start..end);
+        let after = self.control_ends.first_after(start);
+        self.control_ends.lower_from(after, by);
+        for control in &mut self.open_controls {
+            if control.at > start {
+                control.at -= by;
             }
         }
     }

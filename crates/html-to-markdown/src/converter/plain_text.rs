@@ -208,7 +208,7 @@ fn emit_raw_text(bytes: &tl::Bytes<'_>, buf: &mut PlainOutput, state: &WalkState
         return;
     }
     let normalized = text::normalize_whitespace_cow(&decoded);
-    if !(normalized.is_empty() || normalized.as_ref() == " " && buf.as_str().ends_with('\n')) {
+    if !(normalized.is_empty() || normalized.as_ref() == " " && buf.ends_with_line_end()) {
         buf.push_text(&normalized);
     }
 }
@@ -407,7 +407,7 @@ fn dispatch_plain_tag(
         }
         "li" => walk_plain_list_item(tag, parser, buf, list_ctx, state),
         _ if BLOCK_TAGS.contains(&tag_name) => {
-            if state.item_marker_end != Some(buf.as_str().len()) {
+            if state.item_marker_end != Some(buf.len()) {
                 buf.end_block();
             }
             walk_children(tag, parser, buf, list_ctx, &child_state);
@@ -522,7 +522,7 @@ fn walk_plain_list_item(
         }
     }
     let item_state = WalkState {
-        item_marker_end: Some(buf.as_str().len()),
+        item_marker_end: Some(buf.len()),
         in_pre: false,
         ..state.descend()
     };
