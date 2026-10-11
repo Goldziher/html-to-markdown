@@ -227,7 +227,7 @@
       "median_ms": 16.594149708333333,
       "mad_ms": 0.0897917916666664,
       "mb_per_s": 37.409166865473345,
-      "output_bytes": 42130
+      "output_bytes": 42128
     },
     {
       "fixture": "synthetic/optional_li.html",

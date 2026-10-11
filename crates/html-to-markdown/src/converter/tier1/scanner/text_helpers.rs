@@ -113,7 +113,10 @@ fn decode_and_collapse_into_inner(
 ) -> Result<(), BailReason> {
     let bytes = s.as_bytes();
     let mut i = 0;
-    let mut prev_was_space = false;
+    // ~keep Rule 4 of the module: white space at the start of the text is the run that `out`
+    // ~keep ends with, so after a space or a line end it writes nothing. `<td>one <span>two&#10;
+    // ~keep </span> three</td>` is `one two three`, as the full converter writes it.
+    let mut prev_was_space = !crate::converter::utility::white_space::space_is_owed(out);
     // ~keep Mirrors Tier-2's `normalize_block_whitespace_cow` (text.rs): when a literal
     // `\n` survives into the output (only possible here when `collapse_newlines`
     // is false -- the `true` variant folds `\n` straight into a space below and
@@ -127,60 +130,70 @@ fn decode_and_collapse_into_inner(
     // a genuine mid-text line break, never the text node's own edge.
     let mut at_line_start = false;
     while i < bytes.len() {
-        let next_special = match (has_entities, collapse_newlines) {
-            (true, true) => {
-                let s_pos = memchr3(b' ', b'\t', b'\n', &bytes[i..]).map(|pos| i + pos);
-                let e_pos = memchr::memchr(b'&', &bytes[i..]).map(|pos| i + pos);
-                match (s_pos, e_pos) {
-                    (Some(a), Some(b)) => Some(a.min(b)),
-                    (Some(a), None) | (None, Some(a)) => Some(a),
-                    (None, None) => None,
-                }
-            }
-            (true, false) => memchr3(b' ', b'\t', b'&', &bytes[i..]).map(|pos| i + pos),
-            (false, true) => memchr3(b' ', b'\t', b'\n', &bytes[i..]).map(|pos| i + pos),
-            (false, false) => memchr::memchr2(b' ', b'\t', &bytes[i..]).map(|pos| i + pos),
-        };
-
-        if let Some(pos) = next_special {
-            if pos > i {
-                out.push_str(&s[i..pos]);
-                prev_was_space = false;
-                at_line_start = !collapse_newlines && bytes[pos - 1] == b'\n';
-            }
-            match bytes[pos] {
-                b' ' | b'\t' if at_line_start => {
-                    i = pos + 1;
-                }
-                b' ' | b'\t' => {
-                    if !prev_was_space {
-                        out.push(' ');
-                    }
-                    prev_was_space = true;
-                    i = pos + 1;
-                }
-                b'\n' if collapse_newlines => {
-                    if !prev_was_space {
-                        out.push(' ');
-                    }
-                    prev_was_space = true;
-                    i = pos + 1;
-                }
-                b'&' => {
-                    prev_was_space = false;
-                    at_line_start = false;
-                    i = decode_entity_at(bytes, s, pos, out, base_offset, ReferenceContext::Text)?;
-                }
-                _ => unreachable!(),
-            }
-        } else {
-            if i < bytes.len() {
-                out.push_str(&s[i..]);
-            }
+        let Some(pos) = next_special_byte(bytes, i, has_entities, collapse_newlines) else {
+            out.push_str(&s[i..]);
             break;
+        };
+        if pos > i {
+            out.push_str(&s[i..pos]);
+            prev_was_space = false;
+            at_line_start = !collapse_newlines && bytes[pos - 1] == b'\n';
         }
+        // ~keep A character reference that decodes to a space, a tab or a line end (`&#10;`,
+        // ~keep `&#32;`, `&Tab;`) is that white space: the module decides on the decoded text.
+        // ~keep `<td><span>one&#10;</span><span>&#10;two</span></td>` is `one two`, as the full
+        // ~keep converter writes it.
+        let (special, next) = match bytes[pos] {
+            b'&' => match crate::text::decode_character_reference(s, pos, ReferenceContext::Text) {
+                Some((end, decoded @ (' ' | '\t' | '\n'), None))
+                    if bytes[end - 1] == b';' && (decoded != '\n' || collapse_newlines) =>
+                {
+                    (decoded as u8, end)
+                }
+                _ => (b'&', pos),
+            },
+            byte => (byte, pos + 1),
+        };
+        match special {
+            b' ' | b'\t' if at_line_start => {}
+            b' ' | b'\t' | b'\n' => {
+                if !prev_was_space {
+                    out.push(' ');
+                }
+                prev_was_space = true;
+            }
+            b'&' => {
+                prev_was_space = false;
+                at_line_start = false;
+                i = decode_entity_at(bytes, s, pos, out, base_offset, ReferenceContext::Text)?;
+                continue;
+            }
+            _ => unreachable!(),
+        }
+        i = next;
     }
     Ok(())
+}
+
+/// The position of the next byte of `bytes` from `from` that the collapse decides on: a space,
+/// a tab, a line end when `collapse_newlines`, and `&` when `has_entities`.
+fn next_special_byte(bytes: &[u8], from: usize, has_entities: bool, collapse_newlines: bool) -> Option<usize> {
+    let rest = &bytes[from..];
+    let pos = match (has_entities, collapse_newlines) {
+        (true, true) => {
+            let space = memchr3(b' ', b'\t', b'\n', rest);
+            let entity = memchr::memchr(b'&', rest);
+            match (space, entity) {
+                (Some(a), Some(b)) => Some(a.min(b)),
+                (Some(a), None) | (None, Some(a)) => Some(a),
+                (None, None) => None,
+            }
+        }
+        (true, false) => memchr3(b' ', b'\t', b'&', rest),
+        (false, true) => memchr3(b' ', b'\t', b'\n', rest),
+        (false, false) => memchr::memchr2(b' ', b'\t', rest),
+    };
+    pos.map(|pos| from + pos)
 }
 
 /// `raw` without its leading whitespace, where a character reference that decodes to whitespace

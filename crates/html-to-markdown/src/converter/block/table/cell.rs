@@ -177,11 +177,13 @@ fn render_cell_content(
         return;
     };
     let children = tag.children();
-    let has_tag_child = children
+    // ~keep A comment splits the text of the cell in two nodes. The walk writes each of them
+    // ~keep with the rules of running text, as Tier-1 does; the shortcut is for one text alone.
+    let has_tag_or_comment_child = children
         .top()
         .iter()
-        .any(|child_handle| matches!(child_handle.get(parser), Some(tl::Node::Tag(_))));
-    if !has_tag_child {
+        .any(|child_handle| matches!(child_handle.get(parser), Some(tl::Node::Tag(_) | tl::Node::Comment(_))));
+    if !has_tag_or_comment_child {
         let raw = handler.dom_ctx.text_content(*node_handle, parser);
         let normalized = if handler.options.whitespace_mode == crate::options::WhitespaceMode::Normalized {
             crate::text::normalize_cell_whitespace_cow(raw.as_str())

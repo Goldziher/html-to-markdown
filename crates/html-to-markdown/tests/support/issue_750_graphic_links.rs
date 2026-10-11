@@ -153,10 +153,10 @@ fn should_compare_a_resolved_link_with_the_address_of_the_page_and_not_with_the_
             "a [Part](https://example.org/#x) b\n",
         ),
         // ~keep The page's own address is left out, whatever the base element is.
-        (OTHER, "https://example.org/doc#x", Some(PAGE), "a  b\n"),
-        (r#"<base href="https://example.org/doc">"#, "#x", Some(PAGE), "a  b\n"),
-        ("", "#x", Some(PAGE), "a  b\n"),
-        ("", "https://example.org/doc#x", Some(PAGE), "a  b\n"),
+        (OTHER, "https://example.org/doc#x", Some(PAGE), "a b\n"),
+        (r#"<base href="https://example.org/doc">"#, "#x", Some(PAGE), "a b\n"),
+        ("", "#x", Some(PAGE), "a b\n"),
+        ("", "https://example.org/doc#x", Some(PAGE), "a b\n"),
         // ~keep Another spelling of the address is another address, and so is one with no fragment.
         (
             "",
@@ -178,7 +178,7 @@ fn should_compare_a_resolved_link_with_the_address_of_the_page_and_not_with_the_
         ),
         // ~keep No address of the page: `#x` is the page itself only with no `<base>` element.
         (OTHER, "#x", None, "a [Part](#x) b\n"),
-        ("", "#x", None, "a  b\n"),
+        ("", "#x", None, "a b\n"),
     ] {
         let html = page(base_element, href);
         assert_eq!(
@@ -349,7 +349,7 @@ fn should_name_any_link_whose_content_gives_no_text_in_both_converters() {
         (
             format!(r#"<p>a <a href="/files/report.pdf"><img src="{PNG}"></a> b</p>"#),
             drop(),
-            "a  b\n",
+            "a b\n",
         ),
     ] {
         assert_eq!(convert_with(&html, options), expected, "{html}");

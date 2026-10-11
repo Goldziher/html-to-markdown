@@ -286,32 +286,16 @@ pub fn emit_wrapped_inline(
         if content.is_empty() {
             return;
         }
-        // ~keep issue #481: a whitespace-only body (e.g. `<i> </i>`) must contribute at
-        // ~keep most one space -- `chomp_inline` above already collapsed prefix/suffix to
-        // ~keep a single representation, but the buffer can already end with a real space
-        // ~keep from a preceding sibling (e.g. `A <i> </i>B`), in which case even that one
-        // ~keep copy must be suppressed. Mirrors `text_node.rs`'s `!output.ends_with(' ')`
-        // ~keep guards, which every handler but `text_node` was originally missing.
-        // ~keep ...and at a line start it contributes nothing at all: `<p>A</p><p><i> </i>B</p>`
-        // ~keep otherwise opened its second paragraph with a stray space (issue #501's rule --
-        // ~keep leading ASCII whitespace on a line is never Markdown content). An empty buffer
-        // ~keep is a line start only when it is the block's own buffer: an enclosing wrapper
-        // ~keep builds its body into a fresh scratch `String` that is empty mid-line, and
-        // ~keep `<strong><em><br></em></strong>` lost its one space there, so the outer body
-        // ~keep came out empty and the words either side were joined (issue #504). The
-        // ~keep address test is the one `text_node.rs` uses for the same distinction; a
-        // ~keep heading or cell buffer never matches it, and those are trimmed by their
-        // ~keep builders, so a leading space pushed there is harmless.
-        let at_block_line_start = output.ends_with('\n')
-            || (output.is_empty() && std::ptr::from_ref::<String>(output) as usize == ctx.block_output_ptr);
-        if !output.ends_with(' ') && !at_block_line_start {
+        // ~keep issue #481: a whitespace-only body (e.g. `<i> </i>`) is one space at most, and
+        // ~keep none where the rule of running text owes none (after a space, at a line start).
+        if crate::converter::utility::white_space::space_is_owed_in(output, ctx) {
             output.push_str(prefix);
         }
         append_inline_suffix(output, suffix, false, node_handle, parser, dom_ctx);
         return;
     }
 
-    output.push_str(prefix);
+    crate::converter::utility::content::push_inline_prefix(output, prefix, options, ctx);
     let sibling_is_matching_tag =
         get_previous_sibling_tag(node_handle, parser, dom_ctx).is_some_and(|name| sibling_tag_names.contains(&name));
     let merged = prefix.is_empty()

@@ -19,8 +19,8 @@ use crate::converter::inline::link::{MarkdownLink, append_markdown_link_in_conte
 use crate::converter::main::walk_node;
 use crate::converter::media::inline_data_treatment;
 use crate::converter::utility::content::{
-    collect_link_label_text, link_accessible_name, link_text_content, node_is_block_level, normalize_link_label,
-    normalized_tag_name,
+    collect_link_label_text, keeps_source_white_space, link_accessible_name, link_text_content, node_is_block_level,
+    normalize_link_label, normalized_tag_name,
 };
 use crate::converter::utility::escaping::escape_link_label;
 use crate::options::{ConversionOptions, InlineDataMedia};
@@ -94,7 +94,7 @@ pub fn handle_link(tag: &tl::HTMLTag, mut handler: HandlerContext<'_>) {
     }
 
     handler.context.inline_data_replaced.set(false);
-    let mut label = build_label(&data, &handler);
+    let mut label = normalize_link_label(&build_label_content(&data, &handler));
     apply_label_fallbacks(&data, &mut label, &handler);
     indent_hard_break_continuations(&mut label, handler.context, handler.options);
     let drop_link = data.is_dropped(&label, &handler);
@@ -176,7 +176,10 @@ impl<'a> LinkData<'a> {
         }
         let mut label = normalize_link_label(text);
         apply_label_fallbacks(self, &mut label, handler);
-        !self.is_dropped(&label, handler) || outside_code(handler, |outside| !build_label(self, outside).is_empty())
+        !self.is_dropped(&label, handler)
+            || outside_code(handler, |outside| {
+                !normalize_link_label(&build_label_content(self, outside)).is_empty()
+            })
     }
 
     fn new(tag: &'a tl::HTMLTag<'a>, handler: &HandlerContext<'_>) -> Option<Self> {
@@ -330,71 +333,56 @@ fn emit_heading_link(data: &LinkData<'_>, handler: &mut HandlerContext<'_>) -> b
     true
 }
 
-fn build_label(data: &LinkData<'_>, handler: &HandlerContext<'_>) -> String {
+/// The content of the label as the walk writes it. The caller removes the white space at its
+/// two ends.
+fn build_label_content(data: &LinkData<'_>, handler: &HandlerContext<'_>) -> String {
     if data.emit_blocks_separately {
-        return walk_label(&data.inline_children, false, data, handler);
+        return walk_label_content(&data.inline_children, false, data, handler);
     }
     if data.saw_block {
         let content = walk_label_content(&data.children, true, data, handler);
         return if content.trim().is_empty() {
-            normalize_link_label(&data.inline_label)
+            data.inline_label.clone()
         } else {
-            normalize_link_label(&content)
+            content
         };
     }
-    walk_label(&data.children, false, data, handler)
-}
-
-fn walk_label(
-    children: &[tl::NodeHandle],
-    convert_as_inline: bool,
-    data: &LinkData<'_>,
-    handler: &HandlerContext<'_>,
-) -> String {
-    normalize_link_label(&walk_label_content(children, convert_as_inline, data, handler))
+    walk_label_content(&data.children, false, data, handler)
 }
 
 /// The context that the label of a link is built with outside code.
-fn label_context(data: &LinkData<'_>, handler: &HandlerContext<'_>, merge_child_spacing: bool) -> Context {
+fn label_context(data: &LinkData<'_>, handler: &HandlerContext<'_>, convert_as_inline: bool) -> Context {
     Context {
         inline_depth: handler.context.inline_depth + 1,
         in_link: true,
-        convert_as_inline: handler.context.convert_as_inline || merge_child_spacing,
+        convert_as_inline: handler.context.convert_as_inline || convert_as_inline,
         link_allow_inline_images: data.link_allow_inline_images,
         ..handler.context.clone()
     }
 }
 
+/// Walks the children of a link into its label. With `convert_as_inline` the blocks among them
+/// are written inline, and the walk writes one space at each block boundary.
+///
+/// ~keep In such a label an image is written as its alternative text. A reader sees the image
+/// ~keep and the content beside it as two things, so the text of an image child is a word of
+/// ~keep its own: one space separates it from the child before it and the child after it.
 fn walk_label_content(
     children: &[tl::NodeHandle],
-    merge_child_spacing: bool,
+    convert_as_inline: bool,
     data: &LinkData<'_>,
     handler: &HandlerContext<'_>,
 ) -> String {
-    let link_context = label_context(data, handler, merge_child_spacing);
+    let link_context = label_context(data, handler, convert_as_inline);
+    let strict = keeps_source_white_space(handler.options, handler.context);
     let mut content = String::new();
-    if !merge_child_spacing {
-        for child in children {
-            walk_node(
-                child,
-                handler.parser,
-                &mut content,
-                crate::converter::block::container::HandlerContext::new(
-                    handler.options,
-                    &link_context,
-                    handler.depth + 1,
-                    handler.dom_context,
-                ),
-            );
-        }
-        return content;
-    }
+    let mut after_image = false;
     for child in children {
-        let mut child_output = String::new();
+        let child_start = content.len();
         walk_node(
             child,
             handler.parser,
-            &mut child_output,
+            &mut content,
             crate::converter::block::container::HandlerContext::new(
                 handler.options,
                 &link_context,
@@ -402,19 +390,46 @@ fn walk_label_content(
                 handler.dom_context,
             ),
         );
-        if merge_child_spacing && needs_label_space(&content, &child_output) {
-            content.push(' ');
+        if !convert_as_inline || content.len() == child_start {
+            continue;
         }
-        content.push_str(&child_output);
+        let is_image = handler
+            .dom_context
+            .tag_info(child.get_inner(), handler.parser)
+            .is_some_and(|info| matches!(info.name.as_str(), "img" | "picture" | "svg"));
+        // ~keep The strict mode writes no space at a block boundary (`separate_from_block`). It
+        // ~keep keeps the rule that a label had before: one space between two children that touch.
+        let separate = if strict {
+            texts_touch_at(&content, child_start)
+        } else {
+            (is_image || after_image) && words_touch_at(&content, child_start)
+        };
+        if separate {
+            content.insert(child_start, ' ');
+        }
+        after_image = is_image;
     }
     content
 }
 
-fn needs_label_space(content: &str, child: &str) -> bool {
-    !child.trim().is_empty()
-        && !content.is_empty()
-        && !content.chars().last().is_none_or(char::is_whitespace)
-        && !child.chars().next().is_none_or(char::is_whitespace)
+/// Whether two texts touch at the byte offset `at` of `content`: no white space on either side.
+///
+/// ~keep A child can shorten the label (a block trims the white space before it), so `at` can
+/// ~keep lie past the end or inside a character: then nothing touches there.
+fn texts_touch_at(content: &str, at: usize) -> bool {
+    let (Some(before), Some(after)) = (content.get(..at), content.get(at..)) else {
+        return false;
+    };
+    before.ends_with(|character: char| !character.is_whitespace())
+        && after.starts_with(|character: char| !character.is_whitespace())
+}
+
+/// Whether two words touch at the byte offset `at` of `content`: two texts touch there, with no
+/// opening punctuation before it and no closing punctuation after it.
+fn words_touch_at(content: &str, at: usize) -> bool {
+    texts_touch_at(content, at)
+        && !content[..at].ends_with(['(', '[', '{'])
+        && !content[at..].starts_with(['.', ',', ';', ':', '!', '?', ')', ']', '}'])
 }
 
 fn apply_label_fallbacks(data: &LinkData<'_>, label: &mut String, handler: &HandlerContext<'_>) {

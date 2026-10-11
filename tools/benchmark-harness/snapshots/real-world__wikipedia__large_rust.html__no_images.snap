@@ -136,7 +136,7 @@ Rust was named for the [group of fungi](/wiki/Rust_(fungus) "Rust (fungus)") tha
 Rust began as a personal project by [Mozilla](/wiki/Mozilla "Mozilla") employee Graydon Hoare in
 2006.[[15]](#cite_note-MITTechReview-19) Hoare started the project due to his frustration with a broken elevator in his
 apartment building.[[15]](#cite_note-MITTechReview-19) During the time period between 2006 and 2009, Rust was not publicized to others
-at Mozilla and was written in Hoare's free time;[[17]](#cite_note-Klabnik2016ACMHistory-21): 7:50  Hoare began speaking about the language around 2009 after a small group at
+at Mozilla and was written in Hoare's free time;[[17]](#cite_note-Klabnik2016ACMHistory-21): 7:50 Hoare began speaking about the language around 2009 after a small group at
 Mozilla became interested in the project.[[18]](#cite_note-Hoare2010-22) Hoare emphasized prioritizing good ideas from old languages over new
 development, citing languages including [CLU](/wiki/CLU_(programming_language) "CLU (programming language)") (1974), [BETA](/wiki/BETA_(programming_language) "BETA (programming language)") (1975), [Mesa](/wiki/Mesa_(programming_language) "Mesa (programming language)") (1977), NIL (1983),[[note 5]](#cite_note-23) [Erlang](/wiki/Erlang_(programming_language) "Erlang (programming language)") (1987), [Newsqueak](/wiki/Newsqueak "Newsqueak") (1988), [Napier](/wiki/Napier88 "Napier88") (1988), [Hermes](/wiki/Hermes_(programming_language) "Hermes (programming language)") (1990), [Sather](/wiki/Sather "Sather") (1990), [Alef](/wiki/Alef_(programming_language) "Alef (programming language)") (1992), and [Limbo](/wiki/Limbo_(programming_language) "Limbo (programming language)") (1996) as influences, stating "many older languages [are] better than new ones",
 and describing the language as "technology from the past come to save the future
@@ -144,7 +144,7 @@ from itself."[[17]](#cite_note-Klabnik2016ACMHistory-21): 8:17 [[18]](#cite_note
 on "mostly decades-old research."[[15]](#cite_note-MITTechReview-19)
 
 During the early years, the Rust [compiler](/wiki/Compiler "Compiler") was written in about
-38,000 lines of [OCaml](/wiki/OCaml "OCaml").[[17]](#cite_note-Klabnik2016ACMHistory-21): 15:34 [[19]](#cite_note-OCamlCompiler-24) Early Rust contained features such as explicit [object-oriented programming](/wiki/Object-oriented_programming "Object-oriented programming") via an `obj` keyword (later removed),[[17]](#cite_note-Klabnik2016ACMHistory-21): 10:08  and a [typestates](/wiki/Typestate_analysis "Typestate analysis") system that would allow variables of a type to be tracked along with state
+38,000 lines of [OCaml](/wiki/OCaml "OCaml").[[17]](#cite_note-Klabnik2016ACMHistory-21): 15:34 [[19]](#cite_note-OCamlCompiler-24) Early Rust contained features such as explicit [object-oriented programming](/wiki/Object-oriented_programming "Object-oriented programming") via an `obj` keyword (later removed),[[17]](#cite_note-Klabnik2016ACMHistory-21): 10:08 and a [typestates](/wiki/Typestate_analysis "Typestate analysis") system that would allow variables of a type to be tracked along with state
 changes (such as going from uninitialized to initialized, also removed).[[17]](#cite_note-Klabnik2016ACMHistory-21): 13:12
 
 ### 2009–2012: Mozilla sponsorship
@@ -180,8 +180,8 @@ period by developers coming from [C++](/wiki/C%2B%2B "C++") (e.g., low-level per
 features), [scripting languages](/wiki/Scripting_language "Scripting language") (e.g., Cargo and package management), and [functional programming](/wiki/Functional_programming "Functional programming") (e.g., type systems development).[[17]](#cite_note-Klabnik2016ACMHistory-21): 30:50
 
 Graydon Hoare stepped down from Rust in 2013.[[15]](#cite_note-MITTechReview-19) After Hoare's departure, it evolved organically under a federated governance
-structure, with a "core team" of initially six people,[[17]](#cite_note-Klabnik2016ACMHistory-21): 21:45  around 30-40 developers total across various other teams,[[17]](#cite_note-Klabnik2016ACMHistory-21): 22:22  and a Request for Comments (RFC) process for new language features added in
-March 2014.[[17]](#cite_note-Klabnik2016ACMHistory-21): 33:47  The core team would grow to nine people by 2016[[17]](#cite_note-Klabnik2016ACMHistory-21): 21:45  with over 1600 proposed RFCs.[[17]](#cite_note-Klabnik2016ACMHistory-21): 34:08
+structure, with a "core team" of initially six people,[[17]](#cite_note-Klabnik2016ACMHistory-21): 21:45 around 30-40 developers total across various other teams,[[17]](#cite_note-Klabnik2016ACMHistory-21): 22:22 and a Request for Comments (RFC) process for new language features added in
+March 2014.[[17]](#cite_note-Klabnik2016ACMHistory-21): 33:47 The core team would grow to nine people by 2016[[17]](#cite_note-Klabnik2016ACMHistory-21): 21:45 with over 1600 proposed RFCs.[[17]](#cite_note-Klabnik2016ACMHistory-21): 34:08
 
 According to Andrew Binstock writing for *[Dr. Dobb's Journal](/wiki/Dr._Dobb%27s_Journal "Dr. Dobb's Journal")* in January 2014, while Rust was "widely viewed as a remarkably elegant
 language", adoption slowed because it radically changed from version to
@@ -202,12 +202,12 @@ Rust package management website Crates.io.[[17]](#cite_note-Klabnik2016ACMHistor
 
 The development of the [Servo browser engine](/wiki/Servo_(software) "Servo (software)") continued in parallel with Rust, jointly funded by Mozilla and [Samsung](/wiki/Samsung "Samsung").[[26]](#cite_note-32) The teams behind the two projects worked in close collaboration; new features in
 Rust were tested out by the Servo team, and new features in Servo were used to
-give feedback back to the Rust team.[[17]](#cite_note-Klabnik2016ACMHistory-21): 5:41  The first version of Servo was released in 2016.[[15]](#cite_note-MITTechReview-19) The [Firefox](/wiki/Firefox "Firefox") web browser shipped with
+give feedback back to the Rust team.[[17]](#cite_note-Klabnik2016ACMHistory-21): 5:41 The first version of Servo was released in 2016.[[15]](#cite_note-MITTechReview-19) The [Firefox](/wiki/Firefox "Firefox") web browser shipped with
 Rust code as of 2016 (version 45),[[17]](#cite_note-Klabnik2016ACMHistory-21): 53:30 [[27]](#cite_note-33) but components of Servo did not appear in Firefox until September 2017 (version
 57) as part of the [Gecko](/wiki/Gecko_(software) "Gecko (software)") and [Quantum](/wiki/Gecko_(software)#Quantum "Gecko (software)") projects.[[28]](#cite_note-34)
 
 Improvements were made to the Rust toolchain ecosystem during the years
-following 1.0 including [Rustfmt](#Rustfmt), [integrated development environment](/wiki/Integrated_development_environment "Integrated development environment") integration,[[17]](#cite_note-Klabnik2016ACMHistory-21): 44:56  and a regular compiler testing and release cycle.[[17]](#cite_note-Klabnik2016ACMHistory-21): 46:48  Rust also gained a community [code of conduct](/wiki/Code_of_conduct "Code of conduct") and
+following 1.0 including [Rustfmt](#Rustfmt), [integrated development environment](/wiki/Integrated_development_environment "Integrated development environment") integration,[[17]](#cite_note-Klabnik2016ACMHistory-21): 44:56 and a regular compiler testing and release cycle.[[17]](#cite_note-Klabnik2016ACMHistory-21): 46:48 Rust also gained a community [code of conduct](/wiki/Code_of_conduct "Code of conduct") and
 an [IRC](/wiki/IRC "IRC") chat for community discussion.[[17]](#cite_note-Klabnik2016ACMHistory-21): 50:36
 
 The earliest known adoption outside of Mozilla was by individual projects at

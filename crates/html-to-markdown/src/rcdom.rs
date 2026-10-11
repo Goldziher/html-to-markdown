@@ -109,6 +109,9 @@ pub enum NodeData {
 pub struct Node {
     /// Parent node.
     pub parent: Cell<Option<WeakHandle>>,
+    /// The `<template>` element whose contents this node is. The contents are not a child of
+    /// the template and have no parent; only the depth count of the repair reads this link.
+    template_host: Cell<Option<WeakHandle>>,
     /// Child nodes of this node.
     pub children: RefCell<Vec<Handle>>,
     /// Represents this node's data.
@@ -121,6 +124,7 @@ impl Node {
         Rc::new(Node {
             data,
             parent: Cell::new(None),
+            template_host: Cell::new(None),
             children: RefCell::new(Vec::new()),
         })
     }
@@ -164,6 +168,18 @@ fn append(new_parent: &Handle, child: Handle) {
     let previous_parent = child.parent.replace(Some(Rc::downgrade(new_parent)));
     assert!(previous_parent.is_none());
     new_parent.children.borrow_mut().push(child);
+}
+
+/// The node one level above `node` for the depth count of the repair: its parent, or the
+/// template when `node` is the contents of one.
+fn depth_ancestor(node: &Handle) -> Option<Handle> {
+    let read = |link: &Cell<Option<WeakHandle>>| {
+        let weak = link.take();
+        let handle = weak.as_ref().and_then(Weak::upgrade);
+        link.set(weak);
+        handle
+    };
+    read(&node.parent).or_else(|| read(&node.template_host))
 }
 
 /// If the node has a parent, get it and this node's position in its children
@@ -243,13 +259,7 @@ impl RcDom {
         }
         let mut depth = 0;
         let mut current = Rc::clone(parent);
-        loop {
-            let previous = current.parent.take();
-            let ancestor = previous.as_ref().and_then(Weak::upgrade);
-            current.parent.set(previous);
-            let Some(ancestor) = ancestor else {
-                break;
-            };
+        while let Some(ancestor) = depth_ancestor(&current) {
             depth += 1;
             if depth > self.max_depth {
                 self.repair_limit
@@ -278,10 +288,7 @@ impl RcDom {
         }
         let mut current = Rc::clone(parent);
         for _ in 0..self.max_depth {
-            let previous = current.parent.take();
-            let ancestor = previous.as_ref().and_then(Weak::upgrade);
-            current.parent.set(previous);
-            let Some(ancestor) = ancestor else {
+            let Some(ancestor) = depth_ancestor(&current) else {
                 return;
             };
             current = ancestor;
@@ -351,10 +358,11 @@ impl TreeSink for RcDom {
             mathml_annotation_xml_integration_point: flags.mathml_annotation_xml_integration_point,
         });
         // ~keep The contents of a template are not its children, so the depth limit would
-        // ~keep count each template from zero. The contents name the template as their parent,
-        // ~keep and the count goes on through nested templates (issue #808).
+        // ~keep count each template from zero. The contents name the template as their host,
+        // ~keep and the count goes on through nested templates (issue #808). The contents keep
+        // ~keep no parent: a node in them is not in the document (the `<base>` lookup reads that).
         if let Some(contents) = contents {
-            contents.parent.set(Some(Rc::downgrade(&element)));
+            contents.template_host.set(Some(Rc::downgrade(&element)));
         }
         element
     }

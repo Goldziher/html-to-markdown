@@ -80,16 +80,40 @@ impl<'a> Tier1Scanner<'a> {
             return Ok(());
         }
         self.state.start_body(self.text_start);
+        // ~keep Every decision on this text reads the white space of the source as characters,
+        // ~keep as the full converter reads its decoded text: `&#10;` alone is white space.
+        let html = self.html;
+        let text = text_for_decisions(&html[self.text_start..self.pos], &self.state);
+        let is_inline = upcoming_tag_is_inline(self.bytes, self.pos);
+        // ~keep Only a text with content asks: white space alone takes its own path in
+        // ~keep `flush_text`. A form feed is white space here, so a text of form feeds and
+        // ~keep line ends keeps its line end before the comments.
+        let inline_follows_comments =
+            !text.bytes().all(|byte| byte.is_ascii_whitespace()) && inline_follows_comments(self.bytes, self.pos);
+        // ~keep Both scans of the markup ahead decide what a line end at the end of the text
+        // ~keep becomes, so a text that ends with no line end does not scan: each scan passes
+        // ~keep the open tags of the elements that only wrap text, and a run of them on every
+        // ~keep text made the converter four times slower on deep nesting.
+        let before_line_end = crate::converter::utility::content::without_trailing_line_end_in_source(&text);
+        let ends_with_line_end = before_line_end.is_some();
         let upcoming = UpcomingTextSibling {
             is_list: upcoming_tag_is_list_open(self.bytes, self.pos),
             is_img: upcoming_tag_is_named(self.bytes, self.pos, b"img"),
-            is_span: upcoming_tag_is_named(self.bytes, self.pos, b"span"),
-            is_inline: upcoming_tag_is_inline(self.bytes, self.pos),
+            is_inline,
+            inline_follows_comments,
+            inline_starts_with_block: ends_with_line_end
+                && (is_inline || inline_follows_comments)
+                && upcoming_inline_starts_with_block(self.bytes, self.pos),
+            // ~keep Rule 2 has two sides: the character before the line end, or the one after it.
+            line_end_meets_zero_width_space: before_line_end.is_some_and(|text| {
+                crate::converter::utility::content::ends_with_zero_width_space_in_source(text)
+                    || zero_width_space_is_upcoming(self.html, self.pos, &self.state.stack)
+            }),
         };
         flush_text(
             &mut self.state,
             TextFlush {
-                raw: &self.html[self.text_start..self.pos],
+                raw: &text,
                 base_offset: self.text_start,
                 upcoming,
                 br_in_tables: self.options.br_in_tables,
@@ -290,12 +314,14 @@ impl<'a> Tier1Scanner<'a> {
         } else {
             find_svg_close(self.bytes, open_tag_end).unwrap_or(self.bytes.len())
         };
+        let written_from = self.state.cell_or_output_mut().len();
         emit_svg_from_slice(
             &self.html[tag_open_start..svg_end],
             tag_open_start,
             &mut self.state,
             self.options,
         )?;
+        self.state.end_document_start_if_written(written_from);
         self.pos = svg_end;
         self.text_start = self.pos;
         Ok(true)
@@ -366,6 +392,14 @@ impl<'a> Tier1Scanner<'a> {
         };
         if matches!(spec.kind, TagKind::Link) {
             let (raw_href, title) = extract_link_attrs(attrs)?;
+            // ~keep A link with no address is running text in Tier-2. This scanner writes it as
+            // ~keep a label and loses the white space at the ends of its content (`close_link`
+            // ~keep has the other end), so it leaves the page to Tier-2. The decision reads the
+            // ~keep decoded text of the content: `&#32;`, a comment or an empty element first,
+            // ~keep or a space inside the first inline child, is white space at the start too.
+            if raw_href.is_none() && white_space_is_upcoming(self.html, self.pos, &self.state.stack) {
+                return Err(BailReason::Classifier);
+            }
             let href = raw_href
                 .as_deref()
                 .map(|value| self.state.resolve_url(value).unwrap_or_else(|| value.to_owned()));
@@ -626,9 +660,20 @@ fn push_open_frame(
         dropped_whitespace_only_text: false,
         own_buffer: renders_into_own_buffer(spec.kind, name_lower, prev_ctx),
         starts_with_whitespace: false,
-        children_in_own_buffer: matches!(name_lower, b"mark" | b"sub" | b"sup" | b"abbr")
-            || matches!(spec.kind, TagKind::DefinitionTerm | TagKind::DefinitionDescription),
     });
+}
+
+/// The source text `source` as the decisions on it read it: with its references to white space
+/// decoded and, outside code and `pre`, each carriage return a line feed.
+fn text_for_decisions<'source>(source: &'source str, state: &Tier1State) -> std::borrow::Cow<'source, str> {
+    use crate::converter::utility::white_space::{with_line_feeds, with_white_space_references_decoded};
+
+    let text = with_white_space_references_decoded(source);
+    if state.escape_ctx.intersects(EscapeCtx::CODE | EscapeCtx::PRE) {
+        text
+    } else {
+        with_line_feeds(text)
+    }
 }
 
 /// ~keep EOF closes open frames, then applies Tier-2's trim/collapse/trailing-newline order.
@@ -641,10 +686,11 @@ fn finish_scan(
     mut table_probes: Vec<TableLayoutProbe>,
 ) -> Result<ScanOutput, BailReason> {
     if text_start < pos {
+        let text = text_for_decisions(&html[text_start..pos], &state);
         flush_text(
             &mut state,
             TextFlush {
-                raw: &html[text_start..pos],
+                raw: &text,
                 base_offset: text_start,
                 upcoming: UpcomingTextSibling::default(),
                 br_in_tables: options.br_in_tables,

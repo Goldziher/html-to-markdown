@@ -4,6 +4,7 @@
 //! and empty element detection.
 
 use crate::converter::utility::escaping::is_block_level_name;
+use crate::converter::utility::white_space::is_collapsible;
 use crate::text;
 use std::borrow::Cow;
 #[cfg(feature = "visitor")]
@@ -121,6 +122,143 @@ pub fn merge_adjacent_emphasis(output: &mut String, symbol: char, count: usize) 
 pub fn get_text_content(node_handle: &tl::NodeHandle, parser: &tl::Parser, dom_ctx: &DomContext) -> String {
     dom_ctx.text_content(*node_handle, parser)
 }
+
+/// Writes the white space that an inline element starts with (`prefix` of [`chomp_inline`])
+/// before the marks of the element, when a space is owed there.
+///
+/// ~keep `one <b> two</b>` has white space on both sides of the element start. It is one run,
+/// ~keep so it is one space, and it goes outside the marks: `** two**` is not strong text.
+/// ~keep Where the source white space is kept (`keeps_source_white_space`), the prefix is always written.
+pub fn push_inline_prefix(
+    output: &mut String,
+    prefix: &str,
+    options: &crate::options::ConversionOptions,
+    ctx: &crate::converter::context::Context,
+) {
+    if keeps_source_white_space(options, ctx) || crate::converter::utility::white_space::space_is_owed(output) {
+        output.push_str(prefix);
+    }
+}
+
+/// Whether the white space of the source is kept: in the strict white space mode, and in code
+/// (`<pre>`, `<code>`, `<kbd>`, `<samp>`). No rule that collapses white space or moves it out of
+/// an element applies there. Every such rule of the full converter asks here.
+#[must_use]
+pub const fn keeps_source_white_space(
+    options: &crate::options::ConversionOptions,
+    ctx: &crate::converter::context::Context,
+) -> bool {
+    ctx.in_code || matches!(options.whitespace_mode, crate::options::WhitespaceMode::Strict)
+}
+
+/// Whether an inline element is code (`<code>`, `<kbd>`, `<samp>`): its content is written with
+/// [`keeps_source_white_space`], so a rule for running text does not look into it either.
+#[must_use]
+pub fn is_inline_code(tag_name: &str) -> bool {
+    matches!(tag_name, "code" | "kbd" | "samp")
+}
+
+/// The element that follows a line end of the source.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum NextElement {
+    /// A block, or an element that is not inline.
+    Block,
+    /// An inline element.
+    Inline,
+    /// An inline element whose content starts with a block (`<a href="/y"><h3>y</h3></a>`).
+    InlineAroundBlock,
+}
+
+impl NextElement {
+    /// The kind of an element from the two facts that each converter reads in its own way.
+    #[must_use]
+    pub const fn new(is_inline: bool, content_starts_with_block: bool) -> Self {
+        match (is_inline, content_starts_with_block) {
+            (true, true) => Self::InlineAroundBlock,
+            (true, false) => Self::Inline,
+            (false, _) => Self::Block,
+        }
+    }
+}
+
+/// What one line end of the source becomes before the element that follows it: a space in
+/// running text and before an inline element, a line end before a block. Both converters ask
+/// here, so a line end is the same space in a paragraph, a `<div>`, a list item and the root.
+///
+/// ~keep An inline element whose content starts with a block starts a line of its own in a
+/// ~keep browser, so the line end before it stays a line end, as before a block.
+#[must_use]
+pub const fn line_end_before_element(in_running_text: bool, next: NextElement) -> char {
+    if in_running_text || matches!(next, NextElement::Inline) {
+        ' '
+    } else {
+        '\n'
+    }
+}
+
+/// The source text `raw` without the white space at its end, when that white space holds a
+/// line end and other text is before it.
+///
+/// ~keep Tier-1 gives its text with the references to white space already written as
+/// ~keep characters (`with_white_space_references_decoded`), so `one&#10;` and `one\n&#32;`
+/// ~keep end with a line end here as `one\n` does. This function decodes nothing: one decoder
+/// ~keep reads a reference, and `&amp;#10;` stays the text `&#10;`.
+#[must_use]
+pub fn without_trailing_line_end_in_source(raw: &str) -> Option<&str> {
+    let kept = raw.trim_end_matches(is_collapsible);
+    (raw[kept.len()..].contains('\n') && !kept.is_empty()).then_some(kept)
+}
+
+/// Whether the source text `raw` ends with a zero-width space, written as the character or as
+/// a character reference (`one&#8203;`, `one&#x200B;`, `one&ZeroWidthSpace;`).
+///
+/// ~keep Tier-1 asks for the character before a line end (rule 2 of `white_space`); Tier-2 reads
+/// ~keep the last character of its decoded text. Only the text from the last `&` on is decoded:
+/// ~keep a reference ends where the text ends, and `&amp;#8203;` is the text `&#8203;`.
+#[must_use]
+pub fn ends_with_zero_width_space_in_source(raw: &str) -> bool {
+    raw.rfind('&').map_or_else(
+        || raw.ends_with(ZERO_WIDTH_SPACE),
+        |start| text::decode_html_entities_cow(&raw[start..]).ends_with(ZERO_WIDTH_SPACE),
+    )
+}
+
+/// Whether an element only wraps its text: it writes no content of its own, so the text after
+/// a line end can start inside it or after it when it is empty.
+#[must_use]
+pub fn is_text_wrapper(tag_name: &str) -> bool {
+    matches!(
+        tag_name,
+        "a" | "abbr"
+            | "b"
+            | "bdi"
+            | "bdo"
+            | "cite"
+            | "code"
+            | "data"
+            | "del"
+            | "dfn"
+            | "em"
+            | "i"
+            | "ins"
+            | "kbd"
+            | "mark"
+            | "s"
+            | "samp"
+            | "small"
+            | "span"
+            | "strike"
+            | "strong"
+            | "sub"
+            | "sup"
+            | "time"
+            | "u"
+            | "var"
+    )
+}
+
+/// The zero-width space: a place where a line can break, not a space.
+pub const ZERO_WIDTH_SPACE: char = '\u{200b}';
 
 /// Determine whether a node is block-level, preferring the DOM context's precomputed tag
 /// info when available and falling back to a name-based check otherwise.
@@ -399,5 +537,83 @@ pub const fn floor_char_boundary(s: &str, index: usize) -> usize {
             i -= 1;
         }
         i
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{ends_with_zero_width_space_in_source, without_trailing_line_end_in_source};
+    use crate::converter::utility::white_space::with_white_space_references_decoded;
+
+    #[test]
+    fn a_source_text_that_ends_with_a_line_end_loses_its_trailing_white_space() {
+        for (raw, kept) in [
+            ("one\n", "one"),
+            ("one \t\r\n ", "one"),
+            ("one&#10;", "one"),
+            ("one&#xA;", "one"),
+            ("one&#Xa;", "one"),
+            ("one&NewLine;", "one"),
+            ("one&#13;&#10;", "one"),
+            ("one\n&#32;", "one"),
+            ("one&#32;\n", "one"),
+            ("one&#9;&Tab;&#10; &#x20;", "one"),
+            ("a &amp; b&#10;", "a &amp; b"),
+            ("one&amp;#10;\n", "one&amp;#10;"),
+            ("one&nbsp;\n", "one&nbsp;"),
+            ("one &\n", "one &"),
+            ("é&#10;", "é"),
+        ] {
+            let text = with_white_space_references_decoded(raw);
+            assert_eq!(without_trailing_line_end_in_source(&text), Some(kept), "{raw:?}");
+        }
+    }
+
+    #[test]
+    fn a_source_text_with_no_line_end_at_its_end_or_no_other_text_is_not_changed() {
+        for raw in [
+            "",
+            "one",
+            "one ",
+            "one&#32;",
+            "one&#9;&#13;",
+            "one&amp;#10;",
+            "one&amp;NewLine;",
+            "one&NewLines;",
+            "one&NEWLINE;",
+            "one&#10;two",
+            "one\n&nbsp;",
+            "\n",
+            " \n ",
+            "&#10;",
+            "&#32;&#10;\n",
+        ] {
+            let text = with_white_space_references_decoded(raw);
+            assert_eq!(without_trailing_line_end_in_source(&text), None, "{raw:?}");
+        }
+    }
+
+    #[test]
+    fn a_source_text_ends_with_a_zero_width_space_as_a_character_or_a_reference() {
+        for raw in [
+            "one\u{200b}",
+            "one&#8203;",
+            "one&#x200B;",
+            "one&#x200b;",
+            "a &amp; b\u{200b}",
+            "a & b&#8203;",
+        ] {
+            assert!(ends_with_zero_width_space_in_source(raw), "{raw:?}");
+        }
+        for raw in [
+            "one",
+            "",
+            "one\u{200b}two",
+            "one&amp;#8203;",
+            "one&#8203;two",
+            "one&#82030;",
+        ] {
+            assert!(!ends_with_zero_width_space_in_source(raw), "{raw:?}");
+        }
     }
 }
