@@ -72,7 +72,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - Plain text output separates the text of a form control from the words beside it, as the
-  Markdown output does. This shows only with `remove_forms` off.
+  Markdown output does. This shows for a control outside a `form` element with the default
+  options, and for a control inside one with `remove_forms` off.
   `<p>aaa<select><option>Xone</option><option>Xtwo</option></select>bbb</p>` gave
   `aaaXoneXtwobbb` and now gives `aaa Xone Xtwo bbb`. Each option of a select list or a data
   list is a word of its own. A button, an output, a meter, a progress bar or a text area is a

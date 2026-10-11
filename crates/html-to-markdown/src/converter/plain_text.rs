@@ -4,6 +4,7 @@
 //! visible text content with structural whitespace, bypassing the full
 //! Markdown/Djot conversion pipeline.
 
+use std::borrow::Cow;
 use std::collections::HashSet;
 use std::fmt::Write;
 
@@ -20,8 +21,6 @@ use crate::converter::utility::content::is_block_level_element;
 use crate::visitor::EMPTY_ATTRS;
 #[cfg(feature = "visitor")]
 use crate::visitor::{NodeContext, NodeType, VisitResult, VisitorHandle};
-#[cfg(feature = "visitor")]
-use std::borrow::Cow;
 
 /// Tracks list context for proper marker emission on `<li>` elements.
 #[derive(Clone, Debug)]
@@ -181,12 +180,7 @@ fn walk_plain(
 
     match node {
         tl::Node::Raw(bytes) => emit_raw_text(bytes, buf, state),
-        tl::Node::Tag(tag) => {
-            if state.excluded_node_ids.contains(&node_handle.get_inner()) {
-                return;
-            }
-            walk_tag(*node_handle, tag, parser, buf, list_ctx, state);
-        }
+        tl::Node::Tag(tag) => walk_tag(*node_handle, tag, parser, buf, list_ctx, state),
         tl::Node::Comment(_) => {}
     }
 }
@@ -246,14 +240,7 @@ fn walk_tag(
 ) {
     let tag_name = tag.name().as_utf8_str().to_ascii_lowercase();
     let tag_str = tag_name.as_str();
-    if SKIP_TAGS.contains(&tag_str)
-        || should_drop_for_preprocessing(
-            tag_str,
-            tag,
-            state.options,
-            tag_str == "header" && state.in_document_body && !state.in_content_header_scope,
-        )
-    {
+    if writes_nothing(node_handle, tag_str, tag, state) {
         return;
     }
     #[cfg(feature = "visitor")]
@@ -334,6 +321,64 @@ fn plain_element_context<'a>(tag_name: &'a str, tag: &'a tl::HTMLTag<'a>, depth:
     )
 }
 
+/// Whether this writer leaves out the element `tag` and all its content: an element of
+/// `exclude_selectors`, a tag whose content is never text of the page, an element that the
+/// preprocessing drops.
+///
+/// ~keep The walk and the search for the text after a control both ask this function.
+fn writes_nothing(node_handle: tl::NodeHandle, tag_name: &str, tag: &tl::HTMLTag<'_>, state: &WalkState<'_>) -> bool {
+    state.excluded_node_ids.contains(&node_handle.get_inner())
+        || SKIP_TAGS.contains(&tag_name)
+        || should_drop_for_preprocessing(
+            tag_name,
+            tag,
+            state.options,
+            tag_name == "header" && state.in_document_body && !state.in_content_header_scope,
+        )
+}
+
+/// The text that this writer writes for an element whose children it does not walk: a line end
+/// for `br`, the alt text of an image, the text of an inline graphic. The text is empty when the
+/// element writes nothing (`skip_images`, an image with no alt text). `None` for every other
+/// element.
+///
+/// ~keep The walk and the search for the text after a control both ask this function.
+fn own_text<'a>(
+    tag_name: &str,
+    tag: &'a tl::HTMLTag<'a>,
+    parser: &tl::Parser,
+    options: &ConversionOptions,
+) -> Option<Cow<'a, str>> {
+    match tag_name {
+        "br" => Some(Cow::Borrowed("\n")),
+        "img" | "svg" if options.skip_images => Some(Cow::Borrowed("")),
+        "img" => Some(crate::converter::utility::attributes::decoded_attribute(tag, "alt").unwrap_or_default()),
+        // ~keep An inline graphic is an image: its text is written like an alt text, and its
+        // ~keep style sheets and scripts are not text of the page.
+        "svg" => Some(Cow::Owned(crate::converter::media::svg::graphic_text(tag, parser))),
+        _ => None,
+    }
+}
+
+/// Writes the space between a control at the end of `buf` and a word that this writer writes
+/// after it in the same block.
+fn separate_from_next_plain_text(
+    buf: &mut String,
+    node_handle: tl::NodeHandle,
+    parser: &tl::Parser,
+    state: &WalkState<'_>,
+) {
+    spacing::separate_from_next_text_of(buf, node_handle, parser, state.dom_ctx, &|handle, tag, name| {
+        if writes_nothing(handle, name, tag, state) {
+            return spacing::Lead::Nothing;
+        }
+        match own_text(name, tag, parser, state.options) {
+            Some(text) => spacing::starts_with_word(&text).map_or(spacing::Lead::Nothing, spacing::Lead::Text),
+            None => spacing::Lead::Children,
+        }
+    });
+}
+
 fn dispatch_plain_tag(
     tag_name: &str,
     node_handle: tl::NodeHandle,
@@ -349,17 +394,13 @@ fn dispatch_plain_tag(
         ..state.descend()
     };
     match tag_name {
-        "br" => buf.push('\n'),
-        "hr" => ensure_blank_line(buf),
-        "pre" => walk_plain_pre(tag, parser, buf, list_ctx, state),
-        "img" => emit_plain_image(tag, buf, state.options),
-        // ~keep An inline graphic is an image: its text is written like an alt text, and its
-        // ~keep style sheets and scripts are not text of the page.
-        "svg" => {
-            if !state.options.skip_images {
-                buf.push_str(&crate::converter::media::svg::graphic_text(tag, parser));
+        "br" | "img" | "svg" => {
+            if let Some(text) = own_text(tag_name, tag, parser, state.options) {
+                buf.push_str(&text);
             }
         }
+        "hr" => ensure_blank_line(buf),
+        "pre" => walk_plain_pre(tag, parser, buf, list_ctx, state),
         "table" => {
             ensure_blank_line(buf);
             walk_table(tag, parser, buf, &child_state);
@@ -408,7 +449,9 @@ fn dispatch_plain_tag(
             if !state.in_pre {
                 options_text = options_text.split_whitespace().collect::<Vec<_>>().join(" ");
             }
-            spacing::write_option_list(buf, &options_text, state.in_pre, node_handle, parser, state.dom_ctx);
+            if spacing::write_option_list(buf, &options_text, state.in_pre) {
+                separate_from_next_plain_text(buf, node_handle, parser, state);
+            }
         }
         "option" => {
             let mut option_text = String::new();
@@ -437,7 +480,7 @@ fn walk_plain_control(
     let start = spacing::ControlStart::new(buf);
     walk_children(tag, parser, buf, list_ctx, state);
     if !state.in_pre && start.finish(buf) {
-        spacing::separate_from_next_text(buf, node_handle, parser, state.dom_ctx);
+        separate_from_next_plain_text(buf, node_handle, parser, state);
     }
 }
 
@@ -455,17 +498,6 @@ fn walk_plain_pre(
     };
     walk_children(tag, parser, buf, list_ctx, &pre_state);
     ensure_blank_line(buf);
-}
-
-fn emit_plain_image(tag: &tl::HTMLTag<'_>, buf: &mut String, options: &ConversionOptions) {
-    if options.skip_images {
-        return;
-    }
-    if let Some(alt) = crate::converter::utility::attributes::decoded_attribute(tag, "alt")
-        && !alt.is_empty()
-    {
-        buf.push_str(alt.as_ref());
-    }
 }
 
 fn walk_plain_list(

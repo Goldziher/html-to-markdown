@@ -74,16 +74,64 @@ impl ControlStart {
     }
 }
 
+/// What an element writes first. The writer of an output format answers it for the search for
+/// the text after a control, so the search and the writer cannot differ.
+pub enum Lead {
+    /// The element writes nothing: it is not in the way of the text after it.
+    Nothing,
+    /// The element writes text of its own. The value says whether that text starts with a word.
+    Text(bool),
+    /// The element writes what its children write.
+    Children,
+}
+
+/// The answer of a writer for an element: its handle, its tag and its name in lower case.
+pub type LeadOf<'a> = &'a dyn Fn(tl::NodeHandle, &tl::HTMLTag<'_>, &str) -> Lead;
+
+/// Whether `text` starts with a word: not with white space and not with closing punctuation.
+/// `None` when `text` is empty.
+pub fn starts_with_word(text: &str) -> Option<bool> {
+    text.chars()
+        .next()
+        .map(|first| !first.is_whitespace() && !matches!(first, '.' | ',' | ';' | ':' | '!' | '?' | ')' | ']' | '}'))
+}
+
+/// What the Markdown writer writes first for the element `name`.
+fn markdown_lead(name: &str) -> Lead {
+    match name {
+        // ~keep An input writes no text, so it is not in the way.
+        "input" | "script" | "style" | "template" | "noscript" => Lead::Nothing,
+        "br" => Lead::Text(false),
+        "img" => Lead::Text(true),
+        // ~keep An element that writes nothing (an empty button, an empty span) is not in
+        // ~keep the way either. A space before a block is at a line end, where it is removed.
+        _ => Lead::Children,
+    }
+}
+
 /// Writes the space between a control at the end of `output` and the text that follows
-/// `node_handle` in the same block, when that text does not start with white space or closing
-/// punctuation.
+/// `node_handle` in the same block of the Markdown output, when that text does not start with
+/// white space or closing punctuation.
 pub fn separate_from_next_text(
     output: &mut String,
     node_handle: tl::NodeHandle,
     parser: &tl::Parser,
     dom_ctx: &DomContext,
 ) {
-    if needs_space_before(output) && word_follows(node_handle.get_inner(), parser, dom_ctx) {
+    separate_from_next_text_of(output, node_handle, parser, dom_ctx, &|_, _, name| markdown_lead(name));
+}
+
+/// Writes the space between a control at the end of `output` and the text that follows
+/// `node_handle` in the same block, when that text does not start with white space or closing
+/// punctuation. `lead_of` says what the writer of the output writes first for an element.
+pub fn separate_from_next_text_of(
+    output: &mut String,
+    node_handle: tl::NodeHandle,
+    parser: &tl::Parser,
+    dom_ctx: &DomContext,
+    lead_of: LeadOf<'_>,
+) {
+    if needs_space_before(output) && word_follows(node_handle.get_inner(), parser, dom_ctx, lead_of) {
         output.push(' ');
     }
 }
@@ -103,28 +151,20 @@ pub fn write_option(list: &mut String, text: &str) {
     list.push_str(trimmed);
 }
 
-/// Writes `options`, the text of the options of the list `node_handle`, to `output`. The options
-/// are one control in the line: one space separates the control from the text before it and
-/// from the text after it. In code (`in_code`) the white space around the options is text of
-/// the source.
+/// Writes `options`, the text of the options of a list, to `output`. The options are one control
+/// in the line: one space separates the control from the text before it. In code (`in_code`)
+/// the white space around the options is text of the source. Returns whether it wrote: the
+/// caller then separates the list from the text after it.
 ///
 /// ~keep The Markdown writer and the plain text writer both write an option list with this function.
-pub fn write_option_list(
-    output: &mut String,
-    options: &str,
-    in_code: bool,
-    node_handle: tl::NodeHandle,
-    parser: &tl::Parser,
-    dom_ctx: &DomContext,
-) {
+pub fn write_option_list(output: &mut String, options: &str, in_code: bool) -> bool {
     let trimmed = options.trim();
     if trimmed.is_empty() {
-        return;
+        return false;
     }
     let start = ControlStart::new(output);
     output.push_str(if in_code { options } else { trimmed });
-    start.finish(output);
-    separate_from_next_text(output, node_handle, parser, dom_ctx);
+    start.finish(output)
 }
 
 /// The siblings of node `id` that follow it in the source.
@@ -149,11 +189,11 @@ pub fn white_space_follows(id: u32, parser: &tl::Parser, dom_ctx: &DomContext) -
 }
 
 /// Whether the content after node `id` in its block starts with a word.
-fn word_follows(mut id: u32, parser: &tl::Parser, dom_ctx: &DomContext) -> bool {
+fn word_follows(mut id: u32, parser: &tl::Parser, dom_ctx: &DomContext, lead_of: LeadOf<'_>) -> bool {
     let mut budget = MAX_LOOKAHEAD_NODES;
     loop {
         for sibling in siblings_after(id, dom_ctx) {
-            if let Some(starts_with_word) = leading_word(*sibling, parser, dom_ctx, &mut budget) {
+            if let Some(starts_with_word) = leading_word(*sibling, parser, dom_ctx, &mut budget, lead_of) {
                 return starts_with_word;
             }
         }
@@ -169,30 +209,30 @@ fn word_follows(mut id: u32, parser: &tl::Parser, dom_ctx: &DomContext) -> bool 
 }
 
 /// Whether the first content `handle` writes starts with a word, or `None` when it writes nothing.
-fn leading_word(handle: tl::NodeHandle, parser: &tl::Parser, dom_ctx: &DomContext, budget: &mut usize) -> Option<bool> {
+fn leading_word(
+    handle: tl::NodeHandle,
+    parser: &tl::Parser,
+    dom_ctx: &DomContext,
+    budget: &mut usize,
+    lead_of: LeadOf<'_>,
+) -> Option<bool> {
     if *budget == 0 {
         return Some(false);
     }
     *budget -= 1;
     match handle.get(parser)? {
         tl::Node::Comment(_) => None,
-        tl::Node::Raw(raw) => raw.as_utf8_str().chars().next().map(|first| {
-            !first.is_whitespace() && !matches!(first, '.' | ',' | ';' | ':' | '!' | '?' | ')' | ']' | '}')
-        }),
+        tl::Node::Raw(raw) => starts_with_word(raw.as_utf8_str().as_ref()),
         tl::Node::Tag(tag) => {
             let name = dom_ctx.tag_name_for(handle, parser)?;
-            match name.as_ref() {
-                // ~keep An input writes no text, so it is not in the way.
-                "input" | "script" | "style" | "template" | "noscript" => None,
-                "br" => Some(false),
-                "img" => Some(true),
-                // ~keep An element that writes nothing (an empty button, an empty span) is not in
-                // ~keep the way either. A space before a block is at a line end, where it is removed.
-                _ => tag
+            match lead_of(handle, tag, name.as_ref()) {
+                Lead::Nothing => None,
+                Lead::Text(is_word) => Some(is_word),
+                Lead::Children => tag
                     .children()
                     .top()
                     .iter()
-                    .find_map(|child| leading_word(*child, parser, dom_ctx, budget)),
+                    .find_map(|child| leading_word(*child, parser, dom_ctx, budget, lead_of)),
             }
         }
     }

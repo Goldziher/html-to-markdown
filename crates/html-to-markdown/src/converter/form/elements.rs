@@ -556,7 +556,9 @@ pub fn handle_option_list(
                 crate::converter::block::container::HandlerContext::new(options, &list_ctx, depth + 1, dom_ctx),
             );
         }
-        super::spacing::write_option_list(output, &rendered, ctx.in_code, *node_handle, parser, dom_ctx);
+        if super::spacing::write_option_list(output, &rendered, ctx.in_code) {
+            separate_from_next_text(output, *node_handle, parser, dom_ctx);
+        }
     }
 }
 

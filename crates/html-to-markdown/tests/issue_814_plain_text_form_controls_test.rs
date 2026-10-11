@@ -187,3 +187,83 @@ fn the_markdown_output_of_the_same_inputs_does_not_change() {
         "# aaa Xone Xtwo bbb\n",
     );
 }
+
+/// The plain text of `html` with forms kept and one more change of the options.
+fn plain_with(html: &str, change: impl Fn(&mut ConversionOptions)) -> String {
+    let mut changed = options(OutputFormat::Plain, TierStrategy::Tier2);
+    change(&mut changed);
+    converted(html, changed)
+}
+
+#[test]
+fn a_control_outside_a_form_is_a_word_of_its_own_with_the_default_options() {
+    let default_plain = || ConversionOptions {
+        output_format: OutputFormat::Plain,
+        ..ConversionOptions::default()
+    };
+    assert_eq!(
+        converted("<p>aaa<button>Xone</button>bbb</p>", default_plain()),
+        "aaa Xone bbb\n"
+    );
+    assert_eq!(
+        converted(&format!("<p>aaa<select>{OPTIONS}</select>bbb</p>"), default_plain()),
+        "aaa Xone Xtwo bbb\n"
+    );
+    // ~keep The default options remove a `form` element with its content.
+    let in_form = converted(
+        &format!("<p>ccc</p><form><p>aaa<select>{OPTIONS}</select>bbb</p></form>"),
+        default_plain(),
+    );
+    assert!(in_form.contains("ccc") && !in_form.contains("Xone"), "{in_form:?}");
+}
+
+#[test]
+fn an_image_with_no_alt_text_after_a_control_adds_no_second_space_in_plain_text() {
+    assert_plain(
+        "<p>aaa<button>Xone</button><img src=\"i.png\"> bbb</p>",
+        "aaa Xone bbb\n",
+    );
+    assert_plain(
+        "<p>aaa<button>Xone</button><img src=\"i.png\">bbb</p>",
+        "aaa Xone bbb\n",
+    );
+    assert_plain(
+        &format!("<p>aaa<select>{OPTIONS}</select><img src=\"i.png\"> bbb</p>"),
+        "aaa Xone Xtwo bbb\n",
+    );
+}
+
+#[test]
+fn a_tag_that_is_never_text_after_a_control_adds_no_second_space_in_plain_text() {
+    assert_plain(
+        "<p>aaa<button>Xone</button><math><mi>y</mi></math> bbb</p>",
+        "aaa Xone bbb\n",
+    );
+}
+
+#[test]
+fn a_skipped_image_after_a_control_adds_no_second_space_in_plain_text() {
+    let html = "<p>aaa<button>Xone</button><img src=\"i.png\" alt=\"pic\"> bbb</p>";
+    assert_eq!(plain_with(html, |options| options.skip_images = true), "aaa Xone bbb\n");
+}
+
+#[test]
+fn an_excluded_element_after_a_control_adds_no_second_space_in_plain_text() {
+    let html = "<p>aaa<button>Xone</button><span class=\"x\">zzz</span> bbb</p>";
+    assert_eq!(
+        plain_with(html, |options| options.exclude_selectors = vec![".x".to_string()]),
+        "aaa Xone bbb\n"
+    );
+}
+
+#[test]
+fn the_alt_text_of_an_image_after_a_control_is_a_word_in_plain_text() {
+    assert_plain(
+        "<p>aaa<button>Xone</button><img src=\"i.png\" alt=\"pic\">.</p>",
+        "aaa Xone pic.\n",
+    );
+    assert_plain(
+        "<p>aaa<button>Xone</button><img src=\"i.png\" alt=\"pic\"> bbb</p>",
+        "aaa Xone pic bbb\n",
+    );
+}
