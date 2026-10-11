@@ -275,6 +275,12 @@ pub fn handle_q(
             }
             return;
         }
+        // ~keep A block remains a block when inline text follows it inside the quotation (#820).
+        if !handler.ctx.convert_as_inline && content.contains("\n\n") {
+            let quoted = format!("\"{trimmed}\"");
+            crate::converter::block::div::push_block(output, handler.options, handler.ctx, &quoted);
+            return;
+        }
         output.push('"');
         output.push_str(trimmed);
         output.push('"');
