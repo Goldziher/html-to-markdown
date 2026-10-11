@@ -185,7 +185,10 @@ fn markdown_block_prefix_len(block: &str) -> usize {
     digits_start
 }
 
-fn move_leading_hard_breaks<'a>(
+/// Writes the line breaks that `content` starts with to `output`, before the marks of the
+/// element, and gives back the content after them. Bold text and the `<address>` form of a
+/// link call it: neither can keep a line break inside its marks.
+pub fn move_leading_hard_breaks<'a>(
     output: &mut String,
     content: &'a str,
     ctx: &Context,

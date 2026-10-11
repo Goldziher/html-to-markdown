@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- White space at the start or the end of the label of an autolink is written beside the autolink, as it is for a link with other text: `Press <a href="https://e.org/">https://e.org/ </a>now.` gave `Press <https://e.org/>now.` and now gives `Press <https://e.org/> now.`.
 - White space at the start or the end of a link label or of a short quotation is written beside
   the link or the quotation, not inside it, as it is for bold text. `Press <a href="/p">Go </a>now.` gave `Press [Go](/p)now.` and
   now gives `Press [Go](/p) now.`. `Press <q>Go </q>now.` gave `Press "Go"now.` and now gives

@@ -74,6 +74,24 @@ pub fn chomp_inline(text: &str) -> (&str, &str, &str) {
     (prefix, suffix, trimmed)
 }
 
+/// The white space that the content of a link label gives up at its two ends, and the label
+/// without it: (prefix, suffix, label). Every writer of a link asks here, in both converters.
+///
+/// ~keep The white space at an edge of the label goes outside the link, as it does for bold
+/// ~keep and italic text ([`chomp_inline`]): `[Go ](/p)now` shows as `Go now`, and a trimmed
+/// ~keep label joins the words. With `break_stays_in_label`, a line break at an edge is content
+/// ~keep of the label, not white space (issue #497): such a label is given back whole. A link
+/// ~keep in the `<address>` form has no label to keep the break in, so its writer clears the flag.
+pub fn link_label_edges(content: &str, break_stays_in_label: bool) -> (&str, &str, &str) {
+    let inner = content.trim_matches([' ', '\t', '\u{a0}']);
+    let edge_is_break = inner.starts_with('\n') || inner.starts_with("\\\n") || inner.ends_with('\n');
+    if edge_is_break && break_stays_in_label {
+        ("", "", content)
+    } else {
+        chomp_inline(content)
+    }
+}
+
 /// Merge a newly-opening emphasis delimiter into the matching close marker `output` already
 /// ends with, instead of emitting a second, textually-adjacent delimiter run.
 ///
@@ -542,8 +560,37 @@ pub const fn floor_char_boundary(s: &str, index: usize) -> usize {
 
 #[cfg(test)]
 mod tests {
-    use super::{ends_with_zero_width_space_in_source, without_trailing_line_end_in_source};
+    use super::{ends_with_zero_width_space_in_source, link_label_edges, without_trailing_line_end_in_source};
     use crate::converter::utility::white_space::with_white_space_references_decoded;
+
+    #[test]
+    fn a_link_label_gives_up_the_white_space_at_its_edges() {
+        for (content, edges) in [
+            ("Go", ("", "", "Go")),
+            (" Go ", (" ", " ", "Go")),
+            ("\tGo\t", (" ", " ", "Go")),
+            ("\u{a0}Go\u{a0}", ("", "", "Go")),
+            (" ", (" ", "", "")),
+        ] {
+            assert_eq!(link_label_edges(content, true), edges, "{content:?}");
+            assert_eq!(link_label_edges(content, false), edges, "{content:?}");
+        }
+    }
+
+    #[test]
+    fn a_line_break_at_an_edge_of_a_link_label_stays_in_the_label_when_the_writer_keeps_it() {
+        for (content, without_break) in [
+            ("Go  \n", ("", "  \n", "Go")),
+            ("Go\n", ("", "", "Go")),
+            ("Go\\\n", ("", "\\\n", "Go")),
+            ("Go  \n\u{a0}", ("", "", "Go")),
+            ("  \nGo", (" ", "", "Go")),
+            ("\\\nGo", ("", "", "\\\nGo")),
+        ] {
+            assert_eq!(link_label_edges(content, true), ("", "", content), "{content:?}");
+            assert_eq!(link_label_edges(content, false), without_break, "{content:?}");
+        }
+    }
 
     #[test]
     fn a_source_text_that_ends_with_a_line_end_loses_its_trailing_white_space() {

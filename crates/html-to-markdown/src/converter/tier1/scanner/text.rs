@@ -180,6 +180,12 @@ fn drop_block_edge_whitespace(state: &mut Tier1State, raw: &str, in_pre: bool, p
                 frame.dropped_whitespace_only_text = true;
             }
         }
+        // ~keep The white space that a link label starts with is one space of the label:
+        // ~keep `close_link` gives it to `link_label_edges`, which moves it before the link.
+        let in_link_frame = matches!(state.stack.last().map(|frame| frame.spec.kind), Some(TagKind::Link));
+        if in_link_frame && !document_start {
+            state.cell_or_output_mut().push(' ');
+        }
     }
     let _ = raw;
     true
@@ -277,7 +283,7 @@ fn trim_leading_text_run<'a>(
         && !document_start_strip
         && matches!(
             state.stack.last().map(|frame| frame.spec.kind),
-            Some(TagKind::Strong | TagKind::Emphasis)
+            Some(TagKind::Strong | TagKind::Emphasis | TagKind::Link)
         );
     let in_link_frame = matches!(state.stack.last().map(|frame| frame.spec.kind), Some(TagKind::Link));
     let after_line_end = follows_line_end(state);

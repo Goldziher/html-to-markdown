@@ -12,18 +12,19 @@
 use std::collections::BTreeMap;
 
 use crate::converter::Context;
+use crate::converter::append_inline_suffix;
 use crate::converter::block::heading::{find_single_heading_child, heading_allows_inline_images, push_heading};
 use crate::converter::dom_context::DomContext;
 use crate::converter::inline::HandlerContext;
 use crate::converter::inline::link::{MarkdownLink, append_markdown_link_in_context, has_uri_scheme};
+use crate::converter::inline::wrapped::move_leading_hard_breaks;
 use crate::converter::main::walk_node;
 use crate::converter::media::inline_data_treatment;
 use crate::converter::utility::content::{
-    collect_link_label_text, keeps_source_white_space, link_accessible_name, link_text_content, node_is_block_level,
-    normalize_link_label, normalized_tag_name, push_inline_prefix,
+    collect_link_label_text, keeps_source_white_space, link_accessible_name, link_label_edges, link_text_content,
+    node_is_block_level, normalize_link_label, normalized_tag_name, push_inline_prefix,
 };
 use crate::converter::utility::escaping::escape_link_label;
-use crate::converter::{append_inline_suffix, chomp_inline};
 use crate::options::{ConversionOptions, InlineDataMedia};
 use crate::text;
 use std::borrow::Cow;
@@ -103,16 +104,10 @@ pub fn handle_link(tag: &tl::HTMLTag, mut handler: HandlerContext<'_>) {
 
     handler.context.inline_data_replaced.set(false);
     let content = build_label_content(&data, &handler);
-    // ~keep The white space at an edge of the label goes outside the link, as it does for bold
-    // ~keep and italic text: `[Go ](/p)now` shows as `Go now`, and a trimmed label joins the words.
-    // ~keep A line break at an edge of the label is content of the label, not white space
-    // ~keep (issue #497): such a label is written whole.
-    let inner = content.trim_matches([' ', '\t', '\u{a0}']);
-    let edge_is_break = inner.starts_with('\n') || inner.starts_with("\\\n") || inner.ends_with('\n');
-    let (prefix, suffix, trimmed) = if edge_is_break || keeps_source_white_space(handler.options, handler.context) {
+    let (prefix, suffix, trimmed) = if keeps_source_white_space(handler.options, handler.context) {
         ("", "", content.as_str())
     } else {
-        chomp_inline(&content)
+        link_label_edges(&content, true)
     };
     let edges = LabelEdges {
         prefix,
@@ -224,9 +219,9 @@ fn collect_code_link_text(data: &LinkData<'_>, context: &Context, handler: &Hand
     raw
 }
 
-/// The white space that the label of a link had at its two ends (see [`chomp_inline`]).
+/// The white space that the label of a link had at its two ends (see [`link_label_edges`]).
 ///
-/// ~keep It belongs to the link that the converter writes itself, so only [`write_link_with_edges`]
+/// ~keep It belongs to the link that the converter writes itself, so only [`write_with_edges`]
 /// ~keep writes it. A link that is left out, and a link that a visitor skips, replaces or keeps
 /// ~keep as HTML, has no label of the converter: it writes what it wrote before the label gave
 /// ~keep up its white space.
@@ -510,14 +505,39 @@ fn emit_autolink(data: &LinkData<'_>, handler: &mut HandlerContext<'_>) -> bool 
     if !data.is_autolink(handler.options) {
         return false;
     }
-    handler.output.push('<');
-    if data.href.starts_with("mailto:") && data.raw_text == data.href[7..] {
-        handler.output.push_str(&data.raw_text);
+    // ~keep The label of this form is the address, so the content of the link is walked only
+    // ~keep for the white space at its ends. A line break there goes outside the marks, as it
+    // ~keep does for bold text. A visitor gets no call for that walk: it got none before.
+    let content = if keeps_source_white_space(handler.options, handler.context) {
+        String::new()
     } else {
-        handler.output.push_str(&data.href);
-    }
-    handler.output.push('>');
+        autolink_edge_content(data, handler)
+    };
+    let content = move_leading_hard_breaks(handler.output, &content, handler.context, handler.options);
+    let (prefix, suffix, text) = link_label_edges(content, false);
+    let edges = LabelEdges {
+        prefix,
+        suffix,
+        has_text: !text.is_empty(),
+    };
+    write_with_edges(&edges, handler, |handler| {
+        handler.output.push('<');
+        if data.href.starts_with("mailto:") && data.raw_text == data.href[7..] {
+            handler.output.push_str(&data.raw_text);
+        } else {
+            handler.output.push_str(&data.href);
+        }
+        handler.output.push('>');
+    });
     true
+}
+
+fn autolink_edge_content(data: &LinkData<'_>, handler: &HandlerContext<'_>) -> String {
+    #[cfg(feature = "visitor")]
+    if handler.context.has_observer() {
+        return outside_code(handler, |unobserved| build_label_content(data, unobserved));
+    }
+    build_label_content(data, handler)
 }
 
 fn emit_heading_link(data: &LinkData<'_>, handler: &mut HandlerContext<'_>) -> bool {
@@ -707,10 +727,22 @@ fn emit_link(
 /// Writes the link of the converter: the white space of the label start, the link, the white
 /// space of the label end.
 fn write_link_with_edges(data: &LinkData<'_>, label: &str, edges: &LabelEdges<'_>, handler: &mut HandlerContext<'_>) {
+    write_with_edges(edges, handler, |handler| {
+        write_link(handler.output, data, label, handler.options, handler.context);
+    });
+}
+
+/// Writes the white space of the label start, what `write_marks` writes for the link, and the
+/// white space of the label end. Every form of a link is written through here.
+fn write_with_edges(
+    edges: &LabelEdges<'_>,
+    handler: &mut HandlerContext<'_>,
+    write_marks: impl FnOnce(&mut HandlerContext<'_>),
+) {
     if edges.has_text {
         push_inline_prefix(handler.output, edges.prefix, handler.options, handler.context);
     }
-    write_link(handler.output, data, label, handler.options, handler.context);
+    write_marks(handler);
     append_inline_suffix(
         handler.output,
         edges.suffix,
