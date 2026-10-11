@@ -264,7 +264,13 @@ pub fn handle_q(
             }
         }
 
-        let trimmed = content.trim();
+        // ~keep Where the white space of the source is kept, no space moves out of the marks.
+        let (prefix, suffix, trimmed) =
+            if crate::converter::utility::content::keeps_source_white_space(handler.options, handler.ctx) {
+                ("", "", content.trim())
+            } else {
+                chomp_inline(&content)
+            };
         if trimmed.is_empty() {
             // ~keep issue #481: `<q>` wraps in quotes, which a whitespace-only body has
             // ~keep nothing to wrap -- but the body is still the word separator the source
@@ -274,9 +280,11 @@ pub fn handle_q(
             }
             return;
         }
+        crate::converter::utility::content::push_inline_prefix(output, prefix, handler.options, handler.ctx);
         output.push('"');
         output.push_str(trimmed);
         output.push('"');
+        append_inline_suffix(output, suffix, true, node_handle, parser, handler.dom_ctx);
     }
 }
 
