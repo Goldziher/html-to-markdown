@@ -83,6 +83,9 @@ struct WalkState<'a> {
     /// follows the marker directly starts on its line. A table cell starts its own buffer with `None`.
     item_marker_end: Option<usize>,
     in_pre: bool,
+    /// Inside the element that writes an option list: the outermost `<select>`, `<datalist>`
+    /// or `<option>`. An option there is a word of that list.
+    in_option_list: bool,
     in_document_body: bool,
     in_content_header_scope: bool,
     depth: usize,
@@ -97,6 +100,7 @@ impl WalkState<'_> {
             excluded_node_ids: self.excluded_node_ids,
             item_marker_end: self.item_marker_end,
             in_pre: self.in_pre,
+            in_option_list: self.in_option_list,
             in_document_body: self.in_document_body,
             in_content_header_scope: self.in_content_header_scope,
             depth: self.depth + 1,
@@ -152,6 +156,7 @@ pub fn extract_plain_text(dom: &tl::VDom, parser: &tl::Parser, options: &Convers
         excluded_node_ids: &excluded_node_ids,
         item_marker_end: None,
         in_pre: false,
+        in_option_list: false,
         in_document_body: false,
         in_content_header_scope: false,
         depth: 0,
@@ -414,12 +419,15 @@ fn dispatch_plain_tag(
             buf.end_block();
         }
         // ~keep The Markdown writer writes an option list and an option with the same two functions.
-        "select" | "datalist" => walk_plain_option_list(tag, parser, buf, list_ctx, &child_state.for_own_buffer()),
-        "option" => {
-            let mut option = PlainOutput::default();
-            walk_children(tag, parser, &mut option, list_ctx, &child_state.for_own_buffer());
-            buf.write_option(&option.into_text());
+        // ~keep The outermost element of an option list writes the list: an option with no
+        // ~keep select list around it is a list of one option. An option group writes no list.
+        "select" | "datalist" => {
+            walk_plain_option_list(tag_name, tag, parser, buf, list_ctx, &child_state.for_own_buffer());
         }
+        "option" if !state.in_option_list => {
+            walk_plain_option_list(tag_name, tag, parser, buf, list_ctx, &child_state.for_own_buffer());
+        }
+        "option" => walk_plain_option(tag, parser, buf, list_ctx, &child_state.for_own_buffer()),
         _ if spacing::writes_own_text(tag_name) => {
             walk_plain_control(tag, parser, buf, list_ctx, &child_state);
         }
@@ -427,24 +435,51 @@ fn dispatch_plain_tag(
     }
 }
 
-/// Writes the options of a select list or a data list. The list is one control in its line:
-/// one space separates it from the text before it and from a word after it.
+/// Writes an option list: a select list or a data list, and an option that no such element
+/// holds. The list is one control: one space separates it from the text before it and from a
+/// word after it. A select list and a data list are one line. `state` is the state of the
+/// children of `tag`.
 fn walk_plain_option_list(
+    tag_name: &str,
     tag: &tl::HTMLTag<'_>,
     parser: &tl::Parser,
     buf: &mut PlainOutput,
     list_ctx: &mut ListContext,
     state: &WalkState<'_>,
 ) {
+    let list_state = WalkState {
+        in_option_list: true,
+        ..*state
+    };
     let mut options = PlainOutput::default();
-    walk_children(tag, parser, &mut options, list_ctx, state);
+    if tag_name == "option" {
+        walk_plain_option(tag, parser, &mut options, list_ctx, &list_state);
+    } else {
+        walk_children(tag, parser, &mut options, list_ctx, &list_state);
+    }
     // ~keep This writer keeps the line ends of the source in running text: outside `pre`, a
-    // ~keep line end in a list is one space.
+    // ~keep line end in a select list or a data list is one space. An option that no such
+    // ~keep element holds is no list control in a browser, so its line ends and its blocks
+    // ~keep stay.
     let mut options = options.into_text();
-    if !state.in_pre {
+    if !state.in_pre && matches!(tag_name, "select" | "datalist") {
         options = options.split_whitespace().collect::<Vec<_>>().join(" ");
     }
     buf.write_option_list(&options, state.in_pre);
+}
+
+/// Writes an option of an option list to `list`, the text of the list: a word of the list.
+/// `state` is the state of the children of `tag`.
+fn walk_plain_option(
+    tag: &tl::HTMLTag<'_>,
+    parser: &tl::Parser,
+    list: &mut PlainOutput,
+    list_ctx: &mut ListContext,
+    state: &WalkState<'_>,
+) {
+    let mut option = PlainOutput::default();
+    walk_children(tag, parser, &mut option, list_ctx, state);
+    list.write_option(&option.into_text());
 }
 
 /// Writes a control that holds text of its own: a button, an output, a meter, a progress bar

@@ -102,6 +102,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   control before it and leaves no text of its own, and the removal no longer panics inside
   a multi-byte character
   ([#814](https://github.com/xberg-io/html-to-markdown/issues/814)).
+- An `option` element with no select list around it is a word of its own in Markdown output and
+  in plain text output: `<p>aaa<option>Xone</option>bbb</p>` gave `aaa Xonebbb` and now gives
+  `aaa Xone bbb` ([#846](https://github.com/xberg-io/html-to-markdown/issues/846)).
 - A `<title>` before the body content of a page with no `<head>` tag is the document title, as
   in a browser. `<title>T</title><div><p>one</p></div>tail` gave `T`, `one` and `tail` as body
   text and no front matter. It now gives the front matter `title: T`, then `one` and `tail`.
