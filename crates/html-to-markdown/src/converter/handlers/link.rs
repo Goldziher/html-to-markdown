@@ -20,9 +20,10 @@ use crate::converter::main::walk_node;
 use crate::converter::media::inline_data_treatment;
 use crate::converter::utility::content::{
     collect_link_label_text, keeps_source_white_space, link_accessible_name, link_text_content, node_is_block_level,
-    normalize_link_label, normalized_tag_name,
+    normalize_link_label, normalized_tag_name, push_inline_prefix,
 };
 use crate::converter::utility::escaping::escape_link_label;
+use crate::converter::{append_inline_suffix, chomp_inline};
 use crate::options::{ConversionOptions, InlineDataMedia};
 use crate::text;
 use std::borrow::Cow;
@@ -81,7 +82,7 @@ pub fn handle_link(tag: &tl::HTMLTag, mut handler: HandlerContext<'_>) {
         #[cfg(not(feature = "visitor"))]
         let is_shown = false;
         if is_shown {
-            emit_link(tag, &data, &text, false, &mut handler);
+            emit_link(tag, &data, &text, &LabelEdges::NONE, false, &mut handler);
         } else {
             handler.output.push_str(&text);
         }
@@ -94,16 +95,54 @@ pub fn handle_link(tag: &tl::HTMLTag, mut handler: HandlerContext<'_>) {
     }
 
     handler.context.inline_data_replaced.set(false);
-    let mut label = normalize_link_label(&build_label_content(&data, &handler));
+    let content = build_label_content(&data, &handler);
+    // ~keep The white space at an edge of the label goes outside the link, as it does for bold
+    // ~keep and italic text: `[Go ](/p)now` shows as `Go now`, and a trimmed label joins the words.
+    // ~keep A line break at an edge of the label is content of the label, not white space
+    // ~keep (issue #497): such a label is written whole.
+    let inner = content.trim_matches([' ', '\t', '\u{a0}']);
+    let edge_is_break = inner.starts_with('\n') || inner.starts_with("\\\n") || inner.ends_with('\n');
+    let (prefix, suffix, trimmed) = if edge_is_break || keeps_source_white_space(handler.options, handler.context) {
+        ("", "", content.as_str())
+    } else {
+        chomp_inline(&content)
+    };
+    let edges = LabelEdges {
+        prefix,
+        suffix,
+        has_text: !trimmed.is_empty(),
+    };
+    let mut label = normalize_link_label(trimmed);
     apply_label_fallbacks(&data, &mut label, &handler);
     indent_hard_break_continuations(&mut label, handler.context, handler.options);
     let drop_link = data.is_dropped(&label, &handler);
-    let emit_deferred = emit_link(tag, &data, &label, drop_link, &mut handler);
+    let emit_deferred = emit_link(tag, &data, &label, &edges, drop_link, &mut handler);
     #[cfg(feature = "metadata")]
     record_link_metadata(tag, &data, &label, handler.context);
     if data.emit_blocks_separately && emit_deferred {
         walk_handles_to_output(data.deferred.iter().copied(), &mut handler);
     }
+}
+
+/// The white space that the label of a link had at its two ends (see [`chomp_inline`]).
+///
+/// ~keep It belongs to the link that the converter writes itself, so only [`write_link_with_edges`]
+/// ~keep writes it. A link that is left out, and a link that a visitor skips, replaces or keeps
+/// ~keep as HTML, has no label of the converter: it writes what it wrote before the label gave
+/// ~keep up its white space.
+struct LabelEdges<'a> {
+    prefix: &'a str,
+    suffix: &'a str,
+    has_text: bool,
+}
+
+impl LabelEdges<'_> {
+    /// A label that gives up no white space: the text of a link in code.
+    const NONE: Self = Self {
+        prefix: "",
+        suffix: "",
+        has_text: false,
+    };
 }
 
 struct LinkData<'a> {
@@ -468,6 +507,7 @@ fn emit_link(
     tag: &tl::HTMLTag<'_>,
     data: &LinkData<'_>,
     label: &str,
+    edges: &LabelEdges<'_>,
     drop_link: bool,
     handler: &mut HandlerContext<'_>,
 ) -> bool {
@@ -476,10 +516,27 @@ fn emit_link(
     }
     #[cfg(feature = "visitor")]
     if let Some(visitor) = handler.context.visitor.clone() {
-        return visit_link(tag, data, label, &visitor, handler);
+        return visit_link(tag, data, label, edges, &visitor, handler);
+    }
+    write_link_with_edges(data, label, edges, handler);
+    true
+}
+
+/// Writes the link of the converter: the white space of the label start, the link, the white
+/// space of the label end.
+fn write_link_with_edges(data: &LinkData<'_>, label: &str, edges: &LabelEdges<'_>, handler: &mut HandlerContext<'_>) {
+    if edges.has_text {
+        push_inline_prefix(handler.output, edges.prefix, handler.options, handler.context);
     }
     write_link(handler.output, data, label, handler.options, handler.context);
-    true
+    append_inline_suffix(
+        handler.output,
+        edges.suffix,
+        edges.has_text,
+        handler.node_handle,
+        handler.parser,
+        handler.dom_context,
+    );
 }
 
 fn write_link(output: &mut String, data: &LinkData<'_>, label: &str, options: &ConversionOptions, context: &Context) {
@@ -517,6 +574,7 @@ fn visit_link(
     tag: &tl::HTMLTag<'_>,
     data: &LinkData<'_>,
     label: &str,
+    edges: &LabelEdges<'_>,
     visitor: &crate::visitor::VisitorHandle,
     handler: &mut HandlerContext<'_>,
 ) -> bool {
@@ -542,7 +600,7 @@ fn visit_link(
         data.title.as_deref(),
     );
     match result {
-        VisitResult::Continue => write_link(handler.output, data, label, handler.options, handler.context),
+        VisitResult::Continue => write_link_with_edges(data, label, edges, handler),
         VisitResult::Custom(custom) => {
             if let Some(collector) = handler.context.structure_collector.as_ref() {
                 collector.borrow_mut().replace_current_element(Some(&custom));
