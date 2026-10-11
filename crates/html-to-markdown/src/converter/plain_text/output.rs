@@ -1,12 +1,14 @@
 //! The output of the plain text writer: the text of one buffer, the places in it where a
-//! form control ended and the places a visitor can return to.
+//! form control ended, the places where the open controls started and the places a visitor can
+//! return to.
 //!
 //! ~keep The text is private to this module and no function gives a mutable reference to it
 //! ~keep away, so every change of the text is a function here: `append`, `insert_at` and
-//! ~keep `shrink_to`. Each keeps every control end and every open checkpoint a true place in
-//! ~keep the text.
+//! ~keep `shrink_to`. Each keeps every control end, every start of an open control and every
+//! ~keep open checkpoint a true place in the text. A caller holds a token for a place, never
+//! ~keep the place.
 
-use crate::converter::form::spacing::{self, ControlStart};
+use crate::converter::form::spacing;
 
 /// The text of one buffer of the plain text writer (the page, a table cell, an option list).
 #[derive(Default)]
@@ -17,9 +19,34 @@ pub(super) struct PlainOutput {
     /// the last thing in it. After other text, a line end or a block the last length says
     /// nothing.
     control_ends: Vec<usize>,
+    /// The controls that are open, the outer one first, in rising order of their starts.
+    open_controls: Vec<ControlPlace>,
     /// The checkpoints that are open, the outer one first, in rising order of their places.
     #[cfg(feature = "visitor")]
     open_checkpoints: Vec<OpenCheckpoint>,
+}
+
+/// The start of a control, as the output keeps it while the control is open.
+struct ControlPlace {
+    /// The place where the control started to write: a length of the text, never above its
+    /// length now.
+    at: usize,
+    /// Whether the text before the control needed a space when the control started.
+    separate: bool,
+}
+
+/// An open control of a `PlainOutput`. `finish_control` closes it.
+#[must_use = "a control stays open until `finish_control` takes it"]
+pub(super) struct OpenControl {
+    /// The position of the control among the open controls of its output.
+    index: usize,
+}
+
+impl OpenControl {
+    /// The position of the control among the open controls of its output.
+    const fn into_index(self) -> usize {
+        self.index
+    }
 }
 
 /// A place in the text to return to, as the output keeps it while the checkpoint is open.
@@ -61,8 +88,13 @@ impl PlainOutput {
         &self.text
     }
 
-    /// The text, at the end of the buffer. Every checkpoint is closed by then.
+    /// The text, at the end of the buffer. Every control and every checkpoint is closed by
+    /// then.
     pub(super) fn into_text(self) -> String {
+        debug_assert!(
+            self.open_controls.is_empty(),
+            "a control is open at the end of the buffer"
+        );
         #[cfg(feature = "visitor")]
         debug_assert!(
             self.open_checkpoints.is_empty(),
@@ -94,21 +126,37 @@ impl PlainOutput {
         self.append(mark);
     }
 
-    /// The place where a control starts to write: the end of the text.
-    pub(super) fn start_control(&self) -> ControlStart {
-        ControlStart::new(&self.text)
+    /// Opens a control at the end of the text: the place where it starts to write.
+    pub(super) fn start_control(&mut self) -> OpenControl {
+        self.open_controls.push(ControlPlace {
+            at: self.text.len(),
+            separate: spacing::needs_space_before(&self.text),
+        });
+        OpenControl {
+            index: self.open_controls.len() - 1,
+        }
     }
 
-    /// Separates what a control wrote since `start` from the text before it, and records that
-    /// the control ends at the end of the text. A control that wrote nothing leaves no record.
-    pub(super) fn finish_control(&mut self, start: &ControlStart) {
-        let Some(space_owed) = start.space_owed(&self.text) else {
-            return;
-        };
-        if space_owed {
-            self.insert_at(start.offset(), " ");
+    /// Closes `control`, the last control opened: separates what it wrote from the text before
+    /// it, and records that the control ends at the end of the text. A control that wrote
+    /// nothing leaves no record.
+    ///
+    /// ~keep A block end in the control can remove spaces before its start. The output moved
+    /// ~keep the start with the text, so what the control wrote then starts with that block end.
+    pub(super) fn finish_control(&mut self, control: OpenControl) {
+        debug_assert_eq!(
+            control.into_index() + 1,
+            self.open_controls.len(),
+            "the control that finishes is not the last one opened"
+        );
+        if let Some(start) = self.open_controls.pop()
+            && let Some(space_owed) = spacing::space_owed_before(start.separate, &self.text[start.at..])
+        {
+            if space_owed {
+                self.insert_at(start.at, " ");
+            }
+            self.control_ends.push(self.text.len());
         }
-        self.control_ends.push(self.text.len());
     }
 
     /// Writes `text`, the text of one option, to this list of options.
@@ -123,9 +171,9 @@ impl PlainOutput {
     /// (`in_code`) the white space around the options is text of the source.
     pub(super) fn write_option_list(&mut self, options: &str, in_code: bool) {
         if let Some(list) = spacing::option_list_text(options, in_code) {
-            let start = self.start_control();
+            let control = self.start_control();
             self.append(list);
-            self.finish_control(&start);
+            self.finish_control(control);
         }
     }
 
@@ -227,13 +275,18 @@ impl PlainOutput {
         self.text.push_str(text);
     }
 
-    /// Writes `text` at `at`, a character boundary of the text. Each control end and each
-    /// open checkpoint after `at` moves with the text it stands in.
+    /// Writes `text` at `at`, a character boundary of the text. Each control end, each start
+    /// of an open control and each open checkpoint after `at` moves with the text it stands in.
     fn insert_at(&mut self, at: usize, text: &str) {
         self.text.insert_str(at, text);
         for end in &mut self.control_ends {
             if *end > at {
                 *end += text.len();
+            }
+        }
+        for control in &mut self.open_controls {
+            if control.at > at {
+                control.at += text.len();
             }
         }
         #[cfg(feature = "visitor")]
@@ -244,11 +297,15 @@ impl PlainOutput {
         }
     }
 
-    /// Removes the text after `len`, with the record of each control that ended in it. An
-    /// open checkpoint after `len` moves to `len` and keeps the text removed before it.
+    /// Removes the text after `len`, with the record of each control that ended in it. The
+    /// start of an open control after `len` moves to `len`. An open checkpoint after `len`
+    /// moves to `len` and keeps the text removed before it.
     ///
     /// ~keep This is the one function that makes the text shorter.
     fn shrink_to(&mut self, len: usize) {
+        for control in &mut self.open_controls {
+            control.at = control.at.min(len);
+        }
         #[cfg(feature = "visitor")]
         for open in &mut self.open_checkpoints {
             if open.at > len {
@@ -264,13 +321,15 @@ impl PlainOutput {
 
 #[cfg(all(test, feature = "visitor"))]
 mod tests {
-    use super::{Checkpoint, PlainOutput};
+    use super::{Checkpoint, OpenControl, PlainOutput};
 
     /// One change of an output.
     #[derive(Clone, Copy)]
     enum Step {
         Text(&'static str),
         Control(&'static str),
+        Start,
+        Finish,
         Options(&'static str),
         EndBlock,
         Open,
@@ -278,9 +337,27 @@ mod tests {
         Commit,
     }
 
-    /// Fails when a control end or an open checkpoint is not a place in the text, or when
-    /// either list does not rise.
+    /// Fails when the start of an open control is not a place in the text, or when the starts
+    /// do not rise.
+    fn assert_control_starts_are_true(output: &PlainOutput, context: &str) {
+        let starts: Vec<usize> = output.open_controls.iter().map(|control| control.at).collect();
+        assert!(
+            starts
+                .iter()
+                .all(|at| *at <= output.text.len() && output.text.is_char_boundary(*at)),
+            "{context}: the start of an open control is not a place in the text: {starts:?} in {:?}",
+            output.text
+        );
+        assert!(
+            starts.is_sorted(),
+            "{context}: the starts of the open controls do not rise: {starts:?}"
+        );
+    }
+
+    /// Fails when a control end, the start of an open control or an open checkpoint is not a
+    /// place in the text, or when one of the three lists does not rise.
     fn assert_places_are_true(output: &PlainOutput, context: &str) {
+        assert_control_starts_are_true(output, context);
         let len = output.text.len();
         assert!(
             output.control_ends.iter().all(|end| *end <= len),
@@ -309,14 +386,17 @@ mod tests {
     fn run(steps: &[Step]) -> String {
         let mut output = PlainOutput::default();
         let mut open: Vec<Checkpoint> = Vec::new();
+        let mut controls: Vec<OpenControl> = Vec::new();
         for (index, step) in steps.iter().enumerate() {
             match *step {
                 Step::Text(text) => output.push_text(text),
                 Step::Control(text) => {
-                    let start = output.start_control();
+                    let control = output.start_control();
                     output.push_text(text);
-                    output.finish_control(&start);
+                    output.finish_control(control);
                 }
+                Step::Start => controls.push(output.start_control()),
+                Step::Finish => output.finish_control(controls.pop().expect("the table starts before it finishes")),
                 Step::Options(options) => output.write_option_list(options, false),
                 Step::EndBlock => output.end_block(),
                 Step::Open => open.push(output.open()),
@@ -446,6 +526,75 @@ mod tests {
     }
 
     #[test]
+    fn a_block_end_below_the_start_of_an_open_control_keeps_the_places_true() {
+        use Step::{EndBlock, Finish, Open, Rollback, Start, Text};
+        let table: [(&[Step], &str); 5] = [
+            // ~keep A block end in a control removes the spaces before its start: the control
+            // ~keep still ends at the end of its text, and the next word gets its space.
+            (
+                &[Text("b   "), Start, EndBlock, Text("e"), Finish, Text("ccc")],
+                "b\n\ne ccc",
+            ),
+            // ~keep The same with a character of two bytes: the old start was inside it.
+            (
+                &[Text("b   "), Start, EndBlock, Text("\u{e9}"), Finish, Text("ccc")],
+                "b\n\n\u{e9} ccc",
+            ),
+            // ~keep A control that holds a block end and no text.
+            (&[Text("b   "), Start, EndBlock, Finish, Text("ccc")], "b\n\nccc"),
+            // ~keep Two open controls: the block end moves the inner start, and the space of
+            // ~keep the outer control is written at its own start.
+            (
+                &[
+                    Text("a"),
+                    Start,
+                    Text("x  "),
+                    Start,
+                    EndBlock,
+                    Text("e"),
+                    Finish,
+                    Finish,
+                    Text("ccc"),
+                ],
+                "a x\n\ne ccc",
+            ),
+            // ~keep A return to a checkpoint in the control writes the spaces again.
+            (
+                &[
+                    Text("b   "),
+                    Start,
+                    Open,
+                    EndBlock,
+                    Text("e"),
+                    Rollback,
+                    Finish,
+                    Text("ccc"),
+                ],
+                "b   ccc",
+            ),
+        ];
+        for (steps, expected) in table {
+            assert_eq!(run(steps), expected);
+        }
+    }
+
+    #[test]
+    fn text_written_before_the_start_of_an_open_control_moves_the_start() {
+        // ~keep No path of the writer writes text before an open control. `insert_at` keeps
+        // ~keep the start true all the same: the control starts at 3, then at 5.
+        let mut output = PlainOutput::default();
+        output.push_text("aaa");
+        let control = output.start_control();
+        output.push_text("W");
+        output.insert_at(1, "  ");
+        assert_places_are_true(&output, "after the insert");
+        output.finish_control(control);
+        assert_eq!(output.as_str(), "a  aa W");
+        assert_eq!(output.control_ends, [7]);
+        assert_eq!(output.into_text(), "a  aa W");
+    }
+
+    #[test]
     fn an_outer_checkpoint_has_its_place_again_after_an_inner_return() {
         let mut output = PlainOutput::default();
         output.push_text("aa  ");
@@ -473,12 +622,12 @@ mod tests {
         output.push_text("W");
         let inner = output.start_control();
         output.push_text("Y");
-        output.finish_control(&inner);
+        output.finish_control(inner);
         assert_eq!(output.as_str(), "aaaW Y");
         assert_eq!(output.control_ends, [6]);
         let checkpoint = output.open();
         output.push_text("zz");
-        output.finish_control(&outer);
+        output.finish_control(outer);
         assert_eq!(output.as_str(), "aaa W Y zz");
         assert_eq!(output.control_ends, [7, 10]);
         assert_places_are_true(&output, "after the space");

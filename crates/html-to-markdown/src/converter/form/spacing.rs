@@ -62,23 +62,9 @@ impl ControlStart {
         }
     }
 
-    /// The byte offset in the output where the control started to write.
-    pub const fn offset(&self) -> usize {
-        self.at
-    }
-
-    /// Whether one space is owed at the start of what the control wrote to `output`, or
-    /// `None` when the control wrote nothing.
-    ///
-    /// ~keep Both writers ask this function. Each writes the space in its own output.
-    pub fn space_owed(&self, output: &str) -> Option<bool> {
-        let written = output.get(self.at..).filter(|written| !written.is_empty())?;
-        Some(self.separate && !written.starts_with(char::is_whitespace))
-    }
-
     /// Separates what the control wrote from the text before it. Returns whether it wrote.
     pub fn finish(&self, output: &mut String) -> bool {
-        let Some(space_owed) = self.space_owed(output) else {
+        let Some(space_owed) = space_owed_before(self.separate, output.get(self.at..).unwrap_or_default()) else {
             return false;
         };
         if space_owed {
@@ -86,6 +72,14 @@ impl ControlStart {
         }
         true
     }
+}
+
+/// Whether one space is owed before `written`, the text that a control wrote. `separate` says
+/// whether the text before the control needs a space. `None` when the control wrote nothing.
+///
+/// ~keep Both writers ask this function. Each writes the space in its own output.
+pub fn space_owed_before(separate: bool, written: &str) -> Option<bool> {
+    (!written.is_empty()).then(|| separate && !written.starts_with(char::is_whitespace))
 }
 
 /// Whether `text` starts with a word: not with white space and not with closing punctuation.

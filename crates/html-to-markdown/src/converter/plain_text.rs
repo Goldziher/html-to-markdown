@@ -449,11 +449,13 @@ fn walk_plain_control(
     list_ctx: &mut ListContext,
     state: &WalkState<'_>,
 ) {
-    let start = buf.start_control();
-    walk_children(tag, parser, buf, list_ctx, state);
-    if !state.in_pre {
-        buf.finish_control(&start);
+    if state.in_pre {
+        walk_children(tag, parser, buf, list_ctx, state);
+        return;
     }
+    let control = buf.start_control();
+    walk_children(tag, parser, buf, list_ctx, state);
+    buf.finish_control(control);
 }
 
 fn walk_plain_pre(

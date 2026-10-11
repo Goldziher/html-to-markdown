@@ -400,6 +400,36 @@ fn a_control_that_ends_with_the_spaces_of_an_alt_text_separates_no_later_text_in
     );
 }
 
+#[test]
+fn a_control_with_a_block_end_after_spaces_is_separated_from_the_next_word_in_plain_text() {
+    // ~keep The rule in the button ends the line and removes the three spaces before the
+    // ~keep button. The button still ends at the end of its text.
+    assert_plain("<div><img alt=\"b   \"><button><hr>e</button>ccc</div>", "b\n\ne ccc\n");
+    assert_plain("<div><img alt=\"b\"><button><hr>e</button>ccc</div>", "b\n\ne ccc\n");
+}
+
+#[test]
+fn a_control_with_a_block_end_after_spaces_and_a_character_of_two_bytes_is_separated_in_plain_text() {
+    // ~keep The length of the text when the button started is inside the character now.
+    assert_plain(
+        "<div><img alt=\"b   \"><button><hr>\u{e9}</button>ccc</div>",
+        "b\n\n\u{e9} ccc\n",
+    );
+}
+
+#[test]
+fn a_control_that_starts_with_a_block_after_spaces_ends_with_that_block_in_plain_text() {
+    assert_plain(
+        "<div><img alt=\"b   \"><button><div>e</div></button>ccc</div>",
+        "b\n\ne\n\nccc\n",
+    );
+}
+
+#[test]
+fn a_control_with_a_block_end_and_no_text_after_spaces_adds_no_space_in_plain_text() {
+    assert_plain("<div><img alt=\"b   \"><button><hr></button>ccc</div>", "b\n\nccc\n");
+}
+
 #[cfg(feature = "visitor")]
 mod with_a_visitor {
     use std::sync::{Arc, Mutex};
@@ -677,6 +707,14 @@ mod with_a_visitor {
         let expected = "aaa\n\nbcd\n\nccc\n";
         assert_eq!(plain_with(html, |_| {}), expected);
         assert_eq!(plain_with_tag(html, "div", &VisitResult::Continue, false), expected);
+    }
+
+    #[test]
+    fn a_removed_inline_element_that_holds_a_block_after_a_space_keeps_the_space_in_plain_text() {
+        // ~keep The block in the `span` removes the space before the `span`. The removal of
+        // ~keep the `span` writes it again.
+        let html = "<div>aaa <span><div>bcd</div></span>ccc</div>";
+        assert_eq!(plain_with_tag(html, "span", &VisitResult::Skip, false), "aaa ccc\n");
     }
 
     #[test]
