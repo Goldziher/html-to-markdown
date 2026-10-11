@@ -280,7 +280,7 @@ fn fold_label_hard_breaks(dest: &mut String, trim_start: usize, marker: &str) {
 }
 
 /// Normalize the hard line breaks at the edges of the link label Tier-1 has just written in
-/// place. The white space at the edges is gone already: `link_label_edges` took it.
+/// place, and drop the white space around them.
 ///
 /// A `<br>` against the `</a>` is real content: `<a href="H">A<br></a>B` renders as A, a line
 /// break, then B, and `[A  \n](H)B` re-parses to exactly that (issue #497). The blanket
@@ -297,8 +297,8 @@ fn fold_label_hard_breaks(dest: &mut String, trim_start: usize, marker: &str) {
 /// spaces form, while Djot always uses the backslash form regardless of `newline_style`.
 fn keep_boundary_hard_breaks(dest: &mut String, trim_start: usize, marker: &str) {
     // ~keep A label with a break at an edge comes whole from `link_label_edges`, with the white
-    // ~keep space around that break: `Go<br>&nbsp;` and ` Go<br>`. Tier-2 drops it in
-    // ~keep `assemble_label`. The spaces before a line end at the start are those of the marker.
+    // ~keep space around that break: `Go<br>&nbsp;`. Tier-2 drops it in `assemble_label`. The
+    // ~keep spaces before a line end at the start are those of the marker.
     let written_len = dest.len() - trim_start;
     let label = dest[trim_start..].trim_end_matches([' ', '\t']);
     let unspaced = label.trim_start_matches([' ', '\t']);
@@ -344,18 +344,48 @@ fn keep_boundary_hard_breaks(dest: &mut String, trim_start: usize, marker: &str)
 ///
 /// ~keep The white space at an edge of the label goes outside the link, and a `<br>` at an
 /// ~keep edge stays in the label (issue #497): the rule of Tier-2 (`link_label_edges`), read from
-/// ~keep the same text (issues #800, #845). With `keeps_hard_breaks` false, the label is in a
-/// ~keep heading or a pipe-table cell, and every line break in it is a space before the rule reads it.
-fn move_label_edges(dest: &mut String, label_start: usize, keeps_hard_breaks: bool, marker: &str) -> (usize, String) {
+/// ~keep the same text (issues #800, #845). `starts_with_space` is the white space of the link
+/// ~keep itself at the label start, which the text scanner did not write. With `keeps_hard_breaks`
+/// ~keep false, the label is in a heading or a pipe-table cell: every line break in it is a space
+/// ~keep before the rule reads it, and no line end stays at an edge.
+///
+/// ~keep A label with a `<br>` at one edge only keeps the white space of its other edge as this
+/// ~keep scanner wrote it before the rule: a space after the link for the label end, and the
+/// ~keep space that an element in the label starts with inside the label. A browser shows both.
+fn move_label_edges(
+    dest: &mut String,
+    label_start: usize,
+    starts_with_space: bool,
+    keeps_hard_breaks: bool,
+    marker: &str,
+) -> (usize, String) {
+    use crate::converter::utility::content::{label_edge_breaks, link_label_edges};
     if !keeps_hard_breaks {
         fold_label_hard_breaks(dest, label_start, marker);
     }
     let content = dest.split_off(label_start);
-    let (prefix, suffix, label) = crate::converter::utility::content::link_label_edges(&content, true);
-    let has_text = !label.is_empty();
+    let (prefix, suffix, label) = link_label_edges(&content);
+    let label = if keeps_hard_breaks {
+        label
+    } else {
+        label.trim_matches(char::is_whitespace)
+    };
+    let (prefix, suffix, keeps_start_space) = match label_edge_breaks(&content) {
+        (false, false) => (if starts_with_space { " " } else { prefix }, suffix, false),
+        (true, false) if keeps_hard_breaks && content.ends_with([' ', '\t']) => ("", " ", false),
+        (false, true) if keeps_hard_breaks => {
+            let unspaced = content.trim_start_matches([' ', '\t']);
+            (
+                "",
+                "",
+                unspaced.len() < content.len() && !unspaced.starts_with('\u{a0}'),
+            )
+        }
+        _ => ("", "", false),
+    };
     let mut label_start = label_start;
     // ~keep One run of white space on both sides of the link start is one space, before the `[`.
-    if let Some(bracket_pos) = dest.rfind('[').filter(|_| has_text && !prefix.is_empty()) {
+    if let Some(bracket_pos) = dest.rfind('[').filter(|_| !label.is_empty() && !prefix.is_empty()) {
         if bracket_pos > 0 && crate::converter::utility::white_space::space_is_owed(&dest[..bracket_pos]) {
             dest.insert_str(bracket_pos, prefix);
             label_start += prefix.len();
@@ -371,9 +401,42 @@ fn move_label_edges(dest: &mut String, label_start: usize, keeps_hard_breaks: bo
     if keeps_hard_breaks {
         keep_boundary_hard_breaks(dest, label_start, marker);
     }
-    // ~keep A label with no text has no end: nothing goes after such a link.
-    let suffix = if has_text { suffix } else { "" };
+    if keeps_start_space && dest.len() > label_start {
+        dest.insert(label_start, ' ');
+    }
     (label_start, suffix.to_owned())
+}
+
+/// Whether Tier-2 alone writes the label in `content` as it must be written, so that the page
+/// goes to Tier-2. `own_space` is the white space of the link itself at the label start.
+///
+/// ~keep A link with no address is running text in Tier-2, which keeps the white space that
+/// ~keep its content ends with (the scanner does the same where such a link opens, for the white
+/// ~keep space at its start). A link with an empty address writes its label as text: Tier-2
+/// ~keep decides what a `<br>` at the end of that text writes at the end of its block. In a table
+/// ~keep cell Tier-2 writes one space for a `<br>` that the label starts with, and nothing for a
+/// ~keep `<br>` after white space or after another `<br>`.
+fn label_goes_to_tier2(content: &str, href: Option<&str>, own_space: bool, in_table_cell: bool, marker: &str) -> bool {
+    let Some(address) = href else {
+        return content.ends_with(char::is_whitespace);
+    };
+    if address.is_empty() && crate::converter::utility::content::label_edge_breaks(content).1 {
+        return true;
+    }
+    in_table_cell
+        && leading_hard_break(content, marker)
+            .is_some_and(|(after_space, rest)| own_space || after_space || leading_hard_break(rest, marker).is_some())
+}
+
+/// The `<br>` that `content` starts with: whether white space comes before its marker, and the
+/// content after it. A line end that is not the whole marker is no `<br>`: a block wrote it.
+fn leading_hard_break<'a>(content: &'a str, marker: &str) -> Option<(bool, &'a str)> {
+    let line_end = marker.trim_start_matches(' ');
+    let marker_spaces = marker.len() - line_end.len();
+    let unspaced = content.trim_start_matches([' ', '\t']);
+    let spaces = content.len() - unspaced.len();
+    let rest = unspaced.strip_prefix(line_end)?;
+    (spaces >= marker_spaces).then_some((spaces > marker_spaces, rest))
 }
 
 fn close_link(state: &mut Tier1State, frame: &OpenTag, options: &ConversionOptions) -> Result<(), BailReason> {
@@ -386,17 +449,16 @@ fn close_link(state: &mut Tier1State, frame: &OpenTag, options: &ConversionOptio
     // and a pipe-table cell cannot carry a hard break at all, so a `<br>` in either has
     // already been folded to a space regardless of the link, and a marker kept at the
     // label's edge here would only survive as a stray trailing space.
-    let keeps_boundary_hard_breaks = !state.escape_ctx.contains(EscapeCtx::HEADING) && !state.in_table_cell();
+    let in_table_cell = state.in_table_cell();
+    let keeps_boundary_hard_breaks = !state.escape_ctx.contains(EscapeCtx::HEADING) && !in_table_cell;
     let marker = crate::converter::main_helpers::hard_break_marker(options);
     let dest = state.cell_or_output_mut();
     let trim_start = clamp_to_char_boundary(dest, frame.content_start);
-    // ~keep A link with no address is running text in Tier-2, which keeps the white space that
-    // ~keep its content ends with. The trim below loses it, so the page goes to Tier-2 (the
-    // ~keep scanner does the same where such a link opens, for the white space at its start).
-    if href.is_none() && dest[trim_start..].ends_with(char::is_whitespace) {
+    let own_space = frame.label_starts_with_white_space;
+    if label_goes_to_tier2(&dest[trim_start..], href.as_deref(), own_space, in_table_cell, marker) {
         return Err(BailReason::Classifier);
     }
-    let (trim_start, suffix) = move_label_edges(dest, trim_start, keeps_boundary_hard_breaks, marker);
+    let (trim_start, suffix) = move_label_edges(dest, trim_start, own_space, keeps_boundary_hard_breaks, marker);
     // ~keep Tier-2 decides what a link with no text writes: the name of the link as its label,
     // ~keep nothing when the link points into its own page, and the label of a link that holds
     // ~keep only empty elements, or only a title. This scanner has none of these rules, so it

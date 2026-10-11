@@ -75,21 +75,64 @@ pub fn chomp_inline(text: &str) -> (&str, &str, &str) {
 }
 
 /// The white space that the content of a link label gives up at its two ends, and the label
-/// without it: (prefix, suffix, label). Every writer of a link asks here, in both converters.
+/// without it: (prefix, suffix, label). Every writer of a link with a label asks here, in both
+/// converters.
 ///
 /// ~keep The white space at an edge of the label goes outside the link, as it does for bold
 /// ~keep and italic text ([`chomp_inline`]): `[Go ](/p)now` shows as `Go now`, and a trimmed
-/// ~keep label joins the words. With `break_stays_in_label`, a line break at an edge is content
-/// ~keep of the label, not white space (issue #497): such a label is given back whole. A link
-/// ~keep in the `<address>` form has no label to keep the break in, so its writer clears the flag.
-pub fn link_label_edges(content: &str, break_stays_in_label: bool) -> (&str, &str, &str) {
-    let inner = content.trim_matches([' ', '\t', '\u{a0}']);
-    let edge_is_break = inner.starts_with('\n') || inner.starts_with("\\\n") || inner.ends_with('\n');
-    if edge_is_break && break_stays_in_label {
-        ("", "", content)
-    } else {
+/// ~keep label joins the words. A line break at an edge is content of the label, not white
+/// ~keep space (issue #497): such a label is given back whole.
+pub fn link_label_edges(content: &str) -> (&str, &str, &str) {
+    if matches!(label_edge_breaks(content), (false, false)) {
         chomp_inline(content)
+    } else {
+        ("", "", content)
     }
+}
+
+/// Whether the content of a link label has a line break at its start, and at its end.
+pub fn label_edge_breaks(content: &str) -> (bool, bool) {
+    let inner = content.trim_matches([' ', '\t', '\u{a0}']);
+    (
+        inner.starts_with('\n') || inner.starts_with("\\\n"),
+        inner.ends_with('\n'),
+    )
+}
+
+/// The white space at the two ends of the text of a link, as one space for each end:
+/// (prefix, suffix).
+///
+/// ~keep A link in the `<address>` form writes its address, not its content. The text that
+/// ~keep made it that form says what white space it has at its ends, so the content is not
+/// ~keep walked: an element in it writes nothing and is not collected. A `<br>` is no text.
+/// ~keep A no-break space is white space here, as it is where the text is trimmed.
+/// ~keep White space with a `<br>` between it and the end of the link is no white space of that
+/// ~keep end: a label drops the white space around a line break at its edge, and so does this.
+pub fn link_text_edges(link_text: &LinkText) -> (&'static str, &'static str) {
+    let text = link_text.text.as_str();
+    let starts_at_break = link_text
+        .breaks
+        .is_some_and(|(first, _)| first <= text.len() - text.trim_start().len());
+    let ends_at_break = link_text.breaks.is_some_and(|(_, last)| last >= text.trim_end().len());
+    let is_space = |edge: Option<char>| edge.is_some_and(char::is_whitespace);
+    (
+        space_if(!starts_at_break && is_space(text.chars().next())),
+        space_if(!ends_at_break && is_space(text.chars().next_back())),
+    )
+}
+
+const fn space_if(owed: bool) -> &'static str {
+    if owed { " " } else { "" }
+}
+
+/// The text of a link, as the walk of its descendants reads it.
+#[derive(Debug, Clone, Default)]
+pub struct LinkText {
+    /// The text of the text nodes, in document order.
+    pub text: String,
+    /// Where the first and the last `<br>` stand in `text`, as byte offsets. A `<br>` is no
+    /// text: it adds nothing to `text`.
+    pub breaks: Option<(usize, usize)>,
 }
 
 /// Merge a newly-opening emphasis delimiter into the matching close marker `output` already
@@ -304,7 +347,7 @@ pub fn collect_link_label_text(
     children: &[tl::NodeHandle],
     parser: &tl::Parser,
     dom_ctx: &DomContext,
-) -> (String, Vec<tl::NodeHandle>, bool) {
+) -> (LinkText, Vec<tl::NodeHandle>, bool) {
     let mut block_nodes = Vec::new();
     let text = walk_link_text(children, parser, dom_ctx, |handle| {
         block_nodes.push(handle);
@@ -315,7 +358,7 @@ pub fn collect_link_label_text(
 }
 
 /// The text of every descendant of a link, block-level ones included.
-pub fn link_text_content(children: &[tl::NodeHandle], parser: &tl::Parser, dom_ctx: &DomContext) -> String {
+pub fn link_text_content(children: &[tl::NodeHandle], parser: &tl::Parser, dom_ctx: &DomContext) -> LinkText {
     walk_link_text(children, parser, dom_ctx, |_| true)
 }
 
@@ -344,8 +387,9 @@ fn walk_link_text(
     parser: &tl::Parser,
     dom_ctx: &DomContext,
     mut enter_block: impl FnMut(tl::NodeHandle) -> bool,
-) -> String {
+) -> LinkText {
     let mut text = String::new();
+    let mut breaks: Option<(usize, usize)> = None;
     let mut stack: Vec<_> = children.iter().rev().copied().collect();
 
     while let Some(handle) = stack.pop() {
@@ -361,6 +405,9 @@ fn walk_link_text(
             tl::Node::Tag(tag) if tag.name().as_utf8_str().eq_ignore_ascii_case("svg") => {
                 text.push_str(&crate::converter::media::svg::graphic_text(tag, parser));
             }
+            tl::Node::Tag(tag) if tag.name().as_utf8_str().eq_ignore_ascii_case("br") => {
+                breaks = Some((breaks.map_or(text.len(), |(first, _)| first), text.len()));
+            }
             tl::Node::Tag(tag) => {
                 if !node_is_block_level(&handle, parser, dom_ctx) || enter_block(handle) {
                     push_label_children(&mut stack, handle, tag, dom_ctx);
@@ -369,7 +416,7 @@ fn walk_link_text(
             _ => {}
         }
     }
-    text
+    LinkText { text, breaks }
 }
 
 fn push_label_children(
@@ -560,7 +607,10 @@ pub const fn floor_char_boundary(s: &str, index: usize) -> usize {
 
 #[cfg(test)]
 mod tests {
-    use super::{ends_with_zero_width_space_in_source, link_label_edges, without_trailing_line_end_in_source};
+    use super::{
+        LinkText, ends_with_zero_width_space_in_source, label_edge_breaks, link_label_edges, link_text_edges,
+        without_trailing_line_end_in_source,
+    };
     use crate::converter::utility::white_space::with_white_space_references_decoded;
 
     #[test]
@@ -572,23 +622,61 @@ mod tests {
             ("\u{a0}Go\u{a0}", ("", "", "Go")),
             (" ", (" ", "", "")),
         ] {
-            assert_eq!(link_label_edges(content, true), edges, "{content:?}");
-            assert_eq!(link_label_edges(content, false), edges, "{content:?}");
+            assert_eq!(link_label_edges(content), edges, "{content:?}");
         }
     }
 
     #[test]
-    fn a_line_break_at_an_edge_of_a_link_label_stays_in_the_label_when_the_writer_keeps_it() {
-        for (content, without_break) in [
-            ("Go  \n", ("", "  \n", "Go")),
-            ("Go\n", ("", "", "Go")),
-            ("Go\\\n", ("", "\\\n", "Go")),
-            ("Go  \n\u{a0}", ("", "", "Go")),
-            ("  \nGo", (" ", "", "Go")),
-            ("\\\nGo", ("", "", "\\\nGo")),
+    fn a_link_label_with_a_line_break_at_an_edge_is_given_back_whole() {
+        for (content, breaks) in [
+            ("Go  \n", (false, true)),
+            ("Go\n", (false, true)),
+            ("Go\\\n", (false, true)),
+            (" Go  \n\u{a0}", (false, true)),
+            ("  \nGo ", (true, false)),
+            ("\\\nGo", (true, false)),
+            ("  \nGo  \n", (true, true)),
         ] {
-            assert_eq!(link_label_edges(content, true), ("", "", content), "{content:?}");
-            assert_eq!(link_label_edges(content, false), without_break, "{content:?}");
+            assert_eq!(label_edge_breaks(content), breaks, "{content:?}");
+            assert_eq!(link_label_edges(content), ("", "", content), "{content:?}");
+        }
+        assert_eq!(label_edge_breaks("Go  \nnow"), (false, false));
+    }
+
+    #[test]
+    fn the_text_of_a_link_gives_one_space_for_the_white_space_at_each_end() {
+        for (text, edges) in [
+            ("https://e.org/", ("", "")),
+            (" https://e.org/", (" ", "")),
+            ("https://e.org/\n", ("", " ")),
+            ("\t\thttps://e.org/ \r\n", (" ", " ")),
+            ("\u{a0}https://e.org/\u{a0}", (" ", " ")),
+            ("\u{200b}https://e.org/", ("", "")),
+            ("", ("", "")),
+        ] {
+            let link_text = LinkText {
+                text: text.to_owned(),
+                breaks: None,
+            };
+            assert_eq!(link_text_edges(&link_text), edges, "{text:?}");
+        }
+    }
+
+    #[test]
+    fn white_space_beside_a_line_break_at_an_end_of_a_link_gives_no_space() {
+        for (text, breaks, edges) in [
+            ("https://e.org/\u{a0}", (14, 14), ("", "")),
+            ("https://e.org/ ", (15, 15), ("", "")),
+            ("\u{a0}https://e.org/ ", (0, 0), ("", " ")),
+            (" https://e.org/", (1, 1), ("", "")),
+            (" https://e.org/ ", (5, 5), (" ", " ")),
+            (" https://e.org/ ", (0, 16), ("", "")),
+        ] {
+            let link_text = LinkText {
+                text: text.to_owned(),
+                breaks: Some(breaks),
+            };
+            assert_eq!(link_text_edges(&link_text), edges, "{text:?} {breaks:?}");
         }
     }
 

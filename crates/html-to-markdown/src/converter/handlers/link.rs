@@ -17,12 +17,12 @@ use crate::converter::block::heading::{find_single_heading_child, heading_allows
 use crate::converter::dom_context::DomContext;
 use crate::converter::inline::HandlerContext;
 use crate::converter::inline::link::{MarkdownLink, append_markdown_link_in_context, has_uri_scheme};
-use crate::converter::inline::wrapped::move_leading_hard_breaks;
 use crate::converter::main::walk_node;
 use crate::converter::media::inline_data_treatment;
+use crate::converter::text_node::is_fresh_block_start;
 use crate::converter::utility::content::{
     collect_link_label_text, keeps_source_white_space, link_accessible_name, link_label_edges, link_text_content,
-    node_is_block_level, normalize_link_label, normalized_tag_name, push_inline_prefix,
+    link_text_edges, node_is_block_level, normalize_link_label, normalized_tag_name, push_inline_prefix,
 };
 use crate::converter::utility::escaping::escape_link_label;
 use crate::options::{ConversionOptions, InlineDataMedia};
@@ -107,7 +107,7 @@ pub fn handle_link(tag: &tl::HTMLTag, mut handler: HandlerContext<'_>) {
     let (prefix, suffix, trimmed) = if keeps_source_white_space(handler.options, handler.context) {
         ("", "", content.as_str())
     } else {
-        link_label_edges(&content, true)
+        link_label_edges(&content)
     };
     let edges = LabelEdges {
         prefix,
@@ -246,6 +246,8 @@ struct LinkData<'a> {
     children: Vec<tl::NodeHandle>,
     inline_label: String,
     raw_text: String,
+    /// The white space at the two ends of the text that `raw_text` is trimmed from.
+    text_edges: (&'static str, &'static str),
     inline_children: Vec<tl::NodeHandle>,
     deferred: Vec<tl::NodeHandle>,
     emit_blocks_separately: bool,
@@ -349,13 +351,14 @@ impl<'a> LinkData<'a> {
             .dom_context
             .children_of(handler.node_handle.get_inner())
             .map_or_else(|| tag.children().top().iter().copied().collect(), ToOwned::to_owned);
-        let (inline_label, _, saw_block) = collect_link_label_text(&children, handler.parser, handler.dom_context);
+        let (inline_text, _, saw_block) = collect_link_label_text(&children, handler.parser, handler.dom_context);
         let text_source = if saw_block {
             link_text_content(&children, handler.parser, handler.dom_context)
         } else {
-            inline_label.clone()
+            inline_text.clone()
         };
-        let raw_text = text::normalize_whitespace_cow(&text_source).trim().to_string();
+        let inline_label = inline_text.text;
+        let raw_text = text::normalize_whitespace_cow(&text_source.text).trim().to_string();
         let (inline_children, deferred) = partition_link_children(&children, handler.parser, handler.dom_context);
         let holds_element = children
             .iter()
@@ -388,6 +391,7 @@ impl<'a> LinkData<'a> {
             title,
             children,
             inline_label,
+            text_edges: link_text_edges(&text_source),
             raw_text,
             inline_children,
             deferred,
@@ -505,20 +509,26 @@ fn emit_autolink(data: &LinkData<'_>, handler: &mut HandlerContext<'_>) -> bool 
     if !data.is_autolink(handler.options) {
         return false;
     }
-    // ~keep The label of this form is the address, so the content of the link is walked only
-    // ~keep for the white space at its ends. A line break there goes outside the marks, as it
-    // ~keep does for bold text. A visitor gets no call for that walk: it got none before.
-    let content = if keeps_source_white_space(handler.options, handler.context) {
-        String::new()
+    // ~keep The label of this form is the address. The white space at its ends comes from the
+    // ~keep text that made the link this form (`LinkData::text_edges`): the content is not
+    // ~keep walked, so an element in it writes nothing, as before.
+    let (prefix, suffix) = if keeps_source_white_space(handler.options, handler.context) {
+        ("", "")
     } else {
-        autolink_edge_content(data, handler)
+        data.text_edges
     };
-    let content = move_leading_hard_breaks(handler.output, &content, handler.context, handler.options);
-    let (prefix, suffix, text) = link_label_edges(content, false);
+    // ~keep The first text of the document has no white space at its start: the text of a label
+    // ~keep loses it in the walk, by the same rule.
+    let context = handler.context;
+    let prefix = if is_fresh_block_start(context, context.at_fresh_block_start.get()) {
+        ""
+    } else {
+        prefix
+    };
     let edges = LabelEdges {
         prefix,
         suffix,
-        has_text: !text.is_empty(),
+        has_text: true,
     };
     write_with_edges(&edges, handler, |handler| {
         handler.output.push('<');
@@ -530,14 +540,6 @@ fn emit_autolink(data: &LinkData<'_>, handler: &mut HandlerContext<'_>) -> bool 
         handler.output.push('>');
     });
     true
-}
-
-fn autolink_edge_content(data: &LinkData<'_>, handler: &HandlerContext<'_>) -> String {
-    #[cfg(feature = "visitor")]
-    if handler.context.has_observer() {
-        return outside_code(handler, |unobserved| build_label_content(data, unobserved));
-    }
-    build_label_content(data, handler)
 }
 
 fn emit_heading_link(data: &LinkData<'_>, handler: &mut HandlerContext<'_>) -> bool {

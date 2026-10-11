@@ -678,6 +678,7 @@ fn push_open_frame(
         dropped_whitespace_only_text: false,
         own_buffer: renders_into_own_buffer(spec.kind, name_lower, prev_ctx),
         starts_with_whitespace: false,
+        label_starts_with_white_space: false,
     });
 }
 

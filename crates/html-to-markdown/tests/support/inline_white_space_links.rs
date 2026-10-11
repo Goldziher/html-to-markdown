@@ -30,8 +30,7 @@ fn assert_on_each_converter(cases: &[(&str, &str, Option<&str>)]) {
 }
 
 /// The white space at an end of a link label is written outside the link, as a browser shows
-/// it (issue #800): one space, where a space is owed. The fast converter writes the space that a
-/// label ends with, and joins a label that starts with white space to the word before it.
+/// it (issues #800 and #845): one space, where a space is owed, on both converters.
 #[test]
 fn white_space_at_an_end_of_a_link_label_goes_outside_the_link() {
     assert_on_each_converter(&[
@@ -41,16 +40,14 @@ fn white_space_at_an_end_of_a_link_label_goes_outside_the_link() {
             Some("Press [Go](/p) now.\n"),
         ),
         (
-            // ~keep Draft: "the fast converter joins a link to the word beside it at a label edge".
             "<p>Press<a href=\"/p\"> Go</a> now.</p>",
             "Press [Go](/p) now.\n",
-            Some("Press[Go](/p) now.\n"),
+            Some("Press [Go](/p) now.\n"),
         ),
         (
-            // ~keep The same draft: the fast converter writes the end space only.
             "<p>Press<a href=\"/p\"> Go </a>now.</p>",
             "Press [Go](/p) now.\n",
-            Some("Press[Go](/p) now.\n"),
+            Some("Press [Go](/p) now.\n"),
         ),
         (
             "<p>Press <a href=\"/p\">Go\n</a>now.</p>",
@@ -65,8 +62,7 @@ fn white_space_at_an_end_of_a_link_label_goes_outside_the_link() {
         (
             "<ul><li>Press<a href=\"/p\"> Go</a> now.</li></ul>",
             "- Press [Go](/p) now.\n",
-            // ~keep The same draft.
-            Some("- Press[Go](/p) now.\n"),
+            Some("- Press [Go](/p) now.\n"),
         ),
         (
             "<p><a href=\"/a\">one </a><a href=\"/b\">two</a></p>",
@@ -96,12 +92,11 @@ fn white_space_at_an_end_of_a_link_label_goes_outside_the_link() {
     ]);
 }
 
-/// The same for a link around an image and for a short quotation (issue #800). An autolink is
-/// written as before: the white space at an end of its label is lost. In a heading and in a
-/// table cell a line break cannot be written, so a line break at an end of a label is one space
-/// outside the link. The fast converter writes no space for it.
+/// The same for a link around an image, for an autolink (issue #844) and for a short quotation
+/// (issue #800). In a heading and in a table cell a line break cannot be written, so a line
+/// break at an end of a label is one space outside the link, on both converters (issue #845).
 #[test]
-fn white_space_at_an_end_of_an_image_link_or_a_short_quotation_goes_outside_and_an_autolink_is_as_before() {
+fn white_space_at_an_end_of_an_image_link_an_autolink_or_a_short_quotation_goes_outside() {
     assert_on_each_converter(&[
         // ~keep A link around an image.
         (
@@ -112,38 +107,34 @@ fn white_space_at_an_end_of_an_image_link_or_a_short_quotation_goes_outside_and_
         (
             "<p>Press<a href=\"/p\"> <img src=\"/i.png\" alt=\"Go\"></a> now.</p>",
             "Press [![Go](/i.png)](/p) now.\n",
-            // ~keep Draft: "the fast converter joins a link to the word beside it at a label edge".
-            Some("Press[![Go](/i.png)](/p) now.\n"),
+            Some("Press [![Go](/i.png)](/p) now.\n"),
         ),
         // ~keep An autolink.
         (
             "<p>Press <a href=\"https://e.org/\">https://e.org/ </a>now.</p>",
-            "Press <https://e.org/>now.\n",
-            Some("Press <https://e.org/>now.\n"),
+            "Press <https://e.org/> now.\n",
+            Some("Press <https://e.org/> now.\n"),
         ),
         (
             "<p>Press<a href=\"https://e.org/\"> https://e.org/</a> now.</p>",
-            "Press<https://e.org/> now.\n",
-            Some("Press<https://e.org/> now.\n"),
+            "Press <https://e.org/> now.\n",
+            Some("Press <https://e.org/> now.\n"),
         ),
         // ~keep A line break at an end of a label in a heading and in a table cell.
         (
             "<h2>Press<a href=\"/p\">Go<br></a>now</h2>",
             "## Press[Go](/p) now\n",
-            // ~keep The same draft: the fast converter joins the words.
-            Some("## Press[Go](/p)now\n"),
+            Some("## Press[Go](/p) now\n"),
         ),
         (
             "<h2>Press<a href=\"/p\"><br>Go</a>now</h2>",
             "## Press [Go](/p)now\n",
-            // ~keep The same draft.
-            Some("## Press[Go](/p)now\n"),
+            Some("## Press [Go](/p)now\n"),
         ),
         (
             "<table><tr><td>Press<a href=\"/p\">Go<br></a>now</td></tr></table>",
             "| Press[Go](/p) now |\n| ----------------- |\n",
-            // ~keep The same draft.
-            Some("| Press[Go](/p)now |\n| ---------------- |\n"),
+            Some("| Press[Go](/p) now |\n| ----------------- |\n"),
         ),
         // ~keep A short quotation. The fast converter does not write its marks.
         ("<p>Press <q>Go </q>now.</p>", "Press \"Go\" now.\n", None),
@@ -153,15 +144,14 @@ fn white_space_at_an_end_of_an_image_link_or_a_short_quotation_goes_outside_and_
     ]);
 }
 
-/// The fast converter keeps the white space that bold text starts with in a link label, in a
-/// paragraph and in a sectioning element, and the full converter does not: the row is the
-/// output of each converter before the rules of this file.
+/// The white space that bold text starts with in a link label is the white space of the label
+/// start (issue #845): it is no space at the start of a sectioning element, on both converters.
 #[test]
-fn white_space_that_bold_text_starts_with_in_a_link_label_is_written_as_before() {
+fn white_space_that_bold_text_starts_with_in_a_link_label_is_no_space_at_a_block_start() {
     let html = "x<footer><a href=\"/x\"><b> Logo</b></a></footer>";
     assert_eq!(tier2(html), "x\n\n[**Logo**](/x)\n");
     let written = tier1::run(html, &PrescanReport::default(), &tier_options());
-    assert_eq!(written.as_deref().ok(), Some("x\n\n[ **Logo**](/x)\n"));
+    assert_eq!(written.as_deref().ok(), Some("x\n\n[**Logo**](/x)\n"));
 }
 
 /// A link with no address is running text: each row is written as the same content in a `span`

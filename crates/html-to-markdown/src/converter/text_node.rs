@@ -54,7 +54,7 @@ pub fn process_text_node(
 
 /// Whether white space is written at the start of a fresh block, where it is no space.
 /// `was_fresh` is the fresh block flag of the context before the node wrote anything.
-const fn is_fresh_block_start(ctx: &Context, was_fresh: bool) -> bool {
+pub const fn is_fresh_block_start(ctx: &Context, was_fresh: bool) -> bool {
     was_fresh && !ctx.convert_as_inline && !ctx.in_table_cell && !ctx.in_list_item
 }
 

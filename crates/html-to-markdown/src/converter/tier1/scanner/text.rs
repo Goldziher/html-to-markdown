@@ -180,11 +180,8 @@ fn drop_block_edge_whitespace(state: &mut Tier1State, raw: &str, in_pre: bool, p
                 frame.dropped_whitespace_only_text = true;
             }
         }
-        // ~keep The white space that a link label starts with is one space of the label:
-        // ~keep `close_link` gives it to `link_label_edges`, which moves it before the link.
-        let in_link_frame = matches!(state.stack.last().map(|frame| frame.spec.kind), Some(TagKind::Link));
-        if in_link_frame && !document_start {
-            state.cell_or_output_mut().push(' ');
+        if !document_start {
+            note_label_start_white_space(state);
         }
     }
     let _ = raw;
@@ -283,7 +280,7 @@ fn trim_leading_text_run<'a>(
         && !document_start_strip
         && matches!(
             state.stack.last().map(|frame| frame.spec.kind),
-            Some(TagKind::Strong | TagKind::Emphasis | TagKind::Link)
+            Some(TagKind::Strong | TagKind::Emphasis)
         );
     let in_link_frame = matches!(state.stack.last().map(|frame| frame.spec.kind), Some(TagKind::Link));
     let after_line_end = follows_line_end(state);
@@ -302,7 +299,23 @@ fn trim_leading_text_run<'a>(
     if leading_ws_migrates && trimmed.len() < raw.len() {
         state.cell_or_output_mut().push(' ');
     }
+    if at_inline_frame_start && !document_start_strip && trimmed.len() < raw.len() {
+        note_label_start_white_space(state);
+    }
     std::borrow::Cow::Borrowed(trimmed)
+}
+
+/// Notes on the link that is open innermost that its label starts with white space.
+///
+/// ~keep The space is not written here: a label keeps a line break at an edge whole, and such a
+/// ~keep label drops the white space that the link starts with, as Tier-2 does. `close_link`
+/// ~keep knows which label it has.
+fn note_label_start_white_space(state: &mut Tier1State) {
+    if let Some(frame) = state.stack.last_mut() {
+        if matches!(frame.spec.kind, TagKind::Link) {
+            frame.label_starts_with_white_space = true;
+        }
+    }
 }
 
 fn should_strip_document_start(state: &Tier1State, was_at_document_start: bool) -> bool {
