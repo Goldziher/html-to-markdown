@@ -274,11 +274,10 @@ fn prepare_frontmatter(
         return String::new();
     }
     let head_metadata = extract_head_metadata(dom.children(), parser, options, document_base_href);
-    let frontmatter = if wants_frontmatter && !head_metadata.is_empty() {
-        format_metadata_frontmatter(&head_metadata)
-    } else {
-        String::new()
-    };
+    let frontmatter = wants_frontmatter
+        .then(|| format_metadata_frontmatter(&head_metadata))
+        .flatten()
+        .unwrap_or_default();
     #[cfg(feature = "metadata")]
     populate_metadata_collector(dom, parser, metadata_collector, head_metadata, wants_document);
     frontmatter
