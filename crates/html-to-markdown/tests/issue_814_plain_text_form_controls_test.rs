@@ -378,6 +378,18 @@ fn a_control_in_a_table_cell_stays_in_its_cell_in_plain_text() {
     );
 }
 
+#[test]
+fn an_entity_for_a_closing_bracket_after_a_control_gets_no_space_in_plain_text() {
+    assert_plain("<p>(<button>X</button>&#41;</p>", "(X)\n");
+    assert_plain("<p>(<select><option>X</option></select>&#41;</p>", "(X)\n");
+}
+
+#[test]
+fn an_entity_for_a_space_after_a_control_gets_no_second_space_in_plain_text() {
+    assert_plain("<p>aaa<button>X</button>&#32;bbb</p>", "aaa X bbb\n");
+    assert_plain("<p>aaa<select><option>X</option></select>&#32;bbb</p>", "aaa X bbb\n");
+}
+
 #[cfg(feature = "visitor")]
 mod with_a_visitor {
     use std::sync::{Arc, Mutex};
@@ -491,5 +503,103 @@ mod with_a_visitor {
         let html = "<p>aaa<span><button>X</button>yy</span>bbb</p>";
         let custom = VisitResult::Custom("QQ".to_string());
         assert_eq!(plain_with_spans(html, &VisitResult::Continue, &custom), "aaaQQbbb\n");
+    }
+
+    #[test]
+    fn a_removed_element_with_a_control_keeps_the_space_after_the_control_before_it_in_plain_text() {
+        let html = "<p>aaa<button>X</button><span><button>Y</button></span>bbb</p>";
+        for (at_start, at_end) in [
+            (VisitResult::Continue, VisitResult::Skip),
+            (VisitResult::Skip, VisitResult::Continue),
+            (VisitResult::Custom("QQ".to_string()), VisitResult::Skip),
+        ] {
+            assert_eq!(
+                plain_with_spans(html, &at_start, &at_end),
+                "aaa X bbb\n",
+                "{at_start:?} {at_end:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn the_text_of_a_visitor_for_an_element_with_a_control_is_a_word_after_the_control_before_it_in_plain_text() {
+        let html = "<p>aaa<button>X</button><span><button>Y</button></span>bbb</p>";
+        let custom = VisitResult::Custom("Q".to_string());
+        assert_eq!(plain_with_spans(html, &VisitResult::Continue, &custom), "aaa X Qbbb\n");
+    }
+
+    #[test]
+    fn a_removed_element_with_a_control_and_no_control_before_it_adds_no_space_in_plain_text() {
+        let html = "<p>aaa<span><button>Y</button></span>bbb</p>";
+        assert_eq!(
+            plain_with_spans(html, &VisitResult::Continue, &VisitResult::Skip),
+            "aaabbb\n"
+        );
+    }
+
+    #[test]
+    fn a_control_after_a_removed_element_is_a_word_of_its_own_in_plain_text() {
+        for (html, expected) in [
+            ("<p>aaa<span>zzz</span><button>X</button>bbb</p>", "aaa X bbb\n"),
+            (
+                "<p>aaa<span><button>Y</button></span><button>X</button>bbb</p>",
+                "aaa X bbb\n",
+            ),
+            (
+                "<p>aaa<button>W</button><span><button>Y</button></span><button>X</button>bbb</p>",
+                "aaa W X bbb\n",
+            ),
+        ] {
+            assert_eq!(
+                plain_with_spans(html, &VisitResult::Continue, &VisitResult::Skip),
+                expected,
+                "{html}"
+            );
+        }
+    }
+
+    #[test]
+    fn a_removed_element_in_a_removed_element_keeps_the_space_after_the_control_before_them_in_plain_text() {
+        let html = "<p>aaa<button>X</button><span><span><button>Y</button></span></span>bbb</p>";
+        assert_eq!(
+            plain_with_spans(html, &VisitResult::Continue, &VisitResult::Skip),
+            "aaa X bbb\n"
+        );
+    }
+
+    /// Answers `X` with three spaces after it for the text node `X`.
+    #[derive(Debug)]
+    struct PaddedTextVisitor;
+
+    impl HtmlVisitor for PaddedTextVisitor {
+        fn visit_text(&mut self, _ctx: &NodeContext, text: &str) -> VisitResult {
+            if text == "X" {
+                VisitResult::Custom("X   ".to_string())
+            } else {
+                VisitResult::Continue
+            }
+        }
+    }
+
+    fn plain_with_padded_text(html: &str) -> String {
+        plain_with(html, |options| {
+            options.visitor = Some(Arc::new(Mutex::new(PaddedTextVisitor)));
+        })
+    }
+
+    #[test]
+    fn a_control_whose_last_spaces_a_block_end_removes_separates_no_later_text_in_plain_text() {
+        // ~keep The text after the removed spaces is as long as the spaces: the output has the
+        // ~keep length it had at the end of the control when the next word arrives.
+        let html = "<p><button>X</button></p><div>Z<b>w</b></div>";
+        assert_eq!(plain_with_padded_text(html), "X\n\nZw\n");
+    }
+
+    #[test]
+    fn a_character_where_a_block_end_removed_spaces_stays_whole_at_an_element_end_in_plain_text() {
+        // ~keep The inner block starts after the three spaces. It removes them, and a character
+        // ~keep of two bytes then stands across the place where the block started.
+        let html = "<div>X<div>\u{e9}</div></div>";
+        assert_eq!(plain_with_padded_text(html), "X\n\n\u{e9}\n");
     }
 }

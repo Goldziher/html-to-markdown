@@ -4,14 +4,16 @@
 //! visible text content with structural whitespace, bypassing the full
 //! Markdown/Djot conversion pipeline.
 
+mod output;
+
 use std::collections::HashSet;
-use std::fmt::Write;
 
 use crate::converter::form::spacing;
 use crate::converter::main_helpers::effective_max_depth;
 use crate::converter::preprocessing_helpers::should_drop_for_preprocessing;
 use crate::options::ConversionOptions;
 use crate::text;
+use output::PlainOutput;
 
 #[cfg(feature = "visitor")]
 use crate::converter::utility::content::is_block_level_element;
@@ -19,6 +21,8 @@ use crate::converter::utility::content::is_block_level_element;
 use crate::visitor::EMPTY_ATTRS;
 #[cfg(feature = "visitor")]
 use crate::visitor::{NodeContext, NodeType, VisitResult, VisitorHandle};
+#[cfg(feature = "visitor")]
+use output::Checkpoint;
 #[cfg(feature = "visitor")]
 use std::borrow::Cow;
 
@@ -102,51 +106,6 @@ impl WalkState<'_> {
     }
 }
 
-/// The text of one buffer of this writer (the page, a table cell, an option list), and the
-/// place in it where a form control ended.
-#[derive(Default)]
-struct PlainOutput {
-    text: String,
-    /// The length of `text` right after a form control wrote its text. While `text` has this
-    /// length and does not end with white space, the control is the last thing in it. After
-    /// other text, a line end or a block the record says nothing.
-    control_end: Option<usize>,
-}
-
-impl PlainOutput {
-    /// Writes `text`. When a control ends right before it and `text` starts with a word, one
-    /// space separates the two.
-    ///
-    /// ~keep Every arm except `select`, `datalist` and `option` writes the text of the page
-    /// ~keep here; those three separate their text through the shared spacing functions. The
-    /// ~keep space after a control is written when the next text arrives, so no arm decides
-    /// ~keep ahead what follows a control.
-    fn push_text(&mut self, text: &str) {
-        if self.control_end == Some(self.text.len())
-            && spacing::needs_space_before(&self.text)
-            && spacing::starts_with_word(text) == Some(true)
-        {
-            self.text.push(' ');
-        }
-        self.text.push_str(text);
-    }
-
-    /// Records that a control ends at the end of the text.
-    const fn end_control(&mut self) {
-        self.control_end = Some(self.text.len());
-    }
-
-    /// Removes the text after `len`. A control that ended in the removed text is not in the
-    /// text any more.
-    #[cfg(feature = "visitor")]
-    fn truncate(&mut self, len: usize) {
-        self.text.truncate(len);
-        if self.control_end.is_some_and(|end| end > len) {
-            self.control_end = None;
-        }
-    }
-}
-
 /// Extract plain text from a parsed DOM tree.
 ///
 /// Walks the tree collecting visible text with structural whitespace:
@@ -162,10 +121,7 @@ impl PlainOutput {
 /// - When a visitor is configured, `visit_element_start`, `visit_element_end`, and
 ///   `visit_text` callbacks are fired and their results are honoured.
 pub fn extract_plain_text(dom: &tl::VDom, parser: &tl::Parser, options: &ConversionOptions) -> String {
-    let mut buf = PlainOutput {
-        text: String::with_capacity(1024),
-        control_end: None,
-    };
+    let mut buf = PlainOutput::with_capacity(1024);
     let mut list_ctx = ListContext::None;
 
     let excluded_node_ids: HashSet<u32> = if options.exclude_selectors.is_empty() {
@@ -198,8 +154,9 @@ pub fn extract_plain_text(dom: &tl::VDom, parser: &tl::Parser, options: &Convers
         walk_plain(child_handle, parser, &mut buf, &mut list_ctx, &state);
     }
 
-    post_process(&mut buf.text);
-    buf.text
+    let mut text = buf.into_text();
+    post_process(&mut text);
+    text
 }
 
 /// Recursive plain-text walker.
@@ -242,7 +199,7 @@ fn emit_raw_text(bytes: &tl::Bytes<'_>, buf: &mut PlainOutput, state: &WalkState
         return;
     }
     let normalized = text::normalize_whitespace_cow(&decoded);
-    if !(normalized.is_empty() || normalized.as_ref() == " " && buf.text.ends_with('\n')) {
+    if !(normalized.is_empty() || normalized.as_ref() == " " && buf.as_str().ends_with('\n')) {
         buf.push_text(&normalized);
     }
 }
@@ -299,10 +256,10 @@ fn walk_tag(
         return;
     }
     #[cfg(feature = "visitor")]
-    let element_output_start = buf.text.len();
+    let element_start = buf.checkpoint();
     dispatch_plain_tag(tag_str, tag, parser, buf, list_ctx, state);
     #[cfg(feature = "visitor")]
-    visit_plain_element_end(tag_str, tag, buf, state, element_output_start);
+    visit_plain_element_end(tag_str, tag, buf, state, &element_start);
 }
 
 #[cfg(feature = "visitor")]
@@ -323,17 +280,17 @@ fn visit_plain_element_start(
     let VisitResult::Custom(custom) = result else {
         return matches!(result, VisitResult::Skip);
     };
-    let start = buf.text.len();
+    let start = buf.checkpoint();
     buf.push_text(&custom);
     let end_result = visitor_handle
         .lock()
         .expect("visitor mutex poisoned")
         .visit_element_end(&node_ctx, &custom);
     if let VisitResult::Custom(replacement) = end_result {
-        buf.truncate(start);
+        buf.rollback(&start);
         buf.push_text(&replacement);
     } else if matches!(end_result, VisitResult::Skip) {
-        buf.truncate(start);
+        buf.rollback(&start);
     }
     true
 }
@@ -344,23 +301,22 @@ fn visit_plain_element_end(
     tag: &tl::HTMLTag<'_>,
     buf: &mut PlainOutput,
     state: &WalkState<'_>,
-    output_start: usize,
+    element_start: &Checkpoint,
 ) {
     let Some(visitor_handle) = state.visitor else {
         return;
     };
     let node_ctx = plain_element_context(tag_name, tag, state.depth);
-    let safe_start = output_start.min(buf.text.len());
     let result = visitor_handle
         .lock()
         .expect("visitor mutex poisoned")
-        .visit_element_end(&node_ctx, &buf.text[safe_start..]);
+        .visit_element_end(&node_ctx, buf.since(element_start));
     match result {
         VisitResult::Custom(custom) => {
-            buf.truncate(safe_start);
+            buf.rollback(element_start);
             buf.push_text(&custom);
         }
-        VisitResult::Skip => buf.truncate(safe_start),
+        VisitResult::Skip => buf.rollback(element_start),
         _ => {}
     }
 }
@@ -392,8 +348,8 @@ fn dispatch_plain_tag(
         ..state.descend()
     };
     match tag_name {
-        "br" => buf.text.push('\n'),
-        "hr" => ensure_blank_line(buf),
+        "br" => buf.push_mark("\n"),
+        "hr" => buf.end_block(),
         "pre" => walk_plain_pre(tag, parser, buf, list_ctx, state),
         "img" => emit_plain_image(tag, buf, state.options),
         // ~keep An inline graphic is an image: its text is written like an alt text, and its
@@ -404,9 +360,9 @@ fn dispatch_plain_tag(
             }
         }
         "table" => {
-            ensure_blank_line(buf);
+            buf.end_block();
             walk_table(tag, parser, buf, &child_state);
-            ensure_blank_line(buf);
+            buf.end_block();
         }
         "ul" => {
             let list_state = WalkState {
@@ -436,18 +392,18 @@ fn dispatch_plain_tag(
         }
         "li" => walk_plain_list_item(tag, parser, buf, list_ctx, state),
         _ if BLOCK_TAGS.contains(&tag_name) => {
-            if state.item_marker_end != Some(buf.text.len()) {
-                ensure_blank_line(buf);
+            if state.item_marker_end != Some(buf.as_str().len()) {
+                buf.end_block();
             }
             walk_children(tag, parser, buf, list_ctx, &child_state);
-            ensure_blank_line(buf);
+            buf.end_block();
         }
         // ~keep The Markdown writer writes an option list and an option with the same two functions.
         "select" | "datalist" => walk_plain_option_list(tag, parser, buf, list_ctx, &child_state),
         "option" => {
             let mut option = PlainOutput::default();
             walk_children(tag, parser, &mut option, list_ctx, &child_state);
-            spacing::write_option(&mut buf.text, &option.text);
+            buf.write_option(option.as_str());
         }
         _ if spacing::writes_own_text(tag_name) => {
             walk_plain_control(tag, parser, buf, list_ctx, &child_state);
@@ -469,12 +425,11 @@ fn walk_plain_option_list(
     walk_children(tag, parser, &mut options, list_ctx, state);
     // ~keep This writer keeps the line ends of the source in running text: outside `pre`, a
     // ~keep line end in a list is one space.
+    let mut options = options.into_text();
     if !state.in_pre {
-        options.text = options.text.split_whitespace().collect::<Vec<_>>().join(" ");
+        options = options.split_whitespace().collect::<Vec<_>>().join(" ");
     }
-    if spacing::write_option_list(&mut buf.text, &options.text, state.in_pre) {
-        buf.end_control();
-    }
+    buf.write_option_list(&options, state.in_pre);
 }
 
 /// Writes a control that holds text of its own: a button, an output, a meter, a progress bar
@@ -488,10 +443,10 @@ fn walk_plain_control(
     list_ctx: &mut ListContext,
     state: &WalkState<'_>,
 ) {
-    let start = spacing::ControlStart::new(&buf.text);
+    let start = buf.start_control();
     walk_children(tag, parser, buf, list_ctx, state);
-    if !state.in_pre && start.finish(&mut buf.text) {
-        buf.end_control();
+    if !state.in_pre {
+        buf.finish_control(&start);
     }
 }
 
@@ -502,13 +457,13 @@ fn walk_plain_pre(
     list_ctx: &mut ListContext,
     state: &WalkState<'_>,
 ) {
-    ensure_blank_line(buf);
+    buf.end_block();
     let pre_state = WalkState {
         in_pre: true,
         ..state.descend()
     };
     walk_children(tag, parser, buf, list_ctx, &pre_state);
-    ensure_blank_line(buf);
+    buf.end_block();
 }
 
 fn emit_plain_image(tag: &tl::HTMLTag<'_>, buf: &mut PlainOutput, options: &ConversionOptions) {
@@ -529,9 +484,9 @@ fn walk_plain_list(
     mut list_context: ListContext,
     state: &WalkState<'_>,
 ) {
-    ensure_newline(buf);
+    buf.end_line();
     walk_children(tag, parser, buf, &mut list_context, state);
-    ensure_newline(buf);
+    buf.end_line();
 }
 
 fn walk_plain_list_item(
@@ -541,21 +496,21 @@ fn walk_plain_list_item(
     list_ctx: &mut ListContext,
     state: &WalkState<'_>,
 ) {
-    ensure_newline(buf);
+    buf.end_line();
     match list_ctx {
-        ListContext::Unordered | ListContext::None => buf.text.push_str("- "),
+        ListContext::Unordered | ListContext::None => buf.push_mark("- "),
         ListContext::Ordered { next_index } => {
-            let _ = write!(buf.text, "{next_index}. ");
+            buf.push_mark(&format!("{next_index}. "));
             *next_index += 1;
         }
     }
     let item_state = WalkState {
-        item_marker_end: Some(buf.text.len()),
+        item_marker_end: Some(buf.as_str().len()),
         in_pre: false,
         ..state.descend()
     };
     walk_children(tag, parser, buf, list_ctx, &item_state);
-    ensure_newline(buf);
+    buf.end_line();
 }
 
 /// Walk all children of a tag.
@@ -580,7 +535,7 @@ fn walk_table(table_tag: &tl::HTMLTag, parser: &tl::Parser, buf: &mut PlainOutpu
 
     for (row_idx, row_handle) in row_handles.iter().enumerate() {
         if row_idx > 0 {
-            buf.text.push('\n');
+            buf.push_mark("\n");
         }
         let Some(tl::Node::Tag(row_tag)) = row_handle.get(parser) else {
             continue;
@@ -605,14 +560,14 @@ fn walk_table(table_tag: &tl::HTMLTag, parser: &tl::Parser, buf: &mut PlainOutpu
         };
         for (cell_idx, cell_handle) in cell_handles.iter().enumerate() {
             if cell_idx > 0 {
-                buf.text.push('\t');
+                buf.push_mark("\t");
             }
             let mut cell_buf = PlainOutput::default();
             if let Some(tl::Node::Tag(cell_tag)) = cell_handle.get(parser) {
                 let mut cell_list_ctx = ListContext::None;
                 walk_children(cell_tag, parser, &mut cell_buf, &mut cell_list_ctx, &cell_state);
             }
-            buf.push_text(cell_buf.text.trim());
+            buf.push_text(cell_buf.as_str().trim());
         }
     }
 }
@@ -641,32 +596,6 @@ fn collect_descendant_handles(
                 }
             }
         }
-    }
-}
-
-/// Ensure the buffer ends with a blank line (two newlines).
-fn ensure_blank_line(buf: &mut PlainOutput) {
-    let buf = &mut buf.text;
-    if buf.is_empty() {
-        return;
-    }
-    while buf.ends_with(' ') || buf.ends_with('\t') {
-        buf.pop();
-    }
-    let current_newlines = buf.chars().rev().take_while(|&c| c == '\n').count();
-    for _ in current_newlines..2 {
-        buf.push('\n');
-    }
-}
-
-/// Ensure the buffer ends with at least one newline.
-fn ensure_newline(buf: &mut PlainOutput) {
-    let buf = &mut buf.text;
-    if buf.is_empty() {
-        return;
-    }
-    if !buf.ends_with('\n') {
-        buf.push('\n');
     }
 }
 
