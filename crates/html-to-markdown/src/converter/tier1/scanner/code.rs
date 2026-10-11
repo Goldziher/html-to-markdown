@@ -360,6 +360,8 @@ fn close_link(state: &mut Tier1State, frame: &OpenTag, options: &ConversionOptio
     if href.is_none() && dest[trim_start..].ends_with(char::is_whitespace) {
         return Err(BailReason::Classifier);
     }
+    // ~keep The space that a label ends with goes after the link, as in Tier-2 (issue #800).
+    let ends_with_space = dest[trim_start..].ends_with(' ');
     // ~keep Mirror Tier-2's `normalize_whitespace_cow` step inside
     // `normalize_link_label` (utility/content.rs): any Unicode whitespace
     // in the link label (notably NBSP `\u{00a0}`) collapses to a single ASCII
@@ -395,6 +397,8 @@ fn close_link(state: &mut Tier1State, frame: &OpenTag, options: &ConversionOptio
             dest.push('↑');
         }
     }
+    // ~keep A label with no text has no end: no space goes after such a link.
+    let end_space = ends_with_space && dest.len() > trim_start;
     if let Some(href) = href.filter(|value| !value.is_empty()) {
         emit_markdown_link_close(dest, trim_start, &href, title.as_deref(), options);
         // ~keep A link with no text still writes `[](href)`: content, as in Tier-2's `convert_node`.
@@ -404,6 +408,10 @@ fn close_link(state: &mut Tier1State, frame: &OpenTag, options: &ConversionOptio
         if let Some(bracket_pos) = dest[..bracket_search_end].rfind('[') {
             dest.remove(bracket_pos);
         }
+    }
+    // ~keep The space goes after the link, and after the text of a link with an empty address.
+    if end_space {
+        state.cell_or_output_mut().push(' ');
     }
     Ok(())
 }

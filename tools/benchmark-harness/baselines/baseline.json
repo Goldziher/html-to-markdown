@@ -173,7 +173,7 @@
       "median_ms": 1.326241592105263,
       "mad_ms": 0.0045290684885290755,
       "mb_per_s": 33.85789998993207,
-      "output_bytes": 20036
+      "output_bytes": 20038
     },
     {
       "fixture": "real-world/issues/gh-190/ozonekorea.html",
