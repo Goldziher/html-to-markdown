@@ -556,16 +556,7 @@ pub fn handle_option_list(
                 crate::converter::block::container::HandlerContext::new(options, &list_ctx, depth + 1, dom_ctx),
             );
         }
-        let trimmed = rendered.trim();
-        if trimmed.is_empty() {
-            return;
-        }
-        // ~keep In code the white space around the options is text of the source.
-        let trimmed = if ctx.in_code { rendered.as_str() } else { trimmed };
-        let start = ControlStart::new(output);
-        output.push_str(trimmed);
-        start.finish(output);
-        separate_from_next_text(output, *node_handle, parser, dom_ctx);
+        super::spacing::write_option_list(output, &rendered, ctx.in_code, *node_handle, parser, dom_ctx);
     }
 }
 
@@ -599,14 +590,7 @@ pub fn handle_option(
             }
         }
 
-        let trimmed = text.trim();
-        if !trimmed.is_empty() {
-            // ~keep One space separates an option from what its list already holds.
-            if !output.is_empty() && !output.ends_with(char::is_whitespace) {
-                output.push(' ');
-            }
-            output.push_str(trimmed);
-        }
+        super::spacing::write_option(output, &text);
     }
 }
 

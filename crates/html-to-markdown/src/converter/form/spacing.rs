@@ -88,6 +88,45 @@ pub fn separate_from_next_text(
     }
 }
 
+/// Writes `text`, the text of one option, to `list`, the text that its list holds so far. One
+/// space separates an option from the option before it. An option with no text writes nothing.
+///
+/// ~keep The Markdown writer and the plain text writer both write an option with this function.
+pub fn write_option(list: &mut String, text: &str) {
+    let trimmed = text.trim();
+    if trimmed.is_empty() {
+        return;
+    }
+    if !list.is_empty() && !list.ends_with(char::is_whitespace) {
+        list.push(' ');
+    }
+    list.push_str(trimmed);
+}
+
+/// Writes `options`, the text of the options of the list `node_handle`, to `output`. The options
+/// are one control in the line: one space separates the control from the text before it and
+/// from the text after it. In code (`in_code`) the white space around the options is text of
+/// the source.
+///
+/// ~keep The Markdown writer and the plain text writer both write an option list with this function.
+pub fn write_option_list(
+    output: &mut String,
+    options: &str,
+    in_code: bool,
+    node_handle: tl::NodeHandle,
+    parser: &tl::Parser,
+    dom_ctx: &DomContext,
+) {
+    let trimmed = options.trim();
+    if trimmed.is_empty() {
+        return;
+    }
+    let start = ControlStart::new(output);
+    output.push_str(if in_code { options } else { trimmed });
+    start.finish(output);
+    separate_from_next_text(output, node_handle, parser, dom_ctx);
+}
+
 /// The siblings of node `id` that follow it in the source.
 fn siblings_after(id: u32, dom_ctx: &DomContext) -> &[tl::NodeHandle] {
     let siblings = match dom_ctx.parent_of(id) {

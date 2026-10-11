@@ -71,6 +71,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Plain text output separates the text of a form control from the words beside it, as the
+  Markdown output does. This shows only with `remove_forms` off.
+  `<p>aaa<select><option>Xone</option><option>Xtwo</option></select>bbb</p>` gave
+  `aaaXoneXtwobbb` and now gives `aaa Xone Xtwo bbb`. Each option of a select list or a data
+  list is a word of its own. A button, an output, a meter, a progress bar or a text area is a
+  word of its own too: `<h1>aaa<button>Xone</button><button>Xtwo</button>bbb</h1>` gave
+  `aaaXoneXtwobbb` and now gives `aaa Xone Xtwo bbb`. In a `pre` element a button adds no
+  space, and the options of a select list stay separate words
+  ([#814](https://github.com/xberg-io/html-to-markdown/issues/814)).
 - A page with a structured data script keeps its text when a text value of the JSON holds a tag.
   `<script type="application/ld+json">{"a":"<p>"}</script>` in the head made the whole page
   convert to an empty string, and the same script in the body removed the text after it. The

@@ -7,6 +7,8 @@
 use std::collections::HashSet;
 use std::fmt::Write;
 
+use crate::converter::DomContext;
+use crate::converter::form::spacing;
 use crate::converter::main_helpers::effective_max_depth;
 use crate::converter::preprocessing_helpers::should_drop_for_preprocessing;
 use crate::options::ConversionOptions;
@@ -73,6 +75,7 @@ const BLOCK_TAGS: &[&str] = &[
 /// Using a struct avoids feature-gated function parameters at call sites.
 struct WalkState<'a> {
     options: &'a ConversionOptions,
+    dom_ctx: &'a DomContext,
     excluded_node_ids: &'a HashSet<u32>,
     /// Inside a list item, the item's buffer length right after its marker, so a block that
     /// follows the marker directly starts on its line. A table cell starts its own buffer with `None`.
@@ -89,6 +92,7 @@ impl WalkState<'_> {
     const fn descend(&self) -> Self {
         WalkState {
             options: self.options,
+            dom_ctx: self.dom_ctx,
             excluded_node_ids: self.excluded_node_ids,
             item_marker_end: self.item_marker_end,
             in_pre: self.in_pre,
@@ -111,10 +115,16 @@ impl WalkState<'_> {
 /// - `<script>`, `<style>`, `<head>`, `<template>`, `<noscript>` are skipped
 /// - Tables: cells separated by tab, rows by newline
 /// - Inline elements are recursed without markers
+/// - A form control that writes text is a word of its own, and so is each option of a list
 /// - Nodes matching `excluded_node_ids` (from `exclude_selectors`) are dropped entirely
 /// - When a visitor is configured, `visit_element_start`, `visit_element_end`, and
 ///   `visit_text` callbacks are fired and their results are honoured.
-pub fn extract_plain_text(dom: &tl::VDom, parser: &tl::Parser, options: &ConversionOptions) -> String {
+pub fn extract_plain_text(
+    dom: &tl::VDom,
+    parser: &tl::Parser,
+    options: &ConversionOptions,
+    dom_ctx: &DomContext,
+) -> String {
     let mut buf = String::with_capacity(1024);
     let mut list_ctx = ListContext::None;
 
@@ -134,6 +144,7 @@ pub fn extract_plain_text(dom: &tl::VDom, parser: &tl::Parser, options: &Convers
 
     let state = WalkState {
         options,
+        dom_ctx,
         excluded_node_ids: &excluded_node_ids,
         item_marker_end: None,
         in_pre: false,
@@ -174,7 +185,7 @@ fn walk_plain(
             if state.excluded_node_ids.contains(&node_handle.get_inner()) {
                 return;
             }
-            walk_tag(tag, parser, buf, list_ctx, state);
+            walk_tag(*node_handle, tag, parser, buf, list_ctx, state);
         }
         tl::Node::Comment(_) => {}
     }
@@ -226,6 +237,7 @@ fn visit_plain_text(decoded: &str, buf: &mut String, state: &WalkState<'_>) -> b
 }
 
 fn walk_tag(
+    node_handle: tl::NodeHandle,
     tag: &tl::HTMLTag<'_>,
     parser: &tl::Parser,
     buf: &mut String,
@@ -250,7 +262,7 @@ fn walk_tag(
     }
     #[cfg(feature = "visitor")]
     let element_output_start = buf.len();
-    dispatch_plain_tag(tag_str, tag, parser, buf, list_ctx, state);
+    dispatch_plain_tag(tag_str, node_handle, tag, parser, buf, list_ctx, state);
     #[cfg(feature = "visitor")]
     visit_plain_element_end(tag_str, tag, buf, state, element_output_start);
 }
@@ -324,6 +336,7 @@ fn plain_element_context<'a>(tag_name: &'a str, tag: &'a tl::HTMLTag<'a>, depth:
 
 fn dispatch_plain_tag(
     tag_name: &str,
+    node_handle: tl::NodeHandle,
     tag: &tl::HTMLTag<'_>,
     parser: &tl::Parser,
     buf: &mut String,
@@ -386,7 +399,45 @@ fn dispatch_plain_tag(
             walk_children(tag, parser, buf, list_ctx, &child_state);
             ensure_blank_line(buf);
         }
+        // ~keep The Markdown writer writes an option list and an option with the same two functions.
+        "select" | "datalist" => {
+            let mut options_text = String::new();
+            walk_children(tag, parser, &mut options_text, list_ctx, &child_state);
+            // ~keep A list is one control in its line. This writer keeps the line ends of the
+            // ~keep source in running text: outside `pre`, a line end in a list is one space.
+            if !state.in_pre {
+                options_text = options_text.split_whitespace().collect::<Vec<_>>().join(" ");
+            }
+            spacing::write_option_list(buf, &options_text, state.in_pre, node_handle, parser, state.dom_ctx);
+        }
+        "option" => {
+            let mut option_text = String::new();
+            walk_children(tag, parser, &mut option_text, list_ctx, &child_state);
+            spacing::write_option(buf, &option_text);
+        }
+        _ if spacing::writes_own_text(tag_name) => {
+            walk_plain_control(node_handle, tag, parser, buf, list_ctx, &child_state);
+        }
         _ => walk_children(tag, parser, buf, list_ctx, &child_state),
+    }
+}
+
+/// Writes a control that holds text of its own: a button, an output, a meter, a progress bar
+/// or a text area. The text is a word of its own: one space separates it from the text before
+/// it and from a word after it in the same block. In a `pre` element the text is written as
+/// the source has it.
+fn walk_plain_control(
+    node_handle: tl::NodeHandle,
+    tag: &tl::HTMLTag<'_>,
+    parser: &tl::Parser,
+    buf: &mut String,
+    list_ctx: &mut ListContext,
+    state: &WalkState<'_>,
+) {
+    let start = spacing::ControlStart::new(buf);
+    walk_children(tag, parser, buf, list_ctx, state);
+    if !state.in_pre && start.finish(buf) {
+        spacing::separate_from_next_text(buf, node_handle, parser, state.dom_ctx);
     }
 }
 
