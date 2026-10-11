@@ -143,10 +143,11 @@ fn validate_input_size(html: &str, max_size: Option<u64>) -> Result<()> {
 
 fn prepare_conversion<'a>(html: &'a str, options: &ConversionOptions) -> Result<PreparedConversion<'a>> {
     // ~keep Both tiers must see the same repaired tree when head content precedes an
-    // ~keep explicit `<head>`; browsers place that content in the implicit head (issue #592).
+    // ~keep explicit `<head>` (issue #592) or a title precedes the body of a page with no
+    // ~keep `<head>` (issue #816); browsers place that content in the implicit head.
     let normalized_input = normalize_input(html)?;
     let (normalized_html, repair_warning) =
-        crate::converter::repair_head_content_before_explicit_head(normalized_input.as_ref())
+        crate::converter::repair_head_content_outside_head(normalized_input.as_ref())
             .map_or((normalized_input, None), |(html, warning)| (Cow::Owned(html), warning));
     let document_base_href = (options.base_url.is_some() || options.extract_metadata)
         .then(|| crate::converter::url_resolve::document_base_href(&normalized_html))

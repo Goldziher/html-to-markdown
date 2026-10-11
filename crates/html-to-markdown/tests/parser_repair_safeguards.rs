@@ -57,6 +57,71 @@ fn ordinary_formatting_repair_should_keep_all_text_without_a_budget_warning() {
     }
 }
 
+/// A page with a `<title>` and no `<head>` tag (issue #816), then one paragraph with open bold
+/// elements and `paragraphs` paragraphs after it.
+fn page_with_a_title_and_no_head(formatting: usize, paragraphs: usize) -> String {
+    format!(
+        "<title>T</title><p>{}x</p>{}",
+        formatting_tags(formatting),
+        "<p>y</p>".repeat(paragraphs)
+    )
+}
+
+fn convert_with_metadata(html: &str, extract_metadata: bool) -> html_to_markdown_rs::ConversionResult {
+    convert(
+        html,
+        ConversionOptions {
+            extract_metadata,
+            max_depth: Some(512),
+            ..Default::default()
+        },
+    )
+    .expect("a page with a title and no head converts")
+}
+
+#[test]
+fn should_take_a_title_with_no_head_tag_as_the_document_title_inside_the_node_budget() {
+    let html = page_with_a_title_and_no_head(2, 2);
+
+    let with_metadata = convert_with_metadata(&html, true);
+    assert_eq!(
+        with_metadata.content.as_deref(),
+        Some("---\ntitle: T\n---\n\n**x**\n\n**y**\n\n**y**\n")
+    );
+    assert!(with_metadata.warnings.is_empty(), "{:?}", with_metadata.warnings);
+
+    let without_metadata = convert_with_metadata(&html, false);
+    assert_eq!(without_metadata.content.as_deref(), Some("**x**\n\n**y**\n\n**y**\n"));
+    assert!(without_metadata.warnings.is_empty(), "{:?}", without_metadata.warnings);
+}
+
+#[test]
+fn should_keep_a_title_with_no_head_tag_in_the_body_past_the_node_budget() {
+    // ~keep The repair that moves the title into the head has the node budget (issue #809).
+    // ~keep Past the budget the page keeps its structure as written: the title text is the
+    // ~keep first paragraph and there is no front matter.
+    for (formatting, paragraphs) in [(60, 12), (250, 1_000), (250, 4_000)] {
+        let html = page_with_a_title_and_no_head(formatting, paragraphs);
+        let expected = format!("T\n\n**x**\n{}", "\n**y**\n".repeat(paragraphs));
+        for extract_metadata in [true, false] {
+            let result = convert_with_metadata(&html, extract_metadata);
+            assert_eq!(
+                result.content.as_deref(),
+                Some(expected.as_str()),
+                "{formatting} bold elements, {paragraphs} paragraphs, metadata {extract_metadata}"
+            );
+            assert!(
+                result.warnings.iter().any(
+                    |warning| warning.kind == html_to_markdown_rs::WarningKind::MalformedHtml
+                        && warning.message.contains("node budget")
+                ),
+                "{:?}",
+                result.warnings
+            );
+        }
+    }
+}
+
 #[test]
 fn should_keep_the_shallow_text_and_warn_when_the_page_is_deeper_than_the_walker_limit() {
     for prefix in ["<table><td>visible", "<b><p>visible</p></b>", "<x-custom>visible"] {
