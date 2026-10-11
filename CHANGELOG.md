@@ -19,7 +19,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Paragraphs inside short quotations retain their block boundaries
   ([#820](https://github.com/xberg-io/html-to-markdown/issues/820)).
 - Unclosed markup inside inert and raw-text elements no longer swallows following content;
-  document titles and legacy preformatted text retain literal tag text. In HTML, self-closing
+  document titles and legacy preformatted text retain literal tag text. Plain output now omits
+  iframe fallback bodies that were previously included. Tokenization is limited to protected
+  bodies and their namespace context, avoiding a full-page pass for a single inert body.
+  In HTML, self-closing
   syntax on `iframe`, `noscript` and `template` does not close the element: following markup
   remains inside it until its closing tag, including markup previously retained from XHTML-style input
   ([#821](https://github.com/xberg-io/html-to-markdown/issues/821)).

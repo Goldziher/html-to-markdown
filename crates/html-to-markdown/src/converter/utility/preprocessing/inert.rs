@@ -130,13 +130,15 @@ struct BodyNormalizer<'a> {
     preserved: Option<RefCell<PreservedBodies>>,
     replacements: RefCell<Vec<(std::ops::Range<usize>, String)>>,
     token_boundary: Cell<usize>,
+    fed_end: Cell<usize>,
+    opaque: RefCell<Option<LocalName>>,
 }
 
 impl BodyNormalizer<'_> {
     fn position(&self) -> usize {
-        // ~keep One source tendril is queued; its remaining bytes locate tag-token ends
-        // ~keep without guessing at quoted attributes or comment-shaped source text.
-        self.source.len() - self.input.peek_front_chunk_mut().map_or(0, |chunk| chunk.len())
+        // ~keep The absolute segment endpoint locates tokens even when ordinary HTML
+        // ~keep between protected bodies never enters the tokenizer.
+        self.fed_end.get() - self.input.peek_front_chunk_mut().map_or(0, |chunk| chunk.len())
     }
 
     fn finish_body(&self, body: Body, end: usize, closed: bool) {
@@ -237,6 +239,10 @@ impl BodyNormalizer<'_> {
 
     fn process_tag(&self, tag: Tag) -> TokenSinkResult<()> {
         let name = &*tag.name;
+        if tag.kind == TagKind::EndTag && self.opaque.borrow().as_ref() == Some(&tag.name) {
+            self.opaque.replace(None);
+            return TokenSinkResult::Script(());
+        }
         let html = self
             .namespaces
             .borrow()
@@ -268,7 +274,7 @@ impl BodyNormalizer<'_> {
             if let Some(body) = self.body.borrow_mut().take() {
                 self.finish_body(body, self.position(), true);
             }
-            return TokenSinkResult::Continue;
+            return TokenSinkResult::Script(());
         }
         if !self.track_namespace(&tag) {
             return TokenSinkResult::Continue;
@@ -281,6 +287,12 @@ impl BodyNormalizer<'_> {
                 template_depth: usize::from(name == "template"),
                 namespace_depth: self.namespaces.borrow().len(),
             }));
+        }
+        if matches!(
+            name,
+            "textarea" | "script" | "style" | "noembed" | "noframes" | "plaintext"
+        ) {
+            self.opaque.replace(Some(tag.name.clone()));
         }
         match name {
             "title" | "textarea" => TokenSinkResult::RawData(RawKind::Rcdata),
@@ -508,7 +520,6 @@ pub fn normalize_inert_bodies_with_preservation(
         return (Cow::Borrowed(source), HashMap::new());
     }
     let input = BufferQueue::default();
-    input.push_back(StrTendril::from(source));
     let tokenizer = Tokenizer::new(
         BodyNormalizer {
             source,
@@ -518,10 +529,12 @@ pub fn normalize_inert_bodies_with_preservation(
             preserved: preserve.then(|| RefCell::new(PreservedBodies::new(source))),
             replacements: RefCell::new(Vec::new()),
             token_boundary: Cell::new(0),
+            fed_end: Cell::new(0),
+            opaque: RefCell::new(None),
         },
         TokenizerOpts::default(),
     );
-    let _ = tokenizer.feed(&input);
+    feed_protected_regions(source, &input, &tokenizer);
     tokenizer.end();
     let originals = tokenizer
         .sink
@@ -542,6 +555,130 @@ pub fn normalize_inert_bodies_with_preservation(
     (Cow::Owned(output), originals)
 }
 
+const TOKENIZER_CHUNK_BYTES: usize = 4096;
+
+fn feed_protected_regions(source: &str, input: &BufferQueue, tokenizer: &Tokenizer<BodyNormalizer<'_>>) {
+    let bytes = source.as_bytes();
+    let mut cursor = 0;
+    while cursor < bytes.len() {
+        let inside = tokenizer.sink.body.borrow().is_some() || tokenizer.sink.opaque.borrow().is_some();
+        let end = if inside {
+            let limit = (cursor + TOKENIZER_CHUNK_BYTES).min(bytes.len());
+            let mut end = memchr::memchr(b'>', &bytes[cursor..limit]).map_or(limit, |offset| cursor + offset + 1);
+            while !source.is_char_boundary(end) {
+                end -= 1;
+            }
+            end
+        } else {
+            let Some(offset) = memchr::memchr(b'<', &bytes[cursor..]) else {
+                break;
+            };
+            cursor += offset;
+            if !super::raw_text::opens_a_tag(bytes, cursor) && !matches!(bytes.get(cursor + 1), Some(b'!' | b'?')) {
+                cursor += 1;
+                continue;
+            }
+            let end = scan_markup_end(bytes, cursor).unwrap_or(bytes.len());
+            let name_start = cursor + 1 + usize::from(bytes.get(cursor + 1) == Some(&b'/'));
+            let name_end = bytes[name_start..]
+                .iter()
+                .position(|byte| matches!(byte, b'>' | b'/' | b' ' | b'\t' | b'\n' | b'\r' | b'\x0c'))
+                .map_or(bytes.len(), |offset| name_start + offset);
+            let name = &bytes[name_start..name_end];
+            let relevant = !tokenizer.sink.namespaces.borrow().is_empty()
+                || [
+                    "svg",
+                    "math",
+                    "title",
+                    "xmp",
+                    "iframe",
+                    "noscript",
+                    "template",
+                    "textarea",
+                    "script",
+                    "style",
+                    "noembed",
+                    "noframes",
+                    "plaintext",
+                ]
+                .iter()
+                .any(|candidate| name.eq_ignore_ascii_case(candidate.as_bytes()));
+            if !relevant {
+                cursor = end;
+                continue;
+            }
+            end
+        };
+        tokenizer.sink.fed_end.set(end);
+        #[cfg(test)]
+        TOKEN_BYTES.with(|count| count.set(count.get() + end - cursor));
+        input.push_back(StrTendril::from(&source[cursor..end]));
+        let _ = tokenizer.feed(input);
+        cursor = tokenizer.sink.position();
+        // ~keep A closing raw token suspends the feed; its unconsumed suffix is
+        // ~keep scanned as ordinary source instead of changing tokenizer context.
+        while input.pop_front().is_some() {}
+    }
+}
+
+#[derive(Clone, Copy)]
+enum AttributeScan {
+    BeforeName,
+    Name,
+    AfterName,
+    BeforeValue,
+    Unquoted,
+    Quoted(u8),
+}
+
+fn scan_markup_end(bytes: &[u8], start: usize) -> Option<usize> {
+    if bytes[start..].starts_with(b"<!--") {
+        let body = start + 4;
+        if bytes.get(body) == Some(&b'>') {
+            return Some(body + 1);
+        }
+        if bytes.get(body..body + 2) == Some(b"->") {
+            return Some(body + 2);
+        }
+        for index in memchr::memchr_iter(b'>', &bytes[body..]).map(|offset| body + offset) {
+            if bytes.get(index.saturating_sub(2)..index) == Some(b"--")
+                || bytes.get(index.saturating_sub(3)..index) == Some(b"--!")
+            {
+                return Some(index + 1);
+            }
+        }
+        return None;
+    }
+    if matches!(bytes.get(start + 1), Some(b'!' | b'?')) {
+        return memchr::memchr(b'>', &bytes[start + 2..]).map(|offset| start + offset + 3);
+    }
+    let name_start = start + 1 + usize::from(bytes.get(start + 1) == Some(&b'/'));
+    let name_end = bytes[name_start..]
+        .iter()
+        .position(|byte| matches!(byte, b'>' | b'/' | b' ' | b'\t' | b'\n' | b'\r' | b'\x0c'))
+        .map_or(bytes.len(), |offset| name_start + offset);
+    let mut state = AttributeScan::BeforeName;
+    for (offset, byte) in bytes[name_end..].iter().copied().enumerate() {
+        if byte == b'>' && !matches!(state, AttributeScan::Quoted(_)) {
+            return Some(name_end + offset + 1);
+        }
+        state = match state {
+            AttributeScan::Quoted(delimiter) if byte != delimiter => state,
+            AttributeScan::Quoted(_) => AttributeScan::BeforeName,
+            AttributeScan::Unquoted if !byte.is_ascii_whitespace() => state,
+            AttributeScan::Unquoted => AttributeScan::BeforeName,
+            AttributeScan::BeforeValue if byte.is_ascii_whitespace() => state,
+            AttributeScan::BeforeValue if matches!(byte, b'\'' | b'"') => AttributeScan::Quoted(byte),
+            AttributeScan::BeforeValue => AttributeScan::Unquoted,
+            AttributeScan::Name | AttributeScan::AfterName if byte == b'=' => AttributeScan::BeforeValue,
+            AttributeScan::Name if byte.is_ascii_whitespace() => AttributeScan::AfterName,
+            _ if byte.is_ascii_whitespace() || byte == b'/' => AttributeScan::BeforeName,
+            _ => AttributeScan::Name,
+        };
+    }
+    None
+}
+
 /// Restore opaque source bytes after parsing, before metadata or visitor consumers see the DOM. ~keep
 pub fn restore_inert_bodies(dom: &mut tl::VDom<'_>, originals: &HashMap<String, String>) -> crate::error::Result<()> {
     for node in dom.nodes_mut() {
@@ -558,6 +695,7 @@ pub fn restore_inert_bodies(dom: &mut tl::VDom<'_>, originals: &HashMap<String, 
 
 #[cfg(test)]
 thread_local! {
+    static TOKEN_BYTES: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
     static TAG_SCANS: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
     static TOKEN_VISITS: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
     static NAMESPACE_VISITS: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
@@ -567,6 +705,68 @@ thread_local! {
 mod tests {
     use super::normalize_inert_bodies;
     use std::borrow::Cow;
+
+    #[test]
+    fn should_tokenize_only_the_inert_body_amid_large_html_gaps() {
+        let paragraph = "<p data-note='quoted <noscript> fake'>ordinary text</p>";
+        let prefix = paragraph.repeat(20_000);
+        let suffix = paragraph.repeat(20_000);
+        let source = format!("{prefix}<noscript><p>fallback</noscript>{suffix}");
+        super::TOKEN_BYTES.with(|bytes| bytes.set(0));
+        let normalized = normalize_inert_bodies(&source);
+        assert_eq!(normalized, format!("{prefix}<noscript></noscript>{suffix}"));
+        super::TOKEN_BYTES.with(|bytes| {
+            assert!(bytes.get() > 0, "the candidate must actually be tokenized");
+            assert!(bytes.get() <= 64, "tokenized {} of {} bytes", bytes.get(), source.len());
+        });
+    }
+
+    #[test]
+    fn should_keep_fake_candidates_outside_protected_bodies_opaque() {
+        for before in [
+            "a < b ",
+            "<<",
+            "<!bogus data-x='fake> ",
+            "<?bogus data-x='fake> ",
+            "<p data-x='quoted <noscript> fake'></p>",
+            "<!-- <noscript><p>fake</noscript> -->",
+            "<!--> ",
+            "<!---> ",
+            "<!-- <noscript> --!>",
+            "<script><!--<script><noscript>fake</noscript></script>--></script>",
+            "<style><noscript>fake</noscript></style>",
+            "<textarea><noscript>fake</noscript></textarea>",
+            "<p data-x=unquoted'quote><span></span></p>",
+            "<p ='quote><span></span></p>",
+        ] {
+            let source = format!("{before}<noscript><p>fallback</noscript><p>visible</p>");
+            assert_eq!(
+                normalize_inert_bodies(&source),
+                format!("{before}<noscript></noscript><p>visible</p>")
+            );
+        }
+    }
+
+    #[test]
+    fn should_match_tokenizer_abrupt_doctype_identifier_endings() {
+        for keyword in ["PUBLIC", "SYSTEM"] {
+            let source = format!("<!DOCTYPE html {keyword} \"x><noscript><p>fallback</noscript>\"><p>visible</p>");
+            assert_eq!(
+                normalize_inert_bodies(&source),
+                format!("<!DOCTYPE html {keyword} \"x><noscript></noscript>\"><p>visible</p>")
+            );
+        }
+    }
+
+    #[test]
+    fn should_keep_source_offsets_when_a_raw_body_crosses_unicode_chunks() {
+        let text = "é🦀".repeat(2_000);
+        let source = format!("<p>prefix</p><xmp>{text}<p>literal</xmp><p>visible</p>");
+        assert_eq!(
+            normalize_inert_bodies(&source),
+            format!("<p>prefix</p><xmp>{text}&lt;p>literal</xmp><p>visible</p>")
+        );
+    }
 
     #[test]
     fn should_preserve_source_outside_target_bodies() {
