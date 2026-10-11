@@ -20,9 +20,10 @@ use crate::converter::main::walk_node;
 use crate::converter::media::inline_data_treatment;
 use crate::converter::utility::content::{
     collect_link_label_text, keeps_source_white_space, link_accessible_name, link_text_content, node_is_block_level,
-    normalize_link_label, normalized_tag_name,
+    normalize_link_label, normalized_tag_name, push_inline_prefix,
 };
 use crate::converter::utility::escaping::escape_link_label;
+use crate::converter::{append_inline_suffix, chomp_inline};
 use crate::options::{ConversionOptions, InlineDataMedia};
 use crate::text;
 use std::borrow::Cow;
@@ -94,11 +95,35 @@ pub fn handle_link(tag: &tl::HTMLTag, mut handler: HandlerContext<'_>) {
     }
 
     handler.context.inline_data_replaced.set(false);
-    let mut label = normalize_link_label(&build_label_content(&data, &handler));
+    let content = build_label_content(&data, &handler);
+    // ~keep The white space at an edge of the label goes outside the link, as it does for bold
+    // ~keep and italic text: `[Go ](/p)now` shows as `Go now`, and a trimmed label joins the words.
+    // ~keep A line break at an edge of the label is content of the label, not white space
+    // ~keep (issue #497): such a label is written whole.
+    let inner = content.trim_matches([' ', '\t', '\u{a0}']);
+    let edge_is_break = inner.starts_with('\n') || inner.starts_with("\\\n") || inner.ends_with('\n');
+    let (prefix, suffix, trimmed) = if edge_is_break || keeps_source_white_space(handler.options, handler.context) {
+        ("", "", content.as_str())
+    } else {
+        chomp_inline(&content)
+    };
+    let has_text = !trimmed.is_empty();
+    let mut label = normalize_link_label(trimmed);
     apply_label_fallbacks(&data, &mut label, &handler);
     indent_hard_break_continuations(&mut label, handler.context, handler.options);
     let drop_link = data.is_dropped(&label, &handler);
+    if has_text {
+        push_inline_prefix(handler.output, prefix, handler.options, handler.context);
+    }
     let emit_deferred = emit_link(tag, &data, &label, drop_link, &mut handler);
+    append_inline_suffix(
+        handler.output,
+        suffix,
+        has_text,
+        handler.node_handle,
+        handler.parser,
+        handler.dom_context,
+    );
     #[cfg(feature = "metadata")]
     record_link_metadata(tag, &data, &label, handler.context);
     if data.emit_blocks_separately && emit_deferred {

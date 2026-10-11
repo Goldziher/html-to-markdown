@@ -117,7 +117,7 @@ fn should_not_change_the_nested_sibling_anchor_repair_output() {
     // ~keep Issue #479 control: html5ever's adoption agency splits this into two sibling
     // ~keep anchors. No `<table>` is involved, so #490's new branch must not touch it.
     let html = r#"<a href="/o">Outer <a href="/i">Inner</a></a>"#;
-    assert_eq!(content(html), "[Outer](/o)[Inner](/i)\n");
+    assert_eq!(content(html), "[Outer](/o) [Inner](/i)\n");
 }
 
 #[test]
