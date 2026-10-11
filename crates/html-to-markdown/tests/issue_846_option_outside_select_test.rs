@@ -173,6 +173,19 @@ fn an_option_group_outside_a_select_list_keeps_its_line_ends_in_plain_text() {
 }
 
 #[test]
+fn an_empty_option_outside_a_select_list_keeps_the_line_end_of_the_source_beside_it() {
+    // ~keep The line end before an option outside a select list is one space in Markdown,
+    // ~keep also after an opening bracket, where the option writes no space of its own.
+    let html = "<ul><li>(<option></option>\n<option>o2</option>w3</li></ul>";
+    assert_markdown(html, "- ( o2 w3\n");
+    assert_plain(html, "- (\no2 w3\n");
+    assert_markdown("<p>(<option></option>\n<option>o2</option>w3</p>", "( o2 w3\n");
+    assert_markdown("<p>k<option>o2</option>\n<option></option>w3</p>", "k o2 w3\n");
+    // ~keep With no white space in the source nothing separates the bracket and the option.
+    assert_markdown("<p>(<option>o2</option>w3</p>", "(o2 w3\n");
+}
+
+#[test]
 fn options_with_no_end_tag_outside_a_select_list_are_separate_words() {
     for (html, expected) in [
         ("<p>aaa<option>Xone<option>Xtwo</p><p>bbb</p>", "aaa Xone Xtwo\n\nbbb\n"),

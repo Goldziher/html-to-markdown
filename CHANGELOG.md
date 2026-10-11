@@ -102,7 +102,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   ([#814](https://github.com/xberg-io/html-to-markdown/issues/814)).
 - An `option` element with no select list around it is a word of its own in Markdown output and
   in plain text output: `<p>aaa<option>Xone</option>bbb</p>` gave `aaa Xonebbb` and now gives
-  `aaa Xone bbb` ([#846](https://github.com/xberg-io/html-to-markdown/issues/846)).
+  `aaa Xone bbb`. The option code no longer writes a space of its own after an opening bracket:
+  `<p>(<option>o2</option>w3</p>` gave `( o2w3` and now gives `(o2 w3`, as a select list in that
+  place does. A line end of the source before such an option is one space in Markdown
+  ([#846](https://github.com/xberg-io/html-to-markdown/issues/846)).
 - A `<title>` before the body content of a page with no `<head>` tag is the document title, as
   in a browser. `<title>T</title><div><p>one</p></div>tail` gave `T`, `one` and `tail` as body
   text and no front matter. It now gives the front matter `title: T`, then `one` and `tail`.
