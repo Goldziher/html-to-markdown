@@ -9,6 +9,7 @@ use std::collections::HashMap;
 use crate::converter::main_helpers::is_inline_element;
 use crate::converter::utility::content::normalized_tag_name;
 use crate::converter::utility::escaping::is_block_level_name;
+use crate::converter::utility::white_space::{TextClass, classify_text};
 use crate::text;
 
 /// Cached information about an HTML tag element.
@@ -69,7 +70,23 @@ pub struct DomContext {
     pub(crate) next_tag_map: Vec<OnceCell<Option<u32>>>,
     pub(crate) next_whitespace_map: Vec<OnceCell<bool>>,
     pub(crate) table_content_summary_cache: RefCell<HashMap<u32, TableContentSummary>>,
+    /// For each element that [`DomContext::holds_text`] read: whether it holds text.
+    pub(crate) holds_text_cache: RefCell<HashMap<u32, bool>>,
 }
+
+#[cfg(test)]
+thread_local! {
+    /// The nodes that `DomContext::holds_text` read on this thread.
+    pub(crate) static HOLDS_TEXT_NODE_READS: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
+}
+
+#[cfg(test)]
+fn count_node_read() {
+    HOLDS_TEXT_NODE_READS.with(|total| total.set(total.get() + 1));
+}
+
+#[cfg(not(test))]
+const fn count_node_read() {}
 
 impl DomContext {
     pub(crate) fn ensure_capacity(&mut self, id: u32) {
@@ -301,6 +318,66 @@ impl DomContext {
             }
         }
         text
+    }
+
+    /// Whether the element `id` holds text: a text node in it, at any depth, has a character that
+    /// is not collapsible white space ([`classify_text`]). A comment is no text, and an element
+    /// with no text node (an image, a `<br>`) holds none.
+    ///
+    /// ~keep The walk reads the nodes in the order of the document and stops at the first text.
+    /// ~keep It records the answer of each element that it leaves or stops in, so no node is read
+    /// ~keep twice in one conversion: the texts after `n` nested elements ask `n` times, and
+    /// ~keep without the record each of them reads the elements below it again.
+    /// ~keep A loop rather than recursion: nested elements are attacker-controlled depth.
+    pub(crate) fn holds_text(&self, id: u32, parser: &tl::Parser) -> bool {
+        if let Some(known) = self.recorded_holds_text(id) {
+            return known;
+        }
+        let mut open = vec![(id, 0_usize)];
+        while let Some((element, position)) = open.last_mut() {
+            let child = self
+                .children_of(*element)
+                .and_then(|children| children.get(*position))
+                .copied();
+            *position += 1;
+            let Some(child) = child else {
+                self.record_holds_text(*element, false);
+                open.pop();
+                continue;
+            };
+            count_node_read();
+            let found = match child.get(parser) {
+                Some(tl::Node::Raw(raw)) => {
+                    let raw = raw.as_utf8_str();
+                    let decoded = text::decode_html_entities_cow(raw.as_ref());
+                    !matches!(classify_text(decoded.as_ref()), TextClass::WhiteSpaceOnly(_))
+                }
+                Some(tl::Node::Tag(_)) => {
+                    let known = self.recorded_holds_text(child.get_inner());
+                    if known.is_none() {
+                        open.push((child.get_inner(), 0));
+                    }
+                    known.unwrap_or(false)
+                }
+                Some(tl::Node::Comment(_)) | None => false,
+            };
+            if found {
+                for (element, _) in &open {
+                    self.record_holds_text(*element, true);
+                }
+                return true;
+            }
+        }
+        false
+    }
+
+    /// The answer of [`DomContext::holds_text`] for the element `id`, when a walk recorded it.
+    fn recorded_holds_text(&self, id: u32) -> Option<bool> {
+        self.holds_text_cache.borrow().get(&id).copied()
+    }
+
+    fn record_holds_text(&self, id: u32, holds: bool) {
+        self.holds_text_cache.borrow_mut().insert(id, holds);
     }
 
     /// Get the parent tag name for a given node ID.

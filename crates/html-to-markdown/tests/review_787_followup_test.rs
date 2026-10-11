@@ -273,6 +273,74 @@ fn should_keep_a_no_break_space_after_a_line_break_in_a_heading_in_a_table_cell(
     }
 }
 
+#[test]
+fn should_keep_a_no_break_space_after_an_element_of_white_space_only() {
+    // ~keep An element that holds only white space, comments and empty elements holds no text,
+    // ~keep as on `main`: its white space is the run of the space before it, and the no-break
+    // ~keep space after it is a character. The fast converter hands each row over.
+    let [_, fast, ..] = paths();
+    let rows = [
+        ("<p>a <span> </span>&nbsp;b</p>", "a  b\n"),
+        ("<p>a <span>  </span>&nbsp;b</p>", "a  b\n"),
+        ("<p>a <span>\n</span>&nbsp;b</p>", "a  b\n"),
+        ("<p>a <span>&#9;</span>&#160;b</p>", "a  b\n"),
+        ("<p>a <span><span> </span></span>&nbsp;b</p>", "a  b\n"),
+        ("<p>a <span> <!-- c --> </span>&nbsp;b</p>", "a  b\n"),
+        ("<p>a <span></span><span> </span>&nbsp;b</p>", "a  b\n"),
+        ("<p>a <span> </span><!-- c -->&nbsp;b</p>", "a  b\n"),
+        ("<p>a <span> </span> &nbsp;b</p>", "a  b\n"),
+        ("<p>a<span> </span>&nbsp;b</p>", "a  b\n"),
+        ("<h2>a <span> </span>&nbsp;b</h2>", "## a  b\n"),
+        ("<ul><li>a <span> </span>&nbsp;b</li></ul>", "- a  b\n"),
+        (
+            "<table><tr><th>h</th></tr><tr><td>a <span> </span>&nbsp;b</td></tr></table>",
+            "| h    |\n| ---- |\n| a  b |\n",
+        ),
+    ];
+    for (html, expected) in rows {
+        for options in paths() {
+            assert_eq!(convert_with(html, options), expected, "{html}");
+        }
+        assert_eq!(
+            fast_direct(html, &fast),
+            Err("UnicodeSpaceAfterSpace".to_string()),
+            "fast: {html}"
+        );
+    }
+    // ~keep White space before the text of an element does not make the element empty.
+    assert_rows(&[("<p>a <span> <b>x </b></span>&nbsp;b</p>", "a **x** b\n")]);
+}
+
+#[test]
+fn should_keep_a_no_break_space_after_a_line_break_and_an_empty_element_in_a_heading() {
+    // ~keep A heading has one line: its `<br>` is a space, and the no-break space after an
+    // ~keep element with no text is a character, as on `main`. The fast converter writes a hard
+    // ~keep break for that `<br>` and does not know the place of the text: it hands each row over.
+    let [_, fast, ..] = paths();
+    let rows = [
+        ("<h2>a<br><span></span>&nbsp;b</h2>", "## a  b\n"),
+        ("<h2>a<br><i></i><span></span>&nbsp;b</h2>", "## a  b\n"),
+        ("<h2>a<br><span> </span>&nbsp;b</h2>", "## a  b\n"),
+        ("<h2>a<span><br></span>&nbsp;b</h2>", "## a  b\n"),
+        ("<h2><b>a<br><span></span>&nbsp;b</b></h2>", "## **a  b**\n"),
+    ];
+    for (html, expected) in rows {
+        for options in paths() {
+            assert_eq!(convert_with(html, options.clone()), expected, "{html}");
+            let backslash = ConversionOptions {
+                newline_style: html_to_markdown_rs::NewlineStyle::Backslash,
+                ..options
+            };
+            assert_eq!(convert_with(html, backslash), expected, "backslash: {html}");
+        }
+        assert_eq!(
+            fast_direct(html, &fast),
+            Err("UnicodeSpaceAfterSpace".to_string()),
+            "fast: {html}"
+        );
+    }
+}
+
 /// The fast converter called directly: its text, or the reason when it hands the page over.
 fn fast_direct(html: &str, options: &ConversionOptions) -> Result<String, String> {
     let (cleaned, report) = prescan::run(html);

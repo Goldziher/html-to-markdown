@@ -220,6 +220,7 @@ impl<'a> Tier1Scanner<'a> {
                 return Err(BailReason::TableBlockChildInCell);
             }
             emit_void(&mut self.state, spec, name_lower, &attrs, self.html, self.options)?;
+            self.record_heading_break_place(spec);
             self.text_start = self.pos;
             return Ok(());
         }
@@ -250,6 +251,19 @@ impl<'a> Tier1Scanner<'a> {
         self.state.text_place = Some((self.pos, TextPlace::ElementStart));
         self.text_start = self.pos;
         Ok(())
+    }
+
+    /// Record the place of a text that starts where the `<br>` of a heading ends, at `self.pos`.
+    ///
+    /// ~keep Such a text joins its Unicode space to the space of that `<br>`, in both converters.
+    /// ~keep In a table cell the place stays unknown: Tier-2 keeps the Unicode space there.
+    fn record_heading_break_place(&mut self, spec: &TagSpec) {
+        if matches!(spec.kind, TagKind::LineBreak)
+            && self.state.escape_ctx.contains(EscapeCtx::HEADING)
+            && !self.state.in_table_cell()
+        {
+            self.state.text_place = Some((self.pos, TextPlace::AfterBreak));
+        }
     }
 
     /// Leave to Tier-2 an open tag whose code block rule this scanner does not have.

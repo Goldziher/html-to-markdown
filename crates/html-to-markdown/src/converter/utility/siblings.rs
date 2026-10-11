@@ -80,7 +80,8 @@ fn scan_for_sibling_index(siblings: &[tl::NodeHandle], id: u32) -> Option<usize>
 
 /// What stands right before the text `node_handle`: a `<br>` that ends a line, the start of its
 /// parent element, an element that holds no text, or text. A comment before the text does not
-/// count.
+/// count. An element holds no text when it has only white space, comments and elements with no
+/// text in it (`DomContext::holds_text`): `<span> </span>` is one, as `<span></span>` is.
 ///
 /// ~keep `in_cell` tells that the text is in a table cell. A cell has one line: the `<br>` there
 /// ~keep is a space between two words, an element with no text, also in a heading in the cell.
@@ -121,7 +122,7 @@ pub fn text_place(
         None => TextPlace::ElementStart,
         Some(previous)
             if matches!(previous.get(parser), Some(tl::Node::Tag(_)))
-                && dom_ctx.text_content(*previous, parser).is_empty() =>
+                && !dom_ctx.holds_text(previous.get_inner(), parser) =>
         {
             TextPlace::AfterEmptyElement
         }
@@ -474,6 +475,7 @@ pub fn append_inline_suffix(
 #[cfg(test)]
 mod tests {
     use super::TEXT_PLACE_SIBLING_VISITS;
+    use crate::converter::dom_context::HOLDS_TEXT_NODE_READS;
     use crate::{ConversionOptions, TierStrategy, convert};
 
     /// The sibling entries that `text_place` reads for `count` texts that each start with a
@@ -489,6 +491,45 @@ mod tests {
         let text = result.content.unwrap_or_default();
         assert_eq!(text.matches("a  b").count(), count, "every no-break space is kept");
         TEXT_PLACE_SIBLING_VISITS.with(std::cell::Cell::get)
+    }
+
+    /// The nodes that the test for an element with no text reads while the full converter writes
+    /// `html`, and the text it writes.
+    fn node_reads_for(html: &str) -> (usize, String) {
+        let options = ConversionOptions {
+            tier_strategy: TierStrategy::Tier2,
+            ..ConversionOptions::default()
+        };
+        HOLDS_TEXT_NODE_READS.with(|reads| reads.set(0));
+        let result = convert(html, options).expect("convert HTML");
+        (
+            HOLDS_TEXT_NODE_READS.with(std::cell::Cell::get),
+            result.content.unwrap_or_default(),
+        )
+    }
+
+    #[test]
+    fn should_read_a_bounded_count_of_nodes_for_each_text_after_nested_elements() {
+        // ~keep `depth` elements, one in the other, each with a text that starts with a no-break
+        // ~keep space after it: each of these texts asks whether the element before it holds
+        // ~keep text. An element that starts with text answers at its first node. An element that
+        // ~keep starts with white space answers from the record of the element in it. Without
+        // ~keep the stop at the first text, or without the record, the count grows with the
+        // ~keep square of the depth. The count of nodes is the measure, not the time.
+        for depth in [10, 20, 40] {
+            let ends = "</span>&nbsp;b ".repeat(depth);
+            let with_text = format!("<p>{}x {ends}</p>", "<span>a ".repeat(depth));
+            let (reads, text) = node_reads_for(&with_text);
+            assert_eq!(text.matches('b').count(), depth, "with text: {text:?}");
+            assert!(!text.contains("  "), "with text: {text:?}");
+            assert!((depth..=3 * depth).contains(&reads), "with text: {reads} nodes");
+
+            let white_space = format!("<p>a {}{ends}</p>", "<span> ".repeat(depth));
+            let (reads, text) = node_reads_for(&white_space);
+            assert!(text.starts_with("a  b b"), "white space: {text:?}");
+            assert_eq!(text.matches('b').count(), depth, "white space: {text:?}");
+            assert!((depth..=3 * depth).contains(&reads), "white space: {reads} nodes");
+        }
     }
 
     #[test]

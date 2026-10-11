@@ -295,11 +295,12 @@ pub struct Tier1State {
     /// as `next_tag_is_list`).
     pub last_emitted_was_img: bool,
 
-    /// The source offset where the last opening tag ends, and what a text that starts at that
-    /// offset has before it. A text that starts at any other offset has a comment, a closing
-    /// tag or a void tag before it, and the fast converter does not know its
-    /// place. No tag clears this: the offset of a later text never equals an earlier one. The
-    /// full converter reads the same fact from the tree (`siblings::text_place`).
+    /// The source offset where the last opening tag or the last `<br>` of a heading ends, and
+    /// what a text that starts at that offset has before it. A text that starts at any other
+    /// offset has a comment, a closing tag or another void tag before it, and the fast converter
+    /// does not know its place. No tag clears this: the offset of a later text never equals an
+    /// earlier one. The full converter reads the same fact from the tree
+    /// (`siblings::text_place`).
     pub text_place: Option<(usize, crate::converter::utility::white_space::TextPlace)>,
 
     /// True right after the closing tag of a block element or a `<hr>` (block-level by Tier-2's

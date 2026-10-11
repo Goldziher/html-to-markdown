@@ -318,11 +318,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - A no-break space that starts a text is kept after a space when an element with no text stands
   between the two: `<p>a <span></span>&nbsp;b</p>` and `<p>a <img>&nbsp;b</p>` give `a`, two
   spaces and `b`, as a browser shows them. `&nbsp;`, `&#160;`, `&#xA0;` and the character do the
-  same. After a `<br>` in a heading and at the start of an element the no-break space is still
-  the one space. After a `<br>` in a table cell the no-break space is kept, also in a heading
-  in the cell: `<td>a<br>&nbsp;b</td>` gives `a`, two spaces and `b`, as before. Inside one
-  text, and with only a comment between the two, a space and a no-break space are one space,
-  as before.
+  same. An element that holds only white space has no text: `<p>a <span> </span>&nbsp;b</p>`
+  gives the same. After a `<br>` in a heading and at the start of an element the no-break space
+  is still the one space. After a `<br>` in a table cell the no-break space is kept, also in a
+  heading in the cell: `<td>a<br>&nbsp;b</td>` gives `a`, two spaces and `b`, as before. Inside
+  one text, and with only a comment between the two, a space and a no-break space are one
+  space, as before.
 
 ## [3.17.2] - 2026-10-06
 

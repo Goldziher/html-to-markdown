@@ -253,6 +253,10 @@ fn source_starts_with_unicode_space(raw: &str) -> bool {
 /// ~keep Any other text has an unknown place, and Tier-2 takes the page: a text after a `<br>`
 /// ~keep in a table cell is one, and Tier-2 keeps the Unicode space there.
 /// ~keep In `pre` and in code the white space rule does not apply, and nothing is handed over.
+/// ~keep A heading has one line. Tier-2 writes a `<br>` there as a space, and this scanner writes
+/// ~keep a hard break that the close of the heading folds to a space: that hard break is a
+/// ~keep written space here (`<h2>a<br><span></span>&nbsp;b</h2>` is `## a  b`). The text right
+/// ~keep after the `<br>` has a known place and joins.
 fn hand_over_unicode_space_after_space(
     state: &mut Tier1State,
     raw: &str,
@@ -264,8 +268,10 @@ fn hand_over_unicode_space_after_space(
     let place = state
         .text_place
         .and_then(|(offset, place)| (offset == base_offset).then_some(place));
+    let in_heading = state.escape_ctx.contains(EscapeCtx::HEADING);
     let written = state.cell_or_output_mut();
-    if written.ends_with(' ')
+    let after_heading_break = in_heading && (written.ends_with("  \n") || written.ends_with("\\\n"));
+    if (written.ends_with(' ') || after_heading_break)
         && source_starts_with_unicode_space(raw)
         && place.is_none_or(|place| unicode_space_is_kept(written, place))
     {

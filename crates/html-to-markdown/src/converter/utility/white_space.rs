@@ -225,8 +225,9 @@ pub enum TextPlace {
     AfterBreak,
     /// The text is the first content of its parent element.
     ElementStart,
-    /// An element that holds no text is before the text: an image, an empty `span`, a `<br>` in
-    /// a table cell.
+    /// An element that holds no text is before the text: an image, an empty `span`, a `span` of
+    /// white space only, a `<br>` in a table cell. No text is what [`classify_text`] calls
+    /// white space only.
     AfterEmptyElement,
     /// Text is before the text: another text, or an element that holds text.
     AfterText,
@@ -246,8 +247,9 @@ pub fn starts_with_unicode_space(decoded: &str) -> bool {
 /// ends with. Both converters ask here: the full converter writes it, the fast converter gives
 /// the page to the full one.
 ///
-/// ~keep A no-break space is a character (rule 1): `a <img>&nbsp;b` and `a <span></span>&nbsp;b`
-/// ~keep have two spaces. It joins the space where the two are one run of text (`a &nbsp;b`,
+/// ~keep A no-break space is a character (rule 1): `a <img>&nbsp;b`, `a <span></span>&nbsp;b`
+/// ~keep and `a <span> </span>&nbsp;b` have two spaces: the white space in the `span` is the run
+/// ~keep of the space before it. It joins the space where the two are one run of text (`a &nbsp;b`,
 /// ~keep `<b>a </b>&nbsp;b`, a comment between the two), and where it would start a line or
 /// ~keep an element: after a `<br>` whose line end is a space (a heading has one line), and as
 /// ~keep the first content of an element (`a <span>&nbsp;x</span>`, the marker of a list item).
