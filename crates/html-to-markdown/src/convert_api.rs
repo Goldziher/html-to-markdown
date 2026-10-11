@@ -144,6 +144,10 @@ fn prepare_conversion<'a>(html: &'a str, options: &ConversionOptions) -> Result<
     // ~keep Both tiers must see the same repaired tree when head content precedes an
     // ~keep explicit `<head>`; browsers place that content in the implicit head (issue #592).
     let normalized_input = normalize_input(html)?;
+    let normalized_input = match crate::converter::utility::preprocessing::normalize_inert_bodies(&normalized_input) {
+        Cow::Borrowed(_) => normalized_input,
+        Cow::Owned(normalized) => Cow::Owned(normalized),
+    };
     let normalized_html = crate::converter::repair_head_content_before_explicit_head(normalized_input.as_ref())
         .map_or(normalized_input, Cow::Owned);
     let document_base_href = (options.base_url.is_some() || options.extract_metadata)
