@@ -1,7 +1,10 @@
 //! Protect HTML raw-text and inert bodies from the literal DOM parser. ~keep
 
 use std::borrow::Cow;
-use std::cell::RefCell;
+use std::cell::{Cell, RefCell};
+use std::collections::{HashMap, HashSet};
+
+use super::markup::find_tag_end;
 
 use html5ever::LocalName;
 use html5ever::tendril::StrTendril;
@@ -29,12 +32,104 @@ struct ForeignContext {
     children_namespace: Namespace,
 }
 
+#[derive(Default)]
+struct NamespaceStack {
+    contexts: Vec<ForeignContext>,
+    indices: HashMap<LocalName, Vec<usize>>,
+}
+
+impl NamespaceStack {
+    fn last(&self) -> Option<&ForeignContext> {
+        self.contexts.last()
+    }
+
+    fn len(&self) -> usize {
+        self.contexts.len()
+    }
+
+    fn is_empty(&self) -> bool {
+        self.contexts.is_empty()
+    }
+
+    fn matching_index(&self, name: &LocalName) -> Option<usize> {
+        #[cfg(test)]
+        NAMESPACE_VISITS.with(|visits| visits.set(visits.get() + 1));
+        self.indices.get(name).and_then(|indices| indices.last().copied())
+    }
+
+    fn push(&mut self, context: ForeignContext) {
+        let index = self.len();
+        self.indices.entry(context.name.clone()).or_default().push(index);
+        self.contexts.push(context);
+    }
+
+    fn pop(&mut self) {
+        if let Some(context) = self.contexts.pop() {
+            #[cfg(test)]
+            NAMESPACE_VISITS.with(|visits| visits.set(visits.get() + 1));
+            if let Some(indices) = self.indices.get_mut(&context.name) {
+                indices.pop();
+                if indices.is_empty() {
+                    self.indices.remove(&context.name);
+                }
+            }
+        }
+    }
+
+    fn truncate(&mut self, length: usize) {
+        while self.len() > length {
+            self.pop();
+        }
+    }
+}
+
+#[derive(Default)]
+struct PreservedBodies {
+    originals: HashMap<String, String>,
+    occupied: HashSet<usize>,
+    next: usize,
+}
+
+const BODY_MARKER_PREFIX: &str = "h2m_inert_body_";
+
+impl PreservedBodies {
+    fn new(source: &str) -> Self {
+        let decoded = crate::text::decode_html_entities_cow(source);
+        let source = decoded.as_ref();
+        let occupied = source
+            .match_indices(BODY_MARKER_PREFIX)
+            .filter_map(|(index, _)| {
+                let rest = &source[index + BODY_MARKER_PREFIX.len()..];
+                let digits = rest.bytes().take_while(u8::is_ascii_digit).count();
+                rest.get(digits..).filter(|suffix| suffix.starts_with("_end"))?;
+                rest[..digits].parse().ok()
+            })
+            .collect();
+        Self {
+            occupied,
+            ..Self::default()
+        }
+    }
+
+    fn protect(&mut self, body: &str) -> String {
+        while self.occupied.contains(&self.next) {
+            self.next += 1;
+        }
+        let marker = format!("{BODY_MARKER_PREFIX}{}_end", self.next);
+        self.next += 1;
+        self.originals.insert(marker.clone(), body.to_owned());
+        marker
+    }
+}
+
 struct BodyNormalizer<'a> {
     source: &'a str,
     input: &'a BufferQueue,
     body: RefCell<Option<Body>>,
-    namespaces: RefCell<Vec<ForeignContext>>,
+    namespaces: RefCell<NamespaceStack>,
+    preserved: Option<RefCell<PreservedBodies>>,
     replacements: RefCell<Vec<(std::ops::Range<usize>, String)>>,
+    token_boundary: Cell<usize>,
 }
 
 impl BodyNormalizer<'_> {
@@ -44,28 +139,52 @@ impl BodyNormalizer<'_> {
         self.source.len() - self.input.peek_front_chunk_mut().map_or(0, |chunk| chunk.len())
     }
 
-    fn finish_body(&self, body: Body, end: usize) {
+    fn finish_body(&self, body: Body, end: usize, closed: bool) {
+        let close_start = closed.then(|| self.closing_start(&body, end)).flatten();
+        let content_end = close_start.unwrap_or(end);
         let mut replacement = String::new();
-        for character in body.text.chars() {
-            match character {
-                '&' => replacement.push_str("&amp;"),
-                '<' => replacement.push_str("&lt;"),
-                _ => replacement.push(character),
+        if matches!(&*body.name, "iframe" | "noscript" | "template")
+            && let Some(preserved) = &self.preserved
+        {
+            replacement = preserved.borrow_mut().protect(&self.source[body.start..content_end]);
+        } else {
+            for character in body.text.chars() {
+                match character {
+                    '&' => replacement.push_str("&amp;"),
+                    '<' => replacement.push_str("&lt;"),
+                    _ => replacement.push(character),
+                }
             }
         }
-        replacement.push_str("</");
-        replacement.push_str(&body.name);
-        replacement.push('>');
+        if let Some(close_start) = close_start {
+            replacement.push_str(&self.source[close_start..end]);
+        } else {
+            replacement.push_str("</");
+            replacement.push_str(&body.name);
+            replacement.push('>');
+        }
         self.namespaces.borrow_mut().truncate(body.namespace_depth);
         if self.source[body.start..end] != replacement {
             self.replacements.borrow_mut().push((body.start..end, replacement));
         }
     }
 
+    fn closing_start(&self, body: &Body, end: usize) -> Option<usize> {
+        // ~keep The previous tag/comment token ends before this closing token starts;
+        // ~keep tag-shaped strings inside attributes and comments are already behind it.
+        let start = self.token_boundary.get().max(body.start);
+        let bytes = self.source.as_bytes();
+        memchr::memchr_iter(b'<', &bytes[start..end])
+            .map(|index| start + index)
+            .find(|index| {
+                bytes.get(index + 1) == Some(&b'/') && matches_body_name(bytes, index + 2, body.name.as_bytes())
+            })
+    }
+
     fn track_namespace(&self, tag: &Tag) -> bool {
         let mut contexts = self.namespaces.borrow_mut();
         if tag.kind == TagKind::EndTag {
-            if let Some(index) = contexts.iter().rposition(|context| context.name == tag.name) {
+            if let Some(index) = contexts.matching_index(&tag.name) {
                 contexts.truncate(index);
             }
             return false;
@@ -127,10 +246,8 @@ impl BodyNormalizer<'_> {
             && self
                 .namespaces
                 .borrow()
-                .iter()
-                .rev()
-                .find(|context| context.name == tag.name)
-                .is_some_and(|context| context.namespace != Namespace::Html);
+                .matching_index(&tag.name)
+                .is_some_and(|index| self.namespaces.borrow().contexts[index].namespace != Namespace::Html);
         if let Some(body) = self.body.borrow_mut().as_mut() {
             if name == "template"
                 && &*body.name == "template"
@@ -148,7 +265,7 @@ impl BodyNormalizer<'_> {
         });
         if closes_body {
             if let Some(body) = self.body.borrow_mut().take() {
-                self.finish_body(body, self.position());
+                self.finish_body(body, self.position(), true);
             }
             return TokenSinkResult::Continue;
         }
@@ -294,8 +411,18 @@ impl TokenSink for BodyNormalizer<'_> {
     type Handle = ();
 
     fn process_token(&self, token: Token, _: u64) -> TokenSinkResult<()> {
+        #[cfg(test)]
+        TOKEN_VISITS.with(|visits| visits.set(visits.get() + 1));
         match token {
-            Token::TagToken(tag) => self.process_tag(tag),
+            Token::TagToken(tag) => {
+                let result = self.process_tag(tag);
+                self.token_boundary.set(self.position());
+                result
+            }
+            Token::CommentToken(_) | Token::DoctypeToken(_) => {
+                self.token_boundary.set(self.position());
+                TokenSinkResult::Continue
+            }
             Token::CharacterTokens(text) => {
                 if let Some(body) = self.body.borrow_mut().as_mut()
                     && matches!(&*body.name, "title" | "xmp")
@@ -310,23 +437,74 @@ impl TokenSink for BodyNormalizer<'_> {
 
     fn end(&self) {
         if let Some(body) = self.body.borrow_mut().take() {
-            self.finish_body(body, self.source.len());
+            self.finish_body(body, self.source.len(), false);
         }
     }
 }
 
-/// Protect text and inert markup before the literal parser can swallow visible siblings. ~keep
-pub fn normalize_inert_bodies(source: &str) -> Cow<'_, str> {
+fn matches_body_name(bytes: &[u8], start: usize, name: &[u8]) -> bool {
+    bytes
+        .get(start..start + name.len())
+        .is_some_and(|candidate| candidate.eq_ignore_ascii_case(name))
+        && matches!(
+            bytes.get(start + name.len()),
+            None | Some(b'>' | b'/' | b' ' | b'\t' | b'\n' | b'\r' | b'\x0c')
+        )
+}
+
+fn needs_normalization(source: &str) -> bool {
     let bytes = source.as_bytes();
-    if !memchr::memchr_iter(b'<', bytes).any(|index| {
-        bytes.get(index..index + 4).is_some_and(|prefix| {
-            prefix[1].is_ascii_alphabetic()
-                && [b"<tit", b"<xmp", b"<ifr", b"<nos", b"<tem"]
-                    .iter()
-                    .any(|target| prefix.eq_ignore_ascii_case(*target))
-        })
-    }) {
-        return Cow::Borrowed(source);
+    let mut consumed = 0;
+    for index in memchr::memchr_iter(b'<', bytes) {
+        if index < consumed {
+            continue;
+        }
+        let Some(prefix) = bytes.get(index..index + 4) else {
+            continue;
+        };
+        let Some(name) = ["title", "xmp", "iframe", "noscript", "template"]
+            .into_iter()
+            .find(|name| prefix[0] == b'<' && prefix[1..].eq_ignore_ascii_case(&name.as_bytes()[..3]))
+        else {
+            continue;
+        };
+        if !matches_body_name(bytes, index + 1, name.as_bytes()) {
+            continue;
+        }
+        #[cfg(test)]
+        TAG_SCANS.with(|scans| scans.set(scans.get() + 1));
+        let Some(start) = find_tag_end(bytes, index + 1 + name.len()) else {
+            return true;
+        };
+        consumed = start;
+        if bytes[index..start].ends_with(b"/>") {
+            return true;
+        }
+        let next = memchr::memchr(b'<', &bytes[start..]).map_or(bytes.len(), |next| start + next);
+        if name == "xmp" && bytes[start..next].contains(&b'&') {
+            return true;
+        }
+        if next < bytes.len()
+            && !(bytes.get(next + 1) == Some(&b'/') && matches_body_name(bytes, next + 2, name.as_bytes()))
+        {
+            return true;
+        }
+    }
+    false
+}
+
+#[cfg(test)]
+fn normalize_inert_bodies(source: &str) -> Cow<'_, str> {
+    normalize_inert_bodies_with_preservation(source, false).0
+}
+
+/// Keep opaque source bodies available for DOM preservation and visitor serialization. ~keep
+pub fn normalize_inert_bodies_with_preservation(
+    source: &str,
+    preserve: bool,
+) -> (Cow<'_, str>, HashMap<String, String>) {
+    if !needs_normalization(source) {
+        return (Cow::Borrowed(source), HashMap::new());
     }
     let input = BufferQueue::default();
     input.push_back(StrTendril::from(source));
@@ -335,16 +513,22 @@ pub fn normalize_inert_bodies(source: &str) -> Cow<'_, str> {
             source,
             input: &input,
             body: RefCell::new(None),
-            namespaces: RefCell::new(Vec::new()),
+            namespaces: RefCell::new(NamespaceStack::default()),
+            preserved: preserve.then(|| RefCell::new(PreservedBodies::new(source))),
             replacements: RefCell::new(Vec::new()),
+            token_boundary: Cell::new(0),
         },
         TokenizerOpts::default(),
     );
     let _ = tokenizer.feed(&input);
     tokenizer.end();
+    let originals = tokenizer
+        .sink
+        .preserved
+        .map_or_else(HashMap::new, |preserved| preserved.into_inner().originals);
     let replacements = tokenizer.sink.replacements.into_inner();
     if replacements.is_empty() {
-        return Cow::Borrowed(source);
+        return (Cow::Borrowed(source), originals);
     }
     let mut output = String::with_capacity(source.len());
     let mut cursor = 0;
@@ -354,7 +538,28 @@ pub fn normalize_inert_bodies(source: &str) -> Cow<'_, str> {
         cursor = range.end;
     }
     output.push_str(&source[cursor..]);
-    Cow::Owned(output)
+    (Cow::Owned(output), originals)
+}
+
+/// Restore opaque source bytes after parsing, before metadata or visitor consumers see the DOM. ~keep
+pub fn restore_inert_bodies(dom: &mut tl::VDom<'_>, originals: &HashMap<String, String>) -> crate::error::Result<()> {
+    for node in dom.nodes_mut() {
+        if let Some(raw) = node.as_raw_mut()
+            && let Some(original) = originals.get(raw.as_utf8_str().as_ref())
+        {
+            raw.set(original.as_bytes().to_vec()).map_err(|error| {
+                crate::error::ConversionError::Other(format!("restoring inert HTML source bytes: {error:?}"))
+            })?;
+        }
+    }
+    Ok(())
+}
+
+#[cfg(test)]
+thread_local! {
+    static TAG_SCANS: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
+    static TOKEN_VISITS: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
+    static NAMESPACE_VISITS: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
 }
 
 #[cfg(test)]
@@ -367,7 +572,7 @@ mod tests {
         let source = "<p data-x='a > b'>one</p><IFRAME Src=/f><p></IFRAME><p data-y=two>tail</p>";
         assert_eq!(
             normalize_inert_bodies(source),
-            "<p data-x='a > b'>one</p><IFRAME Src=/f></iframe><p data-y=two>tail</p>"
+            "<p data-x='a > b'>one</p><IFRAME Src=/f></IFRAME><p data-y=two>tail</p>"
         );
     }
 
@@ -460,5 +665,92 @@ mod tests {
         let expected =
             "<math><annotation-xml><svg><foreignObject><iframe></iframe></foreignObject></svg></annotation-xml></math>";
         assert_eq!(normalize_inert_bodies(source), expected);
+    }
+    #[test]
+    fn should_skip_tokenization_for_bodies_without_literal_markup() {
+        super::TOKEN_VISITS.with(|visits| visits.set(0));
+        let source = "<TITLE>safe &amp; title</TITLE><noscript>plain</noscript><iframe>plain</iframe><template>plain</template><p>visible</p>";
+        assert!(matches!(normalize_inert_bodies(source), Cow::Borrowed(_)));
+        super::TOKEN_VISITS.with(|visits| assert_eq!(visits.get(), 0));
+    }
+
+    #[test]
+    fn should_bound_namespace_work_for_unmatched_foreign_closes() {
+        const DEPTH: usize = 10_000;
+        let source = "<title><p></title><svg>".to_owned() + &"<g>".repeat(DEPTH) + &"</zz>".repeat(DEPTH);
+        super::NAMESPACE_VISITS.with(|visits| visits.set(0));
+        super::TOKEN_VISITS.with(|visits| visits.set(0));
+        let normalized = normalize_inert_bodies(&source);
+        assert!(normalized.starts_with("<title>&lt;p></title><svg>"));
+        super::TOKEN_VISITS.with(|visits| assert!(visits.get() >= 2 * DEPTH));
+        super::NAMESPACE_VISITS.with(|visits| assert_eq!(visits.get(), DEPTH));
+    }
+
+    #[test]
+    fn should_skip_nested_candidate_shapes_inside_a_scanned_attribute() {
+        let source = "<title a=".to_owned() + &"<title a=".repeat(10_000) + ">safe</title>";
+        super::TAG_SCANS.with(|scans| scans.set(0));
+        super::TOKEN_VISITS.with(|visits| visits.set(0));
+        assert!(matches!(normalize_inert_bodies(&source), Cow::Borrowed(_)));
+        super::TAG_SCANS.with(|scans| assert_eq!(scans.get(), 1));
+        super::TOKEN_VISITS.with(|visits| assert_eq!(visits.get(), 0));
+    }
+
+    #[test]
+    fn should_preserve_closing_token_bytes_with_quoted_tag_shapes() {
+        let source = "<TEMPLATE><p></TEMPLATE data-x='</TEMPLATE> >'>";
+        assert_eq!(
+            normalize_inert_bodies(source),
+            "<TEMPLATE></TEMPLATE data-x='</TEMPLATE> >'>"
+        );
+        let source = "<TEMPLATE><div data-x='</template a=\"'></div></TEMPLATE>";
+        assert_eq!(normalize_inert_bodies(source), "<TEMPLATE></TEMPLATE>");
+        let source = "<NOSCRIPT><p></NOSCRIPT data=x='>";
+        assert_eq!(normalize_inert_bodies(source), "<NOSCRIPT></NOSCRIPT data=x='>");
+    }
+
+    #[test]
+    fn should_bound_unmatched_template_close_lookups_in_foreign_markup() {
+        const DEPTH: usize = 10_000;
+        let source = "<title><p></title><svg>".to_owned() + &"<g>".repeat(DEPTH) + &"</template>".repeat(DEPTH);
+        super::NAMESPACE_VISITS.with(|visits| visits.set(0));
+        assert!(normalize_inert_bodies(&source).starts_with("<title>&lt;p></title>"));
+        super::NAMESPACE_VISITS.with(|visits| assert_eq!(visits.get(), 2 * DEPTH));
+    }
+
+    #[test]
+    fn should_avoid_source_and_entity_decoded_body_marker_collisions() {
+        let source = "<p>h2m_inert_body_0_end h2m_inert_body_&#49;_end</p><noscript><p>x</noscript>";
+        let (normalized, bodies) = super::normalize_inert_bodies_with_preservation(source, true);
+        assert_eq!(bodies.len(), 1);
+        assert_eq!(bodies.get("h2m_inert_body_2_end").map(String::as_str), Some("<p>x"));
+        assert!(normalized.contains("<noscript>h2m_inert_body_2_end</noscript>"));
+        let mut dom = tl::parse(&normalized, tl::ParserOptions::default()).expect("parse protected bodies");
+        super::restore_inert_bodies(&mut dom, &bodies).expect("restore original bodies");
+        assert_eq!(
+            crate::converter::utility::serialization::serialize_tag_to_html(&dom.children()[1], dom.parser()),
+            "<noscript><p>x</noscript>"
+        );
+    }
+
+    #[test]
+    fn should_recognize_form_feed_as_html_tag_whitespace() {
+        assert_eq!(
+            normalize_inert_bodies("<NOSCRIPT\x0c><p></NOSCRIPT\x0c><p>visible</p>"),
+            "<NOSCRIPT\x0c></NOSCRIPT\x0c><p>visible</p>"
+        );
+    }
+
+    #[test]
+    fn should_finish_unterminated_protected_bodies_at_eof() {
+        for (source, expected) in [
+            ("<title><p>", "<title>&lt;p></title>"),
+            ("<xmp>a &amp;", "<xmp>a &amp;amp;</xmp>"),
+            ("<iframe><p>x", "<iframe></iframe>"),
+            ("<noscript><p>x", "<noscript></noscript>"),
+            ("<template><p>x", "<template></template>"),
+        ] {
+            assert_eq!(normalize_inert_bodies(source), expected, "{source}");
+        }
     }
 }

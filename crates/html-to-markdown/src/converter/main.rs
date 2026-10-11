@@ -50,6 +50,7 @@ type ConversionOutput = (
 );
 
 pub struct ConversionParameters<'a> {
+    pub inert_bodies: &'a std::collections::HashMap<String, String>,
     pub inline_collector: Option<InlineCollectorHandle>,
     #[cfg(feature = "metadata")]
     pub metadata_collector: Option<crate::metadata::MetadataCollectorHandle>,
@@ -69,6 +70,7 @@ pub fn convert_html_impl(
     parameters: ConversionParameters<'_>,
 ) -> Result<ConversionOutput> {
     let ConversionParameters {
+        inert_bodies,
         inline_collector,
         #[cfg(feature = "metadata")]
         metadata_collector,
@@ -81,13 +83,17 @@ pub fn convert_html_impl(
     let preserve_menu = options.preserve_tags.iter().any(|tag| tag.eq_ignore_ascii_case("menu"));
     let mut preprocessed = prepare_html(html, preserve_menu);
     let mut attempted_misnest_repair = false;
-    let (dom, dom_ctx) = loop {
+    let (mut dom, mut dom_ctx) = loop {
         let repaired = match parse_for_conversion(&preprocessed, preserve_menu, &mut attempted_misnest_repair)? {
             ParseOutcome::Ready { dom, dom_ctx } => break (dom, dom_ctx),
             ParseOutcome::Retry(repaired) => repaired,
         };
         preprocessed = repaired;
     };
+    if !inert_bodies.is_empty() {
+        crate::converter::utility::preprocessing::restore_inert_bodies(&mut dom, inert_bodies)?;
+        dom_ctx = crate::converter::utility::caching::build_dom_context(&dom, dom.parser(), preprocessed.len());
+    }
     let preprocessed_len = preprocessed.len();
     trace_parse_complete(&dom, preprocessed_len);
     let parser = dom.parser();

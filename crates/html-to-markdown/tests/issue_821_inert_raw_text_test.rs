@@ -126,3 +126,31 @@ fn should_keep_visible_siblings_after_a_foreign_template_in_an_inert_template() 
         false,
     );
 }
+
+#[test]
+fn should_keep_visible_siblings_after_uppercase_inert_elements() {
+    for tag in ["NOSCRIPT", "IFRAME", "TEMPLATE"] {
+        let html = format!("<P>before</P><{tag}><p></{tag}><p>visible</p>");
+        assert_routes(&html, "before\n\nvisible\n", false);
+    }
+}
+
+#[test]
+fn should_preserve_noscript_raw_body_and_visible_siblings() {
+    for tier_strategy in [TierStrategy::Auto, TierStrategy::Tier1, TierStrategy::Tier2] {
+        let result = convert(
+            "<p>before</p><noscript><p>x</noscript><p>visible</p>",
+            ConversionOptions {
+                tier_strategy,
+                preserve_tags: vec!["noscript".to_owned()],
+                ..ConversionOptions::default()
+            },
+        )
+        .expect("preserve inert raw HTML");
+        assert_eq!(
+            result.content.as_deref(),
+            Some("before\n\n<noscript><p>x</noscript>\n\nvisible\n"),
+            "{tier_strategy:?}"
+        );
+    }
+}

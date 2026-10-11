@@ -7,7 +7,7 @@ mod menu;
 mod raw_text;
 mod visibility;
 
-pub use inert::normalize_inert_bodies;
+pub use inert::{normalize_inert_bodies_with_preservation, restore_inert_bodies};
 pub use lists::normalize_unclosed_list_items;
 pub use markup::{find_tag_end, normalize_bogus_comment_endings, normalize_split_closing_tags, preprocess_html};
 pub use menu::{PRESERVED_MENU_ATTRIBUTE, normalize_menu_elements, restore_preserved_menu_elements};
