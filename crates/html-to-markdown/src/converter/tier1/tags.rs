@@ -82,6 +82,9 @@ pub enum TagKind {
     Figcaption,
     /// Inline clickable button content.
     Button,
+    /// Media element (`<audio>`, `<video>`). The scanner writes no link for it, so it hands
+    /// the page to Tier-2, which does.
+    Media,
 
     /// Raw-text container whose content the scanner skips until the matching close tag.
     RawText(RawKind),
@@ -396,8 +399,8 @@ static TAGS: phf::Map<&'static [u8], TagSpec> = phf_map! {
     b"output"    => inline(TagKind::Inline),
     b"datalist"  => inline(TagKind::Inline),
 
-    b"audio"   => block(TagKind::Block),
-    b"video"   => block(TagKind::Block),
+    b"audio"   => block(TagKind::Media),
+    b"video"   => block(TagKind::Media),
     b"picture" => inline(TagKind::Inline),
     b"canvas"  => inline(TagKind::Inline),
     b"map"     => inline(TagKind::Inline),

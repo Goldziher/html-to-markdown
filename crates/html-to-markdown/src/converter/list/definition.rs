@@ -142,12 +142,10 @@ pub fn handle_dt(node_handle: &tl::NodeHandle, parser: &tl::Parser, output: &mut
         }
     }
 
+    separate_from_preceding_text(output, ctx);
     if ctx.convert_as_inline {
         output.push_str(&trimmed);
     } else {
-        if !ctx.in_table_cell && !ctx.in_list_item {
-            output.truncate(output.trim_end_matches([' ', '\t']).len());
-        }
         crate::converter::block::horizontal_rule::separate_leading_rule(output, &trimmed, ctx);
         output.push_str(&trimmed);
         output.push_str(if ctx.in_table_cell { "\n" } else { "\n\n" });
@@ -249,15 +247,33 @@ pub fn handle_dd(node_handle: &tl::NodeHandle, parser: &tl::Parser, output: &mut
         return;
     }
 
+    separate_from_preceding_text(output, ctx);
     if ctx.convert_as_inline {
         output.push_str(&trimmed);
     } else {
-        if !ctx.in_table_cell && !ctx.in_list_item {
-            output.truncate(output.trim_end_matches([' ', '\t']).len());
-        }
         crate::converter::block::horizontal_rule::separate_leading_rule(output, &trimmed, ctx);
         output.push_str(&trimmed);
         output.push_str("\n\n");
+    }
+}
+
+/// Keeps a term or a description apart from the text before it.
+///
+/// In an inline context a space separates it from the word before it. In a block context the
+/// indentation at a line start is dropped, and the space after a word on the same line stays.
+fn separate_from_preceding_text(output: &mut String, ctx: &crate::converter::Context) {
+    if ctx.convert_as_inline {
+        if !output.is_empty() && !output.ends_with(char::is_whitespace) {
+            output.push(' ');
+        }
+        return;
+    }
+    if ctx.in_table_cell || ctx.in_list_item {
+        return;
+    }
+    let text_end = output.trim_end_matches([' ', '\t']).len();
+    if output[..text_end].is_empty() || output[..text_end].ends_with('\n') {
+        output.truncate(text_end);
     }
 }
 

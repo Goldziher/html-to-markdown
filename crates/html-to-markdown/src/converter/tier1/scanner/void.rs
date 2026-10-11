@@ -492,6 +492,7 @@ fn dispatch_close(
         | TagKind::Inline
         | TagKind::LineBreak
         | TagKind::Image
+        | TagKind::Media
         | TagKind::RawText(_)
         | TagKind::Ignored => {}
     }

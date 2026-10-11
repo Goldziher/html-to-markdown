@@ -164,6 +164,10 @@ const fn bail_unsupported(spec: &TagSpec, _offset: usize) -> Result<(), BailReas
         // text content incorrectly.  See the sibling note above `find_raw_text_close`.
         TagKind::RawText(_) => Err(BailReason::Classifier),
 
+        // ~keep Tier-2 writes the link of an `<audio>` or `<video>` (the address, the `title`,
+        // the `<source>` children). Tier-1 has no such rule, so it hands the page over.
+        TagKind::Media => Err(BailReason::Classifier),
+
         // ~keep `Ignored` tags (head/meta/link/script/style) are now handled inline
         // by the main scan loop (see the dispatch above `bail_unsupported`).
         // The match arm is kept for exhaustiveness — it cannot fire in

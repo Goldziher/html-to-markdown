@@ -74,6 +74,7 @@ fn emit_close_for_implicit(
         | TagKind::TableBody
         | TagKind::TableFoot
         | TagKind::TableCaption
+        | TagKind::Media
         | TagKind::RawText(_)
         | TagKind::Ignored => {}
     }

@@ -24,6 +24,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - A `<label>` inside a code block keeps the spaces and the line ends of its text
   ([#822](https://github.com/xberg-io/html-to-markdown/issues/822)).
+- A paragraph inside a heading keeps a space between its text and the text after it
+  ([#804](https://github.com/xberg-io/html-to-markdown/issues/804)).
+- A term or a description of a definition list in a heading or in a link has a space between it
+  and the text before it.
+- An `<audio>` or `<video>` gets its link when `tier_strategy` is `Tier1`.
 
 ## [3.17.2] - 2026-10-06
 
