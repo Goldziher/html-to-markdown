@@ -73,13 +73,12 @@ fn a_space_at_the_start_of_a_link_label_goes_before_the_link() {
 /// A line break at the end of a label stays in the label when a no-break space follows it.
 #[test]
 fn a_line_break_before_a_no_break_space_stays_in_the_label() {
-    let html = "<p>Press<a href=\"/p\">Go<br>&nbsp;</a>now</p>";
-    let full = ConversionOptions {
-        tier_strategy: TierStrategy::Tier2,
-        ..ConversionOptions::default()
-    };
-    assert_eq!(content_with(html, None), "Press[Go  \n](/p)now\n");
-    assert_eq!(content_with(html, Some(full)), "Press[Go  \n](/p)now\n");
+    // ~keep The fast converter drops that break when it is called directly.
+    assert_row_with_fast(
+        "<p>Press<a href=\"/p\">Go<br>&nbsp;</a>now</p>",
+        "Press[Go  \n](/p)now\n",
+        &Fast::Writes("Press[Go](/p)now\n"),
+    );
 }
 
 /// A line break at the end of a label stays in the label when a space follows it, and that
