@@ -368,14 +368,15 @@ fn ends_examined_for(count: usize, block_ends: bool) -> usize {
 
 #[test]
 fn controls_one_after_the_other_examine_a_bounded_count_of_control_ends() {
-    // ~keep No control end stands after the place of a space, so only the binary search
-    // ~keep reads ends: at most `ilog2(count) + 2` for each search, 11 and 13 here. A block
-    // ~keep end makes a second search. A scan of every end reads `count * (count - 1) / 2`
-    // ~keep ends for the spaces alone: 499,500 and 7,998,000.
+    // ~keep No control end stands after the place of a space, so the binary search reads
+    // ~keep ends: at most `ilog2(count) + 2` for each search, 11 and 13 here. A block end
+    // ~keep makes a second search. Each control also reads the last end for its two texts,
+    // ~keep writes its own end and can cut the list one time: 4 more. A scan of every end
+    // ~keep reads `count * (count - 1) / 2` ends for the spaces alone: 499,500 and 7,998,000.
     for (block_ends, searches) in [(false, 1_usize), (true, 2)] {
         for (count, reads) in [(1_000_usize, 11_usize), (4_000, 13)] {
             let examined = ends_examined_for(count, block_ends);
-            let bound = count * reads * searches;
+            let bound = count * (reads * searches + 4);
             assert!(
                 examined <= bound,
                 "{count} controls (block ends: {block_ends}) examined {examined} control ends, over {bound}"
@@ -450,13 +451,78 @@ fn control_ends_taken_out_of_the_output_are_counted() {
     assert!(one_search > 0, "a search reads no end");
     let taken = std::mem::take(&mut output.control_ends);
     assert_eq!(taken.first_after(0), 0);
-    output.control_ends = taken;
+    // ~keep The count is read while the ends are outside the output: the output then holds
+    // ~keep a new list, and a counter in that list holds nothing of the two searches.
     assert_eq!(
         ControlEnds::touched(),
         before + 2 * one_search,
         "a search of ends taken out of the output is not counted"
     );
+    output.control_ends = taken;
     assert_eq!(output.control_ends.as_slice().len(), 8);
+}
+
+#[test]
+fn a_loop_that_moves_every_control_end_one_by_one_is_counted() {
+    // ~keep A loop that takes every end from the back with `last` and `truncate` and writes
+    // ~keep each back with `push`, one time for each insert, costs `count * count`. The
+    // ~keep counter must hold all of it: the bound of the test of controls one after the
+    // ~keep other fails for this loop.
+    for (count, reads) in [(1_000_usize, 11_usize), (4_000, 13)] {
+        let mut output = PlainOutput::default();
+        for _ in 0..count {
+            let control = output.start_control();
+            output.push_text("X");
+            output.finish_control(control);
+        }
+        assert_eq!(output.control_ends.len(), count);
+        let before = ControlEnds::touched();
+        for _ in 0..count {
+            let mut taken = Vec::with_capacity(count);
+            while let Some(end) = output.control_ends.last() {
+                taken.push(end);
+                output.control_ends.truncate(output.control_ends.len() - 1);
+            }
+            while let Some(end) = taken.pop() {
+                output.control_ends.push(end);
+            }
+        }
+        let examined = ControlEnds::touched() - before;
+        assert!(
+            examined >= count * count,
+            "{count} rounds over {count} control ends counted {examined} ends"
+        );
+        assert!(
+            examined > count * (reads * 2 + 4),
+            "the loop is under the bound of controls one after the other: {examined}"
+        );
+        assert_eq!(output.control_ends.len(), count);
+    }
+}
+
+#[test]
+fn every_function_that_reads_or_moves_a_byte_or_an_end_is_counted() {
+    for (name, call) in OutputText::COUNTED {
+        let mut text = OutputText::default();
+        text.push_str("abc");
+        let before = OutputText::work();
+        call(&mut text);
+        assert!(
+            OutputText::work() > before,
+            "`OutputText::{name}` adds nothing to the count"
+        );
+    }
+    for (name, call) in ControlEnds::COUNTED {
+        let mut ends = ControlEnds::default();
+        ends.push(3);
+        ends.push(5);
+        let before = ControlEnds::touched();
+        call(&mut ends);
+        assert!(
+            ControlEnds::touched() > before,
+            "`ControlEnds::{name}` adds nothing to the count"
+        );
+    }
 }
 
 #[test]

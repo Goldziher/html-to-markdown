@@ -4,7 +4,10 @@
 //! ~keep The fields are private to this module, so the output has no other way to read or to
 //! ~keep move a byte of the text or a control end. Under `cfg(test)` each function adds its
 //! ~keep work to a counter: a test of the output then sees all the work, and a loop that reads
-//! ~keep the whole text or every end for each element cannot stay out of the count.
+//! ~keep the whole text or every end for each element cannot stay out of the count. Only
+//! ~keep `len` and `with_capacity` add nothing: they read no byte and no end. `COUNTED` of
+//! ~keep each type names every other function, and a test calls each one and fails when the
+//! ~keep counter does not move. A new function goes into that list.
 //!
 //! ~keep The counters are not fields of the values. `std::mem::take` leaves a new value in
 //! ~keep the output, and a counter in the value starts at 0 again there: a loop that takes the
@@ -20,6 +23,10 @@ thread_local! {
     /// moved.
     static TOUCHED: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
 }
+
+/// The name of a function of a counted type and one call of it, for the test of the counters.
+#[cfg(all(test, feature = "visitor"))]
+pub(super) type Counted<T> = (&'static str, fn(&mut T));
 
 /// The bytes of the text of one output.
 #[derive(Default)]
@@ -71,6 +78,8 @@ impl OutputText {
 
     /// Removes the bytes after `len`. No byte moves.
     pub(super) fn truncate(&mut self, len: usize) {
+        #[cfg(test)]
+        Self::count(1);
         self.text.truncate(len);
     }
 
@@ -115,6 +124,28 @@ impl OutputText {
     pub(super) fn whole(&self) -> &str {
         &self.text
     }
+
+    /// Each function that reads or moves a byte of the text, with one call of it on a text
+    /// of two bytes or more.
+    #[cfg(all(test, feature = "visitor"))]
+    pub(super) const COUNTED: [Counted<Self>; 8] = [
+        ("into_string", |text: &mut Self| {
+            std::mem::take(text).into_string();
+        }),
+        ("push_str", |text: &mut Self| text.push_str("a")),
+        ("insert_str", |text: &mut Self| text.insert_str(0, "a")),
+        ("remove", |text: &mut Self| text.remove(0..1)),
+        ("truncate", |text: &mut Self| text.truncate(1)),
+        ("char_before", |text: &mut Self| {
+            text.char_before(1);
+        }),
+        ("char_at", |text: &mut Self| {
+            text.char_at(0);
+        }),
+        ("from", |text: &mut Self| {
+            text.from(0);
+        }),
+    ];
 }
 
 /// The lengths of the text right after each form control wrote its text, in rising order.
@@ -131,11 +162,15 @@ impl ControlEnds {
 
     /// The last end.
     pub(super) fn last(&self) -> Option<usize> {
+        #[cfg(test)]
+        Self::count(1);
         self.ends.last().copied()
     }
 
     /// Adds `end`, which is not below the last end.
     pub(super) fn push(&mut self, end: usize) {
+        #[cfg(test)]
+        Self::count(1);
         self.ends.push(end);
     }
 
@@ -163,6 +198,8 @@ impl ControlEnds {
 
     /// Keeps the first `count` ends.
     pub(super) fn truncate(&mut self, count: usize) {
+        #[cfg(test)]
+        Self::count(1);
         self.ends.truncate(count);
     }
 
@@ -202,4 +239,23 @@ impl ControlEnds {
     pub(super) fn as_slice(&self) -> &[usize] {
         &self.ends
     }
+
+    /// Each function that reads or moves a control end, with one call of it on a list of
+    /// two ends or more.
+    #[cfg(all(test, feature = "visitor"))]
+    pub(super) const COUNTED: [Counted<Self>; 7] = [
+        ("last", |ends: &mut Self| {
+            ends.last();
+        }),
+        ("push", |ends: &mut Self| ends.push(9)),
+        ("get", |ends: &mut Self| {
+            ends.get(0);
+        }),
+        ("first_after", |ends: &mut Self| {
+            ends.first_after(0);
+        }),
+        ("truncate", |ends: &mut Self| ends.truncate(1)),
+        ("raise_from", |ends: &mut Self| ends.raise_from(0, 1)),
+        ("lower_from", |ends: &mut Self| ends.lower_from(0, 1)),
+    ];
 }
