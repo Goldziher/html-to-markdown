@@ -26,7 +26,11 @@
       "default": "./index.js"
     }
   },
-  "files": ["index.js", "index.d.ts", "*.node"],
+  "files": [
+    "index.js",
+    "index.d.ts",
+    "*.node"
+  ],
   "optionalDependencies": {
     "@xberg-io/html-to-markdown-darwin-arm64": "3.17.2",
     "@xberg-io/html-to-markdown-darwin-x64": "3.17.2",
@@ -52,9 +56,9 @@
     ]
   },
   "scripts": {
-    "build": "npx --yes -p @napi-rs/cli@^3.7.3 napi build --platform --release",
-    "artifacts": "npx --yes -p @napi-rs/cli@^3.7.3 napi artifacts",
-    "prepublishOnly": "npx --yes -p @napi-rs/cli@^3.7.3 napi prepublish -t npm --skip-optional-publish"
+    "build": "pnpm --package @napi-rs/cli@^3.7.3 dlx napi build --platform --release",
+    "artifacts": "pnpm --package @napi-rs/cli@^3.7.3 dlx napi artifacts",
+    "prepublishOnly": "pnpm --package @napi-rs/cli@^3.7.3 dlx napi prepublish -t npm --skip-optional-publish"
   },
   "engines": {
     "node": ">= 22"
@@ -63,6 +67,7 @@
     "access": "public"
   },
   "devDependencies": {
-    "@napi-rs/cli": "^3.9.1"
-  }
+    "@napi-rs/cli": "^3.10.8"
+  },
+  "packageManager": "pnpm@12.11.2"
 }

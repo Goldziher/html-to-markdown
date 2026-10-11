@@ -139,7 +139,7 @@ manifest = "crates/html-to-markdown-node/package.json"
 # The hand-written typescript snippets import the published package name
 # (`@xberg-io/html-to-markdown`), same as a real consumer would -- but this
 # session's cwd IS that package, so nothing installs it into its own
-# node_modules the way `npm install @xberg-io/html-to-markdown` would for a
+# node_modules the way `pnpm add @xberg-io/html-to-markdown` would for a
 # consumer. Self-link it so the compile check resolves the same import a
 # reader copies. ~keep
 before = ["mkdir -p node_modules/@xberg-io && ln -sfn ../.. node_modules/@xberg-io/html-to-markdown"]

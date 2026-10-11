@@ -13,7 +13,7 @@ die() {
 
 LAUNCHER="${HTML_TO_MARKDOWN_LAUNCHER:-auto}"
 case "$LAUNCHER" in
-auto | npx | uvx | brew | download) ;;
+auto | pnpm dlx | uvx | brew | download) ;;
 *) die "invalid HTML_TO_MARKDOWN_LAUNCHER='$LAUNCHER' (expected auto|npx|uvx|brew|download)" ;;
 esac
 
@@ -47,16 +47,16 @@ if have "$BINARY_NAME"; then
   fi
 fi
 
-if want npx && have npx; then
-  log "probing npx $NPM_PKG@latest ..."
+if want pnpm dlx && have npx; then
+  log "probing pnpm dlx $NPM_PKG@latest ..."
   scratch="$(mktemp -d)"
-  if (cd "$scratch" && npx -y "$NPM_PKG@latest" --version >/dev/null 2>&1); then
-    log "launching via npx $NPM_PKG@latest"
+  if (cd "$scratch" && pnpm dlx "$NPM_PKG@latest" --version >/dev/null 2>&1); then
+    log "launching via pnpm dlx $NPM_PKG@latest"
     cd "$scratch"
-    exec npx -y "$NPM_PKG@latest" "$@"
+    exec pnpm dlx "$NPM_PKG@latest" "$@"
   fi
   rm -rf "$scratch"
-  log "npx $NPM_PKG not available (no CLI bin yet); falling through"
+  log "pnpm dlx $NPM_PKG not available (no CLI bin yet); falling through"
 fi
 
 if want uvx && have uvx; then

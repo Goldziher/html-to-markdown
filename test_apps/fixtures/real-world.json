@@ -7,8 +7,8 @@
   },
   {
     "name": "Documentation with code",
-    "html": "<h2>Usage</h2><p>To use the library:</p><code>npm install html-to-markdown</code><p>Then import and use.</p>",
-    "expectedMarkdown": "## Usage\n\nTo use the library:\n\n`npm install html-to-markdown`\n\nThen import and use.",
+    "html": "<h2>Usage</h2><p>To use the library:</p><code>pnpm add html-to-markdown</code><p>Then import and use.</p>",
+    "expectedMarkdown": "## Usage\n\nTo use the library:\n\n`pnpm add html-to-markdown`\n\nThen import and use.",
     "options": {}
   },
   {

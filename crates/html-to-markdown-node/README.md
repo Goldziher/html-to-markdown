@@ -105,7 +105,7 @@ Requires Node.js 18+ or Bun. Native bindings provide superior performance.
 **npm:**
 
 ```bash
-npm install @xberg-io/html-to-markdown
+pnpm add @xberg-io/html-to-markdown
 ```
 
 **pnpm:**
@@ -129,7 +129,7 @@ bun add @xberg-io/html-to-markdown
 Alternatively, use the WebAssembly version for browser/edge environments:
 
 ```bash
-npm install @xberg-io/html-to-markdown-wasm
+pnpm add @xberg-io/html-to-markdown-wasm
 ```
 
 ## Performance Snapshot

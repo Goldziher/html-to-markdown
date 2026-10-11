@@ -18,7 +18,7 @@ definitions.
 ## Installation
 
 ```bash
-npm install @xberg-io/html-to-markdown
+pnpm add @xberg-io/html-to-markdown
 # or
 pnpm add @xberg-io/html-to-markdown
 ```

@@ -22,5 +22,6 @@
   "cpu": ["x64"],
   "libc": ["musl"],
   "engines": { "node": ">= 22" },
-  "publishConfig": { "access": "public" }
+  "publishConfig": { "access": "public" },
+  "packageManager": "pnpm@12.11.2"
 }

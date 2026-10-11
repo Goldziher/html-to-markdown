@@ -7,7 +7,7 @@ This directory contains **end-to-end (e2e) tests** for validating published pack
 Unlike the main test suites that validate local development builds, `test_apps/` validates that:
 
 1. **Packages publish correctly** to public registries
-2. **Installation works** for end users (`pip install`, `npm install`, etc.)
+2. **Installation works** for end users (`pip install`, `pnpm install`, etc.)
 3. **APIs function correctly** in real-world usage
 4. **Breaking changes** are caught before users encounter them
 5. **Version synchronization** works across all language packages

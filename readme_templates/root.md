@@ -72,7 +72,7 @@ See [Python README](https://github.com/xberg-io/html-to-markdown/tree/main/packa
 <summary><strong>Node.js</strong></summary>
 
 ```sh
-npm install @xberg-io/html-to-markdown
+pnpm add @xberg-io/html-to-markdown
 ```
 
 See [Node.js README](https://github.com/xberg-io/html-to-markdown/tree/main/crates/html-to-markdown-node) for full documentation.
@@ -186,7 +186,7 @@ See [Zig README](https://github.com/xberg-io/html-to-markdown/tree/main/packages
 <summary><strong>WebAssembly</strong></summary>
 
 ```sh
-npm install @xberg-io/html-to-markdown-wasm
+pnpm add @xberg-io/html-to-markdown-wasm
 ```
 
 See [WebAssembly README](https://github.com/xberg-io/html-to-markdown/tree/main/crates/html-to-markdown-wasm) for full documentation.

@@ -330,7 +330,7 @@ binding. There are no `convertBytes` / `createConversionOptionsHandle` /
 ## Node.js / npm
 
 **Package:** `@xberg-io/html-to-markdown`
-**Install:** `npm install @xberg-io/html-to-markdown`
+**Install:** `pnpm add @xberg-io/html-to-markdown`
 
 Uses NAPI-RS. Platform-specific native binaries are delivered as optional
 dependencies named `@xberg-io/html-to-markdown-<platform>`. See the

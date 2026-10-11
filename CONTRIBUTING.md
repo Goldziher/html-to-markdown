@@ -83,7 +83,7 @@ html-to-markdown is written following strict AI engineering practices. That is, 
 We use the tool `ai-rulez`, vibe coded by @Goldziher, to manage our AI conventions. You are encouraged to use this tool — running the `task setup` will get you going, or run in your terminal:
 
 ```sh
-npx -y ai-rulez@latest generate
+pnpm dlx ai-rulez@latest generate
 ```
 
 This will be scaffold the AI agent conventions (e.g. CLAUDE.md, AGENTS.md, subagents, skills, etc.). You can see the AGENTS.md generated afterwards.
