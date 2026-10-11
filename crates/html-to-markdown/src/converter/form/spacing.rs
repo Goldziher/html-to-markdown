@@ -62,12 +62,26 @@ impl ControlStart {
         }
     }
 
+    /// The byte offset in the output where the control started to write.
+    pub const fn offset(&self) -> usize {
+        self.at
+    }
+
+    /// Whether one space is owed at the start of what the control wrote to `output`, or
+    /// `None` when the control wrote nothing.
+    ///
+    /// ~keep Both writers ask this function. Each writes the space in its own output.
+    pub fn space_owed(&self, output: &str) -> Option<bool> {
+        let written = output.get(self.at..).filter(|written| !written.is_empty())?;
+        Some(self.separate && !written.starts_with(char::is_whitespace))
+    }
+
     /// Separates what the control wrote from the text before it. Returns whether it wrote.
     pub fn finish(&self, output: &mut String) -> bool {
-        let Some(written) = output.get(self.at..).filter(|written| !written.is_empty()) else {
+        let Some(space_owed) = self.space_owed(output) else {
             return false;
         };
-        if self.separate && !written.starts_with(char::is_whitespace) {
+        if space_owed {
             output.insert(self.at, ' ');
         }
         true
@@ -98,34 +112,54 @@ pub fn separate_from_next_text(
     }
 }
 
-/// Writes `text`, the text of one option, to `list`, the text that its list holds so far. One
-/// space separates an option from the option before it. An option with no text writes nothing.
+/// What `text`, the text of one option, adds to `list`, the text that its list holds so far:
+/// the separator and the word. One space separates an option from the option before it.
+/// `None` for an option with no text.
 ///
-/// ~keep The Markdown writer and the plain text writer both write an option with this function.
+/// ~keep The Markdown writer and the plain text writer both ask this function for an option.
+pub fn option_word<'a>(list: &str, text: &'a str) -> Option<(&'static str, &'a str)> {
+    let word = text.trim();
+    if word.is_empty() {
+        return None;
+    }
+    let separator = if list.is_empty() || list.ends_with(char::is_whitespace) {
+        ""
+    } else {
+        " "
+    };
+    Some((separator, word))
+}
+
+/// Writes `text`, the text of one option, to `list`, the text that its list holds so far.
 pub fn write_option(list: &mut String, text: &str) {
-    let trimmed = text.trim();
+    if let Some((separator, word)) = option_word(list, text) {
+        list.push_str(separator);
+        list.push_str(word);
+    }
+}
+
+/// The text that `options`, the text of the options of a list, writes as one control, or
+/// `None` when no option has text. In code (`in_code`) the white space around the options is
+/// text of the source.
+///
+/// ~keep The Markdown writer and the plain text writer both ask this function for an option list.
+pub fn option_list_text(options: &str, in_code: bool) -> Option<&str> {
+    let trimmed = options.trim();
     if trimmed.is_empty() {
-        return;
+        return None;
     }
-    if !list.is_empty() && !list.ends_with(char::is_whitespace) {
-        list.push(' ');
-    }
-    list.push_str(trimmed);
+    Some(if in_code { options } else { trimmed })
 }
 
 /// Writes `options`, the text of the options of a list, to `output`. The options are one control
-/// in the line: one space separates the control from the text before it. In code (`in_code`)
-/// the white space around the options is text of the source. Returns whether it wrote: each
-/// writer then separates the list from the text after it in its own way.
-///
-/// ~keep The Markdown writer and the plain text writer both write an option list with this function.
+/// in the line: one space separates the control from the text before it. Returns whether it
+/// wrote: the writer then separates the list from the text after it in its own way.
 pub fn write_option_list(output: &mut String, options: &str, in_code: bool) -> bool {
-    let trimmed = options.trim();
-    if trimmed.is_empty() {
+    let Some(list) = option_list_text(options, in_code) else {
         return false;
-    }
+    };
     let start = ControlStart::new(output);
-    output.push_str(if in_code { options } else { trimmed });
+    output.push_str(list);
     start.finish(output)
 }
 

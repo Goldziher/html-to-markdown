@@ -255,11 +255,15 @@ fn walk_tag(
     if visit_plain_element_start(tag_str, tag, buf, state) {
         return;
     }
+    // ~keep The checkpoint is open while the element writes. `visit_plain_element_end` closes
+    // ~keep it on each of its paths, and `dispatch_plain_tag` has no other way out.
     #[cfg(feature = "visitor")]
-    let element_start = buf.checkpoint();
+    let element_start = state.visitor.map(|visitor_handle| (visitor_handle, buf.open()));
     dispatch_plain_tag(tag_str, tag, parser, buf, list_ctx, state);
     #[cfg(feature = "visitor")]
-    visit_plain_element_end(tag_str, tag, buf, state, &element_start);
+    if let Some((visitor_handle, element_start)) = element_start {
+        visit_plain_element_end(visitor_handle, tag_str, tag, buf, state.depth, element_start);
+    }
 }
 
 #[cfg(feature = "visitor")]
@@ -280,44 +284,46 @@ fn visit_plain_element_start(
     let VisitResult::Custom(custom) = result else {
         return matches!(result, VisitResult::Skip);
     };
-    let start = buf.checkpoint();
+    let start = buf.open();
     buf.push_text(&custom);
     let end_result = visitor_handle
         .lock()
         .expect("visitor mutex poisoned")
         .visit_element_end(&node_ctx, &custom);
-    if let VisitResult::Custom(replacement) = end_result {
-        buf.rollback(&start);
-        buf.push_text(&replacement);
-    } else if matches!(end_result, VisitResult::Skip) {
-        buf.rollback(&start);
-    }
+    close_plain_checkpoint(buf, start, end_result);
     true
 }
 
+/// Calls the visitor at the end of an element and closes `element_start`, the checkpoint
+/// opened before the element wrote.
 #[cfg(feature = "visitor")]
 fn visit_plain_element_end(
+    visitor_handle: &VisitorHandle,
     tag_name: &str,
     tag: &tl::HTMLTag<'_>,
     buf: &mut PlainOutput,
-    state: &WalkState<'_>,
-    element_start: &Checkpoint,
+    depth: usize,
+    element_start: Checkpoint,
 ) {
-    let Some(visitor_handle) = state.visitor else {
-        return;
-    };
-    let node_ctx = plain_element_context(tag_name, tag, state.depth);
+    let node_ctx = plain_element_context(tag_name, tag, depth);
     let result = visitor_handle
         .lock()
         .expect("visitor mutex poisoned")
-        .visit_element_end(&node_ctx, buf.since(element_start));
-    match result {
+        .visit_element_end(&node_ctx, buf.since(&element_start));
+    close_plain_checkpoint(buf, element_start, result);
+}
+
+/// Closes `checkpoint` as the visitor answered at the end of an element: its text takes the
+/// place of the text written since, a skip removes that text, and every other answer keeps it.
+#[cfg(feature = "visitor")]
+fn close_plain_checkpoint(buf: &mut PlainOutput, checkpoint: Checkpoint, end_result: VisitResult) {
+    match end_result {
         VisitResult::Custom(custom) => {
-            buf.rollback(element_start);
+            buf.rollback(checkpoint);
             buf.push_text(&custom);
         }
-        VisitResult::Skip => buf.rollback(element_start),
-        _ => {}
+        VisitResult::Skip => buf.rollback(checkpoint),
+        _ => buf.commit(checkpoint),
     }
 }
 
@@ -403,7 +409,7 @@ fn dispatch_plain_tag(
         "option" => {
             let mut option = PlainOutput::default();
             walk_children(tag, parser, &mut option, list_ctx, &child_state);
-            buf.write_option(option.as_str());
+            buf.write_option(&option.into_text());
         }
         _ if spacing::writes_own_text(tag_name) => {
             walk_plain_control(tag, parser, buf, list_ctx, &child_state);
@@ -567,7 +573,7 @@ fn walk_table(table_tag: &tl::HTMLTag, parser: &tl::Parser, buf: &mut PlainOutpu
                 let mut cell_list_ctx = ListContext::None;
                 walk_children(cell_tag, parser, &mut cell_buf, &mut cell_list_ctx, &cell_state);
             }
-            buf.push_text(cell_buf.as_str().trim());
+            buf.push_text(cell_buf.into_text().trim());
         }
     }
 }

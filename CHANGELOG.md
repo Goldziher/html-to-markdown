@@ -82,7 +82,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   element that holds the control is separated too:
   `<p>aaa<fieldset><button>Xone</button></fieldset>bbb</p>` gave `aaaXonebbb` and now gives
   `aaa Xone bbb`. No space is written before closing punctuation. In a `pre` element a button
-  adds no space, and the options of a select list stay separate words
+  adds no space, and the options of a select list stay separate words. With a visitor, an
+  element that is removed or replaced keeps the space after a control before it and leaves no
+  text of its own, and the removal no longer panics inside a multi-byte character
   ([#814](https://github.com/xberg-io/html-to-markdown/issues/814)).
 - A `<title>` before the body content of a page with no `<head>` tag is the document title, as
   in a browser. `<title>T</title><div><p>one</p></div>tail` gave `T`, `one` and `tail` as body

@@ -390,6 +390,16 @@ fn an_entity_for_a_space_after_a_control_gets_no_second_space_in_plain_text() {
     assert_plain("<p>aaa<select><option>X</option></select>&#32;bbb</p>", "aaa X bbb\n");
 }
 
+#[test]
+fn a_control_that_ends_with_the_spaces_of_an_alt_text_separates_no_later_text_in_plain_text() {
+    // ~keep The end of the first block removes the three spaces. The text after them is as
+    // ~keep long as the spaces when the next word arrives.
+    assert_plain(
+        "<p>aaa<button><img alt=\"X   \"></button></p><p>b<i>cc</i></p>",
+        "aaa X\n\nbcc\n",
+    );
+}
+
 #[cfg(feature = "visitor")]
 mod with_a_visitor {
     use std::sync::{Arc, Mutex};
@@ -601,5 +611,95 @@ mod with_a_visitor {
         // ~keep of two bytes then stands across the place where the block started.
         let html = "<div>X<div>\u{e9}</div></div>";
         assert_eq!(plain_with_padded_text(html), "X\n\n\u{e9}\n");
+    }
+
+    /// Answers `at_end` at the end of every element named `tag`. With `pad`, answers `X` with
+    /// three spaces after it for the text node `X`.
+    #[derive(Debug)]
+    struct TagVisitor {
+        tag: &'static str,
+        at_end: VisitResult,
+        pad: bool,
+    }
+
+    impl HtmlVisitor for TagVisitor {
+        fn visit_element_end(&mut self, ctx: &NodeContext, _output: &str) -> VisitResult {
+            if ctx.tag_name == self.tag {
+                self.at_end.clone()
+            } else {
+                VisitResult::Continue
+            }
+        }
+
+        fn visit_text(&mut self, _ctx: &NodeContext, text: &str) -> VisitResult {
+            if self.pad && text == "X" {
+                VisitResult::Custom("X   ".to_string())
+            } else {
+                VisitResult::Continue
+            }
+        }
+    }
+
+    fn plain_with_tag(html: &str, tag: &'static str, at_end: &VisitResult, pad: bool) -> String {
+        plain_with(html, |options| {
+            options.visitor = Some(Arc::new(Mutex::new(TagVisitor {
+                tag,
+                at_end: at_end.clone(),
+                pad,
+            })));
+        })
+    }
+
+    #[test]
+    fn a_removed_block_after_spaces_leaves_no_text_of_its_own_in_plain_text() {
+        // ~keep The block starts after three spaces and removes them before it writes.
+        let html = "<pre>aaa   <div>bcd</div></pre>";
+        assert_eq!(plain_with_tag(html, "div", &VisitResult::Skip, false), "aaa\n");
+        assert_eq!(plain_with(html, |_| {}), "aaa\n\nbcd\n");
+    }
+
+    #[test]
+    fn the_text_of_a_visitor_for_a_block_after_spaces_stands_after_the_spaces_in_plain_text() {
+        let html = "<pre>aaa   <div>bcd</div></pre>";
+        let custom = VisitResult::Custom("Q".to_string());
+        assert_eq!(plain_with_tag(html, "div", &custom, false), "aaa   Q\n");
+    }
+
+    #[test]
+    fn a_removed_block_after_a_space_keeps_the_space_between_the_words_beside_it_in_plain_text() {
+        let html = "<p>aaa <div>bcd</div>ccc</p>";
+        assert_eq!(plain_with_tag(html, "div", &VisitResult::Skip, false), "aaa ccc\n");
+    }
+
+    #[test]
+    fn a_block_that_a_visitor_keeps_after_a_space_is_written_as_with_no_visitor_in_plain_text() {
+        let html = "<p>aaa <div>bcd</div>ccc</p>";
+        let expected = "aaa\n\nbcd\n\nccc\n";
+        assert_eq!(plain_with(html, |_| {}), expected);
+        assert_eq!(plain_with_tag(html, "div", &VisitResult::Continue, false), expected);
+    }
+
+    #[test]
+    fn a_removed_element_with_an_option_list_keeps_the_space_after_the_control_before_it_in_plain_text() {
+        let html =
+            "<p>aaa<button>X</button><span><select><option>one</option><option>two</option></select></span>bbb</p>";
+        assert_eq!(plain_with_tag(html, "span", &VisitResult::Skip, false), "aaa X bbb\n");
+        let custom = VisitResult::Custom("Q".to_string());
+        assert_eq!(plain_with_tag(html, "span", &custom, false), "aaa X Qbbb\n");
+    }
+
+    #[test]
+    fn a_removed_block_with_a_control_after_a_control_and_a_space_keeps_one_space_in_plain_text() {
+        let html = "<p>aaa<button>X</button> <div><button>Y</button></div>bbb</p>";
+        assert_eq!(plain_with_tag(html, "div", &VisitResult::Skip, false), "aaa X bbb\n");
+    }
+
+    #[test]
+    fn a_removed_block_after_a_control_that_ends_with_spaces_keeps_the_spaces_in_plain_text() {
+        let html = "<p>aaa<button>X</button><section>b</section>ccc</p>";
+        assert_eq!(
+            plain_with_tag(html, "section", &VisitResult::Skip, true),
+            "aaa X   ccc\n"
+        );
     }
 }
