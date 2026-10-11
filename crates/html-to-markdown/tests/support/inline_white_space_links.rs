@@ -242,6 +242,11 @@ fn a_link_label_of_white_space_only_puts_no_space_outside_the_link() {
             "Press[](/p)now\n",
             None,
         ),
+        (
+            "<p>Press<a href=\"/p\"><span>&nbsp;</span></a>now</p>",
+            "Press[](/p)now\n",
+            None,
+        ),
     ]);
 }
 

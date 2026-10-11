@@ -56,6 +56,43 @@ pub fn get_previous_sibling_tag<'a>(
     None
 }
 
+/// What stands right before the text `node_handle`: a `<br>`, the start of its parent element,
+/// an element that holds no text, or text. A comment before the text does not count.
+pub fn text_place(
+    node_handle: tl::NodeHandle,
+    parser: &tl::Parser,
+    dom_ctx: &DomContext,
+) -> crate::converter::utility::white_space::TextPlace {
+    use crate::converter::utility::white_space::TextPlace;
+    if get_previous_sibling_tag(&node_handle, parser, dom_ctx) == Some("br") {
+        return TextPlace::AfterBreak;
+    }
+    let id = node_handle.get_inner();
+    let siblings = dom_ctx
+        .parent_of(id)
+        .map_or(Some(&dom_ctx.root_children), |parent| dom_ctx.children_of(parent));
+    let before = siblings
+        .and_then(|siblings| {
+            let position = siblings.iter().position(|sibling| sibling.get_inner() == id)?;
+            Some(&siblings[..position])
+        })
+        .unwrap_or_default();
+    let previous = before
+        .iter()
+        .rev()
+        .find(|sibling| !matches!(sibling.get(parser), Some(tl::Node::Comment(_))));
+    match previous {
+        None => TextPlace::ElementStart,
+        Some(previous)
+            if matches!(previous.get(parser), Some(tl::Node::Tag(_)))
+                && dom_ctx.text_content(*previous, parser).is_empty() =>
+        {
+            TextPlace::AfterEmptyElement
+        }
+        Some(_) => TextPlace::AfterText,
+    }
+}
+
 /// The block element the content before `node_handle` in its parent ends with: the previous
 /// sibling when it is a block, or the block an inline sibling's own last content ends with
 /// (`<span><ul>...</ul></span>`). Whitespace text and comments are skipped (issue #585).

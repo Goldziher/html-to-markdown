@@ -643,6 +643,7 @@ fn flush_text(state: &mut Tier1State, request: TextFlush<'_>) -> Result<(), Bail
         raw
     };
 
+    hand_over_unicode_space_after_space(state, raw, base_offset)?;
     let normalized_whitespace = normalize_unicode_whitespace(raw, in_pre || in_code);
     let raw = normalized_whitespace.as_ref();
 

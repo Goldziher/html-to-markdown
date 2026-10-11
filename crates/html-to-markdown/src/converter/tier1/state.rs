@@ -295,6 +295,13 @@ pub struct Tier1State {
     /// as `next_tag_is_list`).
     pub last_emitted_was_img: bool,
 
+    /// The source offset where the last `<br>` or opening tag ends, and what a text that starts
+    /// at that offset has before it. A text that starts at any other offset has a comment, a
+    /// closing tag or another void tag before it, and the fast converter does not know its
+    /// place. No tag clears this: the offset of a later text never equals an earlier one. The
+    /// full converter reads the same fact from the tree (`siblings::text_place`).
+    pub text_place: Option<(usize, crate::converter::utility::white_space::TextPlace)>,
+
     /// True right after the closing tag of a block element or a `<hr>` (block-level by Tier-2's
     /// test), until the next opening or void tag, the next closing tag that is not inline, or the
     /// next text flush with content (read-then-clear, same convention as
@@ -383,6 +390,7 @@ impl Tier1State {
             summary_buf_stack: Vec::new(),
             last_closed_custom_element: false,
             last_emitted_was_img: false,
+            text_place: None,
             last_closed_block: false,
             pending_newline_join: None,
             last_ordered_list_end: None,

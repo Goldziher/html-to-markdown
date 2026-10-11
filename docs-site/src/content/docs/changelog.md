@@ -312,8 +312,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - A no-break space in an element of its own is kept after a space:
   `<p>one <span>&nbsp;</span> two</p>` gave `one  two` and gives `one`, a space, the no-break
-  space, a space and `two`. A no-break space in running text is one space, as before. In a link
-  label a no-break space beside a space is one space on both converters.
+  space, a space and `two`. A no-break space in running text is written as a space, as before.
+  In a link label a no-break space beside a space is one space on both converters.
+
+- A no-break space that starts a text is kept after a space when an element with no text stands
+  between the two: `<p>a <span></span>&nbsp;b</p>` and `<p>a <img>&nbsp;b</p>` give `a`, two
+  spaces and `b`, as a browser shows them. `&nbsp;`, `&#160;`, `&#xA0;` and the character do the
+  same. After a `<br>` in a heading and at the start of an element the no-break space is still
+  the one space. Inside one text, and with only a comment between the two, a space and a
+  no-break space are one space, as before.
 
 ## [3.17.2] - 2026-10-06
 

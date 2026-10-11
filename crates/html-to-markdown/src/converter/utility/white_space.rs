@@ -218,6 +218,43 @@ pub fn space_is_owed(written: &str) -> bool {
     !written.ends_with([' ', '\n'])
 }
 
+/// What stands right before a text.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TextPlace {
+    /// A `<br>` is the element before the text.
+    AfterBreak,
+    /// The text is the first content of its parent element.
+    ElementStart,
+    /// An element that holds no text is before the text: an image, an empty `span`.
+    AfterEmptyElement,
+    /// Text is before the text: another text, or an element that holds text.
+    AfterText,
+}
+
+/// Whether the white space that `decoded` starts with holds a Unicode space: a no-break space
+/// or another space of [`text::is_unicode_space`]. A form feed is none.
+#[must_use]
+pub fn starts_with_unicode_space(decoded: &str) -> bool {
+    decoded
+        .chars()
+        .take_while(|character| character.is_whitespace())
+        .any(text::is_unicode_space)
+}
+
+/// Whether the Unicode space that a text starts with is written after the space that `written`
+/// ends with. Both converters ask here: the full converter writes it, the fast converter gives
+/// the page to the full one.
+///
+/// ~keep A no-break space is a character (rule 1): `a <img>&nbsp;b` and `a <span></span>&nbsp;b`
+/// ~keep have two spaces. It joins the space where the two are one run of text (`a &nbsp;b`,
+/// ~keep `<b>a </b>&nbsp;b`, a comment between the two), and where it would start a line or
+/// ~keep an element: after a `<br>` whose line end is a space (a heading has one line), and as
+/// ~keep the first content of an element (`a <span>&nbsp;x</span>`, the marker of a list item).
+#[must_use]
+pub fn unicode_space_is_kept(written: &str, place: TextPlace) -> bool {
+    written.ends_with(' ') && place == TextPlace::AfterEmptyElement
+}
+
 /// Rule 4 in the full converter, which builds the body of an inline element in a scratch
 /// buffer of its own: an empty scratch buffer is mid-line and owes the space, an empty block
 /// buffer is a line start and owes none.
@@ -412,6 +449,28 @@ mod tests {
         assert!(with_break.writes_space(Some('s'), Some('G')));
         assert!(!with_break.writes_space(Some('\u{200b}'), Some('G')));
         assert!(!with_break.writes_space(Some('s'), Some('\u{200b}')));
+    }
+
+    #[test]
+    fn a_unicode_space_is_kept_after_a_space_only_after_an_element_with_no_text() {
+        for (text, starts) in [
+            ("\u{a0}b", true),
+            (" \u{a0}b", true),
+            ("\u{3000}b", true),
+            (" b", false),
+            ("\u{c}\nb", false),
+            ("\u{b}b", false),
+            ("b\u{a0}", false),
+            ("", false),
+        ] {
+            assert_eq!(starts_with_unicode_space(text), starts, "{text:?}");
+        }
+        assert!(unicode_space_is_kept("a ", TextPlace::AfterEmptyElement));
+        assert!(!unicode_space_is_kept("a ", TextPlace::AfterBreak));
+        assert!(!unicode_space_is_kept("a ", TextPlace::ElementStart));
+        assert!(!unicode_space_is_kept("a ", TextPlace::AfterText));
+        assert!(!unicode_space_is_kept("a", TextPlace::AfterEmptyElement));
+        assert!(!unicode_space_is_kept("a\n", TextPlace::AfterEmptyElement));
     }
 
     #[test]

@@ -220,6 +220,9 @@ impl<'a> Tier1Scanner<'a> {
                 return Err(BailReason::TableBlockChildInCell);
             }
             emit_void(&mut self.state, spec, name_lower, &attrs, self.html, self.options)?;
+            if name_lower == b"br" {
+                self.state.text_place = Some((self.pos, TextPlace::AfterBreak));
+            }
             self.text_start = self.pos;
             return Ok(());
         }
@@ -247,6 +250,7 @@ impl<'a> Tier1Scanner<'a> {
         );
         apply_open_escape_ctx(&mut self.state, spec);
 
+        self.state.text_place = Some((self.pos, TextPlace::ElementStart));
         self.text_start = self.pos;
         Ok(())
     }

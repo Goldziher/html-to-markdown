@@ -62,6 +62,13 @@ fn a_space_at_the_end_of_a_link_with_an_empty_address_stays_after_its_text() {
     assert_row("<p>Press <a href=\"\">Go </a>now.</p>", "Press Go now.\n");
 }
 
+/// A link to a place in its own page with a label of white space is left out. The space of the
+/// text before it stays: one space between the two words.
+#[test]
+fn a_space_before_a_link_into_its_own_page_with_a_blank_label_stays() {
+    assert_row_with_fast("<p>aaa <a href=\"#top\"> </a>bbb</p>", "aaa bbb\n", &Fast::HandsOver);
+}
+
 #[test]
 fn a_space_after_a_link_stays() {
     assert_row("<p>Press <a href=\"/p\">Go</a> now.</p>", "Press [Go](/p) now.\n");

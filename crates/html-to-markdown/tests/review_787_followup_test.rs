@@ -1,6 +1,6 @@
 #![allow(missing_docs)]
 #![cfg(feature = "testkit")]
-use html_to_markdown_rs::{ConversionOptions, HighlightStyle, TierStrategy, convert, prescan, tier1};
+use html_to_markdown_rs::{ConversionOptions, HighlightStyle, OutputFormat, TierStrategy, convert, prescan, tier1};
 
 fn convert_with(html: &str, options: ConversionOptions) -> String {
     convert(html, Some(options))
@@ -73,14 +73,94 @@ fn should_write_one_space_at_an_image_with_no_source_before_a_comment() {
 
 #[test]
 fn should_keep_the_space_at_an_image_with_no_source_before_a_no_break_space() {
-    // ~keep A loss against `main`: this writes one space, `main` wrote two ("a  b\n") and a browser
-    // ~keep shows two. An image with no source writes nothing, and the no-break space then joins the
-    // ~keep space already written, as after an empty `span`. The fold needs its own fix.
+    // A browser shows the space and the no-break space: only ASCII white space folds. The
+    // converter writes a no-break space in running text as a space, so two spaces stay.
     assert_rows(&[
-        ("<p>a <img>&nbsp;b</p>", "a b\n"),
-        ("<p>a <img>&#160;b</p>", "a b\n"),
-        ("<p>a <img>\u{a0}b</p>", "a b\n"),
+        ("<p>a <img>&nbsp;b</p>", "a  b\n"),
+        ("<p>a <img>&#160;b</p>", "a  b\n"),
+        ("<p>a <img>\u{a0}b</p>", "a  b\n"),
     ]);
+}
+
+#[test]
+fn should_keep_a_no_break_space_after_a_space_only_across_an_element_with_no_text() {
+    // ~keep Each carrier stands between the space and the no-break space. `fast` is what the fast
+    // ~keep converter does when it is called directly: its text, or the reason it hands the page
+    // ~keep over with. An element with no text keeps the two apart. Inside one text, and with
+    // ~keep only a comment between, the two are one run of white space, as on `main`.
+    let carriers: [(&str, &str, Result<&str, &str>); 4] = [
+        ("<img>", "a  b\n", Err("ImageMissingSource")),
+        ("<span></span>", "a  b\n", Err("UnicodeSpaceAfterSpace")),
+        ("<!-- c -->", "a b\n", Err("UnicodeSpaceAfterSpace")),
+        ("", "a b\n", Ok("a b\n")),
+    ];
+    let [_, fast, ..] = paths();
+    let mut wrong = Vec::new();
+    for (carrier, expected, expected_fast) in carriers {
+        for form in ["&nbsp;", "&#160;", "&#xA0;", "\u{a0}"] {
+            let html = format!("<p>a {carrier}{form}b</p>");
+            for options in paths() {
+                let written = convert_with(&html, options);
+                if written != expected {
+                    wrong.push(format!("{html:?}: {written:?}, expected {expected:?}"));
+                }
+            }
+            let direct = fast_direct(&html, &fast);
+            if direct.as_deref().map_err(String::as_str) != expected_fast {
+                wrong.push(format!("{html:?}: fast {direct:?}, expected {expected_fast:?}"));
+            }
+        }
+    }
+    assert!(wrong.is_empty(), "{} wrong:\n{}", wrong.len(), wrong.join("\n"));
+}
+
+#[test]
+fn should_join_a_no_break_space_to_a_space_at_a_line_break_and_at_an_element_start() {
+    // ~keep A `<br>` in a heading is a space, and the no-break space after it would start the
+    // ~keep line. The no-break space that starts an element joins the space before the element.
+    // ~keep The fast converter writes the row itself when the text starts where the `<br>` or
+    // ~keep the opening tag ends. A comment between the two hides the place from it, and it
+    // ~keep hands the page over. The space that ends an element with text is the same run as
+    // ~keep the no-break space after the element, as on `main`: the fast converter writes that
+    // ~keep row or hands the page over (`None`). A form feed is no Unicode space: the fast
+    // ~keep converter answers.
+    let [_, fast, ..] = paths();
+    let rows: [(&str, &str, Option<bool>); 8] = [
+        ("<h2>a<br>&nbsp;b</h2>", "## a b\n", Some(true)),
+        ("<h2>a<br>\u{a0}b</h2>", "## a b\n", Some(true)),
+        ("<p>a <span>&nbsp;x</span></p>", "a x\n", Some(true)),
+        ("<p>a <span>&#xA0;x</span></p>", "a x\n", Some(true)),
+        ("<ul><li>&nbsp;b</li></ul>", "- b\n", Some(true)),
+        ("<p>a <span><!-- c -->&#160;x</span></p>", "a x\n", Some(false)),
+        ("<p><b>a </b>&nbsp;b</p>", "**a** b\n", None),
+        ("<p>a <span></span>\u{c}b</p>", "a b\n", Some(true)),
+    ];
+    for (html, expected, fast_answers) in rows {
+        for options in paths() {
+            assert_eq!(convert_with(html, options), expected, "{html}");
+        }
+        let direct = fast_direct(html, &fast);
+        let direct = direct.as_deref().map_err(String::as_str);
+        let hands_over = direct == Err("UnicodeSpaceAfterSpace");
+        match fast_answers {
+            Some(true) => assert_eq!(direct, Ok(expected), "fast: {html}"),
+            Some(false) => assert!(hands_over, "fast: {html}: {direct:?}"),
+            None => assert!(hands_over || direct == Ok(expected), "fast: {html}: {direct:?}"),
+        }
+    }
+}
+
+#[test]
+fn should_keep_a_no_break_space_after_a_space_in_plain_text() {
+    for html in ["<p>a <img>&nbsp;b</p>", "<p>a <span></span>&nbsp;b</p>"] {
+        for options in paths() {
+            let plain = ConversionOptions {
+                output_format: OutputFormat::Plain,
+                ..options
+            };
+            assert_eq!(convert_with(html, plain).trim_end_matches('\n'), "a  b", "{html}");
+        }
+    }
 }
 
 /// The fast converter called directly: its text, or the reason when it hands the page over.
