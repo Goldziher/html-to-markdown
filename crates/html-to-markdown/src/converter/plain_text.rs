@@ -117,9 +117,10 @@ impl PlainOutput {
     /// Writes `text`. When a control ends right before it and `text` starts with a word, one
     /// space separates the two.
     ///
-    /// ~keep Every arm except `option` writes the text of the page here; an option separates
-    /// ~keep itself through the shared spacing functions. The space after a control is written
-    /// ~keep when the next text arrives, so no arm decides ahead what follows a control.
+    /// ~keep Every arm except `select`, `datalist` and `option` writes the text of the page
+    /// ~keep here; those three separate their text through the shared spacing functions. The
+    /// ~keep space after a control is written when the next text arrives, so no arm decides
+    /// ~keep ahead what follows a control.
     fn push_text(&mut self, text: &str) {
         if self.control_end == Some(self.text.len())
             && spacing::needs_space_before(&self.text)
@@ -442,18 +443,7 @@ fn dispatch_plain_tag(
             ensure_blank_line(buf);
         }
         // ~keep The Markdown writer writes an option list and an option with the same two functions.
-        "select" | "datalist" => {
-            let mut options = PlainOutput::default();
-            walk_children(tag, parser, &mut options, list_ctx, &child_state);
-            // ~keep A list is one control in its line. This writer keeps the line ends of the
-            // ~keep source in running text: outside `pre`, a line end in a list is one space.
-            if !state.in_pre {
-                options.text = options.text.split_whitespace().collect::<Vec<_>>().join(" ");
-            }
-            if spacing::write_option_list(&mut buf.text, &options.text, state.in_pre) {
-                buf.end_control();
-            }
-        }
+        "select" | "datalist" => walk_plain_option_list(tag, parser, buf, list_ctx, &child_state),
         "option" => {
             let mut option = PlainOutput::default();
             walk_children(tag, parser, &mut option, list_ctx, &child_state);
@@ -463,6 +453,27 @@ fn dispatch_plain_tag(
             walk_plain_control(tag, parser, buf, list_ctx, &child_state);
         }
         _ => walk_children(tag, parser, buf, list_ctx, &child_state),
+    }
+}
+
+/// Writes the options of a select list or a data list. The list is one control in its line:
+/// one space separates it from the text before it and from a word after it.
+fn walk_plain_option_list(
+    tag: &tl::HTMLTag<'_>,
+    parser: &tl::Parser,
+    buf: &mut PlainOutput,
+    list_ctx: &mut ListContext,
+    state: &WalkState<'_>,
+) {
+    let mut options = PlainOutput::default();
+    walk_children(tag, parser, &mut options, list_ctx, state);
+    // ~keep This writer keeps the line ends of the source in running text: outside `pre`, a
+    // ~keep line end in a list is one space.
+    if !state.in_pre {
+        options.text = options.text.split_whitespace().collect::<Vec<_>>().join(" ");
+    }
+    if spacing::write_option_list(&mut buf.text, &options.text, state.in_pre) {
+        buf.end_control();
     }
 }
 

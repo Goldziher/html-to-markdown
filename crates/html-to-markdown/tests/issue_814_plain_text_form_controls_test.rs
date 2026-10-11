@@ -268,6 +268,14 @@ fn the_alt_text_of_an_image_after_a_control_is_a_word_in_plain_text() {
     );
 }
 
+#[test]
+fn the_text_of_an_inline_graphic_after_a_control_is_a_word_in_plain_text() {
+    assert_plain(
+        "<p>aaa<button>Xone</button><svg><title>pic</title></svg> bbb</p>",
+        "aaa Xone pic bbb\n",
+    );
+}
+
 /// The plain text of `html` with the default options.
 fn default_plain(html: &str) -> String {
     converted(
@@ -443,6 +451,38 @@ mod with_a_visitor {
             plain_with_spans(html, &custom, &VisitResult::Continue),
             "aaa Xone QQbbb\n"
         );
+    }
+
+    #[test]
+    fn a_text_that_a_visitor_replaces_at_an_element_start_after_a_control_is_a_word_in_plain_text() {
+        // ~keep The visitor answers a text at the start of the element and another for that text.
+        let html = "<p>aaa<button>Xone</button><span>zzz</span>bbb</p>";
+        let first = VisitResult::Custom("QQ".to_string());
+        let second = VisitResult::Custom("RR".to_string());
+        assert_eq!(plain_with_spans(html, &first, &second), "aaa Xone RRbbb\n");
+    }
+
+    /// Answers `QQ` for the text node `bbb`.
+    #[derive(Debug)]
+    struct TextVisitor;
+
+    impl HtmlVisitor for TextVisitor {
+        fn visit_text(&mut self, _ctx: &NodeContext, text: &str) -> VisitResult {
+            if text == "bbb" {
+                VisitResult::Custom("QQ".to_string())
+            } else {
+                VisitResult::Continue
+            }
+        }
+    }
+
+    #[test]
+    fn the_text_of_a_visitor_for_a_text_node_after_a_control_is_a_word_in_plain_text() {
+        let html = "<p>aaa<button>Xone</button>bbb</p>";
+        let with_visitor = plain_with(html, |options| {
+            options.visitor = Some(Arc::new(Mutex::new(TextVisitor)));
+        });
+        assert_eq!(with_visitor, "aaa Xone QQ\n");
     }
 
     #[test]
