@@ -70,3 +70,33 @@ fn should_trim_source_whitespace_around_plain_figure_text() {
         assert_all_tiers(html, "foo\n", CodeBlockStyle::Indented);
     }
 }
+
+#[test]
+fn should_trim_source_whitespace_before_figure_inline_formatting() {
+    for code_block_style in [
+        CodeBlockStyle::Backticks,
+        CodeBlockStyle::Tildes,
+        CodeBlockStyle::Indented,
+    ] {
+        for html in [
+            "<p>a</p><figure> <em>x</em> y</figure>",
+            "<p>a</p><figure>\t<em>x</em> y</figure>",
+            "<p>a</p><figure>\n <em>x</em> y</figure>",
+        ] {
+            assert_all_tiers(html, "a\n\n*x* y\n", code_block_style);
+        }
+    }
+}
+
+#[test]
+fn should_trim_source_whitespace_before_plain_figure_text_after_a_paragraph() {
+    for code_block_style in [
+        CodeBlockStyle::Backticks,
+        CodeBlockStyle::Tildes,
+        CodeBlockStyle::Indented,
+    ] {
+        for html in ["<p>a</p><figure> foo </figure>", "<p>a</p><figure>\tfoo</figure>"] {
+            assert_all_tiers(html, "a\n\nfoo\n", code_block_style);
+        }
+    }
+}
