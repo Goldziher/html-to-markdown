@@ -135,14 +135,7 @@ pub fn convert_html_impl(
     drop(ctx);
 
     append_references(&mut output, reference_collector);
-    let output = finalize_output(
-        &dom,
-        parser,
-        options,
-        output,
-        &frontmatter,
-        is_plain_text.then_some(&dom_ctx),
-    );
+    let output = finalize_output(&dom, parser, options, output, &frontmatter, is_plain_text);
     let (document, tables) = finish_structure_collector(structure_collector);
     trace_render_complete(&output, &tables);
     Ok((output, document, tables, depth_warning))
@@ -250,10 +243,10 @@ fn finalize_output(
     options: &ConversionOptions,
     mut output: String,
     frontmatter: &str,
-    plain_text_dom_ctx: Option<&DomContext>,
+    is_plain_text: bool,
 ) -> String {
-    if let Some(dom_ctx) = plain_text_dom_ctx {
-        output = extract_plain_text(dom, parser, options, dom_ctx);
+    if is_plain_text {
+        output = extract_plain_text(dom, parser, options);
     } else {
         trim_line_end_whitespace(&mut output, options.code_block_style);
         collapse_excess_blank_lines(&mut output, options.code_block_style);

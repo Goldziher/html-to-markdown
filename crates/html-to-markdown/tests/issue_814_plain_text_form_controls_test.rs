@@ -267,3 +267,189 @@ fn the_alt_text_of_an_image_after_a_control_is_a_word_in_plain_text() {
         "aaa Xone pic bbb\n",
     );
 }
+
+/// The plain text of `html` with the default options.
+fn default_plain(html: &str) -> String {
+    converted(
+        html,
+        ConversionOptions {
+            output_format: OutputFormat::Plain,
+            ..ConversionOptions::default()
+        },
+    )
+}
+
+#[test]
+fn a_word_after_the_form_of_a_control_is_separated_in_plain_text() {
+    // ~keep This writer writes a `form` and a `fieldset` in the line of the text around them.
+    let in_heading = format!("<h2>aaa<form><select>{OPTIONS}</select></form>bbb</h2>");
+    assert_plain(&in_heading, "aaa Xone Xtwo bbb\n");
+    // ~keep The default options remove the `form` element with its content.
+    assert_eq!(default_plain(&in_heading), "aaabbb\n");
+    assert_plain("<p>aaa<form><button>Xone</button></form>bbb</p>", "aaa Xone bbb\n");
+    let in_fieldset = "<p>aaa<fieldset><button>Xone</button></fieldset>bbb</p>";
+    assert_plain(in_fieldset, "aaa Xone bbb\n");
+    assert_eq!(default_plain(in_fieldset), "aaa Xone bbb\n");
+}
+
+#[test]
+fn an_element_with_no_text_after_a_control_does_not_join_the_next_word_in_plain_text() {
+    for nothing in [
+        "<img src=\"i.png\">",
+        "<math><mi>y</mi></math>",
+        "<span></span>",
+        "<select> </select>",
+        "<button></button>",
+        "<!-- c -->",
+    ] {
+        for space in ["", " "] {
+            let html = format!("<p>aaa<button>Xone</button>{nothing}{space}bbb</p>");
+            assert_plain(&html, "aaa Xone bbb\n");
+            assert_eq!(default_plain(&html), "aaa Xone bbb\n", "{html}");
+        }
+    }
+    let excluded = "<p>aaa<button>Xone</button><span class=\"x\">zzz</span>bbb</p>";
+    assert_eq!(
+        plain_with(excluded, |options| options.exclude_selectors = vec![".x".to_string()]),
+        "aaa Xone bbb\n"
+    );
+}
+
+#[test]
+fn text_after_a_control_is_separated_by_what_it_starts_with_in_plain_text() {
+    // ~keep The decoded text decides: an entity for a letter is a word, an entity for a space is a space.
+    assert_plain("<p>aaa<button>Xone</button>&amp;bbb</p>", "aaa Xone &bbb\n");
+    for tier_strategy in [TierStrategy::Tier2, TierStrategy::Auto] {
+        let no_break_space = converted(
+            "<p>aaa<button>Xone</button>&nbsp;bbb</p>",
+            options(OutputFormat::Plain, tier_strategy),
+        );
+        assert_eq!(no_break_space.replace('\u{a0}', " "), "aaa Xone bbb\n");
+    }
+    // ~keep No space before closing punctuation, as in the Markdown output.
+    assert_plain("<p>aaa<button>Xone</button>.</p>", "aaa Xone.\n");
+    assert_plain("<p>aaa<button>Xone</button>, bbb</p>", "aaa Xone, bbb\n");
+    assert_plain("<p>aaa<button>Xone</button>(bbb)</p>", "aaa Xone (bbb)\n");
+    assert_markdown(&format!("<p>aaa<select>{OPTIONS}</select>.</p>"), "aaa Xone Xtwo.\n");
+    assert_plain("<p>aaa<button>Xone</button><b>bbb</b></p>", "aaa Xone bbb\n");
+    assert_plain(
+        &format!("<p>aaa<button>Xzero</button><select>{OPTIONS}</select>bbb</p>"),
+        "aaa Xzero Xone Xtwo bbb\n",
+    );
+}
+
+#[test]
+fn only_the_text_right_after_a_control_is_separated_in_plain_text() {
+    assert_plain("<p>aaa<button>Xone</button> ccc<b>ddd</b></p>", "aaa Xone cccddd\n");
+    assert_plain("<p>aaa<button>Xone</button>ccc<b>ddd</b></p>", "aaa Xone cccddd\n");
+}
+
+#[test]
+fn a_control_that_ends_with_white_space_gets_no_second_space_in_plain_text() {
+    assert_plain("<p>aaa<button>Xone </button>bbb</p>", "aaa Xone bbb\n");
+    // ~keep In code the line end of the source after the options is the end of the list.
+    assert_plain(
+        "<pre>aaa<select>\n<option>Xone</option>\n</select>bbb</pre>",
+        "aaa\nXone\nbbb\n",
+    );
+}
+
+#[test]
+fn a_line_end_after_a_control_gets_no_space_in_plain_text() {
+    assert_plain("<p>aaa<button>Xone</button><br>bbb</p>", "aaa Xone\nbbb\n");
+    assert_plain("<p>aaa<button>Xone</button></p><p>bbb</p>", "aaa Xone\n\nbbb\n");
+    assert_plain("<div>aaa<button>Xone</button><div>bbb</div></div>", "aaa Xone\n\nbbb\n");
+    assert_plain("<p>aaa<button>Xone</button></p>", "aaa Xone\n");
+}
+
+#[test]
+fn a_control_in_a_table_cell_stays_in_its_cell_in_plain_text() {
+    assert_plain(
+        "<table><tr><td>aaa<button>Xone</button><img src=\"i.png\">bbb</td><td><button>Xb</button></td><td>ccc</td></tr></table>",
+        "aaa Xone bbb\tXb\tccc\n",
+    );
+}
+
+#[cfg(feature = "visitor")]
+mod with_a_visitor {
+    use std::sync::{Arc, Mutex};
+
+    use html_to_markdown_rs::NodeContext;
+    use html_to_markdown_rs::visitor::{HtmlVisitor, VisitResult};
+
+    use super::plain_with;
+
+    /// Answers `at_start` at the start and `at_end` at the end of every `span` element.
+    #[derive(Debug)]
+    struct SpanVisitor {
+        at_start: VisitResult,
+        at_end: VisitResult,
+    }
+
+    impl HtmlVisitor for SpanVisitor {
+        fn visit_element_start(&mut self, ctx: &NodeContext) -> VisitResult {
+            if ctx.tag_name == "span" {
+                self.at_start.clone()
+            } else {
+                VisitResult::Continue
+            }
+        }
+
+        fn visit_element_end(&mut self, ctx: &NodeContext, _output: &str) -> VisitResult {
+            if ctx.tag_name == "span" {
+                self.at_end.clone()
+            } else {
+                VisitResult::Continue
+            }
+        }
+    }
+
+    fn plain_with_spans(html: &str, at_start: &VisitResult, at_end: &VisitResult) -> String {
+        plain_with(html, |options| {
+            options.visitor = Some(Arc::new(Mutex::new(SpanVisitor {
+                at_start: at_start.clone(),
+                at_end: at_end.clone(),
+            })));
+        })
+    }
+
+    #[test]
+    fn an_element_that_a_visitor_skips_after_a_control_does_not_join_the_next_word_in_plain_text() {
+        for (at_start, at_end) in [
+            (VisitResult::Skip, VisitResult::Continue),
+            (VisitResult::Continue, VisitResult::Skip),
+            (VisitResult::Custom("QQ".to_string()), VisitResult::Skip),
+        ] {
+            for space in ["", " "] {
+                let html = format!("<p>aaa<button>Xone</button><span>zzz</span>{space}bbb</p>");
+                assert_eq!(
+                    plain_with_spans(&html, &at_start, &at_end),
+                    "aaa Xone bbb\n",
+                    "{at_start:?} {at_end:?}: {html}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn the_text_of_a_visitor_after_a_control_is_a_word_in_plain_text() {
+        let html = "<p>aaa<button>Xone</button><span>zzz</span>bbb</p>";
+        let custom = VisitResult::Custom("QQ".to_string());
+        assert_eq!(
+            plain_with_spans(html, &VisitResult::Continue, &custom),
+            "aaa Xone QQbbb\n"
+        );
+        assert_eq!(
+            plain_with_spans(html, &custom, &VisitResult::Continue),
+            "aaa Xone QQbbb\n"
+        );
+    }
+
+    #[test]
+    fn a_control_that_a_visitor_replaces_with_its_element_separates_no_text_in_plain_text() {
+        // ~keep The text of the visitor is as long as the text it replaces up to the end of the control.
+        let html = "<p>aaa<span><button>X</button>yy</span>bbb</p>";
+        let custom = VisitResult::Custom("QQ".to_string());
+        assert_eq!(plain_with_spans(html, &VisitResult::Continue, &custom), "aaaQQbbb\n");
+    }
+}

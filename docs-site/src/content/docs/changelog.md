@@ -80,8 +80,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `aaaXoneXtwobbb` and now gives `aaa Xone Xtwo bbb`. Each option of a select list or a data
   list is a word of its own. A button, an output, a meter, a progress bar or a text area is a
   word of its own too: `<h1>aaa<button>Xone</button><button>Xtwo</button>bbb</h1>` gave
-  `aaaXoneXtwobbb` and now gives `aaa Xone Xtwo bbb`. In a `pre` element a button adds no
-  space, and the options of a select list stay separate words
+  `aaaXoneXtwobbb` and now gives `aaa Xone Xtwo bbb`. A word after the `form` or `fieldset`
+  element that holds the control is separated too:
+  `<p>aaa<fieldset><button>Xone</button></fieldset>bbb</p>` gave `aaaXonebbb` and now gives
+  `aaa Xone bbb`. No space is written before closing punctuation. In a `pre` element a button
+  adds no space, and the options of a select list stay separate words
   ([#814](https://github.com/xberg-io/html-to-markdown/issues/814)).
 - A page with a structured data script keeps its text when a text value of the JSON holds a tag.
   `<script type="application/ld+json">{"a":"<p>"}</script>` in the head made the whole page
