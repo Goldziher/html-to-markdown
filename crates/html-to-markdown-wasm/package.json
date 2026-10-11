@@ -23,7 +23,12 @@
     "access": "public"
   },
   "type": "module",
-  "files": ["pkg", "*.wasm", "*.d.ts", "README.md"],
+  "files": [
+    "pkg",
+    "*.wasm",
+    "*.d.ts",
+    "README.md"
+  ],
   "main": "pkg/nodejs/html_to_markdown_wasm.js",
   "module": "pkg/web/html_to_markdown_wasm.js",
   "types": "pkg/nodejs/html_to_markdown_wasm.d.ts",
@@ -46,14 +51,15 @@
     "build:wasm:bundler": "wasm-pack build --release --target bundler --out-dir pkg/bundler",
     "build:wasm:nodejs": "wasm-pack build --release --target nodejs --out-dir pkg/nodejs",
     "build:wasm:deno": "wasm-pack build --release --target deno --out-dir pkg/deno",
-    "build:all": "npm run build:wasm:web && npm run build:wasm:bundler && npm run build:wasm:nodejs && npm run build:wasm:deno && find pkg -name .gitignore -delete",
+    "build:all": "pnpm run build:wasm:web && pnpm run build:wasm:bundler && pnpm run build:wasm:nodejs && pnpm run build:wasm:deno && find pkg -name .gitignore -delete",
     "test": "vitest run",
     "test:watch": "vitest watch",
     "test:coverage": "vitest run --coverage",
     "clean": "rm -rf pkg dist"
   },
   "devDependencies": {
-    "vitest": "^4.1.11",
-    "@vitest/coverage-v8": "^4.1.11"
-  }
+    "@vitest/coverage-v8": "^5.0.3",
+    "vitest": "^5.0.3"
+  },
+  "packageManager": "pnpm@12.11.2"
 }

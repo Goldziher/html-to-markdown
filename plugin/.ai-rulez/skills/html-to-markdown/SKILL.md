@@ -49,7 +49,7 @@ Use this skill when writing code that:
 brew trust xberg-io/tap
 brew install xberg-io/tap/html-to-markdown
 # or run without a persistent install (the CLI proxy package self-installs the binary):
-npx @xberg-io/html-to-markdown-cli --help
+pnpm dlx @xberg-io/html-to-markdown-cli --help
 uvx --from html-to-markdown-cli html-to-markdown --help
 # or download a prebuilt binary from the latest GitHub release:
 #   https://github.com/xberg-io/html-to-markdown/releases/latest
@@ -61,13 +61,13 @@ cargo install html-to-markdown-cli
 
 ```bash
 pip install html-to-markdown                                # Python
-npm install @xberg-io/html-to-markdown                      # TypeScript / Node.js
+pnpm add @xberg-io/html-to-markdown                      # TypeScript / Node.js
 cargo add html-to-markdown-rs                                # Rust (features: metadata default; full = all)
 gem install html-to-markdown                                 # Ruby
 composer require xberg-io/html-to-markdown              # PHP
 go get github.com/xberg-io/html-to-markdown/packages/go/v3   # Go
 dotnet add package XbergIo.HtmlToMarkdown               # C#
-npm install @xberg-io/html-to-markdown-wasm                 # WASM
+pnpm add @xberg-io/html-to-markdown-wasm                 # WASM
 ```
 
 - Java (Maven): `io.xberg:html-to-markdown`

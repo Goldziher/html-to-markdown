@@ -28,6 +28,10 @@ builtins = [
 
 compact = true
 [header]
+text = """AI-RULEZ :: GENERATED FILE - DO NOT EDIT
+Source: .ai-rulez/config.toml
+Modify .ai-rulez/ content and regenerate with pnpm dlx ai-rulez@5.0.1 generate
+MCP server: pnpm dlx ai-rulez@5.0.1 mcp"""
 style = 'minimal'
 hashes = "full"
 
@@ -96,3 +100,6 @@ members = ["plugin"]
 [marketplace.owner]
 name = "Kreuzberg, Inc."
 email = "contact@xberg.io"
+
+[mcp]
+self_server_command = ["pnpm", "dlx", "ai-rulez@5.0.1", "mcp"]

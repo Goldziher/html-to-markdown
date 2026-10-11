@@ -12,5 +12,6 @@
   },
   "devDependencies": {
     "@types/bun": "latest"
-  }
+  },
+  "packageManager": "pnpm@12.11.2"
 }

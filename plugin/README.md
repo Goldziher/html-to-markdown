@@ -32,7 +32,7 @@ To install the CLI yourself:
 brew trust xberg-io/tap
 brew install xberg-io/tap/html-to-markdown
 # or run it without a persistent install (the CLI proxy package self-installs the binary):
-npx @xberg-io/html-to-markdown-cli --help
+pnpm dlx @xberg-io/html-to-markdown-cli --help
 uvx --from html-to-markdown-cli html-to-markdown --help
 # or download a prebuilt binary from the latest GitHub release:
 #   https://github.com/xberg-io/html-to-markdown/releases/latest
@@ -44,7 +44,7 @@ The skills also cover the language SDKs. Install the one you need:
 
 ```bash
 pip install html-to-markdown                  # Python
-npm install @xberg-io/html-to-markdown        # TypeScript / Node.js
+pnpm add @xberg-io/html-to-markdown        # TypeScript / Node.js
 cargo add html-to-markdown-rs                  # Rust
 gem install html-to-markdown                   # Ruby
 ```

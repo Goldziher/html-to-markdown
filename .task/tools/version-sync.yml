@@ -54,7 +54,7 @@ tasks:
             pnpm@*) ;;
             *) echo "ERROR: package.json packageManager is $pin, expected a pnpm@ pin." >&2; exit 1 ;;
           esac
-          npx --yes "$pin" install --lockfile-only
+          pnpm dlx "$pin" install --lockfile-only
       - uv lock
       # ~keep `alef sync-versions` rewrites MANIFESTS ONLY. Everything generated from the
       # version -- README install snippets, test-app installers, e2e download scripts, stubs,

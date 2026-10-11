@@ -7,7 +7,7 @@ Binary name: `html-to-markdown`
 ```bash
 brew install xberg-io/tap/html-to-markdown
 # or run without a persistent install (self-installs the binary):
-npx @xberg-io/html-to-markdown-cli --help
+pnpm dlx @xberg-io/html-to-markdown-cli --help
 uvx --from html-to-markdown html-to-markdown --help
 # or build from source:
 cargo install html-to-markdown-cli

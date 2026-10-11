@@ -26,7 +26,7 @@ tasks:
   lint:prose:
     desc: Lint prose with textlint
     cmds:
-      - npx textlint 'docs-site/src/content/docs/**/*.{md,mdx}'
+      - pnpm exec textlint 'docs-site/src/content/docs/**/*.{md,mdx}'
 
   snippets:validate:lang:
     desc: "Validate snippets for one language (set LANG=dart|kotlin|swift|...)"
