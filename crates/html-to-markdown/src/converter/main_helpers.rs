@@ -589,7 +589,8 @@ fn write_repaired(dom: crate::rcdom::RcDom, capacity: usize) -> Option<String> {
 }
 
 /// Rebuild a document when head content precedes an authored `<head>` element, or when a
-/// `<title>` precedes the body of a page with no `<head>` tag.
+/// `<title>` precedes the body and is in no `<head>` element: the page has no `<head>` tag, or
+/// the title follows `</head>`.
 ///
 /// The HTML tree builder places that content in an implicit head and ignores a later head
 /// start tag. The lightweight parser preserves source nesting, so its tree needs this targeted
@@ -605,8 +606,12 @@ pub fn repair_head_content_outside_head(input: &str) -> Option<String> {
     repair_with_html5ever(input)
 }
 
-/// A check of the source that is cheap and never false for a page that
-/// [`repair_head_content_outside_head`] rebuilds: the parsed tree decides.
+/// A cheap check of the source in front of the parse of [`repair_head_content_outside_head`];
+/// the parsed tree decides.
+///
+/// ~keep The check reads bytes, not tags. A `<head>` or a `<body>` inside a comment makes it
+/// ~keep false for a page that the parsed tree would rebuild: that page keeps its title in the
+/// ~keep body.
 fn may_hold_head_content_outside_head(bytes: &[u8]) -> bool {
     let Some(head_start) = last_start_tag(bytes, b"head") else {
         return first_start_tag(bytes, b"title").is_some();
@@ -627,6 +632,20 @@ fn may_hold_head_content_outside_head(bytes: &[u8]) -> bool {
     HEAD_CONTENT
         .iter()
         .any(|name| first_start_tag(bytes, name).is_some_and(|start| start < head_start))
+        || title_follows_head_end(bytes)
+}
+
+/// True when a `<title>` tag follows the first `</head>` with no `<body>` tag between them.
+fn title_follows_head_end(bytes: &[u8]) -> bool {
+    // ~keep `/head` as a name: the end tag has the shape of a start tag with that name.
+    let Some(head_end) = first_start_tag(bytes, b"/head") else {
+        return false;
+    };
+    let rest = &bytes[head_end..];
+    let Some(title) = first_start_tag(rest, b"title") else {
+        return false;
+    };
+    first_start_tag(rest, b"body").is_none_or(|body| title < body)
 }
 
 fn first_start_tag(bytes: &[u8], name: &[u8]) -> Option<usize> {

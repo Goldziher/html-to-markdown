@@ -49,6 +49,34 @@ fn a_title_with_no_head_tag_is_not_body_text_when_metadata_is_off() {
 }
 
 #[test]
+fn a_title_between_the_head_and_the_body_is_the_document_title() {
+    let html = "<head></head><title>T</title><p>one</p>";
+    assert_eq!(on_every_route(html, true), "---\ntitle: T\n---\n\none\n");
+    assert_eq!(on_every_route(html, false), "one\n");
+
+    let after_head = r#"<html><head><meta charset="utf-8"></head><title>T</title><body><p>one</p></body></html>"#;
+    let in_head = r#"<html><head><meta charset="utf-8"><title>T</title></head><body><p>one</p></body></html>"#;
+    for extract_metadata in [true, false] {
+        assert_eq!(
+            on_every_route(after_head, extract_metadata),
+            on_every_route(in_head, extract_metadata),
+            "extract_metadata = {extract_metadata}"
+        );
+    }
+    assert!(on_every_route(after_head, true).contains("title: T\n"));
+}
+
+#[test]
+fn a_title_after_the_body_tag_is_not_moved_to_the_head() {
+    let html = "<head></head><body><title>T</title><p>one</p></body>";
+    for extract_metadata in [true, false] {
+        let markdown = on_every_route(html, extract_metadata);
+        assert!(!markdown.starts_with("---"), "{markdown:?}");
+        assert!(markdown.contains('T'), "{markdown:?}");
+    }
+}
+
+#[test]
 fn a_title_with_no_head_tag_reads_like_the_page_with_one() {
     let pairs = [
         (

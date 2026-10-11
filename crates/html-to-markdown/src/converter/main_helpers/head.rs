@@ -262,12 +262,16 @@ pub(super) struct HeadSearch {
     /// The `<head>` element.
     head: Option<tl::NodeHandle>,
     /// True when a browser's parser puts an element in the head that this tree holds outside
-    /// one: head content in front of the `<head>` tag, or a `title` on a page with no `<head>`
-    /// tag (issue #816).
+    /// one: head content in front of the `<head>` tag, or a `title` before the body that is in
+    /// no `<head>` element, with a `<head>` tag on the page or not (issue #816).
     pub(super) content_outside_head: bool,
 }
 
+/// Walks from the start of the document to the start of the body. The walk does not stop at
+/// the `<head>` element: a `title` between `</head>` and the body is in the head for a browser.
 pub(super) fn document_head_search(roots: &[tl::NodeHandle], parser: &tl::Parser) -> HeadSearch {
+    let mut head = None;
+    let mut content_before_head = false;
     let mut saw_head_content = false;
     let mut saw_title = false;
     let mut work: Vec<_> = roots.iter().rev().copied().collect();
@@ -286,10 +290,10 @@ pub(super) fn document_head_search(roots: &[tl::NodeHandle], parser: &tl::Parser
                 let name = tag.name().as_bytes().to_ascii_lowercase();
                 match name.as_slice() {
                     b"head" => {
-                        return HeadSearch {
-                            head: Some(handle),
-                            content_outside_head: saw_head_content,
-                        };
+                        if head.is_none() {
+                            head = Some(handle);
+                            content_before_head = saw_head_content;
+                        }
                     }
                     b"html" => {
                         let first = work.len();
@@ -307,8 +311,8 @@ pub(super) fn document_head_search(roots: &[tl::NodeHandle], parser: &tl::Parser
         }
     }
     HeadSearch {
-        head: None,
-        content_outside_head: saw_title,
+        head,
+        content_outside_head: content_before_head || saw_title,
     }
 }
 
