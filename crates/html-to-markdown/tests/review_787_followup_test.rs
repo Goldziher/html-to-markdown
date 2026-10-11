@@ -73,9 +73,9 @@ fn should_write_one_space_at_an_image_with_no_source_before_a_comment() {
 
 #[test]
 fn should_keep_the_space_at_an_image_with_no_source_before_a_no_break_space() {
-    // ~keep Issue #792 decides: a no-break space at the start of a text is the one space of that
-    // ~keep edge, and it joins a space already written, as after an empty `span`. An image with
-    // ~keep no source writes nothing. Before the sync: two spaces ("a  b\n").
+    // ~keep A loss against `main`: this writes one space, `main` wrote two ("a  b\n") and a browser
+    // ~keep shows two. An image with no source writes nothing, and the no-break space then joins the
+    // ~keep space already written, as after an empty `span`. The fold needs its own fix.
     assert_rows(&[
         ("<p>a <img>&nbsp;b</p>", "a b\n"),
         ("<p>a <img>&#160;b</p>", "a b\n"),

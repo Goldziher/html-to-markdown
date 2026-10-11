@@ -60,11 +60,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   block: `<pre>\n\na\n</pre>` wrote the fence and `a`, and now writes the fence, a blank line and
   `a`. An indented code block does not start with a blank line. Strict white space mode writes the
   start of a block as before.
-- A link, an image, highlighted text and an abbreviation inside a code block or a code span write
-  their text and no Markdown marks, because code shows every character as text:
+- A link, highlighted text and an abbreviation inside a code block write their text and no Markdown
+  marks, because a code block shows every character as text:
   `<pre>Guido &lt;<a href="/mail">guido</a>&gt;</pre>` wrote `Guido <[guido](/mail)>` and now writes
-  `Guido <guido>`. An image in code writes nothing, and an inline `<svg>` in code writes its text in
-  place of a `data:` image. The link and the image stay in the metadata
+  `Guido <guido>`. Highlighted text and an abbreviation inside a code span do the same. A link
+  inside a code span stays a link, with the code marks around its text
+  ([#813](https://github.com/xberg-io/html-to-markdown/issues/813)). An image in a code block or a
+  code span writes its alt text, and an inline `<svg>` in code writes its text in place of a
+  `data:` image. The link and the image stay in the metadata
   ([#781](https://github.com/xberg-io/html-to-markdown/issues/781)).
 - With `extract_metadata` off, an empty `pre` writes nothing in place of an empty fence, as with the
   default options.
