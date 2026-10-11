@@ -229,19 +229,27 @@ pub fn extract_head_metadata(
     metadata
 }
 
-/// The title, meta and canonical link fields of the [`document_head`] below `roots`.
+/// The title, meta and canonical link fields of the head below `roots`: the children of the
+/// [`document_head`], then the head content that follows it before the body starts.
+///
+/// ~keep A browser's parser puts a `meta` or a `link` that is before the body into the head,
+/// ~keep with a `<head>` tag on the page or not (issue #849). The two are void elements, so
+/// ~keep this tree holds them as the source has them and the page needs no rebuild.
 fn head_element_metadata(
     roots: &[tl::NodeHandle],
     parser: &tl::Parser,
     options: &ConversionOptions,
 ) -> BTreeMap<String, String> {
     let mut metadata = BTreeMap::new();
-    let Some(tl::Node::Tag(head)) = document_head(roots, parser).and_then(|handle| handle.get(parser)) else {
-        return metadata;
-    };
+    let search = document_head_search(roots, parser);
+    let mut elements = Vec::new();
+    if let Some(tl::Node::Tag(head)) = search.head.and_then(|handle| handle.get(parser)) {
+        elements.extend(head.children().top().iter().copied());
+    }
+    elements.extend(search.outside_head);
     let mut seen_meta = HashSet::new();
     let mut seen_title = false;
-    for child_handle in head.children().top().iter() {
+    for child_handle in &elements {
         if let Some(tl::Node::Tag(child_tag)) = child_handle.get(parser) {
             collect_meta_head_metadata(child_tag, options, &mut metadata, &mut seen_meta);
             collect_title_head_metadata(child_tag, parser, options, &mut metadata, &mut seen_title);
@@ -258,22 +266,25 @@ pub fn document_head(roots: &[tl::NodeHandle], parser: &tl::Parser) -> Option<tl
 }
 
 /// What [`document_head_search`] finds before the body starts.
-pub(super) struct HeadSearch {
+struct HeadSearch {
     /// The `<head>` element.
     head: Option<tl::NodeHandle>,
-    /// True when a browser's parser puts an element in the head that this tree holds outside
-    /// one: head content in front of the `<head>` tag, or a `title` before the body that is in
-    /// no `<head>` element, with a `<head>` tag on the page or not (issue #816).
-    pub(super) content_outside_head: bool,
+    /// The head content before the body that is in no `<head>` element, in source order.
+    outside_head: Vec<tl::NodeHandle>,
+    /// True when a browser's parser builds another page than this tree holds. Head content is
+    /// in front of the `<head>` tag (issue #592). A `title` is before the body and in no
+    /// `<head>` element, with a `<head>` tag on the page or not (issue #816). The `<head>`
+    /// element holds content of the body in front of its end tag (issue #856).
+    content_outside_head: bool,
 }
 
 /// Walks from the start of the document to the start of the body. The walk does not stop at
 /// the `<head>` element: a `title` between `</head>` and the body is in the head for a browser.
-pub(super) fn document_head_search(roots: &[tl::NodeHandle], parser: &tl::Parser) -> HeadSearch {
+fn document_head_search(roots: &[tl::NodeHandle], parser: &tl::Parser) -> HeadSearch {
     let mut head = None;
-    let mut content_before_head = false;
+    let mut outside_head = Vec::new();
+    let mut content_outside_head = false;
     let mut saw_head_content = false;
-    let mut saw_title = false;
     let mut work: Vec<_> = roots.iter().rev().copied().collect();
     while let Some(handle) = work.pop() {
         match handle.get(parser) {
@@ -292,7 +303,7 @@ pub(super) fn document_head_search(roots: &[tl::NodeHandle], parser: &tl::Parser
                     b"head" => {
                         if head.is_none() {
                             head = Some(handle);
-                            content_before_head = saw_head_content;
+                            content_outside_head |= saw_head_content || ends_after_body_content(tag, parser);
                         }
                     }
                     b"html" => {
@@ -301,9 +312,15 @@ pub(super) fn document_head_search(roots: &[tl::NodeHandle], parser: &tl::Parser
                         work[first..].reverse();
                     }
                     name if starts_body(name) => break,
-                    name => {
+                    // ~keep This tree holds the text of a `title` in the body until the page is
+                    // ~keep rebuilt, so the readers of the head do not read it here (issue #809).
+                    b"title" => {
                         saw_head_content = true;
-                        saw_title |= name == b"title";
+                        content_outside_head = true;
+                    }
+                    _ => {
+                        saw_head_content = true;
+                        outside_head.push(handle);
                     }
                 }
             }
@@ -312,8 +329,24 @@ pub(super) fn document_head_search(roots: &[tl::NodeHandle], parser: &tl::Parser
     }
     HeadSearch {
         head,
-        content_outside_head: content_before_head || saw_title,
+        outside_head,
+        content_outside_head,
     }
+}
+
+/// True when the source ends `head` with an end tag after content of the body: a child that
+/// [`starts_body`], or text that is not white space. A browser's parser ends the head in front
+/// of that content (issue #856).
+///
+/// ~keep A `<head>` with no end tag holds the rest of the page in this tree. The converter
+/// ~keep gives that page to the HTML tree builder itself (issue #772).
+fn ends_after_body_content(head: &tl::HTMLTag, parser: &tl::Parser) -> bool {
+    crate::converter::preprocessing_helpers::has_end_tag(head)
+        && head.children().top().iter().any(|child| match child.get(parser) {
+            Some(tl::Node::Tag(tag)) => starts_body(&tag.name().as_bytes().to_ascii_lowercase()),
+            Some(tl::Node::Raw(text)) => !is_ignorable_before_head(&text.as_utf8_str(), false),
+            _ => false,
+        })
 }
 
 /// Whether a run of text before the head is found should be skipped rather than ending the
@@ -352,4 +385,245 @@ pub fn starts_body(name: &[u8]) -> bool {
             | b"template"
             | b"title"
     )
+}
+
+/// Rebuild a document whose head and body a browser's parser builds from other content than
+/// the source nesting holds: head content precedes the `<head>` tag, a `<title>` precedes the
+/// body and is in no `<head>` element, or the `<head>` element holds content of the body in
+/// front of its end tag.
+///
+/// The HTML tree builder places that content in an implicit head and ignores a later head
+/// start tag. The lightweight parser preserves source nesting, so its tree needs this targeted
+/// repair before either conversion tier reads metadata or renders the body.
+///
+/// ~keep A `<meta>` or a `<link>` outside the `<head>` element starts no rebuild: the readers
+/// ~keep of the head read it where it is (issue #849).
+pub fn repair_head_content_outside_head(input: &str) -> Option<(String, Option<crate::types::WarningKind>)> {
+    if !may_hold_head_content_outside_head(input.as_bytes()) {
+        return None;
+    }
+    let dom = tl::parse(input, tl::ParserOptions::default()).ok()?;
+    let search = document_head_search(dom.children(), dom.parser());
+    if !search.content_outside_head {
+        return None;
+    }
+    let page = match search.head.and_then(|handle| handle.get(dom.parser())) {
+        Some(tl::Node::Tag(head)) => with_head_metadata_first(input, head, dom.parser()),
+        _ => None,
+    };
+    super::repair_with_html5ever_bounded(page.as_deref().unwrap_or(input))
+}
+
+/// The byte range of `part` in `input`, when `part` is a slice of it.
+fn source_range(input: &str, part: &[u8]) -> Option<std::ops::Range<usize>> {
+    let start = (part.as_ptr() as usize).checked_sub(input.as_ptr() as usize)?;
+    let end = start.checked_add(part.len())?;
+    (end <= input.len()).then_some(start..end)
+}
+
+/// The source with the metadata elements of `head` in front of the first body content of that
+/// head. `None` when the head has no end tag, or no metadata element after body content.
+///
+/// ~keep The tree builder ends the head at body content, so a `title`, `meta`, `link` or `base`
+/// ~keep that the source has after it in the head goes into the body. For a browser it is
+/// ~keep metadata of the document all the same: the title of a document is its first `title`
+/// ~keep element. Only a direct child of the head moves: a `title` in an `svg` is no page title.
+fn with_head_metadata_first(input: &str, head: &tl::HTMLTag, parser: &tl::Parser) -> Option<String> {
+    if !crate::converter::preprocessing_helpers::has_end_tag(head) {
+        return None;
+    }
+    let mut body_start = None;
+    let mut moved = Vec::new();
+    for child in head.children().top().iter() {
+        match child.get(parser) {
+            Some(tl::Node::Tag(tag)) => {
+                let name = tag.name().as_bytes().to_ascii_lowercase();
+                let range = source_range(input, tag.raw().as_bytes())?;
+                if starts_body(&name) {
+                    body_start = body_start.or(Some(range.start));
+                } else if body_start.is_some() && matches!(name.as_slice(), b"title" | b"meta" | b"link" | b"base") {
+                    moved.push(range);
+                }
+            }
+            Some(tl::Node::Raw(text)) if !is_ignorable_before_head(&text.as_utf8_str(), false) => {
+                body_start = body_start.or(Some(source_range(input, text.as_bytes())?.start));
+            }
+            _ => {}
+        }
+    }
+    let body_start = body_start?;
+    if moved.is_empty() {
+        return None;
+    }
+    let mut page = String::with_capacity(input.len());
+    page.push_str(input.get(..body_start)?);
+    for range in &moved {
+        page.push_str(input.get(range.clone())?);
+    }
+    let mut rest = body_start;
+    for range in &moved {
+        page.push_str(input.get(rest..range.start)?);
+        rest = range.end;
+    }
+    page.push_str(input.get(rest..)?);
+    Some(page)
+}
+
+/// A cheap check of the source in front of the parse of [`repair_head_content_outside_head`];
+/// the parsed tree decides.
+///
+/// ~keep One read of the tags from the start of the source to the tag that starts the body. A
+/// ~keep comment, a CDATA section and the text of a `<script>` or a `<style>` hold no tag (issue
+/// ~keep #848). The markup in a `<title>`, a `<noscript>`, a `<noframes>` or a `<template>` is
+/// ~keep the content of that element, not of the head.
+fn may_hold_head_content_outside_head(bytes: &[u8]) -> bool {
+    use crate::converter::utility::preprocessing::{find_closing_tag_bytes, find_tag_end, skip_opaque_region};
+
+    let is_text = |range: std::ops::Range<usize>| bytes[range].iter().any(|byte| !byte.is_ascii_whitespace());
+    // ~keep Body content in a `<head>` asks for the rebuild only when the head has its end tag
+    // ~keep (issue #856). The converter rebuilds a head with no end tag itself.
+    let head_ends_after = |from: usize| find_closing_tag_bytes(bytes, from, b"head").is_some();
+    let mut in_head = false;
+    let mut saw_head = false;
+    let mut saw_head_content = false;
+    let mut text_start = 0;
+    let mut idx = 0;
+    while let Some(offset) = memchr::memchr(b'<', &bytes[idx..]) {
+        idx += offset;
+        let is_end_tag = bytes.get(idx + 1) == Some(&b'/');
+        let name_start = idx + 1 + usize::from(is_end_tag);
+        let is_tag = bytes.get(name_start).is_some_and(u8::is_ascii_alphabetic);
+        let is_declaration = !is_end_tag && matches!(bytes.get(idx + 1), Some(b'!' | b'?'));
+        if !is_tag && !is_declaration {
+            // ~keep A `<` that starts no tag is text.
+            idx += 1;
+            continue;
+        }
+        if in_head && is_text(text_start..idx) {
+            return head_ends_after(idx);
+        }
+        let name_end = super::scan_tag_name_end(bytes, name_start);
+        let name = bytes[name_start..name_end].to_ascii_lowercase();
+        let Some(tag_end) = skip_opaque_region(bytes, idx).or_else(|| find_tag_end(bytes, name_end)) else {
+            return false;
+        };
+        idx = tag_end;
+        text_start = tag_end;
+        if is_end_tag {
+            in_head &= name != b"head";
+        }
+        if is_end_tag || is_declaration {
+            continue;
+        }
+        match name.as_slice() {
+            b"html" => {}
+            b"head" => {
+                if !saw_head {
+                    if saw_head_content {
+                        return true;
+                    }
+                    saw_head = true;
+                    in_head = true;
+                }
+            }
+            name if starts_body(name) => return in_head && head_ends_after(idx),
+            name => {
+                if !in_head && name == b"title" {
+                    return true;
+                }
+                saw_head_content = true;
+                if matches!(name, b"title" | b"noscript" | b"noframes" | b"template") {
+                    idx = find_closing_tag_bytes(bytes, tag_end, name).unwrap_or(bytes.len());
+                    text_start = idx;
+                }
+            }
+        }
+    }
+    // ~keep The source ended in the head or before the body: no head has an end tag after body content.
+    false
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn rebuilds_the_head(html: &str) -> bool {
+        repair_head_content_outside_head(html).is_some()
+    }
+
+    #[test]
+    fn should_not_rebuild_a_page_for_a_metadata_element_outside_the_head() {
+        for html in [
+            r#"<meta name="description" content="D"><p>one</p>"#,
+            r#"<link rel="canonical" href="https://e.org/"><p>one</p>"#,
+            r#"<head></head><meta name="description" content="D"><p>one</p>"#,
+            r#"<meta charset="utf-8"><p>one</p>"#,
+            r#"<meta name="description"><p>one</p>"#,
+            r#"<link rel="stylesheet" href="s.css"><p>one</p>"#,
+            "<style>p{}</style><p>one</p>",
+            "<script>var a;</script><p>one</p>",
+            r#"<p>one</p><meta name="description" content="D">"#,
+        ] {
+            assert!(!rebuilds_the_head(html), "{html:?}");
+        }
+    }
+
+    #[test]
+    fn should_put_the_metadata_of_a_head_in_front_of_its_body_content() {
+        let page = |html: &str| {
+            let dom = tl::parse(html, tl::ParserOptions::default()).expect("a tree");
+            let head = document_head(dom.children(), dom.parser()).expect("a head");
+            let Some(tl::Node::Tag(head)) = head.get(dom.parser()) else {
+                panic!("the head is a tag");
+            };
+            with_head_metadata_first(html, head, dom.parser())
+        };
+        assert_eq!(
+            page("<head><o:p></o:p><meta name=a content=b>x<title>T</title></head><p>one").as_deref(),
+            Some("<head><meta name=a content=b><title>T</title><o:p></o:p>x</head><p>one")
+        );
+        assert_eq!(page("<head><title>T</title><img src=i.png></head>"), None);
+        assert_eq!(page("<head><svg><title>X</title></svg></head>"), None);
+        assert_eq!(page("<head><img src=i.png><title>T</title><p>one"), None);
+    }
+
+    #[test]
+    fn should_rebuild_a_page_whose_head_ends_after_body_content() {
+        assert!(rebuilds_the_head("<head><img src=\"p.gif\"></head><p>End</p>"));
+        assert!(rebuilds_the_head("<head>text</head><p>End</p>"));
+        for html in [
+            "<head><title>T</title></head><p>End</p>",
+            "<head><title>T</title><noscript><img src=\"p.gif\"></noscript></head><p>End</p>",
+            "<head><!-- <img> --><title>T</title></head><p>End</p>",
+            // ~keep The converter gives a head with no end tag to the tree builder itself.
+            "<head><title>T</title><p>End</p>",
+        ] {
+            assert!(!rebuilds_the_head(html), "{html:?}");
+        }
+    }
+
+    #[test]
+    fn should_read_no_tag_in_a_comment_or_in_the_content_of_a_head_element() {
+        let may_hold = |html: &str| may_hold_head_content_outside_head(html.as_bytes());
+        for html in [
+            "<!doctype html><html><head><meta charset=\"utf-8\"><title>a <b>x</b></title></head><body><p>one</p>",
+            "<head><noscript><img src=\"p.gif\"></noscript><template><p>x</p></template></head><body><title>T</title>",
+            "<head><script>var a = \"<p>\";</script><style>p > b {}</style><!-- <img> --></head><p>one</p>",
+            "<!-- <title>X</title> --><p>one</p><title>T</title>",
+            "<header>h</header><title>T</title>",
+            "<head><title>T</title><img src=\"p.gif\"><p>one</p>",
+            "<head><title>T</title>text<p>one</p>",
+        ] {
+            assert!(!may_hold(html), "{html:?}");
+        }
+        for html in [
+            "<!-- <head> --><title>T</title><p>one</p>",
+            "<head></head><!-- <body> --><title>T</title><p>one</p>",
+            "<script>var a;</script><head></head>",
+            "<head><title>T</title><img src=\"p.gif\"></head>",
+            "<head>text</head>",
+        ] {
+            assert!(may_hold(html), "{html:?}");
+        }
+    }
 }

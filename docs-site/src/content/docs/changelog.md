@@ -85,6 +85,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- A `<meta>` element with a name or a property, and a `<link rel="canonical">`, before the body
+  of a page are metadata with no `<head>` tag on the page and after `</head>`, as in a browser.
+  `<meta name="description" content="D"><p>one</p>` gave `one` and no front matter. It now gives
+  the front matter `meta-description: D`. With `extract_metadata` off the page converts as before
+  ([#849](https://github.com/xberg-io/html-to-markdown/issues/849)).
+- Content of the body that is written before `</head>` is kept.
+  `<head><img src="p.gif" alt="A1"></head><p>End</p>` gave `End`. It now gives `![A1](p.gif)` and
+  `End` ([#856](https://github.com/xberg-io/html-to-markdown/issues/856)).
+- A `<head>` or a `<body>` tag inside a comment no longer keeps a title with no head tag in the
+  body: `<!-- <head> --><title>T</title><p>one</p>` gave `T` and `one`, and now gives the front
+  matter `title: T` and `one` ([#848](https://github.com/xberg-io/html-to-markdown/issues/848)).
+- The full converter writes a blank line between the front matter and a body that starts with
+  text or an inline element, as the fast converter does. `<head><title>T</title></head>tail` gave
+  `---`, `title: T`, `---`, `tail` with no blank line
+  ([#847](https://github.com/xberg-io/html-to-markdown/issues/847)).
+- A page that the converter rebuilds keeps the blank first line of a `<pre>`.
+  `<title>T</title><pre>`, two line feeds, `x` gave a code block with the line `x` only. It now
+  starts with an empty line, as on the page with a `<head>` tag
+  ([#850](https://github.com/xberg-io/html-to-markdown/issues/850)).
 - A `<title>` before the body content of a page with no `<head>` tag is the document title, as
   in a browser. `<title>T</title><div><p>one</p></div>tail` gave `T`, `one` and `tail` as body
   text and no front matter. It now gives the front matter `title: T`, then `one` and `tail`.

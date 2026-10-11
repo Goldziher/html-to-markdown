@@ -107,7 +107,7 @@ pub fn convert_html_impl(
         #[cfg(feature = "metadata")]
         metadata_collector.as_ref(),
     );
-    output.push_str(&frontmatter);
+    push_frontmatter(&mut output, &frontmatter);
 
     let reference_collector = create_reference_collector(options);
 
@@ -268,6 +268,18 @@ fn finalize_output(
         wrap_after_frontmatter(&output, frontmatter, options)
     } else {
         output
+    }
+}
+
+/// Writes the front matter and the blank line after it.
+///
+/// ~keep The front matter is a block, so a blank line follows it, also when the body starts
+/// ~keep with text or an inline element that asks for no blank line (issue #847). The fast
+/// ~keep converter writes the same line.
+fn push_frontmatter(output: &mut String, frontmatter: &str) {
+    output.push_str(frontmatter);
+    if !frontmatter.is_empty() {
+        output.push('\n');
     }
 }
 

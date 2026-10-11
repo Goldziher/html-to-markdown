@@ -98,11 +98,7 @@ fn should_report_the_effective_document_base_in_frontmatter() {
             .content
             .unwrap_or_default();
 
-        let expected = match tier_strategy {
-            TierStrategy::Tier1 => "---\nbase: https://example.com/other/\n---\n\n[x](https://example.com/other/x)\n",
-            TierStrategy::Tier2 => "---\nbase: https://example.com/other/\n---\n[x](https://example.com/other/x)\n",
-            TierStrategy::Auto => unreachable!("the test enumerates forced tiers only"),
-        };
+        let expected = "---\nbase: https://example.com/other/\n---\n\n[x](https://example.com/other/x)\n";
         assert_eq!(output, expected, "tier: {tier_strategy:?}");
     }
 }

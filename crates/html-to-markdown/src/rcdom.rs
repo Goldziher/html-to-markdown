@@ -526,6 +526,20 @@ impl Default for RcDom {
     }
 }
 
+/// True for a `pre`, a `textarea` or a `listing` whose text starts with a line feed.
+///
+/// ~keep An HTML parser drops a line feed that directly follows the start tag of these three
+/// ~keep elements, so in this tree the line feed is the second one of the source. The page that
+/// ~keep is written back gets the first one again. Without it the next parse drops a line of
+/// ~keep the text (issue #850).
+fn starts_with_line_feed_of_text(name: &QualName, element: &Handle) -> bool {
+    &*name.ns == "http://www.w3.org/1999/xhtml"
+        && matches!(&*name.local, "pre" | "textarea" | "listing")
+        && element.children.borrow().first().is_some_and(
+            |child| matches!(&child.data, NodeData::Text { contents } if contents.borrow().starts_with('\n')),
+        )
+}
+
 enum SerializeOp {
     Open(Handle),
     Close(QualName),
@@ -558,6 +572,9 @@ impl Serialize for SerializableHandle {
                     } => {
                         serializer
                             .start_elem(name.clone(), attrs.borrow().iter().map(|at| (&at.name, &at.value[..])))?;
+                        if starts_with_line_feed_of_text(name, &handle) {
+                            serializer.write_text("\n")?;
+                        }
 
                         ops.reserve(1 + handle.children.borrow().len());
                         ops.push_front(SerializeOp::Close(name.clone()));
