@@ -11,8 +11,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- White space at the start or the end of a link label or of a short quotation goes outside the
-  element, as it does for bold text. `Press <a href="/p">Go </a>now.` gave `Press [Go](/p)now.` and
+- White space at the start or the end of a link label or of a short quotation is written beside
+  the link or the quotation, not inside it, as it is for bold text. `Press <a href="/p">Go </a>now.` gave `Press [Go](/p)now.` and
   now gives `Press [Go](/p) now.`. `Press <q>Go </q>now.` gave `Press "Go"now.` and now gives
   `Press "Go" now.`. A link inside a link is written after the outer link with that space:
   `[Outer](/o) [Inner](/i)`. In a paragraph, a line break at the edge of a link label stays in the
@@ -20,7 +20,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   separates the words on the two sides of the link: `<h2>Press<a href="/p">Go<br></a>now</h2>` gave
   `## Press[Go](/p)now` and now gives `## Press[Go](/p) now`. A short quotation that ends with a
   line break keeps the break: `Press <q>Go<br></q>now.` gave `Press "Go"now.` and now gives
-  `Press "Go"`, a line break and `now.`.
+  `Press "Go"`, a line break and `now.`. A visitor callback at the end of a link or a quotation now
+  receives that edge white space in the text it is given, as for bold text. `Skip`, `Custom` and
+  `PreserveHtml` from the link callback give the same output as before.
 - A checkbox outside a task list item writes nothing.
   `<p>Agree <input type="checkbox"> to the terms</p>` gave `Agree [ ] to the terms` and now gives
   `Agree to the terms`. Bracket pairs in running text are link syntax: `[x](optional)` rendered as
