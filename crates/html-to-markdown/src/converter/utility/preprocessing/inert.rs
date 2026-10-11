@@ -43,11 +43,11 @@ impl NamespaceStack {
         self.contexts.last()
     }
 
-    fn len(&self) -> usize {
+    const fn len(&self) -> usize {
         self.contexts.len()
     }
 
-    fn is_empty(&self) -> bool {
+    const fn is_empty(&self) -> bool {
         self.contexts.is_empty()
     }
 
@@ -142,20 +142,21 @@ impl BodyNormalizer<'_> {
     fn finish_body(&self, body: Body, end: usize, closed: bool) {
         let close_start = closed.then(|| self.closing_start(&body, end)).flatten();
         let content_end = close_start.unwrap_or(end);
-        let mut replacement = String::new();
-        if matches!(&*body.name, "iframe" | "noscript" | "template")
+        let mut replacement = if matches!(&*body.name, "iframe" | "noscript" | "template")
             && let Some(preserved) = &self.preserved
         {
-            replacement = preserved.borrow_mut().protect(&self.source[body.start..content_end]);
+            preserved.borrow_mut().protect(&self.source[body.start..content_end])
         } else {
+            let mut escaped = String::new();
             for character in body.text.chars() {
                 match character {
-                    '&' => replacement.push_str("&amp;"),
-                    '<' => replacement.push_str("&lt;"),
-                    _ => replacement.push(character),
+                    '&' => escaped.push_str("&amp;"),
+                    '<' => escaped.push_str("&lt;"),
+                    _ => escaped.push(character),
                 }
             }
-        }
+            escaped
+        };
         if let Some(close_start) = close_start {
             replacement.push_str(&self.source[close_start..end]);
         } else {
