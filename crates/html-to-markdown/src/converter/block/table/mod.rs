@@ -15,6 +15,7 @@ pub mod builder;
 pub mod caption;
 pub mod cell;
 pub mod cells;
+mod flatten;
 pub mod layout;
 pub mod scanner;
 pub(super) mod utils;

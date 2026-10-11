@@ -78,8 +78,16 @@ fn min_safe_code_span_delimiter_length(content: &str) -> usize {
 /// - Invoking visitor callbacks when the visitor feature is enabled
 /// - Generating appropriate markdown output with proper escaping
 pub fn handle_code(tag: &tl::HTMLTag, mut handler: HandlerContext<'_>) {
+    let links = std::rc::Rc::new(std::cell::RefCell::new(Vec::new()));
     let code_ctx = Context {
         in_code: true,
+        inline_code_links: if handler.context.in_code {
+            handler.context.inline_code_links.clone()
+        } else if contains_anchor(tag, handler.parser) {
+            Some(links.clone())
+        } else {
+            None
+        },
         ..handler.context.clone()
     };
     if handler.context.in_code {
@@ -94,12 +102,100 @@ pub fn handle_code(tag: &tl::HTMLTag, mut handler: HandlerContext<'_>) {
     }
 
     #[cfg(feature = "visitor")]
-    if let Some(custom_output) = visit_inline_code(tag, &content, &handler) {
-        handler.output.push_str(&custom_output);
+    if tag.name().as_utf8_str().eq_ignore_ascii_case("code") {
+        if let Some(custom_output) = visit_inline_code(tag, &content, &handler) {
+            handler.output.push_str(&custom_output);
+            return;
+        }
+    }
+    emit_inline_code_with_links(&content, &links.borrow(), &mut handler);
+}
+
+pub(in crate::converter) fn contains_anchor(tag: &tl::HTMLTag<'_>, parser: &tl::Parser<'_>) -> bool {
+    let mut pending = tag.children().top().to_vec();
+    while let Some(handle) = pending.pop() {
+        if let Some(tl::Node::Tag(child)) = handle.get(parser) {
+            if child.name().as_utf8_str().eq_ignore_ascii_case("a") {
+                return true;
+            }
+            pending.extend(child.children().top().iter().copied());
+        }
+    }
+    false
+}
+
+fn emit_inline_code_with_links(
+    content: &str,
+    links: &[crate::converter::context::InlineCodeLink],
+    handler: &mut HandlerContext<'_>,
+) {
+    if links.is_empty() {
+        emit_code_content(content, handler);
         return;
     }
+    let mut start = 0;
+    let mut pending_break = false;
+    let mut emitted = false;
+    for link in links {
+        emit_linked_code_text(
+            &content[start..link.range.start],
+            &mut pending_break,
+            &mut emitted,
+            handler,
+        );
+        if pending_break && emitted {
+            emit_collected_code_break(handler);
+        }
+        pending_break = false;
+        handler.output.push_str(&link.markdown);
+        emitted = true;
+        start = link.range.end;
+    }
+    emit_linked_code_text(&content[start..], &mut pending_break, &mut emitted, handler);
+}
+
+fn emit_linked_code_text(
+    content: &str,
+    pending_break: &mut bool,
+    emitted: &mut bool,
+    handler: &mut HandlerContext<'_>,
+) {
+    let break_count = content.matches('\n').count();
+    for (index, segment) in content.split('\n').enumerate() {
+        *pending_break |= index > 0;
+        if segment.is_empty() {
+            continue;
+        }
+        if *pending_break && *emitted {
+            emit_collected_code_break(handler);
+        }
+        let segment = if (handler.context.in_table_cell || handler.context.in_heading) && index < break_count {
+            segment.trim_end()
+        } else {
+            segment
+        };
+        if segment.is_empty() {
+            continue;
+        }
+        emit_code_content(segment, handler);
+        *emitted = true;
+        *pending_break = false;
+    }
+}
+
+fn emit_collected_code_break(handler: &mut HandlerContext<'_>) {
+    if handler.context.in_table_cell || handler.context.in_heading {
+        handler.output.push(' ');
+    } else {
+        handler
+            .output
+            .push_str(crate::converter::main_helpers::hard_break_marker(handler.options));
+    }
+}
+
+fn emit_code_content(content: &str, handler: &mut HandlerContext<'_>) {
     emit_inline_code(
-        &content,
+        content,
         handler.output,
         handler.options,
         handler.node_handle,
@@ -178,7 +274,7 @@ fn visit_inline_code(tag: &tl::HTMLTag<'_>, content: &str, handler: &HandlerCont
 /// `<b>`/`<i>` already turn an internal `<br>` into a hard break between two delimiter pairs.
 /// An empty segment (an adjacent, leading, or trailing `<br>`) is dropped rather than emitted
 /// as a dangling empty `` `` `` pair with nothing before or after it. ~keep
-fn emit_inline_code(
+pub(in crate::converter) fn emit_inline_code(
     content: &str,
     output: &mut String,
     options: &ConversionOptions,

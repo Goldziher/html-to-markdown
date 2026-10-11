@@ -221,6 +221,10 @@ fn prepare_open_state(
     name_lower: &[u8],
     options: &ConversionOptions,
 ) -> Result<(), BailReason> {
+    // ~keep Links in inline code need split spans; code-block links must stay literal (#813).
+    if matches!(spec.kind, TagKind::Link) && state.escape_ctx.intersects(EscapeCtx::CODE | EscapeCtx::PRE) {
+        return Err(BailReason::Classifier);
+    }
     if std::mem::take(&mut state.last_closed_list)
         && matches!(spec.kind, TagKind::Pre)
         && options.code_block_style == crate::options::CodeBlockStyle::Indented

@@ -44,6 +44,7 @@ pub fn handle(tag_name: &str, context: HandlerContext<'_>) {
         "sup" => typography::handle_superscript(context),
         "var" => typography::handle_variable(context),
         "dfn" => typography::handle_definition(context),
+        "abbr" if context.context.in_code => typography::handle_small(context),
         "abbr" => typography::handle_abbreviation(context),
         "span" => typography::handle_span(context),
         _ => {}

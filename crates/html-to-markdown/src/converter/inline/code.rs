@@ -53,6 +53,10 @@ fn handle_kbd_samp(mut handler: HandlerContext<'_>) {
         _ => return,
     };
 
+    if !handler.context.in_code && crate::converter::handlers::code_block::contains_anchor(tag, handler.parser) {
+        crate::converter::handlers::code_block::handle_code(tag, handler);
+        return;
+    }
     let children = tag.children();
     if handler.context.in_code {
         // ~keep A nested `<code>` renders transparently inside an outer code span

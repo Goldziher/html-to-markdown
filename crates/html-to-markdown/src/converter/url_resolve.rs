@@ -86,6 +86,15 @@ pub fn resolve_attribute_url(base: &Url, value: &str) -> Option<String> {
     base.join(value).ok().map(|joined| joined.to_string())
 }
 
+// ~keep An empty href refers to the document; an empty image/media src remains absent (#756).
+pub fn resolve_link_url(base: &Url, value: &str) -> Option<String> {
+    if value.is_empty() {
+        base.join(value).ok().map(|url| url.to_string())
+    } else {
+        resolve_attribute_url(base, value)
+    }
+}
+
 /// The `href` of the first HTML `<base>` with one, in tree order, as a browser picks it:
 /// html5ever builds the document, so a `<base>` in a comment, in raw text, in `<template>`
 /// contents or in SVG does not count, and foster parenting and `<frameset>` apply. ~keep

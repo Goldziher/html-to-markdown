@@ -142,6 +142,14 @@ pub(super) fn handle_visitor_end(end: VisitorEndCapture<'_, '_>) {
             depth: end.depth,
         },
     );
+    if !matches!(action, VisitAction::Continue) {
+        if let Some(links) = end.ctx.inline_code_links.as_ref() {
+            // ~keep Replaced or removed subtrees no longer own link ranges in the raw code buffer (#813).
+            links
+                .borrow_mut()
+                .retain(|link| link.range.start < end.element_output_start);
+        }
+    }
     match action {
         VisitAction::Custom => {
             let replacement = end.output.get(end.element_output_start..).map(str::to_string);

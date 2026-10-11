@@ -518,7 +518,11 @@ fn collect_descendant_handles(
 
     while let Some(handle) = stack.pop() {
         if let Some(tl::Node::Tag(child_tag)) = handle.get(parser) {
-            if child_tag.name().as_utf8_str().eq_ignore_ascii_case(target_tag) {
+            let name = child_tag.name().as_utf8_str();
+            if SKIP_TAGS.iter().any(|skip| name.eq_ignore_ascii_case(skip)) {
+                continue;
+            }
+            if name.eq_ignore_ascii_case(target_tag) {
                 result.push(handle);
             } else {
                 let child_children = child_tag.children();
