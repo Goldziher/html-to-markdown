@@ -73,6 +73,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- A `<title>` before the body content of a page with no `<head>` tag is the document title, as
+  in a browser. `<title>T</title><div><p>one</p></div>tail` gave `T`, `one` and `tail` as body
+  text and no front matter. It now gives the front matter `title: T`, then `one` and `tail`.
+  With `extract_metadata` off the title is not written. A `<title>` after body content does not
+  move. A page whose only metadata is an empty title gets no front matter block:
+  `<head><title></title></head><p>one</p>` gave `---`, `---` and `one`, and now gives `one`
+  ([#816](https://github.com/xberg-io/html-to-markdown/issues/816)).
 - A page with a structured data script keeps its text when a text value of the JSON holds a tag.
   `<script type="application/ld+json">{"a":"<p>"}</script>` in the head made the whole page
   convert to an empty string, and the same script in the body removed the text after it. The

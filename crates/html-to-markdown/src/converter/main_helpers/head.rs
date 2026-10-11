@@ -11,8 +11,12 @@ use crate::options::ConversionOptions;
 ///
 /// Keys and values come from the page, so each is written as one YAML scalar (#544): a
 /// newline, `: ` or a leading indicator would otherwise end the line or change what YAML reads.
-pub fn format_metadata_frontmatter(metadata: &BTreeMap<String, String>) -> String {
-    let mut result = String::from("---\n");
+///
+/// `None` when no key writes a line: a page whose only metadata is an empty title gets no
+/// frontmatter block.
+pub fn format_metadata_frontmatter(metadata: &BTreeMap<String, String>) -> Option<String> {
+    const OPEN: &str = "---\n";
+    let mut result = String::from(OPEN);
     for (key, value) in metadata {
         if key == "title" && value.is_empty() {
             continue;
@@ -22,8 +26,11 @@ pub fn format_metadata_frontmatter(metadata: &BTreeMap<String, String>) -> Strin
         push_yaml_scalar(&mut result, value);
         result.push('\n');
     }
+    if result.len() == OPEN.len() {
+        return None;
+    }
     result.push_str("---\n");
-    result
+    Some(result)
 }
 
 /// Append `value` as a plain YAML scalar when it reads back unchanged, else as a double-quoted
@@ -247,11 +254,22 @@ fn head_element_metadata(
 /// The first `<head>` element below `roots` before the body starts. A browser's parser ignores
 /// a `<head>` tag once the body has started, at text or at a tag that [`starts_body`].
 pub fn document_head(roots: &[tl::NodeHandle], parser: &tl::Parser) -> Option<tl::NodeHandle> {
-    document_head_search(roots, parser).0
+    document_head_search(roots, parser).head
 }
 
-pub(super) fn document_head_search(roots: &[tl::NodeHandle], parser: &tl::Parser) -> (Option<tl::NodeHandle>, bool) {
+/// What [`document_head_search`] finds before the body starts.
+pub(super) struct HeadSearch {
+    /// The `<head>` element.
+    head: Option<tl::NodeHandle>,
+    /// True when a browser's parser puts an element in the head that this tree holds outside
+    /// one: head content in front of the `<head>` tag, or a `title` on a page with no `<head>`
+    /// tag (issue #816).
+    pub(super) content_outside_head: bool,
+}
+
+pub(super) fn document_head_search(roots: &[tl::NodeHandle], parser: &tl::Parser) -> HeadSearch {
     let mut saw_head_content = false;
+    let mut saw_title = false;
     let mut work: Vec<_> = roots.iter().rev().copied().collect();
     while let Some(handle) = work.pop() {
         match handle.get(parser) {
@@ -261,26 +279,37 @@ pub(super) fn document_head_search(roots: &[tl::NodeHandle], parser: &tl::Parser
                     Some(tl::Node::Tag(tag)) if tag.name().as_bytes().eq_ignore_ascii_case(b"html")
                 );
                 if !is_ignorable_before_head(&text.as_utf8_str(), next_is_html) {
-                    return (None, false);
+                    break;
                 }
             }
             Some(tl::Node::Tag(tag)) => {
                 let name = tag.name().as_bytes().to_ascii_lowercase();
                 match name.as_slice() {
-                    b"head" => return (Some(handle), saw_head_content),
+                    b"head" => {
+                        return HeadSearch {
+                            head: Some(handle),
+                            content_outside_head: saw_head_content,
+                        };
+                    }
                     b"html" => {
                         let first = work.len();
                         work.extend(tag.children().top().iter().copied());
                         work[first..].reverse();
                     }
-                    name if starts_body(name) => return (None, false),
-                    _ => saw_head_content = true,
+                    name if starts_body(name) => break,
+                    name => {
+                        saw_head_content = true;
+                        saw_title |= name == b"title";
+                    }
                 }
             }
             _ => {}
         }
     }
-    (None, false)
+    HeadSearch {
+        head: None,
+        content_outside_head: saw_title,
+    }
 }
 
 /// Whether a run of text before the head is found should be skipped rather than ending the

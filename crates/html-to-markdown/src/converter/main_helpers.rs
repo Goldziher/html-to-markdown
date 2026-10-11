@@ -588,13 +588,29 @@ fn write_repaired(dom: crate::rcdom::RcDom, capacity: usize) -> Option<String> {
     String::from_utf8(buf).ok()
 }
 
-/// Rebuild a document when head content precedes an authored `<head>` element.
+/// Rebuild a document when head content precedes an authored `<head>` element, or when a
+/// `<title>` precedes the body of a page with no `<head>` tag.
 ///
-/// The HTML tree builder places that content in an implicit head and ignores the later head
+/// The HTML tree builder places that content in an implicit head and ignores a later head
 /// start tag. The lightweight parser preserves source nesting, so its tree needs this targeted
 /// repair before either conversion tier reads metadata or renders the body.
-pub fn repair_head_content_before_explicit_head(input: &str) -> Option<String> {
-    let head_start = last_start_tag(input.as_bytes(), b"head")?;
+pub fn repair_head_content_outside_head(input: &str) -> Option<String> {
+    if !may_hold_head_content_outside_head(input.as_bytes()) {
+        return None;
+    }
+    let dom = tl::parse(input, tl::ParserOptions::default()).ok()?;
+    if !document_head_search(dom.children(), dom.parser()).content_outside_head {
+        return None;
+    }
+    repair_with_html5ever(input)
+}
+
+/// A check of the source that is cheap and never false for a page that
+/// [`repair_head_content_outside_head`] rebuilds: the parsed tree decides.
+fn may_hold_head_content_outside_head(bytes: &[u8]) -> bool {
+    let Some(head_start) = last_start_tag(bytes, b"head") else {
+        return first_start_tag(bytes, b"title").is_some();
+    };
     const HEAD_CONTENT: [&[u8]; 11] = [
         b"base",
         b"basefont",
@@ -608,18 +624,9 @@ pub fn repair_head_content_before_explicit_head(input: &str) -> Option<String> {
         b"template",
         b"title",
     ];
-    if !HEAD_CONTENT
+    HEAD_CONTENT
         .iter()
-        .any(|name| first_start_tag(input.as_bytes(), name).is_some_and(|start| start < head_start))
-    {
-        return None;
-    }
-
-    let dom = tl::parse(input, tl::ParserOptions::default()).ok()?;
-    if !document_head_search(dom.children(), dom.parser()).1 {
-        return None;
-    }
-    repair_with_html5ever(input)
+        .any(|name| first_start_tag(bytes, name).is_some_and(|start| start < head_start))
 }
 
 fn first_start_tag(bytes: &[u8], name: &[u8]) -> Option<usize> {
