@@ -134,7 +134,7 @@ pub fn text_place(
 /// ~keep An element in the text flow ([`writes_in_text_flow`]) writes no mark: the space that
 /// ~keep ends its text is a written space of the text, and the Unicode space after the element
 /// ~keep is a character after it (`a <span>x </span>&nbsp;b` has two spaces). When it has no
-/// ~keep content it writes nothing, and the line end before it is the white space that the text
+/// ~keep content (`DomContext::holds_content`: empty elements of its kind in it are none) it writes nothing, and the line end before it is the white space that the text
 /// ~keep after it starts with: the two are one run (`a\n<span></span>&nbsp;b` has one space). A
 /// ~keep table cell has no line end: the rule of the empty element holds there.
 fn place_after_element(
@@ -149,32 +149,65 @@ fn place_after_element(
         .tag_info(element, parser)
         .is_some_and(|info| writes_in_text_flow(&info.name));
     if dom_ctx.holds_text(element, parser) {
-        return if in_flow {
+        return if in_flow && ends_with_text_space(element, parser, dom_ctx) {
             TextPlace::AfterFlowElement
         } else {
             TextPlace::AfterText
         };
     }
-    let has_no_content = dom_ctx.children_of(element).is_none_or(|children| {
-        children
-            .iter()
-            .all(|child| matches!(child.get(parser), Some(tl::Node::Comment(_)) | None))
-    });
-    if in_flow && !in_cell && has_no_content && ends_with_line_end(before.last(), parser) {
+    if in_flow && !in_cell && ends_with_line_end(before.last(), parser) && !dom_ctx.holds_content(element, parser) {
         TextPlace::AfterText
     } else {
         TextPlace::AfterEmptyElement
     }
 }
 
-/// Whether `node` is a text with visible characters that ends with a line end.
+/// Whether `node` is a text that ends with line ends right after a visible character.
+///
+/// ~keep A space before the line end is a written space of the text (`a \n<span></span>&nbsp;b`
+/// ~keep has two spaces on the fast converter of `main`): only the line end alone is joined.
 fn ends_with_line_end(node: Option<&tl::NodeHandle>, parser: &tl::Parser) -> bool {
     let Some(tl::Node::Raw(raw)) = node.and_then(|node| node.get(parser)) else {
         return false;
     };
     let raw = raw.as_utf8_str();
     let decoded = crate::text::decode_html_entities_cow(raw.as_ref());
-    decoded.ends_with(['\n', '\r']) && !crate::converter::utility::white_space::is_blank(decoded.as_ref())
+    let before_line_ends = decoded.trim_end_matches(['\n', '\r']);
+    before_line_ends.len() < decoded.len() && before_line_ends.ends_with(|character: char| !character.is_whitespace())
+}
+
+/// Whether the content of the element `element` ends with a text that ends with collapsible
+/// white space: its last node, comments apart, is such a text, or an element in the text flow
+/// whose content ends so.
+///
+/// ~keep An element that writes marks puts its end space outside them: that space is no text
+/// ~keep of the `span` around it, and `a <span><a href="/u">x </a></span>&nbsp;b` has one space.
+/// ~keep A loop rather than recursion: nested elements are attacker-controlled depth. Each
+/// ~keep element is the last node of one parent, so no node is read for two texts.
+fn ends_with_text_space(mut element: u32, parser: &tl::Parser, dom_ctx: &DomContext) -> bool {
+    use crate::converter::utility::white_space::{is_collapsible, writes_in_text_flow};
+    loop {
+        let last = dom_ctx.children_of(element).and_then(|children| {
+            children
+                .iter()
+                .rev()
+                .find(|child| !matches!(child.get(parser), Some(tl::Node::Comment(_))))
+        });
+        match last.and_then(|last| last.get(parser).map(|node| (last.get_inner(), node))) {
+            Some((_, tl::Node::Raw(raw))) => {
+                let raw = raw.as_utf8_str();
+                return crate::text::decode_html_entities_cow(raw.as_ref()).ends_with(is_collapsible);
+            }
+            Some((inner, tl::Node::Tag(_)))
+                if dom_ctx
+                    .tag_info(inner, parser)
+                    .is_some_and(|info| writes_in_text_flow(&info.name)) =>
+            {
+                element = inner;
+            }
+            _ => return false,
+        }
+    }
 }
 
 /// The block element the content before `node_handle` in its parent ends with: the previous
@@ -576,6 +609,13 @@ mod tests {
             assert!(text.starts_with("a  b  b"), "white space: {text:?}");
             assert_eq!(text.matches('b').count(), depth, "white space: {text:?}");
             assert!((depth..=3 * depth).contains(&reads), "white space: {reads} nodes");
+
+            // ~keep An empty `span` in an empty `span`, `depth` deep, after a line end: one walk
+            // ~keep for the text and one for the content, each of them reads each element once.
+            let empty = format!("<p>a\n{}{}&nbsp;b</p>", "<span>".repeat(depth), "</span>".repeat(depth));
+            let (reads, text) = node_reads_for(&empty);
+            assert_eq!(text, "a b\n", "empty: {text:?}");
+            assert!((depth..=3 * depth).contains(&reads), "empty: {reads} nodes");
         }
     }
 

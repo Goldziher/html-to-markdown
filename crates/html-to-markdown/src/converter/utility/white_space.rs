@@ -229,8 +229,8 @@ pub enum TextPlace {
     /// white space only, a `<br>` in a table cell. No text is what [`classify_text`] calls
     /// white space only.
     AfterEmptyElement,
-    /// An element that holds text and writes it into the text flow ([`writes_in_text_flow`]) is
-    /// before the text.
+    /// An element in the text flow ([`writes_in_text_flow`]) is before the text, and its content
+    /// ends with a text that ends with collapsible white space.
     AfterFlowElement,
     /// Text is before the text: another text, an element that holds text and writes marks, or
     /// the line end before an element in the text flow that has no content.

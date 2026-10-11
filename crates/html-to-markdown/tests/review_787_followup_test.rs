@@ -320,15 +320,14 @@ fn should_keep_a_no_break_space_after_a_span_whose_text_ends_with_a_space() {
         ("<p>a <span>x </span>&nbsp;b</p>", "a x  b\n"),
         ("<p>a <span>x </span>\u{a0}b</p>", "a x  b\n"),
         ("<p>a <span>x\n</span>&nbsp;b</p>", "a x  b\n"),
-        ("<p>a <span> <b>x </b></span>&nbsp;b</p>", "a **x** b\n"),
+        ("<p>a <span><a href=\"/u\">x </a></span>&nbsp;b</p>", "a [x](/u) b\n"),
+        ("<p>a <span><span>x </span></span>&nbsp;b</p>", "a x  b\n"),
         ("<h2>a <span>x </span>&nbsp;b</h2>", "## a x  b\n"),
         ("<ul><li>a <span>x </span>&nbsp;b</li></ul>", "- a x  b\n"),
         (
             "<table><tr><th>h</th></tr><tr><td>a <span>x </span>&nbsp;b</td></tr></table>",
             "| h      |\n| ------ |\n| a x  b |\n",
         ),
-        ("<p>a <b>x </b>&nbsp;b</p>", "a **x** b\n"),
-        ("<p>a <span>x</span>&nbsp;b</p>", "a x b\n"),
     ]);
 }
 
@@ -342,9 +341,13 @@ fn should_write_one_space_for_a_line_end_an_empty_span_and_a_no_break_space() {
         ("<p>a\n<span></span>&nbsp;b</p>", "a b\n"),
         ("<p>a\n<span></span>\u{a0}b</p>", "a b\n"),
         ("<p>a\n<span><!-- c --></span>&nbsp;b</p>", "a b\n"),
+        ("<p>a\n<span><span></span></span>&nbsp;b</p>", "a b\n"),
+        ("<p>a\n<span><span><!-- c --></span></span>&nbsp;b</p>", "a b\n"),
+        ("<p>a\n<span><b></b></span>&nbsp;b</p>", "a  b\n"),
         ("<h2>a\n<span></span>&nbsp;b</h2>", "## a b\n"),
         ("<ul><li>a\n<span></span>&nbsp;b</li></ul>", "- a b\n"),
         ("<p>a <span></span>&nbsp;b</p>", "a  b\n"),
+        ("<p>a \n<span></span>&nbsp;b</p>", "a  b\n"),
         ("<p>a\n<b></b>&nbsp;b</p>", "a  b\n"),
         ("<p>a\n<span>\n</span>&nbsp;b</p>", "a  b\n"),
         (

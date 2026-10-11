@@ -9,7 +9,7 @@ use std::collections::HashMap;
 use crate::converter::main_helpers::is_inline_element;
 use crate::converter::utility::content::normalized_tag_name;
 use crate::converter::utility::escaping::is_block_level_name;
-use crate::converter::utility::white_space::{TextClass, classify_text};
+use crate::converter::utility::white_space::{TextClass, classify_text, writes_in_text_flow};
 use crate::text;
 
 /// Cached information about an HTML tag element.
@@ -72,11 +72,13 @@ pub struct DomContext {
     pub(crate) table_content_summary_cache: RefCell<HashMap<u32, TableContentSummary>>,
     /// For each element that [`DomContext::holds_text`] read: whether it holds text.
     pub(crate) holds_text_cache: RefCell<HashMap<u32, bool>>,
+    /// For each element that [`DomContext::holds_content`] read: whether it holds content.
+    pub(crate) holds_content_cache: RefCell<HashMap<u32, bool>>,
 }
 
 #[cfg(test)]
 thread_local! {
-    /// The nodes that `DomContext::holds_text` read on this thread.
+    /// The nodes that `DomContext::holds_text` and `DomContext::holds_content` read on this thread.
     pub(crate) static HOLDS_TEXT_NODE_READS: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
 }
 
@@ -87,6 +89,21 @@ fn count_node_read() {
 
 #[cfg(not(test))]
 const fn count_node_read() {}
+
+/// What one node is to a walk of [`DomContext::holds`].
+enum Held {
+    /// The node is what the walk looks for.
+    Yes,
+    /// The node is not.
+    No,
+    /// The node is an element: the walk reads its nodes.
+    Inside,
+}
+
+/// The answer that a walk recorded for the element `id`.
+fn recorded(record: &RefCell<HashMap<u32, bool>>, id: u32) -> Option<bool> {
+    record.borrow().get(&id).copied()
+}
 
 impl DomContext {
     pub(crate) fn ensure_capacity(&mut self, id: u32) {
@@ -330,7 +347,49 @@ impl DomContext {
     /// ~keep without the record each of them reads the elements below it again.
     /// ~keep A loop rather than recursion: nested elements are attacker-controlled depth.
     pub(crate) fn holds_text(&self, id: u32, parser: &tl::Parser) -> bool {
-        if let Some(known) = self.recorded_holds_text(id) {
+        self.holds(id, parser, &self.holds_text_cache, |node, _| match node {
+            tl::Node::Raw(raw) => {
+                let raw = raw.as_utf8_str();
+                let decoded = text::decode_html_entities_cow(raw.as_ref());
+                if matches!(classify_text(decoded.as_ref()), TextClass::WhiteSpaceOnly(_)) {
+                    Held::No
+                } else {
+                    Held::Yes
+                }
+            }
+            tl::Node::Tag(_) => Held::Inside,
+            tl::Node::Comment(_) => Held::No,
+        })
+    }
+
+    /// Whether the element `id` holds content: a text of any kind, or an element that does not
+    /// write its content into the text flow ([`writes_in_text_flow`]), at any depth of elements
+    /// that do. A comment is no content: `<span><span><!-- c --></span></span>` holds none.
+    ///
+    /// ~keep The walk and its record are those of [`DomContext::holds_text`].
+    pub(crate) fn holds_content(&self, id: u32, parser: &tl::Parser) -> bool {
+        self.holds(id, parser, &self.holds_content_cache, |node, child| match node {
+            tl::Node::Raw(_) => Held::Yes,
+            tl::Node::Tag(_) => {
+                let in_flow = self
+                    .tag_info(child, parser)
+                    .is_some_and(|info| writes_in_text_flow(&info.name));
+                if in_flow { Held::Inside } else { Held::Yes }
+            }
+            tl::Node::Comment(_) => Held::No,
+        })
+    }
+
+    /// Whether a node in the element `id` is held, as `held` answers for each node, with the
+    /// answers of `record`.
+    fn holds(
+        &self,
+        id: u32,
+        parser: &tl::Parser,
+        record: &RefCell<HashMap<u32, bool>>,
+        held: impl Fn(&tl::Node, u32) -> Held,
+    ) -> bool {
+        if let Some(known) = recorded(record, id) {
             return known;
         }
         let mut open = vec![(id, 0_usize)];
@@ -341,43 +400,30 @@ impl DomContext {
                 .copied();
             *position += 1;
             let Some(child) = child else {
-                self.record_holds_text(*element, false);
+                record.borrow_mut().insert(*element, false);
                 open.pop();
                 continue;
             };
             count_node_read();
-            let found = match child.get(parser) {
-                Some(tl::Node::Raw(raw)) => {
-                    let raw = raw.as_utf8_str();
-                    let decoded = text::decode_html_entities_cow(raw.as_ref());
-                    !matches!(classify_text(decoded.as_ref()), TextClass::WhiteSpaceOnly(_))
-                }
-                Some(tl::Node::Tag(_)) => {
-                    let known = self.recorded_holds_text(child.get_inner());
+            let found = match child.get(parser).map(|node| held(node, child.get_inner())) {
+                Some(Held::Yes) => true,
+                Some(Held::Inside) => {
+                    let known = recorded(record, child.get_inner());
                     if known.is_none() {
                         open.push((child.get_inner(), 0));
                     }
                     known.unwrap_or(false)
                 }
-                Some(tl::Node::Comment(_)) | None => false,
+                Some(Held::No) | None => false,
             };
             if found {
                 for (element, _) in &open {
-                    self.record_holds_text(*element, true);
+                    record.borrow_mut().insert(*element, true);
                 }
                 return true;
             }
         }
         false
-    }
-
-    /// The answer of [`DomContext::holds_text`] for the element `id`, when a walk recorded it.
-    fn recorded_holds_text(&self, id: u32) -> Option<bool> {
-        self.holds_text_cache.borrow().get(&id).copied()
-    }
-
-    fn record_holds_text(&self, id: u32, holds: bool) {
-        self.holds_text_cache.borrow_mut().insert(id, holds);
     }
 
     /// Get the parent tag name for a given node ID.
