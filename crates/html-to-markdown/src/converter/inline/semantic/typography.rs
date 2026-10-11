@@ -16,37 +16,6 @@ use crate::options::{ConversionOptions, OutputFormat};
 use std::borrow::Cow;
 type Context = crate::converter::Context;
 
-/// Handle small element.
-///
-/// Small text has no direct Markdown equivalent, so just pass through content.
-pub fn handle_small(handler: HandlerContext<'_>) {
-    use crate::converter::walk_node;
-
-    let Some(node) = handler.node_handle.get(handler.parser) else {
-        return;
-    };
-
-    let tag = match node {
-        tl::Node::Tag(tag) => tag,
-        _ => return,
-    };
-
-    let children = tag.children();
-    for child_handle in children.top().iter() {
-        walk_node(
-            child_handle,
-            handler.parser,
-            handler.output,
-            crate::converter::block::container::HandlerContext::new(
-                handler.options,
-                handler.context,
-                handler.depth + 1,
-                handler.dom_context,
-            ),
-        );
-    }
-}
-
 /// Resolve a `<sub>`/`<sup>` wrapping pair for the current output format and configured symbol.
 ///
 /// An HTML-ish symbol such as `<sub>` closes with its matching end tag rather than a repeat of
@@ -83,10 +52,7 @@ enum ScriptKind {
 }
 
 fn handle_script(handler: HandlerContext<'_>, kind: ScriptKind) {
-    if handler.context.in_code {
-        handle_small(handler);
-        return;
-    }
+    // ~keep In code the dispatcher gives the children to the walk and this handler does not run.
     let Some(tl::Node::Tag(tag)) = handler.node_handle.get(handler.parser) else {
         return;
     };
@@ -285,24 +251,16 @@ pub fn handle_abbreviation(handler: HandlerContext<'_>) {
 /// Processes span elements with special handling for:
 /// - OCR words (elements with class "`ocrx_word")`: adds space before if needed
 /// - Otherwise passes through content normally
-pub fn handle_span(handler: HandlerContext<'_>) {
-    use crate::converter::walk_node;
-
-    let HandlerContext {
-        node_handle,
-        parser,
-        output,
-        options,
-        context: ctx,
-        depth,
-        dom_context: dom_ctx,
-    } = handler;
-
-    let Some(node) = node_handle.get(parser) else { return };
-
-    let tag = match node {
-        tl::Node::Tag(tag) => tag,
-        _ => return,
+///
+/// Writes what a span writes before its children and lists the children in `children`.
+pub fn open_span(
+    node_handle: &tl::NodeHandle,
+    parser: &tl::Parser,
+    output: &mut String,
+    children: &mut Vec<tl::NodeHandle>,
+) -> Option<crate::converter::walk::Open> {
+    let Some(tl::Node::Tag(tag)) = node_handle.get(parser) else {
+        return None;
     };
 
     let is_hocr_word = tag.attributes().iter().any(|(name, value)| {
@@ -318,17 +276,8 @@ pub fn handle_span(handler: HandlerContext<'_>) {
         output.push(' ');
     }
 
-    let children = tag.children();
-    {
-        for child_handle in children.top().iter() {
-            walk_node(
-                child_handle,
-                parser,
-                output,
-                crate::converter::block::container::HandlerContext::new(options, ctx, depth + 1, dom_ctx),
-            );
-        }
-    }
+    children.extend(tag.children().top().iter().copied());
+    Some(crate::converter::walk::Open::children_only())
 }
 
 fn walk_children_to_output(tag: &tl::HTMLTag<'_>, handler: &mut HandlerContext<'_>) {

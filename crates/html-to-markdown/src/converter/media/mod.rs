@@ -113,10 +113,6 @@ pub fn dispatch_media_handler(
             embedded::handle_audio(node_handle, tag, parser, output, context);
             true
         }
-        "picture" => {
-            embedded::handle_picture(node_handle, tag, parser, output, context);
-            true
-        }
         "svg" => {
             svg::handle_svg(node_handle, tag, parser, output, context);
             true

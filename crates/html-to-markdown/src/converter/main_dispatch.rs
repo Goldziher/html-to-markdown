@@ -1,5 +1,6 @@
 use crate::converter::block::container::HandlerContext;
 use crate::converter::handlers::{handle_blockquote, handle_code, handle_graphic, handle_img, handle_link, handle_pre};
+use crate::converter::walk::{Close, Open};
 
 struct TagDispatcher<'a, 'output> {
     tag_name: &'a str,
@@ -8,29 +9,45 @@ struct TagDispatcher<'a, 'output> {
     parser: &'a tl::Parser<'a>,
     output: &'output mut String,
     handler: HandlerContext<'a>,
+    children: &'output mut Vec<tl::NodeHandle>,
+    opened: Option<Open>,
+}
+
+/// What the handler of an element left to do.
+pub(super) enum Dispatched {
+    /// The handler wrote the element with its children. `stop` is set when the element has no end.
+    Complete { stop: bool },
+    /// The handler wrote the start of the element and listed its children for the walk.
+    Opened(Open),
 }
 
 pub(super) fn dispatch_tag<'a>(
     tag_name: &'a str,
     node_handle: &'a tl::NodeHandle,
-    tag: &'a tl::HTMLTag<'a>,
     parser: &'a tl::Parser<'a>,
     output: &mut String,
     handler: HandlerContext<'a>,
-) -> bool {
+    children: &mut Vec<tl::NodeHandle>,
+) -> Dispatched {
+    let Some(tl::Node::Tag(tag)) = node_handle.get(parser) else {
+        return Dispatched::Complete { stop: false };
+    };
     // ~keep In a table cell a code block is one code span, which has no lines.
     if handler.ctx.in_code_block
         && !handler.ctx.in_table_cell
         && crate::converter::handlers::code_block::is_line_element_in_pre(tag_name)
     {
         crate::converter::handlers::code_block::handle_line_element_in_pre(node_handle, parser, output, handler);
-        return false;
+        return Dispatched::Complete { stop: false };
     }
     // ~keep Inline-code link ranges belong to this buffer. Container handlers must not
     // ~keep collect children in detached buffers or insert block markup around those ranges (#813).
     if handler.ctx.inline_code_links.is_some() && !code_collection_handler(tag_name) {
-        crate::converter::block::container::handle_passthrough(node_handle, parser, output, handler);
-        return false;
+        return opened_or_complete(crate::converter::block::container::open_children(
+            node_handle,
+            parser,
+            children,
+        ));
     }
     let mut dispatcher = TagDispatcher {
         tag_name,
@@ -39,18 +56,32 @@ pub(super) fn dispatch_tag<'a>(
         parser,
         output,
         handler,
+        children,
+        opened: None,
     };
-    if dispatcher.dispatch_inline() || dispatcher.dispatch_blocks() {
-        return false;
+    let stop = dispatcher.dispatch();
+    match dispatcher.opened {
+        Some(open) => Dispatched::Opened(open),
+        None => Dispatched::Complete { stop },
     }
-    if let Some(stop) = dispatcher.dispatch_tables_and_lists() {
-        return stop;
+}
+
+fn opened_or_complete(opened: Option<Open>) -> Dispatched {
+    opened.map_or(Dispatched::Complete { stop: false }, Dispatched::Opened)
+}
+
+/// Run the second half of the handler that opened an element.
+pub(super) fn close_tag(close: Close, parser: &tl::Parser, output: &mut String, handler: HandlerContext<'_>) {
+    match close {
+        Close::Nothing => {}
+        Close::LineEndControl(end) => {
+            crate::converter::form::elements::close_line_end_control(&end, parser, output, handler);
+        }
+        Close::Div(end) => crate::converter::block::div::close(end, output, handler),
+        Close::InlineDiv(end) => crate::converter::block::div::close_inline(&end, output),
+        Close::Paragraph(end) => crate::converter::block::paragraph::close(&end, output, handler),
+        Close::Unknown(end) => crate::converter::block::unknown::close(&end, output),
     }
-    if dispatcher.dispatch_categories() {
-        return false;
-    }
-    dispatcher.dispatch_fallback();
-    false
 }
 
 fn code_collection_handler(tag_name: &str) -> bool {
@@ -85,11 +116,62 @@ fn code_collection_handler(tag_name: &str) -> bool {
 }
 
 impl TagDispatcher<'_, '_> {
+    /// Run the handler of the element. Returns whether the element has no end.
+    fn dispatch(&mut self) -> bool {
+        if self.open_inline() || self.dispatch_inline() || self.dispatch_blocks() {
+            return false;
+        }
+        if let Some(stop) = self.dispatch_tables_and_lists() {
+            return stop;
+        }
+        if self.open_category() || self.dispatch_categories() {
+            return false;
+        }
+        self.dispatch_fallback();
+        false
+    }
+
+    fn open_children(&mut self) {
+        self.opened = crate::converter::block::container::open_children(self.node_handle, self.parser, self.children);
+    }
+
+    /// The inline elements that give their children to the walk.
+    fn open_inline(&mut self) -> bool {
+        let handler = self.handler;
+        match self.tag_name {
+            "small" => self.open_children(),
+            // ~keep Code shows every character as text: no title in parentheses, no script marks.
+            "abbr" | "sub" | "sup" if handler.ctx.in_code => self.open_children(),
+            "u" => {
+                #[cfg(feature = "visitor")]
+                if crate::converter::inline::semantic::visit_underline(
+                    self.node_handle,
+                    self.parser,
+                    self.output,
+                    handler,
+                ) {
+                    return true;
+                }
+                self.open_children();
+            }
+            "span" => {
+                self.opened = crate::converter::inline::semantic::open_span(
+                    self.node_handle,
+                    self.parser,
+                    self.output,
+                    self.children,
+                );
+            }
+            _ => return false,
+        }
+        true
+    }
+
     fn dispatch_inline(&mut self) -> bool {
         let handler = self.handler;
         match self.tag_name {
-            "strong" | "b" | "em" | "i" | "mark" | "del" | "s" | "strike" | "ins" | "u" | "small" | "sub" | "sup"
-            | "kbd" | "samp" | "var" | "dfn" | "abbr" | "ruby" | "rb" | "rt" | "rp" | "rtc" | "span" => {
+            "strong" | "b" | "em" | "i" | "mark" | "del" | "s" | "strike" | "ins" | "sub" | "sup" | "kbd" | "samp"
+            | "var" | "dfn" | "abbr" | "ruby" | "rb" | "rt" | "rp" | "rtc" => {
                 crate::converter::inline::dispatch_inline_handler(
                     self.tag_name,
                     crate::converter::inline::HandlerContext::new((
@@ -166,7 +248,15 @@ impl TagDispatcher<'_, '_> {
                 self.output,
                 handler,
             ),
-            "p" => crate::converter::block::paragraph::handle(self.node_handle, self.parser, self.output, handler),
+            "p" => {
+                self.opened = Some(crate::converter::block::paragraph::open(
+                    self.node_handle,
+                    self.parser,
+                    self.output,
+                    handler,
+                    self.children,
+                ));
+            }
             "pre" => handle_pre(
                 self.tag,
                 crate::converter::inline::HandlerContext::new((
@@ -191,22 +281,9 @@ impl TagDispatcher<'_, '_> {
                     handler.dom_ctx,
                 )),
             ),
-            "time" | "data" => crate::converter::block::container::handle_passthrough(
-                self.node_handle,
-                self.parser,
-                self.output,
-                handler,
-            ),
             // ~keep A table handler walks its own rows and cells, so a part that arrives here is
             // ~keep stray, in a cell too: its tag is ignored and its text is kept (#805).
-            "td" | "th" | "tr" | "thead" | "tbody" | "tfoot" => {
-                crate::converter::block::container::handle_passthrough(
-                    self.node_handle,
-                    self.parser,
-                    self.output,
-                    handler,
-                );
-            }
+            "time" | "data" | "td" | "th" | "tr" | "thead" | "tbody" | "tfoot" => self.open_children(),
             "wbr" | "source" => {
                 crate::converter::block::container::handle_noop();
             }
@@ -223,7 +300,8 @@ impl TagDispatcher<'_, '_> {
     /// ~keep These content-bearing block containers mirror Tier-1's generic block handling;
     /// routing them through the div handler preserves table-cell and list-item behavior.
     fn dispatch_div_like(&mut self) {
-        crate::converter::block::div::handle(self.node_handle, self.parser, self.output, self.handler);
+        self.opened =
+            crate::converter::block::div::open(self.node_handle, self.parser, self.output, self.handler, self.children);
     }
 
     fn dispatch_tables_and_lists(&mut self) -> Option<bool> {
@@ -279,6 +357,52 @@ impl TagDispatcher<'_, '_> {
         false
     }
 
+    /// The semantic, media and form elements that give their children to the walk.
+    fn open_category(&mut self) -> bool {
+        match self.tag_name {
+            // ~keep In an inline context a section and a figure write nothing of their own.
+            "article" | "section" | "nav" | "aside" | "header" | "footer" | "main" | "figure"
+                if self.handler.ctx.convert_as_inline =>
+            {
+                self.open_children();
+            }
+            "optgroup" => self.open_children(),
+            "picture" => {
+                self.opened = Some(crate::converter::media::embedded::open_picture(
+                    self.tag,
+                    self.parser,
+                    self.children,
+                ));
+            }
+            "button" | "textarea" | "output" | "meter" | "progress" => {
+                #[cfg(feature = "visitor")]
+                if self.tag_name == "button"
+                    && crate::converter::form::elements::visit_button(
+                        self.node_handle,
+                        self.parser,
+                        self.output,
+                        crate::converter::form::FormContext {
+                            options: self.handler.options,
+                            ctx: self.handler.ctx,
+                            depth: self.handler.depth,
+                            dom_ctx: self.handler.dom_ctx,
+                        },
+                    )
+                {
+                    return true;
+                }
+                self.opened = crate::converter::form::elements::open_line_end_control(
+                    self.node_handle,
+                    self.parser,
+                    self.output,
+                    self.children,
+                );
+            }
+            _ => return false,
+        }
+        true
+    }
+
     fn dispatch_categories(&mut self) -> bool {
         match self.tag_name {
             "article" | "section" | "nav" | "aside" | "header" | "footer" | "main" | "q" | "figure" | "figcaption"
@@ -291,7 +415,7 @@ impl TagDispatcher<'_, '_> {
                     self.handler,
                 );
             }
-            "audio" | "video" | "picture" | "iframe" | "svg" | "math" => {
+            "audio" | "video" | "iframe" | "svg" | "math" => {
                 crate::converter::media::dispatch_media_handler(
                     self.tag_name,
                     self.node_handle,
@@ -305,8 +429,7 @@ impl TagDispatcher<'_, '_> {
                     },
                 );
             }
-            "form" | "fieldset" | "legend" | "label" | "input" | "textarea" | "select" | "option" | "optgroup"
-            | "button" | "progress" | "meter" | "output" | "datalist" => {
+            "form" | "fieldset" | "legend" | "label" | "input" | "select" | "option" | "datalist" => {
                 crate::converter::form::dispatch_form_handler(
                     self.tag_name,
                     self.node_handle,
@@ -330,20 +453,26 @@ impl TagDispatcher<'_, '_> {
 
     fn dispatch_fallback(&mut self) {
         match self.tag_name {
-            "head" | "script" | "style" => crate::converter::metadata::handle(
+            "head" => {
+                self.opened =
+                    crate::converter::metadata::open_head(self.node_handle, self.parser, self.handler, self.children);
+            }
+            "script" | "style" => crate::converter::metadata::handle(
                 self.tag_name,
                 self.node_handle,
                 self.parser,
                 self.output,
                 self.handler,
             ),
-            "body" | "html" => crate::converter::block::container::handle_structural_container(
-                self.node_handle,
-                self.parser,
-                self.output,
-                self.handler,
-            ),
-            _ => crate::converter::block::unknown::handle(self.node_handle, self.parser, self.output, self.handler),
+            "body" | "html" => self.open_children(),
+            _ => {
+                #[cfg(feature = "visitor")]
+                if crate::converter::block::unknown::visit(self.node_handle, self.parser, self.output, self.handler) {
+                    return;
+                }
+                self.opened =
+                    crate::converter::block::unknown::open(self.node_handle, self.parser, self.output, self.children);
+            }
         }
     }
 }

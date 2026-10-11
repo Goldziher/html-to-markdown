@@ -283,34 +283,18 @@ pub fn handle_video(
 /// Handle picture element conversion to Markdown.
 ///
 /// Finds and processes the first child img element, skipping source elements.
-pub fn handle_picture(
-    _node_handle: &NodeHandle,
-    tag: &HTMLTag,
-    parser: &Parser,
-    output: &mut String,
-    context: MediaContext<'_>,
-) {
-    let MediaContext {
-        options,
-        ctx,
-        depth,
-        dom_ctx,
-    } = context;
-    use crate::converter::main::walk_node;
-
+///
+/// Lists that child in `children` for the walk.
+pub fn open_picture(tag: &HTMLTag, parser: &Parser, children: &mut Vec<NodeHandle>) -> crate::converter::walk::Open {
     for child_handle in tag.children().top().iter() {
         if let Some(tl::Node::Tag(child_tag)) = child_handle.get(parser) {
             if tag_name_eq(child_tag.name().as_utf8_str(), "img") {
-                walk_node(
-                    child_handle,
-                    parser,
-                    output,
-                    crate::converter::block::container::HandlerContext::new(options, ctx, depth + 1, dom_ctx),
-                );
+                children.push(*child_handle);
                 break;
             }
         }
     }
+    crate::converter::walk::Open::children_only()
 }
 
 /// Handle iframe element conversion to Markdown.

@@ -336,56 +336,32 @@ pub fn handle_inserted(handler: HandlerContext<'_>) {
 ///
 /// Just passes through content (HTML doesn't have native underline in Markdown).
 /// Supports visitor callbacks when enabled, which can provide custom formatting.
-pub fn handle_underline(handler: HandlerContext<'_>) {
-    use crate::converter::walk_node;
-
-    let HandlerContext {
+///
+/// Returns whether the visitor wrote or skipped the element, so that the walk does not open it.
+#[cfg(feature = "visitor")]
+pub fn visit_underline(
+    node_handle: &tl::NodeHandle,
+    parser: &tl::Parser,
+    output: &mut String,
+    handler: crate::converter::block::container::HandlerContext<'_>,
+) -> bool {
+    let Some(tl::Node::Tag(tag)) = node_handle.get(parser) else {
+        return false;
+    };
+    let site = InlineSite {
         node_handle,
         parser,
-        output,
-        options,
-        context: ctx,
-        depth,
-        dom_context: dom_ctx,
-    } = handler;
-
-    let Some(node) = node_handle.get(parser) else { return };
-
-    let tag = match node {
-        tl::Node::Tag(tag) => tag,
-        _ => return,
+        dom_ctx: handler.dom_ctx,
+        ctx: handler.ctx,
+        options: handler.options,
     };
-
-    #[cfg(feature = "visitor")]
-    if let Some(outcome) = visit_semantic(
-        tag,
-        SemanticKind::Underline("u"),
-        depth,
-        InlineSite {
-            node_handle,
-            parser,
-            dom_ctx,
-            ctx,
-            options,
-        },
-    ) {
-        match outcome {
-            VisitorOutcome::Continue => {}
-            VisitorOutcome::Output(custom_output) => {
-                output.push_str(&custom_output);
-                return;
-            }
-            VisitorOutcome::Skip => return,
+    match visit_semantic(tag, SemanticKind::Underline("u"), handler.depth, site) {
+        None | Some(VisitorOutcome::Continue) => false,
+        Some(VisitorOutcome::Output(custom_output)) => {
+            output.push_str(&custom_output);
+            true
         }
-    }
-
-    for child_handle in tag.children().top().iter() {
-        walk_node(
-            child_handle,
-            parser,
-            output,
-            crate::converter::block::container::HandlerContext::new(options, ctx, depth + 1, dom_ctx),
-        );
+        Some(VisitorOutcome::Skip) => true,
     }
 }
 

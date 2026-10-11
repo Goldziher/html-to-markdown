@@ -15,6 +15,7 @@
 use super::FormContext;
 use super::spacing::{ControlStart, line_goes_on_after_parent, separate_from_next_text};
 use super::walk_node;
+use crate::converter::walk::{Close, Open};
 #[cfg(feature = "visitor")]
 use std::borrow::Cow;
 
@@ -480,28 +481,47 @@ pub fn handle_input(
 /// The text is a word of its own after the text before it. A blank line follows it where a
 /// block holds the control. In inline mode and in an inline element the line goes on, and the
 /// text after the control is a word of its own too.
-fn write_line_end_control(
-    node_handle: tl::NodeHandle,
-    tag: &tl::HTMLTag,
+///
+/// This is the first half: it records where the control starts and lists its children.
+pub fn open_line_end_control(
+    node_handle: &tl::NodeHandle,
+    parser: &tl::Parser,
+    output: &str,
+    children: &mut Vec<tl::NodeHandle>,
+) -> Option<Open> {
+    let Some(tl::Node::Tag(tag)) = node_handle.get(parser) else {
+        return None;
+    };
+    children.extend(tag.children().top().iter().copied());
+    Some(Open {
+        scope: None,
+        close: Close::LineEndControl(LineEndControlEnd {
+            start: ControlStart::new(output),
+            node: *node_handle,
+        }),
+    })
+}
+
+/// What `close_line_end_control` needs from `open_line_end_control`.
+pub struct LineEndControlEnd {
+    start: ControlStart,
+    node: tl::NodeHandle,
+}
+
+/// Ends the line of a control after its text.
+pub fn close_line_end_control(
+    end: &LineEndControlEnd,
     parser: &tl::Parser,
     output: &mut String,
-    context: FormContext<'_>,
+    handler: crate::converter::block::container::HandlerContext<'_>,
 ) {
-    let FormContext {
-        options,
-        ctx,
-        depth,
-        dom_ctx,
-    } = context;
-    let start = ControlStart::new(output);
-    for child_handle in tag.children().top().iter() {
-        walk_node(
-            child_handle,
-            parser,
-            output,
-            crate::converter::block::container::HandlerContext::new(options, ctx, depth + 1, dom_ctx),
-        );
-    }
+    let LineEndControlEnd {
+        start,
+        node: node_handle,
+    } = end;
+    let node_handle = *node_handle;
+    let ctx = handler.ctx;
+    let dom_ctx = handler.dom_ctx;
     // ~keep In code the text of a control is written as the source has it: no space is added
     // ~keep and the line does not end.
     if ctx.in_code || !start.finish(output) {
@@ -511,20 +531,6 @@ fn write_line_end_control(
         separate_from_next_text(output, node_handle, parser, dom_ctx);
     } else {
         output.push_str("\n\n");
-    }
-}
-
-/// Handles the `<textarea>`, `<output>`, `<meter>` and `<progress>` elements: their text content
-/// is plain text that ends its line.
-pub fn handle_line_end_control(
-    _tag_name: &str,
-    node_handle: &tl::NodeHandle,
-    parser: &tl::Parser,
-    output: &mut String,
-    context: FormContext<'_>,
-) {
-    if let Some(tl::Node::Tag(tag)) = node_handle.get(parser) {
-        write_line_end_control(*node_handle, tag, parser, output, context);
     }
 }
 
@@ -610,55 +616,22 @@ pub fn handle_option(
     }
 }
 
-/// Handles the `<optgroup>` element.
-///
-/// Its options are written as the options of the list are. The `label` attribute is not text of
-/// the page: a browser shows it only inside the open list.
-pub fn handle_optgroup(
-    _tag_name: &str,
-    node_handle: &tl::NodeHandle,
-    parser: &tl::Parser,
-    output: &mut String,
-    context: FormContext<'_>,
-) {
-    let FormContext {
-        options,
-        ctx,
-        depth,
-        dom_ctx,
-    } = context;
-    if let Some(tl::Node::Tag(tag)) = node_handle.get(parser) {
-        let children = tag.children();
-        {
-            for child_handle in children.top().iter() {
-                walk_node(
-                    child_handle,
-                    parser,
-                    output,
-                    crate::converter::block::container::HandlerContext::new(options, ctx, depth + 1, dom_ctx),
-                );
-            }
-        }
-    }
-}
-
-/// Handles the `<button>` element.
+/// Gives a `<button>` element to the visitor. Returns whether the visitor wrote or skipped the
+/// button, so that the walk does not open it.
 ///
 /// A button element represents a clickable button. Its text content is plain text that ends
-/// its line.
-#[cfg_attr(not(feature = "visitor"), allow(unused_variables))]
-pub fn handle_button(
-    _tag_name: &str,
+/// its line: without a visitor result, `open_line_end_control` writes it.
+#[cfg(feature = "visitor")]
+pub fn visit_button(
     node_handle: &tl::NodeHandle,
     parser: &tl::Parser,
     output: &mut String,
     context: FormContext<'_>,
-) {
+) -> bool {
     let FormContext {
         ctx, depth, dom_ctx, ..
     } = context;
     if let Some(tl::Node::Tag(tag)) = node_handle.get(parser) {
-        #[cfg(feature = "visitor")]
         if let Some(ref visitor_handle) = ctx.visitor {
             use crate::converter::get_text_content;
             use crate::visitor::{NodeContext, NodeType, VisitResult};
@@ -682,30 +655,29 @@ pub fn handle_button(
             };
             match visit_result {
                 VisitResult::Continue => {}
-                VisitResult::Skip => return,
+                VisitResult::Skip => return true,
                 VisitResult::Custom(custom) => {
                     output.push_str(&custom);
                     if !ctx.convert_as_inline && !custom.ends_with('\n') {
                         output.push_str("\n\n");
                     }
-                    return;
+                    return true;
                 }
                 VisitResult::PreserveHtml => {
                     use crate::converter::utility::serialization::serialize_node;
                     output.push_str(&serialize_node(node_handle, parser));
-                    return;
+                    return true;
                 }
                 VisitResult::Error(err) => {
                     if ctx.visitor_error.borrow().is_none() {
                         *ctx.visitor_error.borrow_mut() = Some(err);
                     }
-                    return;
+                    return true;
                 }
             }
         }
-
-        write_line_end_control(*node_handle, tag, parser, output, context);
     }
+    false
 }
 
 /// Dispatcher for form elements.
@@ -724,13 +696,8 @@ pub fn handle(
         "legend" => handle_legend(tag_name, node_handle, parser, output, context),
         "label" => handle_label(tag_name, node_handle, parser, output, context),
         "input" => handle_input(tag_name, node_handle, parser, output, context),
-        "textarea" | "output" | "meter" | "progress" => {
-            handle_line_end_control(tag_name, node_handle, parser, output, context);
-        }
         "select" | "datalist" => handle_option_list(tag_name, node_handle, parser, output, context),
         "option" => handle_option(tag_name, node_handle, parser, output, context),
-        "optgroup" => handle_optgroup(tag_name, node_handle, parser, output, context),
-        "button" => handle_button(tag_name, node_handle, parser, output, context),
         _ => {}
     }
 }

@@ -20,7 +20,7 @@
 ///
 /// # Behavior
 ///
-/// - **Inline mode**: Children are processed inline; block spacing is skipped
+/// - **Inline mode**: The dispatcher gives the children to the walk; this handler does not run
 /// - **Block mode**: Content is collected, trimmed, and formatted with blank lines
 /// - **Empty content**: Empty sections are skipped entirely
 ///
@@ -36,11 +36,6 @@ pub fn handle(
     handler: super::HandlerContext<'_>,
 ) {
     if let Some(tl::Node::Tag(tag)) = node_handle.get(parser) {
-        if handler.ctx.convert_as_inline {
-            super::walk_tag_children(tag, parser, output, handler);
-            return;
-        }
-
         let mut content = String::with_capacity(256);
         let section_ctx = crate::converter::list::utils::nested_block_context(output, handler.ctx, handler.options);
         super::walk_tag_children(

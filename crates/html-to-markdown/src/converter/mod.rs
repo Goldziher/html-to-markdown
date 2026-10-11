@@ -121,6 +121,7 @@ pub mod utility;
 
 #[cfg(feature = "visitor")]
 pub mod visitor_hooks;
+mod walk;
 
 pub use self::context::Context;
 pub use self::dom_context::DomContext;

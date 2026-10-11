@@ -35,12 +35,9 @@ pub fn handle_figure(
     output: &mut String,
     handler: super::HandlerContext<'_>,
 ) {
+    // ~keep In an inline context the dispatcher gives the children to the walk and this handler
+    // ~keep does not run.
     if let Some(tl::Node::Tag(tag)) = node_handle.get(parser) {
-        if handler.ctx.convert_as_inline {
-            super::walk_tag_children(tag, parser, output, handler);
-            return;
-        }
-
         #[cfg(feature = "visitor")]
         if visit_figure_start(tag, node_handle, parser, output, handler) {
             return;

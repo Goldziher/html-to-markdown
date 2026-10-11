@@ -1,6 +1,6 @@
 use std::rc::Rc;
 
-use super::{Context, DomContext, HandlerContext, TagCapture};
+use super::{Begun, Context, DomContext, HandlerContext, TagCapture};
 
 pub(super) fn is_table_part(node: &tl::NodeHandle, parser: &tl::Parser, dom_ctx: &DomContext) -> bool {
     dom_ctx
@@ -72,8 +72,12 @@ pub(super) fn walk_table_parts<'a>(
                     .or(context);
                 let ctx = context.as_deref().unwrap_or(handler.ctx);
                 let local = HandlerContext::new(handler.options, ctx, depth, handler.dom_ctx);
-                let capture = super::begin_tag(&node, tag, parser, output, local, handler.dom_ctx);
-                let should_descend = capture.is_some();
+                let (capture, should_descend) =
+                    match super::begin_tag(&node, tag, parser, output, local, handler.dom_ctx) {
+                        Begun::Complete => (None, false),
+                        Begun::Children => (None, true),
+                        Begun::Open(capture) => (Some(capture), true),
+                    };
                 pending.push(TablePartStep::Exit(TablePartExit {
                     node,
                     depth,

@@ -190,8 +190,8 @@ const fn bail_unsupported(spec: &TagSpec, _offset: usize) -> Result<(), BailReas
 // content-bearing containers with no formatting beyond block separation) all
 // render through a handler that pushes a leading and/or trailing `"\n\n"`.
 // The names below are the ones that still fall through to Tier-2's `_ =>` arm
-// (`block::unknown::handle`) or, for `html`/`body`,
-// `block::container::handle_structural_container` -- both of which just walk
+// (`block::unknown::open`) or, for `html`/`body`,
+// `block::container::open_children` -- both of which just walk
 // children with NO separator of their own, and deliberately so:
 // `colgroup`/`col` are table-internal metadata (never render visible content
 // of their own), `base` is void metadata, and `html`/`body` are document
@@ -345,7 +345,7 @@ fn emit_open_kind(
 }
 
 /// ~keep Button: nothing on open. `close_button` writes the space before its text and
-/// ~keep the `\n\n` after it, as Tier-2 `handle_button` does. In a line that goes on
+/// ~keep the `\n\n` after it, as Tier-2 `close_line_end_control` does. In a line that goes on
 /// ~keep after the control, Tier-2 reads the text that follows it instead. In code Tier-2
 /// ~keep writes neither.
 fn open_button(state: &Tier1State) -> Result<(), BailReason> {

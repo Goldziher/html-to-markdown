@@ -8,11 +8,12 @@
 
 use crate::converter::block::container::HandlerContext;
 use crate::converter::main_helpers::{strip_trailing_backslash_breaks, trim_trailing_whitespace};
+use crate::converter::walk::{Close, Open};
 use crate::options::{ConversionOptions, NewlineStyle};
+use std::rc::Rc;
 use tl::{NodeHandle, Parser};
 
 type Context = crate::converter::Context;
-type DomContext = crate::converter::DomContext;
 
 /// Handles div elements.
 ///
@@ -22,24 +23,38 @@ type DomContext = crate::converter::DomContext;
 /// - When in list item: uses list continuation indentation
 /// - When in block context: adds appropriate newlines before/after content
 ///
-/// # Note
-/// This function references `walk_node` and helper functions from converter.rs
-/// which must be accessible (pub(crate)) for this module to work correctly.
+/// This entry is for a handler that the walk does not drive: it writes the div to its end.
 pub fn handle(node_handle: &NodeHandle, parser: &Parser, output: &mut String, handler: HandlerContext<'_>) {
-    use crate::converter::walk_node;
+    crate::converter::main::walk_opened(parser, output, handler, |output, children| {
+        open(node_handle, parser, output, handler, children)
+    });
+}
 
-    let HandlerContext {
-        options,
-        ctx,
-        depth,
-        dom_ctx,
-    } = handler;
+/// What `close` needs from `open`.
+pub struct DivEnd {
+    content_start_pos: usize,
+    kept: Option<(usize, String)>,
+    children_start: usize,
+    is_list_continuation: bool,
+}
 
-    let Some(node) = node_handle.get(parser) else { return };
+/// What `close_inline` needs from `open`.
+pub struct InlineDivEnd {
+    in_heading_line: bool,
+}
 
-    let tag = match node {
-        tl::Node::Tag(tag) => tag,
-        _ => return,
+/// Write what a div writes before its children and list the children in `children`.
+pub fn open(
+    node_handle: &NodeHandle,
+    parser: &Parser,
+    output: &mut String,
+    handler: HandlerContext<'_>,
+    children: &mut Vec<NodeHandle>,
+) -> Option<Open> {
+    let HandlerContext { options, ctx, .. } = handler;
+
+    let Some(tl::Node::Tag(tag)) = node_handle.get(parser) else {
+        return None;
     };
 
     let is_table_continuation = (ctx.in_table_cell || ctx.in_layout_cell)
@@ -52,8 +67,12 @@ pub fn handle(node_handle: &NodeHandle, parser: &Parser, output: &mut String, ha
         && !output.ends_with('\n');
 
     if ctx.convert_as_inline {
-        handle_inline(tag, parser, output, handler, is_table_continuation);
-        return;
+        let end = open_inline(output, handler, is_table_continuation);
+        children.extend(tag.children().top().iter().copied());
+        return Some(Open {
+            scope: None,
+            close: Close::InlineDiv(end),
+        });
     }
 
     let content_start_pos = output.len();
@@ -76,17 +95,27 @@ pub fn handle(node_handle: &NodeHandle, parser: &Parser, output: &mut String, ha
         ..ctx.clone()
     };
 
-    let children = tag.children();
-    {
-        for child_handle in children.top().iter() {
-            walk_node(
-                child_handle,
-                parser,
-                output,
-                crate::converter::block::container::HandlerContext::new(options, &div_ctx, depth + 1, dom_ctx),
-            );
-        }
-    }
+    children.extend(tag.children().top().iter().copied());
+    Some(Open {
+        scope: Some(Rc::new(div_ctx)),
+        close: Close::Div(DivEnd {
+            content_start_pos,
+            kept,
+            children_start,
+            is_list_continuation,
+        }),
+    })
+}
+
+/// Write what a div writes after its children.
+pub fn close(end: DivEnd, output: &mut String, handler: HandlerContext<'_>) {
+    let DivEnd {
+        content_start_pos,
+        kept,
+        children_start,
+        is_list_continuation,
+    } = end;
+    let HandlerContext { options, ctx, .. } = handler;
 
     if options.newline_style == NewlineStyle::Backslash {
         // ~keep A trailing <br> run with no following sibling has no next dispatch to catch
@@ -103,13 +132,7 @@ pub fn handle(node_handle: &NodeHandle, parser: &Parser, output: &mut String, ha
     close_block(output, ctx, content_start_pos, is_list_continuation);
 }
 
-fn handle_inline(
-    tag: &tl::HTMLTag<'_>,
-    parser: &Parser,
-    output: &mut String,
-    handler: HandlerContext<'_>,
-    is_table_continuation: bool,
-) {
+fn open_inline(output: &mut String, handler: HandlerContext<'_>, is_table_continuation: bool) -> InlineDivEnd {
     if is_table_continuation {
         crate::converter::main_helpers::emit_table_cell_break_in_context(
             output,
@@ -121,20 +144,12 @@ fn handle_inline(
     if in_heading_line && !output.is_empty() && !output.ends_with(char::is_whitespace) {
         output.push(' ');
     }
-    for child_handle in tag.children().top().iter() {
-        crate::converter::walk_node(
-            child_handle,
-            parser,
-            output,
-            crate::converter::block::container::HandlerContext::new(
-                handler.options,
-                handler.ctx,
-                handler.depth + 1,
-                handler.dom_ctx,
-            ),
-        );
-    }
-    if in_heading_line && !output.ends_with(char::is_whitespace) {
+    InlineDivEnd { in_heading_line }
+}
+
+/// Write what a div in an inline context writes after its children.
+pub fn close_inline(end: &InlineDivEnd, output: &mut String) {
+    if end.in_heading_line && !output.ends_with(char::is_whitespace) {
         output.push(' ');
     }
 }

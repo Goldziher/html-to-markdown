@@ -127,7 +127,7 @@ pub fn dispatch_inline_handler(tag_name: &str, context: HandlerContext<'_>) -> b
             code::handle(tag_name, context);
             true
         }
-        "mark" | "del" | "s" | "strike" | "ins" | "u" | "small" | "sub" | "sup" | "var" | "dfn" | "abbr" | "span" => {
+        "mark" | "del" | "s" | "strike" | "ins" | "sub" | "sup" | "var" | "dfn" | "abbr" => {
             semantic::handle(tag_name, context);
             true
         }

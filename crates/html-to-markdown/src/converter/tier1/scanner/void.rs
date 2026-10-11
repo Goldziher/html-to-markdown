@@ -714,7 +714,7 @@ fn close_figcaption(state: &mut Tier1State, _frame: &OpenTag) {
 /// that keeps it a word of its own before it and `\n\n` after it.  The `\n\n` is skipped in
 /// table cells (cells stay one logical line).
 ///
-/// Mirrors Tier-2 `form/elements.rs`'s `write_line_end_control`, with the same `ControlStart`.
+/// Mirrors Tier-2 `form/elements.rs`'s `close_line_end_control`, with the same `ControlStart`.
 fn close_button(state: &mut Tier1State, frame: &OpenTag) {
     let dest = state.cell_or_output_mut();
     let content_start = clamp_to_char_boundary(dest, frame.content_start);

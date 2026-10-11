@@ -14,6 +14,10 @@
 mod marks;
 mod typography;
 
+#[cfg(feature = "visitor")]
+pub use marks::visit_underline;
+pub use typography::open_span;
+
 use crate::converter::inline::HandlerContext;
 
 /// Handler for semantic inline elements: mark, del, s, ins, u, small, sub, sup, var, dfn, abbr, span.
@@ -35,20 +39,14 @@ use crate::converter::inline::HandlerContext;
 /// which must be accessible (pub(crate)) for this module to work correctly.
 pub fn handle(tag_name: &str, context: HandlerContext<'_>) {
     match tag_name {
-        // ~keep Code shows every character as text: no title in parentheses.
-        "abbr" if context.context.in_code => typography::handle_small(context),
         "mark" => marks::handle_mark(context),
         "del" | "s" | "strike" => marks::handle_strikethrough(tag_name, context),
         "ins" => marks::handle_inserted(context),
-        "u" => marks::handle_underline(context),
-        "small" => typography::handle_small(context),
         "sub" => typography::handle_subscript(context),
         "sup" => typography::handle_superscript(context),
         "var" => typography::handle_variable(context),
         "dfn" => typography::handle_definition(context),
-        "abbr" if context.context.in_code => typography::handle_small(context),
         "abbr" => typography::handle_abbreviation(context),
-        "span" => typography::handle_span(context),
         _ => {}
     }
 }

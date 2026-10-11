@@ -17,10 +17,9 @@ use tl::{NodeHandle, Parser};
 type Context = crate::converter::Context;
 type DomContext = crate::converter::DomContext;
 
-/// Handles metadata elements: head, script, style, math.
+/// Handles metadata elements: script, style, math. `open_head` handles head.
 ///
 /// Processes various metadata-related elements:
-/// - head: Scans for structured data in script[type="application/ld+json"]
 /// - script: Extracts JSON-LD for structured data collection
 /// - style: Skipped (CSS not relevant in markdown)
 /// - math: Preserves `MathML` as HTML comments with text content
@@ -32,9 +31,6 @@ pub fn handle(
     handler: HandlerContext<'_>,
 ) {
     match tag_name {
-        "head" => {
-            handle_head(node_handle, parser, output, handler);
-        }
         "script" => {
             handle_script(node_handle, parser, output, handler.ctx);
         }
@@ -63,18 +59,20 @@ pub fn is_body_content_in_head(name: &str) -> bool {
 ///
 /// Head elements contain metadata. We process them to extract structured data from
 /// nested script[type="application/ld+json"] elements if metadata collection is enabled.
-fn handle_head(node_handle: &NodeHandle, parser: &Parser, output: &mut String, handler: HandlerContext<'_>) {
-    use crate::converter::walk_node;
-
-    let Some(node) = node_handle.get(parser) else { return };
-
-    let tag = match node {
-        tl::Node::Tag(tag) => tag,
-        _ => return,
+///
+/// A head that holds body content gives its children to the walk in `children`.
+pub fn open_head(
+    node_handle: &NodeHandle,
+    parser: &Parser,
+    handler: HandlerContext<'_>,
+    children: &mut Vec<NodeHandle>,
+) -> Option<crate::converter::walk::Open> {
+    let Some(tl::Node::Tag(tag)) = node_handle.get(parser) else {
+        return None;
     };
 
-    let children = tag.children();
-    let has_body_like = children.top().iter().any(|child_handle| {
+    let tag_children = tag.children();
+    let has_body_like = tag_children.top().iter().any(|child_handle| {
         if let Some(child_name) = handler.dom_ctx.tag_name_for(*child_handle, parser) {
             is_body_content_in_head(child_name.as_ref())
         } else {
@@ -84,24 +82,14 @@ fn handle_head(node_handle: &NodeHandle, parser: &Parser, output: &mut String, h
 
     #[cfg(feature = "metadata")]
     if handler.ctx.metadata_wants.structured_data {
-        collect_json_ld_from_children(&children, parser, handler);
+        collect_json_ld_from_children(&tag_children, parser, handler);
     }
 
-    if has_body_like {
-        for child_handle in children.top().iter() {
-            walk_node(
-                child_handle,
-                parser,
-                output,
-                crate::converter::block::container::HandlerContext::new(
-                    handler.options,
-                    handler.ctx,
-                    handler.depth + 1,
-                    handler.dom_ctx,
-                ),
-            );
-        }
+    if !has_body_like {
+        return None;
     }
+    children.extend(tag_children.top().iter().copied());
+    Some(crate::converter::walk::Open::children_only())
 }
 
 #[cfg(feature = "metadata")]
