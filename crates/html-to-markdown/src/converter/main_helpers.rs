@@ -590,21 +590,23 @@ pub fn repair_head_content_before_explicit_head(input: &str) -> Option<String> {
 }
 
 fn first_start_tag(bytes: &[u8], name: &[u8]) -> Option<usize> {
-    bytes
-        .iter()
-        .enumerate()
-        .find_map(|(start, _)| is_start_tag_at(bytes, name, start).then_some(start))
+    memchr::memchr_iter(b'<', bytes).find(|&start| is_start_tag_at(bytes, name, start))
 }
 
 fn last_start_tag(bytes: &[u8], name: &[u8]) -> Option<usize> {
-    bytes
-        .iter()
-        .enumerate()
+    memchr::memchr_iter(b'<', bytes)
         .rev()
-        .find_map(|(start, _)| is_start_tag_at(bytes, name, start).then_some(start))
+        .find(|&start| is_start_tag_at(bytes, name, start))
+}
+
+#[cfg(test)]
+thread_local! {
+    static START_TAG_CANDIDATE_CHECKS: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
 }
 
 fn is_start_tag_at(bytes: &[u8], name: &[u8], start: usize) -> bool {
+    #[cfg(test)]
+    START_TAG_CANDIDATE_CHECKS.with(|checks| checks.set(checks.get() + 1));
     if bytes.get(start) != Some(&b'<') {
         return false;
     }
@@ -684,6 +686,20 @@ pub fn is_inline_element(tag_name: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn should_scan_only_markup_candidates_when_finding_head_tags() {
+        let padding = "plain text ".repeat(10_000);
+        let html = format!("{padding}<head>{padding}</head>{padding}<HEAD >{padding}");
+        super::START_TAG_CANDIDATE_CHECKS.with(|checks| checks.set(0));
+
+        assert_eq!(super::first_start_tag(html.as_bytes(), b"head"), Some(padding.len()));
+        assert_eq!(
+            super::last_start_tag(html.as_bytes(), b"head"),
+            Some(padding.len() * 3 + "<head></head>".len())
+        );
+        super::START_TAG_CANDIDATE_CHECKS.with(|checks| assert_eq!(checks.get(), 2));
+    }
 
     #[test]
     fn test_is_ignorable_before_head() {
