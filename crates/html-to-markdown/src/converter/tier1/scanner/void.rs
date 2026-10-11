@@ -236,6 +236,11 @@ fn emit_image(
     if state.escape_ctx.contains(EscapeCtx::CODE) {
         return emit_image_in_code(state, &src, &alt, options);
     }
+    // ~keep Tier-2 owns the text around an image that `skip_images` leaves out (the white space
+    // ~keep beside it, the label of a link that held it), so Tier-2 takes that page.
+    if options.skip_images {
+        return Err(BailReason::Classifier);
+    }
     let title = find_attr(attrs, b"title")
         .map(decode_attr)
         .transpose()?
@@ -262,6 +267,12 @@ fn emit_image_in_code(
 ) -> Result<(), BailReason> {
     if alt.contains(['\n', '\r']) {
         return Err(BailReason::Classifier);
+    }
+    if !state.escape_ctx.contains(EscapeCtx::PRE) {
+        state.code_span.image = true;
+        if state.code_span.needs_tier2() {
+            return Err(BailReason::Classifier);
+        }
     }
     let treatment = crate::converter::media::inline_data_treatment(options.inline_data_media, src);
     if !options.skip_images && treatment != crate::options::InlineDataMedia::DropElement && !alt.is_empty() {

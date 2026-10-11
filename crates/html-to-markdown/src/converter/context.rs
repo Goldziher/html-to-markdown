@@ -333,13 +333,6 @@ pub struct Context {
     pub(crate) structure_collector: Option<StructureCollectorHandle>,
     /// Optional reference collector for reference-style links.
     pub(crate) reference_collector: Option<ReferenceCollectorHandle>,
-    /// When `true`, all visitor-hook Mutex acquisitions are skipped.
-    ///
-    /// Set during the table column-width pre-pass, which walks every cell to
-    /// measure rendered text width but never uses visitor results.  The pre-pass
-    /// runs before the main rendering pass, so acquiring the Mutex there is pure
-    /// overhead (especially costly post-`Arc<Mutex>` migration in 7f6178f25).
-    pub(crate) skip_visitor_hooks: bool,
     /// When `true`, `walk_node` short-circuits nested-table dispatch — the
     /// outer table is currently in its width-measurement pre-pass and the
     /// nested table's full markdown rendering (which itself runs a pre-pass on
@@ -353,8 +346,8 @@ pub struct Context {
     /// output (the column width is slightly underestimated for cells
     /// containing tables, which is fine — the cap dominates anyway).
     ///
-    /// Set together with `skip_visitor_hooks` when constructing `prepass_ctx`
-    /// in `block::table::builder::handle_table`. Resolves issue #406.
+    /// Set when constructing `prepass_ctx` in `block::table::builder::column_widths`, which
+    /// also holds no visitor: a measuring walk calls no visitor method. Resolves issue #406.
     pub(crate) measure_width_only: bool,
     /// Effective base URL for resolving relative `href`/`src` destinations, already
     /// combined with any document `<base href>` (see `converter::url_resolve`).
@@ -447,7 +440,6 @@ impl Context {
             visitor_error: Rc::new(RefCell::new(None)),
             structure_collector: parameters.structure_collector,
             reference_collector: parameters.reference_collector,
-            skip_visitor_hooks: false,
             measure_width_only: false,
             base_url: parameters.base_url,
         }

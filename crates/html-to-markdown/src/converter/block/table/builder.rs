@@ -113,7 +113,7 @@ fn row_columns(
 /// verbatim in the render pass.
 ///
 /// ~keep The pre-pass runs with `measure_width_only` (a nested `<table>` degrades to raw text,
-/// ~keep issue #406) and `skip_visitor_hooks`, so its rendering equals the render pass only
+/// ~keep issue #406) and without the visitor, so its rendering equals the render pass only
 /// ~keep when the table holds no nested table and no visitor is installed.
 ///
 /// ~keep A collector shared through the context also observes the walk, and two of them feed
@@ -286,10 +286,15 @@ fn column_widths(
         return Vec::new();
     }
     let mut prepass_ctx = super::super::super::Context {
-        skip_visitor_hooks: true,
         measure_width_only: true,
         ..handler.ctx.clone()
     };
+    // ~keep The measuring walk holds no visitor, so no visitor method of any kind runs in it:
+    // ~keep the visitor walk of each row and the render pass are the walks a visitor sees.
+    #[cfg(feature = "visitor")]
+    {
+        prepass_ctx.visitor = None;
+    }
     if !reuse_cell_text {
         #[cfg(feature = "metadata")]
         {

@@ -628,10 +628,14 @@ fn flush_text(state: &mut Tier1State, request: TextFlush<'_>) -> Result<(), Bail
     let raw = normalized_whitespace.as_ref();
 
     let position = text_position(state, raw);
-    // ~keep Tier-2 keeps white space beside an image in a code span as the source has it. The
-    // ~keep rules below are the rules for running text, so Tier-2 takes that page.
-    if in_code && !in_pre && position.whitespace_only && (history.after_img || upcoming.is_img) {
-        return Err(BailReason::Classifier);
+    // ~keep Tier-2 keeps white space in a code span that holds an image as the source has it,
+    // ~keep beside the image or in an element of its own. The rules below are the rules for
+    // ~keep running text, so Tier-2 takes that page.
+    if in_code && !in_pre && position.whitespace_only {
+        state.code_span.blank_text = true;
+        if state.code_span.needs_tier2() {
+            return Err(BailReason::Classifier);
+        }
     }
     if handle_whitespace_text(state, raw, in_pre, position, history, upcoming) {
         return Ok(());

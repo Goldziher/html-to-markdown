@@ -272,6 +272,9 @@ fn apply_open_escape_ctx(state: &mut Tier1State, spec: &TagSpec) {
         _ => return,
     };
 
+    if spec.kind == TagKind::Code && !state.escape_ctx.contains(EscapeCtx::CODE) {
+        state.code_span = crate::converter::tier1::state::CodeSpanContent::default();
+    }
     state.escape_ctx |= bit;
 }
 

@@ -192,6 +192,27 @@ pub enum WrapKind {
     Figcaption,
 }
 
+/// What a code span (`code`, `kbd`, `samp`; not `pre`) holds so far.
+///
+/// ~keep Tier-2 keeps a text of white space alone as the source has it when the code span also
+/// ~keep holds an image, wherever the two stand. Tier-1 has the rules for running text only, so
+/// ~keep a code span that holds both goes to Tier-2.
+#[derive(Debug, Clone, Copy, Default)]
+pub struct CodeSpanContent {
+    /// The code span holds an image.
+    pub image: bool,
+    /// The code span holds a text node of white space alone.
+    pub blank_text: bool,
+}
+
+impl CodeSpanContent {
+    /// Whether the code span holds both an image and a text of white space alone.
+    #[must_use]
+    pub const fn needs_tier2(self) -> bool {
+        self.image && self.blank_text
+    }
+}
+
 /// Mutable state threaded through the entire Tier-1 scan pass.
 pub struct Tier1State {
     /// Open-tag stack; one frame per currently-open element.
@@ -294,6 +315,8 @@ pub struct Tier1State {
     /// sibling is an `<img>`" half comes from the scan loop's tag peek, same
     /// as `next_tag_is_list`).
     pub last_emitted_was_img: bool,
+    /// What the open code span holds so far. Reset when a code span opens outside code text.
+    pub code_span: CodeSpanContent,
 
     /// True right after the closing tag of a block element or a `<hr>` (block-level by Tier-2's
     /// test), until the next opening or void tag, the next closing tag that is not inline, or the
@@ -378,6 +401,7 @@ impl Tier1State {
             summary_buf_stack: Vec::new(),
             last_closed_custom_element: false,
             last_emitted_was_img: false,
+            code_span: CodeSpanContent::default(),
             last_closed_block: false,
             pending_newline_join: None,
             last_ordered_list_end: None,

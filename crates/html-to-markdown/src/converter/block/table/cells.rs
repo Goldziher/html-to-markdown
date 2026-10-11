@@ -20,7 +20,7 @@ const MAX_TABLE_COLS: usize = 1000;
 /// ~keep The pre-pass and the render pass walk the same cell subtrees, so the pre-pass result
 /// ~keep can be emitted directly instead of rendering twice — but only where the two passes are
 /// ~keep provably byte-identical. The pre-pass context sets `measure_width_only` (nested tables
-/// ~keep degrade to raw text, issue #406) and `skip_visitor_hooks`, and a second walk is
+/// ~keep degrade to raw text, issue #406) and holds no visitor, and a second walk is
 /// ~keep observable through any collector handle shared via the context. The caller decides via
 /// ~keep `enabled` (see `builder::cell_text_reuse_allowed`); when disabled this stores nothing.
 pub struct CellTextCache {

@@ -712,9 +712,7 @@ fn begin_tag<'a>(
     #[cfg(feature = "visitor")]
     let visitor_output_start = output.len();
     #[cfg(feature = "visitor")]
-    let visitor_element_state = if ctx.skip_visitor_hooks {
-        None
-    } else if let Some(ref visitor_handle) = ctx.visitor {
+    let visitor_element_state = if let Some(ref visitor_handle) = ctx.visitor {
         use crate::converter::visitor_hooks::{VisitAction, build_visitor_element_state, handle_visitor_element_start};
 
         let state = build_visitor_element_state(tag_name, node_handle, parser, dom_ctx);
@@ -884,7 +882,7 @@ fn should_skip_tag(
     handler: HandlerContext<'_>,
 ) -> bool {
     #[cfg(feature = "visitor")]
-    let visitor_is_active = handler.ctx.visitor.is_some() && !handler.ctx.skip_visitor_hooks;
+    let visitor_is_active = handler.ctx.visitor.is_some();
     #[cfg(not(feature = "visitor"))]
     let visitor_is_active = false;
     (!visitor_is_active

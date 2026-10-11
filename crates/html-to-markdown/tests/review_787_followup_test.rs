@@ -328,3 +328,70 @@ fn should_write_a_blank_line_between_a_text_after_a_quote_and_a_rule() {
     // With one line end before the rule, Markdown reads `text` as a heading.
     assert_rows(&[("<blockquote>q</blockquote>text<hr>", "> q\n\ntext\n\n---\n")]);
 }
+
+/// Each row: the fast converter hands the page over, and every path writes `expected`.
+fn assert_handed_over_on_every_path(rows: &[(&str, &str)], options: &ConversionOptions) {
+    assert_handed_to_full(rows, options);
+    for (html, expected) in rows {
+        for path in paths() {
+            let with_options = ConversionOptions {
+                tier_strategy: path.tier_strategy,
+                ..options.clone()
+            };
+            assert_eq!(convert_with(html, with_options), *expected, "{html}");
+        }
+    }
+}
+
+#[test]
+fn should_leave_out_an_image_outside_code_text_on_every_path_when_images_are_skipped() {
+    let options = ConversionOptions {
+        skip_images: true,
+        highlight_style: HighlightStyle::None,
+        ..no_metadata()
+    };
+    assert_handed_over_on_every_path(
+        &[
+            ("<p>a<img src=\"/i.png\" alt=\"pic\">b</p>", "ab\n"),
+            ("<p>a <img src=\"/i.png\" alt=\"pic\"> b</p>", "a  b\n"),
+            (
+                "<p><a href=\"/x\">go <img src=\"/i.png\" alt=\"pic\"></a></p>",
+                "[go](/x)\n",
+            ),
+        ],
+        &options,
+    );
+}
+
+#[test]
+fn should_keep_white_space_in_an_element_between_two_images_in_a_code_span() {
+    let options = ConversionOptions {
+        highlight_style: HighlightStyle::None,
+        ..no_metadata()
+    };
+    assert_handed_over_on_every_path(
+        &[(
+            "<p><code><img src=\"/i.png\" alt=\"one\"><span> </span><img src=\"/j.png\" alt=\"two\"></code></p>",
+            "`one two`\n",
+        )],
+        &options,
+    );
+}
+
+#[test]
+fn should_hand_white_space_in_an_element_before_an_image_in_a_code_span_to_the_full_converter() {
+    let options = no_metadata();
+    let html = "<p><code>a<span> </span><img src=\"/i.png\" alt=\"pic\"></code></p>";
+    assert_eq!(fast_direct(html, &options), Err("Classifier".to_owned()));
+    let full = full_only(html, &options);
+    assert!(full.contains("pic") && !full.contains("!["), "{full:?}");
+}
+
+#[test]
+fn should_answer_a_code_span_with_an_image_after_a_code_span_with_white_space_alone() {
+    // The first code span holds no image, so its white space does not count for the second.
+    let options = no_metadata();
+    let html = "<p><code>a<span> </span>b</code> and <code>c<img src=\"/i.png\" alt=\"pic\">d</code></p>";
+    let fast = fast_direct(html, &options).expect("the fast converter answers");
+    assert_eq!(fast.trim_end(), full_only(html, &options).trim_end());
+}

@@ -29,6 +29,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The rule under a table header is as wide as a cell that holds a nested table.
 - An image in `code`, `kbd`, `samp` or `pre` text is its alt text on the fast path too, as the
   full converter writes it. The fast path wrote the Markdown image inside the code text.
+- With `skip_images`, an image outside code text is left out on the fast path too. The fast path
+  wrote the image when metadata extraction and highlighting were off.
+- White space in an element between two images in a `code`, `kbd` or `samp` span stays on the
+  fast path too, as the full converter writes it.
+- A visitor gets no call from the pass that measures the column widths of a table. It got each
+  link, image and text of a cell with markup one more time.
 
 ## [3.17.2] - 2026-10-06
 

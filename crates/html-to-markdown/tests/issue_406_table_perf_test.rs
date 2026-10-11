@@ -7,8 +7,8 @@
 //! acquired an `Arc<Mutex<>>` for every tag even when no visitor was attached.
 //! For a 1000×10 table this produced ~50 k OS-level lock acquisitions.
 //!
-//! Fix: gate the visitor Mutex on `Context::skip_visitor_hooks = true` during
-//! the pre-pass.  The tests here verify:
+//! Fix: the pre-pass context holds no visitor, so the pre-pass takes no visitor
+//! Mutex.  The tests here verify:
 //!
 //! 1. A large table (500×8) converts without error (sanity / no-panic).
 //! 2. The output has the correct pipe-table structure.
@@ -65,7 +65,7 @@ fn single_row_table_still_works() {
 }
 
 /// With a visitor, the visitor hooks still fire during the main rendering pass.
-/// (Verifies that `skip_visitor_hooks` is scoped only to the pre-pass context.)
+/// (Verifies that only the pre-pass context is without the visitor.)
 #[cfg(feature = "visitor")]
 #[test]
 fn visitor_hooks_fire_during_main_pass_not_suppressed() {
