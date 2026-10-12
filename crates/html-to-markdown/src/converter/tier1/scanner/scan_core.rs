@@ -282,6 +282,13 @@ impl<'a> Tier1Scanner<'a> {
     }
 
     fn prepare_open_tag(&mut self, name_lower: &[u8]) -> Result<(), BailReason> {
+        // ~keep A heading's code divs use spaces; scanner block newlines would split the code span.
+        if name_lower == b"div"
+            && self.state.escape_ctx.contains(EscapeCtx::CODE | EscapeCtx::HEADING)
+            && !self.state.in_table_cell()
+        {
+            return Err(BailReason::Classifier);
+        }
         // ~keep Outside cells, heading labels need Tier-2's structural flattening and visitor hooks.
         // ~keep The scanner's existing cell path already flattens quote and list markers.
         if self.state.escape_ctx.contains(EscapeCtx::HEADING)

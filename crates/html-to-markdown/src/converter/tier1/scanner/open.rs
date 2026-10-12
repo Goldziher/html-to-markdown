@@ -264,6 +264,8 @@ fn prepare_open_state(
             | TagKind::List(_)
             | TagKind::Table
             | TagKind::Summary
+            | TagKind::DefinitionTerm
+            | TagKind::DefinitionDescription
     );
     if is_link_block && state.stack.iter().any(|frame| matches!(frame.spec.kind, TagKind::Link)) {
         return Err(BailReason::Classifier);

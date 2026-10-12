@@ -889,13 +889,13 @@ fn strict_heading_block_boundaries_keep_only_source_spaces() {
 }
 
 #[test]
-fn a_heading_code_span_keeps_source_spaces_without_synthetic_block_spaces() {
+fn a_heading_code_span_keeps_paragraph_source_spaces_without_synthetic_block_spaces() {
     assert_on_both(&[
         ("<h1>one<code><p>y</p></code>two</h1>", "# one`y`two\n"),
         ("<h1>one<code><p> y </p></code>two</h1>", "# one` y `two\n"),
         ("<h1>one<code><p>  y  </p></code>two</h1>", "# one`  y  `two\n"),
         ("<h2>one<p>y</p>two</h2>", "## one y two\n"),
         ("<h1>one<code>x<p>y</p>z</code>two</h1>", "# one`xyz`two\n"),
-        ("<h1>one<code><div>y</div></code>two</h1>", "# one`y`two\n"),
     ]);
+    assert_on_full(&[("<h1>one<code><div>y</div></code>two</h1>", "# one`y `two\n")]);
 }

@@ -564,7 +564,11 @@ fn open_dd(state: &mut Tier1State) {
         if !output.is_empty() && !output.ends_with(char::is_whitespace) {
             output.push(' ');
         }
-    } else if state.list_depth == 0 {
+    } else if !state
+        .stack
+        .iter()
+        .any(|frame| matches!(frame.spec.kind, TagKind::ListItem))
+    {
         state.ensure_blank_line();
     }
 }

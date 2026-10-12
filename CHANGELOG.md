@@ -10,9 +10,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - A line break before inline text in a definition description keeps its joining space after
-  the term's blank line. Strict-mode headings retain source whitespace without added block
-  separators. Blocks in a heading's code span add no synthetic spaces. Unicode indentation
-  after a hard break, including U+3000, is retained (#839).
+  the term's blank line. Paragraphs in strict-mode headings retain source whitespace without
+  doubling a separator; divs keep their word boundaries, including inside heading code spans.
+  Unicode indentation after a hard break, including U+3000, is retained (#839).
 
 - Quotes and lists inside a heading write their labels without structural quote or list
   markers. Literal `>` and `-` text stays, and heading quote/list visitor overrides still apply
@@ -24,7 +24,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - A definition description outside a definition list starts a new block instead of joining the
   preceding word. `<div>a<dd>b</dd> c</div>` now writes `a`, `b` and `c` as separate blocks;
-  a heading keeps its description inline with a word space
+  a heading or link keeps its description inline with a word space, and an orphan description
+  after a closed list item keeps its blank line
   ([#838](https://github.com/xberg-io/html-to-markdown/issues/838)).
 
 - An indented code block at the start of a definition description inside a list item keeps the
