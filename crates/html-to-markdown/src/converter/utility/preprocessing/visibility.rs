@@ -1,6 +1,7 @@
 use std::borrow::Cow;
 
 use super::head_scan::body_start;
+use super::kept::{OpenKept, TagStep};
 use super::markup::{find_tag_end, matches_tag_start, skip_written_text_element};
 use super::raw_text::{
     find_closing_tag_bytes_nested, is_self_closing_tag, matching_tag_ends, opens_a_tag, skip_opaque_region,
@@ -408,7 +409,15 @@ pub fn strip_hidden_elements(input: &str) -> Cow<'_, str> {
 /// ~keep The tags are removed before the parse, not skipped in the walk, so that every reader
 /// ~keep of the tree sees the content: a row in a `<template>` that is a child of a `<table>` is
 /// ~keep a row of that table, which a walk that descends into the template cannot give.
-pub fn unwrap_kept_inert_elements(input: &str, hidden_content: HiddenContent) -> Cow<'_, str> {
+///
+/// `excluded` holds where the start tags that the caller excludes start in `input`, in the
+/// order of the page. An element whose tags this pass would remove is removed whole when its
+/// start tag is one of them: [`OpenKept`] says where it ends.
+pub fn unwrap_kept_inert_elements<'a>(
+    input: &'a str,
+    hidden_content: HiddenContent,
+    excluded: &[usize],
+) -> Cow<'a, str> {
     if hidden_content == HiddenContent::Drop {
         return Cow::Borrowed(input);
     }
@@ -417,11 +426,7 @@ pub fn unwrap_kept_inert_elements(input: &str, hidden_content: HiddenContent) ->
     let Some(body_start) = body_start(input, &mut tag_ends) else {
         return Cow::Borrowed(input);
     };
-    // ~keep For `<template>` and for `<noscript>`, one entry for each open start tag after the
-    // ~keep head: whether the tag was removed. An end tag takes the entry of the start tag that
-    // ~keep it closes. A start tag that stays while its end tag is removed holds the rest of the
-    // ~keep page, and the walk drops what it holds.
-    let mut open: [Vec<bool>; 2] = [Vec::new(), Vec::new()];
+    let mut open = OpenKept::default();
     let mut output: Option<String> = None;
     let mut last = 0;
     let mut idx = body_start;
@@ -458,27 +463,30 @@ pub fn unwrap_kept_inert_elements(input: &str, hidden_content: HiddenContent) ->
         };
         // ~keep Text that starts the body is before its first tag, so only a tag is at the start.
         let starts_body = idx == body_start;
-        let open = &mut open[usize::from(is_noscript)];
-        let remove = if is_end_tag {
-            open.pop().unwrap_or(false)
+        let kind = usize::from(is_noscript);
+        let step = if is_end_tag {
+            open.end(kind)
         } else {
             let remove =
                 hidden_content == HiddenContent::All || (is_template && tag_declares_shadow_root(&input[idx..tag_end]));
-            open.push(remove);
-            remove
+            open.start(kind, remove, excluded.binary_search(&idx).is_ok())
         };
-        if remove {
-            let out = output.get_or_insert_with(|| String::with_capacity(bytes.len()));
-            out.push_str(&input[last..idx]);
-            out.push_str(if starts_body { BODY_START } else { "" });
-            last = tag_end;
+        match step {
+            TagStep::Stays => {}
+            TagStep::Removed => {
+                let out = output.get_or_insert_with(|| String::with_capacity(bytes.len()));
+                out.push_str(&input[last..idx]);
+                out.push_str(if starts_body { BODY_START } else { "" });
+                last = tag_end;
+            }
+            TagStep::ExcludedEnds => last = tag_end,
         }
         idx = tag_end;
     }
 
     match output {
         Some(mut out) => {
-            out.push_str(&input[last..]);
+            out.push_str(if open.in_excluded() { "" } else { &input[last..] });
             Cow::Owned(out)
         }
         None => Cow::Borrowed(input),
@@ -836,7 +844,7 @@ mod tag_ends_tests {
         let timed = |name: &str| {
             let page = format!("{}\">", format!("<{name} ").repeat(1_600_000 / (name.len() + 2)));
             let started = std::time::Instant::now();
-            let unwrapped = unwrap_kept_inert_elements(&page, HiddenContent::All);
+            let unwrapped = unwrap_kept_inert_elements(&page, HiddenContent::All, &[]);
             assert_eq!(unwrapped, page, "no template and no noscript: nothing is removed");
             started.elapsed()
         };
@@ -873,7 +881,7 @@ mod tag_ends_tests {
     /// ~keep The scan writes `</body>` for the removed tag that started the body: once, and for
     /// ~keep the first tag that it removes.
     fn removed_pieces(pieces: &[Piece], page: &str, choice: HiddenContent) -> Vec<bool> {
-        let unwrapped = unwrap_kept_inert_elements(page, choice);
+        let unwrapped = unwrap_kept_inert_elements(page, choice, &[]);
         if let Some(at) = unwrapped.find("</body>") {
             assert!(page.starts_with(&unwrapped[..at]), "{page} {choice:?}");
             assert_eq!(unwrapped.matches("</body>").count(), 1, "{page} {choice:?}");
@@ -950,7 +958,7 @@ mod tag_ends_tests {
                     pieces.push(piece);
                     page.extend([piece.0, "<!--", &position.to_string(), "-->"]);
                 }
-                assert_eq!(unwrap_kept_inert_elements(&page, HiddenContent::Drop), page);
+                assert_eq!(unwrap_kept_inert_elements(&page, HiddenContent::Drop, &[]), page);
                 for choice in [HiddenContent::Reachable, HiddenContent::All] {
                     let (in_page, removed_in_page) = check_the_pairs(&pieces, &page, choice);
                     pairs += in_page;

@@ -78,6 +78,75 @@ impl Kept {
     }
 }
 
+/// The open `<template>` and `<noscript>` elements of the pass that removes the tags of the
+/// kept ones. The kind of a `<template>` is 0, and the kind of a `<noscript>` is 1.
+///
+/// ~keep A kept element that the caller excludes is removed whole. With its tags removed, it is
+/// ~keep no element of the tree, and the exclusion that reads the tree finds nothing to remove.
+/// ~keep An excluded element whose tags stay is left to that exclusion and to the walk, as under
+/// ~keep [`HiddenContent::Drop`].
+#[derive(Default)]
+pub(super) struct OpenKept {
+    /// For each kind, one entry for each open start tag after the head: whether the tag was
+    /// removed. An end tag takes the entry of the start tag that it closes. A start tag that
+    /// stays while its end tag is removed holds the rest of the page, and the walk drops what
+    /// it holds.
+    open: [Vec<bool>; 2],
+    /// The excluded element that is open: its kind, and how many start tags of that kind were
+    /// open with its own.
+    excluded: Option<(usize, usize)>,
+}
+
+/// What the pass does with one tag of a `<template>` or a `<noscript>`.
+pub(super) enum TagStep {
+    /// The tag stays as written, or it is in an excluded element.
+    Stays,
+    /// The tag is removed. The start tag of an excluded element is removed with all that
+    /// follows it, up to the tag of [`TagStep::ExcludedEnds`].
+    Removed,
+    /// The end tag closes the excluded element: the page goes on after it.
+    ExcludedEnds,
+}
+
+impl OpenKept {
+    /// The step for a start tag of `kind`. `remove` says that the choice removes the tags of
+    /// the element, and `excluded` says that the caller excludes the element.
+    pub(super) fn start(&mut self, kind: usize, remove: bool, excluded: bool) -> TagStep {
+        self.open[kind].push(remove);
+        if !remove || self.excluded.is_some() {
+            return TagStep::Stays;
+        }
+        if excluded {
+            self.excluded = Some((kind, self.open[kind].len()));
+        }
+        TagStep::Removed
+    }
+
+    /// The step for an end tag of `kind`.
+    pub(super) fn end(&mut self, kind: usize) -> TagStep {
+        let removed = self.open[kind].pop().unwrap_or(false);
+        let depth = self.open[kind].len();
+        let closes_excluded = self
+            .excluded
+            .is_some_and(|(excluded_kind, open_with_it)| excluded_kind == kind && depth < open_with_it);
+        if closes_excluded {
+            self.excluded = None;
+            return TagStep::ExcludedEnds;
+        }
+        if removed && self.excluded.is_none() {
+            TagStep::Removed
+        } else {
+            TagStep::Stays
+        }
+    }
+
+    /// Whether an excluded element is open. At the end of the page it has no end tag, and it
+    /// holds the rest of the page.
+    pub(super) const fn in_excluded(&self) -> bool {
+        self.excluded.is_some()
+    }
+}
+
 /// Whether the start tag of a `<template>` declares a shadow root: `shadowrootmode` is `open` or
 /// `closed`.
 fn declares_shadow_root(tag: &Tag) -> bool {

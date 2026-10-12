@@ -1,13 +1,13 @@
 use super::{preprocess_initial_html, preprocess_repaired_html, trace_parse_complete};
 use crate::converter::DomContext;
-use crate::converter::main_helpers::{has_custom_element_tags, repair_with_html5ever_bounded};
+use crate::converter::main_helpers::{has_custom_element_tags, preserves_menu, repair_with_html5ever_bounded};
 use crate::converter::preprocessing_helpers::{
     has_discarded_end_tag, has_inline_block_misnest, has_omitted_end_tag, readable_text_len, written_title_len,
 };
 use crate::converter::utility::caching::build_dom_context;
 use crate::converter::utility::preprocessing::normalize_inert_bodies_with_preservation;
 use crate::error::{ConversionError, Result};
-use crate::options::HiddenContent;
+use crate::options::{ConversionOptions, HiddenContent};
 
 #[cfg(test)]
 thread_local! {
@@ -15,7 +15,7 @@ thread_local! {
     static FORCE_INVALID_LENGTH: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
 }
 
-fn parse_html(input: &str) -> Result<tl::VDom<'_>> {
+pub(super) fn parse_html(input: &str) -> Result<tl::VDom<'_>> {
     #[cfg(test)]
     PARSE_CALLS.with(|calls| calls.set(calls.get() + 1));
     #[cfg(test)]
@@ -70,11 +70,10 @@ impl<'a> ParsedPage<'a> {
 pub(super) fn parse_for_conversion<'a>(
     input: &'a str,
     repaired_page: &'a std::cell::OnceCell<String>,
-    preserve_menu: bool,
-    hidden_content: HiddenContent,
-    exclude_selectors: &[String],
+    options: &ConversionOptions,
     as_written: Option<&str>,
 ) -> Result<ParsedPage<'a>> {
+    let (preserve_menu, hidden_content) = (preserves_menu(options), options.hidden_content);
     let dom = parse_html(input)?;
     let parser = dom.parser();
     let dom_ctx = build_dom_context(&dom, parser, input.len());
@@ -82,9 +81,7 @@ pub(super) fn parse_for_conversion<'a>(
     let asked = Asked::of(&dom_ctx, parser, input);
     let misnest = asked.misnest;
     let for_narrower_choice = match as_written {
-        Some(html) if !asked.any() => {
-            narrower_choice_asks(html, input, preserve_menu, hidden_content, exclude_selectors)?
-        }
+        Some(html) if !asked.any() => narrower_choice_asks(html, input, options, hidden_content)?,
         _ => false,
     };
     // ~keep The second parse for a narrower choice has the text rule and the limits of the one
@@ -119,7 +116,7 @@ pub(super) fn parse_for_conversion<'a>(
     // ~keep parse of a misnest can hide content, so its count is not a measure.
     let loses_text = omitted_end_tag
         && (readable_text_len(&second) < readable_text_len(&dom)
-            || loses_a_title_of_a_wider_choice(&dom, &second, as_written, preserve_menu, hidden_content)?);
+            || loses_a_title_of_a_wider_choice(&dom, &second, as_written, options, hidden_content)?);
     if loses_text && !misnest {
         // ~keep A frameset page with every end tag written comes here, so this is no warning.
         tracing::debug!(
@@ -214,9 +211,8 @@ impl Asked {
 fn narrower_choice_asks(
     html: &str,
     page: &str,
-    preserve_menu: bool,
+    options: &ConversionOptions,
     hidden_content: HiddenContent,
-    exclude_selectors: &[String],
 ) -> Result<bool> {
     let narrower = match hidden_content {
         HiddenContent::Drop => return Ok(false),
@@ -224,11 +220,11 @@ fn narrower_choice_asks(
         HiddenContent::All => HiddenContent::Reachable,
     };
     let (narrower_html, _) = normalize_inert_bodies_with_preservation(html, false, narrower);
-    let narrower_page = preprocess_initial_html(&narrower_html, preserve_menu, narrower, exclude_selectors)?;
+    let narrower_page = preprocess_initial_html(&narrower_html, options, narrower)?;
     if narrower_page != page && asks_for_the_tree_builder(&narrower_page) {
         return Ok(true);
     }
-    narrower_choice_asks(html, &narrower_page, preserve_menu, narrower, exclude_selectors)
+    narrower_choice_asks(html, &narrower_page, options, narrower)
 }
 
 /// Whether the second parse of a choice that keeps hidden content loses a title that the first
@@ -245,7 +241,7 @@ fn loses_a_title_of_a_wider_choice(
     first: &tl::VDom<'_>,
     second: &tl::VDom<'_>,
     as_written: Option<&str>,
-    preserve_menu: bool,
+    options: &ConversionOptions,
     hidden_content: HiddenContent,
 ) -> Result<bool> {
     let Some(html) = as_written else {
@@ -255,8 +251,7 @@ fn loses_a_title_of_a_wider_choice(
         return Ok(false);
     }
     let (emptied, _) = normalize_inert_bodies_with_preservation(html, false, HiddenContent::Drop);
-    // ~keep No selector reaches the page of `drop`: it keeps no `<template>` and no `<noscript>`.
-    let page_of_drop = preprocess_initial_html(&emptied, preserve_menu, HiddenContent::Drop, &[])?;
+    let page_of_drop = preprocess_initial_html(&emptied, options, HiddenContent::Drop)?;
     Ok(!asks_for_the_tree_builder(&page_of_drop))
 }
 
