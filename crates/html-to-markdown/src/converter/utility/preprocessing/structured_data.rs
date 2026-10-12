@@ -200,6 +200,10 @@ fn write_repaired_script(
         output.push_str(&marker);
         output.push('"');
         let attributes = &input[open_tag.start + "<script".len()..open_tag.end];
+        // ~keep Removing a slash after the tag name must not join the injected owner value to the first attribute.
+        if attributes.starts_with('/') {
+            output.push(' ');
+        }
         // ~keep Non-void script slash tokens must not strand an owned body in tl; attribute bytes stay authored.
         let mut copied = 0;
         for slash in standalone_script_slashes(attributes.as_bytes()) {

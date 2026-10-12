@@ -43,11 +43,17 @@ fn occupied_attribute_ids(source: &[u8]) -> impl Iterator<Item = usize> + '_ {
 impl PreservedBodies {
     pub(super) fn new(source: &str) -> Self {
         let decoded = crate::text::decode_html_entities_cow(source);
-        let source = decoded.as_ref();
-        let occupied = [BODY_MARKER_PREFIX, SCRIPT_MARKER_PREFIX]
+        // ~keep Later bogus-comment removal can join authored marker and owner names; reserve that exact spelling too.
+        let sanitized = super::visibility::strip_bogus_comments(source);
+        let sanitized_decoded = crate::text::decode_html_entities_cow(&sanitized);
+        let occupied = [decoded.as_ref(), sanitized_decoded.as_ref()]
             .into_iter()
-            .flat_map(|prefix| occupied_marker_ids(source, prefix))
-            .chain(occupied_attribute_ids(source.as_bytes()))
+            .flat_map(|source| {
+                [BODY_MARKER_PREFIX, SCRIPT_MARKER_PREFIX]
+                    .into_iter()
+                    .flat_map(move |prefix| occupied_marker_ids(source, prefix))
+                    .chain(occupied_attribute_ids(source.as_bytes()))
+            })
             .collect();
         Self {
             occupied,
@@ -86,6 +92,21 @@ impl PreservedBodies {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn should_reserve_sanitized_owner_names_without_joining_quoted_processing_instruction_bytes() {
+        let forged =
+            r"<<?x?>script data-h2m-script-<?y?>0='h2m_script_body_<?z?>0_end'>h2m_script_body_<?w?>0_end</script>";
+        assert_eq!(
+            PreservedBodies::new(forged).protect_script("JSON").0,
+            "h2m_script_body_1_end"
+        );
+        let quoted = r"<script data-x='h2m_script_body_<?x?>0_end'></script>";
+        assert_eq!(
+            PreservedBodies::new(quoted).protect_script("JSON").0,
+            "h2m_script_body_0_end"
+        );
+    }
 
     #[test]
     fn should_reserve_authored_attribute_names_in_any_case_and_both_marker_kinds() {

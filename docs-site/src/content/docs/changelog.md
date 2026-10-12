@@ -11,6 +11,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Preserved repaired JSON-LD scripts retain their JSON after slash-separated tag names and
+  cannot claim authored bodies through markers joined by bogus-comment removal. Preserved
+  script attributes now serialize in key order on both HTML serialization paths
+  ([#875](https://github.com/xberg-io/html-to-markdown/issues/875)).
+
 - An unclosed JSON-LD script beginning with a complete JSON value accepted by the JSON parser
   (including scalars at valid JSON boundaries) keeps the markup after that value and its original
   JSON bytes for metadata. Invalid or unrecognized JSON uses

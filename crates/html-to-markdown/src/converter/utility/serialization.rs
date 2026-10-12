@@ -23,6 +23,29 @@ pub fn escape_html_attribute_value(value: &str) -> Cow<'_, str> {
     }
 }
 
+fn serialize_attributes(tag: &tl::HTMLTag<'_>, tag_name: &str, output: &mut String) {
+    if tag_name == "script" {
+        // ~keep A repaired-script owner temporarily promotes tl's inline attributes to a randomized map.
+        let mut attributes: Vec<_> = tag.attributes().iter().collect();
+        attributes.sort_unstable_by(|left, right| left.0.cmp(&right.0));
+        write_attributes(attributes.into_iter(), output);
+    } else {
+        write_attributes(tag.attributes().iter(), output);
+    }
+}
+
+fn write_attributes<'a>(attributes: impl Iterator<Item = (Cow<'a, str>, Option<Cow<'a, str>>)>, output: &mut String) {
+    for (key, value) in attributes {
+        output.push(' ');
+        output.push_str(&key);
+        if let Some(value) = value {
+            output.push_str("=\"");
+            output.push_str(&escape_html_attribute_value(&value));
+            output.push('"');
+        }
+    }
+}
+
 /// Serialize an element to HTML string (for SVG and Math elements).
 ///
 /// Depth-guarded by [`NATIVE_STACK_SAFE_DEPTH`] (see [`serialize_element_at_depth`]): none
@@ -63,15 +86,7 @@ fn serialize_element_at_depth(node_handle: &tl::NodeHandle, parser: &tl::Parser,
         html.push('<');
         html.push_str(&tag_name);
 
-        for (key, value_opt) in tag.attributes().iter() {
-            html.push(' ');
-            html.push_str(&key);
-            if let Some(value) = value_opt {
-                html.push_str("=\"");
-                html.push_str(&escape_html_attribute_value(&value));
-                html.push('"');
-            }
-        }
+        serialize_attributes(tag, &tag_name, &mut html);
 
         let has_children = !tag.children().top().is_empty();
         if has_children {
@@ -141,15 +156,7 @@ fn serialize_node_to_html_at_depth(handle: &tl::NodeHandle, parser: &tl::Parser,
             output.push('<');
             output.push_str(&tag_name);
 
-            for (key, value) in tag.attributes().iter() {
-                output.push(' ');
-                output.push_str(&key);
-                if let Some(val) = value {
-                    output.push_str("=\"");
-                    output.push_str(&escape_html_attribute_value(&val));
-                    output.push('"');
-                }
-            }
+            serialize_attributes(tag, &tag_name, output);
 
             output.push('>');
 
@@ -206,6 +213,21 @@ mod tests {
     /// into a double-quoted attribute without escaping manufactures a real `onclick` that
     /// never existed as an attribute in the original document.
     const QUOTE_BREAKING_HTML: &str = r#"<foo title='x" onclick="alert(1)" y=' data-safe="1">"#;
+
+    #[test]
+    fn should_serialize_closed_script_attributes_in_key_order_on_both_paths() {
+        for _ in 0..60 {
+            let dom = tl::parse(
+                "<script type='application/ld+json' nonce='n' data-x='v'>{}</script>",
+                tl::ParserOptions::default(),
+            )
+            .expect("closed script");
+            let handle = dom.children()[0];
+            let expected = "<script data-x=\"v\" nonce=\"n\" type=\"application/ld+json\">{}</script>";
+            assert_eq!(serialize_element(&handle, dom.parser()), expected);
+            assert_eq!(serialize_tag_to_html(&handle, dom.parser()), expected);
+        }
+    }
 
     #[test]
     fn should_escape_a_quote_inside_serialize_element_attribute_reconstruction() {

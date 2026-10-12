@@ -780,3 +780,110 @@ fn should_restore_owned_script_bytes_even_when_foreign_close_case_confuses_the_l
         assert!(!payload.contains("h2m_script_body_"), "{prefix}: {payload}");
     }
 }
+
+#[test]
+fn should_keep_json_when_a_slash_separates_the_script_name_from_its_type() {
+    let json = r#"{"a":"<b> & c"}"#;
+    for opener in [
+        "<script/type=\"application/ld+json\">",
+        "<SCRIPT//type='application/ld+json'>",
+    ] {
+        for tier_strategy in ROUTES {
+            for extract_metadata in [false, true] {
+                let converted = convert(
+                    &format!("<p>a</p>{opener}{json}<p>t</p>"),
+                    ConversionOptions {
+                        tier_strategy,
+                        extract_metadata,
+                        preserve_tags: vec!["script".into()],
+                        ..Default::default()
+                    },
+                )
+                .expect("slash-separated type");
+                assert_eq!(
+                    converted.content.as_deref(),
+                    Some(format!("a\n\n<script type=\"application/ld+json\">{json}</script>\n\nt\n").as_str()),
+                    "{tier_strategy:?}/{extract_metadata}/{opener}"
+                );
+            }
+        }
+    }
+}
+
+#[test]
+fn should_reserve_owner_names_and_markers_formed_by_bogus_comment_removal() {
+    let json = r#"{"a":"<b> & c"}"#;
+    let authored = r#"<<?x?>script type="application/ld+json" data-h2m-script-<?y?>0="h2m_script_body_<?z?>0_end">h2m_script_body_<?w?>0_end</script>"#;
+    for tier_strategy in ROUTES {
+        for extract_metadata in [false, true] {
+            let content = convert(
+                &format!("{authored}<script type='application/ld+json'>{json}<p>t</p>"),
+                ConversionOptions {
+                    tier_strategy,
+                    extract_metadata,
+                    preserve_tags: vec!["script".into()],
+                    ..Default::default()
+                },
+            )
+            .expect("sanitized authored owner")
+            .content
+            .expect("content");
+            let end = content.find("</script>").expect("first script close") + "</script>".len();
+            let dom = tl::parse(&content[..end], tl::ParserOptions::default()).expect("authored DOM");
+            let tag = dom
+                .query_selector("script")
+                .expect("selector")
+                .next()
+                .expect("first script")
+                .get(dom.parser())
+                .and_then(tl::Node::as_tag)
+                .expect("tag");
+            assert_eq!(
+                tag.attributes()
+                    .get("data-h2m-script-0")
+                    .flatten()
+                    .expect("authored owner")
+                    .as_utf8_str(),
+                "h2m_script_body_0_end"
+            );
+            assert_eq!(
+                tag.inner_text(dom.parser()),
+                "h2m_script_body_0_end",
+                "{tier_strategy:?}/{extract_metadata}"
+            );
+            assert_eq!(
+                &content[end..],
+                format!("\n\n<script type=\"application/ld+json\">{json}</script>\n\nt\n")
+            );
+        }
+    }
+}
+
+#[test]
+fn should_keep_repaired_script_attribute_order_stable_across_conversions() {
+    let json = r#"{"a":"<b> & c"}"#;
+    let html = format!("<p>a</p><script type='application/ld+json' nonce='n'>{json}<p>t</p>");
+    for tier_strategy in ROUTES {
+        let mut observed = std::collections::BTreeSet::new();
+        for _ in 0..60 {
+            observed.insert(
+                convert(
+                    &html,
+                    ConversionOptions {
+                        tier_strategy,
+                        preserve_tags: vec!["script".into()],
+                        ..Default::default()
+                    },
+                )
+                .expect("stable script")
+                .content
+                .expect("content"),
+            );
+        }
+        assert_eq!(observed.len(), 1, "{tier_strategy:?}: {observed:?}");
+        assert_eq!(
+            observed.into_iter().next().expect("one output"),
+            format!("a\n\n<script nonce=\"n\" type=\"application/ld+json\">{json}</script>\n\nt\n")
+        );
+    }
+}

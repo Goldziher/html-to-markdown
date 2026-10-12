@@ -83,6 +83,39 @@ mod tests {
     use super::*;
 
     #[test]
+    fn should_require_the_owner_value_to_equal_its_direct_body_marker() {
+        let marker = "h2m_script_body_0_end";
+        let source = format!(
+            "<script data-h2m-script-0='h2m_script_body_1_end'>{marker}</script><script data-h2m-script-0='{marker}'>{marker}</script>"
+        );
+        let mut dom = tl::parse(&source, tl::ParserOptions::default()).expect("two scripts");
+        let originals = HashMap::from([(marker.into(), "JSON".into())]);
+        let ids = restore_inert_bodies(&mut dom, &originals).expect("restoration");
+        assert_eq!(ids.len(), 1);
+        let scripts: Vec<_> = dom.query_selector("script").expect("selector").collect();
+        let unowned = scripts[0]
+            .get(dom.parser())
+            .and_then(tl::Node::as_tag)
+            .expect("unowned script");
+        assert_eq!(unowned.inner_text(dom.parser()), marker);
+        assert_eq!(
+            unowned
+                .attributes()
+                .get("data-h2m-script-0")
+                .flatten()
+                .expect("authored attribute")
+                .as_utf8_str(),
+            "h2m_script_body_1_end"
+        );
+        let owned = scripts[1]
+            .get(dom.parser())
+            .and_then(tl::Node::as_tag)
+            .expect("owned script");
+        assert_eq!(owned.inner_text(dom.parser()), "JSON");
+        assert_eq!(owned.attributes().len(), 0);
+    }
+
+    #[test]
     fn should_restore_only_the_bound_direct_script_body_and_remove_only_its_attribute() {
         let marker = "h2m_script_body_0_end";
         let json = r#"{"a":"<script> &lt; &amp; 雪"}"#;
