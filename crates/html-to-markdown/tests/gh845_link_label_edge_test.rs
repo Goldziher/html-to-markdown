@@ -476,3 +476,20 @@ fn a_unicode_space_in_a_link_with_no_address_goes_to_the_full_converter() {
     assert_row_of_full_converter(html, "Press Go  now\n");
     assert_eq!(fast(html), None, "fast converter: {html:?}");
 }
+
+/// A text with a word that starts with a Unicode space after a `<br>` starts a line. The full
+/// converter decides what that line starts with, in the label of a link too, and the fast
+/// converter leaves that page to the full one. The public route that reaches the fast converter
+/// writes the text of the full converter.
+#[test]
+fn a_unicode_space_at_a_line_start_in_a_label_goes_to_the_full_converter() {
+    for space in ["&nbsp;", "&#x3000;", "\u{3000}"] {
+        let html = format!("<p>Press<a href=\"/p\">Go<br>{space}now</a></p>");
+        assert_eq!(fast(&html), None, "fast converter: {html:?}");
+        assert_eq!(
+            public_fast_route(&html),
+            content_with(&html, with_tier(TierStrategy::Tier2)),
+            "public fast route: {html:?}"
+        );
+    }
+}

@@ -598,3 +598,88 @@ pub fn matches_end_tag_start(bytes: &[u8], start: usize, tag: &[u8]) -> bool {
     }
     matches_tag_start(bytes, start + 1, tag)
 }
+
+/// ~keep CDATA outside SVG/MathML is an HTML bogus comment, while foreign content owns its body.
+pub fn strip_html_cdata(input: &str) -> Cow<'_, str> {
+    if !input.contains("<![CDATA[") {
+        return Cow::Borrowed(input);
+    }
+    let bytes = input.as_bytes();
+    let mut cursor = 0;
+    let mut last = 0;
+    let mut foreign_depth = 0usize;
+    let mut output = None;
+    while let Some(offset) = memchr::memchr(b'<', &bytes[cursor..]) {
+        cursor += offset;
+        if bytes[cursor..].starts_with(b"<![CDATA[") {
+            let end = cdata_end(bytes, cursor, foreign_depth == 0);
+            if foreign_depth == 0 {
+                let out = output.get_or_insert_with(|| String::with_capacity(input.len()));
+                out.push_str(&input[last..cursor]);
+                last = end;
+            }
+            cursor = end;
+            continue;
+        }
+        if let Some(end) =
+            super::raw_text::skip_opaque_region(bytes, cursor).or_else(|| skip_cdata_text_element(bytes, cursor))
+        {
+            cursor = end;
+            continue;
+        }
+        let name_start = cursor + 1 + usize::from(bytes.get(cursor + 1) == Some(&b'/'));
+        if !bytes.get(name_start).is_some_and(u8::is_ascii_alphabetic) {
+            cursor += 1;
+            continue;
+        }
+        let Some(end) = find_tag_end(bytes, cursor + 1) else {
+            break;
+        };
+        update_cdata_foreign_depth(bytes, cursor, end, &mut foreign_depth);
+        cursor = end;
+    }
+    match output {
+        Some(mut out) => {
+            out.push_str(&input[last..]);
+            Cow::Owned(out)
+        }
+        None => Cow::Borrowed(input),
+    }
+}
+
+fn skip_cdata_text_element(bytes: &[u8], cursor: usize) -> Option<usize> {
+    for tag in [
+        b"textarea".as_slice(),
+        b"title",
+        b"xmp",
+        b"iframe",
+        b"noembed",
+        b"noframes",
+        b"noscript",
+    ] {
+        if matches_tag_start(bytes, cursor + 1, tag) {
+            let open_end = find_tag_end(bytes, cursor + 1 + tag.len())?;
+            return Some(super::raw_text::find_closing_tag_bytes(bytes, open_end, tag).unwrap_or(bytes.len()));
+        }
+    }
+    matches_tag_start(bytes, cursor + 1, b"plaintext").then_some(bytes.len())
+}
+
+fn update_cdata_foreign_depth(bytes: &[u8], cursor: usize, end: usize, depth: &mut usize) {
+    for tag in [b"svg".as_slice(), b"math".as_slice()] {
+        if matches_tag_start(bytes, cursor + 1, tag) && !bytes[cursor..end].ends_with(b"/>") {
+            *depth += 1;
+        } else if matches_end_tag_start(bytes, cursor + 1, tag) {
+            *depth = depth.saturating_sub(1);
+        }
+    }
+}
+
+fn cdata_end(bytes: &[u8], cursor: usize, in_html: bool) -> usize {
+    if in_html {
+        // ~keep HTML bogus comments end at the first `>`; only foreign CDATA uses `]]>`.
+        memchr::memchr(b'>', &bytes[cursor + 2..]).map_or(bytes.len(), |offset| cursor + 2 + offset + 1)
+    } else {
+        super::raw_text::skip_opaque_region(bytes, cursor).unwrap_or(bytes.len())
+    }
+}

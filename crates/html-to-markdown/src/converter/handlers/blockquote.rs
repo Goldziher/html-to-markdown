@@ -127,10 +127,13 @@ fn render_heading_quote(tag: &tl::HTMLTag<'_>, handler: &mut HandlerContext<'_>)
     if trimmed.is_empty() {
         return;
     }
+    #[cfg(feature = "visitor")]
+    if visit_blockquote(tag, trimmed, handler) {
+        return;
+    }
     if !handler.output.is_empty() && !handler.output.ends_with(char::is_whitespace) {
         handler.output.push(' ');
     }
-    handler.output.push_str("> ");
     handler.output.push_str(trimmed);
     handler.output.push(' ');
 }

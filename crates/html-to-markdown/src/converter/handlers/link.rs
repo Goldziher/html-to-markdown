@@ -578,7 +578,12 @@ fn build_label_content(data: &LinkData<'_>, handler: &HandlerContext<'_>) -> Str
 fn label_context(data: &LinkData<'_>, handler: &HandlerContext<'_>, convert_as_inline: bool) -> Context {
     Context {
         inline_depth: handler.context.inline_depth + 1,
-        in_link: true,
+        in_link: handler.context.in_link || !data.href.is_empty(),
+        media_boundary: handler
+            .context
+            .media_boundary
+            .clone()
+            .or_else(|| Some(std::rc::Rc::new(std::cell::Cell::new(Default::default())))),
         convert_as_inline: handler.context.convert_as_inline || convert_as_inline,
         link_allow_inline_images: data.link_allow_inline_images,
         ..handler.context.clone()

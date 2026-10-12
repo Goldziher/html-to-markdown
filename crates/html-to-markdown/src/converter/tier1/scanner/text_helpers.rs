@@ -264,24 +264,35 @@ fn hand_over_unicode_space_after_space(
     raw: &str,
     base_offset: usize,
 ) -> Result<(), BailReason> {
-    if state.escape_ctx.intersects(EscapeCtx::PRE | EscapeCtx::CODE) {
+    if state.escape_ctx.intersects(EscapeCtx::PRE | EscapeCtx::CODE) || !source_starts_with_unicode_space(raw) {
         return Ok(());
+    }
+    let in_label = state.link_stack.iter().any(|(href, ..)| href.is_some());
+    let place = state
+        .text_place
+        .and_then(|(offset, place)| (offset == base_offset).then_some(place));
+    let in_heading = state.escape_ctx.contains(EscapeCtx::HEADING);
+    let in_cell = state.in_table_cell();
+    let written = state.cell_or_output_mut();
+    let after_heading_break = in_heading && (written.ends_with("  \n") || written.ends_with("\\\n"));
+    // ~keep A text with a word that starts a line after a hard break keeps its Unicode spaces as
+    // ~keep the indent of that line in Tier-2 (#839). This scanner has no such rule, in the label
+    // ~keep of a link either, and Tier-2 takes the page.
+    let after_hard_break = !in_heading
+        && !in_cell
+        && (written.ends_with("  \n") || written.ends_with("\\\n"))
+        && !crate::converter::utility::white_space::is_blank(crate::text::decode_html_entities_cow(raw).as_ref());
+    if after_hard_break {
+        return Err(BailReason::UnicodeSpaceAfterSpace);
     }
     // ~keep In the label of a link every run of white space is one space in both converters
     // ~keep (`normalize_link_label`), and a Unicode space at a label edge is the one space of that
     // ~keep edge: the place of the text decides nothing there. A link with no address is running
     // ~keep text, not a label.
-    if state.link_stack.iter().any(|(href, ..)| href.is_some()) {
+    if in_label {
         return Ok(());
     }
-    let place = state
-        .text_place
-        .and_then(|(offset, place)| (offset == base_offset).then_some(place));
-    let in_heading = state.escape_ctx.contains(EscapeCtx::HEADING);
-    let written = state.cell_or_output_mut();
-    let after_heading_break = in_heading && (written.ends_with("  \n") || written.ends_with("\\\n"));
     if (written.ends_with(' ') || after_heading_break)
-        && source_starts_with_unicode_space(raw)
         && place.is_none_or(|place| unicode_space_is_kept(written, place) || is_blank_after_text(place, raw))
     {
         return Err(BailReason::UnicodeSpaceAfterSpace);

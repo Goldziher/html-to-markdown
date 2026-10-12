@@ -43,7 +43,7 @@ fn emit_close_for_implicit(
         TagKind::Strikethrough => close_inline_marker(state, &frame, "~~")?,
         TagKind::Inserted
             if state.escape_ctx.contains(EscapeCtx::CODE) || state.escape_ctx.contains(EscapeCtx::PRE) => {}
-        TagKind::Inserted => close_inline_marker(state, &frame, "==")?,
+        TagKind::Inserted => {}
         TagKind::Code => close_code(state, &frame, false, options)?,
         TagKind::Link => close_link(state, &frame, options)?,
         TagKind::List(ListKind::Definition) => close_dl(state, &frame, options),
@@ -57,8 +57,8 @@ fn emit_close_for_implicit(
         TagKind::Summary => close_summary(state, &frame),
         // ~keep Figcaption: pop accumulation buffer, trim, emit `*…*\n\n` (Phase FF-2).
         TagKind::Figcaption => close_figcaption(state, &frame),
-        // ~keep Button (Phase T): emit `\n\n` on EOF close just like explicit close.
-        TagKind::Button => close_button(state, &frame),
+        // ~keep A control that ends its line: emit `\n\n` on EOF close just like explicit close.
+        TagKind::LineEndControl => close_line_end_control(state, &frame),
         // ~keep An unclosed `<table>` at EOF (html5ever/tl both implicitly close every
         // open element there, per the loop's own doc comment) used to hit the
         // do-nothing arm below, discarding the WHOLE accumulated table --
@@ -75,6 +75,7 @@ fn emit_close_for_implicit(
         | TagKind::TableBody
         | TagKind::TableFoot
         | TagKind::TableCaption
+        | TagKind::Media
         | TagKind::RawText(_)
         | TagKind::Ignored => {}
     }
@@ -83,6 +84,13 @@ fn emit_close_for_implicit(
 }
 
 fn close_paragraph(state: &mut Tier1State) {
+    // ~keep The matching open leaves code content untouched, including source trailing spaces.
+    if state.escape_ctx.contains(EscapeCtx::CODE | EscapeCtx::HEADING)
+        && !state.escape_ctx.contains(EscapeCtx::PRE)
+        && !state.in_table_cell()
+    {
+        return;
+    }
     // ~keep When inside a table cell, `<p>` is transparent — no block separators.
     // Any inter-paragraph separators were already added as `<br>` at open time
     // by `open_paragraph`; `close_paragraph` does nothing in this context.

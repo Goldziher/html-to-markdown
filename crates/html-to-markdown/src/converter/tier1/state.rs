@@ -318,6 +318,8 @@ pub struct Tier1State {
     /// after a block, or after an inline element ending in one, starts a new paragraph (issues
     /// #570, #571, #585).
     pub last_closed_block: bool,
+    /// ~keep A list before indented code needs an explicit CommonMark container boundary (issue #801).
+    pub last_closed_list: bool,
     /// The length of the output right after a text node's trailing source newline was written
     /// as a `'\n'` join. Cleared by an opening tag other than `<br>`, `<script>` or `<style>`,
     /// and by the closing tag of a block or of a form element that Tier-2 writes on a line of its
@@ -402,6 +404,7 @@ impl Tier1State {
             text_place: None,
             text_count: 0,
             last_closed_block: false,
+            last_closed_list: false,
             pending_newline_join: None,
             last_ordered_list_end: None,
             list_item_marker_widths: Vec::new(),

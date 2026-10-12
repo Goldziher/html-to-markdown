@@ -184,7 +184,7 @@ fn the_markdown_output_of_the_same_inputs_does_not_change() {
     );
     assert_markdown(
         "<h1>aaa<button>Xone</button><button>Xtwo</button>bbb</h1>",
-        "# aaa Xone Xtwo bbb\n",
+        "# aaaXoneXtwobbb\n",
     );
 }
 

@@ -12,10 +12,8 @@
 //! `TagKind::Inline` element (`<span>`, `<u>`, ...) has none of those; its children flow
 //! through the same generic per-text-node path as top-level prose, so it needs Tier-2's
 //! actual CONDITIONAL rule, not an unconditional strip. See
-//! `bare_inline_frame_start_after_space` in `scanner.rs` for the fix. `<del>`/`<ins>`
-//! (Strikethrough/Inserted) are deliberately excluded: Tier-2's own dedicated strike/ins
-//! wrapper leaves a genuine double space in the equivalent shape (verified against
-//! Tier-2 directly), so mirroring that divergence away would itself be wrong.
+//! `bare_inline_frame_start_after_space` in `scanner.rs` for the fix. `<del>` uses its
+//! dedicated wrapper and retains delimiter spacing; plain `<ins>` follows `<span>`.
 //!
 //! Found via `test_documents/html/office-gdocs/gdocs-web-page-export.html`, whose
 //! multi-`<span>` paragraph (lines 30-34) reproduces this exact shape.
@@ -94,8 +92,9 @@ fn adjacent_links_separated_by_pretty_printed_whitespace_collapse_to_one_space()
 }
 
 #[test]
-fn strikethrough_and_inserted_collapse_to_one_space_too() {
+fn strikethrough_collapses_to_one_space_too_and_insertions_are_plain_text() {
     // ~keep White space on both sides of the start of an element is one run, so one space.
+    // ~keep Inserted text takes no marks (issue #759).
     let del_html = "<p><del>with </del>\n  <del>bold</del>\n  <del> emphasis</del></p>";
     assert_eq!(
         run_tier2(del_html),
@@ -107,7 +106,7 @@ fn strikethrough_and_inserted_collapse_to_one_space_too() {
     let ins_html = "<p><ins>with </ins>\n  <ins>bold</ins>\n  <ins> emphasis</ins></p>";
     assert_eq!(
         run_tier2(ins_html),
-        "==with== ==bold== ==emphasis==\n",
+        "with bold emphasis\n",
         "tier2 ground truth changed; update this test"
     );
     assert_tier1_matches_tier2(ins_html);
