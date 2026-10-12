@@ -10,7 +10,7 @@ use super::{
     normalized_node_tag_name, separate_from_block,
 };
 use crate::converter::main_dispatch::{Dispatched, close_capture, close_tag, dispatch_tag};
-use crate::converter::walk::{Close, Open, Scratch, Walker, drive};
+use crate::converter::walk::{Child, Close, HookSite, Open, Scratch, Walker, drive};
 
 /// Walk each node of `nodes` with its subtree, in order, and write the Markdown to `output`.
 pub(super) fn walk_nodes(
@@ -114,6 +114,8 @@ struct Frame<'a> {
     first_writer_start: Option<usize>,
     /// The end of the element. `None` for a tag that is dropped: nothing ends it.
     end: Option<TagEnd<'a>>,
+    /// Whether the child that the walk visits now writes to a buffer that the hook gave for it.
+    child_has_buffer: bool,
 }
 
 impl Frame<'_> {
@@ -199,6 +201,7 @@ impl<'a> Walker for MarkdownWalk<'a, '_> {
                 output_start,
                 first_writer_start,
                 end,
+                child_has_buffer: false,
             },
         };
         if frame.captures() {
@@ -217,6 +220,9 @@ impl<'a> Walker for MarkdownWalk<'a, '_> {
                 (Close::Capture(close), Some(buffer)) => {
                     close_capture(close, &frame.node, &buffer.0.0, self.parser, output, handler);
                 }
+                (Close::Hooked(hook), _) => {
+                    hook.close(&mut hook_site(&frame.node, self.parser, output, handler));
+                }
                 (close, _) => close_tag(close, self.parser, output, handler),
             }
             finish_tag(end.capture, end.tag_name.as_ref(), end.tag, output, handler, false);
@@ -228,6 +234,66 @@ impl<'a> Walker for MarkdownWalk<'a, '_> {
             self.spare_captures.push(buffer);
         }
     }
+
+    fn hooks_children(&self, frame: &Frame<'a>) -> bool {
+        frame.end.as_ref().is_some_and(|end| end.close.hooks_children())
+    }
+
+    fn before_child(&mut self, frame: &mut Frame<'a>, index: usize) -> bool {
+        let Some(Close::Hooked(hook)) = frame.end.as_mut().map(|end| &mut end.close) else {
+            return true;
+        };
+        let handler = HandlerContext::new(self.root.options, &frame.scope, frame.depth, self.root.dom_ctx);
+        let output = current_output(&mut self.captures, self.output);
+        let child = hook.before_child(index, &mut hook_site(&frame.node, self.parser, output, handler));
+        let Child::Walk { buffer, scope } = child else {
+            return false;
+        };
+        frame.child_scope = scope;
+        frame.child_has_buffer = buffer.is_some();
+        if let Some(text) = buffer {
+            let mut capture = self.spare_captures.pop().unwrap_or_default();
+            capture.0.0 = text;
+            self.captures.push(capture);
+        }
+        true
+    }
+
+    fn after_child(&mut self, frame: &mut Frame<'a>, index: usize) {
+        let Some(Close::Hooked(hook)) = frame.end.as_mut().map(|end| &mut end.close) else {
+            return;
+        };
+        let own = if frame.child_has_buffer {
+            self.captures.pop().map(|mut capture| {
+                let text = std::mem::take(&mut capture.0.0);
+                self.spare_captures.push(capture);
+                text
+            })
+        } else {
+            None
+        };
+        let handler = HandlerContext::new(self.root.options, &frame.scope, frame.depth, self.root.dom_ctx);
+        let output = current_output(&mut self.captures, self.output);
+        hook.after_child(index, own, &mut hook_site(&frame.node, self.parser, output, handler));
+    }
+}
+
+/// The element of a hook, as the hook sees it: `output` is the buffer of the element.
+const fn hook_site<'s>(
+    node_handle: &'s tl::NodeHandle,
+    parser: &'s tl::Parser<'s>,
+    output: &'s mut String,
+    handler: HandlerContext<'s>,
+) -> HookSite<'s> {
+    HookSite::new((
+        node_handle,
+        parser,
+        output,
+        handler.options,
+        handler.ctx,
+        handler.depth,
+        handler.dom_ctx,
+    ))
 }
 
 /// Convert one DOM node up to its children.
@@ -381,7 +447,10 @@ pub fn walk_opened(
     let Some(Open { scope, close }) = open(output, &mut children) else {
         return;
     };
-    debug_assert!(!close.captures(), "only the dispatcher opens an element that captures");
+    debug_assert!(
+        !close.captures() && !close.hooks_children(),
+        "only the dispatcher opens an element that captures or hooks its children"
+    );
     let ctx = scope.as_deref().unwrap_or(handler.ctx);
     walk_nodes(
         &children,

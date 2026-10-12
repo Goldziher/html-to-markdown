@@ -13,7 +13,9 @@ use crate::converter::inline::HandlerContext;
 use crate::converter::inline::wrapped::emit_code_span;
 use crate::converter::main::walk_node;
 use crate::converter::text::dedent_code_block;
+use crate::converter::walk::{CaptureEnd, Close, Open};
 use crate::options::ConversionOptions;
+use std::rc::Rc;
 
 #[cfg(feature = "visitor")]
 use crate::converter::utility::serialization::serialize_node;
@@ -70,46 +72,64 @@ fn min_safe_code_span_delimiter_length(content: &str) -> usize {
     candidate
 }
 
-/// Handle an inline `<code>` element and convert to Markdown.
+/// Open an inline `<code>` element, or a `<kbd>` or a `<samp>` that holds a link. Lists its
+/// children in `children`.
 ///
-/// This handler processes inline code elements including:
-/// - Extracting code content and applying backtick delimiters
-/// - Handling backticks in content by using multiple delimiters
-/// - Invoking visitor callbacks when the visitor feature is enabled
-/// - Generating appropriate markdown output with proper escaping
-pub fn handle_code(tag: &tl::HTMLTag, mut handler: HandlerContext<'_>) {
-    if handler.context.code_element_is_transparent() {
-        let context = handler.context;
-        walk_children_to_output(tag, context, &mut handler);
-        return;
+/// In code the element writes nothing of its own. Else the walk captures the text of the
+/// children for [`close_code`], with the links that they hold.
+pub fn open_code(
+    tag: &tl::HTMLTag,
+    parser: &tl::Parser,
+    context: &Context,
+    children: &mut Vec<tl::NodeHandle>,
+) -> Open {
+    children.extend(tag.children().top().iter().copied());
+    if context.code_element_is_transparent() {
+        return Open::children_only();
     }
-    let links = std::rc::Rc::new(std::cell::RefCell::new(Vec::new()));
+    let links = Rc::new(std::cell::RefCell::new(Vec::new()));
     let code_ctx = Context {
         in_code: true,
-        inline_code_links: if handler.context.in_code {
-            handler.context.inline_code_links.clone()
-        } else if contains_anchor(tag, handler.parser) {
+        inline_code_links: if context.in_code {
+            context.inline_code_links.clone()
+        } else if contains_anchor(tag, parser) {
             Some(links.clone())
         } else {
             None
         },
-        ..handler.context.clone()
+        ..context.clone()
     };
-    let mut content = String::with_capacity(32);
-    walk_children(tag, &mut content, &code_ctx, &handler);
+    Open {
+        scope: Some(Rc::new(code_ctx)),
+        close: Close::Capture(CaptureEnd::Code(CodeEnd { links })),
+    }
+}
+
+/// What [`open_code`] leaves for [`close_code`]: the links that the children wrote.
+pub struct CodeEnd {
+    links: Rc<std::cell::RefCell<Vec<crate::converter::context::InlineCodeLink>>>,
+}
+
+/// Write `content`, the text of the children of a code element, as inline code:
+/// - Applying backtick delimiters, more than one when the content holds backticks
+/// - Invoking visitor callbacks when the visitor feature is enabled
+/// - Writing each link of the content around its part of the code
+pub fn close_code(end: &CodeEnd, content: &str, mut handler: HandlerContext<'_>) {
     // ~keep An all-whitespace body is a real code span, not an empty element (#481).
     if content.is_empty() {
         return;
     }
 
     #[cfg(feature = "visitor")]
-    if tag.name().as_utf8_str().eq_ignore_ascii_case("code") {
-        if let Some(custom_output) = visit_inline_code(tag, &content, &handler) {
-            handler.output.push_str(&custom_output);
-            return;
+    if let Some(tl::Node::Tag(tag)) = handler.node_handle.get(handler.parser) {
+        if tag.name().as_utf8_str().eq_ignore_ascii_case("code") {
+            if let Some(custom_output) = visit_inline_code(tag, content, &handler) {
+                handler.output.push_str(&custom_output);
+                return;
+            }
         }
     }
-    emit_inline_code_with_links(&content, &links.borrow(), &mut handler);
+    emit_inline_code_with_links(content, &end.links.borrow(), &mut handler);
 }
 
 /// Whether the element holds a link. An `<a>` with no `href` is no link: it is text of the code.
@@ -204,22 +224,6 @@ fn emit_code_content(content: &str, handler: &mut HandlerContext<'_>) {
         handler.parser,
         handler.dom_context,
     );
-}
-
-fn walk_children_to_output(tag: &tl::HTMLTag<'_>, context: &Context, handler: &mut HandlerContext<'_>) {
-    for child_handle in tag.children().top().iter() {
-        walk_node(
-            child_handle,
-            handler.parser,
-            handler.output,
-            crate::converter::block::container::HandlerContext::new(
-                handler.options,
-                context,
-                handler.depth + 1,
-                handler.dom_context,
-            ),
-        );
-    }
 }
 
 fn walk_children(tag: &tl::HTMLTag<'_>, output: &mut String, context: &Context, handler: &HandlerContext<'_>) {

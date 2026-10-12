@@ -111,7 +111,7 @@ pub struct Context {
     /// Are we inside a `<pre>` code BLOCK specifically, as opposed to an inline code SPAN
     /// (`<code>`/`<kbd>`/`<samp>` outside a `<pre>`)?
     ///
-    /// Set only by `handle_pre` (`handlers/code_block.rs`); `handle_code` and
+    /// Set only by `handle_pre` (`handlers/code_block.rs`); `open_code` and
     /// `inline::code::handle` never set it themselves, so it propagates unchanged through
     /// their `..ctx.clone()` spread into any code nested inside a `<pre>`. `line_break.rs`
     /// needs this distinction that `in_code` alone cannot make: a `<br>` inside a code
@@ -245,7 +245,7 @@ pub struct Context {
     /// layout-table cell (its tag name is in `keep_inline_images_in`).
     pub(crate) cell_allow_inline_images: bool,
     /// Whether inline images should remain markdown inside the current `<a>` link label
-    /// ("a" is in `keep_inline_images_in`). Set once per `handle_link` call and carried
+    /// ("a" is in `keep_inline_images_in`). Set once per `open_link` call and carried
     /// unchanged into both the block-label and inline-label branches, so the option means
     /// the same thing whether or not the anchor happens to contain a block child (#492).
     pub(crate) link_allow_inline_images: bool,

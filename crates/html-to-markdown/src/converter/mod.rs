@@ -80,7 +80,6 @@
 //! fn walk_node(...) {
 //!     // Try each dispatcher in order
 //!     if block::dispatch_block_handler(&tag, ...) { return; }
-//!     if inline::dispatch_inline_handler(&tag, ...) { return; }
 //!     if list::dispatch_list_handler(&tag, ...) { return; }
 //!     if media::dispatch_media_handler(&tag, ...) { return; }
 //!     if semantic::dispatch_semantic_handler(&tag, ...) { return; }

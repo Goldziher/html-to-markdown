@@ -6,14 +6,11 @@
 //! - Semantic elements (mark, del, s, ins, u, small, sub, sup, var, dfn, abbr)
 //! - Ruby annotation elements (ruby, rb, rt, rp, rtc)
 //!
-//! These handlers are designed to be extracted from the main `converter.rs`
-//! file and integrated through the dispatcher function.
-//!
 //! Each handler receives a [`HandlerContext`] that groups the DOM node, parser,
 //! output buffer, conversion options, processing state, depth, and DOM context.
 //!
-//! The main dispatcher function `dispatch_inline_handler` routes tags to
-//! their appropriate handlers and returns a boolean indicating success.
+//! The walk opens each of these elements itself (`emphasis::open`, `semantic::open`,
+//! `code::open`, `ruby::open`, `ruby::open_part`): their children are its work.
 
 pub mod code;
 pub mod emphasis;
@@ -64,65 +61,6 @@ impl<'a> HandlerContext<'a> {
             ctx: self.context,
             options: self.options,
         }
-    }
-}
-
-/// Dispatches inline element handling to the appropriate handler.
-///
-/// This function routes inline HTML elements to their specialized handlers
-/// based on tag name. It is designed to be called from the main `walk_node`
-/// function in `converter.rs`.
-///
-/// # Routing Table
-///
-/// The following tag routes are supported:
-///
-/// | Tag(s) | Handler | Description |
-/// |--------|---------|-------------|
-/// | `ruby` | ruby | Ruby annotations (East Asian typography) |
-///
-/// The walk opens the other inline elements itself (`emphasis::open`, `semantic::open`,
-/// `code::open`, `ruby::open_part`): their children are its work, not a call from here.
-///
-/// # Return Value
-///
-/// Returns `true` if the tag was recognized and handled, `false` otherwise.
-/// This allows the caller to distinguish between:
-/// - Handled inline elements (return `true`)
-/// - Unhandled elements (return `false`) that should be processed as text or passed through
-///
-/// # Usage in converter.rs
-///
-/// ```text
-/// let handler = HandlerContext::new((node_handle, parser, output, options, ctx, depth, dom_ctx));
-/// if crate::converter::inline::dispatch_inline_handler(&tag_name, handler) {
-///     return; // Element was handled, move to next sibling
-/// }
-/// // Element was not handled, process as default inline element
-/// ```
-///
-/// # Parameters
-///
-/// * `tag_name` - The normalized HTML tag name (lowercase)
-/// * `context` - The DOM and conversion state used by the selected handler
-///
-/// # Example
-///
-/// For `<strong>Bold text</strong>`, the dispatcher:
-/// 1. Recognizes "strong" tag
-/// 2. Routes to emphasis handler
-/// 3. Returns `true`
-/// 4. Emphasis handler outputs `**Bold text**` to output buffer
-///
-/// For an unrecognized tag, the dispatcher returns `false` so the caller can
-/// process the element through the default path.
-pub fn dispatch_inline_handler(tag_name: &str, context: HandlerContext<'_>) -> bool {
-    match tag_name {
-        "ruby" => {
-            ruby::handle(context);
-            true
-        }
-        _ => false,
     }
 }
 

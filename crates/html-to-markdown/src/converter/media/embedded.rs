@@ -17,6 +17,7 @@ use crate::converter::media::MediaContext;
 use crate::converter::media::first_address;
 use crate::converter::utility::escaping::escape_link_label;
 use crate::converter::utility::preprocessing::sanitize_markdown_url;
+use crate::converter::walk::{CaptureEnd, Close, Open};
 use crate::options::{ConversionOptions, InlineDataMedia};
 
 /// ~keep Append a media element's `src` as a Markdown link where the destination doubles as
@@ -88,28 +89,41 @@ pub const fn should_output_media_link(src: &str) -> bool {
     !src.is_empty()
 }
 
-fn render_media_fallback(tag: &HTMLTag, parser: &Parser, output: &mut String, context: MediaContext<'_>) {
-    use crate::converter::main::walk_node;
-
-    let MediaContext {
-        options,
-        ctx,
-        depth,
-        dom_ctx,
-    } = context;
-    let mut fallback = String::new();
-    for child_handle in tag.children().top().iter() {
-        let is_source =
-            matches!(child_handle.get(parser), Some(tl::Node::Tag(child_tag)) if is_source_element(child_tag));
-        if !is_source {
-            walk_node(
-                child_handle,
-                parser,
-                &mut fallback,
-                crate::converter::block::container::HandlerContext::new(options, ctx, depth + 1, dom_ctx),
-            );
-        }
+/// Open an `audio` or a `video`: writes its address and lists its fallback content in `children`.
+///
+/// The walk captures the text of that content for [`close_media_fallback`]. Returns `None` for an
+/// element that is complete.
+pub fn open_media(
+    tag_name: &str,
+    node_handle: &NodeHandle,
+    parser: &Parser,
+    output: &mut String,
+    context: MediaContext<'_>,
+    children: &mut Vec<NodeHandle>,
+) -> Option<Open> {
+    let Some(tl::Node::Tag(tag)) = node_handle.get(parser) else {
+        return None;
+    };
+    if tag_name == "audio" {
+        handle_audio(node_handle, tag, parser, output, context, children);
+    } else {
+        handle_video(node_handle, tag, parser, output, context, children);
     }
+    (!children.is_empty()).then_some(Open {
+        scope: None,
+        close: Close::Capture(CaptureEnd::MediaFallback),
+    })
+}
+
+/// List the fallback content of a media element: each child that is no `source`.
+fn list_media_fallback(tag: &HTMLTag, parser: &Parser, children: &mut Vec<NodeHandle>) {
+    children.extend(tag.children().top().iter().copied().filter(|child_handle| {
+        !matches!(child_handle.get(parser), Some(tl::Node::Tag(child_tag)) if is_source_element(child_tag))
+    }));
+}
+
+/// Write `fallback`, the text of the fallback content of a media element.
+pub fn close_media_fallback(fallback: &str, output: &mut String, ctx: &Context) {
     if !fallback.is_empty() {
         output.push_str(fallback.trim());
         if !ctx.in_paragraph && !ctx.convert_as_inline {
@@ -121,14 +135,15 @@ fn render_media_fallback(tag: &HTMLTag, parser: &Parser, output: &mut String, co
 /// Handle audio element conversion to Markdown.
 ///
 /// Extracts src from audio tag or nested source elements, outputs as a link,
-/// and processes fallback content (e.g., browser compatibility text).
+/// and lists the fallback content (e.g., browser compatibility text) in `children`.
 #[cfg_attr(not(feature = "visitor"), allow(unused_variables))]
-pub fn handle_audio(
+fn handle_audio(
     node_handle: &NodeHandle,
     tag: &HTMLTag,
     parser: &Parser,
     output: &mut String,
     context: MediaContext<'_>,
+    children: &mut Vec<NodeHandle>,
 ) {
     let MediaContext {
         options,
@@ -196,20 +211,21 @@ pub fn handle_audio(
         }
     }
 
-    render_media_fallback(tag, parser, output, context);
+    list_media_fallback(tag, parser, children);
 }
 
 /// Handle video element conversion to Markdown.
 ///
 /// Extracts src from video tag or nested source elements, outputs as a link,
-/// and processes fallback content (e.g., browser compatibility text).
+/// and lists the fallback content (e.g., browser compatibility text) in `children`.
 #[cfg_attr(not(feature = "visitor"), allow(unused_variables))]
-pub fn handle_video(
+fn handle_video(
     node_handle: &NodeHandle,
     tag: &HTMLTag,
     parser: &Parser,
     output: &mut String,
     context: MediaContext<'_>,
+    children: &mut Vec<NodeHandle>,
 ) {
     let MediaContext {
         options,
@@ -277,7 +293,7 @@ pub fn handle_video(
         }
     }
 
-    render_media_fallback(tag, parser, output, context);
+    list_media_fallback(tag, parser, children);
 }
 
 /// Handle picture element conversion to Markdown.

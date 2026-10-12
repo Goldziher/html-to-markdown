@@ -25,6 +25,23 @@ pub trait Walker {
 
     /// Leave the node of `frame`: all of its children are complete.
     fn leave(&mut self, frame: Self::Frame);
+
+    /// Whether [`drive`] calls [`Walker::before_child`] and [`Walker::after_child`] around each
+    /// child of `frame`.
+    fn hooks_children(&self, _frame: &Self::Frame) -> bool {
+        false
+    }
+
+    /// Called before the child `index` of `frame` is entered, when `frame` hooks its children.
+    /// Returns whether the walk visits the child. A child that is not visited gets no
+    /// [`Walker::after_child`].
+    fn before_child(&mut self, _frame: &mut Self::Frame, _index: usize) -> bool {
+        true
+    }
+
+    /// Called after the child `index` of `frame` is complete with its subtree, when `frame` hooks
+    /// its children.
+    fn after_child(&mut self, _frame: &mut Self::Frame, _index: usize) {}
 }
 
 /// An element of the Markdown walk that its handler opened: the walk visits the children that the
@@ -59,6 +76,48 @@ pub enum Close {
     /// The children write to a buffer of their own, and the second half of the handler reads
     /// it. The children of every other element write to the buffer of the element.
     Capture(CaptureEnd),
+    /// The walk calls the hook before and after each child, and the hook ends the element.
+    Hooked(Box<dyn ChildHook>),
+}
+
+/// The handler of an element that works between two of its children.
+///
+/// The walk calls [`ChildHook::before_child`] before it enters the child with the index `index`
+/// of the list that the first half of the handler gave, [`ChildHook::after_child`] after that
+/// child is complete with its subtree, and [`ChildHook::close`] after the last child.
+pub trait ChildHook {
+    /// Say how the walk visits the child `index`. `element.output` is the buffer of the element.
+    fn before_child(&mut self, index: usize, element: &mut HookSite<'_>) -> Child;
+
+    /// The child `index` is complete. `own` is the buffer that [`ChildHook::before_child`] gave
+    /// for it, with what the child wrote.
+    fn after_child(&mut self, index: usize, own: Option<String>, element: &mut HookSite<'_>);
+
+    /// End the element: the second half of the handler.
+    fn close(self: Box<Self>, element: &mut HookSite<'_>);
+}
+
+/// The element that a [`ChildHook`] works for, with its buffer and its state.
+pub type HookSite<'a> = crate::converter::inline::HandlerContext<'a>;
+
+/// How the walk visits one child of an element with a [`ChildHook`].
+pub enum Child {
+    /// The walk does not visit the child, and calls no [`ChildHook::after_child`] for it.
+    Skip,
+    Walk {
+        /// The buffer that the child writes to. `None` for the buffer of the element.
+        buffer: Option<String>,
+        /// The conversion state of the child. `None` for the state of the element.
+        scope: Option<std::rc::Rc<crate::converter::Context>>,
+    },
+}
+
+impl Child {
+    /// The child writes to the buffer of the element and reads the state of the element.
+    pub const IN_PLACE: Self = Self::Walk {
+        buffer: None,
+        scope: None,
+    };
 }
 
 /// The second half of a handler that captures the text of its children.
@@ -77,6 +136,9 @@ pub enum CaptureEnd {
     /// An `rt` of a ruby.
     RubyAnnotation,
     Quote,
+    /// The content of an `audio` or a `video` that is no `source`.
+    MediaFallback,
+    Code(crate::converter::handlers::code_block::CodeEnd),
 }
 
 impl Close {
@@ -84,11 +146,20 @@ impl Close {
     pub const fn captures(&self) -> bool {
         matches!(self, Self::Capture(_))
     }
+
+    /// Whether the walk calls a hook around each child.
+    pub const fn hooks_children(&self) -> bool {
+        matches!(self, Self::Hooked(_))
+    }
 }
 
 enum Step<N> {
     Enter(N),
     Leave,
+    /// A child of a frame that hooks its children, with its index among them.
+    Child(N, usize),
+    /// The end of the child with this index of a frame that hooks its children.
+    After(usize),
 }
 
 /// The vectors of one walk. A walk leaves them empty, so the next walk can use their memory.
@@ -131,10 +202,20 @@ pub fn drive<W: Walker>(walker: &mut W, roots: &[W::Node], scratch: &mut Scratch
             match step {
                 Step::Enter(node) => {
                     if let Some(frame) = walker.enter(node, frames.last(), children) {
+                        let hooked = walker.hooks_children(&frame);
                         frames.push(frame);
                         work.push(Step::Leave);
                         let first_child = work.len();
-                        work.extend(children.iter().copied().map(Step::Enter));
+                        if hooked {
+                            work.extend(
+                                children
+                                    .iter()
+                                    .enumerate()
+                                    .map(|(index, &child)| Step::Child(child, index)),
+                            );
+                        } else {
+                            work.extend(children.iter().copied().map(Step::Enter));
+                        }
                         work[first_child..].reverse();
                         children.clear();
                     }
@@ -143,6 +224,18 @@ pub fn drive<W: Walker>(walker: &mut W, roots: &[W::Node], scratch: &mut Scratch
                 Step::Leave => {
                     if let Some(frame) = frames.pop() {
                         walker.leave(frame);
+                    }
+                }
+                Step::Child(node, index) => {
+                    if frames.last_mut().is_some_and(|frame| walker.before_child(frame, index)) {
+                        work.push(Step::After(index));
+                        next = Some(Step::Enter(node));
+                        continue;
+                    }
+                }
+                Step::After(index) => {
+                    if let Some(frame) = frames.last_mut() {
+                        walker.after_child(frame, index);
                     }
                 }
             }
@@ -161,6 +254,10 @@ mod tests {
         events: Vec<String>,
         open: usize,
         most_open: usize,
+        /// The nodes that hook their children.
+        hooked: &'a [usize],
+        /// The children that a hook does not visit, each as a node and an index.
+        skipped: &'a [(usize, usize)],
     }
 
     impl Walker for Recorder<'_> {
@@ -183,14 +280,38 @@ mod tests {
             self.open -= 1;
             self.events.push(format!("leave {frame}"));
         }
+
+        fn hooks_children(&self, frame: &usize) -> bool {
+            self.hooked.contains(frame)
+        }
+
+        fn before_child(&mut self, frame: &mut usize, index: usize) -> bool {
+            self.events.push(format!("before child {index} of {frame}"));
+            !self.skipped.contains(&(*frame, index))
+        }
+
+        fn after_child(&mut self, frame: &mut usize, index: usize) {
+            self.events.push(format!("after child {index} of {frame}"));
+        }
     }
 
     fn record<'a>(tree: &'a [Vec<usize>], roots: &[usize]) -> Recorder<'a> {
+        record_hooked(tree, roots, &[], &[])
+    }
+
+    fn record_hooked<'a>(
+        tree: &'a [Vec<usize>],
+        roots: &[usize],
+        hooked: &'a [usize],
+        skipped: &'a [(usize, usize)],
+    ) -> Recorder<'a> {
         let mut recorder = Recorder {
             tree,
             events: Vec::new(),
             open: 0,
             most_open: 0,
+            hooked,
+            skipped,
         };
         drive(&mut recorder, roots, &mut Scratch::default());
         recorder
@@ -213,6 +334,30 @@ mod tests {
                 "leave 4",
                 "leave 0",
                 "enter 6 below root",
+            ]
+        );
+        assert_eq!(recorder.open, 0);
+    }
+
+    #[test]
+    fn should_call_the_hook_before_and_after_each_child_of_a_hooked_node_only() {
+        let tree = vec![vec![1, 4, 6], vec![2, 3], vec![], vec![], vec![5], vec![], vec![]];
+        let recorder = record_hooked(&tree, &[0], &[0], &[(0, 1)]);
+        assert_eq!(
+            recorder.events,
+            [
+                "enter 0 below root",
+                "before child 0 of 0",
+                "enter 1 below 0",
+                "enter 2 below 1",
+                "enter 3 below 1",
+                "leave 1",
+                "after child 0 of 0",
+                "before child 1 of 0",
+                "before child 2 of 0",
+                "enter 6 below 0",
+                "after child 2 of 0",
+                "leave 0",
             ]
         );
         assert_eq!(recorder.open, 0);

@@ -1,5 +1,5 @@
 use crate::converter::block::container::HandlerContext;
-use crate::converter::handlers::{handle_blockquote, handle_code, handle_graphic, handle_img, handle_link, handle_pre};
+use crate::converter::handlers::{handle_blockquote, handle_graphic, handle_img, handle_pre, open_link};
 use crate::converter::walk::{CaptureEnd, Close, Open};
 
 struct TagDispatcher<'a, 'output> {
@@ -83,7 +83,8 @@ pub(super) fn close_tag(close: Close, parser: &tl::Parser, output: &mut String, 
         Close::Unknown(end) => crate::converter::block::unknown::close(&end, output),
         Close::CollectedQuote(end) => crate::converter::semantic::close_collected_q(&end, output, handler),
         // ~keep The walk holds the buffer of a capturing element and ends it with `close_capture`.
-        Close::Capture(_) => {}
+        // ~keep The hook of an element ends it.
+        Close::Capture(_) | Close::Hooked(_) => {}
     }
 }
 
@@ -118,6 +119,10 @@ pub(super) fn close_capture<'a>(
         CaptureEnd::RubyText => crate::converter::inline::ruby::close_text(content, inline.output),
         CaptureEnd::RubyAnnotation => crate::converter::inline::ruby::close_annotation(content, inline.output),
         CaptureEnd::Quote => crate::converter::semantic::close_q(content, inline.output, handler),
+        CaptureEnd::MediaFallback => {
+            crate::converter::media::embedded::close_media_fallback(content, inline.output, handler.ctx);
+        }
+        CaptureEnd::Code(end) => crate::converter::handlers::code_block::close_code(&end, content, inline),
     }
 }
 
@@ -179,6 +184,15 @@ impl TagDispatcher<'_, '_> {
             "small" => self.open_children(),
             // ~keep Code shows every character as text: no title in parentheses, no script marks.
             "abbr" | "sub" | "sup" if handler.ctx.in_code => self.open_children(),
+            "ruby" => {
+                self.opened = crate::converter::inline::ruby::open(
+                    self.node_handle,
+                    self.parser,
+                    self.output,
+                    handler.ctx,
+                    self.children,
+                );
+            }
             "rb" | "rt" | "rp" | "rtc" => {
                 self.opened = crate::converter::inline::ruby::open_part(
                     self.tag_name,
@@ -188,6 +202,14 @@ impl TagDispatcher<'_, '_> {
                     handler.ctx,
                     self.children,
                 );
+            }
+            "code" => {
+                self.opened = Some(crate::converter::handlers::code_block::open_code(
+                    self.tag,
+                    self.parser,
+                    handler.ctx,
+                    self.children,
+                ));
             }
             "kbd" | "samp" => {
                 self.opened = crate::converter::inline::code::open(
@@ -256,10 +278,10 @@ impl TagDispatcher<'_, '_> {
     fn dispatch_inline(&mut self) -> bool {
         let handler = self.handler;
         match self.tag_name {
-            "ruby" => {
-                crate::converter::inline::dispatch_inline_handler(
-                    self.tag_name,
-                    crate::converter::inline::HandlerContext::new((
+            "a" => {
+                self.opened = open_link(
+                    self.tag,
+                    &mut crate::converter::inline::HandlerContext::new((
                         self.node_handle,
                         self.parser,
                         self.output,
@@ -268,20 +290,9 @@ impl TagDispatcher<'_, '_> {
                         handler.depth,
                         handler.dom_ctx,
                     )),
+                    self.children,
                 );
             }
-            "a" => handle_link(
-                self.tag,
-                crate::converter::inline::HandlerContext::new((
-                    self.node_handle,
-                    self.parser,
-                    self.output,
-                    handler.options,
-                    handler.ctx,
-                    handler.depth,
-                    handler.dom_ctx,
-                )),
-            ),
             "img" => handle_img(
                 self.tag,
                 crate::converter::inline::HandlerContext::new((
@@ -295,18 +306,6 @@ impl TagDispatcher<'_, '_> {
                 )),
             ),
             "graphic" => handle_graphic(
-                self.tag,
-                crate::converter::inline::HandlerContext::new((
-                    self.node_handle,
-                    self.parser,
-                    self.output,
-                    handler.options,
-                    handler.ctx,
-                    handler.depth,
-                    handler.dom_ctx,
-                )),
-            ),
-            "code" => handle_code(
                 self.tag,
                 crate::converter::inline::HandlerContext::new((
                     self.node_handle,
@@ -461,6 +460,21 @@ impl TagDispatcher<'_, '_> {
                     self.children,
                 );
             }
+            "audio" | "video" => {
+                self.opened = crate::converter::media::embedded::open_media(
+                    self.tag_name,
+                    self.node_handle,
+                    self.parser,
+                    self.output,
+                    crate::converter::media::MediaContext {
+                        options: self.handler.options,
+                        ctx: self.handler.ctx,
+                        depth: self.handler.depth,
+                        dom_ctx: self.handler.dom_ctx,
+                    },
+                    self.children,
+                );
+            }
             "picture" => {
                 self.opened = Some(crate::converter::media::embedded::open_picture(
                     self.tag,
@@ -509,7 +523,7 @@ impl TagDispatcher<'_, '_> {
                     self.handler,
                 );
             }
-            "audio" | "video" | "iframe" | "svg" | "math" => {
+            "iframe" | "svg" | "math" => {
                 crate::converter::media::dispatch_media_handler(
                     self.tag_name,
                     self.node_handle,

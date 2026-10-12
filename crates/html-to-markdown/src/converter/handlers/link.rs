@@ -16,17 +16,18 @@ use crate::converter::block::heading::{find_single_heading_child, heading_allows
 use crate::converter::dom_context::DomContext;
 use crate::converter::inline::HandlerContext;
 use crate::converter::inline::link::{MarkdownLink, append_markdown_link_in_context, has_uri_scheme};
-use crate::converter::main::walk_node;
 use crate::converter::media::inline_data_treatment;
 use crate::converter::utility::content::{
     collect_link_label_text, keeps_source_white_space, link_accessible_name, link_text_content, node_is_block_level,
     normalize_link_label, normalized_tag_name, push_inline_prefix,
 };
 use crate::converter::utility::escaping::escape_link_label;
+use crate::converter::walk::{Child, ChildHook, Close, HookSite, Open};
 use crate::converter::{append_inline_suffix, chomp_inline};
 use crate::options::{ConversionOptions, InlineDataMedia};
 use crate::text;
 use std::borrow::Cow;
+use std::rc::Rc;
 
 #[cfg(feature = "visitor")]
 use crate::converter::utility::serialization::serialize_node;
@@ -55,9 +56,9 @@ fn indent_hard_break_continuations(label: &mut String, ctx: &Context, options: &
     *label = indented;
 }
 
-/// Handle an `<a>` (link) element and convert to Markdown.
+/// Open an `<a>` (link) element and list in `children` the nodes that the walk visits for it.
 ///
-/// This handler processes link elements including:
+/// The link is written by the hook that this function gives:
 /// - Extracting href and title attributes
 /// - Detecting autolinks (where text equals href)
 /// - Handling links that contain heading elements
@@ -65,44 +66,219 @@ fn indent_hard_break_continuations(label: &mut String, ctx: &Context, options: &
 /// - Invoking visitor callbacks when the visitor feature is enabled
 /// - Collecting link metadata when the metadata feature is enabled
 /// - Generating appropriate markdown link output
-pub fn handle_link(tag: &tl::HTMLTag, mut handler: HandlerContext<'_>) {
-    let Some(data) = LinkData::new(tag, &handler) else {
-        walk_handles_to_output(tag.children().top().iter().copied(), &mut handler);
-        return;
+///
+/// Returns `None` for a link that is complete.
+pub fn open_link(
+    tag: &tl::HTMLTag,
+    handler: &mut HandlerContext<'_>,
+    children: &mut Vec<tl::NodeHandle>,
+) -> Option<Open> {
+    let Some(data) = LinkData::new(tag, handler) else {
+        children.extend(tag.children().top().iter().copied());
+        return Some(Open::children_only());
     };
-    // ~keep A link in a code span stays a link: the code marks go inside its label (#813).
-    let span_links = handler.context.inline_code_links.clone();
-    if let Some(links) = span_links.filter(|_| !handler.context.in_code_block) {
-        emit_code_link(tag, &data, &links, &mut handler);
-        return;
-    }
-    // ~keep A code block shows every character as text, so a link there writes its text and no
-    // ~keep marks (#781). A visitor sees the links that it sees outside code, and decides what
-    // ~keep they write.
-    if handler.context.in_code {
-        handler.context.inline_data_replaced.set(false);
-        let text_start = handler.output.len();
-        walk_handles_to_output(data.children.iter().copied(), &mut handler);
-        let text = handler.output.split_off(text_start);
-        #[cfg(feature = "visitor")]
-        let is_shown = handler.context.has_observer() && data.is_shown_to_visitor_in_code(&text, &handler);
-        #[cfg(not(feature = "visitor"))]
-        let is_shown = false;
-        if is_shown {
-            emit_link(tag, &data, &text, &LabelEdges::NONE, false, &mut handler);
-        } else {
-            handler.output.push_str(&text);
+    let flow = if handler.context.inline_code_links.is_some() && !handler.context.in_code_block {
+        // ~keep A link in a code span stays a link: the code marks go inside its label (#813).
+        children.extend(data.children.iter().copied());
+        LinkFlow::CodeSpan {
+            raw: String::new(),
+            scope: Rc::new(Context {
+                inline_code_links: None,
+                ..handler.context.clone()
+            }),
         }
-        #[cfg(feature = "metadata")]
-        record_link_metadata(tag, &data, text.trim(), handler.context);
-        return;
-    }
-    if emit_autolink(&data, &mut handler) || emit_heading_link(&data, &mut handler) {
-        return;
+    } else if handler.context.in_code {
+        // ~keep A code block shows every character as text, so a link there writes its text and no
+        // ~keep marks (#781). A visitor sees the links that it sees outside code, and decides what
+        // ~keep they write.
+        handler.context.inline_data_replaced.set(false);
+        LinkFlow::Code(CodeText::open(&data, handler, children))
+    } else {
+        if emit_autolink(&data, handler) {
+            return None;
+        }
+        LinkFlow::Label(LabelFlow::open(&data, handler, children))
+    };
+    Some(Open {
+        scope: None,
+        close: Close::Hooked(Box::new(LinkHook { data, flow })),
+    })
+}
+
+/// The work between the children of a link.
+struct LinkHook {
+    data: LinkData,
+    flow: LinkFlow,
+}
+
+/// Where a link is, which decides what the walk visits for it.
+enum LinkFlow {
+    /// In a code span: the children write the text of the link, with `scope` as their state.
+    CodeSpan { raw: String, scope: Rc<Context> },
+    /// In other code.
+    Code(CodeText),
+    /// Outside code.
+    Label(LabelFlow),
+}
+
+impl ChildHook for LinkHook {
+    fn before_child(&mut self, index: usize, element: &mut HookSite<'_>) -> Child {
+        match &mut self.flow {
+            LinkFlow::CodeSpan { raw, scope } => Child::Walk {
+                buffer: Some(std::mem::take(raw)),
+                scope: Some(Rc::clone(scope)),
+            },
+            LinkFlow::Code(code) => code.before_child(index, &self.data, element),
+            LinkFlow::Label(label) => label.before_child(index, &self.data, element),
+        }
     }
 
-    handler.context.inline_data_replaced.set(false);
-    let content = build_label_content(&data, &handler);
+    fn after_child(&mut self, index: usize, own: Option<String>, element: &mut HookSite<'_>) {
+        match &mut self.flow {
+            LinkFlow::CodeSpan { raw, .. } => *raw = own.unwrap_or_default(),
+            LinkFlow::Code(code) => code.after_child(index, own, &self.data, element),
+            LinkFlow::Label(label) => label.after_child(index, own, &self.data, element),
+        }
+    }
+
+    fn close(self: Box<Self>, element: &mut HookSite<'_>) {
+        let Some(tl::Node::Tag(tag)) = element.node_handle.get(element.parser) else {
+            return;
+        };
+        let Self { data, flow } = *self;
+        match flow {
+            LinkFlow::CodeSpan { raw, scope } => emit_code_link(tag, &data, raw, &scope, element),
+            LinkFlow::Code(mut code) => code.advance(CodeStage::Done, tag, &data, element),
+            LinkFlow::Label(mut label) => label.advance(LabelStage::Done, tag, &data, element),
+        }
+    }
+}
+
+/// The work that is next for a link outside code.
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+enum LabelStage {
+    /// The one heading of the link writes its text.
+    Heading,
+    /// The children write the label.
+    Label,
+    /// The blocks that the link does not hold in its label are written after it.
+    Deferred,
+    Done,
+}
+
+/// A link outside code. The walk visits the one heading of the link when it has one, then the
+/// children of the label, then the blocks that are written after the link. Each part decides
+/// whether the walk visits the next one.
+struct LabelFlow {
+    stage: LabelStage,
+    /// The level and the node of the one heading of the link.
+    heading: Option<(usize, tl::NodeHandle)>,
+    heading_text: String,
+    label: Option<LabelWalk>,
+    /// Whether the blocks after the link are written.
+    emits_deferred: bool,
+}
+
+impl LabelFlow {
+    fn open(data: &LinkData, handler: &HandlerContext<'_>, children: &mut Vec<tl::NodeHandle>) -> Self {
+        let heading =
+            find_single_heading_child(*handler.node_handle, handler.parser).filter(|_| !data.href_addr_dropped);
+        children.extend(heading.map(|(_, heading_handle)| heading_handle));
+        children.extend(data.label_children().iter().copied());
+        if data.emit_blocks_separately {
+            children.extend(data.deferred.iter().copied());
+        }
+        Self {
+            stage: LabelStage::Heading,
+            heading,
+            heading_text: String::new(),
+            label: None,
+            emits_deferred: false,
+        }
+    }
+
+    /// The part that the listed child `index` belongs to, with its index in that part.
+    fn part(&self, index: usize, data: &LinkData) -> (LabelStage, usize) {
+        let headings = usize::from(self.heading.is_some());
+        let labels = data.label_children().len();
+        if index < headings {
+            (LabelStage::Heading, index)
+        } else if index < headings + labels {
+            (LabelStage::Label, index - headings)
+        } else {
+            (LabelStage::Deferred, index - headings - labels)
+        }
+    }
+
+    fn before_child(&mut self, index: usize, data: &LinkData, element: &mut HookSite<'_>) -> Child {
+        let (part, _) = self.part(index, data);
+        if let Some(tl::Node::Tag(tag)) = element.node_handle.get(element.parser) {
+            self.advance(part, tag, data, element);
+        }
+        if self.stage != part {
+            return Child::Skip;
+        }
+        match (part, self.heading, self.label.as_mut()) {
+            (LabelStage::Heading, Some((_, heading_handle)), _) => {
+                heading_context(heading_handle, element.parser, element.context).map_or(Child::Skip, |context| {
+                    Child::Walk {
+                        buffer: Some(String::new()),
+                        scope: Some(Rc::new(context)),
+                    }
+                })
+            }
+            (LabelStage::Label, _, Some(label)) => label.before_child(),
+            (LabelStage::Deferred, _, _) if self.emits_deferred => Child::IN_PLACE,
+            _ => Child::Skip,
+        }
+    }
+
+    fn after_child(&mut self, index: usize, own: Option<String>, data: &LinkData, element: &HookSite<'_>) {
+        match (self.part(index, data), self.label.as_mut()) {
+            ((LabelStage::Heading, _), _) => self.heading_text = own.unwrap_or_default(),
+            ((LabelStage::Label, at), Some(label)) => {
+                label.after_child(data.label_children()[at], own, element);
+            }
+            _ => {}
+        }
+    }
+
+    /// Do the work of each stage before `to`.
+    fn advance(&mut self, to: LabelStage, tag: &tl::HTMLTag<'_>, data: &LinkData, element: &mut HookSite<'_>) {
+        while self.stage < to {
+            self.stage = match self.stage {
+                LabelStage::Heading => {
+                    let heading_text = self.heading_text.trim();
+                    match self.heading {
+                        Some((level, _)) if !heading_text.is_empty() => {
+                            emit_heading_link(tag, data, level, heading_text, element);
+                            LabelStage::Done
+                        }
+                        _ => {
+                            element.context.inline_data_replaced.set(false);
+                            self.label = Some(LabelWalk::new(data, element.options, element.context));
+                            LabelStage::Label
+                        }
+                    }
+                }
+                LabelStage::Label => {
+                    let content = self
+                        .label
+                        .take()
+                        .map(|label| label.into_content(data))
+                        .unwrap_or_default();
+                    self.emits_deferred = emit_label_link(tag, data, &content, element) && data.emit_blocks_separately;
+                    LabelStage::Deferred
+                }
+                LabelStage::Deferred | LabelStage::Done => LabelStage::Done,
+            };
+        }
+    }
+}
+
+/// Write the link of the converter around `content`, the content of its label as the walk wrote
+/// it. Returns whether the blocks after the link are written.
+fn emit_label_link(tag: &tl::HTMLTag<'_>, data: &LinkData, content: &str, handler: &mut HandlerContext<'_>) -> bool {
     // ~keep The white space at an edge of the label goes outside the link, as it does for bold
     // ~keep and italic text: `[Go ](/p)now` shows as `Go now`, and a trimmed label joins the words.
     // ~keep A line break at an edge of the label is content of the label, not white space
@@ -110,9 +286,9 @@ pub fn handle_link(tag: &tl::HTMLTag, mut handler: HandlerContext<'_>) {
     let inner = content.trim_matches([' ', '\t', '\u{a0}']);
     let edge_is_break = inner.starts_with('\n') || inner.starts_with("\\\n") || inner.ends_with('\n');
     let (prefix, suffix, trimmed) = if edge_is_break || keeps_source_white_space(handler.options, handler.context) {
-        ("", "", content.as_str())
+        ("", "", content)
     } else {
-        chomp_inline(&content)
+        chomp_inline(content)
     };
     let edges = LabelEdges {
         prefix,
@@ -120,30 +296,210 @@ pub fn handle_link(tag: &tl::HTMLTag, mut handler: HandlerContext<'_>) {
         has_text: !trimmed.is_empty(),
     };
     let mut label = normalize_link_label(trimmed);
-    apply_label_fallbacks(&data, &mut label, &handler);
+    apply_label_fallbacks(tag, data, &mut label, handler);
     indent_hard_break_continuations(&mut label, handler.context, handler.options);
-    let drop_link = data.is_dropped(&label, &handler);
-    let emit_deferred = emit_link(tag, &data, &label, &edges, drop_link, &mut handler);
+    let drop_link = data.is_dropped(&label, handler);
+    let emit_deferred = emit_link(tag, data, &label, &edges, drop_link, handler);
     #[cfg(feature = "metadata")]
-    record_link_metadata(tag, &data, &label, handler.context);
-    if data.emit_blocks_separately && emit_deferred {
-        walk_handles_to_output(data.deferred.iter().copied(), &mut handler);
+    record_link_metadata(tag, data, &label, handler.context);
+    emit_deferred
+}
+
+/// The work that is next for a link in code.
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+enum CodeStage {
+    /// The children write the text of the link.
+    Text,
+    /// The one heading of the link writes what it writes outside code.
+    ProbeHeading,
+    /// The children write the label that the link has outside code.
+    ProbeLabel,
+    Done,
+}
+
+/// A link in code, which writes its text. When a visitor observes the walk, the link asks what
+/// its content writes outside code, to know whether the visitor gets a call (see
+/// [`CodeText::is_shown`]). The walk visits the children for the text, then the one heading
+/// and the children of the label for that answer, each when the answer is still open.
+///
+/// ~keep The answer comes from the walk that writes a link outside code, run once more on
+/// ~keep the content of this link. No second set of rules says what a label is, so a rule of the
+/// ~keep traversal (a stripped tag, an excluded node, a preset) cannot be missing from the answer.
+/// ~keep No state is shared between a link and a link inside it.
+struct CodeText {
+    stage: CodeStage,
+    text_start: usize,
+    text: String,
+    /// The count of the listed children that write the text.
+    texts: usize,
+    /// The one heading of the link, when the walk asks what it writes outside code.
+    heading: Option<tl::NodeHandle>,
+    heading_text: String,
+    label: Option<LabelWalk>,
+    /// Whether a visitor gets a `visit_link` call. `None` while the answer is open.
+    shown: Option<bool>,
+}
+
+impl CodeText {
+    fn open(data: &LinkData, handler: &HandlerContext<'_>, children: &mut Vec<tl::NodeHandle>) -> Self {
+        children.extend(data.children.iter().copied());
+        let asks = is_observed(handler.context) && !data.is_autolink(handler.options);
+        let heading = find_single_heading_child(*handler.node_handle, handler.parser)
+            .filter(|_| asks && !data.href_addr_dropped)
+            .map(|(_, heading_handle)| heading_handle);
+        if asks {
+            children.extend(heading);
+            children.extend(data.label_children().iter().copied());
+        }
+        Self {
+            stage: CodeStage::Text,
+            text_start: handler.output.len(),
+            text: String::new(),
+            texts: data.children.len(),
+            heading,
+            heading_text: String::new(),
+            label: None,
+            shown: (!asks).then_some(false),
+        }
+    }
+
+    /// The part that the listed child `index` belongs to, with its index in that part.
+    fn part(&self, index: usize) -> (CodeStage, usize) {
+        let headings = usize::from(self.heading.is_some());
+        if index < self.texts {
+            (CodeStage::Text, index)
+        } else if index < self.texts + headings {
+            (CodeStage::ProbeHeading, index - self.texts)
+        } else {
+            (CodeStage::ProbeLabel, index - self.texts - headings)
+        }
+    }
+
+    fn before_child(&mut self, index: usize, data: &LinkData, element: &mut HookSite<'_>) -> Child {
+        let (part, _) = self.part(index);
+        if let Some(tl::Node::Tag(tag)) = element.node_handle.get(element.parser) {
+            self.advance(part, tag, data, element);
+        }
+        match (part, self.heading, self.label.as_mut()) {
+            (CodeStage::Text, _, _) => Child::IN_PLACE,
+            _ if self.shown.is_some() => Child::Skip,
+            (CodeStage::ProbeHeading, Some(heading_handle), _) => unobserved_outside_code(element.context)
+                .and_then(|outside| heading_context(heading_handle, element.parser, &outside))
+                .map_or(Child::Skip, |context| Child::Walk {
+                    buffer: Some(String::new()),
+                    scope: Some(Rc::new(context)),
+                }),
+            (CodeStage::ProbeLabel, _, Some(label)) => label.before_child(),
+            _ => Child::Skip,
+        }
+    }
+
+    fn after_child(&mut self, index: usize, own: Option<String>, data: &LinkData, element: &HookSite<'_>) {
+        match (self.part(index), self.label.as_mut()) {
+            ((CodeStage::ProbeHeading, _), _) => self.heading_text = own.unwrap_or_default(),
+            ((CodeStage::ProbeLabel, at), Some(label)) => {
+                label.after_child(data.label_children()[at], own, element);
+            }
+            _ => {}
+        }
+    }
+
+    /// Do the work of each stage before `to`.
+    ///
+    /// ~keep A visitor gets the calls of a link outside code, which makes none for a link in the
+    /// ~keep `<address>` form, for a link around one heading, and for a link that is left out (see
+    /// ~keep `is_dropped`). A highlighter writes one empty anchor into its own page for each line
+    /// ~keep of code. An image with no alt text writes nothing in code, so a link whose text is
+    /// ~keep empty asks what its content writes outside code: a link with a label there is not
+    /// ~keep left out, and a heading with a text there makes a heading link.
+    fn advance(&mut self, to: CodeStage, tag: &tl::HTMLTag<'_>, data: &LinkData, element: &mut HookSite<'_>) {
+        while self.stage < to {
+            self.stage = match self.stage {
+                CodeStage::Text => {
+                    self.text = element.output.split_off(self.text_start);
+                    if self.heading.is_some() && !self.text.trim().is_empty() {
+                        self.shown = Some(false);
+                    }
+                    CodeStage::ProbeHeading
+                }
+                CodeStage::ProbeHeading => {
+                    if self.shown.is_none() {
+                        self.ask_label(tag, data, element);
+                    }
+                    CodeStage::ProbeLabel
+                }
+                CodeStage::ProbeLabel => {
+                    let label = self.label.take().map(|label| label.into_content(data));
+                    let shown = self
+                        .shown
+                        .unwrap_or_else(|| label.is_some_and(|content| !normalize_link_label(&content).is_empty()));
+                    if shown {
+                        emit_link(tag, data, &self.text, &LabelEdges::NONE, false, element);
+                    } else {
+                        element.output.push_str(&self.text);
+                    }
+                    #[cfg(feature = "metadata")]
+                    record_link_metadata(tag, data, self.text.trim(), element.context);
+                    CodeStage::Done
+                }
+                CodeStage::Done => CodeStage::Done,
+            };
+        }
+    }
+
+    /// Answer from the text of the link and the text of its heading outside code, or start the
+    /// walk of the label that the link has outside code.
+    fn ask_label(&mut self, tag: &tl::HTMLTag<'_>, data: &LinkData, element: &HookSite<'_>) {
+        if !self.heading_text.trim().is_empty() {
+            self.shown = Some(false);
+            return;
+        }
+        let mut label = normalize_link_label(&self.text);
+        apply_label_fallbacks(tag, data, &mut label, element);
+        if !data.is_dropped(&label, element) {
+            self.shown = Some(true);
+        } else if let Some(outside) = unobserved_outside_code(element.context) {
+            self.label = Some(LabelWalk::new(data, element.options, &outside));
+        }
     }
 }
 
-/// Write a link in a code span: its text goes to the span, and `links` records the range of
-/// that text with the link that replaces it when the span is written.
+/// Whether a visitor observes the walk with the state `context`.
+#[cfg(feature = "visitor")]
+fn is_observed(context: &Context) -> bool {
+    context.has_observer()
+}
+
+/// Whether a visitor observes the walk with the state `context`.
+#[cfg(not(feature = "visitor"))]
+const fn is_observed(_context: &Context) -> bool {
+    false
+}
+
+/// The state of a walk that writes as outside code and that nothing observes (see
+/// `Context::unobserved_outside_code`). `None` in a build with no visitor.
+#[cfg(feature = "visitor")]
+fn unobserved_outside_code(context: &Context) -> Option<Context> {
+    Some(context.unobserved_outside_code())
+}
+
+/// The state of a walk that writes as outside code and that nothing observes. `None` in a build
+/// with no visitor.
+#[cfg(not(feature = "visitor"))]
+const fn unobserved_outside_code(_context: &Context) -> Option<Context> {
+    None
+}
+
+/// Write a link in a code span: `raw`, the text that its children wrote with the state
+/// `context`, goes to the span, and the links of the span record the range of that text with
+/// the link that replaces it when the span is written.
 fn emit_code_link(
     tag: &tl::HTMLTag<'_>,
-    data: &LinkData<'_>,
-    links: &std::cell::RefCell<Vec<crate::converter::context::InlineCodeLink>>,
+    data: &LinkData,
+    mut raw: String,
+    context: &Context,
     handler: &mut HandlerContext<'_>,
 ) {
-    let context = Context {
-        inline_code_links: None,
-        ..handler.context.clone()
-    };
-    let mut raw = collect_code_link_text(data, &context, handler);
     if (handler.context.in_table_cell || handler.context.in_heading) && followed_by_break(handler) {
         raw.truncate(raw.trim_end().len());
     }
@@ -154,7 +510,7 @@ fn emit_code_link(
         // ~keep The label is a finished code span, and the link marks are outside it.
         let link_context = Context {
             in_code: false,
-            ..context
+            ..context.clone()
         };
         let mut label = String::new();
         crate::converter::handlers::code_block::emit_inline_code(
@@ -179,10 +535,12 @@ fn emit_code_link(
         if !markdown.is_empty() {
             let start = handler.output.len();
             handler.output.push_str(&raw);
-            links.borrow_mut().push(crate::converter::context::InlineCodeLink {
-                range: start..handler.output.len(),
-                markdown,
-            });
+            if let Some(links) = handler.context.inline_code_links.as_ref() {
+                links.borrow_mut().push(crate::converter::context::InlineCodeLink {
+                    range: start..handler.output.len(),
+                    markdown,
+                });
+            }
         }
     } else {
         handler.output.push_str(&raw);
@@ -206,24 +564,6 @@ fn followed_by_break(handler: &HandlerContext<'_>) -> bool {
     matches!(next.and_then(|handle| handle.get(handler.parser)), Some(tl::Node::Tag(tag)) if tag.name().as_utf8_str().eq_ignore_ascii_case("br"))
 }
 
-fn collect_code_link_text(data: &LinkData<'_>, context: &Context, handler: &HandlerContext<'_>) -> String {
-    let mut raw = String::new();
-    for child in &data.children {
-        walk_node(
-            child,
-            handler.parser,
-            &mut raw,
-            crate::converter::block::container::HandlerContext::new(
-                handler.options,
-                context,
-                handler.depth + 1,
-                handler.dom_context,
-            ),
-        );
-    }
-    raw
-}
-
 /// The white space that the label of a link had at its two ends (see [`chomp_inline`]).
 ///
 /// ~keep It belongs to the link that the converter writes itself, so only [`write_link_with_edges`]
@@ -245,9 +585,10 @@ impl LabelEdges<'_> {
     };
 }
 
-struct LinkData<'a> {
+/// What a link is, apart from its `title` and its `aria-label`, which [`link_title`] and
+/// [`apply_label_fallbacks`] read from the tag.
+struct LinkData {
     href: String,
-    title: Option<Cow<'a, str>>,
     children: Vec<tl::NodeHandle>,
     inline_label: String,
     raw_text: String,
@@ -257,17 +598,21 @@ struct LinkData<'a> {
     href_addr_dropped: bool,
     link_allow_inline_images: bool,
     saw_block: bool,
-    aria_label: Option<Cow<'a, str>>,
     same_page_fragment: bool,
     /// The address has a fragment that is not empty: it names a place.
     names_place: bool,
     empty_span_content: bool,
 }
 
-impl<'a> LinkData<'a> {
-    /// The name of the link apart from its content: its `aria-label`, else its `title`.
-    fn accessible_name(&self) -> Option<&str> {
-        link_accessible_name(self.aria_label.as_deref(), self.title.as_deref())
+impl LinkData {
+    /// The children that write the label, in a walk that writes the blocks among them inline
+    /// when the link holds a block and writes no block after itself.
+    fn label_children(&self) -> &[tl::NodeHandle] {
+        if self.emit_blocks_separately {
+            &self.inline_children
+        } else {
+            &self.children
+        }
     }
 
     /// Whether the link is left out of the output: its content gives no text, and either the
@@ -304,39 +649,7 @@ impl<'a> LinkData<'a> {
             && (self.raw_text == self.href || (self.href.starts_with("mailto:") && self.raw_text == self.href[7..]))
     }
 
-    /// Whether a visitor gets a `visit_link` call for this link in code, where `text` is what the
-    /// content of the link writes there.
-    ///
-    /// ~keep The calls are those of a link outside code, which makes none for a link in the
-    /// ~keep `<address>` form, for a link around one heading, and for a link that is left out (see
-    /// ~keep `is_dropped`). A highlighter writes one empty anchor into its own page for each line
-    /// ~keep of code. An image with no alt text writes nothing in code, so a link whose text is empty asks
-    /// ~keep what its content writes outside code (`outside_code`): a link with a label there is
-    /// ~keep not left out, and a heading with a text there makes a heading link.
-    #[cfg(feature = "visitor")]
-    fn is_shown_to_visitor_in_code(&self, text: &str, handler: &HandlerContext<'_>) -> bool {
-        if self.is_autolink(handler.options) {
-            return false;
-        }
-        let heading =
-            find_single_heading_child(*handler.node_handle, handler.parser).filter(|_| !self.href_addr_dropped);
-        if let Some((_, heading_handle)) = heading {
-            let writes_text = |outside: &HandlerContext<'_>| {
-                heading_link_text(heading_handle, outside).is_some_and(|written| !written.trim().is_empty())
-            };
-            if !text.trim().is_empty() || outside_code(handler, writes_text) {
-                return false;
-            }
-        }
-        let mut label = normalize_link_label(text);
-        apply_label_fallbacks(self, &mut label, handler);
-        !self.is_dropped(&label, handler)
-            || outside_code(handler, |outside| {
-                !normalize_link_label(&build_label_content(self, outside)).is_empty()
-            })
-    }
-
-    fn new(tag: &'a tl::HTMLTag<'a>, handler: &HandlerContext<'_>) -> Option<Self> {
+    fn new(tag: &tl::HTMLTag<'_>, handler: &HandlerContext<'_>) -> Option<Self> {
         let raw_href = tag
             .attributes()
             .get("href")
@@ -347,9 +660,6 @@ impl<'a> LinkData<'a> {
             .resolve_link_url(&raw_href, handler.node_handle, handler.parser, handler.dom_context)
             .unwrap_or_else(|| raw_href.clone());
         let same_page_fragment = handler.context.own_page.holds(&raw_href, &href);
-        // ~keep Empty titles are absent because Markdown serializers drop `""` on reparse.
-        let title =
-            crate::converter::utility::attributes::decoded_attribute(tag, "title").filter(|value| !value.is_empty());
         let children = handler
             .dom_context
             .children_of(handler.node_handle.get_inner())
@@ -377,7 +687,6 @@ impl<'a> LinkData<'a> {
                 handler.dom_context,
             ),
             link_allow_inline_images: handler.context.keep_inline_images_in.contains("a"),
-            aria_label: crate::converter::utility::attributes::decoded_attribute(tag, "aria-label"),
             same_page_fragment,
             names_place: href.split_once('#').is_some_and(|(_, fragment)| !fragment.is_empty()),
             // ~keep White space alone is content of a link to another page, not an empty wrapper:
@@ -390,7 +699,6 @@ impl<'a> LinkData<'a> {
                     .iter()
                     .all(|child| empty_text_wrapper_child(child, handler.parser)),
             href,
-            title,
             children,
             inline_label,
             raw_text,
@@ -448,65 +756,29 @@ fn plain_wrapper(tag: &tl::HTMLTag<'_>) -> bool {
         && matches!(normalized_tag_name(tag.name().as_utf8_str()).as_ref(), "i" | "div")
 }
 
-/// What `ask` answers for the link of `handler` when that link is outside code: `ask` gets a
-/// handler that writes as outside code and that nothing observes (see
-/// `Context::unobserved_outside_code`).
-///
-/// ~keep The answer comes from the functions that write a link outside code, run once more on
-/// ~keep the content of this link. No second set of rules says what a label is, so a rule of the
-/// ~keep traversal (a stripped tag, an excluded node, a preset) cannot be missing from the answer.
-/// ~keep No state is shared between a link and a link inside it.
-#[cfg(feature = "visitor")]
-fn outside_code<T>(handler: &HandlerContext<'_>, ask: impl FnOnce(&HandlerContext<'_>) -> T) -> T {
-    let context = handler.context.unobserved_outside_code();
-    let mut unused = String::new();
-    ask(&HandlerContext {
-        node_handle: handler.node_handle,
-        parser: handler.parser,
-        output: &mut unused,
-        options: handler.options,
-        context: &context,
-        depth: handler.depth,
-        dom_context: handler.dom_context,
-    })
-}
-
-/// The text that the one heading of a link writes with the context of `handler`.
-fn heading_link_text(heading_handle: tl::NodeHandle, handler: &HandlerContext<'_>) -> Option<String> {
-    let heading_context = heading_context(heading_handle, handler)?;
-    let mut heading_text = String::new();
-    walk_node(
-        &heading_handle,
-        handler.parser,
-        &mut heading_text,
-        crate::converter::block::container::HandlerContext::new(
-            handler.options,
-            &heading_context,
-            handler.depth + 1,
-            handler.dom_context,
-        ),
-    );
-    Some(heading_text)
-}
-
-/// The context that the one heading of a link is written with.
-fn heading_context(heading_handle: tl::NodeHandle, handler: &HandlerContext<'_>) -> Option<Context> {
-    let tl::Node::Tag(heading_tag) = heading_handle.get(handler.parser)? else {
+/// The context that the one heading of a link is written with, where `context` is the state of
+/// the link.
+fn heading_context(heading_handle: tl::NodeHandle, parser: &tl::Parser<'_>, context: &Context) -> Option<Context> {
+    let tl::Node::Tag(heading_tag) = heading_handle.get(parser)? else {
         return None;
     };
     let heading_name = normalized_tag_name(heading_tag.name().as_utf8_str());
     Some(Context {
         in_heading: true,
         convert_as_inline: true,
-        heading_allow_inline_images: heading_allows_inline_images(
-            &heading_name,
-            &handler.context.keep_inline_images_in,
-        ),
-        ..handler.context.clone()
+        heading_allow_inline_images: heading_allows_inline_images(&heading_name, &context.keep_inline_images_in),
+        ..context.clone()
     })
 }
 
-fn emit_autolink(data: &LinkData<'_>, handler: &mut HandlerContext<'_>) -> bool {
+/// The `title` of a link.
+///
+/// ~keep Empty titles are absent because Markdown serializers drop `""` on reparse.
+fn link_title<'a>(tag: &'a tl::HTMLTag<'a>) -> Option<Cow<'a, str>> {
+    crate::converter::utility::attributes::decoded_attribute(tag, "title").filter(|value| !value.is_empty())
+}
+
+fn emit_autolink(data: &LinkData, handler: &mut HandlerContext<'_>) -> bool {
     if !data.is_autolink(handler.options) {
         return false;
     }
@@ -520,110 +792,112 @@ fn emit_autolink(data: &LinkData<'_>, handler: &mut HandlerContext<'_>) -> bool 
     true
 }
 
-fn emit_heading_link(data: &LinkData<'_>, handler: &mut HandlerContext<'_>) -> bool {
-    if data.href_addr_dropped {
-        return false;
-    }
-    let Some((level, heading_handle)) = find_single_heading_child(*handler.node_handle, handler.parser) else {
-        return false;
-    };
-    let Some(heading_text) = heading_link_text(heading_handle, handler) else {
-        return false;
-    };
-    let heading_text = heading_text.trim();
-    if heading_text.is_empty() {
-        return false;
-    }
+/// Write a link around its one heading as a heading of that `level`, where `heading_text` is
+/// the text that the heading wrote.
+fn emit_heading_link(
+    tag: &tl::HTMLTag<'_>,
+    data: &LinkData,
+    level: usize,
+    heading_text: &str,
+    handler: &mut HandlerContext<'_>,
+) {
     let mut link = String::new();
     append_link(
         &mut link,
         data,
+        link_title(tag).as_deref(),
         &escape_link_label(heading_text),
         &data.raw_text,
         handler.options,
         handler.context,
     );
     push_heading(handler.output, handler.context, handler.options, level, &link);
-    true
 }
 
-/// The content of the label as the walk writes it. The caller removes the white space at its
-/// two ends.
-fn build_label_content(data: &LinkData<'_>, handler: &HandlerContext<'_>) -> String {
-    if data.emit_blocks_separately {
-        return walk_label_content(&data.inline_children, false, data, handler);
-    }
-    if data.saw_block {
-        let content = walk_label_content(&data.children, true, data, handler);
-        return if content.trim().is_empty() {
-            data.inline_label.clone()
-        } else {
-            content
-        };
-    }
-    walk_label_content(&data.children, false, data, handler)
-}
-
-/// The context that the label of a link is built with outside code.
-fn label_context(data: &LinkData<'_>, handler: &HandlerContext<'_>, convert_as_inline: bool) -> Context {
+/// The context that the label of a link is built with outside code, where `context` is the
+/// state of the link.
+fn label_context(data: &LinkData, context: &Context, convert_as_inline: bool) -> Context {
     Context {
-        inline_depth: handler.context.inline_depth + 1,
+        inline_depth: context.inline_depth + 1,
         in_link: true,
-        convert_as_inline: handler.context.convert_as_inline || convert_as_inline,
+        convert_as_inline: context.convert_as_inline || convert_as_inline,
         link_allow_inline_images: data.link_allow_inline_images,
-        ..handler.context.clone()
+        ..context.clone()
     }
 }
 
-/// Walks the children of a link into its label. With `convert_as_inline` the blocks among them
-/// are written inline, and the walk writes one space at each block boundary.
+/// The walk of the children of a link into its label. With `convert_as_inline` the blocks among
+/// them are written inline, and the walk writes one space at each block boundary.
 ///
 /// ~keep In such a label an image is written as its alternative text. A reader sees the image
 /// ~keep and the content beside it as two things, so the text of an image child is a word of
 /// ~keep its own: one space separates it from the child before it and the child after it.
-fn walk_label_content(
-    children: &[tl::NodeHandle],
+struct LabelWalk {
+    /// The state of the children.
+    scope: Rc<Context>,
     convert_as_inline: bool,
-    data: &LinkData<'_>,
-    handler: &HandlerContext<'_>,
-) -> String {
-    let link_context = label_context(data, handler, convert_as_inline);
-    let strict = keeps_source_white_space(handler.options, handler.context);
-    let mut content = String::new();
-    let mut after_image = false;
-    for child in children {
-        let child_start = content.len();
-        walk_node(
-            child,
-            handler.parser,
-            &mut content,
-            crate::converter::block::container::HandlerContext::new(
-                handler.options,
-                &link_context,
-                handler.depth + 1,
-                handler.dom_context,
-            ),
-        );
-        if !convert_as_inline || content.len() == child_start {
-            continue;
+    strict: bool,
+    content: String,
+    /// The length of `content` before the child that the walk visits now.
+    child_start: usize,
+    after_image: bool,
+}
+
+impl LabelWalk {
+    /// The walk of the label of the link `data`, where `context` is the state of the link.
+    fn new(data: &LinkData, options: &ConversionOptions, context: &Context) -> Self {
+        let convert_as_inline = data.saw_block && !data.emit_blocks_separately;
+        Self {
+            scope: Rc::new(label_context(data, context, convert_as_inline)),
+            convert_as_inline,
+            strict: keeps_source_white_space(options, context),
+            content: String::new(),
+            child_start: 0,
+            after_image: false,
         }
-        let is_image = handler
+    }
+
+    fn before_child(&mut self) -> Child {
+        self.child_start = self.content.len();
+        Child::Walk {
+            buffer: Some(std::mem::take(&mut self.content)),
+            scope: Some(Rc::clone(&self.scope)),
+        }
+    }
+
+    /// `child` wrote to `own`, the content of the label.
+    fn after_child(&mut self, child: tl::NodeHandle, own: Option<String>, element: &HookSite<'_>) {
+        self.content = own.unwrap_or_default();
+        let child_start = self.child_start;
+        if !self.convert_as_inline || self.content.len() == child_start {
+            return;
+        }
+        let is_image = element
             .dom_context
-            .tag_info(child.get_inner(), handler.parser)
+            .tag_info(child.get_inner(), element.parser)
             .is_some_and(|info| matches!(info.name.as_str(), "img" | "picture" | "svg"));
         // ~keep The strict mode writes no space at a block boundary (`separate_from_block`). It
         // ~keep keeps the rule that a label had before: one space between two children that touch.
-        let separate = if strict {
-            texts_touch_at(&content, child_start)
+        let separate = if self.strict {
+            texts_touch_at(&self.content, child_start)
         } else {
-            (is_image || after_image) && words_touch_at(&content, child_start)
+            (is_image || self.after_image) && words_touch_at(&self.content, child_start)
         };
         if separate {
-            content.insert(child_start, ' ');
+            self.content.insert(child_start, ' ');
         }
-        after_image = is_image;
+        self.after_image = is_image;
     }
-    content
+
+    /// The content of the label as the walk wrote it. The caller removes the white space at its
+    /// two ends.
+    fn into_content(self, data: &LinkData) -> String {
+        if self.convert_as_inline && self.content.trim().is_empty() {
+            data.inline_label.clone()
+        } else {
+            self.content
+        }
+    }
 }
 
 /// Whether two texts touch at the byte offset `at` of `content`: no white space on either side.
@@ -646,7 +920,7 @@ fn words_touch_at(content: &str, at: usize) -> bool {
         && !content[at..].starts_with(['.', ',', ';', ':', '!', '?', ')', ']', '}'])
 }
 
-fn apply_label_fallbacks(data: &LinkData<'_>, label: &mut String, handler: &HandlerContext<'_>) {
+fn apply_label_fallbacks(tag: &tl::HTMLTag<'_>, data: &LinkData, label: &mut String, handler: &HandlerContext<'_>) {
     // ~keep Deferred table text must not be duplicated into the label (#490).
     if !data.emit_blocks_separately && label.is_empty() && !data.raw_text.is_empty() {
         *label = normalize_link_label(&data.raw_text);
@@ -658,7 +932,9 @@ fn apply_label_fallbacks(data: &LinkData<'_>, label: &mut String, handler: &Hand
     // ~keep that has content and no name; a link that holds only empty text wrappers keeps an
     // ~keep empty label (#771). A link that `leads_nowhere_else` is not named: it is left out.
     if label.is_empty() && !data.leads_nowhere_else() {
-        if let Some(name) = data.accessible_name() {
+        let aria_label = crate::converter::utility::attributes::decoded_attribute(tag, "aria-label");
+        let title = link_title(tag);
+        if let Some(name) = link_accessible_name(aria_label.as_deref(), title.as_deref()) {
             *label = normalize_link_label(name);
         }
     }
@@ -684,10 +960,9 @@ fn apply_label_fallbacks(data: &LinkData<'_>, label: &mut String, handler: &Hand
     }
 }
 
-#[cfg_attr(not(feature = "visitor"), allow(unused_variables))]
 fn emit_link(
     tag: &tl::HTMLTag<'_>,
-    data: &LinkData<'_>,
+    data: &LinkData,
     label: &str,
     edges: &LabelEdges<'_>,
     drop_link: bool,
@@ -700,17 +975,23 @@ fn emit_link(
     if let Some(visitor) = handler.context.visitor.clone() {
         return visit_link(tag, data, label, edges, &visitor, handler);
     }
-    write_link_with_edges(data, label, edges, handler);
+    write_link_with_edges(tag, data, label, edges, handler);
     true
 }
 
 /// Writes the link of the converter: the white space of the label start, the link, the white
 /// space of the label end.
-fn write_link_with_edges(data: &LinkData<'_>, label: &str, edges: &LabelEdges<'_>, handler: &mut HandlerContext<'_>) {
+fn write_link_with_edges(
+    tag: &tl::HTMLTag<'_>,
+    data: &LinkData,
+    label: &str,
+    edges: &LabelEdges<'_>,
+    handler: &mut HandlerContext<'_>,
+) {
     if edges.has_text {
         push_inline_prefix(handler.output, edges.prefix, handler.options, handler.context);
     }
-    write_link(handler.output, data, label, handler.options, handler.context);
+    write_link(handler.output, tag, data, label, handler.options, handler.context);
     append_inline_suffix(
         handler.output,
         edges.suffix,
@@ -721,17 +1002,33 @@ fn write_link_with_edges(data: &LinkData<'_>, label: &str, edges: &LabelEdges<'_
     );
 }
 
-fn write_link(output: &mut String, data: &LinkData<'_>, label: &str, options: &ConversionOptions, context: &Context) {
+fn write_link(
+    output: &mut String,
+    tag: &tl::HTMLTag<'_>,
+    data: &LinkData,
+    label: &str,
+    options: &ConversionOptions,
+    context: &Context,
+) {
     if data.href_addr_dropped || data.href.is_empty() || context.in_code || context.in_code_block {
         output.push_str(label);
         return;
     }
-    append_link(output, data, &escape_link_label(label), label, options, context);
+    append_link(
+        output,
+        data,
+        link_title(tag).as_deref(),
+        &escape_link_label(label),
+        label,
+        options,
+        context,
+    );
 }
 
 fn append_link(
     output: &mut String,
-    data: &LinkData<'_>,
+    data: &LinkData,
+    title: Option<&str>,
     escaped_label: &str,
     raw_text: &str,
     options: &ConversionOptions,
@@ -742,7 +1039,7 @@ fn append_link(
         &MarkdownLink {
             label: escaped_label,
             href: &data.href,
-            title: data.title.as_deref(),
+            title,
             raw_text,
         },
         options,
@@ -754,7 +1051,7 @@ fn append_link(
 #[cfg(feature = "visitor")]
 fn visit_link(
     tag: &tl::HTMLTag<'_>,
-    data: &LinkData<'_>,
+    data: &LinkData,
     label: &str,
     edges: &LabelEdges<'_>,
     visitor: &crate::visitor::VisitorHandle,
@@ -779,10 +1076,10 @@ fn visit_link(
         &node_context,
         &data.href,
         label,
-        data.title.as_deref(),
+        link_title(tag).as_deref(),
     );
     match result {
-        VisitResult::Continue => write_link_with_edges(data, label, edges, handler),
+        VisitResult::Continue => write_link_with_edges(tag, data, label, edges, handler),
         VisitResult::Custom(custom) => {
             if let Some(collector) = handler.context.structure_collector.as_ref() {
                 collector.borrow_mut().replace_current_element(Some(&custom));
@@ -816,7 +1113,7 @@ fn visit_link(
 }
 
 #[cfg(feature = "metadata")]
-fn record_link_metadata(tag: &tl::HTMLTag<'_>, data: &LinkData<'_>, label: &str, context: &Context) {
+fn record_link_metadata(tag: &tl::HTMLTag<'_>, data: &LinkData, label: &str, context: &Context) {
     if !context.metadata_wants.links {
         return;
     }
@@ -842,26 +1139,10 @@ fn record_link_metadata(tag: &tl::HTMLTag<'_>, data: &LinkData<'_>, label: &str,
     collector.borrow_mut().add_link(
         data.href.clone(),
         label.to_string(),
-        data.title.as_deref().map(str::to_string),
+        link_title(tag).map(Cow::into_owned),
         rel,
         attributes,
     );
-}
-
-fn walk_handles_to_output(children: impl Iterator<Item = tl::NodeHandle>, handler: &mut HandlerContext<'_>) {
-    for child in children {
-        walk_node(
-            &child,
-            handler.parser,
-            handler.output,
-            crate::converter::block::container::HandlerContext::new(
-                handler.options,
-                handler.context,
-                handler.depth + 1,
-                handler.dom_context,
-            ),
-        );
-    }
 }
 
 /// Partition an anchor's DIRECT children into (inline, block) using `node_is_block_level`

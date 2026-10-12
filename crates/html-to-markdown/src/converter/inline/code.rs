@@ -6,7 +6,7 @@
 //! - Nested code context tracking (suppress formatting inside <code>/<pre>)
 //! - Whitespace normalization for kbd/samp elements
 //!
-//! `<code>` itself is handled by `converter::handlers::code_block::handle_code`, which is
+//! `<code>` itself is handled by `converter::handlers::code_block::open_code`, which is
 //! what `converter::main`'s walk dispatches to; this module's own `<code>` arm was a second,
 //! silently divergent implementation that nothing ever reached. ~keep
 
@@ -30,21 +30,25 @@ type Context = crate::converter::Context;
 /// This function references helper functions and `walk_node` from converter.rs
 /// which must be accessible (pub(crate)) for this module to work correctly.
 ///
-/// Lists the children of a `kbd` or a `samp` in `children`. Returns `None` when the element is
-/// complete: an element that holds a link is written whole as a code element.
+/// Lists the children of a `kbd` or a `samp` in `children`. An element that holds a link is
+/// written as a code element.
 pub fn open(handler: HandlerContext<'_>, children: &mut Vec<tl::NodeHandle>) -> Option<Open> {
     let Some(tl::Node::Tag(tag)) = handler.node_handle.get(handler.parser) else {
         return None;
     };
 
     if !handler.context.in_code && crate::converter::handlers::code_block::contains_anchor(tag, handler.parser) {
-        crate::converter::handlers::code_block::handle_code(tag, handler);
-        return None;
+        return Some(crate::converter::handlers::code_block::open_code(
+            tag,
+            handler.parser,
+            handler.context,
+            children,
+        ));
     }
     children.extend(tag.children().top().iter().copied());
     if handler.context.code_element_is_transparent() {
         // ~keep A nested `<code>` renders transparently inside an outer code span
-        // ~keep (`handlers::code_block::handle_code`); `<kbd>`/`<samp>` wrapped their own
+        // ~keep (`handlers::code_block::open_code`); `<kbd>`/`<samp>` wrapped their own
         // ~keep backticks anyway, so the outer span grew a second, nested pair.
         return Some(Open::children_only());
     }
