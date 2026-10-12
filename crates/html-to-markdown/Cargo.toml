@@ -123,5 +123,9 @@ required-features = ["testkit"]
 name = "issue_868_silent_void_boundary_test"
 required-features = ["testkit"]
 
+[[test]]
+name = "issue_868_empty_inline_boundary_test"
+required-features = ["testkit"]
+
 [lints]
 workspace = true

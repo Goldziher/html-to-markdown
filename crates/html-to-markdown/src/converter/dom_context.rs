@@ -60,6 +60,7 @@ impl TableContentSummary {
 /// via precomputed maps.
 pub struct DomContext {
     pub(crate) parent_map: Vec<Option<u32>>,
+    pub(crate) literal_pre_map: Vec<bool>,
     pub(crate) children_map: Vec<Option<Vec<tl::NodeHandle>>>,
     pub(crate) sibling_index_map: Vec<Option<usize>>,
     pub(crate) root_children: Vec<tl::NodeHandle>,
@@ -111,6 +112,7 @@ impl DomContext {
         if self.parent_map.len() <= idx {
             let new_len = idx + 1;
             self.parent_map.resize(new_len, None);
+            self.literal_pre_map.resize(new_len, false);
             self.children_map.resize_with(new_len, || None);
             self.sibling_index_map.resize_with(new_len, || None);
             self.node_map.resize(new_len, None);
@@ -364,7 +366,8 @@ impl DomContext {
         })
     }
 
-    /// Whether the element `id` holds content: a text of any kind or a void element
+    /// Whether the element `id` holds content: text other than code/del-owned line ends, literal pre content,
+    /// or a void element
     /// that can write Markdown outside a table cell (a break, a rule or an image), at any depth.
     /// A comment is no content, and an element with
     /// neither in it is none: `<span><b></b></span>` and `<span><span><!-- c --></span></span>`
@@ -379,7 +382,24 @@ impl DomContext {
     pub(crate) fn holds_content(&self, id: u32, parser: &tl::Parser) -> bool {
         let record = RefCell::new(HashMap::new());
         self.holds(id, parser, &record, |node, child| match node {
-            tl::Node::Raw(_) => Held::Yes,
+            tl::Node::Raw(raw) => {
+                let raw = raw.as_utf8_str();
+                let decoded = text::decode_html_entities_cow(raw.as_ref());
+                let parent = self.parent_tag_name(child, parser);
+                let line_ends_only = if parent == Some("code") {
+                    decoded.trim_matches('\n').is_empty()
+                } else {
+                    decoded.trim_matches(['\n', '\r']).is_empty()
+                };
+                if line_ends_only
+                    && !self.literal_pre_map.get(child as usize).copied().unwrap_or(false)
+                    && parent.is_some_and(|name| matches!(name, "code" | "del"))
+                {
+                    Held::No
+                } else {
+                    Held::Yes
+                }
+            }
             tl::Node::Tag(_) if self.writes_void_content(child, parser) => Held::Yes,
             tl::Node::Tag(_) => Held::Inside,
             tl::Node::Comment(_) => Held::No,
@@ -501,5 +521,67 @@ mod tests {
             let root = dom.children()[0].get_inner();
             assert_eq!(context.holds_content(root, parser), expected, "{source}");
         }
+    }
+    #[test]
+    fn should_keep_literal_preformatted_content_when_inline_line_ends_are_empty() {
+        for (body, expected) in [
+            ("<code>\n</code>", false),
+            ("<del>\n</del>", false),
+            ("<code> </code>", true),
+            ("<pre>\n</pre>", true),
+            ("<pre><code>\n\n</code></pre>", true),
+            ("<pre><!-- x --></pre>", false),
+            ("<pre><i></i></pre>", false),
+            ("<pre><span><code>\n</code></span></pre>", true),
+            ("<code>&#13;&#10;</code>", true),
+        ] {
+            let source = format!("<span>{body}</span>");
+            let dom = tl::parse(&source, tl::ParserOptions::default()).expect("parse literal ownership");
+            let parser = dom.parser();
+            let context = crate::converter::utility::caching::build_dom_context(&dom, parser, source.len());
+            assert_eq!(
+                context.holds_content(dom.children()[0].get_inner(), parser),
+                expected,
+                "{source}"
+            );
+            for (index, node) in dom.nodes().iter().enumerate() {
+                if matches!(node, tl::Node::Tag(_)) {
+                    let id = u32::try_from(index).expect("small node arena");
+                    assert_eq!(context.holds_content(id, parser), expected, "rooted {source}");
+                }
+            }
+        }
+    }
+    #[test]
+    fn should_preserve_deep_pre_ownership_without_changing_text_cache() {
+        let depth = 2048;
+        let source = format!(
+            "<span><pre>{}<code>\n</code>{}</pre></span>",
+            "<span>".repeat(depth),
+            "</span>".repeat(depth)
+        );
+        let dom = tl::parse(&source, tl::ParserOptions::default()).expect("parse deep literal ownership");
+        let parser = dom.parser();
+        let context = crate::converter::utility::caching::build_dom_context(&dom, parser, source.len());
+        super::HOLDS_TEXT_NODE_READS.with(|reads| reads.set(0));
+        let root = dom.children()[0].get_inner();
+        let pre = dom
+            .query_selector("pre")
+            .expect("pre selector")
+            .next()
+            .expect("pre exists")
+            .get_inner();
+        let code = dom
+            .query_selector("code")
+            .expect("code selector")
+            .next()
+            .expect("code exists")
+            .get_inner();
+        for id in [root, pre, code] {
+            assert!(context.holds_content(id, parser), "literal query at {id}");
+            assert!(!context.holds_text(id, parser), "text query at {id}");
+        }
+        let reads = super::HOLDS_TEXT_NODE_READS.with(std::cell::Cell::get);
+        assert_eq!(reads, 3 * depth + 9);
     }
 }

@@ -158,9 +158,8 @@ fn place_after_element(
     in_cell: bool,
 ) -> crate::converter::utility::white_space::TextPlace {
     use crate::converter::utility::white_space::{TextPlace, writes_in_text_flow};
-    let in_flow = dom_ctx
-        .tag_info(element, parser)
-        .is_some_and(|info| writes_in_text_flow(&info.name));
+    let info = dom_ctx.tag_info(element, parser);
+    let in_flow = info.is_some_and(|info| writes_in_text_flow(&info.name));
     if dom_ctx.holds_text(element, parser) {
         return if in_flow && ends_with_text_space(element, parser, dom_ctx) {
             TextPlace::AfterFlowElement
@@ -168,25 +167,27 @@ fn place_after_element(
             TextPlace::AfterText
         };
     }
-    if in_flow && !in_cell && ends_with_line_end(before.last(), parser) && !dom_ctx.holds_content(element, parser) {
+    let empty_flow = in_flow || info.is_some_and(|info| matches!(info.name.as_str(), "option" | "optgroup"));
+    if empty_flow && !in_cell && ends_with_line_end(before.last(), parser) && !dom_ctx.holds_content(element, parser) {
         TextPlace::AfterText
     } else {
         TextPlace::AfterEmptyElement
     }
 }
 
-/// Whether `node` is a text that ends with line ends right after a visible character.
+/// Whether `node` ends with a collapsible run containing a line end.
 ///
-/// ~keep A space before the line end is a written space of the text (`a \n<span></span>&nbsp;b`
-/// ~keep has two spaces on the fast converter of `main`): only the line end alone is joined.
+/// ~keep Empty inline boundaries share the full converter's main policy even where main's
+/// ~keep forced-fast route kept a second space. A preceding Unicode space remains a character (#868).
 fn ends_with_line_end(node: Option<&tl::NodeHandle>, parser: &tl::Parser) -> bool {
     let Some(tl::Node::Raw(raw)) = node.and_then(|node| node.get(parser)) else {
         return false;
     };
     let raw = raw.as_utf8_str();
     let decoded = crate::text::decode_html_entities_cow(raw.as_ref());
-    let before_line_ends = decoded.trim_end_matches(['\n', '\r']);
-    before_line_ends.len() < decoded.len() && before_line_ends.ends_with(|character: char| !character.is_whitespace())
+    let before = decoded.trim_end_matches(crate::converter::utility::white_space::is_collapsible);
+    decoded[before.len()..].contains(['\n', '\r'])
+        && (before.is_empty() || before.ends_with(|character: char| !character.is_whitespace()))
 }
 
 /// Whether the content of the element `element` ends with a text that ends with collapsible

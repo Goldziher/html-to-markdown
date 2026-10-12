@@ -186,6 +186,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Collapse no-break-space tails after empty options and empty or line-end-only inline descendants
+  to full-main spacing on every route (#868), retaining literal pre content and strict whitespace.
+
 - Avoid duplicating a space after line-ending text followed by a span containing only silent
   void elements (#868); visible nested breaks and images retain their boundaries.
 

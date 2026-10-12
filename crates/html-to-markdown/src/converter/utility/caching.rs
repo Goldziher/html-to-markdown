@@ -91,6 +91,7 @@ pub fn build_dom_context(dom: &tl::VDom, parser: &tl::Parser, _input_len: usize)
     DOM_CONTEXT_BUILDS.with(|builds| builds.set(builds.get() + 1));
     let mut ctx = DomContext {
         parent_map: Vec::new(),
+        literal_pre_map: Vec::new(),
         children_map: Vec::new(),
         sibling_index_map: Vec::new(),
         root_children: dom.children().to_vec(),
@@ -138,9 +139,15 @@ pub fn record_node_hierarchy(
         let id = node_handle.get_inner();
         ctx.ensure_capacity(id);
         ctx.parent_map[id as usize] = parent;
+        // ~keep Preserve literal pre ownership at every depth without rescanning ancestors (#868).
+        ctx.literal_pre_map[id as usize] = parent
+            .and_then(|parent| ctx.literal_pre_map.get(parent as usize))
+            .copied()
+            .unwrap_or(false);
         ctx.node_map[id as usize] = Some(node_handle);
 
         if let Some(tl::Node::Tag(tag)) = node_handle.get(parser) {
+            ctx.literal_pre_map[id as usize] |= tag.name().as_utf8_str().eq_ignore_ascii_case("pre");
             let tag_children = tag.children();
             // ~keep `RawChildren::iter` reports no size hint, so collecting through it regrows the
             // ~keep Vec from empty (and over-allocates to the growth step). Copying the slice sizes
