@@ -83,5 +83,9 @@ toml.workspace = true
 name = "test_deser"
 required-features = ["serde"]
 
+[[test]]
+name = "inline_boundary_followups"
+required-features = ["testkit"]
+
 [lints]
 workspace = true

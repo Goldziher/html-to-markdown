@@ -254,9 +254,19 @@ fn prepare_open_state(
     }
     // ~keep In code (`<pre>`, `<code>`, `<kbd>`, `<samp>`) Tier-2 writes a link label as it did
     // ~keep before the rules of running text. This scanner trims the label, so it leaves the
-    // ~keep page to Tier-2. A block in code writes the same lines in both converters.
+    // ~keep page to Tier-2. A block inside pre writes the same lines in both converters.
     let in_code = state.escape_ctx.intersects(EscapeCtx::CODE | EscapeCtx::PRE);
     if in_code && matches!(spec.kind, TagKind::Link) {
+        return Err(BailReason::Classifier);
+    }
+    // ~keep A block can close or reconstruct code-like elements in the HTML tree (#842).
+    // ~keep The scanner's source stack cannot reproduce that DOM, so leave it to Tier-2.
+    // ~keep Headings and cells fold block boundaries inline; their existing code-span paths agree.
+    if is_link_block
+        && in_code
+        && !state.escape_ctx.intersects(EscapeCtx::PRE | EscapeCtx::HEADING)
+        && !state.in_table_cell()
+    {
         return Err(BailReason::Classifier);
     }
     // ~keep A block inside marks inside a heading (`<h2>one<b><p>y</p></b>two</h2>`): Tier-2

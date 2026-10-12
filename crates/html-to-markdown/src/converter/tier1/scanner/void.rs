@@ -162,6 +162,25 @@ fn emit_hr(state: &mut Tier1State) -> Result<(), BailReason> {
 fn emit_line_break(state: &mut Tier1State, options: &ConversionOptions) -> Result<(), BailReason> {
     let in_code = state.escape_ctx.contains(EscapeCtx::CODE);
     let in_pre = state.escape_ctx.contains(EscapeCtx::PRE);
+    // ~keep A leading split marker is discarded by the DOM code renderer (#842), whereas
+    // ~keep the flat scanner would hoist it before the span. Ordinary interior breaks stay fast.
+    if in_code && !in_pre && !state.in_table_cell() && !state.escape_ctx.contains(EscapeCtx::HEADING) {
+        let start = state
+            .stack
+            .iter()
+            .rev()
+            .find(|frame| matches!(frame.spec.kind, TagKind::Code))
+            .map(|frame| frame.content_start);
+        if start.is_some_and(|start| {
+            state.cell_or_output_mut().get(start..).is_some_and(|content| {
+                content
+                    .chars()
+                    .all(crate::converter::utility::white_space::is_collapsible)
+            })
+        }) {
+            return Err(BailReason::Classifier);
+        }
+    }
     let inside_link = !in_code && state.stack.iter().any(|frame| matches!(frame.spec.kind, TagKind::Link));
     if inside_link {
         state
@@ -789,10 +808,12 @@ fn handle_empty_inline_body(
     let content_absent = buf.len() <= content_start;
     let is_marks = matches!(marker, "**" | "*" | "~~" | "==");
     // ~keep In marks a blank body is the module's `is_blank`: `<p>a <em>&nbsp;</em> b</p>` goes
-    // ~keep to the full converter, which writes `a b`. Code keeps its text.
+    // ~keep to the full converter, which preserves its no-break space. Code keeps its text.
     let whitespace_only = !content_absent
         && if is_marks {
-            crate::converter::utility::white_space::is_blank(&buf[content_start..])
+            crate::converter::utility::white_space::is_blank(
+                buf[content_start..].trim_end_matches("  \n").trim_end_matches("\\\n"),
+            )
         } else {
             buf[content_start..]
                 .bytes()

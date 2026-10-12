@@ -282,6 +282,28 @@ pub fn emit_wrapped_inline(
 
     let content = move_leading_hard_breaks(output, content, ctx, options);
     let (prefix, suffix, trimmed) = chomp_inline(content);
+    // ~keep Unicode-only space is content, not a collapsible separator (#843). Empty marks
+    // ~keep cannot represent emphasis on it, so retain the characters without delimiters.
+    let marker = crate::converter::main_helpers::hard_break_marker(options);
+    let blank_body = content.trim_end_matches(marker);
+    if blank_body.chars().all(char::is_whitespace)
+        && !blank_body
+            .chars()
+            .all(crate::converter::utility::white_space::is_collapsible)
+    {
+        let body = blank_body.trim_matches(crate::converter::utility::white_space::is_collapsible);
+        if content.starts_with([' ', '\t']) {
+            crate::converter::utility::content::push_inline_prefix(output, " ", options, ctx);
+        }
+        output.push_str(body);
+        let breaks = &content[blank_body.len()..];
+        if breaks.is_empty() {
+            append_inline_suffix(output, suffix, !body.is_empty(), node_handle, parser, dom_ctx);
+        } else {
+            output.push_str(breaks);
+        }
+        return;
+    }
     if content.trim().is_empty() {
         if content.is_empty() {
             return;

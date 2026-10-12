@@ -131,7 +131,10 @@ fn write_flow_break(output: &mut String, options: &ConversionOptions, ctx: &Cont
         // ~keep true or false by coincidence. Whether a break at either edge of the label
         // ~keep survives is `normalize_link_label`'s decision, not this one's.
         output.push_str(hard_break_marker(options));
-    } else if output.len() == ctx.block_content_start {
+    } else if output.is_empty()
+        || (std::ptr::from_ref::<String>(output) as usize == ctx.block_output_ptr
+            && output.len() == ctx.block_content_start)
+    {
         // ~keep A paragraph-leading break has no preceding line and therefore emits nothing
         // ~keep (#572), but only the paragraph's own buffer can prove that position. A fresh
         // ~keep inline-wrapper scratch buffer can have the same length after real paragraph
