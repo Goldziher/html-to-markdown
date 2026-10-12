@@ -70,8 +70,7 @@ fn reference_definitions(content: &str) -> Vec<&str> {
 // ~keep payloads can *not* be used to exercise it: `apply_tag_content` in `scanner.rs` sets
 // ~keep `has_text` for any `<img>` carrying `src` or `alt`, and a `<pre><code>` block needs raw
 // ~keep text — so neither an image nor a code block can ever live inside a blank table. A
-// ~keep nested `<table>` and an `<svg>` are the two payloads scanner.rs does not count as text,
-// ~keep which is why those are the shapes tested here.
+// ~keep nested blank `<table>` remains a blank payload; an SVG now counts as content (#817).
 
 #[test]
 fn should_still_report_the_grid_when_a_blank_table_renders_to_nothing() {
@@ -330,15 +329,11 @@ mod visitor_early_returns {
     }
 }
 
-// ~keep An `<svg>` is the only cell payload that both feeds the inline-image collector and is
-// ~keep invisible to `scanner.rs::apply_tag_content`, so it is the only way to put an
-// ~keep inline-collected image inside a table that hits the blank-table early return without a
-// ~keep visitor. Zero collected images is correct: the table emits nothing, and an entry here
-// ~keep would hand the caller an image with no corresponding output — and would consume an
-// ~keep index in the generated `embedded_image_N` filenames.
+// ~keep SVG-only tables render their graphic (#817); the width and grid passes must not
+// ~keep duplicate the inline-image record emitted by the actual cell walk.
 #[cfg(feature = "inline-images")]
 #[test]
-fn should_collect_no_inline_svg_when_a_blank_table_renders_to_nothing() {
+fn should_collect_inline_svg_once_when_a_media_only_table_renders() {
     let html = concat!(
         r#"<table><tr><td><svg xmlns="http://www.w3.org/2000/svg" aria-label="glyph">"#,
         r#"<rect width="1" height="1"></rect></svg></td></tr></table>"#
@@ -347,23 +342,25 @@ fn should_collect_no_inline_svg_when_a_blank_table_renders_to_nothing() {
         html,
         ConversionOptions {
             extract_images: true,
+            capture_svg: true,
+            compact_tables: true,
             ..options_with_document_structure()
         },
     );
 
-    assert_eq!(
-        content_of(&result).trim(),
-        "",
-        "an <svg> does not make a table non-blank, so the table still emits nothing"
+    let image = concat!(
+        "![SVG Image](data:image/svg+xml;base64,",
+        "PHN2ZyBhcmlhLWxhYmVsPSJnbHlwaCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4",
+        "8cmVjdCBoZWlnaHQ9IjEiIHdpZHRoPSIxIiAvPjwvc3ZnPg==)"
     );
+    assert_eq!(content_of(&result), format!("| {image} |\n| --- |\n"));
+    assert_eq!(result.images.len(), 1, "only the render pass records the SVG");
+    assert_eq!(result.images[0].format, html_to_markdown_rs::InlineImageFormat::Svg);
     assert_eq!(
-        result.images.len(),
-        0,
-        "the TableGrid walk is the only walk of this cell and its inline_collector is detached"
+        result.images[0].source,
+        html_to_markdown_rs::InlineImageSource::SvgElement
     );
-    assert_eq!(
-        result.tables.len(),
-        1,
-        "push_table_data still fires after the early return"
-    );
+    assert_eq!(result.tables.len(), 1);
+    assert_eq!(result.tables[0].grid.rows, 1);
+    assert_eq!(result.tables[0].grid.cols, 1);
 }

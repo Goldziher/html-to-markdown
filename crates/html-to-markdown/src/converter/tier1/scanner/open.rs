@@ -221,6 +221,13 @@ fn prepare_open_state(
     if matches!(spec.kind, TagKind::Link) && state.escape_ctx.intersects(EscapeCtx::CODE | EscapeCtx::PRE) {
         return Err(BailReason::Classifier);
     }
+    // ~keep Form groups need plain word boundaries inside code, rather than block/strong markers (#815).
+    if matches!(name_lower, b"fieldset" | b"legend")
+        && state.escape_ctx.contains(EscapeCtx::CODE)
+        && !state.escape_ctx.contains(EscapeCtx::PRE)
+    {
+        return Err(BailReason::Classifier);
+    }
     state.last_closed_custom_element = false;
     state.last_emitted_was_img = false;
     if std::mem::take(&mut state.last_closed_block) && is_inline_tag(name_lower) {

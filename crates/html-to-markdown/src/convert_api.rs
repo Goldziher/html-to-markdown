@@ -87,6 +87,7 @@ pub fn convert(html: &str, options: impl Into<Option<ConversionOptions>>) -> Res
 
 struct PreparedConversion<'a> {
     html: Cow<'a, str>,
+    inert_bodies: std::collections::HashMap<String, String>,
     effective_base: Option<std::rc::Rc<url::Url>>,
     metadata_base_href: Option<String>,
 }
@@ -144,6 +145,20 @@ fn prepare_conversion<'a>(html: &'a str, options: &ConversionOptions) -> Result<
     // ~keep Both tiers must see the same repaired tree when head content precedes an
     // ~keep explicit `<head>`; browsers place that content in the implicit head (issue #592).
     let normalized_input = normalize_input(html)?;
+    #[cfg(feature = "visitor")]
+    let has_visitor = options.visitor.is_some();
+    #[cfg(not(feature = "visitor"))]
+    let has_visitor = false;
+    let preserve_bodies = options.output_format != crate::options::OutputFormat::Plain
+        && (has_visitor || !options.preserve_tags.is_empty());
+    let (inert_html, inert_bodies) = crate::converter::utility::preprocessing::normalize_inert_bodies_with_preservation(
+        &normalized_input,
+        preserve_bodies,
+    );
+    let normalized_input = match inert_html {
+        Cow::Borrowed(_) => normalized_input,
+        Cow::Owned(normalized) => Cow::Owned(normalized),
+    };
     let normalized_html = crate::converter::repair_head_content_before_explicit_head(normalized_input.as_ref())
         .map_or(normalized_input, Cow::Owned);
     let document_base_href = (options.base_url.is_some() || options.extract_metadata)
@@ -161,12 +176,16 @@ fn prepare_conversion<'a>(html: &'a str, options: &ConversionOptions) -> Result<
     });
     Ok(PreparedConversion {
         html: normalized_html,
+        inert_bodies,
         effective_base,
         metadata_base_href,
     })
 }
 
 fn try_tier1(prepared: &PreparedConversion<'_>, options: &ConversionOptions) -> Option<ConversionResult> {
+    if !options.preserve_tags.is_empty() || !prepared.inert_bodies.is_empty() {
+        return None;
+    }
     let report = crate::converter::prescan::PrescanReport::default();
     match options.tier_strategy {
         crate::options::TierStrategy::Tier2 => None,
@@ -288,6 +307,7 @@ fn call_converter(
         prepared.html.as_ref(),
         options,
         crate::converter::main::ConversionParameters {
+            inert_bodies: &prepared.inert_bodies,
             inline_collector: image_collector(collectors),
             #[cfg(feature = "metadata")]
             metadata_collector: metadata_collector(collectors),

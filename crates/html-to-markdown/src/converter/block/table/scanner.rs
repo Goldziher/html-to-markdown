@@ -235,7 +235,13 @@ fn visit_content_node(
                 acc_stack.push((id, TableContentSummary::default()));
                 work.push(ContentFrame::ExitTable(id));
             } else {
-                apply_tag_content(&tag_name, tag, acc_stack.last_mut().map(|(_, acc)| acc), br_in_tables);
+                apply_tag_content(
+                    &tag_name,
+                    tag,
+                    parser,
+                    acc_stack.last_mut().map(|(_, acc)| acc),
+                    br_in_tables,
+                );
             }
             work.extend(tag.children().top().iter().copied().map(ContentFrame::Enter));
         }
@@ -245,13 +251,31 @@ fn visit_content_node(
 
 /// Fold a single non-table tag's contribution (link/header/caption/image/rule/line break)
 /// into the current accumulator, if one is open.
-fn apply_tag_content(tag_name: &str, tag: &tl::HTMLTag, acc: Option<&mut TableContentSummary>, br_in_tables: bool) {
+fn apply_tag_content(
+    tag_name: &str,
+    tag: &tl::HTMLTag,
+    parser: &tl::Parser,
+    acc: Option<&mut TableContentSummary>,
+    br_in_tables: bool,
+) {
     let Some(acc) = acc else { return };
     match tag_name {
         "a" => acc.link_count += 1,
         "caption" => acc.has_caption = true,
         "th" => acc.has_header = true,
         "img" | "graphic" if tag.attributes().get("src").is_some() || tag.attributes().get("alt").is_some() => {
+            acc.has_text = true;
+        }
+        "svg" => acc.has_text = true,
+        "iframe" if !crate::converter::media::embedded::extract_media_src(tag).is_empty() => acc.has_text = true,
+        "audio" | "video"
+            if !crate::converter::media::embedded::media_element_src(
+                tag,
+                parser,
+                crate::options::InlineDataMedia::Keep,
+            )
+            .is_empty() =>
+        {
             acc.has_text = true;
         }
         "input"
