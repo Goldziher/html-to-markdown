@@ -68,6 +68,7 @@ pub struct DomContext {
     pub(crate) next_inline_like_map: Vec<OnceCell<bool>>,
     pub(crate) prev_tag_map: Vec<OnceCell<Option<u32>>>,
     pub(crate) next_tag_map: Vec<OnceCell<Option<u32>>>,
+    pub(crate) following_content_map: Vec<crate::converter::utility::siblings::FollowingContent>,
     pub(crate) next_whitespace_map: Vec<OnceCell<bool>>,
     pub(crate) table_content_summary_cache: RefCell<HashMap<u32, TableContentSummary>>,
     /// For each element that [`DomContext::holds_text`] read: whether it holds text.
@@ -117,6 +118,8 @@ impl DomContext {
             self.prev_tag_map.resize_with(new_len, OnceCell::new);
             self.next_tag_map.resize_with(new_len, OnceCell::new);
             self.next_whitespace_map.resize_with(new_len, OnceCell::new);
+            self.following_content_map
+                .resize(new_len, crate::converter::utility::siblings::FollowingContent::Absent);
         }
     }
 

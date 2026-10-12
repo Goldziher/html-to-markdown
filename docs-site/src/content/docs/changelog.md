@@ -11,6 +11,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Comment and form-feed runs before a line break use cached sibling lookahead instead of
+  rescanning each suffix, retaining the existing output on every conversion route.
+
 - A line break before inline text in a definition description keeps its joining space after
   the term's blank line. Paragraphs in strict-mode headings retain source whitespace without
   doubling a separator; divs keep their word boundaries, including inside heading code spans.
