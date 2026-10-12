@@ -181,11 +181,7 @@ pub fn is_blank(decoded: &str) -> bool {
 #[must_use]
 pub fn edges(decoded: &str) -> (&'static str, &'static str) {
     let is_space = |character: char| matches!(character, ' ' | '\t') || text::is_unicode_space(character);
-    let before = if decoded.starts_with(is_unseen) {
-        " "
-    } else {
-        ""
-    };
+    let before = if decoded.starts_with(is_unseen) { " " } else { "" };
     let after = if decoded.ends_with("\n\n") || decoded.ends_with("\r\n\r\n") {
         "\n\n"
     } else if decoded.ends_with(is_space) {
@@ -329,6 +325,25 @@ pub fn unicode_space_is_kept(written: &str, place: TextPlace) -> bool {
 pub fn space_is_owed_in(output: &String, ctx: &crate::converter::context::Context) -> bool {
     let is_block_buffer = std::ptr::from_ref::<String>(output) as usize == ctx.block_output_ptr;
     space_is_owed(output) && !(output.is_empty() && is_block_buffer)
+}
+
+/// The leading Unicode spaces after a hard break, with only collapsible runs reduced.
+///
+/// ~keep A U+3000 at the start of a physical line is an indent character (#839). ASCII
+/// ~keep white space at that start writes nothing; between indent characters it is one space.
+#[must_use]
+pub fn unicode_line_indent(decoded: &str) -> String {
+    let mut indent = String::new();
+    for character in decoded.chars().take_while(|character| is_unseen(*character)) {
+        if is_collapsible(character) {
+            if !indent.is_empty() && !indent.ends_with(' ') {
+                indent.push(' ');
+            }
+        } else {
+            indent.push(character);
+        }
+    }
+    indent
 }
 
 #[cfg(test)]

@@ -482,6 +482,13 @@ fn emit_tier1_table_cell_break(state: &mut Tier1State, br_in_tables: bool) {
 }
 
 fn open_paragraph(state: &mut Tier1State, br_in_tables: bool) {
+    // ~keep A paragraph in a heading's code span is transparent: no synthetic code whitespace.
+    if state.escape_ctx.contains(EscapeCtx::CODE | EscapeCtx::HEADING)
+        && !state.escape_ctx.contains(EscapeCtx::PRE)
+        && !state.in_table_cell()
+    {
+        return;
+    }
     // ~keep When inside a table cell, treat `<p>` as a transparent container.
     // Tier-2's paragraph.rs writes the cell break (`<br>` under `br_in_tables`,
     // a space otherwise) when `in_table_cell` and there is already cell content

@@ -133,7 +133,7 @@ fn a_line_break_before_an_inline_element_is_a_space_in_each_container() {
         ("one\n<span id=\"a\"></span>two", "one two\n"),
         (
             "<dl><dt>t</dt><dd>one\n<span id=\"a\"></span>two</dd></dl>",
-            "t\none two\n",
+            "t\n\none two\n",
         ),
     ]);
 }
@@ -844,3 +844,58 @@ fn the_text_of_a_line_feed_reference_before_a_zero_width_space_is_kept() {
 
 include!("support/inline_white_space_links.rs");
 include!("support/inline_white_space_blocks.rs");
+
+#[test]
+fn description_line_end_joins_inline_text_after_a_term_boundary() {
+    for (html, expected) in [
+        ("<dl><dt>t</dt><dd>one\n<span></span>two</dd></dl>", "t\n\none two\n"),
+        (
+            "<dl><dt>long term</dt><dd>one&#10;<span></span>two</dd></dl>",
+            "long term\n\none two\n",
+        ),
+        ("<dl><dt>t</dt><dd>one\n<span>two</span></dd></dl>", "t\n\none two\n"),
+        ("<dl><dt>t</dt><dd>\n<span>two</span></dd></dl>", "t\n\ntwo\n"),
+    ] {
+        assert_eq!(tier2(html), expected, "{html}");
+        assert_eq!(
+            tier1::run(html, &PrescanReport::default(), &tier_options()).expect("description remains fast"),
+            expected,
+            "{html}"
+        );
+    }
+}
+
+#[test]
+fn strict_heading_block_boundaries_keep_only_source_spaces() {
+    for (html, expected) in [
+        ("<h2>x<footer> Logo</footer></h2>", "## x Logo\n"),
+        ("<h2>x<footer>Logo </footer>y</h2>", "## xLogo y\n"),
+        ("<h2>x<footer>Logo</footer>y</h2>", "## xLogoy\n"),
+        ("<h2>x<footer>  Logo  </footer>y</h2>", "## x  Logo  y\n"),
+    ] {
+        for tier_strategy in [TierStrategy::Auto, TierStrategy::Tier2] {
+            let written = convert_with(
+                html,
+                Some(ConversionOptions {
+                    tier_strategy,
+                    whitespace_mode: WhitespaceMode::Strict,
+                    ..tier_options()
+                }),
+            );
+            assert_eq!(written, expected, "{html}, {tier_strategy:?}");
+        }
+    }
+    assert_on_both(&[("<h2>x<footer> Logo</footer>y</h2>", "## x Logo y\n")]);
+}
+
+#[test]
+fn a_heading_code_span_keeps_source_spaces_without_synthetic_block_spaces() {
+    assert_on_both(&[
+        ("<h1>one<code><p>y</p></code>two</h1>", "# one`y`two\n"),
+        ("<h1>one<code><p> y </p></code>two</h1>", "# one` y `two\n"),
+        ("<h1>one<code><p>  y  </p></code>two</h1>", "# one`  y  `two\n"),
+        ("<h2>one<p>y</p>two</h2>", "## one y two\n"),
+        ("<h1>one<code>x<p>y</p>z</code>two</h1>", "# one`xyz`two\n"),
+        ("<h1>one<code><div>y</div></code>two</h1>", "# one`y`two\n"),
+    ]);
+}

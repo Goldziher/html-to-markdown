@@ -117,7 +117,12 @@ fn handle_inline(
             handler.ctx,
         );
     }
-    let in_heading_line = handler.ctx.in_heading && !is_table_continuation;
+    // ~keep Heading block separators are running-text syntax, not code-span content.
+    // ~keep Code retains its source spaces without synthetic boundary padding.
+    let in_heading_line = handler.ctx.in_heading
+        && !handler.ctx.in_code
+        && !is_table_continuation
+        && handler.options.whitespace_mode != crate::options::WhitespaceMode::Strict;
     if in_heading_line && !output.is_empty() && !output.ends_with(char::is_whitespace) {
         output.push(' ');
     }

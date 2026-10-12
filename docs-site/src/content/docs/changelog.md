@@ -11,6 +11,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- A line break before inline text in a definition description keeps its joining space after
+  the term's blank line. Strict-mode headings retain source whitespace without added block
+  separators. Blocks in a heading's code span add no synthetic spaces. Unicode indentation
+  after a hard break, including U+3000, is retained (#839).
+
 - A definition description outside a definition list starts a new block instead of joining the
   preceding word. `<div>a<dd>b</dd> c</div>` now writes `a`, `b` and `c` as separate blocks;
   a heading keeps its description inline with a word space

@@ -632,7 +632,7 @@ fn contains_blank_line(bytes: &[u8]) -> bool {
     false
 }
 
-/// Position where the innermost enclosing `<p>`/`<div>` frame's OWN content
+/// Position where the innermost enclosing paragraph, block or definition frame's OWN content
 /// starts in `state.output` — Tier-1's equivalent of Tier-2's
 /// `ctx.block_content_start` (set in `block/paragraph.rs`, which handles both
 /// tags). Falls back to `0` (the whole buffer) when no such ancestor is open,
@@ -642,7 +642,12 @@ fn nearest_block_content_start(state: &Tier1State) -> usize {
         .stack
         .iter()
         .rev()
-        .find(|frame| matches!(frame.spec.kind, TagKind::Paragraph | TagKind::Block))
+        .find(|frame| {
+            matches!(
+                frame.spec.kind,
+                TagKind::Paragraph | TagKind::Block | TagKind::DefinitionTerm | TagKind::DefinitionDescription
+            )
+        })
         .map_or(0, |frame| frame.content_start)
 }
 

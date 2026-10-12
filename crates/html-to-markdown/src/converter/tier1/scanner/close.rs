@@ -84,6 +84,13 @@ fn emit_close_for_implicit(
 }
 
 fn close_paragraph(state: &mut Tier1State) {
+    // ~keep The matching open leaves code content untouched, including source trailing spaces.
+    if state.escape_ctx.contains(EscapeCtx::CODE | EscapeCtx::HEADING)
+        && !state.escape_ctx.contains(EscapeCtx::PRE)
+        && !state.in_table_cell()
+    {
+        return;
+    }
     // ~keep When inside a table cell, `<p>` is transparent — no block separators.
     // Any inter-paragraph separators were already added as `<br>` at open time
     // by `open_paragraph`; `close_paragraph` does nothing in this context.
