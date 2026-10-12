@@ -1,11 +1,13 @@
 //! HTML cleanup and normalization used before conversion.
 
+mod inert;
 mod lists;
 mod markup;
 mod menu;
 mod raw_text;
 mod visibility;
 
+pub use inert::{normalize_inert_bodies_with_preservation, restore_inert_bodies};
 pub use lists::normalize_unclosed_list_items;
 pub use markup::{
     find_tag_end, is_json_ld_script_open_tag, normalize_bogus_comment_endings, normalize_split_closing_tags,

@@ -284,7 +284,7 @@ fn fold_node_content<'p>(
             if tag_name.as_ref() == "table" {
                 return Some(Element::Table(tag));
             }
-            apply_tag_content(&tag_name, tag, acc, content);
+            apply_tag_content(&tag_name, tag, parser, acc, content);
             Some(Element::Other(tag))
         }
         tl::Node::Comment(_) => None,
@@ -329,7 +329,13 @@ pub fn cell_holds_only_inputs(
 
 /// Fold a single non-table tag's contribution (link/header/caption/image/rule/line break)
 /// into the current accumulator, if one is open.
-fn apply_tag_content(tag_name: &str, tag: &tl::HTMLTag, acc: Option<&mut TableContentSummary>, content: ContentTest) {
+fn apply_tag_content(
+    tag_name: &str,
+    tag: &tl::HTMLTag,
+    parser: &tl::Parser,
+    acc: Option<&mut TableContentSummary>,
+    content: ContentTest,
+) {
     let Some(acc) = acc else { return };
     let br_in_tables = content.br_in_tables;
     match tag_name {
@@ -337,6 +343,18 @@ fn apply_tag_content(tag_name: &str, tag: &tl::HTMLTag, acc: Option<&mut TableCo
         "caption" => acc.has_caption = true,
         "th" => acc.has_header = true,
         "img" | "graphic" if tag.attributes().get("src").is_some() || tag.attributes().get("alt").is_some() => {
+            acc.has_text = true;
+        }
+        "svg" => acc.has_text = true,
+        "iframe" if !crate::converter::media::embedded::extract_media_src(tag).is_empty() => acc.has_text = true,
+        "audio" | "video"
+            if !crate::converter::media::embedded::media_element_src(
+                tag,
+                parser,
+                crate::options::InlineDataMedia::Keep,
+            )
+            .is_empty() =>
+        {
             acc.has_text = true;
         }
         "input" if content.checkboxes && crate::converter::form::elements::checkbox_state(tag).is_some() => {

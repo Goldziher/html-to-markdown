@@ -255,7 +255,7 @@ fn should_not_resolve_link_like_text_inside_textarea() {
 #[test]
 fn should_not_resolve_link_like_text_inside_other_raw_text_elements() {
     for (element, expected) in [
-        ("xmp", "see [here](x.html)\n\nafter\n"),
+        ("xmp", "see <a href=\"x.html\">here</a>\n\nafter\n"),
         ("iframe", "after\n"),
         ("noscript", "after\n"),
         ("noembed", "see [here](x.html)\n\nafter\n"),

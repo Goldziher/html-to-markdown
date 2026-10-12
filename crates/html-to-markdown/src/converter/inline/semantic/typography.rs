@@ -202,7 +202,16 @@ fn handle_italic_semantic(mut handler: HandlerContext<'_>) {
         return;
     }
 
-    let marker_context = handler.context.inline_buffer(handler.output, true);
+    let after_hard_break = if handler.output.is_empty() {
+        handler.context.inline_buffer_after_hard_break
+    } else {
+        crate::converter::utility::escaping::ends_with_hard_break(handler.output)
+    };
+    let marker_context = Context {
+        in_marker_span: true,
+        inline_buffer_after_hard_break: after_hard_break,
+        ..handler.context.clone()
+    };
     let mut content = String::with_capacity(32);
     collect_children(tag, &mut content, &marker_context, &handler);
     let marker = handler.options.strong_em_symbol.to_string();

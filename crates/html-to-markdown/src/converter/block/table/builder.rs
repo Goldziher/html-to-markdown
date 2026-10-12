@@ -231,6 +231,7 @@ fn render_wrapper_cell(
 
 struct DataTableState {
     row_index: usize,
+    has_content: bool,
     total_cols: usize,
     rowspan_tracker: Vec<Option<usize>>,
     cell_cache: CellTextCache,
@@ -257,8 +258,10 @@ fn render_data_table(
     let reuse_cell_text = !handler.options.compact_tables && cell_text_reuse_allowed(handler.ctx, scan);
     let mut cell_cache = CellTextCache::new(reuse_cell_text);
     let col_widths = column_widths(tag, parser, handler, total_cols, reuse_cell_text, &mut cell_cache);
+    let output_start = output.len();
     let mut state = DataTableState {
         row_index: 0,
+        has_content: false,
         total_cols,
         rowspan_tracker: vec![None; total_cols],
         cell_cache,
@@ -268,6 +271,17 @@ fn render_data_table(
     let env = DataEnv { parser, handler, scan };
     for child_handle in tag.children().top().iter() {
         render_data_child(child_handle, output, env, &mut state);
+    }
+    // ~keep Source media can count as table content but be excluded or skipped during rendering (#817).
+    // ~keep Nested-table rows retain their structure when the depth guard truncates their descendants.
+    if !state.has_content
+        && !scan.has_header
+        && !scan.has_caption
+        && scan.nested_table_count == 0
+        && state.deferred_tables.is_empty()
+    {
+        output.truncate(output_start);
+        return;
     }
     append_deferred_tables(output, &state.deferred_tables);
 }
@@ -438,6 +452,7 @@ fn render_data_row(
         },
         &mut RowRender {
             row_index: state.row_index,
+            has_content: &mut state.has_content,
             has_span: env.scan.has_span,
             rowspan_tracker: &mut state.rowspan_tracker,
             total_cols: state.total_cols,
