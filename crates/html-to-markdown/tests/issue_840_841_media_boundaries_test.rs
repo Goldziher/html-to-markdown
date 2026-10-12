@@ -455,6 +455,39 @@ mod review_visitors {
     }
 
     #[test]
+    fn should_keep_no_address_media_overrides_and_report_the_surviving_fallback_once() {
+        for tag in ["video", "audio"] {
+            let html = format!("<a href=/x>before<{tag}>fallback</{tag}>after</a>");
+            for (action, expected) in [
+                (VisitResult::Continue, "before fallback after"),
+                (VisitResult::Skip, "beforeafter"),
+                (VisitResult::Custom("CUSTOM".to_string()), "beforeCUSTOM after"),
+                (VisitResult::Custom(String::new()), "before after"),
+            ] {
+                let (output, calls) = observe(&html, action.clone(), VisitResult::Continue);
+                assert_eq!(
+                    output.expect("media override"),
+                    format!("[{expected}](/x)\n"),
+                    "{tag}, {action:?}"
+                );
+                assert_eq!(calls, [format!("{tag} "), format!("link /x {expected}")]);
+            }
+            let html = format!("<a href=/x><{tag}>fallback</{tag}></a>");
+            let (output, calls) = observe(&html, VisitResult::PreserveHtml, VisitResult::Continue);
+            let preserved = format!("<{tag}>fallback</{tag}>");
+            assert_eq!(output.expect("preserve media"), format!("[{preserved}](/x)\n"));
+            assert_eq!(calls, [format!("{tag} "), format!("link /x {preserved}")]);
+            let (output, calls) = observe(
+                &html,
+                VisitResult::Error("media failed".to_string()),
+                VisitResult::Continue,
+            );
+            assert!(output.expect_err("media error").contains("media failed"));
+            assert_eq!(calls.first(), Some(&format!("{tag} ")));
+        }
+    }
+
+    #[test]
     fn should_give_outer_link_visitors_the_separated_media_label_and_keep_overrides() {
         for tag in ["video", "audio"] {
             let html = format!("<a href=/x><{tag} src=/media></{tag}>after</a>");
@@ -599,6 +632,47 @@ mod rendered_neighbor_visitors {
     }
 
     #[test]
+    fn should_only_mark_a_fallback_that_survives_child_callbacks() {
+        for (start, end, expected, end_output) in [
+            (VisitResult::Skip, VisitResult::Continue, "beforeafter", None),
+            (
+                VisitResult::Continue,
+                VisitResult::Skip,
+                "beforeafter",
+                Some("fallback"),
+            ),
+            (
+                VisitResult::Continue,
+                VisitResult::Custom(String::new()),
+                "beforeafter",
+                Some("fallback"),
+            ),
+            (
+                VisitResult::Continue,
+                VisitResult::Custom("replacement".to_string()),
+                "before replacement after",
+                Some("fallback"),
+            ),
+            (
+                VisitResult::Continue,
+                VisitResult::Continue,
+                "before fallback after",
+                Some("fallback"),
+            ),
+        ] {
+            let html = "<a href=/x>before<video><span>fallback</span></video>after</a>";
+            let (output, calls) = observe(html, start, end);
+            assert_eq!(output, format!("[{expected}](/x)\n"));
+            let mut expected_calls = vec!["video".to_string(), "start".to_string()];
+            if let Some(end_output) = end_output {
+                expected_calls.push(format!("end {end_output}"));
+            }
+            expected_calls.push(format!("link {expected}"));
+            assert_eq!(calls, expected_calls);
+        }
+    }
+
+    #[test]
     fn should_resolve_neighbor_spacing_after_continue_custom_and_preserve_html_callbacks_once() {
         let html = "<a href=/x><video src=/media></video><span>word</span>!</a>";
         for (start, end, expected, end_output) in [
@@ -730,6 +804,92 @@ fn should_use_rendered_opening_punctuation_and_words_before_media_inside_formatt
         ] {
             let html = format!("<a href=/x>{body}<{tag} src=/media></{tag}></a>");
             check_routes(&html, &format!("[{expected}](/x)\n"), CodeBlockStyle::Backticks);
+        }
+    }
+}
+
+#[test]
+fn should_separate_surviving_media_fallback_without_an_address_from_the_next_word() {
+    for tag in ["video", "audio"] {
+        for (body, expected) in [
+            (format!("<{tag}>fallback</{tag}>text"), "fallback text"),
+            (format!("<span><{tag}>fallback</{tag}></span>text"), "fallback text"),
+            (format!("<{tag}><b>fallback</b></{tag}>text"), "**fallback** text"),
+            (format!("<{tag}>fallback</{tag}><b>text</b>"), "fallback **text**"),
+            (
+                format!("<{tag}>fallback</{tag}><span></span><!-- gap -->text"),
+                "fallback text",
+            ),
+            (
+                format!("<{tag}>fallback</{tag}><{tag}>next</{tag}>text"),
+                "fallback next text",
+            ),
+            (format!("<{tag}><source>fallback</{tag}>text"), "fallback text"),
+            (
+                format!("<{tag}>fallback</{tag}><video src=/media></video>text"),
+                "fallback video text",
+            ),
+        ] {
+            check_routes(
+                &format!("<a href=/x>{body}</a>"),
+                &format!("[{expected}](/x)\n"),
+                CodeBlockStyle::Backticks,
+            );
+        }
+    }
+}
+
+#[test]
+fn should_keep_empty_fallback_and_rendered_punctuation_boundaries_inside_the_anchor() {
+    for tag in ["video", "audio"] {
+        for (body, expected) in [
+            (format!("before<{tag}></{tag}>after"), "beforeafter"),
+            (format!("before<{tag}> </{tag}>after"), "beforeafter"),
+            (
+                format!("before<{tag}><span></span><!-- gap --></{tag}>after"),
+                "beforeafter",
+            ),
+            (format!("<{tag}>fallback</{tag}>!"), "fallback!"),
+            (format!("<{tag}>fallback</{tag}><b>!</b>"), "fallback**!**"),
+            (format!("<{tag}><b>(</b></{tag}>text"), "**(**text"),
+            (format!("<{tag}><i>(</i></{tag}><b>text</b>"), "*(***text**"),
+        ] {
+            check_routes(
+                &format!("<a href=/x>{body}</a>"),
+                &format!("[{expected}](/x)\n"),
+                CodeBlockStyle::Backticks,
+            );
+        }
+        check_routes(
+            &format!("<p>a<a href=/x><{tag}>fallback</{tag}></a>b</p>"),
+            "a[fallback](/x)b\n",
+            CodeBlockStyle::Backticks,
+        );
+    }
+}
+
+#[test]
+fn should_keep_surviving_fallback_boundaries_when_a_data_destination_is_suppressed() {
+    for tag in ["video", "audio"] {
+        for tier_strategy in STRATEGIES {
+            for (inline_data_media, expected) in [
+                (InlineDataMedia::AltTextOnly, "[before fallback after](/x)\n"),
+                (InlineDataMedia::DropElement, "[beforeafter](/x)\n"),
+            ] {
+                let html =
+                    format!("<a href=/x>before<{tag} src='data:video/mp4;base64,AAAA'>fallback</{tag}>after</a>");
+                let options = ConversionOptions {
+                    tier_strategy,
+                    inline_data_media,
+                    extract_metadata: false,
+                    ..Default::default()
+                };
+                let output = convert(&html, options)
+                    .expect("data media control")
+                    .content
+                    .unwrap_or_default();
+                assert_eq!(output, expected, "{tag}, {tier_strategy:?}, {inline_data_media:?}");
+            }
         }
     }
 }

@@ -133,6 +133,9 @@ fn render_media_fallback(tag: &HTMLTag, parser: &Parser, output: &mut String, co
             output.push(' ');
         }
         output.push_str(fallback);
+        if ctx.in_link && !fallback.is_empty() {
+            mark_media_tail(ctx);
+        }
         if !ctx.in_paragraph && !ctx.convert_as_inline && !ctx.in_link {
             output.push_str("\n\n");
         }
