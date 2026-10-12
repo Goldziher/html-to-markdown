@@ -9,7 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- Emphasis on a long line no longer recounts the existing line before each element.
+- Emphasis, variable (`var`) and definition (`dfn`) text on a long line no longer recounts
+  the existing line before each element.
   Other inline wrappers still require line-state work ([#862](https://github.com/xberg-io/html-to-markdown/issues/862)).
 
 - White space at the start or the end of a link label or of a short quotation is written beside
