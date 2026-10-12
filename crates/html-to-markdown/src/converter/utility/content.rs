@@ -4,7 +4,7 @@
 //! and empty element detection.
 
 use crate::converter::utility::escaping::is_block_level_name;
-use crate::converter::utility::white_space::is_collapsible;
+use crate::converter::utility::white_space::{FORM_FEED, is_collapsible, mark_edges, owed_part};
 use crate::text;
 use std::borrow::Cow;
 #[cfg(feature = "visitor")]
@@ -49,13 +49,25 @@ pub fn chomp_inline(text: &str) -> (&str, &str, &str) {
         // ~keep `<br>` with nothing before it leaves in a wrapper's scratch buffer
         // ~keep (`line_break.rs`'s block-start arm), and `<b>Alpha</b><b><br></b><b>Beta</b>`
         // ~keep joined its words when it was worth nothing (issue #502).
-        return (" ", "", "");
+        // ~keep A form feed is a character: a body with one is written as it is, with no mark.
+        return (if text.contains(FORM_FEED) { text } else { " " }, "", "");
     }
 
-    let prefix = if text.starts_with(&[' ', '\t'][..]) { " " } else { "" };
+    // ~keep A form feed at an edge goes outside the marks with the white space of that edge: a
+    // ~keep mark beside a form feed is no mark (issue #811).
+    let (start_run, end_run) = mark_edges(text);
+    let prefix = if start_run.contains(FORM_FEED) {
+        start_run
+    } else if text.starts_with(&[' ', '\t'][..]) {
+        " "
+    } else {
+        ""
+    };
 
     let suffix = if has_trailing_linebreak {
         if text.ends_with("  \n") { "  \n" } else { "\\\n" }
+    } else if end_run.contains(FORM_FEED) {
+        end_run
     } else if text.ends_with(&[' ', '\t'][..]) {
         " "
     } else {
@@ -135,8 +147,12 @@ pub fn push_inline_prefix(
     options: &crate::options::ConversionOptions,
     ctx: &crate::converter::context::Context,
 ) {
-    if keeps_source_white_space(options, ctx) || crate::converter::utility::white_space::space_is_owed(output) {
+    if keeps_source_white_space(options, ctx) {
         output.push_str(prefix);
+    } else {
+        // ~keep A form feed in the prefix is a character: it is written where no space is owed too.
+        let owed = owed_part(output, prefix);
+        output.push_str(owed);
     }
 }
 

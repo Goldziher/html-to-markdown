@@ -295,6 +295,7 @@ completed and standardized on 28 October 2014.[[15]](#cite_note-16)
 #### HTML 2
 
 November 24, 1995
+
 HTML 2.0 was published as [RFC](/wiki/RFC_(identifier) "RFC (identifier)") [1866](https://www.rfc-editor.org/rfc/rfc1866). Supplemental [RFCs](/wiki/Request_for_Comments "Request for Comments") added capabilities:
 
 - November 25, 1995: [RFC](/wiki/RFC_(identifier) "RFC (identifier)") [1867](https://www.rfc-editor.org/rfc/rfc1867) (form-based file upload)
@@ -305,6 +306,7 @@ HTML 2.0 was published as [RFC](/wiki/RFC_(identifier) "RFC (identifier)") [186
 #### HTML 3
 
 January 14, 1997
+
 HTML 3.2[[16]](#cite_note-17) was published as a [W3C Recommendation](/wiki/W3C_Recommendation "W3C Recommendation"). It was the first version developed and standardized exclusively by the
 W3C, as the IETF had closed its HTML Working Group on September 12,
 1996.[[17]](#cite_note-18)
@@ -317,6 +319,7 @@ standardized 14 months later in [MathML](/wiki/MathML "MathML").
 #### HTML 4
 
 December 18, 1997
+
 HTML 4.0[[19]](#cite_note-20) was published as a W3C Recommendation. It offers three variations:
 
 - Strict, in which deprecated elements are forbidden
@@ -333,10 +336,12 @@ April 24, 1998
 HTML 4.0[[21]](#cite_note-22) was reissued with minor edits without incrementing the version number.
 
 December 24, 1999
+
 HTML 4.01[[22]](#cite_note-23) was published as a W3C Recommendation. It offers the same three variations
 as HTML 4.0 and its last errata[[23]](#cite_note-24) were published on May 12, 2001.
 
 May 2000
+
 ISO/IEC 15445:2000[[24]](#cite_note-iso-html-25) ("[ISO](/wiki/International_Organization_for_Standardization "International Organization for Standardization") HTML", based on HTML 4.01 Strict) was published as an ISO/IEC
 international standard.[[25]](#cite_note-26) In the ISO, this standard is in the domain of the [ISO/IEC JTC 1/SC 34](/wiki/ISO/IEC_JTC_1/SC_34 "ISO/IEC JTC 1/SC 34") (ISO/IEC Joint Technical Committee 1, Subcommittee 34 – Document
 description and processing languages).[[24]](#cite_note-iso-html-25)
@@ -350,39 +355,49 @@ W3C's HTML Working Group.
 Main article: [HTML5](/wiki/HTML5 "HTML5")
 
 October 28, 2014
+
 HTML5[[26]](#cite_note-27) was published as a W3C Recommendation.[[27]](#cite_note-28)
 
 November 1, 2016
+
 HTML 5.1[[28]](#cite_note-29) was published as a W3C Recommendation.[[29]](#cite_note-30)[[30]](#cite_note-31)
 
 December 14, 2017
+
 HTML 5.2[[31]](#cite_note-32) was published as a W3C Recommendation.[[32]](#cite_note-33)[[33]](#cite_note-34)
 
 ### HTML draft version timeline
 
 October 1991
+
 *HTML Tags*,[[7]](#cite_note-tagshtml-8) an informal CERN document listing 18 HTML tags, was first mentioned in public.
 
 June 1992
+
 First informal draft of the HTML DTD,[[34]](#cite_note-35) with seven subsequent revisions (July 15, August 6, August 18, November 17,
 November 19, November 20, November 22)[[35]](#cite_note-36)[[36]](#cite_note-37)[[37]](#cite_note-html11-38)
 
 November 1992
+
 HTML DTD 1.1 (the first with a version number, based on RCS revisions, which
 start with 1.1 rather than 1.0), an informal draft[[37]](#cite_note-html11-38)
 
 June 1993
+
 Hypertext Markup Language[[38]](#cite_note-39) was published by the [IETF](/wiki/Internet_Engineering_Task_Force "Internet Engineering Task Force") IIIR Working Group as an Internet Draft (a rough proposal for a standard). It
 was replaced by a second version[[39]](#cite_note-ietfiiir-40) one month later.
 
 November 1993
+
 [HTML+](https://www.w3.org/MarkUp/HTMLPlus/htmlplus_1.html) was published by the IETF as an Internet Draft and was a competing proposal to
 the Hypertext Markup Language draft. It expired in July 1994.[[40]](#cite_note-41)
 
 November 1994
+
 First draft (revision 00) of HTML 2.0 published by IETF itself[[41]](#cite_note-42) (called as "HTML 2.0" from revision 02[[42]](#cite_note-43)), that finally led to the publication of [RFC](/wiki/RFC_(identifier) "RFC (identifier)") [1866](https://www.rfc-editor.org/rfc/rfc1866) in November 1995.[[43]](#cite_note-rfc1866-44)
 
 April 1995 (authored March 1995)
+
 HTML 3.0[[44]](#cite_note-45) was proposed as a standard to the IETF, but the proposal expired five months
 later (28 September 1995)[[45]](#cite_note-html30cover-46) without further action. It included many of the capabilities that were in
 Raggett's HTML+ proposal, such as support for tables, text flow around
@@ -407,6 +422,7 @@ extending HTML features."[[14]](#cite_note-raggett-15)
 *Logo of HTML5*
 
 January 2008
+
 [HTML5](/wiki/HTML5 "HTML5") was published as a [Working Draft](/wiki/World_Wide_Web_Consortium#Certification "World Wide Web Consortium") by the W3C.[[49]](#cite_note-50)
 
 Although its syntax closely resembles that of [SGML](/wiki/SGML "SGML"), [HTML5](/wiki/HTML5 "HTML5") has abandoned any attempt to be
@@ -414,6 +430,7 @@ an SGML application and has explicitly defined its own "html" serialization,
 in addition to an alternative XML-based XHTML5 serialization.[[50]](#cite_note-51)
 
 2011 HTML5 – Last Call
+
 On 14 February 2011, the W3C extended the charter of its HTML Working Group
 with clear milestones for HTML5. In May 2011, the working group advanced HTML5
 to "Last Call", an invitation to communities inside and outside W3C to confirm
@@ -423,6 +440,7 @@ specification by 2014, which was the target date for recommendation.[[51]](#cite
 W3C nevertheless continued its project to release HTML5.[[52]](#cite_note-53)
 
 2012 HTML5 – Candidate Recommendation
+
 In July 2012, WHATWG and [W3C](/wiki/W3C "W3C") decided on a
 degree of separation. W3C will continue the HTML5 specification work, focusing
 on a single definitive standard, which is considered a "snapshot" by WHATWG.
@@ -434,6 +452,7 @@ functionality will not be removed.[[53]](#cite_note-54)
 In December 2012, W3C designated HTML5 as a Candidate Recommendation.[[54]](#cite_note-55) The criterion for advancement to [W3C Recommendation](/wiki/W3C_recommendation#W3C_recommendation_(REC) "W3C recommendation") is "two 100% complete and fully interoperable implementations".[[55]](#cite_note-W3Crec-56)
 
 2014 HTML5 – Proposed Recommendation and Recommendation
+
 In September 2014, W3C moved HTML5 to Proposed Recommendation.[[56]](#cite_note-57)
 
 On 28 October 2014, HTML5 was released as a stable W3C Recommendation,[[57]](#cite_note-58) meaning the specification process is complete.[[58]](#cite_note-finalars-59)
@@ -625,6 +644,7 @@ webpage.
 There are several types of markup elements used in HTML:
 
 Structural markup indicates the purpose of text
+
 For example, `<h2>Golf</h2>` establishes "Golf" as a second-level [heading](/wiki/HTML_element#Basic_text "HTML element").
 Structural markup does not denote any specific rendering, but most web
 browsers have default styles for element formatting. Content may be further
@@ -632,6 +652,7 @@ styled using [Cascading Style Sheets](/wiki/Cascading_Style_Sheets "Cascading St
 
 Presentational markup indicates the appearance of the text, regardless of its
 purpose
+
 For example, `<b>bold text</b>` indicates that visual output devices should render "boldface" in bold text,
 but gives little indication what devices that are unable to do this (such as
 aural devices that read the text aloud) should do. In the case of both `<b>bold text</b>` and `<i>italic text</i>`, there are other elements that may have equivalent visual renderings but
@@ -643,6 +664,7 @@ italicized. Most presentational markup elements have become [deprecated](/wiki/D
 4.0 specification in favor of using [CSS](/wiki/CSS "CSS") for styling.
 
 Hypertext markup makes parts of a document into links to other documents
+
 An anchor element creates a [hyperlink](/wiki/Hyperlink "Hyperlink") in the document and
 its `href` attribute sets the link's target [URL](/wiki/URL "URL"). For example, the HTML markup `<a`  
 `                        href="https://en.wikipedia.org/">Wikipedia</a>`, will render the word "[Wikipedia](https://en.wikipedia.org/)" as a hyperlink. To render an image as a hyperlink, an `img` element is inserted as content into the `a` element. Like `br`, `img` is an empty
@@ -1302,7 +1324,7 @@ Wikibooks has more on the topic of: ***[HTML](https://en.wikibooks.org/wiki/Spec
 | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --- |
 |                                                                                                                                                                                                          | |
 
-| [Blink](/wiki/Blink_(browser_engine) "Blink (browser engine)")-based | \| [Proprietary](/wiki/Proprietary_software "Proprietary software")            \| [Google Chrome](/wiki/Google_Chrome "Google Chrome") [Arc](/wiki/Arc_(web_browser) "Arc (web browser)") [Avast](/wiki/Avast_Secure_Browser "Avast Secure Browser") [Cốc Cốc](/wiki/C%E1%BB%91c_C%E1%BB%91c "Cốc Cốc") [Comet](/wiki/Perplexity_AI#Comet "Perplexity AI") [Comodo](/wiki/Comodo_Dragon "Comodo Dragon") [Ecosia](/wiki/Ecosia#Ecosia_Browser "Ecosia") [Epic](/wiki/Epic_(web_browser) "Epic (web browser)") [Huawei](/wiki/Huawei_Mobile_Services "Huawei Mobile Services") [Maxthon](/wiki/Maxthon "Maxthon") [Microsoft Edge](/wiki/Microsoft_Edge "Microsoft Edge") [Opera](/wiki/Opera_(web_browser) "Opera (web browser)") ([Mobile](/wiki/Opera_Mobile "Opera Mobile")) [Puffin](/wiki/Puffin_Browser "Puffin Browser") [QQ](/wiki/QQ_Browser "QQ Browser") [Samsung](/wiki/Samsung_Internet "Samsung Internet") [Silk](/wiki/Amazon_Silk "Amazon Silk") [Sleipnir](/wiki/Sleipnir_(web_browser) "Sleipnir (web browser)") [SRWare](/wiki/SRWare_Iron "SRWare Iron") [UC](/wiki/UC_Browser "UC Browser") [Vivaldi](/wiki/Vivaldi_(web_browser) "Vivaldi (web browser)") [Whale](/wiki/Naver_Whale "Naver Whale") [Yandex](/wiki/Yandex_Browser "Yandex Browser") \| \| --------------------------------------------------------------------------- \| -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- \| \| [FOSS](/wiki/Free_and_open-source_software "Free and open-source software") \| [Chromium](/wiki/Chromium_(web_browser) "Chromium (web browser)") [Brave](/wiki/Brave_(web_browser) "Brave (web browser)") [Dooble](/wiki/Dooble "Dooble") [Falkon](/wiki/Falkon "Falkon") [Otter](/wiki/Otter_Browser "Otter Browser") [Supermium](/wiki/Supermium "Supermium") [ungoogled](/wiki/Ungoogled-chromium "Ungoogled-chromium") \| |
+| [Blink](/wiki/Blink_(browser_engine) "Blink (browser engine)")-based | [Proprietary](/wiki/Proprietary_software "Proprietary software") [Google Chrome](/wiki/Google_Chrome "Google Chrome") [Arc](/wiki/Arc_(web_browser) "Arc (web browser)") [Avast](/wiki/Avast_Secure_Browser "Avast Secure Browser") [Cốc Cốc](/wiki/C%E1%BB%91c_C%E1%BB%91c "Cốc Cốc") [Comet](/wiki/Perplexity_AI#Comet "Perplexity AI") [Comodo](/wiki/Comodo_Dragon "Comodo Dragon") [Ecosia](/wiki/Ecosia#Ecosia_Browser "Ecosia") [Epic](/wiki/Epic_(web_browser) "Epic (web browser)") [Huawei](/wiki/Huawei_Mobile_Services "Huawei Mobile Services") [Maxthon](/wiki/Maxthon "Maxthon") [Microsoft Edge](/wiki/Microsoft_Edge "Microsoft Edge") [Opera](/wiki/Opera_(web_browser) "Opera (web browser)") ([Mobile](/wiki/Opera_Mobile "Opera Mobile")) [Puffin](/wiki/Puffin_Browser "Puffin Browser") [QQ](/wiki/QQ_Browser "QQ Browser") [Samsung](/wiki/Samsung_Internet "Samsung Internet") [Silk](/wiki/Amazon_Silk "Amazon Silk") [Sleipnir](/wiki/Sleipnir_(web_browser) "Sleipnir (web browser)") [SRWare](/wiki/SRWare_Iron "SRWare Iron") [UC](/wiki/UC_Browser "UC Browser") [Vivaldi](/wiki/Vivaldi_(web_browser) "Vivaldi (web browser)") [Whale](/wiki/Naver_Whale "Naver Whale") [Yandex](/wiki/Yandex_Browser "Yandex Browser") [FOSS](/wiki/Free_and_open-source_software "Free and open-source software") [Chromium](/wiki/Chromium_(web_browser) "Chromium (web browser)") [Brave](/wiki/Brave_(web_browser) "Brave (web browser)") [Dooble](/wiki/Dooble "Dooble") [Falkon](/wiki/Falkon "Falkon") [Otter](/wiki/Otter_Browser "Otter Browser") [Supermium](/wiki/Supermium "Supermium") [ungoogled](/wiki/Ungoogled-chromium "Ungoogled-chromium") |
 | -------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | [Gecko](/wiki/Gecko_(software) "Gecko (software)")-based             | [Firefox](/wiki/Firefox "Firefox") [Floorp](/wiki/Floorp "Floorp") [GNU IceCat](/wiki/GNU_IceCat "GNU IceCat") [LibreWolf](/wiki/LibreWolf "LibreWolf") [Midori](/wiki/Midori_(web_browser) "Midori (web browser)") [Mullvad](/wiki/Mullvad_Browser "Mullvad Browser") [SlimBrowser](/wiki/SlimBrowser "SlimBrowser") [Tor](/wiki/Tor_Browser "Tor Browser") [Zen](/wiki/Zen_Browser "Zen Browser") Gecko [forks](/wiki/Fork_(software_development) "Fork (software development)") [Basilisk](/wiki/Basilisk_(web_browser) "Basilisk (web browser)") [K-Meleon](/wiki/K-Meleon "K-Meleon") [Pale Moon](/wiki/Pale_Moon "Pale Moon") [SeaMonkey](/wiki/SeaMonkey "SeaMonkey") [Waterfox](/wiki/Waterfox "Waterfox") |
 | [WebKit](/wiki/WebKit "WebKit")-based                                | [Safari](/wiki/Safari_(web_browser) "Safari (web browser)") [GNOME Web](/wiki/GNOME_Web "GNOME Web") [iCab](/wiki/ICab "ICab") [Orion](/wiki/Kagi_(search_engine)#Orion_Browser "Kagi (search engine)")  |
@@ -1322,9 +1344,9 @@ Wikibooks has more on the topic of: ***[HTML](https://en.wikibooks.org/wiki/Spec
 
 | [v (View this template)](/wiki/Template:W3C_standards "Template:W3C standards") [t (Discuss this template)](/wiki/Template_talk:W3C_standards "Template talk:W3C standards") [e (Edit this template)](/wiki/Special:EditPage/Template:W3C_standards "Special:EditPage/Template:W3C standards") [World Wide Web Consortium](/wiki/World_Wide_Web_Consortium "World Wide Web Consortium") (W3C) | |
 | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Products, standards                                                                                                                                                                                      | \| [Recommendations](/wiki/World_Wide_Web_Consortium#W3C_recommendation_(REC) "World Wide Web Consortium") \| [ActivityPub](/wiki/ActivityPub "ActivityPub") [Activity Streams](/wiki/Activity_Streams_(format) "Activity Streams (format)") [ARIA](/wiki/WAI-ARIA "WAI-ARIA") [Canonical XML](/wiki/Canonical_XML "Canonical XML") [CDF](/wiki/Compound_Document_Format "Compound Document Format") [CSS](/wiki/CSS "CSS") [Animations](/wiki/CSS_animations "CSS animations") [Flexbox](/wiki/Flexbox "Flexbox") [Grid](/wiki/CSS_grid_layout "CSS grid layout")  [DOM](/wiki/Document_Object_Model "Document Object Model") [EXI](/wiki/Efficient_XML_Interchange "Efficient XML Interchange") [EmotionML](/wiki/Emotion_Markup_Language "Emotion Markup Language") [Geolocation API](/wiki/W3C_Geolocation_API "W3C Geolocation API") HTML [HTML5](/wiki/HTML5 "HTML5")  [IndexedDB](/wiki/IndexedDB "IndexedDB") [ITS](/wiki/Internationalization_Tag_Set "Internationalization Tag Set") [JSON-LD](/wiki/JSON-LD "JSON-LD") [Linked Data Notifications](/wiki/Linked_Data_Notifications "Linked Data Notifications") [MathML](/wiki/MathML "MathML") [Micropub](/wiki/Micropub_(protocol) "Micropub (protocol)") [OWL](/wiki/Web_Ontology_Language "Web Ontology Language") [PLS](/wiki/Pronunciation_Lexicon_Specification "Pronunciation Lexicon Specification") [RDF](/wiki/Resource_Description_Framework "Resource Description Framework") [Schema](/wiki/RDF_Schema "RDF Schema") [RDFa](/wiki/RDFa "RDFa")  [SISR](/wiki/Semantic_Interpretation_for_Speech_Recognition "Semantic Interpretation for Speech Recognition") [SKOS](/wiki/Simple_Knowledge_Organization_System "Simple Knowledge Organization System") [SMIL](/wiki/Synchronized_Multimedia_Integration_Language "Synchronized Multimedia Integration Language") [SOAP](/wiki/SOAP "SOAP") [SRGS](/wiki/Speech_Recognition_Grammar_Specification "Speech Recognition Grammar Specification") [SRI](/wiki/Subresource_Integrity "Subresource Integrity") [SSML](/wiki/Speech_Synthesis_Markup_Language "Speech Synthesis Markup Language") [SVG](/wiki/SVG "SVG") [Filter Effects](/wiki/SVG_filter_effects "SVG filter effects")  [SCXML](/wiki/SCXML "SCXML") [SHACL](/wiki/SHACL "SHACL") [SPARQL](/wiki/SPARQL "SPARQL") [Timed text](/wiki/Timed_text "Timed text") [VoiceXML](/wiki/VoiceXML "VoiceXML") [WebAssembly](/wiki/WebAssembly "WebAssembly") [WoT](/wiki/Web_of_Things "Web of Things") [TD](/wiki/Thing_Description "Thing Description")  [Web storage](/wiki/Web_storage "Web storage") [WSDL](/wiki/Web_Services_Description_Language "Web Services Description Language") [Webmention](/wiki/Webmention "Webmention") [WebSub](/wiki/WebSub "WebSub") [WebVTT](/wiki/WebVTT "WebVTT") [WOFF](/wiki/Web_Open_Font_Format "Web Open Font Format") [XHTML](/wiki/XHTML "XHTML") [+RDFa](/wiki/XHTML%2BRDFa "XHTML+RDFa")  [XML](/wiki/XML "XML") [Base](/wiki/XML_Base "XML Base") [Encryption](/wiki/XML_Encryption "XML Encryption") [Events](/wiki/XML_Events "XML Events") [Information Set](/wiki/XML_Information_Set "XML Information Set") [Namespace](/wiki/XML_namespace "XML namespace") [Schema](/wiki/XML_Schema_(W3C) "XML Schema (W3C)") [Signature](/wiki/XML_Signature "XML Signature") [XForms](/wiki/XForms "XForms") [XInclude](/wiki/XInclude "XInclude") [XLink](/wiki/XLink "XLink") [XOP](/wiki/XML-binary_Optimized_Packaging "XML-binary Optimized Packaging") [XPath](/wiki/XPath "XPath") [2.0](/wiki/XPath_2.0 "XPath 2.0") [3.x](/wiki/XPath_3 "XPath 3")   [XPointer](/wiki/XPointer "XPointer") [XProc](/wiki/XProc "XProc") [XQuery](/wiki/XQuery "XQuery") [XSL](/wiki/XSL "XSL") [XSL-FO](/wiki/XSL_Formatting_Objects "XSL Formatting Objects") [XSLT](/wiki/XSLT "XSLT") [elements](/wiki/XSLT_elements "XSLT elements") \| \| ------------------------------------------------------------------------------------------------------- \| -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- \| \| Notes                                                                                                   \| [IndieAuth](/wiki/IndieAuth "IndieAuth") [XAdES](/wiki/XAdES "XAdES") [XBL](/wiki/XBL "XBL") [XHTML+SMIL](/wiki/XHTML%2BSMIL "XHTML+SMIL") [XUP](/wiki/Extensible_User_Interface_Protocol "Extensible User Interface Protocol") \| \| [Working drafts](/wiki/World_Wide_Web_Consortium#Working_draft_(WD) "World Wide Web Consortium")        \| [CCXML](/wiki/Call_Control_eXtensible_Markup_Language "Call Control eXtensible Markup Language") [CURIE](/wiki/CURIE "CURIE") [EME](/wiki/Encrypted_Media_Extensions "Encrypted Media Extensions") [InkML](/wiki/InkML "InkML") [MSE](/wiki/Media_Source_Extensions "Media Source Extensions") [RIF](/wiki/Rule_Interchange_Format "Rule Interchange Format") [SMIL Timesheets](/wiki/SMIL_Timesheets "SMIL Timesheets") [sXBL](/wiki/SXBL "SXBL") [WebGPU](/wiki/WebGPU "WebGPU") [WebXR](/wiki/WebXR "WebXR") [XFDL](/wiki/Extensible_Forms_Description_Language "Extensible Forms Description Language") [XFrames](/wiki/XFrames "XFrames") [XMLHttpRequest](/wiki/XMLHttpRequest "XMLHttpRequest") \| \| Guidelines                                                                                              \| [Web Content Accessibility Guidelines](/wiki/Web_Content_Accessibility_Guidelines "Web Content Accessibility Guidelines")                                                                                \| \| Initiative                                                                                              \| [Markup Validation Service](/wiki/W3C_Markup_Validation_Service "W3C Markup Validation Service") [Web Accessibility Initiative](/wiki/Web_Accessibility_Initiative "Web Accessibility Initiative") [Web Components](/wiki/Web_Components "Web Components") \| \| Deprecated                                                                                              \| [C-HTML](/wiki/C-HTML "C-HTML") [HDML](/wiki/Handheld_Device_Markup_Language "Handheld Device Markup Language") [JSSS](/wiki/JavaScript_Style_Sheets "JavaScript Style Sheets") [PGML](/wiki/Precision_Graphics_Markup_Language "Precision Graphics Markup Language") [VML](/wiki/Vector_Markup_Language "Vector Markup Language") [WebPlatform](/wiki/WebPlatform.org "WebPlatform.org") \| \| Obsoleted                                                                                               \| [P3P](/wiki/P3P "P3P") [XHTML+MathML+SVG](/wiki/XHTML%2BMathML%2BSVG "XHTML+MathML+SVG")                                                                                                                 \| |
-| Groups, organizations                                                                                                                                                                                    | \| [WHATWG](/wiki/WHATWG "WHATWG") Defunct: [World Wide Web Foundation](/wiki/World_Wide_Web_Foundation "World Wide Web Foundation") \| \| \| --------------------------------------------------------------------------------------------------------------------------------- \| -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- \| \| Elected                                                                                                                           \| [AB](/w/index.php?title=W3C_Advisory_Board&action=edit&redlink=1 "W3C Advisory Board (page does not exist)") [Board](/w/index.php?title=W3C_Board&action=edit&redlink=1 "W3C Board (page does not exist)") [TAG](/wiki/Technical_Architecture_Group "Technical Architecture Group") \| \| Working                                                                                                                           \| [CSS](/wiki/CSS_Working_Group "CSS Working Group") [SVG](/wiki/SVG_Working_Group "SVG Working Group") [WebAssembly](/wiki/WebAssembly "WebAssembly") [WebAuthn](/wiki/Web_Authentication_Working_Group "Web Authentication Working Group") \| \| Community, business                                                                                                               \| [Web Advertising BG](/wiki/Improving_Web_Advertising_Business_Group "Improving Web Advertising Business Group") [WebAssembly](/wiki/WebAssembly "WebAssembly") CG                                        \| \| Closed                                                                                                                            \| [Device Description](/wiki/W3C_Device_Description_Working_Group "W3C Device Description Working Group") (DDWG) [HTML](/wiki/HTML_Working_Group "HTML Working Group") [Multimodal Interaction Activity](/wiki/W3C_MMI "W3C MMI") (MMI) \| |
-| Software                                                                                                                                                                                                 | \| [CERN httpd](/wiki/CERN_httpd "CERN httpd") [Libwww](/wiki/Libwww "Libwww") \| \| \| --------------------------------------------------------------------------- \| -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- \| \| [Browsers](/wiki/Web_browser "Web browser")                                 \| [Line Mode](/wiki/Line_Mode_Browser "Line Mode Browser") (1990–) [Arena](/wiki/Arena_(web_browser) "Arena (web browser)") (1993–98) [Agora](/wiki/Agora_(web_browser) "Agora (web browser)") (1994–97) [Argo](/wiki/Argo_(web_browser) "Argo (web browser)") (1994–97) [Amaya](/wiki/Amaya_(web_editor) "Amaya (web editor)") (browser/editor, 1996–2012) \| |
+| Products, standards                                                                                                                                                                                      | [Recommendations](/wiki/World_Wide_Web_Consortium#W3C_recommendation_(REC) "World Wide Web Consortium") [ActivityPub](/wiki/ActivityPub "ActivityPub") [Activity Streams](/wiki/Activity_Streams_(format) "Activity Streams (format)") [ARIA](/wiki/WAI-ARIA "WAI-ARIA") [Canonical XML](/wiki/Canonical_XML "Canonical XML") [CDF](/wiki/Compound_Document_Format "Compound Document Format") [CSS](/wiki/CSS "CSS") [Animations](/wiki/CSS_animations "CSS animations") [Flexbox](/wiki/Flexbox "Flexbox") [Grid](/wiki/CSS_grid_layout "CSS grid layout")  [DOM](/wiki/Document_Object_Model "Document Object Model") [EXI](/wiki/Efficient_XML_Interchange "Efficient XML Interchange") [EmotionML](/wiki/Emotion_Markup_Language "Emotion Markup Language") [Geolocation API](/wiki/W3C_Geolocation_API "W3C Geolocation API") HTML [HTML5](/wiki/HTML5 "HTML5")  [IndexedDB](/wiki/IndexedDB "IndexedDB") [ITS](/wiki/Internationalization_Tag_Set "Internationalization Tag Set") [JSON-LD](/wiki/JSON-LD "JSON-LD") [Linked Data Notifications](/wiki/Linked_Data_Notifications "Linked Data Notifications") [MathML](/wiki/MathML "MathML") [Micropub](/wiki/Micropub_(protocol) "Micropub (protocol)") [OWL](/wiki/Web_Ontology_Language "Web Ontology Language") [PLS](/wiki/Pronunciation_Lexicon_Specification "Pronunciation Lexicon Specification") [RDF](/wiki/Resource_Description_Framework "Resource Description Framework") [Schema](/wiki/RDF_Schema "RDF Schema") [RDFa](/wiki/RDFa "RDFa")  [SISR](/wiki/Semantic_Interpretation_for_Speech_Recognition "Semantic Interpretation for Speech Recognition") [SKOS](/wiki/Simple_Knowledge_Organization_System "Simple Knowledge Organization System") [SMIL](/wiki/Synchronized_Multimedia_Integration_Language "Synchronized Multimedia Integration Language") [SOAP](/wiki/SOAP "SOAP") [SRGS](/wiki/Speech_Recognition_Grammar_Specification "Speech Recognition Grammar Specification") [SRI](/wiki/Subresource_Integrity "Subresource Integrity") [SSML](/wiki/Speech_Synthesis_Markup_Language "Speech Synthesis Markup Language") [SVG](/wiki/SVG "SVG") [Filter Effects](/wiki/SVG_filter_effects "SVG filter effects")  [SCXML](/wiki/SCXML "SCXML") [SHACL](/wiki/SHACL "SHACL") [SPARQL](/wiki/SPARQL "SPARQL") [Timed text](/wiki/Timed_text "Timed text") [VoiceXML](/wiki/VoiceXML "VoiceXML") [WebAssembly](/wiki/WebAssembly "WebAssembly") [WoT](/wiki/Web_of_Things "Web of Things") [TD](/wiki/Thing_Description "Thing Description")  [Web storage](/wiki/Web_storage "Web storage") [WSDL](/wiki/Web_Services_Description_Language "Web Services Description Language") [Webmention](/wiki/Webmention "Webmention") [WebSub](/wiki/WebSub "WebSub") [WebVTT](/wiki/WebVTT "WebVTT") [WOFF](/wiki/Web_Open_Font_Format "Web Open Font Format") [XHTML](/wiki/XHTML "XHTML") [+RDFa](/wiki/XHTML%2BRDFa "XHTML+RDFa")  [XML](/wiki/XML "XML") [Base](/wiki/XML_Base "XML Base") [Encryption](/wiki/XML_Encryption "XML Encryption") [Events](/wiki/XML_Events "XML Events") [Information Set](/wiki/XML_Information_Set "XML Information Set") [Namespace](/wiki/XML_namespace "XML namespace") [Schema](/wiki/XML_Schema_(W3C) "XML Schema (W3C)") [Signature](/wiki/XML_Signature "XML Signature") [XForms](/wiki/XForms "XForms") [XInclude](/wiki/XInclude "XInclude") [XLink](/wiki/XLink "XLink") [XOP](/wiki/XML-binary_Optimized_Packaging "XML-binary Optimized Packaging") [XPath](/wiki/XPath "XPath") [2.0](/wiki/XPath_2.0 "XPath 2.0") [3.x](/wiki/XPath_3 "XPath 3")   [XPointer](/wiki/XPointer "XPointer") [XProc](/wiki/XProc "XProc") [XQuery](/wiki/XQuery "XQuery") [XSL](/wiki/XSL "XSL") [XSL-FO](/wiki/XSL_Formatting_Objects "XSL Formatting Objects") [XSLT](/wiki/XSLT "XSLT") [elements](/wiki/XSLT_elements "XSLT elements") Notes [IndieAuth](/wiki/IndieAuth "IndieAuth") [XAdES](/wiki/XAdES "XAdES") [XBL](/wiki/XBL "XBL") [XHTML+SMIL](/wiki/XHTML%2BSMIL "XHTML+SMIL") [XUP](/wiki/Extensible_User_Interface_Protocol "Extensible User Interface Protocol") [Working drafts](/wiki/World_Wide_Web_Consortium#Working_draft_(WD) "World Wide Web Consortium") [CCXML](/wiki/Call_Control_eXtensible_Markup_Language "Call Control eXtensible Markup Language") [CURIE](/wiki/CURIE "CURIE") [EME](/wiki/Encrypted_Media_Extensions "Encrypted Media Extensions") [InkML](/wiki/InkML "InkML") [MSE](/wiki/Media_Source_Extensions "Media Source Extensions") [RIF](/wiki/Rule_Interchange_Format "Rule Interchange Format") [SMIL Timesheets](/wiki/SMIL_Timesheets "SMIL Timesheets") [sXBL](/wiki/SXBL "SXBL") [WebGPU](/wiki/WebGPU "WebGPU") [WebXR](/wiki/WebXR "WebXR") [XFDL](/wiki/Extensible_Forms_Description_Language "Extensible Forms Description Language") [XFrames](/wiki/XFrames "XFrames") [XMLHttpRequest](/wiki/XMLHttpRequest "XMLHttpRequest") Guidelines [Web Content Accessibility Guidelines](/wiki/Web_Content_Accessibility_Guidelines "Web Content Accessibility Guidelines") Initiative [Markup Validation Service](/wiki/W3C_Markup_Validation_Service "W3C Markup Validation Service") [Web Accessibility Initiative](/wiki/Web_Accessibility_Initiative "Web Accessibility Initiative") [Web Components](/wiki/Web_Components "Web Components") Deprecated [C-HTML](/wiki/C-HTML "C-HTML") [HDML](/wiki/Handheld_Device_Markup_Language "Handheld Device Markup Language") [JSSS](/wiki/JavaScript_Style_Sheets "JavaScript Style Sheets") [PGML](/wiki/Precision_Graphics_Markup_Language "Precision Graphics Markup Language") [VML](/wiki/Vector_Markup_Language "Vector Markup Language") [WebPlatform](/wiki/WebPlatform.org "WebPlatform.org") Obsoleted [P3P](/wiki/P3P "P3P") [XHTML+MathML+SVG](/wiki/XHTML%2BMathML%2BSVG "XHTML+MathML+SVG") |
+| Groups, organizations                                                                                                                                                                                    | [WHATWG](/wiki/WHATWG "WHATWG") Defunct: [World Wide Web Foundation](/wiki/World_Wide_Web_Foundation "World Wide Web Foundation") Elected [AB](/w/index.php?title=W3C_Advisory_Board&action=edit&redlink=1 "W3C Advisory Board (page does not exist)") [Board](/w/index.php?title=W3C_Board&action=edit&redlink=1 "W3C Board (page does not exist)") [TAG](/wiki/Technical_Architecture_Group "Technical Architecture Group") Working [CSS](/wiki/CSS_Working_Group "CSS Working Group") [SVG](/wiki/SVG_Working_Group "SVG Working Group") [WebAssembly](/wiki/WebAssembly "WebAssembly") [WebAuthn](/wiki/Web_Authentication_Working_Group "Web Authentication Working Group") Community, business [Web Advertising BG](/wiki/Improving_Web_Advertising_Business_Group "Improving Web Advertising Business Group") [WebAssembly](/wiki/WebAssembly "WebAssembly") CG Closed [Device Description](/wiki/W3C_Device_Description_Working_Group "W3C Device Description Working Group") (DDWG) [HTML](/wiki/HTML_Working_Group "HTML Working Group") [Multimodal Interaction Activity](/wiki/W3C_MMI "W3C MMI") (MMI) |
+| Software                                                                                                                                                                                                 | [CERN httpd](/wiki/CERN_httpd "CERN httpd") [Libwww](/wiki/Libwww "Libwww") [Browsers](/wiki/Web_browser "Web browser") [Line Mode](/wiki/Line_Mode_Browser "Line Mode Browser") (1990–) [Arena](/wiki/Arena_(web_browser) "Arena (web browser)") (1993–98) [Agora](/wiki/Agora_(web_browser) "Agora (web browser)") (1994–97) [Argo](/wiki/Argo_(web_browser) "Argo (web browser)") (1994–97) [Amaya](/wiki/Amaya_(web_editor) "Amaya (web editor)") (browser/editor, 1996–2012) |
 | Conferences                                                                                                                                                                                              | [International World Wide Web Conference](/wiki/The_Web_Conference "The Web Conference") (IW3C) [Steering Committee](/wiki/International_World_Wide_Web_Conference_Committee "International World Wide Web Conference Committee") (IW3C2) [First conference](/wiki/First_International_Conference_on_the_World-Wide_Web "First International Conference on the World-Wide Web") ("WWW1", 1994) |
 
 | [v (View this template)](/wiki/Template:Document_markup_languages "Template:Document markup languages") [t (Discuss this template)](/wiki/Template_talk:Document_markup_languages "Template talk:Document markup languages") [e (Edit this template)](/wiki/Special:EditPage/Template:Document_markup_languages "Special:EditPage/Template:Document markup languages") [Document markup languages](/wiki/Markup_language "Markup language") | |
@@ -1413,6 +1435,6 @@ Search
 
 HTML
 
-139 languages
+[](#) [](#) [](#) [](#) [](#) [](#) [](#) [](#)
 
-[Add topic](#)
+139 languages [Add topic](#)

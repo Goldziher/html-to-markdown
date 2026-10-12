@@ -29,7 +29,7 @@ type Context = crate::converter::Context;
 /// which must be accessible (pub(crate)) for this module to work correctly.
 pub fn handle(tag_name: &str, context: HandlerContext<'_>) {
     match tag_name {
-        "kbd" | "samp" => handle_kbd_samp(context),
+        "kbd" | "samp" | "tt" => handle_kbd_samp(context),
         _ => {}
     }
 }
@@ -53,6 +53,10 @@ fn handle_kbd_samp(mut handler: HandlerContext<'_>) {
         _ => return,
     };
 
+    if !handler.context.in_code && crate::converter::handlers::code_block::contains_anchor(tag, handler.parser) {
+        crate::converter::handlers::code_block::handle_code(tag, handler);
+        return;
+    }
     let children = tag.children();
     if handler.context.code_element_is_transparent() {
         // ~keep A nested `<code>` renders transparently inside an outer code span

@@ -151,9 +151,8 @@ const CELL_TEXT_CAPACITY: usize = 128;
 /// only when the enclosing row holds no other cell — GFM has no way to express a real nested
 /// table, but a lone cell's content can be lifted out and rendered as its own separate table
 /// after the enclosing one, which keeps the inner table usable instead of flattening it into a
-/// line of escaped pipes (issue #484). `None` (the default, and always the case for a cell
-/// sharing its row with a sibling, per issue #469) keeps the existing flatten-and-escape
-/// behavior.
+/// line of cell content (issue #484). `None` (the default, and always the case for a cell
+/// sharing its row with a sibling) flattens nested rows without table syntax (#760).
 #[allow(clippy::trivially_copy_pass_by_ref)]
 pub fn render_cell_text(
     node_handle: &tl::NodeHandle,
@@ -197,13 +196,96 @@ fn render_cell_content(
         .ctx
         .for_cell(*node_handle, parser, handler.dom_ctx, handler.options.br_in_tables);
     let handler = HandlerContext::new(handler.options, &cell_ctx, handler.depth, handler.dom_ctx);
+    let mut table_ends = Vec::new();
     for child_handle in children.top().iter() {
         render_cell_child(child_handle, parser, text, handler, deferred_tables);
+        if deferred_tables.is_none() && super::utils::is_or_contains_table(child_handle, parser, handler.dom_ctx) {
+            table_ends.push(text.len());
+        }
     }
+    separate_nested_table_following_content(text, &table_ends, handler.options.br_in_tables);
+}
+
+/// Separate content after a flattened nested table once the cell's inline markup is complete.
+/// ~keep Delaying insertion keeps code/link offsets stable and avoids a trailing synthetic `<br>`.
+pub fn separate_nested_table_following_content(text: &mut String, table_ends: &[usize], br_in_tables: bool) {
+    if table_ends.is_empty() {
+        return;
+    }
+    let original = std::mem::take(text);
+    let mut start = 0;
+    let content_end = original.trim_end().len();
+    for &end in table_ends {
+        if end <= start {
+            continue;
+        }
+        let Some(piece) = original.get(start..end) else {
+            continue;
+        };
+        let Some(following) = original.get(end..) else { continue };
+        text.push_str(piece);
+        if end < content_end && !following.starts_with(char::is_whitespace) && !following.starts_with("<br>") {
+            text.push_str(if br_in_tables { "<br>" } else { " " });
+        }
+        start = end;
+    }
+    text.push_str(&original[start..]);
+}
+
+/// Text of a nested table for the width pre-pass, in one walk so issue #406 stays linear.
+/// ~keep The flat form writes one separator between cells and one between rows; the measured
+/// ~keep text has them too, or the rule under the header is short by one character for each.
+#[allow(clippy::trivially_copy_pass_by_ref)]
+pub fn nested_table_width_text(
+    node_handle: &tl::NodeHandle,
+    parser: &tl::Parser,
+    dom_ctx: &super::super::super::DomContext,
+    br_in_tables: bool,
+) -> String {
+    let mut text = String::with_capacity(64);
+    let mut row_gap = false;
+    let mut cell_gap = false;
+    let mut stack = vec![*node_handle];
+    while let Some(handle) = stack.pop() {
+        match handle.get(parser) {
+            Some(tl::Node::Raw(bytes)) => {
+                let raw = bytes.as_utf8_str();
+                let decoded = crate::text::decode_html_entities_cow(raw.as_ref());
+                if decoded.trim().is_empty() {
+                    cell_gap |= !text.is_empty();
+                    continue;
+                }
+                if text.is_empty() {
+                } else if row_gap {
+                    crate::converter::emit_table_cell_break(&mut text, br_in_tables);
+                } else if cell_gap && !text.ends_with(char::is_whitespace) {
+                    text.push(' ');
+                }
+                row_gap = false;
+                cell_gap = false;
+                text.push_str(decoded.as_ref());
+            }
+            Some(tl::Node::Tag(tag)) => {
+                row_gap |= super::utils::is_tag_name(&handle, parser, dom_ctx, "tr");
+                cell_gap |= ["td", "th"]
+                    .iter()
+                    .any(|name| super::utils::is_tag_name(&handle, parser, dom_ctx, name));
+                if let Some(children) = dom_ctx.children_of(handle.get_inner()) {
+                    stack.extend(children.iter().rev().copied());
+                } else {
+                    let first = stack.len();
+                    stack.extend(tag.children().top().iter().copied());
+                    stack[first..].reverse();
+                }
+            }
+            _ => {}
+        }
+    }
+    text
 }
 
 /// ~keep A nested table's structural pipes bypass text-node escaping. It must either be deferred
-/// ~keep from a single-cell row or flattened with escaped pipes and explicit row separators;
+/// ~keep from a single-cell row or flattened to cell content with explicit row separators;
 /// ~keep otherwise reparsing widens and eventually truncates the outer row (issues #469/#484/#488).
 fn render_cell_child(
     child_handle: &tl::NodeHandle,
@@ -227,13 +309,17 @@ fn render_cell_child(
         return;
     }
     let mut nested = String::new();
+    let nested_context = crate::converter::Context {
+        allow_nested_table_markup: deferred_tables.is_some(),
+        ..handler.ctx.clone()
+    };
     super::super::super::walk_node(
         child_handle,
         parser,
         &mut nested,
         crate::converter::block::container::HandlerContext::new(
             handler.options,
-            handler.ctx,
+            &nested_context,
             handler.depth + 1,
             handler.dom_ctx,
         ),

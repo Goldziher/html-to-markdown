@@ -6,6 +6,7 @@
 //! - Plain block formatting (no Pandoc colon syntax)
 
 use super::ListContext;
+use crate::converter::main_helpers::strip_trailing_backslash_breaks_from_fresh_buffer;
 #[cfg(feature = "visitor")]
 use std::borrow::Cow;
 use tl;
@@ -72,7 +73,7 @@ pub fn handle_dl(node_handle: &tl::NodeHandle, parser: &tl::Parser, output: &mut
 
 /// Handle definition term element (<dt>).
 ///
-/// Outputs the term text followed by a newline.
+/// Outputs the term text as a separate paragraph.
 #[cfg_attr(not(feature = "visitor"), allow(unused_variables))]
 pub fn handle_dt(node_handle: &tl::NodeHandle, parser: &tl::Parser, output: &mut String, context: ListContext<'_>) {
     let ListContext {
@@ -89,11 +90,10 @@ pub fn handle_dt(node_handle: &tl::NodeHandle, parser: &tl::Parser, output: &mut
     let mut rendered = String::with_capacity(64);
     let child_context = crate::converter::block::container::HandlerContext::new(options, ctx, depth + 1, dom_ctx);
     let children = tag.children();
-    {
-        for child_handle in children.top().iter() {
-            crate::converter::walk_node(child_handle, parser, &mut rendered, child_context);
-        }
+    for child_handle in children.top().iter() {
+        crate::converter::walk_node(child_handle, parser, &mut rendered, child_context);
     }
+    strip_trailing_backslash_breaks_from_fresh_buffer(&mut rendered, options.newline_style);
     let trimmed = rendered.trim().to_owned();
     if trimmed.is_empty() {
         return;
@@ -125,7 +125,7 @@ pub fn handle_dt(node_handle: &tl::NodeHandle, parser: &tl::Parser, output: &mut
             VisitResult::Custom(custom) => {
                 output.push_str(&custom);
                 if !ctx.convert_as_inline && !custom.ends_with('\n') {
-                    output.push('\n');
+                    output.push_str("\n\n");
                 }
                 return;
             }
@@ -143,12 +143,13 @@ pub fn handle_dt(node_handle: &tl::NodeHandle, parser: &tl::Parser, output: &mut
         }
     }
 
+    separate_from_preceding_text(output, ctx);
     if ctx.convert_as_inline {
         output.push_str(&trimmed);
     } else {
         crate::converter::block::horizontal_rule::separate_leading_rule(output, &trimmed, ctx);
         output.push_str(&trimmed);
-        output.push('\n');
+        output.push_str(if ctx.in_table_cell { "\n" } else { "\n\n" });
     }
 }
 
@@ -249,16 +250,53 @@ pub fn handle_dd(node_handle: &tl::NodeHandle, parser: &tl::Parser, output: &mut
         return;
     }
 
+    separate_from_preceding_text(output, ctx);
+    if !ctx.convert_as_inline
+        && !ctx.in_code
+        && !ctx.in_code_block
+        && !ctx.in_list_item
+        && !ctx.in_table_cell
+        && !output.is_empty()
+        && !output.ends_with("\n\n")
+    {
+        crate::converter::trim_trailing_whitespace(output);
+        output.push_str("\n\n");
+    }
     if ctx.convert_as_inline {
         output.push_str(&trimmed);
     } else {
         crate::converter::block::horizontal_rule::separate_leading_rule(output, &trimmed, ctx);
-        // ~keep Indented code cannot interrupt the paragraph of the term, so a blank line goes
-        // ~keep before a description that starts with it.
-        if trimmed.starts_with([' ', '\t']) && !output.is_empty() && !output.ends_with("\n\n") {
-            output.push_str(if output.ends_with('\n') { "\n" } else { "\n\n" });
+        // ~keep The description's scratch buffer keeps only the code indent on its first line.
+        // ~keep In an item that line also needs the content column; a blank line prevents the
+        // ~keep code from continuing the term's paragraph (#806).
+        if trimmed.starts_with([' ', '\t']) && !output.is_empty() {
+            if ctx.in_list_item && !ctx.in_table_cell {
+                crate::converter::list::utils::start_block_in_list_item(output, ctx, options);
+            } else if !output.ends_with("\n\n") {
+                output.push_str(if output.ends_with('\n') { "\n" } else { "\n\n" });
+            }
         }
         output.push_str(&trimmed);
         output.push_str("\n\n");
+    }
+}
+
+/// Keeps a term or a description apart from the text before it.
+///
+/// In an inline context a space separates it from the word before it. In a block context the
+/// indentation at a line start is dropped, and the space after a word on the same line stays.
+fn separate_from_preceding_text(output: &mut String, ctx: &crate::converter::Context) {
+    if ctx.convert_as_inline {
+        if !output.is_empty() && !output.ends_with(char::is_whitespace) {
+            output.push(' ');
+        }
+        return;
+    }
+    if ctx.in_table_cell || ctx.in_list_item {
+        return;
+    }
+    let text_end = output.trim_end_matches([' ', '\t']).len();
+    if output[..text_end].is_empty() || output[..text_end].ends_with('\n') {
+        output.truncate(text_end);
     }
 }

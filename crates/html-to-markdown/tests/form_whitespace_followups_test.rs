@@ -315,3 +315,55 @@ fn should_keep_source_line_feeds_in_plain_output_for_bare_groups_and_data_lists(
         OutputFormat::Plain,
     );
 }
+
+#[test]
+fn should_keep_a_line_feed_before_an_input_only_data_list() {
+    assert_output(
+        "k\n<datalist><input value='v'></datalist>d",
+        "k\nd\n",
+        OutputFormat::Markdown,
+    );
+}
+
+#[test]
+fn should_keep_a_line_feed_before_blank_or_hidden_data_list_text() {
+    for body in [
+        " ",
+        "&nbsp;",
+        "<span hidden>x</span>",
+        "<span style='display:none'>x</span>",
+    ] {
+        let html = format!("k\n<datalist>{body}</datalist>d");
+        assert_output(&html, "k\nd\n", OutputFormat::Markdown);
+    }
+}
+
+#[test]
+fn should_join_data_list_block_children_to_the_preceding_line() {
+    assert_output(
+        "k\n<datalist><div>blk</div></datalist>d",
+        "k blk d\n",
+        OutputFormat::Markdown,
+    );
+}
+
+#[test]
+fn should_keep_the_boundary_before_preprocessing_skips_all_data_list_content() {
+    for tier_strategy in [TierStrategy::Auto, TierStrategy::Tier1, TierStrategy::Tier2] {
+        let result = convert(
+            "k\n<datalist><nav>x</nav></datalist>d",
+            ConversionOptions {
+                tier_strategy,
+                preprocessing: PreprocessingOptions {
+                    enabled: true,
+                    remove_navigation: true,
+                    remove_forms: false,
+                    ..PreprocessingOptions::default()
+                },
+                ..ConversionOptions::default()
+            },
+        )
+        .expect("removed navigation converts");
+        assert_eq!(result.content.as_deref(), Some("k\nd\n"), "{tier_strategy:?}");
+    }
+}

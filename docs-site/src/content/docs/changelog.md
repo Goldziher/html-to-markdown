@@ -12,11 +12,66 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - A source line ending before retained data-list content becomes a space in Markdown, as before
-  a select list. Empty or excluded data lists keep the existing source boundary. A no-break
-  space beside retained content stays a no-break space. A source line ending at the end of an
+  a select list. Without visitor callbacks, empty, input-only or excluded data lists keep the
+  existing source boundary. A no-break space beside retained content stays a no-break space. A source line ending at the end of an
   option group outside a select or data list also separates the following word. Plain text
   retains these line endings ([#864](https://github.com/xberg-io/html-to-markdown/issues/864),
   [#867](https://github.com/xberg-io/html-to-markdown/issues/867)).
+- The testkit-forced fast scanner keeps retained forms transparent in Plain output.
+  With form removal disabled, `<div>before<form>name</form>after</div>` gives
+  `beforenameafter`, matching the full converter; paragraphs inside forms keep their own breaks.
+  Public Plain conversion continues to use the full converter.
+
+- The fast converter leaves form removal to the full converter's HTML5 tree
+  ([#829](https://github.com/xberg-io/html-to-markdown/issues/829)). With an unclosed label,
+  `<p>before<form><label>name<input></form>after<p>next` now gives `before` on every route:
+  HTML5 keeps `after` and `next` inside the label and form. Closing the label before the form
+  keeps `after` and `next` as separate paragraphs. Nested forms also use the HTML5 tree:
+  `<form>a<form>b</form>c</form>d` now keeps `cd` when removing forms, instead of losing `c`.
+  Pages whose forms are removed, and retained forms with nested starts, use the full converter;
+  well-formed retained forms can still use the fast converter.
+
+- Comment and form-feed runs before a line break use cached sibling lookahead instead of
+  rescanning each suffix, retaining the existing output on every conversion route.
+
+- A line break before inline text in a definition description keeps its joining space after
+  the term's blank line. Paragraphs in strict-mode headings retain source whitespace without
+  doubling a separator; divs keep their word boundaries, including inside heading code spans.
+  Unicode indentation after a hard break, including U+3000, is retained (#839).
+
+- Quotes and lists inside a heading write their labels without structural quote or list
+  markers. Literal `>` and `-` text stays, and heading quote/list visitor overrides still apply
+  ([#859](https://github.com/xberg-io/html-to-markdown/issues/859)).
+
+- Audio and video players inside an outer link contribute plain label text instead of a nested
+  Markdown link. Their labels stay separate from adjacent words without padding punctuation
+  or visitor-skipped content, and an outer anchor with an empty address retains each player
+  destination. Fallback content without a player address also stays separate from the next
+  word inside the link. Inside preformatted code their default player output contributes no link or
+  extra blank line; visitor-provided output still applies (#840, #841).
+
+- A definition description outside a definition list starts a new block instead of joining the
+  preceding word. `<div>a<dd>b</dd> c</div>` now writes `a`, `b` and `c` as separate blocks;
+  a heading or link keeps its description inline with a word space, and an orphan description
+  after a closed list item keeps its blank line
+  ([#838](https://github.com/xberg-io/html-to-markdown/issues/838)).
+
+- An indented code block at the start of a definition description inside a list item keeps the
+  item's content-column indent on its first line as well as later lines, with a blank line
+  before the code. Bullet and numbered items now render the whole block as code
+  ([#806](https://github.com/xberg-io/html-to-markdown/issues/806)).
+
+- Inserted text (`<ins>`) is plain text and no longer takes the highlight markers. A rule inside
+  it is on its own line.
+- Teletype text (`<tt>`) is a code span.
+- A `<button>` stays in the line of the text around it, with no blank lines before or after
+  ([#785](https://github.com/xberg-io/html-to-markdown/issues/785)).
+- A definition list has a blank line between a term and its description.
+- A CDATA section in HTML content is dropped from the output.
+- A form feed is kept as text and no longer collapses as white space
+  ([#811](https://github.com/xberg-io/html-to-markdown/issues/811)).
+- The link for an `<audio>`, `<video>` or `<iframe>` has the `title` of the element as its label,
+  or the element name in lower case, in place of the address.
 - White space at the start or the end of a link label or of a short quotation is written beside
   the link or the quotation, not inside it, as it is for bold text. `Press <a href="/p">Go </a>now.` gave `Press [Go](/p)now.` and
   now gives `Press [Go](/p) now.`. `Press <q>Go </q>now.` gave `Press "Go"now.` and now gives
@@ -38,10 +93,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `<li>Text <input type="checkbox"> more</li>` gave `- [ ] Text  more` and now gives `- Text more`.
   The menu switch of many themes, a checkbox before its label, no longer writes `[ ]`
   ([#757](https://github.com/xberg-io/html-to-markdown/issues/757)).
-- A button, an output, a meter, a progress bar or a text area is a word of its own in running
-  text, also when the source glues it to a word:
-  `<p>Please re<button>load</button>ed the page</p>` gave `Please reload` and now gives
-  `Please re load`. The line still ends after the control
+- An output, a meter, a progress bar or a text area is a word of its own in running text, also
+  when the source glues it to a word: `<p>x<output>half</output>y</p>` gave `xhalf`, a blank line
+  and `y`, and now gives `x half`, a blank line and `y`. The line still ends after the control
   ([#752](https://github.com/xberg-io/html-to-markdown/issues/752)).
 - A link whose content gives no text is labelled with the name of the link: its `aria-label`,
   then its `title`. Before, the label was the address of the link. This changes the default
@@ -80,17 +134,48 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   block: `<pre>\n\na\n</pre>` wrote the fence and `a`, and now writes the fence, a blank line and
   `a`. An indented code block does not start with a blank line. Strict white space mode writes the
   start of a block as before.
-- A link, an image, highlighted text and an abbreviation inside a code block or a code span write
-  their text and no Markdown marks, because code shows every character as text:
+- A link, highlighted text and an abbreviation inside a code block write their text and no Markdown
+  marks, because a code block shows every character as text:
   `<pre>Guido &lt;<a href="/mail">guido</a>&gt;</pre>` wrote `Guido <[guido](/mail)>` and now writes
-  `Guido <guido>`. An image in code writes nothing, and an inline `<svg>` in code writes its text in
-  place of a `data:` image. The link and the image stay in the metadata
+  `Guido <guido>`. Highlighted text and an abbreviation inside a code span do the same. A link
+  inside a code span stays a link, with the code marks around its text
+  ([#813](https://github.com/xberg-io/html-to-markdown/issues/813)). An image in a code block or a
+  code span writes its alt text, and an inline `<svg>` in code writes its text in place of a
+  `data:` image. The link and the image stay in the metadata
   ([#781](https://github.com/xberg-io/html-to-markdown/issues/781)).
 - With `extract_metadata` off, an empty `pre` writes nothing in place of an empty fence, as with the
   default options.
 
 ### Fixed
 
+- A `<label>` inside a code block keeps the spaces and the line ends of its text
+  ([#822](https://github.com/xberg-io/html-to-markdown/issues/822)).
+- A paragraph inside a heading keeps a space between its text and the text after it
+  ([#804](https://github.com/xberg-io/html-to-markdown/issues/804)).
+- With `convert_as_inline`, a term or a description of a definition list has a space between it
+  and the text before it: `<dl><dt>t</dt><dd>d</dd></dl>` gives `t d`, was `td`. The same holds
+  in a heading and in a link.
+- An `<audio>` or `<video>` gets its link also when `extract_metadata` is `false` and
+  `highlight_style` is `none`: `<p>x</p><video src="/v.mp4"></video>` gives `x`, then
+  `[video](/v.mp4)`, was `x` only.
+- Links inside `code`, `kbd` and `samp` spans keep their destinations outside the code marks,
+  including links in table cells. Image labels stay literal, and quotes and hidden templates
+  retain their normal behavior ([#813](https://github.com/xberg-io/html-to-markdown/issues/813)).
+- Nested tables in a Markdown cell retain their text without nested table delimiters, with
+  spaces between cells and surrounding content
+  ([#760](https://github.com/xberg-io/html-to-markdown/issues/760)).
+- Stray table rows and cells retain their text
+  ([#805](https://github.com/xberg-io/html-to-markdown/issues/805)). Empty link destinations
+  keep the label as plain text, and empty presentational wrappers follow the same label rule
+  as a bare empty link; named labels and icons retain their fallback names.
+- An image with no source inside `pre` keeps the space on each side of it. Outside `pre`, one
+  space remains when the next text starts with a character reference or follows a comment.
+- A stray cell inside a table cell keeps its text.
+- A link that holds only an empty `div` or an empty `i`, with no class, gets the empty label, as
+  a link that holds an empty `span` does.
+- The rule under a table header is as wide as a cell that holds a nested table.
+- An image in `code`, `kbd`, `samp` or `pre` text is its alt text on the fast path too, as the
+  full converter writes it. The fast path wrote the Markdown image inside the code text.
 - Plain text output separates the text of a form control from the words beside it, as the
   Markdown output does. This shows for a control outside a `form` element with the default
   options, and for a control inside one with `remove_forms` off.
@@ -324,8 +409,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - A no-break space in an element of its own is kept after a space:
   `<p>one <span>&nbsp;</span> two</p>` gave `one  two` and gives `one`, a space, the no-break
-  space, a space and `two`. A no-break space in running text is one space, as before. In a link
-  label a no-break space beside a space is one space on both converters.
+  space, a space and `two`. A no-break space in running text is written as a space, as before.
+  In a link label a no-break space beside a space is one space on both converters.
+
+- A no-break space that starts a text is kept after a space when an element with no text stands
+  between the two: `<p>a <span></span>&nbsp;b</p>` and `<p>a <img>&nbsp;b</p>` give `a`, two
+  spaces and `b`, as a browser shows them. `&nbsp;`, `&#160;`, `&#xA0;` and the character do the
+  same. An element that holds only white space has no text: `<p>a <span> </span>&nbsp;b</p>`
+  gives the same. After a `span` whose text ends with a space the no-break space is kept too:
+  `<p>a <span>x </span>&nbsp;b</p>` gives `a x`, two spaces and `b`. A line end before an empty
+  `span` and the no-break space after it are one space. After a `<br>` in a heading and at the
+  start of an element the no-break space is still the one space.
+  After a `<br>` in a table cell the no-break space is kept, also in a
+  heading in the cell: `<td>a<br>&nbsp;b</td>` gives `a`, two spaces and `b`, as before. Inside
+  one text, and with only a comment between the two, a space and a no-break space are one
+  space, as before.
 
 ## [3.17.2] - 2026-10-06
 

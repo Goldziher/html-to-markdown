@@ -117,10 +117,12 @@ fn handle_inline(
             handler.ctx,
         );
     }
-    let in_heading_line = handler.ctx.in_heading && !is_table_continuation;
-    if in_heading_line && !output.is_empty() && !output.ends_with(char::is_whitespace) {
-        output.push(' ');
-    }
+    let in_heading_line = handler.ctx.in_heading
+        && !is_table_continuation
+        && (tag.name().as_utf8_str().eq_ignore_ascii_case("div")
+            || (!handler.ctx.in_code && handler.options.whitespace_mode != crate::options::WhitespaceMode::Strict));
+    let content_start = output.len();
+    let needs_prefix = in_heading_line && !output.is_empty() && !output.ends_with(char::is_whitespace);
     for child_handle in tag.children().top().iter() {
         crate::converter::walk_node(
             child_handle,
@@ -133,6 +135,11 @@ fn handle_inline(
                 handler.dom_ctx,
             ),
         );
+    }
+    // ~keep Strict text retains source whitespace, so a source space at this edge already
+    // ~keep separates the block from preceding text. Code keeps the div separators too.
+    if needs_prefix && !output[content_start..].starts_with(char::is_whitespace) {
+        output.insert(content_start, ' ');
     }
     if in_heading_line && !output.ends_with(char::is_whitespace) {
         output.push(' ');

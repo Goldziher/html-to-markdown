@@ -42,6 +42,10 @@ pub(super) fn finish_element(capture: ElementTextCapture, tag_name: &str, tag: &
 }
 
 pub(super) fn replace_element(ctx: &Context, replacement: Option<&str>) {
+    if let Some(boundary) = ctx.media_boundary.as_ref() {
+        boundary.set(Default::default());
+    }
+
     if let Some(collector) = ctx.structure_collector.as_ref() {
         collector.borrow_mut().replace_current_element(replacement);
     }
@@ -142,6 +146,14 @@ pub(super) fn handle_visitor_end(end: VisitorEndCapture<'_, '_>) {
             depth: end.depth,
         },
     );
+    if !matches!(action, VisitAction::Continue) {
+        if let Some(links) = end.ctx.inline_code_links.as_ref() {
+            // ~keep Replaced or removed subtrees no longer own link ranges in the raw code buffer (#813).
+            links
+                .borrow_mut()
+                .retain(|link| link.range.start < end.element_output_start);
+        }
+    }
     match action {
         VisitAction::Custom => {
             let replacement = end.output.get(end.element_output_start..).map(str::to_string);

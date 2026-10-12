@@ -21,9 +21,8 @@ struct TextFlush<'a> {
 }
 
 const UNICODE_WS_ENTITIES: &[&str] = &[
-    "&#12;", "&#x0c;", "&#x0C;", "&#xC;", "&nbsp;", "&#160;", "&#xa0;", "&#xA0;", "&ensp;", "&#8194;", "&#x2002;",
-    "&emsp;", "&#8195;", "&#x2003;", "&thinsp;", "&#8201;", "&#x2009;", "&hairsp;", "&#8202;", "&#x200a;", "&#x200A;",
-    "&#12288;", "&#x3000;",
+    "&nbsp;", "&#160;", "&#xa0;", "&#xA0;", "&ensp;", "&#8194;", "&#x2002;", "&emsp;", "&#8195;", "&#x2003;",
+    "&thinsp;", "&#8201;", "&#x2009;", "&hairsp;", "&#8202;", "&#x200a;", "&#x200A;", "&#12288;", "&#x3000;",
 ];
 
 fn handle_structural_text(state: &mut Tier1State, raw: &str, br_in_tables: bool) -> Result<bool, BailReason> {
@@ -82,7 +81,7 @@ fn normalize_unicode_whitespace(raw: &str, verbatim: bool) -> std::borrow::Cow<'
 }
 
 const fn is_non_ascii_whitespace(character: char) -> bool {
-    character.is_whitespace() && !matches!(character, ' ' | '\t' | '\n' | '\r')
+    character.is_whitespace() && !matches!(character, ' ' | '\t' | '\n' | '\r' | '\u{c}')
 }
 
 #[derive(Clone, Copy)]
@@ -595,6 +594,22 @@ fn without_line_end_at_zero_width_space(raw: &str) -> &str {
     crate::converter::utility::content::without_trailing_line_end_in_source(raw).unwrap_or(raw)
 }
 
+/// Hand the page to Tier-2 at white space text beside an image in a code span.
+///
+/// ~keep Tier-2 keeps white space beside an image in a code span as the source has it. The
+/// ~keep rules of `flush_text` are the rules for running text, so Tier-2 takes that page.
+const fn hand_over_white_space_at_image_in_code_span(
+    in_code_span: bool,
+    position: TextPosition,
+    history: WhitespaceHistory,
+    upcoming: UpcomingTextSibling,
+) -> Result<(), BailReason> {
+    if in_code_span && position.whitespace_only && (history.after_img || upcoming.is_img) {
+        return Err(BailReason::Classifier);
+    }
+    Ok(())
+}
+
 fn flush_text(state: &mut Tier1State, request: TextFlush<'_>) -> Result<(), BailReason> {
     let TextFlush {
         raw,
@@ -618,6 +633,9 @@ fn flush_text(state: &mut Tier1State, request: TextFlush<'_>) -> Result<(), Bail
         return Ok(());
     }
 
+    if !crate::converter::utility::white_space::is_blank(raw) {
+        state.last_closed_list = false;
+    }
     let in_pre = state.escape_ctx.contains(EscapeCtx::PRE);
     let in_code = state.escape_ctx.contains(EscapeCtx::CODE);
 
@@ -627,10 +645,12 @@ fn flush_text(state: &mut Tier1State, request: TextFlush<'_>) -> Result<(), Bail
         raw
     };
 
+    hand_over_unicode_space_after_space(state, raw, base_offset)?;
     let normalized_whitespace = normalize_unicode_whitespace(raw, in_pre || in_code);
     let raw = normalized_whitespace.as_ref();
 
     let position = text_position(state, raw);
+    hand_over_white_space_at_image_in_code_span(in_code && !in_pre, position, history, upcoming)?;
     if handle_whitespace_text(state, raw, in_pre, position, history, upcoming) {
         return Ok(());
     }

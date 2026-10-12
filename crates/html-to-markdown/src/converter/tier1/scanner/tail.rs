@@ -101,6 +101,11 @@ fn emit_table_row(target: &mut String, row: &[(String, u16)], widths: &[usize]) 
         }
         column += usize::from(*span);
     }
+    for width in &widths[column..] {
+        target.push(' ');
+        target.extend(std::iter::repeat_n(' ', *width));
+        target.push_str(" |");
+    }
     target.push('\n');
 }
 
@@ -455,13 +460,20 @@ fn upcoming_inline_starts_with_block(bytes: &[u8], lt_pos: usize) -> bool {
 /// ~keep Tier-2 asks its tree for the next element (`DomContext::next_tag_id`), and the tree
 /// ~keep passes comments and white space. A `<br>` is inline here as it is without a comment
 /// ~keep (`upcoming_tag_is_inline`): the line break removes the white space before it.
+///
+/// ~keep A form feed is a character (issue #811), so the scan ends at one: text follows the
+/// ~keep comments, not an element. Each text between two comments asks this, so a scan that
+/// ~keep passed form feeds read a run of such texts once for each of them.
 fn inline_follows_comments(bytes: &[u8], lt_pos: usize) -> bool {
     let mut pos = lt_pos;
     while bytes.get(pos..).is_some_and(|rest| rest.starts_with(b"<!--")) {
         let Ok(after) = skip_bang(bytes, pos) else {
             return false;
         };
-        pos = parse::skip_ws(bytes, after);
+        pos = after;
+        while matches!(bytes.get(pos), Some(b' ' | b'\t' | b'\n' | b'\r')) {
+            pos += 1;
+        }
     }
     let mut name_buf = [0u8; MAX_TAG_NAME_BYTES];
     pos != lt_pos && upcoming_open_tag_name(bytes, pos, &mut name_buf).is_some_and(is_inline_tag)
@@ -620,7 +632,7 @@ fn contains_blank_line(bytes: &[u8]) -> bool {
     false
 }
 
-/// Position where the innermost enclosing `<p>`/`<div>` frame's OWN content
+/// Position where the innermost enclosing paragraph, block or definition frame's OWN content
 /// starts in `state.output` — Tier-1's equivalent of Tier-2's
 /// `ctx.block_content_start` (set in `block/paragraph.rs`, which handles both
 /// tags). Falls back to `0` (the whole buffer) when no such ancestor is open,
@@ -630,7 +642,12 @@ fn nearest_block_content_start(state: &Tier1State) -> usize {
         .stack
         .iter()
         .rev()
-        .find(|frame| matches!(frame.spec.kind, TagKind::Paragraph | TagKind::Block))
+        .find(|frame| {
+            matches!(
+                frame.spec.kind,
+                TagKind::Paragraph | TagKind::Block | TagKind::DefinitionTerm | TagKind::DefinitionDescription
+            )
+        })
         .map_or(0, |frame| frame.content_start)
 }
 

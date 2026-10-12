@@ -375,11 +375,13 @@ fn close_link(state: &mut Tier1State, frame: &OpenTag, options: &ConversionOptio
         keeps_boundary_hard_breaks,
         crate::converter::main_helpers::hard_break_marker(options),
     );
-    // ~keep Tier-2 labels a link whose content gives no text with the name of the link, and
-    // ~keep leaves such a link out when it points into its own page. This scanner has neither
-    // ~keep rule, so it leaves the page to Tier-2.
-    if tier2_if_no_text && href.is_some() && dest.len() == trim_start {
-        return Err(BailReason::Classifier);
+    // ~keep Tier-2 decides what a link with no text writes: the name of the link as its label,
+    // ~keep nothing when the link points into its own page, and the label of a link that holds
+    // ~keep only empty elements, or only a title. This scanner has none of these rules, so it
+    // ~keep leaves the page to Tier-2.
+    let named_or_own_page = tier2_if_no_text && href.is_some();
+    if dest.len() == trim_start && (named_or_own_page || has_nested_tag || title.is_some()) {
+        return Err(BailReason::LinkEmptyLabel);
     }
     if let Some(href_str) = href.as_deref() {
         if try_emit_autolink(dest, trim_start, frame, href_str, has_nested_tag, options)? {
@@ -395,13 +397,10 @@ fn close_link(state: &mut Tier1State, frame: &OpenTag, options: &ConversionOptio
             dest.push('↑');
         }
     }
-    if let Some(href) = href {
-        // ~keep A label with no text has no end: no space goes after such a link.
-        let has_text = dest.len() > trim_start;
+    // ~keep A label with no text has no end: no space goes after such a link.
+    let end_space = ends_with_space && dest.len() > trim_start;
+    if let Some(href) = href.filter(|value| !value.is_empty()) {
         emit_markdown_link_close(dest, trim_start, &href, title.as_deref(), options);
-        if ends_with_space && has_text {
-            dest.push(' ');
-        }
         // ~keep A link with no text still writes `[](href)`: content, as in Tier-2's `convert_node`.
         state.end_document_start_if_written(trim_start.saturating_sub(1));
     } else {
@@ -409,6 +408,10 @@ fn close_link(state: &mut Tier1State, frame: &OpenTag, options: &ConversionOptio
         if let Some(bracket_pos) = dest[..bracket_search_end].rfind('[') {
             dest.remove(bracket_pos);
         }
+    }
+    // ~keep The space goes after the link, and after the text of a link with an empty address.
+    if end_space {
+        state.cell_or_output_mut().push(' ');
     }
     Ok(())
 }
@@ -472,6 +475,7 @@ fn close_list(state: &mut Tier1State, kind: ListKind) {
         let end = dest.trim_end().len();
         state.last_ordered_list_end = Some(end);
     }
+    state.last_closed_list = true;
 }
 
 fn close_list_item(state: &mut Tier1State, frame: &OpenTag) -> Result<(), BailReason> {
@@ -552,6 +556,21 @@ fn open_dt(state: &mut Tier1State) {
 
 fn open_dd(state: &mut Tier1State) {
     mark_definition_in_cell(state);
+    if state.in_table_cell() || state.escape_ctx.intersects(EscapeCtx::CODE | EscapeCtx::PRE) {
+        return;
+    }
+    if state.escape_ctx.contains(EscapeCtx::HEADING) {
+        let output = state.cell_or_output_mut();
+        if !output.is_empty() && !output.ends_with(char::is_whitespace) {
+            output.push(' ');
+        }
+    } else if !state
+        .stack
+        .iter()
+        .any(|frame| matches!(frame.spec.kind, TagKind::ListItem))
+    {
+        state.ensure_blank_line();
+    }
 }
 
 fn mark_definition_in_cell(state: &mut Tier1State) {
@@ -566,10 +585,14 @@ fn close_dt(state: &mut Tier1State) {
     }
     trim_trailing_inline_whitespace(state);
     let buf = state.cell_or_output_mut();
-    if buf.is_empty() || buf.ends_with('\n') {
+    if buf.is_empty() || buf.ends_with("\n\n") {
         return;
     }
-    buf.push('\n');
+    if buf.ends_with('\n') {
+        buf.push('\n');
+    } else {
+        buf.push_str("\n\n");
+    }
 }
 
 fn close_dd(state: &mut Tier1State) {

@@ -15,10 +15,11 @@ use crate::converter::main_helpers::{hard_break_marker, is_inline_element};
 use crate::converter::utility::content::{NextElement, ZERO_WIDTH_SPACE, line_end_before_element};
 use crate::converter::utility::siblings::{
     FollowingContent, br_follows_enclosing_elements, content_starts_with_block, following_sibling_content,
-    get_next_sibling_tag, get_previous_sibling_tag, next_sibling_is_inline_tag, zero_width_space_follows,
+    get_next_sibling_tag, get_previous_sibling_tag, next_sibling_is_inline_tag, text_place, zero_width_space_follows,
 };
 use crate::converter::utility::white_space::{
-    TextClass, cell_text, classify_text, edges, is_blank, is_collapsible, space_is_owed, visible, with_line_feeds,
+    TextClass, cell_text, classify_text, edges, is_blank, is_collapsible, space_is_owed, starts_with_unicode_space,
+    unicode_space_is_kept, visible, with_line_feeds,
 };
 use crate::text;
 #[cfg(feature = "visitor")]
@@ -168,6 +169,9 @@ impl TextProcessor<'_, '_, '_> {
             self.output.push_str(value);
             return;
         }
+        if self.at_paragraph_buffer_start() {
+            return;
+        }
         if self.handler.options.whitespace_mode == crate::options::WhitespaceMode::Strict {
             self.emit_strict_whitespace(value, facts.has_double_newline);
             return;
@@ -176,7 +180,7 @@ impl TextProcessor<'_, '_, '_> {
             self.output.push(if facts.had_newlines { '\n' } else { ' ' });
             return;
         }
-        if self.at_paragraph_buffer_start() || self.at_fresh_block_start(facts.was_fresh_block_start) {
+        if self.at_fresh_block_start(facts.was_fresh_block_start) {
             return;
         }
         if facts.had_newlines {
@@ -316,7 +320,9 @@ impl TextProcessor<'_, '_, '_> {
             let collapsed = cell_text(value);
             // ~keep White space after a space is the same run of white space, as in `skip_prefix`.
             match collapsed.strip_prefix(' ') {
-                Some(rest) if !space_is_owed(self.output) => Cow::Owned(rest.to_string()),
+                Some(rest) if !space_is_owed(self.output) && !self.keeps_unicode_space(value) => {
+                    Cow::Owned(rest.to_string())
+                }
                 _ => collapsed,
             }
         } else {
@@ -360,6 +366,11 @@ impl TextProcessor<'_, '_, '_> {
             .then(|| strip_single_leading_line_ending(trimmed_end))
             .flatten()
             .unwrap_or(trimmed_end);
+        let strict = if self.at_paragraph_buffer_start() {
+            strict.trim_start_matches([' ', '\t', '\r', '\n'])
+        } else {
+            strict
+        };
         let options = self.handler.options;
         let output = text::escape(
             strict,
@@ -385,10 +396,14 @@ impl TextProcessor<'_, '_, '_> {
         let has_double_newline = value.contains("\n\n") || value.contains("\r\n\r\n");
         let trailing_single_newline = value.ends_with('\n') && !value.ends_with("\n\n") && !value.ends_with("\r\n\r\n");
         let (prefix, suffix) = edges(value);
+        let line_indent = (self.output.ends_with(hard_break_marker(self.handler.options))
+            && starts_with_unicode_space(value))
+        .then(|| crate::converter::utility::white_space::unicode_line_indent(value));
+        let prefix = line_indent.as_deref().unwrap_or(prefix);
         let core = visible(value);
         let mut output = String::with_capacity(prefix.len() + core.len() + suffix.len() + 2);
         let mut semantic = capture_semantic.then(|| String::with_capacity(output.capacity()));
-        if !self.skip_prefix(prefix, was_fresh) && !prefix.is_empty() {
+        if (line_indent.is_some() || !self.skip_prefix(prefix, value, was_fresh)) && !prefix.is_empty() {
             output.push_str(prefix);
             if let Some(semantic) = semantic.as_mut() {
                 semantic.push_str(prefix);
@@ -420,15 +435,32 @@ impl TextProcessor<'_, '_, '_> {
         ProcessedText { output, semantic }
     }
 
-    fn skip_prefix(&self, prefix: &str, was_fresh: bool) -> bool {
+    fn skip_prefix(&self, prefix: &str, value: &str, was_fresh: bool) -> bool {
         is_fresh_block_start(self.handler.ctx, was_fresh)
             || self.output.ends_with("\n\n")
             || ["* ", "- ", ". ", "] "]
                 .iter()
                 .any(|ending| self.output.ends_with(ending))
             // ~keep White space after a space is the same run of white space, whatever lies
-            // ~keep between the two: an element that wrote nothing is no word.
-            || (!space_is_owed(self.output) && prefix == " ")
+            // ~keep between the two: an element that wrote nothing is no word. A Unicode space
+            // ~keep is no such white space.
+            || (!space_is_owed(self.output) && prefix == " " && !self.keeps_unicode_space(value))
+    }
+
+    /// Whether `value` starts with a Unicode space that is written after the space the output
+    /// ends with.
+    fn keeps_unicode_space(&self, value: &str) -> bool {
+        self.output.ends_with(' ')
+            && starts_with_unicode_space(value)
+            && unicode_space_is_kept(
+                self.output,
+                text_place(
+                    *self.node_handle,
+                    self.parser,
+                    self.handler.dom_ctx,
+                    self.handler.ctx.in_table_cell,
+                ),
+            )
     }
 
     fn append_trailing_line_ending(&self, output: &mut String, has_double_newline: bool) {
@@ -467,10 +499,7 @@ impl TextProcessor<'_, '_, '_> {
         let starts_with_block = dom_ctx
             .next_tag_id(self.node_handle.get_inner(), self.parser)
             .is_some_and(|next| content_starts_with_block(next, self.parser, dom_ctx));
-        let next = NextElement::new(
-            self.next_tag_is_inline_for_whitespace(next_tag),
-            starts_with_block && next_tag != "datalist",
-        );
+        let next = NextElement::new(self.next_tag_is_inline_for_whitespace(next_tag), starts_with_block);
         output.push(line_end_before_element(in_running_text, next));
     }
 
@@ -536,8 +565,8 @@ impl TextProcessor<'_, '_, '_> {
                     if matches!(name, "script" | "style" | "template" | "noscript") {
                         continue;
                     }
-                    // ~keep Media and attribute-valued controls may write without text nodes.
-                    if matches!(name, "img" | "svg" | "math" | "iframe" | "audio" | "video" | "input") {
+                    // ~keep Media may write without text nodes; default inputs write nothing.
+                    if matches!(name, "img" | "svg" | "math" | "iframe" | "audio" | "video") {
                         return true;
                     }
                     if let Some(children) = dom_ctx.children_of(handle.get_inner()) {

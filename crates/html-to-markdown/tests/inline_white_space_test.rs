@@ -133,7 +133,7 @@ fn a_line_break_before_an_inline_element_is_a_space_in_each_container() {
         ("one\n<span id=\"a\"></span>two", "one two\n"),
         (
             "<dl><dt>t</dt><dd>one\n<span id=\"a\"></span>two</dd></dl>",
-            "t\none two\n",
+            "t\n\none two\n",
         ),
     ]);
 }
@@ -427,7 +427,8 @@ fn white_space_on_both_sides_of_the_start_of_any_marked_element_is_one_space() {
         ("<p>one <kbd> y</kbd>two</p>", "one `y`two\n"),
         ("<p>one <abbr> y</abbr>two</p>", "one ytwo\n"),
         ("<p>one <dfn> y</dfn>two</p>", "one *y*two\n"),
-        ("<p>one <ins> y</ins>two</p>", "one ==y==two\n"),
+        // ~keep Inserted text writes no mark (issue #759), so only its white space is left.
+        ("<p>one <ins> y</ins>two</p>", "one ytwo\n"),
         ("<p>one <b><i> y</i></b>two</p>", "one ***y***two\n"),
     ]);
 }
@@ -546,17 +547,16 @@ fn a_block_in_code_after_a_line_end_keeps_its_blank_line_on_the_fast_converter()
     }
 }
 
-/// A text of a form feed and a line end is white space for the fast converter, so the comment
-/// scan does not run for it and the line end stays a line end.
+/// A form feed is a character (issue #811), so the line end after it is a space before the
+/// inline element that follows the comment.
 ///
-/// ~keep This row pins the output of the base on the fast converter, where the two converters
-/// ~keep differ: the full converter writes `one*y*`, the form feed and `**two**`. Chrome shows
-/// ~keep `oney`, the form feed, a space and `two`; Markdown shows the line end as that space.
+/// ~keep Chrome shows `oney`, the form feed, a space and `two`.
 #[test]
-fn a_text_of_a_form_feed_and_a_line_end_keeps_its_line_end_before_a_comment() {
+fn a_line_end_after_a_form_feed_is_a_space_before_a_comment_and_an_inline_element() {
     let html = "<div>one<i>y</i>\u{c}\n<!-- c --><b>two</b></div>";
     let written = tier1::run(html, &PrescanReport::default(), &tier_options());
-    assert_eq!(written.as_deref().ok(), Some("one*y*\u{c}\n**two**\n"));
+    assert_eq!(written.as_deref().ok(), Some("one*y*\u{c} **two**\n"));
+    assert_eq!(tier2(html), "one*y*\u{c} **two**\n");
 }
 
 /// A space that is not a line end stays beside a zero-width space, and so does a line end
@@ -844,3 +844,58 @@ fn the_text_of_a_line_feed_reference_before_a_zero_width_space_is_kept() {
 
 include!("support/inline_white_space_links.rs");
 include!("support/inline_white_space_blocks.rs");
+
+#[test]
+fn description_line_end_joins_inline_text_after_a_term_boundary() {
+    for (html, expected) in [
+        ("<dl><dt>t</dt><dd>one\n<span></span>two</dd></dl>", "t\n\none two\n"),
+        (
+            "<dl><dt>long term</dt><dd>one&#10;<span></span>two</dd></dl>",
+            "long term\n\none two\n",
+        ),
+        ("<dl><dt>t</dt><dd>one\n<span>two</span></dd></dl>", "t\n\none two\n"),
+        ("<dl><dt>t</dt><dd>\n<span>two</span></dd></dl>", "t\n\ntwo\n"),
+    ] {
+        assert_eq!(tier2(html), expected, "{html}");
+        assert_eq!(
+            tier1::run(html, &PrescanReport::default(), &tier_options()).expect("description remains fast"),
+            expected,
+            "{html}"
+        );
+    }
+}
+
+#[test]
+fn strict_heading_block_boundaries_keep_only_source_spaces() {
+    for (html, expected) in [
+        ("<h2>x<footer> Logo</footer></h2>", "## x Logo\n"),
+        ("<h2>x<footer>Logo </footer>y</h2>", "## xLogo y\n"),
+        ("<h2>x<footer>Logo</footer>y</h2>", "## xLogoy\n"),
+        ("<h2>x<footer>  Logo  </footer>y</h2>", "## x  Logo  y\n"),
+    ] {
+        for tier_strategy in [TierStrategy::Auto, TierStrategy::Tier2] {
+            let written = convert_with(
+                html,
+                Some(ConversionOptions {
+                    tier_strategy,
+                    whitespace_mode: WhitespaceMode::Strict,
+                    ..tier_options()
+                }),
+            );
+            assert_eq!(written, expected, "{html}, {tier_strategy:?}");
+        }
+    }
+    assert_on_both(&[("<h2>x<footer> Logo</footer>y</h2>", "## x Logo y\n")]);
+}
+
+#[test]
+fn a_heading_code_span_keeps_paragraph_source_spaces_without_synthetic_block_spaces() {
+    assert_on_both(&[
+        ("<h1>one<code><p>y</p></code>two</h1>", "# one`y`two\n"),
+        ("<h1>one<code><p> y </p></code>two</h1>", "# one` y `two\n"),
+        ("<h1>one<code><p>  y  </p></code>two</h1>", "# one`  y  `two\n"),
+        ("<h2>one<p>y</p>two</h2>", "## one y two\n"),
+        ("<h1>one<code>x<p>y</p>z</code>two</h1>", "# one`xyz`two\n"),
+    ]);
+    assert_on_full(&[("<h1>one<code><div>y</div></code>two</h1>", "# one`y `two\n")]);
+}

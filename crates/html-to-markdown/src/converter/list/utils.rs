@@ -477,7 +477,7 @@ fn paragraph_is_open(output: &str, enclosing_column: usize, previous: Option<(us
 /// ~keep and the line before the marker line must match: in another buffer, in a list at another
 /// ~keep depth, or after a write that changed the end of the buffer, the line start means nothing.
 /// If this list is immediately preceded by an HTML comment whose own immediately preceding
-/// sibling is a list of this same tag (`ul`/`ol`), return that comment's literal source text.
+/// sibling is a list of this same tag (`ul`/`ol`), return an empty separator comment.
 ///
 /// ~keep `CommonMark` merges two adjacent lists of the same type into one list unless
 /// ~keep something else -- and per the spec, only a raw HTML comment qualifies -- sits between
@@ -509,14 +509,14 @@ pub fn preceding_same_type_list_separator_comment(
     // ~keep find the nearest MEANINGFUL sibling on each side, exactly like
     // ~keep `get_previous_sibling_tag` does for the tag-name-only lookup.
     let mut cursor = position;
-    let comment_text = loop {
+    loop {
         cursor = cursor.checked_sub(1)?;
         match siblings.get(cursor)?.get(parser) {
-            Some(tl::Node::Comment(bytes)) => break bytes.as_utf8_str().into_owned(),
+            Some(tl::Node::Comment(_)) => break,
             Some(tl::Node::Raw(raw)) if raw.as_utf8_str().trim().is_empty() => {}
             _ => return None,
         }
-    };
+    }
 
     let previous_list_name = loop {
         cursor = cursor.checked_sub(1)?;
@@ -530,7 +530,7 @@ pub fn preceding_same_type_list_separator_comment(
     };
 
     if previous_list_name == tag_name {
-        Some(comment_text)
+        Some("<!-- -->".to_owned())
     } else {
         None
     }
