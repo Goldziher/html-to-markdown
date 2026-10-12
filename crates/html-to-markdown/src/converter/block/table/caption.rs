@@ -45,9 +45,10 @@ pub fn handle_caption(
         let text = text.trim();
         if !text.is_empty() {
             let escaped_text = text.replace('-', r"\-");
-            output.push('*');
+            output.push(handler.options.strong_em_symbol);
             output.push_str(&escaped_text);
-            output.push_str("*\n\n");
+            output.push(handler.options.strong_em_symbol);
+            output.push_str("\n\n");
         }
     }
 }

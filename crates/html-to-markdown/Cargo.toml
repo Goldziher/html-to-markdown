@@ -83,5 +83,13 @@ toml.workspace = true
 name = "test_deser"
 required-features = ["serde"]
 
+[[test]]
+name = "issue_859_heading_block_markers_test"
+required-features = ["testkit"]
+
+[[test]]
+name = "review_791_block_boundaries_test"
+required-features = ["testkit"]
+
 [lints]
 workspace = true

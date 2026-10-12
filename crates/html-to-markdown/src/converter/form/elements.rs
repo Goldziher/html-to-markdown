@@ -286,8 +286,20 @@ pub fn handle_label(
         dom_ctx,
     } = context;
     if let Some(tl::Node::Tag(tag)) = node_handle.get(parser) {
-        let mut rendered = String::new();
         let children = tag.children();
+        // ~keep A code block shows the text of a label as written, so nothing is trimmed (issue #822).
+        if ctx.in_code_block {
+            for child_handle in children.top().iter() {
+                super::walk_node(
+                    child_handle,
+                    parser,
+                    output,
+                    crate::converter::block::container::HandlerContext::new(options, ctx, depth + 1, dom_ctx),
+                );
+            }
+            return;
+        }
+        let mut rendered = String::new();
         let label_ctx = ctx.inline_buffer(output, false);
         {
             for child_handle in children.top().iter() {
@@ -329,7 +341,7 @@ fn starts_with_control(tag: &tl::HTMLTag, parser: &tl::Parser, dom_ctx: &crate::
     };
     match crate::converter::utility::content::normalized_tag_name(control.name().as_utf8_str()).as_ref() {
         "input" => super::spacing::white_space_follows(handle.get_inner(), parser, dom_ctx),
-        name => super::spacing::writes_own_text(name),
+        name => super::spacing::writes_own_markdown_text(name),
     }
 }
 
@@ -474,8 +486,8 @@ pub fn handle_input(
     emit_input(node_handle, parser, output, context);
 }
 
-/// Writes the children of a control that ends its line: `<textarea>`, `<button>`, `<output>`,
-/// `<meter>` and `<progress>`.
+/// Writes the children of a control that ends its line: `<textarea>`, `<output>`, `<meter>` and
+/// `<progress>`.
 ///
 /// The text is a word of its own after the text before it. A blank line follows it where a
 /// block holds the control. In inline mode and in an inline element the line goes on, and the
@@ -650,9 +662,8 @@ pub fn handle_optgroup(
 
 /// Handles the `<button>` element.
 ///
-/// A button element represents a clickable button. Its text content is plain text that ends
-/// its line.
-#[cfg_attr(not(feature = "visitor"), allow(unused_variables))]
+/// A button element represents a clickable button. Its content is inline text in the line of
+/// the text around it, as the content of a `span` is (issue #785).
 pub fn handle_button(
     _tag_name: &str,
     node_handle: &tl::NodeHandle,
@@ -661,7 +672,10 @@ pub fn handle_button(
     context: FormContext<'_>,
 ) {
     let FormContext {
-        ctx, depth, dom_ctx, ..
+        options,
+        ctx,
+        depth,
+        dom_ctx,
     } = context;
     if let Some(tl::Node::Tag(tag)) = node_handle.get(parser) {
         #[cfg(feature = "visitor")]
@@ -691,9 +705,6 @@ pub fn handle_button(
                 VisitResult::Skip => return,
                 VisitResult::Custom(custom) => {
                     output.push_str(&custom);
-                    if !ctx.convert_as_inline && !custom.ends_with('\n') {
-                        output.push_str("\n\n");
-                    }
                     return;
                 }
                 VisitResult::PreserveHtml => {
@@ -710,7 +721,15 @@ pub fn handle_button(
             }
         }
 
-        write_line_end_control(*node_handle, tag, parser, output, context);
+        let children = tag.children();
+        for child_handle in children.top().iter() {
+            walk_node(
+                child_handle,
+                parser,
+                output,
+                crate::converter::block::container::HandlerContext::new(options, ctx, depth + 1, dom_ctx),
+            );
+        }
     }
 }
 

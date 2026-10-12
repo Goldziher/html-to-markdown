@@ -112,7 +112,7 @@ pub fn handle_dt(
                 output.push_str(trimmed);
             } else {
                 output.push_str(trimmed);
-                output.push('\n');
+                output.push_str("\n\n");
             }
         }
     }

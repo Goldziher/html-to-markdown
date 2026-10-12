@@ -353,7 +353,8 @@ fn should_read_the_text_after_a_control_through_what_writes_nothing() {
 fn should_separate_a_control_in_a_line_that_goes_on_after_it() {
     for (html, expected) in [
         ("<h2>Total<output>42</output>items</h2>", "## Total 42 items\n"),
-        ("<h2>Go<button>now</button>then</h2>", "## Go now then\n"),
+        // ~keep A button is inline text (issue #785): only the white space of the source separates it.
+        ("<h2>Go<button>now</button>then</h2>", "## Gonowthen\n"),
         ("<h2>Go <button>now</button> then</h2>", "## Go now then\n"),
         ("<h2>Total<output>42</output>.</h2>", "## Total 42.\n"),
     ] {
@@ -361,22 +362,86 @@ fn should_separate_a_control_in_a_line_that_goes_on_after_it() {
     }
 }
 
-/// In a heading the line goes on after a button. An input between the button and the next word
-/// writes no text, so the button is separated from that word.
+/// A button is inline text (issue #785), and an input after it writes no text, so nothing
+/// separates the text of the button from the words around it.
 #[test]
-fn should_read_past_an_input_to_the_word_after_a_button() {
+fn should_write_no_space_at_a_button_before_an_input() {
     for input in [r#"type="checkbox""#, r#"type="hidden""#, r#"type="text""#] {
         let controls = format!("aaa<button>Xone</button><input {input}>bbb");
-        assert_all_paths(&format!("<h1>{controls}</h1>"), "# aaa Xone bbb\n");
+        assert_all_paths(&format!("<h1>{controls}</h1>"), "# aaaXonebbb\n");
     }
 }
 
-/// A button, an output, a meter and a progress bar end their line only where a block holds
+/// A button is written as a `span` with the same content is (issue #785), in every place where
+/// a control that ends its line has an expected text of its own in this file.
+#[test]
+fn should_write_a_button_as_a_span_is_written() {
+    for html in [
+        "<label><c>One</c></label>items",
+        "<label><c>One</c></label> items",
+        "<label><c>One</c></label>.",
+        "<p>a<label><c>One</c></label>items</p>",
+        "<p>a<label><c>One</c></label></p><p>next</p>",
+        "<label><c>One</c></label><label><c>One</c></label>",
+        "<p><label><c>One</c>after</label>items</p>",
+        "<p><label>Pick <c>One</c></label>items</p>",
+        "<b><c>One</c></b>items",
+        "<b><c>One</c></b> items",
+        "<b><c>One</c></b>.",
+        "<p>a<b><c>One</c></b>items</p>",
+        "<p>a<b><c>One</c></b></p><p>next</p>",
+        "<b><c>One</c></b><b><c>One</c></b>",
+        "<p><b><c>One</c>after</b>items</p>",
+        "<em><c>One</c></em>items",
+        "<p>a<em><c>One</c></em></p><p>next</p>",
+        "<span><c>One</c></span>items",
+        "<span><c>One</c></span> items",
+        "<span><c>One</c></span>.",
+        "<p>a<span><c>One</c></span>items</p>",
+        "<p>a<span><c>One</c></span></p><p>next</p>",
+        "<span><c>One</c></span><span><c>One</c></span>",
+        "<p><span><c>One</c>after</span>items</p>",
+        "<my-tag><c>One</c></my-tag>items",
+        "<p>a<my-tag><c>One</c></my-tag></p><p>next</p>",
+        "<p><span><my-tag><c>One</c></my-tag></span>items</p>",
+        "<p><font><c>One</c></font>items</p>",
+        "<table><tr><th>h</th></tr><tr><td>a<label><c>One</c></label>items</td></tr></table>",
+        "<ul><li>a<label><c>One</c></label>items</li></ul>",
+        "<code><c>One</c></code>items",
+        r#"<p>a<a href="/u"><c>One</c></a>items</p>"#,
+        "<div><c>One</c>items</div>",
+        "<p>a<c>One</c>items</p>",
+        "<label><div><c>One</c></div></label><p>items</p>",
+        "<c>One</c><c>Two</c>",
+    ] {
+        let button = html.replace("<c>", "<button>").replace("</c>", "</button>");
+        let span = html.replace("<c>", "<span>").replace("</c>", "</span>");
+        let expected = markdown(&span, options(TierStrategy::Tier2));
+        assert!(expected.contains("One"), "{expected:?}");
+        assert_all_paths(&button, &expected);
+        // ~keep The fast converter answers a button where it answers a span, with the same text.
+        assert_eq!(
+            fast_converter(&button).map_err(|reason| reason.to_string()),
+            fast_converter(&span).map_err(|reason| reason.to_string()),
+            "{button}"
+        );
+    }
+    // ~keep The rows that had another text when a button ended its line.
+    for (html, expected) in [
+        ("<label><button>One</button></label>items", "Oneitems\n"),
+        ("<p>a<button>One</button>items</p>", "aOneitems\n"),
+        ("<div><button>One</button>items</div>", "Oneitems\n"),
+    ] {
+        assert_all_paths(html, expected);
+    }
+}
+
+/// An output, a meter, a progress bar and a text area end their line only where a block holds
 /// them. In an inline element a browser keeps them in the line, so the text after the element
 /// is a word of the same line.
 #[test]
 fn should_keep_a_control_in_an_inline_element_in_its_line() {
-    for control in ["button", "output", "meter", "progress", "textarea"] {
+    for control in ["output", "meter", "progress", "textarea"] {
         for (html, expected) in [
             ("<label><c>One</c></label>items", "One items\n"),
             ("<label><c>One</c></label> items", "One items\n"),
@@ -458,7 +523,9 @@ fn should_keep_a_control_in_an_inline_element_in_its_line() {
 /// line goes on after it and keeps one that a block holds.
 #[test]
 fn should_hand_a_control_in_an_inline_element_to_the_full_converter() {
-    for control in ["button", "output", "meter", "progress"] {
+    // ~keep A button is not in this list: it is inline text (issue #785), and
+    // ~keep `should_write_a_button_as_a_span_is_written` holds its rows.
+    for control in ["output", "meter", "progress"] {
         for wrapper in ["label", "b", "code", "em", "span", "my-tag"] {
             let html = format!("<{wrapper}><{control}>One</{control}></{wrapper}>items");
             let result = fast_converter(&html);
@@ -547,10 +614,11 @@ fn should_read_the_first_role_of_a_checkbox() {
 }
 
 #[test]
-fn should_write_a_button_as_a_word_of_its_own_in_the_fast_converter_too() {
+fn should_write_a_button_and_a_control_that_ends_its_line_in_the_fast_converter_too() {
     for (html, expected) in [
-        ("<label>Name</label><button>Go</button>", "Name Go\n"),
-        ("<button>One</button><button>Two</button>", "One\n\nTwo\n"),
+        // ~keep A button is inline text (issue #785).
+        ("<label>Name</label><button>Go</button>", "NameGo\n"),
+        ("<button>One</button><button>Two</button>", "OneTwo\n"),
         ("<label>Name</label><button></button>tail", "Nametail\n"),
         ("<label>Name</label><button> Go</button>", "Name Go\n"),
         ("<label>Total</label><output>42</output>", "Total 42\n"),
@@ -580,14 +648,15 @@ fn should_hand_a_control_with_separated_text_to_the_full_converter() {
         r#"<optgroup label="Fruit"></optgroup>"#,
         "<datalist><option>One</option></datalist>",
         "<h2>Total<output>42</output>.</h2>",
-        "<h2>Go<button>now</button>then</h2>",
     ] {
         let result = fast_converter(html);
         assert!(matches!(result, Err(BailReason::FormControl)), "{html}: {result:?}");
     }
     // ~keep An input writes nothing and adds no space in both converters, so the fast converter
     // ~keep keeps the input. The white space on both sides of it is one run, so one space.
+    // ~keep A button is inline text (issue #785), so the fast converter keeps it too.
     for (html, expected) in [
+        ("<h2>Go<button>now</button>then</h2>", "## Gonowthen\n"),
         ("<p>Name<input>Mail</p>", "NameMail\n"),
         (r#"<p>Name<input type="text" value="typed">Mail</p>"#, "NameMail\n"),
         (r#"<p>Name<input type="radio" checked>Mail</p>"#, "NameMail\n"),
@@ -809,7 +878,8 @@ fn should_separate_a_control_in_a_custom_element_from_the_text_after_the_element
             "One items\n",
         ),
         ("<h2><my-tag><output>42</output></my-tag>items</h2>", "## 42 items\n"),
-        ("<h2><my-tag><button>Go</button></my-tag>now</h2>", "## Go now\n"),
+        // ~keep A button is inline text (issue #785).
+        ("<h2><my-tag><button>Go</button></my-tag>now</h2>", "## Gonow\n"),
         (
             "<ul><li><my-tag><select><option>One</option></select></my-tag>items</li></ul>",
             "- One items\n",

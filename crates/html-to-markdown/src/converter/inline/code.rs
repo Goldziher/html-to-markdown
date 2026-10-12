@@ -29,7 +29,7 @@ type Context = crate::converter::Context;
 /// which must be accessible (pub(crate)) for this module to work correctly.
 pub fn handle(tag_name: &str, context: HandlerContext<'_>) {
     match tag_name {
-        "kbd" | "samp" => handle_kbd_samp(context),
+        "kbd" | "samp" | "tt" => handle_kbd_samp(context),
         _ => {}
     }
 }

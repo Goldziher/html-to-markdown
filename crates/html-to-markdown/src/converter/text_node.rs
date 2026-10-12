@@ -169,6 +169,9 @@ impl TextProcessor<'_, '_, '_> {
             self.output.push_str(value);
             return;
         }
+        if self.at_paragraph_buffer_start() {
+            return;
+        }
         if self.handler.options.whitespace_mode == crate::options::WhitespaceMode::Strict {
             self.emit_strict_whitespace(value, facts.has_double_newline);
             return;
@@ -177,7 +180,7 @@ impl TextProcessor<'_, '_, '_> {
             self.output.push(if facts.had_newlines { '\n' } else { ' ' });
             return;
         }
-        if self.at_paragraph_buffer_start() || self.at_fresh_block_start(facts.was_fresh_block_start) {
+        if self.at_fresh_block_start(facts.was_fresh_block_start) {
             return;
         }
         if facts.had_newlines {
@@ -358,6 +361,11 @@ impl TextProcessor<'_, '_, '_> {
             .then(|| strip_single_leading_line_ending(trimmed_end))
             .flatten()
             .unwrap_or(trimmed_end);
+        let strict = if self.at_paragraph_buffer_start() {
+            strict.trim_start_matches([' ', '\t', '\r', '\n'])
+        } else {
+            strict
+        };
         let options = self.handler.options;
         let output = text::escape(
             strict,
@@ -383,10 +391,14 @@ impl TextProcessor<'_, '_, '_> {
         let has_double_newline = value.contains("\n\n") || value.contains("\r\n\r\n");
         let trailing_single_newline = value.ends_with('\n') && !value.ends_with("\n\n") && !value.ends_with("\r\n\r\n");
         let (prefix, suffix) = edges(value);
+        let line_indent = (self.output.ends_with(hard_break_marker(self.handler.options))
+            && starts_with_unicode_space(value))
+        .then(|| crate::converter::utility::white_space::unicode_line_indent(value));
+        let prefix = line_indent.as_deref().unwrap_or(prefix);
         let core = visible(value);
         let mut output = String::with_capacity(prefix.len() + core.len() + suffix.len() + 2);
         let mut semantic = capture_semantic.then(|| String::with_capacity(output.capacity()));
-        if !self.skip_prefix(prefix, value, was_fresh) && !prefix.is_empty() {
+        if (line_indent.is_some() || !self.skip_prefix(prefix, value, was_fresh)) && !prefix.is_empty() {
             output.push_str(prefix);
             if let Some(semantic) = semantic.as_mut() {
                 semantic.push_str(prefix);

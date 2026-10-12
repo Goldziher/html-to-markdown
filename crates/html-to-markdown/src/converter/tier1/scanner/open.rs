@@ -170,6 +170,10 @@ const fn bail_unsupported(spec: &TagSpec, _offset: usize) -> Result<(), BailReas
         // text content incorrectly.  See the sibling note above `find_raw_text_close`.
         TagKind::RawText(_) => Err(BailReason::Classifier),
 
+        // ~keep Tier-2 writes the link of an `<audio>` or `<video>` (the address, the `title`,
+        // the `<source>` children). Tier-1 has no such rule, so it hands the page over.
+        TagKind::Media => Err(BailReason::Classifier),
+
         // ~keep `Ignored` tags (head/meta/link/script/style) are now handled inline
         // by the main scan loop (see the dispatch above `bail_unsupported`).
         // The match arm is kept for exhaustiveness — it cannot fire in
@@ -227,6 +231,14 @@ fn prepare_open_state(
     if matches!(spec.kind, TagKind::Link) && state.escape_ctx.intersects(EscapeCtx::CODE | EscapeCtx::PRE) {
         return Err(BailReason::Classifier);
     }
+    if std::mem::take(&mut state.last_closed_list)
+        && matches!(spec.kind, TagKind::Pre)
+        && options.code_block_style == crate::options::CodeBlockStyle::Indented
+        && !state.in_table_cell()
+    {
+        state.ensure_blank_line();
+        push_list_item_continuation_lines(state, "<!-- -->\n\n");
+    }
     state.last_closed_custom_element = false;
     state.last_emitted_was_img = false;
     if std::mem::take(&mut state.last_closed_block) && is_inline_tag(name_lower) {
@@ -252,6 +264,8 @@ fn prepare_open_state(
             | TagKind::List(_)
             | TagKind::Table
             | TagKind::Summary
+            | TagKind::DefinitionTerm
+            | TagKind::DefinitionDescription
     );
     if is_link_block && state.stack.iter().any(|frame| matches!(frame.spec.kind, TagKind::Link)) {
         return Err(BailReason::Classifier);
@@ -306,7 +320,7 @@ fn emit_open_kind(
         TagKind::Strong => open_strong(state)?,
         TagKind::Emphasis => open_emphasis(state)?,
         TagKind::Strikethrough => open_marker(state, "~~")?,
-        TagKind::Inserted => open_marker(state, "==")?,
+        TagKind::Inserted => {}
         TagKind::Code if !state.escape_ctx.contains(EscapeCtx::PRE) && !state.escape_ctx.contains(EscapeCtx::CODE) => {}
         TagKind::Code if state.pre_lang.is_none() && state.escape_ctx.contains(EscapeCtx::PRE) => {
             if let Some(lang) = extract_language_from_class(attrs) {
@@ -336,7 +350,7 @@ fn emit_open_kind(
         TagKind::Block => open_block_container(state, name_lower, options.br_in_tables),
         TagKind::Summary => open_summary_container(state, options.br_in_tables)?,
         TagKind::Figcaption => open_figcaption(state),
-        TagKind::Button => open_button(state)?,
+        TagKind::LineEndControl => open_line_end_control(state)?,
         TagKind::Inline => {}
         _ => {}
     }
@@ -344,11 +358,11 @@ fn emit_open_kind(
     Ok(())
 }
 
-/// ~keep Button: nothing on open. `close_button` writes the space before its text and
-/// ~keep the `\n\n` after it, as Tier-2 `handle_button` does. In a line that goes on
-/// ~keep after the control, Tier-2 reads the text that follows it instead. In code Tier-2
-/// ~keep writes neither.
-fn open_button(state: &Tier1State) -> Result<(), BailReason> {
+/// ~keep A control that ends its line: nothing on open. `close_line_end_control` writes the
+/// ~keep space before its text and the `\n\n` after it, as Tier-2 `write_line_end_control`
+/// ~keep does. In a line that goes on after the control, Tier-2 reads the text that follows it
+/// ~keep instead. In code Tier-2 writes neither.
+fn open_line_end_control(state: &Tier1State) -> Result<(), BailReason> {
     if state.escape_ctx.intersects(EscapeCtx::CODE | EscapeCtx::PRE) {
         return Err(BailReason::FormControl);
     }
@@ -470,6 +484,13 @@ fn emit_tier1_table_cell_break(state: &mut Tier1State, br_in_tables: bool) {
 }
 
 fn open_paragraph(state: &mut Tier1State, br_in_tables: bool) {
+    // ~keep A paragraph in a heading's code span is transparent: no synthetic code whitespace.
+    if state.escape_ctx.contains(EscapeCtx::CODE | EscapeCtx::HEADING)
+        && !state.escape_ctx.contains(EscapeCtx::PRE)
+        && !state.in_table_cell()
+    {
+        return;
+    }
     // ~keep When inside a table cell, treat `<p>` as a transparent container.
     // Tier-2's paragraph.rs writes the cell break (`<br>` under `br_in_tables`,
     // a space otherwise) when `in_table_cell` and there is already cell content

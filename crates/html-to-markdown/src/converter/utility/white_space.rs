@@ -145,32 +145,43 @@ pub fn classify_text(decoded: &str) -> TextClass<'_> {
     }
 }
 
+/// The form feed character.
+pub const FORM_FEED: char = '\u{c}';
+
+/// Whether `character` is white space of any kind that a reader does not see as a character:
+/// Unicode white space (`char::is_whitespace`), a no-break space included, without the form
+/// feed.
+///
+/// ~keep A form feed is a character (rule 1): a browser keeps it between the words and does not
+/// ~keep collapse it, so no text is blank with one, and an edge of a text keeps it (issue #811).
+#[must_use]
+pub const fn is_unseen(character: char) -> bool {
+    character.is_whitespace() && character != FORM_FEED
+}
+
 /// Whether a reader sees nothing in `decoded`: every character is Unicode white space, a
-/// no-break space included (`char::is_whitespace`). An empty text is blank.
+/// no-break space included, and none is a form feed ([`is_unseen`]). An empty text is blank.
 ///
 /// ~keep A blank text before the first visible content of a block writes nothing, as a browser
 /// ~keep shows none: `<p>&nbsp;<b>a</b></p>` is `**a**`. Between inline content and after the
 /// ~keep last content of a block the caller writes it as it is (`<b>a</b>&nbsp;<b>b</b>`).
 #[must_use]
 pub fn is_blank(decoded: &str) -> bool {
-    decoded.chars().all(char::is_whitespace)
+    decoded.chars().all(is_unseen)
 }
 
 /// The white space a text with visible characters writes at its edges: one space before it
 /// when it starts with white space of any kind (a line end too), and after it a blank line when
 /// it ends with two line ends, one space when it ends with a space, a tab or a Unicode space,
-/// nothing when it ends with one line end (the caller decides that one by its siblings).
+/// nothing when it ends with one line end (the caller decides that one by its siblings). A form
+/// feed at an edge is a visible character, not white space of that edge.
 ///
 /// ~keep A no-break space at an edge is the one space of that edge: `<p>a<em>&nbsp;x</em></p>`
 /// ~keep is `a *x*`, and `<p>a&nbsp;</p>` is `a` because the block drops the space at its end.
 #[must_use]
 pub fn edges(decoded: &str) -> (&'static str, &'static str) {
     let is_space = |character: char| matches!(character, ' ' | '\t') || text::is_unicode_space(character);
-    let before = if decoded.starts_with(char::is_whitespace) {
-        " "
-    } else {
-        ""
-    };
+    let before = if decoded.starts_with(is_unseen) { " " } else { "" };
     let after = if decoded.ends_with("\n\n") || decoded.ends_with("\r\n\r\n") {
         "\n\n"
     } else if decoded.ends_with(is_space) {
@@ -183,12 +194,38 @@ pub fn edges(decoded: &str) -> (&'static str, &'static str) {
 
 /// The visible characters of a text as written: without the white space of any kind at its
 /// edges, every run of spaces, tabs and Unicode spaces inside it one space, and no space after
-/// a line end.
+/// a line end. A form feed is a visible character, at an edge too.
 ///
 /// ~keep `<p>a<em>&nbsp;&nbsp;x</em></p>` is `a *x*`: the run is the one space of the edge.
 #[must_use]
 pub fn visible(decoded: &str) -> Cow<'_, str> {
-    text::normalize_block_whitespace_cow(decoded.trim())
+    text::normalize_block_whitespace_cow(decoded.trim_matches(is_unseen))
+}
+
+/// The white space of any kind that the content of an inline element starts with, and the
+/// white space that it ends with: `(start, end)`. Form feeds count here, so that `content`
+/// between the two runs starts and ends with a character that a mark can stand beside.
+///
+/// ~keep A mark of emphasis beside a form feed is no mark in Markdown, so the form feed goes
+/// ~keep outside the marks with the white space of that edge: `<em>&#12;a</em>` is the form feed
+/// ~keep and `*a*` (issue #811).
+#[must_use]
+pub fn mark_edges(content: &str) -> (&str, &str) {
+    let start = content.len() - content.trim_start().len();
+    let end = content.trim_end().len().max(start);
+    (&content[..start], &content[end..])
+}
+
+/// The start of an inline element `prefix` as written after `written`: all of it where a space
+/// is owed (rule 4), and without its collapsible white space where none is. A form feed in it
+/// is a character and is written in both cases.
+#[must_use]
+pub fn owed_part<'run>(written: &str, prefix: &'run str) -> &'run str {
+    if space_is_owed(written) {
+        prefix
+    } else {
+        prefix.trim_start_matches(is_collapsible)
+    }
 }
 
 /// A text in a table cell as written: a cell has no line, so a line end is a space, and every
@@ -290,6 +327,25 @@ pub fn space_is_owed_in(output: &String, ctx: &crate::converter::context::Contex
     space_is_owed(output) && !(output.is_empty() && is_block_buffer)
 }
 
+/// The leading Unicode spaces after a hard break, with only collapsible runs reduced.
+///
+/// ~keep A U+3000 at the start of a physical line is an indent character (#839). ASCII
+/// ~keep white space at that start writes nothing; between indent characters it is one space.
+#[must_use]
+pub fn unicode_line_indent(decoded: &str) -> String {
+    let mut indent = String::new();
+    for character in decoded.chars().take_while(|character| is_unseen(*character)) {
+        if is_collapsible(character) {
+            if !indent.is_empty() && !indent.ends_with(' ') {
+                indent.push(' ');
+            }
+        } else {
+            indent.push(character);
+        }
+    }
+    indent
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -302,9 +358,24 @@ mod tests {
         for blank in ["", " \t\r\n", "\u{a0}", " \u{a0}\n", "\u{2003}\u{3000}"] {
             assert!(is_blank(blank), "{blank:?}");
         }
-        for text in ["a", " a ", "\u{a0}a", "\u{200b}", "\u{feff}"] {
+        for text in ["a", " a ", "\u{a0}a", "\u{200b}", "\u{feff}", "\u{c}", " \u{c}\n"] {
             assert!(!is_blank(text), "{text:?}");
         }
+    }
+
+    #[test]
+    fn a_form_feed_is_a_character_at_the_edge_of_a_text_and_goes_outside_the_marks() {
+        assert_eq!(edges("\u{c}one"), ("", ""));
+        assert_eq!(edges(" \u{c}one"), (" ", ""));
+        assert_eq!(edges("one\u{c} "), ("", " "));
+        assert_eq!(visible("\u{c}one\u{c}"), "\u{c}one\u{c}");
+        assert_eq!(visible(" \u{c}one\u{c}\n"), "\u{c}one\u{c}");
+        assert_eq!(mark_edges("\u{c}one "), ("\u{c}", " "));
+        assert_eq!(mark_edges("one"), ("", ""));
+        assert_eq!(mark_edges(" \u{c}"), (" \u{c}", ""));
+        assert_eq!(owed_part("x", " \u{c}"), " \u{c}");
+        assert_eq!(owed_part("x ", " \u{c}"), "\u{c}");
+        assert_eq!(owed_part("x ", " "), "");
     }
 
     #[test]
