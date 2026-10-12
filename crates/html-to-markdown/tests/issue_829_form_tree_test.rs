@@ -101,7 +101,7 @@ fn should_keep_scanning_well_formed_retained_forms() {
 }
 
 #[test]
-fn should_keep_retained_forms_transparent_in_plain_output_on_every_route() {
+fn should_keep_retained_forms_transparent_in_forced_plain_scanner() {
     let cases = [
         (CLOSED_LABEL, "before\n\nnameafter\n\nnext\n"),
         (

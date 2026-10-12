@@ -478,12 +478,8 @@ fn emit_close(
     dispatch_close(state, spec, &frame, name_lower, options, table_probes)?;
     // ~keep An inline element whose last content is a block ends in that block too (issue #585).
     // ~keep In a cell Tier-2 writes no break after a nested table (see `separate_from_block`).
-    let transparent_form = is_transparent_plain_form(name_lower, options);
-    let breaks_after = is_block_tag(name_lower)
-        && !transparent_form
-        && !(matches!(spec.kind, TagKind::Table) && state.in_table_cell());
-    state.last_closed_block =
-        breaks_after || (state.last_closed_block && (is_inline_tag(name_lower) || transparent_form));
+    let breaks_after = is_block_tag(name_lower) && !(matches!(spec.kind, TagKind::Table) && state.in_table_cell());
+    state.last_closed_block = breaks_after || (state.last_closed_block && is_inline_tag(name_lower));
 
     Ok(())
 }

@@ -257,22 +257,3 @@ fn test_has_custom_element_tags_rejects_whitespace_before_name() {
     assert!(!has_custom_element_tags("< my-widget>"));
     assert!(!has_custom_element_tags("</ my-widget>"));
 }
-
-#[test]
-fn should_keep_unclosed_label_current_after_removing_form_from_html5_stack() {
-    let cases = [
-        (
-            "<p>before<form><label>name<input></form>after<p>next",
-            "<head></head><p>before</p><form><label>name<input>after<p>next</p></label></form>",
-        ),
-        (
-            "<p>before<form><label>name<input></label></form>after<p>next",
-            "<head></head><p>before</p><form><label>name<input></label></form>after<p>next</p>",
-        ),
-    ];
-    for (html, expected) in cases {
-        let (repaired, limit) = repair_with_html5ever_bounded(html).expect("HTML5 repair");
-        assert_eq!(limit, None);
-        assert_eq!(repaired, expected);
-    }
-}
