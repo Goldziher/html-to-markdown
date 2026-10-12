@@ -282,6 +282,16 @@ impl<'a> Tier1Scanner<'a> {
     }
 
     fn prepare_open_tag(&mut self, name_lower: &[u8]) -> Result<(), BailReason> {
+        // ~keep Form ancestry cannot decide HTML5's form-pointer semantics; Tier-2 repairs it.
+        if name_lower == b"form"
+            && self
+                .state
+                .stack
+                .iter()
+                .any(|frame| self.bytes[frame.name_range.clone()].eq_ignore_ascii_case(b"form"))
+        {
+            return Err(BailReason::Classifier);
+        }
         // ~keep A heading's code divs use spaces; scanner block newlines would split the code span.
         if name_lower == b"div"
             && self.state.escape_ctx.contains(EscapeCtx::CODE | EscapeCtx::HEADING)
@@ -382,6 +392,12 @@ impl<'a> Tier1Scanner<'a> {
         let is_page_header = name_lower == b"header" && header_is_page_level(&self.state, self.html);
         if !should_skip_preprocessing(name_lower, &attrs, self.options, is_page_header) {
             return Ok(false);
+        }
+        // ~keep HTML5 removes only the form from its stack at </form>; an unclosed label can
+        // ~keep still contain the tail. Nested form starts are ignored. A textual balanced skip
+        // ~keep cannot identify the form subtree, so Tier-2 decides what removal drops (#829).
+        if name_lower == b"form" {
+            return Err(BailReason::Classifier);
         }
         if !self.state.in_table_cell() && self.state.list_continuation_indent_width() > 0 {
             return Err(BailReason::ListItemUnsupportedBlockChild);

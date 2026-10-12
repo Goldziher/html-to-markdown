@@ -518,7 +518,7 @@ fn dispatch_close(
         TagKind::TableRow => close_table_row(state),
         TagKind::TableCell { .. } => close_table_cell(state, false, options)?,
         TagKind::TableCaption => close_table_caption(state),
-        TagKind::Block => close_block_container(state, frame, name_lower),
+        TagKind::Block => close_block_container(state, frame, name_lower, options),
         TagKind::Summary => close_summary(state, frame),
         TagKind::Figcaption => close_figcaption(state, frame),
         TagKind::LineEndControl => close_line_end_control(state, frame),
@@ -564,8 +564,8 @@ fn close_abbreviation(state: &mut Tier1State, frame: &OpenTag) {
 /// diverging from Tier-2 which always emits `\n\n` after a block-with-content
 /// close (see Tier-2 `block/div.rs`).  Skipped inside table cells and inline
 /// contexts where the surrounding code already handles spacing.
-fn close_block_container(state: &mut Tier1State, frame: &OpenTag, name_lower: &[u8]) {
-    if block_container_is_passthrough(name_lower) {
+fn close_block_container(state: &mut Tier1State, frame: &OpenTag, name_lower: &[u8], options: &ConversionOptions) {
+    if block_container_is_passthrough(name_lower) || is_transparent_plain_form(name_lower, options) {
         // ~keep Mirrors the open-side skip in `emit_open`'s `TagKind::Block` arm:
         // Tier-2's catch-all handler for these names never emits a trailing
         // separator either.
