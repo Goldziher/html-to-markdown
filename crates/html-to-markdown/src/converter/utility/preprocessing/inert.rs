@@ -574,7 +574,9 @@ fn feed_protected_regions(source: &str, input: &BufferQueue, tokenizer: &Tokeniz
                 break;
             };
             cursor += offset;
-            if !super::raw_text::opens_a_tag(bytes, cursor) && !matches!(bytes.get(cursor + 1), Some(b'!' | b'?')) {
+            if !super::raw_text::opens_a_tag(bytes, cursor)
+                && !matches!(bytes.get(cursor + 1), Some(b'!' | b'?' | b'/'))
+            {
                 cursor += 1;
                 continue;
             }
@@ -641,15 +643,17 @@ fn scan_markup_end(bytes: &[u8], start: usize) -> Option<usize> {
             return Some(body + 2);
         }
         for index in memchr::memchr_iter(b'>', &bytes[body..]).map(|offset| body + offset) {
-            if bytes.get(index.saturating_sub(2)..index) == Some(b"--")
-                || bytes.get(index.saturating_sub(3)..index) == Some(b"--!")
-            {
+            // ~keep The opener's dashes cannot put the tokenizer into comment-end state.
+            if bytes[body..index].ends_with(b"--") || bytes[body..index].ends_with(b"--!") {
                 return Some(index + 1);
             }
         }
         return None;
     }
-    if matches!(bytes.get(start + 1), Some(b'!' | b'?')) {
+    // ~keep Invalid end-tag openers consume through the first >, without attribute quoting.
+    let bogus_end_tag =
+        bytes.get(start + 1) == Some(&b'/') && bytes.get(start + 2).is_some_and(|byte| !byte.is_ascii_alphabetic());
+    if matches!(bytes.get(start + 1), Some(b'!' | b'?')) || bogus_end_tag {
         return memchr::memchr(b'>', &bytes[start + 2..]).map(|offset| start + offset + 3);
     }
     let name_start = start + 1 + usize::from(bytes.get(start + 1) == Some(&b'/'));
@@ -705,6 +709,39 @@ thread_local! {
 mod tests {
     use super::normalize_inert_bodies;
     use std::borrow::Cow;
+
+    #[test]
+    fn should_skip_bogus_end_tag_comments_before_protected_bodies() {
+        for next in [" ", "\t", "\n", "0", "!", "?", "/", "'", "é", " data='"] {
+            for tag in ["title", "xmp", "iframe", "noscript", "template", "plaintext", "script"] {
+                let before = format!("</{next}<{tag}>>");
+                let source = format!("{before}<noscript><p>fallback</noscript><p>visible</p>");
+                assert_eq!(
+                    normalize_inert_bodies(&source),
+                    format!("{before}<noscript></noscript><p>visible</p>"),
+                    "{next:?}/{tag}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn should_not_match_a_comment_terminator_across_its_body_boundary() {
+        for opener in ["<!--!>", "<!---!>", "<!-->!>", "<!--->!>"] {
+            let before = format!("{opener}<plaintext><noscript>fake</noscript></plaintext>-->");
+            let source = format!("{before}<xmp><b>literal</b></xmp><noscript><p>fallback</noscript><p>visible</p>");
+            let expected = format!("{before}<xmp>&lt;b>literal&lt;/b></xmp><noscript></noscript><p>visible</p>");
+            if matches!(opener, "<!--!>" | "<!---!>") {
+                assert_eq!(normalize_inert_bodies(&source), expected, "{opener}");
+            } else {
+                assert_eq!(
+                    normalize_inert_bodies(&source),
+                    source,
+                    "an abrupt empty comment exposes plaintext"
+                );
+            }
+        }
+    }
 
     #[test]
     fn should_tokenize_only_the_inert_body_amid_large_html_gaps() {

@@ -24,6 +24,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   document titles and legacy preformatted text retain literal tag text. Plain output now omits
   iframe fallback bodies that were previously included. Tokenization is limited to protected
   bodies and their namespace context, avoiding a full-page pass for a single inert body.
+  Tag-shaped text in malformed end-tag comments and comments starting with `<!--!>` or
+  `<!---!>` no longer swallows following text or changes literal raw-text bodies.
   In HTML, self-closing
   syntax on `iframe`, `noscript` and `template` does not close the element: following markup
   remains inside it until its closing tag, including markup previously retained from XHTML-style input

@@ -20,6 +20,28 @@ fn assert_routes(html: &str, expected: &str, extract_metadata: bool) {
 }
 
 #[test]
+fn should_not_open_raw_or_inert_elements_inside_bogus_end_tag_comments() {
+    for tag in ["iframe", "noscript", "template", "title", "xmp"] {
+        let html = format!("</ <{tag}>><b>Shown</b><p>tail</p>");
+        for extract_metadata in [false, true] {
+            assert_routes(&html, "\\>**Shown**\n\ntail\n", extract_metadata);
+        }
+    }
+}
+
+#[test]
+fn should_not_end_a_comment_using_dashes_from_its_opener() {
+    for opener in ["<!--!>", "<!---!>"] {
+        let html = format!(
+            "<p>a</p>{opener}<plaintext><b>in</b></plaintext>--><p>mid</p><xmp><b>lit</b></xmp><noscript><p>hid</noscript><p>tail</p>"
+        );
+        for extract_metadata in [false, true] {
+            assert_routes(&html, "a\n\nmid\n\n<b>lit</b>\n\ntail\n", extract_metadata);
+        }
+    }
+}
+
+#[test]
 fn should_keep_visible_siblings_after_noscript_with_an_unclosed_child() {
     assert_routes(
         "<p>before</p><noscript><p></noscript><p>visible</p>",
