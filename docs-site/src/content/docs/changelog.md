@@ -16,6 +16,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   separators. Blocks in a heading's code span add no synthetic spaces. Unicode indentation
   after a hard break, including U+3000, is retained (#839).
 
+- Audio and video players inside an outer link contribute plain label text instead of a nested
+  Markdown link. Inside preformatted code their default player output contributes no link or
+  extra blank line; visitor-provided output still applies (#840, #841).
+
 - A definition description outside a definition list starts a new block instead of joining the
   preceding word. `<div>a<dd>b</dd> c</div>` now writes `a`, `b` and `c` as separate blocks;
   a heading keeps its description inline with a word space

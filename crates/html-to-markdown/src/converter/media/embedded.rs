@@ -28,6 +28,10 @@ fn append_media_src_link(output: &mut String, src: &str, tag: &HTMLTag, options:
         .as_deref()
         .filter(|label| !label.trim().is_empty())
         .unwrap_or(&name);
+    if ctx.in_link && matches!(name.as_ref(), "audio" | "video") {
+        output.push_str(label);
+        return;
+    }
     let escaped_label = escape_link_label(label);
     append_markdown_link(
         output,
@@ -111,7 +115,7 @@ fn render_media_fallback(tag: &HTMLTag, parser: &Parser, output: &mut String, co
     }
     if !fallback.is_empty() {
         output.push_str(fallback.trim());
-        if !ctx.in_paragraph && !ctx.convert_as_inline {
+        if !ctx.in_paragraph && !ctx.convert_as_inline && !ctx.in_link {
             output.push_str("\n\n");
         }
     }
@@ -184,13 +188,16 @@ pub fn handle_audio(
         }
     }
 
+    if ctx.in_code_block {
+        return;
+    }
     let inline_data = ctx.inline_data_treatment(options.inline_data_media, &src);
     if inline_data == InlineDataMedia::DropElement {
         return;
     }
     if inline_data == InlineDataMedia::Keep && should_output_media_link(&src) {
         append_media_src_link(output, &src, tag, options, ctx);
-        if !ctx.in_paragraph && !ctx.convert_as_inline {
+        if !ctx.in_paragraph && !ctx.convert_as_inline && !ctx.in_link {
             output.push_str("\n\n");
         }
     }
@@ -265,13 +272,16 @@ pub fn handle_video(
         }
     }
 
+    if ctx.in_code_block {
+        return;
+    }
     let inline_data = ctx.inline_data_treatment(options.inline_data_media, &src);
     if inline_data == InlineDataMedia::DropElement {
         return;
     }
     if inline_data == InlineDataMedia::Keep && should_output_media_link(&src) {
         append_media_src_link(output, &src, tag, options, ctx);
-        if !ctx.in_paragraph && !ctx.convert_as_inline {
+        if !ctx.in_paragraph && !ctx.convert_as_inline && !ctx.in_link {
             output.push_str("\n\n");
         }
     }
