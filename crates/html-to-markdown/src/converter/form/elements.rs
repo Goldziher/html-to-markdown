@@ -193,6 +193,12 @@ pub fn handle_fieldset(
         depth,
         dom_ctx,
     } = context;
+    if ctx.in_code && !ctx.in_code_block {
+        if let Some(tl::Node::Tag(tag)) = node_handle.get(parser) {
+            write_code_form_group(tag, parser, output, context);
+        }
+        return;
+    }
     crate::converter::block::div::handle(
         node_handle,
         parser,
@@ -225,6 +231,10 @@ pub fn handle_legend(
         dom_ctx,
     } = context;
     if let Some(tl::Node::Tag(tag)) = node_handle.get(parser) {
+        if ctx.in_code && !ctx.in_code_block {
+            write_code_form_group(tag, parser, output, context);
+            return;
+        }
         let mut rendered = String::new();
 
         let mut legend_ctx = ctx.inline_buffer(output, !ctx.convert_as_inline);
@@ -264,6 +274,43 @@ pub fn handle_legend(
                 crate::converter::block::div::push_block(output, options, ctx, &bold);
             }
         }
+    }
+}
+
+// ~keep Form-group block boundaries collapse to spaces inside one code span (#815),
+// ~keep and children stay in its buffer so collected link ranges remain valid.
+fn write_code_form_group(
+    tag: &tl::HTMLTag<'_>,
+    parser: &tl::Parser<'_>,
+    output: &mut String,
+    context: FormContext<'_>,
+) {
+    let original_len = output.len();
+    if !output.is_empty() && !output.ends_with(char::is_whitespace) {
+        output.push(' ');
+    }
+    let content_start = output.len();
+    let code_ctx = super::Context {
+        convert_as_inline: true,
+        ..context.ctx.clone()
+    };
+    for child in tag.children().top().iter() {
+        walk_node(
+            child,
+            parser,
+            output,
+            crate::converter::block::container::HandlerContext::new(
+                context.options,
+                &code_ctx,
+                context.depth + 1,
+                context.dom_ctx,
+            ),
+        );
+    }
+    if output.len() == content_start {
+        output.truncate(original_len);
+    } else if !output.ends_with(char::is_whitespace) {
+        output.push(' ');
     }
 }
 

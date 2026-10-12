@@ -52,6 +52,7 @@ type ConversionOutput = (
 );
 
 pub struct ConversionParameters<'a> {
+    pub inert_bodies: &'a std::collections::HashMap<String, String>,
     pub inline_collector: Option<InlineCollectorHandle>,
     #[cfg(feature = "metadata")]
     pub metadata_collector: Option<crate::metadata::MetadataCollectorHandle>,
@@ -77,6 +78,7 @@ pub fn convert_html_impl(
     parameters: ConversionParameters<'_>,
 ) -> Result<ConversionOutput> {
     let ConversionParameters {
+        inert_bodies,
         inline_collector,
         #[cfg(feature = "metadata")]
         metadata_collector,
@@ -95,7 +97,7 @@ pub fn convert_html_impl(
         dom_ctx,
         len: preprocessed_len,
         repair_limit,
-    } = parse_for_conversion(&preprocessed, &repaired_page, preserve_menu)?;
+    } = parse_for_conversion(&preprocessed, &repaired_page, preserve_menu)?.with_inert_bodies(inert_bodies)?;
     let repair_warning = repair_limit.or(prepare_limit).or(head_repair_limit);
     trace_parse_complete(&dom, preprocessed_len);
     let parser = dom.parser();

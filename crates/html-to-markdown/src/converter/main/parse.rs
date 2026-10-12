@@ -50,6 +50,16 @@ impl<'a> ParsedPage<'a> {
             repair_limit: None,
         }
     }
+
+    /// Put the kept source of each inert body back into the tree, first parse or repaired, and
+    /// build the context of the tree again. With no kept body the page is returned as it is.
+    pub(super) fn with_inert_bodies(mut self, bodies: &std::collections::HashMap<String, String>) -> Result<Self> {
+        if !bodies.is_empty() {
+            crate::converter::utility::preprocessing::restore_inert_bodies(&mut self.dom, bodies)?;
+            self.dom_ctx = build_dom_context(&self.dom, self.dom.parser(), self.len);
+        }
+        Ok(self)
+    }
 }
 
 /// Parse `input`, and parse it a second time through the HTML tree builder when it has an
