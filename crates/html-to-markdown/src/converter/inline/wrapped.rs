@@ -192,8 +192,8 @@ fn blank_break_content<'a>(
     drop_at_paragraph_start: bool,
     options: &ConversionOptions,
 ) -> &'a str {
-    // ~keep Paragraph starts drop the break (#572); detached scratch buffers retain its
-    // ~keep sentinel (#504). A leading break before only blank text keeps the old separator.
+    // ~keep Flow owners drop a leading break (#572); detached scratch buffers retain its
+    // sentinel (#504). A leading break before only blank text keeps the old separator.
     if drop_at_paragraph_start {
         after_breaks
     } else if after_breaks.len() < content.len() && !content.ends_with('\n') {
@@ -209,6 +209,13 @@ fn blank_break_content<'a>(
     } else {
         content
     }
+}
+
+fn inline_break_owner(output: &String, ctx: &Context) -> Option<usize> {
+    let (address, start) = ctx
+        .inline_break_owner
+        .unwrap_or((ctx.block_output_ptr, ctx.block_content_start));
+    (std::ptr::from_ref(output) as usize == address).then_some(start)
 }
 
 fn move_leading_hard_breaks<'a>(
@@ -234,13 +241,9 @@ fn move_leading_hard_breaks<'a>(
         };
         after_breaks = rest;
     }
-    // ~keep The bare newline is an internal sentinel from a break at the start of a detached
-    // ~keep wrapper. It becomes a hard break only when real paragraph content precedes the
-    // ~keep wrapper; hoisting it into the paragraph's own empty block buffer recreates the
-    // ~keep leading break that issue #572 drops before unwrapped text.
-    let drop_at_paragraph_start = ctx.in_paragraph
-        && output.len() == ctx.block_content_start
-        && std::ptr::from_ref::<String>(output) as usize == ctx.block_output_ptr;
+    // ~keep Bare newlines carry breaks across detached wrappers until a flow owner can emit
+    // them. Its leading break is dropped, even after a structural list marker or prior block.
+    let drop_at_paragraph_start = inline_break_owner(output, ctx) == Some(output.len());
     if after_breaks.trim().is_empty() {
         return blank_break_content(content, after_breaks, output, drop_at_paragraph_start, options);
     }
@@ -281,30 +284,50 @@ fn move_leading_hard_breaks<'a>(
     remaining
 }
 
-fn emit_break_sentinel(
-    output: &mut String,
-    content: &str,
-    open: &str,
-    ctx: &Context,
-    options: &ConversionOptions,
-) -> bool {
-    // ~keep Transparent nested strong wrappers transport the sentinel until the owning block
-    // ~keep can emit it; collapsing it in a scratch buffer loses a break at every extra depth.
-    let owns_block = std::ptr::from_ref::<String>(output) as usize == ctx.block_output_ptr;
-    if content != "\n" || (!open.is_empty() && !owns_block) {
+fn emit_break_sentinel(output: &mut String, content: &str, ctx: &Context, options: &ConversionOptions) -> bool {
+    if content != "\n" {
         return false;
     }
-    // ~keep Prior paragraphs may make the shared buffer nonempty while this block still has
-    // ~keep no line to break; only detached buffers transport that leading sentinel outward.
-    if owns_block && output.len() == ctx.block_content_start {
-        return false;
+    let owner_start = inline_break_owner(output, ctx);
+    // ~keep Empty detached wrappers carry the break regardless of their delimiters. An owner
+    // drops its leading break; an existing line, including a scratch line, needs real syntax.
+    if owner_start == Some(output.len()) {
+        return true;
     }
-    output.push_str(if owns_block {
-        crate::converter::main_helpers::hard_break_marker(options)
-    } else {
+    output.push_str(if output.is_empty() && owner_start.is_none() {
         "\n"
+    } else {
+        crate::converter::main_helpers::hard_break_marker(options)
     });
     true
+}
+
+fn strong_separator_content<'a>(output: &str, content: &'a str, site: InlineSite<'_>) -> &'a str {
+    let ctx = site.ctx;
+    if !content.ends_with('\n')
+        || !content
+            .trim_end_matches(crate::converter::main_helpers::hard_break_marker(site.options))
+            .chars()
+            .all(crate::converter::utility::white_space::is_collapsible)
+        || ctx.in_strong
+        || ctx.in_code
+        || ctx.in_code_block
+    {
+        return content;
+    }
+    let previous =
+        crate::converter::utility::siblings::get_previous_sibling_tag(site.node_handle, site.parser, site.dom_ctx);
+    if !previous.is_some_and(|tag| {
+        STRONG_SIBLING_TAGS.contains(&tag) && !ctx.strip_tags.contains(tag) && !ctx.preserve_tags.contains(tag)
+    }) {
+        return content;
+    }
+    let marker = if site.options.output_format == crate::options::OutputFormat::Djot {
+        String::from("*")
+    } else {
+        [site.options.strong_em_symbol; 2].iter().collect()
+    };
+    if output.ends_with(&marker) { " " } else { content }
 }
 
 /// Emit `content` wrapped in `delimiters`, handling delimiter-run adjacency with a preceding
@@ -332,8 +355,11 @@ pub fn emit_wrapped_inline(
     use crate::converter::{append_inline_suffix, chomp_inline, merge_adjacent_emphasis};
 
     let content = move_leading_hard_breaks(output, content, ctx, options);
+    // ~keep A blank wrapper after real strong markup remains a separator (#502/#504).
+    // DOM provenance plus the configured close marker excludes marker-looking prose.
+    let content = strong_separator_content(output, content, site);
     let (prefix, suffix, trimmed) = chomp_inline(content);
-    if emit_break_sentinel(output, content, open, ctx, options) {
+    if emit_break_sentinel(output, content, ctx, options) {
         return;
     }
     // ~keep A noncollapsible blank body after an existing space keeps its character (#843).

@@ -298,6 +298,9 @@ pub struct Context {
     /// paragraphs, as Google Docs exports) puts a genuine, buffer-sharing paragraph body
     /// at non-zero `inline_depth`.
     pub(crate) block_output_ptr: usize,
+    /// ~keep Inline wrappers transport leading breaks through scratch strings to this flow
+    /// buffer; its start excludes structural list markers and is independent of text trimming.
+    pub(crate) inline_break_owner: Option<(usize, usize)>,
     /// Shared flag: true until the first node writes content that is not white space. The node
     /// is text, or an element that writes content of its own (an image, a graphic, a form
     /// control). `convert_node` clears the flag for every kind of node (issue #762).
@@ -395,6 +398,13 @@ pub struct Context {
 }
 
 impl Context {
+    pub(crate) fn with_inline_break_owner(&self, output: &String) -> Self {
+        Self {
+            inline_break_owner: Some((std::ptr::from_ref(output) as usize, output.len())),
+            ..self.clone()
+        }
+    }
+
     /// Set the pre-computed set of node IDs that match `exclude_selectors`.
     ///
     /// Called in `convert_html_impl` after DOM parsing, before the walk starts.
@@ -451,6 +461,7 @@ impl Context {
             djot_rule_like_text: None,
             block_content_start: 0,
             block_output_ptr: 0,
+            inline_break_owner: None,
             at_fresh_block_start: Rc::new(Cell::new(true)),
             in_ruby: false,
             in_strong: false,

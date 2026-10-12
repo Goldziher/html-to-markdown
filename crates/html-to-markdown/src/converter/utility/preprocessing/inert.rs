@@ -4,7 +4,7 @@ use std::borrow::Cow;
 use std::cell::{Cell, RefCell};
 use std::collections::{HashMap, HashSet};
 
-use super::kept::{Kept, Replacements, rewritten};
+use super::kept::{Kept, Replacements, normalize_inert_opening, rewritten};
 use super::markup::find_tag_end;
 
 use html5ever::LocalName;
@@ -282,6 +282,7 @@ impl BodyNormalizer<'_> {
             return TokenSinkResult::Continue;
         }
         if self.body.borrow().is_none() && matches!(name, "title" | "xmp" | "iframe" | "noscript" | "template") {
+            normalize_inert_opening(&tag, self.position(), &mut self.replacements.borrow_mut());
             self.body.replace(Some(Body {
                 name: tag.name.clone(),
                 start: self.position(),

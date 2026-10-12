@@ -472,16 +472,16 @@ fn should_end_the_head_at_an_end_tag_that_a_browser_reads_as_the_body() {
     assert_none(&wrong);
 }
 
-// ~keep The inert-body pass reads `<title/>` as a start tag, so the rest of the page is the text
-// ~keep of the title, and each choice writes it as text. Issue #878 tracks that defect of the
-// ~keep default: a page with a title that closes itself has an empty title and a body.
+// ~keep HTML ignores the title's self-closing slash: remaining markup is title text (#878),
+// ~keep so hidden-content choices cannot expose a body that the parser never creates.
 #[test]
-fn should_write_what_the_default_writes_after_a_title_that_closes_itself() {
+fn should_keep_a_self_closing_head_title_in_metadata_with_every_hidden_choice() {
     let html = "<head><title/><template><p>HEAD</p></template></head><body><p>visible</p><template><p>BODY</p></template></body>";
-    let rest = "<template><p>HEAD</p></template></head><body><p>visible</p><template><p>BODY</p></template></body>\n";
+    let title = "<template><p>HEAD</p></template></head><body><p>visible</p><template><p>BODY</p></template></body>";
+    let expected = format!("---\ntitle: {title}\n---\n");
     for tier in DOM_TIERS {
         for choice in [HiddenContent::Drop, HiddenContent::Reachable, HiddenContent::All] {
-            assert_eq!(convert_in(html, choice, tier), rest, "{choice:?} {tier:?}");
+            assert_eq!(convert_in(html, choice, tier), expected, "{choice:?} {tier:?}");
         }
     }
 }

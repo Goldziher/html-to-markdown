@@ -104,6 +104,10 @@ name = "inline_boundary_followups"
 required-features = ["testkit"]
 
 [[test]]
+name = "issue_863_nested_break_ownership_test"
+required-features = ["testkit"]
+
+[[test]]
 name = "issue_829_form_tree_test"
 required-features = ["testkit"]
 

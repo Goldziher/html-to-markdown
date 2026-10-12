@@ -87,6 +87,12 @@ fn declares_shadow_root(tag: &Tag) -> bool {
     })
 }
 
+/// HTML ignores a non-void start tag's self-closing flag; the literal parser must contain its body. ~keep
+pub(super) fn normalize_inert_opening(tag: &Tag, end: usize, replacements: &mut Replacements) {
+    let opening = tag.self_closing.then(|| (end - 2..end, ">".to_owned()));
+    replacements.extend(opening);
+}
+
 /// `source` with each range of `replacements` replaced by its text. The ranges are in the order
 /// of the page and do not overlap.
 pub(super) fn rewritten<'a>(source: &'a str, replacements: &[(Range<usize>, String)]) -> Cow<'a, str> {
