@@ -4,7 +4,9 @@ use super::{
     find_closing_tag_bytes, find_closing_tag_bytes_nested, find_tag_end, normalize_bogus_comment_endings,
     normalize_menu_elements, normalize_split_closing_tags, normalize_unclosed_list_items,
     restore_preserved_menu_elements, sanitize_markdown_url, strip_bogus_comments, strip_hidden_elements,
+    unwrap_kept_inert_elements,
 };
+use crate::options::HiddenContent;
 
 #[test]
 fn should_find_tag_end_outside_quotes_from_the_requested_byte() {
@@ -571,6 +573,153 @@ fn find_closing_tag_bytes_stays_first_match_for_raw_text_elements() {
     let start = "<script>".len();
     let end = find_closing_tag_bytes(html, start, b"script").expect("closing tag not found");
     assert_eq!(&html[end..], b"tail");
+}
+
+#[test]
+fn should_remove_the_end_tag_of_a_removed_start_tag_that_closes_itself() {
+    // ~keep The inert-body pass and the tree builder read `<template/>` as a start tag: the
+    // ~keep element holds what follows, up to its end tag. So the tag opens an element here too,
+    // ~keep and its end tag is removed with it or stays with it.
+    for (page, choice, expected) in [
+        (
+            "<p>a</p><template/><p>b</p></template><p>c</p>",
+            HiddenContent::All,
+            "<p>a</p><p>b</p><p>c</p>",
+        ),
+        (
+            "<p>a</p><noscript/><p>b</p></noscript><p>c</p>",
+            HiddenContent::All,
+            "<p>a</p><p>b</p><p>c</p>",
+        ),
+        (
+            "<p>a</p><template><p>b</p></template><p>c</p>",
+            HiddenContent::All,
+            "<p>a</p><p>b</p><p>c</p>",
+        ),
+        (
+            "<p>a</p><template/><p>b</p></template><p>c</p>",
+            HiddenContent::Reachable,
+            "<p>a</p><template/><p>b</p></template><p>c</p>",
+        ),
+        (
+            "<div><template shadowrootmode=\"open\"><template/></template><p>x</p></template></div>",
+            HiddenContent::Reachable,
+            "<div><template/></template><p>x</p></div>",
+        ),
+        // ~keep The end tag closes the shadow root, so the first `<template>` has no end tag and
+        // ~keep holds the rest of the page.
+        (
+            "<template><p>IN</p><template shadowrootmode=\"open\"/></template><p>X</p>",
+            HiddenContent::Reachable,
+            "<template><p>IN</p><p>X</p>",
+        ),
+    ] {
+        assert_eq!(unwrap_kept_inert_elements(page, choice), expected, "{page:?}");
+    }
+}
+
+#[test]
+fn should_write_an_end_tag_of_the_body_for_the_removed_tag_that_started_the_body() {
+    let (reachable, all) = (HiddenContent::Reachable, HiddenContent::All);
+    for (page, choice, expected) in [
+        // ~keep The first `<template>` and the first `<noscript>` of a fragment start its body.
+        (
+            "<template><p>a</p></template><title>t</title>",
+            all,
+            "</body><p>a</p><title>t</title>",
+        ),
+        ("<noscript/><title>t</title>", all, "</body><title>t</title>"),
+        (
+            r#"<template shadowrootmode="open"><p>a</p></template><noscript>b</noscript>"#,
+            reachable,
+            "</body><p>a</p><noscript>b</noscript>",
+        ),
+        // ~keep After the end tag of the head, a `<noscript>` starts the body.
+        (
+            "<head></head><noscript><p>a</p></noscript><title>t</title>",
+            all,
+            "<head></head></body><p>a</p><title>t</title>",
+        ),
+        (
+            "<html><template>a</template></head><noscript>b</noscript>",
+            all,
+            "<html><template>a</template></head></body>b",
+        ),
+        // ~keep The body of these pages starts at text, at an element, at an end tag and at a
+        // ~keep tag that stays: the removed tags leave nothing in their place.
+        ("a<noscript>b</noscript>", all, "ab"),
+        ("<p>a</p><template>b</template>", all, "<p>a</p>b"),
+        ("</br><template>a</template>", all, "</br>a"),
+        (
+            "<template>a</template><noscript>b</noscript>",
+            reachable,
+            "<template>a</template><noscript>b</noscript>",
+        ),
+        (
+            r#"<template>a</template><div><template shadowrootmode="open">b</template></div>"#,
+            reachable,
+            "<template>a</template><div>b</div>",
+        ),
+    ] {
+        assert_eq!(unwrap_kept_inert_elements(page, choice), expected, "{page:?}");
+    }
+}
+
+#[test]
+fn should_leave_a_tag_in_the_text_of_a_text_element_as_text() {
+    let inner = [
+        "<template><p>x</p></template>",
+        "<noscript><p>x</p></noscript>",
+        r#"<template shadowrootmode="open"><p>x</p></template>"#,
+    ];
+    for choice in [HiddenContent::Reachable, HiddenContent::All] {
+        for name in ["textarea", "noembed", "noframes", "plaintext", "TextArea"] {
+            for text in inner {
+                // ~keep With its end tag, with no end tag, and with an attribute.
+                for page in [
+                    format!("<p>a</p><{name}>{text}</{name}>"),
+                    format!("<p>a</p><{name}>{text}<p>b</p>"),
+                    format!("<p>a</p><{name} class=\"c\">{text}</{name}><p>b</p>"),
+                ] {
+                    assert_eq!(unwrap_kept_inert_elements(&page, choice), page, "{choice:?}");
+                }
+            }
+        }
+    }
+    let all = HiddenContent::All;
+    for (page, expected) in [
+        // ~keep The element ends at its end tag: a template after it is a template.
+        (
+            "<p>a</p><textarea><template></textarea><template>b</template>",
+            "<p>a</p><textarea><template></textarea>b",
+        ),
+        (
+            "<p>a</p><noembed></noscript></noembed><noscript>b</noscript>",
+            "<p>a</p><noembed></noscript></noembed>b",
+        ),
+        // ~keep An end tag in the text closes nothing: the start tag before the element has no
+        // ~keep end tag, and the end tag after the element has no start tag.
+        (
+            "<p>a</p><template><textarea></template></textarea>",
+            "<p>a</p><textarea></template></textarea>",
+        ),
+        (
+            "<p>a</p><noframes><noscript></noframes>b</noscript>",
+            "<p>a</p><noframes><noscript></noframes>b</noscript>",
+        ),
+        // ~keep A `<plaintext>` has no end tag: the rest of the page is its text.
+        (
+            "<template>a</template><p>b</p><plaintext></plaintext><template>c</template>",
+            "</body>a<p>b</p><plaintext></plaintext><template>c</template>",
+        ),
+        // ~keep A name that only starts like one of the elements is another element.
+        (
+            "<p>a</p><textareas><template>b</template></textareas>",
+            "<p>a</p><textareas>b</textareas>",
+        ),
+    ] {
+        assert_eq!(unwrap_kept_inert_elements(page, all), expected, "{page:?}");
+    }
 }
 
 #[test]

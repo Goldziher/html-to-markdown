@@ -12,9 +12,9 @@
 //! being mirrored here.
 
 use crate::options::{
-    CodeBlockStyle, ConversionOptions, ConversionOptionsUpdate, HeadingStyle, HighlightStyle, InlineDataMedia,
-    LinkStyle, ListIndentType, NewlineStyle, OutputFormat, PreprocessingOptionsUpdate, PreprocessingPreset,
-    TierStrategy, UrlEscapeStyle, WhitespaceMode,
+    CodeBlockStyle, ConversionOptions, ConversionOptionsUpdate, HeadingStyle, HiddenContent, HighlightStyle,
+    InlineDataMedia, LinkStyle, ListIndentType, NewlineStyle, OutputFormat, PreprocessingOptionsUpdate,
+    PreprocessingPreset, TierStrategy, UrlEscapeStyle, WhitespaceMode,
 };
 use rmcp::schemars;
 
@@ -99,6 +99,11 @@ pub struct ConvertConfig {
     /// What to write for an image or media element whose address is a `data:` URL:
     /// `"keep"` (default, the URL with its payload), `"alt_text_only"`, or `"drop_element"`.
     pub inline_data_media: Option<String>,
+    /// Which text that a browser does not show at first to keep: `"drop"` (default, none),
+    /// `"reachable"` (elements hidden by the `hidden` attribute or an inline style, and declarative
+    /// shadow roots), or `"all"` (also `<template>` and `<noscript>` content). Scripts and style
+    /// sheets are never written.
+    pub hidden_content: Option<String>,
     /// URL escaping: `"angle"` (default) or `"percent"`.
     pub url_escape_style: Option<String>,
     /// Link rendering: `"inline"` (default) or `"reference"`.
@@ -187,6 +192,7 @@ const NEWLINE_STYLE_VALUES: &[&str] = &["spaces", "backslash"];
 const CODE_BLOCK_STYLE_VALUES: &[&str] = &["indented", "backticks", "tildes"];
 const URL_ESCAPE_STYLE_VALUES: &[&str] = &["angle", "percent"];
 const INLINE_DATA_MEDIA_VALUES: &[&str] = &["keep", "alttextonly", "dropelement"];
+const HIDDEN_CONTENT_VALUES: &[&str] = &["drop", "reachable", "all"];
 const LINK_STYLE_VALUES: &[&str] = &["inline", "reference"];
 const OUTPUT_FORMAT_VALUES: &[&str] = &["markdown", "djot", "plain", "plaintext", "text"];
 const TIER_STRATEGY_VALUES: &[&str] = &["auto", "tier2"];
@@ -362,6 +368,14 @@ impl ConvertConfig {
             INLINE_DATA_MEDIA_VALUES,
             InlineDataMedia::parse,
         )?;
+        update.hidden_content = match self.hidden_content.take() {
+            Some(raw) => Some(HiddenContent::parse(&raw).map_err(|_| InvalidEnumValue {
+                field: "hidden_content",
+                value: raw,
+                accepted: HIDDEN_CONTENT_VALUES,
+            })?),
+            None => None,
+        };
         update.include_document_structure = self.include_document_structure.take();
         update.extract_images = self.extract_images.take();
         update.max_image_size = self.max_image_size.take();
@@ -614,6 +628,29 @@ mod tests {
         let error = ConversionOptions::try_from(config).expect_err("unrecognized value must be rejected");
         assert_eq!(error.field, "inline_data_media");
         assert_eq!(error.accepted, INLINE_DATA_MEDIA_VALUES);
+    }
+
+    #[test]
+    fn hidden_content_accepts_each_choice_and_rejects_others() {
+        for (value, expected) in [
+            ("drop", HiddenContent::Drop),
+            ("reachable", HiddenContent::Reachable),
+            ("all", HiddenContent::All),
+        ] {
+            let config = ConvertConfig {
+                hidden_content: Some(value.into()),
+                ..ConvertConfig::default()
+            };
+            let opts = ConversionOptions::try_from(config).expect("documented value must be accepted");
+            assert_eq!(opts.hidden_content, expected, "{value}");
+        }
+        let config = ConvertConfig {
+            hidden_content: Some("keep".into()),
+            ..ConvertConfig::default()
+        };
+        let error = ConversionOptions::try_from(config).expect_err("unrecognized value must be rejected");
+        assert_eq!(error.field, "hidden_content");
+        assert_eq!(error.accepted, HIDDEN_CONTENT_VALUES);
     }
 
     #[test]

@@ -120,6 +120,7 @@ module.exports = nativeBinding;
 module.exports.convert = nativeBinding.convert;
 module.exports.CodeBlockStyle = nativeBinding.CodeBlockStyle;
 module.exports.HeadingStyle = nativeBinding.HeadingStyle;
+module.exports.HiddenContent = nativeBinding.HiddenContent;
 module.exports.HighlightStyle = nativeBinding.HighlightStyle;
 module.exports.ImageType = nativeBinding.ImageType;
 module.exports.InlineDataMedia = nativeBinding.InlineDataMedia;

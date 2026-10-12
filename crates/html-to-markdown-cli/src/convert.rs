@@ -70,6 +70,7 @@ pub fn build_conversion_options(cli: &Cli) -> ConversionOptions {
         url_escape_style: cli.url_escape_style.map_or(defaults.url_escape_style, Into::into),
         skip_images: cli.skip_images,
         inline_data_media: cli.inline_data_media.map_or(defaults.inline_data_media, Into::into),
+        hidden_content: cli.hidden_content.map_or(defaults.hidden_content, Into::into),
         preprocessing,
         encoding: cli.encoding.clone(),
         debug: cli.debug,

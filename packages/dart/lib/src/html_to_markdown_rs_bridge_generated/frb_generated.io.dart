@@ -158,6 +158,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   HeadingStyle dco_decode_box_autoadd_heading_style(dynamic raw);
 
   @protected
+  HiddenContent dco_decode_box_autoadd_hidden_content(dynamic raw);
+
+  @protected
   HighlightStyle dco_decode_box_autoadd_highlight_style(dynamic raw);
 
   @protected
@@ -235,6 +238,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   HeadingStyle dco_decode_heading_style(dynamic raw);
+
+  @protected
+  HiddenContent dco_decode_hidden_content(dynamic raw);
 
   @protected
   HighlightStyle dco_decode_highlight_style(dynamic raw);
@@ -358,6 +364,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   HeadingStyle? dco_decode_opt_box_autoadd_heading_style(dynamic raw);
+
+  @protected
+  HiddenContent? dco_decode_opt_box_autoadd_hidden_content(dynamic raw);
 
   @protected
   HighlightStyle? dco_decode_opt_box_autoadd_highlight_style(dynamic raw);
@@ -531,6 +540,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  HiddenContent sse_decode_box_autoadd_hidden_content(
+    SseDeserializer deserializer,
+  );
+
+  @protected
   HighlightStyle sse_decode_box_autoadd_highlight_style(
     SseDeserializer deserializer,
   );
@@ -634,6 +648,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   HeadingStyle sse_decode_heading_style(SseDeserializer deserializer);
+
+  @protected
+  HiddenContent sse_decode_hidden_content(SseDeserializer deserializer);
 
   @protected
   HighlightStyle sse_decode_highlight_style(SseDeserializer deserializer);
@@ -783,6 +800,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   HeadingStyle? sse_decode_opt_box_autoadd_heading_style(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  HiddenContent? sse_decode_opt_box_autoadd_hidden_content(
     SseDeserializer deserializer,
   );
 
@@ -1103,6 +1125,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_box_autoadd_hidden_content(
+    HiddenContent self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_box_autoadd_highlight_style(
     HighlightStyle self,
     SseSerializer serializer,
@@ -1248,6 +1276,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   void sse_encode_heading_style(HeadingStyle self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_hidden_content(HiddenContent self, SseSerializer serializer);
 
   @protected
   void sse_encode_highlight_style(
@@ -1433,6 +1464,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   void sse_encode_opt_box_autoadd_heading_style(
     HeadingStyle? self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_opt_box_autoadd_hidden_content(
+    HiddenContent? self,
     SseSerializer serializer,
   );
 

@@ -6,8 +6,8 @@
 
 use clap::ValueEnum;
 use html_to_markdown_rs::{
-    CodeBlockStyle, HeadingStyle, HighlightStyle, InlineDataMedia, LinkStyle, ListIndentType, NewlineStyle,
-    OutputFormat, PreprocessingPreset, TierStrategy, UrlEscapeStyle, WhitespaceMode,
+    CodeBlockStyle, HeadingStyle, HiddenContent, HighlightStyle, InlineDataMedia, LinkStyle, ListIndentType,
+    NewlineStyle, OutputFormat, PreprocessingPreset, TierStrategy, UrlEscapeStyle, WhitespaceMode,
 };
 
 #[derive(Copy, Clone, PartialEq, Eq, ValueEnum)]
@@ -197,6 +197,26 @@ impl From<CliInlineDataMedia> for InlineDataMedia {
             CliInlineDataMedia::Keep => Self::Keep,
             CliInlineDataMedia::AltTextOnly => Self::AltTextOnly,
             CliInlineDataMedia::DropElement => Self::DropElement,
+        }
+    }
+}
+
+#[derive(Copy, Clone, PartialEq, Eq, ValueEnum)]
+pub enum CliHiddenContent {
+    /// Keep none of the text a browser does not show at first (default)
+    Drop,
+    /// Keep elements hidden by the hidden attribute or an inline style, and declarative shadow roots
+    Reachable,
+    /// Also keep the content of template and noscript elements
+    All,
+}
+
+impl From<CliHiddenContent> for HiddenContent {
+    fn from(choice: CliHiddenContent) -> Self {
+        match choice {
+            CliHiddenContent::Drop => Self::Drop,
+            CliHiddenContent::Reachable => Self::Reachable,
+            CliHiddenContent::All => Self::All,
         }
     }
 }
