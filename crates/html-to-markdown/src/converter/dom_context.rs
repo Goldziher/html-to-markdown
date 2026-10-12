@@ -69,6 +69,7 @@ pub struct DomContext {
     pub(crate) next_tag_map: Vec<OnceCell<Option<u32>>>,
     pub(crate) next_whitespace_map: Vec<OnceCell<bool>>,
     pub(crate) table_content_summary_cache: RefCell<HashMap<u32, TableContentSummary>>,
+    pub(crate) datalist_content_cache: RefCell<HashMap<u32, bool>>,
 }
 
 impl DomContext {

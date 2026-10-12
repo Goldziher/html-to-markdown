@@ -9,8 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- A source line ending before a data list becomes a space in Markdown, as before a select list;
-  a no-break space beside it stays a no-break space. A source line ending at the end of an
+- A source line ending before retained data-list content becomes a space in Markdown, as before
+  a select list. Empty or excluded data lists keep the existing source boundary. A no-break
+  space beside retained content stays a no-break space. A source line ending at the end of an
   option group outside a select or data list also separates the following word. Plain text
   retains these line endings ([#864](https://github.com/xberg-io/html-to-markdown/issues/864),
   [#867](https://github.com/xberg-io/html-to-markdown/issues/867)).

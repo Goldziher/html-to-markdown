@@ -737,7 +737,6 @@ pub fn is_inline_element(tag_name: &str) -> bool {
             | "label"
             | "button"
             | "select"
-            | "datalist"
             | "textarea"
             | "output"
             | "progress"

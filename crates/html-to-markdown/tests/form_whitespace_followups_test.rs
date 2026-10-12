@@ -108,6 +108,173 @@ fn should_collapse_a_word_line_feed_before_a_data_list() {
 }
 
 #[test]
+fn should_keep_word_boundaries_when_a_data_list_is_excluded() {
+    for output_format in [OutputFormat::Markdown, OutputFormat::Djot, OutputFormat::Plain] {
+        for tier_strategy in [TierStrategy::Auto, TierStrategy::Tier1, TierStrategy::Tier2] {
+            let result = convert(
+                "k\n<datalist><option>o2</option></datalist>d",
+                ConversionOptions {
+                    tier_strategy,
+                    output_format,
+                    exclude_selectors: vec!["datalist".to_string()],
+                    ..ConversionOptions::default()
+                },
+            )
+            .expect("excluded data list converts");
+            assert_eq!(
+                result.content.as_deref(),
+                Some("k\nd\n"),
+                "{tier_strategy:?}/{output_format:?}"
+            );
+        }
+    }
+}
+
+#[test]
+fn should_keep_blocks_inside_a_data_list_in_the_same_line() {
+    for output_format in [OutputFormat::Markdown, OutputFormat::Djot, OutputFormat::Plain] {
+        assert_output(
+            "<p>k<datalist><div>blk</div></datalist>d</p>",
+            "k blk d\n",
+            output_format,
+        );
+    }
+}
+
+#[test]
+fn should_keep_source_line_feeds_around_an_empty_data_list() {
+    for output_format in [OutputFormat::Markdown, OutputFormat::Djot] {
+        assert_output("k&nbsp;\n<datalist></datalist>&nbsp;\nd", "k\nd\n", output_format);
+    }
+    assert_output(
+        "k&nbsp;\n<datalist></datalist>&nbsp;\nd",
+        "k\n\nd\n",
+        OutputFormat::Plain,
+    );
+}
+
+#[test]
+fn should_keep_line_feeds_when_data_list_children_write_no_text() {
+    for (body, exclude) in [
+        ("<!--gap-->", ""),
+        ("<span></span>", ""),
+        ("<option><span></span></option>", ""),
+        ("<template>x</template>", ""),
+        ("<option>x</option>", "option"),
+    ] {
+        let html = format!("k&nbsp;\n<datalist>{body}</datalist>&nbsp;\nd");
+        for tier_strategy in [TierStrategy::Auto, TierStrategy::Tier1, TierStrategy::Tier2] {
+            let result = convert(
+                &html,
+                ConversionOptions {
+                    tier_strategy,
+                    exclude_selectors: if exclude.is_empty() {
+                        vec![]
+                    } else {
+                        vec![exclude.to_string()]
+                    },
+                    ..ConversionOptions::default()
+                },
+            )
+            .expect("data list children convert");
+            assert_eq!(result.content.as_deref(), Some("k\nd\n"), "{tier_strategy:?}/{body}");
+        }
+    }
+}
+
+#[test]
+fn should_not_add_a_space_after_an_option_group_inside_an_option_list() {
+    for tag in ["select", "datalist"] {
+        let html = format!("<p>k<{tag}><optgroup><option>one</option>\n</optgroup>)</{tag}>d</p>");
+        assert_output(&html, "k one) d\n", OutputFormat::Markdown);
+    }
+}
+
+#[test]
+fn should_keep_media_only_options_as_inline_controls() {
+    assert_output(
+        "k\n<datalist><option><img src='/a.png' alt='a'></option></datalist>d",
+        "k ![a](/a.png) d\n",
+        OutputFormat::Markdown,
+    );
+}
+
+#[test]
+fn should_consider_only_preserved_content_inside_the_adjacent_data_list() {
+    for (html, preserve, expected) in [
+        ("k&nbsp;\n<datalist></datalist>&nbsp;\nd", "p", "k\nd\n"),
+        ("k\n<datalist><span></span></datalist>d", "span", "k <span></span> d\n"),
+    ] {
+        let result = convert(
+            html,
+            ConversionOptions {
+                preserve_tags: vec![preserve.to_string()],
+                ..ConversionOptions::default()
+            },
+        )
+        .expect("preserved content converts");
+        assert_eq!(result.content.as_deref(), Some(expected));
+    }
+}
+
+#[test]
+fn should_use_the_conversion_depth_limit_for_data_list_whitespace() {
+    let result = convert(
+        "k\n<datalist><span>x</span></datalist>d",
+        ConversionOptions {
+            max_depth: Some(2),
+            ..ConversionOptions::default()
+        },
+    )
+    .expect("depth-limited data list converts");
+    assert_eq!(result.content.as_deref(), Some("k\nd\n"));
+    assert!(
+        result
+            .warnings
+            .iter()
+            .any(|warning| warning.kind == html_to_markdown_rs::WarningKind::DepthLimitExceeded)
+    );
+}
+
+#[cfg(feature = "visitor")]
+#[test]
+fn should_keep_a_visitor_custom_data_list_in_the_surrounding_line() {
+    use html_to_markdown_rs::visitor::{HtmlVisitor, NodeContext, VisitResult};
+    use std::sync::{Arc, Mutex};
+
+    #[derive(Debug)]
+    struct DataListVisitor;
+    impl HtmlVisitor for DataListVisitor {
+        fn visit_element_start(&mut self, ctx: &NodeContext) -> VisitResult {
+            if ctx.tag_name == "datalist" {
+                VisitResult::Custom("custom ".to_string())
+            } else {
+                VisitResult::Continue
+            }
+        }
+    }
+
+    for tier_strategy in [TierStrategy::Auto, TierStrategy::Tier1, TierStrategy::Tier2] {
+        for excluded in [false, true] {
+            let result = convert(
+                "k\n<datalist></datalist>d",
+                ConversionOptions {
+                    tier_strategy,
+                    visitor: Some(Arc::new(Mutex::new(DataListVisitor))),
+                    exclude_selectors: if excluded { vec!["datalist".to_string()] } else { vec![] },
+                    ..ConversionOptions::default()
+                },
+            )
+            .expect("visitor custom data list converts");
+            assert_eq!(
+                result.content.as_deref(),
+                Some(if excluded { "k\ncustom d\n" } else { "k custom d\n" })
+            );
+        }
+    }
+}
+
+#[test]
 fn should_keep_existing_form_and_span_whitespace_controls() {
     for (html, expected) in [
         ("<p>k<optgroup><option>one</option> </optgroup>d</p>", "k one d\n"),
