@@ -588,9 +588,10 @@ mod line_state_cost_tests {
     }
 
     #[test]
-    fn unmarked_highlighting_should_still_count_its_live_output_column() {
-        for n in [100, 400] {
-            assert_eq!(column_reads("mark", HighlightStyle::None, n), n * (n - 1) / 2);
+    fn unmarked_wrappers_after_text_should_not_count_an_unused_output_column() {
+        for tag in ["mark", "abbr", "label", "select", "sub", "sup", "rb", "u", "span"] {
+            let reads = [100, 400].map(|n| column_reads(tag, HighlightStyle::None, n));
+            assert_eq!(reads, [0, 0], "{tag}: n=100 and n=400");
         }
     }
 
@@ -615,6 +616,7 @@ mod line_state_cost_tests {
         let expected = match (tag, highlight_style) {
             ("ins", _) => format!("{}\n", "{+x+}".repeat(n)),
             (_, HighlightStyle::Html) => format!("{}\n", "<mark>x</mark>".repeat(n)),
+            ("select", _) => format!("{}\n", vec!["x"; n].join(" ")),
             (_, HighlightStyle::None) => format!("{}\n", "x".repeat(n)),
             _ => {
                 let marker = if tag == "del" || tag == "s" || tag == "strike" {

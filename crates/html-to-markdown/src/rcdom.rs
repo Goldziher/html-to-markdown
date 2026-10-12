@@ -105,6 +105,12 @@ pub enum NodeData {
     ProcessingInstruction { target: StrTendril, contents: StrTendril },
 }
 
+struct DepthCache {
+    epoch: usize,
+    depth: usize,
+    root: WeakHandle,
+}
+
 /// A DOM node.
 pub struct Node {
     /// Parent node.
@@ -112,6 +118,7 @@ pub struct Node {
     /// The `<template>` element whose contents this node is. The contents are not a child of
     /// the template and have no parent; only the depth count of the repair reads this link.
     template_host: Cell<Option<WeakHandle>>,
+    depth_cache: RefCell<Option<DepthCache>>,
     /// Child nodes of this node.
     pub children: RefCell<Vec<Handle>>,
     /// Represents this node's data.
@@ -125,6 +132,7 @@ impl Node {
             data,
             parent: Cell::new(None),
             template_host: Cell::new(None),
+            depth_cache: RefCell::new(None),
             children: RefCell::new(Vec::new()),
         })
     }
@@ -233,6 +241,9 @@ pub struct RcDom {
     node_count: Cell<usize>,
     max_nodes: usize,
     max_depth: usize,
+    topology_epoch: Cell<usize>,
+    #[cfg(test)]
+    depth_reads: Cell<usize>,
     pub(crate) repair_limit: Cell<Option<crate::types::WarningKind>>,
 }
 
@@ -257,16 +268,11 @@ impl RcDom {
         if self.max_depth == usize::MAX || children.is_empty() {
             return true;
         }
-        let mut depth = 0;
-        let mut current = Rc::clone(parent);
-        while let Some(ancestor) = depth_ancestor(&current) {
-            depth += 1;
-            if depth > self.max_depth {
-                self.repair_limit
-                    .set(Some(crate::types::WarningKind::DepthLimitExceeded));
-                return false;
-            }
-            current = ancestor;
+        let depth = self.parent_depth(parent);
+        if depth > self.max_depth {
+            self.repair_limit
+                .set(Some(crate::types::WarningKind::DepthLimitExceeded));
+            return false;
         }
         let mut work: Vec<_> = children.iter().map(|child| (Rc::clone(child), depth + 1)).collect();
         while let Some((node, depth)) = work.pop() {
@@ -280,21 +286,79 @@ impl RcDom {
         true
     }
 
-    fn observe_depth(&self, parent: &Handle) {
-        // ~keep Adoption-agency reparenting changes descendant depths; reading actual parents
-        // ~keep avoids stale cached depths. The walk stops at the fixed repair ceiling (#808).
-        if self.max_depth == usize::MAX {
+    fn read_depth_ancestor(&self, node: &Handle) -> Option<Handle> {
+        #[cfg(test)]
+        self.depth_reads.set(self.depth_reads.get() + 1);
+        depth_ancestor(node)
+    }
+
+    fn invalidate_depths(&self) {
+        self.topology_epoch.set(self.topology_epoch.get().saturating_add(1));
+    }
+
+    fn prepare_attachment(&self, parent: &Handle, child: &Handle) {
+        // ~keep A fresh leaf has no descendants whose cached ancestry can change (#830).
+        // ~keep Template contents are linked through their host rather than children.
+        if Rc::ptr_eq(parent, child)
+            || !child.children.borrow().is_empty()
+            || matches!(child.data, NodeData::Element { ref template_contents, .. }
+                if template_contents.borrow().is_some())
+        {
+            self.invalidate_depths();
+            child.depth_cache.borrow_mut().take();
             return;
         }
+        *child.depth_cache.borrow_mut() = parent.depth_cache.borrow().as_ref().map(|cache| DepthCache {
+            epoch: cache.epoch,
+            depth: cache.depth.saturating_add(1),
+            root: cache.root.clone(),
+        });
+    }
+
+    fn parent_depth(&self, parent: &Handle) -> usize {
+        let epoch = self.topology_epoch.get();
+        let mut path = Vec::new();
         let mut current = Rc::clone(parent);
-        for _ in 0..self.max_depth {
-            let Some(ancestor) = depth_ancestor(&current) else {
-                return;
+        let (mut depth, root) = loop {
+            if epoch != usize::MAX {
+                if let Some(cache) = current.depth_cache.borrow().as_ref() {
+                    if cache.epoch == epoch && cache.root.strong_count() != 0 {
+                        break (cache.depth, cache.root.clone());
+                    }
+                }
+            }
+            path.push(Rc::clone(&current));
+            if path.len() > self.max_depth.saturating_add(1) {
+                return self.max_depth.saturating_add(1);
+            }
+            let Some(ancestor) = self.read_depth_ancestor(&current) else {
+                path.pop();
+                let root = Rc::downgrade(&current);
+                *current.depth_cache.borrow_mut() = Some(DepthCache {
+                    epoch,
+                    depth: 0,
+                    root: root.clone(),
+                });
+                break (0, root);
             };
             current = ancestor;
+        };
+        for node in path.into_iter().rev() {
+            depth = depth.saturating_add(1);
+            *node.depth_cache.borrow_mut() = Some(DepthCache {
+                epoch,
+                depth,
+                root: root.clone(),
+            });
         }
-        self.repair_limit
-            .set(Some(crate::types::WarningKind::DepthLimitExceeded));
+        depth
+    }
+
+    fn observe_depth(&self, parent: &Handle) {
+        if self.max_depth != usize::MAX && self.parent_depth(parent) >= self.max_depth {
+            self.repair_limit
+                .set(Some(crate::types::WarningKind::DepthLimitExceeded));
+        }
     }
 }
 
@@ -390,6 +454,9 @@ impl TreeSink for RcDom {
             }
         }
 
+        if let NodeOrText::AppendNode(node) = &child {
+            self.prepare_attachment(parent, node);
+        }
         append(
             parent,
             match child {
@@ -429,6 +496,7 @@ impl TreeSink for RcDom {
             (NodeOrText::AppendNode(node), _) => node,
         };
 
+        self.invalidate_depths();
         remove_from_parent(&child);
 
         child.parent.set(Some(Rc::downgrade(&parent)));
@@ -475,6 +543,7 @@ impl TreeSink for RcDom {
     }
 
     fn remove_from_parent(&self, target: &Handle) {
+        self.invalidate_depths();
         remove_from_parent(target);
     }
 
@@ -484,6 +553,7 @@ impl TreeSink for RcDom {
         if !self.subtree_fits_depth(new_parent, &node.children.borrow()) {
             return;
         }
+        self.invalidate_depths();
         let mut children = node.children.borrow_mut();
         let mut new_children = new_parent.children.borrow_mut();
         for child in children.iter() {
@@ -521,6 +591,9 @@ impl Default for RcDom {
             node_count: Cell::new(1),
             max_nodes: usize::MAX,
             max_depth: usize::MAX,
+            topology_epoch: Cell::new(0),
+            #[cfg(test)]
+            depth_reads: Cell::new(0),
             repair_limit: Cell::new(None),
         }
     }
@@ -640,3 +713,6 @@ mod bounded_reparent_tests {
         );
     }
 }
+
+#[cfg(test)]
+mod depth_cache_tests;

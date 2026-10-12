@@ -499,6 +499,27 @@ impl Context {
     /// ~keep After only indent or a list item's marker, the list's first marker starts an item
     /// ~keep where that line ends, as it would with no wrapper.
     pub(crate) fn inline_buffer(&self, output: &str, opens_with_marker: bool) -> Self {
+        // ~keep Bare list markers end in ASCII space. A final non-whitespace character proves
+        // ~keep this detached buffer follows text, so its column cannot be consumed by a list (#862).
+        if self.in_marker_span
+            || opens_with_marker
+            || output.chars().next_back().is_some_and(|last| !last.is_whitespace())
+            || output
+                .trim_end_matches([' ', '\t'])
+                .chars()
+                .next_back()
+                .is_some_and(|last| !last.is_whitespace() && !matches!(last, '-' | '*' | '+' | '.' | ')'))
+        {
+            return Self {
+                in_marker_span: true,
+                inline_buffer_after_hard_break: if output.is_empty() {
+                    self.inline_buffer_after_hard_break
+                } else {
+                    crate::converter::utility::escaping::ends_with_hard_break(output)
+                },
+                ..self.clone()
+            };
+        }
         let line = &output[output.rfind('\n').map_or(0, |pos| pos + 1)..];
         let line_holds_text =
             !line.trim().is_empty() && !crate::converter::list::utils::line_is_bare_list_marker(output);
@@ -662,5 +683,62 @@ impl Context {
             return None;
         }
         crate::converter::url_resolve::resolve_link_url(self.base_url.as_deref()?, value)
+    }
+}
+
+#[cfg(test)]
+mod inline_buffer_tests {
+    use super::{Context, ContextParameters};
+
+    fn context() -> Context {
+        Context::new(
+            &crate::ConversionOptions::default(),
+            ContextParameters {
+                inline_collector: None,
+                #[cfg(feature = "metadata")]
+                metadata_collector: None,
+                #[cfg(feature = "visitor")]
+                visitor: None,
+                structure_collector: None,
+                reference_collector: None,
+                base_url: None,
+                own_page: crate::converter::url_resolve::OwnPage::UnknownWithoutBase,
+            },
+        )
+    }
+
+    #[test]
+    fn should_preserve_live_columns_and_marker_state_after_output_mutations() {
+        let ctx = context();
+        let mut output = String::new();
+        for prefix in ["", "\t", "- ", "* ", "1. ", "1. - ", "text ", "text* ", "text. "] {
+            for suffix in ["", "x", ".", "雪", "\u{a0}", "\u{2000}", "\u{2028}", "\r", "\n"] {
+                output.clear();
+                output.push_str(prefix);
+                output.push_str("discard");
+                output.truncate(prefix.len());
+                output.push_str(suffix);
+                output.insert_str(0, "inserted\n");
+                for opens_with_marker in [false, true] {
+                    let child = ctx.inline_buffer(&output, opens_with_marker);
+                    let line = &output[output.rfind('\n').map_or(0, |pos| pos + 1)..];
+                    let holds_text =
+                        !line.trim().is_empty() && !crate::converter::list::utils::line_is_bare_list_marker(&output);
+                    assert_eq!(child.in_marker_span, opens_with_marker || holds_text, "{output:?}");
+                    assert_eq!(
+                        child.inline_buffer_after_hard_break,
+                        crate::converter::utility::escaping::ends_with_hard_break(&output),
+                        "{output:?}"
+                    );
+                    if !child.in_marker_text() {
+                        let (indent_length, indent_column) = crate::converter::utility::escaping::leading_indent(line);
+                        assert_eq!(
+                            child.inline_buffer_column,
+                            Some(indent_column + line[indent_length..].chars().count())
+                        );
+                    }
+                }
+            }
+        }
     }
 }
