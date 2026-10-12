@@ -71,6 +71,7 @@ pub struct DomContext {
     pub(crate) following_content_map: Vec<crate::converter::utility::siblings::FollowingContent>,
     pub(crate) next_whitespace_map: Vec<OnceCell<bool>>,
     pub(crate) table_content_summary_cache: RefCell<HashMap<u32, TableContentSummary>>,
+    pub(crate) datalist_content_cache: RefCell<HashMap<u32, bool>>,
     /// For each element that [`DomContext::holds_text`] read: whether it holds text.
     pub(crate) holds_text_cache: RefCell<HashMap<u32, bool>>,
 }

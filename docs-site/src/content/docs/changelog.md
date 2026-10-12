@@ -26,6 +26,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   retains its hard break on every route, including in the first paragraph (#863). Code-like elements with block children or leading breaks use the full
   converter's tree rules on every route, avoiding different output from the fast scanner (#842).
 
+- A source line ending before retained data-list content becomes a space in Markdown, as before
+  a select list. Without visitor callbacks, empty, input-only or excluded data lists keep the
+  existing source boundary. A no-break space beside retained content stays a no-break space. A source line ending at the end of an
+  option group outside a select or data list also separates the following word. Plain text
+  retains these line endings ([#864](https://github.com/xberg-io/html-to-markdown/issues/864),
+  [#867](https://github.com/xberg-io/html-to-markdown/issues/867)).
+
 - Emphasis, variable (`var`) and definition (`dfn`) text, strikethrough and Djot inserted text,
   and `mark` styles other than None no longer recount the existing line before each element.
   Unmarked highlighting and other inline wrappers still require line-state work
