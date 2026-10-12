@@ -85,14 +85,67 @@ fn should_keep_form_text_when_form_removal_is_disabled() {
 #[test]
 fn should_keep_scanning_well_formed_retained_forms() {
     let html = "<form><label>name</label></form><p>after</p>";
+    for output_format in [OutputFormat::Markdown, OutputFormat::Djot] {
+        let mut options = ConversionOptions {
+            output_format,
+            extract_metadata: false,
+            ..Default::default()
+        };
+        options.preprocessing.remove_forms = false;
+        let report = html_to_markdown_rs::prescan::PrescanReport::default();
+        assert_eq!(
+            html_to_markdown_rs::tier1::run(html, &report, &options).expect("retained form stays on fast scanner"),
+            "name\n\nafter\n"
+        );
+    }
+}
+
+#[test]
+fn should_keep_retained_forms_transparent_in_plain_output_on_every_route() {
+    let cases = [
+        (CLOSED_LABEL, "before\n\nnameafter\n\nnext\n"),
+        (
+            "<div>before<form><label>name</label></form>after</div>",
+            "beforenameafter\n",
+        ),
+        (
+            "<div>before<form><label>name</label></form><span>after</span></div>",
+            "beforenameafter\n",
+        ),
+        (
+            "<div>before <form><label>name</label></form> after</div>",
+            "before name after\n",
+        ),
+        (
+            "<div>before\n<form><label>name</label></form>after</div>",
+            "before\nnameafter\n",
+        ),
+        ("<form><p>name</p></form>after", "name\n\nafter\n"),
+        ("<form><p>name</p></form><span>after</span>", "name\n\nafter\n"),
+    ];
     let mut options = ConversionOptions {
+        output_format: OutputFormat::Plain,
         extract_metadata: false,
         ..Default::default()
     };
     options.preprocessing.remove_forms = false;
     let report = html_to_markdown_rs::prescan::PrescanReport::default();
-    assert_eq!(
-        html_to_markdown_rs::tier1::run(html, &report, &options).expect("retained form stays on fast scanner"),
-        "name\n\nafter\n"
-    );
+    let mut failures = Vec::new();
+    for (html, expected) in cases {
+        for tier_strategy in [TierStrategy::Auto, TierStrategy::Tier1, TierStrategy::Tier2] {
+            options.tier_strategy = tier_strategy;
+            let result = convert(html, options.clone()).expect("retained plain form converts");
+            if result.content.as_deref() != Some(expected) {
+                failures.push(format!(
+                    "{tier_strategy:?}: {html}: {:?}, expected {expected:?}",
+                    result.content
+                ));
+            }
+        }
+        let scanned = html_to_markdown_rs::tier1::run(html, &report, &options).expect("plain form stays on scanner");
+        if scanned != expected {
+            failures.push(format!("raw scanner: {html}: {scanned:?}, expected {expected:?}"));
+        }
+    }
+    assert!(failures.is_empty(), "{failures:#?}");
 }

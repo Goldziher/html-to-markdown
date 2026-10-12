@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Retained forms in Plain output no longer add paragraph breaks on the fast converter.
+  With form removal disabled, `<div>before<form>name</form>after</div>` now gives
+  `beforenameafter` on every route; paragraphs inside forms keep their own breaks.
+
 - The fast converter leaves form removal to the full converter's HTML5 tree
   ([#829](https://github.com/xberg-io/html-to-markdown/issues/829)). With an unclosed label,
   `<p>before<form><label>name<input></form>after<p>next` now gives `before` on every route:
