@@ -178,3 +178,21 @@ fn should_match_body_iframe_when_the_browser_closes_the_head_implicitly() {
         }
     }
 }
+
+#[test]
+fn should_preserve_xmp_body_in_one_container_after_an_implicit_head_close() {
+    let html = "<html><head><xmp/>s</head><body><p>after</p></body></html>";
+    for mut options in options_matrix() {
+        options.preserve_tags = vec!["xmp".to_owned()];
+        let route = format!(
+            "{:?} {:?} metadata={}",
+            options.tier_strategy, options.output_format, options.extract_metadata
+        );
+        let expected = match options.output_format {
+            OutputFormat::Markdown => "<xmp>s&lt;/head>&lt;body>&lt;p>after&lt;/p>&lt;/body>&lt;/html></xmp>\n",
+            _ => "s</head><body><p>after</p></body></html>\n",
+        };
+        let result = convert(html, options).expect("preserve the browser-visible xmp body");
+        assert_eq!(result.content.as_deref(), Some(expected), "{route}");
+    }
+}

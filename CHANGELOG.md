@@ -145,6 +145,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Self-closing raw-text and inert elements encountered in an HTML head contain their following text.
+  Head titles remain metadata; preserved `xmp` retains one container around its literal body
+  ([#878](https://github.com/xberg-io/html-to-markdown/issues/878)).
 - A `<label>` inside a code block keeps the spaces and the line ends of its text
   ([#822](https://github.com/xberg-io/html-to-markdown/issues/822)).
 - A paragraph inside a heading keeps a space between its text and the text after it
