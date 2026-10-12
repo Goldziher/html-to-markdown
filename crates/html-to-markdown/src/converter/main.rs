@@ -39,7 +39,7 @@ use crate::types::structure_collector::StructureCollectorHandle;
 
 mod parse;
 mod table_parts;
-use self::parse::{ParseOutcome, parse_for_conversion};
+use self::parse::{ParseOutcome, finish_dom_parse, parse_for_conversion};
 use self::table_parts::{is_table_part, walk_table_parts};
 
 type ConversionOutput = (
@@ -90,12 +90,8 @@ pub fn convert_html_impl(
         };
         preprocessed = repaired;
     };
-    if !inert_bodies.is_empty() {
-        crate::converter::utility::preprocessing::restore_inert_bodies(&mut dom, inert_bodies)?;
-        dom_ctx = crate::converter::utility::caching::build_dom_context(&dom, dom.parser(), preprocessed.len());
-    }
     let preprocessed_len = preprocessed.len();
-    trace_parse_complete(&dom, preprocessed_len);
+    finish_dom_parse(&mut dom, &mut dom_ctx, inert_bodies, preprocessed_len)?;
     let parser = dom.parser();
     let mut output = String::with_capacity(preprocessed_len.saturating_add(preprocessed_len / 4));
     let is_plain_text = options.output_format == OutputFormat::Plain;
