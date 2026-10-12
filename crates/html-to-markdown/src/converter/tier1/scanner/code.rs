@@ -339,7 +339,7 @@ fn move_label_edges(
     if dest[label_start..].trim().is_empty() {
         dest.truncate(label_start);
     }
-    (label_start, if has_text { suffix } else { "" })
+    (label_start, suffix)
 }
 
 /// Where the text before the `[` of the link that is closing ends, when the marks of the inline

@@ -7,7 +7,7 @@
 
 use html_to_markdown_rs::prescan;
 use html_to_markdown_rs::tier1;
-use html_to_markdown_rs::{ConversionOptions, LinkStyle, TierStrategy, WhitespaceMode, convert};
+use html_to_markdown_rs::{ConversionOptions, HighlightStyle, LinkStyle, TierStrategy, WhitespaceMode, convert};
 
 fn content_with(html: &str, options: ConversionOptions) -> String {
     convert(html, Some(options))
@@ -27,6 +27,19 @@ fn with_tier(tier_strategy: TierStrategy) -> ConversionOptions {
 fn fast(html: &str) -> Option<String> {
     let (cleaned, report) = prescan::run(html);
     tier1::run(cleaned.as_ref(), &report, &with_tier(TierStrategy::Tier1)).ok()
+}
+
+/// What `convert` writes on the public route that reaches the fast converter: the router is
+/// free, with no metadata and no highlight style.
+fn public_fast_route(html: &str) -> String {
+    content_with(
+        html,
+        ConversionOptions {
+            extract_metadata: false,
+            highlight_style: HighlightStyle::None,
+            ..ConversionOptions::default()
+        },
+    )
 }
 
 /// A row that both converters write.
@@ -414,4 +427,52 @@ fn a_no_break_space_after_a_link_joins_the_space_of_the_label_end_in_both() {
         assert_row_of_full_converter(html, wanted);
         assert_eq!(fast(html), None, "fast converter: {html:?}");
     }
+}
+
+/// A text of only a Unicode space after the close tag of an element that holds text is no word
+/// that joins the space the element ended with: the full converter writes the Unicode space with
+/// no space before it, and the fast converter leaves that page to the full one. The public route
+/// that reaches the fast converter writes the text of the full converter.
+#[test]
+fn a_text_of_only_a_unicode_space_after_a_close_tag_goes_to_the_full_converter() {
+    for (open, close, written) in [
+        ("<a href=\"/p\">", "</a>", "[Go](/p)"),
+        ("<b>", "</b>", "**Go**"),
+        ("<abbr>", "</abbr>", "Go"),
+    ] {
+        for space in ['\u{a0}', '\u{2003}', '\u{3000}'] {
+            for (html, wanted) in [
+                (
+                    format!("<p>Press{open}Go {close}{space}<i>now</i></p><p>next</p>"),
+                    format!("Press{written}{space}*now*\n\nnext\n"),
+                ),
+                (
+                    format!("<p>Press{open}Go {close}{space}</p><p>next</p>"),
+                    format!("Press{written}{space}\n\nnext\n"),
+                ),
+            ] {
+                assert_row_of_full_converter(&html, &wanted);
+                assert_eq!(public_fast_route(&html), wanted, "public fast route: {html:?}");
+                assert_eq!(fast(&html), None, "fast converter: {html:?}");
+            }
+        }
+    }
+}
+
+/// A text of only a Unicode space at the start of an element, or after the line break of a
+/// heading, has a place that both converters read alike: both write it after the written space.
+#[test]
+fn a_text_of_only_a_unicode_space_at_an_element_start_is_written_in_both() {
+    assert_row("<p>a <span>\u{2003}</span>b</p>", "a \u{2003}b\n");
+    assert_row("<h2>a<br>\u{2003}<i>b</i></h2>", "## a \u{2003}*b*\n");
+}
+
+/// A link with no address is running text, not a label: a Unicode space in it after a written
+/// space and an element with no text is a second space, and the fast converter leaves that page
+/// to the full one.
+#[test]
+fn a_unicode_space_in_a_link_with_no_address_goes_to_the_full_converter() {
+    let html = "<p>Press <a>Go <span></span>&nbsp;now</a></p>";
+    assert_row_of_full_converter(html, "Press Go  now\n");
+    assert_eq!(fast(html), None, "fast converter: {html:?}");
 }

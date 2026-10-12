@@ -252,7 +252,8 @@ fn source_starts_with_unicode_space(raw: &str) -> bool {
 /// ~keep opening tag ends, or the closing tag of an element that holds text and is no `span`
 /// ~keep (`emit_close`): there the two converters join the spaces, and the scanner answers.
 /// ~keep Any other text has an unknown place, and Tier-2 takes the page: a text after a `<br>`
-/// ~keep in a table cell is one, and Tier-2 keeps the Unicode space there.
+/// ~keep in a table cell is one, and Tier-2 keeps the Unicode space there. A text of only white
+/// ~keep space after a closing tag is another (`is_blank_after_text`).
 /// ~keep In `pre` and in code the white space rule does not apply, and nothing is handed over.
 /// ~keep A heading has one line. Tier-2 writes a `<br>` there as a space, and this scanner writes
 /// ~keep a hard break that the close of the heading folds to a space: that hard break is a
@@ -281,11 +282,24 @@ fn hand_over_unicode_space_after_space(
     let after_heading_break = in_heading && (written.ends_with("  \n") || written.ends_with("\\\n"));
     if (written.ends_with(' ') || after_heading_break)
         && source_starts_with_unicode_space(raw)
-        && place.is_none_or(|place| unicode_space_is_kept(written, place))
+        && place.is_none_or(|place| unicode_space_is_kept(written, place) || is_blank_after_text(place, raw))
     {
         return Err(BailReason::UnicodeSpaceAfterSpace);
     }
     Ok(())
+}
+
+/// Whether the source text `raw` stands after text and holds no word: every character of it is
+/// white space, a Unicode space included.
+///
+/// ~keep The place after text (`emit_close`) answers for a text that holds a word: the Unicode
+/// ~keep space that `</a>&nbsp;now` starts with joins the written space in both converters. A
+/// ~keep text of only white space is no word to join: Tier-2 writes an em space (U+2003)
+/// ~keep between `<b>Go </b>` and `<i>now</i>` with no space before it, by rules this scanner
+/// ~keep does not have. The place of such a text counts as unknown, and Tier-2 takes the page.
+fn is_blank_after_text(place: TextPlace, raw: &str) -> bool {
+    place == TextPlace::AfterText
+        && crate::converter::utility::white_space::is_blank(&crate::text::decode_html_entities_cow(raw))
 }
 
 /// Scan and decode a single HTML entity starting at `amp_pos` (the `&` byte).
