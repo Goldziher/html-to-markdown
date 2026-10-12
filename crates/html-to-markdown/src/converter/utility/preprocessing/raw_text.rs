@@ -43,18 +43,66 @@ enum RawTextContent {
     Kept,
 }
 
-/// The page that the first pass reads.
-///
-/// ~keep The escape of a kept script is not idempotent (`&` becomes `&amp;`), so it runs on the
-/// ~keep source page only. The tree builder writes a script as raw text and escapes the text of
-/// ~keep a `textarea` itself, so a kept element of a repaired page is already in the form the
-/// ~keep parser reads, however many times the page is repaired.
+/// What the first pass did with a raw-text element.
 #[derive(Clone, Copy, PartialEq, Eq)]
-pub(super) enum RawTextPage {
-    /// The page as its author wrote it.
-    Source,
-    /// The page that the HTML tree builder wrote from a page this pass has read.
-    Repaired,
+enum Outcome {
+    /// The element stays as the page has it.
+    Unchanged,
+    /// The element is removed.
+    Removed,
+    /// The element is written again, with its content as text.
+    Kept,
+}
+
+/// The `<` of a kept element, as the first pass writes it.
+const ESCAPED_LT: &str = "&lt;";
+
+/// The kept scripts of one page whose text the tree cannot give back as written.
+///
+/// ~keep `push_kept_element` writes each `<` of a kept script as `&lt;`, and `as_written` takes
+/// ~keep that back. No other code knows of the escape: the tree holds the escaped text, and a
+/// ~keep writer of HTML writes it as it is. A body that holds `&lt;` itself reads the same in
+/// ~keep the tree as a body that holds `<`, so the first pass records each such body here.
+#[derive(Debug)]
+pub struct KeptScripts {
+    /// The bodies that hold `&lt;`, as written, with no white space at the two ends.
+    #[cfg(feature = "metadata")]
+    with_reference: Vec<Box<str>>,
+}
+
+impl KeptScripts {
+    const fn new() -> Self {
+        Self {
+            #[cfg(feature = "metadata")]
+            with_reference: Vec::new(),
+        }
+    }
+
+    /// Record the body of a kept script when the tree cannot give it back.
+    #[cfg(feature = "metadata")]
+    fn record(&mut self, body: &str) {
+        if body.contains(ESCAPED_LT) {
+            self.with_reference.push(body.trim().into());
+        }
+    }
+
+    /// The text of a kept script as the page has it. `text` is the text that the tree has for
+    /// the script, with no white space at the two ends.
+    ///
+    /// ~keep The tree builder writes a line end of the page as LF, so a CR is not compared.
+    #[cfg(feature = "metadata")]
+    pub fn as_written<'a>(&self, text: &'a str) -> Cow<'a, str> {
+        if !text.contains(ESCAPED_LT) {
+            return Cow::Borrowed(text);
+        }
+        let no_cr = |escaped: &str| escaped.bytes().filter(|byte| *byte != b'\r').collect::<Vec<u8>>();
+        let in_tree = no_cr(text);
+        let recorded = self
+            .with_reference
+            .iter()
+            .find(|body| no_cr(&body.replace('<', ESCAPED_LT)) == in_tree);
+        Cow::Owned(recorded.map_or_else(|| text.replace(ESCAPED_LT, "<"), |body| String::from(body.as_ref())))
+    }
 }
 
 /// A candidate raw-text element: `idx` is its `<`, `last` is the end of the copied input and
@@ -65,7 +113,6 @@ struct RawTextElement<'a> {
     last: usize,
     name: &'a str,
     content: RawTextContent,
-    page: RawTextPage,
 }
 
 /// Remove or rewrite the raw-text element that starts at `element.idx`, appending the input
@@ -76,14 +123,13 @@ struct RawTextElement<'a> {
 /// A kept element is written by `push_kept_element` and adds no space: the walker reads the
 /// white space on its two sides as if the element were not there.
 ///
-/// Returns whether the element was written again. A kept element that needs no change is
-/// not: a `textarea` with no `<`, any kept element of a repaired page.
+/// Returns what it did. A `textarea` with no `<` needs no change and is not written again.
 fn strip_raw_text_element(
     element: &RawTextElement<'_>,
     tag_end: usize,
     (close_start, close_idx): (usize, usize),
     output: &mut Option<String>,
-) -> bool {
+) -> Outcome {
     let bytes = element.input.as_bytes();
     let name = element.name.as_bytes();
     let body = &element.input[tag_end..close_start];
@@ -92,44 +138,39 @@ fn strip_raw_text_element(
         RawTextContent::Removed => false,
         RawTextContent::RemovedUnlessStructuredData => is_json_ld_script_open_tag(&element.input[element.idx..tag_end]),
         // ~keep A `textarea` with no `<` in it is already one text for the parser.
-        RawTextContent::Kept if !body.contains('<') => return false,
+        RawTextContent::Kept if !body.contains('<') => return Outcome::Unchanged,
         RawTextContent::Kept => true,
     };
-    if kept && element.page == RawTextPage::Repaired {
-        return false;
-    }
 
     let out = output.get_or_insert_with(|| String::with_capacity(element.input.len()));
     out.push_str(&element.input[element.last..element.idx]);
     if kept {
+        // ~keep A kept element adds no space of its own: the white space around it is the page's.
         let attributes = &element.input[element.idx + 1 + name.len()..tag_end];
-        push_kept_element(out, element.name, attributes, body, element.content);
+        push_kept_element(out, element.name, attributes, body);
+        return Outcome::Kept;
     }
-    // ~keep A kept element adds no space of its own: the white space around it is the page's.
-    if !kept
-        && element.idx > 0
+    if element.idx > 0
         && close_idx < bytes.len()
         && !bytes[element.idx - 1].is_ascii_whitespace()
         && !bytes[close_idx].is_ascii_whitespace()
     {
         out.push(' ');
     }
-    true
+    Outcome::Removed
 }
 
 /// Write a kept raw-text element in a form the parser reads as one element with one text.
 /// `attributes` is the open tag after its name, with the `>`; `body` is the content.
 ///
 /// ~keep The parser has no raw-text rule: a `<p>` in the content would open an element that
-/// ~keep holds the rest of the page, so each `<` of the body is written as `&lt;`; the reader
-/// ~keep of the text decodes the reference. A script is raw text: a reference in it is not
-/// ~keep decoded, so each `&` is written as `&amp;` and the one decode of the reader gives the
-/// ~keep text as written. A `textarea` is escapable raw text: its references are decoded, so
-/// ~keep its `&` stays. The parser also closes an element only with an end tag of the same
-/// ~keep spelling, so the two tag names are written in one spelling, and it reads only white
-/// ~keep space after the name, so a `/` or a form feed there is written as a space.
-fn push_kept_element(out: &mut String, name: &str, attributes: &str, body: &str, content: RawTextContent) {
-    let references_are_text = content == RawTextContent::RemovedUnlessStructuredData;
+/// ~keep holds the rest of the page, so each `<` of the body is written as `&lt;`. Nothing else
+/// ~keep of the body changes, so this function changes nothing in a body that it wrote: the
+/// ~keep pass reads a repaired page as it reads the page of the author. `KeptScripts` gives the
+/// ~keep text of a script as written. The parser also closes an element only with an end tag of
+/// ~keep the same spelling, so the two tag names are written in one spelling, and it reads only
+/// ~keep white space after the name, so a `/` or a form feed there is written as a space.
+fn push_kept_element(out: &mut String, name: &str, attributes: &str, body: &str) {
     out.push('<');
     out.push_str(name);
     if matches!(attributes.as_bytes().first(), Some(b'/' | b'\x0C')) {
@@ -139,13 +180,9 @@ fn push_kept_element(out: &mut String, name: &str, attributes: &str, body: &str,
         out.push_str(attributes);
     }
     let mut rest = body;
-    while let Some(at) = memchr::memchr2(b'<', b'&', rest.as_bytes()) {
+    while let Some(at) = memchr::memchr(b'<', rest.as_bytes()) {
         out.push_str(&rest[..at]);
-        out.push_str(match rest.as_bytes()[at] {
-            b'<' => "&lt;",
-            _ if references_are_text => "&amp;",
-            _ => "&",
-        });
+        out.push_str(ESCAPED_LT);
         rest = &rest[at + 1..];
     }
     out.push_str(rest);
@@ -171,13 +208,13 @@ pub(super) fn removed_element_name(slot: usize) -> Option<&'static str> {
 /// Strip script and style tags and their content from HTML, and write the content of a
 /// structured data script and of a `textarea` as text.
 pub fn strip_script_and_style_tags(input: &str) -> Cow<'_, str> {
-    FirstPass::new(input, RawTextPage::Source, |_| {}).run()
+    strip_script_and_style_tags_with_kept_scripts(input).0
 }
 
-/// Strip script and style tags and their content from a page that the HTML tree builder wrote
-/// from the output of [`strip_script_and_style_tags`]. A kept element stays as it is.
-pub fn strip_script_and_style_tags_of_repaired_page(input: &str) -> Cow<'_, str> {
-    FirstPass::new(input, RawTextPage::Repaired, |_| {}).run()
+/// [`strip_script_and_style_tags`], with the kept scripts that the reader of the structured
+/// data asks for the text as written.
+pub fn strip_script_and_style_tags_with_kept_scripts(input: &str) -> (Cow<'_, str>, KeptScripts) {
+    FirstPass::new(input, |_| {}).run()
 }
 
 /// A read of the first pass or of the second pass that a test counts.
@@ -192,6 +229,9 @@ pub(super) enum PassRead {
     /// A read of a tag to its end, with the count of the bytes it went over. It can read to
     /// the end of the page.
     TagRead(usize),
+    /// The count of the places where that read stopped to look at a byte: each `=` and the
+    /// `>`. A read that looks at each byte of the tag stops at each byte.
+    TagStops(usize),
 }
 
 /// The reads of one pass over one page that can go to the end of the page: the end of a
@@ -278,8 +318,10 @@ impl<C: FnMut(PassRead)> PageReads<C> {
     /// after its `<`.
     fn tag_end_from(&mut self, bytes: &[u8], from: usize) -> Option<usize> {
         if !self.tags_never_end {
-            let whole = whole_tag_end(bytes, from);
+            let mut stops = 0;
+            let whole = whole_tag_end(bytes, from, &mut stops);
             self.count(PassRead::TagRead(whole.unwrap_or(bytes.len()) - from));
+            self.count(PassRead::TagStops(stops));
             self.tags_never_end = whole.is_none();
             if whole.is_some() {
                 return whole;
@@ -300,26 +342,26 @@ impl<C: FnMut(PassRead)> PageReads<C> {
 /// ~keep a tag.
 pub(super) struct FirstPass<'a, C: FnMut(PassRead)> {
     input: &'a str,
-    page: RawTextPage,
     last: usize,
     output: Option<String>,
     svg_depth: usize,
     reads: PageReads<C>,
+    kept_scripts: KeptScripts,
 }
 
 impl<'a, C: FnMut(PassRead)> FirstPass<'a, C> {
-    pub(super) const fn new(input: &'a str, page: RawTextPage, count: C) -> Self {
+    pub(super) const fn new(input: &'a str, count: C) -> Self {
         Self {
             input,
-            page,
             last: 0,
             output: None,
             svg_depth: 0,
             reads: PageReads::new(count),
+            kept_scripts: KeptScripts::new(),
         }
     }
 
-    pub(super) fn run(mut self) -> Cow<'a, str> {
+    pub(super) fn run(mut self) -> (Cow<'a, str>, KeptScripts) {
         let bytes = self.input.as_bytes();
         // ~keep No tag ends after the last `>` of the page: nothing after it is an element,
         // ~keep and no search for the end of a tag starts there.
@@ -331,13 +373,14 @@ impl<'a, C: FnMut(PassRead)> FirstPass<'a, C> {
             };
             idx = self.read_markup(idx + offset);
         }
-        match self.output {
+        let page = match self.output {
             Some(mut out) => {
                 out.push_str(&self.input[self.last..]);
                 Cow::Owned(out)
             }
             None => Cow::Borrowed(self.input),
-        }
+        };
+        (page, self.kept_scripts)
     }
 
     /// Read the markup that the `<` at `idx` starts. Returns the position of the next read.
@@ -377,10 +420,16 @@ impl<'a, C: FnMut(PassRead)> FirstPass<'a, C> {
             last: self.last,
             name,
             content,
-            page: self.page,
         };
-        if strip_raw_text_element(&element, tag_end, close, &mut self.output) {
+        let outcome = strip_raw_text_element(&element, tag_end, close, &mut self.output);
+        if outcome != Outcome::Unchanged {
             self.last = close.1;
+        }
+        #[cfg(feature = "metadata")]
+        {
+            if outcome == Outcome::Kept && content == RawTextContent::RemovedUnlessStructuredData {
+                self.kept_scripts.record(&self.input[tag_end..close.0]);
+            }
         }
         close.1
     }
@@ -411,7 +460,7 @@ enum TagSide {
 fn raw_text_start_tag_end(bytes: &[u8], lt: usize, name: &[u8]) -> Option<usize> {
     let after_name = raw_text_tag_name_end(bytes, lt, name, TagSide::Start)?;
     let first_bracket = || memchr::memchr(b'>', &bytes[after_name..]).map(|offset| after_name + offset + 1);
-    whole_tag_end(bytes, after_name).or_else(first_bracket)
+    whole_tag_end(bytes, after_name, &mut 0).or_else(first_bracket)
 }
 
 /// The one rule for the name of the start tag and of the end tag of a raw-text element. If
@@ -444,7 +493,8 @@ fn raw_text_tag_name_end(bytes: &[u8], lt: usize, name: &[u8], side: TagSide) ->
 }
 
 /// The position after the `>` that ends the tag read from `from`, a position in the tag after
-/// its `<`. Returns `None` when a value or the tag does not end.
+/// its `<`. Returns `None` when a value or the tag does not end. `stops` counts the places
+/// where the read stops to look at a byte.
 ///
 /// ~keep The HTML rule: a quote opens a value only as the first byte of the value, after `=`
 /// ~keep and white space. A value with no quotes ends at white space or at `>`: the apostrophe
@@ -453,9 +503,10 @@ fn raw_text_tag_name_end(bytes: &[u8], lt: usize, name: &[u8], side: TagSide) ->
 /// ~keep Outside a value only `>` and `=` change the read, so the read jumps to the next one of
 /// ~keep the two: most bytes of a page are in a tag or between two tags, and a read of each
 /// ~keep byte of each tag is a cost on every page.
-fn whole_tag_end(bytes: &[u8], from: usize) -> Option<usize> {
+fn whole_tag_end(bytes: &[u8], from: usize, stops: &mut usize) -> Option<usize> {
     let mut idx = from;
     loop {
+        *stops += 1;
         idx += memchr::memchr2(b'>', b'=', bytes.get(idx..)?)?;
         if bytes[idx] == b'>' {
             return Some(idx + 1);

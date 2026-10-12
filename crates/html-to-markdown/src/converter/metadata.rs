@@ -7,9 +7,9 @@
 //! - **math**: Visible text of `MathML` elements
 
 use crate::converter::block::container::HandlerContext;
-use crate::options::ConversionOptions;
 #[cfg(feature = "metadata")]
-use crate::text::decode_attribute_value_cow;
+use crate::converter::utility::preprocessing::{KeptScripts, ScriptType, script_type};
+use crate::options::ConversionOptions;
 use crate::text::escape;
 use tl::{NodeHandle, Parser};
 
@@ -119,24 +119,25 @@ fn collect_json_ld_from_children(children: &tl::Children, parser: &Parser, handl
         if child_name.as_ref() != "script" {
             continue;
         }
-        if let Some(json) = json_ld_from_tag(child_tag, parser) {
+        if let Some(json) = json_ld_from_tag(child_tag, parser, &handler.ctx.kept_scripts) {
             collector.borrow_mut().add_json_ld(json);
         }
     }
 }
 
+/// The structured data of a script, as the page has it.
+///
+/// ~keep The tree holds the text of a kept script with the escape of the first pass.
+/// ~keep `KeptScripts` takes it back; this function decodes nothing, so a character reference
+/// ~keep of the JSON stays as written.
 #[cfg(feature = "metadata")]
-fn json_ld_from_tag(tag: &tl::HTMLTag<'_>, parser: &Parser) -> Option<String> {
+fn json_ld_from_tag(tag: &tl::HTMLTag<'_>, parser: &Parser, kept_scripts: &KeptScripts) -> Option<String> {
     let type_value = crate::converter::utility::attributes::decoded_attribute(tag, "type")?;
-    let media_type = type_value
-        .split(';')
-        .next()
-        .unwrap_or_else(|| type_value.as_ref())
-        .trim();
-    if !media_type.eq_ignore_ascii_case("application/ld+json") {
+    if script_type(&type_value) != ScriptType::StructuredData {
         return None;
     }
-    let json = decode_attribute_value_cow(tag.inner_text(parser).trim()).into_owned();
+    let text = tag.inner_text(parser);
+    let json = kept_scripts.as_written(text.trim()).into_owned();
     (!json.is_empty()).then_some(json)
 }
 
@@ -156,7 +157,7 @@ fn handle_script(node_handle: &NodeHandle, parser: &Parser, _output: &mut String
     #[cfg(feature = "metadata")]
     if ctx.metadata_wants.structured_data
         && let Some(collector) = ctx.metadata_collector.as_ref()
-        && let Some(json) = json_ld_from_tag(tag, parser)
+        && let Some(json) = json_ld_from_tag(tag, parser, &ctx.kept_scripts)
     {
         collector.borrow_mut().add_json_ld(json);
     }

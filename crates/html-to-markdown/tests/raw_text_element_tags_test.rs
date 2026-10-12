@@ -342,6 +342,72 @@ mod structured_data {
             }
         }
     }
+
+    /// A structured data script with no end tag holds the rest of the page as its text. The
+    /// parser reads it as one script with one text: a start tag in that text opens no script
+    /// in the script. A page of such start tags nested one script for each of them, and a
+    /// large page ended the process with a stack overflow.
+    #[test]
+    fn a_script_with_no_end_tag_is_one_script_with_the_rest_of_the_page_as_its_text() {
+        const START_TAGS: usize = 200;
+        let unit = "<script type=\"application/ld+json\">{} ";
+        let html = format!("<p>x</p>{}", unit.repeat(START_TAGS));
+        let rest = format!("{{}} {}", unit.repeat(START_TAGS - 1));
+        assert_eq!(raw_json(&html), vec![vec![rest.trim_end().to_string()]; 2]);
+    }
+
+    /// A media type that only starts with the name of structured data is not structured data.
+    #[test]
+    fn a_script_of_a_longer_media_type_is_not_read() {
+        for media_type in super::LONGER_MEDIA_TYPES {
+            let html = format!("<p>foo <script type=\"{media_type}\">{{\"a\":1}}</script> bar</p>");
+            assert_eq!(raw_json(&html), vec![Vec::<String>::new(); 2], "{html:?}");
+        }
+    }
+}
+
+/// Media types that start with the name of structured data and are longer. The script stays in
+/// the tree and is not read as structured data.
+const LONGER_MEDIA_TYPES: [&str; 3] = [
+    "application/ld+jsonx",
+    "application/ld+json5",
+    "application/ld+json, text/plain",
+];
+
+/// `preserve_tags` writes such a script as it writes a structured data script: with the `&` of
+/// the page and with `&lt;` for a `<`.
+#[test]
+fn a_preserved_script_of_a_longer_media_type_keeps_the_ampersands_of_the_page() {
+    for media_type in LONGER_MEDIA_TYPES {
+        let html = format!(
+            "<p>foo <script type=\"{media_type}\">{{\"a\":\"a & b &amp; c < d &lt; e\"}}</script> bar</p><p>after</p>"
+        );
+        let expected = format!(
+            "foo <script type=\"{media_type}\">{{\"a\":\"a & b &amp; c &lt; d &lt; e\"}}</script> bar\n\nafter"
+        );
+        for tier_strategy in STRATEGIES {
+            assert_eq!(
+                content_with_preserved(&html, "script", tier_strategy),
+                expected,
+                "{tier_strategy:?}: {html:?}"
+            );
+        }
+    }
+}
+
+/// A script in `math` is no raw text: the page shows its text, with each character reference
+/// decoded. The first pass does not change an `&` of it.
+#[test]
+fn the_text_of_a_script_in_math_has_its_references_decoded() {
+    let html = "<p>foo</p><math><mi>x</mi><script type=\"application/ld+json\">{\"a\":\"a &amp; b\"}</script></math>\
+                <p>after</p>";
+    for tier_strategy in STRATEGIES {
+        assert_eq!(
+            content(html, tier_strategy),
+            "foo\n\nx{\"a\":\"a & b\"}\n\nafter",
+            "{tier_strategy:?}"
+        );
+    }
 }
 
 /// A textarea with no tag in it gives the same text as before.

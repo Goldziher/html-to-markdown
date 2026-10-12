@@ -37,6 +37,8 @@ pub struct ContextParameters {
     pub inline_collector: Option<InlineCollectorHandle>,
     #[cfg(feature = "metadata")]
     pub metadata_collector: Option<crate::metadata::MetadataCollectorHandle>,
+    /// The kept scripts of the page, from the first pass.
+    pub kept_scripts: crate::converter::utility::preprocessing::KeptScripts,
     #[cfg(feature = "visitor")]
     pub visitor: Option<crate::visitor::VisitorHandle>,
     pub structure_collector: Option<StructureCollectorHandle>,
@@ -392,6 +394,10 @@ pub struct Context {
     /// The address of the page, as far as it is known. A link asks it whether it points into
     /// the page (see `converter::url_resolve::OwnPage`).
     pub(crate) own_page: Rc<crate::converter::url_resolve::OwnPage>,
+    /// The kept scripts of the page. The reader of the structured data asks it for the text
+    /// of a script as written (see `KeptScripts`).
+    #[cfg(feature = "metadata")]
+    pub(crate) kept_scripts: Rc<crate::converter::utility::preprocessing::KeptScripts>,
 }
 
 impl Context {
@@ -406,6 +412,9 @@ impl Context {
     pub(crate) fn new(options: &crate::options::ConversionOptions, parameters: ContextParameters) -> Self {
         #[cfg(feature = "metadata")]
         let metadata = metadata_preferences(parameters.metadata_collector.as_ref());
+        // ~keep Only the reader of the structured data asks for the kept scripts.
+        #[cfg(not(feature = "metadata"))]
+        let _: crate::converter::utility::preprocessing::KeptScripts = parameters.kept_scripts;
         Self {
             in_code: false,
             in_code_block: false,
@@ -479,6 +488,8 @@ impl Context {
             measure_width_only: false,
             base_url: parameters.base_url,
             own_page: Rc::new(parameters.own_page),
+            #[cfg(feature = "metadata")]
+            kept_scripts: Rc::new(parameters.kept_scripts),
         }
     }
 

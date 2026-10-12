@@ -504,12 +504,41 @@ pub fn is_json_ld_script_open_tag(tag: &str) -> bool {
 
             // ~keep The decision reads the decoded value: `ld&#43;json` names the same type.
             let value = crate::text::decode_attribute_value_cow(&tag[value_start..value_end]);
-            let media_type = value.split(';').next().unwrap_or(&value).trim();
-            return eq_ascii_case_insensitive(media_type.as_bytes(), b"application/ld+json");
+            return script_type(&value) != ScriptType::Removed;
         }
         idx += 1;
     }
     false
+}
+
+/// What the `type` of a script makes of the script.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ScriptType {
+    /// The two passes remove the script.
+    Removed,
+    /// The script stays in the tree and is not read as structured data.
+    KeptNotRead,
+    /// The script stays in the tree and is read as structured data.
+    StructuredData,
+}
+
+/// The one rule of the `type` of a script. `type_value` is the decoded value of the attribute.
+///
+/// ~keep The two passes, the fast converter and the reader of the metadata ask this function,
+/// ~keep so they cannot disagree. The media type is the value before the first `;`, with no
+/// ~keep white space at its two ends, in any case. A media type that only starts with the name
+/// ~keep (`application/ld+jsonx`) keeps the script in the tree, as it always did, and is not
+/// ~keep structured data.
+pub fn script_type(type_value: &str) -> ScriptType {
+    const STRUCTURED_DATA: &[u8] = b"application/ld+json";
+    let media_type = type_value.split(';').next().unwrap_or(type_value).trim().as_bytes();
+    if media_type.eq_ignore_ascii_case(STRUCTURED_DATA) {
+        ScriptType::StructuredData
+    } else if eq_ascii_case_insensitive(media_type, STRUCTURED_DATA) {
+        ScriptType::KeptNotRead
+    } else {
+        ScriptType::Removed
+    }
 }
 
 /// Case-insensitive byte comparison for ASCII.

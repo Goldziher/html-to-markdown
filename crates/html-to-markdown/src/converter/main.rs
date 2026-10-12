@@ -23,9 +23,10 @@ use crate::converter::plain_text::extract_plain_text;
 use crate::converter::preprocessing_helpers::{is_page_header, should_drop_for_preprocessing};
 use crate::converter::utility::content::{is_block_level_element, normalized_tag_name};
 use crate::converter::utility::preprocessing::{
-    PRESERVED_MENU_ATTRIBUTE, normalize_bogus_comment_endings, normalize_menu_elements, normalize_split_closing_tags,
-    normalize_unclosed_list_items, preprocess_html, restore_preserved_menu_elements, strip_bogus_comments,
-    strip_hidden_elements, strip_html_cdata, strip_script_and_style_tags, strip_script_and_style_tags_of_repaired_page,
+    KeptScripts, PRESERVED_MENU_ATTRIBUTE, normalize_bogus_comment_endings, normalize_menu_elements,
+    normalize_split_closing_tags, normalize_unclosed_list_items, preprocess_html, restore_preserved_menu_elements,
+    strip_bogus_comments, strip_hidden_elements, strip_html_cdata, strip_script_and_style_tags,
+    strip_script_and_style_tags_with_kept_scripts,
 };
 use crate::converter::utility::serialization::serialize_tag_to_html;
 use crate::options::{NewlineStyle, OutputFormat};
@@ -90,7 +91,7 @@ pub fn convert_html_impl(
         head_repair_limit,
     } = parameters;
     let preserve_menu = options.preserve_tags.iter().any(|tag| tag.eq_ignore_ascii_case("menu"));
-    let (preprocessed, prepare_limit) = prepare_html(html, preserve_menu);
+    let (preprocessed, prepare_limit, kept_scripts) = prepare_html(html, preserve_menu);
     let repaired_page = std::cell::OnceCell::new();
     let ParsedPage {
         mut dom,
@@ -121,6 +122,7 @@ pub fn convert_html_impl(
             inline_collector,
             #[cfg(feature = "metadata")]
             metadata_collector,
+            kept_scripts,
             #[cfg(feature = "visitor")]
             visitor,
             structure_collector: structure_collector.as_ref().map(std::rc::Rc::clone),
@@ -375,17 +377,20 @@ fn document_language_and_direction(
     (language, direction)
 }
 
-fn prepare_html(html: &str, preserve_menu: bool) -> (String, Option<crate::types::WarningKind>) {
-    let preprocessed = preprocess_initial_html(html, preserve_menu);
+/// The page that the parser reads, the limit that a repair reached, and the kept scripts of
+/// the page for the reader of the structured data.
+fn prepare_html(html: &str, preserve_menu: bool) -> (String, Option<crate::types::WarningKind>, KeptScripts) {
+    let (preprocessed, kept_scripts) = preprocess_initial_html(html, preserve_menu);
     if has_custom_element_tags(&preprocessed) {
-        return repair_custom_elements(preprocessed, preserve_menu);
+        let (repaired, limit) = repair_custom_elements(preprocessed, preserve_menu);
+        return (repaired, limit, kept_scripts);
     }
-    (preprocessed, None)
+    (preprocessed, None, kept_scripts)
 }
 
-fn preprocess_initial_html(html: &str, preserve_menu: bool) -> String {
+fn preprocess_initial_html(html: &str, preserve_menu: bool) -> (String, KeptScripts) {
     let stripped = strip_html_cdata(html);
-    let stripped = strip_script_and_style_tags(&stripped);
+    let (stripped, kept_scripts) = strip_script_and_style_tags_with_kept_scripts(&stripped);
     // ~keep Bogus comments must be removed before tag-shaped preprocessing examines them.
     let stripped = strip_bogus_comments(&stripped);
     let stripped = strip_hidden_elements(&stripped);
@@ -394,12 +399,12 @@ fn preprocess_initial_html(html: &str, preserve_menu: bool) -> String {
     // ~keep Implicit list-item closes prevent deeply nested parser output on large changelogs.
     let stripped = normalize_unclosed_list_items(&stripped);
     let stripped = normalize_menu_elements(&stripped, preserve_menu);
-    preprocess_html(&stripped).into_owned()
+    (preprocess_html(&stripped).into_owned(), kept_scripts)
 }
 
 fn preprocess_repaired_html(html: &str, preserve_menu: bool) -> String {
     let stripped = strip_html_cdata(html);
-    let stripped = strip_script_and_style_tags_of_repaired_page(&stripped);
+    let stripped = strip_script_and_style_tags(&stripped);
     let stripped = strip_hidden_elements(&stripped);
     let stripped = normalize_bogus_comment_endings(&stripped);
     let stripped = normalize_split_closing_tags(&stripped);

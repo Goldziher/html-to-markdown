@@ -1,7 +1,7 @@
 use std::borrow::Cow;
 
 use super::markup::second_pass;
-use super::raw_text::{FirstPass, PassRead, RawTextPage};
+use super::raw_text::{FirstPass, PassRead};
 use super::{
     find_closing_tag_bytes, find_closing_tag_bytes_nested, find_tag_end, normalize_bogus_comment_endings,
     normalize_menu_elements, normalize_split_closing_tags, normalize_unclosed_list_items,
@@ -585,6 +585,8 @@ struct Reads {
     searches: usize,
     /// The bytes that the reads of a tag went over.
     tag_bytes: usize,
+    /// The places where the reads of a tag stopped to look at a byte.
+    tag_stops: usize,
 }
 
 impl Reads {
@@ -593,13 +595,14 @@ impl Reads {
             PassRead::Markup => self.markup += 1,
             PassRead::EndTagSearch | PassRead::CommentEndSearch => self.searches += 1,
             PassRead::TagRead(bytes) => self.tag_bytes += bytes,
+            PassRead::TagStops(stops) => self.tag_stops += stops,
         }
     }
 }
 
 fn first_pass_reads(input: &str) -> Reads {
     let mut reads = Reads::default();
-    let stripped = FirstPass::new(input, RawTextPage::Source, |read| reads.count(read)).run();
+    let (stripped, _) = FirstPass::new(input, |read| reads.count(read)).run();
     assert_eq!(stripped.as_ref(), input, "nothing in the page has an end");
     reads
 }
@@ -702,12 +705,101 @@ fn a_tag_is_read_to_the_bracket_that_is_in_no_value() {
         "<a x=y= z='>'>",
         "<a x== y='>'>",
         "<a 'x' y='>'>",
+        "<a x' y='>'>",
     ] {
         let html = format!("{tag}z</a>");
         let whole = tag.len() - "<".len() + "/a>".len();
         for (pass, reads) in [("first", first_pass_reads(&html)), ("second", second_pass_reads(&html))] {
             assert_eq!(reads.tag_bytes, whole, "{tag:?}, {pass} pass");
         }
+    }
+}
+
+/// The read of a tag looks at the bytes that can change it and jumps over the others: it
+/// stops at each `=` and at the `>`, not at each byte. The count is of the stops, so a read
+/// that goes byte by byte over the same tag fails here.
+#[test]
+fn the_read_of_a_tag_stops_at_an_equals_sign_and_at_the_bracket_only() {
+    let html = format!("<a {}x=1 {}>z</a>", "b ".repeat(500), "c ".repeat(500));
+    for (pass, reads) in [("first", first_pass_reads(&html)), ("second", second_pass_reads(&html))] {
+        assert!(reads.tag_bytes > 2_000, "{pass} pass: the read went over the tag");
+        assert_eq!(
+            reads.tag_stops, 3,
+            "{pass} pass: the `=`, the `>` of the tag, the `>` of `</a>`"
+        );
+    }
+}
+
+/// A kept script is written with each `<` as `&lt;` and with nothing else changed, so the pass
+/// changes nothing in a page that it wrote: a repaired page is read as the page of the author.
+#[test]
+fn the_first_pass_changes_nothing_in_a_kept_script_that_it_wrote() {
+    use super::strip_script_and_style_tags;
+    let open = r#"<script type="application/ld+json">"#;
+    for body in [
+        r#"{"a":"a & b &amp; c < d &lt; e"}"#,
+        r#"{"a":"<p>x</p>"}"#,
+        "{} <script type=\"application/ld+json\">{} <script type=\"application/ld+json\">{} ",
+    ] {
+        let once = strip_script_and_style_tags(&format!("<p>a</p>{open}{body}</script><p>b</p>")).into_owned();
+        assert_eq!(
+            once,
+            format!("<p>a</p>{open}{}</script><p>b</p>", body.replace('<', "&lt;")),
+            "{body:?}"
+        );
+        assert_eq!(strip_script_and_style_tags(&once), once, "{body:?}: the second read");
+    }
+}
+
+/// The reader of the structured data gets the text of a kept script as the page has it: the
+/// escape of the first pass is taken back and no character reference is decoded.
+#[cfg(feature = "metadata")]
+#[test]
+fn the_text_of_a_kept_script_is_given_as_written() {
+    use super::strip_script_and_style_tags_with_kept_scripts;
+    let open = r#"<script type="application/ld+json">"#;
+    for body in [
+        r#"{"a":"?a=1&b=2 &amp; &#38; &amp;amp;"}"#,
+        r#"{"a":"a < b"}"#,
+        r#"{"a":"a &lt; b"}"#,
+        r#"{"a":"a & b &amp; c < d &lt; e &amp;lt; f"}"#,
+        "{\"a\":\"<p>x</p>\",\r\n\"b\":\"&lt;\"}",
+    ] {
+        let html = format!("<p>a</p>{open} {body}\n</script><p>b</p>");
+        let (page, kept_scripts) = strip_script_and_style_tags_with_kept_scripts(&html);
+        let in_tree = page
+            .strip_prefix(&format!("<p>a</p>{open}"))
+            .and_then(|rest| rest.strip_suffix("</script><p>b</p>"))
+            .expect("the kept script");
+        assert!(!in_tree.contains('<'), "{body:?}: one text for the parser");
+        assert_eq!(kept_scripts.as_written(in_tree.trim()), body, "{body:?}");
+        // ~keep The tree builder writes CR LF as LF.
+        let repaired = in_tree.replace("\r\n", "\n");
+        assert_eq!(
+            kept_scripts.as_written(repaired.trim()),
+            body,
+            "{body:?}: a repaired page"
+        );
+    }
+}
+
+/// The one rule of the `type` of a script: the media type before the first `;`, in any case.
+/// A longer media type that starts with the name keeps the script and is not structured data.
+#[test]
+fn the_type_of_a_script_is_read_by_one_rule() {
+    use super::markup::{ScriptType, script_type};
+    for (value, expected) in [
+        ("application/ld+json", ScriptType::StructuredData),
+        (" Application/LD+JSON ; charset=utf-8", ScriptType::StructuredData),
+        ("application/ld+json;", ScriptType::StructuredData),
+        ("application/ld+jsonx", ScriptType::KeptNotRead),
+        ("application/ld+json5", ScriptType::KeptNotRead),
+        ("application/ld+json, text/plain", ScriptType::KeptNotRead),
+        ("x-application/ld+json", ScriptType::Removed),
+        ("application/json", ScriptType::Removed),
+        ("", ScriptType::Removed),
+    ] {
+        assert_eq!(script_type(value), expected, "{value:?}");
     }
 }
 
