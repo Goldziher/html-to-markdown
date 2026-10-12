@@ -208,11 +208,6 @@ fn move_leading_hard_breaks<'a>(
         };
         after_breaks = rest;
     }
-    // ~keep A break-only wrapper separates adjacent words instead of authoring a hard break (#502).
-    if after_breaks.trim().is_empty() {
-        return content;
-    }
-
     // ~keep The bare newline is an internal sentinel from a break at the start of a detached
     // ~keep wrapper. It becomes a hard break only when real paragraph content precedes the
     // ~keep wrapper; hoisting it into the paragraph's own empty block buffer recreates the
@@ -220,6 +215,18 @@ fn move_leading_hard_breaks<'a>(
     let drop_at_paragraph_start = ctx.in_paragraph
         && output.len() == ctx.block_content_start
         && std::ptr::from_ref::<String>(output) as usize == ctx.block_output_ptr;
+    // ~keep A break-only wrapper at the paragraph start has no preceding line (#572).
+    // ~keep An empty enclosing scratch buffer owes a separator, not a hard break (#504).
+    if after_breaks.trim().is_empty() {
+        return if drop_at_paragraph_start {
+            after_breaks
+        } else if output.is_empty() && content.ends_with('\n') {
+            &content[content.len() - 1..]
+        } else {
+            content
+        };
+    }
+
     let mut remaining = content;
     let mut moved = false;
     loop {
@@ -282,19 +289,18 @@ pub fn emit_wrapped_inline(
 
     let content = move_leading_hard_breaks(output, content, ctx, options);
     let (prefix, suffix, trimmed) = chomp_inline(content);
-    // ~keep Unicode-only space is content, not a collapsible separator (#843). Empty marks
-    // ~keep cannot represent emphasis on it, so retain the characters without delimiters.
+    // ~keep A noncollapsible blank body after an existing space keeps its character (#843).
+    // ~keep Leading whitespace or a leading break still follows the existing blank-wrapper rule.
     let marker = crate::converter::main_helpers::hard_break_marker(options);
     let blank_body = content.trim_end_matches(marker);
-    if blank_body.chars().all(char::is_whitespace)
+    if output.ends_with([' ', '\t'])
+        && !content.starts_with(crate::converter::utility::white_space::is_collapsible)
+        && blank_body.chars().all(char::is_whitespace)
         && !blank_body
             .chars()
             .all(crate::converter::utility::white_space::is_collapsible)
     {
         let body = blank_body.trim_matches(crate::converter::utility::white_space::is_collapsible);
-        if content.starts_with([' ', '\t']) {
-            crate::converter::utility::content::push_inline_prefix(output, " ", options, ctx);
-        }
         output.push_str(body);
         let breaks = &content[blank_body.len()..];
         if breaks.is_empty() {
@@ -304,7 +310,8 @@ pub fn emit_wrapped_inline(
         }
         return;
     }
-    if content.trim().is_empty() {
+    // ~keep A backslash hard-break suffix must not turn a blank body into literal empty marks.
+    if blank_body.trim().is_empty() {
         if content.is_empty() {
             return;
         }

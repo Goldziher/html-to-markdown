@@ -44,8 +44,8 @@ fn should_preserve_hard_break_regardless_of_prefix_length() {
     for length in 1..=24 {
         let prefix = "a".repeat(length);
         assert_routes(
-            &format!("{prefix}<i><hr></i><div><em><hr><img alt=\"  \"><br>"),
-            &format!("{prefix}*---*\n\n*--- ![  ](<>)*  \n"),
+            &format!("{prefix}<i><hr></i><div><em><hr><img src=/i alt=\"  \"><br>"),
+            &format!("{prefix}*---*\n\n*--- ![  ](/i)*  \n"),
         );
     }
 }
@@ -142,4 +142,59 @@ fn should_preserve_nested_noncollapsible_blank_characters() {
             style,
         );
     }
+}
+
+#[test]
+fn should_keep_a_break_only_wrapper_after_content_in_a_later_paragraph() {
+    assert_routes("<p>a</p><p>q<em><br></em></p>", "a\n\nq  \n");
+}
+
+#[test]
+fn should_keep_nbsp_normalization_outside_the_after_space_trigger() {
+    for (body, expected) in [
+        ("a<b>&nbsp;</b>b", "a b"),
+        ("a<b> &nbsp;</b>", "a"),
+        ("a <em><br>&nbsp;</em> b", "a b"),
+        ("a <em> &nbsp;</em>b", "a b"),
+    ] {
+        assert_routes(&format!("<p>{body}</p>"), &format!("{expected}\n"));
+        assert_routes(&format!("<h2>{body}</h2>"), &format!("## {expected}\n"));
+        assert_routes(
+            &format!("<table><tr><td>{body}</td></tr></table>"),
+            &format!("| {expected} |\n| --- |\n"),
+        );
+    }
+}
+
+#[test]
+fn should_keep_a_break_only_wrapper_after_content_in_the_first_paragraph() {
+    assert_routes("<p>a<em><br></em>b</p>", "a  \nb\n");
+    assert_routes("<p><em><br></em>word</p>", "word\n");
+    assert_routes("<p><em><br>word</em></p>", "*word*\n");
+    assert_routes("<br>word", "\nword\n");
+}
+
+#[test]
+fn should_preserve_nbsp_after_a_space_in_default_marked_highlights() {
+    for highlight_style in [HighlightStyle::DoubleEqual, HighlightStyle::Bold] {
+        for tier_strategy in [TierStrategy::Auto, TierStrategy::Tier1, TierStrategy::Tier2] {
+            let options = ConversionOptions {
+                tier_strategy,
+                highlight_style,
+                extract_metadata: false,
+                ..Default::default()
+            };
+            let output = convert("<p>a <mark>&nbsp;</mark> b</p>", options)
+                .expect("marked highlight")
+                .content
+                .unwrap();
+            assert_eq!(output, "a \u{a0} b\n", "{highlight_style:?}, {tier_strategy:?}");
+        }
+    }
+}
+
+#[test]
+fn should_keep_configured_break_only_wrapper_markers_outside_empty_emphasis() {
+    assert_routes_with_newlines("<p>a<em><br></em>b</p>", "a\\\nb\n", NewlineStyle::Backslash);
+    assert_routes_with_newlines("<p>a</p><p>q<em><br></em></p>", "a\n\nq\n", NewlineStyle::Backslash);
 }

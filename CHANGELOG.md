@@ -12,7 +12,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Inline elements whose body is only a no-break space or another noncollapsible blank character
   keep that character after an existing space instead of dropping it (#843). Breaks at the end of
   emphasis use positions from the same output buffer, so preceding text length no longer removes
-  a hard break (#863). Code-like elements with block children or leading breaks use the full
+  a hard break. With the default newline style, direct break-only emphasis after paragraph text
+  retains its hard break on every route, including in the first paragraph (#863). Code-like elements with block children or leading breaks use the full
   converter's tree rules on every route, avoiding different output from the fast scanner (#842).
 - White space at the start or the end of a link label or of a short quotation is written beside
   the link or the quotation, not inside it, as it is for bold text. `Press <a href="/p">Go </a>now.` gave `Press [Go](/p)now.` and
