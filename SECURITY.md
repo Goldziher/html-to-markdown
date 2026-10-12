@@ -10,7 +10,7 @@ Email both maintainers directly:
 - **Na'aman Hirschfeld** — <naaman@xberg.io>
 - **Tobias Silva** — <tobias@xberg.io>
 
-You may also use GitHub's [private vulnerability reporting](https://docs.github.com/en/code-security/security-advisories/guidance-on-reporting-and-writing-information-about-vulnerabilities/privately-reporting-a-security-vulnerability) on this repository, which opens a private channel with the maintainers.
+You may also use GitHub's [private vulnerability reporting](https://github.com/xberg-io/html-to-markdown/security/advisories/new) on this repository, which opens a private channel with the maintainers.
 
 ### What to include
 

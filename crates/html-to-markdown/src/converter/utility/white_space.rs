@@ -218,6 +218,65 @@ pub fn space_is_owed(written: &str) -> bool {
     !written.ends_with([' ', '\n'])
 }
 
+/// What stands right before a text.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TextPlace {
+    /// A `<br>` that ends a line is the element before the text.
+    AfterBreak,
+    /// The text is the first content of its parent element.
+    ElementStart,
+    /// An element that holds no text is before the text: an image, an empty `span`, a `span` of
+    /// white space only, a `<br>` in a table cell. No text is what [`classify_text`] calls
+    /// white space only.
+    AfterEmptyElement,
+    /// An element in the text flow ([`writes_in_text_flow`]) is before the text, and its content
+    /// ends with a text that ends with collapsible white space.
+    AfterFlowElement,
+    /// Text is before the text: another text, an element that holds text and writes marks, or
+    /// the line end before an element in the text flow that has no content.
+    AfterText,
+}
+
+/// Whether the element `name` writes its content into the text flow with no mark of its own, so
+/// that the white space of its content is white space of the text around it.
+///
+/// ~keep Only `span` is one here, as on `main`. Other elements that write no mark (`small`, `u`,
+/// ~keep `abbr`, an `a` with no address) keep the rule of an element with text.
+#[must_use]
+pub fn writes_in_text_flow(name: &str) -> bool {
+    name == "span"
+}
+
+/// Whether the white space that `decoded` starts with holds a Unicode space: a no-break space
+/// or another space of [`text::is_unicode_space`]. A form feed is none.
+#[must_use]
+pub fn starts_with_unicode_space(decoded: &str) -> bool {
+    decoded
+        .chars()
+        .take_while(|character| character.is_whitespace())
+        .any(text::is_unicode_space)
+}
+
+/// Whether the Unicode space that a text starts with is written after the space that `written`
+/// ends with. Both converters ask here: the full converter writes it, the fast converter gives
+/// the page to the full one.
+///
+/// ~keep A no-break space is a character (rule 1): `a <img>&nbsp;b`, `a <span></span>&nbsp;b`
+/// ~keep and `a <span> </span>&nbsp;b` have two spaces: the white space in the `span` is the run
+/// ~keep of the space before it. After an element in the text flow whose text ends with a space
+/// ~keep it is a character too (`a <span>x </span>&nbsp;b` has two spaces).
+/// ~keep It joins the space where the two are one run of text (`a &nbsp;b`, `<b>a </b>&nbsp;b`,
+/// ~keep a comment between the two, the line end before an empty `span`), and where it would start a line or
+/// ~keep an element: after a `<br>` whose line end is a space (a heading has one line), and as
+/// ~keep the first content of an element (`a <span>&nbsp;x</span>`, the marker of a list item).
+/// ~keep A table cell has no line to start: the `<br>` there is a space between two words, an
+/// ~keep element with no text, and the no-break space after it is a character
+/// ~keep (`<td>a<br>&nbsp;b</td>` has two spaces).
+#[must_use]
+pub fn unicode_space_is_kept(written: &str, place: TextPlace) -> bool {
+    written.ends_with(' ') && matches!(place, TextPlace::AfterEmptyElement | TextPlace::AfterFlowElement)
+}
+
 /// Rule 4 in the full converter, which builds the body of an inline element in a scratch
 /// buffer of its own: an empty scratch buffer is mid-line and owes the space, an empty block
 /// buffer is a line start and owes none.
@@ -412,6 +471,32 @@ mod tests {
         assert!(with_break.writes_space(Some('s'), Some('G')));
         assert!(!with_break.writes_space(Some('\u{200b}'), Some('G')));
         assert!(!with_break.writes_space(Some('s'), Some('\u{200b}')));
+    }
+
+    #[test]
+    fn a_unicode_space_is_kept_after_a_space_only_after_an_element_with_no_text() {
+        for (text, starts) in [
+            ("\u{a0}b", true),
+            (" \u{a0}b", true),
+            ("\u{3000}b", true),
+            (" b", false),
+            ("\u{c}\nb", false),
+            ("\u{b}b", false),
+            ("b\u{a0}", false),
+            ("", false),
+        ] {
+            assert_eq!(starts_with_unicode_space(text), starts, "{text:?}");
+        }
+        assert!(unicode_space_is_kept("a ", TextPlace::AfterEmptyElement));
+        assert!(unicode_space_is_kept("a x ", TextPlace::AfterFlowElement));
+        assert!(!unicode_space_is_kept("a x", TextPlace::AfterFlowElement));
+        assert!(writes_in_text_flow("span"));
+        assert!(!writes_in_text_flow("b"));
+        assert!(!unicode_space_is_kept("a ", TextPlace::AfterBreak));
+        assert!(!unicode_space_is_kept("a ", TextPlace::ElementStart));
+        assert!(!unicode_space_is_kept("a ", TextPlace::AfterText));
+        assert!(!unicode_space_is_kept("a", TextPlace::AfterEmptyElement));
+        assert!(!unicode_space_is_kept("a\n", TextPlace::AfterEmptyElement));
     }
 
     #[test]

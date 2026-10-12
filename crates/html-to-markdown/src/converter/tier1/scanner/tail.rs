@@ -101,6 +101,11 @@ fn emit_table_row(target: &mut String, row: &[(String, u16)], widths: &[usize]) 
         }
         column += usize::from(*span);
     }
+    for width in &widths[column..] {
+        target.push(' ');
+        target.extend(std::iter::repeat_n(' ', *width));
+        target.push_str(" |");
+    }
     target.push('\n');
 }
 

@@ -56,6 +56,161 @@ pub fn get_previous_sibling_tag<'a>(
     None
 }
 
+#[cfg(test)]
+thread_local! {
+    /// The sibling entries that `text_place` read on this thread.
+    pub(crate) static TEXT_PLACE_SIBLING_VISITS: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
+}
+
+#[cfg(test)]
+fn count_sibling_visits(visits: usize) {
+    TEXT_PLACE_SIBLING_VISITS.with(|total| total.set(total.get() + visits));
+}
+
+#[cfg(not(test))]
+const fn count_sibling_visits(_visits: usize) {}
+
+/// The index of `id` in `siblings` by a scan from the first sibling, for a node that the index
+/// of the tree does not hold.
+fn scan_for_sibling_index(siblings: &[tl::NodeHandle], id: u32) -> Option<usize> {
+    let position = siblings.iter().position(|sibling| sibling.get_inner() == id);
+    count_sibling_visits(position.map_or(siblings.len(), |position| position + 1));
+    position
+}
+
+/// What stands right before the text `node_handle`: a `<br>` that ends a line, the start of its
+/// parent element, an element that holds no text, or text. A comment before the text does not
+/// count. An element holds no text when it has only white space, comments and elements with no
+/// text in it (`DomContext::holds_text`): `<span> </span>` is one, as `<span></span>` is.
+///
+/// ~keep `in_cell` tells that the text is in a table cell. A cell has one line: the `<br>` there
+/// ~keep is a space between two words, an element with no text, also in a heading in the cell.
+/// ~keep The index of the tree gives the position of the text: a scan from the first sibling
+/// ~keep for each text is quadratic in the count of siblings.
+pub fn text_place(
+    node_handle: tl::NodeHandle,
+    parser: &tl::Parser,
+    dom_ctx: &DomContext,
+    in_cell: bool,
+) -> crate::converter::utility::white_space::TextPlace {
+    use crate::converter::utility::white_space::TextPlace;
+    if get_previous_sibling_tag(&node_handle, parser, dom_ctx) == Some("br") {
+        return if in_cell {
+            TextPlace::AfterEmptyElement
+        } else {
+            TextPlace::AfterBreak
+        };
+    }
+    let id = node_handle.get_inner();
+    let siblings = dom_ctx
+        .parent_of(id)
+        .map_or(Some(&dom_ctx.root_children), |parent| dom_ctx.children_of(parent));
+    let before = siblings
+        .and_then(|siblings| {
+            let position = dom_ctx
+                .sibling_index(id)
+                .or_else(|| scan_for_sibling_index(siblings, id))?;
+            siblings.get(..position)
+        })
+        .unwrap_or_default();
+    let previous = before
+        .iter()
+        .enumerate()
+        .rev()
+        .inspect(|_| count_sibling_visits(1))
+        .find(|(_, sibling)| !matches!(sibling.get(parser), Some(tl::Node::Comment(_))));
+    match previous {
+        None => TextPlace::ElementStart,
+        Some((index, previous)) if matches!(previous.get(parser), Some(tl::Node::Tag(_))) => {
+            place_after_element(previous.get_inner(), &before[..index], parser, dom_ctx, in_cell)
+        }
+        Some(_) => TextPlace::AfterText,
+    }
+}
+
+/// The place of a text that has the element `element` right before it. `before` holds the
+/// siblings before that element.
+///
+/// ~keep An element in the text flow ([`writes_in_text_flow`]) writes no mark: the space that
+/// ~keep ends its text is a written space of the text, and the Unicode space after the element
+/// ~keep is a character after it (`a <span>x </span>&nbsp;b` has two spaces). When it has no
+/// ~keep content (`DomContext::holds_content`: empty elements in it are none) it writes
+/// ~keep nothing, and the line end before it is the white space that the text
+/// ~keep after it starts with: the two are one run (`a\n<span></span>&nbsp;b` has one space). A
+/// ~keep table cell has no line end: the rule of the empty element holds there.
+fn place_after_element(
+    element: u32,
+    before: &[tl::NodeHandle],
+    parser: &tl::Parser,
+    dom_ctx: &DomContext,
+    in_cell: bool,
+) -> crate::converter::utility::white_space::TextPlace {
+    use crate::converter::utility::white_space::{TextPlace, writes_in_text_flow};
+    let in_flow = dom_ctx
+        .tag_info(element, parser)
+        .is_some_and(|info| writes_in_text_flow(&info.name));
+    if dom_ctx.holds_text(element, parser) {
+        return if in_flow && ends_with_text_space(element, parser, dom_ctx) {
+            TextPlace::AfterFlowElement
+        } else {
+            TextPlace::AfterText
+        };
+    }
+    if in_flow && !in_cell && ends_with_line_end(before.last(), parser) && !dom_ctx.holds_content(element, parser) {
+        TextPlace::AfterText
+    } else {
+        TextPlace::AfterEmptyElement
+    }
+}
+
+/// Whether `node` is a text that ends with line ends right after a visible character.
+///
+/// ~keep A space before the line end is a written space of the text (`a \n<span></span>&nbsp;b`
+/// ~keep has two spaces on the fast converter of `main`): only the line end alone is joined.
+fn ends_with_line_end(node: Option<&tl::NodeHandle>, parser: &tl::Parser) -> bool {
+    let Some(tl::Node::Raw(raw)) = node.and_then(|node| node.get(parser)) else {
+        return false;
+    };
+    let raw = raw.as_utf8_str();
+    let decoded = crate::text::decode_html_entities_cow(raw.as_ref());
+    let before_line_ends = decoded.trim_end_matches(['\n', '\r']);
+    before_line_ends.len() < decoded.len() && before_line_ends.ends_with(|character: char| !character.is_whitespace())
+}
+
+/// Whether the content of the element `element` ends with a text that ends with collapsible
+/// white space: its last node, comments apart, is such a text, or an element in the text flow
+/// whose content ends so.
+///
+/// ~keep An element that writes marks puts its end space outside them: that space is no text
+/// ~keep of the `span` around it, and `a <span><a href="/u">x </a></span>&nbsp;b` has one space.
+/// ~keep A loop rather than recursion: nested elements are attacker-controlled depth. Each
+/// ~keep element is the last node of one parent, so no node is read for two texts.
+fn ends_with_text_space(mut element: u32, parser: &tl::Parser, dom_ctx: &DomContext) -> bool {
+    use crate::converter::utility::white_space::{is_collapsible, writes_in_text_flow};
+    loop {
+        let last = dom_ctx.children_of(element).and_then(|children| {
+            children
+                .iter()
+                .rev()
+                .find(|child| !matches!(child.get(parser), Some(tl::Node::Comment(_))))
+        });
+        match last.and_then(|last| last.get(parser).map(|node| (last.get_inner(), node))) {
+            Some((_, tl::Node::Raw(raw))) => {
+                let raw = raw.as_utf8_str();
+                return crate::text::decode_html_entities_cow(raw.as_ref()).ends_with(is_collapsible);
+            }
+            Some((inner, tl::Node::Tag(_)))
+                if dom_ctx
+                    .tag_info(inner, parser)
+                    .is_some_and(|info| writes_in_text_flow(&info.name)) =>
+            {
+                element = inner;
+            }
+            _ => return false,
+        }
+    }
+}
+
 /// The block element the content before `node_handle` in its parent ends with: the previous
 /// sibling when it is a block, or the block an inline sibling's own last content ends with
 /// (`<span><ul>...</ul></span>`). Whitespace text and comments are skipped (issue #585).
@@ -396,4 +551,81 @@ pub fn append_inline_suffix(
     }
 
     output.push_str(suffix);
+}
+
+#[cfg(test)]
+mod tests {
+    use super::TEXT_PLACE_SIBLING_VISITS;
+    use crate::converter::dom_context::HOLDS_TEXT_NODE_READS;
+    use crate::{ConversionOptions, TierStrategy, convert};
+
+    /// The sibling entries that `text_place` reads for `count` texts that each start with a
+    /// no-break space after a space and an empty element, all in one paragraph.
+    fn sibling_visits_for(count: usize) -> usize {
+        let html = format!("<p>{}</p>", "a <span></span>&nbsp;b ".repeat(count));
+        let options = ConversionOptions {
+            tier_strategy: TierStrategy::Tier2,
+            ..ConversionOptions::default()
+        };
+        TEXT_PLACE_SIBLING_VISITS.with(|visits| visits.set(0));
+        let result = convert(&html, options).expect("convert HTML");
+        let text = result.content.unwrap_or_default();
+        assert_eq!(text.matches("a  b").count(), count, "every no-break space is kept");
+        TEXT_PLACE_SIBLING_VISITS.with(std::cell::Cell::get)
+    }
+
+    /// The nodes that the test for an element with no text reads while the full converter writes
+    /// `html`, and the text it writes.
+    fn node_reads_for(html: &str) -> (usize, String) {
+        let options = ConversionOptions {
+            tier_strategy: TierStrategy::Tier2,
+            ..ConversionOptions::default()
+        };
+        HOLDS_TEXT_NODE_READS.with(|reads| reads.set(0));
+        let result = convert(html, options).expect("convert HTML");
+        (
+            HOLDS_TEXT_NODE_READS.with(std::cell::Cell::get),
+            result.content.unwrap_or_default(),
+        )
+    }
+
+    #[test]
+    fn should_read_a_bounded_count_of_nodes_for_each_text_after_nested_elements() {
+        // ~keep `depth` elements, one in the other, each with a text that starts with a no-break
+        // ~keep space after it: each of these texts asks whether the element before it holds
+        // ~keep text. An element that starts with text answers at its first node. An element that
+        // ~keep starts with white space answers from the record of the element in it. Without
+        // ~keep the stop at the first text, or without the record, the count grows with the
+        // ~keep square of the depth. The count of nodes is the measure, not the time.
+        for depth in [10, 20, 40] {
+            let ends = "</span>&nbsp;b ".repeat(depth);
+            let with_text = format!("<p>{}x {ends}</p>", "<span>a ".repeat(depth));
+            let (reads, text) = node_reads_for(&with_text);
+            assert_eq!(text.matches('b').count(), depth, "with text: {text:?}");
+            assert!(text.contains("x  b  b"), "with text: {text:?}");
+            assert!((depth..=3 * depth).contains(&reads), "with text: {reads} nodes");
+
+            let white_space = format!("<p>a {}{ends}</p>", "<span> ".repeat(depth));
+            let (reads, text) = node_reads_for(&white_space);
+            assert!(text.starts_with("a  b  b"), "white space: {text:?}");
+            assert_eq!(text.matches('b').count(), depth, "white space: {text:?}");
+            assert!((depth..=3 * depth).contains(&reads), "white space: {reads} nodes");
+
+            // ~keep An empty `span` in an empty `span`, `depth` deep, after a line end: one walk
+            // ~keep for the text and one for the content, each of them reads each element once.
+            let empty = format!("<p>a\n{}{}&nbsp;b</p>", "<span>".repeat(depth), "</span>".repeat(depth));
+            let (reads, text) = node_reads_for(&empty);
+            assert_eq!(text, "a b\n", "empty: {text:?}");
+            assert!((depth..=3 * depth).contains(&reads), "empty: {reads} nodes");
+        }
+    }
+
+    #[test]
+    fn should_read_one_sibling_for_each_text_after_an_empty_element() {
+        // ~keep A scan from the first sibling for each text reads `count * (count + 2)` entries
+        // ~keep more: 1,002,000 at 1,000 texts. The count of entries is the measure, not the time.
+        for count in [1_000, 2_000] {
+            assert_eq!(sibling_visits_for(count), count, "{count} texts");
+        }
+    }
 }

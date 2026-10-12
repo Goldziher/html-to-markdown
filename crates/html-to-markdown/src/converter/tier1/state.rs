@@ -78,6 +78,8 @@ pub struct TableState {
     /// rendering legitimately introduces unescaped `|` characters that
     /// Tier-2 also emits without escaping.
     pub had_nested_table: bool,
+    /// Ends of flattened nested tables in the current cell; following content is separated at close. ~keep
+    pub nested_table_ends: Vec<usize>,
     /// `colspan` attribute on the currently-open `<td>`/`<th>`.
     ///
     /// Defaults to 1.  On `</td>` / `</th>` close, `close_table_cell` pushes
@@ -215,7 +217,7 @@ pub struct Tier1State {
     /// is emitted as `" (title)"` after the abbreviation text, mirroring
     /// Tier-2's `semantic/attributes.rs::handle_abbr` (line 104-111).
     pub abbr_titles: Vec<Option<String>>,
-    /// Stack of `(href, title, has_nested_tag)` triples for currently-open `<a>`
+    /// Stack of `(href, title, has_nested_tag, has_aria_label)` entries for currently-open `<a>`
     /// elements.
     ///
     /// HTML5 forbids nested `<a>`, but the stack handles malformed input safely.
@@ -292,6 +294,14 @@ pub struct Tier1State {
     /// sibling is an `<img>`" half comes from the scan loop's tag peek, same
     /// as `next_tag_is_list`).
     pub last_emitted_was_img: bool,
+
+    /// The source offset where the last opening tag or the last `<br>` of a heading ends, and
+    /// what a text that starts at that offset has before it. A text that starts at any other
+    /// offset has a comment, a closing tag or another void tag before it, and the fast converter
+    /// does not know its place. No tag clears this: the offset of a later text never equals an
+    /// earlier one. The full converter reads the same fact from the tree
+    /// (`siblings::text_place`).
+    pub text_place: Option<(usize, crate::converter::utility::white_space::TextPlace)>,
 
     /// True right after the closing tag of a block element or a `<hr>` (block-level by Tier-2's
     /// test), until the next opening or void tag, the next closing tag that is not inline, or the
@@ -381,6 +391,7 @@ impl Tier1State {
             summary_buf_stack: Vec::new(),
             last_closed_custom_element: false,
             last_emitted_was_img: false,
+            text_place: None,
             last_closed_block: false,
             pending_newline_join: None,
             last_ordered_list_end: None,

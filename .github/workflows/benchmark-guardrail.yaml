@@ -37,6 +37,10 @@ jobs:
       - name: Install Task
         uses: xberg-io/actions/install-task@v1
 
+      - name: Build benchmark harness
+        run: task bench:build
+        shell: bash
+
       # ~keep The same gate `bench:calibration:collect` runs, from the same task, so the baseline
       # and the run checked against it are measured under matching conditions. Without it the
       # baseline is unreachable by this job: run 35086411684 read every fixture ~29% slow on
@@ -46,7 +50,7 @@ jobs:
         shell: bash
 
       - name: Run benchmark harness
-        run: task bench:run
+        run: task bench:run:built
         shell: bash
 
       # ~keep Uploaded before the comparison and with always(), because the run this job produces

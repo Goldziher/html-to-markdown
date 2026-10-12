@@ -1,6 +1,25 @@
 version: "3"
 
 tasks:
+  build:
+    desc: "Build the benchmark harness before settling the runner"
+    cmds:
+      - cargo build --release -p html-to-markdown-bench --bin htmbench
+
+  run:built:
+    desc: "Run the prebuilt benchmark harness without compiling"
+    env:
+      HTMBENCH_LOG: htmbench=info,html_to_markdown=error
+    vars:
+      RESULTS_FILE: '{{.RESULTS_FILE | default "tools/benchmark-harness/results/latest.json"}}'
+      BENCH_BIN: '{{.BENCH_BIN | default "target/release/htmbench"}}'
+    preconditions:
+      - sh: 'test -x "{{.BENCH_BIN}}"'
+        msg: "Build the benchmark harness with task bench:build before timing"
+    cmds:
+      - mkdir -p tools/benchmark-harness/results
+      - '"{{.BENCH_BIN}}" run --output "{{.RESULTS_FILE}}"'
+
   run:
     desc: "Run the benchmark harness over the fixture corpus"
     env:

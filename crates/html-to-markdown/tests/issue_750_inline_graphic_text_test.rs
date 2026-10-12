@@ -570,17 +570,18 @@ fn should_leave_only_a_named_link_with_no_text_to_the_full_converter() {
     ] {
         assert!(fast(html).is_err(), "the fast converter kept {html}");
     }
-    // ~keep A link with no text and no name is left to the full converter only when it points
-    // ~keep into its own page. With a `<base>` element and no address of the page, `#x` is not
-    // ~keep known to be the page, so the fast converter converts it.
+    // ~keep A link with no text that points into its own page is left to the full converter.
     assert!(
         fast(r##"<p>a <a href="#x"><i class="fa"></i></a> b</p>"##).is_err(),
         "the fast converter kept a link into its own page with no text"
     );
+    // ~keep Issue #771 decides: a link with no text that holds an element is left to the full
+    // ~keep converter too, which alone knows an empty text wrapper from an icon. Before the sync
+    // ~keep the fast converter converted this link. The output of the two converters is equal.
     let with_base_element = r##"<html><head><base href="https://other.example/page"></head><body><p>a <a href="#x"><i class="fa"></i></a> b</p></body></html>"##;
     assert!(
-        fast(with_base_element).is_ok(),
-        "the fast converter left {with_base_element}: {:?}",
+        matches!(fast(with_base_element), Err(tier1::BailReason::LinkEmptyLabel)),
+        "the fast converter did not leave {with_base_element}: {:?}",
         fast(with_base_element)
     );
     // ~keep A link that has text keeps its text as its label, so the fast converter converts it.

@@ -4,6 +4,15 @@
 //! one of these variants. The dispatcher in `convert_api.rs::convert_inner` catches the
 //! error, logs it at `tracing::warn!` (a fallback was taken), and falls back to the
 //! Tier-2 path with the original (pre-prescan) input.
+//!
+//! # Why a cited blockquote is handed over
+//!
+//! Reproducing the citation line of [`BailReason::BlockquoteCite`] here means stashing the
+//! cite across the whole quoted body and re-deriving Tier-2's separator, and
+//! `close_blockquote` computes that separator from the untouched pre-open tail of `output`
+//! (see its own note) — delicate enough that a second implementation would drift. A cited
+//! blockquote is rare and on no hot path, so bail and let Tier-2, which is authoritative,
+//! produce it.
 
 use std::fmt;
 
@@ -229,13 +238,7 @@ pub enum BailReason {
     /// `base_url`. Tier-1's `open_blockquote` reads no attributes at all, so it
     /// dropped the citation outright — the two tiers rendered the same markup
     /// differently, which every other bail in this file exists to prevent.
-    ///
-    /// Reproducing it here means stashing the cite across the whole quoted body
-    /// and re-deriving Tier-2's separator, and `close_blockquote` computes that
-    /// separator from the untouched pre-open tail of `output` (see its own
-    /// note) — delicate enough that a second implementation would drift. A
-    /// cited blockquote is rare and on no hot path, so bail and let Tier-2,
-    /// which is authoritative, produce it.
+    /// The module documentation says why the scanner does not write it.
     BlockquoteCite,
 
     /// A `<a>` element's href satisfies every structural autolink precondition
@@ -254,6 +257,15 @@ pub enum BailReason {
     /// duplicates non-trivial logic that would then have to stay in sync
     /// forever; bail instead so Tier-2 (authoritative) decides.
     LinkAutolinkNestedMarkup,
+
+    /// An empty link label needs DOM-based accessible-name or media fallback. ~keep
+    LinkEmptyLabel,
+
+    /// An image has no source; DOM fallback folds its absent inline boundary. ~keep
+    ImageMissingSource,
+
+    /// A text starts with a Unicode space after a written space; its place is not known. ~keep
+    UnicodeSpaceAfterSpace,
 
     /// A `<strong>`/`<b>` or `<em>`/`<i>` opened while the output already ends with that
     /// same tag kind's matching close marker (`**` or a lone `*`), with no intervening
@@ -332,16 +344,7 @@ impl fmt::Display for BailReason {
             Self::TableNestedTableInSingleCellRow => write!(f, "nested <table> inside a data table's single-cell row"),
             Self::TableCaption => write!(f, "<caption> element in table"),
             Self::TableSectionOrder => write!(f, "table sections in unsupported order"),
-            Self::UnknownEntity { name, offset } => {
-                if is_known_reference_name(name) {
-                    write!(
-                        f,
-                        "HTML entity &{name} is missing its closing semicolon at byte offset {offset}"
-                    )
-                } else {
-                    write!(f, "unknown HTML entity &{name} at byte offset {offset}")
-                }
-            }
+            Self::UnknownEntity { name, offset } => display_entity(f, name, *offset),
             Self::DepthLimitExceeded { depth, max_depth } => {
                 write!(
                     f,
@@ -378,12 +381,26 @@ impl fmt::Display for BailReason {
                     "autolink-eligible <a> href had a nested tag inside the label before close"
                 )
             }
+            Self::ImageMissingSource => write!(f, "image has no effective source"),
+            Self::LinkEmptyLabel => write!(f, "empty link label requires DOM-based fallback"),
+            Self::UnicodeSpaceAfterSpace => write!(f, "text starts with a Unicode space after a written space"),
             Self::AdjacentInlineEmphasis => write!(f, "adjacent strong/emphasis elements would form one delimiter run"),
             Self::WhitespaceOnlyInlineEmphasis => write!(f, "strong/emphasis element with a whitespace-only body"),
             Self::InlineMarkerNotReproduced => write!(f, "inline element whose tier-2 markers tier-1 does not emit"),
             Self::FormControl => write!(f, "form control whose text tier-2 separates from the text around it"),
             Self::RuleBetweenInlineMarkers => write!(f, "horizontal rule between inline markers"),
         }
+    }
+}
+
+fn display_entity(f: &mut fmt::Formatter<'_>, name: &str, offset: usize) -> fmt::Result {
+    if is_known_reference_name(name) {
+        write!(
+            f,
+            "HTML entity &{name} is missing its closing semicolon at byte offset {offset}"
+        )
+    } else {
+        write!(f, "unknown HTML entity &{name} at byte offset {offset}")
     }
 }
 

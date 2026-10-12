@@ -212,71 +212,74 @@ fn a_link_with_no_address_is_written_as_a_span_is() {
 }
 
 /// A label of white space only has no ends, so no space goes outside the link. The full
-/// converter writes the address as the label, the fast converter an empty label.
+/// converter writes the address as the label, the fast converter an empty label. A link that
+/// holds only an element with no text keeps an empty label on the full converter (issue #771),
+/// and the fast converter gives that link to the full one.
 ///
 /// ~keep These rows pin the output of the base, not the output of a browser: a browser shows
 /// ~keep the white space of such a link as a space between the two words.
 #[test]
 fn a_link_label_of_white_space_only_puts_no_space_outside_the_link() {
-    let cases = [
+    assert_on_each_converter(&[
         (
             "<p>Press<a href=\"/p\"> </a>now</p>",
             "Press[/p](/p)now\n",
-            "Press[](/p)now\n",
+            Some("Press[](/p)now\n"),
         ),
         (
             "<p>Press <a href=\"/p\"> </a>.</p>",
             "Press [/p](/p).\n",
-            "Press [](/p).\n",
+            Some("Press [](/p).\n"),
         ),
         (
             "<p>Press<a href=\"/p\">&nbsp;</a>now</p>",
             "Press[/p](/p)now\n",
-            "Press[](/p)now\n",
+            Some("Press[](/p)now\n"),
         ),
         (
+            // ~keep Issue #771 decides: before the sync this row had the address as the label.
             "<p>Press<a href=\"/p\"><span> </span></a>now</p>",
-            "Press[/p](/p)now\n",
             "Press[](/p)now\n",
+            None,
         ),
-    ];
-    for (html, full, fast) in cases {
-        assert_eq!(tier2(html), full, "full converter: {html:?}");
-        assert_eq!(convert_with(html, None), full, "default options: {html:?}");
-        let written = tier1::run(html, &PrescanReport::default(), &tier_options());
-        assert_eq!(written.as_deref().ok(), Some(fast), "fast converter: {html:?}");
-    }
+        (
+            "<p>Press<a href=\"/p\"><span>&nbsp;</span></a>now</p>",
+            "Press[](/p)now\n",
+            None,
+        ),
+    ]);
 }
 
-/// A code span keeps the white space of its text. A link in it is written as its text, and the
-/// white space at an end of the label is not moved. The fast converter gives a link in a code
-/// span to the full one.
+/// A code span keeps the white space of its text. A link in it stays a link (issue #813): each
+/// part of its label is a code span, and the white space at an end of the label is not moved out
+/// of the label. The fast converter gives a link in a code span to the full one.
 ///
-/// ~keep These rows pin the output of the base, not the output of a browser, which shows one
-/// ~keep space between the words: a code span keeps every space of the source.
+/// ~keep These rows pin that a code span keeps every space of the source. A browser shows one
+/// ~keep space between the words.
 #[test]
 fn white_space_at_an_end_of_a_link_label_is_not_moved_in_a_code_span() {
+    // ~keep Issue #813 decides: before the sync these rows had the text of the link only.
     assert_on_full(&[
         (
             "<p><code>Press <a href=\"/p\"> Go </a> now</code></p>",
-            "`Press  Go  now`\n",
+            "`Press `[` Go `](/p)` now`\n",
         ),
         (
             "<p><code>Press <a href=\"/p\">Go </a> now</code></p>",
-            "`Press Go  now`\n",
+            "`Press `[`Go `](/p)` now`\n",
         ),
         (
             "<p><code>Press<a href=\"/p\"> Go </a>now</code></p>",
-            "`Press Go now`\n",
+            "`Press`[` Go `](/p)`now`\n",
         ),
-        ("<p><code><a href=\"/p\"> Go </a></code></p>", "` Go `\n"),
+        ("<p><code><a href=\"/p\"> Go </a></code></p>", "[` Go `](/p)\n"),
         (
             "<p><code><a href=\"/p\"> <img src=\"/i.png\" alt=\"Go\"> </a></code></p>",
-            "`  `\n",
+            "[` Go `](/p)\n",
         ),
         (
             "<p><kbd>Press <a href=\"/p\"> Go </a> now</kbd></p>",
-            "`Press Go now`\n",
+            "`Press `[` Go `](/p)` now`\n",
         ),
         // ~keep A link with no address is running text of the span, with its white space.
         ("<p><code>Press<a>Go </a>now</code></p>", "`PressGo now`\n"),

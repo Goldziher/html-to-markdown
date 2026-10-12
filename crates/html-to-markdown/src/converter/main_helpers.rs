@@ -641,7 +641,7 @@ fn may_hold_head_content_outside_head(bytes: &[u8]) -> bool {
     ];
     HEAD_CONTENT
         .iter()
-        .any(|name| first_start_tag(bytes, name).is_some_and(|start| start < head_start))
+        .any(|name| first_start_tag(&bytes[..head_start], name).is_some())
         || title_follows_head_end(bytes)
 }
 
@@ -659,21 +659,23 @@ fn title_follows_head_end(bytes: &[u8]) -> bool {
 }
 
 fn first_start_tag(bytes: &[u8], name: &[u8]) -> Option<usize> {
-    bytes
-        .iter()
-        .enumerate()
-        .find_map(|(start, _)| is_start_tag_at(bytes, name, start).then_some(start))
+    memchr::memchr_iter(b'<', bytes).find(|&start| is_start_tag_at(bytes, name, start))
 }
 
 fn last_start_tag(bytes: &[u8], name: &[u8]) -> Option<usize> {
-    bytes
-        .iter()
-        .enumerate()
+    memchr::memchr_iter(b'<', bytes)
         .rev()
-        .find_map(|(start, _)| is_start_tag_at(bytes, name, start).then_some(start))
+        .find(|&start| is_start_tag_at(bytes, name, start))
+}
+
+#[cfg(test)]
+thread_local! {
+    static START_TAG_CANDIDATE_CHECKS: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
 }
 
 fn is_start_tag_at(bytes: &[u8], name: &[u8], start: usize) -> bool {
+    #[cfg(test)]
+    START_TAG_CANDIDATE_CHECKS.with(|checks| checks.set(checks.get() + 1));
     if bytes.get(start) != Some(&b'<') {
         return false;
     }
@@ -764,214 +766,4 @@ pub(super) fn repair_limit_warning(limit: crate::types::WarningKind) -> crate::t
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn should_give_the_tree_and_the_rest_of_the_input_when_the_repair_passes_the_depth_limit() {
-        let deep = format!("{}x", "<div>".repeat(600));
-
-        let (page, limit) = repair_with_html5ever_bounded(&deep).expect("a page");
-
-        assert_eq!(limit, Some(crate::types::WarningKind::DepthLimitExceeded));
-        assert_eq!(page.matches("<div>").count(), 600);
-        assert!(
-            page.ends_with(&format!("{}x", "<div>".repeat(80))),
-            "{}",
-            &page[page.len() - 40..]
-        );
-        assert!(repair_with_html5ever_bounded("<div><p>one</div>tail").is_some_and(|(_, limit)| limit.is_none()));
-    }
-
-    #[test]
-    fn test_is_ignorable_before_head() {
-        assert!(is_ignorable_before_head("", false));
-        assert!(is_ignorable_before_head("   \n\t", false));
-        assert!(is_ignorable_before_head("&nbsp;", false));
-        assert!(is_ignorable_before_head("&#160;", false));
-        assert!(!is_ignorable_before_head("hello", false));
-        assert!(!is_ignorable_before_head("x", false));
-        assert!(!is_ignorable_before_head("\u{FFFD}\u{FFFD}", false));
-        // ~keep Any text sitting directly in front of the document's own `<html>` tag is
-        // ~keep forgiven, garbage or genuine prose alike (#527 regression: a mangled byte
-        // ~keep order mark reads as ordinary non-whitespace text by this point).
-        assert!(is_ignorable_before_head("\u{FFFD}\u{FFFD}", true));
-        assert!(is_ignorable_before_head("hello", true));
-    }
-
-    fn cleaned(markdown: &str, style: CodeBlockStyle) -> String {
-        let mut output = markdown.to_owned();
-        trim_line_end_whitespace(&mut output, style);
-        collapse_excess_blank_lines(&mut output, style);
-        output
-    }
-
-    #[test]
-    fn should_clean_the_prose_and_not_the_code_of_an_indented_style_document() {
-        let cases = [
-            // A fence line in indented code opens nothing: the prose after it is cleaned.
-            (
-                "    a \t\n    ```\n\n\n\n    b\n\n\n\nx \t\n\n\n\ny\n",
-                "    a \t\n    ```\n\n\n\n    b\n\nx\n\ny\n",
-            ),
-            // The third level of a list is indented by four columns and is not code.
-            (
-                "- a\n  - b\n    - c \t\n\n\n\n    - d \t\n",
-                "- a\n  - b\n    - c\n\n    - d\n",
-            ),
-            // Code in a list item is indented by four columns past the content of the item.
-            (
-                "1. t\n\n       a \t\n\n\n\n       b\n\n\n\n   u \t\n",
-                "1. t\n\n       a \t\n\n\n\n       b\n\n   u\n",
-            ),
-            // A code block that starts on the line of the item marker.
-            ("-     a \t\n\n\n\n      b\n", "-     a \t\n\n\n\n      b\n"),
-            // The blank lines between the code blocks of two items belong to neither.
-            ("-     a\n\n\n\n-     b\n", "-     a\n\n-     b\n"),
-            // Code in a block quote, and prose after the quote.
-            (
-                ">     a \t\n>\n>\n>\n>     b\n\n\n\nx \t\n",
-                ">     a \t\n>\n>\n>\n>     b\n\nx\n",
-            ),
-            // An indented line that continues a paragraph is not code.
-            ("x\n    y \t\n", "x\n    y\n"),
-            // A tab is four columns of indentation.
-            ("\ta \t\n\n\n\n\tb\n", "\ta \t\n\n\n\n\tb\n"),
-        ];
-        for (markdown, expected) in cases {
-            assert_eq!(cleaned(markdown, CodeBlockStyle::Indented), expected, "{markdown:?}");
-        }
-    }
-
-    #[test]
-    fn should_open_a_block_only_on_the_fence_of_the_configured_style() {
-        let markdown = "~~~\na \t\n\n\n\nb\n~~~\n";
-        assert_eq!(cleaned(markdown, CodeBlockStyle::Tildes), markdown);
-        assert_eq!(cleaned(markdown, CodeBlockStyle::Backticks), "~~~\na\n\nb\n~~~\n");
-    }
-
-    #[test]
-    fn test_trim_line_end_whitespace() {
-        let mut s = String::new();
-        trim_line_end_whitespace(&mut s, CodeBlockStyle::Backticks);
-        assert_eq!("", s.as_str());
-
-        let mut s = "\t\n\t\n".to_owned();
-        trim_line_end_whitespace(&mut s, CodeBlockStyle::Backticks);
-        assert_eq!("", s.as_str());
-
-        let mut s = "hello, world  ".to_owned();
-        trim_line_end_whitespace(&mut s, CodeBlockStyle::Backticks);
-        assert_eq!("hello, world  \n", s.as_str());
-
-        let mut s = "hello, world  \n".to_owned();
-        trim_line_end_whitespace(&mut s, CodeBlockStyle::Backticks);
-        assert_eq!("hello, world  \n", s.as_str());
-
-        let mut s = "hello, world  ".to_owned();
-        trim_line_end_whitespace(&mut s, CodeBlockStyle::Backticks);
-        assert_eq!("hello, world  \n", s.as_str());
-
-        let mut s = "hello, world  \n\n\n".to_owned();
-        trim_line_end_whitespace(&mut s, CodeBlockStyle::Backticks);
-        assert_eq!("hello, world  \n", s.as_str());
-
-        let mut s = "hello  \n- world\n".to_owned();
-        trim_line_end_whitespace(&mut s, CodeBlockStyle::Backticks);
-        assert_eq!("hello  \n- world\n", s.as_str());
-
-        let mut s = "hello, world\t\t  ".to_owned();
-        trim_line_end_whitespace(&mut s, CodeBlockStyle::Backticks);
-        assert_eq!("hello, world  \n", s.as_str());
-
-        let mut s = "hello, world\t\t  \n.abc def \t \t".to_owned();
-        trim_line_end_whitespace(&mut s, CodeBlockStyle::Backticks);
-        assert_eq!("hello, world  \n.abc def\n", s.as_str());
-    }
-
-    #[test]
-    fn test_is_ascii_whitespace_only() {
-        assert!(is_ascii_whitespace_only(""));
-        assert!(is_ascii_whitespace_only(" \t\n\r"));
-        assert!(is_ascii_whitespace_only("\n\n"));
-        // ~keep A decoded `&nbsp;` trims to empty under `str::trim`'s Unicode-aware
-        // ~keep definition but must NOT be treated as safe-to-drop formatting whitespace.
-        assert!(!is_ascii_whitespace_only("\u{a0}"));
-        assert!(!is_ascii_whitespace_only("\n\u{a0}"));
-        assert!(!is_ascii_whitespace_only("a"));
-        assert!(!is_ascii_whitespace_only(" a "));
-    }
-
-    #[test]
-    fn test_has_custom_element_tags_ignores_comments() {
-        // ~keep Regression for the bug this module fixed: a comment's own text
-        // ~keep (`!--c--`) contains a hyphen and must not be mistaken for a tag name.
-        assert!(!has_custom_element_tags("<!--c-->"));
-        assert!(!has_custom_element_tags("<p><!-- a routine comment --></p>"));
-        assert!(!has_custom_element_tags("<!-- multiple -- dashes -- here -->"));
-    }
-
-    #[test]
-    fn should_detect_namespaced_elements_for_html5_repair() {
-        assert!(has_custom_element_tags("<o:p><P></o:p></P>"));
-        assert!(!has_custom_element_tags("<o:p><P></P></o:p>"));
-        assert!(!has_custom_element_tags("<o:p>Office text</o:p>"));
-        assert!(!has_custom_element_tags("<o:p/><P>text</P>"));
-        assert!(!has_custom_element_tags("<!-- <o:p>comment</o:p> -->"));
-        assert!(!has_custom_element_tags("<div title='o:p'>text</div>"));
-    }
-
-    #[test]
-    fn test_has_custom_element_tags_detects_real_custom_element() {
-        assert!(has_custom_element_tags("<my-widget></my-widget>"));
-        assert!(has_custom_element_tags("<p></p><my-widget></my-widget>"));
-        assert!(has_custom_element_tags("<div></my-widget>"));
-    }
-
-    #[test]
-    fn test_has_custom_element_tags_detects_custom_element_alongside_comment() {
-        assert!(has_custom_element_tags(
-            "<!-- a routine comment --><my-widget>hi</my-widget>"
-        ));
-        assert!(has_custom_element_tags(
-            "<my-widget><!-- nested comment -->hi</my-widget>"
-        ));
-    }
-
-    #[test]
-    fn test_has_custom_element_tags_ignores_comment_mentioning_custom_element() {
-        // ~keep A custom-element-shaped tag written INSIDE a comment is text, not markup.
-        assert!(!has_custom_element_tags("<!-- <my-widget>hi</my-widget> -->"));
-    }
-
-    #[test]
-    fn test_has_custom_element_tags_ignores_processing_instruction() {
-        assert!(!has_custom_element_tags("<?php echo 'a-b'; ?>"));
-        assert!(!has_custom_element_tags(
-            "<?xml-stylesheet type=\"text/xsl\" href=\"a-b.xsl\"?>"
-        ));
-    }
-
-    #[test]
-    fn test_has_custom_element_tags_ignores_cdata_section() {
-        assert!(!has_custom_element_tags(
-            "<svg><![CDATA[<my-widget>a-b</my-widget>]]></svg>"
-        ));
-    }
-
-    #[test]
-    fn test_has_custom_element_tags_ignores_doctype() {
-        assert!(!has_custom_element_tags("<!doctype html>"));
-        assert!(!has_custom_element_tags("<!DOCTYPE html><p>no custom elements</p>"));
-        // ~keep A real custom element after the doctype must still be detected.
-        assert!(has_custom_element_tags("<!DOCTYPE html><my-widget></my-widget>"));
-    }
-
-    #[test]
-    fn test_has_custom_element_tags_rejects_whitespace_before_name() {
-        // ~keep HTML5 does not skip whitespace after `<`/`</` before the tag name:
-        // ~keep `< div>` and `</ div>` are plain text, not tags, in a real parser.
-        assert!(!has_custom_element_tags("< my-widget>"));
-        assert!(!has_custom_element_tags("</ my-widget>"));
-    }
-}
+mod tests;

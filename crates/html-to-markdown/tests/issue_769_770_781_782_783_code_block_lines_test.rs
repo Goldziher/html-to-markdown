@@ -262,15 +262,17 @@ const CASES: &[Case] = &[
         "<pre><code>see <a href=\"/api\">the API</a> first</code></pre>",
         "```\nsee the API first\n```\n",
     ),
+    // ~keep Issue #813 decides: a link in a code span stays a link. Before the sync: "`see the API`\n".
     case(
         "issue 781, a link in a code span",
         "<p><code>see <a href=\"/api\">the API</a></code></p>",
-        "`see the API`\n",
+        "`see `[`the API`](/api)\n",
     ),
+    // ~keep Pull request #787 decides: an image in code writes its alt text. Before the sync: "a  b".
     case(
         "issue 781, an image in a block",
         "<pre>a <img src=\"x.png\" alt=\"pic\"> b</pre>",
-        "```\na  b\n```\n",
+        "```\na pic b\n```\n",
     ),
     case(
         "issue 781, an inline graphic with text in a block",
@@ -858,17 +860,20 @@ mod visitor_in_code {
     #[test]
     fn should_ask_the_visitor_about_a_link_a_highlight_and_an_image_in_code() {
         let (content, seen) = converted_with(false);
+        // ~keep Issue #813 decides: the label of a link in a code span has the code marks, and
+        // ~keep the link is written. Pull request #787: the image writes its alt text in the block.
         assert_eq!(
             seen,
-            ["link /x link", "mark hot", "image i.png pic", "link /y two"].map(String::from)
+            ["link /x link", "mark hot", "image i.png pic", "link /y `two`"].map(String::from)
         );
-        assert_eq!(content, "```\nlink hot end\n```\n\n`b two`\n");
+        assert_eq!(content, "```\nlink hotpic end\n```\n\n`b `[`two`](/y)\n");
     }
 
     #[test]
     fn should_write_in_code_what_the_visitor_returns() {
         let (content, seen) = converted_with(true);
-        assert_eq!(content, "```\n<link@/x> [hot]{pic} end\n```\n\n`b <two@/y>`\n");
+        // ~keep Issue #813 decides: what the visitor returns for the link stands outside the code marks.
+        assert_eq!(content, "```\n<link@/x> [hot]{pic} end\n```\n\n`b `<`two`@/y>\n");
         assert_eq!(seen.len(), 4);
     }
 }

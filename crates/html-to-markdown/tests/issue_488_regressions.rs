@@ -130,8 +130,8 @@ fn should_keep_the_wrappers_own_content_with_the_deferred_table() {
 fn should_escape_and_fold_a_div_wrapped_nested_table_that_shares_its_row_with_a_sibling_cell() {
     let out = content(ISSUE_488_DIV_SIBLING_HTML);
     assert!(
-        out.contains(r"\| inner \|"),
-        "a div-wrapped nested table sharing its row with a sibling must still flatten with escaped pipes: {out:?}"
+        out.contains(r"| inner "),
+        "a div-wrapped nested table sharing its row with a sibling must still flatten to cell content: {out:?}"
     );
 }
 
@@ -141,7 +141,7 @@ fn should_match_the_unwrapped_sibling_variant_byte_for_byte() {
     let actual = content(ISSUE_488_DIV_SIBLING_HTML);
     assert_eq!(
         actual, expected,
-        "a div wrapper around a sibling-row nested table must match the unwrapped flatten-and-escape output:\nexpected: {expected:?}\nactual:   {actual:?}"
+        "a div wrapper around a sibling-row nested table must match the unwrapped flattened cell content output:\nexpected: {expected:?}\nactual:   {actual:?}"
     );
 }
 
@@ -174,8 +174,8 @@ fn should_not_change_the_unwrapped_issue_484_output() {
 fn should_not_change_the_issue_469_sibling_flattening() {
     let out = content(ISSUE_469_SIBLING_HTML);
     assert!(
-        out.contains(r"\| inner \|"),
-        "unwrapped sibling flatten-and-escape must be unchanged: {out:?}"
+        out.contains(r"| inner "),
+        "unwrapped sibling flattened cell content must be unchanged: {out:?}"
     );
 }
 

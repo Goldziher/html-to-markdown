@@ -394,16 +394,14 @@ fn should_name_a_link_that_has_no_content_at_all() {
     ] {
         assert_eq!(convert_with(html, ConversionOptions::default()), expected, "{html}");
     }
-    // ~keep No name, and content that gives no text: the address, as before (full converter).
-    for html in [
-        r#"<p>a <a href="/page"> </a> b</p>"#,
-        r#"<p>a <a href="/page"><span></span></a> b</p>"#,
+    // ~keep No name, and white space only: the address, as before (full converter).
+    // ~keep Issue #771 decides for an empty text wrapper: the label stays empty. Before the sync
+    // ~keep that row had the address as its label too.
+    for (html, expected) in [
+        (r#"<p>a <a href="/page"> </a> b</p>"#, "a [/page](/page) b\n"),
+        (r#"<p>a <a href="/page"><span></span></a> b</p>"#, "a [](/page) b\n"),
     ] {
-        assert_eq!(
-            convert_plain(html, ConversionOptions::default()),
-            "a [/page](/page) b\n",
-            "{html}"
-        );
+        assert_eq!(convert_plain(html, ConversionOptions::default()), expected, "{html}");
     }
 }
 
