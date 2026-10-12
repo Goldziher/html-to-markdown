@@ -181,8 +181,24 @@ fn an_empty_option_outside_a_select_list_keeps_the_line_end_of_the_source_beside
     assert_plain(html, "- (\no2 w3\n");
     assert_markdown("<p>(<option></option>\n<option>o2</option>w3</p>", "( o2 w3\n");
     assert_markdown("<p>k<option>o2</option>\n<option></option>w3</p>", "k o2 w3\n");
+    // ~keep The line end before an option group outside a select list is one space too.
+    assert_markdown(
+        "<p>(<option></option>\n<optgroup label=\"L\"><option>o2</option></optgroup>w3</p>",
+        "( o2 w3\n",
+    );
     // ~keep With no white space in the source nothing separates the bracket and the option.
     assert_markdown("<p>(<option>o2</option>w3</p>", "(o2 w3\n");
+}
+
+#[test]
+fn a_line_end_of_the_source_before_an_option_in_a_select_list_writes_no_space() {
+    // ~keep In a select list or a data list the line end before an option writes nothing.
+    assert_markdown("<select>(<option></option>\n<option></option>w3</select>", "(w3\n");
+}
+
+#[test]
+fn a_line_end_of_the_source_before_an_option_in_a_data_list_writes_no_space() {
+    assert_markdown("<datalist>(<option></option>\n<option></option>w3</datalist>", "(w3\n");
 }
 
 #[test]
