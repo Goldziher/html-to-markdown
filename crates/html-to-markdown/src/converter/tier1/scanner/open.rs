@@ -61,7 +61,7 @@ fn emit_svg_from_slice(
     let Some(tl::Node::Tag(svg)) = handle.get(parser) else {
         return Ok(());
     };
-    let title = crate::converter::media::svg::graphic_text(svg, parser);
+    let title = crate::converter::media::svg::graphic_text(svg, parser, options.hidden_content);
 
     let svg_html = serialize_element(&handle, parser);
     let base64_svg = STANDARD.encode(svg_html.as_bytes());

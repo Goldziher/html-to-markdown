@@ -1,6 +1,8 @@
 //! HTML cleanup and normalization used before conversion.
 
+mod head_scan;
 mod inert;
+mod kept;
 mod lists;
 mod markup;
 mod menu;
@@ -22,11 +24,13 @@ pub use raw_text::{
 };
 pub use visibility::{
     HiddenStyleReason, sanitize_markdown_url, strip_bogus_comments, strip_hidden_elements, style_value_hidden_reason,
-    tag_has_hidden_attribute, tag_has_hidden_style,
+    tag_has_hidden_attribute, tag_has_hidden_style, unwrap_kept_inert_elements,
 };
 
 #[cfg(test)]
 use raw_text::{find_closing_tag_bytes, find_closing_tag_bytes_nested};
 
+#[cfg(test)]
+mod kept_script_tests;
 #[cfg(test)]
 mod tests;

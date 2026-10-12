@@ -226,6 +226,11 @@
     "c/options/options_heading_style_atx.md",
     "c/options/options_heading_style_atx_closed.md",
     "c/options/options_heading_style_underlined.md",
+    "c/options/options_hidden_content_all.md",
+    "c/options/options_hidden_content_drop_default.md",
+    "c/options/options_hidden_content_inline_style.md",
+    "c/options/options_hidden_content_reachable.md",
+    "c/options/options_hidden_content_shadow_root.md",
     "c/options/options_highlight_bold.md",
     "c/options/options_highlight_double_equal.md",
     "c/options/options_highlight_none.md",
@@ -567,6 +572,11 @@
     "csharp/options/options_heading_style_atx.md",
     "csharp/options/options_heading_style_atx_closed.md",
     "csharp/options/options_heading_style_underlined.md",
+    "csharp/options/options_hidden_content_all.md",
+    "csharp/options/options_hidden_content_drop_default.md",
+    "csharp/options/options_hidden_content_inline_style.md",
+    "csharp/options/options_hidden_content_reachable.md",
+    "csharp/options/options_hidden_content_shadow_root.md",
     "csharp/options/options_highlight_bold.md",
     "csharp/options/options_highlight_double_equal.md",
     "csharp/options/options_highlight_none.md",
@@ -908,6 +918,11 @@
     "dart/options/options_heading_style_atx.md",
     "dart/options/options_heading_style_atx_closed.md",
     "dart/options/options_heading_style_underlined.md",
+    "dart/options/options_hidden_content_all.md",
+    "dart/options/options_hidden_content_drop_default.md",
+    "dart/options/options_hidden_content_inline_style.md",
+    "dart/options/options_hidden_content_reachable.md",
+    "dart/options/options_hidden_content_shadow_root.md",
     "dart/options/options_highlight_bold.md",
     "dart/options/options_highlight_double_equal.md",
     "dart/options/options_highlight_none.md",
@@ -1249,6 +1264,11 @@
     "elixir/options/options_heading_style_atx.md",
     "elixir/options/options_heading_style_atx_closed.md",
     "elixir/options/options_heading_style_underlined.md",
+    "elixir/options/options_hidden_content_all.md",
+    "elixir/options/options_hidden_content_drop_default.md",
+    "elixir/options/options_hidden_content_inline_style.md",
+    "elixir/options/options_hidden_content_reachable.md",
+    "elixir/options/options_hidden_content_shadow_root.md",
     "elixir/options/options_highlight_bold.md",
     "elixir/options/options_highlight_double_equal.md",
     "elixir/options/options_highlight_none.md",
@@ -1590,6 +1610,11 @@
     "go/options/options_heading_style_atx.md",
     "go/options/options_heading_style_atx_closed.md",
     "go/options/options_heading_style_underlined.md",
+    "go/options/options_hidden_content_all.md",
+    "go/options/options_hidden_content_drop_default.md",
+    "go/options/options_hidden_content_inline_style.md",
+    "go/options/options_hidden_content_reachable.md",
+    "go/options/options_hidden_content_shadow_root.md",
     "go/options/options_highlight_bold.md",
     "go/options/options_highlight_double_equal.md",
     "go/options/options_highlight_none.md",
@@ -1931,6 +1956,11 @@
     "java/options/options_heading_style_atx.md",
     "java/options/options_heading_style_atx_closed.md",
     "java/options/options_heading_style_underlined.md",
+    "java/options/options_hidden_content_all.md",
+    "java/options/options_hidden_content_drop_default.md",
+    "java/options/options_hidden_content_inline_style.md",
+    "java/options/options_hidden_content_reachable.md",
+    "java/options/options_hidden_content_shadow_root.md",
     "java/options/options_highlight_bold.md",
     "java/options/options_highlight_double_equal.md",
     "java/options/options_highlight_none.md",
@@ -2267,6 +2297,11 @@
     "kotlin-android/options/options_heading_style_atx.md",
     "kotlin-android/options/options_heading_style_atx_closed.md",
     "kotlin-android/options/options_heading_style_underlined.md",
+    "kotlin-android/options/options_hidden_content_all.md",
+    "kotlin-android/options/options_hidden_content_drop_default.md",
+    "kotlin-android/options/options_hidden_content_inline_style.md",
+    "kotlin-android/options/options_hidden_content_reachable.md",
+    "kotlin-android/options/options_hidden_content_shadow_root.md",
     "kotlin-android/options/options_highlight_bold.md",
     "kotlin-android/options/options_highlight_double_equal.md",
     "kotlin-android/options/options_highlight_none.md",
@@ -2554,6 +2589,11 @@
     "php/options/options_heading_style_atx.md",
     "php/options/options_heading_style_atx_closed.md",
     "php/options/options_heading_style_underlined.md",
+    "php/options/options_hidden_content_all.md",
+    "php/options/options_hidden_content_drop_default.md",
+    "php/options/options_hidden_content_inline_style.md",
+    "php/options/options_hidden_content_reachable.md",
+    "php/options/options_hidden_content_shadow_root.md",
     "php/options/options_highlight_bold.md",
     "php/options/options_highlight_double_equal.md",
     "php/options/options_highlight_none.md",
@@ -2846,6 +2886,11 @@
     "python/options/options_heading_style_atx.md",
     "python/options/options_heading_style_atx_closed.md",
     "python/options/options_heading_style_underlined.md",
+    "python/options/options_hidden_content_all.md",
+    "python/options/options_hidden_content_drop_default.md",
+    "python/options/options_hidden_content_inline_style.md",
+    "python/options/options_hidden_content_reachable.md",
+    "python/options/options_hidden_content_shadow_root.md",
     "python/options/options_highlight_bold.md",
     "python/options/options_highlight_double_equal.md",
     "python/options/options_highlight_none.md",
@@ -3187,6 +3232,11 @@
     "r/options/options_heading_style_atx.md",
     "r/options/options_heading_style_atx_closed.md",
     "r/options/options_heading_style_underlined.md",
+    "r/options/options_hidden_content_all.md",
+    "r/options/options_hidden_content_drop_default.md",
+    "r/options/options_hidden_content_inline_style.md",
+    "r/options/options_hidden_content_reachable.md",
+    "r/options/options_hidden_content_shadow_root.md",
     "r/options/options_highlight_bold.md",
     "r/options/options_highlight_double_equal.md",
     "r/options/options_highlight_none.md",
@@ -3528,6 +3578,11 @@
     "ruby/options/options_heading_style_atx.md",
     "ruby/options/options_heading_style_atx_closed.md",
     "ruby/options/options_heading_style_underlined.md",
+    "ruby/options/options_hidden_content_all.md",
+    "ruby/options/options_hidden_content_drop_default.md",
+    "ruby/options/options_hidden_content_inline_style.md",
+    "ruby/options/options_hidden_content_reachable.md",
+    "ruby/options/options_hidden_content_shadow_root.md",
     "ruby/options/options_highlight_bold.md",
     "ruby/options/options_highlight_double_equal.md",
     "ruby/options/options_highlight_none.md",
@@ -3869,6 +3924,11 @@
     "rust/options/options_heading_style_atx.md",
     "rust/options/options_heading_style_atx_closed.md",
     "rust/options/options_heading_style_underlined.md",
+    "rust/options/options_hidden_content_all.md",
+    "rust/options/options_hidden_content_drop_default.md",
+    "rust/options/options_hidden_content_inline_style.md",
+    "rust/options/options_hidden_content_reachable.md",
+    "rust/options/options_hidden_content_shadow_root.md",
     "rust/options/options_highlight_bold.md",
     "rust/options/options_highlight_double_equal.md",
     "rust/options/options_highlight_none.md",
@@ -4210,6 +4270,11 @@
     "swift/options/options_heading_style_atx.md",
     "swift/options/options_heading_style_atx_closed.md",
     "swift/options/options_heading_style_underlined.md",
+    "swift/options/options_hidden_content_all.md",
+    "swift/options/options_hidden_content_drop_default.md",
+    "swift/options/options_hidden_content_inline_style.md",
+    "swift/options/options_hidden_content_reachable.md",
+    "swift/options/options_hidden_content_shadow_root.md",
     "swift/options/options_highlight_bold.md",
     "swift/options/options_highlight_double_equal.md",
     "swift/options/options_highlight_none.md",
@@ -4551,6 +4616,11 @@
     "typescript/options/options_heading_style_atx.md",
     "typescript/options/options_heading_style_atx_closed.md",
     "typescript/options/options_heading_style_underlined.md",
+    "typescript/options/options_hidden_content_all.md",
+    "typescript/options/options_hidden_content_drop_default.md",
+    "typescript/options/options_hidden_content_inline_style.md",
+    "typescript/options/options_hidden_content_reachable.md",
+    "typescript/options/options_hidden_content_shadow_root.md",
     "typescript/options/options_highlight_bold.md",
     "typescript/options/options_highlight_double_equal.md",
     "typescript/options/options_highlight_none.md",
@@ -4892,6 +4962,11 @@
     "wasm/options/options_heading_style_atx.md",
     "wasm/options/options_heading_style_atx_closed.md",
     "wasm/options/options_heading_style_underlined.md",
+    "wasm/options/options_hidden_content_all.md",
+    "wasm/options/options_hidden_content_drop_default.md",
+    "wasm/options/options_hidden_content_inline_style.md",
+    "wasm/options/options_hidden_content_reachable.md",
+    "wasm/options/options_hidden_content_shadow_root.md",
     "wasm/options/options_highlight_bold.md",
     "wasm/options/options_highlight_double_equal.md",
     "wasm/options/options_highlight_none.md",
@@ -5233,6 +5308,11 @@
     "zig/options/options_heading_style_atx.md",
     "zig/options/options_heading_style_atx_closed.md",
     "zig/options/options_heading_style_underlined.md",
+    "zig/options/options_hidden_content_all.md",
+    "zig/options/options_hidden_content_drop_default.md",
+    "zig/options/options_hidden_content_inline_style.md",
+    "zig/options/options_hidden_content_reachable.md",
+    "zig/options/options_hidden_content_shadow_root.md",
     "zig/options/options_highlight_bold.md",
     "zig/options/options_highlight_double_equal.md",
     "zig/options/options_highlight_none.md",
@@ -8045,6 +8125,66 @@
         "language": "c"
       },
       "path": "c/options/options_heading_style_underlined.md",
+      "language": "c",
+      "target": "c",
+      "session": "c",
+      "requires": [],
+      "side_effect": "safe"
+    },
+    {
+      "key": {
+        "fixture_id": "options_hidden_content_all",
+        "language": "c"
+      },
+      "path": "c/options/options_hidden_content_all.md",
+      "language": "c",
+      "target": "c",
+      "session": "c",
+      "requires": [],
+      "side_effect": "safe"
+    },
+    {
+      "key": {
+        "fixture_id": "options_hidden_content_drop_default",
+        "language": "c"
+      },
+      "path": "c/options/options_hidden_content_drop_default.md",
+      "language": "c",
+      "target": "c",
+      "session": "c",
+      "requires": [],
+      "side_effect": "safe"
+    },
+    {
+      "key": {
+        "fixture_id": "options_hidden_content_inline_style",
+        "language": "c"
+      },
+      "path": "c/options/options_hidden_content_inline_style.md",
+      "language": "c",
+      "target": "c",
+      "session": "c",
+      "requires": [],
+      "side_effect": "safe"
+    },
+    {
+      "key": {
+        "fixture_id": "options_hidden_content_reachable",
+        "language": "c"
+      },
+      "path": "c/options/options_hidden_content_reachable.md",
+      "language": "c",
+      "target": "c",
+      "session": "c",
+      "requires": [],
+      "side_effect": "safe"
+    },
+    {
+      "key": {
+        "fixture_id": "options_hidden_content_shadow_root",
+        "language": "c"
+      },
+      "path": "c/options/options_hidden_content_shadow_root.md",
       "language": "c",
       "target": "c",
       "session": "c",
@@ -12145,6 +12285,66 @@
     },
     {
       "key": {
+        "fixture_id": "options_hidden_content_all",
+        "language": "csharp"
+      },
+      "path": "csharp/options/options_hidden_content_all.md",
+      "language": "csharp",
+      "target": "csharp",
+      "session": "csharp",
+      "requires": [],
+      "side_effect": "safe"
+    },
+    {
+      "key": {
+        "fixture_id": "options_hidden_content_drop_default",
+        "language": "csharp"
+      },
+      "path": "csharp/options/options_hidden_content_drop_default.md",
+      "language": "csharp",
+      "target": "csharp",
+      "session": "csharp",
+      "requires": [],
+      "side_effect": "safe"
+    },
+    {
+      "key": {
+        "fixture_id": "options_hidden_content_inline_style",
+        "language": "csharp"
+      },
+      "path": "csharp/options/options_hidden_content_inline_style.md",
+      "language": "csharp",
+      "target": "csharp",
+      "session": "csharp",
+      "requires": [],
+      "side_effect": "safe"
+    },
+    {
+      "key": {
+        "fixture_id": "options_hidden_content_reachable",
+        "language": "csharp"
+      },
+      "path": "csharp/options/options_hidden_content_reachable.md",
+      "language": "csharp",
+      "target": "csharp",
+      "session": "csharp",
+      "requires": [],
+      "side_effect": "safe"
+    },
+    {
+      "key": {
+        "fixture_id": "options_hidden_content_shadow_root",
+        "language": "csharp"
+      },
+      "path": "csharp/options/options_hidden_content_shadow_root.md",
+      "language": "csharp",
+      "target": "csharp",
+      "session": "csharp",
+      "requires": [],
+      "side_effect": "safe"
+    },
+    {
+      "key": {
         "fixture_id": "options_highlight_bold",
         "language": "csharp"
       },
@@ -16229,6 +16429,66 @@
         "language": "dart"
       },
       "path": "dart/options/options_heading_style_underlined.md",
+      "language": "dart",
+      "target": "dart",
+      "session": "dart",
+      "requires": [],
+      "side_effect": "safe"
+    },
+    {
+      "key": {
+        "fixture_id": "options_hidden_content_all",
+        "language": "dart"
+      },
+      "path": "dart/options/options_hidden_content_all.md",
+      "language": "dart",
+      "target": "dart",
+      "session": "dart",
+      "requires": [],
+      "side_effect": "safe"
+    },
+    {
+      "key": {
+        "fixture_id": "options_hidden_content_drop_default",
+        "language": "dart"
+      },
+      "path": "dart/options/options_hidden_content_drop_default.md",
+      "language": "dart",
+      "target": "dart",
+      "session": "dart",
+      "requires": [],
+      "side_effect": "safe"
+    },
+    {
+      "key": {
+        "fixture_id": "options_hidden_content_inline_style",
+        "language": "dart"
+      },
+      "path": "dart/options/options_hidden_content_inline_style.md",
+      "language": "dart",
+      "target": "dart",
+      "session": "dart",
+      "requires": [],
+      "side_effect": "safe"
+    },
+    {
+      "key": {
+        "fixture_id": "options_hidden_content_reachable",
+        "language": "dart"
+      },
+      "path": "dart/options/options_hidden_content_reachable.md",
+      "language": "dart",
+      "target": "dart",
+      "session": "dart",
+      "requires": [],
+      "side_effect": "safe"
+    },
+    {
+      "key": {
+        "fixture_id": "options_hidden_content_shadow_root",
+        "language": "dart"
+      },
+      "path": "dart/options/options_hidden_content_shadow_root.md",
       "language": "dart",
       "target": "dart",
       "session": "dart",
@@ -20329,6 +20589,66 @@
     },
     {
       "key": {
+        "fixture_id": "options_hidden_content_all",
+        "language": "elixir"
+      },
+      "path": "elixir/options/options_hidden_content_all.md",
+      "language": "elixir",
+      "target": "elixir",
+      "session": "elixir",
+      "requires": [],
+      "side_effect": "safe"
+    },
+    {
+      "key": {
+        "fixture_id": "options_hidden_content_drop_default",
+        "language": "elixir"
+      },
+      "path": "elixir/options/options_hidden_content_drop_default.md",
+      "language": "elixir",
+      "target": "elixir",
+      "session": "elixir",
+      "requires": [],
+      "side_effect": "safe"
+    },
+    {
+      "key": {
+        "fixture_id": "options_hidden_content_inline_style",
+        "language": "elixir"
+      },
+      "path": "elixir/options/options_hidden_content_inline_style.md",
+      "language": "elixir",
+      "target": "elixir",
+      "session": "elixir",
+      "requires": [],
+      "side_effect": "safe"
+    },
+    {
+      "key": {
+        "fixture_id": "options_hidden_content_reachable",
+        "language": "elixir"
+      },
+      "path": "elixir/options/options_hidden_content_reachable.md",
+      "language": "elixir",
+      "target": "elixir",
+      "session": "elixir",
+      "requires": [],
+      "side_effect": "safe"
+    },
+    {
+      "key": {
+        "fixture_id": "options_hidden_content_shadow_root",
+        "language": "elixir"
+      },
+      "path": "elixir/options/options_hidden_content_shadow_root.md",
+      "language": "elixir",
+      "target": "elixir",
+      "session": "elixir",
+      "requires": [],
+      "side_effect": "safe"
+    },
+    {
+      "key": {
         "fixture_id": "options_highlight_bold",
         "language": "elixir"
       },
@@ -24413,6 +24733,66 @@
         "language": "go"
       },
       "path": "go/options/options_heading_style_underlined.md",
+      "language": "go",
+      "target": "go",
+      "session": "go",
+      "requires": [],
+      "side_effect": "safe"
+    },
+    {
+      "key": {
+        "fixture_id": "options_hidden_content_all",
+        "language": "go"
+      },
+      "path": "go/options/options_hidden_content_all.md",
+      "language": "go",
+      "target": "go",
+      "session": "go",
+      "requires": [],
+      "side_effect": "safe"
+    },
+    {
+      "key": {
+        "fixture_id": "options_hidden_content_drop_default",
+        "language": "go"
+      },
+      "path": "go/options/options_hidden_content_drop_default.md",
+      "language": "go",
+      "target": "go",
+      "session": "go",
+      "requires": [],
+      "side_effect": "safe"
+    },
+    {
+      "key": {
+        "fixture_id": "options_hidden_content_inline_style",
+        "language": "go"
+      },
+      "path": "go/options/options_hidden_content_inline_style.md",
+      "language": "go",
+      "target": "go",
+      "session": "go",
+      "requires": [],
+      "side_effect": "safe"
+    },
+    {
+      "key": {
+        "fixture_id": "options_hidden_content_reachable",
+        "language": "go"
+      },
+      "path": "go/options/options_hidden_content_reachable.md",
+      "language": "go",
+      "target": "go",
+      "session": "go",
+      "requires": [],
+      "side_effect": "safe"
+    },
+    {
+      "key": {
+        "fixture_id": "options_hidden_content_shadow_root",
+        "language": "go"
+      },
+      "path": "go/options/options_hidden_content_shadow_root.md",
       "language": "go",
       "target": "go",
       "session": "go",
@@ -28513,6 +28893,66 @@
     },
     {
       "key": {
+        "fixture_id": "options_hidden_content_all",
+        "language": "java"
+      },
+      "path": "java/options/options_hidden_content_all.md",
+      "language": "java",
+      "target": "java",
+      "session": "java",
+      "requires": [],
+      "side_effect": "safe"
+    },
+    {
+      "key": {
+        "fixture_id": "options_hidden_content_drop_default",
+        "language": "java"
+      },
+      "path": "java/options/options_hidden_content_drop_default.md",
+      "language": "java",
+      "target": "java",
+      "session": "java",
+      "requires": [],
+      "side_effect": "safe"
+    },
+    {
+      "key": {
+        "fixture_id": "options_hidden_content_inline_style",
+        "language": "java"
+      },
+      "path": "java/options/options_hidden_content_inline_style.md",
+      "language": "java",
+      "target": "java",
+      "session": "java",
+      "requires": [],
+      "side_effect": "safe"
+    },
+    {
+      "key": {
+        "fixture_id": "options_hidden_content_reachable",
+        "language": "java"
+      },
+      "path": "java/options/options_hidden_content_reachable.md",
+      "language": "java",
+      "target": "java",
+      "session": "java",
+      "requires": [],
+      "side_effect": "safe"
+    },
+    {
+      "key": {
+        "fixture_id": "options_hidden_content_shadow_root",
+        "language": "java"
+      },
+      "path": "java/options/options_hidden_content_shadow_root.md",
+      "language": "java",
+      "target": "java",
+      "session": "java",
+      "requires": [],
+      "side_effect": "safe"
+    },
+    {
+      "key": {
         "fixture_id": "options_highlight_bold",
         "language": "java"
       },
@@ -32545,6 +32985,66 @@
     },
     {
       "key": {
+        "fixture_id": "options_hidden_content_all",
+        "language": "kotlin_android"
+      },
+      "path": "kotlin-android/options/options_hidden_content_all.md",
+      "language": "kotlin",
+      "target": "kotlin_android",
+      "session": "kotlin_android",
+      "requires": [],
+      "side_effect": "safe"
+    },
+    {
+      "key": {
+        "fixture_id": "options_hidden_content_drop_default",
+        "language": "kotlin_android"
+      },
+      "path": "kotlin-android/options/options_hidden_content_drop_default.md",
+      "language": "kotlin",
+      "target": "kotlin_android",
+      "session": "kotlin_android",
+      "requires": [],
+      "side_effect": "safe"
+    },
+    {
+      "key": {
+        "fixture_id": "options_hidden_content_inline_style",
+        "language": "kotlin_android"
+      },
+      "path": "kotlin-android/options/options_hidden_content_inline_style.md",
+      "language": "kotlin",
+      "target": "kotlin_android",
+      "session": "kotlin_android",
+      "requires": [],
+      "side_effect": "safe"
+    },
+    {
+      "key": {
+        "fixture_id": "options_hidden_content_reachable",
+        "language": "kotlin_android"
+      },
+      "path": "kotlin-android/options/options_hidden_content_reachable.md",
+      "language": "kotlin",
+      "target": "kotlin_android",
+      "session": "kotlin_android",
+      "requires": [],
+      "side_effect": "safe"
+    },
+    {
+      "key": {
+        "fixture_id": "options_hidden_content_shadow_root",
+        "language": "kotlin_android"
+      },
+      "path": "kotlin-android/options/options_hidden_content_shadow_root.md",
+      "language": "kotlin",
+      "target": "kotlin_android",
+      "session": "kotlin_android",
+      "requires": [],
+      "side_effect": "safe"
+    },
+    {
+      "key": {
         "fixture_id": "options_highlight_bold",
         "language": "kotlin_android"
       },
@@ -35981,6 +36481,66 @@
         "language": "php"
       },
       "path": "php/options/options_heading_style_underlined.md",
+      "language": "php",
+      "target": "php",
+      "session": "php",
+      "requires": [],
+      "side_effect": "safe"
+    },
+    {
+      "key": {
+        "fixture_id": "options_hidden_content_all",
+        "language": "php"
+      },
+      "path": "php/options/options_hidden_content_all.md",
+      "language": "php",
+      "target": "php",
+      "session": "php",
+      "requires": [],
+      "side_effect": "safe"
+    },
+    {
+      "key": {
+        "fixture_id": "options_hidden_content_drop_default",
+        "language": "php"
+      },
+      "path": "php/options/options_hidden_content_drop_default.md",
+      "language": "php",
+      "target": "php",
+      "session": "php",
+      "requires": [],
+      "side_effect": "safe"
+    },
+    {
+      "key": {
+        "fixture_id": "options_hidden_content_inline_style",
+        "language": "php"
+      },
+      "path": "php/options/options_hidden_content_inline_style.md",
+      "language": "php",
+      "target": "php",
+      "session": "php",
+      "requires": [],
+      "side_effect": "safe"
+    },
+    {
+      "key": {
+        "fixture_id": "options_hidden_content_reachable",
+        "language": "php"
+      },
+      "path": "php/options/options_hidden_content_reachable.md",
+      "language": "php",
+      "target": "php",
+      "session": "php",
+      "requires": [],
+      "side_effect": "safe"
+    },
+    {
+      "key": {
+        "fixture_id": "options_hidden_content_shadow_root",
+        "language": "php"
+      },
+      "path": "php/options/options_hidden_content_shadow_root.md",
       "language": "php",
       "target": "php",
       "session": "php",
@@ -39485,6 +40045,66 @@
         "language": "python"
       },
       "path": "python/options/options_heading_style_underlined.md",
+      "language": "python",
+      "target": "python",
+      "session": "python",
+      "requires": [],
+      "side_effect": "safe"
+    },
+    {
+      "key": {
+        "fixture_id": "options_hidden_content_all",
+        "language": "python"
+      },
+      "path": "python/options/options_hidden_content_all.md",
+      "language": "python",
+      "target": "python",
+      "session": "python",
+      "requires": [],
+      "side_effect": "safe"
+    },
+    {
+      "key": {
+        "fixture_id": "options_hidden_content_drop_default",
+        "language": "python"
+      },
+      "path": "python/options/options_hidden_content_drop_default.md",
+      "language": "python",
+      "target": "python",
+      "session": "python",
+      "requires": [],
+      "side_effect": "safe"
+    },
+    {
+      "key": {
+        "fixture_id": "options_hidden_content_inline_style",
+        "language": "python"
+      },
+      "path": "python/options/options_hidden_content_inline_style.md",
+      "language": "python",
+      "target": "python",
+      "session": "python",
+      "requires": [],
+      "side_effect": "safe"
+    },
+    {
+      "key": {
+        "fixture_id": "options_hidden_content_reachable",
+        "language": "python"
+      },
+      "path": "python/options/options_hidden_content_reachable.md",
+      "language": "python",
+      "target": "python",
+      "session": "python",
+      "requires": [],
+      "side_effect": "safe"
+    },
+    {
+      "key": {
+        "fixture_id": "options_hidden_content_shadow_root",
+        "language": "python"
+      },
+      "path": "python/options/options_hidden_content_shadow_root.md",
       "language": "python",
       "target": "python",
       "session": "python",
@@ -43585,6 +44205,66 @@
     },
     {
       "key": {
+        "fixture_id": "options_hidden_content_all",
+        "language": "r"
+      },
+      "path": "r/options/options_hidden_content_all.md",
+      "language": "r",
+      "target": "r",
+      "session": "r",
+      "requires": [],
+      "side_effect": "safe"
+    },
+    {
+      "key": {
+        "fixture_id": "options_hidden_content_drop_default",
+        "language": "r"
+      },
+      "path": "r/options/options_hidden_content_drop_default.md",
+      "language": "r",
+      "target": "r",
+      "session": "r",
+      "requires": [],
+      "side_effect": "safe"
+    },
+    {
+      "key": {
+        "fixture_id": "options_hidden_content_inline_style",
+        "language": "r"
+      },
+      "path": "r/options/options_hidden_content_inline_style.md",
+      "language": "r",
+      "target": "r",
+      "session": "r",
+      "requires": [],
+      "side_effect": "safe"
+    },
+    {
+      "key": {
+        "fixture_id": "options_hidden_content_reachable",
+        "language": "r"
+      },
+      "path": "r/options/options_hidden_content_reachable.md",
+      "language": "r",
+      "target": "r",
+      "session": "r",
+      "requires": [],
+      "side_effect": "safe"
+    },
+    {
+      "key": {
+        "fixture_id": "options_hidden_content_shadow_root",
+        "language": "r"
+      },
+      "path": "r/options/options_hidden_content_shadow_root.md",
+      "language": "r",
+      "target": "r",
+      "session": "r",
+      "requires": [],
+      "side_effect": "safe"
+    },
+    {
+      "key": {
         "fixture_id": "options_highlight_bold",
         "language": "r"
       },
@@ -47669,6 +48349,66 @@
         "language": "ruby"
       },
       "path": "ruby/options/options_heading_style_underlined.md",
+      "language": "ruby",
+      "target": "ruby",
+      "session": "ruby",
+      "requires": [],
+      "side_effect": "safe"
+    },
+    {
+      "key": {
+        "fixture_id": "options_hidden_content_all",
+        "language": "ruby"
+      },
+      "path": "ruby/options/options_hidden_content_all.md",
+      "language": "ruby",
+      "target": "ruby",
+      "session": "ruby",
+      "requires": [],
+      "side_effect": "safe"
+    },
+    {
+      "key": {
+        "fixture_id": "options_hidden_content_drop_default",
+        "language": "ruby"
+      },
+      "path": "ruby/options/options_hidden_content_drop_default.md",
+      "language": "ruby",
+      "target": "ruby",
+      "session": "ruby",
+      "requires": [],
+      "side_effect": "safe"
+    },
+    {
+      "key": {
+        "fixture_id": "options_hidden_content_inline_style",
+        "language": "ruby"
+      },
+      "path": "ruby/options/options_hidden_content_inline_style.md",
+      "language": "ruby",
+      "target": "ruby",
+      "session": "ruby",
+      "requires": [],
+      "side_effect": "safe"
+    },
+    {
+      "key": {
+        "fixture_id": "options_hidden_content_reachable",
+        "language": "ruby"
+      },
+      "path": "ruby/options/options_hidden_content_reachable.md",
+      "language": "ruby",
+      "target": "ruby",
+      "session": "ruby",
+      "requires": [],
+      "side_effect": "safe"
+    },
+    {
+      "key": {
+        "fixture_id": "options_hidden_content_shadow_root",
+        "language": "ruby"
+      },
+      "path": "ruby/options/options_hidden_content_shadow_root.md",
       "language": "ruby",
       "target": "ruby",
       "session": "ruby",
@@ -51905,6 +52645,76 @@
         "language": "rust"
       },
       "path": "rust/options/options_heading_style_underlined.md",
+      "language": "rust",
+      "target": "rust",
+      "session": "rust",
+      "requires": [
+        "crate:serde_json"
+      ],
+      "side_effect": "safe"
+    },
+    {
+      "key": {
+        "fixture_id": "options_hidden_content_all",
+        "language": "rust"
+      },
+      "path": "rust/options/options_hidden_content_all.md",
+      "language": "rust",
+      "target": "rust",
+      "session": "rust",
+      "requires": [
+        "crate:serde_json"
+      ],
+      "side_effect": "safe"
+    },
+    {
+      "key": {
+        "fixture_id": "options_hidden_content_drop_default",
+        "language": "rust"
+      },
+      "path": "rust/options/options_hidden_content_drop_default.md",
+      "language": "rust",
+      "target": "rust",
+      "session": "rust",
+      "requires": [
+        "crate:serde_json"
+      ],
+      "side_effect": "safe"
+    },
+    {
+      "key": {
+        "fixture_id": "options_hidden_content_inline_style",
+        "language": "rust"
+      },
+      "path": "rust/options/options_hidden_content_inline_style.md",
+      "language": "rust",
+      "target": "rust",
+      "session": "rust",
+      "requires": [
+        "crate:serde_json"
+      ],
+      "side_effect": "safe"
+    },
+    {
+      "key": {
+        "fixture_id": "options_hidden_content_reachable",
+        "language": "rust"
+      },
+      "path": "rust/options/options_hidden_content_reachable.md",
+      "language": "rust",
+      "target": "rust",
+      "session": "rust",
+      "requires": [
+        "crate:serde_json"
+      ],
+      "side_effect": "safe"
+    },
+    {
+      "key": {
+        "fixture_id": "options_hidden_content_shadow_root",
+        "language": "rust"
+      },
+      "path": "rust/options/options_hidden_content_shadow_root.md",
       "language": "rust",
       "target": "rust",
       "session": "rust",
@@ -56217,6 +57027,66 @@
     },
     {
       "key": {
+        "fixture_id": "options_hidden_content_all",
+        "language": "swift"
+      },
+      "path": "swift/options/options_hidden_content_all.md",
+      "language": "swift",
+      "target": "swift",
+      "session": "swift",
+      "requires": [],
+      "side_effect": "safe"
+    },
+    {
+      "key": {
+        "fixture_id": "options_hidden_content_drop_default",
+        "language": "swift"
+      },
+      "path": "swift/options/options_hidden_content_drop_default.md",
+      "language": "swift",
+      "target": "swift",
+      "session": "swift",
+      "requires": [],
+      "side_effect": "safe"
+    },
+    {
+      "key": {
+        "fixture_id": "options_hidden_content_inline_style",
+        "language": "swift"
+      },
+      "path": "swift/options/options_hidden_content_inline_style.md",
+      "language": "swift",
+      "target": "swift",
+      "session": "swift",
+      "requires": [],
+      "side_effect": "safe"
+    },
+    {
+      "key": {
+        "fixture_id": "options_hidden_content_reachable",
+        "language": "swift"
+      },
+      "path": "swift/options/options_hidden_content_reachable.md",
+      "language": "swift",
+      "target": "swift",
+      "session": "swift",
+      "requires": [],
+      "side_effect": "safe"
+    },
+    {
+      "key": {
+        "fixture_id": "options_hidden_content_shadow_root",
+        "language": "swift"
+      },
+      "path": "swift/options/options_hidden_content_shadow_root.md",
+      "language": "swift",
+      "target": "swift",
+      "session": "swift",
+      "requires": [],
+      "side_effect": "safe"
+    },
+    {
+      "key": {
         "fixture_id": "options_highlight_bold",
         "language": "swift"
       },
@@ -60301,6 +61171,66 @@
         "language": "node"
       },
       "path": "typescript/options/options_heading_style_underlined.md",
+      "language": "typescript",
+      "target": "node",
+      "session": "node",
+      "requires": [],
+      "side_effect": "safe"
+    },
+    {
+      "key": {
+        "fixture_id": "options_hidden_content_all",
+        "language": "node"
+      },
+      "path": "typescript/options/options_hidden_content_all.md",
+      "language": "typescript",
+      "target": "node",
+      "session": "node",
+      "requires": [],
+      "side_effect": "safe"
+    },
+    {
+      "key": {
+        "fixture_id": "options_hidden_content_drop_default",
+        "language": "node"
+      },
+      "path": "typescript/options/options_hidden_content_drop_default.md",
+      "language": "typescript",
+      "target": "node",
+      "session": "node",
+      "requires": [],
+      "side_effect": "safe"
+    },
+    {
+      "key": {
+        "fixture_id": "options_hidden_content_inline_style",
+        "language": "node"
+      },
+      "path": "typescript/options/options_hidden_content_inline_style.md",
+      "language": "typescript",
+      "target": "node",
+      "session": "node",
+      "requires": [],
+      "side_effect": "safe"
+    },
+    {
+      "key": {
+        "fixture_id": "options_hidden_content_reachable",
+        "language": "node"
+      },
+      "path": "typescript/options/options_hidden_content_reachable.md",
+      "language": "typescript",
+      "target": "node",
+      "session": "node",
+      "requires": [],
+      "side_effect": "safe"
+    },
+    {
+      "key": {
+        "fixture_id": "options_hidden_content_shadow_root",
+        "language": "node"
+      },
+      "path": "typescript/options/options_hidden_content_shadow_root.md",
       "language": "typescript",
       "target": "node",
       "session": "node",
@@ -64401,6 +65331,66 @@
     },
     {
       "key": {
+        "fixture_id": "options_hidden_content_all",
+        "language": "wasm"
+      },
+      "path": "wasm/options/options_hidden_content_all.md",
+      "language": "typescript",
+      "target": "wasm",
+      "session": "wasm",
+      "requires": [],
+      "side_effect": "safe"
+    },
+    {
+      "key": {
+        "fixture_id": "options_hidden_content_drop_default",
+        "language": "wasm"
+      },
+      "path": "wasm/options/options_hidden_content_drop_default.md",
+      "language": "typescript",
+      "target": "wasm",
+      "session": "wasm",
+      "requires": [],
+      "side_effect": "safe"
+    },
+    {
+      "key": {
+        "fixture_id": "options_hidden_content_inline_style",
+        "language": "wasm"
+      },
+      "path": "wasm/options/options_hidden_content_inline_style.md",
+      "language": "typescript",
+      "target": "wasm",
+      "session": "wasm",
+      "requires": [],
+      "side_effect": "safe"
+    },
+    {
+      "key": {
+        "fixture_id": "options_hidden_content_reachable",
+        "language": "wasm"
+      },
+      "path": "wasm/options/options_hidden_content_reachable.md",
+      "language": "typescript",
+      "target": "wasm",
+      "session": "wasm",
+      "requires": [],
+      "side_effect": "safe"
+    },
+    {
+      "key": {
+        "fixture_id": "options_hidden_content_shadow_root",
+        "language": "wasm"
+      },
+      "path": "wasm/options/options_hidden_content_shadow_root.md",
+      "language": "typescript",
+      "target": "wasm",
+      "session": "wasm",
+      "requires": [],
+      "side_effect": "safe"
+    },
+    {
+      "key": {
         "fixture_id": "options_highlight_bold",
         "language": "wasm"
       },
@@ -68485,6 +69475,66 @@
         "language": "zig"
       },
       "path": "zig/options/options_heading_style_underlined.md",
+      "language": "zig",
+      "target": "zig",
+      "session": "zig",
+      "requires": [],
+      "side_effect": "safe"
+    },
+    {
+      "key": {
+        "fixture_id": "options_hidden_content_all",
+        "language": "zig"
+      },
+      "path": "zig/options/options_hidden_content_all.md",
+      "language": "zig",
+      "target": "zig",
+      "session": "zig",
+      "requires": [],
+      "side_effect": "safe"
+    },
+    {
+      "key": {
+        "fixture_id": "options_hidden_content_drop_default",
+        "language": "zig"
+      },
+      "path": "zig/options/options_hidden_content_drop_default.md",
+      "language": "zig",
+      "target": "zig",
+      "session": "zig",
+      "requires": [],
+      "side_effect": "safe"
+    },
+    {
+      "key": {
+        "fixture_id": "options_hidden_content_inline_style",
+        "language": "zig"
+      },
+      "path": "zig/options/options_hidden_content_inline_style.md",
+      "language": "zig",
+      "target": "zig",
+      "session": "zig",
+      "requires": [],
+      "side_effect": "safe"
+    },
+    {
+      "key": {
+        "fixture_id": "options_hidden_content_reachable",
+        "language": "zig"
+      },
+      "path": "zig/options/options_hidden_content_reachable.md",
+      "language": "zig",
+      "target": "zig",
+      "session": "zig",
+      "requires": [],
+      "side_effect": "safe"
+    },
+    {
+      "key": {
+        "fixture_id": "options_hidden_content_shadow_root",
+        "language": "zig"
+      },
+      "path": "zig/options/options_hidden_content_shadow_root.md",
       "language": "zig",
       "target": "zig",
       "session": "zig",
@@ -80891,6 +81941,326 @@
     },
     {
       "fixture_id": "options_heading_style_underlined",
+      "language": "zig"
+    },
+    {
+      "fixture_id": "options_hidden_content_all",
+      "language": "c"
+    },
+    {
+      "fixture_id": "options_hidden_content_all",
+      "language": "csharp"
+    },
+    {
+      "fixture_id": "options_hidden_content_all",
+      "language": "dart"
+    },
+    {
+      "fixture_id": "options_hidden_content_all",
+      "language": "elixir"
+    },
+    {
+      "fixture_id": "options_hidden_content_all",
+      "language": "go"
+    },
+    {
+      "fixture_id": "options_hidden_content_all",
+      "language": "java"
+    },
+    {
+      "fixture_id": "options_hidden_content_all",
+      "language": "kotlin_android"
+    },
+    {
+      "fixture_id": "options_hidden_content_all",
+      "language": "node"
+    },
+    {
+      "fixture_id": "options_hidden_content_all",
+      "language": "php"
+    },
+    {
+      "fixture_id": "options_hidden_content_all",
+      "language": "python"
+    },
+    {
+      "fixture_id": "options_hidden_content_all",
+      "language": "r"
+    },
+    {
+      "fixture_id": "options_hidden_content_all",
+      "language": "ruby"
+    },
+    {
+      "fixture_id": "options_hidden_content_all",
+      "language": "rust"
+    },
+    {
+      "fixture_id": "options_hidden_content_all",
+      "language": "swift"
+    },
+    {
+      "fixture_id": "options_hidden_content_all",
+      "language": "wasm"
+    },
+    {
+      "fixture_id": "options_hidden_content_all",
+      "language": "zig"
+    },
+    {
+      "fixture_id": "options_hidden_content_drop_default",
+      "language": "c"
+    },
+    {
+      "fixture_id": "options_hidden_content_drop_default",
+      "language": "csharp"
+    },
+    {
+      "fixture_id": "options_hidden_content_drop_default",
+      "language": "dart"
+    },
+    {
+      "fixture_id": "options_hidden_content_drop_default",
+      "language": "elixir"
+    },
+    {
+      "fixture_id": "options_hidden_content_drop_default",
+      "language": "go"
+    },
+    {
+      "fixture_id": "options_hidden_content_drop_default",
+      "language": "java"
+    },
+    {
+      "fixture_id": "options_hidden_content_drop_default",
+      "language": "kotlin_android"
+    },
+    {
+      "fixture_id": "options_hidden_content_drop_default",
+      "language": "node"
+    },
+    {
+      "fixture_id": "options_hidden_content_drop_default",
+      "language": "php"
+    },
+    {
+      "fixture_id": "options_hidden_content_drop_default",
+      "language": "python"
+    },
+    {
+      "fixture_id": "options_hidden_content_drop_default",
+      "language": "r"
+    },
+    {
+      "fixture_id": "options_hidden_content_drop_default",
+      "language": "ruby"
+    },
+    {
+      "fixture_id": "options_hidden_content_drop_default",
+      "language": "rust"
+    },
+    {
+      "fixture_id": "options_hidden_content_drop_default",
+      "language": "swift"
+    },
+    {
+      "fixture_id": "options_hidden_content_drop_default",
+      "language": "wasm"
+    },
+    {
+      "fixture_id": "options_hidden_content_drop_default",
+      "language": "zig"
+    },
+    {
+      "fixture_id": "options_hidden_content_inline_style",
+      "language": "c"
+    },
+    {
+      "fixture_id": "options_hidden_content_inline_style",
+      "language": "csharp"
+    },
+    {
+      "fixture_id": "options_hidden_content_inline_style",
+      "language": "dart"
+    },
+    {
+      "fixture_id": "options_hidden_content_inline_style",
+      "language": "elixir"
+    },
+    {
+      "fixture_id": "options_hidden_content_inline_style",
+      "language": "go"
+    },
+    {
+      "fixture_id": "options_hidden_content_inline_style",
+      "language": "java"
+    },
+    {
+      "fixture_id": "options_hidden_content_inline_style",
+      "language": "kotlin_android"
+    },
+    {
+      "fixture_id": "options_hidden_content_inline_style",
+      "language": "node"
+    },
+    {
+      "fixture_id": "options_hidden_content_inline_style",
+      "language": "php"
+    },
+    {
+      "fixture_id": "options_hidden_content_inline_style",
+      "language": "python"
+    },
+    {
+      "fixture_id": "options_hidden_content_inline_style",
+      "language": "r"
+    },
+    {
+      "fixture_id": "options_hidden_content_inline_style",
+      "language": "ruby"
+    },
+    {
+      "fixture_id": "options_hidden_content_inline_style",
+      "language": "rust"
+    },
+    {
+      "fixture_id": "options_hidden_content_inline_style",
+      "language": "swift"
+    },
+    {
+      "fixture_id": "options_hidden_content_inline_style",
+      "language": "wasm"
+    },
+    {
+      "fixture_id": "options_hidden_content_inline_style",
+      "language": "zig"
+    },
+    {
+      "fixture_id": "options_hidden_content_reachable",
+      "language": "c"
+    },
+    {
+      "fixture_id": "options_hidden_content_reachable",
+      "language": "csharp"
+    },
+    {
+      "fixture_id": "options_hidden_content_reachable",
+      "language": "dart"
+    },
+    {
+      "fixture_id": "options_hidden_content_reachable",
+      "language": "elixir"
+    },
+    {
+      "fixture_id": "options_hidden_content_reachable",
+      "language": "go"
+    },
+    {
+      "fixture_id": "options_hidden_content_reachable",
+      "language": "java"
+    },
+    {
+      "fixture_id": "options_hidden_content_reachable",
+      "language": "kotlin_android"
+    },
+    {
+      "fixture_id": "options_hidden_content_reachable",
+      "language": "node"
+    },
+    {
+      "fixture_id": "options_hidden_content_reachable",
+      "language": "php"
+    },
+    {
+      "fixture_id": "options_hidden_content_reachable",
+      "language": "python"
+    },
+    {
+      "fixture_id": "options_hidden_content_reachable",
+      "language": "r"
+    },
+    {
+      "fixture_id": "options_hidden_content_reachable",
+      "language": "ruby"
+    },
+    {
+      "fixture_id": "options_hidden_content_reachable",
+      "language": "rust"
+    },
+    {
+      "fixture_id": "options_hidden_content_reachable",
+      "language": "swift"
+    },
+    {
+      "fixture_id": "options_hidden_content_reachable",
+      "language": "wasm"
+    },
+    {
+      "fixture_id": "options_hidden_content_reachable",
+      "language": "zig"
+    },
+    {
+      "fixture_id": "options_hidden_content_shadow_root",
+      "language": "c"
+    },
+    {
+      "fixture_id": "options_hidden_content_shadow_root",
+      "language": "csharp"
+    },
+    {
+      "fixture_id": "options_hidden_content_shadow_root",
+      "language": "dart"
+    },
+    {
+      "fixture_id": "options_hidden_content_shadow_root",
+      "language": "elixir"
+    },
+    {
+      "fixture_id": "options_hidden_content_shadow_root",
+      "language": "go"
+    },
+    {
+      "fixture_id": "options_hidden_content_shadow_root",
+      "language": "java"
+    },
+    {
+      "fixture_id": "options_hidden_content_shadow_root",
+      "language": "kotlin_android"
+    },
+    {
+      "fixture_id": "options_hidden_content_shadow_root",
+      "language": "node"
+    },
+    {
+      "fixture_id": "options_hidden_content_shadow_root",
+      "language": "php"
+    },
+    {
+      "fixture_id": "options_hidden_content_shadow_root",
+      "language": "python"
+    },
+    {
+      "fixture_id": "options_hidden_content_shadow_root",
+      "language": "r"
+    },
+    {
+      "fixture_id": "options_hidden_content_shadow_root",
+      "language": "ruby"
+    },
+    {
+      "fixture_id": "options_hidden_content_shadow_root",
+      "language": "rust"
+    },
+    {
+      "fixture_id": "options_hidden_content_shadow_root",
+      "language": "swift"
+    },
+    {
+      "fixture_id": "options_hidden_content_shadow_root",
+      "language": "wasm"
+    },
+    {
+      "fixture_id": "options_hidden_content_shadow_root",
       "language": "zig"
     },
     {
@@ -102285,6 +103655,326 @@
     },
     {
       "fixture_id": "options_heading_style_underlined",
+      "language": "zig"
+    },
+    {
+      "fixture_id": "options_hidden_content_all",
+      "language": "c"
+    },
+    {
+      "fixture_id": "options_hidden_content_all",
+      "language": "csharp"
+    },
+    {
+      "fixture_id": "options_hidden_content_all",
+      "language": "dart"
+    },
+    {
+      "fixture_id": "options_hidden_content_all",
+      "language": "elixir"
+    },
+    {
+      "fixture_id": "options_hidden_content_all",
+      "language": "go"
+    },
+    {
+      "fixture_id": "options_hidden_content_all",
+      "language": "java"
+    },
+    {
+      "fixture_id": "options_hidden_content_all",
+      "language": "kotlin_android"
+    },
+    {
+      "fixture_id": "options_hidden_content_all",
+      "language": "node"
+    },
+    {
+      "fixture_id": "options_hidden_content_all",
+      "language": "php"
+    },
+    {
+      "fixture_id": "options_hidden_content_all",
+      "language": "python"
+    },
+    {
+      "fixture_id": "options_hidden_content_all",
+      "language": "r"
+    },
+    {
+      "fixture_id": "options_hidden_content_all",
+      "language": "ruby"
+    },
+    {
+      "fixture_id": "options_hidden_content_all",
+      "language": "rust"
+    },
+    {
+      "fixture_id": "options_hidden_content_all",
+      "language": "swift"
+    },
+    {
+      "fixture_id": "options_hidden_content_all",
+      "language": "wasm"
+    },
+    {
+      "fixture_id": "options_hidden_content_all",
+      "language": "zig"
+    },
+    {
+      "fixture_id": "options_hidden_content_drop_default",
+      "language": "c"
+    },
+    {
+      "fixture_id": "options_hidden_content_drop_default",
+      "language": "csharp"
+    },
+    {
+      "fixture_id": "options_hidden_content_drop_default",
+      "language": "dart"
+    },
+    {
+      "fixture_id": "options_hidden_content_drop_default",
+      "language": "elixir"
+    },
+    {
+      "fixture_id": "options_hidden_content_drop_default",
+      "language": "go"
+    },
+    {
+      "fixture_id": "options_hidden_content_drop_default",
+      "language": "java"
+    },
+    {
+      "fixture_id": "options_hidden_content_drop_default",
+      "language": "kotlin_android"
+    },
+    {
+      "fixture_id": "options_hidden_content_drop_default",
+      "language": "node"
+    },
+    {
+      "fixture_id": "options_hidden_content_drop_default",
+      "language": "php"
+    },
+    {
+      "fixture_id": "options_hidden_content_drop_default",
+      "language": "python"
+    },
+    {
+      "fixture_id": "options_hidden_content_drop_default",
+      "language": "r"
+    },
+    {
+      "fixture_id": "options_hidden_content_drop_default",
+      "language": "ruby"
+    },
+    {
+      "fixture_id": "options_hidden_content_drop_default",
+      "language": "rust"
+    },
+    {
+      "fixture_id": "options_hidden_content_drop_default",
+      "language": "swift"
+    },
+    {
+      "fixture_id": "options_hidden_content_drop_default",
+      "language": "wasm"
+    },
+    {
+      "fixture_id": "options_hidden_content_drop_default",
+      "language": "zig"
+    },
+    {
+      "fixture_id": "options_hidden_content_inline_style",
+      "language": "c"
+    },
+    {
+      "fixture_id": "options_hidden_content_inline_style",
+      "language": "csharp"
+    },
+    {
+      "fixture_id": "options_hidden_content_inline_style",
+      "language": "dart"
+    },
+    {
+      "fixture_id": "options_hidden_content_inline_style",
+      "language": "elixir"
+    },
+    {
+      "fixture_id": "options_hidden_content_inline_style",
+      "language": "go"
+    },
+    {
+      "fixture_id": "options_hidden_content_inline_style",
+      "language": "java"
+    },
+    {
+      "fixture_id": "options_hidden_content_inline_style",
+      "language": "kotlin_android"
+    },
+    {
+      "fixture_id": "options_hidden_content_inline_style",
+      "language": "node"
+    },
+    {
+      "fixture_id": "options_hidden_content_inline_style",
+      "language": "php"
+    },
+    {
+      "fixture_id": "options_hidden_content_inline_style",
+      "language": "python"
+    },
+    {
+      "fixture_id": "options_hidden_content_inline_style",
+      "language": "r"
+    },
+    {
+      "fixture_id": "options_hidden_content_inline_style",
+      "language": "ruby"
+    },
+    {
+      "fixture_id": "options_hidden_content_inline_style",
+      "language": "rust"
+    },
+    {
+      "fixture_id": "options_hidden_content_inline_style",
+      "language": "swift"
+    },
+    {
+      "fixture_id": "options_hidden_content_inline_style",
+      "language": "wasm"
+    },
+    {
+      "fixture_id": "options_hidden_content_inline_style",
+      "language": "zig"
+    },
+    {
+      "fixture_id": "options_hidden_content_reachable",
+      "language": "c"
+    },
+    {
+      "fixture_id": "options_hidden_content_reachable",
+      "language": "csharp"
+    },
+    {
+      "fixture_id": "options_hidden_content_reachable",
+      "language": "dart"
+    },
+    {
+      "fixture_id": "options_hidden_content_reachable",
+      "language": "elixir"
+    },
+    {
+      "fixture_id": "options_hidden_content_reachable",
+      "language": "go"
+    },
+    {
+      "fixture_id": "options_hidden_content_reachable",
+      "language": "java"
+    },
+    {
+      "fixture_id": "options_hidden_content_reachable",
+      "language": "kotlin_android"
+    },
+    {
+      "fixture_id": "options_hidden_content_reachable",
+      "language": "node"
+    },
+    {
+      "fixture_id": "options_hidden_content_reachable",
+      "language": "php"
+    },
+    {
+      "fixture_id": "options_hidden_content_reachable",
+      "language": "python"
+    },
+    {
+      "fixture_id": "options_hidden_content_reachable",
+      "language": "r"
+    },
+    {
+      "fixture_id": "options_hidden_content_reachable",
+      "language": "ruby"
+    },
+    {
+      "fixture_id": "options_hidden_content_reachable",
+      "language": "rust"
+    },
+    {
+      "fixture_id": "options_hidden_content_reachable",
+      "language": "swift"
+    },
+    {
+      "fixture_id": "options_hidden_content_reachable",
+      "language": "wasm"
+    },
+    {
+      "fixture_id": "options_hidden_content_reachable",
+      "language": "zig"
+    },
+    {
+      "fixture_id": "options_hidden_content_shadow_root",
+      "language": "c"
+    },
+    {
+      "fixture_id": "options_hidden_content_shadow_root",
+      "language": "csharp"
+    },
+    {
+      "fixture_id": "options_hidden_content_shadow_root",
+      "language": "dart"
+    },
+    {
+      "fixture_id": "options_hidden_content_shadow_root",
+      "language": "elixir"
+    },
+    {
+      "fixture_id": "options_hidden_content_shadow_root",
+      "language": "go"
+    },
+    {
+      "fixture_id": "options_hidden_content_shadow_root",
+      "language": "java"
+    },
+    {
+      "fixture_id": "options_hidden_content_shadow_root",
+      "language": "kotlin_android"
+    },
+    {
+      "fixture_id": "options_hidden_content_shadow_root",
+      "language": "node"
+    },
+    {
+      "fixture_id": "options_hidden_content_shadow_root",
+      "language": "php"
+    },
+    {
+      "fixture_id": "options_hidden_content_shadow_root",
+      "language": "python"
+    },
+    {
+      "fixture_id": "options_hidden_content_shadow_root",
+      "language": "r"
+    },
+    {
+      "fixture_id": "options_hidden_content_shadow_root",
+      "language": "ruby"
+    },
+    {
+      "fixture_id": "options_hidden_content_shadow_root",
+      "language": "rust"
+    },
+    {
+      "fixture_id": "options_hidden_content_shadow_root",
+      "language": "swift"
+    },
+    {
+      "fixture_id": "options_hidden_content_shadow_root",
+      "language": "wasm"
+    },
+    {
+      "fixture_id": "options_hidden_content_shadow_root",
       "language": "zig"
     },
     {

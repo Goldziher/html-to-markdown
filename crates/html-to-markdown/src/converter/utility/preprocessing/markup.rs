@@ -656,11 +656,38 @@ fn skip_cdata_text_element(bytes: &[u8], cursor: usize) -> Option<usize> {
         b"noscript",
     ] {
         if matches_tag_start(bytes, cursor + 1, tag) {
-            let open_end = find_tag_end(bytes, cursor + 1 + tag.len())?;
-            return Some(super::raw_text::find_closing_tag_bytes(bytes, open_end, tag).unwrap_or(bytes.len()));
+            return text_element_end(bytes, cursor, tag);
         }
     }
     matches_tag_start(bytes, cursor + 1, b"plaintext").then_some(bytes.len())
+}
+
+/// The index just past the element that the start tag of `tag` at `cursor` opens, when the
+/// content of the element is text: the element ends at the first end tag of its name, or at
+/// the end of the input. `None` when the start tag has no end.
+fn text_element_end(bytes: &[u8], cursor: usize, tag: &[u8]) -> Option<usize> {
+    let open_end = find_tag_end(bytes, cursor + 1 + tag.len())?;
+    Some(super::raw_text::find_closing_tag_bytes(bytes, open_end, tag).unwrap_or(bytes.len()))
+}
+
+/// The elements whose content is text and reaches the scan for the tags of kept elements as
+/// written.
+///
+/// ~keep `<title>`, `<xmp>` and `<iframe>` hold text too, but the inert-body pass takes their
+/// ~keep bodies out of the page before that scan reads it. `<plaintext>` has no end tag.
+const WRITTEN_TEXT_ELEMENTS: [&[u8]; 3] = [b"textarea", b"noembed", b"noframes"];
+
+/// If the `<` at `cursor` is the start tag of an element of [`WRITTEN_TEXT_ELEMENTS`] or of a
+/// `<plaintext>`, the index just past the element. A `<template>` or a `<noscript>` tag in
+/// its content is text and not a tag.
+pub(super) fn skip_written_text_element(bytes: &[u8], cursor: usize) -> Option<usize> {
+    if matches_tag_start(bytes, cursor + 1, b"plaintext") {
+        return Some(bytes.len());
+    }
+    WRITTEN_TEXT_ELEMENTS
+        .iter()
+        .find(|name| matches_tag_start(bytes, cursor + 1, name))
+        .and_then(|name| text_element_end(bytes, cursor, name))
 }
 
 fn update_cdata_foreign_depth(bytes: &[u8], cursor: usize, end: usize, depth: &mut usize) {

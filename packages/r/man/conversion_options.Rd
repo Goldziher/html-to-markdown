@@ -40,6 +40,7 @@ conversion_options(
   preserve_tags = NULL,
   skip_images = NULL,
   inline_data_media = NULL,
+  hidden_content = NULL,
   url_escape_style = NULL,
   link_style = NULL,
   output_format = NULL,
@@ -126,6 +127,8 @@ conversion_options(
 \item{skip_images}{Skip conversion of \verb{<img>} elements (omit images from output)}
 
 \item{inline_data_media}{What the output shows for an image or embedded media element whose address is an inline}
+
+\item{hidden_content}{Which text that a browser does not show at first the output holds: none of it}
 
 \item{url_escape_style}{URL encoding strategy for link and image destinations}
 

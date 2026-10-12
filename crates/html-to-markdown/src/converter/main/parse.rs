@@ -1,12 +1,14 @@
-use super::{preprocess_repaired_html, trace_parse_complete};
+use super::prepare::{preprocess_initial_html, preprocess_repaired_html};
+use super::trace_parse_complete;
 use crate::converter::DomContext;
-use crate::converter::main_helpers::repair_with_html5ever_bounded;
+use crate::converter::main_helpers::{has_custom_element_tags, repair_with_html5ever_bounded};
 use crate::converter::preprocessing_helpers::{
-    has_discarded_end_tag, has_inline_block_misnest, has_omitted_end_tag, readable_text_len,
+    has_discarded_end_tag, has_inline_block_misnest, has_omitted_end_tag, readable_text_len, written_title_len,
 };
 use crate::converter::utility::caching::build_dom_context;
-use crate::converter::utility::preprocessing::KeptScripts;
+use crate::converter::utility::preprocessing::{KeptScripts, normalize_inert_bodies_with_preservation};
 use crate::error::{ConversionError, Result};
+use crate::options::HiddenContent;
 
 #[cfg(test)]
 thread_local! {
@@ -61,20 +63,29 @@ impl<'a> ParsedPage<'a> {
 /// ~keep cases is kept here: both pages are read by `tl` and measured by
 /// ~keep [`readable_text_len`], and a repaired page with a smaller count is not used. The
 /// ~keep page then converts as it did before issue #772.
+///
+/// ~keep `as_written` is the page before the passes of this conversion, when the tree builder
+/// ~keep has not written the page of `input`. With it, a page that asks for no second parse
+/// ~keep takes one all the same when a narrower choice of `hidden_content` takes one:
+/// ~keep [`narrower_choice_asks`].
 pub(super) fn parse_for_conversion<'a>(
     input: &'a str,
     repaired_page: &'a std::cell::OnceCell<String>,
     preserve_menu: bool,
+    hidden_content: HiddenContent,
+    as_written: Option<&str>,
 ) -> Result<ParsedPage<'a>> {
     let dom = parse_html(input)?;
     let parser = dom.parser();
     let dom_ctx = build_dom_context(&dom, parser, input.len());
     let len = input.len();
-    let open_at_the_end = has_omitted_end_tag(&dom_ctx, parser);
-    let misnest = has_inline_block_misnest(&dom_ctx, parser);
-    // ~keep Both rules ask where the tree builder ends an element, so both have the text rule.
-    let discarded_end_tag = !open_at_the_end && !misnest && has_discarded_end_tag(&dom_ctx, parser, input);
-    let omitted_end_tag = open_at_the_end || discarded_end_tag;
+    let asked = Asked::of(&dom_ctx, parser, input);
+    let misnest = asked.misnest;
+    let for_narrower_choice =
+        !asked.any() && as_written.is_some_and(|html| narrower_choice_asks(html, input, preserve_menu, hidden_content));
+    // ~keep The second parse for a narrower choice has the text rule and the limits of the one
+    // ~keep for an omitted end tag: the first parse holds every word of the page.
+    let omitted_end_tag = asked.omitted_end_tag || for_narrower_choice;
     if !omitted_end_tag && !misnest {
         return Ok(ParsedPage::first_parse(dom, dom_ctx, len));
     }
@@ -98,11 +109,13 @@ pub(super) fn parse_for_conversion<'a>(
             repair_limit,
         });
     }
-    let page = repaired_page.get_or_init(|| preprocess_repaired_html(&repaired, preserve_menu));
+    let page = repaired_page.get_or_init(|| preprocess_repaired_html(&repaired, preserve_menu, hidden_content));
     let second = parse_html(page)?;
     // ~keep The text rule is for the second parse that an omitted end tag asks for. The first
     // ~keep parse of a misnest can hide content, so its count is not a measure.
-    let loses_text = omitted_end_tag && readable_text_len(&second) < readable_text_len(&dom);
+    let loses_text = omitted_end_tag
+        && (readable_text_len(&second) < readable_text_len(&dom)
+            || loses_a_title_of_a_wider_choice(&dom, &second, as_written, preserve_menu, hidden_content));
     if loses_text && !misnest {
         // ~keep A frameset page with every end tag written comes here, so this is no warning.
         tracing::debug!(
@@ -111,12 +124,30 @@ pub(super) fn parse_for_conversion<'a>(
         );
         return Ok(ParsedPage::first_parse(dom, dom_ctx, len));
     }
-    if discarded_end_tag {
+    let for_omitted_end_tag = omitted_end_tag && !loses_text && repair_limit.is_none();
+    log_the_second_parse(for_narrower_choice, asked.discarded_end_tag, for_omitted_end_tag);
+    let dom_ctx = build_dom_context(&second, second.parser(), page.len());
+    Ok(ParsedPage {
+        dom: second,
+        dom_ctx,
+        len: page.len(),
+        repair_limit,
+    })
+}
+
+/// Log why the conversion reads the second parse.
+fn log_the_second_parse(for_narrower_choice: bool, discarded_end_tag: bool, for_omitted_end_tag: bool) {
+    if for_narrower_choice {
+        tracing::debug!(
+            target: "html_to_markdown::convert",
+            "a narrower choice of hidden_content takes the html5ever repair; re-parsed with html5ever repair"
+        );
+    } else if discarded_end_tag {
         tracing::debug!(
             target: "html_to_markdown::convert",
             "end tag of an open element discarded by the first parse; re-parsed with html5ever repair"
         );
-    } else if omitted_end_tag && !loses_text && repair_limit.is_none() {
+    } else if for_omitted_end_tag {
         // ~keep An omitted end tag is HTML that the standard permits, so this route is logged
         // ~keep at debug, like the choice of a tier. A misnest is an authoring error and warns.
         // ~keep A page that reached a limit is here only as a misnest.
@@ -130,13 +161,96 @@ pub(super) fn parse_for_conversion<'a>(
             "misnested HTML elements detected; re-parsed with html5ever repair"
         );
     }
-    let dom_ctx = build_dom_context(&second, second.parser(), page.len());
-    Ok(ParsedPage {
-        dom: second,
-        dom_ctx,
-        len: page.len(),
-        repair_limit,
-    })
+}
+
+/// What in the first parse of a page asks for the second parse, through the HTML tree builder.
+#[derive(Clone, Copy)]
+struct Asked {
+    /// An element with content is open at the end of the page, or the first parse discarded
+    /// the end tag of an open element.
+    omitted_end_tag: bool,
+    /// The first parse discarded the end tag of an open element.
+    discarded_end_tag: bool,
+    /// An element is where the HTML tree builder does not leave it.
+    misnest: bool,
+}
+
+impl Asked {
+    fn of(dom_ctx: &DomContext, parser: &tl::Parser<'_>, input: &str) -> Self {
+        let open_at_the_end = has_omitted_end_tag(dom_ctx, parser);
+        let misnest = has_inline_block_misnest(dom_ctx, parser);
+        // ~keep Both rules ask where the tree builder ends an element, so both have the text rule.
+        let discarded_end_tag = !open_at_the_end && !misnest && has_discarded_end_tag(dom_ctx, parser, input);
+        Self {
+            omitted_end_tag: open_at_the_end || discarded_end_tag,
+            discarded_end_tag,
+            misnest,
+        }
+    }
+
+    const fn any(self) -> bool {
+        self.omitted_end_tag || self.misnest
+    }
+}
+
+/// Whether `html` goes to the HTML tree builder under a choice of `hidden_content` that is
+/// narrower than the choice of the caller. `page` is the page of the caller's choice.
+///
+/// ~keep The tree builder moves content between the head and the body, and the walk writes the
+/// ~keep two differently: an `<img>` in a `<head>` is written only after the tree builder moved
+/// ~keep it to the body. A narrower choice keeps tags that a wider choice removes, and such a
+/// ~keep tag can be all that asks for the tree builder: in `<head><img><template></head><p>`
+/// ~keep the `<template>` has no end tag. So a wider choice takes the tree builder wherever a
+/// ~keep narrower one does, and writes what the narrower one writes. A narrower page that is
+/// ~keep equal to the wider page asks for nothing new and is not parsed.
+///
+/// ~keep The inert-body pass ran on `html` under the choice of the caller and left as written
+/// ~keep each `<template>` and `<noscript>` that the choice keeps. The narrower choice empties
+/// ~keep those that it does not keep, so the pass runs again under the narrower choice.
+fn narrower_choice_asks(html: &str, page: &str, preserve_menu: bool, hidden_content: HiddenContent) -> bool {
+    let narrower = match hidden_content {
+        HiddenContent::Drop => return false,
+        HiddenContent::Reachable => HiddenContent::Drop,
+        HiddenContent::All => HiddenContent::Reachable,
+    };
+    let (narrower_html, _) = normalize_inert_bodies_with_preservation(html, false, narrower);
+    let narrower_page = preprocess_initial_html(&narrower_html, preserve_menu, narrower);
+    (narrower_page != page && asks_for_the_tree_builder(&narrower_page))
+        || narrower_choice_asks(html, &narrower_page, preserve_menu, narrower)
+}
+
+/// Whether the second parse of a choice that keeps hidden content loses a title that the first
+/// parse writes, on a page that `drop` does not send to the tree builder. `as_written` is the
+/// page before the passes of this conversion.
+///
+/// ~keep The walk writes a `<title>` of a `<head>` that holds a paragraph as text, and the tree
+/// ~keep builder puts that title in the head, where it is the title of the document. Kept content
+/// ~keep can be all that asks for the tree builder: in `<head><title>t</title><p>a</p></head>`
+/// ~keep `<template><div>b</template>` the `<div>` has no end tag. `drop` then writes the title
+/// ~keep from its first parse, so a wider choice keeps its first parse too. Where `drop` takes
+/// ~keep the tree builder, each choice takes it and no choice writes the title.
+fn loses_a_title_of_a_wider_choice(
+    first: &tl::VDom<'_>,
+    second: &tl::VDom<'_>,
+    as_written: Option<&str>,
+    preserve_menu: bool,
+    hidden_content: HiddenContent,
+) -> bool {
+    hidden_content != HiddenContent::Drop
+        && written_title_len(second) < written_title_len(first)
+        && as_written.is_some_and(|html| {
+            let (emptied, _) = normalize_inert_bodies_with_preservation(html, false, HiddenContent::Drop);
+            !asks_for_the_tree_builder(&preprocess_initial_html(&emptied, preserve_menu, HiddenContent::Drop))
+        })
+}
+
+/// Whether the conversion of `page`, a page before its first parse, runs the HTML tree builder.
+fn asks_for_the_tree_builder(page: &str) -> bool {
+    has_custom_element_tags(page)
+        || parse_html(page).is_ok_and(|dom| {
+            let parser = dom.parser();
+            Asked::of(&build_dom_context(&dom, parser, page.len()), parser, page).any()
+        })
 }
 
 /// Finish the tree that the converter reads. Returns the kept scripts of the page, each script
@@ -190,6 +304,40 @@ mod tests {
         PARSE_CALLS.with(|calls| calls.set(0));
         let result = convert(html, options).expect("convert HTML");
         (PARSE_CALLS.with(std::cell::Cell::get), result.content)
+    }
+
+    #[test]
+    fn should_parse_the_page_of_a_narrower_choice_only_when_it_is_another_page() {
+        // ~keep A wider choice asks the page of each narrower choice whether it takes the tree
+        // ~keep builder. A page equal to the wider page is not parsed, and no narrower page is
+        // ~keep parsed when the page of the choice asks for the second parse itself.
+        let choices = [
+            crate::HiddenContent::Drop,
+            crate::HiddenContent::Reachable,
+            crate::HiddenContent::All,
+        ];
+        for (html, expected) in [
+            ("<p>one</p>", [1, 1, 1]),
+            ("<p>one</p><div hidden>two</div>", [1, 2, 2]),
+            ("<p>one</p><template><p>two</p></template>", [1, 1, 2]),
+            (
+                "<p>one</p><div hidden>two</div><template><p>three</p></template>",
+                [1, 2, 3],
+            ),
+            ("<div><p>one</div><template><p>two</p></template>tail", [2, 2, 2]),
+        ] {
+            let calls = choices.map(|hidden_content| {
+                let options = ConversionOptions {
+                    tier_strategy: TierStrategy::Tier2,
+                    hidden_content,
+                    ..ConversionOptions::default()
+                };
+                PARSE_CALLS.with(|calls| calls.set(0));
+                convert(html, options).expect("convert HTML");
+                PARSE_CALLS.with(std::cell::Cell::get)
+            });
+            assert_eq!(calls, expected, "{html}");
+        }
     }
 
     #[test]

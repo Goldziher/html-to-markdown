@@ -10,6 +10,7 @@ use std::collections::HashSet;
 
 use crate::converter::form::spacing;
 use crate::converter::main_helpers::effective_max_depth;
+use crate::converter::media::svg::graphic_text;
 use crate::converter::preprocessing_helpers::should_drop_for_preprocessing;
 use crate::options::ConversionOptions;
 use crate::text;
@@ -398,7 +399,7 @@ fn dispatch_plain_tag(
         // ~keep style sheets and scripts are not text of the page.
         "svg" => {
             if !state.options.skip_images {
-                buf.push_text(&crate::converter::media::svg::graphic_text(tag, parser));
+                buf.push_text(&graphic_text(tag, parser, state.options.hidden_content));
             }
         }
         "table" => {

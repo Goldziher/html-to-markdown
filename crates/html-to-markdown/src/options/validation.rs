@@ -286,6 +286,81 @@ impl InlineDataMedia {
     }
 }
 
+/// Which text that a browser does not show at first the output holds.
+///
+/// The choice answers one question: can a reader get to the text? It does not depend on how the
+/// page hides it.
+///
+/// | Markup | `Drop` | `Reachable` | `All` |
+/// | --- | --- | --- | --- |
+/// | An element with the `hidden` attribute, any value (`hidden="until-found"` too) | dropped | kept | kept |
+/// | An element with inline `display: none`, `visibility: hidden` or `font-size: 0` | dropped | kept | kept |
+/// | An element of an inline `<svg>` with `display="none"` or `visibility="hidden"` | dropped | kept | kept |
+/// | A declarative shadow root: a `<template>` whose `shadowrootmode` is `open` or `closed` | dropped | kept | kept |
+/// | Any other `<template>`, and `<noscript>` | dropped | dropped | kept |
+/// | `<script>`, `<style>`, comments, the value of `<input type="hidden">` | dropped | dropped | dropped |
+///
+/// `aria-hidden` is not hidden for this option. It takes an element away from assistive
+/// technology only: a browser still shows the element, so a reader sees its text, and every
+/// choice keeps it. One rule is older than this option and does not change with it: for an
+/// inline `<svg aria-hidden="true">` no choice writes the title, the description or the label
+/// of the graphic.
+///
+/// Every choice also keeps what the converter never treated as hidden: `inert`, a closed
+/// `<details>` or `<dialog>`, `<datalist>` and `<option>` text, and an element hidden by a class
+/// name, a style sheet rule, `opacity`, `content-visibility`, a zero size or an off-screen
+/// position. The converter reads the inline `style` attribute only. It does no layout and reads no
+/// style sheet, so it cannot tell that a rule in a style sheet hides an element.
+///
+/// A kept element converts like the same element without the attribute or style. Kept
+/// `<template>` and `<noscript>` content converts where it is written, as if the two tags were
+/// not there: a row in a `<template>` inside a `<table>` is a row of that table, and the content
+/// of a declarative shadow root comes before the other children of its host element. Slots are
+/// not resolved. `All` keeps `<noscript>` content with every preprocessing preset. A `<template>`
+/// or `<noscript>` in the document head holds metadata (`<link>`, `<meta>`, `<style>`), not text
+/// for a reader, and no choice keeps it. A document with no `<head>` tag has a head too: it
+/// starts at the doctype, at the `<html>` tag or at the first metadata element, and it ends
+/// where the body starts.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum HiddenContent {
+    /// Drop the text a browser does not show at first. Default.
+    #[default]
+    Drop,
+    /// Keep the text of elements that are in the page and that the page can show: an inactive tab
+    /// panel, a collapsed section, an answer shown on a click, a declarative shadow root.
+    Reachable,
+    /// Keep what `Reachable` keeps, and the content of `<template>` and `<noscript>`. A reader
+    /// gets to that text only after a script copies it into the page, or with scripting off.
+    All,
+}
+
+impl HiddenContent {
+    /// Parse the choice from a string.
+    ///
+    /// Accepts "drop", "reachable" and "all".
+    /// Input is normalized (lowercased, alphanumeric only), so "Reachable" and "ALL" are
+    /// accepted too.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ConversionError::ConfigError`] for any other value, the empty string too. A
+    /// value with a typing error does not become `Drop`: that loses the text that the caller
+    /// asked to keep, with no message.
+    ///
+    /// [`ConversionError::ConfigError`]: crate::error::ConversionError::ConfigError
+    #[cfg_attr(alef, alef(skip))]
+    pub fn parse(value: &str) -> Result<Self, crate::error::ConversionError> {
+        match normalize_token(value).as_str() {
+            "drop" => Ok(Self::Drop),
+            "reachable" => Ok(Self::Reachable),
+            "all" => Ok(Self::All),
+            _ => Err(crate::error::ConversionError::ConfigError(format!(
+                "hidden_content is \"{value}\". Use \"drop\", \"reachable\" or \"all\"."
+            ))),
+        }
+    }
+}
+
 /// Output format for conversion.
 ///
 /// Specifies the target markup language format for the conversion output.
@@ -330,8 +405,8 @@ pub(crate) fn normalize_token(value: &str) -> String {
 #[cfg(any(feature = "serde", feature = "metadata"))]
 mod serde_impls {
     use super::{
-        CodeBlockStyle, HeadingStyle, HighlightStyle, InlineDataMedia, LinkStyle, ListIndentType, NewlineStyle,
-        OutputFormat, UrlEscapeStyle, WhitespaceMode,
+        CodeBlockStyle, HeadingStyle, HiddenContent, HighlightStyle, InlineDataMedia, LinkStyle, ListIndentType,
+        NewlineStyle, OutputFormat, UrlEscapeStyle, WhitespaceMode,
     };
     use serde::{Deserialize, Serialize, Serializer};
 
@@ -359,6 +434,16 @@ mod serde_impls {
     impl_deserialize_from_parse!(UrlEscapeStyle, UrlEscapeStyle::parse);
     impl_deserialize_from_parse!(OutputFormat, OutputFormat::parse);
     impl_deserialize_from_parse!(InlineDataMedia, InlineDataMedia::parse);
+
+    impl<'de> Deserialize<'de> for HiddenContent {
+        fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+        where
+            D: serde::Deserializer<'de>,
+        {
+            let value = String::deserialize(deserializer)?;
+            Self::parse(&value).map_err(serde::de::Error::custom)
+        }
+    }
 
     impl Serialize for HeadingStyle {
         fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
@@ -477,6 +562,20 @@ mod serde_impls {
                 Self::Keep => "keep",
                 Self::AltTextOnly => "alttextonly",
                 Self::DropElement => "dropelement",
+            };
+            serializer.serialize_str(s)
+        }
+    }
+
+    impl Serialize for HiddenContent {
+        fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+        where
+            S: Serializer,
+        {
+            let s = match self {
+                Self::Drop => "drop",
+                Self::Reachable => "reachable",
+                Self::All => "all",
             };
             serializer.serialize_str(s)
         }

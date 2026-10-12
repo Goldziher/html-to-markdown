@@ -7,7 +7,19 @@ use std::borrow::Cow;
 use std::str;
 
 use super::markup::{find_tag_end, is_json_ld_script_open_tag, matches_end_tag_start, matches_tag_start};
-use super::visibility::bogus_comment_end;
+use super::visibility::{after_bogus_comment, is_bogus_comment_marker};
+
+/// If the `<` at `idx` starts a bogus comment (see `strip_bogus_comments`), return the position
+/// after it. The caller has read a real comment (`<!--`) before.
+///
+/// ~keep The first pass over raw-text elements reads a bogus comment with this function, so a
+/// ~keep `<textarea>` in `<? ... >` starts nothing there. It reads `<![CDATA[` as a bogus
+/// ~keep comment too: it reads no markup inside `<svg>`, and outside foreign content the
+/// ~keep tokenizer ends the comment at the first `>`.
+fn bogus_comment_end(bytes: &[u8], idx: usize) -> Option<usize> {
+    let next = *bytes.get(idx + 1)?;
+    is_bogus_comment_marker(bytes, idx, bytes.len(), next, &bytes[idx + 2..]).then(|| after_bogus_comment(bytes, idx))
+}
 
 /// If `idx` starts an `<svg`/`</svg` tag, adjust `svg_depth` accordingly and return the index
 /// just past the tag. Returns `None` when `idx` does not start an svg tag (or the tag is

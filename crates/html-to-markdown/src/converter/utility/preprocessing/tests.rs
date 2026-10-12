@@ -6,7 +6,9 @@ use super::{
     find_closing_tag_bytes, find_closing_tag_bytes_nested, find_tag_end, normalize_bogus_comment_endings,
     normalize_menu_elements, normalize_split_closing_tags, normalize_unclosed_list_items,
     restore_preserved_menu_elements, sanitize_markdown_url, strip_bogus_comments, strip_hidden_elements,
+    unwrap_kept_inert_elements,
 };
+use crate::options::HiddenContent;
 
 #[test]
 fn should_find_tag_end_outside_quotes_from_the_requested_byte() {
@@ -751,102 +753,6 @@ fn the_first_pass_changes_nothing_in_a_kept_script_that_it_wrote() {
     }
 }
 
-/// The reader of the structured data gets the text of a kept script as the page has it: the
-/// escape of the first pass is taken back and no character reference is decoded.
-#[cfg(feature = "metadata")]
-#[test]
-fn the_text_of_a_kept_script_is_given_as_written() {
-    use super::strip_script_and_style_tags_with_kept_scripts;
-    let open = r#"<script type="application/ld+json">"#;
-    for body in [
-        r#"{"a":"?a=1&b=2 &amp; &#38; &amp;amp;"}"#,
-        r#"{"a":"a < b"}"#,
-        r#"{"a":"a &lt; b"}"#,
-        r#"{"a":"a & b &amp; c < d &lt; e &amp;lt; f"}"#,
-        "{\"a\":\"<p>x</p>\",\r\n\"b\":\"&lt;\"}",
-    ] {
-        let html = format!("<p>a</p>{open} {body}\n</script><p>b</p>");
-        let (page, _) = strip_script_and_style_tags_with_kept_scripts(&html);
-        let in_tree = page
-            .strip_prefix(&format!("<p>a</p>{open}"))
-            .and_then(|rest| rest.strip_suffix("</script><p>b</p>"))
-            .expect("the kept script");
-        assert!(!in_tree.contains('<'), "{body:?}: one text for the parser");
-        // ~keep The script is the node 7 of a tree that holds this one script.
-        let as_written = |text: &str| {
-            let (_, mut kept_scripts) = strip_script_and_style_tags_with_kept_scripts(&html);
-            kept_scripts.match_to_tree(&[(7, text.to_string())]);
-            kept_scripts.as_written(7, text).into_owned()
-        };
-        assert_eq!(as_written(in_tree.trim()), body, "{body:?}");
-        // ~keep The tree builder writes CR LF as LF.
-        let repaired = in_tree.replace("\r\n", "\n");
-        assert_eq!(as_written(repaired.trim()), body, "{body:?}: a repaired page");
-    }
-}
-
-/// The record of a kept script goes by the place of the script among the scripts with its
-/// escaped text, so two bodies that escape to one text do not meet.
-#[cfg(feature = "metadata")]
-#[test]
-fn the_record_of_a_kept_script_goes_by_its_place_among_the_scripts_with_its_text() {
-    use super::strip_script_and_style_tags_with_kept_scripts;
-    /// A script of the tree: the id of its node, its body in the page, the body that it reads.
-    type InTree = (u32, &'static str, &'static str);
-    let open = r#"<script type="application/ld+json">"#;
-    let page = |bodies: &[&str]| {
-        let mut page = String::new();
-        for body in bodies {
-            page.push_str(open);
-            page.push_str(body);
-            page.push_str("</script>");
-        }
-        page
-    };
-    let lt = r#"{"a":"<"}"#;
-    let reference = r#"{"a":"&lt;"}"#;
-    let other = r#"{"b":"&lt;"}"#;
-    // ~keep Each case: the bodies of the page, then the nodes of the tree with the body that
-    // ~keep each one reads. A node reads the text of the tree with `&lt;` as `<` when it has
-    // ~keep no record.
-    let cases: [(&[&str], &[InTree]); 7] = [
-        (&[lt, reference], &[(3, lt, lt), (9, reference, reference)]),
-        (&[reference, lt], &[(3, reference, reference), (9, lt, lt)]),
-        (
-            &[reference, reference],
-            &[(3, reference, reference), (9, reference, reference)],
-        ),
-        // ~keep A pass moved a script with another text to the front.
-        (
-            &[lt, other, reference],
-            &[(2, other, other), (3, lt, lt), (9, reference, reference)],
-        ),
-        // ~keep A pass dropped the script with another text: no later script takes its record.
-        (&[other, lt, reference], &[(3, lt, lt), (9, reference, reference)]),
-        // ~keep A pass dropped one of two equal bodies.
-        (&[reference, reference], &[(9, reference, reference)]),
-        // ~keep A pass dropped one of two bodies with one escaped text: the place names no
-        // ~keep script, and the script that stays has no record.
-        (&[lt, reference], &[(9, reference, lt)]),
-    ];
-    for (bodies, nodes) in cases {
-        let html = page(bodies);
-        let (_, mut kept_scripts) = strip_script_and_style_tags_with_kept_scripts(&html);
-        let texts: Vec<(u32, String)> = nodes
-            .iter()
-            .map(|(node, body, _)| (*node, body.replace('<', "&lt;")))
-            .collect();
-        kept_scripts.match_to_tree(&texts);
-        for ((node, text), (_, _, expected)) in texts.iter().zip(nodes) {
-            assert_eq!(
-                kept_scripts.as_written(*node, text),
-                *expected,
-                "{bodies:?}: node {node}"
-            );
-        }
-    }
-}
-
 /// The one rule of the `type` of a script: the media type before the first `;`, in any case.
 /// A longer media type that starts with the name keeps the script and is not structured data.
 #[test]
@@ -864,6 +770,153 @@ fn the_type_of_a_script_is_read_by_one_rule() {
         ("", ScriptType::Removed),
     ] {
         assert_eq!(script_type(value), expected, "{value:?}");
+    }
+}
+
+#[test]
+fn should_remove_the_end_tag_of_a_removed_start_tag_that_closes_itself() {
+    // ~keep The inert-body pass and the tree builder read `<template/>` as a start tag: the
+    // ~keep element holds what follows, up to its end tag. So the tag opens an element here too,
+    // ~keep and its end tag is removed with it or stays with it.
+    for (page, choice, expected) in [
+        (
+            "<p>a</p><template/><p>b</p></template><p>c</p>",
+            HiddenContent::All,
+            "<p>a</p><p>b</p><p>c</p>",
+        ),
+        (
+            "<p>a</p><noscript/><p>b</p></noscript><p>c</p>",
+            HiddenContent::All,
+            "<p>a</p><p>b</p><p>c</p>",
+        ),
+        (
+            "<p>a</p><template><p>b</p></template><p>c</p>",
+            HiddenContent::All,
+            "<p>a</p><p>b</p><p>c</p>",
+        ),
+        (
+            "<p>a</p><template/><p>b</p></template><p>c</p>",
+            HiddenContent::Reachable,
+            "<p>a</p><template/><p>b</p></template><p>c</p>",
+        ),
+        (
+            "<div><template shadowrootmode=\"open\"><template/></template><p>x</p></template></div>",
+            HiddenContent::Reachable,
+            "<div><template/></template><p>x</p></div>",
+        ),
+        // ~keep The end tag closes the shadow root, so the first `<template>` has no end tag and
+        // ~keep holds the rest of the page.
+        (
+            "<template><p>IN</p><template shadowrootmode=\"open\"/></template><p>X</p>",
+            HiddenContent::Reachable,
+            "<template><p>IN</p><p>X</p>",
+        ),
+    ] {
+        assert_eq!(unwrap_kept_inert_elements(page, choice), expected, "{page:?}");
+    }
+}
+
+#[test]
+fn should_write_an_end_tag_of_the_body_for_the_removed_tag_that_started_the_body() {
+    let (reachable, all) = (HiddenContent::Reachable, HiddenContent::All);
+    for (page, choice, expected) in [
+        // ~keep The first `<template>` and the first `<noscript>` of a fragment start its body.
+        (
+            "<template><p>a</p></template><title>t</title>",
+            all,
+            "</body><p>a</p><title>t</title>",
+        ),
+        ("<noscript/><title>t</title>", all, "</body><title>t</title>"),
+        (
+            r#"<template shadowrootmode="open"><p>a</p></template><noscript>b</noscript>"#,
+            reachable,
+            "</body><p>a</p><noscript>b</noscript>",
+        ),
+        // ~keep After the end tag of the head, a `<noscript>` starts the body.
+        (
+            "<head></head><noscript><p>a</p></noscript><title>t</title>",
+            all,
+            "<head></head></body><p>a</p><title>t</title>",
+        ),
+        (
+            "<html><template>a</template></head><noscript>b</noscript>",
+            all,
+            "<html><template>a</template></head></body>b",
+        ),
+        // ~keep The body of these pages starts at text, at an element, at an end tag and at a
+        // ~keep tag that stays: the removed tags leave nothing in their place.
+        ("a<noscript>b</noscript>", all, "ab"),
+        ("<p>a</p><template>b</template>", all, "<p>a</p>b"),
+        ("</br><template>a</template>", all, "</br>a"),
+        (
+            "<template>a</template><noscript>b</noscript>",
+            reachable,
+            "<template>a</template><noscript>b</noscript>",
+        ),
+        (
+            r#"<template>a</template><div><template shadowrootmode="open">b</template></div>"#,
+            reachable,
+            "<template>a</template><div>b</div>",
+        ),
+    ] {
+        assert_eq!(unwrap_kept_inert_elements(page, choice), expected, "{page:?}");
+    }
+}
+
+#[test]
+fn should_leave_a_tag_in_the_text_of_a_text_element_as_text() {
+    let inner = [
+        "<template><p>x</p></template>",
+        "<noscript><p>x</p></noscript>",
+        r#"<template shadowrootmode="open"><p>x</p></template>"#,
+    ];
+    for choice in [HiddenContent::Reachable, HiddenContent::All] {
+        for name in ["textarea", "noembed", "noframes", "plaintext", "TextArea"] {
+            for text in inner {
+                // ~keep With its end tag, with no end tag, and with an attribute.
+                for page in [
+                    format!("<p>a</p><{name}>{text}</{name}>"),
+                    format!("<p>a</p><{name}>{text}<p>b</p>"),
+                    format!("<p>a</p><{name} class=\"c\">{text}</{name}><p>b</p>"),
+                ] {
+                    assert_eq!(unwrap_kept_inert_elements(&page, choice), page, "{choice:?}");
+                }
+            }
+        }
+    }
+    let all = HiddenContent::All;
+    for (page, expected) in [
+        // ~keep The element ends at its end tag: a template after it is a template.
+        (
+            "<p>a</p><textarea><template></textarea><template>b</template>",
+            "<p>a</p><textarea><template></textarea>b",
+        ),
+        (
+            "<p>a</p><noembed></noscript></noembed><noscript>b</noscript>",
+            "<p>a</p><noembed></noscript></noembed>b",
+        ),
+        // ~keep An end tag in the text closes nothing: the start tag before the element has no
+        // ~keep end tag, and the end tag after the element has no start tag.
+        (
+            "<p>a</p><template><textarea></template></textarea>",
+            "<p>a</p><textarea></template></textarea>",
+        ),
+        (
+            "<p>a</p><noframes><noscript></noframes>b</noscript>",
+            "<p>a</p><noframes><noscript></noframes>b</noscript>",
+        ),
+        // ~keep A `<plaintext>` has no end tag: the rest of the page is its text.
+        (
+            "<template>a</template><p>b</p><plaintext></plaintext><template>c</template>",
+            "</body>a<p>b</p><plaintext></plaintext><template>c</template>",
+        ),
+        // ~keep A name that only starts like one of the elements is another element.
+        (
+            "<p>a</p><textareas><template>b</template></textareas>",
+            "<p>a</p><textareas>b</textareas>",
+        ),
+    ] {
+        assert_eq!(unwrap_kept_inert_elements(page, all), expected, "{page:?}");
     }
 }
 
