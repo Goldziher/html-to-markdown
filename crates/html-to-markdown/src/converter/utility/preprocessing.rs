@@ -11,7 +11,9 @@ mod raw_text;
 mod visibility;
 
 pub use form_boundaries::removes_closed_forms;
-pub use inert::{normalize_inert_bodies_with_preservation, remove_closed_form_bodies, restore_inert_bodies};
+pub use inert::{
+    html_inert_starts, normalize_inert_bodies_with_preservation, remove_closed_form_bodies, restore_inert_bodies,
+};
 pub use lists::normalize_unclosed_list_items;
 pub use markup::{
     find_tag_end, normalize_bogus_comment_endings, normalize_split_closing_tags, preprocess_html, strip_html_cdata,

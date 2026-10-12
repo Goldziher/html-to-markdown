@@ -171,6 +171,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Preserve foreign template/noscript descendants of SVG and MathML graphics when excluding page elements with hidden content kept.
+
 - Self-closing raw-text and inert elements encountered in an HTML head contain their following text.
   Head titles remain metadata; preserved `xmp` retains one container around its literal body
   ([#878](https://github.com/xberg-io/html-to-markdown/issues/878)).

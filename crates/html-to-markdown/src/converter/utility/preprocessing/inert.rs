@@ -139,6 +139,8 @@ struct BodyNormalizer<'a> {
     remove_closed_forms: bool,
     rewrite_bodies: bool,
     closed_forms: RefCell<ClosedForms>,
+    html_starts: Option<&'a RefCell<Vec<usize>>>,
+    graphic_roots: RefCell<NamespaceStack>,
 }
 
 impl BodyNormalizer<'_> {
@@ -261,6 +263,40 @@ impl BodyNormalizer<'_> {
         }
     }
 
+    fn observe_graphic_root(&self, tag: &Tag) {
+        if self.html_starts.is_none() || !matches!(&*tag.name, "svg" | "math") {
+            return;
+        }
+        let mut roots = self.graphic_roots.borrow_mut();
+        if tag.kind == TagKind::EndTag {
+            if let Some(index) = roots.matching_index(&tag.name) {
+                roots.truncate(index);
+            }
+        } else if !tag.self_closing {
+            let namespace = if &*tag.name == "svg" {
+                Namespace::Svg
+            } else {
+                Namespace::Math
+            };
+            roots.push(ForeignContext {
+                name: tag.name.clone(),
+                namespace,
+                children_namespace: namespace,
+            });
+        }
+    }
+
+    fn observe_html_start(&self, tag: &Tag, is_html: bool) {
+        if is_html
+            && self.graphic_roots.borrow().is_empty()
+            && tag.kind == TagKind::StartTag
+            && matches!(&*tag.name, "template" | "noscript")
+            && let Some(starts) = self.html_starts
+        {
+            starts.borrow_mut().push(self.fed_start.get());
+        }
+    }
+
     fn process_tag(&self, tag: Tag) -> TokenSinkResult<()> {
         let name = &*tag.name;
         if tag.kind == TagKind::EndTag && self.opaque.borrow().as_ref() == Some(&tag.name) {
@@ -300,7 +336,9 @@ impl BodyNormalizer<'_> {
             }
             return TokenSinkResult::Script(());
         }
+        self.observe_graphic_root(&tag);
         let is_html = self.track_namespace(&tag);
+        self.observe_html_start(&tag, is_html);
         let inert = self.kept.is_inert(is_html, &tag, self.position());
         self.observe_closed_form(&tag, is_html, html, inert);
         if !inert {
@@ -562,7 +600,7 @@ pub fn remove_closed_form_bodies(source: &str, hidden_content: crate::options::H
     if !needs_normalization(source, true) {
         return Cow::Borrowed(source);
     }
-    let (replacements, _) = body_replacements(source, false, Kept::of(source, hidden_content), true, false);
+    let (replacements, _) = body_replacements(source, false, Kept::of(source, hidden_content), true, false, None);
     rewritten(source, &replacements)
 }
 
@@ -572,7 +610,23 @@ pub(super) fn inert_body_replacements(
     preserve: bool,
     kept: Kept,
 ) -> (Replacements, HashMap<String, String>) {
-    body_replacements(source, preserve, kept, false, true)
+    body_replacements(source, preserve, kept, false, true, None)
+}
+
+/// Locate page-owned HTML template/noscript starts outside serialized SVG/Math roots.
+/// ~keep Graphics own their descendants even at HTML integration points and foreign breakouts;
+/// ~keep their wrappers/labels follow the existing graphic conversion contract.
+pub fn html_inert_starts(source: &str, hidden_content: crate::options::HiddenContent) -> Vec<usize> {
+    let starts = RefCell::new(Vec::new());
+    let _ = body_replacements(
+        source,
+        false,
+        Kept::of(source, hidden_content),
+        false,
+        false,
+        Some(&starts),
+    );
+    starts.into_inner()
 }
 
 fn body_replacements(
@@ -581,6 +635,7 @@ fn body_replacements(
     kept: Kept,
     remove_closed_forms: bool,
     rewrite_bodies: bool,
+    html_starts: Option<&RefCell<Vec<usize>>>,
 ) -> (Replacements, HashMap<String, String>) {
     let input = BufferQueue::default();
     let tokenizer = Tokenizer::new(
@@ -599,6 +654,8 @@ fn body_replacements(
             remove_closed_forms,
             rewrite_bodies,
             closed_forms: RefCell::new(ClosedForms::default()),
+            html_starts,
+            graphic_roots: RefCell::new(NamespaceStack::default()),
         },
         TokenizerOpts::default(),
     );

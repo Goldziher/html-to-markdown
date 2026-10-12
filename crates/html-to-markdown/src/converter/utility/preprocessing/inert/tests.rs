@@ -285,3 +285,44 @@ fn should_finish_unterminated_protected_bodies_at_eof() {
         assert_eq!(normalize_inert_bodies(source), expected, "{source}");
     }
 }
+
+#[test]
+fn should_identify_html_inert_starts_with_source_namespace_ownership() {
+    for source in [
+        r"<svg><template class=x>foreign</template></svg><template id=real>html</template>",
+        r"<math><noscript>foreign</noscript></math><template id=real>html</template>",
+        r"<svg><foreignObject><template id=inside>html</template></foreignObject></svg><template id=real>page</template>",
+        r"<svg><desc><template id=inside>html</template></desc></svg><template id=real>page</template>",
+        r"<math><mtext><template id=inside>html</template></mtext></math><template id=real>page</template>",
+        r"<math><mtext><mglyph><template>foreign</template></mglyph><template id=inside>html</template></mtext></math><template id=real>page</template>",
+        r"<math><annotation-xml encoding=text/html><template id=inside>html</template></annotation-xml></math><template id=real>page</template>",
+        r"<math><annotation-xml><template>foreign</template></annotation-xml></math><template id=real>html</template>",
+        r"<svg><foreignObject><math><template>foreign</template></math><template id=inside>html</template></foreignObject></svg><template id=real>page</template>",
+        r"<!-- <template>fake</template> --><script><template>fake</template></script><template id=real>html</template>",
+        r"<script><svg><template>fake</template></script><template id=real>html</template>",
+        r"<svg><p><template>graphic</template></p></svg><template id=real>html</template>",
+        r"<svg><foreignObject><math><template>graphic</template></math></foreignObject></SVG><template id=real>html</template>",
+        r"<svg/><math/><template id=real>html</template>",
+        r"<textarea><template>fake</template></textarea><iframe><template>fake</template></iframe><template id=real>html</template>",
+        r"<title><template>fake</template></title><p data-x='<template>fake</template>'>x</p><template id=real>html</template>",
+    ] {
+        let expected = vec![source.find("<template id=real>").expect("real source start")];
+        assert_eq!(
+            super::html_inert_starts(source, crate::options::HiddenContent::All),
+            expected,
+            "{source}"
+        );
+    }
+}
+
+#[test]
+fn should_keep_inert_source_offsets_after_unicode_and_large_opaque_regions() {
+    let html = format!(
+        "<script>{}</script><math><template>foreign</template></math><template id=real>html</template>",
+        "雪<svg>".repeat(1500)
+    );
+    assert_eq!(
+        super::html_inert_starts(&html, crate::options::HiddenContent::All),
+        vec![html.find("<template id=real>").expect("real source start")]
+    );
+}
