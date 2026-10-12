@@ -413,9 +413,10 @@ fn render_caption(tag: &tl::HTMLTag<'_>, output: &mut String, env: DataEnv<'_>) 
     }
     let text = text.trim();
     if !text.is_empty() {
-        output.push('*');
+        output.push(env.handler.options.strong_em_symbol);
         output.push_str(&text.replace('-', r"\-"));
-        output.push_str("*\n\n");
+        output.push(env.handler.options.strong_em_symbol);
+        output.push_str("\n\n");
     }
 }
 

@@ -185,7 +185,7 @@ pub const fn hard_break_marker(options: &ConversionOptions) -> &'static str {
 /// blank lines (`\n\n`) — only runs of three or more newlines are collapsed.
 ///
 /// The lines of a code block, fenced or indented, are code, not block transitions, and stay as
-/// they are (issue #783).
+/// they are (issues #783 and #801).
 pub fn collapse_excess_blank_lines(output: &mut String, style: CodeBlockStyle) {
     if !output.contains("\n\n\n") {
         return;
@@ -733,6 +733,7 @@ pub fn is_inline_element(tag_name: &str) -> bool {
             | "ruby"
             | "s"
             | "samp"
+            | "tt"
             | "small"
             | "span"
             | "strong"

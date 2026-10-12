@@ -94,10 +94,9 @@ fn converting_twice_produces_identical_output_for_indented_continuation_lines() 
 }
 
 #[test]
-fn tier1_bails_on_cdata_and_falls_back_to_the_fixed_tier2_output() {
-    // ~keep Tier-1 does not support CDATA sections at all (`BailReason::Cdata`) and always
-    // ~keep falls back to Tier-2 for this shape, so forcing `TierStrategy::Tier1` here must
-    // ~keep reproduce Tier-2's (fixed) output exactly rather than diverging.
+fn a_cdata_section_is_dropped_before_either_tier_reads_it() {
+    // ~keep A CDATA section in HTML content is a bogus comment: it is removed from the source
+    // ~keep before a converter runs, so neither tier sees it and no fallback happens here.
     let html = concat!(
         "<![CDATA[\n",
         "function matchwo(a,b)\n",
@@ -118,18 +117,8 @@ fn tier1_bails_on_cdata_and_falls_back_to_the_fixed_tier2_output() {
     let tier1_forced = convert_with(html, &options);
     options.tier_strategy = TierStrategy::Tier2;
     let tier2 = convert_with(html, &options);
-    assert_eq!(
-        tier1_forced, tier2,
-        "tier1 should fall back to tier2's output for CDATA"
-    );
-    assert!(
-        tier1_forced.contains("return 1;\n\n"),
-        "expected the blank line inside the indented block to survive: {tier1_forced:?}"
-    );
-    assert!(
-        !tier1_forced.contains("\n "),
-        "no continuation line should retain leading indentation: {tier1_forced:?}"
-    );
+    assert_eq!(tier1_forced, tier2, "both tiers must drop the CDATA section");
+    assert_eq!(tier1_forced, "okay\n");
 }
 
 #[test]

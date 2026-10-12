@@ -578,7 +578,7 @@ fn write_graphic_as_image(
 
 /// Handle `MathML` element conversion to Markdown.
 ///
-/// Serializes `MathML` to HTML comment and outputs text content with escaping.
+/// Outputs visible `MathML` text content with escaping.
 pub fn handle_math(
     node_handle: &NodeHandle,
     tag: &tl::HTMLTag,
@@ -587,10 +587,7 @@ pub fn handle_math(
     context: MediaContext<'_>,
 ) {
     let MediaContext {
-        options,
-        ctx,
-        depth,
-        dom_ctx,
+        options, ctx, dom_ctx, ..
     } = context;
     use crate::converter::utility::content::get_text_content;
     use crate::text;
@@ -600,8 +597,6 @@ pub fn handle_math(
     if text_content.is_empty() {
         return;
     }
-
-    let math_html = serialize_element_at_depth(node_handle, parser, depth, effective_max_depth(options));
 
     let escaped_text = text::escape(
         &text_content,
@@ -621,9 +616,6 @@ pub fn handle_math(
         output.push_str("\n\n");
     }
 
-    output.push_str("<!-- MathML: ");
-    output.push_str(&math_html);
-    output.push_str(" --> ");
     output.push_str(&escaped_text);
 
     if is_display_block && !ctx.in_paragraph && !ctx.convert_as_inline {

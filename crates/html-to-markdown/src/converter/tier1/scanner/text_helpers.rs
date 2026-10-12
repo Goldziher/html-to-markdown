@@ -262,18 +262,23 @@ fn hand_over_unicode_space_after_space(
     raw: &str,
     base_offset: usize,
 ) -> Result<(), BailReason> {
-    if state.escape_ctx.intersects(EscapeCtx::PRE | EscapeCtx::CODE) {
+    if state.escape_ctx.intersects(EscapeCtx::PRE | EscapeCtx::CODE) || !source_starts_with_unicode_space(raw) {
         return Ok(());
     }
     let place = state
         .text_place
         .and_then(|(offset, place)| (offset == base_offset).then_some(place));
     let in_heading = state.escape_ctx.contains(EscapeCtx::HEADING);
+    let in_cell = state.in_table_cell();
     let written = state.cell_or_output_mut();
     let after_heading_break = in_heading && (written.ends_with("  \n") || written.ends_with("\\\n"));
-    if (written.ends_with(' ') || after_heading_break)
-        && source_starts_with_unicode_space(raw)
-        && place.is_none_or(|place| unicode_space_is_kept(written, place))
+    let after_hard_break = !in_heading
+        && !in_cell
+        && (written.ends_with("  \n") || written.ends_with("\\\n"))
+        && !crate::converter::utility::white_space::is_blank(crate::text::decode_html_entities_cow(raw).as_ref());
+    if after_hard_break
+        || ((written.ends_with(' ') || after_heading_break)
+            && place.is_none_or(|place| unicode_space_is_kept(written, place)))
     {
         return Err(BailReason::UnicodeSpaceAfterSpace);
     }
