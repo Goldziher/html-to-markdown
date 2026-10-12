@@ -348,11 +348,13 @@ pub fn escape_block_start(buffer: &mut String, from: usize, in_list_item: bool, 
     let before = &buffer[..from];
     // ~keep A letter already written on this line makes every supported fresh block opener
     // inert or already escaped. Avoid rescanning/copying the growing line for each span (#773).
+    // ~keep A form feed is a character of the line as a letter is: form feeds that comments
+    // ~keep separate fold onto one growing line too (#811).
     if before
         .trim_end_matches([' ', '\t'])
         .as_bytes()
         .last()
-        .is_some_and(u8::is_ascii_alphabetic)
+        .is_some_and(|byte| byte.is_ascii_alphabetic() || *byte == 0x0c)
     {
         return;
     }

@@ -302,9 +302,10 @@ pub fn handle_figcaption(
 
         separate_caption(output);
 
-        output.push('*');
+        output.push(handler.options.strong_em_symbol);
         output.push_str(&text);
-        output.push_str("*\n\n");
+        output.push(handler.options.strong_em_symbol);
+        output.push_str("\n\n");
     }
 }
 

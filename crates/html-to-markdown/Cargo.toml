@@ -87,5 +87,13 @@ required-features = ["serde"]
 name = "issue_829_form_tree_test"
 required-features = ["testkit"]
 
+[[test]]
+name = "issue_859_heading_block_markers_test"
+required-features = ["testkit"]
+
+[[test]]
+name = "review_791_block_boundaries_test"
+required-features = ["testkit"]
+
 [lints]
 workspace = true

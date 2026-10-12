@@ -58,7 +58,9 @@ pub fn get_previous_sibling_tag<'a>(
 
 #[cfg(test)]
 thread_local! {
-    /// The sibling entries that `text_place` read on this thread.
+    /// The eager following-content classifications and cached lookups on this thread. ~keep
+    pub(crate) static FOLLOWING_CONTENT_READS: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
+    /// The sibling entries that `text_place` read on this thread. ~keep
     pub(crate) static TEXT_PLACE_SIBLING_VISITS: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
 }
 
@@ -69,6 +71,16 @@ fn count_sibling_visits(visits: usize) {
 
 #[cfg(not(test))]
 const fn count_sibling_visits(_visits: usize) {}
+
+/// Count both index construction and queries, so a zero-work lookup cannot hide setup cost. ~keep
+#[cfg(test)]
+pub fn count_following_content_read() {
+    FOLLOWING_CONTENT_READS.with(|total| total.set(total.get() + 1));
+}
+
+/// Compile operation counting out of production builds. ~keep
+#[cfg(not(test))]
+pub const fn count_following_content_read() {}
 
 /// The index of `id` in `siblings` by a scan from the first sibling, for a node that the index
 /// of the tree does not hold.
@@ -295,6 +307,7 @@ pub fn next_sibling_is_inline_tag(node_handle: &tl::NodeHandle, parser: &tl::Par
 
 /// What follows a node among its siblings, as far as a word separator is concerned.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[repr(u8)]
 pub enum FollowingContent {
     /// The next meaningful sibling is inline content that butts against this node.
     Inline,
@@ -316,50 +329,13 @@ pub enum FollowingContent {
 /// `Absent` is distinct from `NotInline` so a caller can climb to the parent and ask again:
 /// the newline at the end of `<span><span>\n</span></span>Beta` still separates words, but only
 /// the outer wrapper can see `Beta` (issue #505). ~keep
-pub fn following_sibling_content(id: u32, parser: &tl::Parser, dom_ctx: &DomContext) -> FollowingContent {
-    let siblings = match dom_ctx.parent_of(id) {
-        Some(parent_id) => match dom_ctx.children_of(parent_id) {
-            Some(children) => children,
-            None => return FollowingContent::Absent,
-        },
-        None => &dom_ctx.root_children,
-    };
-
-    let Some(position) = dom_ctx
-        .sibling_index(id)
-        .or_else(|| siblings.iter().position(|handle| handle.get_inner() == id))
-    else {
-        return FollowingContent::Absent;
-    };
-
-    for sibling in siblings.iter().skip(position + 1) {
-        if let Some(info) = dom_ctx.tag_info(sibling.get_inner(), parser) {
-            return if info.is_inline_like {
-                FollowingContent::Inline
-            } else {
-                FollowingContent::NotInline
-            };
-        }
-        if let Some(tl::Node::Raw(raw)) = sibling.get(parser) {
-            let decoded = raw.as_utf8_str();
-            if decoded.trim().is_empty() {
-                continue;
-            }
-            // ~keep Text that already opens with whitespace supplies the separator itself, so
-            // ~keep reporting it as inline content here stacks a second space on top of it.
-            // ~keep `<span>\n</span>\n   Tip` (a Docusaurus admonition icon) regressed from
-            // ~keep ") Tip" to ")  Tip" exactly this way -- the wrapper is only load-bearing
-            // ~keep when the next word butts straight up against it, as in issue #491's
-            // ~keep `Alpha<span>\n</span>13`.
-            return if decoded.starts_with(char::is_whitespace) {
-                FollowingContent::NotInline
-            } else {
-                FollowingContent::Inline
-            };
-        }
-    }
-
-    FollowingContent::Absent
+pub fn following_sibling_content(id: u32, _parser: &tl::Parser, dom_ctx: &DomContext) -> FollowingContent {
+    count_following_content_read();
+    dom_ctx
+        .following_content_map
+        .get(id as usize)
+        .copied()
+        .unwrap_or(FollowingContent::Absent)
 }
 
 /// Whether a `<br>` follows the elements that `id` is the last content of:
@@ -617,6 +593,126 @@ mod tests {
             let (reads, text) = node_reads_for(&empty);
             assert_eq!(text, "a b\n", "empty: {text:?}");
             assert!((depth..=3 * depth).contains(&reads), "empty: {reads} nodes");
+        }
+    }
+
+    #[test]
+    fn should_preserve_following_content_classification_across_comments_and_blank_text() {
+        use super::{FollowingContent, following_sibling_content};
+        for (suffix, expected) in [
+            ("<!--c--> \x0C\n", FollowingContent::Absent),
+            ("<!--c--> \x0C\nword", FollowingContent::NotInline),
+            ("<!--c-->word", FollowingContent::Inline),
+            ("<!--c--><em>x</em>", FollowingContent::Inline),
+            ("<!--c--><script>x</script>", FollowingContent::Inline),
+            ("<!--c--><br>", FollowingContent::Inline),
+            ("<!--c--><div>x</div>", FollowingContent::NotInline),
+            ("<!--c-->&nbsp;word", FollowingContent::Inline),
+        ] {
+            let html = format!("<span>x</span>{suffix}");
+            let dom = tl::parse(&html, tl::ParserOptions::default()).expect("parse HTML");
+            let parser = dom.parser();
+            let ctx = crate::converter::utility::caching::build_dom_context(&dom, parser, html.len());
+            let first = dom.children()[0].get_inner();
+            assert_eq!(following_sibling_content(first, parser, &ctx), expected, "{suffix:?}");
+        }
+    }
+
+    #[test]
+    fn should_preserve_comment_form_feed_content_on_all_conversion_routes() {
+        for count in [100, 200, 400] {
+            let run = "<!--c-->\x0C\n".repeat(count);
+            for html in [format!("a\n{run}<br>b"), format!("<span>a\n{run}</span><br>b")] {
+                let full = format!("a{}  \nb\n", "\x0C".repeat(count));
+                let fast = format!("a\n{}  \nb\n", "\x0C\n".repeat(count).trim_end_matches('\n'));
+                let text = full.as_str();
+                assert_eq!(text.matches('\x0C').count(), count);
+                assert!(!text.contains("<!--"));
+                assert!(text.starts_with('a') && text.ends_with("b\n"));
+                for (tier_strategy, extract_metadata) in [
+                    (TierStrategy::Auto, false),
+                    (TierStrategy::Auto, true),
+                    (TierStrategy::Tier1, false),
+                    (TierStrategy::Tier1, true),
+                    (TierStrategy::Tier2, false),
+                    (TierStrategy::Tier2, true),
+                ] {
+                    let options = ConversionOptions {
+                        extract_metadata,
+                        tier_strategy,
+                        ..Default::default()
+                    };
+                    let expected = if tier_strategy == TierStrategy::Tier1 {
+                        &fast
+                    } else {
+                        &full
+                    };
+                    assert_eq!(
+                        convert(&html, options).expect("convert HTML").content.as_deref(),
+                        Some(expected.as_str())
+                    );
+                }
+                assert_eq!(
+                    convert(&html, None).expect("default converter").content.as_deref(),
+                    Some(full.as_str())
+                );
+                let options = ConversionOptions {
+                    extract_metadata: false,
+                    ..Default::default()
+                };
+                let (page, report) = crate::prescan::run(&html);
+                assert_eq!(
+                    crate::tier1::run(&page, &report, &options).expect("raw fast converter"),
+                    fast
+                );
+            }
+        }
+    }
+
+    #[cfg(feature = "visitor")]
+    #[test]
+    fn should_visit_every_text_in_comment_form_feed_runs() {
+        use std::sync::{Arc, Mutex};
+        #[derive(Debug)]
+        struct TextVisits(usize);
+        impl crate::visitor::HtmlVisitor for TextVisits {
+            fn visit_text(&mut self, _ctx: &crate::visitor::NodeContext, _text: &str) -> crate::visitor::VisitResult {
+                self.0 += 1;
+                crate::visitor::VisitResult::Continue
+            }
+        }
+        for count in [100, 200, 400] {
+            let html = format!("<span>a\n{}</span><br>b", "<!--c-->\x0C\n".repeat(count));
+            let visitor = Arc::new(Mutex::new(TextVisits(0)));
+            let options = ConversionOptions {
+                visitor: Some(visitor.clone()),
+                extract_metadata: false,
+                ..Default::default()
+            };
+            let text = convert(&html, options)
+                .expect("visitor conversion")
+                .content
+                .expect("content");
+            assert_eq!(text.matches('\x0C').count(), count);
+            assert_eq!(visitor.lock().expect("visitor state").0, count + 2);
+        }
+    }
+
+    #[test]
+    fn should_bound_comment_form_feed_sibling_lookahead() {
+        for count in [100, 200, 400] {
+            let html = format!("<span>a\n{}</span><br>b", "<!--c-->\x0C\n".repeat(count));
+            let options = ConversionOptions {
+                tier_strategy: TierStrategy::Tier2,
+                extract_metadata: false,
+                ..ConversionOptions::default()
+            };
+            super::FOLLOWING_CONTENT_READS.with(|visits| visits.set(0));
+            let result = convert(&html, options).expect("convert HTML");
+            let text = result.content.unwrap_or_default();
+            assert_eq!(text.matches('\x0C').count(), count);
+            let visits = super::FOLLOWING_CONTENT_READS.with(std::cell::Cell::get);
+            assert_eq!(visits, 3 * count + 5, "{count} lines read {visits} siblings");
         }
     }
 

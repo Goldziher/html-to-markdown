@@ -475,6 +475,7 @@ fn close_list(state: &mut Tier1State, kind: ListKind) {
         let end = dest.trim_end().len();
         state.last_ordered_list_end = Some(end);
     }
+    state.last_closed_list = true;
 }
 
 fn close_list_item(state: &mut Tier1State, frame: &OpenTag) -> Result<(), BailReason> {
@@ -555,6 +556,21 @@ fn open_dt(state: &mut Tier1State) {
 
 fn open_dd(state: &mut Tier1State) {
     mark_definition_in_cell(state);
+    if state.in_table_cell() || state.escape_ctx.intersects(EscapeCtx::CODE | EscapeCtx::PRE) {
+        return;
+    }
+    if state.escape_ctx.contains(EscapeCtx::HEADING) {
+        let output = state.cell_or_output_mut();
+        if !output.is_empty() && !output.ends_with(char::is_whitespace) {
+            output.push(' ');
+        }
+    } else if !state
+        .stack
+        .iter()
+        .any(|frame| matches!(frame.spec.kind, TagKind::ListItem))
+    {
+        state.ensure_blank_line();
+    }
 }
 
 fn mark_definition_in_cell(state: &mut Tier1State) {
@@ -569,10 +585,14 @@ fn close_dt(state: &mut Tier1State) {
     }
     trim_trailing_inline_whitespace(state);
     let buf = state.cell_or_output_mut();
-    if buf.is_empty() || buf.ends_with('\n') {
+    if buf.is_empty() || buf.ends_with("\n\n") {
         return;
     }
-    buf.push('\n');
+    if buf.ends_with('\n') {
+        buf.push('\n');
+    } else {
+        buf.push_str("\n\n");
+    }
 }
 
 fn close_dd(state: &mut Tier1State) {

@@ -21,9 +21,8 @@ struct TextFlush<'a> {
 }
 
 const UNICODE_WS_ENTITIES: &[&str] = &[
-    "&#12;", "&#x0c;", "&#x0C;", "&#xC;", "&nbsp;", "&#160;", "&#xa0;", "&#xA0;", "&ensp;", "&#8194;", "&#x2002;",
-    "&emsp;", "&#8195;", "&#x2003;", "&thinsp;", "&#8201;", "&#x2009;", "&hairsp;", "&#8202;", "&#x200a;", "&#x200A;",
-    "&#12288;", "&#x3000;",
+    "&nbsp;", "&#160;", "&#xa0;", "&#xA0;", "&ensp;", "&#8194;", "&#x2002;", "&emsp;", "&#8195;", "&#x2003;",
+    "&thinsp;", "&#8201;", "&#x2009;", "&hairsp;", "&#8202;", "&#x200a;", "&#x200A;", "&#12288;", "&#x3000;",
 ];
 
 fn handle_structural_text(state: &mut Tier1State, raw: &str, br_in_tables: bool) -> Result<bool, BailReason> {
@@ -82,7 +81,7 @@ fn normalize_unicode_whitespace(raw: &str, verbatim: bool) -> std::borrow::Cow<'
 }
 
 const fn is_non_ascii_whitespace(character: char) -> bool {
-    character.is_whitespace() && !matches!(character, ' ' | '\t' | '\n' | '\r')
+    character.is_whitespace() && !matches!(character, ' ' | '\t' | '\n' | '\r' | '\u{c}')
 }
 
 #[derive(Clone, Copy)]
@@ -634,6 +633,9 @@ fn flush_text(state: &mut Tier1State, request: TextFlush<'_>) -> Result<(), Bail
         return Ok(());
     }
 
+    if !crate::converter::utility::white_space::is_blank(raw) {
+        state.last_closed_list = false;
+    }
     let in_pre = state.escape_ctx.contains(EscapeCtx::PRE);
     let in_code = state.escape_ctx.contains(EscapeCtx::CODE);
 

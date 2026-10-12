@@ -161,9 +161,7 @@ fn deep_svg_group_nesting_does_not_overflow_stack() {
     );
 }
 
-/// Same `serialize_element_at_depth`/`serialize_node_at_depth` path as
-/// `deep_svg_group_nesting_does_not_overflow_stack`, exercised via `<math>`/`<mrow>`
-/// instead of `<svg>`/`<g>` since `handle_math` shares the same serializer.
+/// Deep `MathML` text extraction remains safe after dropping the serialized source comment.
 #[test]
 fn deep_mathml_nesting_does_not_overflow_stack() {
     let _guard = test_lock();
@@ -179,10 +177,7 @@ fn deep_mathml_nesting_does_not_overflow_stack() {
 
     let result = convert_without_overflow_on_stack(html, ConversionOptions::default(), 256 * 1024);
     let content = result.content.as_deref().unwrap_or_default();
-    assert!(
-        content.contains("<!-- MathML: "),
-        "expected a (truncated) MathML comment in the output. Got:\n{content}"
-    );
+    assert_eq!(content, "x\n");
 }
 
 /// Regression coverage: table-cell conversion used to reset the `walk_node` recursion

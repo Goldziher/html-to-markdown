@@ -35,7 +35,7 @@ const BLOCKS: [(&str, &str); 11] = [
     (GFM_TABLE, "<td>c</td>"),
     (LAYOUT_TABLE, r#"<a href="2">b</a>"#),
     ("<pre>code</pre>", "<pre><code>code\n</code></pre>"),
-    ("<dl><dt>T</dt><dd>D</dd></dl>", "<p>T\nD</p>"),
+    ("<dl><dt>T</dt><dd>D</dd></dl>", "<p>T</p>\n<p>D</p>"),
     ("<span><ul><li>B</li></ul></span>", "<ul>\n<li>B</li>\n</ul>"),
 ];
 
@@ -677,7 +677,7 @@ fn should_reach_the_content_column_with_the_fewest_tabs() {
         tabs,
     );
     assert_eq!(
-        out, "- * x\n\n\tt\n\td\n",
+        out, "- * x\n\n\tt\n\n\td\n",
         "the nested item's definition list got the wrong tab column"
     );
     assert!(!render(&out).contains("<pre>"), "{out:?} renders {:?}", render(&out));

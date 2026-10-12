@@ -209,7 +209,8 @@ fn the_space_after_an_inline_graphic_is_kept() {
 #[test]
 fn the_space_after_other_replaced_content_is_kept() {
     assert_on_full(&[
-        ("<p><video src=\"/v.mp4\"></video> text</p>", "[/v.mp4](/v.mp4) text\n"),
+        // ~keep The text of the link is the kind of the element, not its address (issue #777).
+        ("<p><video src=\"/v.mp4\"></video> text</p>", "[video](/v.mp4) text\n"),
         // ~keep A check box outside a list item writes nothing, and no space with it.
         ("<p><input type=\"checkbox\"> text</p>", "text\n"),
     ]);

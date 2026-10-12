@@ -23,6 +23,47 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Pages whose forms are removed, and retained forms with nested starts, use the full converter;
   well-formed retained forms can still use the fast converter.
 
+- Comment and form-feed runs before a line break use cached sibling lookahead instead of
+  rescanning each suffix, retaining the existing output on every conversion route.
+
+- A line break before inline text in a definition description keeps its joining space after
+  the term's blank line. Paragraphs in strict-mode headings retain source whitespace without
+  doubling a separator; divs keep their word boundaries, including inside heading code spans.
+  Unicode indentation after a hard break, including U+3000, is retained (#839).
+
+- Quotes and lists inside a heading write their labels without structural quote or list
+  markers. Literal `>` and `-` text stays, and heading quote/list visitor overrides still apply
+  ([#859](https://github.com/xberg-io/html-to-markdown/issues/859)).
+
+- Audio and video players inside an outer link contribute plain label text instead of a nested
+  Markdown link. Their labels stay separate from adjacent words without padding punctuation
+  or visitor-skipped content, and an outer anchor with an empty address retains each player
+  destination. Fallback content without a player address also stays separate from the next
+  word inside the link. Inside preformatted code their default player output contributes no link or
+  extra blank line; visitor-provided output still applies (#840, #841).
+
+- A definition description outside a definition list starts a new block instead of joining the
+  preceding word. `<div>a<dd>b</dd> c</div>` now writes `a`, `b` and `c` as separate blocks;
+  a heading or link keeps its description inline with a word space, and an orphan description
+  after a closed list item keeps its blank line
+  ([#838](https://github.com/xberg-io/html-to-markdown/issues/838)).
+
+- An indented code block at the start of a definition description inside a list item keeps the
+  item's content-column indent on its first line as well as later lines, with a blank line
+  before the code. Bullet and numbered items now render the whole block as code
+  ([#806](https://github.com/xberg-io/html-to-markdown/issues/806)).
+
+- Inserted text (`<ins>`) is plain text and no longer takes the highlight markers. A rule inside
+  it is on its own line.
+- Teletype text (`<tt>`) is a code span.
+- A `<button>` stays in the line of the text around it, with no blank lines before or after
+  ([#785](https://github.com/xberg-io/html-to-markdown/issues/785)).
+- A definition list has a blank line between a term and its description.
+- A CDATA section in HTML content is dropped from the output.
+- A form feed is kept as text and no longer collapses as white space
+  ([#811](https://github.com/xberg-io/html-to-markdown/issues/811)).
+- The link for an `<audio>`, `<video>` or `<iframe>` has the `title` of the element as its label,
+  or the element name in lower case, in place of the address.
 - White space at the start or the end of a link label or of a short quotation is written beside
   the link or the quotation, not inside it, as it is for bold text. `Press <a href="/p">Go </a>now.` gave `Press [Go](/p)now.` and
   now gives `Press [Go](/p) now.`. `Press <q>Go </q>now.` gave `Press "Go"now.` and now gives
@@ -44,10 +85,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `<li>Text <input type="checkbox"> more</li>` gave `- [ ] Text  more` and now gives `- Text more`.
   The menu switch of many themes, a checkbox before its label, no longer writes `[ ]`
   ([#757](https://github.com/xberg-io/html-to-markdown/issues/757)).
-- A button, an output, a meter, a progress bar or a text area is a word of its own in running
-  text, also when the source glues it to a word:
-  `<p>Please re<button>load</button>ed the page</p>` gave `Please reload` and now gives
-  `Please re load`. The line still ends after the control
+- An output, a meter, a progress bar or a text area is a word of its own in running text, also
+  when the source glues it to a word: `<p>x<output>half</output>y</p>` gave `xhalf`, a blank line
+  and `y`, and now gives `x half`, a blank line and `y`. The line still ends after the control
   ([#752](https://github.com/xberg-io/html-to-markdown/issues/752)).
 - A link whose content gives no text is labelled with the name of the link: its `aria-label`,
   then its `title`. Before, the label was the address of the link. This changes the default
@@ -100,6 +140,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- A `<label>` inside a code block keeps the spaces and the line ends of its text
+  ([#822](https://github.com/xberg-io/html-to-markdown/issues/822)).
+- A paragraph inside a heading keeps a space between its text and the text after it
+  ([#804](https://github.com/xberg-io/html-to-markdown/issues/804)).
+- With `convert_as_inline`, a term or a description of a definition list has a space between it
+  and the text before it: `<dl><dt>t</dt><dd>d</dd></dl>` gives `t d`, was `td`. The same holds
+  in a heading and in a link.
+- An `<audio>` or `<video>` gets its link also when `extract_metadata` is `false` and
+  `highlight_style` is `none`: `<p>x</p><video src="/v.mp4"></video>` gives `x`, then
+  `[video](/v.mp4)`, was `x` only.
 - Links inside `code`, `kbd` and `samp` spans keep their destinations outside the code marks,
   including links in table cells. Image labels stay literal, and quotes and hidden templates
   retain their normal behavior ([#813](https://github.com/xberg-io/html-to-markdown/issues/813)).
