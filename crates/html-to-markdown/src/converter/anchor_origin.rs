@@ -18,7 +18,7 @@
 //! which the tree also no longer shows, and builds no more of the tree once the tree sink
 //! reached a limit: see [`parse_with_anchor_origins`]. ~keep
 
-use std::cell::Cell;
+use std::cell::{Cell, RefCell};
 use std::collections::BTreeMap;
 use std::rc::Rc;
 
@@ -53,17 +53,92 @@ struct AnchorOriginStamper {
     inner: TreeBuilder<Handle, RcDom>,
     next_origin: Cell<u32>,
     saw_html_tag: Cell<bool>,
+    saw_head_tag: Cell<bool>,
     saw_body_tag: Cell<bool>,
     saw_table_part: Cell<bool>,
+    /// Head mode: the first `<html>` start tag went by after text made the body.
+    html_tag_after_text: Cell<bool>,
+    /// True once a tag, a comment or a doctype went by: the input is more than text.
+    saw_markup: Cell<bool>,
+    /// The last tag opened an element whose content is raw text (a `title`, a `script`).
+    in_raw_text: Cell<bool>,
+    /// The head mode: the parse stops where the body of the page starts.
+    head_mode: bool,
+    /// The head mode stopped the parse.
+    stopped_at_body: Cell<bool>,
+    /// A `<head>` start tag went by and its end tag did not yet.
+    source_head_open: Cell<bool>,
+    /// The tag that started the body, written from its token. The tree does not hold it.
+    written_back: RefCell<String>,
 }
 
 impl AnchorOriginStamper {
+    /// Head mode, before the tree builder gets `tag`: true when the parse stops in front of it.
+    ///
+    /// ~keep The body that began inside the head of the source ends the head at the `</head>`
+    /// ~keep of the source, a tag that the tree builder ignores there. Text that made the body
+    /// ~keep ends the head at the next tag, which is the first tag of the rest.
+    fn stops_before(&self, tag: &Tag) -> bool {
+        let made_body = self.inner.sink.made_body.get();
+        if tag.kind == TagKind::EndTag && &*tag.name == "head" && self.source_head_open.replace(false) && made_body {
+            return true;
+        }
+        if made_body && !self.source_head_open.get() {
+            // ~keep Text in front of the `<html>` tag of the source made the body (issue #609).
+            // ~keep The tree builder gets that tag and the `<head>` tag after it and opens no
+            // ~keep element for them; the head of the source is then read to its `</head>` like
+            // ~keep a head that the body began in, and its title is the title of the document.
+            // ~keep A `<head>` after text with no `<html>` tag between them ends the head (#527).
+            if tag.kind == TagKind::StartTag && !self.saw_head_tag.get() {
+                match &*tag.name {
+                    "html" if !self.saw_html_tag.get() => {
+                        self.html_tag_after_text.set(true);
+                        return false;
+                    }
+                    "head" if self.html_tag_after_text.get() => {
+                        self.source_head_open.set(true);
+                        return false;
+                    }
+                    _ => {}
+                }
+            }
+            write_tag(&mut self.written_back.borrow_mut(), tag);
+            return true;
+        }
+        false
+    }
+
+    /// Head mode, after the tree builder got the tag that `unstamped` copies: true when that
+    /// tag made the body outside the head of the source. The tag is taken out of the body again
+    /// and written back, so the rest of the input starts with it as the source wrote it. A
+    /// `<body>` start tag is not written back: the body of the tree has its attributes.
+    fn stops_after(&self, unstamped: &Tag) -> bool {
+        let made_body = self.inner.sink.made_body.get();
+        let is_start = unstamped.kind == TagKind::StartTag;
+        if is_start && &*unstamped.name == "head" && !made_body {
+            self.source_head_open.set(true);
+        }
+        if !made_body || self.source_head_open.get() {
+            return false;
+        }
+        if !(is_start && &*unstamped.name == "body") {
+            if let Some(body) = child_element(&self.inner.sink.document, "html")
+                .and_then(|html| child_element(&html, "body"))
+            {
+                body.children.borrow_mut().clear();
+            }
+            write_tag(&mut self.written_back.borrow_mut(), unstamped);
+        }
+        true
+    }
+
     fn stamp(&self, tag: &mut Tag) {
         if tag.kind != TagKind::StartTag {
             return;
         }
         match &*tag.name {
             "html" => self.saw_html_tag.set(true),
+            "head" => self.saw_head_tag.set(true),
             // ~keep A `<body>` start tag after the body is open opens no element: the tree
             // ~keep builder copies its attributes to the body it implied. That body is still
             // ~keep one that no start tag asked for.
@@ -108,22 +183,52 @@ fn set_private_attr(tag: &mut Tag, name: &str, value: StrTendril) {
 impl TokenSink for AnchorOriginStamper {
     type Handle = Handle;
 
-    fn process_token(&self, mut token: Token, line_number: u64) -> TokenSinkResult<Self::Handle> {
-        let is_tag = matches!(token, Token::TagToken(_));
-        if let Token::TagToken(ref mut tag) = token {
-            self.stamp(tag);
+    fn process_token(&self, token: Token, line_number: u64) -> TokenSinkResult<Self::Handle> {
+        let mut tag = match token {
+            Token::TagToken(tag) => tag,
+            Token::CommentToken(_) | Token::DoctypeToken(_) => {
+                self.saw_markup.set(true);
+                return self.inner.process_token(token, line_number);
+            }
+            // ~keep A no-break space in front of the head is white space that the converters
+            // ~keep write nowhere, and it must not start the body (issue #594). The tree
+            // ~keep builder does not get it. ASCII white space is its own to place.
+            Token::CharacterTokens(ref text)
+                if self.head_mode
+                    && !self.in_raw_text.get()
+                    && !self.inner.sink.made_body.get()
+                    && !text.is_ascii()
+                    && text.chars().all(char::is_whitespace) =>
+            {
+                return TokenSinkResult::Continue;
+            }
+            token => return self.inner.process_token(token, line_number),
+        };
+        self.saw_markup.set(true);
+        let stop = || TokenSinkResult::Script(Rc::clone(&self.inner.sink.document));
+        if self.head_mode && self.stops_before(&tag) {
+            self.stopped_at_body.set(true);
+            return stop();
         }
-        let result = self.inner.process_token(token, line_number);
+        // ~keep Only a tag that the tree builder gets before it made the body can make it.
+        let unstamped = (self.head_mode && !self.inner.sink.made_body.get()).then(|| tag.clone());
+        self.stamp(&mut tag);
+        let result = self.inner.process_token(Token::TagToken(tag), line_number);
+        self.in_raw_text
+            .set(matches!(result, TokenSinkResult::RawData(_) | TokenSinkResult::Plaintext));
+        if unstamped.is_some_and(|unstamped| self.stops_after(&unstamped)) {
+            self.stopped_at_body.set(true);
+            return stop();
+        }
         // ~keep The parse stops at the tag that reached the node budget or the depth limit of
         // ~keep the sink (issues #808 and #809), so the rest of the input starts at a tag
         // ~keep boundary, no tag is dropped and no tag past the limit is read. It does not
         // ~keep stop after a raw text start tag: the script or style text would become
         // ~keep visible text.
-        if is_tag
-            && self.inner.sink.repair_limit.get().is_some()
+        if self.inner.sink.repair_limit.get().is_some()
             && !matches!(result, TokenSinkResult::RawData(_) | TokenSinkResult::Plaintext)
         {
-            return TokenSinkResult::Script(Rc::clone(&self.inner.sink.document));
+            return stop();
         }
         result
     }
@@ -147,6 +252,58 @@ pub struct RepairTree {
     /// The input that the parse did not read. It is empty unless a limit stopped the parse,
     /// and it starts at a tag boundary.
     pub unparsed: String,
+    /// True when the input holds a tag, a comment or a doctype.
+    pub saw_markup: bool,
+}
+
+/// The tree of the start of a page, from [`parse_to_body_start`].
+pub struct HeadTree {
+    /// The tree, and the input that the parse did not read.
+    pub tree: RepairTree,
+    /// The tag that starts the body, as text, when the parse stopped at the start of the body.
+    /// The input that the parse did not read follows it. `None` when the tree builder read
+    /// the whole page: it has no `</head>` after its `<head>`, or it has no body content.
+    pub body_start: Option<String>,
+}
+
+/// Write `tag` as the source of a tag: its name, its attributes, its self-closing flag.
+fn write_tag(out: &mut String, tag: &Tag) {
+    out.push('<');
+    if tag.kind == TagKind::EndTag {
+        out.push('/');
+    }
+    out.push_str(&tag.name);
+    for attribute in &tag.attrs {
+        out.push(' ');
+        out.push_str(&attribute.name.local);
+        out.push_str("=\"");
+        for character in attribute.value.chars() {
+            match character {
+                '"' => out.push_str("&quot;"),
+                '&' => out.push_str("&amp;"),
+                other => out.push(other),
+            }
+        }
+        out.push('"');
+    }
+    if tag.self_closing {
+        out.push('/');
+    }
+    out.push('>');
+}
+
+/// Parse `html` to the start of its body, as the HTML tree builder decides it.
+///
+/// The tree holds the doctype, the `html` element and the head as a browser builds them.
+/// `read` gets the document before the `html` and `body` elements that no start tag asked for
+/// are unwrapped.
+///
+/// ~keep When the body begins inside the `<head>` of the source, the parse goes on to the
+/// ~keep `</head>` of the source and the tree holds that body content too. A page with a
+/// ~keep `<head>` and no `</head>` is read to its end.
+pub fn parse_to_body_start(html: &str, read: impl FnOnce(&Handle)) -> HeadTree {
+    let (tree, body_start) = parse(html, true, read);
+    HeadTree { tree, body_start }
 }
 
 /// Parse `html` as a document with every `<a>` stamped with its origin id.
@@ -168,6 +325,11 @@ pub struct RepairTree {
 /// ~keep and rules that ask "is this element in the body of a page" (the page header rule) must
 /// ~keep still see a fragment after the repair.
 pub fn parse_with_anchor_origins(html: &str) -> RepairTree {
+    parse(html, false, |_| {}).0
+}
+
+/// [`parse_with_anchor_origins`], or [`parse_to_body_start`] when `head_mode` is true.
+fn parse(html: &str, head_mode: bool, read: impl FnOnce(&Handle)) -> (RepairTree, Option<String>) {
     // ~keep Formatting reconstruction can create hundreds of clones per source tag (#809).
     // ~keep Both allocation and depth budgets apply to every HTML5 repair route (#808).
     const MAX_NODE_MULTIPLIER: usize = 8;
@@ -186,16 +348,24 @@ pub fn parse_with_anchor_origins(html: &str) -> RepairTree {
             inner: tree_builder,
             next_origin: Cell::new(0),
             saw_html_tag: Cell::new(false),
+            saw_head_tag: Cell::new(false),
+            html_tag_after_text: Cell::new(false),
             saw_body_tag: Cell::new(false),
             saw_table_part: Cell::new(false),
+            saw_markup: Cell::new(false),
+            in_raw_text: Cell::new(false),
+            head_mode,
+            stopped_at_body: Cell::new(false),
+            source_head_open: Cell::new(false),
+            written_back: RefCell::new(String::new()),
         },
         TokenizerOpts::default(),
     );
     let input = BufferQueue::default();
     input.push_back(StrTendril::from(html));
-    let reached_limit = || tokenizer.sink.inner.sink.repair_limit.get().is_some();
-    while !reached_limit() && !matches!(tokenizer.feed(&input), TokenizerResult::Done) {}
-    if reached_limit() {
+    let stopped = || tokenizer.sink.inner.sink.repair_limit.get().is_some() || tokenizer.sink.stopped_at_body.get();
+    while !stopped() && !matches!(tokenizer.feed(&input), TokenizerResult::Done) {}
+    if stopped() {
         tokenizer.sink.inner.end();
     } else {
         tokenizer.end();
@@ -206,16 +376,36 @@ pub fn parse_with_anchor_origins(html: &str) -> RepairTree {
     }
     let saw_html_tag = tokenizer.sink.saw_html_tag.get();
     let saw_body_tag = tokenizer.sink.saw_body_tag.get();
+    let saw_head_tag = tokenizer.sink.saw_head_tag.get();
     let saw_table_part = tokenizer.sink.saw_table_part.get();
+    let saw_markup = tokenizer.sink.saw_markup.get();
+    let body_start = tokenizer
+        .sink
+        .stopped_at_body
+        .get()
+        .then(|| tokenizer.sink.written_back.take());
     let dom = TreeSink::finish(tokenizer.sink.inner.sink);
     let limit = dom.repair_limit.get();
+    read(&dom.document);
+    // ~keep The page of the head mode goes to the converters, and a page whose head holds
+    // ~keep nothing must stay as the input wrote it: the head that no start tag asked for
+    // ~keep goes, as the `html` and the `body` of that kind go below.
+    if head_mode && !saw_head_tag {
+        remove_empty_head(&dom.document);
+    }
     unwrap_implied_wrappers(&dom.document, saw_html_tag, saw_body_tag);
     // ~keep Only a table gets a `<tbody>` or a `<colgroup>` that no start tag asked for, and only
     // ~keep such a start tag gets the mark, so a page with none of the three tags skips the walk.
     if saw_table_part {
         unwrap_implied_table_parts(&dom.document);
     }
-    RepairTree { dom, limit, unparsed }
+    let tree = RepairTree {
+        dom,
+        limit,
+        unparsed,
+        saw_markup,
+    };
+    (tree, body_start)
 }
 
 /// Replace each `<tbody>` and `<colgroup>` under `document` that no start tag asked for with its
@@ -251,6 +441,16 @@ fn unwrap_implied_wrappers(document: &Handle, saw_html_tag: bool, saw_body_tag: 
     }
     if !saw_html_tag {
         unwrap_element(&html);
+    }
+}
+
+/// Take the `head` element of `document` out of the tree when it holds nothing.
+fn remove_empty_head(document: &Handle) {
+    let Some(html) = child_element(document, "html") else {
+        return;
+    };
+    if let Some(head) = child_element(&html, "head").filter(|head| head.children.borrow().is_empty()) {
+        html.children.borrow_mut().retain(|child| !Rc::ptr_eq(child, &head));
     }
 }
 
@@ -560,7 +760,9 @@ mod tests {
             "</div>".repeat(572),
             "<br>".repeat(128)
         );
-        let RepairTree { dom, limit, unparsed } = parse_with_anchor_origins(&page);
+        let RepairTree {
+            dom, limit, unparsed, ..
+        } = parse_with_anchor_origins(&page);
         assert_eq!(limit, Some(crate::types::WarningKind::DepthLimitExceeded));
         let built = written(dom);
         assert_eq!(built.matches("<div>").count(), 511);
@@ -577,7 +779,9 @@ mod tests {
         // ~keep The parse stops at one tag, and every tag is in the tree or in the rest once.
         let blocks = 100_000;
         let page = format!("{}tail", "<div>".repeat(blocks));
-        let RepairTree { dom, limit, unparsed } = parse_with_anchor_origins(&page);
+        let RepairTree {
+            dom, limit, unparsed, ..
+        } = parse_with_anchor_origins(&page);
         assert_eq!(limit, Some(crate::types::WarningKind::DepthLimitExceeded));
         let built = written(dom).matches("<div>").count();
         assert!(built <= MAX_REPAIR_DEPTH, "{built} blocks built");

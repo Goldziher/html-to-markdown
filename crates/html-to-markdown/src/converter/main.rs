@@ -15,8 +15,7 @@ use std::collections::HashSet;
 
 use crate::converter::dom_context::DomContext;
 use crate::converter::main_helpers::{
-    collapse_excess_blank_lines, effective_max_depth, extract_head_metadata, format_metadata_frontmatter,
-    has_custom_element_tags, is_inline_element, repair_limit_warning, repair_with_html5ever_bounded,
+    collapse_excess_blank_lines, effective_max_depth, has_custom_element_tags, is_inline_element, repair_limit_warning, repair_with_html5ever_bounded,
     strip_trailing_backslash_breaks, trim_line_end_whitespace, trim_trailing_whitespace,
 };
 use crate::converter::plain_text::extract_plain_text;
@@ -58,11 +57,12 @@ pub struct ConversionParameters<'a> {
     pub structure_collector: Option<StructureCollectorHandle>,
     pub base_url: Option<std::rc::Rc<url::Url>>,
     pub document_base_href: Option<&'a str>,
-    /// The limit that the head repair reached before this conversion, if it reached one.
+    /// What the HTML tree builder says about the head of the page. `html` is its page.
     ///
-    /// ~keep The converter joins it with the limits of its own repairs and gives one warning
-    /// ~keep for the conversion. The caller gives no warning of its own.
-    pub head_repair_limit: Option<crate::types::WarningKind>,
+    /// ~keep The converter joins the limit of that parse with the limits of its own repairs and
+    /// ~keep gives one warning for the conversion. The caller gives no warning of its own, and
+    /// ~keep the caller writes the front matter: the result of the converter is the body.
+    pub head: &'a crate::converter::HeadFacts,
 }
 /// Internal implementation of HTML to Markdown conversion.
 ///
@@ -83,7 +83,7 @@ pub fn convert_html_impl(
         structure_collector,
         base_url,
         document_base_href,
-        head_repair_limit,
+        head,
     } = parameters;
     let preserve_menu = options.preserve_tags.iter().any(|tag| tag.eq_ignore_ascii_case("menu"));
     let (preprocessed, prepare_limit) = prepare_html(html, preserve_menu);
@@ -94,20 +94,15 @@ pub fn convert_html_impl(
         len: preprocessed_len,
         repair_limit,
     } = parse_for_conversion(&preprocessed, &repaired_page, preserve_menu)?;
-    let repair_warning = repair_limit.or(prepare_limit).or(head_repair_limit);
+    let repair_warning = repair_limit.or(prepare_limit).or(head.limit);
     trace_parse_complete(&dom, preprocessed_len);
     let parser = dom.parser();
     let mut output = String::with_capacity(preprocessed_len.saturating_add(preprocessed_len / 4));
     let is_plain_text = options.output_format == OutputFormat::Plain;
-    let frontmatter = prepare_frontmatter(
-        &dom,
-        parser,
-        options,
-        document_base_href,
-        #[cfg(feature = "metadata")]
-        metadata_collector.as_ref(),
-    );
-    output.push_str(&frontmatter);
+    #[cfg(feature = "metadata")]
+    populate_metadata_collector(metadata_collector.as_ref(), head, options, document_base_href);
+    #[cfg(not(feature = "metadata"))]
+    let _ = document_base_href;
 
     let reference_collector = create_reference_collector(options);
 
@@ -140,7 +135,7 @@ pub fn convert_html_impl(
     drop(ctx);
 
     append_references(&mut output, reference_collector);
-    let output = finalize_output(&dom, parser, options, output, &frontmatter, is_plain_text);
+    let output = finalize_output(&dom, parser, options, output, is_plain_text);
     let (document, tables) = finish_structure_collector(structure_collector);
     trace_render_complete(&output, &tables);
     Ok((output, document, tables, depth_warning))
@@ -255,7 +250,6 @@ fn finalize_output(
     parser: &tl::Parser<'_>,
     options: &ConversionOptions,
     mut output: String,
-    frontmatter: &str,
     is_plain_text: bool,
 ) -> String {
     if is_plain_text {
@@ -264,36 +258,13 @@ fn finalize_output(
         trim_line_end_whitespace(&mut output, options.code_block_style);
         collapse_excess_blank_lines(&mut output, options.code_block_style);
     }
+    // ~keep The front matter is YAML, not Markdown, and must not be wrapped. The output holds
+    // ~keep none: the caller writes it in front of this text.
     if options.wrap {
-        wrap_after_frontmatter(&output, frontmatter, options)
+        crate::wrapper::wrap_markdown(&output, options)
     } else {
         output
     }
-}
-
-fn prepare_frontmatter(
-    dom: &tl::VDom<'_>,
-    parser: &tl::Parser<'_>,
-    options: &ConversionOptions,
-    document_base_href: Option<&str>,
-    #[cfg(feature = "metadata")] metadata_collector: Option<&crate::metadata::MetadataCollectorHandle>,
-) -> String {
-    let wants_frontmatter = options.extract_metadata && !options.convert_as_inline;
-    #[cfg(feature = "metadata")]
-    let wants_document = metadata_collector.is_some_and(|collector| collector.borrow().wants_document());
-    #[cfg(not(feature = "metadata"))]
-    let wants_document = false;
-    if !wants_frontmatter && !wants_document {
-        return String::new();
-    }
-    let head_metadata = extract_head_metadata(dom.children(), parser, options, document_base_href);
-    let frontmatter = wants_frontmatter
-        .then(|| format_metadata_frontmatter(&head_metadata))
-        .flatten()
-        .unwrap_or_default();
-    #[cfg(feature = "metadata")]
-    populate_metadata_collector(dom, parser, metadata_collector, head_metadata, wants_document);
-    frontmatter
 }
 
 #[cfg(feature = "visitor")]
@@ -315,60 +286,27 @@ const fn check_visitor_error(_ctx: &Context) -> Result<()> {
 }
 
 #[cfg(feature = "metadata")]
+/// Give the metadata collector the document facts of `head`, when it wants the document.
 fn populate_metadata_collector(
-    dom: &tl::VDom<'_>,
-    parser: &tl::Parser<'_>,
     metadata_collector: Option<&crate::metadata::MetadataCollectorHandle>,
-    head_metadata: std::collections::BTreeMap<String, String>,
-    wants_document: bool,
+    head: &crate::converter::HeadFacts,
+    options: &ConversionOptions,
+    document_base_href: Option<&str>,
 ) {
-    if !wants_document {
-        return;
-    }
-    let Some(collector) = metadata_collector else {
+    let Some(collector) = metadata_collector.filter(|collector| collector.borrow().wants_document()) else {
         return;
     };
-    let (language, direction) = document_language_and_direction(dom.children(), parser);
+    let head_metadata = head.metadata_for(options, document_base_href);
     let mut collector = collector.borrow_mut();
     if !head_metadata.is_empty() {
         collector.set_head_metadata(head_metadata);
     }
-    if let Some(language) = language {
+    if let Some(language) = head.language.clone() {
         collector.set_language(language);
     }
-    if let Some(direction) = direction {
+    if let Some(direction) = head.direction.clone() {
         collector.set_text_direction(direction);
     }
-}
-
-#[cfg(feature = "metadata")]
-fn document_language_and_direction(
-    children: &[tl::NodeHandle],
-    parser: &tl::Parser<'_>,
-) -> (Option<String>, Option<String>) {
-    let mut language = None;
-    let mut direction = None;
-    for child_handle in children {
-        let Some(tl::Node::Tag(tag)) = child_handle.get(parser) else {
-            continue;
-        };
-        if !matches!(tag.name().as_utf8_str().as_ref(), "html" | "body") {
-            continue;
-        }
-        language = language.or_else(|| {
-            tag.attributes()
-                .get("lang")
-                .flatten()
-                .map(|value| value.as_utf8_str().to_string())
-        });
-        direction = direction.or_else(|| {
-            tag.attributes()
-                .get("dir")
-                .flatten()
-                .map(|value| value.as_utf8_str().to_string())
-        });
-    }
-    (language, direction)
 }
 
 fn prepare_html(html: &str, preserve_menu: bool) -> (String, Option<crate::types::WarningKind>) {
@@ -415,22 +353,6 @@ fn repair_custom_elements(preprocessed: String, preserve_menu: bool) -> (String,
         "custom element tags detected; re-parsed input with html5ever repair fallback"
     );
     (preprocess_repaired_html(&repaired, preserve_menu), warning)
-}
-
-/// Wrap `output` at the wrap width, leaving the `frontmatter` it starts with as it is.
-///
-/// ~keep The frontmatter is YAML, not Markdown: wrapped, its closing `---` reads as a heading
-/// ~keep underline and its keys join into one line that YAML cannot parse. The plain-text output
-/// ~keep carries no frontmatter, so all of it is wrapped.
-fn wrap_after_frontmatter(output: &str, frontmatter: &str, options: &ConversionOptions) -> String {
-    let body_start = if output.starts_with(frontmatter) {
-        frontmatter.len()
-    } else {
-        0
-    };
-    let mut wrapped = output[..body_start].to_owned();
-    wrapped.push_str(&crate::wrapper::wrap_markdown(&output[body_start..], options));
-    wrapped
 }
 
 /// Consume the structure collector and return the [`DocumentStructure`] and extracted
@@ -740,7 +662,6 @@ fn convert_tag(
             VisitAction::Skip => return,
             VisitAction::Custom => {
                 if let Some(replacement) = output.get(visitor_output_start..) {
-                    collect_document_attributes(tag_name.as_ref(), tag, ctx);
                     super::structure_capture::replace_element_at_start(tag_name.as_ref(), tag, ctx, replacement);
                 }
                 return;
@@ -761,7 +682,6 @@ fn convert_tag(
     ) {
         return;
     }
-    collect_document_attributes(tag_name.as_ref(), tag, ctx);
     let structure_capture = super::structure_capture::begin_element(tag_name.as_ref(), tag, ctx);
     #[cfg_attr(not(feature = "visitor"), allow(unused_variables))]
     let element_output_start = output.len();
@@ -918,26 +838,6 @@ fn render_preserved_tag(
     }
     true
 }
-
-#[cfg(feature = "metadata")]
-fn collect_document_attributes(tag_name: &str, tag: &tl::HTMLTag<'_>, ctx: &Context) {
-    if !matches!(tag_name, "html" | "head" | "body") || !ctx.metadata_wants.document {
-        return;
-    }
-    let Some(collector) = ctx.metadata_collector.as_ref() else {
-        return;
-    };
-    let mut collector = collector.borrow_mut();
-    if let Some(lang) = tag.attributes().get("lang").flatten() {
-        collector.set_language(lang.as_utf8_str().to_string());
-    }
-    if let Some(dir) = tag.attributes().get("dir").flatten() {
-        collector.set_text_direction(dir.as_utf8_str().to_string());
-    }
-}
-
-#[cfg(not(feature = "metadata"))]
-const fn collect_document_attributes(_tag_name: &str, _tag: &tl::HTMLTag<'_>, _ctx: &Context) {}
 
 /// ~keep Block dispatch is where a trailing hard-break run becomes knowably
 /// ineffective; container endings handle the no-following-sibling case themselves.

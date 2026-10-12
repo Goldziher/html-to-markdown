@@ -100,7 +100,7 @@ fn should_report_the_effective_document_base_in_frontmatter() {
 
         let expected = match tier_strategy {
             TierStrategy::Tier1 => "---\nbase: https://example.com/other/\n---\n\n[x](https://example.com/other/x)\n",
-            TierStrategy::Tier2 => "---\nbase: https://example.com/other/\n---\n[x](https://example.com/other/x)\n",
+            TierStrategy::Tier2 => "---\nbase: https://example.com/other/\n---\n\n[x](https://example.com/other/x)\n",
             TierStrategy::Auto => unreachable!("the test enumerates forced tiers only"),
         };
         assert_eq!(output, expected, "tier: {tier_strategy:?}");
@@ -259,7 +259,9 @@ fn should_not_resolve_link_like_text_inside_other_raw_text_elements() {
         ("iframe", "after\n"),
         ("noscript", "after\n"),
         ("noembed", "see [here](x.html)\n\nafter\n"),
-        ("noframes", "see [here](x.html)\n\nafter\n"),
+        // ~keep A `noframes` in front of the body is head content with raw text for the HTML
+        // ~keep tree builder, as a `noscript` is: a browser shows none of it.
+        ("noframes", "after\n"),
     ] {
         let html = format!(r#"<{element}>see <a href="x.html">here</a></{element}><p>after</p>"#);
         let out = convert_with(&html, Some("https://example.com/dir/page.html"), TierStrategy::Tier2);

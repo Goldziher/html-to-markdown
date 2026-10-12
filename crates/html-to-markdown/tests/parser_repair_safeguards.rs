@@ -122,17 +122,21 @@ fn should_take_a_title_with_no_head_tag_as_the_document_title_inside_the_node_bu
 }
 
 #[test]
-fn should_keep_a_title_with_no_head_tag_in_the_body_past_the_node_budget() {
-    // ~keep The repair that moves the title into the head has the node budget (issue #809).
-    // ~keep Past the budget the page keeps its structure as written: the title text is the
-    // ~keep first paragraph and there is no front matter. The head repair and the repair of
-    // ~keep the converter both reach the budget on this page: the conversion gives ONE warning.
-    // ~keep The fast converter does not convert a page that reached a limit, so every route
-    // ~keep gives the text and the warning of the full converter.
+fn should_take_a_title_with_no_head_tag_as_the_document_title_past_the_node_budget() {
+    // ~keep The HTML tree builder reads the head of the page and stops where the body starts,
+    // ~keep so the body of this page does not count against the node budget of that parse
+    // ~keep (issue #809): the title is the title of the document, as on a page inside the
+    // ~keep budget. The repair of the converter reaches the budget on this page: the
+    // ~keep conversion gives ONE warning on every route.
     for (formatting, paragraphs) in [(60, 12), (250, 1_000), (250, 4_000)] {
         let html = page_with_a_title_and_no_head(formatting, paragraphs);
-        let expected = format!("T\n\n**x**\n{}", "\n**y**\n".repeat(paragraphs));
+        let body = format!("**x**\n{}", "\n**y**\n".repeat(paragraphs));
         for extract_metadata in [true, false] {
+            let expected = if extract_metadata {
+                format!("---\ntitle: T\n---\n\n{body}")
+            } else {
+                body.clone()
+            };
             for route in ROUTES {
                 let result = convert_with_metadata(&html, extract_metadata, route);
                 let page = format!(
@@ -160,12 +164,18 @@ fn should_give_one_warning_when_the_head_repair_stops_at_its_depth_limit() {
     // ~keep The full converter answers on every route. With these options the default route
     // ~keep never asks the fast converter: the router selects the full converter. Only the
     // ~keep forced route asks the fast converter, and there the page is handed over.
+    // ~keep The pages have a `<head>` with no end tag: the tree builder reads such a page to
+    // ~keep its end, so the parse of the head is the one that reaches the depth limit.
     let closed = format!(
-        "<title>T</title>{}deep{}tail",
+        "<head><title>T</title>{}deep{}tail",
         "<div>".repeat(600),
         "</div>".repeat(600)
     );
-    let balanced_rest = format!("<title>T</title>{}deep{}tail", "<div>".repeat(520), "</div>".repeat(9));
+    let balanced_rest = format!(
+        "<head><title>T</title>{}deep{}tail",
+        "<div>".repeat(520),
+        "</div>".repeat(9)
+    );
     for (page, html) in [("closed", &closed), ("balanced rest", &balanced_rest)] {
         for route in ROUTES {
             let result = convert(

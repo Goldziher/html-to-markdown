@@ -70,16 +70,6 @@ impl<'a> Tier1Scanner<'a> {
         if self.text_start >= self.pos {
             return Ok(());
         }
-        let next_tag_is_html = upcoming_tag_is_named(self.bytes, self.pos, b"html");
-        let ignored_before_head = self.state.head_range.is_none()
-            && crate::converter::main_helpers::is_ignorable_before_head(
-                &self.html[self.text_start..self.pos],
-                next_tag_is_html,
-            );
-        if ignored_before_head {
-            return Ok(());
-        }
-        self.state.start_body(self.text_start);
         // ~keep Every decision on this text reads the white space of the source as characters,
         // ~keep as the full converter reads its decoded text: `&#10;` alone is white space.
         let html = self.html;
@@ -158,7 +148,6 @@ impl<'a> Tier1Scanner<'a> {
     }
 
     fn emit_literal_lt(&mut self) -> Result<(), BailReason> {
-        self.state.start_body(self.pos);
         flush_text(
             &mut self.state,
             TextFlush {
@@ -279,9 +268,6 @@ impl<'a> Tier1Scanner<'a> {
             || crate::converter::utility::preprocessing::tag_has_hidden_style(tag_slice)
         {
             return Err(BailReason::HiddenElement { offset: self.pos });
-        }
-        if crate::converter::main_helpers::starts_body(name_lower) {
-            self.state.start_body(self.pos);
         }
         Ok(())
     }
@@ -510,12 +496,9 @@ impl<'a> Tier1Scanner<'a> {
         }
         // ~keep With no end tag, the start tag of the body content ends the `<head>`; only the
         // ~keep HTML tree builder knows where, so Tier-2 converts the document (issue #772).
-        let Some((close_start, close_end)) = find_close_tag_range(self.bytes, open_end, name_lower) else {
+        let Some((_, close_end)) = find_close_tag_range(self.bytes, open_end, name_lower) else {
             return Err(BailReason::EofWithOpenBlock { open_count: 1 });
         };
-        if self.state.head_range.is_none() {
-            self.state.head_range = Some(open_end..close_start);
-        }
         self.pos = close_end;
         self.text_start = self.pos;
         Ok(())
@@ -721,10 +704,7 @@ fn finish_scan(
         }
     }
 
-    Ok(ScanOutput {
-        body: state.output,
-        head_range: state.head_range,
-    })
+    Ok(ScanOutput { body: state.output })
 }
 
 // ~keep ── Bail guard ────────────────────────────────────────────────────────────────

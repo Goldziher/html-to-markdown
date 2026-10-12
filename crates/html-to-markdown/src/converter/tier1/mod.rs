@@ -62,20 +62,22 @@ use crate::options::ConversionOptions;
 /// ~keep needs to pass a resolved `base_url` through to the scanner, which those tests
 /// ~keep have no reason to exercise -- so that need is served by
 /// ~keep [`run_with_base`] instead of widening this signature.
-pub fn run(html: &str, report: &PrescanReport, options: &ConversionOptions) -> Result<String, bail::BailReason> {
-    let document_base_href = options
-        .extract_metadata
-        .then(|| crate::converter::url_resolve::document_base_href(html))
-        .flatten();
-    run_with_base(html, report, options, None, document_base_href.as_deref())
+///
+/// ~keep A direct call reads the head of the page as `convert` does: the HTML tree builder
+/// ~keep gives the page that the scanner reads and the metadata of the front matter.
+pub fn run(html: &str, _report: &PrescanReport, options: &ConversionOptions) -> Result<String, bail::BailReason> {
+    let head = crate::converter::read_head(html);
+    let body = run_with_base(&head.page, options, None)?;
+    let document_base_href = options.extract_metadata.then(|| head.base_href(html)).flatten();
+    let front_matter = crate::convert_api::front_matter(&head, options, document_base_href.as_deref());
+    Ok(crate::convert_api::join_front_matter(&front_matter, body))
 }
 
-/// Run Tier-1 with caller-resolved URL context.
+/// Run the scanner over `html`, the page that the HTML tree builder gave, with the URL context
+/// of the caller. The result is the body of the document: the caller writes the front matter.
 ///
-/// This is the same as [`run`], but resolves relative `href`/`src` destinations against
-/// `effective_base` (see `converter::url_resolve::resolve_attribute_url`) and takes the
-/// document's `<base href>` from the caller. Used by `convert_api.rs`'s production
-/// conversion path.
+/// Relative `href`/`src` destinations resolve against `effective_base` (see
+/// `converter::url_resolve::resolve_attribute_url`).
 ///
 /// # Errors
 ///
@@ -83,46 +85,8 @@ pub fn run(html: &str, report: &PrescanReport, options: &ConversionOptions) -> R
 /// handle.  The dispatcher falls back to Tier-2 transparently.
 pub fn run_with_base(
     html: &str,
-    report: &PrescanReport,
     options: &ConversionOptions,
     effective_base: Option<std::rc::Rc<url::Url>>,
-    document_base_href: Option<&str>,
 ) -> Result<String, bail::BailReason> {
-    let scanner::ScanOutput { body, head_range } = scanner::scan(html, options, effective_base)?;
-
-    // ~keep Phase C: prefer the head range the scanner discovered during its single
-    // ~keep walk over `html`.  Fall back to the prescan's range when the caller
-    // ~keep pre-walked the input and produced one (legacy / Tier-2 fallback path).
-    let scanner_range_for_call;
-    let head_range_ref = if head_range.is_some() {
-        scanner_range_for_call = head_range;
-        scanner_range_for_call.as_ref()
-    } else {
-        report.head_range.as_ref()
-    };
-
-    // ~keep Prepend YAML frontmatter when metadata extraction is requested.
-    // ~keep `head_metadata::extract_frontmatter` re-parses only the head slice (cheap).
-    // ~keep
-    // ~keep The frontmatter returned by the shared Tier-2 formatter ends with a
-    // ~keep single `\n` after the closing `---`.  Tier-2's walker subsequently
-    // ~keep gets `\n\n` from the first paragraph's leading separator (collapse
-    // ~keep squashes the resulting `\n\n\n` to `\n\n`).  Tier-1 already trimmed
-    // ~keep its body to a single trailing `\n` and has no walker pass to add the
-    // ~keep separator, so insert one explicitly: emit `\n` between frontmatter
-    // ~keep (`...---\n`) and the body (`first-paragraph...`) to land on
-    // ~keep `...---\n\nfirst-paragraph...`.
-    if let Some(frontmatter) =
-        crate::converter::head_metadata::extract_frontmatter(html, head_range_ref, options, document_base_href)
-    {
-        let mut output = String::with_capacity(frontmatter.len() + body.len() + 1);
-        output.push_str(&frontmatter);
-        if !body.is_empty() && !body.starts_with('\n') && !frontmatter.ends_with("\n\n") {
-            output.push('\n');
-        }
-        output.push_str(&body);
-        return Ok(output);
-    }
-
-    Ok(body)
+    Ok(scanner::scan(html, options, effective_base)?.body)
 }

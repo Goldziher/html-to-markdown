@@ -409,12 +409,16 @@ fn should_ignore_a_head_inside_the_body_on_both_tiers() {
     for html in [
         "<html><head></head><body><head><title>Stray</title></head><p>x</p></body></html>",
         "<html><body><head><title>Stray</title></head><p>x</p></body></html>",
-        "<html><head></head><head><title>Stray</title></head><body><p>x</p></body></html>",
     ] {
         let out = t2(html);
         assert!(!out.contains("Stray"), "{out}");
         assert_eq!(t1_only(html), out, "{html}");
     }
+    // ~keep A second `<head>` tag in front of the body opens no element, and the HTML tree
+    // ~keep builder puts the title after it into the head: it is the title of the document.
+    let html = "<html><head></head><head><title>Second</title></head><body><p>x</p></body></html>";
+    assert_eq!(t2(html), "---\ntitle: Second\n---\n\nx\n");
+    assert_eq!(t1_only(html), t2(html));
 }
 
 #[test]

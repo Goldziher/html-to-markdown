@@ -606,38 +606,31 @@ fn a_frameset_page_with_an_omitted_end_tag_converts_as_before() {
     }
 }
 
-/// ~keep The tree builder moves a `<noframes>` that starts a page into the head and keeps its
-/// ~keep content as text. The first parser reads that content as elements, so the repaired
-/// ~keep page comes back with the text of the page in the head, where the converter writes
-/// ~keep none of it. Such a repair is not used: the page converts as before issue #772.
+/// ~keep The tree builder puts a `<noframes>` or a `<noscript>` that starts a page into the head
+/// ~keep and keeps its content as text, which a browser shows nowhere. The converter reads the
+/// ~keep head that the tree builder built, so the markup in that text opens no element and the
+/// ~keep page after it is repaired like any other page.
 #[test]
-fn a_page_whose_text_the_second_parse_moves_into_the_head_keeps_its_text() {
-    for (html, expected) in [
-        ("<noframes><div></noframes><div><p>one</p></div>tail", "one\n\ntail\n"),
-        (
-            "<noframes><frameset></noframes><div><p>one</p></div>tail",
-            "one\n\ntail\n",
-        ),
-        ("<noframes><frameset></noframes><div><p>one</div>tail", "onetail\n"),
-        (
-            "<noframes>a <b>x</b></noframes><div><p>one</div>tail",
-            "a **x**\n\nonetail\n",
-        ),
+fn a_page_that_starts_with_raw_text_of_the_head_keeps_its_text() {
+    for html in [
+        "<noframes><div></noframes><div><p>one</p></div>tail",
+        "<noframes><frameset></noframes><div><p>one</p></div>tail",
+        "<noframes><frameset></noframes><div><p>one</div>tail",
+        "<noframes>a <b>x</b></noframes><div><p>one</div>tail",
+        "<noscript><frameset></noscript><div><p>one</div>tail",
+        "<noscript><frameset></noscript><div><p>one</p></div>tail",
     ] {
-        assert_default_and_tier2(html, expected);
+        assert_default_and_tier2(html, "one\n\ntail\n");
     }
 }
 
 /// ~keep Not covered by issue #772: the first parser reads the rest of the page as the content
-/// ~keep of the `<iframe>` or of the `<noscript>`, before and after the repair, and the
-/// ~keep converter writes no text of either element.
+/// ~keep of the `<iframe>`, before and after the repair, and the converter writes no text of it.
 #[test]
-fn a_page_in_an_open_iframe_or_noscript_converts_as_before() {
+fn a_page_in_an_open_iframe_converts_as_before() {
     for html in [
         "<iframe><frameset></iframe><div><p>one</div>tail",
         "<iframe><frameset></iframe><div><p>one</p></div>tail",
-        "<noscript><frameset></noscript><div><p>one</div>tail",
-        "<noscript><frameset></noscript><div><p>one</p></div>tail",
     ] {
         assert_default_and_tier2(html, "");
     }

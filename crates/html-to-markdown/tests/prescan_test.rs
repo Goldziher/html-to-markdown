@@ -15,49 +15,6 @@ fn cleaned(html: &str) -> String {
     prescan::run(html).0.into_owned()
 }
 
-// ~keep ── head_range ────────────────────────────────────────────────────────────────
-
-#[test]
-fn detects_head_range() {
-    let html = "<html><head><title>x</title></head><body>y</body></html>";
-    let r = report(html);
-    let range = r.head_range.expect("should have head_range");
-    let (cow, _) = prescan::run(html);
-    let buf = cow.as_ref();
-    let head_contents = &buf[range];
-    assert!(
-        head_contents.contains("<title>x</title>"),
-        "head contents should include title; got: {head_contents:?}"
-    );
-}
-
-#[test]
-fn missing_head_yields_none() {
-    let r = report("<html><body><p>hello</p></body></html>");
-    assert!(r.head_range.is_none(), "no <head> → head_range must be None");
-}
-
-#[test]
-fn empty_head_yields_empty_range() {
-    let html = "<head></head><body>z</body>";
-    let (cow, r) = prescan::run(html);
-    let range = r.head_range.expect("should detect empty head");
-    assert_eq!(
-        range.start,
-        range.end,
-        "empty <head></head> should produce start==end range; got {:?}",
-        &cow.as_ref()[range.clone()]
-    );
-}
-
-#[test]
-fn unclosed_head_yields_range_to_eof() {
-    let html = "<head><meta charset=\"utf-8\">";
-    let (cow, r) = prescan::run(html);
-    let range = r.head_range.expect("should detect <head> without close");
-    assert_eq!(range.end, cow.as_ref().len(), "unclosed head range end should be EOF");
-}
-
 #[test]
 fn custom_elements_flagged() {
     let r = report("<my-thing attr=\"1\"></my-thing>");

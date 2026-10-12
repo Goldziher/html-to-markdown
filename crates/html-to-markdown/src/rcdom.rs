@@ -234,6 +234,8 @@ pub struct RcDom {
     max_nodes: usize,
     max_depth: usize,
     pub(crate) repair_limit: Cell<Option<crate::types::WarningKind>>,
+    /// True once the tree builder made the HTML `body` element: the head of the page is done.
+    pub(crate) made_body: Cell<bool>,
 }
 
 impl RcDom {
@@ -350,6 +352,9 @@ impl TreeSink for RcDom {
     }
 
     fn create_element(&self, name: QualName, attrs: Vec<Attribute>, flags: ElementFlags) -> Handle {
+        if name.ns == html5ever::ns!(html) && &*name.local == "body" {
+            self.made_body.set(true);
+        }
         let contents = flags.template.then(|| self.new_node(NodeData::Document));
         let element = self.new_node(NodeData::Element {
             name,
@@ -522,6 +527,7 @@ impl Default for RcDom {
             max_nodes: usize::MAX,
             max_depth: usize::MAX,
             repair_limit: Cell::new(None),
+            made_body: Cell::new(false),
         }
     }
 }

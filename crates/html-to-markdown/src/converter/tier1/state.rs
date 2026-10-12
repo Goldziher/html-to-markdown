@@ -234,13 +234,6 @@ pub struct Tier1State {
     /// points into its own page. `close_link` reads it to leave such a link with no text to
     /// Tier-2, which labels the first kind and leaves the second kind out.
     pub link_stack: Vec<(Option<String>, Option<String>, bool, bool)>,
-    /// Byte range of `<head>…</head>` content (between the tags) in the
-    /// input the scanner walked.  Populated by the `TagKind::Ignored`
-    /// dispatch when a non-void Ignored tag (`<head>`) is encountered, or
-    /// set to an empty range when the body starts before any `<head>`;
-    /// `tier1::run` forwards the slice to `head_metadata::extract_frontmatter`
-    /// so the YAML frontmatter pass still works without a `PrescanReport`.
-    pub head_range: Option<std::ops::Range<usize>>,
     /// Language code extracted from the current `<pre>` or its nested `<code>`
     /// child's `class` attribute (`language-X` or `lang-X`).  Used by
     /// `close_pre` to emit the language tag after the opening backtick fence.
@@ -375,7 +368,6 @@ impl Tier1State {
             table_stack: Vec::new(),
             link_stack: Vec::new(),
             abbr_titles: Vec::new(),
-            head_range: None,
             pre_lang: None,
             pre_cell_break_offsets: Vec::new(),
             summary_buf_stack: Vec::new(),
@@ -401,14 +393,6 @@ impl Tier1State {
     #[must_use]
     pub fn resolve_url(&self, value: &str) -> Option<String> {
         crate::converter::url_resolve::resolve_attribute_url(self.effective_base.as_deref()?, value)
-    }
-
-    /// The body starts at `pos`: the head is over, empty if no `<head>` came before, and the
-    /// parser ignores a later `<head>` tag, as Tier 2's head walk does.
-    pub const fn start_body(&mut self, pos: usize) {
-        if self.head_range.is_none() {
-            self.head_range = Some(pos..pos);
-        }
     }
 
     /// Total continuation-indent width (in columns) for a block child of the

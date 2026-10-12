@@ -41,8 +41,8 @@ pub enum RouterDecision {
 ///
 /// # Result-shape gates (see doc block below the custom-element note)
 ///
-/// `options.extract_metadata` no longer forces Tier-2: Tier-1 re-parses the
-/// prescan's `head_range` slice and produces byte-identical YAML frontmatter.
+/// `options.extract_metadata` does not force Tier-2: the caller writes the front matter
+/// from the head that the HTML tree builder read.
 ///
 /// `report.has_svg` no longer forces Tier-2: Phase I teaches the scanner to
 /// emit `<svg>` elements as base64 data URIs matching Tier-2 byte-for-byte.

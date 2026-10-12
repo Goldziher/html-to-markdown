@@ -85,11 +85,43 @@ pub fn convert(html: &str, options: impl Into<Option<ConversionOptions>>) -> Res
     convert_inner(html, options)
 }
 
-struct PreparedConversion<'a> {
-    html: Cow<'a, str>,
+struct PreparedConversion {
+    /// What the HTML tree builder says about the head of the page, and the page to convert.
+    head: crate::converter::HeadFacts,
     effective_base: Option<std::rc::Rc<url::Url>>,
     metadata_base_href: Option<String>,
-    head_repair_limit: Option<crate::types::WarningKind>,
+}
+
+/// The front matter of a page: the metadata of `head` as YAML, or nothing when `options` ask
+/// for none or the page has none.
+pub(crate) fn front_matter(
+    head: &crate::converter::HeadFacts,
+    options: &ConversionOptions,
+    base: Option<&str>,
+) -> String {
+    let wanted = options.extract_metadata
+        && !options.convert_as_inline
+        && options.output_format != crate::options::OutputFormat::Plain;
+    wanted
+        .then(|| crate::converter::format_metadata_frontmatter(&head.metadata_for(options, base)))
+        .flatten()
+        .unwrap_or_default()
+}
+
+/// Put `front_matter` in front of `body`, the text that a converter made of the page.
+///
+/// Exactly one blank line stands between the closing `---` and the first line of the body,
+/// whatever the body starts with (issue #847). Neither converter writes that line or sees the
+/// front matter.
+pub(crate) fn join_front_matter(front_matter: &str, body: String) -> String {
+    if front_matter.is_empty() {
+        return body;
+    }
+    let body = body.trim_start_matches('\n');
+    if body.is_empty() {
+        return front_matter.to_owned();
+    }
+    format!("{front_matter}\n{body}")
 }
 
 #[cfg(feature = "metadata")]
@@ -118,7 +150,7 @@ fn convert_inner(html: &str, options: ConversionOptions) -> Result<ConversionRes
         return Ok(result);
     }
     if !options.wrap
-        && let Some(markdown) = fast_text_only(prepared.html.as_ref(), &options)
+        && let Some(markdown) = fast_text_only(&prepared.head.page, &options)
     {
         return Ok(ConversionResult {
             content: Some(markdown),
@@ -141,16 +173,14 @@ fn validate_input_size(html: &str, max_size: Option<u64>) -> Result<()> {
     Ok(())
 }
 
-fn prepare_conversion<'a>(html: &'a str, options: &ConversionOptions) -> Result<PreparedConversion<'a>> {
-    // ~keep Both tiers must see the same repaired tree when head content precedes an
-    // ~keep explicit `<head>` (issue #592) or a title precedes the body of a page with no
-    // ~keep `<head>` (issue #816); browsers place that content in the implicit head.
+fn prepare_conversion(html: &str, options: &ConversionOptions) -> Result<PreparedConversion> {
+    // ~keep The HTML tree builder reads the head of every page once. Both converters convert
+    // ~keep the page it gives and take the metadata from it (issues #592, #816, #847 to #850
+    // ~keep and #856): neither one decides where the head of a page ends.
     let normalized_input = normalize_input(html)?;
-    let (normalized_html, head_repair_limit) =
-        crate::converter::repair_head_content_outside_head(normalized_input.as_ref())
-            .map_or((normalized_input, None), |(html, limit)| (Cow::Owned(html), limit));
+    let head = crate::converter::read_head(normalized_input.as_ref());
     let document_base_href = (options.base_url.is_some() || options.extract_metadata)
-        .then(|| crate::converter::url_resolve::document_base_href(&normalized_html))
+        .then(|| head.base_href(normalized_input.as_ref()))
         .flatten();
     let effective_base = options
         .base_url
@@ -163,17 +193,23 @@ fn prepare_conversion<'a>(html: &'a str, options: &ConversionOptions) -> Result<
             .map_or_else(|| document_base_href.clone(), |base| base.as_str().to_owned())
     });
     Ok(PreparedConversion {
-        html: normalized_html,
+        head,
         effective_base,
         metadata_base_href,
-        head_repair_limit,
     })
 }
 
-fn try_tier1(prepared: &PreparedConversion<'_>, options: &ConversionOptions) -> Option<ConversionResult> {
-    // ~keep A page on which the head repair reached a limit is not a page for the fast
-    // ~keep converter: the full converter converts it and gives the warning of the limit.
-    if prepared.head_repair_limit.is_some() {
+impl PreparedConversion {
+    /// The front matter of the page for `options`.
+    fn front_matter(&self, options: &ConversionOptions) -> String {
+        front_matter(&self.head, options, self.metadata_base_href.as_deref())
+    }
+}
+
+fn try_tier1(prepared: &PreparedConversion, options: &ConversionOptions) -> Option<ConversionResult> {
+    // ~keep A page on which the tree builder reached a limit in the head is not a page for the
+    // ~keep fast converter: the full converter converts it and gives the warning of the limit.
+    if prepared.head.limit.is_some() {
         return None;
     }
     let report = crate::converter::prescan::PrescanReport::default();
@@ -182,30 +218,24 @@ fn try_tier1(prepared: &PreparedConversion<'_>, options: &ConversionOptions) -> 
         crate::options::TierStrategy::Auto => {
             let decision = crate::converter::tier1::router::classify(&report, options);
             if decision == crate::converter::tier1::RouterDecision::Tier1 {
-                run_tier1(prepared, options, &report)
+                run_tier1(prepared, options)
             } else {
                 tracing::debug!(target: "html_to_markdown::convert", "router selected tier-2 conversion path directly");
                 None
             }
         }
         #[cfg(any(test, feature = "testkit"))]
-        crate::options::TierStrategy::Tier1 => run_tier1(prepared, options, &report),
+        crate::options::TierStrategy::Tier1 => run_tier1(prepared, options),
     }
 }
 
 fn run_tier1(
-    prepared: &PreparedConversion<'_>,
+    prepared: &PreparedConversion,
     options: &ConversionOptions,
-    report: &crate::converter::prescan::PrescanReport,
 ) -> Option<ConversionResult> {
-    match crate::converter::tier1::run_with_base(
-        prepared.html.as_ref(),
-        report,
-        options,
-        prepared.effective_base.clone(),
-        prepared.metadata_base_href.as_deref(),
-    ) {
-        Ok(markdown) => {
+    match crate::converter::tier1::run_with_base(&prepared.head.page, options, prepared.effective_base.clone()) {
+        Ok(body) => {
+            let markdown = join_front_matter(&prepared.front_matter(options), body);
             tracing::debug!(target: "html_to_markdown::convert", output_len = markdown.len(), "tier-1 fast-path conversion completed");
             Some(ConversionResult {
                 content: Some(markdown),
@@ -225,10 +255,10 @@ fn run_tier1(
     }
 }
 
-fn run_tier2(prepared: PreparedConversion<'_>, options: ConversionOptions) -> Result<ConversionResult> {
+fn run_tier2(prepared: PreparedConversion, options: ConversionOptions) -> Result<ConversionResult> {
     let collectors = create_collectors(&options)?;
     let outcome = invoke_converter(&prepared, &options, &collectors);
-    let (markdown, document, tables, depth_warning) = match outcome {
+    let (body, document, tables, depth_warning) = match outcome {
         Ok(result) => result?,
         Err(panic_payload) => {
             #[cfg(feature = "visitor")]
@@ -238,6 +268,7 @@ fn run_tier2(prepared: PreparedConversion<'_>, options: ConversionOptions) -> Re
             return Err(crate::error::ConversionError::Panic(panic_message(&*panic_payload)));
         }
     };
+    let markdown = join_front_matter(&prepared.front_matter(&options), body);
     finish_conversion(markdown, document, tables, depth_warning, collectors)
 }
 
@@ -274,7 +305,7 @@ const fn create_collectors(_: &ConversionOptions) -> Result<Tier2Collectors> {
 }
 
 fn invoke_converter(
-    prepared: &PreparedConversion<'_>,
+    prepared: &PreparedConversion,
     options: &ConversionOptions,
     collectors: &Tier2Collectors,
 ) -> std::thread::Result<Result<ConvertOutput>> {
@@ -284,7 +315,7 @@ fn invoke_converter(
 }
 
 fn call_converter(
-    prepared: &PreparedConversion<'_>,
+    prepared: &PreparedConversion,
     options: &ConversionOptions,
     collectors: &Tier2Collectors,
 ) -> Result<ConvertOutput> {
@@ -294,7 +325,7 @@ fn call_converter(
         .include_document_structure
         .then(|| std::rc::Rc::new(std::cell::RefCell::new(crate::types::StructureCollector::new())));
     crate::converter::convert_html_impl(
-        prepared.html.as_ref(),
+        &prepared.head.page,
         options,
         crate::converter::main::ConversionParameters {
             inline_collector: image_collector(collectors),
@@ -305,7 +336,7 @@ fn call_converter(
             structure_collector: structure,
             base_url: prepared.effective_base.clone(),
             document_base_href: prepared.metadata_base_href.as_deref(),
-            head_repair_limit: prepared.head_repair_limit,
+            head: &prepared.head,
         },
     )
 }

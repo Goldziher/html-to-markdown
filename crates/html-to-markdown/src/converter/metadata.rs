@@ -33,7 +33,7 @@ pub fn handle(
 ) {
     match tag_name {
         "head" => {
-            handle_head(node_handle, parser, output, handler);
+            handle_head(node_handle, parser, handler);
         }
         "script" => {
             handle_script(node_handle, parser, output, handler.ctx);
@@ -53,55 +53,20 @@ pub fn handle(
     }
 }
 
-/// True for the name (lower case) of a child of `head` that makes the converter write the
-/// content of that `head`: a head with no end tag holds the body of the page.
-pub fn is_body_content_in_head(name: &str) -> bool {
-    matches!(name, "body" | "main" | "article" | "section" | "div" | "p")
-}
-
 /// Handle head element.
 ///
-/// Head elements contain metadata. We process them to extract structured data from
-/// nested script[type="application/ld+json"] elements if metadata collection is enabled.
-fn handle_head(node_handle: &NodeHandle, parser: &Parser, output: &mut String, handler: HandlerContext<'_>) {
-    use crate::converter::walk_node;
-
-    let Some(node) = node_handle.get(parser) else { return };
-
-    let tag = match node {
-        tl::Node::Tag(tag) => tag,
-        _ => return,
-    };
-
-    let children = tag.children();
-    let has_body_like = children.top().iter().any(|child_handle| {
-        if let Some(child_name) = handler.dom_ctx.tag_name_for(*child_handle, parser) {
-            is_body_content_in_head(child_name.as_ref())
-        } else {
-            false
-        }
-    });
-
+/// ~keep The head of the page is the one that the HTML tree builder built: it holds head
+/// ~keep content only, and the converter writes no text of it. The structured data of its
+/// ~keep `script[type="application/ld+json"]` children is collected when the caller wants it.
+fn handle_head(node_handle: &NodeHandle, parser: &Parser, handler: HandlerContext<'_>) {
     #[cfg(feature = "metadata")]
-    if handler.ctx.metadata_wants.structured_data {
-        collect_json_ld_from_children(&children, parser, handler);
+    if handler.ctx.metadata_wants.structured_data
+        && let Some(tl::Node::Tag(tag)) = node_handle.get(parser)
+    {
+        collect_json_ld_from_children(&tag.children(), parser, handler);
     }
-
-    if has_body_like {
-        for child_handle in children.top().iter() {
-            walk_node(
-                child_handle,
-                parser,
-                output,
-                crate::converter::block::container::HandlerContext::new(
-                    handler.options,
-                    handler.ctx,
-                    handler.depth + 1,
-                    handler.dom_ctx,
-                ),
-            );
-        }
-    }
+    #[cfg(not(feature = "metadata"))]
+    let _ = (node_handle, parser, handler);
 }
 
 #[cfg(feature = "metadata")]

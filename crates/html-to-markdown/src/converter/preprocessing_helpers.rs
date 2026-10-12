@@ -5,9 +5,7 @@
 
 use crate::converter::dom_context::{DomContext, TagInfo};
 use crate::converter::main_helpers::{is_ascii_whitespace_only, is_inline_element};
-use crate::converter::metadata::is_body_content_in_head;
 use crate::converter::utility::attributes::{attribute_matches_any, element_has_navigation_hint};
-use crate::converter::utility::content::normalized_tag_name;
 use crate::options::ConversionOptions;
 use crate::text::decode_html_entities_cow;
 
@@ -365,7 +363,7 @@ pub fn readable_text_len(dom: &tl::VDom<'_>) -> usize {
     while let Some(handle) = stack.pop() {
         match handle.get(parser) {
             Some(tl::Node::Raw(text)) => total += decoded_len(text.as_bytes()),
-            Some(tl::Node::Tag(tag)) if holds_readable_text(tag, parser) => {
+            Some(tl::Node::Tag(tag)) if holds_readable_text(tag) => {
                 stack.extend(tag.children().top().iter().copied());
             }
             _ => {}
@@ -392,25 +390,14 @@ fn decoded_len(text: &[u8]) -> usize {
 
 /// Elements whose text the count leaves out. The tree builder moves a `title` that starts a
 /// page into the head; only the forced second tier wrote a `title` with no `head` as body text.
-const NO_READABLE_TEXT: [&[u8]; 5] = [b"script", b"style", b"template", b"noscript", b"title"];
+/// ~keep The converter writes no text of a `head`, so text that the tree builder moves into
+/// ~keep the head counts as lost.
+const NO_READABLE_TEXT: [&[u8]; 6] = [b"head", b"script", b"style", b"template", b"noscript", b"title"];
 
 /// False for an element whose text the count leaves out, so text that the tree builder
 /// moves into one counts as lost.
-///
-/// ~keep The tree builder moves a `<noframes>` that starts a page into the head, and `tl`
-/// ~keep reads the markup in it as elements: `<noframes><div></noframes><p>one</p>` comes back
-/// ~keep with all its text in the head. A `head` is read by the rule of the converter
-/// ~keep ([`is_body_content_in_head`]).
-fn holds_readable_text(tag: &tl::HTMLTag<'_>, parser: &tl::Parser<'_>) -> bool {
+fn holds_readable_text(tag: &tl::HTMLTag<'_>) -> bool {
     let name = tag.name().as_bytes();
-    if name.eq_ignore_ascii_case(b"head") {
-        return tag.children().top().iter().any(|child| {
-            matches!(
-                child.get(parser),
-                Some(tl::Node::Tag(child)) if is_body_content_in_head(&normalized_tag_name(child.name().as_utf8_str()))
-            )
-        });
-    }
     !NO_READABLE_TEXT
         .iter()
         .any(|skipped| name.eq_ignore_ascii_case(skipped))
@@ -770,12 +757,14 @@ mod tests {
     }
 
     #[test]
-    fn should_read_a_head_only_when_it_holds_body_content() {
+    fn should_leave_out_the_text_of_a_head() {
+        // ~keep The head of the page that the converter reads is the one that the HTML tree
+        // ~keep builder built, and it holds no body content.
         for (html, expected) in [
             ("<head>out<noframes><b>out</b></noframes></head><p>one</p>", 3),
             ("<HEAD><NOFRAMES><DIV>out</NOFRAMES></HEAD>", 0),
-            ("<head><title>t</title><div>one</div><p>two</p>", 6),
-            ("<HEAD><TITLE>t</TITLE><BODY><p>one</p>", 3),
+            ("<head><title>t</title><div>one</div></head><p>two</p>", 3),
+            ("<HEAD><TITLE>t</TITLE></HEAD><BODY><p>one</p>", 3),
             ("<header>one</header>", 3),
         ] {
             assert_eq!(text_len(html), expected, "{html:?}");

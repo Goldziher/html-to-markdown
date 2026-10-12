@@ -357,16 +357,16 @@ struct BuilderState {
     nodes: Vec<DocumentNode>,
     /// Stack of open heading-group indices: `(heading_level, node_index)`.
     group_stack: Vec<(u8, u32)>,
-    /// The document's head, the only `<head>` that gives a metadata block.
-    head: Option<tl::NodeHandle>,
+    /// True once the walk met a `<head>`: only the first one gives a metadata block.
+    seen_head: bool,
 }
 
 impl BuilderState {
-    const fn new(head: Option<tl::NodeHandle>) -> Self {
+    const fn new() -> Self {
         Self {
             nodes: Vec::new(),
             group_stack: Vec::new(),
-            head,
+            seen_head: false,
         }
     }
 
@@ -428,7 +428,7 @@ impl BuilderState {
 #[must_use]
 pub fn build_document_structure(dom: &tl::VDom<'_>) -> DocumentStructure {
     let parser = dom.parser();
-    let mut state = BuilderState::new(crate::converter::document_head(dom.children(), parser));
+    let mut state = BuilderState::new();
 
     for handle in dom.children() {
         walk(&mut state, handle, parser, None, 0);
@@ -456,7 +456,7 @@ fn walk(state: &mut BuilderState, handle: &tl::NodeHandle, parser: &tl::Parser, 
         tl::Node::Raw(_) | tl::Node::Comment(_) => {}
         tl::Node::Tag(tag) => {
             let tag_name = tag.name().as_utf8_str().to_ascii_lowercase();
-            if tag_name == "head" && state.head != Some(*handle) {
+            if tag_name == "head" && std::mem::replace(&mut state.seen_head, true) {
                 return;
             }
             process_tag(state, tag_name.as_str(), tag, parser, parent_idx, depth);

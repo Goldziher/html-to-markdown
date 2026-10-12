@@ -89,11 +89,6 @@ const LIST_ITEM_INDENTS: [&str; 8] = [
 pub struct ScanOutput {
     /// Accumulated Markdown body.
     pub body: String,
-    /// Byte range of `<head>…</head>` content (if a `<head>` was seen) in
-    /// the input the scanner walked.  Forwarded by `tier1::run` to
-    /// `head_metadata::extract_frontmatter` so the YAML frontmatter step
-    /// works without a `PrescanReport`.
-    pub head_range: Option<std::ops::Range<usize>>,
 }
 
 include!("scanner/scan_core.rs");

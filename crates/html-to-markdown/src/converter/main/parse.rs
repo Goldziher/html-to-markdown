@@ -281,13 +281,17 @@ mod tests {
                 "one\n\ntail\n",
             ),
             ("<FRAMESET></FRAMESET><div><p>one</div>tail", "onetail\n"),
-            ("<noframes><div></noframes><div><p>one</p></div>tail", "one\n\ntail\n"),
         ] {
             let (calls, content) = parse_calls_for(html);
 
             assert_eq!(content.as_deref(), Some(expected), "{html:?}");
             assert_eq!(calls, 2, "{html:?}");
         }
+        // ~keep A `noframes` in front of the body is in the head of the page and holds no tag
+        // ~keep there, so its page needs no second parse.
+        let (calls, content) = parse_calls_for("<noframes><div></noframes><div><p>one</p></div>tail");
+        assert_eq!(content.as_deref(), Some("one\n\ntail\n"));
+        assert_eq!(calls, 1);
     }
 
     #[test]

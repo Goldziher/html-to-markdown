@@ -30,6 +30,7 @@ const NOTHING: MetadataConfig = MetadataConfig {
 /// The counts of a result: document title, headers, links, images, structured data.
 fn collect(config: MetadataConfig) -> [usize; 5] {
     let collector = Rc::new(RefCell::new(MetadataCollector::new(config)));
+    let head = super::read_head(PAGE);
     let parameters = ConversionParameters {
         inline_collector: None,
         metadata_collector: Some(Rc::clone(&collector)),
@@ -38,9 +39,9 @@ fn collect(config: MetadataConfig) -> [usize; 5] {
         structure_collector: None,
         base_url: None,
         document_base_href: None,
-        head_repair_limit: None,
+        head: &head,
     };
-    super::convert_html_impl(PAGE, &ConversionOptions::default(), parameters).expect("conversion must succeed");
+    super::convert_html_impl(&head.page, &ConversionOptions::default(), parameters).expect("conversion must succeed");
     let Ok(collector) = Rc::try_unwrap(collector) else {
         panic!("the conversion must release the collector");
     };

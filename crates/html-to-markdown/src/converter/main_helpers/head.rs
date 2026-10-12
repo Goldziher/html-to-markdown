@@ -1,7 +1,9 @@
 use std::collections::{BTreeMap, HashSet};
+use std::rc::Rc;
 use std::sync::OnceLock;
 
 use crate::options::ConversionOptions;
+use crate::rcdom::{Handle, NodeData};
 
 /// Format metadata as YAML frontmatter.
 ///
@@ -121,235 +123,369 @@ const fn is_yaml_printable(c: char) -> bool {
         && !matches!(c, '\u{2028}' | '\u{2029}' | '\u{FEFF}')
 }
 
-/// Record `<meta name>`/`<meta property>` content into `metadata`, honoring `strip_tags`/
-/// `preserve_tags` for `"meta"`. The first tag per key wins, comparing keys in any letter case;
-/// `seen` holds the lower-cased keys recorded so far.
-fn collect_meta_head_metadata(
-    child_tag: &tl::HTMLTag,
-    options: &ConversionOptions,
-    metadata: &mut BTreeMap<String, String>,
-    seen: &mut HashSet<String>,
-) {
-    if !child_tag.name().as_utf8_str().eq_ignore_ascii_case("meta")
-        || options.strip_tags.iter().any(|t| t == "meta")
-        || options.preserve_tags.iter().any(|t| t == "meta")
-    {
-        return;
-    }
+/// What the HTML tree builder says about the head of a page. Both converters read it, and
+/// neither reads the head of the page by itself.
+#[derive(Debug, Default)]
+pub struct HeadFacts {
+    /// The page that the converters read: the doctype, the `html` element and the head as the
+    /// tree builder built them, then the body of the input as the input wrote it.
+    pub page: String,
+    /// The title, the `meta` values and the canonical link of the page. The first one in tree
+    /// order wins. The `title` key is there for an empty title too (#527).
+    pub metadata: BTreeMap<String, String>,
+    /// The `href` of the first `<base>` in the tree of the start of the page.
+    tree_base_href: Option<String>,
+    /// The `lang` of the `html` element, or else of the `body` element.
+    pub language: Option<String>,
+    /// The `dir` of the `html` element, or else of the `body` element.
+    pub direction: Option<String>,
+    /// The limit that stopped the tree builder, if it reached one.
+    pub limit: Option<crate::types::WarningKind>,
+    /// True when the tree builder read the whole input and `page` is its tree.
+    pub whole_page: bool,
+}
 
-    // ~keep `content` is a user-visible metadata value and carries character references like
-    // ~keep any other attribute, so it is decoded before it reaches the frontmatter (#494).
-    // ~keep The key (`name`/`property`) is an identifier, not prose, and stays raw.
-    if let (Some(name), Some(content)) = (
-        child_tag.attributes().get("name").flatten(),
-        crate::converter::utility::attributes::decoded_attribute(child_tag, "content"),
-    ) {
-        let key = format!("meta-{}", name.as_utf8_str());
-        if seen.insert(key.to_ascii_lowercase()) {
-            metadata.insert(key, content.into_owned());
+impl HeadFacts {
+    /// The `href` of the first `<base>` of the document `input`, which these facts are of.
+    ///
+    /// ~keep A `<base>` can stand in the body. The tree of the start of the page does not hold
+    /// ~keep that one, so the parse of the base goes on into the body for it.
+    pub fn base_href(&self, input: &str) -> Option<String> {
+        if self.tree_base_href.is_some() || self.whole_page {
+            return self.tree_base_href.clone();
         }
+        crate::converter::url_resolve::document_base_href(input)
     }
-    if let (Some(property), Some(content)) = (
-        child_tag.attributes().get("property").flatten(),
-        crate::converter::utility::attributes::decoded_attribute(child_tag, "content"),
-    ) {
-        let key = format!("meta-{}", property.as_utf8_str());
-        if seen.insert(key.to_ascii_lowercase()) {
-            metadata.insert(key, content.into_owned());
+
+    /// The metadata of the page for `options`, with `base` as the `base` key.
+    pub fn metadata_for(&self, options: &ConversionOptions, base: Option<&str>) -> BTreeMap<String, String> {
+        let excluded = |name: &str| {
+            options.strip_tags.iter().any(|tag| tag == name) || options.preserve_tags.iter().any(|tag| tag == name)
+        };
+        let (no_meta, no_title) = (excluded("meta"), excluded("title"));
+        let mut metadata: BTreeMap<String, String> = self
+            .metadata
+            .iter()
+            .filter(|(key, _)| !(no_title && *key == "title") && !(no_meta && key.starts_with("meta-")))
+            .map(|(key, value)| (key.clone(), value.clone()))
+            .collect();
+        if let Some(base) = base {
+            metadata.insert("base".to_owned(), base.to_owned());
         }
+        metadata
     }
 }
 
-/// Record the trimmed, decoded `<title>` text into `metadata`, honoring `strip_tags`/
-/// `preserve_tags` for `"title"`. The first title wins, as in a browser; an empty one still
-/// records the `title` key, empty, so the element's presence survives even though its text does
-/// not (#527). `seen_title` is whether a title came before.
-fn collect_title_head_metadata(
-    child_tag: &tl::HTMLTag,
-    parser: &tl::Parser,
-    options: &ConversionOptions,
-    metadata: &mut BTreeMap<String, String>,
-    seen_title: &mut bool,
-) {
-    if !child_tag.name().as_utf8_str().eq_ignore_ascii_case("title") {
-        return;
-    }
-    let later_title = std::mem::replace(seen_title, true);
-    if later_title
-        || options.strip_tags.iter().any(|t| t == "title")
-        || options.preserve_tags.iter().any(|t| t == "title")
-    {
-        return;
-    }
+/// Read the head of `input` with the HTML tree builder.
+///
+/// The tree builder reads the page to the start of its body. The result holds what its tree
+/// says, and the page for the converters: that tree, then the rest of the input as written.
+///
+/// ~keep Input with no tag, no comment and no doctype is text and stays as written. At the
+/// ~keep node budget the page is the input as written (issue #809). At the depth limit the
+/// ~keep input after the last tag of the tree follows the tree (issue #808).
+pub fn read_head(input: &str) -> HeadFacts {
+    use crate::converter::anchor_origin::{HeadTree, RepairTree, collapse_split_anchors, parse_to_body_start};
 
-    let mut title_content = String::new();
-    let title_children = child_tag.children();
-    for title_child in title_children.top().iter() {
-        if let Some(tl::Node::Raw(raw)) = title_child.get(parser) {
-            title_content.push_str(raw.as_utf8_str().as_ref());
+    let mut facts = HeadFacts::default();
+    let HeadTree { tree, body_start } = parse_to_body_start(input, |document| read_tree(document, &mut facts));
+    let RepairTree {
+        dom,
+        limit,
+        unparsed,
+        saw_markup,
+    } = tree;
+    facts.limit = limit;
+    // ~keep A page that the tree builder gave no body (a frameset page) stays as written too:
+    // ~keep the tree builder drops what follows `</frameset>`, and no text may be lost.
+    let no_body = body_start.is_none() && !dom.made_body.get();
+    if !saw_markup || no_body || limit == Some(crate::types::WarningKind::TruncatedInput) {
+        input.clone_into(&mut facts.page);
+        return facts;
+    }
+    collapse_split_anchors(&dom.document);
+    let Some(mut page) = super::serialize_document(dom.document, input.len()) else {
+        input.clone_into(&mut facts.page);
+        return facts;
+    };
+    // ~keep The tree ends with the end tags of the `html` and `body` elements that the input
+    // ~keep wrote a start tag for. The rest of the input goes in front of them, or takes their
+    // ~keep place when the parse stopped at the body: the rest then holds the end tags.
+    write_cdata_as_the_source(&mut page);
+    let content_end = ["</html>", "</body>"]
+        .iter()
+        .fold(page.len(), |end, tag| end - page[..end].strip_suffix(tag).map_or(0, |_| tag.len()));
+    if let Some(tag) = body_start {
+        page.truncate(content_end);
+        page.push_str(&tag);
+        page.push_str(&unparsed);
+    } else {
+        page.insert_str(content_end, &unparsed);
+        facts.whole_page = limit.is_none();
+    }
+    facts.page = page;
+    facts
+}
+
+/// Write each comment of `page` that the source wrote as `<![CDATA[..]]>` in that form again.
+///
+/// ~keep Outside SVG and MathML the tokenizer gives a CDATA section as a comment with the text
+/// ~keep `[CDATA[..]]`. The converters read the section as the source wrote it (the text of a
+/// ~keep CommonMark HTML block), so the tree of the head must not turn it into a comment.
+fn write_cdata_as_the_source(page: &mut String) {
+    const OPEN: &str = "<!--[CDATA[";
+    const CLOSE: &str = "]]-->";
+    let mut from = 0;
+    while let Some(start) = page[from..].find(OPEN).map(|at| from + at) {
+        let Some(end) = page[start..].find("-->").map(|at| start + at + "-->".len()) else {
+            return;
+        };
+        if page[start..end].ends_with(CLOSE) {
+            page.replace_range(end - CLOSE.len()..end, "]]>");
+            page.replace_range(start..start + OPEN.len(), "<![CDATA[");
         }
+        from = start + OPEN.len() - 2;
     }
-    // ~keep The title is text and carries character references like any other text (#509).
-    let title_content = crate::text::decode_html_entities_cow(title_content.trim()).into_owned();
-    metadata.insert("title".to_string(), title_content);
 }
 
-/// Record the decoded href of the first `<link rel="canonical">` into `metadata`.
-fn collect_link_head_metadata(child_tag: &tl::HTMLTag, metadata: &mut BTreeMap<String, String>) {
-    if !child_tag.name().as_utf8_str().eq_ignore_ascii_case("link") {
-        return;
-    }
-    let Some(rel_attr) = child_tag.attributes().get("rel").flatten() else {
-        return;
-    };
-    let rel_str = rel_attr.as_utf8_str();
-    if !rel_str.contains("canonical") {
-        return;
-    }
-    let Some(href) = crate::converter::utility::attributes::decoded_attribute(child_tag, "href") else {
-        return;
-    };
-    metadata
-        .entry("canonical".to_string())
-        .or_insert_with(|| href.into_owned());
+/// The value of the attribute `name` of an element.
+fn attribute(attributes: &[html5ever::Attribute], name: &str) -> Option<String> {
+    attributes
+        .iter()
+        .find(|attribute| &*attribute.name.local == name)
+        .map(|attribute| attribute.value.to_string())
 }
 
-/// Extract metadata from the head element below `roots`, recording `document_base_href` as
-/// `base` whether or not the source has a `<head>` tag.
-pub fn extract_head_metadata(
-    roots: &[tl::NodeHandle],
-    parser: &tl::Parser,
-    options: &ConversionOptions,
-    document_base_href: Option<&str>,
-) -> BTreeMap<String, String> {
-    let mut metadata = head_element_metadata(roots, parser, options);
-    if let Some(href) = document_base_href {
-        metadata.insert("base".to_string(), href.to_string());
-    }
-    metadata
-}
-
-/// The title, meta and canonical link fields of the [`document_head`] below `roots`.
-fn head_element_metadata(
-    roots: &[tl::NodeHandle],
-    parser: &tl::Parser,
-    options: &ConversionOptions,
-) -> BTreeMap<String, String> {
-    let mut metadata = BTreeMap::new();
-    let Some(tl::Node::Tag(head)) = document_head(roots, parser).and_then(|handle| handle.get(parser)) else {
-        return metadata;
-    };
+/// Read `document`, the tree of the start of a page, into `facts`, and take each `title` that is
+/// a child of the body out of the body: the title of a document is no text of its body.
+///
+/// ~keep The tree holds the head, and body content only when the body began inside the
+/// ~keep `<head>` of the source. Template contents are no children, and a foreign element
+/// ~keep (SVG, MathML) is not read.
+fn read_tree(document: &Handle, facts: &mut HeadFacts) {
     let mut seen_meta = HashSet::new();
-    let mut seen_title = false;
-    for child_handle in head.children().top().iter() {
-        if let Some(tl::Node::Tag(child_tag)) = child_handle.get(parser) {
-            collect_meta_head_metadata(child_tag, options, &mut metadata, &mut seen_meta);
-            collect_title_head_metadata(child_tag, parser, options, &mut metadata, &mut seen_title);
-            collect_link_head_metadata(child_tag, &mut metadata);
-        }
-    }
-    metadata
-}
-
-/// The first `<head>` element below `roots` before the body starts. A browser's parser ignores
-/// a `<head>` tag once the body has started, at text or at a tag that [`starts_body`].
-pub fn document_head(roots: &[tl::NodeHandle], parser: &tl::Parser) -> Option<tl::NodeHandle> {
-    document_head_search(roots, parser).head
-}
-
-/// What [`document_head_search`] finds before the body starts.
-pub(super) struct HeadSearch {
-    /// The `<head>` element.
-    head: Option<tl::NodeHandle>,
-    /// True when a browser's parser puts an element in the head that this tree holds outside
-    /// one: head content in front of the `<head>` tag, or a `title` before the body that is in
-    /// no `<head>` element, with a `<head>` tag on the page or not (issue #816).
-    pub(super) content_outside_head: bool,
-}
-
-/// Walks from the start of the document to the start of the body. The walk does not stop at
-/// the `<head>` element: a `title` between `</head>` and the body is in the head for a browser.
-pub(super) fn document_head_search(roots: &[tl::NodeHandle], parser: &tl::Parser) -> HeadSearch {
-    let mut head = None;
-    let mut content_before_head = false;
-    let mut saw_head_content = false;
-    let mut saw_title = false;
-    let mut work: Vec<_> = roots.iter().rev().copied().collect();
-    while let Some(handle) = work.pop() {
-        match handle.get(parser) {
-            Some(tl::Node::Raw(text)) => {
-                let next_is_html = matches!(
-                    work.last().and_then(|next| next.get(parser)),
-                    Some(tl::Node::Tag(tag)) if tag.name().as_bytes().eq_ignore_ascii_case(b"html")
-                );
-                if !is_ignorable_before_head(&text.as_utf8_str(), next_is_html) {
-                    break;
-                }
-            }
-            Some(tl::Node::Tag(tag)) => {
-                let name = tag.name().as_bytes().to_ascii_lowercase();
-                match name.as_slice() {
-                    b"head" => {
-                        if head.is_none() {
-                            head = Some(handle);
-                            content_before_head = saw_head_content;
+    let mut titles = Vec::new();
+    let mut body = None;
+    let mut work = vec![Rc::clone(document)];
+    while let Some(node) = work.pop() {
+        let descend = match &node.data {
+            NodeData::Document => true,
+            NodeData::Element { name, attrs, .. } if name.ns == html5ever::ns!(html) => {
+                let attributes = attrs.borrow();
+                match &*name.local {
+                    "title" => {
+                        let text: String = node
+                            .children
+                            .borrow()
+                            .iter()
+                            .filter_map(|child| match &child.data {
+                                NodeData::Text { contents } => Some(contents.borrow().to_string()),
+                                _ => None,
+                            })
+                            .collect();
+                        let text = text.trim_matches(|character: char| character.is_ascii_whitespace());
+                        facts
+                            .metadata
+                            .entry("title".to_owned())
+                            .or_insert_with(|| text.to_owned());
+                        titles.push(Rc::clone(&node));
+                        false
+                    }
+                    "meta" => {
+                        if let Some(content) = attribute(&attributes, "content") {
+                            for key in ["name", "property"] {
+                                if let Some(name) = attribute(&attributes, key) {
+                                    let key = format!("meta-{name}");
+                                    if seen_meta.insert(key.to_ascii_lowercase()) {
+                                        facts.metadata.insert(key, content.clone());
+                                    }
+                                }
+                            }
                         }
+                        false
                     }
-                    b"html" => {
-                        let first = work.len();
-                        work.extend(tag.children().top().iter().copied());
-                        work[first..].reverse();
+                    "link" => {
+                        if attribute(&attributes, "rel").is_some_and(|rel| rel.contains("canonical"))
+                            && let Some(href) = attribute(&attributes, "href")
+                        {
+                            facts.metadata.entry("canonical".to_owned()).or_insert(href);
+                        }
+                        false
                     }
-                    name if starts_body(name) => break,
-                    name => {
-                        saw_head_content = true;
-                        saw_title |= name == b"title";
+                    "base" => {
+                        if facts.tree_base_href.is_none() {
+                            facts.tree_base_href = attribute(&attributes, "href");
+                        }
+                        false
                     }
+                    // ~keep The text of a `noframes` or a `noscript` in the head is raw text that
+                    // ~keep a browser shows nowhere. `tl` reads tags in it, and an open one would
+                    // ~keep take the body into the head, so the page holds the element empty.
+                    "head" => {
+                        for child in node.children.borrow().iter() {
+                            if matches!(&child.data, NodeData::Element { name, .. }
+                                if name.ns == html5ever::ns!(html) && matches!(&*name.local, "noframes" | "noscript"))
+                            {
+                                child.children.borrow_mut().clear();
+                            }
+                        }
+                        true
+                    }
+                    name @ ("html" | "body") => {
+                        if facts.language.is_none() {
+                            facts.language = attribute(&attributes, "lang");
+                        }
+                        if facts.direction.is_none() {
+                            facts.direction = attribute(&attributes, "dir");
+                        }
+                        if name == "body" {
+                            body = Some(Rc::clone(&node));
+                        }
+                        true
+                    }
+                    _ => true,
                 }
             }
-            _ => {}
+            _ => false,
+        };
+        if descend {
+            work.extend(node.children.borrow().iter().rev().cloned());
         }
     }
-    HeadSearch {
-        head,
-        content_outside_head: content_before_head || saw_title,
+    if let Some(body) = body {
+        body.children
+            .borrow_mut()
+            .retain(|child| !titles.iter().any(|title| Rc::ptr_eq(title, child)));
     }
 }
 
-/// Whether a run of text before the head is found should be skipped rather than ending the
-/// search: whitespace after character-reference decoding, or any run that sits directly in
-/// front of the document's own `<html>`
-/// tag. The WHATWG "before html" insertion mode already discards anything ahead of `<html>`
-/// itself without letting it block the parser from reaching the real head inside, whether that
-/// text is a real byte order mark (stripped earlier, so it never reaches here), one a wrong
-/// encoding guess mangled beyond recognition, or ordinary prose: a browser shows the page's
-/// title and meta tags either way. Text with nothing named `html` ahead of it, a head-only
-/// fragment, still ends the search unchanged; see
-/// `should_ignore_a_head_after_implicit_body_content_on_both_tiers`.
-pub fn is_ignorable_before_head(text: &str, next_tag_is_html: bool) -> bool {
-    next_tag_is_html
-        || crate::text::decode_html_entities_cow(text)
-            .chars()
-            .all(char::is_whitespace)
-}
+#[cfg(test)]
+mod read_head_tests {
+    use super::*;
 
-/// Whether a start tag named `name` (lower case) starts the body when no body has started:
-/// every tag except the ones the HTML parser's "in head" insertion mode keeps in the head.
-pub fn starts_body(name: &[u8]) -> bool {
-    !matches!(
-        name,
-        b"html"
-            | b"head"
-            | b"base"
-            | b"basefont"
-            | b"bgsound"
-            | b"link"
-            | b"meta"
-            | b"noframes"
-            | b"noscript"
-            | b"script"
-            | b"style"
-            | b"template"
-            | b"title"
-    )
+    fn page(input: &str) -> String {
+        read_head(input).page
+    }
+
+    fn metadata(input: &str) -> Vec<(String, String)> {
+        read_head(input).metadata.into_iter().collect()
+    }
+
+    fn pair(key: &str, value: &str) -> (String, String) {
+        (key.to_owned(), value.to_owned())
+    }
+
+    #[test]
+    fn should_put_head_content_with_no_head_tag_into_the_head() {
+        let input = r#"<title>T</title><meta name="description" content="D"><link rel="canonical" href="https://e.org/c"><p>one</p>"#;
+        assert_eq!(
+            page(input),
+            r#"<head><title>T</title><meta name="description" content="D"><link rel="canonical" href="https://e.org/c"></head><p>one</p>"#
+        );
+        assert_eq!(
+            metadata(input),
+            [
+                pair("canonical", "https://e.org/c"),
+                pair("meta-description", "D"),
+                pair("title", "T")
+            ]
+        );
+    }
+
+    #[test]
+    fn should_keep_the_body_as_the_input_wrote_it() {
+        assert_eq!(
+            page("<html lang=en><head><title>T</title></head><body dir=rtl><P>one<x-foo a='1&amp;\"'>U</x-foo></body></html>"),
+            "<html lang=\"en\"><head><title>T</title></head><body dir=\"rtl\"><P>one<x-foo a='1&amp;\"'>U</x-foo></body></html>"
+        );
+        assert_eq!(page("text<p>one</p>"), "text<p>one</p>");
+        let frameset = "<frameset><frame></frameset><div><p>one</p></div>";
+        assert_eq!(page(frameset), frameset);
+        assert_eq!(page("no tag &amp; no comment"), "no tag &amp; no comment");
+        assert_eq!(page(""), "");
+    }
+
+    #[test]
+    fn should_write_the_tag_that_starts_the_body_from_its_token() {
+        assert_eq!(
+            page("<title>T</title><X-Foo A='1&amp;\"2' b>U</x-foo>"),
+            "<head><title>T</title></head><x-foo a=\"1&amp;&quot;2\" b=\"\">U</x-foo>"
+        );
+        assert_eq!(page("<title>T</title><br/>x"), "<head><title>T</title></head><br/>x");
+        assert_eq!(page("<title>T</title></br>x"), "<head><title>T</title></head></br>x");
+    }
+
+    #[test]
+    fn should_read_a_head_tag_in_a_comment_or_in_a_script_as_text() {
+        assert_eq!(
+            page("<!-- <head> --><title>T</title><p>one</p>"),
+            "<!-- <head> --><head><title>T</title></head><p>one</p>"
+        );
+        let input = r#"text<script>var h="<head>";</script><title>T</title>"#;
+        assert_eq!(page(input), input);
+        assert_eq!(metadata(input), []);
+    }
+
+    #[test]
+    fn should_write_a_cdata_section_as_the_source_wrote_it() {
+        assert_eq!(page("<![CDATA[x]]>"), "<![CDATA[x]]>");
+        assert_eq!(
+            page("<!-- c]] --><![CDATA[x]]><title>T</title><p>one</p>"),
+            "<!-- c]] --><![CDATA[x]]><head><title>T</title></head><p>one</p>"
+        );
+    }
+
+    #[test]
+    fn should_end_the_head_at_the_end_tag_of_the_source_when_the_body_began_inside_it() {
+        let input = "<HEAD><IMG SRC=i.png><TITLE>T</TITLE><meta name=k content=v></HEAD\n><p>one</p>";
+        assert_eq!(
+            page(input),
+            "<head></head><img src=\"i.png\"><meta name=\"k\" content=\"v\"><p>one</p>"
+        );
+        assert_eq!(metadata(input), [pair("meta-k", "v"), pair("title", "T")]);
+    }
+
+    #[test]
+    fn should_read_a_page_with_a_head_and_no_head_end_tag_to_its_end() {
+        let facts = read_head("<head><title>T</title><div><p>one</div>tail");
+        assert!(facts.whole_page);
+        assert_eq!(facts.page, "<head><title>T</title></head><div><p>one</p></div>tail");
+        assert!(!read_head("<title>T</title><p>one").whole_page);
+    }
+
+    #[test]
+    fn should_read_the_language_the_direction_and_the_first_base_from_the_tree() {
+        let input = "<html lang=en><base target=_blank><base href=/a/><base href=/b/><body dir=rtl lang=fr><p>one";
+        let facts = read_head(input);
+        assert_eq!(facts.language.as_deref(), Some("en"));
+        assert_eq!(facts.direction.as_deref(), Some("rtl"));
+        assert_eq!(facts.base_href(input).as_deref(), Some("/a/"));
+        let in_body = "<p>one</p><base href=/late/>";
+        assert_eq!(read_head(in_body).base_href(in_body).as_deref(), Some("/late/"));
+    }
+
+    #[test]
+    fn should_leave_out_the_title_and_the_meta_keys_that_the_options_exclude() {
+        let facts = read_head("<title>T</title><meta name=a content=1><meta property=A content=2><p>one");
+        let all = facts.metadata_for(&ConversionOptions::default(), Some("https://b.org/"));
+        assert_eq!(
+            all.into_iter().collect::<Vec<_>>(),
+            [pair("base", "https://b.org/"), pair("meta-a", "1"), pair("title", "T")]
+        );
+        let options = ConversionOptions {
+            strip_tags: vec!["meta".to_owned()],
+            preserve_tags: vec!["title".to_owned()],
+            ..ConversionOptions::default()
+        };
+        assert!(facts.metadata_for(&options, None).is_empty());
+    }
+
+    #[test]
+    fn should_put_the_rest_of_the_input_after_the_tree_at_the_depth_limit() {
+        let deep = format!("<head><title>T</title>{}x", "<div>".repeat(600));
+        let facts = read_head(&deep);
+        assert_eq!(facts.limit, Some(crate::types::WarningKind::DepthLimitExceeded));
+        assert_eq!(facts.page.matches("<div>").count(), 600);
+        assert!(facts.page.ends_with("<div>x"), "{}", &facts.page[facts.page.len() - 40..]);
+    }
 }

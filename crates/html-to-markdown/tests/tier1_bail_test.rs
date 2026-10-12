@@ -240,7 +240,9 @@ fn handles_eof_nested_open_inline() {
 
 #[test]
 fn bails_on_depth_mismatch_close_without_open() {
-    let html = "</p>orphan close";
+    // ~keep The end tag stands in the body: the HTML tree builder drops an end tag in front of
+    // ~keep the body, and the page that the scanner reads does not hold it.
+    let html = "x</p>orphan close";
     let err = tier1_run(html).unwrap_err();
     assert!(
         matches!(err, BailReason::DepthMismatch { .. }),

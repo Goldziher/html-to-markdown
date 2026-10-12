@@ -97,7 +97,6 @@ pub mod dom_context;
 pub mod form;
 pub mod format;
 pub mod handlers;
-pub mod head_metadata;
 pub mod inline;
 pub mod list;
 pub mod main;
@@ -126,8 +125,7 @@ pub use self::context::Context;
 pub use self::dom_context::DomContext;
 
 pub use self::main::{convert_html_impl, walk_node};
-pub use self::main_helpers::document_head;
-pub use self::main_helpers::repair_head_content_outside_head;
+pub use self::main_helpers::{HeadFacts, format_metadata_frontmatter, read_head};
 pub use self::main_helpers::{emit_table_cell_break, strip_trailing_backslash_breaks, trim_trailing_whitespace};
 
 pub use crate::converter::utility::content::{

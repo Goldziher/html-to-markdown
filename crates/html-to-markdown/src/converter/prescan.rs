@@ -2,15 +2,11 @@
 //! consumed by the tier-1/tier-2 router (added in M2).
 
 use std::borrow::Cow;
-use std::ops::Range;
 use std::str;
 
 /// Signals captured during the single prescan pass.
 #[derive(Debug, Default, Clone)]
 pub struct PrescanReport {
-    /// Byte range of the contents of `<head>…</head>` (between the tags) in the
-    /// **cleaned** buffer, or `None`.
-    pub head_range: Option<Range<usize>>,
     /// Any tag-open whose name contains `-` (custom-elements heuristic).
     pub had_custom_elements: bool,
     /// Any occurrence of `<![CDATA[`.
@@ -27,7 +23,6 @@ pub struct PrescanReport {
 const STRIP_CONTENT_TAGS: [&[u8]; 2] = [b"script", b"style"];
 
 const SVG_TAG: &[u8] = b"svg";
-const HEAD_TAG: &[u8] = b"head";
 const CDATA_START: &[u8] = b"<![CDATA[";
 const DOCTYPE: &[u8] = b"doctype";
 const EMPTY_COMMENT: &[u8] = b"<!---->";
@@ -58,7 +53,6 @@ struct Prescanner<'a> {
     last: usize,
     output: Option<String>,
     svg_depth: usize,
-    head_open_end: Option<usize>,
 }
 
 impl<'a> Prescanner<'a> {
@@ -71,7 +65,6 @@ impl<'a> Prescanner<'a> {
             last: 0,
             output: None,
             svg_depth: 0,
-            head_open_end: None,
         }
     }
 
@@ -150,7 +143,7 @@ impl<'a> Prescanner<'a> {
     }
 
     fn handle_outside_svg(&mut self) -> bool {
-        if self.strip_raw_text() || self.strip_doctype() || self.track_head() {
+        if self.strip_raw_text() || self.strip_doctype() {
             return true;
         }
         self.track_custom_element();
@@ -202,28 +195,6 @@ impl<'a> Prescanner<'a> {
         true
     }
 
-    fn track_head(&mut self) -> bool {
-        if matches_tag_start(self.bytes, self.idx + 1, HEAD_TAG) {
-            let Some(open_end) = find_tag_end(self.bytes, self.idx + 1 + HEAD_TAG.len()) else {
-                return false;
-            };
-            self.head_open_end = Some(self.output_position(open_end));
-            self.idx = open_end;
-            return true;
-        }
-        if !matches_end_tag_start(self.bytes, self.idx + 1, HEAD_TAG) {
-            return false;
-        }
-        let Some(close_end) = find_tag_end(self.bytes, self.idx + 2 + HEAD_TAG.len()) else {
-            return false;
-        };
-        if let Some(start) = self.head_open_end.take() {
-            self.report.head_range = Some(start..self.output_position(self.idx));
-        }
-        self.idx = close_end;
-        true
-    }
-
     fn track_custom_element(&mut self) {
         let tag_start = self.idx + 1;
         if tag_start >= self.bytes.len() || !self.bytes[tag_start].is_ascii_alphabetic() {
@@ -248,12 +219,6 @@ impl<'a> Prescanner<'a> {
         self.last = self.idx;
     }
 
-    fn output_position(&self, source_position: usize) -> usize {
-        self.output
-            .as_ref()
-            .map_or(source_position, |output| output.len() + source_position - self.last)
-    }
-
     fn flush_prefix(&mut self) {
         self.flush_prefix_with_capacity(0);
     }
@@ -265,10 +230,7 @@ impl<'a> Prescanner<'a> {
         output.push_str(&self.html[self.last..self.idx]);
     }
 
-    fn finish(mut self) -> (Cow<'a, str>, PrescanReport) {
-        if let Some(start) = self.head_open_end.take() {
-            self.report.head_range = Some(start..self.output_position(self.bytes.len()));
-        }
+    fn finish(self) -> (Cow<'a, str>, PrescanReport) {
         let cleaned = if let Some(mut output) = self.output {
             if self.last < self.bytes.len() {
                 output.push_str(&self.html[self.last..]);
