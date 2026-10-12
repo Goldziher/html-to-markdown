@@ -9,9 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- Emphasis, variable (`var`) and definition (`dfn`) text on a long line no longer recounts
-  the existing line before each element.
-  Other inline wrappers still require line-state work ([#862](https://github.com/xberg-io/html-to-markdown/issues/862)).
+- Emphasis, variable (`var`) and definition (`dfn`) text, strikethrough and inserted text,
+  and `mark` styles other than None no longer recount the existing line before each element.
+  Unmarked highlighting and other inline wrappers still require line-state work
+  ([#862](https://github.com/xberg-io/html-to-markdown/issues/862)).
 
 - White space at the start or the end of a link label or of a short quotation is written beside
   the link or the quotation, not inside it, as it is for bold text. `Press <a href="/p">Go </a>now.` gave `Press [Go](/p)now.` and
