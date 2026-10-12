@@ -25,10 +25,10 @@ use crate::converter::utility::content::{is_block_level_element, normalized_tag_
 use crate::converter::utility::preprocessing::{
     PRESERVED_MENU_ATTRIBUTE, normalize_bogus_comment_endings, normalize_menu_elements, normalize_split_closing_tags,
     normalize_unclosed_list_items, preprocess_html, restore_preserved_menu_elements, strip_bogus_comments,
-    strip_hidden_elements, strip_html_cdata, strip_script_and_style_tags,
+    strip_hidden_elements, strip_html_cdata, strip_script_and_style_tags, unwrap_kept_inert_elements,
 };
 use crate::converter::utility::serialization::serialize_tag_to_html;
-use crate::options::{NewlineStyle, OutputFormat};
+use crate::options::{HiddenContent, NewlineStyle, OutputFormat};
 
 use crate::converter::block::container::HandlerContext;
 use crate::error::Result;
@@ -90,14 +90,15 @@ pub fn convert_html_impl(
         head_repair_limit,
     } = parameters;
     let preserve_menu = options.preserve_tags.iter().any(|tag| tag.eq_ignore_ascii_case("menu"));
-    let (preprocessed, prepare_limit) = prepare_html(html, preserve_menu);
+    let hidden_content = options.hidden_content;
+    let (preprocessed, prepare_limit, as_written) = prepare_html(html, preserve_menu, hidden_content);
     let repaired_page = std::cell::OnceCell::new();
     let ParsedPage {
         mut dom,
         mut dom_ctx,
         len: preprocessed_len,
         repair_limit,
-    } = parse_for_conversion(&preprocessed, &repaired_page, preserve_menu)?;
+    } = parse_for_conversion(&preprocessed, &repaired_page, preserve_menu, hidden_content, as_written)?;
     let repair_warning = repair_limit.or(prepare_limit).or(head_repair_limit);
     finish_dom_parse(&mut dom, &mut dom_ctx, inert_bodies, preprocessed_len)?;
     let parser = dom.parser();
@@ -375,20 +376,38 @@ fn document_language_and_direction(
     (language, direction)
 }
 
-fn prepare_html(html: &str, preserve_menu: bool) -> (String, Option<crate::types::WarningKind>) {
-    let preprocessed = preprocess_initial_html(html, preserve_menu);
+/// The page that the first parse reads, the limit that the repair of custom elements reached,
+/// and `html` when that repair did not run: the page as written, which the tree builder has
+/// not read.
+fn prepare_html(
+    html: &str,
+    preserve_menu: bool,
+    hidden_content: HiddenContent,
+) -> (String, Option<crate::types::WarningKind>, Option<&str>) {
+    let preprocessed = preprocess_initial_html(html, preserve_menu, hidden_content);
     if has_custom_element_tags(&preprocessed) {
-        return repair_custom_elements(preprocessed, preserve_menu);
+        let (repaired, limit) = repair_custom_elements(preprocessed, preserve_menu, hidden_content);
+        return (repaired, limit, None);
     }
-    (preprocessed, None)
+    (preprocessed, None, Some(html))
 }
 
-fn preprocess_initial_html(html: &str, preserve_menu: bool) -> String {
+/// Remove the elements that the `hidden` attribute or an inline style hides, unless the caller
+/// keeps hidden content. A kept element then converts like any other element.
+fn strip_hidden(html: &str, hidden_content: HiddenContent) -> Cow<'_, str> {
+    match hidden_content {
+        HiddenContent::Drop => strip_hidden_elements(html),
+        HiddenContent::Reachable | HiddenContent::All => Cow::Borrowed(html),
+    }
+}
+
+fn preprocess_initial_html(html: &str, preserve_menu: bool, hidden_content: HiddenContent) -> String {
     let stripped = strip_html_cdata(html);
     let stripped = strip_script_and_style_tags(&stripped);
     // ~keep Bogus comments must be removed before tag-shaped preprocessing examines them.
     let stripped = strip_bogus_comments(&stripped);
-    let stripped = strip_hidden_elements(&stripped);
+    let stripped = strip_hidden(&stripped, hidden_content);
+    let stripped = unwrap_kept_inert_elements(&stripped, hidden_content);
     let stripped = normalize_bogus_comment_endings(&stripped);
     let stripped = normalize_split_closing_tags(&stripped);
     // ~keep Implicit list-item closes prevent deeply nested parser output on large changelogs.
@@ -397,10 +416,10 @@ fn preprocess_initial_html(html: &str, preserve_menu: bool) -> String {
     preprocess_html(&stripped).into_owned()
 }
 
-fn preprocess_repaired_html(html: &str, preserve_menu: bool) -> String {
+fn preprocess_repaired_html(html: &str, preserve_menu: bool, hidden_content: HiddenContent) -> String {
     let stripped = strip_html_cdata(html);
     let stripped = strip_script_and_style_tags(&stripped);
-    let stripped = strip_hidden_elements(&stripped);
+    let stripped = strip_hidden(&stripped, hidden_content);
     let stripped = normalize_bogus_comment_endings(&stripped);
     let stripped = normalize_split_closing_tags(&stripped);
     let stripped = normalize_unclosed_list_items(&stripped);
@@ -408,7 +427,11 @@ fn preprocess_repaired_html(html: &str, preserve_menu: bool) -> String {
     preprocess_html(&stripped).into_owned()
 }
 
-fn repair_custom_elements(preprocessed: String, preserve_menu: bool) -> (String, Option<crate::types::WarningKind>) {
+fn repair_custom_elements(
+    preprocessed: String,
+    preserve_menu: bool,
+    hidden_content: HiddenContent,
+) -> (String, Option<crate::types::WarningKind>) {
     let Some((repaired, warning)) = repair_with_html5ever_bounded(&preprocessed) else {
         tracing::warn!(
             target: "html_to_markdown::convert",
@@ -420,7 +443,10 @@ fn repair_custom_elements(preprocessed: String, preserve_menu: bool) -> (String,
         target: "html_to_markdown::convert",
         "custom element tags detected; re-parsed input with html5ever repair fallback"
     );
-    (preprocess_repaired_html(&repaired, preserve_menu), warning)
+    (
+        preprocess_repaired_html(&repaired, preserve_menu, hidden_content),
+        warning,
+    )
 }
 
 /// Wrap `output` at the wrap width, leaving the `frontmatter` it starts with as it is.
@@ -860,7 +886,7 @@ fn skip_or_render_tag(
         )
 }
 
-fn should_skip_tag(
+pub(super) fn should_skip_tag(
     tag_name: &str,
     node_handle: &tl::NodeHandle,
     tag: &tl::HTMLTag<'_>,

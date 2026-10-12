@@ -7,7 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`ConversionOptions::hidden_content`** chooses whether the output holds the text that a browser
+  does not show at first, so a search index can hold an inactive tab panel or a collapsed answer.
+  `drop` (the default) writes none of it, as before. `reachable` keeps the text a reader can get to
+  in the page: an element with the `hidden` attribute or with inline `display: none`,
+  `visibility: hidden` or `font-size: 0`, an element of an inline `<svg>` with `display="none"` or
+  `visibility="hidden"`, and a declarative shadow root (a `<template>` whose `shadowrootmode` is
+  `open` or `closed`).
+  `all` also keeps the content of `<template>` and `<noscript>`, where it is written, but not in
+  the document head: there the two elements hold metadata, and no choice writes it. No choice
+  writes a `<script>`, a `<style>` or a comment as text. The converter reads the inline `style`
+  attribute only: an element hidden by a style sheet rule or a class name was never dropped and is
+  kept with every choice, and so is `aria-hidden` content, which a browser shows. The metadata and
+  the document structure follow the markdown. The CLI takes it as `--hidden-content`
+  ([#753](https://github.com/xberg-io/html-to-markdown/issues/753)).
+
 ### Changed
+
+- A source line ending before retained data-list content becomes a space in Markdown, as before
+  a select list. Without visitor callbacks, empty, input-only or excluded data lists keep the
+  existing source boundary. A no-break space beside retained content stays a no-break space. A source line ending at the end of an
+  option group outside a select or data list also separates the following word. Plain text
+  retains these line endings ([#864](https://github.com/xberg-io/html-to-markdown/issues/864),
+  [#867](https://github.com/xberg-io/html-to-markdown/issues/867)).
 
 - Emphasis, variable (`var`) and definition (`dfn`) text, strikethrough and Djot inserted text,
   and `mark` styles other than None no longer recount the existing line before each element.

@@ -79,9 +79,21 @@ serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 toml.workspace = true
 
-[[example]]
-name = "test_deser"
-required-features = ["serde"]
+[[test]]
+name = "issue_489_regressions"
+required-features = ["testkit"]
+
+[[test]]
+name = "issue_818_structured_data_script_test"
+required-features = ["testkit"]
+
+[[test]]
+name = "issue_772_omitted_end_tags_test"
+required-features = ["testkit"]
+
+[[test]]
+name = "form_whitespace_followups_test"
+required-features = ["testkit"]
 
 [[test]]
 name = "issue_829_form_tree_test"
@@ -94,6 +106,10 @@ required-features = ["testkit"]
 [[test]]
 name = "review_791_block_boundaries_test"
 required-features = ["testkit"]
+
+[[example]]
+name = "test_deser"
+required-features = ["serde"]
 
 [lints]
 workspace = true

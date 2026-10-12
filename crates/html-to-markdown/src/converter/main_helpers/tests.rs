@@ -26,11 +26,16 @@ fn should_preserve_head_repair_decisions_at_prefix_boundaries() {
         "<tit<head></head><p>body</p>",
         "<title<head></head><p>body</p>",
     ] {
-        assert_eq!(repair_head_content_outside_head(html), None, "{html}");
+        assert_eq!(
+            repair_head_content_outside_head(html, HiddenContent::Drop),
+            None,
+            "{html}"
+        );
     }
     for prefix in ["", "<!-- é🦀 -->"] {
         let html = format!("{prefix}<title>First</title><head><title>Second</title></head><p>x</p>");
-        let (repaired, limit) = repair_head_content_outside_head(&html).expect("repair implicit head");
+        let (repaired, limit) =
+            repair_head_content_outside_head(&html, HiddenContent::Drop).expect("repair implicit head");
         // ~keep The repair writes no `<html>` and no `<body>` that the input has no tag for.
         assert_eq!(
             repaired,
@@ -41,11 +46,34 @@ fn should_preserve_head_repair_decisions_at_prefix_boundaries() {
 }
 
 #[test]
+fn should_write_the_content_of_a_template_back_in_the_head_repair_of_a_choice_that_keeps_it() {
+    // ~keep The pass that removes the tags of a kept element reads the page after this repair.
+    let page = |html: &str, choice| repair_head_content_outside_head(html, choice).map(|(page, _)| page);
+    let html =
+        "<title>t</title><template><meta></template><p>a</p><template shadowrootmode=open><p>b &amp; c</p></template>";
+    let emptied =
+        r#"<head><title>t</title><template></template></head><p>a</p><template shadowrootmode="open"></template>"#;
+    assert_eq!(page(html, HiddenContent::Drop).as_deref(), Some(emptied));
+    let kept = [
+        "<head><title>t</title><template><meta></template></head><p>a</p>",
+        r#"<template shadowrootmode="open"><p>b &amp; c</p></template>"#,
+    ]
+    .concat();
+    assert_eq!(page(html, HiddenContent::Reachable), Some(kept.clone()));
+    assert_eq!(page(html, HiddenContent::All), Some(kept));
+    // ~keep The repair of the second parse reads the page after that pass: it writes no content.
+    assert_eq!(
+        repair_with_html5ever_bounded("<div><p>one</div><template><p>two</p></template>").map(|(page, _)| page),
+        Some("<head></head><div><p>one</p></div><template></template>".to_owned())
+    );
+}
+
+#[test]
 fn should_limit_head_content_searches_to_input_before_the_head() {
     let html = format!("<head></head>{}", "<p>body</p>".repeat(10_000));
     START_TAG_CANDIDATE_CHECKS.with(|checks| checks.set(0));
 
-    assert_eq!(repair_head_content_outside_head(&html), None);
+    assert_eq!(repair_head_content_outside_head(&html, HiddenContent::Drop), None);
     // ~keep 20,002 checks find the last `<head>` from the end; the head content search reads
     // ~keep the empty prefix and adds none. The search for a title after `</head>` adds 2
     // ~keep checks to find `</head>` and one for each of the 20,001 tags from there.

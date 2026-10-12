@@ -6,6 +6,7 @@ use crate::converter::utility::content::normalized_tag_name;
 use crate::converter::utility::escaping::escape_link_label;
 use crate::converter::utility::serialization::escape_html_attribute_value;
 use crate::converter::utility::svg_attrs::canonical_svg_attr;
+use crate::options::HiddenContent;
 use crate::options::conversion::NATIVE_STACK_SAFE_DEPTH;
 // ~keep reason: BTreeMap is only used when the inline-images feature is active.
 #[allow(unused_imports)]
@@ -269,16 +270,18 @@ fn is_aria_hidden(tag: &tl::HTMLTag<'_>) -> bool {
 /// ~keep The two attributes are the SVG spelling of the style declarations with the same names.
 /// ~keep The function that judges a `style` attribute judges them, so text in a graphic and text
 /// ~keep outside one are hidden by one decision. An element hidden by its `style` or by the
-/// ~keep `hidden` attribute is already gone when the graphic is parsed.
-fn is_hidden_in_graphic(tag: &tl::HTMLTag<'_>) -> bool {
+/// ~keep `hidden` attribute is already gone when the graphic is parsed. A caller that keeps hidden
+/// ~keep content keeps this text too, so no element is hidden for it.
+fn is_hidden_in_graphic(tag: &tl::HTMLTag<'_>, hidden_content: HiddenContent) -> bool {
     use crate::converter::utility::preprocessing::{HiddenStyleReason, style_value_hidden_reason};
 
-    ["display", "visibility"].iter().any(|property| {
-        tag.attributes().get(*property).flatten().is_some_and(|value| {
-            let declaration = format!("{property}:{}", value.as_utf8_str());
-            style_value_hidden_reason(&declaration) == Some(HiddenStyleReason::Definitive)
+    hidden_content == HiddenContent::Drop
+        && ["display", "visibility"].iter().any(|property| {
+            tag.attributes().get(*property).flatten().is_some_and(|value| {
+                let declaration = format!("{property}:{}", value.as_utf8_str());
+                style_value_hidden_reason(&declaration) == Some(HiddenStyleReason::Definitive)
+            })
         })
-    })
 }
 
 /// Whether the `systemLanguage` test of a child of a `switch` holds for a reader of English.
@@ -308,10 +311,11 @@ fn system_language_holds(tag: &tl::HTMLTag<'_>) -> bool {
 /// draw their children are entered (`svg`, `g`, `a`, the child of `switch` that a reader of
 /// English gets), so `defs`, `symbol`, `style`, `script` and `metadata` give nothing, and a `use`
 /// reference is not followed. An element with `display="none"` or `visibility="hidden"` gives
-/// nothing. `aria-hidden="true"` removes the label, the title and the description, and keeps
-/// drawn text. A graphic with none of these gives the empty string.
-pub fn graphic_text(svg: &tl::HTMLTag<'_>, parser: &Parser<'_>) -> String {
-    if is_hidden_in_graphic(svg) {
+/// nothing, unless `hidden_content` keeps hidden text. `aria-hidden="true"` removes the label,
+/// the title and the description, and keeps drawn text. A graphic with none of these gives the
+/// empty string.
+pub fn graphic_text(svg: &tl::HTMLTag<'_>, parser: &Parser<'_>, hidden_content: HiddenContent) -> String {
+    if is_hidden_in_graphic(svg, hidden_content) {
         return String::new();
     }
     let named = !is_aria_hidden(svg);
@@ -343,6 +347,7 @@ pub fn graphic_text(svg: &tl::HTMLTag<'_>, parser: &Parser<'_>) -> String {
                 out.current
                     .push_str(&crate::text::decode_html_entities_cow(bytes.as_utf8_str().as_ref()));
             }
+            Some(tl::Node::Tag(tag)) if is_hidden_in_graphic(tag, hidden_content) => {}
             Some(tl::Node::Tag(tag)) => visit_graphic_tag(tag, parser, scope, &mut stack, &mut out),
             _ => {}
         }
@@ -376,9 +381,6 @@ fn visit_graphic_tag(
     stack: &mut Vec<GraphicStep>,
     out: &mut GraphicParts,
 ) {
-    if is_hidden_in_graphic(tag) {
-        return;
-    }
     let name = normalized_tag_name(tag.name().as_utf8_str());
     let nested_svg = |named: bool| GraphicScope::Drawing {
         of_svg: true,
@@ -468,7 +470,7 @@ pub fn handle_svg(
         return;
     }
 
-    let title = graphic_text(tag, parser);
+    let title = graphic_text(tag, parser, options.hidden_content);
     // ~keep Code shows every character as text, so a graphic in code writes its text and no marks.
     if ctx.in_code {
         output.push_str(&title);

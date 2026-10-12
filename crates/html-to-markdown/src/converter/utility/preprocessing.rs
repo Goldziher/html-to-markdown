@@ -1,6 +1,8 @@
 //! HTML cleanup and normalization used before conversion.
 
+mod head_scan;
 mod inert;
+mod kept;
 mod lists;
 mod markup;
 mod menu;
@@ -16,7 +18,7 @@ pub use menu::{PRESERVED_MENU_ATTRIBUTE, normalize_menu_elements, restore_preser
 pub use raw_text::{skip_opaque_region, strip_script_and_style_tags};
 pub use visibility::{
     HiddenStyleReason, sanitize_markdown_url, strip_bogus_comments, strip_hidden_elements, style_value_hidden_reason,
-    tag_has_hidden_attribute, tag_has_hidden_style,
+    tag_has_hidden_attribute, tag_has_hidden_style, unwrap_kept_inert_elements,
 };
 
 #[cfg(test)]

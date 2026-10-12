@@ -102,6 +102,7 @@ pub fn build_dom_context(dom: &tl::VDom, parser: &tl::Parser, _input_len: usize)
         next_whitespace_map: Vec::new(),
         following_content_map: Vec::new(),
         table_content_summary_cache: std::cell::RefCell::new(std::collections::HashMap::new()),
+        datalist_content_cache: std::cell::RefCell::new(std::collections::HashMap::new()),
         holds_text_cache: std::cell::RefCell::new(std::collections::HashMap::new()),
     };
 

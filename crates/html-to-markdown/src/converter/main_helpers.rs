@@ -6,6 +6,7 @@
 use crate::converter::code_scan::CodeScan;
 use crate::options::CodeBlockStyle;
 use crate::options::ConversionOptions;
+use crate::options::HiddenContent;
 use crate::options::NewlineStyle;
 use crate::options::conversion::{MAX_CONFIGURABLE_DEPTH, NATIVE_STACK_SAFE_DEPTH};
 
@@ -13,7 +14,8 @@ mod head;
 
 use head::document_head_search;
 pub use head::{
-    document_head, extract_head_metadata, format_metadata_frontmatter, is_ignorable_before_head, starts_body,
+    document_head, end_tag_starts_body, extract_head_metadata, format_metadata_frontmatter, is_ignorable_before_head,
+    starts_body,
 };
 
 /// Resolve the effective traversal-depth ceiling.
@@ -557,6 +559,12 @@ pub fn expand_xml_self_closing_tags(input: &str) -> String {
 /// ~keep is `input` as written. At the depth limit the tree ends at the tag that reached it,
 /// ~keep and the input after that tag follows the tree as written. No word is lost.
 pub(super) fn repair_with_html5ever_bounded(input: &str) -> Option<(String, Option<crate::types::WarningKind>)> {
+    repair_with_html5ever(input, false)
+}
+
+/// As [`repair_with_html5ever_bounded`]. With `template_contents`, the page that the tree is
+/// written back to holds the content of each `<template>`; without, each `<template>` is empty.
+fn repair_with_html5ever(input: &str, template_contents: bool) -> Option<(String, Option<crate::types::WarningKind>)> {
     use crate::converter::anchor_origin::{RepairTree, collapse_split_anchors, parse_with_anchor_origins};
     use crate::rcdom::SerializableHandle;
     use html5ever::serialize::{SerializeOpts, serialize};
@@ -577,7 +585,11 @@ pub(super) fn repair_with_html5ever_bounded(input: &str) -> Option<(String, Opti
     collapse_split_anchors(&dom.document);
 
     let mut buf = Vec::with_capacity(input.len());
-    let handle = SerializableHandle::from(dom.document);
+    let handle = if template_contents {
+        SerializableHandle::with_template_contents(dom.document)
+    } else {
+        SerializableHandle::from(dom.document)
+    };
     serialize(&mut buf, &handle, SerializeOpts::default()).ok()?;
     let mut html = String::from_utf8(buf).ok()?;
     if limit.is_some() {
@@ -605,15 +617,28 @@ pub(super) fn repair_with_html5ever_bounded(input: &str) -> Option<(String, Opti
 /// The HTML tree builder places that content in an implicit head and ignores a later head
 /// start tag. The lightweight parser preserves source nesting, so its tree needs this targeted
 /// repair before either conversion tier reads metadata or renders the body.
-pub fn repair_head_content_outside_head(input: &str) -> Option<(String, Option<crate::types::WarningKind>)> {
-    if !may_hold_head_content_outside_head(input.as_bytes()) {
+///
+/// ~keep This repair reads the page before the pass that removes the tags of the kept
+/// ~keep `<template>` and `<noscript>` elements. Under a choice of `hidden_content` that keeps
+/// ~keep hidden content, the page that it writes holds the content of each `<template>`, for
+/// ~keep that pass to find. Under `drop` each `<template>` is written empty, as before the
+/// ~keep option: the walk writes no `<template>`.
+pub fn repair_head_content_outside_head(
+    input: &str,
+    hidden_content: HiddenContent,
+) -> Option<(String, Option<crate::types::WarningKind>)> {
+    if !has_head_content_outside_head(input) {
         return None;
     }
-    let dom = tl::parse(input, tl::ParserOptions::default()).ok()?;
-    if !document_head_search(dom.children(), dom.parser()).content_outside_head {
-        return None;
-    }
-    repair_with_html5ever_bounded(input)
+    repair_with_html5ever(input, hidden_content != HiddenContent::Drop)
+}
+
+/// Whether head content precedes the `<head>` element of `input`, or a `<title>` precedes the
+/// body and is in no `<head>` element.
+pub fn has_head_content_outside_head(input: &str) -> bool {
+    may_hold_head_content_outside_head(input.as_bytes())
+        && tl::parse(input, tl::ParserOptions::default())
+            .is_ok_and(|dom| document_head_search(dom.children(), dom.parser()).content_outside_head)
 }
 
 /// A cheap check of the source in front of the parse of [`repair_head_content_outside_head`];

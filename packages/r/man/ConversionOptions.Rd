@@ -86,6 +86,8 @@ Use \code{\link[ConversionOptions:builder]{ConversionOptions::builder()}} to con
 
 \item{\code{inline_data_media}}{What the output shows for an image or embedded media element whose address is an inline}
 
+\item{\code{hidden_content}}{Which text that a browser does not show at first the output holds: none of it}
+
 \item{\code{url_escape_style}}{URL encoding strategy for link and image destinations.}
 
 \item{\code{link_style}}{Link rendering style (inline or reference).}

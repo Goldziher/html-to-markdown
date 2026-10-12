@@ -114,6 +114,48 @@ fn should_reject_invalid_inline_data_media_value() {
 }
 
 #[test]
+fn should_drop_a_hidden_element_by_default() {
+    cli()
+        .write_stdin("<p>visible</p><div hidden>tab two body</div><template><p>row</p></template>")
+        .assert()
+        .success()
+        .stdout("visible\n");
+}
+
+#[test]
+fn should_keep_a_hidden_element_when_hidden_content_is_reachable() {
+    cli()
+        .arg("--hidden-content")
+        .arg("reachable")
+        .write_stdin("<p>visible</p><div hidden>tab two body</div><template><p>row</p></template>")
+        .assert()
+        .success()
+        .stdout("visible\n\ntab two body\n");
+}
+
+#[test]
+fn should_keep_template_content_when_hidden_content_is_all() {
+    cli()
+        .arg("--hidden-content")
+        .arg("all")
+        .write_stdin("<p>visible</p><div hidden>tab two body</div><template><p>row</p></template>")
+        .assert()
+        .success()
+        .stdout("visible\n\ntab two body\n\nrow\n");
+}
+
+#[test]
+fn should_reject_invalid_hidden_content_value() {
+    cli()
+        .arg("--hidden-content")
+        .arg("keep")
+        .write_stdin("<p>Test</p>")
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("invalid value"));
+}
+
+#[test]
 fn should_reject_invalid_url_escape_style_value() {
     cli()
         .arg("--url-escape-style")

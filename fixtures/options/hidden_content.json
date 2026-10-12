@@ -1,0 +1,112 @@
+[
+  {
+    "id": "options_hidden_content_drop_default",
+    "description": "Drop writes no text of a hidden element or a template",
+    "input": {
+      "html": "<p>visible</p><div role=\"tabpanel\" hidden>tab two body</div><template><p>row template</p></template>",
+      "options": {
+        "hidden_content": "Drop"
+      }
+    },
+    "assertions": [
+      {
+        "type": "equals",
+        "field": "content",
+        "value": "visible\n"
+      }
+    ],
+    "docs": {
+      "topic": "options",
+      "stem": "options_hidden_content_drop_default",
+      "title": "Drop writes no text of a hidden element"
+    }
+  },
+  {
+    "id": "options_hidden_content_reachable",
+    "description": "Reachable keeps the text of a hidden element and drops template content",
+    "input": {
+      "html": "<p>visible</p><div role=\"tabpanel\" hidden>tab two body</div><template><p>row template</p></template>",
+      "options": {
+        "hidden_content": "Reachable"
+      }
+    },
+    "assertions": [
+      {
+        "type": "equals",
+        "field": "content",
+        "value": "visible\n\ntab two body\n"
+      }
+    ],
+    "docs": {
+      "topic": "options",
+      "stem": "options_hidden_content_reachable",
+      "title": "Reachable keeps the text of a hidden element"
+    }
+  },
+  {
+    "id": "options_hidden_content_all",
+    "description": "All keeps the text of a hidden element and template content",
+    "input": {
+      "html": "<p>visible</p><div role=\"tabpanel\" hidden>tab two body</div><template><p>row template</p></template>",
+      "options": {
+        "hidden_content": "All"
+      }
+    },
+    "assertions": [
+      {
+        "type": "equals",
+        "field": "content",
+        "value": "visible\n\ntab two body\n\nrow template\n"
+      }
+    ],
+    "docs": {
+      "topic": "options",
+      "stem": "options_hidden_content_all",
+      "title": "All also keeps template content"
+    }
+  },
+  {
+    "id": "options_hidden_content_shadow_root",
+    "description": "Reachable keeps the content of a declarative shadow root",
+    "input": {
+      "html": "<div><template shadowrootmode=\"open\"><p>shadow body</p></template><span>light body</span></div>",
+      "options": {
+        "hidden_content": "Reachable"
+      }
+    },
+    "assertions": [
+      {
+        "type": "equals",
+        "field": "content",
+        "value": "shadow body\n\nlight body\n"
+      }
+    ],
+    "docs": {
+      "topic": "options",
+      "stem": "options_hidden_content_shadow_root",
+      "title": "Reachable keeps a declarative shadow root"
+    }
+  },
+  {
+    "id": "options_hidden_content_inline_style",
+    "description": "Reachable keeps an element that an inline style hides, and never a script",
+    "input": {
+      "html": "<p>visible</p><div style=\"display:none\">collapsed body<script>var code = 1;</script></div>",
+      "options": {
+        "hidden_content": "Reachable"
+      }
+    },
+    "assertions": [
+      {
+        "type": "equals",
+        "field": "content",
+        "value": "visible\n\ncollapsed body\n"
+      }
+    ],
+    "docs": {
+      "topic": "options",
+      "stem": "options_hidden_content_inline_style",
+      "title": "Reachable keeps an element hidden by an inline style"
+    }
+  }
+]
