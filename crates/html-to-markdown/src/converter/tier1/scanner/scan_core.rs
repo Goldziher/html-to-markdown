@@ -368,6 +368,12 @@ impl<'a> Tier1Scanner<'a> {
         if !should_skip_preprocessing(name_lower, &attrs, self.options, is_page_header) {
             return Ok(false);
         }
+        // ~keep HTML5 removes only the form from its stack at </form>; an unclosed label can
+        // ~keep still contain the tail. Nested form starts are ignored. A textual balanced skip
+        // ~keep cannot identify the form subtree, so Tier-2 decides what removal drops (#829).
+        if name_lower == b"form" {
+            return Err(BailReason::Classifier);
+        }
         if !self.state.in_table_cell() && self.state.list_continuation_indent_width() > 0 {
             return Err(BailReason::ListItemUnsupportedBlockChild);
         }

@@ -83,5 +83,9 @@ toml.workspace = true
 name = "test_deser"
 required-features = ["serde"]
 
+[[test]]
+name = "issue_829_form_tree_test"
+required-features = ["testkit"]
+
 [lints]
 workspace = true

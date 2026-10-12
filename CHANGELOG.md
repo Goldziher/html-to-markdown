@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- The fast converter leaves form removal to the full converter's HTML5 tree
+  ([#829](https://github.com/xberg-io/html-to-markdown/issues/829)). With an unclosed label,
+  `<p>before<form><label>name<input></form>after<p>next` now gives `before` on every route:
+  HTML5 keeps `after` and `next` inside the label and form. Closing the label before the form
+  keeps `after` and `next` as separate paragraphs. Nested form starts no longer make removal
+  swallow text outside the HTML5 form. Pages whose forms are removed now use the full converter;
+  well-formed retained forms can still use the fast converter.
+
 - White space at the start or the end of a link label or of a short quotation is written beside
   the link or the quotation, not inside it, as it is for bold text. `Press <a href="/p">Go </a>now.` gave `Press [Go](/p)now.` and
   now gives `Press [Go](/p) now.`. `Press <q>Go </q>now.` gave `Press "Go"now.` and now gives
