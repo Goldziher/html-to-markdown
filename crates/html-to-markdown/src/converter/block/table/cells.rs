@@ -512,6 +512,8 @@ pub fn convert_table_row(
     }
 
     #[cfg(feature = "visitor")]
+    let visitor_output_start = output.len();
+    #[cfg(feature = "visitor")]
     if let Some(early_return) = run_row_visitor_hook(
         node_handle,
         output,
@@ -523,6 +525,7 @@ pub fn convert_table_row(
             depth: render.depth,
         },
     ) {
+        *render.has_content |= output.len() > visitor_output_start;
         return early_return;
     }
 
@@ -536,6 +539,8 @@ pub fn convert_table_row(
 
     let row_env = RowEnv { ctx: &cell_ctx, ..env };
     let mut filled_cols = render_row_cells(&cells, &mut row_text, row_env, render, is_single_cell_row);
+    // ~keep Empty emitted cells contain only padding and delimiters; a literal content pipe is escaped.
+    *render.has_content |= row_text.chars().any(|ch| ch != '|' && !ch.is_whitespace());
     pad_row(&mut row_text, &mut filled_cols, render.total_cols, render.col_widths);
     output.push('|');
     output.push_str(&row_text);
@@ -548,6 +553,7 @@ pub fn convert_table_row(
 
 pub struct RowRender<'a> {
     pub row_index: usize,
+    pub has_content: &'a mut bool,
     pub has_span: bool,
     pub rowspan_tracker: &'a mut [Option<usize>],
     pub total_cols: usize,
