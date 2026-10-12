@@ -1,4 +1,4 @@
-use super::preprocess_repaired_html;
+use super::{preprocess_repaired_html, trace_parse_complete};
 use crate::converter::DomContext;
 use crate::converter::main_helpers::repair_with_html5ever_bounded;
 use crate::converter::preprocessing_helpers::{
@@ -136,6 +136,20 @@ pub(super) fn parse_for_conversion<'a>(
         len: page.len(),
         repair_limit,
     })
+}
+
+pub(super) fn finish_dom_parse(
+    dom: &mut tl::VDom<'_>,
+    dom_ctx: &mut DomContext,
+    inert_bodies: &std::collections::HashMap<String, String>,
+    input_len: usize,
+) -> Result<()> {
+    if !inert_bodies.is_empty() {
+        crate::converter::utility::preprocessing::restore_inert_bodies(dom, inert_bodies)?;
+        *dom_ctx = build_dom_context(dom, dom.parser(), input_len);
+    }
+    trace_parse_complete(dom, input_len);
+    Ok(())
 }
 
 #[cfg(test)]
