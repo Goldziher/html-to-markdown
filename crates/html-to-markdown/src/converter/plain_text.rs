@@ -164,8 +164,9 @@ pub fn extract_plain_text(dom: &tl::VDom, parser: &tl::Parser, options: &Convers
         visitor: options.visitor.as_ref(),
     };
 
+    let mut after_passed_over = false;
     for child_handle in dom.children() {
-        walk_plain(child_handle, parser, &mut buf, &mut list_ctx, &state);
+        after_passed_over = walk_plain(child_handle, parser, &mut buf, &mut list_ctx, &state, after_passed_over);
     }
 
     let mut text = buf.into_text();
@@ -173,35 +174,43 @@ pub fn extract_plain_text(dom: &tl::VDom, parser: &tl::Parser, options: &Convers
     text
 }
 
-/// Recursive plain-text walker.
+/// Recursive plain-text walker. `after_passed_over` says whether the walker passed over the
+/// node right before this one. Returns whether it passed over this node: a comment, or an
+/// element of `SKIP_TAGS`.
+///
+/// ~keep The answer goes from a node to the next node of the same parent only, so the first
+/// ~keep text in an element and the text after an element that was walked never get it.
 fn walk_plain(
     node_handle: &tl::NodeHandle,
     parser: &tl::Parser,
     buf: &mut PlainOutput,
     list_ctx: &mut ListContext,
     state: &WalkState<'_>,
-) {
+    after_passed_over: bool,
+) -> bool {
     if state.depth >= effective_max_depth(state.options) {
-        return;
+        return false;
     }
 
     let Some(node) = node_handle.get(parser) else {
-        return;
+        return false;
     };
 
     match node {
-        tl::Node::Raw(bytes) => emit_raw_text(bytes, buf, state),
-        tl::Node::Tag(tag) => {
-            if state.excluded_node_ids.contains(&node_handle.get_inner()) {
-                return;
-            }
-            walk_tag(tag, parser, buf, list_ctx, state);
+        tl::Node::Raw(bytes) => {
+            emit_raw_text(bytes, buf, state, after_passed_over);
+            false
         }
-        tl::Node::Comment(_) => {}
+        tl::Node::Tag(tag) => {
+            !state.excluded_node_ids.contains(&node_handle.get_inner()) && walk_tag(tag, parser, buf, list_ctx, state)
+        }
+        tl::Node::Comment(_) => true,
     }
 }
 
-fn emit_raw_text(bytes: &tl::Bytes<'_>, buf: &mut PlainOutput, state: &WalkState<'_>) {
+/// Writes a text node. `after_passed_over` says whether the walker passed over the node right
+/// before the text.
+fn emit_raw_text(bytes: &tl::Bytes<'_>, buf: &mut PlainOutput, state: &WalkState<'_>, after_passed_over: bool) {
     let raw = bytes.as_utf8_str();
     let decoded = text::decode_html_entities_cow(raw.as_ref());
     #[cfg(feature = "visitor")]
@@ -213,8 +222,17 @@ fn emit_raw_text(bytes: &tl::Bytes<'_>, buf: &mut PlainOutput, state: &WalkState
         return;
     }
     let normalized = text::normalize_whitespace_cow(&decoded);
-    if !(normalized.is_empty() || normalized.as_ref() == " " && buf.ends_with_line_end()) {
-        buf.push_text(&normalized);
+    // ~keep A node that the walker passed over is no part of the text, so the white space on
+    // ~keep its two sides is one run: the space that opens this text is not written after a
+    // ~keep space. An element that was walked and wrote nothing keeps both spaces, and so does
+    // ~keep a no-break space that opens the text, which `normalized` holds as a space.
+    let joins_run = after_passed_over && decoded.starts_with([' ', '\t']) && buf.ends_with_space();
+    let words = normalized
+        .strip_prefix(' ')
+        .filter(|_| joins_run)
+        .unwrap_or_else(|| normalized.as_ref());
+    if !(words.is_empty() || words == " " && buf.ends_with_line_end()) {
+        buf.push_text(words);
     }
 }
 
@@ -246,28 +264,31 @@ fn visit_plain_text(decoded: &str, buf: &mut PlainOutput, state: &WalkState<'_>)
     }
 }
 
+/// Walks an element. Returns whether the walker passed over it: an element of `SKIP_TAGS`. An
+/// element that the options or a visitor remove is an element that wrote nothing.
 fn walk_tag(
     tag: &tl::HTMLTag<'_>,
     parser: &tl::Parser,
     buf: &mut PlainOutput,
     list_ctx: &mut ListContext,
     state: &WalkState<'_>,
-) {
+) -> bool {
     let tag_name = tag.name().as_utf8_str().to_ascii_lowercase();
     let tag_str = tag_name.as_str();
-    if SKIP_TAGS.contains(&tag_str)
-        || should_drop_for_preprocessing(
-            tag_str,
-            tag,
-            state.options,
-            tag_str == "header" && state.in_document_body && !state.in_content_header_scope,
-        )
-    {
-        return;
+    if SKIP_TAGS.contains(&tag_str) {
+        return true;
+    }
+    if should_drop_for_preprocessing(
+        tag_str,
+        tag,
+        state.options,
+        tag_str == "header" && state.in_document_body && !state.in_content_header_scope,
+    ) {
+        return false;
     }
     #[cfg(feature = "visitor")]
     if visit_plain_element_start(tag_str, tag, buf, state) {
-        return;
+        return false;
     }
     // ~keep The checkpoint is open while the element writes. `visit_plain_element_end` closes
     // ~keep it on each of its paths, and `dispatch_plain_tag` has no other way out.
@@ -278,6 +299,7 @@ fn walk_tag(
     if let Some((visitor_handle, element_start)) = element_start {
         visit_plain_element_end(visitor_handle, tag_str, tag, buf, state.depth, element_start);
     }
+    false
 }
 
 #[cfg(feature = "visitor")]
@@ -575,8 +597,9 @@ fn walk_children(
 ) {
     let children = tag.children();
     let top = children.top();
+    let mut after_passed_over = false;
     for child in top.iter() {
-        walk_plain(child, parser, buf, list_ctx, state);
+        after_passed_over = walk_plain(child, parser, buf, list_ctx, state, after_passed_over);
     }
 }
 

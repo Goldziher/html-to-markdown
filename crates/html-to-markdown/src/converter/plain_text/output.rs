@@ -141,6 +141,11 @@ impl PlainOutput {
         self.text.char_before(self.visible_len()) == "\n"
     }
 
+    /// Whether the text ends with a space.
+    pub(super) fn ends_with_space(&self) -> bool {
+        self.text.char_before(self.visible_len()) == " "
+    }
+
     /// The text, at the end of the buffer. Every control and every checkpoint is closed by
     /// then, so no hole is left.
     pub(super) fn into_text(self) -> String {
