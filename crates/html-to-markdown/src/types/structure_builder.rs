@@ -414,6 +414,9 @@ impl BuilderState {
 /// in document reading order; each node carries index-based `parent` and `children` references
 /// into the same array.
 ///
+/// The metadata block comes from the first `<head>` of the tree it gets, wherever that tree
+/// holds it. A later `<head>` gives no block.
+///
 /// # Examples
 ///
 /// ```rust,no_run

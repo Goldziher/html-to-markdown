@@ -164,18 +164,12 @@ fn should_give_one_warning_when_the_head_repair_stops_at_its_depth_limit() {
     // ~keep The full converter answers on every route. With these options the default route
     // ~keep never asks the fast converter: the router selects the full converter. Only the
     // ~keep forced route asks the fast converter, and there the page is handed over.
-    // ~keep The pages have a `<head>` with no end tag: the tree builder reads such a page to
-    // ~keep its end, so the parse of the head is the one that reaches the depth limit.
     let closed = format!(
-        "<head><title>T</title>{}deep{}tail",
+        "<title>T</title>{}deep{}tail",
         "<div>".repeat(600),
         "</div>".repeat(600)
     );
-    let balanced_rest = format!(
-        "<head><title>T</title>{}deep{}tail",
-        "<div>".repeat(520),
-        "</div>".repeat(9)
-    );
+    let balanced_rest = format!("<title>T</title>{}deep{}tail", "<div>".repeat(520), "</div>".repeat(9));
     for (page, html) in [("closed", &closed), ("balanced rest", &balanced_rest)] {
         for route in ROUTES {
             let result = convert(

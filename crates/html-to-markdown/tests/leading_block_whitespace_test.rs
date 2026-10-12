@@ -57,9 +57,19 @@ fn should_drop_leading_whitespace_inside_a_textarea_at_document_start() {
 }
 
 #[test]
-fn should_drop_leading_whitespace_inside_a_style_tag_at_document_start() {
-    // ~keep CommonMark spec example 173. The `style` has no end tag, so the HTML tree builder
-    // ~keep reads the rest of the input as its text, and a browser shows none of it.
+fn should_drop_leading_whitespace_after_a_style_element_at_document_start() {
+    // ~keep The page of CommonMark spec example 173 with the `style` closed: the text after
+    // ~keep the element is the first text of the document.
+    assert_eq!(
+        to_markdown_escaped("<style\n  type=\"text/css\">\n</style>\n\nfoo\n"),
+        "foo\n"
+    );
+}
+
+#[test]
+fn should_show_no_text_of_a_style_tag_with_no_end_tag() {
+    // ~keep CommonMark spec example 173 as written. The `style` has no end tag, so the HTML
+    // ~keep tree builder reads the rest of the input as its text, and a browser shows none of it.
     assert_eq!(to_markdown_escaped("<style\n  type=\"text/css\">\n\nfoo\n"), "");
 }
 

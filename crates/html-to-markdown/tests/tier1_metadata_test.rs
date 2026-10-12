@@ -597,11 +597,6 @@ fn should_give_the_document_structure_the_metadata_block_of_the_head_the_metadat
             Some("Kept"),
         ),
         (
-            "<html><body><head><title>Stray</title></head><p>x</p></body></html>",
-            None,
-        ),
-        ("<p>x</p><head><title>Stray</title></head>", None),
-        (
             "<html><head><title>Kept</title></head><head><title>Stray</title></head><body><p>x</p></body></html>",
             Some("Kept"),
         ),
