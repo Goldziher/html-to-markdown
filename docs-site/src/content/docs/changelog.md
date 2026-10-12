@@ -24,7 +24,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   ([#859](https://github.com/xberg-io/html-to-markdown/issues/859)).
 
 - Audio and video players inside an outer link contribute plain label text instead of a nested
-  Markdown link. Inside preformatted code their default player output contributes no link or
+  Markdown link. Their labels stay separate from adjacent words without padding punctuation
+  or visitor-skipped content, and an outer anchor with an empty address retains each player
+  destination. Inside preformatted code their default player output contributes no link or
   extra blank line; visitor-provided output still applies (#840, #841).
 
 - A definition description outside a definition list starts a new block instead of joining the

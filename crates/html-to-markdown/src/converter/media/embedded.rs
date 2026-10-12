@@ -30,6 +30,15 @@ fn append_media_src_link(output: &mut String, src: &str, tag: &HTMLTag, options:
         .unwrap_or(&name);
     if ctx.in_link && matches!(name.as_ref(), "audio" | "video") {
         output.push_str(label);
+        if let Some(boundary) = ctx.media_boundary.as_ref() {
+            let mut state = boundary.get();
+            if state.first_edge.is_none() {
+                state.first_edge = label.chars().next();
+                state.first_is_media = true;
+            }
+            state.last_edge = label.chars().next_back();
+            boundary.set(state);
+        }
         return;
     }
     let escaped_label = escape_link_label(label);
@@ -114,10 +123,27 @@ fn render_media_fallback(tag: &HTMLTag, parser: &Parser, output: &mut String, co
         }
     }
     if !fallback.is_empty() {
-        output.push_str(fallback.trim());
+        let fallback = fallback.trim();
+        if ctx.in_link
+            && !fallback.is_empty()
+            && output.ends_with(|character: char| !character.is_whitespace())
+            && !output.ends_with(['(', '[', '{'])
+            && !fallback.starts_with(['.', ',', ';', ':', '!', '?', ')', ']', '}'])
+        {
+            output.push(' ');
+        }
+        output.push_str(fallback);
         if !ctx.in_paragraph && !ctx.convert_as_inline && !ctx.in_link {
             output.push_str("\n\n");
         }
+    }
+}
+
+fn mark_media_tail(ctx: &Context) {
+    if let Some(boundary) = ctx.media_boundary.as_ref() {
+        let mut state = boundary.get();
+        state.pending = true;
+        boundary.set(state);
     }
 }
 
@@ -201,8 +227,10 @@ pub fn handle_audio(
             output.push_str("\n\n");
         }
     }
-
     render_media_fallback(tag, parser, output, context);
+    if ctx.in_link && inline_data == InlineDataMedia::Keep && !src.is_empty() {
+        mark_media_tail(ctx);
+    }
 }
 
 /// Handle video element conversion to Markdown.
@@ -285,8 +313,10 @@ pub fn handle_video(
             output.push_str("\n\n");
         }
     }
-
     render_media_fallback(tag, parser, output, context);
+    if ctx.in_link && inline_data == InlineDataMedia::Keep && !src.is_empty() {
+        mark_media_tail(ctx);
+    }
 }
 
 /// Handle picture element conversion to Markdown.
