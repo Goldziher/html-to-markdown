@@ -56,6 +56,8 @@ html-to-markdown [OPTIONS] [FILE]
 | `--sub-symbol <SYMBOL>`     | string                | `""`     | Symbol wrapping `<sub>` text. E.g. `"~"`.                                           |
 | `--sup-symbol <SYMBOL>`     | string                | `""`     | Symbol wrapping `<sup>` text. E.g. `"^"`.                                           |
 | `--newline-style <STYLE>`   | `backslash`, `spaces` | `spaces` | `<br>` representation: `backslash` (`\`+newline) or `spaces` (two trailing spaces). |
+| `--no-expand-abbreviations` | flag                  | off      | Output the text of an `<abbr>` only. By default its title follows in parentheses.   |
+| `--no-blockquote-citations` | flag                  | off      | Output the quote only. By default the `cite` URL of a `<blockquote>` follows it.    |
 
 ## Code Blocks
 

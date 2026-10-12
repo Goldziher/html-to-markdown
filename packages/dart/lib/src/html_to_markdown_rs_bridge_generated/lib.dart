@@ -414,6 +414,12 @@ class ConversionOptions {
   /// Automatically convert bare URLs into Markdown autolinks.
   final bool autolinks;
 
+  /// Append the title of an `<abbr>` in parentheses (default `true`).
+  final bool expandAbbreviations;
+
+  /// Append the `cite` URL after a blockquote (default `true`).
+  final bool includeBlockquoteCitations;
+
   /// Emit a default title when no `<title>` tag is present.
   final bool defaultTitle;
 
@@ -617,6 +623,8 @@ class ConversionOptions {
     required this.escapeAscii,
     required this.codeLanguage,
     required this.autolinks,
+    required this.expandAbbreviations,
+    required this.includeBlockquoteCitations,
     required this.defaultTitle,
     required this.brInTables,
     required this.compactTables,
@@ -668,6 +676,8 @@ class ConversionOptions {
       escapeAscii.hashCode ^
       codeLanguage.hashCode ^
       autolinks.hashCode ^
+      expandAbbreviations.hashCode ^
+      includeBlockquoteCitations.hashCode ^
       defaultTitle.hashCode ^
       brInTables.hashCode ^
       compactTables.hashCode ^
@@ -721,6 +731,8 @@ class ConversionOptions {
           escapeAscii == other.escapeAscii &&
           codeLanguage == other.codeLanguage &&
           autolinks == other.autolinks &&
+          expandAbbreviations == other.expandAbbreviations &&
+          includeBlockquoteCitations == other.includeBlockquoteCitations &&
           defaultTitle == other.defaultTitle &&
           brInTables == other.brInTables &&
           compactTables == other.compactTables &&
@@ -796,6 +808,12 @@ class ConversionOptionsUpdate {
 
   /// Optional override for [`ConversionOptions::autolinks`].
   final bool? autolinks;
+
+  /// Optional override for [`ConversionOptions::expand_abbreviations`].
+  final bool? expandAbbreviations;
+
+  /// Optional override for [`ConversionOptions::include_blockquote_citations`].
+  final bool? includeBlockquoteCitations;
 
   /// Optional override for [`ConversionOptions::default_title`].
   final bool? defaultTitle;
@@ -917,6 +935,8 @@ class ConversionOptionsUpdate {
     this.escapeAscii,
     this.codeLanguage,
     this.autolinks,
+    this.expandAbbreviations,
+    this.includeBlockquoteCitations,
     this.defaultTitle,
     this.brInTables,
     this.compactTables,
@@ -968,6 +988,8 @@ class ConversionOptionsUpdate {
       escapeAscii.hashCode ^
       codeLanguage.hashCode ^
       autolinks.hashCode ^
+      expandAbbreviations.hashCode ^
+      includeBlockquoteCitations.hashCode ^
       defaultTitle.hashCode ^
       brInTables.hashCode ^
       compactTables.hashCode ^
@@ -1021,6 +1043,8 @@ class ConversionOptionsUpdate {
           escapeAscii == other.escapeAscii &&
           codeLanguage == other.codeLanguage &&
           autolinks == other.autolinks &&
+          expandAbbreviations == other.expandAbbreviations &&
+          includeBlockquoteCitations == other.includeBlockquoteCitations &&
           defaultTitle == other.defaultTitle &&
           brInTables == other.brInTables &&
           compactTables == other.compactTables &&

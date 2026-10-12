@@ -365,9 +365,13 @@ pub fn preprocess_html(input: &str) -> Cow<'_, str> {
     let mut last = 0;
     let mut output: Option<String> = None;
     let mut svg_depth = 0usize;
+    let last_gt = bytes.iter().rposition(|&byte| byte == b'>');
 
     while idx < len {
         if bytes[idx] == b'<' {
+            if last_gt.is_none_or(|end| end <= idx) && looks_like_tag_start(bytes, idx, len) {
+                break;
+            }
             if let Some(new_pos) = collapse_empty_comment(input, bytes, idx, last, &mut output) {
                 last = new_pos;
                 idx = new_pos;

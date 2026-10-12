@@ -346,6 +346,16 @@ pub fn ends_with_hard_break(buffer: &str) -> bool {
 /// marker when that text would otherwise be parsed as block structure (issue #735).
 pub fn escape_block_start(buffer: &mut String, from: usize, in_list_item: bool, followed_by_inline: bool) {
     let before = &buffer[..from];
+    // ~keep A letter already written on this line makes every supported fresh block opener
+    // inert or already escaped. Avoid rescanning/copying the growing line for each span (#773).
+    if before
+        .trim_end_matches([' ', '\t'])
+        .as_bytes()
+        .last()
+        .is_some_and(u8::is_ascii_alphabetic)
+    {
+        return;
+    }
     let line_start = before.rfind('\n').map_or(0, |position| position + 1);
     let prefix = &before[line_start..];
     let content_start = if in_list_item {

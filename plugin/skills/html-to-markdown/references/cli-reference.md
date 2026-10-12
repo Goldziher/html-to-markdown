@@ -1,7 +1,7 @@
 <!--
 AI-RULEZ :: GENERATED FILE — DO NOT EDIT
-Content-Hash: blake3:dfaf03eca6acf6844233aed17bde4f7282aeea1213133a40331becfeb81f2bd2
-Source-Hash: blake3:ee7b42dfe0189be4c8fc402a02da63aad9356731f32835e48c1312669d63bf3b
+Content-Hash: blake3:bd17e25d2ecc4c814a2990a0512f1a7757832fe67a01d440ab6aa8a107adc5c3
+Source-Hash: blake3:0f19d9609e55607f27db4df837426b012b20434ab0599d21b8599931a8e2b067
 Schema-Version: v1
 -->
 
@@ -63,6 +63,8 @@ html-to-markdown [OPTIONS] [FILE]
 | `--sub-symbol <SYMBOL>`     | string                | `""`     | Symbol wrapping `<sub>` text. E.g. `"~"`.                                           |
 | `--sup-symbol <SYMBOL>`     | string                | `""`     | Symbol wrapping `<sup>` text. E.g. `"^"`.                                           |
 | `--newline-style <STYLE>`   | `backslash`, `spaces` | `spaces` | `<br>` representation: `backslash` (`\`+newline) or `spaces` (two trailing spaces). |
+| `--no-expand-abbreviations` | flag                  | off      | Output the text of an `<abbr>` only. By default its title follows in parentheses.   |
+| `--no-blockquote-citations` | flag                  | off      | Output the quote only. By default the `cite` URL of a `<blockquote>` follows it.    |
 
 ## Code Blocks
 

@@ -237,6 +237,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the full and fast converters now write `"t\n\n    a\n    b"`. The spaces at the end of the last
   line of that code stay too
   ([#799](https://github.com/xberg-io/html-to-markdown/issues/799)).
+- Add `expand_abbreviations` and `include_blockquote_citations` options, enabled by default.
+- Keep one blank quote line between lists and blocks, preserving blank lines inside code.
+- Convert repeated unfinished tags, unclosed hidden elements, and inline list fragments with linear scans.
+- Repair a page that ends a paragraph again after the end tag of its parent, or whose head has no end tag, from the first parse with no second tokenizer pass; at 512 levels the repair stops and the input after that point is converted as written, past the node budget of the repair the whole page is converted as written, each with a `malformed_html` warning.
 
 - A line break in the source before an inline element is one space between two words, in every
   container. Before, the words on the two sides of a `<span>` were joined, with an empty span and

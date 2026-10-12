@@ -1256,6 +1256,8 @@ const _: fn() = || {
         let _: bool = ConversionOptions.escape_ascii;
         let _: String = ConversionOptions.code_language;
         let _: bool = ConversionOptions.autolinks;
+        let _: bool = ConversionOptions.expand_abbreviations;
+        let _: bool = ConversionOptions.include_blockquote_citations;
         let _: bool = ConversionOptions.default_title;
         let _: bool = ConversionOptions.br_in_tables;
         let _: bool = ConversionOptions.compact_tables;
@@ -1306,6 +1308,8 @@ const _: fn() = || {
         let _: Option<bool> = ConversionOptionsUpdate.escape_ascii;
         let _: Option<String> = ConversionOptionsUpdate.code_language;
         let _: Option<bool> = ConversionOptionsUpdate.autolinks;
+        let _: Option<bool> = ConversionOptionsUpdate.expand_abbreviations;
+        let _: Option<bool> = ConversionOptionsUpdate.include_blockquote_citations;
         let _: Option<bool> = ConversionOptionsUpdate.default_title;
         let _: Option<bool> = ConversionOptionsUpdate.br_in_tables;
         let _: Option<bool> = ConversionOptionsUpdate.compact_tables;
@@ -2253,6 +2257,8 @@ impl SseDecode for crate::ConversionOptions {
         let mut var_escapeAscii = <bool>::sse_decode(deserializer);
         let mut var_codeLanguage = <String>::sse_decode(deserializer);
         let mut var_autolinks = <bool>::sse_decode(deserializer);
+        let mut var_expandAbbreviations = <bool>::sse_decode(deserializer);
+        let mut var_includeBlockquoteCitations = <bool>::sse_decode(deserializer);
         let mut var_defaultTitle = <bool>::sse_decode(deserializer);
         let mut var_brInTables = <bool>::sse_decode(deserializer);
         let mut var_compactTables = <bool>::sse_decode(deserializer);
@@ -2301,6 +2307,8 @@ impl SseDecode for crate::ConversionOptions {
             escape_ascii: var_escapeAscii,
             code_language: var_codeLanguage,
             autolinks: var_autolinks,
+            expand_abbreviations: var_expandAbbreviations,
+            include_blockquote_citations: var_includeBlockquoteCitations,
             default_title: var_defaultTitle,
             br_in_tables: var_brInTables,
             compact_tables: var_compactTables,
@@ -2355,6 +2363,8 @@ impl SseDecode for crate::ConversionOptionsUpdate {
         let mut var_escapeAscii = <Option<bool>>::sse_decode(deserializer);
         let mut var_codeLanguage = <Option<String>>::sse_decode(deserializer);
         let mut var_autolinks = <Option<bool>>::sse_decode(deserializer);
+        let mut var_expandAbbreviations = <Option<bool>>::sse_decode(deserializer);
+        let mut var_includeBlockquoteCitations = <Option<bool>>::sse_decode(deserializer);
         let mut var_defaultTitle = <Option<bool>>::sse_decode(deserializer);
         let mut var_brInTables = <Option<bool>>::sse_decode(deserializer);
         let mut var_compactTables = <Option<bool>>::sse_decode(deserializer);
@@ -2403,6 +2413,8 @@ impl SseDecode for crate::ConversionOptionsUpdate {
             escape_ascii: var_escapeAscii,
             code_language: var_codeLanguage,
             autolinks: var_autolinks,
+            expand_abbreviations: var_expandAbbreviations,
+            include_blockquote_citations: var_includeBlockquoteCitations,
             default_title: var_defaultTitle,
             br_in_tables: var_brInTables,
             compact_tables: var_compactTables,
@@ -3855,6 +3867,8 @@ impl flutter_rust_bridge::IntoDart for FrbWrapper<crate::ConversionOptions> {
             self.0.escape_ascii.into_into_dart().into_dart(),
             self.0.code_language.into_into_dart().into_dart(),
             self.0.autolinks.into_into_dart().into_dart(),
+            self.0.expand_abbreviations.into_into_dart().into_dart(),
+            self.0.include_blockquote_citations.into_into_dart().into_dart(),
             self.0.default_title.into_into_dart().into_dart(),
             self.0.br_in_tables.into_into_dart().into_dart(),
             self.0.compact_tables.into_into_dart().into_dart(),
@@ -3916,6 +3930,8 @@ impl flutter_rust_bridge::IntoDart for FrbWrapper<crate::ConversionOptionsUpdate
             self.0.escape_ascii.into_into_dart().into_dart(),
             self.0.code_language.into_into_dart().into_dart(),
             self.0.autolinks.into_into_dart().into_dart(),
+            self.0.expand_abbreviations.into_into_dart().into_dart(),
+            self.0.include_blockquote_citations.into_into_dart().into_dart(),
             self.0.default_title.into_into_dart().into_dart(),
             self.0.br_in_tables.into_into_dart().into_dart(),
             self.0.compact_tables.into_into_dart().into_dart(),
@@ -4955,6 +4971,8 @@ impl SseEncode for crate::ConversionOptions {
         <bool>::sse_encode(self.escape_ascii, serializer);
         <String>::sse_encode(self.code_language, serializer);
         <bool>::sse_encode(self.autolinks, serializer);
+        <bool>::sse_encode(self.expand_abbreviations, serializer);
+        <bool>::sse_encode(self.include_blockquote_citations, serializer);
         <bool>::sse_encode(self.default_title, serializer);
         <bool>::sse_encode(self.br_in_tables, serializer);
         <bool>::sse_encode(self.compact_tables, serializer);
@@ -5008,6 +5026,8 @@ impl SseEncode for crate::ConversionOptionsUpdate {
         <Option<bool>>::sse_encode(self.escape_ascii, serializer);
         <Option<String>>::sse_encode(self.code_language, serializer);
         <Option<bool>>::sse_encode(self.autolinks, serializer);
+        <Option<bool>>::sse_encode(self.expand_abbreviations, serializer);
+        <Option<bool>>::sse_encode(self.include_blockquote_citations, serializer);
         <Option<bool>>::sse_encode(self.default_title, serializer);
         <Option<bool>>::sse_encode(self.br_in_tables, serializer);
         <Option<bool>>::sse_encode(self.compact_tables, serializer);

@@ -118,7 +118,9 @@ pub fn handle_abbr(
         if !trimmed.is_empty() {
             output.push_str(trimmed);
 
-            if let Some(title) = crate::converter::utility::attributes::decoded_attribute(tag, "title") {
+            if handler.options.expand_abbreviations
+                && let Some(title) = crate::converter::utility::attributes::decoded_attribute(tag, "title")
+            {
                 let trimmed_title = title.trim();
                 if !trimmed_title.is_empty() {
                     output.push_str(" (");
