@@ -1,5 +1,7 @@
 #![allow(missing_docs)]
 
+use base64::Engine;
+
 use html_to_markdown_rs::{ConversionOptions, OutputFormat, TierStrategy, convert};
 
 #[cfg(feature = "testkit")]
@@ -389,5 +391,392 @@ fn should_keep_repaired_script_bytes_across_document_head_and_body_prefixes() {
                 }
             }
         }
+    }
+}
+
+#[test]
+fn should_keep_paragraph_markers_formed_by_processing_instruction_removal() {
+    let json = r#"{"a":"<b> & c"}"#;
+    for prefix in ["h2m_inert_body_", "h2m_script_body_"] {
+        for tier_strategy in ROUTES {
+            let converted = convert(
+                &format!("<p>{prefix}<?x?>0_end</p><script type='application/ld+json'>{json}<p>t</p>"),
+                ConversionOptions {
+                    preserve_tags: vec!["script".into()],
+                    ..options(tier_strategy, OutputFormat::Markdown, true)
+                },
+            )
+            .expect("marker-shaped paragraph");
+            assert_eq!(
+                converted.content.as_deref(),
+                Some(format!("{prefix}0_end\n\n<script type=\"application/ld+json\">{json}</script>\n\nt\n").as_str())
+            );
+            #[cfg(feature = "metadata")]
+            assert_eq!(converted.metadata.structured_data.len(), 0);
+        }
+    }
+}
+
+#[test]
+fn should_not_restore_a_marker_forged_in_a_closed_script_body() {
+    let json = r#"{"a":"<b> & c"}"#;
+    for prefix in ["h2m_inert_body_", "h2m_script_body_"] {
+        let converted = convert(
+            &format!("<script type='application/ld+json'>{prefix}<?x?>0_end</script><script type='application/ld+json'>{json}<p>t</p>"),
+            ConversionOptions { preserve_tags: vec!["script".into()], ..Default::default() },
+        )
+        .expect("closed marker-shaped script");
+        assert_eq!(converted.content.as_deref(), Some(format!("<script type=\"application/ld+json\">{prefix}0_end</script>\n\n<script type=\"application/ld+json\">{json}</script>\n\nt\n").as_str()));
+    }
+}
+
+#[test]
+fn should_keep_authored_script_attributes_while_removing_only_transport_ownership() {
+    let json = r#"{"a":"x"}"#;
+    let attributes = "DATA-H2M-SCRIPT-0='authored' data-h2m-script-1='second'";
+    let options = ConversionOptions {
+        preserve_tags: vec!["script".into()],
+        ..Default::default()
+    };
+    let repaired = convert(
+        &format!("<script {attributes} type='application/ld+json'>{json}<p>tail</p>"),
+        options.clone(),
+    )
+    .expect("authored attributes repaired");
+    let closed = convert(
+        &format!("<script {attributes} type='application/ld+json'>{json}</script><p>tail</p>"),
+        options,
+    )
+    .expect("authored attributes closed");
+    for converted in [repaired, closed] {
+        let content = converted.content.as_deref().expect("content");
+        assert!(content.ends_with("tail\n"));
+        let dom = tl::parse(content, tl::ParserOptions::default()).expect("preserved HTML");
+        let handle = dom.query_selector("script").expect("selector").next().expect("script");
+        let tag = handle.get(dom.parser()).and_then(tl::Node::as_tag).expect("script tag");
+        assert_eq!(tag.attributes().len(), 3);
+        for (key, value) in [
+            ("data-h2m-script-0", "authored"),
+            ("data-h2m-script-1", "second"),
+            ("type", "application/ld+json"),
+        ] {
+            assert_eq!(
+                tag.attributes()
+                    .get(key)
+                    .flatten()
+                    .expect("authored attribute")
+                    .as_utf8_str(),
+                value
+            );
+        }
+        assert_eq!(tag.inner_text(dom.parser()), json);
+    }
+}
+
+#[test]
+fn should_activate_repaired_script_transport_only_for_script_preservation() {
+    let json = r#"{"a":"&lt; &amp; 雪"}"#;
+    let input = format!("<div><script type='application/ld+json'>{json}<p>tail</p></div>");
+    let script = convert(
+        &input,
+        ConversionOptions {
+            preserve_tags: vec!["script".into()],
+            ..Default::default()
+        },
+    )
+    .expect("script preservation");
+    assert_eq!(
+        script.content.as_deref(),
+        Some(format!("<script type=\"application/ld+json\">{json}</script>\n\ntail\n").as_str())
+    );
+    let ancestor = convert(
+        &input,
+        ConversionOptions {
+            preserve_tags: vec!["div".into()],
+            ..Default::default()
+        },
+    )
+    .expect("ancestor preservation");
+    // ~keep Ancestor encoding is an inherited queued limitation; this fix scopes transport to script preservation.
+    assert_eq!(
+        ancestor.content.as_deref(),
+        Some("<div><script type=\"application/ld+json\">{\"a\":\"&amp;lt; &amp;amp; 雪\"}</script><p>tail</p></div>\n")
+    );
+}
+
+#[test]
+fn should_keep_repaired_script_ownership_when_a_non_void_opener_has_a_slash() {
+    let json = r#"{"a":"<script> &lt; &amp; 雪"}"#;
+    for slash in ["/", " /", "/  "] {
+        for preserve_tags in [vec!["script".into()], vec!["script".into(), "div".into()]] {
+            let converted = convert(
+                &format!("<div><script type='application/ld+json'{slash}>{json}<p>tail</p></div>"),
+                ConversionOptions {
+                    preserve_tags: preserve_tags.clone(),
+                    ..Default::default()
+                },
+            )
+            .expect("non-void script opener");
+            let expected = if preserve_tags.len() == 1 {
+                format!("<script type=\"application/ld+json\">{json}</script>\n\ntail\n")
+            } else {
+                format!("<div><script type=\"application/ld+json\">{json}</script><p>tail</p></div>\n")
+            };
+            assert_eq!(converted.content.as_deref(), Some(expected.as_str()), "{slash}");
+        }
+    }
+}
+
+#[test]
+fn should_keep_quoted_and_unquoted_slash_attribute_values_in_repaired_scripts() {
+    let json = r#"{"a":"<script> &lt; &amp; 雪"}"#;
+    for attributes in [
+        "src='/path/>'",
+        "src=/path/",
+        "src=/path/ /",
+        "src=relative/",
+        "src=relative/ /",
+        "data-note='/' /",
+    ] {
+        for preserve_tags in [vec!["script".into()], vec!["script".into(), "div".into()]] {
+            let converted = convert(
+                &format!("<div><script type='application/ld+json' {attributes}>{json}<p>tail</p></div>"),
+                ConversionOptions {
+                    preserve_tags,
+                    ..Default::default()
+                },
+            )
+            .expect("slash-valued attributes");
+            let content = converted.content.as_deref().expect("content");
+            assert!(
+                content.ends_with("tail\n") || content.ends_with("<p>tail</p></div>\n"),
+                "{attributes}: {content}"
+            );
+            // ~keep Raw JSON may itself contain script openers, so parse only the preserved opening tag.
+            let script_start = content.find("<script ").expect("preserved script");
+            let raw_start = content.find(json).expect("original JSON bytes");
+            let opening = format!("{}</script>", &content[script_start..raw_start]);
+            let dom = tl::parse(&opening, tl::ParserOptions::default()).expect("preserved opener");
+            let tag = dom
+                .query_selector("script")
+                .expect("selector")
+                .next()
+                .expect("script")
+                .get(dom.parser())
+                .and_then(tl::Node::as_tag)
+                .expect("script tag");
+            assert_eq!(tag.attributes().len(), 2, "{attributes}");
+            let (key, expected) = if attributes.starts_with("data-note") {
+                ("data-note", "/")
+            } else if attributes.contains("'/path/>'") {
+                ("src", "/path/>")
+            } else if attributes.starts_with("src=/path/") {
+                ("src", "/path/")
+            } else {
+                ("src", "relative/")
+            };
+            assert_eq!(
+                tag.attributes()
+                    .get(key)
+                    .flatten()
+                    .expect("authored attribute")
+                    .as_utf8_str(),
+                expected,
+                "{attributes}"
+            );
+        }
+    }
+}
+
+#[test]
+fn should_keep_authored_owner_attributes_from_claiming_another_scripts_body() {
+    let json = r#"{"a":"<script> &lt; &amp; 雪"}"#;
+    for attribute in ["data-h2m-script-0", "DATA-H2M-SCRIPT-0"] {
+        let html = format!(
+            "<script type='application/ld+json' {attribute}='h2m_script_body_0_end'>h2m_script_body_<?x?>0_end</script><script type='application/ld+json'>{json}<p>tail</p>"
+        );
+        let converted = convert(
+            &html,
+            ConversionOptions {
+                preserve_tags: vec!["script".into()],
+                ..Default::default()
+            },
+        )
+        .expect("authored ownership lookalike");
+        let content = converted.content.as_deref().expect("preserved content");
+        let end = content.find("</script>").expect("authored script close") + "</script>".len();
+        let dom = tl::parse(&content[..end], tl::ParserOptions::default()).expect("closed authored script");
+        let tag = dom
+            .query_selector("script")
+            .expect("selector")
+            .next()
+            .expect("authored script")
+            .get(dom.parser())
+            .and_then(tl::Node::as_tag)
+            .expect("script tag");
+        assert_eq!(tag.attributes().len(), 2);
+        assert_eq!(
+            tag.attributes()
+                .get("data-h2m-script-0")
+                .flatten()
+                .expect("authored owner attribute")
+                .as_utf8_str(),
+            "h2m_script_body_0_end"
+        );
+        assert_eq!(
+            tag.attributes()
+                .get("type")
+                .flatten()
+                .expect("authored type")
+                .as_utf8_str(),
+            "application/ld+json"
+        );
+        assert_eq!(tag.inner_text(dom.parser()), "h2m_script_body_0_end");
+        assert_eq!(
+            &content[end..],
+            format!("\n\n<script type=\"application/ld+json\">{json}</script>\n\ntail\n")
+        );
+    }
+}
+
+#[test]
+fn should_keep_repaired_script_bytes_after_a_slash_in_a_boolean_attribute_name() {
+    let json = r#"{"a":"<script> &lt; &amp; 雪"}"#;
+    for preserve_tags in [vec!["script".into()], vec!["script".into(), "div".into()]] {
+        let converted = convert(
+            &format!("<div><script type='application/ld+json' data-x/foo />{json}<p>tail</p></div>"),
+            ConversionOptions {
+                preserve_tags,
+                ..Default::default()
+            },
+        )
+        .expect("slash-shaped boolean attribute");
+        let content = converted.content.as_deref().expect("content");
+        let start = content.find("<script ").expect("preserved script");
+        let body = content.find(json).expect("absolute original JSON bytes");
+        let opening = format!("{}</script>", &content[start..body]);
+        let dom = tl::parse(&opening, tl::ParserOptions::default()).expect("preserved attributes");
+        let tag = dom
+            .query_selector("script")
+            .expect("selector")
+            .next()
+            .expect("script")
+            .get(dom.parser())
+            .and_then(tl::Node::as_tag)
+            .expect("script tag");
+        assert_eq!(tag.attributes().len(), 2);
+        assert_eq!(tag.attributes().get("data-x/foo"), Some(None));
+        assert!(content.ends_with("tail\n") || content.ends_with("<p>tail</p></div>\n"));
+    }
+}
+
+#[test]
+fn should_keep_original_script_bytes_when_standalone_slashes_precede_an_attribute() {
+    let json = r#"{"a":"<script> &lt; &amp; 雪"}"#;
+    for attributes in [
+        "/ data-x=foo /",
+        "/data-x=foo /",
+        "/ data-x='foo/' /",
+        "/ data-x=foo/ /",
+    ] {
+        for preserve_tags in [vec!["script".into()], vec!["script".into(), "div".into()]] {
+            let converted = convert(
+                &format!("<div><script type='application/ld+json' {attributes}>{json}<p>tail</p></div>"),
+                ConversionOptions {
+                    preserve_tags,
+                    ..Default::default()
+                },
+            )
+            .expect("standalone slash tokens");
+            let content = converted.content.as_deref().expect("content");
+            let start = content.find("<script ").expect("preserved script");
+            let body = content.find(json).expect("original JSON bytes");
+            let opening = format!("{}</script>", &content[start..body]);
+            let dom = tl::parse(&opening, tl::ParserOptions::default()).expect("script attributes");
+            let tag = dom
+                .query_selector("script")
+                .expect("selector")
+                .next()
+                .expect("script")
+                .get(dom.parser())
+                .and_then(tl::Node::as_tag)
+                .expect("script tag");
+            assert_eq!(tag.attributes().len(), 2);
+            let expected = if attributes.contains("foo/") { "foo/" } else { "foo" };
+            assert_eq!(
+                tag.attributes()
+                    .get("data-x")
+                    .flatten()
+                    .expect("authored data-x")
+                    .as_utf8_str(),
+                expected
+            );
+            assert!(content.ends_with("tail\n") || content.ends_with("<p>tail</p></div>\n"));
+        }
+    }
+}
+
+#[cfg(feature = "metadata")]
+#[test]
+fn should_keep_original_head_json_bytes_with_repaired_slash_shaped_attributes() {
+    let json = r#"{"a":"<script> &lt; &amp; 雪"}"#;
+    for attributes in [
+        "/",
+        "src='/path/>' /",
+        "src=/path/ /",
+        "data-x/foo /",
+        "/ data-x=foo/ /",
+        "/data-x='foo/' /",
+    ] {
+        for tier_strategy in [TierStrategy::Auto, TierStrategy::Tier2] {
+            let converted = convert(
+                &format!("<head><script type='application/ld+json' {attributes}>{json}</head><p>tail</p>"),
+                ConversionOptions {
+                    preserve_tags: vec!["script".into()],
+                    ..options(tier_strategy, OutputFormat::Markdown, true)
+                },
+            )
+            .expect("head script ownership");
+            assert_eq!(converted.metadata.structured_data.len(), 1, "{attributes}");
+            assert_eq!(converted.metadata.structured_data[0].raw_json, json, "{attributes}");
+            assert_eq!(converted.content.as_deref(), Some("tail\n"));
+        }
+    }
+}
+
+#[test]
+fn should_restore_owned_script_bytes_even_when_foreign_close_case_confuses_the_literal_dom() {
+    let json = r#"{"a":"<script> &lt; &amp; 雪"}"#;
+    for prefix in ["<SVG></svg>", "<svg></SVG>", "<math></MATH>", "<MATH></math>"] {
+        let converted = convert(
+            &format!("{prefix}<script type='application/ld+json'>{json}<p>tail</p>"),
+            ConversionOptions {
+                preserve_tags: vec!["script".into()],
+                ..Default::default()
+            },
+        )
+        .expect("mixed-case foreign boundary");
+        let content = converted.content.as_deref().expect("content");
+        let payload = if prefix.to_ascii_lowercase().starts_with("<svg") {
+            let encoded = content
+                .split_once("data:image/svg+xml;base64,")
+                .expect("SVG image")
+                .1
+                .split_once(')')
+                .expect("image end")
+                .0;
+            String::from_utf8(
+                base64::engine::general_purpose::STANDARD
+                    .decode(encoded)
+                    .expect("SVG bytes"),
+            )
+            .expect("UTF-8 SVG")
+        } else {
+            content.to_owned()
+        };
+        let expected = format!("<script type=\"application/ld+json\">{json}</script><p>tail</p>");
+        assert!(payload.contains(&expected), "{prefix}: {payload}");
+        assert!(!payload.contains("data-h2m-script-"), "{prefix}: {payload}");
+        assert!(!payload.contains("h2m_script_body_"), "{prefix}: {payload}");
     }
 }

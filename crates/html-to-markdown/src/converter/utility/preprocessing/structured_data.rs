@@ -190,15 +190,29 @@ fn write_repaired_script(
     output.push_str(&input[copied..open_tag.start]);
     // ~keep tl needs matching tag-name case; this changes only a synthesized missing close.
     output.push_str("<script");
-    output.push_str(&input[open_tag.start + "<script".len()..open_tag.end]);
-    // ~keep Script references are literal. One metadata decode restores escaped < and & bytes.
     let mut body = &input[open_tag.end..body_end];
     if let Some(preserved) = preserved {
-        // ~keep One collision-safe marker keeps literal tag openers opaque until exact DOM-byte restoration.
-        output.push_str(&preserved.protect(body));
+        // ~keep Bind the marker to its repaired script so parser-normalized authored text cannot claim its JSON.
+        let (marker, attribute) = preserved.protect_script(body);
+        output.push(' ');
+        output.push_str(&attribute);
+        output.push_str("=\"");
+        output.push_str(&marker);
+        output.push('"');
+        let attributes = &input[open_tag.start + "<script".len()..open_tag.end];
+        // ~keep Non-void script slash tokens must not strand an owned body in tl; attribute bytes stay authored.
+        let mut copied = 0;
+        for slash in standalone_script_slashes(attributes.as_bytes()) {
+            output.push_str(&attributes[copied..slash]);
+            copied = slash + 1;
+        }
+        output.push_str(&attributes[copied..]);
+        output.push_str(&marker);
         output.push_str("</script>");
         return;
     }
+    output.push_str(&input[open_tag.start + "<script".len()..open_tag.end]);
+    // ~keep Script references are literal. One metadata decode restores escaped < and & bytes.
     while let Some(at) = memchr::memchr2(b'<', b'&', body.as_bytes()) {
         output.push_str(&body[..at]);
         output.push_str(if body.as_bytes()[at] == b'<' { "&lt;" } else { "&amp;" });
@@ -206,6 +220,60 @@ fn write_repaired_script(
     }
     output.push_str(body);
     output.push_str("</script>");
+}
+
+fn standalone_script_slashes(attributes: &[u8]) -> Vec<usize> {
+    let mut cursor = 0;
+    let mut slashes = Vec::new();
+    while cursor < attributes.len() {
+        while attributes.get(cursor).is_some_and(u8::is_ascii_whitespace) {
+            cursor += 1;
+        }
+        if attributes.get(cursor) == Some(&b'/') {
+            slashes.push(cursor);
+            cursor += 1;
+            continue;
+        }
+        while attributes
+            .get(cursor)
+            .is_some_and(|byte| !byte.is_ascii_whitespace() && !matches!(byte, b'=' | b'>'))
+        {
+            cursor += 1;
+        }
+        while attributes.get(cursor).is_some_and(u8::is_ascii_whitespace) {
+            cursor += 1;
+        }
+        if attributes.get(cursor) == Some(&b'>') {
+            break;
+        }
+        if attributes.get(cursor) != Some(&b'=') {
+            continue;
+        }
+        cursor += 1;
+        let Some(end) = script_attribute_value_end(attributes, cursor) else {
+            break;
+        };
+        cursor = end;
+    }
+    slashes
+}
+
+fn script_attribute_value_end(attributes: &[u8], mut cursor: usize) -> Option<usize> {
+    while attributes.get(cursor).is_some_and(u8::is_ascii_whitespace) {
+        cursor += 1;
+    }
+    let byte = *attributes.get(cursor)?;
+    if matches!(byte, b'\'' | b'"') {
+        cursor += 1;
+        return Some(cursor + memchr::memchr(byte, &attributes[cursor..])? + 1);
+    }
+    while attributes
+        .get(cursor)
+        .is_some_and(|byte| !byte.is_ascii_whitespace() && *byte != b'>')
+    {
+        cursor += 1;
+    }
+    Some(cursor)
 }
 
 #[cfg(test)]
@@ -429,10 +497,22 @@ mod tests {
         let repaired = repair_unclosed_structured_data_scripts(&input, Some(&mut originals));
         assert_eq!(originals.len(), 2);
         assert_eq!(originals["h2m_inert_body_2_end"], "earlier");
-        assert_eq!(originals["h2m_inert_body_3_end"], json);
+        assert_eq!(originals["h2m_script_body_3_end"], json);
         assert_eq!(
             repaired,
-            "<p>h2m_inert_body_0_end h2m_inert_body_&#49;_end</p><script type='application/ld+json'>h2m_inert_body_3_end</script><p>tail</p>"
+            "<p>h2m_inert_body_0_end h2m_inert_body_&#49;_end</p><script data-h2m-script-3=\"h2m_script_body_3_end\" type='application/ld+json'>h2m_script_body_3_end</script><p>tail</p>"
         );
+    }
+
+    #[test]
+    fn should_not_treat_later_script_openers_in_opaque_contexts_as_a_repair_boundary() {
+        for name in ["template", "svg", "math", "noscript", "style", "iframe"] {
+            let input =
+                format!("<script type='application/ld+json'>{{\"a\":1}}<{name}><script>x</script></{name}><p>tail</p>");
+            assert!(
+                matches!(repair_unclosed_structured_data_scripts(&input, None), Cow::Borrowed(_)),
+                "{name}"
+            );
+        }
     }
 }

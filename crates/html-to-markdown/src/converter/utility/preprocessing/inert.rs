@@ -2,7 +2,7 @@
 
 use std::borrow::Cow;
 use std::cell::{Cell, RefCell};
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 
 use super::markup::find_tag_end;
 use super::preserved_bodies::PreservedBodies;
@@ -645,25 +645,6 @@ pub(super) fn scan_markup_end(bytes: &[u8], start: usize) -> Option<usize> {
     None
 }
 
-/// Restore opaque source bytes after parsing, before metadata or visitor consumers see the DOM. ~keep
-pub fn restore_inert_bodies(
-    dom: &mut tl::VDom<'_>,
-    originals: &HashMap<String, String>,
-) -> crate::error::Result<HashSet<usize>> {
-    let mut restored = HashSet::new();
-    for (id, node) in dom.nodes_mut().iter_mut().enumerate() {
-        if let Some(raw) = node.as_raw_mut()
-            && let Some(original) = originals.get(raw.as_utf8_str().as_ref())
-        {
-            raw.set(original.as_bytes().to_vec()).map_err(|error| {
-                crate::error::ConversionError::Other(format!("restoring inert HTML source bytes: {error:?}"))
-            })?;
-            restored.insert(id);
-        }
-    }
-    Ok(restored)
-}
-
 #[cfg(test)]
 thread_local! {
     static TOKEN_BYTES: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
@@ -931,7 +912,8 @@ mod tests {
         assert_eq!(bodies.get("h2m_inert_body_2_end").map(String::as_str), Some("<p>x"));
         assert!(normalized.contains("<noscript>h2m_inert_body_2_end</noscript>"));
         let mut dom = tl::parse(&normalized, tl::ParserOptions::default()).expect("parse protected bodies");
-        super::restore_inert_bodies(&mut dom, &bodies).expect("restore original bodies");
+        crate::converter::utility::preprocessing::restore_inert_bodies(&mut dom, &bodies)
+            .expect("restore original bodies");
         assert_eq!(
             crate::converter::utility::serialization::serialize_tag_to_html(&dom.children()[1], dom.parser()),
             "<noscript><p>x</noscript>"
