@@ -219,11 +219,15 @@ fn handle_emphasis_element(mut handler: HandlerContext<'_>, kind: EmphasisKind) 
         return;
     }
 
-    let buffer_context = handler.context.inline_buffer(handler.output, true);
+    let after_hard_break = if handler.output.is_empty() {
+        handler.context.inline_buffer_after_hard_break
+    } else {
+        crate::converter::utility::escaping::ends_with_hard_break(handler.output)
+    };
     let child_context = Context {
         inline_depth: handler.context.inline_depth + 1,
         in_strong: handler.context.in_strong || matches!(kind, EmphasisKind::Strong),
-        inline_buffer_after_hard_break: buffer_context.inline_buffer_after_hard_break,
+        inline_buffer_after_hard_break: after_hard_break,
         ..handler.context.clone()
     };
     let mut content = String::with_capacity(64);
