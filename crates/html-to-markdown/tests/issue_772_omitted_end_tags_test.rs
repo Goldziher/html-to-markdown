@@ -613,18 +613,18 @@ fn a_page_whose_text_the_second_parse_moves_into_the_head_keeps_its_text() {
     }
 }
 
-/// ~keep Not covered by issue #772: the first parser reads the rest of the page as the content
-/// ~keep of the `<iframe>` or of the `<noscript>`, before and after the repair, and the
-/// ~keep converter writes no text of either element.
+/// ~keep The content of an `<iframe>` or of a `<noscript>` is no markup, so a start tag in it
+/// ~keep opens nothing (issue #821). The page after the element is read, and its omitted end
+/// ~keep tag is repaired.
 #[test]
-fn a_page_in_an_open_iframe_or_noscript_converts_as_before() {
+fn a_page_after_an_iframe_or_noscript_that_holds_a_start_tag_is_repaired() {
     for html in [
         "<iframe><frameset></iframe><div><p>one</div>tail",
         "<iframe><frameset></iframe><div><p>one</p></div>tail",
         "<noscript><frameset></noscript><div><p>one</div>tail",
         "<noscript><frameset></noscript><div><p>one</p></div>tail",
     ] {
-        assert_default_and_tier2(html, "");
+        assert_default_and_tier2(html, "one\n\ntail\n");
     }
 }
 
@@ -685,7 +685,10 @@ fn a_frameset_tag_that_makes_no_frameset_document_does_not_stop_the_repair() {
             "<template><frameset></frameset></template><div><p>one</div>tail",
             "one\n\ntail\n",
         ),
-        ("<xmp><frameset></xmp><div><p>one</div>tail", "one\n\ntail\n"),
+        (
+            "<xmp><frameset></xmp><div><p>one</div>tail",
+            "<frameset>\n\none\n\ntail\n",
+        ),
         ("<!-- <frameset> --><div><p>one</div>tail", "one\n\ntail\n"),
         ("<framesetter></framesetter><div><p>one</div>tail", "one\n\ntail\n"),
         ("<div title=\"<frameset>\"><p>one</div>tail", "one\n\ntail\n"),
