@@ -37,7 +37,8 @@ pub struct ContextParameters {
     pub inline_collector: Option<InlineCollectorHandle>,
     #[cfg(feature = "metadata")]
     pub metadata_collector: Option<crate::metadata::MetadataCollectorHandle>,
-    /// The kept scripts of the page, from the first pass.
+    /// The kept scripts of the page, from the first pass. Only a build with `metadata` reads
+    /// them: the reader of the structured data asks for them.
     pub kept_scripts: crate::converter::utility::preprocessing::KeptScripts,
     #[cfg(feature = "visitor")]
     pub visitor: Option<crate::visitor::VisitorHandle>,
@@ -410,11 +411,6 @@ impl Context {
 
     /// Create a new conversion context from options and optional collectors.
     pub(crate) fn new(options: &crate::options::ConversionOptions, parameters: ContextParameters) -> Self {
-        #[cfg(feature = "metadata")]
-        let metadata = metadata_preferences(parameters.metadata_collector.as_ref());
-        // ~keep Only the reader of the structured data asks for the kept scripts.
-        #[cfg(not(feature = "metadata"))]
-        let _: crate::converter::utility::preprocessing::KeptScripts = parameters.kept_scripts;
         Self {
             in_code: false,
             in_code_block: false,
@@ -472,10 +468,11 @@ impl Context {
             inline_data_replaced: Rc::new(Cell::new(false)),
             #[cfg(feature = "inline-images")]
             inline_collector: parameters.inline_collector,
+            // ~keep The preferences read the collector before the context takes it.
+            #[cfg(feature = "metadata")]
+            metadata_wants: metadata_preferences(parameters.metadata_collector.as_ref()),
             #[cfg(feature = "metadata")]
             metadata_collector: parameters.metadata_collector,
-            #[cfg(feature = "metadata")]
-            metadata_wants: metadata,
             #[cfg(feature = "visitor")]
             visitor: parameters.visitor,
             #[cfg(feature = "visitor")]
