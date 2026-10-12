@@ -5,9 +5,9 @@
 #![allow(clippy::struct_excessive_bools)]
 
 use crate::validators::{
-    CliCodeBlockStyle, CliHeadingStyle, CliHighlightStyle, CliInlineDataMedia, CliLinkStyle, CliListIndentType,
-    CliNewlineStyle, CliOutputFormat, CliPreprocessingPreset, CliTierStrategy, CliUrlEscapeStyle, CliWhitespaceMode,
-    validate_bullets, validate_strong_em_symbol,
+    CliCodeBlockStyle, CliHeadingStyle, CliHiddenContent, CliHighlightStyle, CliInlineDataMedia, CliLinkStyle,
+    CliListIndentType, CliNewlineStyle, CliOutputFormat, CliPreprocessingPreset, CliTierStrategy, CliUrlEscapeStyle,
+    CliWhitespaceMode, validate_bullets, validate_strong_em_symbol,
 };
 #[cfg(feature = "mcp")]
 use clap::Subcommand;
@@ -476,6 +476,16 @@ pub struct ExtendedConversionArgs {
     #[arg(long, value_name = "CHOICE")]
     #[arg(help_heading = "Element Handling")]
     pub inline_data_media: Option<CliInlineDataMedia>,
+
+    /// Which text that a browser does not show at first to keep
+    ///
+    /// Scripts and style sheets are never written as text:
+    /// - 'drop': Keep none of it (default)
+    /// - 'reachable': Keep elements hidden by the hidden attribute or an inline style, and declarative shadow roots
+    /// - 'all': Also keep the content of template and noscript elements
+    #[arg(long, value_name = "CHOICE")]
+    #[arg(help_heading = "Element Handling")]
+    pub hidden_content: Option<CliHiddenContent>,
 
     /// CSS selectors for elements to exclude entirely
     ///

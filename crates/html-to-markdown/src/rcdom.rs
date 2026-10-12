@@ -531,11 +531,19 @@ enum SerializeOp {
     Close(QualName),
 }
 
-pub struct SerializableHandle(Handle);
+pub struct SerializableHandle(Handle, bool);
 
 impl From<Handle> for SerializableHandle {
     fn from(h: Handle) -> SerializableHandle {
-        SerializableHandle(h)
+        SerializableHandle(h, false)
+    }
+}
+
+impl SerializableHandle {
+    /// A handle that writes the contents of each `<template>` between its two tags, as the
+    /// HTML serialization does. [`From`] gives a handle that writes an empty `<template>`.
+    pub const fn with_template_contents(h: Handle) -> SerializableHandle {
+        SerializableHandle(h, true)
     }
 }
 
@@ -554,15 +562,21 @@ impl Serialize for SerializableHandle {
             match op {
                 SerializeOp::Open(handle) => match handle.data {
                     NodeData::Element {
-                        ref name, ref attrs, ..
+                        ref name,
+                        ref attrs,
+                        ref template_contents,
+                        ..
                     } => {
                         serializer
                             .start_elem(name.clone(), attrs.borrow().iter().map(|at| (&at.name, &at.value[..])))?;
 
-                        ops.reserve(1 + handle.children.borrow().len());
+                        // ~keep The contents of a template are not its children.
+                        let contents = template_contents.borrow().clone().filter(|_| self.1);
+                        let parent = contents.as_ref().unwrap_or(&handle);
+                        ops.reserve(1 + parent.children.borrow().len());
                         ops.push_front(SerializeOp::Close(name.clone()));
 
-                        for child in handle.children.borrow().iter().rev() {
+                        for child in parent.children.borrow().iter().rev() {
                             ops.push_front(SerializeOp::Open(child.clone()));
                         }
                     }

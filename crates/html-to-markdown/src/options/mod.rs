@@ -14,6 +14,6 @@ pub use conversion::{
 };
 pub use preprocessing::{PreprocessingOptions, PreprocessingOptionsUpdate, PreprocessingPreset};
 pub use validation::{
-    CodeBlockStyle, HeadingStyle, HighlightStyle, InlineDataMedia, LinkStyle, ListIndentType, NewlineStyle,
-    OutputFormat, UrlEscapeStyle, WhitespaceMode,
+    CodeBlockStyle, HeadingStyle, HiddenContent, HighlightStyle, InlineDataMedia, LinkStyle, ListIndentType,
+    NewlineStyle, OutputFormat, UrlEscapeStyle, WhitespaceMode,
 };
