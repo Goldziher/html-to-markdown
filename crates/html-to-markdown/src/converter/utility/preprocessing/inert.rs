@@ -280,6 +280,10 @@ impl BodyNormalizer<'_> {
             return TokenSinkResult::Continue;
         }
         if self.body.borrow().is_none() && matches!(name, "title" | "xmp" | "iframe" | "noscript" | "template") {
+            // ~keep HTML ignores a non-void start tag's self-closing flag; the literal parser must contain its body.
+            let end = self.position();
+            let opening = tag.self_closing.then(|| (end - 2..end, ">".to_owned()));
+            self.replacements.borrow_mut().extend(opening);
             self.body.replace(Some(Body {
                 name: tag.name.clone(),
                 start: self.position(),
