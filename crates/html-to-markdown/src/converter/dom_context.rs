@@ -6,7 +6,7 @@
 use std::cell::{OnceCell, RefCell};
 use std::collections::HashMap;
 
-use crate::converter::main_helpers::{is_html5_void_element, is_inline_element};
+use crate::converter::main_helpers::is_inline_element;
 use crate::converter::utility::content::normalized_tag_name;
 use crate::converter::utility::escaping::is_block_level_name;
 use crate::converter::utility::white_space::{TextClass, classify_text};
@@ -365,7 +365,8 @@ impl DomContext {
     }
 
     /// Whether the element `id` holds content: a text of any kind or a void element
-    /// ([`is_html5_void_element`]), at any depth. A comment is no content, and an element with
+    /// that can write Markdown outside a table cell (a break, a rule or an image), at any depth.
+    /// A comment is no content, and an element with
     /// neither in it is none: `<span><b></b></span>` and `<span><span><!-- c --></span></span>`
     /// hold none, and `<span><br></span>` holds content.
     ///
@@ -379,16 +380,17 @@ impl DomContext {
         let record = RefCell::new(HashMap::new());
         self.holds(id, parser, &record, |node, child| match node {
             tl::Node::Raw(_) => Held::Yes,
-            tl::Node::Tag(_) if self.is_void(child, parser) => Held::Yes,
+            tl::Node::Tag(_) if self.writes_void_content(child, parser) => Held::Yes,
             tl::Node::Tag(_) => Held::Inside,
             tl::Node::Comment(_) => Held::No,
         })
     }
 
-    /// Whether the element `id` is an HTML void element ([`is_html5_void_element`]).
-    fn is_void(&self, id: u32, parser: &tl::Parser) -> bool {
+    /// ~keep Silent void descendants do not separate the line end from a following NBSP (#868).
+    /// ~keep That boundary rule skips table cells, whose checkboxes can write their state.
+    fn writes_void_content(&self, id: u32, parser: &tl::Parser) -> bool {
         self.tag_info(id, parser)
-            .is_some_and(|info| is_html5_void_element(info.name.as_bytes()))
+            .is_some_and(|info| matches!(info.name.as_str(), "br" | "hr" | "img"))
     }
 
     /// Whether a node in the element `id` is held, as `held` answers for each node, with the
@@ -478,5 +480,26 @@ impl DomContext {
     /// Store a computed table content summary for reuse by ancestor/descendant table scans.
     pub(crate) fn cache_table_content_summary(&self, table_id: u32, summary: TableContentSummary) {
         self.table_content_summary_cache.borrow_mut().insert(table_id, summary);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn should_classify_visible_void_descendants_below_inline_wrappers() {
+        for (body, expected) in [
+            ("<em><wbr></em>", false),
+            ("<em><input></em>", false),
+            ("<b><br></b>", true),
+            ("<b><img alt='X' src='x'></b>", true),
+            ("<b><hr></b>", true),
+        ] {
+            let source = format!("<span>{body}</span>");
+            let dom = tl::parse(&source, tl::ParserOptions::default()).expect("parse descendants");
+            let parser = dom.parser();
+            let context = crate::converter::utility::caching::build_dom_context(&dom, parser, source.len());
+            let root = dom.children()[0].get_inner();
+            assert_eq!(context.holds_content(root, parser), expected, "{source}");
+        }
     }
 }

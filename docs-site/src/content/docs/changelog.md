@@ -188,6 +188,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Avoid duplicating a space after line-ending text followed by a span containing only silent
+  void elements (#868); visible nested breaks and images retain their boundaries.
+
 - Self-closing raw-text and inert elements encountered in an HTML head contain their following text.
   Head titles remain metadata; preserved `xmp` retains one container around its literal body
   ([#878](https://github.com/xberg-io/html-to-markdown/issues/878)).
