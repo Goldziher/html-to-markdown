@@ -860,7 +860,7 @@ fn skip_or_render_tag(
         )
 }
 
-fn should_skip_tag(
+pub(super) fn should_skip_tag(
     tag_name: &str,
     node_handle: &tl::NodeHandle,
     tag: &tl::HTMLTag<'_>,
