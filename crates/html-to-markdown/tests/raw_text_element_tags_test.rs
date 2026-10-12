@@ -330,6 +330,18 @@ mod structured_data {
             }
         }
     }
+
+    /// Issue 824 holds beside the rule for `preserve_tags`: with no `preserve_tags` the metadata
+    /// gives the JSON as written, on a page as written and on a repaired page.
+    #[test]
+    fn a_json_with_an_ampersand_is_given_as_written() {
+        for json in super::JSON_WITH_AN_AMPERSAND {
+            let page = format!("<p>foo <script type=\"application/ld+json\">{json}</script> bar</p><p>after</p>");
+            for html in [page.clone(), format!("{}{page}", super::REPAIRED_PAGE_START)] {
+                assert_eq!(raw_json(&html), vec![vec![json.to_string()]; 2], "{html:?}");
+            }
+        }
+    }
 }
 
 /// A textarea with no tag in it gives the same text as before.
@@ -585,6 +597,137 @@ fn a_no_break_space_in_a_table_cell_is_kept_after_an_element_and_not_after_a_scr
         let html = format!("<table><tr><td>{cell}</td></tr></table>");
         for tier_strategy in [TierStrategy::Auto, TierStrategy::Tier2] {
             assert_eq!(content(&html, tier_strategy), expected, "{tier_strategy:?}: {html:?}");
+        }
+    }
+}
+
+/// The JSON of a structured data script with a `&`: in a URL, in a reference, in the reference
+/// of a `<`.
+const JSON_WITH_AN_AMPERSAND: [&str; 3] = [
+    r#"{"a":"https://e.org/?a=1&b=2"}"#,
+    r#"{"a":"a &amp; b"}"#,
+    r#"{"a":"a &lt; b"}"#,
+];
+
+/// A page that the converter repairs before it reads it: a `div` in a `p` and a custom element.
+const REPAIRED_PAGE_START: &str = "<p>one<div>two</div><my-part>q</my-part>";
+
+fn content_with_preserved(html: &str, tag: &str, tier_strategy: TierStrategy) -> String {
+    let options = ConversionOptions {
+        tier_strategy,
+        preserve_tags: vec![tag.to_string()],
+        ..ConversionOptions::default()
+    };
+    convert(html, Some(options))
+        .expect("conversion should succeed")
+        .content
+        .unwrap_or_default()
+        .trim_end()
+        .to_string()
+}
+
+/// A structured data script that `preserve_tags` keeps, by its own name or by the name of a
+/// parent, is written with the `&` of the page: `?a=1&b=2` gave `?a=1&amp;b=2`, and `&amp;` gave
+/// `&amp;amp;`.
+#[test]
+fn a_preserved_structured_data_script_keeps_the_ampersands_of_the_page() {
+    for json in JSON_WITH_AN_AMPERSAND {
+        let script = format!(r#"<script type="application/ld+json">{json}</script>"#);
+        for (tag, html, expected) in [
+            (
+                "script",
+                format!("<p>foo {script} bar</p><p>after</p>"),
+                format!("foo {script} bar\n\nafter"),
+            ),
+            (
+                "div",
+                format!("<div>foo {script} bar</div><p>after</p>"),
+                format!("<div>foo {script} bar</div>\n\nafter"),
+            ),
+        ] {
+            for tier_strategy in STRATEGIES {
+                assert_eq!(
+                    content_with_preserved(&html, tag, tier_strategy),
+                    expected,
+                    "{tier_strategy:?}, {tag}: {html:?}"
+                );
+            }
+        }
+    }
+}
+
+/// The same on a page that the converter repairs, with the script in the body and in the head.
+#[test]
+fn a_preserved_structured_data_script_keeps_the_ampersands_of_a_repaired_page() {
+    for json in JSON_WITH_AN_AMPERSAND {
+        let script = format!(r#"<script type="application/ld+json">{json}</script>"#);
+        for (tag, page, expected) in [
+            (
+                "script",
+                format!("<p>foo {script} bar</p><p>after</p>"),
+                format!("one\n\ntwo\n\nq\n\nfoo {script} bar\n\nafter"),
+            ),
+            (
+                "div",
+                format!("<div>foo {script} bar</div><p>after</p>"),
+                format!("one\n\n<div>two</div>\n\nq<div>foo {script} bar</div>\n\nafter"),
+            ),
+            (
+                "script",
+                format!("<html><head>{script}</head><body><p>foo bar</p></body></html>"),
+                format!("one\n\ntwo\n\nq{script}\n\nfoo bar"),
+            ),
+        ] {
+            let html = format!("{REPAIRED_PAGE_START}{page}");
+            for tier_strategy in STRATEGIES {
+                assert_eq!(
+                    content_with_preserved(&html, tag, tier_strategy),
+                    expected,
+                    "{tier_strategy:?}, {tag}: {html:?}"
+                );
+            }
+        }
+    }
+}
+
+/// A structured data script in the head of a page that needs no repair is not written, with
+/// `preserve_tags` or without.
+#[test]
+fn a_structured_data_script_in_a_head_is_not_written() {
+    for json in JSON_WITH_AN_AMPERSAND {
+        let html = format!(
+            "<html><head><script type=\"application/ld+json\">{json}</script></head>\
+             <body><p>foo bar</p></body></html>"
+        );
+        for tier_strategy in STRATEGIES {
+            assert_eq!(content(&html, tier_strategy), "foo bar", "{tier_strategy:?}: {html:?}");
+            assert_eq!(
+                content_with_preserved(&html, "script", tier_strategy),
+                "foo bar",
+                "{tier_strategy:?}: {html:?}"
+            );
+        }
+    }
+}
+
+/// With no `preserve_tags` the script is not written, on a page as written and on a repaired
+/// page.
+#[test]
+fn a_structured_data_script_with_an_ampersand_is_not_written() {
+    for json in JSON_WITH_AN_AMPERSAND {
+        let page = format!("<p>foo <script type=\"application/ld+json\">{json}</script> bar</p><p>after</p>");
+        for tier_strategy in STRATEGIES {
+            assert_eq!(
+                content(&page, tier_strategy),
+                "foo bar\n\nafter",
+                "{tier_strategy:?}: {page:?}"
+            );
+            let repaired = format!("{REPAIRED_PAGE_START}{page}");
+            assert_eq!(
+                content(&repaired, tier_strategy),
+                "one\n\ntwo\n\nq\n\nfoo bar\n\nafter",
+                "{tier_strategy:?}: {repaired:?}"
+            );
         }
     }
 }

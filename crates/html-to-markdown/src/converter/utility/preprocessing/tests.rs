@@ -687,6 +687,30 @@ fn an_end_tag_with_no_bracket_ends_no_raw_text_element() {
     assert_eq!(&page[end..], "tail");
 }
 
+/// The read of a tag ends at the `>` that is in no attribute value. A quote opens a value
+/// only after `=` and white space; a value with no quotes ends at white space.
+#[test]
+fn a_tag_is_read_to_the_bracket_that_is_in_no_value() {
+    for tag in [
+        "<a x='>' y>",
+        "<a x=\">\" y>",
+        "<a x=\"a'b>\" y>",
+        "<a x = '>' y>",
+        "<a x=\t\n\x0C\r '>' y>",
+        "<a x=it's y='>'>",
+        "<a href=/s?q='tis y='>'>",
+        "<a x=y= z='>'>",
+        "<a x== y='>'>",
+        "<a 'x' y='>'>",
+    ] {
+        let html = format!("{tag}z</a>");
+        let whole = tag.len() - "<".len() + "/a>".len();
+        for (pass, reads) in [("first", first_pass_reads(&html)), ("second", second_pass_reads(&html))] {
+            assert_eq!(reads.tag_bytes, whole, "{tag:?}, {pass} pass");
+        }
+    }
+}
+
 #[test]
 fn should_strip_only_html_cdata_and_keep_opaque_foreign_and_raw_text_regions() {
     use super::strip_html_cdata;

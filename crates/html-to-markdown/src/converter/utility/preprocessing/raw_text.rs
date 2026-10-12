@@ -450,34 +450,34 @@ fn raw_text_tag_name_end(bytes: &[u8], lt: usize, name: &[u8], side: TagSide) ->
 /// ~keep and white space. A value with no quotes ends at white space or at `>`: the apostrophe
 /// ~keep of `title=it's` and the `=` and the apostrophe of `href=/search?q='tis` are bytes of
 /// ~keep the value.
+/// ~keep Outside a value only `>` and `=` change the read, so the read jumps to the next one of
+/// ~keep the two: most bytes of a page are in a tag or between two tags, and a read of each
+/// ~keep byte of each tag is a cost on every page.
 fn whole_tag_end(bytes: &[u8], from: usize) -> Option<usize> {
     let mut idx = from;
-    let mut value_starts = false;
     loop {
-        let byte = *bytes.get(idx)?;
-        match byte {
-            b'>' => return Some(idx + 1),
-            b'\t' | b'\n' | b'\x0C' | b'\r' | b' ' => idx += 1,
-            b'"' | b'\'' if value_starts => {
-                idx += 2 + memchr::memchr(byte, &bytes[idx + 1..])?;
-                value_starts = false;
-            }
-            _ if value_starts => {
-                let value = &bytes[idx..];
-                idx += value.iter().copied().position(ends_an_unquoted_value)?;
-                value_starts = false;
-            }
-            _ => {
-                value_starts = byte == b'=';
-                idx += 1;
-            }
+        idx += memchr::memchr2(b'>', b'=', bytes.get(idx..)?)?;
+        if bytes[idx] == b'>' {
+            return Some(idx + 1);
         }
+        let after_equals = &bytes[idx + 1..];
+        let value = idx + 1 + after_equals.iter().position(|byte| !is_tag_white_space(*byte))?;
+        idx = match bytes[value] {
+            b'>' => return Some(value + 1),
+            quote @ (b'"' | b'\'') => value + 2 + memchr::memchr(quote, &bytes[value + 1..])?,
+            _ => value + bytes[value..].iter().copied().position(ends_an_unquoted_value)?,
+        };
     }
+}
+
+/// Whether `byte` is white space in a tag: tab, LF, FF, CR or space.
+const fn is_tag_white_space(byte: u8) -> bool {
+    matches!(byte, b'\t' | b'\n' | b'\x0C' | b'\r' | b' ')
 }
 
 /// Whether `byte` ends an attribute value with no quotes: white space or `>`.
 const fn ends_an_unquoted_value(byte: u8) -> bool {
-    matches!(byte, b'\t' | b'\n' | b'\x0C' | b'\r' | b' ' | b'>')
+    is_tag_white_space(byte) || byte == b'>'
 }
 
 /// Find the position of the FIRST closing tag in bytes, ignoring nesting.

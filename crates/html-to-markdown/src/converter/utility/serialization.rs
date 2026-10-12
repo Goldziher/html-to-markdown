@@ -3,6 +3,7 @@
 //! Utilities for serializing HTML elements back to string format, used for preserving
 //! original HTML for elements like SVG, math, and custom elements.
 
+use crate::converter::utility::attributes::decoded_attribute;
 use crate::converter::utility::content::normalized_tag_name;
 use crate::options::conversion::NATIVE_STACK_SAFE_DEPTH;
 use std::borrow::Cow;
@@ -163,7 +164,13 @@ fn serialize_node_to_html_at_depth(handle: &tl::NodeHandle, parser: &tl::Parser,
             } else {
                 let children = tag.children();
                 for child_handle in children.top().iter() {
-                    serialize_node_to_html_at_depth(child_handle, parser, output, depth + 1);
+                    if tag_name == "script"
+                        && let Some(tl::Node::Raw(text)) = child_handle.get(parser)
+                    {
+                        output.push_str(&script_text_as_written(tag, &text.as_utf8_str()));
+                    } else {
+                        serialize_node_to_html_at_depth(child_handle, parser, output, depth + 1);
+                    }
                 }
             }
 
@@ -197,9 +204,72 @@ fn serialize_node_to_html_at_depth(handle: &tl::NodeHandle, parser: &tl::Parser,
     }
 }
 
+/// The text of the element `script` as the page has it. `text` is a text node of the element.
+///
+/// ~keep The first pass writes each `&` of a structured data script as `&amp;`, so that the
+/// ~keep reader of the metadata decodes it once and gives the JSON as written
+/// ~keep (`push_kept_element`). HTML output has no such decode: it takes that one escape back,
+/// ~keep or `?a=1&b=2` is written as `?a=1&amp;b=2`. The `&lt;` of a `<` stays, as before that
+/// ~keep escape. A script of another type is not escaped by the first pass and is not changed.
+fn script_text_as_written<'a>(script: &tl::HTMLTag<'_>, text: &'a str) -> Cow<'a, str> {
+    if !text.contains("&amp;") {
+        return Cow::Borrowed(text);
+    }
+    let is_structured_data = decoded_attribute(script, "type").is_some_and(|type_value| {
+        let media_type = type_value.split(';').next().unwrap_or_else(|| type_value.as_ref());
+        media_type.trim().eq_ignore_ascii_case("application/ld+json")
+    });
+    if is_structured_data {
+        Cow::Owned(text.replace("&amp;", "&"))
+    } else {
+        Cow::Borrowed(text)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::{serialize_element, serialize_tag_to_html};
+
+    fn written_again(html: &str) -> String {
+        let dom = tl::parse(html, tl::ParserOptions::default()).unwrap();
+        let parser = dom.parser();
+        let node_handle = dom
+            .children()
+            .iter()
+            .find(|handle| matches!(handle.get(parser), Some(tl::Node::Tag(_))))
+            .expect("tag node");
+        serialize_tag_to_html(node_handle, parser)
+    }
+
+    /// The first pass wrote `a & b &amp; c < d` as `a &amp; b &amp;amp; c &lt; d`.
+    #[test]
+    fn a_structured_data_script_is_written_with_the_ampersands_of_the_page() {
+        for open_tag in [
+            r#"<script type="application/ld+json">"#,
+            r#"<script type="Application/LD+JSON; charset=utf-8">"#,
+        ] {
+            let html = format!("{open_tag}a &amp; b &amp;amp; c &lt; d</script>");
+            assert_eq!(
+                written_again(&html),
+                format!("{open_tag}a & b &amp; c &lt; d</script>"),
+                "{html:?}"
+            );
+        }
+    }
+
+    /// The first pass escapes a structured data script only: a script of another type (it is in
+    /// the tree when it is in an `svg` element) and another element are written as the tree has
+    /// them.
+    #[test]
+    fn a_script_of_another_type_is_written_as_the_tree_has_it() {
+        for html in [
+            "<script>if (a &amp;&amp; b) {}</script>",
+            r#"<script type="text/javascript">if (a &amp;&amp; b) {}</script>"#,
+            r#"<div type="application/ld+json">a &amp; b</div>"#,
+        ] {
+            assert_eq!(written_again(html), html);
+        }
+    }
 
     /// ~keep audit #24 finding 3: the source HTML's `"` is valid, inert content inside a
     /// single-quoted attribute (e.g. `title='x" onclick="alert(1)" y='`). Reconstructing it
