@@ -194,7 +194,7 @@
   },
   {
     "id": "adjacent_inserted_merged",
-    "description": "Adjacent inserted elements share one delimiter run",
+    "description": "Adjacent inserted elements preserve plain content",
     "input": {
       "html": "<p><ins>A</ins><ins>B</ins></p>"
     },
@@ -202,13 +202,13 @@
       {
         "type": "equals",
         "field": "content",
-        "value": "==AB==\n"
+        "value": "AB\n"
       }
     ],
     "docs": {
       "topic": "conversion",
       "stem": "adjacent_inserted_merged",
-      "title": "Adjacent inserted elements share one delimiter run"
+      "title": "Adjacent inserted elements preserve plain content"
     }
   },
   {

@@ -504,8 +504,8 @@ fn dispatch_close(
         TagKind::Strikethrough if suppress_close_marker(state, EscapeCtx::empty(), false) => {}
         TagKind::Strikethrough => close_inline_marker(state, frame, "~~")?,
         TagKind::Inserted if suppress_close_marker(state, EscapeCtx::empty(), false) => {}
-        TagKind::Inserted => close_inline_marker(state, frame, "==")?,
-        TagKind::Code => close_code(state, frame, matches!(name_lower, b"kbd" | b"samp"), options)?,
+        TagKind::Inserted => {}
+        TagKind::Code => close_code(state, frame, matches!(name_lower, b"kbd" | b"samp" | b"tt"), options)?,
         TagKind::Link => close_link(state, frame, options)?,
         TagKind::List(ListKind::Definition) => close_dl(state, frame, options),
         TagKind::List(kind) => close_list(state, kind),
@@ -521,13 +521,14 @@ fn dispatch_close(
         TagKind::Block => close_block_container(state, frame, name_lower),
         TagKind::Summary => close_summary(state, frame),
         TagKind::Figcaption => close_figcaption(state, frame),
-        TagKind::Button => close_button(state, frame),
+        TagKind::LineEndControl => close_line_end_control(state, frame),
         TagKind::Inline if name_lower == b"abbr" => close_abbreviation(state, frame),
         TagKind::Hr
         | TagKind::TableFoot
         | TagKind::Inline
         | TagKind::LineBreak
         | TagKind::Image
+        | TagKind::Media
         | TagKind::RawText(_)
         | TagKind::Ignored => {}
     }
@@ -710,12 +711,12 @@ fn close_figcaption(state: &mut Tier1State, _frame: &OpenTag) {
     dest.push_str("*\n\n");
 }
 
-/// Close a `<button>` (Phase T).  When the button produced visible content, write the space
-/// that keeps it a word of its own before it and `\n\n` after it.  The `\n\n` is skipped in
-/// table cells (cells stay one logical line).
+/// Close a `<progress>`, `<meter>` or `<output>` (Phase T).  When the control produced visible
+/// content, write the space that keeps it a word of its own before it and `\n\n` after it.  The
+/// `\n\n` is skipped in table cells (cells stay one logical line).
 ///
 /// Mirrors Tier-2 `form/elements.rs`'s `write_line_end_control`, with the same `ControlStart`.
-fn close_button(state: &mut Tier1State, frame: &OpenTag) {
+fn close_line_end_control(state: &mut Tier1State, frame: &OpenTag) {
     let dest = state.cell_or_output_mut();
     let content_start = clamp_to_char_boundary(dest, frame.content_start);
     crate::converter::form::spacing::ControlStart::at(dest, content_start).finish(dest);
@@ -819,11 +820,12 @@ fn handle_empty_inline_body(
 ) -> Result<bool, BailReason> {
     let content_absent = buf.len() <= content_start;
     let is_marks = matches!(marker, "**" | "*" | "~~" | "==");
-    // ~keep In marks a blank body is the module's `is_blank`: `<p>a <em>&nbsp;</em> b</p>` goes
-    // ~keep to the full converter, which writes `a b`. Code keeps its text.
+    // ~keep In marks a body of white space of any kind goes to the full converter:
+    // ~keep `<p>a <em>&nbsp;</em> b</p>` is `a b` there. A body of form feeds goes too: no mark
+    // ~keep can stand beside a form feed. Code keeps its text.
     let whitespace_only = !content_absent
         && if is_marks {
-            crate::converter::utility::white_space::is_blank(&buf[content_start..])
+            buf[content_start..].chars().all(char::is_whitespace)
         } else {
             buf[content_start..]
                 .bytes()
@@ -865,11 +867,10 @@ fn migrate_leading_inline_whitespace(buf: &mut String, content_start: usize, mar
     buf.replace_range(content_start..content_start + leading_len, "");
     let marker_start = clamp_to_char_boundary(buf, content_start.saturating_sub(marker.len()));
     // ~keep White space on both sides of the element start is one run: Tier-2's `push_inline_prefix`.
-    if !crate::converter::utility::white_space::space_is_owed(&buf[..marker_start]) {
-        return content_start;
-    }
-    buf.insert_str(marker_start, &leading);
-    content_start + leading_len
+    // ~keep A form feed in it is a character and is written where no space is owed too.
+    let owed = crate::converter::utility::white_space::owed_part(&buf[..marker_start], &leading).len();
+    buf.insert_str(marker_start, &leading[leading_len - owed..]);
+    content_start + owed
 }
 
 fn migrate_trailing_inline_whitespace(buf: &mut String, content_start: usize, marker: &str) -> bool {

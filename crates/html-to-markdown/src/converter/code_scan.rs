@@ -492,6 +492,19 @@ mod tests {
     }
 
     #[test]
+    fn should_preserve_only_blank_lines_inside_indented_code() {
+        for (markdown, expected) in [
+            ("- t\n\n<!-- -->\n\n    a\n\n\n    b\n", "000011110"),
+            ("- t\n\n    a\n\n\n    b\n", "0000000"),
+            ("- t\n\n      a\n\n\n      b\n", "0011110"),
+            (">     a\n>\n>\n>     b\n", "11110"),
+            ("paragraph\n    continuation", "00"),
+        ] {
+            assert_eq!(code(markdown), expected, "{markdown:?}");
+        }
+    }
+
+    #[test]
     fn should_measure_indented_code_after_the_marker_of_a_block_quote() {
         let cases = [
             // One space after the marker belongs to the marker.

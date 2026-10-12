@@ -25,7 +25,7 @@ use crate::converter::utility::content::{is_block_level_element, normalized_tag_
 use crate::converter::utility::preprocessing::{
     PRESERVED_MENU_ATTRIBUTE, normalize_bogus_comment_endings, normalize_menu_elements, normalize_split_closing_tags,
     normalize_unclosed_list_items, preprocess_html, restore_preserved_menu_elements, strip_bogus_comments,
-    strip_hidden_elements, strip_script_and_style_tags,
+    strip_hidden_elements, strip_html_cdata, strip_script_and_style_tags,
 };
 use crate::converter::utility::serialization::serialize_tag_to_html;
 use crate::options::{NewlineStyle, OutputFormat};
@@ -382,7 +382,8 @@ fn prepare_html(html: &str, preserve_menu: bool) -> (String, Option<crate::types
 }
 
 fn preprocess_initial_html(html: &str, preserve_menu: bool) -> String {
-    let stripped = strip_script_and_style_tags(html);
+    let stripped = strip_html_cdata(html);
+    let stripped = strip_script_and_style_tags(&stripped);
     // ~keep Bogus comments must be removed before tag-shaped preprocessing examines them.
     let stripped = strip_bogus_comments(&stripped);
     let stripped = strip_hidden_elements(&stripped);
@@ -395,7 +396,8 @@ fn preprocess_initial_html(html: &str, preserve_menu: bool) -> String {
 }
 
 fn preprocess_repaired_html(html: &str, preserve_menu: bool) -> String {
-    let stripped = strip_script_and_style_tags(html);
+    let stripped = strip_html_cdata(html);
+    let stripped = strip_script_and_style_tags(&stripped);
     let stripped = strip_hidden_elements(&stripped);
     let stripped = normalize_bogus_comment_endings(&stripped);
     let stripped = normalize_split_closing_tags(&stripped);
@@ -560,23 +562,63 @@ fn parent_is_list(node_handle: &tl::NodeHandle, parser: &tl::Parser, dom_ctx: &D
 /// Recursively walk DOM nodes and convert to Markdown.
 #[allow(clippy::trivially_copy_pass_by_ref)]
 pub fn walk_node(node_handle: &tl::NodeHandle, parser: &tl::Parser, output: &mut String, handler: HandlerContext<'_>) {
+    let ctx = handler.ctx;
+    let media_state = ctx
+        .media_boundary
+        .as_ref()
+        .map(|state| state.replace(Default::default()));
+    let media_start = output.len();
     if is_table_part(node_handle, parser, handler.dom_ctx) {
         walk_table_parts(node_handle, parser, output, handler);
-        return;
-    }
-    let ctx = handler.ctx;
-    ctx.last_list.enter(output);
-    // ~keep In a task item, the render of each node before the first content reports whether
-    // ~keep it wrote, so the item knows which element wrote first (issue #650).
-    match ctx.first_writer.as_ref().filter(|first_writer| first_writer.is_open()) {
-        Some(first_writer) => {
-            let start = output.len();
-            convert_node(node_handle, parser, output, handler);
-            first_writer.record(*node_handle, parser, output.get(start..));
+    } else {
+        ctx.last_list.enter(output);
+        // ~keep Task items need the first node that actually wrote content, including custom visitor output (#650).
+        match ctx.first_writer.as_ref().filter(|first_writer| first_writer.is_open()) {
+            Some(first_writer) => {
+                let start = output.len();
+                convert_node(node_handle, parser, output, handler);
+                first_writer.record(*node_handle, parser, output.get(start..));
+            }
+            None => convert_node(node_handle, parser, output, handler),
         }
-        None => convert_node(node_handle, parser, output, handler),
+        ctx.last_list.leave(output);
     }
-    ctx.last_list.leave(output);
+    if let (Some(boundary), Some(incoming)) = (ctx.media_boundary.as_ref(), media_state) {
+        finish_media_boundary(output, media_start, boundary, incoming);
+    }
+}
+
+// ~keep Resolve spacing from final emitted content after callbacks; skipped nodes and erased wrappers owe no edge.
+fn finish_media_boundary(
+    output: &mut String,
+    start: usize,
+    boundary: &std::cell::Cell<super::context::MediaBoundaryState>,
+    incoming: super::context::MediaBoundaryState,
+) {
+    let Some(chunk) = output.get(start..).filter(|chunk| !chunk.is_empty()) else {
+        boundary.set(incoming);
+        return;
+    };
+    let mut current = boundary.get();
+    let first = chunk.chars().next();
+    let edge = first
+        .filter(|character| character.is_whitespace())
+        .or(current.first_edge)
+        .or(first);
+    current.last_edge = current.last_edge.or_else(|| chunk.chars().next_back());
+    let before = output.get(..start).unwrap_or_default();
+    if (incoming.pending || current.first_is_media)
+        && before.ends_with(|character: char| !character.is_whitespace())
+        && !incoming.last_edge.is_some_and(|character| "([{".contains(character))
+        && edge.is_some_and(|character| !character.is_whitespace() && !".,;:!?)]}".contains(character))
+    {
+        output.insert(start, ' ');
+    }
+    if incoming.first_edge.is_some() {
+        current.first_is_media = incoming.first_is_media;
+    }
+    current.first_edge = incoming.first_edge.or(edge);
+    boundary.set(current);
 }
 
 /// Convert one DOM node and its children to Markdown.

@@ -123,7 +123,7 @@ pub fn dispatch_inline_handler(tag_name: &str, context: HandlerContext<'_>) -> b
             emphasis::handle(tag_name, context);
             true
         }
-        "kbd" | "samp" => {
+        "kbd" | "samp" | "tt" => {
             code::handle(tag_name, context);
             true
         }

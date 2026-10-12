@@ -174,8 +174,8 @@ fn should_leave_rules_that_already_had_a_blank_line_or_follow_a_quote_unchanged(
         ("<div>t<hr>B</div>", "t\n\n---\n\nB\n"),
         ("<p><hr>t</p>", "---\n\nt\n"),
         ("<blockquote>q</blockquote><hr>", "> q\n---\n"),
-        ("<dl><dt>t</dt><dd>d<hr></dd></dl>", "t\nd\n\n---\n"),
-        ("<dl><dt>t</dt><dd>d</dd><dd><hr></dd></dl>", "t\nd\n\n---\n"),
+        ("<dl><dt>t</dt><dd>d<hr></dd></dl>", "t\n\nd\n\n---\n"),
+        ("<dl><dt>t</dt><dd>d</dd><dd><hr></dd></dl>", "t\n\nd\n\n---\n"),
         (
             "<table><tr><th>h</th></tr><tr><td>A<hr>B</td></tr></table>",
             "| h        |\n| -------- |\n| A  --- B |\n",
@@ -190,13 +190,12 @@ fn should_leave_rules_that_already_had_a_blank_line_or_follow_a_quote_unchanged(
 }
 
 #[test]
-fn should_keep_a_definition_that_does_not_start_with_a_rule_on_the_line_after_its_term() {
-    // ~keep Only a leading rule needs the blank line; other content keeps the term's single line break.
+fn should_keep_a_definition_separate_from_its_term() {
     for (html, expected) in [
-        ("<dl><dt>T</dt><dd>D</dd></dl>", "T\nD\n"),
-        ("<dl><dt>t</dt><dd><ul><li>a</li></ul></dd></dl>", "t\n- a\n"),
-        ("<dl><dt>t</dt><dd><h2>h</h2></dd></dl>", "t\n## h\n"),
-        ("<dl><dt>t</dt><dt>u</dt></dl>", "t\nu\n"),
+        ("<dl><dt>T</dt><dd>D</dd></dl>", "T\n\nD\n"),
+        ("<dl><dt>t</dt><dd><ul><li>a</li></ul></dd></dl>", "t\n\n- a\n"),
+        ("<dl><dt>t</dt><dd><h2>h</h2></dd></dl>", "t\n\n## h\n"),
+        ("<dl><dt>t</dt><dt>u</dt></dl>", "t\n\nu\n"),
     ] {
         assert_eq!(tier2(html), expected, "Tier 2 changed a definition: {html:?}");
     }
@@ -209,7 +208,7 @@ fn should_not_add_a_second_blank_line_before_a_rule_that_already_has_one() {
     let html = "<blockquote><dl><dt>t</dt><dd>d</dd><dd><hr></dd></dl></blockquote>";
     assert_eq!(
         tier2(html),
-        "> t\n> d\n>\n> ---\n",
+        "> t\n>\n> d\n>\n> ---\n",
         "a rule after a blank line must not get another one: {html:?}"
     );
 }

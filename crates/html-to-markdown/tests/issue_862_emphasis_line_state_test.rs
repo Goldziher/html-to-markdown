@@ -95,7 +95,6 @@ fn marked_wrappers_should_preserve_hard_break_list_and_rule_context() {
         ("del", HighlightStyle::DoubleEqual, "~~"),
         ("s", HighlightStyle::DoubleEqual, "~~"),
         ("strike", HighlightStyle::DoubleEqual, "~~"),
-        ("ins", HighlightStyle::DoubleEqual, "=="),
         ("mark", HighlightStyle::DoubleEqual, "=="),
         ("mark", HighlightStyle::Bold, "**"),
     ] {
@@ -169,7 +168,6 @@ fn marked_wrappers_should_keep_adjacent_markers_on_a_long_unicode_line() {
         ("del", HighlightStyle::DoubleEqual, "~~"),
         ("s", HighlightStyle::DoubleEqual, "~~"),
         ("strike", HighlightStyle::DoubleEqual, "~~"),
-        ("ins", HighlightStyle::DoubleEqual, "=="),
         ("mark", HighlightStyle::DoubleEqual, "=="),
         ("mark", HighlightStyle::Bold, "**"),
         ("mark", HighlightStyle::Html, "<mark>"),
@@ -185,4 +183,49 @@ fn marked_wrappers_should_keep_adjacent_markers_on_a_long_unicode_line() {
             assert_eq!(marked_content(&html, style), expected, "{tag}, {style:?}, {n}");
         }
     }
+}
+
+#[test]
+fn djot_inserted_text_should_preserve_marker_and_boundary_context() {
+    for (html, expected) in [
+        ("<div>a<br><ins> 界</ins></div>", "a\\\n{+界+}\n"),
+        ("<div>a<br><i><ins> 界</ins></i></div>", "a\\\n_{+界+}_\n"),
+        ("<div><ins><ul><li>x</li></ul></ins></div>", "{+- x+}\n"),
+        ("<div><ins><hr></ins></div>", "{+---+}\n"),
+    ] {
+        assert_eq!(inserted_content(html, OutputFormat::Djot), expected);
+    }
+    for n in [100, 400] {
+        let html = format!("<div>{}</div>", "<ins>界</ins>".repeat(n));
+        assert_eq!(
+            inserted_content(&html, OutputFormat::Djot),
+            format!("{}\n", "{+界+}".repeat(n))
+        );
+    }
+}
+
+#[test]
+fn markdown_and_plain_inserted_text_should_keep_the_incoming_plain_text_contract() {
+    for output_format in [OutputFormat::Markdown, OutputFormat::Plain] {
+        assert_eq!(inserted_content("<p>a<ins>b</ins>c</p>", output_format), "abc\n");
+        for n in [100, 400] {
+            let html = format!("<div>{}</div>", "<ins>界</ins>".repeat(n));
+            assert_eq!(inserted_content(&html, output_format), format!("{}\n", "界".repeat(n)));
+        }
+    }
+}
+
+fn inserted_content(html: &str, output_format: OutputFormat) -> String {
+    convert(
+        html,
+        ConversionOptions {
+            output_format,
+            tier_strategy: TierStrategy::Tier2,
+            extract_metadata: false,
+            ..Default::default()
+        },
+    )
+    .expect("convert inserted text")
+    .content
+    .expect("content")
 }

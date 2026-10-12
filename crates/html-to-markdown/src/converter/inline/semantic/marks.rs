@@ -205,17 +205,7 @@ fn emit_inserted_wrapped(output: &mut String, content: &str, site: InlineSite<'_
             site,
         );
     } else {
-        emit_wrapped_inline(
-            output,
-            content,
-            &InlineDelimiters {
-                open: "==",
-                close: "==",
-                merge_symbol: Some('='),
-                sibling_tag_names: &INSERTED_SIBLING_TAGS,
-            },
-            site,
-        );
+        output.push_str(content);
     }
 }
 
@@ -286,7 +276,7 @@ pub fn handle_strikethrough(tag_name: &str, handler: HandlerContext<'_>) {
 
 /// Handle inserted/underlined text (ins tag).
 ///
-/// Converts to `==content==` syntax. Supports visitor callbacks when enabled.
+/// Passes through visible content in Markdown and uses insertion syntax in Djot.
 pub fn handle_inserted(handler: HandlerContext<'_>) {
     use crate::converter::walk_node;
 
@@ -320,6 +310,22 @@ pub fn handle_inserted(handler: HandlerContext<'_>) {
                 crate::converter::block::container::HandlerContext::new(options, ctx, depth + 1, dom_ctx),
             );
         }
+        return;
+    }
+
+    if options.output_format != OutputFormat::Djot {
+        #[cfg(feature = "visitor")]
+        if let Some(outcome) = visit_semantic(tag, SemanticKind::Underline("ins"), depth, site) {
+            match outcome {
+                VisitorOutcome::Continue => {}
+                VisitorOutcome::Output(custom_output) => {
+                    output.push_str(&custom_output);
+                    return;
+                }
+                VisitorOutcome::Skip => return,
+            }
+        }
+        walk_children(tag, output, ctx, depth, site);
         return;
     }
 
@@ -562,7 +568,7 @@ mod tests {
 #[cfg(test)]
 mod line_state_cost_tests {
     use crate::converter::context::INLINE_BUFFER_COLUMN_CHAR_READS;
-    use crate::{ConversionOptions, HighlightStyle, TierStrategy, convert};
+    use crate::{ConversionOptions, HighlightStyle, OutputFormat, TierStrategy, convert};
 
     #[test]
     fn marked_wrappers_should_not_count_the_growing_output_column() {
@@ -592,6 +598,11 @@ mod line_state_cost_tests {
         INLINE_BUFFER_COLUMN_CHAR_READS.with(|reads| reads.set(0));
         let html = format!("<div>{}</div>", format!("<{tag}>x</{tag}>").repeat(n));
         let options = ConversionOptions {
+            output_format: if tag == "ins" {
+                OutputFormat::Djot
+            } else {
+                OutputFormat::Markdown
+            },
             highlight_style,
             tier_strategy: TierStrategy::Tier2,
             extract_metadata: false,
@@ -601,9 +612,10 @@ mod line_state_cost_tests {
             .expect("convert marked wrappers")
             .content
             .expect("content");
-        let expected = match highlight_style {
-            HighlightStyle::Html => format!("{}\n", "<mark>x</mark>".repeat(n)),
-            HighlightStyle::None => format!("{}\n", "x".repeat(n)),
+        let expected = match (tag, highlight_style) {
+            ("ins", _) => format!("{}\n", "{+x+}".repeat(n)),
+            (_, HighlightStyle::Html) => format!("{}\n", "<mark>x</mark>".repeat(n)),
+            (_, HighlightStyle::None) => format!("{}\n", "x".repeat(n)),
             _ => {
                 let marker = if tag == "del" || tag == "s" || tag == "strike" {
                     "~~"

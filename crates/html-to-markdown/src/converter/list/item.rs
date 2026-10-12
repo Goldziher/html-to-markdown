@@ -459,7 +459,9 @@ fn render_task_item(
     item_ctx: &Context,
     context: ListContext<'_>,
 ) {
-    output.push_str(&marker.list_marker());
+    if !context.ctx.in_heading {
+        output.push_str(&marker.list_marker());
+    }
     output.push_str(if marker.task.checked { "[x]" } else { "[ ]" });
     let task_text = collect_task_text(tag, parser, marker, item_ctx, context);
     let first_block = first_task_block(&task_text, parser, item_ctx);
@@ -605,7 +607,7 @@ fn render_regular_item(
     let _ = node_handle;
     if render.list.ctx.in_table_cell {
         add_list_leading_separator(output, render.list.ctx, render.list.options);
-    } else {
+    } else if !render.list.ctx.in_heading {
         output.push_str(&render.marker.list_marker());
     }
     let (item_start, _) = write_regular_children(tag, parser, output, render);

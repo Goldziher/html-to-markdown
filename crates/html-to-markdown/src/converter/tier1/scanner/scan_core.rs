@@ -86,10 +86,10 @@ impl<'a> Tier1Scanner<'a> {
         let text = text_for_decisions(&html[self.text_start..self.pos], &self.state);
         let is_inline = upcoming_tag_is_inline(self.bytes, self.pos);
         // ~keep Only a text with content asks: white space alone takes its own path in
-        // ~keep `flush_text`. A form feed is white space here, so a text of form feeds and
-        // ~keep line ends keeps its line end before the comments.
-        let inline_follows_comments =
-            !text.bytes().all(|byte| byte.is_ascii_whitespace()) && inline_follows_comments(self.bytes, self.pos);
+        // ~keep `flush_text`. A form feed is a character (issue #811), so the line end after it
+        // ~keep is a space before an inline element that follows the comments.
+        let inline_follows_comments = !text.bytes().all(|byte| matches!(byte, b' ' | b'\t' | b'\n' | b'\r'))
+            && inline_follows_comments(self.bytes, self.pos);
         // ~keep Both scans of the markup ahead decide what a line end at the end of the text
         // ~keep becomes, so a text that ends with no line end does not scan: each scan passes
         // ~keep the open tags of the elements that only wrap text, and a run of them on every
@@ -147,7 +147,7 @@ impl<'a> Tier1Scanner<'a> {
         let ends_own_line = tier1::lookup(name_lower).is_some_and(|spec| spec.is_block)
             || matches!(
                 name_lower,
-                b"optgroup" | b"button" | b"progress" | b"meter" | b"output" | b"datalist"
+                b"optgroup" | b"progress" | b"meter" | b"output" | b"datalist"
             );
         let dest = self.state.cell_or_output_mut();
         let (dest_len, ends_in_newline) = (dest.len(), dest.ends_with('\n'));
@@ -282,6 +282,21 @@ impl<'a> Tier1Scanner<'a> {
     }
 
     fn prepare_open_tag(&mut self, name_lower: &[u8]) -> Result<(), BailReason> {
+        // ~keep A heading's code divs use spaces; scanner block newlines would split the code span.
+        if name_lower == b"div"
+            && self.state.escape_ctx.contains(EscapeCtx::CODE | EscapeCtx::HEADING)
+            && !self.state.in_table_cell()
+        {
+            return Err(BailReason::Classifier);
+        }
+        // ~keep Outside cells, heading labels need Tier-2's structural flattening and visitor hooks.
+        // ~keep The scanner's existing cell path already flattens quote and list markers.
+        if self.state.escape_ctx.contains(EscapeCtx::HEADING)
+            && !self.state.in_table_cell()
+            && matches!(name_lower, b"blockquote" | b"ul" | b"ol" | b"li")
+        {
+            return Err(BailReason::Classifier);
+        }
         // ~keep Only a br or stripped raw-text tag keeps a pending newline join open.
         if !matches!(name_lower, b"br" | b"script" | b"style") {
             self.state.pending_newline_join = None;

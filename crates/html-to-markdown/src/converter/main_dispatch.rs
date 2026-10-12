@@ -40,6 +40,15 @@ pub(super) fn dispatch_tag<'a>(
         output,
         handler,
     };
+    if handler.ctx.in_heading
+        && matches!(
+            tag_name,
+            "p" | "section" | "article" | "nav" | "aside" | "header" | "footer" | "main" | "form"
+        )
+    {
+        dispatcher.dispatch_div_like();
+        return false;
+    }
     if dispatcher.dispatch_inline() || dispatcher.dispatch_blocks() {
         return false;
     }
@@ -89,7 +98,7 @@ impl TagDispatcher<'_, '_> {
         let handler = self.handler;
         match self.tag_name {
             "strong" | "b" | "em" | "i" | "mark" | "del" | "s" | "strike" | "ins" | "u" | "small" | "sub" | "sup"
-            | "kbd" | "samp" | "var" | "dfn" | "abbr" | "ruby" | "rb" | "rt" | "rp" | "rtc" | "span" => {
+            | "kbd" | "samp" | "tt" | "var" | "dfn" | "abbr" | "ruby" | "rb" | "rt" | "rp" | "rtc" | "span" => {
                 crate::converter::inline::dispatch_inline_handler(
                     self.tag_name,
                     crate::converter::inline::HandlerContext::new((
