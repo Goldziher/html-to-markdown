@@ -117,7 +117,7 @@ fn should_keep_the_default_markers_when_something_separates_the_lists() {
     );
     assert_eq!(
         convert_with("<ol><li>a</li></ol><!-- c --><ol><li>b</li></ol>", &options),
-        "1. a\n\n<!-- c -->\n\n1. b\n"
+        "1. a\n\n<!-- -->\n\n1. b\n"
     );
     assert_lists(
         "<ul><li>a</li></ul><ol><li>b</li></ol>",
@@ -232,12 +232,19 @@ fn should_give_the_visitor_the_marker_each_item_writes() {
     }
 }
 
+#[test]
+fn should_flatten_adjacent_ordered_lists_into_heading_labels() {
+    let html = "<h2><ol><li>a</li></ol><ol><li>b</li></ol></h2>";
+    let markdown = convert_with(html, &tier2_options());
+    assert_eq!(markdown, "## a b\n");
+    assert_eq!(render(&markdown), "<h2>a b</h2>\n");
+}
+
 // ~keep An ordered list written as text continues nothing, so it keeps the `.` delimiter.
 #[test]
 fn should_keep_the_dot_delimiter_of_ordered_lists_written_as_text() {
     let options = tier2_options();
     for (html, expected) in [
-        ("<h2><ol><li>a</li></ol><ol><li>b</li></ol></h2>", "## 1. a 1. b\n"),
         (
             "<details><summary><ol><li>a</li></ol><ol><li>b</li></ol></summary></details>",
             "**1. a\n\n1. b**\n",

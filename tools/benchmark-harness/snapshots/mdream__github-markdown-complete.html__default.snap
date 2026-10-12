@@ -69,7 +69,7 @@ comment fields and `.md` files.
 | All bold and italic    | `*** ***`          | None                                              | `***All this text is important***`       | ***All this text is important***       |
 | Subscript              | `<sub> </sub>`     | None                                              | `This is a <sub>subscript</sub> text`    | This is a subscript text               |
 | Superscript            | `<sup> </sup>`     | None                                              | `This is a <sup>superscript</sup> text`  | This is a superscript text             |
-| Underline              | `<ins> </ins>`     | None                                              | `This is an <ins>underlined</ins> text`  | This is an ==underlined== text         |
+| Underline              | `<ins> </ins>`     | None                                              | `This is an <ins>underlined</ins> text`  | This is an underlined text             |
 
 ## [Quoting text](#quoting-text)
 

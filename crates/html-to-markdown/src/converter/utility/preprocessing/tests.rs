@@ -686,3 +686,39 @@ fn an_end_tag_with_no_bracket_ends_no_raw_text_element() {
     let end = find_closing_tag_bytes(page.as_bytes(), "<script>".len(), b"script").expect("an end tag");
     assert_eq!(&page[end..], "tail");
 }
+
+#[test]
+fn should_strip_only_html_cdata_and_keep_opaque_foreign_and_raw_text_regions() {
+    use super::strip_html_cdata;
+    for input in [
+        "<svg><![CDATA[<path/>]]></svg>",
+        "<math><mi><![CDATA[x]]></mi></math>",
+        "<p title=\"<![CDATA[attribute]]>\">visible</p>",
+        "<textarea><![CDATA[literal]]></textarea>",
+        "<!-- <svg> --><math><![CDATA[x]]></math>",
+    ] {
+        assert_eq!(strip_html_cdata(input), input);
+    }
+    assert_eq!(
+        strip_html_cdata("<svg/><![CDATA[hidden]]><p>visible</p>"),
+        "<svg/><p>visible</p>"
+    );
+    assert_eq!(
+        strip_html_cdata("<svg></svg><![CDATA[hidden]]><p>visible</p>"),
+        "<svg></svg><p>visible</p>"
+    );
+    assert_eq!(strip_html_cdata("before<![CDATA[unterminated"), "before");
+}
+
+#[test]
+fn should_remove_html_cdata_after_foreign_text_with_a_literal_less_than() {
+    assert_eq!(
+        super::strip_html_cdata("<svg><text>a < b</text></svg><![CDATA[hidden]]>"),
+        "<svg><text>a < b</text></svg>"
+    );
+}
+
+#[test]
+fn should_end_an_html_cdata_bogus_comment_at_the_first_greater_than() {
+    assert_eq!(super::strip_html_cdata("<![CDATA[hidden>visible"), "visible");
+}

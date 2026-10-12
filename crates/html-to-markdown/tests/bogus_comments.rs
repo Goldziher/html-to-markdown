@@ -105,14 +105,10 @@ fn should_not_touch_a_bogus_comment_lookalike_inside_an_attribute_value() {
 }
 
 #[test]
-fn should_leave_cdata_alone() {
-    // ~keep `<![CDATA[` is a bogus comment only OUTSIDE foreign content; inside `<svg>` or
-    // ~keep `<math>` it is real character data. This pre-pass has no element context to tell
-    // ~keep those apart, so it deliberately does not touch CDATA at all -- getting it wrong
-    // ~keep would corrupt SVG.
+fn should_drop_html_cdata_without_corrupting_foreign_content() {
     let svg = convert("<svg><![CDATA[<not-a-tag>]]></svg><p>after</p>");
     assert!(svg.contains("after"), "content after the SVG must survive: {svg:?}");
-    assert_eq!(convert("<![CDATA[x]]>"), "<![CDATA[x]]>\n");
+    assert_eq!(convert("<![CDATA[x]]>"), "");
 }
 
 #[test]

@@ -312,10 +312,13 @@ fn a_block_in_marks_in_a_heading_is_a_word_of_its_own() {
     assert_on_full(&[
         ("<h2>one\n<b><p>y</p></b>two</h2>", "## one **y** two\n"),
         ("<h2>one <i><div>y</div></i>two</h2>", "## one *y* two\n"),
-        ("<h2>one<ins><p>y</p></ins>two</h2>", "## one ==y== two\n"),
         ("<h2>one<del><p>y</p></del>two</h2>", "## one ~~y~~ two\n"),
     ]);
-    assert_on_both(&[("<h2>one <b>y</b>two</h2>", "## one **y**two\n")]);
+    assert_on_both(&[
+        ("<h2>one <b>y</b>two</h2>", "## one **y**two\n"),
+        // ~keep Inserted text writes no mark (issue #759), so the fast converter keeps the page.
+        ("<h2>one<ins><p>y</p></ins>two</h2>", "## one y two\n"),
+    ]);
 }
 
 /// A sectioning element (`<footer>`, `<section>`, `<article>`, `<aside>`, `<header>`, `<main>`)

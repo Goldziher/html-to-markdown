@@ -295,6 +295,7 @@ completed and standardized on 28 October 2014.[[15]](#cite_note-16)
 #### HTML 2 ####
 
 November 24, 1995
+
 HTML 2.0 was published as [RFC](/wiki/RFC_(identifier) "RFC (identifier)") [1866](https://www.rfc-editor.org/rfc/rfc1866). Supplemental [RFCs](/wiki/Request_for_Comments "Request for Comments") added capabilities:
 
 - November 25, 1995: [RFC](/wiki/RFC_(identifier) "RFC (identifier)") [1867](https://www.rfc-editor.org/rfc/rfc1867) (form-based file upload)
@@ -305,6 +306,7 @@ HTML 2.0 was published as [RFC](/wiki/RFC_(identifier) "RFC (identifier)") [186
 #### HTML 3 ####
 
 January 14, 1997
+
 HTML 3.2[[16]](#cite_note-17) was published as a [W3C Recommendation](/wiki/W3C_Recommendation "W3C Recommendation"). It was the first version developed and standardized exclusively by the
 W3C, as the IETF had closed its HTML Working Group on September 12,
 1996.[[17]](#cite_note-18)
@@ -317,6 +319,7 @@ standardized 14 months later in [MathML](/wiki/MathML "MathML").
 #### HTML 4 ####
 
 December 18, 1997
+
 HTML 4.0[[19]](#cite_note-20) was published as a W3C Recommendation. It offers three variations:
 
 - Strict, in which deprecated elements are forbidden
@@ -333,10 +336,12 @@ April 24, 1998
 HTML 4.0[[21]](#cite_note-22) was reissued with minor edits without incrementing the version number.
 
 December 24, 1999
+
 HTML 4.01[[22]](#cite_note-23) was published as a W3C Recommendation. It offers the same three variations
 as HTML 4.0 and its last errata[[23]](#cite_note-24) were published on May 12, 2001.
 
 May 2000
+
 ISO/IEC 15445:2000[[24]](#cite_note-iso-html-25) ("[ISO](/wiki/International_Organization_for_Standardization "International Organization for Standardization") HTML", based on HTML 4.01 Strict) was published as an ISO/IEC
 international standard.[[25]](#cite_note-26) In the ISO, this standard is in the domain of the [ISO/IEC JTC 1/SC 34](/wiki/ISO/IEC_JTC_1/SC_34 "ISO/IEC JTC 1/SC 34") (ISO/IEC Joint Technical Committee 1, Subcommittee 34 – Document
 description and processing languages).[[24]](#cite_note-iso-html-25)
@@ -350,39 +355,49 @@ W3C's HTML Working Group.
 Main article: [HTML5](/wiki/HTML5 "HTML5")
 
 October 28, 2014
+
 HTML5[[26]](#cite_note-27) was published as a W3C Recommendation.[[27]](#cite_note-28)
 
 November 1, 2016
+
 HTML 5.1[[28]](#cite_note-29) was published as a W3C Recommendation.[[29]](#cite_note-30)[[30]](#cite_note-31)
 
 December 14, 2017
+
 HTML 5.2[[31]](#cite_note-32) was published as a W3C Recommendation.[[32]](#cite_note-33)[[33]](#cite_note-34)
 
 ### HTML draft version timeline ###
 
 October 1991
+
 *HTML Tags*,[[7]](#cite_note-tagshtml-8) an informal CERN document listing 18 HTML tags, was first mentioned in public.
 
 June 1992
+
 First informal draft of the HTML DTD,[[34]](#cite_note-35) with seven subsequent revisions (July 15, August 6, August 18, November 17,
 November 19, November 20, November 22)[[35]](#cite_note-36)[[36]](#cite_note-37)[[37]](#cite_note-html11-38)
 
 November 1992
+
 HTML DTD 1.1 (the first with a version number, based on RCS revisions, which
 start with 1.1 rather than 1.0), an informal draft[[37]](#cite_note-html11-38)
 
 June 1993
+
 Hypertext Markup Language[[38]](#cite_note-39) was published by the [IETF](/wiki/Internet_Engineering_Task_Force "Internet Engineering Task Force") IIIR Working Group as an Internet Draft (a rough proposal for a standard). It
 was replaced by a second version[[39]](#cite_note-ietfiiir-40) one month later.
 
 November 1993
+
 [HTML+](https://www.w3.org/MarkUp/HTMLPlus/htmlplus_1.html) was published by the IETF as an Internet Draft and was a competing proposal to
 the Hypertext Markup Language draft. It expired in July 1994.[[40]](#cite_note-41)
 
 November 1994
+
 First draft (revision 00) of HTML 2.0 published by IETF itself[[41]](#cite_note-42) (called as "HTML 2.0" from revision 02[[42]](#cite_note-43)), that finally led to the publication of [RFC](/wiki/RFC_(identifier) "RFC (identifier)") [1866](https://www.rfc-editor.org/rfc/rfc1866) in November 1995.[[43]](#cite_note-rfc1866-44)
 
 April 1995 (authored March 1995)
+
 HTML 3.0[[44]](#cite_note-45) was proposed as a standard to the IETF, but the proposal expired five months
 later (28 September 1995)[[45]](#cite_note-html30cover-46) without further action. It included many of the capabilities that were in
 Raggett's HTML+ proposal, such as support for tables, text flow around
@@ -407,6 +422,7 @@ extending HTML features."[[14]](#cite_note-raggett-15)
 *Logo of HTML5*
 
 January 2008
+
 [HTML5](/wiki/HTML5 "HTML5") was published as a [Working Draft](/wiki/World_Wide_Web_Consortium#Certification "World Wide Web Consortium") by the W3C.[[49]](#cite_note-50)
 
 Although its syntax closely resembles that of [SGML](/wiki/SGML "SGML"), [HTML5](/wiki/HTML5 "HTML5") has abandoned any attempt to be
@@ -414,6 +430,7 @@ an SGML application and has explicitly defined its own "html" serialization,
 in addition to an alternative XML-based XHTML5 serialization.[[50]](#cite_note-51)
 
 2011 HTML5 – Last Call
+
 On 14 February 2011, the W3C extended the charter of its HTML Working Group
 with clear milestones for HTML5. In May 2011, the working group advanced HTML5
 to "Last Call", an invitation to communities inside and outside W3C to confirm
@@ -423,6 +440,7 @@ specification by 2014, which was the target date for recommendation.[[51]](#cite
 W3C nevertheless continued its project to release HTML5.[[52]](#cite_note-53)
 
 2012 HTML5 – Candidate Recommendation
+
 In July 2012, WHATWG and [W3C](/wiki/W3C "W3C") decided on a
 degree of separation. W3C will continue the HTML5 specification work, focusing
 on a single definitive standard, which is considered a "snapshot" by WHATWG.
@@ -434,6 +452,7 @@ functionality will not be removed.[[53]](#cite_note-54)
 In December 2012, W3C designated HTML5 as a Candidate Recommendation.[[54]](#cite_note-55) The criterion for advancement to [W3C Recommendation](/wiki/W3C_recommendation#W3C_recommendation_(REC) "W3C recommendation") is "two 100% complete and fully interoperable implementations".[[55]](#cite_note-W3Crec-56)
 
 2014 HTML5 – Proposed Recommendation and Recommendation
+
 In September 2014, W3C moved HTML5 to Proposed Recommendation.[[56]](#cite_note-57)
 
 On 28 October 2014, HTML5 was released as a stable W3C Recommendation,[[57]](#cite_note-58) meaning the specification process is complete.[[58]](#cite_note-finalars-59)
@@ -625,6 +644,7 @@ webpage.
 There are several types of markup elements used in HTML:
 
 Structural markup indicates the purpose of text
+
 For example, `<h2>Golf</h2>` establishes "Golf" as a second-level [heading](/wiki/HTML_element#Basic_text "HTML element").
 Structural markup does not denote any specific rendering, but most web
 browsers have default styles for element formatting. Content may be further
@@ -632,6 +652,7 @@ styled using [Cascading Style Sheets](/wiki/Cascading_Style_Sheets "Cascading St
 
 Presentational markup indicates the appearance of the text, regardless of its
 purpose
+
 For example, `<b>bold text</b>` indicates that visual output devices should render "boldface" in bold text,
 but gives little indication what devices that are unable to do this (such as
 aural devices that read the text aloud) should do. In the case of both `<b>bold text</b>` and `<i>italic text</i>`, there are other elements that may have equivalent visual renderings but
@@ -643,6 +664,7 @@ italicized. Most presentational markup elements have become [deprecated](/wiki/D
 4.0 specification in favor of using [CSS](/wiki/CSS "CSS") for styling.
 
 Hypertext markup makes parts of a document into links to other documents
+
 An anchor element creates a [hyperlink](/wiki/Hyperlink "Hyperlink") in the document and
 its `href` attribute sets the link's target [URL](/wiki/URL "URL"). For example, the HTML markup `<a`  
 `                        href="https://en.wikipedia.org/">Wikipedia</a>`, will render the word "[Wikipedia](https://en.wikipedia.org/)" as a hyperlink. To render an image as a hyperlink, an `img` element is inserted as content into the `a` element. Like `br`, `img` is an empty
@@ -1415,6 +1437,4 @@ HTML
 
 [](#) [](#) [](#) [](#) [](#) [](#) [](#) [](#)
 
-139 languages
-
-[Add topic](#)
+139 languages [Add topic](#)

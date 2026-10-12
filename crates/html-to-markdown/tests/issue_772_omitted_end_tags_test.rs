@@ -120,7 +120,7 @@ fn list_items_and_definitions_with_no_end_tag_stay_siblings() {
     );
     assert_all_routes(
         "<!doctype html><dl><dt>term<dd>desc<dt>term2<dd>desc2</dl>after",
-        "term\ndesc\n\nterm2\ndesc2\n\nafter\n",
+        "term\n\ndesc\n\nterm2\n\ndesc2\n\nafter\n",
     );
 }
 
@@ -176,10 +176,11 @@ fn a_block_in_an_open_list_item_or_section_ends_with_its_parent() {
         "<!doctype html><article><header><p>h</header><p>one</article><footer><p>f</footer>tail",
         "h\n\none\n\nf\n\ntail\n",
     );
-    assert_all_routes("<!doctype html><dl><dt>a<dt>b<dd>c</dl>after", "a\nb\nc\n\nafter\n");
+    // ~keep A definition term is a paragraph of its own (issue #779).
+    assert_all_routes("<!doctype html><dl><dt>a<dt>b<dd>c</dl>after", "a\n\nb\n\nc\n\nafter\n");
     assert_default_and_tier2(
         "<!doctype html><dl><dt>t<dd><p>d1<p>d2</dl>after",
-        "t\nd1\n\nd2\n\nafter\n",
+        "t\n\nd1\n\nd2\n\nafter\n",
     );
 }
 
@@ -733,7 +734,8 @@ fn a_table_part_name_outside_a_table_keeps_no_private_mark() {
         ),
         (
             "<math><tbody>x</tbody></math><div><p>one</div>tail",
-            "<!-- MathML: <math><tbody>x</tbody></math> --> x\n\none\n\ntail\n",
+            // ~keep A `MathML` element writes its visible text and no comment (issue #754).
+            "x\n\none\n\ntail\n",
         ),
     ] {
         assert_default_and_tier2(html, expected);

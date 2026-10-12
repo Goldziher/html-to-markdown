@@ -328,6 +328,26 @@ pub fn handle_pre(tag: &tl::HTMLTag, handler: HandlerContext<'_>) {
         return;
     }
 
+    // ~keep CommonMark 5.3 keeps indented content in the last list item until an explicit boundary.
+    if handler.options.code_block_style == crate::options::CodeBlockStyle::Indented
+        && !handler.context.in_table_cell
+        && matches!(
+            crate::converter::utility::siblings::previous_content_block(
+                handler.node_handle,
+                handler.parser,
+                handler.dom_context
+            ),
+            Some("ul" | "ol")
+        )
+    {
+        if handler.context.in_list_item {
+            crate::converter::list::utils::start_block_in_list_item(handler.output, handler.context, handler.options);
+        } else {
+            separate_code_block(handler.output, handler.context);
+        }
+        handler.output.push_str("<!-- -->\n\n");
+    }
+
     let offsets = cell_break_offsets
         .as_ref()
         .map(|offsets| offsets.borrow().clone())
