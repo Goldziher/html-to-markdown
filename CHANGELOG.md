@@ -83,6 +83,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Plain text output separates the text of a form control from the words beside it, as the
+  Markdown output does. This shows for a control outside a `form` element with the default
+  options, and for a control inside one with `remove_forms` off.
+  `<p>aaa<select><option>Xone</option><option>Xtwo</option></select>bbb</p>` gave
+  `aaaXoneXtwobbb` and now gives `aaa Xone Xtwo bbb`. Each option of a select list or a data
+  list is a word of its own. A button, an output, a meter, a progress bar or a text area is a
+  word of its own too: `<h1>aaa<button>Xone</button><button>Xtwo</button>bbb</h1>` gave
+  `aaaXoneXtwobbb` and now gives `aaa Xone Xtwo bbb`. A word after the `form` or `fieldset`
+  element that holds the control is separated too:
+  `<p>aaa<fieldset><button>Xone</button></fieldset>bbb</p>` gave `aaaXonebbb` and now gives
+  `aaa Xone bbb`. So is a word after a control that holds the end of a block, such as a
+  button with an `hr` element in it. No space is written before closing punctuation. In a
+  `pre` element a button adds no space, and the options of a select list stay separate
+  words. With a visitor, an element that is removed or replaced keeps the space after a
+  control before it and leaves no text of its own, and the removal no longer panics inside
+  a multi-byte character
+  ([#814](https://github.com/xberg-io/html-to-markdown/issues/814)).
+- An `option` element with no select list around it is a word of its own in Markdown output and
+  in plain text output: `<p>aaa<option>Xone</option>bbb</p>` gave `aaa Xonebbb` and now gives
+  `aaa Xone bbb`. The option code no longer writes a space of its own after an opening bracket:
+  `<p>(<option>o2</option>w3</p>` gave `( o2w3` and now gives `(o2 w3`, as a select list in that
+  place does. A line end of the source before such an option is one space in Markdown
+  ([#846](https://github.com/xberg-io/html-to-markdown/issues/846)).
 - A `<title>` before the body content of a page with no `<head>` tag is the document title, as
   in a browser. `<title>T</title><div><p>one</p></div>tail` gave `T`, `one` and `tail` as body
   text and no front matter. It now gives the front matter `title: T`, then `one` and `tail`.
