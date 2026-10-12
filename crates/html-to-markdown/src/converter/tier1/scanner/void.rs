@@ -569,6 +569,7 @@ fn dispatch_close(
         TagKind::TableRow => close_table_row(state),
         TagKind::TableCell { .. } => close_table_cell(state, false, options)?,
         TagKind::TableCaption => close_table_caption(state),
+        TagKind::Block if figure_joins_an_image(state, frame, name_lower) => return Err(BailReason::Classifier),
         TagKind::Block => close_block_container(state, frame, name_lower, options),
         TagKind::Summary => close_summary(state, frame),
         TagKind::Figcaption => close_figcaption(state, frame),
@@ -605,6 +606,19 @@ fn close_abbreviation(state: &mut Tier1State, frame: &OpenTag) {
     dest.push_str(&title);
     dest.push(')');
     dest.push_str(&trailing);
+}
+
+/// Whether the `<figure>` of `frame` holds a space or a line end before an image.
+///
+/// ~keep Tier-2 takes that character out of the content of a figure
+/// ~keep (`semantic/figure.rs::handle_figure`). This scanner has no such rule, so the caller
+/// ~keep hands the page over (issue #845: write the text of Tier-2 or hand over).
+fn figure_joins_an_image(state: &mut Tier1State, frame: &OpenTag, name_lower: &[u8]) -> bool {
+    name_lower == b"figure"
+        && state
+            .cell_or_output_mut()
+            .get(frame.content_start..)
+            .is_some_and(|content| content.contains(" ![") || content.contains("\n!["))
 }
 
 /// Append a paragraph-break separator after a generic block container close

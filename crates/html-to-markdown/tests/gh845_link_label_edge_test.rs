@@ -536,3 +536,72 @@ fn a_blank_text_after_a_line_break_in_a_link_with_an_empty_address_goes_to_the_f
         );
     }
 }
+
+/// In a figure the full converter takes out the space or the line end before an image. The label
+/// of a link with an empty address gives the space of its start to the text before it, so that
+/// space stands before the image. The fast converter has no figure rule: it leaves such a figure
+/// to the full converter (issue #845: write its text or hand the page over). The public route
+/// that reaches the fast converter writes the text of the full converter.
+#[test]
+fn a_space_before_an_image_in_a_figure_goes_to_the_full_converter() {
+    const IMAGE: &str = "<img src=\"/i.png\" alt=\"Im\">";
+    for (label, line) in [
+        (format!(" {IMAGE}"), "Press![Im](/i.png)now"),
+        (format!("\t{IMAGE}"), "Press![Im](/i.png)now"),
+        (format!("\n{IMAGE}"), "Press![Im](/i.png)now"),
+        (format!("&nbsp;{IMAGE}"), "Press![Im](/i.png)now"),
+        (format!("\u{2003}{IMAGE}"), "Press![Im](/i.png)now"),
+        (format!(" {IMAGE} Go"), "Press![Im](/i.png) Gonow"),
+        (
+            format!(" <picture><source srcset=\"/s.webp\">{IMAGE}</picture>"),
+            "Press![Im](/i.png)now",
+        ),
+    ] {
+        let html = format!("<figure>Press<a href=\"\">{label}</a>now<figcaption>Cap</figcaption></figure><p>next</p>");
+        let wanted = format!("{line}\n\n*Cap*\n\nnext\n");
+        assert_row_of_full_converter(&html, &wanted);
+        assert_eq!(public_fast_route(&html), wanted, "public fast route: {html:?}");
+        assert_eq!(fast(&html), None, "fast converter: {html:?}");
+    }
+}
+
+/// The full converter takes out the line end of a hard break before an image in a figure too.
+/// The fast converter writes that break, so it hands the figure over.
+#[test]
+fn a_line_break_before_an_image_in_a_figure_goes_to_the_full_converter() {
+    let html = "<figure>Press<a href=\"/p\"><br><img src=\"/i.png\" alt=\"Im\"></a>now<figcaption>Cap</figcaption></figure><p>next</p>";
+    let wanted = "Press[ ![Im](/i.png)](/p)now\n\n*Cap*\n\nnext\n";
+    assert_row_of_full_converter(html, wanted);
+    assert_eq!(public_fast_route(html), wanted, "public fast route: {html:?}");
+    assert_eq!(fast(html), None, "fast converter: {html:?}");
+}
+
+/// A figure with no space and no line end before an image stays with the fast converter.
+#[test]
+fn a_figure_with_no_space_before_its_image_is_written_in_both() {
+    assert_row(
+        "<figure>Press<a href=\"\"><img src=\"/i.png\" alt=\"Im\"></a>now<figcaption>Cap</figcaption></figure><p>next</p>",
+        "Press![Im](/i.png)now\n\n*Cap*\n\nnext\n",
+    );
+}
+
+/// Known limits, pinned as the output of today (not the wanted text). A form feed at a label
+/// edge stays a character outside the link in a paragraph, and not after a media element: in a
+/// list item the form feed after an `iframe` at a label end is lost. The rule holds for a link
+/// label, not for the text of an autolink: a form feed at its edge is one space.
+#[test]
+fn a_form_feed_after_a_media_element_or_at_an_autolink_edge_is_not_kept() {
+    for (html, written) in [
+        (
+            "<ul><li>Press<a href=\"/p\"><iframe src=\"/f\"></iframe>\u{c}</a>now</li><li>next</li></ul>",
+            "- Press[\\[iframe\\](/f)](/p)now\n- next\n",
+        ),
+        (
+            "<p>Press<a href=\"https://e.org/\">https://e.org/\u{c}</a>now</p><p>next</p>",
+            "Press<https://e.org/> now\n\nnext\n",
+        ),
+    ] {
+        assert_row_of_full_converter(html, written);
+        assert_eq!(public_fast_route(html), written, "public fast route: {html:?}");
+    }
+}
