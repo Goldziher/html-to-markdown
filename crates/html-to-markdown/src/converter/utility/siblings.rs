@@ -134,7 +134,8 @@ pub fn text_place(
 /// ~keep An element in the text flow ([`writes_in_text_flow`]) writes no mark: the space that
 /// ~keep ends its text is a written space of the text, and the Unicode space after the element
 /// ~keep is a character after it (`a <span>x </span>&nbsp;b` has two spaces). When it has no
-/// ~keep content (`DomContext::holds_content`: empty elements of its kind in it are none) it writes nothing, and the line end before it is the white space that the text
+/// ~keep content (`DomContext::holds_content`: empty elements in it are none) it writes
+/// ~keep nothing, and the line end before it is the white space that the text
 /// ~keep after it starts with: the two are one run (`a\n<span></span>&nbsp;b` has one space). A
 /// ~keep table cell has no line end: the rule of the empty element holds there.
 fn place_after_element(

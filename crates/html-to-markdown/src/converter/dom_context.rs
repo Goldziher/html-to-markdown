@@ -6,10 +6,10 @@
 use std::cell::{OnceCell, RefCell};
 use std::collections::HashMap;
 
-use crate::converter::main_helpers::is_inline_element;
+use crate::converter::main_helpers::{is_html5_void_element, is_inline_element};
 use crate::converter::utility::content::normalized_tag_name;
 use crate::converter::utility::escaping::is_block_level_name;
-use crate::converter::utility::white_space::{TextClass, classify_text, writes_in_text_flow};
+use crate::converter::utility::white_space::{TextClass, classify_text};
 use crate::text;
 
 /// Cached information about an HTML tag element.
@@ -72,8 +72,6 @@ pub struct DomContext {
     pub(crate) table_content_summary_cache: RefCell<HashMap<u32, TableContentSummary>>,
     /// For each element that [`DomContext::holds_text`] read: whether it holds text.
     pub(crate) holds_text_cache: RefCell<HashMap<u32, bool>>,
-    /// For each element that [`DomContext::holds_content`] read: whether it holds content.
-    pub(crate) holds_content_cache: RefCell<HashMap<u32, bool>>,
 }
 
 #[cfg(test)]
@@ -362,22 +360,31 @@ impl DomContext {
         })
     }
 
-    /// Whether the element `id` holds content: a text of any kind, or an element that does not
-    /// write its content into the text flow ([`writes_in_text_flow`]), at any depth of elements
-    /// that do. A comment is no content: `<span><span><!-- c --></span></span>` holds none.
+    /// Whether the element `id` holds content: a text of any kind or a void element
+    /// ([`is_html5_void_element`]), at any depth. A comment is no content, and an element with
+    /// neither in it is none: `<span><b></b></span>` and `<span><span><!-- c --></span></span>`
+    /// hold none, and `<span><br></span>` holds content.
     ///
-    /// ~keep The walk and its record are those of [`DomContext::holds_text`].
+    /// ~keep A void element writes output with no content of its own (a `<br>`, an image): the
+    /// ~keep element around it is not empty.
+    /// ~keep The walk is that of [`DomContext::holds_text`], with a record that lives for this
+    /// ~keep one question. The caller asks only for an element that holds no text, right before a
+    /// ~keep text that starts with a Unicode space. Such a text is text, so no element that is
+    /// ~keep asked about holds another one that is asked about: no node is read for two questions.
     pub(crate) fn holds_content(&self, id: u32, parser: &tl::Parser) -> bool {
-        self.holds(id, parser, &self.holds_content_cache, |node, child| match node {
+        let record = RefCell::new(HashMap::new());
+        self.holds(id, parser, &record, |node, child| match node {
             tl::Node::Raw(_) => Held::Yes,
-            tl::Node::Tag(_) => {
-                let in_flow = self
-                    .tag_info(child, parser)
-                    .is_some_and(|info| writes_in_text_flow(&info.name));
-                if in_flow { Held::Inside } else { Held::Yes }
-            }
+            tl::Node::Tag(_) if self.is_void(child, parser) => Held::Yes,
+            tl::Node::Tag(_) => Held::Inside,
             tl::Node::Comment(_) => Held::No,
         })
+    }
+
+    /// Whether the element `id` is an HTML void element ([`is_html5_void_element`]).
+    fn is_void(&self, id: u32, parser: &tl::Parser) -> bool {
+        self.tag_info(id, parser)
+            .is_some_and(|info| is_html5_void_element(info.name.as_bytes()))
     }
 
     /// Whether a node in the element `id` is held, as `held` answers for each node, with the
