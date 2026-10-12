@@ -248,6 +248,11 @@ pub fn trim_line_end_whitespace(output: &mut String, style: CodeBlockStyle) {
     }
 }
 
+/// Whether the caller keeps `<menu>` elements as HTML.
+pub fn preserves_menu(options: &ConversionOptions) -> bool {
+    options.preserve_tags.iter().any(|tag| tag.eq_ignore_ascii_case("menu"))
+}
+
 /// Check for custom elements or paragraphs misnested inside namespaced elements.
 pub fn has_custom_element_tags(html: &str) -> bool {
     // ~keep Custom elements must have a hyphen in their TAG NAME, not in attributes.
