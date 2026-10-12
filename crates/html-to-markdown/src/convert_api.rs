@@ -159,6 +159,13 @@ fn prepare_conversion<'a>(html: &'a str, options: &ConversionOptions) -> Result<
         Cow::Borrowed(_) => normalized_input,
         Cow::Owned(normalized) => Cow::Owned(normalized),
     };
+    // ~keep Recover the JSON boundary before routing or raw-text stripping can consume visible siblings (#875).
+    let repaired_scripts =
+        crate::converter::utility::preprocessing::repair_unclosed_structured_data_scripts(normalized_input.as_ref());
+    let normalized_input = match repaired_scripts {
+        Cow::Borrowed(_) => normalized_input,
+        Cow::Owned(repaired) => Cow::Owned(repaired),
+    };
     let normalized_html = crate::converter::repair_head_content_before_explicit_head(normalized_input.as_ref())
         .map_or(normalized_input, Cow::Owned);
     let document_base_href = (options.base_url.is_some() || options.extract_metadata)

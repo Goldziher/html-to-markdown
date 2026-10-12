@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- An unclosed JSON-LD script beginning with a complete JSON object or array keeps the markup
+  after that value and its original JSON bytes for metadata. Invalid or unrecognized JSON uses
+  the existing empty-script fallback ([#875](https://github.com/xberg-io/html-to-markdown/issues/875)).
+
 - Form controls inside code spans keep legends and buttons as separate words, without
   emphasis markers or split code spans in table cells
   ([#815](https://github.com/xberg-io/html-to-markdown/issues/815)).

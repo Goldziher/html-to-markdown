@@ -633,7 +633,7 @@ enum AttributeScan {
     Quoted(u8),
 }
 
-fn scan_markup_end(bytes: &[u8], start: usize) -> Option<usize> {
+pub(super) fn scan_markup_end(bytes: &[u8], start: usize) -> Option<usize> {
     if bytes[start..].starts_with(b"<!--") {
         let body = start + 4;
         if bytes.get(body) == Some(&b'>') {
