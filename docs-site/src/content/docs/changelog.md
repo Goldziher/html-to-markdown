@@ -20,7 +20,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   ([#829](https://github.com/xberg-io/html-to-markdown/issues/829)). With an unclosed label,
   `<p>before<form><label>name<input></form>after<p>next` now gives `before` on every route:
   HTML5 keeps `after` and `next` inside the label and form. Closing the label before the form
-  keeps `after` and `next` as separate paragraphs. Pages whose forms are removed use the full converter;
+  keeps `after` and `next` as separate paragraphs. Nested forms also use the HTML5 tree:
+  `<form>a<form>b</form>c</form>d` now keeps `cd` when removing forms, instead of losing `c`.
+  Pages whose forms are removed, and retained forms with nested starts, use the full converter;
   well-formed retained forms can still use the fast converter.
 
 - White space at the start or the end of a link label or of a short quotation is written beside

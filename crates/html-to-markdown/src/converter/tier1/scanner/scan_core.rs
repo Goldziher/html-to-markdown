@@ -282,6 +282,16 @@ impl<'a> Tier1Scanner<'a> {
     }
 
     fn prepare_open_tag(&mut self, name_lower: &[u8]) -> Result<(), BailReason> {
+        // ~keep Form ancestry cannot decide HTML5's form-pointer semantics; Tier-2 repairs it.
+        if name_lower == b"form"
+            && self
+                .state
+                .stack
+                .iter()
+                .any(|frame| self.bytes[frame.name_range.clone()].eq_ignore_ascii_case(b"form"))
+        {
+            return Err(BailReason::Classifier);
+        }
         // ~keep Only a br or stripped raw-text tag keeps a pending newline join open.
         if !matches!(name_lower, b"br" | b"script" | b"style") {
             self.state.pending_newline_join = None;
