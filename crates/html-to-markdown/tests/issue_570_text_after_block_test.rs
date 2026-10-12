@@ -357,7 +357,7 @@ fn should_not_separate_on_whitespace_between_blocks() {
     // ~keep Whitespace between two blocks is not content: a definition term and its description,
     // ~keep or a list and a quote, keep the spacing their own handlers give them.
     for (html, expected) in [
-        ("<dl><dt>T</dt>\n<dd>D</dd></dl>", "T\nD\n"),
+        ("<dl><dt>T</dt>\n<dd>D</dd></dl>", "T\n\nD\n"),
         (
             "<div><ul><li>A</li></ul>\n<blockquote>Q</blockquote></div>",
             "- A\n\n> Q\n",

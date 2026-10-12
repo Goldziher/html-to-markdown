@@ -40,24 +40,39 @@ fn cache_sibling_context(siblings: &[tl::NodeHandle], parser: &tl::Parser, ctx: 
     let mut next_inline_like = false;
     let mut next_tag = None;
     let mut next_whitespace = false;
+    let mut following_content = crate::converter::utility::siblings::FollowingContent::Absent;
     for sibling in siblings.iter().rev() {
         let id = sibling.get_inner();
         ctx.ensure_capacity(id);
         let _ = ctx.next_inline_like_map[id as usize].set(next_inline_like);
         let _ = ctx.next_tag_map[id as usize].set(next_tag);
         let _ = ctx.next_whitespace_map[id as usize].set(next_whitespace);
+        // ~keep Blank text and comments inherit the same following-content answer. Recording
+        // ~keep it during this reverse walk avoids a suffix scan for every form-feed text (#791).
+        crate::converter::utility::siblings::count_following_content_read();
+        ctx.following_content_map[id as usize] = following_content;
 
         match sibling.get(parser) {
             Some(tl::Node::Tag(_)) => {
                 next_inline_like = inline_like_value(*sibling, parser).unwrap_or(false);
                 next_tag = Some(id);
                 next_whitespace = false;
+                following_content = if next_inline_like {
+                    crate::converter::utility::siblings::FollowingContent::Inline
+                } else {
+                    crate::converter::utility::siblings::FollowingContent::NotInline
+                };
             }
             Some(tl::Node::Raw(raw)) => {
                 let is_whitespace = raw.as_utf8_str().trim().is_empty();
                 if !is_whitespace {
                     next_inline_like = false;
                     next_tag = None;
+                    following_content = if raw.as_utf8_str().starts_with(char::is_whitespace) {
+                        crate::converter::utility::siblings::FollowingContent::NotInline
+                    } else {
+                        crate::converter::utility::siblings::FollowingContent::Inline
+                    };
                 }
                 next_whitespace = is_whitespace;
             }
@@ -85,7 +100,9 @@ pub fn build_dom_context(dom: &tl::VDom, parser: &tl::Parser, _input_len: usize)
         prev_tag_map: Vec::new(),
         next_tag_map: Vec::new(),
         next_whitespace_map: Vec::new(),
+        following_content_map: Vec::new(),
         table_content_summary_cache: std::cell::RefCell::new(std::collections::HashMap::new()),
+        holds_text_cache: std::cell::RefCell::new(std::collections::HashMap::new()),
     };
 
     // ~keep Node ids index `dom.nodes()`, so the arena length is an exact upper bound on them.

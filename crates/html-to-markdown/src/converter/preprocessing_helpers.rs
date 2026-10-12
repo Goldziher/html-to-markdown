@@ -26,6 +26,8 @@ pub fn inline_ancestor_allows_block(tag_name: &str) -> bool {
 struct MisnestState {
     /// True if a strict ancestor is an anchor.
     inside_anchor: bool,
+    inside_form: bool,
+    form_repair_opaque: bool,
     /// True if this node or any strict ancestor is `<pre>`/`<code>`.
     inside_preformatted: bool,
     /// True if any strict ancestor is an inline element that disallows block children.
@@ -44,6 +46,8 @@ struct MisnestState {
 impl MisnestState {
     const ROOT: Self = Self {
         inside_anchor: false,
+        inside_form: false,
+        form_repair_opaque: false,
         inside_preformatted: false,
         blocked_by_inline_ancestor: false,
         p_ancestor_state: false,
@@ -61,6 +65,9 @@ impl MisnestState {
 fn node_is_misnested(info: &TagInfo, state: MisnestState, self_inside_preformatted: bool) -> bool {
     // An anchor nested inside another anchor, outside preformatted content.
     (info.name == "a" && state.inside_anchor && !state.inside_preformatted)
+        // ~keep A nested form in tl can hide text outside the HTML5 form. Ancestry is only
+        // ~keep a repair signal: html5ever owns the form pointer and its end-tag semantics.
+        || (info.name == "form" && state.inside_form && !state.form_repair_opaque)
         // ~keep Table elements under <p>: tl misparsed an unclosed <p> in <td>.
         || (matches!(info.name.as_str(), "td" | "tr" | "th") && state.p_ancestor_state)
         || (info.is_block && !self_inside_preformatted && state.blocked_by_inline_ancestor)
@@ -77,6 +84,11 @@ fn node_is_misnested(info: &TagInfo, state: MisnestState, self_inside_preformatt
 fn child_misnest_state(info: &TagInfo, state: MisnestState, self_inside_preformatted: bool) -> MisnestState {
     MisnestState {
         inside_anchor: state.inside_anchor || info.name == "a",
+        inside_form: state.inside_form || info.name == "form",
+        // ~keep Templates have independent form parsing; raw-text bodies contain no tags.
+        form_repair_opaque: state.form_repair_opaque
+            || info.name == "template"
+            || crate::converter::tier1::tags::lookup(info.name.as_bytes()).is_some_and(|spec| spec.is_rawtext),
         inside_preformatted: self_inside_preformatted,
         blocked_by_inline_ancestor: state.blocked_by_inline_ancestor
             || (is_inline_element(&info.name) && !inline_ancestor_allows_block(&info.name)),

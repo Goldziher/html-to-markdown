@@ -132,12 +132,10 @@ fn should_keep_a_pure_data_uri_src_when_no_fallback_attribute_exists() {
 }
 
 #[test]
-fn should_leave_an_img_with_no_usable_attributes_at_all_unchanged() {
-    // ~keep Pre-existing (pre-fix) behaviour for a `src`-less `<img>`: an empty
-    // ~keep destination is wrapped in `<>` by `append_url_destination`. Pinned here to
-    // ~keep prove `resolve_effective_src` does not change this no-fallback-available case.
+fn should_use_alt_text_when_an_img_has_no_usable_source() {
+    // ~keep With no usable source, the alternative text stands for the image (#756).
     let html = r#"<img alt="No source anywhere" />"#;
-    assert_eq!(convert(html), "![No source anywhere](<>)\n");
+    assert_eq!(convert(html), "No source anywhere\n");
 }
 
 #[test]

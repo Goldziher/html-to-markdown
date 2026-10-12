@@ -127,12 +127,11 @@ fn should_write_no_space_at_the_start_of_the_line_after_a_break() {
         assert_eq!(tier2(html), expected, "input: {html:?}");
         assert_eq!(tier1(html), expected, "input: {html:?}");
     }
-    // ~keep The white space between a definition term and the next term or description is a
-    // ~keep line of one space in the full converter, as before this change; the fast converter
-    // ~keep writes the start of the line with no space (step 3).
+    // ~keep A definition term is a paragraph of its own (issue #779). The white space between it
+    // ~keep and the next term or description is no space at the start of that paragraph.
     for html in ["<dl><dt>a</dt> <dd> b</dd></dl>", "<dl><dt>a</dt> <dt> b</dt></dl>"] {
-        assert_eq!(tier2(html), "a\n b\n", "input: {html:?}");
-        assert_eq!(tier1(html), "a\nb\n", "input: {html:?}");
+        assert_eq!(tier2(html), "a\n\nb\n", "input: {html:?}");
+        assert_eq!(tier1(html), "a\n\nb\n", "input: {html:?}");
     }
     let no_highlight = ConversionOptions {
         highlight_style: HighlightStyle::None,

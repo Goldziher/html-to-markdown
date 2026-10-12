@@ -179,6 +179,33 @@ mod tests {
     }
 
     #[test]
+    fn should_repair_a_form_nested_in_a_form_without_an_omitted_end_tag() {
+        let (calls, content) = parse_calls_for("<form>a<form>b</form>c</form>d");
+
+        assert_eq!(content.as_deref(), Some("cd\n"));
+        assert_eq!(calls, 2);
+    }
+
+    #[test]
+    fn should_not_repair_form_shaped_text_or_forms_inside_a_template() {
+        for html in [
+            "<form>a</form><form>b</form><p>tail</p>",
+            "<form title='<form>'>a</form><p>tail</p>",
+            "<form><!-- <form>b</form> -->a</form><p>tail</p>",
+            "<form><script>const text = '<form><form>';</script>a</form><p>tail</p>",
+            "<form><style>a::after { content: '<form><form>'; }</style>a</form><p>tail</p>",
+            "<form><template><form>b</form></template>a</form><p>tail</p>",
+            "<template><form>a<form>b</form>c</form></template><p>tail</p>",
+            "<form><noscript><form>a<form>b</form>c</form></noscript></form><p>tail</p>",
+        ] {
+            let (calls, content) = parse_calls_for(html);
+
+            assert_eq!(calls, 1, "{html:?}");
+            assert_eq!(content.as_deref(), Some("tail\n"), "{html:?}");
+        }
+    }
+
+    #[test]
     fn should_parse_once_when_only_html_and_body_have_no_end_tag() {
         for html in ["<html><body><p>one</p><p>two</p>", "<HTML><BODY><p>one</p><p>two</p>"] {
             let (calls, content) = parse_calls_for(html);

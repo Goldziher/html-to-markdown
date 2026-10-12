@@ -238,8 +238,8 @@ fn should_keep_the_blocks_of_a_list_item_in_a_quote_in_the_item() {
     assert_converts(
         "<blockquote><ul><li>x<dl><dt>t</dt><dd>d</dd></dl></li></ul></blockquote>",
         &options(TierStrategy::Tier2),
-        "> - x\n>\n>   t\n>   d\n",
-        "<blockquote><ul><li><p>x</p><p>td</p></li></ul></blockquote>",
+        "> - x\n>\n>   t\n>\n>   d\n",
+        "<blockquote><ul><li><p>x</p><p>t</p><p>d</p></li></ul></blockquote>",
     );
     assert_converts(
         "<blockquote><ul><li>x<section><p>s</p></section></li></ul></blockquote>",

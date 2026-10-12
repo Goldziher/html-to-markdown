@@ -26,6 +26,12 @@ pub(super) fn dispatch_tag<'a>(
         crate::converter::handlers::code_block::handle_line_element_in_pre(node_handle, parser, output, handler);
         return false;
     }
+    // ~keep Inline-code link ranges belong to this buffer. Container handlers must not
+    // ~keep collect children in detached buffers or insert block markup around those ranges (#813).
+    if handler.ctx.inline_code_links.is_some() && !code_collection_handler(tag_name) {
+        crate::converter::block::container::handle_passthrough(node_handle, parser, output, handler);
+        return false;
+    }
     let mut dispatcher = TagDispatcher {
         tag_name,
         node_handle,
@@ -34,6 +40,15 @@ pub(super) fn dispatch_tag<'a>(
         output,
         handler,
     };
+    if handler.ctx.in_heading
+        && matches!(
+            tag_name,
+            "p" | "section" | "article" | "nav" | "aside" | "header" | "footer" | "main" | "form"
+        )
+    {
+        dispatcher.dispatch_div_like();
+        return false;
+    }
     if dispatcher.dispatch_inline() || dispatcher.dispatch_blocks() {
         return false;
     }
@@ -47,12 +62,43 @@ pub(super) fn dispatch_tag<'a>(
     false
 }
 
+fn code_collection_handler(tag_name: &str) -> bool {
+    matches!(
+        tag_name,
+        "a" | "br"
+            | "img"
+            | "code"
+            | "kbd"
+            | "samp"
+            | "strong"
+            | "b"
+            | "em"
+            | "i"
+            | "mark"
+            | "del"
+            | "s"
+            | "strike"
+            | "ins"
+            | "u"
+            | "small"
+            | "sub"
+            | "sup"
+            | "var"
+            | "dfn"
+            | "abbr"
+            | "span"
+            | "q"
+            | "template"
+            | "noscript"
+    )
+}
+
 impl TagDispatcher<'_, '_> {
     fn dispatch_inline(&mut self) -> bool {
         let handler = self.handler;
         match self.tag_name {
             "strong" | "b" | "em" | "i" | "mark" | "del" | "s" | "strike" | "ins" | "u" | "small" | "sub" | "sup"
-            | "kbd" | "samp" | "var" | "dfn" | "abbr" | "ruby" | "rb" | "rt" | "rp" | "rtc" | "span" => {
+            | "kbd" | "samp" | "tt" | "var" | "dfn" | "abbr" | "ruby" | "rb" | "rt" | "rp" | "rtc" | "span" => {
                 crate::converter::inline::dispatch_inline_handler(
                     self.tag_name,
                     crate::converter::inline::HandlerContext::new((
@@ -160,7 +206,17 @@ impl TagDispatcher<'_, '_> {
                 self.output,
                 handler,
             ),
-            "wbr" | "thead" | "tbody" | "tfoot" | "tr" | "th" | "td" | "source" => {
+            // ~keep A table handler walks its own rows and cells, so a part that arrives here is
+            // ~keep stray, in a cell too: its tag is ignored and its text is kept (#805).
+            "td" | "th" | "tr" | "thead" | "tbody" | "tfoot" => {
+                crate::converter::block::container::handle_passthrough(
+                    self.node_handle,
+                    self.parser,
+                    self.output,
+                    handler,
+                );
+            }
+            "wbr" | "source" => {
                 crate::converter::block::container::handle_noop();
             }
             "br" => crate::converter::block::line_break::handle(self.node_handle, self.parser, self.output, handler),
@@ -214,7 +270,12 @@ impl TagDispatcher<'_, '_> {
     /// measuring another table, which keeps issue #406's deeply nested layouts linear.
     fn dispatch_table(&mut self) -> bool {
         if self.handler.ctx.measure_width_only {
-            let text = self.handler.dom_ctx.text_content(*self.node_handle, self.parser);
+            let text = crate::converter::block::table::cell::nested_table_width_text(
+                self.node_handle,
+                self.parser,
+                self.handler.dom_ctx,
+                self.handler.options.br_in_tables,
+            );
             self.output.push_str(text.as_str());
             return true;
         }

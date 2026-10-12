@@ -4,10 +4,9 @@
 //! - **head**: Document metadata container; processes script[type="application/ld+json"]
 //! - **script**: Script elements; extracts JSON-LD structured data when appropriate
 //! - **style**: CSS stylesheet elements; skipped in conversion
-//! - **math**: `MathML` elements with serialization and HTML comments for preservation
+//! - **math**: Visible text of `MathML` elements
 
 use crate::converter::block::container::HandlerContext;
-use crate::converter::media::svg::serialize_element;
 use crate::options::ConversionOptions;
 #[cfg(feature = "metadata")]
 use crate::text::decode_attribute_value_cow;
@@ -23,7 +22,7 @@ type DomContext = crate::converter::DomContext;
 /// - head: Scans for structured data in script[type="application/ld+json"]
 /// - script: Extracts JSON-LD for structured data collection
 /// - style: Skipped (CSS not relevant in markdown)
-/// - math: Preserves `MathML` as HTML comments with text content
+/// - math: Outputs visible `MathML` text
 pub fn handle(
     tag_name: &str,
     node_handle: &NodeHandle,
@@ -165,7 +164,7 @@ fn handle_script(node_handle: &NodeHandle, parser: &Parser, _output: &mut String
 
 /// Handle math element.
 ///
-/// `MathML` elements are serialized to HTML and wrapped in a comment to preserve them.
+/// `MathML` elements contribute their visible text.
 /// The text content of the element is also output as plain text.
 fn handle_math(
     node_handle: &NodeHandle,
@@ -182,8 +181,6 @@ fn handle_math(
     if text_content.is_empty() {
         return;
     }
-
-    let math_html = serialize_element(node_handle, parser);
 
     let escaped_text = escape(
         &text_content,
@@ -210,9 +207,6 @@ fn handle_math(
         output.push_str("\n\n");
     }
 
-    output.push_str("<!-- MathML: ");
-    output.push_str(&math_html);
-    output.push_str(" --> ");
     output.push_str(&escaped_text);
 
     if is_display_block && !ctx.in_paragraph && !ctx.convert_as_inline {

@@ -189,17 +189,7 @@ fn emit_inserted_wrapped(output: &mut String, content: &str, site: InlineSite<'_
             site,
         );
     } else {
-        emit_wrapped_inline(
-            output,
-            content,
-            &InlineDelimiters {
-                open: "==",
-                close: "==",
-                merge_symbol: Some('='),
-                sibling_tag_names: &INSERTED_SIBLING_TAGS,
-            },
-            site,
-        );
+        output.push_str(content);
     }
 }
 
@@ -270,7 +260,7 @@ pub fn handle_strikethrough(tag_name: &str, handler: HandlerContext<'_>) {
 
 /// Handle inserted/underlined text (ins tag).
 ///
-/// Converts to `==content==` syntax. Supports visitor callbacks when enabled.
+/// Passes through visible content in Markdown and uses insertion syntax in Djot.
 pub fn handle_inserted(handler: HandlerContext<'_>) {
     use crate::converter::walk_node;
 
@@ -307,9 +297,25 @@ pub fn handle_inserted(handler: HandlerContext<'_>) {
         return;
     }
 
+    if options.output_format != OutputFormat::Djot {
+        #[cfg(feature = "visitor")]
+        if let Some(outcome) = visit_semantic(tag, SemanticKind::Underline("ins"), depth, site) {
+            match outcome {
+                VisitorOutcome::Continue => {}
+                VisitorOutcome::Output(custom_output) => {
+                    output.push_str(&custom_output);
+                    return;
+                }
+                VisitorOutcome::Skip => return,
+            }
+        }
+        walk_children(tag, output, ctx, depth, site);
+        return;
+    }
+
     let mut content = String::with_capacity(32);
     let children = tag.children();
-    let marker_ctx = ctx.inline_buffer(output, true);
+    let marker_ctx = ctx.inline_buffer(output, options.output_format == OutputFormat::Djot);
     for child_handle in children.top().iter() {
         walk_node(
             child_handle,

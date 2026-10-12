@@ -32,3 +32,5 @@ overrides:
   nanoid: ">=3.3.17 <4"
   # ~keep GHSA-2883-xcg3-v3hh: js-yaml merge-key CPU exhaustion, including empty merge sources
   js-yaml: ">=4.3.2 <5"
+  # ~keep GHSA-68fv-2mgg-jv7q: indexed source-map section offsets can exhaust the event loop.
+  source-map-js: ">=1.2.2 <2"

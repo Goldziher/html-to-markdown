@@ -42,12 +42,12 @@ fn reporter_options(br_in_tables: bool) -> ConversionOptions {
 fn should_separate_flattened_nested_table_rows_with_br() {
     let out = content(NESTED, reporter_options(true));
     assert!(
-        out.contains(r"Before<br>\| ID \| Status \|<br>"),
+        out.contains(r"Before<br>ID Status<br>"),
         "the paragraph and the inner header row must be separated by <br>: {out:?}"
     );
     assert!(
-        out.contains(r"<br>\| 123 \| Done \|"),
-        "the inner data row must stay separate from the separator row: {out:?}"
+        out.contains(r"<br>123 Done"),
+        "the inner data row must stay separate from the header row: {out:?}"
     );
 }
 
@@ -78,7 +78,7 @@ fn should_leave_the_default_flattening_unchanged() {
     let out = content(NESTED, reporter_options(false));
     assert!(!out.contains("<br>"), "no <br> may appear by default: {out:?}");
     assert!(
-        out.contains(r"Before \| ID \| Status \|"),
+        out.contains(r"Before ID Status"),
         "default flattening must still space-join: {out:?}"
     );
 }

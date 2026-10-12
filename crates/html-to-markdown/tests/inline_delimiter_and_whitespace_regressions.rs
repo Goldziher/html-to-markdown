@@ -82,8 +82,8 @@ fn should_merge_adjacent_strikethrough_siblings_across_the_del_s_and_strike_syno
 }
 
 #[test]
-fn should_merge_adjacent_inserted_siblings_into_one_run() {
-    assert_eq!(content("<p><ins>A</ins><ins>B</ins></p>"), "==AB==");
+fn should_preserve_plain_content_of_adjacent_inserted_siblings() {
+    assert_eq!(content("<p><ins>A</ins><ins>B</ins></p>"), "AB");
 }
 
 #[test]
@@ -109,7 +109,7 @@ fn should_not_merge_inline_siblings_separated_by_a_real_space() {
     // ~keep Control: a genuine separator means the delimiters are not adjacent, so each
     // ~keep element must keep its own pair.
     assert_eq!(content("<p><del>A</del> <del>B</del></p>"), "~~A~~ ~~B~~");
-    assert_eq!(content("<p><ins>A</ins> <ins>B</ins></p>"), "==A== ==B==");
+    assert_eq!(content("<p><ins>A</ins> <ins>B</ins></p>"), "A B");
     assert_eq!(content("<p><var>A</var> <var>B</var></p>"), "*A* *B*");
     assert_eq!(content("<p><code>A</code> <code>B</code></p>"), "`A` `B`");
 }
@@ -118,7 +118,7 @@ fn should_not_merge_inline_siblings_separated_by_a_real_space() {
 fn should_not_merge_inline_siblings_of_different_kinds() {
     // ~keep Control: `~~A~~` followed by `==B==` shares no delimiter character, so there is
     // ~keep no run to merge and both pairs must survive.
-    assert_eq!(content("<p><del>A</del><ins>B</ins></p>"), "~~A~~==B==");
+    assert_eq!(content("<p><del>A</del><ins>B</ins></p>"), "~~A~~B");
 }
 
 #[test]

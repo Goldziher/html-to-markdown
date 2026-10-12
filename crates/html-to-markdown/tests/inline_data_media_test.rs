@@ -261,7 +261,10 @@ fn a_link_around_a_replaced_image_keeps_its_alt_text_or_goes_with_it() {
     assert_eq!(convert_with(&wrapped, InlineDataMedia::DropElement), "");
 
     let no_alt = format!(r#"<p><a href="https://example.com/x.html"><img src="{PNG}"></a></p>"#);
-    assert_eq!(convert_with(&no_alt, InlineDataMedia::AltTextOnly), "");
+    assert_eq!(
+        convert_with(&no_alt, InlineDataMedia::AltTextOnly),
+        "[https://example.com/x.html](https://example.com/x.html)\n"
+    );
 }
 
 #[test]
@@ -330,8 +333,8 @@ fn a_video_falls_back_to_a_nested_source_that_is_not_data() {
     let html = format!(r#"<video src="{MP4}"><source src="{MP4}"><source src="{real}"></video>"#);
     let [keep, alt, drop] = all_choices(&html);
     assert!(keep.contains(MP4), "Keep writes the payload: {keep:?}");
-    assert_eq!(alt, format!("[{real}]({real})\n"));
-    assert_eq!(drop, format!("[{real}]({real})\n"));
+    assert_eq!(alt, format!("[video]({real})\n"));
+    assert_eq!(drop, format!("[video]({real})\n"));
 }
 
 #[test]
@@ -401,12 +404,11 @@ fn a_data_link_wrapping_a_heading_drops_the_address_not_the_heading_text() {
 
 #[test]
 fn a_data_link_with_no_text_content_writes_nothing_once_the_address_is_dropped() {
-    // ~keep With `Keep`, an empty label falls back to the href itself so the link is never
-    // ~keep silently blank; that fallback must not fire once the choice is dropping the
-    // ~keep address, or the payload reappears as the link's own visible text.
+    // ~keep Empty span wrappers add no URL label (#771). Once the data address is removed,
+    // ~keep the payload must not reappear as visible text.
     let html = r#"<p><a href="data:text/plain,hello"><span></span></a></p>"#;
     let [keep, alt, drop] = all_choices(html);
-    assert_eq!(keep, "[data:text/plain,hello](data:text/plain,hello)\n");
+    assert_eq!(keep, "[](data:text/plain,hello)\n");
     assert_eq!(alt, "");
     assert_eq!(drop, "");
 }

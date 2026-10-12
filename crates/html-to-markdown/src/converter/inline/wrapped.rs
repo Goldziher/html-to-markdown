@@ -216,11 +216,21 @@ fn move_leading_hard_breaks<'a>(
         && output.len() == ctx.block_content_start
         && std::ptr::from_ref::<String>(output) as usize == ctx.block_output_ptr;
     // ~keep A break-only wrapper at the paragraph start has no preceding line (#572).
-    // ~keep An empty enclosing scratch buffer owes a separator, not a hard break (#504).
+    // ~keep An empty enclosing scratch buffer owes a separator for a break-only child (#504).
+    // ~keep A leading break followed only by blank text collapses to the old separator,
+    // ~keep including Backslash style; retaining its slash creates empty emphasis marks.
     if after_breaks.trim().is_empty() {
         return if drop_at_paragraph_start {
             after_breaks
-        } else if output.is_empty() && content.ends_with('\n') {
+        } else if after_breaks.len() < content.len() && !content.ends_with('\n') {
+            " "
+        } else if output.is_empty()
+            && content.ends_with('\n')
+            && content
+                .trim_end_matches(crate::converter::main_helpers::hard_break_marker(options))
+                .chars()
+                .all(crate::converter::utility::white_space::is_collapsible)
+        {
             &content[content.len() - 1..]
         } else {
             content
@@ -289,6 +299,16 @@ pub fn emit_wrapped_inline(
 
     let content = move_leading_hard_breaks(output, content, ctx, options);
     let (prefix, suffix, trimmed) = chomp_inline(content);
+    // ~keep A bare newline from a direct div wrapper is a real break after existing content.
+    // ~keep Nested scratch buffers still reduce their bare sentinel to the #504 separator.
+    if content == "\n"
+        && !output.is_empty()
+        && !ctx.in_paragraph
+        && std::ptr::from_ref::<String>(output) as usize == ctx.block_output_ptr
+    {
+        output.push_str(crate::converter::main_helpers::hard_break_marker(options));
+        return;
+    }
     // ~keep A noncollapsible blank body after an existing space keeps its character (#843).
     // ~keep Leading whitespace or a leading break still follows the existing blank-wrapper rule.
     let marker = crate::converter::main_helpers::hard_break_marker(options);
@@ -386,5 +406,39 @@ pub fn emit_whitespace_only_inline_body(content: &str, output: &mut String) {
     let (prefix, _, _) = chomp_inline(content);
     if !output.ends_with(' ') {
         output.push_str(prefix);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::move_leading_hard_breaks;
+    use crate::converter::Context;
+    use crate::converter::context::ContextParameters;
+    use crate::converter::url_resolve::OwnPage;
+    use crate::options::ConversionOptions;
+
+    #[test]
+    fn should_drop_break_only_content_in_the_paragraphs_own_empty_buffer() {
+        let options = ConversionOptions::default();
+        let mut output = String::new();
+        let mut context = Context::new(
+            &options,
+            ContextParameters {
+                inline_collector: None,
+                #[cfg(feature = "metadata")]
+                metadata_collector: None,
+                #[cfg(feature = "visitor")]
+                visitor: None,
+                structure_collector: None,
+                reference_collector: None,
+                base_url: None,
+                own_page: OwnPage::UnknownWithoutBase,
+            },
+        );
+        context.in_paragraph = true;
+        context.block_output_ptr = std::ptr::from_ref::<String>(&output) as usize;
+        let remaining = move_leading_hard_breaks(&mut output, "  \n", &context, &options);
+        assert_eq!(remaining, "");
+        assert_eq!(output, "");
     }
 }
