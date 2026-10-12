@@ -346,15 +346,15 @@ pub fn ends_with_hard_break(buffer: &str) -> bool {
 /// marker when that text would otherwise be parsed as block structure (issue #735).
 pub fn escape_block_start(buffer: &mut String, from: usize, in_list_item: bool, followed_by_inline: bool) {
     let before = &buffer[..from];
-    // ~keep A non-indent byte cannot precede a fresh block opener except an unfinished ordered
-    // ~keep marker. Reject it before finding the line start, or comment-separated form feeds
-    // ~keep folded onto one growing line cause a quadratic scan of the already-emitted text.
-    if !in_list_item
-        && before
-            .trim_end_matches([' ', '\t'])
-            .chars()
-            .next_back()
-            .is_some_and(|character| !matches!(character, '\n' | '.' | ')'))
+    // ~keep A letter already written on this line makes every supported fresh block opener
+    // inert or already escaped. Avoid rescanning/copying the growing line for each span (#773).
+    // ~keep A form feed is a character of the line as a letter is: form feeds that comments
+    // ~keep separate fold onto one growing line too (#811).
+    if before
+        .trim_end_matches([' ', '\t'])
+        .as_bytes()
+        .last()
+        .is_some_and(|byte| byte.is_ascii_alphabetic() || *byte == 0x0c)
     {
         return;
     }

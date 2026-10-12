@@ -39,7 +39,7 @@ fn an_image_prints_the_payload_the_alt_text_or_nothing() {
     let [keep, alt, drop] = all_choices(&html);
     assert_eq!(keep, format!("Before ![icon]({PNG}) after\n"));
     assert_eq!(alt, "Before icon after\n");
-    assert_eq!(drop, "Before  after\n");
+    assert_eq!(drop, "Before after\n");
 }
 
 #[test]

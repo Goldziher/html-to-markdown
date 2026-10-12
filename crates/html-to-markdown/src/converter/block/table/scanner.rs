@@ -218,35 +218,120 @@ fn visit_content_node(
     work: &mut Vec<ContentFrame>,
     br_in_tables: bool,
 ) {
-    match handle.get(parser) {
-        Some(tl::Node::Raw(bytes)) => {
-            let raw = bytes.as_utf8_str();
-            let decoded = crate::text::decode_html_entities_cow(raw.as_ref());
-            if !decoded.trim().is_empty() {
-                if let Some((_, acc)) = acc_stack.last_mut() {
+    let content = ContentTest {
+        br_in_tables,
+        checkboxes: true,
+    };
+    let acc = acc_stack.last_mut().map(|(_, acc)| acc);
+    match fold_node_content(handle, parser, dom_ctx, acc, content) {
+        Some(Element::Table(tag)) => {
+            let id = handle.get_inner();
+            acc_stack.push((id, TableContentSummary::default()));
+            work.push(ContentFrame::ExitTable(id));
+            work.extend(tag.children().top().iter().copied().map(ContentFrame::Enter));
+        }
+        Some(Element::Other(tag)) => work.extend(tag.children().top().iter().copied().map(ContentFrame::Enter)),
+        None => {}
+    }
+}
+
+/// What the content test of a table counts.
+#[derive(Clone, Copy)]
+struct ContentTest {
+    /// The conversion option of the same name: a line break is content only under it.
+    br_in_tables: bool,
+    /// Whether a checkbox is content. A table asks with `true`. A cell asks with `false`, to
+    /// learn whether it holds something other than checkboxes.
+    checkboxes: bool,
+}
+
+/// An element that [`fold_node_content`] read.
+enum Element<'p> {
+    /// A `<table>`. Its content belongs to a summary of its own.
+    Table(&'p tl::HTMLTag<'p>),
+    /// Any other element.
+    Other(&'p tl::HTMLTag<'p>),
+}
+
+/// The content test of a table for one node: folds the text of a text node, or what an element
+/// that is not a table counts for, into `acc`. Returns the element, for the caller to read
+/// its children.
+///
+/// ~keep The scan of a table and `cell_holds_only_inputs` both read each node here, so "the
+/// ~keep table has content" and "the cell holds only inputs" are one decision with one list.
+fn fold_node_content<'p>(
+    handle: tl::NodeHandle,
+    parser: &'p tl::Parser<'p>,
+    dom_ctx: &super::super::super::DomContext,
+    acc: Option<&mut TableContentSummary>,
+    content: ContentTest,
+) -> Option<Element<'p>> {
+    match handle.get(parser)? {
+        tl::Node::Raw(bytes) => {
+            // ~keep A character reference for white space is white space.
+            if !crate::text::decode_html_entities_cow(bytes.as_utf8_str().as_ref())
+                .trim()
+                .is_empty()
+            {
+                if let Some(acc) = acc {
                     acc.has_text = true;
                 }
             }
+            None
         }
-        Some(tl::Node::Tag(tag)) => {
+        tl::Node::Tag(tag) => {
             let tag_name = tag_name_of(&handle, tag, parser, dom_ctx);
             if tag_name.as_ref() == "table" {
-                let id = handle.get_inner();
-                acc_stack.push((id, TableContentSummary::default()));
-                work.push(ContentFrame::ExitTable(id));
-            } else {
-                apply_tag_content(&tag_name, tag, acc_stack.last_mut().map(|(_, acc)| acc), br_in_tables);
+                return Some(Element::Table(tag));
             }
-            work.extend(tag.children().top().iter().copied().map(ContentFrame::Enter));
+            apply_tag_content(&tag_name, tag, acc, content);
+            Some(Element::Other(tag))
         }
-        _ => {}
+        tl::Node::Comment(_) => None,
     }
+}
+
+/// Whether the table cell `cell_handle` holds only inputs: the content test of a table, with
+/// checkboxes left out, finds nothing in the cell. A table inside the cell is content.
+///
+/// ~keep This reads the subtree of the cell, so a cell asks it one time for each walk of its
+/// ~keep children, where the walk opens the cell: `Context::for_cell`, and the two walks that
+/// ~keep build the context of a cell themselves (the table grid and a layout cell). A control
+/// ~keep reads the answer from its context. The walk stops at the first content and at a table
+/// ~keep inside the cell, so nested tables are not read one time for each level.
+pub fn cell_holds_only_inputs(
+    cell_handle: tl::NodeHandle,
+    parser: &tl::Parser,
+    dom_ctx: &super::super::super::DomContext,
+    br_in_tables: bool,
+) -> bool {
+    let content = ContentTest {
+        br_in_tables,
+        checkboxes: false,
+    };
+    let Some(tl::Node::Tag(cell_tag)) = cell_handle.get(parser) else {
+        return false;
+    };
+    let mut found = TableContentSummary::default();
+    let mut work: Vec<tl::NodeHandle> = cell_tag.children().top().iter().copied().collect();
+    while let Some(handle) = work.pop() {
+        match fold_node_content(handle, parser, dom_ctx, Some(&mut found), content) {
+            Some(Element::Table(_)) => return false,
+            Some(Element::Other(tag)) => work.extend(tag.children().top().iter().copied()),
+            None => {}
+        }
+        if !found.is_empty() {
+            return false;
+        }
+    }
+    true
 }
 
 /// Fold a single non-table tag's contribution (link/header/caption/image/rule/line break)
 /// into the current accumulator, if one is open.
-fn apply_tag_content(tag_name: &str, tag: &tl::HTMLTag, acc: Option<&mut TableContentSummary>, br_in_tables: bool) {
+fn apply_tag_content(tag_name: &str, tag: &tl::HTMLTag, acc: Option<&mut TableContentSummary>, content: ContentTest) {
     let Some(acc) = acc else { return };
+    let br_in_tables = content.br_in_tables;
     match tag_name {
         "a" => acc.link_count += 1,
         "caption" => acc.has_caption = true,
@@ -254,13 +339,7 @@ fn apply_tag_content(tag_name: &str, tag: &tl::HTMLTag, acc: Option<&mut TableCo
         "img" | "graphic" if tag.attributes().get("src").is_some() || tag.attributes().get("alt").is_some() => {
             acc.has_text = true;
         }
-        "input"
-            if tag
-                .attributes()
-                .get("type")
-                .flatten()
-                .is_some_and(|value| value.as_utf8_str().eq_ignore_ascii_case("checkbox")) =>
-        {
+        "input" if content.checkboxes && crate::converter::form::elements::checkbox_state(tag).is_some() => {
             acc.has_text = true;
         }
         // ~keep A rule is content without text: a table whose cells hold only rules is not a blank

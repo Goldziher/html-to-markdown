@@ -80,8 +80,11 @@ pub enum TagKind {
     /// emitted as `*…*\n\n` (italic-wrap). Mirrors Tier-2's
     /// `semantic/figure.rs::handle_figcaption`.
     Figcaption,
-    /// Inline clickable button content.
-    Button,
+    /// `<progress>`, `<meter>`, `<output>` — a form control that ends its line. Tier-2
+    /// (`form/elements.rs`'s `write_line_end_control`) emits `\n\n` after the control's content
+    /// in block mode and no block separator before it; mirror with close-only block-separator
+    /// semantics.
+    LineEndControl,
     /// Media element (`<audio>`, `<video>`). The scanner writes no link for it, so it hands
     /// the page to Tier-2, which does.
     Media,
@@ -393,10 +396,15 @@ static TAGS: phf::Map<&'static [u8], TagSpec> = phf_map! {
         is_rawtext: false,
     },
     b"optgroup"  => inline(TagKind::Inline),
-    b"button"    => inline(TagKind::Button),
-    b"progress"  => inline(TagKind::Inline),
-    b"meter"     => inline(TagKind::Inline),
-    b"output"    => inline(TagKind::Inline),
+    // ~keep A button stays in the line of the text around it (issue #785).
+    b"button"    => inline(TagKind::Inline),
+    // ~keep Tier-2 form/elements.rs's write_line_end_control emits `\n\n` after the content of
+    // ~keep these three in block mode but no leading separator. TagKind::LineEndControl gives
+    // ~keep close-only block-separator semantics — distinct from Block which also emits a
+    // ~keep leading `\n\n` on open.
+    b"progress"  => block(TagKind::LineEndControl),
+    b"meter"     => block(TagKind::LineEndControl),
+    b"output"    => block(TagKind::LineEndControl),
     b"datalist"  => inline(TagKind::Inline),
 
     b"audio"   => block(TagKind::Media),

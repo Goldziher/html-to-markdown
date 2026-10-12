@@ -3,6 +3,8 @@
 //! This module contains utility functions used by the main conversion pipeline,
 //! including preprocessing helpers, HTML repair, and metadata formatting.
 
+use crate::converter::code_scan::CodeScan;
+use crate::options::CodeBlockStyle;
 use crate::options::ConversionOptions;
 use crate::options::NewlineStyle;
 use crate::options::conversion::{MAX_CONFIGURABLE_DEPTH, NATIVE_STACK_SAFE_DEPTH};
@@ -179,18 +181,19 @@ pub const fn hard_break_marker(options: &ConversionOptions) -> &'static str {
 /// markdownlint's MD012 rule forbids multiple consecutive blank lines, so the
 /// final emission is normalized here. This intentionally preserves single
 /// blank lines (`\n\n`) — only runs of three or more newlines are collapsed.
-pub fn collapse_excess_blank_lines(output: &mut String, style: crate::options::CodeBlockStyle) {
+///
+/// The lines of a code block, fenced or indented, are code, not block transitions, and stay as
+/// they are (issues #783 and #801).
+pub fn collapse_excess_blank_lines(output: &mut String, style: CodeBlockStyle) {
     if !output.contains("\n\n\n") {
         return;
     }
-    // ~keep CommonMark 4.4 preserves interior blank lines as code, including after a list boundary (#801).
-    let code_lines = (style == crate::options::CodeBlockStyle::Indented)
-        .then(|| crate::converter::code_scan::indented_code_lines(output));
     let mut cleaned = String::with_capacity(output.len());
+    let mut fences = CodeScan::new(style, output);
     let mut consecutive = 0usize;
-    for (index, line) in output.split_inclusive('\n').enumerate() {
+    for line in output.split_inclusive('\n') {
         let content = line.strip_suffix('\n').unwrap_or(line);
-        if !content.is_empty() || code_lines.as_ref().is_some_and(|lines| lines[index]) {
+        if fences.is_code(content) || !content.is_empty() {
             consecutive = 1;
             cleaned.push_str(line);
         } else {
@@ -204,13 +207,21 @@ pub fn collapse_excess_blank_lines(output: &mut String, style: crate::options::C
 }
 
 /// Remove trailing spaces/tabs from every line while preserving newlines.
-pub fn trim_line_end_whitespace(output: &mut String) {
+///
+/// The lines of a code block, fenced or indented, keep their line ends: they are code.
+pub fn trim_line_end_whitespace(output: &mut String, style: CodeBlockStyle) {
     if output.is_empty() {
         return;
     }
 
     let mut cleaned = String::with_capacity(output.len());
+    let mut fences = CodeScan::new(style, output);
     for line in output.split('\n') {
+        if fences.is_code(line) {
+            cleaned.push_str(line);
+            cleaned.push('\n');
+            continue;
+        }
         let content = line.trim_end_matches([' ', '\t']);
         cleaned.push_str(content);
         // ~keep The two-space hard break is only meaningful after content on the same line;
@@ -358,7 +369,7 @@ fn skip_to_after_gt(bytes: &[u8], from: usize) -> usize {
 ///
 /// These elements are always void in HTML5: they have no end tag, and `<br />` is
 /// equivalent to `<br>`.  We must leave them as-is when pre-processing XML-style
-/// self-closing syntax so that `repair_with_html5ever` can parse them correctly.
+/// self-closing syntax so that `repair_with_html5ever_bounded` can parse them correctly.
 const HTML5_VOID_ELEMENTS: &[&str] = &[
     "area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta", "param", "source", "track", "wbr",
 ];
@@ -444,7 +455,7 @@ fn scan_tag_terminator(bytes: &[u8], start: usize) -> (bool, usize) {
 /// Expand XML-style self-closing tags to explicit open+close pairs.
 ///
 /// HTML5 does not honour the `/>` self-close syntax for non-void elements.  When
-/// `repair_with_html5ever` re-parses content that contains custom / namespaced tags
+/// `repair_with_html5ever_bounded` re-parses content that contains custom / namespaced tags
 /// written as `<ac:parameter name="foo" />`, the HTML5 parser treats the `/>` as `>`
 /// and leaves the element open.  Subsequent siblings then nest inside it, breaking
 /// visitor pre-order/post-order start/end pairing.
@@ -540,32 +551,81 @@ pub fn expand_xml_self_closing_tags(input: &str) -> String {
 /// semantics do not honour `/>` on unknown elements — without the expansion, the
 /// element would be left open and subsequent siblings would nest inside it, breaking
 /// visitor start/end event pairing (issue #331).
-pub fn repair_with_html5ever(input: &str) -> Option<String> {
-    use crate::converter::anchor_origin::{collapse_split_anchors, parse_with_anchor_origins};
+///
+/// ~keep The tree builder has a node budget and a depth limit on every route (issues #808 and
+/// ~keep #809), and the result names the limit that it reached. At the node budget the result
+/// ~keep is `input` as written. At the depth limit the tree ends at the tag that reached it,
+/// ~keep and the input after that tag follows the tree as written. No word is lost.
+pub(super) fn repair_with_html5ever_bounded(input: &str) -> Option<(String, Option<crate::types::WarningKind>)> {
+    use crate::converter::anchor_origin::{RepairTree, collapse_split_anchors, parse_with_anchor_origins};
     use crate::rcdom::SerializableHandle;
     use html5ever::serialize::{SerializeOpts, serialize};
 
     let expanded = expand_xml_self_closing_tags(input);
-
+    let RepairTree { dom, limit, unparsed } = parse_with_anchor_origins(&expanded);
+    if limit == Some(crate::types::WarningKind::TruncatedInput) {
+        tracing::warn!(
+            target: "html_to_markdown::convert",
+            "HTML tree repair reached its node budget; continuing with the original structure"
+        );
+        // ~keep Abandon the amplified repair and keep the authored text (issue #809).
+        return Some((input.to_owned(), limit));
+    }
     // ~keep The adoption agency splits an `<a>` around a block into an authored element and
     // ~keep clones; collapse the empty halves before the tree is flattened to a string and
     // ~keep the provenance is gone (issue #493).
-    let dom = parse_with_anchor_origins(&expanded);
     collapse_split_anchors(&dom.document);
 
     let mut buf = Vec::with_capacity(input.len());
     let handle = SerializableHandle::from(dom.document);
     serialize(&mut buf, &handle, SerializeOpts::default()).ok()?;
-    String::from_utf8(buf).ok()
+    let mut html = String::from_utf8(buf).ok()?;
+    if limit.is_some() {
+        tracing::warn!(
+            target: "html_to_markdown::convert",
+            "HTML tree repair reached its depth limit; the rest of the input keeps its original structure"
+        );
+        // ~keep The input after the last tag of the tree goes into the body as written (issue
+        // ~keep #808). The tree has a `<body>` end tag only when the input wrote a `<body>`.
+        const DOCUMENT_END: &str = "</body></html>";
+        let end = if html.ends_with(DOCUMENT_END) {
+            DOCUMENT_END.len()
+        } else {
+            0
+        };
+        html.insert_str(html.len() - end, &unparsed);
+    }
+    Some((html, limit))
 }
 
-/// Rebuild a document when head content precedes an authored `<head>` element.
+/// Rebuild a document when head content precedes an authored `<head>` element, or when a
+/// `<title>` precedes the body and is in no `<head>` element: the page has no `<head>` tag, or
+/// the title follows `</head>`.
 ///
-/// The HTML tree builder places that content in an implicit head and ignores the later head
+/// The HTML tree builder places that content in an implicit head and ignores a later head
 /// start tag. The lightweight parser preserves source nesting, so its tree needs this targeted
 /// repair before either conversion tier reads metadata or renders the body.
-pub fn repair_head_content_before_explicit_head(input: &str) -> Option<String> {
-    let head_start = last_start_tag(input.as_bytes(), b"head")?;
+pub fn repair_head_content_outside_head(input: &str) -> Option<(String, Option<crate::types::WarningKind>)> {
+    if !may_hold_head_content_outside_head(input.as_bytes()) {
+        return None;
+    }
+    let dom = tl::parse(input, tl::ParserOptions::default()).ok()?;
+    if !document_head_search(dom.children(), dom.parser()).content_outside_head {
+        return None;
+    }
+    repair_with_html5ever_bounded(input)
+}
+
+/// A cheap check of the source in front of the parse of [`repair_head_content_outside_head`];
+/// the parsed tree decides.
+///
+/// ~keep The check reads bytes, not tags. A `<head>` or a `<body>` inside a comment makes it
+/// ~keep false for a page that the parsed tree would rebuild: that page keeps its title in the
+/// ~keep body.
+fn may_hold_head_content_outside_head(bytes: &[u8]) -> bool {
+    let Some(head_start) = last_start_tag(bytes, b"head") else {
+        return first_start_tag(bytes, b"title").is_some();
+    };
     const HEAD_CONTENT: [&[u8]; 11] = [
         b"base",
         b"basefont",
@@ -579,36 +639,43 @@ pub fn repair_head_content_before_explicit_head(input: &str) -> Option<String> {
         b"template",
         b"title",
     ];
-    if !HEAD_CONTENT
+    HEAD_CONTENT
         .iter()
-        .any(|name| first_start_tag(input.as_bytes(), name).is_some_and(|start| start < head_start))
-    {
-        return None;
-    }
+        .any(|name| first_start_tag(&bytes[..head_start], name).is_some())
+        || title_follows_head_end(bytes)
+}
 
-    let dom = tl::parse(input, tl::ParserOptions::default()).ok()?;
-    if !document_head_search(dom.children(), dom.parser()).1 {
-        return None;
-    }
-    repair_with_html5ever(input)
+/// True when a `<title>` tag follows the first `</head>` with no `<body>` tag between them.
+fn title_follows_head_end(bytes: &[u8]) -> bool {
+    // ~keep `/head` as a name: the end tag has the shape of a start tag with that name.
+    let Some(head_end) = first_start_tag(bytes, b"/head") else {
+        return false;
+    };
+    let rest = &bytes[head_end..];
+    let Some(title) = first_start_tag(rest, b"title") else {
+        return false;
+    };
+    first_start_tag(rest, b"body").is_none_or(|body| title < body)
 }
 
 fn first_start_tag(bytes: &[u8], name: &[u8]) -> Option<usize> {
-    bytes
-        .iter()
-        .enumerate()
-        .find_map(|(start, _)| is_start_tag_at(bytes, name, start).then_some(start))
+    memchr::memchr_iter(b'<', bytes).find(|&start| is_start_tag_at(bytes, name, start))
 }
 
 fn last_start_tag(bytes: &[u8], name: &[u8]) -> Option<usize> {
-    bytes
-        .iter()
-        .enumerate()
+    memchr::memchr_iter(b'<', bytes)
         .rev()
-        .find_map(|(start, _)| is_start_tag_at(bytes, name, start).then_some(start))
+        .find(|&start| is_start_tag_at(bytes, name, start))
+}
+
+#[cfg(test)]
+thread_local! {
+    static START_TAG_CANDIDATE_CHECKS: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
 }
 
 fn is_start_tag_at(bytes: &[u8], name: &[u8], start: usize) -> bool {
+    #[cfg(test)]
+    START_TAG_CANDIDATE_CHECKS.with(|checks| checks.set(checks.get() + 1));
     if bytes.get(start) != Some(&b'<') {
         return false;
     }
@@ -620,12 +687,6 @@ fn is_start_tag_at(bytes: &[u8], name: &[u8], start: usize) -> bool {
         && bytes
             .get(tag_end)
             .is_some_and(|next| next.is_ascii_whitespace() || matches!(next, b'/' | b'>'))
-}
-
-/// Check if text has more than one character.
-pub fn has_more_than_one_char(text: &str) -> bool {
-    let mut chars = text.chars();
-    chars.next().is_some() && chars.next().is_some()
 }
 
 /// Check if an element is inline (not block-level).
@@ -686,148 +747,24 @@ pub fn is_inline_element(tag_name: &str) -> bool {
     )
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_is_ignorable_before_head() {
-        assert!(is_ignorable_before_head("", false));
-        assert!(is_ignorable_before_head("   \n\t", false));
-        assert!(is_ignorable_before_head("&nbsp;", false));
-        assert!(is_ignorable_before_head("&#160;", false));
-        assert!(!is_ignorable_before_head("hello", false));
-        assert!(!is_ignorable_before_head("x", false));
-        assert!(!is_ignorable_before_head("\u{FFFD}\u{FFFD}", false));
-        // ~keep Any text sitting directly in front of the document's own `<html>` tag is
-        // ~keep forgiven, garbage or genuine prose alike (#527 regression: a mangled byte
-        // ~keep order mark reads as ordinary non-whitespace text by this point).
-        assert!(is_ignorable_before_head("\u{FFFD}\u{FFFD}", true));
-        assert!(is_ignorable_before_head("hello", true));
-    }
-
-    #[test]
-    fn test_trim_line_end_whitespace() {
-        let mut s = String::new();
-        trim_line_end_whitespace(&mut s);
-        assert_eq!("", s.as_str());
-
-        let mut s = "\t\n\t\n".to_owned();
-        trim_line_end_whitespace(&mut s);
-        assert_eq!("", s.as_str());
-
-        let mut s = "hello, world  ".to_owned();
-        trim_line_end_whitespace(&mut s);
-        assert_eq!("hello, world  \n", s.as_str());
-
-        let mut s = "hello, world  \n".to_owned();
-        trim_line_end_whitespace(&mut s);
-        assert_eq!("hello, world  \n", s.as_str());
-
-        let mut s = "hello, world  ".to_owned();
-        trim_line_end_whitespace(&mut s);
-        assert_eq!("hello, world  \n", s.as_str());
-
-        let mut s = "hello, world  \n\n\n".to_owned();
-        trim_line_end_whitespace(&mut s);
-        assert_eq!("hello, world  \n", s.as_str());
-
-        let mut s = "hello  \n- world\n".to_owned();
-        trim_line_end_whitespace(&mut s);
-        assert_eq!("hello  \n- world\n", s.as_str());
-
-        let mut s = "hello, world\t\t  ".to_owned();
-        trim_line_end_whitespace(&mut s);
-        assert_eq!("hello, world  \n", s.as_str());
-
-        let mut s = "hello, world\t\t  \n.abc def \t \t".to_owned();
-        trim_line_end_whitespace(&mut s);
-        assert_eq!("hello, world  \n.abc def\n", s.as_str());
-    }
-
-    #[test]
-    fn test_is_ascii_whitespace_only() {
-        assert!(is_ascii_whitespace_only(""));
-        assert!(is_ascii_whitespace_only(" \t\n\r"));
-        assert!(is_ascii_whitespace_only("\n\n"));
-        // ~keep A decoded `&nbsp;` trims to empty under `str::trim`'s Unicode-aware
-        // ~keep definition but must NOT be treated as safe-to-drop formatting whitespace.
-        assert!(!is_ascii_whitespace_only("\u{a0}"));
-        assert!(!is_ascii_whitespace_only("\n\u{a0}"));
-        assert!(!is_ascii_whitespace_only("a"));
-        assert!(!is_ascii_whitespace_only(" a "));
-    }
-
-    #[test]
-    fn test_has_custom_element_tags_ignores_comments() {
-        // ~keep Regression for the bug this module fixed: a comment's own text
-        // ~keep (`!--c--`) contains a hyphen and must not be mistaken for a tag name.
-        assert!(!has_custom_element_tags("<!--c-->"));
-        assert!(!has_custom_element_tags("<p><!-- a routine comment --></p>"));
-        assert!(!has_custom_element_tags("<!-- multiple -- dashes -- here -->"));
-    }
-
-    #[test]
-    fn should_detect_namespaced_elements_for_html5_repair() {
-        assert!(has_custom_element_tags("<o:p><P></o:p></P>"));
-        assert!(!has_custom_element_tags("<o:p><P></P></o:p>"));
-        assert!(!has_custom_element_tags("<o:p>Office text</o:p>"));
-        assert!(!has_custom_element_tags("<o:p/><P>text</P>"));
-        assert!(!has_custom_element_tags("<!-- <o:p>comment</o:p> -->"));
-        assert!(!has_custom_element_tags("<div title='o:p'>text</div>"));
-    }
-
-    #[test]
-    fn test_has_custom_element_tags_detects_real_custom_element() {
-        assert!(has_custom_element_tags("<my-widget></my-widget>"));
-        assert!(has_custom_element_tags("<p></p><my-widget></my-widget>"));
-        assert!(has_custom_element_tags("<div></my-widget>"));
-    }
-
-    #[test]
-    fn test_has_custom_element_tags_detects_custom_element_alongside_comment() {
-        assert!(has_custom_element_tags(
-            "<!-- a routine comment --><my-widget>hi</my-widget>"
-        ));
-        assert!(has_custom_element_tags(
-            "<my-widget><!-- nested comment -->hi</my-widget>"
-        ));
-    }
-
-    #[test]
-    fn test_has_custom_element_tags_ignores_comment_mentioning_custom_element() {
-        // ~keep A custom-element-shaped tag written INSIDE a comment is text, not markup.
-        assert!(!has_custom_element_tags("<!-- <my-widget>hi</my-widget> -->"));
-    }
-
-    #[test]
-    fn test_has_custom_element_tags_ignores_processing_instruction() {
-        assert!(!has_custom_element_tags("<?php echo 'a-b'; ?>"));
-        assert!(!has_custom_element_tags(
-            "<?xml-stylesheet type=\"text/xsl\" href=\"a-b.xsl\"?>"
-        ));
-    }
-
-    #[test]
-    fn test_has_custom_element_tags_ignores_cdata_section() {
-        assert!(!has_custom_element_tags(
-            "<svg><![CDATA[<my-widget>a-b</my-widget>]]></svg>"
-        ));
-    }
-
-    #[test]
-    fn test_has_custom_element_tags_ignores_doctype() {
-        assert!(!has_custom_element_tags("<!doctype html>"));
-        assert!(!has_custom_element_tags("<!DOCTYPE html><p>no custom elements</p>"));
-        // ~keep A real custom element after the doctype must still be detected.
-        assert!(has_custom_element_tags("<!DOCTYPE html><my-widget></my-widget>"));
-    }
-
-    #[test]
-    fn test_has_custom_element_tags_rejects_whitespace_before_name() {
-        // ~keep HTML5 does not skip whitespace after `<`/`</` before the tag name:
-        // ~keep `< div>` and `</ div>` are plain text, not tags, in a real parser.
-        assert!(!has_custom_element_tags("< my-widget>"));
-        assert!(!has_custom_element_tags("</ my-widget>"));
+/// Build the warning for a repair that stopped at `limit`.
+///
+/// `limit` is the reason the tree builder reports: `TruncatedInput` for the node budget (the
+/// first parse is kept), `DepthLimitExceeded` for the depth limit (the first parse is kept
+/// too). No text is lost in either case, so the warning kind is `MalformedHtml` for both.
+pub(super) fn repair_limit_warning(limit: crate::types::WarningKind) -> crate::types::ProcessingWarning {
+    use crate::converter::anchor_origin::MAX_REPAIR_DEPTH;
+    crate::types::ProcessingWarning {
+        kind: crate::types::WarningKind::MalformedHtml,
+        message: if limit == crate::types::WarningKind::TruncatedInput {
+            "HTML tree repair exceeded its node budget; continued with the original structure.".to_owned()
+        } else {
+            format!(
+                "HTML tree repair reached the depth limit of {MAX_REPAIR_DEPTH}; continued with the original structure."
+            )
+        },
     }
 }
+
+#[cfg(test)]
+mod tests;

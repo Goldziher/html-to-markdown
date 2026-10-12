@@ -9,7 +9,7 @@
 //! the stack.
 //!
 //! Options are fuzzed alongside the input, because several past defects were reachable only
-//! under a non-default `newline_style`.
+//! under a non-default `newline_style`, and issue #749 only with the document structure on.
 //!
 //! Run with:
 //!   cargo +nightly fuzz run convert -- -max_len=65536
@@ -25,6 +25,7 @@ struct Input<'a> {
     escape_asterisks: bool,
     escape_underscores: bool,
     wrap: bool,
+    include_document_structure: bool,
     html: &'a str,
 }
 
@@ -38,6 +39,7 @@ fuzz_target!(|input: Input<'_>| {
         escape_asterisks: input.escape_asterisks,
         escape_underscores: input.escape_underscores,
         wrap: input.wrap,
+        include_document_structure: input.include_document_structure,
         ..Default::default()
     };
 

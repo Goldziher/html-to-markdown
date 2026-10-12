@@ -56,7 +56,8 @@ pub fn handle_dl(node_handle: &tl::NodeHandle, parser: &tl::Parser, output: &mut
         }
     }
 
-    let trimmed = trim_definition_content(&rendered, options, ctx);
+    let trimmed =
+        crate::converter::handlers::blockquote::container_content(tag, parser, &rendered, options.code_block_style);
     if !trimmed.is_empty() {
         // ~keep Inside a list item the list starts at the item's content column (issue #583).
         if ctx.in_list_item && !ctx.in_table_cell && !output.is_empty() {
@@ -237,7 +238,9 @@ pub fn handle_dd(node_handle: &tl::NodeHandle, parser: &tl::Parser, output: &mut
         }
     }
 
-    let trimmed = trim_definition_content(&rendered, options, ctx).to_owned();
+    let trimmed =
+        crate::converter::handlers::blockquote::container_content(tag, parser, &rendered, options.code_block_style)
+            .to_owned();
     if trimmed.is_empty() {
         return;
     }
@@ -252,6 +255,11 @@ pub fn handle_dd(node_handle: &tl::NodeHandle, parser: &tl::Parser, output: &mut
         output.push_str(&trimmed);
     } else {
         crate::converter::block::horizontal_rule::separate_leading_rule(output, &trimmed, ctx);
+        // ~keep Indented code cannot interrupt the paragraph of the term, so a blank line goes
+        // ~keep before a description that starts with it.
+        if trimmed.starts_with([' ', '\t']) && !output.is_empty() && !output.ends_with("\n\n") {
+            output.push_str(if output.ends_with('\n') { "\n" } else { "\n\n" });
+        }
         output.push_str(&trimmed);
         output.push_str("\n\n");
     }
@@ -274,22 +282,5 @@ fn separate_from_preceding_text(output: &mut String, ctx: &crate::converter::Con
     let text_end = output.trim_end_matches([' ', '\t']).len();
     if output[..text_end].is_empty() || output[..text_end].ends_with('\n') {
         output.truncate(text_end);
-    }
-}
-
-fn trim_definition_content<'a>(
-    rendered: &'a str,
-    options: &crate::options::ConversionOptions,
-    ctx: &crate::converter::Context,
-) -> &'a str {
-    let content = rendered.trim_matches('\n');
-    if options.code_block_style == crate::options::CodeBlockStyle::Indented
-        && !ctx.in_table_cell
-        && !ctx.convert_as_inline
-        && crate::converter::code_scan::indented_code_lines(content).first() == Some(&true)
-    {
-        content
-    } else {
-        rendered.trim()
     }
 }

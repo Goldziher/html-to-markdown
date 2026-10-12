@@ -266,10 +266,12 @@ pub fn handle_abbreviation(handler: HandlerContext<'_>) {
         return;
     }
 
-    output.push_str(prefix);
+    crate::converter::utility::content::push_inline_prefix(output, prefix, options, ctx);
     output.push_str(trimmed);
 
-    if let Some(title) = crate::converter::utility::attributes::decoded_attribute(tag, "title") {
+    if options.expand_abbreviations
+        && let Some(title) = crate::converter::utility::attributes::decoded_attribute(tag, "title")
+    {
         let trimmed_title = title.trim();
         if !trimmed_title.is_empty() {
             output.push_str(" (");

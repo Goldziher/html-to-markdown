@@ -137,10 +137,22 @@ pub(crate) fn annotation_kind_for_tag(name: &str, tag: &tl::HTMLTag) -> Option<A
 
 fn collect_annotated_text(tag: &tl::HTMLTag, parser: &tl::Parser) -> (String, Vec<TextAnnotation>) {
     let raw_text = extract_text(tag, parser);
-    let text_start = raw_text.len() - raw_text.trim_start().len();
-    let text_end = raw_text.trim_end().len();
     let mut annotations = Vec::new();
     collect_annotations(tag, parser, &raw_text, &mut annotations);
+    trim_annotated_text(&raw_text, annotations)
+}
+
+/// Trim the white space from the ends of `text` and move `annotations` to the trimmed text.
+///
+/// ~keep The end is the start plus the length of the trimmed slice, so it is never before the
+/// ~keep start. Two indexes measured from the two ends cross when the text is only white space,
+/// ~keep and a slice between them panics (issue #749). Such text gives the empty text here, and
+/// ~keep neither structure builder records a heading, paragraph or list item for empty text.
+pub(super) fn trim_annotated_text(text: &str, mut annotations: Vec<TextAnnotation>) -> (String, Vec<TextAnnotation>) {
+    let without_leading = text.trim_start();
+    let trimmed = without_leading.trim_end();
+    let text_start = text.len() - without_leading.len();
+    let text_end = text_start + trimmed.len();
     annotations.retain_mut(|annotation| {
         let start = (annotation.start as usize).max(text_start);
         let end = (annotation.end as usize).min(text_end);
@@ -151,7 +163,7 @@ fn collect_annotated_text(tag: &tl::HTMLTag, parser: &tl::Parser) -> (String, Ve
         annotation.end = (end - text_start) as u32;
         true
     });
-    (raw_text[text_start..text_end].to_string(), annotations)
+    (trimmed.to_owned(), annotations)
 }
 
 /// Build a [`TableGrid`] from a `<table>` element.
@@ -712,6 +724,9 @@ fn process_list(
 
 fn process_list_item(state: &mut BuilderState, tag: &tl::HTMLTag, parser: &tl::Parser, parent_idx: Option<u32>) {
     let (text, annotations) = collect_annotated_text(tag, parser);
+    if text.is_empty() {
+        return;
+    }
     state.push_attached(DocumentNode {
         id: make_node_id("list_item", &text, state.nodes.len()),
         content: NodeContent::ListItem { text },
@@ -769,6 +784,9 @@ fn process_heading(
 ) {
     let level = tag_name[1..].parse::<u8>().unwrap_or(1);
     let (text, annotations) = collect_annotated_text(tag, parser);
+    if text.is_empty() {
+        return;
+    }
     while state
         .group_stack
         .last()

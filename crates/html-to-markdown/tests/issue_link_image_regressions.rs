@@ -47,7 +47,15 @@ fn should_preserve_empty_image_links_when_only_the_alt_is_requested() {
             inline_data_media: InlineDataMedia::DropElement,
             ..ConversionOptions::default()
         };
-        assert_eq!(content(&html, drop), "See  today.\n");
+        // ~keep Issue #792 decides: one space between two words where a link writes nothing.
+        // ~keep Issue #764 decides: a link with a name is kept under that name when its content
+        // ~keep is removed. Before the sync: "See  today.\n" for each of the three links.
+        let dropped = if name.is_empty() {
+            "See today.\n".to_string()
+        } else {
+            expected
+        };
+        assert_eq!(content(&html, drop), dropped);
     }
 }
 
@@ -61,9 +69,11 @@ fn should_name_icon_and_heading_image_links_on_both_paths() {
             ),
             "Go to [/cart](/cart) now\n"
         );
+        // ~keep Issue #750 decides: a link to a place in its own page around a graphic with no
+        // ~keep text is left out. Before the sync: "## Head [#x](#x)\n".
         assert_eq!(
             content("<h2>Head <a href=\"#x\"><img src=\"/i.png\"></a></h2>", options.clone()),
-            "## Head [#x](#x)\n"
+            "## Head\n"
         );
         assert_eq!(
             content(

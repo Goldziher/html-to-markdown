@@ -4,6 +4,15 @@
 //! one of these variants. The dispatcher in `convert_api.rs::convert_inner` catches the
 //! error, logs it at `tracing::warn!` (a fallback was taken), and falls back to the
 //! Tier-2 path with the original (pre-prescan) input.
+//!
+//! # Why a cited blockquote is handed over
+//!
+//! Reproducing the citation line of [`BailReason::BlockquoteCite`] here means stashing the
+//! cite across the whole quoted body and re-deriving Tier-2's separator, and
+//! `close_blockquote` computes that separator from the untouched pre-open tail of `output`
+//! (see its own note) — delicate enough that a second implementation would drift. A cited
+//! blockquote is rare and on no hot path, so bail and let Tier-2, which is authoritative,
+//! produce it.
 
 use std::fmt;
 
@@ -204,8 +213,8 @@ pub enum BailReason {
     /// #583), which this scanner does not track.
     ListItemUnsupportedBlockChild,
 
-    /// A checkbox `<input>` opened inside a list item. Tier-2 writes that item as a task item
-    /// (`- [ ]`), which this scanner does not.
+    /// A checkbox `<input>` opened inside a list item. Tier-2 writes an item that starts with a
+    /// checkbox as a task item (`- [ ]`), which this scanner does not.
     ListItemCheckbox,
 
     /// An `<img>` had an empty (or whitespace-only) `src`, or a `src` that is a
@@ -229,13 +238,7 @@ pub enum BailReason {
     /// `base_url`. Tier-1's `open_blockquote` reads no attributes at all, so it
     /// dropped the citation outright — the two tiers rendered the same markup
     /// differently, which every other bail in this file exists to prevent.
-    ///
-    /// Reproducing it here means stashing the cite across the whole quoted body
-    /// and re-deriving Tier-2's separator, and `close_blockquote` computes that
-    /// separator from the untouched pre-open tail of `output` (see its own
-    /// note) — delicate enough that a second implementation would drift. A
-    /// cited blockquote is rare and on no hot path, so bail and let Tier-2,
-    /// which is authoritative, produce it.
+    /// The module documentation says why the scanner does not write it.
     BlockquoteCite,
 
     /// A `<a>` element's href satisfies every structural autolink precondition
@@ -260,6 +263,9 @@ pub enum BailReason {
 
     /// An image has no source; DOM fallback folds its absent inline boundary. ~keep
     ImageMissingSource,
+
+    /// A text starts with a Unicode space after a written space; its place is not known. ~keep
+    UnicodeSpaceAfterSpace,
 
     /// A `<strong>`/`<b>` or `<em>`/`<i>` opened while the output already ends with that
     /// same tag kind's matching close marker (`**` or a lone `*`), with no intervening
@@ -294,6 +300,12 @@ pub enum BailReason {
     /// `TierStrategy::Auto` -- it is still checked here so the Tier-1/Tier-2 byte-equality
     /// contract holds under a forced Tier-1 run rather than resting on that gate.
     InlineMarkerNotReproduced,
+
+    /// A form control whose text Tier-2 separates from the text around it: `<select>`,
+    /// `<option>`, `<optgroup>`, `<datalist>`, and a `<button>`, `<output>`, `<meter>` or `<progress>` in a
+    /// heading, a summary, a caption, a link, an inline element or code. The space after such a control depends
+    /// on the text that follows it, which this scanner has not read yet.
+    FormControl,
 
     /// An `<hr>` opened between inline markers: inside `<strong>`/`<b>`, `<em>`/`<i>`,
     /// `<var>`/`<dfn>`, `<del>`, `<ins>`, a `<summary>`, a `<figcaption>` or a table caption.
@@ -371,9 +383,11 @@ impl fmt::Display for BailReason {
             }
             Self::ImageMissingSource => write!(f, "image has no effective source"),
             Self::LinkEmptyLabel => write!(f, "empty link label requires DOM-based fallback"),
+            Self::UnicodeSpaceAfterSpace => write!(f, "text starts with a Unicode space after a written space"),
             Self::AdjacentInlineEmphasis => write!(f, "adjacent strong/emphasis elements would form one delimiter run"),
             Self::WhitespaceOnlyInlineEmphasis => write!(f, "strong/emphasis element with a whitespace-only body"),
             Self::InlineMarkerNotReproduced => write!(f, "inline element whose tier-2 markers tier-1 does not emit"),
+            Self::FormControl => write!(f, "form control whose text tier-2 separates from the text around it"),
             Self::RuleBetweenInlineMarkers => write!(f, "horizontal rule between inline markers"),
         }
     }

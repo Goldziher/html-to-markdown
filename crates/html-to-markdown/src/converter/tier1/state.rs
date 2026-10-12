@@ -166,10 +166,6 @@ pub struct OpenTag {
     /// Whether the first content of this quote or heading in a table cell was whitespace, which
     /// Tier-2 keeps at the start of the element's own buffer (see `scanner::flush_text`).
     pub starts_with_whitespace: bool,
-    /// Tier-2 renders this element's children into a fresh buffer of their own (`<mark>`,
-    /// `<sub>`, `<sup>`, `<abbr>`, `<dt>`, `<dd>`), so its text sees an empty buffer, not
-    /// the line before the element.
-    pub children_in_own_buffer: bool,
 }
 
 /// Minimum capacity for each summary accumulation buffer.
@@ -235,6 +231,10 @@ pub struct Tier1State {
     /// its ancestor). `close_link` reads it to bail (`BailReason::LinkAutolinkNestedMarkup`)
     /// rather than risk a false negative against Tier-2's tag-stripped autolink
     /// predicate — see that bail reason's doc comment.
+    ///
+    /// The last flag says that the link has a name of its own (`aria-label` or `title`) or
+    /// points into its own page. `close_link` reads it to leave such a link with no text to
+    /// Tier-2, which labels the first kind and leaves the second kind out.
     pub link_stack: Vec<(Option<String>, Option<String>, bool, bool)>,
     /// Byte range of `<head>…</head>` content (between the tags) in the
     /// input the scanner walked.  Populated by the `TagKind::Ignored`
@@ -295,6 +295,14 @@ pub struct Tier1State {
     /// as `next_tag_is_list`).
     pub last_emitted_was_img: bool,
 
+    /// The source offset where the last opening tag or the last `<br>` of a heading ends, and
+    /// what a text that starts at that offset has before it. A text that starts at any other
+    /// offset has a comment, a closing tag or another void tag before it, and the fast converter
+    /// does not know its place. No tag clears this: the offset of a later text never equals an
+    /// earlier one. The full converter reads the same fact from the tree
+    /// (`siblings::text_place`).
+    pub text_place: Option<(usize, crate::converter::utility::white_space::TextPlace)>,
+
     /// True right after the closing tag of a block element or a `<hr>` (block-level by Tier-2's
     /// test), until the next opening or void tag, the next closing tag that is not inline, or the
     /// next text flush with content (read-then-clear, same convention as
@@ -336,7 +344,8 @@ pub struct Tier1State {
     pub list_items_after_text: Vec<bool>,
 
     /// `true` until the first text node carrying real (non-whitespace)
-    /// content has been processed anywhere in the document, then
+    /// content has been processed anywhere in the document, or an image or
+    /// a graphic has written content (`end_document_start_if_written`), then
     /// permanently `false`.
     ///
     /// Mirrors Tier-2's `Context::at_fresh_block_start` (an
@@ -356,6 +365,10 @@ pub struct Tier1State {
     /// so both tiers resolve the same input identically. `None` when `options.base_url`
     /// is unset (the default), making every resolution call a no-op.
     pub effective_base: Option<std::rc::Rc<url::Url>>,
+
+    /// The address of the page, as far as it is known; read when the first link opens. The
+    /// same value Tier-2 holds in `Context::own_page`.
+    pub own_page: std::cell::OnceCell<crate::converter::url_resolve::OwnPage>,
 }
 
 impl Tier1State {
@@ -380,6 +393,7 @@ impl Tier1State {
             summary_buf_stack: Vec::new(),
             last_closed_custom_element: false,
             last_emitted_was_img: false,
+            text_place: None,
             last_closed_block: false,
             last_closed_list: false,
             pending_newline_join: None,
@@ -388,6 +402,7 @@ impl Tier1State {
             list_items_after_text: Vec::new(),
             at_document_start: true,
             effective_base,
+            own_page: std::cell::OnceCell::new(),
         }
     }
 
@@ -447,6 +462,22 @@ impl Tier1State {
             }
         }
         &mut self.output
+    }
+
+    /// Ends the start of the document when an element wrote content of its own (an image, a
+    /// graphic) from `written_from` on in the buffer that inline text lands in. Mirrors the
+    /// check that Tier-2's `convert_node` does for every node (issue #762).
+    pub fn end_document_start_if_written(&mut self, written_from: usize) {
+        if !self.at_document_start {
+            return;
+        }
+        let wrote_content = self
+            .cell_or_output_mut()
+            .get(written_from..)
+            .is_some_and(|written| !written.trim().is_empty());
+        if wrote_content {
+            self.at_document_start = false;
+        }
     }
 
     /// True when the scanner is currently accumulating `<summary>` or

@@ -140,7 +140,7 @@ impl StructureCollector {
             return (String::new(), Vec::new());
         };
         let capture = self.text_captures.remove(position);
-        Self::trim_capture(capture.text, capture.annotations)
+        super::structure_builder::trim_annotated_text(&capture.text, capture.annotations)
     }
 
     pub(crate) fn append_text(&mut self, text: &str) {
@@ -592,22 +592,6 @@ impl StructureCollector {
         self.container_stack.clone_from(&element.container_stack);
         self.list_stack.clone_from(&element.list_stack);
         self.tables.truncate(element.tables_len);
-    }
-
-    fn trim_capture(text: String, mut annotations: Vec<TextAnnotation>) -> (String, Vec<TextAnnotation>) {
-        let text_start = text.len() - text.trim_start().len();
-        let text_end = text.trim_end().len();
-        annotations.retain_mut(|annotation| {
-            let start = (annotation.start as usize).max(text_start);
-            let end = (annotation.end as usize).min(text_end);
-            if start >= end {
-                return false;
-            }
-            annotation.start = (start - text_start) as u32;
-            annotation.end = (end - text_start) as u32;
-            true
-        });
-        (text[text_start..text_end].to_string(), annotations)
     }
 
     /// The effective structural parent for a new node:

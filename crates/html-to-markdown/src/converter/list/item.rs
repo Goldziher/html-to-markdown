@@ -10,7 +10,6 @@ use crate::converter::list::ListContext;
 use crate::converter::list::utils::add_list_leading_separator;
 use crate::converter::main_helpers::effective_max_depth;
 use crate::converter::main_helpers::strip_trailing_backslash_breaks;
-use crate::converter::main_helpers::tag_name_eq;
 use crate::converter::main_helpers::trim_trailing_whitespace;
 use crate::converter::utility::content::normalized_tag_name;
 use crate::converter::walk_node;
@@ -53,6 +52,20 @@ struct TaskInfo {
     checkbox: Option<tl::NodeHandle>,
 }
 
+/// What the search for the checkbox of a task item met first in a node.
+enum FirstContent {
+    /// A checkbox, with its checked state.
+    Checkbox(bool, tl::NodeHandle),
+    /// Content that is not a checkbox: the item is not a task item.
+    Other,
+    /// Nothing a reader sees.
+    Nothing,
+}
+
+/// Finds the checkbox a list item starts with.
+///
+/// ~keep A task item starts with its checkbox. A checkbox after other content of the item is a
+/// ~keep control in the text, not the item's marker.
 #[allow(clippy::trivially_copy_pass_by_ref)]
 fn find_checkbox<'a>(
     node_handle: &tl::NodeHandle,
@@ -60,53 +73,55 @@ fn find_checkbox<'a>(
     options: &ConversionOptions,
     ctx: &Context,
     depth: usize,
-) -> Option<(bool, tl::NodeHandle)> {
+) -> FirstContent {
     // ~keep This helper recurses over the li subtree independently of `walk_node`
     // ~keep (it runs before any handler dispatch), so it needs its own depth guard
     // ~keep instead of relying on the main walker's check.
     if depth >= effective_max_depth(options) {
         ctx.depth_limit_reached.set(true);
-        return None;
+        return FirstContent::Other;
     }
-    if let Some(tl::Node::Tag(node_tag)) = node_handle.get(parser) {
-        if tag_name_eq(node_tag.name().as_utf8_str(), "input") {
-            let input_type = node_tag
-                .attributes()
-                .get("type")
-                .flatten()
-                .map(|value| value.as_utf8_str());
-            // ~keep An attribute value like `CHECKBOX` names the same type.
-            if input_type.is_some_and(|input_type| input_type.eq_ignore_ascii_case("checkbox")) {
-                return Some((node_tag.attributes().get("checked").is_some(), *node_handle));
+    match node_handle.get(parser) {
+        Some(tl::Node::Raw(raw)) if !raw.as_utf8_str().trim().is_empty() => FirstContent::Other,
+        Some(tl::Node::Tag(node_tag)) => {
+            match normalized_tag_name(node_tag.name().as_utf8_str()).as_ref() {
+                "input" => {
+                    return crate::converter::form::elements::checkbox_state(node_tag)
+                        .map_or(FirstContent::Nothing, |checked| {
+                            FirstContent::Checkbox(checked, *node_handle)
+                        });
+                }
+                // ~keep A nested list's items own the checkboxes inside it (issue #604).
+                "ul" | "ol" | "img" | "hr" => return FirstContent::Other,
+                "script" | "style" | "template" | "noscript" => return FirstContent::Nothing,
+                _ => {}
             }
-        }
-        // ~keep A nested list's items own the checkboxes inside it (issue #604).
-        if matches!(normalized_tag_name(node_tag.name().as_utf8_str()).as_ref(), "ul" | "ol") {
-            return None;
-        }
-        for child_handle in node_tag.children().top().iter() {
-            if let Some(result) = find_checkbox(child_handle, parser, options, ctx, depth + 1) {
-                return Some(result);
+            for child_handle in node_tag.children().top().iter() {
+                let found = find_checkbox(child_handle, parser, options, ctx, depth + 1);
+                if !matches!(found, FirstContent::Nothing) {
+                    return found;
+                }
             }
+            FirstContent::Nothing
         }
+        _ => FirstContent::Nothing,
     }
-    None
 }
 
 impl TaskInfo {
     fn new(node_handle: &tl::NodeHandle, parser: &tl::Parser, context: ListContext<'_>) -> Self {
-        find_checkbox(node_handle, parser, context.options, context.ctx, context.depth).map_or(
-            Self {
-                is_task: false,
-                checked: false,
-                checkbox: None,
-            },
-            |(checked, checkbox)| Self {
+        match find_checkbox(node_handle, parser, context.options, context.ctx, context.depth) {
+            FirstContent::Checkbox(checked, checkbox) => Self {
                 is_task: true,
                 checked,
                 checkbox: Some(checkbox),
             },
-        )
+            FirstContent::Other | FirstContent::Nothing => Self {
+                is_task: false,
+                checked: false,
+                checkbox: None,
+            },
+        }
     }
 }
 

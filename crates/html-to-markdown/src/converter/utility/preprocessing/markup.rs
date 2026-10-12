@@ -365,9 +365,13 @@ pub fn preprocess_html(input: &str) -> Cow<'_, str> {
     let mut last = 0;
     let mut output: Option<String> = None;
     let mut svg_depth = 0usize;
+    let last_gt = bytes.iter().rposition(|&byte| byte == b'>');
 
     while idx < len {
         if bytes[idx] == b'<' {
+            if last_gt.is_none_or(|end| end <= idx) && looks_like_tag_start(bytes, idx, len) {
+                break;
+            }
             if let Some(new_pos) = collapse_empty_comment(input, bytes, idx, last, &mut output) {
                 last = new_pos;
                 idx = new_pos;
@@ -491,8 +495,9 @@ pub fn is_json_ld_script_open_tag(tag: &str) -> bool {
                 }
             };
 
-            let value = &tag[value_start..value_end];
-            let media_type = value.split(';').next().unwrap_or(value).trim();
+            // ~keep The decision reads the decoded value: `ld&#43;json` names the same type.
+            let value = crate::text::decode_attribute_value_cow(&tag[value_start..value_end]);
+            let media_type = value.split(';').next().unwrap_or(&value).trim();
             return eq_ascii_case_insensitive(media_type.as_bytes(), b"application/ld+json");
         }
         idx += 1;

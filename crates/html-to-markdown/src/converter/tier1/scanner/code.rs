@@ -51,7 +51,13 @@ fn close_code(
     // preceded by our own separator instead.
     let (leading, content, trailing) = code_span_parts(&buf[content_start..], trim_boundary_whitespace);
     buf.truncate(content_start);
-    buf.push_str(&leading);
+    // ~keep White space on both sides of the element start is one run: Tier-2's `push_inline_prefix`.
+    // ~keep A line end in `leading` is no white space of the source: a block in the code wrote
+    // ~keep its separator across the start of the content (`one\n<kbd><div>y</div></kbd>`), or a
+    // ~keep `<br>` its split marker. It is written as before the rules of running text.
+    if leading.contains('\n') || crate::converter::utility::white_space::space_is_owed(buf) {
+        buf.push_str(&leading);
+    }
 
     let mut first = true;
     for segment in content.split('\n').filter(|segment| !segment.is_empty()) {
@@ -121,28 +127,10 @@ fn format_inline_code_segment(buf: &mut String, content: &str) {
     }
 }
 
-/// Compute the length of the longest consecutive run of `` ` `` in `content`.
-///
-/// ~keep Mirrors `converter::handlers::code_block::longest_consecutive_run`
-/// (see the shared-helper note on `MIN_FENCE_LENGTH` above).
-fn longest_consecutive_backtick_run(content: &str) -> usize {
-    content
-        .chars()
-        .fold((0usize, 0usize), |(max, current), c| {
-            if c == '`' {
-                let next = current + 1;
-                (max.max(next), next)
-            } else {
-                (max, 0)
-            }
-        })
-        .0
-}
-
 /// Smallest backtick-run length (starting at 1) that does not occur as a run inside `content`.
 ///
 /// ~keep Mirrors `converter::handlers::code_block::min_safe_code_span_delimiter_length`
-/// byte-for-byte (see the shared-helper note on `MIN_FENCE_LENGTH` above). CommonMark
+/// byte-for-byte. CommonMark
 /// closes an inline code span at the next backtick string of the *same* length as the
 /// opener (6.1), so `longest_run + 1` unconditionally over-escapes: content `` `` `` (a
 /// single length-2 run, no length-1 run) is valid with a single backtick delimiter.
@@ -353,7 +341,7 @@ fn close_link(state: &mut Tier1State, frame: &OpenTag, options: &ConversionOptio
     // ~keep Close the link: `](href "title")` or `](href)`
     // If no href, just emit the text as-is (Tier-2 behaviour: no link markup).
     // Link state was pushed to state.link_stack at open; pop it now.
-    let (href, title, has_nested_tag, has_aria_label) = state.link_stack.pop().unwrap_or((None, None, false, false));
+    let (href, title, has_nested_tag, tier2_if_no_text) = state.link_stack.pop().unwrap_or((None, None, false, false));
     // ~keep Mirrors the branch ORDER of Tier-2's `line_break.rs`, where `in_heading` and
     // `in_table_cell` are both tested ahead of the link arm: a single-line ATX heading
     // and a pipe-table cell cannot carry a hard break at all, so a `<br>` in either has
@@ -366,19 +354,33 @@ fn close_link(state: &mut Tier1State, frame: &OpenTag, options: &ConversionOptio
     // source HTML with whitespace before `</a>`), while keeping a `<br>` that sits at
     // either edge of the label (issue #497).
     let trim_start = clamp_to_char_boundary(dest, frame.content_start);
+    // ~keep A link with no address is running text in Tier-2, which keeps the white space that
+    // ~keep its content ends with. The trim below loses it, so the page goes to Tier-2 (the
+    // ~keep scanner does the same where such a link opens, for the white space at its start).
+    if href.is_none() && dest[trim_start..].ends_with(char::is_whitespace) {
+        return Err(BailReason::Classifier);
+    }
+    // ~keep The space that a label ends with goes after the link, as in Tier-2 (issue #800).
+    let ends_with_space = dest[trim_start..].ends_with(' ');
+    // ~keep Mirror Tier-2's `normalize_whitespace_cow` step inside
+    // `normalize_link_label` (utility/content.rs): any Unicode whitespace
+    // in the link label (notably NBSP `\u{00a0}`) collapses to a single ASCII
+    // space.  Tier-1 otherwise emits `[Designed\u{a0}by](url)` where Tier-2
+    // emits `[Designed by](url)`. It runs before the trim, as it does in Tier-2:
+    // a no-break space at the edge of the label is white space of the label.
+    normalize_link_label_nbsp(dest, trim_start);
     trim_label_preserving_boundary_hard_breaks(
         dest,
         trim_start,
         keeps_boundary_hard_breaks,
         crate::converter::main_helpers::hard_break_marker(options),
     );
-    // ~keep Mirror Tier-2's `normalize_whitespace_cow` step inside
-    // `normalize_link_label` (utility/content.rs:144): any Unicode whitespace
-    // in the link label (notably NBSP `\u{00a0}`) collapses to a single ASCII
-    // space.  Tier-1 otherwise emits `[Designed\u{a0}by](url)` where Tier-2
-    // emits `[Designed by](url)`.
-    normalize_link_label_nbsp(dest, trim_start);
-    if dest.len() == trim_start && (has_nested_tag || title.is_some() || has_aria_label) {
+    // ~keep Tier-2 decides what a link with no text writes: the name of the link as its label,
+    // ~keep nothing when the link points into its own page, and the label of a link that holds
+    // ~keep only empty elements, or only a title. This scanner has none of these rules, so it
+    // ~keep leaves the page to Tier-2.
+    let named_or_own_page = tier2_if_no_text && href.is_some();
+    if dest.len() == trim_start && (named_or_own_page || has_nested_tag || title.is_some()) {
         return Err(BailReason::LinkEmptyLabel);
     }
     if let Some(href_str) = href.as_deref() {
@@ -395,13 +397,21 @@ fn close_link(state: &mut Tier1State, frame: &OpenTag, options: &ConversionOptio
             dest.push('↑');
         }
     }
+    // ~keep A label with no text has no end: no space goes after such a link.
+    let end_space = ends_with_space && dest.len() > trim_start;
     if let Some(href) = href.filter(|value| !value.is_empty()) {
         emit_markdown_link_close(dest, trim_start, &href, title.as_deref(), options);
+        // ~keep A link with no text still writes `[](href)`: content, as in Tier-2's `convert_node`.
+        state.end_document_start_if_written(trim_start.saturating_sub(1));
     } else {
         let bracket_search_end = clamp_to_char_boundary(dest, frame.content_start);
         if let Some(bracket_pos) = dest[..bracket_search_end].rfind('[') {
             dest.remove(bracket_pos);
         }
+    }
+    // ~keep The space goes after the link, and after the text of a link with an empty address.
+    if end_space {
+        state.cell_or_output_mut().push(' ');
     }
     Ok(())
 }
@@ -410,10 +420,14 @@ fn normalize_link_label_nbsp(dest: &mut String, trim_start: usize) {
     if !dest[trim_start..].contains('\u{00a0}') {
         return;
     }
-    let normalized = dest[trim_start..]
-        .chars()
-        .map(|character| if character == '\u{00a0}' { ' ' } else { character })
-        .collect::<String>();
+    let spaced = dest[trim_start..].replace('\u{00a0}', " ");
+    // ~keep A no-break space beside a space is one space of the label, and none at its start,
+    // ~keep as in Tier-2. A label with a line break keeps the two spaces of its hard break marker.
+    let normalized = if spaced.contains('\n') {
+        spaced
+    } else {
+        crate::text::normalize_whitespace_cow(&spaced).trim_start().to_owned()
+    };
     dest.truncate(trim_start);
     dest.push_str(&normalized);
 }
@@ -585,7 +599,7 @@ fn close_dd(state: &mut Tier1State) {
     }
 }
 
-fn close_dl(state: &mut Tier1State, frame: &OpenTag) {
+fn close_dl(state: &mut Tier1State, frame: &OpenTag, options: &ConversionOptions) {
     if state.in_table_cell() {
         return;
     }
@@ -595,9 +609,13 @@ fn close_dl(state: &mut Tier1State, frame: &OpenTag) {
     if buf.len() <= frame.content_start {
         return;
     }
+    // ~keep A last line of indented code keeps its line end, as in Tier-2: the spaces are code.
+    let content_start = clamp_to_char_boundary(buf, frame.content_start);
+    let kept_end = content_start
+        + crate::converter::code_scan::quote_content_range(&buf[content_start..], options.code_block_style).end;
     // ~keep Tier-2 trims the dl's accumulated content, so any trailing whitespace
     // from the last dt/dd close should collapse to a single "\n\n" separator.
-    while buf.len() > frame.content_start {
+    while buf.len() > frame.content_start.max(kept_end) {
         let last = buf.as_bytes()[buf.len() - 1];
         if matches!(last, b' ' | b'\t' | b'\n' | b'\r') {
             buf.pop();

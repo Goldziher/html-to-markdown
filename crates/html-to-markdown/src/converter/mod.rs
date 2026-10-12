@@ -105,6 +105,8 @@ mod main_dispatch;
 mod main_helpers;
 pub mod media;
 mod metadata;
+#[cfg(all(test, feature = "metadata"))]
+mod metadata_preferences_tests;
 pub mod plain_text;
 pub mod preprocessing_helpers;
 pub mod prescan;
@@ -125,7 +127,7 @@ pub use self::dom_context::DomContext;
 
 pub use self::main::{convert_html_impl, walk_node};
 pub use self::main_helpers::document_head;
-pub use self::main_helpers::repair_head_content_before_explicit_head;
+pub use self::main_helpers::repair_head_content_outside_head;
 pub use self::main_helpers::{emit_table_cell_break, strip_trailing_backslash_breaks, trim_trailing_whitespace};
 
 pub use crate::converter::utility::content::{

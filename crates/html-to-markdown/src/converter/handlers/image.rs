@@ -48,7 +48,7 @@ struct ImageData<'a> {
 pub fn handle_img(tag: &tl::HTMLTag, mut handler: HandlerContext<'_>) {
     let data = image_data(tag, &handler);
     #[cfg(feature = "metadata")]
-    let metadata = handler.context.metadata_wants_images.then(|| image_metadata(tag));
+    let metadata = handler.context.metadata_wants.images.then(|| image_metadata(tag));
     #[cfg(feature = "inline-images")]
     collect_inline_image(tag, &data, handler.context);
     let inline_data = handler
@@ -211,6 +211,8 @@ fn render_image(
     if let std::ops::ControlFlow::Break(result) = visit_image(tag, data, handler) {
         return result;
     }
+    // ~keep Code has no image marks. An image in code is its alt text as literal code text, as
+    // ~keep where a heading or a table cell cannot hold an image. A visitor is asked first.
     if context.in_code {
         return (inline_data != InlineDataMedia::DropElement).then(|| data.alt.to_string());
     }

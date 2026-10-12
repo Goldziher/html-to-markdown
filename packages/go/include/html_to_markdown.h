@@ -1129,6 +1129,20 @@ char *htm_conversion_options_code_language(HTMAlefHandle handle);
 int32_t htm_conversion_options_autolinks(HTMAlefHandle handle);
 
 /**
+ * Get the `expand_abbreviations` field from a `ConversionOptions`.
+ * # Safety
+ * Pointer must be a valid handle returned by this library.
+ */
+int32_t htm_conversion_options_expand_abbreviations(HTMAlefHandle handle);
+
+/**
+ * Get the `include_blockquote_citations` field from a `ConversionOptions`.
+ * # Safety
+ * Pointer must be a valid handle returned by this library.
+ */
+int32_t htm_conversion_options_include_blockquote_citations(HTMAlefHandle handle);
+
+/**
  * Get the `default_title` field from a `ConversionOptions`.
  * # Safety
  * Pointer must be a valid handle returned by this library.
@@ -1629,6 +1643,46 @@ int32_t htm_conversion_options_update_autolinks(HTMAlefHandle handle);
  * Pointer must be a valid handle returned by this library.
  */
 int32_t htm_conversion_options_update_has_autolinks(HTMAlefHandle handle);
+
+/**
+ * Get the `expand_abbreviations` field from a `ConversionOptionsUpdate`.
+ * # Safety
+ * Pointer must be a valid handle returned by this library.
+ */
+int32_t htm_conversion_options_update_expand_abbreviations(HTMAlefHandle handle);
+
+/**
+ * Report whether the `expand_abbreviations` field on a `ConversionOptionsUpdate` is `Some`.
+ *
+ * `htm_conversion_options_update_expand_abbreviations` cannot distinguish a `None` field from a
+ * legitimate zero-valued `Some` at the C ABI boundary -- there is no null representation for a
+ * numeric return, so both collapse to the same sentinel. Call this function first: `1` means
+ * the field getter's return value is meaningful, `0` means the field is absent and the getter's
+ * sentinel must be ignored, `-1` reports an invalid handle (see `htm_last_error_code`).
+ * # Safety
+ * Pointer must be a valid handle returned by this library.
+ */
+int32_t htm_conversion_options_update_has_expand_abbreviations(HTMAlefHandle handle);
+
+/**
+ * Get the `include_blockquote_citations` field from a `ConversionOptionsUpdate`.
+ * # Safety
+ * Pointer must be a valid handle returned by this library.
+ */
+int32_t htm_conversion_options_update_include_blockquote_citations(HTMAlefHandle handle);
+
+/**
+ * Report whether the `include_blockquote_citations` field on a `ConversionOptionsUpdate` is `Some`.
+ *
+ * `htm_conversion_options_update_include_blockquote_citations` cannot distinguish a `None` field from a
+ * legitimate zero-valued `Some` at the C ABI boundary -- there is no null representation for a
+ * numeric return, so both collapse to the same sentinel. Call this function first: `1` means
+ * the field getter's return value is meaningful, `0` means the field is absent and the getter's
+ * sentinel must be ignored, `-1` reports an invalid handle (see `htm_last_error_code`).
+ * # Safety
+ * Pointer must be a valid handle returned by this library.
+ */
+int32_t htm_conversion_options_update_has_include_blockquote_citations(HTMAlefHandle handle);
 
 /**
  * Get the `default_title` field from a `ConversionOptionsUpdate`.

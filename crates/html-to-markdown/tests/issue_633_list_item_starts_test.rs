@@ -529,7 +529,7 @@ fn should_start_a_task_item_quote_after_an_empty_inline_element_on_the_next_line
     }
     for (wrapper, first_line) in [
         (r#"<a href="u"></a>"#, "- [ ] [](u)\n"),
-        ("<svg></svg>", "- [ ] ![SVG Image]"),
+        ("<svg></svg>", "- [ ] ![](data:image/svg+xml;base64,"),
     ] {
         let html = format!(r#"<ul><li><input type="checkbox">{wrapper}<blockquote>q</blockquote></li></ul>"#);
         let markdown = convert_with(&html, &options);

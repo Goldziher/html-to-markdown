@@ -35,6 +35,8 @@ use crate::converter::inline::HandlerContext;
 /// which must be accessible (pub(crate)) for this module to work correctly.
 pub fn handle(tag_name: &str, context: HandlerContext<'_>) {
     match tag_name {
+        // ~keep Code shows every character as text: no title in parentheses.
+        "abbr" if context.context.in_code => typography::handle_small(context),
         "mark" => marks::handle_mark(context),
         "del" | "s" | "strike" => marks::handle_strikethrough(tag_name, context),
         "ins" => marks::handle_inserted(context),

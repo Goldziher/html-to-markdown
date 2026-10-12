@@ -616,9 +616,10 @@ fn test_uppercase_tags_issue_113() {
 
 #[test]
 fn test_breaks_and_newlines_issue_112() {
+    // ~keep The line end before the inline element is a space, as a browser shows it.
     let html = "<br>\n1\n2\n<b>3</b>";
     let result = convert(html, None).unwrap();
-    assert_eq!(result, "\n1\n2\n**3**\n");
+    assert_eq!(result, "\n1\n2 **3**\n");
 }
 
 #[test]
