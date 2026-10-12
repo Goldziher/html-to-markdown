@@ -1,6 +1,6 @@
 use std::borrow::Cow;
 
-use super::head_scan::HeadScan;
+use super::head_scan::body_start;
 use super::markup::{find_tag_end, matches_tag_start};
 use super::raw_text::{
     find_closing_tag_bytes_nested, is_self_closing_tag, matching_tag_ends, opens_a_tag, skip_opaque_region,
@@ -300,18 +300,18 @@ impl TagEnds {
 /// ~keep left, or a quote before it has no partner. A page with many such starts made a scan
 /// ~keep that asks at each of them quadratic (#765). After the first scan that fails, the ends
 /// ~keep come from a table that reads the page once.
-struct TagEndScan<'a> {
+pub(super) struct TagEndScan<'a> {
     bytes: &'a [u8],
     table: Option<TagEnds>,
 }
 
 impl<'a> TagEndScan<'a> {
-    const fn new(bytes: &'a [u8]) -> Self {
+    pub(super) const fn new(bytes: &'a [u8]) -> Self {
         Self { bytes, table: None }
     }
 
     /// The result of `find_tag_end(bytes, from)`.
-    fn tag_end(&mut self, from: usize) -> Option<usize> {
+    pub(super) fn tag_end(&mut self, from: usize) -> Option<usize> {
         if let Some(table) = &self.table {
             return table.tag_end(from);
         }
@@ -390,7 +390,7 @@ pub fn strip_hidden_elements(input: &str) -> Cow<'_, str> {
 /// renders in its host element. [`HiddenContent::All`] removes the tags of every `<template>` and
 /// `<noscript>`. An element whose tags stay is dropped by the walk, as before. Inside `<head>` no
 /// tag is removed: what the two elements hold there is metadata (`<link>`, `<meta>`, `<style>`),
-/// and removing the tags would make it the metadata of the document. [`HeadScan`] says where
+/// and removing the tags would make it the metadata of the document. [`body_start`] says where
 /// the head ends.
 ///
 /// The two tags of one element are removed together or not at all: an end tag is removed only
@@ -410,6 +410,10 @@ pub fn unwrap_kept_inert_elements(input: &str, hidden_content: HiddenContent) ->
         return Cow::Borrowed(input);
     }
     let bytes = input.as_bytes();
+    let mut tag_ends = TagEndScan::new(bytes);
+    let Some(body_start) = body_start(input, &mut tag_ends) else {
+        return Cow::Borrowed(input);
+    };
     // ~keep For `<template>` and for `<noscript>`, one entry for each open start tag after the
     // ~keep head: whether the tag was removed. An end tag takes the entry of the start tag that
     // ~keep it closes. A start tag that stays while its end tag is removed holds the rest of the
@@ -417,10 +421,7 @@ pub fn unwrap_kept_inert_elements(input: &str, hidden_content: HiddenContent) ->
     let mut open: [Vec<bool>; 2] = [Vec::new(), Vec::new()];
     let mut output: Option<String> = None;
     let mut last = 0;
-    let mut idx = 0;
-    let mut tag_ends = TagEndScan::new(bytes);
-    let mut head = HeadScan::new();
-    let mut text_start = 0;
+    let mut idx = body_start;
 
     while idx < bytes.len() {
         let Some(offset) = memchr::memchr(b'<', &bytes[idx..]) else {
@@ -429,16 +430,11 @@ pub fn unwrap_kept_inert_elements(input: &str, hidden_content: HiddenContent) ->
         idx += offset;
         let is_end_tag = bytes.get(idx + 1) == Some(&b'/');
         let name_start = idx + 1 + usize::from(is_end_tag);
-        let next_tag_is_html = !is_end_tag && matches_tag_start(bytes, name_start, b"html");
-        head = head.after_text(input.get(text_start..idx).unwrap_or_default(), next_tag_is_html);
         let is_template = matches_tag_start(bytes, name_start, b"template");
         let is_noscript = matches_tag_start(bytes, name_start, b"noscript");
         let is_tag = opens_a_tag(bytes, idx);
         let tag_end = if is_tag { tag_ends.tag_end(idx + 1) } else { None };
-        let closes_itself = tag_end.is_some_and(|end| is_self_closing_tag(&bytes[idx..end], b"template"));
-        let starts_body = !head.in_body();
-        head = head.after_tag(bytes, name_start, is_end_tag, closes_itself);
-        if !head.in_body() || (!is_template && !is_noscript) {
+        if !is_template && !is_noscript {
             // ~keep A comment, a raw-text body and a quoted attribute value can hold text that
             // ~keep looks like one of the two tags. Step over each as one unit.
             // ~keep A raw-text element starts with a tag that ends. For a tag start with no end
@@ -448,15 +444,15 @@ pub fn unwrap_kept_inert_elements(input: &str, hidden_content: HiddenContent) ->
             } else {
                 skip_opaque_region(bytes, idx).or(tag_end)
             };
-            // ~keep The text that the head state reads starts after the unit. A `<` that starts
-            // ~keep no tag is text itself. A tag with no end holds the rest of the page.
-            text_start = unit_end.unwrap_or(if is_tag { bytes.len() } else { idx });
             idx = unit_end.unwrap_or(idx + 1);
             continue;
         }
         let Some(tag_end) = tag_end else {
             break;
         };
+        let closes_itself = is_self_closing_tag(&bytes[idx..tag_end], b"template");
+        // ~keep Text that starts the body is before its first tag, so only a tag is at the start.
+        let starts_body = idx == body_start;
         let open = &mut open[usize::from(is_noscript)];
         let remove = if is_end_tag {
             open.pop().unwrap_or(false)

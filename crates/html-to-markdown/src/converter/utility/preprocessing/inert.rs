@@ -4,6 +4,7 @@ use std::borrow::Cow;
 use std::cell::{Cell, RefCell};
 use std::collections::{HashMap, HashSet};
 
+use super::kept::{Kept, Replacements, rewritten};
 use super::markup::find_tag_end;
 
 use html5ever::LocalName;
@@ -128,7 +129,7 @@ struct BodyNormalizer<'a> {
     body: RefCell<Option<Body>>,
     namespaces: RefCell<NamespaceStack>,
     preserved: Option<RefCell<PreservedBodies>>,
-    hidden_content: crate::options::HiddenContent,
+    kept: Kept,
     replacements: RefCell<Vec<(std::ops::Range<usize>, String)>>,
     token_boundary: Cell<usize>,
     fed_end: Cell<usize>,
@@ -277,7 +278,7 @@ impl BodyNormalizer<'_> {
             }
             return TokenSinkResult::Script(());
         }
-        if !self.track_namespace(&tag) || super::kept::keeps_inert_body(self.hidden_content, &tag) {
+        if !self.kept.is_inert(self.track_namespace(&tag), &tag, self.position()) {
             return TokenSinkResult::Continue;
         }
         if self.body.borrow().is_none() && matches!(name, "title" | "xmp" | "iframe" | "noscript" | "template") {
@@ -521,6 +522,16 @@ pub fn normalize_inert_bodies_with_preservation(
     if !needs_normalization(source) {
         return (Cow::Borrowed(source), HashMap::new());
     }
+    let (replacements, originals) = inert_body_replacements(source, preserve, Kept::of(source, hidden_content));
+    (rewritten(source, &replacements), originals)
+}
+
+/// The text for each body of `source` that `kept` does not keep, and the preserved bodies.
+pub(super) fn inert_body_replacements(
+    source: &str,
+    preserve: bool,
+    kept: Kept,
+) -> (Replacements, HashMap<String, String>) {
     let input = BufferQueue::default();
     let tokenizer = Tokenizer::new(
         BodyNormalizer {
@@ -529,7 +540,7 @@ pub fn normalize_inert_bodies_with_preservation(
             body: RefCell::new(None),
             namespaces: RefCell::new(NamespaceStack::default()),
             preserved: preserve.then(|| RefCell::new(PreservedBodies::new(source))),
-            hidden_content,
+            kept,
             replacements: RefCell::new(Vec::new()),
             token_boundary: Cell::new(0),
             fed_end: Cell::new(0),
@@ -543,19 +554,7 @@ pub fn normalize_inert_bodies_with_preservation(
         .sink
         .preserved
         .map_or_else(HashMap::new, |preserved| preserved.into_inner().originals);
-    let replacements = tokenizer.sink.replacements.into_inner();
-    if replacements.is_empty() {
-        return (Cow::Borrowed(source), originals);
-    }
-    let mut output = String::with_capacity(source.len());
-    let mut cursor = 0;
-    for (range, replacement) in replacements {
-        output.push_str(&source[cursor..range.start]);
-        output.push_str(&replacement);
-        cursor = range.end;
-    }
-    output.push_str(&source[cursor..]);
-    (Cow::Owned(output), originals)
+    (tokenizer.sink.replacements.into_inner(), originals)
 }
 
 const TOKENIZER_CHUNK_BYTES: usize = 4096;

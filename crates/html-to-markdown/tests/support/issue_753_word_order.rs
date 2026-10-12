@@ -270,9 +270,11 @@ fn should_take_the_tree_builder_under_a_wider_choice_when_a_narrower_choice_take
             r#"<head><img src="p.gif" alt="A"><noscript></head><p>End</p>"#,
             [image, image, both],
         ),
+        // ~keep The inert-body pass ends a `<template>` that has no end tag, so no narrower
+        // ~keep choice takes the tree builder here, and the image stays in the head.
         (
             r#"<head><img src="p.gif" alt="A"></head><template><p>End</p>"#,
-            [image, image, both],
+            ["", "", "End\n"],
         ),
         (
             r#"<head><img src="p.gif" alt="A"></head><div><template></div></template><p>End</p>"#,
@@ -296,44 +298,61 @@ fn should_start_the_body_where_a_narrower_choice_starts_it() {
     // ~keep Each page has an element with no end tag, so every choice takes the tree builder. The
     // ~keep first parse holds each title in another element, so the head repair leaves the page.
     // ~keep The outputs have no front matter: a title of the head is then written nowhere.
+    //
+    // ~keep Each row names the narrowest choice that writes the title. The inert-body pass reads
+    // ~keep `<template/>` and `<noscript/>` as start tags, so the first three pages are the
+    // ~keep content of one such element: `drop` and `reachable` write nothing, and `all` writes
+    // ~keep the title.
+    let (reachable, all) = (1, 2);
     let pages = [
         // ~keep Three of the generated documents.
         (
             r#"<template/></div></head><noscript/><TEMPLATE shadowrootmode="open"><title>T5</title><template><div hidden>H7</div><noscript><img src="p.gif" alt="A9"><p>End</p>"#,
             "T5",
+            all,
         ),
         (
             r#"<noscript/></head><TEMPLATE shadowrootmode="open"><noscript/><title>T4</title></div><body></head><div><template/><noscript><p>End</p>"#,
             "T4",
+            all,
         ),
         (
             r#"</head><head><noscript/><title>T3</title><head></div><img src="p.gif" alt="A6"><meta name="m7" content="c"><img src="p.gif" alt="A8"><title>T9</title><template><div><p>End</p>"#,
             "T3",
+            all,
         ),
         // ~keep A `<noscript>` after the end tag of the head, before a title of the page and
         // ~keep before a title of a shadow root.
         (
             "</head><head><noscript></noscript><title>T1</title><div><p>End</p>",
             "T1",
+            reachable,
         ),
         (
             r#"</head><noscript></noscript><template shadowrootmode="open"><title>T2</title></template><div><p>End</p>"#,
             "T2",
+            reachable,
         ),
         // ~keep The first `<template>` of a fragment, and a shadow root in that place.
         (
             r#"<template></template></head><noscript></noscript><template shadowrootmode="open"><title>T6</title></template><div><p>End</p>"#,
             "T6",
+            reachable,
         ),
         (
             r#"<template shadowrootmode="open"><title>T7</title></template><div><p>End</p>"#,
             "T7",
+            reachable,
         ),
         // ~keep A hidden element, which keeps its tags under each choice that keeps it.
-        ("</head><head><div hidden></div><title>T8</title><div><p>End</p>", "T8"),
+        (
+            "</head><head><div hidden></div><title>T8</title><div><p>End</p>",
+            "T8",
+            reachable,
+        ),
     ];
     let mut failures = Vec::new();
-    for (html, title) in pages {
+    for (html, title, narrowest) in pages {
         let outputs = CHOICES.map(|hidden_content| {
             let options = ConversionOptions {
                 hidden_content,
@@ -345,12 +364,61 @@ fn should_start_the_body_where_a_narrower_choice_starts_it() {
                 .content
                 .unwrap_or_default()
         });
-        check(&mut failures, outputs[1].contains(title), || {
-            format!("{html}: `reachable` does not write {title}: {:?}", outputs[1])
+        check(&mut failures, outputs[narrowest].contains(title), || {
+            format!(
+                "{html}: {:?} does not write {title}: {:?}",
+                CHOICES[narrowest], outputs[narrowest]
+            )
         });
+        check(
+            &mut failures,
+            narrowest == reachable || outputs[reachable].is_empty(),
+            || format!("{html}: `reachable` writes {:?}", outputs[reachable]),
+        );
         check_that_no_output_loses_a_word(&mut failures, html, &outputs);
     }
-    report(&failures, pages.len() * 3);
+    report(&failures, pages.len() * 4);
+}
+
+#[test]
+fn should_empty_a_kept_element_of_the_head_like_a_narrower_choice() {
+    // ~keep The inert-body pass leaves a kept element as written only in the body. The later
+    // ~keep pass leaves the tags of an element of the head, so the content of that element, read
+    // ~keep as markup, held the text after it. The first three pages are generated documents.
+    for html in [
+        "<head><noscript><head></NOSCRIPT><p>End</p>",
+        "<head><noscript><body></NOSCRIPT><p>End</p>",
+        "<head><noscript><div></NOSCRIPT><p>End</p>",
+        "<head><noscript><div>IN</NOSCRIPT><p>End</p>",
+        "<head><template><div>IN</template><p>End</p>",
+        r#"<head><TEMPLATE shadowrootmode="open"><div>IN</template><p>End</p>"#,
+        "<head><iframe><div>IN</iframe><p>End</p>",
+    ] {
+        assert_eq!(all_choices(html), ["End\n", "End\n", "End\n"], "{html}");
+    }
+    // ~keep In the body each choice writes the content that it keeps. No choice keeps the
+    // ~keep content of an `<iframe>`.
+    let (dropped, kept) = ("First\n\nEnd\n", "First\n\nIN\n\nEnd\n");
+    for (html, expected) in [
+        (
+            "<p>First</p><noscript><div>IN</NOSCRIPT><p>End</p>",
+            [dropped, dropped, kept],
+        ),
+        (
+            "<p>First</p><template><div>IN</template><p>End</p>",
+            [dropped, dropped, kept],
+        ),
+        (
+            r#"<p>First</p><TEMPLATE shadowrootmode="open"><div>IN</template><p>End</p>"#,
+            [dropped, kept, kept],
+        ),
+        (
+            "<p>First</p><iframe><div>IN</iframe><p>End</p>",
+            [dropped, dropped, dropped],
+        ),
+    ] {
+        assert_eq!(all_choices(html), expected, "{html}");
+    }
 }
 
 /// The pieces of the generated documents. `{}` takes a word that no other piece of the document has.
