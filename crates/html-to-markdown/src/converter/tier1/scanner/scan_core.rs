@@ -282,6 +282,14 @@ impl<'a> Tier1Scanner<'a> {
     }
 
     fn prepare_open_tag(&mut self, name_lower: &[u8]) -> Result<(), BailReason> {
+        // ~keep Outside cells, heading labels need Tier-2's structural flattening and visitor hooks.
+        // ~keep The scanner's existing cell path already flattens quote and list markers.
+        if self.state.escape_ctx.contains(EscapeCtx::HEADING)
+            && !self.state.in_table_cell()
+            && matches!(name_lower, b"blockquote" | b"ul" | b"ol" | b"li")
+        {
+            return Err(BailReason::Classifier);
+        }
         // ~keep Only a br or stripped raw-text tag keeps a pending newline join open.
         if !matches!(name_lower, b"br" | b"script" | b"style") {
             self.state.pending_newline_join = None;
