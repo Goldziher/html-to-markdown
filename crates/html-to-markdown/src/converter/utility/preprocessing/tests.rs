@@ -4,7 +4,9 @@ use super::{
     find_closing_tag_bytes, find_closing_tag_bytes_nested, find_tag_end, normalize_bogus_comment_endings,
     normalize_menu_elements, normalize_split_closing_tags, normalize_unclosed_list_items,
     restore_preserved_menu_elements, sanitize_markdown_url, strip_bogus_comments, strip_hidden_elements,
+    unwrap_kept_inert_elements,
 };
+use crate::options::HiddenContent;
 
 #[test]
 fn should_find_tag_end_outside_quotes_from_the_requested_byte() {
@@ -571,4 +573,83 @@ fn find_closing_tag_bytes_stays_first_match_for_raw_text_elements() {
     let start = "<script>".len();
     let end = find_closing_tag_bytes(html, start, b"script").expect("closing tag not found");
     assert_eq!(&html[end..], b"tail");
+}
+
+#[test]
+fn should_leave_the_end_tag_after_a_template_start_tag_that_closes_itself() {
+    // ~keep The parser reads `<template/>` as an element with no content, so the start tag
+    // ~keep opens nothing and the end tag that follows closes nothing: it stays.
+    for (page, choice, expected) in [
+        (
+            "<p>a</p><template/><p>b</p></template><p>c</p>",
+            HiddenContent::All,
+            "<p>a</p><p>b</p></template><p>c</p>",
+        ),
+        (
+            "<p>a</p><template><p>b</p></template><p>c</p>",
+            HiddenContent::All,
+            "<p>a</p><p>b</p><p>c</p>",
+        ),
+        (
+            "<div><template shadowrootmode=\"open\"><template/></template><p>x</p></template></div>",
+            HiddenContent::Reachable,
+            "<div><template/><p>x</p></template></div>",
+        ),
+        // ~keep With an entry for the start tag that closes itself, the end tag is removed
+        // ~keep alone: the `<template>` stays and holds the rest of the page.
+        (
+            "<template><p>IN</p><template shadowrootmode=\"open\"/></template><p>X</p>",
+            HiddenContent::Reachable,
+            "<template><p>IN</p></template><p>X</p>",
+        ),
+    ] {
+        assert_eq!(unwrap_kept_inert_elements(page, choice), expected, "{page:?}");
+    }
+}
+
+#[test]
+fn should_write_an_end_tag_of_the_body_for_the_removed_tag_that_started_the_body() {
+    let (reachable, all) = (HiddenContent::Reachable, HiddenContent::All);
+    for (page, choice, expected) in [
+        // ~keep The first `<template>` and the first `<noscript>` of a fragment start its body.
+        (
+            "<template><p>a</p></template><title>t</title>",
+            all,
+            "</body><p>a</p><title>t</title>",
+        ),
+        ("<noscript/><title>t</title>", all, "</body><title>t</title>"),
+        (
+            r#"<template shadowrootmode="open"><p>a</p></template><noscript>b</noscript>"#,
+            reachable,
+            "</body><p>a</p><noscript>b</noscript>",
+        ),
+        // ~keep After the end tag of the head, a `<noscript>` starts the body.
+        (
+            "<head></head><noscript><p>a</p></noscript><title>t</title>",
+            all,
+            "<head></head></body><p>a</p><title>t</title>",
+        ),
+        (
+            "<html><template>a</template></head><noscript>b</noscript>",
+            all,
+            "<html><template>a</template></head></body>b",
+        ),
+        // ~keep The body of these pages starts at text, at an element, at an end tag and at a
+        // ~keep tag that stays: the removed tags leave nothing in their place.
+        ("a<noscript>b</noscript>", all, "ab"),
+        ("<p>a</p><template>b</template>", all, "<p>a</p>b"),
+        ("</br><template>a</template>", all, "</br>a"),
+        (
+            "<template>a</template><noscript>b</noscript>",
+            reachable,
+            "<template>a</template><noscript>b</noscript>",
+        ),
+        (
+            r#"<template>a</template><div><template shadowrootmode="open">b</template></div>"#,
+            reachable,
+            "<template>a</template><div>b</div>",
+        ),
+    ] {
+        assert_eq!(unwrap_kept_inert_elements(page, choice), expected, "{page:?}");
+    }
 }

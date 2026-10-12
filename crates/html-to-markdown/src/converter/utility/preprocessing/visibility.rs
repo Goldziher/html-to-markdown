@@ -396,6 +396,12 @@ pub fn strip_hidden_elements(input: &str) -> Cow<'_, str> {
 /// The two tags of one element are removed together or not at all: an end tag is removed only
 /// when the start tag that it closes was removed.
 ///
+/// ~keep A removed start tag can be the tag that starts the body: the first `<template>` of a
+/// ~keep fragment, or a `<noscript>` after the end tag of the head. With nothing in its place the
+/// ~keep tree builder starts the body at a later tag and puts a `<title>` before that tag in the
+/// ~keep head, and a narrower choice, which keeps the tag, writes that title as text. So
+/// ~keep [`BODY_START`] is written for that tag.
+///
 /// ~keep The tags are removed before the parse, not skipped in the walk, so that every reader
 /// ~keep of the tree sees the content: a row in a `<template>` that is a child of a `<table>` is
 /// ~keep a row of that table, which a walk that descends into the template cannot give.
@@ -430,6 +436,7 @@ pub fn unwrap_kept_inert_elements(input: &str, hidden_content: HiddenContent) ->
         let is_tag = opens_a_tag(bytes, idx);
         let tag_end = if is_tag { tag_ends.tag_end(idx + 1) } else { None };
         let closes_itself = tag_end.is_some_and(|end| is_self_closing_tag(&bytes[idx..end], b"template"));
+        let starts_body = !head.in_body();
         head = head.after_tag(bytes, name_start, is_end_tag, closes_itself);
         if !head.in_body() || (!is_template && !is_noscript) {
             // ~keep A comment, a raw-text body and a quoted attribute value can hold text that
@@ -464,6 +471,7 @@ pub fn unwrap_kept_inert_elements(input: &str, hidden_content: HiddenContent) ->
         if remove {
             let out = output.get_or_insert_with(|| String::with_capacity(bytes.len()));
             out.push_str(&input[last..idx]);
+            out.push_str(if starts_body { BODY_START } else { "" });
             last = tag_end;
         }
         idx = tag_end;
@@ -477,6 +485,13 @@ pub fn unwrap_kept_inert_elements(input: &str, hidden_content: HiddenContent) ->
         None => Cow::Borrowed(input),
     }
 }
+
+/// What [`unwrap_kept_inert_elements`] writes for the removed tag that started the body.
+///
+/// ~keep The tree builder starts the body at this end tag and makes no element for it, and the
+/// ~keep first parse discards it. A `<body>` start tag would make the page one that wrote its
+/// ~keep body, and a `<header>` in such a body is the page header.
+const BODY_START: &str = "</body>";
 
 /// Whether the start tag of a `<template>` declares a shadow root: `shadowrootmode` is `open` or
 /// `closed`, the two values for which a browser attaches one.
@@ -855,8 +870,15 @@ mod tag_ends_tests {
     ];
 
     /// Which pieces of `page` the scan removed. A comment with the position follows each piece.
+    ///
+    /// ~keep The scan writes `</body>` for the removed tag that started the body: once, and for
+    /// ~keep the first tag that it removes.
     fn removed_pieces(pieces: &[Piece], page: &str, choice: HiddenContent) -> Vec<bool> {
         let unwrapped = unwrap_kept_inert_elements(page, choice);
+        if let Some(at) = unwrapped.find("</body>") {
+            assert!(page.starts_with(&unwrapped[..at]), "{page} {choice:?}");
+            assert_eq!(unwrapped.matches("</body>").count(), 1, "{page} {choice:?}");
+        }
         let mut rest: &str = &unwrapped;
         let removed = pieces
             .iter()
@@ -864,6 +886,7 @@ mod tag_ends_tests {
             .map(|(position, (text, _))| {
                 let kept = rest.strip_prefix(text);
                 rest = kept
+                    .or_else(|| rest.strip_prefix("</body>"))
                     .unwrap_or(rest)
                     .strip_prefix(&format!("<!--{position}-->"))
                     .unwrap_or_else(|| panic!("{page} {choice:?}: {unwrapped} is not the page without some tags"));
@@ -940,38 +963,6 @@ mod tag_ends_tests {
             pairs > 20_000 && removed_pairs > 5_000,
             "{pairs} pairs, {removed_pairs} removed"
         );
-    }
-
-    #[test]
-    fn should_leave_the_end_tag_after_a_template_start_tag_that_closes_itself() {
-        // ~keep The parser reads `<template/>` as an element with no content, so the start tag
-        // ~keep opens nothing and the end tag that follows closes nothing: it stays.
-        for (page, choice, expected) in [
-            (
-                "<p>a</p><template/><p>b</p></template><p>c</p>",
-                HiddenContent::All,
-                "<p>a</p><p>b</p></template><p>c</p>",
-            ),
-            (
-                "<p>a</p><template><p>b</p></template><p>c</p>",
-                HiddenContent::All,
-                "<p>a</p><p>b</p><p>c</p>",
-            ),
-            (
-                "<div><template shadowrootmode=\"open\"><template/></template><p>x</p></template></div>",
-                HiddenContent::Reachable,
-                "<div><template/><p>x</p></template></div>",
-            ),
-            // ~keep With an entry for the start tag that closes itself, the end tag is removed
-            // ~keep alone: the `<template>` stays and holds the rest of the page.
-            (
-                "<template><p>IN</p><template shadowrootmode=\"open\"/></template><p>X</p>",
-                HiddenContent::Reachable,
-                "<template><p>IN</p></template><p>X</p>",
-            ),
-        ] {
-            assert_eq!(unwrap_kept_inert_elements(page, choice), expected, "{page:?}");
-        }
     }
 
     #[test]

@@ -286,6 +286,73 @@ fn should_take_the_tree_builder_under_a_wider_choice_when_a_narrower_choice_take
     assert_eq!(all_choices(html), ["End\n", "End\n", "End\n\nIN\n"]);
 }
 
+#[test]
+fn should_start_the_body_where_a_narrower_choice_starts_it() {
+    // ~keep The tree builder puts a `<title>` that precedes the body in the head, and a title in
+    // ~keep the body is text. A kept element can be what starts the body: a `<noscript>` after the
+    // ~keep end tag of the head, the first `<template>` of a fragment, a hidden element. A wider
+    // ~keep choice removes the tags of that element, and the body still starts there.
+    //
+    // ~keep Each page has an element with no end tag, so every choice takes the tree builder. The
+    // ~keep first parse holds each title in another element, so the head repair leaves the page.
+    // ~keep The outputs have no front matter: a title of the head is then written nowhere.
+    let pages = [
+        // ~keep Three of the generated documents.
+        (
+            r#"<template/></div></head><noscript/><TEMPLATE shadowrootmode="open"><title>T5</title><template><div hidden>H7</div><noscript><img src="p.gif" alt="A9"><p>End</p>"#,
+            "T5",
+        ),
+        (
+            r#"<noscript/></head><TEMPLATE shadowrootmode="open"><noscript/><title>T4</title></div><body></head><div><template/><noscript><p>End</p>"#,
+            "T4",
+        ),
+        (
+            r#"</head><head><noscript/><title>T3</title><head></div><img src="p.gif" alt="A6"><meta name="m7" content="c"><img src="p.gif" alt="A8"><title>T9</title><template><div><p>End</p>"#,
+            "T3",
+        ),
+        // ~keep A `<noscript>` after the end tag of the head, before a title of the page and
+        // ~keep before a title of a shadow root.
+        (
+            "</head><head><noscript></noscript><title>T1</title><div><p>End</p>",
+            "T1",
+        ),
+        (
+            r#"</head><noscript></noscript><template shadowrootmode="open"><title>T2</title></template><div><p>End</p>"#,
+            "T2",
+        ),
+        // ~keep The first `<template>` of a fragment, and a shadow root in that place.
+        (
+            r#"<template></template></head><noscript></noscript><template shadowrootmode="open"><title>T6</title></template><div><p>End</p>"#,
+            "T6",
+        ),
+        (
+            r#"<template shadowrootmode="open"><title>T7</title></template><div><p>End</p>"#,
+            "T7",
+        ),
+        // ~keep A hidden element, which keeps its tags under each choice that keeps it.
+        ("</head><head><div hidden></div><title>T8</title><div><p>End</p>", "T8"),
+    ];
+    let mut failures = Vec::new();
+    for (html, title) in pages {
+        let outputs = CHOICES.map(|hidden_content| {
+            let options = ConversionOptions {
+                hidden_content,
+                extract_metadata: false,
+                ..ConversionOptions::default()
+            };
+            convert(html, Some(options))
+                .expect("conversion should succeed")
+                .content
+                .unwrap_or_default()
+        });
+        check(&mut failures, outputs[1].contains(title), || {
+            format!("{html}: `reachable` does not write {title}: {:?}", outputs[1])
+        });
+        check_that_no_output_loses_a_word(&mut failures, html, &outputs);
+    }
+    report(&failures, pages.len() * 3);
+}
+
 /// The pieces of the generated documents. `{}` takes a word that no other piece of the document has.
 const PIECES: &[&str] = &[
     "<head>",
