@@ -115,18 +115,24 @@ fn should_drop_the_leading_space_of_the_line_after_a_hard_break() {
 }
 
 #[test]
-fn should_keep_the_leading_space_of_an_element_the_full_converter_renders_on_its_own() {
-    // ~keep The full converter writes these elements' children into a buffer of their own, so
-    // ~keep the line end before the element does not drop the space at their start.
-    for html in [
-        "<div>a<br><sup> x</sup></div>",
-        "<blockquote>a<br><sub> x</sub></blockquote>",
-        "<p>a<br><abbr> x</abbr></p>",
-        "<div>a<br><sup><span> x</span></sup></div>",
-        "<dl><dt>a</dt> <dd> b</dd></dl>",
-        "<dl><dt>a</dt> <dt> b</dt></dl>",
+fn should_write_no_space_at_the_start_of_the_line_after_a_break() {
+    // ~keep The full converter writes these elements' children into a buffer of their own. The
+    // ~keep white space at their start is still white space at the start of a line: none.
+    for (html, expected) in [
+        ("<div>a<br><sup> x</sup></div>", "a  \nx\n"),
+        ("<blockquote>a<br><sub> x</sub></blockquote>", "> a  \n> x\n"),
+        ("<p>a<br><abbr> x</abbr></p>", "a  \nx\n"),
+        ("<div>a<br><sup><span> x</span></sup></div>", "a  \nx\n"),
     ] {
-        assert_eq!(tier1(html), tier2(html), "input: {html:?}");
+        assert_eq!(tier2(html), expected, "input: {html:?}");
+        assert_eq!(tier1(html), expected, "input: {html:?}");
+    }
+    // ~keep The white space between a definition term and the next term or description is a
+    // ~keep line of one space in the full converter, as before this change; the fast converter
+    // ~keep writes the start of the line with no space (step 3).
+    for html in ["<dl><dt>a</dt> <dd> b</dd></dl>", "<dl><dt>a</dt> <dt> b</dt></dl>"] {
+        assert_eq!(tier2(html), "a\n b\n", "input: {html:?}");
+        assert_eq!(tier1(html), "a\nb\n", "input: {html:?}");
     }
     let no_highlight = ConversionOptions {
         highlight_style: HighlightStyle::None,

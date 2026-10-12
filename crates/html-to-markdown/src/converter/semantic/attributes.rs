@@ -118,7 +118,9 @@ pub fn handle_abbr(
         if !trimmed.is_empty() {
             output.push_str(trimmed);
 
-            if let Some(title) = crate::converter::utility::attributes::decoded_attribute(tag, "title") {
+            if handler.options.expand_abbreviations
+                && let Some(title) = crate::converter::utility::attributes::decoded_attribute(tag, "title")
+            {
                 let trimmed_title = title.trim();
                 if !trimmed_title.is_empty() {
                     output.push_str(" (");
@@ -240,6 +242,9 @@ pub fn handle_q(
     handler: super::HandlerContext<'_>,
 ) {
     if let Some(tl::Node::Tag(tag)) = node_handle.get(parser) {
+        if handle_collected_q(tag, parser, output, handler) {
+            return;
+        }
         let mut content = String::with_capacity(32);
         let children = tag.children();
         {
@@ -262,7 +267,13 @@ pub fn handle_q(
             }
         }
 
-        let trimmed = content.trim();
+        // ~keep Where the white space of the source is kept, no space moves out of the marks.
+        let (prefix, suffix, trimmed) =
+            if crate::converter::utility::content::keeps_source_white_space(handler.options, handler.ctx) {
+                ("", "", content.trim())
+            } else {
+                chomp_inline(&content)
+            };
         if trimmed.is_empty() {
             // ~keep issue #481: `<q>` wraps in quotes, which a whitespace-only body has
             // ~keep nothing to wrap -- but the body is still the word separator the source
@@ -272,10 +283,42 @@ pub fn handle_q(
             }
             return;
         }
+        crate::converter::utility::content::push_inline_prefix(output, prefix, handler.options, handler.ctx);
         output.push('"');
         output.push_str(trimmed);
         output.push('"');
+        append_inline_suffix(output, suffix, true, node_handle, parser, handler.dom_ctx);
     }
+}
+
+fn handle_collected_q(
+    tag: &tl::HTMLTag<'_>,
+    parser: &tl::Parser<'_>,
+    output: &mut String,
+    handler: super::HandlerContext<'_>,
+) -> bool {
+    let Some(links) = handler.ctx.inline_code_links.as_ref() else {
+        return false;
+    };
+    let link_count = links.borrow().len();
+    let start = output.len();
+    output.push('"');
+    super::walk_tag_children(tag, parser, output, handler);
+    if links.borrow().len() == link_count {
+        let body = output[start + 1..].to_string();
+        output.truncate(start);
+        if body.trim().is_empty() {
+            crate::converter::inline::wrapped::emit_whitespace_only_inline_body(&body, output);
+        } else {
+            output.push('"');
+            output.push_str(body.trim());
+            output.push('"');
+        }
+    } else {
+        // ~keep Quoted links were collected in this buffer; preserve their offsets.
+        output.push('"');
+    }
+    true
 }
 
 /// Dispatcher for semantic inline attribute elements.

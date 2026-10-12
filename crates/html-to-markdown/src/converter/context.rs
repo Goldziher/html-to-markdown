@@ -95,6 +95,11 @@ impl DjotRuleLikeText {
     }
 }
 
+pub(super) struct InlineCodeLink {
+    pub(super) range: std::ops::Range<usize>,
+    pub(super) markdown: String,
+}
+
 /// Conversion context that tracks state during HTML to Markdown conversion.
 ///
 /// This context is passed through the recursive tree walker and maintains information
@@ -114,6 +119,8 @@ pub struct Context {
     /// SPAN must split the span in two rather than embed a newline inside the backticks
     /// (issue #487). ~keep
     pub(crate) in_code_block: bool,
+    /// ~keep Link ranges refer to the raw inline-code buffer, before delimiters are emitted (#813).
+    pub(super) inline_code_links: Option<Rc<RefCell<Vec<InlineCodeLink>>>>,
     /// Output offsets of real `<br>` nodes while a table-cell `<pre>` is collected. ~keep
     pub(crate) pre_cell_break_offsets: Option<Rc<RefCell<Vec<usize>>>>,
     /// Current list item counter for ordered lists.
@@ -127,9 +134,14 @@ pub struct Context {
     pub(crate) blockquote_depth: usize,
     /// Are we inside a table cell (td/th)?
     pub(crate) in_table_cell: bool,
+    /// ~keep Deferred single-cell tables keep their surrounding cell context but render as blocks.
+    pub(crate) allow_nested_table_markup: bool,
     /// Are we inside a table cell (td/th) that holds only inputs and white space? A checkbox
     /// writes its state there. [`Self::for_cell`] decides it where the cell opens.
     pub(crate) in_cell_of_inputs: bool,
+    /// Are we inside the element that writes an option list: the outermost `<select>`,
+    /// `<datalist>` or `<option>`? An option there is a word of that list.
+    pub(crate) in_option_list: bool,
     /// Are we inside a *layout*-table cell, whose row renders as a list item rather than a
     /// pipe row?
     ///
@@ -266,7 +278,9 @@ pub struct Context {
     /// paragraphs, as Google Docs exports) puts a genuine, buffer-sharing paragraph body
     /// at non-zero `inline_depth`.
     pub(crate) block_output_ptr: usize,
-    /// Shared flag: true until the first non-whitespace text content is emitted.
+    /// Shared flag: true until the first node writes content that is not white space. The node
+    /// is text, or an element that writes content of its own (an image, a graphic, a form
+    /// control). `convert_node` clears the flag for every kind of node (issue #762).
     ///
     /// ~keep `block_content_start` cannot answer "is this text node at the very start of a
     /// ~keep fresh block" on its own: it is a byte offset compared against `output.len()`,
@@ -372,16 +386,18 @@ impl Context {
     pub(crate) fn new(options: &crate::options::ConversionOptions, parameters: ContextParameters) -> Self {
         #[cfg(feature = "metadata")]
         let metadata = metadata_preferences(parameters.metadata_collector.as_ref());
-
         Self {
             in_code: false,
             in_code_block: false,
+            inline_code_links: None,
             pre_cell_break_offsets: None,
             list_counter: 0,
             in_ordered_list: false,
             blockquote_depth: 0,
             in_table_cell: false,
+            allow_nested_table_markup: false,
             in_cell_of_inputs: false,
+            in_option_list: false,
             in_layout_cell: false,
             convert_as_inline: options.convert_as_inline,
             inline_depth: 0,
@@ -606,5 +622,17 @@ impl Context {
             return None;
         }
         crate::converter::url_resolve::resolve_attribute_url(self.base_url.as_deref()?, value)
+    }
+    pub(crate) fn resolve_link_url(
+        &self,
+        value: &str,
+        node_handle: &tl::NodeHandle,
+        parser: &tl::Parser,
+        dom_ctx: &crate::converter::DomContext,
+    ) -> Option<String> {
+        if dom_ctx.has_raw_text_ancestor(node_handle.get_inner(), parser) {
+            return None;
+        }
+        crate::converter::url_resolve::resolve_link_url(self.base_url.as_deref()?, value)
     }
 }

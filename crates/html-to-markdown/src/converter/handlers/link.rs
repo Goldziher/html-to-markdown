@@ -19,10 +19,11 @@ use crate::converter::inline::link::{MarkdownLink, append_markdown_link_in_conte
 use crate::converter::main::walk_node;
 use crate::converter::media::inline_data_treatment;
 use crate::converter::utility::content::{
-    collect_link_label_text, link_accessible_name, link_text_content, node_is_block_level, normalize_link_label,
-    normalized_tag_name,
+    collect_link_label_text, keeps_source_white_space, link_accessible_name, link_text_content, node_is_block_level,
+    normalize_link_label, normalized_tag_name, push_inline_prefix,
 };
 use crate::converter::utility::escaping::escape_link_label;
+use crate::converter::{append_inline_suffix, chomp_inline};
 use crate::options::{ConversionOptions, InlineDataMedia};
 use crate::text;
 use std::borrow::Cow;
@@ -69,8 +70,15 @@ pub fn handle_link(tag: &tl::HTMLTag, mut handler: HandlerContext<'_>) {
         walk_handles_to_output(tag.children().top().iter().copied(), &mut handler);
         return;
     };
-    // ~keep Code shows every character as text, so a link in code writes its text and no marks.
-    // ~keep A visitor sees the links that it sees outside code, and decides what they write.
+    // ~keep A link in a code span stays a link: the code marks go inside its label (#813).
+    let span_links = handler.context.inline_code_links.clone();
+    if let Some(links) = span_links.filter(|_| !handler.context.in_code_block) {
+        emit_code_link(tag, &data, &links, &mut handler);
+        return;
+    }
+    // ~keep A code block shows every character as text, so a link there writes its text and no
+    // ~keep marks (#781). A visitor sees the links that it sees outside code, and decides what
+    // ~keep they write.
     if handler.context.in_code {
         handler.context.inline_data_replaced.set(false);
         let text_start = handler.output.len();
@@ -81,7 +89,7 @@ pub fn handle_link(tag: &tl::HTMLTag, mut handler: HandlerContext<'_>) {
         #[cfg(not(feature = "visitor"))]
         let is_shown = false;
         if is_shown {
-            emit_link(tag, &data, &text, false, &mut handler);
+            emit_link(tag, &data, &text, &LabelEdges::NONE, false, &mut handler);
         } else {
             handler.output.push_str(&text);
         }
@@ -94,16 +102,147 @@ pub fn handle_link(tag: &tl::HTMLTag, mut handler: HandlerContext<'_>) {
     }
 
     handler.context.inline_data_replaced.set(false);
-    let mut label = build_label(&data, &handler);
+    let content = build_label_content(&data, &handler);
+    // ~keep The white space at an edge of the label goes outside the link, as it does for bold
+    // ~keep and italic text: `[Go ](/p)now` shows as `Go now`, and a trimmed label joins the words.
+    // ~keep A line break at an edge of the label is content of the label, not white space
+    // ~keep (issue #497): such a label is written whole.
+    let inner = content.trim_matches([' ', '\t', '\u{a0}']);
+    let edge_is_break = inner.starts_with('\n') || inner.starts_with("\\\n") || inner.ends_with('\n');
+    let (prefix, suffix, trimmed) = if edge_is_break || keeps_source_white_space(handler.options, handler.context) {
+        ("", "", content.as_str())
+    } else {
+        chomp_inline(&content)
+    };
+    let edges = LabelEdges {
+        prefix,
+        suffix,
+        has_text: !trimmed.is_empty(),
+    };
+    let mut label = normalize_link_label(trimmed);
     apply_label_fallbacks(&data, &mut label, &handler);
     indent_hard_break_continuations(&mut label, handler.context, handler.options);
     let drop_link = data.is_dropped(&label, &handler);
-    let emit_deferred = emit_link(tag, &data, &label, drop_link, &mut handler);
+    let emit_deferred = emit_link(tag, &data, &label, &edges, drop_link, &mut handler);
     #[cfg(feature = "metadata")]
     record_link_metadata(tag, &data, &label, handler.context);
     if data.emit_blocks_separately && emit_deferred {
         walk_handles_to_output(data.deferred.iter().copied(), &mut handler);
     }
+}
+
+/// Write a link in a code span: its text goes to the span, and `links` records the range of
+/// that text with the link that replaces it when the span is written.
+fn emit_code_link(
+    tag: &tl::HTMLTag<'_>,
+    data: &LinkData<'_>,
+    links: &std::cell::RefCell<Vec<crate::converter::context::InlineCodeLink>>,
+    handler: &mut HandlerContext<'_>,
+) {
+    let context = Context {
+        inline_code_links: None,
+        ..handler.context.clone()
+    };
+    let mut raw = collect_code_link_text(data, &context, handler);
+    if (handler.context.in_table_cell || handler.context.in_heading) && followed_by_break(handler) {
+        raw.truncate(raw.trim_end().len());
+    }
+    // ~keep A link to a place in its own page whose content gives no text is left out in a code
+    // ~keep span as it is outside code: its white space stays text of the span.
+    let left_out = data.leads_nowhere_else() && normalize_link_label(&raw).is_empty();
+    if !data.href.is_empty() && !data.href_addr_dropped && !raw.is_empty() && !left_out {
+        // ~keep The label is a finished code span, and the link marks are outside it.
+        let link_context = Context {
+            in_code: false,
+            ..context
+        };
+        let mut label = String::new();
+        crate::converter::handlers::code_block::emit_inline_code(
+            &raw,
+            &mut label,
+            handler.options,
+            handler.node_handle,
+            handler.parser,
+            handler.dom_context,
+        );
+        let mut markdown = String::new();
+        let mut link_handler = HandlerContext::new((
+            handler.node_handle,
+            handler.parser,
+            &mut markdown,
+            handler.options,
+            &link_context,
+            handler.depth,
+            handler.dom_context,
+        ));
+        emit_link(tag, data, &label, &LabelEdges::NONE, false, &mut link_handler);
+        if !markdown.is_empty() {
+            let start = handler.output.len();
+            handler.output.push_str(&raw);
+            links.borrow_mut().push(crate::converter::context::InlineCodeLink {
+                range: start..handler.output.len(),
+                markdown,
+            });
+        }
+    } else {
+        handler.output.push_str(&raw);
+    }
+    #[cfg(feature = "metadata")]
+    record_link_metadata(tag, data, raw.trim(), handler.context);
+}
+
+fn followed_by_break(handler: &HandlerContext<'_>) -> bool {
+    let id = handler.node_handle.get_inner();
+    let next = handler
+        .dom_context
+        .parent_of(id)
+        .and_then(|parent| handler.dom_context.children_of(parent))
+        .and_then(|siblings| {
+            handler
+                .dom_context
+                .get_sibling_index(id)
+                .and_then(|index| siblings.get(index + 1))
+        });
+    matches!(next.and_then(|handle| handle.get(handler.parser)), Some(tl::Node::Tag(tag)) if tag.name().as_utf8_str().eq_ignore_ascii_case("br"))
+}
+
+fn collect_code_link_text(data: &LinkData<'_>, context: &Context, handler: &HandlerContext<'_>) -> String {
+    let mut raw = String::new();
+    for child in &data.children {
+        walk_node(
+            child,
+            handler.parser,
+            &mut raw,
+            crate::converter::block::container::HandlerContext::new(
+                handler.options,
+                context,
+                handler.depth + 1,
+                handler.dom_context,
+            ),
+        );
+    }
+    raw
+}
+
+/// The white space that the label of a link had at its two ends (see [`chomp_inline`]).
+///
+/// ~keep It belongs to the link that the converter writes itself, so only [`write_link_with_edges`]
+/// ~keep writes it. A link that is left out, and a link that a visitor skips, replaces or keeps
+/// ~keep as HTML, has no label of the converter: it writes what it wrote before the label gave
+/// ~keep up its white space.
+struct LabelEdges<'a> {
+    prefix: &'a str,
+    suffix: &'a str,
+    has_text: bool,
+}
+
+impl LabelEdges<'_> {
+    /// A label that gives up no white space: the text of a link in code.
+    const NONE: Self = Self {
+        prefix: "",
+        suffix: "",
+        has_text: false,
+    };
 }
 
 struct LinkData<'a> {
@@ -120,6 +259,9 @@ struct LinkData<'a> {
     saw_block: bool,
     aria_label: Option<Cow<'a, str>>,
     same_page_fragment: bool,
+    /// The address has a fragment that is not empty: it names a place.
+    names_place: bool,
+    empty_span_content: bool,
 }
 
 impl<'a> LinkData<'a> {
@@ -131,11 +273,23 @@ impl<'a> LinkData<'a> {
     /// Whether the link is left out of the output: its content gives no text, and either the
     /// link points into its own page or the `inline_data_media` choice removed its content.
     ///
-    /// ~keep A link into its own page with nothing to read is the icon of a heading permalink
-    /// ~keep or of a "back to top" link. It leads nowhere else, so it is left out whatever its
-    /// ~keep content is (a graphic, an empty element, nothing) and whether or not it has a name.
+    /// ~keep See `leads_nowhere_else` for the link into its own page.
     fn is_dropped(&self, label: &str, handler: &HandlerContext<'_>) -> bool {
-        label.is_empty() && (handler.context.inline_data_replaced.get() || self.same_page_fragment)
+        let content_removed = handler.context.inline_data_replaced.get()
+            && handler.options.inline_data_media == InlineDataMedia::DropElement;
+        label.is_empty() && (content_removed || self.leads_nowhere_else())
+    }
+
+    /// Whether the link points into its own page and is left out when its content gives no text.
+    ///
+    /// ~keep A link to a place in the page (`#id`) with nothing to read is a heading permalink,
+    /// ~keep a "back to top" link or the line anchor of a highlighter. It is left out whatever its
+    /// ~keep content is and whether or not it has a name (pull request #764). A link that names no place
+    /// ~keep (`#` alone) is a control that a script runs: it is kept, with its name or an empty
+    /// ~keep label, when it has no child or only empty text wrappers (#771), and left out when
+    /// ~keep it holds a graphic or an icon (#750).
+    const fn leads_nowhere_else(&self) -> bool {
+        self.same_page_fragment && (self.names_place || !(self.empty_span_content || self.children.is_empty()))
     }
 
     /// Whether the link has the visible `<address>` form outside code.
@@ -156,7 +310,7 @@ impl<'a> LinkData<'a> {
     /// ~keep The calls are those of a link outside code, which makes none for a link in the
     /// ~keep `<address>` form, for a link around one heading, and for a link that is left out (see
     /// ~keep `is_dropped`). A highlighter writes one empty anchor into its own page for each line
-    /// ~keep of code. An image writes nothing in code, so a link whose text is empty there asks
+    /// ~keep of code. An image with no alt text writes nothing in code, so a link whose text is empty asks
     /// ~keep what its content writes outside code (`outside_code`): a link with a label there is
     /// ~keep not left out, and a heading with a text there makes a heading link.
     #[cfg(feature = "visitor")]
@@ -176,7 +330,10 @@ impl<'a> LinkData<'a> {
         }
         let mut label = normalize_link_label(text);
         apply_label_fallbacks(self, &mut label, handler);
-        !self.is_dropped(&label, handler) || outside_code(handler, |outside| !build_label(self, outside).is_empty())
+        !self.is_dropped(&label, handler)
+            || outside_code(handler, |outside| {
+                !normalize_link_label(&build_label_content(self, outside)).is_empty()
+            })
     }
 
     fn new(tag: &'a tl::HTMLTag<'a>, handler: &HandlerContext<'_>) -> Option<Self> {
@@ -187,7 +344,7 @@ impl<'a> LinkData<'a> {
             .map(|value| text::decode_attribute_value_cow(&value.as_utf8_str()).into_owned())?;
         let href = handler
             .context
-            .resolve_url(&raw_href, handler.node_handle, handler.parser, handler.dom_context)
+            .resolve_link_url(&raw_href, handler.node_handle, handler.parser, handler.dom_context)
             .unwrap_or_else(|| raw_href.clone());
         let same_page_fragment = handler.context.own_page.holds(&raw_href, &href);
         // ~keep Empty titles are absent because Markdown serializers drop `""` on reparse.
@@ -207,6 +364,9 @@ impl<'a> LinkData<'a> {
         };
         let raw_text = text::normalize_whitespace_cow(&text_source).trim().to_string();
         let (inline_children, deferred) = partition_link_children(&children, handler.parser, handler.dom_context);
+        let holds_element = children
+            .iter()
+            .any(|child| matches!(child.get(handler.parser), Some(tl::Node::Tag(_))));
         Some(Self {
             href_addr_dropped: matches!(
                 inline_data_treatment(handler.options.inline_data_media, &href),
@@ -221,6 +381,16 @@ impl<'a> LinkData<'a> {
             link_allow_inline_images: handler.context.keep_inline_images_in.contains("a"),
             aria_label: crate::converter::utility::attributes::decoded_attribute(tag, "aria-label"),
             same_page_fragment,
+            names_place: href.split_once('#').is_some_and(|(_, fragment)| !fragment.is_empty()),
+            // ~keep White space alone is content of a link to another page, not an empty wrapper:
+            // ~keep the address names that link. A link into its own page gets no such label, so
+            // ~keep white space and comments are no content there, as for a link with no child
+            // ~keep (#851).
+            empty_span_content: !children.is_empty()
+                && (same_page_fragment || holds_element)
+                && children
+                    .iter()
+                    .all(|child| empty_text_wrapper_child(child, handler.parser)),
             href,
             title,
             children,
@@ -231,6 +401,53 @@ impl<'a> LinkData<'a> {
             saw_block,
         })
     }
+}
+
+// ~keep Empty presentational wrappers carry no textual or media fallback; preserve their destination
+// ~keep without inserting URL words into document content (#771). An icon font or an image is
+// ~keep no empty wrapper: such a link gets its name or its address as the label (#775), except
+// ~keep a link into its own page, which `leads_nowhere_else` leaves out.
+fn empty_text_wrapper_child(handle: &tl::NodeHandle, parser: &tl::Parser<'_>) -> bool {
+    let mut pending = vec![*handle];
+    while let Some(child) = pending.pop() {
+        match child.get(parser) {
+            Some(tl::Node::Raw(raw)) if text::decode_html_entities_cow(&raw.as_utf8_str()).trim().is_empty() => {}
+            Some(tl::Node::Comment(_)) => {}
+            Some(tl::Node::Tag(tag))
+                if matches!(
+                    normalized_tag_name(tag.name().as_utf8_str()).as_ref(),
+                    "span"
+                        | "b"
+                        | "strong"
+                        | "em"
+                        | "mark"
+                        | "del"
+                        | "s"
+                        | "strike"
+                        | "ins"
+                        | "u"
+                        | "small"
+                        | "sub"
+                        | "sup"
+                        | "code"
+                        | "kbd"
+                        | "samp"
+                ) || plain_wrapper(tag) =>
+            {
+                pending.extend(tag.children().top().iter().copied());
+            }
+            _ => return false,
+        }
+    }
+    true
+}
+
+// ~keep An `i` or a `div` with a class is an icon that a style sheet draws: #774 and the vote
+// ~keep link of the #121 fixture name it by the link address. With no class it shows nothing,
+// ~keep as an empty `span` does.
+fn plain_wrapper(tag: &tl::HTMLTag<'_>) -> bool {
+    tag.attributes().get("class").is_none()
+        && matches!(normalized_tag_name(tag.name().as_utf8_str()).as_ref(), "i" | "div")
 }
 
 /// What `ask` answers for the link of `handler` when that link is outside code: `ask` gets a
@@ -332,71 +549,56 @@ fn emit_heading_link(data: &LinkData<'_>, handler: &mut HandlerContext<'_>) -> b
     true
 }
 
-fn build_label(data: &LinkData<'_>, handler: &HandlerContext<'_>) -> String {
+/// The content of the label as the walk writes it. The caller removes the white space at its
+/// two ends.
+fn build_label_content(data: &LinkData<'_>, handler: &HandlerContext<'_>) -> String {
     if data.emit_blocks_separately {
-        return walk_label(&data.inline_children, false, data, handler);
+        return walk_label_content(&data.inline_children, false, data, handler);
     }
     if data.saw_block {
         let content = walk_label_content(&data.children, true, data, handler);
         return if content.trim().is_empty() {
-            normalize_link_label(&data.inline_label)
+            data.inline_label.clone()
         } else {
-            normalize_link_label(&content)
+            content
         };
     }
-    walk_label(&data.children, false, data, handler)
-}
-
-fn walk_label(
-    children: &[tl::NodeHandle],
-    convert_as_inline: bool,
-    data: &LinkData<'_>,
-    handler: &HandlerContext<'_>,
-) -> String {
-    normalize_link_label(&walk_label_content(children, convert_as_inline, data, handler))
+    walk_label_content(&data.children, false, data, handler)
 }
 
 /// The context that the label of a link is built with outside code.
-fn label_context(data: &LinkData<'_>, handler: &HandlerContext<'_>, merge_child_spacing: bool) -> Context {
+fn label_context(data: &LinkData<'_>, handler: &HandlerContext<'_>, convert_as_inline: bool) -> Context {
     Context {
         inline_depth: handler.context.inline_depth + 1,
         in_link: true,
-        convert_as_inline: handler.context.convert_as_inline || merge_child_spacing,
+        convert_as_inline: handler.context.convert_as_inline || convert_as_inline,
         link_allow_inline_images: data.link_allow_inline_images,
         ..handler.context.clone()
     }
 }
 
+/// Walks the children of a link into its label. With `convert_as_inline` the blocks among them
+/// are written inline, and the walk writes one space at each block boundary.
+///
+/// ~keep In such a label an image is written as its alternative text. A reader sees the image
+/// ~keep and the content beside it as two things, so the text of an image child is a word of
+/// ~keep its own: one space separates it from the child before it and the child after it.
 fn walk_label_content(
     children: &[tl::NodeHandle],
-    merge_child_spacing: bool,
+    convert_as_inline: bool,
     data: &LinkData<'_>,
     handler: &HandlerContext<'_>,
 ) -> String {
-    let link_context = label_context(data, handler, merge_child_spacing);
+    let link_context = label_context(data, handler, convert_as_inline);
+    let strict = keeps_source_white_space(handler.options, handler.context);
     let mut content = String::new();
-    if !merge_child_spacing {
-        for child in children {
-            walk_node(
-                child,
-                handler.parser,
-                &mut content,
-                crate::converter::block::container::HandlerContext::new(
-                    handler.options,
-                    &link_context,
-                    handler.depth + 1,
-                    handler.dom_context,
-                ),
-            );
-        }
-        return content;
-    }
+    let mut after_image = false;
     for child in children {
-        let mut child_output = String::new();
+        let child_start = content.len();
         walk_node(
             child,
             handler.parser,
-            &mut child_output,
+            &mut content,
             crate::converter::block::container::HandlerContext::new(
                 handler.options,
                 &link_context,
@@ -404,19 +606,46 @@ fn walk_label_content(
                 handler.dom_context,
             ),
         );
-        if merge_child_spacing && needs_label_space(&content, &child_output) {
-            content.push(' ');
+        if !convert_as_inline || content.len() == child_start {
+            continue;
         }
-        content.push_str(&child_output);
+        let is_image = handler
+            .dom_context
+            .tag_info(child.get_inner(), handler.parser)
+            .is_some_and(|info| matches!(info.name.as_str(), "img" | "picture" | "svg"));
+        // ~keep The strict mode writes no space at a block boundary (`separate_from_block`). It
+        // ~keep keeps the rule that a label had before: one space between two children that touch.
+        let separate = if strict {
+            texts_touch_at(&content, child_start)
+        } else {
+            (is_image || after_image) && words_touch_at(&content, child_start)
+        };
+        if separate {
+            content.insert(child_start, ' ');
+        }
+        after_image = is_image;
     }
     content
 }
 
-fn needs_label_space(content: &str, child: &str) -> bool {
-    !child.trim().is_empty()
-        && !content.is_empty()
-        && !content.chars().last().is_none_or(char::is_whitespace)
-        && !child.chars().next().is_none_or(char::is_whitespace)
+/// Whether two texts touch at the byte offset `at` of `content`: no white space on either side.
+///
+/// ~keep A child can shorten the label (a block trims the white space before it), so `at` can
+/// ~keep lie past the end or inside a character: then nothing touches there.
+fn texts_touch_at(content: &str, at: usize) -> bool {
+    let (Some(before), Some(after)) = (content.get(..at), content.get(at..)) else {
+        return false;
+    };
+    before.ends_with(|character: char| !character.is_whitespace())
+        && after.starts_with(|character: char| !character.is_whitespace())
+}
+
+/// Whether two words touch at the byte offset `at` of `content`: two texts touch there, with no
+/// opening punctuation before it and no closing punctuation after it.
+fn words_touch_at(content: &str, at: usize) -> bool {
+    texts_touch_at(content, at)
+        && !content[..at].ends_with(['(', '[', '{'])
+        && !content[at..].starts_with(['.', ',', ';', ':', '!', '?', ')', ']', '}'])
 }
 
 fn apply_label_fallbacks(data: &LinkData<'_>, label: &mut String, handler: &HandlerContext<'_>) {
@@ -428,14 +657,21 @@ fn apply_label_fallbacks(data: &LinkData<'_>, label: &mut String, handler: &Hand
     // ~keep names it: by its `aria-label`, then by its `title`. A named link is also kept when
     // ~keep `inline_data_media` removed its content. A link with no child node at all is named
     // ~keep too: its icon comes from a style sheet. Its own address is the last label, for a link
-    // ~keep that has content and no name. A link into its own page is not named: it is left out.
-    if label.is_empty() && !data.same_page_fragment {
+    // ~keep that has content and no name; a link that holds only empty text wrappers keeps an
+    // ~keep empty label (#771). A link that `leads_nowhere_else` is not named: it is left out.
+    if label.is_empty() && !data.leads_nowhere_else() {
         if let Some(name) = data.accessible_name() {
             *label = normalize_link_label(name);
         }
     }
     let drop_link = data.is_dropped(label, handler);
-    if label.is_empty() && !data.href.is_empty() && !data.children.is_empty() && !drop_link && !data.href_addr_dropped {
+    if label.is_empty()
+        && !data.href.is_empty()
+        && !data.children.is_empty()
+        && !data.empty_span_content
+        && !drop_link
+        && !data.href_addr_dropped
+    {
         *label = text::escape(
             &data.href,
             handler.options.escape_misc,
@@ -455,6 +691,7 @@ fn emit_link(
     tag: &tl::HTMLTag<'_>,
     data: &LinkData<'_>,
     label: &str,
+    edges: &LabelEdges<'_>,
     drop_link: bool,
     handler: &mut HandlerContext<'_>,
 ) -> bool {
@@ -463,14 +700,31 @@ fn emit_link(
     }
     #[cfg(feature = "visitor")]
     if let Some(visitor) = handler.context.visitor.clone() {
-        return visit_link(tag, data, label, &visitor, handler);
+        return visit_link(tag, data, label, edges, &visitor, handler);
     }
-    write_link(handler.output, data, label, handler.options, handler.context);
+    write_link_with_edges(data, label, edges, handler);
     true
 }
 
+/// Writes the link of the converter: the white space of the label start, the link, the white
+/// space of the label end.
+fn write_link_with_edges(data: &LinkData<'_>, label: &str, edges: &LabelEdges<'_>, handler: &mut HandlerContext<'_>) {
+    if edges.has_text {
+        push_inline_prefix(handler.output, edges.prefix, handler.options, handler.context);
+    }
+    write_link(handler.output, data, label, handler.options, handler.context);
+    append_inline_suffix(
+        handler.output,
+        edges.suffix,
+        edges.has_text,
+        handler.node_handle,
+        handler.parser,
+        handler.dom_context,
+    );
+}
+
 fn write_link(output: &mut String, data: &LinkData<'_>, label: &str, options: &ConversionOptions, context: &Context) {
-    if data.href_addr_dropped || context.in_code {
+    if data.href_addr_dropped || data.href.is_empty() || context.in_code || context.in_code_block {
         output.push_str(label);
         return;
     }
@@ -504,6 +758,7 @@ fn visit_link(
     tag: &tl::HTMLTag<'_>,
     data: &LinkData<'_>,
     label: &str,
+    edges: &LabelEdges<'_>,
     visitor: &crate::visitor::VisitorHandle,
     handler: &mut HandlerContext<'_>,
 ) -> bool {
@@ -529,7 +784,7 @@ fn visit_link(
         data.title.as_deref(),
     );
     match result {
-        VisitResult::Continue => write_link(handler.output, data, label, handler.options, handler.context),
+        VisitResult::Continue => write_link_with_edges(data, label, edges, handler),
         VisitResult::Custom(custom) => {
             if let Some(collector) = handler.context.structure_collector.as_ref() {
                 collector.borrow_mut().replace_current_element(Some(&custom));

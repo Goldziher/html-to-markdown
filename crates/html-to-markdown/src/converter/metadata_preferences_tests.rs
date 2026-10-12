@@ -38,6 +38,7 @@ fn collect(config: MetadataConfig) -> [usize; 5] {
         structure_collector: None,
         base_url: None,
         document_base_href: None,
+        head_repair_limit: None,
     };
     super::convert_html_impl(PAGE, &ConversionOptions::default(), parameters).expect("conversion must succeed");
     let Ok(collector) = Rc::try_unwrap(collector) else {

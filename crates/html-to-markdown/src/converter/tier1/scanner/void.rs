@@ -119,6 +119,12 @@ fn emit_hr(state: &mut Tier1State) -> Result<(), BailReason> {
     {
         return Err(BailReason::RuleBetweenInlineMarkers);
     }
+    // ~keep A rule in a link in a heading is a block of the link: Tier-2 writes the block
+    // ~keep boundary as one space outside the link (issue #751). This scanner has written the
+    // ~keep text before the link by then, so it leaves the page to Tier-2.
+    if state.escape_ctx.contains(EscapeCtx::HEADING) && !state.link_stack.is_empty() {
+        return Err(BailReason::Classifier);
+    }
     // ~keep Tier-2 starts a rule after an item's content at the item's content column
     // ~keep (issue #583); see `BailReason::ListItemUnsupportedBlockChild`.
     if !state.in_table_cell() && state.list_continuation_indent_width() > 0 && !inside_stray_definition(state) {
@@ -225,19 +231,52 @@ fn emit_image(
         return Err(BailReason::ImageLazyLoadSrc);
     }
     let src = decode_attr(raw_src)?;
+    if src.trim().is_empty() {
+        return Err(BailReason::ImageMissingSource);
+    }
     let src = state.resolve_url(&src).unwrap_or(src);
     let alt = decode_attr(find_attr(attrs, b"alt").unwrap_or_default())?;
+    if state.escape_ctx.contains(EscapeCtx::CODE) {
+        return emit_image_in_code(state, &src, &alt, options);
+    }
     let title = find_attr(attrs, b"title")
         .map(decode_attr)
         .transpose()?
         .map(|title| crate::converter::inline::link::escape_markdown_title(&title).into_owned());
     let keep_as_markdown = should_keep_image_as_markdown(html, &state.stack, options);
     let dest = state.cell_or_output_mut();
+    let written_from = dest.len();
     if keep_as_markdown {
         emit_markdown_image(dest, &src, &alt, title.as_deref(), options);
     } else {
         dest.push_str(&alt);
     }
+    state.end_document_start_if_written(written_from);
+    state.last_emitted_was_img = true;
+    Ok(())
+}
+
+// ~keep In code text (`code`, `kbd`, `samp`, `pre`) an image is its alt text, written as literal
+// ~keep code text as Tier-2 writes it; `keep_inline_images_in` does not apply there. A line end
+// ~keep in the buffer of a code span marks a `<br>`, so Tier-2 takes an alt text that has one.
+fn emit_image_in_code(
+    state: &mut Tier1State,
+    src: &str,
+    alt: &str,
+    options: &ConversionOptions,
+) -> Result<(), BailReason> {
+    if alt.contains(['\n', '\r']) {
+        return Err(BailReason::Classifier);
+    }
+    let treatment = crate::converter::media::inline_data_treatment(options.inline_data_media, src);
+    if !options.skip_images && treatment != crate::options::InlineDataMedia::DropElement && !alt.is_empty() {
+        let dest = state.cell_or_output_mut();
+        let written_from = dest.len();
+        dest.push_str(alt);
+        // ~keep The alt text is content: the text after the code span keeps its leading space.
+        state.end_document_start_if_written(written_from);
+    }
+    // ~keep Tier-2 keeps white space between two `<img>` siblings, whatever the images wrote.
     state.last_emitted_was_img = true;
     Ok(())
 }
@@ -477,7 +516,7 @@ fn dispatch_close(
         TagKind::TableHead => close_table_head(state),
         TagKind::TableBody => close_table_body(state),
         TagKind::TableRow => close_table_row(state),
-        TagKind::TableCell { .. } => close_table_cell(state, false)?,
+        TagKind::TableCell { .. } => close_table_cell(state, false, options)?,
         TagKind::TableCaption => close_table_caption(state),
         TagKind::Block => close_block_container(state, frame, name_lower),
         TagKind::Summary => close_summary(state, frame),
@@ -779,15 +818,22 @@ fn handle_empty_inline_body(
     marker: &str,
 ) -> Result<bool, BailReason> {
     let content_absent = buf.len() <= content_start;
+    let is_marks = matches!(marker, "**" | "*" | "~~" | "==");
+    // ~keep In marks a blank body is the module's `is_blank`: `<p>a <em>&nbsp;</em> b</p>` goes
+    // ~keep to the full converter, which writes `a b`. Code keeps its text.
     let whitespace_only = !content_absent
-        && buf[content_start..]
-            .bytes()
-            .all(|byte| matches!(byte, b' ' | b'\t' | b'\n' | b'\r'));
+        && if is_marks {
+            crate::converter::utility::white_space::is_blank(&buf[content_start..])
+        } else {
+            buf[content_start..]
+                .bytes()
+                .all(|byte| matches!(byte, b' ' | b'\t' | b'\n' | b'\r'))
+        };
     if !content_absent && !whitespace_only {
         return Ok(false);
     }
     let was_whitespace_only = whitespace_only || (content_absent && frame.dropped_whitespace_only_text);
-    if was_whitespace_only && matches!(marker, "**" | "*" | "~~" | "==") {
+    if was_whitespace_only && is_marks {
         return Err(BailReason::WhitespaceOnlyInlineEmphasis);
     }
     let marker_start = clamp_to_char_boundary(buf, content_start.saturating_sub(marker.len()));
@@ -818,6 +864,10 @@ fn migrate_leading_inline_whitespace(buf: &mut String, content_start: usize, mar
     let leading = content[..leading_len].to_owned();
     buf.replace_range(content_start..content_start + leading_len, "");
     let marker_start = clamp_to_char_boundary(buf, content_start.saturating_sub(marker.len()));
+    // ~keep White space on both sides of the element start is one run: Tier-2's `push_inline_prefix`.
+    if !crate::converter::utility::white_space::space_is_owed(&buf[..marker_start]) {
+        return content_start;
+    }
     buf.insert_str(marker_start, &leading);
     content_start + leading_len
 }

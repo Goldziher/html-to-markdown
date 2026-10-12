@@ -15,3 +15,4 @@ pub mod preprocessing;
 pub mod serialization;
 pub mod siblings;
 pub mod svg_attrs;
+pub mod white_space;

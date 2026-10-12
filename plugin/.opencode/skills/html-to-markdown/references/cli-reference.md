@@ -1,7 +1,7 @@
 <!--
 AI-RULEZ :: GENERATED FILE — DO NOT EDIT
-Content-Hash: blake3:aa5e038e536fdd1e04c0b930a2950e4024c53de89296e7a2ada0940987f8b8f2
-Source-Hash: blake3:b9cee51f3d06666c206da66a14b6934198ee9cddc674dad38b4d92922d8a304e
+Content-Hash: blake3:bd17e25d2ecc4c814a2990a0512f1a7757832fe67a01d440ab6aa8a107adc5c3
+Source-Hash: blake3:0f19d9609e55607f27db4df837426b012b20434ab0599d21b8599931a8e2b067
 Schema-Version: v1
 -->
 
@@ -63,6 +63,8 @@ html-to-markdown [OPTIONS] [FILE]
 | `--sub-symbol <SYMBOL>`     | string                | `""`     | Symbol wrapping `<sub>` text. E.g. `"~"`.                                           |
 | `--sup-symbol <SYMBOL>`     | string                | `""`     | Symbol wrapping `<sup>` text. E.g. `"^"`.                                           |
 | `--newline-style <STYLE>`   | `backslash`, `spaces` | `spaces` | `<br>` representation: `backslash` (`\`+newline) or `spaces` (two trailing spaces). |
+| `--no-expand-abbreviations` | flag                  | off      | Output the text of an `<abbr>` only. By default its title follows in parentheses.   |
+| `--no-blockquote-citations` | flag                  | off      | Output the quote only. By default the `cite` URL of a `<blockquote>` follows it.    |
 
 ## Code Blocks
 
@@ -89,7 +91,6 @@ html-to-markdown [OPTIONS] [FILE]
 | `--capture-svg`                      | flag                      | off     | Capture inline `<svg>` elements as extracted images. Requires `--extract-inline-images`. |
 | `--no-infer-dimensions`              | flag                      | off     | Skip inferring image width/height from the decoded payload when the HTML omits them. Inference is on by default. Requires `--extract-inline-images`. |
 | `--inline-data-media <CHOICE>`      | `keep`, `alt-text-only`, `drop-element` | `keep` | What to write for an image or media element whose address is a `data:` URL. `keep`: the URL with its payload. `alt-text-only`: the alt text (the title of an inline `<svg>`, the fallback content of `<video>` and `<audio>`). `drop-element`: nothing. A real address on the element wins over the `data:` one. |
-| `--hidden-content <CHOICE>`         | `drop`, `reachable`, `all`              | `drop` | Which text that a browser does not show at first to keep. `drop`: none of it. `reachable`: elements hidden by the `hidden` attribute or an inline style, and declarative shadow roots. `all`: also `<template>` and `<noscript>` content. Scripts and style sheets are never written. |
 
 ## Tables
 

@@ -53,6 +53,12 @@ pub fn handle(
     }
 }
 
+/// True for the name (lower case) of a child of `head` that makes the converter write the
+/// content of that `head`: a head with no end tag holds the body of the page.
+pub fn is_body_content_in_head(name: &str) -> bool {
+    matches!(name, "body" | "main" | "article" | "section" | "div" | "p")
+}
+
 /// Handle head element.
 ///
 /// Head elements contain metadata. We process them to extract structured data from
@@ -70,10 +76,7 @@ fn handle_head(node_handle: &NodeHandle, parser: &Parser, output: &mut String, h
     let children = tag.children();
     let has_body_like = children.top().iter().any(|child_handle| {
         if let Some(child_name) = handler.dom_ctx.tag_name_for(*child_handle, parser) {
-            matches!(
-                child_name.as_ref(),
-                "body" | "main" | "article" | "section" | "div" | "p"
-            )
+            is_body_content_in_head(child_name.as_ref())
         } else {
             false
         }

@@ -361,13 +361,10 @@ pub fn checkbox_state(tag: &tl::HTMLTag) -> Option<bool> {
 /// its state there.
 ///
 /// ~keep The task marker `[ ]` of a list item belongs to `list/item.rs`.
-fn emit_input(
-    node_handle: &tl::NodeHandle,
-    parser: &tl::Parser,
-    output: &mut String,
-    ctx: &crate::converter::Context,
-    dom_ctx: &crate::converter::DomContext,
-) {
+fn emit_input(node_handle: &tl::NodeHandle, parser: &tl::Parser, output: &mut String, context: FormContext<'_>) {
+    let FormContext {
+        options, ctx, dom_ctx, ..
+    } = context;
     let Some(tl::Node::Tag(tag)) = node_handle.get(parser) else {
         return;
     };
@@ -375,15 +372,30 @@ fn emit_input(
         return;
     }
     let id = node_handle.get_inner();
+    // ~keep Strict mode writes what it wrote before the rules of running text: any space
+    // ~keep before the checkbox goes, the indent of a line too.
+    let space_goes = if crate::converter::utility::content::keeps_source_white_space(options, ctx) {
+        output.ends_with(' ')
+    } else {
+        ends_with_a_space_between_words(output)
+    };
     match checkbox_state(tag) {
         Some(checked) if ctx.in_cell_of_inputs => output.push_str(if checked { "[x]" } else { "[ ]" }),
         // ~keep The white space on both sides of a checkbox that writes nothing is one space
         // ~keep between two words. A checkbox with the role of a button writes nothing too.
-        _ if !ctx.in_code && output.ends_with(' ') && super::spacing::white_space_follows(id, parser, dom_ctx) => {
+        // ~keep The space after a line end is the indent of the line, not white space between
+        // ~keep words: `<li><p>x</p><input type="checkbox"> a</li>` keeps the two spaces of `a`.
+        _ if !ctx.in_code && space_goes && super::spacing::white_space_follows(id, parser, dom_ctx) => {
             output.pop();
         }
         _ => {}
     }
+}
+
+/// Whether `output` ends with a space that follows a word on its line.
+fn ends_with_a_space_between_words(output: &str) -> bool {
+    let before_spaces = output.trim_end_matches(' ');
+    before_spaces.len() < output.len() && !before_spaces.is_empty() && !before_spaces.ends_with('\n')
 }
 
 /// Handles the `<input>` element.
@@ -459,7 +471,7 @@ pub fn handle_input(
         }
     }
 
-    emit_input(node_handle, parser, output, ctx, dom_ctx);
+    emit_input(node_handle, parser, output, context);
 }
 
 /// Writes the children of a control that ends its line: `<textarea>`, `<button>`, `<output>`,
@@ -516,12 +528,14 @@ pub fn handle_line_end_control(
     }
 }
 
-/// Handles the `<select>` and `<datalist>` elements.
+/// Writes an option list: a `<select>` or a `<datalist>`, and an `<option>` that no such
+/// element holds.
 ///
-/// The options are one control in the line: one space separates each option from the option
-/// before it, and the control from the text before and after it.
+/// The options are one control: one space separates each option from the option before it,
+/// and the control from the text before and after it. Only the options of a `<select>` or a
+/// `<datalist>` are inline text.
 pub fn handle_option_list(
-    _tag_name: &str,
+    tag_name: &str,
     node_handle: &tl::NodeHandle,
     parser: &tl::Parser,
     output: &mut String,
@@ -535,31 +549,43 @@ pub fn handle_option_list(
     } = context;
     if let Some(tl::Node::Tag(tag)) = node_handle.get(parser) {
         let mut rendered = String::new();
-        let list_ctx = ctx.inline_buffer(output, false);
-        for child_handle in tag.children().top().iter() {
-            walk_node(
-                child_handle,
-                parser,
-                &mut rendered,
-                crate::converter::block::container::HandlerContext::new(options, &list_ctx, depth + 1, dom_ctx),
-            );
+        // ~keep A select list and a data list are one control of inline text. An option that
+        // ~keep no such element holds is no list control in a browser, so a block in it stays
+        // ~keep a block: its children keep the context of its parent.
+        let children_ctx = if matches!(tag_name, "select" | "datalist") {
+            ctx.inline_buffer(output, false)
+        } else {
+            ctx.clone()
+        };
+        let list_ctx = super::Context {
+            in_option_list: true,
+            ..children_ctx
+        };
+        if tag_name == "option" {
+            let list_context = FormContext {
+                ctx: &list_ctx,
+                ..context
+            };
+            handle_option(tag_name, node_handle, parser, &mut rendered, list_context);
+        } else {
+            for child_handle in tag.children().top().iter() {
+                walk_node(
+                    child_handle,
+                    parser,
+                    &mut rendered,
+                    crate::converter::block::container::HandlerContext::new(options, &list_ctx, depth + 1, dom_ctx),
+                );
+            }
         }
-        let trimmed = rendered.trim();
-        if trimmed.is_empty() {
-            return;
+        if super::spacing::write_option_list(output, &rendered, ctx.in_code) {
+            separate_from_next_text(output, *node_handle, parser, dom_ctx);
         }
-        // ~keep In code the white space around the options is text of the source.
-        let trimmed = if ctx.in_code { rendered.as_str() } else { trimmed };
-        let start = ControlStart::new(output);
-        output.push_str(trimmed);
-        start.finish(output);
-        separate_from_next_text(output, *node_handle, parser, dom_ctx);
     }
 }
 
-/// Handles the `<option>` element.
+/// Writes an `<option>` of an option list: a word of the list.
 ///
-/// An option is inline text. Selection state does not change the visible label.
+/// Selection state does not change the visible label.
 pub fn handle_option(
     _tag_name: &str,
     node_handle: &tl::NodeHandle,
@@ -587,21 +613,13 @@ pub fn handle_option(
             }
         }
 
-        let trimmed = text.trim();
-        if !trimmed.is_empty() {
-            // ~keep One space separates an option from what its list already holds.
-            if !output.is_empty() && !output.ends_with(char::is_whitespace) {
-                output.push(' ');
-            }
-            output.push_str(trimmed);
-        }
+        super::spacing::write_option(output, &text);
     }
 }
 
-/// Handles the `<optgroup>` element.
+/// Writes an `<optgroup>`: its children alone, in an option list and outside one.
 ///
-/// Its options are written as the options of the list are. The `label` attribute is not text of
-/// the page: a browser shows it only inside the open list.
+/// The `label` attribute is not text of the page: a browser shows it only inside the open list.
 pub fn handle_optgroup(
     _tag_name: &str,
     node_handle: &tl::NodeHandle,
@@ -715,7 +733,12 @@ pub fn handle(
         "textarea" | "output" | "meter" | "progress" => {
             handle_line_end_control(tag_name, node_handle, parser, output, context);
         }
+        // ~keep The outermost element of an option list writes the list. An option with no
+        // ~keep select list around it is a list of one option. An option group writes no list.
         "select" | "datalist" => handle_option_list(tag_name, node_handle, parser, output, context),
+        "option" if !context.ctx.in_option_list => {
+            handle_option_list(tag_name, node_handle, parser, output, context);
+        }
         "option" => handle_option(tag_name, node_handle, parser, output, context),
         "optgroup" => handle_optgroup(tag_name, node_handle, parser, output, context),
         "button" => handle_button(tag_name, node_handle, parser, output, context),

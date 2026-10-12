@@ -5,8 +5,11 @@
 
 use crate::converter::dom_context::{DomContext, TagInfo};
 use crate::converter::main_helpers::{is_ascii_whitespace_only, is_inline_element};
+use crate::converter::metadata::is_body_content_in_head;
 use crate::converter::utility::attributes::{attribute_matches_any, element_has_navigation_hint};
+use crate::converter::utility::content::normalized_tag_name;
 use crate::options::ConversionOptions;
+use crate::text::decode_html_entities_cow;
 
 /// Check if an inline ancestor element is allowed to contain block-level elements.
 pub fn inline_ancestor_allows_block(tag_name: &str) -> bool {
@@ -188,6 +191,229 @@ pub fn has_inline_block_misnest(dom_ctx: &DomContext, parser: &tl::Parser) -> bo
     }
 
     false
+}
+
+/// True when an element with content is still open at the end of the input, so the HTML tree
+/// builder must decide where it ends.
+///
+/// ~keep `tl` closes an element only for an end tag that names the element on top of its stack
+/// ~keep and discards every other end tag (astral-tl `parser/base.rs`, `read_end`). In
+/// ~keep `<div><p>text</div>` the `div` and the `p` stay open and take the rest of the page as
+/// ~keep descendants (issue #772). The open elements are the stack of `tl` at the end of the
+/// ~keep input: the last root node, its last child, and so on, so the walk is O(depth).
+/// ~keep `html` and `body` are exempt: their end tags close no element in the standard.
+pub fn has_omitted_end_tag(dom_ctx: &DomContext, parser: &tl::Parser) -> bool {
+    let mut last = dom_ctx.root_children.last().copied();
+    while let Some(handle) = last {
+        let Some(tl::Node::Tag(tag)) = handle.get(parser) else {
+            return false;
+        };
+        if has_end_tag(tag) {
+            return false;
+        }
+        let children = dom_ctx.children_of(handle.get_inner());
+        let has_content = children.is_some_and(|children| !children.is_empty());
+        let name = tag.name().as_bytes();
+        if has_content && !name.eq_ignore_ascii_case(b"html") && !name.eq_ignore_ascii_case(b"body") {
+            return true;
+        }
+        last = children.and_then(|children| children.last().copied());
+    }
+    false
+}
+
+/// True when the source range of `tag` ends with its end tag. For an element that `tl` never
+/// closed, the range is the start tag alone.
+fn has_end_tag(tag: &tl::HTMLTag<'_>) -> bool {
+    let name = tag.name().as_bytes();
+    tag.raw()
+        .as_bytes()
+        .strip_suffix(b">")
+        .and_then(|raw| raw.strip_suffix(name))
+        .is_some_and(|raw| raw.ends_with(b"</"))
+}
+
+/// The children of one element (or of the page) in the walk of [`has_discarded_end_tag`].
+struct SiblingList<'a> {
+    children: &'a [tl::NodeHandle],
+    next: usize,
+    /// The source offset where the last node ended, when the offset is known.
+    previous_end: Option<usize>,
+    /// The source offset of the end tag of the element, for an element that has one.
+    end_tag: Option<usize>,
+    /// The name of the element in lower case. The page has none.
+    name: Option<std::borrow::Cow<'a, [u8]>>,
+}
+
+/// True when the first parse discarded an end tag that names an element that was open, so the
+/// HTML tree builder must decide where that element ends (issue #810).
+///
+/// ~keep `tl` discards an end tag that does not name the element on top of its stack (astral-tl
+/// ~keep `parser/base.rs`, `read_end`) and makes no node for it. Each node is a slice of the
+/// ~keep source, so a discarded end tag is the source between two sibling nodes, or between
+/// ~keep the last child and the end tag of the parent, that is in no node. In
+/// ~keep `<div><p>one</div>two</p>` the `p` holds the text nodes `one` and `two`, and the
+/// ~keep source between them is `</div>`. The walk reads each node once and no token.
+/// ~keep A comment and an attribute value are inside a node, so an end tag in one is not seen.
+/// ~keep Not read: the source between a start tag and the first child of an element that has
+/// ~keep its end tag, because `tl` does not keep the length of a start tag.
+pub fn has_discarded_end_tag(dom_ctx: &DomContext, parser: &tl::Parser, input: &str) -> bool {
+    let source = input.as_bytes();
+    let mut open: std::collections::HashMap<std::borrow::Cow<'_, [u8]>, usize> = std::collections::HashMap::new();
+    let mut lists = vec![SiblingList {
+        children: &dom_ctx.root_children,
+        next: 0,
+        previous_end: None,
+        end_tag: None,
+        name: None,
+    }];
+    while let Some(list) = lists.last_mut() {
+        let Some(handle) = list.children.get(list.next) else {
+            if names_open_element(source, list.previous_end, list.end_tag, &open) {
+                return true;
+            }
+            if let Some(count) = list.name.as_ref().and_then(|name| open.get_mut(name)) {
+                *count -= 1;
+            }
+            lists.pop();
+            continue;
+        };
+        list.next += 1;
+        let Some(node) = handle.get(parser) else {
+            list.previous_end = None;
+            continue;
+        };
+        let span = node_span(node, source);
+        if names_open_element(source, list.previous_end, span.map(|(start, _)| start), &open) {
+            return true;
+        }
+        list.previous_end = span.map(|(_, end)| end);
+        let tl::Node::Tag(tag) = node else { continue };
+        let Some(children) = dom_ctx
+            .children_of(handle.get_inner())
+            .filter(|children| !children.is_empty())
+        else {
+            continue;
+        };
+        let name = tag.name().as_bytes();
+        let closed = has_end_tag(tag);
+        let name_in_lower_case = lower_case(name);
+        *open.entry(name_in_lower_case.clone()).or_insert(0) += 1;
+        lists.push(SiblingList {
+            children,
+            next: 0,
+            // ~keep The source range of an element with no end tag is its start tag.
+            previous_end: span.filter(|_| !closed).map(|(_, end)| end),
+            end_tag: span.filter(|_| closed).map(|(_, end)| end - name.len() - 3),
+            name: Some(name_in_lower_case),
+        });
+    }
+    false
+}
+
+fn lower_case(name: &[u8]) -> std::borrow::Cow<'_, [u8]> {
+    if name.iter().any(u8::is_ascii_uppercase) {
+        std::borrow::Cow::Owned(name.to_ascii_lowercase())
+    } else {
+        std::borrow::Cow::Borrowed(name)
+    }
+}
+
+/// The source range of `node`, or `None` when its bytes are no part of `source`: `tl` gives a
+/// comment with no end an empty slice of its own.
+fn node_span(node: &tl::Node<'_>, source: &[u8]) -> Option<(usize, usize)> {
+    let raw = match node {
+        tl::Node::Tag(tag) => tag.raw().as_bytes(),
+        tl::Node::Raw(bytes) | tl::Node::Comment(bytes) => bytes.as_bytes(),
+    };
+    let start = (raw.as_ptr() as usize).checked_sub(source.as_ptr() as usize)?;
+    (!raw.is_empty() && start + raw.len() <= source.len()).then_some((start, start + raw.len()))
+}
+
+/// True when `source[from..to]`, which is in no node, holds an end tag that names an open element.
+fn names_open_element(
+    source: &[u8],
+    from: Option<usize>,
+    to: Option<usize>,
+    open: &std::collections::HashMap<std::borrow::Cow<'_, [u8]>, usize>,
+) -> bool {
+    let Some(gap) = from.zip(to).and_then(|(from, to)| source.get(from..to)) else {
+        return false;
+    };
+    memchr::memmem::find_iter(gap, b"</").any(|at| {
+        let name = &gap[at + 2..];
+        let end = name
+            .iter()
+            .position(|byte| byte.is_ascii_whitespace() || matches!(byte, b'/' | b'>'))
+            .unwrap_or(name.len());
+        open.get(&*lower_case(&name[..end])).is_some_and(|count| *count > 0)
+    })
+}
+
+/// The count of characters that are not ASCII white space in the text nodes of `dom` that the
+/// converter can write, with every character reference decoded.
+///
+/// ~keep The measure that decides whether a second parse lost text. It is taken the same way
+/// ~keep on the page as written and on the page as the tree builder wrote it back, so only a
+/// ~keep difference between the two pages changes it. A parse can drop text, keep it or move
+/// ~keep it, and cannot put other text in its place, so a page that lost text has a smaller
+/// ~keep count. A no-break space counts on both pages, written as a character or as `&nbsp;`.
+pub fn readable_text_len(dom: &tl::VDom<'_>) -> usize {
+    let parser = dom.parser();
+    let mut total = 0;
+    let mut stack = dom.children().to_vec();
+    while let Some(handle) = stack.pop() {
+        match handle.get(parser) {
+            Some(tl::Node::Raw(text)) => total += decoded_len(text.as_bytes()),
+            Some(tl::Node::Tag(tag)) if holds_readable_text(tag, parser) => {
+                stack.extend(tag.children().top().iter().copied());
+            }
+            _ => {}
+        }
+    }
+    total
+}
+
+/// The count of characters of `text` that are not ASCII white space, after its character
+/// references are decoded. Text with no `&` is counted as it is.
+fn decoded_len(text: &[u8]) -> usize {
+    // ~keep A byte of the form 10xxxxxx continues a character, so it starts none.
+    let characters = |bytes: &[u8]| {
+        bytes
+            .iter()
+            .filter(|byte| !byte.is_ascii_whitespace() && (**byte & 0xC0) != 0x80)
+            .count()
+    };
+    if memchr::memchr(b'&', text).is_none() {
+        return characters(text);
+    }
+    characters(decode_html_entities_cow(&String::from_utf8_lossy(text)).as_bytes())
+}
+
+/// Elements whose text the count leaves out. The tree builder moves a `title` that starts a
+/// page into the head; only the forced second tier wrote a `title` with no `head` as body text.
+const NO_READABLE_TEXT: [&[u8]; 5] = [b"script", b"style", b"template", b"noscript", b"title"];
+
+/// False for an element whose text the count leaves out, so text that the tree builder
+/// moves into one counts as lost.
+///
+/// ~keep The tree builder moves a `<noframes>` that starts a page into the head, and `tl`
+/// ~keep reads the markup in it as elements: `<noframes><div></noframes><p>one</p>` comes back
+/// ~keep with all its text in the head. A `head` is read by the rule of the converter
+/// ~keep ([`is_body_content_in_head`]).
+fn holds_readable_text(tag: &tl::HTMLTag<'_>, parser: &tl::Parser<'_>) -> bool {
+    let name = tag.name().as_bytes();
+    if name.eq_ignore_ascii_case(b"head") {
+        return tag.children().top().iter().any(|child| {
+            matches!(
+                child.get(parser),
+                Some(tl::Node::Tag(child)) if is_body_content_in_head(&normalized_tag_name(child.name().as_utf8_str()))
+            )
+        });
+    }
+    !NO_READABLE_TEXT
+        .iter()
+        .any(|skipped| name.eq_ignore_ascii_case(skipped))
 }
 
 /// True if `child`, as a direct child of a `<table>` element, is content that a
@@ -416,4 +642,143 @@ fn element_has_noise_hint(tag: &tl::HTMLTag) -> bool {
     ];
 
     attribute_matches_any(tag, "class", NOISE_KEYWORDS) || attribute_matches_any(tag, "id", NOISE_KEYWORDS)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{has_discarded_end_tag, readable_text_len};
+    use crate::converter::utility::caching::build_dom_context;
+
+    fn discards_an_end_tag_of_an_open_element(html: &str) -> bool {
+        let dom = tl::parse(html, tl::ParserOptions::default()).expect("parse");
+        let dom_ctx = build_dom_context(&dom, dom.parser(), html.len());
+        has_discarded_end_tag(&dom_ctx, dom.parser(), html)
+    }
+
+    #[test]
+    fn should_leave_a_discarded_end_tag_as_source_between_two_sibling_nodes() {
+        let html = "<div><p>one</div>two</p>";
+        let dom = tl::parse(html, tl::ParserOptions::default()).expect("parse");
+        let parser = dom.parser();
+        let paragraph = dom
+            .nodes()
+            .iter()
+            .filter_map(tl::Node::as_tag)
+            .find(|tag| tag.name() == "p")
+            .expect("paragraph");
+        let texts: Vec<(usize, &[u8])> = paragraph
+            .children()
+            .top()
+            .iter()
+            .filter_map(|child| match child.get(parser) {
+                Some(tl::Node::Raw(text)) => Some(text.as_bytes()),
+                _ => None,
+            })
+            .map(|text| (text.as_ptr() as usize - html.as_ptr() as usize, text))
+            .collect();
+
+        assert_eq!(texts, [(8, b"one".as_slice()), (17, b"two".as_slice())]);
+        assert_eq!(&html[11..17], "</div>");
+    }
+
+    #[test]
+    fn should_find_an_end_tag_that_the_first_parse_discarded_while_its_element_was_open() {
+        for html in [
+            "<div><p>one</div>two</p>",
+            "<div><p>one</div>two</p>rest</div>tail",
+            "<div><p>one<b>x</b></div>two</p>rest</div>tail",
+            "<div><p>one</DIV >two</p>rest</div>tail",
+            "<DIV><p>one</div>two</p>rest</DIV>tail",
+            "<ul><li>one</ul>two</li></ul>tail",
+            "<dl><dd>one</dl>two</dd></dl>tail",
+            "<table><tr><td>one</tr>two</td></tr></table>tail",
+            "<select><option>one</select>two</option></select>tail",
+            "<html><body><div><p>one</div>two</p>rest</div>tail",
+        ] {
+            assert!(discards_an_end_tag_of_an_open_element(html), "{html:?}");
+        }
+    }
+
+    #[test]
+    fn should_find_no_discarded_end_tag_when_none_names_an_open_element() {
+        let deep = format!("{}x{}", "<div>".repeat(600), "</div>".repeat(600));
+        for html in [
+            "",
+            "<p>a</b>b",
+            "<p>a</p></div>tail",
+            "<div><p>one</p></div>tail",
+            "<div><p>one</p><p>two</p></span></div>tail",
+            "<div title='</div>'><p>x</p></div>",
+            "<div><p>one<!-- </div> -->two</p></div>",
+            "<div><p>one<!-- </div> two</p></div>",
+            "<!doctype html><div><p>one</p>two</div>",
+            "<div><pre>one\n</pre>two</div>",
+            deep.as_str(),
+        ] {
+            assert!(!discards_an_end_tag_of_an_open_element(html), "{html:?}");
+        }
+    }
+
+    fn text_len(html: &str) -> usize {
+        readable_text_len(&tl::parse(html, tl::ParserOptions::default()).expect("parse"))
+    }
+
+    #[test]
+    fn should_count_the_characters_of_text_that_are_not_white_space() {
+        for (html, expected) in [
+            ("", 0),
+            ("<p> \n\t</p>", 0),
+            ("<div><p>one</div>tail", 7),
+            ("lead<DIV>one <b>two</b></DIV>", 10),
+            ("<p>é ü</p>", 2),
+            ("<!-- comment --><p>one<!-- two --></p>", 3),
+            ("<p title=\"text\">one</p>", 3),
+        ] {
+            assert_eq!(text_len(html), expected, "{html:?}");
+        }
+    }
+
+    #[test]
+    fn should_count_a_character_reference_as_the_character_it_names() {
+        for (html, expected) in [
+            ("<p>&#65;</p>", 1),
+            ("<p>&#x41;</p>", 1),
+            ("<p>&amp;</p>", 1),
+            ("<p>R&amp;D</p>", 3),
+            ("<p>a&nbsp;b&#160;c&#xA0;d&#32;e</p>", 8),
+            ("<p>a\u{a0}b</p>", 3),
+            ("<p>&copy 2020</p>", 5),
+        ] {
+            assert_eq!(text_len(html), expected, "{html:?}");
+        }
+    }
+
+    #[test]
+    fn should_leave_out_the_text_that_the_converter_never_writes() {
+        for name in ["script", "style", "template", "noscript", "title", "TITLE", "NoScript"] {
+            let html = format!("<{name}>out <b>out</b></{name}><p>one</p>");
+            assert_eq!(text_len(&html), 3, "{html:?}");
+        }
+        for html in [
+            "<titles>four</titles><p>one</p>",
+            "<header>four</header><p>one</p>",
+            "<noframes>four</noframes><p>one</p>",
+            "<iframe>four</iframe><p>one</p>",
+        ] {
+            assert_eq!(text_len(html), 7, "{html:?}");
+        }
+    }
+
+    #[test]
+    fn should_read_a_head_only_when_it_holds_body_content() {
+        for (html, expected) in [
+            ("<head>out<noframes><b>out</b></noframes></head><p>one</p>", 3),
+            ("<HEAD><NOFRAMES><DIV>out</NOFRAMES></HEAD>", 0),
+            ("<head><title>t</title><div>one</div><p>two</p>", 6),
+            ("<HEAD><TITLE>t</TITLE><BODY><p>one</p>", 3),
+            ("<header>one</header>", 3),
+        ] {
+            assert_eq!(text_len(html), expected, "{html:?}");
+        }
+    }
 }

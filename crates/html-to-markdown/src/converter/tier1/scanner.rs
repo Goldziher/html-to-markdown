@@ -27,6 +27,8 @@ use crate::converter::tier1::state::{EscapeCtx, OpenTag, Tier1State};
 use crate::converter::tier1::tags::{ListKind, TagKind, TagSpec};
 use crate::converter::tier1::{self};
 use crate::converter::utility::attributes::NAV_KEYWORDS;
+use crate::converter::utility::content::NextElement;
+use crate::converter::utility::white_space::{TextPlace, unicode_space_is_kept};
 use crate::options::ConversionOptions;
 use crate::text::ReferenceContext;
 
