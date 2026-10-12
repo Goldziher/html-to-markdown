@@ -139,6 +139,9 @@ pub struct Context {
     /// Are we inside a table cell (td/th) that holds only inputs and white space? A checkbox
     /// writes its state there. [`Self::for_cell`] decides it where the cell opens.
     pub(crate) in_cell_of_inputs: bool,
+    /// Are we inside the element that writes an option list: the outermost `<select>`,
+    /// `<datalist>` or `<option>`? An option there is a word of that list.
+    pub(crate) in_option_list: bool,
     /// Are we inside a *layout*-table cell, whose row renders as a list item rather than a
     /// pipe row?
     ///
@@ -394,6 +397,7 @@ impl Context {
             in_table_cell: false,
             allow_nested_table_markup: false,
             in_cell_of_inputs: false,
+            in_option_list: false,
             in_layout_cell: false,
             convert_as_inline: options.convert_as_inline,
             inline_depth: 0,

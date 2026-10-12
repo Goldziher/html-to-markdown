@@ -253,7 +253,10 @@ impl TextProcessor<'_, '_, '_> {
             return;
         }
         let next_tag = get_next_sibling_tag(self.node_handle, self.parser, self.handler.dom_ctx);
-        if next_tag.is_some_and(|next_tag| !is_inline_element(next_tag)) {
+        // ~keep An option that no select list holds is text of its line, as a select list is:
+        // ~keep the line end before it is one space.
+        let before_bare_option = !self.handler.ctx.in_option_list && matches!(next_tag, Some("option" | "optgroup"));
+        if !before_bare_option && next_tag.is_some_and(|next_tag| !is_inline_element(next_tag)) {
             return;
         }
         let mut kept = value.chars().filter(|character| !is_collapsible(*character));

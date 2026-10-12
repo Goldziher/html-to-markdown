@@ -64,14 +64,32 @@ impl ControlStart {
 
     /// Separates what the control wrote from the text before it. Returns whether it wrote.
     pub fn finish(&self, output: &mut String) -> bool {
-        let Some(written) = output.get(self.at..).filter(|written| !written.is_empty()) else {
+        let Some(space_owed) = space_owed_before(self.separate, output.get(self.at..).unwrap_or_default()) else {
             return false;
         };
-        if self.separate && !written.starts_with(char::is_whitespace) {
+        if space_owed {
             output.insert(self.at, ' ');
         }
         true
     }
+}
+
+/// Whether one space is owed before `written`, the text that a control wrote. `separate` says
+/// whether the text before the control needs a space. `None` when the control wrote nothing.
+///
+/// ~keep Both writers ask this function. Each writes the space in its own output.
+pub fn space_owed_before(separate: bool, written: &str) -> Option<bool> {
+    (!written.is_empty()).then(|| separate && !written.starts_with(char::is_whitespace))
+}
+
+/// Whether `text` starts with a word: not with white space and not with closing punctuation.
+/// `None` when `text` is empty.
+///
+/// ~keep Both writers ask this function whether a space is owed between a control and `text`.
+pub fn starts_with_word(text: &str) -> Option<bool> {
+    text.chars()
+        .next()
+        .map(|first| !first.is_whitespace() && !matches!(first, '.' | ',' | ';' | ':' | '!' | '?' | ')' | ']' | '}'))
 }
 
 /// Writes the space between a control at the end of `output` and the text that follows
@@ -86,6 +104,57 @@ pub fn separate_from_next_text(
     if needs_space_before(output) && word_follows(node_handle.get_inner(), parser, dom_ctx) {
         output.push(' ');
     }
+}
+
+/// What `text`, the text of one option, adds to `list`, the text that its list holds so far:
+/// the separator and the word. One space separates an option from the option before it.
+/// `None` for an option with no text.
+///
+/// ~keep The Markdown writer and the plain text writer both ask this function for an option.
+pub fn option_word<'a>(list: &str, text: &'a str) -> Option<(&'static str, &'a str)> {
+    let word = text.trim();
+    if word.is_empty() {
+        return None;
+    }
+    let separator = if list.is_empty() || list.ends_with(char::is_whitespace) {
+        ""
+    } else {
+        " "
+    };
+    Some((separator, word))
+}
+
+/// Writes `text`, the text of one option, to `list`, the text that its list holds so far.
+pub fn write_option(list: &mut String, text: &str) {
+    if let Some((separator, word)) = option_word(list, text) {
+        list.push_str(separator);
+        list.push_str(word);
+    }
+}
+
+/// The text that `options`, the text of the options of a list, writes as one control, or
+/// `None` when no option has text. In code (`in_code`) the white space around the options is
+/// text of the source.
+///
+/// ~keep The Markdown writer and the plain text writer both ask this function for an option list.
+pub fn option_list_text(options: &str, in_code: bool) -> Option<&str> {
+    let trimmed = options.trim();
+    if trimmed.is_empty() {
+        return None;
+    }
+    Some(if in_code { options } else { trimmed })
+}
+
+/// Writes `options`, the text of the options of a list, to `output`. The options are one control
+/// in the line: one space separates the control from the text before it. Returns whether it
+/// wrote: the writer then separates the list from the text after it in its own way.
+pub fn write_option_list(output: &mut String, options: &str, in_code: bool) -> bool {
+    let Some(list) = option_list_text(options, in_code) else {
+        return false;
+    };
+    let start = ControlStart::new(output);
+    output.push_str(list);
+    start.finish(output)
 }
 
 /// The siblings of node `id` that follow it in the source.
@@ -137,9 +206,7 @@ fn leading_word(handle: tl::NodeHandle, parser: &tl::Parser, dom_ctx: &DomContex
     *budget -= 1;
     match handle.get(parser)? {
         tl::Node::Comment(_) => None,
-        tl::Node::Raw(raw) => raw.as_utf8_str().chars().next().map(|first| {
-            !first.is_whitespace() && !matches!(first, '.' | ',' | ';' | ':' | '!' | '?' | ')' | ']' | '}')
-        }),
+        tl::Node::Raw(raw) => starts_with_word(raw.as_utf8_str().as_ref()),
         tl::Node::Tag(tag) => {
             let name = dom_ctx.tag_name_for(handle, parser)?;
             match name.as_ref() {
