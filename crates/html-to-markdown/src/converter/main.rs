@@ -100,7 +100,7 @@ pub fn convert_html_impl(
         repair_limit,
     } = parse_for_conversion(&preprocessed, &repaired_page, preserve_menu)?;
     let repair_warning = repair_limit.or(prepare_limit).or(head_repair_limit);
-    finish_dom_parse(&mut dom, &mut dom_ctx, inert_bodies, preprocessed_len)?;
+    let kept_scripts = finish_dom_parse(&mut dom, &mut dom_ctx, inert_bodies, preprocessed_len, kept_scripts)?;
     let parser = dom.parser();
     let mut output = String::with_capacity(preprocessed_len.saturating_add(preprocessed_len / 4));
     let is_plain_text = options.output_format == OutputFormat::Plain;

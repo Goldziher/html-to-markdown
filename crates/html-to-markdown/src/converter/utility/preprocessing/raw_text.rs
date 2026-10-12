@@ -62,47 +62,121 @@ const ESCAPED_LT: &str = "&lt;";
 /// ~keep `push_kept_element` writes each `<` of a kept script as `&lt;`, and `as_written` takes
 /// ~keep that back. No other code knows of the escape: the tree holds the escaped text, and a
 /// ~keep writer of HTML writes it as it is. A body that holds `&lt;` itself reads the same in
-/// ~keep the tree as a body that holds `<`, so the first pass records each such body here.
+/// ~keep the tree as a body that holds `<`, so the escaped text does not name a script. The
+/// ~keep first pass records each body whose escaped text holds `&lt;`, in the order of the page,
+/// ~keep and `match_to_tree` gives each script of the final tree its own record.
 #[derive(Debug)]
 pub struct KeptScripts {
-    /// The bodies that hold `&lt;`, as written, with no white space at the two ends.
+    /// The bodies whose escaped text holds `&lt;`, as written, in the order of the page, with
+    /// no white space at the two ends.
     #[cfg(feature = "metadata")]
-    with_reference: Vec<Box<str>>,
+    bodies: Vec<Box<str>>,
+    /// The id of a script node of the final tree with the index of its body in `bodies`, in
+    /// the order of the ids.
+    #[cfg(feature = "metadata")]
+    of_node: Vec<(u32, usize)>,
+    /// Whether the page has a kept script with no end tag.
+    ///
+    /// ~keep The rest of the page is the text of the first such script, and a later start tag
+    /// ~keep is in that text, so the first pass records one body for them: the read stays
+    /// ~keep linear on a page of such start tags.
+    #[cfg(feature = "metadata")]
+    has_no_end_tag: bool,
 }
 
 impl KeptScripts {
     const fn new() -> Self {
         Self {
             #[cfg(feature = "metadata")]
-            with_reference: Vec::new(),
+            bodies: Vec::new(),
+            #[cfg(feature = "metadata")]
+            of_node: Vec::new(),
+            #[cfg(feature = "metadata")]
+            has_no_end_tag: false,
         }
     }
 
-    /// Record the body of a kept script when the tree cannot give it back.
+    /// Record the body of a kept script when its escaped text holds `&lt;`.
     #[cfg(feature = "metadata")]
     fn record(&mut self, body: &str) {
-        if body.contains(ESCAPED_LT) {
-            self.with_reference.push(body.trim().into());
+        if body.contains('<') || body.contains(ESCAPED_LT) {
+            self.bodies.push(body.trim().into());
         }
     }
 
-    /// The text of a kept script as the page has it. `text` is the text that the tree has for
-    /// the script, with no white space at the two ends.
-    ///
-    /// ~keep The tree builder writes a line end of the page as LF, so a CR is not compared.
+    /// Whether the first pass recorded no body.
     #[cfg(feature = "metadata")]
-    pub fn as_written<'a>(&self, text: &'a str) -> Cow<'a, str> {
-        if !text.contains(ESCAPED_LT) {
-            return Cow::Borrowed(text);
-        }
-        let no_cr = |escaped: &str| escaped.bytes().filter(|byte| *byte != b'\r').collect::<Vec<u8>>();
-        let in_tree = no_cr(text);
-        let recorded = self
-            .with_reference
-            .iter()
-            .find(|body| no_cr(&body.replace('<', ESCAPED_LT)) == in_tree);
-        Cow::Owned(recorded.map_or_else(|| text.replace(ESCAPED_LT, "<"), |body| String::from(body.as_ref())))
+    #[must_use]
+    pub const fn is_empty(&self) -> bool {
+        self.bodies.is_empty()
     }
+
+    /// Give each kept script of the final tree its record. `in_tree` has the id of the node
+    /// and the text of each kept script whose text holds `&lt;`, in the order of the tree; the
+    /// text has no white space at the two ends.
+    ///
+    /// ~keep A script is one of the scripts with its escaped text, and its place among them is
+    /// ~keep its identity: the first of them in the tree is the first of them in the page. A
+    /// ~keep script never gets the record of a script with another escaped text, so a pass that
+    /// ~keep drops, moves or adds such a script changes nothing here. When the tree and the
+    /// ~keep page do not have the same count of scripts with one escaped text, the place names
+    /// ~keep no script and none of them gets a record; when all their bodies are equal the
+    /// ~keep place is not needed. The tree builder writes a line end of the page as LF, so a
+    /// ~keep CR is not compared.
+    #[cfg(feature = "metadata")]
+    pub fn match_to_tree(&mut self, in_tree: &[(u32, String)]) {
+        let mut recorded: ahash::AHashMap<Vec<u8>, Vec<usize>> = ahash::AHashMap::new();
+        for (index, body) in self.bodies.iter().enumerate() {
+            let escaped = body.replace('<', ESCAPED_LT);
+            recorded.entry(without_cr(&escaped)).or_default().push(index);
+        }
+        let mut found: ahash::AHashMap<Vec<u8>, Vec<u32>> = ahash::AHashMap::new();
+        for (node, text) in in_tree {
+            found.entry(without_cr(text)).or_default().push(*node);
+        }
+        for (text, scripts) in found {
+            let Some(written) = recorded.get(&text) else {
+                continue;
+            };
+            let one_body = written
+                .iter()
+                .all(|index| self.bodies[*index] == self.bodies[written[0]]);
+            let named = scripts.len() == written.len() || (one_body && scripts.len() < written.len());
+            if !named {
+                continue;
+            }
+            for (place, node) in scripts.into_iter().enumerate() {
+                let index = if one_body { written[0] } else { written[place] };
+                self.of_node.push((node, index));
+            }
+        }
+        self.of_node.sort_unstable();
+    }
+
+    /// The text of a kept script as the page has it. `node` is the id of the script in the
+    /// final tree and `text` is the text that the tree has for it, with no white space at the
+    /// two ends.
+    ///
+    /// ~keep A script with no record reads with each `&lt;` as `<`: right for a body that
+    /// ~keep holds no `&lt;` of its own.
+    #[cfg(feature = "metadata")]
+    pub fn as_written<'a>(&'a self, node: u32, text: &'a str) -> Cow<'a, str> {
+        if let Ok(at) = self.of_node.binary_search_by_key(&node, |(id, _)| *id) {
+            let body: &str = &self.bodies[self.of_node[at].1];
+            return Cow::Borrowed(body);
+        }
+        if text.contains(ESCAPED_LT) {
+            Cow::Owned(text.replace(ESCAPED_LT, "<"))
+        } else {
+            Cow::Borrowed(text)
+        }
+    }
+}
+
+/// The bytes of `text` that `KeptScripts` compares: all but each CR.
+#[cfg(feature = "metadata")]
+fn without_cr(text: &str) -> Vec<u8> {
+    text.bytes().filter(|byte| *byte != b'\r').collect()
 }
 
 /// A candidate raw-text element: `idx` is its `<`, `last` is the end of the copied input and
@@ -412,6 +486,16 @@ impl<'a, C: FnMut(PassRead)> FirstPass<'a, C> {
         let (name, content) = FIRST_PASS_ELEMENTS[slot];
         let Some(close) = self.reads.raw_text_end_tag(bytes, tag_end, slot) else {
             // ~keep The second pass reads an element with no end tag.
+            #[cfg(feature = "metadata")]
+            {
+                if content == RawTextContent::RemovedUnlessStructuredData
+                    && !self.kept_scripts.has_no_end_tag
+                    && is_json_ld_script_open_tag(&self.input[idx..tag_end])
+                {
+                    self.kept_scripts.has_no_end_tag = true;
+                    self.kept_scripts.record(&self.input[tag_end..]);
+                }
+            }
             return tag_end;
         };
         let element = RawTextElement {

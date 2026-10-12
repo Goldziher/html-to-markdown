@@ -364,6 +364,168 @@ mod structured_data {
             assert_eq!(raw_json(&html), vec![Vec::<String>::new(); 2], "{html:?}");
         }
     }
+
+    const OPEN: &str = r#"<script type="application/ld+json">"#;
+    /// Two bodies that the tree holds as one text: the first pass writes each `<` as `&lt;`.
+    const LT: &str = r#"{"a":"<"}"#;
+    const REFERENCE: &str = r#"{"a":"&lt;"}"#;
+    const BOTH_ORDERS: [[&str; 2]; 2] = [[LT, REFERENCE], [REFERENCE, LT]];
+
+    fn script(body: &str) -> String {
+        format!("{OPEN}{body}</script>")
+    }
+
+    /// The bodies as the page has them, by the automatic choice and by the full converter.
+    fn as_written(bodies: &[&str]) -> Vec<Vec<String>> {
+        vec![bodies.iter().map(|body| (*body).to_string()).collect(); 2]
+    }
+
+    /// Pull request 831: each of two scripts gives its own JSON when the tree holds the two
+    /// bodies as one text. The second script gave the JSON of the first one.
+    #[test]
+    fn two_scripts_with_one_text_in_the_tree_give_each_its_own_json() {
+        for [first, second] in BOTH_ORDERS {
+            let pair = format!("{}{}", script(first), script(second));
+            for html in [
+                format!("{pair}<p>visible</p>"),
+                format!("{}<p>visible</p>{}", script(first), script(second)),
+                format!("<html><head><title>T</title></head><body>{pair}<p>visible</p></body></html>"),
+                format!("<html><head>{pair}</head><body><h1>Shop</h1><p>visible</p></body></html>"),
+            ] {
+                assert_eq!(raw_json(&html), as_written(&[first, second]), "{html:?}");
+            }
+        }
+    }
+
+    #[test]
+    fn three_scripts_in_a_row_give_each_its_own_json() {
+        let bodies = [LT, REFERENCE, r#"{"a":"&amp;lt;"}"#];
+        for order in [[0, 1, 2], [2, 1, 0], [1, 0, 2]] {
+            let bodies = order.map(|at: usize| bodies[at]);
+            let html = format!("{}<p>visible</p>", bodies.map(script).concat());
+            assert_eq!(raw_json(&html), as_written(&bodies), "{html:?}");
+        }
+    }
+
+    #[test]
+    fn two_scripts_with_equal_bodies_give_each_its_json() {
+        for body in [LT, REFERENCE] {
+            let html = format!("{}<p>visible</p>{}", script(body), script(body));
+            assert_eq!(raw_json(&html), as_written(&[body, body]), "{html:?}");
+        }
+    }
+
+    /// The first pass reads nothing in `svg`: a script there is not structured data and has no
+    /// record. It does not take the record of a script outside `svg`.
+    #[test]
+    fn a_script_in_svg_does_not_take_the_record_of_a_script_outside() {
+        for [inside, outside] in BOTH_ORDERS {
+            for html in [
+                format!("<svg>{}</svg>{}<p>visible</p>", script(inside), script(outside)),
+                format!("{}<svg>{}</svg><p>visible</p>", script(outside), script(inside)),
+            ] {
+                assert_eq!(raw_json(&html), as_written(&[outside]), "{html:?}");
+            }
+        }
+    }
+
+    /// A script with no end tag holds the rest of the page, and it has a record of its own.
+    #[test]
+    fn a_script_with_no_end_tag_gives_its_own_json_beside_a_script_with_its_text() {
+        for [first, second] in BOTH_ORDERS {
+            let html = format!("{}<p>visible</p>{OPEN}{second}", script(first));
+            assert_eq!(raw_json(&html), as_written(&[first, second]), "{html:?}");
+        }
+    }
+
+    /// A character reference in a script with no end tag stays as written: `&lt;b&gt;` gave
+    /// `<b&gt;`.
+    #[test]
+    fn a_script_with_no_end_tag_gives_a_reference_as_written() {
+        for body in [r#"{"a":"&lt;b&gt;"}"#, r#"{"a":"a < b &lt; c"}"#] {
+            let html = format!("<p>visible</p>{OPEN}{body}");
+            assert_eq!(raw_json(&html), as_written(&[body]), "{html:?}");
+        }
+    }
+
+    /// The head repair writes the page again before the first pass reads it.
+    #[test]
+    fn the_scripts_of_a_page_with_a_rebuilt_head_give_each_its_own_json() {
+        for [first, second] in BOTH_ORDERS {
+            let (first_script, second_script) = (script(first), script(second));
+            for html in [
+                format!("{first_script}<head><title>T</title>{second_script}</head><body><p>visible</p></body>"),
+                format!("<title>T</title>{first_script}{second_script}<p>visible</p>"),
+            ] {
+                assert_eq!(raw_json(&html), as_written(&[first, second]), "{html:?}");
+            }
+        }
+    }
+
+    /// A page with an omitted end tag, with a custom element or with a misnest is parsed again.
+    #[test]
+    fn the_scripts_of_a_page_that_is_parsed_again_give_each_its_own_json() {
+        for start in [
+            "<p>one<div>two</div>",
+            super::REPAIRED_PAGE_START,
+            "<b><p>one</b>two</p>",
+        ] {
+            for [first, second] in BOTH_ORDERS {
+                let html = format!(
+                    "{start}<p>foo {} and {} bar</p><p>after</p>",
+                    script(first),
+                    script(second)
+                );
+                assert_eq!(raw_json(&html), as_written(&[first, second]), "{html:?}");
+            }
+        }
+    }
+
+    /// A pass removes a hidden element after the first pass recorded the script in it. No later
+    /// script takes that record.
+    #[test]
+    fn a_script_in_a_hidden_element_gives_its_record_to_no_other_script() {
+        let hidden = script(r#"{"b":"&lt;"}"#);
+        for [first, second] in BOTH_ORDERS {
+            let html = format!(
+                "<div hidden>{hidden}</div>{}<p>visible</p>{}",
+                script(first),
+                script(second)
+            );
+            assert_eq!(raw_json(&html), as_written(&[first, second]), "{html:?}");
+        }
+    }
+}
+
+/// Pull request 831: two structured data scripts in a row add nothing to the text, on both
+/// converters, when the tree holds their two bodies as one text.
+#[test]
+fn two_scripts_with_one_text_in_the_tree_add_nothing_to_the_text() {
+    let open = r#"<script type="application/ld+json">"#;
+    for (first, second) in [(r#"{"a":"<"}"#, r#"{"a":"&lt;"}"#), (r#"{"a":"&lt;"}"#, r#"{"a":"<"}"#)] {
+        let html = format!("<p>foo {open}{first}</script>{open}{second}</script> bar</p>");
+        for tier_strategy in STRATEGIES {
+            assert_eq!(content(&html, tier_strategy), "foo bar", "{tier_strategy:?}: {html:?}");
+        }
+    }
+}
+
+/// `preserve_tags` writes each of the two scripts with the text that the tree has for it: a `<`
+/// of the JSON is `&lt;`.
+#[test]
+fn two_preserved_scripts_with_one_text_in_the_tree_are_written_with_that_text() {
+    let open = r#"<script type="application/ld+json">"#;
+    let in_tree = format!(r#"{open}{{"a":"&lt;"}}</script>"#);
+    for (first, second) in [(r#"{"a":"<"}"#, r#"{"a":"&lt;"}"#), (r#"{"a":"&lt;"}"#, r#"{"a":"<"}"#)] {
+        let html = format!("<p>foo {open}{first}</script> and {open}{second}</script> bar</p><p>after</p>");
+        for tier_strategy in STRATEGIES {
+            assert_eq!(
+                content_with_preserved(&html, "script", tier_strategy),
+                format!("foo {in_tree} and {in_tree} bar\n\nafter"),
+                "{tier_strategy:?}: {html:?}"
+            );
+        }
+    }
 }
 
 /// Media types that start with the name of structured data and are longer. The script stays in

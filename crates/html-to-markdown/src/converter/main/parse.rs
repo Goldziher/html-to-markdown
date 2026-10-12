@@ -5,6 +5,7 @@ use crate::converter::preprocessing_helpers::{
     has_discarded_end_tag, has_inline_block_misnest, has_omitted_end_tag, readable_text_len,
 };
 use crate::converter::utility::caching::build_dom_context;
+use crate::converter::utility::preprocessing::KeptScripts;
 use crate::error::{ConversionError, Result};
 
 #[cfg(test)]
@@ -138,18 +139,25 @@ pub(super) fn parse_for_conversion<'a>(
     })
 }
 
+/// Finish the tree that the converter reads. Returns the kept scripts of the page, each script
+/// of that tree with its record.
+///
+/// ~keep No parse comes after this function, so the ids of the nodes are final here.
 pub(super) fn finish_dom_parse(
     dom: &mut tl::VDom<'_>,
     dom_ctx: &mut DomContext,
     inert_bodies: &std::collections::HashMap<String, String>,
     input_len: usize,
-) -> Result<()> {
+    kept_scripts: KeptScripts,
+) -> Result<KeptScripts> {
     if !inert_bodies.is_empty() {
         crate::converter::utility::preprocessing::restore_inert_bodies(dom, inert_bodies)?;
         *dom_ctx = build_dom_context(dom, dom.parser(), input_len);
     }
     trace_parse_complete(dom, input_len);
-    Ok(())
+    #[cfg(feature = "metadata")]
+    let kept_scripts = crate::converter::metadata::kept_scripts_of_tree(dom, kept_scripts);
+    Ok(kept_scripts)
 }
 
 #[cfg(test)]
