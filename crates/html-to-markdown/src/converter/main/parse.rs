@@ -1,4 +1,4 @@
-use super::preprocess_repaired_html;
+use super::{preprocess_repaired_html, trace_parse_complete};
 use crate::converter::DomContext;
 use crate::converter::main_helpers::repair_with_html5ever_bounded;
 use crate::converter::preprocessing_helpers::{
@@ -49,16 +49,6 @@ impl<'a> ParsedPage<'a> {
             len,
             repair_limit: None,
         }
-    }
-
-    /// Put the kept source of each inert body back into the tree, first parse or repaired, and
-    /// build the context of the tree again. With no kept body the page is returned as it is.
-    pub(super) fn with_inert_bodies(mut self, bodies: &std::collections::HashMap<String, String>) -> Result<Self> {
-        if !bodies.is_empty() {
-            crate::converter::utility::preprocessing::restore_inert_bodies(&mut self.dom, bodies)?;
-            self.dom_ctx = build_dom_context(&self.dom, self.dom.parser(), self.len);
-        }
-        Ok(self)
     }
 }
 
@@ -146,6 +136,20 @@ pub(super) fn parse_for_conversion<'a>(
         len: page.len(),
         repair_limit,
     })
+}
+
+pub(super) fn finish_dom_parse(
+    dom: &mut tl::VDom<'_>,
+    dom_ctx: &mut DomContext,
+    inert_bodies: &std::collections::HashMap<String, String>,
+    input_len: usize,
+) -> Result<()> {
+    if !inert_bodies.is_empty() {
+        crate::converter::utility::preprocessing::restore_inert_bodies(dom, inert_bodies)?;
+        *dom_ctx = build_dom_context(dom, dom.parser(), input_len);
+    }
+    trace_parse_complete(dom, input_len);
+    Ok(())
 }
 
 #[cfg(test)]
