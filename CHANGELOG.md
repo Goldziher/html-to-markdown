@@ -21,8 +21,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   writes a `<script>`, a `<style>` or a comment as text. The converter reads the inline `style`
   attribute only: an element hidden by a style sheet rule or a class name was never dropped and is
   kept with every choice, and so is `aria-hidden` content, which a browser shows. The metadata and
-  the document structure follow the markdown. The CLI takes it as `--hidden-content`
-  ([#753](https://github.com/xberg-io/html-to-markdown/issues/753)).
+  the document structure follow the markdown. An element that `exclude_selectors` names is not
+  written under any choice: a kept `<template>` or `<noscript>` that a selector matches is removed
+  whole, and a selector removes the same elements under each choice. The CLI takes it as
+  `--hidden-content` ([#753](https://github.com/xberg-io/html-to-markdown/issues/753)).
 
 ### Changed
 
@@ -170,6 +172,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Self-closing raw-text and inert elements encountered in an HTML head contain their following text.
+  Head titles remain metadata; preserved `xmp` retains one container around its literal body
+  ([#878](https://github.com/xberg-io/html-to-markdown/issues/878)).
 - A `<label>` inside a code block keeps the spaces and the line ends of its text
   ([#822](https://github.com/xberg-io/html-to-markdown/issues/822)).
 - A paragraph inside a heading keeps a space between its text and the text after it
