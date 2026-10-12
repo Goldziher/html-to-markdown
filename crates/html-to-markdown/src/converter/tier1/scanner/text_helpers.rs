@@ -249,7 +249,8 @@ fn source_starts_with_unicode_space(raw: &str) -> bool {
 ///
 /// ~keep Tier-2 writes that space (`a <span></span>&nbsp;b` is `a  b`) by what stands before
 /// ~keep the text in the tree. The scanner knows that only for a text that starts where an
-/// ~keep opening tag ends: there the two converters join the spaces, and the scanner answers.
+/// ~keep opening tag ends, or the closing tag of an element that holds text and is no `span`
+/// ~keep (`emit_close`): there the two converters join the spaces, and the scanner answers.
 /// ~keep Any other text has an unknown place, and Tier-2 takes the page: a text after a `<br>`
 /// ~keep in a table cell is one, and Tier-2 keeps the Unicode space there.
 /// ~keep In `pre` and in code the white space rule does not apply, and nothing is handed over.

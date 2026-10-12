@@ -489,6 +489,29 @@ pub fn normalize_link_label(label: &str) -> String {
     protect_adjacent_hard_breaks(&label).into_owned()
 }
 
+/// Starts every line of `label` after the first with `indent`, the content column of the list
+/// item that holds the link, and nothing else. Both converters indent a normalized label here.
+///
+/// ~keep Link-label normalization collapses the content-column whitespace after a hard break to
+/// ~keep one space. Restore the enclosing item's actual column so the continuation cannot become
+/// ~keep a new block and split the link (issue #678). A blank line stays blank.
+pub fn indent_continuation_lines(label: &mut String, indent: &str) {
+    if !label.contains('\n') {
+        return;
+    }
+    let original = std::mem::take(label);
+    let mut lines = original.split('\n');
+    let mut indented = lines.next().unwrap_or_default().to_string();
+    for line in lines {
+        indented.push('\n');
+        if !line.is_empty() {
+            indented.push_str(indent);
+            indented.push_str(line.trim_start_matches([' ', '\t']));
+        }
+    }
+    *label = indented;
+}
+
 /// ~keep Keep consecutive hard breaks inside a link label from creating a blank line, which
 /// would end the paragraph before the link's closing delimiter is parsed.
 pub fn protect_adjacent_hard_breaks(label: &str) -> Cow<'_, str> {

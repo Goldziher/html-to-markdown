@@ -153,7 +153,7 @@ impl<'a> Tier1Scanner<'a> {
         let (dest_len, ends_in_newline) = (dest.len(), dest.ends_with('\n'));
         self.state.pending_newline_join = (join_open && ends_in_newline && !ends_own_line).then_some(dest_len);
         self.pos = close.0 + 1;
-        self.state.text_place = Some((self.pos, place_after));
+        self.state.text_place = place_after.map(|place| (self.pos, place));
         self.text_start = self.pos;
         Ok(())
     }
@@ -679,6 +679,7 @@ fn push_open_frame(
         dropped_whitespace_only_text: false,
         own_buffer: renders_into_own_buffer(spec.kind, name_lower, prev_ctx),
         starts_with_whitespace: false,
+        texts_before: state.text_count,
     });
 }
 

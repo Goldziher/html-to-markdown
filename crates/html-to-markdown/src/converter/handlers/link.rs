@@ -21,8 +21,9 @@ use crate::converter::main::walk_node;
 use crate::converter::media::inline_data_treatment;
 use crate::converter::text_node::is_fresh_block_start;
 use crate::converter::utility::content::{
-    collect_link_label_text, keeps_source_white_space, link_accessible_name, link_label_edges, link_text_content,
-    link_text_edges, node_is_block_level, normalize_link_label, normalized_tag_name, push_inline_prefix,
+    collect_link_label_text, indent_continuation_lines, keeps_source_white_space, link_accessible_name,
+    link_label_edges, link_text_content, link_text_edges, node_is_block_level, normalize_link_label,
+    normalized_tag_name, push_inline_prefix,
 };
 use crate::converter::utility::escaping::escape_link_label;
 use crate::options::{ConversionOptions, InlineDataMedia};
@@ -40,20 +41,7 @@ fn indent_hard_break_continuations(label: &mut String, ctx: &Context, options: &
     else {
         return;
     };
-    let original = std::mem::take(label);
-    let mut lines = original.split('\n');
-    let mut indented = lines.next().unwrap_or_default().to_string();
-    for line in lines {
-        indented.push('\n');
-        if !line.is_empty() {
-            // ~keep Link-label normalization collapses the content-column whitespace after a
-            // ~keep hard break to one space. Restore the enclosing item's actual column so the
-            // ~keep continuation cannot become a new block and split the link (issue #678).
-            indented.push_str(&indent);
-            indented.push_str(line.trim_start_matches([' ', '\t']));
-        }
-    }
-    *label = indented;
+    indent_continuation_lines(label, &indent);
 }
 
 /// Handle an `<a>` (link) element and convert to Markdown.

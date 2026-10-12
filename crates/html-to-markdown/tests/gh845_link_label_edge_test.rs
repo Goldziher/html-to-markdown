@@ -297,18 +297,24 @@ fn code_and_strict_mode_keep_their_text() {
         "See `Press`[` Go `](/p)`now` end\n",
     );
     assert_row_of_full_converter("<pre>Press<a href=\"/p\"> Go </a>now</pre>", "```\nPress Go now\n```\n");
-    let strict = ConversionOptions {
-        whitespace_mode: WhitespaceMode::Strict,
-        ..ConversionOptions::default()
-    };
-    assert_eq!(
-        content_with("<p>Press<a href=\"/p\"> Go </a>now</p>", strict.clone()),
-        "Press[Go](/p)now\n"
-    );
-    assert_eq!(
-        content_with("<p>Press<a href=\"https://e.org/\">https://e.org/ </a>now</p>", strict),
-        "Press<https://e.org/>now\n"
-    );
+    // ~keep The strict mode keeps the white space of the source inside the link: the full
+    // ~keep converter writes every such page, on the default route too.
+    for tier_strategy in [TierStrategy::Tier2, TierStrategy::default()] {
+        let strict = ConversionOptions {
+            whitespace_mode: WhitespaceMode::Strict,
+            ..with_tier(tier_strategy)
+        };
+        assert_eq!(
+            content_with("<p>Press<a href=\"/p\"> Go </a>now</p>", strict.clone()),
+            "Press[Go](/p)now\n",
+            "{tier_strategy:?}"
+        );
+        assert_eq!(
+            content_with("<p>Press<a href=\"https://e.org/\">https://e.org/ </a>now</p>", strict),
+            "Press<https://e.org/>now\n",
+            "{tier_strategy:?}"
+        );
+    }
 }
 
 /// Two `<br>` in a row in a label are kept apart, so that the label does not end its paragraph,
@@ -330,10 +336,7 @@ fn the_space_of_a_label_start_is_not_owed_behind_marks_at_a_block_start() {
         "<p><b><a href=\"/p\">&nbsp;<em> Go </em></a></b></p>",
         "**[*Go*](/p)**\n",
     );
-    assert_row(
-        "<p>x</p><p><b><a href=\"/p\"> Go</a></b></p>",
-        "x\n\n**[Go](/p)**\n",
-    );
+    assert_row("<p>x</p><p><b><a href=\"/p\"> Go</a></b></p>", "x\n\n**[Go](/p)**\n");
     assert_row(
         "<p>Press<b><a href=\"/p\"> Go</a></b>now</p>",
         "Press **[Go](/p)**now\n",
@@ -345,12 +348,25 @@ fn the_space_of_a_label_start_is_not_owed_behind_marks_at_a_block_start() {
 }
 
 /// A continuation line of a label in a list item starts with the indent of the item and nothing
-/// else, on both converters.
+/// else, on both converters: after text, after an element that follows the break, and on the
+/// line that keeps two breaks apart.
 #[test]
 fn a_continuation_line_of_a_label_in_a_list_item_starts_with_its_indent_in_both() {
     assert_row(
         "<ul><li>Press<a href=\"/p\"><br>&nbsp;<em> Go </em>&nbsp;<br></a>now</li></ul>",
         "- Press[  \n  *Go*  \n](/p)now\n",
+    );
+    assert_row(
+        "<ul><li>Press&nbsp;<a href=\"/p\"> <br><em> Go </em></a>&nbsp;now</li></ul>",
+        "- Press [  \n  *Go*](/p) now\n",
+    );
+    assert_row(
+        "<ul><li>Press<a href=\"/p\"><br><img src=\"/i.png\" alt=\"Go\"></a>now</li></ul>",
+        "- Press[  \n  ![Go](/i.png)](/p)now\n",
+    );
+    assert_row(
+        "<ul><li>Press<a href=\"/p\">Go<br><br>now</a></li></ul>",
+        "- Press[Go  \n  \\\n  now](/p)\n",
     );
 }
 
@@ -367,7 +383,8 @@ fn a_label_of_breaks_around_blank_text_goes_to_the_full_converter() {
 }
 
 /// A no-break space after a link whose label gave up the space at its end joins that space, on
-/// both converters: the fast converter knows what stands before a text after a close tag.
+/// both converters: the fast converter knows what stands before a text after the close tag of an
+/// element that holds text and is no `span`.
 #[test]
 fn a_no_break_space_after_a_link_joins_the_space_of_the_label_end_in_both() {
     assert_row(
@@ -376,4 +393,25 @@ fn a_no_break_space_after_a_link_joins_the_space_of_the_label_end_in_both() {
     );
     assert_row("<p>Press <a href=\"/p\">Go </a>&nbsp;now</p>", "Press [Go](/p) now\n");
     assert_row("<p>Press <b>Go </b>&nbsp;now</p>", "Press **Go** now\n");
+    // ~keep After an element with no text (an image is none, white space is none) and after a
+    // ~keep `span` whose text ends with a space the no-break space is a second space: the fast
+    // ~keep converter leaves that page to the full one, as before.
+    for (html, wanted) in [
+        (
+            "<p>Press <a href=\"/p\">Go </a><span></span>&nbsp;now</p>",
+            "Press [Go](/p)  now\n",
+        ),
+        (
+            "<p>Press <a href=\"/p\"><img src=\"/i.png\" alt=\"Go\"> </a>&nbsp;now</p>",
+            "Press [![Go](/i.png)](/p)  now\n",
+        ),
+        (
+            "<p>Press <a href=\"/p\">Go </a><small> </small>&nbsp;now</p>",
+            "Press [Go](/p)  now\n",
+        ),
+        ("<p>a <span>x </span>&nbsp;b</p>", "a x  b\n"),
+    ] {
+        assert_row_of_full_converter(html, wanted);
+        assert_eq!(fast(html), None, "fast converter: {html:?}");
+    }
 }

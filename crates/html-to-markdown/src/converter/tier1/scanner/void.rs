@@ -450,18 +450,22 @@ fn is_adjacent_rawtext_ignored_open(bytes: &[u8], pos: usize) -> bool {
 }
 
 /// Closes the element of the close tag `tag_name_bytes` and gives back the place of a text that
-/// follows the tag: after text, or after an element that wrote no text.
+/// follows the tag, where this scanner knows it: after text, when the element holds text and
+/// is no `span`.
 ///
-/// ~keep Tier-2 reads the place of a text from the tree (`siblings::text_place`): the element
-/// ~keep before it holds text, or none. This scanner reads it from what the element wrote: a link
-/// ~keep whose label gave up a space at its end leaves `[Go](/p) `, and the no-break space that
-/// ~keep `</a>&nbsp;now` starts with joins that space in both converters (rule 4), with no hand-over.
+/// ~keep Tier-2 reads the place of a text from the tree (`siblings::place_after_element`). An
+/// ~keep element that holds text and is not in the text flow has text before the text that
+/// ~keep follows it: a link whose label gave up a space at its end leaves `[Go](/p) `, and the
+/// ~keep no-break space that `</a>&nbsp;now` starts with joins that space in both converters
+/// ~keep (rule 4), with no hand-over. After an element with no text, and after an element in
+/// ~keep the text flow, the place depends on what this scanner does not read (how the content
+/// ~keep of a `span` ends, the line end before it): the place stays unknown there.
 fn emit_close(
     state: &mut Tier1State,
     tag_name_bytes: &[u8],
     options: &ConversionOptions,
     table_probes: &mut Vec<TableLayoutProbe>,
-) -> Result<TextPlace, BailReason> {
+) -> Result<Option<TextPlace>, BailReason> {
     let mut name_buf = [0u8; MAX_TAG_NAME_BYTES];
     let name_lower = lowercase_into(tag_name_bytes, &mut name_buf);
 
@@ -519,12 +523,10 @@ fn emit_close(
     let breaks_after = is_block_tag(name_lower) && !(matches!(spec.kind, TagKind::Table) && state.in_table_cell());
     state.last_closed_block = breaks_after || (state.last_closed_block && is_inline_tag(name_lower));
 
-    let wrote_text = state.cell_or_output_mut().len() > frame.content_start;
-    Ok(if wrote_text {
-        TextPlace::AfterText
-    } else {
-        TextPlace::AfterEmptyElement
-    })
+    let holds_text = state.text_count > frame.texts_before;
+    let in_text_flow =
+        std::str::from_utf8(name_lower).is_ok_and(crate::converter::utility::white_space::writes_in_text_flow);
+    Ok((holds_text && !in_text_flow).then_some(TextPlace::AfterText))
 }
 
 fn dispatch_close(

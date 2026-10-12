@@ -265,13 +265,16 @@ fn try_emit_autolink(
 /// its white space to single spaces (a no-break space, and a line end that a block in the label
 /// left, included); the first segment loses the white space at its start and the last one the
 /// white space at its end; a run of markers at an edge is one marker, and a label of only markers
-/// is empty (issue #497); two markers in a row are kept apart.
+/// is empty (issue #497); two markers in a row are kept apart. In a list item every line after a
+/// marker then starts with the content column of the item (`indent`) and nothing else, as Tier-2's
+/// `indent_hard_break_continuations` writes it after the collapse.
 ///
-/// ~keep The indent after a marker stays: this scanner writes it where the text after the break
-/// ~keep starts, and Tier-2 adds it after it has normalized the label. A label of ASCII text with
-/// ~keep single spaces and no marker is already normal and is not read again.
-fn normalize_label_in_place(dest: &mut String, trim_start: usize, marker: &'static str) {
-    use crate::converter::utility::content::{assemble_label, collapse_whitespace_into, protect_adjacent_hard_breaks};
+/// ~keep A label of ASCII text with single spaces and no marker is already normal and is not read
+/// ~keep again.
+fn normalize_label_in_place(dest: &mut String, trim_start: usize, marker: &'static str, indent: Option<&str>) {
+    use crate::converter::utility::content::{
+        assemble_label, collapse_whitespace_into, indent_continuation_lines, protect_adjacent_hard_breaks,
+    };
     let label = &dest[trim_start..];
     let is_normal = !label.contains(['\t', '\n', '\r'])
         && !label.contains("  ")
@@ -282,39 +285,25 @@ fn normalize_label_in_place(dest: &mut String, trim_start: usize, marker: &'stat
     let mut segments = Vec::new();
     let mut markers = Vec::new();
     let mut rest = label;
-    let mut after_marker = false;
     loop {
         let (text, next) = match rest.find(marker) {
             Some(pos) => (&rest[..pos], Some(&rest[pos + marker.len()..])),
             None => (rest, None),
         };
-        let indent = if after_marker {
-            text.len() - text.trim_start_matches(' ').len()
-        } else {
-            0
-        };
-        let mut collapsed = String::with_capacity(text.len());
-        collapse_whitespace_into(&mut collapsed, &text[indent..]);
-        // ~keep A continuation line of a list item starts with its indent and nothing else, as
-        // ~keep Tier-2's `indent_hard_break_continuations` writes it after the collapse.
-        let body = if indent > 0 {
-            collapsed.trim_start_matches([' ', '\t'])
-        } else {
-            collapsed.as_str()
-        };
-        let mut segment = String::with_capacity(indent + body.len());
-        segment.push_str(&text[..indent]);
-        segment.push_str(body);
+        let mut segment = String::with_capacity(text.len());
+        collapse_whitespace_into(&mut segment, text);
         segments.push(segment);
         let Some(next) = next else {
             break;
         };
         markers.push(marker);
         rest = next;
-        after_marker = true;
     }
     let normalized = assemble_label(segments, markers);
-    let normalized = protect_adjacent_hard_breaks(&normalized);
+    let mut normalized = protect_adjacent_hard_breaks(&normalized).into_owned();
+    if let Some(indent) = indent {
+        indent_continuation_lines(&mut normalized, indent);
+    }
     dest.truncate(trim_start);
     dest.push_str(&normalized);
 }
@@ -332,6 +321,7 @@ fn move_label_edges(
     label_start: usize,
     space_owed_before_link: bool,
     marker: &'static str,
+    indent: Option<&str>,
 ) -> (usize, &'static str) {
     let content = dest.split_off(label_start);
     let (prefix, suffix, label) = crate::converter::utility::content::link_label_edges(&content);
@@ -343,7 +333,7 @@ fn move_label_edges(
         label_start += prefix.len();
     }
     dest.push_str(label);
-    normalize_label_in_place(dest, label_start, marker);
+    normalize_label_in_place(dest, label_start, marker, indent);
     // ~keep A label whose text is blank has no text: Tier-2 names such a link by its address or
     // ~keep its title, or leaves it out, and this scanner leaves that to Tier-2 below.
     if dest[label_start..].trim().is_empty() {
@@ -389,10 +379,18 @@ fn close_link(state: &mut Tier1State, frame: &OpenTag, options: &ConversionOptio
     // ~keep One run of white space on both sides of the link start is one space, before the `[`
     // ~keep (rule 4 of the white space module); the start of a block owes none.
     let text_end = text_end_before_link(state, trim_start.saturating_sub(1));
+    // ~keep The content column of the list item that holds the link, for the lines of the label
+    // ~keep after a hard break (Tier-2's `indent_hard_break_continuations`).
+    let in_list_item = state.stack.iter().any(|frame| matches!(frame.spec.kind, TagKind::ListItem));
+    let indent = in_list_item
+        .then(|| {
+            crate::converter::list::utils::continuation_indent_string(state.list_continuation_indent_width(), options)
+        })
+        .flatten();
     let dest = state.cell_or_output_mut();
     let space_owed_before_link =
         text_end > 0 && crate::converter::utility::white_space::space_is_owed(&dest[..text_end]);
-    let (trim_start, suffix) = move_label_edges(dest, trim_start, space_owed_before_link, marker);
+    let (trim_start, suffix) = move_label_edges(dest, trim_start, space_owed_before_link, marker, indent.as_deref());
     // ~keep Tier-2 decides what a link with no text writes: the name of the link as its label,
     // ~keep nothing when the link points into its own page, and the label of a link that holds
     // ~keep only empty elements, or only a title. This scanner has none of these rules, so it

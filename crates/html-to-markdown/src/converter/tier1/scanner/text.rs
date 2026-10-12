@@ -612,6 +612,16 @@ const fn hand_over_white_space_at_image_in_code_span(
     Ok(())
 }
 
+/// Whether the source text `raw` is text of the element around it: not white space only.
+///
+/// ~keep The question of `DomContext::holds_text`, asked of the same decoded text. The close of
+/// ~keep an element reads the count of such texts to tell whether the element holds text.
+fn is_text_of_an_element(raw: &str) -> bool {
+    use crate::converter::utility::white_space::{TextClass, classify_text};
+    let decoded = crate::text::decode_html_entities_cow(raw);
+    !matches!(classify_text(decoded.as_ref()), TextClass::WhiteSpaceOnly(_))
+}
+
 fn flush_text(state: &mut Tier1State, request: TextFlush<'_>) -> Result<(), BailReason> {
     let TextFlush {
         raw,
@@ -623,6 +633,7 @@ fn flush_text(state: &mut Tier1State, request: TextFlush<'_>) -> Result<(), Bail
     if raw.is_empty() {
         return Ok(());
     }
+    state.text_count += usize::from(is_text_of_an_element(raw));
 
     let history = WhitespaceHistory {
         after_custom_element: state.last_closed_custom_element,
@@ -689,6 +700,5 @@ fn flush_text(state: &mut Tier1State, request: TextFlush<'_>) -> Result<(), Bail
             next_tag_is_inline: upcoming.is_inline,
             ends_in_newline_join,
         },
-    )?;
-    Ok(())
+    )
 }
