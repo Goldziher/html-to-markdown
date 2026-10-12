@@ -475,8 +475,9 @@ fn a_deep_page_that_took_the_second_parse_before_keeps_its_text_and_its_warning(
     // ~keep A cell with no row and a custom element asked for the second parse before issue
     // ~keep #772, and the first parse hides such a cell. They still take the second parse, and
     // ~keep the tree builder stops at its depth limit (issue #808): the page keeps the words in
-    // ~keep front of the deep tables and behind them, with one warning that names the limit.
-    // ~keep The `x` is 800 levels deep, past the depth of the walk.
+    // ~keep front of the deep tables and behind them. The `x` is 800 levels deep, past the depth
+    // ~keep of the walk: the walk skips it and records its own limit. The warning of the walk
+    // ~keep names skipped content, so it is the one warning of the conversion.
     let open = "<table><td>".repeat(400);
     let close = "</td></table>".repeat(400);
     let pages = [
@@ -496,8 +497,8 @@ fn a_deep_page_that_took_the_second_parse_before_keeps_its_text_and_its_warning(
         for result in [default, convert_with(html, TierStrategy::Tier2)] {
             assert_eq!(result.content.as_deref(), Some(*expected), "{:?}", &html[..40]);
             assert_eq!(result.warnings.len(), 1, "warnings: {:?}", result.warnings);
-            assert!(matches!(result.warnings[0].kind, WarningKind::MalformedHtml));
-            assert!(result.warnings[0].message.contains("depth limit of 512"));
+            assert!(matches!(result.warnings[0].kind, WarningKind::DepthLimitExceeded));
+            assert!(result.warnings[0].message.contains("depth limit of 64"));
         }
     }
 }

@@ -127,11 +127,11 @@ fn nested_table_in_header_table_cell_does_not_lose_content_on_reparse() {
         for word in ["Outer A", "Inner 1", "Inner 2", "Inner 3", "Inner 4"] {
             assert!(md.contains(word), "expected {word:?} to survive in {md:?}");
         }
-        // ~keep The flattened inner table's own separator/pipe syntax must be escaped so a
-        // ~keep reparse cannot mistake it for additional outer-row cell boundaries.
+        // ~keep Flattened inner cells omit table syntax so a reparse cannot mistake it
+        // ~keep for additional outer-row cell boundaries (#760).
         assert!(
-            md.contains(r"\| Inner 1 \| Inner 2 \|"),
-            "expected the inner table's pipes to be escaped in {md:?}"
+            md.contains("Inner 1 Inner 2 Inner 3 Inner 4"),
+            "expected the inner cells to remain as text in {md:?}"
         );
     }
 }

@@ -567,3 +567,24 @@ fn a_textarea_after_a_bogus_comment_is_an_element() {
         );
     }
 }
+
+/// In a table cell a no-break space after a space is kept when an empty inline element is
+/// between the two, also after `. ` and after a link. A script between the two is no element:
+/// the space and the no-break space are one space.
+#[test]
+fn a_no_break_space_in_a_table_cell_is_kept_after_an_element_and_not_after_a_script() {
+    for (cell, expected) in [
+        ("a. <span></span>&nbsp;b", "| a.  b |\n| ----- |"),
+        (
+            "<a href=\"/y\">x</a> <span></span>&nbsp;b",
+            "| [x](/y)  b |\n| ---------- |",
+        ),
+        ("a. <script>x()</script>&nbsp;b", "| a. b |\n| ---- |"),
+        ("a <style>p{}</style>&nbsp;b", "| a b |\n| --- |"),
+    ] {
+        let html = format!("<table><tr><td>{cell}</td></tr></table>");
+        for tier_strategy in [TierStrategy::Auto, TierStrategy::Tier2] {
+            assert_eq!(content(&html, tier_strategy), expected, "{tier_strategy:?}: {html:?}");
+        }
+    }
+}

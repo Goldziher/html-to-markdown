@@ -241,6 +241,8 @@ jobs:
         }
       - { "name": "Install Task", "uses": "xberg-io/actions/install-task@v1" }
       - { "name": "Install alef", "uses": "xberg-io/actions/install-alef@v1" }
+      # ~keep Alef runs Dart's formatter during generation; without it the freshness check reports formatting drift.
+      - { "name": "Setup Dart", "uses": "dart-lang/setup-dart@v1" }
       # ~keep Alef delegates C# formatting to Poly's clang-format adapter. Ubuntu's clang-format
       # 18 leaves nullable switch assertions unformatted; pin the generator's local formatter
       # version so freshness compares fixture changes rather than formatter-version differences.

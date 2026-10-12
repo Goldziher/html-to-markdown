@@ -150,10 +150,10 @@ fn should_leave_mailto_href_unchanged_on_both_tiers() {
 }
 
 #[test]
-fn should_leave_empty_href_unchanged_on_both_tiers() {
+fn should_resolve_empty_href_against_the_base_on_both_tiers() {
     let html = r#"<a href="">empty</a>"#;
     let out = assert_tier1_matches_tier2(html, "https://example.com/");
-    assert_eq!(out, "[empty](<>)\n");
+    assert_eq!(out, "[empty](https://example.com/)\n");
 }
 
 #[test]

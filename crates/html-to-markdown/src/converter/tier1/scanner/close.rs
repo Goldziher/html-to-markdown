@@ -51,7 +51,7 @@ fn emit_close_for_implicit(
         TagKind::ListItem => close_list_item(state, &frame)?,
         TagKind::DefinitionTerm => close_dt(state),
         TagKind::DefinitionDescription => close_dd(state),
-        TagKind::TableCell { .. } => close_table_cell(state, true)?,
+        TagKind::TableCell { .. } => close_table_cell(state, true, options)?,
         TagKind::TableRow => close_table_row(state),
         // ~keep Summary: pop accumulation buffer, trim, emit `**…**\n\n` (Phase R).
         TagKind::Summary => close_summary(state, &frame),

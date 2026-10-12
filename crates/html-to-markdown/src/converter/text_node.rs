@@ -15,10 +15,11 @@ use crate::converter::main_helpers::{hard_break_marker, is_inline_element};
 use crate::converter::utility::content::{NextElement, ZERO_WIDTH_SPACE, line_end_before_element};
 use crate::converter::utility::siblings::{
     FollowingContent, br_follows_enclosing_elements, content_starts_with_block, following_sibling_content,
-    get_next_sibling_tag, get_previous_sibling_tag, next_sibling_is_inline_tag, zero_width_space_follows,
+    get_next_sibling_tag, get_previous_sibling_tag, next_sibling_is_inline_tag, text_place, zero_width_space_follows,
 };
 use crate::converter::utility::white_space::{
-    TextClass, cell_text, classify_text, edges, is_blank, is_collapsible, space_is_owed, visible, with_line_feeds,
+    TextClass, cell_text, classify_text, edges, is_blank, is_collapsible, space_is_owed, starts_with_unicode_space,
+    unicode_space_is_kept, visible, with_line_feeds,
 };
 use crate::text;
 #[cfg(feature = "visitor")]
@@ -322,9 +323,10 @@ impl TextProcessor<'_, '_, '_> {
         // ~keep The space that opens a text in a cell follows the rule of running text
         // ~keep (`skip_prefix`): after a space in the output it adds nothing, unless an inline
         // ~keep element is between the two. A comment, a script or a style element is not.
+        // ~keep A Unicode space that the cell keeps is no such space, whatever the output ends with.
         let normalized = folded
             .strip_prefix(' ')
-            .filter(|_| collapses && self.skip_prefix(" ", was_fresh))
+            .filter(|_| collapses && !self.keeps_unicode_space(value) && self.skip_prefix(" ", value, was_fresh))
             .unwrap_or_else(|| folded.as_ref());
         let mut output = String::with_capacity(normalized.len());
         text::escape_into(
@@ -392,7 +394,7 @@ impl TextProcessor<'_, '_, '_> {
         let core = visible(value);
         let mut output = String::with_capacity(prefix.len() + core.len() + suffix.len() + 2);
         let mut semantic = capture_semantic.then(|| String::with_capacity(output.capacity()));
-        if !self.skip_prefix(prefix, was_fresh) && !prefix.is_empty() {
+        if !self.skip_prefix(prefix, value, was_fresh) && !prefix.is_empty() {
             output.push_str(prefix);
             if let Some(semantic) = semantic.as_mut() {
                 semantic.push_str(prefix);
@@ -424,15 +426,32 @@ impl TextProcessor<'_, '_, '_> {
         ProcessedText { output, semantic }
     }
 
-    fn skip_prefix(&self, prefix: &str, was_fresh: bool) -> bool {
+    fn skip_prefix(&self, prefix: &str, value: &str, was_fresh: bool) -> bool {
         is_fresh_block_start(self.handler.ctx, was_fresh)
             || self.output.ends_with("\n\n")
             || ["* ", "- ", ". ", "] "]
                 .iter()
                 .any(|ending| self.output.ends_with(ending))
             // ~keep White space after a space is the same run of white space, whatever lies
-            // ~keep between the two: an element that wrote nothing is no word.
-            || (!space_is_owed(self.output) && prefix == " ")
+            // ~keep between the two: an element that wrote nothing is no word. A Unicode space
+            // ~keep is no such white space.
+            || (!space_is_owed(self.output) && prefix == " " && !self.keeps_unicode_space(value))
+    }
+
+    /// Whether `value` starts with a Unicode space that is written after the space the output
+    /// ends with.
+    fn keeps_unicode_space(&self, value: &str) -> bool {
+        self.output.ends_with(' ')
+            && starts_with_unicode_space(value)
+            && unicode_space_is_kept(
+                self.output,
+                text_place(
+                    *self.node_handle,
+                    self.parser,
+                    self.handler.dom_ctx,
+                    self.handler.ctx.in_table_cell,
+                ),
+            )
     }
 
     fn append_trailing_line_ending(&self, output: &mut String, has_double_newline: bool) {

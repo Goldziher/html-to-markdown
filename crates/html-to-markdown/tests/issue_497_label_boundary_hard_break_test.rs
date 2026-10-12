@@ -103,23 +103,18 @@ fn should_keep_a_boundary_break_beside_an_inline_image_in_the_label() {
 
 // ~keep ── CONTROL cases ───────────────────────────────────────────────────────────────────
 
-// ~keep A break needs a line on both sides to mean anything, so a label of nothing but
-// ~keep breaks still collapses to empty and the caller's own fallback takes over. Tier-1 has
-// ~keep no href fallback, which is a separate, pre-existing divergence (#493's neighbourhood)
-// ~keep -- asserted per tier here rather than through `assert_tiers_agree` so this test pins
-// ~keep the boundary-break behaviour without also claiming a parity that never held.
+// ~keep A break-only label still collapses to empty; Tier-1 now delegates its fallback
+// ~keep to Tier-2, preserving boundary normalization while eliminating label divergence (#774).
 #[test]
 fn should_still_drop_a_label_that_is_nothing_but_breaks() {
     assert_eq!(
         content_with(r#"<a href="H"><br></a>"#, ConversionOptions::default()),
         "[H](H)\n"
     );
-    assert_eq!(
-        tier1_run(r#"<a href="H"><br></a>"#, &ConversionOptions::default())
-            .as_deref()
-            .ok(),
-        Some("[](H)\n")
-    );
+    assert!(matches!(
+        tier1_run(r#"<a href="H"><br></a>"#, &ConversionOptions::default()),
+        Err(BailReason::LinkEmptyLabel)
+    ));
 }
 
 #[test]

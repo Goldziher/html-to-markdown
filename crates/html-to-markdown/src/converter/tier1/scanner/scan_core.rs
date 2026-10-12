@@ -220,6 +220,7 @@ impl<'a> Tier1Scanner<'a> {
                 return Err(BailReason::TableBlockChildInCell);
             }
             emit_void(&mut self.state, spec, name_lower, &attrs, self.html, self.options)?;
+            self.record_heading_break_place(spec);
             self.text_start = self.pos;
             return Ok(());
         }
@@ -247,8 +248,22 @@ impl<'a> Tier1Scanner<'a> {
         );
         apply_open_escape_ctx(&mut self.state, spec);
 
+        self.state.text_place = Some((self.pos, TextPlace::ElementStart));
         self.text_start = self.pos;
         Ok(())
+    }
+
+    /// Record the place of a text that starts where the `<br>` of a heading ends, at `self.pos`.
+    ///
+    /// ~keep Such a text joins its Unicode space to the space of that `<br>`, in both converters.
+    /// ~keep In a table cell the place stays unknown: Tier-2 keeps the Unicode space there.
+    fn record_heading_break_place(&mut self, spec: &TagSpec) {
+        if matches!(spec.kind, TagKind::LineBreak)
+            && self.state.escape_ctx.contains(EscapeCtx::HEADING)
+            && !self.state.in_table_cell()
+        {
+            self.state.text_place = Some((self.pos, TextPlace::AfterBreak));
+        }
     }
 
     /// Leave to Tier-2 an open tag whose code block rule this scanner does not have.
@@ -258,10 +273,9 @@ impl<'a> Tier1Scanner<'a> {
         {
             return Err(BailReason::Classifier);
         }
-        // ~keep A link or an image in code writes no marks; Tier-2 knows the rule.
-        if matches!(spec.kind, TagKind::Link | TagKind::Image)
-            && self.state.escape_ctx.intersects(EscapeCtx::CODE | EscapeCtx::PRE)
-        {
+        // ~keep Tier-2 knows the rule for a link in code. An image in code is its alt text, which
+        // ~keep this scanner writes itself.
+        if matches!(spec.kind, TagKind::Link) && self.state.escape_ctx.intersects(EscapeCtx::CODE | EscapeCtx::PRE) {
             return Err(BailReason::Classifier);
         }
         Ok(())
@@ -400,9 +414,13 @@ impl<'a> Tier1Scanner<'a> {
             if raw_href.is_none() && white_space_is_upcoming(self.html, self.pos, &self.state.stack) {
                 return Err(BailReason::Classifier);
             }
-            let href = raw_href
-                .as_deref()
-                .map(|value| self.state.resolve_url(value).unwrap_or_else(|| value.to_owned()));
+            let href = raw_href.as_deref().map(|value| {
+                self.state
+                    .effective_base
+                    .as_deref()
+                    .and_then(|base| crate::converter::url_resolve::resolve_link_url(base, value))
+                    .unwrap_or_else(|| value.to_owned())
+            });
             let aria_label = find_attr(attrs, b"aria-label").map(decode_attr).transpose()?;
             let has_name =
                 crate::converter::utility::content::link_accessible_name(aria_label.as_deref(), title.as_deref())

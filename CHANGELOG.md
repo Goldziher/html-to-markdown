@@ -80,17 +80,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   block: `<pre>\n\na\n</pre>` wrote the fence and `a`, and now writes the fence, a blank line and
   `a`. An indented code block does not start with a blank line. Strict white space mode writes the
   start of a block as before.
-- A link, an image, highlighted text and an abbreviation inside a code block or a code span write
-  their text and no Markdown marks, because code shows every character as text:
+- A link, highlighted text and an abbreviation inside a code block write their text and no Markdown
+  marks, because a code block shows every character as text:
   `<pre>Guido &lt;<a href="/mail">guido</a>&gt;</pre>` wrote `Guido <[guido](/mail)>` and now writes
-  `Guido <guido>`. An image in code writes nothing, and an inline `<svg>` in code writes its text in
-  place of a `data:` image. The link and the image stay in the metadata
+  `Guido <guido>`. Highlighted text and an abbreviation inside a code span do the same. A link
+  inside a code span stays a link, with the code marks around its text
+  ([#813](https://github.com/xberg-io/html-to-markdown/issues/813)). An image in a code block or a
+  code span writes its alt text, and an inline `<svg>` in code writes its text in place of a
+  `data:` image. The link and the image stay in the metadata
   ([#781](https://github.com/xberg-io/html-to-markdown/issues/781)).
 - With `extract_metadata` off, an empty `pre` writes nothing in place of an empty fence, as with the
   default options.
 
 ### Fixed
 
+- Links inside `code`, `kbd` and `samp` spans keep their destinations outside the code marks,
+  including links in table cells. Image labels stay literal, and quotes and hidden templates
+  retain their normal behavior ([#813](https://github.com/xberg-io/html-to-markdown/issues/813)).
+- Nested tables in a Markdown cell retain their text without nested table delimiters, with
+  spaces between cells and surrounding content
+  ([#760](https://github.com/xberg-io/html-to-markdown/issues/760)).
+- Stray table rows and cells retain their text
+  ([#805](https://github.com/xberg-io/html-to-markdown/issues/805)). Empty link destinations
+  keep the label as plain text, and empty presentational wrappers follow the same label rule
+  as a bare empty link; named labels and icons retain their fallback names.
+- An image with no source inside `pre` keeps the space on each side of it. Outside `pre`, one
+  space remains when the next text starts with a character reference or follows a comment.
+- A stray cell inside a table cell keeps its text.
+- A link that holds only an empty `div` or an empty `i`, with no class, gets the empty label, as
+  a link that holds an empty `span` does.
+- The rule under a table header is as wide as a cell that holds a nested table.
+- An image in `code`, `kbd`, `samp` or `pre` text is its alt text on the fast path too, as the
+  full converter writes it. The fast path wrote the Markdown image inside the code text.
 - Plain text output separates the text of a form control from the words beside it, as the
   Markdown output does. This shows for a control outside a `form` element with the default
   options, and for a control inside one with `remove_forms` off.
@@ -324,8 +345,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - A no-break space in an element of its own is kept after a space:
   `<p>one <span>&nbsp;</span> two</p>` gave `one  two` and gives `one`, a space, the no-break
-  space, a space and `two`. A no-break space in running text is one space, as before. In a link
-  label a no-break space beside a space is one space on both converters.
+  space, a space and `two`. A no-break space in running text is written as a space, as before.
+  In a link label a no-break space beside a space is one space on both converters.
+
+- A no-break space that starts a text is kept after a space when an element with no text stands
+  between the two: `<p>a <span></span>&nbsp;b</p>` and `<p>a <img>&nbsp;b</p>` give `a`, two
+  spaces and `b`, as a browser shows them. `&nbsp;`, `&#160;`, `&#xA0;` and the character do the
+  same. An element that holds only white space has no text: `<p>a <span> </span>&nbsp;b</p>`
+  gives the same. After a `span` whose text ends with a space the no-break space is kept too:
+  `<p>a <span>x </span>&nbsp;b</p>` gives `a x`, two spaces and `b`. A line end before an empty
+  `span` and the no-break space after it are one space. After a `<br>` in a heading and at the
+  start of an element the no-break space is still the one space.
+  After a `<br>` in a table cell the no-break space is kept, also in a
+  heading in the cell: `<td>a<br>&nbsp;b</td>` gives `a`, two spaces and `b`, as before. Inside
+  one text, and with only a comment between the two, a space and a no-break space are one
+  space, as before.
 
 ## [3.17.2] - 2026-10-06
 

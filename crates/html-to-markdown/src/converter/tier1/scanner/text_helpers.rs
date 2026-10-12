@@ -216,6 +216,70 @@ fn trim_leading_text_whitespace(raw: &str) -> &str {
     rest
 }
 
+/// Whether the white space that the source text `raw` starts with holds a Unicode space, as a
+/// character or as a character reference (`&nbsp;`, `&#160;`, `&#xA0;`).
+///
+/// ~keep The source form of `white_space::starts_with_unicode_space`, which reads decoded text.
+fn source_starts_with_unicode_space(raw: &str) -> bool {
+    let mut rest = raw;
+    loop {
+        let Some(first) = rest.chars().next() else {
+            return false;
+        };
+        let (character, end) = if first == '&' {
+            match crate::text::decode_character_reference(rest, 0, ReferenceContext::Text) {
+                Some((end, decoded, None)) if rest.as_bytes()[end - 1] == b';' => (decoded, end),
+                _ => return false,
+            }
+        } else {
+            (first, first.len_utf8())
+        };
+        if !character.is_whitespace() {
+            return false;
+        }
+        if crate::text::is_unicode_space(character) {
+            return true;
+        }
+        rest = &rest[end..];
+    }
+}
+
+/// Hand the page to Tier-2 at a text that starts with a Unicode space after a written space,
+/// unless the tag before the text tells that the space joins the written one.
+///
+/// ~keep Tier-2 writes that space (`a <span></span>&nbsp;b` is `a  b`) by what stands before
+/// ~keep the text in the tree. The scanner knows that only for a text that starts where an
+/// ~keep opening tag ends: there the two converters join the spaces, and the scanner answers.
+/// ~keep Any other text has an unknown place, and Tier-2 takes the page: a text after a `<br>`
+/// ~keep in a table cell is one, and Tier-2 keeps the Unicode space there.
+/// ~keep In `pre` and in code the white space rule does not apply, and nothing is handed over.
+/// ~keep A heading has one line. Tier-2 writes a `<br>` there as a space, and this scanner writes
+/// ~keep a hard break that the close of the heading folds to a space: that hard break is a
+/// ~keep written space here (`<h2>a<br><span></span>&nbsp;b</h2>` is `## a  b`). The text right
+/// ~keep after the `<br>` has a known place and joins.
+fn hand_over_unicode_space_after_space(
+    state: &mut Tier1State,
+    raw: &str,
+    base_offset: usize,
+) -> Result<(), BailReason> {
+    if state.escape_ctx.intersects(EscapeCtx::PRE | EscapeCtx::CODE) {
+        return Ok(());
+    }
+    let place = state
+        .text_place
+        .and_then(|(offset, place)| (offset == base_offset).then_some(place));
+    let in_heading = state.escape_ctx.contains(EscapeCtx::HEADING);
+    let written = state.cell_or_output_mut();
+    let after_heading_break = in_heading && (written.ends_with("  \n") || written.ends_with("\\\n"));
+    if (written.ends_with(' ') || after_heading_break)
+        && source_starts_with_unicode_space(raw)
+        && place.is_none_or(|place| unicode_space_is_kept(written, place))
+    {
+        return Err(BailReason::UnicodeSpaceAfterSpace);
+    }
+    Ok(())
+}
+
 /// Scan and decode a single HTML entity starting at `amp_pos` (the `&` byte).
 ///
 /// Tries the hot subset in `decode_entity_into` for an alphanumeric name closed by `;`; every

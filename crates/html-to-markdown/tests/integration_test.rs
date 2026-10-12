@@ -322,7 +322,7 @@ fn test_code_with_special_chars() {
 fn test_empty_link() {
     let html = "<p><a href=\"\">Empty</a></p>";
     let result = convert(html, None).unwrap();
-    assert_eq!(result, "[Empty](<>)\n");
+    assert_eq!(result, "Empty\n");
 }
 
 #[test]
