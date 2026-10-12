@@ -174,3 +174,220 @@ fn should_keep_scripts_after_the_html_bogus_comment_end_of_cdata_shaped_markup()
         }
     }
 }
+
+fn assert_repaired_scripts_match_explicit_closes(input: &str, closed: &str) {
+    for tier_strategy in ROUTES {
+        for output_format in [OutputFormat::Markdown, OutputFormat::Djot, OutputFormat::Plain] {
+            for extract_metadata in [false, true] {
+                let options = options(tier_strategy, output_format, extract_metadata);
+                let repaired = convert(input, options.clone()).expect("repaired page");
+                let expected = convert(closed, options).expect("closed page");
+                assert_eq!(
+                    repaired.content, expected.content,
+                    "{tier_strategy:?}/{output_format:?}: {input}"
+                );
+                #[cfg(feature = "metadata")]
+                assert_eq!(
+                    repaired
+                        .metadata
+                        .structured_data
+                        .iter()
+                        .map(|item| &item.raw_json)
+                        .collect::<Vec<_>>(),
+                    expected
+                        .metadata
+                        .structured_data
+                        .iter()
+                        .map(|item| &item.raw_json)
+                        .collect::<Vec<_>>()
+                );
+            }
+        }
+    }
+}
+
+#[test]
+fn should_not_let_synthetic_close_capture_an_earlier_plain_script() {
+    assert_repaired_scripts_match_explicit_closes(
+        r#"<script>x<p>a</p><script type="application/ld+json">{"a":1}<p>b</p>"#,
+        r#"<script></script>x<p>a</p><script type="application/ld+json">{"a":1}</script><p>b</p>"#,
+    );
+}
+
+#[test]
+fn should_recover_a_structured_script_before_a_later_closed_plain_script() {
+    assert_repaired_scripts_match_explicit_closes(
+        r#"<p>a</p><script type="application/ld+json">{"a":1}<script>x</script><p>b</p>"#,
+        r#"<p>a</p><script type="application/ld+json">{"a":1}</script><script>x</script><p>b</p>"#,
+    );
+}
+
+#[test]
+fn should_recover_two_structured_scripts_with_no_end_tags() {
+    assert_repaired_scripts_match_explicit_closes(
+        r#"<script type="application/ld+json">{"a":1}<script type="application/ld+json">{"b":2}<p>tail</p>"#,
+        r#"<script type="application/ld+json">{"a":1}</script><script type="application/ld+json">{"b":2}</script><p>tail</p>"#,
+    );
+}
+
+#[test]
+fn should_preserve_original_json_bytes_in_a_repaired_preserved_script() {
+    for json in [r#"{"a":"b & c"}"#, r#"{"a":"&lt; &amp; 雪"}"#] {
+        for format in [OutputFormat::Markdown, OutputFormat::Djot] {
+            let options = ConversionOptions {
+                preserve_tags: vec!["script".into()],
+                extract_metadata: true,
+                output_format: format,
+                ..Default::default()
+            };
+            let input = format!("<script type='application/ld+json'>{json}");
+            let repaired = convert(&format!("{input}<p>tail</p>"), options.clone()).expect("preserved repaired");
+            let closed = convert(&format!("{input}</script><p>tail</p>"), options).expect("preserved closed");
+            assert_eq!(repaired.content, closed.content, "{json}");
+            #[cfg(feature = "metadata")]
+            {
+                // ~keep Preserved body scripts bypass collection; head scripts have separate non-empty coverage below.
+                assert_eq!(
+                    closed.metadata.structured_data.len(),
+                    0,
+                    "closed preserved script: {json}"
+                );
+                assert_eq!(
+                    repaired.metadata.structured_data.len(),
+                    0,
+                    "repaired preserved script: {json}"
+                );
+            }
+            assert_eq!(
+                repaired.content.as_deref(),
+                Some(format!("<script type=\"application/ld+json\">{json}</script>\n\ntail\n").as_str())
+            );
+        }
+    }
+}
+
+#[test]
+fn should_support_valid_scalar_json_prefixes_with_the_same_tail_as_explicit_close() {
+    for json in [r#""x""#, "null", "true", "false", "42", "1.5e2"] {
+        for tier_strategy in ROUTES {
+            let options = options(tier_strategy, OutputFormat::Markdown, true);
+            let input = format!("<script type='application/ld+json'>{json} y<p>tail</p>");
+            let repaired = convert(&input, options.clone()).expect("scalar repaired");
+            let closed = convert(
+                &format!("<script type='application/ld+json'>{json}</script> y<p>tail</p>"),
+                options,
+            )
+            .expect("scalar closed");
+            assert_eq!(repaired.content, closed.content, "{json}");
+            #[cfg(feature = "metadata")]
+            assert_eq!(
+                repaired
+                    .metadata
+                    .structured_data
+                    .iter()
+                    .map(|item| &item.raw_json)
+                    .collect::<Vec<_>>(),
+                closed
+                    .metadata
+                    .structured_data
+                    .iter()
+                    .map(|item| &item.raw_json)
+                    .collect::<Vec<_>>()
+            );
+        }
+    }
+}
+
+#[cfg(feature = "metadata")]
+#[test]
+fn should_keep_original_head_metadata_bytes_when_preserving_repaired_scripts() {
+    for json in [r#"{"a":"b & c"}"#, r#"{"a":"&lt; &amp; 雪"}"#] {
+        let options = ConversionOptions {
+            preserve_tags: vec!["script".into()],
+            extract_metadata: true,
+            ..Default::default()
+        };
+        let input = format!("<head><script type='application/ld+json'>{json}");
+        let repaired = convert(&format!("{input}</head><p>tail</p>"), options.clone()).expect("repaired head metadata");
+        let closed = convert(&format!("{input}</script></head><p>tail</p>"), options).expect("closed head metadata");
+        assert_eq!(closed.metadata.structured_data.len(), 1, "{json}");
+        assert_eq!(repaired.metadata.structured_data.len(), 1, "{json}");
+        assert_eq!(
+            repaired.metadata.structured_data[0].raw_json, json,
+            "original repaired head bytes: {json}"
+        );
+        assert_eq!(repaired.content, closed.content, "{json}");
+    }
+}
+
+#[test]
+fn should_keep_literal_script_openers_entities_and_unicode_in_repaired_preserved_bodies() {
+    let json = r#"{"a":"<script> &lt; &amp; 雪"}"#;
+    for output_format in [OutputFormat::Markdown, OutputFormat::Djot] {
+        for tier_strategy in ROUTES {
+            let options = ConversionOptions {
+                preserve_tags: vec!["script".into()],
+                ..options(tier_strategy, output_format, true)
+            };
+            let converted = convert(
+                &format!("<script type='application/ld+json'>{json}<p>tail</p>"),
+                options,
+            )
+            .expect("preserved repaired script");
+            assert_eq!(
+                converted.content.as_deref(),
+                Some(format!("<script type=\"application/ld+json\">{json}</script>\n\ntail\n").as_str())
+            );
+        }
+    }
+}
+
+#[test]
+fn should_keep_repaired_script_bytes_across_document_head_and_body_prefixes() {
+    for (prefix, suffix, in_head) in [
+        ("", "", false),
+        ("<head>", "</head>", true),
+        ("<html><head>", "</head></html>", true),
+        ("<html>", "</html>", false),
+        ("<!doctype html><html>", "</html>", false),
+        ("<title>prefix</title>", "", false),
+        ("<body>", "</body>", false),
+        ("<body><p>prefix</p><head>", "</head></body>", true),
+    ] {
+        for json in [
+            r#"{"a":"b & c"}"#,
+            r#"{"a":"&lt; &amp; 雪"}"#,
+            r#"{"a":"<script> &lt; &amp; 雪"}"#,
+        ] {
+            for tier_strategy in ROUTES {
+                let converted = convert(
+                    &format!("{prefix}<script type='application/ld+json'>{json}{suffix}<p>tail</p>"),
+                    ConversionOptions {
+                        preserve_tags: vec!["script".into()],
+                        ..options(tier_strategy, OutputFormat::Markdown, true)
+                    },
+                )
+                .expect("repaired document prefix");
+                let content = converted.content.as_deref().expect("content");
+                assert!(content.ends_with("tail\n"), "{prefix}: {content}");
+                if !in_head {
+                    assert!(
+                        content.contains(&format!("<script type=\"application/ld+json\">{json}</script>")),
+                        "{prefix}: {content}"
+                    );
+                }
+                #[cfg(feature = "metadata")]
+                {
+                    assert_eq!(
+                        converted.metadata.structured_data.len(),
+                        usize::from(in_head),
+                        "{prefix}"
+                    );
+                    if in_head {
+                        assert_eq!(converted.metadata.structured_data[0].raw_json, json, "{prefix}");
+                    }
+                }
+            }
+        }
+    }
+}

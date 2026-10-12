@@ -5,6 +5,7 @@ use std::cell::{Cell, RefCell};
 use std::collections::{HashMap, HashSet};
 
 use super::markup::find_tag_end;
+use super::preserved_bodies::PreservedBodies;
 
 use html5ever::LocalName;
 use html5ever::tendril::StrTendril;
@@ -80,45 +81,6 @@ impl NamespaceStack {
         while self.len() > length {
             self.pop();
         }
-    }
-}
-
-#[derive(Default)]
-struct PreservedBodies {
-    originals: HashMap<String, String>,
-    occupied: HashSet<usize>,
-    next: usize,
-}
-
-const BODY_MARKER_PREFIX: &str = "h2m_inert_body_";
-
-impl PreservedBodies {
-    fn new(source: &str) -> Self {
-        let decoded = crate::text::decode_html_entities_cow(source);
-        let source = decoded.as_ref();
-        let occupied = source
-            .match_indices(BODY_MARKER_PREFIX)
-            .filter_map(|(index, _)| {
-                let rest = &source[index + BODY_MARKER_PREFIX.len()..];
-                let digits = rest.bytes().take_while(u8::is_ascii_digit).count();
-                rest.get(digits..).filter(|suffix| suffix.starts_with("_end"))?;
-                rest[..digits].parse().ok()
-            })
-            .collect();
-        Self {
-            occupied,
-            ..Self::default()
-        }
-    }
-
-    fn protect(&mut self, body: &str) -> String {
-        while self.occupied.contains(&self.next) {
-            self.next += 1;
-        }
-        let marker = format!("{BODY_MARKER_PREFIX}{}_end", self.next);
-        self.next += 1;
-        self.originals.insert(marker.clone(), body.to_owned());
-        marker
     }
 }
 
@@ -684,17 +646,22 @@ pub(super) fn scan_markup_end(bytes: &[u8], start: usize) -> Option<usize> {
 }
 
 /// Restore opaque source bytes after parsing, before metadata or visitor consumers see the DOM. ~keep
-pub fn restore_inert_bodies(dom: &mut tl::VDom<'_>, originals: &HashMap<String, String>) -> crate::error::Result<()> {
-    for node in dom.nodes_mut() {
+pub fn restore_inert_bodies(
+    dom: &mut tl::VDom<'_>,
+    originals: &HashMap<String, String>,
+) -> crate::error::Result<HashSet<usize>> {
+    let mut restored = HashSet::new();
+    for (id, node) in dom.nodes_mut().iter_mut().enumerate() {
         if let Some(raw) = node.as_raw_mut()
             && let Some(original) = originals.get(raw.as_utf8_str().as_ref())
         {
             raw.set(original.as_bytes().to_vec()).map_err(|error| {
                 crate::error::ConversionError::Other(format!("restoring inert HTML source bytes: {error:?}"))
             })?;
+            restored.insert(id);
         }
     }
-    Ok(())
+    Ok(restored)
 }
 
 #[cfg(test)]

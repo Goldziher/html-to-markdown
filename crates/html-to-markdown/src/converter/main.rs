@@ -34,11 +34,13 @@ use crate::converter::block::container::HandlerContext;
 use crate::error::Result;
 use crate::options::ConversionOptions;
 
-use crate::converter::context::{Context, ContextParameters, InlineCollectorHandle};
+use crate::converter::context::{Context, InlineCollectorHandle};
 use crate::types::structure_collector::StructureCollectorHandle;
 
+mod context_setup;
 mod parse;
 mod table_parts;
+use self::context_setup::create_conversion_context;
 use self::parse::{ParseOutcome, parse_for_conversion};
 use self::table_parts::{is_table_part, walk_table_parts};
 
@@ -69,17 +71,9 @@ pub fn convert_html_impl(
     options: &ConversionOptions,
     parameters: ConversionParameters<'_>,
 ) -> Result<ConversionOutput> {
-    let ConversionParameters {
-        inert_bodies,
-        inline_collector,
-        #[cfg(feature = "metadata")]
-        metadata_collector,
-        #[cfg(feature = "visitor")]
-        visitor,
-        structure_collector,
-        base_url,
-        document_base_href,
-    } = parameters;
+    let inert_bodies = parameters.inert_bodies;
+    let structure_collector = parameters.structure_collector.as_ref().map(std::rc::Rc::clone);
+    let document_base_href = parameters.document_base_href;
     let preserve_menu = options.preserve_tags.iter().any(|tag| tag.eq_ignore_ascii_case("menu"));
     let mut preprocessed = prepare_html(html, preserve_menu);
     let mut attempted_misnest_repair = false;
@@ -90,10 +84,13 @@ pub fn convert_html_impl(
         };
         preprocessed = repaired;
     };
-    if !inert_bodies.is_empty() {
-        crate::converter::utility::preprocessing::restore_inert_bodies(&mut dom, inert_bodies)?;
+    let literal_body_ids = if inert_bodies.is_empty() {
+        HashSet::new()
+    } else {
+        let ids = crate::converter::utility::preprocessing::restore_inert_bodies(&mut dom, inert_bodies)?;
         dom_ctx = crate::converter::utility::caching::build_dom_context(&dom, dom.parser(), preprocessed.len());
-    }
+        ids
+    };
     let preprocessed_len = preprocessed.len();
     trace_parse_complete(&dom, preprocessed_len);
     let parser = dom.parser();
@@ -105,25 +102,13 @@ pub fn convert_html_impl(
         options,
         document_base_href,
         #[cfg(feature = "metadata")]
-        metadata_collector.as_ref(),
+        parameters.metadata_collector.as_ref(),
     );
     output.push_str(&frontmatter);
 
     let reference_collector = create_reference_collector(options);
 
-    let mut ctx = Context::new(
-        options,
-        ContextParameters {
-            inline_collector,
-            #[cfg(feature = "metadata")]
-            metadata_collector,
-            #[cfg(feature = "visitor")]
-            visitor,
-            structure_collector: structure_collector.as_ref().map(std::rc::Rc::clone),
-            reference_collector: reference_collector.as_ref().map(std::rc::Rc::clone),
-            base_url,
-        },
-    );
+    let mut ctx = create_conversion_context(options, parameters, reference_collector.as_ref(), literal_body_ids);
 
     apply_exclusions(&dom, options, &mut ctx);
     walk_document(&dom, parser, &mut output, options, &ctx, &dom_ctx);

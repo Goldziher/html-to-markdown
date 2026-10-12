@@ -4,6 +4,7 @@ mod inert;
 mod lists;
 mod markup;
 mod menu;
+mod preserved_bodies;
 mod raw_text;
 mod structured_data;
 mod visibility;
