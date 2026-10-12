@@ -185,6 +185,32 @@ fn markdown_block_prefix_len(block: &str) -> usize {
     digits_start
 }
 
+fn blank_break_content<'a>(
+    content: &'a str,
+    after_breaks: &'a str,
+    output: &str,
+    drop_at_paragraph_start: bool,
+    options: &ConversionOptions,
+) -> &'a str {
+    // ~keep Paragraph starts drop the break (#572); detached scratch buffers retain its
+    // ~keep sentinel (#504). A leading break before only blank text keeps the old separator.
+    if drop_at_paragraph_start {
+        after_breaks
+    } else if after_breaks.len() < content.len() && !content.ends_with('\n') {
+        " "
+    } else if output.is_empty()
+        && content.ends_with('\n')
+        && content
+            .trim_end_matches(crate::converter::main_helpers::hard_break_marker(options))
+            .chars()
+            .all(crate::converter::utility::white_space::is_collapsible)
+    {
+        &content[content.len() - 1..]
+    } else {
+        content
+    }
+}
+
 fn move_leading_hard_breaks<'a>(
     output: &mut String,
     content: &'a str,
@@ -215,26 +241,8 @@ fn move_leading_hard_breaks<'a>(
     let drop_at_paragraph_start = ctx.in_paragraph
         && output.len() == ctx.block_content_start
         && std::ptr::from_ref::<String>(output) as usize == ctx.block_output_ptr;
-    // ~keep A break-only wrapper at the paragraph start has no preceding line (#572).
-    // ~keep An empty enclosing scratch buffer owes a separator for a break-only child (#504).
-    // ~keep A leading break followed only by blank text collapses to the old separator,
-    // ~keep including Backslash style; retaining its slash creates empty emphasis marks.
     if after_breaks.trim().is_empty() {
-        return if drop_at_paragraph_start {
-            after_breaks
-        } else if after_breaks.len() < content.len() && !content.ends_with('\n') {
-            " "
-        } else if output.is_empty()
-            && content.ends_with('\n')
-            && content
-                .trim_end_matches(crate::converter::main_helpers::hard_break_marker(options))
-                .chars()
-                .all(crate::converter::utility::white_space::is_collapsible)
-        {
-            &content[content.len() - 1..]
-        } else {
-            content
-        };
+        return blank_break_content(content, after_breaks, output, drop_at_paragraph_start, options);
     }
 
     let mut remaining = content;
@@ -273,6 +281,32 @@ fn move_leading_hard_breaks<'a>(
     remaining
 }
 
+fn emit_break_sentinel(
+    output: &mut String,
+    content: &str,
+    open: &str,
+    ctx: &Context,
+    options: &ConversionOptions,
+) -> bool {
+    // ~keep Transparent nested strong wrappers transport the sentinel until the owning block
+    // ~keep can emit it; collapsing it in a scratch buffer loses a break at every extra depth.
+    let owns_block = std::ptr::from_ref::<String>(output) as usize == ctx.block_output_ptr;
+    if content != "\n" || (!open.is_empty() && !owns_block) {
+        return false;
+    }
+    // ~keep Prior paragraphs may make the shared buffer nonempty while this block still has
+    // ~keep no line to break; only detached buffers transport that leading sentinel outward.
+    if owns_block && output.len() == ctx.block_content_start {
+        return false;
+    }
+    output.push_str(if owns_block {
+        crate::converter::main_helpers::hard_break_marker(options)
+    } else {
+        "\n"
+    });
+    true
+}
+
 /// Emit `content` wrapped in `delimiters`, handling delimiter-run adjacency with a preceding
 /// sibling and a body that is non-empty but entirely whitespace.
 pub fn emit_wrapped_inline(
@@ -299,14 +333,7 @@ pub fn emit_wrapped_inline(
 
     let content = move_leading_hard_breaks(output, content, ctx, options);
     let (prefix, suffix, trimmed) = chomp_inline(content);
-    // ~keep A bare newline from a direct div wrapper is a real break after existing content.
-    // ~keep Nested scratch buffers still reduce their bare sentinel to the #504 separator.
-    if content == "\n"
-        && !output.is_empty()
-        && !ctx.in_paragraph
-        && std::ptr::from_ref::<String>(output) as usize == ctx.block_output_ptr
-    {
-        output.push_str(crate::converter::main_helpers::hard_break_marker(options));
+    if emit_break_sentinel(output, content, open, ctx, options) {
         return;
     }
     // ~keep A noncollapsible blank body after an existing space keeps its character (#843).

@@ -226,6 +226,43 @@ fn emit_open(
     emit_open_kind(state, spec, name_lower, attrs, table_probes, options)
 }
 
+const fn is_block_open_kind(spec: &TagSpec) -> bool {
+    matches!(
+        spec.kind,
+        TagKind::Block
+            | TagKind::Paragraph
+            | TagKind::Heading(_)
+            | TagKind::Blockquote
+            | TagKind::Pre
+            | TagKind::List(_)
+            | TagKind::Table
+            | TagKind::Summary
+            | TagKind::DefinitionTerm
+            | TagKind::DefinitionDescription
+    )
+}
+
+fn validate_code_open(state: &Tier1State, spec: &TagSpec, is_link_block: bool) -> Result<(), BailReason> {
+    // ~keep In code (`<pre>`, `<code>`, `<kbd>`, `<samp>`) Tier-2 writes a link label as it did
+    // ~keep before the rules of running text. This scanner trims the label, so it leaves the
+    // ~keep page to Tier-2. A block inside pre writes the same lines in both converters.
+    let in_code = state.escape_ctx.intersects(EscapeCtx::CODE | EscapeCtx::PRE);
+    if in_code && matches!(spec.kind, TagKind::Link) {
+        return Err(BailReason::Classifier);
+    }
+    // ~keep A block can close or reconstruct code-like elements in the HTML tree (#842).
+    // ~keep The scanner's source stack cannot reproduce that DOM, so leave it to Tier-2.
+    // ~keep Headings and cells fold block boundaries inline; their existing code-span paths agree.
+    if is_link_block
+        && in_code
+        && !state.escape_ctx.intersects(EscapeCtx::PRE | EscapeCtx::HEADING)
+        && !state.in_table_cell()
+    {
+        return Err(BailReason::Classifier);
+    }
+    Ok(())
+}
+
 fn prepare_open_state(
     state: &mut Tier1State,
     spec: &TagSpec,
@@ -266,39 +303,11 @@ fn prepare_open_state(
     if matches!(name_lower, b"select" | b"option" | b"optgroup" | b"datalist") {
         return Err(BailReason::FormControl);
     }
-    let is_link_block = matches!(
-        spec.kind,
-        TagKind::Block
-            | TagKind::Paragraph
-            | TagKind::Heading(_)
-            | TagKind::Blockquote
-            | TagKind::Pre
-            | TagKind::List(_)
-            | TagKind::Table
-            | TagKind::Summary
-            | TagKind::DefinitionTerm
-            | TagKind::DefinitionDescription
-    );
+    let is_link_block = is_block_open_kind(spec);
     if is_link_block && state.stack.iter().any(|frame| matches!(frame.spec.kind, TagKind::Link)) {
         return Err(BailReason::Classifier);
     }
-    // ~keep In code (`<pre>`, `<code>`, `<kbd>`, `<samp>`) Tier-2 writes a link label as it did
-    // ~keep before the rules of running text. This scanner trims the label, so it leaves the
-    // ~keep page to Tier-2. A block inside pre writes the same lines in both converters.
-    let in_code = state.escape_ctx.intersects(EscapeCtx::CODE | EscapeCtx::PRE);
-    if in_code && matches!(spec.kind, TagKind::Link) {
-        return Err(BailReason::Classifier);
-    }
-    // ~keep A block can close or reconstruct code-like elements in the HTML tree (#842).
-    // ~keep The scanner's source stack cannot reproduce that DOM, so leave it to Tier-2.
-    // ~keep Headings and cells fold block boundaries inline; their existing code-span paths agree.
-    if is_link_block
-        && in_code
-        && !state.escape_ctx.intersects(EscapeCtx::PRE | EscapeCtx::HEADING)
-        && !state.in_table_cell()
-    {
-        return Err(BailReason::Classifier);
-    }
+    validate_code_open(state, spec, is_link_block)?;
     // ~keep A block inside marks inside a heading (`<h2>one<b><p>y</p></b>two</h2>`): Tier-2
     // ~keep writes the block boundary as one space after the closing marks (issue #751). This
     // ~keep scanner closes the marks before it knows what follows, so it leaves the page to Tier-2.

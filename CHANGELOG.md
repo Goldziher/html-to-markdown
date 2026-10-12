@@ -9,8 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- Inline break-only wrappers retain a real break inside a div or after a nested no-break space,
-  including after earlier paragraphs (#863). A leading Backslash break followed only by blank
+- Inline break-only wrappers retain a real break after text inside a div or after a nested
+  no-break space, including through transparent nested strong wrappers and after earlier
+  paragraphs (#863). A leading Backslash break followed only by blank
   text collapses to the existing separator instead of emitting empty emphasis marks. A quote
   containing only those artificial marks now matches Spaces style and is omitted; quotes with
   real text keep their structure. Form-feed-only marked bodies retain the form feed outside the

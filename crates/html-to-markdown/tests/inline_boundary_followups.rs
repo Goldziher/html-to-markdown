@@ -281,3 +281,105 @@ fn should_keep_existing_empty_quote_and_nonempty_quote_contracts() {
         }
     }
 }
+
+#[test]
+fn should_keep_a_break_through_nested_strong_buffers() {
+    assert_routes("<p>x</p><p>a<b><b><br></b></b>b</p>", "x\n\na  \nb\n");
+    assert_routes("<p>a<b><b> <br></b></b>b</p>", "a  \nb\n");
+}
+
+#[test]
+fn should_keep_a_break_through_three_nbsp_only_strong_buffers() {
+    assert_routes("<p>a<b><b><b>&nbsp;<br></b></b></b>b</p>", "a  \nb\n");
+}
+
+#[test]
+fn should_keep_breaks_through_transparent_strong_wrappers_at_each_depth() {
+    let mut rows = 0;
+    for (style, separator) in [(NewlineStyle::Spaces, "  \n"), (NewlineStyle::Backslash, "\\\n")] {
+        let bodies: &[&str] = if style == NewlineStyle::Spaces {
+            &["<br>", " <br>", "&nbsp;<br>"]
+        } else {
+            &["<br>"]
+        };
+        for depth in 1..=8 {
+            for body in bodies {
+                let nested = format!("{}{body}{}", "<b>".repeat(depth), "</b>".repeat(depth));
+                for (html, prefix) in [
+                    (format!("<p>a{nested}b</p>"), "a"),
+                    (format!("<p>x</p><p>a{nested}b</p>"), "x\n\na"),
+                    (format!("<p>x</p><div>a{nested}b</div>"), "x\n\na"),
+                ] {
+                    assert_routes_with_newlines(&html, &format!("{prefix}{separator}b\n"), style);
+                    rows += 1;
+                }
+            }
+        }
+    }
+    assert_eq!(rows, 96);
+}
+
+#[test]
+fn should_preserve_the_intended_after_space_nbsp_class_across_block_contexts() {
+    let mut rows = 0;
+    for tag in ["em", "b", "strong", "i", "span"] {
+        for entity in ["&nbsp;", "&#160;", "&#xA0;", "\u{a0}"] {
+            let body = format!("a <{tag}>{entity}</{tag}> b");
+            for (html, expected) in [
+                (format!("<p>{body}</p>"), "a \u{a0} b\n"),
+                (format!("<h2>{body}</h2>"), "## a \u{a0} b\n"),
+                (
+                    format!("<table><tr><td>{body}</td></tr></table>"),
+                    "| a \u{a0} b |\n| ----- |\n",
+                ),
+            ] {
+                assert_routes(&html, expected);
+                rows += 1;
+            }
+        }
+    }
+    assert_eq!(rows, 60);
+}
+
+#[test]
+fn should_drop_break_only_strong_at_the_owning_blocks_start() {
+    let mut rows = 0;
+    for (tag, prefix, expected_prefix) in [
+        ("p", "", ""),
+        ("div", "", ""),
+        ("p", "<p>x</p>", "x\n\n"),
+        ("div", "<p>x</p>", "x\n\n"),
+    ] {
+        for depth in 1..=8 {
+            let html = format!(
+                "{prefix}<{tag}>{}<br>{}word</{tag}>",
+                "<b>".repeat(depth),
+                "</b>".repeat(depth)
+            );
+            for style in [NewlineStyle::Spaces, NewlineStyle::Backslash] {
+                // ~keep The fast converter already differs on leading div breaks; preserve the
+                // ~keep full converter's established contract without changing that separate policy.
+                for extract_metadata in [false, true] {
+                    let result = convert(
+                        &html,
+                        ConversionOptions {
+                            tier_strategy: TierStrategy::Tier2,
+                            extract_metadata,
+                            newline_style: style,
+                            highlight_style: HighlightStyle::None,
+                            ..Default::default()
+                        },
+                    )
+                    .expect("full conversion");
+                    assert_eq!(
+                        result.content.as_deref(),
+                        Some(format!("{expected_prefix}word\n").as_str()),
+                        "{html:?}, {style:?}, metadata={extract_metadata}"
+                    );
+                }
+                rows += 1;
+            }
+        }
+    }
+    assert_eq!(rows, 64);
+}
