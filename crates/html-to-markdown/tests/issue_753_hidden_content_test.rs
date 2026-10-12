@@ -988,4 +988,3 @@ fn should_step_over_a_structured_data_script_that_holds_template_tags() {
 }
 
 include!("support/issue_753_word_order.rs");
-include!("support/issue_753_named_limit.rs");

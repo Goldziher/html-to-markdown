@@ -249,6 +249,43 @@ fn should_write_every_word_of_a_narrower_choice_on_the_recorded_pages() {
     report(&failures, total);
 }
 
+#[test]
+fn should_take_the_tree_builder_under_a_wider_choice_when_a_narrower_choice_takes_it() {
+    // ~keep The image is in the `<head>` as written, and the walk writes no image of a head. The
+    // ~keep tree builder moves it to the body. Under a narrower choice an element with no end
+    // ~keep tag, or an end tag that the first parse discarded, asks for the tree builder. A wider
+    // ~keep choice removes that tag and takes the tree builder all the same.
+    let image = "![A](p.gif)\n";
+    let both = "![A](p.gif)\n\nEnd\n";
+    for (html, expected) in [
+        (
+            r#"<head><img src="p.gif" alt="A"><template></head><p>End</p>"#,
+            [image, image, both],
+        ),
+        (
+            r#"<head><img src="p.gif" alt="A"><TEMPLATE shadowrootmode="open"></head><p>End</p>"#,
+            [image, both, both],
+        ),
+        (
+            r#"<head><img src="p.gif" alt="A"><noscript></head><p>End</p>"#,
+            [image, image, both],
+        ),
+        (
+            r#"<head><img src="p.gif" alt="A"></head><template><p>End</p>"#,
+            [image, image, both],
+        ),
+        (
+            r#"<head><img src="p.gif" alt="A"></head><div><template></div></template><p>End</p>"#,
+            [both, both, both],
+        ),
+    ] {
+        assert_eq!(all_choices(html), expected, "{html}");
+    }
+    // ~keep No choice sends this page to the tree builder, so it converts as it did before.
+    let html = r#"<head><img src="p.gif" alt="A"></head><p>End</p><template><p>IN</p></template>"#;
+    assert_eq!(all_choices(html), ["End\n", "End\n", "End\n\nIN\n"]);
+}
+
 /// The pieces of the generated documents. `{}` takes a word that no other piece of the document has.
 const PIECES: &[&str] = &[
     "<head>",
@@ -279,42 +316,10 @@ fn generated_document(pieces: &[usize]) -> String {
     html
 }
 
-/// Whether a generated document is of one of the two page classes of the named limit.
-///
-/// ~keep On such a page a wider choice can write less than a narrower one: the tree builder,
-/// ~keep which rebuilds the page, puts the text after an open `<template>` or `<noscript>` and an
-/// ~keep element of the head where the walk does not write it. The two classes are a
-/// ~keep `<template>` or a `<noscript>` start tag that no later end tag of its name closes, and
-/// ~keep an element that is not metadata between a `<head>` tag and the tag that ends that head.
-/// ~keep The generated-document test leaves both out, and
-/// ~keep `should_write_what_the_pages_of_the_named_limit_write_today` holds the pages that it
-/// ~keep found. Both go when the limit goes (the follow-up issue of #753 for these two classes).
-fn is_under_the_named_limit(pieces: &[usize]) -> bool {
-    let mut open = [0_usize; 2];
-    let mut in_head = false;
-    let mut other_element_in_head = false;
-    for piece in pieces {
-        match PIECES[*piece] {
-            "<template>" | r#"<TEMPLATE shadowrootmode="open">"# => open[0] += 1,
-            "</template>" => open[0] = open[0].saturating_sub(1),
-            "<noscript>" => open[1] += 1,
-            "</NOSCRIPT>" => open[1] = open[1].saturating_sub(1),
-            "<head>" => in_head = true,
-            "</head>" | "<body>" => in_head = false,
-            other => {
-                let is_metadata = !["<p>", "<img", "<div"].iter().any(|start| other.starts_with(start));
-                other_element_in_head |= in_head && !is_metadata;
-            }
-        }
-    }
-    other_element_in_head || open != [0, 0]
-}
-
 #[test]
 fn should_write_every_word_of_a_narrower_choice_on_generated_documents() {
     let mut failures = Vec::new();
     let mut total = 0;
-    let mut left_out = 0;
     // ~keep The front matter is metadata, not text: a kept element before the `<head>` tag makes
     // ~keep the head a part of the body, as the same element does when it is not hidden.
     let outputs = |html: &str| {
@@ -330,8 +335,7 @@ fn should_write_every_word_of_a_narrower_choice_on_generated_documents() {
                 .unwrap_or_default()
         })
     };
-    // ~keep Every document of up to three pieces, after nothing and after an open head, but the
-    // ~keep documents under the named limit.
+    // ~keep Every document of up to three pieces, after nothing and after an open head.
     for prefix in [&[][..], &[0][..]] {
         for len in 0..=3u32 {
             for mut code in 0..PIECES.len().pow(len) {
@@ -340,18 +344,13 @@ fn should_write_every_word_of_a_narrower_choice_on_generated_documents() {
                     pieces.push(code % PIECES.len());
                     code /= PIECES.len();
                 }
-                if is_under_the_named_limit(&pieces) {
-                    left_out += 1;
-                    continue;
-                }
                 let html = generated_document(&pieces);
                 total += 2;
                 check_that_no_output_loses_a_word(&mut failures, &html, &outputs(&html));
             }
         }
     }
-    // ~keep Longer documents from a fixed sequence of numbers, half of them after an open head:
-    // ~keep the first 9000 of the sequence that are not under the named limit.
+    // ~keep Longer documents from a fixed sequence of numbers, half of them after an open head.
     let mut state = 0x9E37_79B9_7F4A_7C15_u64;
     let mut next = |bound: usize| {
         state = state
@@ -359,28 +358,15 @@ fn should_write_every_word_of_a_narrower_choice_on_generated_documents() {
             .wrapping_add(1_442_695_040_888_963_407);
         usize::try_from(state >> 33).unwrap_or(0) % bound
     };
-    let mut longer = 0;
-    for document in 0.. {
-        if longer == 9000 {
-            break;
-        }
+    for document in 0..6000 {
         let mut pieces = if document % 2 == 0 { vec![0] } else { Vec::new() };
         for _ in 0..4 + next(9) {
             pieces.push(next(PIECES.len()));
         }
-        if is_under_the_named_limit(&pieces) {
-            left_out += 1;
-            continue;
-        }
-        longer += 1;
         let html = generated_document(&pieces);
         total += 2;
         check_that_no_output_loses_a_word(&mut failures, &html, &outputs(&html));
     }
     assert!(total > 25_000, "only {total} checks");
-    println!(
-        "{} generated documents are checked and {left_out} are left out",
-        total / 2
-    );
     report(&failures, total);
 }

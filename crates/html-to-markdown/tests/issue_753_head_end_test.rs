@@ -357,6 +357,49 @@ fn should_read_a_template_and_a_noscript_of_a_head_with_no_head_tag_as_metadata(
     assert_none(&wrong);
 }
 
+// ~keep The head repair rebuilds a page whose `<title>` is in no `<head>` element (issue #816)
+// ~keep and a page with head content before its `<head>` tag (issue #592). The tree builder
+// ~keep writes no content of a `<template>` back, so the tags of a kept element are removed
+// ~keep before it reads the page.
+#[test]
+fn should_keep_the_hidden_content_of_a_page_that_the_head_repair_rebuilds() {
+    let mut wrong = Vec::new();
+    for (html, unwrapped) in [
+        (
+            "<title>t</title><p>visible</p><template><p>BODY</p></template>",
+            "<title>t</title><p>visible</p><p>BODY</p>",
+        ),
+        (
+            "<title>t</title><p>visible</p><noscript><p>BODY</p></noscript>",
+            "<title>t</title><p>visible</p><p>BODY</p>",
+        ),
+        (
+            "<head></head><title>t</title><body><p>visible</p><template><p>BODY</p></template></body>",
+            "<head></head><title>t</title><body><p>visible</p><p>BODY</p></body>",
+        ),
+        (
+            r#"<meta charset="utf-8"><head></head><body><p>visible</p><template><p>BODY</p></template></body>"#,
+            r#"<meta charset="utf-8"><head></head><body><p>visible</p><p>BODY</p></body>"#,
+        ),
+    ] {
+        wrong.extend(wrong_after_the_head(html, unwrapped));
+    }
+    assert_none(&wrong);
+
+    let template = "<title>t</title><p>visible</p><template><p>BODY</p></template>";
+    let shadow_root =
+        r#"<title>t</title><p>visible</p><div><template shadowrootmode="open"><p>BODY</p></template></div>"#;
+    let (visible, kept) = (format!("{TITLE}\nvisible\n"), format!("{TITLE}\nvisible\n\nBODY\n"));
+    let (visible, kept) = (visible.as_str(), kept.as_str());
+    for tier in DOM_TIERS {
+        let outputs = |html: &str| {
+            [HiddenContent::Drop, HiddenContent::Reachable, HiddenContent::All].map(|c| convert_in(html, c, tier))
+        };
+        assert_eq!(outputs(template), [visible, visible, kept], "{tier:?}");
+        assert_eq!(outputs(shadow_root), [visible, kept, kept], "{tier:?}");
+    }
+}
+
 // ~keep A fragment has no head: a `<template>` or a `<noscript>` that nothing of a document
 // ~keep precedes is content, and so is one after an element whose name only starts like the name
 // ~keep of a metadata element.

@@ -147,7 +147,7 @@ fn prepare_conversion<'a>(html: &'a str, options: &ConversionOptions) -> Result<
     // ~keep `<head>` (issue #816); browsers place that content in the implicit head.
     let normalized_input = normalize_input(html)?;
     let (normalized_html, head_repair_limit) =
-        crate::converter::repair_head_content_outside_head(normalized_input.as_ref())
+        crate::converter::repair_head_content_outside_head(normalized_input.as_ref(), options.hidden_content)
             .map_or((normalized_input, None), |(html, limit)| (Cow::Owned(html), limit));
     let document_base_href = (options.base_url.is_some() || options.extract_metadata)
         .then(|| crate::converter::url_resolve::document_base_href(&normalized_html))

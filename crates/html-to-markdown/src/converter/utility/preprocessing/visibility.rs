@@ -962,35 +962,15 @@ mod tag_ends_tests {
                 HiddenContent::Reachable,
                 "<div><template/><p>x</p></template></div>",
             ),
-        ] {
-            assert_eq!(unwrap_kept_inert_elements(page, choice), expected, "{page:?}");
-        }
-    }
-
-    #[test]
-    fn should_write_the_text_after_a_template_start_tag_that_closes_itself() {
-        // ~keep A start tag that closes itself opens nothing. With an entry for it, the end tag
-        // ~keep of the first page is removed alone: its `<template>` stays, holds the rest of
-        // ~keep the page, and `reachable` writes no `X`.
-        for (page, expected) in [
+            // ~keep With an entry for the start tag that closes itself, the end tag is removed
+            // ~keep alone: the `<template>` stays and holds the rest of the page.
             (
                 "<template><p>IN</p><template shadowrootmode=\"open\"/></template><p>X</p>",
-                ["X\n", "X\n", "IN\n\nX\n"],
-            ),
-            (
-                "<div><template shadowrootmode=\"open\"><template/></template><p>X</p></template></div>",
-                ["X\n"; 3],
+                HiddenContent::Reachable,
+                "<template><p>IN</p></template><p>X</p>",
             ),
         ] {
-            let choices = [HiddenContent::Drop, HiddenContent::Reachable, HiddenContent::All];
-            for (hidden_content, expected) in choices.into_iter().zip(expected) {
-                let options = crate::ConversionOptions {
-                    hidden_content,
-                    ..crate::ConversionOptions::default()
-                };
-                let result = crate::convert(page, options).expect("convert HTML");
-                assert_eq!(result.content.as_deref(), Some(expected), "{page:?} {hidden_content:?}");
-            }
+            assert_eq!(unwrap_kept_inert_elements(page, choice), expected, "{page:?}");
         }
     }
 

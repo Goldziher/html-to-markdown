@@ -89,14 +89,14 @@ pub fn convert_html_impl(
     } = parameters;
     let preserve_menu = options.preserve_tags.iter().any(|tag| tag.eq_ignore_ascii_case("menu"));
     let hidden_content = options.hidden_content;
-    let (preprocessed, prepare_limit) = prepare_html(html, preserve_menu, hidden_content);
+    let (preprocessed, prepare_limit, as_written) = prepare_html(html, preserve_menu, hidden_content);
     let repaired_page = std::cell::OnceCell::new();
     let ParsedPage {
         dom,
         dom_ctx,
         len: preprocessed_len,
         repair_limit,
-    } = parse_for_conversion(&preprocessed, &repaired_page, preserve_menu, hidden_content)?;
+    } = parse_for_conversion(&preprocessed, &repaired_page, preserve_menu, hidden_content, as_written)?;
     let repair_warning = repair_limit.or(prepare_limit).or(head_repair_limit);
     trace_parse_complete(&dom, preprocessed_len);
     let parser = dom.parser();
@@ -374,16 +374,20 @@ fn document_language_and_direction(
     (language, direction)
 }
 
+/// The page that the first parse reads, the limit that the repair of custom elements reached,
+/// and `html` when that repair did not run: the page as written, which the tree builder has
+/// not read.
 fn prepare_html(
     html: &str,
     preserve_menu: bool,
     hidden_content: HiddenContent,
-) -> (String, Option<crate::types::WarningKind>) {
+) -> (String, Option<crate::types::WarningKind>, Option<&str>) {
     let preprocessed = preprocess_initial_html(html, preserve_menu, hidden_content);
     if has_custom_element_tags(&preprocessed) {
-        return repair_custom_elements(preprocessed, preserve_menu, hidden_content);
+        let (repaired, limit) = repair_custom_elements(preprocessed, preserve_menu, hidden_content);
+        return (repaired, limit, None);
     }
-    (preprocessed, None)
+    (preprocessed, None, Some(html))
 }
 
 /// Remove the elements that the `hidden` attribute or an inline style hides, unless the caller
