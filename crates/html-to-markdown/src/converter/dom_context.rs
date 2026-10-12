@@ -65,15 +65,10 @@ pub struct DomContext {
     pub(crate) node_map: Vec<Option<tl::NodeHandle>>,
     pub(crate) tag_info_map: Vec<OnceCell<Option<TagInfo>>>,
     pub(crate) next_inline_like_map: Vec<OnceCell<bool>>,
+    pub(crate) prev_tag_map: Vec<OnceCell<Option<u32>>>,
     pub(crate) next_tag_map: Vec<OnceCell<Option<u32>>>,
     pub(crate) next_whitespace_map: Vec<OnceCell<bool>>,
     pub(crate) table_content_summary_cache: RefCell<HashMap<u32, TableContentSummary>>,
-}
-
-/// A script or a style element draws nothing. The white space on its two sides is read as if the
-/// element were not there.
-pub fn draws_nothing(name: &str) -> bool {
-    matches!(name, "script" | "style")
 }
 
 impl DomContext {
@@ -87,6 +82,7 @@ impl DomContext {
             self.node_map.resize(new_len, None);
             self.tag_info_map.resize_with(new_len, OnceCell::new);
             self.next_inline_like_map.resize_with(new_len, OnceCell::new);
+            self.prev_tag_map.resize_with(new_len, OnceCell::new);
             self.next_tag_map.resize_with(new_len, OnceCell::new);
             self.next_whitespace_map.resize_with(new_len, OnceCell::new);
         }
@@ -159,9 +155,6 @@ impl DomContext {
 
                 for sibling in siblings.iter().skip(position + 1) {
                     if let Some(info) = self.tag_info(sibling.get_inner(), parser) {
-                        if draws_nothing(&info.name) {
-                            continue;
-                        }
                         return info.is_inline_like;
                     }
                     if let Some(tl::Node::Raw(raw)) = sibling.get(parser) {

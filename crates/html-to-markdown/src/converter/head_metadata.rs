@@ -56,9 +56,5 @@ pub fn extract_frontmatter(
     // ~keep key names / casing / value normalisation byte-for-byte.
     let metadata = extract_head_metadata(dom.children(), dom.parser(), options, document_base_href);
 
-    if metadata.is_empty() {
-        return None;
-    }
-
-    Some(format_metadata_frontmatter(&metadata))
+    format_metadata_frontmatter(&metadata)
 }

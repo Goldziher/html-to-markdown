@@ -471,11 +471,99 @@ fn an_apostrophe_in_an_unquoted_attribute_value_opens_no_quote() {
 fn a_raw_text_start_tag_with_no_end_tag_follows_one_rule_in_every_spelling() {
     let plain = content("<p>a</p><script><p>b</p>", TierStrategy::Tier2);
     assert_eq!(plain, "a\n\nb");
-    for start_tag in ["<script>", "<script data=it's>", "<script\x0C>", "<style>"] {
+    for start_tag in [
+        "<script>",
+        "<script data=it's>",
+        "<script\x0C>",
+        "<style>",
+        "<style media=it's>",
+        "<style\x0C>",
+    ] {
         let html = format!("<p>a</p>{start_tag}<p>b</p>");
         for tier_strategy in [TierStrategy::Auto, TierStrategy::Tier2] {
             assert_eq!(content(&html, tier_strategy), plain, "{tier_strategy:?}: {html:?}");
         }
         assert_eq!(content(&html, TierStrategy::Tier1), "a", "the fast converter: {html:?}");
+    }
+}
+
+/// A `textarea` start tag with no end tag gives one text in every spelling of the start tag.
+#[test]
+fn a_textarea_start_tag_with_no_end_tag_follows_one_rule_in_every_spelling() {
+    for tier_strategy in [TierStrategy::Auto, TierStrategy::Tier2] {
+        let plain = content("<p>a</p><textarea><p>b</p>", tier_strategy);
+        for start_tag in ["<textarea data=it's>", "<textarea\x0C>"] {
+            let html = format!("<p>a</p>{start_tag}<p>b</p>");
+            assert_eq!(content(&html, tier_strategy), plain, "{tier_strategy:?}: {html:?}");
+        }
+    }
+}
+
+/// An `=` and an apostrophe in an attribute value with no quotes are bytes of the value: the
+/// value ends at white space or at `>`. The `textarea` after the link is an element and the
+/// tags inside it are text, as they are with the same value in quotes.
+///
+/// ~keep The full converter only, for the reason given at
+/// ~keep `an_apostrophe_in_an_unquoted_attribute_value_opens_no_quote`.
+#[test]
+fn an_equals_sign_in_an_unquoted_attribute_value_starts_no_value() {
+    let no_quotes = "<a href=/search?q='tis>link</a><textarea><b>x</b></textarea><p>it's after</p>";
+    let quotes = "<a href=\"/search?q='tis\">link</a><textarea><b>x</b></textarea><p>it's after</p>";
+    for tier_strategy in [TierStrategy::Auto, TierStrategy::Tier2] {
+        for html in [no_quotes, quotes] {
+            assert_eq!(
+                content(html, tier_strategy),
+                "[link](/search?q='tis) <b>x</b>\n\nit's after",
+                "{tier_strategy:?}: {html:?}"
+            );
+        }
+    }
+}
+
+/// The forms of a bogus comment: a tokenizer reads each one to its first `>`.
+const BOGUS_COMMENTS: [(&str, &str); 3] = [("<?x ", "?>"), ("<! ", ">"), ("</ ", ">")];
+
+/// The start tag and the end tag of a raw-text element in two bogus comments hold nothing: the
+/// markup between the two comments is read as markup.
+#[test]
+fn a_raw_text_tag_in_each_of_two_bogus_comments_leaves_the_markup_between_them() {
+    for name in ["textarea", "script", "style"] {
+        for (open, close) in BOGUS_COMMENTS {
+            let html = format!("<p>before</p>{open}<{name}>{close}<b>Shown</b>{open}</{name}>{close}<p>after</p>");
+            for tier_strategy in STRATEGIES {
+                let markdown = content(&html, tier_strategy);
+                assert!(
+                    markdown.starts_with("before\n\n") && markdown.contains("**Shown**") && markdown.ends_with("after"),
+                    "{tier_strategy:?}: {html:?}: {markdown:?}"
+                );
+            }
+        }
+    }
+}
+
+/// A `textarea` start tag and its end tag in two CDATA sections hold nothing either.
+#[test]
+fn a_textarea_tag_in_each_of_two_cdata_sections_leaves_the_markup_between_them() {
+    let html = "<p>before</p><![CDATA[<textarea>]]><b>Shown</b><![CDATA[</textarea>]]><p>after</p>";
+    for tier_strategy in STRATEGIES {
+        let markdown = content(html, tier_strategy);
+        assert!(
+            markdown.contains("**Shown**") && markdown.ends_with("after"),
+            "{tier_strategy:?}: {markdown:?}"
+        );
+    }
+}
+
+/// A real `textarea` after a bogus comment that holds a `textarea` start tag is an element:
+/// the tags inside it are text.
+#[test]
+fn a_textarea_after_a_bogus_comment_is_an_element() {
+    let html = "<p>before</p></ <textarea>><b>Shown</b><textarea>x <i>y</i></textarea><p>after</p>";
+    for tier_strategy in STRATEGIES {
+        let markdown = content(html, tier_strategy);
+        assert!(
+            markdown.contains("**Shown**") && markdown.contains("x <i>y</i>") && markdown.ends_with("after"),
+            "{tier_strategy:?}: {markdown:?}"
+        );
     }
 }

@@ -89,6 +89,7 @@ struct PreparedConversion<'a> {
     html: Cow<'a, str>,
     effective_base: Option<std::rc::Rc<url::Url>>,
     metadata_base_href: Option<String>,
+    head_repair_limit: Option<crate::types::WarningKind>,
 }
 
 #[cfg(feature = "metadata")]
@@ -142,10 +143,12 @@ fn validate_input_size(html: &str, max_size: Option<u64>) -> Result<()> {
 
 fn prepare_conversion<'a>(html: &'a str, options: &ConversionOptions) -> Result<PreparedConversion<'a>> {
     // ~keep Both tiers must see the same repaired tree when head content precedes an
-    // ~keep explicit `<head>`; browsers place that content in the implicit head (issue #592).
+    // ~keep explicit `<head>` (issue #592) or a title precedes the body of a page with no
+    // ~keep `<head>` (issue #816); browsers place that content in the implicit head.
     let normalized_input = normalize_input(html)?;
-    let normalized_html = crate::converter::repair_head_content_before_explicit_head(normalized_input.as_ref())
-        .map_or(normalized_input, Cow::Owned);
+    let (normalized_html, head_repair_limit) =
+        crate::converter::repair_head_content_outside_head(normalized_input.as_ref())
+            .map_or((normalized_input, None), |(html, limit)| (Cow::Owned(html), limit));
     let document_base_href = (options.base_url.is_some() || options.extract_metadata)
         .then(|| crate::converter::url_resolve::document_base_href(&normalized_html))
         .flatten();
@@ -163,10 +166,16 @@ fn prepare_conversion<'a>(html: &'a str, options: &ConversionOptions) -> Result<
         html: normalized_html,
         effective_base,
         metadata_base_href,
+        head_repair_limit,
     })
 }
 
 fn try_tier1(prepared: &PreparedConversion<'_>, options: &ConversionOptions) -> Option<ConversionResult> {
+    // ~keep A page on which the head repair reached a limit is not a page for the fast
+    // ~keep converter: the full converter converts it and gives the warning of the limit.
+    if prepared.head_repair_limit.is_some() {
+        return None;
+    }
     let report = crate::converter::prescan::PrescanReport::default();
     match options.tier_strategy {
         crate::options::TierStrategy::Tier2 => None,
@@ -296,6 +305,7 @@ fn call_converter(
             structure_collector: structure,
             base_url: prepared.effective_base.clone(),
             document_base_href: prepared.metadata_base_href.as_deref(),
+            head_repair_limit: prepared.head_repair_limit,
         },
     )
 }

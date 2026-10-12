@@ -1,5 +1,7 @@
 use std::borrow::Cow;
 
+use super::markup::second_pass;
+use super::raw_text::{FirstPass, PassRead, RawTextPage};
 use super::{
     find_closing_tag_bytes, find_closing_tag_bytes_nested, find_tag_end, normalize_bogus_comment_endings,
     normalize_menu_elements, normalize_split_closing_tags, normalize_unclosed_list_items,
@@ -573,20 +575,39 @@ fn find_closing_tag_bytes_stays_first_match_for_raw_text_elements() {
     assert_eq!(&html[end..], b"tail");
 }
 
-/// The reads of the first pass over `input`: the `<` characters, and the searches that can
-/// read to the end of the page.
-fn first_pass_reads(input: &str) -> (usize, usize) {
-    use super::raw_text::{FirstPass, FirstPassRead, RawTextPage};
+/// The reads of a pass over one page that a test counts.
+#[derive(Default)]
+struct Reads {
+    /// The `<` characters that the first pass read.
+    markup: usize,
+    /// The searches for an end tag and for the end of a comment: each can read to the end of
+    /// the page.
+    searches: usize,
+    /// The bytes that the reads of a tag went over.
+    tag_bytes: usize,
+}
 
-    let mut markup = 0;
-    let mut searches = 0;
-    let stripped = FirstPass::new(input, RawTextPage::Source, |read| match read {
-        FirstPassRead::Markup => markup += 1,
-        FirstPassRead::EndTagSearch | FirstPassRead::CommentEndSearch => searches += 1,
-    })
-    .run();
+impl Reads {
+    fn count(&mut self, read: PassRead) {
+        match read {
+            PassRead::Markup => self.markup += 1,
+            PassRead::EndTagSearch | PassRead::CommentEndSearch => self.searches += 1,
+            PassRead::TagRead(bytes) => self.tag_bytes += bytes,
+        }
+    }
+}
+
+fn first_pass_reads(input: &str) -> Reads {
+    let mut reads = Reads::default();
+    let stripped = FirstPass::new(input, RawTextPage::Source, |read| reads.count(read)).run();
     assert_eq!(stripped.as_ref(), input, "nothing in the page has an end");
-    (markup, searches)
+    reads
+}
+
+fn second_pass_reads(input: &str) -> Reads {
+    let mut reads = Reads::default();
+    drop(second_pass(input, |read| reads.count(read)));
+    reads
 }
 
 #[test]
@@ -595,18 +616,73 @@ fn the_first_pass_searches_once_for_an_end_that_the_page_does_not_have() {
     // ~keep The `>` in the comment unit keeps the comments before the last `>` of the page.
     for unit in ["<textarea>x ", "<script>x ", "<style>x ", "<!-- x> "] {
         let html = format!("<p>start</p>{}", unit.repeat(STARTS));
-        let (markup, searches) = first_pass_reads(&html);
-        assert_eq!(searches, 1, "{unit:?}: one search, not one for each start");
-        assert!(markup <= STARTS + 2, "{unit:?}: {markup} reads");
+        let reads = first_pass_reads(&html);
+        assert_eq!(reads.searches, 1, "{unit:?}: one search, not one for each start");
+        assert!(reads.markup <= STARTS + 2, "{unit:?}: {} reads", reads.markup);
     }
     let mixed = format!("<p>start</p>{}", "<textarea>x <script>x <style>x ".repeat(STARTS));
-    assert_eq!(first_pass_reads(&mixed).1, 3, "one search for each name");
+    assert_eq!(first_pass_reads(&mixed).searches, 3, "one search for each name");
 }
 
 #[test]
 fn the_first_pass_reads_nothing_after_the_last_tag_end_of_the_page() {
     for unit in ["<textarea x ", "<script x ", "<a x ", "<svg x ", "</svg x "] {
         let html = format!("<p>start</p>{}", unit.repeat(2_000));
-        assert_eq!(first_pass_reads(&html), (2, 0), "{unit:?}");
+        let reads = first_pass_reads(&html);
+        assert_eq!((reads.markup, reads.searches), (2, 0), "{unit:?}");
     }
+}
+
+#[test]
+fn the_second_pass_searches_once_for_an_end_that_the_page_does_not_have() {
+    const STARTS: usize = 2_000;
+    for unit in ["<script>x ", "<style>x ", "<!-- x> "] {
+        let html = format!("<p>start</p>{}", unit.repeat(STARTS));
+        let reads = second_pass_reads(&html);
+        assert_eq!(reads.searches, 1, "{unit:?}: one search, not one for each start");
+    }
+    let mixed = format!("<p>start</p>{}", "<script>x <style>x ".repeat(STARTS));
+    assert_eq!(second_pass_reads(&mixed).searches, 2, "one search for each name");
+}
+
+/// Start tags with a `>` in each attribute value: the read of the first one goes to the end
+/// of the page, because the quote after its last `>` has no partner.
+const TAGS_THAT_NEVER_END: [&str; 5] = [
+    "<a x='>'",
+    "<BR x='>'",
+    "<textarea x='>'",
+    "<script x='>'",
+    "<style x='>'",
+];
+
+#[test]
+fn a_pass_reads_a_tag_that_never_ends_once() {
+    for unit in TAGS_THAT_NEVER_END {
+        let html = format!("<p>start</p>{}", unit.repeat(2_000));
+        for (pass, reads) in [("first", first_pass_reads(&html)), ("second", second_pass_reads(&html))] {
+            assert!(
+                reads.tag_bytes <= 2 * html.len(),
+                "{unit:?}, {pass} pass: the tag reads went over {} bytes of a page of {}",
+                reads.tag_bytes,
+                html.len()
+            );
+            assert!(
+                reads.searches <= 1,
+                "{unit:?}, {pass} pass: {} searches",
+                reads.searches
+            );
+        }
+    }
+}
+
+#[test]
+fn an_end_tag_with_no_bracket_ends_no_raw_text_element() {
+    let page = format!("<script>{}", "</script x ".repeat(3));
+    assert_eq!(
+        find_closing_tag_bytes(page.as_bytes(), "<script>".len(), b"script"),
+        None
+    );
+    let page = format!("<script></scriptx>{}>tail", "</script x ".repeat(3));
+    let end = find_closing_tag_bytes(page.as_bytes(), "<script>".len(), b"script").expect("an end tag");
+    assert_eq!(&page[end..], "tail");
 }

@@ -473,33 +473,31 @@ fn an_omitted_end_tag_leaves_the_depth_limit_where_the_page_with_every_end_tag_h
 #[test]
 fn a_deep_page_that_took_the_second_parse_before_keeps_its_text_and_its_warning() {
     // ~keep A cell with no row and a custom element asked for the second parse before issue
-    // ~keep #772, and the first parse hides such a cell. The limit on the second parse for an
-    // ~keep omitted end tag must not apply to them. The text and the warning are those of
-    // ~keep 3.17.2. The empty tables at the limit are not: the repaired tree has no `<html>` and
-    // ~keep no `<body>` and no `<tbody>` that the input did not write, so the limit cuts it later.
+    // ~keep #772, and the first parse hides such a cell. They still take the second parse, and
+    // ~keep the tree builder stops at its depth limit (issue #808): the page keeps the words in
+    // ~keep front of the deep tables and behind them, with one warning that names the limit.
+    // ~keep The `x` is 800 levels deep, past the depth of the walk.
     let open = "<table><td>".repeat(400);
     let close = "</td></table>".repeat(400);
     let pages = [
-        (
-            format!("<table><td>one<table><td>two{open}x"),
-            "one\n\ntwo\n\n|  |\n| --- |\n",
-        ),
+        (format!("<table><td>one<table><td>two{open}x"), "one\n\ntwo\n"),
         (
             format!("<table><td>one{open}x{close}</td></table><p>tail</p>"),
-            "one\n\n|  |\n| --- |\n\ntail\n",
+            "one\n\ntail\n",
         ),
         (
             format!("<x-note>note</x-note>{open}x{close}<p>tail</p>"),
-            "note\n\n|  |\n| --- |\n\ntail\n",
+            "note\n\ntail\n",
         ),
-        (format!("<x-note><p>one</x-note>{open}x"), "one\n\n|  |\n| --- |\n"),
+        (format!("<x-note><p>one</x-note>{open}x"), "one\n"),
     ];
     for (html, expected) in &pages {
         let default = convert(html, None).expect("conversion must succeed");
         for result in [default, convert_with(html, TierStrategy::Tier2)] {
             assert_eq!(result.content.as_deref(), Some(*expected), "{:?}", &html[..40]);
             assert_eq!(result.warnings.len(), 1, "warnings: {:?}", result.warnings);
-            assert!(matches!(result.warnings[0].kind, WarningKind::DepthLimitExceeded));
+            assert!(matches!(result.warnings[0].kind, WarningKind::MalformedHtml));
+            assert!(result.warnings[0].message.contains("depth limit of 512"));
         }
     }
 }

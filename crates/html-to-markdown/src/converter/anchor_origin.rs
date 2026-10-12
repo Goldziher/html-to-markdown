@@ -15,8 +15,8 @@
 //! and the split can be undone on the repaired tree before it is serialized. ~keep
 //!
 //! The same token sink records whether the input wrote an `<html>` and a `<body>` start tag,
-//! which the tree also no longer shows, and can give the repair up when the tree builder nests
-//! too deep: see [`parse_with_anchor_origins_within_depth`]. ~keep
+//! which the tree also no longer shows, and builds no more of the tree once the tree sink
+//! reached a limit: see [`parse_with_anchor_origins`]. ~keep
 
 use std::cell::Cell;
 use std::collections::BTreeMap;
@@ -24,13 +24,16 @@ use std::rc::Rc;
 
 use html5ever::tendril::StrTendril;
 use html5ever::tokenizer::{BufferQueue, Tag, TagKind, Token, TokenSink, TokenSinkResult, Tokenizer, TokenizerOpts};
-use html5ever::tree_builder::{Tracer, TreeBuilder, TreeBuilderOpts, TreeSink};
+use html5ever::tree_builder::{TreeBuilder, TreeBuilderOpts, TreeSink};
 use html5ever::{Attribute, LocalName, QualName, TokenizerResult, ns};
 
 use crate::rcdom::{Handle, NodeData, RcDom};
 
 /// The private attribute that carries an anchor's origin id through the tree builder.
 const ORIGIN_ATTR: &str = "data-h2m-anchor-origin";
+
+/// The deepest tree the HTML tree builder makes for a repair.
+pub(super) const MAX_REPAIR_DEPTH: usize = 512;
 
 /// The private attribute that marks a `<tbody>` or a `<colgroup>` that a start tag asked for.
 const AUTHORED_ATTR: &str = "data-h2m-authored";
@@ -41,67 +44,20 @@ const CONTENT_BEARING: [&str; 14] = [
     "textarea", "select",
 ];
 
-/// The number of elements the tree builder may hold open before the repair is given up.
-///
-/// ~keep For most start tags the tree builder searches its stack of open elements (the scope
-/// ~keep checks of the standard), so each tag costs the depth of the tree and a document that
-/// ~keep never ends its blocks costs the square of its size. Chrome and Safari keep at most 512
-/// ~keep elements open and flatten what is deeper, which html5ever does not do: past this depth
-/// ~keep its tree is not the tree of a browser, and the converter cuts the page long before
-/// ~keep (`max_depth`). The count includes the active formatting elements.
-const MAX_OPEN_ELEMENTS: usize = 512;
-
-/// The tree builder is measured once in this many start tags. One measurement reads the whole
-/// stack, so this keeps its cost per tag constant.
-const START_TAGS_PER_MEASUREMENT: usize = 64;
-
-/// True when the tree builder is measured after start tag number `start_tags`.
-const fn is_measured(start_tags: usize) -> bool {
-    start_tags.is_multiple_of(START_TAGS_PER_MEASUREMENT)
-}
-
-/// Counts the handles that the tree builder holds.
-struct HandleCount(Cell<usize>);
-
-impl Tracer for HandleCount {
-    type Handle = Handle;
-
-    fn trace_handle(&self, _node: &Handle) {
-        self.0.set(self.0.get() + 1);
-    }
-}
-
 /// Token sink that stamps each `<a>` start tag with a fresh origin id before forwarding it,
 /// marks each `<tbody>` and `<colgroup>` start tag, records whether an `<html>` start tag, a
 /// start tag of a table or of one of those two parts, and a `<body>` start tag that opens the
-/// body went by, and stops
-/// forwarding when the tree builder holds more than `max_open_elements` elements open.
+/// body went by, and stops forwarding when the tree sink reached its node budget or its depth
+/// limit.
 struct AnchorOriginStamper {
     inner: TreeBuilder<Handle, RcDom>,
     next_origin: Cell<u32>,
     saw_html_tag: Cell<bool>,
     saw_body_tag: Cell<bool>,
     saw_table_part: Cell<bool>,
-    max_open_elements: Option<usize>,
-    start_tags: Cell<usize>,
-    too_deep: Cell<bool>,
 }
 
 impl AnchorOriginStamper {
-    fn measure_depth(&self) {
-        let Some(max_open_elements) = self.max_open_elements else {
-            return;
-        };
-        let start_tags = self.start_tags.get() + 1;
-        self.start_tags.set(start_tags);
-        if !is_measured(start_tags) {
-            return;
-        }
-        let held = HandleCount(Cell::new(0));
-        self.inner.trace_handles(&held);
-        self.too_deep.set(held.0.get() > max_open_elements);
-    }
-
     fn stamp(&self, tag: &mut Tag) {
         if tag.kind != TagKind::StartTag {
             return;
@@ -153,16 +109,21 @@ impl TokenSink for AnchorOriginStamper {
     type Handle = Handle;
 
     fn process_token(&self, mut token: Token, line_number: u64) -> TokenSinkResult<Self::Handle> {
-        if self.too_deep.get() {
-            return TokenSinkResult::Continue;
-        }
-        let is_start_tag = matches!(&token, Token::TagToken(tag) if tag.kind == TagKind::StartTag);
+        let is_tag = matches!(token, Token::TagToken(_));
         if let Token::TagToken(ref mut tag) = token {
             self.stamp(tag);
         }
         let result = self.inner.process_token(token, line_number);
-        if is_start_tag {
-            self.measure_depth();
+        // ~keep The parse stops at the tag that reached the node budget or the depth limit of
+        // ~keep the sink (issues #808 and #809), so the rest of the input starts at a tag
+        // ~keep boundary, no tag is dropped and no tag past the limit is read. It does not
+        // ~keep stop after a raw text start tag: the script or style text would become
+        // ~keep visible text.
+        if is_tag
+            && self.inner.sink.repair_limit.get().is_some()
+            && !matches!(result, TokenSinkResult::RawData(_) | TokenSinkResult::Plaintext)
+        {
+            return TokenSinkResult::Script(Rc::clone(&self.inner.sink.document));
         }
         result
     }
@@ -176,11 +137,26 @@ impl TokenSink for AnchorOriginStamper {
     }
 }
 
+/// The tree of a repair, and where the tree builder stopped.
+pub struct RepairTree {
+    /// The tree that the tree builder made.
+    pub dom: RcDom,
+    /// The limit that stopped the tree builder: the node budget (`TruncatedInput`) or the depth
+    /// limit (`DepthLimitExceeded`). The tree then holds the input only up to that point.
+    pub limit: Option<crate::types::WarningKind>,
+    /// The input that the parse did not read. It is empty unless a limit stopped the parse,
+    /// and it starts at a tag boundary.
+    pub unparsed: String,
+}
+
 /// Parse `html` as a document with every `<a>` stamped with its origin id.
 ///
 /// Drives the tokenizer by hand: `html5ever::parse_document` hard-codes
 /// `Tokenizer<TreeBuilder<..>>` and leaves no room for a sink between the two. The input is
 /// already a `str`, so nothing the `TendrilSink` driver adds (UTF-8 decoding) is lost.
+///
+/// Returns the tree, the limit that stopped the tree builder, if one did, and the input that
+/// the parse did not read.
 ///
 /// ~keep The tree builder gives every document an `<html>` and a `<body>`, a table with a bare
 /// ~keep row a `<tbody>`, and a table with a bare `<col>` a `<colgroup>`. Each one that no
@@ -191,24 +167,20 @@ impl TokenSink for AnchorOriginStamper {
 /// ~keep Input with no `<body>` start tag is also a fragment,
 /// ~keep and rules that ask "is this element in the body of a page" (the page header rule) must
 /// ~keep still see a fragment after the repair.
-pub fn parse_with_anchor_origins(html: &str) -> RcDom {
-    build_tree(html, None).0
-}
-
-/// The tree of [`parse_with_anchor_origins`], or `None` when the tree builder holds more than
-/// [`MAX_OPEN_ELEMENTS`] elements open.
-///
-/// The rest of the input is then tokenized and not built, so the call stays linear in the size
-/// of the input.
-pub fn parse_with_anchor_origins_within_depth(html: &str) -> Option<RcDom> {
-    let (dom, too_deep) = build_tree(html, Some(MAX_OPEN_ELEMENTS));
-    (!too_deep).then_some(dom)
-}
-
-/// Build the tree and say whether the tree builder went past `max_open_elements`. A tree that
-/// went past it holds the input only up to that point.
-fn build_tree(html: &str, max_open_elements: Option<usize>) -> (RcDom, bool) {
-    let tree_builder = TreeBuilder::new(RcDom::default(), TreeBuilderOpts::default());
+pub fn parse_with_anchor_origins(html: &str) -> RepairTree {
+    // ~keep Formatting reconstruction can create hundreds of clones per source tag (#809).
+    // ~keep Both allocation and depth budgets apply to every HTML5 repair route (#808).
+    const MAX_NODE_MULTIPLIER: usize = 8;
+    const IMPLICIT_NODE_ALLOWANCE: usize = 16;
+    let markup_count = html
+        .as_bytes()
+        .windows(2)
+        .filter(|pair| pair[0] == b'<' && pair[1] != b'/')
+        .count();
+    let max_nodes = markup_count
+        .saturating_mul(MAX_NODE_MULTIPLIER)
+        .saturating_add(IMPLICIT_NODE_ALLOWANCE);
+    let tree_builder = TreeBuilder::new(RcDom::bounded(max_nodes, MAX_REPAIR_DEPTH), TreeBuilderOpts::default());
     let tokenizer = Tokenizer::new(
         AnchorOriginStamper {
             inner: tree_builder,
@@ -216,28 +188,34 @@ fn build_tree(html: &str, max_open_elements: Option<usize>) -> (RcDom, bool) {
             saw_html_tag: Cell::new(false),
             saw_body_tag: Cell::new(false),
             saw_table_part: Cell::new(false),
-            max_open_elements,
-            start_tags: Cell::new(0),
-            too_deep: Cell::new(false),
         },
         TokenizerOpts::default(),
     );
     let input = BufferQueue::default();
     input.push_back(StrTendril::from(html));
-    while !matches!(tokenizer.feed(&input), TokenizerResult::Done) {}
-    tokenizer.end();
-    let too_deep = tokenizer.sink.too_deep.get();
+    let reached_limit = || tokenizer.sink.inner.sink.repair_limit.get().is_some();
+    while !reached_limit() && !matches!(tokenizer.feed(&input), TokenizerResult::Done) {}
+    if reached_limit() {
+        tokenizer.sink.inner.end();
+    } else {
+        tokenizer.end();
+    }
+    let mut unparsed = String::new();
+    while let Some(chunk) = input.pop_front() {
+        unparsed.push_str(&chunk);
+    }
     let saw_html_tag = tokenizer.sink.saw_html_tag.get();
     let saw_body_tag = tokenizer.sink.saw_body_tag.get();
     let saw_table_part = tokenizer.sink.saw_table_part.get();
     let dom = TreeSink::finish(tokenizer.sink.inner.sink);
+    let limit = dom.repair_limit.get();
     unwrap_implied_wrappers(&dom.document, saw_html_tag, saw_body_tag);
     // ~keep Only a table gets a `<tbody>` or a `<colgroup>` that no start tag asked for, and only
     // ~keep such a start tag gets the mark, so a page with none of the three tags skips the walk.
     if saw_table_part {
         unwrap_implied_table_parts(&dom.document);
     }
-    (dom, too_deep)
+    RepairTree { dom, limit, unparsed }
 }
 
 /// Replace each `<tbody>` and `<colgroup>` under `document` that no start tag asked for with its
@@ -412,8 +390,49 @@ mod tests {
     use html5ever::serialize::{SerializeOpts, serialize};
     use std::fmt::Write as _;
 
+    /// The tree of `html`, or `None` when the tree sink reached a limit.
+    fn parse_with_anchor_origins_within_depth(html: &str) -> Option<RcDom> {
+        let tree = parse_with_anchor_origins(html);
+        tree.limit.is_none().then_some(tree.dom)
+    }
+
+    fn tree_size_and_depth(document: &Handle) -> (usize, usize) {
+        let mut work = vec![(Rc::clone(document), 0)];
+        let mut count = 0;
+        let mut max_depth = 0;
+        while let Some((node, depth)) = work.pop() {
+            count += 1;
+            max_depth = max_depth.max(depth);
+            work.extend(node.children.borrow().iter().map(|child| (Rc::clone(child), depth + 1)));
+        }
+        (count, max_depth)
+    }
+
+    #[test]
+    fn bounded_repair_should_cap_tree_builder_depth_on_every_shape() {
+        for prefix in ["<table><td>visible", "<b><p>one</p></b>", "<x-custom>"] {
+            let html = format!("{prefix}{}tail", "<div>".repeat(2_000));
+            let dom = parse_with_anchor_origins(&html).dom;
+            let (nodes, depth) = tree_size_and_depth(&dom.document);
+            assert!(depth <= 514, "depth={depth}, nodes={nodes}");
+        }
+    }
+
+    #[test]
+    fn bounded_repair_should_cap_formatting_reconstruction_amplification() {
+        use std::fmt::Write;
+        let bold = (0..250).fold(String::new(), |mut bold, id| {
+            write!(bold, "<b id='b{id}'>").expect("writing to String succeeds");
+            bold
+        });
+        let html = format!("<p>{bold}x</p>{}", "<p>y</p>".repeat(1_000));
+        let dom = parse_with_anchor_origins(&html).dom;
+        let (nodes, _) = tree_size_and_depth(&dom.document);
+        assert!(nodes <= (1_251 * 8) + 512, "amplified to {nodes} nodes");
+    }
+
     fn repaired(html: &str) -> String {
-        written(parse_with_anchor_origins(html))
+        written(parse_with_anchor_origins(html).dom)
     }
 
     fn written(dom: RcDom) -> String {
@@ -511,25 +530,27 @@ mod tests {
 
     #[test]
     fn should_measure_after_start_tags_only() {
-        // ~keep Start tag 512 is measured with 512 handles. Ten more blocks open, 54 end tags
-        // ~keep that end no element go by, the ten blocks end, and start tag 576 is measured
-        // ~keep with 512 handles again. A count of every tag measures at the last stray end
-        // ~keep tag, with 522 handles.
-        let page = format!(
-            "{}{}{}{}{}x",
-            "<br>".repeat(4),
-            "<div>".repeat(518),
-            "</span>".repeat(54),
-            "</div>".repeat(10),
-            "<br>".repeat(54)
-        );
-        assert!(parse_with_anchor_origins_within_depth(&page).is_some());
+        // ~keep The text of block 509 is at depth 512, the limit. An end tag that ends no
+        // ~keep element and a `<br>` add no depth, so the page keeps its tree. One block more
+        // ~keep puts the text past the limit.
+        let page = |blocks: usize| {
+            format!(
+                "{}{}x{}{}{}",
+                "<br>".repeat(4),
+                "<div>".repeat(blocks),
+                "</span>".repeat(54),
+                "</div>".repeat(10),
+                "<br>".repeat(54)
+            )
+        };
+        assert!(parse_with_anchor_origins_within_depth(&page(509)).is_some());
+        assert!(parse_with_anchor_origins_within_depth(&page(510)).is_none());
     }
 
     #[test]
     fn should_build_nothing_more_once_the_tree_builder_went_past_the_limit() {
-        // ~keep Start tags 512 and 576 are measured with 512 handles, start tag 640 with 576.
-        // ~keep The page then ends its blocks, and start tags 704 and 768 go by with 4 open.
+        // ~keep The blocks go past the depth limit of the tree sink. The page then ends its
+        // ~keep blocks, and the text and the start tags that follow at depth 3 are not built.
         let page = format!(
             "{}{}{}{}after{}{}<p>late",
             "<br>".repeat(4),
@@ -539,13 +560,29 @@ mod tests {
             "</div>".repeat(572),
             "<br>".repeat(128)
         );
-        let (dom, too_deep) = build_tree(&page, Some(MAX_OPEN_ELEMENTS));
-        assert!(too_deep);
+        let RepairTree { dom, limit, unparsed } = parse_with_anchor_origins(&page);
+        assert_eq!(limit, Some(crate::types::WarningKind::DepthLimitExceeded));
         let built = written(dom);
-        assert_eq!(built.matches("<div>").count(), 572);
+        assert_eq!(built.matches("<div>").count(), 511);
         assert!(!built.contains("after"), "{}", &built[built.len() - 40..]);
         assert!(!built.contains("late"));
+        assert!(unparsed.contains("after") && unparsed.ends_with("<p>late"));
         assert!(parse_with_anchor_origins_within_depth(&page).is_none());
+    }
+
+    #[test]
+    fn should_read_no_tag_after_the_one_that_reached_the_limit() {
+        // ~keep The cost of the tree builder for one start tag grows with the number of open
+        // ~keep elements, so a page that never ends its blocks must not be read to its end.
+        // ~keep The parse stops at one tag, and every tag is in the tree or in the rest once.
+        let blocks = 100_000;
+        let page = format!("{}tail", "<div>".repeat(blocks));
+        let RepairTree { dom, limit, unparsed } = parse_with_anchor_origins(&page);
+        assert_eq!(limit, Some(crate::types::WarningKind::DepthLimitExceeded));
+        let built = written(dom).matches("<div>").count();
+        assert!(built <= MAX_REPAIR_DEPTH, "{built} blocks built");
+        assert_eq!(built + unparsed.matches("<div>").count(), blocks);
+        assert!(unparsed.starts_with("<div>") && unparsed.ends_with("tail"));
     }
 
     #[test]
@@ -587,18 +624,17 @@ mod tests {
 
     #[test]
     fn should_give_a_tree_at_the_limit_and_none_one_element_past_it() {
-        // ~keep The tree builder also holds the document, `html`, `body` and the `head` it
-        // ~keep remembers. A `<br>` is a start tag that leaves nothing open, so start tag 512 is
-        // ~keep measured with 512 handles in the first page and 513 in the second.
-        let page = |breaks: usize, blocks: usize| format!("{}{}x", "<br>".repeat(breaks), "<div>".repeat(blocks));
-        assert!(parse_with_anchor_origins_within_depth(&page(4, 508)).is_some());
-        assert!(parse_with_anchor_origins_within_depth(&page(3, 509)).is_none());
+        // ~keep The depth counts the document, `html` and `body`, so the text of block 509 is
+        // ~keep at depth 512 and the text of block 510 at depth 513.
+        let page = |blocks: usize| format!("{}x", "<div>".repeat(blocks));
+        assert!(parse_with_anchor_origins_within_depth(&page(509)).is_some());
+        assert!(parse_with_anchor_origins_within_depth(&page(510)).is_none());
     }
 
     #[test]
-    fn should_give_a_tree_when_the_tree_builder_is_past_the_limit_only_between_two_measurements() {
-        // ~keep Start tag 512 is measured with 512 handles. Ten more blocks open and end before
-        // ~keep start tag 576, which is measured with 512 handles again.
+    fn should_give_no_tree_when_the_page_is_past_the_limit_for_a_few_blocks_only() {
+        // ~keep Ten blocks open past the limit and end at once. No later tag is that deep,
+        // ~keep and the page still gets no tree.
         let page = format!(
             "{}{}{}{}x",
             "<br>".repeat(4),
@@ -606,7 +642,7 @@ mod tests {
             "</div>".repeat(10),
             "<br>".repeat(54)
         );
-        assert!(parse_with_anchor_origins_within_depth(&page).is_some());
+        assert!(parse_with_anchor_origins_within_depth(&page).is_none());
     }
 
     #[test]
@@ -620,23 +656,19 @@ mod tests {
         assert!(parse_with_anchor_origins_within_depth(&math).is_none());
         let templates = format!("{}x", "<template>".repeat(600));
         assert!(parse_with_anchor_origins_within_depth(&templates).is_none());
-        // ~keep Each `<b>` with its own attribute is held twice: open, and as a formatting
-        // ~keep element that the tree builder opens again in the next paragraph.
-        let mut formatting = String::from("<p>");
-        for number in 0..300 {
-            write!(formatting, "<b id='b{number}'>").expect("write to a string");
-        }
-        formatting.push('x');
-        assert!(parse_with_anchor_origins_within_depth(&formatting).is_none());
-    }
-
-    #[test]
-    fn should_measure_the_tree_builder_once_in_sixty_four_start_tags() {
-        assert!(!is_measured(1));
-        assert!(!is_measured(63));
-        assert!(is_measured(64));
-        assert!(!is_measured(65));
-        assert!(is_measured(128));
+        // ~keep The tree builder holds each `<b>` with its own attribute twice: open, and as a
+        // ~keep formatting element. The limit counts the depth of the tree, so 300 of them
+        // ~keep keep their tree and the node budget bounds what they cost (issue #809).
+        let formatting = |count: usize| {
+            let mut page = String::from("<p>");
+            for number in 0..count {
+                write!(page, "<b id='b{number}'>").expect("write to a string");
+            }
+            page.push('x');
+            page
+        };
+        assert!(parse_with_anchor_origins_within_depth(&formatting(300)).is_some());
+        assert!(parse_with_anchor_origins_within_depth(&formatting(600)).is_none());
     }
 
     #[test]

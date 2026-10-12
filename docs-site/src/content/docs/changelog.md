@@ -17,6 +17,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - A `script` or `style` start tag with no end tag follows one rule in every spelling on the full converter, the rule of [#277](https://github.com/xberg-io/html-to-markdown/issues/277): the markup after it is written. A start tag with a form feed after its name, or with an apostrophe in an attribute value with no quotes, was not read: `<p>a</p><script data=it's><p>b</p>` gave `a` and now gives `a` and `b`.
 - A character reference in a structured data script is kept as written in the metadata: `{"a":"&lt;p&gt;"}` gave `{"a":"<p>"}` in `raw_json` and now gives `{"a":"&lt;p&gt;"}` ([#824](https://github.com/xberg-io/html-to-markdown/issues/824)).
 - A structured data script adds no space of its own: `<p>foo<script type="application/ld+json">{}</script>bar</p>` gives `foobar` with both converters (the fast converter gave `foo bar`), and white space on its two sides gives one space ([#827](https://github.com/xberg-io/html-to-markdown/issues/827)).
+- A `script`, `style` or `textarea` tag inside a bogus comment (`<? ... >`, `<! ... >`, `</ ... >`) starts no element: `<p>before</p><?x <script>?><b>Shown</b><?x </script>?><p>after</p>` gave `before` and `after` and now gives `?>**Shown**?>` between them.
+- A page with many `script` or `style` start tags with no end tag converts in linear time: 2,000 `<script>` start tags took 1.2 s and now take 26 ms.
+- White space at the start or the end of a link label or of a short quotation is written beside
+  the link or the quotation, not inside it, as it is for bold text. `Press <a href="/p">Go </a>now.` gave `Press [Go](/p)now.` and
+  now gives `Press [Go](/p) now.`. `Press <q>Go </q>now.` gave `Press "Go"now.` and now gives
+  `Press "Go" now.`. A link inside a link is written after the outer link with that space:
+  `[Outer](/o) [Inner](/i)`. In a paragraph, a line break at the edge of a link label stays in the
+  label, as before. In a heading or a table cell, where a line break cannot be written, a space now
+  separates the words on the two sides of the link: `<h2>Press<a href="/p">Go<br></a>now</h2>` gave
+  `## Press[Go](/p)now` and now gives `## Press[Go](/p) now`. A short quotation that ends with a
+  line break keeps the break: `Press <q>Go<br></q>now.` gave `Press "Go"now.` and now gives
+  `Press "Go"`, a line break and `now.`. A visitor callback at the end of a link or a quotation now
+  receives that edge white space in the text it is given, as for bold text. `Skip`, `Custom` and
+  `PreserveHtml` from the link callback give the same output as before.
 - A checkbox outside a task list item writes nothing.
   `<p>Agree <input type="checkbox"> to the terms</p>` gave `Agree [ ] to the terms` and now gives
   `Agree to the terms`. Bracket pairs in running text are link syntax: `[x](optional)` rendered as
@@ -79,6 +93,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Plain text output separates the text of a form control from the words beside it, as the
+  Markdown output does. This shows for a control outside a `form` element with the default
+  options, and for a control inside one with `remove_forms` off.
+  `<p>aaa<select><option>Xone</option><option>Xtwo</option></select>bbb</p>` gave
+  `aaaXoneXtwobbb` and now gives `aaa Xone Xtwo bbb`. Each option of a select list or a data
+  list is a word of its own. A button, an output, a meter, a progress bar or a text area is a
+  word of its own too: `<h1>aaa<button>Xone</button><button>Xtwo</button>bbb</h1>` gave
+  `aaaXoneXtwobbb` and now gives `aaa Xone Xtwo bbb`. A word after the `form` or `fieldset`
+  element that holds the control is separated too:
+  `<p>aaa<fieldset><button>Xone</button></fieldset>bbb</p>` gave `aaaXonebbb` and now gives
+  `aaa Xone bbb`. So is a word after a control that holds the end of a block, such as a
+  button with an `hr` element in it. No space is written before closing punctuation. In a
+  `pre` element a button adds no space, and the options of a select list stay separate
+  words. With a visitor, an element that is removed or replaced keeps the space after a
+  control before it and leaves no text of its own, and the removal no longer panics inside
+  a multi-byte character
+  ([#814](https://github.com/xberg-io/html-to-markdown/issues/814)).
+- An `option` element with no select list around it is a word of its own in Markdown output and
+  in plain text output: `<p>aaa<option>Xone</option>bbb</p>` gave `aaa Xonebbb` and now gives
+  `aaa Xone bbb`. The option code no longer writes a space of its own after an opening bracket:
+  `<p>(<option>o2</option>w3</p>` gave `( o2w3` and now gives `(o2 w3`, as a select list in that
+  place does. A line end of the source before such an option is one space in Markdown
+  ([#846](https://github.com/xberg-io/html-to-markdown/issues/846)).
+- A `<title>` before the body content of a page with no `<head>` tag is the document title, as
+  in a browser. `<title>T</title><div><p>one</p></div>tail` gave `T`, `one` and `tail` as body
+  text and no front matter. It now gives the front matter `title: T`, then `one` and `tail`.
+  With `extract_metadata` off the title is not written. A `<title>` between `</head>` and the
+  body content is the document title too: `<head></head><title>T</title><p>one</p>` gave `T`
+  and `one`. A `<title>` after body content does not move. A page whose only metadata is an empty title gets no front matter block:
+  `<head><title></title></head><p>one</p>` gave `---`, `---` and `one`, and now gives `one`
+  ([#816](https://github.com/xberg-io/html-to-markdown/issues/816)).
 - A page with a structured data script keeps its text when a text value of the JSON holds a tag.
   `<script type="application/ld+json">{"a":"<p>"}</script>` in the head made the whole page
   convert to an empty string, and the same script in the body removed the text after it. The
@@ -202,6 +247,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the full and fast converters now write `"t\n\n    a\n    b"`. The spaces at the end of the last
   line of that code stay too
   ([#799](https://github.com/xberg-io/html-to-markdown/issues/799)).
+- Add `expand_abbreviations` and `include_blockquote_citations` options, enabled by default.
+- Keep one blank quote line between lists and blocks, preserving blank lines inside code.
+- Convert repeated unfinished tags, unclosed hidden elements, and inline list fragments with linear scans.
+- Repair a page that ends a paragraph again after the end tag of its parent, or whose head has no end tag, from the first parse with no second tokenizer pass; at 512 levels the repair stops and the input after that point is converted as written, past the node budget of the repair the whole page is converted as written, each with a `malformed_html` warning.
 
 - A line break in the source before an inline element is one space between two words, in every
   container. Before, the words on the two sides of a `<span>` were joined, with an empty span and

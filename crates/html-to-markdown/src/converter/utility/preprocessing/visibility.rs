@@ -1,7 +1,7 @@
 use std::borrow::Cow;
 
 use super::markup::{find_tag_end, matches_tag_start};
-use super::raw_text::{find_closing_tag_bytes_nested, is_self_closing_tag, skip_opaque_region};
+use super::raw_text::{find_closing_tag_bytes_nested, is_self_closing_tag, matching_tag_ends, skip_opaque_region};
 
 /// Sanitize malformed markdown-like URLs in HTML attributes.
 ///
@@ -99,6 +99,25 @@ fn is_bogus_comment_marker(bytes: &[u8], idx: usize, len: usize, next: u8, rest:
     false
 }
 
+/// The position after the bogus comment that the `<` at `idx` starts.
+fn after_bogus_comment(bytes: &[u8], idx: usize) -> usize {
+    // ~keep The bogus-comment state ends at the first `>` regardless of quoting, or at
+    // ~keep end-of-input if there is none -- unlike a tag, it has no attribute grammar.
+    memchr::memchr(b'>', &bytes[idx + 1..]).map_or(bytes.len(), |off| idx + 1 + off + 1)
+}
+
+/// If the `<` at `idx` starts a bogus comment (see [`strip_bogus_comments`]), return the
+/// position after it. The caller has read a real comment (`<!--`) before.
+///
+/// ~keep The first pass over raw-text elements reads a bogus comment with this function, so a
+/// ~keep `<textarea>` in `<? ... >` starts nothing there. It reads `<![CDATA[` as a bogus
+/// ~keep comment too: it reads no markup inside `<svg>`, and outside foreign content the
+/// ~keep tokenizer ends the comment at the first `>`.
+pub(super) fn bogus_comment_end(bytes: &[u8], idx: usize) -> Option<usize> {
+    let next = *bytes.get(idx + 1)?;
+    is_bogus_comment_marker(bytes, idx, bytes.len(), next, &bytes[idx + 2..]).then(|| after_bogus_comment(bytes, idx))
+}
+
 fn has_bogus_comment_candidate(bytes: &[u8]) -> bool {
     // ~keep Markers inside quotes, comments, or CDATA may produce false positives here;
     // ~keep the full scanner resolves those. Reject only inputs containing no removal marker.
@@ -170,18 +189,14 @@ pub fn strip_bogus_comments(input: &str) -> Cow<'_, str> {
             // ~keep Skip a real tag wholesale so a `<?`/`<!` sitting inside a quoted
             // ~keep attribute value is never seen as a bogus comment of its own.
             if next.is_ascii_alphabetic() {
-                if let Some(tag_end) = find_tag_end(bytes, idx + 1) {
-                    idx = tag_end;
-                    continue;
-                }
+                idx = find_tag_end(bytes, idx + 1).unwrap_or(len);
+                continue;
             }
             idx += 1;
             continue;
         }
 
-        // ~keep The bogus-comment state ends at the first `>` regardless of quoting, or at
-        // ~keep end-of-input if there is none -- unlike a tag, it has no attribute grammar.
-        let end = memchr::memchr(b'>', &bytes[idx + 1..]).map_or(len, |off| idx + 1 + off + 1);
+        let end = after_bogus_comment(bytes, idx);
         let out = output.get_or_insert_with(|| String::with_capacity(len));
         out.push_str(&input[last..idx]);
         last = end;
@@ -200,23 +215,26 @@ pub fn strip_bogus_comments(input: &str) -> Cow<'_, str> {
 /// Compute the end index of the hidden element starting at `idx` whose opening tag spans
 /// `idx..tag_end` — either just past the opening tag itself (self-closing) or past its matching
 /// closing tag.
-///
-/// Extracted from `strip_hidden_elements`'s main scan loop — identical tag-name scan and
-/// self-closing/closing-tag dispatch, unchanged.
-fn hidden_element_remove_end(bytes: &[u8], idx: usize, tag_end: usize, len: usize) -> usize {
+fn hidden_element_remove_end(
+    bytes: &[u8],
+    idx: usize,
+    tag_end: usize,
+    ends: &mut Option<ahash::AHashMap<usize, Option<usize>>>,
+) -> usize {
     let name_start = idx + 1;
-    let mut name_end = name_start;
-    while name_end < len && !bytes[name_end].is_ascii_whitespace() && bytes[name_end] != b'>' && bytes[name_end] != b'/'
-    {
-        name_end += 1;
+    let name_len = bytes[name_start..]
+        .iter()
+        .take_while(|byte| !byte.is_ascii_whitespace() && !matches!(byte, b'>' | b'/'))
+        .count();
+    let name = &bytes[name_start..name_start + name_len];
+    if is_self_closing_tag(&bytes[idx..tag_end], name) {
+        return tag_end;
     }
-    let tag_name = &bytes[name_start..name_end];
-
-    if is_self_closing_tag(&bytes[idx..tag_end], tag_name) {
-        tag_end
-    } else {
-        find_closing_tag_bytes_nested(bytes, tag_end, tag_name).unwrap_or(tag_end)
+    if let Some(end) = ends.get_or_insert_with(|| matching_tag_ends(bytes)).get(&idx) {
+        return end.unwrap_or(tag_end);
     }
+    // ~keep Preserve the legacy scan of tag-looking text inside an unrelated quoted attribute.
+    find_closing_tag_bytes_nested(bytes, tag_end, name).unwrap_or(tag_end)
 }
 
 /// Where the removal of the element whose open tag spans `idx..tag_end` ends, or `None` when
@@ -224,18 +242,24 @@ fn hidden_element_remove_end(bytes: &[u8], idx: usize, tag_end: usize, len: usiz
 ///
 /// The `hidden` attribute and a definitive `display`/`visibility` declaration remove the
 /// subtree outright. `font-size: 0` must preserve images and descendants that restore a readable size.
-fn hidden_element_removal_end(input: &str, bytes: &[u8], idx: usize, tag_end: usize, len: usize) -> Option<usize> {
+fn hidden_element_removal_end(
+    input: &str,
+    bytes: &[u8],
+    idx: usize,
+    tag_end: usize,
+    ends: &mut Option<ahash::AHashMap<usize, Option<usize>>>,
+) -> Option<usize> {
     let tag_slice = &input[idx..tag_end];
     if tag_has_hidden_attribute(tag_slice) {
-        return Some(hidden_element_remove_end(bytes, idx, tag_end, len));
+        return Some(hidden_element_remove_end(bytes, idx, tag_end, ends));
     }
     match hidden_style_reason(tag_slice)? {
-        HiddenStyleReason::Definitive => Some(hidden_element_remove_end(bytes, idx, tag_end, len)),
+        HiddenStyleReason::Definitive => Some(hidden_element_remove_end(bytes, idx, tag_end, ends)),
         HiddenStyleReason::FontSizeZero => {
             if matches_tag_start(bytes, idx + 1, b"img") {
                 return None;
             }
-            let remove_end = hidden_element_remove_end(bytes, idx, tag_end, len);
+            let remove_end = hidden_element_remove_end(bytes, idx, tag_end, ends);
             // ~keep Scan past the element's own open tag so its `font-size: 0` is not re-read.
             let subtree = input.get(tag_end..remove_end).unwrap_or("");
             (!region_restores_visible_content(subtree)).then_some(remove_end)
@@ -306,6 +330,7 @@ pub fn strip_hidden_elements(input: &str) -> Cow<'_, str> {
     let mut idx = 0;
     let mut last = 0;
     let mut output: Option<String> = None;
+    let mut ends = None;
 
     while idx < len {
         let Some(offset) = memchr::memchr(b'<', &bytes[idx..]) else {
@@ -328,7 +353,7 @@ pub fn strip_hidden_elements(input: &str) -> Cow<'_, str> {
                 tag_end
             };
             if let Some(tag_end) = tag_end {
-                if let Some(remove_end) = hidden_element_removal_end(input, bytes, idx, tag_end, len) {
+                if let Some(remove_end) = hidden_element_removal_end(input, bytes, idx, tag_end, &mut ends) {
                     let out = output.get_or_insert_with(|| String::with_capacity(len));
                     out.push_str(&input[last..idx]);
                     last = remove_end;
@@ -563,6 +588,7 @@ fn region_restores_visible_content(region: &str) -> bool {
     let bytes = region.as_bytes();
     let len = bytes.len();
     let mut idx = 0;
+    let mut ends = None;
     while idx < len {
         if let Some(end) = skip_opaque_region(bytes, idx) {
             idx = end;
@@ -572,7 +598,7 @@ fn region_restores_visible_content(region: &str) -> bool {
             if let Some(tag_end) = find_tag_end(bytes, idx + 1) {
                 let tag = &region[idx..tag_end];
                 if tag_has_hidden_attribute(tag) || hidden_style_reason(tag) == Some(HiddenStyleReason::Definitive) {
-                    idx = hidden_element_remove_end(bytes, idx, tag_end, len);
+                    idx = hidden_element_remove_end(bytes, idx, tag_end, &mut ends);
                     continue;
                 }
                 if tag_sets_non_zero_font_size(tag) || matches_tag_start(bytes, idx + 1, b"img") {

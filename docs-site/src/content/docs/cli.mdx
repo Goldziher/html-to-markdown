@@ -87,6 +87,8 @@ html-to-markdown --url https://example.com > output.md
 | `--sub-symbol SYMBOL`     | any string                             | `""`           | Wrapper symbol for `<sub>` text.                  |
 | `--sup-symbol SYMBOL`     | any string                             | `""`           | Wrapper symbol for `<sup>` text.                  |
 | `--highlight-style STYLE` | `double-equal`, `html`, `bold`, `none` | `double-equal` | Rendering of `<mark>` elements.                   |
+| `--no-expand-abbreviations` | —                                    | off            | Write the text of an `<abbr>` without its title.  |
+| `--no-blockquote-citations` | —                                    | off            | Write a blockquote without its `cite` URL.        |
 | `--escape-asterisks`      | —                                      | off            | Escape `*` characters.                            |
 | `--escape-underscores`    | —                                      | off            | Escape `_` characters.                            |
 | `--escape-misc`           | —                                      | off            | Escape `[`, `]`, `<`, `>`, `#`, etc.              |
@@ -248,6 +250,8 @@ Each CLI flag has a corresponding `ConversionOptions` field. Library users can c
 | `--code-block-style STYLE`      | `code_block_style`           | `"indented"` \| `"backticks"` \| `"tildes"`                |
 | `-l, --code-language LANG`      | `code_language`              | string                                                     |
 | `--no-autolinks`                | `autolinks`                  | inverted: flag sets `autolinks = false`; default is `true` |
+| `--no-expand-abbreviations`     | `expand_abbreviations`       | inverted: flag sets `expand_abbreviations = false`; default is `true` |
+| `--no-blockquote-citations`     | `include_blockquote_citations` | inverted: flag sets `include_blockquote_citations = false`; default is `true` |
 | `--default-title`               | `default_title`              | boolean flag                                               |
 | `--link-style STYLE`            | `link_style`                 | `"inline"` \| `"reference"`                                |
 | `--url-escape-style STYLE`      | `url_escape_style`           | `"angle"` \| `"percent"`                                   |

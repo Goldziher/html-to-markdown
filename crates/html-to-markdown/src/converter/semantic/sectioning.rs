@@ -69,7 +69,10 @@ pub fn handle(
         if handler.ctx.in_list_item && !handler.ctx.in_table_cell && !output.is_empty() {
             crate::converter::list::utils::start_block_in_list_item(output, handler.ctx, handler.options);
         } else if !output.is_empty() && !output.ends_with("\n\n") {
-            output.push_str("\n\n");
+            if !output.ends_with('\n') {
+                output.push('\n');
+            }
+            output.push('\n');
         }
 
         crate::converter::block::horizontal_rule::separate_leading_rule(output, content, handler.ctx);

@@ -369,7 +369,7 @@ fn skip_to_after_gt(bytes: &[u8], from: usize) -> usize {
 ///
 /// These elements are always void in HTML5: they have no end tag, and `<br />` is
 /// equivalent to `<br>`.  We must leave them as-is when pre-processing XML-style
-/// self-closing syntax so that `repair_with_html5ever` can parse them correctly.
+/// self-closing syntax so that `repair_with_html5ever_bounded` can parse them correctly.
 const HTML5_VOID_ELEMENTS: &[&str] = &[
     "area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta", "param", "source", "track", "wbr",
 ];
@@ -455,7 +455,7 @@ fn scan_tag_terminator(bytes: &[u8], start: usize) -> (bool, usize) {
 /// Expand XML-style self-closing tags to explicit open+close pairs.
 ///
 /// HTML5 does not honour the `/>` self-close syntax for non-void elements.  When
-/// `repair_with_html5ever` re-parses content that contains custom / namespaced tags
+/// `repair_with_html5ever_bounded` re-parses content that contains custom / namespaced tags
 /// written as `<ac:parameter name="foo" />`, the HTML5 parser treats the `/>` as `>`
 /// and leaves the element open.  Subsequent siblings then nest inside it, breaking
 /// visitor pre-order/post-order start/end pairing.
@@ -551,50 +551,81 @@ pub fn expand_xml_self_closing_tags(input: &str) -> String {
 /// semantics do not honour `/>` on unknown elements — without the expansion, the
 /// element would be left open and subsequent siblings would nest inside it, breaking
 /// visitor start/end event pairing (issue #331).
-pub fn repair_with_html5ever(input: &str) -> Option<String> {
-    use crate::converter::anchor_origin::parse_with_anchor_origins;
-
-    let expanded = expand_xml_self_closing_tags(input);
-    write_repaired(parse_with_anchor_origins(&expanded), input.len())
-}
-
-/// The repair of [`repair_with_html5ever`], given up on a document that nests deeper than a
-/// browser builds (512 open elements), so its cost stays linear in the size of the input.
 ///
-/// ~keep For the second parse that an omitted end tag asks for (issue #772) only. A caller that
-/// ~keep made the repair before that issue keeps the repair with no limit: its first parse can
-/// ~keep hide content (a table cell with no row), so giving up there loses text and the depth
-/// ~keep warning.
-pub fn repair_with_html5ever_within_depth(input: &str) -> Option<String> {
-    use crate::converter::anchor_origin::parse_with_anchor_origins_within_depth;
-
-    let expanded = expand_xml_self_closing_tags(input);
-    write_repaired(parse_with_anchor_origins_within_depth(&expanded)?, input.len())
-}
-
-fn write_repaired(dom: crate::rcdom::RcDom, capacity: usize) -> Option<String> {
-    use crate::converter::anchor_origin::collapse_split_anchors;
+/// ~keep The tree builder has a node budget and a depth limit on every route (issues #808 and
+/// ~keep #809), and the result names the limit that it reached. At the node budget the result
+/// ~keep is `input` as written. At the depth limit the tree ends at the tag that reached it,
+/// ~keep and the input after that tag follows the tree as written. No word is lost.
+pub(super) fn repair_with_html5ever_bounded(input: &str) -> Option<(String, Option<crate::types::WarningKind>)> {
+    use crate::converter::anchor_origin::{RepairTree, collapse_split_anchors, parse_with_anchor_origins};
     use crate::rcdom::SerializableHandle;
     use html5ever::serialize::{SerializeOpts, serialize};
 
+    let expanded = expand_xml_self_closing_tags(input);
+    let RepairTree { dom, limit, unparsed } = parse_with_anchor_origins(&expanded);
+    if limit == Some(crate::types::WarningKind::TruncatedInput) {
+        tracing::warn!(
+            target: "html_to_markdown::convert",
+            "HTML tree repair reached its node budget; continuing with the original structure"
+        );
+        // ~keep Abandon the amplified repair and keep the authored text (issue #809).
+        return Some((input.to_owned(), limit));
+    }
     // ~keep The adoption agency splits an `<a>` around a block into an authored element and
     // ~keep clones; collapse the empty halves before the tree is flattened to a string and
     // ~keep the provenance is gone (issue #493).
     collapse_split_anchors(&dom.document);
 
-    let mut buf = Vec::with_capacity(capacity);
+    let mut buf = Vec::with_capacity(input.len());
     let handle = SerializableHandle::from(dom.document);
     serialize(&mut buf, &handle, SerializeOpts::default()).ok()?;
-    String::from_utf8(buf).ok()
+    let mut html = String::from_utf8(buf).ok()?;
+    if limit.is_some() {
+        tracing::warn!(
+            target: "html_to_markdown::convert",
+            "HTML tree repair reached its depth limit; the rest of the input keeps its original structure"
+        );
+        // ~keep The input after the last tag of the tree goes into the body as written (issue
+        // ~keep #808). The tree has a `<body>` end tag only when the input wrote a `<body>`.
+        const DOCUMENT_END: &str = "</body></html>";
+        let end = if html.ends_with(DOCUMENT_END) {
+            DOCUMENT_END.len()
+        } else {
+            0
+        };
+        html.insert_str(html.len() - end, &unparsed);
+    }
+    Some((html, limit))
 }
 
-/// Rebuild a document when head content precedes an authored `<head>` element.
+/// Rebuild a document when head content precedes an authored `<head>` element, or when a
+/// `<title>` precedes the body and is in no `<head>` element: the page has no `<head>` tag, or
+/// the title follows `</head>`.
 ///
-/// The HTML tree builder places that content in an implicit head and ignores the later head
+/// The HTML tree builder places that content in an implicit head and ignores a later head
 /// start tag. The lightweight parser preserves source nesting, so its tree needs this targeted
 /// repair before either conversion tier reads metadata or renders the body.
-pub fn repair_head_content_before_explicit_head(input: &str) -> Option<String> {
-    let head_start = last_start_tag(input.as_bytes(), b"head")?;
+pub fn repair_head_content_outside_head(input: &str) -> Option<(String, Option<crate::types::WarningKind>)> {
+    if !may_hold_head_content_outside_head(input.as_bytes()) {
+        return None;
+    }
+    let dom = tl::parse(input, tl::ParserOptions::default()).ok()?;
+    if !document_head_search(dom.children(), dom.parser()).content_outside_head {
+        return None;
+    }
+    repair_with_html5ever_bounded(input)
+}
+
+/// A cheap check of the source in front of the parse of [`repair_head_content_outside_head`];
+/// the parsed tree decides.
+///
+/// ~keep The check reads bytes, not tags. A `<head>` or a `<body>` inside a comment makes it
+/// ~keep false for a page that the parsed tree would rebuild: that page keeps its title in the
+/// ~keep body.
+fn may_hold_head_content_outside_head(bytes: &[u8]) -> bool {
+    let Some(head_start) = last_start_tag(bytes, b"head") else {
+        return first_start_tag(bytes, b"title").is_some();
+    };
     const HEAD_CONTENT: [&[u8]; 11] = [
         b"base",
         b"basefont",
@@ -608,18 +639,23 @@ pub fn repair_head_content_before_explicit_head(input: &str) -> Option<String> {
         b"template",
         b"title",
     ];
-    if !HEAD_CONTENT
+    HEAD_CONTENT
         .iter()
-        .any(|name| first_start_tag(input.as_bytes(), name).is_some_and(|start| start < head_start))
-    {
-        return None;
-    }
+        .any(|name| first_start_tag(bytes, name).is_some_and(|start| start < head_start))
+        || title_follows_head_end(bytes)
+}
 
-    let dom = tl::parse(input, tl::ParserOptions::default()).ok()?;
-    if !document_head_search(dom.children(), dom.parser()).1 {
-        return None;
-    }
-    repair_with_html5ever(input)
+/// True when a `<title>` tag follows the first `</head>` with no `<body>` tag between them.
+fn title_follows_head_end(bytes: &[u8]) -> bool {
+    // ~keep `/head` as a name: the end tag has the shape of a start tag with that name.
+    let Some(head_end) = first_start_tag(bytes, b"/head") else {
+        return false;
+    };
+    let rest = &bytes[head_end..];
+    let Some(title) = first_start_tag(rest, b"title") else {
+        return false;
+    };
+    first_start_tag(rest, b"body").is_none_or(|body| title < body)
 }
 
 fn first_start_tag(bytes: &[u8], name: &[u8]) -> Option<usize> {
@@ -708,17 +744,43 @@ pub fn is_inline_element(tag_name: &str) -> bool {
     )
 }
 
+/// Build the warning for a repair that stopped at `limit`.
+///
+/// `limit` is the reason the tree builder reports: `TruncatedInput` for the node budget (the
+/// first parse is kept), `DepthLimitExceeded` for the depth limit (the first parse is kept
+/// too). No text is lost in either case, so the warning kind is `MalformedHtml` for both.
+pub(super) fn repair_limit_warning(limit: crate::types::WarningKind) -> crate::types::ProcessingWarning {
+    use crate::converter::anchor_origin::MAX_REPAIR_DEPTH;
+    crate::types::ProcessingWarning {
+        kind: crate::types::WarningKind::MalformedHtml,
+        message: if limit == crate::types::WarningKind::TruncatedInput {
+            "HTML tree repair exceeded its node budget; continued with the original structure.".to_owned()
+        } else {
+            format!(
+                "HTML tree repair reached the depth limit of {MAX_REPAIR_DEPTH}; continued with the original structure."
+            )
+        },
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
-    fn should_repair_a_document_of_any_depth_and_give_up_only_within_the_depth_limit() {
+    fn should_give_the_tree_and_the_rest_of_the_input_when_the_repair_passes_the_depth_limit() {
         let deep = format!("{}x", "<div>".repeat(600));
 
-        assert!(repair_with_html5ever(&deep).is_some_and(|repaired| repaired.matches("</div>").count() == 600));
-        assert!(repair_with_html5ever_within_depth(&deep).is_none());
-        assert!(repair_with_html5ever_within_depth("<div><p>one</div>tail").is_some());
+        let (page, limit) = repair_with_html5ever_bounded(&deep).expect("a page");
+
+        assert_eq!(limit, Some(crate::types::WarningKind::DepthLimitExceeded));
+        assert_eq!(page.matches("<div>").count(), 600);
+        assert!(
+            page.ends_with(&format!("{}x", "<div>".repeat(80))),
+            "{}",
+            &page[page.len() - 40..]
+        );
+        assert!(repair_with_html5ever_bounded("<div><p>one</div>tail").is_some_and(|(_, limit)| limit.is_none()));
     }
 
     #[test]

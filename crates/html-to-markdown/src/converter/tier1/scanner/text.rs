@@ -279,14 +279,16 @@ fn trim_leading_text_run<'a>(
             state.stack.last().map(|frame| frame.spec.kind),
             Some(TagKind::Strong | TagKind::Emphasis)
         );
+    let in_link_frame = matches!(state.stack.last().map(|frame| frame.spec.kind), Some(TagKind::Link));
     let after_line_end = follows_line_end(state);
     // ~keep White space after a space is the same run of white space, whatever lies between
-    // ~keep the two: an element that wrote nothing is no word. A cell follows the rule of a
-    // ~keep paragraph. Mirrors Tier-2's `skip_prefix`.
+    // ~keep the two: an element that wrote nothing is no word. Mirrors Tier-2's `skip_prefix`.
     let after_space = state.cell_or_output_mut().ends_with(' ');
     let should_trim = !in_pre
         && !in_code
-        && (after_space || at_inline_frame_start || block_separator_after || document_start_strip || after_line_end);
+        && (after_space
+            || ((!state.in_table_cell() || in_link_frame)
+                && (at_inline_frame_start || block_separator_after || document_start_strip || after_line_end)));
     if !should_trim {
         return std::borrow::Cow::Borrowed(raw);
     }

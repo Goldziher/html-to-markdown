@@ -21,7 +21,7 @@ fn nested_anchors_preserve_both_destinations() {
     let html = r#"<a href="https://example.com/outer">Outer <a href="https://example.com/inner">Inner</a></a>"#;
     assert_eq!(
         convert(html, None).unwrap().content.unwrap().trim(),
-        "[Outer](https://example.com/outer)[Inner](https://example.com/inner)"
+        "[Outer](https://example.com/outer) [Inner](https://example.com/inner)"
     );
 }
 
@@ -34,7 +34,7 @@ fn nested_anchors_inside_formatting_preserve_links_in_tier_two() {
     };
     assert_eq!(
         convert(html, Some(options)).unwrap().content.unwrap().trim(),
-        "[Outer](/outer)[Inner](/inner) Tail"
+        "[Outer](/outer) [Inner](/inner) Tail"
     );
 }
 

@@ -1,7 +1,9 @@
 use super::preprocess_repaired_html;
 use crate::converter::DomContext;
-use crate::converter::main_helpers::{repair_with_html5ever, repair_with_html5ever_within_depth};
-use crate::converter::preprocessing_helpers::{has_inline_block_misnest, has_omitted_end_tag, readable_text_len};
+use crate::converter::main_helpers::repair_with_html5ever_bounded;
+use crate::converter::preprocessing_helpers::{
+    has_discarded_end_tag, has_inline_block_misnest, has_omitted_end_tag, readable_text_len,
+};
 use crate::converter::utility::caching::build_dom_context;
 use crate::error::{ConversionError, Result};
 
@@ -30,11 +32,24 @@ fn invalid_length(input: &str) -> ConversionError {
     ConversionError::ParseError("Failed to parse HTML".to_string())
 }
 
-/// The tree that the converter reads, and the length of the page that the tree is made of.
+/// The tree that the converter reads, the length of the page that the tree is made of, and the
+/// limit that stopped the tree builder when the first parse was kept for that reason.
 pub(super) struct ParsedPage<'a> {
     pub(super) dom: tl::VDom<'a>,
     pub(super) dom_ctx: DomContext,
     pub(super) len: usize,
+    pub(super) repair_limit: Option<crate::types::WarningKind>,
+}
+
+impl<'a> ParsedPage<'a> {
+    const fn first_parse(dom: tl::VDom<'a>, dom_ctx: DomContext, len: usize) -> Self {
+        Self {
+            dom,
+            dom_ctx,
+            len,
+            repair_limit: None,
+        }
+    }
 }
 
 /// Parse `input`, and parse it a second time through the HTML tree builder when it has an
@@ -54,44 +69,56 @@ pub(super) fn parse_for_conversion<'a>(
     let parser = dom.parser();
     let dom_ctx = build_dom_context(&dom, parser, input.len());
     let len = input.len();
-    let omitted_end_tag = has_omitted_end_tag(&dom_ctx, parser);
-    if !omitted_end_tag && !has_inline_block_misnest(&dom_ctx, parser) {
-        return Ok(ParsedPage { dom, dom_ctx, len });
+    let open_at_the_end = has_omitted_end_tag(&dom_ctx, parser);
+    let misnest = has_inline_block_misnest(&dom_ctx, parser);
+    // ~keep Both rules ask where the tree builder ends an element, so both have the text rule.
+    let discarded_end_tag = !open_at_the_end && !misnest && has_discarded_end_tag(&dom_ctx, parser, input);
+    let omitted_end_tag = open_at_the_end || discarded_end_tag;
+    if !omitted_end_tag && !misnest {
+        return Ok(ParsedPage::first_parse(dom, dom_ctx, len));
     }
-    // ~keep The depth limit and the text rule are for the second parse that only an omitted end
-    // ~keep tag asks for. A misnest got the second parse before issue #772 and keeps it with no
-    // ~keep limit and no rule: its first parse can hide content, so it is not a tree to fall
-    // ~keep back on.
-    let within_depth = omitted_end_tag
-        .then(|| repair_with_html5ever_within_depth(input))
-        .flatten();
-    let for_omitted_end_tag = within_depth.is_some();
-    let repaired = within_depth.or_else(|| {
-        (!omitted_end_tag || has_inline_block_misnest(&dom_ctx, parser))
-            .then(|| repair_with_html5ever(input))
-            .flatten()
-    });
-    let Some(repaired) = repaired else {
+    // ~keep Every route to the tree builder has the node budget and the depth limit (issues
+    // ~keep #808 and #809). When only an omitted end tag asked for the repair, a tree that
+    // ~keep reached a limit is not used: the first parse holds every word of the input and is
+    // ~keep kept, with the warning. The first parse of a misnest can hide content, so a misnest
+    // ~keep takes the tree up to the depth limit and the rest of the input as written.
+    let Some((repaired, repair_limit)) = repair_with_html5ever_bounded(input) else {
         tracing::warn!(
             target: "html_to_markdown::convert",
-            "html5ever repair gave no tree (the document nests too deep or cannot be written back); proceeding with original structure"
+            "html5ever repair gave no tree (the document cannot be written back); proceeding with original structure"
         );
-        return Ok(ParsedPage { dom, dom_ctx, len });
+        return Ok(ParsedPage::first_parse(dom, dom_ctx, len));
     };
+    if repair_limit.is_some() && !misnest {
+        return Ok(ParsedPage {
+            dom,
+            dom_ctx,
+            len,
+            repair_limit,
+        });
+    }
     let page = repaired_page.get_or_init(|| preprocess_repaired_html(&repaired, preserve_menu));
     let second = parse_html(page)?;
-    let loses_text = for_omitted_end_tag && readable_text_len(&second) < readable_text_len(&dom);
-    if loses_text && !has_inline_block_misnest(&dom_ctx, parser) {
+    // ~keep The text rule is for the second parse that an omitted end tag asks for. The first
+    // ~keep parse of a misnest can hide content, so its count is not a measure.
+    let loses_text = omitted_end_tag && readable_text_len(&second) < readable_text_len(&dom);
+    if loses_text && !misnest {
         // ~keep A frameset page with every end tag written comes here, so this is no warning.
         tracing::debug!(
             target: "html_to_markdown::convert",
             "html5ever repair would lose text; proceeding with original structure"
         );
-        return Ok(ParsedPage { dom, dom_ctx, len });
+        return Ok(ParsedPage::first_parse(dom, dom_ctx, len));
     }
-    if for_omitted_end_tag && !loses_text {
+    if discarded_end_tag {
+        tracing::debug!(
+            target: "html_to_markdown::convert",
+            "end tag of an open element discarded by the first parse; re-parsed with html5ever repair"
+        );
+    } else if omitted_end_tag && !loses_text && repair_limit.is_none() {
         // ~keep An omitted end tag is HTML that the standard permits, so this route is logged
         // ~keep at debug, like the choice of a tier. A misnest is an authoring error and warns.
+        // ~keep A page that reached a limit is here only as a misnest.
         tracing::debug!(
             target: "html_to_markdown::convert",
             "element with no end tag; re-parsed with html5ever repair"
@@ -107,6 +134,7 @@ pub(super) fn parse_for_conversion<'a>(
         dom: second,
         dom_ctx,
         len: page.len(),
+        repair_limit,
     })
 }
 
@@ -170,13 +198,59 @@ mod tests {
     }
 
     #[test]
-    fn should_parse_twice_when_a_misnest_nests_past_the_limit_for_an_omitted_end_tag() {
-        // ~keep A cell with no row is a misnest and has no end tag. The first parse hides it.
+    fn should_parse_twice_when_a_misnest_nests_past_the_repair_depth_limit() {
+        // ~keep A cell with no row is a misnest and has no end tag. The first parse hides it,
+        // ~keep so the page takes the tree up to the depth limit (issue #808) and the rest of
+        // ~keep the input as written, in a second parse.
         let html = format!("{}x", "<table><td>".repeat(300));
         let (calls, content) = parse_calls_for(&html);
 
-        assert_eq!(content.as_deref(), Some("|  |\n| --- |\n"));
+        // ~keep The page is past the default depth of the walk, so the test reads the parse
+        // ~keep count. The words of such a page are a test of `parser_repair_safeguards.rs`,
+        // ~keep which raises the depth of the walk.
+        assert!(content.is_some());
         assert_eq!(calls, 2);
+    }
+
+    #[test]
+    fn should_parse_twice_when_the_first_parse_discarded_the_end_tag_of_an_open_element() {
+        // ~keep The list pass writes the end tag of an `li` and of a `dd` before the first
+        // ~keep parse, so in a list no element is open at the end tag of the list: one parse.
+        let mut failures = Vec::new();
+        let cases = [
+            ("div", "p", 2),
+            ("select", "option", 2),
+            ("ul", "li", 1),
+            ("dl", "dd", 1),
+        ];
+        let words = ["one", "two", "rest", "tail"];
+        for (outer, inner, expected) in cases {
+            let html = format!("<{outer}><{inner}>one</{outer}>two</{inner}>rest</{outer}>tail");
+            let (calls, content) = parse_calls_for(&html);
+            let content = content.unwrap_or_default();
+            let has_every_word = words.into_iter().all(|word| content.contains(word));
+            if calls != expected || !has_every_word {
+                failures.push(format!("{html:?}: {calls} parse(s), not {expected}: {content:?}"));
+            }
+        }
+        assert!(failures.is_empty(), "{failures:#?}");
+        let (calls, content) = parse_calls_for("<div><p>one</div>two</p>rest</div>tail");
+        assert_eq!(content.as_deref(), Some("one\n\ntwo\n\nresttail\n"));
+        assert_eq!(calls, 2);
+    }
+
+    #[test]
+    fn should_parse_once_when_a_discarded_end_tag_names_no_open_element() {
+        for html in [
+            "<p>a</b>b</p>",
+            "<div title='</div>'><p>x</p></div>",
+            "<div><p>x<!-- </div> --></p></div>",
+        ] {
+            let (calls, content) = parse_calls_for(html);
+
+            assert_eq!(calls, 1, "{html:?}");
+            assert!(content.is_some(), "{html:?}");
+        }
     }
 
     #[test]
@@ -300,9 +374,9 @@ mod tests {
     }
 
     #[test]
-    fn should_warn_of_a_misnest_when_a_page_with_an_omitted_end_tag_takes_the_repair_with_no_limit() {
-        // ~keep No cell has an end tag, and the tree builder nests past the limit for an
-        // ~keep omitted end tag. The repair that the page then takes is the one for a misnest.
+    fn should_warn_of_a_misnest_when_it_nests_past_the_repair_depth_limit() {
+        // ~keep No cell has an end tag, and the tree builder nests past its depth limit. The
+        // ~keep repair that the page then takes is the one for a misnest.
         let html = format!("{}x", "<table><td>".repeat(300));
 
         assert_eq!(

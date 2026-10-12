@@ -25,6 +25,18 @@ fn inline_like_value(node_handle: tl::NodeHandle, parser: &tl::Parser) -> Option
 }
 
 fn cache_sibling_context(siblings: &[tl::NodeHandle], parser: &tl::Parser, ctx: &mut DomContext) {
+    let mut previous_tag = None;
+    for sibling in siblings {
+        let id = sibling.get_inner();
+        ctx.ensure_capacity(id);
+        let _ = ctx.prev_tag_map[id as usize].set(previous_tag);
+        match sibling.get(parser) {
+            Some(tl::Node::Tag(_)) => previous_tag = Some(id),
+            Some(tl::Node::Raw(raw)) if !raw.as_utf8_str().trim().is_empty() => previous_tag = None,
+            _ => {}
+        }
+    }
+
     let mut next_inline_like = false;
     let mut next_tag = None;
     let mut next_whitespace = false;
@@ -70,6 +82,7 @@ pub fn build_dom_context(dom: &tl::VDom, parser: &tl::Parser, _input_len: usize)
         node_map: Vec::new(),
         tag_info_map: Vec::new(),
         next_inline_like_map: Vec::new(),
+        prev_tag_map: Vec::new(),
         next_tag_map: Vec::new(),
         next_whitespace_map: Vec::new(),
         table_content_summary_cache: std::cell::RefCell::new(std::collections::HashMap::new()),
@@ -77,7 +90,7 @@ pub fn build_dom_context(dom: &tl::VDom, parser: &tl::Parser, _input_len: usize)
 
     // ~keep Node ids index `dom.nodes()`, so the arena length is an exact upper bound on them.
     // ~keep Sizing every map once here replaces one incremental grow per map per newly-seen id
-    // ~keep (eight maps x one grow per node) with eight allocations for the whole document.
+    // ~keep (nine maps x one grow per node) with nine allocations for the whole document.
     if let Some(highest_node_id) = dom.nodes().len().checked_sub(1).and_then(|id| u32::try_from(id).ok()) {
         ctx.ensure_capacity(highest_node_id);
     }

@@ -7,6 +7,7 @@ use std::borrow::Cow;
 use std::str;
 
 use super::markup::{find_tag_end, is_json_ld_script_open_tag, matches_end_tag_start, matches_tag_start};
+use super::visibility::bogus_comment_end;
 
 /// If `idx` starts an `<svg`/`</svg` tag, adjust `svg_depth` accordingly and return the index
 /// just past the tag. Returns `None` when `idx` does not start an svg tag (or the tag is
@@ -160,6 +161,13 @@ const FIRST_PASS_ELEMENTS: [(&str, RawTextContent); 3] = [
     ("textarea", RawTextContent::Kept),
 ];
 
+/// The name of the raw-text element `FIRST_PASS_ELEMENTS[slot]` when the two passes remove
+/// it (`script`, `style`). `None` for an element that is kept.
+pub(super) fn removed_element_name(slot: usize) -> Option<&'static str> {
+    let (name, content) = FIRST_PASS_ELEMENTS[slot];
+    (content != RawTextContent::Kept).then_some(name)
+}
+
 /// Strip script and style tags and their content from HTML, and write the content of a
 /// structured data script and of a `textarea` as text.
 pub fn strip_script_and_style_tags(input: &str) -> Cow<'_, str> {
@@ -172,53 +180,113 @@ pub fn strip_script_and_style_tags_of_repaired_page(input: &str) -> Cow<'_, str>
     FirstPass::new(input, RawTextPage::Repaired, |_| {}).run()
 }
 
-/// A read of the first pass that a test counts.
+/// A read of the first pass or of the second pass that a test counts.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(super) enum FirstPassRead {
+pub(super) enum PassRead {
     /// A `<` of the page.
     Markup,
     /// A search for the end tag of a raw-text element. It can read to the end of the page.
     EndTagSearch,
     /// A search for the end of a comment. It can read to the end of the page.
     CommentEndSearch,
+    /// A read of a tag to its end, with the count of the bytes it went over. It can read to
+    /// the end of the page.
+    TagRead(usize),
 }
 
-/// The ends of the comments of one page. The first pass and the second pass read a comment
-/// whole with it, so a tag in a comment starts nothing in either pass.
+/// The reads of one pass over one page that can go to the end of the page: the end of a
+/// comment, the end of a tag and the end tag of a raw-text element. The first pass and the
+/// second pass read a comment and a tag whole with it, so a tag in a comment or in an
+/// attribute value starts nothing in either pass.
 ///
-/// ~keep A search that finds no end is not made again: a later comment has no end either.
-#[derive(Default)]
-pub(super) struct CommentEnds {
-    never_end: bool,
+/// ~keep A read that finds no end is not made again, so the reads of a pass are linear. A later
+/// ~keep comment has no end either, and a later start tag of the same name has no end tag
+/// ~keep either. A tag that does not end holds the rest of the page, so a later `<` is in it:
+/// ~keep it ends at its first `>`, as a tag with a quote that never ends.
+pub(super) struct PageReads<C: FnMut(PassRead)> {
+    comments_never_end: bool,
+    tags_never_end: bool,
+    no_end_tag: [bool; FIRST_PASS_ELEMENTS.len()],
+    count: C,
 }
 
-impl CommentEnds {
-    /// The position after the comment that the `<` at `idx` starts, when it starts a comment
-    /// that ends.
-    pub(super) fn end(&mut self, bytes: &[u8], idx: usize) -> Option<usize> {
-        if self.never_end || !bytes[idx..].starts_with(COMMENT_OPEN) {
+impl<C: FnMut(PassRead)> PageReads<C> {
+    pub(super) const fn new(count: C) -> Self {
+        Self {
+            comments_never_end: false,
+            tags_never_end: false,
+            no_end_tag: [false; FIRST_PASS_ELEMENTS.len()],
+            count,
+        }
+    }
+
+    /// The first end tag of the raw-text element `FIRST_PASS_ELEMENTS[slot]` at or after
+    /// `from`: the position of its `<` and the position after its `>`.
+    pub(super) fn raw_text_end_tag(&mut self, bytes: &[u8], from: usize, slot: usize) -> Option<(usize, usize)> {
+        if self.no_end_tag[slot] {
             return None;
         }
+        self.count(PassRead::EndTagSearch);
+        let found = find_raw_text_end_tag(bytes, from, FIRST_PASS_ELEMENTS[slot].0.as_bytes());
+        // ~keep A search that stopped at the scan limit did not read the whole page and proves
+        // ~keep nothing.
+        self.no_end_tag[slot] = found.is_none() && bytes.len() - from <= MAX_CLOSING_TAG_SCAN;
+        found
+    }
+
+    /// Count one read of the pass.
+    pub(super) fn count(&mut self, read: PassRead) {
+        (self.count)(read);
+    }
+
+    /// The position after the comment that the `<` at `idx` starts, when it starts a comment
+    /// that ends.
+    pub(super) fn comment_end(&mut self, bytes: &[u8], idx: usize) -> Option<usize> {
+        if self.comments_never_end || !bytes[idx..].starts_with(COMMENT_OPEN) {
+            return None;
+        }
+        self.count(PassRead::CommentEndSearch);
         // ~keep `<!-->` and `<!--->` are whole comments: the search starts in the opening.
         let from = idx + 2;
         let found = memchr::memmem::find(&bytes[from..], COMMENT_CLOSE);
-        self.never_end = found.is_none();
+        self.comments_never_end = found.is_none();
         found.map(|offset| from + offset + COMMENT_CLOSE.len())
     }
-}
 
-/// The position after the tag that the `<` at `idx` starts, read whole with its quoted
-/// attribute values. Returns `None` for a `<` of the text and for a tag with no `>`.
-///
-/// ~keep The first pass and the second pass read a tag with this function: a `<` in an
-/// ~keep attribute value starts nothing in either pass. A quote that never ends is no quote:
-/// ~keep the tag ends at its first `>`, as a raw-text start tag does.
-pub(super) fn tag_end(bytes: &[u8], idx: usize) -> Option<usize> {
-    if !opens_a_tag(bytes, idx) {
-        return None;
+    /// The position after the tag that the `<` at `idx` starts, read whole with its quoted
+    /// attribute values. Returns `None` for a `<` of the text and for a tag with no `>`.
+    pub(super) fn tag_end(&mut self, bytes: &[u8], idx: usize) -> Option<usize> {
+        if !opens_a_tag(bytes, idx) {
+            return None;
+        }
+        self.tag_end_from(bytes, idx + 1)
     }
-    let first_bracket = || memchr::memchr(b'>', &bytes[idx..]).map(|offset| idx + offset + 1);
-    whole_tag_end(bytes, idx + 1).or_else(first_bracket)
+
+    /// If the `<` at `lt` starts a raw-text element of `FIRST_PASS_ELEMENTS`, return its slot
+    /// there and the position after its start tag, read whole with its quoted attribute
+    /// values.
+    pub(super) fn raw_text_start_tag_end(&mut self, bytes: &[u8], lt: usize) -> Option<(usize, usize)> {
+        let (slot, after_name) = FIRST_PASS_ELEMENTS.iter().enumerate().find_map(|(slot, (name, _))| {
+            let after_name = raw_text_tag_name_end(bytes, lt, name.as_bytes(), TagSide::Start)?;
+            Some((slot, after_name))
+        })?;
+        let tag_end = self.tag_end_from(bytes, after_name)?;
+        Some((slot, tag_end))
+    }
+
+    /// The position after the `>` that ends the tag read from `from`, a position in the tag
+    /// after its `<`.
+    fn tag_end_from(&mut self, bytes: &[u8], from: usize) -> Option<usize> {
+        if !self.tags_never_end {
+            let whole = whole_tag_end(bytes, from);
+            self.count(PassRead::TagRead(whole.unwrap_or(bytes.len()) - from));
+            self.tags_never_end = whole.is_none();
+            if whole.is_some() {
+                return whole;
+            }
+        }
+        memchr::memchr(b'>', &bytes[from..]).map(|offset| from + offset + 1)
+    }
 }
 
 /// The first pass over one page.
@@ -226,20 +294,20 @@ pub(super) fn tag_end(bytes: &[u8], idx: usize) -> Option<usize> {
 /// ~keep The pass reads markup as a tokenizer does: a comment whole, a tag to its end with its
 /// ~keep quoted attribute values, a raw-text element to its end tag. The next `<` it tries is
 /// ~keep after that, so a `<textarea>` in a comment or in an attribute value starts nothing.
+/// ~keep A bogus comment is read to its first `>`: a `<textarea>` in `<? ... >` starts nothing.
 /// ~keep The pass is linear: a search that finds no end is not made again. A later start tag
-/// ~keep of the same name has no end tag either, and a later comment has no end either.
-pub(super) struct FirstPass<'a, C: FnMut(FirstPassRead)> {
+/// ~keep of the same name has no end tag either; `PageReads` has the rule of a comment and of
+/// ~keep a tag.
+pub(super) struct FirstPass<'a, C: FnMut(PassRead)> {
     input: &'a str,
     page: RawTextPage,
     last: usize,
     output: Option<String>,
     svg_depth: usize,
-    no_end_tag: [bool; FIRST_PASS_ELEMENTS.len()],
-    comments: CommentEnds,
-    count: C,
+    reads: PageReads<C>,
 }
 
-impl<'a, C: FnMut(FirstPassRead)> FirstPass<'a, C> {
+impl<'a, C: FnMut(PassRead)> FirstPass<'a, C> {
     pub(super) const fn new(input: &'a str, page: RawTextPage, count: C) -> Self {
         Self {
             input,
@@ -247,9 +315,7 @@ impl<'a, C: FnMut(FirstPassRead)> FirstPass<'a, C> {
             last: 0,
             output: None,
             svg_depth: 0,
-            no_end_tag: [false; FIRST_PASS_ELEMENTS.len()],
-            comments: CommentEnds { never_end: false },
-            count,
+            reads: PageReads::new(count),
         }
     }
 
@@ -277,7 +343,7 @@ impl<'a, C: FnMut(FirstPassRead)> FirstPass<'a, C> {
     /// Read the markup that the `<` at `idx` starts. Returns the position of the next read.
     fn read_markup(&mut self, idx: usize) -> usize {
         let bytes = self.input.as_bytes();
-        (self.count)(FirstPassRead::Markup);
+        self.reads.count(PassRead::Markup);
         if let Some(after_tag) = track_svg_tag(bytes, idx, &mut self.svg_depth) {
             return after_tag;
         }
@@ -285,25 +351,15 @@ impl<'a, C: FnMut(FirstPassRead)> FirstPass<'a, C> {
             return idx + 1;
         }
         if bytes[idx..].starts_with(COMMENT_OPEN) {
-            return self.comment_end(idx).unwrap_or(idx + 1);
+            return self.reads.comment_end(bytes, idx).unwrap_or(idx + 1);
         }
-        let start_tag = FIRST_PASS_ELEMENTS.iter().enumerate().find_map(|(slot, &(name, _))| {
-            let tag_end = raw_text_tag_end(bytes, idx, name.as_bytes(), TagSide::Start)?;
-            Some((slot, tag_end))
-        });
-        if let Some((slot, tag_end)) = start_tag {
+        if let Some(after_comment) = bogus_comment_end(bytes, idx) {
+            return after_comment;
+        }
+        if let Some((slot, tag_end)) = self.reads.raw_text_start_tag_end(bytes, idx) {
             return self.read_raw_text_element(idx, slot, tag_end);
         }
-        tag_end(bytes, idx).unwrap_or(idx + 1)
-    }
-
-    /// The position after the comment that starts at `idx`, when the comment ends.
-    fn comment_end(&mut self, idx: usize) -> Option<usize> {
-        if self.comments.never_end {
-            return None;
-        }
-        (self.count)(FirstPassRead::CommentEndSearch);
-        self.comments.end(self.input.as_bytes(), idx)
+        self.reads.tag_end(bytes, idx).unwrap_or(idx + 1)
     }
 
     /// Read the raw-text element of `FIRST_PASS_ELEMENTS[slot]` whose start tag is at `idx`
@@ -311,16 +367,8 @@ impl<'a, C: FnMut(FirstPassRead)> FirstPass<'a, C> {
     fn read_raw_text_element(&mut self, idx: usize, slot: usize, tag_end: usize) -> usize {
         let bytes = self.input.as_bytes();
         let (name, content) = FIRST_PASS_ELEMENTS[slot];
-        let close = if self.no_end_tag[slot] {
-            None
-        } else {
-            (self.count)(FirstPassRead::EndTagSearch);
-            find_raw_text_end_tag(bytes, tag_end, name.as_bytes())
-        };
-        let Some(close) = close else {
-            // ~keep The second pass reads an element with no end tag. A search that stopped
-            // ~keep at the scan limit did not read the whole page and proves nothing.
-            self.no_end_tag[slot] |= bytes.len() - tag_end <= MAX_CLOSING_TAG_SCAN;
+        let Some(close) = self.reads.raw_text_end_tag(bytes, tag_end, slot) else {
+            // ~keep The second pass reads an element with no end tag.
             return tag_end;
         };
         let element = RawTextElement {
@@ -347,24 +395,33 @@ const MAX_CLOSING_TAG_SCAN: usize = 100_000_000;
 
 /// The side of an element that a tag is on.
 #[derive(Clone, Copy, PartialEq, Eq)]
-pub enum TagSide {
+enum TagSide {
     /// `<name ...>`
     Start,
     /// `</name ...>`
     End,
 }
 
-/// The one rule for the start tag and the end tag of a raw-text element. If the `<` at `lt`
-/// starts a tag of `name` on `side`, return the index after the `>` of the tag.
+/// If the `<` at `lt` starts the start tag of the raw-text element `name`, return the index
+/// after the `>` of the tag. A scan that skips a raw-text element reads its start tag here.
+///
+/// ~keep A `>` in a quoted attribute value does not end a start tag. A start tag with a quote
+/// ~keep that never ends ends at its first `>`. A pass reads many tags of one page: it reads
+/// ~keep them with `PageReads`, which has this rule and makes no read twice.
+fn raw_text_start_tag_end(bytes: &[u8], lt: usize, name: &[u8]) -> Option<usize> {
+    let after_name = raw_text_tag_name_end(bytes, lt, name, TagSide::Start)?;
+    let first_bracket = || memchr::memchr(b'>', &bytes[after_name..]).map(|offset| after_name + offset + 1);
+    whole_tag_end(bytes, after_name).or_else(first_bracket)
+}
+
+/// The one rule for the name of the start tag and of the end tag of a raw-text element. If
+/// the `<` at `lt` starts a tag of `name` on `side`, return the position after the name.
 ///
 /// ~keep The HTML rule: the name in any case, then tab, LF, FF, CR, space, `/` or `>`. The
-/// ~keep two passes, the scan of hidden regions and the fast converter call this function; a
-/// ~keep second copy of the rule is how they came to disagree on the form feed and the slash.
-/// ~keep The second pass (`preprocess_html`) meets only what the first pass leaves: an element
-/// ~keep with no end tag.
-/// ~keep A `>` in a quoted attribute value does not end a start tag. A start tag with a quote
-/// ~keep that never ends, and an end tag, end at the first `>`.
-pub fn raw_text_tag_end(bytes: &[u8], lt: usize, name: &[u8], side: TagSide) -> Option<usize> {
+/// ~keep two passes, the scan of hidden regions and the fast converter read a tag with this
+/// ~keep function; a second copy of the rule is how they came to disagree on the form feed
+/// ~keep and the slash.
+fn raw_text_tag_name_end(bytes: &[u8], lt: usize, name: &[u8], side: TagSide) -> Option<usize> {
     if bytes.get(lt) != Some(&b'<') {
         return None;
     }
@@ -383,18 +440,16 @@ pub fn raw_text_tag_end(bytes: &[u8], lt: usize, name: &[u8], side: TagSide) -> 
     ) {
         return None;
     }
-    let first_bracket = || memchr::memchr(b'>', &bytes[after_name..]).map(|offset| after_name + offset + 1);
-    match side {
-        TagSide::Start => whole_tag_end(bytes, after_name).or_else(first_bracket),
-        TagSide::End => first_bracket(),
-    }
+    Some(after_name)
 }
 
 /// The position after the `>` that ends the tag read from `from`, a position in the tag after
-/// its `<`. Returns `None` when a quoted value or the tag does not end.
+/// its `<`. Returns `None` when a value or the tag does not end.
 ///
 /// ~keep The HTML rule: a quote opens a value only as the first byte of the value, after `=`
-/// ~keep and white space. The apostrophe of `title=it's` is a byte of the value.
+/// ~keep and white space. A value with no quotes ends at white space or at `>`: the apostrophe
+/// ~keep of `title=it's` and the `=` and the apostrophe of `href=/search?q='tis` are bytes of
+/// ~keep the value.
 fn whole_tag_end(bytes: &[u8], from: usize) -> Option<usize> {
     let mut idx = from;
     let mut value_starts = false;
@@ -402,16 +457,27 @@ fn whole_tag_end(bytes: &[u8], from: usize) -> Option<usize> {
         let byte = *bytes.get(idx)?;
         match byte {
             b'>' => return Some(idx + 1),
+            b'\t' | b'\n' | b'\x0C' | b'\r' | b' ' => idx += 1,
             b'"' | b'\'' if value_starts => {
-                idx += 1 + memchr::memchr(byte, &bytes[idx + 1..])?;
+                idx += 2 + memchr::memchr(byte, &bytes[idx + 1..])?;
                 value_starts = false;
             }
-            b'=' => value_starts = true,
-            b'\t' | b'\n' | b'\x0C' | b'\r' | b' ' => {}
-            _ => value_starts = false,
+            _ if value_starts => {
+                let value = &bytes[idx..];
+                idx += value.iter().copied().position(ends_an_unquoted_value)?;
+                value_starts = false;
+            }
+            _ => {
+                value_starts = byte == b'=';
+                idx += 1;
+            }
         }
-        idx += 1;
     }
+}
+
+/// Whether `byte` ends an attribute value with no quotes: white space or `>`.
+const fn ends_an_unquoted_value(byte: u8) -> bool {
+    matches!(byte, b'\t' | b'\n' | b'\x0C' | b'\r' | b' ' | b'>')
 }
 
 /// Find the position of the FIRST closing tag in bytes, ignoring nesting.
@@ -436,7 +502,9 @@ pub fn find_raw_text_end_tag(bytes: &[u8], start: usize, name: &[u8]) -> Option<
     let mut idx = start;
     while idx < bytes.len() && (idx - start) < MAX_CLOSING_TAG_SCAN {
         idx += memchr::memchr(b'<', &bytes[idx..])?;
-        if let Some(end) = raw_text_tag_end(bytes, idx, name, TagSide::End) {
+        if let Some(after_name) = raw_text_tag_name_end(bytes, idx, name, TagSide::End) {
+            // ~keep An end tag with no `>` ends the search: no later end tag has one either.
+            let end = after_name + memchr::memchr(b'>', &bytes[after_name..])? + 1;
             return Some((idx, end));
         }
         idx += 1;
@@ -517,7 +585,7 @@ pub fn skip_opaque_region(bytes: &[u8], idx: usize) -> Option<usize> {
     }
 
     for raw_text_name in RAW_TEXT_ELEMENT_NAMES {
-        if let Some(open_end) = raw_text_tag_end(bytes, idx, raw_text_name, TagSide::Start) {
+        if let Some(open_end) = raw_text_start_tag_end(bytes, idx, raw_text_name) {
             // ~keep First-match close is the spec terminator for raw text — see
             // ~keep the doc comment on `find_closing_tag_bytes`.
             return Some(find_closing_tag_bytes(bytes, open_end, raw_text_name).unwrap_or(len));
@@ -607,4 +675,48 @@ pub fn find_closing_tag_bytes_nested(bytes: &[u8], start: usize, tag: &[u8]) -> 
     }
 
     None
+}
+
+// ~keep Match each same-name nesting stack once; repeated hidden opens without closes
+// otherwise search the entire suffix independently (#773).
+pub(super) fn matching_tag_ends(bytes: &[u8]) -> ahash::AHashMap<usize, Option<usize>> {
+    let mut stacks: ahash::AHashMap<Vec<u8>, Vec<usize>> = ahash::AHashMap::new();
+    let mut ends = ahash::AHashMap::new();
+    let mut idx = 0;
+    let last_gt = bytes.iter().rposition(|&byte| byte == b'>').unwrap_or(0);
+    while idx < last_gt {
+        let Some(offset) = memchr::memchr(b'<', &bytes[idx..]) else {
+            break;
+        };
+        idx += offset;
+        if let Some(end) = skip_opaque_region(bytes, idx) {
+            idx = end;
+            continue;
+        }
+        if !opens_a_tag(bytes, idx) {
+            idx += 1;
+            continue;
+        }
+        let closing = bytes.get(idx + 1) == Some(&b'/');
+        let start = idx + if closing { 2 } else { 1 };
+        let name_len = bytes[start..]
+            .iter()
+            .take_while(|byte| !byte.is_ascii_whitespace() && !matches!(byte, b'>' | b'/'))
+            .count();
+        let name = bytes[start..start + name_len].to_ascii_lowercase();
+        let Some(end) = find_tag_end(bytes, start + name_len) else {
+            break;
+        };
+        let stack = stacks.entry(name.clone()).or_default();
+        if closing {
+            if let Some(open) = stack.pop() {
+                ends.insert(open, Some(end));
+            }
+        } else if !is_self_closing_tag(&bytes[idx..end], &name) {
+            ends.insert(idx, None);
+            stack.push(idx);
+        }
+        idx = end;
+    }
+    ends
 }

@@ -233,6 +233,22 @@ pub struct ConversionArgs {
     #[arg(help_heading = "Links")]
     pub no_autolinks: bool,
 
+    /// Disable abbreviation expansion
+    ///
+    /// By default, the title of an `<abbr>` follows its text in parentheses.
+    /// Pass this flag to output the text only.
+    #[arg(long = "no-expand-abbreviations")]
+    #[arg(help_heading = "Text Formatting")]
+    pub no_expand_abbreviations: bool,
+
+    /// Disable blockquote citations
+    ///
+    /// By default, the `cite` URL of a `<blockquote>` follows the quote.
+    /// Pass this flag to output the quote only.
+    #[arg(long = "no-blockquote-citations")]
+    #[arg(help_heading = "Text Formatting")]
+    pub no_blockquote_citations: bool,
+
     /// Link rendering style
     ///
     /// Controls how links are formatted:
