@@ -96,6 +96,10 @@ pub struct ConversionOptions {
     pub code_language: String,
     /// Automatically convert bare URLs into Markdown autolinks.
     pub autolinks: bool,
+    /// Append the title of an `<abbr>` in parentheses (default `true`).
+    pub expand_abbreviations: bool,
+    /// Append the `cite` URL after a blockquote (default `true`).
+    pub include_blockquote_citations: bool,
     /// Emit a default title when no `<title>` tag is present.
     pub default_title: bool,
     /// Render `<br>` elements inside table cells as literal line breaks.
@@ -280,6 +284,8 @@ impl Default for ConversionOptions {
             escape_ascii: false,
             code_language: String::new(),
             autolinks: true,
+            expand_abbreviations: true,
+            include_blockquote_citations: true,
             default_title: false,
             br_in_tables: false,
             compact_tables: false,
@@ -399,6 +405,8 @@ impl ConversionOptionsBuilder {
     builder_setter_into!(code_language, String);
     builder_setter!(link_style, LinkStyle);
     builder_setter!(autolinks, bool);
+    builder_setter!(expand_abbreviations, bool);
+    builder_setter!(include_blockquote_citations, bool);
     builder_setter!(default_title, bool);
     builder_setter!(br_in_tables, bool);
     builder_setter!(compact_tables, bool);
@@ -524,6 +532,10 @@ pub struct ConversionOptionsUpdate {
     pub code_language: Option<String>,
     /// Optional override for [`ConversionOptions::autolinks`].
     pub autolinks: Option<bool>,
+    /// Optional override for [`ConversionOptions::expand_abbreviations`].
+    pub expand_abbreviations: Option<bool>,
+    /// Optional override for [`ConversionOptions::include_blockquote_citations`].
+    pub include_blockquote_citations: Option<bool>,
     /// Optional override for [`ConversionOptions::default_title`].
     pub default_title: Option<bool>,
     /// Optional override for [`ConversionOptions::br_in_tables`].
@@ -622,6 +634,8 @@ impl ConversionOptions {
         apply!(escape_ascii);
         apply!(code_language);
         apply!(autolinks);
+        apply!(expand_abbreviations);
+        apply!(include_blockquote_citations);
         apply!(default_title);
         apply!(br_in_tables);
         apply!(compact_tables);

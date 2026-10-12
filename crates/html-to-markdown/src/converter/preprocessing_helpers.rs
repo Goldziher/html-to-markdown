@@ -233,6 +233,123 @@ fn has_end_tag(tag: &tl::HTMLTag<'_>) -> bool {
         .is_some_and(|raw| raw.ends_with(b"</"))
 }
 
+/// The children of one element (or of the page) in the walk of [`has_discarded_end_tag`].
+struct SiblingList<'a> {
+    children: &'a [tl::NodeHandle],
+    next: usize,
+    /// The source offset where the last node ended, when the offset is known.
+    previous_end: Option<usize>,
+    /// The source offset of the end tag of the element, for an element that has one.
+    end_tag: Option<usize>,
+    /// The name of the element in lower case. The page has none.
+    name: Option<std::borrow::Cow<'a, [u8]>>,
+}
+
+/// True when the first parse discarded an end tag that names an element that was open, so the
+/// HTML tree builder must decide where that element ends (issue #810).
+///
+/// ~keep `tl` discards an end tag that does not name the element on top of its stack (astral-tl
+/// ~keep `parser/base.rs`, `read_end`) and makes no node for it. Each node is a slice of the
+/// ~keep source, so a discarded end tag is the source between two sibling nodes, or between
+/// ~keep the last child and the end tag of the parent, that is in no node. In
+/// ~keep `<div><p>one</div>two</p>` the `p` holds the text nodes `one` and `two`, and the
+/// ~keep source between them is `</div>`. The walk reads each node once and no token.
+/// ~keep A comment and an attribute value are inside a node, so an end tag in one is not seen.
+/// ~keep Not read: the source between a start tag and the first child of an element that has
+/// ~keep its end tag, because `tl` does not keep the length of a start tag.
+pub fn has_discarded_end_tag(dom_ctx: &DomContext, parser: &tl::Parser, input: &str) -> bool {
+    let source = input.as_bytes();
+    let mut open: std::collections::HashMap<std::borrow::Cow<'_, [u8]>, usize> = std::collections::HashMap::new();
+    let mut lists = vec![SiblingList {
+        children: &dom_ctx.root_children,
+        next: 0,
+        previous_end: None,
+        end_tag: None,
+        name: None,
+    }];
+    while let Some(list) = lists.last_mut() {
+        let Some(handle) = list.children.get(list.next) else {
+            if names_open_element(source, list.previous_end, list.end_tag, &open) {
+                return true;
+            }
+            if let Some(count) = list.name.as_ref().and_then(|name| open.get_mut(name)) {
+                *count -= 1;
+            }
+            lists.pop();
+            continue;
+        };
+        list.next += 1;
+        let Some(node) = handle.get(parser) else {
+            list.previous_end = None;
+            continue;
+        };
+        let span = node_span(node, source);
+        if names_open_element(source, list.previous_end, span.map(|(start, _)| start), &open) {
+            return true;
+        }
+        list.previous_end = span.map(|(_, end)| end);
+        let tl::Node::Tag(tag) = node else { continue };
+        let Some(children) = dom_ctx
+            .children_of(handle.get_inner())
+            .filter(|children| !children.is_empty())
+        else {
+            continue;
+        };
+        let name = tag.name().as_bytes();
+        let closed = has_end_tag(tag);
+        let name_in_lower_case = lower_case(name);
+        *open.entry(name_in_lower_case.clone()).or_insert(0) += 1;
+        lists.push(SiblingList {
+            children,
+            next: 0,
+            // ~keep The source range of an element with no end tag is its start tag.
+            previous_end: span.filter(|_| !closed).map(|(_, end)| end),
+            end_tag: span.filter(|_| closed).map(|(_, end)| end - name.len() - 3),
+            name: Some(name_in_lower_case),
+        });
+    }
+    false
+}
+
+fn lower_case(name: &[u8]) -> std::borrow::Cow<'_, [u8]> {
+    if name.iter().any(u8::is_ascii_uppercase) {
+        std::borrow::Cow::Owned(name.to_ascii_lowercase())
+    } else {
+        std::borrow::Cow::Borrowed(name)
+    }
+}
+
+/// The source range of `node`, or `None` when its bytes are no part of `source`: `tl` gives a
+/// comment with no end an empty slice of its own.
+fn node_span(node: &tl::Node<'_>, source: &[u8]) -> Option<(usize, usize)> {
+    let raw = match node {
+        tl::Node::Tag(tag) => tag.raw().as_bytes(),
+        tl::Node::Raw(bytes) | tl::Node::Comment(bytes) => bytes.as_bytes(),
+    };
+    let start = (raw.as_ptr() as usize).checked_sub(source.as_ptr() as usize)?;
+    (!raw.is_empty() && start + raw.len() <= source.len()).then_some((start, start + raw.len()))
+}
+
+/// True when `source[from..to]`, which is in no node, holds an end tag that names an open element.
+fn names_open_element(
+    source: &[u8],
+    from: Option<usize>,
+    to: Option<usize>,
+    open: &std::collections::HashMap<std::borrow::Cow<'_, [u8]>, usize>,
+) -> bool {
+    let Some(gap) = from.zip(to).and_then(|(from, to)| source.get(from..to)) else {
+        return false;
+    };
+    memchr::memmem::find_iter(gap, b"</").any(|at| {
+        let name = &gap[at + 2..];
+        let end = name
+            .iter()
+            .position(|byte| byte.is_ascii_whitespace() || matches!(byte, b'/' | b'>'))
+            .unwrap_or(name.len());
+        open.get(&*lower_case(&name[..end])).is_some_and(|count| *count > 0)
+    })
+}
+
 /// The count of characters that are not ASCII white space in the text nodes of `dom` that the
 /// converter can write, with every character reference decoded.
 ///
@@ -529,7 +646,78 @@ fn element_has_noise_hint(tag: &tl::HTMLTag) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use super::readable_text_len;
+    use super::{has_discarded_end_tag, readable_text_len};
+    use crate::converter::utility::caching::build_dom_context;
+
+    fn discards_an_end_tag_of_an_open_element(html: &str) -> bool {
+        let dom = tl::parse(html, tl::ParserOptions::default()).expect("parse");
+        let dom_ctx = build_dom_context(&dom, dom.parser(), html.len());
+        has_discarded_end_tag(&dom_ctx, dom.parser(), html)
+    }
+
+    #[test]
+    fn should_leave_a_discarded_end_tag_as_source_between_two_sibling_nodes() {
+        let html = "<div><p>one</div>two</p>";
+        let dom = tl::parse(html, tl::ParserOptions::default()).expect("parse");
+        let parser = dom.parser();
+        let paragraph = dom
+            .nodes()
+            .iter()
+            .filter_map(tl::Node::as_tag)
+            .find(|tag| tag.name() == "p")
+            .expect("paragraph");
+        let texts: Vec<(usize, &[u8])> = paragraph
+            .children()
+            .top()
+            .iter()
+            .filter_map(|child| match child.get(parser) {
+                Some(tl::Node::Raw(text)) => Some(text.as_bytes()),
+                _ => None,
+            })
+            .map(|text| (text.as_ptr() as usize - html.as_ptr() as usize, text))
+            .collect();
+
+        assert_eq!(texts, [(8, b"one".as_slice()), (17, b"two".as_slice())]);
+        assert_eq!(&html[11..17], "</div>");
+    }
+
+    #[test]
+    fn should_find_an_end_tag_that_the_first_parse_discarded_while_its_element_was_open() {
+        for html in [
+            "<div><p>one</div>two</p>",
+            "<div><p>one</div>two</p>rest</div>tail",
+            "<div><p>one<b>x</b></div>two</p>rest</div>tail",
+            "<div><p>one</DIV >two</p>rest</div>tail",
+            "<DIV><p>one</div>two</p>rest</DIV>tail",
+            "<ul><li>one</ul>two</li></ul>tail",
+            "<dl><dd>one</dl>two</dd></dl>tail",
+            "<table><tr><td>one</tr>two</td></tr></table>tail",
+            "<select><option>one</select>two</option></select>tail",
+            "<html><body><div><p>one</div>two</p>rest</div>tail",
+        ] {
+            assert!(discards_an_end_tag_of_an_open_element(html), "{html:?}");
+        }
+    }
+
+    #[test]
+    fn should_find_no_discarded_end_tag_when_none_names_an_open_element() {
+        let deep = format!("{}x{}", "<div>".repeat(600), "</div>".repeat(600));
+        for html in [
+            "",
+            "<p>a</b>b",
+            "<p>a</p></div>tail",
+            "<div><p>one</p></div>tail",
+            "<div><p>one</p><p>two</p></span></div>tail",
+            "<div title='</div>'><p>x</p></div>",
+            "<div><p>one<!-- </div> -->two</p></div>",
+            "<div><p>one<!-- </div> two</p></div>",
+            "<!doctype html><div><p>one</p>two</div>",
+            "<div><pre>one\n</pre>two</div>",
+            deep.as_str(),
+        ] {
+            assert!(!discards_an_end_tag_of_an_open_element(html), "{html:?}");
+        }
+    }
 
     fn text_len(html: &str) -> usize {
         readable_text_len(&tl::parse(html, tl::ParserOptions::default()).expect("parse"))

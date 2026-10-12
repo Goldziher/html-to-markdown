@@ -50,6 +50,10 @@ pub struct ConvertConfig {
     pub code_language: Option<String>,
     /// Convert bare URLs into autolinks. Default `true`.
     pub autolinks: Option<bool>,
+    /// Append the title of an `<abbr>` in parentheses. Default `true`.
+    pub expand_abbreviations: Option<bool>,
+    /// Append the `cite` URL after a blockquote. Default `true`.
+    pub include_blockquote_citations: Option<bool>,
     /// Emit a default title when no `<title>` is present. Default `false`.
     pub default_title: Option<bool>,
     /// Render `<br>` inside table cells as literal line breaks. Default `false`.
@@ -273,6 +277,8 @@ impl ConvertConfig {
         update.escape_ascii = self.escape_ascii.take();
         update.code_language = self.code_language.take();
         update.autolinks = self.autolinks.take();
+        update.expand_abbreviations = self.expand_abbreviations.take();
+        update.include_blockquote_citations = self.include_blockquote_citations.take();
         update.default_title = self.default_title.take();
         update.br_in_tables = self.br_in_tables.take();
         update.compact_tables = self.compact_tables.take();
@@ -637,6 +643,20 @@ mod tests {
         assert!(opts.autolinks);
         assert_eq!(opts.bullets, "-*+");
         assert_eq!(opts.heading_style, HeadingStyle::Atx);
+    }
+
+    #[test]
+    fn should_pass_the_abbreviation_and_citation_options_to_the_converter() {
+        let defaults: ConversionOptions = ConvertConfig::default().try_into().expect("no enum fields set");
+        assert!(defaults.expand_abbreviations);
+        assert!(defaults.include_blockquote_citations);
+
+        let config: ConvertConfig =
+            serde_json::from_str(r#"{"expand_abbreviations":false,"include_blockquote_citations":false}"#)
+                .expect("both options are accepted");
+        let opts: ConversionOptions = config.try_into().expect("no enum fields set");
+        assert!(!opts.expand_abbreviations);
+        assert!(!opts.include_blockquote_citations);
     }
 
     #[test]

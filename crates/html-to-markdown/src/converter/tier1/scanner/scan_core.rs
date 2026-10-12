@@ -440,7 +440,7 @@ impl<'a> Tier1Scanner<'a> {
                 .map(decode_attr)
                 .transpose()?
                 .map(|value| value.trim().to_owned())
-                .filter(|value| !value.is_empty());
+                .filter(|value| self.options.expand_abbreviations && !value.is_empty());
             self.state.abbr_titles.push(title);
         }
         Ok((prev_ctx, ol_start))

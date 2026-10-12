@@ -168,6 +168,30 @@ jobs:
         if: always() && steps.checkout.outcome == 'success'
         uses: xberg-io/actions/cleanup-rust-cache@v1
 
+  closing-tag-complexity:
+    name: "Complexity: ten runs (${{ matrix.os }})"
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    steps:
+      - uses: actions/checkout@v7
+      - uses: xberg-io/actions/setup-rust@v1
+        with:
+          cache-key-prefix: closing-tag-complexity-${{ matrix.os }}
+      - uses: xberg-io/actions/install-task@v1
+      # ~keep Issue #796 requires repeated measurements on all three runner operating systems.
+      # Run the unchanged ratio gate ten times, stopping on the first failure.
+      - name: Repeat the complexity regression ten times
+        shell: bash
+        run: |
+          for attempt in $(seq 1 10); do
+            echo "Complexity run ${attempt}/10"
+            task rust:test:complexity
+          done
+
   rust-coverage:
     name: "Coverage: Rust"
     runs-on: ubuntu-latest

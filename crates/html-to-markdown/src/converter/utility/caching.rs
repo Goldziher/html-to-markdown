@@ -91,7 +91,7 @@ pub fn build_dom_context(dom: &tl::VDom, parser: &tl::Parser, _input_len: usize)
 
     // ~keep Node ids index `dom.nodes()`, so the arena length is an exact upper bound on them.
     // ~keep Sizing every map once here replaces one incremental grow per map per newly-seen id
-    // ~keep (eight maps x one grow per node) with eight allocations for the whole document.
+    // ~keep (nine maps x one grow per node) with nine allocations for the whole document.
     if let Some(highest_node_id) = dom.nodes().len().checked_sub(1).and_then(|id| u32::try_from(id).ok()) {
         ctx.ensure_capacity(highest_node_id);
     }

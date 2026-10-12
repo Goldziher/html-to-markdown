@@ -603,7 +603,12 @@ traineddata = "traineddata"
 # The php crate is MIXED: src/lib.rs, the visitor interface and the stubs are alef-generated,
 # but src/HtmlVisitor.php is hand-written and must keep its quality metrics. ~keep
 "crates/html-to-markdown-php/**" = ["comment", "doc-comment"]
-"crates/html-to-markdown-php/src/lib.rs" = ["file-too-long", "function-too-long", "too-many-parameters"]
+"crates/html-to-markdown-php/src/lib.rs" = [
+  "file-too-long",
+  "function-too-long",
+  "too-many-parameters",
+  "type-too-long",
+]
 "crates/html-to-markdown-php/stubs/**" = [
   "comment",
   "doc-comment",
