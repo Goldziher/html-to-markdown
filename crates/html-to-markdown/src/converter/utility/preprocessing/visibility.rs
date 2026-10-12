@@ -1,7 +1,11 @@
 use std::borrow::Cow;
 
-use super::markup::{find_tag_end, matches_tag_start};
-use super::raw_text::{find_closing_tag_bytes_nested, is_self_closing_tag, matching_tag_ends, skip_opaque_region};
+use super::head_scan::body_start;
+use super::markup::{find_tag_end, matches_tag_start, skip_written_text_element};
+use super::raw_text::{
+    find_closing_tag_bytes_nested, is_self_closing_tag, matching_tag_ends, opens_a_tag, skip_opaque_region,
+};
+use crate::options::HiddenContent;
 
 /// Sanitize malformed markdown-like URLs in HTML attributes.
 ///
@@ -290,6 +294,35 @@ impl TagEnds {
     }
 }
 
+/// The tag ends of one page for a scan that asks at many tag starts.
+///
+/// ~keep A tag start with no end makes `find_tag_end` read to the end of the page: no `>` is
+/// ~keep left, or a quote before it has no partner. A page with many such starts made a scan
+/// ~keep that asks at each of them quadratic (#765). After the first scan that fails, the ends
+/// ~keep come from a table that reads the page once.
+pub(super) struct TagEndScan<'a> {
+    bytes: &'a [u8],
+    table: Option<TagEnds>,
+}
+
+impl<'a> TagEndScan<'a> {
+    pub(super) const fn new(bytes: &'a [u8]) -> Self {
+        Self { bytes, table: None }
+    }
+
+    /// The result of `find_tag_end(bytes, from)`.
+    pub(super) fn tag_end(&mut self, from: usize) -> Option<usize> {
+        if let Some(table) = &self.table {
+            return table.tag_end(from);
+        }
+        let tag_end = find_tag_end(self.bytes, from);
+        if tag_end.is_none() {
+            self.table = Some(TagEnds::new(self.bytes));
+        }
+        tag_end
+    }
+}
+
 pub fn strip_hidden_elements(input: &str) -> Cow<'_, str> {
     let bytes = input.as_bytes();
     let len = bytes.len();
@@ -304,11 +337,7 @@ pub fn strip_hidden_elements(input: &str) -> Cow<'_, str> {
         return Cow::Borrowed(input);
     }
 
-    // ~keep A tag start with no end makes `find_tag_end` read to the end of the page: no `>` is
-    // ~keep left, or a quote before it has no partner. A page with many such starts made this
-    // ~keep loop quadratic (#765). After the first scan that fails, the ends come from a table
-    // ~keep that reads the page once.
-    let mut tag_ends: Option<TagEnds> = None;
+    let mut tag_ends = TagEndScan::new(bytes);
 
     let mut idx = 0;
     let mut last = 0;
@@ -326,16 +355,7 @@ pub fn strip_hidden_elements(input: &str) -> Cow<'_, str> {
         // ~keep candidate tag start, and each failing scan re-walks the same suffix.
         let starts_tag_name = idx + 1 < len && bytes[idx + 1].is_ascii_alphabetic();
         if starts_tag_name {
-            let tag_end = if let Some(table) = &tag_ends {
-                table.tag_end(idx + 1)
-            } else {
-                let tag_end = find_tag_end(bytes, idx + 1);
-                if tag_end.is_none() {
-                    tag_ends = Some(TagEnds::new(bytes));
-                }
-                tag_end
-            };
-            if let Some(tag_end) = tag_end {
+            if let Some(tag_end) = tag_ends.tag_end(idx + 1) {
                 if let Some(remove_end) = hidden_element_removal_end(input, bytes, idx, tag_end, &mut ends) {
                     let out = output.get_or_insert_with(|| String::with_capacity(len));
                     out.push_str(&input[last..idx]);
@@ -361,6 +381,122 @@ pub fn strip_hidden_elements(input: &str) -> Cow<'_, str> {
     } else {
         Cow::Borrowed(input)
     }
+}
+
+/// Remove the start and end tags of the `<template>` and `<noscript>` elements whose content
+/// the caller keeps, so that the content converts where it is written.
+///
+/// [`HiddenContent::Reachable`] removes the tags of a declarative shadow root, which a browser
+/// renders in its host element. [`HiddenContent::All`] removes the tags of every `<template>` and
+/// `<noscript>`. An element whose tags stay is dropped by the walk, as before. Inside `<head>` no
+/// tag is removed: what the two elements hold there is metadata (`<link>`, `<meta>`, `<style>`),
+/// and removing the tags would make it the metadata of the document. [`body_start`] says where
+/// the head ends.
+///
+/// The two tags of one element are removed together or not at all: an end tag is removed only
+/// when the start tag that it closes was removed.
+///
+/// ~keep A start tag that is written as self-closing opens an element all the same: the
+/// ~keep inert-body pass and the tree builder read `<template/>` as `<template>`.
+///
+/// ~keep A removed start tag can be the tag that starts the body: the first `<template>` of a
+/// ~keep fragment, or a `<noscript>` after the end tag of the head. With nothing in its place the
+/// ~keep tree builder starts the body at a later tag and puts a `<title>` before that tag in the
+/// ~keep head, and a narrower choice, which keeps the tag, writes that title as text. So
+/// ~keep [`BODY_START`] is written for that tag.
+///
+/// ~keep The tags are removed before the parse, not skipped in the walk, so that every reader
+/// ~keep of the tree sees the content: a row in a `<template>` that is a child of a `<table>` is
+/// ~keep a row of that table, which a walk that descends into the template cannot give.
+pub fn unwrap_kept_inert_elements(input: &str, hidden_content: HiddenContent) -> Cow<'_, str> {
+    if hidden_content == HiddenContent::Drop {
+        return Cow::Borrowed(input);
+    }
+    let bytes = input.as_bytes();
+    let mut tag_ends = TagEndScan::new(bytes);
+    let Some(body_start) = body_start(input, &mut tag_ends) else {
+        return Cow::Borrowed(input);
+    };
+    // ~keep For `<template>` and for `<noscript>`, one entry for each open start tag after the
+    // ~keep head: whether the tag was removed. An end tag takes the entry of the start tag that
+    // ~keep it closes. A start tag that stays while its end tag is removed holds the rest of the
+    // ~keep page, and the walk drops what it holds.
+    let mut open: [Vec<bool>; 2] = [Vec::new(), Vec::new()];
+    let mut output: Option<String> = None;
+    let mut last = 0;
+    let mut idx = body_start;
+
+    while idx < bytes.len() {
+        let Some(offset) = memchr::memchr(b'<', &bytes[idx..]) else {
+            break;
+        };
+        idx += offset;
+        let is_end_tag = bytes.get(idx + 1) == Some(&b'/');
+        let name_start = idx + 1 + usize::from(is_end_tag);
+        let is_template = matches_tag_start(bytes, name_start, b"template");
+        let is_noscript = matches_tag_start(bytes, name_start, b"noscript");
+        let is_tag = opens_a_tag(bytes, idx);
+        let tag_end = if is_tag { tag_ends.tag_end(idx + 1) } else { None };
+        if !is_template && !is_noscript {
+            // ~keep A comment, a raw-text body, the text of a text element and a quoted attribute
+            // ~keep value can hold text that looks like one of the two tags. Step over each as
+            // ~keep one unit.
+            // ~keep A raw-text element starts with a tag that ends. For a tag start with no end
+            // ~keep the raw-text scan would read to the end of the input and find nothing.
+            let unit_end = if is_tag && tag_end.is_none() {
+                None
+            } else {
+                skip_opaque_region(bytes, idx)
+                    .or_else(|| skip_written_text_element(bytes, idx))
+                    .or(tag_end)
+            };
+            idx = unit_end.unwrap_or(idx + 1);
+            continue;
+        }
+        let Some(tag_end) = tag_end else {
+            break;
+        };
+        // ~keep Text that starts the body is before its first tag, so only a tag is at the start.
+        let starts_body = idx == body_start;
+        let open = &mut open[usize::from(is_noscript)];
+        let remove = if is_end_tag {
+            open.pop().unwrap_or(false)
+        } else {
+            let remove =
+                hidden_content == HiddenContent::All || (is_template && tag_declares_shadow_root(&input[idx..tag_end]));
+            open.push(remove);
+            remove
+        };
+        if remove {
+            let out = output.get_or_insert_with(|| String::with_capacity(bytes.len()));
+            out.push_str(&input[last..idx]);
+            out.push_str(if starts_body { BODY_START } else { "" });
+            last = tag_end;
+        }
+        idx = tag_end;
+    }
+
+    match output {
+        Some(mut out) => {
+            out.push_str(&input[last..]);
+            Cow::Owned(out)
+        }
+        None => Cow::Borrowed(input),
+    }
+}
+
+/// What [`unwrap_kept_inert_elements`] writes for the removed tag that started the body.
+///
+/// ~keep The tree builder starts the body at this end tag and makes no element for it, and the
+/// ~keep first parse discards it. A `<body>` start tag would make the page one that wrote its
+/// ~keep body, and a `<header>` in such a body is the page header.
+const BODY_START: &str = "</body>";
+
+/// Whether the start tag of a `<template>` declares a shadow root: `shadowrootmode` is `open` or
+/// `closed`, the two values for which a browser attaches one.
+fn tag_declares_shadow_root(tag: &str) -> bool {
+    extract_attribute_value(tag, "shadowrootmode")
+        .is_some_and(|mode| mode.eq_ignore_ascii_case("open") || mode.eq_ignore_ascii_case("closed"))
 }
 
 /// Consume an optional `=value` following an attribute name, starting at `i` (already past the
@@ -691,7 +827,142 @@ fn scan_attribute_value<'a>(bytes: &[u8], tag: &'a str, start: usize) -> (&'a st
 
 #[cfg(test)]
 mod tag_ends_tests {
-    use super::{TagEnds, find_tag_end};
+    use super::{HiddenContent, TagEnds, find_tag_end, unwrap_kept_inert_elements};
+
+    #[test]
+    fn should_step_over_a_run_of_raw_text_tag_starts_with_no_end_in_linear_time() {
+        // ~keep The quote before the last `>` has no partner, so no tag of the run ends. The scan
+        // ~keep for the end of a raw-text element reads the rest of the input for each start.
+        let timed = |name: &str| {
+            let page = format!("{}\">", format!("<{name} ").repeat(1_600_000 / (name.len() + 2)));
+            let started = std::time::Instant::now();
+            let unwrapped = unwrap_kept_inert_elements(&page, HiddenContent::All);
+            assert_eq!(unwrapped, page, "no template and no noscript: nothing is removed");
+            started.elapsed()
+        };
+        let plain = timed("a");
+        for name in ["script", "style"] {
+            let raw_text = timed(name);
+            // ~keep A quadratic scan reads 160 GB here. The bound is a multiple of a page of the
+            // ~keep same size with an ordinary tag, so a loaded host moves both sides.
+            assert!(
+                raw_text < plain * 50 + std::time::Duration::from_secs(5),
+                "{name} took {raw_text:?}, an ordinary tag took {plain:?}"
+            );
+        }
+    }
+
+    /// The pieces of the generated pages: the text, and for a tag of the two elements its
+    /// element and whether it is a start tag.
+    type Piece = (&'static str, Option<(usize, bool)>);
+    const PIECES: [Piece; 10] = [
+        ("<head>", None),
+        ("</head>", None),
+        ("<title>", None),
+        ("</title>", None),
+        ("<p>", None),
+        ("<template>", Some((0, true))),
+        (r#"<TEMPLATE shadowrootmode="open">"#, Some((0, true))),
+        ("</template>", Some((0, false))),
+        (r#"<noscript class="a">"#, Some((1, true))),
+        ("</NOSCRIPT>", Some((1, false))),
+    ];
+
+    /// Which pieces of `page` the scan removed. A comment with the position follows each piece.
+    ///
+    /// ~keep The scan writes `</body>` for the removed tag that started the body: once, and for
+    /// ~keep the first tag that it removes.
+    fn removed_pieces(pieces: &[Piece], page: &str, choice: HiddenContent) -> Vec<bool> {
+        let unwrapped = unwrap_kept_inert_elements(page, choice);
+        if let Some(at) = unwrapped.find("</body>") {
+            assert!(page.starts_with(&unwrapped[..at]), "{page} {choice:?}");
+            assert_eq!(unwrapped.matches("</body>").count(), 1, "{page} {choice:?}");
+        }
+        let mut rest: &str = &unwrapped;
+        let removed = pieces
+            .iter()
+            .enumerate()
+            .map(|(position, (text, _))| {
+                let kept = rest.strip_prefix(text);
+                rest = kept
+                    .or_else(|| rest.strip_prefix("</body>"))
+                    .unwrap_or(rest)
+                    .strip_prefix(&format!("<!--{position}-->"))
+                    .unwrap_or_else(|| panic!("{page} {choice:?}: {unwrapped} is not the page without some tags"));
+                kept.is_none()
+            })
+            .collect();
+        assert_eq!(rest, "", "{page} {choice:?}");
+        removed
+    }
+
+    /// Check one page under one choice, and give the count of its elements with two tags and
+    /// the count of those whose tags the scan removed.
+    ///
+    /// ~keep The pairs come from a count of start and end tags for each element, which knows
+    /// ~keep nothing of the head. A page with a tag of the head or with a `<title>` can have a
+    /// ~keep head, with or without the `<head>` tag.
+    fn check_the_pairs(pieces: &[Piece], page: &str, choice: HiddenContent) -> (usize, usize) {
+        let has_head = pieces
+            .iter()
+            .any(|(text, _)| matches!(*text, "<head>" | "</head>" | "<title>"));
+        let removed = removed_pieces(pieces, page, choice);
+        let mut open: [Vec<usize>; 2] = [Vec::new(), Vec::new()];
+        let (mut pairs, mut removed_pairs) = (0, 0);
+        for (position, (text, tag)) in pieces.iter().enumerate() {
+            let Some((element, is_start)) = *tag else {
+                assert!(!removed[position], "{page} {choice:?}: {text} is removed");
+                continue;
+            };
+            if is_start {
+                open[element].push(position);
+                let kept_by_choice = choice == HiddenContent::All || text.contains("shadowrootmode");
+                assert!(kept_by_choice || !removed[position], "{page} {choice:?}: {text}");
+                assert!(
+                    has_head || removed[position] == kept_by_choice,
+                    "{page} {choice:?}: {text}"
+                );
+            } else if let Some(start) = open[element].pop() {
+                pairs += 1;
+                removed_pairs += usize::from(removed[position]);
+                assert_eq!(
+                    removed[start], removed[position],
+                    "{page} {choice:?}: the tags at {start} and {position} are one element"
+                );
+            } else {
+                assert!(!removed[position], "{page} {choice:?}: {text} closes nothing");
+            }
+        }
+        (pairs, removed_pairs)
+    }
+
+    #[test]
+    fn should_remove_the_two_tags_of_an_element_together_or_not_at_all() {
+        // ~keep Every page of up to five pieces.
+        let (mut pairs, mut removed_pairs) = (0, 0);
+        for len in 0..=5u32 {
+            for mut code in 0..PIECES.len().pow(len) {
+                let mut pieces = Vec::new();
+                let mut page = String::new();
+                for position in 0..len {
+                    let piece = PIECES[code % PIECES.len()];
+                    code /= PIECES.len();
+                    pieces.push(piece);
+                    page.extend([piece.0, "<!--", &position.to_string(), "-->"]);
+                }
+                assert_eq!(unwrap_kept_inert_elements(&page, HiddenContent::Drop), page);
+                for choice in [HiddenContent::Reachable, HiddenContent::All] {
+                    let (in_page, removed_in_page) = check_the_pairs(&pieces, &page, choice);
+                    pairs += in_page;
+                    removed_pairs += removed_in_page;
+                }
+            }
+        }
+        assert!(
+            pairs > 20_000 && removed_pairs > 5_000,
+            "{pairs} pairs, {removed_pairs} removed"
+        );
+    }
 
     #[test]
     fn should_give_the_tag_end_that_a_scan_from_each_byte_gives() {

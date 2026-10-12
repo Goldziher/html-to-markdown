@@ -4,6 +4,7 @@ use std::borrow::Cow;
 use std::cell::{Cell, RefCell};
 use std::collections::{HashMap, HashSet};
 
+use super::kept::{Kept, Replacements, normalize_inert_opening, rewritten};
 use super::markup::find_tag_end;
 
 use html5ever::LocalName;
@@ -128,6 +129,7 @@ struct BodyNormalizer<'a> {
     body: RefCell<Option<Body>>,
     namespaces: RefCell<NamespaceStack>,
     preserved: Option<RefCell<PreservedBodies>>,
+    kept: Kept,
     replacements: RefCell<Vec<(std::ops::Range<usize>, String)>>,
     token_boundary: Cell<usize>,
     fed_end: Cell<usize>,
@@ -276,14 +278,11 @@ impl BodyNormalizer<'_> {
             }
             return TokenSinkResult::Script(());
         }
-        if !self.track_namespace(&tag) {
+        if !self.kept.is_inert(self.track_namespace(&tag), &tag, self.position()) {
             return TokenSinkResult::Continue;
         }
         if self.body.borrow().is_none() && matches!(name, "title" | "xmp" | "iframe" | "noscript" | "template") {
-            // ~keep HTML ignores a non-void start tag's self-closing flag; the literal parser must contain its body.
-            let end = self.position();
-            let opening = tag.self_closing.then(|| (end - 2..end, ">".to_owned()));
-            self.replacements.borrow_mut().extend(opening);
+            normalize_inert_opening(&tag, self.position(), &mut self.replacements.borrow_mut());
             self.body.replace(Some(Body {
                 name: tag.name.clone(),
                 start: self.position(),
@@ -512,17 +511,28 @@ fn needs_normalization(source: &str) -> bool {
 
 #[cfg(test)]
 fn normalize_inert_bodies(source: &str) -> Cow<'_, str> {
-    normalize_inert_bodies_with_preservation(source, false).0
+    normalize_inert_bodies_with_preservation(source, false, crate::options::HiddenContent::Drop).0
 }
 
 /// Keep opaque source bodies available for DOM preservation and visitor serialization. ~keep
 pub fn normalize_inert_bodies_with_preservation(
     source: &str,
     preserve: bool,
+    hidden_content: crate::options::HiddenContent,
 ) -> (Cow<'_, str>, HashMap<String, String>) {
     if !needs_normalization(source) {
         return (Cow::Borrowed(source), HashMap::new());
     }
+    let (replacements, originals) = inert_body_replacements(source, preserve, Kept::of(source, hidden_content));
+    (rewritten(source, &replacements), originals)
+}
+
+/// The text for each body of `source` that `kept` does not keep, and the preserved bodies.
+pub(super) fn inert_body_replacements(
+    source: &str,
+    preserve: bool,
+    kept: Kept,
+) -> (Replacements, HashMap<String, String>) {
     let input = BufferQueue::default();
     let tokenizer = Tokenizer::new(
         BodyNormalizer {
@@ -531,6 +541,7 @@ pub fn normalize_inert_bodies_with_preservation(
             body: RefCell::new(None),
             namespaces: RefCell::new(NamespaceStack::default()),
             preserved: preserve.then(|| RefCell::new(PreservedBodies::new(source))),
+            kept,
             replacements: RefCell::new(Vec::new()),
             token_boundary: Cell::new(0),
             fed_end: Cell::new(0),
@@ -544,19 +555,7 @@ pub fn normalize_inert_bodies_with_preservation(
         .sink
         .preserved
         .map_or_else(HashMap::new, |preserved| preserved.into_inner().originals);
-    let replacements = tokenizer.sink.replacements.into_inner();
-    if replacements.is_empty() {
-        return (Cow::Borrowed(source), originals);
-    }
-    let mut output = String::with_capacity(source.len());
-    let mut cursor = 0;
-    for (range, replacement) in replacements {
-        output.push_str(&source[cursor..range.start]);
-        output.push_str(&replacement);
-        cursor = range.end;
-    }
-    output.push_str(&source[cursor..]);
-    (Cow::Owned(output), originals)
+    (tokenizer.sink.replacements.into_inner(), originals)
 }
 
 const TOKENIZER_CHUNK_BYTES: usize = 4096;
@@ -965,7 +964,8 @@ mod tests {
     #[test]
     fn should_avoid_source_and_entity_decoded_body_marker_collisions() {
         let source = "<p>h2m_inert_body_0_end h2m_inert_body_&#49;_end</p><noscript><p>x</noscript>";
-        let (normalized, bodies) = super::normalize_inert_bodies_with_preservation(source, true);
+        let (normalized, bodies) =
+            super::normalize_inert_bodies_with_preservation(source, true, crate::options::HiddenContent::Drop);
         assert_eq!(bodies.len(), 1);
         assert_eq!(bodies.get("h2m_inert_body_2_end").map(String::as_str), Some("<p>x"));
         assert!(normalized.contains("<noscript>h2m_inert_body_2_end</noscript>"));

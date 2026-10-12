@@ -10,7 +10,7 @@ part 'lib.freezed.dart';
 
 // These functions are ignored because they are not marked as `pub`: `try_convert_annotation_kind_from_core`, `try_convert_image_type_from_core`, `try_convert_link_type_from_core`, `try_convert_node_content_from_core`, `try_convert_node_type_from_core`, `try_convert_structured_data_type_from_core`, `try_convert_text_direction_from_core`, `try_convert_tier_strategy_from_core`, `try_convert_visit_result_from_core`, `try_convert_warning_kind_from_core`
 // These types are ignored because they are neither used by any `pub` functions nor (for structs and enums) marked `#[frb(unignore)]`: `HtmlVisitorDartImpl`
-// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `fmt`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `visit_audio`, `visit_blockquote`, `visit_button`, `visit_code_block`, `visit_code_inline`, `visit_custom_element`, `visit_definition_description`, `visit_definition_list_end`, `visit_definition_list_start`, `visit_definition_term`, `visit_details`, `visit_element_end`, `visit_element_start`, `visit_emphasis`, `visit_figcaption`, `visit_figure_end`, `visit_figure_start`, `visit_form`, `visit_heading`, `visit_horizontal_rule`, `visit_iframe`, `visit_image`, `visit_input`, `visit_line_break`, `visit_link`, `visit_list_end`, `visit_list_item`, `visit_list_start`, `visit_mark`, `visit_strikethrough`, `visit_strong`, `visit_subscript`, `visit_summary`, `visit_superscript`, `visit_table_end`, `visit_table_row`, `visit_table_start`, `visit_text`, `visit_underline`, `visit_video`
+// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `fmt`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `visit_audio`, `visit_blockquote`, `visit_button`, `visit_code_block`, `visit_code_inline`, `visit_custom_element`, `visit_definition_description`, `visit_definition_list_end`, `visit_definition_list_start`, `visit_definition_term`, `visit_details`, `visit_element_end`, `visit_element_start`, `visit_emphasis`, `visit_figcaption`, `visit_figure_end`, `visit_figure_start`, `visit_form`, `visit_heading`, `visit_horizontal_rule`, `visit_iframe`, `visit_image`, `visit_input`, `visit_line_break`, `visit_link`, `visit_list_end`, `visit_list_item`, `visit_list_start`, `visit_mark`, `visit_strikethrough`, `visit_strong`, `visit_subscript`, `visit_summary`, `visit_superscript`, `visit_table_end`, `visit_table_row`, `visit_table_start`, `visit_text`, `visit_underline`, `visit_video`
 
 /// Convert HTML to Markdown, Djot, or plain text.
 ///
@@ -518,6 +518,13 @@ class ConversionOptions {
   /// text alone, or nothing. See [`InlineDataMedia`] for the elements it covers.
   final InlineDataMedia inlineDataMedia;
 
+  /// Which text that a browser does not show at first the output holds: none of it
+  /// ([`HiddenContent::Drop`], the default), the text a reader can get to in the page, such as
+  /// an inactive tab panel ([`HiddenContent::Reachable`]), or that text and the content of
+  /// `<template>` and `<noscript>` ([`HiddenContent::All`]). No choice writes a script or a
+  /// style sheet as text. See [`HiddenContent`] for each kind of hidden markup.
+  final HiddenContent hiddenContent;
+
   /// URL encoding strategy for link and image destinations.
   ///
   /// Controls how special characters in URL destinations are escaped:
@@ -647,6 +654,7 @@ class ConversionOptions {
     required this.preserveTags,
     required this.skipImages,
     required this.inlineDataMedia,
+    required this.hiddenContent,
     required this.urlEscapeStyle,
     required this.linkStyle,
     required this.outputFormat,
@@ -700,6 +708,7 @@ class ConversionOptions {
       preserveTags.hashCode ^
       skipImages.hashCode ^
       inlineDataMedia.hashCode ^
+      hiddenContent.hashCode ^
       urlEscapeStyle.hashCode ^
       linkStyle.hashCode ^
       outputFormat.hashCode ^
@@ -755,6 +764,7 @@ class ConversionOptions {
           preserveTags == other.preserveTags &&
           skipImages == other.skipImages &&
           inlineDataMedia == other.inlineDataMedia &&
+          hiddenContent == other.hiddenContent &&
           urlEscapeStyle == other.urlEscapeStyle &&
           linkStyle == other.linkStyle &&
           outputFormat == other.outputFormat &&
@@ -881,6 +891,9 @@ class ConversionOptionsUpdate {
   /// Optional override for [`ConversionOptions::inline_data_media`].
   final InlineDataMedia? inlineDataMedia;
 
+  /// Optional override for [`ConversionOptions::hidden_content`].
+  final HiddenContent? hiddenContent;
+
   /// Optional override for [`ConversionOptions::url_escape_style`].
   final UrlEscapeStyle? urlEscapeStyle;
 
@@ -959,6 +972,7 @@ class ConversionOptionsUpdate {
     this.preserveTags,
     this.skipImages,
     this.inlineDataMedia,
+    this.hiddenContent,
     this.urlEscapeStyle,
     this.linkStyle,
     this.outputFormat,
@@ -1012,6 +1026,7 @@ class ConversionOptionsUpdate {
       preserveTags.hashCode ^
       skipImages.hashCode ^
       inlineDataMedia.hashCode ^
+      hiddenContent.hashCode ^
       urlEscapeStyle.hashCode ^
       linkStyle.hashCode ^
       outputFormat.hashCode ^
@@ -1067,6 +1082,7 @@ class ConversionOptionsUpdate {
           preserveTags == other.preserveTags &&
           skipImages == other.skipImages &&
           inlineDataMedia == other.inlineDataMedia &&
+          hiddenContent == other.hiddenContent &&
           urlEscapeStyle == other.urlEscapeStyle &&
           linkStyle == other.linkStyle &&
           outputFormat == other.outputFormat &&
@@ -1468,6 +1484,54 @@ enum HeadingStyle {
 
   /// ATX closed style (# title #, with closing hashes).
   atxClosed,
+}
+
+/// Which text that a browser does not show at first the output holds.
+///
+/// The choice answers one question: can a reader get to the text? It does not depend on how the
+/// page hides it.
+///
+/// | Markup | `Drop` | `Reachable` | `All` |
+/// | --- | --- | --- | --- |
+/// | An element with the `hidden` attribute, any value (`hidden="until-found"` too) | dropped | kept | kept |
+/// | An element with inline `display: none`, `visibility: hidden` or `font-size: 0` | dropped | kept | kept |
+/// | An element of an inline `<svg>` with `display="none"` or `visibility="hidden"` | dropped | kept | kept |
+/// | A declarative shadow root: a `<template>` whose `shadowrootmode` is `open` or `closed` | dropped | kept | kept |
+/// | Any other `<template>`, and `<noscript>` | dropped | dropped | kept |
+/// | `<script>`, `<style>`, comments, the value of `<input type="hidden">` | dropped | dropped | dropped |
+///
+/// `aria-hidden` is not hidden for this option. It takes an element away from assistive
+/// technology only: a browser still shows the element, so a reader sees its text, and every
+/// choice keeps it. One rule is older than this option and does not change with it: for an
+/// inline `<svg aria-hidden="true">` no choice writes the title, the description or the label
+/// of the graphic.
+///
+/// Every choice also keeps what the converter never treated as hidden: `inert`, a closed
+/// `<details>` or `<dialog>`, `<datalist>` and `<option>` text, and an element hidden by a class
+/// name, a style sheet rule, `opacity`, `content-visibility`, a zero size or an off-screen
+/// position. The converter reads the inline `style` attribute only. It does no layout and reads no
+/// style sheet, so it cannot tell that a rule in a style sheet hides an element.
+///
+/// A kept element converts like the same element without the attribute or style. Kept
+/// `<template>` and `<noscript>` content converts where it is written, as if the two tags were
+/// not there: a row in a `<template>` inside a `<table>` is a row of that table, and the content
+/// of a declarative shadow root comes before the other children of its host element. Slots are
+/// not resolved. `All` keeps `<noscript>` content with every preprocessing preset. A `<template>`
+/// or `<noscript>` in the document head holds metadata (`<link>`, `<meta>`, `<style>`), not text
+/// for a reader, and no choice keeps it. A document with no `<head>` tag has a head too: it
+/// starts at the doctype, at the `<html>` tag or at the first metadata element, and it ends
+/// where the body starts.
+enum HiddenContent {
+  /// Drop the text a browser does not show at first. Default.
+  drop,
+
+  /// Keep the text of elements that are in the page and that the page can show: an inactive tab
+  /// panel, a collapsed section, an answer shown on a click, a declarative shadow root.
+  reachable,
+
+  /// Keep what `Reachable` keeps, and the content of `<template>` and `<noscript>`. A reader
+  /// gets to that text only after a script copies it into the page, or with scripting off.
+  all,
 }
 
 /// Highlight rendering style for `<mark>` elements.

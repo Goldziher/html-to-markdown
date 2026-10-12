@@ -259,7 +259,7 @@ impl TextProcessor<'_, '_, '_> {
         // ~keep An option that no select list holds is text of its line, as a select list is:
         // ~keep the line end before it is one space.
         let before_bare_option = !self.handler.ctx.in_option_list && matches!(next_tag, Some("option" | "optgroup"));
-        if !before_bare_option && next_tag.is_some_and(|next_tag| !is_inline_element(next_tag)) {
+        if !before_bare_option && next_tag.is_some_and(|next_tag| !self.next_tag_is_inline_for_whitespace(next_tag)) {
             return;
         }
         let mut kept = value.chars().filter(|character| !is_collapsible(*character));
@@ -271,7 +271,12 @@ impl TextProcessor<'_, '_, '_> {
         }
         let needs_space = next_tag.is_some()
             || holds_more
-            || newline_span_needs_separating_space(self.node_handle, self.parser, self.handler.dom_ctx);
+            || newline_span_needs_separating_space(
+                self.node_handle,
+                self.parser,
+                self.handler.dom_ctx,
+                self.handler.ctx.in_option_list,
+            );
         if needs_space && space_is_owed(self.output) {
             self.output.push(' ');
         }
@@ -494,8 +499,84 @@ impl TextProcessor<'_, '_, '_> {
         let starts_with_block = dom_ctx
             .next_tag_id(self.node_handle.get_inner(), self.parser)
             .is_some_and(|next| content_starts_with_block(next, self.parser, dom_ctx));
-        let next = NextElement::new(is_inline_element(next_tag), starts_with_block);
+        let next = NextElement::new(self.next_tag_is_inline_for_whitespace(next_tag), starts_with_block);
         output.push(line_end_before_element(in_running_text, next));
+    }
+
+    fn next_tag_is_inline_for_whitespace(&self, next_tag: &str) -> bool {
+        if next_tag != "datalist" {
+            return is_inline_element(next_tag);
+        }
+        let dom_ctx = self.handler.dom_ctx;
+        let Some(next) = dom_ctx.next_tag_id(self.node_handle.get_inner(), self.parser) else {
+            return false;
+        };
+        if self.handler.ctx.excluded_node_ids.contains(&next) {
+            return false;
+        }
+        #[cfg(feature = "visitor")]
+        if self.handler.ctx.visitor.is_some() && !self.handler.ctx.skip_visitor_hooks {
+            return true;
+        }
+        if let Some(cached) = dom_ctx.datalist_content_cache.borrow().get(&next).copied() {
+            return cached;
+        }
+        // ~keep This local classification must not change HTML repair. Cache by list so
+        // ~keep adjacent text/comment fragments never rescan the same option subtree.
+        let has_content = self.datalist_may_write_content(next);
+        dom_ctx.datalist_content_cache.borrow_mut().insert(next, has_content);
+        has_content
+    }
+
+    fn datalist_may_write_content(&self, node_id: u32) -> bool {
+        let dom_ctx = self.handler.dom_ctx;
+        let options = self.handler.options;
+        let max_depth = crate::converter::main_helpers::effective_max_depth(options);
+        let mut stack = vec![(tl::NodeHandle::new(node_id), self.handler.depth)];
+        while let Some((handle, depth)) = stack.pop() {
+            if depth >= max_depth || self.handler.ctx.excluded_node_ids.contains(&handle.get_inner()) {
+                continue;
+            }
+            #[cfg(test)]
+            DATALIST_NODE_READS.with(|reads| reads.set(reads.get() + 1));
+            match handle.get(self.parser) {
+                Some(tl::Node::Raw(raw)) => {
+                    let raw_text = raw.as_utf8_str();
+                    let decoded = text::decode_html_entities_cow(raw_text.as_ref());
+                    if !decoded.trim().is_empty() {
+                        return true;
+                    }
+                }
+                Some(tl::Node::Tag(tag)) => {
+                    let Some(info) = dom_ctx.tag_info(handle.get_inner(), self.parser) else {
+                        continue;
+                    };
+                    let name = info.name.as_str();
+                    if crate::converter::main::should_skip_tag(name, &handle, tag, self.parser, self.handler) {
+                        continue;
+                    }
+                    if options
+                        .preserve_tags
+                        .iter()
+                        .any(|preserved| name.eq_ignore_ascii_case(preserved))
+                    {
+                        return true;
+                    }
+                    if matches!(name, "script" | "style" | "template" | "noscript") {
+                        continue;
+                    }
+                    // ~keep Media may write without text nodes; default inputs write nothing.
+                    if matches!(name, "img" | "svg" | "math" | "iframe" | "audio" | "video") {
+                        return true;
+                    }
+                    if let Some(children) = dom_ctx.children_of(handle.get_inner()) {
+                        stack.extend(children.iter().map(|child| (*child, depth + 1)));
+                    }
+                }
+                _ => {}
+            }
+        }
+        false
     }
 
     #[cfg(feature = "visitor")]
@@ -680,6 +761,7 @@ fn newline_span_needs_separating_space(
     node_handle: &tl::NodeHandle,
     parser: &tl::Parser,
     dom_ctx: &DomContext,
+    in_option_list: bool,
 ) -> bool {
     // ~keep Climb through every transparent inline ancestor that has nothing after it: in
     // ~keep `<span><span>\n</span></span>Beta` only the outer wrapper is followed by `Beta`,
@@ -690,9 +772,11 @@ fn newline_span_needs_separating_space(
         let Some(parent_id) = dom_ctx.parent_of(node_id) else {
             return false;
         };
+        // ~keep A bare option group writes its children in the surrounding line (#864).
+        // ~keep Inside a select or data list, its line ends belong to the list's own buffer.
         let parent_is_inline = dom_ctx
             .tag_info(parent_id, parser)
-            .is_some_and(|info| info.is_inline_like);
+            .is_some_and(|info| info.is_inline_like || (!in_option_list && info.name == "optgroup"));
         if !parent_is_inline {
             return false;
         }
@@ -701,5 +785,33 @@ fn newline_span_needs_separating_space(
             FollowingContent::NotInline => return false,
             FollowingContent::Absent => node_id = parent_id,
         }
+    }
+}
+
+#[cfg(test)]
+thread_local! {
+    static DATALIST_NODE_READS: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
+}
+
+#[cfg(test)]
+mod tests {
+    use super::DATALIST_NODE_READS;
+    use crate::{ConversionOptions, TierStrategy, convert};
+
+    #[test]
+    fn should_read_an_adjacent_data_list_once_across_comment_separated_text() {
+        DATALIST_NODE_READS.with(|reads| reads.set(0));
+        let result = convert(
+            "k\n<!--gap-->\n<datalist><span>x</span></datalist>d",
+            ConversionOptions {
+                tier_strategy: TierStrategy::Tier2,
+                extract_metadata: false,
+                ..Default::default()
+            },
+        )
+        .expect("adjacent data list converts");
+
+        assert_eq!(result.content.as_deref(), Some("k x d\n"));
+        DATALIST_NODE_READS.with(|reads| assert_eq!(reads.get(), 3));
     }
 }

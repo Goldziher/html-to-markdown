@@ -2,8 +2,8 @@
 
 use crate::options::preprocessing::PreprocessingOptions;
 use crate::options::validation::{
-    CodeBlockStyle, HeadingStyle, HighlightStyle, InlineDataMedia, LinkStyle, ListIndentType, NewlineStyle,
-    OutputFormat, UrlEscapeStyle, WhitespaceMode,
+    CodeBlockStyle, HeadingStyle, HiddenContent, HighlightStyle, InlineDataMedia, LinkStyle, ListIndentType,
+    NewlineStyle, OutputFormat, UrlEscapeStyle, WhitespaceMode,
 };
 
 /// Native recursion guard used as the default when the caller does not set an
@@ -176,6 +176,12 @@ pub struct ConversionOptions {
     /// `data:` URL: the URL with its payload ([`InlineDataMedia::Keep`], the default), the alt
     /// text alone, or nothing. See [`InlineDataMedia`] for the elements it covers.
     pub inline_data_media: InlineDataMedia,
+    /// Which text that a browser does not show at first the output holds: none of it
+    /// ([`HiddenContent::Drop`], the default), the text a reader can get to in the page, such as
+    /// an inactive tab panel ([`HiddenContent::Reachable`]), or that text and the content of
+    /// `<template>` and `<noscript>` ([`HiddenContent::All`]). No choice writes a script or a
+    /// style sheet as text. See [`HiddenContent`] for each kind of hidden markup.
+    pub hidden_content: HiddenContent,
     /// URL encoding strategy for link and image destinations.
     ///
     /// Controls how special characters in URL destinations are escaped:
@@ -308,6 +314,7 @@ impl Default for ConversionOptions {
             preserve_tags: Vec::new(),
             skip_images: false,
             inline_data_media: InlineDataMedia::Keep,
+            hidden_content: HiddenContent::Drop,
             url_escape_style: UrlEscapeStyle::default(),
             link_style: LinkStyle::default(),
             output_format: OutputFormat::default(),
@@ -426,6 +433,7 @@ impl ConversionOptionsBuilder {
     builder_setter!(convert_as_inline, bool);
     builder_setter!(skip_images, bool);
     builder_setter!(inline_data_media, InlineDataMedia);
+    builder_setter!(hidden_content, HiddenContent);
     builder_setter!(url_escape_style, UrlEscapeStyle);
 
     /// Set the list of HTML tag names whose content is stripped from output.
@@ -580,6 +588,8 @@ pub struct ConversionOptionsUpdate {
     pub skip_images: Option<bool>,
     /// Optional override for [`ConversionOptions::inline_data_media`].
     pub inline_data_media: Option<InlineDataMedia>,
+    /// Optional override for [`ConversionOptions::hidden_content`].
+    pub hidden_content: Option<HiddenContent>,
     /// Optional override for [`ConversionOptions::url_escape_style`].
     pub url_escape_style: Option<UrlEscapeStyle>,
     /// Optional override for [`ConversionOptions::link_style`].
@@ -657,6 +667,7 @@ impl ConversionOptions {
         apply!(preserve_tags);
         apply!(skip_images);
         apply!(inline_data_media);
+        apply!(hidden_content);
         apply!(url_escape_style);
         apply!(link_style);
         apply!(output_format);

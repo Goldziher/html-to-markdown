@@ -371,13 +371,25 @@ fn names_open_element(
 /// ~keep it, and cannot put other text in its place, so a page that lost text has a smaller
 /// ~keep count. A no-break space counts on both pages, written as a character or as `&nbsp;`.
 pub fn readable_text_len(dom: &tl::VDom<'_>) -> usize {
+    text_len(dom, &NO_READABLE_TEXT)
+}
+
+/// The count, taken as in [`readable_text_len`], of the text of the `title` elements of `dom`
+/// that the converter writes as text: a title of the body, and a title of a `head` that holds
+/// the body of the page.
+pub fn written_title_len(dom: &tl::VDom<'_>) -> usize {
+    text_len(dom, &NO_READABLE_TEXT[..NO_READABLE_TEXT.len() - 1]) - readable_text_len(dom)
+}
+
+/// The count of [`readable_text_len`], with the text of the elements named in `skipped` left out.
+fn text_len(dom: &tl::VDom<'_>, skipped: &[&[u8]]) -> usize {
     let parser = dom.parser();
     let mut total = 0;
     let mut stack = dom.children().to_vec();
     while let Some(handle) = stack.pop() {
         match handle.get(parser) {
             Some(tl::Node::Raw(text)) => total += decoded_len(text.as_bytes()),
-            Some(tl::Node::Tag(tag)) if holds_readable_text(tag, parser) => {
+            Some(tl::Node::Tag(tag)) if holds_readable_text(tag, parser, skipped) => {
                 stack.extend(tag.children().top().iter().copied());
             }
             _ => {}
@@ -404,6 +416,7 @@ fn decoded_len(text: &[u8]) -> usize {
 
 /// Elements whose text the count leaves out. The tree builder moves a `title` that starts a
 /// page into the head; only the forced second tier wrote a `title` with no `head` as body text.
+/// The `title` is the last name: [`written_title_len`] counts with every name but that one.
 const NO_READABLE_TEXT: [&[u8]; 5] = [b"script", b"style", b"template", b"noscript", b"title"];
 
 /// False for an element whose text the count leaves out, so text that the tree builder
@@ -413,7 +426,7 @@ const NO_READABLE_TEXT: [&[u8]; 5] = [b"script", b"style", b"template", b"noscri
 /// ~keep reads the markup in it as elements: `<noframes><div></noframes><p>one</p>` comes back
 /// ~keep with all its text in the head. A `head` is read by the rule of the converter
 /// ~keep ([`is_body_content_in_head`]).
-fn holds_readable_text(tag: &tl::HTMLTag<'_>, parser: &tl::Parser<'_>) -> bool {
+fn holds_readable_text(tag: &tl::HTMLTag<'_>, parser: &tl::Parser<'_>, skipped: &[&[u8]]) -> bool {
     let name = tag.name().as_bytes();
     if name.eq_ignore_ascii_case(b"head") {
         return tag.children().top().iter().any(|child| {
@@ -423,9 +436,7 @@ fn holds_readable_text(tag: &tl::HTMLTag<'_>, parser: &tl::Parser<'_>) -> bool {
             )
         });
     }
-    !NO_READABLE_TEXT
-        .iter()
-        .any(|skipped| name.eq_ignore_ascii_case(skipped))
+    !skipped.iter().any(|other| name.eq_ignore_ascii_case(other))
 }
 
 /// True if `child`, as a direct child of a `<table>` element, is content that a

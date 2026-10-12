@@ -354,9 +354,11 @@ impl<'a> LinkData<'a> {
             .dom_context
             .children_of(handler.node_handle.get_inner())
             .map_or_else(|| tag.children().top().iter().copied().collect(), ToOwned::to_owned);
-        let (inline_label, _, saw_block) = collect_link_label_text(&children, handler.parser, handler.dom_context);
+        let hidden_content = handler.options.hidden_content;
+        let (inline_label, _, saw_block) =
+            collect_link_label_text(&children, handler.parser, handler.dom_context, hidden_content);
         let text_source = if saw_block {
-            link_text_content(&children, handler.parser, handler.dom_context)
+            link_text_content(&children, handler.parser, handler.dom_context, hidden_content)
         } else {
             inline_label.clone()
         };
