@@ -369,6 +369,8 @@ pub struct Context {
     /// The address of the page, as far as it is known. A link asks it whether it points into
     /// the page (see `converter::url_resolve::OwnPage`).
     pub(crate) own_page: Rc<crate::converter::url_resolve::OwnPage>,
+    /// The spare vectors of the Markdown walk, shared by every walk of the conversion.
+    pub(crate) walk_spares: Rc<crate::converter::main::WalkSpares>,
 }
 
 impl Context {
@@ -454,6 +456,7 @@ impl Context {
             measure_width_only: false,
             base_url: parameters.base_url,
             own_page: Rc::new(parameters.own_page),
+            walk_spares: Rc::default(),
         }
     }
 

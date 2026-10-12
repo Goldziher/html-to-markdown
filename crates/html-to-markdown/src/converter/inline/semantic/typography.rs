@@ -11,10 +11,11 @@ use crate::converter::inline::{
     HandlerContext,
     wrapped::{EMPHASIS_SIBLING_TAGS, InlineDelimiters, emit_wrapped_inline},
 };
+use crate::converter::walk::{CaptureEnd, Close, Open};
 use crate::options::{ConversionOptions, OutputFormat};
 #[cfg(feature = "visitor")]
 use std::borrow::Cow;
-type Context = crate::converter::Context;
+use std::rc::Rc;
 
 /// Resolve a `<sub>`/`<sup>` wrapping pair for the current output format and configured symbol.
 ///
@@ -31,57 +32,62 @@ fn resolve_script_delimiters(options: &ConversionOptions, symbol: &str, djot_mar
     (symbol.to_owned(), symbol.to_owned())
 }
 
-/// Handle subscript element (sub tag).
-///
-/// Wraps content with configurable subscript symbol from options.
-pub fn handle_subscript(handler: HandlerContext<'_>) {
-    handle_script(handler, ScriptKind::Subscript);
-}
-
-/// Handle superscript element (sup tag).
-///
-/// Wraps content with configurable superscript symbol from options.
-pub fn handle_superscript(handler: HandlerContext<'_>) {
-    handle_script(handler, ScriptKind::Superscript);
-}
-
 #[derive(Clone, Copy)]
 enum ScriptKind {
     Subscript,
     Superscript,
 }
 
-fn handle_script(handler: HandlerContext<'_>, kind: ScriptKind) {
-    // ~keep In code the dispatcher gives the children to the walk and this handler does not run.
+/// What `close_script` needs from `open_script`: the kind of the element and its marks.
+pub struct ScriptEnd {
+    kind: ScriptKind,
+    open: String,
+    close: String,
+}
+
+/// Open a subscript (`sub`) or a superscript (`sup`): the marks come from the options, and the
+/// walk captures the text of the children for [`close_script`].
+// ~keep In code the dispatcher gives the children to the walk and this handler does not run.
+pub fn open_script(tag_name: &str, handler: &HandlerContext<'_>, children: &mut Vec<tl::NodeHandle>) -> Option<Open> {
     let Some(tl::Node::Tag(tag)) = handler.node_handle.get(handler.parser) else {
-        return;
+        return None;
     };
-    let symbol = match kind {
-        ScriptKind::Subscript => &handler.options.sub_symbol,
-        ScriptKind::Superscript => &handler.options.sup_symbol,
-    };
-    let djot_marker = match kind {
-        ScriptKind::Subscript => '~',
-        ScriptKind::Superscript => '^',
+    let (kind, symbol, djot_marker) = if tag_name == "sub" {
+        (ScriptKind::Subscript, &handler.options.sub_symbol, '~')
+    } else {
+        (ScriptKind::Superscript, &handler.options.sup_symbol, '^')
     };
     let (open, close) = resolve_script_delimiters(handler.options, symbol, djot_marker);
     let marker_context = handler.context.inline_buffer(handler.output, !open.is_empty());
-    let mut content = String::with_capacity(32);
-    collect_children(tag, &mut content, &marker_context, &handler);
+    children.extend(tag.children().top().iter().copied());
+    Some(Open {
+        scope: Some(Rc::new(marker_context)),
+        close: Close::Capture(CaptureEnd::Script(ScriptEnd { kind, open, close })),
+    })
+}
 
+/// Write the marks of a subscript or a superscript around `content`, the text of the children.
+pub fn close_script(end: &ScriptEnd, content: &str, handler: HandlerContext<'_>) {
     #[cfg(feature = "visitor")]
-    if let Some(custom_output) = visit_script(tag, kind, &handler) {
-        handler.output.push_str(&custom_output);
-        return;
+    {
+        let Some(tl::Node::Tag(tag)) = handler.node_handle.get(handler.parser) else {
+            return;
+        };
+        if let Some(custom_output) = visit_script(tag, end.kind, &handler) {
+            handler.output.push_str(&custom_output);
+            return;
+        }
     }
+    #[cfg(not(feature = "visitor"))]
+    let _ = end.kind;
 
     let site = handler.inline_site();
     emit_wrapped_inline(
         handler.output,
-        &content,
+        content,
         &InlineDelimiters {
-            open: &open,
-            close: &close,
+            open: &end.open,
+            close: &end.close,
             merge_symbol: None,
             sibling_tag_names: &[],
         },
@@ -144,38 +150,32 @@ fn visit_script(tag: &tl::HTMLTag<'_>, kind: ScriptKind, handler: &HandlerContex
     }
 }
 
-/// Handle variable element (var tag).
+/// Open a variable (`var`) or a definition (`dfn`), which write the italic symbol
+/// (`strong_em_symbol` from the options) around their content.
 ///
-/// Wraps content with italic symbol (`strong_em_symbol` from options).
-pub fn handle_variable(handler: HandlerContext<'_>) {
-    handle_italic_semantic(handler);
-}
-
-/// Handle definition element (dfn tag).
-///
-/// Wraps content with italic symbol (`strong_em_symbol` from options).
-pub fn handle_definition(handler: HandlerContext<'_>) {
-    handle_italic_semantic(handler);
-}
-
-fn handle_italic_semantic(mut handler: HandlerContext<'_>) {
+/// In code the children write to the buffer of the element and no mark is written. Otherwise
+/// the walk captures their text for [`close_italic_semantic`].
+pub fn open_italic_semantic(handler: &HandlerContext<'_>, children: &mut Vec<tl::NodeHandle>) -> Option<Open> {
     let Some(tl::Node::Tag(tag)) = handler.node_handle.get(handler.parser) else {
-        return;
+        return None;
     };
-
+    children.extend(tag.children().top().iter().copied());
     if handler.context.in_code {
-        walk_children_to_output(tag, &mut handler);
-        return;
+        return Some(Open::children_only());
     }
+    Some(Open {
+        scope: Some(Rc::new(handler.context.inline_buffer(handler.output, true))),
+        close: Close::Capture(CaptureEnd::ItalicSemantic),
+    })
+}
 
-    let marker_context = handler.context.inline_buffer(handler.output, true);
-    let mut content = String::with_capacity(32);
-    collect_children(tag, &mut content, &marker_context, &handler);
+/// Write the italic symbol around `content`, the text of the children of a `var` or a `dfn`.
+pub fn close_italic_semantic(content: &str, handler: HandlerContext<'_>) {
     let marker = handler.options.strong_em_symbol.to_string();
     let site = handler.inline_site();
     emit_wrapped_inline(
         handler.output,
-        &content,
+        content,
         &InlineDelimiters {
             open: &marker,
             close: &marker,
@@ -186,11 +186,22 @@ fn handle_italic_semantic(mut handler: HandlerContext<'_>) {
     );
 }
 
-/// Handle abbreviation element (abbr tag).
-///
-/// Passes through content and optionally appends title attribute in parentheses.
-pub fn handle_abbreviation(handler: HandlerContext<'_>) {
-    use crate::converter::{append_inline_suffix, chomp_inline, walk_node};
+/// Open an abbreviation (`abbr`): the walk captures the text of the children for
+/// [`close_abbreviation`].
+pub fn open_abbreviation(handler: &HandlerContext<'_>, children: &mut Vec<tl::NodeHandle>) -> Option<Open> {
+    let Some(tl::Node::Tag(tag)) = handler.node_handle.get(handler.parser) else {
+        return None;
+    };
+    children.extend(tag.children().top().iter().copied());
+    Some(Open {
+        scope: Some(Rc::new(handler.context.inline_buffer(handler.output, false))),
+        close: Close::Capture(CaptureEnd::Abbreviation),
+    })
+}
+
+/// Write `content`, the text of the children of an abbreviation, and its title in parentheses.
+pub fn close_abbreviation(content: &str, handler: HandlerContext<'_>) {
+    use crate::converter::{append_inline_suffix, chomp_inline};
 
     let HandlerContext {
         node_handle,
@@ -198,30 +209,15 @@ pub fn handle_abbreviation(handler: HandlerContext<'_>) {
         output,
         options,
         context: ctx,
-        depth,
         dom_context: dom_ctx,
+        ..
     } = handler;
 
-    let Some(node) = node_handle.get(parser) else { return };
-
-    let tag = match node {
-        tl::Node::Tag(tag) => tag,
-        _ => return,
+    let Some(tl::Node::Tag(tag)) = node_handle.get(parser) else {
+        return;
     };
 
-    let mut content = String::with_capacity(32);
-    let children = tag.children();
-    let abbr_ctx = ctx.inline_buffer(output, false);
-    for child_handle in children.top().iter() {
-        walk_node(
-            child_handle,
-            parser,
-            &mut content,
-            crate::converter::block::container::HandlerContext::new(options, &abbr_ctx, depth + 1, dom_ctx),
-        );
-    }
-
-    let (prefix, suffix, trimmed) = chomp_inline(&content);
+    let (prefix, suffix, trimmed) = chomp_inline(content);
 
     if trimmed.is_empty() {
         // ~keep issue #481: `<abbr>` renders no delimiters of its own, so a whitespace-only
@@ -278,38 +274,6 @@ pub fn open_span(
 
     children.extend(tag.children().top().iter().copied());
     Some(crate::converter::walk::Open::children_only())
-}
-
-fn walk_children_to_output(tag: &tl::HTMLTag<'_>, handler: &mut HandlerContext<'_>) {
-    for child_handle in tag.children().top().iter() {
-        crate::converter::walk_node(
-            child_handle,
-            handler.parser,
-            handler.output,
-            crate::converter::block::container::HandlerContext::new(
-                handler.options,
-                handler.context,
-                handler.depth + 1,
-                handler.dom_context,
-            ),
-        );
-    }
-}
-
-fn collect_children(tag: &tl::HTMLTag<'_>, output: &mut String, context: &Context, handler: &HandlerContext<'_>) {
-    for child_handle in tag.children().top().iter() {
-        crate::converter::walk_node(
-            child_handle,
-            handler.parser,
-            output,
-            crate::converter::block::container::HandlerContext::new(
-                handler.options,
-                context,
-                handler.depth + 1,
-                handler.dom_context,
-            ),
-        );
-    }
 }
 
 #[cfg(all(test, feature = "visitor"))]

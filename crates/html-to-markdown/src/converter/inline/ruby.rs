@@ -12,6 +12,8 @@
 //! - Whitespace normalization and trimming
 
 use crate::converter::inline::HandlerContext;
+use crate::converter::walk::{CaptureEnd, Close, Open};
+use std::rc::Rc;
 
 type Context = crate::converter::Context;
 
@@ -42,23 +44,54 @@ type Context = crate::converter::Context;
 /// # Note
 /// This function references `walk_node` and `normalized_tag_name` from converter.rs,
 /// which must be accessible (pub(crate)) for this module to work correctly.
-pub fn handle(tag_name: &str, mut handler: HandlerContext<'_>) {
-    let Some(node) = handler.node_handle.get(handler.parser) else {
+pub fn handle(mut handler: HandlerContext<'_>) {
+    let Some(tl::Node::Tag(tag)) = handler.node_handle.get(handler.parser) else {
         return;
     };
+    handle_ruby(tag, &mut handler);
+}
 
-    let tag = match node {
-        tl::Node::Tag(tag) => tag,
-        _ => return,
+/// Open a part of a ruby: `rb`, `rt`, `rp` or `rtc`. Lists the children in `children`.
+///
+/// The children of an `rtc` write to the buffer of the element. The walk captures the text of
+/// the children of the other parts for [`close_text`] or [`close_annotation`].
+pub fn open_part(
+    tag_name: &str,
+    node_handle: &tl::NodeHandle,
+    parser: &tl::Parser,
+    output: &str,
+    context: &Context,
+    children: &mut Vec<tl::NodeHandle>,
+) -> Option<Open> {
+    let Some(tl::Node::Tag(tag)) = node_handle.get(parser) else {
+        return None;
     };
+    children.extend(tag.children().top().iter().copied());
+    let (opens_with_marker, end) = match tag_name {
+        "rb" | "rp" => (false, CaptureEnd::RubyText),
+        "rt" => (true, CaptureEnd::RubyAnnotation),
+        _ => return Some(Open::children_only()),
+    };
+    Some(Open {
+        scope: Some(Rc::new(context.inline_buffer(output, opens_with_marker))),
+        close: Close::Capture(end),
+    })
+}
 
-    match tag_name {
-        "ruby" => handle_ruby(tag, &mut handler),
-        "rb" => handle_base(tag, &mut handler),
-        "rt" => handle_annotation(tag, &mut handler),
-        "rp" => handle_parenthesis(tag, &mut handler),
-        "rtc" => walk_children_to_output(tag, &mut handler),
-        _ => walk_children_to_output(tag, &mut handler),
+/// Write `text`, the text of the children of an `rb` or an `rp`, with no space around it.
+pub fn close_text(text: &str, output: &mut String) {
+    output.push_str(text.trim());
+}
+
+/// Write `text`, the text of the children of an `rt`, in parentheses.
+pub fn close_annotation(text: &str, output: &mut String) {
+    let trimmed = text.trim();
+    if output.ends_with('(') {
+        output.push_str(trimmed);
+    } else {
+        output.push('(');
+        output.push_str(trimmed);
+        output.push(')');
     }
 }
 
@@ -187,58 +220,6 @@ fn emit_grouped(grouped: GroupedRuby, has_rtc: bool, output: &mut String) {
     }
     if !grouped.rtc_content.trim().is_empty() {
         output.push_str(grouped.rtc_content.trim());
-    }
-}
-
-fn handle_base(tag: &tl::HTMLTag<'_>, handler: &mut HandlerContext<'_>) {
-    let text_context = handler.context.inline_buffer(handler.output, false);
-    let mut text = String::new();
-    collect_children(tag, &mut text, &text_context, handler);
-    handler.output.push_str(text.trim());
-}
-
-fn handle_annotation(tag: &tl::HTMLTag<'_>, handler: &mut HandlerContext<'_>) {
-    let text_context = handler.context.inline_buffer(handler.output, true);
-    let mut text = String::new();
-    collect_children(tag, &mut text, &text_context, handler);
-    let trimmed = text.trim();
-    if handler.output.ends_with('(') {
-        handler.output.push_str(trimmed);
-    } else {
-        handler.output.push('(');
-        handler.output.push_str(trimmed);
-        handler.output.push(')');
-    }
-}
-
-fn handle_parenthesis(tag: &tl::HTMLTag<'_>, handler: &mut HandlerContext<'_>) {
-    let content_context = handler.context.inline_buffer(handler.output, false);
-    let mut content = String::new();
-    collect_children(tag, &mut content, &content_context, handler);
-    if !content.trim().is_empty() {
-        handler.output.push_str(content.trim());
-    }
-}
-
-fn walk_children_to_output(tag: &tl::HTMLTag<'_>, handler: &mut HandlerContext<'_>) {
-    for child_handle in tag.children().top().iter() {
-        crate::converter::walk_node(
-            child_handle,
-            handler.parser,
-            handler.output,
-            crate::converter::block::container::HandlerContext::new(
-                handler.options,
-                handler.context,
-                handler.depth + 1,
-                handler.dom_context,
-            ),
-        );
-    }
-}
-
-fn collect_children(tag: &tl::HTMLTag<'_>, output: &mut String, context: &Context, handler: &HandlerContext<'_>) {
-    for child_handle in tag.children().top().iter() {
-        walk_child(child_handle, output, context, handler);
     }
 }
 

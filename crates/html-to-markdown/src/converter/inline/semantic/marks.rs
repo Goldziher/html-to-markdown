@@ -9,9 +9,11 @@ use crate::converter::inline::{
     HandlerContext,
     wrapped::{InlineDelimiters, InlineSite, emit_first_block_wrapped, emit_wrapped_inline},
 };
+use crate::converter::walk::{CaptureEnd, Close, Open};
 use crate::options::{ConversionOptions, OutputFormat};
 #[cfg(feature = "visitor")]
 use std::borrow::Cow;
+use std::rc::Rc;
 type Context = crate::converter::Context;
 
 /// Handle mark (highlight) element with configurable styles.
@@ -21,12 +23,11 @@ type Context = crate::converter::Context;
 /// - Html: `<mark>highlighted</mark>`
 /// - Bold: `**highlighted**`
 /// - None: just pass through content
-pub fn handle_mark(handler: HandlerContext<'_>) {
-    // ~keep reason: serialize_node is only used when the visitor feature is active;
-    // ~keep walk_node depends on feature-gated code paths.
-    #[allow(unused_imports)]
-    use crate::converter::{get_text_content, serialize_node, walk_node};
-
+///
+/// Asks the visitor, then lists the children in `children`. Returns `None` when the visitor
+/// wrote or skipped the element.
+pub fn open_mark(handler: HandlerContext<'_>, children: &mut Vec<tl::NodeHandle>) -> Option<Open> {
+    let site = handler.inline_site();
     let HandlerContext {
         node_handle,
         parser,
@@ -34,18 +35,11 @@ pub fn handle_mark(handler: HandlerContext<'_>) {
         options,
         context: ctx,
         depth,
-        dom_context: dom_ctx,
+        ..
     } = handler;
 
     let Some(tl::Node::Tag(tag)) = node_handle.get(parser) else {
-        return;
-    };
-    let site = InlineSite {
-        node_handle,
-        parser,
-        dom_ctx,
-        ctx,
-        options,
+        return None;
     };
 
     #[cfg(feature = "visitor")]
@@ -54,16 +48,18 @@ pub fn handle_mark(handler: HandlerContext<'_>) {
             VisitorOutcome::Continue => {}
             VisitorOutcome::Output(custom_output) => {
                 output.push_str(&custom_output);
-                return;
+                return None;
             }
-            VisitorOutcome::Skip => return,
+            VisitorOutcome::Skip => return None,
         }
     }
+    #[cfg(not(feature = "visitor"))]
+    let _ = (depth, site);
 
+    children.extend(tag.children().top().iter().copied());
     // ~keep Code shows every character as text: no highlight marks. The visitor is asked first.
     if ctx.convert_as_inline || ctx.in_code {
-        walk_children(tag, output, ctx, depth, site);
-        return;
+        return Some(Open::children_only());
     }
 
     use crate::options::HighlightStyle;
@@ -74,22 +70,31 @@ pub fn handle_mark(handler: HandlerContext<'_>) {
         in_strong: ctx.in_strong || options.highlight_style == HighlightStyle::Bold,
         ..ctx.inline_buffer(output, options.highlight_style != HighlightStyle::None)
     };
-    let mut content = String::with_capacity(32);
-    walk_children(tag, &mut content, &child_ctx, depth, site);
+    Some(Open {
+        scope: Some(Rc::new(child_ctx)),
+        close: Close::Capture(CaptureEnd::Mark),
+    })
+}
+
+/// Write the highlight marks around `content`, the text of the children of a mark element.
+pub fn close_mark(content: &str, handler: HandlerContext<'_>) {
+    use crate::options::HighlightStyle;
+    let site = handler.inline_site();
+    let HandlerContext { output, options, .. } = handler;
 
     let (open, close, merge_symbol) = resolve_mark_delimiters(options);
     // ~keep Markdown delimiters hoist edge whitespace, but raw HTML must preserve the source boundary exactly (#744).
     if options.highlight_style == HighlightStyle::Html {
         if !content.is_empty() {
             output.push_str(&open);
-            output.push_str(&content);
+            output.push_str(content);
             output.push_str(&close);
         }
         return;
     }
     emit_wrapped_inline(
         output,
-        &content,
+        content,
         &InlineDelimiters {
             open: &open,
             close: &close,
@@ -98,17 +103,6 @@ pub fn handle_mark(handler: HandlerContext<'_>) {
         },
         site,
     );
-}
-
-fn walk_children(tag: &tl::HTMLTag<'_>, output: &mut String, context: &Context, depth: usize, site: InlineSite<'_>) {
-    for child_handle in tag.children().top().iter() {
-        crate::converter::walk_node(
-            child_handle,
-            site.parser,
-            output,
-            crate::converter::block::container::HandlerContext::new(site.options, context, depth + 1, site.dom_ctx),
-        );
-    }
 }
 
 /// Resolve `<mark>`'s wrapping pair, and the character it can merge a delimiter run with.
@@ -207,129 +201,89 @@ fn emit_inserted_wrapped(output: &mut String, content: &str, site: InlineSite<'_
 ///
 /// Converts to `~~content~~` syntax. Suppresses formatting in code context.
 /// Supports visitor callbacks when the visitor feature is enabled.
-// ~keep reason: some parameters are only used when the visitor feature is active;
-// ~keep using cfg_attr here is equivalent but more verbose given the function signature.
-#[allow(unused_variables)]
-pub fn handle_strikethrough(tag_name: &str, handler: HandlerContext<'_>) {
-    use crate::converter::walk_node;
-
-    let site = handler.inline_site();
-    let HandlerContext {
-        node_handle,
-        parser,
-        output,
-        options,
-        context: ctx,
-        depth,
-        dom_context: dom_ctx,
-    } = handler;
-
-    let Some(node) = node_handle.get(parser) else { return };
-
-    let tag = match node {
-        tl::Node::Tag(tag) => tag,
-        _ => return,
+///
+/// Lists the children in `children`. In code they write to the buffer of the element and no mark
+/// is written. Otherwise the walk captures their text for [`close_strikethrough`].
+pub fn open_strikethrough(
+    tag_name: &str,
+    handler: &HandlerContext<'_>,
+    children: &mut Vec<tl::NodeHandle>,
+) -> Option<Open> {
+    let tag_name = match tag_name {
+        "del" => "del",
+        "s" => "s",
+        _ => "strike",
     };
-
-    if ctx.in_code {
-        let children = tag.children();
-        for child_handle in children.top().iter() {
-            walk_node(
-                child_handle,
-                parser,
-                output,
-                crate::converter::block::container::HandlerContext::new(options, ctx, depth + 1, dom_ctx),
-            );
-        }
-    } else {
-        let mut content = String::with_capacity(32);
-        let children = tag.children();
-        let marker_ctx = ctx.inline_buffer(output, true);
-        for child_handle in children.top().iter() {
-            walk_node(
-                child_handle,
-                parser,
-                &mut content,
-                crate::converter::block::container::HandlerContext::new(options, &marker_ctx, depth + 1, dom_ctx),
-            );
-        }
-
-        #[cfg(feature = "visitor")]
-        if let Some(outcome) = visit_semantic(tag, SemanticKind::Strikethrough(tag_name), depth, site) {
-            match outcome {
-                VisitorOutcome::Continue => emit_strikethrough_wrapped(output, &content, site),
-                VisitorOutcome::Output(custom_output) => output.push_str(&custom_output),
-                VisitorOutcome::Skip => {}
-            }
-            return;
-        }
-
-        emit_strikethrough_wrapped(output, &content, site);
-    }
+    open_marked(handler, children, CaptureEnd::Strikethrough(tag_name))
 }
 
 /// Handle inserted/underlined text (ins tag).
 ///
 /// Converts to `==content==` syntax. Supports visitor callbacks when enabled.
-pub fn handle_inserted(handler: HandlerContext<'_>) {
-    use crate::converter::walk_node;
+///
+/// Lists the children in `children`, as [`open_strikethrough`] does.
+// ~keep In code `<ins>` writes no `==`, as `<del>` writes no `~~`: there the mark is text.
+pub fn open_inserted(handler: &HandlerContext<'_>, children: &mut Vec<tl::NodeHandle>) -> Option<Open> {
+    open_marked(handler, children, CaptureEnd::Inserted)
+}
 
-    let site = handler.inline_site();
-    let HandlerContext {
-        node_handle,
-        parser,
-        output,
-        options,
-        context: ctx,
-        depth,
-        dom_context: dom_ctx,
-    } = handler;
-
-    let Some(node) = node_handle.get(parser) else { return };
-
-    let tag = match node {
-        tl::Node::Tag(tag) => tag,
-        _ => return,
+fn open_marked(handler: &HandlerContext<'_>, children: &mut Vec<tl::NodeHandle>, end: CaptureEnd) -> Option<Open> {
+    let Some(tl::Node::Tag(tag)) = handler.node_handle.get(handler.parser) else {
+        return None;
     };
-
-    if ctx.in_code {
-        // ~keep `handle_strikethrough` already suppresses its `~~` under `in_code`; `<ins>`
-        // ~keep did not, so it emitted literal `==` INTO code content, where it is text.
-        let children = tag.children();
-        for child_handle in children.top().iter() {
-            walk_node(
-                child_handle,
-                parser,
-                output,
-                crate::converter::block::container::HandlerContext::new(options, ctx, depth + 1, dom_ctx),
-            );
-        }
-        return;
+    children.extend(tag.children().top().iter().copied());
+    if handler.context.in_code {
+        return Some(Open::children_only());
     }
+    Some(Open {
+        scope: Some(Rc::new(handler.context.inline_buffer(handler.output, true))),
+        close: Close::Capture(end),
+    })
+}
 
-    let mut content = String::with_capacity(32);
-    let children = tag.children();
-    let marker_ctx = ctx.inline_buffer(output, true);
-    for child_handle in children.top().iter() {
-        walk_node(
-            child_handle,
-            parser,
-            &mut content,
-            crate::converter::block::container::HandlerContext::new(options, &marker_ctx, depth + 1, dom_ctx),
-        );
-    }
-
+/// Write the strikethrough marks around `content`, the text of the children.
+pub fn close_strikethrough(tag_name: &str, content: &str, handler: HandlerContext<'_>) {
+    let site = handler.inline_site();
+    #[cfg(not(feature = "visitor"))]
+    let _ = tag_name;
     #[cfg(feature = "visitor")]
-    if let Some(outcome) = visit_semantic(tag, SemanticKind::Underline("ins"), depth, site) {
-        match outcome {
-            VisitorOutcome::Continue => emit_inserted_wrapped(output, &content, site),
-            VisitorOutcome::Output(custom_output) => output.push_str(&custom_output),
-            VisitorOutcome::Skip => {}
+    {
+        let Some(tl::Node::Tag(tag)) = handler.node_handle.get(handler.parser) else {
+            return;
+        };
+        let kind = SemanticKind::Strikethrough(tag_name);
+        if let Some(outcome) = visit_semantic(tag, kind, handler.depth, site) {
+            match outcome {
+                VisitorOutcome::Continue => emit_strikethrough_wrapped(handler.output, content, site),
+                VisitorOutcome::Output(custom_output) => handler.output.push_str(&custom_output),
+                VisitorOutcome::Skip => {}
+            }
+            return;
         }
-        return;
     }
 
-    emit_inserted_wrapped(output, &content, site);
+    emit_strikethrough_wrapped(handler.output, content, site);
+}
+
+/// Write the marks of inserted text around `content`, the text of the children.
+pub fn close_inserted(content: &str, handler: HandlerContext<'_>) {
+    let site = handler.inline_site();
+    #[cfg(feature = "visitor")]
+    {
+        let Some(tl::Node::Tag(tag)) = handler.node_handle.get(handler.parser) else {
+            return;
+        };
+        if let Some(outcome) = visit_semantic(tag, SemanticKind::Underline("ins"), handler.depth, site) {
+            match outcome {
+                VisitorOutcome::Continue => emit_inserted_wrapped(handler.output, content, site),
+                VisitorOutcome::Output(custom_output) => handler.output.push_str(&custom_output),
+                VisitorOutcome::Skip => {}
+            }
+            return;
+        }
+    }
+
+    emit_inserted_wrapped(handler.output, content, site);
 }
 
 /// Handle underline element (u tag).

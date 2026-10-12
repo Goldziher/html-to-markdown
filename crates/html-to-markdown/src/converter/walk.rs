@@ -28,7 +28,8 @@ pub trait Walker {
 }
 
 /// An element of the Markdown walk that its handler opened: the walk visits the children that the
-/// handler listed, each one level deeper, and then ends the element with `close`.
+/// handler listed, each one level deeper, and then ends the element with `close`. When `close`
+/// captures, the children write to a buffer of their own and `close` gets its text.
 pub struct Open {
     /// The conversion state of the children, when it differs from the state of the element.
     pub scope: Option<std::rc::Rc<crate::converter::Context>>,
@@ -54,6 +55,35 @@ pub enum Close {
     LineEndControl(crate::converter::form::elements::LineEndControlEnd),
     Paragraph(crate::converter::block::paragraph::ParagraphEnd),
     Unknown(crate::converter::block::unknown::UnknownEnd),
+    CollectedQuote(crate::converter::semantic::CollectedQuoteEnd),
+    /// The children write to a buffer of their own, and the second half of the handler reads
+    /// it. The children of every other element write to the buffer of the element.
+    Capture(CaptureEnd),
+}
+
+/// The second half of a handler that captures the text of its children.
+pub enum CaptureEnd {
+    Emphasis(crate::converter::inline::emphasis::EmphasisKind),
+    Mark,
+    /// The name of the element: `del`, `s` or `strike`.
+    Strikethrough(&'static str),
+    Inserted,
+    Script(crate::converter::inline::semantic::ScriptEnd),
+    ItalicSemantic,
+    Abbreviation,
+    KbdSamp,
+    /// An `rb` or an `rp` of a ruby.
+    RubyText,
+    /// An `rt` of a ruby.
+    RubyAnnotation,
+    Quote,
+}
+
+impl Close {
+    /// Whether the children write to a buffer of their own.
+    pub const fn captures(&self) -> bool {
+        matches!(self, Self::Capture(_))
+    }
 }
 
 enum Step<N> {
@@ -61,18 +91,46 @@ enum Step<N> {
     Leave,
 }
 
+/// The vectors of one walk. A walk leaves them empty, so the next walk can use their memory.
+pub struct Scratch<N, F> {
+    work: Vec<Step<N>>,
+    frames: Vec<F>,
+    children: Vec<N>,
+}
+
+impl<N, F> Default for Scratch<N, F> {
+    fn default() -> Self {
+        Self {
+            work: Vec::new(),
+            frames: Vec::new(),
+            children: Vec::new(),
+        }
+    }
+}
+
+impl<N, F> Scratch<N, F> {
+    /// The same vectors for frames of the type `G`. The vectors are empty between two walks, so
+    /// no frame changes its type. `F` and `G` differ in a lifetime only, so the memory stays.
+    pub fn with_frames<G>(self) -> Scratch<N, G> {
+        debug_assert!(self.frames.is_empty(), "a walk leaves no frame");
+        Scratch {
+            work: self.work,
+            frames: self.frames.into_iter().filter_map(|_| None).collect(),
+            children: self.children,
+        }
+    }
+}
+
 /// Walk each tree of `roots` in order.
-pub fn drive<W: Walker>(walker: &mut W, roots: &[W::Node]) {
-    let mut work: Vec<Step<W::Node>> = Vec::new();
-    let mut frames: Vec<W::Frame> = Vec::new();
-    let mut children: Vec<W::Node> = Vec::new();
+pub fn drive<W: Walker>(walker: &mut W, roots: &[W::Node], scratch: &mut Scratch<W::Node, W::Frame>) {
+    let Scratch { work, frames, children } = scratch;
     for &root in roots {
         // ~keep The root is entered with no push, so a walk of one complete node allocates nothing.
         let mut next = Some(Step::Enter(root));
         while let Some(step) = next {
             match step {
                 Step::Enter(node) => {
-                    if let Some(frame) = walker.enter(node, frames.last(), &mut children) {
+                    if let Some(frame) = walker.enter(node, frames.last(), children) {
                         frames.push(frame);
                         work.push(Step::Leave);
                         let first_child = work.len();
@@ -95,7 +153,7 @@ pub fn drive<W: Walker>(walker: &mut W, roots: &[W::Node]) {
 
 #[cfg(test)]
 mod tests {
-    use super::{Walker, drive};
+    use super::{Scratch, Walker, drive};
 
     /// A tree as a list of child lists: node `n` has the children `tree[n]`.
     struct Recorder<'a> {
@@ -134,7 +192,7 @@ mod tests {
             open: 0,
             most_open: 0,
         };
-        drive(&mut recorder, roots);
+        drive(&mut recorder, roots, &mut Scratch::default());
         recorder
     }
 

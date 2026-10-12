@@ -79,11 +79,10 @@ impl<'a> HandlerContext<'a> {
 ///
 /// | Tag(s) | Handler | Description |
 /// |--------|---------|-------------|
-/// | `strong`, `b` | emphasis | Bold/strong text formatting |
-/// | `em`, `i` | emphasis | Italic/emphasis text formatting |
-/// | `kbd`, `samp` | code | Keyboard input and sample output, rendered as code |
-/// | `mark`, `del`, `s`, `ins`, `u`, `small`, `sub`, `sup`, `var`, `dfn`, `abbr`, `span` | semantic | Semantic formatting |
-/// | `ruby`, `rb`, `rt`, `rp`, `rtc` | ruby | Ruby annotations (East Asian typography) |
+/// | `ruby` | ruby | Ruby annotations (East Asian typography) |
+///
+/// The walk opens the other inline elements itself (`emphasis::open`, `semantic::open`,
+/// `code::open`, `ruby::open_part`): their children are its work, not a call from here.
 ///
 /// # Return Value
 ///
@@ -119,20 +118,8 @@ impl<'a> HandlerContext<'a> {
 /// process the element through the default path.
 pub fn dispatch_inline_handler(tag_name: &str, context: HandlerContext<'_>) -> bool {
     match tag_name {
-        "strong" | "b" | "em" | "i" => {
-            emphasis::handle(tag_name, context);
-            true
-        }
-        "kbd" | "samp" => {
-            code::handle(tag_name, context);
-            true
-        }
-        "mark" | "del" | "s" | "strike" | "ins" | "sub" | "sup" | "var" | "dfn" | "abbr" => {
-            semantic::handle(tag_name, context);
-            true
-        }
-        "ruby" | "rb" | "rt" | "rp" | "rtc" => {
-            ruby::handle(tag_name, context);
+        "ruby" => {
+            ruby::handle(context);
             true
         }
         _ => false,

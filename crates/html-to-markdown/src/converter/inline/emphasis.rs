@@ -9,30 +9,12 @@
 //! - Bootstrap caret detection (.caret class)
 
 use crate::converter::inline::HandlerContext;
+use crate::converter::walk::{CaptureEnd, Close, Open};
 use crate::options::OutputFormat;
 #[cfg(feature = "visitor")]
 use std::borrow::Cow;
+use std::rc::Rc;
 type Context = crate::converter::Context;
-
-/// Handler for emphasis elements: strong, b (bold) and em, i (italic).
-///
-/// Processes emphasis content based on context:
-/// - Suppresses formatting when already in strong/code context
-/// - Applies configurable emphasis symbols (* or _)
-/// - Handles nested emphasis with proper context tracking
-/// - Supports visitor callbacks for custom behavior
-/// - Detects Bootstrap caret elements (.caret class)
-///
-/// # Note
-/// This function references helper functions and `walk_node` from converter.rs
-/// which must be accessible (pub(crate)) for this module to work correctly.
-pub fn handle(tag_name: &str, context: HandlerContext<'_>) {
-    match tag_name {
-        "strong" | "b" => handle_strong(context),
-        "em" | "i" => handle_emphasis(context),
-        _ => {}
-    }
-}
 
 use crate::converter::inline::wrapped::{
     EMPHASIS_SIBLING_TAGS, InlineDelimiters, InlineSite, STRONG_SIBLING_TAGS, block_runs_are_plain,
@@ -194,40 +176,55 @@ fn emit_emphasis_wrapped(output: &mut String, content: &str, site: InlineSite<'_
     }
 }
 
-/// Handle strong/bold emphasis (strong, b tags).
-fn handle_strong(handler: HandlerContext<'_>) {
-    handle_emphasis_element(handler, EmphasisKind::Strong);
-}
-
-/// Handle emphasis/italic (em, i tags).
-fn handle_emphasis(handler: HandlerContext<'_>) {
-    handle_emphasis_element(handler, EmphasisKind::Emphasis);
-}
-
+/// Which emphasis an element writes: strong (`strong`, `b`) or emphasis (`em`, `i`).
 #[derive(Clone, Copy)]
-enum EmphasisKind {
+pub enum EmphasisKind {
     Strong,
     Emphasis,
 }
 
-fn handle_emphasis_element(mut handler: HandlerContext<'_>, kind: EmphasisKind) {
+/// List the children of an emphasis element in `children`, with the state they read.
+///
+/// In code the children write to the buffer of the element and no mark is written. Otherwise
+/// the walk captures their text for [`close`].
+pub fn open(
+    tag_name: &str,
+    node_handle: &tl::NodeHandle,
+    parser: &tl::Parser,
+    output: &str,
+    context: &Context,
+    children: &mut Vec<tl::NodeHandle>,
+) -> Option<Open> {
+    let kind = match tag_name {
+        "strong" | "b" => EmphasisKind::Strong,
+        _ => EmphasisKind::Emphasis,
+    };
+    let Some(tl::Node::Tag(tag)) = node_handle.get(parser) else {
+        return None;
+    };
+    children.extend(tag.children().top().iter().copied());
+    if context.in_code {
+        return Some(Open::children_only());
+    }
+
+    let buffer_context = context.inline_buffer(output, true);
+    let child_context = Context {
+        inline_depth: context.inline_depth + 1,
+        in_strong: context.in_strong || matches!(kind, EmphasisKind::Strong),
+        inline_buffer_after_hard_break: buffer_context.inline_buffer_after_hard_break,
+        ..context.clone()
+    };
+    Some(Open {
+        scope: Some(Rc::new(child_context)),
+        close: Close::Capture(CaptureEnd::Emphasis(kind)),
+    })
+}
+
+/// Write an emphasis element around `content`, the text of its children.
+pub fn close(kind: EmphasisKind, content: &str, handler: HandlerContext<'_>) {
     let Some(tl::Node::Tag(tag)) = handler.node_handle.get(handler.parser) else {
         return;
     };
-    if handler.context.in_code {
-        walk_children_to_output(tag, &mut handler);
-        return;
-    }
-
-    let buffer_context = handler.context.inline_buffer(handler.output, true);
-    let child_context = Context {
-        inline_depth: handler.context.inline_depth + 1,
-        in_strong: handler.context.in_strong || matches!(kind, EmphasisKind::Strong),
-        inline_buffer_after_hard_break: buffer_context.inline_buffer_after_hard_break,
-        ..handler.context.clone()
-    };
-    let mut content = String::with_capacity(64);
-    collect_children(tag, &mut content, &child_context, &handler);
 
     #[cfg(feature = "visitor")]
     if let Some(custom_output) = visit_emphasis(tag, kind, &handler) {
@@ -237,10 +234,10 @@ fn handle_emphasis_element(mut handler: HandlerContext<'_>, kind: EmphasisKind) 
 
     let site = handler.inline_site();
     match kind {
-        EmphasisKind::Strong => emit_strong_wrapped(handler.output, &content, site),
+        EmphasisKind::Strong => emit_strong_wrapped(handler.output, content, site),
         EmphasisKind::Emphasis => {
-            emit_emphasis_wrapped(handler.output, &content, site);
-            maybe_emit_caret(handler.output, &content, tag);
+            emit_emphasis_wrapped(handler.output, content, site);
+            maybe_emit_caret(handler.output, content, tag);
         }
     }
 }
@@ -297,38 +294,6 @@ fn visit_emphasis(tag: &tl::HTMLTag<'_>, kind: EmphasisKind, handler: &HandlerCo
             }
             None
         }
-    }
-}
-
-fn walk_children_to_output(tag: &tl::HTMLTag<'_>, handler: &mut HandlerContext<'_>) {
-    for child_handle in tag.children().top().iter() {
-        crate::converter::walk_node(
-            child_handle,
-            handler.parser,
-            handler.output,
-            crate::converter::block::container::HandlerContext::new(
-                handler.options,
-                handler.context,
-                handler.depth + 1,
-                handler.dom_context,
-            ),
-        );
-    }
-}
-
-fn collect_children(tag: &tl::HTMLTag<'_>, output: &mut String, context: &Context, handler: &HandlerContext<'_>) {
-    for child_handle in tag.children().top().iter() {
-        crate::converter::walk_node(
-            child_handle,
-            handler.parser,
-            output,
-            crate::converter::block::container::HandlerContext::new(
-                handler.options,
-                context,
-                handler.depth + 1,
-                handler.dom_context,
-            ),
-        );
     }
 }
 

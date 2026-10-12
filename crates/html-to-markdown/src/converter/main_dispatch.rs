@@ -1,6 +1,6 @@
 use crate::converter::block::container::HandlerContext;
 use crate::converter::handlers::{handle_blockquote, handle_code, handle_graphic, handle_img, handle_link, handle_pre};
-use crate::converter::walk::{Close, Open};
+use crate::converter::walk::{CaptureEnd, Close, Open};
 
 struct TagDispatcher<'a, 'output> {
     tag_name: &'a str,
@@ -81,6 +81,43 @@ pub(super) fn close_tag(close: Close, parser: &tl::Parser, output: &mut String, 
         Close::InlineDiv(end) => crate::converter::block::div::close_inline(&end, output),
         Close::Paragraph(end) => crate::converter::block::paragraph::close(&end, output, handler),
         Close::Unknown(end) => crate::converter::block::unknown::close(&end, output),
+        Close::CollectedQuote(end) => crate::converter::semantic::close_collected_q(&end, output, handler),
+        // ~keep The walk holds the buffer of a capturing element and ends it with `close_capture`.
+        Close::Capture(_) => {}
+    }
+}
+
+/// Run the second half of the handler of an element that captured its children in `content`.
+pub(super) fn close_capture<'a>(
+    close: CaptureEnd,
+    node_handle: &'a tl::NodeHandle,
+    content: &str,
+    parser: &'a tl::Parser<'a>,
+    output: &'a mut String,
+    handler: HandlerContext<'a>,
+) {
+    use crate::converter::inline::{emphasis, semantic};
+    let inline = crate::converter::inline::HandlerContext::new((
+        node_handle,
+        parser,
+        output,
+        handler.options,
+        handler.ctx,
+        handler.depth,
+        handler.dom_ctx,
+    ));
+    match close {
+        CaptureEnd::Emphasis(kind) => emphasis::close(kind, content, inline),
+        CaptureEnd::Mark => semantic::close_mark(content, inline),
+        CaptureEnd::Strikethrough(tag_name) => semantic::close_strikethrough(tag_name, content, inline),
+        CaptureEnd::Inserted => semantic::close_inserted(content, inline),
+        CaptureEnd::Script(end) => semantic::close_script(&end, content, inline),
+        CaptureEnd::ItalicSemantic => semantic::close_italic_semantic(content, inline),
+        CaptureEnd::Abbreviation => semantic::close_abbreviation(content, inline),
+        CaptureEnd::KbdSamp => crate::converter::inline::code::close(content, inline),
+        CaptureEnd::RubyText => crate::converter::inline::ruby::close_text(content, inline.output),
+        CaptureEnd::RubyAnnotation => crate::converter::inline::ruby::close_annotation(content, inline.output),
+        CaptureEnd::Quote => crate::converter::semantic::close_q(content, inline.output, handler),
     }
 }
 
@@ -142,6 +179,55 @@ impl TagDispatcher<'_, '_> {
             "small" => self.open_children(),
             // ~keep Code shows every character as text: no title in parentheses, no script marks.
             "abbr" | "sub" | "sup" if handler.ctx.in_code => self.open_children(),
+            "rb" | "rt" | "rp" | "rtc" => {
+                self.opened = crate::converter::inline::ruby::open_part(
+                    self.tag_name,
+                    self.node_handle,
+                    self.parser,
+                    self.output,
+                    handler.ctx,
+                    self.children,
+                );
+            }
+            "kbd" | "samp" => {
+                self.opened = crate::converter::inline::code::open(
+                    crate::converter::inline::HandlerContext::new((
+                        self.node_handle,
+                        self.parser,
+                        self.output,
+                        handler.options,
+                        handler.ctx,
+                        handler.depth,
+                        handler.dom_ctx,
+                    )),
+                    self.children,
+                );
+            }
+            "strong" | "b" | "em" | "i" => {
+                self.opened = crate::converter::inline::emphasis::open(
+                    self.tag_name,
+                    self.node_handle,
+                    self.parser,
+                    self.output,
+                    handler.ctx,
+                    self.children,
+                );
+            }
+            "mark" | "del" | "s" | "strike" | "ins" | "sub" | "sup" | "var" | "dfn" | "abbr" => {
+                self.opened = crate::converter::inline::semantic::open(
+                    self.tag_name,
+                    crate::converter::inline::HandlerContext::new((
+                        self.node_handle,
+                        self.parser,
+                        self.output,
+                        handler.options,
+                        handler.ctx,
+                        handler.depth,
+                        handler.dom_ctx,
+                    )),
+                    self.children,
+                );
+            }
             "u" => {
                 #[cfg(feature = "visitor")]
                 if crate::converter::inline::semantic::visit_underline(
@@ -170,8 +256,7 @@ impl TagDispatcher<'_, '_> {
     fn dispatch_inline(&mut self) -> bool {
         let handler = self.handler;
         match self.tag_name {
-            "strong" | "b" | "em" | "i" | "mark" | "del" | "s" | "strike" | "ins" | "sub" | "sup" | "kbd" | "samp"
-            | "var" | "dfn" | "abbr" | "ruby" | "rb" | "rt" | "rp" | "rtc" => {
+            "ruby" => {
                 crate::converter::inline::dispatch_inline_handler(
                     self.tag_name,
                     crate::converter::inline::HandlerContext::new((
@@ -367,6 +452,15 @@ impl TagDispatcher<'_, '_> {
                 self.open_children();
             }
             "optgroup" => self.open_children(),
+            "q" => {
+                self.opened = crate::converter::semantic::open_q(
+                    self.node_handle,
+                    self.parser,
+                    self.output,
+                    self.handler,
+                    self.children,
+                );
+            }
             "picture" => {
                 self.opened = Some(crate::converter::media::embedded::open_picture(
                     self.tag,
@@ -405,7 +499,7 @@ impl TagDispatcher<'_, '_> {
 
     fn dispatch_categories(&mut self) -> bool {
         match self.tag_name {
-            "article" | "section" | "nav" | "aside" | "header" | "footer" | "main" | "q" | "figure" | "figcaption"
+            "article" | "section" | "nav" | "aside" | "header" | "footer" | "main" | "figure" | "figcaption"
             | "details" | "summary" | "menu" => {
                 crate::converter::semantic::dispatch_semantic_handler(
                     self.tag_name,

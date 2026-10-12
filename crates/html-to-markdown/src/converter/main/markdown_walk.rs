@@ -9,8 +9,8 @@ use super::{
     Begun, Context, DomContext, HandlerContext, TagCapture, begin_tag, djot_context, effective_max_depth, finish_tag,
     normalized_node_tag_name, separate_from_block,
 };
-use crate::converter::main_dispatch::{Dispatched, close_tag, dispatch_tag};
-use crate::converter::walk::{Close, Open, Walker, drive};
+use crate::converter::main_dispatch::{Dispatched, close_capture, close_tag, dispatch_tag};
+use crate::converter::walk::{Close, Open, Scratch, Walker, drive};
 
 /// Walk each node of `nodes` with its subtree, in order, and write the Markdown to `output`.
 pub(super) fn walk_nodes(
@@ -19,12 +19,40 @@ pub(super) fn walk_nodes(
     output: &mut String,
     handler: HandlerContext<'_>,
 ) {
+    // ~keep Text and comments open no element, so a walk of them needs no vector.
+    let opens = nodes
+        .iter()
+        .any(|node| matches!(node.get(parser), Some(tl::Node::Tag(_))));
+    let spares = &handler.ctx.walk_spares;
+    let mut scratch = if opens { spares.take() } else { Scratch::default() };
     let mut walk = MarkdownWalk {
         parser,
         output,
         root: handler,
+        captures: Vec::new(),
+        spare_captures: Vec::new(),
     };
-    drive(&mut walk, nodes);
+    drive(&mut walk, nodes, &mut scratch);
+    if opens {
+        spares.give(scratch);
+    }
+}
+
+/// The vectors of the walks that ended, for the walks that start.
+///
+/// ~keep A handler that the walk does not drive yet starts a walk for each child. Without the
+/// ~keep spare vectors each of those walks allocates its own.
+#[derive(Default)]
+pub struct WalkSpares(std::cell::RefCell<Vec<Scratch<tl::NodeHandle, Frame<'static>>>>);
+
+impl WalkSpares {
+    fn take<'a>(&self) -> Scratch<tl::NodeHandle, Frame<'a>> {
+        self.0.borrow_mut().pop().unwrap_or_default().with_frames()
+    }
+
+    fn give(&self, scratch: Scratch<tl::NodeHandle, Frame<'_>>) {
+        self.0.borrow_mut().push(scratch.with_frames());
+    }
 }
 
 /// The Markdown walk of one buffer: `root` is the state of the nodes the walk starts from.
@@ -32,6 +60,28 @@ struct MarkdownWalk<'a, 'output> {
     parser: &'a tl::Parser<'a>,
     output: &'output mut String,
     root: HandlerContext<'a>,
+    /// The buffers of the open elements that capture their children, the innermost last.
+    captures: Vec<CaptureBuffer>,
+    spare_captures: Vec<CaptureBuffer>,
+}
+
+/// The buffer that the children of a capturing element write to.
+///
+/// ~keep The text is boxed: a block in the buffer keeps the address of the buffer
+/// ~keep (`Context::block_output_ptr`), and the list of buffers moves its items when it grows.
+#[derive(Default)]
+struct CaptureBuffer(Box<CaptureText>);
+
+/// The text of a capture, at an address that does not change while the capture is open.
+#[derive(Default)]
+struct CaptureText(String);
+
+/// The buffer that the walk writes to now: the innermost capture, or the output of the walk.
+fn current_output<'s>(captures: &'s mut [CaptureBuffer], output: &'s mut String) -> &'s mut String {
+    match captures.last_mut() {
+        Some(buffer) => &mut buffer.0.0,
+        None => output,
+    }
 }
 
 /// The conversion state that the nodes of one subtree read.
@@ -66,6 +116,13 @@ struct Frame<'a> {
     end: Option<TagEnd<'a>>,
 }
 
+impl Frame<'_> {
+    /// Whether the children of the element write to a buffer of their own.
+    fn captures(&self) -> bool {
+        self.end.as_ref().is_some_and(|end| end.close.captures())
+    }
+}
+
 /// What ends an element after its children: the second half of its handler, then `finish_tag`.
 struct TagEnd<'a> {
     tag: &'a tl::HTMLTag<'a>,
@@ -95,72 +152,81 @@ impl<'a> Walker for MarkdownWalk<'a, '_> {
         parent: Option<&Frame<'a>>,
         children: &mut Vec<tl::NodeHandle>,
     ) -> Option<Frame<'a>> {
-        let (scope, depth) = match parent {
-            Some(frame) => (
-                frame
-                    .child_scope
-                    .as_ref()
-                    .map_or_else(|| frame.scope.clone(), |ctx| Scope::Shared(Rc::clone(ctx))),
-                frame.depth + 1,
-            ),
-            None => (Scope::Root(self.root.ctx), self.root.depth),
+        // ~keep The node reads the state of its parent in place. Only an element that opens takes
+        // ~keep a share of it, so text costs no count of shares.
+        let (scope, depth): (&Context, usize) = match parent {
+            Some(frame) => (frame.child_scope.as_deref().unwrap_or(&frame.scope), frame.depth + 1),
+            None => (self.root.ctx, self.root.depth),
         };
-        let handler = HandlerContext::new(self.root.options, &scope, depth, self.root.dom_ctx);
+        let handler = HandlerContext::new(self.root.options, scope, depth, self.root.dom_ctx);
+        let output = current_output(&mut self.captures, self.output);
         if is_table_part(&node_handle, self.parser, handler.dom_ctx) {
-            walk_table_parts(&node_handle, self.parser, self.output, handler);
+            walk_table_parts(&node_handle, self.parser, output, handler);
             return None;
         }
-        scope.last_list.enter(self.output);
+        scope.last_list.enter(output);
         // ~keep In a task item, the render of each node before the first content reports whether
         // ~keep it wrote, so the item knows which element wrote first (issue #650).
         let first_writer_start = scope
             .first_writer
             .as_ref()
             .filter(|first_writer| first_writer.is_open())
-            .map(|_| self.output.len());
-        match enter_node(
-            &node_handle,
-            self.parser,
-            self.output,
-            handler,
-            self.root.dom_ctx,
-            children,
-        ) {
+            .map(|_| output.len());
+        let frame = match enter_node(&node_handle, self.parser, output, handler, self.root.dom_ctx, children) {
             Entered::Complete => {
-                leave_node(node_handle, self.parser, self.output, &scope, first_writer_start);
-                None
+                leave_node(node_handle, self.parser, output, scope, first_writer_start);
+                return None;
             }
             Entered::Children {
                 scope: djot_scope,
                 child_scope,
                 output_start,
                 end,
-            } => Some(Frame {
+            } => Frame {
                 node: node_handle,
-                scope: djot_scope.map_or(scope, Scope::Shared),
+                scope: djot_scope.map_or_else(
+                    || match parent {
+                        Some(frame) => frame
+                            .child_scope
+                            .as_ref()
+                            .map_or_else(|| frame.scope.clone(), |ctx| Scope::Shared(Rc::clone(ctx))),
+                        None => Scope::Root(self.root.ctx),
+                    },
+                    Scope::Shared,
+                ),
                 child_scope,
                 depth,
                 output_start,
                 first_writer_start,
                 end,
-            }),
+            },
+        };
+        if frame.captures() {
+            let buffer = self.spare_captures.pop().unwrap_or_default();
+            self.captures.push(buffer);
         }
+        Some(frame)
     }
 
     fn leave(&mut self, frame: Frame<'a>) {
+        let captured = if frame.captures() { self.captures.pop() } else { None };
+        let output = current_output(&mut self.captures, self.output);
         if let Some(end) = frame.end {
             let handler = HandlerContext::new(self.root.options, &frame.scope, frame.depth, self.root.dom_ctx);
-            close_tag(end.close, self.parser, self.output, handler);
-            finish_tag(end.capture, end.tag_name.as_ref(), end.tag, self.output, handler, false);
+            match (end.close, captured.as_ref()) {
+                (Close::Capture(close), Some(buffer)) => {
+                    close_capture(close, &frame.node, &buffer.0.0, self.parser, output, handler);
+                }
+                (close, _) => close_tag(close, self.parser, output, handler),
+            }
+            finish_tag(end.capture, end.tag_name.as_ref(), end.tag, output, handler, false);
         }
-        end_fresh_block_start(&frame.scope, self.output, frame.output_start);
-        leave_node(
-            frame.node,
-            self.parser,
-            self.output,
-            &frame.scope,
-            frame.first_writer_start,
-        );
+        end_fresh_block_start(&frame.scope, output, frame.output_start);
+        leave_node(frame.node, self.parser, output, &frame.scope, frame.first_writer_start);
+        if let Some(mut buffer) = captured {
+            buffer.0.0.clear();
+            self.spare_captures.push(buffer);
+        }
     }
 }
 
@@ -315,6 +381,7 @@ pub fn walk_opened(
     let Some(Open { scope, close }) = open(output, &mut children) else {
         return;
     };
+    debug_assert!(!close.captures(), "only the dispatcher opens an element that captures");
     let ctx = scope.as_deref().unwrap_or(handler.ctx);
     walk_nodes(
         &children,
