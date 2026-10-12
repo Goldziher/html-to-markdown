@@ -123,7 +123,7 @@ fn should_join_a_no_break_space_to_a_space_at_a_line_break_and_at_an_element_sta
     // ~keep that place, and it hands the page over. The space that ends an element with text is the same run as
     // ~keep the no-break space after the element, as on `main`: the fast converter writes that
     // ~keep row or hands the page over (`None`). A form feed is no Unicode space: the fast
-    // ~keep converter answers.
+    // ~keep converter answers. It is a character that a browser keeps (issue #811).
     let [_, fast, ..] = paths();
     let rows: [(&str, &str, Option<bool>); 8] = [
         ("<h2>a<br>&nbsp;b</h2>", "## a b\n", Some(true)),
@@ -133,7 +133,7 @@ fn should_join_a_no_break_space_to_a_space_at_a_line_break_and_at_an_element_sta
         ("<ul><li>&nbsp;b</li></ul>", "- b\n", Some(true)),
         ("<p>a <span><!-- c -->&#160;x</span></p>", "a x\n", Some(false)),
         ("<p><b>a </b>&nbsp;b</p>", "**a** b\n", None),
-        ("<p>a <span></span>\u{c}b</p>", "a b\n", Some(true)),
+        ("<p>a <span></span>\u{c}b</p>", "a \u{c}b\n", Some(true)),
     ];
     for (html, expected, fast_answers) in rows {
         for options in paths() {

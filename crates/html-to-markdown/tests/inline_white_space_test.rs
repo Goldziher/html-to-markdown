@@ -427,7 +427,8 @@ fn white_space_on_both_sides_of_the_start_of_any_marked_element_is_one_space() {
         ("<p>one <kbd> y</kbd>two</p>", "one `y`two\n"),
         ("<p>one <abbr> y</abbr>two</p>", "one ytwo\n"),
         ("<p>one <dfn> y</dfn>two</p>", "one *y*two\n"),
-        ("<p>one <ins> y</ins>two</p>", "one ==y==two\n"),
+        // ~keep Inserted text writes no mark (issue #759), so only its white space is left.
+        ("<p>one <ins> y</ins>two</p>", "one ytwo\n"),
         ("<p>one <b><i> y</i></b>two</p>", "one ***y***two\n"),
     ]);
 }
@@ -546,17 +547,16 @@ fn a_block_in_code_after_a_line_end_keeps_its_blank_line_on_the_fast_converter()
     }
 }
 
-/// A text of a form feed and a line end is white space for the fast converter, so the comment
-/// scan does not run for it and the line end stays a line end.
+/// A form feed is a character (issue #811), so the line end after it is a space before the
+/// inline element that follows the comment.
 ///
-/// ~keep This row pins the output of the base on the fast converter, where the two converters
-/// ~keep differ: the full converter writes `one*y*`, the form feed and `**two**`. Chrome shows
-/// ~keep `oney`, the form feed, a space and `two`; Markdown shows the line end as that space.
+/// ~keep Chrome shows `oney`, the form feed, a space and `two`.
 #[test]
-fn a_text_of_a_form_feed_and_a_line_end_keeps_its_line_end_before_a_comment() {
+fn a_line_end_after_a_form_feed_is_a_space_before_a_comment_and_an_inline_element() {
     let html = "<div>one<i>y</i>\u{c}\n<!-- c --><b>two</b></div>";
     let written = tier1::run(html, &PrescanReport::default(), &tier_options());
-    assert_eq!(written.as_deref().ok(), Some("one*y*\u{c}\n**two**\n"));
+    assert_eq!(written.as_deref().ok(), Some("one*y*\u{c} **two**\n"));
+    assert_eq!(tier2(html), "one*y*\u{c} **two**\n");
 }
 
 /// A space that is not a line end stays beside a zero-width space, and so does a line end
