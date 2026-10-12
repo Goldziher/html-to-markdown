@@ -11,6 +11,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Emphasis, variable (`var`) and definition (`dfn`) text, strikethrough and Djot inserted text,
+  and `mark` styles other than None no longer recount the existing line before each element.
+  Unmarked highlighting and other inline wrappers still require line-state work
+  ([#862](https://github.com/xberg-io/html-to-markdown/issues/862)).
+
 - The testkit-forced fast scanner keeps retained forms transparent in Plain output.
   With form removal disabled, `<div>before<form>name</form>after</div>` gives
   `beforenameafter`, matching the full converter; paragraphs inside forms keep their own breaks.
