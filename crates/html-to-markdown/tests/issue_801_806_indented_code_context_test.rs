@@ -88,3 +88,32 @@ fn should_keep_blank_code_lines_after_a_terminated_list() {
         &options,
     );
 }
+
+#[test]
+fn should_keep_fenced_definition_code_and_code_after_a_paragraph_inside_the_item() {
+    for (list, marker, content_indent) in [("ul", "-", "  "), ("ol", "1.", "   ")] {
+        let definition = format!("<{list}><li><dl><dt>t</dt><dd><pre>a\nb\n</pre></dd></dl></li></{list}>");
+        for (code_block_style, fence) in [(CodeBlockStyle::Backticks, "```"), (CodeBlockStyle::Tildes, "~~~")] {
+            let options = ConversionOptions {
+                code_block_style,
+                ..Default::default()
+            };
+            check(
+                &definition,
+                &format!(
+                    "{marker} t\n\n{content_indent}{fence}\n{content_indent}a\n{content_indent}b\n{content_indent}{fence}\n"
+                ),
+                &options,
+            );
+        }
+        let options = ConversionOptions {
+            code_block_style: CodeBlockStyle::Indented,
+            ..Default::default()
+        };
+        check(
+            &format!("<{list}><li><p>t</p><pre>a\nb\n</pre></li></{list}>"),
+            &format!("{marker} t\n\n{content_indent}    a\n{content_indent}    b\n"),
+            &options,
+        );
+    }
+}

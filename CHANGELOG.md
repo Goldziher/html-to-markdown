@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- A definition description outside a definition list starts a new block instead of joining the
+  preceding word. `<div>a<dd>b</dd> c</div>` now writes `a`, `b` and `c` as separate blocks;
+  a heading keeps its description inline with a word space
+  ([#838](https://github.com/xberg-io/html-to-markdown/issues/838)).
+
+- An indented code block at the start of a definition description inside a list item keeps the
+  item's content-column indent on its first line as well as later lines, with a blank line
+  before the code. Bullet and numbered items now render the whole block as code
+  ([#806](https://github.com/xberg-io/html-to-markdown/issues/806)).
+
 - Inserted text (`<ins>`) is plain text and no longer takes the highlight markers. A rule inside
   it is on its own line.
 - Teletype text (`<tt>`) is a code span.

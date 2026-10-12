@@ -556,6 +556,17 @@ fn open_dt(state: &mut Tier1State) {
 
 fn open_dd(state: &mut Tier1State) {
     mark_definition_in_cell(state);
+    if state.in_table_cell() || state.escape_ctx.intersects(EscapeCtx::CODE | EscapeCtx::PRE) {
+        return;
+    }
+    if state.escape_ctx.contains(EscapeCtx::HEADING) {
+        let output = state.cell_or_output_mut();
+        if !output.is_empty() && !output.ends_with(char::is_whitespace) {
+            output.push(' ');
+        }
+    } else if state.list_depth == 0 {
+        state.ensure_blank_line();
+    }
 }
 
 fn mark_definition_in_cell(state: &mut Tier1State) {

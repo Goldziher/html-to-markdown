@@ -188,3 +188,51 @@ fn should_preserve_real_blocks_inside_plain_inserted_content() {
         &ConversionOptions::default(),
     );
 }
+
+#[test]
+fn should_separate_a_stray_description_from_preceding_text() {
+    let options = ConversionOptions {
+        extract_metadata: false,
+        ..Default::default()
+    };
+    for html in ["<div>a<dd>b</dd> c</div>", "<div>a <dd>b</dd> c</div>"] {
+        let expected = "a\n\nb\n\nc\n";
+        for tier_strategy in [TierStrategy::Auto, TierStrategy::Tier1, TierStrategy::Tier2] {
+            let result = convert(
+                html,
+                ConversionOptions {
+                    tier_strategy,
+                    ..options.clone()
+                },
+            )
+            .expect("stray description converts");
+            assert_eq!(result.content.as_deref(), Some(expected), "{tier_strategy:?}: {html}");
+        }
+        let (page, report) = html_to_markdown_rs::prescan::run(html);
+        assert_eq!(
+            html_to_markdown_rs::tier1::run(&page, &report, &options).expect("stray description scans"),
+            expected
+        );
+    }
+}
+
+#[test]
+fn should_keep_description_text_inline_in_a_heading() {
+    for html in ["<h2>a<dd>b</dd> c</h2>", "<h2>a <dd>b</dd> c</h2>"] {
+        for tier_strategy in [TierStrategy::Auto, TierStrategy::Tier1, TierStrategy::Tier2] {
+            let result = convert(
+                html,
+                ConversionOptions {
+                    tier_strategy,
+                    ..Default::default()
+                },
+            )
+            .expect("heading description converts");
+            assert_eq!(
+                result.content.as_deref(),
+                Some("## a b c\n"),
+                "{tier_strategy:?}: {html}"
+            );
+        }
+    }
+}

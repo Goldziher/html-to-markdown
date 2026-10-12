@@ -73,8 +73,8 @@ fn should_separate_two_descriptions_in_a_heading() {
 }
 
 #[test]
-fn should_keep_the_word_space_before_a_description_outside_a_list() {
-    check("<div>a <dd>b</dd> c</div>", "a b\n\nc\n");
+fn should_separate_a_description_from_preceding_text_outside_a_list() {
+    check("<div>a <dd>b</dd> c</div>", "a\n\nb\n\nc\n");
 }
 
 #[test]

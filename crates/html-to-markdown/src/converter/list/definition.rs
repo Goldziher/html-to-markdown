@@ -251,14 +251,30 @@ pub fn handle_dd(node_handle: &tl::NodeHandle, parser: &tl::Parser, output: &mut
     }
 
     separate_from_preceding_text(output, ctx);
+    if !ctx.convert_as_inline
+        && !ctx.in_code
+        && !ctx.in_code_block
+        && !ctx.in_list_item
+        && !ctx.in_table_cell
+        && !output.is_empty()
+        && !output.ends_with("\n\n")
+    {
+        crate::converter::trim_trailing_whitespace(output);
+        output.push_str("\n\n");
+    }
     if ctx.convert_as_inline {
         output.push_str(&trimmed);
     } else {
         crate::converter::block::horizontal_rule::separate_leading_rule(output, &trimmed, ctx);
-        // ~keep Indented code cannot interrupt the paragraph of the term, so a blank line goes
-        // ~keep before a description that starts with it.
-        if trimmed.starts_with([' ', '\t']) && !output.is_empty() && !output.ends_with("\n\n") {
-            output.push_str(if output.ends_with('\n') { "\n" } else { "\n\n" });
+        // ~keep The description's scratch buffer keeps only the code indent on its first line.
+        // ~keep In an item that line also needs the content column; a blank line prevents the
+        // ~keep code from continuing the term's paragraph (#806).
+        if trimmed.starts_with([' ', '\t']) && !output.is_empty() {
+            if ctx.in_list_item && !ctx.in_table_cell {
+                crate::converter::list::utils::start_block_in_list_item(output, ctx, options);
+            } else if !output.ends_with("\n\n") {
+                output.push_str(if output.ends_with('\n') { "\n" } else { "\n\n" });
+            }
         }
         output.push_str(&trimmed);
         output.push_str("\n\n");
