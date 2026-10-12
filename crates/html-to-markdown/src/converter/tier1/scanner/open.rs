@@ -209,6 +209,11 @@ fn block_container_is_passthrough(name_lower: &[u8]) -> bool {
     matches!(name_lower, b"colgroup" | b"col" | b"base" | b"html" | b"body")
 }
 
+// ~keep Plain extraction walks form children without a block boundary; HTML paragraph closing still uses TagSpec.
+fn is_transparent_plain_form(name_lower: &[u8], options: &ConversionOptions) -> bool {
+    name_lower == b"form" && options.output_format == crate::options::OutputFormat::Plain
+}
+
 fn emit_open(
     state: &mut Tier1State,
     spec: &'static TagSpec,
@@ -347,7 +352,7 @@ fn emit_open_kind(
         // `close_table_cell`'s `replace('\n', ' ')` step, this becomes a 3-space
         // run between sibling divs — matching Tier-2's lists_timeline cell
         // layout `[link]   [other-link]`.  Without this, Tier-1 emits 1 space.
-        TagKind::Block => open_block_container(state, name_lower, options.br_in_tables),
+        TagKind::Block => open_block_container(state, name_lower, options),
         TagKind::Summary => open_summary_container(state, options.br_in_tables)?,
         TagKind::Figcaption => open_figcaption(state),
         TagKind::LineEndControl => open_line_end_control(state)?,
@@ -421,12 +426,15 @@ fn open_marker(state: &mut Tier1State, marker: &str) -> Result<(), BailReason> {
     Ok(())
 }
 
-fn open_block_container(state: &mut Tier1State, name_lower: &[u8], br_in_tables: bool) {
-    if block_container_is_passthrough(name_lower) || start_line_in_pre(state, name_lower) {
+fn open_block_container(state: &mut Tier1State, name_lower: &[u8], options: &ConversionOptions) {
+    if block_container_is_passthrough(name_lower)
+        || is_transparent_plain_form(name_lower, options)
+        || start_line_in_pre(state, name_lower)
+    {
         return;
     }
     if state.in_table_cell() {
-        break_cell_before_block(state, br_in_tables);
+        break_cell_before_block(state, options.br_in_tables);
         return;
     }
     let output = state.cell_or_output_mut();

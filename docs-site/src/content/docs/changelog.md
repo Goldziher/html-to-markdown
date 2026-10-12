@@ -11,6 +11,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- The testkit-forced fast scanner keeps retained forms transparent in Plain output.
+  With form removal disabled, `<div>before<form>name</form>after</div>` gives
+  `beforenameafter`, matching the full converter; paragraphs inside forms keep their own breaks.
+  Public Plain conversion continues to use the full converter.
+
+- The fast converter leaves form removal to the full converter's HTML5 tree
+  ([#829](https://github.com/xberg-io/html-to-markdown/issues/829)). With an unclosed label,
+  `<p>before<form><label>name<input></form>after<p>next` now gives `before` on every route:
+  HTML5 keeps `after` and `next` inside the label and form. Closing the label before the form
+  keeps `after` and `next` as separate paragraphs. Nested forms also use the HTML5 tree:
+  `<form>a<form>b</form>c</form>d` now keeps `cd` when removing forms, instead of losing `c`.
+  Pages whose forms are removed, and retained forms with nested starts, use the full converter;
+  well-formed retained forms can still use the fast converter.
+
 - Comment and form-feed runs before a line break use cached sibling lookahead instead of
   rescanning each suffix, retaining the existing output on every conversion route.
 
