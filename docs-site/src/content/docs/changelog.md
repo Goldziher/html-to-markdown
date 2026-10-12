@@ -11,6 +11,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- A source line ending before a data list becomes a space in Markdown, as before a select list;
+  a no-break space beside it stays a no-break space. A source line ending at the end of an
+  option group outside a select or data list also separates the following word. Plain text
+  retains these line endings ([#864](https://github.com/xberg-io/html-to-markdown/issues/864),
+  [#867](https://github.com/xberg-io/html-to-markdown/issues/867)).
 - White space at the start or the end of a link label or of a short quotation is written beside
   the link or the quotation, not inside it, as it is for bold text. `Press <a href="/p">Go </a>now.` gave `Press [Go](/p)now.` and
   now gives `Press [Go](/p) now.`. `Press <q>Go </q>now.` gave `Press "Go"now.` and now gives

@@ -267,7 +267,12 @@ impl TextProcessor<'_, '_, '_> {
         }
         let needs_space = next_tag.is_some()
             || holds_more
-            || newline_span_needs_separating_space(self.node_handle, self.parser, self.handler.dom_ctx);
+            || newline_span_needs_separating_space(
+                self.node_handle,
+                self.parser,
+                self.handler.dom_ctx,
+                self.handler.ctx.in_option_list,
+            );
         if needs_space && space_is_owed(self.output) {
             self.output.push(' ');
         }
@@ -648,6 +653,7 @@ fn newline_span_needs_separating_space(
     node_handle: &tl::NodeHandle,
     parser: &tl::Parser,
     dom_ctx: &DomContext,
+    in_option_list: bool,
 ) -> bool {
     // ~keep Climb through every transparent inline ancestor that has nothing after it: in
     // ~keep `<span><span>\n</span></span>Beta` only the outer wrapper is followed by `Beta`,
@@ -658,9 +664,11 @@ fn newline_span_needs_separating_space(
         let Some(parent_id) = dom_ctx.parent_of(node_id) else {
             return false;
         };
+        // ~keep A bare option group writes its children in the surrounding line (#864).
+        // ~keep Inside a select or data list, its line ends belong to the list's own buffer.
         let parent_is_inline = dom_ctx
             .tag_info(parent_id, parser)
-            .is_some_and(|info| info.is_inline_like);
+            .is_some_and(|info| info.is_inline_like || (!in_option_list && info.name == "optgroup"));
         if !parent_is_inline {
             return false;
         }

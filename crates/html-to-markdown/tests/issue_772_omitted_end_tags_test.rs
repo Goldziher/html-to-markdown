@@ -185,45 +185,28 @@ fn a_block_in_an_open_list_item_or_section_ends_with_its_parent() {
 
 #[test]
 fn options_with_no_end_tag_give_the_output_of_closed_options() {
-    // ~keep How a select list is written is not the subject here, so only one output is spelled
-    // ~keep out. Each open form is compared with its closed form on every route.
     let pairs = [
         (
             "<!doctype html><select><option>one<option>two</select>after",
             "<!doctype html><select><option>one</option><option>two</option></select>after",
+            "one two after\n",
         ),
         (
             "<!doctype html><p>before <select><option>one<option>two</select> after<p>next",
             "<!doctype html><p>before <select><option>one</option><option>two</option></select> after</p><p>next</p>",
+            "before one two after\n\nnext\n",
         ),
         (
             "<!doctype html><select><optgroup label=a><option>x<optgroup label=b><option>y</select>after",
             "<!doctype html><select><optgroup label=a><option>x</option></optgroup>\
              <optgroup label=b><option>y</option></optgroup></select>after",
+            "x y after\n",
         ),
     ];
-    for (open, closed) in pairs {
-        let closed_default = convert(closed, None).expect("conversion must succeed").content;
-        assert!(
-            closed_default
-                .as_deref()
-                .is_some_and(|content| !content.trim().is_empty()),
-            "the closed form gives no text: {closed:?}"
-        );
-        assert_eq!(
-            convert(open, None).expect("conversion must succeed").content,
-            closed_default,
-            "default options: {open:?}"
-        );
-        for tier_strategy in [TierStrategy::Tier2, TierStrategy::Tier1] {
-            assert_eq!(
-                convert_with(open, tier_strategy).content,
-                convert_with(closed, tier_strategy).content,
-                "{tier_strategy:?}: {open:?}"
-            );
-        }
+    for (open, closed, expected) in pairs {
+        assert_all_routes(open, expected);
+        assert_all_routes(closed, expected);
     }
-    assert_all_routes(pairs[0].0, "one two after\n");
 }
 
 #[test]
