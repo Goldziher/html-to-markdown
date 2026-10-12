@@ -316,15 +316,23 @@ fn normalize_label_in_place(dest: &mut String, trim_start: usize, marker: &'stat
 /// ~keep The label holds its white space as the text scanner wrote it, the white space it starts
 /// ~keep with included, and the rule decides the edges (issues #800, #844, #845): this scanner
 /// ~keep has no rule of its own for a label edge. A label with no text has no ends.
+/// ~keep A form feed at an edge is a character that Tier-2 writes outside the link with the white
+/// ~keep space of that edge (issue #811). This scanner writes one space for an edge and nothing
+/// ~keep else, so it leaves that page to Tier-2.
 fn move_label_edges(
     dest: &mut String,
     label_start: usize,
     space_owed_before_link: bool,
     marker: &'static str,
     indent: Option<&str>,
-) -> (usize, &'static str) {
+) -> Result<(usize, &'static str), BailReason> {
+    use crate::converter::utility::white_space::FORM_FEED;
     let content = dest.split_off(label_start);
     let (prefix, suffix, label) = crate::converter::utility::content::link_label_edges(&content);
+    if prefix.contains(FORM_FEED) || suffix.contains(FORM_FEED) {
+        return Err(BailReason::Classifier);
+    }
+    let suffix = if suffix.is_empty() { "" } else { " " };
     let has_text = !label.is_empty();
     let mut label_start = label_start;
     if has_text && !prefix.is_empty() && space_owed_before_link && dest.ends_with('[') {
@@ -339,7 +347,7 @@ fn move_label_edges(
     if dest[label_start..].trim().is_empty() {
         dest.truncate(label_start);
     }
-    (label_start, suffix)
+    Ok((label_start, suffix))
 }
 
 /// Where the text before the `[` of the link that is closing ends, when the marks of the inline
@@ -390,7 +398,7 @@ fn close_link(state: &mut Tier1State, frame: &OpenTag, options: &ConversionOptio
     let dest = state.cell_or_output_mut();
     let space_owed_before_link =
         text_end > 0 && crate::converter::utility::white_space::space_is_owed(&dest[..text_end]);
-    let (trim_start, suffix) = move_label_edges(dest, trim_start, space_owed_before_link, marker, indent.as_deref());
+    let (trim_start, suffix) = move_label_edges(dest, trim_start, space_owed_before_link, marker, indent.as_deref())?;
     // ~keep Tier-2 decides what a link with no text writes: the name of the link as its label,
     // ~keep nothing when the link points into its own page, and the label of a link that holds
     // ~keep only empty elements, or only a title. This scanner has none of these rules, so it

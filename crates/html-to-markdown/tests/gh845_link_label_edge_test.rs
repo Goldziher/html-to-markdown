@@ -168,8 +168,8 @@ fn the_edge_opposite_a_line_break_still_gives_up_its_space() {
 }
 
 /// One definition of white space at a label edge on both converters: a no-break space, a narrow
-/// no-break space (U+202F), an em space or a form feed at an edge is the one space of that edge,
-/// as it is at the edge of a text. The words beside the link stay apart.
+/// no-break space (U+202F) or an em space at an edge is the one space of that edge, as it is at
+/// the edge of a text. The words beside the link stay apart.
 #[test]
 fn a_unicode_space_at_a_label_edge_is_one_space_outside_the_link_in_both() {
     assert_row("<p>One<a href=\"/p\">&#8239;Go</a>two</p>", "One [Go](/p)two\n");
@@ -179,7 +179,6 @@ fn a_unicode_space_at_a_label_edge_is_one_space_outside_the_link_in_both() {
         "<p>One<a href=\"/p\">&emsp;<strong>Go</strong></a>two</p>",
         "One [**Go**](/p)two\n",
     );
-    assert_row("<p>One<a href=\"/p\">&#12;Go</a>two</p>", "One [Go](/p)two\n");
     assert_row(
         "<p>One<a href=\"https://e.org/\">&#8239;https://e.org/</a>two</p>",
         "One <https://e.org/>two\n",
@@ -216,11 +215,13 @@ fn a_line_break_in_a_label_in_a_table_cell_is_written_alike_in_both() {
         "| Press[Go now](/p) |\n| ----------------- |\n",
     );
     assert_row("<p>Press<a href=\"\">Go<br></a>now</p>", "PressGo  \nnow\n");
-    assert_row(
-        "<blockquote><p><a href=\"\">Go<br>&nbsp;</a></p></blockquote>",
-        "> Go\n",
-    );
     assert_row("<blockquote><p><a href=\"\">Go<br></a></p></blockquote>", "> Go\n");
+    // ~keep A no-break space after the `<br>` of a link with an empty address: the fast converter
+    // ~keep leaves that page to the full one, and each route writes the same text.
+    let html = "<blockquote><p><a href=\"\">Go<br>&nbsp;</a></p></blockquote>";
+    assert_row_of_full_converter(html, "> Go\n");
+    assert_eq!(public_fast_route(html), "> Go\n", "public fast route: {html:?}");
+    assert_eq!(fast(html), None, "fast converter: {html:?}");
 }
 
 /// A quotation drops a hard break at the end of its content, with a link and without one, on
@@ -489,6 +490,48 @@ fn a_unicode_space_at_a_line_start_in_a_label_goes_to_the_full_converter() {
         assert_eq!(
             public_fast_route(&html),
             content_with(&html, with_tier(TierStrategy::Tier2)),
+            "public fast route: {html:?}"
+        );
+    }
+}
+
+/// A form feed is a character (issue #811): a browser does not collapse it. At an edge of a
+/// label the full converter writes it outside the link with the white space of that edge, for a
+/// link with an empty address too. The fast converter leaves that page to the full one, and the
+/// public route that reaches the fast converter writes the text of the full converter.
+#[test]
+fn a_form_feed_at_a_label_edge_stays_a_character_outside_the_link() {
+    for (html, wanted) in [
+        ("<p>One<a href=\"/p\">&#12;Go</a>two</p>", "One\u{c}[Go](/p)two\n"),
+        ("<p>Press<a href=\"/p\">Go\u{c}</a>now</p>", "Press[Go](/p)\u{c}now\n"),
+        (
+            "<p>Press<a href=\"/p\">\u{c}Go\u{c}</a>now</p>",
+            "Press\u{c}[Go](/p)\u{c}now\n",
+        ),
+        ("<p><a href=\"\">\u{c}Go</a>now</p>", "\u{c}Gonow\n"),
+        ("<p><a href=\"\"> \u{c}Go</a>now</p>", "\u{c}Gonow\n"),
+    ] {
+        assert_row_of_full_converter(html, wanted);
+        assert_eq!(public_fast_route(html), wanted, "public fast route: {html:?}");
+        assert_eq!(fast(html), None, "fast converter: {html:?}");
+    }
+}
+
+/// A link with an empty address is running text in the full converter: a `<br>` in it is a break
+/// of the block, not of a label. The fast converter leaves a text of only Unicode spaces after
+/// that break to the full converter (issue #845: write its text or hand the page over). The
+/// public route that reaches the fast converter writes the text of the full converter.
+#[test]
+fn a_blank_text_after_a_line_break_in_a_link_with_an_empty_address_goes_to_the_full_converter() {
+    for html in [
+        "<ul><li><p>Press<a href=\"\">Go<br>&nbsp;</a>now</p></li></ul>",
+        "<ul><li><p>Press<a href=\"\">Go<br>&nbsp;</a> now</p></li></ul>",
+        "<ul><li><p>Press<a href=\"\">Go<br>&#x3000;</a></p></li></ul>",
+    ] {
+        assert_eq!(fast(html), None, "fast converter: {html:?}");
+        assert_eq!(
+            public_fast_route(html),
+            content_with(html, with_tier(TierStrategy::Tier2)),
             "public fast route: {html:?}"
         );
     }

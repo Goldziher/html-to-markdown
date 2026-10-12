@@ -268,6 +268,7 @@ fn hand_over_unicode_space_after_space(
         return Ok(());
     }
     let in_label = state.link_stack.iter().any(|(href, ..)| href.is_some());
+    let in_empty_address_link = state.link_stack.iter().any(|(href, ..)| href.as_deref() == Some(""));
     let place = state
         .text_place
         .and_then(|(offset, place)| (offset == base_offset).then_some(place));
@@ -278,10 +279,14 @@ fn hand_over_unicode_space_after_space(
     // ~keep A text with a word that starts a line after a hard break keeps its Unicode spaces as
     // ~keep the indent of that line in Tier-2 (#839). This scanner has no such rule, in the label
     // ~keep of a link either, and Tier-2 takes the page.
+    // ~keep A link with an empty address is running text in Tier-2: a `<br>` in it is a break of
+    // ~keep the block there, and this scanner writes the break of a label. What a text of only
+    // ~keep Unicode spaces writes after that break is decided in Tier-2 (issue #845).
     let after_hard_break = !in_heading
         && !in_cell
         && (written.ends_with("  \n") || written.ends_with("\\\n"))
-        && !crate::converter::utility::white_space::is_blank(crate::text::decode_html_entities_cow(raw).as_ref());
+        && (in_empty_address_link
+            || !crate::converter::utility::white_space::is_blank(crate::text::decode_html_entities_cow(raw).as_ref()));
     if after_hard_break {
         return Err(BailReason::UnicodeSpaceAfterSpace);
     }

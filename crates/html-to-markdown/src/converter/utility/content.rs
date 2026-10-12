@@ -93,15 +93,17 @@ pub fn chomp_inline(text: &str) -> (&str, &str, &str) {
 /// ~keep The white space at an edge of the label goes outside the link, as it does for bold
 /// ~keep and italic text: `[Go ](/p)now` shows as `Go now`, and a trimmed label joins the words.
 /// ~keep White space here is `char::is_whitespace`, the one definition of both converters: a
-/// ~keep no-break space, a narrow one, an em space or a form feed at an edge is the one space of
-/// ~keep that edge, as it is at the edge of a text ([`white_space::edges`]) and of an autolink
-/// ~keep ([`link_text_edges`]). A line end is not white space of an edge: a line break there is
+/// ~keep no-break space, a narrow one or an em space at an edge is the one space of that edge, as
+/// ~keep it is at the edge of a text ([`white_space::edges`]) and of an autolink
+/// ~keep ([`link_text_edges`]). A form feed is a character (issue #811): the white space of an
+/// ~keep edge that holds one goes outside the link as it is, as [`chomp_inline`] gives it for
+/// ~keep bold and italic text. A line end is not white space of an edge: a line break there is
 /// ~keep content of the label (issue #497), and that side is given back whole, with the white
 /// ~keep space around the break for [`normalize_link_label`] to drop. Each edge is decided on its
 /// ~keep own: `[  \nGo ](/p)now` shows `Go now` after the break, so the end still gives its space.
 ///
 /// [`white_space::edges`]: crate::converter::utility::white_space::edges
-pub fn link_label_edges(content: &str) -> (&'static str, &'static str, &str) {
+pub fn link_label_edges(content: &str) -> (&str, &str, &str) {
     let is_edge_space = |character: char| character.is_whitespace() && character != '\n';
     let after_start = content.trim_start_matches(is_edge_space);
     let starts_at_break = after_start.starts_with('\n') || after_start.starts_with("\\\n");
@@ -116,7 +118,19 @@ pub fn link_label_edges(content: &str) -> (&'static str, &'static str, &str) {
     } else {
         start + before_end.len()
     };
-    (space_if(start > 0), space_if(end < content.len()), &content[start..end])
+    let prefix = edge_space(&content[..start]);
+    let suffix = edge_space(&content[end..]);
+    (prefix, suffix, &content[start..end])
+}
+
+/// The white space `run` of a label edge as it is written outside the link: one space, or the
+/// run as it is when it holds a form feed.
+fn edge_space(run: &str) -> &str {
+    if run.contains(FORM_FEED) {
+        run
+    } else {
+        space_if(!run.is_empty())
+    }
 }
 
 /// The white space at the two ends of the text of a link, as one space for each end:
@@ -677,8 +691,8 @@ mod tests {
         }
     }
 
-    /// One definition of white space for every label edge: a Unicode space or a form feed at an
-    /// edge is the one space of that edge, as at the edge of a text or of an autolink.
+    /// One definition of white space for every label edge: a Unicode space at an edge is the
+    /// one space of that edge, as at the edge of a text or of an autolink.
     #[test]
     fn a_unicode_space_at_a_link_label_edge_is_the_space_of_that_edge() {
         for (content, edges) in [
@@ -686,9 +700,24 @@ mod tests {
             ("\u{202f}Go", (" ", "", "Go")),
             ("Go\u{202f}", ("", " ", "Go")),
             ("\u{2003}**Go**", (" ", "", "**Go**")),
-            ("\u{c}Go", (" ", "", "Go")),
             (" \u{a0}Go\u{a0} ", (" ", " ", "Go")),
             ("\u{a0}", (" ", "", "")),
+        ] {
+            assert_eq!(link_label_edges(content), edges, "{content:?}");
+        }
+    }
+
+    /// A form feed is a character (issue #811): the white space of an edge that holds one goes
+    /// outside the link as it is. The other edge is decided on its own.
+    #[test]
+    fn a_form_feed_at_a_link_label_edge_is_given_back_as_it_is() {
+        for (content, edges) in [
+            ("\u{c}Go", ("\u{c}", "", "Go")),
+            ("Go\u{c}", ("", "\u{c}", "Go")),
+            (" \u{c}Go ", (" \u{c}", " ", "Go")),
+            ("\u{a0}Go\u{c} ", (" ", "\u{c} ", "Go")),
+            ("\u{c}", ("\u{c}", "", "")),
+            ("Go\u{c}now", ("", "", "Go\u{c}now")),
         ] {
             assert_eq!(link_label_edges(content), edges, "{content:?}");
         }
