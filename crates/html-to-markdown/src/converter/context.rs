@@ -17,6 +17,11 @@ use crate::converter::reference_collector::ReferenceCollectorHandle;
 use crate::options::InlineDataMedia;
 use crate::types::structure_collector::StructureCollectorHandle;
 
+#[cfg(test)]
+thread_local! {
+    pub(crate) static INLINE_BUFFER_COLUMN_CHAR_READS: Cell<usize> = const { Cell::new(0) };
+}
+
 /// Handle type for inline image collector when feature is enabled.
 #[cfg(feature = "inline-images")]
 pub type InlineCollectorHandle = Rc<RefCell<InlineImageCollector>>;
@@ -503,7 +508,10 @@ impl Context {
             inline_buffer_column: if output.is_empty() {
                 self.inline_buffer_column
             } else {
-                Some(indent_column + line[indent_length..].chars().count())
+                let characters = line[indent_length..].chars().count();
+                #[cfg(test)]
+                INLINE_BUFFER_COLUMN_CHAR_READS.with(|reads| reads.set(reads.get() + characters));
+                Some(indent_column + characters)
             },
             inline_buffer_after_hard_break: if output.is_empty() {
                 self.inline_buffer_after_hard_break
