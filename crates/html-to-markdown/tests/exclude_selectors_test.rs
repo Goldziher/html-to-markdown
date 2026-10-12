@@ -128,3 +128,90 @@ fn test_exclude_selectors_plain_text_output() {
         "Should drop excluded element in plain output"
     );
 }
+
+#[test]
+fn should_exclude_inert_tags_before_retaining_their_hidden_content() {
+    for tag in ["noscript", "template"] {
+        for format in [
+            html_to_markdown_rs::OutputFormat::Markdown,
+            html_to_markdown_rs::OutputFormat::Plain,
+        ] {
+            let html = format!("<body><p>Visible.</p><{tag}><p>Excluded sentence.</p></{tag}></body>");
+            let options = ConversionOptions {
+                hidden_content: html_to_markdown_rs::HiddenContent::All,
+                exclude_selectors: vec![tag.to_owned()],
+                output_format: format,
+                ..Default::default()
+            };
+            assert_eq!(
+                convert(&html, Some(options)).expect("conversion succeeds").trim(),
+                "Visible.",
+                "{tag}, {format:?}"
+            );
+        }
+    }
+}
+
+#[test]
+fn should_apply_attribute_exclusions_to_kept_template_and_noscript_wrappers() {
+    for tag in ["noscript", "template"] {
+        for selector in [".secret", "#private", "[data-private]"] {
+            let html = format!(
+                "<body><p>Visible.</p><{tag} class=\"secret\" id=\"private\" data-private><p>Excluded sentence.</p></{tag}></body>"
+            );
+            let options = ConversionOptions {
+                hidden_content: html_to_markdown_rs::HiddenContent::All,
+                exclude_selectors: vec![selector.to_owned()],
+                ..Default::default()
+            };
+            assert_eq!(
+                convert(&html, Some(options)).expect("conversion succeeds").trim(),
+                "Visible.",
+                "{tag}, {selector}"
+            );
+        }
+    }
+}
+
+#[test]
+fn should_exclude_overlapping_hidden_subtrees_without_removing_adjacent_unicode_text() {
+    let html = r#"<body><p>Before α.</p><section class="secret">
+        <noscript class="secret"><p>Excluded fallback.</p></noscript>
+        <template><p>Excluded template.</p></template><p>Excluded parent.</p>
+        </section><p>After β.</p></body>"#;
+    let options = ConversionOptions {
+        hidden_content: html_to_markdown_rs::HiddenContent::All,
+        exclude_selectors: vec![
+            ".secret".to_owned(),
+            "noscript".to_owned(),
+            "template".to_owned(),
+            ".secret".to_owned(),
+        ],
+        ..Default::default()
+    };
+    assert_eq!(
+        convert(html, Some(options)).expect("conversion succeeds"),
+        "Before α.\n\nAfter β.\n"
+    );
+}
+
+#[test]
+fn should_exclude_declarative_shadow_templates_when_retaining_reachable_content() {
+    let html = r#"<body><div><template shadowrootmode="open"><p>Excluded shadow.</p></template>
+        <p>Visible light.</p></div></body>"#;
+    for choice in [
+        html_to_markdown_rs::HiddenContent::Reachable,
+        html_to_markdown_rs::HiddenContent::All,
+    ] {
+        let options = ConversionOptions {
+            hidden_content: choice,
+            exclude_selectors: vec!["template".to_owned()],
+            ..Default::default()
+        };
+        assert_eq!(
+            convert(html, Some(options)).expect("conversion succeeds"),
+            "Visible light.\n",
+            "{choice:?}"
+        );
+    }
+}

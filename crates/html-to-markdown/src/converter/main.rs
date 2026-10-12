@@ -16,7 +16,7 @@ use std::collections::HashSet;
 use crate::converter::dom_context::DomContext;
 use crate::converter::main_helpers::{
     collapse_excess_blank_lines, effective_max_depth, extract_head_metadata, format_metadata_frontmatter,
-    has_custom_element_tags, is_inline_element, repair_limit_warning, repair_with_html5ever_bounded,
+    has_custom_element_tags, is_inline_element, preserves_menu, repair_limit_warning, repair_with_html5ever_bounded,
     strip_trailing_backslash_breaks, trim_line_end_whitespace, trim_trailing_whitespace,
 };
 use crate::converter::plain_text::extract_plain_text;
@@ -25,7 +25,7 @@ use crate::converter::utility::content::{is_block_level_element, normalized_tag_
 use crate::converter::utility::preprocessing::{
     PRESERVED_MENU_ATTRIBUTE, normalize_bogus_comment_endings, normalize_menu_elements, normalize_split_closing_tags,
     normalize_unclosed_list_items, preprocess_html, restore_preserved_menu_elements, strip_bogus_comments,
-    strip_hidden_elements, strip_html_cdata, strip_script_and_style_tags, unwrap_kept_inert_elements,
+    strip_hidden_elements, strip_html_cdata, strip_script_and_style_tags,
 };
 use crate::converter::utility::serialization::serialize_tag_to_html;
 use crate::options::{HiddenContent, NewlineStyle, OutputFormat};
@@ -38,6 +38,7 @@ use crate::converter::context::{Context, ContextParameters, InlineCollectorHandl
 use crate::types::structure_collector::StructureCollectorHandle;
 
 mod block_boundary;
+mod exclusions;
 mod parse;
 mod table_parts;
 use self::block_boundary::{separate_in_list_item, separate_words_at_block_boundary};
@@ -89,16 +90,14 @@ pub fn convert_html_impl(
         document_base_href,
         head_repair_limit,
     } = parameters;
-    let preserve_menu = options.preserve_tags.iter().any(|tag| tag.eq_ignore_ascii_case("menu"));
-    let hidden_content = options.hidden_content;
-    let (preprocessed, prepare_limit, as_written) = prepare_html(html, preserve_menu, hidden_content);
+    let (preprocessed, prepare_limit, as_written) = prepare_html(html, options)?;
     let repaired_page = std::cell::OnceCell::new();
     let ParsedPage {
         mut dom,
         mut dom_ctx,
         len: preprocessed_len,
         repair_limit,
-    } = parse_for_conversion(&preprocessed, &repaired_page, preserve_menu, hidden_content, as_written)?;
+    } = parse_for_conversion(&preprocessed, &repaired_page, options, as_written)?;
     let repair_warning = repair_limit.or(prepare_limit).or(head_repair_limit);
     finish_dom_parse(&mut dom, &mut dom_ctx, inert_bodies, preprocessed_len)?;
     let parser = dom.parser();
@@ -379,17 +378,17 @@ fn document_language_and_direction(
 /// The page that the first parse reads, the limit that the repair of custom elements reached,
 /// and `html` when that repair did not run: the page as written, which the tree builder has
 /// not read.
-fn prepare_html(
-    html: &str,
-    preserve_menu: bool,
-    hidden_content: HiddenContent,
-) -> (String, Option<crate::types::WarningKind>, Option<&str>) {
-    let preprocessed = preprocess_initial_html(html, preserve_menu, hidden_content);
+fn prepare_html<'a>(
+    html: &'a str,
+    options: &ConversionOptions,
+) -> Result<(String, Option<crate::types::WarningKind>, Option<&'a str>)> {
+    let hidden_content = options.hidden_content;
+    let preprocessed = preprocess_initial_html(html, options, hidden_content)?;
     if has_custom_element_tags(&preprocessed) {
-        let (repaired, limit) = repair_custom_elements(preprocessed, preserve_menu, hidden_content);
-        return (repaired, limit, None);
+        let (repaired, limit) = repair_custom_elements(preprocessed, preserves_menu(options), hidden_content);
+        return Ok((repaired, limit, None));
     }
-    (preprocessed, None, Some(html))
+    Ok((preprocessed, None, Some(html)))
 }
 
 /// Remove the elements that the `hidden` attribute or an inline style hides, unless the caller
@@ -401,19 +400,19 @@ fn strip_hidden(html: &str, hidden_content: HiddenContent) -> Cow<'_, str> {
     }
 }
 
-fn preprocess_initial_html(html: &str, preserve_menu: bool, hidden_content: HiddenContent) -> String {
+fn preprocess_initial_html(html: &str, options: &ConversionOptions, hidden_content: HiddenContent) -> Result<String> {
     let stripped = strip_html_cdata(html);
     let stripped = strip_script_and_style_tags(&stripped);
     // ~keep Bogus comments must be removed before tag-shaped preprocessing examines them.
     let stripped = strip_bogus_comments(&stripped);
     let stripped = strip_hidden(&stripped, hidden_content);
-    let stripped = unwrap_kept_inert_elements(&stripped, hidden_content);
+    let stripped = exclusions::remove_kept_tags(&stripped, hidden_content, &options.exclude_selectors)?;
     let stripped = normalize_bogus_comment_endings(&stripped);
     let stripped = normalize_split_closing_tags(&stripped);
     // ~keep Implicit list-item closes prevent deeply nested parser output on large changelogs.
     let stripped = normalize_unclosed_list_items(&stripped);
-    let stripped = normalize_menu_elements(&stripped, preserve_menu);
-    preprocess_html(&stripped).into_owned()
+    let stripped = normalize_menu_elements(&stripped, preserves_menu(options));
+    Ok(preprocess_html(&stripped).into_owned())
 }
 
 fn preprocess_repaired_html(html: &str, preserve_menu: bool, hidden_content: HiddenContent) -> String {
