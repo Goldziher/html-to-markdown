@@ -174,6 +174,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Self-closing raw-text and inert elements encountered in an HTML head contain their following text.
   Head titles remain metadata; preserved `xmp` retains one container around its literal body
   ([#878](https://github.com/xberg-io/html-to-markdown/issues/878)).
+- With form removal enabled, text after an explicit `</form>` stays outside the removed form
+  even when a child is still open. Forms without an end tag keep the existing subtree removal.
+  Minimal preprocessing, visitor callbacks, possible preserved ancestors and table-contained
+  forms retain their existing behavior ([#879](https://github.com/xberg-io/html-to-markdown/issues/879)).
+
 - A `<label>` inside a code block keeps the spaces and the line ends of its text
   ([#822](https://github.com/xberg-io/html-to-markdown/issues/822)).
 - A paragraph inside a heading keeps a space between its text and the text after it
