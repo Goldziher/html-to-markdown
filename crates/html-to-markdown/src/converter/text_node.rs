@@ -298,7 +298,7 @@ impl TextProcessor<'_, '_, '_> {
             return ProcessedText::same(value.into_owned(), capture_semantic);
         }
         if ctx.in_table_cell {
-            return self.process_table_cell(value.as_ref(), escape_asterisks, was_fresh, capture_semantic);
+            return self.process_table_cell(value.as_ref(), escape_asterisks, capture_semantic);
         }
         if self.handler.options.whitespace_mode == crate::options::WhitespaceMode::Strict {
             return self.process_strict(value.as_ref(), escape_asterisks, capture_semantic);
@@ -306,32 +306,24 @@ impl TextProcessor<'_, '_, '_> {
         self.process_normalized(value.as_ref(), escape_asterisks, was_fresh, capture_semantic)
     }
 
-    fn process_table_cell(
-        &self,
-        value: &str,
-        escape_asterisks: bool,
-        was_fresh: bool,
-        capture_semantic: bool,
-    ) -> ProcessedText {
+    fn process_table_cell(&self, value: &str, escape_asterisks: bool, capture_semantic: bool) -> ProcessedText {
         let options = self.handler.options;
-        let collapses = options.whitespace_mode == crate::options::WhitespaceMode::Normalized;
-        let folded = if collapses {
-            cell_text(value)
+        let normalized = if options.whitespace_mode == crate::options::WhitespaceMode::Normalized {
+            let collapsed = cell_text(value);
+            // ~keep White space after a space is the same run of white space, as in `skip_prefix`.
+            match collapsed.strip_prefix(' ') {
+                Some(rest) if !space_is_owed(self.output) && !self.keeps_unicode_space(value) => {
+                    Cow::Owned(rest.to_string())
+                }
+                _ => collapsed,
+            }
         } else {
             text::fold_cell_line_breaks_verbatim_cow(value)
         };
-        // ~keep The space that opens a text in a cell follows the rule of running text
-        // ~keep (`skip_prefix`): after a space in the output it adds nothing, unless an inline
-        // ~keep element is between the two. A comment, a script or a style element is not.
-        // ~keep A Unicode space that the cell keeps is no such space, whatever the output ends with.
-        let normalized = folded
-            .strip_prefix(' ')
-            .filter(|_| collapses && !self.keeps_unicode_space(value) && self.skip_prefix(" ", value, was_fresh))
-            .unwrap_or_else(|| folded.as_ref());
         let mut output = String::with_capacity(normalized.len());
         text::escape_into(
             &mut output,
-            normalized,
+            normalized.as_ref(),
             options.escape_misc,
             escape_asterisks,
             options.escape_underscores,
@@ -348,7 +340,7 @@ impl TextProcessor<'_, '_, '_> {
         .into_owned();
         ProcessedText {
             output,
-            semantic: capture_semantic.then(|| normalized.to_string()),
+            semantic: capture_semantic.then(|| normalized.into_owned()),
         }
     }
 

@@ -168,3 +168,42 @@ fn a_no_break_space_after_a_node_that_is_passed_over_is_kept_in_plain_output() {
         }
     }
 }
+
+/// A node with white space on one side only, after a word and as the first node of a
+/// paragraph, with the plain text of the page.
+const ONE_SPACE_PLACES: [(&str, &str, &str); 2] = [("<p>foo", " bar</p>", "foo bar"), ("<p>", " foo</p>", " foo")];
+
+#[test]
+fn the_only_space_beside_a_node_that_is_passed_over_is_kept_in_plain_output() {
+    // ~keep The space after the node is dropped only after a space: here it is the only one.
+    for node in PASSED_OVER {
+        for (before, after, expected) in ONE_SPACE_PLACES {
+            let html = format!("{before}{node}{after}");
+            for tier_strategy in FULL_ROUTES {
+                for extract_metadata in [false, true] {
+                    assert_eq!(
+                        plain(&html, tier_strategy, extract_metadata),
+                        expected,
+                        "{tier_strategy:?}, extract_metadata {extract_metadata}: {html:?}"
+                    );
+                }
+            }
+        }
+    }
+}
+
+#[test]
+fn a_node_that_is_passed_over_outside_every_element_leaves_one_space_in_plain_output() {
+    for node in PASSED_OVER {
+        let html = format!("foo {node} bar");
+        for tier_strategy in FULL_ROUTES {
+            for extract_metadata in [false, true] {
+                assert_eq!(
+                    plain(&html, tier_strategy, extract_metadata),
+                    "foo bar",
+                    "{tier_strategy:?}, extract_metadata {extract_metadata}: {html:?}"
+                );
+            }
+        }
+    }
+}
