@@ -666,6 +666,63 @@ fn should_write_an_end_tag_of_the_body_for_the_removed_tag_that_started_the_body
 }
 
 #[test]
+fn should_leave_a_tag_in_the_text_of_a_text_element_as_text() {
+    let inner = [
+        "<template><p>x</p></template>",
+        "<noscript><p>x</p></noscript>",
+        r#"<template shadowrootmode="open"><p>x</p></template>"#,
+    ];
+    for choice in [HiddenContent::Reachable, HiddenContent::All] {
+        for name in ["textarea", "noembed", "noframes", "plaintext", "TextArea"] {
+            for text in inner {
+                // ~keep With its end tag, with no end tag, and with an attribute.
+                for page in [
+                    format!("<p>a</p><{name}>{text}</{name}>"),
+                    format!("<p>a</p><{name}>{text}<p>b</p>"),
+                    format!("<p>a</p><{name} class=\"c\">{text}</{name}><p>b</p>"),
+                ] {
+                    assert_eq!(unwrap_kept_inert_elements(&page, choice), page, "{choice:?}");
+                }
+            }
+        }
+    }
+    let all = HiddenContent::All;
+    for (page, expected) in [
+        // ~keep The element ends at its end tag: a template after it is a template.
+        (
+            "<p>a</p><textarea><template></textarea><template>b</template>",
+            "<p>a</p><textarea><template></textarea>b",
+        ),
+        (
+            "<p>a</p><noembed></noscript></noembed><noscript>b</noscript>",
+            "<p>a</p><noembed></noscript></noembed>b",
+        ),
+        // ~keep An end tag in the text closes nothing: the start tag before the element has no
+        // ~keep end tag, and the end tag after the element has no start tag.
+        (
+            "<p>a</p><template><textarea></template></textarea>",
+            "<p>a</p><textarea></template></textarea>",
+        ),
+        (
+            "<p>a</p><noframes><noscript></noframes>b</noscript>",
+            "<p>a</p><noframes><noscript></noframes>b</noscript>",
+        ),
+        // ~keep A `<plaintext>` has no end tag: the rest of the page is its text.
+        (
+            "<template>a</template><p>b</p><plaintext></plaintext><template>c</template>",
+            "</body>a<p>b</p><plaintext></plaintext><template>c</template>",
+        ),
+        // ~keep A name that only starts like one of the elements is another element.
+        (
+            "<p>a</p><textareas><template>b</template></textareas>",
+            "<p>a</p><textareas>b</textareas>",
+        ),
+    ] {
+        assert_eq!(unwrap_kept_inert_elements(page, all), expected, "{page:?}");
+    }
+}
+
+#[test]
 fn should_strip_only_html_cdata_and_keep_opaque_foreign_and_raw_text_regions() {
     use super::strip_html_cdata;
     for input in [

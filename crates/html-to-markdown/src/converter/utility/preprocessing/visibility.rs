@@ -1,7 +1,7 @@
 use std::borrow::Cow;
 
 use super::head_scan::body_start;
-use super::markup::{find_tag_end, matches_tag_start};
+use super::markup::{find_tag_end, matches_tag_start, skip_written_text_element};
 use super::raw_text::{
     find_closing_tag_bytes_nested, is_self_closing_tag, matching_tag_ends, opens_a_tag, skip_opaque_region,
 };
@@ -438,14 +438,17 @@ pub fn unwrap_kept_inert_elements(input: &str, hidden_content: HiddenContent) ->
         let is_tag = opens_a_tag(bytes, idx);
         let tag_end = if is_tag { tag_ends.tag_end(idx + 1) } else { None };
         if !is_template && !is_noscript {
-            // ~keep A comment, a raw-text body and a quoted attribute value can hold text that
-            // ~keep looks like one of the two tags. Step over each as one unit.
+            // ~keep A comment, a raw-text body, the text of a text element and a quoted attribute
+            // ~keep value can hold text that looks like one of the two tags. Step over each as
+            // ~keep one unit.
             // ~keep A raw-text element starts with a tag that ends. For a tag start with no end
             // ~keep the raw-text scan would read to the end of the input and find nothing.
             let unit_end = if is_tag && tag_end.is_none() {
                 None
             } else {
-                skip_opaque_region(bytes, idx).or(tag_end)
+                skip_opaque_region(bytes, idx)
+                    .or_else(|| skip_written_text_element(bytes, idx))
+                    .or(tag_end)
             };
             idx = unit_end.unwrap_or(idx + 1);
             continue;
