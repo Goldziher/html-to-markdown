@@ -158,13 +158,14 @@ fn prepare_conversion<'a>(html: &'a str, options: &ConversionOptions) -> Result<
         preserve_bodies,
         options.hidden_content,
     );
+    // ~keep The page of `drop` says whether the head is repaired, for each choice: a `<head>` tag
+    // ~keep in kept content is no head of the page, and a browser ignores it there.
     let normalized_input = match inert_html {
         Cow::Borrowed(_) => normalized_input,
         Cow::Owned(normalized) => Cow::Owned(normalized),
     };
-    let (normalized_html, head_repair_limit) =
-        crate::converter::repair_head_content_outside_head(normalized_input.as_ref(), options.hidden_content)
-            .map_or((normalized_input, None), |(html, limit)| (Cow::Owned(html), limit));
+    let (normalized_html, head_repair_limit) = repair_head(normalized_input.as_ref(), options.hidden_content)
+        .map_or((normalized_input, None), |(html, limit)| (Cow::Owned(html), limit));
     let document_base_href = (options.base_url.is_some() || options.extract_metadata)
         .then(|| crate::converter::url_resolve::document_base_href(&normalized_html))
         .flatten();
@@ -185,6 +186,28 @@ fn prepare_conversion<'a>(html: &'a str, options: &ConversionOptions) -> Result<
         metadata_base_href,
         head_repair_limit,
     })
+}
+
+/// The head repair of `html`, the page after the inert-body pass of `hidden_content`.
+///
+/// ~keep A choice that keeps hidden content takes the repair only where `drop` takes it too.
+/// ~keep Kept content can hold a `<head>` tag, which is no head of the page: a browser ignores it
+/// ~keep there. Read as the head, it sent only the wider choice to the repair, which then put a
+/// ~keep title of the body in the head. So a wider choice empties the kept elements again and
+/// ~keep asks that page first.
+fn repair_head(
+    html: &str,
+    hidden_content: crate::options::HiddenContent,
+) -> Option<(String, Option<crate::types::WarningKind>)> {
+    let drop = crate::options::HiddenContent::Drop;
+    if hidden_content != drop {
+        let emptied =
+            crate::converter::utility::preprocessing::normalize_inert_bodies_with_preservation(html, false, drop).0;
+        if !crate::converter::has_head_content_outside_head(&emptied) {
+            return None;
+        }
+    }
+    crate::converter::repair_head_content_outside_head(html, hidden_content)
 }
 
 fn try_tier1(prepared: &PreparedConversion<'_>, options: &ConversionOptions) -> Option<ConversionResult> {

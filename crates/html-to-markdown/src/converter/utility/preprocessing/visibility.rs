@@ -396,6 +396,9 @@ pub fn strip_hidden_elements(input: &str) -> Cow<'_, str> {
 /// The two tags of one element are removed together or not at all: an end tag is removed only
 /// when the start tag that it closes was removed.
 ///
+/// ~keep A start tag that is written as self-closing opens an element all the same: the
+/// ~keep inert-body pass and the tree builder read `<template/>` as `<template>`.
+///
 /// ~keep A removed start tag can be the tag that starts the body: the first `<template>` of a
 /// ~keep fragment, or a `<noscript>` after the end tag of the head. With nothing in its place the
 /// ~keep tree builder starts the body at a later tag and puts a `<title>` before that tag in the
@@ -450,7 +453,6 @@ pub fn unwrap_kept_inert_elements(input: &str, hidden_content: HiddenContent) ->
         let Some(tag_end) = tag_end else {
             break;
         };
-        let closes_itself = is_self_closing_tag(&bytes[idx..tag_end], b"template");
         // ~keep Text that starts the body is before its first tag, so only a tag is at the start.
         let starts_body = idx == body_start;
         let open = &mut open[usize::from(is_noscript)];
@@ -459,9 +461,7 @@ pub fn unwrap_kept_inert_elements(input: &str, hidden_content: HiddenContent) ->
         } else {
             let remove =
                 hidden_content == HiddenContent::All || (is_template && tag_declares_shadow_root(&input[idx..tag_end]));
-            if !closes_itself {
-                open.push(remove);
-            }
+            open.push(remove);
             remove
         };
         if remove {

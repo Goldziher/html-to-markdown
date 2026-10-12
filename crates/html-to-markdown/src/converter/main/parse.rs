@@ -2,7 +2,7 @@ use super::{preprocess_initial_html, preprocess_repaired_html, trace_parse_compl
 use crate::converter::DomContext;
 use crate::converter::main_helpers::{has_custom_element_tags, repair_with_html5ever_bounded};
 use crate::converter::preprocessing_helpers::{
-    has_discarded_end_tag, has_inline_block_misnest, has_omitted_end_tag, readable_text_len,
+    has_discarded_end_tag, has_inline_block_misnest, has_omitted_end_tag, readable_text_len, written_title_len,
 };
 use crate::converter::utility::caching::build_dom_context;
 use crate::converter::utility::preprocessing::normalize_inert_bodies_with_preservation;
@@ -112,7 +112,9 @@ pub(super) fn parse_for_conversion<'a>(
     let second = parse_html(page)?;
     // ~keep The text rule is for the second parse that an omitted end tag asks for. The first
     // ~keep parse of a misnest can hide content, so its count is not a measure.
-    let loses_text = omitted_end_tag && readable_text_len(&second) < readable_text_len(&dom);
+    let loses_text = omitted_end_tag
+        && (readable_text_len(&second) < readable_text_len(&dom)
+            || loses_a_title_of_a_wider_choice(&dom, &second, as_written, preserve_menu, hidden_content));
     if loses_text && !misnest {
         // ~keep A frameset page with every end tag written comes here, so this is no warning.
         tracing::debug!(
@@ -214,6 +216,31 @@ fn narrower_choice_asks(html: &str, page: &str, preserve_menu: bool, hidden_cont
     let narrower_page = preprocess_initial_html(&narrower_html, preserve_menu, narrower);
     (narrower_page != page && asks_for_the_tree_builder(&narrower_page))
         || narrower_choice_asks(html, &narrower_page, preserve_menu, narrower)
+}
+
+/// Whether the second parse of a choice that keeps hidden content loses a title that the first
+/// parse writes, on a page that `drop` does not send to the tree builder. `as_written` is the
+/// page before the passes of this conversion.
+///
+/// ~keep The walk writes a `<title>` of a `<head>` that holds a paragraph as text, and the tree
+/// ~keep builder puts that title in the head, where it is the title of the document. Kept content
+/// ~keep can be all that asks for the tree builder: in `<head><title>t</title><p>a</p></head>`
+/// ~keep `<template><div>b</template>` the `<div>` has no end tag. `drop` then writes the title
+/// ~keep from its first parse, so a wider choice keeps its first parse too. Where `drop` takes
+/// ~keep the tree builder, each choice takes it and no choice writes the title.
+fn loses_a_title_of_a_wider_choice(
+    first: &tl::VDom<'_>,
+    second: &tl::VDom<'_>,
+    as_written: Option<&str>,
+    preserve_menu: bool,
+    hidden_content: HiddenContent,
+) -> bool {
+    hidden_content != HiddenContent::Drop
+        && written_title_len(second) < written_title_len(first)
+        && as_written.is_some_and(|html| {
+            let (emptied, _) = normalize_inert_bodies_with_preservation(html, false, HiddenContent::Drop);
+            !asks_for_the_tree_builder(&preprocess_initial_html(&emptied, preserve_menu, HiddenContent::Drop))
+        })
 }
 
 /// Whether the conversion of `page`, a page before its first parse, runs the HTML tree builder.

@@ -627,14 +627,18 @@ pub fn repair_head_content_outside_head(
     input: &str,
     hidden_content: HiddenContent,
 ) -> Option<(String, Option<crate::types::WarningKind>)> {
-    if !may_hold_head_content_outside_head(input.as_bytes()) {
-        return None;
-    }
-    let dom = tl::parse(input, tl::ParserOptions::default()).ok()?;
-    if !document_head_search(dom.children(), dom.parser()).content_outside_head {
+    if !has_head_content_outside_head(input) {
         return None;
     }
     repair_with_html5ever(input, hidden_content != HiddenContent::Drop)
+}
+
+/// Whether head content precedes the `<head>` element of `input`, or a `<title>` precedes the
+/// body and is in no `<head>` element.
+pub fn has_head_content_outside_head(input: &str) -> bool {
+    may_hold_head_content_outside_head(input.as_bytes())
+        && tl::parse(input, tl::ParserOptions::default())
+            .is_ok_and(|dom| document_head_search(dom.children(), dom.parser()).content_outside_head)
 }
 
 /// A cheap check of the source in front of the parse of [`repair_head_content_outside_head`];

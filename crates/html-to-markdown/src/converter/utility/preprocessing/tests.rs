@@ -576,14 +576,20 @@ fn find_closing_tag_bytes_stays_first_match_for_raw_text_elements() {
 }
 
 #[test]
-fn should_leave_the_end_tag_after_a_template_start_tag_that_closes_itself() {
-    // ~keep The parser reads `<template/>` as an element with no content, so the start tag
-    // ~keep opens nothing and the end tag that follows closes nothing: it stays.
+fn should_remove_the_end_tag_of_a_removed_start_tag_that_closes_itself() {
+    // ~keep The inert-body pass and the tree builder read `<template/>` as a start tag: the
+    // ~keep element holds what follows, up to its end tag. So the tag opens an element here too,
+    // ~keep and its end tag is removed with it or stays with it.
     for (page, choice, expected) in [
         (
             "<p>a</p><template/><p>b</p></template><p>c</p>",
             HiddenContent::All,
-            "<p>a</p><p>b</p></template><p>c</p>",
+            "<p>a</p><p>b</p><p>c</p>",
+        ),
+        (
+            "<p>a</p><noscript/><p>b</p></noscript><p>c</p>",
+            HiddenContent::All,
+            "<p>a</p><p>b</p><p>c</p>",
         ),
         (
             "<p>a</p><template><p>b</p></template><p>c</p>",
@@ -591,16 +597,21 @@ fn should_leave_the_end_tag_after_a_template_start_tag_that_closes_itself() {
             "<p>a</p><p>b</p><p>c</p>",
         ),
         (
+            "<p>a</p><template/><p>b</p></template><p>c</p>",
+            HiddenContent::Reachable,
+            "<p>a</p><template/><p>b</p></template><p>c</p>",
+        ),
+        (
             "<div><template shadowrootmode=\"open\"><template/></template><p>x</p></template></div>",
             HiddenContent::Reachable,
-            "<div><template/><p>x</p></template></div>",
+            "<div><template/></template><p>x</p></div>",
         ),
-        // ~keep With an entry for the start tag that closes itself, the end tag is removed
-        // ~keep alone: the `<template>` stays and holds the rest of the page.
+        // ~keep The end tag closes the shadow root, so the first `<template>` has no end tag and
+        // ~keep holds the rest of the page.
         (
             "<template><p>IN</p><template shadowrootmode=\"open\"/></template><p>X</p>",
             HiddenContent::Reachable,
-            "<template><p>IN</p></template><p>X</p>",
+            "<template><p>IN</p><p>X</p>",
         ),
     ] {
         assert_eq!(unwrap_kept_inert_elements(page, choice), expected, "{page:?}");

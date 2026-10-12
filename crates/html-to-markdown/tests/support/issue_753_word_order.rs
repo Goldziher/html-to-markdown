@@ -421,6 +421,59 @@ fn should_empty_a_kept_element_of_the_head_like_a_narrower_choice() {
     }
 }
 
+/// The output of each choice with no front matter: a title of the head is then written nowhere.
+fn without_front_matter(html: &str) -> [String; 3] {
+    CHOICES.map(|hidden_content| {
+        let options = ConversionOptions {
+            hidden_content,
+            extract_metadata: false,
+            ..ConversionOptions::default()
+        };
+        convert(html, Some(options))
+            .expect("conversion should succeed")
+            .content
+            .unwrap_or_default()
+    })
+}
+
+#[test]
+fn should_write_a_title_under_a_wider_choice_where_a_narrower_choice_writes_it() {
+    // ~keep The walk writes the title of a `<head>` that holds a paragraph as text. The kept
+    // ~keep content has an element with no end tag, which asks for the tree builder, and the
+    // ~keep tree builder puts the title in the head. No narrower choice takes the tree builder
+    // ~keep here, so the wider choice keeps its first parse. The first page of each group is a
+    // ~keep generated document.
+    for html in [
+        r#"<head><title>T1</title><meta name="m2" content="c"></div><p>W4</p></head></NOSCRIPT></div><TEMPLATE shadowrootmode="open"><template/><body><div><noscript/><p>End</p>"#,
+        "<head><title>T1</title><p>W4</p></head><template><div><p>End</p></template>",
+        "<head><title>T1</title><p>W4</p></head><noscript><div><p>End</p></noscript>",
+    ] {
+        let [drop, reachable, all] = without_front_matter(html);
+        assert_eq!(drop, "T1\n\nW4\n", "{html}");
+        assert_eq!(reachable, drop, "{html}");
+        assert_eq!(all, "T1\n\nW4\n\nEnd\n", "{html}");
+    }
+    // ~keep Where `drop` takes the tree builder, each choice takes it: no choice writes the title.
+    let html = r#"<head><title>T1</title><p>W4</p></head><div><TEMPLATE shadowrootmode="open"><div><p>End</p></template></div>"#;
+    let [drop, reachable, all] = without_front_matter(html);
+    assert_eq!(drop, "W4\n", "{html}");
+    assert_eq!(reachable, "W4\n\nEnd\n", "{html}");
+    assert_eq!(all, reachable, "{html}");
+    let html = "<head><title>T1</title><p>W4</p></head><div><p>Mid</p><template><div><p>End</p></template>";
+    let [drop, reachable, all] = without_front_matter(html);
+    assert_eq!(drop, "W4\n\nMid\n", "{html}");
+    assert_eq!(reachable, drop, "{html}");
+    assert_eq!(all, "W4\n\nMid\n\nEnd\n", "{html}");
+    // ~keep A `<head>` tag in kept content is no head of the page: the tree builder ignores it in
+    // ~keep the body. It sends no choice to the head repair that `drop` does not take.
+    let html =
+        r#"<template/><head><head></template><TEMPLATE shadowrootmode="open"><title>T5</title><noscript/><p>End</p>"#;
+    let [drop, reachable, all] = without_front_matter(html);
+    assert_eq!(drop, "", "{html}");
+    assert_eq!(reachable, "T5\n", "{html}");
+    assert_eq!(all, "T5\n\nEnd\n", "{html}");
+}
+
 /// The pieces of the generated documents. `{}` takes a word that no other piece of the document has.
 const PIECES: &[&str] = &[
     "<head>",
