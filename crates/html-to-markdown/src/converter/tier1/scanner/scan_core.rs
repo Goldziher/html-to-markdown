@@ -141,7 +141,7 @@ impl<'a> Tier1Scanner<'a> {
         let tag_name = &self.bytes[name_start..name_end];
         let len_before_close = self.state.cell_or_output_mut().len();
         let join_open = self.state.pending_newline_join == Some(len_before_close);
-        emit_close(&mut self.state, tag_name, self.options, &mut self.table_probes)?;
+        let place_after = emit_close(&mut self.state, tag_name, self.options, &mut self.table_probes)?;
         let mut name_buf = [0u8; MAX_TAG_NAME_BYTES];
         let name_lower = lowercase_into(tag_name, &mut name_buf);
         let ends_own_line = tier1::lookup(name_lower).is_some_and(|spec| spec.is_block)
@@ -153,6 +153,7 @@ impl<'a> Tier1Scanner<'a> {
         let (dest_len, ends_in_newline) = (dest.len(), dest.ends_with('\n'));
         self.state.pending_newline_join = (join_open && ends_in_newline && !ends_own_line).then_some(dest_len);
         self.pos = close.0 + 1;
+        self.state.text_place = Some((self.pos, place_after));
         self.text_start = self.pos;
         Ok(())
     }
@@ -678,7 +679,6 @@ fn push_open_frame(
         dropped_whitespace_only_text: false,
         own_buffer: renders_into_own_buffer(spec.kind, name_lower, prev_ctx),
         starts_with_whitespace: false,
-        label_starts_with_white_space: false,
     });
 }
 

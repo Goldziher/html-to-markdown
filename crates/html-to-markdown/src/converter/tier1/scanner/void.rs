@@ -162,11 +162,12 @@ fn emit_hr(state: &mut Tier1State) -> Result<(), BailReason> {
 fn emit_line_break(state: &mut Tier1State, options: &ConversionOptions) -> Result<(), BailReason> {
     let in_code = state.escape_ctx.contains(EscapeCtx::CODE);
     let in_pre = state.escape_ctx.contains(EscapeCtx::PRE);
-    let inside_link = !in_code && state.stack.iter().any(|frame| matches!(frame.spec.kind, TagKind::Link));
-    if inside_link {
-        state
-            .cell_or_output_mut()
-            .push_str(crate::converter::main_helpers::hard_break_marker(options));
+    let label_start = (!in_code)
+        .then(|| state.stack.iter().rev().find(|frame| matches!(frame.spec.kind, TagKind::Link)))
+        .flatten()
+        .map(|frame| frame.content_start);
+    if let Some(label_start) = label_start {
+        emit_label_line_break(state, label_start, options);
     } else if in_code && !in_pre && state.escape_ctx.contains(EscapeCtx::HEADING) {
         let dest = state.cell_or_output_mut();
         crate::converter::main_helpers::trim_trailing_whitespace(dest);
@@ -181,6 +182,36 @@ fn emit_line_break(state: &mut Tier1State, options: &ConversionOptions) -> Resul
         emit_regular_line_break(state, options);
     }
     Ok(())
+}
+
+/// Writes a `<br>` inside a link label, where `label_start` is the start of the label in the
+/// buffer: what Tier-2's `line_break.rs` writes into its label buffer, in the same order of its
+/// arms. In a heading the break is one space after the trimmed label; in a table cell it is the
+/// cell break of the label alone, so a `<br>` that the label starts with is one space, and a
+/// `<br>` after white space or after another `<br>` is nothing (issue #845); elsewhere it is the
+/// hard break marker, and `close_link` decides which marker at an edge stays (issue #497).
+fn emit_label_line_break(state: &mut Tier1State, label_start: usize, options: &ConversionOptions) {
+    let in_heading = state.escape_ctx.contains(EscapeCtx::HEADING);
+    let in_table_cell = state.in_table_cell();
+    let dest = state.cell_or_output_mut();
+    let label_start = clamp_to_char_boundary(dest, label_start);
+    if in_heading {
+        crate::converter::main_helpers::trim_trailing_whitespace(dest);
+        dest.push(' ');
+    } else if in_table_cell {
+        if dest.len() == label_start && !options.br_in_tables {
+            dest.push(' ');
+        } else {
+            crate::converter::main_helpers::trim_trailing_whitespace(dest);
+            if options.br_in_tables {
+                dest.push_str("<br>");
+            } else if dest.len() > label_start {
+                dest.push(' ');
+            }
+        }
+    } else {
+        dest.push_str(crate::converter::main_helpers::hard_break_marker(options));
+    }
 }
 
 fn emit_pre_line_break(state: &mut Tier1State, br_in_tables: bool) {
@@ -418,12 +449,19 @@ fn is_adjacent_rawtext_ignored_open(bytes: &[u8], pos: usize) -> bool {
     false
 }
 
+/// Closes the element of the close tag `tag_name_bytes` and gives back the place of a text that
+/// follows the tag: after text, or after an element that wrote no text.
+///
+/// ~keep Tier-2 reads the place of a text from the tree (`siblings::text_place`): the element
+/// ~keep before it holds text, or none. This scanner reads it from what the element wrote: a link
+/// ~keep whose label gave up a space at its end leaves `[Go](/p) `, and the no-break space that
+/// ~keep `</a>&nbsp;now` starts with joins that space in both converters (rule 4), with no hand-over.
 fn emit_close(
     state: &mut Tier1State,
     tag_name_bytes: &[u8],
     options: &ConversionOptions,
     table_probes: &mut Vec<TableLayoutProbe>,
-) -> Result<(), BailReason> {
+) -> Result<TextPlace, BailReason> {
     let mut name_buf = [0u8; MAX_TAG_NAME_BYTES];
     let name_lower = lowercase_into(tag_name_bytes, &mut name_buf);
 
@@ -481,7 +519,12 @@ fn emit_close(
     let breaks_after = is_block_tag(name_lower) && !(matches!(spec.kind, TagKind::Table) && state.in_table_cell());
     state.last_closed_block = breaks_after || (state.last_closed_block && is_inline_tag(name_lower));
 
-    Ok(())
+    let wrote_text = state.cell_or_output_mut().len() > frame.content_start;
+    Ok(if wrote_text {
+        TextPlace::AfterText
+    } else {
+        TextPlace::AfterEmptyElement
+    })
 }
 
 fn dispatch_close(

@@ -132,16 +132,17 @@ fn handle_adjacent_image_whitespace(
 fn text_position(state: &mut Tier1State, raw: &str) -> TextPosition {
     let in_summary = state.in_summary();
     let active_len = state.cell_or_output_mut().len();
+    // ~keep A link label is not such a start: the white space it starts with is written into the
+    // ~keep label, as the full converter writes it into its label buffer, and `close_link` gives
+    // ~keep the label to the edge rule of both converters (issue #845).
     let at_inline_frame_start = state.stack.last().is_some_and(|frame| {
         frame.content_start >= active_len
-            && (matches!(
-                frame.spec.kind,
-                TagKind::Link | TagKind::Strong | TagKind::Emphasis | TagKind::Code
-            ) || (in_summary
-                && matches!(
-                    frame.spec.kind,
-                    TagKind::Inline | TagKind::Block | TagKind::Paragraph | TagKind::Heading(_)
-                )))
+            && (matches!(frame.spec.kind, TagKind::Strong | TagKind::Emphasis | TagKind::Code)
+                || (in_summary
+                    && matches!(
+                        frame.spec.kind,
+                        TagKind::Inline | TagKind::Block | TagKind::Paragraph | TagKind::Heading(_)
+                    )))
     });
     let active = state.cell_or_output_mut();
     let block_edge = active.is_empty()
@@ -179,9 +180,6 @@ fn drop_block_edge_whitespace(state: &mut Tier1State, raw: &str, in_pre: bool, p
             ) {
                 frame.dropped_whitespace_only_text = true;
             }
-        }
-        if !document_start {
-            note_label_start_white_space(state);
         }
     }
     let _ = raw;
@@ -299,23 +297,7 @@ fn trim_leading_text_run<'a>(
     if leading_ws_migrates && trimmed.len() < raw.len() {
         state.cell_or_output_mut().push(' ');
     }
-    if at_inline_frame_start && !document_start_strip && trimmed.len() < raw.len() {
-        note_label_start_white_space(state);
-    }
     std::borrow::Cow::Borrowed(trimmed)
-}
-
-/// Notes on the link that is open innermost that its label starts with white space.
-///
-/// ~keep The space is not written here: a label keeps a line break at an edge whole, and such a
-/// ~keep label drops the white space that the link starts with, as Tier-2 does. `close_link`
-/// ~keep knows which label it has.
-fn note_label_start_white_space(state: &mut Tier1State) {
-    if let Some(frame) = state.stack.last_mut() {
-        if matches!(frame.spec.kind, TagKind::Link) {
-            frame.label_starts_with_white_space = true;
-        }
-    }
 }
 
 fn should_strip_document_start(state: &Tier1State, was_at_document_start: bool) -> bool {

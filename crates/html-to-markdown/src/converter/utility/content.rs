@@ -76,27 +76,35 @@ pub fn chomp_inline(text: &str) -> (&str, &str, &str) {
 
 /// The white space that the content of a link label gives up at its two ends, and the label
 /// without it: (prefix, suffix, label). Every writer of a link with a label asks here, in both
-/// converters.
+/// converters, with the bytes of the label as that converter wrote them.
 ///
 /// ~keep The white space at an edge of the label goes outside the link, as it does for bold
-/// ~keep and italic text ([`chomp_inline`]): `[Go ](/p)now` shows as `Go now`, and a trimmed
-/// ~keep label joins the words. A line break at an edge is content of the label, not white
-/// ~keep space (issue #497): such a label is given back whole.
-pub fn link_label_edges(content: &str) -> (&str, &str, &str) {
-    if matches!(label_edge_breaks(content), (false, false)) {
-        chomp_inline(content)
+/// ~keep and italic text: `[Go ](/p)now` shows as `Go now`, and a trimmed label joins the words.
+/// ~keep White space here is `char::is_whitespace`, the one definition of both converters: a
+/// ~keep no-break space, a narrow one, an em space or a form feed at an edge is the one space of
+/// ~keep that edge, as it is at the edge of a text ([`white_space::edges`]) and of an autolink
+/// ~keep ([`link_text_edges`]). A line end is not white space of an edge: a line break there is
+/// ~keep content of the label (issue #497), and that side is given back whole, with the white
+/// ~keep space around the break for [`normalize_link_label`] to drop. Each edge is decided on its
+/// ~keep own: `[  \nGo ](/p)now` shows `Go now` after the break, so the end still gives its space.
+///
+/// [`white_space::edges`]: crate::converter::utility::white_space::edges
+pub fn link_label_edges(content: &str) -> (&'static str, &'static str, &str) {
+    let is_edge_space = |character: char| character.is_whitespace() && character != '\n';
+    let after_start = content.trim_start_matches(is_edge_space);
+    let starts_at_break = after_start.starts_with('\n') || after_start.starts_with("\\\n");
+    let start = if starts_at_break {
+        0
     } else {
-        ("", "", content)
-    }
-}
-
-/// Whether the content of a link label has a line break at its start, and at its end.
-pub fn label_edge_breaks(content: &str) -> (bool, bool) {
-    let inner = content.trim_matches([' ', '\t', '\u{a0}']);
-    (
-        inner.starts_with('\n') || inner.starts_with("\\\n"),
-        inner.ends_with('\n'),
-    )
+        content.len() - after_start.len()
+    };
+    let before_end = content[start..].trim_end_matches(is_edge_space);
+    let end = if before_end.ends_with('\n') {
+        content.len()
+    } else {
+        start + before_end.len()
+    };
+    (space_if(start > 0), space_if(end < content.len()), &content[start..end])
 }
 
 /// The white space at the two ends of the text of a link, as one space for each end:
@@ -502,7 +510,7 @@ pub fn protect_adjacent_hard_breaks(label: &str) -> Cow<'_, str> {
 /// A run of breaks at either end still collapses to one. Two adjacent markers put a blank line
 /// in the label, and a blank line ends the paragraph -- so `[  \n  \nA](H)` would destroy the
 /// link rather than preserve a second break nobody can see anyway.
-fn assemble_label(mut segments: Vec<String>, mut markers: Vec<&'static str>) -> String {
+pub fn assemble_label(mut segments: Vec<String>, mut markers: Vec<&'static str>) -> String {
     if let Some(first) = segments.first_mut() {
         *first = first.trim_start().to_string();
     }
@@ -557,8 +565,9 @@ fn find_earliest_hard_break_marker(text: &str) -> Option<(usize, &'static str)> 
 
 /// Fold newlines to a space and collapse whitespace runs in a marker-free segment, appending
 /// the result to `out`. Mirrors the whitespace handling `normalize_link_label` has always
-/// applied outside of a hard-break marker.
-fn collapse_whitespace_into(out: &mut String, segment: &str) {
+/// applied outside of a hard-break marker. The fast converter normalizes its label with this
+/// function and [`assemble_label`] too.
+pub fn collapse_whitespace_into(out: &mut String, segment: &str) {
     if segment.is_empty() {
         return;
     }
@@ -608,7 +617,7 @@ pub const fn floor_char_boundary(s: &str, index: usize) -> usize {
 #[cfg(test)]
 mod tests {
     use super::{
-        LinkText, ends_with_zero_width_space_in_source, label_edge_breaks, link_label_edges, link_text_edges,
+        LinkText, ends_with_zero_width_space_in_source, link_label_edges, link_text_edges,
         without_trailing_line_end_in_source,
     };
     use crate::converter::utility::white_space::with_white_space_references_decoded;
@@ -619,28 +628,55 @@ mod tests {
             ("Go", ("", "", "Go")),
             (" Go ", (" ", " ", "Go")),
             ("\tGo\t", (" ", " ", "Go")),
-            ("\u{a0}Go\u{a0}", ("", "", "Go")),
+            ("  Go", (" ", "", "Go")),
+            ("Go\r", ("", " ", "Go")),
             (" ", (" ", "", "")),
+            ("", ("", "", "")),
+            ("Go  \nnow", ("", "", "Go  \nnow")),
         ] {
             assert_eq!(link_label_edges(content), edges, "{content:?}");
         }
     }
 
+    /// One definition of white space for every label edge: a Unicode space or a form feed at an
+    /// edge is the one space of that edge, as at the edge of a text or of an autolink.
     #[test]
-    fn a_link_label_with_a_line_break_at_an_edge_is_given_back_whole() {
-        for (content, breaks) in [
-            ("Go  \n", (false, true)),
-            ("Go\n", (false, true)),
-            ("Go\\\n", (false, true)),
-            (" Go  \n\u{a0}", (false, true)),
-            ("  \nGo ", (true, false)),
-            ("\\\nGo", (true, false)),
-            ("  \nGo  \n", (true, true)),
+    fn a_unicode_space_at_a_link_label_edge_is_the_space_of_that_edge() {
+        for (content, edges) in [
+            ("\u{a0}Go\u{a0}", (" ", " ", "Go")),
+            ("\u{202f}Go", (" ", "", "Go")),
+            ("Go\u{202f}", ("", " ", "Go")),
+            ("\u{2003}**Go**", (" ", "", "**Go**")),
+            ("\u{c}Go", (" ", "", "Go")),
+            (" \u{a0}Go\u{a0} ", (" ", " ", "Go")),
+            ("\u{a0}", (" ", "", "")),
         ] {
-            assert_eq!(label_edge_breaks(content), breaks, "{content:?}");
-            assert_eq!(link_label_edges(content), ("", "", content), "{content:?}");
+            assert_eq!(link_label_edges(content), edges, "{content:?}");
         }
-        assert_eq!(label_edge_breaks("Go  \nnow"), (false, false));
+    }
+
+    /// A line end at an edge is a break, not white space: that side is given back whole, with the
+    /// white space around the break. The other edge still gives its space.
+    #[test]
+    fn a_line_break_at_a_link_label_edge_keeps_that_side_whole() {
+        for (content, edges) in [
+            ("Go  \n", ("", "", "Go  \n")),
+            ("Go\n", ("", "", "Go\n")),
+            ("Go\\\n", ("", "", "Go\\\n")),
+            ("Go  \n\u{a0}", ("", "", "Go  \n\u{a0}")),
+            ("  \nGo", ("", "", "  \nGo")),
+            ("\\\nGo", ("", "", "\\\nGo")),
+            ("   \nGo", ("", "", "   \nGo")),
+            ("\u{a0}  \nGo", ("", "", "\u{a0}  \nGo")),
+            ("  \nGo  \n", ("", "", "  \nGo  \n")),
+            ("  \n", ("", "", "  \n")),
+            (" Go  \n", (" ", "", "Go  \n")),
+            (" Go  \n\u{a0}", (" ", "", "Go  \n\u{a0}")),
+            ("  \nGo ", ("", " ", "  \nGo")),
+            ("  \nGo\u{a0}", ("", " ", "  \nGo")),
+        ] {
+            assert_eq!(link_label_edges(content), edges, "{content:?}");
+        }
     }
 
     #[test]

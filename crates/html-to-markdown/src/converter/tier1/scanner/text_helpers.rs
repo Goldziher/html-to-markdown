@@ -265,6 +265,13 @@ fn hand_over_unicode_space_after_space(
     if state.escape_ctx.intersects(EscapeCtx::PRE | EscapeCtx::CODE) {
         return Ok(());
     }
+    // ~keep In the label of a link every run of white space is one space in both converters
+    // ~keep (`normalize_link_label`), and a Unicode space at a label edge is the one space of that
+    // ~keep edge: the place of the text decides nothing there. A link with no address is running
+    // ~keep text, not a label.
+    if state.link_stack.iter().any(|(href, ..)| href.is_some()) {
+        return Ok(());
+    }
     let place = state
         .text_place
         .and_then(|(offset, place)| (offset == base_offset).then_some(place));

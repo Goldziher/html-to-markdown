@@ -166,9 +166,6 @@ pub struct OpenTag {
     /// Whether the first content of this quote or heading in a table cell was whitespace, which
     /// Tier-2 keeps at the start of the element's own buffer (see `scanner::flush_text`).
     pub starts_with_whitespace: bool,
-    /// Whether the label of this link starts with white space of its own. The text scanner
-    /// writes no space for it: `close_link` writes one before the link (issue #845).
-    pub label_starts_with_white_space: bool,
 }
 
 /// Minimum capacity for each summary accumulation buffer.

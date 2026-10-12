@@ -29,11 +29,6 @@ fn fast(html: &str) -> Option<String> {
     tier1::run(cleaned.as_ref(), &report, &with_tier(TierStrategy::Tier1)).ok()
 }
 
-/// What the full converter writes.
-fn full(html: &str) -> String {
-    content_with(html, with_tier(TierStrategy::Tier2))
-}
-
 /// A row that both converters write.
 fn assert_row(html: &str, wanted: &str) {
     assert_row_of_full_converter(html, wanted);
@@ -143,46 +138,123 @@ fn an_element_in_an_autolink_is_not_collected() {
     }
 }
 
-/// A label with a `<br>` at one edge is written whole. The fast converter keeps the white space
-/// of the other edge as it wrote it before the rule, and a browser shows that space. The full
-/// converter drops it.
+/// A label with a `<br>` at one edge keeps that side whole. Its other edge still gives up its
+/// white space, as a browser shows it (`Press Go`, a line break, `now`), on both converters.
 #[test]
-fn the_fast_converter_keeps_the_space_at_the_edge_opposite_a_line_break() {
-    let start_space = "<p>Press<a href=\"/p\"><em> Go </em><br></a>now</p>";
-    assert_eq!(fast(start_space).as_deref(), Some("Press[ *Go*  \n](/p)now\n"));
-    assert_eq!(full(start_space), "Press[*Go*  \n](/p)now\n");
-    let end_space = "<p>Press<a href=\"/p\"><br>Go </a>now</p>";
-    assert_eq!(fast(end_space).as_deref(), Some("Press[  \nGo](/p) now\n"));
-    assert_eq!(full(end_space), "Press[  \nGo](/p)now\n");
-    // ~keep The white space of the link itself at the label start is dropped in both.
-    assert_row("<p>Press<a href=\"/p\"> Go<br></a>now</p>", "Press[Go  \n](/p)now\n");
+fn the_edge_opposite_a_line_break_still_gives_up_its_space() {
+    assert_row(
+        "<p>Press<a href=\"/p\"><em> Go </em><br></a>now</p>",
+        "Press [*Go*  \n](/p)now\n",
+    );
+    assert_row("<p>Press<a href=\"/p\"><br>Go </a>now</p>", "Press[  \nGo](/p) now\n");
+    assert_row("<p>Press<a href=\"/p\"> Go<br></a>now</p>", "Press [Go  \n](/p)now\n");
+    assert_row(
+        "<p>Press<a href=\"/p\">&nbsp;Go<br></a>now</p>",
+        "Press [Go  \n](/p)now\n",
+    );
 }
 
-/// The fast converter hands over a label that it cannot write as the full converter does: a
-/// label in a table cell that starts with a `<br>` after white space or another `<br>`, and
-/// the text of a link with an empty address that ends with a `<br>`.
+/// One definition of white space at a label edge on both converters: a no-break space, a narrow
+/// no-break space (U+202F), an em space or a form feed at an edge is the one space of that edge,
+/// as it is at the edge of a text. The words beside the link stay apart.
 #[test]
-fn the_fast_converter_hands_over_a_label_that_only_the_full_converter_writes() {
-    for (html, wanted) in [
-        (
-            "<table><tr><td>Press<a href=\"/p\"> <br>Go</a>now</td></tr></table>",
-            "| Press[Go](/p)now |\n| ---------------- |\n",
-        ),
-        (
-            "<table><tr><td>(<a href=\"#top\"><br><br>Go</a>).</td></tr></table>",
-            "| ([Go](#top)). |\n| ------------- |\n",
-        ),
-        (
-            "<blockquote><p><a href=\"\">Go<br>&nbsp;</a></p></blockquote>",
-            "> Go\n",
-        ),
-    ] {
-        assert_eq!(fast(html), None, "fast converter: {html:?}");
-        assert_row_of_full_converter(html, wanted);
-    }
+fn a_unicode_space_at_a_label_edge_is_one_space_outside_the_link_in_both() {
+    assert_row("<p>One<a href=\"/p\">&#8239;Go</a>two</p>", "One [Go](/p)two\n");
+    assert_row("<p>One<a href=\"/p\">Go&#8239;</a>two</p>", "One[Go](/p) two\n");
+    assert_row("<p>One<a href=\"/p\">&nbsp;Go&nbsp;</a>two</p>", "One [Go](/p) two\n");
+    assert_row(
+        "<p>One<a href=\"/p\">&emsp;<strong>Go</strong></a>two</p>",
+        "One [**Go**](/p)two\n",
+    );
+    assert_row("<p>One<a href=\"/p\">&#12;Go</a>two</p>", "One [Go](/p)two\n");
+    assert_row(
+        "<p>One<a href=\"https://e.org/\">&#8239;https://e.org/</a>two</p>",
+        "One <https://e.org/>two\n",
+    );
+    assert_row(
+        "<p>One<a href=\"https://e.org/\">https://e.org/&#8239;</a>two</p>",
+        "One<https://e.org/> two\n",
+    );
+    assert_row("<p>One<a href=\"\">&#8239;Go</a>two</p>", "One Gotwo\n");
+    // ~keep One run of white space on both sides of the link start is one space.
+    assert_row("<p>One <a href=\"/p\">&#8239;Go</a>two</p>", "One [Go](/p)two\n");
+}
+
+/// A `<br>` inside a label in a table cell is the cell break of the label alone, on both
+/// converters: one space for a `<br>` that the label starts with, nothing for a `<br>` after
+/// white space or after another `<br>`. A link with an empty address writes its text with the
+/// break, and the block drops a break at its end.
+#[test]
+fn a_line_break_in_a_label_in_a_table_cell_is_written_alike_in_both() {
     assert_row(
         "<table><tr><td>Press<a href=\"/p\"><br>Go</a>now</td></tr></table>",
         "| Press [Go](/p)now |\n| ----------------- |\n",
+    );
+    assert_row(
+        "<table><tr><td>Press<a href=\"/p\"> <br>Go</a>now</td></tr></table>",
+        "| Press[Go](/p)now |\n| ---------------- |\n",
+    );
+    assert_row(
+        "<table><tr><td>(<a href=\"#top\"><br><br>Go</a>).</td></tr></table>",
+        "| ([Go](#top)). |\n| ------------- |\n",
+    );
+    assert_row(
+        "<table><tr><td>Press<a href=\"/p\">Go<br>now</a></td></tr></table>",
+        "| Press[Go now](/p) |\n| ----------------- |\n",
+    );
+    assert_row("<p>Press<a href=\"\">Go<br></a>now</p>", "PressGo  \nnow\n");
+    assert_row(
+        "<blockquote><p><a href=\"\">Go<br>&nbsp;</a></p></blockquote>",
+        "> Go\n",
+    );
+    assert_row("<blockquote><p><a href=\"\">Go<br></a></p></blockquote>", "> Go\n");
+}
+
+/// A quotation drops a hard break at the end of its content, with a link and without one, on
+/// both converters: the text of a link with an empty address that ends with a `<br>` is such
+/// content.
+#[test]
+fn a_quotation_drops_a_hard_break_at_the_end_of_its_content_in_both() {
+    assert_row("<blockquote><p>Go<br></p></blockquote>", "> Go\n");
+    assert_row("<blockquote><p>Press<br>Go<br></p></blockquote>", "> Press  \n> Go\n");
+}
+
+/// The white space after a leading `<br>` and before a trailing one is content of the label, as
+/// in the full converter: the indent of a list item, the space that a no-break space after the
+/// break stands for. A no-break space after a `<br>` in a heading or a table cell is white space
+/// of the label end, on both converters.
+#[test]
+fn the_white_space_beside_an_edge_line_break_is_written_alike_in_both() {
+    assert_row(
+        "<ul><li>Press<a href=\"/p\"><br>Go</a>now</li></ul>",
+        "- Press[  \n  Go](/p)now\n",
+    );
+    assert_row(
+        "<p>Press<a href=\"/p\"><br>&nbsp;<img src=\"/i.png\" alt=\"Go\"><br></a>now</p>",
+        "Press[  \n ![Go](/i.png)  \n](/p)now\n",
+    );
+    assert_row(
+        "<h2>Press <a href=\"/p\">Go<br>&nbsp;</a>now</h2>",
+        "## Press [Go](/p) now\n",
+    );
+    assert_row(
+        "<table><tr><td>Press <a href=\"/p\">Go<br>&nbsp;</a>now</td></tr></table>",
+        "| Press [Go](/p) now |\n| ------------------ |\n",
+    );
+    assert_row(
+        "<p><a href=\"/x\">one<span>&nbsp;</span> two</a> <a href=\"/y\">a <span></span>&nbsp;b</a></p>",
+        "[one two](/x) [a b](/y)\n",
+    );
+}
+
+/// A block in a label leaves line ends in it that are no hard break: each is one space of the
+/// label, and none at an edge, on both converters.
+#[test]
+fn a_line_end_that_a_block_left_in_a_label_is_a_space_in_both() {
+    assert_row("<p>one<a href=\"/y\"><hr>y</a>two</p>", "one[--- y](/y)two\n");
+    assert_row(
+        "<table><tr><td>one<a href=\"/y\"><hr>y</a>two</td></tr></table>",
+        "| one[--- y](/y)two |\n| ----------------- |\n",
     );
 }
 
@@ -237,4 +309,71 @@ fn code_and_strict_mode_keep_their_text() {
         content_with("<p>Press<a href=\"https://e.org/\">https://e.org/ </a>now</p>", strict),
         "Press<https://e.org/>now\n"
     );
+}
+
+/// Two `<br>` in a row in a label are kept apart, so that the label does not end its paragraph,
+/// on both converters.
+#[test]
+fn two_line_breaks_in_a_row_in_a_label_are_kept_apart_in_both() {
+    assert_row(
+        "<p>Press<a href=\"/p\">Go<br><br>now</a>two</p>",
+        "Press[Go  \n\\\nnow](/p)two\n",
+    );
+}
+
+/// The space of a label start is owed by the text before the link, read behind the marks of bold
+/// or italic text that opened right before it: none at the start of a paragraph, on both
+/// converters.
+#[test]
+fn the_space_of_a_label_start_is_not_owed_behind_marks_at_a_block_start() {
+    assert_row(
+        "<p><b><a href=\"/p\">&nbsp;<em> Go </em></a></b></p>",
+        "**[*Go*](/p)**\n",
+    );
+    assert_row(
+        "<p>x</p><p><b><a href=\"/p\"> Go</a></b></p>",
+        "x\n\n**[Go](/p)**\n",
+    );
+    assert_row(
+        "<p>Press<b><a href=\"/p\"> Go</a></b>now</p>",
+        "Press **[Go](/p)**now\n",
+    );
+    assert_row(
+        "<p>Press <b><a href=\"/p\"> Go</a></b>now</p>",
+        "Press **[Go](/p)**now\n",
+    );
+}
+
+/// A continuation line of a label in a list item starts with the indent of the item and nothing
+/// else, on both converters.
+#[test]
+fn a_continuation_line_of_a_label_in_a_list_item_starts_with_its_indent_in_both() {
+    assert_row(
+        "<ul><li>Press<a href=\"/p\"><br>&nbsp;<em> Go </em>&nbsp;<br></a>now</li></ul>",
+        "- Press[  \n  *Go*  \n](/p)now\n",
+    );
+}
+
+/// A label whose text is blank between two line breaks has no text: the fast converter leaves
+/// such a link to the full one, as before.
+#[test]
+fn a_label_of_breaks_around_blank_text_goes_to_the_full_converter() {
+    for html in [
+        "<p>Press<a href=\"/p\"><br>&nbsp;&nbsp;<br></a>now</p>",
+        "<div><a href=\"/p\"><br>&nbsp;&nbsp;<br></a></div>",
+    ] {
+        assert_eq!(fast(html), None, "fast converter: {html:?}");
+    }
+}
+
+/// A no-break space after a link whose label gave up the space at its end joins that space, on
+/// both converters: the fast converter knows what stands before a text after a close tag.
+#[test]
+fn a_no_break_space_after_a_link_joins_the_space_of_the_label_end_in_both() {
+    assert_row(
+        "<p>Press&nbsp;<a href=\"/p\">Go <b>Up</b> &nbsp;</a>&nbsp;now</p>",
+        "Press [Go **Up**](/p) now\n",
+    );
+    assert_row("<p>Press <a href=\"/p\">Go </a>&nbsp;now</p>", "Press [Go](/p) now\n");
+    assert_row("<p>Press <b>Go </b>&nbsp;now</p>", "Press **Go** now\n");
 }
