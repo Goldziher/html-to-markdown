@@ -37,6 +37,7 @@ use crate::options::ConversionOptions;
 use crate::converter::context::{Context, ContextParameters, InlineCollectorHandle};
 use crate::types::structure_collector::StructureCollectorHandle;
 
+mod exclusions;
 mod parse;
 use self::parse::{ParseOutcome, parse_for_conversion};
 
@@ -76,7 +77,7 @@ pub fn convert_html_impl(
         base_url,
         document_base_href,
     } = parameters;
-    let mut preprocessed = prepare_html(html, options);
+    let mut preprocessed = prepare_html(html, options)?;
     let mut attempted_misnest_repair = false;
     let (dom, dom_ctx) = loop {
         let repaired = match parse_for_conversion(&preprocessed, options, &mut attempted_misnest_repair)? {
@@ -364,13 +365,13 @@ fn preserves_menu(options: &ConversionOptions) -> bool {
     options.preserve_tags.iter().any(|tag| tag.eq_ignore_ascii_case("menu"))
 }
 
-fn prepare_html(html: &str, options: &ConversionOptions) -> String {
+fn prepare_html(html: &str, options: &ConversionOptions) -> Result<String> {
     let (preserve_menu, hidden_content) = (preserves_menu(options), options.hidden_content);
-    let mut preprocessed = preprocess_initial_html(html, preserve_menu, hidden_content);
+    let mut preprocessed = preprocess_initial_html(html, preserve_menu, hidden_content, &options.exclude_selectors)?;
     if has_custom_element_tags(&preprocessed) {
         preprocessed = repair_custom_elements(preprocessed, preserve_menu, hidden_content);
     }
-    preprocessed
+    Ok(preprocessed)
 }
 
 /// Remove the elements that the `hidden` attribute or an inline style hides, unless the caller
@@ -382,18 +383,25 @@ fn strip_hidden(html: &str, hidden_content: HiddenContent) -> Cow<'_, str> {
     }
 }
 
-fn preprocess_initial_html(html: &str, preserve_menu: bool, hidden_content: HiddenContent) -> String {
+fn preprocess_initial_html(
+    html: &str,
+    preserve_menu: bool,
+    hidden_content: HiddenContent,
+    exclude_selectors: &[String],
+) -> Result<String> {
     let stripped = strip_script_and_style_tags(html);
     // ~keep Bogus comments must be removed before tag-shaped preprocessing examines them.
     let stripped = strip_bogus_comments(&stripped);
     let stripped = strip_hidden(&stripped, hidden_content);
+    // ~keep Unwrapping removes template/noscript selector identities, so exclusions must see them first.
+    let stripped = exclusions::before_unwrapping(&stripped, hidden_content, exclude_selectors)?;
     let stripped = unwrap_kept_inert_elements(&stripped, hidden_content);
     let stripped = normalize_bogus_comment_endings(&stripped);
     let stripped = normalize_split_closing_tags(&stripped);
     // ~keep Implicit list-item closes prevent deeply nested parser output on large changelogs.
     let stripped = normalize_unclosed_list_items(&stripped);
     let stripped = normalize_menu_elements(&stripped, preserve_menu);
-    preprocess_html(&stripped).into_owned()
+    Ok(preprocess_html(&stripped).into_owned())
 }
 
 fn preprocess_repaired_html(html: &str, preserve_menu: bool, hidden_content: HiddenContent) -> String {
