@@ -389,7 +389,10 @@ fn close_link(state: &mut Tier1State, frame: &OpenTag, options: &ConversionOptio
     let text_end = text_end_before_link(state, trim_start.saturating_sub(1));
     // ~keep The content column of the list item that holds the link, for the lines of the label
     // ~keep after a hard break (Tier-2's `indent_hard_break_continuations`).
-    let in_list_item = state.stack.iter().any(|frame| matches!(frame.spec.kind, TagKind::ListItem));
+    let in_list_item = state
+        .stack
+        .iter()
+        .any(|frame| matches!(frame.spec.kind, TagKind::ListItem));
     let indent = in_list_item
         .then(|| {
             crate::converter::list::utils::continuation_indent_string(state.list_continuation_indent_width(), options)

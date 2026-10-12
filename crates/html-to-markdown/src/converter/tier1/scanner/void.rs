@@ -163,7 +163,13 @@ fn emit_line_break(state: &mut Tier1State, options: &ConversionOptions) -> Resul
     let in_code = state.escape_ctx.contains(EscapeCtx::CODE);
     let in_pre = state.escape_ctx.contains(EscapeCtx::PRE);
     let label_start = (!in_code)
-        .then(|| state.stack.iter().rev().find(|frame| matches!(frame.spec.kind, TagKind::Link)))
+        .then(|| {
+            state
+                .stack
+                .iter()
+                .rev()
+                .find(|frame| matches!(frame.spec.kind, TagKind::Link))
+        })
         .flatten()
         .map(|frame| frame.content_start);
     if let Some(label_start) = label_start {
