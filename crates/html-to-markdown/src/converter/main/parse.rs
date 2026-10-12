@@ -1,10 +1,11 @@
-use super::{preprocess_initial_html, preprocess_repaired_html};
+use super::{preprocess_initial_html, preprocess_repaired_html, trace_parse_complete};
 use crate::converter::DomContext;
 use crate::converter::main_helpers::{has_custom_element_tags, repair_with_html5ever_bounded};
 use crate::converter::preprocessing_helpers::{
     has_discarded_end_tag, has_inline_block_misnest, has_omitted_end_tag, readable_text_len,
 };
 use crate::converter::utility::caching::build_dom_context;
+use crate::converter::utility::preprocessing::normalize_inert_bodies_with_preservation;
 use crate::error::{ConversionError, Result};
 use crate::options::HiddenContent;
 
@@ -199,13 +200,18 @@ impl Asked {
 /// ~keep the `<template>` has no end tag. So a wider choice takes the tree builder wherever a
 /// ~keep narrower one does, and writes what the narrower one writes. A narrower page that is
 /// ~keep equal to the wider page asks for nothing new and is not parsed.
+///
+/// ~keep The inert-body pass ran on `html` under the choice of the caller and left as written
+/// ~keep each `<template>` and `<noscript>` that the choice keeps. The narrower choice empties
+/// ~keep those that it does not keep, so the pass runs again under the narrower choice.
 fn narrower_choice_asks(html: &str, page: &str, preserve_menu: bool, hidden_content: HiddenContent) -> bool {
     let narrower = match hidden_content {
         HiddenContent::Drop => return false,
         HiddenContent::Reachable => HiddenContent::Drop,
         HiddenContent::All => HiddenContent::Reachable,
     };
-    let narrower_page = preprocess_initial_html(html, preserve_menu, narrower);
+    let (narrower_html, _) = normalize_inert_bodies_with_preservation(html, false, narrower);
+    let narrower_page = preprocess_initial_html(&narrower_html, preserve_menu, narrower);
     (narrower_page != page && asks_for_the_tree_builder(&narrower_page))
         || narrower_choice_asks(html, &narrower_page, preserve_menu, narrower)
 }
@@ -217,6 +223,20 @@ fn asks_for_the_tree_builder(page: &str) -> bool {
             let parser = dom.parser();
             Asked::of(&build_dom_context(&dom, parser, page.len()), parser, page).any()
         })
+}
+
+pub(super) fn finish_dom_parse(
+    dom: &mut tl::VDom<'_>,
+    dom_ctx: &mut DomContext,
+    inert_bodies: &std::collections::HashMap<String, String>,
+    input_len: usize,
+) -> Result<()> {
+    if !inert_bodies.is_empty() {
+        crate::converter::utility::preprocessing::restore_inert_bodies(dom, inert_bodies)?;
+        *dom_ctx = build_dom_context(dom, dom.parser(), input_len);
+    }
+    trace_parse_complete(dom, input_len);
+    Ok(())
 }
 
 #[cfg(test)]

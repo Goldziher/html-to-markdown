@@ -41,7 +41,7 @@ mod block_boundary;
 mod parse;
 mod table_parts;
 use self::block_boundary::{separate_in_list_item, separate_words_at_block_boundary};
-use self::parse::{ParsedPage, parse_for_conversion};
+use self::parse::{ParsedPage, finish_dom_parse, parse_for_conversion};
 use self::table_parts::{is_table_part, walk_table_parts};
 
 type ConversionOutput = (
@@ -52,6 +52,7 @@ type ConversionOutput = (
 );
 
 pub struct ConversionParameters<'a> {
+    pub inert_bodies: &'a std::collections::HashMap<String, String>,
     pub inline_collector: Option<InlineCollectorHandle>,
     #[cfg(feature = "metadata")]
     pub metadata_collector: Option<crate::metadata::MetadataCollectorHandle>,
@@ -77,6 +78,7 @@ pub fn convert_html_impl(
     parameters: ConversionParameters<'_>,
 ) -> Result<ConversionOutput> {
     let ConversionParameters {
+        inert_bodies,
         inline_collector,
         #[cfg(feature = "metadata")]
         metadata_collector,
@@ -92,13 +94,13 @@ pub fn convert_html_impl(
     let (preprocessed, prepare_limit, as_written) = prepare_html(html, preserve_menu, hidden_content);
     let repaired_page = std::cell::OnceCell::new();
     let ParsedPage {
-        dom,
-        dom_ctx,
+        mut dom,
+        mut dom_ctx,
         len: preprocessed_len,
         repair_limit,
     } = parse_for_conversion(&preprocessed, &repaired_page, preserve_menu, hidden_content, as_written)?;
     let repair_warning = repair_limit.or(prepare_limit).or(head_repair_limit);
-    trace_parse_complete(&dom, preprocessed_len);
+    finish_dom_parse(&mut dom, &mut dom_ctx, inert_bodies, preprocessed_len)?;
     let parser = dom.parser();
     let mut output = String::with_capacity(preprocessed_len.saturating_add(preprocessed_len / 4));
     let is_plain_text = options.output_format == OutputFormat::Plain;
