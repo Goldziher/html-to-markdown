@@ -63,7 +63,17 @@ pub fn handle_figure(
         figure_content = figure_content.replace("\n![", "![");
         figure_content = figure_content.replace(" ![", "![");
 
-        let trimmed = figure_content.trim_matches(|c| c == '\n' || c == ' ' || c == '\t');
+        let content = figure_content
+            .trim_start_matches('\n')
+            .trim_end_matches(['\n', ' ', '\t']);
+        // ~keep Keep the code renderer's four-space prefix, but strip ordinary figure padding (#819).
+        let trimmed = if handler.options.code_block_style == crate::options::CodeBlockStyle::Indented
+            && content.starts_with("    ")
+        {
+            content
+        } else {
+            content.trim_start_matches([' ', '\t'])
+        };
         if !trimmed.is_empty() {
             crate::converter::block::div::push_block(output, handler.options, handler.ctx, trimmed);
         }
@@ -302,9 +312,10 @@ pub fn handle_figcaption(
 
         separate_caption(output);
 
-        output.push('*');
+        output.push(handler.options.strong_em_symbol);
         output.push_str(&text);
-        output.push_str("*\n\n");
+        output.push(handler.options.strong_em_symbol);
+        output.push_str("\n\n");
     }
 }
 

@@ -389,9 +389,19 @@ fn should_convert_kept_template_and_noscript_content_where_it_is_written() {
                     // ~keep with every choice. The base does that too, and Drop is the base.
                     let plain_table =
                         matches!(mode.output_format, OutputFormat::Plain) && context.starts_with("<table");
+                    // ~keep The content of a `<noscript>` is raw text, which has no comment: the
+                    // ~keep element ends at the end tag in the comment, and Drop writes the rest.
+                    let ends_in_its_comment =
+                        context.contains("<!-- {CLOSE} -->") && close.eq_ignore_ascii_case("</noscript>");
+                    let mark = ["-->", " -->"][usize::from(matches!(mode.output_format, OutputFormat::Plain))];
+                    let drops_the_body = if ends_in_its_comment {
+                        dropped == format!("visible\n\n{mark}\n\nBODY\n\nafter\n")
+                    } else {
+                        plain_table || !dropped.contains("BODY")
+                    };
                     let holds = shown.contains("BODY")
                         && dropped.contains("visible")
-                        && (plain_table || !dropped.contains("BODY"))
+                        && drops_the_body
                         && all == shown
                         && reachable == if reachable_keeps { &shown } else { &dropped_in_tier2 }.as_str();
                     check(&mut failures, holds, || {

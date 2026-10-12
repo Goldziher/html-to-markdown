@@ -1,8 +1,10 @@
 use std::borrow::Cow;
 
-use super::head_scan::HeadScan;
-use super::markup::{find_tag_end, matches_tag_start};
-use super::raw_text::{find_closing_tag_bytes_nested, is_self_closing_tag, opens_a_tag, skip_opaque_region};
+use super::head_scan::body_start;
+use super::markup::{find_tag_end, matches_tag_start, skip_written_text_element};
+use super::raw_text::{
+    find_closing_tag_bytes_nested, is_self_closing_tag, matching_tag_ends, opens_a_tag, skip_opaque_region,
+};
 use crate::options::HiddenContent;
 
 /// Sanitize malformed markdown-like URLs in HTML attributes.
@@ -172,10 +174,8 @@ pub fn strip_bogus_comments(input: &str) -> Cow<'_, str> {
             // ~keep Skip a real tag wholesale so a `<?`/`<!` sitting inside a quoted
             // ~keep attribute value is never seen as a bogus comment of its own.
             if next.is_ascii_alphabetic() {
-                if let Some(tag_end) = find_tag_end(bytes, idx + 1) {
-                    idx = tag_end;
-                    continue;
-                }
+                idx = find_tag_end(bytes, idx + 1).unwrap_or(len);
+                continue;
             }
             idx += 1;
             continue;
@@ -202,23 +202,26 @@ pub fn strip_bogus_comments(input: &str) -> Cow<'_, str> {
 /// Compute the end index of the hidden element starting at `idx` whose opening tag spans
 /// `idx..tag_end` — either just past the opening tag itself (self-closing) or past its matching
 /// closing tag.
-///
-/// Extracted from `strip_hidden_elements`'s main scan loop — identical tag-name scan and
-/// self-closing/closing-tag dispatch, unchanged.
-fn hidden_element_remove_end(bytes: &[u8], idx: usize, tag_end: usize, len: usize) -> usize {
+fn hidden_element_remove_end(
+    bytes: &[u8],
+    idx: usize,
+    tag_end: usize,
+    ends: &mut Option<ahash::AHashMap<usize, Option<usize>>>,
+) -> usize {
     let name_start = idx + 1;
-    let mut name_end = name_start;
-    while name_end < len && !bytes[name_end].is_ascii_whitespace() && bytes[name_end] != b'>' && bytes[name_end] != b'/'
-    {
-        name_end += 1;
+    let name_len = bytes[name_start..]
+        .iter()
+        .take_while(|byte| !byte.is_ascii_whitespace() && !matches!(byte, b'>' | b'/'))
+        .count();
+    let name = &bytes[name_start..name_start + name_len];
+    if is_self_closing_tag(&bytes[idx..tag_end], name) {
+        return tag_end;
     }
-    let tag_name = &bytes[name_start..name_end];
-
-    if is_self_closing_tag(&bytes[idx..tag_end], tag_name) {
-        tag_end
-    } else {
-        find_closing_tag_bytes_nested(bytes, tag_end, tag_name).unwrap_or(tag_end)
+    if let Some(end) = ends.get_or_insert_with(|| matching_tag_ends(bytes)).get(&idx) {
+        return end.unwrap_or(tag_end);
     }
+    // ~keep Preserve the legacy scan of tag-looking text inside an unrelated quoted attribute.
+    find_closing_tag_bytes_nested(bytes, tag_end, name).unwrap_or(tag_end)
 }
 
 /// Where the removal of the element whose open tag spans `idx..tag_end` ends, or `None` when
@@ -226,18 +229,24 @@ fn hidden_element_remove_end(bytes: &[u8], idx: usize, tag_end: usize, len: usiz
 ///
 /// The `hidden` attribute and a definitive `display`/`visibility` declaration remove the
 /// subtree outright. `font-size: 0` must preserve images and descendants that restore a readable size.
-fn hidden_element_removal_end(input: &str, bytes: &[u8], idx: usize, tag_end: usize, len: usize) -> Option<usize> {
+fn hidden_element_removal_end(
+    input: &str,
+    bytes: &[u8],
+    idx: usize,
+    tag_end: usize,
+    ends: &mut Option<ahash::AHashMap<usize, Option<usize>>>,
+) -> Option<usize> {
     let tag_slice = &input[idx..tag_end];
     if tag_has_hidden_attribute(tag_slice) {
-        return Some(hidden_element_remove_end(bytes, idx, tag_end, len));
+        return Some(hidden_element_remove_end(bytes, idx, tag_end, ends));
     }
     match hidden_style_reason(tag_slice)? {
-        HiddenStyleReason::Definitive => Some(hidden_element_remove_end(bytes, idx, tag_end, len)),
+        HiddenStyleReason::Definitive => Some(hidden_element_remove_end(bytes, idx, tag_end, ends)),
         HiddenStyleReason::FontSizeZero => {
             if matches_tag_start(bytes, idx + 1, b"img") {
                 return None;
             }
-            let remove_end = hidden_element_remove_end(bytes, idx, tag_end, len);
+            let remove_end = hidden_element_remove_end(bytes, idx, tag_end, ends);
             // ~keep Scan past the element's own open tag so its `font-size: 0` is not re-read.
             let subtree = input.get(tag_end..remove_end).unwrap_or("");
             (!region_restores_visible_content(subtree)).then_some(remove_end)
@@ -291,18 +300,18 @@ impl TagEnds {
 /// ~keep left, or a quote before it has no partner. A page with many such starts made a scan
 /// ~keep that asks at each of them quadratic (#765). After the first scan that fails, the ends
 /// ~keep come from a table that reads the page once.
-struct TagEndScan<'a> {
+pub(super) struct TagEndScan<'a> {
     bytes: &'a [u8],
     table: Option<TagEnds>,
 }
 
 impl<'a> TagEndScan<'a> {
-    const fn new(bytes: &'a [u8]) -> Self {
+    pub(super) const fn new(bytes: &'a [u8]) -> Self {
         Self { bytes, table: None }
     }
 
     /// The result of `find_tag_end(bytes, from)`.
-    fn tag_end(&mut self, from: usize) -> Option<usize> {
+    pub(super) fn tag_end(&mut self, from: usize) -> Option<usize> {
         if let Some(table) = &self.table {
             return table.tag_end(from);
         }
@@ -333,6 +342,7 @@ pub fn strip_hidden_elements(input: &str) -> Cow<'_, str> {
     let mut idx = 0;
     let mut last = 0;
     let mut output: Option<String> = None;
+    let mut ends = None;
 
     while idx < len {
         let Some(offset) = memchr::memchr(b'<', &bytes[idx..]) else {
@@ -346,7 +356,7 @@ pub fn strip_hidden_elements(input: &str) -> Cow<'_, str> {
         let starts_tag_name = idx + 1 < len && bytes[idx + 1].is_ascii_alphabetic();
         if starts_tag_name {
             if let Some(tag_end) = tag_ends.tag_end(idx + 1) {
-                if let Some(remove_end) = hidden_element_removal_end(input, bytes, idx, tag_end, len) {
+                if let Some(remove_end) = hidden_element_removal_end(input, bytes, idx, tag_end, &mut ends) {
                     let out = output.get_or_insert_with(|| String::with_capacity(len));
                     out.push_str(&input[last..idx]);
                     last = remove_end;
@@ -380,11 +390,20 @@ pub fn strip_hidden_elements(input: &str) -> Cow<'_, str> {
 /// renders in its host element. [`HiddenContent::All`] removes the tags of every `<template>` and
 /// `<noscript>`. An element whose tags stay is dropped by the walk, as before. Inside `<head>` no
 /// tag is removed: what the two elements hold there is metadata (`<link>`, `<meta>`, `<style>`),
-/// and removing the tags would make it the metadata of the document. [`HeadScan`] says where
+/// and removing the tags would make it the metadata of the document. [`body_start`] says where
 /// the head ends.
 ///
 /// The two tags of one element are removed together or not at all: an end tag is removed only
 /// when the start tag that it closes was removed.
+///
+/// ~keep A start tag that is written as self-closing opens an element all the same: the
+/// ~keep inert-body pass and the tree builder read `<template/>` as `<template>`.
+///
+/// ~keep A removed start tag can be the tag that starts the body: the first `<template>` of a
+/// ~keep fragment, or a `<noscript>` after the end tag of the head. With nothing in its place the
+/// ~keep tree builder starts the body at a later tag and puts a `<title>` before that tag in the
+/// ~keep head, and a narrower choice, which keeps the tag, writes that title as text. So
+/// ~keep [`BODY_START`] is written for that tag.
 ///
 /// ~keep The tags are removed before the parse, not skipped in the walk, so that every reader
 /// ~keep of the tree sees the content: a row in a `<template>` that is a child of a `<table>` is
@@ -394,6 +413,10 @@ pub fn unwrap_kept_inert_elements(input: &str, hidden_content: HiddenContent) ->
         return Cow::Borrowed(input);
     }
     let bytes = input.as_bytes();
+    let mut tag_ends = TagEndScan::new(bytes);
+    let Some(body_start) = body_start(input, &mut tag_ends) else {
+        return Cow::Borrowed(input);
+    };
     // ~keep For `<template>` and for `<noscript>`, one entry for each open start tag after the
     // ~keep head: whether the tag was removed. An end tag takes the entry of the start tag that
     // ~keep it closes. A start tag that stays while its end tag is removed holds the rest of the
@@ -401,10 +424,7 @@ pub fn unwrap_kept_inert_elements(input: &str, hidden_content: HiddenContent) ->
     let mut open: [Vec<bool>; 2] = [Vec::new(), Vec::new()];
     let mut output: Option<String> = None;
     let mut last = 0;
-    let mut idx = 0;
-    let mut tag_ends = TagEndScan::new(bytes);
-    let mut head = HeadScan::new();
-    let mut text_start = 0;
+    let mut idx = body_start;
 
     while idx < bytes.len() {
         let Some(offset) = memchr::memchr(b'<', &bytes[idx..]) else {
@@ -413,47 +433,44 @@ pub fn unwrap_kept_inert_elements(input: &str, hidden_content: HiddenContent) ->
         idx += offset;
         let is_end_tag = bytes.get(idx + 1) == Some(&b'/');
         let name_start = idx + 1 + usize::from(is_end_tag);
-        let next_tag_is_html = !is_end_tag && matches_tag_start(bytes, name_start, b"html");
-        head = head.after_text(input.get(text_start..idx).unwrap_or_default(), next_tag_is_html);
         let is_template = matches_tag_start(bytes, name_start, b"template");
         let is_noscript = matches_tag_start(bytes, name_start, b"noscript");
         let is_tag = opens_a_tag(bytes, idx);
         let tag_end = if is_tag { tag_ends.tag_end(idx + 1) } else { None };
-        let closes_itself = tag_end.is_some_and(|end| is_self_closing_tag(&bytes[idx..end], b"template"));
-        head = head.after_tag(bytes, name_start, is_end_tag, closes_itself);
-        if !head.in_body() || (!is_template && !is_noscript) {
-            // ~keep A comment, a raw-text body and a quoted attribute value can hold text that
-            // ~keep looks like one of the two tags. Step over each as one unit.
+        if !is_template && !is_noscript {
+            // ~keep A comment, a raw-text body, the text of a text element and a quoted attribute
+            // ~keep value can hold text that looks like one of the two tags. Step over each as
+            // ~keep one unit.
             // ~keep A raw-text element starts with a tag that ends. For a tag start with no end
             // ~keep the raw-text scan would read to the end of the input and find nothing.
             let unit_end = if is_tag && tag_end.is_none() {
                 None
             } else {
-                skip_opaque_region(bytes, idx).or(tag_end)
+                skip_opaque_region(bytes, idx)
+                    .or_else(|| skip_written_text_element(bytes, idx))
+                    .or(tag_end)
             };
-            // ~keep The text that the head state reads starts after the unit. A `<` that starts
-            // ~keep no tag is text itself. A tag with no end holds the rest of the page.
-            text_start = unit_end.unwrap_or(if is_tag { bytes.len() } else { idx });
             idx = unit_end.unwrap_or(idx + 1);
             continue;
         }
         let Some(tag_end) = tag_end else {
             break;
         };
+        // ~keep Text that starts the body is before its first tag, so only a tag is at the start.
+        let starts_body = idx == body_start;
         let open = &mut open[usize::from(is_noscript)];
         let remove = if is_end_tag {
             open.pop().unwrap_or(false)
         } else {
             let remove =
                 hidden_content == HiddenContent::All || (is_template && tag_declares_shadow_root(&input[idx..tag_end]));
-            if !closes_itself {
-                open.push(remove);
-            }
+            open.push(remove);
             remove
         };
         if remove {
             let out = output.get_or_insert_with(|| String::with_capacity(bytes.len()));
             out.push_str(&input[last..idx]);
+            out.push_str(if starts_body { BODY_START } else { "" });
             last = tag_end;
         }
         idx = tag_end;
@@ -467,6 +484,13 @@ pub fn unwrap_kept_inert_elements(input: &str, hidden_content: HiddenContent) ->
         None => Cow::Borrowed(input),
     }
 }
+
+/// What [`unwrap_kept_inert_elements`] writes for the removed tag that started the body.
+///
+/// ~keep The tree builder starts the body at this end tag and makes no element for it, and the
+/// ~keep first parse discards it. A `<body>` start tag would make the page one that wrote its
+/// ~keep body, and a `<header>` in such a body is the page header.
+const BODY_START: &str = "</body>";
 
 /// Whether the start tag of a `<template>` declares a shadow root: `shadowrootmode` is `open` or
 /// `closed`, the two values for which a browser attaches one.
@@ -683,6 +707,7 @@ fn region_restores_visible_content(region: &str) -> bool {
     let bytes = region.as_bytes();
     let len = bytes.len();
     let mut idx = 0;
+    let mut ends = None;
     while idx < len {
         if let Some(end) = skip_opaque_region(bytes, idx) {
             idx = end;
@@ -692,7 +717,7 @@ fn region_restores_visible_content(region: &str) -> bool {
             if let Some(tag_end) = find_tag_end(bytes, idx + 1) {
                 let tag = &region[idx..tag_end];
                 if tag_has_hidden_attribute(tag) || hidden_style_reason(tag) == Some(HiddenStyleReason::Definitive) {
-                    idx = hidden_element_remove_end(bytes, idx, tag_end, len);
+                    idx = hidden_element_remove_end(bytes, idx, tag_end, &mut ends);
                     continue;
                 }
                 if tag_sets_non_zero_font_size(tag) || matches_tag_start(bytes, idx + 1, b"img") {
@@ -844,8 +869,15 @@ mod tag_ends_tests {
     ];
 
     /// Which pieces of `page` the scan removed. A comment with the position follows each piece.
+    ///
+    /// ~keep The scan writes `</body>` for the removed tag that started the body: once, and for
+    /// ~keep the first tag that it removes.
     fn removed_pieces(pieces: &[Piece], page: &str, choice: HiddenContent) -> Vec<bool> {
         let unwrapped = unwrap_kept_inert_elements(page, choice);
+        if let Some(at) = unwrapped.find("</body>") {
+            assert!(page.starts_with(&unwrapped[..at]), "{page} {choice:?}");
+            assert_eq!(unwrapped.matches("</body>").count(), 1, "{page} {choice:?}");
+        }
         let mut rest: &str = &unwrapped;
         let removed = pieces
             .iter()
@@ -853,6 +885,7 @@ mod tag_ends_tests {
             .map(|(position, (text, _))| {
                 let kept = rest.strip_prefix(text);
                 rest = kept
+                    .or_else(|| rest.strip_prefix("</body>"))
                     .unwrap_or(rest)
                     .strip_prefix(&format!("<!--{position}-->"))
                     .unwrap_or_else(|| panic!("{page} {choice:?}: {unwrapped} is not the page without some tags"));
@@ -929,31 +962,6 @@ mod tag_ends_tests {
             pairs > 20_000 && removed_pairs > 5_000,
             "{pairs} pairs, {removed_pairs} removed"
         );
-    }
-
-    #[test]
-    fn should_leave_the_end_tag_after_a_template_start_tag_that_closes_itself() {
-        // ~keep The parser reads `<template/>` as an element with no content, so the start tag
-        // ~keep opens nothing and the end tag that follows closes nothing: it stays.
-        for (page, choice, expected) in [
-            (
-                "<p>a</p><template/><p>b</p></template><p>c</p>",
-                HiddenContent::All,
-                "<p>a</p><p>b</p></template><p>c</p>",
-            ),
-            (
-                "<p>a</p><template><p>b</p></template><p>c</p>",
-                HiddenContent::All,
-                "<p>a</p><p>b</p><p>c</p>",
-            ),
-            (
-                "<div><template shadowrootmode=\"open\"><template/></template><p>x</p></template></div>",
-                HiddenContent::Reachable,
-                "<div><template/><p>x</p></template></div>",
-            ),
-        ] {
-            assert_eq!(unwrap_kept_inert_elements(page, choice), expected, "{page:?}");
-        }
     }
 
     #[test]

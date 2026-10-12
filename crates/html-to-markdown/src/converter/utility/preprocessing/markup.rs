@@ -365,9 +365,13 @@ pub fn preprocess_html(input: &str) -> Cow<'_, str> {
     let mut last = 0;
     let mut output: Option<String> = None;
     let mut svg_depth = 0usize;
+    let last_gt = bytes.iter().rposition(|&byte| byte == b'>');
 
     while idx < len {
         if bytes[idx] == b'<' {
+            if last_gt.is_none_or(|end| end <= idx) && looks_like_tag_start(bytes, idx, len) {
+                break;
+            }
             if let Some(new_pos) = collapse_empty_comment(input, bytes, idx, last, &mut output) {
                 last = new_pos;
                 idx = new_pos;
@@ -593,4 +597,116 @@ pub fn matches_end_tag_start(bytes: &[u8], start: usize, tag: &[u8]) -> bool {
         return false;
     }
     matches_tag_start(bytes, start + 1, tag)
+}
+
+/// ~keep CDATA outside SVG/MathML is an HTML bogus comment, while foreign content owns its body.
+pub fn strip_html_cdata(input: &str) -> Cow<'_, str> {
+    if !input.contains("<![CDATA[") {
+        return Cow::Borrowed(input);
+    }
+    let bytes = input.as_bytes();
+    let mut cursor = 0;
+    let mut last = 0;
+    let mut foreign_depth = 0usize;
+    let mut output = None;
+    while let Some(offset) = memchr::memchr(b'<', &bytes[cursor..]) {
+        cursor += offset;
+        if bytes[cursor..].starts_with(b"<![CDATA[") {
+            let end = cdata_end(bytes, cursor, foreign_depth == 0);
+            if foreign_depth == 0 {
+                let out = output.get_or_insert_with(|| String::with_capacity(input.len()));
+                out.push_str(&input[last..cursor]);
+                last = end;
+            }
+            cursor = end;
+            continue;
+        }
+        if let Some(end) =
+            super::raw_text::skip_opaque_region(bytes, cursor).or_else(|| skip_cdata_text_element(bytes, cursor))
+        {
+            cursor = end;
+            continue;
+        }
+        let name_start = cursor + 1 + usize::from(bytes.get(cursor + 1) == Some(&b'/'));
+        if !bytes.get(name_start).is_some_and(u8::is_ascii_alphabetic) {
+            cursor += 1;
+            continue;
+        }
+        let Some(end) = find_tag_end(bytes, cursor + 1) else {
+            break;
+        };
+        update_cdata_foreign_depth(bytes, cursor, end, &mut foreign_depth);
+        cursor = end;
+    }
+    match output {
+        Some(mut out) => {
+            out.push_str(&input[last..]);
+            Cow::Owned(out)
+        }
+        None => Cow::Borrowed(input),
+    }
+}
+
+fn skip_cdata_text_element(bytes: &[u8], cursor: usize) -> Option<usize> {
+    for tag in [
+        b"textarea".as_slice(),
+        b"title",
+        b"xmp",
+        b"iframe",
+        b"noembed",
+        b"noframes",
+        b"noscript",
+    ] {
+        if matches_tag_start(bytes, cursor + 1, tag) {
+            return text_element_end(bytes, cursor, tag);
+        }
+    }
+    matches_tag_start(bytes, cursor + 1, b"plaintext").then_some(bytes.len())
+}
+
+/// The index just past the element that the start tag of `tag` at `cursor` opens, when the
+/// content of the element is text: the element ends at the first end tag of its name, or at
+/// the end of the input. `None` when the start tag has no end.
+fn text_element_end(bytes: &[u8], cursor: usize, tag: &[u8]) -> Option<usize> {
+    let open_end = find_tag_end(bytes, cursor + 1 + tag.len())?;
+    Some(super::raw_text::find_closing_tag_bytes(bytes, open_end, tag).unwrap_or(bytes.len()))
+}
+
+/// The elements whose content is text and reaches the scan for the tags of kept elements as
+/// written.
+///
+/// ~keep `<title>`, `<xmp>` and `<iframe>` hold text too, but the inert-body pass takes their
+/// ~keep bodies out of the page before that scan reads it. `<plaintext>` has no end tag.
+const WRITTEN_TEXT_ELEMENTS: [&[u8]; 3] = [b"textarea", b"noembed", b"noframes"];
+
+/// If the `<` at `cursor` is the start tag of an element of [`WRITTEN_TEXT_ELEMENTS`] or of a
+/// `<plaintext>`, the index just past the element. A `<template>` or a `<noscript>` tag in
+/// its content is text and not a tag.
+pub(super) fn skip_written_text_element(bytes: &[u8], cursor: usize) -> Option<usize> {
+    if matches_tag_start(bytes, cursor + 1, b"plaintext") {
+        return Some(bytes.len());
+    }
+    WRITTEN_TEXT_ELEMENTS
+        .iter()
+        .find(|name| matches_tag_start(bytes, cursor + 1, name))
+        .and_then(|name| text_element_end(bytes, cursor, name))
+}
+
+fn update_cdata_foreign_depth(bytes: &[u8], cursor: usize, end: usize, depth: &mut usize) {
+    for tag in [b"svg".as_slice(), b"math".as_slice()] {
+        if matches_tag_start(bytes, cursor + 1, tag) && !bytes[cursor..end].ends_with(b"/>") {
+            *depth += 1;
+        } else if matches_end_tag_start(bytes, cursor + 1, tag) {
+            *depth = depth.saturating_sub(1);
+        }
+    }
+}
+
+fn cdata_end(bytes: &[u8], cursor: usize, in_html: bool) -> usize {
+    if in_html {
+        // ~keep HTML bogus comments end at the first `>`; only foreign CDATA uses `]]>`.
+        memchr::memchr(b'>', &bytes[cursor + 2..]).map_or(bytes.len(), |offset| cursor + 2 + offset + 1)
+    } else {
+        super::raw_text::skip_opaque_region(bytes, cursor).unwrap_or(bytes.len())
+    }
 }

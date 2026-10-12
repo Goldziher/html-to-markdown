@@ -36,6 +36,7 @@ pub fn handle_blockquote(tag: &tl::HTMLTag, mut handler: HandlerContext<'_>) {
 
     // ~keep Relative citations must remain meaningful after the Markdown leaves its source page.
     let cite = crate::converter::utility::attributes::decoded_attribute(tag, "cite")
+        .filter(|_| handler.options.include_blockquote_citations)
         .map(std::borrow::Cow::into_owned)
         .map(|value| {
             handler
@@ -126,10 +127,13 @@ fn render_heading_quote(tag: &tl::HTMLTag<'_>, handler: &mut HandlerContext<'_>)
     if trimmed.is_empty() {
         return;
     }
+    #[cfg(feature = "visitor")]
+    if visit_blockquote(tag, trimmed, handler) {
+        return;
+    }
     if !handler.output.is_empty() && !handler.output.ends_with(char::is_whitespace) {
         handler.output.push(' ');
     }
-    handler.output.push_str("> ");
     handler.output.push_str(trimmed);
     handler.output.push(' ');
 }

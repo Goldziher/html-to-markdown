@@ -6,9 +6,10 @@
 use std::cell::{OnceCell, RefCell};
 use std::collections::HashMap;
 
-use crate::converter::main_helpers::is_inline_element;
+use crate::converter::main_helpers::{is_html5_void_element, is_inline_element};
 use crate::converter::utility::content::normalized_tag_name;
 use crate::converter::utility::escaping::is_block_level_name;
+use crate::converter::utility::white_space::{TextClass, classify_text};
 use crate::text;
 
 /// Cached information about an HTML tag element.
@@ -64,11 +65,44 @@ pub struct DomContext {
     pub(crate) root_children: Vec<tl::NodeHandle>,
     pub(crate) node_map: Vec<Option<tl::NodeHandle>>,
     pub(crate) tag_info_map: Vec<OnceCell<Option<TagInfo>>>,
-    pub(crate) prev_inline_like_map: Vec<OnceCell<bool>>,
     pub(crate) next_inline_like_map: Vec<OnceCell<bool>>,
+    pub(crate) prev_tag_map: Vec<OnceCell<Option<u32>>>,
     pub(crate) next_tag_map: Vec<OnceCell<Option<u32>>>,
+    pub(crate) following_content_map: Vec<crate::converter::utility::siblings::FollowingContent>,
     pub(crate) next_whitespace_map: Vec<OnceCell<bool>>,
     pub(crate) table_content_summary_cache: RefCell<HashMap<u32, TableContentSummary>>,
+    pub(crate) datalist_content_cache: RefCell<HashMap<u32, bool>>,
+    /// For each element that [`DomContext::holds_text`] read: whether it holds text.
+    pub(crate) holds_text_cache: RefCell<HashMap<u32, bool>>,
+}
+
+#[cfg(test)]
+thread_local! {
+    /// The nodes that `DomContext::holds_text` and `DomContext::holds_content` read on this thread.
+    pub(crate) static HOLDS_TEXT_NODE_READS: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
+}
+
+#[cfg(test)]
+fn count_node_read() {
+    HOLDS_TEXT_NODE_READS.with(|total| total.set(total.get() + 1));
+}
+
+#[cfg(not(test))]
+const fn count_node_read() {}
+
+/// What one node is to a walk of [`DomContext::holds`].
+enum Held {
+    /// The node is what the walk looks for.
+    Yes,
+    /// The node is not.
+    No,
+    /// The node is an element: the walk reads its nodes.
+    Inside,
+}
+
+/// The answer that a walk recorded for the element `id`.
+fn recorded(record: &RefCell<HashMap<u32, bool>>, id: u32) -> Option<bool> {
+    record.borrow().get(&id).copied()
 }
 
 impl DomContext {
@@ -81,10 +115,12 @@ impl DomContext {
             self.sibling_index_map.resize_with(new_len, || None);
             self.node_map.resize(new_len, None);
             self.tag_info_map.resize_with(new_len, OnceCell::new);
-            self.prev_inline_like_map.resize_with(new_len, OnceCell::new);
             self.next_inline_like_map.resize_with(new_len, OnceCell::new);
+            self.prev_tag_map.resize_with(new_len, OnceCell::new);
             self.next_tag_map.resize_with(new_len, OnceCell::new);
             self.next_whitespace_map.resize_with(new_len, OnceCell::new);
+            self.following_content_map
+                .resize(new_len, crate::converter::utility::siblings::FollowingContent::Absent);
         }
     }
 
@@ -129,45 +165,6 @@ impl DomContext {
     pub(crate) fn next_tag_name<'a>(&'a self, node_handle: tl::NodeHandle, parser: &'a tl::Parser) -> Option<&'a str> {
         let next_id = self.next_tag_id(node_handle.get_inner(), parser)?;
         self.tag_info(next_id, parser).map(|info| info.name.as_str())
-    }
-
-    pub(crate) fn previous_inline_like(&self, node_handle: tl::NodeHandle, parser: &tl::Parser) -> bool {
-        let id = node_handle.get_inner();
-        self.prev_inline_like_map.get(id as usize).is_some_and(|cell| {
-            *cell.get_or_init(|| {
-                let parent = self.parent_of(id);
-                let siblings = if let Some(parent_id) = parent {
-                    if let Some(children) = self.children_of(parent_id) {
-                        children
-                    } else {
-                        return false;
-                    }
-                } else {
-                    &self.root_children
-                };
-
-                let Some(position) = self
-                    .sibling_index(id)
-                    .or_else(|| siblings.iter().position(|handle| handle.get_inner() == id))
-                else {
-                    return false;
-                };
-
-                for sibling in siblings.iter().take(position).rev() {
-                    if let Some(info) = self.tag_info(sibling.get_inner(), parser) {
-                        return info.is_inline_like;
-                    }
-                    if let Some(tl::Node::Raw(raw)) = sibling.get(parser) {
-                        if raw.as_utf8_str().trim().is_empty() {
-                            continue;
-                        }
-                        return false;
-                    }
-                }
-
-                false
-            })
-        })
     }
 
     pub(crate) fn next_inline_like(&self, node_handle: tl::NodeHandle, parser: &tl::Parser) -> bool {
@@ -340,6 +337,104 @@ impl DomContext {
             }
         }
         text
+    }
+
+    /// Whether the element `id` holds text: a text node in it, at any depth, has a character that
+    /// is not collapsible white space ([`classify_text`]). A comment is no text, and an element
+    /// with no text node (an image, a `<br>`) holds none.
+    ///
+    /// ~keep The walk reads the nodes in the order of the document and stops at the first text.
+    /// ~keep It records the answer of each element that it leaves or stops in, so no node is read
+    /// ~keep twice in one conversion: the texts after `n` nested elements ask `n` times, and
+    /// ~keep without the record each of them reads the elements below it again.
+    /// ~keep A loop rather than recursion: nested elements are attacker-controlled depth.
+    pub(crate) fn holds_text(&self, id: u32, parser: &tl::Parser) -> bool {
+        self.holds(id, parser, &self.holds_text_cache, |node, _| match node {
+            tl::Node::Raw(raw) => {
+                let raw = raw.as_utf8_str();
+                let decoded = text::decode_html_entities_cow(raw.as_ref());
+                if matches!(classify_text(decoded.as_ref()), TextClass::WhiteSpaceOnly(_)) {
+                    Held::No
+                } else {
+                    Held::Yes
+                }
+            }
+            tl::Node::Tag(_) => Held::Inside,
+            tl::Node::Comment(_) => Held::No,
+        })
+    }
+
+    /// Whether the element `id` holds content: a text of any kind or a void element
+    /// ([`is_html5_void_element`]), at any depth. A comment is no content, and an element with
+    /// neither in it is none: `<span><b></b></span>` and `<span><span><!-- c --></span></span>`
+    /// hold none, and `<span><br></span>` holds content.
+    ///
+    /// ~keep A void element writes output with no content of its own (a `<br>`, an image): the
+    /// ~keep element around it is not empty.
+    /// ~keep The walk is that of [`DomContext::holds_text`], with a record that lives for this
+    /// ~keep one question. The caller asks only for an element that holds no text, right before a
+    /// ~keep text that starts with a Unicode space. Such a text is text, so no element that is
+    /// ~keep asked about holds another one that is asked about: no node is read for two questions.
+    pub(crate) fn holds_content(&self, id: u32, parser: &tl::Parser) -> bool {
+        let record = RefCell::new(HashMap::new());
+        self.holds(id, parser, &record, |node, child| match node {
+            tl::Node::Raw(_) => Held::Yes,
+            tl::Node::Tag(_) if self.is_void(child, parser) => Held::Yes,
+            tl::Node::Tag(_) => Held::Inside,
+            tl::Node::Comment(_) => Held::No,
+        })
+    }
+
+    /// Whether the element `id` is an HTML void element ([`is_html5_void_element`]).
+    fn is_void(&self, id: u32, parser: &tl::Parser) -> bool {
+        self.tag_info(id, parser)
+            .is_some_and(|info| is_html5_void_element(info.name.as_bytes()))
+    }
+
+    /// Whether a node in the element `id` is held, as `held` answers for each node, with the
+    /// answers of `record`.
+    fn holds(
+        &self,
+        id: u32,
+        parser: &tl::Parser,
+        record: &RefCell<HashMap<u32, bool>>,
+        held: impl Fn(&tl::Node, u32) -> Held,
+    ) -> bool {
+        if let Some(known) = recorded(record, id) {
+            return known;
+        }
+        let mut open = vec![(id, 0_usize)];
+        while let Some((element, position)) = open.last_mut() {
+            let child = self
+                .children_of(*element)
+                .and_then(|children| children.get(*position))
+                .copied();
+            *position += 1;
+            let Some(child) = child else {
+                record.borrow_mut().insert(*element, false);
+                open.pop();
+                continue;
+            };
+            count_node_read();
+            let found = match child.get(parser).map(|node| held(node, child.get_inner())) {
+                Some(Held::Yes) => true,
+                Some(Held::Inside) => {
+                    let known = recorded(record, child.get_inner());
+                    if known.is_none() {
+                        open.push((child.get_inner(), 0));
+                    }
+                    known.unwrap_or(false)
+                }
+                Some(Held::No) | None => false,
+            };
+            if found {
+                for (element, _) in &open {
+                    record.borrow_mut().insert(*element, true);
+                }
+                return true;
+            }
+        }
+        false
     }
 
     /// Get the parent tag name for a given node ID.

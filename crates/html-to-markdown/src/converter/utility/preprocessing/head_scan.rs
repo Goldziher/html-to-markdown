@@ -1,6 +1,8 @@
 //! Where the document head is, for a scan that reads the tags of a page before the parse.
 
 use super::markup::matches_tag_start;
+use super::raw_text::{is_self_closing_tag, opens_a_tag, skip_opaque_region};
+use super::visibility::TagEndScan;
 use crate::converter::main_helpers::{end_tag_starts_body, is_ignorable_before_head, starts_body};
 
 /// Where a scan over the tags of a page is, relative to the document head.
@@ -174,6 +176,47 @@ impl Inside {
             (inside, _) => inside,
         }
     }
+}
+
+/// Where the body of `input` starts: the offset of the tag that starts it, or of the text that
+/// starts it. `None` when the page has no body.
+///
+/// ~keep A comment, a raw-text body and a quoted attribute value can hold text that looks like a
+/// ~keep tag. The scan steps over each as one unit.
+pub(super) fn body_start(input: &str, tag_ends: &mut TagEndScan<'_>) -> Option<usize> {
+    let bytes = input.as_bytes();
+    let mut head = HeadScan::new();
+    let mut text_start = 0;
+    let mut idx = 0;
+    while let Some(offset) = memchr::memchr(b'<', &bytes[idx..]) {
+        idx += offset;
+        let is_end_tag = bytes.get(idx + 1) == Some(&b'/');
+        let name_start = idx + 1 + usize::from(is_end_tag);
+        let next_tag_is_html = !is_end_tag && matches_tag_start(bytes, name_start, b"html");
+        head = head.after_text(input.get(text_start..idx).unwrap_or_default(), next_tag_is_html);
+        if head.in_body() {
+            return Some(text_start);
+        }
+        let is_tag = opens_a_tag(bytes, idx);
+        let tag_end = if is_tag { tag_ends.tag_end(idx + 1) } else { None };
+        let closes_itself = tag_end.is_some_and(|end| is_self_closing_tag(&bytes[idx..end], b"template"));
+        head = head.after_tag(bytes, name_start, is_end_tag, closes_itself);
+        if head.in_body() {
+            return Some(idx);
+        }
+        // ~keep A raw-text element starts with a tag that ends. For a tag start with no end the
+        // ~keep raw-text scan would read to the end of the input and find nothing.
+        let unit_end = if is_tag && tag_end.is_none() {
+            None
+        } else {
+            skip_opaque_region(bytes, idx).or(tag_end)
+        };
+        // ~keep The text that the head state reads starts after the unit. A `<` that starts no tag
+        // ~keep is text itself. A tag with no end holds the rest of the page.
+        text_start = unit_end.unwrap_or(if is_tag { bytes.len() } else { idx });
+        idx = unit_end.unwrap_or(idx + 1);
+    }
+    None
 }
 
 /// The name of the tag whose name starts at `name_start`, in lower case. It is empty where no

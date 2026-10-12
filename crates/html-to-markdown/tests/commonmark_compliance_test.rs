@@ -146,9 +146,9 @@ fn test_commonmark_compliance() {
                 skipped += 1;
                 continue;
             }
-            let passing_examples = [
-                482, 483, 484, 486, 496, 498, 501, 512, 514, 516, 517, 518, 519, 521, 522,
-            ];
+            // ~keep Example 486 has an empty destination. Without a document base, #756
+            // ~keep intentionally keeps its text only; issue_link_image_regressions covers both bases.
+            let passing_examples = [482, 483, 484, 496, 498, 501, 512, 514, 516, 517, 518, 519, 521, 522];
             if !passing_examples.contains(&test.example) {
                 skipped += 1;
                 continue;

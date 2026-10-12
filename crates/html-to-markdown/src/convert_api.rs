@@ -87,8 +87,10 @@ pub fn convert(html: &str, options: impl Into<Option<ConversionOptions>>) -> Res
 
 struct PreparedConversion<'a> {
     html: Cow<'a, str>,
+    inert_bodies: std::collections::HashMap<String, String>,
     effective_base: Option<std::rc::Rc<url::Url>>,
     metadata_base_href: Option<String>,
+    head_repair_limit: Option<crate::types::WarningKind>,
 }
 
 #[cfg(feature = "metadata")]
@@ -142,10 +144,28 @@ fn validate_input_size(html: &str, max_size: Option<u64>) -> Result<()> {
 
 fn prepare_conversion<'a>(html: &'a str, options: &ConversionOptions) -> Result<PreparedConversion<'a>> {
     // ~keep Both tiers must see the same repaired tree when head content precedes an
-    // ~keep explicit `<head>`; browsers place that content in the implicit head (issue #592).
+    // ~keep explicit `<head>` (issue #592) or a title precedes the body of a page with no
+    // ~keep `<head>` (issue #816); browsers place that content in the implicit head.
     let normalized_input = normalize_input(html)?;
-    let normalized_html = crate::converter::repair_head_content_before_explicit_head(normalized_input.as_ref())
-        .map_or(normalized_input, Cow::Owned);
+    #[cfg(feature = "visitor")]
+    let has_visitor = options.visitor.is_some();
+    #[cfg(not(feature = "visitor"))]
+    let has_visitor = false;
+    let preserve_bodies = options.output_format != crate::options::OutputFormat::Plain
+        && (has_visitor || !options.preserve_tags.is_empty());
+    let (inert_html, inert_bodies) = crate::converter::utility::preprocessing::normalize_inert_bodies_with_preservation(
+        &normalized_input,
+        preserve_bodies,
+        options.hidden_content,
+    );
+    // ~keep The page of `drop` says whether the head is repaired, for each choice: a `<head>` tag
+    // ~keep in kept content is no head of the page, and a browser ignores it there.
+    let normalized_input = match inert_html {
+        Cow::Borrowed(_) => normalized_input,
+        Cow::Owned(normalized) => Cow::Owned(normalized),
+    };
+    let (normalized_html, head_repair_limit) = repair_head(normalized_input.as_ref(), options.hidden_content)
+        .map_or((normalized_input, None), |(html, limit)| (Cow::Owned(html), limit));
     let document_base_href = (options.base_url.is_some() || options.extract_metadata)
         .then(|| crate::converter::url_resolve::document_base_href(&normalized_html))
         .flatten();
@@ -161,12 +181,44 @@ fn prepare_conversion<'a>(html: &'a str, options: &ConversionOptions) -> Result<
     });
     Ok(PreparedConversion {
         html: normalized_html,
+        inert_bodies,
         effective_base,
         metadata_base_href,
+        head_repair_limit,
     })
 }
 
+/// The head repair of `html`, the page after the inert-body pass of `hidden_content`.
+///
+/// ~keep A choice that keeps hidden content takes the repair only where `drop` takes it too.
+/// ~keep Kept content can hold a `<head>` tag, which is no head of the page: a browser ignores it
+/// ~keep there. Read as the head, it sent only the wider choice to the repair, which then put a
+/// ~keep title of the body in the head. So a wider choice empties the kept elements again and
+/// ~keep asks that page first.
+fn repair_head(
+    html: &str,
+    hidden_content: crate::options::HiddenContent,
+) -> Option<(String, Option<crate::types::WarningKind>)> {
+    let drop = crate::options::HiddenContent::Drop;
+    if hidden_content != drop {
+        let emptied =
+            crate::converter::utility::preprocessing::normalize_inert_bodies_with_preservation(html, false, drop).0;
+        if !crate::converter::has_head_content_outside_head(&emptied) {
+            return None;
+        }
+    }
+    crate::converter::repair_head_content_outside_head(html, hidden_content)
+}
+
 fn try_tier1(prepared: &PreparedConversion<'_>, options: &ConversionOptions) -> Option<ConversionResult> {
+    if !options.preserve_tags.is_empty() || !prepared.inert_bodies.is_empty() {
+        return None;
+    }
+    // ~keep A page on which the head repair reached a limit is not a page for the fast
+    // ~keep converter: the full converter converts it and gives the warning of the limit.
+    if prepared.head_repair_limit.is_some() {
+        return None;
+    }
     let report = crate::converter::prescan::PrescanReport::default();
     match options.tier_strategy {
         crate::options::TierStrategy::Tier2 => None,
@@ -288,6 +340,7 @@ fn call_converter(
         prepared.html.as_ref(),
         options,
         crate::converter::main::ConversionParameters {
+            inert_bodies: &prepared.inert_bodies,
             inline_collector: image_collector(collectors),
             #[cfg(feature = "metadata")]
             metadata_collector: metadata_collector(collectors),
@@ -296,6 +349,7 @@ fn call_converter(
             structure_collector: structure,
             base_url: prepared.effective_base.clone(),
             document_base_href: prepared.metadata_base_href.as_deref(),
+            head_repair_limit: prepared.head_repair_limit,
         },
     )
 }

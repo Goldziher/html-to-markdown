@@ -26,6 +26,7 @@ pub fn handle_mark(handler: HandlerContext<'_>) {
     // ~keep walk_node depends on feature-gated code paths.
     #[allow(unused_imports)]
     use crate::converter::{get_text_content, serialize_node, walk_node};
+    use crate::options::HighlightStyle;
 
     let HandlerContext {
         node_handle,
@@ -66,17 +67,18 @@ pub fn handle_mark(handler: HandlerContext<'_>) {
         return;
     }
 
-    use crate::options::HighlightStyle;
     // ~keep Bold highlighting renders its children with `in_strong` set, which suppresses a
     // ~keep nested `<strong>`'s own markers. Every style that writes markers renders them as
     // ~keep marker text (issue #603).
     let child_ctx = Context {
         in_strong: ctx.in_strong || options.highlight_style == HighlightStyle::Bold,
-        ..ctx.inline_buffer(output, options.highlight_style != HighlightStyle::None)
+        ..match options.highlight_style {
+            HighlightStyle::None => ctx.inline_buffer(output, false),
+            _ => marked_buffer_context(ctx, output),
+        }
     };
     let mut content = String::with_capacity(32);
     walk_children(tag, &mut content, &child_ctx, depth, site);
-
     let (open, close, merge_symbol) = resolve_mark_delimiters(options);
     // ~keep Markdown delimiters hoist edge whitespace, but raw HTML must preserve the source boundary exactly (#744).
     if options.highlight_style == HighlightStyle::Html {
@@ -98,6 +100,20 @@ pub fn handle_mark(handler: HandlerContext<'_>) {
         },
         site,
     );
+}
+
+// ~keep A guaranteed opening marker makes the last-line column irrelevant to list rendering.
+// ~keep Hard-break state remains live when children start in their detached buffer.
+fn marked_buffer_context(context: &Context, output: &str) -> Context {
+    Context {
+        in_marker_span: true,
+        inline_buffer_after_hard_break: if output.is_empty() {
+            context.inline_buffer_after_hard_break
+        } else {
+            crate::converter::utility::escaping::ends_with_hard_break(output)
+        },
+        ..context.clone()
+    }
 }
 
 fn walk_children(tag: &tl::HTMLTag<'_>, output: &mut String, context: &Context, depth: usize, site: InlineSite<'_>) {
@@ -189,17 +205,7 @@ fn emit_inserted_wrapped(output: &mut String, content: &str, site: InlineSite<'_
             site,
         );
     } else {
-        emit_wrapped_inline(
-            output,
-            content,
-            &InlineDelimiters {
-                open: "==",
-                close: "==",
-                merge_symbol: Some('='),
-                sibling_tag_names: &INSERTED_SIBLING_TAGS,
-            },
-            site,
-        );
+        output.push_str(content);
     }
 }
 
@@ -244,7 +250,7 @@ pub fn handle_strikethrough(tag_name: &str, handler: HandlerContext<'_>) {
     } else {
         let mut content = String::with_capacity(32);
         let children = tag.children();
-        let marker_ctx = ctx.inline_buffer(output, true);
+        let marker_ctx = marked_buffer_context(ctx, output);
         for child_handle in children.top().iter() {
             walk_node(
                 child_handle,
@@ -270,7 +276,7 @@ pub fn handle_strikethrough(tag_name: &str, handler: HandlerContext<'_>) {
 
 /// Handle inserted/underlined text (ins tag).
 ///
-/// Converts to `==content==` syntax. Supports visitor callbacks when enabled.
+/// Passes through visible content in Markdown and uses insertion syntax in Djot.
 pub fn handle_inserted(handler: HandlerContext<'_>) {
     use crate::converter::walk_node;
 
@@ -307,9 +313,25 @@ pub fn handle_inserted(handler: HandlerContext<'_>) {
         return;
     }
 
+    if options.output_format != OutputFormat::Djot {
+        #[cfg(feature = "visitor")]
+        if let Some(outcome) = visit_semantic(tag, SemanticKind::Underline("ins"), depth, site) {
+            match outcome {
+                VisitorOutcome::Continue => {}
+                VisitorOutcome::Output(custom_output) => {
+                    output.push_str(&custom_output);
+                    return;
+                }
+                VisitorOutcome::Skip => return,
+            }
+        }
+        walk_children(tag, output, ctx, depth, site);
+        return;
+    }
+
     let mut content = String::with_capacity(32);
     let children = tag.children();
-    let marker_ctx = ctx.inline_buffer(output, true);
+    let marker_ctx = marked_buffer_context(ctx, output);
     for child_handle in children.top().iter() {
         walk_node(
             child_handle,
@@ -540,5 +562,72 @@ mod tests {
             content.contains("<mark>highlighted</mark>"),
             "original html should be preserved: {content}"
         );
+    }
+}
+
+#[cfg(test)]
+mod line_state_cost_tests {
+    use crate::converter::context::INLINE_BUFFER_COLUMN_CHAR_READS;
+    use crate::{ConversionOptions, HighlightStyle, OutputFormat, TierStrategy, convert};
+
+    #[test]
+    fn marked_wrappers_should_not_count_the_growing_output_column() {
+        for (tag, style) in [
+            ("del", HighlightStyle::DoubleEqual),
+            ("s", HighlightStyle::DoubleEqual),
+            ("strike", HighlightStyle::DoubleEqual),
+            ("ins", HighlightStyle::DoubleEqual),
+            ("mark", HighlightStyle::DoubleEqual),
+            ("mark", HighlightStyle::Bold),
+            ("mark", HighlightStyle::Html),
+        ] {
+            for n in [100, 400] {
+                assert_eq!(column_reads(tag, style, n), 0, "{tag}, {style:?}, {n}");
+            }
+        }
+    }
+
+    #[test]
+    fn unmarked_highlighting_should_still_count_its_live_output_column() {
+        for n in [100, 400] {
+            assert_eq!(column_reads("mark", HighlightStyle::None, n), n * (n - 1) / 2);
+        }
+    }
+
+    fn column_reads(tag: &str, highlight_style: HighlightStyle, n: usize) -> usize {
+        INLINE_BUFFER_COLUMN_CHAR_READS.with(|reads| reads.set(0));
+        let html = format!("<div>{}</div>", format!("<{tag}>x</{tag}>").repeat(n));
+        let options = ConversionOptions {
+            output_format: if tag == "ins" {
+                OutputFormat::Djot
+            } else {
+                OutputFormat::Markdown
+            },
+            highlight_style,
+            tier_strategy: TierStrategy::Tier2,
+            extract_metadata: false,
+            ..Default::default()
+        };
+        let content = convert(&html, options)
+            .expect("convert marked wrappers")
+            .content
+            .expect("content");
+        let expected = match (tag, highlight_style) {
+            ("ins", _) => format!("{}\n", "{+x+}".repeat(n)),
+            (_, HighlightStyle::Html) => format!("{}\n", "<mark>x</mark>".repeat(n)),
+            (_, HighlightStyle::None) => format!("{}\n", "x".repeat(n)),
+            _ => {
+                let marker = if tag == "del" || tag == "s" || tag == "strike" {
+                    "~~"
+                } else if highlight_style == HighlightStyle::Bold {
+                    "**"
+                } else {
+                    "=="
+                };
+                format!("{marker}{}{marker}\n", "x".repeat(n))
+            }
+        };
+        assert_eq!(content, expected);
+        INLINE_BUFFER_COLUMN_CHAR_READS.with(std::cell::Cell::get)
     }
 }

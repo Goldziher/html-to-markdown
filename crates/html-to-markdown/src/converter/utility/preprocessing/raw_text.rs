@@ -159,12 +159,17 @@ pub fn strip_script_and_style_tags(input: &str) -> Cow<'_, str> {
     let mut last = 0;
     let mut output: Option<String> = None;
     let mut svg_depth = 0usize;
+    let last_gt = bytes.iter().rposition(|&byte| byte == b'>');
 
     while idx < len {
         let Some(offset) = memchr::memchr(b'<', &bytes[idx..]) else {
             break;
         };
         idx += offset;
+        // ~keep No tag can terminate beyond the final `>`; do not rescan unfinished suffixes (#773).
+        if last_gt.is_none_or(|end| end <= idx) {
+            break;
+        }
 
         if idx + 1 < len {
             if let Some(new_idx) = track_svg_tag(bytes, idx, &mut svg_depth) {
@@ -466,4 +471,48 @@ pub fn eq_ascii_insensitive(a: &[u8], b: &[u8]) -> bool {
         return false;
     }
     a.iter().zip(b.iter()).all(|(x, y)| x.eq_ignore_ascii_case(y))
+}
+
+// ~keep Match each same-name nesting stack once; repeated hidden opens without closes
+// otherwise search the entire suffix independently (#773).
+pub(super) fn matching_tag_ends(bytes: &[u8]) -> ahash::AHashMap<usize, Option<usize>> {
+    let mut stacks: ahash::AHashMap<Vec<u8>, Vec<usize>> = ahash::AHashMap::new();
+    let mut ends = ahash::AHashMap::new();
+    let mut idx = 0;
+    let last_gt = bytes.iter().rposition(|&byte| byte == b'>').unwrap_or(0);
+    while idx < last_gt {
+        let Some(offset) = memchr::memchr(b'<', &bytes[idx..]) else {
+            break;
+        };
+        idx += offset;
+        if let Some(end) = skip_opaque_region(bytes, idx) {
+            idx = end;
+            continue;
+        }
+        if !opens_a_tag(bytes, idx) {
+            idx += 1;
+            continue;
+        }
+        let closing = bytes.get(idx + 1) == Some(&b'/');
+        let start = idx + if closing { 2 } else { 1 };
+        let name_len = bytes[start..]
+            .iter()
+            .take_while(|byte| !byte.is_ascii_whitespace() && !matches!(byte, b'>' | b'/'))
+            .count();
+        let name = bytes[start..start + name_len].to_ascii_lowercase();
+        let Some(end) = find_tag_end(bytes, start + name_len) else {
+            break;
+        };
+        let stack = stacks.entry(name.clone()).or_default();
+        if closing {
+            if let Some(open) = stack.pop() {
+                ends.insert(open, Some(end));
+            }
+        } else if !is_self_closing_tag(&bytes[idx..end], &name) {
+            ends.insert(idx, None);
+            stack.push(idx);
+        }
+        idx = end;
+    }
+    ends
 }

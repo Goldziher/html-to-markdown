@@ -203,7 +203,9 @@ const CASES: &[(&str, &str, &[&str])] = &[
     (
         "a link whose text is its address in a code span",
         "<p>t <code><a href=\"https://e.org/x\">https://e.org/x</a></code></p>",
-        &["code_inline"],
+        // ~keep Issue #813 decides: a link in a code span is written as a link with its label,
+        // ~keep so the visitor gets its call. Before the sync: no `link` call.
+        &["link https://e.org/x", "code_inline"],
     ),
     (
         "a link around one heading",

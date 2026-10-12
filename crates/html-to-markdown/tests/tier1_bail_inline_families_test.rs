@@ -56,12 +56,11 @@ fn assert_bails_with(html: &str, expected: &BailReason) {
 }
 
 #[test]
-fn should_bail_on_adjacent_strikethrough_and_inserted_delimiter_runs() {
+fn should_bail_on_adjacent_strikethrough_and_emphasis_delimiter_runs() {
     for html in [
         "<p><del>A</del><del>B</del></p>",
         "<p><s>A</s><s>B</s></p>",
         "<p><strike>A</strike><strike>B</strike></p>",
-        "<p><ins>A</ins><ins>B</ins></p>",
         "<p><var>A</var><var>B</var></p>",
         "<p><dfn>A</dfn><dfn>B</dfn></p>",
     ] {
@@ -81,12 +80,11 @@ fn should_bail_on_adjacent_code_spans() {
 }
 
 #[test]
-fn should_bail_on_a_whitespace_only_strikethrough_inserted_or_code_body() {
+fn should_bail_on_a_whitespace_only_strikethrough_or_code_body() {
     for html in [
         "<p>A<del> </del>B</p>",
         "<p>A<s> </s>B</p>",
         "<p>A<strike> </strike>B</p>",
-        "<p>A<ins> </ins>B</p>",
         "<p>A<code> </code>B</p>",
         "<p>A<kbd> </kbd>B</p>",
         "<p>A<samp> </samp>B</p>",
@@ -123,7 +121,7 @@ fn should_not_bail_on_the_same_shapes_when_a_real_separator_intervenes() {
 fn should_reach_tier2_output_through_auto_dispatch_for_every_bailed_shape() {
     // ~keep The bail is only useful if Auto actually falls back and produces Tier-2's answer.
     assert_eq!(auto("<p><del>A</del><del>B</del></p>"), "~~AB~~");
-    assert_eq!(auto("<p><ins>A</ins><ins>B</ins></p>"), "==AB==");
+    assert_eq!(auto("<p><ins>A</ins><ins>B</ins></p>"), "AB");
     assert_eq!(auto("<p><code>A</code><code>B</code></p>"), "`AB`");
     assert_eq!(auto("<p>A<del> </del>B</p>"), "A B");
     assert_eq!(auto("<p>A<code> </code>B</p>"), "A` `B");

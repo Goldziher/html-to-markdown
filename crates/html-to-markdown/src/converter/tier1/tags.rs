@@ -80,10 +80,14 @@ pub enum TagKind {
     /// emitted as `*…*\n\n` (italic-wrap). Mirrors Tier-2's
     /// `semantic/figure.rs::handle_figcaption`.
     Figcaption,
-    /// `<button>` — clickable button. Tier-2 (`form/elements.rs`'s `handle_button`)
-    /// emits `\n\n` after the button's content in block mode and no block separator before
-    /// it; mirror with close-only block-separator semantics.
-    Button,
+    /// `<progress>`, `<meter>`, `<output>` — a form control that ends its line. Tier-2
+    /// (`form/elements.rs`'s `write_line_end_control`) emits `\n\n` after the control's content
+    /// in block mode and no block separator before it; mirror with close-only block-separator
+    /// semantics.
+    LineEndControl,
+    /// Media element (`<audio>`, `<video>`). The scanner writes no link for it, so it hands
+    /// the page to Tier-2, which does.
+    Media,
 
     /// Raw-text container whose content the scanner skips until the matching close tag.
     RawText(RawKind),
@@ -322,7 +326,7 @@ static TAGS: phf::Map<&'static [u8], TagSpec> = phf_map! {
     b"del"    => inline(TagKind::Strikethrough),
     b"strike" => inline(TagKind::Strikethrough),
     b"u"      => inline(TagKind::Inline),
-    b"ins"    => inline(TagKind::Inserted),
+    b"ins"    => inline(TagKind::Inline),
 
     b"mark"   => inline(TagKind::Inline),
     b"small"  => inline(TagKind::Inline),
@@ -331,6 +335,7 @@ static TAGS: phf::Map<&'static [u8], TagSpec> = phf_map! {
     b"kbd"    => inline(TagKind::Code),
     b"code"   => inline(TagKind::Code),
     b"samp"   => inline(TagKind::Code),
+    b"tt"     => inline(TagKind::Code),
     // ~keep Tier-2 wraps <var>/<dfn> in the same single `strong_em_symbol` pair <em>/<i> use
     // ~keep (`typography::handle_variable`), and the router only picks Tier-1 when that symbol
     // ~keep is the default `*`, so Emphasis reproduces them exactly. Classifying them as plain
@@ -391,19 +396,19 @@ static TAGS: phf::Map<&'static [u8], TagSpec> = phf_map! {
         is_rawtext: false,
     },
     b"optgroup"  => inline(TagKind::Inline),
-    // ~keep <button>: Tier-2 form/elements.rs's handle_button emits `\n\n` after content in
-    // ~keep block mode but no leading separator.  TagKind::Button gives us
-    // ~keep close-only block-separator semantics — distinct from Block which also
-    // ~keep emits a leading `\n\n` on open.
-    b"button"    => block(TagKind::Button),
-    // ~keep Tier-2 writes these three with the function that writes a button's content.
-    b"progress"  => block(TagKind::Button),
-    b"meter"     => block(TagKind::Button),
-    b"output"    => block(TagKind::Button),
+    // ~keep A button stays in the line of the text around it (issue #785).
+    b"button"    => inline(TagKind::Inline),
+    // ~keep Tier-2 form/elements.rs's write_line_end_control emits `\n\n` after the content of
+    // ~keep these three in block mode but no leading separator. TagKind::LineEndControl gives
+    // ~keep close-only block-separator semantics — distinct from Block which also emits a
+    // ~keep leading `\n\n` on open.
+    b"progress"  => block(TagKind::LineEndControl),
+    b"meter"     => block(TagKind::LineEndControl),
+    b"output"    => block(TagKind::LineEndControl),
     b"datalist"  => inline(TagKind::Inline),
 
-    b"audio"   => block(TagKind::Block),
-    b"video"   => block(TagKind::Block),
+    b"audio"   => block(TagKind::Media),
+    b"video"   => block(TagKind::Media),
     b"picture" => inline(TagKind::Inline),
     b"canvas"  => inline(TagKind::Inline),
     b"map"     => inline(TagKind::Inline),

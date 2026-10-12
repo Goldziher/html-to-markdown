@@ -17,6 +17,11 @@ use crate::converter::reference_collector::ReferenceCollectorHandle;
 use crate::options::InlineDataMedia;
 use crate::types::structure_collector::StructureCollectorHandle;
 
+#[cfg(test)]
+thread_local! {
+    pub(crate) static INLINE_BUFFER_COLUMN_CHAR_READS: Cell<usize> = const { Cell::new(0) };
+}
+
 /// Handle type for inline image collector when feature is enabled.
 #[cfg(feature = "inline-images")]
 pub type InlineCollectorHandle = Rc<RefCell<InlineImageCollector>>;
@@ -95,6 +100,24 @@ impl DjotRuleLikeText {
     }
 }
 
+pub(super) struct InlineCodeLink {
+    pub(super) range: std::ops::Range<usize>,
+    pub(super) markdown: String,
+}
+
+/// ~keep Transactional rendered edges distinguish formatted punctuation from delimiter bytes.
+#[derive(Clone, Copy, Default)]
+pub struct MediaBoundaryState {
+    /// ~keep A default player label owes separation from the next emitted word.
+    pub pending: bool,
+    /// ~keep The first surviving child edge, before a wrapper adds its Markdown delimiters.
+    pub first_edge: Option<char>,
+    /// ~keep The last surviving child edge ignores a wrapper's closing delimiters.
+    pub last_edge: Option<char>,
+    /// ~keep Leading media needs a separator; media after ordinary text must not separate that text from its parent.
+    pub first_is_media: bool,
+}
+
 /// Conversion context that tracks state during HTML to Markdown conversion.
 ///
 /// This context is passed through the recursive tree walker and maintains information
@@ -114,6 +137,10 @@ pub struct Context {
     /// SPAN must split the span in two rather than embed a newline inside the backticks
     /// (issue #487). ~keep
     pub(crate) in_code_block: bool,
+    /// ~keep Link ranges refer to the raw inline-code buffer, before delimiters are emitted (#813).
+    pub(super) inline_code_links: Option<Rc<RefCell<Vec<InlineCodeLink>>>>,
+    /// ~keep Only a link label shares rendered media boundaries; each recursive walk saves its parent state.
+    pub(crate) media_boundary: Option<Rc<Cell<MediaBoundaryState>>>,
     /// Output offsets of real `<br>` nodes while a table-cell `<pre>` is collected. ~keep
     pub(crate) pre_cell_break_offsets: Option<Rc<RefCell<Vec<usize>>>>,
     /// Current list item counter for ordered lists.
@@ -127,9 +154,14 @@ pub struct Context {
     pub(crate) blockquote_depth: usize,
     /// Are we inside a table cell (td/th)?
     pub(crate) in_table_cell: bool,
+    /// ~keep Deferred single-cell tables keep their surrounding cell context but render as blocks.
+    pub(crate) allow_nested_table_markup: bool,
     /// Are we inside a table cell (td/th) that holds only inputs and white space? A checkbox
     /// writes its state there. [`Self::for_cell`] decides it where the cell opens.
     pub(crate) in_cell_of_inputs: bool,
+    /// Are we inside the element that writes an option list: the outermost `<select>`,
+    /// `<datalist>` or `<option>`? An option there is a word of that list.
+    pub(crate) in_option_list: bool,
     /// Are we inside a *layout*-table cell, whose row renders as a list item rather than a
     /// pipe row?
     ///
@@ -266,7 +298,9 @@ pub struct Context {
     /// paragraphs, as Google Docs exports) puts a genuine, buffer-sharing paragraph body
     /// at non-zero `inline_depth`.
     pub(crate) block_output_ptr: usize,
-    /// Shared flag: true until the first non-whitespace text content is emitted.
+    /// Shared flag: true until the first node writes content that is not white space. The node
+    /// is text, or an element that writes content of its own (an image, a graphic, a form
+    /// control). `convert_node` clears the flag for every kind of node (issue #762).
     ///
     /// ~keep `block_content_start` cannot answer "is this text node at the very start of a
     /// ~keep fresh block" on its own: it is a byte offset compared against `output.len()`,
@@ -372,16 +406,19 @@ impl Context {
     pub(crate) fn new(options: &crate::options::ConversionOptions, parameters: ContextParameters) -> Self {
         #[cfg(feature = "metadata")]
         let metadata = metadata_preferences(parameters.metadata_collector.as_ref());
-
         Self {
             in_code: false,
             in_code_block: false,
+            inline_code_links: None,
+            media_boundary: None,
             pre_cell_break_offsets: None,
             list_counter: 0,
             in_ordered_list: false,
             blockquote_depth: 0,
             in_table_cell: false,
+            allow_nested_table_markup: false,
             in_cell_of_inputs: false,
+            in_option_list: false,
             in_layout_cell: false,
             convert_as_inline: options.convert_as_inline,
             inline_depth: 0,
@@ -471,7 +508,10 @@ impl Context {
             inline_buffer_column: if output.is_empty() {
                 self.inline_buffer_column
             } else {
-                Some(indent_column + line[indent_length..].chars().count())
+                let characters = line[indent_length..].chars().count();
+                #[cfg(test)]
+                INLINE_BUFFER_COLUMN_CHAR_READS.with(|reads| reads.set(reads.get() + characters));
+                Some(indent_column + characters)
             },
             inline_buffer_after_hard_break: if output.is_empty() {
                 self.inline_buffer_after_hard_break
@@ -564,6 +604,10 @@ impl Context {
             at_fresh_block_start: Rc::new(Cell::new(self.at_fresh_block_start.get())),
             depth_limit_reached: Rc::new(Cell::new(self.depth_limit_reached.get())),
             inline_data_replaced: Rc::new(Cell::new(false)),
+            media_boundary: self
+                .media_boundary
+                .as_ref()
+                .map(|_| Rc::new(Cell::new(Default::default()))),
             #[cfg(feature = "inline-images")]
             inline_collector: None,
             #[cfg(feature = "metadata")]
@@ -606,5 +650,17 @@ impl Context {
             return None;
         }
         crate::converter::url_resolve::resolve_attribute_url(self.base_url.as_deref()?, value)
+    }
+    pub(crate) fn resolve_link_url(
+        &self,
+        value: &str,
+        node_handle: &tl::NodeHandle,
+        parser: &tl::Parser,
+        dom_ctx: &crate::converter::DomContext,
+    ) -> Option<String> {
+        if dom_ctx.has_raw_text_ancestor(node_handle.get_inner(), parser) {
+            return None;
+        }
+        crate::converter::url_resolve::resolve_link_url(self.base_url.as_deref()?, value)
     }
 }

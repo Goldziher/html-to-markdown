@@ -22,7 +22,7 @@ title: Array - JavaScript | MDN
 
 # Array
 
-**Baseline Widely available  ***
+**Baseline Widely available ***
 
 This feature is well established and works across many devices and browser versions. It’s been available across browsers since July 2015.
 
@@ -213,12 +213,15 @@ method(callbackFn, thisArg)
 Where `callbackFn` takes three arguments:
 
 [`element`](#element)
+
 The current element being processed in the array.
 
 [`index`](#index)
+
 The index of the current element being processed in the array.
 
 [`array`](#array)
+
 The array that the method was called upon.
 
 What `callbackFn` is expected to return depends on the array method that was called.
@@ -317,25 +320,31 @@ f("a", "b"); // 'a+b'
 ## [Constructor](#constructor)
 
 [`Array()`](/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/Array)
+
 Creates a new `Array` object.
 
 ## [Static properties](#static_properties)
 
 [`Array[Symbol.species]`](/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/Symbol.species)
+
 Returns the `Array` constructor.
 
 ## [Static methods](#static_methods)
 
 [`Array.from()`](/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/from)
+
 Creates a new `Array` instance from an iterable or array-like object.
 
 [`Array.fromAsync()`](/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/fromAsync)
+
 Creates a new `Array` instance from an async iterable, iterable, or array-like object.
 
 [`Array.isArray()`](/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/isArray)
+
 Returns `true` if the argument is an array, or `false` otherwise.
 
 [`Array.of()`](/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/of)
+
 Creates a new `Array` instance with a variable number of arguments, regardless of number or type of the arguments.
 
 ## [Instance properties](#instance_properties)
@@ -343,133 +352,175 @@ Creates a new `Array` instance with a variable number of arguments, regardless o
 These properties are defined on `Array.prototype` and shared by all `Array` instances.
 
 [`Array.prototype.constructor`](/en-US/docs/Web/JavaScript/Reference/Global_Objects/Object/constructor)
+
 The constructor function that created the instance object. For `Array` instances, the initial value is the [`Array`](/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/Array) constructor.
 
 [`Array.prototype[Symbol.unscopables]`](/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/Symbol.unscopables)
+
 Contains property names that were not included in the ECMAScript standard prior to the ES2015 version and that are ignored for [`with`](/en-US/docs/Web/JavaScript/Reference/Statements/with) statement-binding purposes.
 
 These properties are own properties of each `Array` instance.
 
 [`length`](/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/length)
+
 Reflects the number of elements in an array.
 
 ## [Instance methods](#instance_methods)
 
 [`Array.prototype.at()`](/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/at)
+
 Returns the array item at the given index. Accepts negative integers, which count back from the last item.
 
 [`Array.prototype.concat()`](/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/concat)
+
 Returns a new array that is the calling array joined with other array(s) and/or value(s).
 
 [`Array.prototype.copyWithin()`](/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/copyWithin)
+
 Copies a sequence of array elements within an array.
 
 [`Array.prototype.entries()`](/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/entries)
+
 Returns a new [*array iterator*](/en-US/docs/Web/JavaScript/Guide/Iterators_and_generators) object that contains the key/value pairs for each index in an array.
 
 [`Array.prototype.every()`](/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/every)
+
 Returns `false` if it finds an element in the array that does not satisfy the provided testing function. Otherwise, it returns `true`.
 
 [`Array.prototype.fill()`](/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/fill)
+
 Fills all the elements of an array from a start index to an end index with a static value.
 
 [`Array.prototype.filter()`](/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/filter)
+
 Returns a new array containing all elements of the calling array for which the provided filtering function returns `true`.
 
 [`Array.prototype.find()`](/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/find)
+
 Returns the value of the first element in the array that satisfies the provided testing function, or `undefined` if no appropriate element is found.
 
 [`Array.prototype.findIndex()`](/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/findIndex)
+
 Returns the index of the first element in the array that satisfies the provided testing function, or `-1` if no appropriate element was found.
 
 [`Array.prototype.findLast()`](/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/findLast)
+
 Returns the value of the last element in the array that satisfies the provided testing function, or `undefined` if no appropriate element is found.
 
 [`Array.prototype.findLastIndex()`](/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/findLastIndex)
+
 Returns the index of the last element in the array that satisfies the provided testing function, or `-1` if no appropriate element was found.
 
 [`Array.prototype.flat()`](/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/flat)
+
 Returns a new array with all sub-array elements concatenated into it recursively up to the specified depth.
 
 [`Array.prototype.flatMap()`](/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/flatMap)
+
 Returns a new array formed by applying a given callback function to each element of the calling array, and then flattening the result by one level.
 
 [`Array.prototype.forEach()`](/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/forEach)
+
 Calls a function for each element in the calling array.
 
 [`Array.prototype.includes()`](/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/includes)
+
 Determines whether the calling array contains a value, returning `true` or `false` as appropriate.
 
 [`Array.prototype.indexOf()`](/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/indexOf)
+
 Returns the first (least) index at which a given element can be found in the calling array.
 
 [`Array.prototype.join()`](/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/join)
+
 Joins all elements of an array into a string.
 
 [`Array.prototype.keys()`](/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/keys)
+
 Returns a new [*array iterator*](/en-US/docs/Web/JavaScript/Guide/Iterators_and_generators) that contains the keys for each index in the calling array.
 
 [`Array.prototype.lastIndexOf()`](/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/lastIndexOf)
+
 Returns the last (greatest) index at which a given element can be found in the calling array, or `-1` if none is found.
 
 [`Array.prototype.map()`](/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/map)
+
 Returns a new array containing the results of invoking a function on every element in the calling array.
 
 [`Array.prototype.pop()`](/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/pop)
+
 Removes the last element from an array and returns that element.
 
 [`Array.prototype.push()`](/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/push)
+
 Adds one or more elements to the end of an array, and returns the new `length` of the array.
 
 [`Array.prototype.reduce()`](/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/reduce)
+
 Executes a user-supplied "reducer" callback function on each element of the array (from left to right), to reduce it to a single value.
 
 [`Array.prototype.reduceRight()`](/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/reduceRight)
+
 Executes a user-supplied "reducer" callback function on each element of the array (from right to left), to reduce it to a single value.
 
 [`Array.prototype.reverse()`](/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/reverse)
+
 Reverses the order of the elements of an array *in place*. (First becomes the last, last becomes first.)
 
 [`Array.prototype.shift()`](/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/shift)
+
 Removes the first element from an array and returns that element.
 
 [`Array.prototype.slice()`](/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/slice)
+
 Extracts a section of the calling array and returns a new array.
 
 [`Array.prototype.some()`](/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/some)
+
 Returns `true` if it finds an element in the array that satisfies the provided testing function. Otherwise, it returns `false`.
 
 [`Array.prototype.sort()`](/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/sort)
+
 Sorts the elements of an array in place and returns the array.
 
 [`Array.prototype.splice()`](/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/splice)
+
 Adds and/or removes elements from an array.
 
 [`Array.prototype.toLocaleString()`](/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/toLocaleString)
+
 Returns a localized string representing the calling array and its elements. Overrides the [`Object.prototype.toLocaleString()`](/en-US/docs/Web/JavaScript/Reference/Global_Objects/Object/toLocaleString) method.
 
 [`Array.prototype.toReversed()`](/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/toReversed)
+
 Returns a new array with the elements in reversed order, without modifying the original array.
 
 [`Array.prototype.toSorted()`](/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/toSorted)
+
 Returns a new array with the elements sorted in ascending order, without modifying the original array.
 
 [`Array.prototype.toSpliced()`](/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/toSpliced)
+
 Returns a new array with some elements removed and/or replaced at a given index, without modifying the original array.
 
 [`Array.prototype.toString()`](/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/toString)
+
 Returns a string representing the calling array and its elements. Overrides the [`Object.prototype.toString()`](/en-US/docs/Web/JavaScript/Reference/Global_Objects/Object/toString) method.
 
 [`Array.prototype.unshift()`](/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/unshift)
+
 Adds one or more elements to the front of an array, and returns the new `length` of the array.
 
 [`Array.prototype.values()`](/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/values)
+
 Returns a new [*array iterator*](/en-US/docs/Web/JavaScript/Guide/Iterators_and_generators) object that contains the values for each index in the array.
 
 [`Array.prototype.with()`](/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/with)
+
 Returns a new array with the element at the given index replaced with the given value, without modifying the original array.
 
 [`Array.prototype\[Symbol.iterator\]()`](/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/Symbol.iterator)
+
 An alias for the [`values()`](/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/values) method by default.
 
 ## [Examples](#examples)
@@ -1123,6 +1174,7 @@ Your blueprint for a better internet.
 - [MDN blog RSS feed](/en-US/blog/rss.xml)
 
 MDN
+
 - [About](/en-US/about)
 - [Blog](/en-US/blog/)
 - [Mozilla careers](https://www.mozilla.org/en-US/careers/listings/)
@@ -1131,6 +1183,7 @@ MDN
 - [Product help](https://support.mozilla.org/products/mdn-plus)
 
 Contribute
+
 - [MDN Community](/en-US/community)
 - [Community resources](/en-US/docs/MDN/Community)
 - [Writing guidelines](/en-US/docs/MDN/Writing_guidelines)
@@ -1138,6 +1191,7 @@ Contribute
 - [MDN on GitHub](https://github.com/mdn)
 
 Developers
+
 - [Web technologies](/en-US/docs/Web)
 - [Learn web development](/en-US/docs/Learn_web_development)
 - [Guides](/en-US/docs/MDN/Guides)

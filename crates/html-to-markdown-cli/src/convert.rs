@@ -46,6 +46,8 @@ pub fn build_conversion_options(cli: &Cli) -> ConversionOptions {
         escape_ascii: cli.escape_ascii,
         code_language: cli.code_language.clone().unwrap_or(defaults.code_language),
         autolinks: !cli.no_autolinks,
+        expand_abbreviations: !cli.no_expand_abbreviations,
+        include_blockquote_citations: !cli.no_blockquote_citations,
         default_title: cli.default_title,
         br_in_tables: cli.br_in_tables,
         compact_tables: cli.compact_tables,

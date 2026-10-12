@@ -149,10 +149,11 @@ fn should_write_no_checkbox_state_in_a_cell_that_holds_another_element() {
 }
 
 #[test]
-fn should_separate_a_control_from_an_image_after_it() {
+fn should_write_a_button_before_an_image_as_inline_text() {
+    // ~keep A button is inline text (issue #785): nothing separates it from the image.
     assert_in_both_modes(
         "<p><span><button>One</button><img src=\"a.png\" alt=\"x\"></span></p>",
-        "One ![x](a.png)\n",
+        "One![x](a.png)\n",
     );
 }
 
@@ -179,6 +180,19 @@ fn should_write_a_control_in_strict_white_space_mode_as_in_the_default_mode() {
         ("<p>before<input type=\"checkbox\">after</p>", "beforeafter\n"),
         ("<p>before <input type=\"checkbox\"> after</p>", "before after\n"),
         (&*format!("<p>before{OPTION_GROUP}after</p>"), "before One Two after\n"),
+    ] {
+        assert_in_mode(html, expected, WhitespaceMode::Strict);
+    }
+}
+
+/// Strict mode takes the space before a checkbox at the start of a line too, as it did before
+/// the rules of running text: the two spaces around the checkbox are one.
+#[test]
+fn should_write_one_space_for_a_checkbox_at_a_line_start_in_strict_white_space_mode() {
+    for (html, expected) in [
+        ("<footer> <input type=\"checkbox\"> Logo</footer>", " Logo\n"),
+        ("x<footer> <input type=\"checkbox\"> Logo</footer>", "x\n\n Logo\n"),
+        ("<p>x</p><main> <input type=\"checkbox\"> Logo</main>", "x\n\n Logo\n"),
     ] {
         assert_in_mode(html, expected, WhitespaceMode::Strict);
     }

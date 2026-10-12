@@ -78,6 +78,8 @@ pub struct TableState {
     /// rendering legitimately introduces unescaped `|` characters that
     /// Tier-2 also emits without escaping.
     pub had_nested_table: bool,
+    /// Ends of flattened nested tables in the current cell; following content is separated at close. ~keep
+    pub nested_table_ends: Vec<usize>,
     /// `colspan` attribute on the currently-open `<td>`/`<th>`.
     ///
     /// Defaults to 1.  On `</td>` / `</th>` close, `close_table_cell` pushes
@@ -164,10 +166,6 @@ pub struct OpenTag {
     /// Whether the first content of this quote or heading in a table cell was whitespace, which
     /// Tier-2 keeps at the start of the element's own buffer (see `scanner::flush_text`).
     pub starts_with_whitespace: bool,
-    /// Tier-2 renders this element's children into a fresh buffer of their own (`<mark>`,
-    /// `<sub>`, `<sup>`, `<abbr>`, `<dt>`, `<dd>`), so its text sees an empty buffer, not
-    /// the line before the element.
-    pub children_in_own_buffer: bool,
 }
 
 /// Minimum capacity for each summary accumulation buffer.
@@ -219,7 +217,7 @@ pub struct Tier1State {
     /// is emitted as `" (title)"` after the abbreviation text, mirroring
     /// Tier-2's `semantic/attributes.rs::handle_abbr` (line 104-111).
     pub abbr_titles: Vec<Option<String>>,
-    /// Stack of `(href, title, has_nested_tag)` triples for currently-open `<a>`
+    /// Stack of `(href, title, has_nested_tag, has_aria_label)` entries for currently-open `<a>`
     /// elements.
     ///
     /// HTML5 forbids nested `<a>`, but the stack handles malformed input safely.
@@ -297,6 +295,14 @@ pub struct Tier1State {
     /// as `next_tag_is_list`).
     pub last_emitted_was_img: bool,
 
+    /// The source offset where the last opening tag or the last `<br>` of a heading ends, and
+    /// what a text that starts at that offset has before it. A text that starts at any other
+    /// offset has a comment, a closing tag or another void tag before it, and the fast converter
+    /// does not know its place. No tag clears this: the offset of a later text never equals an
+    /// earlier one. The full converter reads the same fact from the tree
+    /// (`siblings::text_place`).
+    pub text_place: Option<(usize, crate::converter::utility::white_space::TextPlace)>,
+
     /// True right after the closing tag of a block element or a `<hr>` (block-level by Tier-2's
     /// test), until the next opening or void tag, the next closing tag that is not inline, or the
     /// next text flush with content (read-then-clear, same convention as
@@ -304,6 +310,8 @@ pub struct Tier1State {
     /// after a block, or after an inline element ending in one, starts a new paragraph (issues
     /// #570, #571, #585).
     pub last_closed_block: bool,
+    /// ~keep A list before indented code needs an explicit CommonMark container boundary (issue #801).
+    pub last_closed_list: bool,
     /// The length of the output right after a text node's trailing source newline was written
     /// as a `'\n'` join. Cleared by an opening tag other than `<br>`, `<script>` or `<style>`,
     /// and by the closing tag of a block or of a form element that Tier-2 writes on a line of its
@@ -336,7 +344,8 @@ pub struct Tier1State {
     pub list_items_after_text: Vec<bool>,
 
     /// `true` until the first text node carrying real (non-whitespace)
-    /// content has been processed anywhere in the document, then
+    /// content has been processed anywhere in the document, or an image or
+    /// a graphic has written content (`end_document_start_if_written`), then
     /// permanently `false`.
     ///
     /// Mirrors Tier-2's `Context::at_fresh_block_start` (an
@@ -384,7 +393,9 @@ impl Tier1State {
             summary_buf_stack: Vec::new(),
             last_closed_custom_element: false,
             last_emitted_was_img: false,
+            text_place: None,
             last_closed_block: false,
+            last_closed_list: false,
             pending_newline_join: None,
             last_ordered_list_end: None,
             list_item_marker_widths: Vec::new(),
@@ -451,6 +462,22 @@ impl Tier1State {
             }
         }
         &mut self.output
+    }
+
+    /// Ends the start of the document when an element wrote content of its own (an image, a
+    /// graphic) from `written_from` on in the buffer that inline text lands in. Mirrors the
+    /// check that Tier-2's `convert_node` does for every node (issue #762).
+    pub fn end_document_start_if_written(&mut self, written_from: usize) {
+        if !self.at_document_start {
+            return;
+        }
+        let wrote_content = self
+            .cell_or_output_mut()
+            .get(written_from..)
+            .is_some_and(|written| !written.trim().is_empty());
+        if wrote_content {
+            self.at_document_start = false;
+        }
     }
 
     /// True when the scanner is currently accumulating `<summary>` or

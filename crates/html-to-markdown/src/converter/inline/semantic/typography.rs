@@ -83,6 +83,10 @@ enum ScriptKind {
 }
 
 fn handle_script(handler: HandlerContext<'_>, kind: ScriptKind) {
+    if handler.context.in_code {
+        handle_small(handler);
+        return;
+    }
     let Some(tl::Node::Tag(tag)) = handler.node_handle.get(handler.parser) else {
         return;
     };
@@ -98,11 +102,6 @@ fn handle_script(handler: HandlerContext<'_>, kind: ScriptKind) {
     let marker_context = handler.context.inline_buffer(handler.output, !open.is_empty());
     let mut content = String::with_capacity(32);
     collect_children(tag, &mut content, &marker_context, &handler);
-
-    if handler.context.in_code {
-        handler.output.push_str(&content);
-        return;
-    }
 
     #[cfg(feature = "visitor")]
     if let Some(custom_output) = visit_script(tag, kind, &handler) {
@@ -203,7 +202,16 @@ fn handle_italic_semantic(mut handler: HandlerContext<'_>) {
         return;
     }
 
-    let marker_context = handler.context.inline_buffer(handler.output, true);
+    let after_hard_break = if handler.output.is_empty() {
+        handler.context.inline_buffer_after_hard_break
+    } else {
+        crate::converter::utility::escaping::ends_with_hard_break(handler.output)
+    };
+    let marker_context = Context {
+        in_marker_span: true,
+        inline_buffer_after_hard_break: after_hard_break,
+        ..handler.context.clone()
+    };
     let mut content = String::with_capacity(32);
     collect_children(tag, &mut content, &marker_context, &handler);
     let marker = handler.options.strong_em_symbol.to_string();
@@ -267,10 +275,12 @@ pub fn handle_abbreviation(handler: HandlerContext<'_>) {
         return;
     }
 
-    output.push_str(prefix);
+    crate::converter::utility::content::push_inline_prefix(output, prefix, options, ctx);
     output.push_str(trimmed);
 
-    if let Some(title) = crate::converter::utility::attributes::decoded_attribute(tag, "title") {
+    if options.expand_abbreviations
+        && let Some(title) = crate::converter::utility::attributes::decoded_attribute(tag, "title")
+    {
         let trimmed_title = title.trim();
         if !trimmed_title.is_empty() {
             output.push_str(" (");

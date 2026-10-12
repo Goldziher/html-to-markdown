@@ -109,6 +109,9 @@ pub enum NodeData {
 pub struct Node {
     /// Parent node.
     pub parent: Cell<Option<WeakHandle>>,
+    /// The `<template>` element whose contents this node is. The contents are not a child of
+    /// the template and have no parent; only the depth count of the repair reads this link.
+    template_host: Cell<Option<WeakHandle>>,
     /// Child nodes of this node.
     pub children: RefCell<Vec<Handle>>,
     /// Represents this node's data.
@@ -121,6 +124,7 @@ impl Node {
         Rc::new(Node {
             data,
             parent: Cell::new(None),
+            template_host: Cell::new(None),
             children: RefCell::new(Vec::new()),
         })
     }
@@ -164,6 +168,18 @@ fn append(new_parent: &Handle, child: Handle) {
     let previous_parent = child.parent.replace(Some(Rc::downgrade(new_parent)));
     assert!(previous_parent.is_none());
     new_parent.children.borrow_mut().push(child);
+}
+
+/// The node one level above `node` for the depth count of the repair: its parent, or the
+/// template when `node` is the contents of one.
+fn depth_ancestor(node: &Handle) -> Option<Handle> {
+    let read = |link: &Cell<Option<WeakHandle>>| {
+        let weak = link.take();
+        let handle = weak.as_ref().and_then(Weak::upgrade);
+        link.set(weak);
+        handle
+    };
+    read(&node.parent).or_else(|| read(&node.template_host))
 }
 
 /// If the node has a parent, get it and this node's position in its children
@@ -214,6 +230,72 @@ pub struct RcDom {
 
     /// The document's quirks mode.
     pub quirks_mode: Cell<QuirksMode>,
+    node_count: Cell<usize>,
+    max_nodes: usize,
+    max_depth: usize,
+    pub(crate) repair_limit: Cell<Option<crate::types::WarningKind>>,
+}
+
+impl RcDom {
+    pub(crate) fn bounded(max_nodes: usize, max_depth: usize) -> Self {
+        Self {
+            max_nodes,
+            max_depth,
+            ..Self::default()
+        }
+    }
+
+    fn new_node(&self, data: NodeData) -> Handle {
+        self.node_count.set(self.node_count.get().saturating_add(1));
+        if self.node_count.get() > self.max_nodes {
+            self.repair_limit.set(Some(crate::types::WarningKind::TruncatedInput));
+        }
+        Node::new(data)
+    }
+
+    fn subtree_fits_depth(&self, parent: &Handle, children: &[Handle]) -> bool {
+        if self.max_depth == usize::MAX || children.is_empty() {
+            return true;
+        }
+        let mut depth = 0;
+        let mut current = Rc::clone(parent);
+        while let Some(ancestor) = depth_ancestor(&current) {
+            depth += 1;
+            if depth > self.max_depth {
+                self.repair_limit
+                    .set(Some(crate::types::WarningKind::DepthLimitExceeded));
+                return false;
+            }
+            current = ancestor;
+        }
+        let mut work: Vec<_> = children.iter().map(|child| (Rc::clone(child), depth + 1)).collect();
+        while let Some((node, depth)) = work.pop() {
+            if depth > self.max_depth {
+                self.repair_limit
+                    .set(Some(crate::types::WarningKind::DepthLimitExceeded));
+                return false;
+            }
+            work.extend(node.children.borrow().iter().map(|child| (Rc::clone(child), depth + 1)));
+        }
+        true
+    }
+
+    fn observe_depth(&self, parent: &Handle) {
+        // ~keep Adoption-agency reparenting changes descendant depths; reading actual parents
+        // ~keep avoids stale cached depths. The walk stops at the fixed repair ceiling (#808).
+        if self.max_depth == usize::MAX {
+            return;
+        }
+        let mut current = Rc::clone(parent);
+        for _ in 0..self.max_depth {
+            let Some(ancestor) = depth_ancestor(&current) else {
+                return;
+            };
+            current = ancestor;
+        }
+        self.repair_limit
+            .set(Some(crate::types::WarningKind::DepthLimitExceeded));
+    }
 }
 
 impl TreeSink for RcDom {
@@ -268,27 +350,38 @@ impl TreeSink for RcDom {
     }
 
     fn create_element(&self, name: QualName, attrs: Vec<Attribute>, flags: ElementFlags) -> Handle {
-        Node::new(NodeData::Element {
+        let contents = flags.template.then(|| self.new_node(NodeData::Document));
+        let element = self.new_node(NodeData::Element {
             name,
             attrs: RefCell::new(attrs),
-            template_contents: RefCell::new(if flags.template {
-                Some(Node::new(NodeData::Document))
-            } else {
-                None
-            }),
+            template_contents: RefCell::new(contents.clone()),
             mathml_annotation_xml_integration_point: flags.mathml_annotation_xml_integration_point,
-        })
+        });
+        // ~keep The contents of a template are not its children, so the depth limit would
+        // ~keep count each template from zero. The contents name the template as their host,
+        // ~keep and the count goes on through nested templates (issue #808). The contents keep
+        // ~keep no parent: a node in them is not in the document (the `<base>` lookup reads that).
+        if let Some(contents) = contents {
+            contents.template_host.set(Some(Rc::downgrade(&element)));
+        }
+        element
     }
 
     fn create_comment(&self, text: StrTendril) -> Handle {
-        Node::new(NodeData::Comment { contents: text })
+        self.new_node(NodeData::Comment { contents: text })
     }
 
     fn create_pi(&self, target: StrTendril, data: StrTendril) -> Handle {
-        Node::new(NodeData::ProcessingInstruction { target, contents: data })
+        self.new_node(NodeData::ProcessingInstruction { target, contents: data })
     }
 
     fn append(&self, parent: &Handle, child: NodeOrText<Handle>) {
+        self.observe_depth(parent);
+        if let NodeOrText::AppendNode(node) = &child {
+            if !node.children.borrow().is_empty() && !self.subtree_fits_depth(parent, std::slice::from_ref(node)) {
+                return;
+            }
+        }
         if let NodeOrText::AppendText(text) = &child {
             if let Some(h) = parent.children.borrow().last() {
                 if append_to_existing_text(h, text) {
@@ -300,7 +393,7 @@ impl TreeSink for RcDom {
         append(
             parent,
             match child {
-                NodeOrText::AppendText(text) => Node::new(NodeData::Text {
+                NodeOrText::AppendText(text) => self.new_node(NodeData::Text {
                     contents: RefCell::new(text),
                 }),
                 NodeOrText::AppendNode(node) => node,
@@ -311,8 +404,14 @@ impl TreeSink for RcDom {
     fn append_before_sibling(&self, sibling: &Handle, child: NodeOrText<Handle>) {
         let (parent, i) = get_parent_and_index(sibling).expect("append_before_sibling called on node without parent");
 
+        self.observe_depth(&parent);
+        if let NodeOrText::AppendNode(node) = &child {
+            if !node.children.borrow().is_empty() && !self.subtree_fits_depth(&parent, std::slice::from_ref(node)) {
+                return;
+            }
+        }
         let child = match (child, i) {
-            (NodeOrText::AppendText(text), 0) => Node::new(NodeData::Text {
+            (NodeOrText::AppendText(text), 0) => self.new_node(NodeData::Text {
                 contents: RefCell::new(text),
             }),
 
@@ -322,7 +421,7 @@ impl TreeSink for RcDom {
                 if append_to_existing_text(prev, &text) {
                     return;
                 }
-                Node::new(NodeData::Text {
+                self.new_node(NodeData::Text {
                     contents: RefCell::new(text),
                 })
             }
@@ -356,7 +455,7 @@ impl TreeSink for RcDom {
     fn append_doctype_to_document(&self, name: StrTendril, public_id: StrTendril, system_id: StrTendril) {
         append(
             &self.document,
-            Node::new(NodeData::Doctype {
+            self.new_node(NodeData::Doctype {
                 name,
                 public_id,
                 system_id,
@@ -380,6 +479,11 @@ impl TreeSink for RcDom {
     }
 
     fn reparent_children(&self, node: &Handle, new_parent: &Handle) {
+        self.observe_depth(new_parent);
+        // ~keep Moving a subtree can exceed the limit even when its new parent's own depth is safe.
+        if !self.subtree_fits_depth(new_parent, &node.children.borrow()) {
+            return;
+        }
         let mut children = node.children.borrow_mut();
         let mut new_children = new_parent.children.borrow_mut();
         for child in children.iter() {
@@ -414,6 +518,10 @@ impl Default for RcDom {
             document: Node::new(NodeData::Document),
             errors: Default::default(),
             quirks_mode: Cell::new(tree_builder::NoQuirks),
+            node_count: Cell::new(1),
+            max_nodes: usize::MAX,
+            max_depth: usize::MAX,
+            repair_limit: Cell::new(None),
         }
     }
 }
@@ -423,11 +531,19 @@ enum SerializeOp {
     Close(QualName),
 }
 
-pub struct SerializableHandle(Handle);
+pub struct SerializableHandle(Handle, bool);
 
 impl From<Handle> for SerializableHandle {
     fn from(h: Handle) -> SerializableHandle {
-        SerializableHandle(h)
+        SerializableHandle(h, false)
+    }
+}
+
+impl SerializableHandle {
+    /// A handle that writes the contents of each `<template>` between its two tags, as the
+    /// HTML serialization does. [`From`] gives a handle that writes an empty `<template>`.
+    pub const fn with_template_contents(h: Handle) -> SerializableHandle {
+        SerializableHandle(h, true)
     }
 }
 
@@ -446,15 +562,21 @@ impl Serialize for SerializableHandle {
             match op {
                 SerializeOp::Open(handle) => match handle.data {
                     NodeData::Element {
-                        ref name, ref attrs, ..
+                        ref name,
+                        ref attrs,
+                        ref template_contents,
+                        ..
                     } => {
                         serializer
                             .start_elem(name.clone(), attrs.borrow().iter().map(|at| (&at.name, &at.value[..])))?;
 
-                        ops.reserve(1 + handle.children.borrow().len());
+                        // ~keep The contents of a template are not its children.
+                        let contents = template_contents.borrow().clone().filter(|_| self.1);
+                        let parent = contents.as_ref().unwrap_or(&handle);
+                        ops.reserve(1 + parent.children.borrow().len());
                         ops.push_front(SerializeOp::Close(name.clone()));
 
-                        for child in handle.children.borrow().iter().rev() {
+                        for child in parent.children.borrow().iter().rev() {
                             ops.push_front(SerializeOp::Open(child.clone()));
                         }
                     }
@@ -480,5 +602,41 @@ impl Serialize for SerializableHandle {
         }
 
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod bounded_reparent_tests {
+    use super::*;
+    use html5ever::{local_name, ns};
+
+    #[test]
+    fn bounded_repair_should_detect_descendant_depth_when_reparenting() {
+        let dom = RcDom::bounded(100, 4);
+        let element = || {
+            dom.create_element(
+                QualName::new(None, ns!(html), local_name!(div)),
+                Vec::new(),
+                ElementFlags::default(),
+            )
+        };
+        let mut branch = dom.document.clone();
+        let mut first = None;
+        for _ in 0..4 {
+            let child = element();
+            dom.append(&branch, NodeOrText::AppendNode(child.clone()));
+            first.get_or_insert_with(|| child.clone());
+            branch = child;
+        }
+        let destination = element();
+        dom.append(&dom.document, NodeOrText::AppendNode(destination.clone()));
+        let nested_destination = element();
+        dom.append(&destination, NodeOrText::AppendNode(nested_destination.clone()));
+        assert_eq!(dom.repair_limit.get(), None);
+        dom.reparent_children(&first.expect("source branch"), &nested_destination);
+        assert_eq!(
+            dom.repair_limit.get(),
+            Some(crate::types::WarningKind::DepthLimitExceeded)
+        );
     }
 }

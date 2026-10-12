@@ -304,11 +304,9 @@ fn should_drop_a_trailing_br_in_sectioning_and_disclosure_containers() {
 
 #[test]
 fn should_drop_a_br_at_the_end_of_a_definition_term() {
-    // ~keep The two-space style already renders this as "A\nB\n"; the backslash style
-    // ~keep leaked "A\\\nB\n". The dt/dd boundary is a block boundary.
     assert_eq!(
         convert("<dl><dt>A<br></dt><dd>B</dd></dl>", backslash_options()),
-        "A\nB\n"
+        "A\n\nB\n"
     );
 }
 
