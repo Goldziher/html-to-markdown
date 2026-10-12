@@ -595,6 +595,35 @@ mod line_state_cost_tests {
         }
     }
 
+    #[test]
+    fn marker_looking_text_tails_should_not_count_an_unused_output_column() {
+        for text in ["x. ", "x) ", "x- ", "x* ", "x+ "] {
+            for output_format in [OutputFormat::Markdown, OutputFormat::Plain, OutputFormat::Djot] {
+                for n in [100, 400] {
+                    INLINE_BUFFER_COLUMN_CHAR_READS.with(|reads| reads.set(0));
+                    let html = format!("<div>{}</div>", format!("<mark>{text}</mark>").repeat(n));
+                    let options = ConversionOptions {
+                        output_format,
+                        highlight_style: HighlightStyle::None,
+                        tier_strategy: TierStrategy::Tier2,
+                        extract_metadata: false,
+                        ..Default::default()
+                    };
+                    let content = convert(&html, options)
+                        .expect("convert marker-looking tails")
+                        .content
+                        .expect("content");
+                    assert_eq!(content, format!("{}\n", text.repeat(n).trim_end()));
+                    assert_eq!(
+                        INLINE_BUFFER_COLUMN_CHAR_READS.with(std::cell::Cell::get),
+                        0,
+                        "{text:?}, {output_format:?}, {n}"
+                    );
+                }
+            }
+        }
+    }
+
     fn column_reads(tag: &str, highlight_style: HighlightStyle, n: usize) -> usize {
         INLINE_BUFFER_COLUMN_CHAR_READS.with(|reads| reads.set(0));
         let html = format!("<div>{}</div>", format!("<{tag}>x</{tag}>").repeat(n));

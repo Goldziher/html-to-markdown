@@ -504,11 +504,7 @@ impl Context {
         if self.in_marker_span
             || opens_with_marker
             || output.chars().next_back().is_some_and(|last| !last.is_whitespace())
-            || output
-                .trim_end_matches([' ', '\t'])
-                .chars()
-                .next_back()
-                .is_some_and(|last| !last.is_whitespace() && !matches!(last, '-' | '*' | '+' | '.' | ')'))
+            || line_cannot_end_in_bare_marker(output)
         {
             return Self {
                 in_marker_span: true,
@@ -686,6 +682,24 @@ impl Context {
     }
 }
 
+// ~keep This is only a necessary suffix check: an adjacent non-whitespace character rules
+// ~keep out a bullet token, and a non-digit rules out an ordered token. Ambiguous tails still
+// ~keep use the whole-line classifier, including stacked bare markers and Unicode blanks (#862).
+fn line_cannot_end_in_bare_marker(output: &str) -> bool {
+    let mut tail = output.trim_end_matches([' ', '\t']).chars().rev();
+    let Some(last) = tail.next() else {
+        return false;
+    };
+    if last.is_whitespace() {
+        return false;
+    }
+    match last {
+        '-' | '*' | '+' => tail.next().is_some_and(|previous| !previous.is_whitespace()),
+        '.' | ')' => !tail.next().is_some_and(|previous| previous.is_ascii_digit()),
+        _ => true,
+    }
+}
+
 #[cfg(test)]
 mod inline_buffer_tests {
     use super::{Context, ContextParameters};
@@ -711,7 +725,23 @@ mod inline_buffer_tests {
     fn should_preserve_live_columns_and_marker_state_after_output_mutations() {
         let ctx = context();
         let mut output = String::new();
-        for prefix in ["", "\t", "- ", "* ", "1. ", "1. - ", "text ", "text* ", "text. "] {
+        for prefix in [
+            "",
+            "\t",
+            "- ",
+            "* ",
+            "1. ",
+            "1. - ",
+            "text ",
+            "text* ",
+            "text. ",
+            "x- ",
+            "x+ ",
+            "x) ",
+            "1) ",
+            "- + ",
+            "\u{2000}* ",
+        ] {
             for suffix in ["", "x", ".", "雪", "\u{a0}", "\u{2000}", "\u{2028}", "\r", "\n"] {
                 output.clear();
                 output.push_str(prefix);
