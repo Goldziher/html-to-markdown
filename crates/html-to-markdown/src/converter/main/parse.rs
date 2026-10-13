@@ -269,13 +269,16 @@ pub(super) fn finish_dom_parse(
     dom_ctx: &mut DomContext,
     inert_bodies: &std::collections::HashMap<String, String>,
     input_len: usize,
-) -> Result<()> {
-    if !inert_bodies.is_empty() {
-        crate::converter::utility::preprocessing::restore_inert_bodies(dom, inert_bodies)?;
+) -> Result<std::collections::HashSet<usize>> {
+    let literal_body_ids = if inert_bodies.is_empty() {
+        std::collections::HashSet::new()
+    } else {
+        let ids = crate::converter::utility::preprocessing::restore_inert_bodies(dom, inert_bodies)?;
         *dom_ctx = build_dom_context(dom, dom.parser(), input_len);
-    }
+        ids
+    };
     trace_parse_complete(dom, input_len);
-    Ok(())
+    Ok(literal_body_ids)
 }
 
 #[cfg(test)]

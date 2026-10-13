@@ -232,7 +232,7 @@ pub fn strip_script_and_style_tags(input: &str) -> Cow<'_, str> {
 /// ~keep DoS guard: hostile input can contain an unterminated element followed
 /// ~keep by hundreds of megabytes of text; the scan gives up rather than walking
 /// ~keep the whole document for every such tag.
-const MAX_CLOSING_TAG_SCAN: usize = 100_000_000;
+pub(super) const MAX_CLOSING_TAG_SCAN: usize = 100_000_000;
 
 /// If `idx` starts a `</tag>` (or `</tag ...>`, `</tag/>`) closing tag matching `tag` (case-insensitively),
 /// return the index just past its `>`. Returns `None` when `idx` does not start such a tag.
