@@ -180,6 +180,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   still require suffix scanning. Empty unmarked `mark` elements no longer scan a growing blank
   prefix for a column their absent children cannot use; nonempty wrappers retain live columns.
   Topology changes and live marker columns retain their existing limits and behavior.
+  Repair detection reads the parser tree directly, building topology maps only for the selected
+  conversion tree; mandatory HTML5 repair, text guards and parser limits remain in effect.
 
 - Self-closing raw-text and inert elements encountered in an HTML head contain their following text.
   Head titles remain metadata; preserved `xmp` retains one container around its literal body
