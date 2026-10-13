@@ -121,44 +121,6 @@ fn find_svg_handle(dom: &tl::VDom<'_>) -> Option<tl::NodeHandle> {
     })
 }
 
-/// Skip the body of a raw-text element (script/style/textarea/iframe/…).
-///
-/// `open_end` is the byte index immediately after the tag's `>`.  `tag_name`
-/// is the lowercased open-tag name.  Returns the byte index after the
-/// matching `</tag>` close, or `None` if no matching close tag exists in the
-/// remainder of the input.
-///
-/// Mirrors the prescan's STRIP_CONTENT_TAGS handling: content is discarded,
-/// only the position advances.  Matches Tier-2's behaviour byte-for-byte
-/// because Tier-2 sees this content already stripped by the prescan.
-fn find_raw_text_close(bytes: &[u8], open_end: usize, tag_name: &[u8]) -> Option<usize> {
-    let len = bytes.len();
-    let mut idx = open_end;
-    while idx < len {
-        match memchr3(b'<', b'<', b'<', &bytes[idx..]) {
-            Some(off) => idx += off,
-            None => return None,
-        }
-        if idx + 2 < len && bytes[idx + 1] == b'/' {
-            let after_slash = idx + 2;
-            if after_slash + tag_name.len() <= len
-                && bytes[after_slash..after_slash + tag_name.len()].eq_ignore_ascii_case(tag_name)
-            {
-                let post_name = after_slash + tag_name.len();
-                if matches!(bytes.get(post_name), Some(b'>' | b'/' | b' ' | b'\t' | b'\n' | b'\r')) {
-                    return find_tag_end(bytes, post_name);
-                }
-            }
-        }
-        idx += 1;
-    }
-    None
-}
-
-fn find_tag_end(bytes: &[u8], start: usize) -> Option<usize> {
-    memchr::memchr(b'>', &bytes[start..]).map(|offset| start + offset + 1)
-}
-
 #[inline]
 const fn bail_unsupported(spec: &TagSpec, _offset: usize) -> Result<(), BailReason> {
     match spec.kind {
@@ -167,7 +129,7 @@ const fn bail_unsupported(spec: &TagSpec, _offset: usize) -> Result<(), BailReas
         // is only `<script>`/`<style>`.  The seven genuine `TagKind::RawText` kinds
         // (title / xmp / textarea / iframe / noscript / noembed / noframes) fall
         // through to here, and this is the bail that keeps Tier-1 from emitting their
-        // text content incorrectly.  See the sibling note above `find_raw_text_close`.
+        // text content incorrectly.
         TagKind::RawText(_) => Err(BailReason::Classifier),
 
         // ~keep Tier-2 writes the link of an `<audio>` or `<video>` (the address, the `title`,

@@ -82,15 +82,13 @@ fn should_preserve_authored_spaces_and_tabs_beside_removed_scripts() {
         for (left, right) in [(" ", ""), ("", " "), (" ", " "), ("\t", "")] {
             let html = format!("<p>foo{left}{script}{right}bar</p>");
             for output_format in FORMATS {
-                // ~keep These inherited route differences belong to whitespace policy, outside issue #827.
-                let expected =
-                    if script == SCRIPTS[1] && left == " " && right == " " && output_format == OutputFormat::Plain {
-                        ["foo  bar\n", "foo bar\n", "foo  bar\n"]
-                    } else if script == SCRIPTS[0] && left == "\t" && output_format != OutputFormat::Plain {
-                        ["foo\tbar\n", "foo bar\n", "foo\tbar\n"]
-                    } else {
-                        ["foo bar\n"; 3]
-                    };
+                // ~keep This inherited route difference belongs to whitespace policy, outside issue #827.
+                // ~keep In plain output the white space on the two sides of a kept script is one space.
+                let expected = if script == SCRIPTS[0] && left == "\t" && output_format != OutputFormat::Plain {
+                    ["foo\tbar\n", "foo bar\n", "foo\tbar\n"]
+                } else {
+                    ["foo bar\n"; 3]
+                };
                 assert_route_outputs(&html, output_format, expected);
             }
         }

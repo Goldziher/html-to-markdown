@@ -1,5 +1,7 @@
 use std::borrow::Cow;
 
+use super::markup::second_pass;
+use super::raw_text::{FirstPass, PassRead};
 use super::{
     find_closing_tag_bytes, find_closing_tag_bytes_nested, find_tag_end, normalize_bogus_comment_endings,
     normalize_menu_elements, normalize_split_closing_tags, normalize_unclosed_list_items,
@@ -575,6 +577,202 @@ fn find_closing_tag_bytes_stays_first_match_for_raw_text_elements() {
     assert_eq!(&html[end..], b"tail");
 }
 
+/// The reads of a pass over one page that a test counts.
+#[derive(Default)]
+struct Reads {
+    /// The `<` characters that the first pass read.
+    markup: usize,
+    /// The searches for an end tag and for the end of a comment: each can read to the end of
+    /// the page.
+    searches: usize,
+    /// The bytes that the reads of a tag went over.
+    tag_bytes: usize,
+    /// The places where the reads of a tag stopped to look at a byte.
+    tag_stops: usize,
+}
+
+impl Reads {
+    fn count(&mut self, read: PassRead) {
+        match read {
+            PassRead::Markup => self.markup += 1,
+            PassRead::EndTagSearch | PassRead::CommentEndSearch => self.searches += 1,
+            PassRead::TagRead(bytes) => self.tag_bytes += bytes,
+            PassRead::TagStops(stops) => self.tag_stops += stops,
+        }
+    }
+}
+
+fn first_pass_reads(input: &str) -> Reads {
+    let mut reads = Reads::default();
+    let (stripped, _) = FirstPass::new(input, |read| reads.count(read)).run();
+    assert_eq!(stripped.as_ref(), input, "nothing in the page has an end");
+    reads
+}
+
+fn second_pass_reads(input: &str) -> Reads {
+    let mut reads = Reads::default();
+    drop(second_pass(input, |read| reads.count(read)));
+    reads
+}
+
+#[test]
+fn the_first_pass_searches_once_for_an_end_that_the_page_does_not_have() {
+    const STARTS: usize = 2_000;
+    // ~keep The `>` in the comment unit keeps the comments before the last `>` of the page.
+    for unit in ["<textarea>x ", "<script>x ", "<style>x ", "<!-- x> "] {
+        let html = format!("<p>start</p>{}", unit.repeat(STARTS));
+        let reads = first_pass_reads(&html);
+        assert_eq!(reads.searches, 1, "{unit:?}: one search, not one for each start");
+        assert!(reads.markup <= STARTS + 2, "{unit:?}: {} reads", reads.markup);
+    }
+    let mixed = format!("<p>start</p>{}", "<textarea>x <script>x <style>x ".repeat(STARTS));
+    assert_eq!(first_pass_reads(&mixed).searches, 3, "one search for each name");
+}
+
+#[test]
+fn the_first_pass_reads_nothing_after_the_last_tag_end_of_the_page() {
+    for unit in ["<textarea x ", "<script x ", "<a x ", "<svg x ", "</svg x "] {
+        let html = format!("<p>start</p>{}", unit.repeat(2_000));
+        let reads = first_pass_reads(&html);
+        assert_eq!((reads.markup, reads.searches), (2, 0), "{unit:?}");
+    }
+}
+
+#[test]
+fn the_second_pass_searches_once_for_an_end_that_the_page_does_not_have() {
+    const STARTS: usize = 2_000;
+    for unit in ["<script>x ", "<style>x ", "<!-- x> "] {
+        let html = format!("<p>start</p>{}", unit.repeat(STARTS));
+        let reads = second_pass_reads(&html);
+        assert_eq!(reads.searches, 1, "{unit:?}: one search, not one for each start");
+    }
+    let mixed = format!("<p>start</p>{}", "<script>x <style>x ".repeat(STARTS));
+    assert_eq!(second_pass_reads(&mixed).searches, 2, "one search for each name");
+}
+
+/// Start tags with a `>` in each attribute value: the read of the first one goes to the end
+/// of the page, because the quote after its last `>` has no partner.
+const TAGS_THAT_NEVER_END: [&str; 5] = [
+    "<a x='>'",
+    "<BR x='>'",
+    "<textarea x='>'",
+    "<script x='>'",
+    "<style x='>'",
+];
+
+#[test]
+fn a_pass_reads_a_tag_that_never_ends_once() {
+    for unit in TAGS_THAT_NEVER_END {
+        let html = format!("<p>start</p>{}", unit.repeat(2_000));
+        for (pass, reads) in [("first", first_pass_reads(&html)), ("second", second_pass_reads(&html))] {
+            assert!(
+                reads.tag_bytes <= 2 * html.len(),
+                "{unit:?}, {pass} pass: the tag reads went over {} bytes of a page of {}",
+                reads.tag_bytes,
+                html.len()
+            );
+            assert!(
+                reads.searches <= 1,
+                "{unit:?}, {pass} pass: {} searches",
+                reads.searches
+            );
+        }
+    }
+}
+
+#[test]
+fn an_end_tag_with_no_bracket_ends_no_raw_text_element() {
+    let page = format!("<script>{}", "</script x ".repeat(3));
+    assert_eq!(
+        find_closing_tag_bytes(page.as_bytes(), "<script>".len(), b"script"),
+        None
+    );
+    let page = format!("<script></scriptx>{}>tail", "</script x ".repeat(3));
+    let end = find_closing_tag_bytes(page.as_bytes(), "<script>".len(), b"script").expect("an end tag");
+    assert_eq!(&page[end..], "tail");
+}
+
+/// The read of a tag ends at the `>` that is in no attribute value. A quote opens a value
+/// only after `=` and white space; a value with no quotes ends at white space.
+#[test]
+fn a_tag_is_read_to_the_bracket_that_is_in_no_value() {
+    for tag in [
+        "<a x='>' y>",
+        "<a x=\">\" y>",
+        "<a x=\"a'b>\" y>",
+        "<a x = '>' y>",
+        "<a x=\t\n\x0C\r '>' y>",
+        "<a x=it's y='>'>",
+        "<a href=/s?q='tis y='>'>",
+        "<a x=y= z='>'>",
+        "<a x== y='>'>",
+        "<a 'x' y='>'>",
+        "<a x' y='>'>",
+    ] {
+        let html = format!("{tag}z</a>");
+        let whole = tag.len() - "<".len() + "/a>".len();
+        for (pass, reads) in [("first", first_pass_reads(&html)), ("second", second_pass_reads(&html))] {
+            assert_eq!(reads.tag_bytes, whole, "{tag:?}, {pass} pass");
+        }
+    }
+}
+
+/// The read of a tag looks at the bytes that can change it and jumps over the others: it
+/// stops at each `=` and at the `>`, not at each byte. The count is of the stops, so a read
+/// that goes byte by byte over the same tag fails here.
+#[test]
+fn the_read_of_a_tag_stops_at_an_equals_sign_and_at_the_bracket_only() {
+    let html = format!("<a {}x=1 {}>z</a>", "b ".repeat(500), "c ".repeat(500));
+    for (pass, reads) in [("first", first_pass_reads(&html)), ("second", second_pass_reads(&html))] {
+        assert!(reads.tag_bytes > 2_000, "{pass} pass: the read went over the tag");
+        assert_eq!(
+            reads.tag_stops, 3,
+            "{pass} pass: the `=`, the `>` of the tag, the `>` of `</a>`"
+        );
+    }
+}
+
+/// A kept script is written with each `<` as `&lt;` and with nothing else changed, so the pass
+/// changes nothing in a page that it wrote: a repaired page is read as the page of the author.
+#[test]
+fn the_first_pass_changes_nothing_in_a_kept_script_that_it_wrote() {
+    use super::strip_script_and_style_tags;
+    let open = r#"<script type="application/ld+json">"#;
+    for body in [
+        r#"{"a":"a & b &amp; c < d &lt; e"}"#,
+        r#"{"a":"<p>x</p>"}"#,
+        "{} <script type=\"application/ld+json\">{} <script type=\"application/ld+json\">{} ",
+    ] {
+        let once = strip_script_and_style_tags(&format!("<p>a</p>{open}{body}</script><p>b</p>")).into_owned();
+        assert_eq!(
+            once,
+            format!("<p>a</p>{open}{}</script><p>b</p>", body.replace('<', "&lt;")),
+            "{body:?}"
+        );
+        assert_eq!(strip_script_and_style_tags(&once), once, "{body:?}: the second read");
+    }
+}
+
+/// The one rule of the `type` of a script: the media type before the first `;`, in any case.
+/// A longer media type that starts with the name keeps the script and is not structured data.
+#[test]
+fn the_type_of_a_script_is_read_by_one_rule() {
+    use super::markup::{ScriptType, script_type};
+    for (value, expected) in [
+        ("application/ld+json", ScriptType::StructuredData),
+        (" Application/LD+JSON ; charset=utf-8", ScriptType::StructuredData),
+        ("application/ld+json;", ScriptType::StructuredData),
+        ("application/ld+jsonx", ScriptType::KeptNotRead),
+        ("application/ld+json5", ScriptType::KeptNotRead),
+        ("application/ld+json, text/plain", ScriptType::KeptNotRead),
+        ("x-application/ld+json", ScriptType::Removed),
+        ("application/json", ScriptType::Removed),
+        ("", ScriptType::Removed),
+    ] {
+        assert_eq!(script_type(value), expected, "{value:?}");
+    }
+}
+
 #[test]
 fn should_remove_the_end_tag_of_a_removed_start_tag_that_closes_itself() {
     // ~keep The inert-body pass and the tree builder read `<template/>` as a start tag: the
@@ -756,97 +954,4 @@ fn should_remove_html_cdata_after_foreign_text_with_a_literal_less_than() {
 #[test]
 fn should_end_an_html_cdata_bogus_comment_at_the_first_greater_than() {
     assert_eq!(super::strip_html_cdata("<![CDATA[hidden>visible"), "visible");
-}
-
-/// Where the start tags that carry the attribute `x` start in `page`.
-fn starts_marked_x(page: &str) -> Vec<usize> {
-    page.match_indices('<')
-        .map(|(start, _)| start)
-        .filter(|&start| {
-            ["<template x", "<noscript x"]
-                .iter()
-                .any(|tag| page[start..].starts_with(tag))
-        })
-        .collect()
-}
-
-#[test]
-fn should_remove_whole_a_kept_element_that_the_caller_excludes() {
-    let (reachable, all) = (HiddenContent::Reachable, HiddenContent::All);
-    for (page, choice, expected) in [
-        ("<p>a</p><template x><p>b</p></template>c", all, "<p>a</p>c"),
-        ("<p>a</p><noscript x><p>b</p></noscript>c", all, "<p>a</p>c"),
-        // ~keep The end tag of an element in the excluded one closes that element only.
-        (
-            "<p>a</p><template x>b<template>c</template>d</template>e",
-            all,
-            "<p>a</p>e",
-        ),
-        (
-            "<p>a</p><noscript x>b<template>c</template>d</noscript>e",
-            all,
-            "<p>a</p>e",
-        ),
-        // ~keep An excluded element in a kept one, and a kept one after an excluded one.
-        (
-            "<p>a</p><template>b<noscript x>c</noscript>d</template>e",
-            all,
-            "<p>a</p>bde",
-        ),
-        (
-            "<p>a</p><template x>b</template><template>c</template>d",
-            all,
-            "<p>a</p>cd",
-        ),
-        // ~keep An omitted end tag in the excluded element, and a start tag written as self-closing.
-        ("<p>a</p><template x><ul><li>b<li>c</ul></template>d", all, "<p>a</p>d"),
-        ("<p>a</p><template x/>b</template>c", all, "<p>a</p>c"),
-        // ~keep With no end tag the excluded element holds the rest of the page.
-        ("<p>a</p><noscript x>b<p>c", all, "<p>a</p>"),
-        ("<p>a</p><template>b</template><template x>c<p>d", all, "<p>a</p>b"),
-        (
-            r#"<div><template x shadowrootmode="open">b</template>c</div>"#,
-            reachable,
-            "<div>c</div>",
-        ),
-        // ~keep An excluded element whose tags stay is left as written.
-        (
-            "<p>a</p><template x>b</template><noscript x>c</noscript>d",
-            reachable,
-            "<p>a</p><template x>b</template><noscript x>c</noscript>d",
-        ),
-        (
-            "<head><noscript x>a</noscript></head><p>b</p>",
-            all,
-            "<head><noscript x>a</noscript></head><p>b</p>",
-        ),
-        // ~keep A tag in the text of a text element is text.
-        (
-            "<p>a</p><textarea><template x>b</template></textarea>c",
-            all,
-            "<p>a</p><textarea><template x>b</template></textarea>c",
-        ),
-    ] {
-        let excluded = starts_marked_x(page);
-        assert!(!excluded.is_empty(), "{page:?}");
-        assert_eq!(
-            unwrap_kept_inert_elements(page, choice, &excluded),
-            expected,
-            "{page:?}"
-        );
-        assert_eq!(
-            unwrap_kept_inert_elements(page, HiddenContent::Drop, &excluded),
-            page,
-            "{page:?}"
-        );
-    }
-}
-
-#[test]
-fn should_write_an_end_tag_of_the_body_for_the_excluded_element_that_started_the_body() {
-    let page = "<template x><p>a</p></template><title>t</title>";
-    assert_eq!(
-        unwrap_kept_inert_elements(page, HiddenContent::All, &starts_marked_x(page)),
-        "</body><title>t</title>"
-    );
 }

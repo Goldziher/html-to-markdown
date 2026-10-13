@@ -86,10 +86,10 @@ fn should_leave_a_template_or_a_noscript_tag_in_the_text_of_an_element_as_text()
 
 #[test]
 fn should_write_a_hidden_element_in_the_text_of_an_element_as_each_choice_reads_it() {
-    // ~keep The default removes a hidden element before it reads a `<textarea>`, and a wider
-    // ~keep choice leaves the text of the `<textarea>` as written. The converter reads the
-    // ~keep content of `<plaintext>`, `<noembed>` and `<noframes>` as markup, so a kept element
-    // ~keep there converts like the same element that is not hidden.
+    // ~keep The text of a `<textarea>` is text (issue #828), so each choice leaves a tag in it
+    // ~keep as written. The converter reads the content of `<plaintext>`, `<noembed>` and
+    // ~keep `<noframes>` as markup, so a kept element there converts like the same element that
+    // ~keep is not hidden.
     let (as_written, nothing, converted) = (
         "see\n\n<div hidden>x</div>\n\nafter\n",
         "see\n\nafter\n",
@@ -97,7 +97,7 @@ fn should_write_a_hidden_element_in_the_text_of_an_element_as_each_choice_reads_
     );
     let mut wrong = Vec::new();
     for (name, dropped, kept) in [
-        ("textarea", nothing, as_written),
+        ("textarea", as_written, as_written),
         ("title", as_written, as_written),
         ("xmp", as_written, as_written),
         ("iframe", nothing, nothing),
