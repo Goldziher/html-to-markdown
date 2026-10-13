@@ -26,12 +26,14 @@ fn bogus_comment_end(bytes: &[u8], idx: usize) -> Option<usize> {
 /// just past the tag. Returns `None` when `idx` does not start an svg tag (or the tag is
 /// unterminated), in which case the caller's scan is unaffected.
 ///
-/// Extracted from `strip_script_and_style_tags` — identical `<svg`/`</svg` detection and depth
-/// bookkeeping, unchanged.
+/// ~keep A start tag that ends with `/>` opens nothing: the parser and the tree builder end the
+/// ~keep element there, so what follows `<svg/>` is outside it and the passes read it.
 pub(super) fn track_svg_tag(bytes: &[u8], idx: usize, svg_depth: &mut usize) -> Option<usize> {
     if matches_tag_start(bytes, idx + 1, b"svg") {
         if let Some(open_end) = find_tag_end(bytes, idx + 1 + b"svg".len()) {
-            *svg_depth += 1;
+            if !bytes[idx..open_end].ends_with(b"/>") {
+                *svg_depth += 1;
+            }
             return Some(open_end);
         }
     } else if matches_end_tag_start(bytes, idx + 1, b"svg") {

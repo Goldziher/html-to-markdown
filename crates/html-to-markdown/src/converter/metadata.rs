@@ -214,3 +214,21 @@ fn handle_math(
         output.push_str("\n\n");
     }
 }
+
+#[cfg(all(test, feature = "metadata"))]
+mod tests {
+    use super::json_ld_from_tag;
+    use crate::converter::utility::preprocessing::strip_script_and_style_tags_with_kept_scripts;
+
+    /// A script with no owner mark gives the text of the tree, and nothing is decoded: a
+    /// reference of the author stays as written.
+    #[test]
+    fn a_script_with_no_owner_mark_gives_its_text_with_nothing_decoded() {
+        let (_, kept_scripts) = strip_script_and_style_tags_with_kept_scripts("");
+        let page = r#"<script type="application/ld+json">{"a":"&lt;"}</script>"#;
+        let dom = tl::parse(page, tl::ParserOptions::default()).expect("the page");
+        let tag = dom.nodes()[0].as_tag().expect("the script");
+        let json = json_ld_from_tag(0, tag, dom.parser(), &kept_scripts);
+        assert_eq!(json.as_deref(), Some(r#"{"a":"&lt;"}"#));
+    }
+}

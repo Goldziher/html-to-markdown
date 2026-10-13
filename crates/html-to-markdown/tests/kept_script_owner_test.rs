@@ -189,13 +189,24 @@ fn pages_with_one_wrapped_script(wrapper: [&str; 2], inside: &str, beside: &str)
     ]
 }
 
-/// A script that the first pass does not write has no owner mark: its JSON is the text of the
-/// tree, and a reference of the author is not decoded. The first pass reads `<svg/>` as an
-/// open `svg`, so it does not write the script after it.
+/// A start tag of `svg` or `math` that closes itself opens nothing, so the script after it is a
+/// script of the page: it gives its JSON as written, with a `<` and with a reference of the
+/// author. The same holds after an `svg` with an end tag.
 #[test]
-fn a_script_with_no_owner_mark_keeps_a_reference_of_the_author() {
-    let html = format!("<svg/>{}<p>t</p>", script(REFERENCE));
-    assert_eq!(raw_json(&html), as_written(&[REFERENCE]));
+fn a_script_after_a_self_closing_svg_or_math_gives_its_json_as_written() {
+    for before in [
+        "<svg/>",
+        "<svg />",
+        "<SVG/>",
+        "<math/>",
+        "<svg></svg>",
+        "<svg><g/></svg>",
+    ] {
+        for body in [LT, REFERENCE] {
+            let html = format!("{before}{}<p>t</p>", script(body));
+            assert_eq!(raw_json(&html), as_written(&[body]), "{html:?}");
+        }
+    }
 }
 
 /// A `textarea` with no end tag has the rest of the page as its text. The start tag of a
