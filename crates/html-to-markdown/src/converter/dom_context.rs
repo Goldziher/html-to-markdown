@@ -4,7 +4,7 @@
 //! and provides O(1) access to node relationships via precomputed maps.
 
 use std::cell::{OnceCell, RefCell};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use crate::converter::main_helpers::is_inline_element;
 use crate::converter::utility::content::normalized_tag_name;
@@ -75,6 +75,7 @@ pub struct DomContext {
     pub(crate) datalist_content_cache: RefCell<HashMap<u32, bool>>,
     /// For each element that [`DomContext::holds_text`] read: whether it holds text.
     pub(crate) holds_text_cache: RefCell<HashMap<u32, bool>>,
+    pub(crate) silent_heading_images: RefCell<HashSet<u32>>,
 }
 
 #[cfg(test)]
@@ -409,8 +410,11 @@ impl DomContext {
     /// ~keep Silent void descendants do not separate the line end from a following NBSP (#868).
     /// ~keep That boundary rule skips table cells, whose checkboxes can write their state.
     fn writes_void_content(&self, id: u32, parser: &tl::Parser) -> bool {
-        self.tag_info(id, parser)
-            .is_some_and(|info| matches!(info.name.as_str(), "br" | "hr" | "img"))
+        self.tag_info(id, parser).is_some_and(|info| match info.name.as_str() {
+            "br" | "hr" => true,
+            "img" => !self.silent_heading_images.borrow().contains(&id),
+            _ => false,
+        })
     }
 
     /// Whether a node in the element `id` is held, as `held` answers for each node, with the

@@ -114,3 +114,188 @@ fn should_keep_table_checkbox_and_preserved_control_output() {
         );
     }
 }
+
+#[test]
+fn should_join_heading_line_end_to_nbsp_after_an_image_that_renders_nothing() {
+    let mut rows = 0;
+    for (tag, prefix) in [("h1", "# "), ("h2", "## "), ("h6", "###### ")] {
+        for image in ["<img>", "<img src='' alt=''>", "<img src='x'>"] {
+            for depth in [0, 2] {
+                let body = format!("{}{}{}", "<span>".repeat(depth), image, "</span>".repeat(depth));
+                for tail in ["&nbsp;", "\u{a0}"] {
+                    let source = format!("<{tag}>a\n<span>{body}</span>{tail}b</{tag}>");
+                    assert_routes(&source, &format!("{prefix}a b\n"));
+                    rows += 1;
+                }
+            }
+        }
+    }
+    assert_eq!(rows, 36);
+}
+
+#[cfg(feature = "visitor")]
+#[test]
+fn should_keep_unobserved_image_probes_out_of_preformatted_boundary_ownership() {
+    use html_to_markdown_rs::visitor::{HtmlVisitor, NodeContext, VisitResult};
+    use std::sync::{Arc, Mutex};
+    #[derive(Debug)]
+    struct EmptyImages {
+        custom: bool,
+        calls: usize,
+    }
+    impl HtmlVisitor for EmptyImages {
+        fn visit_image(&mut self, _: &NodeContext<'_>, _: &str, _: &str, _: Option<&str>) -> VisitResult {
+            self.calls += 1;
+            if self.custom {
+                VisitResult::Custom(String::new())
+            } else {
+                VisitResult::Continue
+            }
+        }
+    }
+    let source = "<h2>a\n<span><pre><a href='#x'><img></a></pre></span>&nbsp;b</h2>";
+    let mut rows = 0;
+    for custom in [false, true] {
+        for tier_strategy in [TierStrategy::Auto, TierStrategy::Tier1, TierStrategy::Tier2] {
+            for extract_metadata in [false, true] {
+                let visitor = Arc::new(Mutex::new(EmptyImages { custom, calls: 0 }));
+                let result = convert(
+                    source,
+                    ConversionOptions {
+                        tier_strategy,
+                        extract_metadata,
+                        visitor: Some(visitor.clone()),
+                        ..Default::default()
+                    },
+                )
+                .expect("preformatted image probe converts");
+                assert_eq!(
+                    result.content.as_deref(),
+                    Some("## a  b\n"),
+                    "{tier_strategy:?}, custom={custom}"
+                );
+                assert_eq!(visitor.lock().expect("visitor state").calls, 1);
+                rows += 1;
+            }
+        }
+    }
+    assert_eq!(rows, 12);
+}
+
+// ~keep Forced-fast skip_images behavior is inherited; this repair preserves its current output.
+const HEADING_IMAGE_CONTROLS: [(&str, &str, &str, Option<&str>); 16] = [
+    (
+        "<h2>a\n<span><img alt='X' src='x'></span>&nbsp;b</h2>",
+        "default",
+        "## a X b\n",
+        None,
+    ),
+    (
+        "<h2>a\n<span><img alt='X'></span>&nbsp;b</h2>",
+        "default",
+        "## a X b\n",
+        None,
+    ),
+    (
+        "<h2>a\n<span><img alt='&nbsp;'></span>&nbsp;b</h2>",
+        "default",
+        "## a   b\n",
+        None,
+    ),
+    (
+        "<h2>a\n<span><img src='x'></span>&nbsp;b</h2>",
+        "inline",
+        "## a ![](x) b\n",
+        None,
+    ),
+    (
+        "<h2>a\n<span><img></span>&nbsp;b</h2>",
+        "preserve",
+        "## a <img> b\n",
+        None,
+    ),
+    ("<h2>a\n<span><img></span>&nbsp;b</h2>", "strict", "## a  b\n", None),
+    ("<p>a\n<span><img></span>&nbsp;b</p>", "default", "a  b\n", None),
+    ("<h2>a <span><img></span>&nbsp;b</h2>", "default", "## a  b\n", None),
+    (
+        "<h2>a\n<span><code><img></code></span>&nbsp;b</h2>",
+        "default",
+        "## a  b\n",
+        None,
+    ),
+    (
+        "<h2>a\n<span><pre><img></pre></span>&nbsp;b</h2>",
+        "default",
+        "## a  b\n",
+        None,
+    ),
+    ("<h2>a\n<span><img></span>&nbsp;b</h2>", "skip", "## a  b\n", None),
+    (
+        "<h2>a\n<span><img alt='X' src='x'></span>&nbsp;b</h2>",
+        "skip",
+        "## a  b\n",
+        Some("## a X b\n"),
+    ),
+    (
+        "<h2>a\n<span><img src='data:image/svg+xml;base64,PHN2Zz48L3N2Zz4='></span>&nbsp;b</h2>",
+        "drop",
+        "## a  b\n",
+        None,
+    ),
+    (
+        "<h2>a\n<span><img alt='V' src='data:image/svg+xml;base64,PHN2Zz48L3N2Zz4='></span>&nbsp;b</h2>",
+        "inline",
+        "## a ![V](data:image/svg+xml;base64,PHN2Zz48L3N2Zz4=) b\n",
+        None,
+    ),
+    (
+        "<h2>a\n<span><img alt='&#x2003;X&#160;' src='x'></span>&nbsp;b</h2>",
+        "default",
+        "## a  X  b\n",
+        None,
+    ),
+    (
+        "<h2>a\n<span><img><br></span>&nbsp;b</h2>",
+        "default",
+        "## a  b\n",
+        None,
+    ),
+];
+#[test]
+fn should_keep_visible_literal_excluded_and_nonheading_image_boundaries() {
+    let mut rows = 0;
+    for (source, mode, expected, fast) in HEADING_IMAGE_CONTROLS {
+        for tier_strategy in [TierStrategy::Auto, TierStrategy::Tier1, TierStrategy::Tier2] {
+            for extract_metadata in [false, true] {
+                let mut options = ConversionOptions {
+                    tier_strategy,
+                    extract_metadata,
+                    ..Default::default()
+                };
+                match mode {
+                    "inline" => options.keep_inline_images_in = vec!["h2".into()],
+                    "preserve" => options.preserve_tags = vec!["img".into()],
+                    "strict" => options.whitespace_mode = html_to_markdown_rs::WhitespaceMode::Strict,
+                    "skip" => options.skip_images = true,
+                    "drop" => options.inline_data_media = html_to_markdown_rs::InlineDataMedia::DropElement,
+                    _ => {}
+                }
+                let expected = if tier_strategy == TierStrategy::Tier1 {
+                    fast.unwrap_or(expected)
+                } else {
+                    expected
+                };
+                assert_eq!(
+                    convert(source, options)
+                        .expect("image boundary control")
+                        .content
+                        .as_deref(),
+                    Some(expected),
+                    "{source}, {mode}, {tier_strategy:?}"
+                );
+                rows += 1;
+            }
+        }
+    }
+    assert_eq!(rows, 96);
+}
