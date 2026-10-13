@@ -45,7 +45,8 @@ pub(super) struct ParsedPage<'a> {
 }
 
 impl<'a> ParsedPage<'a> {
-    const fn first_parse(dom: tl::VDom<'a>, dom_ctx: DomContext, len: usize) -> Self {
+    fn first_parse(dom: tl::VDom<'a>, len: usize) -> Self {
+        let dom_ctx = build_dom_context(&dom, dom.parser(), len);
         Self {
             dom,
             dom_ctx,
@@ -77,9 +78,8 @@ pub(super) fn parse_for_conversion<'a>(
     let (preserve_menu, hidden_content) = (preserves_menu(options), options.hidden_content);
     let dom = parse_html(input)?;
     let parser = dom.parser();
-    let dom_ctx = build_dom_context(&dom, parser, input.len());
     let len = input.len();
-    let asked = Asked::of(&dom_ctx, parser, input);
+    let asked = Asked::of(&dom, parser, input);
     let misnest = asked.misnest;
     let for_narrower_choice = match as_written {
         Some(html) if !asked.any() => narrower_choice_asks(html, input, options, hidden_content)?,
@@ -89,7 +89,7 @@ pub(super) fn parse_for_conversion<'a>(
     // ~keep for an omitted end tag: the first parse holds every word of the page.
     let omitted_end_tag = asked.omitted_end_tag || for_narrower_choice;
     if !omitted_end_tag && !misnest {
-        return Ok(ParsedPage::first_parse(dom, dom_ctx, len));
+        return Ok(ParsedPage::first_parse(dom, len));
     }
     // ~keep Every route to the tree builder has the node budget and the depth limit (issues
     // ~keep #808 and #809). When only an omitted end tag asked for the repair, a tree that
@@ -101,9 +101,10 @@ pub(super) fn parse_for_conversion<'a>(
             target: "html_to_markdown::convert",
             "html5ever repair gave no tree (the document cannot be written back); proceeding with original structure"
         );
-        return Ok(ParsedPage::first_parse(dom, dom_ctx, len));
+        return Ok(ParsedPage::first_parse(dom, len));
     };
     if repair_limit.is_some() && !misnest {
+        let dom_ctx = build_dom_context(&dom, parser, len);
         return Ok(ParsedPage {
             dom,
             dom_ctx,
@@ -124,7 +125,7 @@ pub(super) fn parse_for_conversion<'a>(
             target: "html_to_markdown::convert",
             "html5ever repair would lose text; proceeding with original structure"
         );
-        return Ok(ParsedPage::first_parse(dom, dom_ctx, len));
+        return Ok(ParsedPage::first_parse(dom, len));
     }
     let for_omitted_end_tag = omitted_end_tag && !loses_text && repair_limit.is_none();
     log_the_second_parse(for_narrower_choice, asked.discarded_end_tag, for_omitted_end_tag);
@@ -178,11 +179,11 @@ struct Asked {
 }
 
 impl Asked {
-    fn of(dom_ctx: &DomContext, parser: &tl::Parser<'_>, input: &str) -> Self {
-        let open_at_the_end = has_omitted_end_tag(dom_ctx, parser);
-        let misnest = has_inline_block_misnest(dom_ctx, parser);
+    fn of(dom: &tl::VDom, parser: &tl::Parser<'_>, input: &str) -> Self {
+        let open_at_the_end = has_omitted_end_tag(dom, parser);
+        let misnest = has_inline_block_misnest(dom, parser);
         // ~keep Both rules ask where the tree builder ends an element, so both have the text rule.
-        let discarded_end_tag = !open_at_the_end && !misnest && has_discarded_end_tag(dom_ctx, parser, input);
+        let discarded_end_tag = !open_at_the_end && !misnest && has_discarded_end_tag(dom, parser, input);
         Self {
             omitted_end_tag: open_at_the_end || discarded_end_tag,
             discarded_end_tag,
@@ -261,7 +262,7 @@ fn asks_for_the_tree_builder(page: &str) -> bool {
     has_custom_element_tags(page)
         || parse_html(page).is_ok_and(|dom| {
             let parser = dom.parser();
-            Asked::of(&build_dom_context(&dom, parser, page.len()), parser, page).any()
+            Asked::of(&dom, parser, page).any()
         })
 }
 
@@ -310,6 +311,118 @@ mod tests {
         assert_eq!(result.content.as_deref(), Some("Hello **world**\n"));
         PARSE_CALLS.with(|calls| assert_eq!(calls.get(), 1));
         DOM_CONTEXT_BUILDS.with(|builds| assert_eq!(builds.get(), 1));
+    }
+
+    #[test]
+    fn should_build_only_the_selected_context_after_paragraph_repair() {
+        let cases = [0, 100, 500].into_iter().flat_map(|depth| {
+            [500, 2000]
+                .into_iter()
+                .flat_map(move |n| ["fully_closed", "legacy_open", "omitted"].map(|shape| (depth, n, shape)))
+        });
+        for (depth, n, shape) in cases {
+            let paragraph = if shape == "omitted" { "<p>x " } else { "<p>x </p>" };
+            let closes = if shape == "fully_closed" {
+                "</div>".repeat(depth)
+            } else {
+                String::new()
+            };
+            let html = format!("{}{}{closes}", "<div>".repeat(depth), paragraph.repeat(n));
+            let options = ConversionOptions {
+                max_depth: Some(1024),
+                tier_strategy: TierStrategy::Tier2,
+                extract_metadata: false,
+                ..Default::default()
+            };
+            PARSE_CALLS.with(|calls| calls.set(0));
+            DOM_CONTEXT_BUILDS.with(|calls| calls.set(0));
+            let result = convert(&html, options).expect("convert repaired paragraphs");
+            assert_eq!(
+                result.content.as_deref(),
+                Some(format!("{}x\n", "x\n\n".repeat(n - 1)).as_str())
+            );
+            assert!(result.warnings.is_empty());
+            let repairs = shape == "omitted" || (shape == "legacy_open" && depth != 0);
+            assert_eq!(PARSE_CALLS.with(std::cell::Cell::get), if repairs { 2 } else { 1 });
+            assert_eq!(
+                DOM_CONTEXT_BUILDS.with(std::cell::Cell::get),
+                1,
+                "{depth}, {n}, {shape}"
+            );
+        }
+    }
+
+    #[test]
+    fn should_build_one_context_for_repair_and_fallback_decisions() {
+        // ~keep Preserve deep decision coverage without depending on the default libtest stack.
+        std::thread::Builder::new()
+            .stack_size(16 * 1024 * 1024)
+            .spawn(|| {
+                let cases = [
+                    (
+                        "<DIV><P>one</DIV>two</P>rest</DIV>tail".to_string(),
+                        "one\n\ntwo\n\nresttail\n",
+                        2,
+                        0,
+                    ),
+                    (
+                        "<table>a<tr><td>b</td></tr></table>".to_string(),
+                        "a\n\n| b |\n| --- |\n",
+                        2,
+                        0,
+                    ),
+                    ("<HTML><BODY><p>a</p><p>b</p>".to_string(), "a\n\nb\n", 1, 0),
+                    ("<frameset><frame></frameset><p>a<p>b".to_string(), "a\n\nb\n", 2, 0),
+                    (
+                        format!("<p>kept</p>{}deep", "<div>".repeat(600)),
+                        "kept\n\ndeep\n",
+                        1,
+                        1,
+                    ),
+                    (format!("{}x", "<table><td>".repeat(300)), "", 2, 1),
+                ];
+                for (html, content, parses, warnings) in cases {
+                    let options = ConversionOptions {
+                        max_depth: Some(1024),
+                        tier_strategy: TierStrategy::Tier2,
+                        extract_metadata: false,
+                        ..Default::default()
+                    };
+                    PARSE_CALLS.with(|calls| calls.set(0));
+                    DOM_CONTEXT_BUILDS.with(|calls| calls.set(0));
+                    let result = convert(&html, options).expect("convert selected tree");
+                    assert_eq!(result.content.as_deref(), Some(content));
+                    assert_eq!(result.warnings.len(), warnings);
+                    assert_eq!(PARSE_CALLS.with(std::cell::Cell::get), parses);
+                    assert_eq!(DOM_CONTEXT_BUILDS.with(std::cell::Cell::get), 1);
+                }
+            })
+            .expect("spawn deep selected-tree fixtures")
+            .join()
+            .expect("deep selected-tree fixtures complete");
+    }
+
+    #[test]
+    fn should_follow_the_last_root_and_child_for_omitted_end_tag_repair() {
+        for html in [
+            "<p>one</p><div>two",
+            "<html><head><title>T</title></head><body><p>one</p><div>two",
+        ] {
+            PARSE_CALLS.with(|calls| calls.set(0));
+            DOM_CONTEXT_BUILDS.with(|calls| calls.set(0));
+            let result = convert(
+                html,
+                ConversionOptions {
+                    tier_strategy: TierStrategy::Tier2,
+                    extract_metadata: false,
+                    ..Default::default()
+                },
+            )
+            .expect("convert omitted final sibling");
+            assert_eq!(result.content.as_deref(), Some("one\n\ntwo\n"));
+            assert_eq!(PARSE_CALLS.with(std::cell::Cell::get), 2);
+            assert_eq!(DOM_CONTEXT_BUILDS.with(std::cell::Cell::get), 1);
+        }
     }
 
     fn parse_calls_for(html: &str) -> (usize, Option<String>) {

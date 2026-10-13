@@ -457,7 +457,7 @@ mod structured_data {
             for body in [r#"{"a":"<b>"}"#, r#"{"a":"&lt;b>"}"#] {
                 let html = format!("<p>x</p><{element}>{OPEN}{body}<p>tail</p>");
                 let rest = format!("{body}<p>tail</p>");
-                assert_eq!(raw_json(&html), as_written(&[&rest]), "{html:?}");
+                assert_eq!(raw_json(&html), as_written(&[rest.as_str()]), "{html:?}");
             }
         }
     }

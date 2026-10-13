@@ -187,7 +187,7 @@ fn prepare_conversion<'a>(html: &'a str, options: &ConversionOptions) -> Result<
         let first_repair = head
             .as_ref()
             .map(|(html, _)| html.as_str())
-            .or_else(|| repaired_page.as_deref());
+            .or(repaired_page.as_deref());
         inert_bodies = bodies;
         (repaired_page, head) =
             repair_with_reserved_owner_names(&normalized_input, first_repair, &mut inert_bodies, options)?;

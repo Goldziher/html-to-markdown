@@ -544,6 +544,21 @@ fn the_plain_output_holds_no_owner_mark() {
     }
 }
 
+/// The conversion builds its context for the tree that it reads only (pull request 882): the
+/// first parse of a page with each end tag, the second parse of a page of paragraphs with no
+/// end tag, which the tree builder writes again. The owner marks are taken out of that tree
+/// and the records go with it, so each of two scripts with one text in the tree gives its own
+/// JSON.
+#[test]
+fn the_scripts_give_each_its_own_json_in_the_tree_that_the_conversion_reads() {
+    for paragraph in ["<p>x </p>", "<p>x "] {
+        for [first, second] in BOTH_ORDERS {
+            let html = format!("{}{}{}", paragraph.repeat(20), script(first), script(second));
+            assert_eq!(raw_json(&html), as_written(&[first, second]), "{html:?}");
+        }
+    }
+}
+
 /// The repair of a script with no end tag (#875) writes its owner mark before the cleanup of
 /// the conversion. The cleanup joins the parts of a name, a value and a text of the author into
 /// that mark. The repair reserves the names of the cleaned page, so the script of the author
@@ -577,10 +592,11 @@ fn a_marked_script_and_a_repaired_script_give_their_own_json() {
     const NO_END_TAG: [&str; 2] = [r#"{"unclosed":"<3> &amp;"}"#, r#"{"unclosed":"&lt;4>"}"#];
     for count in [1, 2] {
         let with_end_tag: String = WITH_END_TAG[..count].iter().map(|body| script(body)).collect();
-        let no_end_tag: String = NO_END_TAG[..count]
+        let no_end_tag = NO_END_TAG[..count]
             .iter()
             .map(|body| format!("{OPEN}{body}<p>tail</p>"))
-            .collect();
+            .collect::<Vec<_>>()
+            .concat();
         let with_end_tag_first: Vec<&str> = WITH_END_TAG[..count]
             .iter()
             .chain(&NO_END_TAG[..count])

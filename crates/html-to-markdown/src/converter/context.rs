@@ -19,6 +19,9 @@ use crate::types::structure_collector::StructureCollectorHandle;
 
 #[cfg(test)]
 thread_local! {
+    pub(crate) static INLINE_BUFFER_LINE_SEARCH_CALLS: Cell<usize> = const { Cell::new(0) };
+    pub(crate) static INLINE_BUFFER_CONTEXT_CALLS: Cell<usize> = const { Cell::new(0) };
+    pub(crate) static INLINE_BUFFER_TAIL_CHAR_READS: Cell<usize> = const { Cell::new(0) };
     pub(crate) static INLINE_BUFFER_COLUMN_CHAR_READS: Cell<usize> = const { Cell::new(0) };
 }
 
@@ -456,6 +459,27 @@ impl Context {
     /// ~keep After only indent or a list item's marker, the list's first marker starts an item
     /// ~keep where that line ends, as it would with no wrapper.
     pub(crate) fn inline_buffer(&self, output: &str, opens_with_marker: bool) -> Self {
+        #[cfg(test)]
+        INLINE_BUFFER_CONTEXT_CALLS.with(|calls| calls.set(calls.get() + 1));
+        // ~keep Bare list markers end in ASCII space. A final non-whitespace character proves
+        // ~keep this detached buffer follows text, so its column cannot be consumed by a list (#862).
+        if self.in_marker_span
+            || opens_with_marker
+            || output.chars().next_back().is_some_and(|last| !last.is_whitespace())
+            || line_cannot_end_in_bare_marker(output)
+        {
+            return Self {
+                in_marker_span: true,
+                inline_buffer_after_hard_break: if output.is_empty() {
+                    self.inline_buffer_after_hard_break
+                } else {
+                    crate::converter::utility::escaping::ends_with_hard_break(output)
+                },
+                ..self.clone()
+            };
+        }
+        #[cfg(test)]
+        INLINE_BUFFER_LINE_SEARCH_CALLS.with(|calls| calls.set(calls.get() + 1));
         let line = &output[output.rfind('\n').map_or(0, |pos| pos + 1)..];
         let line_holds_text =
             !line.trim().is_empty() && !crate::converter::list::utils::line_is_bare_list_marker(output);
@@ -619,5 +643,114 @@ impl Context {
             return None;
         }
         crate::converter::url_resolve::resolve_link_url(self.base_url.as_deref()?, value)
+    }
+}
+
+// ~keep This is only a necessary suffix check: an adjacent non-whitespace character rules
+// ~keep out a bullet token. An ordered token cannot have text adjoining its ASCII digit run.
+// ~keep Ambiguous tails still
+// ~keep use the whole-line classifier, including stacked bare markers and Unicode blanks (#862).
+fn line_cannot_end_in_bare_marker(output: &str) -> bool {
+    let mut tail = output.trim_end_matches([' ', '\t']).chars().rev().inspect(|_| {
+        #[cfg(test)]
+        INLINE_BUFFER_TAIL_CHAR_READS.with(|reads| reads.set(reads.get() + 1));
+    });
+    let Some(last) = tail.next() else {
+        return false;
+    };
+    if last.is_whitespace() {
+        return false;
+    }
+    match last {
+        '-' | '*' | '+' => tail.next().is_some_and(|previous| !previous.is_whitespace()),
+        '.' | ')' => {
+            if tail.next().is_some_and(|previous| previous.is_ascii_digit()) {
+                tail.find(|previous| !previous.is_ascii_digit())
+                    .is_some_and(|previous| !previous.is_whitespace())
+            } else {
+                true
+            }
+        }
+        _ => true,
+    }
+}
+
+#[cfg(test)]
+mod inline_buffer_tests {
+    use super::{Context, ContextParameters};
+
+    fn context() -> Context {
+        Context::new(
+            &crate::ConversionOptions::default(),
+            ContextParameters {
+                inline_collector: None,
+                #[cfg(feature = "metadata")]
+                metadata_collector: None,
+                kept_scripts: crate::converter::utility::preprocessing::KeptScripts::default(),
+                #[cfg(feature = "visitor")]
+                visitor: None,
+                structure_collector: None,
+                reference_collector: None,
+                base_url: None,
+                own_page: crate::converter::url_resolve::OwnPage::UnknownWithoutBase,
+            },
+        )
+    }
+
+    #[test]
+    fn should_preserve_live_columns_and_marker_state_after_output_mutations() {
+        let ctx = context();
+        let mut output = String::new();
+        for prefix in [
+            "",
+            "\t",
+            "- ",
+            "* ",
+            "1. ",
+            "1. - ",
+            "text ",
+            "text* ",
+            "text. ",
+            "x- ",
+            "x+ ",
+            "x) ",
+            "x1. ",
+            "雪12) ",
+            "x 1. ",
+            "1. - 2. ",
+            "\u{2000}1. ",
+            "1234567890123456. ",
+            "1) ",
+            "- + ",
+            "\u{2000}* ",
+        ] {
+            for suffix in ["", "x", ".", "雪", "\u{a0}", "\u{2000}", "\u{2028}", "\r", "\n"] {
+                output.clear();
+                output.push_str(prefix);
+                output.push_str("discard");
+                output.truncate(prefix.len());
+                output.push_str(suffix);
+                output.insert_str(0, "inserted\n");
+                for opens_with_marker in [false, true] {
+                    let child = ctx.inline_buffer(&output, opens_with_marker);
+                    let line = &output[output.rfind('\n').map_or(0, |pos| pos + 1)..];
+                    let holds_text =
+                        !line.trim().is_empty() && !crate::converter::list::utils::line_is_bare_list_marker(&output);
+                    assert_eq!(child.in_marker_span, opens_with_marker || holds_text, "{output:?}");
+                    assert_eq!(
+                        child.inline_buffer_after_hard_break,
+                        crate::converter::utility::escaping::ends_with_hard_break(&output),
+                        "{output:?}"
+                    );
+                    if !child.in_marker_text() {
+                        let (indent_length, indent_column) = crate::converter::utility::escaping::leading_indent(line);
+                        assert_eq!(
+                            child.inline_buffer_column,
+                            Some(indent_column + line[indent_length..].chars().count())
+                        );
+                    }
+                }
+            }
+        }
     }
 }

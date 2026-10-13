@@ -3,11 +3,12 @@
 //! This module contains helper functions for preprocessing HTML before conversion,
 //! including validation and normalization checks.
 
-use crate::converter::dom_context::{DomContext, TagInfo};
+use crate::converter::dom_context::DomContext;
 use crate::converter::main_helpers::{is_ascii_whitespace_only, is_inline_element};
 use crate::converter::metadata::is_body_content_in_head;
 use crate::converter::utility::attributes::{attribute_matches_any, element_has_navigation_hint};
 use crate::converter::utility::content::normalized_tag_name;
+use crate::converter::utility::escaping::is_block_level_name;
 use crate::options::ConversionOptions;
 use crate::text::decode_html_entities_cow;
 
@@ -56,45 +57,45 @@ impl MisnestState {
     };
 }
 
-/// True when `info`, reached with inherited `state`, is one of the misnestings this pass repairs.
+/// True when `name`, reached with inherited `state`, is one of the misnestings this pass repairs.
 ///
 /// ~keep Each disjunct is an independent, side-effect-free shape check, so collecting them here
 /// ~keep preserves the original sequence of early returns exactly -- same order, same
 /// ~keep short-circuiting, same answer -- while keeping the walk itself under the complexity limit
 /// ~keep (issue #465).
-fn node_is_misnested(info: &TagInfo, state: MisnestState, self_inside_preformatted: bool) -> bool {
+fn node_is_misnested(name: &str, is_block: bool, state: MisnestState, self_inside_preformatted: bool) -> bool {
     // An anchor nested inside another anchor, outside preformatted content.
-    (info.name == "a" && state.inside_anchor && !state.inside_preformatted)
+    (name == "a" && state.inside_anchor && !state.inside_preformatted)
         // ~keep A nested form in tl can hide text outside the HTML5 form. Ancestry is only
         // ~keep a repair signal: html5ever owns the form pointer and its end-tag semantics.
-        || (info.name == "form" && state.inside_form && !state.form_repair_opaque)
+        || (name == "form" && state.inside_form && !state.form_repair_opaque)
         // ~keep Table elements under <p>: tl misparsed an unclosed <p> in <td>.
-        || (matches!(info.name.as_str(), "td" | "tr" | "th") && state.p_ancestor_state)
-        || (info.is_block && !self_inside_preformatted && state.blocked_by_inline_ancestor)
+        || (matches!(name, "td" | "tr" | "th") && state.p_ancestor_state)
+        || (is_block && !self_inside_preformatted && state.blocked_by_inline_ancestor)
         // ~keep <li>/<dt>/<dd> nested under another one without an intervening list
         // ~keep container: tl absorbed the next item because a <p>/<div> inside the
         // ~keep previous one was left unclosed.
-        || (matches!(info.name.as_str(), "li" | "dt" | "dd") && state.list_item_ancestor_state)
+        || (matches!(name, "li" | "dt" | "dd") && state.list_item_ancestor_state)
         // ~keep <tr> nested directly inside a <td>/<th>: not reachable per HTML5 tree
         // ~keep construction, and silently dropped by the table renderer (issue #486).
-        || (info.name == "tr" && state.cell_ancestor_state)
+        || (name == "tr" && state.cell_ancestor_state)
 }
 
-/// Inherited state to hand to every child of `info`.
-fn child_misnest_state(info: &TagInfo, state: MisnestState, self_inside_preformatted: bool) -> MisnestState {
+/// Inherited state to hand to every child of the element.
+fn child_misnest_state(name: &str, state: MisnestState, self_inside_preformatted: bool) -> MisnestState {
     MisnestState {
-        inside_anchor: state.inside_anchor || info.name == "a",
-        inside_form: state.inside_form || info.name == "form",
+        inside_anchor: state.inside_anchor || name == "a",
+        inside_form: state.inside_form || name == "form",
         // ~keep Templates have independent form parsing; raw-text bodies contain no tags.
         form_repair_opaque: state.form_repair_opaque
-            || info.name == "template"
-            || crate::converter::tier1::tags::lookup(info.name.as_bytes()).is_some_and(|spec| spec.is_rawtext),
+            || name == "template"
+            || crate::converter::tier1::tags::lookup(name.as_bytes()).is_some_and(|spec| spec.is_rawtext),
         inside_preformatted: self_inside_preformatted,
         blocked_by_inline_ancestor: state.blocked_by_inline_ancestor
-            || (is_inline_element(&info.name) && !inline_ancestor_allows_block(&info.name)),
-        p_ancestor_state: p_ancestor_state_for(&info.name, state.p_ancestor_state),
-        list_item_ancestor_state: list_item_ancestor_state_for(&info.name, state.list_item_ancestor_state),
-        cell_ancestor_state: cell_ancestor_state_for(&info.name, state.cell_ancestor_state),
+            || (is_inline_element(name) && !inline_ancestor_allows_block(name)),
+        p_ancestor_state: p_ancestor_state_for(name, state.p_ancestor_state),
+        list_item_ancestor_state: list_item_ancestor_state_for(name, state.list_item_ancestor_state),
+        cell_ancestor_state: cell_ancestor_state_for(name, state.cell_ancestor_state),
     }
 }
 
@@ -146,60 +147,60 @@ fn child_misnest_state(info: &TagInfo, state: MisnestState, self_inside_preforma
 /// ~keep a deeply nested chain (e.g. 20k nested `<div>`s took ~30s; this pass alone
 /// ~keep accounted for essentially all of it, confirmed via phase timing in
 /// ~keep `tools/benchmark-harness/examples/profile_deep_nesting_phases.rs`).
-pub fn has_inline_block_misnest(dom_ctx: &DomContext, parser: &tl::Parser) -> bool {
-    let mut stack: Vec<(tl::NodeHandle, MisnestState)> = dom_ctx
-        .root_children
+#[must_use]
+pub fn has_inline_block_misnest(dom: &tl::VDom, parser: &tl::Parser) -> bool {
+    let mut stack: Vec<(tl::NodeHandle, MisnestState)> = dom
+        .children()
         .iter()
         .map(|handle| (*handle, MisnestState::ROOT))
         .collect();
 
     while let Some((handle, state)) = stack.pop() {
-        let node_id = handle.get_inner();
-        if !matches!(handle.get(parser), Some(tl::Node::Tag(_))) {
-            continue;
-        }
-        let Some(info) = dom_ctx.tag_info(node_id, parser) else {
+        let Some(tl::Node::Tag(tag)) = handle.get(parser) else {
             continue;
         };
+        let name = normalized_tag_name(tag.name().as_utf8_str());
+        let name = name.as_ref();
+        let is_block = is_block_level_name(name, is_inline_element(name));
 
-        let self_inside_preformatted = state.inside_preformatted || matches!(info.name.as_str(), "pre" | "code");
-        if node_is_misnested(info, state, self_inside_preformatted) {
+        let self_inside_preformatted = state.inside_preformatted || matches!(name, "pre" | "code");
+        if node_is_misnested(name, is_block, state, self_inside_preformatted) {
             return true;
         }
 
-        if let Some(children) = dom_ctx.children_of(node_id) {
-            // ~keep <table> with a direct child that a spec-compliant parser would
-            // ~keep foster-parent or restructure (see the doc comment above).
-            if info.name == "table"
-                && children
-                    .iter()
-                    .any(|child| is_foster_parenting_candidate(*child, parser, dom_ctx))
-            {
-                return true;
-            }
-
-            // ~keep A <tr>/<row> or table section (<thead>/<tbody>/<tfoot>) holding a
-            // ~keep misplaced element child: `tl`'s `read_end` (astral-tl
-            // ~keep parser/base.rs:240-256) silently discards an unmatched close tag
-            // ~keep instead of erroring, so `</table>` inside a still-open `<tr>` is
-            // ~keep dropped and a following sibling element (e.g. a footer `<p>`)
-            // ~keep attaches as a child of that `<tr>` instead of becoming `<table>`'s
-            // ~keep sibling. `collect_table_cells` only walks `td`/`th`/`cell`
-            // ~keep children, so the misattached element -- and everything after it --
-            // ~keep is silently dropped (issue #489). Deliberately element-only:
-            // ~keep `is_foster_parenting_candidate`'s text arm decodes entities and
-            // ~keep treats `&nbsp;` as non-whitespace, so widening this to text would
-            // ~keep route every Outlook/newsletter `<tr>&nbsp;</tr>` through a full
-            // ~keep html5ever re-parse for no benefit. `<tr>stray text</tr>` losing its
-            // ~keep text stays a separate, documented defect (see the CONTROL test in
-            // ~keep `issue_489_regressions.rs`).
-            if is_row_context_with_misplaced_element(info, children, parser, dom_ctx) {
-                return true;
-            }
-
-            let child_state = child_misnest_state(info, state, self_inside_preformatted);
-            stack.extend(children.iter().map(|child| (*child, child_state)));
+        let tag_children = tag.children();
+        let children = tag_children.top().as_slice();
+        // ~keep <table> with a direct child that a spec-compliant parser would
+        // ~keep foster-parent or restructure (see the doc comment above).
+        if name == "table"
+            && children
+                .iter()
+                .any(|child| is_foster_parenting_candidate(*child, parser))
+        {
+            return true;
         }
+
+        // ~keep A <tr>/<row> or table section (<thead>/<tbody>/<tfoot>) holding a
+        // ~keep misplaced element child: `tl`'s `read_end` (astral-tl
+        // ~keep parser/base.rs:240-256) silently discards an unmatched close tag
+        // ~keep instead of erroring, so `</table>` inside a still-open `<tr>` is
+        // ~keep dropped and a following sibling element (e.g. a footer `<p>`)
+        // ~keep attaches as a child of that `<tr>` instead of becoming `<table>`'s
+        // ~keep sibling. `collect_table_cells` only walks `td`/`th`/`cell`
+        // ~keep children, so the misattached element -- and everything after it --
+        // ~keep is silently dropped (issue #489). Deliberately element-only:
+        // ~keep `is_foster_parenting_candidate`'s text arm decodes entities and
+        // ~keep treats `&nbsp;` as non-whitespace, so widening this to text would
+        // ~keep route every Outlook/newsletter `<tr>&nbsp;</tr>` through a full
+        // ~keep html5ever re-parse for no benefit. `<tr>stray text</tr>` losing its
+        // ~keep text stays a separate, documented defect (see the CONTROL test in
+        // ~keep `issue_489_regressions.rs`).
+        if is_row_context_with_misplaced_element(name, children, parser) {
+            return true;
+        }
+
+        let child_state = child_misnest_state(name, state, self_inside_preformatted);
+        stack.extend(children.iter().map(|child| (*child, child_state)));
     }
 
     false
@@ -214,8 +215,8 @@ pub fn has_inline_block_misnest(dom_ctx: &DomContext, parser: &tl::Parser) -> bo
 /// ~keep descendants (issue #772). The open elements are the stack of `tl` at the end of the
 /// ~keep input: the last root node, its last child, and so on, so the walk is O(depth).
 /// ~keep `html` and `body` are exempt: their end tags close no element in the standard.
-pub fn has_omitted_end_tag(dom_ctx: &DomContext, parser: &tl::Parser) -> bool {
-    let mut last = dom_ctx.root_children.last().copied();
+pub fn has_omitted_end_tag(dom: &tl::VDom, parser: &tl::Parser) -> bool {
+    let mut last = dom.children().last().copied();
     while let Some(handle) = last {
         let Some(tl::Node::Tag(tag)) = handle.get(parser) else {
             return false;
@@ -223,13 +224,14 @@ pub fn has_omitted_end_tag(dom_ctx: &DomContext, parser: &tl::Parser) -> bool {
         if has_end_tag(tag) {
             return false;
         }
-        let children = dom_ctx.children_of(handle.get_inner());
-        let has_content = children.is_some_and(|children| !children.is_empty());
+        let tag_children = tag.children();
+        let children = tag_children.top().as_slice();
+        let has_content = !children.is_empty();
         let name = tag.name().as_bytes();
         if has_content && !name.eq_ignore_ascii_case(b"html") && !name.eq_ignore_ascii_case(b"body") {
             return true;
         }
-        last = children.and_then(|children| children.last().copied());
+        last = children.last().copied();
     }
     false
 }
@@ -245,9 +247,9 @@ fn has_end_tag(tag: &tl::HTMLTag<'_>) -> bool {
         .is_some_and(|raw| raw.ends_with(b"</"))
 }
 
-/// The children of one element (or of the page) in the walk of [`has_discarded_end_tag`].
+/// The position in one element (or the page) in the walk of [`has_discarded_end_tag`].
 struct SiblingList<'a> {
-    children: &'a [tl::NodeHandle],
+    parent: Option<tl::NodeHandle>,
     next: usize,
     /// The source offset where the last node ended, when the offset is known.
     previous_end: Option<usize>,
@@ -269,18 +271,25 @@ struct SiblingList<'a> {
 /// ~keep A comment and an attribute value are inside a node, so an end tag in one is not seen.
 /// ~keep Not read: the source between a start tag and the first child of an element that has
 /// ~keep its end tag, because `tl` does not keep the length of a start tag.
-pub fn has_discarded_end_tag(dom_ctx: &DomContext, parser: &tl::Parser, input: &str) -> bool {
+pub fn has_discarded_end_tag(dom: &tl::VDom, parser: &tl::Parser, input: &str) -> bool {
     let source = input.as_bytes();
     let mut open: std::collections::HashMap<std::borrow::Cow<'_, [u8]>, usize> = std::collections::HashMap::new();
     let mut lists = vec![SiblingList {
-        children: &dom_ctx.root_children,
+        parent: None,
         next: 0,
         previous_end: None,
         end_tag: None,
         name: None,
     }];
     while let Some(list) = lists.last_mut() {
-        let Some(handle) = list.children.get(list.next) else {
+        let handle = match list.parent {
+            Some(parent) => parent
+                .get(parser)
+                .and_then(|node| node.as_tag())
+                .and_then(|tag| tag.children().top().get(list.next).copied()),
+            None => dom.children().get(list.next).copied(),
+        };
+        let Some(handle) = handle else {
             if names_open_element(source, list.previous_end, list.end_tag, &open) {
                 return true;
             }
@@ -301,18 +310,17 @@ pub fn has_discarded_end_tag(dom_ctx: &DomContext, parser: &tl::Parser, input: &
         }
         list.previous_end = span.map(|(_, end)| end);
         let tl::Node::Tag(tag) = node else { continue };
-        let Some(children) = dom_ctx
-            .children_of(handle.get_inner())
-            .filter(|children| !children.is_empty())
-        else {
+        let tag_children = tag.children();
+        let children = tag_children.top().as_slice();
+        if children.is_empty() {
             continue;
-        };
+        }
         let name = tag.name().as_bytes();
         let closed = has_end_tag(tag);
         let name_in_lower_case = lower_case(name);
         *open.entry(name_in_lower_case.clone()).or_insert(0) += 1;
         lists.push(SiblingList {
-            children,
+            parent: Some(handle),
             next: 0,
             // ~keep The source range of an element with no end tag is its start tag.
             previous_end: span.filter(|_| !closed).map(|(_, end)| end),
@@ -447,16 +455,14 @@ fn holds_readable_text(tag: &tl::HTMLTag<'_>, parser: &tl::Parser<'_>, skipped: 
 /// A comment is neither: HTML5's "in table" insertion mode inserts a comment token
 /// as a child of the current node (the table itself), so it is not lost and needs
 /// no repair.
-fn is_foster_parenting_candidate(child: tl::NodeHandle, parser: &tl::Parser, dom_ctx: &DomContext) -> bool {
+fn is_foster_parenting_candidate(child: tl::NodeHandle, parser: &tl::Parser) -> bool {
     match child.get(parser) {
         Some(tl::Node::Raw(bytes)) => {
             let raw = bytes.as_utf8_str();
             let decoded = crate::text::decode_html_entities_cow(raw.as_ref());
             !is_ascii_whitespace_only(&decoded)
         }
-        Some(tl::Node::Tag(_)) => dom_ctx
-            .tag_name_for(child, parser)
-            .is_some_and(|name| !is_table_structural_child(name.as_ref())),
+        Some(tl::Node::Tag(tag)) => !is_table_structural_child(&normalized_tag_name(tag.name().as_utf8_str())),
         _ => false,
     }
 }
@@ -473,26 +479,19 @@ fn is_table_structural_child(tag_name: &str) -> bool {
     )
 }
 
-/// True when `info` is a `<tr>`/`<row>` or table section (`<thead>`/`<tbody>`/`<tfoot>`) with an
+/// True when `name` is a `<tr>`/`<row>` or table section (`<thead>`/`<tbody>`/`<tfoot>`) with an
 /// element child outside the set valid in that context (see [`is_row_structural_child`] and
 /// [`is_section_structural_child`]). Element children only -- see the call site's doc comment for
 /// why text is deliberately excluded.
-fn is_row_context_with_misplaced_element(
-    info: &TagInfo,
-    children: &[tl::NodeHandle],
-    parser: &tl::Parser,
-    dom_ctx: &DomContext,
-) -> bool {
-    let valid: fn(&str) -> bool = match info.name.as_str() {
+fn is_row_context_with_misplaced_element(name: &str, children: &[tl::NodeHandle], parser: &tl::Parser) -> bool {
+    let valid: fn(&str) -> bool = match name {
         "tr" | "row" => is_row_structural_child,
         "thead" | "tbody" | "tfoot" => is_section_structural_child,
         _ => return false,
     };
-    children.iter().any(|child| {
-        matches!(child.get(parser), Some(tl::Node::Tag(_)))
-            && dom_ctx
-                .tag_name_for(*child, parser)
-                .is_some_and(|name| !valid(name.as_ref()))
+    children.iter().any(|child| match child.get(parser) {
+        Some(tl::Node::Tag(tag)) => !valid(&normalized_tag_name(tag.name().as_utf8_str())),
+        _ => false,
     })
 }
 
@@ -670,12 +669,10 @@ fn element_has_noise_hint(tag: &tl::HTMLTag) -> bool {
 #[cfg(test)]
 mod tests {
     use super::{has_discarded_end_tag, readable_text_len};
-    use crate::converter::utility::caching::build_dom_context;
 
     fn discards_an_end_tag_of_an_open_element(html: &str) -> bool {
         let dom = tl::parse(html, tl::ParserOptions::default()).expect("parse");
-        let dom_ctx = build_dom_context(&dom, dom.parser(), html.len());
-        has_discarded_end_tag(&dom_ctx, dom.parser(), html)
+        has_discarded_end_tag(&dom, dom.parser(), html)
     }
 
     #[test]

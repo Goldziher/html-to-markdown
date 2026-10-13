@@ -37,7 +37,6 @@ pub fn handle_mark(handler: HandlerContext<'_>) {
         depth,
         dom_context: dom_ctx,
     } = handler;
-
     let Some(tl::Node::Tag(tag)) = node_handle.get(parser) else {
         return;
     };
@@ -73,6 +72,7 @@ pub fn handle_mark(handler: HandlerContext<'_>) {
     let child_ctx = Context {
         in_strong: ctx.in_strong || options.highlight_style == HighlightStyle::Bold,
         ..match options.highlight_style {
+            HighlightStyle::None if has_only_blank_text_children(tag, parser) => ctx.clone(),
             HighlightStyle::None => ctx.inline_buffer(output, false),
             _ => marked_buffer_context(ctx, output),
         }
@@ -100,6 +100,15 @@ pub fn handle_mark(handler: HandlerContext<'_>) {
         },
         site,
     );
+}
+
+// ~keep Blank raw text returns before Markdown text-content processing, without reading inline line state.
+// ~keep Tags, comments and encoded text retain their ordinary child context; parent hooks ran first.
+fn has_only_blank_text_children(tag: &tl::HTMLTag<'_>, parser: &tl::Parser<'_>) -> bool {
+    tag.children().top().iter().all(|handle| {
+        matches!(handle.get(parser), Some(tl::Node::Raw(raw))
+            if crate::converter::utility::white_space::is_blank(raw.as_utf8_str().as_ref()))
+    })
 }
 
 // ~keep A guaranteed opening marker makes the last-line column irrelevant to list rendering.
@@ -568,7 +577,7 @@ mod tests {
 #[cfg(test)]
 mod line_state_cost_tests {
     use crate::converter::context::INLINE_BUFFER_COLUMN_CHAR_READS;
-    use crate::{ConversionOptions, HighlightStyle, OutputFormat, TierStrategy, convert};
+    use crate::{ConversionOptions, HighlightStyle, OutputFormat, TierStrategy, WhitespaceMode, convert};
 
     #[test]
     fn marked_wrappers_should_not_count_the_growing_output_column() {
@@ -588,9 +597,269 @@ mod line_state_cost_tests {
     }
 
     #[test]
-    fn unmarked_highlighting_should_still_count_its_live_output_column() {
+    fn unmarked_wrappers_after_text_should_not_count_an_unused_output_column() {
+        for tag in ["mark", "abbr", "label", "select", "sub", "sup", "rb", "u", "span"] {
+            let reads = [100, 400].map(|n| column_reads(tag, HighlightStyle::None, n));
+            assert_eq!(reads, [0, 0], "{tag}: n=100 and n=400");
+        }
+    }
+
+    #[test]
+    fn marker_looking_text_tails_should_not_count_an_unused_output_column() {
+        for text in ["x. ", "x) ", "x- ", "x* ", "x+ "] {
+            for output_format in [OutputFormat::Markdown, OutputFormat::Plain, OutputFormat::Djot] {
+                for n in [100, 400] {
+                    INLINE_BUFFER_COLUMN_CHAR_READS.with(|reads| reads.set(0));
+                    let html = format!("<div>{}</div>", format!("<mark>{text}</mark>").repeat(n));
+                    let options = ConversionOptions {
+                        output_format,
+                        highlight_style: HighlightStyle::None,
+                        tier_strategy: TierStrategy::Tier2,
+                        extract_metadata: false,
+                        ..Default::default()
+                    };
+                    let content = convert(&html, options)
+                        .expect("convert marker-looking tails")
+                        .content
+                        .expect("content");
+                    assert_eq!(content, format!("{}\n", text.repeat(n).trim_end()));
+                    assert_eq!(
+                        INLINE_BUFFER_COLUMN_CHAR_READS.with(std::cell::Cell::get),
+                        0,
+                        "{text:?}, {output_format:?}, {n}"
+                    );
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn numeric_text_tails_should_bound_suffix_and_column_reads() {
+        for text in ["x1. ", "x1) ", "雪1. ", "雪12) ", "x1234567890123456. ", "x1.\u{a0}"] {
+            for output_format in [OutputFormat::Markdown, OutputFormat::Plain, OutputFormat::Djot] {
+                for n in [100, 400] {
+                    INLINE_BUFFER_COLUMN_CHAR_READS.with(|reads| reads.set(0));
+                    crate::converter::context::INLINE_BUFFER_TAIL_CHAR_READS.with(|reads| reads.set(0));
+                    let options = ConversionOptions {
+                        output_format,
+                        highlight_style: HighlightStyle::None,
+                        tier_strategy: TierStrategy::Tier2,
+                        extract_metadata: false,
+                        ..Default::default()
+                    };
+                    let content = convert(
+                        &format!("<div>{}</div>", format!("<mark>{text}</mark>").repeat(n)),
+                        options,
+                    )
+                    .expect("convert numeric tails")
+                    .content
+                    .expect("content");
+                    assert_eq!(
+                        content,
+                        format!("{}\n", text.replace('\u{a0}', " ").repeat(n).trim_end())
+                    );
+                    let columns = INLINE_BUFFER_COLUMN_CHAR_READS.with(std::cell::Cell::get);
+                    let suffix = crate::converter::context::INLINE_BUFFER_TAIL_CHAR_READS.with(std::cell::Cell::get);
+                    assert_eq!(columns, 0, "{text:?}, {output_format:?}, {n}");
+                    assert!(
+                        suffix <= n * text.chars().count(),
+                        "{text:?}, {output_format:?}, {n}: {suffix}"
+                    );
+                    assert_eq!(suffix, text.trim_end().chars().count() * (n - 1));
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn empty_marks_should_not_scan_growing_blank_output() {
+        for space in ['\u{2000}', '\u{a0}', ' ', '\t'] {
+            for (output_format, whitespace_mode) in [
+                (OutputFormat::Markdown, WhitespaceMode::Strict),
+                (OutputFormat::Markdown, WhitespaceMode::Normalized),
+                (OutputFormat::Plain, WhitespaceMode::Strict),
+                (OutputFormat::Plain, WhitespaceMode::Normalized),
+                (OutputFormat::Djot, WhitespaceMode::Strict),
+                (OutputFormat::Djot, WhitespaceMode::Normalized),
+            ] {
+                for n in [100, 400] {
+                    INLINE_BUFFER_COLUMN_CHAR_READS.with(|reads| reads.set(0));
+                    crate::converter::context::INLINE_BUFFER_CONTEXT_CALLS.with(|calls| calls.set(0));
+                    let options = ConversionOptions {
+                        output_format,
+                        whitespace_mode,
+                        highlight_style: HighlightStyle::None,
+                        tier_strategy: TierStrategy::Tier2,
+                        extract_metadata: false,
+                        ..Default::default()
+                    };
+                    let html = format!("<div>{}z</div>", format!("{space}<mark></mark>").repeat(n));
+                    let content = convert(&html, options)
+                        .expect("convert empty marks")
+                        .content
+                        .expect("content");
+                    let expected_space = if output_format == OutputFormat::Plain {
+                        ' '
+                    } else {
+                        space
+                    };
+                    let expected = if output_format == OutputFormat::Plain || whitespace_mode == WhitespaceMode::Strict
+                    {
+                        format!("{}z\n", expected_space.to_string().repeat(n))
+                    } else {
+                        "z\n".to_string()
+                    };
+                    assert_eq!(
+                        content, expected,
+                        "{space:?}, {output_format:?}, {whitespace_mode:?}, {n}"
+                    );
+                    assert_eq!(INLINE_BUFFER_COLUMN_CHAR_READS.with(std::cell::Cell::get), 0);
+                    assert_eq!(
+                        crate::converter::context::INLINE_BUFFER_CONTEXT_CALLS.with(std::cell::Cell::get),
+                        0
+                    );
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn nonempty_marks_should_keep_live_columns_for_nested_children() {
         for n in [100, 400] {
-            assert_eq!(column_reads("mark", HighlightStyle::None, n), n * (n - 1) / 2);
+            INLINE_BUFFER_COLUMN_CHAR_READS.with(|reads| reads.set(0));
+            let html = format!("<div>{}z</div>", "\u{2000}<mark><span></span></mark>".repeat(n));
+            let options = ConversionOptions {
+                whitespace_mode: WhitespaceMode::Strict,
+                highlight_style: HighlightStyle::None,
+                tier_strategy: TierStrategy::Tier2,
+                extract_metadata: false,
+                ..Default::default()
+            };
+            assert_eq!(
+                convert(&html, options)
+                    .expect("convert nested empty span")
+                    .content
+                    .expect("content"),
+                format!("{}z\n", "\u{2000}".repeat(n))
+            );
+            assert_eq!(
+                INLINE_BUFFER_COLUMN_CHAR_READS.with(std::cell::Cell::get),
+                n * (n + 1) / 2
+            );
+        }
+    }
+
+    #[test]
+    fn empty_marks_should_preserve_styles_tags_wrapping_and_structure() {
+        for output_format in [OutputFormat::Markdown, OutputFormat::Plain, OutputFormat::Djot] {
+            for highlight_style in [
+                HighlightStyle::None,
+                HighlightStyle::DoubleEqual,
+                HighlightStyle::Bold,
+                HighlightStyle::Html,
+            ] {
+                for preserved in [false, true] {
+                    let options = ConversionOptions {
+                        output_format,
+                        highlight_style,
+                        whitespace_mode: WhitespaceMode::Strict,
+                        wrap: true,
+                        wrap_width: 40,
+                        include_document_structure: true,
+                        extract_metadata: true,
+                        preserve_tags: if preserved { vec!["mark".to_string()] } else { vec![] },
+                        tier_strategy: TierStrategy::Tier2,
+                        ..Default::default()
+                    };
+                    let html = "<html><head><title>T</title></head><body><div>\u{2000}<mark></mark>\u{2000}<mark></mark>z</div></body></html>";
+                    let result = convert(html, options).expect("convert empty mark options");
+                    let gap = if output_format == OutputFormat::Plain {
+                        " "
+                    } else {
+                        "\u{2000}"
+                    };
+                    let markup = if preserved { "<mark></mark>" } else { "" };
+                    let expected = if output_format == OutputFormat::Plain {
+                        "  z\n\n".to_string()
+                    } else {
+                        let head = "---\ntitle: T\n---\n\n";
+                        format!("{head}{gap}{markup}{gap}{markup}z\n\n")
+                    };
+                    assert_eq!(result.content.as_deref(), Some(expected.as_str()));
+                    assert_eq!(
+                        result.document,
+                        Some(crate::DocumentStructure {
+                            nodes: vec![],
+                            source_format: Some("html".to_string())
+                        })
+                    );
+                    #[cfg(feature = "metadata")]
+                    {
+                        let expected_metadata = crate::metadata::HtmlMetadata {
+                            document: crate::metadata::DocumentMetadata {
+                                title: Some("T".to_string()),
+                                ..Default::default()
+                            },
+                            ..Default::default()
+                        };
+                        assert_eq!(
+                            serde_json::to_value(&result.metadata).expect("metadata value"),
+                            serde_json::to_value(expected_metadata).expect("expected metadata value")
+                        );
+                    }
+                }
+            }
+        }
+    }
+
+    #[cfg(feature = "visitor")]
+    #[test]
+    fn empty_marks_should_keep_visitor_callbacks_before_context_selection() {
+        use crate::visitor::{HtmlVisitor, NodeContext, VisitResult, VisitorHandle};
+        use std::sync::{Arc, Mutex};
+        #[derive(Debug)]
+        struct Recorder {
+            answer: VisitResult,
+            calls: usize,
+        }
+        impl HtmlVisitor for Recorder {
+            fn visit_mark(&mut self, _ctx: &NodeContext<'_>, text: &str) -> VisitResult {
+                assert_eq!(text, "");
+                self.calls += 1;
+                self.answer.clone()
+            }
+        }
+        for (answer, markup) in [
+            (VisitResult::Continue, ""),
+            (VisitResult::Skip, ""),
+            (VisitResult::Custom("C".to_string()), "C"),
+            (VisitResult::PreserveHtml, "<mark />"),
+        ] {
+            for output_format in [OutputFormat::Markdown, OutputFormat::Plain, OutputFormat::Djot] {
+                let recorder = Arc::new(Mutex::new(Recorder {
+                    answer: answer.clone(),
+                    calls: 0,
+                }));
+                let handle: VisitorHandle = recorder.clone();
+                let options = ConversionOptions {
+                    output_format,
+                    whitespace_mode: WhitespaceMode::Strict,
+                    highlight_style: HighlightStyle::None,
+                    tier_strategy: TierStrategy::Tier2,
+                    extract_metadata: false,
+                    visitor: Some(handle),
+                    ..Default::default()
+                };
+                let result = convert("<div>\u{2000}<mark></mark>\u{2000}<mark></mark>z</div>", options)
+                    .expect("convert visited empty marks");
+                let expected = if output_format == OutputFormat::Plain {
+                    "  z\n".to_string()
+                } else {
+                    format!("\u{2000}{markup}\u{2000}{markup}z\n")
+                };
+                assert_eq!(result.content.as_deref(), Some(expected.as_str()));
+                assert_eq!(recorder.lock().expect("visitor recorder").calls, 2);
+            }
         }
     }
 
@@ -615,6 +884,7 @@ mod line_state_cost_tests {
         let expected = match (tag, highlight_style) {
             ("ins", _) => format!("{}\n", "{+x+}".repeat(n)),
             (_, HighlightStyle::Html) => format!("{}\n", "<mark>x</mark>".repeat(n)),
+            ("select", _) => format!("{}\n", vec!["x"; n].join(" ")),
             (_, HighlightStyle::None) => format!("{}\n", "x".repeat(n)),
             _ => {
                 let marker = if tag == "del" || tag == "s" || tag == "strike" {
@@ -631,3 +901,7 @@ mod line_state_cost_tests {
         INLINE_BUFFER_COLUMN_CHAR_READS.with(std::cell::Cell::get)
     }
 }
+
+#[cfg(test)]
+#[path = "blank_text_cost_tests.rs"]
+mod blank_text_cost_tests;

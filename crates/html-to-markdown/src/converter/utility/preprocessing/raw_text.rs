@@ -8,6 +8,7 @@ use std::str;
 
 use super::kept_scripts::{ESCAPED_LT, KeptScripts, push_owner_mark};
 use super::markup::{find_tag_end, is_json_ld_script_open_tag, matches_end_tag_start, matches_tag_start};
+use super::structured_data::push_without_standalone_slashes;
 use super::visibility::{after_bogus_comment, is_bogus_comment_marker};
 
 /// If the `<` at `idx` starts a bogus comment (see `strip_bogus_comments`), return the position
@@ -156,17 +157,22 @@ fn push_kept_element(out: &mut String, name: &str, mark: Option<usize>, attribut
 /// `mark`, then `attributes`, the open tag after its name, with the `>`.
 ///
 /// ~keep The parser reads only white space after the name, so a `/` or a form feed there is
-/// ~keep written as a space.
+/// ~keep written as a space. The parser also ends a start tag at a `/` that stands alone
+/// ~keep between two attributes, and the rest of the tag is text of the page then. The HTML
+/// ~keep rule reads such a `/` as nothing, so it is not written: the repair of a script with no
+/// ~keep end tag has the rule (`push_without_standalone_slashes`).
 fn push_kept_attributes(out: &mut String, mark: Option<usize>, attributes: &str) {
     if let Some(mark) = mark {
         push_owner_mark(out, mark);
     }
-    if matches!(attributes.as_bytes().first(), Some(b'/' | b'\x0C')) {
-        out.push(' ');
-        out.push_str(&attributes[1..]);
-    } else {
-        out.push_str(attributes);
-    }
+    let attributes = match attributes.as_bytes().first() {
+        Some(b'/' | b'\x0C') => {
+            out.push(' ');
+            &attributes[1..]
+        }
+        _ => attributes,
+    };
+    push_without_standalone_slashes(out, attributes);
 }
 
 /// The raw-text elements the first pass reads, each with what happens to its content.
@@ -297,7 +303,7 @@ impl<C: FnMut(PassRead)> PageReads<C> {
         if !opens_a_tag(bytes, idx) {
             return None;
         }
-        self.tag_end_from(bytes, idx + 1)
+        self.tag_end_from(bytes, idx + 1, None)
     }
 
     /// If the `<` at `lt` starts a raw-text element of `FIRST_PASS_ELEMENTS`, return its slot
@@ -308,16 +314,17 @@ impl<C: FnMut(PassRead)> PageReads<C> {
             let after_name = raw_text_tag_name_end(bytes, lt, name.as_bytes(), TagSide::Start)?;
             Some((slot, after_name))
         })?;
-        let tag_end = self.tag_end_from(bytes, after_name)?;
+        let tag_end = self.tag_end_from(bytes, after_name, Some(after_name))?;
         Some((slot, tag_end))
     }
 
     /// The position after the `>` that ends the tag read from `from`, a position in the tag
-    /// after its `<`.
-    fn tag_end_from(&mut self, bytes: &[u8], from: usize) -> Option<usize> {
+    /// after its `<`. `attributes` is the position after the name of the tag, when the caller
+    /// read the name.
+    fn tag_end_from(&mut self, bytes: &[u8], from: usize, attributes: Option<usize>) -> Option<usize> {
         if !self.tags_never_end {
             let mut stops = 0;
-            let whole = whole_tag_end(bytes, from, &mut stops);
+            let whole = whole_tag_end(bytes, from, attributes, &mut stops);
             self.count(PassRead::TagRead(whole.unwrap_or(bytes.len()) - from));
             self.count(PassRead::TagStops(stops));
             self.tags_never_end = whole.is_none();
@@ -505,7 +512,7 @@ enum TagSide {
 fn raw_text_start_tag_end(bytes: &[u8], lt: usize, name: &[u8]) -> Option<usize> {
     let after_name = raw_text_tag_name_end(bytes, lt, name, TagSide::Start)?;
     let first_bracket = || memchr::memchr(b'>', &bytes[after_name..]).map(|offset| after_name + offset + 1);
-    whole_tag_end(bytes, after_name, &mut 0).or_else(first_bracket)
+    whole_tag_end(bytes, after_name, Some(after_name), &mut 0).or_else(first_bracket)
 }
 
 /// The one rule for the name of the start tag and of the end tag of a raw-text element. If
@@ -537,24 +544,45 @@ fn raw_text_tag_name_end(bytes: &[u8], lt: usize, name: &[u8], side: TagSide) ->
     Some(after_name)
 }
 
+/// The position after the `>` that ends the tag whose name starts at `name`, the position
+/// after its `<`. Returns `None` when a value or the tag does not end.
+///
+/// ~keep One read owns the end of a tag: the first pass of the raw-text elements and the scan
+/// ~keep of the repair of a script with no end tag (`scan_markup_end`) both ask it. Two reads
+/// ~keep with a rule each ended one start tag at two places, and the text between the two
+/// ~keep ends was a record of structured data.
+pub(super) fn tag_end_from_name(bytes: &[u8], name: usize) -> Option<usize> {
+    whole_tag_end(bytes, name, None, &mut 0)
+}
+
 /// The position after the `>` that ends the tag read from `from`, a position in the tag after
-/// its `<`. Returns `None` when a value or the tag does not end. `stops` counts the places
-/// where the read stops to look at a byte.
+/// its `<`. `attributes` is the position after the name of the tag, when the caller read the
+/// name. Returns `None` when a value or the tag does not end. `stops` counts the places where
+/// the read stops to look at a byte.
 ///
 /// ~keep The HTML rule: a quote opens a value only as the first byte of the value, after `=`
 /// ~keep and white space. A value with no quotes ends at white space or at `>`: the apostrophe
 /// ~keep of `title=it's` and the `=` and the apostrophe of `href=/search?q='tis` are bytes of
-/// ~keep the value.
+/// ~keep the value. An `=` starts a value only after the name of an attribute: an `=` in the
+/// ~keep name of the tag, after a value or after a `/` is a byte of a name, so the quote of
+/// ~keep `<a ="x>` opens no value and the tag ends at its `>`.
 /// ~keep Outside a value only `>` and `=` change the read, so the read jumps to the next one of
 /// ~keep the two: most bytes of a page are in a tag or between two tags, and a read of each
-/// ~keep byte of each tag is a cost on every page.
-fn whole_tag_end(bytes: &[u8], from: usize, stops: &mut usize) -> Option<usize> {
+/// ~keep byte of each tag is a cost on every page. The name of the tag is read only at the
+/// ~keep first `=` of a tag whose caller did not read it.
+fn whole_tag_end(bytes: &[u8], from: usize, attributes: Option<usize>, stops: &mut usize) -> Option<usize> {
     let mut idx = from;
+    let mut names = attributes;
     loop {
         *stops += 1;
         idx += memchr::memchr2(b'>', b'=', bytes.get(idx..)?)?;
         if bytes[idx] == b'>' {
             return Some(idx + 1);
+        }
+        let names_start = *names.get_or_insert_with(|| tag_name_end(bytes, from));
+        if !ends_an_attribute_name(bytes, names_start, idx) {
+            idx += 1;
+            continue;
         }
         let after_equals = &bytes[idx + 1..];
         let value = idx + 1 + after_equals.iter().position(|byte| !is_tag_white_space(*byte))?;
@@ -563,7 +591,35 @@ fn whole_tag_end(bytes: &[u8], from: usize, stops: &mut usize) -> Option<usize> 
             quote @ (b'"' | b'\'') => value + 2 + memchr::memchr(quote, &bytes[value + 1..])?,
             _ => value + bytes[value..].iter().copied().position(ends_an_unquoted_value)?,
         };
+        names = Some(idx);
     }
+}
+
+/// The position after the name of the tag read from `from`, the position after its `<`. The
+/// name of an end tag starts after its `/`.
+fn tag_name_end(bytes: &[u8], from: usize) -> usize {
+    let name = from + usize::from(bytes.get(from) == Some(&b'/'));
+    bytes
+        .get(name..)
+        .and_then(|rest| rest.iter().position(|byte| ends_a_tag_name(*byte)))
+        .map_or(bytes.len(), |offset| name + offset)
+}
+
+/// Whether the `=` at `equals` comes after the name of an attribute. `names` is the position
+/// where the names of the attributes start: after the name of the tag, or after the last
+/// value.
+///
+/// ~keep The read goes back over white space only, so a tag is read a fixed number of times.
+fn ends_an_attribute_name(bytes: &[u8], names: usize, equals: usize) -> bool {
+    bytes
+        .get(names..equals)
+        .and_then(|before| before.iter().rev().find(|byte| !is_tag_white_space(**byte)))
+        .is_some_and(|last| *last != b'/')
+}
+
+/// Whether `byte` ends the name of a tag: white space, `/` or `>`.
+const fn ends_a_tag_name(byte: u8) -> bool {
+    is_tag_white_space(byte) || matches!(byte, b'/' | b'>')
 }
 
 /// Whether `byte` is white space in a tag: tab, LF, FF, CR or space.
