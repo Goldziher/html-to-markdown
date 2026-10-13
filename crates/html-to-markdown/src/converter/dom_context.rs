@@ -83,12 +83,19 @@ pub struct DomContext {
     /// For each element that [`DomContext::holds_text`] read: whether it holds text.
     pub(crate) holds_text_cache: RefCell<HashMap<u32, bool>>,
     pub(crate) silent_heading_images: RefCell<HashSet<u32>>,
+    pub(crate) blank_font_renders: RefCell<HashSet<u32>>,
 }
 
 #[cfg(test)]
 thread_local! {
     /// The nodes that `DomContext::holds_text` and `DomContext::holds_content` read on this thread.
     pub(crate) static HOLDS_TEXT_NODE_READS: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
+    /// Actual emitted bytes examined by observed font registration. ~keep
+    pub(crate) static FONT_RENDER_BYTE_READS: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
+    /// Number of actual observed font registration guards, including length rejections. ~keep
+    pub(crate) static FONT_RENDER_GUARD_CALLS: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
+    /// Maximum actual sparse observed-font entries and reserved capacity during this test. ~keep
+    pub(crate) static FONT_RENDER_SET_STATS: std::cell::Cell<(usize, usize)> = const { std::cell::Cell::new((0, 0)) };
 }
 
 #[cfg(test)]
@@ -417,6 +424,75 @@ impl DomContext {
         })
     }
 
+    pub(crate) fn begin_font_render(
+        &self,
+        id: u32,
+        parser: &tl::Parser,
+        output_len: usize,
+        handler: crate::converter::block::container::HandlerContext<'_>,
+    ) -> Option<usize> {
+        let ctx = handler.ctx;
+        #[cfg(feature = "visitor")]
+        let font_observer_suppressed = ctx.skip_visitor_hooks && ctx.has_observer();
+        #[cfg(not(feature = "visitor"))]
+        let font_observer_suppressed = false;
+        (self.tag_info(id, parser).is_some_and(|info| info.name == "font")
+            && !font_observer_suppressed
+            && !ctx.code_element_is_transparent()
+            && !ctx.in_code_block
+            && handler.options.whitespace_mode != crate::WhitespaceMode::Strict)
+            .then(|| {
+                self.blank_font_renders.borrow_mut().remove(&id);
+                output_len
+            })
+    }
+
+    pub(crate) fn record_blank_font_render(&self, id: u32, written: &str) {
+        #[cfg(test)]
+        FONT_RENDER_GUARD_CALLS.with(|calls| calls.set(calls.get() + 1));
+        let blank = written.is_empty()
+            || (written.len() == 1 && {
+                #[cfg(test)]
+                FONT_RENDER_BYTE_READS.with(|reads| reads.set(reads.get() + 1));
+                matches!(written.as_bytes()[0], b' ' | b'\t')
+            });
+        if blank {
+            let mut fonts = self.blank_font_renders.borrow_mut();
+            fonts.insert(id);
+            #[cfg(test)]
+            FONT_RENDER_SET_STATS.with(|stats| {
+                let (entries, capacity) = stats.get();
+                stats.set((entries.max(fonts.len()), capacity.max(fonts.capacity())));
+            });
+        }
+    }
+
+    /// ~keep Code/del can render an empty line end, and a break can render whitespace; neither is a blank font.
+    pub(crate) fn font_boundary_has_content(&self, id: u32, parser: &tl::Parser) -> bool {
+        let record = RefCell::new(HashMap::new());
+        self.holds(id, parser, &record, |node, child| match node {
+            tl::Node::Raw(raw) => {
+                let raw = raw.as_utf8_str();
+                let decoded = text::decode_html_entities_cow(raw.as_ref());
+                if matches!(classify_text(decoded.as_ref()), TextClass::WhiteSpaceOnly(_)) {
+                    Held::No
+                } else {
+                    Held::Yes
+                }
+            }
+            tl::Node::Tag(_)
+                if self.writes_void_content(child, parser)
+                    || self
+                        .tag_info(child, parser)
+                        .is_some_and(|info| matches!(info.name.as_str(), "code" | "del" | "pre")) =>
+            {
+                Held::Yes
+            }
+            tl::Node::Tag(_) => Held::Inside,
+            tl::Node::Comment(_) => Held::No,
+        })
+    }
+
     /// ~keep Silent void descendants do not separate the line end from a following NBSP (#868).
     /// ~keep That boundary rule skips table cells, whose checkboxes can write their state.
     fn writes_void_content(&self, id: u32, parser: &tl::Parser) -> bool {
@@ -519,6 +595,114 @@ impl DomContext {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn should_bound_observed_font_registration_and_boundary_reads() {
+        let mut jobs = 0;
+        for overlapping in [false, true] {
+            for depth in [4, 16, 64, 256] {
+                let closing = if overlapping {
+                    "</font>&nbsp;".repeat(depth)
+                } else {
+                    "</font>".repeat(depth) + "&nbsp;"
+                };
+                let source = format!("<p>a{} {closing}b</p>", "<font>".repeat(depth));
+                let dom = tl::parse(&source, tl::ParserOptions::default()).expect("font nodes");
+                let nodes = dom.nodes().len();
+                super::HOLDS_TEXT_NODE_READS.with(|reads| reads.set(0));
+                super::FONT_RENDER_BYTE_READS.with(|reads| reads.set(0));
+                super::FONT_RENDER_GUARD_CALLS.with(|calls| calls.set(0));
+                super::FONT_RENDER_SET_STATS.with(|stats| stats.set((0, 0)));
+                let result = crate::convert(
+                    &source,
+                    crate::ConversionOptions {
+                        tier_strategy: crate::TierStrategy::Tier2,
+                        extract_metadata: false,
+                        max_depth: Some(1024),
+                        ..Default::default()
+                    },
+                )
+                .expect("font nesting");
+                let node_reads = super::HOLDS_TEXT_NODE_READS.with(std::cell::Cell::get);
+                let byte_reads = super::FONT_RENDER_BYTE_READS.with(std::cell::Cell::get);
+                assert_eq!(result.content.as_deref(), Some("a b\n"));
+                assert_eq!(byte_reads, depth);
+                assert_eq!(node_reads, if overlapping { depth + 1 } else { 2 * depth });
+                assert_eq!(super::FONT_RENDER_GUARD_CALLS.with(std::cell::Cell::get), depth);
+                assert_eq!(super::FONT_RENDER_SET_STATS.with(std::cell::Cell::get).0, depth);
+                assert!(super::FONT_RENDER_SET_STATS.with(std::cell::Cell::get).1 <= 2 * depth);
+                assert!(
+                    byte_reads > 0 && byte_reads <= 4 * nodes,
+                    "font registration {byte_reads}/{nodes}"
+                );
+                assert!(
+                    node_reads > 0 && node_reads <= 4 * nodes,
+                    "font boundary {node_reads}/{nodes}"
+                );
+                jobs += 1;
+            }
+        }
+        assert_eq!(jobs, 8);
+    }
+    #[cfg(feature = "visitor")]
+    #[test]
+    fn should_bound_font_registration_with_growing_custom_child_whitespace() {
+        use std::sync::{Arc, Mutex};
+        #[derive(Debug)]
+        struct BlankChild {
+            width: usize,
+            calls: usize,
+        }
+        impl crate::visitor::HtmlVisitor for BlankChild {
+            fn visit_element_start(&mut self, ctx: &crate::visitor::NodeContext) -> crate::visitor::VisitResult {
+                if ctx.tag_name == "span" {
+                    self.calls += 1;
+                    crate::visitor::VisitResult::Custom(" ".repeat(self.width))
+                } else {
+                    crate::visitor::VisitResult::Continue
+                }
+            }
+        }
+        let mut jobs = 0;
+        for depth in [4, 16, 64, 256] {
+            let source = format!(
+                "<p>a{}<span></span>{}&nbsp;b</p>",
+                "<font>".repeat(depth),
+                "</font>".repeat(depth)
+            );
+            let dom = tl::parse(&source, tl::ParserOptions::default()).expect("custom font nodes");
+            let nodes = dom.nodes().len();
+            let visitor = Arc::new(Mutex::new(BlankChild { width: depth, calls: 0 }));
+            super::HOLDS_TEXT_NODE_READS.with(|reads| reads.set(0));
+            super::FONT_RENDER_BYTE_READS.with(|reads| reads.set(0));
+            super::FONT_RENDER_GUARD_CALLS.with(|calls| calls.set(0));
+            super::FONT_RENDER_SET_STATS.with(|stats| stats.set((0, 0)));
+            let result = crate::convert(
+                &source,
+                crate::ConversionOptions {
+                    visitor: Some(visitor.clone()),
+                    tier_strategy: crate::TierStrategy::Tier2,
+                    extract_metadata: false,
+                    max_depth: Some(1024),
+                    ..Default::default()
+                },
+            )
+            .expect("custom child whitespace");
+            let node_reads = super::HOLDS_TEXT_NODE_READS.with(std::cell::Cell::get);
+            let byte_reads = super::FONT_RENDER_BYTE_READS.with(std::cell::Cell::get);
+            assert_eq!(
+                result.content.as_deref(),
+                Some(format!("a{}b\n", " ".repeat(depth + 1)).as_str())
+            );
+            assert_eq!(visitor.lock().expect("visitor calls").calls, 1);
+            assert_eq!(byte_reads, 0);
+            assert_eq!(node_reads, depth);
+            assert_eq!(super::FONT_RENDER_SET_STATS.with(std::cell::Cell::get), (0, 0));
+            assert_eq!(super::FONT_RENDER_GUARD_CALLS.with(std::cell::Cell::get), depth);
+            assert!(node_reads > 0 && node_reads <= 4 * nodes);
+            jobs += 1;
+        }
+        assert_eq!(jobs, 4);
+    }
     #[test]
     fn should_classify_visible_void_descendants_below_inline_wrappers() {
         for (body, expected) in [

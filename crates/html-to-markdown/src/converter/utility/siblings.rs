@@ -171,6 +171,12 @@ fn place_after_element(
             TextPlace::AfterText
         };
     }
+    if info.is_some_and(|info| info.name == "font")
+        && dom_ctx.blank_font_renders.borrow().contains(&element)
+        && !dom_ctx.font_boundary_has_content(element, parser)
+    {
+        return TextPlace::AfterText;
+    }
     let empty_flow = in_flow || info.is_some_and(|info| matches!(info.name.as_str(), "option" | "optgroup"));
     if empty_flow && !in_cell && ends_with_line_end(before.last(), parser) && !dom_ctx.holds_content(element, parser) {
         TextPlace::AfterText

@@ -41,6 +41,7 @@ mod block_boundary;
 mod exclusions;
 mod parse;
 mod table_parts;
+mod tag;
 use self::block_boundary::{separate_in_list_item, separate_words_at_block_boundary};
 use self::parse::{ParsedPage, finish_dom_parse, parse_for_conversion};
 use self::table_parts::{is_table_part, walk_table_parts};
@@ -679,7 +680,7 @@ fn convert_node(node_handle: &tl::NodeHandle, parser: &tl::Parser, output: &mut 
             );
         }
 
-        tl::Node::Tag(tag) => convert_tag(node_handle, tag, parser, output, handler),
+        tl::Node::Tag(tag) => tag::convert_tag(node_handle, tag, parser, output, handler),
 
         tl::Node::Comment(_) => {}
     }
@@ -795,24 +796,6 @@ fn finish_tag(
     #[cfg(not(feature = "visitor"))]
     let _ = (output, stop);
     super::structure_capture::finish_element(capture.structure, tag_name, tag, handler.ctx);
-}
-
-fn convert_tag(
-    node_handle: &tl::NodeHandle,
-    tag: &tl::HTMLTag<'_>,
-    parser: &tl::Parser,
-    output: &mut String,
-    handler: HandlerContext<'_>,
-) {
-    let tag_name = normalized_node_tag_name(node_handle, tag, parser, handler.dom_ctx);
-    let djot_scope = djot_context(node_handle, parser, tag_name.as_ref(), handler);
-    let ctx = djot_scope.as_ref().unwrap_or(handler.ctx);
-    let handler = HandlerContext::new(handler.options, ctx, handler.depth, handler.dom_ctx);
-    let Some(capture) = begin_tag(node_handle, tag, parser, output, handler, handler.dom_ctx) else {
-        return;
-    };
-    let stop = super::main_dispatch::dispatch_tag(tag_name.as_ref(), node_handle, tag, parser, output, handler);
-    finish_tag(capture, tag_name.as_ref(), tag, output, handler, stop);
 }
 
 fn normalized_node_tag_name<'a>(

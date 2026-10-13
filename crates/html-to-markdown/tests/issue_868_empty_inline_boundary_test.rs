@@ -142,7 +142,7 @@ fn assert_routes_with_fast(source: &str, expected: &str, mode: &str, fast: Optio
             if mode == "strict" {
                 options.whitespace_mode = WhitespaceMode::Strict;
             }
-            if ["code", "del", "span", "p"].contains(&mode) {
+            if ["code", "del", "span", "p", "font"].contains(&mode) {
                 options.preserve_tags = vec![mode.into()];
             }
             let expected = if tier_strategy == TierStrategy::Tier1 {
@@ -712,4 +712,242 @@ fn should_preserve_visible_list_block_and_nonlist_prefix_ownership() {
         "strict",
     );
     assert_eq!(rows, 89);
+}
+
+#[test]
+fn should_merge_font_collapsible_boundaries_with_nbsp() {
+    let mut rows = 0;
+    for content in [
+        "",
+        "<!-- x -->",
+        "<span></span>",
+        " ",
+        "  ",
+        "\n",
+        "&#9;",
+        "&#13;",
+        "\r",
+    ] {
+        for prefix in ["", " ", "\n", " \n"] {
+            for tail in ["&nbsp;", "\u{a0}"] {
+                rows += assert_default_and_routes(&format!("<p>a{prefix}<font>{content}</font>{tail}b</p>"), "a b\n");
+            }
+        }
+    }
+    assert_eq!(rows, 504);
+}
+#[test]
+fn should_preserve_font_output_and_other_element_boundaries() {
+    let mut rows = 0;
+    for (source, expected) in [
+        ("<p>a <font>x </font>&nbsp;b</p>", "a x b\n"),
+        ("<p>a<font>&nbsp;</font>&nbsp;b</p>", "a b\n"),
+        ("<p>a\n<font><br></font>&nbsp;b</p>", "a  b\n"),
+        (
+            "<p>a\n<font><img src=\"x\" alt=\"y\"></font>&nbsp;b</p>",
+            "a ![y](x) b\n",
+        ),
+        ("<p>a\n<span>\n</span>&nbsp;b</p>", "a  b\n"),
+        ("<p>a <x-y></x-y>&nbsp;b</p>", "a  b\n"),
+        ("<p>a\n<font><code>\n</code></font>&nbsp;b</p>", "a  b\n"),
+        ("<pre>a <font> </font>&nbsp;b</pre>", "```\na \u{a0}b\n```\n"),
+        ("<p><code>a<font> </font>&nbsp;b</code></p>", "`a \u{a0}b`\n"),
+    ] {
+        rows += assert_default_and_routes(source, expected);
+    }
+    assert_eq!(
+        convert("<h2>a\n<x-y></x-y>&nbsp;b</h2>", None)
+            .expect("unknown heading")
+            .content
+            .as_deref(),
+        Some("## a  b\n")
+    );
+    rows += 1 + assert_routes_with_fast(
+        "<h2>a\n<x-y></x-y>&nbsp;b</h2>",
+        "## a  b\n",
+        "default",
+        Some("## a b\n"),
+    );
+    assert_eq!(rows, 70);
+}
+
+#[test]
+fn should_preserve_strict_and_serialized_font_content() {
+    let mut rows = 0;
+    for (source, strict, preserved) in [
+        ("<p>a <font></font>&nbsp;b</p>", "a  b\n", "a <font></font> b\n"),
+        ("<p>a<font> </font>&nbsp;b</p>", "a  b\n", "a<font> </font> b\n"),
+        (
+            "<p>a <font><span></span></font>&nbsp;b</p>",
+            "a  b\n",
+            "a <font><span></span></font> b\n",
+        ),
+        ("<h2>a <font></font>&nbsp;b</h2>", "## a  b\n", "## a <font></font> b\n"),
+        (
+            "<table><tr><td>a <font></font>&nbsp;b</td></tr></table>",
+            "| a  b |\n| ---- |\n",
+            "| a <font></font> b |\n| ----------------- |\n",
+        ),
+        (
+            "<pre>a <font> </font>&nbsp;b</pre>",
+            "```\na  b\n```\n",
+            "```\na <font> </font> b\n```\n",
+        ),
+    ] {
+        rows += assert_routes(source, strict, "strict");
+        rows += assert_routes(source, preserved, "font");
+    }
+    assert_eq!(rows, 72);
+}
+
+#[cfg(feature = "visitor")]
+#[derive(Debug)]
+struct FontBoundaryVisitor {
+    mode: usize,
+    starts: usize,
+    ends: usize,
+}
+#[cfg(feature = "visitor")]
+impl html_to_markdown_rs::visitor::HtmlVisitor for FontBoundaryVisitor {
+    fn visit_element_start(
+        &mut self,
+        ctx: &html_to_markdown_rs::visitor::NodeContext,
+    ) -> html_to_markdown_rs::visitor::VisitResult {
+        use html_to_markdown_rs::visitor::VisitResult;
+        if ctx.tag_name == "font" {
+            self.starts += 1;
+            if self.mode == 1 {
+                return VisitResult::Custom("V ".into());
+            }
+            if self.mode == 3 {
+                return VisitResult::Skip;
+            }
+        }
+        if self.mode == 4 && ctx.tag_name == "span" {
+            return VisitResult::Custom("V ".into());
+        }
+        VisitResult::Continue
+    }
+    fn visit_element_end(
+        &mut self,
+        ctx: &html_to_markdown_rs::visitor::NodeContext,
+        _out: &str,
+    ) -> html_to_markdown_rs::visitor::VisitResult {
+        use html_to_markdown_rs::visitor::VisitResult;
+        if ctx.tag_name == "font" {
+            self.ends += 1;
+            if self.mode == 2 {
+                return VisitResult::Custom("V ".into());
+            }
+        }
+        VisitResult::Continue
+    }
+}
+#[cfg(feature = "visitor")]
+fn assert_font_observer(source: &str, mode: usize, expected: &str, starts: usize, ends: usize) -> usize {
+    use std::sync::{Arc, Mutex};
+    let mut rows = 0;
+    for tier_strategy in [TierStrategy::Auto, TierStrategy::Tier1, TierStrategy::Tier2] {
+        for extract_metadata in [false, true] {
+            let visitor = Arc::new(Mutex::new(FontBoundaryVisitor {
+                mode,
+                starts: 0,
+                ends: 0,
+            }));
+            let result = convert(
+                source,
+                ConversionOptions {
+                    tier_strategy,
+                    extract_metadata,
+                    include_document_structure: true,
+                    visitor: Some(visitor.clone()),
+                    ..Default::default()
+                },
+            )
+            .expect("observed font output");
+            assert_eq!(result.content.as_deref(), Some(expected), "{source} observer {mode}");
+            let document = result.document.expect("document capture");
+            assert_eq!(document.source_format.as_deref(), Some("html"));
+            assert!(!document.nodes.is_empty());
+            let observed = {
+                let observer = visitor.lock().expect("observer calls");
+                (observer.starts, observer.ends)
+            };
+            assert_eq!(observed, (starts, ends));
+            rows += 1;
+        }
+    }
+    rows
+}
+#[cfg(feature = "visitor")]
+#[test]
+fn should_preserve_font_observer_replacements_and_table_measurements() {
+    let mut rows = 0;
+    for (source, expected) in [
+        (
+            "<p>a <font></font>&nbsp;b</p>",
+            [
+                ("a b\n", 1, 1),
+                ("a V  b\n", 1, 1),
+                ("a V  b\n", 1, 1),
+                ("a  b\n", 1, 0),
+                ("a b\n", 1, 1),
+            ],
+        ),
+        (
+            "<p>a<font> </font>&nbsp;b</p>",
+            [
+                ("a b\n", 1, 1),
+                ("aV  b\n", 1, 1),
+                ("aV  b\n", 1, 1),
+                ("a b\n", 1, 0),
+                ("a b\n", 1, 1),
+            ],
+        ),
+        (
+            "<p>a <font><span></span></font>&nbsp;b</p>",
+            [
+                ("a b\n", 1, 1),
+                ("a V  b\n", 1, 1),
+                ("a V  b\n", 1, 1),
+                ("a  b\n", 1, 0),
+                ("a V  b\n", 1, 1),
+            ],
+        ),
+        (
+            "<h2>a <font></font>&nbsp;b</h2>",
+            [
+                ("## a b\n", 1, 1),
+                ("## a V  b\n", 1, 1),
+                ("## a V  b\n", 1, 1),
+                ("## a  b\n", 1, 0),
+                ("## a b\n", 1, 1),
+            ],
+        ),
+        (
+            "<table><tr><td>a <font></font>&nbsp;b</td></tr></table>",
+            [
+                ("| a b  |\n| ---- |\n", 3, 3),
+                ("| a V  b |\n| ---- |\n", 3, 3),
+                ("| a V  b |\n| ---- |\n", 3, 3),
+                ("| a  b |\n| ---- |\n", 3, 0),
+                ("| a b  |\n| ---- |\n", 3, 3),
+            ],
+        ),
+        (
+            "<pre>a <font> </font>&nbsp;b</pre>",
+            [
+                ("```\na  b\n```\n", 1, 1),
+                ("```\na V  b\n```\n", 1, 1),
+                ("```\na V  b\n```\n", 1, 1),
+                ("```\na  b\n```\n", 1, 0),
+                ("```\na  b\n```\n", 1, 1),
+            ],
+        ),
+    ] {
+        for (mode, (content, starts, ends)) in expected.into_iter().enumerate() {
+            rows += assert_font_observer(source, mode, content, starts, ends);
+        }
+    }
+    assert_eq!(rows, 180);
 }
