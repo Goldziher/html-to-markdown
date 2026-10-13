@@ -164,12 +164,32 @@ fn prepare_conversion<'a>(html: &'a str, options: &ConversionOptions) -> Result<
         Cow::Borrowed(_) => normalized_input,
         Cow::Owned(normalized) => Cow::Owned(normalized),
     };
-    let normalized_input = normalize_closed_forms(normalized_input, options, has_visitor);
+    let removes_forms =
+        crate::converter::utility::preprocessing::removes_closed_forms(&normalized_input, options, has_visitor);
+    // ~keep Preserve the existing hidden-before-form ownership rule (#873), including bases.
+    let normalized_input = if removes_forms && options.hidden_content == crate::options::HiddenContent::Drop {
+        match crate::converter::utility::preprocessing::strip_hidden_elements(&normalized_input) {
+            Cow::Owned(stripped) => Cow::Owned(stripped),
+            Cow::Borrowed(_) => normalized_input,
+        }
+    } else {
+        normalized_input
+    };
+    // ~keep A document base remains effective even when its containing form is removed.
+    let read_base = |source: &str| {
+        (options.base_url.is_some() || options.extract_metadata)
+            .then(|| crate::converter::url_resolve::document_base_href(source))
+            .flatten()
+    };
+    let document_base_href = removes_forms.then(|| read_base(&normalized_input)).flatten();
+    let normalized_input = normalize_closed_forms(normalized_input, options.hidden_content, removes_forms);
     let (normalized_html, head_repair_limit) = repair_head(normalized_input.as_ref(), options.hidden_content)
         .map_or((normalized_input, None), |(html, limit)| (Cow::Owned(html), limit));
-    let document_base_href = (options.base_url.is_some() || options.extract_metadata)
-        .then(|| crate::converter::url_resolve::document_base_href(&normalized_html))
-        .flatten();
+    let document_base_href = if removes_forms {
+        document_base_href
+    } else {
+        read_base(&normalized_html)
+    };
     let effective_base = options
         .base_url
         .as_deref()
@@ -189,27 +209,17 @@ fn prepare_conversion<'a>(html: &'a str, options: &ConversionOptions) -> Result<
     })
 }
 
-fn normalize_closed_forms<'a>(input: Cow<'a, str>, options: &ConversionOptions, has_visitor: bool) -> Cow<'a, str> {
-    use crate::converter::utility::preprocessing::{
-        remove_closed_form_bodies, removes_closed_forms, strip_hidden_elements,
-    };
-    if !removes_closed_forms(&input, options, has_visitor) {
+fn normalize_closed_forms(
+    input: Cow<'_, str>,
+    hidden_content: crate::options::HiddenContent,
+    removes_forms: bool,
+) -> Cow<'_, str> {
+    if !removes_forms {
         return input;
     }
-    // ~keep Hidden subtrees are removed before form-pointer construction today (#873);
-    // ~keep a nested form end inside such a subtree must not end the outer removal early.
-    let stripped = if options.hidden_content == crate::options::HiddenContent::Drop {
-        strip_hidden_elements(&input)
-    } else {
-        Cow::Borrowed(input.as_ref())
-    };
-    let source = remove_closed_form_bodies(&stripped, options.hidden_content);
-    match source {
+    match crate::converter::utility::preprocessing::remove_closed_form_bodies(&input, hidden_content) {
         Cow::Owned(source) => Cow::Owned(source),
-        Cow::Borrowed(_) => match stripped {
-            Cow::Owned(stripped) => Cow::Owned(stripped),
-            Cow::Borrowed(_) => input,
-        },
+        Cow::Borrowed(_) => input,
     }
 }
 

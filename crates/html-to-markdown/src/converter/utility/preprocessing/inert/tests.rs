@@ -326,3 +326,19 @@ fn should_keep_inert_source_offsets_after_unicode_and_large_opaque_regions() {
         vec![html.find("<template id=real>").expect("real source start")]
     );
 }
+
+#[test]
+fn should_tokenize_only_relevant_tags_in_the_source_form_pass() {
+    use crate::options::HiddenContent;
+    for paragraphs in [100, 1000, 4000] {
+        let prefix = "<p>ordinary text <b>bold</b></p>".repeat(paragraphs);
+        for (suffix, tokens, bytes) in [("", 0, 0), ("<form>x</form>", 3, 13)] {
+            let source = format!("{prefix}{suffix}");
+            super::TOKEN_VISITS.with(|counter| counter.set(0));
+            super::TOKEN_BYTES.with(|counter| counter.set(0));
+            let _ = super::remove_closed_form_bodies(&source, HiddenContent::Drop);
+            assert_eq!(super::TOKEN_VISITS.with(std::cell::Cell::get), tokens);
+            assert_eq!(super::TOKEN_BYTES.with(std::cell::Cell::get), bytes);
+        }
+    }
+}

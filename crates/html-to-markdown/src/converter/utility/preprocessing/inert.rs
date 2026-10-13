@@ -707,9 +707,17 @@ fn feed_protected_regions(source: &str, input: &BufferQueue, tokenizer: &Tokeniz
             let name = &bytes[name_start..name_end];
             let relevant = !tokenizer.sink.namespaces.borrow().is_empty()
                 || (tokenizer.sink.remove_closed_forms
-                    && [b"form".as_slice(), b"table"]
-                        .iter()
-                        .any(|candidate| name.eq_ignore_ascii_case(candidate)))
+                    && [
+                        b"form".as_slice(),
+                        b"table",
+                        b"select",
+                        b"input",
+                        b"object",
+                        b"applet",
+                        b"marquee",
+                    ]
+                    .iter()
+                    .any(|candidate| name.eq_ignore_ascii_case(candidate)))
                 || [
                     "svg",
                     "math",

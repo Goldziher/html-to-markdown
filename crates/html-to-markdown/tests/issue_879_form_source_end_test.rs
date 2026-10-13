@@ -311,3 +311,217 @@ fn should_keep_the_nested_table_form_fallback_and_reset_after_the_outer_table() 
     );
     assert_output("<table></table></table><form>a<span>b</form>c", "c\n");
 }
+
+#[test]
+fn should_resolve_links_against_the_document_base_before_removing_its_form() {
+    for tier_strategy in ROUTES {
+        for extract_metadata in [false, true] {
+            let options = ConversionOptions {
+                tier_strategy,
+                extract_metadata,
+                base_url: Some("https://o.test/x/".into()),
+                ..Default::default()
+            };
+            let result = convert("<form><base href='https://b.test/d/'></form><a href='p'>l</a>", options)
+                .expect("base in removed form");
+            assert_eq!(
+                result.content.as_deref().and_then(|text| text.lines().last()),
+                Some("[l](https://b.test/d/p)")
+            );
+        }
+    }
+}
+
+#[test]
+fn should_keep_text_outside_the_select_that_contains_a_form_start() {
+    for html in [
+        "<select><option>o<form>a</select>x</form>c",
+        "<select><option>o<form>a</option></select>x</form>c",
+    ] {
+        assert_output(html, "o xc\n");
+    }
+}
+
+#[test]
+fn should_keep_form_content_when_preprocessing_is_disabled_but_remove_forms_is_set() {
+    for tier_strategy in ROUTES {
+        let mut options = ConversionOptions {
+            tier_strategy,
+            ..Default::default()
+        };
+        options.preprocessing.enabled = false;
+        assert!(options.preprocessing.remove_forms);
+        assert_eq!(
+            convert("<form>a<span>b</form>c", options)
+                .expect("disabled preprocessing")
+                .content
+                .as_deref(),
+            Some("abc\n")
+        );
+    }
+}
+
+#[test]
+fn should_remove_select_descendants_of_an_outer_form_without_losing_its_tail() {
+    assert_output("<form><span>a<select><option>o</select>x</form>c", "c\n");
+    assert_output("<form>a<select><option>o</select>x</form>c", "c\n");
+}
+
+#[test]
+fn should_keep_real_base_priority_while_ignoring_opaque_and_foreign_bases() {
+    for opaque in [
+        "<!-- <base href='https://fake.test/'> -->",
+        r#"<script>"<base href='https://fake.test/'>"</script>"#,
+        "<template><base href='https://fake.test/'></template>",
+        "<svg><base href='https://fake.test/'></svg>",
+        r#"<div title="<base href='https://fake.test/'>"></div>"#,
+    ] {
+        for tier_strategy in ROUTES {
+            let html = format!(
+                "<form>{opaque}<base href='https://b.test/d/'></form><base href='https://later.test/'><a href='p'>l</a>"
+            );
+            let result = convert(
+                &html,
+                ConversionOptions {
+                    tier_strategy,
+                    base_url: Some("https://o.test/x/".into()),
+                    ..Default::default()
+                },
+            )
+            .expect("base priority");
+            assert_eq!(
+                result.content.as_deref().and_then(|text| text.lines().last()),
+                Some("[l](https://b.test/d/p)"),
+                "{opaque:?}/{tier_strategy:?}"
+            );
+        }
+    }
+}
+
+#[test]
+fn should_keep_select_scope_with_selector_exclusion_and_preserved_ancestors() {
+    for tier_strategy in ROUTES {
+        for preserve in [false, true] {
+            for exclusion in [false, true] {
+                let options = ConversionOptions {
+                    tier_strategy,
+                    preserve_tags: if preserve { vec!["div".into()] } else { Vec::new() },
+                    exclude_selectors: if exclusion { vec!["form".into()] } else { Vec::new() },
+                    ..Default::default()
+                };
+                assert_eq!(
+                    convert("<select><option>o<form>a</select>x</form>c", options)
+                        .expect("select ownership")
+                        .content
+                        .as_deref(),
+                    Some("o xc\n")
+                );
+            }
+        }
+    }
+}
+
+#[cfg(feature = "visitor")]
+#[test]
+fn should_keep_select_scope_with_a_visitor() {
+    use html_to_markdown_rs::visitor::HtmlVisitor;
+    use std::sync::{Arc, Mutex};
+    #[derive(Debug)]
+    struct Observer;
+    impl HtmlVisitor for Observer {
+        fn visit_form(
+            &mut self,
+            _ctx: &html_to_markdown_rs::visitor::NodeContext,
+            _action: Option<&str>,
+            _method: Option<&str>,
+        ) -> html_to_markdown_rs::visitor::VisitResult {
+            html_to_markdown_rs::visitor::VisitResult::Skip
+        }
+    }
+    for tier_strategy in ROUTES {
+        assert_eq!(
+            convert(
+                "<select><option>o<form>a</select>x</form>c",
+                ConversionOptions {
+                    tier_strategy,
+                    visitor: Some(Arc::new(Mutex::new(Observer))),
+                    ..Default::default()
+                }
+            )
+            .expect("select visitor")
+            .content
+            .as_deref(),
+            Some("o xc\n")
+        );
+    }
+}
+
+#[test]
+fn should_keep_hidden_base_priority_before_removing_visible_forms() {
+    for hidden in ["hidden", "style='display:none'"] {
+        for tier_strategy in ROUTES {
+            let html = format!(
+                "<form>a</form><div {hidden}><base href='https://fake.test/'></div><base href='https://real.test/'><a href='p'>l</a>"
+            );
+            let result = convert(
+                &html,
+                ConversionOptions {
+                    tier_strategy,
+                    base_url: Some("https://o.test/x/".into()),
+                    ..Default::default()
+                },
+            )
+            .expect("hidden base priority");
+            assert_eq!(
+                result.content.as_deref().and_then(|text| text.lines().last()),
+                Some("[l](https://real.test/p)")
+            );
+        }
+    }
+}
+
+#[test]
+fn should_keep_the_literal_form_end_policy_when_it_precedes_the_select_end() {
+    assert_output("<select><option>o<form><span>a</form>c", "oc\n");
+    assert_output("<select><option>o<form><span>a</form>c</select>x", "oc x\n");
+    assert_output("<select><form><span>a</form>c</select>", "c\n");
+}
+
+#[test]
+fn should_retain_the_form_pointer_after_select_scope_releases_it() {
+    for html in [
+        "<select><form>a</select><form>b</form>c</form>d",
+        "<select><form>a<input><form>b</form>c</form>d",
+        "<select><form>a<select><form>b</form>c</form>d",
+    ] {
+        assert_output(html, "bcd\n");
+    }
+}
+
+#[test]
+fn should_keep_literal_form_tails_when_a_scope_blocker_prevents_select_release() {
+    for blocker in ["object", "applet", "marquee"] {
+        for ending in ["</select>", "<input>", "<select>"] {
+            assert_output(
+                &format!("<select><{blocker}><form><span>a{ending}b</form>c</{blocker}></select>d"),
+                "c d\n",
+            );
+        }
+    }
+}
+
+#[test]
+fn should_keep_form_tails_when_table_scope_ignores_a_select_end() {
+    assert_output(
+        "<select><form><span>a<table><tbody><tr><td></select>x</td></tr></tbody></table>b</form>c</select>d",
+        "c d\n",
+    );
+}
+
+#[test]
+fn should_ignore_mismatched_scope_blocker_ends_without_losing_form_tails() {
+    assert_output(
+        "<select><object><applet><form><span>a</object></select>b</form>c</applet></object></select>d",
+        "c d\n",
+    );
+}
