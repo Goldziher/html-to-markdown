@@ -72,8 +72,7 @@ pub fn handle_mark(handler: HandlerContext<'_>) {
     let child_ctx = Context {
         in_strong: ctx.in_strong || options.highlight_style == HighlightStyle::Bold,
         ..match options.highlight_style {
-            HighlightStyle::None if has_only_blank_text_children(tag, parser) => ctx.clone(),
-            HighlightStyle::None => ctx.inline_buffer(output, false),
+            HighlightStyle::None => unmarked_buffer_context(tag, parser, ctx, output),
             _ => marked_buffer_context(ctx, output),
         }
     };
@@ -102,13 +101,31 @@ pub fn handle_mark(handler: HandlerContext<'_>) {
     );
 }
 
+fn unmarked_buffer_context(tag: &tl::HTMLTag<'_>, parser: &tl::Parser<'_>, context: &Context, output: &str) -> Context {
+    if has_only_blank_text_children(tag, parser) {
+        context.clone()
+    } else if has_only_raw_text_children(tag, parser) {
+        context.inline_text_buffer(output)
+    } else {
+        context.inline_buffer(output, false)
+    }
+}
+
 // ~keep Blank raw text returns before Markdown text-content processing, without reading inline line state.
-// ~keep Tags, comments and encoded text retain their ordinary child context; parent hooks ran first.
+// ~keep Tags and comments retain column-aware child context; parent hooks ran first.
 fn has_only_blank_text_children(tag: &tl::HTMLTag<'_>, parser: &tl::Parser<'_>) -> bool {
     tag.children().top().iter().all(|handle| {
         matches!(handle.get(parser), Some(tl::Node::Raw(raw))
             if crate::converter::utility::white_space::is_blank(raw.as_utf8_str().as_ref()))
     })
+}
+
+// ~keep Encoded tags and text-hook replacements stay text; only real child tags can consume list columns.
+fn has_only_raw_text_children(tag: &tl::HTMLTag<'_>, parser: &tl::Parser<'_>) -> bool {
+    tag.children()
+        .top()
+        .iter()
+        .all(|handle| matches!(handle.get(parser), Some(tl::Node::Raw(_))))
 }
 
 // ~keep A guaranteed opening marker makes the last-line column irrelevant to list rendering.
@@ -905,3 +922,7 @@ mod line_state_cost_tests {
 #[cfg(test)]
 #[path = "blank_text_cost_tests.rs"]
 mod blank_text_cost_tests;
+
+#[cfg(test)]
+#[path = "raw_text_column_cost_tests.rs"]
+mod raw_text_column_cost_tests;
