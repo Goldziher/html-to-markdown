@@ -647,3 +647,35 @@ fn should_collect_hidden_base_before_form_removal_without_a_caller_base() {
         assert_eq!(result.metadata.document.base_href.as_deref(), Some("https://b.test/d/"));
     }
 }
+
+#[cfg(feature = "metadata")]
+#[test]
+fn should_repair_structured_script_boundaries_before_removing_adjacent_forms() {
+    let json = r#"{"@type":"Thing","name":"雪"}"#;
+    for html in [
+        format!("<script type='application/ld+json'>{json}<form>a<span>b</form><p>tail</p>"),
+        format!("<form>a<span>b</form><script type='application/ld+json'>{json}<p>tail</p>"),
+    ] {
+        for tier_strategy in ROUTES {
+            for output_format in [OutputFormat::Markdown, OutputFormat::Djot, OutputFormat::Plain] {
+                let result = convert(
+                    &html,
+                    ConversionOptions {
+                        tier_strategy,
+                        output_format,
+                        extract_metadata: true,
+                        ..Default::default()
+                    },
+                )
+                .expect("adjacent script and form conversion");
+                assert_eq!(
+                    result.content.as_deref(),
+                    Some("tail\n"),
+                    "{html}/{tier_strategy:?}/{output_format:?}"
+                );
+                assert_eq!(result.metadata.structured_data.len(), 1);
+                assert_eq!(result.metadata.structured_data[0].raw_json, json);
+            }
+        }
+    }
+}

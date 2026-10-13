@@ -258,7 +258,7 @@ fn should_avoid_source_and_entity_decoded_body_marker_collisions() {
     assert_eq!(bodies.get("h2m_inert_body_2_end").map(String::as_str), Some("<p>x"));
     assert!(normalized.contains("<noscript>h2m_inert_body_2_end</noscript>"));
     let mut dom = tl::parse(&normalized, tl::ParserOptions::default()).expect("parse protected bodies");
-    super::restore_inert_bodies(&mut dom, &bodies).expect("restore original bodies");
+    crate::converter::utility::preprocessing::restore_inert_bodies(&mut dom, &bodies).expect("restore original bodies");
     assert_eq!(
         crate::converter::utility::serialization::serialize_tag_to_html(&dom.children()[1], dom.parser()),
         "<noscript><p>x</noscript>"

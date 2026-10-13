@@ -153,17 +153,19 @@ fn prepare_conversion<'a>(html: &'a str, options: &ConversionOptions) -> Result<
     let has_visitor = false;
     let preserve_bodies = options.output_format != crate::options::OutputFormat::Plain
         && (has_visitor || !options.preserve_tags.is_empty());
-    let (inert_html, inert_bodies) = crate::converter::utility::preprocessing::normalize_inert_bodies_with_preservation(
-        &normalized_input,
-        preserve_bodies,
-        options.hidden_content,
-    );
-    // ~keep The page of `drop` says whether the head is repaired, for each choice: a `<head>` tag
-    // ~keep in kept content is no head of the page, and a browser ignores it there.
+    let (inert_html, mut inert_bodies) =
+        crate::converter::utility::preprocessing::normalize_inert_bodies_with_preservation(
+            &normalized_input,
+            preserve_bodies,
+            options.hidden_content,
+        );
     let normalized_input = match inert_html {
         Cow::Borrowed(_) => normalized_input,
         Cow::Owned(normalized) => Cow::Owned(normalized),
     };
+    // ~keep Recover the JSON boundary before routing or raw-text stripping can consume visible siblings (#875).
+    let normalized_input =
+        normalize_structured_data_scripts(normalized_input, options, preserve_bodies, &mut inert_bodies);
     let removes_forms =
         crate::converter::utility::preprocessing::removes_closed_forms(&normalized_input, options, has_visitor);
     // ~keep A document base stays effective when hidden stripping or form removal removes its container.
@@ -183,6 +185,8 @@ fn prepare_conversion<'a>(html: &'a str, options: &ConversionOptions) -> Result<
         normalized_input
     };
     let normalized_input = normalize_closed_forms(normalized_input, options.hidden_content, removes_forms);
+    // ~keep The page of `drop` says whether the head is repaired, for each choice: a `<head>` tag
+    // ~keep in kept content is no head of the page, and a browser ignores it there.
     let (normalized_html, head_repair_limit) = repair_head(normalized_input.as_ref(), options.hidden_content)
         .map_or((normalized_input, None), |(html, limit)| (Cow::Owned(html), limit));
     let document_base_href = if removes_forms {
@@ -207,6 +211,27 @@ fn prepare_conversion<'a>(html: &'a str, options: &ConversionOptions) -> Result<
         metadata_base_href,
         head_repair_limit,
     })
+}
+
+fn normalize_structured_data_scripts<'a>(
+    input: Cow<'a, str>,
+    options: &ConversionOptions,
+    preserve_bodies: bool,
+    inert_bodies: &mut std::collections::HashMap<String, String>,
+) -> Cow<'a, str> {
+    let repaired_scripts = crate::converter::utility::preprocessing::repair_unclosed_structured_data_scripts(
+        input.as_ref(),
+        (preserve_bodies
+            && options
+                .preserve_tags
+                .iter()
+                .any(|tag| tag.eq_ignore_ascii_case("script")))
+        .then_some(inert_bodies),
+    );
+    match repaired_scripts {
+        Cow::Borrowed(_) => input,
+        Cow::Owned(repaired) => Cow::Owned(repaired),
+    }
 }
 
 fn normalize_closed_forms(
