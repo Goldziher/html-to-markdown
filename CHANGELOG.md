@@ -43,6 +43,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   retains its hard break on every route, including in the first paragraph (#863). Code-like elements with block children or leading breaks use the full
   converter's tree rules on every route, avoiding different output from the fast scanner (#842).
 
+- Removed script elements no longer insert a space between adjacent words. Authored whitespace
+  and style-element boundaries retain their existing behavior
+  ([#827](https://github.com/xberg-io/html-to-markdown/issues/827)).
+
 - Unmarked `mark` elements with only direct text children no longer count an unused line
   column. Nested elements still retain live list columns; suffix classification and line
   searches remain unchanged ([#862](https://github.com/xberg-io/html-to-markdown/issues/862)).
