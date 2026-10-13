@@ -193,11 +193,24 @@ fn blank_break_content<'a>(
     options: &ConversionOptions,
 ) -> &'a str {
     // ~keep Flow owners drop a leading break (#572); detached scratch buffers retain its
-    // sentinel (#504). A leading break before only blank text keeps the old separator.
+    // sentinel (#504). Noncollapsible blank tails retain the old separator.
     if drop_at_paragraph_start {
-        after_breaks
+        let marker = crate::converter::main_helpers::hard_break_marker(options);
+        if content.ends_with(marker) && content.trim_end_matches(marker).trim().is_empty() {
+            ""
+        } else {
+            after_breaks
+        }
     } else if after_breaks.len() < content.len() && !content.ends_with('\n') {
-        " "
+        // ~keep ASCII blank tails keep the detached break sentinel; NBSP keeps its old separator (#863/#843).
+        if after_breaks
+            .chars()
+            .all(crate::converter::utility::white_space::is_collapsible)
+        {
+            &content[..content.len() - after_breaks.len()]
+        } else {
+            " "
+        }
     } else if output.is_empty()
         && content.ends_with('\n')
         && content
@@ -244,7 +257,11 @@ fn move_leading_hard_breaks<'a>(
     // ~keep Bare newlines carry breaks across detached wrappers until a flow owner can emit
     // them. Its leading break is dropped, even after a structural list marker or prior block.
     let drop_at_paragraph_start = inline_break_owner(output, ctx) == Some(output.len());
-    if after_breaks.trim().is_empty() {
+    if after_breaks
+        .trim_end_matches(crate::converter::main_helpers::hard_break_marker(options))
+        .trim()
+        .is_empty()
+    {
         return blank_break_content(content, after_breaks, output, drop_at_paragraph_start, options);
     }
 
@@ -312,6 +329,24 @@ fn strong_separator_content<'a>(output: &str, content: &'a str, site: InlineSite
         || ctx.in_strong
         || ctx.in_code
         || ctx.in_code_block
+    {
+        return content;
+    }
+    // ~keep A directly authored em break follows real strong content; nested blank wrappers remain separators.
+    if site
+        .dom_ctx
+        .tag_info(site.node_handle.get_inner(), site.parser)
+        .is_some_and(|tag| tag.name == "em")
+        && site
+            .dom_ctx
+            .children_of(site.node_handle.get_inner())
+            .is_some_and(|children| {
+                children.iter().any(|child| {
+                    site.dom_ctx
+                        .tag_info(child.get_inner(), site.parser)
+                        .is_some_and(|tag| tag.name == "br")
+                })
+            })
     {
         return content;
     }

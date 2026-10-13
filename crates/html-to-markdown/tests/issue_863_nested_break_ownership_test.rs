@@ -206,3 +206,51 @@ fn should_keep_a_hard_break_after_literal_marker_looking_prose() {
         }
     }
 }
+
+#[test]
+fn should_keep_a_break_only_emphasis_after_a_real_strong_sibling() {
+    for (html, prefix) in [
+        ("<p>x</p><p><b>a</b><em><br></em>b</p>", "x\n\n**a**"),
+        ("<p><b>a</b><em> <br></em>b</p>", "**a**"),
+    ] {
+        for (style, line_break) in [(NewlineStyle::Spaces, "  \n"), (NewlineStyle::Backslash, "\\\n")] {
+            let before_break = if html.contains("<em> ") && style == NewlineStyle::Backslash {
+                " "
+            } else {
+                ""
+            };
+            assert_routes(html, &format!("{prefix}{before_break}{line_break}b\n"), style);
+        }
+    }
+}
+#[test]
+fn should_keep_a_nested_break_followed_by_blank_text_in_a_later_flow_owner() {
+    for tail in [" ", "\t"] {
+        for (style, line_break) in [(NewlineStyle::Spaces, "  \n"), (NewlineStyle::Backslash, "\\\n")] {
+            let html = format!("<p>x</p><div>a<b><br>{tail}</b>b</div>");
+            assert_routes(&html, &format!("x\n\na{line_break}b\n"), style);
+        }
+    }
+}
+#[test]
+fn should_drop_a_leading_wrapped_em_space_break_in_a_later_paragraph() {
+    for style in [NewlineStyle::Spaces, NewlineStyle::Backslash] {
+        assert_routes("<p>x</p><p><b>&emsp;<br></b>w</p>", "x\n\nw\n", style);
+    }
+}
+#[test]
+fn should_keep_breaks_when_a_strong_sibling_emits_no_close_marker() {
+    for (style, line_break) in [(NewlineStyle::Spaces, "  \n"), (NewlineStyle::Backslash, "\\\n")] {
+        assert_routes("<p>a<b></b><b><br></b>b</p>", &format!("a{line_break}b\n"), style);
+    }
+}
+#[test]
+fn should_keep_a_break_inside_strong_content_after_a_nested_strong_sibling() {
+    // ~keep Literal marker-looking text makes the in-strong guard independent of the close-marker guard.
+    for text in ["x", "x**"] {
+        for (style, line_break) in [(NewlineStyle::Spaces, "  \n"), (NewlineStyle::Backslash, "\\\n")] {
+            let html = format!("<p><b>a<b>{text}</b><b><br></b>y</b></p>");
+            assert_routes(&html, &format!("**a{text}{line_break}y**\n"), style);
+        }
+    }
+}
