@@ -270,7 +270,7 @@ fn should_preserve_prefixes_after_blocks_with_retained_text() {
 fn should_keep_header_custom_and_covered_block_prefix_contracts() {
     let mut rows = 0;
     for (tag, expected) in [
-        ("header", "- a\n  b\n"),
+        ("header", "- a\n   b\n"),
         ("x-y", "- a b\n"),
         ("h1", "- a\n   b\n"),
         ("section", "- a\n   b\n"),

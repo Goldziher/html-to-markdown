@@ -496,6 +496,7 @@ impl TextProcessor<'_, '_, '_> {
                             | "center"
                             | "dialog"
                             | "hgroup"
+                            | "header"
                     )
                 )
         })
