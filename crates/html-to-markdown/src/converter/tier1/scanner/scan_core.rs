@@ -494,20 +494,10 @@ impl<'a> Tier1Scanner<'a> {
         };
         self.pos = find_raw_text_close(self.bytes, open_end, name_lower).unwrap_or(self.bytes.len());
 
-        // ~keep Tier-2's `strip_script_and_style_tags` preprocessing pass
-        // (converter/utility/preprocessing.rs, outside tier1/) inserts a
-        // boundary space *per removed element* when its source-adjacent
-        // self.bytes are non-whitespace.  Two `<script>`/`<style>` tags sitting
-        // back-to-back with zero separating whitespace therefore each
-        // contribute a boundary space, and — because they collapse to a
-        // single whitespace-only DOM text node — Tier-2's downstream
-        // whitespace-mode handling of that node produces an idiosyncratic
-        // byte pattern (observed: a stray `\n\n  \n` at the nuxt-example
-        // fixture's trailing `<script><script></body>`) that is specific
-        // to whitespace-only-node handling, not reproducible by mirroring
-        // the boundary-space rule alone.  Bail so Tier-2 (authoritative)
-        // handles this rare, adjacency-only case; the single-tag word-glue
-        // mirror below still covers the common case.
+        // ~keep Tier-2 inserts a boundary space per removed style when its source neighbors
+        // ~keep are non-whitespace. Adjacent raw-text tags can coalesce those spaces into a
+        // ~keep whitespace-only DOM text node whose rendering the scanner cannot mirror.
+        // ~keep Keep the adjacency fallback so Tier-2 handles that case.
         if is_adjacent_rawtext_ignored_open(self.bytes, self.pos) {
             return Err(BailReason::AdjacentRawTextTags { offset: self.pos });
         }
@@ -527,14 +517,14 @@ impl<'a> Tier1Scanner<'a> {
         }
 
         self.text_start = self.pos;
-        // ~keep Mirror the single-element boundary-space rule: a space is
-        // inserted only when the removed tag would otherwise glue two
+        // ~keep Mirror the style boundary-space rule: a space is
+        // inserted only when the removed style would otherwise glue two
         // word characters together.  The "before" check uses the emitted
         // output tail (not the raw source byte) so that a space already
         // produced by a preceding sibling is never doubled up; the "after"
         // check peeks the next source byte, matching Tier-2's boundary
         // condition exactly.
-        if name_lower == b"script" || name_lower == b"style" {
+        if name_lower == b"style" {
             let after_is_word = self.pos < self.bytes.len() && !self.bytes[self.pos].is_ascii_whitespace();
             if after_is_word {
                 let dest = self.state.cell_or_output_mut();

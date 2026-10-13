@@ -28,6 +28,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Removed script elements no longer insert a space between adjacent words. Authored whitespace
+  and style-element boundaries retain their existing behavior
+  ([#827](https://github.com/xberg-io/html-to-markdown/issues/827)).
+
 - Unmarked `mark` elements with only direct text children no longer count an unused line
   column. Nested elements still retain live list columns; suffix classification and line
   searches remain unchanged ([#862](https://github.com/xberg-io/html-to-markdown/issues/862)).

@@ -111,5 +111,9 @@ required-features = ["testkit"]
 name = "review_791_block_boundaries_test"
 required-features = ["testkit"]
 
+[[test]]
+name = "issue_827_removed_script_join_test"
+required-features = ["testkit"]
+
 [lints]
 workspace = true
