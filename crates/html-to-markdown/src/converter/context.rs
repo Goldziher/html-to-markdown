@@ -19,6 +19,7 @@ use crate::types::structure_collector::StructureCollectorHandle;
 
 #[cfg(test)]
 thread_local! {
+    pub(crate) static INLINE_BUFFER_CONTEXT_CALLS: Cell<usize> = const { Cell::new(0) };
     pub(crate) static INLINE_BUFFER_TAIL_CHAR_READS: Cell<usize> = const { Cell::new(0) };
     pub(crate) static INLINE_BUFFER_COLUMN_CHAR_READS: Cell<usize> = const { Cell::new(0) };
 }
@@ -500,6 +501,8 @@ impl Context {
     /// ~keep After only indent or a list item's marker, the list's first marker starts an item
     /// ~keep where that line ends, as it would with no wrapper.
     pub(crate) fn inline_buffer(&self, output: &str, opens_with_marker: bool) -> Self {
+        #[cfg(test)]
+        INLINE_BUFFER_CONTEXT_CALLS.with(|calls| calls.set(calls.get() + 1));
         // ~keep Bare list markers end in ASCII space. A final non-whitespace character proves
         // ~keep this detached buffer follows text, so its column cannot be consumed by a list (#862).
         if self.in_marker_span
