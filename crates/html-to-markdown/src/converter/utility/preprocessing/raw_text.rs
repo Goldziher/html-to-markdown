@@ -86,8 +86,8 @@ struct RawTextElement<'a> {
 /// before it to `*output` (lazily allocated). `tag_end` is the end of its start tag;
 /// `close_start` and `close_idx` are the two ends of its end tag.
 ///
-/// A removed element leaves one space when the two characters around it are not white space.
-/// A kept element is written by `push_kept_element` and adds no space: the walker reads the
+/// A removed `style` leaves one space when the two characters around it are not white space.
+/// A removed script leaves none (#827). A kept element is written by `push_kept_element` and adds no space: the walker reads the
 /// white space on its two sides as if the element were not there.
 ///
 /// Returns what it did. A `textarea` with no `<` needs no change and is not written again.
@@ -117,7 +117,8 @@ fn strip_raw_text_element(
         push_kept_element(out, element.name, element.mark, attributes, body);
         return Outcome::Kept;
     }
-    if element.idx > 0
+    if element.content == RawTextContent::Removed
+        && element.idx > 0
         && close_idx < bytes.len()
         && !bytes[element.idx - 1].is_ascii_whitespace()
         && !bytes[close_idx].is_ascii_whitespace()

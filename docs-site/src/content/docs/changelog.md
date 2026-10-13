@@ -35,10 +35,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - A page is not empty when a structured data script has a slash or a form feed after `script` in its start tag and `<script>` in its JSON ([#825](https://github.com/xberg-io/html-to-markdown/issues/825)).
 - A `script` or `style` start tag with no end tag follows one rule in every spelling on the full converter, the rule of [#277](https://github.com/xberg-io/html-to-markdown/issues/277): the markup after it is written. A start tag with a form feed after its name, or with an apostrophe in an attribute value with no quotes, was not read: `<p>a</p><script data=it's><p>b</p>` gave `a` and now gives `a` and `b`.
 - A character reference in a structured data script is kept as written in the metadata: `{"a":"&lt;p&gt;"}` gave `{"a":"<p>"}` in `raw_json` and now gives `{"a":"&lt;p&gt;"}` ([#824](https://github.com/xberg-io/html-to-markdown/issues/824)).
-- A structured data script adds no space of its own: `<p>foo<script type="application/ld+json">{}</script>bar</p>` gives `foobar` with both converters (the fast converter gave `foo bar`) ([#827](https://github.com/xberg-io/html-to-markdown/issues/827)).
 - In plain output, white space on the two sides of a structured data script, a template, a comment, a `noscript` or a `math` element gives one space with the full converter: `<p>foo <script type="application/ld+json">{}</script> bar</p>` gave `foo  bar` and now gives `foo bar` ([#827](https://github.com/xberg-io/html-to-markdown/issues/827)).
 - A `script`, `style` or `textarea` tag inside a bogus comment (`<? ... >`, `<! ... >`, `</ ... >`) starts no element: `<p>before</p><?x <script>?><b>Shown</b><?x </script>?><p>after</p>` gave `before` and `after` and now gives `?>**Shown**?>` between them.
 - A page with many `script` or `style` start tags with no end tag converts in linear time; the time was quadratic. In a release build 2,000 `<script>` start tags took 48 ms and now take 1 ms, and 32,000 took 12 s and now take 16 ms.
+- Removed script elements no longer insert a space between adjacent words. Authored whitespace
+  and style-element boundaries retain their existing behavior
+  ([#827](https://github.com/xberg-io/html-to-markdown/issues/827)).
 
 - Unmarked `mark` elements with only direct text children no longer count an unused line
   column. Nested elements still retain live list columns; suffix classification and line
