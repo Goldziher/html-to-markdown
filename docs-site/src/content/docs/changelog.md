@@ -34,6 +34,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   layout and nested tables. The document table grid excludes the same selected parts
   ([#730](https://github.com/xberg-io/crawlberg/issues/730)).
 
+- Normalized Markdown and Djot retain no-break-space prefixes after empty `header`, `figcaption`,
+  `address`, `fieldset`, `center`, `dialog`, and `hgroup` blocks in list continuations (#868).
+
+- Strict whitespace treats space/tab-only line-break replacements and visitor-skipped
+  inline break subtrees as omissions, while retaining breaks on later table passes (#868).
+
 - Strict whitespace no longer turns an empty line-break callback or a CSS-excluded
   break subtree into a hard break inside blank inline wrappers (#868).
 

@@ -135,6 +135,18 @@ required-features = ["testkit"]
 name = "issue_868_nonflow_list_prefix_test"
 required-features = ["testkit"]
 
+[[test]]
+name = "issue_868_visitor_break_boundary_test"
+required-features = ["testkit"]
+
+[[test]]
+name = "issue_868_empty_list_block_prefix_test"
+required-features = ["testkit"]
+
+[[test]]
+name = "issue_868_header_list_prefix_test"
+required-features = ["testkit"]
+
 [[example]]
 name = "test_deser"
 required-features = ["serde"]

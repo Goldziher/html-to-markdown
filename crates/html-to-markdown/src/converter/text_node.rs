@@ -490,6 +490,13 @@ impl TextProcessor<'_, '_, '_> {
                             | "footer"
                             | "main"
                             | "details"
+                            | "figcaption"
+                            | "address"
+                            | "fieldset"
+                            | "center"
+                            | "dialog"
+                            | "hgroup"
+                            | "header"
                     )
                 )
         })
