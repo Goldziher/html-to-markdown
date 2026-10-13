@@ -716,16 +716,6 @@ fn feed_protected_regions(source: &str, input: &BufferQueue, tokenizer: &Tokeniz
     }
 }
 
-#[derive(Clone, Copy)]
-enum AttributeScan {
-    BeforeName,
-    Name,
-    AfterName,
-    BeforeValue,
-    Unquoted,
-    Quoted(u8),
-}
-
 pub(super) fn scan_markup_end(bytes: &[u8], start: usize) -> Option<usize> {
     if bytes[start..].starts_with(b"<!--") {
         let body = start + 4;
@@ -749,31 +739,9 @@ pub(super) fn scan_markup_end(bytes: &[u8], start: usize) -> Option<usize> {
     if matches!(bytes.get(start + 1), Some(b'!' | b'?')) || bogus_end_tag {
         return memchr::memchr(b'>', &bytes[start + 2..]).map(|offset| start + offset + 3);
     }
-    let name_start = start + 1 + usize::from(bytes.get(start + 1) == Some(&b'/'));
-    let name_end = bytes[name_start..]
-        .iter()
-        .position(|byte| matches!(byte, b'>' | b'/' | b' ' | b'\t' | b'\n' | b'\r' | b'\x0c'))
-        .map_or(bytes.len(), |offset| name_start + offset);
-    let mut state = AttributeScan::BeforeName;
-    for (offset, byte) in bytes[name_end..].iter().copied().enumerate() {
-        if byte == b'>' && !matches!(state, AttributeScan::Quoted(_)) {
-            return Some(name_end + offset + 1);
-        }
-        state = match state {
-            AttributeScan::Quoted(delimiter) if byte != delimiter => state,
-            AttributeScan::Quoted(_) => AttributeScan::BeforeName,
-            AttributeScan::Unquoted if !byte.is_ascii_whitespace() => state,
-            AttributeScan::Unquoted => AttributeScan::BeforeName,
-            AttributeScan::BeforeValue if byte.is_ascii_whitespace() => state,
-            AttributeScan::BeforeValue if matches!(byte, b'\'' | b'"') => AttributeScan::Quoted(byte),
-            AttributeScan::BeforeValue => AttributeScan::Unquoted,
-            AttributeScan::Name | AttributeScan::AfterName if byte == b'=' => AttributeScan::BeforeValue,
-            AttributeScan::Name if byte.is_ascii_whitespace() => AttributeScan::AfterName,
-            _ if byte.is_ascii_whitespace() || byte == b'/' => AttributeScan::BeforeName,
-            _ => AttributeScan::Name,
-        };
-    }
-    None
+    // ~keep The first pass of the raw-text elements reads a tag to its end with the same read,
+    // ~keep so a start tag ends at one place for the repair of a script and for that pass.
+    super::raw_text::tag_end_from_name(bytes, start + 1)
 }
 
 #[cfg(test)]

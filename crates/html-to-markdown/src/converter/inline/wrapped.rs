@@ -594,6 +594,7 @@ mod tests {
                 inline_collector: None,
                 #[cfg(feature = "metadata")]
                 metadata_collector: None,
+                kept_scripts: crate::converter::utility::preprocessing::KeptScripts::default(),
                 #[cfg(feature = "visitor")]
                 visitor: None,
                 structure_collector: None,

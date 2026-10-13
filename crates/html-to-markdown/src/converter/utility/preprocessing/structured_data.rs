@@ -14,10 +14,21 @@ pub fn repair_unclosed_structured_data_scripts<'a>(
     input: &'a str,
     originals: Option<&mut std::collections::HashMap<String, String>>,
 ) -> Cow<'a, str> {
-    let Some(originals) = originals else {
-        return repair_scripts(input, None, &mut ScriptEndSearch::default());
-    };
+    match originals {
+        Some(originals) => repair_unclosed_structured_data_scripts_reserving(input, originals, &[]),
+        None => repair_scripts(input, None, &mut ScriptEndSearch::default()),
+    }
+}
+
+/// [`repair_unclosed_structured_data_scripts`] with the bytes of each repaired script kept in
+/// `originals`, where no owner mark of the repair has a number of `reserved`.
+pub fn repair_unclosed_structured_data_scripts_reserving<'a>(
+    input: &'a str,
+    originals: &mut std::collections::HashMap<String, String>,
+    reserved: &[usize],
+) -> Cow<'a, str> {
     let mut preserved = PreservedBodies::new(input);
+    preserved.reserve(reserved);
     preserved.extend_originals(std::mem::take(originals));
     let repaired = repair_scripts(input, Some(&mut preserved), &mut ScriptEndSearch::default());
     *originals = preserved.originals;
@@ -190,7 +201,7 @@ fn write_repaired_script(
     output.push_str(&input[copied..open_tag.start]);
     // ~keep tl needs matching tag-name case; this changes only a synthesized missing close.
     output.push_str("<script");
-    let mut body = &input[open_tag.end..body_end];
+    let body = &input[open_tag.end..body_end];
     if let Some(preserved) = preserved {
         // ~keep Bind the marker to its repaired script so parser-normalized authored text cannot claim its JSON.
         let (marker, attribute) = preserved.protect_script(body);
@@ -204,26 +215,32 @@ fn write_repaired_script(
         if attributes.starts_with('/') {
             output.push(' ');
         }
-        // ~keep Non-void script slash tokens must not strand an owned body in tl; attribute bytes stay authored.
-        let mut copied = 0;
-        for slash in standalone_script_slashes(attributes.as_bytes()) {
-            output.push_str(&attributes[copied..slash]);
-            copied = slash + 1;
-        }
-        output.push_str(&attributes[copied..]);
+        push_without_standalone_slashes(output, attributes);
         output.push_str(&marker);
         output.push_str("</script>");
         return;
     }
     output.push_str(&input[open_tag.start + "<script".len()..open_tag.end]);
-    // ~keep Script references are literal. One metadata decode restores escaped < and & bytes.
-    while let Some(at) = memchr::memchr2(b'<', b'&', body.as_bytes()) {
-        output.push_str(&body[..at]);
-        output.push_str(if body.as_bytes()[at] == b'<' { "&lt;" } else { "&amp;" });
-        body = &body[at + 1..];
-    }
+    // ~keep The body is written as the page has it, like a script with an end tag of the author.
+    // ~keep The first pass of the kept scripts escapes it and gives it an owner mark, so the
+    // ~keep metadata reads the bytes of the page and decodes nothing (#824).
     output.push_str(body);
     output.push_str("</script>");
+}
+
+/// Write `attributes`, a start tag after its name with its `>`, with no `/` that stands alone
+/// between two attributes.
+///
+/// ~keep Non-void script slash tokens must not strand an owned body in tl; attribute bytes stay authored.
+/// ~keep The first pass writes the start tag of a kept element with this function too, so a
+/// ~keep start tag that the repair closed and one that the author closed read the same.
+pub(super) fn push_without_standalone_slashes(output: &mut String, attributes: &str) {
+    let mut copied = 0;
+    for slash in standalone_script_slashes(attributes.as_bytes()) {
+        output.push_str(&attributes[copied..slash]);
+        copied = slash + 1;
+    }
+    output.push_str(&attributes[copied..]);
 }
 
 fn standalone_script_slashes(attributes: &[u8]) -> Vec<usize> {
@@ -324,7 +341,7 @@ mod tests {
         let input = r#"<SCRIPT type='APPLICATION/LD+JSON; charset=utf-8'>{"a":"<script> &amp;"} text<p>tail</p>"#;
         assert_eq!(
             repair_unclosed_structured_data_scripts(input, None),
-            r#"<script type='APPLICATION/LD+JSON; charset=utf-8'>{"a":"&lt;script> &amp;amp;"}</script> text<p>tail</p>"#
+            r#"<script type='APPLICATION/LD+JSON; charset=utf-8'>{"a":"<script> &amp;"}</script> text<p>tail</p>"#
         );
     }
 
@@ -452,7 +469,7 @@ mod tests {
         let input = r#"<script type='application/ld+json'>{"a":"<script>"} x < y <script>z</script><p>tail</p>"#;
         assert_eq!(
             repair_unclosed_structured_data_scripts(input, None),
-            r#"<script type='application/ld+json'>{"a":"&lt;script>"}</script> x < y <script>z</script><p>tail</p>"#
+            r#"<script type='application/ld+json'>{"a":"<script>"}</script> x < y <script>z</script><p>tail</p>"#
         );
     }
 

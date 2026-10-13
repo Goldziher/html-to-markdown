@@ -2,7 +2,7 @@ use std::borrow::Cow;
 
 use super::head_scan::body_start;
 use super::kept::{OpenKept, TagStep};
-use super::markup::{find_tag_end, matches_tag_start, skip_written_text_element};
+use super::markup::{find_subslice, find_tag_end, matches_tag_start, skip_written_text_element};
 use super::raw_text::{
     find_closing_tag_bytes_nested, is_self_closing_tag, matching_tag_ends, opens_a_tag, skip_opaque_region,
 };
@@ -53,14 +53,7 @@ pub fn sanitize_markdown_url(url: &str) -> Cow<'_, str> {
 /// Scans for opening tags matching either condition, finds their matching
 /// closing tag, and removes the entire element (tag + content, so nested
 /// content never leaks out). Self-closing tags are also removed.
-/// Find `needle` in `haystack` at or after `from`, returning its start offset.
-fn find_subslice(haystack: &[u8], from: usize, needle: &[u8]) -> Option<usize> {
-    if from >= haystack.len() {
-        return None;
-    }
-    memchr::memmem::find(&haystack[from..], needle).map(|off| from + off)
-}
-
+///
 /// If `<` at `idx` (with `next`/`rest` already read) opens a real HTML comment (`<!--`) or a
 /// CDATA section (`<![CDATA[`), return the index just past its terminator (or `len` if
 /// unterminated). Returns `None` for anything else, in which case `idx` is unaffected.
@@ -87,7 +80,7 @@ fn skip_real_comment_or_cdata(bytes: &[u8], idx: usize, len: usize, next: u8, re
 /// starts a "bogus comment" per the HTML5 tokenizer.
 ///
 /// Extracted from `strip_bogus_comments`'s main scan loop — identical classification, unchanged.
-fn is_bogus_comment_marker(bytes: &[u8], idx: usize, len: usize, next: u8, rest: &[u8]) -> bool {
+pub(super) fn is_bogus_comment_marker(bytes: &[u8], idx: usize, len: usize, next: u8, rest: &[u8]) -> bool {
     if next == b'?' {
         return true;
     }
@@ -102,6 +95,13 @@ fn is_bogus_comment_marker(bytes: &[u8], idx: usize, len: usize, next: u8, rest:
         return idx + 2 >= len || !bytes[idx + 2].is_ascii_alphabetic();
     }
     false
+}
+
+/// The position after the bogus comment that the `<` at `idx` starts.
+pub(super) fn after_bogus_comment(bytes: &[u8], idx: usize) -> usize {
+    // ~keep The bogus-comment state ends at the first `>` regardless of quoting, or at
+    // ~keep end-of-input if there is none -- unlike a tag, it has no attribute grammar.
+    memchr::memchr(b'>', &bytes[idx + 1..]).map_or(bytes.len(), |off| idx + 1 + off + 1)
 }
 
 fn has_bogus_comment_candidate(bytes: &[u8]) -> bool {
@@ -182,9 +182,7 @@ pub fn strip_bogus_comments(input: &str) -> Cow<'_, str> {
             continue;
         }
 
-        // ~keep The bogus-comment state ends at the first `>` regardless of quoting, or at
-        // ~keep end-of-input if there is none -- unlike a tag, it has no attribute grammar.
-        let end = memchr::memchr(b'>', &bytes[idx + 1..]).map_or(len, |off| idx + 1 + off + 1);
+        let end = after_bogus_comment(bytes, idx);
         let out = output.get_or_insert_with(|| String::with_capacity(len));
         out.push_str(&input[last..idx]);
         last = end;

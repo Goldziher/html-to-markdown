@@ -40,6 +40,10 @@ pub struct ContextParameters {
     pub inline_collector: Option<InlineCollectorHandle>,
     #[cfg(feature = "metadata")]
     pub metadata_collector: Option<crate::metadata::MetadataCollectorHandle>,
+    /// The kept scripts of the page, from the first pass, with the node of each script that
+    /// had an owner mark. Only a build with `metadata` reads them: the reader of the structured
+    /// data asks for them.
+    pub kept_scripts: crate::converter::utility::preprocessing::KeptScripts,
     #[cfg(feature = "visitor")]
     pub visitor: Option<crate::visitor::VisitorHandle>,
     pub structure_collector: Option<StructureCollectorHandle>,
@@ -337,9 +341,6 @@ pub struct Context {
     pub(crate) keep_inline_images_in: Rc<HashSet<String>>,
     /// Node IDs matching `exclude_selectors` — these nodes and all descendants are dropped.
     pub(crate) excluded_node_ids: Rc<HashSet<u32>>,
-    // ~keep Restored raw nodes own literal source bytes; JSON-LD must not decode another entity layer.
-    #[cfg(feature = "metadata")]
-    pub(crate) literal_body_ids: Rc<HashSet<usize>>,
     /// Shared flag set when the guarded DOM walk reaches its effective depth limit.
     pub(crate) depth_limit_reached: Rc<Cell<bool>>,
     /// Shared flag set when `inline_data_media` replaced or dropped an element. A link reads it to
@@ -401,6 +402,10 @@ pub struct Context {
     /// The address of the page, as far as it is known. A link asks it whether it points into
     /// the page (see `converter::url_resolve::OwnPage`).
     pub(crate) own_page: Rc<crate::converter::url_resolve::OwnPage>,
+    /// The kept scripts of the page. The reader of the structured data asks it for the text
+    /// of a script as written (see `KeptScripts`).
+    #[cfg(feature = "metadata")]
+    pub(crate) kept_scripts: Rc<crate::converter::utility::preprocessing::KeptScripts>,
 }
 
 impl Context {
@@ -436,6 +441,8 @@ impl Context {
             reference_collector: parameters.reference_collector,
             base_url: parameters.base_url,
             own_page: Rc::new(parameters.own_page),
+            #[cfg(feature = "metadata")]
+            kept_scripts: Rc::new(parameters.kept_scripts),
             ..Self::default()
         };
         context.at_fresh_block_start.set(true);
@@ -444,6 +451,7 @@ impl Context {
         Rc::make_mut(&mut context.keep_inline_images_in).extend(options.keep_inline_images_in.iter().cloned());
         context
     }
+
     /// Whether the current output buffer is written between inline markers: an inline wrapper's
     /// (`inline_depth`, a link's brackets included), a summary's or caption's (`text_in_markers`)
     /// or a marker-only wrapper's (`in_marker_span`). A rule written there is text, since the
@@ -697,6 +705,7 @@ mod inline_buffer_tests {
                 inline_collector: None,
                 #[cfg(feature = "metadata")]
                 metadata_collector: None,
+                kept_scripts: crate::converter::utility::preprocessing::KeptScripts::default(),
                 #[cfg(feature = "visitor")]
                 visitor: None,
                 structure_collector: None,

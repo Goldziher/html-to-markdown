@@ -235,20 +235,41 @@ mod structured_data {
         }
     }
 
-    /// A character reference in the JSON gives the same text as before the change, with a `<`
-    /// beside it or without.
+    const BODIES_WITH_A_REFERENCE: [&str; 8] = [
+        r#"{"a":"&lt;p&gt;"}"#,
+        r#"{"a":"Tom &amp; Jerry"}"#,
+        r#"{"a":"&amp;lt;"}"#,
+        r#"{"a":"a < b &lt; c"}"#,
+        r#"{"a":"1 <2 &lt;3 &#60;4 &#x3C;5"}"#,
+        r#"{"a":"<b>x</b> &lt;b&gt;"}"#,
+        r#"{"a":"Q&A & more &"}"#,
+        r#"{"a":"&amp;amp;"}"#,
+    ];
+
+    /// Issue 824: a script is raw text, so a character reference in the JSON is not decoded.
     #[test]
-    fn a_reference_in_the_json_is_read_as_before() {
-        for (body, expected) in [
-            (r#"{"a":"&lt;p&gt;"}"#, r#"{"a":"<p>"}"#),
-            (r#"{"a":"Tom &amp; Jerry"}"#, r#"{"a":"Tom & Jerry"}"#),
-            (r#"{"a":"&amp;lt;"}"#, r#"{"a":"&lt;"}"#),
-            (r#"{"a":"a < b &lt; c"}"#, r#"{"a":"a < b < c"}"#),
-            (r#"{"a":"1 <2 &lt;3 &#60;4"}"#, r#"{"a":"1 <2 <3 <4"}"#),
-            (r#"{"a":"<b>x</b> &lt;b&gt;"}"#, r#"{"a":"<b>x</b> <b>"}"#),
-        ] {
+    fn a_reference_in_the_json_is_kept_as_written() {
+        for body in BODIES_WITH_A_REFERENCE {
             let found = raw_json(&shop_page(JSON_LD, body, "</script>"));
-            assert_eq!(found, vec![vec![expected.to_string()]; 2], "{body}");
+            assert_eq!(found, vec![vec![body.to_string()]; 2], "{body}");
+        }
+    }
+
+    /// Issue 824: a page that the converter parses a second time, and a third time, gives the
+    /// JSON as written too. An omitted end tag asks for one more parse and a custom element for
+    /// another.
+    #[test]
+    fn a_reference_in_the_json_is_kept_as_written_on_a_repaired_page() {
+        for page_body in [
+            "<p>one<div>two</div>",
+            "<my-part>one</my-part><p>two</p>",
+            "<my-part><p>one<div>two</div></my-part>",
+            "<b><p>one</b>two</p>",
+        ] {
+            for body in BODIES_WITH_A_REFERENCE {
+                let html = format!("<html><head>{JSON_LD}{body}</script></head><body>{page_body}</body></html>");
+                assert_eq!(raw_json(&html), vec![vec![body.to_string()]; 2], "{page_body} {body}");
+            }
         }
     }
 

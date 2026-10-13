@@ -7,9 +7,9 @@
 //! - **math**: Visible text of `MathML` elements
 
 use crate::converter::block::container::HandlerContext;
-use crate::options::ConversionOptions;
 #[cfg(feature = "metadata")]
-use crate::text::decode_attribute_value_cow;
+use crate::converter::utility::preprocessing::{KeptScripts, ScriptType, script_type};
+use crate::options::ConversionOptions;
 use crate::text::escape;
 use tl::{NodeHandle, Parser};
 
@@ -119,34 +119,27 @@ fn collect_json_ld_from_children(children: &tl::Children, parser: &Parser, handl
         if child_name.as_ref() != "script" {
             continue;
         }
-        if let Some(json) = json_ld_from_tag(child_tag, parser, handler.ctx) {
+        if let Some(json) = json_ld_from_tag(child_handle.get_inner(), child_tag, parser, &handler.ctx.kept_scripts) {
             collector.borrow_mut().add_json_ld(json);
         }
     }
 }
 
+/// The structured data of a script, as the page has it. `node` is the id of the script.
+///
+/// ~keep The tree holds the text of a kept script with the escape of the first pass.
+/// ~keep `KeptScripts` takes it back for the node that had the owner mark of the script; this
+/// ~keep function decodes nothing, so a character reference of the JSON stays as written.
+/// ~keep A script with no end tag whose bytes the repair kept has those bytes in the tree by now
+/// ~keep (`restore_inert_bodies`), and no owner mark of the first pass: it reads as the tree has it.
 #[cfg(feature = "metadata")]
-fn json_ld_from_tag(tag: &tl::HTMLTag<'_>, parser: &Parser, ctx: &Context) -> Option<String> {
+fn json_ld_from_tag(node: u32, tag: &tl::HTMLTag<'_>, parser: &Parser, kept_scripts: &KeptScripts) -> Option<String> {
     let type_value = crate::converter::utility::attributes::decoded_attribute(tag, "type")?;
-    let media_type = type_value
-        .split(';')
-        .next()
-        .unwrap_or_else(|| type_value.as_ref())
-        .trim();
-    if !media_type.eq_ignore_ascii_case("application/ld+json") {
+    if script_type(&type_value) != ScriptType::StructuredData {
         return None;
     }
-    let body = tag.inner_text(parser);
-    let original = tag
-        .children()
-        .top()
-        .iter()
-        .any(|handle| usize::try_from(handle.get_inner()).is_ok_and(|id| ctx.literal_body_ids.contains(&id)));
-    let json = if original {
-        body.trim().to_owned()
-    } else {
-        decode_attribute_value_cow(body.trim()).into_owned()
-    };
+    let text = tag.inner_text(parser);
+    let json = kept_scripts.as_written(node, text.trim()).to_owned();
     (!json.is_empty()).then_some(json)
 }
 
@@ -166,7 +159,7 @@ fn handle_script(node_handle: &NodeHandle, parser: &Parser, _output: &mut String
     #[cfg(feature = "metadata")]
     if ctx.metadata_wants.structured_data
         && let Some(collector) = ctx.metadata_collector.as_ref()
-        && let Some(json) = json_ld_from_tag(tag, parser, ctx)
+        && let Some(json) = json_ld_from_tag(node_handle.get_inner(), tag, parser, &ctx.kept_scripts)
     {
         collector.borrow_mut().add_json_ld(json);
     }
@@ -221,5 +214,23 @@ fn handle_math(
 
     if is_display_block && !ctx.in_paragraph && !ctx.convert_as_inline {
         output.push_str("\n\n");
+    }
+}
+
+#[cfg(all(test, feature = "metadata"))]
+mod tests {
+    use super::json_ld_from_tag;
+    use crate::converter::utility::preprocessing::strip_script_and_style_tags_with_kept_scripts;
+
+    /// A script with no owner mark gives the text of the tree, and nothing is decoded: a
+    /// reference of the author stays as written.
+    #[test]
+    fn a_script_with_no_owner_mark_gives_its_text_with_nothing_decoded() {
+        let (_, kept_scripts) = strip_script_and_style_tags_with_kept_scripts("");
+        let page = r#"<script type="application/ld+json">{"a":"&lt;"}</script>"#;
+        let dom = tl::parse(page, tl::ParserOptions::default()).expect("the page");
+        let tag = dom.nodes()[0].as_tag().expect("the script");
+        let json = json_ld_from_tag(0, tag, dom.parser(), &kept_scripts);
+        assert_eq!(json.as_deref(), Some(r#"{"a":"&lt;"}"#));
     }
 }

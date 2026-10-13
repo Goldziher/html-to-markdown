@@ -164,36 +164,45 @@ fn prepare_conversion<'a>(html: &'a str, options: &ConversionOptions) -> Result<
         Cow::Owned(normalized) => Cow::Owned(normalized),
     };
     // ~keep Recover the JSON boundary before routing or raw-text stripping can consume visible siblings (#875).
-    let normalized_input =
-        normalize_structured_data_scripts(normalized_input, options, preserve_bodies, &mut inert_bodies);
-    let removes_forms =
-        crate::converter::utility::preprocessing::removes_closed_forms(&normalized_input, options, has_visitor);
-    // ~keep A document base stays effective when hidden stripping or form removal removes its container.
-    let read_base = |source: &str| {
-        (options.base_url.is_some() || options.extract_metadata)
-            .then(|| crate::converter::url_resolve::document_base_href(source))
-            .flatten()
-    };
-    let document_base_href = removes_forms.then(|| read_base(&normalized_input)).flatten();
-    // ~keep Hidden content still loses form-body ownership before the form-removal pass (#873).
-    let normalized_input = if removes_forms && options.hidden_content == crate::options::HiddenContent::Drop {
-        match crate::converter::utility::preprocessing::strip_hidden_elements(&normalized_input) {
-            Cow::Owned(stripped) => Cow::Owned(stripped),
-            Cow::Borrowed(_) => normalized_input,
-        }
-    } else {
-        normalized_input
-    };
-    let normalized_input = normalize_closed_forms(normalized_input, options.hidden_content, removes_forms);
-    // ~keep The page of `drop` says whether the head is repaired, for each choice: a `<head>` tag
-    // ~keep in kept content is no head of the page, and a browser ignores it there.
-    let (normalized_html, head_repair_limit) = repair_head(normalized_input.as_ref(), options.hidden_content)
-        .map_or((normalized_input, None), |(html, limit)| (Cow::Owned(html), limit));
-    let document_base_href = if removes_forms {
-        document_base_href
-    } else {
-        read_base(&normalized_html)
-    };
+    // ~keep Plain text keeps the bytes of a repaired script apart too: the search for head content reads
+    // ~keep a tag in its JSON, so a script before `<head>` gives its record only with its body kept apart.
+    let preserves_script = options
+        .preserve_tags
+        .iter()
+        .any(|tag| tag.eq_ignore_ascii_case("script"));
+    let bodies_before_repair = preserves_script.then(|| inert_bodies.clone());
+    let mut repaired_page = written_page(
+        crate::converter::utility::preprocessing::repair_unclosed_structured_data_scripts(
+            normalized_input.as_ref(),
+            preserves_script.then_some(&mut inert_bodies),
+        ),
+    );
+    let mut after_repair = after_script_repair(
+        repaired_page.as_deref().unwrap_or_else(|| normalized_input.as_ref()),
+        options,
+        has_visitor,
+    );
+    // ~keep A page with no repaired script whose bytes are kept, which is most pages, is repaired once.
+    if let Some(bodies) = bodies_before_repair.filter(|bodies| bodies.len() < inert_bodies.len()) {
+        let first_repair = after_repair
+            .page
+            .as_deref()
+            .or(repaired_page.as_deref())
+            .unwrap_or_else(|| normalized_input.as_ref());
+        inert_bodies = bodies;
+        repaired_page = repair_with_reserved_owner_names(&normalized_input, first_repair, &mut inert_bodies, options)?;
+        after_repair = after_script_repair(
+            repaired_page.as_deref().unwrap_or_else(|| normalized_input.as_ref()),
+            options,
+            has_visitor,
+        );
+    }
+    let AfterScriptRepair {
+        page,
+        head_repair_limit,
+        document_base_href,
+    } = after_repair;
+    let normalized_html = page.or(repaired_page).map_or(normalized_input, Cow::Owned);
     let effective_base = options
         .base_url
         .as_deref()
@@ -213,38 +222,92 @@ fn prepare_conversion<'a>(html: &'a str, options: &ConversionOptions) -> Result<
     })
 }
 
-fn normalize_structured_data_scripts<'a>(
-    input: Cow<'a, str>,
-    options: &ConversionOptions,
-    preserve_bodies: bool,
-    inert_bodies: &mut std::collections::HashMap<String, String>,
-) -> Cow<'a, str> {
-    let repaired_scripts = crate::converter::utility::preprocessing::repair_unclosed_structured_data_scripts(
-        input.as_ref(),
-        (preserve_bodies
-            && options
-                .preserve_tags
-                .iter()
-                .any(|tag| tag.eq_ignore_ascii_case("script")))
-        .then_some(inert_bodies),
-    );
-    match repaired_scripts {
-        Cow::Borrowed(_) => input,
-        Cow::Owned(repaired) => Cow::Owned(repaired),
+/// What the passes after the script repair give: the page, when one of them wrote it, the limit
+/// that the head repair reached, and the base of the document.
+struct AfterScriptRepair {
+    page: Option<String>,
+    head_repair_limit: Option<crate::types::WarningKind>,
+    document_base_href: Option<String>,
+}
+
+/// The passes over `input`, the page after the script repair, in their order: the form decision,
+/// the base read, the hidden strip, the form removal and the head repair.
+///
+/// ~keep The second script repair runs these passes again on its page, so the two repairs give
+/// ~keep one page shape.
+fn after_script_repair(input: &str, options: &ConversionOptions, has_visitor: bool) -> AfterScriptRepair {
+    let removes_forms = crate::converter::utility::preprocessing::removes_closed_forms(input, options, has_visitor);
+    // ~keep A document base stays effective when hidden stripping or form removal removes its container.
+    let read_base = |source: &str| {
+        (options.base_url.is_some() || options.extract_metadata)
+            .then(|| crate::converter::url_resolve::document_base_href(source))
+            .flatten()
+    };
+    let base_before_removal = removes_forms.then(|| read_base(input)).flatten();
+    // ~keep Hidden content still loses form-body ownership before the form-removal pass (#873).
+    let stripped = if removes_forms && options.hidden_content == crate::options::HiddenContent::Drop {
+        crate::converter::utility::preprocessing::strip_hidden_elements(input)
+    } else {
+        Cow::Borrowed(input)
+    };
+    let without_forms = if removes_forms {
+        crate::converter::utility::preprocessing::remove_closed_form_bodies(&stripped, options.hidden_content)
+    } else {
+        Cow::Borrowed(stripped.as_ref())
+    };
+    // ~keep The page of `drop` says whether the head is repaired, for each choice: a `<head>` tag
+    // ~keep in kept content is no head of the page, and a browser ignores it there.
+    let head = repair_head(&without_forms, options.hidden_content);
+    let document_base_href = if removes_forms {
+        base_before_removal
+    } else {
+        read_base(
+            head.as_ref()
+                .map_or_else(|| without_forms.as_ref(), |(html, _)| html.as_str()),
+        )
+    };
+    let page_before_head = written_page(without_forms);
+    let (page, head_repair_limit) = match head {
+        Some((html, limit)) => (Some(html), limit),
+        None => (page_before_head.or_else(|| written_page(stripped)), None),
+    };
+    AfterScriptRepair {
+        page,
+        head_repair_limit,
+        document_base_href,
     }
 }
 
-fn normalize_closed_forms(
-    input: Cow<'_, str>,
-    hidden_content: crate::options::HiddenContent,
-    removes_forms: bool,
-) -> Cow<'_, str> {
-    if !removes_forms {
-        return input;
-    }
-    match crate::converter::utility::preprocessing::remove_closed_form_bodies(&input, hidden_content) {
-        Cow::Owned(source) => Cow::Owned(source),
-        Cow::Borrowed(_) => input,
+/// The repair of the scripts of `input` with no end tag a second time. `first_repair` is the
+/// page that the first repair and the passes after it wrote. `bodies` holds the kept bodies as
+/// they were before the first repair.
+///
+/// ~keep The first repair wrote an owner mark. The cleanup of the conversion removes bytes, and
+/// ~keep two parts of a name of the author can meet there and spell that mark. So the repair
+/// ~keep writes its marks a second time, with no number that the cleaned page has: the
+/// ~keep reservation of the kept scripts (`KeptScripts::reserving_owner_names_of`).
+fn repair_with_reserved_owner_names(
+    input: &str,
+    first_repair: &str,
+    bodies: &mut std::collections::HashMap<String, String>,
+    options: &ConversionOptions,
+) -> Result<Option<String>> {
+    let reserved = crate::converter::owner_mark_numbers_after_cleanup(first_repair, options)?;
+    Ok(written_page(
+        crate::converter::utility::preprocessing::repair_unclosed_structured_data_scripts_reserving(
+            input, bodies, &reserved,
+        ),
+    ))
+}
+
+/// The page of a head repair, with the limit that the repair reached.
+type HeadRepair = Option<(String, Option<crate::types::WarningKind>)>;
+
+/// The page that a pass wrote, when it wrote one.
+fn written_page(page: Cow<'_, str>) -> Option<String> {
+    match page {
+        Cow::Borrowed(_) => None,
+        Cow::Owned(page) => Some(page),
     }
 }
 
@@ -255,10 +318,7 @@ fn normalize_closed_forms(
 /// ~keep there. Read as the head, it sent only the wider choice to the repair, which then put a
 /// ~keep title of the body in the head. So a wider choice empties the kept elements again and
 /// ~keep asks that page first.
-fn repair_head(
-    html: &str,
-    hidden_content: crate::options::HiddenContent,
-) -> Option<(String, Option<crate::types::WarningKind>)> {
+fn repair_head(html: &str, hidden_content: crate::options::HiddenContent) -> HeadRepair {
     let drop = crate::options::HiddenContent::Drop;
     if hidden_content != drop {
         let emptied =

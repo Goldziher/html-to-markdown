@@ -493,7 +493,9 @@ impl<'a> Tier1Scanner<'a> {
             Some(close) => close.0 + 1,
             None => self.bytes.len(),
         };
-        self.pos = find_raw_text_close(self.bytes, open_end, name_lower).unwrap_or(self.bytes.len());
+        // ~keep The rule for the end of raw text is the one Tier-2 uses.
+        self.pos = crate::converter::utility::preprocessing::find_raw_text_end_tag(self.bytes, open_end, name_lower)
+            .map_or(self.bytes.len(), |(_, end)| end);
 
         // ~keep Tier-2 inserts a boundary space per removed style when its source neighbors
         // ~keep are non-whitespace. Adjacent raw-text tags can coalesce those spaces into a

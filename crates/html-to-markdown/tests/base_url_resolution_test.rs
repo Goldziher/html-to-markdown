@@ -248,7 +248,7 @@ fn should_not_resolve_link_like_text_inside_textarea() {
 
     assert_eq!(
         out,
-        "see [here](x.html) ![pic](pic.png)\n\n[real](https://example.com/dir/real.html)\n"
+        "see <a href=\"x.html\">here</a> <img src=\"pic.png\" alt=\"pic\">\n\n[real](https://example.com/dir/real.html)\n"
     );
 }
 

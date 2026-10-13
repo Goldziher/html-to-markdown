@@ -31,6 +31,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Strict whitespace no longer turns an empty line-break callback or a CSS-excluded
   break subtree into a hard break inside blank inline wrappers (#868).
 
+- The text inside a `textarea` is text: `<textarea><b>bold</b></textarea>` gave `**bold**` and now gives `<b>bold</b>` ([#828](https://github.com/xberg-io/html-to-markdown/issues/828)).
+- The fast converter keeps the text after a `</style>` end tag with a form feed after the name ([#826](https://github.com/xberg-io/html-to-markdown/issues/826)).
+- A page is not empty when a structured data script has a slash or a form feed after `script` in its start tag and `<script>` in its JSON ([#825](https://github.com/xberg-io/html-to-markdown/issues/825)).
+- A `script` or `style` start tag with no end tag follows one rule in every spelling on the full converter, the rule of [#277](https://github.com/xberg-io/html-to-markdown/issues/277): the markup after it is written. A start tag with a form feed after its name, or with an apostrophe in an attribute value with no quotes, was not read: `<p>a</p><script data=it's><p>b</p>` gave `a` and now gives `a` and `b`.
+- A character reference in a structured data script is kept as written in the metadata: `{"a":"&lt;p&gt;"}` gave `{"a":"<p>"}` in `raw_json` and now gives `{"a":"&lt;p&gt;"}` ([#824](https://github.com/xberg-io/html-to-markdown/issues/824)).
+- In plain output, white space on the two sides of a structured data script, a template, a comment, a `noscript` or a `math` element gives one space with the full converter: `<p>foo <script type="application/ld+json">{}</script> bar</p>` gave `foo  bar` and now gives `foo bar` ([#827](https://github.com/xberg-io/html-to-markdown/issues/827)).
+- A `script`, `style` or `textarea` tag inside a bogus comment (`<? ... >`, `<! ... >`, `</ ... >`) starts no element: `<p>before</p><?x <script>?><b>Shown</b><?x </script>?><p>after</p>` gave `before` and `after` and now gives `?>**Shown**?>` between them.
+- A page with many `script` or `style` start tags with no end tag converts in linear time; the time was quadratic. In a release build 2,000 `<script>` start tags took 48 ms and now take 1 ms, and 32,000 took 12 s and now take 16 ms.
 - Inline break-only wrappers retain a real break after text inside a div or after a nested
   no-break space, including through transparent nested strong wrappers and after earlier
   paragraphs (#863). A leading Backslash break followed only by blank

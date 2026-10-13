@@ -501,10 +501,10 @@ fn should_activate_repaired_script_transport_only_for_script_preservation() {
         },
     )
     .expect("ancestor preservation");
-    // ~keep Ancestor encoding is an inherited queued limitation; this fix scopes transport to script preservation.
+    // ~keep The repair writes the body as the page has it, so the ancestor gives the bytes of the page (#824).
     assert_eq!(
         ancestor.content.as_deref(),
-        Some("<div><script type=\"application/ld+json\">{\"a\":\"&amp;lt; &amp;amp; 雪\"}</script><p>tail</p></div>\n")
+        Some("<div><script type=\"application/ld+json\">{\"a\":\"&lt; &amp; 雪\"}</script><p>tail</p></div>\n")
     );
 }
 

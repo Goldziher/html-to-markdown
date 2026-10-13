@@ -1,11 +1,12 @@
-use super::{preprocess_initial_html, preprocess_repaired_html, trace_parse_complete};
+use super::prepare::{preprocess_initial_html, preprocess_repaired_html};
+use super::trace_parse_complete;
 use crate::converter::DomContext;
 use crate::converter::main_helpers::{has_custom_element_tags, preserves_menu, repair_with_html5ever_bounded};
 use crate::converter::preprocessing_helpers::{
     has_discarded_end_tag, has_inline_block_misnest, has_omitted_end_tag, readable_text_len, written_title_len,
 };
 use crate::converter::utility::caching::build_dom_context;
-use crate::converter::utility::preprocessing::normalize_inert_bodies_with_preservation;
+use crate::converter::utility::preprocessing::{KeptScripts, normalize_inert_bodies_with_preservation};
 use crate::error::{ConversionError, Result};
 use crate::options::{ConversionOptions, HiddenContent};
 
@@ -265,21 +266,29 @@ fn asks_for_the_tree_builder(page: &str) -> bool {
         })
 }
 
+/// Finish the tree that the converter reads. Returns the kept scripts of the page, with the
+/// node of each script that had an owner mark.
+///
+/// ~keep No parse comes after this function, so the ids of the nodes are final here. The owner
+/// ~keep marks leave the tree here, before the metadata, a visitor or a writer of HTML reads it.
 pub(super) fn finish_dom_parse(
     dom: &mut tl::VDom<'_>,
     dom_ctx: &mut DomContext,
     inert_bodies: &std::collections::HashMap<String, String>,
     input_len: usize,
-) -> Result<std::collections::HashSet<usize>> {
-    let literal_body_ids = if inert_bodies.is_empty() {
-        std::collections::HashSet::new()
-    } else {
-        let ids = crate::converter::utility::preprocessing::restore_inert_bodies(dom, inert_bodies)?;
+    kept_scripts: KeptScripts,
+) -> Result<KeptScripts> {
+    if !inert_bodies.is_empty() {
+        // ~keep The restore runs first: it puts the bytes of a repaired script back in the tree
+        // ~keep and takes the owner mark of that script out. No reader asks for its node ids:
+        // ~keep nothing decodes the text of a script, so a restored body reads as the tree has it.
+        crate::converter::utility::preprocessing::restore_inert_bodies(dom, inert_bodies)?;
         *dom_ctx = build_dom_context(dom, dom.parser(), input_len);
-        ids
-    };
+    }
     trace_parse_complete(dom, input_len);
-    Ok(literal_body_ids)
+    #[cfg(feature = "metadata")]
+    let kept_scripts = kept_scripts.with_owner_marks_taken(dom)?;
+    Ok(kept_scripts)
 }
 
 #[cfg(test)]

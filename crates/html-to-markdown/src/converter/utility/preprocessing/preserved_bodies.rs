@@ -9,7 +9,8 @@ pub(super) struct PreservedBodies {
 
 const BODY_MARKER_PREFIX: &str = "h2m_inert_body_";
 const SCRIPT_MARKER_PREFIX: &str = "h2m_script_body_";
-const SCRIPT_ATTRIBUTE_PREFIX: &str = "data-h2m-script-";
+// ~keep One name for the owner mark of a script: the first pass of the kept scripts writes it too.
+const SCRIPT_ATTRIBUTE_PREFIX: &str = super::kept_scripts::OWNER_MARK_PREFIX;
 
 fn marker_id(marker: &str, prefix: &str) -> Option<usize> {
     marker.strip_prefix(prefix)?.strip_suffix("_end")?.parse().ok()
@@ -28,18 +29,6 @@ fn occupied_marker_ids<'a>(source: &'a str, prefix: &'a str) -> impl Iterator<It
     })
 }
 
-fn occupied_attribute_ids(source: &[u8]) -> impl Iterator<Item = usize> + '_ {
-    memchr::memchr2_iter(b'd', b'D', source).filter_map(|index| {
-        let end = index + SCRIPT_ATTRIBUTE_PREFIX.len();
-        source
-            .get(index..end)
-            .filter(|name| name.eq_ignore_ascii_case(SCRIPT_ATTRIBUTE_PREFIX.as_bytes()))?;
-        let rest = source.get(end..)?;
-        let digits = rest.iter().take_while(|byte| byte.is_ascii_digit()).count();
-        std::str::from_utf8(&rest[..digits]).ok()?.parse().ok()
-    })
-}
-
 impl PreservedBodies {
     pub(super) fn new(source: &str) -> Self {
         let decoded = crate::text::decode_html_entities_cow(source);
@@ -52,13 +41,21 @@ impl PreservedBodies {
                 [BODY_MARKER_PREFIX, SCRIPT_MARKER_PREFIX]
                     .into_iter()
                     .flat_map(move |prefix| occupied_marker_ids(source, prefix))
-                    .chain(occupied_attribute_ids(source.as_bytes()))
+                    .chain(super::kept_scripts::owner_mark_numbers(source.as_bytes()))
             })
             .collect();
         Self {
             occupied,
             ..Self::default()
         }
+    }
+
+    /// Keep each number of `numbers` away from the markers and the owner marks of this page.
+    ///
+    /// ~keep The cleanup of the conversion removes bytes, and two parts of a name of the author can
+    /// ~keep meet there. The caller reads the names of the page as that cleanup leaves it.
+    pub(super) fn reserve(&mut self, numbers: &[usize]) {
+        self.occupied.extend(numbers.iter().copied());
     }
 
     pub(super) fn extend_originals(&mut self, originals: HashMap<String, String>) {

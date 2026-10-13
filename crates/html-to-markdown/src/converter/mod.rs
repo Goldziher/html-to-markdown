@@ -125,7 +125,7 @@ pub mod visitor_hooks;
 pub use self::context::Context;
 pub use self::dom_context::DomContext;
 
-pub use self::main::{convert_html_impl, walk_node};
+pub use self::main::{convert_html_impl, owner_mark_numbers_after_cleanup, walk_node};
 pub use self::main_helpers::document_head;
 pub use self::main_helpers::{emit_table_cell_break, strip_trailing_backslash_breaks, trim_trailing_whitespace};
 pub use self::main_helpers::{has_head_content_outside_head, repair_head_content_outside_head};
