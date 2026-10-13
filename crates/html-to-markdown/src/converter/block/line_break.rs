@@ -205,7 +205,7 @@ fn visit_line_break(
         handler.dom_ctx.record_absent_breaks(
             node_id,
             matches!(&visit_result, VisitResult::Skip)
-                || matches!(&visit_result, VisitResult::Custom(custom) if custom.is_empty()),
+                || matches!(&visit_result, VisitResult::Custom(custom) if custom.trim_matches([' ', '\t']).is_empty()),
         );
     }
     match visit_result {

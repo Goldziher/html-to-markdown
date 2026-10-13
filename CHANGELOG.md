@@ -28,6 +28,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Strict whitespace treats space/tab-only line-break replacements and visitor-skipped
+  inline break subtrees as omissions, while retaining breaks on later table passes (#868).
+
 - Strict whitespace no longer turns an empty line-break callback or a CSS-excluded
   break subtree into a hard break inside blank inline wrappers (#868).
 

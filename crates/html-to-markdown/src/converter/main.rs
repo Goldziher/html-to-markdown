@@ -637,8 +637,20 @@ fn begin_tag<'a>(
         let action = handle_visitor_element_start(visitor_handle, tag_name, tag, &state, output, depth);
 
         match action {
-            VisitAction::Continue => Some(state),
-            VisitAction::Skip => return None,
+            VisitAction::Continue => {
+                if options.whitespace_mode == crate::options::WhitespaceMode::Strict
+                    && !ctx.excluded_node_ids.contains(&node_handle.get_inner())
+                {
+                    dom_ctx.record_absent_breaks(node_handle.get_inner(), false);
+                }
+                Some(state)
+            }
+            VisitAction::Skip => {
+                if options.whitespace_mode == crate::options::WhitespaceMode::Strict {
+                    dom_ctx.record_absent_breaks(node_handle.get_inner(), true);
+                }
+                return None;
+            }
             VisitAction::Custom => {
                 if let Some(replacement) = output.get(visitor_output_start..) {
                     collect_document_attributes(tag_name, tag, ctx);

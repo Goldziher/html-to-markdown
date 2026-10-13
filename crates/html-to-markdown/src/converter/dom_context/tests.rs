@@ -1,3 +1,19 @@
+#[test]
+fn should_keep_ordinary_negative_break_memo_when_no_owner_was_omitted() {
+    let source = "<b><span> </span></b>";
+    let dom = tl::parse(source, tl::ParserOptions::default()).expect("blank nodes");
+    let context = crate::converter::utility::caching::build_dom_context(&dom, dom.parser(), source.len());
+    let root = dom.children()[0].get_inner();
+    let child = context.children_of(root).expect("one span")[0].get_inner();
+    super::HOLDS_TEXT_NODE_READS.with(|reads| reads.set(0));
+    assert!(!context.holds_authored_break(root, dom.parser()));
+    super::HOLDS_TEXT_NODE_READS.with(|reads| assert_eq!(reads.get(), 2));
+    context.record_absent_breaks(child, false);
+    super::HOLDS_TEXT_NODE_READS.with(|reads| reads.set(0));
+    assert!(!context.holds_authored_break(root, dom.parser()));
+    super::HOLDS_TEXT_NODE_READS.with(|reads| assert_eq!(reads.get(), 0));
+}
+
 #[cfg(feature = "visitor")]
 #[test]
 fn should_refresh_cached_break_ancestors_without_forgetting_siblings() {

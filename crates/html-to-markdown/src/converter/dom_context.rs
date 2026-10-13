@@ -85,6 +85,7 @@ pub struct DomContext {
     pub(crate) silent_heading_images: RefCell<HashSet<u32>>,
     pub(crate) blank_passthrough_renders: RefCell<HashSet<u32>>,
     pub(crate) authored_break_cache: RefCell<HashMap<u32, bool>>,
+    pub(crate) omitted_break_owners: RefCell<HashSet<u32>>,
 }
 
 #[cfg(test)]
@@ -488,13 +489,19 @@ impl DomContext {
         found
     }
 
-    // ~keep Strict wrappers must not transport BRs in omitted subtrees or empty callbacks.
+    // ~keep Strict wrappers must not transport BRs in omitted subtrees or space-only callbacks.
     // ~keep Later renders can retain them; status changes invalidate ancestors, preserving siblings.
+    // ~keep Ordinary negative query memo entries are not omissions and survive retaining renders.
     pub(crate) fn record_absent_breaks(&self, id: u32, skipped: bool) {
-        let mut cache = self.authored_break_cache.borrow_mut();
-        if (cache.get(&id) == Some(&false)) == skipped {
+        let changed = if skipped {
+            self.omitted_break_owners.borrow_mut().insert(id)
+        } else {
+            self.omitted_break_owners.borrow_mut().remove(&id)
+        };
+        if !changed {
             return;
         }
+        let mut cache = self.authored_break_cache.borrow_mut();
         if skipped {
             cache.insert(id, false);
         } else {
