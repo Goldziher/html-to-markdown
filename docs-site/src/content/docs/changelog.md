@@ -30,6 +30,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Strict whitespace no longer promotes source line endings to hard breaks when strikethrough,
+  underline, insertion, or mark visitors skip a break subtree or replace it with only spaces/tabs (#868).
+
 - Markdown and Djot honor `exclude_selectors` on table cells, rows, and sections, including
   layout and nested tables. The document table grid excludes the same selected parts
   ([#730](https://github.com/xberg-io/crawlberg/issues/730)).

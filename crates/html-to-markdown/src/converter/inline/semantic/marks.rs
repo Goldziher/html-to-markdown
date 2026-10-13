@@ -487,6 +487,12 @@ fn visit_semantic(
             SemanticKind::Underline(_) => visitor.visit_underline(&node_context, &text_content),
         }
     };
+    if site.options.whitespace_mode == crate::options::WhitespaceMode::Strict
+        && (matches!(&result, VisitResult::Skip)
+            || matches!(&result, VisitResult::Custom(custom) if custom.trim_matches([' ', '\t']).is_empty()))
+    {
+        site.dom_ctx.record_absent_breaks(node_id, true);
+    }
     Some(match result {
         VisitResult::Continue => VisitorOutcome::Continue,
         VisitResult::Custom(custom) => {
