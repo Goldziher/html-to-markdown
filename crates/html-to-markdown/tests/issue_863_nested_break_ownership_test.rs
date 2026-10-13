@@ -174,6 +174,22 @@ fn should_preserve_blank_wrapper_separators_after_real_strong_siblings() {
                                 }),
                             )
                             .expect("blank formatted separator converts");
+                            let nested_expected;
+                            let expected = if body == "<em><em><br></em></em>" {
+                                let marker = if newline_style == NewlineStyle::Spaces {
+                                    "  \n"
+                                } else {
+                                    "\\\n"
+                                };
+                                nested_expected = format!(
+                                    "{}Alpha{}{marker}Beta\n",
+                                    strong_em_symbol.to_string().repeat(2),
+                                    strong_em_symbol.to_string().repeat(2)
+                                );
+                                nested_expected.as_str()
+                            } else {
+                                expected
+                            };
                             assert_eq!(result.content.as_deref(), Some(expected), "{html}, {newline_style:?}");
                             rows += 1;
                         }

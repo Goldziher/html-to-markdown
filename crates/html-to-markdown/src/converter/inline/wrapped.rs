@@ -319,6 +319,22 @@ fn emit_break_sentinel(output: &mut String, content: &str, ctx: &Context, option
     true
 }
 
+#[cfg(test)]
+thread_local! {
+    static BLANK_PREFIX_NODE_READS: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
+}
+
+fn has_leading_blank_source(site: InlineSite<'_>) -> bool {
+    site.dom_ctx.children_of(site.node_handle.get_inner())
+        .and_then(|children| children.first())
+        .inspect(|_| {
+            #[cfg(test)]
+            BLANK_PREFIX_NODE_READS.with(|reads| reads.set(reads.get() + 1));
+        })
+        .and_then(|child| child.get(site.parser))
+        .is_some_and(|node| matches!(node, tl::Node::Raw(raw) if raw.as_utf8_str().starts_with(crate::converter::utility::white_space::is_collapsible)))
+}
+
 fn strong_separator_content<'a>(output: &str, content: &'a str, site: InlineSite<'_>) -> &'a str {
     let ctx = site.ctx;
     if !content.ends_with('\n')
@@ -332,21 +348,16 @@ fn strong_separator_content<'a>(output: &str, content: &'a str, site: InlineSite
     {
         return content;
     }
-    // ~keep A directly authored em break follows real strong content; nested blank wrappers remain separators.
-    if site
-        .dom_ctx
-        .tag_info(site.node_handle.get_inner(), site.parser)
-        .is_some_and(|tag| tag.name == "em")
+    // ~keep Italic wrappers carry rendered breaks; a leading blank prefix also belongs to the break.
+    // ~keep Other blank strong/mark wrappers retain the established separator (#504).
+    if (has_leading_blank_source(site)
+        || site
+            .dom_ctx
+            .tag_info(site.node_handle.get_inner(), site.parser)
+            .is_some_and(|tag| EMPHASIS_SIBLING_TAGS.contains(&tag.name.as_str())))
         && site
             .dom_ctx
-            .children_of(site.node_handle.get_inner())
-            .is_some_and(|children| {
-                children.iter().any(|child| {
-                    site.dom_ctx
-                        .tag_info(child.get_inner(), site.parser)
-                        .is_some_and(|tag| tag.name == "br")
-                })
-            })
+            .holds_authored_break(site.node_handle.get_inner(), site.parser)
     {
         return content;
     }
@@ -499,6 +510,54 @@ pub fn emit_whitespace_only_inline_body(content: &str, output: &mut String) {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    #[allow(clippy::print_stdout)]
+    fn should_bound_nested_blank_break_prefix_and_content_reads() {
+        let mut jobs = 0;
+        for depth in [4, 16, 64, 256] {
+            for newline_style in [crate::NewlineStyle::Spaces, crate::NewlineStyle::Backslash] {
+                let source = format!("<p><b>a</b>{}<br>{}b</p>", "<em>".repeat(depth), "</em>".repeat(depth));
+                let dom = tl::parse(&source, tl::ParserOptions::default()).expect("nested break nodes");
+                let nodes = dom.nodes().len();
+                assert_eq!(nodes, depth + 5);
+                super::BLANK_PREFIX_NODE_READS.with(|reads| reads.set(0));
+                crate::converter::dom_context::AUTHORED_BREAK_CACHE_STATS.with(|stats| stats.set((0, 0)));
+                crate::converter::dom_context::HOLDS_TEXT_NODE_READS.with(|reads| reads.set(0));
+                let result = crate::convert(
+                    &source,
+                    crate::ConversionOptions {
+                        tier_strategy: crate::TierStrategy::Tier2,
+                        extract_metadata: false,
+                        newline_style,
+                        max_depth: Some(1024),
+                        ..Default::default()
+                    },
+                )
+                .expect("nested breaks");
+                let prefix_reads = super::BLANK_PREFIX_NODE_READS.with(std::cell::Cell::get);
+                let content_reads = crate::converter::dom_context::HOLDS_TEXT_NODE_READS.with(std::cell::Cell::get);
+                let marker = if newline_style == crate::NewlineStyle::Spaces {
+                    "  \n"
+                } else {
+                    "\\\n"
+                };
+                assert_eq!(result.content.as_deref(), Some(format!("**a**{marker}b\n").as_str()));
+                assert_eq!(prefix_reads, depth);
+                assert_eq!(content_reads, depth);
+                let (entries, capacity) =
+                    crate::converter::dom_context::AUTHORED_BREAK_CACHE_STATS.with(std::cell::Cell::get);
+                assert_eq!(entries, depth);
+                assert!(capacity <= 2 * depth);
+                assert!(content_reads > 0 && content_reads <= 4 * nodes);
+                std::println!(
+                    "break-cost {depth} {nodes} {prefix_reads} {content_reads} {entries} {capacity} {newline_style:?}"
+                );
+                jobs += 1;
+            }
+        }
+        assert_eq!(jobs, 8);
+    }
+
     use super::move_leading_hard_breaks;
     use crate::converter::Context;
     use crate::converter::context::ContextParameters;

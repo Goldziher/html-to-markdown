@@ -241,6 +241,7 @@ pub fn handle_dd(node_handle: &tl::NodeHandle, parser: &tl::Parser, output: &mut
         }
     }
 
+    trim_description_breaks(&mut rendered, ctx, options.newline_style);
     let trimmed =
         crate::converter::handlers::blockquote::container_content(tag, parser, &rendered, options.code_block_style)
             .to_owned();
@@ -281,6 +282,16 @@ pub fn handle_dd(node_handle: &tl::NodeHandle, parser: &tl::Parser, output: &mut
         }
         output.push_str(&trimmed);
         output.push_str("\n\n");
+    }
+}
+
+fn trim_description_breaks(
+    rendered: &mut String,
+    ctx: &crate::converter::Context,
+    newline_style: crate::options::NewlineStyle,
+) {
+    if !ctx.convert_as_inline && !ctx.in_code && !ctx.in_code_block && !ctx.in_table_cell {
+        strip_trailing_backslash_breaks_from_fresh_buffer(rendered, newline_style);
     }
 }
 

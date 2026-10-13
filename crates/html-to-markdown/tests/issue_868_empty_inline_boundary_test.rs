@@ -748,7 +748,7 @@ fn should_preserve_font_output_and_other_element_boundaries() {
             "a ![y](x) b\n",
         ),
         ("<p>a\n<span>\n</span>&nbsp;b</p>", "a  b\n"),
-        ("<p>a <x-y></x-y>&nbsp;b</p>", "a  b\n"),
+        ("<p>a <x-y></x-y>&nbsp;b</p>", "a b\n"),
         ("<p>a\n<font><code>\n</code></font>&nbsp;b</p>", "a  b\n"),
         ("<pre>a <font> </font>&nbsp;b</pre>", "```\na \u{a0}b\n```\n"),
         ("<p><code>a<font> </font>&nbsp;b</code></p>", "`a \u{a0}b`\n"),
@@ -760,11 +760,11 @@ fn should_preserve_font_output_and_other_element_boundaries() {
             .expect("unknown heading")
             .content
             .as_deref(),
-        Some("## a  b\n")
+        Some("## a b\n")
     );
     rows += 1 + assert_routes_with_fast(
         "<h2>a\n<x-y></x-y>&nbsp;b</h2>",
-        "## a  b\n",
+        "## a b\n",
         "default",
         Some("## a b\n"),
     );

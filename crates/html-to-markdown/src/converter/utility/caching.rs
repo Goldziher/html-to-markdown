@@ -108,7 +108,8 @@ pub fn build_dom_context(dom: &tl::VDom, parser: &tl::Parser, _input_len: usize)
         datalist_content_cache: std::cell::RefCell::new(std::collections::HashMap::new()),
         holds_text_cache: std::cell::RefCell::new(std::collections::HashMap::new()),
         silent_heading_images: std::cell::RefCell::new(std::collections::HashSet::new()),
-        blank_font_renders: std::cell::RefCell::new(std::collections::HashSet::new()),
+        blank_passthrough_renders: std::cell::RefCell::new(std::collections::HashSet::new()),
+        authored_break_cache: std::cell::RefCell::new(std::collections::HashMap::new()),
     };
 
     // ~keep Node ids index `dom.nodes()`, so the arena length is an exact upper bound on them.

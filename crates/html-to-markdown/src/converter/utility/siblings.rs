@@ -171,9 +171,8 @@ fn place_after_element(
             TextPlace::AfterText
         };
     }
-    if info.is_some_and(|info| info.name == "font")
-        && dom_ctx.blank_font_renders.borrow().contains(&element)
-        && !dom_ctx.font_boundary_has_content(element, parser)
+    if dom_ctx.blank_passthrough_renders.borrow().contains(&element)
+        && !dom_ctx.passthrough_boundary_has_content(element, parser)
     {
         return TextPlace::AfterText;
     }

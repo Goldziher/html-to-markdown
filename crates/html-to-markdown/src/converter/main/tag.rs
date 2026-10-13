@@ -11,17 +11,21 @@ pub(super) fn convert_tag(
     let djot_scope = djot_context(node_handle, parser, tag_name.as_ref(), handler);
     let ctx = djot_scope.as_ref().unwrap_or(handler.ctx);
     let handler = HandlerContext::new(handler.options, ctx, handler.depth, handler.dom_ctx);
-    let font_start = handler
+    let passthrough_start = handler
         .dom_ctx
-        .begin_font_render(node_handle.get_inner(), parser, output.len(), handler);
+        .begin_passthrough_render(node_handle.get_inner(), output.len(), handler);
     let Some(capture) = begin_tag(node_handle, tag, parser, output, handler, handler.dom_ctx) else {
         return;
     };
-    let stop = super::super::main_dispatch::dispatch_tag(tag_name.as_ref(), node_handle, tag, parser, output, handler);
+    let (stop, normal_unknown) =
+        super::super::main_dispatch::dispatch_tag(tag_name.as_ref(), node_handle, tag, parser, output, handler);
     finish_tag(capture, tag_name.as_ref(), tag, output, handler, stop);
-    if let Some(written) = font_start.and_then(|start| output.get(start..)) {
+    if let Some(written) = passthrough_start
+        .filter(|_| normal_unknown || tag_name == "font")
+        .and_then(|start| output.get(start..))
+    {
         handler
             .dom_ctx
-            .record_blank_font_render(node_handle.get_inner(), written);
+            .record_blank_passthrough_render(node_handle.get_inner(), written);
     }
 }
