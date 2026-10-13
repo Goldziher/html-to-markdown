@@ -142,7 +142,7 @@ fn assert_routes_with_fast(source: &str, expected: &str, mode: &str, fast: Optio
             if mode == "strict" {
                 options.whitespace_mode = WhitespaceMode::Strict;
             }
-            if ["code", "del", "span"].contains(&mode) {
+            if ["code", "del", "span", "p"].contains(&mode) {
                 options.preserve_tags = vec![mode.into()];
             }
             let expected = if tier_strategy == TierStrategy::Tier1 {
@@ -634,4 +634,82 @@ fn should_keep_code_ownership_literal_content_and_unowned_line_ends() {
         rows += assert_routes(source, expected, mode);
     }
     assert_eq!(rows, 90);
+}
+
+fn assert_default_and_routes(source: &str, expected: &str) -> usize {
+    assert_eq!(
+        convert(source, None).expect("default list boundary").content.as_deref(),
+        Some(expected),
+        "{source}"
+    );
+    1 + assert_routes(source, expected, "default")
+}
+#[test]
+fn should_keep_nbsp_content_indent_after_empty_blocks_in_list_spans() {
+    let mut rows = 0;
+    for (tag, expected) in [("p", "- a\n\n   b\n"), ("div", "- a\n   b\n"), ("table", "- a\n   b\n")] {
+        for tail in ["&nbsp;", "\u{a0}"] {
+            for depth in [0, 2, 16] {
+                let inner = format!("{}<{tag}></{tag}>{}", "<span>".repeat(depth), "</span>".repeat(depth));
+                let source = format!("<ul><li>a\n<span>{inner}</span>{tail}b</li></ul>");
+                rows += assert_default_and_routes(&source, expected);
+            }
+        }
+    }
+    for tail in ["&nbsp;", "\u{a0}"] {
+        rows += assert_default_and_routes(
+            &format!("<ol><li>a\n<span><p></p></span>{tail}b</li></ol>"),
+            "1. a\n\n    b\n",
+        );
+    }
+    assert_eq!(rows, 140);
+}
+#[test]
+fn should_preserve_visible_list_block_and_nonlist_prefix_ownership() {
+    let mut rows = 0;
+    for (source, expected) in [
+        ("<ul><li>a\n<span></span>&nbsp;b</li></ul>", "- a b\n"),
+        ("<ul><li>a\n<span>\n</span>&nbsp;b</li></ul>", "- a  b\n"),
+        (
+            "<ul><li>a\n<span><ul><li>x</li></ul></span>&nbsp;b</li></ul>",
+            "- a\n  * x\n\n  b\n",
+        ),
+        (
+            "<ul><li>a\n<span><p>x</p></span>&nbsp;b</li></ul>",
+            "- a\n\n  x\n\n  b\n",
+        ),
+        ("<p>a\n<span><div></div></span>&nbsp;b</p>", "a\n\nb\n"),
+        (
+            "<table><tr><td>a\n<span><p></p></span>&nbsp;b</td></tr></table>",
+            "| a  b |\n| ---- |\n",
+        ),
+        ("<p>a\n<span>\n</span>&nbsp;b</p>", "a  b\n"),
+    ] {
+        rows += assert_default_and_routes(source, expected);
+    }
+    for (source, expected) in [
+        (
+            "<ul><li>a\n<span><code><p></p></code></span>&nbsp;b</li></ul>",
+            "- a\n\n  b\n",
+        ),
+        (
+            "<ul><li>a\n<span><pre>\n</pre></span>&nbsp;b</li></ul>",
+            "- a\n\n  ```\n\n  ```\n\n   b\n",
+        ),
+        ("<ul><li>a\n<p></p>&nbsp;b</li></ul>", "- a\n\n   b\n"),
+        ("<ul><li>a\n<span><p></p></span> b</li></ul>", "- a\n\n  b\n"),
+    ] {
+        rows += assert_default_and_routes(source, expected);
+    }
+    rows += assert_routes(
+        "<ul><li>a\n<span><p></p></span>&nbsp;b</li></ul>",
+        "- a\n\n  <p></p>\n\n   b\n",
+        "p",
+    );
+    rows += assert_routes(
+        "<ul><li>a\n<span><p></p></span>&nbsp;b</li></ul>",
+        "- a\n\n  \u{a0}b\n",
+        "strict",
+    );
+    assert_eq!(rows, 89);
 }

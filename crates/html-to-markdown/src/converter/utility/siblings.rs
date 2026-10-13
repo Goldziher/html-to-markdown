@@ -62,6 +62,10 @@ thread_local! {
     pub(crate) static FOLLOWING_CONTENT_READS: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
     /// The sibling entries that `text_place` read on this thread. ~keep
     pub(crate) static TEXT_PLACE_SIBLING_VISITS: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
+    /// Actual sibling entries visited while looking through inline wrappers for a block. ~keep
+    pub(crate) static PREVIOUS_CONTENT_BLOCK_READS: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
+    /// Number of actual preceding-block queries on this thread. ~keep
+    pub(crate) static PREVIOUS_CONTENT_BLOCK_CALLS: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
 }
 
 #[cfg(test)]
@@ -250,6 +254,8 @@ pub fn previous_content_block_through<'a>(
     dom_ctx: &'a DomContext,
     looks_into: fn(&str) -> bool,
 ) -> Option<&'a str> {
+    #[cfg(test)]
+    PREVIOUS_CONTENT_BLOCK_CALLS.with(|calls| calls.set(calls.get() + 1));
     let id = node_handle.get_inner();
     let siblings = match dom_ctx.parent_of(id) {
         Some(parent_id) => match dom_ctx.children_of(parent_id) {
@@ -265,6 +271,8 @@ pub fn previous_content_block_through<'a>(
     // ~keep A loop rather than recursion: nested inline wrappers are attacker-controlled depth.
     'outer: loop {
         for sibling in nodes.iter().rev() {
+            #[cfg(test)]
+            PREVIOUS_CONTENT_BLOCK_READS.with(|reads| reads.set(reads.get() + 1));
             if let Some(info) = dom_ctx.tag_info(sibling.get_inner(), parser) {
                 if crate::converter::utility::content::is_block_level_element(&info.name) {
                     return Some(info.name.as_str());
