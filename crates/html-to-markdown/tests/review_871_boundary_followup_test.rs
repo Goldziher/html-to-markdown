@@ -529,3 +529,215 @@ fn should_preserve_skipped_and_custom_break_callback_output() {
     }
     assert_eq!(rows, 192);
 }
+
+#[test]
+fn should_collapse_strict_source_line_endings_in_blank_wrappers() {
+    let mut rows = 0;
+    for (source, expected) in [
+        ("<div>a<b>\n </b>z</div>", "a z\n"),
+        ("<div>a<b>\n</b>z</div>", "a z\n"),
+        ("<div>a<b><span>\n </span></b>z</div>", "a z\n"),
+        ("<div>\u{2000}<mark>\r\n </mark>z</div>", "\u{2000} z\n"),
+    ] {
+        for newline_style in [NewlineStyle::Spaces, NewlineStyle::Backslash] {
+            for tier_strategy in [TierStrategy::Auto, TierStrategy::Tier1, TierStrategy::Tier2] {
+                for extract_metadata in [false, true] {
+                    let result = convert(
+                        source,
+                        ConversionOptions {
+                            whitespace_mode: html_to_markdown_rs::WhitespaceMode::Strict,
+                            highlight_style: html_to_markdown_rs::HighlightStyle::None,
+                            include_document_structure: true,
+                            tier_strategy,
+                            extract_metadata,
+                            newline_style,
+                            ..Default::default()
+                        },
+                    )
+                    .expect("strict blank wrapper");
+                    assert_eq!(
+                        result.content.as_deref(),
+                        Some(expected),
+                        "{source:?} {tier_strategy:?} {newline_style:?}"
+                    );
+                    rows += 1;
+                }
+            }
+        }
+    }
+    assert_eq!(rows, 48);
+}
+
+#[cfg(feature = "visitor")]
+#[test]
+fn should_keep_continue_hooks_neutral_for_strict_blank_wrappers() {
+    use html_to_markdown_rs::visitor::HtmlVisitor;
+    use std::sync::{Arc, Mutex};
+    #[derive(Debug)]
+    struct Continue;
+    impl HtmlVisitor for Continue {}
+    let mut rows = 0;
+    for (source, expected) in [
+        ("<div>a<b>\n </b>z</div>", "a z\n"),
+        ("<div>a<b>\n</b>z</div>", "a z\n"),
+        ("<div>a<b><span>\n </span></b>z</div>", "a z\n"),
+        ("<div>\u{2000}<mark>\r\n </mark>z</div>", "\u{2000} z\n"),
+    ] {
+        for newline_style in [NewlineStyle::Spaces, NewlineStyle::Backslash] {
+            for tier_strategy in [TierStrategy::Auto, TierStrategy::Tier1, TierStrategy::Tier2] {
+                for extract_metadata in [false, true] {
+                    let result = convert(
+                        source,
+                        ConversionOptions {
+                            whitespace_mode: html_to_markdown_rs::WhitespaceMode::Strict,
+                            highlight_style: html_to_markdown_rs::HighlightStyle::None,
+                            include_document_structure: true,
+                            visitor: Some(Arc::new(Mutex::new(Continue))),
+                            tier_strategy,
+                            extract_metadata,
+                            newline_style,
+                            ..Default::default()
+                        },
+                    )
+                    .expect("continued strict wrapper");
+                    assert_eq!(result.content.as_deref(), Some(expected));
+                    rows += 1;
+                }
+            }
+        }
+    }
+    assert_eq!(rows, 48);
+}
+#[cfg(feature = "visitor")]
+#[test]
+fn should_apply_the_blank_separator_policy_to_custom_child_newlines() {
+    use html_to_markdown_rs::visitor::{HtmlVisitor, NodeContext, VisitResult};
+    use std::sync::{Arc, Mutex};
+    #[derive(Debug)]
+    struct Custom {
+        calls: usize,
+    }
+    impl HtmlVisitor for Custom {
+        fn visit_element_start(&mut self, context: &NodeContext) -> VisitResult {
+            if context.tag_name == "span" {
+                self.calls += 1;
+                VisitResult::Custom("\n".into())
+            } else {
+                VisitResult::Continue
+            }
+        }
+    }
+    let mut rows = 0;
+    for output_format in [
+        html_to_markdown_rs::OutputFormat::Markdown,
+        html_to_markdown_rs::OutputFormat::Djot,
+    ] {
+        for newline_style in [NewlineStyle::Spaces, NewlineStyle::Backslash] {
+            let visitor = Arc::new(Mutex::new(Custom { calls: 0 }));
+            let result = convert(
+                "<div>a<b><span>x</span></b>z</div>",
+                ConversionOptions {
+                    whitespace_mode: html_to_markdown_rs::WhitespaceMode::Strict,
+                    tier_strategy: TierStrategy::Tier2,
+                    extract_metadata: true,
+                    include_document_structure: true,
+                    output_format,
+                    newline_style,
+                    visitor: Some(visitor.clone()),
+                    ..Default::default()
+                },
+            )
+            .expect("custom blank child");
+            assert_eq!(result.content.as_deref(), Some("a z\n"));
+            assert_eq!(visitor.lock().expect("callback count").calls, 1);
+            rows += 1;
+        }
+    }
+    assert_eq!(rows, 4);
+}
+
+#[test]
+fn should_keep_main_spacing_after_strict_del_line_endings() {
+    let mut rows = 0;
+    for (source, expected) in [
+        ("<div>a<del>\n</del>z</div>", "a z\n"),
+        ("<div>a<b><del>\n</del></b>z</div>", "a z\n"),
+        (
+            "<p>a\n<span><del><span>\n</span></del></span>&nbsp;b</p>",
+            "a\n\u{a0}b\n",
+        ),
+    ] {
+        for newline_style in [NewlineStyle::Spaces, NewlineStyle::Backslash] {
+            for tier_strategy in [TierStrategy::Auto, TierStrategy::Tier1, TierStrategy::Tier2] {
+                for extract_metadata in [false, true] {
+                    let result = convert(
+                        source,
+                        ConversionOptions {
+                            whitespace_mode: html_to_markdown_rs::WhitespaceMode::Strict,
+                            include_document_structure: true,
+                            tier_strategy,
+                            extract_metadata,
+                            newline_style,
+                            ..Default::default()
+                        },
+                    )
+                    .expect("strict del separator");
+                    assert_eq!(result.content.as_deref(), Some(expected));
+                    rows += 1;
+                }
+            }
+        }
+    }
+    assert_eq!(rows, 36);
+}
+
+#[cfg(feature = "visitor")]
+#[test]
+fn should_keep_strict_break_callback_transport() {
+    use html_to_markdown_rs::visitor::{HtmlVisitor, NodeContext, VisitResult};
+    use std::sync::{Arc, Mutex};
+    #[derive(Debug)]
+    struct Skip {
+        calls: usize,
+    }
+    impl HtmlVisitor for Skip {
+        fn visit_line_break(&mut self, _: &NodeContext) -> VisitResult {
+            self.calls += 1;
+            VisitResult::Skip
+        }
+    }
+    let mut rows = 0;
+    for output_format in [
+        html_to_markdown_rs::OutputFormat::Markdown,
+        html_to_markdown_rs::OutputFormat::Djot,
+    ] {
+        for newline_style in [NewlineStyle::Spaces, NewlineStyle::Backslash] {
+            let visitor = Arc::new(Mutex::new(Skip { calls: 0 }));
+            let expected = if output_format == html_to_markdown_rs::OutputFormat::Markdown
+                && newline_style == NewlineStyle::Spaces
+            {
+                "a  \nz\n"
+            } else {
+                "a\\\nz\n"
+            };
+            let result = convert(
+                "<div>a<b>\n <br> </b>z</div>",
+                ConversionOptions {
+                    whitespace_mode: html_to_markdown_rs::WhitespaceMode::Strict,
+                    tier_strategy: TierStrategy::Tier2,
+                    extract_metadata: true,
+                    include_document_structure: true,
+                    output_format,
+                    newline_style,
+                    visitor: Some(visitor.clone()),
+                    ..Default::default()
+                },
+            )
+            .expect("skipped strict break");
+            assert_eq!(result.content.as_deref(), Some(expected));
+            assert_eq!(visitor.lock().expect("callback count").calls, 1);
+            rows += 1;
+        }
+    }
+    assert_eq!(rows, 4);
+}

@@ -376,6 +376,26 @@ fn strong_separator_content<'a>(output: &str, content: &'a str, site: InlineSite
     if output.ends_with(&marker) { " " } else { content }
 }
 
+// ~keep Strict blank inline bodies without a source BR contribute a separator, including custom blank children.
+// ~keep Code/pre literals and source BR callbacks retain their established break transport.
+fn strict_blank_separator<'a>(content: &'a str, site: InlineSite<'_>) -> &'a str {
+    if site.options.whitespace_mode == crate::options::WhitespaceMode::Strict
+        && !site.ctx.in_code
+        && !site.ctx.in_code_block
+        && content.contains('\n')
+        && content
+            .chars()
+            .all(crate::converter::utility::white_space::is_collapsible)
+        && !site
+            .dom_ctx
+            .holds_authored_break(site.node_handle.get_inner(), site.parser)
+    {
+        " "
+    } else {
+        content
+    }
+}
+
 /// Emit `content` wrapped in `delimiters`, handling delimiter-run adjacency with a preceding
 /// sibling and a body that is non-empty but entirely whitespace.
 pub fn emit_wrapped_inline(
@@ -400,7 +420,7 @@ pub fn emit_wrapped_inline(
     use crate::converter::utility::siblings::get_previous_sibling_tag;
     use crate::converter::{append_inline_suffix, chomp_inline, merge_adjacent_emphasis};
 
-    let content = move_leading_hard_breaks(output, content, ctx, options);
+    let content = move_leading_hard_breaks(output, strict_blank_separator(content, site), ctx, options);
     // ~keep A blank wrapper after real strong markup remains a separator (#502/#504).
     // DOM provenance plus the configured close marker excludes marker-looking prose.
     let content = strong_separator_content(output, content, site);

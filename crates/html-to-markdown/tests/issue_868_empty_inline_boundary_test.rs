@@ -617,7 +617,7 @@ fn should_keep_code_ownership_literal_content_and_unowned_line_ends() {
         ),
         (
             "<p>a\n<span><del><span>\n</span></del></span>&nbsp;b</p>",
-            "a\n\n\u{a0}b\n",
+            "a\n\u{a0}b\n",
             "strict",
         ),
         (
