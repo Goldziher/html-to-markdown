@@ -260,7 +260,10 @@ fn after_script_repair(input: &str, options: &ConversionOptions, has_visitor: bo
     let document_base_href = if removes_forms {
         base_before_removal
     } else {
-        read_base(head.as_ref().map_or_else(|| without_forms.as_ref(), |(html, _)| html.as_str()))
+        read_base(
+            head.as_ref()
+                .map_or_else(|| without_forms.as_ref(), |(html, _)| html.as_str()),
+        )
     };
     let page_before_head = written_page(without_forms);
     let (page, head_repair_limit) = match head {

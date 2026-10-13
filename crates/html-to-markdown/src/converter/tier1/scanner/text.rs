@@ -131,16 +131,17 @@ fn handle_adjacent_image_whitespace(
 fn text_position(state: &mut Tier1State, raw: &str) -> TextPosition {
     let in_summary = state.in_summary();
     let active_len = state.cell_or_output_mut().len();
+    // ~keep A link label is not such a start: the white space it starts with is written into the
+    // ~keep label, as the full converter writes it into its label buffer, and `close_link` gives
+    // ~keep the label to the edge rule of both converters (issue #845).
     let at_inline_frame_start = state.stack.last().is_some_and(|frame| {
         frame.content_start >= active_len
-            && (matches!(
-                frame.spec.kind,
-                TagKind::Link | TagKind::Strong | TagKind::Emphasis | TagKind::Code
-            ) || (in_summary
-                && matches!(
-                    frame.spec.kind,
-                    TagKind::Inline | TagKind::Block | TagKind::Paragraph | TagKind::Heading(_)
-                )))
+            && (matches!(frame.spec.kind, TagKind::Strong | TagKind::Emphasis | TagKind::Code)
+                || (in_summary
+                    && matches!(
+                        frame.spec.kind,
+                        TagKind::Inline | TagKind::Block | TagKind::Paragraph | TagKind::Heading(_)
+                    )))
     });
     let active = state.cell_or_output_mut();
     let block_edge = active.is_empty()
@@ -610,6 +611,16 @@ const fn hand_over_white_space_at_image_in_code_span(
     Ok(())
 }
 
+/// Whether the source text `raw` is text of the element around it: not white space only.
+///
+/// ~keep The question of `DomContext::holds_text`, asked of the same decoded text. The close of
+/// ~keep an element reads the count of such texts to tell whether the element holds text.
+fn is_text_of_an_element(raw: &str) -> bool {
+    use crate::converter::utility::white_space::{TextClass, classify_text};
+    let decoded = crate::text::decode_html_entities_cow(raw);
+    !matches!(classify_text(decoded.as_ref()), TextClass::WhiteSpaceOnly(_))
+}
+
 fn flush_text(state: &mut Tier1State, request: TextFlush<'_>) -> Result<(), BailReason> {
     let TextFlush {
         raw,
@@ -621,6 +632,7 @@ fn flush_text(state: &mut Tier1State, request: TextFlush<'_>) -> Result<(), Bail
     if raw.is_empty() {
         return Ok(());
     }
+    state.text_count += usize::from(is_text_of_an_element(raw));
 
     let history = WhitespaceHistory {
         after_custom_element: state.last_closed_custom_element,
@@ -690,6 +702,5 @@ fn flush_text(state: &mut Tier1State, request: TextFlush<'_>) -> Result<(), Bail
             next_tag_is_inline: upcoming.is_inline,
             ends_in_newline_join,
         },
-    )?;
-    Ok(())
+    )
 }

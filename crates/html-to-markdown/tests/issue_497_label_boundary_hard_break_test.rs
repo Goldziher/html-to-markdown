@@ -146,14 +146,11 @@ fn should_still_fold_a_boundary_break_inside_a_table_cell() {
     );
 }
 
-// ~keep `br_in_tables` inside a LINK inside a cell is a pre-existing tier divergence, not
-// ~keep one this change introduced: Tier-2 tests `in_table_cell` ahead of the link arm in
-// ~keep `line_break.rs` and so emits the literal `<br>`, while Tier-1's `TagKind::LineBreak`
-// ~keep tests the link frame first and emits its marker, which the cell fold later turns into
-// ~keep a space. Both are unchanged by #497 -- asserted per tier rather than through
-// ~keep `assert_tiers_agree` so this file does not claim a parity that never held.
+// ~keep `br_in_tables` inside a LINK inside a cell: Tier-2 tests `in_table_cell` ahead of the
+// ~keep link arm in `line_break.rs` and so emits the literal `<br>`. Tier-1 writes a `<br>` in a
+// ~keep label in a cell as Tier-2 does (issue #845), so both emit the literal `<br>`.
 #[test]
-fn should_keep_the_pre_existing_br_in_tables_behaviour_for_a_link_inside_a_cell() {
+fn should_write_the_literal_br_in_tables_for_a_link_inside_a_cell_on_both_tiers() {
     let html = r#"<table><tr><td><a href="H">A<br>B</a></td></tr></table>"#;
     let options = ConversionOptions {
         br_in_tables: true,
@@ -165,7 +162,7 @@ fn should_keep_the_pre_existing_br_in_tables_behaviour_for_a_link_inside_a_cell(
     );
     assert_eq!(
         tier1_run(html, &options).as_deref().ok(),
-        Some("| [A B](H) |\n| -------- |\n")
+        Some("| [A<br>B](H) |\n| ----------- |\n")
     );
 }
 

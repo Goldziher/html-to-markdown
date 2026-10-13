@@ -76,22 +76,15 @@ fn a_space_after_a_link_stays() {
 
 #[test]
 fn a_space_at_the_start_of_a_link_label_goes_before_the_link() {
-    // ~keep Draft: "the fast converter joins a link to the word beside it at a label edge".
-    assert_row_with_fast(
-        "<p>Press<a href=\"/p\"> Go</a> now.</p>",
-        "Press [Go](/p) now.\n",
-        &Fast::Writes("Press[Go](/p) now.\n"),
-    );
+    assert_row("<p>Press<a href=\"/p\"> Go</a> now.</p>", "Press [Go](/p) now.\n");
 }
 
 /// A line break at the end of a label stays in the label when a no-break space follows it.
 #[test]
 fn a_line_break_before_a_no_break_space_stays_in_the_label() {
-    // ~keep The fast converter drops that break when it is called directly.
-    assert_row_with_fast(
+    assert_row(
         "<p>Press<a href=\"/p\">Go<br>&nbsp;</a>now</p>",
         "Press[Go  \n](/p)now\n",
-        &Fast::Writes("Press[Go](/p)now\n"),
     );
 }
 
