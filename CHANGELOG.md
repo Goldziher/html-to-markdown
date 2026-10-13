@@ -28,7 +28,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- Normalized Markdown and Djot retain no-break-space prefixes after empty `figcaption`,
+- Normalized Markdown and Djot retain no-break-space prefixes after empty `header`, `figcaption`,
   `address`, `fieldset`, `center`, `dialog`, and `hgroup` blocks in list continuations (#868).
 
 - Strict whitespace treats space/tab-only line-break replacements and visitor-skipped
