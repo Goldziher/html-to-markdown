@@ -377,6 +377,152 @@ fn a_preserved_script_keeps_an_attribute_with_the_name_of_an_owner_mark() {
     }
 }
 
+const AUTHORED: &str = r#"{"a":"authored"}"#;
+const WITH_TAG: &str = r#"{"a":"<b>"}"#;
+/// The first owner mark of a page, as an attribute that the author wrote.
+const AUTHORED_MARK: &str = r#"data-h2m-script-0="h2m_script_body_0_end""#;
+/// What the cleanup removes after the first pass, with the text that hides a start tag from
+/// the first pass: a processing instruction, two bogus comments, a CDATA section, a hidden
+/// element.
+const REMOVED: [[&str; 2]; 5] = [
+    ["<?x?>", "<?y?>"],
+    ["<?x?>", "<!x>"],
+    ["<?x?>", "</ x>"],
+    ["<?x?>", "<![CDATA[x]]>"],
+    ["<span hidden>x</span>", "<span hidden>x</span>"],
+];
+
+/// A script of the author that the first pass does not read as a script: `lead` is between
+/// its `<` and its name. `in_name` is in the name of an attribute and `in_value` is in its
+/// value. With the three removed, the attribute is the first owner mark of a page.
+fn script_with_a_mark_in_parts(lead: &str, in_name: &str, in_value: &str, body: &str) -> String {
+    format!(
+        r#"<{lead}script type="application/ld+json" data-h2m-script-{in_name}0="h2m_script_body_{in_value}0_end">{body}</script>"#
+    )
+}
+
+/// The content of `html` by each route, with the options that `configure` sets.
+fn content_with(html: &str, configure: impl Fn(&mut ConversionOptions)) -> Vec<String> {
+    ROUTES
+        .into_iter()
+        .map(|tier_strategy| {
+            let mut options = ConversionOptions {
+                tier_strategy,
+                ..ConversionOptions::default()
+            };
+            configure(&mut options);
+            convert(html, Some(options))
+                .expect("conversion should succeed")
+                .content
+                .unwrap_or_default()
+        })
+        .collect()
+}
+
+/// The content of `html` by each route, with the elements `tag` written as HTML.
+fn preserved(html: &str, tag: &str) -> Vec<String> {
+    content_with(html, |options| options.preserve_tags = vec![tag.to_string()])
+}
+
+/// The row of the second review: the cleanup removes three processing instructions, and the
+/// first script then has the name and the value of the mark of the second one. Each script
+/// gave `{"a":"<b>"}`, and `preserve_tags` wrote the first one with no attribute of the author.
+#[test]
+fn a_script_keeps_its_json_and_its_attribute_when_the_cleanup_joins_the_name_of_an_owner_mark() {
+    let html = r#"<<?x?>script type="application/ld+json" data-h2m-script-<?y?>0="h2m_script_body_<?z?>0_end">{"a":"authored"}</script><script type="application/ld+json">{"a":"<b>"}</script><p>tail</p>"#;
+    assert_eq!(raw_json(html), as_written(&[AUTHORED, WITH_TAG]));
+    let written = format!(
+        "<script {AUTHORED_MARK} type=\"application/ld+json\">{AUTHORED}</script>\n\n\
+         <script type=\"application/ld+json\">{{\"a\":\"&lt;b>\"}}</script>\n\ntail\n"
+    );
+    assert_eq!(preserved(html, "script"), vec![written; ROUTES.len()]);
+}
+
+/// Each text that the cleanup removes, in the name of the attribute, in its value and in the
+/// two, with the script of the author before and after the script of the page.
+#[test]
+fn a_script_keeps_its_json_for_each_text_that_the_cleanup_removes_from_a_name_or_a_value() {
+    for [lead, removed] in REMOVED {
+        for [in_name, in_value] in [[removed, ""], ["", removed], [removed, removed]] {
+            let authored = script_with_a_mark_in_parts(lead, in_name, in_value, AUTHORED);
+            let before = format!("{authored}{}<p>tail</p>", script(WITH_TAG));
+            assert_eq!(raw_json(&before), as_written(&[AUTHORED, WITH_TAG]), "{before:?}");
+            let after = format!("{}{authored}<p>tail</p>", script(WITH_TAG));
+            assert_eq!(raw_json(&after), as_written(&[WITH_TAG, AUTHORED]), "{after:?}");
+        }
+    }
+}
+
+/// The script of the page is hidden and the cleanup removes it, so the page that the parser
+/// reads has the name of its mark once, on the script of the author. That script keeps its own
+/// JSON, a `&lt;` of it too, and its attribute.
+#[test]
+fn a_script_keeps_its_json_when_the_cleanup_joins_the_mark_of_a_script_that_it_removes() {
+    for [gone, stays] in [[WITH_TAG, AUTHORED], [LT, REFERENCE]] {
+        let authored = script_with_a_mark_in_parts("<?x?>", "<?y?>", "<?z?>", stays);
+        let html = format!("<div hidden>{}</div>{authored}<p>tail</p>", script(gone));
+        assert_eq!(raw_json(&html), as_written(&[stays]), "{html:?}");
+        let written = format!("<script {AUTHORED_MARK} type=\"application/ld+json\">{stays}</script>\n\ntail\n");
+        assert_eq!(preserved(&html, "script"), vec![written; ROUTES.len()], "{html:?}");
+    }
+}
+
+/// An attribute that the author wrote whole, with no text for the cleanup to remove, in each
+/// case of its letters, before and after the script of the page.
+#[test]
+fn a_script_keeps_an_attribute_of_the_author_with_the_name_and_the_value_of_an_owner_mark() {
+    for name in ["data-h2m-script-0", "DATA-H2M-SCRIPT-0"] {
+        let authored =
+            format!(r#"<script type="application/ld+json" {name}="h2m_script_body_0_end">{AUTHORED}</script>"#);
+        let before = format!("{authored}{}<p>tail</p>", script(WITH_TAG));
+        assert_eq!(raw_json(&before), as_written(&[AUTHORED, WITH_TAG]), "{before:?}");
+        let written = format!(
+            "<script {AUTHORED_MARK} type=\"application/ld+json\">{AUTHORED}</script>\n\n\
+             <script type=\"application/ld+json\">{{\"a\":\"&lt;b>\"}}</script>\n\ntail\n"
+        );
+        assert_eq!(preserved(&before, "script"), vec![written; ROUTES.len()], "{before:?}");
+        let after = format!("{}{authored}<p>tail</p>", script(WITH_TAG));
+        assert_eq!(raw_json(&after), as_written(&[WITH_TAG, AUTHORED]), "{after:?}");
+    }
+}
+
+/// The name and the value of an owner mark on a `div`, written whole or joined by the
+/// cleanup, stay on the `div`: only a script has an owner.
+#[test]
+fn a_div_keeps_an_attribute_with_the_name_and_the_value_of_an_owner_mark() {
+    let whole = format!("<div {AUTHORED_MARK}>d</div>");
+    let joined = r#"<<?x?>div data-h2m-script-<?y?>0="h2m_script_body_<?z?>0_end">d</div>"#;
+    for div in [whole.as_str(), joined] {
+        let html = format!("{div}{}<p>tail</p>", script(WITH_TAG));
+        let written = format!("<div {AUTHORED_MARK}>d</div>\n\ntail\n");
+        assert_eq!(preserved(&html, "div"), vec![written; ROUTES.len()], "{html:?}");
+        assert_eq!(
+            content_with(&html, |_| {}),
+            vec!["d\n\ntail\n"; ROUTES.len()],
+            "{html:?}"
+        );
+    }
+}
+
+/// The text of a `textarea` is the text of the author. A start tag of a script there, with
+/// the name and the value of an owner mark, stays as written: in a `textarea` with an end tag
+/// the cleanup removes nothing, and in one with no end tag it joins the name. The script of
+/// the page is hidden, so the pass reads the text of the tree for its mark.
+#[test]
+fn the_text_of_a_textarea_keeps_the_name_and_the_value_of_an_owner_mark() {
+    let hidden = format!("<div hidden>{}</div>", script(WITH_TAG));
+    let authored = script_with_a_mark_in_parts("<?x?>", "<?y?>", "<?z?>", AUTHORED);
+    let closed = format!("<textarea>{authored}</textarea>{hidden}<p>tail</p>");
+    assert_eq!(
+        content_with(&closed, |_| {}),
+        vec![format!("{authored}\n\ntail\n"); ROUTES.len()],
+        "{closed:?}"
+    );
+    let open = format!("{hidden}<textarea>{authored}<p>tail</p>");
+    let written = format!("<script type=\"application/ld+json\" {AUTHORED_MARK}>{AUTHORED}</script><p>tail</p>\n");
+    assert_eq!(content_with(&open, |_| {}), vec![written; ROUTES.len()], "{open:?}");
+}
+
 /// The plain writer writes no owner mark.
 #[test]
 fn the_plain_output_holds_no_owner_mark() {

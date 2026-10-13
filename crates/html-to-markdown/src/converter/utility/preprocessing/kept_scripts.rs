@@ -39,9 +39,14 @@ pub struct KeptScripts {
     /// tree builder writes the marks of the first page again.
     #[cfg(feature = "metadata")]
     pub(super) marks: bool,
-    /// The numbers that the page has after `OWNER_MARK_PREFIX`, read at the first mark.
+    /// The numbers that the page has after `OWNER_MARK_PREFIX`, read at the first mark, with
+    /// the numbers of `reserved`.
     #[cfg(feature = "metadata")]
     taken: Option<ahash::AHashSet<usize>>,
+    /// The numbers that the cleaned page of the pass before this one has after
+    /// `OWNER_MARK_PREFIX` (see `reserving_owner_names_of`).
+    #[cfg(feature = "metadata")]
+    reserved: Vec<usize>,
     /// The lowest number that no mark of this pass has.
     #[cfg(feature = "metadata")]
     next: usize,
@@ -62,6 +67,8 @@ impl KeptScripts {
             #[cfg(feature = "metadata")]
             taken: None,
             #[cfg(feature = "metadata")]
+            reserved: Vec::new(),
+            #[cfg(feature = "metadata")]
             next: 0,
         }
     }
@@ -79,15 +86,21 @@ impl KeptScripts {
     /// holds `&lt;`. `page` is the page that the pass reads.
     ///
     /// ~keep The page has no attribute with the name of a mark, in any case of its letters: a
-    /// ~keep number that the page has after `OWNER_MARK_PREFIX` is not used. So an attribute of
-    /// ~keep the author is never read as a mark and is never removed.
+    /// ~keep number that the page has after `OWNER_MARK_PREFIX` is not used, and no number of
+    /// ~keep `reserved` is. So an attribute of the author is never read as a mark and is never
+    /// ~keep removed.
     #[cfg(feature = "metadata")]
     pub(super) fn mark(&mut self, page: &str, body: &str) -> Option<usize> {
         let escaped_text_holds_lt = body.contains('<') || body.contains(ESCAPED_LT);
         if !self.marks || !escaped_text_holds_lt {
             return None;
         }
-        let taken = self.taken.get_or_insert_with(|| owner_mark_numbers(page.as_bytes()));
+        let reserved = &self.reserved;
+        let taken = self.taken.get_or_insert_with(|| {
+            let mut numbers = owner_mark_numbers(page.as_bytes());
+            numbers.extend(reserved.iter().copied());
+            numbers
+        });
         while taken.contains(&self.next) {
             self.next += 1;
         }
@@ -95,6 +108,28 @@ impl KeptScripts {
         self.next += 1;
         self.bodies.push((number, body.trim().into()));
         Some(number)
+    }
+
+    /// The kept scripts of a second pass over the page of `self`, when `self` wrote an owner
+    /// mark. `cleaned` is the page that `self` wrote, as the cleanup left it: the page that the
+    /// parser would read.
+    ///
+    /// ~keep The cleanup that comes after the first pass removes bytes: a bogus comment, a
+    /// ~keep hidden element. Two parts of a name of the author can meet there and spell the name
+    /// ~keep of a mark that the pass wrote, with its value. `cleaned` does not tell that name
+    /// ~keep from the mark of the pass, and the script of the pass can be gone from it, so the
+    /// ~keep pass does not look for a name that is there twice: the second pass uses no number
+    /// ~keep that `cleaned` has. The parts of the author meet in the same way after the second
+    /// ~keep pass, so in the page that the parser reads no name of the author is a mark.
+    #[cfg(feature = "metadata")]
+    #[must_use]
+    pub fn reserving_owner_names_of(&self, cleaned: &str) -> Option<Self> {
+        if self.bodies.is_empty() {
+            return None;
+        }
+        let mut kept_scripts = Self::with_marks();
+        kept_scripts.reserved = owner_mark_numbers(cleaned.as_bytes()).into_iter().collect();
+        Some(kept_scripts)
     }
 
     /// The index in `bodies` of the body whose owner mark is the attribute `name` with

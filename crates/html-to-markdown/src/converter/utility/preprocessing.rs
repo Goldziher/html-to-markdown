@@ -20,6 +20,8 @@ pub use markup::{
     preprocess_html, strip_html_cdata,
 };
 pub use menu::{PRESERVED_MENU_ATTRIBUTE, normalize_menu_elements, restore_preserved_menu_elements};
+#[cfg(feature = "metadata")]
+pub use raw_text::strip_script_and_style_tags_for_second_pass;
 pub use raw_text::{
     find_raw_text_end_tag, skip_opaque_region, strip_script_and_style_tags,
     strip_script_and_style_tags_with_kept_scripts,

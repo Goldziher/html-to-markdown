@@ -204,6 +204,17 @@ pub fn strip_script_and_style_tags_with_kept_scripts(input: &str) -> (Cow<'_, st
     FirstPass::with_kept_scripts(input, kept_scripts, |_| {}).run()
 }
 
+/// [`strip_script_and_style_tags_with_kept_scripts`] for the second pass over a page:
+/// `kept_scripts` is what `KeptScripts::reserving_owner_names_of` gives, so no owner mark has a
+/// number that the cleaned page of the first pass has.
+#[cfg(feature = "metadata")]
+pub fn strip_script_and_style_tags_for_second_pass(
+    input: &str,
+    kept_scripts: KeptScripts,
+) -> (Cow<'_, str>, KeptScripts) {
+    FirstPass::with_kept_scripts(input, kept_scripts, |_| {}).run()
+}
+
 /// A read of the first pass or of the second pass that a test counts.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(super) enum PassRead {

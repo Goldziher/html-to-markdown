@@ -226,6 +226,40 @@ fn an_owner_mark_in_the_text_of_the_tree_is_taken_out() {
     );
 }
 
+/// The second pass over a page uses no number that the cleaned page of the first pass has, in
+/// any case of the letters of the name, and no number that the page of the author has.
+#[test]
+fn the_second_pass_uses_no_number_that_the_cleaned_page_has() {
+    let html = format!("<p data-h2m-script-1>a</p>{OPEN}{{\"a\":\"<\"}}</script>");
+    let (page, kept_scripts) = strip_script_and_style_tags_with_kept_scripts(&html);
+    let marked = |mark: usize| {
+        format!(
+            "<p data-h2m-script-1>a</p><script data-h2m-script-{mark}=\"h2m_script_body_{mark}_end\" \
+             type=\"application/ld+json\">{{\"a\":\"&lt;\"}}</script>"
+        )
+    };
+    assert_eq!(page, marked(0));
+    // ~keep The cleanup joined a name of the author: the page has the number 0 twice.
+    let cleaned =
+        format!("<script data-h2m-script-0=\"h2m_script_body_0_end\">x</script><i DATA-H2M-SCRIPT-2>b</i>{page}");
+    let second = kept_scripts
+        .reserving_owner_names_of(&cleaned)
+        .expect("the first pass wrote a mark");
+    let (page, kept_scripts) =
+        crate::converter::utility::preprocessing::strip_script_and_style_tags_for_second_pass(&html, second);
+    assert_eq!(page, marked(3));
+    assert_eq!(scripts(&page, kept_scripts)[0].as_written, r#"{"a":"<"}"#);
+}
+
+/// A pass that wrote no owner mark asks for no second pass.
+#[test]
+fn a_pass_with_no_owner_mark_asks_for_no_second_pass() {
+    let html = format!("{OPEN}{{\"a\":\"b\"}}</script><p data-h2m-script-0>a</p>");
+    let (page, kept_scripts) = strip_script_and_style_tags_with_kept_scripts(&html);
+    assert_eq!(page, html);
+    assert!(kept_scripts.reserving_owner_names_of(&page).is_none());
+}
+
 /// The pass over a repaired page writes no owner mark: the tree builder writes the marks of
 /// the first page again, and the pass leaves them as they are.
 #[test]
