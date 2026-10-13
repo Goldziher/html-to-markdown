@@ -451,6 +451,15 @@ impl Context {
     /// ~keep After only indent or a list item's marker, the list's first marker starts an item
     /// ~keep where that line ends, as it would with no wrapper.
     pub(crate) fn inline_buffer(&self, output: &str, opens_with_marker: bool) -> Self {
+        self.inline_buffer_with_columns(output, opens_with_marker, true)
+    }
+
+    // ~keep Raw children cannot render list items; marker and hard-break state remain live.
+    pub(crate) fn inline_text_buffer(&self, output: &str) -> Self {
+        self.inline_buffer_with_columns(output, false, false)
+    }
+
+    fn inline_buffer_with_columns(&self, output: &str, opens_with_marker: bool, needs_column: bool) -> Self {
         #[cfg(test)]
         INLINE_BUFFER_CONTEXT_CALLS.with(|calls| calls.set(calls.get() + 1));
         // ~keep Bare list markers end in ASCII space. A final non-whitespace character proves
@@ -478,7 +487,7 @@ impl Context {
         let (indent_length, indent_column) = crate::converter::utility::escaping::leading_indent(line);
         Self {
             in_marker_span: self.in_marker_span || opens_with_marker || line_holds_text,
-            inline_buffer_column: if output.is_empty() {
+            inline_buffer_column: if output.is_empty() || !needs_column {
                 self.inline_buffer_column
             } else {
                 let characters = line[indent_length..].chars().count();
