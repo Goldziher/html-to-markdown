@@ -33,8 +33,8 @@ pub(super) fn track_svg_tag(bytes: &[u8], idx: usize, svg_depth: &mut usize) -> 
 
 /// Strip a `<script>…</script>` or `<style>…</style>` element starting at `idx` (which must
 /// point at the `<`), appending everything before it to `*output` (lazily allocated) and
-/// inserting a single space if collapsing the removed span would otherwise fuse two
-/// non-whitespace characters together.
+/// inserting a single space only for a removed style when its neighbors are non-whitespace.
+/// ~keep Removed scripts add no space, matching the text around a kept structured data script (#827).
 ///
 /// `open_tag_pattern` is the lowercase opening-tag prefix including `<` (e.g. `b"<script"`);
 /// `close_tag_name` is the bare lowercase tag name for the closing-tag scan (e.g. `b"script"`).
@@ -116,7 +116,8 @@ fn strip_raw_text_element(element: RawTextElement<'_>, output: &mut Option<Strin
         );
         return Some(close_idx);
     }
-    if element.idx > 0
+    if element.close_tag_name == b"style"
+        && element.idx > 0
         && close_idx < element.len
         && !element.bytes[element.idx - 1].is_ascii_whitespace()
         && !element.bytes[close_idx].is_ascii_whitespace()
