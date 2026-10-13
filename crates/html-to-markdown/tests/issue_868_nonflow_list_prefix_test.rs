@@ -87,7 +87,7 @@ fn should_keep_covered_blocks_and_unrelated_list_boundaries_unchanged() {
     for (tag, expected) in [
         ("h1", "- a\n   b\n"),
         ("section", "- a\n   b\n"),
-        ("header", "- a\n  b\n"),
+        ("header", "- a\n   b\n"),
         ("x-y", "- a b\n"),
     ] {
         let source = format!("<ul><li>a \n<span><{tag}></{tag}></span>&nbsp;b</li></ul>");
