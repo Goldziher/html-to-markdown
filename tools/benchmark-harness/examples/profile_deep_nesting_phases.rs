@@ -39,11 +39,12 @@ fn time_phase_for_depth(depth: usize) {
 
     let parser = dom.parser();
     let start = Instant::now();
-    let dom_ctx = build_dom_context(&dom, parser, html.len());
+    // ~keep The predicate reads the DOM now, so keep the separate context-build measurement observable.
+    let _dom_ctx = std::hint::black_box(build_dom_context(&dom, parser, html.len()));
     let dom_ctx_elapsed = start.elapsed();
 
     let start = Instant::now();
-    let misnest = has_inline_block_misnest(&dom_ctx, parser);
+    let misnest = has_inline_block_misnest(&dom, parser);
     let misnest_elapsed = start.elapsed();
 
     eprintln!(
