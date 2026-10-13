@@ -1,0 +1,457 @@
+//! Pull request 831: the owner of a kept script goes with its element. The tree holds the body
+//! `{"a":"<"}` and the body `{"a":"&lt;"}` as one text, and a pass can remove one of two such
+//! scripts after the first pass. The script that stays gives its own JSON as written, on the
+//! default route and on the full converter, and the mark that names its owner is in no output.
+
+#![allow(missing_docs)]
+// ~keep The converter is chosen by name, which the crate offers under this feature only.
+#![cfg(all(feature = "testkit", feature = "metadata"))]
+
+use html_to_markdown_rs::{
+    ConversionOptions, HiddenContent, OutputFormat, PreprocessingOptions, PreprocessingPreset, TierStrategy, convert,
+};
+
+const ROUTES: [TierStrategy; 2] = [TierStrategy::Auto, TierStrategy::Tier2];
+const OPEN: &str = r#"<script type="application/ld+json">"#;
+/// Two bodies that the tree holds as one text: the first pass writes each `<` as `&lt;`.
+const LT: &str = r#"{"a":"<"}"#;
+const REFERENCE: &str = r#"{"a":"&lt;"}"#;
+const BOTH_ORDERS: [[&str; 2]; 2] = [[LT, REFERENCE], [REFERENCE, LT]];
+/// The start of the name of the owner mark.
+const MARK: &str = "data-h2m-script-";
+/// The two ways in which a page hides an element, as its start tag and its end tag.
+const HIDDEN: [[&str; 2]; 2] = [["<div hidden>", "</div>"], [r#"<div style="display:none">"#, "</div>"]];
+/// A page as written, and the starts of a page that is parsed again: an omitted end tag, a
+/// custom element, a misnest.
+const STARTS: [&str; 4] = [
+    "",
+    "<p>one<div>two</div>",
+    "<p>one<div>two</div><my-part>q</my-part>",
+    "<b><p>one</b>two</p>",
+];
+
+fn script(body: &str) -> String {
+    format!("{OPEN}{body}</script>")
+}
+
+/// The JSON of each script by each route, with the options that `configure` sets. No content
+/// holds the owner mark.
+fn raw_json_with(html: &str, configure: impl Fn(&mut ConversionOptions)) -> Vec<Vec<String>> {
+    ROUTES
+        .into_iter()
+        .map(|tier_strategy| {
+            let mut options = ConversionOptions {
+                tier_strategy,
+                ..ConversionOptions::default()
+            };
+            configure(&mut options);
+            let result = convert(html, Some(options)).expect("conversion should succeed");
+            let content = result.content.unwrap_or_default();
+            assert!(!content.contains(MARK), "{tier_strategy:?}: {html:?} gave {content:?}");
+            result
+                .metadata
+                .structured_data
+                .into_iter()
+                .map(|data| data.raw_json)
+                .collect()
+        })
+        .collect()
+}
+
+fn raw_json(html: &str) -> Vec<Vec<String>> {
+    raw_json_with(html, |_| {})
+}
+
+/// The bodies as the page has them, by each route.
+fn as_written(bodies: &[&str]) -> Vec<Vec<String>> {
+    vec![bodies.iter().map(|body| (*body).to_string()).collect(); ROUTES.len()]
+}
+
+/// The row of the review: the hidden script and the script that stays have unequal bodies and
+/// one text in the tree. The script that stays gave `{"a":"<"}`.
+#[test]
+fn the_script_that_stays_after_a_hidden_script_with_its_text_gives_its_own_json() {
+    let html = r#"<div hidden><script type="application/ld+json">{"a":"<"}</script></div><script type="application/ld+json">{"a":"&lt;"}</script><p>visible</p>"#;
+    assert_eq!(raw_json(html), as_written(&[r#"{"a":"&lt;"}"#]));
+}
+
+/// The hidden cleanup removes one of two scripts with one text in the tree: the first one or
+/// the second one, hidden by the attribute or by the style, on a page as written and on a page
+/// that is parsed again.
+#[test]
+fn a_script_gives_its_own_json_when_the_hidden_cleanup_removes_a_script_with_its_text() {
+    for [open, close] in HIDDEN {
+        for [removed, kept] in BOTH_ORDERS {
+            for start in STARTS {
+                for html in [
+                    format!("{start}{open}{}{close}{}<p>visible</p>", script(removed), script(kept)),
+                    format!("{start}{}{open}{}{close}<p>visible</p>", script(kept), script(removed)),
+                ] {
+                    assert_eq!(raw_json(&html), as_written(&[kept]), "{html:?}");
+                }
+            }
+        }
+    }
+}
+
+/// The start tags of a structured data script that the converter reads: the media type in
+/// another case, with a parameter, with white space at its two ends, and a `/` after the name.
+const START_TAGS: [&str; 5] = [
+    r#"<script type="application/ld+json">"#,
+    r#"<script type="APPLICATION/LD+JSON">"#,
+    r#"<script type="application/ld+json; charset=utf-8">"#,
+    r#"<script type=" application/ld+json ">"#,
+    r#"<script/type="application/ld+json">"#,
+];
+/// The white space on the two sides of the JSON in the script.
+const AROUND_THE_JSON: [[&str; 2]; 3] = [["", ""], ["  ", " "], ["\n", "\n  "]];
+
+/// The matrix of the review: a hidden script before the script that stays, for each way to
+/// hide, each start tag and each white space around the JSON. A visible element in the place of
+/// the hidden one is the control: each of the two scripts gives its own JSON.
+#[test]
+fn the_script_after_a_hidden_script_gives_its_own_json_for_each_start_tag_and_white_space() {
+    for start_tag in START_TAGS {
+        for [before, after] in AROUND_THE_JSON {
+            for [first, second] in BOTH_ORDERS {
+                let scripts = [first, second].map(|body| format!("{start_tag}{before}{body}{after}</script>"));
+                for [open, close] in HIDDEN {
+                    let html = format!("{open}{}{close}{}<p>visible</p>", scripts[0], scripts[1]);
+                    assert_eq!(raw_json(&html), as_written(&[second]), "{html:?}");
+                }
+                let control = format!("<div>{}</div>{}<p>visible</p>", scripts[0], scripts[1]);
+                assert_eq!(raw_json(&control), as_written(&[first, second]), "{control:?}");
+            }
+        }
+    }
+}
+
+/// A script that the first pass does not write again has no owner mark and no record. It reads
+/// as the tree has it: a character reference of the author is not decoded.
+#[test]
+fn a_script_with_no_record_keeps_the_references_of_the_author() {
+    let html = format!("{OPEN}{{\"a\":\"&amp; &quot; &#60; &gt;\"}}</script><p>visible</p>");
+    assert_eq!(raw_json(&html), as_written(&[r#"{"a":"&amp; &quot; &#60; &gt;"}"#]));
+}
+
+/// The hidden cleanup removes the middle one of three scripts.
+#[test]
+fn two_scripts_give_each_its_own_json_when_the_hidden_cleanup_removes_the_script_between_them() {
+    for [open, close] in HIDDEN {
+        for [first, middle, last] in [
+            [LT, REFERENCE, LT],
+            [REFERENCE, LT, REFERENCE],
+            [LT, LT, REFERENCE],
+            [REFERENCE, REFERENCE, LT],
+        ] {
+            let html = format!(
+                "{}{open}{}{close}{}<p>visible</p>",
+                script(first),
+                script(middle),
+                script(last)
+            );
+            assert_eq!(raw_json(&html), as_written(&[first, last]), "{html:?}");
+        }
+    }
+}
+
+/// A choice that keeps hidden content keeps the hidden script: each of the two scripts gives
+/// its own JSON.
+#[test]
+fn a_kept_hidden_script_and_the_script_beside_it_give_each_its_own_json() {
+    for hidden_content in [HiddenContent::Reachable, HiddenContent::All] {
+        for [open, close] in HIDDEN {
+            for [first, second] in BOTH_ORDERS {
+                for start in ["", "<p>one<div>two</div><my-part>q</my-part>"] {
+                    for html in [
+                        format!("{start}{open}{}{close}{}<p>visible</p>", script(first), script(second)),
+                        format!("{start}{}{open}{}{close}<p>visible</p>", script(first), script(second)),
+                    ] {
+                        assert_eq!(
+                            raw_json_with(&html, |options| options.hidden_content = hidden_content),
+                            as_written(&[first, second]),
+                            "{hidden_content:?}: {html:?}"
+                        );
+                    }
+                }
+            }
+        }
+    }
+}
+
+/// The two pages with one script in `wrapper` and one script beside it: the wrapped script
+/// first, and the wrapped script second. `wrapper` is a start tag and an end tag.
+fn pages_with_one_wrapped_script(wrapper: [&str; 2], inside: &str, beside: &str) -> [String; 2] {
+    let [open, close] = wrapper;
+    [
+        format!("{open}{}{close}{}<p>visible</p>", script(inside), script(beside)),
+        format!("{}{open}{}{close}<p>visible</p>", script(beside), script(inside)),
+    ]
+}
+
+/// A script that the first pass does not write has no owner mark: its JSON is the text of the
+/// tree, and a reference of the author is not decoded. The first pass reads `<svg/>` as an
+/// open `svg`, so it does not write the script after it.
+#[test]
+fn a_script_with_no_owner_mark_keeps_a_reference_of_the_author() {
+    let html = format!("<svg/>{}<p>t</p>", script(REFERENCE));
+    assert_eq!(raw_json(&html), as_written(&[REFERENCE]));
+}
+
+/// A `textarea` with no end tag has the rest of the page as its text. The start tag of a
+/// script in that text is text, and no content holds the owner mark that the first pass gave
+/// it: `raw_json_with` looks for the mark in each content.
+#[test]
+fn a_script_tag_in_the_text_of_a_textarea_with_no_end_tag_shows_no_owner_mark() {
+    for body in [LT, REFERENCE] {
+        for html in [
+            format!(
+                "<html><head><textarea></head><body><p>body</p>{}</body></html>",
+                script(body)
+            ),
+            format!("<p>foo</p><div><textarea>t{}</div><p>after</p>", script(body)),
+        ] {
+            assert_eq!(raw_json(&html).len(), ROUTES.len(), "{html:?}");
+        }
+    }
+}
+
+/// An excluded selector removes one of the two scripts in the walk: the script itself, or the
+/// element that holds it.
+#[test]
+fn a_script_gives_its_own_json_when_a_selector_excludes_a_script_with_its_text() {
+    for [removed, kept] in BOTH_ORDERS {
+        let excluded = format!(r#"<script id="gone" type="application/ld+json">{removed}</script>"#);
+        let mut pages = vec![
+            format!("{excluded}{}<p>visible</p>", script(kept)),
+            format!("{}{excluded}<p>visible</p>", script(kept)),
+        ];
+        pages.extend(pages_with_one_wrapped_script(
+            [r#"<div id="gone">"#, "</div>"],
+            removed,
+            kept,
+        ));
+        for html in pages {
+            assert_eq!(
+                raw_json_with(&html, |options| options.exclude_selectors = vec!["#gone".to_string()]),
+                as_written(&[kept]),
+                "{html:?}"
+            );
+        }
+    }
+}
+
+/// A preprocessing preset removes the navigation that holds one of the two scripts.
+#[test]
+fn a_script_gives_its_own_json_when_a_preset_removes_a_script_with_its_text() {
+    for [removed, kept] in BOTH_ORDERS {
+        for html in pages_with_one_wrapped_script(["<nav>", "</nav>"], removed, kept) {
+            let found = raw_json_with(&html, |options| {
+                options.preprocessing = PreprocessingOptions {
+                    enabled: true,
+                    preset: PreprocessingPreset::Standard,
+                    remove_navigation: true,
+                    remove_forms: true,
+                };
+            });
+            assert_eq!(found, as_written(&[kept]), "{html:?}");
+        }
+    }
+}
+
+/// `strip_tags` writes the content of an element and not its tags, so a script in a stripped
+/// `div` stays: each of the two scripts gives its own JSON. With `script` in `strip_tags` no
+/// script is read as structured data.
+#[test]
+fn the_scripts_give_each_its_own_json_beside_a_stripped_tag() {
+    for [first, second] in BOTH_ORDERS {
+        for html in [
+            format!("<div>{}</div>{}<p>visible</p>", script(first), script(second)),
+            format!("{}<div>{}</div><p>visible</p>", script(first), script(second)),
+        ] {
+            assert_eq!(
+                raw_json_with(&html, |options| options.strip_tags = vec!["div".to_string()]),
+                as_written(&[first, second]),
+                "{html:?}"
+            );
+            assert_eq!(
+                raw_json_with(&html, |options| options.strip_tags = vec!["script".to_string()]),
+                as_written(&[]),
+                "{html:?}"
+            );
+        }
+    }
+}
+
+/// The inert-body pass takes the content of a `template` and of a `noscript` out of the page
+/// when the choice of hidden content does not keep it. `all` keeps it.
+#[test]
+fn a_script_gives_its_own_json_beside_a_script_with_its_text_in_an_inert_element() {
+    for [inert, beside] in BOTH_ORDERS {
+        for html in pages_with_one_wrapped_script(["<template>", "</template>"], inert, beside) {
+            for hidden_content in [HiddenContent::Drop, HiddenContent::Reachable] {
+                assert_eq!(
+                    raw_json_with(&html, |options| options.hidden_content = hidden_content),
+                    as_written(&[beside]),
+                    "{hidden_content:?}: {html:?}"
+                );
+            }
+        }
+        for html in pages_with_one_wrapped_script(["<noscript>", "</noscript>"], inert, beside) {
+            assert_eq!(raw_json(&html), as_written(&[beside]), "{html:?}");
+        }
+        let kept = format!("<template>{}</template>{}<p>visible</p>", script(inert), script(beside));
+        assert_eq!(
+            raw_json_with(&kept, |options| options.hidden_content = HiddenContent::All),
+            as_written(&[inert, beside]),
+            "{kept:?}"
+        );
+    }
+}
+
+/// The head repair writes the page again before the first pass reads it, and the hidden
+/// cleanup then removes one of the two scripts.
+#[test]
+fn a_script_of_a_page_with_a_rebuilt_head_gives_its_own_json_after_a_hidden_script_is_removed() {
+    for [removed, kept] in BOTH_ORDERS {
+        for html in [
+            format!(
+                "<title>T</title><div hidden>{}</div>{}<p>visible</p>",
+                script(removed),
+                script(kept)
+            ),
+            format!(
+                "<title>T</title>{}<div hidden>{}</div><p>visible</p>",
+                script(kept),
+                script(removed)
+            ),
+        ] {
+            assert_eq!(raw_json(&html), as_written(&[kept]), "{html:?}");
+        }
+    }
+}
+
+/// A script with no end tag holds the rest of the page. It gives its own JSON after the hidden
+/// cleanup removed a script with its text.
+#[test]
+fn a_script_with_no_end_tag_gives_its_own_json_after_a_hidden_script_is_removed() {
+    for [removed, kept] in BOTH_ORDERS {
+        let html = format!("<div hidden>{}</div><p>visible</p>{OPEN}{kept}", script(removed));
+        assert_eq!(raw_json(&html), as_written(&[kept]), "{html:?}");
+    }
+}
+
+/// An attribute of the author with the name of an owner mark stays as the author wrote it, and
+/// `preserve_tags` writes no owner mark. The two attributes of the script are written in the
+/// one order or in the other.
+#[test]
+fn a_preserved_script_keeps_an_attribute_with_the_name_of_an_owner_mark() {
+    let html = r#"<p>foo <script type="application/ld+json" data-h2m-script-0="mine">{"a":"<"}</script> bar</p>"#;
+    assert_eq!(raw_json(html), as_written(&[LT]));
+    let written = [
+        r#"foo <script type="application/ld+json" data-h2m-script-0="mine">{"a":"&lt;"}</script> bar"#,
+        r#"foo <script data-h2m-script-0="mine" type="application/ld+json">{"a":"&lt;"}</script> bar"#,
+    ];
+    for tier_strategy in ROUTES {
+        let options = ConversionOptions {
+            tier_strategy,
+            preserve_tags: vec!["script".to_string()],
+            ..ConversionOptions::default()
+        };
+        let content = convert(html, Some(options))
+            .expect("conversion should succeed")
+            .content
+            .unwrap_or_default();
+        assert!(written.contains(&content.trim_end()), "{tier_strategy:?}: {content:?}");
+    }
+}
+
+/// The plain writer writes no owner mark.
+#[test]
+fn the_plain_output_holds_no_owner_mark() {
+    for [first, second] in BOTH_ORDERS {
+        let html = format!("<p>foo {} and {} bar</p>", script(first), script(second));
+        for tier_strategy in ROUTES {
+            let options = ConversionOptions {
+                tier_strategy,
+                output_format: OutputFormat::Plain,
+                ..ConversionOptions::default()
+            };
+            let content = convert(&html, Some(options))
+                .expect("conversion should succeed")
+                .content
+                .unwrap_or_default();
+            assert!(content.contains("foo"), "{tier_strategy:?}: {content:?}");
+            assert!(!content.contains(MARK), "{tier_strategy:?}: {content:?}");
+        }
+    }
+}
+
+#[cfg(feature = "visitor")]
+mod with_a_visitor {
+    use std::collections::BTreeMap;
+    use std::sync::{Arc, Mutex};
+
+    use html_to_markdown_rs::NodeContext;
+    use html_to_markdown_rs::visitor::{HtmlVisitor, VisitResult};
+
+    use super::{BOTH_ORDERS, MARK, as_written, raw_json_with, script};
+
+    /// The attributes of each script that the visitor was shown, in the order of the walk.
+    type Shown = Arc<Mutex<Vec<BTreeMap<String, String>>>>;
+
+    /// Skips the element with the id `gone` and keeps the attributes of each script.
+    #[derive(Debug)]
+    struct SkipVisitor {
+        shown: Shown,
+    }
+
+    impl HtmlVisitor for SkipVisitor {
+        fn visit_element_start(&mut self, ctx: &NodeContext) -> VisitResult {
+            if ctx.tag_name == "script" {
+                self.shown
+                    .lock()
+                    .expect("the shown scripts")
+                    .push(ctx.attributes().clone());
+            }
+            if ctx.attributes().get("id").is_some_and(|id| id == "gone") {
+                VisitResult::Skip
+            } else {
+                VisitResult::Continue
+            }
+        }
+    }
+
+    /// A visitor skips one of the two scripts. The script that stays gives its own JSON, and
+    /// the visitor is shown no owner mark.
+    #[test]
+    fn a_script_gives_its_own_json_when_a_visitor_skips_a_script_with_its_text() {
+        for [removed, kept] in BOTH_ORDERS {
+            let skipped = format!(r#"<script id="gone" type="application/ld+json">{removed}</script>"#);
+            for html in [
+                format!("{skipped}{}<p>visible</p>", script(kept)),
+                format!("{}{skipped}<p>visible</p>", script(kept)),
+            ] {
+                let shown = Shown::default();
+                let found = raw_json_with(&html, |options| {
+                    options.visitor = Some(Arc::new(Mutex::new(SkipVisitor {
+                        shown: Arc::clone(&shown),
+                    })));
+                });
+                assert_eq!(found, as_written(&[kept]), "{html:?}");
+                let shown = shown.lock().expect("the shown scripts");
+                // ~keep Each of the two routes shows the two scripts.
+                assert_eq!(shown.len(), 4, "{html:?}");
+                for attributes in shown.iter() {
+                    assert!(attributes.keys().all(|name| !name.starts_with(MARK)), "{attributes:?}");
+                    assert_eq!(
+                        attributes.get("type").map(String::as_str),
+                        Some("application/ld+json"),
+                        "{attributes:?}"
+                    );
+                    assert!(attributes.len() <= 2, "{attributes:?}");
+                }
+            }
+        }
+    }
+}

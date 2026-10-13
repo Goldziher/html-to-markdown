@@ -3,6 +3,7 @@
 mod head_scan;
 mod inert;
 mod kept;
+mod kept_scripts;
 mod lists;
 mod markup;
 mod menu;
@@ -10,6 +11,7 @@ mod raw_text;
 mod visibility;
 
 pub use inert::{normalize_inert_bodies_with_preservation, restore_inert_bodies};
+pub use kept_scripts::KeptScripts;
 pub use lists::normalize_unclosed_list_items;
 #[cfg(feature = "metadata")]
 pub use markup::{ScriptType, script_type};
@@ -19,7 +21,7 @@ pub use markup::{
 };
 pub use menu::{PRESERVED_MENU_ATTRIBUTE, normalize_menu_elements, restore_preserved_menu_elements};
 pub use raw_text::{
-    KeptScripts, find_raw_text_end_tag, skip_opaque_region, strip_script_and_style_tags,
+    find_raw_text_end_tag, skip_opaque_region, strip_script_and_style_tags,
     strip_script_and_style_tags_with_kept_scripts,
 };
 pub use visibility::{

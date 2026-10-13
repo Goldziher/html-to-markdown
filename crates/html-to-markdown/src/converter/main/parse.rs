@@ -253,10 +253,11 @@ fn asks_for_the_tree_builder(page: &str) -> bool {
         })
 }
 
-/// Finish the tree that the converter reads. Returns the kept scripts of the page, each script
-/// of that tree with its record.
+/// Finish the tree that the converter reads. Returns the kept scripts of the page, with the
+/// node of each script that had an owner mark.
 ///
-/// ~keep No parse comes after this function, so the ids of the nodes are final here.
+/// ~keep No parse comes after this function, so the ids of the nodes are final here. The owner
+/// ~keep marks leave the tree here, before the metadata, a visitor or a writer of HTML reads it.
 pub(super) fn finish_dom_parse(
     dom: &mut tl::VDom<'_>,
     dom_ctx: &mut DomContext,
@@ -270,7 +271,7 @@ pub(super) fn finish_dom_parse(
     }
     trace_parse_complete(dom, input_len);
     #[cfg(feature = "metadata")]
-    let kept_scripts = crate::converter::metadata::kept_scripts_of_tree(dom, kept_scripts);
+    let kept_scripts = kept_scripts.with_owner_marks_taken(dom)?;
     Ok(kept_scripts)
 }
 

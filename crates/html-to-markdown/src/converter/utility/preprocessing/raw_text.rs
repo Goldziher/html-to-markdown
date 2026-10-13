@@ -6,6 +6,7 @@
 use std::borrow::Cow;
 use std::str;
 
+use super::kept_scripts::{ESCAPED_LT, KeptScripts, push_owner_mark};
 use super::markup::{find_tag_end, is_json_ld_script_open_tag, matches_end_tag_start, matches_tag_start};
 use super::visibility::{after_bogus_comment, is_bogus_comment_marker};
 
@@ -66,139 +67,16 @@ enum Outcome {
     Kept,
 }
 
-/// The `<` of a kept element, as the first pass writes it.
-const ESCAPED_LT: &str = "&lt;";
-
-/// The kept scripts of one page whose text the tree cannot give back as written.
-///
-/// ~keep `push_kept_element` writes each `<` of a kept script as `&lt;`, and `as_written` takes
-/// ~keep that back. No other code knows of the escape: the tree holds the escaped text, and a
-/// ~keep writer of HTML writes it as it is. A body that holds `&lt;` itself reads the same in
-/// ~keep the tree as a body that holds `<`, so the escaped text does not name a script. The
-/// ~keep first pass records each body whose escaped text holds `&lt;`, in the order of the page,
-/// ~keep and `match_to_tree` gives each script of the final tree its own record.
-#[derive(Debug)]
-pub struct KeptScripts {
-    /// The bodies whose escaped text holds `&lt;`, as written, in the order of the page, with
-    /// no white space at the two ends.
-    #[cfg(feature = "metadata")]
-    bodies: Vec<Box<str>>,
-    /// The id of a script node of the final tree with the index of its body in `bodies`, in
-    /// the order of the ids.
-    #[cfg(feature = "metadata")]
-    of_node: Vec<(u32, usize)>,
-    /// Whether the page has a kept script with no end tag.
-    ///
-    /// ~keep The rest of the page is the text of the first such script, and a later start tag
-    /// ~keep is in that text, so the first pass records one body for them: the read stays
-    /// ~keep linear on a page of such start tags.
-    #[cfg(feature = "metadata")]
-    has_no_end_tag: bool,
-}
-
-impl KeptScripts {
-    const fn new() -> Self {
-        Self {
-            #[cfg(feature = "metadata")]
-            bodies: Vec::new(),
-            #[cfg(feature = "metadata")]
-            of_node: Vec::new(),
-            #[cfg(feature = "metadata")]
-            has_no_end_tag: false,
-        }
-    }
-
-    /// Record the body of a kept script when its escaped text holds `&lt;`.
-    #[cfg(feature = "metadata")]
-    fn record(&mut self, body: &str) {
-        if body.contains('<') || body.contains(ESCAPED_LT) {
-            self.bodies.push(body.trim().into());
-        }
-    }
-
-    /// Whether the first pass recorded no body.
-    #[cfg(feature = "metadata")]
-    #[must_use]
-    pub const fn is_empty(&self) -> bool {
-        self.bodies.is_empty()
-    }
-
-    /// Give each kept script of the final tree its record. `in_tree` has the id of the node
-    /// and the text of each kept script whose text holds `&lt;`, in the order of the tree; the
-    /// text has no white space at the two ends.
-    ///
-    /// ~keep A script is one of the scripts with its escaped text, and its place among them is
-    /// ~keep its identity: the first of them in the tree is the first of them in the page. A
-    /// ~keep script never gets the record of a script with another escaped text, so a pass that
-    /// ~keep drops, moves or adds such a script changes nothing here. When the tree and the
-    /// ~keep page do not have the same count of scripts with one escaped text, the place names
-    /// ~keep no script and none of them gets a record; when all their bodies are equal the
-    /// ~keep place is not needed. The tree builder writes a line end of the page as LF, so a
-    /// ~keep CR is not compared.
-    #[cfg(feature = "metadata")]
-    pub fn match_to_tree(&mut self, in_tree: &[(u32, String)]) {
-        let mut recorded: ahash::AHashMap<Vec<u8>, Vec<usize>> = ahash::AHashMap::new();
-        for (index, body) in self.bodies.iter().enumerate() {
-            let escaped = body.replace('<', ESCAPED_LT);
-            recorded.entry(without_cr(&escaped)).or_default().push(index);
-        }
-        let mut found: ahash::AHashMap<Vec<u8>, Vec<u32>> = ahash::AHashMap::new();
-        for (node, text) in in_tree {
-            found.entry(without_cr(text)).or_default().push(*node);
-        }
-        for (text, scripts) in found {
-            let Some(written) = recorded.get(&text) else {
-                continue;
-            };
-            let one_body = written
-                .iter()
-                .all(|index| self.bodies[*index] == self.bodies[written[0]]);
-            let named = scripts.len() == written.len() || (one_body && scripts.len() < written.len());
-            if !named {
-                continue;
-            }
-            for (place, node) in scripts.into_iter().enumerate() {
-                let index = if one_body { written[0] } else { written[place] };
-                self.of_node.push((node, index));
-            }
-        }
-        self.of_node.sort_unstable();
-    }
-
-    /// The text of a kept script as the page has it. `node` is the id of the script in the
-    /// final tree and `text` is the text that the tree has for it, with no white space at the
-    /// two ends.
-    ///
-    /// ~keep A script with no record reads with each `&lt;` as `<`: right for a body that
-    /// ~keep holds no `&lt;` of its own.
-    #[cfg(feature = "metadata")]
-    pub fn as_written<'a>(&'a self, node: u32, text: &'a str) -> Cow<'a, str> {
-        if let Ok(at) = self.of_node.binary_search_by_key(&node, |(id, _)| *id) {
-            let body: &str = &self.bodies[self.of_node[at].1];
-            return Cow::Borrowed(body);
-        }
-        if text.contains(ESCAPED_LT) {
-            Cow::Owned(text.replace(ESCAPED_LT, "<"))
-        } else {
-            Cow::Borrowed(text)
-        }
-    }
-}
-
-/// The bytes of `text` that `KeptScripts` compares: all but each CR.
-#[cfg(feature = "metadata")]
-fn without_cr(text: &str) -> Vec<u8> {
-    text.bytes().filter(|byte| *byte != b'\r').collect()
-}
-
 /// A candidate raw-text element: `idx` is its `<`, `last` is the end of the copied input and
-/// `name` is the tag name in lower case.
+/// `name` is the tag name in lower case. `mark` is the number of its owner mark, when it is a
+/// kept script that has one.
 struct RawTextElement<'a> {
     input: &'a str,
     idx: usize,
     last: usize,
     name: &'a str,
     content: RawTextContent,
+    mark: Option<usize>,
 }
 
 /// Remove or rewrite the raw-text element that starts at `element.idx`, appending the input
@@ -233,7 +111,7 @@ fn strip_raw_text_element(
     if kept {
         // ~keep A kept element adds no space of its own: the white space around it is the page's.
         let attributes = &element.input[element.idx + 1 + name.len()..tag_end];
-        push_kept_element(out, element.name, attributes, body);
+        push_kept_element(out, element.name, element.mark, attributes, body);
         return Outcome::Kept;
     }
     if element.idx > 0
@@ -247,24 +125,19 @@ fn strip_raw_text_element(
 }
 
 /// Write a kept raw-text element in a form the parser reads as one element with one text.
-/// `attributes` is the open tag after its name, with the `>`; `body` is the content.
+/// `mark` is the number of its owner mark, `attributes` is the open tag after its name, with
+/// the `>`, and `body` is the content.
 ///
 /// ~keep The parser has no raw-text rule: a `<p>` in the content would open an element that
 /// ~keep holds the rest of the page, so each `<` of the body is written as `&lt;`. Nothing else
 /// ~keep of the body changes, so this function changes nothing in a body that it wrote: the
 /// ~keep pass reads a repaired page as it reads the page of the author. `KeptScripts` gives the
 /// ~keep text of a script as written. The parser also closes an element only with an end tag of
-/// ~keep the same spelling, so the two tag names are written in one spelling, and it reads only
-/// ~keep white space after the name, so a `/` or a form feed there is written as a space.
-fn push_kept_element(out: &mut String, name: &str, attributes: &str, body: &str) {
+/// ~keep the same spelling, so the two tag names are written in one spelling.
+fn push_kept_element(out: &mut String, name: &str, mark: Option<usize>, attributes: &str, body: &str) {
     out.push('<');
     out.push_str(name);
-    if matches!(attributes.as_bytes().first(), Some(b'/' | b'\x0C')) {
-        out.push(' ');
-        out.push_str(&attributes[1..]);
-    } else {
-        out.push_str(attributes);
-    }
+    push_kept_attributes(out, mark, attributes);
     let mut rest = body;
     while let Some(at) = memchr::memchr(b'<', rest.as_bytes()) {
         out.push_str(&rest[..at]);
@@ -275,6 +148,23 @@ fn push_kept_element(out: &mut String, name: &str, attributes: &str, body: &str)
     out.push_str("</");
     out.push_str(name);
     out.push('>');
+}
+
+/// Write the start tag of a kept element after its name: the owner mark with the number
+/// `mark`, then `attributes`, the open tag after its name, with the `>`.
+///
+/// ~keep The parser reads only white space after the name, so a `/` or a form feed there is
+/// ~keep written as a space.
+fn push_kept_attributes(out: &mut String, mark: Option<usize>, attributes: &str) {
+    if let Some(mark) = mark {
+        push_owner_mark(out, mark);
+    }
+    if matches!(attributes.as_bytes().first(), Some(b'/' | b'\x0C')) {
+        out.push(' ');
+        out.push_str(&attributes[1..]);
+    } else {
+        out.push_str(attributes);
+    }
 }
 
 /// The raw-text elements the first pass reads, each with what happens to its content.
@@ -293,14 +183,23 @@ pub(super) fn removed_element_name(slot: usize) -> Option<&'static str> {
 
 /// Strip script and style tags and their content from HTML, and write the content of a
 /// structured data script and of a `textarea` as text.
+///
+/// ~keep This pass writes no owner mark. The pass over a repaired page is this one: the tree
+/// ~keep builder writes the marks of the first page again, and a second mark on one script
+/// ~keep would have no record.
 pub fn strip_script_and_style_tags(input: &str) -> Cow<'_, str> {
-    strip_script_and_style_tags_with_kept_scripts(input).0
+    FirstPass::new(input, |_| {}).run().0
 }
 
-/// [`strip_script_and_style_tags`], with the kept scripts that the reader of the structured
-/// data asks for the text as written.
+/// [`strip_script_and_style_tags`], with an owner mark in the start tag of each kept script
+/// whose escaped text holds `&lt;`, and with the kept scripts that the reader of the
+/// structured data asks for the text as written.
 pub fn strip_script_and_style_tags_with_kept_scripts(input: &str) -> (Cow<'_, str>, KeptScripts) {
-    FirstPass::new(input, |_| {}).run()
+    #[cfg(feature = "metadata")]
+    let kept_scripts = KeptScripts::with_marks();
+    #[cfg(not(feature = "metadata"))]
+    let kept_scripts = KeptScripts::new();
+    FirstPass::with_kept_scripts(input, kept_scripts, |_| {}).run()
 }
 
 /// A read of the first pass or of the second pass that a test counts.
@@ -436,14 +335,19 @@ pub(super) struct FirstPass<'a, C: FnMut(PassRead)> {
 }
 
 impl<'a, C: FnMut(PassRead)> FirstPass<'a, C> {
+    /// The pass that writes no owner mark.
     pub(super) const fn new(input: &'a str, count: C) -> Self {
+        Self::with_kept_scripts(input, KeptScripts::new(), count)
+    }
+
+    const fn with_kept_scripts(input: &'a str, kept_scripts: KeptScripts, count: C) -> Self {
         Self {
             input,
             last: 0,
             output: None,
             svg_depth: 0,
             reads: PageReads::new(count),
-            kept_scripts: KeptScripts::new(),
+            kept_scripts,
         }
     }
 
@@ -499,15 +403,7 @@ impl<'a, C: FnMut(PassRead)> FirstPass<'a, C> {
         let Some(close) = self.reads.raw_text_end_tag(bytes, tag_end, slot) else {
             // ~keep The second pass reads an element with no end tag.
             #[cfg(feature = "metadata")]
-            {
-                if content == RawTextContent::RemovedUnlessStructuredData
-                    && !self.kept_scripts.has_no_end_tag
-                    && is_json_ld_script_open_tag(&self.input[idx..tag_end])
-                {
-                    self.kept_scripts.has_no_end_tag = true;
-                    self.kept_scripts.record(&self.input[tag_end..]);
-                }
-            }
+            self.mark_script_with_no_end_tag(idx, tag_end, name, content);
             return tag_end;
         };
         let element = RawTextElement {
@@ -516,18 +412,58 @@ impl<'a, C: FnMut(PassRead)> FirstPass<'a, C> {
             last: self.last,
             name,
             content,
+            mark: None,
+        };
+        #[cfg(feature = "metadata")]
+        let element = RawTextElement {
+            mark: self.owner_mark(&element, tag_end, close.0),
+            ..element
         };
         let outcome = strip_raw_text_element(&element, tag_end, close, &mut self.output);
         if outcome != Outcome::Unchanged {
             self.last = close.1;
         }
-        #[cfg(feature = "metadata")]
-        {
-            if outcome == Outcome::Kept && content == RawTextContent::RemovedUnlessStructuredData {
-                self.kept_scripts.record(&self.input[tag_end..close.0]);
-            }
-        }
         close.1
+    }
+
+    /// The number of the owner mark of `element`, when it is a kept script whose escaped text
+    /// holds `&lt;`. `tag_end` is the end of its start tag and `body_end` is the end of its
+    /// content.
+    #[cfg(feature = "metadata")]
+    fn owner_mark(&mut self, element: &RawTextElement<'_>, tag_end: usize, body_end: usize) -> Option<usize> {
+        let is_kept_script = element.content == RawTextContent::RemovedUnlessStructuredData
+            && self.kept_scripts.marks
+            && is_json_ld_script_open_tag(&self.input[element.idx..tag_end]);
+        if !is_kept_script {
+            return None;
+        }
+        self.kept_scripts.mark(self.input, &self.input[tag_end..body_end])
+    }
+
+    /// Write the owner mark in the start tag of the first kept script with no end tag, when
+    /// the rest of the page, which is its text, holds a `<` or `&lt;`. `idx` is the `<` of the
+    /// start tag, `tag_end` is its end and `name` is the name of the element.
+    ///
+    /// ~keep The tree builder ends this script at the end of the page and writes the mark
+    /// ~keep again, so the script of the final tree has the rest of the page as its record.
+    #[cfg(feature = "metadata")]
+    fn mark_script_with_no_end_tag(&mut self, idx: usize, tag_end: usize, name: &str, content: RawTextContent) {
+        let input = self.input;
+        if content != RawTextContent::RemovedUnlessStructuredData
+            || self.kept_scripts.has_no_end_tag
+            || !is_json_ld_script_open_tag(&input[idx..tag_end])
+        {
+            return;
+        }
+        self.kept_scripts.has_no_end_tag = true;
+        let Some(mark) = self.kept_scripts.mark(input, &input[tag_end..]) else {
+            return;
+        };
+        let after_name = idx + 1 + name.len();
+        let out = self.output.get_or_insert_with(|| String::with_capacity(input.len()));
+        out.push_str(&input[self.last..after_name]);
+        push_kept_attributes(out, Some(mark), &input[after_name..tag_end]);
+        self.last = tag_end;
     }
 }
 

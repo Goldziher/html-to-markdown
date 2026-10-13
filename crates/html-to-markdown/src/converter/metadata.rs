@@ -128,8 +128,8 @@ fn collect_json_ld_from_children(children: &tl::Children, parser: &Parser, handl
 /// The structured data of a script, as the page has it. `node` is the id of the script.
 ///
 /// ~keep The tree holds the text of a kept script with the escape of the first pass.
-/// ~keep `KeptScripts` takes it back; this function decodes nothing, so a character reference
-/// ~keep of the JSON stays as written.
+/// ~keep `KeptScripts` takes it back for the node that had the owner mark of the script; this
+/// ~keep function decodes nothing, so a character reference of the JSON stays as written.
 #[cfg(feature = "metadata")]
 fn json_ld_from_tag(node: u32, tag: &tl::HTMLTag<'_>, parser: &Parser, kept_scripts: &KeptScripts) -> Option<String> {
     let type_value = crate::converter::utility::attributes::decoded_attribute(tag, "type")?;
@@ -137,57 +137,8 @@ fn json_ld_from_tag(node: u32, tag: &tl::HTMLTag<'_>, parser: &Parser, kept_scri
         return None;
     }
     let text = tag.inner_text(parser);
-    let json = kept_scripts.as_written(node, text.trim()).into_owned();
+    let json = kept_scripts.as_written(node, text.trim()).to_owned();
     (!json.is_empty()).then_some(json)
-}
-
-/// The kept scripts of the page with the record of each script of the final tree. `dom` is the
-/// tree that the converter reads, after the last parse.
-///
-/// ~keep The first pass records a script outside `svg` only, it keeps a script by the rule of
-/// ~keep `script_type`, and it writes the body as one text, so this function takes the same
-/// ~keep scripts: a script with an element in it is not one that the first pass wrote. The
-/// ~keep read is in the order of the page and goes to each node once, with no recursion.
-#[cfg(feature = "metadata")]
-#[must_use]
-pub fn kept_scripts_of_tree(dom: &tl::VDom<'_>, mut kept_scripts: KeptScripts) -> KeptScripts {
-    if kept_scripts.is_empty() {
-        return kept_scripts;
-    }
-    let parser = dom.parser();
-    let mut in_tree = Vec::new();
-    // ~keep The nodes to read, the next one last, each with whether it is in an `svg`.
-    let mut open: Vec<(NodeHandle, bool)> = dom.children().iter().rev().map(|child| (*child, false)).collect();
-    while let Some((handle, in_svg)) = open.pop() {
-        let Some(tl::Node::Tag(tag)) = handle.get(parser) else {
-            continue;
-        };
-        let name = tag.name().as_bytes();
-        let children = tag.children();
-        let children = children.top().as_slice();
-        if !in_svg
-            && name.eq_ignore_ascii_case(b"script")
-            && let [only] = children
-            && let Some(tl::Node::Raw(text)) = only.get(parser)
-        {
-            let text = text.as_utf8_str();
-            let text = text.trim();
-            if text.contains("&lt;") && is_kept_script(tag) {
-                in_tree.push((handle.get_inner(), text.to_string()));
-            }
-        }
-        let in_svg = in_svg || name.eq_ignore_ascii_case(b"svg");
-        open.extend(children.iter().rev().map(|child| (*child, in_svg)));
-    }
-    kept_scripts.match_to_tree(&in_tree);
-    kept_scripts
-}
-
-/// Whether the first pass keeps a script with the start tag `tag`.
-#[cfg(feature = "metadata")]
-fn is_kept_script(tag: &tl::HTMLTag<'_>) -> bool {
-    crate::converter::utility::attributes::decoded_attribute(tag, "type")
-        .is_some_and(|type_value| script_type(&type_value) != ScriptType::Removed)
 }
 
 /// Handle script element.

@@ -97,3 +97,17 @@ fn repair_custom_elements(
         warning,
     )
 }
+
+#[cfg(test)]
+mod tests {
+    use super::{HiddenContent, preprocess_repaired_html};
+
+    /// The pass reads a repaired page too: the tree builder writes each `<` of a kept script
+    /// as `<` again, and the parser gets it as text only when the pass writes it as `&lt;`.
+    #[test]
+    fn a_lt_of_a_kept_script_of_a_repaired_page_is_written_as_text() {
+        let html = r#"<p>t</p><script type="application/ld+json">{"a":"<b>"}</script><p>after</p>"#;
+        let page = preprocess_repaired_html(html, false, HiddenContent::Drop);
+        assert!(page.contains(r#"{"a":"&lt;b>"}"#), "{page}");
+    }
+}

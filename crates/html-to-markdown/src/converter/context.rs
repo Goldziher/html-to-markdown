@@ -37,8 +37,9 @@ pub struct ContextParameters {
     pub inline_collector: Option<InlineCollectorHandle>,
     #[cfg(feature = "metadata")]
     pub metadata_collector: Option<crate::metadata::MetadataCollectorHandle>,
-    /// The kept scripts of the page, from the first pass. Only a build with `metadata` reads
-    /// them: the reader of the structured data asks for them.
+    /// The kept scripts of the page, from the first pass, with the node of each script that
+    /// had an owner mark. Only a build with `metadata` reads them: the reader of the structured
+    /// data asks for them.
     pub kept_scripts: crate::converter::utility::preprocessing::KeptScripts,
     #[cfg(feature = "visitor")]
     pub visitor: Option<crate::visitor::VisitorHandle>,
