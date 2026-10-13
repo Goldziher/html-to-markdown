@@ -95,10 +95,6 @@ required-features = ["testkit"]
 name = "form_whitespace_followups_test"
 required-features = ["testkit"]
 
-[[example]]
-name = "test_deser"
-required-features = ["serde"]
-
 [[test]]
 name = "inline_boundary_followups"
 required-features = ["testkit"]
@@ -126,6 +122,10 @@ required-features = ["testkit"]
 [[test]]
 name = "issue_868_empty_inline_boundary_test"
 required-features = ["testkit"]
+
+[[example]]
+name = "test_deser"
+required-features = ["serde"]
 
 [lints]
 workspace = true

@@ -249,9 +249,11 @@ fn source_starts_with_unicode_space(raw: &str) -> bool {
 ///
 /// ~keep Tier-2 writes that space (`a <span></span>&nbsp;b` is `a  b`) by what stands before
 /// ~keep the text in the tree. The scanner knows that only for a text that starts where an
-/// ~keep opening tag ends: there the two converters join the spaces, and the scanner answers.
+/// ~keep opening tag ends, or the closing tag of an element that holds text and is no `span`
+/// ~keep (`emit_close`): there the two converters join the spaces, and the scanner answers.
 /// ~keep Any other text has an unknown place, and Tier-2 takes the page: a text after a `<br>`
-/// ~keep in a table cell is one, and Tier-2 keeps the Unicode space there.
+/// ~keep in a table cell is one, and Tier-2 keeps the Unicode space there. A text of only white
+/// ~keep space after a closing tag is another (`is_blank_after_text`).
 /// ~keep In `pre` and in code the white space rule does not apply, and nothing is handed over.
 /// ~keep A heading has one line. Tier-2 writes a `<br>` there as a space, and this scanner writes
 /// ~keep a hard break that the close of the heading folds to a space: that hard break is a
@@ -265,6 +267,8 @@ fn hand_over_unicode_space_after_space(
     if state.escape_ctx.intersects(EscapeCtx::PRE | EscapeCtx::CODE) || !source_starts_with_unicode_space(raw) {
         return Ok(());
     }
+    let in_label = state.link_stack.iter().any(|(href, ..)| href.is_some());
+    let in_empty_address_link = state.link_stack.iter().any(|(href, ..)| href.as_deref() == Some(""));
     let place = state
         .text_place
         .and_then(|(offset, place)| (offset == base_offset).then_some(place));
@@ -272,17 +276,46 @@ fn hand_over_unicode_space_after_space(
     let in_cell = state.in_table_cell();
     let written = state.cell_or_output_mut();
     let after_heading_break = in_heading && (written.ends_with("  \n") || written.ends_with("\\\n"));
+    // ~keep A text with a word that starts a line after a hard break keeps its Unicode spaces as
+    // ~keep the indent of that line in Tier-2 (#839). This scanner has no such rule, in the label
+    // ~keep of a link either, and Tier-2 takes the page.
+    // ~keep A link with an empty address is running text in Tier-2: a `<br>` in it is a break of
+    // ~keep the block there, and this scanner writes the break of a label. What a text of only
+    // ~keep Unicode spaces writes after that break is decided in Tier-2 (issue #845).
     let after_hard_break = !in_heading
         && !in_cell
         && (written.ends_with("  \n") || written.ends_with("\\\n"))
-        && !crate::converter::utility::white_space::is_blank(crate::text::decode_html_entities_cow(raw).as_ref());
-    if after_hard_break
-        || ((written.ends_with(' ') || after_heading_break)
-            && place.is_none_or(|place| unicode_space_is_kept(written, place)))
+        && (in_empty_address_link
+            || !crate::converter::utility::white_space::is_blank(crate::text::decode_html_entities_cow(raw).as_ref()));
+    if after_hard_break {
+        return Err(BailReason::UnicodeSpaceAfterSpace);
+    }
+    // ~keep In the label of a link every run of white space is one space in both converters
+    // ~keep (`normalize_link_label`), and a Unicode space at a label edge is the one space of that
+    // ~keep edge: the place of the text decides nothing there. A link with no address is running
+    // ~keep text, not a label.
+    if in_label {
+        return Ok(());
+    }
+    if (written.ends_with(' ') || after_heading_break)
+        && place.is_none_or(|place| unicode_space_is_kept(written, place) || is_blank_after_text(place, raw))
     {
         return Err(BailReason::UnicodeSpaceAfterSpace);
     }
     Ok(())
+}
+
+/// Whether the source text `raw` stands after text and holds no word: every character of it is
+/// white space, a Unicode space included.
+///
+/// ~keep The place after text (`emit_close`) answers for a text that holds a word: the Unicode
+/// ~keep space that `</a>&nbsp;now` starts with joins the written space in both converters. A
+/// ~keep text of only white space is no word to join: Tier-2 writes an em space (U+2003)
+/// ~keep between `<b>Go </b>` and `<i>now</i>` with no space before it, by rules this scanner
+/// ~keep does not have. The place of such a text counts as unknown, and Tier-2 takes the page.
+fn is_blank_after_text(place: TextPlace, raw: &str) -> bool {
+    place == TextPlace::AfterText
+        && crate::converter::utility::white_space::is_blank(&crate::text::decode_html_entities_cow(raw))
 }
 
 /// Scan and decode a single HTML entity starting at `amp_pos` (the `&` byte).

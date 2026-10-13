@@ -166,6 +166,9 @@ pub struct OpenTag {
     /// Whether the first content of this quote or heading in a table cell was whitespace, which
     /// Tier-2 keeps at the start of the element's own buffer (see `scanner::flush_text`).
     pub starts_with_whitespace: bool,
+    /// The count of texts of the page (`Tier1State::text_count`) when this element opened: the
+    /// element holds text when the count is higher at its close.
+    pub texts_before: usize,
 }
 
 /// Minimum capacity for each summary accumulation buffer.
@@ -295,13 +298,18 @@ pub struct Tier1State {
     /// as `next_tag_is_list`).
     pub last_emitted_was_img: bool,
 
-    /// The source offset where the last opening tag or the last `<br>` of a heading ends, and
-    /// what a text that starts at that offset has before it. A text that starts at any other
-    /// offset has a comment, a closing tag or another void tag before it, and the fast converter
-    /// does not know its place. No tag clears this: the offset of a later text never equals an
-    /// earlier one. The full converter reads the same fact from the tree
-    /// (`siblings::text_place`).
+    /// The source offset where the last opening tag, the last `<br>` of a heading or the last
+    /// closing tag of an element with a known place after it ends, and what a text that starts
+    /// at that offset has before it. A text that starts at any other offset has a comment,
+    /// another closing tag or another void tag before it, and the fast converter does not know
+    /// its place. No tag clears this: the offset of a later text never equals an earlier one.
+    /// The full converter reads the same fact from the tree (`siblings::text_place`).
     pub text_place: Option<(usize, crate::converter::utility::white_space::TextPlace)>,
+
+    /// How many texts of the page so far are text as `DomContext::holds_text` reads it: not
+    /// white space only. An element holds text when a text was counted between its tags
+    /// (`OpenTag::texts_before`).
+    pub text_count: usize,
 
     /// True right after the closing tag of a block element or a `<hr>` (block-level by Tier-2's
     /// test), until the next opening or void tag, the next closing tag that is not inline, or the
@@ -394,6 +402,7 @@ impl Tier1State {
             last_closed_custom_element: false,
             last_emitted_was_img: false,
             text_place: None,
+            text_count: 0,
             last_closed_block: false,
             last_closed_list: false,
             pending_newline_join: None,
