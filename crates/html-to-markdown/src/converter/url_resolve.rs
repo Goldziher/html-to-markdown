@@ -24,11 +24,12 @@ use crate::rcdom::{Handle, NodeData, RcDom};
 /// ~keep The page's address is the caller's `base_url`. It is not the base that links resolve
 /// ~keep against: with a `<base>` element, `#part` names the document of the `<base>`, which can
 /// ~keep be another document. So a link is compared, after it is resolved, with the page's address.
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub enum OwnPage {
     /// The caller gave the address of the page.
     Known(Url),
     /// No address, and no `<base>` element: a written `#part` is a link into the page.
+    #[default]
     UnknownWithoutBase,
     /// No address, and a `<base>` element: where `#part` leads is not known.
     UnknownWithBase,

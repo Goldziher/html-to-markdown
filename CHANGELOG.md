@@ -47,9 +47,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - The fast converter leaves form removal to the full converter's HTML5 tree
   ([#829](https://github.com/xberg-io/html-to-markdown/issues/829)). With an unclosed label,
-  `<p>before<form><label>name<input></form>after<p>next` now gives `before` on every route:
-  HTML5 keeps `after` and `next` inside the label and form. Closing the label before the form
-  keeps `after` and `next` as separate paragraphs. Nested forms also use the HTML5 tree:
+  `<p>before<form><label>name<input></form>after<p>next` keeps `before`, `after` and `next`
+  as separate paragraphs: source form removal stops at the explicit end tag (#879).
+  Nested forms also use the HTML5 tree:
   `<form>a<form>b</form>c</form>d` now keeps `cd` when removing forms, instead of losing `c`.
   Pages whose forms are removed, and retained forms with nested starts, use the full converter;
   well-formed retained forms can still use the fast converter.
@@ -172,9 +172,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Keep the first document base effective when hidden content is dropped before removing a form, matching pages without a removed form.
+
+- Preserve foreign template/noscript descendants of SVG and MathML graphics when excluding page elements with hidden content kept.
+
+- Avoid repeated depth ancestry walks during HTML5 repair and unused inline output-column scans (Refs #830, #862).
+  Marker-looking text tails such as `x.` and `x12)` also skip unused column scans. Numeric suffixes
+  read only their trailing digit run before proving an adjacent text prefix cannot start a marker;
+  whitespace-separated markers and all-blank tails keep the existing fallback. Growing digit runs
+  still require suffix scanning. Unmarked `mark` elements with no children or only direct blank
+  text no longer scan a growing prefix for unused inline line state. Comments, nested tags,
+  encoded text and visible form feeds retain their ordinary child context.
+  Topology changes and live marker columns retain their existing limits and behavior.
+  Repair detection reads the parser tree directly, building topology maps only for the selected
+  conversion tree; mandatory HTML5 repair, text guards and parser limits remain in effect.
+
 - Self-closing raw-text and inert elements encountered in an HTML head contain their following text.
   Head titles remain metadata; preserved `xmp` retains one container around its literal body
   ([#878](https://github.com/xberg-io/html-to-markdown/issues/878)).
+- With form removal enabled, text after an explicit `</form>` stays outside the removed form
+  even when a child is still open. Forms without an end tag keep the existing subtree removal.
+  Minimal preprocessing, visitor callbacks, possible preserved ancestors and table-contained
+  forms retain their existing behavior ([#879](https://github.com/xberg-io/html-to-markdown/issues/879)).
+
 - A `<label>` inside a code block keeps the spaces and the line ends of its text
   ([#822](https://github.com/xberg-io/html-to-markdown/issues/822)).
 - A paragraph inside a heading keeps a space between its text and the text after it
@@ -185,6 +205,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - An `<audio>` or `<video>` gets its link also when `extract_metadata` is `false` and
   `highlight_style` is `none`: `<p>x</p><video src="/v.mp4"></video>` gives `x`, then
   `[video](/v.mp4)`, was `x` only.
+- Preserved repaired JSON-LD scripts retain their JSON after slash-separated tag names and
+  cannot claim authored bodies through markers joined by bogus-comment removal. Preserved
+  script attributes now serialize in key order on both HTML serialization paths
+  ([#875](https://github.com/xberg-io/html-to-markdown/issues/875)).
+
+- An unclosed JSON-LD script beginning with a complete JSON value accepted by the JSON parser
+  (including scalars at valid JSON boundaries) keeps the markup after that value and its original
+  JSON bytes for metadata. Invalid or unrecognized JSON uses
+  the existing empty-script fallback ([#875](https://github.com/xberg-io/html-to-markdown/issues/875)).
+
 - Form controls inside code spans keep legends and buttons as separate words, without
   emphasis markers or split code spans in table cells
   ([#815](https://github.com/xberg-io/html-to-markdown/issues/815)).

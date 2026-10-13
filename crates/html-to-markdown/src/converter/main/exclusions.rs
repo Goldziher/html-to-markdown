@@ -3,7 +3,7 @@
 use std::borrow::Cow;
 
 use super::parse::parse_html;
-use crate::converter::utility::preprocessing::unwrap_kept_inert_elements;
+use crate::converter::utility::preprocessing::{html_inert_starts, unwrap_kept_inert_elements};
 use crate::error::Result;
 use crate::options::HiddenContent;
 
@@ -43,6 +43,12 @@ fn excluded_starts(html: &str, hidden_content: HiddenContent, selectors: &[Strin
             starts
                 .extend(matches.filter_map(|handle| handle.get(parser)?.as_tag().map(|tag| tag.boundaries(parser).0)));
         }
+    }
+    if !starts.is_empty() {
+        // ~keep The literal DOM also exposes foreign template/noscript lookalikes. Only HTML
+        // ~keep source elements lose their selector identity before the page exclusion walk.
+        let html_starts = html_inert_starts(html, hidden_content);
+        starts.retain(|start| html_starts.binary_search(start).is_ok());
     }
     starts.sort_unstable();
     Ok(starts)

@@ -119,14 +119,14 @@ fn collect_json_ld_from_children(children: &tl::Children, parser: &Parser, handl
         if child_name.as_ref() != "script" {
             continue;
         }
-        if let Some(json) = json_ld_from_tag(child_tag, parser) {
+        if let Some(json) = json_ld_from_tag(child_tag, parser, handler.ctx) {
             collector.borrow_mut().add_json_ld(json);
         }
     }
 }
 
 #[cfg(feature = "metadata")]
-fn json_ld_from_tag(tag: &tl::HTMLTag<'_>, parser: &Parser) -> Option<String> {
+fn json_ld_from_tag(tag: &tl::HTMLTag<'_>, parser: &Parser, ctx: &Context) -> Option<String> {
     let type_value = crate::converter::utility::attributes::decoded_attribute(tag, "type")?;
     let media_type = type_value
         .split(';')
@@ -136,7 +136,17 @@ fn json_ld_from_tag(tag: &tl::HTMLTag<'_>, parser: &Parser) -> Option<String> {
     if !media_type.eq_ignore_ascii_case("application/ld+json") {
         return None;
     }
-    let json = decode_attribute_value_cow(tag.inner_text(parser).trim()).into_owned();
+    let body = tag.inner_text(parser);
+    let original = tag
+        .children()
+        .top()
+        .iter()
+        .any(|handle| usize::try_from(handle.get_inner()).is_ok_and(|id| ctx.literal_body_ids.contains(&id)));
+    let json = if original {
+        body.trim().to_owned()
+    } else {
+        decode_attribute_value_cow(body.trim()).into_owned()
+    };
     (!json.is_empty()).then_some(json)
 }
 
@@ -156,7 +166,7 @@ fn handle_script(node_handle: &NodeHandle, parser: &Parser, _output: &mut String
     #[cfg(feature = "metadata")]
     if ctx.metadata_wants.structured_data
         && let Some(collector) = ctx.metadata_collector.as_ref()
-        && let Some(json) = json_ld_from_tag(tag, parser)
+        && let Some(json) = json_ld_from_tag(tag, parser, ctx)
     {
         collector.borrow_mut().add_json_ld(json);
     }
