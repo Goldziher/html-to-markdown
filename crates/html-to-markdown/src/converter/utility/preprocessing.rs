@@ -4,14 +4,19 @@ mod inert;
 mod lists;
 mod markup;
 mod menu;
+mod preserved_bodies;
 mod raw_text;
+mod restoration;
+mod structured_data;
 mod visibility;
 
-pub use inert::{normalize_inert_bodies_with_preservation, restore_inert_bodies};
+pub use inert::normalize_inert_bodies_with_preservation;
 pub use lists::normalize_unclosed_list_items;
 pub use markup::{find_tag_end, normalize_bogus_comment_endings, normalize_split_closing_tags, preprocess_html};
 pub use menu::{PRESERVED_MENU_ATTRIBUTE, normalize_menu_elements, restore_preserved_menu_elements};
 pub use raw_text::{skip_opaque_region, strip_script_and_style_tags};
+pub use restoration::restore_inert_bodies;
+pub use structured_data::repair_unclosed_structured_data_scripts;
 pub use visibility::{
     sanitize_markdown_url, strip_bogus_comments, strip_hidden_elements, tag_has_hidden_attribute, tag_has_hidden_style,
 };

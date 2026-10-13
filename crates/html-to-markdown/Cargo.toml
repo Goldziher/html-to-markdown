@@ -30,9 +30,9 @@ crate-type = ["rlib"]
 default = ["metadata"]
 full = ["inline-images", "metadata", "visitor", "serde"]
 inline-images = ["dep:image"]
-metadata = ["dep:serde", "dep:serde_json"]
+metadata = ["dep:serde"]
 visitor = []
-serde = ["dep:serde", "dep:serde_json"]
+serde = ["dep:serde"]
 testkit = []
 mcp = ["dep:rmcp", "dep:tokio", "dep:schemars", "serde", "metadata"]
 mcp-http = ["mcp", "dep:axum", "dep:tower", "dep:tower-http"]
@@ -64,7 +64,7 @@ rmcp = { version = "3.5.1", features = [
 ], optional = true }
 schemars = { version = "1.2.2", optional = true }
 serde = { version = "1.0", features = ["derive"], optional = true }
-serde_json = { version = "1.0", optional = true }
+serde_json = { version = "1.0", features = ["raw_value"] }
 thiserror.workspace = true
 tl.workspace = true
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "io-std"], optional = true }
