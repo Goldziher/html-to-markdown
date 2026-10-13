@@ -2,28 +2,31 @@
 
 use std::borrow::Cow;
 
-use crate::converter::main_helpers::{has_custom_element_tags, repair_with_html5ever_bounded};
+use super::exclusions;
+use crate::converter::main_helpers::{has_custom_element_tags, preserves_menu, repair_with_html5ever_bounded};
 use crate::converter::utility::preprocessing::{
     KeptScripts, normalize_bogus_comment_endings, normalize_menu_elements, normalize_split_closing_tags,
     normalize_unclosed_list_items, preprocess_html, strip_bogus_comments, strip_hidden_elements, strip_html_cdata,
-    strip_script_and_style_tags, strip_script_and_style_tags_with_kept_scripts, unwrap_kept_inert_elements,
+    strip_script_and_style_tags, strip_script_and_style_tags_with_kept_scripts,
 };
-use crate::options::HiddenContent;
+use crate::error::Result;
+use crate::options::{ConversionOptions, HiddenContent};
 
-/// The page that the first parse reads, the limit that the repair of custom elements reached,
-/// `html` when that repair did not run (the page as written, which the tree builder has not
-/// read), and the kept scripts of the page for the reader of the structured data.
-pub(super) fn prepare_html(
-    html: &str,
-    preserve_menu: bool,
-    hidden_content: HiddenContent,
-) -> (String, Option<crate::types::WarningKind>, Option<&str>, KeptScripts) {
-    let (preprocessed, kept_scripts) = preprocess_initial_html_with_kept_scripts(html, preserve_menu, hidden_content);
+/// What [`prepare_html`] gives: the page that the first parse reads, the limit that the repair
+/// of custom elements reached, the page as written when that repair did not run (the tree
+/// builder has not read it), and the kept scripts of the page for the reader of the structured
+/// data.
+type Prepared<'a> = (String, Option<crate::types::WarningKind>, Option<&'a str>, KeptScripts);
+
+/// The page that the first parse reads, with what [`Prepared`] names.
+pub(super) fn prepare_html<'a>(html: &'a str, options: &ConversionOptions) -> Result<Prepared<'a>> {
+    let hidden_content = options.hidden_content;
+    let (preprocessed, kept_scripts) = preprocess_initial_html_with_kept_scripts(html, options, hidden_content)?;
     if has_custom_element_tags(&preprocessed) {
-        let (repaired, limit) = repair_custom_elements(preprocessed, preserve_menu, hidden_content);
-        return (repaired, limit, None, kept_scripts);
+        let (repaired, limit) = repair_custom_elements(preprocessed, preserves_menu(options), hidden_content);
+        return Ok((repaired, limit, None, kept_scripts));
     }
-    (preprocessed, None, Some(html), kept_scripts)
+    Ok((preprocessed, None, Some(html), kept_scripts))
 }
 
 /// Remove the elements that the `hidden` attribute or an inline style hides, unless the caller
@@ -37,8 +40,12 @@ fn strip_hidden(html: &str, hidden_content: HiddenContent) -> Cow<'_, str> {
 
 /// The page that the first parse reads under `hidden_content`, before the repair of custom
 /// elements.
-pub(super) fn preprocess_initial_html(html: &str, preserve_menu: bool, hidden_content: HiddenContent) -> String {
-    preprocess_initial_html_with_kept_scripts(html, preserve_menu, hidden_content).0
+pub(super) fn preprocess_initial_html(
+    html: &str,
+    options: &ConversionOptions,
+    hidden_content: HiddenContent,
+) -> Result<String> {
+    Ok(preprocess_initial_html_with_kept_scripts(html, options, hidden_content)?.0)
 }
 
 /// [`preprocess_initial_html`], with the kept scripts of `html`.
@@ -48,21 +55,21 @@ pub(super) fn preprocess_initial_html(html: &str, preserve_menu: bool, hidden_co
 /// ~keep and its kept scripts are not used.
 fn preprocess_initial_html_with_kept_scripts(
     html: &str,
-    preserve_menu: bool,
+    options: &ConversionOptions,
     hidden_content: HiddenContent,
-) -> (String, KeptScripts) {
+) -> Result<(String, KeptScripts)> {
     let stripped = strip_html_cdata(html);
     let (stripped, kept_scripts) = strip_script_and_style_tags_with_kept_scripts(&stripped);
     // ~keep Bogus comments must be removed before tag-shaped preprocessing examines them.
     let stripped = strip_bogus_comments(&stripped);
     let stripped = strip_hidden(&stripped, hidden_content);
-    let stripped = unwrap_kept_inert_elements(&stripped, hidden_content);
+    let stripped = exclusions::remove_kept_tags(&stripped, hidden_content, &options.exclude_selectors)?;
     let stripped = normalize_bogus_comment_endings(&stripped);
     let stripped = normalize_split_closing_tags(&stripped);
     // ~keep Implicit list-item closes prevent deeply nested parser output on large changelogs.
     let stripped = normalize_unclosed_list_items(&stripped);
-    let stripped = normalize_menu_elements(&stripped, preserve_menu);
-    (preprocess_html(&stripped).into_owned(), kept_scripts)
+    let stripped = normalize_menu_elements(&stripped, preserves_menu(options));
+    Ok((preprocess_html(&stripped).into_owned(), kept_scripts))
 }
 
 pub(super) fn preprocess_repaired_html(html: &str, preserve_menu: bool, hidden_content: HiddenContent) -> String {

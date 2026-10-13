@@ -2,6 +2,14 @@ use std::borrow::Cow;
 
 use super::raw_text::{PageReads, PassRead, removed_element_name, track_svg_tag};
 
+/// Find `needle` in `haystack` at or after `from`, returning its start offset.
+pub(super) fn find_subslice(haystack: &[u8], from: usize, needle: &[u8]) -> Option<usize> {
+    if from >= haystack.len() {
+        return None;
+    }
+    memchr::memmem::find(&haystack[from..], needle).map(|off| from + off)
+}
+
 /// Normalize bogus HTML comment endings that confuse the `tl` parser.
 pub fn normalize_bogus_comment_endings(input: &str) -> Cow<'_, str> {
     let bytes = input.as_bytes();

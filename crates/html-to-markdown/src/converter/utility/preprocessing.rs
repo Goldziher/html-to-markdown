@@ -33,6 +33,8 @@ pub use visibility::{
 use raw_text::{find_closing_tag_bytes, find_closing_tag_bytes_nested};
 
 #[cfg(test)]
+mod excluded_tests;
+#[cfg(test)]
 mod kept_script_tests;
 #[cfg(test)]
 mod tests;

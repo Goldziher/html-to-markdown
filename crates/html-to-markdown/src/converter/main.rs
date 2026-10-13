@@ -34,6 +34,7 @@ use crate::converter::context::{Context, ContextParameters, InlineCollectorHandl
 use crate::types::structure_collector::StructureCollectorHandle;
 
 mod block_boundary;
+mod exclusions;
 mod parse;
 mod prepare;
 mod table_parts;
@@ -87,16 +88,14 @@ pub fn convert_html_impl(
         document_base_href,
         head_repair_limit,
     } = parameters;
-    let preserve_menu = options.preserve_tags.iter().any(|tag| tag.eq_ignore_ascii_case("menu"));
-    let hidden_content = options.hidden_content;
-    let (preprocessed, prepare_limit, as_written, kept_scripts) = prepare_html(html, preserve_menu, hidden_content);
+    let (preprocessed, prepare_limit, as_written, kept_scripts) = prepare_html(html, options)?;
     let repaired_page = std::cell::OnceCell::new();
     let ParsedPage {
         mut dom,
         mut dom_ctx,
         len: preprocessed_len,
         repair_limit,
-    } = parse_for_conversion(&preprocessed, &repaired_page, preserve_menu, hidden_content, as_written)?;
+    } = parse_for_conversion(&preprocessed, &repaired_page, options, as_written)?;
     let repair_warning = repair_limit.or(prepare_limit).or(head_repair_limit);
     let kept_scripts = finish_dom_parse(&mut dom, &mut dom_ctx, inert_bodies, preprocessed_len, kept_scripts)?;
     let parser = dom.parser();

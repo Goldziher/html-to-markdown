@@ -812,7 +812,7 @@ fn should_remove_the_end_tag_of_a_removed_start_tag_that_closes_itself() {
             "<template><p>IN</p><p>X</p>",
         ),
     ] {
-        assert_eq!(unwrap_kept_inert_elements(page, choice), expected, "{page:?}");
+        assert_eq!(unwrap_kept_inert_elements(page, choice, &[]), expected, "{page:?}");
     }
 }
 
@@ -859,7 +859,7 @@ fn should_write_an_end_tag_of_the_body_for_the_removed_tag_that_started_the_body
             "<template>a</template><div>b</div>",
         ),
     ] {
-        assert_eq!(unwrap_kept_inert_elements(page, choice), expected, "{page:?}");
+        assert_eq!(unwrap_kept_inert_elements(page, choice, &[]), expected, "{page:?}");
     }
 }
 
@@ -879,7 +879,7 @@ fn should_leave_a_tag_in_the_text_of_a_text_element_as_text() {
                     format!("<p>a</p><{name}>{text}<p>b</p>"),
                     format!("<p>a</p><{name} class=\"c\">{text}</{name}><p>b</p>"),
                 ] {
-                    assert_eq!(unwrap_kept_inert_elements(&page, choice), page, "{choice:?}");
+                    assert_eq!(unwrap_kept_inert_elements(&page, choice, &[]), page, "{choice:?}");
                 }
             }
         }
@@ -916,7 +916,7 @@ fn should_leave_a_tag_in_the_text_of_a_text_element_as_text() {
             "<p>a</p><textareas>b</textareas>",
         ),
     ] {
-        assert_eq!(unwrap_kept_inert_elements(page, all), expected, "{page:?}");
+        assert_eq!(unwrap_kept_inert_elements(page, all, &[]), expected, "{page:?}");
     }
 }
 
