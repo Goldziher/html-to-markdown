@@ -82,12 +82,19 @@ pub fn collect_table_cells(
     node_handle: &tl::NodeHandle,
     parser: &tl::Parser,
     dom_ctx: &super::super::super::DomContext,
+    ctx: &super::super::super::Context,
     cells: &mut Vec<tl::NodeHandle>,
 ) {
     cells.clear();
+    if ctx.excluded_node_ids.contains(&node_handle.get_inner()) {
+        return;
+    }
     if let Some(tl::Node::Tag(tag)) = node_handle.get(parser) {
         let children = tag.children();
         for child_handle in children.top().iter() {
+            if ctx.excluded_node_ids.contains(&child_handle.get_inner()) {
+                continue;
+            }
             if let Some(cell_name) = dom_ctx.tag_name_for(*child_handle, parser) {
                 if matches!(cell_name.as_ref(), "th" | "td" | "cell") {
                     cells.push(*child_handle);
@@ -240,6 +247,7 @@ pub fn nested_table_width_text(
     node_handle: &tl::NodeHandle,
     parser: &tl::Parser,
     dom_ctx: &super::super::super::DomContext,
+    ctx: &super::super::super::Context,
     br_in_tables: bool,
 ) -> String {
     let mut text = String::with_capacity(64);
@@ -247,6 +255,9 @@ pub fn nested_table_width_text(
     let mut cell_gap = false;
     let mut stack = vec![*node_handle];
     while let Some(handle) = stack.pop() {
+        if ctx.excluded_node_ids.contains(&handle.get_inner()) {
+            continue;
+        }
         match handle.get(parser) {
             Some(tl::Node::Raw(bytes)) => {
                 let raw = bytes.as_utf8_str();

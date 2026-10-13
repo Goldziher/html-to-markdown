@@ -72,6 +72,9 @@ pub struct RowEnv<'p> {
 /// Extracted from `append_layout_row`'s per-cell loop body — identical cell-name check,
 /// inline-image handling, and whitespace trim, unchanged.
 fn append_layout_cell_text(cell_handle: &tl::NodeHandle, row_text: &mut String, env: RowEnv<'_>, depth: usize) {
+    if env.ctx.excluded_node_ids.contains(&cell_handle.get_inner()) {
+        return;
+    }
     let Some(tl::Node::Tag(cell_tag)) = cell_handle.get(env.parser) else {
         return;
     };
@@ -131,6 +134,9 @@ fn append_layout_cell_text(cell_handle: &tl::NodeHandle, row_text: &mut String, 
 /// * `depth` - Current recursion depth (the row's own depth; cell content is walked at `depth + 1`)
 #[allow(clippy::trivially_copy_pass_by_ref)]
 pub fn append_layout_row(row_handle: &tl::NodeHandle, output: &mut String, env: RowEnv<'_>, depth: usize) {
+    if env.ctx.excluded_node_ids.contains(&row_handle.get_inner()) {
+        return;
+    }
     let Some(tl::Node::Tag(row_tag)) = row_handle.get(env.parser) else {
         return;
     };
@@ -230,7 +236,7 @@ pub fn collect_row_cell_widths(
     depth: usize,
 ) {
     let mut cells = Vec::new();
-    collect_table_cells(node_handle, env.parser, env.dom_ctx, &mut cells);
+    collect_table_cells(node_handle, env.parser, env.dom_ctx, env.ctx, &mut cells);
 
     let mut col = 0usize;
     let mut cell_iter = cells.iter();
@@ -494,7 +500,7 @@ pub fn convert_table_row(
     let mut row_text = String::with_capacity(256);
     let mut cells = Vec::new();
 
-    collect_table_cells(node_handle, env.parser, env.dom_ctx, &mut cells);
+    collect_table_cells(node_handle, env.parser, env.dom_ctx, env.ctx, &mut cells);
     // ~keep A nested table may only be deferred out of a cell that shares its row with no
     // ~keep other cell -- pulling it out of a row with a sibling would leave that sibling's
     // ~keep column position undefined (issue #469 locks the sibling-cell shape to the

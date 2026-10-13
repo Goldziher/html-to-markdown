@@ -183,6 +183,10 @@ fn collect_grid_child(
 ) {
     use utils::{is_tag_name, normalized_tag_name};
 
+    if handler.ctx.excluded_node_ids.contains(&child_handle.get_inner()) {
+        return;
+    }
+
     let Some(tl::Node::Tag(child_tag)) = child_handle.get(parser) else {
         return;
     };
@@ -215,7 +219,17 @@ fn collect_grid_row(
 ) {
     use cell::{collect_table_cells, get_colspan_rowspan};
 
-    collect_table_cells(row_handle, parser, handler.dom_ctx, &mut state.cell_handles);
+    if handler.ctx.excluded_node_ids.contains(&row_handle.get_inner()) {
+        return;
+    }
+
+    collect_table_cells(
+        row_handle,
+        parser,
+        handler.dom_ctx,
+        handler.ctx,
+        &mut state.cell_handles,
+    );
 
     let mut col_index: u32 = 0;
     for cell_handle in &state.cell_handles {
