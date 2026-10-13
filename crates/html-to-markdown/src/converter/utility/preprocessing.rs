@@ -1,5 +1,6 @@
 //! HTML cleanup and normalization used before conversion.
 
+mod form_boundaries;
 mod head_scan;
 mod inert;
 mod kept;
@@ -13,7 +14,8 @@ mod restoration;
 mod structured_data;
 mod visibility;
 
-pub use inert::normalize_inert_bodies_with_preservation;
+pub use form_boundaries::removes_closed_forms;
+pub use inert::{html_inert_starts, normalize_inert_bodies_with_preservation, remove_closed_form_bodies};
 pub use kept_scripts::{KeptScripts, owner_mark_numbers};
 pub use lists::normalize_unclosed_list_items;
 #[cfg(feature = "metadata")]

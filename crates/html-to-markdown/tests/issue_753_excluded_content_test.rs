@@ -3,7 +3,7 @@
 
 #![allow(missing_docs)]
 
-use html_to_markdown_rs::{ConversionOptions, HiddenContent, OutputFormat, convert};
+use html_to_markdown_rs::{ConversionOptions, HiddenContent, OutputFormat, TierStrategy, convert};
 
 const CHOICES: [HiddenContent; 3] = [HiddenContent::Drop, HiddenContent::Reachable, HiddenContent::All];
 
@@ -313,6 +313,97 @@ fn should_write_no_excluded_text_of_a_template_or_a_noscript_under_each_choice()
                     );
                 }
             }
+        }
+    }
+}
+
+#[test]
+fn should_keep_foreign_template_text_when_excluding_html_elements() {
+    let html = r#"<p>Va</p><math><template class="x">Xb</template>Vc</math><p>Vd</p>"#;
+    for (choice, tier) in CHOICES
+        .into_iter()
+        .flat_map(|choice| [TierStrategy::Auto, TierStrategy::Tier2].map(|tier| (choice, tier)))
+    {
+        assert_eq!(convert_foreign(html, choice, tier), "Va\n\nXbVc\n\nVd\n");
+    }
+}
+
+#[test]
+fn should_keep_foreign_template_svg_bytes_when_excluding_html_elements() {
+    use base64::{Engine, engine::general_purpose::STANDARD};
+    let html = r#"<p>Va</p><svg><template class="x"><text>Xb</text></template><text>Vc</text></svg>"#;
+    for (choice, tier) in CHOICES
+        .into_iter()
+        .flat_map(|choice| [TierStrategy::Auto, TierStrategy::Tier2].map(|tier| (choice, tier)))
+    {
+        let output = convert_foreign(html, choice, tier);
+        let encoded = output
+            .split("base64,")
+            .nth(1)
+            .expect("SVG image")
+            .split(')')
+            .next()
+            .expect("image end");
+        let expected = if choice == HiddenContent::All {
+            "<svg><text>Xb</text><text>Vc</text></svg>"
+        } else {
+            r#"<svg><template class="x"><text>Xb</text></template><text>Vc</text></svg>"#
+        };
+        assert_eq!(STANDARD.decode(encoded).expect("SVG bytes"), expected.as_bytes());
+    }
+}
+
+fn convert_foreign(html: &str, choice: HiddenContent, tier: TierStrategy) -> String {
+    convert(
+        html,
+        ConversionOptions {
+            hidden_content: choice,
+            tier_strategy: tier,
+            exclude_selectors: vec![".x".into()],
+            ..ConversionOptions::default()
+        },
+    )
+    .expect("foreign conversion succeeds")
+    .content
+    .unwrap_or_default()
+}
+
+#[test]
+fn should_keep_graphic_integration_point_content_when_excluding_page_elements() {
+    use base64::{Engine, engine::general_purpose::STANDARD};
+    let cases = [
+        (
+            r#"<svg><foreignObject><template class="x"><p>Xb</p></template><p>Vc</p></foreignObject></svg>"#,
+            "<svg><foreignobject><p>Xb</p><p>Vc</p></foreignobject></svg>",
+        ),
+        (
+            r#"<svg><desc><template class="x">Xb</template>Vc</desc></svg>"#,
+            "<svg><desc>XbVc</desc></svg>",
+        ),
+        (
+            r#"<svg><p><template class="x">Xb</template>Vc</p></svg>"#,
+            "<svg><p>XbVc</p></svg>",
+        ),
+    ];
+    for (html, expected) in cases {
+        for tier in [TierStrategy::Auto, TierStrategy::Tier2] {
+            let output = convert_foreign(html, HiddenContent::All, tier);
+            let encoded = output
+                .split("base64,")
+                .nth(1)
+                .expect("SVG image")
+                .split(')')
+                .next()
+                .expect("image end");
+            assert_eq!(STANDARD.decode(encoded).expect("SVG bytes"), expected.as_bytes());
+        }
+    }
+    for html in [
+        r#"<math><mtext><template class="x">Xb</template>Vc</mtext></math>"#,
+        r#"<math><annotation-xml encoding='text/html'><template class="x">Xb</template>Vc</annotation-xml></math>"#,
+    ] {
+        for tier in [TierStrategy::Auto, TierStrategy::Tier2] {
+            assert_eq!(convert_foreign(html, HiddenContent::All, tier), "XbVc\n");
         }
     }
 }

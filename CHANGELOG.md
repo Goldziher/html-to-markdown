@@ -38,6 +38,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - A `script`, `style` or `textarea` tag inside a bogus comment (`<? ... >`, `<! ... >`, `</ ... >`) starts no element: `<p>before</p><?x <script>?><b>Shown</b><?x </script>?><p>after</p>` gave `before` and `after` and now gives `?>**Shown**?>` between them.
 - A page with many `script` or `style` start tags with no end tag converts in linear time; the time was quadratic. In a release build 2,000 `<script>` start tags took 48 ms and now take 1 ms, and 32,000 took 12 s and now take 16 ms.
 
+- Unmarked `mark` elements with only direct text children no longer count an unused line
+  column. Nested elements still retain live list columns; suffix classification and line
+  searches remain unchanged ([#862](https://github.com/xberg-io/html-to-markdown/issues/862)).
+
 - A source line ending before retained data-list content becomes a space in Markdown, as before
   a select list. Without visitor callbacks, empty, input-only or excluded data lists keep the
   existing source boundary. A no-break space beside retained content stays a no-break space. A source line ending at the end of an
@@ -57,9 +61,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - The fast converter leaves form removal to the full converter's HTML5 tree
   ([#829](https://github.com/xberg-io/html-to-markdown/issues/829)). With an unclosed label,
-  `<p>before<form><label>name<input></form>after<p>next` now gives `before` on every route:
-  HTML5 keeps `after` and `next` inside the label and form. Closing the label before the form
-  keeps `after` and `next` as separate paragraphs. Nested forms also use the HTML5 tree:
+  `<p>before<form><label>name<input></form>after<p>next` keeps `before`, `after` and `next`
+  as separate paragraphs: source form removal stops at the explicit end tag (#879).
+  Nested forms also use the HTML5 tree:
   `<form>a<form>b</form>c</form>d` now keeps `cd` when removing forms, instead of losing `c`.
   Pages whose forms are removed, and retained forms with nested starts, use the full converter;
   well-formed retained forms can still use the fast converter.
@@ -181,6 +185,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Keep the first document base effective when hidden content is dropped before removing a form, matching pages without a removed form.
+
+- Preserve foreign template/noscript descendants of SVG and MathML graphics when excluding page elements with hidden content kept.
+
 - Avoid repeated depth ancestry walks during HTML5 repair and unused inline output-column scans (Refs #830, #862).
   Marker-looking text tails such as `x.` and `x12)` also skip unused column scans. Numeric suffixes
   read only their trailing digit run before proving an adjacent text prefix cannot start a marker;
@@ -195,6 +203,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Self-closing raw-text and inert elements encountered in an HTML head contain their following text.
   Head titles remain metadata; preserved `xmp` retains one container around its literal body
   ([#878](https://github.com/xberg-io/html-to-markdown/issues/878)).
+- With form removal enabled, text after an explicit `</form>` stays outside the removed form
+  even when a child is still open. Forms without an end tag keep the existing subtree removal.
+  Minimal preprocessing, visitor callbacks, possible preserved ancestors and table-contained
+  forms retain their existing behavior ([#879](https://github.com/xberg-io/html-to-markdown/issues/879)).
+
 - A `<label>` inside a code block keeps the spaces and the line ends of its text
   ([#822](https://github.com/xberg-io/html-to-markdown/issues/822)).
 - A paragraph inside a heading keeps a space between its text and the text after it
