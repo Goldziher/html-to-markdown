@@ -60,10 +60,11 @@ pub fn scan_table(
     node_handle: &tl::NodeHandle,
     parser: &tl::Parser,
     dom_ctx: &super::super::super::DomContext,
+    ctx: &super::super::super::Context,
     br_in_tables: bool,
 ) -> TableScan {
-    let (row_counts, nested_table_count, has_span) = scan_own_structure(node_handle, parser, dom_ctx);
-    let content = content_summary(*node_handle, parser, dom_ctx, br_in_tables);
+    let (row_counts, nested_table_count, has_span) = scan_own_structure(node_handle, parser, dom_ctx, ctx);
+    let content = content_summary(*node_handle, parser, dom_ctx, ctx, br_in_tables);
     TableScan {
         row_counts,
         has_span,
@@ -99,6 +100,7 @@ fn scan_own_structure(
     node_handle: &tl::NodeHandle,
     parser: &tl::Parser,
     dom_ctx: &super::super::super::DomContext,
+    ctx: &super::super::super::Context,
 ) -> (Vec<usize>, usize, bool) {
     let mut row_counts = Vec::new();
     let mut nested_table_count = 0usize;
@@ -110,6 +112,9 @@ fn scan_own_structure(
 
     let mut work: Vec<tl::NodeHandle> = root_tag.children().top().iter().copied().collect();
     while let Some(handle) = work.pop() {
+        if ctx.excluded_node_ids.contains(&handle.get_inner()) {
+            continue;
+        }
         let Some(tl::Node::Tag(tag)) = handle.get(parser) else {
             continue;
         };
@@ -118,7 +123,7 @@ fn scan_own_structure(
         match tag_name.as_ref() {
             "table" => nested_table_count += 1,
             "tr" | "row" => {
-                let (cell_count, row_has_span) = scan_row_cells(tag, parser, dom_ctx);
+                let (cell_count, row_has_span) = scan_row_cells(tag, parser, dom_ctx, ctx);
                 row_counts.push(cell_count);
                 has_span |= row_has_span;
                 // ~keep Still descend into the row's own cells (not their counts, already
@@ -139,10 +144,14 @@ fn scan_row_cells(
     row_tag: &tl::HTMLTag,
     parser: &tl::Parser,
     dom_ctx: &super::super::super::DomContext,
+    ctx: &super::super::super::Context,
 ) -> (usize, bool) {
     let mut cell_count = 0;
     let mut has_span = false;
     for child in row_tag.children().top().iter() {
+        if ctx.excluded_node_ids.contains(&child.get_inner()) {
+            continue;
+        }
         let Some(tl::Node::Tag(cell_tag)) = child.get(parser) else {
             continue;
         };
@@ -186,6 +195,7 @@ fn content_summary(
     table_handle: tl::NodeHandle,
     parser: &tl::Parser,
     dom_ctx: &super::super::super::DomContext,
+    ctx: &super::super::super::Context,
     br_in_tables: bool,
 ) -> TableContentSummary {
     let table_id = table_handle.get_inner();
@@ -198,6 +208,9 @@ fn content_summary(
     while let Some(frame) = work.pop() {
         match frame {
             ContentFrame::Enter(handle) => {
+                if ctx.excluded_node_ids.contains(&handle.get_inner()) {
+                    continue;
+                }
                 visit_content_node(handle, parser, dom_ctx, &mut acc_stack, &mut work, br_in_tables);
             }
             ContentFrame::ExitTable(id) => finish_table_accumulator(id, dom_ctx, &mut acc_stack),
