@@ -19,6 +19,7 @@ use crate::types::structure_collector::StructureCollectorHandle;
 
 #[cfg(test)]
 thread_local! {
+    pub(crate) static INLINE_BUFFER_LINE_SEARCH_CALLS: Cell<usize> = const { Cell::new(0) };
     pub(crate) static INLINE_BUFFER_CONTEXT_CALLS: Cell<usize> = const { Cell::new(0) };
     pub(crate) static INLINE_BUFFER_TAIL_CHAR_READS: Cell<usize> = const { Cell::new(0) };
     pub(crate) static INLINE_BUFFER_COLUMN_CHAR_READS: Cell<usize> = const { Cell::new(0) };
@@ -520,6 +521,8 @@ impl Context {
                 ..self.clone()
             };
         }
+        #[cfg(test)]
+        INLINE_BUFFER_LINE_SEARCH_CALLS.with(|calls| calls.set(calls.get() + 1));
         let line = &output[output.rfind('\n').map_or(0, |pos| pos + 1)..];
         let line_holds_text =
             !line.trim().is_empty() && !crate::converter::list::utils::line_is_bare_list_marker(output);

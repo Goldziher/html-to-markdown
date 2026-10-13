@@ -72,7 +72,7 @@ pub fn handle_mark(handler: HandlerContext<'_>) {
     let child_ctx = Context {
         in_strong: ctx.in_strong || options.highlight_style == HighlightStyle::Bold,
         ..match options.highlight_style {
-            HighlightStyle::None if tag.children().top().is_empty() => ctx.clone(),
+            HighlightStyle::None if has_only_blank_text_children(tag, parser) => ctx.clone(),
             HighlightStyle::None => ctx.inline_buffer(output, false),
             _ => marked_buffer_context(ctx, output),
         }
@@ -100,6 +100,15 @@ pub fn handle_mark(handler: HandlerContext<'_>) {
         },
         site,
     );
+}
+
+// ~keep Blank raw text returns before Markdown text-content processing, without reading inline line state.
+// ~keep Tags, comments and encoded text retain their ordinary child context; parent hooks ran first.
+fn has_only_blank_text_children(tag: &tl::HTMLTag<'_>, parser: &tl::Parser<'_>) -> bool {
+    tag.children().top().iter().all(|handle| {
+        matches!(handle.get(parser), Some(tl::Node::Raw(raw))
+            if crate::converter::utility::white_space::is_blank(raw.as_utf8_str().as_ref()))
+    })
 }
 
 // ~keep A guaranteed opening marker makes the last-line column irrelevant to list rendering.
@@ -892,3 +901,7 @@ mod line_state_cost_tests {
         INLINE_BUFFER_COLUMN_CHAR_READS.with(std::cell::Cell::get)
     }
 }
+
+#[cfg(test)]
+#[path = "blank_text_cost_tests.rs"]
+mod blank_text_cost_tests;

@@ -177,8 +177,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Marker-looking text tails such as `x.` and `x12)` also skip unused column scans. Numeric suffixes
   read only their trailing digit run before proving an adjacent text prefix cannot start a marker;
   whitespace-separated markers and all-blank tails keep the existing fallback. Growing digit runs
-  still require suffix scanning. Empty unmarked `mark` elements no longer scan a growing blank
-  prefix for a column their absent children cannot use; nonempty wrappers retain live columns.
+  still require suffix scanning. Unmarked `mark` elements with no children or only direct blank
+  text no longer scan a growing prefix for unused inline line state. Comments, nested tags,
+  encoded text and visible form feeds retain their ordinary child context.
   Topology changes and live marker columns retain their existing limits and behavior.
   Repair detection reads the parser tree directly, building topology maps only for the selected
   conversion tree; mandatory HTML5 repair, text guards and parser limits remain in effect.
