@@ -239,48 +239,7 @@ fn collect_grid_row(
                 .tag_name_for(*cell_handle, parser)
                 .is_some_and(|name| name.as_ref() == "th");
 
-        let mut text = String::new();
-        // ~keep This walk runs after `builder::handle_table` has already rendered — and recorded —
-        // ~keep the same cells; it exists only to fill the `TableGrid` returned below, which is
-        // ~keep built from `text` and not from any collector. The collectors are `Rc`s that
-        // ~keep `..ctx.clone()` shares, so without detaching them here `include_document_structure`
-        // ~keep alone would add a third recording of every link, image and nested table in a cell —
-        // ~keep including into the very `DocumentStructure` this walk exists to build.
-        let mut cell_ctx = super::super::Context {
-            in_table_cell: true,
-            in_cell_of_inputs: scanner::cell_holds_only_inputs(
-                *cell_handle,
-                parser,
-                handler.dom_ctx,
-                handler.options.br_in_tables,
-            ),
-            ..handler.ctx.clone()
-        };
-        #[cfg(feature = "metadata")]
-        {
-            cell_ctx.metadata_collector = None;
-        }
-        cell_ctx.structure_collector = None;
-        #[cfg(feature = "inline-images")]
-        {
-            cell_ctx.inline_collector = None;
-        }
-        if let Some(tl::Node::Tag(cell_tag)) = cell_handle.get(parser) {
-            for child_handle in cell_tag.children().top().iter() {
-                super::super::walk_node(
-                    child_handle,
-                    parser,
-                    &mut text,
-                    crate::converter::block::container::HandlerContext::new(
-                        handler.options,
-                        &cell_ctx,
-                        handler.depth + 2,
-                        handler.dom_ctx,
-                    ),
-                );
-            }
-        }
-        let content = crate::text::normalize_whitespace_cow(&text).trim().to_string();
+        let content = collect_grid_cell_content(cell_handle, parser, handler);
 
         let (colspan, rowspan) = get_colspan_rowspan(cell_handle, parser);
 
@@ -297,4 +256,49 @@ fn collect_grid_row(
     }
     state.max_cols = state.max_cols.max(col_index);
     state.row_index += 1;
+}
+
+fn collect_grid_cell_content(cell_handle: &tl::NodeHandle, parser: &tl::Parser, handler: HandlerContext<'_>) -> String {
+    let mut text = String::new();
+    // ~keep This walk runs after `builder::handle_table` has already rendered — and recorded —
+    // ~keep the same cells; it exists only to fill the `TableGrid` returned below, which is
+    // ~keep built from `text` and not from any collector. The collectors are `Rc`s that
+    // ~keep `..ctx.clone()` shares, so without detaching them here `include_document_structure`
+    // ~keep alone would add a third recording of every link, image and nested table in a cell —
+    // ~keep including into the very `DocumentStructure` this walk exists to build.
+    let mut cell_ctx = super::super::Context {
+        in_table_cell: true,
+        in_cell_of_inputs: scanner::cell_holds_only_inputs(
+            *cell_handle,
+            parser,
+            handler.dom_ctx,
+            handler.options.br_in_tables,
+        ),
+        ..handler.ctx.clone()
+    };
+    #[cfg(feature = "metadata")]
+    {
+        cell_ctx.metadata_collector = None;
+    }
+    cell_ctx.structure_collector = None;
+    #[cfg(feature = "inline-images")]
+    {
+        cell_ctx.inline_collector = None;
+    }
+    if let Some(tl::Node::Tag(cell_tag)) = cell_handle.get(parser) {
+        for child_handle in cell_tag.children().top().iter() {
+            super::super::walk_node(
+                child_handle,
+                parser,
+                &mut text,
+                crate::converter::block::container::HandlerContext::new(
+                    handler.options,
+                    &cell_ctx,
+                    handler.depth + 2,
+                    handler.dom_ctx,
+                ),
+            );
+        }
+    }
+    crate::text::normalize_whitespace_cow(&text).trim().to_string()
 }

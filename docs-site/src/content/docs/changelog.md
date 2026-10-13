@@ -30,6 +30,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Markdown and Djot honor `exclude_selectors` on table cells, rows, and sections, including
+  layout and nested tables. The document table grid excludes the same selected parts
+  ([#730](https://github.com/xberg-io/crawlberg/issues/730)).
+
 - Strict whitespace no longer turns an empty line-break callback or a CSS-excluded
   break subtree into a hard break inside blank inline wrappers (#868).
 
