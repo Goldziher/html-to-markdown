@@ -166,7 +166,14 @@ fn prepare_conversion<'a>(html: &'a str, options: &ConversionOptions) -> Result<
     };
     let removes_forms =
         crate::converter::utility::preprocessing::removes_closed_forms(&normalized_input, options, has_visitor);
-    // ~keep Preserve the existing hidden-before-form ownership rule (#873), including bases.
+    // ~keep A document base stays effective when hidden stripping or form removal removes its container.
+    let read_base = |source: &str| {
+        (options.base_url.is_some() || options.extract_metadata)
+            .then(|| crate::converter::url_resolve::document_base_href(source))
+            .flatten()
+    };
+    let document_base_href = removes_forms.then(|| read_base(&normalized_input)).flatten();
+    // ~keep Hidden content still loses form-body ownership before the form-removal pass (#873).
     let normalized_input = if removes_forms && options.hidden_content == crate::options::HiddenContent::Drop {
         match crate::converter::utility::preprocessing::strip_hidden_elements(&normalized_input) {
             Cow::Owned(stripped) => Cow::Owned(stripped),
@@ -175,13 +182,6 @@ fn prepare_conversion<'a>(html: &'a str, options: &ConversionOptions) -> Result<
     } else {
         normalized_input
     };
-    // ~keep A document base remains effective even when its containing form is removed.
-    let read_base = |source: &str| {
-        (options.base_url.is_some() || options.extract_metadata)
-            .then(|| crate::converter::url_resolve::document_base_href(source))
-            .flatten()
-    };
-    let document_base_href = removes_forms.then(|| read_base(&normalized_input)).flatten();
     let normalized_input = normalize_closed_forms(normalized_input, options.hidden_content, removes_forms);
     let (normalized_html, head_repair_limit) = repair_head(normalized_input.as_ref(), options.hidden_content)
         .map_or((normalized_input, None), |(html, limit)| (Cow::Owned(html), limit));

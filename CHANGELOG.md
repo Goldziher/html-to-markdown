@@ -171,6 +171,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Keep the first document base effective when hidden content is dropped before removing a form, matching pages without a removed form.
+
 - Preserve foreign template/noscript descendants of SVG and MathML graphics when excluding page elements with hidden content kept.
 
 - Self-closing raw-text and inert elements encountered in an HTML head contain their following text.

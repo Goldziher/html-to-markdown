@@ -474,7 +474,7 @@ fn should_keep_hidden_base_priority_before_removing_visible_forms() {
             .expect("hidden base priority");
             assert_eq!(
                 result.content.as_deref().and_then(|text| text.lines().last()),
-                Some("[l](https://real.test/p)")
+                Some("[l](https://fake.test/p)")
             );
         }
     }
@@ -524,4 +524,126 @@ fn should_ignore_mismatched_scope_blocker_ends_without_losing_form_tails() {
         "<select><object><applet><form><span>a</object></select>b</form>c</applet></object></select>d",
         "c d\n",
     );
+}
+
+#[test]
+fn should_use_the_same_hidden_base_with_and_without_removed_forms() {
+    use html_to_markdown_rs::HiddenContent;
+    for hidden_content in [HiddenContent::Drop, HiddenContent::Reachable, HiddenContent::All] {
+        for remove_forms in [false, true] {
+            for form in ["", "<form>a</form>"] {
+                for output_format in [OutputFormat::Markdown, OutputFormat::Djot, OutputFormat::Plain] {
+                    for tier_strategy in ROUTES {
+                        let mut options = ConversionOptions {
+                            output_format,
+                            tier_strategy,
+                            hidden_content,
+                            base_url: Some("https://o.test/x/".into()),
+                            extract_metadata: true,
+                            ..Default::default()
+                        };
+                        options.preprocessing.remove_forms = remove_forms;
+                        let html = format!("<div hidden><base href='https://b.test/d/'></div>{form}<a href='p'>l</a>");
+                        let result = convert(&html, options).expect("hidden base and form policy");
+                        let last = if output_format == OutputFormat::Plain {
+                            if !remove_forms && !form.is_empty() { "al" } else { "l" }
+                        } else {
+                            "[l](https://b.test/d/p)"
+                        };
+                        assert_eq!(
+                            result.content.as_deref().and_then(|s| s.lines().last()),
+                            Some(last),
+                            "{hidden_content:?}/{remove_forms}/{form}/{output_format:?}/{tier_strategy:?}"
+                        );
+                        #[cfg(feature = "metadata")]
+                        assert_eq!(result.metadata.document.base_href.as_deref(), Some("https://b.test/d/"));
+                    }
+                }
+            }
+        }
+    }
+}
+
+#[test]
+fn should_read_hidden_base_before_form_removal_without_collecting_metadata() {
+    for extract_metadata in [false, true] {
+        for tier_strategy in ROUTES {
+            let options = ConversionOptions {
+                base_url: Some("https://o.test/x/".into()),
+                extract_metadata,
+                tier_strategy,
+                ..Default::default()
+            };
+            let result = convert(
+                "<div hidden><base href='https://b.test/d/'></div><form>a</form><a href='p'>l</a>",
+                options,
+            )
+            .expect("hidden base");
+            let expected = if extract_metadata {
+                "---\nbase: https://b.test/d/\n---\n\n[l](https://b.test/d/p)\n"
+            } else {
+                "[l](https://b.test/d/p)\n"
+            };
+            assert_eq!(result.content.as_deref(), Some(expected));
+        }
+    }
+}
+
+#[cfg(feature = "visitor")]
+#[test]
+fn should_keep_hidden_base_when_a_visitor_removes_a_form() {
+    use html_to_markdown_rs::visitor::{HtmlVisitor, NodeContext, VisitResult};
+    use std::sync::{Arc, Mutex};
+    #[derive(Debug)]
+    struct Observer {
+        forms: usize,
+    }
+    impl HtmlVisitor for Observer {
+        fn visit_form(&mut self, _: &NodeContext, _: Option<&str>, _: Option<&str>) -> VisitResult {
+            self.forms += 1;
+            VisitResult::Skip
+        }
+    }
+    for tier_strategy in ROUTES {
+        let recorder = Arc::new(Mutex::new(Observer { forms: 0 }));
+        let result = convert(
+            "<div hidden><base href='https://b.test/d/'></div><form>a</form><a href='p'>l</a>",
+            ConversionOptions {
+                tier_strategy,
+                base_url: Some("https://o.test/x/".into()),
+                extract_metadata: true,
+                visitor: Some(recorder.clone()),
+                ..Default::default()
+            },
+        )
+        .expect("visited form hidden base");
+        assert_eq!(
+            result.content.as_deref(),
+            Some("---\nbase: https://b.test/d/\n---\n\n[l](https://b.test/d/p)\n")
+        );
+        assert_eq!(recorder.lock().expect("observer").forms, 1);
+        #[cfg(feature = "metadata")]
+        assert_eq!(result.metadata.document.base_href.as_deref(), Some("https://b.test/d/"));
+    }
+}
+
+#[cfg(feature = "metadata")]
+#[test]
+fn should_collect_hidden_base_before_form_removal_without_a_caller_base() {
+    for tier_strategy in ROUTES {
+        let result = convert(
+            "<div hidden><base href='https://b.test/d/'></div><form>a</form><a href='p'>l</a>",
+            ConversionOptions {
+                tier_strategy,
+                extract_metadata: true,
+                ..Default::default()
+            },
+        )
+        .expect("metadata-only base");
+        assert_eq!(
+            result.content.as_deref(),
+            Some("---\nbase: https://b.test/d/\n---\n\n[l](p)\n")
+        );
+        assert_eq!(result.metadata.document.base_href.as_deref(), Some("https://b.test/d/"));
+    }
 }

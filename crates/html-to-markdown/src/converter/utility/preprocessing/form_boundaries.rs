@@ -449,4 +449,51 @@ mod tests {
             false
         ));
     }
+    #[test]
+    fn should_release_only_select_scopes_inside_the_table_that_ends() {
+        let mut forms = super::ClosedForms::default();
+        forms.observe_select(true);
+        forms.observe_table(true);
+        forms.observe_select(true);
+        forms.observe_table(true);
+        forms.observe_select(true);
+        assert_eq!(forms.selects.len(), 3);
+        forms.observe_table(false);
+        assert_eq!(forms.table_depth, 1);
+        assert_eq!(forms.selects.len(), 2);
+        forms.observe_table(false);
+        assert_eq!(forms.table_depth, 0);
+        assert_eq!(forms.selects.len(), 1);
+        forms.observe_select(false);
+        assert_eq!(forms.selects.len(), 0);
+    }
+
+    #[test]
+    fn should_release_a_template_form_only_for_its_current_offset_and_select_depth() {
+        for (owned_offset, current_offset, depth, released) in
+            [(10, 10, 1, true), (10, 20, 1, false), (10, 10, 2, false)]
+        {
+            let mut forms = super::ClosedForms {
+                templates: vec![super::TemplateForms {
+                    starts: vec![super::FormStart {
+                        start: current_offset,
+                        end: current_offset + 6,
+                        select_depth: depth,
+                        released: false,
+                    }],
+                    table_depth: 0,
+                    selects: vec![],
+                }],
+                selects: vec![super::SelectScope {
+                    blockers: vec![],
+                    table_depth: 0,
+                    forms: vec![(0, owned_offset)],
+                }],
+                ..Default::default()
+            };
+            forms.release_select_forms();
+            assert_eq!(forms.templates[0].starts[0].released, released);
+            assert_eq!(forms.selects[0].forms.len(), 0);
+        }
+    }
 }
