@@ -162,11 +162,18 @@ fn emit_hr(state: &mut Tier1State) -> Result<(), BailReason> {
 fn emit_line_break(state: &mut Tier1State, options: &ConversionOptions) -> Result<(), BailReason> {
     let in_code = state.escape_ctx.contains(EscapeCtx::CODE);
     let in_pre = state.escape_ctx.contains(EscapeCtx::PRE);
-    let inside_link = !in_code && state.stack.iter().any(|frame| matches!(frame.spec.kind, TagKind::Link));
-    if inside_link {
-        state
-            .cell_or_output_mut()
-            .push_str(crate::converter::main_helpers::hard_break_marker(options));
+    let label_start = (!in_code)
+        .then(|| {
+            state
+                .stack
+                .iter()
+                .rev()
+                .find(|frame| matches!(frame.spec.kind, TagKind::Link))
+        })
+        .flatten()
+        .map(|frame| frame.content_start);
+    if let Some(label_start) = label_start {
+        emit_label_line_break(state, label_start, options);
     } else if in_code && !in_pre && state.escape_ctx.contains(EscapeCtx::HEADING) {
         let dest = state.cell_or_output_mut();
         crate::converter::main_helpers::trim_trailing_whitespace(dest);
@@ -181,6 +188,36 @@ fn emit_line_break(state: &mut Tier1State, options: &ConversionOptions) -> Resul
         emit_regular_line_break(state, options);
     }
     Ok(())
+}
+
+/// Writes a `<br>` inside a link label, where `label_start` is the start of the label in the
+/// buffer: what Tier-2's `line_break.rs` writes into its label buffer, in the same order of its
+/// arms. In a heading the break is one space after the trimmed label; in a table cell it is the
+/// cell break of the label alone, so a `<br>` that the label starts with is one space, and a
+/// `<br>` after white space or after another `<br>` is nothing (issue #845); elsewhere it is the
+/// hard break marker, and `close_link` decides which marker at an edge stays (issue #497).
+fn emit_label_line_break(state: &mut Tier1State, label_start: usize, options: &ConversionOptions) {
+    let in_heading = state.escape_ctx.contains(EscapeCtx::HEADING);
+    let in_table_cell = state.in_table_cell();
+    let dest = state.cell_or_output_mut();
+    let label_start = clamp_to_char_boundary(dest, label_start);
+    if in_heading {
+        crate::converter::main_helpers::trim_trailing_whitespace(dest);
+        dest.push(' ');
+    } else if in_table_cell {
+        if dest.len() == label_start && !options.br_in_tables {
+            dest.push(' ');
+        } else {
+            crate::converter::main_helpers::trim_trailing_whitespace(dest);
+            if options.br_in_tables {
+                dest.push_str("<br>");
+            } else if dest.len() > label_start {
+                dest.push(' ');
+            }
+        }
+    } else {
+        dest.push_str(crate::converter::main_helpers::hard_break_marker(options));
+    }
 }
 
 fn emit_pre_line_break(state: &mut Tier1State, br_in_tables: bool) {
@@ -418,12 +455,23 @@ fn is_adjacent_rawtext_ignored_open(bytes: &[u8], pos: usize) -> bool {
     false
 }
 
+/// Closes the element of the close tag `tag_name_bytes` and gives back the place of a text that
+/// follows the tag, where this scanner knows it: after text, when the element holds text and
+/// is no `span`.
+///
+/// ~keep Tier-2 reads the place of a text from the tree (`siblings::place_after_element`). An
+/// ~keep element that holds text and is not in the text flow has text before the text that
+/// ~keep follows it: a link whose label gave up a space at its end leaves `[Go](/p) `, and the
+/// ~keep no-break space that `</a>&nbsp;now` starts with joins that space in both converters
+/// ~keep (rule 4), with no hand-over. After an element with no text, and after an element in
+/// ~keep the text flow, the place depends on what this scanner does not read (how the content
+/// ~keep of a `span` ends, the line end before it): the place stays unknown there.
 fn emit_close(
     state: &mut Tier1State,
     tag_name_bytes: &[u8],
     options: &ConversionOptions,
     table_probes: &mut Vec<TableLayoutProbe>,
-) -> Result<(), BailReason> {
+) -> Result<Option<TextPlace>, BailReason> {
     let mut name_buf = [0u8; MAX_TAG_NAME_BYTES];
     let name_lower = lowercase_into(tag_name_bytes, &mut name_buf);
 
@@ -481,7 +529,10 @@ fn emit_close(
     let breaks_after = is_block_tag(name_lower) && !(matches!(spec.kind, TagKind::Table) && state.in_table_cell());
     state.last_closed_block = breaks_after || (state.last_closed_block && is_inline_tag(name_lower));
 
-    Ok(())
+    let holds_text = state.text_count > frame.texts_before;
+    let in_text_flow =
+        std::str::from_utf8(name_lower).is_ok_and(crate::converter::utility::white_space::writes_in_text_flow);
+    Ok((holds_text && !in_text_flow).then_some(TextPlace::AfterText))
 }
 
 fn dispatch_close(
@@ -518,6 +569,7 @@ fn dispatch_close(
         TagKind::TableRow => close_table_row(state),
         TagKind::TableCell { .. } => close_table_cell(state, false, options)?,
         TagKind::TableCaption => close_table_caption(state),
+        TagKind::Block if figure_joins_an_image(state, frame, name_lower) => return Err(BailReason::Classifier),
         TagKind::Block => close_block_container(state, frame, name_lower, options),
         TagKind::Summary => close_summary(state, frame),
         TagKind::Figcaption => close_figcaption(state, frame),
@@ -554,6 +606,19 @@ fn close_abbreviation(state: &mut Tier1State, frame: &OpenTag) {
     dest.push_str(&title);
     dest.push(')');
     dest.push_str(&trailing);
+}
+
+/// Whether the `<figure>` of `frame` holds a space or a line end before an image.
+///
+/// ~keep Tier-2 takes that character out of the content of a figure
+/// ~keep (`semantic/figure.rs::handle_figure`). This scanner has no such rule, so the caller
+/// ~keep hands the page over (issue #845: write the text of Tier-2 or hand over).
+fn figure_joins_an_image(state: &mut Tier1State, frame: &OpenTag, name_lower: &[u8]) -> bool {
+    name_lower == b"figure"
+        && state
+            .cell_or_output_mut()
+            .get(frame.content_start..)
+            .is_some_and(|content| content.contains(" ![") || content.contains("\n!["))
 }
 
 /// Append a paragraph-break separator after a generic block container close

@@ -12,18 +12,20 @@
 use std::collections::BTreeMap;
 
 use crate::converter::Context;
+use crate::converter::append_inline_suffix;
 use crate::converter::block::heading::{find_single_heading_child, heading_allows_inline_images, push_heading};
 use crate::converter::dom_context::DomContext;
 use crate::converter::inline::HandlerContext;
 use crate::converter::inline::link::{MarkdownLink, append_markdown_link_in_context, has_uri_scheme};
 use crate::converter::main::walk_node;
 use crate::converter::media::inline_data_treatment;
+use crate::converter::text_node::is_fresh_block_start;
 use crate::converter::utility::content::{
-    collect_link_label_text, keeps_source_white_space, link_accessible_name, link_text_content, node_is_block_level,
-    normalize_link_label, normalized_tag_name, push_inline_prefix,
+    collect_link_label_text, indent_continuation_lines, keeps_source_white_space, link_accessible_name,
+    link_label_edges, link_text_content, link_text_edges, node_is_block_level, normalize_link_label,
+    normalized_tag_name, push_inline_prefix,
 };
 use crate::converter::utility::escaping::escape_link_label;
-use crate::converter::{append_inline_suffix, chomp_inline};
 use crate::options::{ConversionOptions, InlineDataMedia};
 use crate::text;
 use std::borrow::Cow;
@@ -39,20 +41,7 @@ fn indent_hard_break_continuations(label: &mut String, ctx: &Context, options: &
     else {
         return;
     };
-    let original = std::mem::take(label);
-    let mut lines = original.split('\n');
-    let mut indented = lines.next().unwrap_or_default().to_string();
-    for line in lines {
-        indented.push('\n');
-        if !line.is_empty() {
-            // ~keep Link-label normalization collapses the content-column whitespace after a
-            // ~keep hard break to one space. Restore the enclosing item's actual column so the
-            // ~keep continuation cannot become a new block and split the link (issue #678).
-            indented.push_str(&indent);
-            indented.push_str(line.trim_start_matches([' ', '\t']));
-        }
-    }
-    *label = indented;
+    indent_continuation_lines(label, &indent);
 }
 
 /// Handle an `<a>` (link) element and convert to Markdown.
@@ -103,16 +92,10 @@ pub fn handle_link(tag: &tl::HTMLTag, mut handler: HandlerContext<'_>) {
 
     handler.context.inline_data_replaced.set(false);
     let content = build_label_content(&data, &handler);
-    // ~keep The white space at an edge of the label goes outside the link, as it does for bold
-    // ~keep and italic text: `[Go ](/p)now` shows as `Go now`, and a trimmed label joins the words.
-    // ~keep A line break at an edge of the label is content of the label, not white space
-    // ~keep (issue #497): such a label is written whole.
-    let inner = content.trim_matches([' ', '\t', '\u{a0}']);
-    let edge_is_break = inner.starts_with('\n') || inner.starts_with("\\\n") || inner.ends_with('\n');
-    let (prefix, suffix, trimmed) = if edge_is_break || keeps_source_white_space(handler.options, handler.context) {
+    let (prefix, suffix, trimmed) = if keeps_source_white_space(handler.options, handler.context) {
         ("", "", content.as_str())
     } else {
-        chomp_inline(&content)
+        link_label_edges(&content)
     };
     let edges = LabelEdges {
         prefix,
@@ -224,9 +207,9 @@ fn collect_code_link_text(data: &LinkData<'_>, context: &Context, handler: &Hand
     raw
 }
 
-/// The white space that the label of a link had at its two ends (see [`chomp_inline`]).
+/// The white space that the label of a link had at its two ends (see [`link_label_edges`]).
 ///
-/// ~keep It belongs to the link that the converter writes itself, so only [`write_link_with_edges`]
+/// ~keep It belongs to the link that the converter writes itself, so only [`write_with_edges`]
 /// ~keep writes it. A link that is left out, and a link that a visitor skips, replaces or keeps
 /// ~keep as HTML, has no label of the converter: it writes what it wrote before the label gave
 /// ~keep up its white space.
@@ -251,6 +234,8 @@ struct LinkData<'a> {
     children: Vec<tl::NodeHandle>,
     inline_label: String,
     raw_text: String,
+    /// The white space at the two ends of the text that `raw_text` is trimmed from.
+    text_edges: (&'static str, &'static str),
     inline_children: Vec<tl::NodeHandle>,
     deferred: Vec<tl::NodeHandle>,
     emit_blocks_separately: bool,
@@ -355,14 +340,15 @@ impl<'a> LinkData<'a> {
             .children_of(handler.node_handle.get_inner())
             .map_or_else(|| tag.children().top().iter().copied().collect(), ToOwned::to_owned);
         let hidden_content = handler.options.hidden_content;
-        let (inline_label, _, saw_block) =
+        let (inline_text, _, saw_block) =
             collect_link_label_text(&children, handler.parser, handler.dom_context, hidden_content);
         let text_source = if saw_block {
             link_text_content(&children, handler.parser, handler.dom_context, hidden_content)
         } else {
-            inline_label.clone()
+            inline_text.clone()
         };
-        let raw_text = text::normalize_whitespace_cow(&text_source).trim().to_string();
+        let inline_label = inline_text.text;
+        let raw_text = text::normalize_whitespace_cow(&text_source.text).trim().to_string();
         let (inline_children, deferred) = partition_link_children(&children, handler.parser, handler.dom_context);
         let holds_element = children
             .iter()
@@ -395,6 +381,7 @@ impl<'a> LinkData<'a> {
             title,
             children,
             inline_label,
+            text_edges: link_text_edges(&text_source),
             raw_text,
             inline_children,
             deferred,
@@ -512,13 +499,36 @@ fn emit_autolink(data: &LinkData<'_>, handler: &mut HandlerContext<'_>) -> bool 
     if !data.is_autolink(handler.options) {
         return false;
     }
-    handler.output.push('<');
-    if data.href.starts_with("mailto:") && data.raw_text == data.href[7..] {
-        handler.output.push_str(&data.raw_text);
+    // ~keep The label of this form is the address. The white space at its ends comes from the
+    // ~keep text that made the link this form (`LinkData::text_edges`): the content is not
+    // ~keep walked, so an element in it writes nothing, as before.
+    let (prefix, suffix) = if keeps_source_white_space(handler.options, handler.context) {
+        ("", "")
     } else {
-        handler.output.push_str(&data.href);
-    }
-    handler.output.push('>');
+        data.text_edges
+    };
+    // ~keep The first text of the document has no white space at its start: the text of a label
+    // ~keep loses it in the walk, by the same rule.
+    let context = handler.context;
+    let prefix = if is_fresh_block_start(context, context.at_fresh_block_start.get()) {
+        ""
+    } else {
+        prefix
+    };
+    let edges = LabelEdges {
+        prefix,
+        suffix,
+        has_text: true,
+    };
+    write_with_edges(&edges, handler, |handler| {
+        handler.output.push('<');
+        if data.href.starts_with("mailto:") && data.raw_text == data.href[7..] {
+            handler.output.push_str(&data.raw_text);
+        } else {
+            handler.output.push_str(&data.href);
+        }
+        handler.output.push('>');
+    });
     true
 }
 
@@ -714,10 +724,22 @@ fn emit_link(
 /// Writes the link of the converter: the white space of the label start, the link, the white
 /// space of the label end.
 fn write_link_with_edges(data: &LinkData<'_>, label: &str, edges: &LabelEdges<'_>, handler: &mut HandlerContext<'_>) {
+    write_with_edges(edges, handler, |handler| {
+        write_link(handler.output, data, label, handler.options, handler.context);
+    });
+}
+
+/// Writes the white space of the label start, what `write_marks` writes for the link, and the
+/// white space of the label end. Every form of a link is written through here.
+fn write_with_edges(
+    edges: &LabelEdges<'_>,
+    handler: &mut HandlerContext<'_>,
+    write_marks: impl FnOnce(&mut HandlerContext<'_>),
+) {
     if edges.has_text {
         push_inline_prefix(handler.output, edges.prefix, handler.options, handler.context);
     }
-    write_link(handler.output, data, label, handler.options, handler.context);
+    write_marks(handler);
     append_inline_suffix(
         handler.output,
         edges.suffix,

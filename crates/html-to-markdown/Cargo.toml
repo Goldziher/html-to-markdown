@@ -95,10 +95,6 @@ required-features = ["testkit"]
 name = "form_whitespace_followups_test"
 required-features = ["testkit"]
 
-[[example]]
-name = "test_deser"
-required-features = ["serde"]
-
 [[test]]
 name = "issue_829_form_tree_test"
 required-features = ["testkit"]
@@ -114,6 +110,10 @@ required-features = ["testkit"]
 [[test]]
 name = "issue_827_removed_script_join_test"
 required-features = ["testkit"]
+
+[[example]]
+name = "test_deser"
+required-features = ["serde"]
 
 [lints]
 workspace = true
