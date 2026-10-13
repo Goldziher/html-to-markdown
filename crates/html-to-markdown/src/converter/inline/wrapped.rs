@@ -376,8 +376,8 @@ fn strong_separator_content<'a>(output: &str, content: &'a str, site: InlineSite
     if output.ends_with(&marker) { " " } else { content }
 }
 
-// ~keep Strict blank inline bodies without a source BR contribute a separator, including custom blank children.
-// ~keep Code/pre literals and source BR callbacks retain their established break transport.
+// ~keep Strict blank bodies without a non-skipped BR contribute a separator, including custom blank children.
+// ~keep Code/pre literals and non-skipped BR callbacks keep their established break transport.
 fn strict_blank_separator<'a>(content: &'a str, site: InlineSite<'_>) -> &'a str {
     if site.options.whitespace_mode == crate::options::WhitespaceMode::Strict
         && !site.ctx.in_code

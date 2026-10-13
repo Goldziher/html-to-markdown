@@ -201,6 +201,11 @@ fn visit_line_break(
         let mut visitor = visitor_handle.lock().expect("visitor mutex poisoned");
         visitor.visit_line_break(&node_ctx)
     };
+    if handler.options.whitespace_mode == crate::options::WhitespaceMode::Strict {
+        handler
+            .dom_ctx
+            .record_line_break_skip(node_id, matches!(visit_result, VisitResult::Skip));
+    }
     match visit_result {
         VisitResult::Continue => false,
         VisitResult::Skip => true,

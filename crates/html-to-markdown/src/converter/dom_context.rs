@@ -469,7 +469,13 @@ impl DomContext {
 
     pub(crate) fn holds_authored_break(&self, id: u32, parser: &tl::Parser) -> bool {
         let found = self.holds(id, parser, &self.authored_break_cache, |node, child| match node {
-            tl::Node::Tag(_) if self.tag_info(child, parser).is_some_and(|info| info.name == "br") => Held::Yes,
+            tl::Node::Tag(_) if self.tag_info(child, parser).is_some_and(|info| info.name == "br") => {
+                if recorded(&self.authored_break_cache, child) == Some(false) {
+                    Held::No
+                } else {
+                    Held::Yes
+                }
+            }
             tl::Node::Tag(_) => Held::Inside,
             tl::Node::Raw(_) | tl::Node::Comment(_) => Held::No,
         });
@@ -480,6 +486,26 @@ impl DomContext {
             stats.set((entries.max(cache.len()), capacity.max(cache.capacity())));
         });
         found
+    }
+
+    // ~keep Strict wrappers must not transport a source BR skipped by its callback. Later
+    // ~keep renders may continue that same BR; changing its status invalidates all ancestors.
+    #[cfg(feature = "visitor")]
+    pub(crate) fn record_line_break_skip(&self, id: u32, skipped: bool) {
+        let mut cache = self.authored_break_cache.borrow_mut();
+        if (cache.get(&id) == Some(&false)) == skipped {
+            return;
+        }
+        if skipped {
+            cache.insert(id, false);
+        } else {
+            cache.remove(&id);
+        }
+        let mut parent = self.parent_of(id);
+        while let Some(id) = parent {
+            cache.remove(&id);
+            parent = self.parent_of(id);
+        }
     }
 
     /// ~keep Code/del can render an empty line end, and a break can render whitespace; neither is a blank passthrough element.
@@ -610,6 +636,33 @@ impl DomContext {
 
 #[cfg(test)]
 mod tests {
+    #[cfg(feature = "visitor")]
+    #[test]
+    fn should_refresh_cached_break_ancestors_without_forgetting_siblings() {
+        let source = "<b><span><br></span><i><br></i></b>";
+        for order in [[0, 1], [1, 0]] {
+            let dom = tl::parse(source, tl::ParserOptions::default()).expect("break siblings");
+            let parser = dom.parser();
+            let context = crate::converter::utility::caching::build_dom_context(&dom, parser, source.len());
+            let root = dom.children()[0].get_inner();
+            let breaks = dom
+                .query_selector("br")
+                .expect("break selector")
+                .map(|handle| handle.get_inner())
+                .collect::<Vec<_>>();
+            assert_eq!(breaks.len(), 2);
+            assert!(context.holds_authored_break(root, parser));
+            context.record_line_break_skip(breaks[order[0]], true);
+            assert!(context.holds_authored_break(root, parser));
+            context.record_line_break_skip(breaks[order[1]], true);
+            assert!(!context.holds_authored_break(root, parser));
+            context.record_line_break_skip(breaks[order[0]], false);
+            assert!(context.holds_authored_break(root, parser));
+            context.record_line_break_skip(breaks[order[0]], true);
+            assert!(!context.holds_authored_break(root, parser));
+        }
+    }
+
     #[test]
     fn should_bound_observed_font_registration_and_boundary_reads() {
         let mut jobs = 0;

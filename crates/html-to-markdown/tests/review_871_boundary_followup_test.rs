@@ -693,7 +693,7 @@ fn should_keep_main_spacing_after_strict_del_line_endings() {
 
 #[cfg(feature = "visitor")]
 #[test]
-fn should_keep_strict_break_callback_transport() {
+fn should_collapse_strict_blank_wrappers_when_the_break_callback_skips() {
     use html_to_markdown_rs::visitor::{HtmlVisitor, NodeContext, VisitResult};
     use std::sync::{Arc, Mutex};
     #[derive(Debug)]
@@ -713,13 +713,6 @@ fn should_keep_strict_break_callback_transport() {
     ] {
         for newline_style in [NewlineStyle::Spaces, NewlineStyle::Backslash] {
             let visitor = Arc::new(Mutex::new(Skip { calls: 0 }));
-            let expected = if output_format == html_to_markdown_rs::OutputFormat::Markdown
-                && newline_style == NewlineStyle::Spaces
-            {
-                "a  \nz\n"
-            } else {
-                "a\\\nz\n"
-            };
             let result = convert(
                 "<div>a<b>\n <br> </b>z</div>",
                 ConversionOptions {
@@ -734,7 +727,7 @@ fn should_keep_strict_break_callback_transport() {
                 },
             )
             .expect("skipped strict break");
-            assert_eq!(result.content.as_deref(), Some(expected));
+            assert_eq!(result.content.as_deref(), Some("a z\n"));
             assert_eq!(visitor.lock().expect("callback count").calls, 1);
             rows += 1;
         }
